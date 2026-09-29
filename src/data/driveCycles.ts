@@ -1,3 +1,5 @@
+export type DriveCycleSource = 'CARSCANNER_SEED' | 'REAL_OBD' | 'SIMULACAO';
+
 export interface DriveCycle {
   id: string;
   startedAt: string;
@@ -10,7 +12,7 @@ export interface DriveCycle {
   standingTimeHms: string;
   avgDrivingSpeedKmh: number;
   avgFuelConsumptionKml: number;
-  source: 'CARSCANNER_SEED' | 'REAL_OBD' | 'SIMULACAO';
+  source: DriveCycleSource;
   importedAt: string;
 }
 
@@ -92,13 +94,15 @@ export function getDriveCycleSummary(cycles: DriveCycle[]) {
   const totalFuelL = cycles.reduce((sum, cycle) => sum + cycle.fuelUsedL, 0);
   const avgConsumptionKml = totalFuelL > 0 ? totalDistanceKm / totalFuelL : 0;
   const avgSpeedKmh = cycles.reduce((sum, cycle) => sum + cycle.avgDrivingSpeedKmh, 0) / cycles.length;
-  const lastCycle = [...cycles].sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())[0];
+  const ordered = [...cycles].sort(
+    (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
+  );
 
   return {
     totalDistanceKm: Number(totalDistanceKm.toFixed(2)),
     totalFuelL: Number(totalFuelL.toFixed(3)),
     avgConsumptionKml: Number(avgConsumptionKml.toFixed(2)),
     avgSpeedKmh: Number(avgSpeedKmh.toFixed(1)),
-    lastCycle,
+    lastCycle: ordered[0] ?? null,
   };
 }
