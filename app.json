@@ -12,18 +12,13 @@
       "permissions": [
         "BLUETOOTH",
         "BLUETOOTH_ADMIN",
+        "BLUETOOTH_CONNECT",
+        "BLUETOOTH_SCAN",
         "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
+        "ACCESS_COARSE_LOCATION"
       ]
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
-    "experiments": {
-      "typedRoutes": true,
-      "tsconfigPaths": true
-    }
+    "assetBundlePatterns": ["**/*"],
+    "experiments": { "typedRoutes": true, "tsconfigPaths": true }
   }
 }
