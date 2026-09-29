@@ -2,31 +2,28 @@
 
 Aplicativo offline de diagnóstico automotivo para Chevrolet Meriva Maxx 1.4 8V 2011/2012.
 
+## Simulação local
+
+A tela **Laboratório OBD** possui um modo de simulação local explícito para testar o parser e a interface sem ELM327.
+
+A simulação:
+
+- usa respostas fixas e identificadas como `SIMULAÇÃO LOCAL`;
+- não representa uma ECU real;
+- não confirma suporte de PID na Meriva;
+- não deve alimentar histórico, telemetria ou aprendizado;
+- deve ser desligada antes de qualquer coleta real.
+
+Os dados simulados incluem exemplos para temperatura, STFT, MAP, RPM, velocidade, MAF, tensão e blocos de descoberta.
+
 ## Stack
+
 - Expo
 - React Native
 - TypeScript
 - Expo Router
 - armazenamento local e offline
 
-## Estrutura principal
-- `app/` — telas e rotas do app
-- `src/obd/` — protocolo, parser e detecção ELM327
-- `src/database/` — arquivos TXT/CSV/JSON
-- `src/learning/` — aprendizado local e DNA da Meriva
-- `src/diagnostics/` — regras e correlações
-- `src/storage/` — quota, limpeza e backup
+## Regra de dados
 
-## Primeira fase implementada
-- interface inicial
-- navegação básica
-- layout de home e painéis de diagnóstico
-- módulos de banco local e armazenamento
-- estrutura de diretórios esperada para a Meriva Smart
-
-## Observações importantes
-- Sem uso de IA externa
-- Sem dependência de internet
-- Sem mock de dados reais
-- Os valores devem ser obtidos da ECU/ELM327 em operação real
-
+Sem transporte real ou resposta válida da ECU, o aplicativo mostra `SEM DADOS`, `NÃO RESPONDEU` ou `VALOR NÃO INTERPRETADO`. Nenhum valor simulado deve ser apresentado como diagnóstico real.

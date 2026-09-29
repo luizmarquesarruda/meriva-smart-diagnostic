@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Elm327Session, ObdTransport } from '../src/obd/elm327';
 import { parsePidResponse } from '../src/obd/parser';
+import { SimulatedObdTransport } from '../src/obd/simulatedTransport';
 
 class UnavailableTransport implements ObdTransport {
   async open(): Promise<void> { throw new Error('TRANSPORTE BLUETOOTH NÃO CONFIGURADO'); }
@@ -16,18 +17,22 @@ export default function LaboratorioScreen() {
   const [rx, setRx] = useState('');
   const [status, setStatus] = useState('ELM327 NÃO CONECTADO');
   const [error, setError] = useState('');
-  const session = useMemo(() => new Elm327Session(new UnavailableTransport()), []);
+  const [simulationEnabled, setSimulationEnabled] = useState(false);
+  const session = useMemo(
+    () => new Elm327Session(simulationEnabled ? new SimulatedObdTransport() : new UnavailableTransport()),
+    [simulationEnabled],
+  );
 
   async function testPid() {
     setError('');
-    setStatus('CONECTANDO...');
+    setStatus(simulationEnabled ? 'SIMULAÇÃO LOCAL: CONECTANDO...' : 'CONECTANDO...');
     try {
       const result = await session.queryPid(pid);
       setTx(result.tx);
       setRx(result.rx);
-      setStatus(result.parsed.status);
+      setStatus(simulationEnabled ? `SIMULAÇÃO LOCAL: ${result.parsed.status}` : result.parsed.status);
     } catch (cause) {
-      setStatus('ELM CONECTADO / ECU SEM RESPOSTA');
+      setStatus('ELM NÃO CONECTADO');
       setError(cause instanceof Error ? cause.message : 'ERRO DESCONHECIDO');
     }
   }
@@ -38,11 +43,25 @@ export default function LaboratorioScreen() {
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>LABORATÓRIO OBD</Text>
       <Text style={styles.status}>{status}</Text>
+      <TouchableOpacity
+        style={[styles.toggle, simulationEnabled && styles.toggleEnabled]}
+        onPress={() => {
+          setSimulationEnabled((current) => !current);
+          setTx('');
+          setRx('');
+          setStatus('ELM327 NÃO CONECTADO');
+          setError('');
+        }}
+      >
+        <Text style={styles.toggleText}>{simulationEnabled ? 'SIMULAÇÃO ATIVA (DESLIGAR)' : 'ATIVAR SIMULAÇÃO LOCAL'}</Text>
+      </TouchableOpacity>
+      {simulationEnabled && <Text style={styles.warning}>DEMONSTRAÇÃO: estes dados não vêm de uma ECU e não serão usados no aprendizado.</Text>}
       <TextInput value={pid} onChangeText={setPid} autoCapitalize="characters" style={styles.input} placeholder="PID, ex.: 010C" />
       <TouchableOpacity style={styles.button} onPress={testPid}><Text style={styles.buttonText}>TESTAR PID</Text></TouchableOpacity>
       <View style={styles.panel}>
         <Text style={styles.label}>TX</Text><Text style={styles.value}>{tx || 'SEM DADOS'}</Text>
         <Text style={styles.label}>RX</Text><Text style={styles.value}>{rx || 'SEM DADOS'}</Text>
+        <Text style={styles.label}>STATUS DA INTERPRETAÇÃO</Text><Text style={styles.value}>{parsed?.status || 'SEM DADOS'}</Text>
         <Text style={styles.label}>VALOR</Text><Text style={styles.value}>{parsed?.value === null || !parsed ? 'SEM DADOS' : `${parsed.value} ${parsed.unit}`}</Text>
         <Text style={styles.label}>RAW PRESERVADO</Text><Text style={styles.value}>{parsed?.rawResponse || 'SEM DADOS'}</Text>
       </View>
@@ -55,6 +74,10 @@ const styles = StyleSheet.create({
   container: { flexGrow: 1, padding: 20, backgroundColor: '#eef3fb' },
   title: { fontSize: 24, fontWeight: '700', color: '#1f2937', marginBottom: 14 },
   status: { color: '#2563eb', fontWeight: '700', marginBottom: 16 },
+  toggle: { borderColor: '#64748b', borderWidth: 1, borderRadius: 10, padding: 12, alignItems: 'center', marginBottom: 10 },
+  toggleEnabled: { backgroundColor: '#fef3c7', borderColor: '#d97706' },
+  toggleText: { color: '#1f2937', fontWeight: '700' },
+  warning: { color: '#b45309', fontSize: 12, marginBottom: 12 },
   input: { backgroundColor: '#fff', borderColor: '#cbd5e1', borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 12 },
   button: { backgroundColor: '#2563eb', borderRadius: 10, padding: 14, alignItems: 'center' },
   buttonText: { color: '#fff', fontWeight: '700' },
