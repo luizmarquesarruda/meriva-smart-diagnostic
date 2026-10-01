@@ -1,5 +1,6 @@
 import * as FileSystem from 'expo-file-system';
 import { TxtEntry } from './txtDatabase';
+import { DataSource, DtcStatus } from '../types/sourceTypes';
 
 export interface PidConfirmationEntry {
   pid: string;
@@ -11,14 +12,28 @@ export interface PidConfirmationEntry {
   occurrences: number;
   protocol: string;
   responseTime: number;
-  source: string;
+  source: DataSource;
   confidence: number;
 }
 
 export async function recordPidConfirmation(basePath: string, entry: PidConfirmationEntry): Promise<void> {
   const target = `${basePath}/BANCO/pids_meriva_confirmados.txt`;
-  const line = `${entry.pid}|${entry.name}|${entry.classification}|${entry.status}|${entry.firstSeen}|${entry.lastSeen}|${entry.occurrences}|${entry.protocol}|${entry.responseTime}|${entry.source}|${entry.confidence}`;
+  await FileSystem.makeDirectoryAsync(`${basePath}/BANCO`, { intermediates: true });
   
+  const line = [
+    entry.pid,
+    entry.name,
+    entry.classification,
+    entry.status,
+    entry.firstSeen,
+    entry.lastSeen,
+    entry.occurrences,
+    entry.protocol,
+    entry.responseTime,
+    entry.source,
+    entry.confidence,
+  ].join('|');
+
   const info = await FileSystem.getInfoAsync(target);
   if (!info.exists) {
     await FileSystem.writeAsStringAsync(target, `${line}\n`, { encoding: FileSystem.EncodingType.UTF8 });
@@ -27,16 +42,12 @@ export async function recordPidConfirmation(basePath: string, entry: PidConfirma
 
   const current = await FileSystem.readAsStringAsync(target);
   const lines = current.split('\n').filter((l) => l.trim());
-  const updated = lines.map((l) => {
-    if (l.startsWith(entry.pid + '|')) {
-      return line;
-    }
-    return l;
-  });
-  if (!updated.some((l) => l.startsWith(entry.pid + '|'))) {
+  const updated = lines.map((l) => (l.startsWith(`${entry.pid}|`) ? line : l)).filter((l) => l.trim());
+
+  if (!updated.some((l) => l.startsWith(`${entry.pid}|`))) {
     updated.push(line);
   }
-  await FileSystem.writeAsStringAsync(target, updated.join('\n') + '\n', { encoding: FileSystem.EncodingType.UTF8 });
+  await FileSystem.writeAsStringAsync(target, `${updated.join('\n')}\n`, { encoding: FileSystem.EncodingType.UTF8 });
 }
 
 export async function readPidConfirmations(basePath: string): Promise<PidConfirmationEntry[]> {
@@ -45,20 +56,23 @@ export async function readPidConfirmations(basePath: string): Promise<PidConfirm
   if (!info.exists) return [];
 
   const content = await FileSystem.readAsStringAsync(target);
-  return content.split('\n').filter((l) => l.trim()).map((line) => {
-    const [pid, name, classification, status, firstSeen, lastSeen, occurrences, protocol, responseTime, source, confidence] = line.split('|');
-    return {
-      pid,
-      name,
-      classification: classification as any,
-      status: status as any,
-      firstSeen,
-      lastSeen,
-      occurrences: Number(occurrences),
-      protocol,
-      responseTime: Number(responseTime),
-      source,
-      confidence: Number(confidence),
-    };
-  });
+  return content
+    .split('\n')
+    .filter((l) => l.trim())
+    .map((line) => {
+      const [pid, name, classification, status, firstSeen, lastSeen, occurrences, protocol, responseTime, source, confidence] = line.split('|');
+      return {
+        pid,
+        name,
+        classification: (classification as any) || 'DESCONHECIDO',
+        status: (status as any) || 'NAO_RESPONDEU',
+        firstSeen,
+        lastSeen,
+        occurrences: Number(occurrences || 0),
+        protocol,
+        responseTime: Number(responseTime || 0),
+        source: (source as DataSource) || 'IMPORTADO',
+        confidence: Number(confidence || 0),
+      };
+    });
 }
