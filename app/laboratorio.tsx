@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import * as FileSystem from 'expo-file-system';
 import { Elm327Session, ObdTransport } from '../src/obd/elm327';
 import { parsePidResponse } from '../src/obd/parser';
 import { SimulatedObdTransport } from '../src/obd/simulatedTransport';
 import { BluetoothDeviceInfo } from '../src/obd/bluetoothClassicTransport';
 import { createRealElmSession, discoverPairedDevices } from '../src/obd/bluetoothManager';
+import { startObdSessionCheckpoint, stopObdSessionCheckpoint, updateAutoSaveState } from '../src/meriva/autosaveManager';
+import { registerObdQuery, forceSaveOnObdEvent } from '../src/meriva/autosaveIntegration';
 
 class UnavailableTransport implements ObdTransport {
   async open(): Promise<void> { throw new Error('TRANSPORTE BLUETOOTH NÃO CONFIGURADO'); }
@@ -14,6 +17,10 @@ class UnavailableTransport implements ObdTransport {
 }
 
 type Mode = 'REAL' | 'SIMULACAO';
+
+function getBasePath(): string {
+  return `${FileSystem.documentDirectory}MERIVA_SMART`;
+}
 
 export default function LaboratorioScreen() {
   const [mode, setMode] = useState<Mode>('REAL');
@@ -33,7 +40,19 @@ export default function LaboratorioScreen() {
     [],
   );
 
-  useEffect(() => () => { void session?.close(); }, [session]);
+  useEffect(() => {
+    return () => {
+      void (async () => {
+        try {
+          await session?.close();
+        } catch {
+          // sessão já fechada
+        }
+        stopObdSessionCheckpoint();
+        await forceSaveOnObdEvent();
+      })();
+    };
+  }, [session]);
 
   async function loadDevices() {
     setLoadingDevices(true);
@@ -59,6 +78,14 @@ export default function LaboratorioScreen() {
     try {
       const connection = await createRealElmSession(device);
       setSession(connection.session);
+      startObdSessionCheckpoint();
+      updateAutoSaveState((state) => {
+        state.obd = {
+          connected: true,
+          adapterName: device.name,
+          lastConnectedAt: new Date().toISOString(),
+        };
+      });
       setStatus('ELM RESPONDENDO');
     } catch (cause) {
       setSession(null);
@@ -74,6 +101,10 @@ export default function LaboratorioScreen() {
       const activeSession = mode === 'SIMULACAO' ? simulationSession : session;
       if (!activeSession) throw new Error('CONECTE AO ELM327 ANTES DE TESTAR O PID');
       const result = await activeSession.queryPid(pid);
+
+      // registra no autosave: logs CSV sempre; banco/aprendizado somente se REAL + RESPONDEU
+      await registerObdQuery(getBasePath(), result, mode);
+
       setTx(result.tx);
       setRx(result.rx);
       setElapsedMs(result.elapsedMs);

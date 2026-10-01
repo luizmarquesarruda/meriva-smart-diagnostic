@@ -1,3 +1,12 @@
+// MERIVA SMART DIAGNOSTIC — Quota de armazenamento
+// ARQUIVO DE SUBSTITUIÇÃO para: <repo>/src/storage/quotaManager.ts
+//
+// Correção da auditoria: o cálculo anterior lia "${basePath}/../.size",
+// um arquivo que nunca é criado — o resultado era sempre 0 MB.
+// Agora o tamanho é calculado recursivamente pelos arquivos reais.
+// A interface pública (getStorageUsage / checkStorageQuota) é preservada;
+// getStorageBreakdown é adicional, para a tela de armazenamento.
+
 import * as FileSystem from 'expo-file-system';
 
 export interface StorageQuotaConfig {
@@ -7,14 +16,47 @@ export interface StorageQuotaConfig {
   autoCleanupEnabled: boolean;
 }
 
-export async function getStorageUsage(basePath: string): Promise<{ usedMb: number; limitMb: number }> {
-  const info = await FileSystem.getInfoAsync(basePath);
-  if (!info.exists) return { usedMb: 0, limitMb: 2048 };
-  const stat = await FileSystem.readAsStringAsync(`${basePath}/../.size`, { encoding: 'utf8' }).catch(() => '0');
-  return { usedMb: Number(stat) || 0, limitMb: 2048 };
+const MB = 1024 * 1024;
+const DEFAULT_LIMIT_MB = 2048;
+
+async function getEntrySizeBytes(path: string): Promise<number> {
+  try {
+    const info = await FileSystem.getInfoAsync(path, { size: true });
+    if (!info.exists) return 0;
+    if (!info.isDirectory) return info.size ?? 0;
+    const children = await FileSystem.readDirectoryAsync(path);
+    let total = 0;
+    for (const child of children) {
+      total += await getEntrySizeBytes(`${path}/${child}`);
+    }
+    return total;
+  } catch {
+    return 0; // item ilegível não deve derrubar a medição
+  }
 }
 
-export async function checkStorageQuota(basePath: string, config: StorageQuotaConfig): Promise<{ warning: boolean; critical: boolean; message: string }> {
+function toMb(bytes: number): number {
+  return Math.round((bytes / MB) * 10) / 10;
+}
+
+export async function getStorageBreakdown(basePath: string): Promise<Record<string, number>> {
+  const dirs = ['CONFIG', 'BANCO', 'LEITURAS', 'APRENDIZADO', 'DTC', 'LOGS', 'VIAGENS', 'BACKUP'];
+  const breakdown: Record<string, number> = {};
+  for (const dir of dirs) {
+    breakdown[dir] = toMb(await getEntrySizeBytes(`${basePath}/${dir}`));
+  }
+  return breakdown;
+}
+
+export async function getStorageUsage(basePath: string): Promise<{ usedMb: number; limitMb: number }> {
+  const bytes = await getEntrySizeBytes(basePath);
+  return { usedMb: toMb(bytes), limitMb: DEFAULT_LIMIT_MB };
+}
+
+export async function checkStorageQuota(
+  basePath: string,
+  config: StorageQuotaConfig,
+): Promise<{ warning: boolean; critical: boolean; message: string }> {
   const { usedMb, limitMb } = await getStorageUsage(basePath);
   const percentUsed = usedMb / limitMb;
 

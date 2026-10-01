@@ -1,0 +1,51 @@
+// MERIVA SMART DIAGNOSTIC — Exportação manual do salvamento (.TXT)
+// Arquivo para copiar em: <repo>/src/meriva/exportAutoSaveTxt.ts
+//
+// Autosave é interno e automático; a exportação TXT é a ÚNICA ação manual.
+// Usa StorageAccessFramework (expo-file-system) — sem dependência nova.
+
+import * as FileSystem from 'expo-file-system';
+import { Platform } from 'react-native';
+import type { MerivaPersistedState } from './autosaveState';
+import { formatAutoSaveTxt } from './autosaveTxtFormatter';
+
+export { ND } from './autosaveTxtFormatter';
+
+export interface ExportTxtResult {
+  ok: boolean;
+  fileName?: string;
+  uri?: string;
+  reason?: 'CANCELADO' | 'ERRO' | 'INDISPONIVEL';
+  message?: string;
+}
+
+/** Exportação manual: o usuário escolhe a pasta; o app cria o .txt lá. */
+export async function exportAutoSaveTxt(
+  state: MerivaPersistedState,
+  appVersion: string,
+): Promise<ExportTxtResult> {
+  if (Platform.OS !== 'android') {
+    return { ok: false, reason: 'INDISPONIVEL', message: 'EXPORTACAO DISPONIVEL SOMENTE NO ANDROID' };
+  }
+  try {
+    const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+    if (!permissions.granted) return { ok: false, reason: 'CANCELADO' };
+
+    const exportedAt = new Date().toISOString().replace('T', ' ').split('.')[0];
+    const content = formatAutoSaveTxt(state, { appVersion, exportedAt });
+    const fileName = `meriva_smart_save_${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
+    const uri = await FileSystem.StorageAccessFramework.createFileAsync(
+      permissions.directoryUri,
+      fileName,
+      'text/plain',
+    );
+    await FileSystem.writeAsStringAsync(uri, content, { encoding: FileSystem.EncodingType.UTF8 });
+    return { ok: true, fileName, uri };
+  } catch (cause) {
+    return {
+      ok: false,
+      reason: 'ERRO',
+      message: cause instanceof Error ? cause.message : 'DESCONHECIDO',
+    };
+  }
+}
