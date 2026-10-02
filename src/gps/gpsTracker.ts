@@ -23,8 +23,7 @@ export interface GpsTripState {
 export type GpsListener = (state: GpsTripState) => void;
 
 const MIN_ACCURACY_M = 60;
-const MAX_SEGMENT_SPEED_KMH = 220;
-const MAX_VALID_SPEED_KMH = 220;
+const MAX_SPEED_KMH = 220;
 
 export function haversineDistanceKm(
   a: Pick<GpsSample, 'latitude' | 'longitude'>,
@@ -59,8 +58,8 @@ export function normalizeGpsSpeedKmh(speedMs: number | null | undefined): number
     : 0;
 }
 
-function validCoordinate(value: number): boolean {
-  return Number.isFinite(value);
+function isAccurate(sample: GpsSample): boolean {
+  return sample.accuracyM == null || sample.accuracyM <= MIN_ACCURACY_M;
 }
 
 export class GpsTracker {
@@ -97,8 +96,7 @@ export class GpsTracker {
 
   async requestPermission(): Promise<boolean> {
     try {
-      const servicesEnabled = await Location.hasServicesEnabledAsync();
-      if (!servicesEnabled) {
+      if (!(await Location.hasServicesEnabledAsync())) {
         this.state = {
           ...this.state,
           permissionGranted: false,
@@ -125,9 +123,7 @@ export class GpsTracker {
       this.state = {
         ...this.state,
         permissionGranted: false,
-        error: cause instanceof Error
-          ? cause.message
-          : 'NÃO FOI POSSÍVEL VERIFICAR O GPS.',
+        error: cause instanceof Error ? cause.message : 'NÃO FOI POSSÍVEL VERIFICAR O GPS.',
       };
       this.emit();
       return false;
@@ -135,11 +131,15 @@ export class GpsTracker {
   }
 
   async start(): Promise<boolean> {
+    const permitted = await this.requestPermission();
+    if (!permitted) {
+      await this.stop();
+      return false;
+    }
+
     if (this.subscription && this.state.running) return true;
-    if (!(await this.requestPermission())) return false;
 
-    await this.stop({ preserveTrip: false });
-
+    await this.stop({ resetTrip: true });
     this.state = {
       ...this.state,
       running: true,
@@ -183,7 +183,7 @@ export class GpsTracker {
 
   private handleLocation(location: Location.LocationObject): void {
     const c = location.coords;
-    if (!validCoordinate(c.latitude) || !validCoordinate(c.longitude)) return;
+    if (!Number.isFinite(c.latitude) || !Number.isFinite(c.longitude)) return;
 
     const sample: GpsSample = {
       latitude: c.latitude,
@@ -195,25 +195,19 @@ export class GpsTracker {
       timestamp: Number.isFinite(location.timestamp) ? location.timestamp : Date.now(),
     };
 
-    const accurateEnough =
-      sample.accuracyM == null || sample.accuracyM <= MIN_ACCURACY_M;
-    let segmentSpeedKmh: number | null = null;
+    const accurate = isAccurate(sample);
+    let derivedSpeedKmh: number | null = null;
 
-    if (
-      this.previous &&
-      accurateEnough &&
-      (this.previous.accuracyM == null || this.previous.accuracyM <= MIN_ACCURACY_M)
-    ) {
+    if (this.previous && accurate && isAccurate(this.previous)) {
       const elapsedMs = sample.timestamp - this.previous.timestamp;
       if (elapsedMs > 0) {
         const segmentKm = haversineDistanceKm(this.previous, sample);
-        const elapsedHours = elapsedMs / 3600000;
-        segmentSpeedKmh = segmentKm / elapsedHours;
+        derivedSpeedKmh = segmentKm / (elapsedMs / 3600000);
 
         if (
           segmentKm <= 0.25 &&
-          segmentSpeedKmh >= 0 &&
-          segmentSpeedKmh <= MAX_SEGMENT_SPEED_KMH
+          derivedSpeedKmh >= 0 &&
+          derivedSpeedKmh <= MAX_SPEED_KMH
         ) {
           this.state.distanceKm = Number(
             (this.state.distanceKm + segmentKm).toFixed(3),
@@ -222,26 +216,22 @@ export class GpsTracker {
       }
     }
 
-    let speedKmh = accurateEnough ? sample.speedKmh : null;
+    let speedKmh = accurate ? sample.speedKmh : null;
     if (
-      (speedKmh == null || speedKmh > MAX_VALID_SPEED_KMH) &&
-      segmentSpeedKmh != null &&
-      segmentSpeedKmh <= MAX_VALID_SPEED_KMH
+      (speedKmh == null || speedKmh > MAX_SPEED_KMH) &&
+      derivedSpeedKmh != null &&
+      derivedSpeedKmh <= MAX_SPEED_KMH
     ) {
-      speedKmh = segmentSpeedKmh;
+      speedKmh = derivedSpeedKmh;
     }
-    if (speedKmh == null || speedKmh < 0 || speedKmh > MAX_VALID_SPEED_KMH) {
-      speedKmh = 0;
-    }
+    if (speedKmh == null || speedKmh < 0 || speedKmh > MAX_SPEED_KMH) speedKmh = 0;
 
-    this.previous = accurateEnough ? sample : this.previous;
+    if (accurate) this.previous = sample;
     this.state = {
       ...this.state,
       samples: this.state.samples + 1,
       currentSpeedKmh: Number(speedKmh.toFixed(1)),
-      maxSpeedKmh: Number(
-        Math.max(this.state.maxSpeedKmh, speedKmh).toFixed(1),
-      ),
+      maxSpeedKmh: Number(Math.max(this.state.maxSpeedKmh, speedKmh).toFixed(1)),
       lastTimestamp: sample.timestamp,
       lastAccuracyM: sample.accuracyM,
       error: null,
@@ -249,24 +239,25 @@ export class GpsTracker {
     this.emit();
   }
 
-  async stop(options: { preserveTrip?: boolean } = {}): Promise<void> {
+  async stop(options: { resetTrip?: boolean } = {}): Promise<void> {
     this.subscription?.remove();
     this.subscription = null;
     this.previous = null;
 
-    const preserveTrip = options.preserveTrip !== false;
-    this.state = preserveTrip
-      ? { ...this.state, running: false, currentSpeedKmh: 0 }
-      : {
-          ...this.state,
-          running: false,
-          currentSpeedKmh: 0,
-          maxSpeedKmh: 0,
-          distanceKm: 0,
-          samples: 0,
-          lastTimestamp: null,
-          lastAccuracyM: null,
-        };
+    if (options.resetTrip) {
+      this.state = {
+        ...this.state,
+        running: false,
+        currentSpeedKmh: 0,
+        maxSpeedKmh: 0,
+        distanceKm: 0,
+        samples: 0,
+        lastTimestamp: null,
+        lastAccuracyM: null,
+      };
+    } else {
+      this.state = { ...this.state, running: false, currentSpeedKmh: 0 };
+    }
     this.emit();
   }
 }
