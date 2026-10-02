@@ -228,7 +228,7 @@ async function testPidScanner() {
   assert.ok(supported.includes('0105'));
   assert.ok(supported.includes('010C'));
   assert.ok(supported.includes('010F'));
-  assert.ok(!supported.includes('0111'));
+  assert.ok(supported.includes('0111'));
 }
 
 async function testBluetoothEventTransport() {
