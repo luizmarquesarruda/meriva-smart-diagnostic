@@ -3,29 +3,38 @@
 ## Visão geral
 
 ```
-UI (Expo Router)
-      |
-      v
-Bluetooth Manager
-      |
-      v
-BluetoothClassicTransport
-      |
-      v
-Elm327Session
-      |
-      +--> PID Discovery
-      |
-      +--> PID Parser
-      |
-      v
-Raw/Interpretado
-      |
-      +--> Banco de PIDs
-      +--> DTC
-      +--> Histórico
-      +--> DNA da Meriva
-      +--> Autosave/Backup
+                    +------------------+
+                    |    Root Layout   |
+                    | Bluetooth + GPS  |
+                    +--------+---------+
+                             |
+              +--------------+--------------+
+              |                             |
+              v                             v
+      Bluetooth Manager                 GpsTracker
+              |                             |
+              v                             v
+   BluetoothClassicTransport          GPS celular
+              |
+              v
+        Elm327Session
+          |       |
+          v       v
+    PID Discovery DTC
+          \       /
+           v     v
+             Parser
+                |
+        RAW + Interpretado
+                |
+      +---------+---------+
+      |         |         |
+      v         v         v
+     PID       DTC      Histórico
+      |         |         |
+      +---------+---------+
+                |
+          Autosave/Backup
 ```
 
 ## Camadas
@@ -34,13 +43,21 @@ Raw/Interpretado
 
 `app/` contém as telas do aplicativo.
 
+### GPS
+
+`src/gps/` concentra o rastreador em primeiro plano, permissões, filtragem de precisão, cálculo de distância e conversão de velocidade.
+
+O `GpsTracker` é singleton no runtime para não parar ao navegar entre telas. O cálculo de consumo recebe quilômetros do GPS e só usa litros fornecidos por uma fonte válida.
+
 ### OBD
 
-`src/obd/` concentra transporte, sessão ELM327, parser, definições de PID e descoberta.
+`src/obd/` concentra transporte Bluetooth Classic, sessão ELM327, parser, definições de PID e descoberta.
+
+A recepção Bluetooth usa o listener de dados como fonte única. A `Elm327Session` serializa comandos para evitar interleaving de respostas.
 
 ### Dados
 
-`src/database/` contém persistência e aprendizado.
+`src/database/` contém persistência, DTC, banco de PIDs, aprendizado e configuração do veículo.
 
 ### Meriva
 
@@ -48,17 +65,17 @@ Raw/Interpretado
 
 ### Storage
 
-`src/storage/` controla quota, limpeza, backups, ciclos de condução e importação de dados.
+`src/storage/` controla quota, limpeza, backups e ciclos de condução.
 
 ### Tipos
 
-`src/types/` contém contratos compartilhados, inclusive a tipagem local da biblioteca Bluetooth.
+`src/types/` contém contratos compartilhados. `DtcRecord` é definido uma única vez em `sourceTypes.ts`.
 
 ## Regra de confiança
 
-O fluxo de dados deve manter a origem:
+O fluxo de dados mantém a origem explícita:
 
-`REAL_OBD`, `SIMULACAO` ou `REFERENCIA`.
+`REAL_OBD`, `SIMULACAO`, `CARSCANNER_BASELINE` e outros tipos definidos em `sourceTypes.ts`.
 
 Somente dados reais podem alimentar o aprendizado real do veículo.
 
@@ -72,4 +89,6 @@ O autosave escreve primeiro em arquivo temporário, valida o conteúdo e só ent
 
 ## Limite atual
 
-A aplicação exige build nativo Android por usar Bluetooth Classic. Expo Go não é suficiente para validar esse transporte.
+A aplicação exige build nativo Android por usar Bluetooth Classic. Expo Go não é suficiente para validar o transporte.
+
+A disponibilidade dos PIDs, a qualidade do GPS e a comunicação com a ECU da Meriva dependem do hardware físico e devem ser confirmadas no veículo.
