@@ -2,15 +2,20 @@ import { Link } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import * as FileSystem from 'expo-file-system';
-import { INITIAL_DRIVE_CYCLES, getDriveCycleSummary, type DriveCycle } from '../src/data/driveCycles';
+import { readDriveCycles, initializeDriveCycles } from '../src/storage/driveCycleStorage';
+import { getDriveCycleSummary, type DriveCycle } from '../src/data/driveCycles';
 import { getAutoSaveStatus, initAutoSave, updateAutoSaveState } from '../src/meriva/autosaveManager';
 import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
 import type { ObdConnectionState } from '../src/meriva/autosaveState';
-import { calculateConsumptionKml, GpsTracker, type GpsTripState } from '../src/gps';
+import { calculateConsumptionKml, gpsTracker, type GpsTripState } from '../src/gps';
 
 function formatTime(iso: string | null): string {
   if (!iso) return 'N/D';
-  try { return new Date(iso).toLocaleTimeString('pt-BR'); } catch { return 'N/D'; }
+  try {
+    return new Date(iso).toLocaleTimeString('pt-BR');
+  } catch {
+    return 'N/D';
+  }
 }
 
 export default function IndexScreen() {
@@ -18,48 +23,37 @@ export default function IndexScreen() {
   const [obd, setObd] = useState<ObdConnectionState>({ connected: false });
   const [saveStatus, setSaveStatus] = useState<AutoSaveStatus>({ lastSavedAt: null, lastSaveReason: null, lastError: null });
   const [isHydrated, setIsHydrated] = useState(false);
-  const [gps] = useState(() => new GpsTracker());
-  const [gpsState, setGpsState] = useState<GpsTripState>(gps.getState());
-  const [gpsError, setGpsError] = useState<string | null>(null);
+  const [gpsState, setGpsState] = useState<GpsTripState>(gpsTracker.getState());
   const [fuelUsedL, setFuelUsedL] = useState('');
 
-  useEffect(() => {
-    let mounted = true;
-    setGpsError(null);
-    void gps.start((state) => {
-      if (mounted) setGpsState(state);
-    }).then((started) => {
-      if (mounted && !started) setGpsError('GPS desligado ou permissão de localização não concedida.');
-    }).catch((error) => {
-      if (mounted) setGpsError(error instanceof Error ? error.message : 'Não foi possível iniciar o GPS automaticamente.');
-    });
-    return () => {
-      mounted = false;
-      void gps.stop();
-    };
-  }, [gps]);
+  useEffect(() => gpsTracker.subscribe(setGpsState), []);
 
-  const gpsConsumption = calculateConsumptionKml(gpsState.distanceKm, Number(fuelUsedL.replace(',', '.')));
+  const gpsConsumption = calculateConsumptionKml(
+    gpsState.distanceKm,
+    Number(fuelUsedL.replace(',', '.')),
+  );
 
   useEffect(() => {
     async function restoreState() {
       const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
       const restored = await initAutoSave(basePath);
-      let loaded = restored.driveCycles;
-      if (!loaded.length) {
-        try {
-          const content = await FileSystem.readAsStringAsync(`${basePath}/VIAGENS/index.json`, { encoding: FileSystem.EncodingType.UTF8 });
-          const parsed = JSON.parse(content);
-          loaded = Array.isArray(parsed?.cycles) ? parsed.cycles : [];
-        } catch { loaded = []; }
-        if (!loaded.length) loaded = INITIAL_DRIVE_CYCLES;
-        updateAutoSaveState((state) => { state.driveCycles = loaded; });
+
+      await initializeDriveCycles(basePath);
+      const storedCycles = await readDriveCycles(basePath);
+      const loaded = restored.driveCycles.length ? restored.driveCycles : storedCycles;
+
+      if (!restored.driveCycles.length && loaded.length) {
+        updateAutoSaveState((state) => {
+          state.driveCycles = loaded;
+        });
       }
+
       setCycles(loaded);
       setObd(restored.obd);
       setSaveStatus(getAutoSaveStatus());
       setIsHydrated(true);
     }
+
     void restoreState();
   }, []);
 
@@ -98,7 +92,7 @@ export default function IndexScreen() {
           <Text style={styles.gpsHelp}>GPS inicia automaticamente ao abrir o aplicativo. Velocidade e distância vêm do celular. O GPS não mede litros consumidos sozinho.</Text>
           <TextInput value={fuelUsedL} onChangeText={setFuelUsedL} keyboardType="decimal-pad" placeholder="Combustível usado na viagem (L)" placeholderTextColor="#64748b" style={styles.fuelInput} />
           <Text style={styles.consumptionLine}>{gpsConsumption == null ? 'Consumo: informe litros usados' : `Consumo calculado: ${gpsConsumption.toFixed(2)} km/L`}</Text>
-          {gpsError ? <Text style={styles.gpsError}>{gpsError}</Text> : null}
+          {gpsState.error ? <Text style={styles.gpsError}>{gpsState.error}</Text> : null}
         </View>
 
         <View style={styles.summaryGrid}>
