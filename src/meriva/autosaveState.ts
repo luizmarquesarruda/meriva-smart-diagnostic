@@ -23,6 +23,10 @@ export interface LastPidReading {
 /** Estado da conexão OBD confirmado por comunicação real. */
 export interface ObdConnectionState {
   connected: boolean;
+  bluetoothState?: string;
+  elmInitialized?: boolean;
+  ecuReady?: boolean;
+  sessionState?: string;
   adapterName?: string;
   protocol?: string;
   ecuAddress?: string;
