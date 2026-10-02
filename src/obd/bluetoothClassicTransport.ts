@@ -21,16 +21,19 @@ export class BluetoothClassicTransport implements ObdTransport {
     if (!(await RNBluetoothClassic.isBluetoothAvailable())) throw new Error('BLUETOOTH NÃO DISPONÍVEL NESTE APARELHO');
     if (!(await RNBluetoothClassic.isBluetoothEnabled())) throw new Error('BLUETOOTH DESLIGADO');
 
-    this.device = await RNBluetoothClassic.connectToDevice(this.deviceAddress, {
-      connectionType: 'delimited',
-      delimiter: '\r',
+    this.received = '';
+    this.subscription?.remove();
+    this.subscription = undefined;
+
+    const device = await RNBluetoothClassic.connectToDevice(this.deviceAddress, {
+      connectionType: 'raw',
       charset: 'ascii',
       secureSocket: false,
     });
 
+    this.device = device;
     this.connected = true;
-    this.received = '';
-    this.subscription = this.device.onDataReceived((event) => {
+    this.subscription = device.onDataReceived((event) => {
       if (event?.data) this.received += String(event.data);
     });
   }
@@ -39,7 +42,11 @@ export class BluetoothClassicTransport implements ObdTransport {
     this.subscription?.remove();
     this.subscription = undefined;
     if (this.device && this.connected) {
-      try { await this.device.disconnect(); } catch { /* já desconectado */ }
+      try {
+        await this.device.disconnect();
+      } catch {
+        // já desconectado
+      }
     }
     this.device = null;
     this.connected = false;
@@ -60,23 +67,14 @@ export class BluetoothClassicTransport implements ObdTransport {
       if (promptIndex >= 0) {
         const response = this.received.slice(0, promptIndex);
         this.received = this.received.slice(promptIndex + 1);
-        return response.trim();
+        return response.replace(/^\s+|\s+$/g, '');
       }
-
-      try {
-        if (await this.device.available()) {
-          const chunk = await this.device.read();
-          if (chunk) this.received += String(chunk);
-        }
-      } catch {
-        // O evento pode já ter entregue os dados.
-      }
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 25));
     }
 
-    const partial = this.received;
+    const partial = this.received.replace(/^\s+|\s+$/g, '');
     this.received = '';
-    if (partial.trim()) return partial.trim();
+    if (partial) return partial;
     throw new Error('TIMEOUT');
   }
 }
