@@ -79,30 +79,43 @@ export const INITIAL_DRIVE_CYCLES: DriveCycle[] = [
   },
 ];
 
-export function getDriveCycleSummary(cycles: DriveCycle[]) {
-  if (!cycles.length) {
-    return {
-      totalDistanceKm: 0,
-      totalFuelL: 0,
-      avgConsumptionKml: 0,
-      avgSpeedKmh: 0,
-      lastCycle: null,
-    };
-  }
+export interface DriveCycleSummary {
+  totalDistanceKm: number;
+  totalFuelL: number;
+  avgConsumptionKml: number;
+  avgSpeedKmh: number;
+  realCycleCount: number;
+  referenceCycleCount: number;
+  lastCycle: DriveCycle | null;
+  lastRealCycle: DriveCycle | null;
+}
 
-  const totalDistanceKm = cycles.reduce((sum, cycle) => sum + cycle.distanceTotalKm, 0);
-  const totalFuelL = cycles.reduce((sum, cycle) => sum + cycle.fuelUsedL, 0);
-  const avgConsumptionKml = totalFuelL > 0 ? totalDistanceKm / totalFuelL : 0;
-  const avgSpeedKmh = cycles.reduce((sum, cycle) => sum + cycle.avgDrivingSpeedKmh, 0) / cycles.length;
+export function getDriveCycleSummary(cycles: DriveCycle[]): DriveCycleSummary {
+  const realCycles = cycles.filter((cycle) => cycle.source === 'REAL_OBD');
+  const referenceCycles = cycles.filter((cycle) => cycle.source === 'CARSCANNER_SEED');
+  const realDistanceKm = realCycles.reduce((sum, cycle) => sum + cycle.distanceTotalKm, 0);
+  const realFuelL = realCycles.reduce((sum, cycle) => sum + cycle.fuelUsedL, 0);
+  const realAvgSpeedKmh = realCycles.length
+    ? realCycles.reduce((sum, cycle) => sum + cycle.avgDrivingSpeedKmh, 0) / realCycles.length
+    : 0;
+
   const ordered = [...cycles].sort(
+    (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
+  );
+  const orderedReal = [...realCycles].sort(
     (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
   );
 
   return {
-    totalDistanceKm: Number(totalDistanceKm.toFixed(2)),
-    totalFuelL: Number(totalFuelL.toFixed(3)),
-    avgConsumptionKml: Number(avgConsumptionKml.toFixed(2)),
-    avgSpeedKmh: Number(avgSpeedKmh.toFixed(1)),
+    totalDistanceKm: Number(realDistanceKm.toFixed(2)),
+    totalFuelL: Number(realFuelL.toFixed(3)),
+    avgConsumptionKml: Number(
+      (realFuelL > 0 ? realDistanceKm / realFuelL : 0).toFixed(2),
+    ),
+    avgSpeedKmh: Number(realAvgSpeedKmh.toFixed(1)),
+    realCycleCount: realCycles.length,
+    referenceCycleCount: referenceCycles.length,
     lastCycle: ordered[0] ?? null,
+    lastRealCycle: orderedReal[0] ?? null,
   };
 }
