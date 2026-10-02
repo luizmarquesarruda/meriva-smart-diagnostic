@@ -32,7 +32,7 @@ export async function appendCsvRow(filePath: string, row: CsvRow): Promise<void>
 
   const info = await FileSystem.getInfoAsync(filePath);
   if (!info.exists) {
-    await FileSystem.writeAsStringAsync(`${keys.join(',')}\n${line}\n`, { encoding: FileSystem.EncodingType.UTF8, fileUri: filePath });
+    await FileSystem.writeAsStringAsync(filePath, `${keys.join(',')}\n${line}\n`, { encoding: FileSystem.EncodingType.UTF8 });
     return;
   }
 
@@ -40,5 +40,5 @@ export async function appendCsvRow(filePath: string, row: CsvRow): Promise<void>
   const trimmed = current.trim();
   const content = trimmed.length > 0 ? `${trimmed}\n${line}` : `${keys.join(',')}\n${line}`;
 
-  await FileSystem.writeAsStringAsync(content, { encoding: FileSystem.EncodingType.UTF8, fileUri: filePath });
+  await FileSystem.writeAsStringAsync(filePath, content, { encoding: FileSystem.EncodingType.UTF8 });
 }
