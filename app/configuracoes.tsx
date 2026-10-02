@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import Constants from 'expo-constants';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import { createBackup } from '../src/storage/backup';
@@ -23,6 +24,7 @@ export default function ConfiguracaoScreen() {
   const [status, setStatus] = useState('INICIALIZANDO...');
   const [busy, setBusy] = useState(false);
   const [saveStatus, setSaveStatus] = useState<AutoSaveStatus>({ lastSavedAt: null, lastSaveReason: null, lastError: null });
+  const appVersion = Constants.expoConfig?.version ?? '1.0.1';
 
   useEffect(() => {
     async function initStorage() {
@@ -70,7 +72,7 @@ export default function ConfiguracaoScreen() {
     if (busy) return;
     setBusy(true);
     try {
-      const result = await exportAutoSaveTxt(getAutoSaveState(), '1.0.1');
+      const result = await exportAutoSaveTxt(getAutoSaveState(), appVersion);
       if (result.ok) {
         setStatus(`EXPORTADO: ${result.fileName}`);
       } else if (result.reason === 'CANCELADO') {
@@ -88,13 +90,11 @@ export default function ConfiguracaoScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>CONFIGURAÇÕES</Text>
       <Text style={styles.status}>{status}</Text>
+      <Text style={styles.info}>VERSÃO: {appVersion}</Text>
       <Text style={styles.info}>Local: {storageBase || 'INICIALIZANDO'}</Text>
       <Text style={styles.info}>SALVAMENTO AUTOMÁTICO: ATIVO</Text>
       <Text style={styles.info}>ÚLTIMO SALVAMENTO: {formatTime(saveStatus.lastSavedAt)}</Text>
       {saveStatus.lastError ? <Text style={styles.error}>FALHA NO AUTOSAVE: {saveStatus.lastError}</Text> : null}
-      <TouchableOpacity style={[styles.button, styles.disabled]} disabled>
-        <Text style={styles.buttonText}>DEFINIR VEÍCULO: EM DESENVOLVIMENTO</Text>
-      </TouchableOpacity>
       <TouchableOpacity style={styles.button} onPress={handleBackup} disabled={busy}>
         <Text style={styles.buttonText}>{busy ? 'AGUARDE...' : 'FAZER BACKUP'}</Text>
       </TouchableOpacity>
@@ -117,5 +117,4 @@ const styles = StyleSheet.create({
   error: { color: '#dc2626', fontWeight: '600', marginBottom: 12 },
   button: { backgroundColor: '#2563eb', borderRadius: 10, padding: 14, alignItems: 'center', marginBottom: 10, marginTop: 6 },
   buttonText: { color: '#fff', fontWeight: '700' },
-  disabled: { backgroundColor: '#94a3b8' },
 });
