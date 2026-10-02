@@ -1,5 +1,9 @@
 import * as FileSystem from 'expo-file-system';
-import { DataSource, ConfidenceLevel, VehicleCondition, SampleStatistics } from '../types/sourceTypes';
+import type {
+  ConfidenceLevel,
+  SampleStatistics,
+  VehicleCondition,
+} from '../types/sourceTypes';
 
 export interface ContextualStatistics {
   condition: VehicleCondition;
@@ -36,14 +40,18 @@ export interface MerivaLearningProfile {
   };
 }
 
-export async function createLearningProfile(basePath: string, seedImportDate: string): Promise<MerivaLearningProfile> {
+export async function createLearningProfile(
+  basePath: string,
+  seedImportDate: string,
+): Promise<MerivaLearningProfile> {
+  const now = new Date().toISOString();
   const profile: MerivaLearningProfile = {
-    vehicleId: 'MERIVA_MAXX_2011',
-    profileCreated: new Date().toISOString(),
-    lastUpdated: new Date().toISOString(),
-    seedVersion: '1.0',
+    vehicleId: 'MERIVA_MAXX',
+    profileCreated: now,
+    lastUpdated: now,
+    seedVersion: 'NONE',
     seedImportDate,
-    learningStatus: 'SEED_INITIALIZED',
+    learningStatus: 'COLD_START',
     confidenceThresholds: {
       low: 10,
       medium: 50,
@@ -53,12 +61,12 @@ export async function createLearningProfile(basePath: string, seedImportDate: st
     contextualData: [],
     overallStatistics: {},
     globalSampleCounts: {
-      seedSamples: 1,
+      seedSamples: 0,
       realSamples: 0,
-      totalSamples: 1,
+      totalSamples: 0,
     },
-    source: 'HYBRID',
-    seedWeight: 1,
+    source: 'REAL_ONLY',
+    seedWeight: 0,
     dataContamination: {
       simulationDetected: 0,
       simulationFiltered: 0,
@@ -69,41 +77,54 @@ export async function createLearningProfile(basePath: string, seedImportDate: st
   return profile;
 }
 
-export async function saveLearningProfile(basePath: string, profile: MerivaLearningProfile): Promise<void> {
+export async function saveLearningProfile(
+  basePath: string,
+  profile: MerivaLearningProfile,
+): Promise<void> {
   await FileSystem.makeDirectoryAsync(`${basePath}/APRENDIZADO`, { intermediates: true });
   const target = `${basePath}/APRENDIZADO/dna_meriva.json`;
-  await FileSystem.writeAsStringAsync(target, JSON.stringify(profile, null, 2), { encoding: FileSystem.EncodingType.UTF8 });
+  await FileSystem.writeAsStringAsync(target, JSON.stringify(profile, null, 2), {
+    encoding: FileSystem.EncodingType.UTF8,
+  });
 }
 
-export async function readLearningProfile(basePath: string): Promise<MerivaLearningProfile | null> {
+export async function readLearningProfile(
+  basePath: string,
+): Promise<MerivaLearningProfile | null> {
   const target = `${basePath}/APRENDIZADO/dna_meriva.json`;
   const info = await FileSystem.getInfoAsync(target);
-  if (!info.exists) return null;
-  const content = await FileSystem.readAsStringAsync(target);
-  return JSON.parse(content) as MerivaLearningProfile;
+  if (!info.exists || info.isDirectory) return null;
+
+  try {
+    const content = await FileSystem.readAsStringAsync(target);
+    return JSON.parse(content) as MerivaLearningProfile;
+  } catch {
+    return null;
+  }
 }
 
 export async function updateLearningProfileRealSample(
   basePath: string,
   pidName: string,
   value: number,
-  condition: VehicleCondition
+  condition: VehicleCondition,
 ): Promise<void> {
   const profile = await readLearningProfile(basePath);
-  if (!profile) return;
+  if (!profile || !Number.isFinite(value)) return;
 
   profile.lastUpdated = new Date().toISOString();
-  profile.globalSampleCounts.realSamples++;
-  profile.globalSampleCounts.totalSamples++;
+  profile.globalSampleCounts.realSamples += 1;
+  profile.globalSampleCounts.totalSamples += 1;
 
-  if (profile.globalSampleCounts.realSamples >= 100) {
+  if (profile.globalSampleCounts.realSamples >= profile.confidenceThresholds.high) {
+    profile.learningStatus = 'CONFIDENT';
+  } else if (profile.globalSampleCounts.realSamples >= profile.confidenceThresholds.good) {
+    profile.learningStatus = 'LEARNING_ACTIVE';
+  } else if (profile.globalSampleCounts.realSamples > 0) {
     profile.learningStatus = 'LEARNING_ACTIVE';
   }
-  if (profile.globalSampleCounts.realSamples >= 1000) {
-    profile.learningStatus = 'CONFIDENT';
-  }
 
-  let contextStats = profile.contextualData.find((c) => c.condition === condition);
+  let contextStats = profile.contextualData.find((item) => item.condition === condition);
   if (!contextStats) {
     contextStats = {
       condition,
@@ -114,10 +135,11 @@ export async function updateLearningProfileRealSample(
     profile.contextualData.push(contextStats);
   }
 
-  contextStats.sampleCount++;
+  contextStats.sampleCount += 1;
   contextStats.lastUpdate = new Date().toISOString();
 
-  if (!contextStats.statistics[pidName]) {
+  const existing = contextStats.statistics[pidName];
+  if (!existing) {
     contextStats.statistics[pidName] = {
       mean: value,
       median: value,
@@ -132,19 +154,19 @@ export async function updateLearningProfileRealSample(
       source: ['REAL_OBD'],
     };
   } else {
-    const stat = contextStats.statistics[pidName];
-    const prevMean = stat.mean;
-    const prevM2 = stat.stddev * stat.stddev * (stat.samples - 1);
-    stat.samples++;
-    stat.realSamples++;
-    stat.mean = (prevMean * (stat.samples - 1) + value) / stat.samples;
-    const delta = value - prevMean;
-    const m2 = prevM2 + delta * (value - stat.mean);
-    stat.stddev = Math.sqrt(m2 / (stat.samples - 1));
-    stat.min = Math.min(stat.min, value);
-    stat.max = Math.max(stat.max, value);
-    stat.confidence = determineConfidence(stat.samples, profile.confidenceThresholds);
-    stat.lastUpdate = new Date().toISOString();
+    const previousMean = existing.mean;
+    const previousSamples = existing.samples;
+    const previousM2 = existing.stddev * existing.stddev * Math.max(0, previousSamples - 1);
+    existing.samples = previousSamples + 1;
+    existing.realSamples += 1;
+    existing.mean = previousMean + (value - previousMean) / existing.samples;
+    const delta = value - previousMean;
+    const m2 = previousM2 + delta * (value - existing.mean);
+    existing.stddev = Math.sqrt(Math.max(0, m2 / Math.max(1, existing.samples - 1)));
+    existing.min = Math.min(existing.min, value);
+    existing.max = Math.max(existing.max, value);
+    existing.confidence = determineConfidence(existing.samples, profile.confidenceThresholds);
+    existing.lastUpdate = new Date().toISOString();
   }
 
   await saveLearningProfile(basePath, profile);
@@ -153,15 +175,18 @@ export async function updateLearningProfileRealSample(
 export async function blockSimulationLearning(basePath: string): Promise<void> {
   const profile = await readLearningProfile(basePath);
   if (!profile) return;
-  profile.dataContamination.simulationDetected++;
-  profile.dataContamination.simulationFiltered++;
+
+  profile.dataContamination.simulationDetected += 1;
+  profile.dataContamination.simulationFiltered += 1;
   await saveLearningProfile(basePath, profile);
 }
 
-function determineConfidence(samples: number, thresholds: Record<string, number>): ConfidenceLevel {
+function determineConfidence(
+  samples: number,
+  thresholds: Record<string, number>,
+): ConfidenceLevel {
   if (samples < thresholds.low) return 'LOW';
-  if (samples < thresholds.medium) return 'LOW';
-  if (samples < thresholds.good) return 'MEDIUM';
-  if (samples < thresholds.high) return 'GOOD';
+  if (samples < thresholds.medium) return 'MEDIUM';
+  if (samples < thresholds.good) return 'GOOD';
   return 'HIGH';
 }
