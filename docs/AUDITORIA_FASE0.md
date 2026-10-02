@@ -1,128 +1,78 @@
-# AUDITORIA E CORREÇÃO - FASE 0
+# AUDITORIA DO REPOSITÓRIO
 
-## ERROS ENCONTRADOS
+Atualização: 2026-10-02
 
-### 1. Inconsistência de Tipos (CRÍTICO) ✅ CORRIGIDO
+## Situação
 
-**Arquivo**: `src/obd/bluetoothManager.ts` linha 2
-**Erro**: `import { Elm327CommandResult }`
-**Realidade**: `elm327.ts` exporta `ElmCommandResult`
-**Impacto**: Compilação falha
-**Solução**: Renomear para `ElmCommandResult`
+A auditoria inicial da Fase 0 foi executada e as falhas de compilação registradas naquele documento foram tratadas.
 
-### 2. Imports Quebrados (CRÍTICO) ✅ CORRIGIDO
+Este documento histórico não deve ser usado como checklist atual. O estado atual está descrito em:
 
-**Arquivo**: `src/database/merivaLearning.ts` linhas 1-2
-**Erro**: Referencia módulos que não existem:
-  - `../learning/learner`
-  - `../learning/dnaMeriva`
-**Impacto**: Compilação falha
-**Solução**: Criar os módulos ou remover imports não utilizados
+- `README.md`
+- `docs/ARCHITECTURE.md`
+- `docs/DEVELOPMENT.md`
+- `CHANGELOG.md`
 
-### 3. Falta de Dockerfile/Build Script
+## Estrutura atual
 
-**Status**: Não há configuração de build Android nativa
-**Razão**: Projeto requer `react-native-bluetooth-classic` que exige native build
-**Solução**: Usar `npx expo prebuild && npx expo run:android` com Android Studio configurado
+- `app/`: interface Expo Router.
+- `src/obd/`: transporte Bluetooth Classic, sessão ELM327, parser e PIDs.
+- `src/database/`: DTC, aprendizado e persistência.
+- `src/meriva/`: autosave e estado persistido.
+- `src/storage/`: quota, limpeza, backup, ciclos e importação.
+- `src/types/`: contratos TypeScript.
+- `tests/`: testes automatizados.
+- `.github/`: CI e governança.
+- `docs/`: documentação técnica.
 
-### 4. Bluetooth Classic Não Validado
+## Correções realizadas desde a auditoria inicial
 
-**Biblioteca**: `react-native-bluetooth-classic` versão 1.73.0
-**Status**: Instalada no package.json, mas não testada
-**Necessário**: Executar `npm install && npx expo prebuild`
+- import de `ElmCommandResult`;
+- módulos quebrados do aprendizado legado;
+- logger CSV;
+- transporte Bluetooth Classic;
+- inicialização e permissões Bluetooth;
+- classificação das respostas do ELM327;
+- descoberta de PIDs;
+- autosave e recuperação;
+- migração de schema;
+- cálculo de tamanho de backup;
+- quota por tamanho real;
+- CI;
+- documentação de arquitetura e desenvolvimento.
 
-### 5. Falta de Estrutura de Dados Correta
+## Pontos que ainda exigem validação
 
-**Problemas**:
-- Nenhum arquivo de dados da Meriva real
-- Nenhum baseline CAR_SCANNER
-- Nenhuma separação de fontes (REAL vs SIMULACAO vs REFERENCIA)
-- Nenhum arquivo de constantes do veículo
+### CI
 
-**Solução**: Criar arquivos TypeScript na pasta `src/data/`
+O GitHub Actions foi criado para executar TypeScript e testes. Uma execução anterior falhou na etapa `setup-node` porque o workflow usava cache npm sem `package-lock.json`. O cache foi removido para não depender de lockfile inexistente.
 
-### 6. Parser Incompleto
+### Bluetooth
 
-**Status**: Parser básico funciona, mas não suporta:
-- Multi-frame
-- Variações de header
-- Normalização robusta
-- Extração de payload garantida
+A tipagem local foi alinhada com os métodos realmente usados pelo transporte. Ainda é necessária validação em Android físico.
 
-**Solução**: Expandir com funções auxiliares
+### Parser
 
-### 7. Falta de Command Queue
+O parser cobre os PIDs atualmente definidos, mas ainda deve receber testes para respostas multi-frame, headers variados e casos reais específicos da ECU da Meriva.
 
-**Status**: Elm327Session envia comandos sequencialmente, mas não há fila explícita
-**Problema**: Sem proteção contra concorrência
-**Solução**: Implementar CommandQueue com mutex
+### Protocolo
 
-### 8. Logger Incompleto
+Não assumir protocolo específico da Meriva como verdade universal. O aplicativo deve registrar a identificação efetivamente obtida do ELM/ECU.
 
-**Status**: `obdLogger.ts` referencia `csvLogger` que não existe
-**Impacto**: Compilação falha
-**Solução**: Implementar `csvLogger.ts`
+### Integração
 
-### 9. DTC Manager Criado mas Não Integrado
+DTC, histórico, logger e aprendizado precisam continuar sendo integrados ao fluxo real de leitura sem permitir contaminação por simulação.
 
-**Status**: `dtcManager.ts` existe, mas:
-- Não é importado em lugar nenhum
-- Não é chamado da UI
-- Não está em laboratorio.tsx
+## Critério de conclusão
 
-### 10. Histórico Criado mas Não Integrado
+Uma funcionalidade só deve ser marcada como concluída depois de:
 
-**Status**: `historyStore.ts` existe, mas:
-- Não é alimentado durante leituras
-- Não é exibido na UI
-- Diagnóstico usa, mas lógica de alimentação está ausente
+1. implementação;
+2. typecheck;
+3. teste automatizado quando aplicável;
+4. teste Android quando envolver hardware/nativo;
+5. documentação atualizada.
 
-## RESULTADO DO TYPECHECK ANTES DE CORREÇÕES
+## Regra principal
 
-Comandos que falharam:
-- `src/database/merivaLearning.ts`: Módulos não encontrados
-- `src/database/obdLogger.ts`: `csvLogger` não encontrado
-- `src/obd/bluetoothManager.ts`: `Elm327CommandResult` não existe
-
-## PLANO DE CORREÇÃO
-
-**Fase 0 (Auditoria)**: ✅ Concluída
-
-**Fase 1 (Compilação)**:
-1. Corrigir `ElmCommandResult` em `bluetoothManager.ts`
-2. Criar `csvLogger.ts`
-3. Remover imports quebrados de `merivaLearning.ts`
-4. Executar `npm run typecheck`
-
-**Fase 2 (Dados Estruturados)**:
-1. Criar `src/data/veiculo_meriva.ts`
-2. Criar `src/data/baseline_car_scanner.ts`
-3. Criar `src/data/pid_database.ts` (expandido)
-4. Criar `src/data/protocolo_iso14230.ts`
-
-**Fase 3 (Correção de Transporte)**:
-1. Expandir `BluetoothClassicTransport`
-2. Criar `CommandQueue`
-3. Melhorar validação de inicialização
-
-**Fase 4 (Parser Robusto)**:
-1. Expandir `parser.ts` com funções auxiliares
-2. Criar `normalizeObdResponse()`
-3. Criar `extractResponseFrames()`
-4. Testes completos
-
-**Fase 5 (Integração)**:
-1. Conectar Logger em queryPid
-2. Conectar History em queryPid
-3. Conectar DTC na tela
-4. Conectar Learning quando source === REAL
-
-**Fase 6 (Validação)**:
-1. Typecheck
-2. Build Android
-3. Testes de compilação
-
-## PRÓXIMO PASSO
-
-Executar Fase 1 - Compilação imediatamente.
-
+**Sem evidência, o sistema deve dizer que não sabe.**
