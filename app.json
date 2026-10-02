@@ -3,7 +3,7 @@
     "name": "MERIVA SMART DIAGNOSTIC",
     "slug": "meriva-smart-diagnostic",
     "scheme": "meriva-smart-diagnostic",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "default",
     "userInterfaceStyle": "light",
     "platforms": ["android"],
