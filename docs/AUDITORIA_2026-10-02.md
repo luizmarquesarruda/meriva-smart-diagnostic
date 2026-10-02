@@ -20,6 +20,8 @@ Revisão do código rastreado no branch principal e da integração GPS subseque
 - A tela de laboratório encerra a sessão de forma explícita.
 - O transporte Bluetooth usa somente recepção por eventos. A leitura manual `available()/read()` foi removida para evitar duas fontes concorrentes de dados.
 - Ações OBD ficam bloqueadas até o armazenamento inicial estar pronto.
+- O transporte reage a desconexão inesperada do dispositivo em vez de esperar apenas um timeout.
+- Escritas CSV para o mesmo arquivo são serializadas para impedir perda de linhas por concorrência.
 
 ### Parser, PIDs e DTC
 - Mantida a distinção entre resposta real, ausência de dados e valor não interpretado.
@@ -43,7 +45,8 @@ Revisão do código rastreado no branch principal e da integração GPS subseque
 - Perfil do veículo valida JSON e garante a criação do diretório.
 - Histórico de viagens usa o módulo `driveCycleStorage` em vez de leitura manual duplicada na tela principal.
 - Removidos módulos legados sem uso no caminho de execução: `merivaLearning.ts`, `seedImporter.ts` e `txtDatabase.ts`.
-- Removidos pacotes diretos sem uso: AsyncStorage, DocumentPicker, Expo Linking e Expo Status Bar.
+- Removidos pacotes diretos sem uso: AsyncStorage, DocumentPicker e Expo Splash Screen.
+- Expo Linking e Expo Status Bar permanecem como dependências diretas exigidas pelo expo-router e pelo runtime Expo.
 
 ### UI
 - Removido botão placeholder de veículo "em desenvolvimento".
