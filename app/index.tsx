@@ -1,11 +1,12 @@
 import { Link } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import { INITIAL_DRIVE_CYCLES, getDriveCycleSummary, type DriveCycle } from '../src/data/driveCycles';
 import { getAutoSaveStatus, getAutoSaveState, initAutoSave, updateAutoSaveState } from '../src/meriva/autosaveManager';
 import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
 import type { ObdConnectionState } from '../src/meriva/autosaveState';
+import { calculateConsumptionKml, GpsTracker, type GpsTripState } from '../src/gps';
 
 function formatTime(iso: string | null): string {
   if (!iso) return 'N/D';
@@ -21,6 +22,14 @@ export default function IndexScreen() {
   const [obd, setObd] = useState<ObdConnectionState>({ connected: false });
   const [saveStatus, setSaveStatus] = useState<AutoSaveStatus>({ lastSavedAt: null, lastSaveReason: null, lastError: null });
   const [isHydrated, setIsHydrated] = useState(false);
+  const [gps] = useState(() => new GpsTracker());
+  const [gpsState, setGpsState] = useState<GpsTripState>(gps.getState());
+  const [gpsError, setGpsError] = useState<string | null>(null);
+  const [fuelUsedL, setFuelUsedL] = useState('');
+
+  useEffect(() => () => { void gps.stop(); }, [gps]);
+
+  const gpsConsumption = calculateConsumptionKml(gpsState.distanceKm, Number(fuelUsedL.replace(',', '.')));
 
   useEffect(() => {
     async function restoreState() {
@@ -72,6 +81,63 @@ export default function IndexScreen() {
             <Text style={styles.autosaveError}>FALHA NO AUTOSAVE: {saveStatus.lastError}</Text>
           ) : null}
           <Text style={styles.status}>{isHydrated ? 'ESTADO RESTAURADO' : 'CARREGANDO...'}</Text>
+        </View>
+
+        <View style={styles.gpsCard}>
+          <View style={styles.gpsHeader}>
+            <Text style={styles.sectionTitle}>GPS DO CELULAR</Text>
+            <Text style={gpsState.running ? styles.gpsLive : styles.gpsOff}>
+              {gpsState.running ? 'ATIVO' : 'PARADO'}
+            </Text>
+          </View>
+          <View style={styles.gpsGrid}>
+            <View style={styles.gpsMetric}>
+              <Text style={styles.metricLabel}>VELOCIDADE</Text>
+              <Text style={styles.gpsSpeed}>{gpsState.currentSpeedKmh.toFixed(1)} km/h</Text>
+            </View>
+            <View style={styles.gpsMetric}>
+              <Text style={styles.metricLabel}>DISTÂNCIA</Text>
+              <Text style={styles.metricValue}>{gpsState.distanceKm.toFixed(3)} km</Text>
+            </View>
+            <View style={styles.gpsMetric}>
+              <Text style={styles.metricLabel}>MÁXIMA</Text>
+              <Text style={styles.metricValue}>{gpsState.maxSpeedKmh.toFixed(1)} km/h</Text>
+            </View>
+            <View style={styles.gpsMetric}>
+              <Text style={styles.metricLabel}>PRECISÃO</Text>
+              <Text style={styles.metricValue}>{gpsState.lastAccuracyM == null ? 'N/D' : `${gpsState.lastAccuracyM.toFixed(0)} m`}</Text>
+            </View>
+          </View>
+          <Text style={styles.gpsHelp}>
+            Velocidade e distância vêm do GPS do celular. O GPS não mede litros consumidos sozinho.
+          </Text>
+          <TextInput
+            value={fuelUsedL}
+            onChangeText={setFuelUsedL}
+            keyboardType="decimal-pad"
+            placeholder="Combustível usado na viagem (L)"
+            placeholderTextColor="#64748b"
+            style={styles.fuelInput}
+          />
+          <Text style={styles.consumptionLine}>
+            {gpsConsumption == null ? 'Consumo: informe litros usados' : `Consumo calculado: ${gpsConsumption.toFixed(2)} km/L`}
+          </Text>
+          {gpsError ? <Text style={styles.gpsError}>{gpsError}</Text> : null}
+          <TouchableOpacity
+            style={gpsState.running ? styles.gpsStopButton : styles.gpsButton}
+            onPress={async () => {
+              setGpsError(null);
+              if (gpsState.running) {
+                await gps.stop();
+                setGpsState(gps.getState());
+                return;
+              }
+              const started = await gps.start(setGpsState);
+              if (!started) setGpsError('GPS desligado ou permissão de localização não concedida.');
+            }}
+          >
+            <Text style={styles.buttonText}>{gpsState.running ? 'PARAR GPS' : 'INICIAR GPS'}</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.summaryGrid}>
@@ -152,6 +218,19 @@ const styles = StyleSheet.create({
   statusLine: { color: '#e5e7eb', marginTop: 2 },
   autosaveError: { color: '#fca5a5', marginTop: 6, fontWeight: '600' },
   status: { color: '#9ca3af', marginTop: 14, fontWeight: '700' },
+  gpsCard: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 18 },
+  gpsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  gpsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  gpsMetric: { width: '48%', marginBottom: 10 },
+  gpsSpeed: { color: '#2563eb', fontWeight: '800', fontSize: 22 },
+  gpsLive: { color: '#16a34a', fontWeight: '800' },
+  gpsOff: { color: '#64748b', fontWeight: '800' },
+  gpsHelp: { color: '#64748b', fontSize: 12, marginBottom: 10 },
+  fuelInput: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, padding: 12, color: '#0f172a', marginBottom: 8 },
+  consumptionLine: { color: '#1f2937', fontWeight: '700', marginBottom: 10 },
+  gpsError: { color: '#b91c1c', fontWeight: '700', marginBottom: 10 },
+  gpsButton: { backgroundColor: '#16a34a', padding: 14, borderRadius: 10, alignItems: 'center' },
+  gpsStopButton: { backgroundColor: '#dc2626', padding: 14, borderRadius: 10, alignItems: 'center' },
   summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 18 },
   metricCard: { width: '48%', backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 10 },
   metricLabel: { color: '#6b7280', fontSize: 12, fontWeight: '600', marginBottom: 6 },
