@@ -1,13 +1,12 @@
 import { Link } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { AppState, Alert } from 'react-native';
+import { AppState } from 'react-native';
 import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import { INITIAL_DRIVE_CYCLES, getDriveCycleSummary, type DriveCycle } from '../src/data/driveCycles';
 import { getAutoSaveStatus, getAutoSaveState, initAutoSave, updateAutoSaveState } from '../src/meriva/autosaveManager';
 import type { AutoSaveStatus } from '../src/meriva/autosaveTypes';
 import type { ObdConnectionState } from '../src/meriva/autosaveState';
-import RNBluetoothClassic from 'react-native-bluetooth-classic';
 import { bootstrapBluetooth, requestBluetoothEnable, subscribeBluetoothState } from '../src/obd/bluetoothManager';
 
 function formatTime(iso: string | null): string {
