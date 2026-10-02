@@ -96,19 +96,19 @@ export default function IndexScreen() {
         </View>
 
         <View style={styles.summaryGrid}>
-          <View style={styles.metricCard}><Text style={styles.metricLabel}>Ciclos</Text><Text style={styles.metricValue}>{cycles.length}</Text></View>
-          <View style={styles.metricCard}><Text style={styles.metricLabel}>Distância</Text><Text style={styles.metricValue}>{summary.totalDistanceKm.toFixed(2)} km</Text></View>
-          <View style={styles.metricCard}><Text style={styles.metricLabel}>Consumo</Text><Text style={styles.metricValue}>{summary.avgConsumptionKml.toFixed(2)} km/L</Text></View>
-          <View style={styles.metricCard}><Text style={styles.metricLabel}>Média</Text><Text style={styles.metricValue}>{summary.avgSpeedKmh.toFixed(1)} km/h</Text></View>
+          <View style={styles.metricCard}><Text style={styles.metricLabel}>CICLOS REAIS</Text><Text style={styles.metricValue}>{summary.realCycleCount}</Text></View>
+          <View style={styles.metricCard}><Text style={styles.metricLabel}>DISTÂNCIA REAL</Text><Text style={styles.metricValue}>{summary.totalDistanceKm.toFixed(2)} km</Text></View>
+          <View style={styles.metricCard}><Text style={styles.metricLabel}>CONSUMO REAL</Text><Text style={styles.metricValue}>{summary.avgConsumptionKml.toFixed(2)} km/L</Text></View>
+          <View style={styles.metricCard}><Text style={styles.metricLabel}>MÉDIA REAL</Text><Text style={styles.metricValue}>{summary.avgSpeedKmh.toFixed(1)} km/h</Text></View>
         </View>
 
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>ÚLTIMO CICLO</Text>
-          {summary.lastCycle ? <><Text style={styles.row}><Text style={styles.label}>Início:</Text> {summary.lastCycle.startedAt}</Text><Text style={styles.row}><Text style={styles.label}>Fim:</Text> {summary.lastCycle.finishedAt}</Text><Text style={styles.row}><Text style={styles.label}>Distância:</Text> {summary.lastCycle.distanceTotalKm.toFixed(2)} km</Text><Text style={styles.row}><Text style={styles.label}>Consumo:</Text> {summary.lastCycle.avgFuelConsumptionKml.toFixed(3)} km/L</Text><View style={styles.sourceRow}><Text style={styles.row}><Text style={styles.label}>Fonte:</Text> {summary.lastCycle.source}</Text><Text style={summary.lastCycle.source === 'REAL_OBD' ? styles.sourceReal : styles.sourceRef}>{summary.lastCycle.source === 'REAL_OBD' ? 'REAL' : 'REFERÊNCIA'}</Text></View></> : <Text style={styles.empty}>Sem ciclos carregados.</Text>}
+          {summary.lastRealCycle ? <><Text style={styles.row}><Text style={styles.label}>Início:</Text> {summary.lastRealCycle.startedAt}</Text><Text style={styles.row}><Text style={styles.label}>Fim:</Text> {summary.lastRealCycle.finishedAt}</Text><Text style={styles.row}><Text style={styles.label}>Distância:</Text> {summary.lastCycle.distanceTotalKm.toFixed(2)} km</Text><Text style={styles.row}><Text style={styles.label}>Consumo:</Text> {summary.lastCycle.avgFuelConsumptionKml.toFixed(3)} km/L</Text><View style={styles.sourceRow}><Text style={styles.row}><Text style={styles.label}>Fonte:</Text> {summary.lastRealCycle.source}</Text><Text style={summary.lastRealCycle.source === 'REAL_OBD' ? styles.sourceReal : styles.sourceRef}>{summary.lastCycle.source === 'REAL_OBD' ? 'REAL' : 'REFERÊNCIA'}</Text></View></> : <Text style={styles.empty}>Sem ciclos carregados.</Text>}
         </View>
 
         <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>HISTÓRICO</Text>
+          <Text style={styles.sectionTitle}>HISTÓRICO</Text><Text style={styles.historyNote}>Referências Car Scanner: {summary.referenceCycleCount}. Elas não entram nas métricas reais.</Text>
           {cycles.map((cycle) => <View key={cycle.id} style={styles.historyItem}><View style={styles.historyHeader}><Text style={styles.historyDate}>{cycle.startedAt}</Text><Text style={cycle.source === 'REAL_OBD' ? styles.sourceReal : styles.sourceRef}>{cycle.source === 'REAL_OBD' ? 'REAL' : 'REFERÊNCIA'}</Text></View><Text style={styles.historyMeta}>{cycle.distanceTotalKm.toFixed(2)} km • {cycle.avgFuelConsumptionKml.toFixed(3)} km/L</Text></View>)}
         </View>
 
