@@ -20,6 +20,8 @@ module.exports = function withBluetoothClassicPermissions(config) {
     ensure('android.permission.BLUETOOTH_ADMIN', 30);
     ensure('android.permission.BLUETOOTH_CONNECT');
     ensure('android.permission.BLUETOOTH_SCAN');
+    const scanPermission = permissions.find((p) => p.$?.['android:name'] === 'android.permission.BLUETOOTH_SCAN');
+    if (scanPermission) scanPermission.$['android:usesPermissionFlags'] = 'neverForLocation';
     ensure('android.permission.ACCESS_FINE_LOCATION', 30);
     ensure('android.permission.ACCESS_COARSE_LOCATION', 30);
     return mod;
