@@ -1,0 +1,27 @@
+export const BLUETOOTH_FLOW_STATES = {
+  OFF: 'BLUETOOTH DESLIGADO', ON: 'BLUETOOTH LIGADO', SELECTED: 'DISPOSITIVO SELECIONADO',
+  CONNECTED: 'BLUETOOTH CONECTADO', ELM_RESPONDING: 'ELM327 RESPONDENDO', ELM_INITIALIZED: 'ELM327 INICIALIZADO',
+  ECU_READY: 'ECU CONECTADA/RESPONDENDO', READY: 'DIAGNÓSTICO PRONTO', ELM_FAILED: 'ELM327 NÃO RESPONDE', ECU_FAILED: 'ECU NÃO RESPONDE',
+} as const;
+export type BluetoothFlowState = typeof BLUETOOTH_FLOW_STATES[keyof typeof BLUETOOTH_FLOW_STATES];
+export type BluetoothFlowEvent =
+  | { type: 'BLUETOOTH_OFF' } | { type: 'BLUETOOTH_ON' } | { type: 'DEVICE_SELECTED' }
+  | { type: 'DEVICE_CONNECTED' } | { type: 'ELM_RESPONDING' } | { type: 'ELM_INITIALIZED' }
+  | { type: 'ECU_READY' } | { type: 'ELM_FAILED' } | { type: 'ECU_FAILED' } | { type: 'RESET' };
+export function reduceBluetoothFlow(state: BluetoothFlowState, event: BluetoothFlowEvent): BluetoothFlowState {
+  switch (event.type) {
+    case 'BLUETOOTH_OFF': return BLUETOOTH_FLOW_STATES.OFF;
+    case 'BLUETOOTH_ON': return BLUETOOTH_FLOW_STATES.ON;
+    case 'DEVICE_SELECTED': return state === BLUETOOTH_FLOW_STATES.ON ? BLUETOOTH_FLOW_STATES.SELECTED : state;
+    case 'DEVICE_CONNECTED': return state === BLUETOOTH_FLOW_STATES.SELECTED ? BLUETOOTH_FLOW_STATES.CONNECTED : state;
+    case 'ELM_RESPONDING': return state === BLUETOOTH_FLOW_STATES.CONNECTED ? BLUETOOTH_FLOW_STATES.ELM_RESPONDING : state;
+    case 'ELM_INITIALIZED': return state === BLUETOOTH_FLOW_STATES.ELM_RESPONDING ? BLUETOOTH_FLOW_STATES.ELM_INITIALIZED : state;
+    case 'ECU_READY': return state === BLUETOOTH_FLOW_STATES.ELM_INITIALIZED ? BLUETOOTH_FLOW_STATES.ECU_READY : state;
+    case 'RESET': return BLUETOOTH_FLOW_STATES.OFF;
+    case 'ELM_FAILED': return BLUETOOTH_FLOW_STATES.ELM_FAILED;
+    case 'ECU_FAILED': return BLUETOOTH_FLOW_STATES.ECU_FAILED;
+  }
+}
+export function canQueryPids(state: BluetoothFlowState): boolean {
+  return state === BLUETOOTH_FLOW_STATES.READY || state === BLUETOOTH_FLOW_STATES.ECU_READY;
+}
