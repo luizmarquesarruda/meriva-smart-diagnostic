@@ -5,6 +5,8 @@ import type {
   VehicleCondition,
 } from '../types/sourceTypes';
 
+const profileQueues = new Map<string, Promise<void>>();
+
 export interface ContextualStatistics {
   condition: VehicleCondition;
   statistics: Record<string, SampleStatistics>;
@@ -81,17 +83,30 @@ export async function saveLearningProfile(
   basePath: string,
   profile: MerivaLearningProfile,
 ): Promise<void> {
-  await FileSystem.makeDirectoryAsync(`${basePath}/APRENDIZADO`, { intermediates: true });
   const target = `${basePath}/APRENDIZADO/dna_meriva.json`;
-  await FileSystem.writeAsStringAsync(target, JSON.stringify(profile, null, 2), {
-    encoding: FileSystem.EncodingType.UTF8,
-  });
+  const previous = profileQueues.get(target) ?? Promise.resolve();
+  const current = previous
+    .catch(() => undefined)
+    .then(async () => {
+      await FileSystem.makeDirectoryAsync(`${basePath}/APRENDIZADO`, { intermediates: true });
+      await FileSystem.writeAsStringAsync(target, JSON.stringify(profile, null, 2), {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+    });
+
+  profileQueues.set(target, current.catch(() => undefined));
+  try {
+    await current;
+  } finally {
+    if (profileQueues.get(target) === current) profileQueues.delete(target);
+  }
 }
 
 export async function readLearningProfile(
   basePath: string,
 ): Promise<MerivaLearningProfile | null> {
   const target = `${basePath}/APRENDIZADO/dna_meriva.json`;
+  await (profileQueues.get(target) ?? Promise.resolve()).catch(() => undefined);
   const info = await FileSystem.getInfoAsync(target);
   if (!info.exists || info.isDirectory) return null;
 
