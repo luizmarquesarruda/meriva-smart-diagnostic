@@ -6,7 +6,9 @@
     "version": "1.0.0",
     "orientation": "default",
     "userInterfaceStyle": "light",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "android": {
       "package": "com.meriva.smartdiagnostic",
       "permissions": [
@@ -18,7 +20,15 @@
         "ACCESS_COARSE_LOCATION"
       ]
     },
-    "assetBundlePatterns": ["**/*"],
-    "experiments": { "typedRoutes": true, "tsconfigPaths": true }
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "tsconfigPaths": true
+    },
+    "plugins": [
+      "./plugins/withBluetoothClassicPermissions"
+    ]
   }
 }
