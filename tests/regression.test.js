@@ -392,6 +392,24 @@ async function testBackupCompleteness() {
   m.disposeAutoSave();
 }
 
+async function testCsvWriteSerialization() {
+  resetFS();
+  const logger = loadTs(path.join(ROOT, 'src/database/csvLogger.ts'));
+  const target = `${BASE}/LOGS/concurrent.csv`;
+
+  writeDelayMs = 30;
+  await Promise.all([
+    logger.appendCsvRow(target, { id: 'A', timestamp: 't1' }),
+    logger.appendCsvRow(target, { id: 'B', timestamp: 't2' }),
+  ]);
+  writeDelayMs = 0;
+
+  const content = files.get(target);
+  assert.ok(content.includes('A,t1'));
+  assert.ok(content.includes('B,t2'));
+  assert.strictEqual(content.split('\n').filter(Boolean).length, 3);
+}
+
 async function testAutosaveRace() {
   resetFS();
   const m = loadTs(path.join(ROOT, 'src/meriva/autosaveManager.ts'));
@@ -432,6 +450,7 @@ async function main() {
     ['drive cycles', testDriveCycleValidation],
     ['DTC persistência', testDtcStorage],
     ['backup completo', testBackupCompleteness],
+    ['CSV serializado', testCsvWriteSerialization],
     ['autosave race', testAutosaveRace],
   ];
 
