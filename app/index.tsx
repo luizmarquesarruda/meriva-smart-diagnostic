@@ -1,11 +1,14 @@
 import { Link } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
+import { AppState, Alert } from 'react-native';
 import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import { INITIAL_DRIVE_CYCLES, getDriveCycleSummary, type DriveCycle } from '../src/data/driveCycles';
 import { getAutoSaveStatus, getAutoSaveState, initAutoSave, updateAutoSaveState } from '../src/meriva/autosaveManager';
 import type { AutoSaveStatus } from '../src/meriva/autosaveTypes';
 import type { ObdConnectionState } from '../src/meriva/autosaveState';
+import RNBluetoothClassic from 'react-native-bluetooth-classic';
+import { bootstrapBluetooth, requestBluetoothEnable, subscribeBluetoothState } from '../src/obd/bluetoothManager';
 
 function formatTime(iso: string | null): string {
   if (!iso) return 'N/D';
@@ -21,8 +24,33 @@ export default function IndexScreen() {
   const [obd, setObd] = useState<ObdConnectionState>({ connected: false });
   const [saveStatus, setSaveStatus] = useState<AutoSaveStatus>({ lastSavedAt: null, lastSaveReason: null, lastError: null });
   const [isHydrated, setIsHydrated] = useState(false);
+  const [bluetoothState, setBluetoothState] = useState('BLUETOOTH DESLIGADO');
+  const [bluetoothError, setBluetoothError] = useState('');
 
   useEffect(() => {
+    let mounted = true;
+    const initializeBluetooth = async () => {
+      try {
+        const state = await bootstrapBluetooth();
+        if (mounted) setBluetoothState(state);
+        if (state === 'BLUETOOTH DESLIGADO') setBluetoothError('Bluetooth necessário para diagnóstico do veículo.');
+        if (state === 'PERMISSÃO BLUETOOTH NEGADA') setBluetoothError('Permissão Bluetooth negada.');
+      } catch (cause) {
+        if (mounted) { setBluetoothState('BLUETOOTH DESLIGADO'); setBluetoothError(cause instanceof Error ? cause.message : 'Falha ao iniciar Bluetooth'); }
+      }
+    };
+    void initializeBluetooth();
+    let subscription: { remove: () => void } | undefined;
+    try {
+      subscription = subscribeBluetoothState((enabled) => {
+        if (!mounted) return;
+        setBluetoothState(enabled ? 'BLUETOOTH LIGADO' : 'BLUETOOTH DESLIGADO');
+        if (!enabled) setBluetoothError('Bluetooth necessário para diagnóstico do veículo.');
+      });
+    } catch {}
+    const appStateSubscription = AppState.addEventListener('change', (next) => {
+      if (next === 'active') void initializeBluetooth();
+    });
     async function restoreState() {
       const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
       const restored = await initAutoSave(basePath);
@@ -51,6 +79,7 @@ export default function IndexScreen() {
     }
 
     void restoreState();
+    return () => { mounted = false; subscription?.remove(); appStateSubscription.remove(); };
   }, []);
 
   const summary = useMemo(() => getDriveCycleSummary(cycles), [cycles]);
@@ -62,6 +91,9 @@ export default function IndexScreen() {
           <Text style={styles.title}>MERIVA SMART</Text>
           <Text style={styles.subtitle}>DIAGNOSTIC</Text>
           <Text style={styles.sectionTitleDark}>STATUS</Text>
+          <Text style={styles.statusLine}>BLUETOOTH: {bluetoothState}</Text>
+          {bluetoothError ? <Text style={styles.autosaveError}>{bluetoothError}</Text> : null}
+          {bluetoothState === 'BLUETOOTH DESLIGADO' ? <TouchableOpacity style={styles.button} onPress={async () => { const ok = await requestBluetoothEnable(); if (ok) { setBluetoothState('BLUETOOTH LIGADO'); setBluetoothError(''); } else setBluetoothError('Bluetooth continua desligado.'); }}><Text style={styles.buttonText}>ATIVAR BLUETOOTH</Text></TouchableOpacity> : null}
           <Text style={styles.statusLine}>OBD: {obd.connected ? 'CONECTADO' : 'DESCONECTADO'}</Text>
           <Text style={styles.statusLine}>ECU: {obd.ecuAddress ?? 'N/D'}</Text>
           <Text style={styles.statusLine}>PROTOCOLO: {obd.protocol ?? 'N/D'}</Text>
