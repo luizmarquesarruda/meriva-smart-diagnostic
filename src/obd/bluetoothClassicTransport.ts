@@ -8,11 +8,14 @@ export interface BluetoothDeviceInfo {
   bonded?: boolean;
 }
 
+type RemovableSubscription = { remove: () => void };
+
 export class BluetoothClassicTransport implements ObdTransport {
   private device: BluetoothDevice | null = null;
   private connected = false;
   private received = '';
-  private subscription?: { remove: () => void };
+  private dataSubscription?: RemovableSubscription;
+  private disconnectSubscription?: RemovableSubscription;
 
   constructor(private readonly deviceAddress: string) {}
 
@@ -22,8 +25,7 @@ export class BluetoothClassicTransport implements ObdTransport {
     if (!(await RNBluetoothClassic.isBluetoothEnabled())) throw new Error('BLUETOOTH DESLIGADO');
 
     this.received = '';
-    this.subscription?.remove();
-    this.subscription = undefined;
+    this.removeSubscriptions();
 
     const device = await RNBluetoothClassic.connectToDevice(this.deviceAddress, {
       connectionType: 'raw',
@@ -33,21 +35,33 @@ export class BluetoothClassicTransport implements ObdTransport {
 
     this.device = device;
     this.connected = true;
-    this.subscription = device.onDataReceived((event) => {
+
+    this.dataSubscription = device.onDataReceived((event) => {
       if (event?.data) this.received += String(event.data);
     });
+
+    if (RNBluetoothClassic.onDeviceDisconnected) {
+      this.disconnectSubscription = RNBluetoothClassic.onDeviceDisconnected((event) => {
+        const eventAddress = event?.address ?? event?.device?.address;
+        if (eventAddress && eventAddress !== this.deviceAddress) return;
+        this.markDisconnected();
+      });
+    }
   }
 
   async close(): Promise<void> {
-    this.subscription?.remove();
-    this.subscription = undefined;
-    if (this.device && this.connected) {
+    const device = this.device;
+    const wasConnected = this.connected;
+    this.removeSubscriptions();
+
+    if (device && wasConnected) {
       try {
-        await this.device.disconnect();
+        await device.disconnect();
       } catch {
         // já desconectado
       }
     }
+
     this.device = null;
     this.connected = false;
     this.received = '';
@@ -63,6 +77,8 @@ export class BluetoothClassicTransport implements ObdTransport {
 
     const started = Date.now();
     while (Date.now() - started < timeoutMs) {
+      if (!this.connected) throw new Error('BLUETOOTH DESCONECTADO');
+
       const promptIndex = this.received.indexOf('>');
       if (promptIndex >= 0) {
         const response = this.received.slice(0, promptIndex);
@@ -76,6 +92,23 @@ export class BluetoothClassicTransport implements ObdTransport {
     this.received = '';
     if (partial) return partial;
     throw new Error('TIMEOUT');
+  }
+
+  private markDisconnected(): void {
+    this.dataSubscription?.remove();
+    this.dataSubscription = undefined;
+    this.disconnectSubscription?.remove();
+    this.disconnectSubscription = undefined;
+    this.device = null;
+    this.connected = false;
+    this.received = '';
+  }
+
+  private removeSubscriptions(): void {
+    this.dataSubscription?.remove();
+    this.dataSubscription = undefined;
+    this.disconnectSubscription?.remove();
+    this.disconnectSubscription = undefined;
   }
 }
 
