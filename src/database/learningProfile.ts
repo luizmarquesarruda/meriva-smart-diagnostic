@@ -116,12 +116,13 @@ export async function updateLearningProfileRealSample(
   profile.globalSampleCounts.realSamples += 1;
   profile.globalSampleCounts.totalSamples += 1;
 
-  if (profile.globalSampleCounts.realSamples >= profile.confidenceThresholds.high) {
+  const realSamples = profile.globalSampleCounts.realSamples;
+  if (realSamples >= profile.confidenceThresholds.high) {
     profile.learningStatus = 'CONFIDENT';
-  } else if (profile.globalSampleCounts.realSamples >= profile.confidenceThresholds.good) {
+  } else if (realSamples >= profile.confidenceThresholds.low) {
     profile.learningStatus = 'LEARNING_ACTIVE';
-  } else if (profile.globalSampleCounts.realSamples > 0) {
-    profile.learningStatus = 'LEARNING_ACTIVE';
+  } else {
+    profile.learningStatus = 'COLD_START';
   }
 
   let contextStats = profile.contextualData.find((item) => item.condition === condition);
