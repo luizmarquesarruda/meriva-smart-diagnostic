@@ -1,120 +1,101 @@
 # MERIVA SMART DIAGNOSTIC
 
-Aplicativo offline de diagnóstico automotivo para Chevrolet Meriva Maxx 1.4 8V.
+Aplicativo Android offline de diagnóstico OBD-II para Chevrolet Meriva Maxx 1.4 8V.
 
-## Fases Implementadas
+Versão: 1.0.1 | Plataforma: Android | Transporte: Bluetooth Classic | ECU: OBD-II/ELM327
 
-### Fase 1: Bluetooth Classic Real ✅
-- Transporte abstrato para ELM327
-- Descoberta de dispositivos Bluetooth pareados
-- Conexão real com inicialização AT
-- Diferenciação entre BLUETOOTH, ELM e ECU
+## Estado atual
 
-### Fase 2: Armazenamento Local ✅
-- Estrutura MERIVA_SMART em DocumentDirectory
-- Pastas: CONFIG, BANCO, LOGS, APRENDIZADO, DTC, LEITURAS, VIAGENS, BACKUP
-- CSV para leituras e RAW OBD
-- JSON para configuração de veículo e aprendizado
-- TXT para banco de PIDs confirmados
+O projeto prioriza dados reais, rastreabilidade e diagnóstico explicável. Uma resposta ausente não é transformada em um valor inventado.
 
-### Fase 3: Sistema de Quota ✅
-- Limite padrão: 2 GB
-- Aviso em 90% de uso
-- Limpeza automática preservando BANCO, APRENDIZADO, CONFIG, DTC
-- Retenção de logs: 7 dias
-- Retenção de leituras: 30 dias
+Bluetooth Classic exige build nativo Android. Expo Go não é o ambiente de validação do transporte.
 
-### Fase 4: Registros Duplos (Raw e Interpretado) ✅
-- TX/RX guardados em CSV
-- Valores interpretados em CSV separado
-- Fonte identificada (REAL vs SIMULACAO)
-- Status de comando preservado
+## Estrutura
 
-### Fase 5: Banco de PIDs Confirmados ✅
-- Registro de PIDs que responderam da ECU
-- Classificação obrigatória
-- Timestamp de primeira e última visualização
-- Contagem de ocorrências
-- Confiança acumulada
-
-### Fase 6: Perfil do Veículo ✅
-- Armazenamento de dados básicos (Meriva Maxx, ano, VIN)
-- Protocolo baseline
-- Endereço da ECU
-
-### Fase 7: Aprendizado Local (DNA da Meriva) ✅
-- RPM por contexto (marcha lenta, aceleração, cruzeiro, desaceleração)
-- Temperatura por fases (partida, aquecimento, normal)
-- Mínimo, máximo, média por contexto
-- Total de amostras
-- Última atualização
-
-### Fase 8: Backup ✅
-- Backup automático de BANCO, APRENDIZADO, DTC, CONFIG
-- Timestamp no nome do backup
-- Preservação de conhecimento
-
-## Próximas Fases
-
-### Fase 9: Discovery de PIDs Suportados
-- Enviar 0100, 0120, 0140, 0160
-- Interpretar bitmaps
-- Registrar PIDs que ECU responde
-
-### Fase 10: Histórico Completo
-- Registro de leituras periódicas
-- Contexto de operação
-- Timestamp
-- Relacionamento com DTCs
-
-### Fase 11: DTC (Códigos de Falha)
-- Leitura de códigos
-- Histórico de ocorrências
-- Status (confirmado, pendente, inativo)
-- Armazenamento em TXT
-
-### Fase 12: Análise e Correlação
-- Comparação com padrão aprendido
-- Detecção de anomalias
-- Relação entre PIDs
-- Níveis de diagnóstico (1-4)
-
-## Arquitetura
-
+```text
+app/             telas e navegação
+src/obd/         Bluetooth, ELM327, parser e PIDs
+src/data/        dados e ciclos
+src/database/    persistência, DTC e aprendizado
+src/meriva/      autosave e estado persistido
+src/storage/     quota, backup, limpeza e importação
+src/types/       contratos compartilhados
+tests/           testes automatizados
+docs/            arquitetura e desenvolvimento
+.github/         CI e governança
 ```
-App (UI)
-  ↓
+
+## Fluxo OBD
+
+```text
+UI
+ ↓
+Bluetooth Manager
+ ↓
+Bluetooth Classic
+ ↓
 Elm327Session
-  ↓
-BluetoothClassicTransport / SimulatedTransport
-  ↓
-ELM327 / Simulação
-  ↓
-ECU da Meriva
-  ↓
-Parser (PidDefinition + formulas)
-  ↓
-Storage (Raw + Interpretado)
-  ↓
-Aprendizado (DNA da Meriva)
-  ↓
-Análise
+ ↓
+Discovery / PID
+ ↓
+Parser
+ ↓
+Raw + Interpretado
+ ↓
+Banco / DTC / Histórico / DNA
 ```
 
-## Regras Fundamentais
+O sistema diferencia Bluetooth, ELM327 e ECU. Estar conectado ao ELM327 não significa que a ECU respondeu.
 
-1. **Sem dados falsos**: SEM DADOS, NÃO RESPONDEU, VALOR NÃO INTERPRETADO
-2. **RAW TX/RX obrigatório**: Toda leitura preserva resposta original
-3. **Simulação isolada**: Marcada explicitamente, não alimenta aprendizado
-4. **Confirmação real**: PID PADRAO_OBD ≠ MERIVA_CONFIRMADO
-5. **Diagnóstico cauteloso**: Evidência antes de conclusão
+## Regras de dados
 
-## Como Testar
+- REAL_OBD: veio da ECU através do transporte real.
+- SIMULACAO: usado apenas para testes.
+- REFERENCIA: dado externo usado como referência.
+- Dados simulados não alimentam o aprendizado real.
+- TX/RX original deve ser preservado quando houver logging.
+- Respostas sem interpretação ficam como NÃO RESPONDEU, VALOR NÃO INTERPRETADO ou SEM DADOS.
+- Nunca inventar valores.
 
-1. Pareie o ELM327 nas configs Bluetooth do Android
-2. `npm install && npx expo prebuild && npx expo run:android`
-3. Abra Laboratório OBD
-4. BLUETOOTH REAL → Listar Pareados → Conectar
-5. Teste PID 010C
-6. Confira ARMAZENAMENTO para logs
+## Persistência
 
+O aplicativo mantém CONFIG, BANCO, LEITURAS, APRENDIZADO, DTC, LOGS, VIAGENS e BACKUP.
+
+O autosave usa arquivo temporário, valida o conteúdo e mantém uma cópia anterior para recuperação.
+
+## Bluetooth
+
+Na abertura do aplicativo, o sistema verifica suporte, solicita permissões, verifica o estado do Bluetooth, solicita ativação quando necessário e repete a verificação ao retornar ao aplicativo.
+
+O ELM327 deve estar previamente pareado no Android.
+
+## Testes
+
+```bash
+npm install
+npm run typecheck
+npm test
+npx expo prebuild
+npx expo run:android
+```
+
+## Documentação
+
+- Arquitetura: docs/ARCHITECTURE.md
+- Desenvolvimento: docs/DEVELOPMENT.md
+- Segurança: SECURITY.md
+- Contribuição: CONTRIBUTING.md
+- Histórico: CHANGELOG.md
+
+## Próximos blocos técnicos
+
+1. estabilizar CI;
+2. ampliar testes do parser e Bluetooth;
+3. integrar logging e histórico ao fluxo real de PID;
+4. completar DTC na UI;
+5. identificar protocolo real sem valores fixos;
+6. validar em Android físico com ELM327 e veículo real.
+
+## Princípio
+
+**Evidência antes de conclusão.**
