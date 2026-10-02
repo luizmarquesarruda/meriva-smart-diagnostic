@@ -10,10 +10,11 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "prebuild": "expo prebuild --clean",
-    "test": "node tests/merivaAutosave.test.js",
+    "test": "node tests/merivaAutosave.test.js && node tests/regression.test.js",
     "build:apk": "eas build --platform android --profile preview",
     "build:production": "eas build --platform android --profile production",
-    "doctor": "npx expo-doctor"
+    "doctor": "npx expo-doctor",
+    "validate": "npm run typecheck && npm test"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "1.23.1",
@@ -34,7 +35,6 @@
   "devDependencies": {
     "@babel/core": "^7.0.0",
     "@types/react": "~18.2.0",
-    "typescript": "^5.5.4",
-    "@types/jest": "^29.5.14"
+    "typescript": "^5.5.4"
   }
 }
