@@ -35,6 +35,7 @@ const dirs = new Set(['/doc']);
 let writeDelayMs = 0;
 let bluetoothListener = null;
 let bluetoothDisconnectListener = null;
+let fakeDeviceConnected = true;
 
 function parentDir(p) {
   const i = p.lastIndexOf('/');
@@ -151,6 +152,7 @@ const fakeBluetooth = {
     address: 'AA:BB:CC:DD:EE:FF',
     name: 'ELM327',
     bonded: true,
+    isConnected: async () => fakeDeviceConnected,
     onDataReceived(listener) {
       bluetoothListener = listener;
       return { remove() { bluetoothListener = null; } };
@@ -234,6 +236,7 @@ async function testPidScanner() {
 async function testBluetoothEventTransport() {
   bluetoothListener = null;
   bluetoothDisconnectListener = null;
+  fakeDeviceConnected = true;
   const { BluetoothClassicTransport } = loadTs(path.join(ROOT, 'src/obd/bluetoothClassicTransport.ts'));
   const transport = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF');
   await transport.open();
@@ -244,6 +247,7 @@ async function testBluetoothEventTransport() {
 
   await transport.open();
   const pendingRead = transport.readUntilPrompt(500);
+  fakeDeviceConnected = false;
   bluetoothDisconnectListener?.({ address: 'AA:BB:CC:DD:EE:FF' });
   await assert.rejects(pendingRead, /BLUETOOTH DESCONECTADO|BLUETOOTH NÃO CONECTADO/);
   await transport.close();
