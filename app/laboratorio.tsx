@@ -109,6 +109,10 @@ export default function LaboratorioScreen() {
     setStatus(mode === 'SIMULACAO' ? BLUETOOTH_FLOW_STATES.ON : BLUETOOTH_FLOW_STATES.READY);
     try {
       const activeSession = mode === 'SIMULACAO' ? simulationSession : sessionRef.current;
+      if (mode === 'SIMULACAO' && (!simulationSession.isInitialized || !simulationSession.isEcuReady)) {
+        await simulationSession.initialize();
+        await simulationSession.confirmEcu();
+      }
       if (!activeSession) throw new Error('CONECTE AO ELM327 ANTES DE TESTAR O PID');
       const result = await activeSession.queryPid(pid);
       await registerObdQuery(getBasePath(), result, mode);
