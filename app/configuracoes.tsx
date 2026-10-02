@@ -6,7 +6,7 @@ import { cleanupOldLogs, cleanupOldReadings } from '../src/storage/cleanup';
 import { VehicleProfile } from '../src/database/vehicleConfig';
 import { getAutoSaveState, getAutoSaveStatus, initAutoSave } from '../src/meriva/autosaveManager';
 import { exportAutoSaveTxt } from '../src/meriva/exportAutoSaveTxt';
-import type { AutoSaveStatus } from '../src/meriva/autosaveTypes';
+import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
 
 function formatTime(iso: string | null): string {
   if (!iso) return 'N/D';
