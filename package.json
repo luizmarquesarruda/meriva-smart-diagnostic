@@ -20,7 +20,6 @@
     "expo": "~51.0.28",
     "expo-file-system": "~17.0.1",
     "expo-router": "~3.5.23",
-    "expo-splash-screen": "~0.27.5",
     "react": "18.2.0",
     "react-native": "0.74.5",
     "react-native-bluetooth-classic": "1.73.0-rc.17",
