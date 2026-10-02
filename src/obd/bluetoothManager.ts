@@ -66,7 +66,11 @@ export async function ensureBluetoothReady(): Promise<boolean> {
   // Usa a API pública da biblioteca. No Android, ela abre o diálogo
   // nativo para o usuário ativar o rádio, sem tentar alterar o estado
   // silenciosamente.
-  const requestBluetoothEnabled = RNBluetoothClassic.requestBluetoothEnabled;
+  type BluetoothClassicWithEnable = typeof RNBluetoothClassic & {
+    requestBluetoothEnabled?: () => Promise<boolean>;
+  };
+  const bluetoothClassic = RNBluetoothClassic as BluetoothClassicWithEnable;
+  const requestBluetoothEnabled = bluetoothClassic.requestBluetoothEnabled;
   if (typeof requestBluetoothEnabled !== 'function') {
     throw new Error('BIBLIOTECA BLUETOOTH SEM SUPORTE PARA ATIVAÇÃO DO RÁDIO.');
   }
