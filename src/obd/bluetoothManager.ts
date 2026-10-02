@@ -66,7 +66,12 @@ export async function ensureBluetoothReady(): Promise<boolean> {
   // Usa a API pública da biblioteca. No Android, ela abre o diálogo
   // nativo para o usuário ativar o rádio, sem tentar alterar o estado
   // silenciosamente.
-  const requested = await RNBluetoothClassic.requestBluetoothEnabled();
+  const requestBluetoothEnabled = RNBluetoothClassic.requestBluetoothEnabled;
+  if (typeof requestBluetoothEnabled !== 'function') {
+    throw new Error('BIBLIOTECA BLUETOOTH SEM SUPORTE PARA ATIVAÇÃO DO RÁDIO.');
+  }
+
+  const requested = await requestBluetoothEnabled();
   if (!requested) {
     throw new Error('BLUETOOTH CONTINUA DESLIGADO. ATIVE-O PARA USAR O ELM327.');
   }
