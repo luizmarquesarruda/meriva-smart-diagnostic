@@ -1,5 +1,3 @@
-// MERIVA SMART DIAGNOSTIC — Migrações do formato de autosave
-
 import { AutoSaveEnvelope, AUTOSAVE_SCHEMA_VERSION } from './autosaveTypes';
 
 export type AutosaveMigration = (payload: Record<string, unknown>) => Record<string, unknown>;
@@ -11,7 +9,6 @@ export function migrateEnvelope<T>(envelope: AutoSaveEnvelope<T>): AutoSaveEnvel
   if (envelope.schemaVersion > AUTOSAVE_SCHEMA_VERSION) return null;
 
   let current = envelope as unknown as AutoSaveEnvelope<Record<string, unknown>>;
-
   while (current.schemaVersion < AUTOSAVE_SCHEMA_VERSION) {
     const migration = AUTOSAVE_MIGRATIONS[current.schemaVersion];
     if (!migration) return null;
@@ -21,6 +18,5 @@ export function migrateEnvelope<T>(envelope: AutoSaveEnvelope<T>): AutoSaveEnvel
       payload: migration(current.payload) as unknown as T,
     };
   }
-
   return current as unknown as AutoSaveEnvelope<T>;
 }
