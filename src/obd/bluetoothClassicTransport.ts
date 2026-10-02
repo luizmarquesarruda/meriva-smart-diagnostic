@@ -12,10 +12,8 @@ export class BluetoothClassicTransport implements ObdTransport {
     const isConnected = typeof device.isConnected === 'function' ? await device.isConnected() : true;
     if (!isConnected) throw new Error('BLUETOOTH CONECTADO NÃO CONFIRMADO');
     this.device = device; this.connected = true; this.received = '';
-    if (typeof device.onDataReceived === 'function') this.dataSubscription = device.onDataReceived((event) => { if (event?.data) this.received += event.data; });
   }
   async close(): Promise<void> {
-    this.dataSubscription?.remove(); this.dataSubscription = undefined;
     try { if (this.device?.disconnect) await this.device.disconnect(); } finally { this.device = null; this.connected = false; this.received = ''; }
   }
   async write(data: string): Promise<void> {
