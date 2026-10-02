@@ -21,19 +21,13 @@ export default function RootLayout() {
         const now = Date.now();
         if (now - lastFailureAt.current > 2500) {
           lastFailureAt.current = now;
-
           Alert.alert(
             'Bluetooth necessário',
             cause instanceof Error
               ? cause.message
               : 'Ative o Bluetooth e permita o acesso a dispositivos próximos para usar o ELM327.',
             [
-              {
-                text: 'Abrir configurações',
-                onPress: () => {
-                  void openBluetoothAppSettings();
-                },
-              },
+              { text: 'Abrir configurações', onPress: () => void openBluetoothAppSettings() },
               { text: 'Tentar novamente', onPress: () => void checkBluetooth() },
             ],
           );
@@ -44,7 +38,7 @@ export default function RootLayout() {
     };
 
     const startGps = async () => {
-      if (gpsChecking.current || gpsTracker.getState().running) return;
+      if (gpsChecking.current) return;
       gpsChecking.current = true;
       try {
         const started = await gpsTracker.start();
@@ -52,17 +46,11 @@ export default function RootLayout() {
           const now = Date.now();
           if (now - lastGpsFailureAt.current > 3000) {
             lastGpsFailureAt.current = now;
-            const message =
-              gpsTracker.getState().error ??
-              'Não foi possível iniciar o GPS automaticamente.';
             Alert.alert(
-              'GPS necessário',
-              message,
+              'GPS do celular',
+              gpsTracker.getState().error ?? 'Não foi possível iniciar o GPS automaticamente.',
               [
-                {
-                  text: 'Abrir configurações',
-                  onPress: () => void Linking.openSettings(),
-                },
+                { text: 'Abrir configurações', onPress: () => void Linking.openSettings() },
                 { text: 'Tentar novamente', onPress: () => void startGps() },
               ],
             );
@@ -73,14 +61,15 @@ export default function RootLayout() {
       }
     };
 
-    void checkBluetooth();
-    void startGps();
+    const startup = async () => {
+      await checkBluetooth();
+      await startGps();
+    };
+
+    void startup();
 
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') {
-        void checkBluetooth();
-        void startGps();
-      }
+      if (state === 'active') void startup();
     });
 
     return () => {
