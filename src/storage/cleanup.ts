@@ -35,7 +35,7 @@ export async function cleanupOldReadings(basePath: string, retentionDays = 30): 
   for (const file of files) {
     const filePath = `${readingsDir}/${file}`;
     const fileInfo = await FileSystem.getInfoAsync(filePath);
-    if (fileInfo.modificationTime && fileInfo.modificationTime * 1000 < cutoff) {
+    if ('modificationTime' in fileInfo && fileInfo.modificationTime && fileInfo.modificationTime * 1000 < cutoff) {
       await FileSystem.deleteAsync(filePath);
       removed++;
     }
