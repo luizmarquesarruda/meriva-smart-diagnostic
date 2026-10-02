@@ -1,5 +1,5 @@
 import { PermissionsAndroid, Platform, Linking } from 'react-native';
-import RNBluetoothClassic, { requestBluetoothEnabled } from 'react-native-bluetooth-classic';
+import RNBluetoothClassic from 'react-native-bluetooth-classic';
 import { BluetoothClassicTransport, BluetoothDeviceInfo, listBondedBluetoothDevices } from './bluetoothClassicTransport';
 import { ElmCommandResult, Elm327Session } from './elm327';
 
@@ -66,7 +66,7 @@ export async function ensureBluetoothReady(): Promise<boolean> {
   // Usa a API pública da biblioteca. No Android, ela abre o diálogo
   // nativo para o usuário ativar o rádio, sem tentar alterar o estado
   // silenciosamente.
-  const requested = await requestBluetoothEnabled();
+  const requested = await RNBluetoothClassic.requestBluetoothEnabled();
   if (!requested) {
     throw new Error('BLUETOOTH CONTINUA DESLIGADO. ATIVE-O PARA USAR O ELM327.');
   }
