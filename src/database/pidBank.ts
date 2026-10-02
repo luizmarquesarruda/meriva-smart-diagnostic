@@ -16,47 +16,70 @@ export interface PidConfirmationEntry {
   confidence: number;
 }
 
-export async function recordPidConfirmation(basePath: string, entry: PidConfirmationEntry): Promise<void> {
+const fileQueues = new Map<string, Promise<void>>();
+
+export async function recordPidConfirmation(
+  basePath: string,
+  entry: PidConfirmationEntry,
+): Promise<void> {
   const target = `${basePath}/BANCO/pids_meriva_confirmados.txt`;
-  await FileSystem.makeDirectoryAsync(`${basePath}/BANCO`, { intermediates: true });
+  const previous = fileQueues.get(target) ?? Promise.resolve();
+  const current = previous
+    .catch(() => undefined)
+    .then(async () => {
+      await FileSystem.makeDirectoryAsync(`${basePath}/BANCO`, { intermediates: true });
 
-  const line = [
-    entry.pid,
-    entry.name,
-    entry.classification,
-    entry.status,
-    entry.firstSeen,
-    entry.lastSeen,
-    entry.occurrences,
-    entry.protocol,
-    entry.responseTime,
-    entry.source,
-    entry.confidence,
-  ].join('|');
+      const line = [
+        entry.pid,
+        entry.name,
+        entry.classification,
+        entry.status,
+        entry.firstSeen,
+        entry.lastSeen,
+        entry.occurrences,
+        entry.protocol,
+        entry.responseTime,
+        entry.source,
+        entry.confidence,
+      ].join('|');
 
-  const info = await FileSystem.getInfoAsync(target);
-  if (!info.exists) {
-    await FileSystem.writeAsStringAsync(target, `${line}\n`, { encoding: FileSystem.EncodingType.UTF8 });
-    return;
+      const info = await FileSystem.getInfoAsync(target);
+      if (!info.exists) {
+        await FileSystem.writeAsStringAsync(target, `${line}\n`, {
+          encoding: FileSystem.EncodingType.UTF8,
+        });
+        return;
+      }
+
+      const currentContent = await FileSystem.readAsStringAsync(target);
+      const lines = currentContent.split('\n').filter((lineItem) => lineItem.trim());
+      const updated = lines
+        .map((lineItem) => (lineItem.startsWith(`${entry.pid}|`) ? line : lineItem))
+        .filter((lineItem) => lineItem.trim());
+
+      if (!updated.some((lineItem) => lineItem.startsWith(`${entry.pid}|`))) {
+        updated.push(line);
+      }
+
+      await FileSystem.writeAsStringAsync(target, `${updated.join('\n')}\n`, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+    });
+
+  fileQueues.set(target, current.catch(() => undefined));
+  try {
+    await current;
+  } finally {
+    if (fileQueues.get(target) === current) fileQueues.delete(target);
   }
-
-  const current = await FileSystem.readAsStringAsync(target);
-  const lines = current.split('\n').filter((lineItem) => lineItem.trim());
-  const updated = lines
-    .map((lineItem) => (lineItem.startsWith(`${entry.pid}|`) ? line : lineItem))
-    .filter((lineItem) => lineItem.trim());
-
-  if (!updated.some((lineItem) => lineItem.startsWith(`${entry.pid}|`))) {
-    updated.push(line);
-  }
-
-  await FileSystem.writeAsStringAsync(target, `${updated.join('\n')}\n`, {
-    encoding: FileSystem.EncodingType.UTF8,
-  });
 }
 
-export async function readPidConfirmations(basePath: string): Promise<PidConfirmationEntry[]> {
+export async function readPidConfirmations(
+  basePath: string,
+): Promise<PidConfirmationEntry[]> {
   const target = `${basePath}/BANCO/pids_meriva_confirmados.txt`;
+  await (fileQueues.get(target) ?? Promise.resolve()).catch(() => undefined);
+
   const info = await FileSystem.getInfoAsync(target);
   if (!info.exists) return [];
 
