@@ -34,6 +34,7 @@ const files = new Map();
 const dirs = new Set(['/doc']);
 let writeDelayMs = 0;
 let bluetoothListener = null;
+let bluetoothDisconnectListener = null;
 
 function parentDir(p) {
   const i = p.lastIndexOf('/');
@@ -232,12 +233,19 @@ async function testPidScanner() {
 
 async function testBluetoothEventTransport() {
   bluetoothListener = null;
+  bluetoothDisconnectListener = null;
   const { BluetoothClassicTransport } = loadTs(path.join(ROOT, 'src/obd/bluetoothClassicTransport.ts'));
   const transport = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF');
   await transport.open();
   await transport.write('010C\\r');
   const response = await transport.readUntilPrompt(500);
   assert.strictEqual(response, '41 0C 0C 18');
+  await transport.close();
+
+  await transport.open();
+  const pendingRead = transport.readUntilPrompt(500);
+  setTimeout(() => bluetoothDisconnectListener?.({ address: 'AA:BB:CC:DD:EE:FF' }), 30);
+  await assert.rejects(pendingRead, /BLUETOOTH DESCONECTADO|BLUETOOTH NÃO CONECTADO/);
   await transport.close();
 }
 
