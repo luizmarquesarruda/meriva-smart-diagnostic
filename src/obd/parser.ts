@@ -1,4 +1,5 @@
-import { getPidDefinition, PidDefinition } from './pidDefinition';
+import { getPidDefinition } from './pidDefinition';
+import type { PidDefinition } from './pidDefinition';
 
 export type ParseStatus = 'RESPONDEU' | 'NÃO RESPONDEU' | 'VALOR NÃO INTERPRETADO';
 
@@ -25,6 +26,7 @@ export function validateOBDResponse(response: string): boolean {
 
 export function parsePidResponse(pidRequested: string, rawResponse: string): ParsedPidResult {
   const pid = pidRequested.replace(/\s/g, '').toUpperCase();
+
   if (!rawResponse.trim() || /NO DATA|UNABLE TO CONNECT|ERROR/i.test(rawResponse)) {
     return {
       pid,
@@ -73,11 +75,7 @@ export function parsePidResponse(pidRequested: string, rawResponse: string): Par
     };
   }
 
-  const data = rawBytes.slice(
-    headerIndex + 2,
-    headerIndex + 2 + definition.bytes,
-  );
-
+  const data = rawBytes.slice(headerIndex + 2, headerIndex + 2 + definition.bytes);
   if (data.length !== definition.bytes) {
     return {
       pid,
