@@ -96,6 +96,8 @@ npx expo run:android
 5. identificar protocolo real sem valores fixos;
 6. validar em Android físico com ELM327 e veículo real.
 
+<!-- CI verification: typecheck and autosave tests -->
+
 ## Princípio
 
 **Evidência antes de conclusão.**
