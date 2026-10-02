@@ -17,16 +17,9 @@ export class BluetoothClassicTransport implements ObdTransport {
   constructor(private readonly deviceAddress: string) {}
 
   async open(): Promise<void> {
-    if (Platform.OS !== 'android') {
-      throw new Error('BLUETOOTH CLASSIC DISPONÍVEL SOMENTE NO ANDROID');
-    }
-
-    const available = await RNBluetoothClassic.isBluetoothAvailable();
-    if (!available) throw new Error('BLUETOOTH NÃO DISPONÍVEL NESTE APARELHO');
-
-    if (!(await RNBluetoothClassic.isBluetoothEnabled())) {
-      throw new Error('BLUETOOTH DESLIGADO');
-    }
+    if (Platform.OS !== 'android') throw new Error('BLUETOOTH CLASSIC DISPONÍVEL SOMENTE NO ANDROID');
+    if (!(await RNBluetoothClassic.isBluetoothAvailable())) throw new Error('BLUETOOTH NÃO DISPONÍVEL NESTE APARELHO');
+    if (!(await RNBluetoothClassic.isBluetoothEnabled())) throw new Error('BLUETOOTH DESLIGADO');
 
     this.device = await RNBluetoothClassic.connectToDevice(this.deviceAddress, {
       connectionType: 'delimited',
@@ -37,7 +30,6 @@ export class BluetoothClassicTransport implements ObdTransport {
 
     this.connected = true;
     this.received = '';
-
     this.subscription = this.device.onDataReceived((event) => {
       if (event?.data) this.received += String(event.data);
     });
@@ -46,15 +38,9 @@ export class BluetoothClassicTransport implements ObdTransport {
   async close(): Promise<void> {
     this.subscription?.remove();
     this.subscription = undefined;
-
     if (this.device && this.connected) {
-      try {
-        await this.device.disconnect();
-      } catch {
-        // conexão já encerrada
-      }
+      try { await this.device.disconnect(); } catch { /* já desconectado */ }
     }
-
     this.device = null;
     this.connected = false;
     this.received = '';
@@ -83,9 +69,8 @@ export class BluetoothClassicTransport implements ObdTransport {
           if (chunk) this.received += String(chunk);
         }
       } catch {
-        // Event listener may already have delivered the data.
+        // O evento pode já ter entregue os dados.
       }
-
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
 
@@ -97,10 +82,7 @@ export class BluetoothClassicTransport implements ObdTransport {
 }
 
 export async function listBondedBluetoothDevices(): Promise<BluetoothDeviceInfo[]> {
-  if (Platform.OS !== 'android') {
-    throw new Error('BLUETOOTH CLASSIC DISPONÍVEL SOMENTE NO ANDROID');
-  }
-
+  if (Platform.OS !== 'android') throw new Error('BLUETOOTH CLASSIC DISPONÍVEL SOMENTE NO ANDROID');
   const devices = await RNBluetoothClassic.getBondedDevices();
   return devices.map((device) => ({
     address: device.address,
