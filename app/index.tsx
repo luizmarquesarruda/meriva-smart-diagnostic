@@ -38,7 +38,7 @@ export default function IndexScreen() {
         } catch {
           loaded = [];
         }
-        if (!loaded.length) loaded = INITIAL_DRIVE_CYCLES; // REFERÊNCIA Car Scanner — não é histórico real
+        if (!loaded.length) loaded = INITIAL_DRIVE_CYCLES;
         updateAutoSaveState((state) => {
           state.driveCycles = loaded;
         });
@@ -131,6 +131,12 @@ export default function IndexScreen() {
         <Link href="/laboratorio" asChild>
           <TouchableOpacity style={styles.button}><Text style={styles.buttonText}>LABORATÓRIO OBD</Text></TouchableOpacity>
         </Link>
+        <Link href="/armazenamento" asChild>
+          <TouchableOpacity style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>ARMAZENAMENTO</Text></TouchableOpacity>
+        </Link>
+        <Link href="/configuracoes" asChild>
+          <TouchableOpacity style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>CONFIGURAÇÕES</Text></TouchableOpacity>
+        </Link>
       </ScrollView>
     </SafeAreaView>
   );
@@ -164,4 +170,6 @@ const styles = StyleSheet.create({
   historyMeta: { color: '#6b7280', marginTop: 2 },
   button: { backgroundColor: '#2563eb', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 8 },
   buttonText: { color: '#fff', fontWeight: '700' },
+  secondaryButton: { backgroundColor: '#fff', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 8, borderWidth: 1, borderColor: '#94a3b8' },
+  secondaryButtonText: { color: '#1f2937', fontWeight: '700' },
 });
