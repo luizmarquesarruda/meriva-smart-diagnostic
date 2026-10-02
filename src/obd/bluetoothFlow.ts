@@ -7,7 +7,7 @@ export type BluetoothFlowState = typeof BLUETOOTH_FLOW_STATES[keyof typeof BLUET
 export type BluetoothFlowEvent =
   | { type: 'BLUETOOTH_OFF' } | { type: 'BLUETOOTH_ON' } | { type: 'DEVICE_SELECTED' }
   | { type: 'DEVICE_CONNECTED' } | { type: 'ELM_RESPONDING' } | { type: 'ELM_INITIALIZED' }
-  | { type: 'ECU_READY' } | { type: 'ELM_FAILED' } | { type: 'ECU_FAILED' } | { type: 'RESET' };
+  | { type: 'ECU_READY' } | { type: 'DIAGNOSTIC_READY' } | { type: 'ELM_FAILED' } | { type: 'ECU_FAILED' } | { type: 'RESET' };
 export function reduceBluetoothFlow(state: BluetoothFlowState, event: BluetoothFlowEvent): BluetoothFlowState {
   switch (event.type) {
     case 'BLUETOOTH_OFF': return BLUETOOTH_FLOW_STATES.OFF;
@@ -17,6 +17,7 @@ export function reduceBluetoothFlow(state: BluetoothFlowState, event: BluetoothF
     case 'ELM_RESPONDING': return state === BLUETOOTH_FLOW_STATES.CONNECTED ? BLUETOOTH_FLOW_STATES.ELM_RESPONDING : state;
     case 'ELM_INITIALIZED': return state === BLUETOOTH_FLOW_STATES.ELM_RESPONDING ? BLUETOOTH_FLOW_STATES.ELM_INITIALIZED : state;
     case 'ECU_READY': return state === BLUETOOTH_FLOW_STATES.ELM_INITIALIZED ? BLUETOOTH_FLOW_STATES.ECU_READY : state;
+    case 'DIAGNOSTIC_READY': return state === BLUETOOTH_FLOW_STATES.ECU_READY ? BLUETOOTH_FLOW_STATES.READY : state;
     case 'RESET': return BLUETOOTH_FLOW_STATES.OFF;
     case 'ELM_FAILED': return BLUETOOTH_FLOW_STATES.ELM_FAILED;
     case 'ECU_FAILED': return BLUETOOTH_FLOW_STATES.ECU_FAILED;
