@@ -1,5 +1,4 @@
 // MERIVA SMART DIAGNOSTIC — Envelope de autosave
-// Arquivo para copiar em: <repo>/src/meriva/autosaveTypes.ts
 
 export const AUTOSAVE_SCHEMA_VERSION = 1;
 export const AUTOSAVE_DATA_TYPE = 'APP_STATE';
@@ -13,4 +12,10 @@ export interface AutoSaveEnvelope<T> {
   dataType: string;
   source: string;
   payload: T;
+}
+
+export interface AutoSaveStatus {
+  lastSavedAt: string | null;
+  lastSaveReason: SaveReason | null;
+  lastError: string | null;
 }
