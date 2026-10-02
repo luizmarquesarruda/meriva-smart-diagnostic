@@ -7,8 +7,6 @@ import { SimulatedObdTransport } from '../src/obd/simulatedTransport';
 import { BluetoothDeviceInfo } from '../src/obd/bluetoothClassicTransport';
 import { createRealElmSession, discoverPairedDevices } from '../src/obd/bluetoothManager';
 import {
-  getAutoSaveState,
-  getAutoSaveStatus,
   initAutoSave,
   startObdSessionCheckpoint,
   stopObdSessionCheckpoint,
