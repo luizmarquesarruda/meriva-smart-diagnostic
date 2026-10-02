@@ -19,7 +19,9 @@ import {
   AUTOSAVE_SCHEMA_VERSION,
   AUTOSAVE_SOURCE,
   SaveReason,
+  AutoSaveStatus,
 } from './autosaveTypes';
+export type { AutoSaveStatus } from './autosaveTypes';
 import { MerivaPersistedState, createEmptyMerivaState } from './autosaveState';
 import { hydrateState, isValidEnvelope, validatePayload } from './autosaveValidation';
 import { migrateEnvelope } from './autosaveMigrations';
@@ -27,12 +29,6 @@ import { migrateEnvelope } from './autosaveMigrations';
 const DEBOUNCE_MS = 1500;
 const CHECKPOINT_MS = 45000;
 const MAX_LAST_READINGS = 50;
-
-export interface AutoSaveStatus {
-  lastSavedAt: string | null;
-  lastSaveReason: SaveReason | null;
-  lastError: string | null;
-}
 
 interface AutosaveRuntime {
   basePath: string;
