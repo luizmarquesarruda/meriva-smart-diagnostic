@@ -358,6 +358,32 @@ async function testDtcStorage() {
   assert.strictEqual(dtcs[0].code, 'P0133');
 }
 
+async function testBackupCompleteness() {
+  resetFS();
+  const m = loadTs(path.join(ROOT, 'src/meriva/autosaveManager.ts'));
+  m.disposeAutoSave();
+  await m.initAutoSave(BASE);
+  const backup = loadTs(path.join(ROOT, 'src/storage/backup.ts'));
+
+  const expectedDirs = ['BANCO', 'APRENDIZADO', 'DTC', 'CONFIG', 'LEITURAS', 'LOGS', 'VIAGENS'];
+  for (const dir of expectedDirs) {
+    await fakeFS.writeAsStringAsync(`${BASE}/${dir}/arquivo.txt`, dir);
+  }
+
+  const info = await backup.createBackup(BASE);
+  assert.deepStrictEqual(info.includes, expectedDirs);
+
+  const backupRoot = `${BASE}/BACKUP/meriva_smart_${info.timestamp}`;
+  for (const dir of expectedDirs) {
+    assert.strictEqual(
+      files.get(`${backupRoot}/${dir}/arquivo.txt`),
+      dir,
+      `backup deve conter ${dir}`,
+    );
+  }
+  m.disposeAutoSave();
+}
+
 async function testAutosaveRace() {
   resetFS();
   const m = loadTs(path.join(ROOT, 'src/meriva/autosaveManager.ts'));
@@ -397,6 +423,7 @@ async function main() {
     ['perfil do veículo', testVehicleProfile],
     ['drive cycles', testDriveCycleValidation],
     ['DTC persistência', testDtcStorage],
+    ['backup completo', testBackupCompleteness],
     ['autosave race', testAutosaveRace],
   ];
 
