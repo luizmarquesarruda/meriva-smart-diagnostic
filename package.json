@@ -10,7 +10,10 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "prebuild": "expo prebuild --clean",
-    "test": "node tests/merivaAutosave.test.js"
+    "test": "node tests/merivaAutosave.test.js",
+    "build:apk": "eas build --platform android --profile preview",
+    "build:production": "eas build --platform android --profile production",
+    "doctor": "npx expo-doctor"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "1.23.1",
