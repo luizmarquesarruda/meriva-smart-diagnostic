@@ -244,7 +244,7 @@ async function testBluetoothEventTransport() {
 
   await transport.open();
   const pendingRead = transport.readUntilPrompt(500);
-  setTimeout(() => bluetoothDisconnectListener?.({ address: 'AA:BB:CC:DD:EE:FF' }), 30);
+  bluetoothDisconnectListener?.({ address: 'AA:BB:CC:DD:EE:FF' });
   await assert.rejects(pendingRead, /BLUETOOTH DESCONECTADO|BLUETOOTH NÃO CONECTADO/);
   await transport.close();
 }
