@@ -1,5 +1,5 @@
 import * as FileSystem from 'expo-file-system';
-import { appendTxtEntry, TxtEntry, parseTxtEntries } from '../database/txtDatabase';
+import { appendTxtEntry, parseTxtEntries } from '../database/txtDatabase';
 
 export interface SeedImportState {
   seedVersion: string;
@@ -18,9 +18,19 @@ export async function getSeedImportState(basePath: string): Promise<SeedImportSt
   try {
     const stateFile = `${basePath}/CONFIG/${SEED_STATE_FILE}`;
     const info = await FileSystem.getInfoAsync(stateFile);
-    if (!info.exists) return null;
+    if (!info.exists || info.isDirectory) return null;
     const content = await FileSystem.readAsStringAsync(stateFile);
-    return JSON.parse(content) as SeedImportState;
+    const state = JSON.parse(content) as Partial<SeedImportState>;
+    if (typeof state.seedVersion !== 'string' || typeof state.seedImported !== 'boolean') return null;
+    return {
+      seedVersion: state.seedVersion,
+      seedImported: state.seedImported,
+      seedImportDate: typeof state.seedImportDate === 'string' ? state.seedImportDate : '',
+      pidsImported: Number(state.pidsImported) || 0,
+      observationsImported: Number(state.observationsImported) || 0,
+      dtcHistoricalImported: Number(state.dtcHistoricalImported) || 0,
+      consumptionReferencesImported: Number(state.consumptionReferencesImported) || 0,
+    };
   } catch {
     return null;
   }
@@ -74,20 +84,19 @@ export async function importCarScannerBaseline(basePath: string, seedContent: st
   return state;
 }
 
-export async function initializeWarmStart(basePath: string): Promise<void> {
+/**
+ * O warm start recebe o conteúdo do seed explicitamente.
+ * Não depende de um caminho dentro de documentDirectory, que não é uma
+ * garantia de acesso ao código-fonte empacotado no Android.
+ */
+export async function initializeWarmStart(
+  basePath: string,
+  seedContent?: string,
+): Promise<SeedImportState | null> {
   const state = await getSeedImportState(basePath);
-  if (state?.seedImported) return;
-
-  try {
-    const seedPath = `${FileSystem.documentDirectory}../src/data/meriva_carscanner_baseline.txt`;
-    const info = await FileSystem.getInfoAsync(seedPath);
-    if (info.exists) {
-      const content = await FileSystem.readAsStringAsync(seedPath);
-      await importCarScannerBaseline(basePath, content);
-    }
-  } catch (error) {
-    console.warn('Could not auto-import baseline seed:', error instanceof Error ? error.message : 'unknown error');
-  }
+  if (state?.seedImported) return state;
+  if (!seedContent) return null;
+  return importCarScannerBaseline(basePath, seedContent);
 }
 
 export async function hasValidSeed(basePath: string): Promise<boolean> {

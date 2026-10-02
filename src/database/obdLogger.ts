@@ -13,41 +13,53 @@ export interface RawObdLogEntry {
   source: 'REAL' | 'SIMULACAO';
 }
 
-export async function logRawObdData(basePath: string, query: PidQueryResult, pid: string, source: 'REAL' | 'SIMULACAO'): Promise<void> {
+export async function logRawObdData(
+  basePath: string,
+  query: PidQueryResult,
+  pid: string,
+  source: 'REAL' | 'SIMULACAO',
+): Promise<void> {
   const today = new Date().toISOString().split('T')[0];
   const fileName = `obd_raw_${today}.csv`;
   const filePath = `${basePath}/LOGS/${fileName}`;
 
   const row: CsvRow = {
     timestamp: new Date().toISOString(),
-    pid: pid,
-    nome: query.parsed.name,
-    valor: query.rx,
-    unidade: source,
-    rpm: query.elapsedMs,
-    temperatura: undefined,
-    velocidade: undefined,
-    condicao: query.commandStatus,
+    tx: query.tx,
+    rx: query.rx,
+    pid,
+    responseTimeMs: query.elapsedMs,
+    commandStatus: query.commandStatus,
+    protocol: query.protocol ?? 'N/D',
+    source,
   };
 
   await appendCsvRow(filePath, row);
 }
 
-export async function logInterpretedData(basePath: string, query: PidQueryResult, pid: string, source: 'REAL' | 'SIMULACAO'): Promise<void> {
+export async function logInterpretedData(
+  basePath: string,
+  query: PidQueryResult,
+  pid: string,
+  source: 'REAL' | 'SIMULACAO',
+): Promise<void> {
   const today = new Date().toISOString().split('T')[0];
   const fileName = `obd_interpreted_${today}.csv`;
   const filePath = `${basePath}/LOGS/${fileName}`;
 
   const row: CsvRow = {
     timestamp: new Date().toISOString(),
-    pid: pid,
+    tx: query.tx,
+    rx: query.rx,
+    pid,
     nome: query.parsed.name,
     valor: query.parsed.value ?? 'SEM_DADOS',
     unidade: query.parsed.unit,
-    rpm: undefined,
-    temperatura: undefined,
-    velocidade: undefined,
-    condicao: `${query.parsed.status}|${source}`,
+    responseTimeMs: query.elapsedMs,
+    commandStatus: query.commandStatus,
+    protocol: query.protocol ?? 'N/D',
+    source,
+    condicao: query.parsed.status,
   };
 
   await appendCsvRow(filePath, row);

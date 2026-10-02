@@ -1,15 +1,3 @@
-// MERIVA SMART DIAGNOSTIC — Camada central de persistência automática
-// Arquivo para copiar em: <repo>/src/meriva/autosaveManager.ts
-//
-// Estrutura de arquivos (dentro de MERIVA_SMART/CONFIG/):
-//   autosave.json          — último estado válido
-//   autosave.json.tmp      — gravação temporária (validada antes de virar principal)
-//   autosave.previous.json — fallback do penúltimo estado válido
-//
-// Fluxo: alteração em memória -> debounce 1,5 s -> gravação atômica.
-// Checkpoint periódico durante sessão OBD ativa (45 s) e save forçado
-// em eventos críticos (desconexão, fim de sessão, DTC, background).
-
 import * as FileSystem from 'expo-file-system';
 import { AppState } from 'react-native';
 import type { AppStateStatus } from 'react-native';
@@ -35,6 +23,7 @@ interface AutosaveRuntime {
   state: MerivaPersistedState;
   dirty: boolean;
   saving: boolean;
+  mutationVersion: number;
   lastSavedAt: string | null;
   lastSaveReason: SaveReason | null;
   lastError: string | null;
@@ -48,6 +37,7 @@ const runtime: AutosaveRuntime = {
   state: createEmptyMerivaState(),
   dirty: false,
   saving: false,
+  mutationVersion: 0,
   lastSavedAt: null,
   lastSaveReason: null,
   lastError: null,
@@ -55,8 +45,6 @@ const runtime: AutosaveRuntime = {
   checkpointTimer: null,
   appStateSubscription: null,
 };
-
-// ---------- caminhos ----------
 
 function mainPath(basePath: string): string {
   return `${basePath}/CONFIG/autosave.json`;
@@ -81,8 +69,6 @@ export async function ensureStorageDirs(basePath: string): Promise<void> {
   for (const dir of dirs) await ensureDir(`${basePath}/${dir}`);
 }
 
-// ---------- leitura / recuperação ----------
-
 async function readEnvelope(path: string): Promise<AutoSaveEnvelope<MerivaPersistedState> | null> {
   try {
     const info = await FileSystem.getInfoAsync(path);
@@ -94,7 +80,7 @@ async function readEnvelope(path: string): Promise<AutoSaveEnvelope<MerivaPersis
     if (!migrated || !validatePayload(migrated.payload)) return null;
     return migrated;
   } catch {
-    return null; // corrompido ou ilegível — tenta o fallback
+    return null;
   }
 }
 
@@ -103,17 +89,19 @@ async function loadLastValidEnvelope(
 ): Promise<AutoSaveEnvelope<MerivaPersistedState> | null> {
   const main = await readEnvelope(mainPath(basePath));
   if (main) return main;
-  return readEnvelope(previousPath(basePath)); // fallback do último estado válido
+  return readEnvelope(previousPath(basePath));
 }
-
-// ---------- gravação atômica ----------
 
 async function persistNow(reason: SaveReason): Promise<boolean> {
   if (runtime.saving) {
-    runtime.dirty = true; // gravando agora; checkpoint/debounce cobre a próxima
+    runtime.dirty = true;
     return false;
   }
+
   runtime.saving = true;
+  const mutationVersionAtStart = runtime.mutationVersion;
+  let saved = false;
+
   try {
     const envelope: AutoSaveEnvelope<MerivaPersistedState> = {
       schemaVersion: AUTOSAVE_SCHEMA_VERSION,
@@ -125,12 +113,10 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
     const content = JSON.stringify(envelope, null, 2);
     const base = runtime.basePath;
 
-    // 1) grava temporário
     await FileSystem.writeAsStringAsync(tmpPath(base), content, {
       encoding: FileSystem.EncodingType.UTF8,
     });
 
-    // 2) confirma integridade lendo de volta
     const readBack = await FileSystem.readAsStringAsync(tmpPath(base), {
       encoding: FileSystem.EncodingType.UTF8,
     });
@@ -139,39 +125,39 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
       throw new Error('AUTOSAVE_VALIDACAO_FALHOU');
     }
 
-    // 3) preserva o último estado válido como fallback
     const mainInfo = await FileSystem.getInfoAsync(mainPath(base));
     if (mainInfo.exists) {
       await FileSystem.copyAsync({ from: mainPath(base), to: previousPath(base) });
     }
 
-    // 4) promove o temporário e descarta
     await FileSystem.copyAsync({ from: tmpPath(base), to: mainPath(base) });
     await FileSystem.deleteAsync(tmpPath(base), { idempotent: true });
 
     runtime.lastSavedAt = envelope.savedAt;
     runtime.lastSaveReason = reason;
     runtime.lastError = null;
-    runtime.dirty = false;
+    runtime.dirty = runtime.mutationVersion !== mutationVersionAtStart;
+    saved = true;
     return true;
   } catch (cause) {
-    // Nunca apaga o último save válido; erro fica registrado em silêncio.
+    runtime.dirty = true;
     runtime.lastError = cause instanceof Error ? cause.message : 'ERRO DESCONHECIDO NO AUTOSAVE';
     console.warn('[autosave] falha ao salvar:', runtime.lastError);
     return false;
   } finally {
     runtime.saving = false;
+    if (saved && runtime.dirty) {
+      scheduleDebouncedSave();
+    }
   }
 }
 
-// ---------- API pública ----------
-
-/**
- * Inicializa o armazenamento e restaura o último estado válido.
- * Idempotente: chamar duas vezes com o mesmo basePath não recarrega do disco.
- */
 export async function initAutoSave(basePath: string): Promise<MerivaPersistedState> {
   if (runtime.basePath === basePath) return runtime.state;
+
+  if (runtime.basePath && runtime.basePath !== basePath) {
+    disposeAutoSave();
+  }
 
   await ensureStorageDirs(basePath);
   runtime.basePath = basePath;
@@ -179,6 +165,10 @@ export async function initAutoSave(basePath: string): Promise<MerivaPersistedSta
   const envelope = await loadLastValidEnvelope(basePath);
   runtime.state = envelope ? hydrateState(envelope.payload) : createEmptyMerivaState();
   runtime.lastSavedAt = envelope?.savedAt ?? null;
+  runtime.lastSaveReason = null;
+  runtime.lastError = null;
+  runtime.dirty = false;
+  runtime.mutationVersion = 0;
 
   if (!runtime.appStateSubscription) {
     runtime.appStateSubscription = AppState.addEventListener(
@@ -204,14 +194,13 @@ export function getAutoSaveStatus(): AutoSaveStatus {
   };
 }
 
-/** Aplica uma mutação ao estado em memória e agenda o autosave com debounce. */
 export function updateAutoSaveState(mutate: (state: MerivaPersistedState) => void): void {
   mutate(runtime.state);
   runtime.dirty = true;
+  runtime.mutationVersion += 1;
   scheduleDebouncedSave();
 }
 
-/** Guarda a leitura mais recente por PID (mantém as últimas MAX_LAST_READINGS). */
 export function pushLastReading(reading: MerivaPersistedState['lastReadings'][number]): void {
   updateAutoSaveState((state) => {
     state.lastReadings = [
@@ -230,7 +219,6 @@ function scheduleDebouncedSave(): void {
   }, DEBOUNCE_MS);
 }
 
-/** Salva imediatamente (eventos críticos, DTC, desconexão, encerramento). */
 export async function saveNow(reason: SaveReason = 'critical'): Promise<boolean> {
   if (runtime.debounceTimer) {
     clearTimeout(runtime.debounceTimer);
@@ -239,7 +227,6 @@ export async function saveNow(reason: SaveReason = 'critical'): Promise<boolean>
   return persistNow(reason);
 }
 
-/** Checkpoint periódico durante sessão OBD ativa. */
 export function startObdSessionCheckpoint(): void {
   if (runtime.checkpointTimer) return;
   runtime.checkpointTimer = setInterval(() => {
@@ -254,7 +241,6 @@ export function stopObdSessionCheckpoint(): void {
   }
 }
 
-/** Encerra timers/listeners — para testes e encerramento do app. */
 export function disposeAutoSave(): void {
   if (runtime.debounceTimer) clearTimeout(runtime.debounceTimer);
   if (runtime.checkpointTimer) clearInterval(runtime.checkpointTimer);
@@ -265,4 +251,9 @@ export function disposeAutoSave(): void {
   runtime.basePath = '';
   runtime.state = createEmptyMerivaState();
   runtime.dirty = false;
+  runtime.saving = false;
+  runtime.mutationVersion = 0;
+  runtime.lastSavedAt = null;
+  runtime.lastSaveReason = null;
+  runtime.lastError = null;
 }

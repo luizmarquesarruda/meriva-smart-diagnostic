@@ -43,7 +43,7 @@ export default function ConfiguracaoScreen() {
     try {
       const info = await createBackup(storageBase);
       setStatus(`BACKUP CRIADO: ${info.timestamp}`);
-    } catch (cause) {
+    } catch {
       setStatus('FALHA NO BACKUP');
     } finally {
       setBusy(false);
@@ -58,7 +58,7 @@ export default function ConfiguracaoScreen() {
       const logs = await cleanupOldLogs(storageBase);
       const readings = await cleanupOldReadings(storageBase);
       setStatus(`REMOVIDOS: ${logs} LOGS, ${readings} LEITURAS`);
-    } catch (cause) {
+    } catch {
       setStatus('FALHA NA LIMPEZA');
     } finally {
       setBusy(false);
@@ -70,7 +70,7 @@ export default function ConfiguracaoScreen() {
     if (busy) return;
     setBusy(true);
     try {
-      const result = await exportAutoSaveTxt(getAutoSaveState(), '1.0.0');
+      const result = await exportAutoSaveTxt(getAutoSaveState(), '1.0.1');
       if (result.ok) {
         setStatus(`EXPORTADO: ${result.fileName}`);
       } else if (result.reason === 'CANCELADO') {
@@ -93,7 +93,7 @@ export default function ConfiguracaoScreen() {
       <Text style={styles.info}>ÚLTIMO SALVAMENTO: {formatTime(saveStatus.lastSavedAt)}</Text>
       {saveStatus.lastError ? <Text style={styles.error}>FALHA NO AUTOSAVE: {saveStatus.lastError}</Text> : null}
       <TouchableOpacity style={[styles.button, styles.disabled]} disabled>
-        <Text style={styles.buttonText}>DEFINIR VEÍCULO — EM DESENVOLVIMENTO</Text>
+        <Text style={styles.buttonText}>DEFINIR VEÍCULO: EM DESENVOLVIMENTO</Text>
       </TouchableOpacity>
       <TouchableOpacity style={styles.button} onPress={handleBackup} disabled={busy}>
         <Text style={styles.buttonText}>{busy ? 'AGUARDE...' : 'FAZER BACKUP'}</Text>

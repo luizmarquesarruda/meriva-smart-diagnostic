@@ -1,10 +1,8 @@
-// MERIVA SMART DIAGNOSTIC — Ponte OBD -> armazenamento -> autosave
-// Arquivo para copiar em: <repo>/src/meriva/autosaveIntegration.ts
+// MERIVA SMART DIAGNOSTIC: Ponte OBD -> armazenamento -> autosave
 //
-// Integra os módulos que JÁ EXISTEM (obdLogger, pidBank, learningProfile)
-// ao autosave, SEM criar segunda arquitetura. Dados de simulação
-// são gravados nos logs com source=SIMULACAO mas NUNCA alimentam
-// o banco de PIDs confirmados nem o aprendizado (regra shouldFeedLearning).
+// Integra os módulos que já existem (obdLogger, pidBank, learningProfile)
+// ao autosave. Dados de simulação são gravados nos logs, mas nunca alimentam
+// o banco de PIDs confirmados nem o aprendizado.
 
 import type { PidQueryResult } from '../obd/elm327';
 import { logRawObdData, logInterpretedData } from '../database/obdLogger';
@@ -14,17 +12,12 @@ import type { VehicleCondition } from '../types/sourceTypes';
 import { pushLastReading, updateAutoSaveState, saveNow } from './autosaveManager';
 import { shouldFeedLearning } from './autosaveValidation';
 
-/**
- * Registra o resultado de uma consulta OBD real (ou de simulação,
- * explicitamente marcada) nos logs CSV existentes e no autosave.
- */
 export async function registerObdQuery(
   basePath: string,
   result: PidQueryResult,
   source: 'REAL' | 'SIMULACAO',
   condition: VehicleCondition = 'UNKNOWN',
 ): Promise<void> {
-  // 1) logs CSV que já existem no projeto (raw + interpretado)
   try {
     await logRawObdData(basePath, result, result.parsed.pid, source);
     await logInterpretedData(basePath, result, result.parsed.pid, source);
@@ -32,7 +25,6 @@ export async function registerObdQuery(
     console.warn('[autosave] falha ao gravar logs OBD:', cause instanceof Error ? cause.message : cause);
   }
 
-  // 2) telemetria recente no autosave (com debounce interno)
   pushLastReading({
     pid: result.parsed.pid,
     name: result.parsed.name,
@@ -42,7 +34,6 @@ export async function registerObdQuery(
     timestamp: new Date().toISOString(),
   });
 
-  // 3) banco de PIDs confirmados + aprendizado — SOMENTE dados reais válidos
   const parsedValue = result.parsed.value;
   if (shouldFeedLearning(source, result.parsed.status, parsedValue) && parsedValue !== null) {
     try {
@@ -58,8 +49,7 @@ export async function registerObdQuery(
         firstSeen: prior?.firstSeen ?? now,
         lastSeen: now,
         occurrences: (prior?.occurrences ?? 0) + 1,
-        // baseline documentado do veículo (ISO 14230-4 KWP) — confirmado em comunicação real quando disponível
-        protocol: prior?.protocol ?? 'ISO 14230-4 KWP',
+        protocol: prior?.protocol ?? result.protocol ?? 'N/D',
         responseTime: result.elapsedMs,
         source: 'REAL_OBD',
         confidence: prior ? prior.confidence + 1 : 1,
@@ -77,7 +67,6 @@ export async function registerObdQuery(
     }
   }
 
-  // 4) simulação nunca contamina o aprendizado (contagem opcional)
   if (source === 'SIMULACAO') {
     updateAutoSaveState((state) => {
       state.settings.simulationQueries = (Number(state.settings.simulationQueries) || 0) + 1;
@@ -85,7 +74,6 @@ export async function registerObdQuery(
   }
 }
 
-/** Save forçado em eventos críticos da sessão OBD (desconexão, encerramento). */
 export async function forceSaveOnObdEvent(): Promise<void> {
   await saveNow('critical');
 }

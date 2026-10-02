@@ -23,6 +23,7 @@ export interface PidQueryResult {
   rx: string;
   elapsedMs: number;
   commandStatus: ElmCommandStatus;
+  protocol: string | null;
   parsed: ReturnType<typeof parsePidResponse>;
 }
 
@@ -37,6 +38,7 @@ function classifyResponse(response: string): ElmCommandStatus {
 export class Elm327Session {
   private opened = false;
   private initializing = false;
+  private protocol: string | null = null;
 
   constructor(private readonly transport: ObdTransport) {}
 
@@ -47,6 +49,7 @@ export class Elm327Session {
     try {
       await this.transport.open();
       this.opened = true;
+      this.protocol = null;
       const results: ElmCommandResult[] = [];
 
       for (const command of ['ATZ', 'ATE0', 'ATL0', 'ATS0', 'ATH1', 'ATSP0']) {
@@ -56,14 +59,27 @@ export class Elm327Session {
           throw new Error(`ELM NÃO ACEITOU ${command}: ${result.status}`);
         }
       }
+
+      const protocolResult = await this.command('ATDP');
+      results.push(protocolResult);
+      if (protocolResult.status === 'OK') {
+        const protocol = protocolResult.response.trim();
+        this.protocol = protocol || null;
+      }
+
       return results;
     } catch (cause) {
       this.opened = false;
       try { await this.transport.close(); } catch { /* preserva erro original */ }
+      this.protocol = null;
       throw cause;
     } finally {
       this.initializing = false;
     }
+  }
+
+  getProtocol(): string | null {
+    return this.protocol;
   }
 
   async queryPid(pid: string): Promise<PidQueryResult> {
@@ -77,6 +93,7 @@ export class Elm327Session {
       rx: result.response,
       elapsedMs: result.elapsedMs,
       commandStatus: result.status,
+      protocol: this.protocol,
       parsed,
     };
   }
@@ -84,6 +101,7 @@ export class Elm327Session {
   async close(): Promise<void> {
     if (this.opened) await this.transport.close();
     this.opened = false;
+    this.protocol = null;
   }
 
   private async command(command: string, attempt = 1): Promise<ElmCommandResult> {

@@ -25,6 +25,7 @@ export interface BluetoothConnectionState {
 export interface RealElmConnection {
   session: Elm327Session;
   initialization: ElmCommandResult[];
+  protocol: string | null;
 }
 
 export async function requestBluetoothPermissions(): Promise<void> {
@@ -63,14 +64,12 @@ export async function ensureBluetoothReady(): Promise<boolean> {
   const enabled = await RNBluetoothClassic.isBluetoothEnabled();
   if (enabled) return true;
 
-  // Usa a API pública da biblioteca. No Android, ela abre o diálogo
-  // nativo para o usuário ativar o rádio, sem tentar alterar o estado
-  // silenciosamente.
   type BluetoothClassicWithEnable = typeof RNBluetoothClassic & {
     requestBluetoothEnabled?: () => Promise<boolean>;
   };
   const bluetoothClassic = RNBluetoothClassic as BluetoothClassicWithEnable;
   const requestBluetoothEnabled = bluetoothClassic.requestBluetoothEnabled;
+
   if (typeof requestBluetoothEnabled !== 'function') {
     throw new Error('BIBLIOTECA BLUETOOTH SEM SUPORTE PARA ATIVAÇÃO DO RÁDIO.');
   }
@@ -102,5 +101,5 @@ export async function createRealElmSession(device: BluetoothDeviceInfo): Promise
   await ensureBluetoothReady();
   const session = new Elm327Session(new BluetoothClassicTransport(device.address));
   const initialization = await session.initialize();
-  return { session, initialization };
+  return { session, initialization, protocol: session.getProtocol() };
 }

@@ -1,12 +1,3 @@
-// MERIVA SMART DIAGNOSTIC — Quota de armazenamento
-// ARQUIVO DE SUBSTITUIÇÃO para: <repo>/src/storage/quotaManager.ts
-//
-// Correção da auditoria: o cálculo anterior lia "${basePath}/../.size",
-// um arquivo que nunca é criado — o resultado era sempre 0 MB.
-// Agora o tamanho é calculado recursivamente pelos arquivos reais.
-// A interface pública (getStorageUsage / checkStorageQuota) é preservada;
-// getStorageBreakdown é adicional, para a tela de armazenamento.
-
 import * as FileSystem from 'expo-file-system';
 
 export interface StorageQuotaConfig {
@@ -26,12 +17,10 @@ async function getEntrySizeBytes(path: string): Promise<number> {
     if (!info.isDirectory) return info.size ?? 0;
     const children = await FileSystem.readDirectoryAsync(path);
     let total = 0;
-    for (const child of children) {
-      total += await getEntrySizeBytes(`${path}/${child}`);
-    }
+    for (const child of children) total += await getEntrySizeBytes(`${path}/${child}`);
     return total;
   } catch {
-    return 0; // item ilegível não deve derrubar a medição
+    return 0;
   }
 }
 
@@ -48,16 +37,20 @@ export async function getStorageBreakdown(basePath: string): Promise<Record<stri
   return breakdown;
 }
 
-export async function getStorageUsage(basePath: string): Promise<{ usedMb: number; limitMb: number }> {
+export async function getStorageUsage(
+  basePath: string,
+  limitMb: number = DEFAULT_LIMIT_MB,
+): Promise<{ usedMb: number; limitMb: number }> {
+  const safeLimitMb = Number.isFinite(limitMb) && limitMb > 0 ? limitMb : DEFAULT_LIMIT_MB;
   const bytes = await getEntrySizeBytes(basePath);
-  return { usedMb: toMb(bytes), limitMb: DEFAULT_LIMIT_MB };
+  return { usedMb: toMb(bytes), limitMb: safeLimitMb };
 }
 
 export async function checkStorageQuota(
   basePath: string,
   config: StorageQuotaConfig,
 ): Promise<{ warning: boolean; critical: boolean; message: string }> {
-  const { usedMb, limitMb } = await getStorageUsage(basePath);
+  const { usedMb, limitMb } = await getStorageUsage(basePath, config.limitMb);
   const percentUsed = usedMb / limitMb;
 
   if (percentUsed >= 1) {
