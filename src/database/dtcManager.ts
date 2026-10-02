@@ -1,17 +1,7 @@
 import * as FileSystem from 'expo-file-system';
-import { DataSource, DtcStatus } from '../types/sourceTypes';
+import type { DataSource, DtcStatus, DtcRecord } from '../types/sourceTypes';
 
-export interface DtcRecord {
-  code: string;
-  description?: string;
-  status: DtcStatus;
-  firstSeen: string;
-  lastSeen: string;
-  occurrences: number;
-  source: DataSource;
-  historical: boolean;
-  confirmed?: boolean;
-}
+export type { DtcRecord } from '../types/sourceTypes';
 
 export async function recordDtc(basePath: string, dtc: DtcRecord): Promise<void> {
   await FileSystem.makeDirectoryAsync(`${basePath}/DTC`, { intermediates: true });
@@ -47,20 +37,34 @@ export async function readDtcs(basePath: string): Promise<DtcRecord[]> {
   if (!info.exists) return [];
 
   const content = await FileSystem.readAsStringAsync(target);
-  return content.split('\n').filter((line) => line.trim()).map((line) => {
-    const [code, description, status, firstSeen, lastSeen, occurrences, source, historical, confirmed] = line.split('|');
-    return {
-      code,
-      description: description || undefined,
-      status: (status as DtcStatus) || 'UNKNOWN',
-      firstSeen,
-      lastSeen,
-      occurrences: Number(occurrences || 0),
-      source: (source as DataSource) || 'IMPORTADO',
-      historical: historical === 'true',
-      confirmed: confirmed === 'true',
-    };
-  });
+  return content
+    .split('\n')
+    .filter((line) => line.trim())
+    .map((line) => {
+      const [
+        code,
+        description,
+        status,
+        firstSeen,
+        lastSeen,
+        occurrences,
+        source,
+        historical,
+        confirmed,
+      ] = line.split('|');
+
+      return {
+        code,
+        description: description || undefined,
+        status: (status as DtcStatus) || 'UNKNOWN',
+        firstSeen,
+        lastSeen,
+        occurrences: Number(occurrences || 0),
+        source: (source as DataSource) || 'IMPORTADO',
+        historical: historical === 'true',
+        confirmed: confirmed === 'true',
+      };
+    });
 }
 
 export async function getCurrentDtcs(basePath: string): Promise<DtcRecord[]> {
