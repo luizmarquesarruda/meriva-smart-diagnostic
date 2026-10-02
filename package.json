@@ -10,7 +10,7 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "prebuild": "expo prebuild --clean",
-    "test": "node tests/merivaAutosave.test.js"
+    "test": "node tests/merivaAutosave.test.js && node tests/bluetoothFlow.test.js"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "1.23.1",
