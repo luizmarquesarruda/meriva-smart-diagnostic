@@ -410,6 +410,42 @@ async function testCsvWriteSerialization() {
   assert.strictEqual(content.split('\n').filter(Boolean).length, 3);
 }
 
+async function testPidAndLearningWriteSerialization() {
+  resetFS();
+  const pidBank = loadTs(path.join(ROOT, 'src/database/pidBank.ts'));
+  writeDelayMs = 25;
+  const baseEntry = {
+    name: 'RPM',
+    classification: 'PADRAO_OBD',
+    status: 'CONFIRMADO',
+    firstSeen: '2026-10-02T20:00:00.000Z',
+    lastSeen: '2026-10-02T20:00:00.000Z',
+    occurrences: 1,
+    protocol: 'ISO 14230-4',
+    responseTime: 10,
+    source: 'REAL_OBD',
+    confidence: 1,
+  };
+  await Promise.all([
+    pidBank.recordPidConfirmation(BASE, { pid: '010C', ...baseEntry }),
+    pidBank.recordPidConfirmation(BASE, { pid: '0105', ...baseEntry, name: 'COOLANT' }),
+  ]);
+  const confirmations = await pidBank.readPidConfirmations(BASE);
+  assert.strictEqual(confirmations.length, 2);
+
+  const learning = loadTs(path.join(ROOT, 'src/database/learningProfile.ts'));
+  await learning.createLearningProfile(BASE, '');  
+  await Promise.all([
+    learning.updateLearningProfileRealSample(BASE, 'RPM', 1000, 'IDLE_WARM'),
+    learning.updateLearningProfileRealSample(BASE, 'RPM', 1100, 'IDLE_WARM'),
+  ]);
+  const profile = await learning.readLearningProfile(BASE);
+  assert.strictEqual(profile.globalSampleCounts.realSamples, 2);
+  assert.strictEqual(profile.globalSampleCounts.totalSamples, 2);
+  assert.strictEqual(profile.learningStatus, 'COLD_START');
+  writeDelayMs = 0;
+}
+
 async function testAutosaveRace() {
   resetFS();
   const m = loadTs(path.join(ROOT, 'src/meriva/autosaveManager.ts'));
@@ -451,6 +487,7 @@ async function main() {
     ['DTC persistência', testDtcStorage],
     ['backup completo', testBackupCompleteness],
     ['CSV serializado', testCsvWriteSerialization],
+    ['PID + DNA serializados', testPidAndLearningWriteSerialization],
     ['autosave race', testAutosaveRace],
   ];
 
