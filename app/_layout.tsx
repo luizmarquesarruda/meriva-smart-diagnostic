@@ -11,7 +11,6 @@ export default function RootLayout() {
     const checkBluetooth = async () => {
       if (checking.current) return;
       checking.current = true;
-
       try {
         await ensureBluetoothReady();
       } catch (cause) {
@@ -31,11 +30,9 @@ export default function RootLayout() {
     };
 
     void checkBluetooth();
-
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') void checkBluetooth();
     });
-
     return () => subscription.remove();
   }, []);
 
