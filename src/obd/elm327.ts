@@ -26,6 +26,14 @@ export interface PidQueryResult {
   parsed: ReturnType<typeof parsePidResponse>;
 }
 
+function classifyResponse(response: string): ElmCommandStatus {
+  const normalized = response.trim().toUpperCase();
+  if (!normalized) return 'NO_RESPONSE';
+  if (/\b(NO DATA|UNABLE TO CONNECT|BUS INIT|BUS ERROR|STOPPED|ERROR)\b/.test(normalized)) return 'ERROR';
+  if (normalized === '?' || normalized.endsWith('\n?')) return 'ERROR';
+  return 'OK';
+}
+
 export class Elm327Session {
   private opened = false;
   private initializing = false;
@@ -48,7 +56,6 @@ export class Elm327Session {
           throw new Error(`ELM NÃO ACEITOU ${command}: ${result.status}`);
         }
       }
-
       return results;
     } catch (cause) {
       this.opened = false;
@@ -84,12 +91,14 @@ export class Elm327Session {
     try {
       await this.transport.write(`${command}\r`);
       const response = await this.transport.readUntilPrompt();
+      const status = classifyResponse(response);
       return {
         command,
         response,
         elapsedMs: Date.now() - started,
-        status: response.trim() ? 'OK' : 'NO_RESPONSE',
+        status,
         attempt,
+        ...(status === 'ERROR' ? { errorMessage: 'ELM retornou erro ou ausência de dados' } : {}),
       };
     } catch (cause) {
       const errorMessage = cause instanceof Error ? cause.message : 'ERRO DESCONHECIDO';
