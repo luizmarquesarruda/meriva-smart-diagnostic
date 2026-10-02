@@ -7,6 +7,7 @@ import { SimulatedObdTransport } from '../src/obd/simulatedTransport';
 import { BluetoothDeviceInfo } from '../src/obd/bluetoothClassicTransport';
 import { createRealElmSession, discoverPairedDevices } from '../src/obd/bluetoothManager';
 import {
+  getAutoSaveState,
   getAutoSaveStatus,
   initAutoSave,
   startObdSessionCheckpoint,
@@ -41,7 +42,9 @@ export default function LaboratorioScreen() {
   const [protocol, setProtocol] = useState('N/D');
   const [error, setError] = useState('');
   const [loadingDevices, setLoadingDevices] = useState(false);
+  const [storageReady, setStorageReady] = useState(false);
   const sessionRef = useRef<Elm327Session | null>(null);
+  const autoSaveReadyRef = useRef(false);
 
   const simulationSession = useMemo(
     () => new Elm327Session(new SimulatedObdTransport()),
@@ -52,10 +55,11 @@ export default function LaboratorioScreen() {
     let mounted = true;
 
     void initAutoSave(getBasePath())
-      .then(() => {
+      .then((state) => {
+        autoSaveReadyRef.current = true;
         if (mounted) {
-          const saved = getAutoSaveStatus();
-          setProtocol(saved.lastSavedAt ? getAutoSaveStateProtocolFallback() : 'N/D');
+          setStorageReady(true);
+          setProtocol(state.obd.protocol ?? 'N/D');
           setStatus('BLUETOOTH PRONTO PARA TESTE');
         }
       })
@@ -71,6 +75,9 @@ export default function LaboratorioScreen() {
       const activeSession = sessionRef.current;
       sessionRef.current = null;
       stopObdSessionCheckpoint();
+
+      if (!autoSaveReadyRef.current) return;
+
       void (async () => {
         try {
           await activeSession?.close();
@@ -84,10 +91,6 @@ export default function LaboratorioScreen() {
       })();
     };
   }, []);
-
-  function getAutoSaveStateProtocolFallback(): string {
-    return 'N/D';
-  }
 
   async function loadDevices() {
     setLoadingDevices(true);
@@ -193,6 +196,7 @@ export default function LaboratorioScreen() {
       <Text style={styles.title}>LABORATÓRIO OBD</Text>
       <Text style={styles.status}>{status}</Text>
       <Text style={styles.protocol}>PROTOCOLO: {protocol}</Text>
+      {!storageReady ? <Text style={styles.warning}>PREPARANDO AUTOSAVE...</Text> : null}
       <View style={styles.modeRow}>
         <TouchableOpacity style={[styles.modeButton, mode === 'REAL' && styles.active]} onPress={() => setMode('REAL')}>
           <Text>BLUETOOTH REAL</Text>
@@ -203,7 +207,7 @@ export default function LaboratorioScreen() {
       </View>
       {mode === 'REAL' ? (
         <>
-          <TouchableOpacity style={styles.button} onPress={loadDevices} disabled={loadingDevices}>
+          <TouchableOpacity style={styles.button} onPress={loadDevices} disabled={loadingDevices || !storageReady}>
             {loadingDevices ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>LISTAR PAREADOS</Text>}
           </TouchableOpacity>
           {devices.map((device) => (
@@ -216,7 +220,7 @@ export default function LaboratorioScreen() {
               <Text>{device.address}</Text>
             </TouchableOpacity>
           ))}
-          <TouchableOpacity style={styles.button} onPress={connectReal} disabled={!selectedAddress}>
+          <TouchableOpacity style={styles.button} onPress={connectReal} disabled={!selectedAddress || !storageReady}>
             <Text style={styles.buttonText}>CONECTAR E INICIALIZAR ELM327</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.button, styles.disconnect]} onPress={() => void disconnectReal()} disabled={!sessionRef.current}>
@@ -234,7 +238,11 @@ export default function LaboratorioScreen() {
         placeholder="PID, ex.: 010C"
         placeholderTextColor="#64748b"
       />
-      <TouchableOpacity style={styles.button} onPress={testPid} disabled={mode === 'REAL' && !sessionRef.current}>
+      <TouchableOpacity
+        style={styles.button}
+        onPress={testPid}
+        disabled={!storageReady || (mode === 'REAL' && !sessionRef.current)}
+      >
         <Text style={styles.buttonText}>TESTAR PID</Text>
       </TouchableOpacity>
       <View style={styles.panel}>
@@ -254,7 +262,7 @@ const styles = StyleSheet.create({
   container: { flexGrow: 1, padding: 20, backgroundColor: '#eef3fb' },
   title: { fontSize: 24, fontWeight: '700', color: '#1f2937', marginBottom: 8 },
   status: { color: '#2563eb', fontWeight: '700', marginBottom: 6 },
-  protocol: { color: '#475569', fontWeight: '600', marginBottom: 14 },
+  protocol: { color: '#475569', fontWeight: '600', marginBottom: 8 },
   modeRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   modeButton: { flex: 1, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#94a3b8', alignItems: 'center' },
   active: { backgroundColor: '#dbeafe', borderColor: '#2563eb' },
