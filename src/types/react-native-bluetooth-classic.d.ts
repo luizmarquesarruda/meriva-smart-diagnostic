@@ -1,22 +1,27 @@
 declare module 'react-native-bluetooth-classic' {
+  export interface BluetoothDataEvent { data?: string; }
+
   export interface BluetoothDevice {
     address: string;
     name: string;
     bonded?: boolean;
     id?: string;
     type?: string;
+    onDataReceived: (listener: (event: BluetoothDataEvent) => void) => { remove: () => void };
+    available: () => Promise<boolean>;
+    read: () => Promise<string>;
+    write: (data: string, charset?: string) => Promise<void>;
+    disconnect: () => Promise<void>;
   }
-
-  export function requestBluetoothEnabled(): Promise<boolean>;
 
   const BluetoothClassic: {
     isBluetoothAvailable: () => Promise<boolean>;
     isBluetoothEnabled: () => Promise<boolean>;
     getBondedDevices: () => Promise<BluetoothDevice[]>;
+    requestBluetoothEnabled?: () => Promise<boolean>;
     startDiscovery?: () => Promise<BluetoothDevice[]>;
     cancelDiscovery?: () => Promise<void>;
-    connect?: (address: string) => Promise<boolean | void>;
-    connectToDevice?: (
+    connectToDevice: (
       address: string,
       options?: {
         connectionType?: 'delimited' | 'length' | 'raw';
@@ -25,12 +30,6 @@ declare module 'react-native-bluetooth-classic' {
         secureSocket?: boolean;
       },
     ) => Promise<BluetoothDevice>;
-    disconnect?: () => Promise<void>;
-    disconnectFromDevice?: (address: string) => Promise<void>;
-    write?: (data: string) => Promise<void>;
-    writeToDevice?: (data: string) => Promise<void>;
-    read?: () => Promise<string>;
-    readFromDevice?: () => Promise<string>;
   };
 
   export default BluetoothClassic;
