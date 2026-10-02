@@ -43,7 +43,8 @@ export async function registerObdQuery(
   });
 
   // 3) banco de PIDs confirmados + aprendizado — SOMENTE dados reais válidos
-  if (shouldFeedLearning(source, result.parsed.status, result.parsed.value)) {
+  const parsedValue = result.parsed.value;
+  if (shouldFeedLearning(source, result.parsed.status, parsedValue) && parsedValue !== null) {
     try {
       const now = new Date().toISOString();
       const existing = await readPidConfirmations(basePath);
@@ -68,7 +69,7 @@ export async function registerObdQuery(
       await updateLearningProfileRealSample(
         basePath,
         result.parsed.name,
-        result.parsed.value,
+        parsedValue,
         condition,
       );
     } catch (cause) {
