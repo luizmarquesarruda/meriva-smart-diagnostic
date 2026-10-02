@@ -1,4 +1,5 @@
-import { NativeEventEmitter, NativeModules, Platform } from 'react-native';
+import RNBluetoothClassic, { BluetoothDevice } from 'react-native-bluetooth-classic';
+import { Platform } from 'react-native';
 import { ObdTransport } from './elm327';
 
 export interface BluetoothDeviceInfo {
@@ -7,94 +8,82 @@ export interface BluetoothDeviceInfo {
   bonded?: boolean;
 }
 
-type BluetoothClassicModule = {
-  getBondedDevices?: () => Promise<BluetoothDeviceInfo[]>;
-  startDiscovery?: () => Promise<BluetoothDeviceInfo[]>;
-  cancelDiscovery?: () => Promise<void>;
-  connect?: (address: string) => Promise<boolean | void>;
-  connectToDevice?: (address: string) => Promise<boolean | void>;
-  disconnect?: () => Promise<void>;
-  disconnectFromDevice?: () => Promise<void>;
-  write?: (data: string) => Promise<void>;
-  writeToDevice?: (data: string) => Promise<void>;
-  read?: () => Promise<string>;
-  readFromDevice?: () => Promise<string>;
-};
-
-function getNativeBluetooth(): BluetoothClassicModule {
-  if (Platform.OS !== 'android') {
-    throw new Error('BLUETOOTH CLASSIC DISPONÍVEL SOMENTE NO ANDROID');
-  }
-
-  const nativeModule = (NativeModules as Record<string, unknown>).RNBluetoothClassic as BluetoothClassicModule | undefined;
-  if (!nativeModule) {
-    throw new Error('MÓDULO BLUETOOTH CLASSIC AUSENTE. USE UM DEVELOPMENT BUILD ANDROID.');
-  }
-
-  return nativeModule;
-}
-
 export class BluetoothClassicTransport implements ObdTransport {
-  private native: BluetoothClassicModule | null = null;
+  private device: BluetoothDevice | null = null;
   private connected = false;
-  private readonly emitter = new NativeEventEmitter();
   private received = '';
   private subscription?: { remove: () => void };
 
   constructor(private readonly deviceAddress: string) {}
 
   async open(): Promise<void> {
-    this.native = getNativeBluetooth();
-    const connect = this.native.connectToDevice ?? this.native.connect;
-    if (!connect) throw new Error('API DE CONEXÃO BLUETOOTH NÃO DISPONÍVEL');
+    if (Platform.OS !== 'android') {
+      throw new Error('BLUETOOTH CLASSIC DISPONÍVEL SOMENTE NO ANDROID');
+    }
 
-    await connect.call(this.native, this.deviceAddress);
+    const available = await RNBluetoothClassic.isBluetoothAvailable();
+    if (!available) throw new Error('BLUETOOTH NÃO DISPONÍVEL NESTE APARELHO');
+
+    if (!(await RNBluetoothClassic.isBluetoothEnabled())) {
+      throw new Error('BLUETOOTH DESLIGADO');
+    }
+
+    this.device = await RNBluetoothClassic.connectToDevice(this.deviceAddress, {
+      connectionType: 'delimited',
+      delimiter: '\r',
+      charset: 'ascii',
+      secureSocket: false,
+    });
+
     this.connected = true;
     this.received = '';
 
-    // Some versions expose data through events; polling read() is used when available.
-    this.subscription = this.emitter.addListener('dataReceived', (event: { data?: string }) => {
-      if (event?.data) this.received += event.data;
+    this.subscription = this.device.onDataReceived((event) => {
+      if (event?.data) this.received += String(event.data);
     });
   }
 
   async close(): Promise<void> {
     this.subscription?.remove();
     this.subscription = undefined;
-    if (this.native) {
-      const disconnect = this.native.disconnectFromDevice ?? this.native.disconnect;
-      if (disconnect && this.connected) await disconnect.call(this.native);
+
+    if (this.device && this.connected) {
+      try {
+        await this.device.disconnect();
+      } catch {
+        // conexão já encerrada
+      }
     }
+
+    this.device = null;
     this.connected = false;
     this.received = '';
   }
 
   async write(data: string): Promise<void> {
-    if (!this.native || !this.connected) throw new Error('BLUETOOTH NÃO CONECTADO');
-    const write = this.native.writeToDevice ?? this.native.write;
-    if (!write) throw new Error('API DE ESCRITA BLUETOOTH NÃO DISPONÍVEL');
-    await write.call(this.native, data);
+    if (!this.device || !this.connected) throw new Error('BLUETOOTH NÃO CONECTADO');
+    await this.device.write(data, 'ascii');
   }
 
   async readUntilPrompt(timeoutMs = 3000): Promise<string> {
-    if (!this.native || !this.connected) throw new Error('BLUETOOTH NÃO CONECTADO');
-    const started = Date.now();
-    const read = this.native.readFromDevice ?? this.native.read;
+    if (!this.device || !this.connected) throw new Error('BLUETOOTH NÃO CONECTADO');
 
+    const started = Date.now();
     while (Date.now() - started < timeoutMs) {
-      if (this.received.includes('>')) {
-        const response = this.received;
-        this.received = '';
-        return response.replace(/>/g, '').trim();
+      const promptIndex = this.received.indexOf('>');
+      if (promptIndex >= 0) {
+        const response = this.received.slice(0, promptIndex);
+        this.received = this.received.slice(promptIndex + 1);
+        return response.trim();
       }
 
-      if (read) {
-        try {
-          const chunk = await read.call(this.native);
-          if (chunk) this.received += chunk;
-        } catch {
-          // Continue until timeout; the caller receives a clear timeout state.
+      try {
+        if (await this.device.available()) {
+          const chunk = await this.device.read();
+          if (chunk) this.received += String(chunk);
         }
+      } catch {
+        // Event listener may already have delivered the data.
       }
 
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -108,7 +97,14 @@ export class BluetoothClassicTransport implements ObdTransport {
 }
 
 export async function listBondedBluetoothDevices(): Promise<BluetoothDeviceInfo[]> {
-  const native = getNativeBluetooth();
-  if (!native.getBondedDevices) throw new Error('API DE DISPOSITIVOS PAREADOS NÃO DISPONÍVEL');
-  return native.getBondedDevices();
+  if (Platform.OS !== 'android') {
+    throw new Error('BLUETOOTH CLASSIC DISPONÍVEL SOMENTE NO ANDROID');
+  }
+
+  const devices = await RNBluetoothClassic.getBondedDevices();
+  return devices.map((device) => ({
+    address: device.address,
+    name: device.name || 'DISPOSITIVO SEM NOME',
+    bonded: device.bonded ?? true,
+  }));
 }
