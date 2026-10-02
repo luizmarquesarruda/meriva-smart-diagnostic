@@ -73,11 +73,27 @@ export class BluetoothClassicTransport implements ObdTransport {
   }
 
   async readUntilPrompt(timeoutMs = 3000): Promise<string> {
-    if (!this.device || !this.connected) throw new Error('BLUETOOTH NÃO CONECTADO');
+    const device = this.device;
+    if (!device || !this.connected) throw new Error('BLUETOOTH NÃO CONECTADO');
 
     const started = Date.now();
+    let nextConnectionCheck = started;
+
     while (Date.now() - started < timeoutMs) {
-      if (!this.connected) throw new Error('BLUETOOTH DESCONECTADO');
+      if (!this.connected || !this.device) throw new Error('BLUETOOTH DESCONECTADO');
+
+      if (Date.now() >= nextConnectionCheck && typeof device.isConnected === 'function') {
+        nextConnectionCheck = Date.now() + 250;
+        try {
+          if (!(await device.isConnected())) {
+            this.markDisconnected();
+            throw new Error('BLUETOOTH DESCONECTADO');
+          }
+        } catch (cause) {
+          const message = cause instanceof Error ? cause.message : '';
+          if (message === 'BLUETOOTH DESCONECTADO') throw cause;
+        }
+      }
 
       const promptIndex = this.received.indexOf('>');
       if (promptIndex >= 0) {
@@ -85,6 +101,7 @@ export class BluetoothClassicTransport implements ObdTransport {
         this.received = this.received.slice(promptIndex + 1);
         return response.replace(/^\s+|\s+$/g, '');
       }
+
       await new Promise((resolve) => setTimeout(resolve, 25));
     }
 
@@ -95,10 +112,7 @@ export class BluetoothClassicTransport implements ObdTransport {
   }
 
   private markDisconnected(): void {
-    this.dataSubscription?.remove();
-    this.dataSubscription = undefined;
-    this.disconnectSubscription?.remove();
-    this.disconnectSubscription = undefined;
+    this.removeSubscriptions();
     this.device = null;
     this.connected = false;
     this.received = '';
