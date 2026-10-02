@@ -1,6 +1,6 @@
 import type { VehicleProfile } from '../database/vehicleConfig';
 import type { DriveCycle } from '../data/driveCycles';
-import type { DtcRecord } from '../database/dtcManager';
+import type { DtcRecord } from '../types/sourceTypes';
 import type { MerivaLearningProfile } from '../database/learningProfile';
 
 export interface LastPidReading {
