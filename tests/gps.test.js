@@ -1,0 +1,27 @@
+'use strict';
+const assert = require('assert');
+const ts = require('typescript');
+const fs = require('fs');
+const path = require('path');
+const Module = require('module');
+const ROOT = path.resolve(__dirname, '..');
+const sourcePath = path.join(ROOT, 'src/gps/gpsTracker.ts');
+const output = ts.transpileModule(fs.readFileSync(sourcePath, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2019, esModuleInterop: true } }).outputText;
+const mod = new Module(sourcePath, null);
+mod.filename = sourcePath;
+mod.paths = Module._nodeModulePaths(path.dirname(sourcePath));
+const originalLoad = Module._load;
+Module._load = function(request) {
+  if (request === 'expo-location') return { Accuracy: { BestForNavigation: 6 }, PermissionStatus: { GRANTED: 'granted' } };
+  return originalLoad.apply(this, arguments);
+};
+mod._compile(output, sourcePath);
+Module._load = originalLoad;
+const { haversineDistanceKm, normalizeGpsSpeedKmh, calculateConsumptionKml } = mod.exports;
+assert.strictEqual(normalizeGpsSpeedKmh(10), 36);
+assert.strictEqual(normalizeGpsSpeedKmh(null), 0);
+assert.ok(Math.abs(haversineDistanceKm({ latitude: 0, longitude: 0 }, { latitude: 0, longitude: 1 }) - 111.195) < 0.2);
+assert.strictEqual(calculateConsumptionKml(100, 8), 12.5);
+assert.strictEqual(calculateConsumptionKml(0, 8), null);
+assert.strictEqual(calculateConsumptionKml(100, 0), null);
+console.log('PASS GPS: velocidade, distância e consumo');

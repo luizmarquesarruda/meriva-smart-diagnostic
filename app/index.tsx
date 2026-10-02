@@ -1,19 +1,16 @@
 import { Link } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import { INITIAL_DRIVE_CYCLES, getDriveCycleSummary, type DriveCycle } from '../src/data/driveCycles';
-import { getAutoSaveStatus, getAutoSaveState, initAutoSave, updateAutoSaveState } from '../src/meriva/autosaveManager';
+import { getAutoSaveStatus, initAutoSave, updateAutoSaveState } from '../src/meriva/autosaveManager';
 import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
 import type { ObdConnectionState } from '../src/meriva/autosaveState';
+import { calculateConsumptionKml, GpsTracker, type GpsTripState } from '../src/gps';
 
 function formatTime(iso: string | null): string {
   if (!iso) return 'N/D';
-  try {
-    return new Date(iso).toLocaleTimeString('pt-BR');
-  } catch {
-    return 'N/D';
-  }
+  try { return new Date(iso).toLocaleTimeString('pt-BR'); } catch { return 'N/D'; }
 }
 
 export default function IndexScreen() {
@@ -21,35 +18,48 @@ export default function IndexScreen() {
   const [obd, setObd] = useState<ObdConnectionState>({ connected: false });
   const [saveStatus, setSaveStatus] = useState<AutoSaveStatus>({ lastSavedAt: null, lastSaveReason: null, lastError: null });
   const [isHydrated, setIsHydrated] = useState(false);
+  const [gps] = useState(() => new GpsTracker());
+  const [gpsState, setGpsState] = useState<GpsTripState>(gps.getState());
+  const [gpsError, setGpsError] = useState<string | null>(null);
+  const [fuelUsedL, setFuelUsedL] = useState('');
+
+  useEffect(() => {
+    let mounted = true;
+    setGpsError(null);
+    void gps.start((state) => {
+      if (mounted) setGpsState(state);
+    }).then((started) => {
+      if (mounted && !started) setGpsError('GPS desligado ou permissão de localização não concedida.');
+    }).catch((error) => {
+      if (mounted) setGpsError(error instanceof Error ? error.message : 'Não foi possível iniciar o GPS automaticamente.');
+    });
+    return () => {
+      mounted = false;
+      void gps.stop();
+    };
+  }, [gps]);
+
+  const gpsConsumption = calculateConsumptionKml(gpsState.distanceKm, Number(fuelUsedL.replace(',', '.')));
 
   useEffect(() => {
     async function restoreState() {
       const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
       const restored = await initAutoSave(basePath);
-
       let loaded = restored.driveCycles;
       if (!loaded.length) {
         try {
-          const content = await FileSystem.readAsStringAsync(`${basePath}/VIAGENS/index.json`, {
-            encoding: FileSystem.EncodingType.UTF8,
-          });
+          const content = await FileSystem.readAsStringAsync(`${basePath}/VIAGENS/index.json`, { encoding: FileSystem.EncodingType.UTF8 });
           const parsed = JSON.parse(content);
           loaded = Array.isArray(parsed?.cycles) ? parsed.cycles : [];
-        } catch {
-          loaded = [];
-        }
+        } catch { loaded = []; }
         if (!loaded.length) loaded = INITIAL_DRIVE_CYCLES;
-        updateAutoSaveState((state) => {
-          state.driveCycles = loaded;
-        });
+        updateAutoSaveState((state) => { state.driveCycles = loaded; });
       }
-
       setCycles(loaded);
       setObd(restored.obd);
       setSaveStatus(getAutoSaveStatus());
       setIsHydrated(true);
     }
-
     void restoreState();
   }, []);
 
@@ -68,75 +78,49 @@ export default function IndexScreen() {
           <Text style={styles.sectionTitleDark}>SALVAMENTO</Text>
           <Text style={styles.statusLine}>AUTOMÁTICO: ATIVO</Text>
           <Text style={styles.statusLine}>ÚLTIMO SAVE: {formatTime(saveStatus.lastSavedAt)}</Text>
-          {saveStatus.lastError ? (
-            <Text style={styles.autosaveError}>FALHA NO AUTOSAVE: {saveStatus.lastError}</Text>
-          ) : null}
+          {saveStatus.lastError ? <Text style={styles.autosaveError}>FALHA NO AUTOSAVE: {saveStatus.lastError}</Text> : null}
           <Text style={styles.status}>{isHydrated ? 'ESTADO RESTAURADO' : 'CARREGANDO...'}</Text>
         </View>
 
+        <View style={styles.gpsCard}>
+          <View style={styles.gpsHeader}>
+            <Text style={styles.sectionTitle}>GPS DO CELULAR</Text>
+            <Text style={gpsState.running ? styles.gpsLive : styles.gpsOff}>
+              {gpsState.running ? 'ATIVO AUTOMÁTICO' : 'AGUARDANDO GPS'}
+            </Text>
+          </View>
+          <View style={styles.gpsGrid}>
+            <View style={styles.gpsMetric}><Text style={styles.metricLabel}>VELOCIDADE</Text><Text style={styles.gpsSpeed}>{gpsState.currentSpeedKmh.toFixed(1)} km/h</Text></View>
+            <View style={styles.gpsMetric}><Text style={styles.metricLabel}>DISTÂNCIA</Text><Text style={styles.metricValue}>{gpsState.distanceKm.toFixed(3)} km</Text></View>
+            <View style={styles.gpsMetric}><Text style={styles.metricLabel}>MÁXIMA</Text><Text style={styles.metricValue}>{gpsState.maxSpeedKmh.toFixed(1)} km/h</Text></View>
+            <View style={styles.gpsMetric}><Text style={styles.metricLabel}>PRECISÃO</Text><Text style={styles.metricValue}>{gpsState.lastAccuracyM == null ? 'N/D' : `${gpsState.lastAccuracyM.toFixed(0)} m`}</Text></View>
+          </View>
+          <Text style={styles.gpsHelp}>GPS inicia automaticamente ao abrir o aplicativo. Velocidade e distância vêm do celular. O GPS não mede litros consumidos sozinho.</Text>
+          <TextInput value={fuelUsedL} onChangeText={setFuelUsedL} keyboardType="decimal-pad" placeholder="Combustível usado na viagem (L)" placeholderTextColor="#64748b" style={styles.fuelInput} />
+          <Text style={styles.consumptionLine}>{gpsConsumption == null ? 'Consumo: informe litros usados' : `Consumo calculado: ${gpsConsumption.toFixed(2)} km/L`}</Text>
+          {gpsError ? <Text style={styles.gpsError}>{gpsError}</Text> : null}
+        </View>
+
         <View style={styles.summaryGrid}>
-          <View style={styles.metricCard}>
-            <Text style={styles.metricLabel}>Ciclos</Text>
-            <Text style={styles.metricValue}>{cycles.length}</Text>
-          </View>
-          <View style={styles.metricCard}>
-            <Text style={styles.metricLabel}>Distância</Text>
-            <Text style={styles.metricValue}>{summary.totalDistanceKm.toFixed(2)} km</Text>
-          </View>
-          <View style={styles.metricCard}>
-            <Text style={styles.metricLabel}>Consumo</Text>
-            <Text style={styles.metricValue}>{summary.avgConsumptionKml.toFixed(2)} km/L</Text>
-          </View>
-          <View style={styles.metricCard}>
-            <Text style={styles.metricLabel}>Média</Text>
-            <Text style={styles.metricValue}>{summary.avgSpeedKmh.toFixed(1)} km/h</Text>
-          </View>
+          <View style={styles.metricCard}><Text style={styles.metricLabel}>Ciclos</Text><Text style={styles.metricValue}>{cycles.length}</Text></View>
+          <View style={styles.metricCard}><Text style={styles.metricLabel}>Distância</Text><Text style={styles.metricValue}>{summary.totalDistanceKm.toFixed(2)} km</Text></View>
+          <View style={styles.metricCard}><Text style={styles.metricLabel}>Consumo</Text><Text style={styles.metricValue}>{summary.avgConsumptionKml.toFixed(2)} km/L</Text></View>
+          <View style={styles.metricCard}><Text style={styles.metricLabel}>Média</Text><Text style={styles.metricValue}>{summary.avgSpeedKmh.toFixed(1)} km/h</Text></View>
         </View>
 
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>ÚLTIMO CICLO</Text>
-          {summary.lastCycle ? (
-            <>
-              <Text style={styles.row}><Text style={styles.label}>Início:</Text> {summary.lastCycle.startedAt}</Text>
-              <Text style={styles.row}><Text style={styles.label}>Fim:</Text> {summary.lastCycle.finishedAt}</Text>
-              <Text style={styles.row}><Text style={styles.label}>Distância:</Text> {summary.lastCycle.distanceTotalKm.toFixed(2)} km</Text>
-              <Text style={styles.row}><Text style={styles.label}>Consumo:</Text> {summary.lastCycle.avgFuelConsumptionKml.toFixed(3)} km/L</Text>
-              <View style={styles.sourceRow}>
-                <Text style={styles.row}><Text style={styles.label}>Fonte:</Text> {summary.lastCycle.source}</Text>
-                <Text style={summary.lastCycle.source === 'REAL_OBD' ? styles.sourceReal : styles.sourceRef}>
-                  {summary.lastCycle.source === 'REAL_OBD' ? 'REAL' : 'REFERÊNCIA'}
-                </Text>
-              </View>
-            </>
-          ) : (
-            <Text style={styles.empty}>Sem ciclos carregados.</Text>
-          )}
+          {summary.lastCycle ? <><Text style={styles.row}><Text style={styles.label}>Início:</Text> {summary.lastCycle.startedAt}</Text><Text style={styles.row}><Text style={styles.label}>Fim:</Text> {summary.lastCycle.finishedAt}</Text><Text style={styles.row}><Text style={styles.label}>Distância:</Text> {summary.lastCycle.distanceTotalKm.toFixed(2)} km</Text><Text style={styles.row}><Text style={styles.label}>Consumo:</Text> {summary.lastCycle.avgFuelConsumptionKml.toFixed(3)} km/L</Text><View style={styles.sourceRow}><Text style={styles.row}><Text style={styles.label}>Fonte:</Text> {summary.lastCycle.source}</Text><Text style={summary.lastCycle.source === 'REAL_OBD' ? styles.sourceReal : styles.sourceRef}>{summary.lastCycle.source === 'REAL_OBD' ? 'REAL' : 'REFERÊNCIA'}</Text></View></> : <Text style={styles.empty}>Sem ciclos carregados.</Text>}
         </View>
 
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>HISTÓRICO</Text>
-          {cycles.map((cycle) => (
-            <View key={cycle.id} style={styles.historyItem}>
-              <View style={styles.historyHeader}>
-                <Text style={styles.historyDate}>{cycle.startedAt}</Text>
-                <Text style={cycle.source === 'REAL_OBD' ? styles.sourceReal : styles.sourceRef}>
-                  {cycle.source === 'REAL_OBD' ? 'REAL' : 'REFERÊNCIA'}
-                </Text>
-              </View>
-              <Text style={styles.historyMeta}>{cycle.distanceTotalKm.toFixed(2)} km • {cycle.avgFuelConsumptionKml.toFixed(3)} km/L</Text>
-            </View>
-          ))}
+          {cycles.map((cycle) => <View key={cycle.id} style={styles.historyItem}><View style={styles.historyHeader}><Text style={styles.historyDate}>{cycle.startedAt}</Text><Text style={cycle.source === 'REAL_OBD' ? styles.sourceReal : styles.sourceRef}>{cycle.source === 'REAL_OBD' ? 'REAL' : 'REFERÊNCIA'}</Text></View><Text style={styles.historyMeta}>{cycle.distanceTotalKm.toFixed(2)} km • {cycle.avgFuelConsumptionKml.toFixed(3)} km/L</Text></View>)}
         </View>
 
-        <Link href="/laboratorio" asChild>
-          <TouchableOpacity style={styles.button}><Text style={styles.buttonText}>LABORATÓRIO OBD</Text></TouchableOpacity>
-        </Link>
-        <Link href="/armazenamento" asChild>
-          <TouchableOpacity style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>ARMAZENAMENTO</Text></TouchableOpacity>
-        </Link>
-        <Link href="/configuracoes" asChild>
-          <TouchableOpacity style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>CONFIGURAÇÕES</Text></TouchableOpacity>
-        </Link>
+        <Link href="/laboratorio" asChild><TouchableOpacity style={styles.button}><Text style={styles.buttonText}>LABORATÓRIO OBD</Text></TouchableOpacity></Link>
+        <Link href="/armazenamento" asChild><TouchableOpacity style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>ARMAZENAMENTO</Text></TouchableOpacity></Link>
+        <Link href="/configuracoes" asChild><TouchableOpacity style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>CONFIGURAÇÕES</Text></TouchableOpacity></Link>
       </ScrollView>
     </SafeAreaView>
   );
@@ -152,6 +136,17 @@ const styles = StyleSheet.create({
   statusLine: { color: '#e5e7eb', marginTop: 2 },
   autosaveError: { color: '#fca5a5', marginTop: 6, fontWeight: '600' },
   status: { color: '#9ca3af', marginTop: 14, fontWeight: '700' },
+  gpsCard: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 18 },
+  gpsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  gpsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  gpsMetric: { width: '48%', marginBottom: 10 },
+  gpsSpeed: { color: '#2563eb', fontWeight: '800', fontSize: 22 },
+  gpsLive: { color: '#16a34a', fontWeight: '800' },
+  gpsOff: { color: '#64748b', fontWeight: '800' },
+  gpsHelp: { color: '#64748b', fontSize: 12, marginBottom: 10 },
+  fuelInput: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, padding: 12, color: '#0f172a', marginBottom: 8 },
+  consumptionLine: { color: '#1f2937', fontWeight: '700', marginBottom: 10 },
+  gpsError: { color: '#b91c1c', fontWeight: '700', marginBottom: 10 },
   summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 18 },
   metricCard: { width: '48%', backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 10 },
   metricLabel: { color: '#6b7280', fontSize: 12, fontWeight: '600', marginBottom: 6 },
