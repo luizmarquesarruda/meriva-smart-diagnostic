@@ -1,11 +1,14 @@
 import { useEffect, useRef } from 'react';
-import { Alert, AppState } from 'react-native';
+import { Alert, AppState, Linking } from 'react-native';
 import { Stack } from 'expo-router';
 import { ensureBluetoothReady, openBluetoothAppSettings } from '../src/obd/bluetoothManager';
+import { gpsTracker } from '../src/gps';
 
 export default function RootLayout() {
   const checking = useRef(false);
   const lastFailureAt = useRef(0);
+  const gpsChecking = useRef(false);
+  const lastGpsFailureAt = useRef(0);
 
   useEffect(() => {
     const checkBluetooth = async () => {
@@ -40,13 +43,50 @@ export default function RootLayout() {
       }
     };
 
+    const startGps = async () => {
+      if (gpsChecking.current || gpsTracker.getState().running) return;
+      gpsChecking.current = true;
+      try {
+        const started = await gpsTracker.start();
+        if (!started) {
+          const now = Date.now();
+          if (now - lastGpsFailureAt.current > 3000) {
+            lastGpsFailureAt.current = now;
+            const message =
+              gpsTracker.getState().error ??
+              'Não foi possível iniciar o GPS automaticamente.';
+            Alert.alert(
+              'GPS necessário',
+              message,
+              [
+                {
+                  text: 'Abrir configurações',
+                  onPress: () => void Linking.openSettings(),
+                },
+                { text: 'Tentar novamente', onPress: () => void startGps() },
+              ],
+            );
+          }
+        }
+      } finally {
+        gpsChecking.current = false;
+      }
+    };
+
     void checkBluetooth();
+    void startGps();
 
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void checkBluetooth();
+      if (state === 'active') {
+        void checkBluetooth();
+        void startGps();
+      }
     });
 
-    return () => subscription.remove();
+    return () => {
+      subscription.remove();
+      void gpsTracker.stop();
+    };
   }, []);
 
   return <Stack screenOptions={{ headerStyle: { backgroundColor: '#1f2937' }, headerTintColor: '#fff' }} />;
