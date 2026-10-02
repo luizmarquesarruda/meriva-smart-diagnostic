@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import { Elm327Session, ObdTransport } from '../src/obd/elm327';
@@ -6,7 +6,13 @@ import { parsePidResponse } from '../src/obd/parser';
 import { SimulatedObdTransport } from '../src/obd/simulatedTransport';
 import { BluetoothDeviceInfo } from '../src/obd/bluetoothClassicTransport';
 import { createRealElmSession, discoverPairedDevices } from '../src/obd/bluetoothManager';
-import { startObdSessionCheckpoint, stopObdSessionCheckpoint, updateAutoSaveState } from '../src/meriva/autosaveManager';
+import {
+  getAutoSaveStatus,
+  initAutoSave,
+  startObdSessionCheckpoint,
+  stopObdSessionCheckpoint,
+  updateAutoSaveState,
+} from '../src/meriva/autosaveManager';
 import { registerObdQuery, forceSaveOnObdEvent } from '../src/meriva/autosaveIntegration';
 
 class UnavailableTransport implements ObdTransport {
@@ -31,9 +37,11 @@ export default function LaboratorioScreen() {
   const [tx, setTx] = useState('');
   const [rx, setRx] = useState('');
   const [elapsedMs, setElapsedMs] = useState<number | null>(null);
-  const [status, setStatus] = useState('BLUETOOTH DESLIGADO');
+  const [status, setStatus] = useState('VERIFICANDO BLUETOOTH');
+  const [protocol, setProtocol] = useState('N/D');
   const [error, setError] = useState('');
   const [loadingDevices, setLoadingDevices] = useState(false);
+  const sessionRef = useRef<Elm327Session | null>(null);
 
   const simulationSession = useMemo(
     () => new Elm327Session(new SimulatedObdTransport()),
@@ -41,18 +49,45 @@ export default function LaboratorioScreen() {
   );
 
   useEffect(() => {
+    let mounted = true;
+
+    void initAutoSave(getBasePath())
+      .then(() => {
+        if (mounted) {
+          const saved = getAutoSaveStatus();
+          setProtocol(saved.lastSavedAt ? getAutoSaveStateProtocolFallback() : 'N/D');
+          setStatus('BLUETOOTH PRONTO PARA TESTE');
+        }
+      })
+      .catch((cause) => {
+        if (mounted) {
+          setStatus('FALHA AO INICIALIZAR ARMAZENAMENTO');
+          setError(cause instanceof Error ? cause.message : 'FALHA NO AUTOSAVE');
+        }
+      });
+
     return () => {
+      mounted = false;
+      const activeSession = sessionRef.current;
+      sessionRef.current = null;
+      stopObdSessionCheckpoint();
       void (async () => {
         try {
-          await session?.close();
+          await activeSession?.close();
         } catch {
           // sessão já fechada
         }
-        stopObdSessionCheckpoint();
+        updateAutoSaveState((state) => {
+          state.obd = { ...state.obd, connected: false };
+        });
         await forceSaveOnObdEvent();
       })();
     };
-  }, [session]);
+  }, []);
+
+  function getAutoSaveStateProtocolFallback(): string {
+    return 'N/D';
+  }
 
   async function loadDevices() {
     setLoadingDevices(true);
@@ -60,9 +95,9 @@ export default function LaboratorioScreen() {
     try {
       const paired = await discoverPairedDevices();
       setDevices(paired);
-      setStatus(paired.length ? 'BLUETOOTH CONECTADO / ELM NÃO CONECTADO' : 'NENHUM ELM327 PAREADO');
+      setStatus(paired.length ? 'BLUETOOTH OK / ELM NÃO CONECTADO' : 'NENHUM ELM327 PAREADO');
     } catch (cause) {
-      setStatus('BLUETOOTH DESLIGADO');
+      setStatus('BLUETOOTH NÃO PRONTO');
       setError(cause instanceof Error ? cause.message : 'FALHA AO LISTAR BLUETOOTH');
     } finally {
       setLoadingDevices(false);
@@ -76,21 +111,51 @@ export default function LaboratorioScreen() {
     setError('');
     setStatus('BLUETOOTH CONECTANDO');
     try {
+      if (sessionRef.current) {
+        await sessionRef.current.close();
+        sessionRef.current = null;
+      }
+
       const connection = await createRealElmSession(device);
+      sessionRef.current = connection.session;
       setSession(connection.session);
+      setProtocol(connection.protocol ?? 'N/D');
       startObdSessionCheckpoint();
       updateAutoSaveState((state) => {
         state.obd = {
           connected: true,
           adapterName: device.name,
+          protocol: connection.protocol ?? undefined,
           lastConnectedAt: new Date().toISOString(),
         };
       });
-      setStatus('ELM RESPONDENDO');
+      setStatus(connection.protocol ? 'ELM RESPONDENDO' : 'ELM RESPONDENDO / PROTOCOLO N/D');
     } catch (cause) {
+      sessionRef.current = null;
       setSession(null);
+      setProtocol('N/D');
       setStatus('ELM NÃO RESPONDE');
       setError(cause instanceof Error ? cause.message : 'FALHA AO CONECTAR AO ELM327');
+    }
+  }
+
+  async function disconnectReal() {
+    const activeSession = sessionRef.current;
+    sessionRef.current = null;
+    setSession(null);
+    setProtocol('N/D');
+    stopObdSessionCheckpoint();
+
+    try {
+      await activeSession?.close();
+      updateAutoSaveState((state) => {
+        state.obd = { ...state.obd, connected: false };
+      });
+      await forceSaveOnObdEvent();
+      setStatus('BLUETOOTH OK / ELM DESCONECTADO');
+    } catch (cause) {
+      setStatus('DESCONECTADO COM AVISO');
+      setError(cause instanceof Error ? cause.message : 'FALHA AO ENCERRAR ELM327');
     }
   }
 
@@ -98,17 +163,23 @@ export default function LaboratorioScreen() {
     setError('');
     setStatus(mode === 'SIMULACAO' ? 'SIMULAÇÃO LOCAL: CONSULTANDO' : 'ECU CONSULTANDO');
     try {
-      const activeSession = mode === 'SIMULACAO' ? simulationSession : session;
+      const activeSession = mode === 'SIMULACAO' ? simulationSession : sessionRef.current;
       if (!activeSession) throw new Error('CONECTE AO ELM327 ANTES DE TESTAR O PID');
       const result = await activeSession.queryPid(pid);
 
-      // registra no autosave: logs CSV sempre; banco/aprendizado somente se REAL + RESPONDEU
       await registerObdQuery(getBasePath(), result, mode);
 
       setTx(result.tx);
       setRx(result.rx);
       setElapsedMs(result.elapsedMs);
-      setStatus(mode === 'SIMULACAO' ? `SIMULAÇÃO LOCAL: ${result.parsed.status}` : result.parsed.status === 'RESPONDEU' ? 'ECU RESPONDENDO' : 'ECU NÃO RESPONDE');
+      setProtocol(result.protocol ?? 'N/D');
+      setStatus(
+        mode === 'SIMULACAO'
+          ? `SIMULAÇÃO LOCAL: ${result.parsed.status}`
+          : result.parsed.status === 'RESPONDEU'
+            ? 'ECU RESPONDENDO'
+            : 'ECU NÃO RESPONDE',
+      );
     } catch (cause) {
       setStatus('ECU NÃO RESPONDE');
       setError(cause instanceof Error ? cause.message : 'ERRO AO CONSULTAR PID');
@@ -121,9 +192,14 @@ export default function LaboratorioScreen() {
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>LABORATÓRIO OBD</Text>
       <Text style={styles.status}>{status}</Text>
+      <Text style={styles.protocol}>PROTOCOLO: {protocol}</Text>
       <View style={styles.modeRow}>
-        <TouchableOpacity style={[styles.modeButton, mode === 'REAL' && styles.active]} onPress={() => setMode('REAL')}><Text>BLUETOOTH REAL</Text></TouchableOpacity>
-        <TouchableOpacity style={[styles.modeButton, mode === 'SIMULACAO' && styles.simActive]} onPress={() => setMode('SIMULACAO')}><Text>SIMULAÇÃO</Text></TouchableOpacity>
+        <TouchableOpacity style={[styles.modeButton, mode === 'REAL' && styles.active]} onPress={() => setMode('REAL')}>
+          <Text>BLUETOOTH REAL</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.modeButton, mode === 'SIMULACAO' && styles.simActive]} onPress={() => setMode('SIMULACAO')}>
+          <Text>SIMULAÇÃO</Text>
+        </TouchableOpacity>
       </View>
       {mode === 'REAL' ? (
         <>
@@ -131,16 +207,36 @@ export default function LaboratorioScreen() {
             {loadingDevices ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>LISTAR PAREADOS</Text>}
           </TouchableOpacity>
           {devices.map((device) => (
-            <TouchableOpacity key={device.address} style={[styles.device, selectedAddress === device.address && styles.selected]} onPress={() => setSelectedAddress(device.address)}>
+            <TouchableOpacity
+              key={device.address}
+              style={[styles.device, selectedAddress === device.address && styles.selected]}
+              onPress={() => setSelectedAddress(device.address)}
+            >
               <Text style={styles.deviceName}>{device.name || 'DISPOSITIVO SEM NOME'}</Text>
               <Text>{device.address}</Text>
             </TouchableOpacity>
           ))}
-          <TouchableOpacity style={styles.button} onPress={connectReal}><Text style={styles.buttonText}>CONECTAR E INICIALIZAR ELM327</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.button} onPress={connectReal} disabled={!selectedAddress}>
+            <Text style={styles.buttonText}>CONECTAR E INICIALIZAR ELM327</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.button, styles.disconnect]} onPress={() => void disconnectReal()} disabled={!sessionRef.current}>
+            <Text style={styles.buttonText}>DESCONECTAR ELM327</Text>
+          </TouchableOpacity>
         </>
-      ) : <Text style={styles.warning}>SIMULAÇÃO: não é ECU real e não alimenta aprendizado.</Text>}
-      <TextInput value={pid} onChangeText={setPid} autoCapitalize="characters" style={styles.input} placeholder="PID, ex.: 010C" />
-      <TouchableOpacity style={styles.button} onPress={testPid}><Text style={styles.buttonText}>TESTAR PID</Text></TouchableOpacity>
+      ) : (
+        <Text style={styles.warning}>SIMULAÇÃO: não é ECU real e não alimenta aprendizado.</Text>
+      )}
+      <TextInput
+        value={pid}
+        onChangeText={setPid}
+        autoCapitalize="characters"
+        style={styles.input}
+        placeholder="PID, ex.: 010C"
+        placeholderTextColor="#64748b"
+      />
+      <TouchableOpacity style={styles.button} onPress={testPid} disabled={mode === 'REAL' && !sessionRef.current}>
+        <Text style={styles.buttonText}>TESTAR PID</Text>
+      </TouchableOpacity>
       <View style={styles.panel}>
         <Text style={styles.label}>TX</Text><Text style={styles.value}>{tx || 'SEM DADOS'}</Text>
         <Text style={styles.label}>RX</Text><Text style={styles.value}>{rx || 'SEM DADOS'}</Text>
@@ -157,18 +253,20 @@ export default function LaboratorioScreen() {
 const styles = StyleSheet.create({
   container: { flexGrow: 1, padding: 20, backgroundColor: '#eef3fb' },
   title: { fontSize: 24, fontWeight: '700', color: '#1f2937', marginBottom: 8 },
-  status: { color: '#2563eb', fontWeight: '700', marginBottom: 14 },
+  status: { color: '#2563eb', fontWeight: '700', marginBottom: 6 },
+  protocol: { color: '#475569', fontWeight: '600', marginBottom: 14 },
   modeRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   modeButton: { flex: 1, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#94a3b8', alignItems: 'center' },
   active: { backgroundColor: '#dbeafe', borderColor: '#2563eb' },
   simActive: { backgroundColor: '#fef3c7', borderColor: '#d97706' },
   button: { backgroundColor: '#2563eb', borderRadius: 10, padding: 14, alignItems: 'center', marginBottom: 10 },
+  disconnect: { backgroundColor: '#64748b' },
   buttonText: { color: '#fff', fontWeight: '700' },
   device: { backgroundColor: '#fff', borderRadius: 10, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: '#cbd5e1' },
   selected: { borderColor: '#2563eb', borderWidth: 2 },
   deviceName: { fontWeight: '700', color: '#1f2937' },
   warning: { color: '#b45309', marginBottom: 12 },
-  input: { backgroundColor: '#fff', borderColor: '#cbd5e1', borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 12 },
+  input: { backgroundColor: '#fff', borderColor: '#cbd5e1', borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 12, color: '#0f172a' },
   panel: { backgroundColor: '#1f2937', borderRadius: 14, padding: 16, marginTop: 8 },
   label: { color: '#93c5fd', marginTop: 8 },
   value: { color: '#f8fafc', fontSize: 16, marginTop: 3 },
