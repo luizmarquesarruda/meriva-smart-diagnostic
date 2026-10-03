@@ -4,6 +4,7 @@ export {
   calculateConsumptionKml,
   haversineDistanceKm,
   normalizeGpsSpeedKmh,
+  formatDistance,
 } from './gpsTracker';
 
 export type {
