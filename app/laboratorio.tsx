@@ -8,6 +8,9 @@ import { BluetoothDeviceInfo } from '../src/obd/bluetoothClassicTransport';
 import { createRealElmSession, discoverPairedDevices } from '../src/obd/bluetoothManager';
 import { discoverSupportedPids, KNOWN_PIDS } from '../src/obd/pidScanner';
 import { FuelRateIntegrator } from '../src/obd/fuelConsumption';
+import { gpsTracker } from '../src/gps';
+import { RealTripRecorder } from '../src/trip/tripRecorder';
+import { addDriveCycle, readDriveCycles } from '../src/storage/driveCycleStorage';
 import { DtcRecord, readDtcs, recordDtc } from '../src/database/dtcManager';
 import {
   initAutoSave,
@@ -39,14 +42,107 @@ export default function LaboratorioScreen() {
   const [supportedPids, setSupportedPids] = useState<string[]>([]);
   const [dtcCodes, setDtcCodes] = useState<string[]>([]);
   const [fuelUsedL, setFuelUsedL] = useState(0);
+  const [tripDistanceKm, setTripDistanceKm] = useState(0);
+  const [tripFuelUsedL, setTripFuelUsedL] = useState(0);
+  const [tripConsumptionKml, setTripConsumptionKml] = useState<number | null>(null);
+  const [tripActive, setTripActive] = useState(false);
+  const [tripFuelSupported, setTripFuelSupported] = useState<boolean | null>(null);
   const fuelIntegratorRef = useRef(new FuelRateIntegrator());
   const sessionRef = useRef<Elm327Session | null>(null);
+  const tripRecorderRef = useRef<RealTripRecorder | null>(null);
+  const tripLoopActiveRef = useRef(false);
+  const tripLoopPromiseRef = useRef<Promise<void> | null>(null);
   const autoSaveReadyRef = useRef(false);
 
   const simulationSession = useMemo(
     () => new Elm327Session(new SimulatedObdTransport()),
     [],
   );
+
+  async function delay(ms: number): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  async function stopRealTripRecorder(): Promise<void> {
+    tripLoopActiveRef.current = false;
+    const loop = tripLoopPromiseRef.current;
+    tripLoopPromiseRef.current = null;
+    try {
+      await loop;
+    } catch {
+      // falha de uma leitura não impede o fechamento da viagem
+    }
+
+    const recorder = tripRecorderRef.current;
+    tripRecorderRef.current = null;
+    setTripActive(false);
+
+    if (!recorder) return;
+    const cycle = recorder.buildDriveCycle();
+    if (!cycle) return;
+
+    await addDriveCycle(getBasePath(), cycle);
+    const storedCycles = await readDriveCycles(getBasePath());
+    updateAutoSaveState((state) => {
+      state.driveCycles = storedCycles;
+    });
+    await forceSaveOnObdEvent();
+  }
+
+  async function runRealTripRecorder(session: Elm327Session): Promise<void> {
+    while (tripLoopActiveRef.current && sessionRef.current === session) {
+      const timestampMs = Date.now();
+      try {
+        const result = await session.queryPid('015E');
+        const fuelRate =
+          result.parsed.status === 'RESPONDEU' &&
+          result.parsed.unit === 'L/h' &&
+          result.parsed.value != null
+            ? result.parsed.value
+            : null;
+        const gps = gpsTracker.getState();
+        const recorder = tripRecorderRef.current;
+
+        if (recorder) {
+          const state = recorder.addSample({
+            timestampMs: Date.now(),
+            distanceKm: gps.distanceKm,
+            speedKmh: gps.currentSpeedKmh,
+            fuelRateLph: fuelRate,
+          });
+          setTripDistanceKm(state.distanceKm);
+          setTripFuelUsedL(state.fuelUsedL);
+          setFuelUsedL(state.fuelUsedL);
+          setTripConsumptionKml(
+            state.fuelUsedL > 0 && state.distanceKm > 0
+              ? state.distanceKm / state.fuelUsedL
+              : null,
+          );
+          if (fuelRate == null && state.validFuelSamples === 0) {
+            setStatus('GPS ATIVO / ECU SEM PID 015E VÁLIDO');
+          }
+        }
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : 'FALHA NA LEITURA AUTOMÁTICA DO PID 015E');
+      }
+
+      await delay(1500);
+    }
+  }
+
+  function startRealTripRecorder(session: Elm327Session): void {
+    const gpsDistanceAtStart = gpsTracker.getState().distanceKm;
+    const recorder = new RealTripRecorder(Date.now(), gpsDistanceAtStart);
+    tripRecorderRef.current = recorder;
+    fuelIntegratorRef.current.reset();
+    setFuelUsedL(0);
+    setTripDistanceKm(0);
+    setTripFuelUsedL(0);
+    setTripConsumptionKml(null);
+    setTripActive(true);
+    tripLoopActiveRef.current = true;
+    tripLoopPromiseRef.current = runRealTripRecorder(session);
+  }
 
   useEffect(() => {
     let mounted = true;
@@ -69,13 +165,13 @@ export default function LaboratorioScreen() {
 
     return () => {
       mounted = false;
-      const activeSession = sessionRef.current;
-      sessionRef.current = null;
-      stopObdSessionCheckpoint();
-
       if (!autoSaveReadyRef.current) return;
 
       void (async () => {
+        await stopRealTripRecorder();
+        const activeSession = sessionRef.current;
+        sessionRef.current = null;
+        stopObdSessionCheckpoint();
         try {
           await activeSession?.close();
         } catch {
@@ -118,6 +214,7 @@ export default function LaboratorioScreen() {
     setStatus('BLUETOOTH CONECTANDO');
     try {
       if (sessionRef.current) {
+        await stopRealTripRecorder();
         await sessionRef.current.close();
         sessionRef.current = null;
       }
@@ -134,7 +231,20 @@ export default function LaboratorioScreen() {
           lastConnectedAt: new Date().toISOString(),
         };
       });
-      setStatus(connection.protocol ? 'ELM RESPONDENDO' : 'ELM RESPONDENDO / PROTOCOLO N/D');
+
+      setStatus('ELM RESPONDENDO / DESCOBRINDO SUPORTE DOS PIDs');
+      const discovery = await discoverSupportedPids(connection.session);
+      const discovered = Array.from(new Set(discovery.flatMap((item) => item.supportedPids))).sort();
+      setSupportedPids(discovered);
+      const fuelSupported = discovered.includes('015E');
+      setTripFuelSupported(fuelSupported);
+      if (fuelSupported) {
+        startRealTripRecorder(connection.session);
+        setStatus(connection.protocol ? 'VIAGEM AUTOMÁTICA / PID 015E ATIVO' : 'VIAGEM AUTOMÁTICA / PROTOCOLO N/D');
+      } else {
+        setTripActive(false);
+        setStatus('ELM RESPONDENDO / PID 015E NÃO SUPORTADO');
+      }
     } catch (cause) {
       sessionRef.current = null;
       setProtocol('N/D');
@@ -150,11 +260,17 @@ export default function LaboratorioScreen() {
     stopObdSessionCheckpoint();
 
     try {
+      await stopRealTripRecorder();
       await activeSession?.close();
       updateAutoSaveState((state) => {
         state.obd = { ...state.obd, connected: false };
       });
       await forceSaveOnObdEvent();
+      setTripFuelSupported(null);
+      setTripConsumptionKml(null);
+      setTripDistanceKm(0);
+      setTripFuelUsedL(0);
+      setFuelUsedL(0);
       setStatus('BLUETOOTH OK / ELM DESCONECTADO');
     } catch (cause) {
       setStatus('DESCONECTADO COM AVISO');
@@ -263,6 +379,15 @@ export default function LaboratorioScreen() {
       <Text style={styles.status}>{status}</Text>
       <Text style={styles.protocol}>PROTOCOLO: {protocol}</Text>
       {!storageReady ? <Text style={styles.warning}>PREPARANDO AUTOSAVE...</Text> : null}
+      <View style={styles.tripPanel}>
+        <Text style={styles.tripTitle}>VIAGEM AUTOMÁTICA</Text>
+        <Text style={styles.tripLine}>STATUS: {tripActive ? 'GRAVANDO' : 'AGUARDANDO OBD'}</Text>
+        <Text style={styles.tripLine}>PID 015E: {tripFuelSupported === null ? 'N/D' : tripFuelSupported ? 'SUPORTADO' : 'NÃO SUPORTADO'}</Text>
+        <Text style={styles.tripLine}>DISTÂNCIA GPS: {tripDistanceKm.toFixed(3)} km</Text>
+        <Text style={styles.tripLine}>COMBUSTÍVEL REAL: {tripFuelUsedL.toFixed(6)} L</Text>
+        <Text style={styles.tripLine}>CONSUMO: {tripConsumptionKml == null ? 'N/D' : `${tripConsumptionKml.toFixed(3)} km/L`}</Text>
+        <Text style={styles.tripHelp}>A viagem é criada sem botão iniciar. O ciclo junta GPS + PID 015E e salva somente dados reais válidos.</Text>
+      </View>
 
       <View style={styles.modeRow}>
         <TouchableOpacity style={[styles.modeButton, mode === 'REAL' && styles.active]} onPress={() => setMode('REAL')}>
@@ -356,6 +481,10 @@ const styles = StyleSheet.create({
   deviceName: { fontWeight: '700', color: '#1f2937' },
   warning: { color: '#b45309', marginBottom: 12 },
   input: { backgroundColor: '#fff', borderColor: '#cbd5e1', borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 12, color: '#0f172a' },
+  tripPanel: { backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#cbd5e1' },
+  tripTitle: { color: '#1f2937', fontWeight: '800', fontSize: 16, marginBottom: 6 },
+  tripLine: { color: '#334155', marginTop: 3 },
+  tripHelp: { color: '#64748b', fontSize: 12, marginTop: 8 },
   panel: { backgroundColor: '#1f2937', borderRadius: 14, padding: 16, marginTop: 8 },
   label: { color: '#93c5fd', marginTop: 8 },
   value: { color: '#f8fafc', fontSize: 16, marginTop: 3 },
