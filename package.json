@@ -10,7 +10,7 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "prebuild": "expo prebuild --clean",
-    "test": "node tests/merivaAutosave.test.js && node tests/regression.test.js && node tests/gps.test.js",
+    "test": "node tests/merivaAutosave.test.js && node tests/regression.test.js && node tests/gps.test.js && node tests/fuelConsumption.test.js && node tests/tripRecorder.test.js",
     "build:apk": "eas build --platform android --profile preview",
     "build:production": "eas build --platform android --profile production",
     "doctor": "npx expo-doctor",
