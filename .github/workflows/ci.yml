@@ -30,6 +30,8 @@ jobs:
     runs-on: ubuntu-24.04
     needs: validate
     timeout-minutes: 30
+    env:
+      NODE_ENV: production
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -41,11 +43,18 @@ jobs:
           java-version: '17'
       - run: npm install --no-audit --no-fund
       - run: npx expo prebuild --clean --platform android --non-interactive
-      - name: Assemble Android release APK (standalone)
+      - name: Assemble Android release APK (standalone, no Metro)
         working-directory: android
         run: ./gradlew :app:assembleRelease --no-daemon --stacktrace
-      - name: Verify standalone APK
-        run: test -s android/app/build/outputs/apk/release/app-release.apk
+      - name: Verify standalone APK and embedded JS bundle
+        run: |
+          set -euo pipefail
+          APK="android/app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK"
+          unzip -l "$APK" | grep -q 'assets/index.android.bundle'
+          sha256sum "$APK"
+          echo "Standalone APK OK: $APK"
+          echo "Embedded JS bundle OK: assets/index.android.bundle"
       - name: Upload Android standalone APK
         uses: actions/upload-artifact@v7
         with:
