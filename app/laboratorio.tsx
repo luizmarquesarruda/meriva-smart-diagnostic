@@ -7,6 +7,7 @@ import { SimulatedObdTransport } from '../src/obd/simulatedTransport';
 import { BluetoothDeviceInfo } from '../src/obd/bluetoothClassicTransport';
 import { createRealElmSession, discoverPairedDevices } from '../src/obd/bluetoothManager';
 import { discoverSupportedPids, KNOWN_PIDS } from '../src/obd/pidScanner';
+import { FuelRateIntegrator } from '../src/obd/fuelConsumption';
 import { DtcRecord, readDtcs, recordDtc } from '../src/database/dtcManager';
 import {
   initAutoSave,
@@ -37,6 +38,8 @@ export default function LaboratorioScreen() {
   const [storageReady, setStorageReady] = useState(false);
   const [supportedPids, setSupportedPids] = useState<string[]>([]);
   const [dtcCodes, setDtcCodes] = useState<string[]>([]);
+  const [fuelUsedL, setFuelUsedL] = useState(0);
+  const fuelIntegratorRef = useRef(new FuelRateIntegrator());
   const sessionRef = useRef<Elm327Session | null>(null);
   const autoSaveReadyRef = useRef(false);
 
@@ -173,6 +176,9 @@ export default function LaboratorioScreen() {
       setRx(result.rx);
       setElapsedMs(result.elapsedMs);
       setProtocol(result.protocol ?? 'N/D');
+      if (mode === 'REAL' && result.parsed.status === 'RESPONDEU' && result.parsed.unit === 'L/h' && result.parsed.value != null) {
+        setFuelUsedL(fuelIntegratorRef.current.addSample(result.parsed.value).fuelUsedL);
+      }
       setStatus(
         mode === 'SIMULACAO'
           ? `SIMULAÇÃO LOCAL: ${result.parsed.status}`
@@ -319,6 +325,7 @@ export default function LaboratorioScreen() {
         <Text style={styles.label}>TEMPO</Text><Text style={styles.value}>{elapsedMs === null ? 'SEM DADOS' : `${elapsedMs} ms`}</Text>
         <Text style={styles.label}>STATUS</Text><Text style={styles.value}>{parsed?.status || 'COMANDO'}</Text>
         <Text style={styles.label}>VALOR</Text><Text style={styles.value}>{parsed?.value === null || !parsed ? 'SEM DADOS' : `${parsed.value} ${parsed.unit}`}</Text>
+        <Text style={styles.label}>COMBUSTÍVEL INTEGRADO (PID 015E)</Text><Text style={styles.value}>{fuelUsedL.toFixed(6)} L</Text>
         <Text style={styles.label}>RAW PRESERVADO</Text><Text style={styles.value}>{rx || 'SEM DADOS'}</Text>
         <Text style={styles.label}>DTC ATUAIS</Text><Text style={styles.value}>{dtcCodes.length ? dtcCodes.join(', ') : 'NENHUM'}</Text>
         <Text style={styles.label}>PIDs CONHECIDOS SUPORTADOS</Text><Text style={styles.value}>{knownSupported.length ? knownSupported.join(', ') : 'N/D'}</Text>
