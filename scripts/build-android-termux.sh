@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
 
-find_java17() {
+find_termux_java() {
   local candidate version
   local candidates=()
 
@@ -24,7 +24,7 @@ find_java17() {
     [ -x "$candidate" ] || continue
     version="$( "$candidate" -version 2>&1 | awk -F '"' '/version "/ {print $2; exit}' )"
     case "$version" in
-      17.*)
+      21.*|25.*)
         printf '%s\n' "$candidate"
         return 0
         ;;
@@ -34,21 +34,21 @@ find_java17() {
   return 1
 }
 
-JAVA17_BIN="$(find_java17 || true)"
+JAVA_BIN="$(find_termux_java || true)"
 
-if [ -z "$JAVA17_BIN" ]; then
-  echo "ERRO: Java 17 não foi encontrado no Termux."
+if [ -z "$JAVA_BIN" ]; then
+  echo "ERRO: nenhum JDK compatível foi encontrado no Termux."
   echo
-  echo "Instale o JDK 17 e tente novamente:"
+  echo "O Termux atual fornece OpenJDK 21/25. Instale o OpenJDK 21:"
   echo "  pkg update"
-  echo "  pkg install openjdk-17"
+  echo "  pkg install openjdk-21"
   echo
   echo "Depois confira:"
   echo "  '${PREFIX}/lib/jvm/*/bin/java' -version"
   exit 1
 fi
 
-export JAVA_HOME="$(cd "$(dirname "$JAVA17_BIN")/.." && pwd)"
+export JAVA_HOME="$(cd "$(dirname "$JAVA_BIN")/.." && pwd)"
 export PATH="$JAVA_HOME/bin:$PATH"
 
 echo "===== MERIVA SMART DIAGNOSTIC / ANDROID ====="
@@ -57,14 +57,13 @@ java -version
 echo
 
 if [ ! -x "$ROOT/android/gradlew" ]; then
-  echo "ERRO: projeto Android não encontrado."
-  echo "Execute antes:"
-  echo "  npx expo prebuild --platform android --non-interactive"
-  exit 1
+  echo "Android nativo não encontrado. Gerando com Expo prebuild..."
+  cd "$ROOT"
+  npx expo prebuild --platform android --non-interactive
 fi
 
 cd "$ROOT/android"
-./gradlew :app:assembleDebug --no-daemon --stacktrace
+./gradlew :app:assembleDebug --no-daemon --stacktrace -Dorg.gradle.java.home="$JAVA_HOME"
 
 APK="$ROOT/android/app/build/outputs/apk/debug/app-debug.apk"
 if [ -f "$APK" ]; then
