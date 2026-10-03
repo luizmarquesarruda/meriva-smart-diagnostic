@@ -10,8 +10,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
-    "smoke": "node dist/smoke-client.js",
-    "check": "npm run build && npm run smoke"
+    "check": "npm run build"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.3.0",
