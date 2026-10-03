@@ -22,6 +22,8 @@ const bridgeDataDir = resolve(
 
 mkdirSync(bridgeDataDir, { recursive: true });
 
+const buildLogPath = join(bridgeDataDir, 'last-build.log');
+
 type ExecResult = {
   command: string;
   cwd: string;
@@ -311,6 +313,12 @@ function buildServer(): McpServer {
 
       const result = await runGradle(args, 15 * 60 * 1000);
 
+      const buildText = result.content?.[0]?.type === 'text'
+        ? result.content[0].text
+        : JSON.stringify(result);
+
+      writeFileSync(buildLogPath, buildText, 'utf8');
+
       if (!result.content?.[0] || result.isError) return result;
 
       const apkCandidates = [
@@ -336,19 +344,13 @@ function buildServer(): McpServer {
       inputSchema: z.object({})
     },
     async () => {
-      const logPath = join(bridgeDataDir, 'last-build.log');
-
-      if (!existsSync(logPath)) {
-        return textResult(`No build log found at ${logPath}`);
+      if (!existsSync(buildLogPath)) {
+        return textResult(`No build log found at ${buildLogPath}`);
       }
 
-      return textResult(readFileSync(logPath, 'utf8'));
+      return textResult(readFileSync(buildLogPath, 'utf8'));
     }
   );
-
-  server.server.setRequestHandler('tools/call', async (request, ctx) => {
-    return await server.server._defaultRequestHandler(request, ctx);
-  });
 
   return server;
 }
