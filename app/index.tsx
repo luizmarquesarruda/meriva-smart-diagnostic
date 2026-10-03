@@ -83,8 +83,8 @@ export default function IndexScreen() {
             <View style={styles.gpsMetric}><Text style={styles.metricLabel}>PRECISÃO</Text><Text style={styles.metricValue}>{gpsState.lastAccuracyM == null ? 'N/D' : `${gpsState.lastAccuracyM.toFixed(0)} m`}</Text></View>
           </View>
           <Text style={styles.gpsHelp}>GPS inicia automaticamente ao abrir o aplicativo. Velocidade e distância vêm do celular. O GPS não mede litros consumidos sozinho.</Text>
-          <TextInput value={fuelUsedL} onChangeText={setFuelUsedL} keyboardType="decimal-pad" placeholder="Combustível usado na viagem (L)" placeholderTextColor="#64748b" style={styles.fuelInput} />
-          <Text style={styles.consumptionLine}>{gpsConsumption == null ? 'Consumo: informe litros usados' : `Consumo calculado: ${gpsConsumption.toFixed(2)} km/L`}</Text>
+          <Text style={styles.fuelInfo}>COMBUSTÍVEL: aguardando taxa real da ECU (PID 015E).</Text>
+          <Text style={styles.fuelInfo}>O GPS mede distância e velocidade. Litros só entram quando a ECU fornecer L/h válido.</Text>
           {gpsState.error ? <Text style={styles.gpsError}>{gpsState.error}</Text> : null}
         </View>
 
@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
   gpsLive: { color: '#16a34a', fontWeight: '800' },
   gpsOff: { color: '#64748b', fontWeight: '800' },
   gpsHelp: { color: '#64748b', fontSize: 12, marginBottom: 10 },
-  consumptionLine: { color: '#1f2937', fontWeight: '700', marginBottom: 10 },
+  fuelInfo: { color: '#475569', fontSize: 12, marginBottom: 6 },
   gpsError: { color: '#b91c1c', fontWeight: '700', marginBottom: 10 },
   summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 18 },
   metricCard: { width: '48%', backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 10 },
