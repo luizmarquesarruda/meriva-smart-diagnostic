@@ -42,6 +42,64 @@ export interface MerivaLearningProfile {
   };
 }
 
+function profilePath(basePath: string): string {
+  return `${basePath}/APRENDIZADO/dna_meriva.json`;
+}
+
+async function readLearningProfileUnsafe(
+  basePath: string,
+): Promise<MerivaLearningProfile | null> {
+  const target = profilePath(basePath);
+  const info = await FileSystem.getInfoAsync(target);
+  if (!info.exists || info.isDirectory) return null;
+
+  try {
+    const content = await FileSystem.readAsStringAsync(target);
+    return JSON.parse(content) as MerivaLearningProfile;
+  } catch {
+    return null;
+  }
+}
+
+async function writeLearningProfileUnsafe(
+  basePath: string,
+  profile: MerivaLearningProfile,
+): Promise<void> {
+  const target = profilePath(basePath);
+  await FileSystem.makeDirectoryAsync(`${basePath}/APRENDIZADO`, { intermediates: true });
+  await FileSystem.writeAsStringAsync(target, JSON.stringify(profile, null, 2), {
+    encoding: FileSystem.EncodingType.UTF8,
+  });
+}
+
+async function enqueueProfileTransaction<T>(
+  basePath: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const target = profilePath(basePath);
+  const previous = profileQueues.get(target) ?? Promise.resolve();
+
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  const current = previous
+    .catch(() => undefined)
+    .then(async () => operation());
+
+  profileQueues.set(target, current.then(() => gate, () => gate));
+
+  try {
+    return await current;
+  } finally {
+    release();
+    if (profileQueues.get(target) === gate) {
+      profileQueues.delete(target);
+    }
+  }
+}
+
 export async function createLearningProfile(
   basePath: string,
   seedImportDate: string,
@@ -83,39 +141,17 @@ export async function saveLearningProfile(
   basePath: string,
   profile: MerivaLearningProfile,
 ): Promise<void> {
-  const target = `${basePath}/APRENDIZADO/dna_meriva.json`;
-  const previous = profileQueues.get(target) ?? Promise.resolve();
-  const current = previous
-    .catch(() => undefined)
-    .then(async () => {
-      await FileSystem.makeDirectoryAsync(`${basePath}/APRENDIZADO`, { intermediates: true });
-      await FileSystem.writeAsStringAsync(target, JSON.stringify(profile, null, 2), {
-        encoding: FileSystem.EncodingType.UTF8,
-      });
-    });
-
-  profileQueues.set(target, current.catch(() => undefined));
-  try {
-    await current;
-  } finally {
-    if (profileQueues.get(target) === current) profileQueues.delete(target);
-  }
+  await enqueueProfileTransaction(basePath, () =>
+    writeLearningProfileUnsafe(basePath, profile),
+  );
 }
 
 export async function readLearningProfile(
   basePath: string,
 ): Promise<MerivaLearningProfile | null> {
-  const target = `${basePath}/APRENDIZADO/dna_meriva.json`;
+  const target = profilePath(basePath);
   await (profileQueues.get(target) ?? Promise.resolve()).catch(() => undefined);
-  const info = await FileSystem.getInfoAsync(target);
-  if (!info.exists || info.isDirectory) return null;
-
-  try {
-    const content = await FileSystem.readAsStringAsync(target);
-    return JSON.parse(content) as MerivaLearningProfile;
-  } catch {
-    return null;
-  }
+  return readLearningProfileUnsafe(basePath);
 }
 
 export async function updateLearningProfileRealSample(
@@ -124,77 +160,91 @@ export async function updateLearningProfileRealSample(
   value: number,
   condition: VehicleCondition,
 ): Promise<void> {
-  const profile = await readLearningProfile(basePath);
-  if (!profile || !Number.isFinite(value)) return;
+  if (!Number.isFinite(value)) return;
 
-  profile.lastUpdated = new Date().toISOString();
-  profile.globalSampleCounts.realSamples += 1;
-  profile.globalSampleCounts.totalSamples += 1;
+  await enqueueProfileTransaction(basePath, async () => {
+    const profile = await readLearningProfileUnsafe(basePath);
+    if (!profile) return;
 
-  const realSamples = profile.globalSampleCounts.realSamples;
-  if (realSamples >= profile.confidenceThresholds.high) {
-    profile.learningStatus = 'CONFIDENT';
-  } else if (realSamples >= profile.confidenceThresholds.low) {
-    profile.learningStatus = 'LEARNING_ACTIVE';
-  } else {
-    profile.learningStatus = 'COLD_START';
-  }
+    const now = new Date().toISOString();
+    profile.lastUpdated = now;
+    profile.globalSampleCounts.realSamples += 1;
+    profile.globalSampleCounts.totalSamples += 1;
 
-  let contextStats = profile.contextualData.find((item) => item.condition === condition);
-  if (!contextStats) {
-    contextStats = {
-      condition,
-      statistics: {},
-      lastUpdate: new Date().toISOString(),
-      sampleCount: 0,
-    };
-    profile.contextualData.push(contextStats);
-  }
+    const realSamples = profile.globalSampleCounts.realSamples;
+    if (realSamples >= profile.confidenceThresholds.high) {
+      profile.learningStatus = 'CONFIDENT';
+    } else if (realSamples >= profile.confidenceThresholds.low) {
+      profile.learningStatus = 'LEARNING_ACTIVE';
+    } else {
+      profile.learningStatus = 'COLD_START';
+    }
 
-  contextStats.sampleCount += 1;
-  contextStats.lastUpdate = new Date().toISOString();
+    let contextStats = profile.contextualData.find((item) => item.condition === condition);
+    if (!contextStats) {
+      contextStats = {
+        condition,
+        statistics: {},
+        lastUpdate: now,
+        sampleCount: 0,
+      };
+      profile.contextualData.push(contextStats);
+    }
 
-  const existing = contextStats.statistics[pidName];
-  if (!existing) {
-    contextStats.statistics[pidName] = {
-      mean: value,
-      median: value,
-      min: value,
-      max: value,
-      stddev: 0,
-      samples: 1,
-      realSamples: 1,
-      seedSamples: 0,
-      confidence: determineConfidence(1, profile.confidenceThresholds),
-      lastUpdate: new Date().toISOString(),
-      source: ['REAL_OBD'],
-    };
-  } else {
-    const previousMean = existing.mean;
-    const previousSamples = existing.samples;
-    const previousM2 = existing.stddev * existing.stddev * Math.max(0, previousSamples - 1);
-    existing.samples = previousSamples + 1;
-    existing.realSamples += 1;
-    existing.mean = previousMean + (value - previousMean) / existing.samples;
-    const delta = value - previousMean;
-    const m2 = previousM2 + delta * (value - existing.mean);
-    existing.stddev = Math.sqrt(Math.max(0, m2 / Math.max(1, existing.samples - 1)));
-    existing.min = Math.min(existing.min, value);
-    existing.max = Math.max(existing.max, value);
-    existing.confidence = determineConfidence(existing.samples, profile.confidenceThresholds);
-    existing.lastUpdate = new Date().toISOString();
-  }
+    contextStats.sampleCount += 1;
+    contextStats.lastUpdate = now;
 
-  await saveLearningProfile(basePath, profile);
+    const existing = contextStats.statistics[pidName];
+    if (!existing) {
+      contextStats.statistics[pidName] = {
+        mean: value,
+        median: value,
+        min: value,
+        max: value,
+        stddev: 0,
+        samples: 1,
+        realSamples: 1,
+        seedSamples: 0,
+        confidence: determineConfidence(1, profile.confidenceThresholds),
+        lastUpdate: now,
+        source: ['REAL_OBD'],
+      };
+    } else {
+      const previousMean = existing.mean;
+      const previousSamples = existing.samples;
+      const previousM2 =
+        existing.stddev * existing.stddev * Math.max(0, previousSamples - 1);
+      existing.samples = previousSamples + 1;
+      existing.realSamples += 1;
+      existing.mean =
+        previousMean + (value - previousMean) / existing.samples;
+      const delta = value - previousMean;
+      const m2 = previousM2 + delta * (value - existing.mean);
+      existing.stddev = Math.sqrt(
+        Math.max(0, m2 / Math.max(1, existing.samples - 1)),
+      );
+      existing.min = Math.min(existing.min, value);
+      existing.max = Math.max(existing.max, value);
+      existing.confidence = determineConfidence(
+        existing.samples,
+        profile.confidenceThresholds,
+      );
+      existing.lastUpdate = now;
+    }
+
+    await writeLearningProfileUnsafe(basePath, profile);
+  });
 }
 
 export async function blockSimulationLearning(basePath: string): Promise<void> {
-  const profile = await readLearningProfile(basePath);
-  if (!profile) return;
+  await enqueueProfileTransaction(basePath, async () => {
+    const profile = await readLearningProfileUnsafe(basePath);
+    if (!profile) return;
 
-  profile.dataContamination.simulationDetected += 1;
-  profile.dataContamination.simulationFiltered += 1;
-  await saveLearningProfile(basePath, profile);
+    profile.dataContamination.simulationDetected += 1;
+    profile.dataContamination.simulationFiltered += 1;
+    await writeLearningProfileUnsafe(basePath, profile);
+  });
 }
 
 function determineConfidence(
