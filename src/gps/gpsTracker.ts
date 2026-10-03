@@ -212,12 +212,23 @@ export class GpsTracker {
       const elapsedMs = sample.timestamp - this.previous.timestamp;
       if (elapsedMs > 0) {
         const segmentKm = haversineDistanceKm(this.previous, sample);
+        const segmentM = segmentKm * 1000;
         derivedSpeedKmh = segmentKm / (elapsedMs / 3600000);
 
+        const previousReportedSpeed = this.previous.speedKmh ?? null;
+        const currentReportedSpeed = sample.speedKmh ?? null;
+        const bothReportStationary =
+          previousReportedSpeed != null &&
+          currentReportedSpeed != null &&
+          previousReportedSpeed < STATIONARY_SPEED_KMH &&
+          currentReportedSpeed < STATIONARY_SPEED_KMH;
+
         if (
-          segmentKm <= 0.25 &&
+          segmentM >= MIN_MOVEMENT_M &&
+          segmentKm <= MAX_SEGMENT_M / 1000 &&
           derivedSpeedKmh >= 0 &&
-          derivedSpeedKmh <= MAX_SPEED_KMH
+          derivedSpeedKmh <= MAX_SPEED_KMH &&
+          !bothReportStationary
         ) {
           this.state.distanceKm = Number(
             (this.state.distanceKm + segmentKm).toFixed(3),
