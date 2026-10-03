@@ -24,6 +24,9 @@ export type GpsListener = (state: GpsTripState) => void;
 
 const MIN_ACCURACY_M = 60;
 const MAX_SPEED_KMH = 220;
+const STATIONARY_SPEED_KMH = 2;
+const MIN_MOVEMENT_M = 3;
+const MAX_SEGMENT_M = 250;
 
 export function haversineDistanceKm(
   a: Pick<GpsSample, 'latitude' | 'longitude'>,
@@ -56,6 +59,13 @@ export function normalizeGpsSpeedKmh(speedMs: number | null | undefined): number
   return Number.isFinite(speedMs) && (speedMs as number) >= 0
     ? (speedMs as number) * 3.6
     : 0;
+}
+
+export function formatDistance(distanceKm: number): string {
+  if (!Number.isFinite(distanceKm) || distanceKm <= 0) return '0 m';
+  const meters = distanceKm * 1000;
+  if (meters < 1000) return `${Math.round(meters)} m`;
+  return `${distanceKm.toFixed(2)} km`;
 }
 
 function isAccurate(sample: GpsSample): boolean {
@@ -197,34 +207,37 @@ export class GpsTracker {
 
     const accurate = isAccurate(sample);
     let derivedSpeedKmh: number | null = null;
+    let segmentKm = 0;
 
     if (this.previous && accurate && isAccurate(this.previous)) {
       const elapsedMs = sample.timestamp - this.previous.timestamp;
       if (elapsedMs > 0) {
-        const segmentKm = haversineDistanceKm(this.previous, sample);
-        derivedSpeedKmh = segmentKm / (elapsedMs / 3600000);
-
-        if (
-          segmentKm <= 0.25 &&
-          derivedSpeedKmh >= 0 &&
-          derivedSpeedKmh <= MAX_SPEED_KMH
-        ) {
-          this.state.distanceKm = Number(
-            (this.state.distanceKm + segmentKm).toFixed(3),
-          );
+        segmentKm = haversineDistanceKm(this.previous, sample);
+        const segmentM = segmentKm * 1000;
+        if (segmentM <= MAX_SEGMENT_M) {
+          derivedSpeedKmh = segmentKm / (elapsedMs / 3600000);
+        } else {
+          segmentKm = 0;
         }
       }
     }
 
+    // A velocidade reportada pelo GPS é a principal fonte para decidir se o carro
+    // está realmente em movimento. Isso evita acumular a deriva de posição quando parado.
     let speedKmh = accurate ? sample.speedKmh : null;
-    if (
-      (speedKmh == null || speedKmh > MAX_SPEED_KMH) &&
-      derivedSpeedKmh != null &&
-      derivedSpeedKmh <= MAX_SPEED_KMH
-    ) {
+    if (speedKmh == null && derivedSpeedKmh != null && derivedSpeedKmh <= MAX_SPEED_KMH) {
       speedKmh = derivedSpeedKmh;
     }
     if (speedKmh == null || speedKmh < 0 || speedKmh > MAX_SPEED_KMH) speedKmh = 0;
+
+    const moving = speedKmh >= STATIONARY_SPEED_KMH;
+    if (moving && segmentKm > 0 && segmentKm * 1000 >= MIN_MOVEMENT_M) {
+      this.state.distanceKm = Number((this.state.distanceKm + segmentKm).toFixed(3));
+    }
+
+    // Se o aparelho informar velocidade praticamente zero, mantemos o veículo parado
+    // mesmo que as coordenadas tenham pequenas oscilações.
+    if (!moving) speedKmh = 0;
 
     if (accurate) this.previous = sample;
     this.state = {
