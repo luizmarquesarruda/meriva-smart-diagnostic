@@ -15,6 +15,16 @@ function formatTime(iso: string | null): string {
   try { return new Date(iso).toLocaleTimeString('pt-BR'); } catch { return 'N/D'; }
 }
 
+function formatDistance(distanceKm: number): string {
+  if (!Number.isFinite(distanceKm) || distanceKm <= 0) return '0 m';
+  if (distanceKm < 1) return `${Math.round(distanceKm * 1000)} m`;
+  return `${distanceKm.toFixed(2)} km`;
+}
+
+function statusColor(ok: boolean): string {
+  return ok ? '#16a34a' : '#64748b';
+}
+
 export default function IndexScreen() {
   const [cycles, setCycles] = useState<DriveCycle[]>([]);
   const [obd, setObd] = useState<ObdConnectionState>({ connected: false });
@@ -50,107 +60,178 @@ export default function IndexScreen() {
   useFocusEffect(useCallback(() => { void reloadStoredState(); }, [reloadStoredState]));
 
   const summary = useMemo(() => getDriveCycleSummary(cycles), [cycles]);
+  const gpsReady = gpsState.running && gpsState.permissionGranted;
+  const obdReady = obd.connected;
+  const hasRealCycle = Boolean(summary.lastRealCycle);
+  const distanceLabel = formatDistance(gpsState.distanceKm);
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.card}>
-          <Text style={styles.title}>MERIVA SMART</Text>
-          <Text style={styles.subtitle}>DIAGNOSTIC</Text>
-          <Text style={styles.sectionTitleDark}>STATUS</Text>
-          <Text style={styles.statusLine}>OBD: {obd.connected ? 'CONECTADO' : 'DESCONECTADO'}</Text>
-          <Text style={styles.statusLine}>ECU: {obd.ecuAddress ?? 'N/D'}</Text>
-          <Text style={styles.statusLine}>PROTOCOLO: {obd.protocol ?? 'N/D'}</Text>
-          <Text style={styles.sectionTitleDark}>SALVAMENTO</Text>
-          <Text style={styles.statusLine}>AUTOMÁTICO: ATIVO</Text>
-          <Text style={styles.statusLine}>ÚLTIMO SAVE: {formatTime(saveStatus.lastSavedAt)}</Text>
-          {saveStatus.lastError ? <Text style={styles.autosaveError}>FALHA NO AUTOSAVE: {saveStatus.lastError}</Text> : null}
-          <Text style={styles.status}>{isHydrated ? 'ESTADO RESTAURADO' : 'CARREGANDO...'}</Text>
-        </View>
-
-        <View style={styles.gpsCard}>
-          <View style={styles.gpsHeader}>
-            <Text style={styles.sectionTitle}>GPS DO CELULAR</Text>
-            <Text style={gpsState.running ? styles.gpsLive : styles.gpsOff}>
-              {gpsState.running ? 'ATIVO AUTOMÁTICO' : 'AGUARDANDO GPS'}
-            </Text>
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.brand}>MERIVA SMART</Text>
+            <Text style={styles.vehicle}>MAXX 1.4 8V</Text>
           </View>
-          <View style={styles.gpsGrid}>
-            <View style={styles.gpsMetric}><Text style={styles.metricLabel}>VELOCIDADE</Text><Text style={styles.gpsSpeed}>{gpsState.currentSpeedKmh.toFixed(1)} km/h</Text></View>
-            <View style={styles.gpsMetric}><Text style={styles.metricLabel}>DISTÂNCIA</Text><Text style={styles.metricValue}>{gpsState.distanceKm.toFixed(3)} km</Text></View>
-            <View style={styles.gpsMetric}><Text style={styles.metricLabel}>MÁXIMA</Text><Text style={styles.metricValue}>{gpsState.maxSpeedKmh.toFixed(1)} km/h</Text></View>
-            <View style={styles.gpsMetric}><Text style={styles.metricLabel}>PRECISÃO</Text><Text style={styles.metricValue}>{gpsState.lastAccuracyM == null ? 'N/D' : `${gpsState.lastAccuracyM.toFixed(0)} m`}</Text></View>
+          <View style={styles.headerState}>
+            <Text style={styles.headerStateLabel}>ESTADO</Text>
+            <Text style={styles.headerStateValue}>{obdReady ? 'OBD OK' : 'OBD OFF'}</Text>
           </View>
-          <Text style={styles.gpsHelp}>GPS inicia automaticamente. Deriva de posição e velocidade sem confiança são descartadas.</Text>
-          {gpsState.error ? <Text style={styles.gpsError}>{gpsState.error}</Text> : null}
         </View>
 
-        <View style={styles.summaryGrid}>
-          <View style={styles.metricCard}><Text style={styles.metricLabel}>CICLOS REAIS</Text><Text style={styles.metricValue}>{summary.realCycleCount}</Text></View>
-          <View style={styles.metricCard}><Text style={styles.metricLabel}>DISTÂNCIA REAL</Text><Text style={styles.metricValue}>{summary.totalDistanceKm.toFixed(2)} km</Text></View>
-          <View style={styles.metricCard}><Text style={styles.metricLabel}>CONSUMO REAL</Text><Text style={styles.metricValue}>{summary.avgConsumptionKml.toFixed(2)} km/L</Text></View>
-          <View style={styles.metricCard}><Text style={styles.metricLabel}>MÉDIA REAL</Text><Text style={styles.metricValue}>{summary.avgSpeedKmh.toFixed(1)} km/h</Text></View>
+        <View style={styles.statusBar}>
+          <View style={styles.statusItem}>
+            <View style={[styles.dot, { backgroundColor: statusColor(gpsReady) }]} />
+            <Text style={styles.statusText}>GPS {gpsReady ? 'ATIVO' : 'AGUARDANDO'}</Text>
+          </View>
+          <View style={styles.statusItem}>
+            <View style={[styles.dot, { backgroundColor: statusColor(obdReady) }]} />
+            <Text style={styles.statusText}>OBD {obdReady ? 'CONECTADO' : 'DESCONECTADO'}</Text>
+          </View>
+          <View style={styles.statusItem}>
+            <View style={[styles.dot, { backgroundColor: statusColor(!saveStatus.lastError) }]} />
+            <Text style={styles.statusText}>AUTO SAVE</Text>
+          </View>
         </View>
 
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>ÚLTIMO CICLO</Text>
-          {summary.lastRealCycle ? <><Text style={styles.row}><Text style={styles.label}>Início:</Text> {summary.lastRealCycle.startedAt}</Text><Text style={styles.row}><Text style={styles.label}>Fim:</Text> {summary.lastRealCycle.finishedAt}</Text><Text style={styles.row}><Text style={styles.label}>Distância:</Text> {summary.lastRealCycle.distanceTotalKm.toFixed(2)} km</Text><Text style={styles.row}><Text style={styles.label}>Consumo:</Text> {summary.lastRealCycle.avgFuelConsumptionKml.toFixed(3)} km/L</Text><View style={styles.sourceRow}><Text style={styles.row}><Text style={styles.label}>Fonte:</Text> {summary.lastRealCycle.source}</Text><Text style={summary.lastRealCycle.source === 'REAL_OBD' ? styles.sourceReal : styles.sourceRef}>{summary.lastRealCycle.source === 'REAL_OBD' ? 'REAL' : 'REFERÊNCIA'}</Text></View></> : <Text style={styles.empty}>Sem ciclos carregados.</Text>}
+        <View style={styles.speedPanel}>
+          <Text style={styles.eyebrow}>VELOCIDADE REAL DO CELULAR</Text>
+          <View style={styles.speedRow}>
+            <Text style={styles.speedValue}>{gpsReady ? gpsState.currentSpeedKmh.toFixed(0) : '--'}</Text>
+            <Text style={styles.speedUnit}>km/h</Text>
+          </View>
+          <Text style={styles.gpsHint}>
+            {gpsState.error
+              ? gpsState.error
+              : gpsReady
+                ? `Precisão ${gpsState.lastAccuracyM == null ? 'N/D' : `${gpsState.lastAccuracyM.toFixed(0)} m`}`
+                : 'Sem sinal GPS confiável. Nenhuma velocidade é inventada.'}
+          </Text>
         </View>
 
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>HISTÓRICO</Text>
-          <Text style={styles.historyNote}>Referências Car Scanner: {summary.referenceCycleCount}. Elas não entram nas métricas reais.</Text>
-          {cycles.map((cycle) => <View key={cycle.id} style={styles.historyItem}><View style={styles.historyHeader}><Text style={styles.historyDate}>{cycle.startedAt}</Text><Text style={cycle.source === 'REAL_OBD' ? styles.sourceReal : styles.sourceRef}>{cycle.source === 'REAL_OBD' ? 'REAL' : 'REFERÊNCIA'}</Text></View><Text style={styles.historyMeta}>{cycle.distanceTotalKm.toFixed(2)} km • {cycle.avgFuelConsumptionKml.toFixed(3)} km/L</Text></View>)}
+        <View style={styles.tripRow}>
+          <View style={styles.tripBlock}>
+            <Text style={styles.metricLabel}>DISTÂNCIA</Text>
+            <Text style={styles.metricValue}>{distanceLabel}</Text>
+            <Text style={styles.metricHint}>viagem atual</Text>
+          </View>
+          <View style={styles.tripBlock}>
+            <Text style={styles.metricLabel}>MÁXIMA</Text>
+            <Text style={styles.metricValue}>{gpsReady ? `${gpsState.maxSpeedKmh.toFixed(0)} km/h` : '--'}</Text>
+            <Text style={styles.metricHint}>GPS confiável</Text>
+          </View>
         </View>
 
-        <Text style={styles.menuTitle}>TELAS</Text>
-        {screenPrefs.laboratorio && <Link href="/laboratorio" asChild><TouchableOpacity style={styles.button}><Text style={styles.buttonText}>LABORATÓRIO OBD</Text></TouchableOpacity></Link>}
-        {screenPrefs.armazenamento && <Link href="/armazenamento" asChild><TouchableOpacity style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>ARMAZENAMENTO</Text></TouchableOpacity></Link>}
-        {screenPrefs.configuracoes && <Link href="/configuracoes" asChild><TouchableOpacity style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>CONFIGURAÇÕES</Text></TouchableOpacity></Link>}
+        <View style={styles.healthSection}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>SAÚDE DO VEÍCULO</Text>
+            <Text style={obdReady ? styles.goodText : styles.waitText}>{obdReady ? 'ONLINE' : 'AGUARDANDO OBD'}</Text>
+          </View>
+          <View style={styles.healthRow}>
+            <View>
+              <Text style={styles.healthLabel}>ECU</Text>
+              <Text style={styles.healthValue}>{obd.ecuAddress ?? 'N/D'}</Text>
+            </View>
+            <View>
+              <Text style={styles.healthLabel}>PROTOCOLO</Text>
+              <Text style={styles.healthValue}>{obd.protocol ?? 'N/D'}</Text>
+            </View>
+          </View>
+          <Text style={styles.healthHint}>
+            {obdReady ? 'Dados reais podem ser consultados no Laboratório OBD.' : 'Conecte um ELM327 Bluetooth Classic para liberar dados da ECU.'}
+          </Text>
+        </View>
+
+        {hasRealCycle ? (
+          <View style={styles.realDataSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>ÚLTIMO CICLO REAL</Text>
+              <Text style={styles.goodText}>REAL</Text>
+            </View>
+            <View style={styles.realGrid}>
+              <View><Text style={styles.metricLabel}>DISTÂNCIA</Text><Text style={styles.smallValue}>{summary.lastRealCycle!.distanceTotalKm.toFixed(2)} km</Text></View>
+              <View><Text style={styles.metricLabel}>CONSUMO</Text><Text style={styles.smallValue}>{summary.lastRealCycle!.avgFuelConsumptionKml.toFixed(2)} km/L</Text></View>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.noticeSection}>
+            <Text style={styles.noticeTitle}>PRONTO PARA A PRIMEIRA VIAGEM</Text>
+            <Text style={styles.noticeText}>O painel não usa dados de referência como se fossem dados atuais do carro.</Text>
+          </View>
+        )}
+
+        <Link href="/laboratorio" asChild>
+          <TouchableOpacity style={styles.primaryButton}>
+            <Text style={styles.primaryButtonText}>ABRIR LABORATÓRIO OBD</Text>
+          </TouchableOpacity>
+        </Link>
+
+        <View style={styles.secondaryActions}>
+          {screenPrefs.armazenamento && (
+            <Link href="/armazenamento" asChild>
+              <TouchableOpacity style={styles.secondaryButton}>
+                <Text style={styles.secondaryButtonText}>ARMAZENAMENTO</Text>
+              </TouchableOpacity>
+            </Link>
+          )}
+          {screenPrefs.configuracoes && (
+            <Link href="/configuracoes" asChild>
+              <TouchableOpacity style={styles.secondaryButton}>
+                <Text style={styles.secondaryButtonText}>CONFIGURAÇÕES</Text>
+              </TouchableOpacity>
+            </Link>
+          )}
+        </View>
+
+        <Text style={styles.footer}>{isHydrated ? `Autosave ativo • último save ${formatTime(saveStatus.lastSavedAt)}` : 'Carregando estado salvo...'}</Text>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#eef3fb' },
-  content: { flexGrow: 1, padding: 20, paddingBottom: 40 },
-  card: { backgroundColor: '#1f2937', borderRadius: 18, padding: 24, marginBottom: 18 },
-  title: { color: '#dbeafe', fontSize: 28, fontWeight: '700' },
-  subtitle: { color: '#60a5fa', fontSize: 24, fontWeight: '700', marginBottom: 16 },
-  sectionTitleDark: { color: '#93c5fd', fontSize: 12, fontWeight: '700', letterSpacing: 1, marginTop: 8, marginBottom: 4 },
-  statusLine: { color: '#e5e7eb', marginTop: 2 },
-  autosaveError: { color: '#fca5a5', marginTop: 6, fontWeight: '600' },
-  status: { color: '#9ca3af', marginTop: 14, fontWeight: '700' },
-  gpsCard: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 18 },
-  gpsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  gpsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  gpsMetric: { width: '48%', marginBottom: 10 },
-  gpsSpeed: { color: '#2563eb', fontWeight: '800', fontSize: 22 },
-  gpsLive: { color: '#16a34a', fontWeight: '800' },
-  gpsOff: { color: '#64748b', fontWeight: '800' },
-  gpsHelp: { color: '#64748b', fontSize: 12, marginBottom: 10 },
-  gpsError: { color: '#b91c1c', fontWeight: '700', marginBottom: 10 },
-  summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 18 },
-  metricCard: { width: '48%', backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 10 },
-  metricLabel: { color: '#6b7280', fontSize: 12, fontWeight: '600', marginBottom: 6 },
-  metricValue: { color: '#1f2937', fontWeight: '700', fontSize: 18 },
-  sectionCard: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 18 },
-  sectionTitle: { color: '#1f2937', fontWeight: '700', fontSize: 16, marginBottom: 10 },
-  menuTitle: { color: '#1f2937', fontWeight: '800', fontSize: 15, marginTop: 4, marginBottom: 4 },
-  row: { color: '#374151', marginBottom: 6 },
-  label: { fontWeight: '700' },
-  sourceRow: { flexDirection: 'row', alignItems: 'center' },
-  sourceReal: { color: '#16a34a', fontWeight: '700', marginLeft: 8 },
-  sourceRef: { color: '#d97706', fontWeight: '700', marginLeft: 8 },
-  empty: { color: '#6b7280' },
-  historyItem: { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
-  historyHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  historyDate: { color: '#1f2937', fontWeight: '600' },
-  historyMeta: { color: '#6b7280', marginTop: 2 },
-  historyNote: { color: '#64748b', fontSize: 12, marginBottom: 8 },
-  button: { backgroundColor: '#2563eb', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 8 },
-  buttonText: { color: '#fff', fontWeight: '700' },
-  secondaryButton: { backgroundColor: '#fff', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 8, borderWidth: 1, borderColor: '#94a3b8' },
-  secondaryButtonText: { color: '#1f2937', fontWeight: '700' },
+  container: { flex: 1, backgroundColor: '#f4f7fb' },
+  content: { flexGrow: 1, padding: 18, paddingBottom: 32 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  brand: { color: '#1d4ed8', fontSize: 25, fontWeight: '800', letterSpacing: 0.4 },
+  vehicle: { color: '#475569', fontSize: 14, fontWeight: '700', marginTop: 2 },
+  headerState: { alignItems: 'flex-end' },
+  headerStateLabel: { color: '#94a3b8', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  headerStateValue: { color: '#1e293b', fontSize: 13, fontWeight: '800', marginTop: 2 },
+  statusBar: { backgroundColor: '#e8eef8', borderRadius: 12, padding: 11, flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 },
+  statusItem: { flexDirection: 'row', alignItems: 'center' },
+  dot: { width: 8, height: 8, borderRadius: 4, marginRight: 5 },
+  statusText: { color: '#475569', fontSize: 10, fontWeight: '800' },
+  speedPanel: { backgroundColor: '#fff', borderRadius: 18, padding: 20, marginBottom: 12, borderWidth: 1, borderColor: '#e2e8f0' },
+  eyebrow: { color: '#64748b', fontSize: 11, fontWeight: '800', letterSpacing: 0.7 },
+  speedRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: 4 },
+  speedValue: { color: '#0f172a', fontSize: 64, lineHeight: 72, fontWeight: '800', letterSpacing: -2 },
+  speedUnit: { color: '#2563eb', fontSize: 20, fontWeight: '800', marginLeft: 8 },
+  gpsHint: { color: '#64748b', fontSize: 12, lineHeight: 17, marginTop: 3 },
+  tripRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
+  tripBlock: { flex: 1, backgroundColor: '#fff', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#e2e8f0' },
+  metricLabel: { color: '#64748b', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+  metricValue: { color: '#0f172a', fontSize: 21, fontWeight: '800', marginTop: 5 },
+  metricHint: { color: '#94a3b8', fontSize: 11, marginTop: 2 },
+  healthSection: { backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#e2e8f0' },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  sectionTitle: { color: '#1e293b', fontSize: 13, fontWeight: '800', letterSpacing: 0.4 },
+  goodText: { color: '#15803d', fontSize: 11, fontWeight: '800' },
+  waitText: { color: '#64748b', fontSize: 11, fontWeight: '800' },
+  healthRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  healthLabel: { color: '#94a3b8', fontSize: 10, fontWeight: '800' },
+  healthValue: { color: '#334155', fontSize: 13, fontWeight: '700', marginTop: 2 },
+  healthHint: { color: '#64748b', fontSize: 12, lineHeight: 17 },
+  realDataSection: { backgroundColor: '#ecfdf5', borderRadius: 14, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#bbf7d0' },
+  realGrid: { flexDirection: 'row', justifyContent: 'space-between' },
+  smallValue: { color: '#166534', fontSize: 17, fontWeight: '800', marginTop: 4 },
+  noticeSection: { backgroundColor: '#eff6ff', borderRadius: 14, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#bfdbfe' },
+  noticeTitle: { color: '#1e40af', fontSize: 12, fontWeight: '800', marginBottom: 4 },
+  noticeText: { color: '#475569', fontSize: 12, lineHeight: 17 },
+  primaryButton: { backgroundColor: '#2563eb', borderRadius: 14, minHeight: 54, alignItems: 'center', justifyContent: 'center', marginTop: 4, marginBottom: 10 },
+  primaryButtonText: { color: '#fff', fontSize: 14, fontWeight: '800', letterSpacing: 0.2 },
+  secondaryActions: { flexDirection: 'row', gap: 10 },
+  secondaryButton: { flex: 1, backgroundColor: '#fff', borderRadius: 12, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#cbd5e1' },
+  secondaryButtonText: { color: '#334155', fontSize: 11, fontWeight: '800' },
+  footer: { color: '#94a3b8', fontSize: 10, textAlign: 'center', marginTop: 14 },
 });
