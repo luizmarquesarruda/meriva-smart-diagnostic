@@ -5,6 +5,25 @@
 - `preview`: gera APK instalável para testes no Android.
 - `production`: gera AAB para distribuição pela Google Play.
 
+O APK que deve ser instalado diretamente no telefone é o **standalone release APK**. Ele contém o bundle JavaScript dentro do próprio arquivo e **não depende do Metro**.
+
+## CI do GitHub
+
+A CI faz:
+
+1. instala as dependências;
+2. executa `expo doctor` e os testes;
+3. gera o projeto nativo com `expo prebuild`;
+4. compila `app-release.apk`;
+5. verifica se `assets/index.android.bundle` está dentro do APK;
+6. publica o APK como artefato.
+
+O artefato correto é:
+
+`meriva-smart-diagnostic-standalone-apk`
+
+Não use um `app-debug.apk` da CI para o teste standalone. APK Debug pode depender do Metro durante o desenvolvimento.
+
 ## Validação local
 
 ```bash
@@ -12,7 +31,13 @@ npm install
 npm run doctor
 npm run typecheck
 npm test
-npx expo prebuild
+npx expo prebuild --platform android
+```
+
+Para desenvolvimento com Metro:
+
+```bash
+npx expo start --dev-client
 ```
 
 Para testar o projeto nativo em um Android conectado:
@@ -30,9 +55,7 @@ npx eas-cli login
 npx eas-cli build --platform android --profile preview
 ```
 
-O perfil `preview` está configurado com `android.buildType = apk`.
-
-O arquivo gerado pode ser instalado diretamente no Android. O EAS usa APK para instalação direta e AAB como formato padrão para distribuição em loja. 
+O perfil `preview` usa `distribution: internal`, `developmentClient: false` e `android.buildType: apk`. O resultado é um APK instalável diretamente no Android e não depende do Metro.
 
 ## Produção
 
@@ -42,18 +65,18 @@ npx eas-cli build --platform android --profile production
 
 O perfil de produção gera AAB.
 
-## Observação sobre Bluetooth
+## Java no Termux
+
+O CI do GitHub usa Temurin 17.
+
+O Termux deste projeto pode usar um JDK disponível localmente, conforme o script já existente em `scripts/build-android-termux.sh`. O Termux não é o caminho principal para gerar o APK standalone; a compilação oficial de validação é feita pela CI do GitHub.
+
+## Bluetooth
 
 Este aplicativo usa `react-native-bluetooth-classic`, portanto o teste deve ser feito em um build nativo Android. Expo Go não é suficiente para validar o transporte Bluetooth Classic.
 
-## Estado da auditoria
+## Diagnóstico do erro "Unable to load script"
 
-- Expo SDK: 51
-- React Native: 0.74.5
-- Android package: `com.meriva.smartdiagnostic`
-- EAS: configurado
-- APK preview: configurado
-- AAB production: configurado
-- Assinatura: será administrada pelo EAS quando o primeiro build for executado
+Esse erro aparece quando um build de desenvolvimento/debug tenta carregar o JavaScript pelo Metro ou quando o bundle não foi empacotado.
 
-Antes do primeiro build, execute `npm run doctor`. Se houver incompatibilidade de dependências, corrija-a antes de gerar o APK final.
+Para o teste físico do aplicativo, use somente o artefato `meriva-smart-diagnostic-standalone-apk`. O APK standalone é validado pela CI antes de ser publicado como artefato.
