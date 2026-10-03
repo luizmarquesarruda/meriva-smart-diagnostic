@@ -1,13 +1,13 @@
 import { Link } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import { readDriveCycles, initializeDriveCycles } from '../src/storage/driveCycleStorage';
 import { getDriveCycleSummary, type DriveCycle } from '../src/data/driveCycles';
 import { getAutoSaveStatus, initAutoSave, updateAutoSaveState } from '../src/meriva/autosaveManager';
 import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
 import type { ObdConnectionState } from '../src/meriva/autosaveState';
-import { calculateConsumptionKml, gpsTracker, type GpsTripState } from '../src/gps';
+import { gpsTracker, type GpsTripState } from '../src/gps';
 
 function formatTime(iso: string | null): string {
   if (!iso) return 'N/D';
@@ -24,14 +24,7 @@ export default function IndexScreen() {
   const [saveStatus, setSaveStatus] = useState<AutoSaveStatus>({ lastSavedAt: null, lastSaveReason: null, lastError: null });
   const [isHydrated, setIsHydrated] = useState(false);
   const [gpsState, setGpsState] = useState<GpsTripState>(gpsTracker.getState());
-  const [fuelUsedL, setFuelUsedL] = useState('');
-
   useEffect(() => gpsTracker.subscribe(setGpsState), []);
-
-  const gpsConsumption = calculateConsumptionKml(
-    gpsState.distanceKm,
-    Number(fuelUsedL.replace(',', '.')),
-  );
 
   useEffect(() => {
     async function restoreState() {
@@ -138,7 +131,6 @@ const styles = StyleSheet.create({
   gpsLive: { color: '#16a34a', fontWeight: '800' },
   gpsOff: { color: '#64748b', fontWeight: '800' },
   gpsHelp: { color: '#64748b', fontSize: 12, marginBottom: 10 },
-  fuelInput: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, padding: 12, color: '#0f172a', marginBottom: 8 },
   consumptionLine: { color: '#1f2937', fontWeight: '700', marginBottom: 10 },
   gpsError: { color: '#b91c1c', fontWeight: '700', marginBottom: 10 },
   summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 18 },
