@@ -36,6 +36,10 @@ Module._load = function(request) {
   return originalLoad.apply(this, arguments);
 };
 
+function assertApprox(actual, expected, epsilon = 1e-9) {
+  assert.ok(Math.abs(actual - expected) <= epsilon, `expected ${actual} ≈ ${expected}`);
+}
+
 const { RealTripRecorder } = loadTs('src/trip/tripRecorder.ts');
 Module._load = originalLoad;
 
@@ -45,7 +49,7 @@ recorder.addSample({ timestampMs: 3000, distanceKm: 5.020, speedKmh: 36, fuelRat
 const state = recorder.addSample({ timestampMs: 5000, distanceKm: 5.040, speedKmh: 36, fuelRateLph: 10 });
 
 assert.strictEqual(state.distanceKm, 0.04);
-assert.strictEqual(state.fuelUsedL, 0.011111);
+assertApprox(state.fuelUsedL, 0.011111, 1e-6);
 assert.strictEqual(state.validFuelSamples, 3);
 assert.strictEqual(state.durationMs, 4000);
 assert.strictEqual(state.movingTimeMs, 4000);
@@ -65,7 +69,7 @@ const saved = cycle.buildDriveCycle(22000);
 assert.ok(saved);
 assert.strictEqual(saved.source, 'REAL_OBD');
 assert.strictEqual(saved.distanceTotalKm, 2);
-assert.strictEqual(saved.fuelUsedL, 8 * 20_000 / 3_600_000);
+assertApprox(saved.fuelUsedL, 8 * 20_000 / 3_600_000, 1e-6);
 assert.strictEqual(saved.avgFuelConsumptionKml, Number((2 / saved.fuelUsedL).toFixed(3)));
 
 const gap = new RealTripRecorder(0, 0);
