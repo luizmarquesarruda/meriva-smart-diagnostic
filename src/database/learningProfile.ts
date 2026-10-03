@@ -88,13 +88,14 @@ async function enqueueProfileTransaction<T>(
     .catch(() => undefined)
     .then(async () => operation());
 
-  profileQueues.set(target, current.then(() => gate, () => gate));
+  const queued = current.then(() => gate, () => gate);
+  profileQueues.set(target, queued);
 
   try {
     return await current;
   } finally {
     release();
-    if (profileQueues.get(target) === gate) {
+    if (profileQueues.get(target) === queued) {
       profileQueues.delete(target);
     }
   }
