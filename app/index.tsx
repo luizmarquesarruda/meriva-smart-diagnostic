@@ -1,5 +1,5 @@
-import { Link } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { Link, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import { readDriveCycles, initializeDriveCycles } from '../src/storage/driveCycleStorage';
@@ -26,11 +26,10 @@ export default function IndexScreen() {
   const [gpsState, setGpsState] = useState<GpsTripState>(gpsTracker.getState());
   useEffect(() => gpsTracker.subscribe(setGpsState), []);
 
-  useEffect(() => {
-    async function restoreState() {
-      const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
+  const reloadStoredState = useCallback(async () => {
+    const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
+    try {
       const restored = await initAutoSave(basePath);
-
       await initializeDriveCycles(basePath);
       const storedCycles = await readDriveCycles(basePath);
       const loaded = restored.driveCycles.length ? restored.driveCycles : storedCycles;
@@ -45,10 +44,21 @@ export default function IndexScreen() {
       setObd(restored.obd);
       setSaveStatus(getAutoSaveStatus());
       setIsHydrated(true);
+    } catch {
+      setSaveStatus(getAutoSaveStatus());
+      setIsHydrated(true);
     }
-
-    void restoreState();
   }, []);
+
+  useEffect(() => {
+    void reloadStoredState();
+  }, [reloadStoredState]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void reloadStoredState();
+    }, [reloadStoredState]),
+  );
 
   const summary = useMemo(() => getDriveCycleSummary(cycles), [cycles]);
 
