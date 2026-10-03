@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
@@ -27,7 +27,7 @@ jobs:
       - run: npm run validate
 
   android-build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: validate
     timeout-minutes: 30
     steps:
