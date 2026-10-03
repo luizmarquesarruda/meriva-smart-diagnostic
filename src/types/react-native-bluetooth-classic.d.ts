@@ -1,5 +1,10 @@
 declare module 'react-native-bluetooth-classic' {
   export interface BluetoothDataEvent { data?: string; }
+  export interface BluetoothDeviceEvent {
+    address?: string;
+    name?: string;
+    device?: { address?: string };
+  }
 
   export interface BluetoothDevice {
     address: string;
@@ -8,6 +13,7 @@ declare module 'react-native-bluetooth-classic' {
     id?: string;
     type?: string;
     onDataReceived: (listener: (event: BluetoothDataEvent) => void) => { remove: () => void };
+    isConnected?: () => Promise<boolean>;
     available: () => Promise<boolean>;
     read: () => Promise<string>;
     write: (data: string, charset?: string) => Promise<void>;
@@ -21,6 +27,9 @@ declare module 'react-native-bluetooth-classic' {
     requestBluetoothEnabled?: () => Promise<boolean>;
     startDiscovery?: () => Promise<BluetoothDevice[]>;
     cancelDiscovery?: () => Promise<void>;
+    onDeviceDisconnected?: (
+      listener: (event: BluetoothDeviceEvent) => void,
+    ) => { remove: () => void };
     connectToDevice: (
       address: string,
       options?: {

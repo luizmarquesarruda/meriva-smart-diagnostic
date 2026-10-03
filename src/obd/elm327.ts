@@ -30,28 +30,48 @@ export interface PidQueryResult {
 function classifyResponse(response: string): ElmCommandStatus {
   const normalized = response.trim().toUpperCase();
   if (!normalized) return 'NO_RESPONSE';
-  if (/\b(NO DATA|UNABLE TO CONNECT|BUS INIT|BUS ERROR|STOPPED|ERROR)\b/.test(normalized)) return 'ERROR';
+  if (/\b(NO DATA|UNABLE TO CONNECT|BUS INIT|BUS ERROR|STOPPED|ERROR)\b/.test(normalized)) {
+    return 'ERROR';
+  }
   if (normalized === '?' || normalized.endsWith('\n?')) return 'ERROR';
   return 'OK';
 }
 
+function normalizeCommand(command: string): string {
+  const normalized = command.replace(/\s/g, '').toUpperCase();
+  if (!normalized || !/^[0-9A-Z]+$/.test(normalized)) {
+    throw new Error('COMANDO ELM INVÁLIDO');
+  }
+  return normalized;
+}
+
 export class Elm327Session {
   private opened = false;
-  private initializing = false;
   private protocol: string | null = null;
+  private initializationPromise: Promise<ElmCommandResult[]> | null = null;
+  private commandQueue: Promise<void> = Promise.resolve();
 
   constructor(private readonly transport: ObdTransport) {}
 
   async initialize(): Promise<ElmCommandResult[]> {
-    if (this.initializing) throw new Error('INICIALIZAÇÃO ELM JÁ EM ANDAMENTO');
-    this.initializing = true;
+    if (this.initializationPromise) return this.initializationPromise;
+    if (this.opened) return [];
+
+    this.initializationPromise = this.performInitialize();
+    try {
+      return await this.initializationPromise;
+    } finally {
+      this.initializationPromise = null;
+    }
+  }
+
+  private async performInitialize(): Promise<ElmCommandResult[]> {
+    await this.transport.open();
+    this.opened = true;
+    this.protocol = null;
 
     try {
-      await this.transport.open();
-      this.opened = true;
-      this.protocol = null;
       const results: ElmCommandResult[] = [];
-
       for (const command of ['ATZ', 'ATE0', 'ATL0', 'ATS0', 'ATH1', 'ATSP0']) {
         const result = await this.command(command);
         results.push(result);
@@ -63,18 +83,20 @@ export class Elm327Session {
       const protocolResult = await this.command('ATDP');
       results.push(protocolResult);
       if (protocolResult.status === 'OK') {
-        const protocol = protocolResult.response.trim();
-        this.protocol = protocol || null;
+        const detected = protocolResult.response.trim();
+        this.protocol = detected || null;
       }
 
       return results;
     } catch (cause) {
       this.opened = false;
-      try { await this.transport.close(); } catch { /* preserva erro original */ }
+      try {
+        await this.transport.close();
+      } catch {
+        // preserva o erro original
+      }
       this.protocol = null;
       throw cause;
-    } finally {
-      this.initializing = false;
     }
   }
 
@@ -83,9 +105,9 @@ export class Elm327Session {
   }
 
   async queryPid(pid: string): Promise<PidQueryResult> {
-    if (!this.opened) await this.initialize();
-    const normalized = pid.replace(/\s/g, '').toUpperCase();
-    const result = await this.command(normalized);
+    await this.initialize();
+    const normalized = normalizeCommand(pid);
+    const result = await this.executeCommand(normalized);
     const parsed = parsePidResponse(normalized, result.response);
 
     return {
@@ -98,13 +120,51 @@ export class Elm327Session {
     };
   }
 
+  async executeCommand(command: string): Promise<ElmCommandResult> {
+    await this.initialize();
+    const normalized = normalizeCommand(command);
+    return this.enqueueCommand(() => this.command(normalized));
+  }
+
   async close(): Promise<void> {
-    if (this.opened) await this.transport.close();
-    this.opened = false;
-    this.protocol = null;
+    const initialization = this.initializationPromise;
+    if (initialization) {
+      try {
+        await initialization;
+      } catch {
+        // a inicialização já fechou o transporte
+      }
+    }
+
+    await this.enqueueCommand(async () => {
+      if (this.opened) {
+        try {
+          await this.transport.close();
+        } finally {
+          this.opened = false;
+          this.protocol = null;
+        }
+      } else {
+        this.protocol = null;
+      }
+    });
+  }
+
+  private enqueueCommand<T>(operation: () => Promise<T>): Promise<T> {
+    const previous = this.commandQueue;
+    let release!: () => void;
+    this.commandQueue = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    return previous
+      .then(operation)
+      .finally(() => release());
   }
 
   private async command(command: string, attempt = 1): Promise<ElmCommandResult> {
+    if (!this.opened) throw new Error('ELM NÃO INICIALIZADO');
+
     const started = Date.now();
     try {
       await this.transport.write(`${command}\r`);
@@ -116,7 +176,9 @@ export class Elm327Session {
         elapsedMs: Date.now() - started,
         status,
         attempt,
-        ...(status === 'ERROR' ? { errorMessage: 'ELM retornou erro ou ausência de dados' } : {}),
+        ...(status === 'ERROR'
+          ? { errorMessage: 'ELM retornou erro ou ausência de dados' }
+          : {}),
       };
     } catch (cause) {
       const errorMessage = cause instanceof Error ? cause.message : 'ERRO DESCONHECIDO';

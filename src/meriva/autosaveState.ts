@@ -1,16 +1,8 @@
-// MERIVA SMART DIAGNOSTIC — Estado persistível do aplicativo
-// Arquivo para copiar em: <repo>/src/meriva/autosaveState.ts
-//
-// IMPORTANTE: os tipos vêm dos módulos que JÁ EXISTEM no repositório.
-// Nada é duplicado — o autosave referencia as fontes de verdade atuais.
-// Todos os imports são type-only: este módulo é puro (sem expo/react-native).
-
 import type { VehicleProfile } from '../database/vehicleConfig';
 import type { DriveCycle } from '../data/driveCycles';
-import type { DtcRecord } from '../database/dtcManager';
+import type { DtcRecord } from '../types/sourceTypes';
 import type { MerivaLearningProfile } from '../database/learningProfile';
 
-/** Última leitura válida por PID (telemetria recente, não histórico). */
 export interface LastPidReading {
   pid: string;
   name: string;
@@ -20,7 +12,6 @@ export interface LastPidReading {
   timestamp: string;
 }
 
-/** Estado da conexão OBD confirmado por comunicação real. */
 export interface ObdConnectionState {
   connected: boolean;
   adapterName?: string;
@@ -29,16 +20,12 @@ export interface ObdConnectionState {
   lastConnectedAt?: string;
 }
 
-/**
- * Estado persistível. Campos são opcionais por seção para tolerar
- * evolução de schema sem quebrar o restore.
- */
 export interface MerivaPersistedState {
   vehicle: VehicleProfile | null;
   obd: ObdConnectionState;
   lastReadings: LastPidReading[];
   dtcs: DtcRecord[];
-  driveCycles: DriveCycle[]; // mantém o campo `source` — seeds permanecem identificados
+  driveCycles: DriveCycle[];
   learning: MerivaLearningProfile | null;
   settings: Record<string, string | number | boolean>;
   metadata: { savedAt: string; appVersion: string };
@@ -53,6 +40,6 @@ export function createEmptyMerivaState(): MerivaPersistedState {
     driveCycles: [],
     learning: null,
     settings: {},
-    metadata: { savedAt: '', appVersion: '1.0.0' },
+    metadata: { savedAt: '', appVersion: '1.0.1' },
   };
 }

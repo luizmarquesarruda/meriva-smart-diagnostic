@@ -1,2 +1,13 @@
-export { GpsTracker, calculateConsumptionKml, haversineDistanceKm, normalizeGpsSpeedKmh } from './gpsTracker';
-export type { GpsSample, GpsTripState } from './gpsTracker';
+export {
+  GpsTracker,
+  gpsTracker,
+  calculateConsumptionKml,
+  haversineDistanceKm,
+  normalizeGpsSpeedKmh,
+} from './gpsTracker';
+
+export type {
+  GpsSample,
+  GpsTripState,
+  GpsListener,
+} from './gpsTracker';

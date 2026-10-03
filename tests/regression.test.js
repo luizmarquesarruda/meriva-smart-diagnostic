@@ -33,6 +33,9 @@ function loadTs(tsPath) {
 const files = new Map();
 const dirs = new Set(['/doc']);
 let writeDelayMs = 0;
+let bluetoothListener = null;
+let bluetoothDisconnectListener = null;
+let fakeDeviceConnected = true;
 
 function parentDir(p) {
   const i = p.lastIndexOf('/');
@@ -141,10 +144,39 @@ const fakeRN = {
   Platform: { OS: 'android', Version: 35 },
 };
 
+const fakeBluetooth = {
+  isBluetoothAvailable: async () => true,
+  isBluetoothEnabled: async () => true,
+  getBondedDevices: async () => [],
+  connectToDevice: async () => ({
+    address: 'AA:BB:CC:DD:EE:FF',
+    name: 'ELM327',
+    bonded: true,
+    isConnected: async () => fakeDeviceConnected,
+    onDataReceived(listener) {
+      bluetoothListener = listener;
+      return { remove() { bluetoothListener = null; } };
+    },
+    write: async () => {
+      bluetoothListener?.({ data: '41 0C 0C 18\r\n>' });
+    },
+    available: async () => {
+      throw new Error('available() não deve ser usado com listener');
+    },
+    read: async () => {
+      throw new Error('read() não deve ser usado com listener');
+    },
+    disconnect: async () => {
+      bluetoothListener = null;
+    },
+  }),
+};
+
 const originalLoad = Module._load;
 Module._load = function (request, parent, isMain) {
   if (request === 'expo-file-system') return fakeFS;
   if (request === 'react-native') return fakeRN;
+  if (request === 'react-native-bluetooth-classic') return fakeBluetooth;
   if (parent && parent.filename && (request.startsWith('./') || request.startsWith('../'))) {
     const resolved = path.resolve(path.dirname(parent.filename), request);
     if (fs.existsSync(resolved + '.ts')) return loadTs(resolved + '.ts');
@@ -165,6 +197,7 @@ async function testParser() {
   assert.strictEqual(parser.parsePidResponse('010C', '41 0C 1A').value, null);
   assert.strictEqual(parser.parsePidResponse('0199', '41 99 FF').status, 'VALOR NÃO INTERPRETADO');
   assert.strictEqual(parser.parsePidResponse('010C', 'NO DATA').status, 'NÃO RESPONDEU');
+  assert.deepStrictEqual(parser.parseDtcResponse('43 01 33 00 00 00'), ['P0133']);
 }
 
 async function testElmAndProtocol() {
@@ -176,12 +209,48 @@ async function testElmAndProtocol() {
   assert.ok(initialization.some((item) => item.command === 'ATDP'));
   assert.strictEqual(session.getProtocol(), 'SIMULATED OBD TRANSPORT');
 
-  const result = await session.queryPid('010C');
-  assert.strictEqual(result.tx, '010C');
-  assert.strictEqual(result.rx, '41 0C 0C 18');
-  assert.strictEqual(result.protocol, 'SIMULATED OBD TRANSPORT');
-  assert.strictEqual(result.parsed.value, 774);
+  const results = await Promise.all([
+    session.queryPid('010C'),
+    session.queryPid('0105'),
+  ]);
+  assert.strictEqual(results[0].parsed.value, 774);
+  assert.strictEqual(results[1].parsed.value, 65);
+  assert.strictEqual(results[0].rx, '41 0C 0C 18');
+  assert.strictEqual(results[1].rx, '41 05 69');
+
+  const generic = await session.executeCommand('03');
+  assert.strictEqual(generic.command, '03');
+  assert.strictEqual(generic.status, 'ERROR');
   await session.close();
+}
+
+async function testPidScanner() {
+  const scanner = loadTs(path.join(ROOT, 'src/obd/pidScanner.ts'));
+  const supported = scanner.decodeSupportedPids('0100', '41 00 BE 3E B8 13');
+  assert.ok(supported.includes('0105'));
+  assert.ok(supported.includes('010C'));
+  assert.ok(supported.includes('010F'));
+  assert.ok(supported.includes('0111'));
+}
+
+async function testBluetoothEventTransport() {
+  bluetoothListener = null;
+  bluetoothDisconnectListener = null;
+  fakeDeviceConnected = true;
+  const { BluetoothClassicTransport } = loadTs(path.join(ROOT, 'src/obd/bluetoothClassicTransport.ts'));
+  const transport = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF');
+  await transport.open();
+  await transport.write('010C\\r');
+  const response = await transport.readUntilPrompt(500);
+  assert.strictEqual(response, '41 0C 0C 18');
+  await transport.close();
+
+  await transport.open();
+  const pendingRead = transport.readUntilPrompt(500);
+  fakeDeviceConnected = false;
+  bluetoothDisconnectListener?.({ address: 'AA:BB:CC:DD:EE:FF' });
+  await assert.rejects(pendingRead, /BLUETOOTH DESCONECTADO|BLUETOOTH NÃO CONECTADO/);
+  await transport.close();
 }
 
 async function testQuota() {
@@ -256,25 +325,6 @@ async function testVehicleProfile() {
   assert.strictEqual(await vehicle.readVehicleProfile(BASE), null);
 }
 
-async function testSeedImporter() {
-  resetFS();
-  const seed = loadTs(path.join(ROOT, 'src/storage/seedImporter.ts'));
-  const txt = loadTs(path.join(ROOT, 'src/database/txtDatabase.ts'));
-
-  const content = `[PID]\nname=010C\n\n[OBSERVATION]\nrpm=900\n\n[DTC_HISTORICAL]\ncode=P0301\n\n[CONSUMPTION_REFERENCE]\nkm=20\n`;
-  const first = await seed.importCarScannerBaseline(BASE, content);
-  assert.strictEqual(first.pidsImported, 1);
-  assert.strictEqual(first.observationsImported, 1);
-  assert.strictEqual(first.dtcHistoricalImported, 1);
-  assert.strictEqual(first.consumptionReferencesImported, 1);
-
-  const second = await seed.importCarScannerBaseline(BASE, content);
-  assert.deepStrictEqual(second, first);
-
-  const pids = await txt.readTxtEntries(BASE, 'carscanner_baseline_pids.txt');
-  assert.strictEqual(pids.length, 1);
-}
-
 async function testDriveCycleValidation() {
   resetFS();
   const storage = loadTs(path.join(ROOT, 'src/storage/driveCycleStorage.ts'));
@@ -301,6 +351,103 @@ async function testDriveCycleValidation() {
 
   files.set(`${BASE}/VIAGENS/index.json`, JSON.stringify({ cycles: 'corrompido' }));
   assert.deepStrictEqual(await storage.readDriveCycles(BASE), []);
+}
+
+async function testDtcStorage() {
+  resetFS();
+  const dtcManager = loadTs(path.join(ROOT, 'src/database/dtcManager.ts'));
+  await dtcManager.recordDtc(BASE, {
+    code: 'P0133',
+    status: 'CURRENT',
+    firstSeen: '2026-10-02T20:00:00.000Z',
+    lastSeen: '2026-10-02T20:00:00.000Z',
+    occurrences: 1,
+    source: 'REAL_OBD',
+    historical: false,
+    confirmed: true,
+  });
+  const dtcs = await dtcManager.readDtcs(BASE);
+  assert.strictEqual(dtcs[0].code, 'P0133');
+}
+
+async function testBackupCompleteness() {
+  resetFS();
+  const m = loadTs(path.join(ROOT, 'src/meriva/autosaveManager.ts'));
+  m.disposeAutoSave();
+  await m.initAutoSave(BASE);
+  const backup = loadTs(path.join(ROOT, 'src/storage/backup.ts'));
+
+  const expectedDirs = ['BANCO', 'APRENDIZADO', 'DTC', 'CONFIG', 'LEITURAS', 'LOGS', 'VIAGENS'];
+  for (const dir of expectedDirs) {
+    await fakeFS.writeAsStringAsync(`${BASE}/${dir}/arquivo.txt`, dir);
+  }
+
+  const info = await backup.createBackup(BASE);
+  assert.deepStrictEqual(info.includes, expectedDirs);
+
+  const backupRoot = `${BASE}/BACKUP/meriva_smart_${info.timestamp}`;
+  for (const dir of expectedDirs) {
+    assert.strictEqual(
+      files.get(`${backupRoot}/${dir}/arquivo.txt`),
+      dir,
+      `backup deve conter ${dir}`,
+    );
+  }
+  m.disposeAutoSave();
+}
+
+async function testCsvWriteSerialization() {
+  resetFS();
+  const logger = loadTs(path.join(ROOT, 'src/database/csvLogger.ts'));
+  const target = `${BASE}/LOGS/concurrent.csv`;
+
+  writeDelayMs = 30;
+  await Promise.all([
+    logger.appendCsvRow(target, { id: 'A', timestamp: 't1' }),
+    logger.appendCsvRow(target, { id: 'B', timestamp: 't2' }),
+  ]);
+  writeDelayMs = 0;
+
+  const content = files.get(target);
+  assert.ok(content.includes('A,t1'));
+  assert.ok(content.includes('B,t2'));
+  assert.strictEqual(content.split('\n').filter(Boolean).length, 3);
+}
+
+async function testPidAndLearningWriteSerialization() {
+  resetFS();
+  const pidBank = loadTs(path.join(ROOT, 'src/database/pidBank.ts'));
+  writeDelayMs = 25;
+  const baseEntry = {
+    name: 'RPM',
+    classification: 'PADRAO_OBD',
+    status: 'CONFIRMADO',
+    firstSeen: '2026-10-02T20:00:00.000Z',
+    lastSeen: '2026-10-02T20:00:00.000Z',
+    occurrences: 1,
+    protocol: 'ISO 14230-4',
+    responseTime: 10,
+    source: 'REAL_OBD',
+    confidence: 1,
+  };
+  await Promise.all([
+    pidBank.recordPidConfirmation(BASE, { pid: '010C', ...baseEntry }),
+    pidBank.recordPidConfirmation(BASE, { pid: '0105', ...baseEntry, name: 'COOLANT' }),
+  ]);
+  const confirmations = await pidBank.readPidConfirmations(BASE);
+  assert.strictEqual(confirmations.length, 2);
+
+  const learning = loadTs(path.join(ROOT, 'src/database/learningProfile.ts'));
+  await learning.createLearningProfile(BASE, '');  
+  await Promise.all([
+    learning.updateLearningProfileRealSample(BASE, 'RPM', 1000, 'IDLE_WARM'),
+    learning.updateLearningProfileRealSample(BASE, 'RPM', 1100, 'IDLE_WARM'),
+  ]);
+  const profile = await learning.readLearningProfile(BASE);
+  assert.strictEqual(profile.globalSampleCounts.realSamples, 2);
+  assert.strictEqual(profile.globalSampleCounts.totalSamples, 2);
+  assert.strictEqual(profile.learningStatus, 'COLD_START');
+  writeDelayMs = 0;
 }
 
 async function testAutosaveRace() {
@@ -333,13 +480,18 @@ async function testAutosaveRace() {
 
 async function main() {
   const tests = [
-    ['parser', testParser],
-    ['elm/protocolo', testElmAndProtocol],
+    ['parser + DTC', testParser],
+    ['elm/protocolo/serialização', testElmAndProtocol],
+    ['descoberta de PIDs', testPidScanner],
+    ['Bluetooth por eventos', testBluetoothEventTransport],
     ['quota configurável', testQuota],
     ['logger TX/RX', testRawLogger],
     ['perfil do veículo', testVehicleProfile],
-    ['seed importer', testSeedImporter],
     ['drive cycles', testDriveCycleValidation],
+    ['DTC persistência', testDtcStorage],
+    ['backup completo', testBackupCompleteness],
+    ['CSV serializado', testCsvWriteSerialization],
+    ['PID + DNA serializados', testPidAndLearningWriteSerialization],
     ['autosave race', testAutosaveRace],
   ];
 

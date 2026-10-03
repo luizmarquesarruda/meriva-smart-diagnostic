@@ -25,16 +25,20 @@ export async function createBackup(basePath: string): Promise<BackupInfo> {
   const backupDir = `${basePath}/BACKUP/meriva_smart_${timestamp}`;
   await FileSystem.makeDirectoryAsync(backupDir, { intermediates: true });
 
-  const dirs = ['BANCO', 'APRENDIZADO', 'DTC', 'CONFIG'];
+  const dirs = ['BANCO', 'APRENDIZADO', 'DTC', 'CONFIG', 'LEITURAS', 'LOGS', 'VIAGENS'];
+  const included: string[] = [];
   let totalSize = 0;
+
   for (const dir of dirs) {
     const source = `${basePath}/${dir}`;
     const dest = `${backupDir}/${dir}`;
     const info = await FileSystem.getInfoAsync(source);
-    if (info.exists) {
-      await FileSystem.copyAsync({ from: source, to: dest });
-      totalSize += await getDirectorySize(source);
-    }
+    if (!info.exists || !info.isDirectory) continue;
+
+    await FileSystem.copyAsync({ from: source, to: dest });
+    totalSize += await getDirectorySize(source);
+    included.push(dir);
   }
-  return { timestamp, sizeBytes: totalSize, includes: dirs };
+
+  return { timestamp, sizeBytes: totalSize, includes: included };
 }
