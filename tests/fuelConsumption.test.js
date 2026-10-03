@@ -48,7 +48,7 @@ assert.strictEqual(
     { fuelRateLph: 0, timestampMs: 1000 },
     { fuelRateLph: 20, timestampMs: 2000 },
   ),
-  0,
+  0.002777777777777778,
 );
 
 const integrator = new FuelRateIntegrator();
@@ -62,6 +62,15 @@ const state = integrator.addSample(10, 3700);
 assert.strictEqual(state.validSamples, 2);
 assert.strictEqual(state.fuelUsedL, 0.0075);
 assert.strictEqual(integrator.addSample(NaN, 4700).fuelUsedL, 0.0075);
+integrator.reset();
+assert.deepStrictEqual(integrator.addSample(0, 1000), {
+  fuelUsedL: 0,
+  validSamples: 1,
+  lastRateLph: 0,
+  lastTimestampMs: 1000,
+});
+assert.strictEqual(integrator.addSample(20, 2000).fuelUsedL, 0.002778);
+assert.strictEqual(integrator.addSample(-1, 3000).fuelUsedL, 0.002778);
 integrator.reset();
 assert.strictEqual(integrator.getState().fuelUsedL, 0);
 
