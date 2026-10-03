@@ -7,15 +7,12 @@ import { getDriveCycleSummary, type DriveCycle } from '../src/data/driveCycles';
 import { getAutoSaveStatus, initAutoSave, updateAutoSaveState } from '../src/meriva/autosaveManager';
 import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
 import type { ObdConnectionState } from '../src/meriva/autosaveState';
-import { formatDistance, gpsTracker, type GpsTripState } from '../src/gps';
+import { gpsTracker, type GpsTripState } from '../src/gps';
+import { DEFAULT_SCREEN_PREFERENCES, loadScreenPreferences, type ScreenPreferences } from '../src/ui/screenPreferences';
 
 function formatTime(iso: string | null): string {
   if (!iso) return 'N/D';
-  try {
-    return new Date(iso).toLocaleTimeString('pt-BR');
-  } catch {
-    return 'N/D';
-  }
+  try { return new Date(iso).toLocaleTimeString('pt-BR'); } catch { return 'N/D'; }
 }
 
 export default function IndexScreen() {
@@ -24,6 +21,8 @@ export default function IndexScreen() {
   const [saveStatus, setSaveStatus] = useState<AutoSaveStatus>({ lastSavedAt: null, lastSaveReason: null, lastError: null });
   const [isHydrated, setIsHydrated] = useState(false);
   const [gpsState, setGpsState] = useState<GpsTripState>(gpsTracker.getState());
+  const [screenPrefs, setScreenPrefs] = useState<ScreenPreferences>(DEFAULT_SCREEN_PREFERENCES);
+
   useEffect(() => gpsTracker.subscribe(setGpsState), []);
 
   const reloadStoredState = useCallback(async () => {
@@ -33,15 +32,12 @@ export default function IndexScreen() {
       await initializeDriveCycles(basePath);
       const storedCycles = await readDriveCycles(basePath);
       const loaded = restored.driveCycles.length ? restored.driveCycles : storedCycles;
-
       if (!restored.driveCycles.length && loaded.length) {
-        updateAutoSaveState((state) => {
-          state.driveCycles = loaded;
-        });
+        updateAutoSaveState((state) => { state.driveCycles = loaded; });
       }
-
       setCycles(loaded);
       setObd(restored.obd);
+      setScreenPrefs(await loadScreenPreferences(basePath));
       setSaveStatus(getAutoSaveStatus());
       setIsHydrated(true);
     } catch {
@@ -50,15 +46,8 @@ export default function IndexScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    void reloadStoredState();
-  }, [reloadStoredState]);
-
-  useFocusEffect(
-    useCallback(() => {
-      void reloadStoredState();
-    }, [reloadStoredState]),
-  );
+  useEffect(() => { void reloadStoredState(); }, [reloadStoredState]);
+  useFocusEffect(useCallback(() => { void reloadStoredState(); }, [reloadStoredState]));
 
   const summary = useMemo(() => getDriveCycleSummary(cycles), [cycles]);
 
@@ -92,9 +81,7 @@ export default function IndexScreen() {
             <View style={styles.gpsMetric}><Text style={styles.metricLabel}>MÁXIMA</Text><Text style={styles.metricValue}>{gpsState.maxSpeedKmh.toFixed(1)} km/h</Text></View>
             <View style={styles.gpsMetric}><Text style={styles.metricLabel}>PRECISÃO</Text><Text style={styles.metricValue}>{gpsState.lastAccuracyM == null ? 'N/D' : `${gpsState.lastAccuracyM.toFixed(0)} m`}</Text></View>
           </View>
-          <Text style={styles.gpsHelp}>GPS inicia automaticamente ao abrir o aplicativo. Velocidade e distância vêm do celular. O GPS não mede litros consumidos sozinho.</Text>
-          <Text style={styles.fuelInfo}>COMBUSTÍVEL: aguardando taxa real da ECU (PID 015E).</Text>
-          <Text style={styles.fuelInfo}>O GPS mede distância e velocidade. Litros só entram quando a ECU fornecer L/h válido.</Text>
+          <Text style={styles.gpsHelp}>GPS inicia automaticamente. Deriva de posição e velocidade sem confiança são descartadas.</Text>
           {gpsState.error ? <Text style={styles.gpsError}>{gpsState.error}</Text> : null}
         </View>
 
@@ -111,13 +98,15 @@ export default function IndexScreen() {
         </View>
 
         <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>HISTÓRICO</Text><Text style={styles.historyNote}>Referências Car Scanner: {summary.referenceCycleCount}. Elas não entram nas métricas reais.</Text>
+          <Text style={styles.sectionTitle}>HISTÓRICO</Text>
+          <Text style={styles.historyNote}>Referências Car Scanner: {summary.referenceCycleCount}. Elas não entram nas métricas reais.</Text>
           {cycles.map((cycle) => <View key={cycle.id} style={styles.historyItem}><View style={styles.historyHeader}><Text style={styles.historyDate}>{cycle.startedAt}</Text><Text style={cycle.source === 'REAL_OBD' ? styles.sourceReal : styles.sourceRef}>{cycle.source === 'REAL_OBD' ? 'REAL' : 'REFERÊNCIA'}</Text></View><Text style={styles.historyMeta}>{cycle.distanceTotalKm.toFixed(2)} km • {cycle.avgFuelConsumptionKml.toFixed(3)} km/L</Text></View>)}
         </View>
 
-        <Link href="/laboratorio" asChild><TouchableOpacity style={styles.button}><Text style={styles.buttonText}>LABORATÓRIO OBD</Text></TouchableOpacity></Link>
-        <Link href="/armazenamento" asChild><TouchableOpacity style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>ARMAZENAMENTO</Text></TouchableOpacity></Link>
-        <Link href="/configuracoes" asChild><TouchableOpacity style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>CONFIGURAÇÕES</Text></TouchableOpacity></Link>
+        <Text style={styles.menuTitle}>TELAS</Text>
+        {screenPrefs.laboratorio && <Link href="/laboratorio" asChild><TouchableOpacity style={styles.button}><Text style={styles.buttonText}>LABORATÓRIO OBD</Text></TouchableOpacity></Link>}
+        {screenPrefs.armazenamento && <Link href="/armazenamento" asChild><TouchableOpacity style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>ARMAZENAMENTO</Text></TouchableOpacity></Link>}
+        {screenPrefs.configuracoes && <Link href="/configuracoes" asChild><TouchableOpacity style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>CONFIGURAÇÕES</Text></TouchableOpacity></Link>}
       </ScrollView>
     </SafeAreaView>
   );
@@ -141,7 +130,6 @@ const styles = StyleSheet.create({
   gpsLive: { color: '#16a34a', fontWeight: '800' },
   gpsOff: { color: '#64748b', fontWeight: '800' },
   gpsHelp: { color: '#64748b', fontSize: 12, marginBottom: 10 },
-  fuelInfo: { color: '#475569', fontSize: 12, marginBottom: 6 },
   gpsError: { color: '#b91c1c', fontWeight: '700', marginBottom: 10 },
   summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 18 },
   metricCard: { width: '48%', backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 10 },
@@ -149,6 +137,7 @@ const styles = StyleSheet.create({
   metricValue: { color: '#1f2937', fontWeight: '700', fontSize: 18 },
   sectionCard: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 18 },
   sectionTitle: { color: '#1f2937', fontWeight: '700', fontSize: 16, marginBottom: 10 },
+  menuTitle: { color: '#1f2937', fontWeight: '800', fontSize: 15, marginTop: 4, marginBottom: 4 },
   row: { color: '#374151', marginBottom: 6 },
   label: { fontWeight: '700' },
   sourceRow: { flexDirection: 'row', alignItems: 'center' },
