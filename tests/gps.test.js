@@ -49,11 +49,15 @@ const {
   GpsTracker,
   haversineDistanceKm,
   normalizeGpsSpeedKmh,
+  formatDistance,
   calculateConsumptionKml,
 } = mod.exports;
 
 assert.strictEqual(normalizeGpsSpeedKmh(10), 36);
 assert.strictEqual(normalizeGpsSpeedKmh(null), 0);
+assert.strictEqual(formatDistance(0.35), '350 m');
+assert.strictEqual(formatDistance(0.999), '999 m');
+assert.strictEqual(formatDistance(1), '1.00 km');
 assert.ok(
   Math.abs(
     haversineDistanceKm(
@@ -99,6 +103,14 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
   assert.ok(state.distanceKm > 0.01 && state.distanceKm < 0.012);
   assert.ok(state.maxSpeedKmh >= 36);
   assert.ok(receivedStates.length >= 3);
+
+  const stopped = new GpsTracker();
+  await stopped.start();
+  watcher({ coords: { latitude: 0, longitude: 0, speed: 0, accuracy: 5 }, timestamp: 3000 });
+  watcher({ coords: { latitude: 0, longitude: 0.0001, speed: 0, accuracy: 5 }, timestamp: 4000 });
+  assert.strictEqual(stopped.getState().currentSpeedKmh, 0);
+  assert.strictEqual(stopped.getState().distanceKm, 0);
+  await stopped.stop();
 
   await tracker.stop();
   assert.strictEqual(tracker.getState().running, false);
