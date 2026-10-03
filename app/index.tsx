@@ -11,11 +11,11 @@ import { calculateConsumptionKml, gpsTracker, type GpsTripState } from '../src/g
 
 function formatTime(iso: string | null): string {
   if (!iso) return 'N/D';
-  try {
-    return new Date(iso).toLocaleTimeString('pt-BR');
-  } catch {
-    return 'N/D';
-  }
+  try { return new Date(iso).toLocaleTimeString('pt-BR'); } catch { return 'N/D'; }
+}
+
+function StateDot({ ok }: { ok: boolean }) {
+  return <View style={[styles.dot, ok ? styles.dotOn : styles.dotOff]} />;
 }
 
 export default function IndexScreen() {
@@ -27,139 +27,88 @@ export default function IndexScreen() {
   const [fuelUsedL, setFuelUsedL] = useState('');
 
   useEffect(() => gpsTracker.subscribe(setGpsState), []);
-
-  const gpsConsumption = calculateConsumptionKml(
-    gpsState.distanceKm,
-    Number(fuelUsedL.replace(',', '.')),
-  );
-
   useEffect(() => {
     async function restoreState() {
       const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
       const restored = await initAutoSave(basePath);
-
       await initializeDriveCycles(basePath);
       const storedCycles = await readDriveCycles(basePath);
       const loaded = restored.driveCycles.length ? restored.driveCycles : storedCycles;
-
-      if (!restored.driveCycles.length && loaded.length) {
-        updateAutoSaveState((state) => {
-          state.driveCycles = loaded;
-        });
-      }
-
-      setCycles(loaded);
-      setObd(restored.obd);
-      setSaveStatus(getAutoSaveStatus());
-      setIsHydrated(true);
+      if (!restored.driveCycles.length && loaded.length) updateAutoSaveState(state => { state.driveCycles = loaded; });
+      setCycles(loaded); setObd(restored.obd); setSaveStatus(getAutoSaveStatus()); setIsHydrated(true);
     }
-
     void restoreState();
   }, []);
 
   const summary = useMemo(() => getDriveCycleSummary(cycles), [cycles]);
+  const gpsConsumption = calculateConsumptionKml(gpsState.distanceKm, Number(fuelUsedL.replace(',', '.')));
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.hero}>
+          <View style={styles.heroTop}>
+            <View><Text style={styles.kicker}>MERIVA SMART</Text><Text style={styles.heroTitle}>DIAGNÓSTICO</Text></View>
+            <View style={styles.livePill}><StateDot ok={obd.connected} /><Text style={styles.liveText}>{obd.connected ? 'OBD ONLINE' : 'OBD OFFLINE'}</Text></View>
+          </View>
+          <Text style={styles.vehicle}>CHEVROLET MERIVA • ECU {obd.ecuAddress ?? 'N/D'}</Text>
+          <View style={styles.heroGrid}>
+            <View><Text style={styles.heroLabel}>PROTOCOLO</Text><Text style={styles.heroValue}>{obd.protocol ?? 'N/D'}</Text></View>
+            <View><Text style={styles.heroLabel}>AUTOSAVE</Text><Text style={styles.heroValue}>{formatTime(saveStatus.lastSavedAt)}</Text></View>
+          </View>
+          <Text style={styles.heroState}>{isHydrated ? '● DADOS RESTAURADOS' : '○ CARREGANDO DADOS...'}</Text>
+        </View>
+
+        <View style={styles.sectionHead}><Text style={styles.sectionTitle}>VIAGEM AGORA</Text><Text style={gpsState.running ? styles.green : styles.muted}>{gpsState.running ? 'GPS ATIVO' : 'GPS AGUARDANDO'}</Text></View>
+        <View style={styles.speedCard}>
+          <Text style={styles.metricCaption}>VELOCIDADE</Text>
+          <Text style={styles.speed}>{gpsState.currentSpeedKmh.toFixed(0)}<Text style={styles.speedUnit}> km/h</Text></Text>
+          <View style={styles.tripRow}>
+            <View><Text style={styles.metricCaption}>DISTÂNCIA</Text><Text style={styles.tripValue}>{gpsState.distanceKm.toFixed(2)} km</Text></View>
+            <View><Text style={styles.metricCaption}>MÁXIMA</Text><Text style={styles.tripValue}>{gpsState.maxSpeedKmh.toFixed(0)} km/h</Text></View>
+            <View><Text style={styles.metricCaption}>PRECISÃO</Text><Text style={styles.tripValue}>{gpsState.lastAccuracyM == null ? 'N/D' : `${gpsState.lastAccuracyM.toFixed(0)} m`}</Text></View>
+          </View>
+        </View>
+
+        <View style={styles.sectionHead}><Text style={styles.sectionTitle}>CONSUMO</Text><Text style={styles.muted}>GPS + entrada manual</Text></View>
         <View style={styles.card}>
-          <Text style={styles.title}>MERIVA SMART</Text>
-          <Text style={styles.subtitle}>DIAGNOSTIC</Text>
-          <Text style={styles.sectionTitleDark}>STATUS</Text>
-          <Text style={styles.statusLine}>OBD: {obd.connected ? 'CONECTADO' : 'DESCONECTADO'}</Text>
-          <Text style={styles.statusLine}>ECU: {obd.ecuAddress ?? 'N/D'}</Text>
-          <Text style={styles.statusLine}>PROTOCOLO: {obd.protocol ?? 'N/D'}</Text>
-          <Text style={styles.sectionTitleDark}>SALVAMENTO</Text>
-          <Text style={styles.statusLine}>AUTOMÁTICO: ATIVO</Text>
-          <Text style={styles.statusLine}>ÚLTIMO SAVE: {formatTime(saveStatus.lastSavedAt)}</Text>
-          {saveStatus.lastError ? <Text style={styles.autosaveError}>FALHA NO AUTOSAVE: {saveStatus.lastError}</Text> : null}
-          <Text style={styles.status}>{isHydrated ? 'ESTADO RESTAURADO' : 'CARREGANDO...'}</Text>
+          <TextInput value={fuelUsedL} onChangeText={setFuelUsedL} keyboardType="decimal-pad" placeholder="Litros usados na viagem" placeholderTextColor="#718096" style={styles.input} />
+          <Text style={styles.consumption}>{gpsConsumption == null ? 'Informe os litros usados' : `${gpsConsumption.toFixed(2)} km/L`}</Text>
+          <Text style={styles.help}>O consumo real da ECU aparece quando houver dados OBD reais. O GPS sozinho não mede litros.</Text>
         </View>
 
-        <View style={styles.gpsCard}>
-          <View style={styles.gpsHeader}>
-            <Text style={styles.sectionTitle}>GPS DO CELULAR</Text>
-            <Text style={gpsState.running ? styles.gpsLive : styles.gpsOff}>
-              {gpsState.running ? 'ATIVO AUTOMÁTICO' : 'AGUARDANDO GPS'}
-            </Text>
-          </View>
-          <View style={styles.gpsGrid}>
-            <View style={styles.gpsMetric}><Text style={styles.metricLabel}>VELOCIDADE</Text><Text style={styles.gpsSpeed}>{gpsState.currentSpeedKmh.toFixed(1)} km/h</Text></View>
-            <View style={styles.gpsMetric}><Text style={styles.metricLabel}>DISTÂNCIA</Text><Text style={styles.metricValue}>{gpsState.distanceKm.toFixed(3)} km</Text></View>
-            <View style={styles.gpsMetric}><Text style={styles.metricLabel}>MÁXIMA</Text><Text style={styles.metricValue}>{gpsState.maxSpeedKmh.toFixed(1)} km/h</Text></View>
-            <View style={styles.gpsMetric}><Text style={styles.metricLabel}>PRECISÃO</Text><Text style={styles.metricValue}>{gpsState.lastAccuracyM == null ? 'N/D' : `${gpsState.lastAccuracyM.toFixed(0)} m`}</Text></View>
-          </View>
-          <Text style={styles.gpsHelp}>GPS inicia automaticamente ao abrir o aplicativo. Velocidade e distância vêm do celular. O GPS não mede litros consumidos sozinho.</Text>
-          <TextInput value={fuelUsedL} onChangeText={setFuelUsedL} keyboardType="decimal-pad" placeholder="Combustível usado na viagem (L)" placeholderTextColor="#64748b" style={styles.fuelInput} />
-          <Text style={styles.consumptionLine}>{gpsConsumption == null ? 'Consumo: informe litros usados' : `Consumo calculado: ${gpsConsumption.toFixed(2)} km/L`}</Text>
-          {gpsState.error ? <Text style={styles.gpsError}>{gpsState.error}</Text> : null}
+        <View style={styles.sectionHead}><Text style={styles.sectionTitle}>RESUMO REAL</Text><Text style={styles.muted}>somente dados REAL_OBD</Text></View>
+        <View style={styles.metrics}>
+          <View style={styles.metric}><Text style={styles.metricCaption}>CICLOS</Text><Text style={styles.metricBig}>{summary.realCycleCount}</Text></View>
+          <View style={styles.metric}><Text style={styles.metricCaption}>DISTÂNCIA</Text><Text style={styles.metricBig}>{summary.totalDistanceKm.toFixed(1)} km</Text></View>
+          <View style={styles.metric}><Text style={styles.metricCaption}>CONSUMO</Text><Text style={styles.metricBig}>{summary.avgConsumptionKml.toFixed(2)} km/L</Text></View>
+          <View style={styles.metric}><Text style={styles.metricCaption}>MÉDIA</Text><Text style={styles.metricBig}>{summary.avgSpeedKmh.toFixed(0)} km/h</Text></View>
         </View>
 
-        <View style={styles.summaryGrid}>
-          <View style={styles.metricCard}><Text style={styles.metricLabel}>CICLOS REAIS</Text><Text style={styles.metricValue}>{summary.realCycleCount}</Text></View>
-          <View style={styles.metricCard}><Text style={styles.metricLabel}>DISTÂNCIA REAL</Text><Text style={styles.metricValue}>{summary.totalDistanceKm.toFixed(2)} km</Text></View>
-          <View style={styles.metricCard}><Text style={styles.metricLabel}>CONSUMO REAL</Text><Text style={styles.metricValue}>{summary.avgConsumptionKml.toFixed(2)} km/L</Text></View>
-          <View style={styles.metricCard}><Text style={styles.metricLabel}>MÉDIA REAL</Text><Text style={styles.metricValue}>{summary.avgSpeedKmh.toFixed(1)} km/h</Text></View>
+        <View style={styles.sectionHead}><Text style={styles.sectionTitle}>ÚLTIMO CICLO</Text><Text style={summary.lastRealCycle?.source === 'REAL_OBD' ? styles.green : styles.amber}>{summary.lastRealCycle ? (summary.lastRealCycle.source === 'REAL_OBD' ? 'REAL' : 'REFERÊNCIA') : 'NENHUM'}</Text></View>
+        <View style={styles.card}>
+          {summary.lastRealCycle ? <><Text style={styles.row}>Distância <Text style={styles.rowStrong}>{summary.lastRealCycle.distanceTotalKm.toFixed(2)} km</Text></Text><Text style={styles.row}>Consumo <Text style={styles.rowStrong}>{summary.lastRealCycle.avgFuelConsumptionKml.toFixed(3)} km/L</Text></Text><Text style={styles.row}>Início <Text style={styles.rowStrong}>{summary.lastRealCycle.startedAt}</Text></Text></> : <Text style={styles.help}>Ainda não há um ciclo real salvo.</Text>}
         </View>
 
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>ÚLTIMO CICLO</Text>
-          {summary.lastRealCycle ? <><Text style={styles.row}><Text style={styles.label}>Início:</Text> {summary.lastRealCycle.startedAt}</Text><Text style={styles.row}><Text style={styles.label}>Fim:</Text> {summary.lastRealCycle.finishedAt}</Text><Text style={styles.row}><Text style={styles.label}>Distância:</Text> {summary.lastRealCycle.distanceTotalKm.toFixed(2)} km</Text><Text style={styles.row}><Text style={styles.label}>Consumo:</Text> {summary.lastRealCycle.avgFuelConsumptionKml.toFixed(3)} km/L</Text><View style={styles.sourceRow}><Text style={styles.row}><Text style={styles.label}>Fonte:</Text> {summary.lastRealCycle.source}</Text><Text style={summary.lastRealCycle.source === 'REAL_OBD' ? styles.sourceReal : styles.sourceRef}>{summary.lastRealCycle.source === 'REAL_OBD' ? 'REAL' : 'REFERÊNCIA'}</Text></View></> : <Text style={styles.empty}>Sem ciclos carregados.</Text>}
-        </View>
+        {saveStatus.lastError ? <View style={styles.alert}><Text style={styles.alertTitle}>AUTOSAVE COM FALHA</Text><Text style={styles.alertText}>{saveStatus.lastError}</Text></View> : null}
 
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>HISTÓRICO</Text><Text style={styles.historyNote}>Referências Car Scanner: {summary.referenceCycleCount}. Elas não entram nas métricas reais.</Text>
-          {cycles.map((cycle) => <View key={cycle.id} style={styles.historyItem}><View style={styles.historyHeader}><Text style={styles.historyDate}>{cycle.startedAt}</Text><Text style={cycle.source === 'REAL_OBD' ? styles.sourceReal : styles.sourceRef}>{cycle.source === 'REAL_OBD' ? 'REAL' : 'REFERÊNCIA'}</Text></View><Text style={styles.historyMeta}>{cycle.distanceTotalKm.toFixed(2)} km • {cycle.avgFuelConsumptionKml.toFixed(3)} km/L</Text></View>)}
+        <View style={styles.actions}>
+          <Link href="/laboratorio" asChild><TouchableOpacity style={styles.primary}><Text style={styles.primaryText}>ABRIR LABORATÓRIO OBD</Text></TouchableOpacity></Link>
+          <Link href="/armazenamento" asChild><TouchableOpacity style={styles.secondary}><Text style={styles.secondaryText}>ARMAZENAMENTO</Text></TouchableOpacity></Link>
+          <Link href="/configuracoes" asChild><TouchableOpacity style={styles.secondary}><Text style={styles.secondaryText}>CONFIGURAÇÕES</Text></TouchableOpacity></Link>
         </View>
-
-        <Link href="/laboratorio" asChild><TouchableOpacity style={styles.button}><Text style={styles.buttonText}>LABORATÓRIO OBD</Text></TouchableOpacity></Link>
-        <Link href="/armazenamento" asChild><TouchableOpacity style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>ARMAZENAMENTO</Text></TouchableOpacity></Link>
-        <Link href="/configuracoes" asChild><TouchableOpacity style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>CONFIGURAÇÕES</Text></TouchableOpacity></Link>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#eef3fb' },
-  content: { flexGrow: 1, padding: 20, paddingBottom: 40 },
-  card: { backgroundColor: '#1f2937', borderRadius: 18, padding: 24, marginBottom: 18 },
-  title: { color: '#dbeafe', fontSize: 28, fontWeight: '700' },
-  subtitle: { color: '#60a5fa', fontSize: 24, fontWeight: '700', marginBottom: 16 },
-  sectionTitleDark: { color: '#93c5fd', fontSize: 12, fontWeight: '700', letterSpacing: 1, marginTop: 8, marginBottom: 4 },
-  statusLine: { color: '#e5e7eb', marginTop: 2 },
-  autosaveError: { color: '#fca5a5', marginTop: 6, fontWeight: '600' },
-  status: { color: '#9ca3af', marginTop: 14, fontWeight: '700' },
-  gpsCard: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 18 },
-  gpsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  gpsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  gpsMetric: { width: '48%', marginBottom: 10 },
-  gpsSpeed: { color: '#2563eb', fontWeight: '800', fontSize: 22 },
-  gpsLive: { color: '#16a34a', fontWeight: '800' },
-  gpsOff: { color: '#64748b', fontWeight: '800' },
-  gpsHelp: { color: '#64748b', fontSize: 12, marginBottom: 10 },
-  fuelInput: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, padding: 12, color: '#0f172a', marginBottom: 8 },
-  consumptionLine: { color: '#1f2937', fontWeight: '700', marginBottom: 10 },
-  gpsError: { color: '#b91c1c', fontWeight: '700', marginBottom: 10 },
-  summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 18 },
-  metricCard: { width: '48%', backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 10 },
-  metricLabel: { color: '#6b7280', fontSize: 12, fontWeight: '600', marginBottom: 6 },
-  metricValue: { color: '#1f2937', fontWeight: '700', fontSize: 18 },
-  sectionCard: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 18 },
-  sectionTitle: { color: '#1f2937', fontWeight: '700', fontSize: 16, marginBottom: 10 },
-  row: { color: '#374151', marginBottom: 6 },
-  label: { fontWeight: '700' },
-  sourceRow: { flexDirection: 'row', alignItems: 'center' },
-  sourceReal: { color: '#16a34a', fontWeight: '700', marginLeft: 8 },
-  sourceRef: { color: '#d97706', fontWeight: '700', marginLeft: 8 },
-  empty: { color: '#6b7280' },
-  historyItem: { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
-  historyHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  historyDate: { color: '#1f2937', fontWeight: '600' },
-  historyMeta: { color: '#6b7280', marginTop: 2 },
-  historyNote: { color: '#64748b', fontSize: 12, marginBottom: 8 },
-  button: { backgroundColor: '#2563eb', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 8 },
-  buttonText: { color: '#fff', fontWeight: '700' },
-  secondaryButton: { backgroundColor: '#fff', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 8, borderWidth: 1, borderColor: '#94a3b8' },
-  secondaryButtonText: { color: '#1f2937', fontWeight: '700' },
+  container:{flex:1,backgroundColor:'#0b1118'},content:{padding:18,paddingBottom:42},
+  hero:{backgroundColor:'#111a24',borderWidth:1,borderColor:'#263646',borderRadius:18,padding:18,marginBottom:20},
+  heroTop:{flexDirection:'row',justifyContent:'space-between',alignItems:'flex-start'},kicker:{color:'#7dd3fc',fontSize:12,fontWeight:'800',letterSpacing:2},heroTitle:{color:'#f8fafc',fontSize:27,fontWeight:'900',marginTop:2},
+  livePill:{flexDirection:'row',alignItems:'center',borderWidth:1,borderColor:'#334155',borderRadius:20,paddingHorizontal:10,paddingVertical:7},liveText:{color:'#cbd5e1',fontSize:11,fontWeight:'800'},dot:{width:7,height:7,borderRadius:4,marginRight:6},dotOn:{backgroundColor:'#22c55e'},dotOff:{backgroundColor:'#64748b'},
+  vehicle:{color:'#94a3b8',fontSize:12,marginTop:16},heroGrid:{flexDirection:'row',gap:24,marginTop:18},heroLabel:{color:'#64748b',fontSize:10,fontWeight:'800'},heroValue:{color:'#e2e8f0',fontSize:13,fontWeight:'700',marginTop:3},heroState:{color:'#67e8f9',fontSize:11,fontWeight:'800',marginTop:18},
+  sectionHead:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:8,marginTop:2},sectionTitle:{color:'#e2e8f0',fontSize:12,fontWeight:'900',letterSpacing:1.4},green:{color:'#4ade80',fontWeight:'800',fontSize:11},amber:{color:'#fbbf24',fontWeight:'800',fontSize:11},muted:{color:'#64748b',fontSize:11},
+  speedCard:{backgroundColor:'#101923',borderRadius:16,borderWidth:1,borderColor:'#243443',padding:18,marginBottom:18},metricCaption:{color:'#64748b',fontSize:10,fontWeight:'800',letterSpacing:1},speed:{color:'#f8fafc',fontSize:48,fontWeight:'900',marginTop:2},speedUnit:{fontSize:15,color:'#94a3b8',fontWeight:'700'},tripRow:{flexDirection:'row',justifyContent:'space-between',borderTopWidth:1,borderTopColor:'#22303d',marginTop:14,paddingTop:14},tripValue:{color:'#e2e8f0',fontSize:14,fontWeight:'800',marginTop:3},
+  card:{backgroundColor:'#111a24',borderRadius:14,borderWidth:1,borderColor:'#243443',padding:14,marginBottom:18},input:{backgroundColor:'#0b1118',borderWidth:1,borderColor:'#334155',borderRadius:10,padding:13,color:'#f8fafc',fontSize:16},consumption:{color:'#7dd3fc',fontSize:26,fontWeight:'900',marginTop:12},help:{color:'#718096',fontSize:11,lineHeight:16,marginTop:8},metrics:{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',marginBottom:18},metric:{width:'48%',backgroundColor:'#111a24',borderRadius:12,borderWidth:1,borderColor:'#243443',padding:14,marginBottom:10},metricBig:{color:'#f1f5f9',fontSize:17,fontWeight:'900',marginTop:5},row:{color:'#94a3b8',paddingVertical:5},rowStrong:{color:'#e2e8f0',fontWeight:'800'},alert:{backgroundColor:'#2a1c10',borderWidth:1,borderColor:'#854d0e',borderRadius:12,padding:13,marginBottom:18},alertTitle:{color:'#fbbf24',fontWeight:'900',fontSize:11},alertText:{color:'#fde68a',fontSize:12,marginTop:4},actions:{gap:9},primary:{backgroundColor:'#0284c7',borderRadius:12,padding:15,alignItems:'center'},primaryText:{color:'#fff',fontWeight:'900',letterSpacing:.5},secondary:{backgroundColor:'#111a24',borderWidth:1,borderColor:'#334155',borderRadius:12,padding:15,alignItems:'center'},secondaryText:{color:'#e2e8f0',fontWeight:'800'}
 });
