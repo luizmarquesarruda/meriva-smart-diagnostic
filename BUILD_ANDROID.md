@@ -58,10 +58,10 @@ npm run android:termux
 
 O script:
 1. encontra o JDK instalado;
-2. define `JAVA_HOME) somente para o build;
+2. define `JAVA_HOME` somente para o build;
 3. gera o projeto Android com Expo prebuild se necessário;
 4. força o Gradle a usar esse `JAVA_HOME`;
-5. gera `android/app/build/outputs/apk/debug/app-debug.apk);
+5. gera `android/app/build/outputs/apk/debug/app-debug.apk`;
 6. mostra o SHA256 do APK.
 
 Não use `pkg install openjdk-17` no Termux atual deste projeto, porque esse pacote não está disponível no repositório configurado.
