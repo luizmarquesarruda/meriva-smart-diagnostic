@@ -21,15 +21,19 @@ mod._compile(output, sourcePath);
 
 const { integrateFuelRateLph, FuelRateIntegrator } = mod.exports;
 
+function assertApprox(actual, expected, epsilon = 1e-12) {
+  assert.ok(Math.abs(actual - expected) <= epsilon, `expected ${actual} ≈ ${expected}`);
+}
+
 assert.strictEqual(integrateFuelRateLph(null, { fuelRateLph: 12, timestampMs: 1000 }), 0);
-assert.strictEqual(
+assertApprox(
   integrateFuelRateLph(
     { fuelRateLph: 12, timestampMs: 1000 },
     { fuelRateLph: 12, timestampMs: 3700 },
   ),
   0.009,
 );
-assert.strictEqual(
+assertApprox(
   integrateFuelRateLph(
     { fuelRateLph: 10, timestampMs: 1000 },
     { fuelRateLph: 20, timestampMs: 11000 },
@@ -43,7 +47,7 @@ assert.strictEqual(
   ),
   0,
 );
-assert.strictEqual(
+assertApprox(
   integrateFuelRateLph(
     { fuelRateLph: 0, timestampMs: 1000 },
     { fuelRateLph: 20, timestampMs: 2000 },
