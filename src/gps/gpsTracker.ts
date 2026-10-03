@@ -204,14 +204,21 @@ export class GpsTracker {
     const c = location.coords;
     if (!Number.isFinite(c.latitude) || !Number.isFinite(c.longitude)) return;
 
+    // Expo Location typings in this project do not expose speedAccuracy,
+    // although Android may provide it at runtime. Keep the runtime check
+    // optional so typecheck stays compatible with the installed Expo SDK.
+    const speedAccuracyMs = (c as Location.LocationObjectCoords & {
+      speedAccuracy?: number | null;
+    }).speedAccuracy;
+
     const sample: GpsSample = {
       latitude: c.latitude,
       longitude: c.longitude,
       speedKmh: Number.isFinite(c.speed) && (c.speed as number) >= 0
         ? normalizeGpsSpeedKmh(c.speed)
         : null,
-      speedAccuracyKmh: Number.isFinite(c.speedAccuracy) && (c.speedAccuracy as number) >= 0
-        ? normalizeGpsSpeedKmh(c.speedAccuracy)
+      speedAccuracyKmh: Number.isFinite(speedAccuracyMs) && (speedAccuracyMs as number) >= 0
+        ? normalizeGpsSpeedKmh(speedAccuracyMs)
         : null,
       accuracyM: c.accuracy ?? null,
       timestamp: Number.isFinite(location.timestamp) ? location.timestamp : Date.now(),
