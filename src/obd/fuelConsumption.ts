@@ -59,7 +59,7 @@ export class FuelRateIntegrator {
     const valid = Number.isFinite(fuelRateLph) && fuelRateLph >= 0 && Number.isFinite(timestampMs);
 
     this.state = {
-      fuelUsedL: Number((this.state.fuelUsedL + increment).toFixed(6)),
+      fuelUsedL: this.state.fuelUsedL + increment,
       validSamples: this.state.validSamples + (valid ? 1 : 0),
       lastRateLph: valid ? fuelRateLph : this.state.lastRateLph,
       lastTimestampMs: valid ? timestampMs : this.state.lastTimestampMs,
