@@ -73,7 +73,7 @@ assert.deepStrictEqual(integrator.addSample(0, 1000), {
   lastRateLph: 0,
   lastTimestampMs: 1000,
 });
-assert.strictEqual(integrator.addSample(20, 2000).fuelUsedL, 0.002778);
+assertApprox(integrator.addSample(20, 2000).fuelUsedL, 0.002777777777777778, 1e-12);
 assert.strictEqual(integrator.addSample(-1, 3000).fuelUsedL, 0.002778);
 integrator.reset();
 assert.strictEqual(integrator.getState().fuelUsedL, 0);
