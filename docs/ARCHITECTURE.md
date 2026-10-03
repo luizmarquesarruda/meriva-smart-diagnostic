@@ -47,7 +47,11 @@
 
 `src/gps/` concentra o rastreador em primeiro plano, permissões, filtragem de precisão, cálculo de distância e conversão de velocidade.
 
-O `GpsTracker` é singleton no runtime para não parar ao navegar entre telas. O cálculo de consumo recebe quilômetros do GPS e só usa litros fornecidos por uma fonte válida.
+O `GpsTracker` é singleton no runtime para não parar ao navegar entre telas. O cálculo de consumo recebe quilômetros do GPS e litros integrados a partir de uma taxa OBD válida. O PID 015E fornece L/h quando suportado; a integração usa o intervalo entre amostras e rejeita dados inválidos ou intervalos longos.
+
+### Combustível OBD
+
+`src/obd/fuelConsumption.ts` integra a taxa do PID 015E em litros consumidos. O integrador não fabrica combustível: sem amostras válidas, o acumulado permanece inalterado.
 
 ### OBD
 

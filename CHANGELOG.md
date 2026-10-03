@@ -24,6 +24,12 @@
 - filtros de precisão e saltos;
 - cálculo de km/L somente quando litros válidos são fornecidos.
 
+### Combustível
+- remoção da entrada manual de litros na tela principal;
+- integração temporal da taxa OBD PID 015E em L/h;
+- rejeição de amostras inválidas e intervalos longos;
+- teste automatizado do acumulador de combustível.
+
 ### Persistência
 - autosave com validação e recuperação;
 - migração de schema;

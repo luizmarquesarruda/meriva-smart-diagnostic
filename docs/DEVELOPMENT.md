@@ -32,6 +32,9 @@ O adaptador ELM327 deve estar pareado nas configurações do Android antes do te
 10. Verifique TX/RX, tempo e status.
 11. Teste a descoberta de PIDs.
 12. Leia os DTCs atuais.
+13. Consulte o PID `015E` repetidamente e confirme a taxa em `L/h`.
+14. Confirme que o acumulado de litros só aumenta com amostras válidas e intervalos aceitáveis.
+15. Se a ECU não suportar `015E`, mantenha o consumo como indisponível, sem estimativa.
 
 A recepção do Bluetooth deve ocorrer pelo listener de dados. O transporte não deve misturar `onDataReceived` com `available()/read()`.
 
@@ -44,7 +47,7 @@ A recepção do Bluetooth deve ocorrer pelo listener de dados. O transporte não
 5. Desative a localização e confirme que o app informa a falha.
 6. Volte de Configurações do Android para o app e confira a tentativa automática de recuperação.
 
-O GPS mede velocidade e distância. Litros consumidos não devem ser inventados a partir de GPS.
+O GPS mede velocidade e distância. O consumo deve vir do OBD/ECU. Para combustível, teste o PID `015E`: uma resposta válida é interpretada em `L/h` e integrada ao longo de amostras consecutivas. Não digite litros manualmente para substituir uma leitura ausente.
 
 ## Teste sem veículo
 
@@ -62,7 +65,7 @@ Se um PID não estiver na resposta de descoberta, não assuma que ele é suporta
 
 ## Testes automatizados
 
-`npm test` cobre autosave, parser, DTC, descoberta de PIDs, serialização ELM, transporte Bluetooth por eventos, storage e GPS.
+`npm test` cobre autosave, parser, DTC, descoberta de PIDs, serialização ELM, transporte Bluetooth por eventos, storage, GPS e integração da taxa de combustível OBD.
 
 ## CI
 
