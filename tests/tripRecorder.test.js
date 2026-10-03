@@ -49,7 +49,7 @@ recorder.addSample({ timestampMs: 3000, distanceKm: 5.020, speedKmh: 36, fuelRat
 const state = recorder.addSample({ timestampMs: 5000, distanceKm: 5.040, speedKmh: 36, fuelRateLph: 10 });
 
 assert.strictEqual(state.distanceKm, 0.04);
-assertApprox(state.fuelUsedL, 0.011111, 1e-6);
+assertApprox(state.fuelUsedL, 0.011111111111111112, 1e-12);
 assert.strictEqual(state.validFuelSamples, 3);
 assert.strictEqual(state.durationMs, 4000);
 assert.strictEqual(state.movingTimeMs, 4000);
