@@ -246,8 +246,17 @@ export default function LaboratorioScreen() {
         setStatus('ELM RESPONDENDO / PID 015E NÃO SUPORTADO');
       }
     } catch (cause) {
+      const failedSession = sessionRef.current;
       sessionRef.current = null;
+      stopObdSessionCheckpoint();
+      try {
+        await failedSession?.close();
+      } catch {
+        // sessão já encerrada ou transporte indisponível
+      }
       setProtocol('N/D');
+      setTripFuelSupported(null);
+      setTripActive(false);
       setStatus('ELM NÃO RESPONDE');
       setError(cause instanceof Error ? cause.message : 'FALHA AO CONECTAR AO ELM327');
     }
