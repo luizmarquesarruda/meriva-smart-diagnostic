@@ -32,8 +32,6 @@ npx eas-cli build --platform android --profile preview
 
 O perfil `preview` está configurado com `android.buildType = apk`.
 
-O arquivo gerado pode ser instalado diretamente no Android. O EAS usa APK para instalação direta e AAB como formato padrão para distribuição em loja. 
-
 ## Produção
 
 ```bash
@@ -46,32 +44,27 @@ O perfil de produção gera AAB.
 
 Este aplicativo usa `react-native-bluetooth-classic`, portanto o teste deve ser feito em um build nativo Android. Expo Go não é suficiente para validar o transporte Bluetooth Classic.
 
-## Estado da auditoria
-
-- Expo SDK: 51
-- React Native: 0.74.5
-- Android package: `com.meriva.smartdiagnostic`
-- EAS: configurado
-- APK preview: configurado
-- AAB production: configurado
-- Assinatura: será administrada pelo EAS quando o primeiro build for executado
-
-Antes do primeiro build, execute `npm run doctor`. Se houver incompatibilidade de dependências, corrija-a antes de gerar o APK final.
-
-
 ## Java no Termux
 
-O projeto Android é compilado com **Java 17**. O CI do GitHub já usa Temurin 17.
+O CI do GitHub usa Temurin 17 porque o ambiente de CI suporta esse JDK de forma estável.
 
-No Termux, o Android/Gradle pode iniciar com outro JDK instalado no sistema. Para evitar que o Gradle use Java 21 por engano, use:
+O Termux atual deste projeto fornece OpenJDK 21 e 25. O build local do Termux usa o JDK compatível disponível, preferindo 21.
+
+Execute:
 
 ```bash
 npm run android:termux
 ```
 
-O script procura automaticamente um JDK 17 instalado em `$PREFIX/lib/jvm`, define `JAVA_HOME` somente para essa compilação e monta o APK debug.
+O script:
+1. encontra o JDK instalado;
+2. define `JAVA_HOME) somente para o build;
+3. gera o projeto Android com Expo prebuild se necessário;
+4. força o Gradle a usar esse `JAVA_HOME`;
+5. gera `android/app/build/outputs/apk/debug/app-debug.apk);
+6. mostra o SHA256 do APK.
 
-Não é necessário copiar um caminho fixo de JDK para dentro do GitHub. Isso mantém o projeto portátil.
+Não use `pkg install openjdk-17` no Termux atual deste projeto, porque esse pacote não está disponível no repositório configurado.
 
 ## Como as funções conversam
 
@@ -110,6 +103,6 @@ SERVIÇOS TYPESCRIPT
               Arquivos locais
 ```
 
-O Java nativo não deve duplicar o parser OBD, DTC, PID, histórico ou autosave. Ele fornece as funções Android nativas. A lógica de diagnóstico continua no TypeScript, onde os dados podem ser testados e rastreados por origem.
+O Java nativo não duplica o parser OBD, DTC, PID, histórico ou autosave. Ele fornece as funções Android nativas. A lógica de diagnóstico continua no TypeScript, onde os dados podem ser testados e rastreados por origem.
 
 Assim, Bluetooth Classic, ELM327, ECU, GPS, armazenamento e interface permanecem separados, mas ligados pelo mesmo fluxo do aplicativo.
