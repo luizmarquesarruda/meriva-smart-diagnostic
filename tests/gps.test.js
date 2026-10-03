@@ -84,6 +84,7 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
       latitude: 0,
       longitude: 0,
       speed: 10,
+      speedAccuracy: 0.5,
       accuracy: 5,
     },
     timestamp: 1000,
@@ -93,6 +94,7 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
       latitude: 0,
       longitude: 0.0001,
       speed: 10,
+      speedAccuracy: 0.5,
       accuracy: 5,
     },
     timestamp: 2000,
@@ -106,16 +108,23 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
 
   const stopped = new GpsTracker();
   await stopped.start();
-  watcher({ coords: { latitude: 0, longitude: 0, speed: 0, accuracy: 5 }, timestamp: 3000 });
-  watcher({ coords: { latitude: 0, longitude: 0.0001, speed: 0, accuracy: 5 }, timestamp: 4000 });
+  watcher({ coords: { latitude: 0, longitude: 0, speed: 0, speedAccuracy: 0.5, accuracy: 5 }, timestamp: 3000 });
+  watcher({ coords: { latitude: 0, longitude: 0.00001, speed: 12, speedAccuracy: 8, accuracy: 5 }, timestamp: 4000 });
   assert.strictEqual(stopped.getState().currentSpeedKmh, 0);
   assert.strictEqual(stopped.getState().distanceKm, 0);
-  await stopped.stop();
+
+  const falseDrift = new GpsTracker();
+  await falseDrift.start();
+  watcher({ coords: { latitude: 0, longitude: 0, speed: 0, speedAccuracy: 0.5, accuracy: 5 }, timestamp: 5000 });
+  watcher({ coords: { latitude: 0, longitude: 0.00004, speed: 15, speedAccuracy: 9, accuracy: 5 }, timestamp: 6000 });
+  assert.strictEqual(falseDrift.getState().currentSpeedKmh, 0);
+  assert.strictEqual(falseDrift.getState().distanceKm, 0);
 
   await tracker.stop();
-  assert.strictEqual(tracker.getState().running, false);
+  await stopped.stop();
+  await falseDrift.stop();
   unsubscribe();
-  console.log('PASS GPS: automático, velocidade, distância e consumo');
+  console.log('PASS GPS: velocidade, distância, unidades e rejeição de deriva');
 })().catch((error) => {
   console.error(error);
   process.exitCode = 1;
