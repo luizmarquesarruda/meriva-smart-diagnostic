@@ -24,6 +24,9 @@ export type GpsListener = (state: GpsTripState) => void;
 
 const MIN_ACCURACY_M = 60;
 const MAX_SPEED_KMH = 220;
+const STATIONARY_SPEED_KMH = 2;
+const MIN_MOVEMENT_M = 3;
+const MAX_SEGMENT_M = 250;
 
 export function haversineDistanceKm(
   a: Pick<GpsSample, 'latitude' | 'longitude'>,
@@ -50,6 +53,13 @@ export function calculateConsumptionKml(distanceKm: number, fuelUsedL: number): 
     return null;
   }
   return distanceKm / fuelUsedL;
+}
+
+export function formatDistance(distanceKm: number): string {
+  if (!Number.isFinite(distanceKm) || distanceKm <= 0) return '0 m';
+  const meters = distanceKm * 1000;
+  if (meters < 1000) return `${Math.round(meters)} m`;
+  return `${distanceKm.toFixed(2)} km`;
 }
 
 export function normalizeGpsSpeedKmh(speedMs: number | null | undefined): number {
@@ -225,6 +235,8 @@ export class GpsTracker {
       speedKmh = derivedSpeedKmh;
     }
     if (speedKmh == null || speedKmh < 0 || speedKmh > MAX_SPEED_KMH) speedKmh = 0;
+    const moving = speedKmh >= STATIONARY_SPEED_KMH;
+    if (!moving) speedKmh = 0;
 
     if (accurate) this.previous = sample;
     this.state = {
