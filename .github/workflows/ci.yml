@@ -41,13 +41,15 @@ jobs:
           java-version: '17'
       - run: npm install --no-audit --no-fund
       - run: npx expo prebuild --clean --platform android --non-interactive
-      - name: Assemble Android debug APK
+      - name: Assemble Android release APK (standalone)
         working-directory: android
-        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
-      - name: Upload Android debug APK
+        run: ./gradlew :app:assembleRelease --no-daemon --stacktrace
+      - name: Verify standalone APK
+        run: test -s android/app/build/outputs/apk/release/app-release.apk
+      - name: Upload Android standalone APK
         uses: actions/upload-artifact@v7
         with:
-          name: meriva-smart-diagnostic-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: meriva-smart-diagnostic-standalone-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14
