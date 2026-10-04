@@ -52,9 +52,26 @@ export async function readVehicleProfile(basePath: string): Promise<VehicleProfi
 
 export async function ensureMerivaBibleProfile(basePath: string): Promise<VehicleProfile> {
   const existing = await readVehicleProfile(basePath);
-  if (existing) return existing;
-
   const now = new Date().toISOString();
+
+  const bibleFields: Pick<VehicleProfile, 'technicalSource' | 'engineFamily' | 'fuelType' | 'applicationCode' | 'ecuReferences'> = {
+    technicalSource: MERIVA_BIBLE_SOURCE.name,
+    engineFamily: MERIVA_TECHNICAL_PROFILE.engine,
+    fuelType: MERIVA_TECHNICAL_PROFILE.fuel,
+    applicationCode: MERIVA_TECHNICAL_PROFILE.application,
+    ecuReferences: [...MERIVA_TECHNICAL_PROFILE.ecuReferences],
+  };
+
+  if (existing) {
+    const merged: VehicleProfile = {
+      ...existing,
+      ...bibleFields,
+      lastModified: now,
+    };
+    await createVehicleProfile(basePath, merged);
+    return merged;
+  }
+
   const profile: VehicleProfile = {
     vehicleName: 'Meriva Maxx',
     year: 2012,
@@ -64,11 +81,7 @@ export async function ensureMerivaBibleProfile(basePath: string): Promise<Vehicl
     createdAt: now,
     lastModified: now,
     protocolBaseline: 'NÃO CONFIRMADO',
-    technicalSource: MERIVA_BIBLE_SOURCE.name,
-    engineFamily: MERIVA_TECHNICAL_PROFILE.engine,
-    fuelType: MERIVA_TECHNICAL_PROFILE.fuel,
-    applicationCode: MERIVA_TECHNICAL_PROFILE.application,
-    ecuReferences: [...MERIVA_TECHNICAL_PROFILE.ecuReferences],
+    ...bibleFields,
   };
 
   await createVehicleProfile(basePath, profile);
