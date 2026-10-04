@@ -64,10 +64,6 @@ Esses dados podem ser consultados futuramente quando houver uma função real qu
 4. Nenhum PID é criado porque existe um componente físico correspondente.
 5. Nenhum DTC é considerado resolvido somente pela Bíblia.
 
-## Exclusão
-
-Informações de boia/medidor de nível entram no aplicativo como dado de autonomia quando a ECU responder validamente ao PID padrão OBD 012F. Isso não transforma a boia em dado de diagnóstico por si só.
-
 ## Próximas evoluções
 
 Só adicionar novos dados da Bíblia quando existir uma função concreta que os consuma, por exemplo:
