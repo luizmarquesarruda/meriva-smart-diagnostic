@@ -201,6 +201,8 @@ async function testParser() {
   assert.strictEqual(parser.parsePidResponse('010C', '41 0C 1A F8').value, 1726);
   assert.strictEqual(parser.validateOBDResponse('410C1AF8'), true);
   assert.strictEqual(parser.parsePidResponse('010C', '410C1AF8').value, 1726);
+  assert.strictEqual(parser.validateOBDResponse('41 0C 1A F8'), true);
+  assert.strictEqual(parser.parsePidResponse('010C', '41 0C 1A F8').value, 1726);
   assert.strictEqual(parser.parsePidResponse('010C', '41 0C 1A').value, null);
   assert.strictEqual(parser.parsePidResponse('012F', '41 2F 80').value, 50.19607843137255);
   assert.strictEqual(parser.parsePidResponse('012F', '41 2F FF').value, 100);
