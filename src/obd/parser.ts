@@ -15,18 +15,38 @@ export interface ParsedPidResult {
   definition?: PidDefinition;
 }
 
+function normalizeHexStream(rawResponse: string): string {
+  return rawResponse.replace(/[^0-9A-F]/gi, '').toUpperCase();
+}
+
+function findResponsePayload(rawResponse: string, pid: string, byteCount: number): number[] {
+  const stream = normalizeHexStream(rawResponse);
+  const marker = `41${pid.slice(-2)}`;
+  const markerIndex = stream.indexOf(marker);
+  if (markerIndex < 0) return [];
+
+  const payloadHex = stream.slice(markerIndex + marker.length, markerIndex + marker.length + byteCount * 2);
+  if (payloadHex.length !== byteCount * 2 || !/^[0-9A-F]+$/.test(payloadHex)) return [];
+
+  const bytes: number[] = [];
+  for (let index = 0; index < payloadHex.length; index += 2) {
+    bytes.push(Number.parseInt(payloadHex.slice(index, index + 2), 16));
+  }
+  return bytes;
+}
+
 export function extractHexBytes(rawResponse: string): number[] {
-  const tokens = rawResponse.toUpperCase().match(/[0-9A-F]{2}/g) ?? [];
-  return tokens.map((token) => Number.parseInt(token, 16));
+  const tokens = rawResponse.toUpperCase().match(/(?:^|\\s)([0-9A-F]{2})(?=\\s|$)/g) ?? [];
+  return tokens.map((token) => Number.parseInt(token.trim(), 16));
 }
 
 export function validateOBDResponse(response: string): boolean {
-  const normalized = response.replace(/\s+/g, '').toUpperCase();
-  return /^41[0-9A-F]{2}/.test(normalized) && !/NO DATA|UNABLE TO CONNECT|ERROR|BUS ERROR/i.test(response);
+  if (!response.trim() || /NO DATA|UNABLE TO CONNECT|ERROR|BUS ERROR/i.test(response)) return false;
+  return /41[0-9A-F]{2}/i.test(normalizeHexStream(response));
 }
 
 export function parsePidResponse(pidRequested: string, rawResponse: string): ParsedPidResult {
-  const pid = pidRequested.replace(/\s/g, '').toUpperCase();
+  const pid = pidRequested.replace(/\\s/g, '').toUpperCase();
 
   if (!rawResponse.trim() || /NO DATA|UNABLE TO CONNECT|ERROR/i.test(rawResponse)) {
     return {
@@ -43,11 +63,6 @@ export function parsePidResponse(pidRequested: string, rawResponse: string): Par
 
   const definition = getPidDefinition(pid);
   const rawBytes = extractHexBytes(rawResponse);
-  const headerIndex = rawBytes.findIndex(
-    (byte, index) =>
-      byte === 0x41 &&
-      rawBytes[index + 1] === Number.parseInt(pid.slice(-2), 16),
-  );
 
   if (!definition) {
     return {
@@ -62,7 +77,7 @@ export function parsePidResponse(pidRequested: string, rawResponse: string): Par
     };
   }
 
-  if (!validateOBDResponse(rawResponse) || headerIndex < 0) {
+  if (!validateOBDResponse(rawResponse)) {
     return {
       pid,
       name: definition.name,
@@ -71,12 +86,12 @@ export function parsePidResponse(pidRequested: string, rawResponse: string): Par
       rawResponse,
       rawBytes,
       status: 'VALOR NÃO INTERPRETADO',
-      errorMessage: 'Resposta não contém cabeçalho 41/PID esperado',
+      errorMessage: 'Resposta não contém resposta OBD positiva',
       definition,
     };
   }
 
-  const data = rawBytes.slice(headerIndex + 2, headerIndex + 2 + definition.bytes);
+  const data = findResponsePayload(rawResponse, pid, definition.bytes);
   if (data.length !== definition.bytes) {
     return {
       pid,
@@ -119,16 +134,16 @@ export function parsePidResponse(pidRequested: string, rawResponse: string): Par
 }
 
 export function parseDtcResponse(rawResponse: string): string[] {
-  const rawBytes = extractHexBytes(rawResponse);
-  const headerIndex = rawBytes.findIndex((byte) => byte === 0x43);
+  const stream = normalizeHexStream(rawResponse);
+  const headerIndex = stream.indexOf('43');
   if (headerIndex < 0) return [];
 
-  const data = rawBytes.slice(headerIndex + 1);
+  const data = stream.slice(headerIndex + 2);
   const codes: string[] = [];
 
-  for (let index = 0; index + 1 < data.length; index += 2) {
-    const high = data[index];
-    const low = data[index + 1];
+  for (let index = 0; index + 3 < data.length; index += 4) {
+    const high = Number.parseInt(data.slice(index, index + 2), 16);
+    const low = Number.parseInt(data.slice(index + 2, index + 4), 16);
     if (high === 0 && low === 0) continue;
 
     const type = ['P', 'C', 'B', 'U'][(high >> 6) & 0x03];
