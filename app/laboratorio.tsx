@@ -346,9 +346,13 @@ export default function LaboratorioScreen() {
   return (
     <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
       <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
-      <Text style={styles.title}>LABORATÓRIO OBD</Text>
+      <Text style={styles.title}>DIAGNÓSTICO OBD</Text>
       <Text style={styles.status}>{status}</Text>
-      <Text style={styles.protocol}>PROTOCOLO: {protocol}</Text>
+      <View style={styles.connectionSummary}>
+        <View style={styles.connectionItem}><Text style={styles.connectionLabel}>ELM327</Text><Text style={styles.connectionValue}>{sessionRef.current ? 'CONECTADO' : 'AGUARDANDO'}</Text></View>
+        <View style={styles.connectionItem}><Text style={styles.connectionLabel}>PROTOCOLO</Text><Text style={styles.connectionValue}>{protocol}</Text></View>
+        <View style={styles.connectionItem}><Text style={styles.connectionLabel}>PIDs</Text><Text style={styles.connectionValue}>{supportedPids.length || 'N/D'}</Text></View>
+      </View>
       {!storageReady ? <Text style={styles.warning}>PREPARANDO AUTOSAVE...</Text> : null}
       <View style={styles.tripPanel}>
         <View style={styles.tripHeader}>
@@ -366,10 +370,10 @@ export default function LaboratorioScreen() {
 
       <View style={styles.modeRow}>
         <TouchableOpacity style={[styles.modeButton, mode === 'REAL' && styles.active]} onPress={() => setMode('REAL')}>
-          <Text>BLUETOOTH REAL</Text>
+          <Text style={styles.modeText}>REAL</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.modeButton, mode === 'SIMULACAO' && styles.simActive]} onPress={() => setMode('SIMULACAO')}>
-          <Text>SIMULAÇÃO</Text>
+          <Text style={styles.modeText}>SIMULAÇÃO</Text>
         </TouchableOpacity>
       </View>
 
@@ -401,17 +405,20 @@ export default function LaboratorioScreen() {
         <Text style={styles.warning}>SIMULAÇÃO: não é ECU real e não alimenta aprendizado.</Text>
       )}
 
-      <TextInput
-        value={pid}
-        onChangeText={setPid}
-        autoCapitalize="characters"
-        style={styles.input}
-        placeholder="PID, ex.: 010C"
-        placeholderTextColor="#64748b"
-      />
-      <TouchableOpacity style={styles.button} onPress={testPid} disabled={!storageReady || (mode === 'REAL' && !sessionRef.current)}>
-        <Text style={styles.buttonText}>TESTAR PID</Text>
-      </TouchableOpacity>
+      <View style={styles.commandCard}>
+        <Text style={styles.commandTitle}>CONSULTA MANUAL</Text>
+        <TextInput
+          value={pid}
+          onChangeText={setPid}
+          autoCapitalize="characters"
+          style={styles.input}
+          placeholder="PID, ex.: 010C"
+          placeholderTextColor="#64748b"
+        />
+        <TouchableOpacity style={styles.button} onPress={testPid} disabled={!storageReady || (mode === 'REAL' && !sessionRef.current)}>
+          <Text style={styles.buttonText}>CONSULTAR PID</Text>
+        </TouchableOpacity>
+      </View>
       <TouchableOpacity style={styles.secondaryButton} onPress={discoverPids} disabled={!storageReady || (mode === 'REAL' && !sessionRef.current)}>
         <Text style={styles.secondaryButtonText}>DESCOBRIR PIDs SUPORTADOS</Text>
       </TouchableOpacity>
@@ -445,15 +452,22 @@ export default function LaboratorioScreen() {
 
 const styles = StyleSheet.create({
   container: { flexGrow: 1, paddingVertical: 16, backgroundColor: '#eef3fb' },
-  title: { fontSize: 24, fontWeight: '700', color: '#1f2937', marginBottom: 8 },
+  title: { fontSize: 22, fontWeight: '900', color: '#1557a6', letterSpacing: 0.5, marginBottom: 6 },
   status: { color: '#2563eb', fontWeight: '700', marginBottom: 6 },
   protocol: { color: '#475569', fontWeight: '600', marginBottom: 8 },
+  connectionSummary: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  connectionItem: { flex: 1, backgroundColor: '#fff', borderRadius: 7, borderWidth: 1, borderColor: '#d1d9e2', padding: 9 },
+  connectionLabel: { color: '#64748b', fontSize: 9, fontWeight: '900' },
+  connectionValue: { color: '#1f2937', fontSize: 12, fontWeight: '900', marginTop: 3 },
   modeRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  modeButton: { flex: 1, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#94a3b8', alignItems: 'center' },
+  modeButton: { flex: 1, padding: 10, borderRadius: 7, borderWidth: 1, borderColor: '#94a3b8', alignItems: 'center' },
+  modeText: { color: '#1f2937', fontWeight: '900', fontSize: 11 },
   active: { backgroundColor: '#dbeafe', borderColor: '#2563eb' },
   simActive: { backgroundColor: '#fef3c7', borderColor: '#d97706' },
-  button: { backgroundColor: '#2563eb', borderRadius: 10, padding: 14, alignItems: 'center', marginBottom: 10 },
-  secondaryButton: { backgroundColor: '#fff', borderColor: '#94a3b8', borderWidth: 1, borderRadius: 10, padding: 13, alignItems: 'center', marginBottom: 10 },
+  commandCard: { backgroundColor: '#fff', borderRadius: 8, padding: 11, marginBottom: 10, borderWidth: 1, borderColor: '#d1d9e2' },
+  commandTitle: { color: '#1f2937', fontSize: 12, fontWeight: '900', marginBottom: 7 },
+  button: { backgroundColor: '#1557a6', borderRadius: 7, padding: 13, alignItems: 'center', marginBottom: 9 },
+  secondaryButton: { backgroundColor: '#fff', borderColor: '#94a3b8', borderWidth: 1, borderRadius: 7, padding: 12, alignItems: 'center', marginBottom: 9 },
   secondaryButtonText: { color: '#1f2937', fontWeight: '700' },
   disconnect: { backgroundColor: '#64748b' },
   buttonText: { color: '#fff', fontWeight: '700' },
