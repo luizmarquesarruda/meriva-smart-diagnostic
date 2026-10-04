@@ -80,7 +80,7 @@ export default function RootLayout() {
               gpsTracker.getState().error ?? 'Não foi possível iniciar o GPS automaticamente.',
               [
                 { text: 'Abrir configurações', onPress: () => void Linking.openSettings() },
-                { text: 'Tentar novamente', onPress: () => void startGps(true, true) },
+                { text: 'Tentar novamente', onPress: () => void startGps(true) },
               ],
             );
           }
