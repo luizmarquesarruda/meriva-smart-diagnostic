@@ -107,23 +107,28 @@ export async function createRealElmSession(device: BluetoothDeviceInfo): Promise
   try {
     const initialization = await session.initialize();
 
-    // Com a chave ligada e motor parado, 010C pode responder 0 rpm,
-    // mas não deve ser o único critério para declarar a ECU viva.
+    // Primeiro confirme ECU/ELM com um PID real e simples.
+    // 010C funciona com a chave ligada mesmo com motor parado e evita
+    // bombardear a ECU com vários blocos de descoberta antes do primeiro OK.
+    const ecuProbe = await session.executeCommand('010C');
+    const probeIsValid =
+      ecuProbe.status === 'OK' &&
+      /(?:^|\\s)41\\s+0C(?:\\s|$)/i.test(ecuProbe.response);
+
+    if (!probeIsValid) {
+      await session.close();
+      throw new Error(
+        ecuProbe.response
+          ? `ECU NÃO RESPONDEU AO PID 010C: ${ecuProbe.response.trim()}`
+          : 'ECU NÃO RESPONDEU AO PID 010C',
+      );
+    }
+
+    // Só depois do primeiro OK fazemos a descoberta dos blocos de PIDs.
     const discovery = await discoverSupportedPids(session);
     const supportedPids = Array.from(
       new Set(discovery.flatMap((item) => item.supportedPids)),
     ).sort();
-
-    const discoveryProbe = discovery.find((item) => item.responded);
-    const ecuProbe = discoveryProbe
-      ? {
-          command: discoveryProbe.pid,
-          response: discoveryProbe.response,
-          elapsedMs: discoveryProbe.elapsedMs,
-          status: 'OK' as const,
-          attempt: 1,
-        }
-      : await session.executeCommand('010C');
 
     const probeIsValid =
       ecuProbe.status === 'OK' &&
