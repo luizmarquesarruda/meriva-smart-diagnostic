@@ -13,7 +13,7 @@ export interface DiscoveryItem {
 }
 
 export function decodeSupportedPids(requestedPid: string, response: string): string[] {
-  const normalized = requestedPid.replace(/\\s/g, '').toUpperCase();
+  const normalized = requestedPid.replace(/\s/g, '').toUpperCase();
   if (!/^01(?:00|20|40|60)$/.test(normalized) || !validateOBDResponse(response)) return [];
 
   const stream = response.replace(/[^0-9A-F]/gi, '').toUpperCase();
