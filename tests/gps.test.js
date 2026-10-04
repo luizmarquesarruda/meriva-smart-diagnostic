@@ -51,6 +51,7 @@ const {
   normalizeGpsSpeedKmh,
   formatDistance,
   calculateConsumptionKml,
+  hasReliableGpsFix,
 } = mod.exports;
 
 assert.strictEqual(normalizeGpsSpeedKmh(10), 36);
@@ -69,6 +70,22 @@ assert.ok(
 assert.strictEqual(calculateConsumptionKml(100, 8), 12.5);
 assert.strictEqual(calculateConsumptionKml(0, 8), null);
 assert.strictEqual(calculateConsumptionKml(100, 0), null);
+
+const validGpsState = {
+  running: true,
+  permissionGranted: true,
+  currentSpeedKmh: 0,
+  maxSpeedKmh: 0,
+  distanceKm: 0,
+  samples: 2,
+  lastTimestamp: 10000,
+  lastAccuracyM: 8,
+  error: null,
+};
+assert.strictEqual(hasReliableGpsFix(validGpsState, 14000), true);
+assert.strictEqual(hasReliableGpsFix(validGpsState, 15001), false);
+assert.strictEqual(hasReliableGpsFix({ ...validGpsState, samples: 0 }, 10000), false);
+assert.strictEqual(hasReliableGpsFix({ ...validGpsState, lastAccuracyM: 80 }, 10000), false);
 
 (async () => {
   const tracker = new GpsTracker();
