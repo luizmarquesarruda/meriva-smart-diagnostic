@@ -249,7 +249,9 @@ export default function LaboratorioScreen() {
     try {
       const activeSession = mode === 'SIMULACAO' ? simulationSession : sessionRef.current;
       if (!activeSession) throw new Error('CONECTE AO ELM327 ANTES DE TESTAR O PID');
-      const result = await activeSession.queryPid(pid);
+      const result = mode === 'REAL'
+        ? await autoTripService.withPollingPaused(() => activeSession.queryPid(pid))
+        : await activeSession.queryPid(pid);
 
       await registerObdQuery(getBasePath(), result, mode);
 
@@ -293,7 +295,9 @@ export default function LaboratorioScreen() {
       const activeSession = mode === 'SIMULACAO' ? simulationSession : sessionRef.current;
       if (!activeSession) throw new Error('CONECTE AO ELM327 ANTES DE LER DTC');
 
-      const result = await activeSession.executeCommand('03');
+      const result = mode === 'REAL'
+        ? await autoTripService.withPollingPaused(() => activeSession.executeCommand('03'))
+        : await activeSession.executeCommand('03');
       const codes = parseDtcResponse(result.response);
       setTx(result.command);
       setRx(result.response);
