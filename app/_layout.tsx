@@ -21,11 +21,10 @@ export default function RootLayout() {
       checking.current = true;
 
       try {
+        if (!autoConnectObd) return;
         await ensureBluetoothReady();
-        if (autoConnectObd) {
-          const connection = await connectPreferredElm();
-          if (!connection.protocol) throw new Error('ELM RESPONDEU, MAS O PROTOCOLO NÃO FOI IDENTIFICADO.');
-        }
+        const connection = await connectPreferredElm();
+        if (!connection.protocol) throw new Error('ELM RESPONDEU, MAS O PROTOCOLO NÃO FOI IDENTIFICADO.');
       } catch (cause) {
         const now = Date.now();
         if (now - lastFailureAt.current > 2500) {
