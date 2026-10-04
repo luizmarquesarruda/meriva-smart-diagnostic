@@ -4,6 +4,8 @@ import * as FileSystem from 'expo-file-system';
 import { checkStorageQuota, getStorageBreakdown, StorageQuotaConfig } from '../src/storage/quotaManager';
 import { cleanupOldLogs, cleanupOldReadings } from '../src/storage/cleanup';
 import { getMidLayout } from '../src/ui/midLayout';
+import { readDriveCycles } from '../src/storage/driveCycleStorage';
+import type { DriveCycle } from '../src/data/driveCycles';
 
 const DEFAULT_QUOTA: StorageQuotaConfig = {
   limitMb: 2048,
@@ -20,12 +22,14 @@ export default function ArmazenamentoScreen() {
   const [usageBreakdown, setUsageBreakdown] = useState<Record<string, number>>({});
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const [cycles, setCycles] = useState<DriveCycle[]>([]);
 
   async function refresh(path: string) {
     const status = await checkStorageQuota(path, DEFAULT_QUOTA);
     setQuota(status);
     const breakdown = await getStorageBreakdown(path);
     setUsageBreakdown(breakdown);
+    setCycles((await readDriveCycles(path)).sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()));
   }
 
   useEffect(() => {
@@ -73,6 +77,19 @@ export default function ArmazenamentoScreen() {
         ))}
         <Text style={styles.note}>Limite configurado: 2 GB. A limpeza remove somente dados antigos permitidos pelo sistema.</Text>
       </View>
+      <View style={styles.historyCard}>
+        <Text style={styles.cardTitle}>VIAGENS SALVAS</Text>
+        {cycles.length ? cycles.slice(0, 6).map((cycle) => (
+          <View key={cycle.id} style={styles.historyRow}>
+            <View style={styles.historyMain}>
+              <Text style={styles.historyDate}>{cycle.startedAt}</Text>
+              <Text style={styles.historyMeta}>{cycle.distanceTotalKm.toFixed(2)} km • {cycle.avgFuelConsumptionKml.toFixed(2)} km/L</Text>
+            </View>
+            <Text style={cycle.source === 'REAL_OBD' ? styles.real : styles.reference}>{cycle.source === 'REAL_OBD' ? 'REAL' : 'REF.'}</Text>
+          </View>
+        )) : <Text style={styles.empty}>Nenhuma viagem salva ainda.</Text>}
+      </View>
+
       <TouchableOpacity style={styles.button} onPress={handleClean} disabled={!basePath || busy}>
         <Text style={styles.buttonText}>{busy ? 'LIMPANDO...' : 'LIMPAR DADOS ANTIGOS'}</Text>
       </TouchableOpacity>
@@ -90,6 +107,14 @@ const styles = StyleSheet.create({
   warning: { color: '#d97706' },
   critical: { color: '#dc2626' },
   cleanMessage: { color: '#374151', marginBottom: 12 },
+  historyCard: { backgroundColor: '#fff', borderRadius: 8, padding: 11, borderWidth: 1, borderColor: '#d1d9e2', marginBottom: 10 },
+  historyRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
+  historyMain: { flex: 1 },
+  historyDate: { color: '#1f2937', fontWeight: '800', fontSize: 11 },
+  historyMeta: { color: '#64748b', fontSize: 10, marginTop: 2 },
+  real: { color: '#15803d', fontWeight: '900', fontSize: 9 },
+  reference: { color: '#b45309', fontWeight: '900', fontSize: 9 },
+  empty: { color: '#64748b', fontSize: 11 },
   card: { backgroundColor: '#fff', borderRadius: 8, padding: 11, borderWidth: 1, borderColor: '#d1d9e2', marginBottom: 10 },
   cardTitle: { color: '#1f2937', fontSize: 12, fontWeight: '900', marginBottom: 7 },
   row: { paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: '#e5e7eb', flexDirection: 'row', justifyContent: 'space-between' },
