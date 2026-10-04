@@ -47,6 +47,7 @@ export class SimulatedObdTransport implements ObdTransport {
       ATS0: 'OK',
       ATH1: 'OK',
       ATSP0: 'OK',
+      ATSP5: 'OK',
       ATDP: 'SIMULATED OBD TRANSPORT',
       '0100': '41 00 BE 3E B8 13',
       '0120': '41 20 80 00 00 01',
