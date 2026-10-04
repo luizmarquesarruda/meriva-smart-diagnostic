@@ -162,7 +162,12 @@ export default function LaboratorioScreen() {
 
       const connection = await createRealElmSession(device);
       sessionRef.current = connection.session;
-      await setSharedObdConnection({ session: connection.session, device, protocol: connection.protocol });
+      await setSharedObdConnection({
+        session: connection.session,
+        device,
+        protocol: connection.protocol,
+        supportedPids: connection.supportedPids,
+      });
       setProtocol(connection.protocol ?? 'N/D');
       startObdSessionCheckpoint();
       updateAutoSaveState((state) => {
