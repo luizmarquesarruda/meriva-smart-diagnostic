@@ -1,6 +1,6 @@
 import * as FileSystem from 'expo-file-system';
 
-export type FuelType = 'ETANOL' | 'GASOLINA';
+export type FuelType = 'FLEX' | 'ETANOL' | 'GASOLINA';
 export type DistanceUnit = 'KM' | 'MI';
 export interface AppSettings {
   fuelType: FuelType;
@@ -11,7 +11,7 @@ export interface AppSettings {
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
-  fuelType: 'ETANOL',
+  fuelType: 'FLEX',
   distanceUnit: 'KM',
   autoConnectObd: true,
   diagnosticAlerts: true,
@@ -35,7 +35,7 @@ export async function readAppSettings(basePath: string): Promise<AppSettings> {
   try {
     const parsed = JSON.parse(await FileSystem.readAsStringAsync(target)) as Partial<AppSettings>;
     const settings: AppSettings = {
-      fuelType: parsed.fuelType === 'GASOLINA' ? 'GASOLINA' : 'ETANOL',
+      fuelType: parsed.fuelType === 'GASOLINA' ? 'GASOLINA' : parsed.fuelType === 'ETANOL' ? 'ETANOL' : 'FLEX',
       distanceUnit: parsed.distanceUnit === 'MI' ? 'MI' : 'KM',
       autoConnectObd: parsed.autoConnectObd !== false,
       diagnosticAlerts: parsed.diagnosticAlerts !== false,
