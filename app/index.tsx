@@ -94,6 +94,7 @@ export default function IndexScreen() {
   const fuelLiters = fuelLevelPercent == null ? null : (MERIVA_MANUAL.capacities.fuelTankL * fuelLevelPercent) / 100;
   const autonomyKm = obd.connected && fuelLiters != null && realConsumptionKml != null ? fuelLiters * realConsumptionKml : null;
   const distanceUnit = settings?.distanceUnit ?? 'KM';
+  const autonomyDisplay = autonomyKm == null ? null : distanceUnit === 'MI' ? autonomyKm * 0.621371 : autonomyKm;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -107,8 +108,8 @@ export default function IndexScreen() {
 
           <View style={styles.heroCard}>
             <Text style={styles.heroLabel}>AUTONOMIA ESTIMADA</Text>
-            <Text style={styles.heroValue}>{autonomyKm == null ? 'N/D' : Math.round(autonomyKm)}</Text>
-            <Text style={styles.heroUnit}>km restantes</Text>
+            <Text style={styles.heroValue}>{autonomyDisplay == null ? 'N/D' : Math.round(autonomyDisplay)}</Text>
+            <Text style={styles.heroUnit}>{distanceUnit === 'MI' ? 'mi restantes' : 'km restantes'}</Text>
             <Text style={styles.heroHelp}>
               {fuelLevelPercent == null ? 'Aguardando nível real da ECU (PID 012F).' : `${fuelLevelPercent.toFixed(1)}% informado pela ECU • tanque de ${MERIVA_MANUAL.capacities.fuelTankL} L.`}
             </Text>
