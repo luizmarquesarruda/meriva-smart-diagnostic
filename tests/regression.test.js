@@ -36,6 +36,7 @@ let writeDelayMs = 0;
 let bluetoothListener = null;
 let bluetoothDisconnectListener = null;
 let fakeDeviceConnected = true;
+let lastBluetoothConnectionOptions = null;
 
 function parentDir(p) {
   const i = p.lastIndexOf('/');
@@ -148,7 +149,9 @@ const fakeBluetooth = {
   isBluetoothAvailable: async () => true,
   isBluetoothEnabled: async () => true,
   getBondedDevices: async () => [],
-  connectToDevice: async () => ({
+  connectToDevice: async (_address, options) => {
+    lastBluetoothConnectionOptions = options;
+    return {
     address: 'AA:BB:CC:DD:EE:FF',
     name: 'ELM327',
     bonded: true,
@@ -170,7 +173,8 @@ const fakeBluetooth = {
     disconnect: async () => {
       bluetoothListener = null;
     },
-  }),
+    };
+  },
 };
 
 const originalLoad = Module._load;
@@ -258,6 +262,8 @@ async function testBluetoothEventTransport() {
   const { BluetoothClassicTransport } = loadTs(path.join(ROOT, 'src/obd/bluetoothClassicTransport.ts'));
   const transport = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF');
   await transport.open();
+  assert.strictEqual(lastBluetoothConnectionOptions?.connectionType, 'binary');
+  assert.strictEqual(lastBluetoothConnectionOptions?.secureSocket, false);
   await transport.write('010C\\r');
   const response = await transport.readUntilPrompt(500);
   assert.strictEqual(response, '41 0C 0C 18');
