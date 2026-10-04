@@ -213,7 +213,7 @@ class AutoTripService {
         });
       }
 
-        const intervalMs = this.state.fuelSupported ? 1500 : 5000;
+      const intervalMs = this.state.fuelSupported ? 1500 : 5000;
       const elapsedMs = Date.now() - loopStartedAt;
       const waitMs = Math.max(150, intervalMs - elapsedMs);
       await new Promise((resolve) => setTimeout(resolve, waitMs));
