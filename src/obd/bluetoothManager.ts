@@ -128,9 +128,11 @@ export async function createRealElmSession(device: BluetoothDeviceInfo): Promise
       );
     }
 
-    // O ATDP já foi executado na inicialização. Reutilize o resultado e evite
-    // uma segunda rodada desnecessária na K-Line.
-    if (!session.getProtocol()) {
+    // Depois do primeiro PID válido, atualize o protocolo efetivamente usado
+    // pela sessão. Em modo automático o ATDP anterior pode ainda representar
+    // somente a seleção AUTO, e não o protocolo negociado na ECU.
+    const protocolResult = await session.identifyProtocol();
+    if (protocolResult.status !== 'OK' || !session.getProtocol()) {
       throw new Error('PROTOCOLO OBD NÃO IDENTIFICADO');
     }
 
