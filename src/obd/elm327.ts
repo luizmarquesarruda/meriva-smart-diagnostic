@@ -100,6 +100,16 @@ export class Elm327Session {
     }
   }
 
+  async identifyProtocol(): Promise<ElmCommandResult> {
+    await this.initialize();
+    const result = await this.executeCommand('ATDP');
+    if (result.status === 'OK') {
+      const detected = result.response.trim();
+      this.protocol = detected || null;
+    }
+    return result;
+  }
+
   getProtocol(): string | null {
     return this.protocol;
   }
