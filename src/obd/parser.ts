@@ -138,7 +138,11 @@ export function parseDtcResponse(rawResponse: string): string[] {
   const headerIndex = stream.indexOf('43');
   if (headerIndex < 0) return [];
 
-  const data = stream.slice(headerIndex + 2);
+  const rawData = stream.slice(headerIndex + 2);
+  // Em respostas com cabeçalho/CRC o final pode ter 1 byte extra.
+  // DTCs são sempre pares de bytes, então descartamos a sobra incompleta.
+  const usableLength = rawData.length - (rawData.length % 4);
+  const data = rawData.slice(0, usableLength);
   const codes: string[] = [];
 
   for (let index = 0; index + 3 < data.length; index += 4) {
