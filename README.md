@@ -124,4 +124,4 @@ A suíte automatizada cobre autosave, parser, DTC, descoberta de PIDs, fila de c
 **Evidência antes de conclusão.**
 
 
-<!-- CI validation: 2026-10-04 -->
+<!-- CI validation PR test: 2026-10-04 -->
