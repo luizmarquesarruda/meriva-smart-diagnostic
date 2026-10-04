@@ -354,12 +354,12 @@ export default function LaboratorioScreen() {
         <View style={styles.connectionItem}><Text style={styles.connectionLabel}>PIDs</Text><Text style={styles.connectionValue}>{supportedPids.length || 'N/D'}</Text></View>
       </View>
       {!storageReady ? <Text style={styles.warning}>PREPARANDO AUTOSAVE...</Text> : null}
-      <View style={styles.tripPanel}>
+      <View style={[styles.tripPanel, layout.landscape && styles.tripPanelLandscape]}>
         <View style={styles.tripHeader}>
           <Text style={styles.tripTitle}>VIAGEM AUTOMÁTICA</Text>
           <Text style={tripActive ? styles.live : styles.muted}>{tripActive ? 'GRAVANDO' : 'AGUARDANDO'}</Text>
         </View>
-        <View style={styles.tripGrid}>
+        <View style={[styles.tripGrid, layout.landscape && styles.tripGridLandscape]}>
           <View style={styles.tripMetric}><Text style={styles.tripLabel}>DISTÂNCIA GPS</Text><Text style={styles.tripValue}>{tripDistanceKm.toFixed(2)} km</Text></View>
           <View style={styles.tripMetric}><Text style={styles.tripLabel}>CONSUMO</Text><Text style={styles.tripValue}>{tripConsumptionKml == null ? 'N/D' : tripConsumptionKml.toFixed(2) + ' km/L'}</Text></View>
           <View style={styles.tripMetric}><Text style={styles.tripLabel}>COMBUSTÍVEL</Text><Text style={styles.tripValue}>{fuelLevelPercent == null ? 'N/D' : fuelLevelPercent.toFixed(1) + '%'}</Text></View>
@@ -368,7 +368,7 @@ export default function LaboratorioScreen() {
         <Text style={styles.tripHelp}>Sem botão iniciar. O app registra somente dados reais válidos.</Text>
       </View>
 
-      <View style={styles.modeRow}>
+      <View style={[styles.modeRow, layout.landscape && styles.rowLandscape]}>
         <TouchableOpacity style={[styles.modeButton, mode === 'REAL' && styles.active]} onPress={() => setMode('REAL')}>
           <Text style={styles.modeText}>REAL</Text>
         </TouchableOpacity>
@@ -379,7 +379,7 @@ export default function LaboratorioScreen() {
 
       {mode === 'REAL' ? (
         <>
-          <TouchableOpacity style={styles.button} onPress={loadDevices} disabled={loadingDevices || !storageReady}>
+          <TouchableOpacity style={[styles.button, layout.landscape && styles.flexButton]} onPress={loadDevices} disabled={loadingDevices || !storageReady}>
             {loadingDevices ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>LISTAR PAREADOS</Text>}
           </TouchableOpacity>
 
@@ -394,10 +394,10 @@ export default function LaboratorioScreen() {
             </TouchableOpacity>
           ))}
 
-          <TouchableOpacity style={styles.button} onPress={connectReal} disabled={!selectedAddress || !storageReady}>
+          <TouchableOpacity style={[styles.button, layout.landscape && styles.flexButton]} onPress={connectReal} disabled={!selectedAddress || !storageReady}>
             <Text style={styles.buttonText}>CONECTAR E INICIALIZAR ELM327</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.button, styles.disconnect]} onPress={() => void disconnectReal()} disabled={!sessionRef.current}>
+          <TouchableOpacity style={[styles.button, styles.disconnect, layout.landscape && styles.flexButton]} onPress={() => void disconnectReal()} disabled={!sessionRef.current}>
             <Text style={styles.buttonText}>DESCONECTAR ELM327</Text>
           </TouchableOpacity>
         </>
@@ -405,7 +405,7 @@ export default function LaboratorioScreen() {
         <Text style={styles.warning}>SIMULAÇÃO: não é ECU real e não alimenta aprendizado.</Text>
       )}
 
-      <View style={styles.commandCard}>
+      <View style={[styles.commandCard, layout.landscape && styles.commandCardLandscape]}>
         <Text style={styles.commandTitle}>CONSULTA MANUAL</Text>
         <TextInput
           value={pid}
@@ -459,7 +459,12 @@ const styles = StyleSheet.create({
   connectionItem: { flex: 1, backgroundColor: '#fff', borderRadius: 7, borderWidth: 1, borderColor: '#d1d9e2', padding: 9 },
   connectionLabel: { color: '#64748b', fontSize: 9, fontWeight: '900' },
   connectionValue: { color: '#1f2937', fontSize: 12, fontWeight: '900', marginTop: 3 },
-  modeRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  modeRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  rowLandscape: { alignItems: 'stretch' },
+  flexButton: { flex: 1 },
+  tripPanelLandscape: { padding: 14 },
+  tripGridLandscape: { flexWrap: 'nowrap', gap: 12 },
+  commandCardLandscape: { maxWidth: 620 },
   modeButton: { flex: 1, padding: 10, borderRadius: 7, borderWidth: 1, borderColor: '#94a3b8', alignItems: 'center' },
   modeText: { color: '#1f2937', fontWeight: '900', fontSize: 11 },
   active: { backgroundColor: '#dbeafe', borderColor: '#2563eb' },
@@ -481,6 +486,7 @@ const styles = StyleSheet.create({
   tripTitle: { color: '#1f2937', fontWeight: '900', fontSize: 14 },
   tripGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   tripMetric: { width: '48%', marginBottom: 8 },
+  tripGridLandscape: { flexWrap: 'nowrap', gap: 12 },
   tripLabel: { color: '#64748b', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
   tripValue: { color: '#1f2937', fontWeight: '800', fontSize: 16, marginTop: 2 },
   live: { color: '#15803d', fontWeight: '900', fontSize: 10 },
