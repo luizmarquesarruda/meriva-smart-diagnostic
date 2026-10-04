@@ -2,6 +2,7 @@ import { PermissionsAndroid, Platform, Linking } from 'react-native';
 import RNBluetoothClassic from 'react-native-bluetooth-classic';
 import { BluetoothClassicTransport, BluetoothDeviceInfo, listBondedBluetoothDevices } from './bluetoothClassicTransport';
 import { ElmCommandResult, Elm327Session } from './elm327';
+import { discoverSupportedPids } from './pidScanner';
 
 export type BluetoothConnectionStatus =
   | 'BLUETOOTH INDISPONÍVEL'
@@ -27,6 +28,7 @@ export interface RealElmConnection {
   initialization: ElmCommandResult[];
   protocol: string | null;
   ecuProbe: ElmCommandResult;
+  supportedPids: string[];
 }
 
 export async function requestBluetoothPermissions(): Promise<void> {
@@ -104,17 +106,36 @@ export async function createRealElmSession(device: BluetoothDeviceInfo): Promise
 
   try {
     const initialization = await session.initialize();
-    const ecuProbe = await session.executeCommand('010C');
+
+    // Com a chave ligada e motor parado, 010C pode responder 0 rpm,
+    // mas não deve ser o único critério para declarar a ECU viva.
+    const discovery = await discoverSupportedPids(session);
+    const supportedPids = Array.from(
+      new Set(discovery.flatMap((item) => item.supportedPids)),
+    ).sort();
+
+    const discoveryProbe = discovery.find((item) => item.responded);
+    const ecuProbe = discoveryProbe
+      ? {
+          command: discoveryProbe.pid,
+          response: discoveryProbe.response,
+          elapsedMs: discoveryProbe.elapsedMs,
+          status: 'OK' as const,
+          attempt: 1,
+        }
+      : await session.executeCommand('010C');
+
     const probeIsValid =
       ecuProbe.status === 'OK' &&
-      /(?:^|\s)41\s+0C(?:\s|$)/i.test(ecuProbe.response);
+      (discoveryProbe?.responded === true ||
+        /(?:^|\s)41\s+0C(?:\s|$)/i.test(ecuProbe.response));
 
     if (!probeIsValid) {
       await session.close();
       throw new Error(
         ecuProbe.response
-          ? `ECU NÃO RESPONDEU AO 010C: ${ecuProbe.response.trim()}`
-          : 'ECU NÃO RESPONDEU AO 010C',
+          ? `ECU NÃO RESPONDEU AOS PIDs DE DESCOBERTA: ${ecuProbe.response.trim()}`
+          : 'ECU NÃO RESPONDEU AOS PIDs DE DESCOBERTA',
       );
     }
 
@@ -123,6 +144,7 @@ export async function createRealElmSession(device: BluetoothDeviceInfo): Promise
       initialization,
       protocol: session.getProtocol(),
       ecuProbe,
+      supportedPids,
     };
   } catch (cause) {
     try {
