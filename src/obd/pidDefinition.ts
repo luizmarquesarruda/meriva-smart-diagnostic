@@ -21,6 +21,7 @@ export const PID_DATABASE: Record<string, PidDefinition> = {
   '010F': { pid: '010F', name: 'Intake Air Temperature', bytes: 1, unit: '°C', formula: ([a]) => a - 40, classification: 'PADRAO_OBD', description: 'Temperatura do ar de admissão' },
   '0110': { pid: '0110', name: 'MAF', bytes: 2, unit: 'g/s', formula: ([a, b]) => ((a * 256) + b) / 100, classification: 'PADRAO_OBD', description: 'Fluxo de ar; kg/h = g/s × 3,6' },
   '0111': { pid: '0111', name: 'Throttle Position', bytes: 1, unit: '%', formula: ([a]) => (a * 100) / 255, classification: 'PADRAO_OBD', description: 'Posição relativa da borboleta' },
+  '012F': { pid: '012F', name: 'Fuel Tank Level Input', bytes: 1, unit: '%', formula: ([a]) => (a * 100) / 255, classification: 'PADRAO_OBD', description: 'Nível de combustível informado pela ECU; usar como fonte da boia somente quando a ECU responder validamente' },
   '0131': { pid: '0131', name: 'Distance Since DTC Clear', bytes: 2, unit: 'km', formula: ([a, b]) => (a * 256) + b, classification: 'PADRAO_OBD', description: 'Distância desde limpeza dos DTCs' },
   '0142': { pid: '0142', name: 'ECU Voltage', bytes: 2, unit: 'V', formula: ([a, b]) => ((a * 256) + b) / 1000, classification: 'PADRAO_OBD', description: 'Tensão informada pela ECU' },
   '015E': { pid: '015E', name: 'Engine Fuel Rate', bytes: 2, unit: 'L/h', formula: ([a, b]) => ((a * 256) + b) / 20, classification: 'PADRAO_OBD', description: 'Taxa de combustível calculada pela ECU; permite integrar litros usados quando suportada' },
