@@ -111,9 +111,10 @@ export async function createRealElmSession(device: BluetoothDeviceInfo): Promise
     // 010C funciona com a chave ligada mesmo com motor parado e evita
     // bombardear a ECU com vários blocos de descoberta antes do primeiro OK.
     const ecuProbe = await session.executeCommand('010C');
+    const normalizedProbeResponse = ecuProbe.response.replace(/\s+/g, '').toUpperCase();
     const probeIsValid =
       ecuProbe.status === 'OK' &&
-      /(?:^|\\s)41\\s+0C(?:\\s|$)/i.test(ecuProbe.response);
+      /^41(?:0C)/.test(normalizedProbeResponse);
 
     if (!probeIsValid) {
       await session.close();
