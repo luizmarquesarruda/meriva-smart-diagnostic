@@ -9,11 +9,20 @@ import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
 import type { ObdConnectionState } from '../src/meriva/autosaveState';
 import { gpsTracker, type GpsTripState } from '../src/gps';
 import { ensureMerivaVehicleProfile } from '../src/database/vehicleConfig';
+import { readAppSettings, type AppSettings } from '../src/database/appSettings';
 
 function formatDistance(km: number): string {
   if (!Number.isFinite(km) || km < 0) return 'N/D';
   if (km < 1) return `${Math.round(km * 1000)} m`;
   return `${km.toFixed(2)} km`;
+}
+
+function formatDistanceForUnit(km: number, unit: AppSettings['distanceUnit']): string {
+  if (unit === 'MI') {
+    if (!Number.isFinite(km) || km < 0) return 'N/D';
+    return `${(km * 0.621371).toFixed(2)} mi`;
+  }
+  return formatDistance(km);
 }
 
 function formatTime(iso: string | null): string {
@@ -31,11 +40,13 @@ export default function IndexScreen() {
   const [saveStatus, setSaveStatus] = useState<AutoSaveStatus>({ lastSavedAt: null, lastSaveReason: null, lastError: null });
   const [isHydrated, setIsHydrated] = useState(false);
   const [gpsState, setGpsState] = useState<GpsTripState>(gpsTracker.getState());
+  const [settings, setSettings] = useState<AppSettings | null>(null);
   useEffect(() => gpsTracker.subscribe(setGpsState), []);
 
   const reloadStoredState = useCallback(async () => {
     const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
     try {
+      setSettings(await readAppSettings(basePath));
       const restored = await initAutoSave(basePath);
       await initializeDriveCycles(basePath);
       await ensureMerivaVehicleProfile(basePath);
@@ -96,31 +107,31 @@ export default function IndexScreen() {
           </View>
           <View style={styles.gpsGrid}>
             <View style={styles.gpsMetric}><Text style={styles.metricLabel}>VELOCIDADE</Text><Text style={styles.gpsSpeed}>{gpsState.currentSpeedKmh.toFixed(1)} km/h</Text></View>
-            <View style={styles.gpsMetric}><Text style={styles.metricLabel}>DISTÂNCIA</Text><Text style={styles.metricValue}>{formatDistance(gpsState.distanceKm)}</Text></View>
+            <View style={styles.gpsMetric}><Text style={styles.metricLabel}>DISTÂNCIA</Text><Text style={styles.metricValue}>{formatDistanceForUnit(gpsState.distanceKm, settings?.distanceUnit ?? 'KM')}</Text></View>
             <View style={styles.gpsMetric}><Text style={styles.metricLabel}>MÁXIMA</Text><Text style={styles.metricValue}>{gpsState.maxSpeedKmh.toFixed(1)} km/h</Text></View>
             <View style={styles.gpsMetric}><Text style={styles.metricLabel}>PRECISÃO</Text><Text style={styles.metricValue}>{gpsState.lastAccuracyM == null ? 'N/D' : `${gpsState.lastAccuracyM.toFixed(0)} m`}</Text></View>
           </View>
           <Text style={styles.gpsHelp}>GPS inicia automaticamente ao abrir o aplicativo. Velocidade e distância vêm do celular. O GPS não mede litros consumidos sozinho.</Text>
-          <Text style={styles.fuelInfo}>COMBUSTÍVEL: aguardando taxa real da ECU (PID 015E).</Text>
+          <Text style={styles.fuelInfo}>COMBUSTÍVEL: {settings?.fuelType === 'GASOLINA' ? 'GASOLINA' : 'ETANOL'} • taxa real da ECU (PID 015E).</Text>
           <Text style={styles.fuelInfo}>O GPS mede distância e velocidade. Litros só entram quando a ECU fornecer L/h válido.</Text>
           {gpsState.error ? <Text style={styles.gpsError}>{gpsState.error}</Text> : null}
         </View>
 
         <View style={styles.summaryGrid}>
           <View style={styles.metricCard}><Text style={styles.metricLabel}>CICLOS REAIS</Text><Text style={styles.metricValue}>{summary.realCycleCount}</Text></View>
-          <View style={styles.metricCard}><Text style={styles.metricLabel}>DISTÂNCIA REAL</Text><Text style={styles.metricValue}>{formatDistance(summary.totalDistanceKm)}</Text></View>
+          <View style={styles.metricCard}><Text style={styles.metricLabel}>DISTÂNCIA REAL</Text><Text style={styles.metricValue}>{formatDistanceForUnit(summary.totalDistanceKm, settings?.distanceUnit ?? 'KM')}</Text></View>
           <View style={styles.metricCard}><Text style={styles.metricLabel}>CONSUMO REAL</Text><Text style={styles.metricValue}>{summary.avgConsumptionKml.toFixed(2)} km/L</Text></View>
           <View style={styles.metricCard}><Text style={styles.metricLabel}>MÉDIA REAL</Text><Text style={styles.metricValue}>{summary.avgSpeedKmh.toFixed(1)} km/h</Text></View>
         </View>
 
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>ÚLTIMO CICLO</Text>
-          {summary.lastRealCycle ? <><Text style={styles.row}><Text style={styles.label}>Início:</Text> {summary.lastRealCycle.startedAt}</Text><Text style={styles.row}><Text style={styles.label}>Fim:</Text> {summary.lastRealCycle.finishedAt}</Text><Text style={styles.row}><Text style={styles.label}>Distância:</Text> {formatDistance(summary.lastRealCycle.distanceTotalKm)}</Text><Text style={styles.row}><Text style={styles.label}>Consumo:</Text> {summary.lastRealCycle.avgFuelConsumptionKml.toFixed(3)} km/L</Text><View style={styles.sourceRow}><Text style={styles.row}><Text style={styles.label}>Fonte:</Text> {summary.lastRealCycle.source}</Text><Text style={summary.lastRealCycle.source === 'REAL_OBD' ? styles.sourceReal : styles.sourceRef}>{summary.lastRealCycle.source === 'REAL_OBD' ? 'REAL' : 'REFERÊNCIA'}</Text></View></> : <Text style={styles.empty}>Sem ciclos carregados.</Text>}
+          {summary.lastRealCycle ? <><Text style={styles.row}><Text style={styles.label}>Início:</Text> {summary.lastRealCycle.startedAt}</Text><Text style={styles.row}><Text style={styles.label}>Fim:</Text> {summary.lastRealCycle.finishedAt}</Text><Text style={styles.row}><Text style={styles.label}>Distância:</Text> {formatDistanceForUnit(summary.lastRealCycle.distanceTotalKm, settings?.distanceUnit ?? 'KM')}</Text><Text style={styles.row}><Text style={styles.label}>Consumo:</Text> {summary.lastRealCycle.avgFuelConsumptionKml.toFixed(3)} km/L</Text><View style={styles.sourceRow}><Text style={styles.row}><Text style={styles.label}>Fonte:</Text> {summary.lastRealCycle.source}</Text><Text style={summary.lastRealCycle.source === 'REAL_OBD' ? styles.sourceReal : styles.sourceRef}>{summary.lastRealCycle.source === 'REAL_OBD' ? 'REAL' : 'REFERÊNCIA'}</Text></View></> : <Text style={styles.empty}>Sem ciclos carregados.</Text>}
         </View>
 
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>HISTÓRICO</Text><Text style={styles.historyNote}>Referências Car Scanner: {summary.referenceCycleCount}. Elas não entram nas métricas reais.</Text>
-          {cycles.map((cycle) => <View key={cycle.id} style={styles.historyItem}><View style={styles.historyHeader}><Text style={styles.historyDate}>{cycle.startedAt}</Text><Text style={cycle.source === 'REAL_OBD' ? styles.sourceReal : styles.sourceRef}>{cycle.source === 'REAL_OBD' ? 'REAL' : 'REFERÊNCIA'}</Text></View><Text style={styles.historyMeta}>{formatDistance(cycle.distanceTotalKm)} • {cycle.avgFuelConsumptionKml.toFixed(3)} km/L</Text></View>)}
+          {cycles.map((cycle) => <View key={cycle.id} style={styles.historyItem}><View style={styles.historyHeader}><Text style={styles.historyDate}>{cycle.startedAt}</Text><Text style={cycle.source === 'REAL_OBD' ? styles.sourceReal : styles.sourceRef}>{cycle.source === 'REAL_OBD' ? 'REAL' : 'REFERÊNCIA'}</Text></View><Text style={styles.historyMeta}>{formatDistanceForUnit(cycle.distanceTotalKm, settings?.distanceUnit ?? 'KM')} • {cycle.avgFuelConsumptionKml.toFixed(3)} km/L</Text></View>)}
         </View>
 
         <Link href="/laboratorio" asChild><TouchableOpacity style={styles.button}><Text style={styles.buttonText}>LABORATÓRIO OBD</Text></TouchableOpacity></Link>
