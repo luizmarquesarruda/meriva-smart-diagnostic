@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import { checkStorageQuota, getStorageBreakdown, StorageQuotaConfig } from '../src/storage/quotaManager';
 import { cleanupOldLogs, cleanupOldReadings } from '../src/storage/cleanup';
+import { getMidLayout } from '../src/ui/midLayout';
 
 const DEFAULT_QUOTA: StorageQuotaConfig = {
   limitMb: 2048,
@@ -12,6 +13,8 @@ const DEFAULT_QUOTA: StorageQuotaConfig = {
 };
 
 export default function ArmazenamentoScreen() {
+  const windowSize = useWindowDimensions();
+  const layout = getMidLayout(windowSize);
   const [basePath, setBasePath] = useState<string | null>(null);
   const [quota, setQuota] = useState<{ warning: boolean; critical: boolean; message: string } | null>(null);
   const [usageBreakdown, setUsageBreakdown] = useState<Record<string, number>>({});
@@ -52,7 +55,7 @@ export default function ArmazenamentoScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>\n      <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
       <Text style={styles.title}>ARMAZENAMENTO</Text>
       <Text style={[styles.status, quota?.critical ? styles.critical : quota?.warning ? styles.warning : styles.ok]}>
         {quota?.message || 'VERIFICANDO'}
@@ -72,7 +75,7 @@ export default function ArmazenamentoScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, padding: 20, backgroundColor: '#eef3fb' },
+  container: { flexGrow: 1, paddingVertical: 16, backgroundColor: '#eef3fb' },
   title: { fontSize: 24, fontWeight: '700', color: '#1f2937', marginBottom: 16 },
   status: { fontWeight: '700', marginBottom: 16 },
   ok: { color: '#16a34a' },
