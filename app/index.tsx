@@ -4,7 +4,7 @@ import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } fr
 import * as FileSystem from 'expo-file-system';
 import { readDriveCycles, initializeDriveCycles } from '../src/storage/driveCycleStorage';
 import { getDriveCycleSummary, type DriveCycle } from '../src/data/driveCycles';
-import { getAutoSaveStatus, initAutoSave, updateAutoSaveState } from '../src/meriva/autosaveManager';
+import { getAutoSaveState, getAutoSaveStatus, initAutoSave, updateAutoSaveState } from '../src/meriva/autosaveManager';
 import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
 import type { ObdConnectionState } from '../src/meriva/autosaveState';
 import { gpsTracker, type GpsTripState } from '../src/gps';
@@ -41,7 +41,19 @@ export default function IndexScreen() {
   const [isHydrated, setIsHydrated] = useState(false);
   const [gpsState, setGpsState] = useState<GpsTripState>(gpsTracker.getState());
   const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [fuelLevelPercent, setFuelLevelPercent] = useState<number | null>(null);
   useEffect(() => gpsTracker.subscribe(setGpsState), []);
+  useEffect(() => {
+    const syncFuelLevel = () => {
+      const reading = getAutoSaveState().lastReadings.find((item) => item.pid === '012F');
+      setFuelLevelPercent(
+        reading?.value != null && reading.value >= 0 && reading.value <= 100 ? reading.value : null,
+      );
+    };
+    syncFuelLevel();
+    const timer = setInterval(syncFuelLevel, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const reloadStoredState = useCallback(async () => {
     const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
@@ -80,6 +92,11 @@ export default function IndexScreen() {
   );
 
   const summary = useMemo(() => getDriveCycleSummary(cycles), [cycles]);
+  const realConsumptionKml = summary.avgConsumptionKml > 0 ? summary.avgConsumptionKml : null;
+  const fuelLiters = fuelLevelPercent == null ? null : (56 * fuelLevelPercent) / 100;
+  const autonomyKm = fuelLiters != null && realConsumptionKml != null
+    ? fuelLiters * realConsumptionKml
+    : null;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -107,17 +124,21 @@ export default function IndexScreen() {
           </View>
           <View style={styles.autonomyCard}>
             <Text style={styles.autonomyLabel}>AUTONOMIA</Text>
-            <Text style={styles.autonomyValue}>N/D</Text>
+            <Text style={styles.autonomyValue}>{autonomyKm == null ? 'N/D' : Math.round(autonomyKm)}</Text>
             <Text style={styles.autonomyUnit}>km restantes</Text>
-            <Text style={styles.autonomyHelp}>A autonomia só é exibida quando houver combustível restante confiável. O aplicativo não usa a boia como fonte de diagnóstico.</Text>
+            <Text style={styles.autonomyHelp}>
+              {fuelLevelPercent == null
+                ? 'Aguardando nível de combustível real da ECU (PID 012F).'
+                : `${fuelLevelPercent.toFixed(1)}% da boia • ${fuelLiters?.toFixed(1)} L estimados de 56 L.`}
+            </Text>
           </View>
           <View style={styles.gpsGrid}>
             <View style={styles.gpsMetric}><Text style={styles.metricLabel}>DISTÂNCIA</Text><Text style={styles.metricValue}>{formatDistanceForUnit(gpsState.distanceKm, settings?.distanceUnit ?? 'KM')}</Text></View>
             <View style={styles.gpsMetric}><Text style={styles.metricLabel}>PRECISÃO</Text><Text style={styles.metricValue}>{gpsState.lastAccuracyM == null ? 'N/D' : `${gpsState.lastAccuracyM.toFixed(0)} m`}</Text></View>
           </View>
           <Text style={styles.gpsHelp}>GPS inicia automaticamente. Velocidade continua sendo usada internamente para cálculos, mas não é mostrada na tela principal.</Text>
-          <Text style={styles.fuelInfo}>COMBUSTÍVEL: {settings?.fuelType === 'GASOLINA' ? 'GASOLINA' : 'ETANOL'} • taxa real da ECU (PID 015E).</Text>
-          <Text style={styles.fuelInfo}>O GPS mede distância e velocidade. Litros só entram quando a ECU fornecer L/h válido.</Text>
+          <Text style={styles.fuelInfo}>COMBUSTÍVEL: {settings?.fuelType === 'GASOLINA' ? 'GASOLINA' : 'ETANOL'} • boia real via PID 012F quando a ECU suportar.</Text>
+          <Text style={styles.fuelInfo}>Autonomia = nível da boia × tanque de 56 L × consumo real aprendido. Sem dado real, o app mostra N/D.</Text>
           {gpsState.error ? <Text style={styles.gpsError}>{gpsState.error}</Text> : null}
         </View>
 
