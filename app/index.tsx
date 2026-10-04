@@ -129,7 +129,7 @@ export default function IndexScreen() {
             <Text style={styles.autonomyHelp}>
               {fuelLevelPercent == null
                 ? 'Aguardando nível de combustível real da ECU (PID 012F).'
-                : `${fuelLevelPercent.toFixed(1)}% da boia • ${fuelLiters?.toFixed(1)} L estimados de 56 L.`}
+                : `${fuelLevelPercent.toFixed(1)}% do nível de combustível ECU • ${fuelLiters?.toFixed(1)} L estimados de 56 L.`}
             </Text>
           </View>
           <View style={styles.gpsGrid}>
@@ -137,8 +137,8 @@ export default function IndexScreen() {
             <View style={styles.gpsMetric}><Text style={styles.metricLabel}>PRECISÃO</Text><Text style={styles.metricValue}>{gpsState.lastAccuracyM == null ? 'N/D' : `${gpsState.lastAccuracyM.toFixed(0)} m`}</Text></View>
           </View>
           <Text style={styles.gpsHelp}>GPS inicia automaticamente. Velocidade continua sendo usada internamente para cálculos, mas não é mostrada na tela principal.</Text>
-          <Text style={styles.fuelInfo}>COMBUSTÍVEL: {settings?.fuelType === 'GASOLINA' ? 'GASOLINA' : 'ETANOL'} • boia real via PID 012F quando a ECU suportar.</Text>
-          <Text style={styles.fuelInfo}>Autonomia = nível da boia × tanque de 56 L × consumo real aprendido. Sem dado real, o app mostra N/D.</Text>
+          <Text style={styles.fuelInfo}>COMBUSTÍVEL: {settings?.fuelType === 'GASOLINA' ? 'GASOLINA' : 'ETANOL'} • nível real da ECU via PID 012F quando a ECU suportar.</Text>
+          <Text style={styles.fuelInfo}>Autonomia = nível do nível de combustível ECU × tanque de 56 L × consumo real aprendido. Sem dado real, o app mostra N/D.</Text>
           {gpsState.error ? <Text style={styles.gpsError}>{gpsState.error}</Text> : null}
         </View>
 
