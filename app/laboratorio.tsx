@@ -52,6 +52,7 @@ export default function LaboratorioScreen() {
   const [tripActive, setTripActive] = useState(false);
   const [tripFuelSupported, setTripFuelSupported] = useState<boolean | null>(null);
   const [fuelLevelPercent, setFuelLevelPercent] = useState<number | null>(null);
+  const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const sessionRef = useRef<Elm327Session | null>(null);
   const autoSaveReadyRef = useRef(false);
 
@@ -350,14 +351,17 @@ export default function LaboratorioScreen() {
       <Text style={styles.protocol}>PROTOCOLO: {protocol}</Text>
       {!storageReady ? <Text style={styles.warning}>PREPARANDO AUTOSAVE...</Text> : null}
       <View style={styles.tripPanel}>
-        <Text style={styles.tripTitle}>VIAGEM AUTOMÁTICA</Text>
-        <Text style={styles.tripLine}>STATUS: {tripActive ? 'GRAVANDO' : 'AGUARDANDO OBD'}</Text>
-        <Text style={styles.tripLine}>PID 015E: {tripFuelSupported === null ? 'N/D' : tripFuelSupported ? 'SUPORTADO' : 'NÃO SUPORTADO'}</Text>
-        <Text style={styles.tripLine}>NÍVEL DE COMBUSTÍVEL ECU / PID 012F: {fuelLevelPercent == null ? 'N/D' : `${fuelLevelPercent.toFixed(1)}%`}</Text>
-        <Text style={styles.tripLine}>DISTÂNCIA GPS: {tripDistanceKm.toFixed(3)} km</Text>
-        <Text style={styles.tripLine}>COMBUSTÍVEL REAL: {tripFuelUsedL.toFixed(6)} L</Text>
-        <Text style={styles.tripLine}>CONSUMO: {tripConsumptionKml == null ? 'N/D' : `${tripConsumptionKml.toFixed(3)} km/L`}</Text>
-        <Text style={styles.tripHelp}>A viagem é criada sem botão iniciar. O ciclo junta GPS + PID 015E e salva somente dados reais válidos.</Text>
+        <View style={styles.tripHeader}>
+          <Text style={styles.tripTitle}>VIAGEM AUTOMÁTICA</Text>
+          <Text style={tripActive ? styles.live : styles.muted}>{tripActive ? 'GRAVANDO' : 'AGUARDANDO'}</Text>
+        </View>
+        <View style={styles.tripGrid}>
+          <View style={styles.tripMetric}><Text style={styles.tripLabel}>DISTÂNCIA GPS</Text><Text style={styles.tripValue}>{tripDistanceKm.toFixed(2)} km</Text></View>
+          <View style={styles.tripMetric}><Text style={styles.tripLabel}>CONSUMO</Text><Text style={styles.tripValue}>{tripConsumptionKml == null ? 'N/D' : tripConsumptionKml.toFixed(2) + ' km/L'}</Text></View>
+          <View style={styles.tripMetric}><Text style={styles.tripLabel}>COMBUSTÍVEL</Text><Text style={styles.tripValue}>{fuelLevelPercent == null ? 'N/D' : fuelLevelPercent.toFixed(1) + '%'}</Text></View>
+          <View style={styles.tripMetric}><Text style={styles.tripLabel}>PID 015E</Text><Text style={styles.tripValue}>{tripFuelSupported === null ? 'N/D' : tripFuelSupported ? 'OK' : 'NÃO'}</Text></View>
+        </View>
+        <Text style={styles.tripHelp}>Sem botão iniciar. O app registra somente dados reais válidos.</Text>
       </View>
 
       <View style={styles.modeRow}>
@@ -415,19 +419,23 @@ export default function LaboratorioScreen() {
         <Text style={styles.secondaryButtonText}>LER DTC ATUAIS</Text>
       </TouchableOpacity>
 
-      <View style={styles.panel}>
-        <Text style={styles.label}>TX</Text><Text style={styles.value}>{tx || 'SEM DADOS'}</Text>
-        <Text style={styles.label}>RX</Text><Text style={styles.value}>{rx || 'SEM DADOS'}</Text>
-        <Text style={styles.label}>TEMPO</Text><Text style={styles.value}>{elapsedMs === null ? 'SEM DADOS' : `${elapsedMs} ms`}</Text>
-        <Text style={styles.label}>STATUS</Text><Text style={styles.value}>{parsed?.status || 'COMANDO'}</Text>
-        <Text style={styles.label}>VALOR</Text><Text style={styles.value}>{parsed?.value === null || !parsed ? 'SEM DADOS' : `${parsed.value} ${parsed.unit}`}</Text>
-        <Text style={styles.label}>NÍVEL DE COMBUSTÍVEL ECU (PID 012F)</Text><Text style={styles.value}>{fuelLevelPercent == null ? 'N/D' : `${fuelLevelPercent.toFixed(1)} %`}</Text>
-        <Text style={styles.label}>COMBUSTÍVEL INTEGRADO (PID 015E)</Text><Text style={styles.value}>{fuelUsedL.toFixed(6)} L</Text>
-        <Text style={styles.label}>RAW PRESERVADO</Text><Text style={styles.value}>{rx || 'SEM DADOS'}</Text>
-        <Text style={styles.label}>DTC ATUAIS</Text><Text style={styles.value}>{dtcCodes.length ? dtcCodes.join(', ') : 'NENHUM'}</Text>
-        <Text style={styles.label}>PIDs CONHECIDOS SUPORTADOS</Text><Text style={styles.value}>{knownSupported.length ? knownSupported.join(', ') : 'N/D'}</Text>
-        <Text style={styles.label}>TOTAL DE PIDs DESCOBERTOS</Text><Text style={styles.value}>{supportedPids.length}</Text>
-      </View>
+      <TouchableOpacity style={styles.secondaryButton} onPress={() => setShowTechnicalDetails((value) => !value)}>
+        <Text style={styles.secondaryButtonText}>{showTechnicalDetails ? 'OCULTAR DETALHES TÉCNICOS' : 'DETALHES TÉCNICOS'}</Text>
+      </TouchableOpacity>
+
+      {showTechnicalDetails ? (
+        <View style={styles.panel}>
+          <Text style={styles.label}>TX</Text><Text style={styles.value}>{tx || 'SEM DADOS'}</Text>
+          <Text style={styles.label}>RX RAW</Text><Text style={styles.value}>{rx || 'SEM DADOS'}</Text>
+          <Text style={styles.label}>TEMPO</Text><Text style={styles.value}>{elapsedMs === null ? 'SEM DADOS' : elapsedMs + ' ms'}</Text>
+          <Text style={styles.label}>STATUS</Text><Text style={styles.value}>{parsed?.status || 'COMANDO'}</Text>
+          <Text style={styles.label}>VALOR</Text><Text style={styles.value}>{parsed?.value === null || !parsed ? 'SEM DADOS' : parsed.value + ' ' + parsed.unit}</Text>
+          <Text style={styles.label}>COMBUSTÍVEL INTEGRADO (PID 015E)</Text><Text style={styles.value}>{fuelUsedL.toFixed(6)} L</Text>
+          <Text style={styles.label}>DTC ATUAIS</Text><Text style={styles.value}>{dtcCodes.length ? dtcCodes.join(', ') : 'NENHUM'}</Text>
+          <Text style={styles.label}>PIDs CONHECIDOS SUPORTADOS</Text><Text style={styles.value}>{knownSupported.length ? knownSupported.join(', ') : 'N/D'}</Text>
+          <Text style={styles.label}>TOTAL DE PIDs DESCOBERTOS</Text><Text style={styles.value}>{supportedPids.length}</Text>
+        </View>
+      ) : null}
 
       {!!error && <Text style={styles.error}>{error}</Text>}
       </View>
@@ -454,10 +462,16 @@ const styles = StyleSheet.create({
   deviceName: { fontWeight: '700', color: '#1f2937' },
   warning: { color: '#b45309', marginBottom: 12 },
   input: { backgroundColor: '#fff', borderColor: '#cbd5e1', borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 12, color: '#0f172a' },
-  tripPanel: { backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#cbd5e1' },
-  tripTitle: { color: '#1f2937', fontWeight: '800', fontSize: 16, marginBottom: 6 },
-  tripLine: { color: '#334155', marginTop: 3 },
-  tripHelp: { color: '#64748b', fontSize: 12, marginTop: 8 },
+  tripPanel: { backgroundColor: '#fff', borderRadius: 10, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#cbd5e1' },
+  tripHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  tripTitle: { color: '#1f2937', fontWeight: '900', fontSize: 14 },
+  tripGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  tripMetric: { width: '48%', marginBottom: 8 },
+  tripLabel: { color: '#64748b', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+  tripValue: { color: '#1f2937', fontWeight: '800', fontSize: 16, marginTop: 2 },
+  live: { color: '#15803d', fontWeight: '900', fontSize: 10 },
+  muted: { color: '#64748b', fontWeight: '900', fontSize: 10 },
+  tripHelp: { color: '#64748b', fontSize: 11, marginTop: 2 },
   panel: { backgroundColor: '#1f2937', borderRadius: 14, padding: 16, marginTop: 8 },
   label: { color: '#93c5fd', marginTop: 8 },
   value: { color: '#f8fafc', fontSize: 16, marginTop: 3 },
