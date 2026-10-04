@@ -1,5 +1,4 @@
 import * as FileSystem from 'expo-file-system';
-import { MERIVA_BIBLE_SOURCE, MERIVA_TECHNICAL_PROFILE } from './merivaBible';
 
 export interface VehicleProfile {
   vehicleName: string;
@@ -12,11 +11,6 @@ export interface VehicleProfile {
   lastModified: string;
   protocolBaseline: string;
   ecuAddress?: string;
-  technicalSource?: string;
-  engineFamily?: string;
-  fuelType?: string;
-  applicationCode?: string;
-  ecuReferences?: string[];
 }
 
 export async function createVehicleProfile(basePath: string, profile: VehicleProfile): Promise<void> {
@@ -29,6 +23,7 @@ export async function readVehicleProfile(basePath: string): Promise<VehicleProfi
   const target = `${basePath}/CONFIG/veiculo.json`;
   const info = await FileSystem.getInfoAsync(target);
   if (!info.exists || info.isDirectory) return null;
+
   try {
     const content = await FileSystem.readAsStringAsync(target);
     const parsed = JSON.parse(content) as Partial<VehicleProfile>;
@@ -50,38 +45,23 @@ export async function readVehicleProfile(basePath: string): Promise<VehicleProfi
   }
 }
 
-export async function ensureMerivaBibleProfile(basePath: string): Promise<VehicleProfile> {
+export async function ensureMerivaVehicleProfile(basePath: string): Promise<VehicleProfile> {
   const existing = await readVehicleProfile(basePath);
   const now = new Date().toISOString();
 
-  const bibleFields: Pick<VehicleProfile, 'technicalSource' | 'engineFamily' | 'fuelType' | 'applicationCode' | 'ecuReferences'> = {
-    technicalSource: MERIVA_BIBLE_SOURCE.name,
-    engineFamily: MERIVA_TECHNICAL_PROFILE.engine,
-    fuelType: MERIVA_TECHNICAL_PROFILE.fuel,
-    applicationCode: MERIVA_TECHNICAL_PROFILE.application,
-    ecuReferences: [...MERIVA_TECHNICAL_PROFILE.ecuReferences],
-  };
-
   if (existing) {
-    const merged: VehicleProfile = {
-      ...existing,
-      ...bibleFields,
-      lastModified: now,
-    };
-    await createVehicleProfile(basePath, merged);
-    return merged;
+    return existing;
   }
 
   const profile: VehicleProfile = {
     vehicleName: 'Meriva Maxx',
     year: 2012,
-    make: MERIVA_TECHNICAL_PROFILE.make,
-    model: MERIVA_TECHNICAL_PROFILE.model,
-    engine: MERIVA_TECHNICAL_PROFILE.engine,
+    make: 'Chevrolet',
+    model: 'Meriva Maxx',
+    engine: '1.4 MPFI 8V ECONOFLEX',
     createdAt: now,
     lastModified: now,
     protocolBaseline: 'NÃO CONFIRMADO',
-    ...bibleFields,
   };
 
   await createVehicleProfile(basePath, profile);
