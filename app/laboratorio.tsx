@@ -430,6 +430,7 @@ export default function LaboratorioScreen() {
       </View>
 
       {!!error && <Text style={styles.error}>{error}</Text>}
+      </View>
     </ScrollView>
   );
 }
