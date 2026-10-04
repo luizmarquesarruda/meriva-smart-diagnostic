@@ -86,6 +86,27 @@ A base agora cobre PIDs padrão úteis, incluindo velocidade, RPM, temperatura, 
 
 O PID 015E representa taxa de combustível em L/h quando suportado pela ECU. O aplicativo integra essa taxa ao longo do tempo usando os intervalos entre amostras, ignorando amostras inválidas e intervalos excessivamente longos. A disponibilidade e a exatidão devem ser confirmadas na ECU real da Meriva antes de usar o resultado como medição de consumo.
 
+## Identificação de combustível
+
+A versão de validação passou a reconhecer os PIDs padrão **0151 (Fuel Type)** e **0152 (Alcohol Fuel Percentage)**.
+
+- **0151**: identifica o tipo de combustível declarado pela ECU. Não deve ser tratado como leitura da mistura atual do tanque.
+- **0152**: quando suportado e respondido validamente, informa o percentual de álcool fornecido pela ECU.
+- O aplicativo **não estima** a mistura usando STFT, LTFT, lambda, MAF ou consumo.
+- Respostas TX/RX continuam sendo preservadas para conferência.
+- Um valor fora da faixa de 0–100% é marcado como incoerente e não é usado.
+- A Meriva real ainda precisa responder aos PIDs para que eles sejam considerados **confirmados para este veículo**.
+
+O módulo src/obd/fuelIdentification.ts é deliberadamente conservador. Ele separa TIPO_VEICULO, COMPOSICAO_ECU, SEM_DADOS e DADO_INCOERENTE. Não altera a tela principal nem declara automaticamente o combustível até haver evidência real suficiente.
+
+### Critério para avançar
+
+1. Consultar 0151 e 0152 na ECU real da Meriva.
+2. Registrar várias respostas reais, incluindo TX/RX e protocolo.
+3. Verificar estabilidade e coerência dos valores.
+4. Só depois considerar qualquer uso do resultado no diagnóstico ou na autonomia.
+5. Se a ECU não suportar os PIDs, manter a funcionalidade como investigação e não substituir por uma estimativa silenciosa.
+
 ## Persistência
 
 O aplicativo mantém CONFIG, BANCO, LEITURAS, APRENDIZADO, DTC, LOGS, VIAGENS e BACKUP.
