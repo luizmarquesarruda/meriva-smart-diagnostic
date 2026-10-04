@@ -66,8 +66,7 @@ export default function RootLayout() {
       }
     };
 
-    const startGps = async (autoStartGps: boolean, diagnosticAlerts: boolean) => {
-      if (!autoStartGps) return;
+    const startGps = async (diagnosticAlerts: boolean) => {
       if (gpsChecking.current) return;
       gpsChecking.current = true;
       try {
@@ -101,7 +100,7 @@ export default function RootLayout() {
           settings.diagnosticAlerts,
           settings.selectedAdapterAddress,
         ),
-        startGps(settings.autoStartGps, settings.diagnosticAlerts),
+        startGps(settings.diagnosticAlerts),
       ]);
     };
 
