@@ -13,21 +13,21 @@ export interface DiscoveryItem {
 }
 
 export function decodeSupportedPids(requestedPid: string, response: string): string[] {
-  const normalized = requestedPid.replace(/\s/g, '').toUpperCase();
+  const normalized = requestedPid.replace(/\\s/g, '').toUpperCase();
   if (!/^01(?:00|20|40|60)$/.test(normalized) || !validateOBDResponse(response)) return [];
 
-  const bytes = response.toUpperCase().match(/[0-9A-F]{2}/g) ?? [];
-  const headerIndex = bytes.findIndex(
-    (byte, index) =>
-      byte === '41' &&
-      bytes[index + 1] === normalized.slice(-2),
-  );
+  const stream = response.replace(/[^0-9A-F]/gi, '').toUpperCase();
+  const marker = `41${normalized.slice(-2)}`;
+  const headerIndex = stream.indexOf(marker);
   if (headerIndex < 0) return [];
 
-  const bitmap = bytes
-    .slice(headerIndex + 2, headerIndex + 6)
-    .map((value) => Number.parseInt(value, 16));
-  if (bitmap.length !== 4) return [];
+  const bitmapHex = stream.slice(headerIndex + marker.length, headerIndex + marker.length + 8);
+  if (bitmapHex.length !== 8 || !/^[0-9A-F]{8}$/.test(bitmapHex)) return [];
+
+  const bitmap = [];
+  for (let index = 0; index < bitmapHex.length; index += 2) {
+    bitmap.push(Number.parseInt(bitmapHex.slice(index, index + 2), 16));
+  }
 
   const startPid = Number.parseInt(normalized.slice(-2), 16) + 1;
   const supported: string[] = [];
@@ -35,11 +35,20 @@ export function decodeSupportedPids(requestedPid: string, response: string): str
     for (let bit = 7; bit >= 0; bit--) {
       if ((bitmap[byteIndex] & (1 << bit)) !== 0) {
         const pidNumber = startPid + byteIndex * 8 + (7 - bit);
-        if (pidNumber <= startPid + 31) supported.push(`01${pidNumber.toString(16).padStart(2, '0').toUpperCase()}`);
+        if (pidNumber <= startPid + 31) {
+          supported.push(`01${pidNumber.toString(16).padStart(2, '0').toUpperCase()}`);
+        }
       }
     }
   }
   return supported;
+}
+
+function nextDiscoveryPid(previousPid: string, supportedPids: string[]): string | null {
+  const index = DISCOVERY_PIDS.indexOf(previousPid);
+  if (index < 0 || index === DISCOVERY_PIDS.length - 1) return null;
+  const nextPid = DISCOVERY_PIDS[index + 1];
+  return supportedPids.includes(nextPid) ? nextPid : null;
 }
 
 export async function discoverSupportedPids(
@@ -47,17 +56,32 @@ export async function discoverSupportedPids(
   pids: string[] = DISCOVERY_PIDS,
 ): Promise<DiscoveryItem[]> {
   const result: DiscoveryItem[] = [];
-  for (const pid of pids) {
+  let nextPid: string | null = pids[0] ?? null;
+
+  while (nextPid) {
+    const pid = nextPid;
     const started = Date.now();
+
     try {
       const reply = await session.executeCommand(pid);
-      result.push({
+      const supportedPids = decodeSupportedPids(pid, reply.response);
+      const item: DiscoveryItem = {
         pid,
         response: reply.response,
         responded: reply.status === 'OK' && validateOBDResponse(reply.response),
         elapsedMs: reply.elapsedMs || Date.now() - started,
-        supportedPids: decodeSupportedPids(pid, reply.response),
-      });
+        supportedPids,
+      };
+      result.push(item);
+
+      if (pids !== DISCOVERY_PIDS) {
+        const currentIndex = pids.indexOf(pid);
+        nextPid = currentIndex >= 0 && currentIndex + 1 < pids.length
+          ? pids[currentIndex + 1]
+          : null;
+      } else {
+        nextPid = nextDiscoveryPid(pid, supportedPids);
+      }
     } catch {
       result.push({
         pid,
@@ -66,7 +90,9 @@ export async function discoverSupportedPids(
         elapsedMs: Date.now() - started,
         supportedPids: [],
       });
+      break;
     }
   }
+
   return result;
 }
