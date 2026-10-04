@@ -29,7 +29,7 @@ export function subscribeSharedObd(listener: (connection: SharedObdConnection | 
   return () => listeners.delete(listener);
 }
 
-export async function connectPreferredElm(): Promise<SharedObdConnection> {
+export async function connectPreferredElm(preferredAddress: string | null = null): Promise<SharedObdConnection> {
   if (active) return active;
 
   const devices = await discoverPairedDevices();
@@ -39,7 +39,13 @@ export async function connectPreferredElm(): Promise<SharedObdConnection> {
 
   // Nunca trate um Bluetooth desconhecido como ELM só porque é o único pareado.
   // O nome apenas seleciona candidatos. A prova real continua sendo o PID 010C.
-  const candidates = devices.filter(looksLikeElm327);
+  const preferred = preferredAddress
+    ? devices.find((device) => device.address.toUpperCase() === preferredAddress.toUpperCase())
+    : undefined;
+  const namedCandidates = devices.filter(looksLikeElm327);
+  const candidates = preferred
+    ? [preferred, ...namedCandidates.filter((device) => device.address !== preferred.address)]
+    : namedCandidates;
 
   if (!candidates.length) {
     const names = devices.map((device) => device.name).join(', ');
