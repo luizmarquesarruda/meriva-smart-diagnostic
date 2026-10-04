@@ -1,6 +1,7 @@
 import { Link, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { getMidLayout } from '../src/ui/midLayout';
 import * as FileSystem from 'expo-file-system';
 import { readDriveCycles, initializeDriveCycles } from '../src/storage/driveCycleStorage';
 import { getDriveCycleSummary, type DriveCycle } from '../src/data/driveCycles';
@@ -42,6 +43,8 @@ export default function IndexScreen() {
   const [gpsState, setGpsState] = useState<GpsTripState>(gpsTracker.getState());
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [fuelLevelPercent, setFuelLevelPercent] = useState<number | null>(null);
+  const windowSize = useWindowDimensions();
+  const layout = getMidLayout(windowSize);
   useEffect(() => gpsTracker.subscribe(setGpsState), []);
   useEffect(() => {
     const syncFuelLevel = () => {
@@ -100,7 +103,13 @@ export default function IndexScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
+        <View style={[styles.screenFrame, { width: '100%', maxWidth: layout.maxContentWidth }]}>
+        <View style={[styles.midHeader, { paddingHorizontal: layout.cardPadding }]}>
+          <Text style={styles.midBrand}>CHEVROLET</Text>
+          <Text style={styles.midModel}>MERIVA MAXX 1.4</Text>
+          <Text style={styles.midStatus}>{obd.connected ? 'OBD • ONLINE' : 'OBD • AGUARDANDO'}</Text>
+        </View>
         <View style={styles.card}>
           <Text style={styles.title}>MERIVA SMART</Text>
           <Text style={styles.subtitle}>DIAGNOSTIC</Text>
@@ -161,6 +170,7 @@ export default function IndexScreen() {
         <Link href="/laboratorio" asChild><TouchableOpacity style={styles.button}><Text style={styles.buttonText}>LABORATÓRIO OBD</Text></TouchableOpacity></Link>
         <Link href="/armazenamento" asChild><TouchableOpacity style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>ARMAZENAMENTO</Text></TouchableOpacity></Link>
         <Link href="/configuracoes" asChild><TouchableOpacity style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>CONFIGURAÇÕES</Text></TouchableOpacity></Link>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -169,8 +179,13 @@ export default function IndexScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#eef3fb' },
   content: { flexGrow: 1, padding: 20, paddingBottom: 40 },
-  card: { backgroundColor: '#1f2937', borderRadius: 18, padding: 24, marginBottom: 18 },
-  title: { color: '#dbeafe', fontSize: 28, fontWeight: '700' },
+  screenFrame: { width: '100%' },
+  midHeader: { backgroundColor: '#d9d9d9', borderRadius: 8, borderWidth: 1, borderColor: '#a3a3a3', paddingVertical: 12, marginBottom: 12 },
+  midBrand: { color: '#1557a6', fontSize: 12, fontWeight: '800', letterSpacing: 2, textAlign: 'center' },
+  midModel: { color: '#1557a6', fontSize: 20, fontWeight: '900', letterSpacing: 1, textAlign: 'center', marginTop: 2 },
+  midStatus: { color: '#1557a6', fontSize: 10, fontWeight: '800', letterSpacing: 1, textAlign: 'center', marginTop: 5 },
+  card: { backgroundColor: '#1f2937', borderRadius: 10, padding: 18, marginBottom: 12 },
+  title: { color: '#dbeafe', fontSize: 24, fontWeight: '700' },
   subtitle: { color: '#60a5fa', fontSize: 24, fontWeight: '700', marginBottom: 16 },
   sectionTitleDark: { color: '#93c5fd', fontSize: 12, fontWeight: '700', letterSpacing: 1, marginTop: 8, marginBottom: 4 },
   statusLine: { color: '#e5e7eb', marginTop: 2 },
@@ -182,7 +197,7 @@ const styles = StyleSheet.create({
   gpsMetric: { width: '48%', marginBottom: 10 },
   autonomyCard: { backgroundColor: '#eff6ff', borderRadius: 12, padding: 18, marginBottom: 14, alignItems: 'center', borderWidth: 1, borderColor: '#bfdbfe' },
   autonomyLabel: { color: '#1d4ed8', fontSize: 13, fontWeight: '800', letterSpacing: 1 },
-  autonomyValue: { color: '#1e40af', fontWeight: '800', fontSize: 38, marginTop: 2 },
+  autonomyValue: { color: '#1e40af', fontWeight: '900', fontSize: 40, marginTop: 2, fontVariant: ['tabular-nums'] },
   autonomyUnit: { color: '#475569', fontSize: 13, fontWeight: '600' },
   autonomyHelp: { color: '#64748b', fontSize: 11, textAlign: 'center', marginTop: 8 },
   gpsLive: { color: '#16a34a', fontWeight: '800' },
