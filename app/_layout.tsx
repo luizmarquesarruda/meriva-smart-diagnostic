@@ -3,6 +3,9 @@ import { Alert, AppState, Linking } from 'react-native';
 import { Stack } from 'expo-router';
 import { ensureBluetoothReady, openBluetoothAppSettings } from '../src/obd/bluetoothManager';
 import { gpsTracker } from '../src/gps';
+import { readAppSettings } from '../src/database/appSettings';
+import { connectPreferredElm, disconnectSharedObd } from '../src/obd/sharedConnection';
+import * as FileSystem from 'expo-file-system';
 
 export default function RootLayout() {
   const checking = useRef(false);
@@ -11,12 +14,18 @@ export default function RootLayout() {
   const lastGpsFailureAt = useRef(0);
 
   useEffect(() => {
-    const checkBluetooth = async () => {
+    const loadSettings = async () => readAppSettings(`${FileSystem.documentDirectory}MERIVA_SMART`);
+
+    const checkBluetooth = async (autoConnectObd: boolean) => {
       if (checking.current) return;
       checking.current = true;
 
       try {
         await ensureBluetoothReady();
+        if (autoConnectObd) {
+          const connection = await connectPreferredElm();
+          if (!connection.protocol) throw new Error('ELM RESPONDEU, MAS O PROTOCOLO NÃO FOI IDENTIFICADO.');
+        }
       } catch (cause) {
         const now = Date.now();
         if (now - lastFailureAt.current > 2500) {
@@ -37,7 +46,8 @@ export default function RootLayout() {
       }
     };
 
-    const startGps = async () => {
+    const startGps = async (autoStartGps: boolean) => {
+      if (!autoStartGps) return;
       if (gpsChecking.current) return;
       gpsChecking.current = true;
       try {
@@ -62,8 +72,9 @@ export default function RootLayout() {
     };
 
     const startup = async () => {
-      await checkBluetooth();
-      await startGps();
+      const settings = await loadSettings();
+      await checkBluetooth(settings.autoConnectObd);
+      await startGps(settings.autoStartGps);
     };
 
     void startup();
@@ -75,6 +86,7 @@ export default function RootLayout() {
     return () => {
       subscription.remove();
       void gpsTracker.stop();
+      void disconnectSharedObd();
     };
   }, []);
 
