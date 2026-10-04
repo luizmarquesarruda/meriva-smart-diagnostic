@@ -120,5 +120,18 @@ export default function RootLayout() {
     };
   }, []);
 
-  return <Stack screenOptions={{ headerStyle: { backgroundColor: '#1f2937' }, headerTintColor: '#fff' }} />;
+  return (
+    <Stack
+      screenOptions={{
+        headerStyle: { backgroundColor: '#d9d9d9' },
+        headerTintColor: '#1557a6',
+        headerTitleStyle: { fontWeight: '900' },
+      }}
+    >
+      <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="laboratorio" options={{ title: 'DIAGNÓSTICO OBD' }} />
+      <Stack.Screen name="armazenamento" options={{ title: 'HISTÓRICO E DADOS' }} />
+      <Stack.Screen name="configuracoes" options={{ title: 'CONFIGURAÇÕES' }} />
+    </Stack>
+  );
 }
