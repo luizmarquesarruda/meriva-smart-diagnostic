@@ -273,8 +273,9 @@ export default function LaboratorioScreen() {
       });
 
       setStatus('ELM RESPONDENDO / DESCOBRINDO SUPORTE DOS PIDs');
-      const discovery = await discoverSupportedPids(connection.session);
-      const discovered = Array.from(new Set(discovery.flatMap((item) => item.supportedPids))).sort();
+      // A conexão já fez a descoberta com a chave ligada. Reutilizamos o resultado
+      // para não bombardear a K-Line com uma segunda varredura imediata.
+      const discovered = connection.supportedPids;
       setSupportedPids(discovered);
       const fuelSupported = discovered.includes('015E');
       const fuelLevelSupported = discovered.includes('012F');
