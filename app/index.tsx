@@ -24,6 +24,7 @@ function formatDistance(km: number, unit: AppSettings['distanceUnit']): string {
 export default function IndexScreen() {
   const [cycles, setCycles] = useState<DriveCycle[]>([]);
   const [obd, setObd] = useState<ObdConnectionState>({ connected: false });
+  const [bluetoothSearching, setBluetoothSearching] = useState(false);
   const [saveStatus, setSaveStatus] = useState<AutoSaveStatus>({ lastSavedAt: null, lastSaveReason: null, lastError: null });
   const [isHydrated, setIsHydrated] = useState(false);
   const [gpsState, setGpsState] = useState<GpsTripState>(gpsTracker.getState());
@@ -110,10 +111,10 @@ export default function IndexScreen() {
       }));
     });
 
-    void connectPreferredElm().catch(() => {
-      // Falha silenciosa na tela inicial: o usuário ainda pode abrir
-      // Diagnóstico OBD e tentar novamente. Não mascaramos erro da sessão.
-    });
+    setBluetoothSearching(true);
+    void connectPreferredElm()
+      .then(() => setBluetoothSearching(false))
+      .catch(() => setBluetoothSearching(true));
 
     return () => {
       cancelled = true;
@@ -141,7 +142,9 @@ export default function IndexScreen() {
           <View style={[styles.midHeader, { paddingHorizontal: layout.cardPadding }]}>
             <Text style={styles.midBrand}>CHEVROLET</Text>
             <Text style={styles.midModel}>MERIVA MAXX 1.4</Text>
-            <Text style={styles.midStatus}>{obd.connected ? 'OBD • ONLINE' : 'OBD • AGUARDANDO'}</Text>
+            <Text style={styles.midStatus}>
+              {obd.connected ? 'OBD • ONLINE' : bluetoothSearching ? 'BLUETOOTH • BUSCANDO ELM327' : 'OBD • AGUARDANDO'}
+            </Text>
           </View>
 
           <View style={styles.heroCard}>
