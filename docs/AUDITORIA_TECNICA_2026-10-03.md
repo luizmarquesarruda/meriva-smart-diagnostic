@@ -50,3 +50,4 @@ A auditoria priorizou comportamento real do Android/ELM327 e dados observados. N
 10. Confirmar GPS parado sem aumento artificial de distância.
 11. Rodar alguns minutos e conferir distância em metros/km.
 12. Testar PID 015E somente se anunciado como suportado pela ECU.
+false
