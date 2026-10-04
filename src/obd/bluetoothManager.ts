@@ -26,6 +26,7 @@ export interface RealElmConnection {
   session: Elm327Session;
   initialization: ElmCommandResult[];
   protocol: string | null;
+  ecuProbe: ElmCommandResult;
 }
 
 export async function requestBluetoothPermissions(): Promise<void> {
@@ -100,6 +101,35 @@ export async function discoverPairedDevices(): Promise<BluetoothDeviceInfo[]> {
 export async function createRealElmSession(device: BluetoothDeviceInfo): Promise<RealElmConnection> {
   await ensureBluetoothReady();
   const session = new Elm327Session(new BluetoothClassicTransport(device.address));
-  const initialization = await session.initialize();
-  return { session, initialization, protocol: session.getProtocol() };
+
+  try {
+    const initialization = await session.initialize();
+    const ecuProbe = await session.executeCommand('010C');
+    const probeIsValid =
+      ecuProbe.status === 'OK' &&
+      /(?:^|\s)41\s+0C(?:\s|$)/i.test(ecuProbe.response);
+
+    if (!probeIsValid) {
+      await session.close();
+      throw new Error(
+        ecuProbe.response
+          ? `ECU NÃO RESPONDEU AO 010C: ${ecuProbe.response.trim()}`
+          : 'ECU NÃO RESPONDEU AO 010C',
+      );
+    }
+
+    return {
+      session,
+      initialization,
+      protocol: session.getProtocol(),
+      ecuProbe,
+    };
+  } catch (cause) {
+    try {
+      await session.close();
+    } catch {
+      // preserva o erro original
+    }
+    throw cause;
+  }
 }
