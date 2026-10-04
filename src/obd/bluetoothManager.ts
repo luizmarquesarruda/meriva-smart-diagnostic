@@ -111,10 +111,13 @@ export async function createRealElmSession(device: BluetoothDeviceInfo): Promise
     // 010C funciona com a chave ligada mesmo com motor parado e evita
     // bombardear a ECU com vários blocos de descoberta antes do primeiro OK.
     const ecuProbe = await session.executeCommand('010C');
-    const normalizedProbeResponse = ecuProbe.response.replace(/\s+/g, '').toUpperCase();
+    const probeStream = ecuProbe.response.replace(/[^0-9A-F]/gi, '').toUpperCase();
+    const probeMarker = '410C';
+    const probeIndex = probeStream.indexOf(probeMarker);
     const probeIsValid =
       ecuProbe.status === 'OK' &&
-      /^410C[0-9A-F]{4}$/.test(normalizedProbeResponse);
+      probeIndex >= 0 &&
+      probeStream.length >= probeIndex + probeMarker.length + 4;
 
     if (!probeIsValid) {
       await session.close();
@@ -125,9 +128,9 @@ export async function createRealElmSession(device: BluetoothDeviceInfo): Promise
       );
     }
 
-    // Só depois do primeiro OK fazemos a descoberta dos blocos de PIDs.
-    const protocolResult = await session.identifyProtocol();
-    if (protocolResult.status !== 'OK') {
+    // O ATDP já foi executado na inicialização. Reutilize o resultado e evite
+    // uma segunda rodada desnecessária na K-Line.
+    if (!session.getProtocol()) {
       throw new Error('PROTOCOLO OBD NÃO IDENTIFICADO');
     }
 
