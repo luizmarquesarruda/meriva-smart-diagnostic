@@ -130,20 +130,6 @@ export async function createRealElmSession(device: BluetoothDeviceInfo): Promise
       new Set(discovery.flatMap((item) => item.supportedPids)),
     ).sort();
 
-    const probeIsValid =
-      ecuProbe.status === 'OK' &&
-      (discoveryProbe?.responded === true ||
-        /(?:^|\s)41\s+0C(?:\s|$)/i.test(ecuProbe.response));
-
-    if (!probeIsValid) {
-      await session.close();
-      throw new Error(
-        ecuProbe.response
-          ? `ECU NÃO RESPONDEU AOS PIDs DE DESCOBERTA: ${ecuProbe.response.trim()}`
-          : 'ECU NÃO RESPONDEU AOS PIDs DE DESCOBERTA',
-      );
-    }
-
     return {
       session,
       initialization,
