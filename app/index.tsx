@@ -60,7 +60,9 @@ export default function IndexScreen() {
   useFocusEffect(useCallback(() => { void reloadStoredState(); }, [reloadStoredState]));
 
   const summary = useMemo(() => getDriveCycleSummary(cycles), [cycles]);
-  const gpsReady = gpsState.running && gpsState.permissionGranted;
+  const gpsFixAgeMs = gpsState.lastTimestamp == null ? Infinity : Math.max(0, Date.now() - gpsState.lastTimestamp);
+  const gpsReady = gpsState.running && gpsState.permissionGranted && gpsState.samples > 0 && gpsFixAgeMs <= 5000 && (gpsState.lastAccuracyM == null || gpsState.lastAccuracyM <= 60);
+  const gpsWaitingForFix = gpsState.running && gpsState.permissionGranted && !gpsReady;
   const obdReady = obd.connected;
   const hasRealCycle = Boolean(summary.lastRealCycle);
   const distanceLabel = formatDistance(gpsState.distanceKm);
@@ -82,7 +84,7 @@ export default function IndexScreen() {
         <View style={styles.statusBar}>
           <View style={styles.statusItem}>
             <View style={[styles.dot, { backgroundColor: statusColor(gpsReady) }]} />
-            <Text style={styles.statusText}>GPS {gpsReady ? 'ATIVO' : 'AGUARDANDO'}</Text>
+            <Text style={styles.statusText}>GPS {gpsReady ? 'FIX OK' : 'AGUARDANDO'}</Text>
           </View>
           <View style={styles.statusItem}>
             <View style={[styles.dot, { backgroundColor: statusColor(obdReady) }]} />
@@ -104,8 +106,10 @@ export default function IndexScreen() {
             {gpsState.error
               ? gpsState.error
               : gpsReady
-                ? `Precisão ${gpsState.lastAccuracyM == null ? 'N/D' : `${gpsState.lastAccuracyM.toFixed(0)} m`}`
-                : 'Sem sinal GPS confiável. Nenhuma velocidade é inventada.'}
+                ? `Precisão ${gpsState.lastAccuracyM == null ? 'N/D' : `${gpsState.lastAccuracyM.toFixed(0)} m`} • atualização recente`
+                : gpsWaitingForFix
+                  ? 'Aguardando uma posição GPS confiável. Velocidade e distância ficam bloqueadas.'
+                  : 'GPS não está disponível. Nenhuma velocidade é inventada.'}
           </Text>
         </View>
 
@@ -138,7 +142,7 @@ export default function IndexScreen() {
             </View>
           </View>
           <Text style={styles.healthHint}>
-            {obdReady ? 'Dados reais podem ser consultados no Laboratório OBD.' : 'Conecte um ELM327 Bluetooth Classic para liberar dados da ECU.'}
+            {obdReady ? 'OBD conectado. Consulte dados reais da ECU no Laboratório.' : 'Conecte um ELM327 Bluetooth Classic para liberar dados da ECU.'}
           </Text>
         </View>
 
