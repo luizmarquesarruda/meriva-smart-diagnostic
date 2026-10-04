@@ -57,7 +57,7 @@ export default function RootLayout() {
               : 'Ative o Bluetooth e permita o acesso a dispositivos próximos para usar o ELM327.',
             [
               { text: 'Abrir configurações', onPress: () => void openBluetoothAppSettings() },
-              { text: 'Tentar novamente', onPress: () => void checkBluetooth(true, true) },
+              { text: 'Tentar novamente', onPress: () => void checkBluetooth(true, true, selectedAdapterAddress) },
             ],
           );
         }
