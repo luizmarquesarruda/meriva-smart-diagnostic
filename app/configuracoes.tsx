@@ -140,7 +140,14 @@ export default function ConfiguracaoScreen() {
       <TouchableOpacity style={styles.button} onPress={handleExport} disabled={busy}>
         <Text style={styles.buttonText}>{busy ? 'AGUARDE...' : 'EXPORTAR SALVAMENTO (.TXT)'}</Text>
       </TouchableOpacity>
-      {profile ? <Text style={styles.info}>Veículo: {profile.vehicleName}</Text> : <Text style={styles.info}>Veículo: N/D</Text>}
+      {profile ? (
+        <>
+          <Text style={styles.info}>Veículo: {profile.vehicleName}</Text>
+          <Text style={styles.info}>Motor: {profile.engine} • {profile.displacementCm3} cm³ • {profile.cylinders} cilindros</Text>
+          <Text style={styles.info}>Tanque: {profile.tankCapacityL} L • Reserva aprox.: {profile.reserveCapacityL} L</Text>
+          <Text style={styles.note}>Especificações físicas conforme o Manual do Proprietário Chevrolet Meriva 2012.</Text>
+        </>
+      ) : <Text style={styles.info}>Veículo: N/D</Text>}
       </View>
     </ScrollView>
   );
