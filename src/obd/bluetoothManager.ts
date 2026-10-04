@@ -125,6 +125,11 @@ export async function createRealElmSession(device: BluetoothDeviceInfo): Promise
     }
 
     // Só depois do primeiro OK fazemos a descoberta dos blocos de PIDs.
+    const protocolResult = await session.identifyProtocol();
+    if (protocolResult.status !== 'OK') {
+      throw new Error('PROTOCOLO OBD NÃO IDENTIFICADO');
+    }
+
     const discovery = await discoverSupportedPids(session);
     const supportedPids = Array.from(
       new Set(discovery.flatMap((item) => item.supportedPids)),
