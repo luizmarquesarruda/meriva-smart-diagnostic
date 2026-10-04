@@ -251,8 +251,11 @@ async function testPidScanner() {
 
   const supported40 = scanner.decodeSupportedPids('0140', '41 40 00 00 00 02');
   assert.ok(supported40.includes('015F'));
-  const supported60 = scanner.decodeSupportedPids('0160', '41 60 00 00 00 01');
+  // No bloco 0160, o bit mais significativo do 4º byte representa o PID 0179.
+  // 01 seria o PID 0180. Mantemos a relação OBD-II MSB-first explícita no teste.
+  const supported60 = scanner.decodeSupportedPids('0160', '41 60 00 00 00 80');
   assert.ok(supported60.includes('0179'));
+  assert.ok(!supported60.includes('0180'));
 }
 
 async function testBluetoothEventTransport() {
