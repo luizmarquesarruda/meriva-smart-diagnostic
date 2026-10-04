@@ -184,7 +184,7 @@ export default function LaboratorioScreen() {
         sessionRef.current = null;
         stopObdSessionCheckpoint();
         try {
-          await activeSession?.close();
+          if (getSharedObdConnection()?.session !== activeSession) await activeSession?.close();
         } catch {
           // sessão já fechada
         }
