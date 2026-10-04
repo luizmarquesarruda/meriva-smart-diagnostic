@@ -6,6 +6,7 @@ export interface SharedObdConnection {
   session: Elm327Session;
   device: BluetoothDeviceInfo;
   protocol: string | null;
+  supportedPids: string[];
 }
 
 let active: SharedObdConnection | null = null;
@@ -66,6 +67,7 @@ export async function connectPreferredElm(preferredAddress: string | null = null
         session: connection.session,
         device,
         protocol: connection.protocol,
+        supportedPids: connection.supportedPids,
       };
       emit();
       return active;
