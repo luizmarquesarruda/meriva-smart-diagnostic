@@ -72,6 +72,8 @@ export async function ensureMerivaVehicleProfile(basePath: string): Promise<Vehi
       tankCapacityL: MERIVA_MANUAL.capacities.fuelTankL,
       reserveCapacityL: MERIVA_MANUAL.capacities.fuelReserveApproxL,
       manualSource: MERIVA_MANUAL.source,
+      protocolBaseline: 'ISO 14230-4 KWP FAST INIT / K-LINE (OBSERVADO)',
+      ecuAddress: '0x11',
       lastModified: now,
     };
     if (JSON.stringify(normalized) !== JSON.stringify(existing)) await createVehicleProfile(basePath, normalized);
@@ -93,7 +95,8 @@ export async function ensureMerivaVehicleProfile(basePath: string): Promise<Vehi
     manualSource: MERIVA_MANUAL.source,
     createdAt: now,
     lastModified: now,
-    protocolBaseline: 'NÃO CONFIRMADO',
+    protocolBaseline: 'ISO 14230-4 KWP FAST INIT / K-LINE (OBSERVADO)',
+    ecuAddress: '0x11',
   };
 
   await createVehicleProfile(basePath, profile);
