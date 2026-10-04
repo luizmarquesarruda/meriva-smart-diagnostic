@@ -2,7 +2,7 @@ import { Elm327Session } from './elm327';
 import { validateOBDResponse } from './parser';
 
 export const DISCOVERY_PIDS = ['0100', '0120', '0140', '0160'];
-export const KNOWN_PIDS = ['0105', '0106', '010B', '010C', '010D', '0110', '012F', '0142', '015E'];
+export const KNOWN_PIDS = ['0105', '0106', '010B', '010C', '010D', '010F', '0110', '0111', '012F', '0142', '0151', '0152', '015E'];
 
 export interface DiscoveryItem {
   pid: string;
