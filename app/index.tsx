@@ -105,13 +105,17 @@ export default function IndexScreen() {
               {gpsState.running ? 'ATIVO AUTOMÁTICO' : 'AGUARDANDO GPS'}
             </Text>
           </View>
+          <View style={styles.autonomyCard}>
+            <Text style={styles.autonomyLabel}>AUTONOMIA</Text>
+            <Text style={styles.autonomyValue}>N/D</Text>
+            <Text style={styles.autonomyUnit}>km restantes</Text>
+            <Text style={styles.autonomyHelp}>A autonomia só é exibida quando houver combustível restante confiável. O aplicativo não usa a boia como fonte de diagnóstico.</Text>
+          </View>
           <View style={styles.gpsGrid}>
-            <View style={styles.gpsMetric}><Text style={styles.metricLabel}>VELOCIDADE</Text><Text style={styles.gpsSpeed}>{gpsState.currentSpeedKmh.toFixed(1)} km/h</Text></View>
             <View style={styles.gpsMetric}><Text style={styles.metricLabel}>DISTÂNCIA</Text><Text style={styles.metricValue}>{formatDistanceForUnit(gpsState.distanceKm, settings?.distanceUnit ?? 'KM')}</Text></View>
-            <View style={styles.gpsMetric}><Text style={styles.metricLabel}>MÁXIMA</Text><Text style={styles.metricValue}>{gpsState.maxSpeedKmh.toFixed(1)} km/h</Text></View>
             <View style={styles.gpsMetric}><Text style={styles.metricLabel}>PRECISÃO</Text><Text style={styles.metricValue}>{gpsState.lastAccuracyM == null ? 'N/D' : `${gpsState.lastAccuracyM.toFixed(0)} m`}</Text></View>
           </View>
-          <Text style={styles.gpsHelp}>GPS inicia automaticamente ao abrir o aplicativo. Velocidade e distância vêm do celular. O GPS não mede litros consumidos sozinho.</Text>
+          <Text style={styles.gpsHelp}>GPS inicia automaticamente. Velocidade continua sendo usada internamente para cálculos, mas não é mostrada na tela principal.</Text>
           <Text style={styles.fuelInfo}>COMBUSTÍVEL: {settings?.fuelType === 'GASOLINA' ? 'GASOLINA' : 'ETANOL'} • taxa real da ECU (PID 015E).</Text>
           <Text style={styles.fuelInfo}>O GPS mede distância e velocidade. Litros só entram quando a ECU fornecer L/h válido.</Text>
           {gpsState.error ? <Text style={styles.gpsError}>{gpsState.error}</Text> : null}
@@ -121,7 +125,6 @@ export default function IndexScreen() {
           <View style={styles.metricCard}><Text style={styles.metricLabel}>CICLOS REAIS</Text><Text style={styles.metricValue}>{summary.realCycleCount}</Text></View>
           <View style={styles.metricCard}><Text style={styles.metricLabel}>DISTÂNCIA REAL</Text><Text style={styles.metricValue}>{formatDistanceForUnit(summary.totalDistanceKm, settings?.distanceUnit ?? 'KM')}</Text></View>
           <View style={styles.metricCard}><Text style={styles.metricLabel}>CONSUMO REAL</Text><Text style={styles.metricValue}>{summary.avgConsumptionKml.toFixed(2)} km/L</Text></View>
-          <View style={styles.metricCard}><Text style={styles.metricLabel}>MÉDIA REAL</Text><Text style={styles.metricValue}>{summary.avgSpeedKmh.toFixed(1)} km/h</Text></View>
         </View>
 
         <View style={styles.sectionCard}>
@@ -156,7 +159,11 @@ const styles = StyleSheet.create({
   gpsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   gpsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   gpsMetric: { width: '48%', marginBottom: 10 },
-  gpsSpeed: { color: '#2563eb', fontWeight: '800', fontSize: 22 },
+  autonomyCard: { backgroundColor: '#eff6ff', borderRadius: 12, padding: 18, marginBottom: 14, alignItems: 'center', borderWidth: 1, borderColor: '#bfdbfe' },
+  autonomyLabel: { color: '#1d4ed8', fontSize: 13, fontWeight: '800', letterSpacing: 1 },
+  autonomyValue: { color: '#1e40af', fontWeight: '800', fontSize: 38, marginTop: 2 },
+  autonomyUnit: { color: '#475569', fontSize: 13, fontWeight: '600' },
+  autonomyHelp: { color: '#64748b', fontSize: 11, textAlign: 'center', marginTop: 8 },
   gpsLive: { color: '#16a34a', fontWeight: '800' },
   gpsOff: { color: '#64748b', fontWeight: '800' },
   gpsHelp: { color: '#64748b', fontSize: 12, marginBottom: 10 },
