@@ -10,6 +10,7 @@ import { discoverSupportedPids, KNOWN_PIDS } from '../src/obd/pidScanner';
 import { gpsTracker } from '../src/gps';
 import { getSharedObdConnection, setSharedObdConnection, subscribeSharedObd, disconnectSharedObd } from '../src/obd/sharedConnection';
 import { RealTripRecorder } from '../src/trip/tripRecorder';
+import { FuelRateIntegrator } from '../src/obd/fuelConsumption';
 import { addDriveCycle, readDriveCycles } from '../src/storage/driveCycleStorage';
 import { DtcRecord, readDtcs, recordDtc } from '../src/database/dtcManager';
 import {
@@ -53,6 +54,7 @@ export default function LaboratorioScreen() {
   const tripLoopActiveRef = useRef(false);
   const tripLoopPromiseRef = useRef<Promise<void> | null>(null);
   const autoSaveReadyRef = useRef(false);
+  const fuelIntegratorRef = useRef(new FuelRateIntegrator());
 
   const simulationSession = useMemo(
     () => new Elm327Session(new SimulatedObdTransport()),
