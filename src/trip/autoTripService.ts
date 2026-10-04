@@ -1,7 +1,7 @@
 import { gpsTracker } from '../gps';
 import type { SharedObdConnection } from '../obd/sharedConnection';
 import { getSharedObdConnection, subscribeSharedObd } from '../obd/sharedConnection';
-import { addDriveCycle } from '../storage/driveCycleStorage';
+import { addDriveCycle, readDriveCycles } from '../storage/driveCycleStorage';
 import { forceSaveOnObdEvent } from '../meriva/autosaveIntegration';
 import { updateAutoSaveState, initAutoSave } from '../meriva/autosaveManager';
 import { RealTripRecorder } from './tripRecorder';
@@ -227,8 +227,9 @@ class AutoTripService {
     if (!cycle) return;
 
     await addDriveCycle(this.basePath, cycle);
+    const storedCycles = await readDriveCycles(this.basePath);
     updateAutoSaveState((state) => {
-      state.driveCycles = [...state.driveCycles, cycle];
+      state.driveCycles = storedCycles;
     });
     await forceSaveOnObdEvent();
   }
