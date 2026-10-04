@@ -6,7 +6,6 @@ export interface AppSettings {
   fuelType: FuelType;
   distanceUnit: DistanceUnit;
   autoConnectObd: boolean;
-  autoStartGps: boolean;
   diagnosticAlerts: boolean;
   selectedAdapterAddress: string | null;
 }
@@ -15,7 +14,6 @@ const DEFAULT_SETTINGS: AppSettings = {
   fuelType: 'ETANOL',
   distanceUnit: 'KM',
   autoConnectObd: true,
-  autoStartGps: true,
   diagnosticAlerts: true,
   selectedAdapterAddress: null,
 };
@@ -40,7 +38,6 @@ export async function readAppSettings(basePath: string): Promise<AppSettings> {
       fuelType: parsed.fuelType === 'GASOLINA' ? 'GASOLINA' : 'ETANOL',
       distanceUnit: parsed.distanceUnit === 'MI' ? 'MI' : 'KM',
       autoConnectObd: parsed.autoConnectObd !== false,
-      autoStartGps: parsed.autoStartGps !== false,
       diagnosticAlerts: parsed.diagnosticAlerts !== false,
       selectedAdapterAddress: typeof parsed.selectedAdapterAddress === 'string' && parsed.selectedAdapterAddress.trim()
         ? parsed.selectedAdapterAddress.trim().toUpperCase()
