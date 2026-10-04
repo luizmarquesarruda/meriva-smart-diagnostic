@@ -116,14 +116,14 @@ export default function ConfiguracaoScreen() {
           </View>
 
           <SettingSwitch label="Conectar ao ELM327 automaticamente" value={settings.autoConnectObd} onChange={(v) => void updateSetting('autoConnectObd', v)} />
-          <SettingSwitch label="Iniciar GPS automaticamente" value={settings.autoStartGps} onChange={(v) => void updateSetting('autoStartGps', v)} />
           <SettingSwitch label="Alertas de diagnóstico" value={settings.diagnosticAlerts} onChange={(v) => void updateSetting('diagnosticAlerts', v)} />
+          <Text style={styles.note}>O GPS inicia automaticamente quando o aplicativo entra em uso. Essa função é controlada pelo sistema para manter a viagem automática.</Text>
         </>
       )}
 
-      <Text style={styles.section}>SISTEMA</Text>
+      <Text style={styles.section}>DADOS E MANUTENÇÃO</Text>
       <Text style={styles.info}>VERSÃO: {appVersion}</Text>
-      <Text style={styles.info}>Local de dados: {storageBase || 'INICIALIZANDO'}</Text>
+      
       <Text style={styles.info}>SALVAMENTO AUTOMÁTICO: ATIVO</Text>
       <Text style={styles.info}>ÚLTIMO SALVAMENTO: {formatTime(saveStatus.lastSavedAt)}</Text>
       {saveStatus.lastError ? <Text style={styles.error}>FALHA NO AUTOSAVE: {saveStatus.lastError}</Text> : null}
@@ -154,17 +154,18 @@ function SettingSwitch({ label, value, onChange }: { label: string; value: boole
 
 const styles = StyleSheet.create({
   container: { flexGrow: 1, paddingVertical: 16, backgroundColor: '#eef3fb' },
-  title: { fontSize: 24, fontWeight: '700', color: '#1f2937', marginBottom: 8 },
-  section: { fontSize: 14, fontWeight: '800', color: '#2563eb', marginTop: 18, marginBottom: 8 },
+  title: { fontSize: 23, fontWeight: '900', color: '#1557a6', letterSpacing: 0.5, marginBottom: 6 },
+  section: { fontSize: 12, fontWeight: '900', color: '#1557a6', letterSpacing: 0.8, marginTop: 16, marginBottom: 8 },
   status: { color: '#2563eb', fontWeight: '700', marginBottom: 12 },
-  card: { backgroundColor: '#fff', borderRadius: 10, padding: 12, marginBottom: 10 },
+  card: { backgroundColor: '#fff', borderRadius: 8, padding: 11, marginBottom: 9, borderWidth: 1, borderColor: '#d1d9e2' },
   label: { flex: 1, color: '#374151', fontWeight: '600' },
   row: { flexDirection: 'row', gap: 8, marginTop: 10 },
   choice: { flex: 1, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, padding: 11, alignItems: 'center' },
   choiceActive: { backgroundColor: '#dbeafe', borderColor: '#2563eb' },
   choiceText: { color: '#1f2937', fontWeight: '700' },
-  switchRow: { backgroundColor: '#fff', borderRadius: 10, padding: 12, marginBottom: 10, flexDirection: 'row', alignItems: 'center' },
-  info: { color: '#374151', marginBottom: 6 },
+  switchRow: { backgroundColor: '#fff', borderRadius: 8, padding: 11, marginBottom: 9, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#d1d9e2' },
+  info: { color: '#374151', marginBottom: 6, fontSize: 12 },
+  note: { color: '#64748b', fontSize: 10, lineHeight: 15, marginTop: -2, marginBottom: 8 },
   error: { color: '#dc2626', fontWeight: '600', marginBottom: 12 },
   button: { backgroundColor: '#2563eb', borderRadius: 10, padding: 14, alignItems: 'center', marginBottom: 10, marginTop: 6 },
   buttonText: { color: '#fff', fontWeight: '700' },
