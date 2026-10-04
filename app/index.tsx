@@ -12,6 +12,7 @@ import { gpsTracker, type GpsTripState } from '../src/gps';
 import { ensureMerivaVehicleProfile } from '../src/database/vehicleConfig';
 import { readAppSettings, type AppSettings } from '../src/database/appSettings';
 import { MERIVA_MANUAL } from '../src/database/merivaManual';
+import { connectPreferredElm, subscribeSharedObd } from '../src/obd/sharedConnection';
 
 function formatDistance(km: number, unit: AppSettings['distanceUnit']): string {
   if (!Number.isFinite(km) || km < 0) return 'N/D';
@@ -82,6 +83,43 @@ export default function IndexScreen() {
   useEffect(() => {
     void reloadStoredState();
   }, [reloadStoredState]);
+
+  // Conecta automaticamente o ELM327 pareado ao abrir o aplicativo.
+  // O endereço conhecido é tentado primeiro e a sessão só é aceita após
+  // ATZ/ATSP0 + PID 010C responderem corretamente.
+  useEffect(() => {
+    if (!isHydrated) return;
+
+    let cancelled = false;
+    const unsubscribe = subscribeSharedObd((connection) => {
+      if (cancelled || !connection) return;
+      updateAutoSaveState((state) => {
+        state.obd = {
+          connected: true,
+          adapterName: connection.device.name,
+          protocol: connection.protocol ?? undefined,
+          lastConnectedAt: new Date().toISOString(),
+        };
+      });
+      setObd((current) => ({
+        ...current,
+        connected: true,
+        adapterName: connection.device.name,
+        protocol: connection.protocol ?? undefined,
+        lastConnectedAt: new Date().toISOString(),
+      }));
+    });
+
+    void connectPreferredElm().catch(() => {
+      // Falha silenciosa na tela inicial: o usuário ainda pode abrir
+      // Diagnóstico OBD e tentar novamente. Não mascaramos erro da sessão.
+    });
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [isHydrated]);
 
   useFocusEffect(
     useCallback(() => {
