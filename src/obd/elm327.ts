@@ -80,13 +80,6 @@ export class Elm327Session {
         }
       }
 
-      const protocolResult = await this.command('ATDP');
-      results.push(protocolResult);
-      if (protocolResult.status === 'OK') {
-        const detected = protocolResult.response.trim();
-        this.protocol = detected || null;
-      }
-
       return results;
     } catch (cause) {
       this.opened = false;
