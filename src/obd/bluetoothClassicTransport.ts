@@ -31,7 +31,7 @@ export class BluetoothClassicTransport implements ObdTransport {
     let device: BluetoothDevice;
     try {
       device = await RNBluetoothClassic.connectToDevice(this.deviceAddress, {
-        connectionType: 'binary',
+        connectionType: 'raw',
         charset: 'ascii',
         secureSocket: false,
       });
