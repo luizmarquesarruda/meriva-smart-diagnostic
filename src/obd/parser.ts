@@ -21,7 +21,8 @@ export function extractHexBytes(rawResponse: string): number[] {
 }
 
 export function validateOBDResponse(response: string): boolean {
-  return /(?:^|\s)41\s+[0-9A-F]{2}(?:\s|$)/i.test(response) && !/NO DATA/i.test(response);
+  const normalized = response.replace(/\s+/g, '').toUpperCase();
+  return /^41[0-9A-F]{2}/.test(normalized) && !/NO DATA|UNABLE TO CONNECT|ERROR|BUS ERROR/i.test(response);
 }
 
 export function parsePidResponse(pidRequested: string, rawResponse: string): ParsedPidResult {
