@@ -72,7 +72,7 @@ export class Elm327Session {
 
     try {
       const results: ElmCommandResult[] = [];
-      for (const command of ['ATZ', 'ATE0', 'ATL0', 'ATS0', 'ATH1', 'ATSP0']) {
+      for (const command of ['ATZ', 'ATE0', 'ATL0', 'ATS0', 'ATH1', 'ATSP5']) {
         const result = await this.command(command);
         results.push(result);
         if (result.status !== 'OK') {
