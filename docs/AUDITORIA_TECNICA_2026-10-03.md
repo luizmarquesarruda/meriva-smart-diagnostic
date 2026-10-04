@@ -50,4 +50,9 @@ A auditoria priorizou comportamento real do Android/ELM327 e dados observados. N
 10. Confirmar GPS parado sem aumento artificial de distância.
 11. Rodar alguns minutos e conferir distância em metros/km.
 12. Testar PID 015E somente se anunciado como suportado pela ECU.
-false
+
+## Revisão complementar 2026-10-04
+
+Fontes cruzadas: ELM327 datasheet, SAE J1979/ISO 15031-5, react-native-bluetooth-classic e repositórios AndroidOBD, AndrOBD, seaargsp/obd2, ELM327-emulator e OBDb/SAEJ1979.
+
+Correções: decoder de bitmap alinhado ao padrão; descoberta ampliada para 0100, 0120, 0140 e 0160; teste de protocolo agora confirma ATDP depois da resposta da ECU; teste Bluetooth cobre resposta fragmentada; separação REAL_OBD/CARSCANNER_BASELINE/SIMULACAO preservada.
