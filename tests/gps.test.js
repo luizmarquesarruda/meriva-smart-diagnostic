@@ -100,6 +100,30 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
   assert.ok(state.maxSpeedKmh >= 36);
   assert.ok(receivedStates.length >= 3);
 
+  const distanceBeforeStop = state.distanceKm;
+  watcher({
+    coords: {
+      latitude: 0,
+      longitude: 0.0002,
+      speed: 0,
+      accuracy: 5,
+    },
+    timestamp: 3000,
+  });
+  assert.strictEqual(tracker.getState().currentSpeedKmh, 0);
+  assert.strictEqual(tracker.getState().distanceKm, distanceBeforeStop);
+
+  watcher({
+    coords: {
+      latitude: 0,
+      longitude: 0.0005,
+      speed: 10,
+      accuracy: 5,
+    },
+    timestamp: 10_000,
+  });
+  assert.strictEqual(tracker.getState().distanceKm, distanceBeforeStop);
+
   await tracker.stop();
   assert.strictEqual(tracker.getState().running, false);
   unsubscribe();
