@@ -114,13 +114,13 @@ export async function createRealElmSession(device: BluetoothDeviceInfo): Promise
     const normalizedProbeResponse = ecuProbe.response.replace(/\s+/g, '').toUpperCase();
     const probeIsValid =
       ecuProbe.status === 'OK' &&
-      /^41(?:0C)/.test(normalizedProbeResponse);
+      /^410C[0-9A-F]{4}$/.test(normalizedProbeResponse);
 
     if (!probeIsValid) {
       await session.close();
       throw new Error(
         ecuProbe.response
-          ? `ECU NÃO RESPONDEU AO PID 010C: ${ecuProbe.response.trim()}`
+          ? `ECU NÃO RESPONDEU VALIDAMENTE AO PID 010C: ${ecuProbe.response.trim()}`
           : 'ECU NÃO RESPONDEU AO PID 010C',
       );
     }
