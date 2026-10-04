@@ -47,6 +47,7 @@ export default function LaboratorioScreen() {
   const [tripConsumptionKml, setTripConsumptionKml] = useState<number | null>(null);
   const [tripActive, setTripActive] = useState(false);
   const [tripFuelSupported, setTripFuelSupported] = useState<boolean | null>(null);
+  const [fuelLevelPercent, setFuelLevelPercent] = useState<number | null>(null);
   const sessionRef = useRef<Elm327Session | null>(null);
   const tripRecorderRef = useRef<RealTripRecorder | null>(null);
   const tripLoopActiveRef = useRef(false);
@@ -92,13 +93,40 @@ export default function LaboratorioScreen() {
     while (tripLoopActiveRef.current && sessionRef.current === session) {
       const timestampMs = Date.now();
       try {
-        const result = await session.queryPid('015E');
+        const [fuelResult, levelResult] = await Promise.all([
+          session.queryPid('015E'),
+          session.queryPid('012F'),
+        ]);
         const fuelRate =
-          result.parsed.status === 'RESPONDEU' &&
-          result.parsed.unit === 'L/h' &&
-          result.parsed.value != null
-            ? result.parsed.value
+          fuelResult.parsed.status === 'RESPONDEU' &&
+          fuelResult.parsed.unit === 'L/h' &&
+          fuelResult.parsed.value != null
+            ? fuelResult.parsed.value
             : null;
+        const level =
+          levelResult.parsed.status === 'RESPONDEU' &&
+          levelResult.parsed.unit === '%' &&
+          levelResult.parsed.value != null &&
+          levelResult.parsed.value >= 0 &&
+          levelResult.parsed.value <= 100
+            ? levelResult.parsed.value
+            : null;
+        if (level != null) {
+          setFuelLevelPercent(level);
+          updateAutoSaveState((state) => {
+            state.lastReadings = [
+              {
+                pid: '012F',
+                name: levelResult.parsed.name,
+                value: level,
+                unit: '%',
+                status: levelResult.parsed.status,
+                timestamp: new Date().toISOString(),
+              },
+              ...state.lastReadings.filter((item) => item.pid !== '012F'),
+            ].slice(0, 50);
+          });
+        }
         const gps = gpsTracker.getState();
         const recorder = tripRecorderRef.current;
 
@@ -249,14 +277,15 @@ export default function LaboratorioScreen() {
       const discovered = Array.from(new Set(discovery.flatMap((item) => item.supportedPids))).sort();
       setSupportedPids(discovered);
       const fuelSupported = discovered.includes('015E');
+      const fuelLevelSupported = discovered.includes('012F');
       setTripFuelSupported(fuelSupported);
-      if (fuelSupported) {
-        startRealTripRecorder(connection.session);
-        setStatus(connection.protocol ? 'VIAGEM AUTOMÁTICA / PID 015E ATIVO' : 'VIAGEM AUTOMÁTICA / PROTOCOLO N/D');
-      } else {
-        setTripActive(false);
-        setStatus('ELM RESPONDENDO / PID 015E NÃO SUPORTADO');
-      }
+      startRealTripRecorder(connection.session);
+      setTripActive(fuelSupported);
+      setStatus(
+        fuelSupported
+          ? connection.protocol ? 'VIAGEM AUTOMÁTICA / PID 015E + BOIA 012F' : 'VIAGEM AUTOMÁTICA / PROTOCOLO N/D'
+          : fuelLevelSupported ? 'ELM RESPONDENDO / BOIA 012F ATIVA' : 'ELM RESPONDENDO / SEM PID 015E E 012F',
+      );
     } catch (cause) {
       const failedSession = sessionRef.current;
       sessionRef.current = null;
@@ -408,6 +437,7 @@ export default function LaboratorioScreen() {
         <Text style={styles.tripTitle}>VIAGEM AUTOMÁTICA</Text>
         <Text style={styles.tripLine}>STATUS: {tripActive ? 'GRAVANDO' : 'AGUARDANDO OBD'}</Text>
         <Text style={styles.tripLine}>PID 015E: {tripFuelSupported === null ? 'N/D' : tripFuelSupported ? 'SUPORTADO' : 'NÃO SUPORTADO'}</Text>
+        <Text style={styles.tripLine}>BOIA / PID 012F: {fuelLevelPercent == null ? 'N/D' : `${fuelLevelPercent.toFixed(1)}%`}</Text>
         <Text style={styles.tripLine}>DISTÂNCIA GPS: {tripDistanceKm.toFixed(3)} km</Text>
         <Text style={styles.tripLine}>COMBUSTÍVEL REAL: {tripFuelUsedL.toFixed(6)} L</Text>
         <Text style={styles.tripLine}>CONSUMO: {tripConsumptionKml == null ? 'N/D' : `${tripConsumptionKml.toFixed(3)} km/L`}</Text>
@@ -475,6 +505,7 @@ export default function LaboratorioScreen() {
         <Text style={styles.label}>TEMPO</Text><Text style={styles.value}>{elapsedMs === null ? 'SEM DADOS' : `${elapsedMs} ms`}</Text>
         <Text style={styles.label}>STATUS</Text><Text style={styles.value}>{parsed?.status || 'COMANDO'}</Text>
         <Text style={styles.label}>VALOR</Text><Text style={styles.value}>{parsed?.value === null || !parsed ? 'SEM DADOS' : `${parsed.value} ${parsed.unit}`}</Text>
+        <Text style={styles.label}>NÍVEL DA BOIA (PID 012F)</Text><Text style={styles.value}>{fuelLevelPercent == null ? 'N/D' : `${fuelLevelPercent.toFixed(1)} %`}</Text>
         <Text style={styles.label}>COMBUSTÍVEL INTEGRADO (PID 015E)</Text><Text style={styles.value}>{fuelUsedL.toFixed(6)} L</Text>
         <Text style={styles.label}>RAW PRESERVADO</Text><Text style={styles.value}>{rx || 'SEM DADOS'}</Text>
         <Text style={styles.label}>DTC ATUAIS</Text><Text style={styles.value}>{dtcCodes.length ? dtcCodes.join(', ') : 'NENHUM'}</Text>
