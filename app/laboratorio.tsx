@@ -9,10 +9,10 @@ import { createRealElmSession, discoverPairedDevices } from '../src/obd/bluetoot
 import { discoverSupportedPids, KNOWN_PIDS } from '../src/obd/pidScanner';
 import { gpsTracker } from '../src/gps';
 import { getSharedObdConnection, setSharedObdConnection, subscribeSharedObd, disconnectSharedObd } from '../src/obd/sharedConnection';
-import { RealTripRecorder } from '../src/trip/tripRecorder';
-import { FuelRateIntegrator } from '../src/obd/fuelConsumption';
+import { autoTripService } from '../src/trip/autoTripService';
+
 import { readAppSettings, writeAppSettings } from '../src/database/appSettings';
-import { addDriveCycle, readDriveCycles } from '../src/storage/driveCycleStorage';
+
 import { DtcRecord, readDtcs, recordDtc } from '../src/database/dtcManager';
 import {
   initAutoSave,
@@ -51,133 +51,25 @@ export default function LaboratorioScreen() {
   const [tripFuelSupported, setTripFuelSupported] = useState<boolean | null>(null);
   const [fuelLevelPercent, setFuelLevelPercent] = useState<number | null>(null);
   const sessionRef = useRef<Elm327Session | null>(null);
-  const tripRecorderRef = useRef<RealTripRecorder | null>(null);
-  const tripLoopActiveRef = useRef(false);
-  const tripLoopPromiseRef = useRef<Promise<void> | null>(null);
   const autoSaveReadyRef = useRef(false);
-  const fuelIntegratorRef = useRef(new FuelRateIntegrator());
-  const lastFuelLevelReadAtRef = useRef(0);
 
   const simulationSession = useMemo(
     () => new Elm327Session(new SimulatedObdTransport()),
     [],
   );
 
-  async function delay(ms: number): Promise<void> {
-    await new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
-  async function stopRealTripRecorder(): Promise<void> {
-    tripLoopActiveRef.current = false;
-    const loop = tripLoopPromiseRef.current;
-    tripLoopPromiseRef.current = null;
-    try {
-      await loop;
-    } catch {
-      // falha de uma leitura não impede o fechamento da viagem
-    }
-
-    const recorder = tripRecorderRef.current;
-    tripRecorderRef.current = null;
-    setTripActive(false);
-
-    if (!recorder) return;
-    const cycle = recorder.buildDriveCycle();
-    if (!cycle) return;
-
-    await addDriveCycle(getBasePath(), cycle);
-    const storedCycles = await readDriveCycles(getBasePath());
-    updateAutoSaveState((state) => {
-      state.driveCycles = storedCycles;
-    });
-    await forceSaveOnObdEvent();
-  }
-
-  async function runRealTripRecorder(session: Elm327Session): Promise<void> {
-    while (tripLoopActiveRef.current && sessionRef.current === session) {
-      const timestampMs = Date.now();
-      try {
-        const fuelResult = await session.queryPid('015E');
-        const fuelRate =
-          fuelResult.parsed.status === 'RESPONDEU' &&
-          fuelResult.parsed.unit === 'L/h' &&
-          fuelResult.parsed.value != null
-            ? fuelResult.parsed.value
-            : null;
-        let level: number | null = null;
-        if (tripFuelSupported !== false && Date.now() - lastFuelLevelReadAtRef.current >= 10_000) {
-          lastFuelLevelReadAtRef.current = Date.now();
-          const levelResult = await session.queryPid('012F');
-          level =
-            levelResult.parsed.status === 'RESPONDEU' &&
-            levelResult.parsed.unit === '%' &&
-            levelResult.parsed.value != null &&
-            levelResult.parsed.value >= 0 &&
-            levelResult.parsed.value <= 100
-              ? levelResult.parsed.value
-              : null;
-          if (level != null) {
-            setFuelLevelPercent(level);
-            updateAutoSaveState((state) => {
-              state.lastReadings = [
-                {
-                  pid: '012F',
-                  name: levelResult.parsed.name,
-                  value: level,
-                  unit: '%',
-                  status: levelResult.parsed.status,
-                  timestamp: new Date().toISOString(),
-                },
-                ...state.lastReadings.filter((item) => item.pid !== '012F'),
-              ].slice(0, 50);
-            });
-          }
-        }
-        const gps = gpsTracker.getState();
-        const recorder = tripRecorderRef.current;
-
-        if (recorder) {
-          const state = recorder.addSample({
-            timestampMs: Date.now(),
-            distanceKm: gps.distanceKm,
-            speedKmh: gps.currentSpeedKmh,
-            fuelRateLph: fuelRate,
-          });
-          setTripDistanceKm(state.distanceKm);
-          setTripFuelUsedL(state.fuelUsedL);
-          setFuelUsedL(state.fuelUsedL);
-          setTripConsumptionKml(
-            state.fuelUsedL > 0 && state.distanceKm > 0
-              ? state.distanceKm / state.fuelUsedL
-              : null,
-          );
-          if (fuelRate == null && state.validFuelSamples === 0) {
-            setStatus('GPS ATIVO / ECU SEM PID 015E VÁLIDO');
-          }
-        }
-      } catch (cause) {
-        setError(cause instanceof Error ? cause.message : 'FALHA NA LEITURA AUTOMÁTICA DO PID 015E');
-      }
-
-      await delay(1500);
-    }
-  }
-
-  function startRealTripRecorder(session: Elm327Session): void {
-    const gpsDistanceAtStart = gpsTracker.getState().distanceKm;
-    const recorder = new RealTripRecorder(Date.now(), gpsDistanceAtStart);
-    tripRecorderRef.current = recorder;
-    setFuelUsedL(0);
-    setTripDistanceKm(0);
-    setTripFuelUsedL(0);
-    setTripConsumptionKml(null);
-    lastFuelLevelReadAtRef.current = 0;
-    setTripActive(true);
-    tripLoopActiveRef.current = true;
-    tripLoopPromiseRef.current = runRealTripRecorder(session);
-  }
-
   useEffect(() => {
+    const unsubscribeTrip = autoTripService.subscribe((trip) => {
+      setTripActive(trip.active);
+      setTripFuelSupported(trip.connected ? trip.fuelSupported : null);
+      setTripDistanceKm(trip.distanceKm);
+      setTripFuelUsedL(trip.fuelUsedL);
+      setFuelUsedL(trip.fuelUsedL);
+      setTripConsumptionKml(trip.consumptionKml);
+      setFuelLevelPercent(trip.fuelLevelPercent);
+      if (trip.error) setError(trip.error);
+    });
+
     const unsubscribe = subscribeSharedObd((connection) => {
       if (!connection) return;
       sessionRef.current = connection.session;
@@ -209,12 +101,12 @@ export default function LaboratorioScreen() {
       });
 
     return () => {
+      unsubscribeTrip();
       unsubscribe();
       mounted = false;
       if (!autoSaveReadyRef.current) return;
 
       void (async () => {
-        await stopRealTripRecorder();
         const activeSession = sessionRef.current;
         sessionRef.current = null;
         stopObdSessionCheckpoint();
@@ -264,7 +156,6 @@ export default function LaboratorioScreen() {
     setStatus('BLUETOOTH CONECTANDO');
     try {
       if (sessionRef.current) {
-        await stopRealTripRecorder();
         await sessionRef.current.close();
         sessionRef.current = null;
       }
@@ -297,12 +188,7 @@ export default function LaboratorioScreen() {
       const fuelSupported = discovered.includes('015E');
       const fuelLevelSupported = discovered.includes('012F');
       setTripFuelSupported(fuelSupported);
-      if (fuelSupported) {
-        startRealTripRecorder(connection.session);
-        setTripActive(true);
-      } else {
-        setTripActive(false);
-      }
+      setTripActive(fuelSupported);
       setStatus(
         fuelSupported
           ? connection.protocol ? 'VIAGEM AUTOMÁTICA / PID 015E + NÍVEL DE COMBUSTÍVEL 012F' : 'VIAGEM AUTOMÁTICA / PROTOCOLO N/D'
