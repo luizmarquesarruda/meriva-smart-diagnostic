@@ -77,8 +77,8 @@ export class Elm327Session {
       // reset, eco/desenho de linha, espaços, cabeçalho, protocolo automático.
       // ATAT1 não é necessário para este projeto e pode alterar o comportamento
       // de adaptadores ELM327/KWP mais simples.
-      // ATST32 dá ao ELM até 5 s para concluir uma resposta da ECU.
-      // É um valor conservador para K-Line/KWP, seguindo a lógica do Car Scanner.
+      // ATST32 é o limite padrão de aproximadamente 200 ms do ELM327.
+      // Mantemos esse valor para a Meriva e deixamos o transporte com margem maior.
       for (const command of ['ATZ', 'ATE0', 'ATL0', 'ATS0', 'ATH1', 'ATST32', 'ATSP0']) {
         const result = await this.command(command);
         results.push(result);
