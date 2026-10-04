@@ -10,7 +10,7 @@ Versão: 1.0.1 | Plataforma: Android | Transporte: Bluetooth Classic | ECU: OBD-
 
 O projeto prioriza dados reais, rastreabilidade e diagnóstico explicável. Uma resposta ausente não vira um valor inventado.
 
-O GPS do celular inicia automaticamente ao abrir o aplicativo. Ele fornece velocidade e distância em primeiro plano, mesmo quando a ECU não oferece o PID 015E. A gravação de litros e consumo depende de taxa de combustível OBD válida. Litros consumidos só entram no cálculo quando a ECU fornece uma taxa de combustível válida pelo PID OBD 015E. O GPS sozinho não mede litros e o aplicativo não aceita mais litros digitados manualmente na tela principal.
+O GPS do celular inicia automaticamente ao abrir o aplicativo. Ele fornece velocidade e distância em primeiro plano, mesmo quando a ECU não oferece o PID 015E. A gravação de litros e consumo depende de taxa de combustível OBD válida. Litros consumidos só entram no cálculo quando a ECU fornece uma taxa de combustível válida pelo PID OBD 015E. O GPS sozinho não mede litros. O aplicativo não aceita litros digitados manualmente na tela principal.
 
 Bluetooth Classic exige build nativo Android. Expo Go não é o ambiente de validação do transporte.
 
@@ -115,9 +115,9 @@ A suíte automatizada cobre autosave, parser, DTC, descoberta de PIDs, fila de c
 
 1. validar Bluetooth/ELM327 e GPS em Android físico;
 2. monitorar PIDs suportados em ciclo real;
-3. integrar a coleta contínua do PID 015E ao ciclo automático de viagem e persistir litros/km/L;
+3. validar a taxa do PID 015E e o nível do PID 012F na ECU real;
 4. validar o comportamento específico da ECU da Meriva com dados reais;
-5. completar o cadastro do veículo na UI, sem valores presumidos.
+5. manter especificações do manual separadas das evidências atuais da ECU.
 
 ## Princípio
 
