@@ -217,9 +217,10 @@ async function testElmAndProtocol() {
 
   const session = new Elm327Session(new SimulatedObdTransport());
   const initialization = await session.initialize();
-  assert.ok(initialization.some((item) => item.command === 'ATAT1'));
-  assert.ok(initialization.some((item) => item.command === 'ATSP0'));
-  assert.ok(initialization.some((item) => item.command === 'ATDP'));
+  assert.deepStrictEqual(
+    initialization.map((item) => item.command),
+    ['ATZ', 'ATE0', 'ATL0', 'ATS0', 'ATH1', 'ATSP0', 'ATDP'],
+  );
   assert.strictEqual(session.getProtocol(), null);
 
   const results = await Promise.all([
