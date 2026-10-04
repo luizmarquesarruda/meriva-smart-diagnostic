@@ -4,6 +4,7 @@ export interface GpsSample {
   latitude: number;
   longitude: number;
   speedKmh: number | null;
+  speedAccuracyKmh: number | null;
   accuracyM: number | null;
   timestamp: number;
 }
@@ -22,8 +23,21 @@ export interface GpsTripState {
 
 export type GpsListener = (state: GpsTripState) => void;
 
+const MAX_FIX_AGE_MS = 5000;
 const MIN_ACCURACY_M = 60;
+
+export function hasReliableGpsFix(state: GpsTripState, now = Date.now()): boolean {
+  if (!state.running || !state.permissionGranted || state.samples <= 0 || state.lastTimestamp == null) return false;
+  if (state.lastAccuracyM != null && state.lastAccuracyM > MIN_ACCURACY_M) return false;
+  return Number.isFinite(state.lastTimestamp) && now - state.lastTimestamp <= MAX_FIX_AGE_MS;
+}
+
 const MAX_SPEED_KMH = 220;
+const STATIONARY_SPEED_KMH = 2;
+const MIN_MOVEMENT_M = 3;
+const MAX_STATIONARY_DRIFT_M = 8;
+const MAX_SEGMENT_M = 250;
+const MAX_SPEED_ACCURACY_KMH = 7;
 
 export function haversineDistanceKm(
   a: Pick<GpsSample, 'latitude' | 'longitude'>,
@@ -52,6 +66,13 @@ export function calculateConsumptionKml(distanceKm: number, fuelUsedL: number): 
   return distanceKm / fuelUsedL;
 }
 
+export function formatDistance(distanceKm: number): string {
+  if (!Number.isFinite(distanceKm) || distanceKm <= 0) return '0 m';
+  const meters = distanceKm * 1000;
+  if (meters < 1000) return `${Math.round(meters)} m`;
+  return `${distanceKm.toFixed(2)} km`;
+}
+
 export function normalizeGpsSpeedKmh(speedMs: number | null | undefined): number {
   return Number.isFinite(speedMs) && (speedMs as number) >= 0
     ? (speedMs as number) * 3.6
@@ -60,6 +81,12 @@ export function normalizeGpsSpeedKmh(speedMs: number | null | undefined): number
 
 function isAccurate(sample: GpsSample): boolean {
   return sample.accuracyM == null || sample.accuracyM <= MIN_ACCURACY_M;
+}
+
+function isReportedSpeedReliable(sample: GpsSample): boolean {
+  if (sample.speedKmh == null) return false;
+  if (sample.speedKmh <= STATIONARY_SPEED_KMH) return true;
+  return sample.speedAccuracyKmh == null || sample.speedAccuracyKmh <= MAX_SPEED_ACCURACY_KMH;
 }
 
 export class GpsTracker {
@@ -185,11 +212,21 @@ export class GpsTracker {
     const c = location.coords;
     if (!Number.isFinite(c.latitude) || !Number.isFinite(c.longitude)) return;
 
+    // Expo Location typings in this project do not expose speedAccuracy,
+    // although Android may provide it at runtime. Keep the runtime check
+    // optional so typecheck stays compatible with the installed Expo SDK.
+    const speedAccuracyMs = (c as Location.LocationObjectCoords & {
+      speedAccuracy?: number | null;
+    }).speedAccuracy;
+
     const sample: GpsSample = {
       latitude: c.latitude,
       longitude: c.longitude,
       speedKmh: Number.isFinite(c.speed) && (c.speed as number) >= 0
         ? normalizeGpsSpeedKmh(c.speed)
+        : null,
+      speedAccuracyKmh: Number.isFinite(speedAccuracyMs) && (speedAccuracyMs as number) >= 0
+        ? normalizeGpsSpeedKmh(speedAccuracyMs)
         : null,
       accuracyM: c.accuracy ?? null,
       timestamp: Number.isFinite(location.timestamp) ? location.timestamp : Date.now(),
@@ -197,18 +234,35 @@ export class GpsTracker {
 
     const accurate = isAccurate(sample);
     let derivedSpeedKmh: number | null = null;
+    let segmentM = 0;
+    let movingSegment = false;
 
     if (this.previous && accurate && isAccurate(this.previous)) {
       const elapsedMs = sample.timestamp - this.previous.timestamp;
       if (elapsedMs > 0) {
         const segmentKm = haversineDistanceKm(this.previous, sample);
+        segmentM = segmentKm * 1000;
         derivedSpeedKmh = segmentKm / (elapsedMs / 3600000);
 
-        if (
-          segmentKm <= 0.25 &&
-          derivedSpeedKmh >= 0 &&
-          derivedSpeedKmh <= MAX_SPEED_KMH
-        ) {
+        const reportedSpeed = sample.speedKmh ?? 0;
+        const previousReportedSpeed = this.previous.speedKmh ?? 0;
+        const reportedStationary =
+          reportedSpeed < STATIONARY_SPEED_KMH &&
+          previousReportedSpeed < STATIONARY_SPEED_KMH;
+
+        const accuracyNoiseM = Math.max(
+          MAX_STATIONARY_DRIFT_M,
+          (sample.accuracyM ?? 0) + (this.previous.accuracyM ?? 0),
+        );
+
+        movingSegment =
+          segmentM >= MIN_MOVEMENT_M &&
+          segmentKm <= MAX_SEGMENT_M / 1000 &&
+          derivedSpeedKmh <= MAX_SPEED_KMH &&
+          !reportedStationary &&
+          segmentM > accuracyNoiseM;
+
+        if (movingSegment) {
           this.state.distanceKm = Number(
             (this.state.distanceKm + segmentKm).toFixed(3),
           );
@@ -216,15 +270,25 @@ export class GpsTracker {
       }
     }
 
-    let speedKmh = accurate ? sample.speedKmh : null;
-    if (
-      (speedKmh == null || speedKmh > MAX_SPEED_KMH) &&
-      derivedSpeedKmh != null &&
-      derivedSpeedKmh <= MAX_SPEED_KMH
-    ) {
+    let speedKmh = 0;
+
+    if (isReportedSpeedReliable(sample)) {
+      speedKmh = sample.speedKmh ?? 0;
+      if (
+        speedKmh > STATIONARY_SPEED_KMH &&
+        !movingSegment &&
+        sample.speedAccuracyKmh == null &&
+        segmentM <= MAX_STATIONARY_DRIFT_M
+      ) {
+        speedKmh = 0;
+      }
+    } else if (movingSegment && derivedSpeedKmh != null) {
       speedKmh = derivedSpeedKmh;
     }
-    if (speedKmh == null || speedKmh < 0 || speedKmh > MAX_SPEED_KMH) speedKmh = 0;
+
+    if (!Number.isFinite(speedKmh) || speedKmh < STATIONARY_SPEED_KMH || speedKmh > MAX_SPEED_KMH) {
+      speedKmh = 0;
+    }
 
     if (accurate) this.previous = sample;
     this.state = {
