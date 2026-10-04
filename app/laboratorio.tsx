@@ -56,6 +56,7 @@ export default function LaboratorioScreen() {
   const tripLoopPromiseRef = useRef<Promise<void> | null>(null);
   const autoSaveReadyRef = useRef(false);
   const fuelIntegratorRef = useRef(new FuelRateIntegrator());
+  const lastFuelLevelReadAtRef = useRef(0);
 
   const simulationSession = useMemo(
     () => new Elm327Session(new SimulatedObdTransport()),
@@ -96,39 +97,41 @@ export default function LaboratorioScreen() {
     while (tripLoopActiveRef.current && sessionRef.current === session) {
       const timestampMs = Date.now();
       try {
-        const [fuelResult, levelResult] = await Promise.all([
-          session.queryPid('015E'),
-          session.queryPid('012F'),
-        ]);
+        const fuelResult = await session.queryPid('015E');
         const fuelRate =
           fuelResult.parsed.status === 'RESPONDEU' &&
           fuelResult.parsed.unit === 'L/h' &&
           fuelResult.parsed.value != null
             ? fuelResult.parsed.value
             : null;
-        const level =
-          levelResult.parsed.status === 'RESPONDEU' &&
-          levelResult.parsed.unit === '%' &&
-          levelResult.parsed.value != null &&
-          levelResult.parsed.value >= 0 &&
-          levelResult.parsed.value <= 100
-            ? levelResult.parsed.value
-            : null;
-        if (level != null) {
-          setFuelLevelPercent(level);
-          updateAutoSaveState((state) => {
-            state.lastReadings = [
-              {
-                pid: '012F',
-                name: levelResult.parsed.name,
-                value: level,
-                unit: '%',
-                status: levelResult.parsed.status,
-                timestamp: new Date().toISOString(),
-              },
-              ...state.lastReadings.filter((item) => item.pid !== '012F'),
-            ].slice(0, 50);
-          });
+        let level: number | null = null;
+        if (tripFuelSupported !== false && Date.now() - lastFuelLevelReadAtRef.current >= 10_000) {
+          lastFuelLevelReadAtRef.current = Date.now();
+          const levelResult = await session.queryPid('012F');
+          level =
+            levelResult.parsed.status === 'RESPONDEU' &&
+            levelResult.parsed.unit === '%' &&
+            levelResult.parsed.value != null &&
+            levelResult.parsed.value >= 0 &&
+            levelResult.parsed.value <= 100
+              ? levelResult.parsed.value
+              : null;
+          if (level != null) {
+            setFuelLevelPercent(level);
+            updateAutoSaveState((state) => {
+              state.lastReadings = [
+                {
+                  pid: '012F',
+                  name: levelResult.parsed.name,
+                  value: level,
+                  unit: '%',
+                  status: levelResult.parsed.status,
+                  timestamp: new Date().toISOString(),
+                },
+                ...state.lastReadings.filter((item) => item.pid !== '012F'),
+              ].slice(0, 50);
+            });
+          }
         }
         const gps = gpsTracker.getState();
         const recorder = tripRecorderRef.current;
@@ -168,6 +171,7 @@ export default function LaboratorioScreen() {
     setTripDistanceKm(0);
     setTripFuelUsedL(0);
     setTripConsumptionKml(null);
+    lastFuelLevelReadAtRef.current = 0;
     setTripActive(true);
     tripLoopActiveRef.current = true;
     tripLoopPromiseRef.current = runRealTripRecorder(session);
