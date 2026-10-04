@@ -207,15 +207,16 @@ export class GpsTracker {
         derivedSpeedKmh = segmentKm / (elapsedMs / 3600000);
 
         const reportedSpeedKmh = sample.speedKmh;
-        const movingBySensor =
-          reportedSpeedKmh != null && reportedSpeedKmh >= MIN_MOVEMENT_SPEED_KMH;
-        const movingByGeometry = derivedSpeedKmh >= MIN_MOVEMENT_SPEED_KMH;
+        const moving =
+          reportedSpeedKmh != null
+            ? reportedSpeedKmh >= MIN_MOVEMENT_SPEED_KMH
+            : derivedSpeedKmh >= MIN_MOVEMENT_SPEED_KMH;
 
         if (
           segmentKm <= 0.25 &&
           derivedSpeedKmh >= 0 &&
           derivedSpeedKmh <= MAX_SPEED_KMH &&
-          (movingBySensor || movingByGeometry)
+          moving
         ) {
           this.state.distanceKm = Number(
             (this.state.distanceKm + segmentKm).toFixed(3),
