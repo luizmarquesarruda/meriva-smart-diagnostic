@@ -33,7 +33,7 @@ function classifyResponse(response: string): ElmCommandStatus {
   if (/\b(NO DATA|UNABLE TO CONNECT|BUS INIT|BUS ERROR|STOPPED|ERROR)\b/.test(normalized)) {
     return 'ERROR';
   }
-  if (normalized === '?' || normalized.endsWith('\n?')) return 'ERROR';
+  if (/^\?\s*$/.test(normalized)) return 'ERROR';
   return 'OK';
 }
 
@@ -72,7 +72,12 @@ export class Elm327Session {
 
     try {
       const results: ElmCommandResult[] = [];
-      for (const command of ['ATZ', 'ATE0', 'ATL0', 'ATS0', 'ATH1', 'ATAT1', 'ATSP0']) {
+
+      // Fluxo de inicialização compatível com o padrão usado pelo Car Scanner:
+      // reset, eco/desenho de linha, espaços, cabeçalho, protocolo automático.
+      // ATAT1 não é necessário para este projeto e pode alterar o comportamento
+      // de adaptadores ELM327/KWP mais simples.
+      for (const command of ['ATZ', 'ATE0', 'ATL0', 'ATS0', 'ATH1', 'ATSP0']) {
         const result = await this.command(command);
         results.push(result);
         if (result.status !== 'OK') {
