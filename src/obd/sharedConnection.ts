@@ -12,8 +12,6 @@ export interface SharedObdConnection {
 let active: SharedObdConnection | null = null;
 let connecting: Promise<SharedObdConnection> | null = null;
 
-// ELM327 Bluetooth Classic do veículo de teste. O endereço só é usado para
-// selecionar o adaptador pareado. A conexão real continua sendo validada pelo 010C.
 export const MERIVA_ELM327_ADDRESS = '01:23:45:67:89:BA';
 const listeners = new Set<(connection: SharedObdConnection | null) => void>();
 
@@ -35,89 +33,66 @@ export function subscribeSharedObd(listener: (connection: SharedObdConnection | 
   return () => listeners.delete(listener);
 }
 
-export async function connectPreferredElm(preferredAddress: string | null = MERIVA_ELM327_ADDRESS): Promise<SharedObdConnection> {
+async function connectPreferredElmOnce(preferredAddress: string | null): Promise<SharedObdConnection> {
+  const devices = await discoverPairedDevices();
+  const preferredKnown = preferredAddress
+    ? devices.find((device) => device.address.toUpperCase() === preferredAddress.toUpperCase())
+    : undefined;
+
+  if (!devices.length && preferredAddress) {
+    const directDevice: BluetoothDeviceInfo = {
+      address: preferredAddress.toUpperCase(),
+      name: 'ELM327 (ENDEREÇO CONFIGURADO)',
+      bonded: true,
+    };
+    const connection = await createRealElmSession(directDevice);
+    active = { session: connection.session, device: directDevice, protocol: connection.protocol, supportedPids: connection.supportedPids };
+    emit();
+    return active;
+  }
+
+  if (!devices.length) throw new Error('NENHUM ELM327 PAREADO');
+
+  const namedCandidates = devices.filter(looksLikeElm327);
+  const candidates = preferredKnown
+    ? [preferredKnown, ...namedCandidates.filter((device) => device.address !== preferredKnown.address)]
+    : namedCandidates;
+
+  if (!candidates.length) throw new Error('ELM327 NÃO ENCONTRADO ENTRE OS PAREADOS');
+
+  let lastError: unknown = null;
+  for (const device of candidates) {
+    try {
+      const connection = await createRealElmSession(device);
+      active = { session: connection.session, device, protocol: connection.protocol, supportedPids: connection.supportedPids };
+      emit();
+      return active;
+    } catch (cause) {
+      lastError = cause;
+    }
+  }
+
+  const detail = lastError instanceof Error ? lastError.message : String(lastError ?? '');
+  throw new Error('ELM327 NÃO CONECTOU. ENDEREÇO TESTADO: ' + MERIVA_ELM327_ADDRESS + (detail ? '. ' + detail : ''));
+}
+
+export async function connectPreferredElm(
+  preferredAddress: string | null = MERIVA_ELM327_ADDRESS,
+): Promise<SharedObdConnection> {
   if (active) return active;
   if (connecting) return connecting;
 
   connecting = (async () => {
-    const devices = await discoverPairedDevices();
-
-    // O MAC conhecido é a âncora da conexão automática. Alguns Androids/ELM
-    // podem não expor o dispositivo na lista imediatamente, mesmo já pareado.
-    // Nesse caso ainda tentamos o endereço diretamente antes de desistir.
-    const preferredKnown = preferredAddress
-      ? devices.find((device) => device.address.toUpperCase() === preferredAddress.toUpperCase())
-      : undefined;
-
-    if (!devices.length && preferredAddress) {
-      const directDevice: BluetoothDeviceInfo = {
-        address: preferredAddress.toUpperCase(),
-        name: 'ELM327 (ENDEREÇO CONFIGURADO)',
-        bonded: true,
-      };
-      try {
-        const connection = await createRealElmSession(directDevice);
-        active = {
-          session: connection.session,
-          device: directDevice,
-          protocol: connection.protocol,
-          supportedPids: connection.supportedPids,
-        };
-        emit();
-        return active;
-      } catch (cause) {
-        const detail = cause instanceof Error ? cause.message : String(cause);
-        throw new Error(
-          'ELM327 NÃO FOI LOCALIZADO NA LISTA DE PAREADOS E A TENTATIVA DIRETA FALHOU: ' + detail,
-        );
-      }
-    }
-
-    if (!devices.length) {
-      throw new Error('NENHUM ELM327 PAREADO. PAREIE O ADAPTADOR NO ANDROID PRIMEIRO.');
-    }
-
-  // Nunca trate um Bluetooth desconhecido como ELM só porque é o único pareado.
-  // O nome apenas seleciona candidatos. A prova real continua sendo o PID 010C.
-    const preferred = preferredKnown;
-    const namedCandidates = devices.filter(looksLikeElm327);
-    const candidates = preferred
-      ? [preferred, ...namedCandidates.filter((device) => device.address !== preferred.address)]
-      : namedCandidates;
-
-    if (!candidates.length) {
-      const names = devices.map((device) => `${device.name} (${device.address})`).join(', ');
-      throw new Error(
-        'ELM327 NÃO ENCONTRADO ENTRE OS PAREADOS. ENDEREÇO ESPERADO: ' + MERIVA_ELM327_ADDRESS +
-        '. PAREIE O ADAPTADOR NO ANDROID. PAREADOS: ' + names,
-      );
-    }
-
     let lastError: unknown = null;
-
-    // O endereço conhecido é tentado primeiro. A prova final continua sendo
-    // a inicialização do ELM e o PID 010C, nunca apenas o endereço/nome.
-    for (const device of candidates) {
+    while (!active) {
       try {
-        const connection = await createRealElmSession(device);
-        active = {
-          session: connection.session,
-          device,
-          protocol: connection.protocol,
-          supportedPids: connection.supportedPids,
-        };
-        emit();
-        return active;
+        return await connectPreferredElmOnce(preferredAddress);
       } catch (cause) {
         lastError = cause;
+        await new Promise((resolve) => setTimeout(resolve, 3000));
       }
     }
-
-    const detail = lastError instanceof Error ? lastError.message : String(lastError ?? '');
-    throw new Error(
-      'ELM327 PAREADO NÃO RESPONDEU AO PID 010C. ENDEREÇO TESTADO: ' +
-      MERIVA_ELM327_ADDRESS + (detail ? '. ' + detail : ''),
-    );
+    throw lastError instanceof Error ? lastError : new Error('ELM327 NÃO CONECTADO');
   })();
 
   try {
