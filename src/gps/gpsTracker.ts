@@ -24,6 +24,7 @@ export interface GpsTripState {
 export type GpsListener = (state: GpsTripState) => void;
 
 const MAX_FIX_AGE_MS = 5000;
+const MIN_ACCURACY_M = 60;
 
 export function hasReliableGpsFix(state: GpsTripState, now = Date.now()): boolean {
   if (!state.running || !state.permissionGranted || state.samples <= 0 || state.lastTimestamp == null) return false;
@@ -31,7 +32,6 @@ export function hasReliableGpsFix(state: GpsTripState, now = Date.now()): boolea
   return Number.isFinite(state.lastTimestamp) && now - state.lastTimestamp <= MAX_FIX_AGE_MS;
 }
 
-const MIN_ACCURACY_M = 60;
 const MAX_SPEED_KMH = 220;
 const STATIONARY_SPEED_KMH = 2;
 const MIN_MOVEMENT_M = 3;
