@@ -8,7 +8,13 @@ import { getAutoSaveStatus, initAutoSave, updateAutoSaveState } from '../src/mer
 import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
 import type { ObdConnectionState } from '../src/meriva/autosaveState';
 import { gpsTracker, type GpsTripState } from '../src/gps';
-import { ensureMerivaBibleProfile } from '../src/database/vehicleConfig';
+import { ensureMerivaVehicleProfile } from '../src/database/vehicleConfig';
+
+function formatDistance(km: number): string {
+  if (!Number.isFinite(km) || km < 0) return 'N/D';
+  if (km < 1) return `${Math.round(km * 1000)} m`;
+  return `${km.toFixed(2)} km`;
+}
 
 function formatTime(iso: string | null): string {
   if (!iso) return 'N/D';
@@ -32,7 +38,7 @@ export default function IndexScreen() {
     try {
       const restored = await initAutoSave(basePath);
       await initializeDriveCycles(basePath);
-      await ensureMerivaBibleProfile(basePath);
+      await ensureMerivaVehicleProfile(basePath);
       const storedCycles = await readDriveCycles(basePath);
       const loaded = restored.driveCycles.length ? restored.driveCycles : storedCycles;
 
@@ -90,7 +96,7 @@ export default function IndexScreen() {
           </View>
           <View style={styles.gpsGrid}>
             <View style={styles.gpsMetric}><Text style={styles.metricLabel}>VELOCIDADE</Text><Text style={styles.gpsSpeed}>{gpsState.currentSpeedKmh.toFixed(1)} km/h</Text></View>
-            <View style={styles.gpsMetric}><Text style={styles.metricLabel}>DISTÂNCIA</Text><Text style={styles.metricValue}>{gpsState.distanceKm.toFixed(3)} km</Text></View>
+            <View style={styles.gpsMetric}><Text style={styles.metricLabel}>DISTÂNCIA</Text><Text style={styles.metricValue}>{formatDistance(gpsState.distanceKm)}</Text></View>
             <View style={styles.gpsMetric}><Text style={styles.metricLabel}>MÁXIMA</Text><Text style={styles.metricValue}>{gpsState.maxSpeedKmh.toFixed(1)} km/h</Text></View>
             <View style={styles.gpsMetric}><Text style={styles.metricLabel}>PRECISÃO</Text><Text style={styles.metricValue}>{gpsState.lastAccuracyM == null ? 'N/D' : `${gpsState.lastAccuracyM.toFixed(0)} m`}</Text></View>
           </View>
@@ -102,19 +108,19 @@ export default function IndexScreen() {
 
         <View style={styles.summaryGrid}>
           <View style={styles.metricCard}><Text style={styles.metricLabel}>CICLOS REAIS</Text><Text style={styles.metricValue}>{summary.realCycleCount}</Text></View>
-          <View style={styles.metricCard}><Text style={styles.metricLabel}>DISTÂNCIA REAL</Text><Text style={styles.metricValue}>{summary.totalDistanceKm.toFixed(2)} km</Text></View>
+          <View style={styles.metricCard}><Text style={styles.metricLabel}>DISTÂNCIA REAL</Text><Text style={styles.metricValue}>{formatDistance(summary.totalDistanceKm)}</Text></View>
           <View style={styles.metricCard}><Text style={styles.metricLabel}>CONSUMO REAL</Text><Text style={styles.metricValue}>{summary.avgConsumptionKml.toFixed(2)} km/L</Text></View>
           <View style={styles.metricCard}><Text style={styles.metricLabel}>MÉDIA REAL</Text><Text style={styles.metricValue}>{summary.avgSpeedKmh.toFixed(1)} km/h</Text></View>
         </View>
 
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>ÚLTIMO CICLO</Text>
-          {summary.lastRealCycle ? <><Text style={styles.row}><Text style={styles.label}>Início:</Text> {summary.lastRealCycle.startedAt}</Text><Text style={styles.row}><Text style={styles.label}>Fim:</Text> {summary.lastRealCycle.finishedAt}</Text><Text style={styles.row}><Text style={styles.label}>Distância:</Text> {summary.lastRealCycle.distanceTotalKm.toFixed(2)} km</Text><Text style={styles.row}><Text style={styles.label}>Consumo:</Text> {summary.lastRealCycle.avgFuelConsumptionKml.toFixed(3)} km/L</Text><View style={styles.sourceRow}><Text style={styles.row}><Text style={styles.label}>Fonte:</Text> {summary.lastRealCycle.source}</Text><Text style={summary.lastRealCycle.source === 'REAL_OBD' ? styles.sourceReal : styles.sourceRef}>{summary.lastRealCycle.source === 'REAL_OBD' ? 'REAL' : 'REFERÊNCIA'}</Text></View></> : <Text style={styles.empty}>Sem ciclos carregados.</Text>}
+          {summary.lastRealCycle ? <><Text style={styles.row}><Text style={styles.label}>Início:</Text> {summary.lastRealCycle.startedAt}</Text><Text style={styles.row}><Text style={styles.label}>Fim:</Text> {summary.lastRealCycle.finishedAt}</Text><Text style={styles.row}><Text style={styles.label}>Distância:</Text> {formatDistance(summary.lastRealCycle.distanceTotalKm)}</Text><Text style={styles.row}><Text style={styles.label}>Consumo:</Text> {summary.lastRealCycle.avgFuelConsumptionKml.toFixed(3)} km/L</Text><View style={styles.sourceRow}><Text style={styles.row}><Text style={styles.label}>Fonte:</Text> {summary.lastRealCycle.source}</Text><Text style={summary.lastRealCycle.source === 'REAL_OBD' ? styles.sourceReal : styles.sourceRef}>{summary.lastRealCycle.source === 'REAL_OBD' ? 'REAL' : 'REFERÊNCIA'}</Text></View></> : <Text style={styles.empty}>Sem ciclos carregados.</Text>}
         </View>
 
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>HISTÓRICO</Text><Text style={styles.historyNote}>Referências Car Scanner: {summary.referenceCycleCount}. Elas não entram nas métricas reais.</Text>
-          {cycles.map((cycle) => <View key={cycle.id} style={styles.historyItem}><View style={styles.historyHeader}><Text style={styles.historyDate}>{cycle.startedAt}</Text><Text style={cycle.source === 'REAL_OBD' ? styles.sourceReal : styles.sourceRef}>{cycle.source === 'REAL_OBD' ? 'REAL' : 'REFERÊNCIA'}</Text></View><Text style={styles.historyMeta}>{cycle.distanceTotalKm.toFixed(2)} km • {cycle.avgFuelConsumptionKml.toFixed(3)} km/L</Text></View>)}
+          {cycles.map((cycle) => <View key={cycle.id} style={styles.historyItem}><View style={styles.historyHeader}><Text style={styles.historyDate}>{cycle.startedAt}</Text><Text style={cycle.source === 'REAL_OBD' ? styles.sourceReal : styles.sourceRef}>{cycle.source === 'REAL_OBD' ? 'REAL' : 'REFERÊNCIA'}</Text></View><Text style={styles.historyMeta}>{formatDistance(cycle.distanceTotalKm)} • {cycle.avgFuelConsumptionKml.toFixed(3)} km/L</Text></View>)}
         </View>
 
         <Link href="/laboratorio" asChild><TouchableOpacity style={styles.button}><Text style={styles.buttonText}>LABORATÓRIO OBD</Text></TouchableOpacity></Link>
