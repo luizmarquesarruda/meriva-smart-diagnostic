@@ -16,7 +16,7 @@ function emit(): void {
 }
 
 function looksLikeElm327(device: BluetoothDeviceInfo): boolean {
-  return /ELM327|OBD(?:II|2|Ⅱ)?|V-LINK|VLINK|V-GATE|VLINKER|KONNWEI/i.test(device.name);
+  return /ELM327|OBD\s*(?:II|2|Ⅱ)|V-LINK|VLINK|V-GATE|VLINKER|KONNWEI/i.test(device.name);
 }
 
 export function getSharedObdConnection(): SharedObdConnection | null {
