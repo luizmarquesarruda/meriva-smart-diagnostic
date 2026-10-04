@@ -36,7 +36,7 @@ function findResponsePayload(rawResponse: string, pid: string, byteCount: number
 }
 
 export function extractHexBytes(rawResponse: string): number[] {
-  const tokens = rawResponse.toUpperCase().match(/(?:^|\\s)([0-9A-F]{2})(?=\\s|$)/g) ?? [];
+  const tokens = rawResponse.toUpperCase().match(/(?:^|\s)([0-9A-F]{2})(?=\s|$)/g) ?? [];
   return tokens.map((token) => Number.parseInt(token.trim(), 16));
 }
 
@@ -46,7 +46,7 @@ export function validateOBDResponse(response: string): boolean {
 }
 
 export function parsePidResponse(pidRequested: string, rawResponse: string): ParsedPidResult {
-  const pid = pidRequested.replace(/\\s/g, '').toUpperCase();
+  const pid = pidRequested.replace(/\s/g, '').toUpperCase();
 
   if (!rawResponse.trim() || /NO DATA|UNABLE TO CONNECT|ERROR/i.test(rawResponse)) {
     return {
