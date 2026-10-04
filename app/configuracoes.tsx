@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Constants from 'expo-constants';
-import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import { createBackup } from '../src/storage/backup';
 import { cleanupOldLogs, cleanupOldReadings } from '../src/storage/cleanup';
@@ -9,6 +9,7 @@ import { getAutoSaveState, getAutoSaveStatus, initAutoSave } from '../src/meriva
 import { exportAutoSaveTxt } from '../src/meriva/exportAutoSaveTxt';
 import { AppSettings, readAppSettings, writeAppSettings } from '../src/database/appSettings';
 import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
+import { getMidLayout } from '../src/ui/midLayout';
 
 function formatTime(iso: string | null): string {
   if (!iso) return 'N/D';
@@ -16,6 +17,8 @@ function formatTime(iso: string | null): string {
 }
 
 export default function ConfiguracaoScreen() {
+  const windowSize = useWindowDimensions();
+  const layout = getMidLayout(windowSize);
   const [storageBase, setStorageBase] = useState<string | null>(null);
   const [profile, setProfile] = useState<VehicleProfile | null>(null);
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -80,7 +83,7 @@ export default function ConfiguracaoScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>\n      <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
       <Text style={styles.title}>CONFIGURAÇÕES</Text>
       <Text style={styles.status}>{status}</Text>
 
@@ -148,7 +151,7 @@ function SettingSwitch({ label, value, onChange }: { label: string; value: boole
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 20, backgroundColor: '#eef3fb' },
+  container: { flexGrow: 1, paddingVertical: 16, backgroundColor: '#eef3fb' },
   title: { fontSize: 24, fontWeight: '700', color: '#1f2937', marginBottom: 8 },
   section: { fontSize: 14, fontWeight: '800', color: '#2563eb', marginTop: 18, marginBottom: 8 },
   status: { color: '#2563eb', fontWeight: '700', marginBottom: 12 },
