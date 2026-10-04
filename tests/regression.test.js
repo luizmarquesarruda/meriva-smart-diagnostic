@@ -208,13 +208,18 @@ async function testElmAndProtocol() {
 
   const session = new Elm327Session(new SimulatedObdTransport());
   const initialization = await session.initialize();
+  assert.ok(initialization.some((item) => item.command === 'ATAT1'));
+  assert.ok(initialization.some((item) => item.command === 'ATSP0'));
   assert.ok(initialization.some((item) => item.command === 'ATDP'));
-  assert.strictEqual(session.getProtocol(), 'SIMULATED OBD TRANSPORT');
+  assert.strictEqual(session.getProtocol(), null);
 
   const results = await Promise.all([
     session.queryPid('010C'),
     session.queryPid('0105'),
   ]);
+  const protocol = await session.identifyProtocol();
+  assert.strictEqual(protocol.response, 'SIMULATED OBD TRANSPORT');
+  assert.strictEqual(session.getProtocol(), 'SIMULATED OBD TRANSPORT');
   assert.strictEqual(results[0].parsed.value, 774);
   assert.strictEqual(results[1].parsed.value, 65);
   assert.strictEqual(results[0].rx, '41 0C 0C 18');
@@ -238,6 +243,11 @@ async function testPidScanner() {
   const supported20 = scanner.decodeSupportedPids('0120', '41 20 00 02 00 00');
   assert.ok(supported20.includes('012F'));
   assert.ok(!supported20.includes('012E'));
+
+  const supported40 = scanner.decodeSupportedPids('0140', '41 40 00 00 00 02');
+  assert.ok(supported40.includes('0160'));
+  const supported60 = scanner.decodeSupportedPids('0160', '41 60 00 00 00 01');
+  assert.ok(supported60.includes('0180'));
 }
 
 async function testBluetoothEventTransport() {
