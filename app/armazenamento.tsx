@@ -55,7 +55,8 @@ export default function ArmazenamentoScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>\n      <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
+    <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
+      <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
       <Text style={styles.title}>ARMAZENAMENTO</Text>
       <Text style={[styles.status, quota?.critical ? styles.critical : quota?.warning ? styles.warning : styles.ok]}>
         {quota?.message || 'VERIFICANDO'}
@@ -70,6 +71,7 @@ export default function ArmazenamentoScreen() {
       <TouchableOpacity style={styles.button} onPress={handleClean} disabled={!basePath || busy}>
         <Text style={styles.buttonText}>{busy ? 'LIMPANDO...' : 'LIMPAR DADOS ANTIGOS'}</Text>
       </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 }
