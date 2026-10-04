@@ -11,6 +11,7 @@ import { gpsTracker } from '../src/gps';
 import { getSharedObdConnection, setSharedObdConnection, subscribeSharedObd, disconnectSharedObd } from '../src/obd/sharedConnection';
 import { RealTripRecorder } from '../src/trip/tripRecorder';
 import { FuelRateIntegrator } from '../src/obd/fuelConsumption';
+import { readAppSettings, writeAppSettings } from '../src/database/appSettings';
 import { addDriveCycle, readDriveCycles } from '../src/storage/driveCycleStorage';
 import { DtcRecord, readDtcs, recordDtc } from '../src/database/dtcManager';
 import {
@@ -231,9 +232,13 @@ export default function LaboratorioScreen() {
     setError('');
     try {
       const paired = await discoverPairedDevices();
+      const settings = await readAppSettings(getBasePath());
       setDevices(paired);
+      const savedAddress = settings.selectedAdapterAddress?.toUpperCase() ?? '';
       setSelectedAddress((current) =>
-        paired.some((item) => item.address === current) ? current : paired[0]?.address ?? '',
+        paired.some((item) => item.address === current) ? current :
+          paired.some((item) => item.address.toUpperCase() === savedAddress) ? savedAddress :
+          paired[0]?.address ?? '',
       );
       setStatus(paired.length ? 'BLUETOOTH OK / ELM NÃO CONECTADO' : 'NENHUM ELM327 PAREADO');
     } catch (cause) {
@@ -274,6 +279,12 @@ export default function LaboratorioScreen() {
         };
       });
 
+      const settings = await readAppSettings(getBasePath());
+      await writeAppSettings(getBasePath(), {
+        ...settings,
+        selectedAdapterAddress: device.address,
+      });
+
       setStatus('ELM RESPONDENDO / DESCOBRINDO SUPORTE DOS PIDs');
       // A conexão já fez a descoberta com a chave ligada. Reutilizamos o resultado
       // para não bombardear a K-Line com uma segunda varredura imediata.
@@ -282,8 +293,12 @@ export default function LaboratorioScreen() {
       const fuelSupported = discovered.includes('015E');
       const fuelLevelSupported = discovered.includes('012F');
       setTripFuelSupported(fuelSupported);
-      startRealTripRecorder(connection.session);
-      setTripActive(fuelSupported);
+      if (fuelSupported) {
+        startRealTripRecorder(connection.session);
+        setTripActive(true);
+      } else {
+        setTripActive(false);
+      }
       setStatus(
         fuelSupported
           ? connection.protocol ? 'VIAGEM AUTOMÁTICA / PID 015E + NÍVEL DE COMBUSTÍVEL 012F' : 'VIAGEM AUTOMÁTICA / PROTOCOLO N/D'
