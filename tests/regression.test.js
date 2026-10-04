@@ -233,6 +233,11 @@ async function testPidScanner() {
   assert.ok(supported.includes('010C'));
   assert.ok(supported.includes('010F'));
   assert.ok(supported.includes('0111'));
+
+  // 012F fica no bloco descoberto por 0120, não por 0100.
+  const supported20 = scanner.decodeSupportedPids('0120', '41 20 00 00 00 02');
+  assert.ok(supported20.includes('012F'));
+  assert.ok(!supported20.includes('012E'));
 }
 
 async function testBluetoothEventTransport() {
