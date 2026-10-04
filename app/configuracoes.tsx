@@ -83,7 +83,8 @@ export default function ConfiguracaoScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>\n      <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
+    <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
+      <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
       <Text style={styles.title}>CONFIGURAÇÕES</Text>
       <Text style={styles.status}>{status}</Text>
 
@@ -137,6 +138,7 @@ export default function ConfiguracaoScreen() {
         <Text style={styles.buttonText}>{busy ? 'AGUARDE...' : 'EXPORTAR SALVAMENTO (.TXT)'}</Text>
       </TouchableOpacity>
       {profile ? <Text style={styles.info}>Veículo: {profile.vehicleName}</Text> : <Text style={styles.info}>Veículo: N/D</Text>}
+      </View>
     </ScrollView>
   );
 }
