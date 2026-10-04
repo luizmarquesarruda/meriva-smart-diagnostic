@@ -19,10 +19,10 @@ function formatTime(iso: string | null): string {
   try { return new Date(iso).toLocaleTimeString('pt-BR'); } catch { return 'N/D'; }
 }
 
-function formatDistance(distanceKm: number): string {
-  if (!Number.isFinite(distanceKm) || distanceKm <= 0) return '0 m';
-  if (distanceKm < 1) return `${Math.round(distanceKm * 1000)} m`;
-  return `${distanceKm.toFixed(2)} km`;
+function formatDistanceParts(distanceKm: number): { value: string; unit: 'm' | 'km' } {
+  if (!Number.isFinite(distanceKm) || distanceKm <= 0) return { value: '0', unit: 'm' };
+  if (distanceKm < 1) return { value: String(Math.round(distanceKm * 1000)), unit: 'm' };
+  return { value: distanceKm.toFixed(2), unit: 'km' };
 }
 
 function reading(readings: LastPidReading[], pid: string): LastPidReading | undefined {
@@ -31,7 +31,7 @@ function reading(readings: LastPidReading[], pid: string): LastPidReading | unde
 
 function value(readings: LastPidReading[], pid: string, digits = 0): string {
   const item = reading(readings, pid);
-  if (item?.status !== 'REAL' || item.value == null || !Number.isFinite(item.value)) return '--';
+  if (item?.status !== 'RESPONDEU' || item.value == null || !Number.isFinite(item.value)) return '--';
   return item.value.toFixed(digits);
 }
 
@@ -84,12 +84,12 @@ export default function IndexScreen() {
   const gpsReady = hasReliableGpsFix(gpsState);
   const gpsWaitingForFix = gpsState.running && gpsState.permissionGranted && !gpsReady;
   const obdReady = obd.connected;
-  const distanceLabel = formatDistance(gpsState.distanceKm);
+  const distance = formatDistanceParts(gpsState.distanceKm);
   const currentRpm = value(readings, '0C');
   const coolant = value(readings, '05');
   const throttle = value(readings, '11', 1);
   const map = value(readings, '0B', 1);
-  const dtcCurrent = dtcs.filter((item) => item.status === 'CURRENT' || item.status === 'CONFIRMED' || item.status === 'PENDING').length;
+  const dtcCurrent = dtcs.filter((item) => item.status === 'CURRENT' || item.status === 'PENDING').length;
 
   if (booting) {
     return (
@@ -128,7 +128,10 @@ export default function IndexScreen() {
             <View style={styles.midGrid}>
               <View>
                 <Text style={styles.midLabel}>DISTÂNCIA</Text>
-                <Text style={styles.midValue}>{distanceLabel}</Text>
+                <View style={styles.rowValue}>
+                  <Text style={styles.midValue}>{distance.value}</Text>
+                  <Text style={styles.midUnit}>{distance.unit}</Text>
+                </View>
               </View>
               <View style={styles.midRight}>
                 <Text style={styles.midLabel}>MÁXIMA</Text>
@@ -163,7 +166,7 @@ export default function IndexScreen() {
         {mode === 'viagem' && (
           <View style={styles.mainScreen}>
             <Text style={styles.screenTitle}>VIAGEM ATUAL</Text>
-            <MidRow label="DISTÂNCIA" value={distanceLabel.replace(' ', '')} unit="" />
+            <MidRow label="DISTÂNCIA" value={distance.value} unit={distance.unit} />
             <MidRow label="MÁXIMA" value={gpsReady ? gpsState.maxSpeedKmh.toFixed(0) : '--'} unit="km/h" />
             <MidRow label="ÚLTIMO CICLO" value={summary.lastRealCycle ? summary.lastRealCycle.distanceTotalKm.toFixed(2) : '--'} unit="km" />
             <MidRow label="CONSUMO" value={summary.lastRealCycle ? summary.lastRealCycle.avgFuelConsumptionKml.toFixed(2) : '--'} unit="km/L" />
@@ -177,8 +180,8 @@ export default function IndexScreen() {
             <MidRow label="OBD" value={obdReady ? 'OK' : '--'} unit="" />
             <MidRow label="PROTOCOLO" value={obd.protocol ?? '--'} unit="" />
             <MidRow label="ECU" value={obd.ecuAddress ?? '--'} unit="" />
-            <MidRow label="FALHAS ATIVAS" value={String(dtcCurrent)} unit="" />
-            <Text style={styles.sourceNote}>{dtcCurrent ? 'VERIFICAR LABORATÓRIO OBD' : 'NENHUMA FALHA ATIVA REGISTRADA'}</Text>
+            <MidRow label="DTC ATIVOS/PENDENTES" value={dtcCurrent ? String(dtcCurrent) : '--'} unit="" />
+            <Text style={styles.sourceNote}>{dtcs.length ? (dtcCurrent ? 'VERIFICAR LABORATÓRIO OBD' : 'SEM DTC ATIVO/PENDENTE REGISTRADO') : 'NENHUMA LEITURA DTC REGISTRADA'}</Text>
           </View>
         )}
 
@@ -198,11 +201,20 @@ export default function IndexScreen() {
         </View>
 
         <View style={styles.actions}>
-          <Link href="/laboratorio" asChild>
-            <TouchableOpacity style={styles.actionButton}>
-              <Text style={styles.actionText}>LABORATÓRIO OBD</Text>
-            </TouchableOpacity>
-          </Link>
+          {screenPrefs.laboratorio && (
+            <Link href="/laboratorio" asChild>
+              <TouchableOpacity style={styles.actionButton}>
+                <Text style={styles.actionText}>LABORATÓRIO OBD</Text>
+              </TouchableOpacity>
+            </Link>
+          )}
+          {screenPrefs.armazenamento && (
+            <Link href="/armazenamento" asChild>
+              <TouchableOpacity style={styles.actionButton}>
+                <Text style={styles.actionText}>ARMAZENAMENTO</Text>
+              </TouchableOpacity>
+            </Link>
+          )}
           {screenPrefs.configuracoes && (
             <Link href="/configuracoes" asChild>
               <TouchableOpacity style={styles.actionButton}>
