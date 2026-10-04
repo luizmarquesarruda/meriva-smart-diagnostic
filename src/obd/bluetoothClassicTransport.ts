@@ -100,7 +100,7 @@ export class BluetoothClassicTransport implements ObdTransport {
     await device.write(data, 'ascii');
   }
 
-  async readUntilPrompt(timeoutMs = 3000): Promise<string> {
+  async readUntilPrompt(timeoutMs = 6000): Promise<string> {
     const device = this.device;
     if (!device || !this.connected) throw new Error('BLUETOOTH NÃO CONECTADO');
 
