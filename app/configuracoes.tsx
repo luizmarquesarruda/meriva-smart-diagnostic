@@ -94,6 +94,9 @@ export default function ConfiguracaoScreen() {
           <View style={styles.card}>
             <Text style={styles.label}>Combustível</Text>
             <View style={styles.row}>
+              <TouchableOpacity style={[styles.choice, settings.fuelType === 'FLEX' && styles.choiceActive]} onPress={() => void updateSetting('fuelType', 'FLEX')}>
+                <Text style={styles.choiceText}>FLEX</Text>
+              </TouchableOpacity>
               <TouchableOpacity style={[styles.choice, settings.fuelType === 'ETANOL' && styles.choiceActive]} onPress={() => void updateSetting('fuelType', 'ETANOL')}>
                 <Text style={styles.choiceText}>ETANOL</Text>
               </TouchableOpacity>
