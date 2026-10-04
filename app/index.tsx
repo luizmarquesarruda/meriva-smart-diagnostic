@@ -1,14 +1,18 @@
 import { Link, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import { readDriveCycles, initializeDriveCycles } from '../src/storage/driveCycleStorage';
 import { getDriveCycleSummary, type DriveCycle } from '../src/data/driveCycles';
 import { getAutoSaveStatus, initAutoSave, updateAutoSaveState } from '../src/meriva/autosaveManager';
 import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
-import type { ObdConnectionState } from '../src/meriva/autosaveState';
+import type { LastPidReading, ObdConnectionState } from '../src/meriva/autosaveState';
 import { gpsTracker, hasReliableGpsFix, type GpsTripState } from '../src/gps';
 import { DEFAULT_SCREEN_PREFERENCES, loadScreenPreferences, type ScreenPreferences } from '../src/ui/screenPreferences';
+
+type DisplayMode = 'principal' | 'motor' | 'viagem' | 'diagnostico';
+
+const BOOT_MS = 1800;
 
 function formatTime(iso: string | null): string {
   if (!iso) return 'N/D';
@@ -21,19 +25,34 @@ function formatDistance(distanceKm: number): string {
   return `${distanceKm.toFixed(2)} km`;
 }
 
-function statusColor(ok: boolean): string {
-  return ok ? '#16a34a' : '#64748b';
+function reading(readings: LastPidReading[], pid: string): LastPidReading | undefined {
+  return readings.find((item) => item.pid.toUpperCase().replace(/^01/, '') === pid.toUpperCase());
+}
+
+function value(readings: LastPidReading[], pid: string, digits = 0): string {
+  const item = reading(readings, pid);
+  if (item?.status !== 'REAL' || item.value == null || !Number.isFinite(item.value)) return '--';
+  return item.value.toFixed(digits);
 }
 
 export default function IndexScreen() {
   const [cycles, setCycles] = useState<DriveCycle[]>([]);
   const [obd, setObd] = useState<ObdConnectionState>({ connected: false });
+  const [readings, setReadings] = useState<LastPidReading[]>([]);
+  const [dtcs, setDtcs] = useState<import('../src/types/sourceTypes').DtcRecord[]>([]);
   const [saveStatus, setSaveStatus] = useState<AutoSaveStatus>({ lastSavedAt: null, lastSaveReason: null, lastError: null });
   const [isHydrated, setIsHydrated] = useState(false);
   const [gpsState, setGpsState] = useState<GpsTripState>(gpsTracker.getState());
   const [screenPrefs, setScreenPrefs] = useState<ScreenPreferences>(DEFAULT_SCREEN_PREFERENCES);
+  const [booting, setBooting] = useState(true);
+  const [mode, setMode] = useState<DisplayMode>('principal');
 
   useEffect(() => gpsTracker.subscribe(setGpsState), []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setBooting(false), BOOT_MS);
+    return () => clearTimeout(timer);
+  }, []);
 
   const reloadStoredState = useCallback(async () => {
     const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
@@ -47,6 +66,8 @@ export default function IndexScreen() {
       }
       setCycles(loaded);
       setObd(restored.obd);
+      setReadings(restored.lastReadings);
+      setDtcs(restored.dtcs);
       setScreenPrefs(await loadScreenPreferences(basePath));
       setSaveStatus(getAutoSaveStatus());
       setIsHydrated(true);
@@ -63,178 +84,197 @@ export default function IndexScreen() {
   const gpsReady = hasReliableGpsFix(gpsState);
   const gpsWaitingForFix = gpsState.running && gpsState.permissionGranted && !gpsReady;
   const obdReady = obd.connected;
-  const hasRealCycle = Boolean(summary.lastRealCycle);
   const distanceLabel = formatDistance(gpsState.distanceKm);
+  const currentRpm = value(readings, '0C');
+  const coolant = value(readings, '05');
+  const throttle = value(readings, '11', 1);
+  const map = value(readings, '0B', 1);
+  const dtcCurrent = dtcs.filter((item) => item.status === 'CURRENT' || item.status === 'CONFIRMED' || item.status === 'PENDING').length;
+
+  if (booting) {
+    return (
+      <SafeAreaView style={styles.boot}>
+        <View style={styles.bootCenter}>
+          <Text style={styles.bootBrand}>CHEVROLET</Text>
+          <Text style={styles.bootModel}>MERIVA MAXX 1.4</Text>
+          <View style={styles.bootLine} />
+          <Text style={styles.bootSmall}>INICIALIZANDO</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.brand}>MERIVA SMART</Text>
-            <Text style={styles.vehicle}>MAXX 1.4 8V</Text>
-          </View>
-          <View style={styles.headerState}>
-            <Text style={styles.headerStateLabel}>ESTADO</Text>
-            <Text style={styles.headerStateValue}>{obdReady ? 'OBD OK' : 'OBD OFF'}</Text>
-          </View>
+      <View style={styles.display}>
+        <View style={styles.topLine}>
+          <Text style={styles.topText}>CHEVROLET</Text>
+          <Text style={styles.topStatus}>{obdReady ? 'OBD OK' : 'OBD --'}</Text>
         </View>
 
-        <View style={styles.statusBar}>
-          <View style={styles.statusItem}>
-            <View style={[styles.dot, { backgroundColor: statusColor(gpsReady) }]} />
-            <Text style={styles.statusText}>GPS {gpsReady ? 'FIX OK' : 'AGUARDANDO'}</Text>
-          </View>
-          <View style={styles.statusItem}>
-            <View style={[styles.dot, { backgroundColor: statusColor(obdReady) }]} />
-            <Text style={styles.statusText}>OBD {obdReady ? 'CONECTADO' : 'DESCONECTADO'}</Text>
-          </View>
-          <View style={styles.statusItem}>
-            <View style={[styles.dot, { backgroundColor: statusColor(!saveStatus.lastError) }]} />
-            <Text style={styles.statusText}>AUTO SAVE</Text>
-          </View>
-        </View>
+        <View style={styles.separator} />
 
-        <View style={styles.speedPanel}>
-          <Text style={styles.eyebrow}>VELOCIDADE REAL DO CELULAR</Text>
-          <View style={styles.speedRow}>
-            <Text style={styles.speedValue}>{gpsReady ? gpsState.currentSpeedKmh.toFixed(0) : '--'}</Text>
-            <Text style={styles.speedUnit}>km/h</Text>
-          </View>
-          <Text style={styles.gpsHint}>
-            {gpsState.error
-              ? gpsState.error
-              : gpsReady
-                ? `Precisão ${gpsState.lastAccuracyM == null ? 'N/D' : `${gpsState.lastAccuracyM.toFixed(0)} m`} • atualização recente`
-                : gpsWaitingForFix
-                  ? 'Aguardando uma posição GPS confiável. Velocidade e distância ficam bloqueadas.'
-                  : 'GPS não está disponível. Nenhuma velocidade é inventada.'}
-          </Text>
-        </View>
-
-        <View style={styles.tripRow}>
-          <View style={styles.tripBlock}>
-            <Text style={styles.metricLabel}>DISTÂNCIA</Text>
-            <Text style={styles.metricValue}>{distanceLabel}</Text>
-            <Text style={styles.metricHint}>viagem atual</Text>
-          </View>
-          <View style={styles.tripBlock}>
-            <Text style={styles.metricLabel}>MÁXIMA</Text>
-            <Text style={styles.metricValue}>{gpsReady ? `${gpsState.maxSpeedKmh.toFixed(0)} km/h` : '--'}</Text>
-            <Text style={styles.metricHint}>GPS confiável</Text>
-          </View>
-        </View>
-
-        <View style={styles.healthSection}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>SAÚDE DO VEÍCULO</Text>
-            <Text style={obdReady ? styles.goodText : styles.waitText}>{obdReady ? 'ONLINE' : 'AGUARDANDO OBD'}</Text>
-          </View>
-          <View style={styles.healthRow}>
-            <View>
-              <Text style={styles.healthLabel}>ECU</Text>
-              <Text style={styles.healthValue}>{obd.ecuAddress ?? 'N/D'}</Text>
+        {mode === 'principal' && (
+          <View style={styles.mainScreen}>
+            <Text style={styles.screenTitle}>MERIVA MAXX 1.4</Text>
+            <View style={styles.mainValueRow}>
+              <Text style={styles.mainValue}>{gpsReady ? gpsState.currentSpeedKmh.toFixed(0) : '--'}</Text>
+              <Text style={styles.mainUnit}>km/h</Text>
             </View>
-            <View>
-              <Text style={styles.healthLabel}>PROTOCOLO</Text>
-              <Text style={styles.healthValue}>{obd.protocol ?? 'N/D'}</Text>
-            </View>
-          </View>
-          <Text style={styles.healthHint}>
-            {obdReady ? 'OBD conectado. Consulte dados reais da ECU no Laboratório.' : 'Conecte um ELM327 Bluetooth Classic para liberar dados da ECU.'}
-          </Text>
-        </View>
+            <Text style={styles.mainCaption}>
+              {gpsState.error ? gpsState.error : gpsReady ? 'VELOCIDADE GPS' : gpsWaitingForFix ? 'AGUARDANDO GPS' : 'GPS SEM FIX'}
+            </Text>
 
-        {hasRealCycle ? (
-          <View style={styles.realDataSection}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>ÚLTIMO CICLO REAL</Text>
-              <Text style={styles.goodText}>REAL</Text>
+            <View style={styles.midGrid}>
+              <View>
+                <Text style={styles.midLabel}>DISTÂNCIA</Text>
+                <Text style={styles.midValue}>{distanceLabel}</Text>
+              </View>
+              <View style={styles.midRight}>
+                <Text style={styles.midLabel}>MÁXIMA</Text>
+                <Text style={styles.midValue}>{gpsReady ? `${gpsState.maxSpeedKmh.toFixed(0)} km/h` : '--'}</Text>
+              </View>
             </View>
-            <View style={styles.realGrid}>
-              <View><Text style={styles.metricLabel}>DISTÂNCIA</Text><Text style={styles.smallValue}>{summary.lastRealCycle!.distanceTotalKm.toFixed(2)} km</Text></View>
-              <View><Text style={styles.metricLabel}>CONSUMO</Text><Text style={styles.smallValue}>{summary.lastRealCycle!.avgFuelConsumptionKml.toFixed(2)} km/L</Text></View>
+
+            <View style={styles.midGrid}>
+              <View>
+                <Text style={styles.midLabel}>GPS</Text>
+                <Text style={styles.midValue}>{gpsReady ? `${gpsState.lastAccuracyM?.toFixed(0) ?? '--'} m` : '--'}</Text>
+              </View>
+              <View style={styles.midRight}>
+                <Text style={styles.midLabel}>ECU</Text>
+                <Text style={styles.midValue}>{obd.ecuAddress ?? '--'}</Text>
+              </View>
             </View>
-          </View>
-        ) : (
-          <View style={styles.noticeSection}>
-            <Text style={styles.noticeTitle}>PRONTO PARA A PRIMEIRA VIAGEM</Text>
-            <Text style={styles.noticeText}>O painel não usa dados de referência como se fossem dados atuais do carro.</Text>
           </View>
         )}
 
-        <Link href="/laboratorio" asChild>
-          <TouchableOpacity style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>ABRIR LABORATÓRIO OBD</Text>
-          </TouchableOpacity>
-        </Link>
+        {mode === 'motor' && (
+          <View style={styles.mainScreen}>
+            <Text style={styles.screenTitle}>DADOS DO MOTOR</Text>
+            <MidRow label="RPM" value={currentRpm} unit="rpm" />
+            <MidRow label="TEMPERATURA" value={coolant} unit="°C" />
+            <MidRow label="BORBOLETA" value={throttle} unit="%" />
+            <MidRow label="MAP" value={map} unit="kPa" />
+            <Text style={styles.sourceNote}>SOMENTE LEITURA REAL DA ECU</Text>
+          </View>
+        )}
 
-        <View style={styles.secondaryActions}>
-          {screenPrefs.armazenamento && (
-            <Link href="/armazenamento" asChild>
-              <TouchableOpacity style={styles.secondaryButton}>
-                <Text style={styles.secondaryButtonText}>ARMAZENAMENTO</Text>
-              </TouchableOpacity>
-            </Link>
-          )}
+        {mode === 'viagem' && (
+          <View style={styles.mainScreen}>
+            <Text style={styles.screenTitle}>VIAGEM ATUAL</Text>
+            <MidRow label="DISTÂNCIA" value={distanceLabel.replace(' ', '')} unit="" />
+            <MidRow label="MÁXIMA" value={gpsReady ? gpsState.maxSpeedKmh.toFixed(0) : '--'} unit="km/h" />
+            <MidRow label="ÚLTIMO CICLO" value={summary.lastRealCycle ? summary.lastRealCycle.distanceTotalKm.toFixed(2) : '--'} unit="km" />
+            <MidRow label="CONSUMO" value={summary.lastRealCycle ? summary.lastRealCycle.avgFuelConsumptionKml.toFixed(2) : '--'} unit="km/L" />
+            <Text style={styles.sourceNote}>CONSUMO SOMENTE QUANDO HOUVER DADO REAL VÁLIDO</Text>
+          </View>
+        )}
+
+        {mode === 'diagnostico' && (
+          <View style={styles.mainScreen}>
+            <Text style={styles.screenTitle}>DIAGNÓSTICO</Text>
+            <MidRow label="OBD" value={obdReady ? 'OK' : '--'} unit="" />
+            <MidRow label="PROTOCOLO" value={obd.protocol ?? '--'} unit="" />
+            <MidRow label="ECU" value={obd.ecuAddress ?? '--'} unit="" />
+            <MidRow label="FALHAS ATIVAS" value={String(dtcCurrent)} unit="" />
+            <Text style={styles.sourceNote}>{dtcCurrent ? 'VERIFICAR LABORATÓRIO OBD' : 'NENHUMA FALHA ATIVA REGISTRADA'}</Text>
+          </View>
+        )}
+
+        <View style={styles.separator} />
+
+        <View style={styles.bottomStatus}>
+          <Text style={styles.bottomText}>{gpsReady ? 'GPS FIX' : 'GPS --'}</Text>
+          <Text style={styles.bottomText}>{obdReady ? 'ELM327 OK' : 'ELM327 --'}</Text>
+          <Text style={styles.bottomText}>{saveStatus.lastError ? 'SAVE ERRO' : 'AUTO SAVE'}</Text>
+        </View>
+
+        <View style={styles.menu}>
+          <MenuButton label="VEÍCULO" active={mode === 'principal'} onPress={() => setMode('principal')} />
+          <MenuButton label="MOTOR" active={mode === 'motor'} onPress={() => setMode('motor')} />
+          <MenuButton label="VIAGEM" active={mode === 'viagem'} onPress={() => setMode('viagem')} />
+          <MenuButton label="DIAG." active={mode === 'diagnostico'} onPress={() => setMode('diagnostico')} />
+        </View>
+
+        <View style={styles.actions}>
+          <Link href="/laboratorio" asChild>
+            <TouchableOpacity style={styles.actionButton}>
+              <Text style={styles.actionText}>LABORATÓRIO OBD</Text>
+            </TouchableOpacity>
+          </Link>
           {screenPrefs.configuracoes && (
             <Link href="/configuracoes" asChild>
-              <TouchableOpacity style={styles.secondaryButton}>
-                <Text style={styles.secondaryButtonText}>CONFIGURAÇÕES</Text>
+              <TouchableOpacity style={styles.actionButton}>
+                <Text style={styles.actionText}>CONFIGURAÇÕES</Text>
               </TouchableOpacity>
             </Link>
           )}
         </View>
 
-        <Text style={styles.footer}>{isHydrated ? `Autosave ativo • último save ${formatTime(saveStatus.lastSavedAt)}` : 'Carregando estado salvo...'}</Text>
-      </ScrollView>
+        <Text style={styles.footer}>
+          {isHydrated ? `MERIVA SMART • ${formatTime(saveStatus.lastSavedAt)}` : 'CARREGANDO...'}
+        </Text>
+      </View>
     </SafeAreaView>
   );
 }
 
+function MidRow({ label, value: displayValue, unit }: { label: string; value: string; unit: string }) {
+  return (
+    <View style={styles.midRow}>
+      <Text style={styles.midLabel}>{label}</Text>
+      <View style={styles.rowValue}>
+        <Text style={styles.midValue}>{displayValue}</Text>
+        {unit ? <Text style={styles.midUnit}>{unit}</Text> : null}
+      </View>
+    </View>
+  );
+}
+
+function MenuButton({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <TouchableOpacity onPress={onPress} style={styles.menuButton}>
+      <Text style={[styles.menuText, active && styles.menuTextActive]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f4f7fb' },
-  content: { flexGrow: 1, padding: 18, paddingBottom: 32 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  brand: { color: '#1d4ed8', fontSize: 25, fontWeight: '800', letterSpacing: 0.4 },
-  vehicle: { color: '#475569', fontSize: 14, fontWeight: '700', marginTop: 2 },
-  headerState: { alignItems: 'flex-end' },
-  headerStateLabel: { color: '#94a3b8', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
-  headerStateValue: { color: '#1e293b', fontSize: 13, fontWeight: '800', marginTop: 2 },
-  statusBar: { backgroundColor: '#e8eef8', borderRadius: 12, padding: 11, flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 },
-  statusItem: { flexDirection: 'row', alignItems: 'center' },
-  dot: { width: 8, height: 8, borderRadius: 4, marginRight: 5 },
-  statusText: { color: '#475569', fontSize: 10, fontWeight: '800' },
-  speedPanel: { backgroundColor: '#fff', borderRadius: 18, padding: 20, marginBottom: 12, borderWidth: 1, borderColor: '#e2e8f0' },
-  eyebrow: { color: '#64748b', fontSize: 11, fontWeight: '800', letterSpacing: 0.7 },
-  speedRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: 4 },
-  speedValue: { color: '#0f172a', fontSize: 64, lineHeight: 72, fontWeight: '800', letterSpacing: -2 },
-  speedUnit: { color: '#2563eb', fontSize: 20, fontWeight: '800', marginLeft: 8 },
-  gpsHint: { color: '#64748b', fontSize: 12, lineHeight: 17, marginTop: 3 },
-  tripRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
-  tripBlock: { flex: 1, backgroundColor: '#fff', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#e2e8f0' },
-  metricLabel: { color: '#64748b', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
-  metricValue: { color: '#0f172a', fontSize: 21, fontWeight: '800', marginTop: 5 },
-  metricHint: { color: '#94a3b8', fontSize: 11, marginTop: 2 },
-  healthSection: { backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#e2e8f0' },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  sectionTitle: { color: '#1e293b', fontSize: 13, fontWeight: '800', letterSpacing: 0.4 },
-  goodText: { color: '#15803d', fontSize: 11, fontWeight: '800' },
-  waitText: { color: '#64748b', fontSize: 11, fontWeight: '800' },
-  healthRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  healthLabel: { color: '#94a3b8', fontSize: 10, fontWeight: '800' },
-  healthValue: { color: '#334155', fontSize: 13, fontWeight: '700', marginTop: 2 },
-  healthHint: { color: '#64748b', fontSize: 12, lineHeight: 17 },
-  realDataSection: { backgroundColor: '#ecfdf5', borderRadius: 14, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#bbf7d0' },
-  realGrid: { flexDirection: 'row', justifyContent: 'space-between' },
-  smallValue: { color: '#166534', fontSize: 17, fontWeight: '800', marginTop: 4 },
-  noticeSection: { backgroundColor: '#eff6ff', borderRadius: 14, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#bfdbfe' },
-  noticeTitle: { color: '#1e40af', fontSize: 12, fontWeight: '800', marginBottom: 4 },
-  noticeText: { color: '#475569', fontSize: 12, lineHeight: 17 },
-  primaryButton: { backgroundColor: '#2563eb', borderRadius: 14, minHeight: 54, alignItems: 'center', justifyContent: 'center', marginTop: 4, marginBottom: 10 },
-  primaryButtonText: { color: '#fff', fontSize: 14, fontWeight: '800', letterSpacing: 0.2 },
-  secondaryActions: { flexDirection: 'row', gap: 10 },
-  secondaryButton: { flex: 1, backgroundColor: '#fff', borderRadius: 12, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#cbd5e1' },
-  secondaryButtonText: { color: '#334155', fontSize: 11, fontWeight: '800' },
-  footer: { color: '#94a3b8', fontSize: 10, textAlign: 'center', marginTop: 14 },
+  boot: { flex: 1, backgroundColor: '#02070d', alignItems: 'center', justifyContent: 'center' },
+  bootCenter: { width: '88%', alignItems: 'center' },
+  bootBrand: { color: '#4da3ff', fontSize: 25, fontWeight: '700', letterSpacing: 2.2, fontFamily: 'monospace' },
+  bootModel: { color: '#4da3ff', fontSize: 20, fontWeight: '700', letterSpacing: 1.4, marginTop: 10, fontFamily: 'monospace' },
+  bootLine: { width: '64%', height: 1, backgroundColor: '#1e5f9f', marginVertical: 22 },
+  bootSmall: { color: '#2e79bb', fontSize: 11, letterSpacing: 2, fontFamily: 'monospace' },
+  container: { flex: 1, backgroundColor: '#02070d', padding: 10 },
+  display: { flex: 1, borderWidth: 1, borderColor: '#123a5c', backgroundColor: '#02070d', padding: 14 },
+  topLine: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 28 },
+  topText: { color: '#4da3ff', fontSize: 15, fontWeight: '700', letterSpacing: 1.8, fontFamily: 'monospace' },
+  topStatus: { color: '#2e79bb', fontSize: 10, fontWeight: '700', letterSpacing: 1, fontFamily: 'monospace' },
+  separator: { height: 1, backgroundColor: '#123a5c', marginVertical: 8 },
+  mainScreen: { flex: 1, paddingVertical: 6 },
+  screenTitle: { color: '#2e79bb', fontSize: 12, fontWeight: '700', letterSpacing: 1.5, fontFamily: 'monospace', marginBottom: 12 },
+  mainValueRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center', marginTop: 8 },
+  mainValue: { color: '#4da3ff', fontSize: 72, lineHeight: 80, fontWeight: '700', fontFamily: 'monospace', letterSpacing: -3 },
+  mainUnit: { color: '#2e79bb', fontSize: 18, fontWeight: '700', fontFamily: 'monospace', marginLeft: 8 },
+  mainCaption: { color: '#2e79bb', fontSize: 10, textAlign: 'center', letterSpacing: 1.2, fontFamily: 'monospace', marginTop: 4 },
+  midGrid: { flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: '#0c2b44', paddingTop: 12, marginTop: 14 },
+  midRight: { alignItems: 'flex-end' },
+  midLabel: { color: '#2e79bb', fontSize: 10, fontWeight: '700', letterSpacing: 1.1, fontFamily: 'monospace' },
+  midValue: { color: '#4da3ff', fontSize: 19, fontWeight: '700', letterSpacing: 0.4, fontFamily: 'monospace', marginTop: 4 },
+  midUnit: { color: '#2e79bb', fontSize: 11, fontFamily: 'monospace', marginLeft: 5 },
+  midRow: { minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#0c2b44' },
+  rowValue: { flexDirection: 'row', alignItems: 'baseline' },
+  sourceNote: { color: '#235e92', fontSize: 9, letterSpacing: 0.8, fontFamily: 'monospace', marginTop: 16, textAlign: 'center' },
+  bottomStatus: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8 },
+  bottomText: { color: '#2e79bb', fontSize: 9, fontWeight: '700', fontFamily: 'monospace', letterSpacing: 0.8 },
+  menu: { flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#0c2b44', paddingVertical: 7 },
+  menuButton: { paddingHorizontal: 5, paddingVertical: 5 },
+  menuText: { color: '#235e92', fontSize: 9, fontWeight: '700', fontFamily: 'monospace', letterSpacing: 0.5 },
+  menuTextActive: { color: '#4da3ff' },
+  actions: { flexDirection: 'row', gap: 8, marginTop: 9 },
+  actionButton: { flex: 1, minHeight: 40, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#164a75', backgroundColor: '#04111d' },
+  actionText: { color: '#4da3ff', fontSize: 9, fontWeight: '700', fontFamily: 'monospace', letterSpacing: 0.6 },
+  footer: { color: '#1f5687', fontSize: 8, textAlign: 'center', marginTop: 8, fontFamily: 'monospace' },
 });
