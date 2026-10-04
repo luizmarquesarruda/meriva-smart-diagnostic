@@ -3,7 +3,7 @@ import { Alert, AppState, Linking } from 'react-native';
 import { Stack } from 'expo-router';
 import { ensureBluetoothReady, openBluetoothAppSettings } from '../src/obd/bluetoothManager';
 import { gpsTracker } from '../src/gps';
-import { readAppSettings } from '../src/database/appSettings';
+import { readAppSettings, writeAppSettings } from '../src/database/appSettings';
 import { connectPreferredElm, disconnectSharedObd } from '../src/obd/sharedConnection';
 import * as FileSystem from 'expo-file-system';
 import { initAutoSave, updateAutoSaveState } from '../src/meriva/autosaveManager';
@@ -25,7 +25,12 @@ export default function RootLayout() {
       try {
         if (!autoConnectObd) return;
         await ensureBluetoothReady();
-        const connection = await connectPreferredElm();
+        const settings = await loadSettings();
+        const connection = await connectPreferredElm(settings.selectedAdapterAddress);
+        await writeAppSettings(basePath, {
+          ...settings,
+          selectedAdapterAddress: connection.device.address,
+        });
         await initAutoSave(basePath);
         updateAutoSaveState((state) => {
           state.obd = {
@@ -83,8 +88,10 @@ export default function RootLayout() {
 
     const startup = async () => {
       const settings = await loadSettings();
-      await checkBluetooth(settings.autoConnectObd, settings.diagnosticAlerts);
-      await startGps(settings.autoStartGps, settings.diagnosticAlerts);
+      await Promise.all([
+        checkBluetooth(settings.autoConnectObd, settings.diagnosticAlerts),
+        startGps(settings.autoStartGps, settings.diagnosticAlerts),
+      ]);
     };
 
     void startup();
