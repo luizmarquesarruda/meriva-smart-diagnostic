@@ -7,7 +7,7 @@ import { getDriveCycleSummary, type DriveCycle } from '../src/data/driveCycles';
 import { getAutoSaveStatus, initAutoSave, updateAutoSaveState } from '../src/meriva/autosaveManager';
 import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
 import type { ObdConnectionState } from '../src/meriva/autosaveState';
-import { gpsTracker, type GpsTripState } from '../src/gps';
+import { gpsTracker, hasReliableGpsFix, type GpsTripState } from '../src/gps';
 import { DEFAULT_SCREEN_PREFERENCES, loadScreenPreferences, type ScreenPreferences } from '../src/ui/screenPreferences';
 
 function formatTime(iso: string | null): string {
@@ -60,8 +60,7 @@ export default function IndexScreen() {
   useFocusEffect(useCallback(() => { void reloadStoredState(); }, [reloadStoredState]));
 
   const summary = useMemo(() => getDriveCycleSummary(cycles), [cycles]);
-  const gpsFixAgeMs = gpsState.lastTimestamp == null ? Infinity : Math.max(0, Date.now() - gpsState.lastTimestamp);
-  const gpsReady = gpsState.running && gpsState.permissionGranted && gpsState.samples > 0 && gpsFixAgeMs <= 5000 && (gpsState.lastAccuracyM == null || gpsState.lastAccuracyM <= 60);
+  const gpsReady = hasReliableGpsFix(gpsState);
   const gpsWaitingForFix = gpsState.running && gpsState.permissionGranted && !gpsReady;
   const obdReady = obd.connected;
   const hasRealCycle = Boolean(summary.lastRealCycle);
