@@ -286,8 +286,8 @@ export default function LaboratorioScreen() {
       setTripActive(fuelSupported);
       setStatus(
         fuelSupported
-          ? connection.protocol ? 'VIAGEM AUTOMÁTICA / PID 015E + BOIA 012F' : 'VIAGEM AUTOMÁTICA / PROTOCOLO N/D'
-          : fuelLevelSupported ? 'ELM RESPONDENDO / BOIA 012F ATIVA' : 'ELM RESPONDENDO / SEM PID 015E E 012F',
+          ? connection.protocol ? 'VIAGEM AUTOMÁTICA / PID 015E + NÍVEL DE COMBUSTÍVEL 012F' : 'VIAGEM AUTOMÁTICA / PROTOCOLO N/D'
+          : fuelLevelSupported ? 'ELM RESPONDENDO / NÍVEL DE COMBUSTÍVEL 012F ATIVA' : 'ELM RESPONDENDO / SEM PID 015E E 012F',
       );
     } catch (cause) {
       const failedSession = sessionRef.current;
@@ -440,7 +440,7 @@ export default function LaboratorioScreen() {
         <Text style={styles.tripTitle}>VIAGEM AUTOMÁTICA</Text>
         <Text style={styles.tripLine}>STATUS: {tripActive ? 'GRAVANDO' : 'AGUARDANDO OBD'}</Text>
         <Text style={styles.tripLine}>PID 015E: {tripFuelSupported === null ? 'N/D' : tripFuelSupported ? 'SUPORTADO' : 'NÃO SUPORTADO'}</Text>
-        <Text style={styles.tripLine}>BOIA / PID 012F: {fuelLevelPercent == null ? 'N/D' : `${fuelLevelPercent.toFixed(1)}%`}</Text>
+        <Text style={styles.tripLine}>NÍVEL DE COMBUSTÍVEL ECU / PID 012F: {fuelLevelPercent == null ? 'N/D' : `${fuelLevelPercent.toFixed(1)}%`}</Text>
         <Text style={styles.tripLine}>DISTÂNCIA GPS: {tripDistanceKm.toFixed(3)} km</Text>
         <Text style={styles.tripLine}>COMBUSTÍVEL REAL: {tripFuelUsedL.toFixed(6)} L</Text>
         <Text style={styles.tripLine}>CONSUMO: {tripConsumptionKml == null ? 'N/D' : `${tripConsumptionKml.toFixed(3)} km/L`}</Text>
@@ -508,7 +508,7 @@ export default function LaboratorioScreen() {
         <Text style={styles.label}>TEMPO</Text><Text style={styles.value}>{elapsedMs === null ? 'SEM DADOS' : `${elapsedMs} ms`}</Text>
         <Text style={styles.label}>STATUS</Text><Text style={styles.value}>{parsed?.status || 'COMANDO'}</Text>
         <Text style={styles.label}>VALOR</Text><Text style={styles.value}>{parsed?.value === null || !parsed ? 'SEM DADOS' : `${parsed.value} ${parsed.unit}`}</Text>
-        <Text style={styles.label}>NÍVEL DA BOIA (PID 012F)</Text><Text style={styles.value}>{fuelLevelPercent == null ? 'N/D' : `${fuelLevelPercent.toFixed(1)} %`}</Text>
+        <Text style={styles.label}>NÍVEL DE COMBUSTÍVEL ECU (PID 012F)</Text><Text style={styles.value}>{fuelLevelPercent == null ? 'N/D' : `${fuelLevelPercent.toFixed(1)} %`}</Text>
         <Text style={styles.label}>COMBUSTÍVEL INTEGRADO (PID 015E)</Text><Text style={styles.value}>{fuelUsedL.toFixed(6)} L</Text>
         <Text style={styles.label}>RAW PRESERVADO</Text><Text style={styles.value}>{rx || 'SEM DADOS'}</Text>
         <Text style={styles.label}>DTC ATUAIS</Text><Text style={styles.value}>{dtcCodes.length ? dtcCodes.join(', ') : 'NENHUM'}</Text>
