@@ -7,7 +7,6 @@ import { SimulatedObdTransport } from '../src/obd/simulatedTransport';
 import { BluetoothDeviceInfo } from '../src/obd/bluetoothClassicTransport';
 import { createRealElmSession, discoverPairedDevices } from '../src/obd/bluetoothManager';
 import { discoverSupportedPids, KNOWN_PIDS } from '../src/obd/pidScanner';
-import { FuelRateIntegrator } from '../src/obd/fuelConsumption';
 import { gpsTracker } from '../src/gps';
 import { RealTripRecorder } from '../src/trip/tripRecorder';
 import { addDriveCycle, readDriveCycles } from '../src/storage/driveCycleStorage';
@@ -47,7 +46,6 @@ export default function LaboratorioScreen() {
   const [tripConsumptionKml, setTripConsumptionKml] = useState<number | null>(null);
   const [tripActive, setTripActive] = useState(false);
   const [tripFuelSupported, setTripFuelSupported] = useState<boolean | null>(null);
-  const fuelIntegratorRef = useRef(new FuelRateIntegrator());
   const sessionRef = useRef<Elm327Session | null>(null);
   const tripRecorderRef = useRef<RealTripRecorder | null>(null);
   const tripLoopActiveRef = useRef(false);
@@ -134,7 +132,6 @@ export default function LaboratorioScreen() {
     const gpsDistanceAtStart = gpsTracker.getState().distanceKm;
     const recorder = new RealTripRecorder(Date.now(), gpsDistanceAtStart);
     tripRecorderRef.current = recorder;
-    fuelIntegratorRef.current.reset();
     setFuelUsedL(0);
     setTripDistanceKm(0);
     setTripFuelUsedL(0);
