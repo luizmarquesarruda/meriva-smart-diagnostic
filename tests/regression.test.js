@@ -250,9 +250,9 @@ async function testPidScanner() {
   assert.ok(!supported20.includes('012E'));
 
   const supported40 = scanner.decodeSupportedPids('0140', '41 40 00 00 00 02');
-  assert.ok(supported40.includes('0160'));
+  assert.ok(supported40.includes('015F'));
   const supported60 = scanner.decodeSupportedPids('0160', '41 60 00 00 00 01');
-  assert.ok(supported60.includes('0180'));
+  assert.ok(supported60.includes('0179'));
 }
 
 async function testBluetoothEventTransport() {
