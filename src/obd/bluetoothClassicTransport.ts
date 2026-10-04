@@ -107,8 +107,7 @@ export class BluetoothClassicTransport implements ObdTransport {
 
     const partial = this.received.replace(/^\s+|\s+$/g, '');
     this.received = '';
-    if (partial) return partial;
-    throw new Error('TIMEOUT');
+    throw new Error(partial ? 'TIMEOUT: RESPOSTA ELM SEM PROMPT FINAL' : 'TIMEOUT');
   }
 
   private markDisconnected(): void {
