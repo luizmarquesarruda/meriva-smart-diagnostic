@@ -1,4 +1,5 @@
 import * as FileSystem from 'expo-file-system';
+import { MERIVA_BIBLE_SOURCE, MERIVA_TECHNICAL_PROFILE } from './merivaBible';
 
 export interface VehicleProfile {
   vehicleName: string;
@@ -11,6 +12,11 @@ export interface VehicleProfile {
   lastModified: string;
   protocolBaseline: string;
   ecuAddress?: string;
+  technicalSource?: string;
+  engineFamily?: string;
+  fuelType?: string;
+  applicationCode?: string;
+  ecuReferences?: string[];
 }
 
 export async function createVehicleProfile(basePath: string, profile: VehicleProfile): Promise<void> {
@@ -42,4 +48,29 @@ export async function readVehicleProfile(basePath: string): Promise<VehicleProfi
   } catch {
     return null;
   }
+}
+
+export async function ensureMerivaBibleProfile(basePath: string): Promise<VehicleProfile> {
+  const existing = await readVehicleProfile(basePath);
+  if (existing) return existing;
+
+  const now = new Date().toISOString();
+  const profile: VehicleProfile = {
+    vehicleName: 'Meriva Maxx',
+    year: 2012,
+    make: MERIVA_TECHNICAL_PROFILE.make,
+    model: MERIVA_TECHNICAL_PROFILE.model,
+    engine: MERIVA_TECHNICAL_PROFILE.engine,
+    createdAt: now,
+    lastModified: now,
+    protocolBaseline: 'NÃO CONFIRMADO',
+    technicalSource: MERIVA_BIBLE_SOURCE.name,
+    engineFamily: MERIVA_TECHNICAL_PROFILE.engine,
+    fuelType: MERIVA_TECHNICAL_PROFILE.fuel,
+    applicationCode: MERIVA_TECHNICAL_PROFILE.application,
+    ecuReferences: [...MERIVA_TECHNICAL_PROFILE.ecuReferences],
+  };
+
+  await createVehicleProfile(basePath, profile);
+  return profile;
 }
