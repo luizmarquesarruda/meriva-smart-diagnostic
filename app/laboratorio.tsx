@@ -7,7 +7,6 @@ import { SimulatedObdTransport } from '../src/obd/simulatedTransport';
 import { BluetoothDeviceInfo } from '../src/obd/bluetoothClassicTransport';
 import { createRealElmSession, discoverPairedDevices } from '../src/obd/bluetoothManager';
 import { discoverSupportedPids, KNOWN_PIDS } from '../src/obd/pidScanner';
-import { gpsTracker } from '../src/gps';
 import { getSharedObdConnection, setSharedObdConnection, subscribeSharedObd, disconnectSharedObd } from '../src/obd/sharedConnection';
 import { autoTripService } from '../src/trip/autoTripService';
 
@@ -259,9 +258,6 @@ export default function LaboratorioScreen() {
       setRx(result.rx);
       setElapsedMs(result.elapsedMs);
       setProtocol(result.protocol ?? 'N/D');
-      if (mode === 'REAL' && result.parsed.status === 'RESPONDEU' && result.parsed.unit === 'L/h' && result.parsed.value != null) {
-        setFuelUsedL(fuelIntegratorRef.current.addSample(result.parsed.value).fuelUsedL);
-      }
       setStatus(
         mode === 'SIMULACAO'
           ? `SIMULAÇÃO LOCAL: ${result.parsed.status}`
