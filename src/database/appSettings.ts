@@ -11,6 +11,7 @@ export interface AppSettings {
   autoStartGps: boolean;
   diagnosticAlerts: boolean;
   theme: ThemeMode;
+  selectedAdapterAddress: string | null;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -20,6 +21,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   autoStartGps: true,
   diagnosticAlerts: true,
   theme: 'CLARO',
+  selectedAdapterAddress: null,
 };
 
 async function settingsPath(basePath: string): Promise<string> {
@@ -45,6 +47,9 @@ export async function readAppSettings(basePath: string): Promise<AppSettings> {
       autoStartGps: parsed.autoStartGps !== false,
       diagnosticAlerts: parsed.diagnosticAlerts !== false,
       theme: parsed.theme === 'ESCURO' ? 'ESCURO' : 'CLARO',
+      selectedAdapterAddress: typeof parsed.selectedAdapterAddress === 'string' && parsed.selectedAdapterAddress.trim()
+        ? parsed.selectedAdapterAddress.trim().toUpperCase()
+        : null,
     };
     return settings;
   } catch {
