@@ -8,6 +8,7 @@ import { BluetoothDeviceInfo } from '../src/obd/bluetoothClassicTransport';
 import { createRealElmSession, discoverPairedDevices } from '../src/obd/bluetoothManager';
 import { discoverSupportedPids, KNOWN_PIDS } from '../src/obd/pidScanner';
 import { gpsTracker } from '../src/gps';
+import { getSharedObdConnection, setSharedObdConnection, subscribeSharedObd, disconnectSharedObd } from '../src/obd/sharedConnection';
 import { RealTripRecorder } from '../src/trip/tripRecorder';
 import { addDriveCycle, readDriveCycles } from '../src/storage/driveCycleStorage';
 import { DtcRecord, readDtcs, recordDtc } from '../src/database/dtcManager';
@@ -142,6 +143,18 @@ export default function LaboratorioScreen() {
   }
 
   useEffect(() => {
+    const unsubscribe = subscribeSharedObd((connection) => {
+      if (!connection) return;
+      sessionRef.current = connection.session;
+      setProtocol(connection.protocol ?? 'N/D');
+      setStatus('ELM RESPONDENDO / CONEXÃO AUTOMÁTICA');
+    });
+    const existing = getSharedObdConnection();
+    if (existing) {
+      sessionRef.current = existing.session;
+      setProtocol(existing.protocol ?? 'N/D');
+    }
+
     let mounted = true;
 
     void initAutoSave(getBasePath())
@@ -161,6 +174,7 @@ export default function LaboratorioScreen() {
       });
 
     return () => {
+      unsubscribe();
       mounted = false;
       if (!autoSaveReadyRef.current) return;
 
@@ -218,6 +232,7 @@ export default function LaboratorioScreen() {
 
       const connection = await createRealElmSession(device);
       sessionRef.current = connection.session;
+      await setSharedObdConnection({ session: connection.session, device, protocol: connection.protocol });
       setProtocol(connection.protocol ?? 'N/D');
       startObdSessionCheckpoint();
       updateAutoSaveState((state) => {
@@ -267,7 +282,11 @@ export default function LaboratorioScreen() {
 
     try {
       await stopRealTripRecorder();
-      await activeSession?.close();
+      if (getSharedObdConnection()?.session === activeSession) {
+        await disconnectSharedObd();
+      } else {
+        await activeSession?.close();
+      }
       updateAutoSaveState((state) => {
         state.obd = { ...state.obd, connected: false };
       });
