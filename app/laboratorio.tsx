@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import { Elm327Session } from '../src/obd/elm327';
 import { parseDtcResponse, parsePidResponse } from '../src/obd/parser';
@@ -9,6 +9,7 @@ import { createRealElmSession, discoverPairedDevices } from '../src/obd/bluetoot
 import { discoverSupportedPids, KNOWN_PIDS } from '../src/obd/pidScanner';
 import { getSharedObdConnection, setSharedObdConnection, subscribeSharedObd, disconnectSharedObd } from '../src/obd/sharedConnection';
 import { autoTripService } from '../src/trip/autoTripService';
+import { getMidLayout } from '../src/ui/midLayout';
 
 import { readAppSettings, writeAppSettings } from '../src/database/appSettings';
 
@@ -28,6 +29,8 @@ function getBasePath(): string {
 }
 
 export default function LaboratorioScreen() {
+  const windowSize = useWindowDimensions();
+  const layout = getMidLayout(windowSize);
   const [mode, setMode] = useState<Mode>('REAL');
   const [devices, setDevices] = useState<BluetoothDeviceInfo[]>([]);
   const [selectedAddress, setSelectedAddress] = useState('');
@@ -340,7 +343,7 @@ export default function LaboratorioScreen() {
   const knownSupported = supportedPids.filter((value) => KNOWN_PIDS.includes(value));
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>\n      <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
       <Text style={styles.title}>LABORATÓRIO OBD</Text>
       <Text style={styles.status}>{status}</Text>
       <Text style={styles.protocol}>PROTOCOLO: {protocol}</Text>
@@ -431,7 +434,7 @@ export default function LaboratorioScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, padding: 20, backgroundColor: '#eef3fb' },
+  container: { flexGrow: 1, paddingVertical: 16, backgroundColor: '#eef3fb' },
   title: { fontSize: 24, fontWeight: '700', color: '#1f2937', marginBottom: 8 },
   status: { color: '#2563eb', fontWeight: '700', marginBottom: 6 },
   protocol: { color: '#475569', fontWeight: '600', marginBottom: 8 },
