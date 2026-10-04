@@ -8,6 +8,7 @@ import { getAutoSaveStatus, initAutoSave, updateAutoSaveState } from '../src/mer
 import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
 import type { ObdConnectionState } from '../src/meriva/autosaveState';
 import { gpsTracker, type GpsTripState } from '../src/gps';
+import { ensureMerivaBibleProfile } from '../src/database/vehicleConfig';
 
 function formatTime(iso: string | null): string {
   if (!iso) return 'N/D';
@@ -31,6 +32,7 @@ export default function IndexScreen() {
     try {
       const restored = await initAutoSave(basePath);
       await initializeDriveCycles(basePath);
+      await ensureMerivaBibleProfile(basePath);
       const storedCycles = await readDriveCycles(basePath);
       const loaded = restored.driveCycles.length ? restored.driveCycles : storedCycles;
 
