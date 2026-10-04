@@ -7,6 +7,7 @@ import { readAppSettings, writeAppSettings } from '../src/database/appSettings';
 import { connectPreferredElm, disconnectSharedObd } from '../src/obd/sharedConnection';
 import * as FileSystem from 'expo-file-system';
 import { initAutoSave, updateAutoSaveState } from '../src/meriva/autosaveManager';
+import { autoTripService } from '../src/trip/autoTripService';
 
 export default function RootLayout() {
   const checking = useRef(false);
@@ -90,6 +91,8 @@ export default function RootLayout() {
       }
     };
 
+    void autoTripService.start(basePath);
+
     const startup = async () => {
       const settings = await loadSettings();
       await Promise.all([
@@ -111,7 +114,9 @@ export default function RootLayout() {
     return () => {
       subscription.remove();
       void gpsTracker.stop();
-      void disconnectSharedObd();
+      void autoTripService.stop().finally(() => {
+        void disconnectSharedObd();
+      });
     };
   }, []);
 
