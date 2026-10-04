@@ -222,7 +222,6 @@ export default function LaboratorioScreen() {
     stopObdSessionCheckpoint();
 
     try {
-      await stopRealTripRecorder();
       if (getSharedObdConnection()?.session === activeSession) {
         await disconnectSharedObd();
       } else {
