@@ -18,7 +18,11 @@ export default function RootLayout() {
     const loadSettings = async () => readAppSettings(`${FileSystem.documentDirectory}MERIVA_SMART`);
     const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
 
-    const checkBluetooth = async (autoConnectObd: boolean, diagnosticAlerts: boolean) => {
+    const checkBluetooth = async (
+      autoConnectObd: boolean,
+      diagnosticAlerts: boolean,
+      selectedAdapterAddress: string | null,
+    ) => {
       if (checking.current) return;
       checking.current = true;
 
@@ -26,7 +30,7 @@ export default function RootLayout() {
         if (!autoConnectObd) return;
         await ensureBluetoothReady();
         const settings = await loadSettings();
-        const connection = await connectPreferredElm(settings.selectedAdapterAddress);
+        const connection = await connectPreferredElm(selectedAdapterAddress);
         await writeAppSettings(basePath, {
           ...settings,
           selectedAdapterAddress: connection.device.address,
@@ -89,7 +93,11 @@ export default function RootLayout() {
     const startup = async () => {
       const settings = await loadSettings();
       await Promise.all([
-        checkBluetooth(settings.autoConnectObd, settings.diagnosticAlerts),
+        checkBluetooth(
+          settings.autoConnectObd,
+          settings.diagnosticAlerts,
+          settings.selectedAdapterAddress,
+        ),
         startGps(settings.autoStartGps, settings.diagnosticAlerts),
       ]);
     };
