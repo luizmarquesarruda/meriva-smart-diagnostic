@@ -24,6 +24,8 @@ export type GpsListener = (state: GpsTripState) => void;
 
 const MIN_ACCURACY_M = 60;
 const MAX_SPEED_KMH = 220;
+const MIN_MOVEMENT_SPEED_KMH = 2;
+const MAX_SEGMENT_GAP_MS = 5_000;
 
 export function haversineDistanceKm(
   a: Pick<GpsSample, 'latitude' | 'longitude'>,
@@ -200,14 +202,20 @@ export class GpsTracker {
 
     if (this.previous && accurate && isAccurate(this.previous)) {
       const elapsedMs = sample.timestamp - this.previous.timestamp;
-      if (elapsedMs > 0) {
+      if (elapsedMs > 0 && elapsedMs <= MAX_SEGMENT_GAP_MS) {
         const segmentKm = haversineDistanceKm(this.previous, sample);
         derivedSpeedKmh = segmentKm / (elapsedMs / 3600000);
+
+        const reportedSpeedKmh = sample.speedKmh;
+        const movingBySensor =
+          reportedSpeedKmh != null && reportedSpeedKmh >= MIN_MOVEMENT_SPEED_KMH;
+        const movingByGeometry = derivedSpeedKmh >= MIN_MOVEMENT_SPEED_KMH;
 
         if (
           segmentKm <= 0.25 &&
           derivedSpeedKmh >= 0 &&
-          derivedSpeedKmh <= MAX_SPEED_KMH
+          derivedSpeedKmh <= MAX_SPEED_KMH &&
+          (movingBySensor || movingByGeometry)
         ) {
           this.state.distanceKm = Number(
             (this.state.distanceKm + segmentKm).toFixed(3),
