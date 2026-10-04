@@ -202,13 +202,16 @@ async function testParser() {
   assert.strictEqual(parser.validateOBDResponse('410C1AF8'), true);
   assert.strictEqual(parser.parsePidResponse('010C', '410C1AF8').value, 1726);
   assert.strictEqual(parser.validateOBDResponse('41 0C 1A F8'), true);
-  assert.strictEqual(parser.parsePidResponse('010C', '41 0C 1A F8').value, 1726);
+  assert.strictEqual(parser.parsePidResponse('41 0C 1A F8').value, 1726);
+  assert.strictEqual(parser.parsePidResponse('48 6B 10 41 0C 1A F8 82').value, 1726);
+  assert.strictEqual(parser.parsePidResponse('7E8 04 41 0C 1A F8').value, 1726);
   assert.strictEqual(parser.parsePidResponse('010C', '41 0C 1A').value, null);
   assert.strictEqual(parser.parsePidResponse('012F', '41 2F 80').value, 50.19607843137255);
   assert.strictEqual(parser.parsePidResponse('012F', '41 2F FF').value, 100);
   assert.strictEqual(parser.parsePidResponse('0199', '41 99 FF').status, 'VALOR NÃO INTERPRETADO');
   assert.strictEqual(parser.parsePidResponse('010C', 'NO DATA').status, 'NÃO RESPONDEU');
   assert.deepStrictEqual(parser.parseDtcResponse('43 01 33 00 00 00'), ['P0133']);
+  assert.deepStrictEqual(parser.parseDtcResponse('48 6B 10 43 01 33 00 00 82'), ['P0133']);
 }
 
 async function testElmAndProtocol() {
@@ -221,7 +224,7 @@ async function testElmAndProtocol() {
     initialization.map((item) => item.command),
     ['ATZ', 'ATE0', 'ATL0', 'ATS0', 'ATH1', 'ATST32', 'ATSP0', 'ATDP'],
   );
-  assert.strictEqual(session.getProtocol(), null);
+  assert.strictEqual(session.getProtocol(), 'SIMULATED OBD TRANSPORT');
 
   const results = await Promise.all([
     session.queryPid('010C'),
@@ -261,6 +264,20 @@ async function testPidScanner() {
   const supported60 = scanner.decodeSupportedPids('0160', '41 60 00 00 00 80');
   assert.ok(supported60.includes('0179'));
   assert.ok(!supported60.includes('0180'));
+
+  const fakeSession = {
+    async executeCommand(pid) {
+      const responses = {
+        '0100': { response: '41 00 80 00 00 01', status: 'OK', elapsedMs: 10 },
+        '0120': { response: '41 20 80 00 00 01', status: 'OK', elapsedMs: 10 },
+        '0140': { response: '41 40 80 00 00 01', status: 'OK', elapsedMs: 10 },
+        '0160': { response: '41 60 00 00 00 80', status: 'OK', elapsedMs: 10 },
+      };
+      return responses[pid];
+    },
+  };
+  const discovered = await scanner.discoverSupportedPids(fakeSession);
+  assert.deepStrictEqual(discovered.map((item) => item.pid), ['0100', '0120', '0140', '0160']);
 }
 
 async function testBluetoothEventTransport() {
