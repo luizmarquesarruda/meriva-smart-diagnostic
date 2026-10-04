@@ -66,7 +66,7 @@ Esses dados podem ser consultados futuramente quando houver uma função real qu
 
 ## Exclusão
 
-Informações de boia/medidor de nível permanecem fora do aplicativo conforme requisito do projeto.
+Informações de boia/medidor de nível entram no aplicativo como dado de autonomia quando a ECU responder validamente ao PID padrão OBD 012F. Isso não transforma a boia em dado de diagnóstico por si só.
 
 ## Próximas evoluções
 
