@@ -11,6 +11,7 @@ import type { ObdConnectionState } from '../src/meriva/autosaveState';
 import { gpsTracker, type GpsTripState } from '../src/gps';
 import { ensureMerivaVehicleProfile } from '../src/database/vehicleConfig';
 import { readAppSettings, type AppSettings } from '../src/database/appSettings';
+import { MERIVA_MANUAL } from '../src/database/merivaManual';
 
 function formatDistance(km: number, unit: AppSettings['distanceUnit']): string {
   if (!Number.isFinite(km) || km < 0) return 'N/D';
@@ -35,7 +36,7 @@ export default function IndexScreen() {
 
   const syncLiveState = useCallback(() => {
     const state = getAutoSaveState();
-    const reading = state.lastReadings.find((item) => item.pid === '012F');
+    const reading = state.obd.connected ? state.lastReadings.find((item) => item.pid === '012F') : undefined;
     setFuelLevelPercent(reading?.value != null && reading.value >= 0 && reading.value <= 100 ? reading.value : null);
     setDtcCount(state.dtcs.length);
     setObd(state.obd);
@@ -69,7 +70,7 @@ export default function IndexScreen() {
       setObd(restored.obd);
       setSaveStatus(getAutoSaveStatus());
       setDtcCount(restored.dtcs.length);
-      const reading = restored.lastReadings.find((item) => item.pid === '012F');
+      const reading = restored.obd.connected ? restored.lastReadings.find((item) => item.pid === '012F') : undefined;
       setFuelLevelPercent(reading?.value != null && reading.value >= 0 && reading.value <= 100 ? reading.value : null);
       setIsHydrated(true);
     } catch {
@@ -90,8 +91,8 @@ export default function IndexScreen() {
 
   const summary = useMemo(() => getDriveCycleSummary(cycles), [cycles]);
   const realConsumptionKml = summary.avgConsumptionKml > 0 ? summary.avgConsumptionKml : null;
-  const fuelLiters = fuelLevelPercent == null ? null : (56 * fuelLevelPercent) / 100;
-  const autonomyKm = fuelLiters != null && realConsumptionKml != null ? fuelLiters * realConsumptionKml : null;
+  const fuelLiters = fuelLevelPercent == null ? null : (MERIVA_MANUAL.capacities.fuelTankL * fuelLevelPercent) / 100;
+  const autonomyKm = obd.connected && fuelLiters != null && realConsumptionKml != null ? fuelLiters * realConsumptionKml : null;
   const distanceUnit = settings?.distanceUnit ?? 'KM';
 
   return (
@@ -109,7 +110,7 @@ export default function IndexScreen() {
             <Text style={styles.heroValue}>{autonomyKm == null ? 'N/D' : Math.round(autonomyKm)}</Text>
             <Text style={styles.heroUnit}>km restantes</Text>
             <Text style={styles.heroHelp}>
-              {fuelLevelPercent == null ? 'Aguardando nível real da ECU (PID 012F).' : `${fuelLevelPercent.toFixed(1)}% de combustível ECU • tanque de 56 L.`}
+              {fuelLevelPercent == null ? 'Aguardando nível real da ECU (PID 012F).' : `${fuelLevelPercent.toFixed(1)}% informado pela ECU • tanque de ${MERIVA_MANUAL.capacities.fuelTankL} L.`}
             </Text>
           </View>
 
