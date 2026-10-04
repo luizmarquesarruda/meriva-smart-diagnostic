@@ -25,15 +25,33 @@ export class BluetoothClassicTransport implements ObdTransport {
     if (!(await RNBluetoothClassic.isBluetoothEnabled())) throw new Error('BLUETOOTH DESLIGADO');
 
     this.received = '';
+    this.connected = false;
     this.removeSubscriptions();
 
-    const device = await RNBluetoothClassic.connectToDevice(this.deviceAddress, {
-      connectionType: 'raw',
-      charset: 'ascii',
-      secureSocket: false,
-    });
+    let device: BluetoothDevice;
+    try {
+      device = await RNBluetoothClassic.connectToDevice(this.deviceAddress, {
+        connectionType: 'binary',
+        charset: 'ascii',
+        secureSocket: false,
+      });
+    } catch (cause) {
+      this.markDisconnected();
+      const message = cause instanceof Error ? cause.message : String(cause);
+      throw new Error('FALHA AO CONECTAR AO ELM327: ' + message);
+    }
 
     this.device = device;
+
+    if (typeof device.isConnected === 'function') {
+      const confirmed = await device.isConnected();
+      if (!confirmed) {
+        await this.safeDisconnect(device);
+        this.markDisconnected();
+        throw new Error('ELM327 NÃO CONFIRMOU A CONEXÃO BLUETOOTH');
+      }
+    }
+
     this.connected = true;
 
     this.dataSubscription = device.onDataReceived((event) => {
@@ -55,11 +73,7 @@ export class BluetoothClassicTransport implements ObdTransport {
     this.removeSubscriptions();
 
     if (device && wasConnected) {
-      try {
-        await device.disconnect();
-      } catch {
-        // já desconectado
-      }
+      await this.safeDisconnect(device);
     }
 
     this.device = null;
@@ -68,8 +82,22 @@ export class BluetoothClassicTransport implements ObdTransport {
   }
 
   async write(data: string): Promise<void> {
-    if (!this.device || !this.connected) throw new Error('BLUETOOTH NÃO CONECTADO');
-    await this.device.write(data, 'ascii');
+    const device = this.device;
+    if (!device || !this.connected) throw new Error('BLUETOOTH NÃO CONECTADO');
+
+    if (typeof device.isConnected === 'function') {
+      try {
+        if (!(await device.isConnected())) {
+          this.markDisconnected();
+          throw new Error('BLUETOOTH DESCONECTADO');
+        }
+      } catch (cause) {
+        const message = cause instanceof Error ? cause.message : '';
+        if (message === 'BLUETOOTH DESCONECTADO') throw cause;
+      }
+    }
+
+    await device.write(data, 'ascii');
   }
 
   async readUntilPrompt(timeoutMs = 3000): Promise<string> {
@@ -108,6 +136,14 @@ export class BluetoothClassicTransport implements ObdTransport {
     const partial = this.received.replace(/^\s+|\s+$/g, '');
     this.received = '';
     throw new Error(partial ? 'TIMEOUT: RESPOSTA ELM SEM PROMPT FINAL' : 'TIMEOUT');
+  }
+
+  private async safeDisconnect(device: BluetoothDevice): Promise<void> {
+    try {
+      await device.disconnect();
+    } catch {
+      // já desconectado
+    }
   }
 
   private markDisconnected(): void {
