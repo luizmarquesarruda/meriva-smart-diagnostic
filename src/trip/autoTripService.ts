@@ -38,6 +38,7 @@ class AutoTripService {
   private recorder: RealTripRecorder | null = null;
   private loopPromise: Promise<void> | null = null;
   private generation = 0;
+  private pollingPauseCount = 0;
   private transition: Promise<void> = Promise.resolve();
   private unsubscribeConnection: (() => void) | null = null;
   private readonly listeners = new Set<Listener>();
@@ -51,6 +52,15 @@ class AutoTripService {
 
   getState(): AutoTripServiceState {
     return { ...this.state };
+  }
+
+  async withPollingPaused<T>(operation: () => Promise<T>): Promise<T> {
+    this.pollingPauseCount += 1;
+    try {
+      return await operation();
+    } finally {
+      this.pollingPauseCount = Math.max(0, this.pollingPauseCount - 1);
+    }
   }
 
   async start(basePath: string): Promise<void> {
@@ -117,6 +127,11 @@ class AutoTripService {
       generation === this.generation &&
       getSharedObdConnection()?.session === connection.session
     ) {
+      if (this.pollingPauseCount > 0) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        continue;
+      }
+
       const loopStartedAt = Date.now();
 
       try {
