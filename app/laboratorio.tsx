@@ -343,7 +343,8 @@ export default function LaboratorioScreen() {
   const knownSupported = supportedPids.filter((value) => KNOWN_PIDS.includes(value));
 
   return (
-    <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>\n      <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
+    <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
+      <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
       <Text style={styles.title}>LABORATÓRIO OBD</Text>
       <Text style={styles.status}>{status}</Text>
       <Text style={styles.protocol}>PROTOCOLO: {protocol}</Text>
