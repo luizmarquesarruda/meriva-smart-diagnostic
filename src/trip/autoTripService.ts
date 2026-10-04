@@ -103,13 +103,13 @@ class AutoTripService {
     const fuelSupported = connection.supportedPids.includes('015E');
     const fuelLevelSupported = connection.supportedPids.includes('012F');
     const initialDistanceKm = gpsTracker.getState().distanceKm;
-    this.recorder = fuelSupported ? new RealTripRecorder(Date.now(), initialDistanceKm) : null;
+    this.recorder = new RealTripRecorder(Date.now(), initialDistanceKm);
     const generation = ++this.generation;
 
     this.state = {
       ...INITIAL_STATE,
       connected: true,
-      active: fuelSupported,
+      active: true,
       fuelSupported,
       fuelLevelSupported,
       error: null,
@@ -213,7 +213,7 @@ class AutoTripService {
         });
       }
 
-      const intervalMs = this.state.fuelSupported ? 1500 : 10_000;
+      const intervalMs = this.state.fuelSupported ? 1500 : 5000;
       const elapsedMs = Date.now() - loopStartedAt;
       const waitMs = Math.max(150, intervalMs - elapsedMs);
       await new Promise((resolve) => setTimeout(resolve, waitMs));

@@ -17,12 +17,16 @@ Motivos:
 ## Dados mantidos no runtime
 
 ### Identificação técnica
-- Família do motor: 1.4 MPFI 8V ECONOFLEX.
+- Família do motor: 1.4L 8V ECONO.FLEX, 1.389 cm³, 4 cilindros em linha.
 - Combustível: Flex Fuel.
 - Aplicação: LKF.
 - Referências de ECU: 24578333 e 93338267.
 
 As referências de ECU são tratadas como **referências de catálogo**, não como confirmação da ECU instalada no veículo.
+
+### Fonte adicional: manual do proprietário
+
+As especificações físicas e de manutenção são mantidas separadamente em `src/database/merivaManual.ts`, com referência ao Manual do Proprietário Chevrolet Meriva 2012. Elas não são usadas para inferir falhas ou PIDs.
 
 ### Apoio ao diagnóstico de DTC
 Quando um DTC real conhecido é registrado, o app pode anexar uma árvore de investigação baseada na fonte:
@@ -63,10 +67,6 @@ Esses dados podem ser consultados futuramente quando houver uma função real qu
 3. A Bíblia serve para contexto físico e árvores de investigação.
 4. Nenhum PID é criado porque existe um componente físico correspondente.
 5. Nenhum DTC é considerado resolvido somente pela Bíblia.
-
-## Exclusão
-
-Informações de boia/medidor de nível entram no aplicativo como dado de autonomia quando a ECU responder validamente ao PID padrão OBD 012F. Isso não transforma a boia em dado de diagnóstico por si só.
 
 ## Próximas evoluções
 

@@ -196,11 +196,11 @@ export default function LaboratorioScreen() {
       const fuelSupported = discovered.includes('015E');
       const fuelLevelSupported = discovered.includes('012F');
       setTripFuelSupported(fuelSupported);
-      setTripActive(fuelSupported);
+      setTripActive(true);
       setStatus(
         fuelSupported
-          ? connection.protocol ? 'VIAGEM AUTOMÁTICA / PID 015E + NÍVEL DE COMBUSTÍVEL 012F' : 'VIAGEM AUTOMÁTICA / PROTOCOLO N/D'
-          : fuelLevelSupported ? 'ELM RESPONDENDO / NÍVEL DE COMBUSTÍVEL 012F ATIVA' : 'ELM RESPONDENDO / SEM PID 015E E 012F',
+          ? connection.protocol ? 'VIAGEM AUTOMÁTICA / GPS + PID 015E + NÍVEL 012F' : 'VIAGEM AUTOMÁTICA / PROTOCOLO N/D'
+          : fuelLevelSupported ? 'VIAGEM AUTOMÁTICA / GPS + NÍVEL 012F, SEM PID 015E' : 'VIAGEM AUTOMÁTICA / GPS, SEM PID 015E E 012F',
       );
     } catch (cause) {
       const failedSession = sessionRef.current;
@@ -360,10 +360,10 @@ export default function LaboratorioScreen() {
           <Text style={tripActive ? styles.live : styles.muted}>{tripActive ? 'GRAVANDO' : 'AGUARDANDO'}</Text>
         </View>
         <View style={[styles.tripGrid, layout.landscape && styles.tripGridLandscape]}>
-          <View style={styles.tripMetric}><Text style={styles.tripLabel}>DISTÂNCIA GPS</Text><Text style={styles.tripValue}>{tripDistanceKm.toFixed(2)} km</Text></View>
-          <View style={styles.tripMetric}><Text style={styles.tripLabel}>CONSUMO</Text><Text style={styles.tripValue}>{tripConsumptionKml == null ? 'N/D' : tripConsumptionKml.toFixed(2) + ' km/L'}</Text></View>
-          <View style={styles.tripMetric}><Text style={styles.tripLabel}>COMBUSTÍVEL</Text><Text style={styles.tripValue}>{fuelLevelPercent == null ? 'N/D' : fuelLevelPercent.toFixed(1) + '%'}</Text></View>
-          <View style={styles.tripMetric}><Text style={styles.tripLabel}>PID 015E</Text><Text style={styles.tripValue}>{tripFuelSupported === null ? 'N/D' : tripFuelSupported ? 'OK' : 'NÃO'}</Text></View>
+          <View style={[styles.tripMetric, layout.landscape && styles.tripMetricLandscape]}><Text style={styles.tripLabel}>DISTÂNCIA GPS</Text><Text style={styles.tripValue}>{tripDistanceKm.toFixed(2)} km</Text></View>
+          <View style={[styles.tripMetric, layout.landscape && styles.tripMetricLandscape]}><Text style={styles.tripLabel}>CONSUMO</Text><Text style={styles.tripValue}>{tripConsumptionKml == null ? 'N/D' : tripConsumptionKml.toFixed(2) + ' km/L'}</Text></View>
+          <View style={[styles.tripMetric, layout.landscape && styles.tripMetricLandscape]}><Text style={styles.tripLabel}>COMBUSTÍVEL</Text><Text style={styles.tripValue}>{fuelLevelPercent == null ? 'N/D' : fuelLevelPercent.toFixed(1) + '%'}</Text></View>
+          <View style={[styles.tripMetric, layout.landscape && styles.tripMetricLandscape]}><Text style={styles.tripLabel}>PID 015E</Text><Text style={styles.tripValue}>{tripFuelSupported === null ? 'N/D' : tripFuelSupported ? 'OK' : 'NÃO'}</Text></View>
         </View>
         <Text style={styles.tripHelp}>Sem botão iniciar. O app registra somente dados reais válidos.</Text>
       </View>
@@ -486,7 +486,7 @@ const styles = StyleSheet.create({
   tripTitle: { color: '#1f2937', fontWeight: '900', fontSize: 14 },
   tripGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   tripMetric: { width: '48%', marginBottom: 8 },
-  tripGridLandscape: { flexWrap: 'nowrap', gap: 12 },
+  tripMetricLandscape: { width: '23%', marginBottom: 0 },
   tripLabel: { color: '#64748b', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
   tripValue: { color: '#1f2937', fontWeight: '800', fontSize: 16, marginTop: 2 },
   live: { color: '#15803d', fontWeight: '900', fontSize: 10 },

@@ -74,6 +74,8 @@ A recepção Bluetooth usa o listener de dados como fonte única. A `Elm327Sessi
 
 `src/meriva/` contém o estado persistido e o autosave.
 
+`src/database/merivaManual.ts` contém somente especificações confirmadas no Manual do Proprietário 2012. Elas servem para configurar o veículo e cálculos físicos, como a capacidade de 56 L do tanque. Não criam PIDs, não substituem a ECU e não confirmam protocolo.
+
 ### Storage
 
 `src/storage/` controla quota, limpeza, backups e ciclos de condução.
