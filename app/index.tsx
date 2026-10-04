@@ -138,7 +138,7 @@ export default function IndexScreen() {
           </View>
           <Text style={styles.gpsHelp}>GPS inicia automaticamente. Velocidade continua sendo usada internamente para cálculos, mas não é mostrada na tela principal.</Text>
           <Text style={styles.fuelInfo}>COMBUSTÍVEL: {settings?.fuelType === 'GASOLINA' ? 'GASOLINA' : 'ETANOL'} • nível real da ECU via PID 012F quando a ECU suportar.</Text>
-          <Text style={styles.fuelInfo}>Autonomia = nível do nível de combustível ECU × tanque de 56 L × consumo real aprendido. Sem dado real, o app mostra N/D.</Text>
+          <Text style={styles.fuelInfo}>Autonomia = nível de combustível ECU × tanque de 56 L × consumo real aprendido. Sem dado real, o app mostra N/D.</Text>
           {gpsState.error ? <Text style={styles.gpsError}>{gpsState.error}</Text> : null}
         </View>
 
