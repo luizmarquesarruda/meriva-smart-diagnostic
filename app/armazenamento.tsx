@@ -57,17 +57,22 @@ export default function ArmazenamentoScreen() {
   return (
     <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
       <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
-      <Text style={styles.title}>ARMAZENAMENTO</Text>
+      <Text style={styles.title}>HISTÓRICO E DADOS</Text>
+      <Text style={styles.subtitle}>O app salva as viagens e leituras automaticamente. Esta tela serve para acompanhar o espaço usado e fazer limpeza quando necessário.</Text>
       <Text style={[styles.status, quota?.critical ? styles.critical : quota?.warning ? styles.warning : styles.ok]}>
         {quota?.message || 'VERIFICANDO'}
       </Text>
       {!!message && <Text style={styles.cleanMessage}>{message}</Text>}
-      {Object.entries(usageBreakdown).map(([dir, sizesMb]) => (
-        <View key={dir} style={styles.row}>
-          <Text style={styles.label}>{dir}</Text>
-          <Text style={styles.value}>{sizesMb} MB</Text>
-        </View>
-      ))}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>ESPAÇO UTILIZADO</Text>
+        {Object.entries(usageBreakdown).map(([dir, sizesMb]) => (
+          <View key={dir} style={styles.row}>
+            <Text style={styles.label}>{dir}</Text>
+            <Text style={styles.value}>{sizesMb} MB</Text>
+          </View>
+        ))}
+        <Text style={styles.note}>Limite configurado: 2 GB. A limpeza remove somente dados antigos permitidos pelo sistema.</Text>
+      </View>
       <TouchableOpacity style={styles.button} onPress={handleClean} disabled={!basePath || busy}>
         <Text style={styles.buttonText}>{busy ? 'LIMPANDO...' : 'LIMPAR DADOS ANTIGOS'}</Text>
       </TouchableOpacity>
@@ -78,15 +83,19 @@ export default function ArmazenamentoScreen() {
 
 const styles = StyleSheet.create({
   container: { flexGrow: 1, paddingVertical: 16, backgroundColor: '#eef3fb' },
-  title: { fontSize: 24, fontWeight: '700', color: '#1f2937', marginBottom: 16 },
+  title: { fontSize: 23, fontWeight: '900', color: '#1557a6', letterSpacing: 0.5, marginBottom: 5 },
+  subtitle: { color: '#64748b', fontSize: 11, lineHeight: 16, marginBottom: 12 },
   status: { fontWeight: '700', marginBottom: 16 },
   ok: { color: '#16a34a' },
   warning: { color: '#d97706' },
   critical: { color: '#dc2626' },
   cleanMessage: { color: '#374151', marginBottom: 12 },
-  row: { backgroundColor: '#fff', borderRadius: 10, padding: 12, marginBottom: 8, flexDirection: 'row', justifyContent: 'space-between' },
+  card: { backgroundColor: '#fff', borderRadius: 8, padding: 11, borderWidth: 1, borderColor: '#d1d9e2', marginBottom: 10 },
+  cardTitle: { color: '#1f2937', fontSize: 12, fontWeight: '900', marginBottom: 7 },
+  row: { paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: '#e5e7eb', flexDirection: 'row', justifyContent: 'space-between' },
+  note: { color: '#64748b', fontSize: 10, lineHeight: 15, marginTop: 8 },
   label: { color: '#1f2937', fontWeight: '600' },
   value: { color: '#2563eb', fontWeight: '700' },
-  button: { backgroundColor: '#2563eb', borderRadius: 10, padding: 14, alignItems: 'center', marginTop: 12 },
+  button: { backgroundColor: '#1557a6', borderRadius: 7, padding: 13, alignItems: 'center', marginTop: 4 },
   buttonText: { color: '#fff', fontWeight: '700' },
 });
