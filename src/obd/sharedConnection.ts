@@ -15,6 +15,10 @@ function emit(): void {
   for (const listener of listeners) listener(active);
 }
 
+function looksLikeElm327(device: BluetoothDeviceInfo): boolean {
+  return /ELM327|OBD(?:II|2)?|V-LINK|VLINK|V-GATE|VLINKER|KONNWEI/i.test(device.name);
+}
+
 export function getSharedObdConnection(): SharedObdConnection | null {
   return active;
 }
@@ -33,21 +37,42 @@ export async function connectPreferredElm(): Promise<SharedObdConnection> {
     throw new Error('NENHUM ELM327 PAREADO. PAREIE O ADAPTADOR NO ANDROID PRIMEIRO.');
   }
 
-  const preferred = devices.find((device) => /ELM|OBD|OBDII|OBD2|V-LINK|VLINK|CAR/i.test(device.name))
-    ?? (devices.length === 1 ? devices[0] : null);
+  // Nunca trate um Bluetooth desconhecido como ELM só porque é o único pareado.
+  // O nome apenas seleciona candidatos. A prova real continua sendo o PID 010C.
+  const candidates = devices.filter(looksLikeElm327);
 
-  if (!preferred) {
-    throw new Error('MAIS DE UM BLUETOOTH PAREADO. SELECIONE O ELM327 NO LABORATÓRIO OBD.');
+  if (!candidates.length) {
+    const names = devices.map((device) => device.name).join(', ');
+    throw new Error(
+      'NENHUM ELM327 IDENTIFICADO ENTRE OS DISPOSITIVOS PAREADOS: ' + names +
+      '. PAREIE O ELM327 OU SELECIONE-O NO LABORATÓRIO OBD.',
+    );
   }
 
-  const connection = await createRealElmSession(preferred);
-  active = {
-    session: connection.session,
-    device: preferred,
-    protocol: connection.protocol,
-  };
-  emit();
-  return active;
+  let lastError: unknown = null;
+
+  // Se houver mais de um candidato, testa um por um. createRealElmSession()
+  // só retorna sucesso depois de confirmar a ECU pelo 010C.
+  for (const device of candidates) {
+    try {
+      const connection = await createRealElmSession(device);
+      active = {
+        session: connection.session,
+        device,
+        protocol: connection.protocol,
+      };
+      emit();
+      return active;
+    } catch (cause) {
+      lastError = cause;
+    }
+  }
+
+  const detail = lastError instanceof Error ? lastError.message : String(lastError ?? '');
+  throw new Error(
+    'NENHUM DOS ELM327 PAREADOS RESPONDEU AO PID 010C.' +
+    (detail ? ' ' + detail : ''),
+  );
 }
 
 export async function setSharedObdConnection(connection: SharedObdConnection | null): Promise<void> {
