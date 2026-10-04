@@ -22,7 +22,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 20
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - run: npm run doctor
       - run: npm run validate
 
@@ -39,7 +39,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - run: npx expo prebuild --clean --platform android --non-interactive
       - name: Assemble Android release APK (standalone)
         working-directory: android
