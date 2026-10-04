@@ -1,13 +1,9 @@
 import * as FileSystem from 'expo-file-system';
 import type { DataSource, DtcStatus, DtcRecord } from '../types/sourceTypes';
-import { getMerivaDiagnosticGuidance } from './merivaBible';
 
 export type { DtcRecord } from '../types/sourceTypes';
 
 export async function recordDtc(basePath: string, dtc: DtcRecord): Promise<void> {
-  const guidance = getMerivaDiagnosticGuidance(dtc.code);
-  const enrichedDescription = dtc.description ?? (guidance.length ? `Investigação: ${guidance.join(' → ')}` : undefined);
-  dtc = enrichedDescription === dtc.description ? dtc : { ...dtc, description: enrichedDescription };
   await FileSystem.makeDirectoryAsync(`${basePath}/DTC`, { intermediates: true });
   const target = `${basePath}/DTC/dtc_records.txt`;
   const line = [
