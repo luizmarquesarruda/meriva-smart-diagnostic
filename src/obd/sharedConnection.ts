@@ -41,15 +41,45 @@ export async function connectPreferredElm(preferredAddress: string | null = MERI
 
   connecting = (async () => {
     const devices = await discoverPairedDevices();
+
+    // O MAC conhecido é a âncora da conexão automática. Alguns Androids/ELM
+    // podem não expor o dispositivo na lista imediatamente, mesmo já pareado.
+    // Nesse caso ainda tentamos o endereço diretamente antes de desistir.
+    const preferredKnown = preferredAddress
+      ? devices.find((device) => device.address.toUpperCase() === preferredAddress.toUpperCase())
+      : undefined;
+
+    if (!devices.length && preferredAddress) {
+      const directDevice: BluetoothDeviceInfo = {
+        address: preferredAddress.toUpperCase(),
+        name: 'ELM327 (ENDEREÇO CONFIGURADO)',
+        bonded: true,
+      };
+      try {
+        const connection = await createRealElmSession(directDevice);
+        active = {
+          session: connection.session,
+          device: directDevice,
+          protocol: connection.protocol,
+          supportedPids: connection.supportedPids,
+        };
+        emit();
+        return active;
+      } catch (cause) {
+        const detail = cause instanceof Error ? cause.message : String(cause);
+        throw new Error(
+          'ELM327 NÃO FOI LOCALIZADO NA LISTA DE PAREADOS E A TENTATIVA DIRETA FALHOU: ' + detail,
+        );
+      }
+    }
+
     if (!devices.length) {
       throw new Error('NENHUM ELM327 PAREADO. PAREIE O ADAPTADOR NO ANDROID PRIMEIRO.');
     }
 
   // Nunca trate um Bluetooth desconhecido como ELM só porque é o único pareado.
   // O nome apenas seleciona candidatos. A prova real continua sendo o PID 010C.
-    const preferred = preferredAddress
-      ? devices.find((device) => device.address.toUpperCase() === preferredAddress.toUpperCase())
-      : undefined;
+    const preferred = preferredKnown;
     const namedCandidates = devices.filter(looksLikeElm327);
     const candidates = preferred
       ? [preferred, ...namedCandidates.filter((device) => device.address !== preferred.address)]
