@@ -36,7 +36,7 @@ export default function RootLayout() {
               : 'Ative o Bluetooth e permita o acesso a dispositivos próximos para usar o ELM327.',
             [
               { text: 'Abrir configurações', onPress: () => void openBluetoothAppSettings() },
-              { text: 'Tentar novamente', onPress: () => void checkBluetooth() },
+              { text: 'Tentar novamente', onPress: () => void checkBluetooth(true) },
             ],
           );
         }
@@ -60,7 +60,7 @@ export default function RootLayout() {
               gpsTracker.getState().error ?? 'Não foi possível iniciar o GPS automaticamente.',
               [
                 { text: 'Abrir configurações', onPress: () => void Linking.openSettings() },
-                { text: 'Tentar novamente', onPress: () => void startGps() },
+                { text: 'Tentar novamente', onPress: () => void startGps(true) },
               ],
             );
           }
