@@ -44,7 +44,7 @@ export async function readAppSettings(basePath: string): Promise<AppSettings> {
       autoConnectObd: parsed.autoConnectObd !== false,
       autoStartGps: parsed.autoStartGps !== false,
       diagnosticAlerts: parsed.diagnosticAlerts !== false,
-      theme: 'CLARO',
+      theme: parsed.theme === 'ESCURO' ? 'ESCURO' : 'CLARO',
     };
     return settings;
   } catch {
