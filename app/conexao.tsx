@@ -31,10 +31,10 @@ export default function ConexaoScreen() {
         ? list.find((device) => device.address.replace(/:/g, '').toUpperCase() === preferred.replace(/:/g, '').toUpperCase())
         : undefined;
       const elmLike = list.find((device) => /ELM327|OBD\\s*(?:II|2|Ⅱ)|V-LINK|VLINK|V-GATE|VLINKER|KONNWEI/i.test(device.name));
-      const first = preferredDevice || elmLike || list[0];
+      // A conexão automática só pode começar por um candidato que tenha\n      // forte indício de ser adaptador OBD. Nunca envie ATZ automaticamente\n      // para fone, caixa de som ou outro Bluetooth pareado.\n      const first = preferredDevice || elmLike;
 
       setSelected(first?.address || null);
-      setStage(list.length ? `Pareados encontrados: ${list.length}` : 'Nenhum adaptador pareado');
+      setStage(list.length\n        ? (first ? `Pareados encontrados: ${list.length}. ELM candidato: ${first.name || first.address}` : `Pareados encontrados: ${list.length}. Selecione o ELM327`)\n        : 'Nenhum adaptador pareado');
 
       if (autoConnect && first) {
         setStage(`Conectando ${first.name || first.address}`);
