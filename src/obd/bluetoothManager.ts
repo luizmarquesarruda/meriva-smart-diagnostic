@@ -119,13 +119,19 @@ export async function createRealElmSession(device: BluetoothDeviceInfo): Promise
       probeIndex >= 0 &&
       probeStream.length >= probeIndex + probeMarker.length + 4;
 
+    // A conexão Bluetooth/ELM e a comunicação com a ECU são camadas diferentes.
+    // O ELM já foi confirmado pelos comandos AT acima. Portanto, uma falha no
+    // primeiro PID não pode derrubar a conexão Bluetooth nem iniciar um loop de
+    // reconexão desnecessário. Isso também permite ligar o app antes da ECU estar
+    // pronta e diagnosticar a causa real na tela.
     if (!probeIsValid) {
-      await session.close();
-      throw new Error(
-        ecuProbe.response
-          ? `ECU NÃO RESPONDEU VALIDAMENTE AO PID 010C: ${ecuProbe.response.trim()}`
-          : 'ECU NÃO RESPONDEU AO PID 010C',
-      );
+      return {
+        session,
+        initialization,
+        protocol: session.getProtocol(),
+        ecuProbe,
+        supportedPids: [],
+      };
     }
 
     // Depois do primeiro PID válido, atualize o protocolo efetivamente usado
@@ -133,7 +139,13 @@ export async function createRealElmSession(device: BluetoothDeviceInfo): Promise
     // somente a seleção AUTO, e não o protocolo negociado na ECU.
     const protocolResult = await session.identifyProtocol();
     if (protocolResult.status !== 'OK' || !session.getProtocol()) {
-      throw new Error('PROTOCOLO OBD NÃO IDENTIFICADO');
+      return {
+        session,
+        initialization,
+        protocol: session.getProtocol(),
+        ecuProbe,
+        supportedPids: [],
+      };
     }
 
     const discovery = await discoverSupportedPids(session);
