@@ -79,7 +79,7 @@ export class Elm327Session {
       // de adaptadores ELM327/KWP mais simples.
       // ATST32 é o limite padrão de aproximadamente 200 ms do ELM327.
       // Mantemos esse valor para a Meriva e deixamos o transporte com margem maior.
-      for (const command of ['ATZ', 'ATE0', 'ATL0', 'ATS0', 'ATH1', 'ATST32', 'ATSP0']) {
+      for (const command of ['ATZ', 'ATE0', 'ATL0', 'ATS0', 'ATH1', 'ATSP0']) {
         const result = await this.command(command);
         results.push(result);
         if (result.status !== 'OK') {
