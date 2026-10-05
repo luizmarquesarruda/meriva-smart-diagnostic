@@ -210,8 +210,8 @@ async function testParser() {
   assert.strictEqual(parser.parsePidResponse('010C', '48 6B 10 41 0C 1A F8 82').value, 1726);
   assert.strictEqual(parser.parsePidResponse('010C', '7E8 04 41 0C 1A F8').value, 1726);
   assert.strictEqual(parser.parsePidResponse('010C', '41 0C 1A').value, null);
-  assert.strictEqual(parser.parsePidResponse('012F', '41 2F 80').status, 'VALOR NÃO INTERPRETADO');
-  assert.strictEqual(parser.parsePidResponse('012F', '41 2F FF').status, 'VALOR NÃO INTERPRETADO');
+  assert.ok(Math.abs(parser.parsePidResponse('012F', '41 2F 80').value - (128 * 100) / 255) < 0.000001);
+  assert.strictEqual(parser.parsePidResponse('012F', '41 2F FF').value, 100);
   assert.strictEqual(parser.parsePidResponse('0199', '41 99 FF').status, 'VALOR NÃO INTERPRETADO');
   assert.strictEqual(parser.parsePidResponse('010C', 'NO DATA').status, 'NÃO RESPONDEU');
   assert.deepStrictEqual(parser.parseDtcResponse('43 01 33 00 00 00'), ['P0133']);
