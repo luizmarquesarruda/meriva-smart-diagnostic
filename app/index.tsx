@@ -114,7 +114,7 @@ export default function IndexScreen() {
 
     setBluetoothSearching(true);
     setBluetoothError(null);
-    void connectPreferredElm()
+    if (settings?.autoConnectObd === false) {\n      setBluetoothSearching(false);\n      return () => { cancelled = true; unsubscribe(); };\n    }\n\n    void connectPreferredElm(settings.selectedAdapterAddress, {\n      ioTimeoutMs: settings.elmIoTimeoutMs,\n      bluetoothConnectTimeoutMs: settings.elmBluetoothTimeoutMs,\n      commandDelayMs: settings.elmCommandDelayMs,\n      maxConnectionAttempts: settings.elmMaxConnectionAttempts,\n      noDataReconnectThreshold: settings.elmNoDataReconnectThreshold,\n      partialResponseAction: settings.elmPartialResponseAction,\n      forceInitialization: settings.elmForceInitialization,\n    })
       .then(() => {
         setBluetoothSearching(false);
         setBluetoothError(null);
