@@ -3,6 +3,7 @@ import RNBluetoothClassic from 'react-native-bluetooth-classic';
 import { BluetoothClassicTransport, BluetoothDeviceInfo, listBondedBluetoothDevices } from './bluetoothClassicTransport';
 import { ElmCommandResult, Elm327Session } from './elm327';
 import { discoverSupportedPids } from './pidScanner';
+import { Elm327CompatibilityConfig, DEFAULT_ELM327_COMPATIBILITY, mergeCompatibilityConfig } from './elm327Compatibility';
 
 export type BluetoothConnectionStatus =
   | 'BLUETOOTH INDISPONÍVEL'
@@ -100,9 +101,9 @@ export async function discoverPairedDevices(): Promise<BluetoothDeviceInfo[]> {
   return listBondedBluetoothDevices();
 }
 
-export async function createRealElmSession(device: BluetoothDeviceInfo): Promise<RealElmConnection> {
+export async function createRealElmSession(\n  device: BluetoothDeviceInfo,\n  compatibility?: Partial<Elm327CompatibilityConfig>,\n): Promise<RealElmConnection> {
   await ensureBluetoothReady();
-  const session = new Elm327Session(new BluetoothClassicTransport(device.address));
+  const config = mergeCompatibilityConfig(compatibility ?? DEFAULT_ELM327_COMPATIBILITY);\n  const session = new Elm327Session(new BluetoothClassicTransport(device.address, config), config);
 
   try {
     const initialization = await session.initialize();
