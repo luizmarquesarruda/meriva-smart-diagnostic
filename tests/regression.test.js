@@ -163,8 +163,7 @@ const fakeBluetooth = {
       return { remove() { bluetoothListener = null; } };
     },
     write: async () => {
-      bluetoothListener?.({ data: '41 0C ' });
-      bluetoothListener?.({ data: '0C 18\r\n>' });
+      bluetoothListener?.({ data: '41 0C 0C 18\r\n' });
     },
     available: async () => {
       throw new Error('available() não deve ser usado com listener');
