@@ -102,6 +102,10 @@ export class Elm327Session {
 
     try {
       const results: ElmCommandResult[] = [];
+      // ATZ reinicia fisicamente o firmware do clone. Alguns ELM327 precisam
+      // de até ~1,2 s antes de voltar a aceitar comandos e entregar o prompt.
+      // Sem essa janela, o primeiro ATZ pode parecer um erro mesmo com RFCOMM aberto.
+      const mandatoryAttempts = 3;
       const mandatory = ['ATZ', 'ATI'];
       const forced = this.config.forceInitialization
         ? this.config.forceInitCommands.filter((item) => /^AT[A-Z0-9]+$/.test(item.toUpperCase()))
@@ -112,7 +116,15 @@ export class Elm327Session {
 
       for (const command of [...mandatory, ...optional]) {
         if (this.disabledOptionalCommands.has(command)) continue;
-        const result = await this.command(command);
+        let result = await this.command(command);
+        for (let retry = 1; retry < mandatoryAttempts && result.status !== 'OK'; retry += 1) {
+          if (command === 'ATZ') {
+            await new Promise((resolve) => setTimeout(resolve, 1200));
+          } else {
+            await new Promise((resolve) => setTimeout(resolve, 350));
+          }
+          result = await this.command(command, retry + 1);
+        }
         results.push(result);
 
         // ATI/ATZ prove that the adapter is alive. Other AT commands are
