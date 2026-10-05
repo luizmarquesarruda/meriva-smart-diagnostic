@@ -11,6 +11,7 @@ export interface SharedObdConnection {
 
 let active: SharedObdConnection | null = null;
 let connecting: Promise<SharedObdConnection> | null = null;
+let lastConnectionError: string | null = null;
 
 export const MERIVA_ELM327_ADDRESS = '01:23:45:67:89:BA';
 const listeners = new Set<(connection: SharedObdConnection | null) => void>();
@@ -19,8 +20,20 @@ function emit(): void {
   for (const listener of listeners) listener(active);
 }
 
+function setConnectionError(cause: unknown): void {
+  lastConnectionError = cause instanceof Error ? cause.message : String(cause ?? 'ERRO DESCONHECIDO');
+}
+
+export function getSharedObdLastError(): string | null {
+  return lastConnectionError;
+}
+
 function looksLikeElm327(device: BluetoothDeviceInfo): boolean {
   return /ELM327|OBD\s*(?:II|2|Ⅱ)|V-LINK|VLINK|V-GATE|VLINKER|KONNWEI/i.test(device.name);
+}
+
+function sameAddress(a: string, b: string): boolean {
+  return a.replace(/:/g, '').toUpperCase() === b.replace(/:/g, '').toUpperCase();
 }
 
 export function getSharedObdConnection(): SharedObdConnection | null {
@@ -35,45 +48,62 @@ export function subscribeSharedObd(listener: (connection: SharedObdConnection | 
 
 async function connectPreferredElmOnce(preferredAddress: string | null): Promise<SharedObdConnection> {
   const devices = await discoverPairedDevices();
-  const preferredKnown = preferredAddress
-    ? devices.find((device) => device.address.toUpperCase() === preferredAddress.toUpperCase())
+
+  // O endereço configurado é uma âncora conhecida e deve ser testado
+  // mesmo quando o Android devolve outros dispositivos pareados.
+  const preferredDevice: BluetoothDeviceInfo | undefined = preferredAddress
+    ? devices.find((device) => sameAddress(device.address, preferredAddress))
     : undefined;
 
-  if (!devices.length && preferredAddress) {
-    const directDevice: BluetoothDeviceInfo = {
+  const namedCandidates = devices.filter(looksLikeElm327);
+  const candidates: BluetoothDeviceInfo[] = [];
+
+  if (preferredDevice) candidates.push(preferredDevice);
+
+  // Se o endereço conhecido não apareceu na lista do Android, ainda assim
+  // tentamos a conexão direta. Isso evita depender do nome retornado pelo SO.
+  if (preferredAddress && !preferredDevice) {
+    candidates.push({
       address: preferredAddress.toUpperCase(),
       name: 'ELM327 (ENDEREÇO CONFIGURADO)',
       bonded: true,
-    };
-    const connection = await createRealElmSession(directDevice);
-    active = { session: connection.session, device: directDevice, protocol: connection.protocol, supportedPids: connection.supportedPids };
-    emit();
-    return active;
+    });
   }
 
-  if (!devices.length) throw new Error('NENHUM ELM327 PAREADO');
+  for (const device of namedCandidates) {
+    if (!candidates.some((candidate) => sameAddress(candidate.address, device.address))) {
+      candidates.push(device);
+    }
+  }
 
-  const namedCandidates = devices.filter(looksLikeElm327);
-  const candidates = preferredKnown
-    ? [preferredKnown, ...namedCandidates.filter((device) => device.address !== preferredKnown.address)]
-    : namedCandidates;
-
-  if (!candidates.length) throw new Error('ELM327 NÃO ENCONTRADO ENTRE OS PAREADOS');
+  if (!candidates.length) {
+    throw new Error('NENHUM DISPOSITIVO ELM327 DISPONÍVEL. PAREIE O ADAPTADOR NO ANDROID.');
+  }
 
   let lastError: unknown = null;
+
   for (const device of candidates) {
     try {
       const connection = await createRealElmSession(device);
-      active = { session: connection.session, device, protocol: connection.protocol, supportedPids: connection.supportedPids };
+      active = {
+        session: connection.session,
+        device,
+        protocol: connection.protocol,
+        supportedPids: connection.supportedPids,
+      };
+      lastConnectionError = null;
       emit();
       return active;
     } catch (cause) {
       lastError = cause;
+      setConnectionError(cause);
     }
   }
 
-  const detail = lastError instanceof Error ? lastError.message : String(lastError ?? '');
-  throw new Error('ELM327 NÃO CONECTOU. ENDEREÇO TESTADO: ' + MERIVA_ELM327_ADDRESS + (detail ? '. ' + detail : ''));
+  const detail = lastError instanceof Error ? lastError.message : String(lastError ?? 'ERRO DESCONHECIDO');
+  throw new Error(
+    'ELM327 NÃO CONECTOU. ÚLTIMO ERRO: ' + detail,
+  );
 }
 
 export async function connectPreferredElm(
@@ -84,14 +114,17 @@ export async function connectPreferredElm(
 
   connecting = (async () => {
     let lastError: unknown = null;
+
     while (!active) {
       try {
         return await connectPreferredElmOnce(preferredAddress);
       } catch (cause) {
         lastError = cause;
+        setConnectionError(cause);
         await new Promise((resolve) => setTimeout(resolve, 3000));
       }
     }
+
     throw lastError instanceof Error ? lastError : new Error('ELM327 NÃO CONECTADO');
   })();
 
@@ -104,6 +137,7 @@ export async function connectPreferredElm(
 
 export async function setSharedObdConnection(connection: SharedObdConnection | null): Promise<void> {
   active = connection;
+  if (connection) lastConnectionError = null;
   emit();
 }
 
