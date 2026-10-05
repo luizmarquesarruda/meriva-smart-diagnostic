@@ -18,7 +18,14 @@ export class BluetoothClassicTransport implements ObdTransport {
   private dataSubscription?: RemovableSubscription;
   private disconnectSubscription?: RemovableSubscription;
 
-  private readonly config: Elm327CompatibilityConfig;\n\n  constructor(\n    private readonly deviceAddress: string,\n    config?: Partial<Elm327CompatibilityConfig>,\n  ) {\n    this.config = mergeCompatibilityConfig(config ?? DEFAULT_ELM327_COMPATIBILITY);\n  }
+  private readonly config: Elm327CompatibilityConfig;
+
+  constructor(
+    private readonly deviceAddress: string,
+    config?: Partial<Elm327CompatibilityConfig>,
+  ) {
+    this.config = mergeCompatibilityConfig(config ?? DEFAULT_ELM327_COMPATIBILITY);
+  }
 
   async open(): Promise<void> {
     if (Platform.OS !== 'android') throw new Error('BLUETOOTH CLASSIC DISPONÍVEL SOMENTE NO ANDROID');
@@ -51,7 +58,8 @@ export class BluetoothClassicTransport implements ObdTransport {
     // connectToDevice.
     for (const secureSocket of [false, true]) {
       try {
-        device = await Promise.race([\n          RNBluetoothClassic.connectToDevice(this.deviceAddress, {
+        device = await Promise.race([
+          RNBluetoothClassic.connectToDevice(this.deviceAddress, {
           connectionType: 'delimited',
           delimiter: '>',
           charset: 'ascii',
