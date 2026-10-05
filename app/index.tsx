@@ -80,9 +80,8 @@ export default function IndexScreen() {
     void reloadStoredState();
   }, [reloadStoredState]);
 
-  // Conecta automaticamente o ELM327 pareado ao abrir o aplicativo.
-  // O endereço conhecido é tentado primeiro e a sessão só é aceita após
-  // ATZ/ATSP0 + PID 010C responderem corretamente.
+  // Conecta automaticamente. O aplicativo escolhe o candidato entre os dispositivos
+  // Classic pareados e só aceita um ELM após inicialização + resposta OBD válida.
   useEffect(() => {
     if (!isHydrated || !settings) return;
 
@@ -114,7 +113,7 @@ export default function IndexScreen() {
     }
 
     const elmSettings = settings;
-    void connectPreferredElm(elmSettings.selectedAdapterAddress, {
+    void connectPreferredElm(null, {
       ioTimeoutMs: elmSettings.elmIoTimeoutMs,
       bluetoothConnectTimeoutMs: elmSettings.elmBluetoothTimeoutMs,
       commandDelayMs: elmSettings.elmCommandDelayMs,
