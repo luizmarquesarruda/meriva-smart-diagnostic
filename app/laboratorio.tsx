@@ -359,7 +359,6 @@ export default function LaboratorioScreen() {
         <View style={[styles.tripGrid, layout.landscape && styles.tripGridLandscape]}>
           <View style={[styles.tripMetric, layout.landscape && styles.tripMetricLandscape]}><Text style={styles.tripLabel}>DISTÂNCIA GPS</Text><Text style={styles.tripValue}>{tripDistanceKm.toFixed(2)} km</Text></View>
           <View style={[styles.tripMetric, layout.landscape && styles.tripMetricLandscape]}><Text style={styles.tripLabel}>CONSUMO</Text><Text style={styles.tripValue}>{tripConsumptionKml == null ? 'N/D' : tripConsumptionKml.toFixed(2) + ' km/L'}</Text></View>
-          <View style={[styles.tripMetric, layout.landscape && styles.tripMetricLandscape]}><Text style={styles.tripLabel}>COMBUSTÍVEL</Text><Text style={styles.tripValue}>{fuelLevelPercent == null ? 'N/D' : fuelLevelPercent.toFixed(1) + '%'}</Text></View>
           <View style={[styles.tripMetric, layout.landscape && styles.tripMetricLandscape]}><Text style={styles.tripLabel}>PID 015E</Text><Text style={styles.tripValue}>{tripFuelSupported === null ? 'N/D' : tripFuelSupported ? 'OK' : 'NÃO'}</Text></View>
         </View>
         <Text style={styles.tripHelp}>Sem botão iniciar. O app registra somente dados reais válidos.</Text>
