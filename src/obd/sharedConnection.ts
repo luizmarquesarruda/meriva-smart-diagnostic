@@ -47,8 +47,8 @@ export function subscribeSharedObd(listener: (connection: SharedObdConnection | 
   return () => listeners.delete(listener);
 }
 
-async function connectCandidate(device: BluetoothDeviceInfo): Promise<SharedObdConnection> {
-  const connection = await createRealElmSession(device);
+async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm327CompatibilityConfig): Promise<SharedObdConnection> {
+  const connection = await createRealElmSession(device, compatibility);
   active = {
     session: connection.session,
     device,
@@ -60,7 +60,10 @@ async function connectCandidate(device: BluetoothDeviceInfo): Promise<SharedObdC
   return active;
 }
 
-async function connectPreferredElmOnce(\n  preferredAddress: string | null,\n  compatibility: Elm327CompatibilityConfig,\n): Promise<SharedObdConnection> {
+async function connectPreferredElmOnce(
+  preferredAddress: string | null,
+  compatibility: Elm327CompatibilityConfig,
+): Promise<SharedObdConnection> {
   // IMPORTANTE: o MAC configurado é tentado diretamente primeiro.
   // Não bloqueamos a conexão porque getBondedDevices() falhou, demorou
   // ou não devolveu o ELM corretamente no Android.
