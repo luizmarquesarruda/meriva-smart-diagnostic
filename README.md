@@ -149,3 +149,7 @@ A suíte automatizada cobre autosave, parser, DTC, descoberta de PIDs, fila de c
 A camada Bluetooth usa o transporte nativo do react-native-bluetooth-classic, com framing BINARY no aplicativo. Isso permite que o parser receba o prompt > do ELM327 sem depender do delimitador consumido pela biblioteca.
 
 A inicialização separa Bluetooth, ELM e ECU. O primeiro teste real da ECU é 010C. A documentação detalhada e a matriz de comparação com AndrOBD, python-OBD e implementações Java estão em docs/ELM327_ENGINEERING_PLAYBOOK.md.
+
+## Validação CI
+
+Este commit é um gatilho técnico para confirmar que o workflow `.github/workflows/ci.yml` continua disparando em `push` e executando a validação e o build Android nativo.
