@@ -89,8 +89,10 @@ export class Elm327Session {
 
     try {
       const results: ElmCommandResult[] = [];
-      const mandatory = ['ATZ', 'ATI'];
-      const optional = ['ATE0', 'ATL0', 'ATS0', 'ATH1', 'ATSP0'];
+      const mandatory = this.config.forceInitialization ? ['ATZ', 'ATI'] : ['ATI'];
+      const optional = this.config.forceInitialization
+        ? ['ATE0', 'ATL0', 'ATS0', 'ATH1', 'ATSP0']
+        : ['ATL0', 'ATS0', 'ATH1', 'ATSP0'];
 
       for (const command of [...mandatory, ...optional]) {
         const result = await this.command(command);
