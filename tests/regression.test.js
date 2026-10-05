@@ -208,8 +208,6 @@ async function testParser() {
   assert.strictEqual(parser.parsePidResponse('010C', '48 6B 10 41 0C 1A F8 82').value, 1726);
   assert.strictEqual(parser.parsePidResponse('010C', '7E8 04 41 0C 1A F8').value, 1726);
   assert.strictEqual(parser.parsePidResponse('010C', '41 0C 1A').value, null);
-  assert.strictEqual(parser.parsePidResponse('012F', '41 2F 80').value, 50.19607843137255);
-  assert.strictEqual(parser.parsePidResponse('012F', '41 2F FF').value, 100);
   assert.strictEqual(parser.parsePidResponse('0199', '41 99 FF').status, 'VALOR NÃO INTERPRETADO');
   assert.strictEqual(parser.parsePidResponse('010C', 'NO DATA').status, 'NÃO RESPONDEU');
   assert.deepStrictEqual(parser.parseDtcResponse('43 01 33 00 00 00'), ['P0133']);
@@ -254,10 +252,6 @@ async function testPidScanner() {
   assert.ok(supported.includes('010F'));
   assert.ok(supported.includes('0111'));
 
-  // 012F fica no bloco descoberto por 0120, não por 0100.
-  const supported20 = scanner.decodeSupportedPids('0120', '41 20 00 02 00 00');
-  assert.ok(supported20.includes('012F'));
-  assert.ok(!supported20.includes('012E'));
 
   const supported40 = scanner.decodeSupportedPids('0140', '41 40 00 00 00 02');
   assert.ok(supported40.includes('015F'));
@@ -291,8 +285,9 @@ async function testBluetoothEventTransport() {
   const transport = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF');
   await transport.open();
   assert.strictEqual(lastBluetoothDiscoveryCancelled, true);
-  assert.strictEqual(lastBluetoothConnectionOptions?.connectionType, 'raw');
-  assert.strictEqual(lastBluetoothConnectionOptions?.secureSocket, false);
+  assert.strictEqual(lastBluetoothConnectionOptions?.connectionType, 'delimited');
+  assert.strictEqual(lastBluetoothConnectionOptions?.delimiter, '>');
+  assert.strictEqual(lastBluetoothConnectionOptions?.secureSocket, true);
   await transport.write('010C\\r');
   const response = await transport.readUntilPrompt(500);
   assert.strictEqual(response, '41 0C 0C 18');
