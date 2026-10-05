@@ -94,6 +94,16 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
     timestamp: 2000,
   });
 
+  watcher({
+    coords: {
+      latitude: 0,
+      longitude: 0.0002,
+      speed: 10,
+      accuracy: 5,
+    },
+    timestamp: 3000,
+  });
+
   const state = tracker.getState();
   assert.strictEqual(state.currentSpeedKmh, 36);
   assert.ok(state.distanceKm > 0.01 && state.distanceKm < 0.012);
@@ -121,7 +131,7 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
       speed: 10,
       accuracy: 5,
     },
-    timestamp: 4000,
+    timestamp: 5000,
   });
   assert.strictEqual(tracker.getState().currentSpeedKmh, 0);
 
