@@ -48,3 +48,15 @@ const defaults = mergeCompatibilityConfig();
 assert.equal(defaults.ioTimeoutMs, 15000);
 assert.equal(defaults.adaptiveTimeoutMaxMs, 15000);
 console.log('ELM327 compatibility regression tests: PASS');
+
+// Android/RFCOMM regression guards: raw ELM transport must not inject a
+// '>' delimiter into the native connection. The JS transport owns prompt framing.
+const transportSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'obd', 'bluetoothClassicTransport.ts'), 'utf8');
+assert.ok(transportSource.includes("connectionType: 'raw'"));
+assert.ok(!transportSource.includes("delimiter: '>'"));
+assert.ok(transportSource.includes('clearInputBuffer()'));
+
+const elmSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'obd', 'elm327.ts'), 'utf8');
+assert.ok(elmSource.includes("command === 'ATZ'"));
+assert.ok(elmSource.includes('clearInputBuffer?.()'));
+console.log('Android RFCOMM/ELM327 v1.5 regression guards: PASS');
