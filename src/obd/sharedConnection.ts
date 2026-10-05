@@ -8,6 +8,7 @@ export interface SharedObdConnection {
   device: BluetoothDeviceInfo;
   protocol: string | null;
   supportedPids: string[];
+  getDiagnosticsText: () => string;
 }
 
 let active: SharedObdConnection | null = null;
@@ -54,6 +55,7 @@ async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm3
     device,
     protocol: connection.protocol,
     supportedPids: connection.supportedPids,
+    getDiagnosticsText: () => connection.session.getTransportDiagnosticsText(),
   };
   lastConnectionError = null;
   emit();
