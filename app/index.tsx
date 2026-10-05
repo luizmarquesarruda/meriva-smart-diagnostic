@@ -127,6 +127,9 @@ export default function IndexScreen() {
       noDataReconnectThreshold: settings.elmNoDataReconnectThreshold,
       partialResponseAction: settings.elmPartialResponseAction,
       forceInitialization: settings.elmForceInitialization,
+      adaptiveTiming: settings.elmAdaptiveTiming,
+      adaptiveTimeoutMinMs: settings.elmAdaptiveTimeoutMinMs,
+      adaptiveTimeoutMaxMs: settings.elmAdaptiveTimeoutMaxMs,
     })
       .then(() => {
         setBluetoothSearching(false);
