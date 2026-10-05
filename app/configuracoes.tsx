@@ -169,6 +169,19 @@ export default function ConfiguracaoScreen() {
           </View>
 
           <View style={styles.card}>
+            <Text style={styles.label}>Adaptive Timing do ELM</Text>
+            <SettingSwitch label="Ajustar timeout conforme a resposta" value={settings.elmAdaptiveTiming} onChange={(v) => void updateSetting('elmAdaptiveTiming', v)} />
+            <View style={styles.row}>
+              {[3000, 5000, 10000].map((value) => (
+                <TouchableOpacity key={value} style={[styles.choice, settings.elmAdaptiveTimeoutMinMs === value && styles.choiceActive]} onPress={() => void updateSetting('elmAdaptiveTimeoutMinMs', value)}>
+                  <Text style={styles.choiceText}>mín. {value / 1000}s</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={styles.note}>O app aumenta o tempo quando há timeout/erro e reduz gradualmente quando as respostas ficam rápidas.</Text>
+          </View>
+
+          <View style={styles.card}>
             <Text style={styles.label}>NO DATA antes de recuperação</Text>
             <View style={styles.row}>
               {[20, 40, 80].map((value) => (
