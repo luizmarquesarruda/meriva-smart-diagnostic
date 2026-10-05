@@ -128,6 +128,11 @@ export default function RootLayout() {
       }}
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="conexao" options={{ title: 'CONEXÃO ELM327' }} />
+      <Stack.Screen name="tempo-real" options={{ title: 'DADOS EM TEMPO REAL' }} />
+      <Stack.Screen name="dtc" options={{ title: 'CÓDIGOS DE FALHA' }} />
+      <Stack.Screen name="compatibilidade" options={{ title: 'COMPATIBILIDADE ELM327' }} />
+      <Stack.Screen name="historico" options={{ title: 'HISTÓRICO DE VIAGENS' }} />
       <Stack.Screen name="laboratorio" options={{ title: 'DIAGNÓSTICO OBD' }} />
       <Stack.Screen name="armazenamento" options={{ title: 'HISTÓRICO E DADOS' }} />
       <Stack.Screen name="configuracoes" options={{ title: 'CONFIGURAÇÕES' }} />
