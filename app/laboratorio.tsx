@@ -34,7 +34,6 @@ export default function LaboratorioScreen() {
   const layout = getMidLayout(windowSize);
   const [mode, setMode] = useState<Mode>('REAL');
   const [devices, setDevices] = useState<BluetoothDeviceInfo[]>([]);
-  const [selectedAddress, setSelectedAddress] = useState('');
   const [pid, setPid] = useState('010C');
   const [tx, setTx] = useState('');
   const [rx, setRx] = useState('');
@@ -75,7 +74,7 @@ export default function LaboratorioScreen() {
     const unsubscribe = subscribeSharedObd((connection) => {
       if (!connection) return;
       sessionRef.current = connection.session;
-      setProtocol(connection.protocol ?? 'N/D');
+      setProtocol(connected.protocol ?? 'N/D');
       setStatus('ELM RESPONDENDO / CONEXÃO AUTOMÁTICA');
     });
     const existing = getSharedObdConnection();
@@ -131,8 +130,6 @@ export default function LaboratorioScreen() {
     try {
       const paired = await discoverPairedDevices();
       setDevices(paired);
-      const savedAddress = settings.selectedAdapterAddress?.toUpperCase() ?? '';
-      setSelectedAddress('');
       setStatus(paired.length ? 'BLUETOOTH OK / ELM NÃO CONECTADO' : 'NENHUM ELM327 PAREADO');
     } catch (cause) {
       setStatus('BLUETOOTH NÃO PRONTO');
@@ -180,14 +177,15 @@ export default function LaboratorioScreen() {
         throw lastError instanceof Error ? lastError : new Error('NENHUM ELM327 PAREADO RESPONDEU À ECU.');
       }
       const device = selectedDevice;
-      sessionRef.current = connection.session;
+      const connected = connection;
+      sessionRef.current = connected.session;
       await setSharedObdConnection({
-        session: connection.session,
+        session: connected.session,
         device,
-        protocol: connection.protocol,
-        supportedPids: connection.supportedPids,
-        ecuValidated: connection.ecuValidated,
-        getDiagnosticsText: () => connection.session.getTransportDiagnosticsText(),
+        protocol: connected.protocol,
+        supportedPids: connected.supportedPids,
+        ecuValidated: connected.ecuValidated,
+        getDiagnosticsText: () => connected.session.getTransportDiagnosticsText(),
       });
       setProtocol(connection.protocol ?? 'N/D');
       startObdSessionCheckpoint();
@@ -195,18 +193,18 @@ export default function LaboratorioScreen() {
         state.obd = {
           connected: true,
           adapterName: device.name,
-          protocol: connection.protocol ?? undefined,
+          protocol: connected.protocol ?? undefined,
           lastConnectedAt: new Date().toISOString(),
         };
 
         if (
-          connection.pidDiscoverySource === 'ECU' &&
-          connection.protocol &&
-          connection.supportedPids.length > 0
+          connected.pidDiscoverySource === 'ECU' &&
+          connected.protocol &&
+          connected.supportedPids.length > 0
         ) {
           state.pidDiscovery = {
-            supportedPids: connection.supportedPids,
-            protocol: connection.protocol,
+            supportedPids: connected.supportedPids,
+            protocol: connected.protocol,
             discoveredAt: new Date().toISOString(),
           };
         }
@@ -219,19 +217,19 @@ export default function LaboratorioScreen() {
       });
 
       setStatus(
-        connection.pidDiscoverySource === 'CACHE'
+        connected.pidDiscoverySource === 'CACHE'
           ? 'ELM RESPONDENDO / PIDs CARREGADOS DO JSON'
           : 'ELM RESPONDENDO / PIDs DESCOBERTOS E SALVOS',
       );
       // A conexão já fez a descoberta. Não repita a varredura imediatamente.
-      const discovered = connection.supportedPids;
+      const discovered = connected.supportedPids;
       setSupportedPids(discovered);
       const fuelSupported = discovered.includes('015E');
       setTripFuelSupported(fuelSupported);
       setTripActive(true);
       setStatus(
         fuelSupported
-          ? connection.protocol ? 'VIAGEM AUTOMÁTICA / GPS + PID 015E' : 'VIAGEM AUTOMÁTICA / PROTOCOLO N/D'
+          ? connected.protocol ? 'VIAGEM AUTOMÁTICA / GPS + PID 015E' : 'VIAGEM AUTOMÁTICA / PROTOCOLO N/D'
           : 'VIAGEM AUTOMÁTICA / GPS, SEM PID 015E',
       );
     } catch (cause) {
