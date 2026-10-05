@@ -13,7 +13,7 @@ type RemovableSubscription = { remove: () => void };
 export class BluetoothClassicTransport implements ObdTransport {
   private device: BluetoothDevice | null = null;
   private connected = false;
-  private received = '';
+  private receivedMessages: string[] = [];
   private dataSubscription?: RemovableSubscription;
   private disconnectSubscription?: RemovableSubscription;
 
@@ -24,7 +24,7 @@ export class BluetoothClassicTransport implements ObdTransport {
     if (!(await RNBluetoothClassic.isBluetoothAvailable())) throw new Error('BLUETOOTH NÃO DISPONÍVEL NESTE APARELHO');
     if (!(await RNBluetoothClassic.isBluetoothEnabled())) throw new Error('BLUETOOTH DESLIGADO');
 
-    this.received = '';
+    this.receivedMessages = [];
     this.connected = false;
     this.removeSubscriptions();
 
@@ -44,7 +44,8 @@ export class BluetoothClassicTransport implements ObdTransport {
     let lastCause: unknown = null;
 
     // ELM327 clones variam no uso do RFCOMM seguro. Tentamos primeiro o
-    // socket inseguro, padrão comum desses adaptadores, e depois o seguro.
+    // socket seguro e depois o inseguro, porque alguns telefones/Androids
+    // negociam melhor o SPP seguro e alguns clones exigem fallback inseguro.
     // Conecta diretamente pelo endereço MAC. A API instalada não expõe
     // getters para sockets já conectados, portanto o retry é feito no próprio
     // connectToDevice.
@@ -85,7 +86,7 @@ export class BluetoothClassicTransport implements ObdTransport {
     this.connected = true;
 
     this.dataSubscription = device.onDataReceived((event) => {
-      if (event?.data) this.received += String(event.data);
+      if (event?.data) this.receivedMessages.push(String(event.data));
     });
 
     if (RNBluetoothClassic.onDeviceDisconnected) {
@@ -108,7 +109,7 @@ export class BluetoothClassicTransport implements ObdTransport {
 
     this.device = null;
     this.connected = false;
-    this.received = '';
+    this.receivedMessages = [];
   }
 
   async write(data: string): Promise<void> {
@@ -137,6 +138,9 @@ export class BluetoothClassicTransport implements ObdTransport {
     const started = Date.now();
     let nextConnectionCheck = started;
 
+    // Com connectionType=delimited, a biblioteca já remove o delimitador '>'
+    // antes de disparar onDataReceived. Portanto, não devemos procurar '>' aqui.
+    // Cada evento recebido representa uma mensagem completa delimitada.
     while (Date.now() - started < timeoutMs) {
       if (!this.connected || !this.device) throw new Error('BLUETOOTH DESCONECTADO');
 
@@ -153,19 +157,16 @@ export class BluetoothClassicTransport implements ObdTransport {
         }
       }
 
-      const promptIndex = this.received.indexOf('>');
-      if (promptIndex >= 0) {
-        const response = this.received.slice(0, promptIndex);
-        this.received = this.received.slice(promptIndex + 1);
-        return response.replace(/^\s+|\s+$/g, '');
+      const message = this.receivedMessages.shift();
+      if (message != null) {
+        return message.replace(/^\\s+|\\s+$/g, '');
       }
 
       await new Promise((resolve) => setTimeout(resolve, 25));
     }
 
-    const partial = this.received.replace(/^\s+|\s+$/g, '');
-    this.received = '';
-    throw new Error(partial ? 'TIMEOUT: RESPOSTA ELM SEM PROMPT FINAL' : 'TIMEOUT');
+    this.receivedMessages = [];
+    throw new Error('TIMEOUT: RESPOSTA ELM SEM MENSAGEM DELIMITADA');
   }
 
   private async safeDisconnect(device: BluetoothDevice): Promise<void> {
