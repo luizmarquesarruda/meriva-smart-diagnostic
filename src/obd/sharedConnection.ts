@@ -64,48 +64,50 @@ async function connectPreferredElmOnce(
   preferredAddress: string | null,
   compatibility: Elm327CompatibilityConfig,
 ): Promise<SharedObdConnection> {
-  // IMPORTANTE: o MAC configurado é tentado diretamente primeiro.
-  // Não bloqueamos a conexão porque getBondedDevices() falhou, demorou
-  // ou não devolveu o ELM corretamente no Android.
+  // FLUXO PRINCIPAL: começar pelos dispositivos Bluetooth Classic já
+  // pareados no celular. Não fazemos descoberta Bluetooth para encontrar o
+  // ELM. O usuário já pareou o adaptador no Android, então usamos a lista
+  // do sistema como fonte de verdade.
   await ensureBluetoothReady();
 
-  if (preferredAddress) {
-    const directDevice: BluetoothDeviceInfo = {
-      address: preferredAddress.toUpperCase(),
-      name: 'ELM327 (ENDEREÇO CONFIGURADO)',
-      bonded: true,
-    };
-
-    try {
-      return await connectCandidate(directDevice, compatibility);
-    } catch (cause) {
-      setConnectionError(cause);
-    }
-  }
-
-  let devices: BluetoothDeviceInfo[] = [];
+  let devices: BluetoothDeviceInfo[];
   try {
     devices = await discoverPairedDevices();
   } catch (cause) {
     setConnectionError(cause);
+    throw cause;
+  }
+
+  if (!devices.length) {
+    throw new Error('NENHUM BLUETOOTH PAREADO. PAREIE O ELM327 NO ANDROID E TENTE NOVAMENTE.');
   }
 
   const candidates: BluetoothDeviceInfo[] = [];
-  const preferredDevice = preferredAddress
-    ? devices.find((device) => sameAddress(device.address, preferredAddress))
-    : undefined;
 
-  if (preferredDevice && !candidates.some((item) => sameAddress(item.address, preferredDevice.address))) {
-    candidates.push(preferredDevice);
+  // 1. MAC preferido, somente se ele estiver realmente na lista de pareados.
+  // Isso evita tentar um endereço conhecido sem o Android ter o dispositivo
+  // pareado neste aparelho.
+  if (preferredAddress) {
+    const preferred = devices.find((device) => sameAddress(device.address, preferredAddress));
+    if (preferred) candidates.push(preferred);
   }
 
+  // 2. Outros dispositivos que parecem ELM/OBD.
   for (const device of devices.filter(looksLikeElm327)) {
     if (!candidates.some((candidate) => sameAddress(candidate.address, device.address))) {
       candidates.push(device);
     }
   }
 
-  let lastError: unknown = lastConnectionError;
+  // 3. Último recurso dentro da lista pareada: testar os demais Bluetooth
+  // Classic. Não fazemos discovery e não tocamos em dispositivos não pareados.
+  for (const device of devices) {
+    if (!candidates.some((candidate) => sameAddress(candidate.address, device.address))) {
+      candidates.push(device);
+    }
+  }
+
+  let lastError: unknown = null;
 
   for (const device of candidates) {
     try {
@@ -116,8 +118,8 @@ async function connectPreferredElmOnce(
     }
   }
 
-  const detail = lastError instanceof Error ? lastError.message : String(lastError ?? 'NENHUM DISPOSITIVO RESPONDEU');
-  throw new Error('ELM327 NÃO CONECTOU. ÚLTIMO ERRO: ' + detail);
+  const detail = lastError instanceof Error ? lastError.message : String(lastError ?? 'NENHUM DISPOSITIVO PAREADO RESPONDEU');
+  throw new Error('NENHUM ELM327 PAREADO CONECTOU. ÚLTIMO ERRO: ' + detail);
 }
 
 export async function connectPreferredElm(
