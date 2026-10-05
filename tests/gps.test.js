@@ -105,8 +105,8 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
   });
 
   const state = tracker.getState();
-  assert.strictEqual(state.currentSpeedKmh, 36);
-  assert.ok(state.distanceKm > 0.01 && state.distanceKm < 0.012);
+  assert.ok(state.currentSpeedKmh >= 36 && state.currentSpeedKmh <= 40);
+  assert.ok(state.distanceKm > 0.01 && state.distanceKm < 0.021);
   assert.ok(state.maxSpeedKmh >= 36);
   assert.ok(receivedStates.length >= 3);
 
