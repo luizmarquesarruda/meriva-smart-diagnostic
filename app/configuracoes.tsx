@@ -119,7 +119,82 @@ export default function ConfiguracaoScreen() {
           </View>
 
           <SettingSwitch label="Conectar ao ELM327 automaticamente" value={settings.autoConnectObd} onChange={(v) => void updateSetting('autoConnectObd', v)} />
+          <SettingSwitch label="Inicialização forçada do ELM (ATZ + ATE0)" value={settings.elmForceInitialization} onChange={(v) => void updateSetting('elmForceInitialization', v)} />
           <SettingSwitch label="Alertas de diagnóstico" value={settings.diagnosticAlerts} onChange={(v) => void updateSetting('diagnosticAlerts', v)} />
+
+          <Text style={styles.section}>COMPATIBILIDADE ELM327</Text>
+          <View style={styles.card}>
+            <Text style={styles.label}>Tempo de espera de entrada/saída</Text>
+            <View style={styles.row}>
+              {[5000, 10000, 15000].map((value) => (
+                <TouchableOpacity key={value} style={[styles.choice, settings.elmIoTimeoutMs === value && styles.choiceActive]} onPress={() => void updateSetting('elmIoTimeoutMs', value)}>
+                  <Text style={styles.choiceText}>{value / 1000}s</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.label}>Tempo limite Bluetooth</Text>
+            <View style={styles.row}>
+              {[3000, 5000, 10000].map((value) => (
+                <TouchableOpacity key={value} style={[styles.choice, settings.elmBluetoothTimeoutMs === value && styles.choiceActive]} onPress={() => void updateSetting('elmBluetoothTimeoutMs', value)}>
+                  <Text style={styles.choiceText}>{value / 1000}s</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.label}>Atraso antes de enviar comando</Text>
+            <View style={styles.row}>
+              {[0, 20, 50].map((value) => (
+                <TouchableOpacity key={value} style={[styles.choice, settings.elmCommandDelayMs === value && styles.choiceActive]} onPress={() => void updateSetting('elmCommandDelayMs', value)}>
+                  <Text style={styles.choiceText}>{value} ms</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.label}>Tentativas de conexão</Text>
+            <View style={styles.row}>
+              {[0, 3, 10].map((value) => (
+                <TouchableOpacity key={value} style={[styles.choice, settings.elmMaxConnectionAttempts === value && styles.choiceActive]} onPress={() => void updateSetting('elmMaxConnectionAttempts', value)}>
+                  <Text style={styles.choiceText}>{value === 0 ? 'INFINITO' : String(value)}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={styles.note}>0 = continuar tentando até o usuário cancelar ou o ELM responder.</Text>
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.label}>NO DATA antes de recuperação</Text>
+            <View style={styles.row}>
+              {[20, 40, 80].map((value) => (
+                <TouchableOpacity key={value} style={[styles.choice, settings.elmNoDataReconnectThreshold === value && styles.choiceActive]} onPress={() => void updateSetting('elmNoDataReconnectThreshold', value)}>
+                  <Text style={styles.choiceText}>{value}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.label}>Resposta parcial</Text>
+            <View style={styles.row}>
+              <TouchableOpacity style={[styles.choice, settings.elmPartialResponseAction === 'RECONNECT_AND_INITIALIZE' && styles.choiceActive]} onPress={() => void updateSetting('elmPartialResponseAction', 'RECONNECT_AND_INITIALIZE')}>
+                <Text style={styles.choiceText}>RECONEXÃO + INIT</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.choice, settings.elmPartialResponseAction === 'RECONNECT' && styles.choiceActive]} onPress={() => void updateSetting('elmPartialResponseAction', 'RECONNECT')}>
+                <Text style={styles.choiceText}>RECONEXÃO</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.choice, settings.elmPartialResponseAction === 'IGNORE' && styles.choiceActive]} onPress={() => void updateSetting('elmPartialResponseAction', 'IGNORE')}>
+                <Text style={styles.choiceText}>IGNORAR</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <Text style={styles.note}>Os parâmetros são inspirados no comportamento observado no Car Scanner e em implementações públicas de ELM327. Eles não garantem compatibilidade com todo clone.</Text>
           <Text style={styles.note}>O GPS inicia automaticamente quando o aplicativo entra em uso. Essa função é controlada pelo sistema para manter a viagem automática.</Text>
         </>
       )}
