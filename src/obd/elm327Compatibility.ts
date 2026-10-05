@@ -41,7 +41,7 @@ export interface ElmHealthSnapshot {
   lastErrorType: ElmErrorType;
 }
 
-export const DEFAULT_ELM327_COMPATIBILITY: Elm327CompatibilityConfig = {
+/** Perfil real de referência: ELM327 Mini genérico Bluetooth Classic,\n * firmware comercialmente anunciado como v1.5.\n * A implementação privilegia tolerância a clones e validação por PID real.\n */\nexport const ELM327_MINI_GENERIC_V15_PROFILE = 'ELM327_MINI_GENERIC_V15_KWP';\n\nexport const DEFAULT_ELM327_COMPATIBILITY: Elm327CompatibilityConfig = {
   ioTimeoutMs: 15_000,
   bluetoothConnectTimeoutMs: 5_000,
   commandDelayMs: 20,
