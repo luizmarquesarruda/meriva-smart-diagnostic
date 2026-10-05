@@ -77,8 +77,8 @@ export class Elm327Session {
       // reset, eco/desenho de linha, espaços, cabeçalho, protocolo automático.
       // ATAT1 não é necessário para este projeto e pode alterar o comportamento
       // de adaptadores ELM327/KWP mais simples.
-      // ATST32 é o limite padrão de aproximadamente 200 ms do ELM327.
-      // Mantemos esse valor para a Meriva e deixamos o transporte com margem maior.
+      // O timeout de leitura fica na camada de transporte. Não enviamos
+      // ATST32 porque a sequência real validada para este projeto não o usa.
       for (const command of ['ATZ', 'ATE0', 'ATL0', 'ATS0', 'ATH1', 'ATSP0']) {
         const result = await this.command(command);
         results.push(result);
