@@ -224,7 +224,7 @@ async function testElmAndProtocol() {
   const initialization = await session.initialize();
   assert.deepStrictEqual(
     initialization.map((item) => item.command),
-    ['ATZ', 'ATE0', 'ATL0', 'ATS0', 'ATH1', 'ATSP0', 'ATDP'],
+    ['ATZ', 'ATI', 'ATE0', 'ATL0', 'ATS0', 'ATH1', 'ATSP0', 'ATDP'],
   );
   assert.strictEqual(session.getProtocol(), 'SIMULATED OBD TRANSPORT');
 
