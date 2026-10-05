@@ -106,7 +106,6 @@ class AutoTripService {
       connected: true,
       active: true,
       fuelSupported,
-      fuelLevelSupported,
       error: null,
     };
     this.emit();
