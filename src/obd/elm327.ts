@@ -80,18 +80,13 @@ export class Elm327Session {
       // ATAT1/ATST32 não são enviados porque não são necessários para o KWP
       // Fast Init conhecido desta Meriva e podem alterar o comportamento de
       // adaptadores simples.
-      const mandatory = ['ATZ', 'ATE0'];
-      const identity = 'ATI';
+      const mandatory = ['ATZ', 'ATI', 'ATE0'];
       const optional = ['ATL0', 'ATS0', 'ATH1', 'ATSP0'];
 
-      // ATI é uma prova obrigatória de identidade do adaptador, mas fica fora
-      // da lista pública de comandos de configuração para manter a API de
-      // inicialização compatível com versões anteriores do aplicativo.
-      const identityResult = await this.command(identity);
-      if (identityResult.status !== 'OK') {
-        throw new Error(`ELM NÃO RESPONDEU CORRETAMENTE A ${identity}: ${identityResult.status}`);
-      }
-
+      // A ordem é importante em clones ELM327: ATZ reinicia o adaptador,
+      // ATI identifica o firmware já reiniciado e ATE0 desliga o eco antes
+      // de qualquer comando de configuração. Isso evita interpretar uma
+      // resposta residual do estado anterior como prova de identidade.
       for (const command of [...mandatory, ...optional]) {
         const result = await this.command(command);
         results.push(result);
