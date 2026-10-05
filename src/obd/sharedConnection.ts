@@ -119,21 +119,27 @@ async function connectPreferredElmOnce(\n  preferredAddress: string | null,\n  c
 
 export async function connectPreferredElm(
   preferredAddress: string | null = MERIVA_ELM327_ADDRESS,
+  compatibility?: Partial<Elm327CompatibilityConfig>,
 ): Promise<SharedObdConnection> {
   if (active) return active;
   if (connecting) return connecting;
 
+  const config = mergeCompatibilityConfig(compatibility ?? DEFAULT_ELM327_COMPATIBILITY);
+
   connecting = (async () => {
     let lastError: unknown = null;
+    let attempts = 0;
 
-    // Continua tentando enquanto o aplicativo estiver aberto e não houver
-    // conexão válida. Isso cobre ligar o ELM depois de abrir o app.
     while (!active) {
+      attempts += 1;
       try {
         return await connectPreferredElmOnce(preferredAddress, config);
       } catch (cause) {
         lastError = cause;
         setConnectionError(cause);
+        if (config.maxConnectionAttempts > 0 && attempts >= config.maxConnectionAttempts) {
+          throw cause;
+        }
         await new Promise((resolve) => setTimeout(resolve, 2500));
       }
     }
