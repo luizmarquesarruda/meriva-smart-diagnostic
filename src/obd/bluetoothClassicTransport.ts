@@ -52,6 +52,7 @@ export class BluetoothClassicTransport implements ObdTransport {
     for (const secureSocket of [true, false]) {
       try {
         device = await RNBluetoothClassic.connectToDevice(this.deviceAddress, {
+          connectorType: 'rfcomm',
           connectionType: 'delimited',
           delimiter: '>',
           charset: 'ascii',
