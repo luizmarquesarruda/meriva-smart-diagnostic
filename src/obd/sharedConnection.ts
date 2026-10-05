@@ -2,6 +2,7 @@ import type { Elm327Session } from './elm327';
 import type { BluetoothDeviceInfo } from './bluetoothClassicTransport';
 import { createRealElmSession, discoverPairedDevices, ensureBluetoothReady } from './bluetoothManager';
 import { DEFAULT_ELM327_COMPATIBILITY, Elm327CompatibilityConfig, mergeCompatibilityConfig } from './elm327Compatibility';
+import { getAutoSaveState } from '../meriva/autosaveManager';
 
 export interface SharedObdConnection {
   session: Elm327Session;
@@ -49,7 +50,7 @@ export function subscribeSharedObd(listener: (connection: SharedObdConnection | 
 }
 
 async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm327CompatibilityConfig): Promise<SharedObdConnection> {
-  const connection = await createRealElmSession(device, compatibility);
+  const connection = await createRealElmSession(device, compatibility, getAutoSaveState().pidDiscovery);
   if (!connection.ecuValidated) {
     try { await connection.session.close(); } catch { /* preserva o estado inválido */ }
     throw new Error('ECU NÃO VALIDADA. OBLIGATÓRIO RECEBER 41 0C PARA MARCAR OBD COMO CONECTADO.');
