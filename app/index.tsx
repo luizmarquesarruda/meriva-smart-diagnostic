@@ -12,7 +12,7 @@ import { gpsTracker, type GpsTripState } from '../src/gps';
 import { ensureMerivaVehicleProfile } from '../src/database/vehicleConfig';
 import { readAppSettings, type AppSettings } from '../src/database/appSettings';
 import { MERIVA_MANUAL } from '../src/database/merivaManual';
-import { connectPreferredElm, subscribeSharedObd } from '../src/obd/sharedConnection';
+import { connectPreferredElm, getSharedObdLastError, subscribeSharedObd } from '../src/obd/sharedConnection';
 
 function formatDistance(km: number, unit: AppSettings['distanceUnit']): string {
   if (!Number.isFinite(km) || km < 0) return 'N/D';
@@ -25,6 +25,7 @@ export default function IndexScreen() {
   const [cycles, setCycles] = useState<DriveCycle[]>([]);
   const [obd, setObd] = useState<ObdConnectionState>({ connected: false });
   const [bluetoothSearching, setBluetoothSearching] = useState(false);
+  const [bluetoothError, setBluetoothError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<AutoSaveStatus>({ lastSavedAt: null, lastSaveReason: null, lastError: null });
   const [isHydrated, setIsHydrated] = useState(false);
   const [gpsState, setGpsState] = useState<GpsTripState>(gpsTracker.getState());
@@ -112,9 +113,17 @@ export default function IndexScreen() {
     });
 
     setBluetoothSearching(true);
+    setBluetoothError(null);
     void connectPreferredElm()
-      .then(() => setBluetoothSearching(false))
-      .catch(() => setBluetoothSearching(true));
+      .then(() => {
+        setBluetoothSearching(false);
+        setBluetoothError(null);
+      })
+      .catch((cause) => {
+        setBluetoothSearching(true);
+        const detail = cause instanceof Error ? cause.message : getSharedObdLastError() ?? String(cause ?? 'ERRO DESCONHECIDO');
+        setBluetoothError(detail);
+      });
 
     return () => {
       cancelled = true;
@@ -143,7 +152,7 @@ export default function IndexScreen() {
             <Text style={styles.midBrand}>CHEVROLET</Text>
             <Text style={styles.midModel}>MERIVA MAXX 1.4</Text>
             <Text style={styles.midStatus}>
-              {obd.connected ? 'OBD • ONLINE' : bluetoothSearching ? 'BLUETOOTH • BUSCANDO ELM327' : 'OBD • AGUARDANDO'}
+              {obd.connected ? 'OBD • ONLINE' : bluetoothError ? 'BLUETOOTH • FALHA DE CONEXÃO' : bluetoothSearching ? 'BLUETOOTH • BUSCANDO ELM327' : 'OBD • AGUARDANDO'}
             </Text>
           </View>
 
@@ -194,6 +203,7 @@ export default function IndexScreen() {
             </Link>
           </View>
 
+          {bluetoothError ? <Text style={styles.error}>BLUETOOTH/ELM327: {bluetoothError}</Text> : null}
           {gpsState.error ? <Text style={styles.error}>GPS: {gpsState.error}</Text> : null}
           {saveStatus.lastError ? <Text style={styles.error}>AUTOSAVE: {saveStatus.lastError}</Text> : null}
           <Text style={styles.footerStatus}>{isHydrated ? 'DADOS SALVOS AUTOMATICAMENTE' : 'CARREGANDO DADOS...'}</Text>
