@@ -4,7 +4,7 @@ import RNBluetoothClassic from 'react-native-bluetooth-classic';
 import { BluetoothClassicTransport, BluetoothDeviceInfo, listBondedBluetoothDevices } from './bluetoothClassicTransport';
 import { ElmCommandResult, Elm327Session } from './elm327';
 import { Elm327CompatibilityConfig, DEFAULT_ELM327_COMPATIBILITY, mergeCompatibilityConfig } from './elm327Compatibility';
-import { discoverSupportedPids } from './pidScanner';
+import { discoverIntelligentPids } from './intelligentPidDiscovery';
 import type { PidDiscoveryCache } from '../meriva/autosaveState';
 
 export type BluetoothConnectionStatus =
@@ -194,8 +194,8 @@ export async function createRealElmSession(
     } else {
       pidDiscoverySource = 'ECU';
       try {
-        const discovery = await discoverSupportedPids(session);
-        supportedPids = Array.from(new Set(discovery.flatMap((item) => item.supportedPids))).sort();
+        const discovery = await discoverIntelligentPids(session);
+        supportedPids = discovery.supportedPids;
       } catch {
         supportedPids = [];
       }
