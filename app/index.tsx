@@ -113,17 +113,18 @@ export default function IndexScreen() {
       return () => { cancelled = true; unsubscribe(); };
     }
 
-    void connectPreferredElm(settings.selectedAdapterAddress, {
-      ioTimeoutMs: settings.elmIoTimeoutMs,
-      bluetoothConnectTimeoutMs: settings.elmBluetoothTimeoutMs,
-      commandDelayMs: settings.elmCommandDelayMs,
-      maxConnectionAttempts: settings.elmMaxConnectionAttempts,
-      noDataReconnectThreshold: settings.elmNoDataReconnectThreshold,
-      partialResponseAction: settings.elmPartialResponseAction,
-      forceInitialization: settings.elmForceInitialization,
-      adaptiveTiming: settings.elmAdaptiveTiming,
-      adaptiveTimeoutMinMs: settings.elmAdaptiveTimeoutMinMs,
-      adaptiveTimeoutMaxMs: settings.elmAdaptiveTimeoutMaxMs,
+    const elmSettings = settings;
+    void connectPreferredElm(elmSettings.selectedAdapterAddress, {
+      ioTimeoutMs: elmSettings.elmIoTimeoutMs,
+      bluetoothConnectTimeoutMs: elmSettings.elmBluetoothTimeoutMs,
+      commandDelayMs: elmSettings.elmCommandDelayMs,
+      maxConnectionAttempts: elmSettings.elmMaxConnectionAttempts,
+      noDataReconnectThreshold: elmSettings.elmNoDataReconnectThreshold,
+      partialResponseAction: elmSettings.elmPartialResponseAction,
+      forceInitialization: elmSettings.elmForceInitialization,
+      adaptiveTiming: elmSettings.elmAdaptiveTiming,
+      adaptiveTimeoutMinMs: elmSettings.elmAdaptiveTimeoutMinMs,
+      adaptiveTimeoutMaxMs: elmSettings.elmAdaptiveTimeoutMaxMs,
     })
       .then(() => {
         setBluetoothSearching(false);
