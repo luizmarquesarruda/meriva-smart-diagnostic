@@ -7,7 +7,17 @@ export interface AppSettings {
   distanceUnit: DistanceUnit;
   autoConnectObd: boolean;
   diagnosticAlerts: boolean;
-  selectedAdapterAddress: string | null;\n  elmIoTimeoutMs: number;\n  elmBluetoothTimeoutMs: number;\n  elmCommandDelayMs: number;\n  elmMaxConnectionAttempts: number;\n  elmNoDataReconnectThreshold: number;\n  elmPartialResponseAction: 'RECONNECT_AND_INITIALIZE' | 'RECONNECT' | 'IGNORE';\n  elmForceInitialization: boolean;
+  selectedAdapterAddress: string | null;
+  elmIoTimeoutMs: number;
+  elmBluetoothTimeoutMs: number;
+  elmCommandDelayMs: number;
+  elmMaxConnectionAttempts: number;
+  elmNoDataReconnectThreshold: number;
+  elmPartialResponseAction: 'RECONNECT_AND_INITIALIZE' | 'RECONNECT' | 'IGNORE';
+  elmForceInitialization: boolean;
+  elmAdaptiveTiming: boolean;
+  elmAdaptiveTimeoutMinMs: number;
+  elmAdaptiveTimeoutMaxMs: number;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -15,10 +25,26 @@ const DEFAULT_SETTINGS: AppSettings = {
   distanceUnit: 'KM',
   autoConnectObd: true,
   diagnosticAlerts: true,
-  selectedAdapterAddress: null,\n  elmIoTimeoutMs: 10_000,\n  elmBluetoothTimeoutMs: 5_000,\n  elmCommandDelayMs: 20,\n  elmMaxConnectionAttempts: 0,\n  elmNoDataReconnectThreshold: 40,\n  elmPartialResponseAction: 'RECONNECT_AND_INITIALIZE',\n  elmForceInitialization: true,
+  selectedAdapterAddress: null,
+  elmIoTimeoutMs: 10_000,
+  elmBluetoothTimeoutMs: 5_000,
+  elmCommandDelayMs: 20,
+  elmMaxConnectionAttempts: 0,
+  elmNoDataReconnectThreshold: 40,
+  elmPartialResponseAction: 'RECONNECT_AND_INITIALIZE',
+  elmForceInitialization: true,
+  elmAdaptiveTiming: true,
+  elmAdaptiveTimeoutMinMs: 3000,
+  elmAdaptiveTimeoutMaxMs: 15000,
 };
 
-function numberSetting(value: unknown, fallback: number, min: number, max: number): number {\n  const numeric = typeof value === 'number' ? value : Number(value);\n  if (!Number.isFinite(numeric)) return fallback;\n  return Math.min(max, Math.max(min, Math.round(numeric)));\n}\n\nasync function settingsPath(basePath: string): Promise<string> {
+function numberSetting(value: unknown, fallback: number, min: number, max: number): number {
+  const numeric = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(numeric)));
+}
+
+async function settingsPath(basePath: string): Promise<string> {
   const dir = `${basePath}/CONFIG`;
   await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
   return `${dir}/app-settings.json`;
@@ -42,6 +68,18 @@ export async function readAppSettings(basePath: string): Promise<AppSettings> {
       selectedAdapterAddress: typeof parsed.selectedAdapterAddress === 'string' && parsed.selectedAdapterAddress.trim()
         ? parsed.selectedAdapterAddress.trim().toUpperCase()
         : null,
+      elmIoTimeoutMs: numberSetting(parsed.elmIoTimeoutMs, 10000, 1000, 30000),
+      elmBluetoothTimeoutMs: numberSetting(parsed.elmBluetoothTimeoutMs, 5000, 1000, 30000),
+      elmCommandDelayMs: numberSetting(parsed.elmCommandDelayMs, 20, 0, 1000),
+      elmMaxConnectionAttempts: numberSetting(parsed.elmMaxConnectionAttempts, 0, 0, 100),
+      elmNoDataReconnectThreshold: numberSetting(parsed.elmNoDataReconnectThreshold, 40, 1, 1000),
+      elmPartialResponseAction: parsed.elmPartialResponseAction === 'RECONNECT' || parsed.elmPartialResponseAction === 'IGNORE'
+        ? parsed.elmPartialResponseAction
+        : 'RECONNECT_AND_INITIALIZE',
+      elmForceInitialization: parsed.elmForceInitialization !== false,
+      elmAdaptiveTiming: parsed.elmAdaptiveTiming !== false,
+      elmAdaptiveTimeoutMinMs: numberSetting(parsed.elmAdaptiveTimeoutMinMs, 3000, 1000, 15000),
+      elmAdaptiveTimeoutMaxMs: numberSetting(parsed.elmAdaptiveTimeoutMaxMs, 15000, 3000, 30000),
     };
     return settings;
   } catch {
