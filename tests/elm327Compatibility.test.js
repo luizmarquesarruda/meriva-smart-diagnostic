@@ -60,3 +60,10 @@ const elmSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'obd', 'elm3
 assert.ok(elmSource.includes("command === 'ATZ'"));
 assert.ok(elmSource.includes('clearInputBuffer?.()'));
 console.log('Android RFCOMM/ELM327 v1.5 regression guards: PASS');
+
+// O auto-connect da tela deve começar por ELM/OBD pareado, nunca por um
+// Bluetooth genérico só porque ele aparece primeiro na lista.
+const connectionScreenSource = fs.readFileSync(path.join(__dirname, '..', 'app', 'conexao.tsx'), 'utf8');
+assert.ok(connectionScreenSource.includes('const first = preferredDevice || elmLike;'));
+assert.ok(!connectionScreenSource.includes('const first = preferredDevice || elmLike || list[0]'));
+console.log('Paired-first generic-device guard: PASS');
