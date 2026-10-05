@@ -55,7 +55,6 @@ export class BluetoothClassicTransport implements ObdTransport {
           delimiter: '>',
           charset: 'ascii',
           secureSocket,
-          ...(secureSocket ? {} : { secure_socket: false }),
         });
         break;
       } catch (cause) {
