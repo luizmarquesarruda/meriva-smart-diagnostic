@@ -10,3 +10,15 @@ assert.equal(classify('BUS ERROR\r\n'), 'ERROR');
 assert.equal(classify('ELM327 v1.5\r\n>'), 'OK');
 assert.equal(classify(''), 'NO_RESPONSE');
 console.log('ELM327 compatibility regression tests: PASS');
+const { classifyElmError, mergeCompatibilityConfig } = require('../src/obd/elm327Compatibility');
+
+assert.equal(classifyElmError('NO DATA'), 'NO_DATA');
+assert.equal(classifyElmError('BUFFER FULL'), 'BUFFER_FULL');
+assert.equal(classifyElmError('BUS ERROR'), 'BUS_ERROR');
+assert.equal(classifyElmError('', 'TIMEOUT'), 'TIMEOUT');
+assert.equal(classifyElmError('?'), 'UNSUPPORTED');
+const cfg = mergeCompatibilityConfig({ adaptiveTiming: true, adaptiveTimeoutMinMs: 2500, adaptiveTimeoutMaxMs: 12000 });
+assert.equal(cfg.adaptiveTiming, true);
+assert.equal(cfg.adaptiveTimeoutMinMs, 2500);
+assert.equal(cfg.adaptiveTimeoutMaxMs, 12000);
+console.log('adaptive ELM compatibility checks: OK');
