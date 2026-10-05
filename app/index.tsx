@@ -11,7 +11,6 @@ import type { ObdConnectionState } from '../src/meriva/autosaveState';
 import { gpsTracker, type GpsTripState } from '../src/gps';
 import { ensureMerivaVehicleProfile } from '../src/database/vehicleConfig';
 import { readAppSettings, type AppSettings } from '../src/database/appSettings';
-import { MERIVA_MANUAL } from '../src/database/merivaManual';
 import { connectPreferredElm, getSharedObdLastError, subscribeSharedObd } from '../src/obd/sharedConnection';
 
 function formatDistance(km: number, unit: AppSettings['distanceUnit']): string {
