@@ -159,7 +159,7 @@ export class BluetoothClassicTransport implements ObdTransport {
 
       const message = this.receivedMessages.shift();
       if (message != null) {
-        return message.replace(/^\\s+|\\s+$/g, '');
+        return message.replace(/^\s+|\s+$/g, '');
       }
 
       await new Promise((resolve) => setTimeout(resolve, 25));
@@ -181,7 +181,7 @@ export class BluetoothClassicTransport implements ObdTransport {
     this.removeSubscriptions();
     this.device = null;
     this.connected = false;
-    this.received = '';
+    this.receivedMessages = [];
   }
 
   private removeSubscriptions(): void {
