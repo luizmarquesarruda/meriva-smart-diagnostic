@@ -82,9 +82,7 @@ O rastreador é criado uma vez por sessão do aplicativo para continuar ativo en
 
 ## PIDs e combustível
 
-A base cobre PIDs padrão úteis para telemetria e diagnóstico, incluindo velocidade, RPM, temperatura, MAF, posição da borboleta e taxa de combustível do motor (PID 015E). O aplicativo não usa leitura de boia/nível de tanque como entrada de diagnóstico ou autonomia.
-
-O PID 015E representa taxa de combustível em L/h quando suportado pela ECU. O aplicativo integra essa taxa ao longo do tempo usando os intervalos entre amostras, ignorando amostras inválidas e intervalos excessivamente longos. A disponibilidade e a exatidão devem ser confirmadas na ECU real da Meriva antes de usar o resultado como medição de consumo.
+A base cobre PIDs padrão úteis para telemetria e diagnóstico, incluindo velocidade, RPM, temperatura, MAF, posição da borboleta e taxa de combustível do motor (PID 015E). O PID 015E representa taxa de combustível em L/h quando suportado pela ECU. O aplicativo integra essa taxa ao longo do tempo usando os intervalos entre amostras, ignorando amostras inválidas e intervalos excessivamente longos. A disponibilidade e a exatidão devem ser confirmadas na ECU real da Meriva antes de usar o resultado como medição de consumo.
 
 ## Identificação de combustível
 
@@ -117,7 +115,7 @@ O autosave usa arquivo temporário, valida o conteúdo e mantém uma cópia ante
 
 Na abertura do aplicativo, o sistema verifica suporte, solicita permissões, verifica o estado do Bluetooth, solicita ativação quando necessário e repete a verificação ao retornar ao aplicativo.
 
-O ELM327 deve estar previamente pareado no Android.
+O ELM327 deve estar previamente pareado no Android. A conexão usa Bluetooth Classic/RFCOMM e preserva o prompt > para o parser do ELM.
 
 ## Testes
 
@@ -146,3 +144,8 @@ A suíte automatizada cobre autosave, parser, DTC, descoberta de PIDs, fila de c
 
 
 <!-- CI validation: 2026-10-04 -->
+## Engenharia ELM327
+
+A camada Bluetooth usa o transporte nativo do react-native-bluetooth-classic, com framing BINARY no aplicativo. Isso permite que o parser receba o prompt > do ELM327 sem depender do delimitador consumido pela biblioteca.
+
+A inicialização separa Bluetooth, ELM e ECU. O primeiro teste real da ECU é 010C. A documentação detalhada e a matriz de comparação com AndrOBD, python-OBD e implementações Java estão em docs/ELM327_ENGINEERING_PLAYBOOK.md.
