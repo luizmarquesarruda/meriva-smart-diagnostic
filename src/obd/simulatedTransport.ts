@@ -42,6 +42,7 @@ export class SimulatedObdTransport implements ObdTransport {
   private responseFor(command: string): string {
     const responses: Record<string, string> = {
       ATZ: 'ELM327 v1.5',
+      ATI: 'ELM327 v1.5',
       ATE0: 'OK',
       ATL0: 'OK',
       ATS0: 'OK',
