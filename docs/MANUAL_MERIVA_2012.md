@@ -29,7 +29,7 @@ O manual oficial confirma que a Chevrolet Meriva 2012 está disponível na pági
 - Direção hidráulica: 0,95 L
 - Reservatório de partida a frio: 0,58 L
 
-A capacidade de 56 L é usada pelo aplicativo apenas como constante física do veículo para estimativa de autonomia. A autonomia só é exibida quando existe leitura válida de combustível da ECU e uma média de consumo real disponível.
+A capacidade de 56 L permanece como especificação física do veículo. O aplicativo não usa boia/nível de tanque como entrada de diagnóstico.
 
 ## Lubrificantes e manutenção
 
@@ -60,9 +60,8 @@ A pressão correta também deve ser conferida na etiqueta da portinhola de abast
 3. O manual não cria PID.
 4. O manual não confirma protocolo OBD.
 5. Um valor de catálogo não substitui uma resposta real da ECU.
-6. A autonomia usa 56 L como capacidade do tanque, mas nunca inventa o nível de combustível.
-7. O nível usado na autonomia deve vir de uma resposta válida da ECU ao PID 012F.
-8. Consumo atual deve usar dados reais válidos. Dados de simulação e referência Car Scanner não entram como leitura atual.
+6. A capacidade do tanque é dado técnico do veículo, não uma leitura atual.
+7. Consumo atual deve usar dados reais válidos. Dados de simulação e referência Car Scanner não entram como leitura atual.
 
 ## Fonte
 
