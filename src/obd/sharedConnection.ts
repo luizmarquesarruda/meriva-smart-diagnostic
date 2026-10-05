@@ -11,6 +11,7 @@ export interface SharedObdConnection {
 
 let active: SharedObdConnection | null = null;
 let connecting: Promise<SharedObdConnection> | null = null;
+let connectionGeneration = 0;
 let lastConnectionError: string | null = null;
 
 export const MERIVA_ELM327_ADDRESS = '01:23:45:67:89:BA';
@@ -122,12 +123,14 @@ export async function connectPreferredElm(
   if (active) return active;
   if (connecting) return connecting;
 
+  const generation = ++connectionGeneration;
   connecting = (async () => {
     let lastError: unknown = null;
 
     // Continua tentando enquanto o aplicativo estiver aberto e não houver
-    // conexão válida. Isso cobre ligar o ELM depois de abrir o app.
-    while (!active) {
+    // conexão válida. A geração permite cancelar o loop quando a tela/app
+    // for encerrado ou uma nova sessão for iniciada.
+    while (!active && generation === connectionGeneration) {
       try {
         return await connectPreferredElmOnce(preferredAddress);
       } catch (cause) {
@@ -137,6 +140,7 @@ export async function connectPreferredElm(
       }
     }
 
+    if (active) return active;
     throw lastError instanceof Error ? lastError : new Error('ELM327 NÃO CONECTADO');
   })();
 
@@ -154,6 +158,7 @@ export async function setSharedObdConnection(connection: SharedObdConnection | n
 }
 
 export async function disconnectSharedObd(): Promise<void> {
+  connectionGeneration += 1;
   connecting = null;
   const connection = active;
   active = null;
