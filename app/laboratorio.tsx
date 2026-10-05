@@ -51,6 +51,7 @@ export default function LaboratorioScreen() {
   const [tripConsumptionKml, setTripConsumptionKml] = useState<number | null>(null);
   const [tripActive, setTripActive] = useState(false);
   const [tripFuelSupported, setTripFuelSupported] = useState<boolean | null>(null);
+  const [tripFuelLevelSupported, setTripFuelLevelSupported] = useState<boolean | null>(null);
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const sessionRef = useRef<Elm327Session | null>(null);
   const autoSaveReadyRef = useRef(false);
@@ -225,7 +226,9 @@ export default function LaboratorioScreen() {
       const discovered = connected.supportedPids;
       setSupportedPids(discovered);
       const fuelSupported = discovered.includes('015E');
+      const fuelLevelSupported = discovered.includes('012F');
       setTripFuelSupported(fuelSupported);
+      setTripFuelLevelSupported(fuelLevelSupported);
       setTripActive(true);
       setStatus(
         fuelSupported
@@ -405,7 +408,7 @@ export default function LaboratorioScreen() {
         <View style={[styles.tripGrid, layout.landscape && styles.tripGridLandscape]}>
           <View style={[styles.tripMetric, layout.landscape && styles.tripMetricLandscape]}><Text style={styles.tripLabel}>DISTÂNCIA GPS</Text><Text style={styles.tripValue}>{tripDistanceKm.toFixed(2)} km</Text></View>
           <View style={[styles.tripMetric, layout.landscape && styles.tripMetricLandscape]}><Text style={styles.tripLabel}>CONSUMO</Text><Text style={styles.tripValue}>{tripConsumptionKml == null ? 'N/D' : tripConsumptionKml.toFixed(2) + ' km/L'}</Text></View>
-          <View style={[styles.tripMetric, layout.landscape && styles.tripMetricLandscape]}><Text style={styles.tripLabel}>PID 015E</Text><Text style={styles.tripValue}>{tripFuelSupported === null ? 'N/D' : tripFuelSupported ? 'OK' : 'NÃO'}</Text></View>
+          <View style={[styles.tripMetric, layout.landscape && styles.tripMetricLandscape]}><Text style={styles.tripLabel}>PID 015E / 012F</Text><Text style={styles.tripValue}>{tripFuelSupported === null ? 'N/D' : `${tripFuelSupported ? '015E OK' : '015E NÃO'} / ${tripFuelLevelSupported ? '012F OK' : '012F NÃO'}`}</Text></View>
           <View style={[styles.tripMetric, layout.landscape && styles.tripMetricLandscape]}><Text style={styles.tripLabel}>AUTONOMIA ESTIMADA</Text><Text style={styles.tripValue}>{autoTripService.getState().estimatedRangeKm > 0 ? autoTripService.getState().estimatedRangeKm.toFixed(0) + ' km' : 'N/D'}</Text></View>
         </View>
         <Text style={styles.tripHelp}>Sem botão iniciar. O app registra somente dados reais válidos.</Text>
@@ -480,6 +483,7 @@ export default function LaboratorioScreen() {
           <Text style={styles.label}>STATUS</Text><Text style={styles.value}>{parsed?.status || 'COMANDO'}</Text>
           <Text style={styles.label}>VALOR</Text><Text style={styles.value}>{parsed?.value === null || !parsed ? 'SEM DADOS' : parsed.value + ' ' + parsed.unit}</Text>
           <Text style={styles.label}>COMBUSTÍVEL INTEGRADO (PID 015E)</Text><Text style={styles.value}>{fuelUsedL.toFixed(6)} L</Text>
+          <Text style={styles.label}>NÍVEL DE COMBUSTÍVEL OBD (PID 012F)</Text><Text style={styles.value}>{autoTripService.getState().fuelLevelPct == null ? 'N/D' : autoTripService.getState().fuelLevelPct.toFixed(1) + ' %'}</Text>
           <Text style={styles.label}>DTC ATUAIS</Text><Text style={styles.value}>{dtcCodes.length ? dtcCodes.join(', ') : 'NENHUM'}</Text>
           <Text style={styles.label}>PIDs CONHECIDOS SUPORTADOS</Text><Text style={styles.value}>{knownSupported.length ? knownSupported.join(', ') : 'N/D'}</Text>
           <Text style={styles.label}>TOTAL DE PIDs DESCOBERTOS</Text><Text style={styles.value}>{supportedPids.length}</Text>
