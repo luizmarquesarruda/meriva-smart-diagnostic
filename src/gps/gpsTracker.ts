@@ -25,6 +25,7 @@ export type GpsListener = (state: GpsTripState) => void;
 const MIN_ACCURACY_M = 60;
 const MAX_SPEED_KMH = 220;
 const MIN_MOVEMENT_SPEED_KMH = 2;
+const MIN_MOVEMENT_DISTANCE_M = 3;
 const MAX_SEGMENT_GAP_MS = 5_000;
 
 export function haversineDistanceKm(
@@ -225,15 +226,23 @@ export class GpsTracker {
       }
     }
 
-    let speedKmh = accurate ? sample.speedKmh : null;
-    if (
-      (speedKmh == null || speedKmh > MAX_SPEED_KMH) &&
+    const segmentDistanceM = this.previous
+      ? haversineDistanceKm(this.previous, sample) * 1000
+      : 0;
+    const movementConfirmed =
+      this.previous != null &&
+      accurate &&
+      isAccurate(this.previous) &&
+      segmentDistanceM >= MIN_MOVEMENT_DISTANCE_M &&
       derivedSpeedKmh != null &&
-      derivedSpeedKmh <= MAX_SPEED_KMH
-    ) {
-      speedKmh = derivedSpeedKmh;
-    }
-    if (speedKmh == null || speedKmh < 0 || speedKmh > MAX_SPEED_KMH) speedKmh = 0;
+      derivedSpeedKmh >= MIN_MOVEMENT_SPEED_KMH &&
+      derivedSpeedKmh <= MAX_SPEED_KMH;
+    let speedKmh = movementConfirmed
+      ? (sample.speedKmh != null && sample.speedKmh <= MAX_SPEED_KMH
+        ? Math.max(sample.speedKmh, derivedSpeedKmh ?? 0)
+        : (derivedSpeedKmh ?? 0))
+      : 0;
+    if (!Number.isFinite(speedKmh) || speedKmh < MIN_MOVEMENT_SPEED_KMH || speedKmh > MAX_SPEED_KMH) speedKmh = 0;
 
     if (accurate) this.previous = sample;
     this.state = {
