@@ -285,6 +285,7 @@ async function testBluetoothEventTransport() {
   const transport = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF');
   await transport.open();
   assert.strictEqual(lastBluetoothDiscoveryCancelled, true);
+  assert.strictEqual(lastBluetoothConnectionOptions?.connectorType, 'rfcomm');
   assert.strictEqual(lastBluetoothConnectionOptions?.connectionType, 'delimited');
   assert.strictEqual(lastBluetoothConnectionOptions?.delimiter, '>');
   assert.strictEqual(lastBluetoothConnectionOptions?.secureSocket, true);
