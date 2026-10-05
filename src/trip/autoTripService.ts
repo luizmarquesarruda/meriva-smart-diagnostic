@@ -13,6 +13,7 @@ export interface AutoTripServiceState {
   distanceKm: number;
   fuelUsedL: number;
   consumptionKml: number | null;
+  instantaneousConsumptionKml: number | null;
   error: string | null;
   averageConsumptionKml: number;
   estimatedRangeKm: number;
@@ -27,6 +28,7 @@ const INITIAL_STATE: AutoTripServiceState = {
   distanceKm: 0,
   fuelUsedL: 0,
   consumptionKml: null,
+  instantaneousConsumptionKml: null,
   error: null,
   averageConsumptionKml: 0,
   estimatedRangeKm: 0,
@@ -165,6 +167,10 @@ class AutoTripService {
             speedKmh: gps.currentSpeedKmh,
             fuelRateLph: fuelRateLph,
           });
+          const instantaneousConsumptionKml =
+            fuelRateLph != null && fuelRateLph > 0 && gps.currentSpeedKmh > 0
+              ? gps.currentSpeedKmh / fuelRateLph
+              : null;
           this.setState({
             connected: true,
             active: true,
@@ -174,6 +180,7 @@ class AutoTripService {
               state.distanceKm > 0 && state.fuelUsedL > 0
                 ? state.distanceKm / state.fuelUsedL
                 : null,
+            instantaneousConsumptionKml,
             error: fuelRateLph == null && state.validFuelSamples === 0
               ? 'GPS ATIVO / ECU SEM PID 015E VÁLIDO'
               : null,
