@@ -20,6 +20,12 @@ export interface ObdConnectionState {
   lastConnectedAt?: string;
 }
 
+export interface PidDiscoveryCache {
+  supportedPids: string[];
+  protocol: string;
+  discoveredAt: string;
+}
+
 export interface MerivaPersistedState {
   vehicle: VehicleProfile | null;
   obd: ObdConnectionState;
@@ -27,6 +33,7 @@ export interface MerivaPersistedState {
   dtcs: DtcRecord[];
   driveCycles: DriveCycle[];
   learning: MerivaLearningProfile | null;
+  pidDiscovery: PidDiscoveryCache | null;
   settings: Record<string, string | number | boolean>;
   metadata: { savedAt: string; appVersion: string };
 }
@@ -39,6 +46,7 @@ export function createEmptyMerivaState(): MerivaPersistedState {
     dtcs: [],
     driveCycles: [],
     learning: null,
+    pidDiscovery: null,
     settings: {},
     metadata: { savedAt: '', appVersion: '1.0.1' },
   };
