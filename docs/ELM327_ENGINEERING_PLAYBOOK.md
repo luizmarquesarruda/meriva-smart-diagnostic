@@ -34,9 +34,9 @@ histórico / aprendizado / diagnóstico
 ~~~
 
 ## O achado mais importante
-A biblioteca React Native usada pelo projeto oferece modos diferentes de conexão serial. Para um ELM327, o projeto agora usa BINARY no transporte.
+A biblioteca React Native usada pelo projeto oferece modos diferentes de conexão serial. Para um ELM327, o projeto agora usa RAW no transporte.
 
-Motivo: o ELM327 fecha uma resposta com o caractere >. Em modo delimitado, a biblioteca pode consumir o delimitador antes de entregar o evento ao JavaScript. Se o app depois procurar > novamente, ele pode esperar até timeout mesmo tendo recebido a resposta. O modo BINARY deixa o framing sob controle do nosso parser.
+Motivo: o ELM327 fecha uma resposta com o caractere >. Em modo delimitado, a biblioteca pode consumir o delimitador antes de entregar o evento ao JavaScript. Se o app depois procurar > novamente, ele pode esperar até timeout mesmo tendo recebido a resposta. O modo RAW deixa o framing sob controle do nosso parser.
 
 ## Comparação com implementações reais
 
