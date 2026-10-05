@@ -11,7 +11,8 @@ import type { ObdConnectionState } from '../src/meriva/autosaveState';
 import { gpsTracker, type GpsTripState } from '../src/gps';
 import { ensureMerivaVehicleProfile } from '../src/database/vehicleConfig';
 import { readAppSettings, type AppSettings } from '../src/database/appSettings';
-import { connectPreferredElm, getSharedObdLastError, subscribeSharedObd } from '../src/obd/sharedConnection';
+import { connectPreferredElm, getSharedObdConnection, getSharedObdLastError, subscribeSharedObd } from '../src/obd/sharedConnection';
+import { autoTripService, type AutoTripServiceState } from '../src/trip/autoTripService';
 
 function formatDistance(km: number, unit: AppSettings['distanceUnit']): string {
   if (!Number.isFinite(km) || km < 0) return 'N/D';
@@ -28,17 +29,26 @@ export default function IndexScreen() {
   const [saveStatus, setSaveStatus] = useState<AutoSaveStatus>({ lastSavedAt: null, lastSaveReason: null, lastError: null });
   const [isHydrated, setIsHydrated] = useState(false);
   const [gpsState, setGpsState] = useState<GpsTripState>(gpsTracker.getState());
+  const [tripState, setTripState] = useState<AutoTripServiceState>(autoTripService.getState());
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [dtcCount, setDtcCount] = useState(0);
   const windowSize = useWindowDimensions();
   const layout = getMidLayout(windowSize);
 
   useEffect(() => gpsTracker.subscribe(setGpsState), []);
+  useEffect(() => autoTripService.subscribe(setTripState), []);
 
   const syncLiveState = useCallback(() => {
     const state = getAutoSaveState();
+    const live = getSharedObdConnection();
+    const liveConnected = Boolean(live?.ecuValidated);
     setDtcCount(state.dtcs.length);
-    setObd(state.obd);
+    setObd({
+      ...state.obd,
+      connected: liveConnected,
+      adapterName: live?.device.name ?? state.obd.adapterName,
+      protocol: live?.protocol ?? state.obd.protocol,
+    });
     setSaveStatus(getAutoSaveStatus());
   }, []);
 
@@ -66,7 +76,8 @@ export default function IndexScreen() {
 
       setSettings(nextSettings);
       setCycles(loaded);
-      setObd(restored.obd);
+      const live = getSharedObdConnection();
+      setObd({ ...restored.obd, connected: Boolean(live?.ecuValidated) });
       setSaveStatus(getAutoSaveStatus());
       setDtcCount(restored.dtcs.length);
       setIsHydrated(true);
@@ -130,9 +141,13 @@ export default function IndexScreen() {
         setBluetoothError(null);
       })
       .catch((cause) => {
-        setBluetoothSearching(true);
+        setBluetoothSearching(false);
+        updateAutoSaveState((state) => {
+          state.obd = { ...state.obd, connected: false };
+        });
         const detail = cause instanceof Error ? cause.message : getSharedObdLastError() ?? String(cause ?? 'ERRO DESCONHECIDO');
         setBluetoothError(detail);
+        setObd((current) => ({ ...current, connected: false }));
       });
 
     return () => {
@@ -164,10 +179,30 @@ export default function IndexScreen() {
           </View>
 
           <View style={styles.heroCard}>
-            <Text style={styles.heroLabel}>VEÍCULO</Text>
-            <Text style={styles.heroValue}>MERIVA MAXX</Text>
-            <Text style={styles.heroUnit}>1.4 8V • FLEX • 2011/2012 • 4 CILINDROS</Text>
-            <Text style={styles.heroHelp}>Painel principal do veículo. Dados OBD, GPS e consumo aparecem somente quando forem reais e válidos.</Text>
+            <Text style={styles.heroLabel}>AUTONOMIA ESTIMADA</Text>
+            <Text style={styles.heroValue}>
+              {getAutoSaveState().autonomy.estimatedRangeKm > 0
+                ? (getAutoSaveState().autonomy.estimatedRangeKm.toFixed(0) + ' km')
+                : 'N/D'}
+            </Text>
+            <Text style={styles.heroUnit}>BASEADA NO CONSUMO MÉDIO REAL • TANQUE NOMINAL 56 L</Text>
+            <View style={styles.heroMetrics}>
+              <View style={styles.heroMetric}>
+                <Text style={styles.heroMetricLabel}>CONSUMO INSTANTÂNEO</Text>
+                <Text style={styles.heroMetricValue}>
+                  {tripState.instantaneousConsumptionKml != null
+                    ? (tripState.instantaneousConsumptionKml.toFixed(1) + ' km/L')
+                    : 'N/D'}
+                </Text>
+              </View>
+              <View style={styles.heroMetric}>
+                <Text style={styles.heroMetricLabel}>COMBUSTÍVEL GASTO</Text>
+                <Text style={styles.heroMetricValue}>
+                  {tripState.fuelUsedL > 0 ? (tripState.fuelUsedL.toFixed(3) + ' L') : 'N/D'}
+                </Text>
+              </View>
+            </View>
+            <Text style={styles.heroHelp}>Somente dados reais. Sem estimativa baseada em boia ou nível de combustível.</Text>
           </View>
 
           <View style={[styles.statusGrid, layout.landscape && styles.statusGridLandscape]}>
@@ -262,7 +297,11 @@ const styles = StyleSheet.create({
   heroCard: { backgroundColor: '#121f33', borderRadius: 16, borderWidth: 1, borderColor: '#28415f', paddingVertical: 20, paddingHorizontal: 14, alignItems: 'center', marginBottom: 10 },
   heroLabel: { color: '#7db3ff', fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
   heroValue: { color: '#f8fafc', fontSize: 38, lineHeight: 44, fontWeight: '900', fontVariant: ['tabular-nums'], marginTop: 3, letterSpacing: 1 },
-  heroUnit: { color: '#9fb4cf', fontSize: 12, fontWeight: '800' },
+  heroUnit: { color: '#9fb4cf', fontSize: 11, fontWeight: '800', textAlign: 'center' },
+  heroMetrics: { width: '100%', flexDirection: 'row', gap: 8, marginTop: 12 },
+  heroMetric: { flex: 1, backgroundColor: '#0e192a', borderRadius: 10, borderWidth: 1, borderColor: '#243b59', padding: 10, alignItems: 'center' },
+  heroMetricLabel: { color: '#7185a1', fontSize: 8, fontWeight: '900', textAlign: 'center', letterSpacing: 0.4 },
+  heroMetricValue: { color: '#e5edf7', fontSize: 17, fontWeight: '900', marginTop: 4, fontVariant: ['tabular-nums'] },
   heroHelp: { color: '#7185a1', fontSize: 10, textAlign: 'center', marginTop: 7 },
   statusGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 2 },
   statusGridLandscape: { flexWrap: 'nowrap', gap: 8 },
