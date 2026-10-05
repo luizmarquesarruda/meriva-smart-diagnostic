@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
-import { Alert, AppState, Linking } from 'react-native';
+import { Alert, AppState, Linking, Platform } from 'react-native';
 import { Stack } from 'expo-router';
-import { ensureBluetoothReady, openBluetoothAppSettings } from '../src/obd/bluetoothManager';
+import { ensureBluetoothReady, openBluetoothAppSettings, requestBluetoothPermissions } from '../src/obd/bluetoothManager';
+import * as Location from 'expo-location';
 import { gpsTracker } from '../src/gps';
 import { readAppSettings, writeAppSettings } from '../src/database/appSettings';
 import { connectPreferredElm, disconnectSharedObd } from '../src/obd/sharedConnection';
@@ -14,10 +15,26 @@ export default function RootLayout() {
   const lastFailureAt = useRef(0);
   const gpsChecking = useRef(false);
   const lastGpsFailureAt = useRef(0);
+  const permissionsChecked = useRef(false);
 
   useEffect(() => {
     const loadSettings = async () => readAppSettings(`${FileSystem.documentDirectory}MERIVA_SMART`);
     const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
+
+    const preparePermissions = async () => {
+      if (permissionsChecked.current) return;
+      if (Platform.OS === 'android') {
+        await requestBluetoothPermissions();
+      }
+      let locationPermission = await Location.getForegroundPermissionsAsync();
+      if (locationPermission.status !== Location.PermissionStatus.GRANTED) {
+        locationPermission = await Location.requestForegroundPermissionsAsync();
+      }
+      if (locationPermission.status !== Location.PermissionStatus.GRANTED) {
+        throw new Error('PERMISSÃO DE LOCALIZAÇÃO NÃO CONCEDIDA. O GPS é necessário para velocidade, distância e viagem automática.');
+      }
+      permissionsChecked.current = true;
+    };
 
     const checkBluetooth = async (
       autoConnectObd: boolean,
@@ -94,6 +111,23 @@ export default function RootLayout() {
 
     const startup = async () => {
       const settings = await loadSettings();
+      try {
+        await preparePermissions();
+      } catch (cause) {
+        const now = Date.now();
+        if (settings.diagnosticAlerts && now - lastFailureAt.current > 2500) {
+          lastFailureAt.current = now;
+          Alert.alert(
+            'Permissões necessárias',
+            cause instanceof Error ? cause.message : 'O aplicativo precisa de acesso ao Bluetooth e à localização para funcionar.',
+            [
+              { text: 'Abrir configurações', onPress: () => void Linking.openSettings() },
+              { text: 'Tentar novamente', onPress: () => void startup() },
+            ],
+          );
+        }
+        return;
+      }
       await Promise.all([
         checkBluetooth(
           settings.autoConnectObd,
