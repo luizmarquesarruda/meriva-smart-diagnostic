@@ -152,78 +152,172 @@ export default function IndexScreen() {
   const realConsumptionKml = summary.avgConsumptionKml > 0 ? summary.avgConsumptionKml : null;
   const distanceUnit = settings?.distanceUnit ?? 'KM';
 
+  const connectionTone = obd.connected ? 'success' : bluetoothError ? 'danger' : bluetoothSearching ? 'info' : 'neutral';
+  const connectionTitle = obd.connected ? 'OBD PRONTO' : bluetoothError ? 'CONEXÃO COM PROBLEMA' : bluetoothSearching ? 'CONECTANDO' : 'AGUARDANDO CONEXÃO';
+
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={[styles.content, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingHorizontal: layout.horizontalPadding,
+            alignItems: 'center',
+          },
+        ]}
+      >
         <View style={[styles.screenFrame, { maxWidth: layout.maxContentWidth }]}>
-          <View style={[styles.midHeader, { paddingHorizontal: layout.cardPadding }]}>
-            <Text style={styles.midBrand}>CHEVROLET</Text>
-            <Text style={styles.midModel}>MERIVA MAXX 1.4</Text>
-            <Text style={styles.midStatus}>
-              {obd.connected ? 'OBD • ONLINE' : bluetoothError ? 'BLUETOOTH • FALHA DE CONEXÃO' : bluetoothSearching ? 'BLUETOOTH • BUSCANDO ELM327' : 'OBD • AGUARDANDO'}
+          <View style={styles.appHeader}>
+            <View>
+              <Text style={styles.appTitle}>Meriva Smart Diagnostic</Text>
+              <Text style={styles.vehicleTitle}>Chevrolet Meriva Maxx 1.4</Text>
+            </View>
+            <View style={styles.headerDot} />
+          </View>
+
+          <View style={styles.connectionCard}>
+            <View style={styles.connectionTopRow}>
+              <View>
+                <Text style={styles.eyebrow}>STATUS DO VEÍCULO</Text>
+                <Text style={styles.connectionTitle}>{connectionTitle}</Text>
+              </View>
+              <View style={[styles.statePill, styles[`statePill${connectionTone[0].toUpperCase() + connectionTone.slice(1)}`]]}>
+                <Text style={styles.statePillText}>{obd.connected ? 'CONECTADO' : bluetoothSearching ? 'BUSCANDO' : 'OFFLINE'}</Text>
+              </View>
+            </View>
+
+            <View style={styles.pipeline}>
+              <PipelineStep label="Bluetooth" value="Ativado" ok={!bluetoothError} active={bluetoothSearching && !obd.connected} />
+              <PipelineStep label="ELM327" value={obd.connected ? (obd.adapterName ?? 'Conectado') : bluetoothSearching ? 'Procurando adaptador' : 'Não conectado'} ok={obd.connected} active={bluetoothSearching && !obd.connected} />
+              <PipelineStep label="ECU" value={obd.connected ? 'Respondendo' : 'Aguardando'} ok={obd.connected} />
+              <PipelineStep label="OBD" value={obd.connected ? 'Pronto' : 'Aguardando'} ok={obd.connected} last />
+            </View>
+
+            <Text style={styles.connectionHelp}>
+              {obd.connected
+                ? `Protocolo: ${obd.protocol ?? 'identificado'}`
+                : 'O aplicativo só considera a conexão pronta depois de validar o ELM327 e a ECU.'}
             </Text>
           </View>
 
-          <View style={styles.heroCard}>
-            <Text style={styles.heroLabel}>CENTRAL DE CONTROLE</Text>
-            <Text style={styles.heroValue}>{obd.connected ? 'ONLINE' : bluetoothSearching ? 'BUSCANDO' : 'PRONTO'}</Text>
-            <Text style={styles.heroUnit}>{obd.connected ? (obd.protocol ?? 'ELM327 VALIDADO') : 'Bluetooth Classic + ELM327'}</Text>
-            <Text style={styles.heroHelp}>Diagnóstico real. Sem dados inventados. Respostas brutas preservadas.</Text>
-          </View>
-
-          <View style={[styles.statusGrid, layout.landscape && styles.statusGridLandscape]}>
-            <StatusCard label="OBD" value={obd.connected ? 'ONLINE' : 'AGUARDANDO'} landscape={layout.landscape} />
-            <StatusCard label="GPS" value={gpsState.running ? 'ATIVO' : 'AGUARDANDO'} landscape={layout.landscape} />
-            <StatusCard label="CONSUMO" value={realConsumptionKml == null ? 'N/D' : `${realConsumptionKml.toFixed(1)} km/L`} landscape={layout.landscape} />
-            <StatusCard label="FALHAS" value={dtcCount ? String(dtcCount) : 'OK'} danger={dtcCount > 0} landscape={layout.landscape} />
-          </View>
-
-          <View style={styles.tripCard}>
-            <View style={styles.cardHeaderRow}>
-              <Text style={styles.sectionTitle}>VIAGEM ATUAL</Text>
-              <Text style={gpsState.running ? styles.live : styles.muted}>{gpsState.running ? 'AUTOMÁTICA' : 'AGUARDANDO GPS'}</Text>
-            </View>
-            <View style={[styles.tripGrid, layout.landscape && styles.tripGridLandscape]}>
-              <Metric label="DISTÂNCIA" value={formatDistance(gpsState.distanceKm, distanceUnit)} />
-              <Metric label="ÚLTIMO CONSUMO" value={summary.lastRealCycle ? `${summary.lastRealCycle.avgFuelConsumptionKml.toFixed(2)} km/L` : 'N/D'} />
-              <Metric label="PRECISÃO GPS" value={gpsState.lastAccuracyM == null ? 'N/D' : `${gpsState.lastAccuracyM.toFixed(0)} m`} />
-            </View>
-            <Text style={styles.tripHelp}>Registro automático. Nenhum botão de iniciar é necessário.</Text>
-          </View>
-
-          <View style={[styles.actionGrid, layout.landscape && styles.actionGridLandscape]}>
+          <View style={styles.primaryActions}>
             <Link href="/laboratorio" asChild>
-              <TouchableOpacity style={[styles.primaryButton, layout.landscape && styles.actionButtonLandscape]}>
-                <Text style={styles.buttonText}>DIAGNÓSTICO OBD</Text>
-              </TouchableOpacity>
-            </Link>
-            <Link href="/armazenamento" asChild>
-              <TouchableOpacity style={[styles.secondaryButton, layout.landscape && styles.actionButtonLandscape]}>
-                <Text style={styles.secondaryButtonText}>HISTÓRICO E DADOS</Text>
+              <TouchableOpacity style={styles.primaryButton}>
+                <Text style={styles.primaryButtonText}>ABRIR DIAGNÓSTICO OBD</Text>
               </TouchableOpacity>
             </Link>
             <Link href="/configuracoes" asChild>
-              <TouchableOpacity style={[styles.secondaryButton, layout.landscape && styles.actionButtonLandscape]}>
+              <TouchableOpacity style={styles.secondaryButton}>
                 <Text style={styles.secondaryButtonText}>CONFIGURAÇÕES</Text>
               </TouchableOpacity>
             </Link>
           </View>
 
-          {bluetoothError ? <Text style={styles.error}>BLUETOOTH/ELM327: {bluetoothError}</Text> : null}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>VISÃO RÁPIDA</Text>
+            <Text style={styles.sectionHint}>dados reais</Text>
+          </View>
+
+          <View style={styles.statusGrid}>
+            <StatusCard label="OBD" value={obd.connected ? 'ONLINE' : 'AGUARDANDO'} tone={obd.connected ? 'success' : 'neutral'} />
+            <StatusCard label="GPS" value={gpsState.running ? 'ATIVO' : 'AGUARDANDO'} tone={gpsState.running ? 'success' : 'neutral'} />
+            <StatusCard label="CONSUMO" value={realConsumptionKml == null ? 'N/D' : `${realConsumptionKml.toFixed(1)} km/L`} tone="neutral" />
+            <StatusCard label="FALHAS" value={dtcCount ? String(dtcCount) : 'OK'} tone={dtcCount ? 'danger' : 'success'} />
+          </View>
+
+          <View style={styles.tripCard}>
+            <View style={styles.cardHeaderRow}>
+              <View>
+                <Text style={styles.sectionTitle}>VIAGEM ATUAL</Text>
+                <Text style={styles.cardSubtitle}>registro automático pelo GPS</Text>
+              </View>
+              <Text style={gpsState.running ? styles.live : styles.muted}>{gpsState.running ? 'ATIVA' : 'AGUARDANDO'}</Text>
+            </View>
+
+            <View style={styles.tripGrid}>
+              <Metric label="DISTÂNCIA" value={formatDistance(gpsState.distanceKm, distanceUnit)} />
+              <Metric label="ÚLTIMO CONSUMO" value={summary.lastRealCycle ? `${summary.lastRealCycle.avgFuelConsumptionKml.toFixed(2)} km/L` : 'N/D'} />
+              <Metric label="PRECISÃO GPS" value={gpsState.lastAccuracyM == null ? 'N/D' : `${gpsState.lastAccuracyM.toFixed(0)} m`} />
+            </View>
+          </View>
+
+          <View style={styles.menuList}>
+            <Link href="/laboratorio" asChild>
+              <TouchableOpacity style={styles.menuRow}>
+                <View style={styles.menuIcon}><Text style={styles.menuIconText}>OBD</Text></View>
+                <View style={styles.menuCopy}><Text style={styles.menuTitle}>Diagnóstico OBD</Text><Text style={styles.menuDescription}>PIDs, ECU e comunicação ELM327</Text></View>
+                <Text style={styles.menuArrow}>›</Text>
+              </TouchableOpacity>
+            </Link>
+            <Link href="/armazenamento" asChild>
+              <TouchableOpacity style={styles.menuRow}>
+                <View style={styles.menuIcon}><Text style={styles.menuIconText}>LOG</Text></View>
+                <View style={styles.menuCopy}><Text style={styles.menuTitle}>Histórico e dados</Text><Text style={styles.menuDescription}>Viagens, registros e arquivos</Text></View>
+                <Text style={styles.menuArrow}>›</Text>
+              </TouchableOpacity>
+            </Link>
+            <Link href="/configuracoes" asChild>
+              <TouchableOpacity style={styles.menuRow}>
+                <View style={styles.menuIcon}><Text style={styles.menuIconText}>CFG</Text></View>
+                <View style={styles.menuCopy}><Text style={styles.menuTitle}>Configurações</Text><Text style={styles.menuDescription}>Veículo, adaptador e compatibilidade</Text></View>
+                <Text style={styles.menuArrow}>›</Text>
+              </TouchableOpacity>
+            </Link>
+          </View>
+
+          {bluetoothError ? <Text style={styles.error}>ELM327: {bluetoothError}</Text> : null}
           {gpsState.error ? <Text style={styles.error}>GPS: {gpsState.error}</Text> : null}
-          {saveStatus.lastError ? <Text style={styles.error}>AUTOSAVE: {saveStatus.lastError}</Text> : null}
-          <Text style={styles.footerStatus}>{isHydrated ? 'DADOS SALVOS AUTOMATICAMENTE' : 'CARREGANDO DADOS...'}</Text>
+          {saveStatus.lastError ? <Text style={styles.error}>ARMAZENAMENTO: {saveStatus.lastError}</Text> : null}
+
+          <Text style={styles.footerStatus}>
+            {isHydrated ? 'SALVAMENTO AUTOMÁTICO ATIVO' : 'CARREGANDO DADOS...'}
+          </Text>
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function StatusCard({ label, value, danger = false, landscape = false }: { label: string; value: string; danger?: boolean; landscape?: boolean }) {
+function PipelineStep({
+  label,
+  value,
+  ok,
+  active = false,
+  last = false,
+}: {
+  label: string;
+  value: string;
+  ok: boolean;
+  active?: boolean;
+  last?: boolean;
+}) {
   return (
-    <View style={[styles.statusCard, landscape && styles.statusCardLandscape]}>
+    <View style={styles.pipelineStep}>
+      <View style={styles.pipelineMarkerRow}>
+        <View style={[styles.pipelineMarker, ok && styles.pipelineMarkerOk, active && styles.pipelineMarkerActive]}>
+          <Text style={styles.pipelineMarkerText}>{ok ? '✓' : active ? '•' : '○'}</Text>
+        </View>
+        {!last ? <View style={[styles.pipelineLine, ok && styles.pipelineLineOk]} /> : null}
+      </View>
+      <Text style={styles.pipelineLabel}>{label}</Text>
+      <Text style={styles.pipelineValue}>{value}</Text>
+    </View>
+  );
+}
+
+function StatusCard({
+  label,
+  value,
+  tone = 'neutral',
+}: {
+  label: string;
+  value: string;
+  tone?: 'success' | 'danger' | 'neutral';
+}) {
+  return (
+    <View style={styles.statusCard}>
       <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={danger ? styles.metricDanger : styles.metricValue}>{value}</Text>
+      <Text style={[styles.metricValue, tone === 'success' && styles.metricSuccess, tone === 'danger' && styles.metricDanger]}>{value}</Text>
     </View>
   );
 }
@@ -238,41 +332,64 @@ function Metric({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b1220' },
-  content: { flexGrow: 1, paddingVertical: 14, paddingBottom: 30 },
+  container: { flex: 1, backgroundColor: '#f5f7fb' },
+  content: { flexGrow: 1, paddingVertical: 14, paddingBottom: 32 },
   screenFrame: { width: '100%' },
-  midHeader: { backgroundColor: '#111c2e', borderRadius: 14, borderWidth: 1, borderColor: '#29415f', paddingVertical: 14, marginBottom: 10 },
-  midBrand: { color: '#7db3ff', fontSize: 10, fontWeight: '900', letterSpacing: 2, textAlign: 'center' },
-  midModel: { color: '#f8fafc', fontSize: 22, fontWeight: '900', letterSpacing: 1, textAlign: 'center', marginTop: 1 },
-  midStatus: { color: '#9fb4cf', fontSize: 10, fontWeight: '900', letterSpacing: 1, textAlign: 'center', marginTop: 4 },
-  heroCard: { backgroundColor: '#121f33', borderRadius: 16, borderWidth: 1, borderColor: '#28415f', paddingVertical: 20, paddingHorizontal: 14, alignItems: 'center', marginBottom: 10 },
-  heroLabel: { color: '#7db3ff', fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
-  heroValue: { color: '#f8fafc', fontSize: 38, lineHeight: 44, fontWeight: '900', fontVariant: ['tabular-nums'], marginTop: 3, letterSpacing: 1 },
-  heroUnit: { color: '#9fb4cf', fontSize: 12, fontWeight: '800' },
-  heroHelp: { color: '#7185a1', fontSize: 10, textAlign: 'center', marginTop: 7 },
-  statusGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 2 },
-  statusGridLandscape: { flexWrap: 'nowrap', gap: 8 },
-  statusCard: { width: '48%', backgroundColor: '#111c2e', borderRadius: 12, borderWidth: 1, borderColor: '#243652', padding: 11, marginBottom: 8 },
-  statusCardLandscape: { flex: 1, width: undefined },
-  metricLabel: { color: '#7185a1', fontSize: 9, fontWeight: '900', letterSpacing: 0.7, marginBottom: 2 },
-  metricValue: { color: '#e5edf7', fontWeight: '900', fontSize: 15 },
-  metricDanger: { color: '#b91c1c', fontWeight: '900', fontSize: 15 },
-  tripCard: { backgroundColor: '#111c2e', borderRadius: 14, borderWidth: 1, borderColor: '#243652', padding: 13, marginBottom: 10 },
-  cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 },
-  sectionTitle: { color: '#f1f5f9', fontWeight: '900', fontSize: 13, letterSpacing: 0.5 },
-  live: { color: '#4ade80', fontWeight: '900', fontSize: 9 },
-  muted: { color: '#7185a1', fontWeight: '900', fontSize: 9 },
-  tripGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  tripGridLandscape: { flexWrap: 'nowrap', gap: 12 },
-  tripMetric: { width: '31%', minWidth: 90 },
-  tripHelp: { color: '#64748b', fontSize: 10, marginTop: 5 },
-  actionGrid: { gap: 7 },
-  actionGridLandscape: { flexDirection: 'row' },
-  actionButtonLandscape: { flex: 1 },
-  primaryButton: { backgroundColor: '#2563eb', borderRadius: 12, padding: 14, alignItems: 'center' },
-  buttonText: { color: '#fff', fontWeight: '900', fontSize: 11, letterSpacing: 0.3 },
-  secondaryButton: { backgroundColor: '#111c2e', borderRadius: 12, padding: 13, alignItems: 'center', borderWidth: 1, borderColor: '#34506f' },
-  secondaryButtonText: { color: '#dbeafe', fontWeight: '900', fontSize: 11 },
-  error: { color: '#fb7185', fontWeight: '800', fontSize: 10, marginTop: 8 },
-  footerStatus: { color: '#60748f', textAlign: 'center', fontSize: 9, marginTop: 9 },
+  appHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6, marginBottom: 14 },
+  appTitle: { color: '#123c70', fontSize: 20, fontWeight: '900' },
+  vehicleTitle: { color: '#5d6f85', fontSize: 11, fontWeight: '700', marginTop: 2 },
+  headerDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#2d74da' },
+  connectionCard: { backgroundColor: '#ffffff', borderRadius: 16, borderWidth: 1, borderColor: '#dce4ee', padding: 16, marginBottom: 10, shadowColor: '#1c3554', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 2 },
+  connectionTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 15 },
+  eyebrow: { color: '#718096', fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
+  connectionTitle: { color: '#172b43', fontSize: 22, fontWeight: '900', marginTop: 3 },
+  statePill: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
+  statePillSuccess: { backgroundColor: '#e7f7ed' },
+  statePillDanger: { backgroundColor: '#fdebec' },
+  statePillInfo: { backgroundColor: '#e8f1ff' },
+  statePillNeutral: { backgroundColor: '#eef2f6' },
+  statePillText: { color: '#31445b', fontSize: 9, fontWeight: '900' },
+  pipeline: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  pipelineStep: { flex: 1, minWidth: 65 },
+  pipelineMarkerRow: { flexDirection: 'row', alignItems: 'center' },
+  pipelineMarker: { width: 24, height: 24, borderRadius: 12, borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#f8fafc', alignItems: 'center', justifyContent: 'center' },
+  pipelineMarkerOk: { backgroundColor: '#e7f7ed', borderColor: '#9bd3ad' },
+  pipelineMarkerActive: { backgroundColor: '#e8f1ff', borderColor: '#8bb5f0' },
+  pipelineMarkerText: { color: '#60748a', fontSize: 12, fontWeight: '900' },
+  pipelineLine: { flex: 1, height: 1, backgroundColor: '#d9e1ea', marginHorizontal: 4 },
+  pipelineLineOk: { backgroundColor: '#9bd3ad' },
+  pipelineLabel: { color: '#5d6f85', fontSize: 9, fontWeight: '900', marginTop: 7 },
+  pipelineValue: { color: '#172b43', fontSize: 9, fontWeight: '700', marginTop: 2, paddingRight: 3 },
+  connectionHelp: { color: '#718096', fontSize: 10, lineHeight: 14, marginTop: 13 },
+  primaryActions: { flexDirection: 'row', gap: 8, marginBottom: 18 },
+  primaryButton: { flex: 1, backgroundColor: '#1769d1', borderRadius: 12, paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
+  primaryButtonText: { color: '#ffffff', fontWeight: '900', fontSize: 11 },
+  secondaryButton: { backgroundColor: '#ffffff', borderRadius: 12, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#cbd8e7' },
+  secondaryButtonText: { color: '#1760b9', fontWeight: '900', fontSize: 10 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 },
+  sectionTitle: { color: '#26384f', fontWeight: '900', fontSize: 12, letterSpacing: 0.5 },
+  sectionHint: { color: '#8796a8', fontSize: 9, fontWeight: '700' },
+  statusGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 10 },
+  statusCard: { width: '48.5%', backgroundColor: '#ffffff', borderRadius: 12, borderWidth: 1, borderColor: '#dce4ee', padding: 12, marginBottom: 8 },
+  metricLabel: { color: '#8291a3', fontSize: 8, fontWeight: '900', letterSpacing: 0.7, marginBottom: 3 },
+  metricValue: { color: '#26384f', fontWeight: '900', fontSize: 15 },
+  metricSuccess: { color: '#168348' },
+  metricDanger: { color: '#c7373f' },
+  tripCard: { backgroundColor: '#ffffff', borderRadius: 14, borderWidth: 1, borderColor: '#dce4ee', padding: 14, marginBottom: 10 },
+  cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  cardSubtitle: { color: '#8a98a9', fontSize: 9, marginTop: 2 },
+  live: { color: '#168348', fontWeight: '900', fontSize: 9 },
+  muted: { color: '#7b8b9e', fontWeight: '900', fontSize: 9 },
+  tripGrid: { flexDirection: 'row', justifyContent: 'space-between' },
+  tripMetric: { width: '31%' },
+  menuList: { backgroundColor: '#ffffff', borderRadius: 14, borderWidth: 1, borderColor: '#dce4ee', overflow: 'hidden' },
+  menuRow: { flexDirection: 'row', alignItems: 'center', minHeight: 64, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: '#edf1f5' },
+  menuIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#eaf2ff', alignItems: 'center', justifyContent: 'center', marginRight: 11 },
+  menuIconText: { color: '#1769d1', fontSize: 8, fontWeight: '900' },
+  menuCopy: { flex: 1 },
+  menuTitle: { color: '#26384f', fontSize: 12, fontWeight: '900' },
+  menuDescription: { color: '#7c8b9d', fontSize: 9, marginTop: 2 },
+  menuArrow: { color: '#1769d1', fontSize: 24, fontWeight: '300', marginLeft: 8 },
+  error: { color: '#bd343c', backgroundColor: '#fff0f1', borderRadius: 8, padding: 9, fontWeight: '800', fontSize: 9, marginTop: 8 },
+  footerStatus: { color: '#8291a3', textAlign: 'center', fontSize: 9, marginTop: 11 },
 });
