@@ -17,6 +17,10 @@ export class BluetoothClassicTransport implements ObdTransport {
   private received = '';
   private dataSubscription?: RemovableSubscription;
   private disconnectSubscription?: RemovableSubscription;
+  private diagnostics: string[] = [];
+  private logDiagnostic(event: string, details?: unknown): void { const time=new Date().toISOString(); let line=`[${time}] ${event}`; if(details!==undefined){try{line+=` | ${JSON.stringify(details)}`;}catch{line+=` | ${String(details)}`;}} this.diagnostics.push(line); if(this.diagnostics.length>500)this.diagnostics.shift(); }
+  getDiagnosticsText(): string { return this.diagnostics.join('\\n'); }
+  clearDiagnostics(): void { this.diagnostics=[]; }
 
   private readonly config: Elm327CompatibilityConfig;
 
@@ -27,10 +31,9 @@ export class BluetoothClassicTransport implements ObdTransport {
     this.config = mergeCompatibilityConfig(config ?? DEFAULT_ELM327_COMPATIBILITY);
   }
 
-  async open(): Promise<void> {
+  async open(): Promise<void> { this.clearDiagnostics(); this.logDiagnostic('OPEN_START',{platform:Platform.OS,deviceAddress:this.deviceAddress});
     if (Platform.OS !== 'android') throw new Error('BLUETOOTH CLASSIC DISPONÍVEL SOMENTE NO ANDROID');
-    if (!(await RNBluetoothClassic.isBluetoothAvailable())) throw new Error('BLUETOOTH NÃO DISPONÍVEL NESTE APARELHO');
-    if (!(await RNBluetoothClassic.isBluetoothEnabled())) throw new Error('BLUETOOTH DESLIGADO');
+    const available=await RNBluetoothClassic.isBluetoothAvailable(); this.logDiagnostic('BLUETOOTH_AVAILABLE',available); if(!available) throw new Error('BLUETOOTH NÃO DISPONÍVEL NESTE APARELHO'); const enabled=await RNBluetoothClassic.isBluetoothEnabled(); this.logDiagnostic('BLUETOOTH_ENABLED',enabled); if(!enabled) throw new Error('BLUETOOTH DESLIGADO');
 
     this.received = '';
     this.connected = false;
@@ -58,7 +61,7 @@ export class BluetoothClassicTransport implements ObdTransport {
     // Conecta diretamente pelo endereço MAC. A API instalada não expõe
     // getters para sockets já conectados, portanto o retry é feito no próprio
     // connectToDevice.
-    for (const secureSocket of [false, true]) {
+    for (const secureSocket of [false, true]) { this.logDiagnostic('CONNECT_ATTEMPT',{secureSocket});
       try {
         device = await Promise.race([
           RNBluetoothClassic.connectToDevice(this.deviceAddress, {
@@ -77,8 +80,8 @@ export class BluetoothClassicTransport implements ObdTransport {
             ),
           ),
         ]);
-        break;
-      } catch (cause) {
+        this.logDiagnostic('CONNECT_SUCCESS',{secureSocket}); break;
+      } catch (cause) { this.logDiagnostic('CONNECT_FAILURE',{secureSocket,error:cause instanceof Error?cause.message:String(cause)});
         lastCause = cause;
         if (device) await this.safeDisconnect(device);
         device = null;
@@ -107,7 +110,7 @@ export class BluetoothClassicTransport implements ObdTransport {
     this.connected = true;
 
     this.dataSubscription = device.onDataReceived((event) => {
-      if (event?.data) this.received += String(event.data);
+      if(event?.data){const chunk=String(event.data); this.logDiagnostic('RX',{length:chunk.length,data:chunk}); this.received+=chunk;}
     });
 
     if (RNBluetoothClassic.onDeviceDisconnected) {
@@ -149,7 +152,7 @@ export class BluetoothClassicTransport implements ObdTransport {
       }
     }
 
-    await device.write(data, 'ascii');
+    this.logDiagnostic('TX',{data}); await device.write(data,'ascii');
   }
 
   async readUntilPrompt(timeoutMs = 6000): Promise<string> {
@@ -179,7 +182,7 @@ export class BluetoothClassicTransport implements ObdTransport {
       if (promptIndex >= 0) {
         const response = this.received.slice(0, promptIndex);
         this.received = this.received.slice(promptIndex + 1);
-        return response.replace(/^\s+|\s+$/g, '');
+        const clean=response.replace(/^\s+|\s+$/g,''); this.logDiagnostic('RESPONSE_COMPLETE',{response:clean}); return clean;
       }
 
       await new Promise((resolve) => setTimeout(resolve, 25));
@@ -187,7 +190,7 @@ export class BluetoothClassicTransport implements ObdTransport {
 
     const partial = this.received.replace(/^\s+|\s+$/g, '');
     this.received = '';
-    throw new Error(partial ? 'TIMEOUT: RESPOSTA ELM SEM PROMPT FINAL' : 'TIMEOUT');
+    this.logDiagnostic('READ_TIMEOUT',{partial}); throw new Error(partial?'TIMEOUT: RESPOSTA ELM SEM PROMPT FINAL':'TIMEOUT');
   }
 
   private async safeDisconnect(device: BluetoothDevice): Promise<void> {
