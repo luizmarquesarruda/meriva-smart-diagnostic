@@ -168,6 +168,7 @@ export default function LaboratorioScreen() {
         device,
         protocol: connection.protocol,
         supportedPids: connection.supportedPids,
+        ecuValidated: connection.ecuValidated,
         getDiagnosticsText: () => connection.session.getTransportDiagnosticsText(),
       });
       setProtocol(connection.protocol ?? 'N/D');
