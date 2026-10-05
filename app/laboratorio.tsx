@@ -47,11 +47,9 @@ export default function LaboratorioScreen() {
   const [dtcCodes, setDtcCodes] = useState<string[]>([]);
   const [fuelUsedL, setFuelUsedL] = useState(0);
   const [tripDistanceKm, setTripDistanceKm] = useState(0);
-  const [tripFuelUsedL, setTripFuelUsedL] = useState(0);
   const [tripConsumptionKml, setTripConsumptionKml] = useState<number | null>(null);
   const [tripActive, setTripActive] = useState(false);
   const [tripFuelSupported, setTripFuelSupported] = useState<boolean | null>(null);
-  const [fuelLevelPercent, setFuelLevelPercent] = useState<number | null>(null);
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const sessionRef = useRef<Elm327Session | null>(null);
   const autoSaveReadyRef = useRef(false);
@@ -66,10 +64,8 @@ export default function LaboratorioScreen() {
       setTripActive(trip.active);
       setTripFuelSupported(trip.connected ? trip.fuelSupported : null);
       setTripDistanceKm(trip.distanceKm);
-      setTripFuelUsedL(trip.fuelUsedL);
       setFuelUsedL(trip.fuelUsedL);
       setTripConsumptionKml(trip.consumptionKml);
-      setFuelLevelPercent(trip.fuelLevelPercent);
       if (trip.error) setError(trip.error);
     });
 
@@ -194,13 +190,12 @@ export default function LaboratorioScreen() {
       const discovered = connection.supportedPids;
       setSupportedPids(discovered);
       const fuelSupported = discovered.includes('015E');
-      const fuelLevelSupported = discovered.includes('012F');
       setTripFuelSupported(fuelSupported);
       setTripActive(true);
       setStatus(
         fuelSupported
-          ? connection.protocol ? 'VIAGEM AUTOMÁTICA / GPS + PID 015E + NÍVEL 012F' : 'VIAGEM AUTOMÁTICA / PROTOCOLO N/D'
-          : fuelLevelSupported ? 'VIAGEM AUTOMÁTICA / GPS + NÍVEL 012F, SEM PID 015E' : 'VIAGEM AUTOMÁTICA / GPS, SEM PID 015E E 012F',
+          ? connection.protocol ? 'VIAGEM AUTOMÁTICA / GPS + PID 015E' : 'VIAGEM AUTOMÁTICA / PROTOCOLO N/D'
+          : 'VIAGEM AUTOMÁTICA / GPS, SEM PID 015E',
       );
     } catch (cause) {
       const failedSession = sessionRef.current;
@@ -238,7 +233,6 @@ export default function LaboratorioScreen() {
       setTripFuelSupported(null);
       setTripConsumptionKml(null);
       setTripDistanceKm(0);
-      setTripFuelUsedL(0);
       setFuelUsedL(0);
       setStatus('BLUETOOTH OK / ELM DESCONECTADO');
     } catch (cause) {
@@ -362,7 +356,6 @@ export default function LaboratorioScreen() {
         <View style={[styles.tripGrid, layout.landscape && styles.tripGridLandscape]}>
           <View style={[styles.tripMetric, layout.landscape && styles.tripMetricLandscape]}><Text style={styles.tripLabel}>DISTÂNCIA GPS</Text><Text style={styles.tripValue}>{tripDistanceKm.toFixed(2)} km</Text></View>
           <View style={[styles.tripMetric, layout.landscape && styles.tripMetricLandscape]}><Text style={styles.tripLabel}>CONSUMO</Text><Text style={styles.tripValue}>{tripConsumptionKml == null ? 'N/D' : tripConsumptionKml.toFixed(2) + ' km/L'}</Text></View>
-          <View style={[styles.tripMetric, layout.landscape && styles.tripMetricLandscape]}><Text style={styles.tripLabel}>COMBUSTÍVEL</Text><Text style={styles.tripValue}>{fuelLevelPercent == null ? 'N/D' : fuelLevelPercent.toFixed(1) + '%'}</Text></View>
           <View style={[styles.tripMetric, layout.landscape && styles.tripMetricLandscape]}><Text style={styles.tripLabel}>PID 015E</Text><Text style={styles.tripValue}>{tripFuelSupported === null ? 'N/D' : tripFuelSupported ? 'OK' : 'NÃO'}</Text></View>
         </View>
         <Text style={styles.tripHelp}>Sem botão iniciar. O app registra somente dados reais válidos.</Text>

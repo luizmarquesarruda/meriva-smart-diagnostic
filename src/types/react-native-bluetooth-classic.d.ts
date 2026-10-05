@@ -33,6 +33,7 @@ declare module 'react-native-bluetooth-classic' {
     connectToDevice: (
       address: string,
       options?: {
+        connectorType?: 'rfcomm' | 'l2cap';
         connectionType?: 'delimited' | 'length' | 'raw';
         delimiter?: string;
         charset?: string;

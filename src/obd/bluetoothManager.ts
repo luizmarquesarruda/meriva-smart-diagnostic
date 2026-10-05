@@ -125,27 +125,25 @@ export async function createRealElmSession(device: BluetoothDeviceInfo): Promise
     // reconexão desnecessário. Isso também permite ligar o app antes da ECU estar
     // pronta e diagnosticar a causa real na tela.
     if (!probeIsValid) {
-      return {
-        session,
-        initialization,
-        protocol: session.getProtocol(),
-        ecuProbe,
-        supportedPids: [],
-      };
+      // Bluetooth + ELM conectados não significam ECU conectada.
+      // 010C é a prova mínima de comunicação real com a ECU desta Meriva.
+      // Falha aqui deve devolver erro para o chamador e permitir nova tentativa,
+      // em vez de publicar uma conexão "OBD pronta" falsa.
+      throw new Error(
+        ecuProbe.status === 'TIMEOUT'
+          ? 'ELM RESPONDEU, MAS A ECU NÃO RESPONDEU AO PID 010C.'
+          : 'ECU NÃO RESPONDEU VALIDAMENTE AO PID 010C.',
+      );
     }
 
-    // Depois do primeiro PID válido, atualize o protocolo efetivamente usado
-    // pela sessão. Em modo automático o ATDP anterior pode ainda representar
-    // somente a seleção AUTO, e não o protocolo negociado na ECU.
-    const protocolResult = await session.identifyProtocol();
-    if (protocolResult.status !== 'OK' || !session.getProtocol()) {
-      return {
-        session,
-        initialization,
-        protocol: session.getProtocol(),
-        ecuProbe,
-        supportedPids: [],
-      };
+    // ATDP é diagnóstico. Se o clone não responder ou devolver AUTO/N/D,
+    // não invalide uma conexão que já provou comunicação real com a ECU.
+    // O protocolo conhecido da Meriva permanece um dado observado, não uma
+    // suposição injetada nesta sessão.
+    try {
+      await session.identifyProtocol();
+    } catch {
+      // O ECU probe já foi validado. Continua para descoberta de PIDs.
     }
 
     const discovery = await discoverSupportedPids(session);

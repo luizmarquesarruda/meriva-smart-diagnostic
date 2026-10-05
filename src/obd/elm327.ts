@@ -73,14 +73,18 @@ export class Elm327Session {
     try {
       const results: ElmCommandResult[] = [];
 
-      // Inicialização tolerante a clones chineses:
-      // primeiro provamos que o adaptador responde; os demais comandos de
-      // configuração são "best effort". Um clone pode não implementar todos
-      // os comandos AT e ainda funcionar perfeitamente para OBD.
-      // ATAT1/ATST32 não são enviados porque não são necessários para o KWP
-      // Fast Init conhecido desta Meriva e podem alterar o comportamento de
-      // adaptadores simples.
-      const mandatory = ['ATZ', 'ATI', 'ATE0'];
+      // ATZ é um reset do ELM. Em clones baratos ele pode reiniciar o
+      // firmware sem devolver um prompt de forma confiável. Portanto é
+      // best-effort. ATI será a prova real de que o adaptador está vivo.
+      const resetResult = await this.command('ATZ');
+      results.push(resetResult);
+
+      // Após ATZ alguns clones precisam de tempo para reinicializar antes
+      // de aceitarem outro comando.
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // ATI identifica o firmware. ATE0 estabiliza o formato das respostas.
+      const mandatory = ['ATI', 'ATE0'];
       const optional = ['ATL0', 'ATS0', 'ATH1', 'ATSP0'];
 
       for (const command of [...mandatory, ...optional]) {
@@ -92,9 +96,7 @@ export class Elm327Session {
         }
       }
 
-      // ATDP é diagnóstico, não requisito para manter o socket aberto.
-      // Alguns clones retornam resposta vazia ou "AUTO" mesmo quando a ECU
-      // está pronta. A prova real da ECU será feita por 010C.
+      // ATDP é apenas diagnóstico. A prova real da ECU será feita por 010C.
       const protocolResult = await this.command('ATDP');
       results.push(protocolResult);
       if (protocolResult.status === 'OK') {

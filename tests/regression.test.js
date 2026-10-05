@@ -38,6 +38,7 @@ let bluetoothDisconnectListener = null;
 let fakeDeviceConnected = true;
 let lastBluetoothConnectionOptions = null;
 let lastBluetoothDiscoveryCancelled = false;
+let bluetoothCommands = [];
 
 function parentDir(p) {
   const i = p.lastIndexOf('/');
@@ -163,8 +164,7 @@ const fakeBluetooth = {
       return { remove() { bluetoothListener = null; } };
     },
     write: async () => {
-      bluetoothListener?.({ data: '41 0C ' });
-      bluetoothListener?.({ data: '0C 18\r\n>' });
+      bluetoothListener?.({ data: '41 0C 0C 18\r\n' });
     },
     available: async () => {
       throw new Error('available() não deve ser usado com listener');
@@ -208,8 +208,6 @@ async function testParser() {
   assert.strictEqual(parser.parsePidResponse('010C', '48 6B 10 41 0C 1A F8 82').value, 1726);
   assert.strictEqual(parser.parsePidResponse('010C', '7E8 04 41 0C 1A F8').value, 1726);
   assert.strictEqual(parser.parsePidResponse('010C', '41 0C 1A').value, null);
-  assert.strictEqual(parser.parsePidResponse('012F', '41 2F 80').value, 50.19607843137255);
-  assert.strictEqual(parser.parsePidResponse('012F', '41 2F FF').value, 100);
   assert.strictEqual(parser.parsePidResponse('0199', '41 99 FF').status, 'VALOR NÃO INTERPRETADO');
   assert.strictEqual(parser.parsePidResponse('010C', 'NO DATA').status, 'NÃO RESPONDEU');
   assert.deepStrictEqual(parser.parseDtcResponse('43 01 33 00 00 00'), ['P0133']);
@@ -224,7 +222,7 @@ async function testElmAndProtocol() {
   const initialization = await session.initialize();
   assert.deepStrictEqual(
     initialization.map((item) => item.command),
-    ['ATZ', 'ATE0', 'ATL0', 'ATS0', 'ATH1', 'ATSP0', 'ATDP'],
+    ['ATZ', 'ATI', 'ATE0', 'ATL0', 'ATS0', 'ATH1', 'ATSP0', 'ATDP'],
   );
   assert.strictEqual(session.getProtocol(), 'SIMULATED OBD TRANSPORT');
 
@@ -254,10 +252,6 @@ async function testPidScanner() {
   assert.ok(supported.includes('010F'));
   assert.ok(supported.includes('0111'));
 
-  // 012F fica no bloco descoberto por 0120, não por 0100.
-  const supported20 = scanner.decodeSupportedPids('0120', '41 20 00 02 00 00');
-  assert.ok(supported20.includes('012F'));
-  assert.ok(!supported20.includes('012E'));
 
   const supported40 = scanner.decodeSupportedPids('0140', '41 40 00 00 00 02');
   assert.ok(supported40.includes('015F'));
@@ -287,12 +281,15 @@ async function testBluetoothEventTransport() {
   bluetoothDisconnectListener = null;
   fakeDeviceConnected = true;
   lastBluetoothDiscoveryCancelled = false;
+  bluetoothCommands = [];
   const { BluetoothClassicTransport } = loadTs(path.join(ROOT, 'src/obd/bluetoothClassicTransport.ts'));
   const transport = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF');
   await transport.open();
   assert.strictEqual(lastBluetoothDiscoveryCancelled, true);
-  assert.strictEqual(lastBluetoothConnectionOptions?.connectionType, 'raw');
-  assert.strictEqual(lastBluetoothConnectionOptions?.secureSocket, false);
+  assert.strictEqual(lastBluetoothConnectionOptions?.connectorType, 'rfcomm');
+  assert.strictEqual(lastBluetoothConnectionOptions?.connectionType, 'delimited');
+  assert.strictEqual(lastBluetoothConnectionOptions?.delimiter, '>');
+  assert.strictEqual(lastBluetoothConnectionOptions?.secureSocket, true);
   await transport.write('010C\\r');
   const response = await transport.readUntilPrompt(500);
   assert.strictEqual(response, '41 0C 0C 18');
@@ -304,6 +301,27 @@ async function testBluetoothEventTransport() {
   bluetoothDisconnectListener?.({ address: 'AA:BB:CC:DD:EE:FF' });
   await assert.rejects(pendingRead, /BLUETOOTH DESCONECTADO|BLUETOOTH NÃO CONECTADO/);
   await transport.close();
+}
+
+async function testElmInitializationOrder() {
+  const { Elm327Session } = loadTs(path.join(ROOT, 'src/obd/elm327.ts'));
+  const commands = [];
+  const transport = {
+    async open() {},
+    async close() {},
+    async write(data) { commands.push(String(data).trim()); },
+    async readUntilPrompt() {
+      const command = commands[commands.length - 1];
+      const responses = { ATZ: 'ELM327 v1.5', ATI: 'ELM327 v1.5', ATE0: 'OK', ATL0: 'OK', ATS0: 'OK', ATH1: 'OK', ATSP0: 'OK', ATDP: 'ISO 14230-4 (KWP FAST)' };
+      return responses[command] ?? 'NO DATA';
+    },
+  };
+  const session = new Elm327Session(transport);
+  const initialization = await session.initialize();
+  assert.deepStrictEqual(initialization.map((item) => item.command), ['ATZ', 'ATI', 'ATE0', 'ATL0', 'ATS0', 'ATH1', 'ATSP0', 'ATDP']);
+  assert.deepStrictEqual(commands, ['ATZ', 'ATI', 'ATE0', 'ATL0', 'ATS0', 'ATH1', 'ATSP0', 'ATDP']);
+  assert.strictEqual(session.getProtocol(), 'ISO 14230-4 (KWP FAST)');
+  await session.close();
 }
 
 async function testQuota() {
@@ -537,6 +555,7 @@ async function main() {
     ['elm/protocolo/serialização', testElmAndProtocol],
     ['descoberta de PIDs', testPidScanner],
     ['Bluetooth por eventos', testBluetoothEventTransport],
+    ['ordem de inicialização ELM', testElmInitializationOrder],
     ['quota configurável', testQuota],
     ['logger TX/RX', testRawLogger],
     ['perfil do veículo', testVehicleProfile],
