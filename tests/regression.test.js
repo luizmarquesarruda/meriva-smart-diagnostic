@@ -37,6 +37,7 @@ let bluetoothListener = null;
 let bluetoothDisconnectListener = null;
 let fakeDeviceConnected = true;
 let lastBluetoothConnectionOptions = null;
+let lastBluetoothDiscoveryCancelled = false;
 
 function parentDir(p) {
   const i = p.lastIndexOf('/');
@@ -149,6 +150,7 @@ const fakeBluetooth = {
   isBluetoothAvailable: async () => true,
   isBluetoothEnabled: async () => true,
   getBondedDevices: async () => [],
+  cancelDiscovery: async () => { lastBluetoothDiscoveryCancelled = true; },
   connectToDevice: async (_address, options) => {
     lastBluetoothConnectionOptions = options;
     return {
@@ -284,9 +286,11 @@ async function testBluetoothEventTransport() {
   bluetoothListener = null;
   bluetoothDisconnectListener = null;
   fakeDeviceConnected = true;
+  lastBluetoothDiscoveryCancelled = false;
   const { BluetoothClassicTransport } = loadTs(path.join(ROOT, 'src/obd/bluetoothClassicTransport.ts'));
   const transport = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF');
   await transport.open();
+  assert.strictEqual(lastBluetoothDiscoveryCancelled, true);
   assert.strictEqual(lastBluetoothConnectionOptions?.connectionType, 'raw');
   assert.strictEqual(lastBluetoothConnectionOptions?.secureSocket, false);
   await transport.write('010C\\r');
