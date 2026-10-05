@@ -132,11 +132,7 @@ export default function LaboratorioScreen() {
       const settings = await readAppSettings(getBasePath());
       setDevices(paired);
       const savedAddress = settings.selectedAdapterAddress?.toUpperCase() ?? '';
-      setSelectedAddress((current) =>
-        paired.some((item) => item.address === current) ? current :
-          paired.some((item) => item.address.toUpperCase() === savedAddress) ? savedAddress :
-          paired[0]?.address ?? '',
-      );
+      setSelectedAddress('');
       setStatus(paired.length ? 'BLUETOOTH OK / ELM NÃO CONECTADO' : 'NENHUM ELM327 PAREADO');
     } catch (cause) {
       setStatus('BLUETOOTH NÃO PRONTO');
@@ -147,12 +143,6 @@ export default function LaboratorioScreen() {
   }
 
   async function connectReal() {
-    const device = devices.find((item) => item.address === selectedAddress);
-    if (!device) {
-      setError('SELECIONE UM DISPOSITIVO PAREADO');
-      return;
-    }
-
     setError('');
     setStatus('BLUETOOTH CONECTANDO');
     try {
@@ -161,7 +151,35 @@ export default function LaboratorioScreen() {
         sessionRef.current = null;
       }
 
-      const connection = await createRealElmSession(device);
+      // O aplicativo escolhe o adaptador. A lista de pareados é somente
+      // diagnóstico visual; o usuário não precisa selecionar MAC.
+      const candidates = [...devices].sort((a, b) => {
+        const score = (device: BluetoothDeviceInfo) => {
+          const name = (device.name || '').toUpperCase();
+          return /ELM327|OBD|OBDII|V-LINK/.test(name) ? 0 : 1;
+        };
+        return score(a) - score(b);
+      });
+      if (!candidates.length) throw new Error('NENHUM DISPOSITIVO BLUETOOTH PAREADO. PAREIE O ELM327 NAS CONFIGURAÇÕES DO ANDROID.');
+
+      let selectedDevice: BluetoothDeviceInfo | null = null;
+      let connection: Awaited<ReturnType<typeof createRealElmSession>> | null = null;
+      let lastError: unknown = null;
+      for (const candidate of candidates) {
+        try {
+          setStatus(`TESTANDO ELM327: ${candidate.name || candidate.address}`);
+          const candidateConnection = await createRealElmSession(candidate);
+          selectedDevice = candidate;
+          connection = candidateConnection;
+          break;
+        } catch (cause) {
+          lastError = cause;
+        }
+      }
+      if (!selectedDevice || !connection) {
+        throw lastError instanceof Error ? lastError : new Error('NENHUM ELM327 PAREADO RESPONDEU À ECU.');
+      }
+      const device = selectedDevice;
       sessionRef.current = connection.session;
       await setSharedObdConnection({
         session: connection.session,
@@ -188,9 +206,8 @@ export default function LaboratorioScreen() {
         selectedAdapterAddress: device.address,
       });
 
-      setStatus('ELM RESPONDENDO / DESCOBRINDO SUPORTE DOS PIDs');
-      // A conexão já fez a descoberta com a chave ligada. Reutilizamos o resultado
-      // para não bombardear a K-Line com uma segunda varredura imediata.
+      setStatus('ELM RESPONDENDO / PIDs DESCOBERTOS');
+      // A conexão já fez a descoberta. Não repita a varredura imediatamente.
       const discovered = connection.supportedPids;
       setSupportedPids(discovered);
       const fuelSupported = discovered.includes('015E');
@@ -382,18 +399,17 @@ export default function LaboratorioScreen() {
           </TouchableOpacity>
 
           {devices.map((device) => (
-            <TouchableOpacity
+            <View
               key={device.address}
-              style={[styles.device, selectedAddress === device.address && styles.selected]}
-              onPress={() => setSelectedAddress(device.address)}
+              style={styles.device}
             >
               <Text style={styles.deviceName}>{device.name || 'DISPOSITIVO SEM NOME'}</Text>
               <Text>{device.address}</Text>
-            </TouchableOpacity>
+            </View>
           ))}
 
-          <TouchableOpacity style={[styles.button, layout.landscape && styles.flexButton]} onPress={connectReal} disabled={!selectedAddress || !storageReady}>
-            <Text style={styles.buttonText}>CONECTAR E INICIALIZAR ELM327</Text>
+          <TouchableOpacity style={[styles.button, layout.landscape && styles.flexButton]} onPress={connectReal} disabled={!devices.length || !storageReady}>
+            <Text style={styles.buttonText}>CONECTAR AUTOMATICAMENTE AO ELM327</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.button, styles.disconnect, layout.landscape && styles.flexButton]} onPress={() => void disconnectReal()} disabled={!sessionRef.current}>
             <Text style={styles.buttonText}>DESCONECTAR ELM327</Text>
