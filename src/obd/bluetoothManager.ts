@@ -4,6 +4,7 @@ import RNBluetoothClassic from 'react-native-bluetooth-classic';
 import { BluetoothClassicTransport, BluetoothDeviceInfo, listBondedBluetoothDevices } from './bluetoothClassicTransport';
 import { ElmCommandResult, Elm327Session } from './elm327';
 import { Elm327CompatibilityConfig, DEFAULT_ELM327_COMPATIBILITY, mergeCompatibilityConfig } from './elm327Compatibility';
+import { discoverSupportedPids } from './pidScanner';
 
 export type BluetoothConnectionStatus =
   | 'BLUETOOTH INDISPONÍVEL'
@@ -180,15 +181,23 @@ export async function createRealElmSession(
       };
     }
 
-    // Conexão VALIDADA: RFCOMM aberto + ELM inicializado + ECU respondeu 010C.
-    // Não descubra todos os PIDs nesta etapa. Clones v1.5 podem demorar e gerar
-    // um falso erro de Bluetooth depois que a conexão já está boa.
+    // A ECU já foi validada. Agora faça a descoberta padrão J1979 por blocos,
+    // mas sem transformar uma falha de descoberta em falha de Bluetooth.
+    // O resultado real da ECU fica disponível para a tela e para o autosave.
+    let supportedPids: string[] = [];
+    try {
+      const discovery = await discoverSupportedPids(session);
+      supportedPids = Array.from(new Set(discovery.flatMap((item) => item.supportedPids))).sort();
+    } catch {
+      supportedPids = [];
+    }
+
     return {
       session,
       initialization,
       protocol: session.getProtocol(),
       ecuProbe,
-      supportedPids: [],
+      supportedPids,
       ecuValidated: true,
     };
   } catch (cause) {
