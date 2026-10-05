@@ -28,6 +28,7 @@ export const PID_DATABASE: Record<string, PidDefinition> = {
   '0142': { pid: '0142', name: 'ECU Voltage', bytes: 2, unit: 'V', formula: ([a, b]) => ((a * 256) + b) / 1000, classification: 'PADRAO_OBD', description: 'Tensão informada pela ECU' },
   '0151': { pid: '0151', name: 'Fuel Type', bytes: 1, unit: 'código', formula: ([a]) => a, classification: 'PADRAO_OBD', description: 'Tipo de combustível declarado pela ECU. Não representa necessariamente a composição atual do tanque.' },
   '0152': { pid: '0152', name: 'Alcohol Fuel Percentage', bytes: 1, unit: '%', formula: ([a]) => (a * 100) / 255, classification: 'PADRAO_OBD', description: 'Percentual de álcool informado pela ECU quando este PID é suportado. Deve ser tratado como evidência direta, não como estimativa própria do aplicativo.' },
+  '012F': { pid: '012F', name: 'Fuel Level Input', bytes: 1, unit: '%', formula: ([a]) => (a * 100) / 255, classification: 'PADRAO_OBD', description: 'Nível de combustível informado pela ECU. Pode vir diretamente do sensor ou ser inferido pela estratégia da ECU; usar somente quando a ECU responder.' },
   '015E': { pid: '015E', name: 'Engine Fuel Rate', bytes: 2, unit: 'L/h', formula: ([a, b]) => ((a * 256) + b) / 20, classification: 'PADRAO_OBD', description: 'Taxa de combustível calculada pela ECU; permite integrar litros usados quando suportada' },
 };
 
