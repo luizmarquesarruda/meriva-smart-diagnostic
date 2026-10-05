@@ -129,7 +129,6 @@ export default function LaboratorioScreen() {
     setError('');
     try {
       const paired = await discoverPairedDevices();
-      const settings = await readAppSettings(getBasePath());
       setDevices(paired);
       const savedAddress = settings.selectedAdapterAddress?.toUpperCase() ?? '';
       setSelectedAddress('');
