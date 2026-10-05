@@ -143,7 +143,9 @@ export async function connectPreferredElm(
         if (config.maxConnectionAttempts > 0 && attempts >= config.maxConnectionAttempts) {
           throw cause;
         }
-        await new Promise((resolve) => setTimeout(resolve, 2500));
+        // Reconexão agressiva: clones ELM327 costumam liberar o RFCOMM
+        // somente depois de uma pequena janela após uma tentativa falha.
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
 
