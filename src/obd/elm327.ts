@@ -73,26 +73,35 @@ export class Elm327Session {
     try {
       const results: ElmCommandResult[] = [];
 
-      // Fluxo de inicialização compatível com o padrão usado pelo Car Scanner:
-      // reset, eco/desenho de linha, espaços, cabeçalho, protocolo automático.
-      // ATAT1 não é necessário para este projeto e pode alterar o comportamento
-      // de adaptadores ELM327/KWP mais simples.
-      // O timeout de leitura fica na camada de transporte. Não enviamos
-      // ATST32 porque a sequência real validada para este projeto não o usa.
-      for (const command of ['ATZ', 'ATE0', 'ATL0', 'ATS0', 'ATH1', 'ATSP0']) {
+      // Inicialização tolerante a clones chineses:
+      // primeiro provamos que o adaptador responde; os demais comandos de
+      // configuração são "best effort". Um clone pode não implementar todos
+      // os comandos AT e ainda funcionar perfeitamente para OBD.
+      // ATAT1/ATST32 não são enviados porque não são necessários para o KWP
+      // Fast Init conhecido desta Meriva e podem alterar o comportamento de
+      // adaptadores simples.
+      const mandatory = ['ATZ', 'ATI', 'ATE0'];
+      const optional = ['ATL0', 'ATS0', 'ATH1', 'ATSP0'];
+
+      for (const command of [...mandatory, ...optional]) {
         const result = await this.command(command);
         results.push(result);
-        if (result.status !== 'OK') {
-          throw new Error(`ELM NÃO ACEITOU ${command}: ${result.status}`);
+
+        if (mandatory.includes(command) && result.status !== 'OK') {
+          throw new Error(`ELM NÃO RESPONDEU CORRETAMENTE A ${command}: ${result.status}`);
         }
       }
 
+      // ATDP é diagnóstico, não requisito para manter o socket aberto.
+      // Alguns clones retornam resposta vazia ou "AUTO" mesmo quando a ECU
+      // está pronta. A prova real da ECU será feita por 010C.
       const protocolResult = await this.command('ATDP');
       results.push(protocolResult);
       if (protocolResult.status === 'OK') {
         const detected = protocolResult.response.trim();
         this.protocol = detected || null;
       }
+
       return results;
     } catch (cause) {
       this.opened = false;
