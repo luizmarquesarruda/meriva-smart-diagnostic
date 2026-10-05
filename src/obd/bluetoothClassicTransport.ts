@@ -30,7 +30,7 @@ export class BluetoothClassicTransport implements ObdTransport {
     if (this.diagnostics.length > 500) this.diagnostics.shift();
   }
 
-  getDiagnosticsText(): string { return this.diagnostics.join('\\n'); }
+  getDiagnosticsText(): string { return this.diagnostics.join('\n'); }
   clearDiagnostics(): void { this.diagnostics = []; }
 
   private readonly config: Elm327CompatibilityConfig;
@@ -70,24 +70,21 @@ export class BluetoothClassicTransport implements ObdTransport {
     let device: BluetoothDevice | null = null;
     let lastCause: unknown = null;
 
-    // ELM327 usa Bluetooth Classic SPP sobre RFCOMM. Nesta versão da biblioteca,
-    // RFCOMM é o CONNECTOR_TYPE e "delimited"/"binary" são CONNECTION_TYPEs.
-    // Para o ELM327 usamos texto delimitado, pois o adaptador troca ASCII e termina
-    // respostas com CR/LF e o prompt '>'.
+    // ELM327 usa Bluetooth Classic SPP. Nesta versão da biblioteca, o transporte
+    // é selecionado pelo connectionType. Para o ELM327 usamos texto delimitado,
+    // com CR como terminador de linha e ASCII.
     for (const secureSocket of [false, true]) {
       this.logDiagnostic('CONNECT_ATTEMPT', {
         secureSocket,
-        connectorType: 'rfcomm',
         connectionType: 'delimited',
-        delimiter: '\\r',
+        delimiter: '\r',
       });
 
       try {
         device = await Promise.race([
           RNBluetoothClassic.connectToDevice(this.deviceAddress, {
-            connectorType: 'rfcomm',
             connectionType: 'delimited',
-            delimiter: '\\r',
+            delimiter: '\r',
             charset: 'ascii',
             secureSocket,
           }),
@@ -101,14 +98,12 @@ export class BluetoothClassicTransport implements ObdTransport {
 
         this.logDiagnostic('CONNECT_SUCCESS', {
           secureSocket,
-          connectorType: 'rfcomm',
-          connectionType: 'delimited',
+            connectionType: 'delimited',
         });
         break;
       } catch (cause) {
         this.logDiagnostic('CONNECT_FAILURE', {
           secureSocket,
-          connectorType: 'rfcomm',
           connectionType: 'delimited',
           error: cause instanceof Error ? cause.message : String(cause),
         });
@@ -218,7 +213,7 @@ export class BluetoothClassicTransport implements ObdTransport {
       if (promptIndex >= 0) {
         const response = this.received.slice(0, promptIndex);
         this.received = this.received.slice(promptIndex + 1);
-        const clean = response.replace(/^\\s+|\\s+$/g, '');
+        const clean = response.replace(/^\s+|\s+$/g, '');
         this.logDiagnostic('RESPONSE_COMPLETE', { response: clean });
         return clean;
       }
@@ -226,7 +221,7 @@ export class BluetoothClassicTransport implements ObdTransport {
       await new Promise((resolve) => setTimeout(resolve, 25));
     }
 
-    const partial = this.received.replace(/^\\s+|\\s+$/g, '');
+    const partial = this.received.replace(/^\s+|\s+$/g, '');
     this.received = '';
     this.logDiagnostic('READ_TIMEOUT', { partial });
     throw new Error(partial ? 'TIMEOUT: RESPOSTA ELM SEM PROMPT FINAL' : 'TIMEOUT');
