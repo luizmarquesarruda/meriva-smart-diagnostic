@@ -1,4 +1,5 @@
 import { PermissionsAndroid, Platform, Linking } from 'react-native';
+import * as Location from 'expo-location';
 import RNBluetoothClassic from 'react-native-bluetooth-classic';
 import { BluetoothClassicTransport, BluetoothDeviceInfo, listBondedBluetoothDevices } from './bluetoothClassicTransport';
 import { ElmCommandResult, Elm327Session } from './elm327';
@@ -43,11 +44,22 @@ export async function requestBluetoothPermissions(): Promise<void> {
     if (Object.values(result).some((value) => value !== PermissionsAndroid.RESULTS.GRANTED)) {
       throw new Error('PERMISSÃO DE DISPOSITIVOS PRÓXIMOS NÃO CONCEDIDA. PERMITA O ACESSO NAS CONFIGURAÇÕES DO APLICATIVO.');
     }
+
+    // O app também usa o GPS para velocidade, distância e consumo.
+    // Bluetooth não concede localização automaticamente, então a permissão
+    // do GPS precisa ser solicitada separadamente.
+    const location = await Location.requestForegroundPermissionsAsync();
+    if (location.status !== Location.PermissionStatus.GRANTED) {
+      throw new Error('PERMISSÃO DE LOCALIZAÇÃO NÃO CONCEDIDA. O GPS É NECESSÁRIO PARA VELOCIDADE E DISTÂNCIA.');
+    }
     return;
   }
 
-  const result = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION);
-  if (result !== PermissionsAndroid.RESULTS.GRANTED) {
+  const result = await PermissionsAndroid.requestMultiple([
+    PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+    PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
+  ]);
+  if (Object.values(result).some((value) => value !== PermissionsAndroid.RESULTS.GRANTED)) {
     throw new Error('PERMISSÃO DE LOCALIZAÇÃO NECESSÁRIA NO ANDROID ANTIGO. PERMITA O ACESSO NAS CONFIGURAÇÕES DO APLICATIVO.');
   }
 }
