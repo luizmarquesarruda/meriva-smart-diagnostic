@@ -10,11 +10,9 @@ export interface AutoTripServiceState {
   connected: boolean;
   active: boolean;
   fuelSupported: boolean;
-  fuelLevelSupported: boolean;
   distanceKm: number;
   fuelUsedL: number;
   consumptionKml: number | null;
-  fuelLevelPercent: number | null;
   error: string | null;
 }
 
@@ -24,11 +22,9 @@ const INITIAL_STATE: AutoTripServiceState = {
   connected: false,
   active: false,
   fuelSupported: false,
-  fuelLevelSupported: false,
   distanceKm: 0,
   fuelUsedL: 0,
   consumptionKml: null,
-  fuelLevelPercent: null,
   error: null,
 };
 
@@ -101,7 +97,6 @@ class AutoTripService {
     }
 
     const fuelSupported = connection.supportedPids.includes('015E');
-    const fuelLevelSupported = connection.supportedPids.includes('012F');
     const initialDistanceKm = gpsTracker.getState().distanceKm;
     this.recorder = new RealTripRecorder(Date.now(), initialDistanceKm);
     const generation = ++this.generation;
@@ -111,7 +106,6 @@ class AutoTripService {
       connected: true,
       active: true,
       fuelSupported,
-      fuelLevelSupported,
       error: null,
     };
     this.emit();
@@ -120,7 +114,6 @@ class AutoTripService {
   }
 
   private async runLoop(connection: SharedObdConnection, generation: number): Promise<void> {
-    let lastFuelLevelReadAt = 0;
 
     while (
       this.running &&
@@ -147,40 +140,6 @@ class AutoTripService {
             fuelResult.parsed.value >= 0
           ) {
             fuelRateLph = fuelResult.parsed.value;
-          }
-        }
-
-        if (
-          this.state.fuelLevelSupported &&
-          Date.now() - lastFuelLevelReadAt >= 10_000
-        ) {
-          lastFuelLevelReadAt = Date.now();
-          const levelResult = await connection.session.queryPid('012F');
-          const level =
-            levelResult.parsed.status === 'RESPONDEU' &&
-            levelResult.parsed.unit === '%' &&
-            levelResult.parsed.value != null &&
-            Number.isFinite(levelResult.parsed.value) &&
-            levelResult.parsed.value >= 0 &&
-            levelResult.parsed.value <= 100
-              ? levelResult.parsed.value
-              : null;
-
-          if (level != null) {
-            updateAutoSaveState((state) => {
-              state.lastReadings = [
-                {
-                  pid: '012F',
-                  name: levelResult.parsed.name,
-                  value: level,
-                  unit: '%',
-                  status: levelResult.parsed.status,
-                  timestamp: new Date().toISOString(),
-                },
-                ...state.lastReadings.filter((item) => item.pid !== '012F'),
-              ].slice(0, 50);
-            });
-            this.setState({ fuelLevelPercent: level, error: null });
           }
         }
 
