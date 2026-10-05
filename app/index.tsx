@@ -207,9 +207,9 @@ export default function IndexScreen() {
           </View>
 
           <View style={styles.primaryActions}>
-            <Link href="/laboratorio" asChild>
+            <Link href="/conexao" asChild>
               <TouchableOpacity style={styles.primaryButton}>
-                <Text style={styles.primaryButtonText}>ABRIR DIAGNÓSTICO OBD</Text>
+                <Text style={styles.primaryButtonText}>CONEXÃO E DIAGNÓSTICO OBD</Text>
               </TouchableOpacity>
             </Link>
             <Link href="/configuracoes" asChild>
@@ -248,10 +248,45 @@ export default function IndexScreen() {
           </View>
 
           <View style={styles.menuList}>
+            <Link href="/conexao" asChild>
+              <TouchableOpacity style={styles.menuRow}>
+                <View style={styles.menuIcon}><Text style={styles.menuIconText}>BT</Text></View>
+                <View style={styles.menuCopy}><Text style={styles.menuTitle}>Conexão ELM327</Text><Text style={styles.menuDescription}>Bluetooth Classic, ELM e validação ECU</Text></View>
+                <Text style={styles.menuArrow}>›</Text>
+              </TouchableOpacity>
+            </Link>
             <Link href="/laboratorio" asChild>
               <TouchableOpacity style={styles.menuRow}>
                 <View style={styles.menuIcon}><Text style={styles.menuIconText}>OBD</Text></View>
                 <View style={styles.menuCopy}><Text style={styles.menuTitle}>Diagnóstico OBD</Text><Text style={styles.menuDescription}>PIDs, ECU e comunicação ELM327</Text></View>
+                <Text style={styles.menuArrow}>›</Text>
+              </TouchableOpacity>
+            </Link>
+            <Link href="/tempo-real" asChild>
+              <TouchableOpacity style={styles.menuRow}>
+                <View style={styles.menuIcon}><Text style={styles.menuIconText}>LIVE</Text></View>
+                <View style={styles.menuCopy}><Text style={styles.menuTitle}>Dados em tempo real</Text><Text style={styles.menuDescription}>RPM, temperatura, pressão e TPS</Text></View>
+                <Text style={styles.menuArrow}>›</Text>
+              </TouchableOpacity>
+            </Link>
+            <Link href="/dtc" asChild>
+              <TouchableOpacity style={styles.menuRow}>
+                <View style={styles.menuIcon}><Text style={styles.menuIconText}>DTC</Text></View>
+                <View style={styles.menuCopy}><Text style={styles.menuTitle}>Códigos de falha</Text><Text style={styles.menuDescription}>Leitura atual e histórico</Text></View>
+                <Text style={styles.menuArrow}>›</Text>
+              </TouchableOpacity>
+            </Link>
+            <Link href="/compatibilidade" asChild>
+              <TouchableOpacity style={styles.menuRow}>
+                <View style={styles.menuIcon}><Text style={styles.menuIconText}>ELM</Text></View>
+                <View style={styles.menuCopy}><Text style={styles.menuTitle}>Compatibilidade ELM327</Text><Text style={styles.menuDescription}>Saúde, timeouts e erros do adaptador</Text></View>
+                <Text style={styles.menuArrow}>›</Text>
+              </TouchableOpacity>
+            </Link>
+            <Link href="/historico" asChild>
+              <TouchableOpacity style={styles.menuRow}>
+                <View style={styles.menuIcon}><Text style={styles.menuIconText}>HIST</Text></View>
+                <View style={styles.menuCopy}><Text style={styles.menuTitle}>Histórico de viagens</Text><Text style={styles.menuDescription}>Dados reais e referências separadas</Text></View>
                 <Text style={styles.menuArrow}>›</Text>
               </TouchableOpacity>
             </Link>
