@@ -144,6 +144,7 @@ const fakeFS = {
 const fakeRN = {
   AppState: { addEventListener: () => ({ remove() {} }) },
   Platform: { OS: 'android', Version: 35 },
+  PermissionsAndroid: { PERMISSIONS: { BLUETOOTH_CONNECT: 'BLUETOOTH_CONNECT', BLUETOOTH_SCAN: 'BLUETOOTH_SCAN', ACCESS_FINE_LOCATION: 'ACCESS_FINE_LOCATION', ACCESS_COARSE_LOCATION: 'ACCESS_COARSE_LOCATION' }, RESULTS: { GRANTED: 'granted' }, requestMultiple: async () => ({}) },
 };
 
 const fakeBluetooth = {
@@ -184,6 +185,7 @@ Module._load = function (request, parent, isMain) {
   if (request === 'expo-file-system') return fakeFS;
   if (request === 'react-native') return fakeRN;
   if (request === 'react-native-bluetooth-classic') return fakeBluetooth;
+  if (request === 'expo-location') return { PermissionStatus: { GRANTED: 'granted' }, requestForegroundPermissionsAsync: async () => ({ status: 'granted' }) };
   if (parent && parent.filename && (request.startsWith('./') || request.startsWith('../'))) {
     const resolved = path.resolve(path.dirname(parent.filename), request);
     if (fs.existsSync(resolved + '.ts')) return loadTs(resolved + '.ts');
@@ -244,6 +246,14 @@ async function testElmAndProtocol() {
   assert.strictEqual(generic.command, '03');
   assert.strictEqual(generic.status, 'ERROR');
   await session.close();
+}
+
+async function testEcuValidationGate() {
+  const manager = loadTs(path.join(ROOT, 'src/obd/bluetoothManager.ts'));
+  assert.strictEqual(manager.isValidEcuProbe({ status: 'OK', response: '41 0C 1A F8', command: '010C', elapsedMs: 10, attempt: 1 }), true);
+  assert.strictEqual(manager.isValidEcuProbe({ status: 'OK', response: 'NO DATA', command: '010C', elapsedMs: 10, attempt: 1 }), false);
+  assert.strictEqual(manager.isValidEcuProbe({ status: 'TIMEOUT', response: '', command: '010C', elapsedMs: 1000, attempt: 1 }), false);
+  assert.strictEqual(manager.isValidEcuProbe({ status: 'OK', response: '41 0B 25', command: '010C', elapsedMs: 10, attempt: 1 }), false);
 }
 
 async function testPidScanner() {
@@ -537,6 +547,7 @@ async function main() {
   const tests = [
     ['parser + DTC', testParser],
     ['elm/protocolo/serialização', testElmAndProtocol],
+    ['gate de validação ECU/010C', testEcuValidationGate],
     ['descoberta de PIDs', testPidScanner],
     ['Bluetooth por eventos', testBluetoothEventTransport],
     ['quota configurável', testQuota],
