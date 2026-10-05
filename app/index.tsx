@@ -165,10 +165,10 @@ export default function IndexScreen() {
           </View>
 
           <View style={styles.heroCard}>
-            <Text style={styles.heroLabel}>CENTRAL DE CONTROLE</Text>
-            <Text style={styles.heroValue}>{obd.connected ? 'ONLINE' : bluetoothSearching ? 'BUSCANDO' : 'PRONTO'}</Text>
-            <Text style={styles.heroUnit}>{obd.connected ? (obd.protocol ?? 'ELM327 VALIDADO') : 'Bluetooth Classic + ELM327'}</Text>
-            <Text style={styles.heroHelp}>Diagnóstico real. Sem dados inventados. Respostas brutas preservadas.</Text>
+            <Text style={styles.heroLabel}>VEÍCULO</Text>
+            <Text style={styles.heroValue}>MERIVA MAXX</Text>
+            <Text style={styles.heroUnit}>1.4 8V • FLEX • 2011/2012 • 4 CILINDROS</Text>
+            <Text style={styles.heroHelp}>Painel principal do veículo. Dados OBD, GPS e consumo aparecem somente quando forem reais e válidos.</Text>
           </View>
 
           <View style={[styles.statusGrid, layout.landscape && styles.statusGridLandscape]}>
@@ -212,6 +212,21 @@ export default function IndexScreen() {
           {bluetoothError ? <Text style={styles.error}>BLUETOOTH/ELM327: {bluetoothError}</Text> : null}
           {gpsState.error ? <Text style={styles.error}>GPS: {gpsState.error}</Text> : null}
           {saveStatus.lastError ? <Text style={styles.error}>AUTOSAVE: {saveStatus.lastError}</Text> : null}
+
+          <View style={styles.bottomNav}>
+            <Link href="/" asChild>
+              <TouchableOpacity style={styles.bottomNavItem}>
+                <Text style={styles.bottomNavIcon}>🚗</Text>
+                <Text style={styles.bottomNavActive}>CARRO</Text>
+              </TouchableOpacity>
+            </Link>
+            <Link href="/bluetooth" asChild>
+              <TouchableOpacity style={styles.bottomNavItem}>
+                <Text style={styles.bottomNavIcon}>🔵</Text>
+                <Text style={styles.bottomNavText}>BLUETOOTH</Text>
+              </TouchableOpacity>
+            </Link>
+          </View>
           <Text style={styles.footerStatus}>{isHydrated ? 'DADOS SALVOS AUTOMATICAMENTE' : 'CARREGANDO DADOS...'}</Text>
         </View>
       </ScrollView>
@@ -274,5 +289,10 @@ const styles = StyleSheet.create({
   secondaryButton: { backgroundColor: '#111c2e', borderRadius: 12, padding: 13, alignItems: 'center', borderWidth: 1, borderColor: '#34506f' },
   secondaryButtonText: { color: '#dbeafe', fontWeight: '900', fontSize: 11 },
   error: { color: '#fb7185', fontWeight: '800', fontSize: 10, marginTop: 8 },
+  bottomNav: { flexDirection: 'row', backgroundColor: '#111c2e', borderRadius: 14, borderWidth: 1, borderColor: '#29415f', marginTop: 12, padding: 5 },
+  bottomNavItem: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 10 },
+  bottomNavIcon: { fontSize: 17, marginBottom: 2 },
+  bottomNavActive: { color: '#7db3ff', fontSize: 9, fontWeight: '900', letterSpacing: 0.6 },
+  bottomNavText: { color: '#9fb4cf', fontSize: 9, fontWeight: '900', letterSpacing: 0.6 },
   footerStatus: { color: '#60748f', textAlign: 'center', fontSize: 9, marginTop: 9 },
 });
