@@ -63,10 +63,14 @@ export class BluetoothClassicTransport implements ObdTransport {
       try {
         device = await Promise.race([
           RNBluetoothClassic.connectToDevice(this.deviceAddress, {
-            connectionType: 'raw',
-            delimiter: '>',
-            charset: 'ascii',
-            secureSocket,
+            // react-native-bluetooth-classic usa estas chaves em MAIÚSCULAS.
+            // As versões Android da biblioteca ignoram as variantes camelCase.
+            // Para ELM327, não dependemos de delimitador: o prompt ">" pode
+            // chegar separado dos dados. O buffer completo é tratado em JS.
+            CONNECTION_TYPE: 'delimited',
+            DELIMITER: '',
+            DEVICE_CHARSET: 'ascii',
+            SECURE_SOCKET: secureSocket,
           }),
           new Promise<never>((_, reject) =>
             setTimeout(
