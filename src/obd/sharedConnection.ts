@@ -1,6 +1,7 @@
 import type { Elm327Session } from './elm327';
 import type { BluetoothDeviceInfo } from './bluetoothClassicTransport';
 import { createRealElmSession, discoverPairedDevices, ensureBluetoothReady } from './bluetoothManager';
+import { DEFAULT_ELM327_COMPATIBILITY, Elm327CompatibilityConfig, mergeCompatibilityConfig } from './elm327Compatibility';
 
 export interface SharedObdConnection {
   session: Elm327Session;
@@ -59,7 +60,7 @@ async function connectCandidate(device: BluetoothDeviceInfo): Promise<SharedObdC
   return active;
 }
 
-async function connectPreferredElmOnce(preferredAddress: string | null): Promise<SharedObdConnection> {
+async function connectPreferredElmOnce(\n  preferredAddress: string | null,\n  compatibility: Elm327CompatibilityConfig,\n): Promise<SharedObdConnection> {
   // IMPORTANTE: o MAC configurado é tentado diretamente primeiro.
   // Não bloqueamos a conexão porque getBondedDevices() falhou, demorou
   // ou não devolveu o ELM corretamente no Android.
@@ -73,7 +74,7 @@ async function connectPreferredElmOnce(preferredAddress: string | null): Promise
     };
 
     try {
-      return await connectCandidate(directDevice);
+      return await connectCandidate(directDevice, compatibility);
     } catch (cause) {
       setConnectionError(cause);
     }
@@ -105,7 +106,7 @@ async function connectPreferredElmOnce(preferredAddress: string | null): Promise
 
   for (const device of candidates) {
     try {
-      return await connectCandidate(device);
+      return await connectCandidate(device, compatibility);
     } catch (cause) {
       lastError = cause;
       setConnectionError(cause);
@@ -129,7 +130,7 @@ export async function connectPreferredElm(
     // conexão válida. Isso cobre ligar o ELM depois de abrir o app.
     while (!active) {
       try {
-        return await connectPreferredElmOnce(preferredAddress);
+        return await connectPreferredElmOnce(preferredAddress, config);
       } catch (cause) {
         lastError = cause;
         setConnectionError(cause);
