@@ -15,7 +15,6 @@ let active: SharedObdConnection | null = null;
 let connecting: Promise<SharedObdConnection> | null = null;
 let lastConnectionError: string | null = null;
 
-export const MERIVA_ELM327_ADDRESS = '01:23:45:67:89:BA';
 const listeners = new Set<(connection: SharedObdConnection | null) => void>();
 
 function emit(): void {
@@ -63,40 +62,23 @@ async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm3
 }
 
 async function connectPreferredElmOnce(
-  preferredAddress: string | null,
   compatibility: Elm327CompatibilityConfig,
 ): Promise<SharedObdConnection> {
-  // Primeiro usamos o inventário de dispositivos PAREADOS pelo Android.
-  // Não tentamos um MAC arbitrário antes disso.
   await ensureBluetoothReady();
 
-  let devices: BluetoothDeviceInfo[] = [];
-  try {
-    devices = await discoverPairedDevices();
-  } catch (cause) {
-    setConnectionError(cause);
-  }
-
+  const devices = await discoverPairedDevices();
   const candidates: BluetoothDeviceInfo[] = [];
   const addCandidate = (device: BluetoothDeviceInfo) => {
-    if (!candidates.some((item) => sameAddress(item.address, device.address))) {
-      candidates.push(device);
-    }
+    if (!candidates.some((item) => sameAddress(item.address, device.address))) candidates.push(device);
   };
 
-  // 1) endereço previamente selecionado, se realmente estiver pareado;
-  // 2) nomes típicos de ELM/OBD;
-  // 3) qualquer outro Bluetooth Classic pareado.
-  // O teste ATI + 010C decide qual dispositivo é o ELM327.
-  if (preferredAddress) {
-    const preferredDevice = devices.find((device) => sameAddress(device.address, preferredAddress));
-    if (preferredDevice) addCandidate(preferredDevice);
-  }
+  // O aplicativo escolhe. Primeiro tenta nomes que indicam adaptador OBD/ELM;
+  // depois testa qualquer dispositivo Classic pareado. O candidato só é aceito
+  // após passar pela inicialização ELM e pelo teste real da ECU.
   for (const device of devices.filter(looksLikeElm327)) addCandidate(device);
   for (const device of devices) addCandidate(device);
 
-  let lastError: unknown = lastConnectionError;
-
+  let lastError: unknown = null;
   for (const device of candidates) {
     try {
       return await connectCandidate(device, compatibility);
@@ -106,12 +88,12 @@ async function connectPreferredElmOnce(
     }
   }
 
-  const detail = lastError instanceof Error ? lastError.message : String(lastError ?? 'NENHUM DISPOSITIVO RESPONDEU');
-  throw new Error('ELM327 NÃO CONECTOU. ÚLTIMO ERRO: ' + detail);
+  const detail = lastError instanceof Error ? lastError.message : String(lastError ?? 'NENHUM DISPOSITIVO PAREADO RESPONDEU');
+  throw new Error('ELM327 NÃO CONECTOU. DISPOSITIVOS TESTADOS: ' + candidates.length + '. ÚLTIMO ERRO: ' + detail);
 }
 
 export async function connectPreferredElm(
-  preferredAddress: string | null = null,
+  _ignoredPreferredAddress: string | null = null,
   compatibility?: Partial<Elm327CompatibilityConfig>,
 ): Promise<SharedObdConnection> {
   if (active) return active;
@@ -126,7 +108,7 @@ export async function connectPreferredElm(
     while (!active) {
       attempts += 1;
       try {
-        return await connectPreferredElmOnce(preferredAddress, config);
+        return await connectPreferredElmOnce(config);
       } catch (cause) {
         lastError = cause;
         setConnectionError(cause);
