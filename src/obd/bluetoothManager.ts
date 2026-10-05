@@ -5,6 +5,7 @@ import { BluetoothClassicTransport, BluetoothDeviceInfo, listBondedBluetoothDevi
 import { ElmCommandResult, Elm327Session } from './elm327';
 import { Elm327CompatibilityConfig, DEFAULT_ELM327_COMPATIBILITY, mergeCompatibilityConfig } from './elm327Compatibility';
 import { discoverSupportedPids } from './pidScanner';
+import type { PidDiscoveryCache } from '../meriva/autosaveState';
 
 export type BluetoothConnectionStatus =
   | 'BLUETOOTH INDISPONÍVEL'
@@ -28,12 +29,6 @@ export interface BluetoothConnectionState {
 let lastBluetoothDiagnosticText = '';
 
 export function getLastBluetoothDiagnosticText(): string { return lastBluetoothDiagnosticText; }
-
-export interface PidDiscoveryCache {
-  supportedPids: string[];
-  protocol: string;
-  discoveredAt: string;
-}
 
 export interface RealElmConnection {
   session: Elm327Session;
@@ -178,25 +173,18 @@ export async function createRealElmSession(
     // pela sessão. Em modo automático o ATDP anterior pode ainda representar
     // somente a seleção AUTO, e não o protocolo negociado na ECU.
     const protocolResult = await session.identifyProtocol();
-    if (protocolResult.status !== 'OK' || !session.getProtocol()) {
-      return {
-        session,
-        initialization,
-        protocol: session.getProtocol(),
-        ecuProbe,
-        supportedPids: [],
-        ecuValidated: false,
-        pidDiscoverySource: 'ECU',
-      };
-    }
+    // O 010C válido já é a prova de que a ECU respondeu. Uma falha do
+    // comando informativo ATDP/identificação não pode transformar uma ECU
+    // comprovadamente ativa em "desconectada".
+    const activeProtocol = session.getProtocol() ?? 'ISO 14230-4 KWP FAST INIT';
 
     // A ECU já foi validada. Se já temos uma descoberta persistida para o
     // mesmo protocolo, reutilize-a. Não interrogue novamente os blocos 0100,
     // 0120, 0140 e 0160.
-    const activeProtocol = session.getProtocol() ?? '';
+    const negotiatedProtocol = session.getProtocol() ?? activeProtocol;
     const cacheMatchesProtocol =
       Boolean(pidDiscoveryCache) &&
-      pidDiscoveryCache?.protocol === activeProtocol;
+      pidDiscoveryCache?.protocol === negotiatedProtocol;
 
     let supportedPids: string[] = [];
     let pidDiscoverySource: RealElmConnection['pidDiscoverySource'] = 'CACHE';
@@ -216,7 +204,7 @@ export async function createRealElmSession(
     return {
       session,
       initialization,
-      protocol: activeProtocol || null,
+      protocol: negotiatedProtocol || null,
       ecuProbe,
       supportedPids,
       ecuValidated: true,
