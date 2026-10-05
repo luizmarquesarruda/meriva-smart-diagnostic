@@ -18,9 +18,20 @@ export class BluetoothClassicTransport implements ObdTransport {
   private dataSubscription?: RemovableSubscription;
   private disconnectSubscription?: RemovableSubscription;
   private diagnostics: string[] = [];
-  private logDiagnostic(event: string, details?: unknown): void { const time=new Date().toISOString(); let line=`[${time}] ${event}`; if(details!==undefined){try{line+=` | ${JSON.stringify(details)}`;}catch{line+=` | ${String(details)}`;}} this.diagnostics.push(line); if(this.diagnostics.length>500)this.diagnostics.shift(); }
+
+  private logDiagnostic(event: string, details?: unknown): void {
+    const time = new Date().toISOString();
+    let line = `[${time}] ${event}`;
+    if (details !== undefined) {
+      try { line += ` | ${JSON.stringify(details)}`; }
+      catch { line += ` | ${String(details)}`; }
+    }
+    this.diagnostics.push(line);
+    if (this.diagnostics.length > 500) this.diagnostics.shift();
+  }
+
   getDiagnosticsText(): string { return this.diagnostics.join('\\n'); }
-  clearDiagnostics(): void { this.diagnostics=[]; }
+  clearDiagnostics(): void { this.diagnostics = []; }
 
   private readonly config: Elm327CompatibilityConfig;
 
@@ -31,45 +42,55 @@ export class BluetoothClassicTransport implements ObdTransport {
     this.config = mergeCompatibilityConfig(config ?? DEFAULT_ELM327_COMPATIBILITY);
   }
 
-  async open(): Promise<void> { this.clearDiagnostics(); this.logDiagnostic('OPEN_START',{platform:Platform.OS,deviceAddress:this.deviceAddress});
-    if (Platform.OS !== 'android') throw new Error('BLUETOOTH CLASSIC DISPONÍVEL SOMENTE NO ANDROID');
-    const available=await RNBluetoothClassic.isBluetoothAvailable(); this.logDiagnostic('BLUETOOTH_AVAILABLE',available); if(!available) throw new Error('BLUETOOTH NÃO DISPONÍVEL NESTE APARELHO'); const enabled=await RNBluetoothClassic.isBluetoothEnabled(); this.logDiagnostic('BLUETOOTH_ENABLED',enabled); if(!enabled) throw new Error('BLUETOOTH DESLIGADO');
+  async open(): Promise<void> {
+    this.clearDiagnostics();
+    this.logDiagnostic('OPEN_START', { platform: Platform.OS, deviceAddress: this.deviceAddress });
+
+    if (Platform.OS !== 'android') {
+      throw new Error('BLUETOOTH CLASSIC DISPONÍVEL SOMENTE NO ANDROID');
+    }
+
+    const available = await RNBluetoothClassic.isBluetoothAvailable();
+    this.logDiagnostic('BLUETOOTH_AVAILABLE', available);
+    if (!available) throw new Error('BLUETOOTH NÃO DISPONÍVEL NESTE APARELHO');
+
+    const enabled = await RNBluetoothClassic.isBluetoothEnabled();
+    this.logDiagnostic('BLUETOOTH_ENABLED', enabled);
+    if (!enabled) throw new Error('BLUETOOTH DESLIGADO');
 
     this.received = '';
     this.connected = false;
     this.removeSubscriptions();
 
-    // RFCOMM/SPP fica mais confiável quando uma descoberta Bluetooth em
-    // andamento é encerrada antes de abrir o socket. Isso é especialmente
-    // importante em Android quando o usuário ou outro app iniciou uma busca.
     if (RNBluetoothClassic.cancelDiscovery) {
-      try {
-        await RNBluetoothClassic.cancelDiscovery();
-      } catch {
-        // Se não houver descoberta ativa, algumas versões da biblioteca podem
-        // rejeitar a chamada. A conexão direta continua sendo tentada.
-      }
+      try { await RNBluetoothClassic.cancelDiscovery(); }
+      catch { /* sem descoberta ativa */ }
     }
 
     let device: BluetoothDevice | null = null;
     let lastCause: unknown = null;
 
-    // ELM327 clones variam no uso do RFCOMM seguro. Tentamos primeiro o
-    // socket inseguro, padrão comum desses adaptadores, e depois o seguro.
-    // Usamos conexão RAW: não dependemos de delimitador. O ELM327 entrega CR/LF,
-    // bytes fragmentados e o prompt '>'; o buffer local monta a resposta.
-    // Conecta diretamente pelo endereço MAC. A API instalada não expõe
-    // getters para sockets já conectados, portanto o retry é feito no próprio
-    // connectToDevice.
-    for (const secureSocket of [false, true]) { this.logDiagnostic('CONNECT_ATTEMPT',{secureSocket});
+    // IMPORTANTE:
+    // react-native-bluetooth-classic não aceita "raw" como connectionType.
+    // Os tipos suportados incluem "binary" e "delimited". Para ELM327,
+    // "binary" é a opção adequada: preserva o fluxo e deixa o app montar
+    // a resposta até o prompt '>'.
+    //
+    // O erro observado no relatório:
+    //   "Tipo de conexão inválida: rfcomm"
+    // era causado pelo antigo connectionType: 'raw'.
+    for (const secureSocket of [false, true]) {
+      this.logDiagnostic('CONNECT_ATTEMPT', {
+        secureSocket,
+        connectionType: 'binary',
+        delimiter: '\\r\\n',
+      });
+
       try {
         device = await Promise.race([
           RNBluetoothClassic.connectToDevice(this.deviceAddress, {
-            // A versão instalada expõe as opções em camelCase.
-            // O conector padrão da biblioteca é RFCOMM, então não precisamos
-            // informar CONNECTOR_TYPE. Para o ELM327 usamos fluxo sem
-            // delimitador e acumulamos os dados até o prompt ">".
-            connectionType: 'raw',
+            connectionType: 'binary',
+            delimiter: '\\r\\n',
             charset: 'ascii',
             secureSocket,
           }),
@@ -80,26 +101,38 @@ export class BluetoothClassicTransport implements ObdTransport {
             ),
           ),
         ]);
-        this.logDiagnostic('CONNECT_SUCCESS',{secureSocket}); break;
-      } catch (cause) { this.logDiagnostic('CONNECT_FAILURE',{secureSocket,error:cause instanceof Error?cause.message:String(cause)});
+
+        this.logDiagnostic('CONNECT_SUCCESS', {
+          secureSocket,
+          connectionType: 'binary',
+        });
+        break;
+      } catch (cause) {
+        this.logDiagnostic('CONNECT_FAILURE', {
+          secureSocket,
+          connectionType: 'binary',
+          error: cause instanceof Error ? cause.message : String(cause),
+        });
         lastCause = cause;
         if (device) await this.safeDisconnect(device);
         device = null;
       }
     }
+
     if (!device) {
-      const message = lastCause instanceof Error ? lastCause.message : String(lastCause ?? 'ERRO DESCONHECIDO');
+      const message = lastCause instanceof Error
+        ? lastCause.message
+        : String(lastCause ?? 'ERRO DESCONHECIDO');
       throw new Error('FALHA AO CONECTAR AO ELM327: ' + message);
     }
 
     this.device = device;
 
-    // Alguns clones ELM327 precisam de uma pequena janela após o RFCOMM
-    // abrir antes de aceitarem o primeiro comando AT.
     await new Promise((resolve) => setTimeout(resolve, 250));
 
     if (typeof device.isConnected === 'function') {
       const confirmed = await device.isConnected();
+      this.logDiagnostic('DEVICE_CONNECTED_CHECK', confirmed);
       if (!confirmed) {
         await this.safeDisconnect(device);
         this.markDisconnected();
@@ -110,13 +143,18 @@ export class BluetoothClassicTransport implements ObdTransport {
     this.connected = true;
 
     this.dataSubscription = device.onDataReceived((event) => {
-      if(event?.data){const chunk=String(event.data); this.logDiagnostic('RX',{length:chunk.length,data:chunk}); this.received+=chunk;}
+      if (event?.data) {
+        const chunk = String(event.data);
+        this.logDiagnostic('RX', { length: chunk.length, data: chunk });
+        this.received += chunk;
+      }
     });
 
     if (RNBluetoothClassic.onDeviceDisconnected) {
       this.disconnectSubscription = RNBluetoothClassic.onDeviceDisconnected((event) => {
         const eventAddress = event?.address ?? event?.device?.address;
         if (eventAddress && eventAddress !== this.deviceAddress) return;
+        this.logDiagnostic('DEVICE_DISCONNECTED', eventAddress ?? {});
         this.markDisconnected();
       });
     }
@@ -127,9 +165,7 @@ export class BluetoothClassicTransport implements ObdTransport {
     const wasConnected = this.connected;
     this.removeSubscriptions();
 
-    if (device && wasConnected) {
-      await this.safeDisconnect(device);
-    }
+    if (device && wasConnected) await this.safeDisconnect(device);
 
     this.device = null;
     this.connected = false;
@@ -152,7 +188,8 @@ export class BluetoothClassicTransport implements ObdTransport {
       }
     }
 
-    this.logDiagnostic('TX',{data}); await device.write(data,'ascii');
+    this.logDiagnostic('TX', { data });
+    await device.write(data, 'ascii');
   }
 
   async readUntilPrompt(timeoutMs = 6000): Promise<string> {
@@ -182,23 +219,23 @@ export class BluetoothClassicTransport implements ObdTransport {
       if (promptIndex >= 0) {
         const response = this.received.slice(0, promptIndex);
         this.received = this.received.slice(promptIndex + 1);
-        const clean=response.replace(/^\s+|\s+$/g,''); this.logDiagnostic('RESPONSE_COMPLETE',{response:clean}); return clean;
+        const clean = response.replace(/^\\s+|\\s+$/g, '');
+        this.logDiagnostic('RESPONSE_COMPLETE', { response: clean });
+        return clean;
       }
 
       await new Promise((resolve) => setTimeout(resolve, 25));
     }
 
-    const partial = this.received.replace(/^\s+|\s+$/g, '');
+    const partial = this.received.replace(/^\\s+|\\s+$/g, '');
     this.received = '';
-    this.logDiagnostic('READ_TIMEOUT',{partial}); throw new Error(partial?'TIMEOUT: RESPOSTA ELM SEM PROMPT FINAL':'TIMEOUT');
+    this.logDiagnostic('READ_TIMEOUT', { partial });
+    throw new Error(partial ? 'TIMEOUT: RESPOSTA ELM SEM PROMPT FINAL' : 'TIMEOUT');
   }
 
   private async safeDisconnect(device: BluetoothDevice): Promise<void> {
-    try {
-      await device.disconnect();
-    } catch {
-      // já desconectado
-    }
+    try { await device.disconnect(); }
+    catch { /* já desconectado */ }
   }
 
   private markDisconnected(): void {
@@ -217,8 +254,12 @@ export class BluetoothClassicTransport implements ObdTransport {
 }
 
 export async function listBondedBluetoothDevices(): Promise<BluetoothDeviceInfo[]> {
-  if (Platform.OS !== 'android') throw new Error('BLUETOOTH CLASSIC DISPONÍVEL SOMENTE NO ANDROID');
+  if (Platform.OS !== 'android') {
+    throw new Error('BLUETOOTH CLASSIC DISPONÍVEL SOMENTE NO ANDROID');
+  }
+
   const devices = await RNBluetoothClassic.getBondedDevices();
+
   return devices.map((device) => ({
     address: device.address,
     name: device.name || 'DISPOSITIVO SEM NOME',
