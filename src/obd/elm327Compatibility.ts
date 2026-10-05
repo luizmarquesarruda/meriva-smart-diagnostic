@@ -46,7 +46,8 @@ export interface ElmHealthSnapshot {
  * A implementação privilegia tolerância a clones e validação por PID real.
  */
 export const ELM327_MINI_GENERIC_V15_PROFILE = 'ELM327_MINI_GENERIC_V15_KWP';
-\nexport const DEFAULT_ELM327_COMPATIBILITY: Elm327CompatibilityConfig = {
+
+export const DEFAULT_ELM327_COMPATIBILITY: Elm327CompatibilityConfig = {
   ioTimeoutMs: 15_000,
   bluetoothConnectTimeoutMs: 5_000,
   commandDelayMs: 20,
