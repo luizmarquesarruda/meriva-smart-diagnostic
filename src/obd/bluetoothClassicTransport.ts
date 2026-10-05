@@ -124,8 +124,11 @@ export class BluetoothClassicTransport implements ObdTransport {
           throw new Error('BLUETOOTH DESCONECTADO');
         }
       } catch (cause) {
-        const message = cause instanceof Error ? cause.message : '';
-        if (message === 'BLUETOOTH DESCONECTADO') throw cause;
+        if (cause instanceof Error && cause.message === 'BLUETOOTH DESCONECTADO') throw cause;
+        throw new Error(
+          'NÃO FOI POSSÍVEL CONFIRMAR O SOCKET BLUETOOTH: ' +
+          (cause instanceof Error ? cause.message : String(cause)),
+        );
       }
     }
 
@@ -153,8 +156,11 @@ export class BluetoothClassicTransport implements ObdTransport {
             throw new Error('BLUETOOTH DESCONECTADO');
           }
         } catch (cause) {
-          const message = cause instanceof Error ? cause.message : '';
-          if (message === 'BLUETOOTH DESCONECTADO') throw cause;
+          if (cause instanceof Error && cause.message === 'BLUETOOTH DESCONECTADO') throw cause;
+          throw new Error(
+            'NÃO FOI POSSÍVEL CONFIRMAR O SOCKET BLUETOOTH: ' +
+            (cause instanceof Error ? cause.message : String(cause)),
+          );
         }
       }
 
