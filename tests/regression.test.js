@@ -222,7 +222,7 @@ async function testElmAndProtocol() {
   const initialization = await session.initialize();
   assert.deepStrictEqual(
     initialization.map((item) => item.command),
-    ['ATZ', 'ATE0', 'ATL0', 'ATS0', 'ATH1', 'ATSP0', 'ATDP'],
+    ['ATZ', 'ATI', 'ATE0', 'ATL0', 'ATS0', 'ATH1', 'ATSP0', 'ATDP'],
   );
   assert.strictEqual(session.getProtocol(), 'SIMULATED OBD TRANSPORT');
 
@@ -319,7 +319,7 @@ async function testElmInitializationOrder() {
   const session = new Elm327Session(transport);
   const initialization = await session.initialize();
   assert.deepStrictEqual(initialization.map((item) => item.command), ['ATZ', 'ATI', 'ATE0', 'ATL0', 'ATS0', 'ATH1', 'ATSP0', 'ATDP']);
-  assert.deepStrictEqual(commands, ['ATZ\\r', 'ATI\\r', 'ATE0\\r', 'ATL0\\r', 'ATS0\\r', 'ATH1\\r', 'ATSP0\\r', 'ATDP\\r']);
+  assert.deepStrictEqual(commands, ['ATZ', 'ATI', 'ATE0', 'ATL0', 'ATS0', 'ATH1', 'ATSP0', 'ATDP']);
   assert.strictEqual(session.getProtocol(), 'ISO 14230-4 (KWP FAST)');
   await session.close();
 }
