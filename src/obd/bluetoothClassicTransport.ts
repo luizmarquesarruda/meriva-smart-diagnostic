@@ -28,6 +28,18 @@ export class BluetoothClassicTransport implements ObdTransport {
     this.connected = false;
     this.removeSubscriptions();
 
+    // RFCOMM/SPP fica mais confiável quando uma descoberta Bluetooth em
+    // andamento é encerrada antes de abrir o socket. Isso é especialmente
+    // importante em Android quando o usuário ou outro app iniciou uma busca.
+    if (RNBluetoothClassic.cancelDiscovery) {
+      try {
+        await RNBluetoothClassic.cancelDiscovery();
+      } catch {
+        // Se não houver descoberta ativa, algumas versões da biblioteca podem
+        // rejeitar a chamada. A conexão direta continua sendo tentada.
+      }
+    }
+
     let device: BluetoothDevice | null = null;
     let lastCause: unknown = null;
 
