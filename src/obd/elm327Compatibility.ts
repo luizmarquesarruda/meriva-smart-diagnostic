@@ -42,7 +42,7 @@ export interface ElmHealthSnapshot {
 }
 
 export const DEFAULT_ELM327_COMPATIBILITY: Elm327CompatibilityConfig = {
-  ioTimeoutMs: 10_000,
+  ioTimeoutMs: 15_000,
   bluetoothConnectTimeoutMs: 5_000,
   commandDelayMs: 20,
   maxConnectionAttempts: 0,
