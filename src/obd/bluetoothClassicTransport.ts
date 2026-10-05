@@ -1,6 +1,7 @@
 import RNBluetoothClassic, { BluetoothDevice } from 'react-native-bluetooth-classic';
 import { Platform } from 'react-native';
 import { ObdTransport } from './elm327';
+import { DEFAULT_ELM327_COMPATIBILITY, Elm327CompatibilityConfig, mergeCompatibilityConfig } from './elm327Compatibility';
 
 export interface BluetoothDeviceInfo {
   address: string;
@@ -17,7 +18,7 @@ export class BluetoothClassicTransport implements ObdTransport {
   private dataSubscription?: RemovableSubscription;
   private disconnectSubscription?: RemovableSubscription;
 
-  constructor(private readonly deviceAddress: string) {}
+  private readonly config: Elm327CompatibilityConfig;\n\n  constructor(\n    private readonly deviceAddress: string,\n    config?: Partial<Elm327CompatibilityConfig>,\n  ) {\n    this.config = mergeCompatibilityConfig(config ?? DEFAULT_ELM327_COMPATIBILITY);\n  }
 
   async open(): Promise<void> {
     if (Platform.OS !== 'android') throw new Error('BLUETOOTH CLASSIC DISPONÍVEL SOMENTE NO ANDROID');
@@ -48,9 +49,9 @@ export class BluetoothClassicTransport implements ObdTransport {
     // Conecta diretamente pelo endereço MAC. A API instalada não expõe
     // getters para sockets já conectados, portanto o retry é feito no próprio
     // connectToDevice.
-    for (const secureSocket of [true, false]) {
+    for (const secureSocket of [false, true]) {
       try {
-        device = await RNBluetoothClassic.connectToDevice(this.deviceAddress, {
+        device = await Promise.race([\n          RNBluetoothClassic.connectToDevice(this.deviceAddress, {
           connectionType: 'delimited',
           delimiter: '>',
           charset: 'ascii',
