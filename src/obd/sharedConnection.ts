@@ -1,6 +1,6 @@
 import type { Elm327Session } from './elm327';
 import type { BluetoothDeviceInfo } from './bluetoothClassicTransport';
-import { createRealElmSession, discoverPairedDevices } from './bluetoothManager';
+import { createRealElmSession, discoverPairedDevices, ensureBluetoothReady } from './bluetoothManager';
 
 export interface SharedObdConnection {
   session: Elm327Session;
@@ -46,64 +46,74 @@ export function subscribeSharedObd(listener: (connection: SharedObdConnection | 
   return () => listeners.delete(listener);
 }
 
+async function connectCandidate(device: BluetoothDeviceInfo): Promise<SharedObdConnection> {
+  const connection = await createRealElmSession(device);
+  active = {
+    session: connection.session,
+    device,
+    protocol: connection.protocol,
+    supportedPids: connection.supportedPids,
+  };
+  lastConnectionError = null;
+  emit();
+  return active;
+}
+
 async function connectPreferredElmOnce(preferredAddress: string | null): Promise<SharedObdConnection> {
-  const devices = await discoverPairedDevices();
+  // IMPORTANTE: o MAC configurado é tentado diretamente primeiro.
+  // Não bloqueamos a conexão porque getBondedDevices() falhou, demorou
+  // ou não devolveu o ELM corretamente no Android.
+  await ensureBluetoothReady();
 
-  // O endereço configurado é uma âncora conhecida e deve ser testado
-  // mesmo quando o Android devolve outros dispositivos pareados.
-  const preferredDevice: BluetoothDeviceInfo | undefined = preferredAddress
-    ? devices.find((device) => sameAddress(device.address, preferredAddress))
-    : undefined;
-
-  const namedCandidates = devices.filter(looksLikeElm327);
-  const candidates: BluetoothDeviceInfo[] = [];
-
-  if (preferredDevice) candidates.push(preferredDevice);
-
-  // Se o endereço conhecido não apareceu na lista do Android, ainda assim
-  // tentamos a conexão direta. Isso evita depender do nome retornado pelo SO.
-  if (preferredAddress && !preferredDevice) {
-    candidates.push({
+  if (preferredAddress) {
+    const directDevice: BluetoothDeviceInfo = {
       address: preferredAddress.toUpperCase(),
       name: 'ELM327 (ENDEREÇO CONFIGURADO)',
       bonded: true,
-    });
+    };
+
+    try {
+      return await connectCandidate(directDevice);
+    } catch (cause) {
+      setConnectionError(cause);
+    }
   }
 
-  for (const device of namedCandidates) {
+  let devices: BluetoothDeviceInfo[] = [];
+  try {
+    devices = await discoverPairedDevices();
+  } catch (cause) {
+    setConnectionError(cause);
+  }
+
+  const candidates: BluetoothDeviceInfo[] = [];
+  const preferredDevice = preferredAddress
+    ? devices.find((device) => sameAddress(device.address, preferredAddress))
+    : undefined;
+
+  if (preferredDevice && !candidates.some((item) => sameAddress(item.address, preferredDevice.address))) {
+    candidates.push(preferredDevice);
+  }
+
+  for (const device of devices.filter(looksLikeElm327)) {
     if (!candidates.some((candidate) => sameAddress(candidate.address, device.address))) {
       candidates.push(device);
     }
   }
 
-  if (!candidates.length) {
-    throw new Error('NENHUM DISPOSITIVO ELM327 DISPONÍVEL. PAREIE O ADAPTADOR NO ANDROID.');
-  }
-
-  let lastError: unknown = null;
+  let lastError: unknown = lastConnectionError;
 
   for (const device of candidates) {
     try {
-      const connection = await createRealElmSession(device);
-      active = {
-        session: connection.session,
-        device,
-        protocol: connection.protocol,
-        supportedPids: connection.supportedPids,
-      };
-      lastConnectionError = null;
-      emit();
-      return active;
+      return await connectCandidate(device);
     } catch (cause) {
       lastError = cause;
       setConnectionError(cause);
     }
   }
 
-  const detail = lastError instanceof Error ? lastError.message : String(lastError ?? 'ERRO DESCONHECIDO');
-  throw new Error(
-    'ELM327 NÃO CONECTOU. ÚLTIMO ERRO: ' + detail,
-  );
+  const detail = lastError instanceof Error ? lastError.message : String(lastError ?? 'NENHUM DISPOSITIVO RESPONDEU');
+  throw new Error('ELM327 NÃO CONECTOU. ÚLTIMO ERRO: ' + detail);
 }
 
 export async function connectPreferredElm(
@@ -115,13 +125,15 @@ export async function connectPreferredElm(
   connecting = (async () => {
     let lastError: unknown = null;
 
+    // Continua tentando enquanto o aplicativo estiver aberto e não houver
+    // conexão válida. Isso cobre ligar o ELM depois de abrir o app.
     while (!active) {
       try {
         return await connectPreferredElmOnce(preferredAddress);
       } catch (cause) {
         lastError = cause;
         setConnectionError(cause);
-        await new Promise((resolve) => setTimeout(resolve, 3000));
+        await new Promise((resolve) => setTimeout(resolve, 2500));
       }
     }
 
