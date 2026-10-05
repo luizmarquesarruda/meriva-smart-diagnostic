@@ -24,6 +24,10 @@ export interface BluetoothConnectionState {
   error?: string;
 }
 
+let lastBluetoothDiagnosticText = '';
+
+export function getLastBluetoothDiagnosticText(): string { return lastBluetoothDiagnosticText; }
+
 export interface RealElmConnection {
   session: Elm327Session;
   initialization: ElmCommandResult[];
@@ -191,6 +195,7 @@ export async function createRealElmSession(
       supportedPids: [],
     };
   } catch (cause) {
+    lastBluetoothDiagnosticText = session.getTransportDiagnosticsText();
     try {
       await session.close();
     } catch {
