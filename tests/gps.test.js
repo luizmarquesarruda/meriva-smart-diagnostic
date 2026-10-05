@@ -113,6 +113,18 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
   assert.strictEqual(tracker.getState().currentSpeedKmh, 0);
   assert.strictEqual(tracker.getState().distanceKm, distanceBeforeStop);
 
+  // Velocidade positiva stale do Android não pode indicar movimento com jitter pequeno.
+  watcher({
+    coords: {
+      latitude: 0,
+      longitude: 0.00021,
+      speed: 10,
+      accuracy: 5,
+    },
+    timestamp: 4000,
+  });
+  assert.strictEqual(tracker.getState().currentSpeedKmh, 0);
+
   watcher({
     coords: {
       latitude: 0,
