@@ -254,7 +254,7 @@ class AutoTripService {
               fuelUsedL,
               consumptionKml: Number((fuelUsedL > 0 ? distanceKm / fuelUsedL : 0).toFixed(3)),
               estimatedRangeKm: Number(estimatedRangeKm.toFixed(1)),
-              source: 'REAL_OBD',
+              source: 'REAL_OBD' as const,
             },
           ].slice(-200),
         };
