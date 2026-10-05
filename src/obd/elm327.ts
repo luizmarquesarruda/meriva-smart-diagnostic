@@ -102,10 +102,13 @@ export class Elm327Session {
 
     try {
       const results: ElmCommandResult[] = [];
-      const mandatory = this.config.forceInitialization ? ['ATZ', 'ATI'] : ['ATI'];
-      const optional = this.config.forceInitialization
-        ? ['ATE0', 'ATL0', 'ATS0', 'ATH1', 'ATSP0']
-        : ['ATL0', 'ATS0', 'ATH1', 'ATSP0'];
+      const mandatory = ['ATZ', 'ATI'];
+      const forced = this.config.forceInitialization
+        ? this.config.forceInitCommands.filter((item) => /^AT[A-Z0-9]+$/.test(item.toUpperCase()))
+        : [];
+      const optional = Array.from(new Set([...forced, 'ATE0', 'ATL0', 'ATS0', 'ATH1', 'ATSP0']))
+        .map((item) => item.toUpperCase())
+        .filter((item) => !mandatory.includes(item));
 
       for (const command of [...mandatory, ...optional]) {
         if (this.disabledOptionalCommands.has(command)) continue;
@@ -114,7 +117,7 @@ export class Elm327Session {
 
         // ATI/ATZ prove that the adapter is alive. Other AT commands are
         // best-effort because real-world ELM327 clones expose different subsets.
-        if (mandatory.includes(command) && !['OK', 'UNSUPPORTED'].includes(result.status)) {
+        if (mandatory.includes(command) && result.status !== 'OK') {
           throw new Error(`ELM NÃO RESPONDEU CORRETAMENTE A ${command}: ${result.status}`);
         }
       }
@@ -288,7 +291,7 @@ export class Elm327Session {
     } catch (cause) {
       this.commands += 1;
       this.timeouts += 1;
-      this.lastErrorType = 'TIMEOUT';
+      this.lastErrorType = classifyElmError('', cause instanceof Error ? cause.message : '');
       if (this.config.adaptiveTiming) {
         this.adaptiveTimeoutMs = Math.min(this.config.adaptiveTimeoutMaxMs, this.adaptiveTimeoutMs + this.config.adaptiveTimeoutStepMs);
       }
