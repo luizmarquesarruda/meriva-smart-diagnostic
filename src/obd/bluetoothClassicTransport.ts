@@ -48,16 +48,22 @@ export class BluetoothClassicTransport implements ObdTransport {
     // Conecta diretamente pelo endereço MAC. A API instalada não expõe
     // getters para sockets já conectados, portanto o retry é feito no próprio
     // connectToDevice.
-    for (const secureSocket of [false, true]) {
+    for (const secureSocket of [true, false]) {
       try {
         device = await RNBluetoothClassic.connectToDevice(this.deviceAddress, {
-          connectionType: 'raw',
+          connectionType: 'delimited',
+          delimiter: '>',
           charset: 'ascii',
           secureSocket,
+          ...(secureSocket ? {} : { secure_socket: false }),
         });
         break;
       } catch (cause) {
         lastCause = cause;
+        // Alguns clones mantêm o socket anterior parcialmente aberto após uma
+        // tentativa que falhou. Limpa antes de trocar secure/insecure.
+        if (device) await this.safeDisconnect(device);
+        device = null;
       }
     }
 
