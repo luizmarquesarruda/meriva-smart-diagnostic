@@ -291,11 +291,11 @@ async function testBluetoothEventTransport() {
   const transport = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF');
   await transport.open();
   assert.strictEqual(lastBluetoothDiscoveryCancelled, true);
-  assert.strictEqual(lastBluetoothConnectionOptions?.connectionType, 'binary');
+  assert.strictEqual(lastBluetoothConnectionOptions?.connectionType, 'delimited');
   assert.strictEqual(lastBluetoothConnectionOptions?.delimiter, '\\r\\n');
   assert.strictEqual(lastBluetoothConnectionOptions?.charset, 'ascii');
   assert.strictEqual(lastBluetoothConnectionOptions?.secureSocket, false);
-  await transport.write('010C\\r');
+  await transport.write('010C\r');
   const response = await transport.readUntilPrompt(500);
   assert.strictEqual(response, '41 0C 0C 18');
   await transport.close();
