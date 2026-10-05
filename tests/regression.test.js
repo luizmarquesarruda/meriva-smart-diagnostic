@@ -292,6 +292,35 @@ async function testPidScanner() {
   assert.deepStrictEqual(discovered.map((item) => item.pid), ['0100', '0120', '0140', '0160']);
 }
 
+
+async function testIntelligentPidDiscovery() {
+  const ai = loadTs(path.join(ROOT, 'src/obd/intelligentPidDiscovery.ts'));
+  const fakeSession = {
+    async executeCommand(pid) {
+      const responses = {
+        '0100': { response: '41 00 BE 3E B8 13', status: 'OK', elapsedMs: 8 },
+        '0120': { response: '41 20 00 02 00 00', status: 'OK', elapsedMs: 8 },
+        '0140': { response: '41 40 00 00 00 02', status: 'OK', elapsedMs: 8 },
+        '0160': { response: '41 60 00 00 00 80', status: 'OK', elapsedMs: 8 },
+        '010C': { response: '41 0C 1A F8', status: 'OK', elapsedMs: 10 },
+        '0105': { response: '41 05 69', status: 'OK', elapsedMs: 10 },
+        '010F': { response: '41 0F 80', status: 'OK', elapsedMs: 10 },
+        '012F': { response: '41 2F 80', status: 'OK', elapsedMs: 10 },
+      };
+      return responses[pid] || { response: 'NO DATA', status: 'ERROR', elapsedMs: 10 };
+    },
+  };
+  const result = await ai.discoverIntelligentPids(fakeSession, {
+    knownPids: ['010C', '012F'],
+  });
+  assert.ok(result.supportedPids.includes('010C'));
+  assert.ok(result.supportedPids.includes('012F'));
+  assert.strictEqual(result.confidence['010C'], 1);
+  assert.strictEqual(result.observations.find((item) => item.pid === '010C').status, 'CONFIRMADO');
+  assert.strictEqual(result.observations.find((item) => item.pid === '012F').response, '41 2F 80');
+  assert.strictEqual(result.observations.find((item) => item.pid === '010C').value, 1726);
+}
+
 async function testBluetoothEventTransport() {
   bluetoothListener = null;
   bluetoothDisconnectListener = null;
@@ -549,6 +578,7 @@ async function main() {
     ['elm/protocolo/serialização', testElmAndProtocol],
     ['gate de validação ECU/010C', testEcuValidationGate],
     ['descoberta de PIDs', testPidScanner],
+    ['IA burrinha de PIDs', testIntelligentPidDiscovery],
     ['Bluetooth por eventos', testBluetoothEventTransport],
     ['quota configurável', testQuota],
     ['logger TX/RX', testRawLogger],
