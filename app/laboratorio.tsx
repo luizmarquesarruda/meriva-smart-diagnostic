@@ -74,7 +74,7 @@ export default function LaboratorioScreen() {
     const unsubscribe = subscribeSharedObd((connection) => {
       if (!connection) return;
       sessionRef.current = connection.session;
-      setProtocol(connected.protocol ?? 'N/D');
+      setProtocol(connection.protocol ?? 'N/D');
       setStatus('ELM RESPONDENDO / CONEXÃO AUTOMÁTICA');
     });
     const existing = getSharedObdConnection();
