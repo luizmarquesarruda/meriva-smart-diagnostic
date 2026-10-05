@@ -67,6 +67,7 @@ export class BluetoothClassicTransport implements ObdTransport {
             // As versões Android da biblioteca ignoram as variantes camelCase.
             // Para ELM327, não dependemos de delimitador: o prompt ">" pode
             // chegar separado dos dados. O buffer completo é tratado em JS.
+            CONNECTOR_TYPE: 'rfcomm',
             CONNECTION_TYPE: 'delimited',
             DELIMITER: '',
             DEVICE_CHARSET: 'ascii',
