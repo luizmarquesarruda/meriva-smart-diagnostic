@@ -30,7 +30,6 @@ jobs:
           java-version: '17'
           java-package: 'jdk'
           architecture: 'x64'
-          cache: 'gradle'
       - name: Verify Java toolchain
         run: |
           java -version
