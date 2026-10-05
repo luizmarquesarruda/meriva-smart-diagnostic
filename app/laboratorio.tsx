@@ -19,6 +19,7 @@ import {
   startObdSessionCheckpoint,
   stopObdSessionCheckpoint,
   updateAutoSaveState,
+  getAutoSaveState,
 } from '../src/meriva/autosaveManager';
 import { forceSaveOnObdEvent, registerObdQuery } from '../src/meriva/autosaveIntegration';
 
@@ -167,7 +168,7 @@ export default function LaboratorioScreen() {
       for (const candidate of candidates) {
         try {
           setStatus(`TESTANDO ELM327: ${candidate.name || candidate.address}`);
-          const candidateConnection = await createRealElmSession(candidate);
+          const candidateConnection = await createRealElmSession(candidate, undefined, getAutoSaveState().pidDiscovery);
           selectedDevice = candidate;
           connection = candidateConnection;
           break;
@@ -197,6 +198,18 @@ export default function LaboratorioScreen() {
           protocol: connection.protocol ?? undefined,
           lastConnectedAt: new Date().toISOString(),
         };
+
+        if (
+          connection.pidDiscoverySource === 'ECU' &&
+          connection.protocol &&
+          connection.supportedPids.length > 0
+        ) {
+          state.pidDiscovery = {
+            supportedPids: connection.supportedPids,
+            protocol: connection.protocol,
+            discoveredAt: new Date().toISOString(),
+          };
+        }
       });
 
       const settings = await readAppSettings(getBasePath());
@@ -205,7 +218,11 @@ export default function LaboratorioScreen() {
         selectedAdapterAddress: device.address,
       });
 
-      setStatus('ELM RESPONDENDO / PIDs DESCOBERTOS');
+      setStatus(
+        connection.pidDiscoverySource === 'CACHE'
+          ? 'ELM RESPONDENDO / PIDs CARREGADOS DO JSON'
+          : 'ELM RESPONDENDO / PIDs DESCOBERTOS E SALVOS',
+      );
       // A conexão já fez a descoberta. Não repita a varredura imediatamente.
       const discovered = connection.supportedPids;
       setSupportedPids(discovered);
@@ -300,6 +317,19 @@ export default function LaboratorioScreen() {
       const items = await discoverSupportedPids(activeSession);
       const discovered = Array.from(new Set(items.flatMap((item) => item.supportedPids))).sort();
       setSupportedPids(discovered);
+      if (mode === 'REAL') {
+        const activeProtocol = activeSession.getProtocol();
+        updateAutoSaveState((state) => {
+          if (activeProtocol && discovered.length > 0) {
+            state.pidDiscovery = {
+              supportedPids: discovered,
+              protocol: activeProtocol,
+              discoveredAt: new Date().toISOString(),
+            };
+          }
+        });
+        await forceSaveOnObdEvent();
+      }
       setStatus(`DESCOBERTA CONCLUÍDA: ${discovered.length} PIDs`);
     } catch (cause) {
       setStatus('FALHA NA DESCOBERTA');
