@@ -101,9 +101,13 @@ export async function discoverPairedDevices(): Promise<BluetoothDeviceInfo[]> {
   return listBondedBluetoothDevices();
 }
 
-export async function createRealElmSession(\n  device: BluetoothDeviceInfo,\n  compatibility?: Partial<Elm327CompatibilityConfig>,\n): Promise<RealElmConnection> {
+export async function createRealElmSession(
+  device: BluetoothDeviceInfo,
+  compatibility?: Partial<Elm327CompatibilityConfig>,
+): Promise<RealElmConnection> {
   await ensureBluetoothReady();
-  const config = mergeCompatibilityConfig(compatibility ?? DEFAULT_ELM327_COMPATIBILITY);\n  const session = new Elm327Session(new BluetoothClassicTransport(device.address, config), config);
+  const config = mergeCompatibilityConfig(compatibility ?? DEFAULT_ELM327_COMPATIBILITY);
+  const session = new Elm327Session(new BluetoothClassicTransport(device.address, config), config);
 
   try {
     const initialization = await session.initialize();
