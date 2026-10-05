@@ -29,6 +29,12 @@ let lastBluetoothDiagnosticText = '';
 
 export function getLastBluetoothDiagnosticText(): string { return lastBluetoothDiagnosticText; }
 
+export interface PidDiscoveryCache {
+  supportedPids: string[];
+  protocol: string;
+  discoveredAt: string;
+}
+
 export interface RealElmConnection {
   session: Elm327Session;
   initialization: ElmCommandResult[];
@@ -36,6 +42,7 @@ export interface RealElmConnection {
   ecuProbe: ElmCommandResult;
   supportedPids: string[];
   ecuValidated: boolean;
+  pidDiscoverySource: 'CACHE' | 'ECU';
 }
 
 /** A conexão só é considerada OBD real quando existe um payload 41 0C válido. */
@@ -129,6 +136,7 @@ export async function discoverPairedDevices(): Promise<BluetoothDeviceInfo[]> {
 export async function createRealElmSession(
   device: BluetoothDeviceInfo,
   compatibility?: Partial<Elm327CompatibilityConfig>,
+  pidDiscoveryCache?: PidDiscoveryCache | null,
 ): Promise<RealElmConnection> {
   await ensureBluetoothReady();
   const config = mergeCompatibilityConfig(compatibility ?? DEFAULT_ELM327_COMPATIBILITY);
@@ -178,27 +186,41 @@ export async function createRealElmSession(
         ecuProbe,
         supportedPids: [],
         ecuValidated: false,
+        pidDiscoverySource: 'ECU',
       };
     }
 
-    // A ECU já foi validada. Agora faça a descoberta padrão J1979 por blocos,
-    // mas sem transformar uma falha de descoberta em falha de Bluetooth.
-    // O resultado real da ECU fica disponível para a tela e para o autosave.
+    // A ECU já foi validada. Se já temos uma descoberta persistida para o
+    // mesmo protocolo, reutilize-a. Não interrogue novamente os blocos 0100,
+    // 0120, 0140 e 0160.
+    const activeProtocol = session.getProtocol() ?? '';
+    const cacheMatchesProtocol =
+      Boolean(pidDiscoveryCache) &&
+      pidDiscoveryCache?.protocol === activeProtocol;
+
     let supportedPids: string[] = [];
-    try {
-      const discovery = await discoverSupportedPids(session);
-      supportedPids = Array.from(new Set(discovery.flatMap((item) => item.supportedPids))).sort();
-    } catch {
-      supportedPids = [];
+    let pidDiscoverySource: RealElmConnection['pidDiscoverySource'] = 'CACHE';
+
+    if (cacheMatchesProtocol && pidDiscoveryCache) {
+      supportedPids = Array.from(new Set(pidDiscoveryCache.supportedPids)).sort();
+    } else {
+      pidDiscoverySource = 'ECU';
+      try {
+        const discovery = await discoverSupportedPids(session);
+        supportedPids = Array.from(new Set(discovery.flatMap((item) => item.supportedPids))).sort();
+      } catch {
+        supportedPids = [];
+      }
     }
 
     return {
       session,
       initialization,
-      protocol: session.getProtocol(),
+      protocol: activeProtocol || null,
       ecuProbe,
       supportedPids,
       ecuValidated: true,
+      pidDiscoverySource,
     };
   } catch (cause) {
     lastBluetoothDiagnosticText = session.getTransportDiagnosticsText();
