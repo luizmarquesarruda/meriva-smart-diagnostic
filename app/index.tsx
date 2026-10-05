@@ -84,7 +84,7 @@ export default function IndexScreen() {
   // O endereço conhecido é tentado primeiro e a sessão só é aceita após
   // ATZ/ATSP0 + PID 010C responderem corretamente.
   useEffect(() => {
-    if (!isHydrated) return;
+    if (!isHydrated || !settings) return;
 
     let cancelled = false;
     const unsubscribe = subscribeSharedObd((connection) => {
@@ -139,7 +139,7 @@ export default function IndexScreen() {
       cancelled = true;
       unsubscribe();
     };
-  }, [isHydrated]);
+  }, [isHydrated, settings]);
 
   useFocusEffect(
     useCallback(() => {
