@@ -138,6 +138,15 @@ export async function createLearningProfile(
   return profile;
 }
 
+export async function ensureLearningProfile(
+  basePath: string,
+  seedImportDate = '',
+): Promise<MerivaLearningProfile> {
+  const existing = await readLearningProfile(basePath);
+  if (existing) return existing;
+  return createLearningProfile(basePath, seedImportDate);
+}
+
 export async function saveLearningProfile(
   basePath: string,
   profile: MerivaLearningProfile,
