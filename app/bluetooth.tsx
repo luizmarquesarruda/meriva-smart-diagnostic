@@ -3,8 +3,8 @@ import { ActivityIndicator, Alert, SafeAreaView, ScrollView, StyleSheet, Text, T
 import * as FileSystem from 'expo-file-system';
 import { Link } from 'expo-router';
 import { BluetoothDeviceInfo } from '../src/obd/bluetoothClassicTransport';
-import { discoverPairedDevices, ensureBluetoothReady, createRealElmSession } from '../src/obd/bluetoothManager';
-import { getSharedObdConnection, subscribeSharedObd, disconnectSharedObd } from '../src/obd/sharedConnection';
+import { discoverPairedDevices, ensureBluetoothReady } from '../src/obd/bluetoothManager';
+import { connectPreferredElm, getSharedObdConnection, subscribeSharedObd, disconnectSharedObd } from '../src/obd/sharedConnection';
 import { readAppSettings, writeAppSettings } from '../src/database/appSettings';
 
 export default function BluetoothScreen() {
@@ -56,7 +56,7 @@ export default function BluetoothScreen() {
     setError('');
     setStatus('ABRINDO BLUETOOTH CLASSIC...');
     try {
-      const connection = await createRealElmSession(device);
+      const connection = await connectPreferredElm(device.address);
       const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
       const settings = await readAppSettings(basePath);
       await writeAppSettings(basePath, { ...settings, selectedAdapterAddress: device.address });
