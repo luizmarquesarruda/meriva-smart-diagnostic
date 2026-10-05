@@ -181,7 +181,13 @@ export default function IndexScreen() {
                 <Text style={styles.eyebrow}>STATUS DO VEÍCULO</Text>
                 <Text style={styles.connectionTitle}>{connectionTitle}</Text>
               </View>
-              <View style={[styles.statePill, styles[`statePill${connectionTone[0].toUpperCase() + connectionTone.slice(1)}`]]}>
+              <View style={[
+                styles.statePill,
+                connectionTone === 'success' && styles.statePillSuccess,
+                connectionTone === 'danger' && styles.statePillDanger,
+                connectionTone === 'info' && styles.statePillInfo,
+                connectionTone === 'neutral' && styles.statePillNeutral,
+              ]}>
                 <Text style={styles.statePillText}>{obd.connected ? 'CONECTADO' : bluetoothSearching ? 'BUSCANDO' : 'OFFLINE'}</Text>
               </View>
             </View>
