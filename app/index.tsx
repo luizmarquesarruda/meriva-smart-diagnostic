@@ -10,6 +10,7 @@ import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
 import type { ObdConnectionState } from '../src/meriva/autosaveState';
 import { gpsTracker, type GpsTripState } from '../src/gps';
 import { ensureMerivaVehicleProfile } from '../src/database/vehicleConfig';
+import { ensureLearningProfile } from '../src/database/learningProfile';
 import { readAppSettings, type AppSettings } from '../src/database/appSettings';
 import { connectPreferredElm, getSharedObdLastError, subscribeSharedObd } from '../src/obd/sharedConnection';
 
@@ -54,15 +55,18 @@ export default function IndexScreen() {
       const nextSettings = await readAppSettings(basePath);
       const restored = await initAutoSave(basePath);
       await initializeDriveCycles(basePath);
-      await ensureMerivaVehicleProfile(basePath);
+      const vehicle = await ensureMerivaVehicleProfile(basePath);
+      const learning = await ensureLearningProfile(basePath);
       const storedCycles = await readDriveCycles(basePath);
       const loaded = restored.driveCycles.length ? restored.driveCycles : storedCycles;
 
-      if (!restored.driveCycles.length && loaded.length) {
-        updateAutoSaveState((state) => {
+      updateAutoSaveState((state) => {
+        state.vehicle = vehicle;
+        state.learning = learning;
+        if (!state.driveCycles.length && loaded.length) {
           state.driveCycles = loaded;
-        });
-      }
+        }
+      });
 
       setSettings(nextSettings);
       setCycles(loaded);
