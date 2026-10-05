@@ -8,6 +8,7 @@ export interface SharedObdConnection {
   device: BluetoothDeviceInfo;
   protocol: string | null;
   supportedPids: string[];
+  ecuValidated: boolean;
   getDiagnosticsText: () => string;
 }
 
@@ -49,11 +50,16 @@ export function subscribeSharedObd(listener: (connection: SharedObdConnection | 
 
 async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm327CompatibilityConfig): Promise<SharedObdConnection> {
   const connection = await createRealElmSession(device, compatibility);
+  if (!connection.ecuValidated) {
+    try { await connection.session.close(); } catch { /* preserva o estado inválido */ }
+    throw new Error('ECU NÃO VALIDADA. OBLIGATÓRIO RECEBER 41 0C PARA MARCAR OBD COMO CONECTADO.');
+  }
   active = {
     session: connection.session,
     device,
     protocol: connection.protocol,
     supportedPids: connection.supportedPids,
+    ecuValidated: connection.ecuValidated,
     getDiagnosticsText: () => connection.session.getTransportDiagnosticsText(),
   };
   lastConnectionError = null;
