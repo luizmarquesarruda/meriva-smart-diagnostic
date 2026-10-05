@@ -51,7 +51,6 @@ export default function LaboratorioScreen() {
   const [tripConsumptionKml, setTripConsumptionKml] = useState<number | null>(null);
   const [tripActive, setTripActive] = useState(false);
   const [tripFuelSupported, setTripFuelSupported] = useState<boolean | null>(null);
-  const [fuelLevelPercent, setFuelLevelPercent] = useState<number | null>(null);
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const sessionRef = useRef<Elm327Session | null>(null);
   const autoSaveReadyRef = useRef(false);
@@ -69,7 +68,6 @@ export default function LaboratorioScreen() {
       setTripFuelUsedL(trip.fuelUsedL);
       setFuelUsedL(trip.fuelUsedL);
       setTripConsumptionKml(trip.consumptionKml);
-      setFuelLevelPercent(trip.fuelLevelPercent);
       if (trip.error) setError(trip.error);
     });
 
@@ -194,13 +192,12 @@ export default function LaboratorioScreen() {
       const discovered = connection.supportedPids;
       setSupportedPids(discovered);
       const fuelSupported = discovered.includes('015E');
-      const fuelLevelSupported = discovered.includes('012F');
       setTripFuelSupported(fuelSupported);
       setTripActive(true);
       setStatus(
         fuelSupported
-          ? connection.protocol ? 'VIAGEM AUTOMÁTICA / GPS + PID 015E + NÍVEL 012F' : 'VIAGEM AUTOMÁTICA / PROTOCOLO N/D'
-          : fuelLevelSupported ? 'VIAGEM AUTOMÁTICA / GPS + NÍVEL 012F, SEM PID 015E' : 'VIAGEM AUTOMÁTICA / GPS, SEM PID 015E E 012F',
+          ? connection.protocol ? 'VIAGEM AUTOMÁTICA / GPS + PID 015E' : 'VIAGEM AUTOMÁTICA / PROTOCOLO N/D'
+          : 'VIAGEM AUTOMÁTICA / GPS, SEM PID 015E',
       );
     } catch (cause) {
       const failedSession = sessionRef.current;
