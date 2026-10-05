@@ -30,7 +30,6 @@ export default function IndexScreen() {
   const [isHydrated, setIsHydrated] = useState(false);
   const [gpsState, setGpsState] = useState<GpsTripState>(gpsTracker.getState());
   const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [fuelLevelPercent, setFuelLevelPercent] = useState<number | null>(null);
   const [dtcCount, setDtcCount] = useState(0);
   const windowSize = useWindowDimensions();
   const layout = getMidLayout(windowSize);
@@ -39,8 +38,6 @@ export default function IndexScreen() {
 
   const syncLiveState = useCallback(() => {
     const state = getAutoSaveState();
-    const reading = state.obd.connected ? state.lastReadings.find((item) => item.pid === '012F') : undefined;
-    setFuelLevelPercent(reading?.value != null && reading.value >= 0 && reading.value <= 100 ? reading.value : null);
     setDtcCount(state.dtcs.length);
     setObd(state.obd);
     setSaveStatus(getAutoSaveStatus());
@@ -73,8 +70,6 @@ export default function IndexScreen() {
       setObd(restored.obd);
       setSaveStatus(getAutoSaveStatus());
       setDtcCount(restored.dtcs.length);
-      const reading = restored.obd.connected ? restored.lastReadings.find((item) => item.pid === '012F') : undefined;
-      setFuelLevelPercent(reading?.value != null && reading.value >= 0 && reading.value <= 100 ? reading.value : null);
       setIsHydrated(true);
     } catch {
       setSaveStatus(getAutoSaveStatus());
@@ -155,10 +150,7 @@ export default function IndexScreen() {
 
   const summary = useMemo(() => getDriveCycleSummary(cycles), [cycles]);
   const realConsumptionKml = summary.avgConsumptionKml > 0 ? summary.avgConsumptionKml : null;
-  const fuelLiters = fuelLevelPercent == null ? null : (MERIVA_MANUAL.capacities.fuelTankL * fuelLevelPercent) / 100;
-  const autonomyKm = obd.connected && fuelLiters != null && realConsumptionKml != null ? fuelLiters * realConsumptionKml : null;
   const distanceUnit = settings?.distanceUnit ?? 'KM';
-  const autonomyDisplay = autonomyKm == null ? null : distanceUnit === 'MI' ? autonomyKm * 0.621371 : autonomyKm;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -173,12 +165,10 @@ export default function IndexScreen() {
           </View>
 
           <View style={styles.heroCard}>
-            <Text style={styles.heroLabel}>AUTONOMIA ESTIMADA</Text>
-            <Text style={styles.heroValue}>{autonomyDisplay == null ? 'N/D' : Math.round(autonomyDisplay)}</Text>
-            <Text style={styles.heroUnit}>{distanceUnit === 'MI' ? 'mi restantes' : 'km restantes'}</Text>
-            <Text style={styles.heroHelp}>
-              {fuelLevelPercent == null ? 'Aguardando nível real da ECU (PID 012F).' : `${fuelLevelPercent.toFixed(1)}% informado pela ECU • tanque de ${MERIVA_MANUAL.capacities.fuelTankL} L.`}
-            </Text>
+            <Text style={styles.heroLabel}>CENTRAL DE CONTROLE</Text>
+            <Text style={styles.heroValue}>{obd.connected ? 'ONLINE' : bluetoothSearching ? 'BUSCANDO' : 'PRONTO'}</Text>
+            <Text style={styles.heroUnit}>{obd.connected ? (obd.protocol ?? 'ELM327 VALIDADO') : 'Bluetooth Classic + ELM327'}</Text>
+            <Text style={styles.heroHelp}>Diagnóstico real. Sem dados inventados. Respostas brutas preservadas.</Text>
           </View>
 
           <View style={[styles.statusGrid, layout.landscape && styles.statusGridLandscape]}>
@@ -248,30 +238,30 @@ function Metric({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#eef3fb' },
-  content: { flexGrow: 1, paddingVertical: 12, paddingBottom: 24 },
+  container: { flex: 1, backgroundColor: '#0b1220' },
+  content: { flexGrow: 1, paddingVertical: 14, paddingBottom: 30 },
   screenFrame: { width: '100%' },
-  midHeader: { backgroundColor: '#d9d9d9', borderRadius: 5, borderWidth: 1, borderColor: '#9fa6ad', paddingVertical: 10, marginBottom: 8 },
-  midBrand: { color: '#1557a6', fontSize: 10, fontWeight: '900', letterSpacing: 2, textAlign: 'center' },
-  midModel: { color: '#1557a6', fontSize: 20, fontWeight: '900', letterSpacing: 1, textAlign: 'center', marginTop: 1 },
-  midStatus: { color: '#1557a6', fontSize: 10, fontWeight: '900', letterSpacing: 1, textAlign: 'center', marginTop: 3 },
-  heroCard: { backgroundColor: '#e6edf5', borderRadius: 6, borderWidth: 1, borderColor: '#9aa9b8', paddingVertical: 14, paddingHorizontal: 12, alignItems: 'center', marginBottom: 8 },
-  heroLabel: { color: '#1557a6', fontSize: 11, fontWeight: '900', letterSpacing: 1.2 },
-  heroValue: { color: '#0b4a91', fontSize: 46, lineHeight: 52, fontWeight: '900', fontVariant: ['tabular-nums'], marginTop: 1 },
-  heroUnit: { color: '#334155', fontSize: 12, fontWeight: '800' },
-  heroHelp: { color: '#64748b', fontSize: 10, textAlign: 'center', marginTop: 6 },
+  midHeader: { backgroundColor: '#111c2e', borderRadius: 14, borderWidth: 1, borderColor: '#29415f', paddingVertical: 14, marginBottom: 10 },
+  midBrand: { color: '#7db3ff', fontSize: 10, fontWeight: '900', letterSpacing: 2, textAlign: 'center' },
+  midModel: { color: '#f8fafc', fontSize: 22, fontWeight: '900', letterSpacing: 1, textAlign: 'center', marginTop: 1 },
+  midStatus: { color: '#9fb4cf', fontSize: 10, fontWeight: '900', letterSpacing: 1, textAlign: 'center', marginTop: 4 },
+  heroCard: { backgroundColor: '#121f33', borderRadius: 16, borderWidth: 1, borderColor: '#28415f', paddingVertical: 20, paddingHorizontal: 14, alignItems: 'center', marginBottom: 10 },
+  heroLabel: { color: '#7db3ff', fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
+  heroValue: { color: '#f8fafc', fontSize: 38, lineHeight: 44, fontWeight: '900', fontVariant: ['tabular-nums'], marginTop: 3, letterSpacing: 1 },
+  heroUnit: { color: '#9fb4cf', fontSize: 12, fontWeight: '800' },
+  heroHelp: { color: '#7185a1', fontSize: 10, textAlign: 'center', marginTop: 7 },
   statusGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 2 },
   statusGridLandscape: { flexWrap: 'nowrap', gap: 8 },
-  statusCard: { width: '48%', backgroundColor: '#fff', borderRadius: 6, borderWidth: 1, borderColor: '#d1d9e2', padding: 9, marginBottom: 8 },
+  statusCard: { width: '48%', backgroundColor: '#111c2e', borderRadius: 12, borderWidth: 1, borderColor: '#243652', padding: 11, marginBottom: 8 },
   statusCardLandscape: { flex: 1, width: undefined },
-  metricLabel: { color: '#64748b', fontSize: 9, fontWeight: '900', letterSpacing: 0.7, marginBottom: 2 },
-  metricValue: { color: '#1f2937', fontWeight: '900', fontSize: 15 },
+  metricLabel: { color: '#7185a1', fontSize: 9, fontWeight: '900', letterSpacing: 0.7, marginBottom: 2 },
+  metricValue: { color: '#e5edf7', fontWeight: '900', fontSize: 15 },
   metricDanger: { color: '#b91c1c', fontWeight: '900', fontSize: 15 },
-  tripCard: { backgroundColor: '#fff', borderRadius: 6, borderWidth: 1, borderColor: '#d1d9e2', padding: 11, marginBottom: 8 },
+  tripCard: { backgroundColor: '#111c2e', borderRadius: 14, borderWidth: 1, borderColor: '#243652', padding: 13, marginBottom: 10 },
   cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 },
-  sectionTitle: { color: '#1f2937', fontWeight: '900', fontSize: 13, letterSpacing: 0.5 },
-  live: { color: '#15803d', fontWeight: '900', fontSize: 9 },
-  muted: { color: '#64748b', fontWeight: '900', fontSize: 9 },
+  sectionTitle: { color: '#f1f5f9', fontWeight: '900', fontSize: 13, letterSpacing: 0.5 },
+  live: { color: '#4ade80', fontWeight: '900', fontSize: 9 },
+  muted: { color: '#7185a1', fontWeight: '900', fontSize: 9 },
   tripGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   tripGridLandscape: { flexWrap: 'nowrap', gap: 12 },
   tripMetric: { width: '31%', minWidth: 90 },
@@ -279,10 +269,10 @@ const styles = StyleSheet.create({
   actionGrid: { gap: 7 },
   actionGridLandscape: { flexDirection: 'row' },
   actionButtonLandscape: { flex: 1 },
-  primaryButton: { backgroundColor: '#1557a6', borderRadius: 6, padding: 13, alignItems: 'center' },
+  primaryButton: { backgroundColor: '#2563eb', borderRadius: 12, padding: 14, alignItems: 'center' },
   buttonText: { color: '#fff', fontWeight: '900', fontSize: 11, letterSpacing: 0.3 },
-  secondaryButton: { backgroundColor: '#fff', borderRadius: 6, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: '#8fa1b3' },
-  secondaryButtonText: { color: '#1f2937', fontWeight: '900', fontSize: 11 },
-  error: { color: '#b91c1c', fontWeight: '800', fontSize: 10, marginTop: 7 },
-  footerStatus: { color: '#64748b', textAlign: 'center', fontSize: 9, marginTop: 7 },
+  secondaryButton: { backgroundColor: '#111c2e', borderRadius: 12, padding: 13, alignItems: 'center', borderWidth: 1, borderColor: '#34506f' },
+  secondaryButtonText: { color: '#dbeafe', fontWeight: '900', fontSize: 11 },
+  error: { color: '#fb7185', fontWeight: '800', fontSize: 10, marginTop: 8 },
+  footerStatus: { color: '#60748f', textAlign: 'center', fontSize: 9, marginTop: 9 },
 });
