@@ -7,7 +7,7 @@ export interface AppSettings {
   distanceUnit: DistanceUnit;
   autoConnectObd: boolean;
   diagnosticAlerts: boolean;
-  selectedAdapterAddress: string | null;
+  selectedAdapterAddress: string | null;\n  elmIoTimeoutMs: number;\n  elmBluetoothTimeoutMs: number;\n  elmCommandDelayMs: number;\n  elmMaxConnectionAttempts: number;\n  elmNoDataReconnectThreshold: number;\n  elmPartialResponseAction: 'RECONNECT_AND_INITIALIZE' | 'RECONNECT' | 'IGNORE';\n  elmForceInitialization: boolean;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -15,10 +15,10 @@ const DEFAULT_SETTINGS: AppSettings = {
   distanceUnit: 'KM',
   autoConnectObd: true,
   diagnosticAlerts: true,
-  selectedAdapterAddress: null,
+  selectedAdapterAddress: null,\n  elmIoTimeoutMs: 10_000,\n  elmBluetoothTimeoutMs: 5_000,\n  elmCommandDelayMs: 20,\n  elmMaxConnectionAttempts: 0,\n  elmNoDataReconnectThreshold: 40,\n  elmPartialResponseAction: 'RECONNECT_AND_INITIALIZE',\n  elmForceInitialization: true,
 };
 
-async function settingsPath(basePath: string): Promise<string> {
+function numberSetting(value: unknown, fallback: number, min: number, max: number): number {\n  const numeric = typeof value === 'number' ? value : Number(value);\n  if (!Number.isFinite(numeric)) return fallback;\n  return Math.min(max, Math.max(min, Math.round(numeric)));\n}\n\nasync function settingsPath(basePath: string): Promise<string> {
   const dir = `${basePath}/CONFIG`;
   await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
   return `${dir}/app-settings.json`;
