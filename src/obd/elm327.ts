@@ -261,7 +261,12 @@ export class Elm327Session {
       }
 
       await this.transport.write(`${command}\r`);
-      const timeout = this.config.adaptiveTiming ? this.adaptiveTimeoutMs : this.config.ioTimeoutMs;
+      // ATSP0 can spend several seconds searching protocols on inexpensive
+      // ELM327 v1.5 clones. Keep the generic adaptive timeout, but never let
+      // protocol auto-detection expire before the configured I/O ceiling.
+      const timeout = command === 'ATSP0'
+        ? this.config.ioTimeoutMs
+        : (this.config.adaptiveTiming ? this.adaptiveTimeoutMs : this.config.ioTimeoutMs);
       const response = await this.transport.readUntilPrompt(timeout);
       const normalizedResponse = normalizeElmResponse(response);
       const status = classifyResponse(normalizedResponse);
