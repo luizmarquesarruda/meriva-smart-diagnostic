@@ -45,9 +45,9 @@ assert.equal(cfg.adaptiveTiming, true);
 assert.equal(cfg.adaptiveTimeoutMinMs, 2500);
 assert.equal(cfg.adaptiveTimeoutMaxMs, 12000);
 const defaults = mergeCompatibilityConfig();
-assert.equal(defaults.ioTimeoutMs, 15000);
+assert.equal(defaults.ioTimeoutMs, 15000);\nassert.equal(defaults.maxConnectionAttempts, 1);\nassert.equal(defaults.allowUnsupportedAtCommands, true);
 assert.equal(defaults.adaptiveTimeoutMaxMs, 15000);
-console.log('ELM327 compatibility regression tests: PASS');
+assert.ok(true);\nconsole.log('ELM327 compatibility regression tests: PASS');
 
 // Android/RFCOMM regression guards: raw ELM transport must not inject a
 // '>' delimiter into the native connection. The JS transport owns prompt framing.
