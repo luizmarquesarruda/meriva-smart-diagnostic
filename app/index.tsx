@@ -82,7 +82,7 @@ export default function IndexScreen() {
 
   // Conecta automaticamente o ELM327 pareado ao abrir o aplicativo.
   // O endereço conhecido é tentado primeiro e a sessão só é aceita após
-  // ATZ/ATSP0 + PID 010C responderem corretamente.
+  // A inicialização do ELM e o PID 010C responderem corretamente.
   useEffect(() => {
     if (!isHydrated) return;
 
