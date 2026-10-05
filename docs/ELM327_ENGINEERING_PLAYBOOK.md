@@ -1,27 +1,246 @@
-# Meriva Smart Diagnostic - ELM327 Engineering Playbook
+# ELM327 Engineering Playbook
 
-## Architecture
-Bluetooth Classic -> RFCOMM/SPP -> ELM validated -> ECU validated -> protocol -> PID -> raw data -> diagnosis.
+## Objetivo
+Construir uma sessão OBD-II tolerante a clones ELM327, mas rigorosa com evidência.
 
-## Engineering rules
-1. Bluetooth connected is not the same as ELM ready.
-2. ELM ready is not the same as ECU responding.
-3. ATZ and ATI are mandatory gates.
-4. Optional AT commands may be disabled individually when a clone returns ?.
-5. The ELM prompt character > closes a response. The transport accumulates fragments until the prompt arrives.
-6. PID 010C is the first ECU probe for the Meriva project.
-7. Raw TX/RX and response time must remain available for diagnosis.
-8. Adaptive timeout changes polling speed without hiding errors.
-9. NO DATA must not become a fake vehicle fault.
-10. Recovery must be observable and cancellable.
+## Arquitetura atual
+~~~text
+Android Bluetooth Classic
+        |
+        v
+RFCOMM / SPP
+        |
+        v
+react-native-bluetooth-classic
+        |
+        v
+BluetoothClassicTransport
+        | bytes/eventos crus
+        v
+prompt ELM >
+        |
+        v
+Elm327Session + fila/mutex
+        |
+        +--> ATZ / ATI / AT...
+        +--> 010C
+        +--> ATDPN / ATDP
+        v
+PID / DTC / parser
+        v
+RAW TX/RX + resposta interpretada
+        v
+histórico / aprendizado / diagnóstico
+~~~
 
-## External engineering references
-- AndrOBD: state machine, error classes, timeout handling and clone compatibility.
-- MotoCortex: Android Bluetooth Classic RFCOMM and prioritized polling.
-- OBD2 App: prompt-delimited ELM responses with react-native-bluetooth-classic.
-- OBDLink documentation: bonded-device flow and reconnection strategy.
-- Pi Drive 2: AT initialization and PID validation tests.
-- OBD2AI reference inventory: optional AT disabling, adaptive timing and multi-frame work.
+## O achado mais importante
+A biblioteca React Native usada pelo projeto oferece modos diferentes de conexão serial. Para um ELM327, o projeto agora usa BINARY no transporte.
 
-## Current project decision
-The app keeps the simple user surface but exposes a technical laboratory for raw evidence. The next major transport frontier is explicit connection-state control plus ISO/KWP multi-frame reassembly.
+Motivo: o ELM327 fecha uma resposta com o caractere >. Em modo delimitado, a biblioteca pode consumir o delimitador antes de entregar o evento ao JavaScript. Se o app depois procurar > novamente, ele pode esperar até timeout mesmo tendo recebido a resposta. O modo BINARY deixa o framing sob controle do nosso parser.
+
+## Comparação com implementações reais
+
+| Implementação | Transporte | Inicialização | Timeout | Recuperação |
+|---|---|---|---|---|
+| AndrOBD | Android/Java | máquina de estados ELM | adaptativo | BUS/NODATA/RX/DATA separados |
+| python-OBD | serial | ATSP0 + 0100 + ATDPN | configurável | fallback de protocolo |
+| Java OBD | BluetoothSocket RFCOMM/SPP | comandos AT | socket + OBD | dependente da sessão |
+| react-native-bluetooth-classic | ponte nativa | socket nativo | conexão + eventos | evento de desconexão |
+| Meriva Smart Diagnostic | RN -> Java nativo -> RFCOMM/SPP | ATZ + ATI + ATDP | adaptativo no app | estado ELM/ECU + retry de conexão |
+
+AndrOBD mantém estados explícitos como INITIALIZING, ECU_DETECT, CONNECTED, NODATA, BUSERROR, DATAERROR, RXERROR e DISCONNECTED. O projeto deve seguir a mesma ideia, mesmo com implementação TypeScript.
+
+python-OBD usa ATSP0, envia 0100 como primeira busca real e consulta ATDPN. Também possui fallback de protocolos quando o automático falha.
+
+Implementações Java Android tradicionais usam BluetoothSocket com o UUID SPP conhecido:
+
+~~~text
+00001101-0000-1000-8000-00805F9B34FB
+~~~
+
+Nossa aplicação não abre esse socket diretamente em Java. Ela delega essa parte à biblioteca react-native-bluetooth-classic, que é uma ponte nativa Android. Isso reduz código nativo próprio, mas deixa o controle fino do socket abaixo da nossa camada.
+
+## Regras de conexão
+
+### 1. Bluetooth não é ELM
+Estados mínimos:
+1. Bluetooth indisponível
+2. Bluetooth desligado
+3. permissões ausentes
+4. Bluetooth pronto
+5. RFCOMM conectando
+6. RFCOMM conectado
+7. ELM respondendo
+8. ECU respondendo
+9. protocolo identificado
+10. sessão operacional
+11. recuperação
+12. desconectado
+
+Nunca mostrar apenas conectado como diagnóstico final.
+
+### 2. SPP/RFCOMM
+O alvo atual é Bluetooth Classic, não BLE.
+Endereço configurado da bancada: 01:23:45:67:89:BA.
+O endereço só identifica o dispositivo. A confirmação real exige resposta do ELM.
+
+### 3. Framing
+TX termina com CR: 010C + CR.
+RX é acumulado em fragmentos até >.
+O prompt não é descartado pelo transporte.
+
+### 4. Inicialização
+Sequência base:
+~~~text
+ATZ
+ATI
+ATE0
+ATL0
+ATS0
+ATH1
+ATSP0
+ATDP
+~~~
+
+ATZ e ATI são portas de entrada obrigatórias.
+Comandos AT opcionais podem ser desabilitados individualmente se o adaptador responder ?.
+
+### 5. Primeiro teste da ECU
+O primeiro PID real da Meriva é 010C.
+Resposta conhecida de referência: 41 0C 1A F8.
+RPM = ((0x1A * 256) + 0xF8) / 4 = 1726 rpm.
+Uma conexão Bluetooth sem 410C não deve ser chamada de ECU OK.
+
+## Timing
+O ELM327 possui seu próprio temporizador de resposta. ATST usa unidades de aproximadamente 4 ms. O ELM também possui adaptive timing.
+
+O projeto também possui timeout adaptativo no lado do aplicativo.
+
+Regra:
+- timeout do socket não é igual a timeout OBD;
+- timeout do app não substitui o temporizador interno do ELM;
+- NO DATA é uma resposta do adaptador, não prova de defeito da ECU;
+- timeout repetido exige recuperação observável;
+- nunca esconder timeout aumentando o valor indefinidamente.
+
+## Recuperação
+Classificar separadamente:
+- NO DATA
+- BUS ERROR
+- BUS INIT ERROR
+- BUFFER FULL
+- RX ERROR
+- DATA ERROR
+- TIMEOUT
+- DISCONNECTED
+- UNSUPPORTED
+
+Depois decidir:
+~~~text
+falha de AT obrigatório
+    -> fechar -> reconectar -> inicializar
+
+falha parcial de resposta
+    -> limpar framing -> reexecutar somente se seguro
+
+NO DATA isolado
+    -> registrar -> não inventar valor
+
+BUS/RX/DATA ERROR
+    -> recuperação do ELM/protocolo
+
+desconexão Bluetooth
+    -> fechar estado -> reconexão
+~~~
+
+A recuperação deve ser cancelável no futuro. O modo infinito de reconexão não deve bloquear o fechamento da sessão.
+
+## Java versus nossa implementação
+### O que os projetos Java fazem melhor
+- acesso direto ao BluetoothSocket;
+- controle explícito do UUID SPP;
+- leitura de InputStream;
+- escrita em OutputStream;
+- estados nativos de conexão;
+- possibilidade de fallback de socket.
+
+### O que nosso projeto faz melhor
+- fila de comandos;
+- separação Bluetooth / ELM / ECU;
+- persistência de TX/RX;
+- parser de PIDs;
+- histórico;
+- diagnóstico local;
+- testes rápidos sem depender da ECU.
+
+### Decisão de engenharia
+Não duplicar o socket Java agora.
+Primeiro corrigir o framing e validar o transporte nativo existente. Só criar uma camada Java própria se o hardware real demonstrar que a ponte não oferece controle suficiente sobre UUID SPP, fallback RFCOMM, leitura por bytes, reconexão, cancelamento de socket ou estados nativos.
+
+## UX / Product Design
+A interface deve tratar a conexão como um processo técnico, não como um botão binário.
+
+Hierarquia recomendada:
+~~~text
+BLUETOOTH
+   OK
+
+ELM327
+   RESPONDENDO
+   ELM327 v1.5
+
+ECU
+   RESPONDENDO
+
+PROTOCOLO
+   ISO 14230-4 KWP FAST
+
+PRIMEIRO PID
+   010C -> 1726 rpm
+~~~
+
+Em falha, mostrar a camada que falhou:
+- Bluetooth desligado
+- RFCOMM não abriu
+- ELM não respondeu ao ATI
+- ECU não respondeu ao 010C
+
+Evitar mensagens genéricas como Erro Bluetooth.
+
+## Critérios de aceite
+### Bluetooth
+- [ ] permissões Android concedidas
+- [ ] Bluetooth ligado
+- [ ] dispositivo pareado
+- [ ] RFCOMM abre
+- [ ] estado do socket confirmado
+
+### ELM
+- [ ] ATZ responde
+- [ ] ATI responde
+- [ ] versão preservada
+- [ ] comandos AT opcionais classificados
+- [ ] prompt > recebido
+
+### ECU
+- [ ] 010C enviado
+- [ ] 410C validado
+- [ ] protocolo identificado
+- [ ] PIDs descobertos somente depois de ECU válida
+
+### Evidência
+- [ ] TX preservado
+- [ ] RX preservado
+- [ ] tempo de resposta preservado
+- [ ] status preservado
+- [ ] protocolo preservado
+- [ ] origem REAL/SIMULAÇÃO preservada
+
+## Referências técnicas
+- AndrOBD: máquina de estados, adaptive timing e recuperação.
+- python-OBD: descoberta de protocolo e fallback.
+- react-native-bluetooth-classic: ponte Android/Java e modos de framing.
+- Android Bluetooth: RFCOMM/SPP e UUID.
+- ELM327 datasheet: prompt, ATST e adaptive timing.
+
+A documentação externa é referência de engenharia. Ela não substitui o comportamento medido no ELM327 real da Meriva.
