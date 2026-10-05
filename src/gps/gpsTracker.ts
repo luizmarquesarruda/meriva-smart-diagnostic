@@ -25,7 +25,9 @@ export type GpsListener = (state: GpsTripState) => void;
 const MIN_ACCURACY_M = 60;
 const MAX_SPEED_KMH = 220;
 const MIN_MOVEMENT_SPEED_KMH = 2;
-const MIN_MOVEMENT_DISTANCE_M = 3;
+const MIN_MOVEMENT_DISTANCE_M = 5;
+const STOP_SPEED_KMH = 2;
+const MIN_MOVING_SAMPLES = 2;
 const MAX_SEGMENT_GAP_MS = 5_000;
 
 export function haversineDistanceKm(
@@ -69,6 +71,7 @@ export class GpsTracker {
   private subscription: Location.LocationSubscription | null = null;
   private previous: GpsSample | null = null;
   private readonly listeners = new Set<GpsListener>();
+  private consecutiveMovingSamples = 0;
 
   private state: GpsTripState = {
     running: false,
@@ -155,6 +158,7 @@ export class GpsTracker {
       error: null,
     };
     this.previous = null;
+    this.consecutiveMovingSamples = 0;
     this.emit();
 
     try {
@@ -207,17 +211,25 @@ export class GpsTracker {
         const segmentKm = haversineDistanceKm(this.previous, sample);
         derivedSpeedKmh = segmentKm / (elapsedMs / 3600000);
 
-        const reportedSpeedKmh = sample.speedKmh;
-        const moving =
-          reportedSpeedKmh != null
-            ? reportedSpeedKmh >= MIN_MOVEMENT_SPEED_KMH
-            : derivedSpeedKmh >= MIN_MOVEMENT_SPEED_KMH;
+        const segmentDistanceM = segmentKm * 1000;
+        const derivedMoving =
+          segmentDistanceM >= MIN_MOVEMENT_DISTANCE_M &&
+          derivedSpeedKmh >= MIN_MOVEMENT_SPEED_KMH &&
+          derivedSpeedKmh <= MAX_SPEED_KMH;
 
+        if (derivedMoving) {
+          this.consecutiveMovingSamples += 1;
+        } else {
+          this.consecutiveMovingSamples = 0;
+        }
+
+        // Distância só entra no odômetro GPS depois de duas amostras consecutivas
+        // que comprovem movimento. Isso elimina o "carro andando parado" causado
+        // por jitter e velocidade stale do Android.
         if (
           segmentKm <= 0.25 &&
-          derivedSpeedKmh >= 0 &&
-          derivedSpeedKmh <= MAX_SPEED_KMH &&
-          moving
+          derivedMoving &&
+          this.consecutiveMovingSamples >= MIN_MOVING_SAMPLES
         ) {
           this.state.distanceKm = Number(
             (this.state.distanceKm + segmentKm).toFixed(3),
@@ -226,23 +238,20 @@ export class GpsTracker {
       }
     }
 
-    const segmentDistanceM = this.previous
-      ? haversineDistanceKm(this.previous, sample) * 1000
-      : 0;
     const movementConfirmed =
       this.previous != null &&
       accurate &&
       isAccurate(this.previous) &&
-      segmentDistanceM >= MIN_MOVEMENT_DISTANCE_M &&
       derivedSpeedKmh != null &&
       derivedSpeedKmh >= MIN_MOVEMENT_SPEED_KMH &&
-      derivedSpeedKmh <= MAX_SPEED_KMH;
+      derivedSpeedKmh <= MAX_SPEED_KMH &&
+      this.consecutiveMovingSamples >= MIN_MOVING_SAMPLES;
     let speedKmh = movementConfirmed
       ? (sample.speedKmh != null && sample.speedKmh <= MAX_SPEED_KMH
         ? Math.max(sample.speedKmh, derivedSpeedKmh ?? 0)
         : (derivedSpeedKmh ?? 0))
       : 0;
-    if (!Number.isFinite(speedKmh) || speedKmh < MIN_MOVEMENT_SPEED_KMH || speedKmh > MAX_SPEED_KMH) speedKmh = 0;
+    if (!Number.isFinite(speedKmh) || speedKmh < STOP_SPEED_KMH || speedKmh > MAX_SPEED_KMH) speedKmh = 0;
 
     if (accurate) this.previous = sample;
     this.state = {
@@ -261,6 +270,7 @@ export class GpsTracker {
     this.subscription?.remove();
     this.subscription = null;
     this.previous = null;
+    this.consecutiveMovingSamples = 0;
 
     if (options.resetTrip) {
       this.state = {
