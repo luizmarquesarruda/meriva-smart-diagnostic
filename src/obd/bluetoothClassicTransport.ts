@@ -53,8 +53,8 @@ export class BluetoothClassicTransport implements ObdTransport {
 
     // ELM327 clones variam no uso do RFCOMM seguro. Tentamos primeiro o
     // socket inseguro, padrão comum desses adaptadores, e depois o seguro.
-    // Usamos conexão delimitada com delimitador vazio: o buffer chega inteiro
-    // ao JavaScript e o prompt '>' é tratado pelo parser local.
+    // Usamos conexão RAW: não dependemos de delimitador. O ELM327 entrega CR/LF,
+    // bytes fragmentados e o prompt '>'; o buffer local monta a resposta.
     // Conecta diretamente pelo endereço MAC. A API instalada não expõe
     // getters para sockets já conectados, portanto o retry é feito no próprio
     // connectToDevice.
@@ -66,8 +66,7 @@ export class BluetoothClassicTransport implements ObdTransport {
             // O conector padrão da biblioteca é RFCOMM, então não precisamos
             // informar CONNECTOR_TYPE. Para o ELM327 usamos fluxo sem
             // delimitador e acumulamos os dados até o prompt ">".
-            connectionType: 'delimited',
-            delimiter: '',
+            connectionType: 'raw',
             charset: 'ascii',
             secureSocket,
           }),
