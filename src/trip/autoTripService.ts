@@ -109,6 +109,7 @@ class AutoTripService {
     }
 
     const fuelSupported = connection.supportedPids.includes('015E');
+    const obdSpeedSupported = connection.supportedPids.includes('010D');
     const initialDistanceKm = gpsTracker.getState().distanceKm;
     this.recorder = new RealTripRecorder(Date.now(), initialDistanceKm);
     const generation = ++this.generation;
@@ -158,13 +159,30 @@ class AutoTripService {
           }
         }
 
+        if (obdSpeedSupported) {
+          const speedResult = await connection.session.queryPid('010D');
+          if (
+            speedResult.parsed.status === 'RESPONDEU' &&
+            speedResult.parsed.unit === 'km/h' &&
+            speedResult.parsed.value != null &&
+            Number.isFinite(speedResult.parsed.value) &&
+            speedResult.parsed.value >= 0 &&
+            speedResult.parsed.value <= 220
+          ) {
+            obdSpeedKmh = speedResult.parsed.value;
+          }
+        }
+
         const recorder = this.recorder;
         if (recorder) {
           const gps = gpsTracker.getState();
+          // Quando a ECU fornece 010D, ele é a fonte primária de velocidade do veículo.
+          // GPS continua responsável por rota/distância e serve de fallback.
+          const vehicleSpeedKmh = obdSpeedKmh ?? gps.currentSpeedKmh;
           const state = recorder.addSample({
             timestampMs: Date.now(),
             distanceKm: gps.distanceKm,
-            speedKmh: gps.currentSpeedKmh,
+            speedKmh: vehicleSpeedKmh,
             fuelRateLph: fuelRateLph,
           });
           const instantaneousConsumptionKml =
