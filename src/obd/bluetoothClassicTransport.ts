@@ -60,21 +60,25 @@ export class BluetoothClassicTransport implements ObdTransport {
       try {
         device = await Promise.race([
           RNBluetoothClassic.connectToDevice(this.deviceAddress, {
-          connectionType: 'delimited',
-          delimiter: '>',
-          charset: 'ascii',
-          secureSocket,
-        });
+            connectionType: 'delimited',
+            delimiter: '>',
+            charset: 'ascii',
+            secureSocket,
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error('TIMEOUT CONEXÃO BLUETOOTH')),
+              this.config.bluetoothConnectTimeoutMs,
+            ),
+          ),
+        ]);
         break;
       } catch (cause) {
         lastCause = cause;
-        // Alguns clones mantêm o socket anterior parcialmente aberto após uma
-        // tentativa que falhou. Limpa antes de trocar secure/insecure.
         if (device) await this.safeDisconnect(device);
         device = null;
       }
     }
-
     if (!device) {
       const message = lastCause instanceof Error ? lastCause.message : String(lastCause ?? 'ERRO DESCONHECIDO');
       throw new Error('FALHA AO CONECTAR AO ELM327: ' + message);
