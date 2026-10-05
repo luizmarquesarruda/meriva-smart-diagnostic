@@ -7,6 +7,7 @@ import { cleanupOldLogs, cleanupOldReadings } from '../src/storage/cleanup';
 import { VehicleProfile } from '../src/database/vehicleConfig';
 import { getAutoSaveState, getAutoSaveStatus, initAutoSave } from '../src/meriva/autosaveManager';
 import { exportAutoSaveTxt } from '../src/meriva/exportAutoSaveTxt';
+import { exportBluetoothDiagnosticTxt } from '../src/obd/exportBluetoothDiagnosticTxt';
 import { AppSettings, readAppSettings, writeAppSettings } from '../src/database/appSettings';
 import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
 import { getMidLayout } from '../src/ui/midLayout';
@@ -69,6 +70,17 @@ export default function ConfiguracaoScreen() {
       setStatus(`REMOVIDOS: ${logs} LOGS, ${readings} LEITURAS`);
     } catch { setStatus('FALHA NA LIMPEZA'); }
     finally { setBusy(false); setSaveStatus(getAutoSaveStatus()); }
+  }
+
+  async function handleBluetoothReport() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const result = await exportBluetoothDiagnosticTxt();
+      if (result.ok) setStatus(`RELATÓRIO BLUETOOTH EXPORTADO: ${result.fileName}`);
+      else if (result.reason === 'CANCELADO') setStatus('EXPORTAÇÃO CANCELADA');
+      else setStatus(`FALHA NO RELATÓRIO BLUETOOTH: ${result.message ?? result.reason}`);
+    } finally { setBusy(false); setSaveStatus(getAutoSaveStatus()); }
   }
 
   async function handleExport() {
@@ -224,6 +236,9 @@ export default function ConfiguracaoScreen() {
       </TouchableOpacity>
       <TouchableOpacity style={styles.button} onPress={handleCleanLogs} disabled={busy}>
         <Text style={styles.buttonText}>{busy ? 'AGUARDE...' : 'LIMPAR LOGS ANTIGOS'}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.button} onPress={handleBluetoothReport} disabled={busy}>
+        <Text style={styles.buttonText}>{busy ? 'AGUARDE...' : 'EXPORTAR RELATÓRIO BLUETOOTH (.TXT)'}</Text>
       </TouchableOpacity>
       <TouchableOpacity style={styles.button} onPress={handleExport} disabled={busy}>
         <Text style={styles.buttonText}>{busy ? 'AGUARDE...' : 'EXPORTAR SALVAMENTO (.TXT)'}</Text>
