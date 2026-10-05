@@ -4,6 +4,9 @@ import {
   Elm327CompatibilityConfig,
   isNoDataResponse,
   isPartialResponseError,
+  classifyElmError,
+  ElmErrorType,
+  ElmHealthSnapshot,
   isUnsupportedAtResponse,
   mergeCompatibilityConfig,
   normalizeElmResponse,
@@ -60,6 +63,15 @@ export class Elm327Session {
   private initializationPromise: Promise<ElmCommandResult[]> | null = null;
   private commandQueue: Promise<void> = Promise.resolve();
   private noDataCount = 0;
+  private adaptiveTimeoutMs: number;
+  private commands = 0;
+  private successfulCommands = 0;
+  private timeouts = 0;
+  private unsupported = 0;
+  private errors = 0;
+  private totalResponseMs = 0;
+  private lastErrorType: ElmErrorType = 'NONE';
+  private readonly disabledOptionalCommands = new Set<string>();
   private readonly config: Elm327CompatibilityConfig;
 
   constructor(
@@ -67,6 +79,7 @@ export class Elm327Session {
     config?: Partial<Elm327CompatibilityConfig>,
   ) {
     this.config = mergeCompatibilityConfig(config ?? DEFAULT_ELM327_COMPATIBILITY);
+    this.adaptiveTimeoutMs = Math.min(this.config.ioTimeoutMs, this.config.adaptiveTimeoutMaxMs);
   }
 
   async initialize(): Promise<ElmCommandResult[]> {
@@ -95,6 +108,7 @@ export class Elm327Session {
         : ['ATL0', 'ATS0', 'ATH1', 'ATSP0'];
 
       for (const command of [...mandatory, ...optional]) {
+        if (this.disabledOptionalCommands.has(command)) continue;
         const result = await this.command(command);
         results.push(result);
 
@@ -145,6 +159,25 @@ export class Elm327Session {
 
   getCompatibilityConfig(): Elm327CompatibilityConfig {
     return { ...this.config };
+  }
+
+  getHealthSnapshot(): ElmHealthSnapshot {
+    return {
+      commands: this.commands,
+      successfulCommands: this.successfulCommands,
+      noData: this.noDataCount,
+      timeouts: this.timeouts,
+      unsupported: this.unsupported,
+      errors: this.errors,
+      averageResponseMs: this.commands ? Math.round(this.totalResponseMs / this.commands) : 0,
+      adaptiveTimeoutMs: this.adaptiveTimeoutMs,
+      recoveryRecommended: this.noDataCount >= this.config.noDataReconnectThreshold || this.timeouts >= 3,
+      lastErrorType: this.lastErrorType,
+    };
+  }
+
+  shouldRecover(): boolean {
+    return this.getHealthSnapshot().recoveryRecommended;
   }
 
   async queryPid(pid: string): Promise<PidQueryResult> {
@@ -213,12 +246,32 @@ export class Elm327Session {
       }
 
       await this.transport.write(`${command}\r`);
-      const response = await this.transport.readUntilPrompt(this.config.ioTimeoutMs);
+      const timeout = this.config.adaptiveTiming ? this.adaptiveTimeoutMs : this.config.ioTimeoutMs;
+      const response = await this.transport.readUntilPrompt(timeout);
       const normalizedResponse = normalizeElmResponse(response);
       const status = classifyResponse(normalizedResponse);
-
+      const errorType = classifyElmError(normalizedResponse);
+      this.commands += 1;
+      this.totalResponseMs += Date.now() - started;
+      this.lastErrorType = errorType;
+      if (status === 'OK') this.successfulCommands += 1;
+      if (status === 'UNSUPPORTED') {
+        this.unsupported += 1;
+        if (this.config.allowUnsupportedAtCommands && /^AT[A-Z0-9]+$/.test(command)) {
+          this.disabledOptionalCommands.add(command);
+        }
+      }
+      if (status === 'ERROR') this.errors += 1;
       if (isNoDataResponse(normalizedResponse)) this.noDataCount += 1;
       else if (normalizedResponse) this.noDataCount = 0;
+
+      if (this.config.adaptiveTiming) {
+        if (status === 'OK' && Date.now() - started < this.adaptiveTimeoutMs / 2) {
+          this.adaptiveTimeoutMs = Math.max(this.config.adaptiveTimeoutMinMs, this.adaptiveTimeoutMs - this.config.adaptiveTimeoutStepMs);
+        } else if (status === 'ERROR' || status === 'TIMEOUT') {
+          this.adaptiveTimeoutMs = Math.min(this.config.adaptiveTimeoutMaxMs, this.adaptiveTimeoutMs + this.config.adaptiveTimeoutStepMs);
+        }
+      }
 
       return {
         command,
@@ -233,6 +286,12 @@ export class Elm327Session {
             : {}),
       };
     } catch (cause) {
+      this.commands += 1;
+      this.timeouts += 1;
+      this.lastErrorType = 'TIMEOUT';
+      if (this.config.adaptiveTiming) {
+        this.adaptiveTimeoutMs = Math.min(this.config.adaptiveTimeoutMaxMs, this.adaptiveTimeoutMs + this.config.adaptiveTimeoutStepMs);
+      }
       const errorMessage = cause instanceof Error ? cause.message : 'ERRO DESCONHECIDO';
       const status: ElmCommandStatus = isPartialResponseError(errorMessage)
         ? 'TIMEOUT'
