@@ -44,4 +44,7 @@ const cfg = mergeCompatibilityConfig({ adaptiveTiming: true, adaptiveTimeoutMinM
 assert.equal(cfg.adaptiveTiming, true);
 assert.equal(cfg.adaptiveTimeoutMinMs, 2500);
 assert.equal(cfg.adaptiveTimeoutMaxMs, 12000);
+const defaults = mergeCompatibilityConfig();
+assert.equal(defaults.ioTimeoutMs, 15000);
+assert.equal(defaults.adaptiveTimeoutMaxMs, 15000);
 console.log('ELM327 compatibility regression tests: PASS');
