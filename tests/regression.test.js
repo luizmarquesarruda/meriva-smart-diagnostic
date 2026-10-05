@@ -38,6 +38,7 @@ let bluetoothDisconnectListener = null;
 let fakeDeviceConnected = true;
 let lastBluetoothConnectionOptions = null;
 let lastBluetoothDiscoveryCancelled = false;
+let bluetoothCommands = [];
 
 function parentDir(p) {
   const i = p.lastIndexOf('/');
@@ -280,6 +281,7 @@ async function testBluetoothEventTransport() {
   bluetoothDisconnectListener = null;
   fakeDeviceConnected = true;
   lastBluetoothDiscoveryCancelled = false;
+  bluetoothCommands = [];
   const { BluetoothClassicTransport } = loadTs(path.join(ROOT, 'src/obd/bluetoothClassicTransport.ts'));
   const transport = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF');
   await transport.open();
@@ -299,6 +301,27 @@ async function testBluetoothEventTransport() {
   bluetoothDisconnectListener?.({ address: 'AA:BB:CC:DD:EE:FF' });
   await assert.rejects(pendingRead, /BLUETOOTH DESCONECTADO|BLUETOOTH NÃO CONECTADO/);
   await transport.close();
+}
+
+async function testElmInitializationOrder() {
+  const { Elm327Session } = loadTs(path.join(ROOT, 'src/obd/elm327.ts'));
+  const commands = [];
+  const transport = {
+    async open() {},
+    async close() {},
+    async write(data) { commands.push(String(data).trim()); },
+    async readUntilPrompt() {
+      const command = commands[commands.length - 1];
+      const responses = { ATZ: 'ELM327 v1.5', ATI: 'ELM327 v1.5', ATE0: 'OK', ATL0: 'OK', ATS0: 'OK', ATH1: 'OK', ATSP0: 'OK', ATDP: 'ISO 14230-4 (KWP FAST)' };
+      return responses[command] ?? 'NO DATA';
+    },
+  };
+  const session = new Elm327Session(transport);
+  const initialization = await session.initialize();
+  assert.deepStrictEqual(initialization.map((item) => item.command), ['ATZ', 'ATI', 'ATE0', 'ATL0', 'ATS0', 'ATH1', 'ATSP0', 'ATDP']);
+  assert.deepStrictEqual(commands, ['ATZ\\r', 'ATI\\r', 'ATE0\\r', 'ATL0\\r', 'ATS0\\r', 'ATH1\\r', 'ATSP0\\r', 'ATDP\\r']);
+  assert.strictEqual(session.getProtocol(), 'ISO 14230-4 (KWP FAST)');
+  await session.close();
 }
 
 async function testQuota() {
@@ -532,6 +555,7 @@ async function main() {
     ['elm/protocolo/serialização', testElmAndProtocol],
     ['descoberta de PIDs', testPidScanner],
     ['Bluetooth por eventos', testBluetoothEventTransport],
+    ['ordem de inicialização ELM', testElmInitializationOrder],
     ['quota configurável', testQuota],
     ['logger TX/RX', testRawLogger],
     ['perfil do veículo', testVehicleProfile],
