@@ -82,7 +82,7 @@ O rastreador é criado uma vez por sessão do aplicativo para continuar ativo en
 
 ## PIDs e combustível
 
-A base agora cobre PIDs padrão úteis, incluindo velocidade, RPM, temperatura, MAF, posição da borboleta, nível de combustível e taxa de combustível do motor (PID 015E). Um PID só é usado quando a ECU efetivamente responde e o parser reconhece o formato.
+A base agora cobre PIDs padrão úteis, incluindo velocidade, RPM, temperatura, MAF, posição da borboleta e taxa de combustível do motor (PID 015E). Um PID só é usado quando a ECU efetivamente responde e o parser reconhece o formato.
 
 O PID 015E representa taxa de combustível em L/h quando suportado pela ECU. O aplicativo integra essa taxa ao longo do tempo usando os intervalos entre amostras, ignorando amostras inválidas e intervalos excessivamente longos. A disponibilidade e a exatidão devem ser confirmadas na ECU real da Meriva antes de usar o resultado como medição de consumo.
 
@@ -136,7 +136,7 @@ A suíte automatizada cobre autosave, parser, DTC, descoberta de PIDs, fila de c
 
 1. validar Bluetooth/ELM327 e GPS em Android físico;
 2. monitorar PIDs suportados em ciclo real;
-3. validar a taxa do PID 015E e o nível do PID 012F na ECU real;
+3. validar a taxa do PID 015E na ECU real;
 4. validar o comportamento específico da ECU da Meriva com dados reais;
 5. manter especificações do manual separadas das evidências atuais da ECU.
 
