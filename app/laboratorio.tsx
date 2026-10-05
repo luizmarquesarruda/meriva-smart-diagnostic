@@ -47,7 +47,6 @@ export default function LaboratorioScreen() {
   const [dtcCodes, setDtcCodes] = useState<string[]>([]);
   const [fuelUsedL, setFuelUsedL] = useState(0);
   const [tripDistanceKm, setTripDistanceKm] = useState(0);
-  const [tripFuelUsedL, setTripFuelUsedL] = useState(0);
   const [tripConsumptionKml, setTripConsumptionKml] = useState<number | null>(null);
   const [tripActive, setTripActive] = useState(false);
   const [tripFuelSupported, setTripFuelSupported] = useState<boolean | null>(null);
@@ -65,7 +64,6 @@ export default function LaboratorioScreen() {
       setTripActive(trip.active);
       setTripFuelSupported(trip.connected ? trip.fuelSupported : null);
       setTripDistanceKm(trip.distanceKm);
-      setTripFuelUsedL(trip.fuelUsedL);
       setFuelUsedL(trip.fuelUsedL);
       setTripConsumptionKml(trip.consumptionKml);
       if (trip.error) setError(trip.error);
