@@ -175,6 +175,12 @@ export class Elm327Session {
     return this.protocol;
   }
 
+  /** Retorna o diagnóstico bruto quando o transporte fornece essa capacidade. */
+  getTransportDiagnosticsText(): string {
+    const candidate = this.transport as ObdTransport & { getDiagnosticsText?: () => string };
+    return typeof candidate.getDiagnosticsText === 'function' ? candidate.getDiagnosticsText() : '';
+  }
+
   getNoDataCount(): number {
     return this.noDataCount;
   }
