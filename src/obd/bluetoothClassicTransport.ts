@@ -70,27 +70,24 @@ export class BluetoothClassicTransport implements ObdTransport {
     let device: BluetoothDevice | null = null;
     let lastCause: unknown = null;
 
-    // IMPORTANTE:
-    // react-native-bluetooth-classic não aceita "raw" como connectionType.
-    // Os tipos suportados incluem "binary" e "delimited". Para ELM327,
-    // "binary" é a opção adequada: preserva o fluxo e deixa o app montar
-    // a resposta até o prompt '>'.
-    //
-    // O erro observado no relatório:
-    //   "Tipo de conexão inválida: rfcomm"
-    // era causado pelo antigo connectionType: 'raw'.
+    // ELM327 usa Bluetooth Classic SPP sobre RFCOMM. Nesta versão da biblioteca,
+    // RFCOMM é o CONNECTOR_TYPE e "delimited"/"binary" são CONNECTION_TYPEs.
+    // Para o ELM327 usamos texto delimitado, pois o adaptador troca ASCII e termina
+    // respostas com CR/LF e o prompt '>'.
     for (const secureSocket of [false, true]) {
       this.logDiagnostic('CONNECT_ATTEMPT', {
         secureSocket,
-        connectionType: 'binary',
-        delimiter: '\\r\\n',
+        connectorType: 'rfcomm',
+        connectionType: 'delimited',
+        delimiter: '\\r',
       });
 
       try {
         device = await Promise.race([
           RNBluetoothClassic.connectToDevice(this.deviceAddress, {
-            connectionType: 'binary',
-            delimiter: '\\r\\n',
+            connectorType: 'rfcomm',
+            connectionType: 'delimited',
+            delimiter: '\\r',
             charset: 'ascii',
             secureSocket,
           }),
@@ -104,13 +101,15 @@ export class BluetoothClassicTransport implements ObdTransport {
 
         this.logDiagnostic('CONNECT_SUCCESS', {
           secureSocket,
-          connectionType: 'binary',
+          connectorType: 'rfcomm',
+          connectionType: 'delimited',
         });
         break;
       } catch (cause) {
         this.logDiagnostic('CONNECT_FAILURE', {
           secureSocket,
-          connectionType: 'binary',
+          connectorType: 'rfcomm',
+          connectionType: 'delimited',
           error: cause instanceof Error ? cause.message : String(cause),
         });
         lastCause = cause;
