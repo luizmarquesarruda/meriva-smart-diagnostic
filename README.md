@@ -153,3 +153,5 @@ A inicialização separa Bluetooth, ELM e ECU. O primeiro teste real da ECU é 0
 ## Validação CI
 
 Este commit é um gatilho técnico para confirmar que o workflow `.github/workflows/ci.yml` continua disparando em `push` e executando a validação e o build Android nativo.
+
+O teste de transporte Bluetooth usa `connectionType: raw`, com buffering local até o prompt `>`. Esse contrato é intencional para o fluxo ELM327 e é protegido pela regressão automatizada.
