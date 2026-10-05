@@ -17,6 +17,7 @@ export interface ObdTransport {
   close(): Promise<void>;
   write(data: string): Promise<void>;
   readUntilPrompt(timeoutMs?: number): Promise<string>;
+  clearInputBuffer?(): void;
 }
 
 export type ElmCommandStatus = 'OK' | 'TIMEOUT' | 'ERROR' | 'NO_RESPONSE' | 'UNSUPPORTED';
@@ -267,13 +268,16 @@ export class Elm327Session {
         await new Promise((resolve) => setTimeout(resolve, this.config.commandDelayMs));
       }
 
+      this.transport.clearInputBuffer?.();
       await this.transport.write(`${command}\r`);
       // ATSP0 can spend several seconds searching protocols on inexpensive
       // ELM327 v1.5 clones. Keep the generic adaptive timeout, but never let
       // protocol auto-detection expire before the configured I/O ceiling.
-      const timeout = command === 'ATSP0'
-        ? this.config.ioTimeoutMs
-        : (this.config.adaptiveTiming ? this.adaptiveTimeoutMs : this.config.ioTimeoutMs);
+      const timeout = command === 'ATZ'
+        ? Math.min(5_000, Math.max(3_000, this.config.ioTimeoutMs))
+        : command === 'ATSP0'
+          ? this.config.ioTimeoutMs
+          : (this.config.adaptiveTiming ? this.adaptiveTimeoutMs : this.config.ioTimeoutMs);
       const response = await this.transport.readUntilPrompt(timeout);
       const normalizedResponse = normalizeElmResponse(response);
       const status = classifyResponse(normalizedResponse);
