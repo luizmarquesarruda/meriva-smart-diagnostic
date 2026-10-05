@@ -61,7 +61,7 @@ A pressão correta também deve ser conferida na etiqueta da portinhola de abast
 4. O manual não confirma protocolo OBD.
 5. Um valor de catálogo não substitui uma resposta real da ECU.
 6. A autonomia usa 56 L como capacidade do tanque, mas nunca inventa o nível de combustível.
-7. O nível usado na autonomia deve vir de uma resposta válida da ECU ao PID 012F.
+7. A autonomia não usa nível de combustível da ECU nesta versão.
 8. Consumo atual deve usar dados reais válidos. Dados de simulação e referência Car Scanner não entram como leitura atual.
 
 ## Fonte
