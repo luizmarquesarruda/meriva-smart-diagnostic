@@ -64,24 +64,9 @@ async function connectPreferredElmOnce(
   preferredAddress: string | null,
   compatibility: Elm327CompatibilityConfig,
 ): Promise<SharedObdConnection> {
-  // IMPORTANTE: o MAC configurado é tentado diretamente primeiro.
-  // Não bloqueamos a conexão porque getBondedDevices() falhou, demorou
-  // ou não devolveu o ELM corretamente no Android.
+  // Primeiro usamos o inventário de dispositivos PAREADOS pelo Android.
+  // Não tentamos um MAC arbitrário antes disso.
   await ensureBluetoothReady();
-
-  if (preferredAddress) {
-    const directDevice: BluetoothDeviceInfo = {
-      address: preferredAddress.toUpperCase(),
-      name: 'ELM327 (ENDEREÇO CONFIGURADO)',
-      bonded: true,
-    };
-
-    try {
-      return await connectCandidate(directDevice, compatibility);
-    } catch (cause) {
-      setConnectionError(cause);
-    }
-  }
 
   let devices: BluetoothDeviceInfo[] = [];
   try {
@@ -91,19 +76,22 @@ async function connectPreferredElmOnce(
   }
 
   const candidates: BluetoothDeviceInfo[] = [];
-  const preferredDevice = preferredAddress
-    ? devices.find((device) => sameAddress(device.address, preferredAddress))
-    : undefined;
-
-  if (preferredDevice && !candidates.some((item) => sameAddress(item.address, preferredDevice.address))) {
-    candidates.push(preferredDevice);
-  }
-
-  for (const device of devices.filter(looksLikeElm327)) {
-    if (!candidates.some((candidate) => sameAddress(candidate.address, device.address))) {
+  const addCandidate = (device: BluetoothDeviceInfo) => {
+    if (!candidates.some((item) => sameAddress(item.address, device.address))) {
       candidates.push(device);
     }
+  };
+
+  // 1) endereço previamente selecionado, se realmente estiver pareado;
+  // 2) nomes típicos de ELM/OBD;
+  // 3) qualquer outro Bluetooth Classic pareado.
+  // O teste ATI + 010C decide qual dispositivo é o ELM327.
+  if (preferredAddress) {
+    const preferredDevice = devices.find((device) => sameAddress(device.address, preferredAddress));
+    if (preferredDevice) addCandidate(preferredDevice);
   }
+  for (const device of devices.filter(looksLikeElm327)) addCandidate(device);
+  for (const device of devices) addCandidate(device);
 
   let lastError: unknown = lastConnectionError;
 
@@ -121,7 +109,7 @@ async function connectPreferredElmOnce(
 }
 
 export async function connectPreferredElm(
-  preferredAddress: string | null = MERIVA_ELM327_ADDRESS,
+  preferredAddress: string | null = null,
   compatibility?: Partial<Elm327CompatibilityConfig>,
 ): Promise<SharedObdConnection> {
   if (active) return active;
