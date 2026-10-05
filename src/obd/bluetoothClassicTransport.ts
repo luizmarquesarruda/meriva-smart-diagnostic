@@ -33,31 +33,19 @@ export class BluetoothClassicTransport implements ObdTransport {
 
     // ELM327 clones variam no uso do RFCOMM seguro. Tentamos primeiro o
     // socket inseguro, padrão comum desses adaptadores, e depois o seguro.
-    // Se o socket já estiver aberto pelo próprio processo, reaproveite-o.
-    // Isso evita falhas ao tentar abrir um segundo RFCOMM para o mesmo ELM327.
-    try {
-      if (await RNBluetoothClassic.isDeviceConnected(this.deviceAddress)) {
-        device = await RNBluetoothClassic.getConnectedDevice(this.deviceAddress);
-      }
-    } catch {
-      device = null;
-    }
-
-    // ELM327 usa um fluxo serial puro. Forçamos RFCOMM + RAW para não deixar
-    // o delimitador padrão da biblioteca interferir no prompt ">" do ELM.
-    if (!device) for (const secureSocket of [false, true]) {
+    // Conecta diretamente pelo endereço MAC. A API instalada não expõe
+    // getters para sockets já conectados, portanto o retry é feito no próprio
+    // connectToDevice.
+    for (const secureSocket of [false, true]) {
       try {
         device = await RNBluetoothClassic.connectToDevice(this.deviceAddress, {
-          connectorType: 'rfcomm',
           connectionType: 'raw',
           charset: 'ascii',
-          readSize: 4096,
           secureSocket,
         });
         break;
       } catch (cause) {
         lastCause = cause;
-        this.markDisconnected();
       }
     }
 
