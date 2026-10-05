@@ -172,7 +172,7 @@ export async function createRealElmSession(
     // Depois do primeiro PID válido, atualize o protocolo efetivamente usado
     // pela sessão. Em modo automático o ATDP anterior pode ainda representar
     // somente a seleção AUTO, e não o protocolo negociado na ECU.
-    const protocolResult = await session.identifyProtocol();
+    await session.identifyProtocol();
     // O 010C válido já é a prova de que a ECU respondeu. Uma falha do
     // comando informativo ATDP/identificação não pode transformar uma ECU
     // comprovadamente ativa em "desconectada".
