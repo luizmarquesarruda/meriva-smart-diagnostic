@@ -14,6 +14,8 @@ export interface AutoTripServiceState {
   fuelUsedL: number;
   consumptionKml: number | null;
   error: string | null;
+  averageConsumptionKml: number;
+  estimatedRangeKm: number;
 }
 
 type Listener = (state: AutoTripServiceState) => void;
@@ -26,6 +28,8 @@ const INITIAL_STATE: AutoTripServiceState = {
   fuelUsedL: 0,
   consumptionKml: null,
   error: null,
+  averageConsumptionKml: 0,
+  estimatedRangeKm: 0,
 };
 
 class AutoTripService {
@@ -62,7 +66,13 @@ class AutoTripService {
   async start(basePath: string): Promise<void> {
     if (this.running) return;
     this.basePath = basePath;
-    await initAutoSave(basePath);
+    const persisted = await initAutoSave(basePath);
+    this.state = {
+      ...this.state,
+      averageConsumptionKml: persisted.autonomy.averageConsumptionKml,
+      estimatedRangeKm: persisted.autonomy.estimatedRangeKm,
+    };
+    this.emit();
     this.running = true;
     this.unsubscribeConnection = subscribeSharedObd((connection) => {
       this.transition = this.transition
@@ -101,12 +111,15 @@ class AutoTripService {
     this.recorder = new RealTripRecorder(Date.now(), initialDistanceKm);
     const generation = ++this.generation;
 
+    const persistedAutonomy = (await initAutoSave(this.basePath)).autonomy;
     this.state = {
       ...INITIAL_STATE,
       connected: true,
       active: true,
       fuelSupported,
       error: null,
+      averageConsumptionKml: persistedAutonomy.averageConsumptionKml,
+      estimatedRangeKm: persistedAutonomy.estimatedRangeKm,
     };
     this.emit();
 
@@ -204,6 +217,54 @@ class AutoTripService {
     const storedCycles = await readDriveCycles(this.basePath);
     updateAutoSaveState((state) => {
       state.driveCycles = storedCycles;
+
+      // Autonomia é acumulada somente com viagens reais concluídas.
+      // Não usamos boia/sensor de nível. A autonomia é estimada pelo
+      // consumo médio real acumulado e pela capacidade nominal de 56 L.
+      const existingReading = state.autonomy.readings.find((item) => item.id === cycle.id);
+      if (!existingReading) {
+        const previousDistance = Number(state.autonomy.cumulativeDistanceKm) || 0;
+        const previousFuel = Number(state.autonomy.cumulativeFuelUsedL) || 0;
+        const distanceKm = Math.max(0, Number(cycle.distanceTotalKm) || 0);
+        const fuelUsedL = Math.max(0, Number(cycle.fuelUsedL) || 0);
+        const cumulativeDistanceKm = previousDistance + distanceKm;
+        const cumulativeFuelUsedL = previousFuel + fuelUsedL;
+        const averageConsumptionKml = cumulativeFuelUsedL > 0
+          ? cumulativeDistanceKm / cumulativeFuelUsedL
+          : 0;
+        const estimatedRangeKm = averageConsumptionKml > 0
+          ? averageConsumptionKml * state.autonomy.tankCapacityL
+          : 0;
+
+        state.autonomy = {
+          ...state.autonomy,
+          tankCapacityL: 56,
+          cumulativeDistanceKm: Number(cumulativeDistanceKm.toFixed(3)),
+          cumulativeFuelUsedL: Number(cumulativeFuelUsedL.toFixed(3)),
+          averageConsumptionKml: Number(averageConsumptionKml.toFixed(3)),
+          estimatedRangeKm: Number(estimatedRangeKm.toFixed(1)),
+          realReadingCount: (Number(state.autonomy.realReadingCount) || 0) + 1,
+          lastReadingAt: cycle.finishedAt,
+          readings: [
+            ...state.autonomy.readings,
+            {
+              id: cycle.id,
+              timestamp: cycle.finishedAt,
+              distanceKm,
+              fuelUsedL,
+              consumptionKml: Number((fuelUsedL > 0 ? distanceKm / fuelUsedL : 0).toFixed(3)),
+              estimatedRangeKm: Number(estimatedRangeKm.toFixed(1)),
+              source: 'REAL_OBD',
+            },
+          ].slice(-200),
+        };
+      }
+    });
+
+    const autonomy = (await initAutoSave(this.basePath)).autonomy;
+    this.setState({
+      averageConsumptionKml: autonomy.averageConsumptionKml,
+      estimatedRangeKm: autonomy.estimatedRangeKm,
     });
     await forceSaveOnObdEvent();
   }
