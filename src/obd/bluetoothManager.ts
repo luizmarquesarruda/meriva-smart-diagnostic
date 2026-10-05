@@ -115,20 +115,36 @@ export async function createRealElmSession(
     // Primeiro confirme ECU/ELM com um PID real e simples.
     // 010C funciona com a chave ligada mesmo com motor parado e evita
     // bombardear a ECU com vários blocos de descoberta antes do primeiro OK.
-    const ecuProbe = await session.executeCommand('010C');
-    const probeStream = ecuProbe.response.replace(/[^0-9A-F]/gi, '').toUpperCase();
+    let ecuProbe = await session.executeCommand('010C');
+    let probeStream = ecuProbe.response.replace(/[^0-9A-F]/gi, '').toUpperCase();
     const probeMarker = '410C';
-    const probeIndex = probeStream.indexOf(probeMarker);
-    const probeIsValid =
+    let probeIndex = probeStream.indexOf(probeMarker);
+    let probeIsValid =
       ecuProbe.status === 'OK' &&
       probeIndex >= 0 &&
       probeStream.length >= probeIndex + probeMarker.length + 4;
 
+    // A Meriva usa ISO 14230-4 KWP Fast Init. Em clones v1.5 baratos, a
+    // descoberta automática ATSP0 pode falhar ou escolher mal o protocolo.
+    // Se o primeiro 010C não validar, faça uma única tentativa direcionada
+    // ATSP5 antes de declarar a ECU sem resposta. Isso mantém Bluetooth/ELM
+    // conectados e evita um ciclo destrutivo de reconexão.
+    if (!probeIsValid) {
+      const forcedKwp = await session.executeCommand('ATSP5');
+      if (forcedKwp.status === 'OK') {
+        ecuProbe = await session.executeCommand('010C');
+        probeStream = ecuProbe.response.replace(/[^0-9A-F]/gi, '').toUpperCase();
+        probeIndex = probeStream.indexOf(probeMarker);
+        probeIsValid =
+          ecuProbe.status === 'OK' &&
+          probeIndex >= 0 &&
+          probeStream.length >= probeIndex + probeMarker.length + 4;
+      }
+    }
+
     // A conexão Bluetooth/ELM e a comunicação com a ECU são camadas diferentes.
     // O ELM já foi confirmado pelos comandos AT acima. Portanto, uma falha no
-    // primeiro PID não pode derrubar a conexão Bluetooth nem iniciar um loop de
-    // reconexão desnecessário. Isso também permite ligar o app antes da ECU estar
-    // pronta e diagnosticar a causa real na tela.
+    // primeiro PID e no fallback KWP5 não deve derrubar o Bluetooth.
     if (!probeIsValid) {
       return {
         session,
