@@ -133,11 +133,14 @@ class AutoTripService {
     };
     this.emit();
 
-    this.loopPromise = this.runLoop(connection, generation);
+    this.loopPromise = this.runLoop(connection, generation, obdSpeedSupported);
   }
 
-  private async runLoop(connection: SharedObdConnection, generation: number): Promise<void> {
-
+  private async runLoop(
+    connection: SharedObdConnection,
+    generation: number,
+    obdSpeedSupported: boolean,
+  ): Promise<void> {
     while (
       this.running &&
       generation === this.generation &&
@@ -206,10 +209,10 @@ class AutoTripService {
             timestampMs: Date.now(),
             distanceKm: gps.distanceKm,
             speedKmh: vehicleSpeedKmh,
-            fuelRateLph: fuelRateLph,
+            fuelRateLph,
           });
           const instantaneousConsumptionKml =
-            fuelRateLph != null && fuelRateLph > 0 && gps.currentSpeedKmh > 0
+            fuelRateLph != null && fuelRateLph > 0 && vehicleSpeedKmh > 0
               ? vehicleSpeedKmh / fuelRateLph
               : null;
           this.setState({
