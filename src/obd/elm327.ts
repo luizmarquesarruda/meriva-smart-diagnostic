@@ -1,4 +1,13 @@
 import { parsePidResponse } from './parser';
+import {
+  DEFAULT_ELM327_COMPATIBILITY,
+  Elm327CompatibilityConfig,
+  isNoDataResponse,
+  isPartialResponseError,
+  isUnsupportedAtResponse,
+  mergeCompatibilityConfig,
+  normalizeElmResponse,
+} from './elm327Compatibility';
 
 export interface ObdTransport {
   open(): Promise<void>;
@@ -7,7 +16,7 @@ export interface ObdTransport {
   readUntilPrompt(timeoutMs?: number): Promise<string>;
 }
 
-export type ElmCommandStatus = 'OK' | 'TIMEOUT' | 'ERROR' | 'NO_RESPONSE';
+export type ElmCommandStatus = 'OK' | 'TIMEOUT' | 'ERROR' | 'NO_RESPONSE' | 'UNSUPPORTED';
 
 export interface ElmCommandResult {
   command: string;
@@ -51,7 +60,7 @@ export class Elm327Session {
   private initializationPromise: Promise<ElmCommandResult[]> | null = null;
   private commandQueue: Promise<void> = Promise.resolve();
 
-  constructor(private readonly transport: ObdTransport) {}
+  private readonly config: Elm327CompatibilityConfig;\n  private noDataCount = 0;\n\n  constructor(\n    private readonly transport: ObdTransport,\n    config?: Partial<Elm327CompatibilityConfig>,\n  ) {\n    this.config = mergeCompatibilityConfig(config ?? DEFAULT_ELM327_COMPATIBILITY);\n  }
 
   async initialize(): Promise<ElmCommandResult[]> {
     if (this.initializationPromise) return this.initializationPromise;
@@ -87,7 +96,7 @@ export class Elm327Session {
         const result = await this.command(command);
         results.push(result);
 
-        if (mandatory.includes(command) && result.status !== 'OK') {
+        if (mandatory.includes(command) && !['OK', 'UNSUPPORTED'].includes(result.status)) {
           throw new Error(`ELM NÃO RESPONDEU CORRETAMENTE A ${command}: ${result.status}`);
         }
       }
@@ -197,7 +206,7 @@ export class Elm327Session {
       const status = classifyResponse(response);
       return {
         command,
-        response,
+        response: normalizedResponse,
         elapsedMs: Date.now() - started,
         status,
         attempt,
@@ -206,12 +215,12 @@ export class Elm327Session {
           : {}),
       };
     } catch (cause) {
-      const errorMessage = cause instanceof Error ? cause.message : 'ERRO DESCONHECIDO';
+      const errorMessage = cause instanceof Error ? cause.message : 'ERRO DESCONHECIDO';\n      const status = isPartialResponseError(errorMessage) ? 'TIMEOUT' : (errorMessage.includes('TIMEOUT') ? 'TIMEOUT' : 'ERROR');
       return {
         command,
         response: '',
         elapsedMs: Date.now() - started,
-        status: errorMessage.includes('TIMEOUT') ? 'TIMEOUT' : 'ERROR',
+        status,
         attempt,
         errorMessage,
       };
