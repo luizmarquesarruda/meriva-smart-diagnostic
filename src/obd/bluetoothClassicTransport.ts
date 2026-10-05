@@ -64,7 +64,6 @@ export class BluetoothClassicTransport implements ObdTransport {
         device = await Promise.race([
           RNBluetoothClassic.connectToDevice(this.deviceAddress, {
             connectionType: 'raw',
-            delimiter: '>',
             charset: 'ascii',
             secureSocket,
           }),
@@ -128,6 +127,13 @@ export class BluetoothClassicTransport implements ObdTransport {
 
     this.device = null;
     this.connected = false;
+    this.received = '';
+  }
+
+  clearInputBuffer(): void {
+    // O ELM pode deixar um prompt/resposta atrasado no buffer após ATZ ou
+    // uma tentativa de conexão abortada. O próximo comando precisa começar
+    // com um RX limpo para não consumir esse prompt como resposta nova.
     this.received = '';
   }
 
