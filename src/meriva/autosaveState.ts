@@ -26,6 +26,27 @@ export interface PidDiscoveryCache {
   discoveredAt: string;
 }
 
+export interface AutonomyReading {
+  id: string;
+  timestamp: string;
+  distanceKm: number;
+  fuelUsedL: number;
+  consumptionKml: number;
+  estimatedRangeKm: number;
+  source: 'REAL_OBD';
+}
+
+export interface AutonomyState {
+  tankCapacityL: number;
+  cumulativeDistanceKm: number;
+  cumulativeFuelUsedL: number;
+  averageConsumptionKml: number;
+  estimatedRangeKm: number;
+  realReadingCount: number;
+  lastReadingAt: string | null;
+  readings: AutonomyReading[];
+}
+
 export interface MerivaPersistedState {
   vehicle: VehicleProfile | null;
   obd: ObdConnectionState;
@@ -34,6 +55,7 @@ export interface MerivaPersistedState {
   driveCycles: DriveCycle[];
   learning: MerivaLearningProfile | null;
   pidDiscovery: PidDiscoveryCache | null;
+  autonomy: AutonomyState;
   settings: Record<string, string | number | boolean>;
   metadata: { savedAt: string; appVersion: string };
 }
@@ -47,6 +69,16 @@ export function createEmptyMerivaState(): MerivaPersistedState {
     driveCycles: [],
     learning: null,
     pidDiscovery: null,
+    autonomy: {
+      tankCapacityL: 56,
+      cumulativeDistanceKm: 0,
+      cumulativeFuelUsedL: 0,
+      averageConsumptionKml: 0,
+      estimatedRangeKm: 0,
+      realReadingCount: 0,
+      lastReadingAt: null,
+      readings: [],
+    },
     settings: {},
     metadata: { savedAt: '', appVersion: '1.0.1' },
   };
