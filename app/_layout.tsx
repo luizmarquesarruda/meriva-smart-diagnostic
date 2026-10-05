@@ -48,7 +48,7 @@ export default function RootLayout() {
         if (!autoConnectObd) return;
         await ensureBluetoothReady();
         const settings = await loadSettings();
-        const connection = await connectPreferredElm(selectedAdapterAddress);
+        const connection = await connectPreferredElm(null);
         await writeAppSettings(basePath, {
           ...settings,
           selectedAdapterAddress: connection.device.address,
@@ -74,7 +74,7 @@ export default function RootLayout() {
               : 'Ative o Bluetooth e permita o acesso a dispositivos próximos para usar o ELM327.',
             [
               { text: 'Abrir configurações', onPress: () => void openBluetoothAppSettings() },
-              { text: 'Tentar novamente', onPress: () => void checkBluetooth(true, true, selectedAdapterAddress) },
+              { text: 'Tentar novamente', onPress: () => void checkBluetooth(true, true, null) },
             ],
           );
         }
@@ -132,7 +132,7 @@ export default function RootLayout() {
         checkBluetooth(
           settings.autoConnectObd,
           settings.diagnosticAlerts,
-          settings.selectedAdapterAddress,
+          null,
         ),
         startGps(settings.diagnosticAlerts),
       ]);
