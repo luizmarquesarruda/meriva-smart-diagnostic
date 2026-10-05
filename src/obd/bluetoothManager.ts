@@ -34,6 +34,15 @@ export interface RealElmConnection {
   protocol: string | null;
   ecuProbe: ElmCommandResult;
   supportedPids: string[];
+  ecuValidated: boolean;
+}
+
+/** A conexão só é considerada OBD real quando existe um payload 41 0C válido. */
+export function isValidEcuProbe(result: ElmCommandResult): boolean {
+  const stream = result.response.replace(/[^0-9A-F]/gi, '').toUpperCase();
+  const marker = '410C';
+  const index = stream.indexOf(marker);
+  return result.status === 'OK' && index >= 0 && stream.length >= index + marker.length + 4;
 }
 
 export async function requestBluetoothPermissions(): Promise<void> {
@@ -132,42 +141,28 @@ export async function createRealElmSession(
     // bombardear a ECU com vários blocos de descoberta antes do primeiro OK.
     let ecuProbe = await session.executeCommand('010C');
     let probeStream = ecuProbe.response.replace(/[^0-9A-F]/gi, '').toUpperCase();
-    const probeMarker = '410C';
-    let probeIndex = probeStream.indexOf(probeMarker);
-    let probeIsValid =
-      ecuProbe.status === 'OK' &&
-      probeIndex >= 0 &&
-      probeStream.length >= probeIndex + probeMarker.length + 4;
+    let probeIsValid = isValidEcuProbe(ecuProbe);
 
     // A Meriva usa ISO 14230-4 KWP Fast Init. Em clones v1.5 baratos, a
     // descoberta automática ATSP0 pode falhar ou escolher mal o protocolo.
     // Se o primeiro 010C não validar, faça uma única tentativa direcionada
-    // ATSP5 antes de declarar a ECU sem resposta. Isso mantém Bluetooth/ELM
+    // ATSP6. A Meriva usa ISO 14230-4 KWP Fast Init; ATSP5 é KWP 5-baud e
+    // não é o fallback correto para esta ECU. Isso mantém Bluetooth/ELM
     // conectados e evita um ciclo destrutivo de reconexão.
     if (!probeIsValid) {
-      const forcedKwp = await session.executeCommand('ATSP5');
+      const forcedKwp = await session.executeCommand('ATSP6');
       if (forcedKwp.status === 'OK') {
         ecuProbe = await session.executeCommand('010C');
         probeStream = ecuProbe.response.replace(/[^0-9A-F]/gi, '').toUpperCase();
-        probeIndex = probeStream.indexOf(probeMarker);
-        probeIsValid =
-          ecuProbe.status === 'OK' &&
-          probeIndex >= 0 &&
-          probeStream.length >= probeIndex + probeMarker.length + 4;
+        probeIsValid = isValidEcuProbe(ecuProbe);
       }
     }
 
-    // A conexão Bluetooth/ELM e a comunicação com a ECU são camadas diferentes.
-    // O ELM já foi confirmado pelos comandos AT acima. Portanto, uma falha no
-    // primeiro PID e no fallback KWP5 não deve derrubar o Bluetooth.
+    // Bluetooth/ELM e ECU são camadas diferentes. Se a ECU não respondeu,
+    // NÃO crie uma conexão OBD ativa. O relatório deve mostrar a falha e o
+    // próximo candidato pareado poderá ser testado pelo sharedConnection.
     if (!probeIsValid) {
-      return {
-        session,
-        initialization,
-        protocol: session.getProtocol(),
-        ecuProbe,
-        supportedPids: [],
-      };
+      throw new Error(`ECU NÃO RESPONDEU AO 010C: ${ecuProbe.status} | RX=${ecuProbe.response || 'N/D'}`);
     }
 
     // Depois do primeiro PID válido, atualize o protocolo efetivamente usado
@@ -181,6 +176,7 @@ export async function createRealElmSession(
         protocol: session.getProtocol(),
         ecuProbe,
         supportedPids: [],
+        ecuValidated: false,
       };
     }
 
@@ -193,6 +189,7 @@ export async function createRealElmSession(
       protocol: session.getProtocol(),
       ecuProbe,
       supportedPids: [],
+      ecuValidated: true,
     };
   } catch (cause) {
     lastBluetoothDiagnosticText = session.getTransportDiagnosticsText();
