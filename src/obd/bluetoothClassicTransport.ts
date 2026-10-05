@@ -53,7 +53,7 @@ export class BluetoothClassicTransport implements ObdTransport {
 
     // ELM327 clones variam no uso do RFCOMM seguro. Tentamos primeiro o
     // socket inseguro, padrão comum desses adaptadores, e depois o seguro.
-    // O modo BINARY é deliberado: o app precisa enxergar o caractere '>' do
+    // O modo RAW é deliberado: o app precisa enxergar o caractere '>' do
     // ELM. O modo DELIMITED pode consumir o delimitador antes de entregar o
     // evento ao JavaScript, escondendo justamente o prompt que fecha a resposta.
     // Conecta diretamente pelo endereço MAC. A API instalada não expõe
@@ -63,7 +63,7 @@ export class BluetoothClassicTransport implements ObdTransport {
       try {
         device = await Promise.race([
           RNBluetoothClassic.connectToDevice(this.deviceAddress, {
-            connectionType: 'binary',
+            connectionType: 'raw',
             delimiter: '>',
             charset: 'ascii',
             secureSocket,
