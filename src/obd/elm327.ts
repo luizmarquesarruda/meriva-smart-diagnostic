@@ -127,6 +127,13 @@ export class Elm327Session {
         }
         results.push(result);
 
+        // Cheap v1.5 clones often return the ATZ prompt before their serial
+        // command processor is fully ready. Give the firmware a short, fixed
+        // settling window even when ATZ succeeded on the first try.
+        if (command === 'ATZ' && result.status === 'OK') {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+
         // ATI/ATZ prove that the adapter is alive. Other AT commands are
         // best-effort because real-world ELM327 clones expose different subsets.
         if (mandatory.includes(command) && result.status !== 'OK') {
