@@ -34,7 +34,9 @@ export default function ConexaoScreen() {
       // A conexão automática só pode começar por um candidato que tenha\n      // forte indício de ser adaptador OBD. Nunca envie ATZ automaticamente\n      // para fone, caixa de som ou outro Bluetooth pareado.\n      const first = preferredDevice || elmLike;
 
       setSelected(first?.address || null);
-      setStage(list.length\n        ? (first ? `Pareados encontrados: ${list.length}. ELM candidato: ${first.name || first.address}` : `Pareados encontrados: ${list.length}. Selecione o ELM327`)\n        : 'Nenhum adaptador pareado');
+      setStage(list.length
+        ? (first ? `Pareados encontrados: ${list.length}. ELM candidato: ${first.name || first.address}` : `Pareados encontrados: ${list.length}. Selecione o ELM327`)
+        : 'Nenhum adaptador pareado');
 
       if (autoConnect && first) {
         setStage(`Conectando ${first.name || first.address}`);
