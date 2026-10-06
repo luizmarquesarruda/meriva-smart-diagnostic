@@ -6,6 +6,7 @@ import { ElmCommandResult, Elm327Session } from './elm327';
 import { Elm327CompatibilityConfig, DEFAULT_ELM327_COMPATIBILITY, mergeCompatibilityConfig } from './elm327Compatibility';
 import { discoverIntelligentPids } from './intelligentPidDiscovery';
 import type { PidDiscoveryCache } from '../meriva/autosaveState';
+import bluetoothConfig from '../knowledge/bluetooth_config.json';
 
 export type BluetoothConnectionStatus =
   | 'BLUETOOTH INDISPONÍVEL'
@@ -177,8 +178,8 @@ export async function discoverPairedDevices(): Promise<BluetoothDeviceInfo[]> {
   }
 }
 
-export const MAX_BLUETOOTH_ATTEMPTS = 20;
-export const BLUETOOTH_RETRY_INTERVAL_MS = 8000;
+export const MAX_BLUETOOTH_ATTEMPTS = bluetoothConfig.retry.maxAttempts;
+export const BLUETOOTH_RETRY_INTERVAL_MS = bluetoothConfig.retry.intervalMs;
 
 export async function createRealElmSession(
   device: BluetoothDeviceInfo,
@@ -213,7 +214,7 @@ export async function createRealElmSession(
         attemptsTotal: attempt,
         successes: 1,
         failures: attempt - 1,
-        reason: 'SUCCESS_STOPPED',
+        reason: bluetoothConfig.retry.stopOnSuccess ? 'SUCCESS_STOPPED' : 'SUCCESS_CONTINUE',
       });
 
       return session;
