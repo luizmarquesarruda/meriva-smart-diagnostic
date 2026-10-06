@@ -132,13 +132,14 @@ class AutoTripService {
     };
     this.emit();
 
-    this.loopPromise = this.runLoop(connection, generation, obdSpeedSupported);
+    this.loopPromise = this.runLoop(connection, generation, obdSpeedSupported, fuelLevelSupported);
   }
 
   private async runLoop(
     connection: SharedObdConnection,
     generation: number,
     obdSpeedSupported: boolean,
+    fuelLevelSupported: boolean,
   ): Promise<void> {
     while (
       this.running &&
@@ -317,8 +318,13 @@ class AutoTripService {
         const averageConsumptionKml = cumulativeFuelUsedL > 0
           ? cumulativeDistanceKm / cumulativeFuelUsedL
           : 0;
+        const fuelLevel = Number(state.autonomy.fuelLevelPercent);
+        const hasFuelLevel = Number.isFinite(fuelLevel) && fuelLevel >= 0 && fuelLevel <= 100;
+        const estimatedFuelRemainingL = hasFuelLevel
+          ? Number((state.autonomy.tankCapacityL * fuelLevel / 100).toFixed(2))
+          : null;
         const estimatedRangeKm = averageConsumptionKml > 0
-          ? averageConsumptionKml * state.autonomy.tankCapacityL
+          ? averageConsumptionKml * (estimatedFuelRemainingL ?? state.autonomy.tankCapacityL)
           : 0;
 
         state.autonomy = {
@@ -328,6 +334,8 @@ class AutoTripService {
           cumulativeFuelUsedL: Number(cumulativeFuelUsedL.toFixed(3)),
           averageConsumptionKml: Number(averageConsumptionKml.toFixed(3)),
           estimatedRangeKm: Number(estimatedRangeKm.toFixed(1)),
+          estimatedFuelRemainingL,
+          fuelLevelSource: hasFuelLevel ? 'PID_012F' : state.autonomy.fuelLevelSource,
           realReadingCount: (Number(state.autonomy.realReadingCount) || 0) + 1,
           lastReadingAt: cycle.finishedAt,
           readings: [
