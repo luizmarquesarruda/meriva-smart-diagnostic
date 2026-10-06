@@ -352,7 +352,7 @@ async function testCarScannerBaselineAndFuel012F() {
   assert.strictEqual(parser.parsePidResponse('012F', 'NO DATA').status, 'NÃO RESPONDEU');
   assert.strictEqual(fuel.fuelLevelPercentToLiters(0), 0);
   assert.strictEqual(fuel.fuelLevelPercentToLiters(100), 56);
-  assert.ok(Math.abs(fuel.fuelLevelPercentToLiters(parsed.value) - (56 * 128 / 255)) < 1e-12);
+  assert.strictEqual(fuel.fuelLevelPercentToLiters(parsed.value), 28.11);
   assert.strictEqual(fuel.isFuelReserve(parsed.value), false);
   assert.strictEqual(fuel.isFuelReserve(8), true);
   assert.strictEqual(fuel.estimateRangeFromFuelLevel(50, 10), 280);
