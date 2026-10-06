@@ -3,6 +3,7 @@ import type { BluetoothDeviceInfo } from './bluetoothClassicTransport';
 import { createRealElmSession, discoverPairedDevices, ensureBluetoothReady } from './bluetoothManager';
 import { DEFAULT_ELM327_COMPATIBILITY, Elm327CompatibilityConfig, mergeCompatibilityConfig } from './elm327Compatibility';
 import { getAutoSaveState } from '../meriva/autosaveManager';
+import { clearBluetoothDiagnostic, getLastBluetoothDiagnosticText } from './bluetoothManager';
 
 export interface SharedObdConnection {
   session: Elm327Session;
@@ -16,6 +17,7 @@ export interface SharedObdConnection {
 let active: SharedObdConnection | null = null;
 let connecting: Promise<SharedObdConnection> | null = null;
 let lastConnectionError: string | null = null;
+let lastDiscoveryDevices: BluetoothDeviceInfo[] = [];
 
 const listeners = new Set<(connection: SharedObdConnection | null) => void>();
 
@@ -29,6 +31,10 @@ function setConnectionError(cause: unknown): void {
 
 export function getSharedObdLastError(): string | null {
   return lastConnectionError;
+}
+
+export function getSharedObdDiagnosticContext(): { devices: BluetoothDeviceInfo[]; trace: string } {
+  return { devices: [...lastDiscoveryDevices], trace: getLastBluetoothDiagnosticText() };
 }
 
 function looksLikeElm327(device: BluetoothDeviceInfo): boolean {
@@ -71,9 +77,12 @@ async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm3
 async function connectPreferredElmOnce(
   compatibility: Elm327CompatibilityConfig,
 ): Promise<SharedObdConnection> {
+  clearBluetoothDiagnostic();
+  lastDiscoveryDevices = [];
   await ensureBluetoothReady();
 
   const devices = await discoverPairedDevices();
+  lastDiscoveryDevices = devices;
   const candidates: BluetoothDeviceInfo[] = [];
   const addCandidate = (device: BluetoothDeviceInfo) => {
     if (!candidates.some((item) => sameAddress(item.address, device.address))) candidates.push(device);
