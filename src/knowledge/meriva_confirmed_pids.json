@@ -140,6 +140,17 @@
       "observed_value": 0.53,
       "source_note": "Valor observado no baseline CarScanner de 2026-09-24.",
       "status": "CANDIDATO"
+    },
+    {
+      "pid": "012F",
+      "name": "Fuel Level Input",
+      "unit": "percent",
+      "formulaId": "PERCENT_255",
+      "bytes": 1,
+      "evidence": "STANDARD_OBD",
+      "confidence": 0.85,
+      "source_note": "PID padrão OBD para nível de combustível. No projeto, é a fonte absoluta para combustível/autonomia somente após resposta RAW_ECU válida.",
+      "status": "CANDIDATO"
     }
   ],
   "rules": [
@@ -155,10 +166,13 @@
     "0106",
     "0107",
     "010B",
+    "010D",
     "010E",
     "010F",
     "0110",
     "0111",
-    "0114"
+    "0114",
+    "012F",
+    "015E"
   ]
 }
