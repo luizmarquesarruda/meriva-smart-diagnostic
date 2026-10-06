@@ -14,6 +14,7 @@ import { getMidLayout } from '../src/ui/midLayout';
 import { readAppSettings, writeAppSettings } from '../src/database/appSettings';
 
 import { DtcRecord, readDtcs, recordDtc } from '../src/database/dtcManager';
+import { getDtcKnowledge } from '../src/obd/knowledgeRuntime';
 import {
   initAutoSave,
   startObdSessionCheckpoint,
@@ -359,6 +360,7 @@ export default function LaboratorioScreen() {
           const previous = existing.find((item) => item.code === code);
           return {
             code,
+            description: getDtcKnowledge(code)?.meaning,
             status: 'CURRENT',
             firstSeen: previous?.firstSeen ?? now,
             lastSeen: now,
@@ -376,7 +378,8 @@ export default function LaboratorioScreen() {
         await forceSaveOnObdEvent();
       }
 
-      setStatus(codes.length ? `DTC ENCONTRADOS: ${codes.join(', ')}` : 'NENHUM DTC RETORNADO');
+      const describedCodes = codes.map((code) => getDtcKnowledge(code)?.meaning ? `${code}: ${getDtcKnowledge(code)?.meaning}` : `${code}: CÓDIGO NÃO MAPEADO`);
+      setStatus(describedCodes.length ? `DTC ENCONTRADOS: ${describedCodes.join(' | ')}` : 'NENHUM DTC RETORNADO');
     } catch (cause) {
       setStatus('FALHA NA LEITURA DE DTC');
       setError(cause instanceof Error ? cause.message : 'ERRO AO LER DTC');
