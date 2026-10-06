@@ -12,7 +12,10 @@ export interface MaintenanceRecord {
 }
 
 export interface MaintenanceState {
+  /** Hodômetro real informado pelo painel do veículo. */
   vehicleOdometerKm: number | null;
+  /** Distância que o app confirmou/monitorou via GPS. Nunca altera o hodômetro. */
+  monitoredDistanceKm: number;
   severeUse: boolean;
   records: MaintenanceRecord[];
   lastGpsDistanceKm: number;
@@ -21,6 +24,7 @@ export interface MaintenanceState {
 
 const EMPTY: MaintenanceState = {
   vehicleOdometerKm: null,
+  monitoredDistanceKm: 0,
   severeUse: false,
   records: [],
   lastGpsDistanceKm: 0,
@@ -62,6 +66,7 @@ function normalize(value: unknown): MaintenanceState {
     : [];
   return {
     vehicleOdometerKm: validKm(v.vehicleOdometerKm) ? v.vehicleOdometerKm : null,
+    monitoredDistanceKm: validKm(v.monitoredDistanceKm) ? v.monitoredDistanceKm : 0,
     severeUse: v.severeUse === true,
     records,
     lastGpsDistanceKm: validKm(v.lastGpsDistanceKm) ? v.lastGpsDistanceKm : 0,
@@ -130,12 +135,8 @@ export async function recordMaintenance(
     ...(details.observation?.trim() ? { observation: details.observation.trim() } : {}),
   };
 
-  // Histórico é append-only. Não apagamos a troca anterior.
+  // A quilometragem da troca é histórica. Não altera o hodômetro atual.
   state.records = [...state.records, record];
-  if (state.vehicleOdometerKm == null || changedAtKm > state.vehicleOdometerKm) {
-    state.vehicleOdometerKm = changedAtKm;
-    state.lastGpsDistanceKm = 0;
-  }
   await writeMaintenanceState(basePath, state);
   return state;
 }
@@ -158,9 +159,7 @@ export async function addDrivenDistance(
   const state = await readMaintenanceState(basePath);
   if (state.vehicleOdometerKm == null) return state;
 
-  // O GPS não é o hodômetro do carro. Ele só incrementa o valor inicial
-  // lido no painel pelo usuário. Se o rastreador reiniciar e voltar para
-  // um valor menor, tratamos o primeiro ponto como novo baseline.
+  // GPS é somente distância monitorada. Nunca incrementa o hodômetro real.
   if (gpsDistanceKm < state.lastGpsDistanceKm) {
     state.lastGpsDistanceKm = gpsDistanceKm;
     await writeMaintenanceState(basePath, state);
@@ -170,7 +169,7 @@ export async function addDrivenDistance(
   const delta = gpsDistanceKm - state.lastGpsDistanceKm;
   state.lastGpsDistanceKm = gpsDistanceKm;
   if (delta > 0 && delta < 100) {
-    state.vehicleOdometerKm = Number((state.vehicleOdometerKm + delta).toFixed(3));
+    state.monitoredDistanceKm = Number((state.monitoredDistanceKm + delta).toFixed(3));
   }
   await writeMaintenanceState(basePath, state);
   return state;
