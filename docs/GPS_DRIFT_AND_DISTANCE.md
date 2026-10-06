@@ -22,7 +22,7 @@ Estas referências foram usadas como direção arquitetural. O Meriva Smart Diag
 3. quando há precisão declarada, o deslocamento precisa superar 1,5x a pior precisão entre os dois fixes;
 4. velocidade derivada precisa ser de pelo menos 5 km/h;
 5. a velocidade informada pelo próprio Android também precisa confirmar pelo menos 5 km/h;
-6. são necessárias 3 amostras consecutivas confirmando movimento;
+6. são necessários 3 segmentos consecutivos confirmando movimento, o que exige 4 posições válidas consecutivas;
 7. segmentos acima de 250 m são descartados;
 8. speed stale ou ausência de speed não gera distância;
 9. a velocidade exibida deixa de usar max(GPS speed, velocidade derivada), evitando inflar o valor com um fix inconsistente.
@@ -45,3 +45,7 @@ Para o modo de viagem automotiva, a melhor arquitetura é combinar:
 - filtro adaptativo somente depois de medir o comportamento real do aparelho.
 
 O GPS não deve ser tratado como um odômetro perfeito.
+
+## Regra de teste 2026-10-06
+
+O primeiro fix estabelece a referência. Três segmentos consecutivos precisam confirmar movimento antes de somar distância. Portanto, o teste automatizado de movimento usa quatro posições válidas.
