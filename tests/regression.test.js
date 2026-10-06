@@ -338,6 +338,35 @@ async function testIntelligentPidDiscovery() {
   assert.strictEqual(result.observations.find((item) => item.pid === '010C').value, 1726);
 }
 
+async function testCarScannerBaselineAndFuel012F() {
+  resetFS();
+  const parser = loadTs(path.join(ROOT, 'src/obd/parser.ts'));
+  const fuel = loadTs(path.join(ROOT, 'src/trip/fuelLevel.ts'));
+  const learning = loadTs(path.join(ROOT, 'src/database/learningProfile.ts'));
+
+  const parsed = parser.parsePidResponse('012F', '41 2F 80');
+  assert.strictEqual(parsed.status, 'RESPONDEU');
+  assert.strictEqual(parsed.value, 50);
+  assert.strictEqual(parsed.unit, 'percent');
+  assert.strictEqual(fuel.fuelLevelPercentToLiters(parsed.value), 28);
+  assert.strictEqual(fuel.isFuelReserve(parsed.value), false);
+  assert.strictEqual(fuel.isFuelReserve(8), true);
+  assert.strictEqual(fuel.estimateRangeFromFuelLevel(50, 10), 280);
+
+  await learning.createLearningProfile(BASE, '2026-09-24T14:48:00.000Z');
+  const seeded = await learning.initializeCarScannerSeed(BASE);
+  assert.strictEqual(seeded.globalSampleCounts.seedSamples, 10);
+  assert.strictEqual(seeded.globalSampleCounts.realSamples, 0);
+  assert.strictEqual(seeded.globalSampleCounts.totalSamples, 10);
+  assert.strictEqual(seeded.source, 'HYBRID');
+  assert.strictEqual(seeded.learningStatus, 'SEED_INITIALIZED');
+  const rpm = seeded.contextualData.find((item) => item.condition === 'IDLE_WARM').statistics['Engine RPM'];
+  assert.strictEqual(rpm.mean, 778);
+  assert.strictEqual(rpm.realSamples, 0);
+  assert.strictEqual(rpm.seedSamples, 1);
+  assert.deepStrictEqual(rpm.source, ['CARSCANNER_BASELINE']);
+}
+
 async function testBluetoothEventTransport() {
   bluetoothListener = null;
   bluetoothDisconnectListener = null;
@@ -604,6 +633,7 @@ async function main() {
     ['gate de validação ECU/010C', testEcuValidationGate],
     ['descoberta de PIDs', testPidScanner],
     ['IA burrinha de PIDs', testIntelligentPidDiscovery],
+    ['CarScanner baseline + PID 012F', testCarScannerBaselineAndFuel012F],
     ['Bluetooth por eventos', testBluetoothEventTransport],
     ['quota configurável', testQuota],
     ['logger TX/RX', testRawLogger],
