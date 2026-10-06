@@ -32,6 +32,17 @@
   ],
   "candidates": [
     {
+      "pid": "012F",
+      "name": "Fuel Level Input",
+      "unit": "percent",
+      "formulaId": "PERCENT_255",
+      "bytes": 1,
+      "evidence": "RAW_ECU_PENDING",
+      "confidence": 0,
+      "source_note": "PID experimental/observado. Deve ser consultado somente como candidato e nunca tratado como confirmação da boia sem resposta RAW_ECU válida e repetível.",
+      "status": "CANDIDATO"
+    },
+    {
       "pid": "0105",
       "name": "Coolant Temperature",
       "unit": "celsius",
