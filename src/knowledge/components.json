@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "vehicleScope": "Chevrolet Meriva Maxx 1.4 8V ECONO.FLEX 2011/2012",
+  "ecuFamily":"Multec H-X14YFH",
+  "components":[
+    {"id":"ECT","name":"Engine Coolant Temperature Sensor","relatedPids":["0105"],"references":["meriva_health.json"]},
+    {"id":"IAT","name":"Intake Air Temperature Sensor","relatedPids":["010F"],"references":["meriva_health.json"]},
+    {"id":"MAP","name":"Manifold Absolute Pressure Sensor","relatedPids":["010B"],"references":["meriva_health.json"]},
+    {"id":"TPS","name":"Throttle Position Sensor","relatedPids":["0111"],"references":["meriva_health.json"]},
+    {"id":"MAF","name":"Mass Air Flow Sensor","relatedPids":["0110"],"references":["meriva_health.json"]},
+    {"id":"HEGO_B1S1","name":"Heated Oxygen Sensor Bank 1 Sensor 1","relatedPids":["0114"],"references":["meriva_health.json"]},
+    {"id":"ECU","name":"Engine Control Unit","relatedPids":["010C","0142"],"references":["ecu.json"]},
+    {"id":"FUEL_SYSTEM","name":"Fuel system","relatedPids":["0106","0107","0151","0152","015E"],"references":["meriva_health.json","fuel_types.json"]}
+  ]
+}
