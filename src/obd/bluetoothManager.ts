@@ -6,6 +6,7 @@ import { ElmCommandResult, Elm327Session } from './elm327';
 import { Elm327CompatibilityConfig, DEFAULT_ELM327_COMPATIBILITY, mergeCompatibilityConfig } from './elm327Compatibility';
 import { discoverIntelligentPids } from './intelligentPidDiscovery';
 import type { PidDiscoveryCache } from '../meriva/autosaveState';
+import { getEcuPolicy, validateEcuPolicy } from './ecuKnowledge';
 
 export type BluetoothConnectionStatus =
   | 'BLUETOOTH INDISPONÍVEL'
@@ -153,12 +154,14 @@ export async function createRealElmSession(
   const session = new Elm327Session(new BluetoothClassicTransport(device.address, config), config);
 
   try {
+    const ecuPolicy = validateEcuPolicy();
     const initialization = await session.initialize();
 
     // Primeiro confirme ECU/ELM com um PID real e simples.
     // 010C funciona com a chave ligada mesmo com motor parado e evita
     // bombardear a ECU com vários blocos de descoberta antes do primeiro OK.
-    let ecuProbe = await session.executeCommand('010C');
+    const requiredPid = ecuPolicy.elm327.validation.requiredPid;
+    let ecuProbe = await session.executeCommand(requiredPid);
     let probeIsValid = isValidEcuProbe(ecuProbe);
 
     // ATSP0 é a primeira tentativa. Se o ELM/ECU não fechar a comunicação,
@@ -167,7 +170,7 @@ export async function createRealElmSession(
     // IMPORTANTE: no ELM327, ATSP5 = ISO 14230 KWP FAST,
     // ATSP3 = ISO 9141-2 e ATSP4 = ISO 14230 KWP 5-baud.
     // ATSP6 NÃO é KWP: é CAN 11/500.
-    const protocolFallbacks = ['5', '3', '4', '6', '7', '8', '9'];
+    const protocolFallbacks = ecuPolicy.protocolFallback.map((item) => item.elmProtocol);
     let successfulForcedProtocol: string | null = null;
 
     for (const protocol of protocolFallbacks) {
@@ -176,10 +179,15 @@ export async function createRealElmSession(
       const forcedProtocol = await session.executeCommand(`ATSP${protocol}`);
       if (forcedProtocol.status !== 'OK') continue;
 
-      ecuProbe = await session.executeCommand('010C');
+      ecuProbe = await session.executeCommand(requiredPid);
       probeIsValid = isValidEcuProbe(ecuProbe);
       if (probeIsValid) successfulForcedProtocol = protocol;
     }
+
+    // A política JSON define a ordem dos protocolos e o PID de prova. O código
+    // mantém a validação estrutural para não aceitar uma configuração quebrada.
+    const configuredFallbacks = getEcuPolicy().protocolFallback.map((item) => item.elmProtocol);
+    if (configuredFallbacks.length === 0) throw new Error('POLÍTICA ECU SEM PROTOCOLOS DE FALLBACK.');
 
     // Bluetooth/ELM e ECU são camadas diferentes. Se a ECU não respondeu,
     // NÃO crie uma conexão OBD ativa. O relatório deve mostrar a falha e o
