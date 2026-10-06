@@ -144,22 +144,23 @@ export async function createRealElmSession(
     // 010C funciona com a chave ligada mesmo com motor parado e evita
     // bombardear a ECU com vários blocos de descoberta antes do primeiro OK.
     let ecuProbe = await session.executeCommand('010C');
-    let probeStream = ecuProbe.response.replace(/[^0-9A-F]/gi, '').toUpperCase();
     let probeIsValid = isValidEcuProbe(ecuProbe);
 
-    // A Meriva usa ISO 14230-4 KWP Fast Init. Em clones v1.5 baratos, a
-    // descoberta automática ATSP0 pode falhar ou escolher mal o protocolo.
-    // Se o primeiro 010C não validar, faça uma única tentativa direcionada
-    // ATSP6. A Meriva usa ISO 14230-4 KWP Fast Init; ATSP5 é KWP 5-baud e
-    // não é o fallback correto para esta ECU. Isso mantém Bluetooth/ELM
-    // conectados e evita um ciclo destrutivo de reconexão.
-    if (!probeIsValid) {
-      const forcedKwp = await session.executeCommand('ATSP6');
-      if (forcedKwp.status === 'OK') {
-        ecuProbe = await session.executeCommand('010C');
-        probeStream = ecuProbe.response.replace(/[^0-9A-F]/gi, '').toUpperCase();
-        probeIsValid = isValidEcuProbe(ecuProbe);
-      }
+    // ATSP0 é a primeira tentativa. Se o ELM/ECU não fechar a comunicação,
+    // tente protocolos K-Line em ordem de evidência para esta família GM.
+    // IMPORTANTE: no ELM327, ATSP5 = ISO 14230 KWP FAST,
+    // ATSP3 = ISO 9141-2 e ATSP4 = ISO 14230 KWP 5-baud.
+    // ATSP6 NÃO é KWP: é CAN 11/500.
+    const protocolFallbacks = ['5', '3', '4'];
+
+    for (const protocol of protocolFallbacks) {
+      if (probeIsValid) break;
+
+      const forcedProtocol = await session.executeCommand(`ATSP${protocol}`);
+      if (forcedProtocol.status !== 'OK') continue;
+
+      ecuProbe = await session.executeCommand('010C');
+      probeIsValid = isValidEcuProbe(ecuProbe);
     }
 
     // Bluetooth/ELM e ECU são camadas diferentes. Se a ECU não respondeu,
