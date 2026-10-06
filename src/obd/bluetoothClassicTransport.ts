@@ -206,7 +206,7 @@ export class BluetoothClassicTransport implements ObdTransport {
         this.logDiagnostic('RX_CHUNK', {
           length: chunk.length,
           data: chunk,
-          hex: Array.from(new TextEncoder().encode(chunk)).map((value) => value.toString(16).padStart(2, '0')).join(' '),
+          hex: Array.from(chunk).map((char) => char.charCodeAt(0).toString(16).padStart(2, '0')).join(' '),
         });
         this.received += chunk;
       }
