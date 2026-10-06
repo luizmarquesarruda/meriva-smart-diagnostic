@@ -22,13 +22,24 @@ export interface GpsTripState {
 
 export type GpsListener = (state: GpsTripState) => void;
 
-const MIN_ACCURACY_M = 60;
+const MAX_ACCURACY_M = 30;
 const MAX_SPEED_KMH = 220;
-const MIN_MOVEMENT_SPEED_KMH = 2;
-const MIN_MOVEMENT_DISTANCE_M = 5;
+const MIN_MOVEMENT_SPEED_KMH = 5;
+const MIN_MOVEMENT_DISTANCE_M = 8;
 const STOP_SPEED_KMH = 2;
-const MIN_MOVING_SAMPLES = 2;
+const MIN_MOVING_SAMPLES = 3;
 const MAX_SEGMENT_GAP_MS = 5_000;
+
+// GPS parado pode variar vários metros mesmo com o carro imóvel.
+// O odômetro só aceita um segmento quando o deslocamento supera
+// o ruído esperado pela precisão declarada pelo Android.
+function movementThresholdM(sample: GpsSample, previous: GpsSample): number {
+  const accuracies = [sample.accuracyM, previous.accuracyM].filter(
+    (value): value is number => value != null && Number.isFinite(value),
+  );
+  const reportedAccuracy = accuracies.length > 0 ? Math.max(...accuracies) : 0;
+  return Math.max(MIN_MOVEMENT_DISTANCE_M, reportedAccuracy * 1.5);
+}
 
 export function haversineDistanceKm(
   a: Pick<GpsSample, 'latitude' | 'longitude'>,
@@ -64,7 +75,7 @@ export function normalizeGpsSpeedKmh(speedMs: number | null | undefined): number
 }
 
 function isAccurate(sample: GpsSample): boolean {
-  return sample.accuracyM == null || sample.accuracyM <= MIN_ACCURACY_M;
+  return sample.accuracyM == null || sample.accuracyM <= MAX_ACCURACY_M;
 }
 
 export class GpsTracker {
@@ -213,9 +224,12 @@ export class GpsTracker {
 
         const segmentDistanceM = segmentKm * 1000;
         const derivedMoving =
-          segmentDistanceM >= MIN_MOVEMENT_DISTANCE_M &&
+          segmentDistanceM >= movementThresholdM(sample, this.previous) &&
           derivedSpeedKmh >= MIN_MOVEMENT_SPEED_KMH &&
-          derivedSpeedKmh <= MAX_SPEED_KMH;
+          derivedSpeedKmh <= MAX_SPEED_KMH &&
+          sample.speedKmh != null &&
+          sample.speedKmh >= MIN_MOVEMENT_SPEED_KMH &&
+          sample.speedKmh <= MAX_SPEED_KMH;
 
         if (derivedMoving) {
           this.consecutiveMovingSamples += 1;
@@ -223,8 +237,8 @@ export class GpsTracker {
           this.consecutiveMovingSamples = 0;
         }
 
-        // Distância só entra no odômetro GPS depois de duas amostras consecutivas
-        // que comprovem movimento. Isso elimina o "carro andando parado" causado
+        // Distância só entra no odômetro GPS depois de três amostras consecutivas
+        // que comprovem movimento e velocidade real do fix. Isso elimina o "carro andando parado" causado
         // por jitter e velocidade stale do Android.
         if (
           segmentKm <= 0.25 &&
@@ -245,10 +259,13 @@ export class GpsTracker {
       derivedSpeedKmh != null &&
       derivedSpeedKmh >= MIN_MOVEMENT_SPEED_KMH &&
       derivedSpeedKmh <= MAX_SPEED_KMH &&
+      sample.speedKmh != null &&
+      sample.speedKmh >= MIN_MOVEMENT_SPEED_KMH &&
+      sample.speedKmh <= MAX_SPEED_KMH &&
       this.consecutiveMovingSamples >= MIN_MOVING_SAMPLES;
     let speedKmh = movementConfirmed
       ? (sample.speedKmh != null && sample.speedKmh <= MAX_SPEED_KMH
-        ? Math.max(sample.speedKmh, derivedSpeedKmh ?? 0)
+        ? sample.speedKmh
         : (derivedSpeedKmh ?? 0))
       : 0;
     if (!Number.isFinite(speedKmh) || speedKmh < STOP_SPEED_KMH || speedKmh > MAX_SPEED_KMH) speedKmh = 0;
