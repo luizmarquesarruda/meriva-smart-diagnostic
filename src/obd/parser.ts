@@ -1,4 +1,5 @@
 import { getPidDefinition } from './pidDefinition';
+import { validatePidValue } from './formulaEngine';
 import type { PidDefinition } from './pidDefinition';
 
 export type ParseStatus = 'RESPONDEU' | 'NÃO RESPONDEU' | 'VALOR NÃO INTERPRETADO';
@@ -107,6 +108,21 @@ export function parsePidResponse(pidRequested: string, rawResponse: string): Par
   }
 
   const value = definition.formula(data);
+  const validation = validatePidValue(pid, value);
+  if (!validation.valid) {
+    return {
+      pid,
+      name: definition.name,
+      value: null,
+      unit: definition.unit,
+      rawResponse,
+      rawBytes,
+      status: 'VALOR NÃO INTERPRETADO',
+      errorMessage: validation.reason,
+      definition,
+    };
+  }
+
   if (!Number.isFinite(value)) {
     return {
       pid,
