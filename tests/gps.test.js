@@ -105,10 +105,19 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
     },
     timestamp: 3000,
   });
+  watcher({
+    coords: {
+      latitude: 0,
+      longitude: 0.0003,
+      speed: 10,
+      accuracy: 5,
+    },
+    timestamp: 4000,
+  });
 
   const state = tracker.getState();
   assert.ok(state.currentSpeedKmh >= 36 && state.currentSpeedKmh <= 40);
-  assert.ok(state.distanceKm > 0.01 && state.distanceKm < 0.021);
+  assert.ok(state.distanceKm > 0.03 && state.distanceKm < 0.04);
   assert.ok(state.maxSpeedKmh >= 36);
   assert.strictEqual(state.signalQuality, 'EXCELENTE');
   assert.strictEqual(state.speedSource, 'GPS');
@@ -122,7 +131,7 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
       speed: 0,
       accuracy: 5,
     },
-    timestamp: 3000,
+    timestamp: 5000,
   });
   assert.strictEqual(tracker.getState().currentSpeedKmh, 0);
   assert.strictEqual(tracker.getState().speedSource, 'PARADO');
@@ -133,75 +142,29 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
   watcher({ coords: { latitude: 0, longitude: 0.0010, speed: 10, accuracy: 5 }, timestamp: 14000 });
   watcher({ coords: { latitude: 0, longitude: 0.0012, speed: 10, accuracy: 5 }, timestamp: 15000 });
   watcher({ coords: { latitude: 0, longitude: 0.0014, speed: 10, accuracy: 5 }, timestamp: 16000 });
+  watcher({ coords: { latitude: 0, longitude: 0.0016, speed: 10, accuracy: 5 }, timestamp: 17000 });
   assert.strictEqual(tracker.getState().speedSource, 'OBD');
   tracker.setVehicleSpeedHintKmh(0);
-  watcher({ coords: { latitude: 0, longitude: 0.0014, speed: 10, accuracy: 5 }, timestamp: 17000 });
+  watcher({ coords: { latitude: 0, longitude: 0.0016, speed: 10, accuracy: 5 }, timestamp: 18000 });
   assert.strictEqual(tracker.getState().currentSpeedKmh, 0);
 
-  // Jitter parado de ~7 m não pode virar distância, mesmo com um speed positivo stale.
+  // Jitter parado de poucos metros não pode virar distância, mesmo com speed stale positivo.
   const distanceBeforeJitter = tracker.getState().distanceKm;
-  watcher({
-    coords: {
-      latitude: 0,
-      longitude: 0.00021,
-      speed: 10,
-      accuracy: 5,
-    },
-    timestamp: 4000,
-  });
+  watcher({ coords: { latitude: 0, longitude: 0.00161, speed: 10, accuracy: 5 }, timestamp: 19000 });
+  watcher({ coords: { latitude: 0, longitude: 0.00162, speed: 10, accuracy: 5 }, timestamp: 20000 });
   assert.strictEqual(tracker.getState().distanceKm, distanceBeforeJitter);
 
   // Fixes com speed ausente também não podem transformar deriva do GPS em movimento.
-  watcher({
-    coords: {
-      latitude: 0,
-      longitude: 0.00010,
-      speed: null,
-      accuracy: 5,
-    },
-    timestamp: 11_000,
-  });
-  watcher({
-    coords: {
-      latitude: 0,
-      longitude: 0.00020,
-      speed: null,
-      accuracy: 5,
-    },
-    timestamp: 12_000,
-  });
-  watcher({
-    coords: {
-      latitude: 0,
-      longitude: 0.00030,
-      speed: null,
-      accuracy: 5,
-    },
-    timestamp: 13_000,
-  });
+  watcher({ coords: { latitude: 0, longitude: 0.00163, speed: null, accuracy: 5 }, timestamp: 21000 });
+  watcher({ coords: { latitude: 0, longitude: 0.00164, speed: null, accuracy: 5 }, timestamp: 22000 });
+  watcher({ coords: { latitude: 0, longitude: 0.00165, speed: null, accuracy: 5 }, timestamp: 23000 });
   assert.strictEqual(tracker.getState().distanceKm, distanceBeforeJitter);
 
-  // Velocidade positiva stale do Android não pode indicar movimento com jitter pequeno.
-  watcher({
-    coords: {
-      latitude: 0,
-      longitude: 0.00021,
-      speed: 10,
-      accuracy: 5,
-    },
-    timestamp: 5000,
-  });
+  // Velocidade positiva stale não pode indicar movimento quando o deslocamento é pequeno.
+  watcher({ coords: { latitude: 0, longitude: 0.00166, speed: 10, accuracy: 5 }, timestamp: 24000 });
   assert.strictEqual(tracker.getState().currentSpeedKmh, 0);
 
-  watcher({
-    coords: {
-      latitude: 0,
-      longitude: 0.0005,
-      speed: 10,
-      accuracy: 5,
-    },
-    timestamp: 10_000,
-  });
+  watcher({ coords: { latitude: 0, longitude: 0.00175, speed: 10, accuracy: 5 }, timestamp: 29000 });
   assert.strictEqual(tracker.getState().distanceKm, distanceBeforeStop);
 
   await tracker.stop();
