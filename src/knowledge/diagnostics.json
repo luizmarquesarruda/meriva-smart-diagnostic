@@ -1,0 +1,15 @@
+{
+  "version":1,
+  "rules":{
+    "diagnosisRequiresEvidence":true,
+    "combineMultipleSignals":true,
+    "singleSensorNeverAutomaticallyDefinesCause":true,
+    "missingData":"SEM_DADOS",
+    "preserveEvidence":true
+  },
+  "correlations":[
+    {"id":"MISFIRE_FUEL","when":["P0301","fuel_trim_abnormal","oxygen_sensor_unstable"],"conclusion":"Possível problema de combustão/combustível; confirmar com testes físicos.","severity":"ATENCAO"},
+    {"id":"COOLING","when":["0105 >= 99","fan_state_unknown"],"conclusion":"Temperatura atingiu referência de acionamento da ventoinha; verificar resposta do sistema.","severity":"ATENCAO"},
+    {"id":"MAP_IDLE","when":["IDLE","010B outside learned_range"],"conclusion":"MAP fora do comportamento aprendido em marcha lenta; investigar entrada de ar, carga ou sensor.","severity":"ATENCAO"}
+  ]
+}
