@@ -143,10 +143,10 @@ A suíte automatizada cobre autosave, parser, DTC, descoberta de PIDs, fila de c
 **Evidência antes de conclusão.**
 
 
-<!-- CI validation: 2026-10-04 -->
+<!-- CI validation: 2026-10-06 -->
 ## Engenharia ELM327
 
-A camada Bluetooth usa o transporte nativo do react-native-bluetooth-classic, com framing BINARY no aplicativo. Isso permite que o parser receba o prompt > do ELM327 sem depender do delimitador consumido pela biblioteca.
+A camada Bluetooth usa o transporte nativo do react-native-bluetooth-classic com `connectionType: delimited`, `delimiter: \r` e `charset: ascii`. O aplicativo mantém um buffer local e só conclui a resposta quando encontra o prompt `>` do ELM327. O termo RAW no projeto significa preservar TX/RX recebidos.
 
 A inicialização separa Bluetooth, ELM e ECU. O primeiro teste real da ECU é 010C. A documentação detalhada e a matriz de comparação com AndrOBD, python-OBD e implementações Java estão em docs/ELM327_ENGINEERING_PLAYBOOK.md.
 
@@ -154,4 +154,4 @@ A inicialização separa Bluetooth, ELM e ECU. O primeiro teste real da ECU é 0
 
 Este commit é um gatilho técnico para confirmar que o workflow `.github/workflows/ci.yml` continua disparando em `push` e executando a validação e o build Android nativo.
 
-O teste de transporte Bluetooth usa `connectionType: raw`, com buffering local até o prompt `>`. Esse contrato é intencional para o fluxo ELM327 e é protegido pela regressão automatizada.
+O teste de transporte Bluetooth usa `connectionType: delimited`, `delimiter: \r` e buffering local até o prompt `>`. Esse contrato corresponde ao código atual e é protegido pela regressão automatizada.
