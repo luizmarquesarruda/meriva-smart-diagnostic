@@ -137,3 +137,34 @@ Ainda **não confirmado** no ELM327 real. O próximo relatório deve mostrar `RX
 
 ### Próximo passo
 Executar a CI do estado final e instalar o APK gerado no telefone. O teste físico decisivo é `010C -> 41 0C XX XX`, sem aceitar `OK` isolado como resposta da ECU.
+
+---
+
+## 2026-10-06 - Política automática de 20 tentativas Bluetooth
+
+### Solicitação
+Para o teste físico do ELM327, a conexão Bluetooth deve tentar automaticamente até **20 vezes**, com **intervalo de 8 segundos** entre uma tentativa e a próxima. Cada tentativa deve deixar sua própria trilha no relatório TXT.
+
+### Correção
+- `MAX_BLUETOOTH_ATTEMPTS = 20`.
+- `BLUETOOTH_RETRY_INTERVAL_MS = 8000`.
+- Cada ciclo registra `BLUETOOTH_ATTEMPT_START`, inicialização, trace bruto do ELM327 e `BLUETOOTH_ATTEMPT_RESULT`.
+- Entre falhas, registra o início e o fim da espera de 8 segundos.
+- Ao atingir 20 falhas, encerra com `BLUETOOTH_TEST_SESSION_END` e motivo `MAX_ATTEMPTS_REACHED`.
+- Se uma tentativa for bem-sucedida, encerra imediatamente e não executa as demais.
+- O fechamento da sessão continua sendo feito em cada falha, evitando deixar uma conexão anterior aberta para a próxima tentativa.
+- O trace é acumulado no relatório TXT, preservando a evidência de cada tentativa.
+
+### Testes
+O teste de regressão agora fixa os valores de 20 tentativas e 8000 ms, evitando que uma alteração futura reduza ou aumente silenciosamente a janela do teste físico.
+
+### Arquivos afetados
+- `src/obd/bluetoothManager.ts`
+- `tests/regression.test.js`
+- `docs/DIARIO_DE_BORDO.md`
+
+### CI
+A CI será disparada pelos commits desta alteração. A correção só será considerada concluída após a validação da CI.
+
+### Próximo teste físico
+Instalar o APK da CI e gerar um novo relatório TXT. Em caso de falha persistente, o relatório deve conter até 20 blocos `BLUETOOTH_ATTEMPT_START`, cada um separado por aproximadamente 8 segundos, além dos erros RX/TX correspondentes.
