@@ -168,6 +168,7 @@ export default function IndexScreen() {
 
   const summary = useMemo(() => getDriveCycleSummary(cycles), [cycles]);
   const realConsumptionKml = summary.avgConsumptionKml > 0 ? summary.avgConsumptionKml : null;
+  const availableConsumptionKml = tripState.averageConsumptionKml > 0 ? tripState.averageConsumptionKml : realConsumptionKml;
   const distanceUnit = settings?.distanceUnit ?? 'KM';
 
   return (
@@ -189,7 +190,7 @@ export default function IndexScreen() {
                 ? (getAutoSaveState().autonomy.estimatedRangeKm.toFixed(0) + ' km')
                 : 'N/D'}
             </Text>
-            <Text style={styles.heroUnit}>BASEADA NO CONSUMO MÉDIO REAL • TANQUE NOMINAL 56 L</Text>
+            <Text style={styles.heroUnit}>AUTONOMIA COM 012F • REFERÊNCIA CARSCANNER • TANQUE NOMINAL 56 L</Text>
             <View style={styles.heroMetrics}>
               <View style={styles.heroMetric}>
                 <Text style={styles.heroMetricLabel}>CONSUMO INSTANTÂNEO</Text>
@@ -211,7 +212,7 @@ export default function IndexScreen() {
           <View style={[styles.statusGrid, layout.landscape && styles.statusGridLandscape]}>
             <StatusCard label="OBD" value={obd.connected ? 'ONLINE' : 'AGUARDANDO'} landscape={layout.landscape} />
             <StatusCard label="GPS" value={gpsState.running ? 'ATIVO' : 'AGUARDANDO'} landscape={layout.landscape} />
-            <StatusCard label="CONSUMO" value={realConsumptionKml == null ? 'N/D' : `${realConsumptionKml.toFixed(1)} km/L`} landscape={layout.landscape} />
+            <StatusCard label="CONSUMO" value={availableConsumptionKml == null ? 'N/D' : `${availableConsumptionKml.toFixed(1)} km/L`} landscape={layout.landscape} />
             <StatusCard label="FALHAS" value={dtcCount ? String(dtcCount) : 'OK'} danger={dtcCount > 0} landscape={layout.landscape} />
           </View>
 
@@ -222,7 +223,7 @@ export default function IndexScreen() {
             </View>
             <View style={[styles.tripGrid, layout.landscape && styles.tripGridLandscape]}>
               <Metric label="DISTÂNCIA" value={formatDistance(gpsState.distanceKm, distanceUnit)} />
-              <Metric label="ÚLTIMO CONSUMO" value={summary.lastRealCycle ? `${summary.lastRealCycle.avgFuelConsumptionKml.toFixed(2)} km/L` : 'N/D'} />
+              <Metric label="CONSUMO DE REFERÊNCIA" value={summary.lastRealCycle ? `${summary.lastRealCycle.avgFuelConsumptionKml.toFixed(2)} km/L` : availableConsumptionKml == null ? 'N/D' : `${availableConsumptionKml.toFixed(2)} km/L`} />
               <Metric label="PRECISÃO GPS" value={gpsState.lastAccuracyM == null ? 'N/D' : `${gpsState.lastAccuracyM.toFixed(0)} m`} />
               <Metric label="QUALIDADE" value={gpsState.signalQuality.replace('_', ' ')} />
               <Metric label="FONTE VELOCIDADE" value={gpsState.speedSource} />
