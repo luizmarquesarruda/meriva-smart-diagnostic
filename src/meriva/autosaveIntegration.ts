@@ -35,7 +35,7 @@ export async function registerObdQuery(
   });
 
   const parsedValue = result.parsed.value;
-  if (shouldFeedLearning(source, result.parsed.status, parsedValue) && parsedValue !== null) {
+  if (shouldFeedLearning(source, result.parsed.status, parsedValue, result.parsed.pid) && parsedValue !== null) {
     try {
       const now = new Date().toISOString();
       const existing = await readPidConfirmations(basePath);
