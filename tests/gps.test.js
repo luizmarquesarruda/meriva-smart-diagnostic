@@ -74,6 +74,8 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
   assert.strictEqual(await tracker.start(), true);
   assert.strictEqual(tracker.getState().running, true);
   assert.strictEqual(tracker.getState().permissionGranted, true);
+  assert.strictEqual(tracker.getState().signalQuality, 'SEM_FIX');
+  assert.strictEqual(tracker.getState().speedSource, 'PARADO');
 
   watcher({
     coords: {
@@ -108,6 +110,8 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
   assert.ok(state.currentSpeedKmh >= 36 && state.currentSpeedKmh <= 40);
   assert.ok(state.distanceKm > 0.01 && state.distanceKm < 0.021);
   assert.ok(state.maxSpeedKmh >= 36);
+  assert.strictEqual(state.signalQuality, 'EXCELENTE');
+  assert.strictEqual(state.speedSource, 'GPS');
   assert.ok(receivedStates.length >= 3);
 
   const distanceBeforeStop = state.distanceKm;
@@ -121,7 +125,18 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
     timestamp: 3000,
   });
   assert.strictEqual(tracker.getState().currentSpeedKmh, 0);
+  assert.strictEqual(tracker.getState().speedSource, 'PARADO');
   assert.strictEqual(tracker.getState().distanceKm, distanceBeforeStop);
+
+  // Quando a ECU confirma velocidade, a origem exibida passa a ser OBD.
+  tracker.setVehicleSpeedHintKmh(36);
+  watcher({ coords: { latitude: 0, longitude: 0.0010, speed: 10, accuracy: 5 }, timestamp: 14000 });
+  watcher({ coords: { latitude: 0, longitude: 0.0012, speed: 10, accuracy: 5 }, timestamp: 15000 });
+  watcher({ coords: { latitude: 0, longitude: 0.0014, speed: 10, accuracy: 5 }, timestamp: 16000 });
+  assert.strictEqual(tracker.getState().speedSource, 'OBD');
+  tracker.setVehicleSpeedHintKmh(0);
+  watcher({ coords: { latitude: 0, longitude: 0.0014, speed: 10, accuracy: 5 }, timestamp: 17000 });
+  assert.strictEqual(tracker.getState().currentSpeedKmh, 0);
 
   // Jitter parado de ~7 m não pode virar distância, mesmo com um speed positivo stale.
   const distanceBeforeJitter = tracker.getState().distanceKm;
