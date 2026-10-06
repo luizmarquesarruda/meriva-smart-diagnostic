@@ -330,6 +330,7 @@ class AutoTripService {
           estimatedRangeKm: Number(estimatedRangeKm.toFixed(1)),
           fuelLevelPercent: this.state.fuelLevelPercent,
           fuelRemainingL: this.state.fuelRemainingL,
+          fuelReserve: this.state.fuelReserve,
           realReadingCount: (Number(state.autonomy.realReadingCount) || 0) + 1,
           lastReadingAt: cycle.finishedAt,
           readings: [
