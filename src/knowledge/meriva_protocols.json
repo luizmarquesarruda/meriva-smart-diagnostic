@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "vehicle_family": "Chevrolet Corsa C / Meriva / Montana 1.4 8V Econoflex",
   "engine_system": "Multec H / X14YFH",
   "purpose": "Ordem de tentativa de protocolos para recuperar comunicação sem inventar compatibilidade.",
@@ -77,19 +77,22 @@
     }
   ],
   "rules": [
-    "Não testar todos os protocolos indiscriminadamente se o protocolo já respondeu.",
-    "Após ATSP0, validar com 010C.",
-    "Se 010C falhar, testar ATSP5 e repetir 010C.",
-    "Se ainda falhar, testar ATSP3 e repetir 010C.",
-    "ATSP4 é candidato secundário, somente depois de 5 e 3.",
-    "CAN não deve ser priorizado para esta Meriva porque a evidência real aponta K-Line.",
-    "Um protocolo só é considerado confirmado quando um PID válido retorna payload esperado.",
-    "ATSP6 NÃO é KWP Fast. No ELM327, ATSP6 corresponde a ISO 15765-4 CAN 11/500."
+    "Começar em ATSP0 e validar a ECU com 010C.",
+    "Se 010C não validar, tentar ATSP5 e repetir 010C.",
+    "Depois tentar ATSP3 e repetir 010C.",
+    "Depois tentar ATSP4 e repetir 010C.",
+    "Somente se os protocolos K-Line falharem, tentar ATSP6, ATSP7, ATSP8 e ATSP9, sempre validando com 010C.",
+    "Parar no primeiro protocolo que produza resposta 41 0C válida.",
+    "Um protocolo só é considerado confirmado quando um PID real retorna payload válido.",
+    "ATSP6 é CAN 11/500, não KWP.",
+    "ATSP7 é CAN 29/500; ATSP8 é CAN 11/250; ATSP9 é CAN 29/250.",
+    "Não trocar de protocolo enquanto uma tentativa anterior de 010C ainda estiver pendente.",
+    "Preservar TX, RX, tempo, status e protocolo escolhido para auditoria."
   ],
   "sources": [
-    "CarScanner baseline da Meriva: ISO 14230-4 KWP Fast Init, 10.4 kbaud, K-Line",
-    "Corsa Clube Brasil: Corsa C 1.4 Econoflex relatado com ISO 9141-2, 10.4 kbaud",
-    "Corsa Clube Brasil: Corsa Sedan Premium 1.4 2008/2009 relatado com ISO 14230-4 KWP Fast",
-    "ELM327 protocol references: ISO 9141-2 e ISO 14230-4 usam K-Line; ISO 15765-4 usa CAN"
+    "CarScanner baseline da Meriva: ISO 14230-4 KWP Fast Init, 10.4 kbaud, K-Line.",
+    "Corsa Clube Brasil: relatos de Corsa C 1.4 Econoflex com ISO 9141-2.",
+    "Corsa Clube Brasil: relato de Corsa 1.4 com ISO 14230-4 KWP Fast.",
+    "Referência ELM327: ATSP3 ISO 9141-2; ATSP4 ISO 14230-4 KWP 5-baud; ATSP5 ISO 14230-4 KWP Fast; ATSP6-9 CAN."
   ]
 }
