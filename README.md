@@ -82,7 +82,7 @@ O rastreador é criado uma vez por sessão do aplicativo para continuar ativo en
 
 ## PIDs e combustível
 
-A base cobre PIDs padrão úteis para telemetria e diagnóstico, incluindo velocidade, RPM, temperatura, MAF, posição da borboleta e taxa de combustível do motor (PID 015E). O PID 015E representa taxa de combustível em L/h quando suportado pela ECU. O aplicativo integra essa taxa ao longo do tempo usando os intervalos entre amostras, ignorando amostras inválidas e intervalos excessivamente longos. A disponibilidade e a exatidão devem ser confirmadas na ECU real da Meriva antes de usar o resultado como medição de consumo.
+A base cobre PIDs padrão úteis para telemetria e diagnóstico, incluindo velocidade, RPM, temperatura, MAF, posição da borboleta, nível de combustível (PID 012F) e taxa de combustível do motor (PID 015E). O PID 012F é a fonte absoluta de nível de combustível usada para litros, reserva e autonomia quando a resposta for válida. O PID 015E representa taxa de combustível em L/h quando suportado pela ECU; o aplicativo integra essa taxa ao longo do tempo usando os intervalos entre amostras, ignorando amostras inválidas e intervalos excessivamente longos.
 
 ## Identificação de combustível
 
@@ -115,7 +115,7 @@ O autosave usa arquivo temporário, valida o conteúdo e mantém uma cópia ante
 
 Na abertura do aplicativo, o sistema verifica suporte, solicita permissões, verifica o estado do Bluetooth, solicita ativação quando necessário e repete a verificação ao retornar ao aplicativo.
 
-O ELM327 deve estar previamente pareado no Android. A conexão usa Bluetooth Classic/RFCOMM e preserva o prompt > para o parser do ELM.
+O ELM327 deve estar previamente pareado no Android. O aplicativo escolhe automaticamente os candidatos pareados: primeiro nomes compatíveis com ELM/OBD e depois outros dispositivos Classic, aceitando somente o candidato que passa pela inicialização do ELM e pelo teste real 010C. A conexão usa Bluetooth Classic/RFCOMM e preserva o prompt > para o parser do ELM.
 
 ## Testes
 
@@ -132,7 +132,7 @@ A suíte automatizada cobre autosave, parser, DTC, descoberta de PIDs, fila de c
 
 ## Próximos blocos técnicos
 
-1. validar Bluetooth/ELM327 e GPS em Android físico;
+1. validar Bluetooth/ELM327, 012F e GPS em Android físico;
 2. monitorar PIDs suportados em ciclo real;
 3. validar a taxa do PID 015E e outros PIDs relevantes na ECU real;
 4. validar o comportamento específico da ECU da Meriva com dados reais;
