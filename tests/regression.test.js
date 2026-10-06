@@ -38,6 +38,7 @@ let bluetoothDisconnectListener = null;
 let fakeDeviceConnected = true;
 let lastBluetoothConnectionOptions = null;
 let lastBluetoothDiscoveryCancelled = false;
+let bluetoothConnectCalls = 0;
 
 function parentDir(p) {
   const i = p.lastIndexOf('/');
@@ -153,6 +154,7 @@ const fakeBluetooth = {
   getBondedDevices: async () => [],
   cancelDiscovery: async () => { lastBluetoothDiscoveryCancelled = true; },
   connectToDevice: async (_address, options) => {
+    bluetoothConnectCalls++;
     lastBluetoothConnectionOptions = options;
     return {
     address: 'AA:BB:CC:DD:EE:FF',
@@ -326,10 +328,12 @@ async function testBluetoothEventTransport() {
   bluetoothDisconnectListener = null;
   fakeDeviceConnected = true;
   lastBluetoothDiscoveryCancelled = false;
+  bluetoothConnectCalls = 0;
   const { BluetoothClassicTransport } = loadTs(path.join(ROOT, 'src/obd/bluetoothClassicTransport.ts'));
   const transport = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF');
   await transport.open();
   assert.strictEqual(lastBluetoothDiscoveryCancelled, true);
+  assert.strictEqual(bluetoothConnectCalls, 1);
   assert.strictEqual(lastBluetoothConnectionOptions?.connectionType, 'delimited');
   assert.strictEqual(lastBluetoothConnectionOptions?.delimiter, '\r');
   assert.strictEqual(lastBluetoothConnectionOptions?.charset, 'ascii');
@@ -337,6 +341,11 @@ async function testBluetoothEventTransport() {
   await transport.write('010C\r');
   const response = await transport.readUntilPrompt(500);
   assert.strictEqual(response, '41 0C 0C 18');
+  await transport.close();
+
+  bluetoothConnectCalls = 0;
+  await Promise.all([transport.open(), transport.open()]);
+  assert.strictEqual(bluetoothConnectCalls, 1, 'duas chamadas open() concorrentes devem compartilhar a mesma tentativa');
   await transport.close();
 
   await transport.open();
