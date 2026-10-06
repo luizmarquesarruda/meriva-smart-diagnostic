@@ -34,6 +34,10 @@ const invalid = m.identifyFuelFromObd(3, 101);
 assert.strictEqual(invalid.status, 'DADO_INCOERENTE');
 assert.strictEqual(invalid.alcoholPercent, null);
 
+const unknown = m.identifyFuelFromObd(99, null);
+assert.strictEqual(unknown.status, 'TIPO_VEICULO');
+assert.strictEqual(unknown.fuelTypeLabel, 'Código não mapeado');
+
 const none = m.identifyFuelFromObd(null, null);
 assert.strictEqual(none.status, 'SEM_DADOS');
 
