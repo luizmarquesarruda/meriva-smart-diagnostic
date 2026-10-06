@@ -12,7 +12,7 @@
     "neverLearnDtcMeaningAutomatically":true,
     "neverLearnProprietaryCommandsAutomatically":true
   },
-  "learnable":["0105","0106","0107","010B","010C","010D","010E","010F","0110","0111","0114","0131","0142","0151","0152","015E"],
+  "learnable":["012F","0105","0106","0107","010B","010C","010D","010E","010F","0110","0111","0114","0131","0142","0151","0152","015E"],
   "states":["SEED","OBSERVED","LEARNING","STABLE","ANOMALY"],
   "confidence":{"RAW_ECU_VALID":1,"CARSCANNER_SEED":0.85}
 }
