@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "description": "Faixas de plausibilidade, não limites de diagnóstico. Valores fora delas viram evidência para revisão, não prova de defeito.",
+  "ranges": {
+    "0104": {
+      "min": 0,
+      "max": 100
+    },
+    "0105": {
+      "min": -40,
+      "max": 215
+    },
+    "0106": {
+      "min": -100,
+      "max": 99.2
+    },
+    "0107": {
+      "min": -100,
+      "max": 99.2
+    },
+    "010B": {
+      "min": 0,
+      "max": 255
+    },
+    "010C": {
+      "min": 0,
+      "max": 16383.75
+    },
+    "010D": {
+      "min": 0,
+      "max": 255
+    },
+    "010E": {
+      "min": -64,
+      "max": 63.5
+    },
+    "010F": {
+      "min": -40,
+      "max": 215
+    },
+    "0110": {
+      "min": 0,
+      "max": 655.35
+    },
+    "0111": {
+      "min": 0,
+      "max": 100
+    },
+    "0114": {
+      "min": 0,
+      "max": 1.275
+    },
+    "012F": {
+      "min": 0,
+      "max": 100
+    },
+    "0131": {
+      "min": 0,
+      "max": 65535
+    },
+    "0142": {
+      "min": 0,
+      "max": 65.535
+    },
+    "0152": {
+      "min": 0,
+      "max": 100
+    },
+    "015E": {
+      "min": 0,
+      "max": 3276.75
+    }
+  }
+}
