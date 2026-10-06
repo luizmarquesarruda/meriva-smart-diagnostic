@@ -160,6 +160,61 @@ export const CARSCANNER_SEED_SAMPLES: CarScannerSeedSample[] = [
   { pidName: 'O2 Sensor 1 Voltage', value: 0.53, condition: 'IDLE_WARM', timestamp: '2026-09-24T14:48:00.000Z' },
 ];
 
+export async function initializeCarScannerSeed(
+  basePath: string,
+  seedImportDate = '2026-09-24T14:48:00.000Z',
+): Promise<MerivaLearningProfile | null> {
+  return enqueueProfileTransaction(basePath, async () => {
+    const profile = await readLearningProfileUnsafe(basePath);
+    if (!profile) return null;
+    if (profile.seedVersion === CARSCANNER_SEED_VERSION && profile.globalSampleCounts.seedSamples > 0) {
+      return profile;
+    }
+
+    const now = new Date().toISOString();
+    profile.seedVersion = CARSCANNER_SEED_VERSION;
+    profile.seedImportDate = seedImportDate;
+    profile.learningStatus = 'SEED_INITIALIZED';
+    profile.source = 'HYBRID';
+    profile.seedWeight = 0.25;
+    profile.globalSampleCounts.seedSamples = CARSCANNER_SEED_SAMPLES.length;
+    profile.globalSampleCounts.totalSamples = profile.globalSampleCounts.realSamples + profile.globalSampleCounts.seedSamples;
+    profile.lastUpdated = now;
+
+    for (const sample of CARSCANNER_SEED_SAMPLES) {
+      const context = profile.contextualData.find((item) => item.condition === sample.condition) ?? {
+        condition: sample.condition,
+        statistics: {},
+        lastUpdate: now,
+        sampleCount: 0,
+      };
+      if (!profile.contextualData.includes(context)) profile.contextualData.push(context);
+
+      const existing = context.statistics[sample.pidName];
+      if (existing && existing.realSamples > 0) continue;
+
+      context.sampleCount = Math.max(context.sampleCount, 1);
+      context.lastUpdate = now;
+      context.statistics[sample.pidName] = {
+        mean: sample.value,
+        median: sample.value,
+        min: sample.value,
+        max: sample.value,
+        stddev: 0,
+        samples: 1,
+        realSamples: 0,
+        seedSamples: 1,
+        confidence: 'LOW',
+        lastUpdate: sample.timestamp,
+        source: ['CARSCANNER_BASELINE'],
+      };
+    }
+
+    await writeLearningProfileUnsafe(basePath, profile);
+    return profile;
+  });
+}
+
 export async function saveLearningProfile(
   basePath: string,
   profile: MerivaLearningProfile,
