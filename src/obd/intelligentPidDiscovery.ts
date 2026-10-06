@@ -117,7 +117,7 @@ export async function discoverIntelligentPids(
     if (observation && observation.value !== null && supported.has(pid)) {
       observation.status = 'CONFIRMADO';
       observation.confidence = 1;
-      observation.reason = 'BITMAP + RESPOSTA VÁLIDA NA FASE PRIORITÁRIA';
+      observation.reason = 'RESPOSTA RAW_ECU VÁLIDA NA FASE PRIORITÁRIA';
       confidence[pid] = 1;
     }
   }
