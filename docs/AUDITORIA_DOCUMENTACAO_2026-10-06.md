@@ -32,3 +32,11 @@ Todo documento operacional deve ser conferido contra código, package.json, work
 ## Estado
 
 Código, testes e documentação passam a usar a mesma definição para Bluetooth, GPS, combustível e CI. A validação física ainda é obrigatória para provar Android, ELM327 real e ECU da Meriva.
+
+## Atualização 2026-10-06 - Bluetooth Classic físico
+
+O teste físico de 2026-10-06 revelou uma falha de concorrência no RFCOMM: o bloqueio de conexão existia apenas na instância do transporte, enquanto novas tentativas criavam novas instâncias. A documentação técnica foi atualizada no diário de bordo e o transporte passou a serializar tentativas nativas por endereço MAC.
+
+Também foi removida a inicialização redundante do Bluetooth durante a descoberta de dispositivos pareados. O trace anterior mostrava duas chamadas `BLUETOOTH_READY_START` na mesma operação.
+
+A regressão foi adicionada ao `tests/regression.test.js` para impedir duas tentativas nativas simultâneas para o mesmo endereço.
