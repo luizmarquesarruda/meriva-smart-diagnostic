@@ -3,6 +3,9 @@ import type { BluetoothDeviceInfo } from './bluetoothClassicTransport';
 import { createRealElmSession, discoverPairedDevices, ensureBluetoothReady } from './bluetoothManager';
 import { DEFAULT_ELM327_COMPATIBILITY, Elm327CompatibilityConfig, mergeCompatibilityConfig } from './elm327Compatibility';
 import { getAutoSaveState } from '../meriva/autosaveManager';
+import { readAppSettings } from '../database/appSettings';
+import * as FileSystem from 'expo-file-system';
+import { prioritizeBluetoothCandidates } from './bluetoothCandidatePriority';
 
 export interface SharedObdConnection {
   session: Elm327Session;
@@ -79,11 +82,17 @@ async function connectPreferredElmOnce(
     if (!candidates.some((item) => sameAddress(item.address, device.address))) candidates.push(device);
   };
 
-  // O aplicativo escolhe. Primeiro tenta nomes que indicam adaptador OBD/ELM;
-  // depois testa qualquer dispositivo Classic pareado. O candidato só é aceito
-  // após passar pela inicialização ELM e pelo teste real da ECU.
-  for (const device of devices.filter(looksLikeElm327)) addCandidate(device);
-  for (const device of devices) addCandidate(device);
+  // O aplicativo escolhe. O último ELM327 que conseguiu uma conexão real
+  // entra primeiro na fila. Depois vêm outros adaptadores OBD/ELM e, por fim,
+  // os demais dispositivos Classic pareados.
+  const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
+  const settings = await readAppSettings(basePath);
+  const prioritized = prioritizeBluetoothCandidates(
+    devices,
+    settings.selectedAdapterAddress,
+    looksLikeElm327,
+  );
+  for (const device of prioritized) addCandidate(device);
 
   let lastError: unknown = null;
   for (const device of candidates) {
