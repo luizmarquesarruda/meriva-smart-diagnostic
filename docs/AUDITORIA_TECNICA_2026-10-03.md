@@ -1,6 +1,6 @@
-# Auditoria técnica do Meriva Smart Diagnostic
+# Auditoria técnica consolidada
 
-Data: 2026-10-03
+Data da revisão: 2026-10-06
 
 ## Escopo
 
@@ -11,7 +11,7 @@ A auditoria priorizou comportamento real do Android/ELM327 e dados observados. N
 ## Correções aplicadas
 
 - Removida a camada da chamada "Bíblia" do runtime.
-- Removido o PID 012F de nível de combustível.
+- Removida do runtime, UI, testes e bancos locais a camada de PID de nível de combustível.
 - Perfil do veículo voltou a ser independente de fonte documental externa.
 - DTC não recebe diagnóstico automático de catálogo.
 - GPS passou a rejeitar segmentos com intervalo maior que 5 s.
@@ -20,7 +20,7 @@ A auditoria priorizou comportamento real do Android/ELM327 e dados observados. N
 - Timeout Bluetooth sem prompt final do ELM não é mais tratado como resposta válida.
 - Conexão real do ELM agora exige uma resposta válida ao 010C antes de ser considerada pronta para ECU.
 - Removido integrador de combustível duplicado e sem uso na tela de laboratório.
-- CI passou de npm install para npm ci, usando o package-lock de forma reprodutível.
+- CI continua usando `npm install`, porque o repositório não versiona `package-lock.json`.
 
 ## Regras preservadas
 
@@ -51,8 +51,8 @@ A auditoria priorizou comportamento real do Android/ELM327 e dados observados. N
 11. Rodar alguns minutos e conferir distância em metros/km.
 12. Testar PID 015E somente se anunciado como suportado pela ECU.
 
-## Revisão complementar 2026-10-04
+## Revisão complementar 2026-10-06
 
-Fontes cruzadas: ELM327 datasheet, SAE J1979/ISO 15031-5, react-native-bluetooth-classic e repositórios AndroidOBD, AndrOBD, seaargsp/obd2, ELM327-emulator e OBDb/SAEJ1979.
+Fontes cruzadas: ELM327, SAE J1979/ISO 15031-5, react-native-bluetooth-classic e implementações abertas de OBD.
 
-Correções: decoder de bitmap alinhado ao padrão; descoberta ampliada para 0100, 0120, 0140 e 0160; teste de protocolo agora confirma ATDP depois da resposta da ECU; teste Bluetooth cobre resposta fragmentada; separação REAL_OBD/CARSCANNER_BASELINE/SIMULACAO preservada.
+Correções desta revisão: transporte documentado como `delimited` em vez de `raw`; fallback de protocolo alinhado ao código; relato do protocolo corrigido após fallback; Expo alinhado ao patch 51.0.39; Java 17 mantido como referência de CI; banco de PIDs confirmado separado de candidatos; unidade de MAP/MAF normalizada; camada de PID de nível de combustível removida novamente do runtime; testes e documentação sincronizados.
