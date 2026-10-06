@@ -242,6 +242,11 @@ export default function IndexScreen() {
                 <Text style={styles.secondaryButtonText}>CONFIGURAÇÕES</Text>
               </TouchableOpacity>
             </Link>
+            <Link href="/manutencao" asChild>
+              <TouchableOpacity style={[styles.secondaryButton, layout.landscape && styles.actionButtonLandscape]}>
+                <Text style={styles.secondaryButtonText}>MANUTENÇÃO</Text>
+              </TouchableOpacity>
+            </Link>
           </View>
 
           {bluetoothError ? <Text style={styles.error}>BLUETOOTH/ELM327: {bluetoothError}</Text> : null}
