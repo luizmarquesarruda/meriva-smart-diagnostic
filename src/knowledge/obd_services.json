@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "standard": "SAE_J1979_ISO_15031_5",
+  "vehicleScope": "Chevrolet Meriva Maxx 1.4 8V ECONO.FLEX 2011/2012",
+  "rules": {
+    "preserveRawTxRx": true,
+    "requirePositiveResponse": true,
+    "neverGuessUnsupportedService": true,
+    "stopOnValidatedEcu": true
+  },
+  "services": [
+    {"mode":"01","name":"CURRENT_DATA","allowed":true,"transport":"ELM327","notes":"Use only PIDs present in pids.json and confirmed/learnable by evidence rules."},
+    {"mode":"03","name":"STORED_DTC","allowed":true,"transport":"ELM327","notes":"Read and preserve raw DTC response."},
+    {"mode":"04","name":"CLEAR_DTC","allowed":false,"requiresExplicitUserAction":true,"notes":"Never clear automatically."},
+    {"mode":"09","name":"VEHICLE_INFORMATION","allowed":true,"notes":"Only use supported PIDs; preserve raw response."}
+  ]
+}
