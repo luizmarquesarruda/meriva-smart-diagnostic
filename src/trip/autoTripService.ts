@@ -309,6 +309,8 @@ class AutoTripService {
           cumulativeFuelUsedL: Number(cumulativeFuelUsedL.toFixed(3)),
           averageConsumptionKml: Number(averageConsumptionKml.toFixed(3)),
           estimatedRangeKm: Number(estimatedRangeKm.toFixed(1)),
+          fuelLevelPercent: this.state.fuelLevelPercent,
+          fuelRemainingL: this.state.fuelRemainingL,
           realReadingCount: (Number(state.autonomy.realReadingCount) || 0) + 1,
           lastReadingAt: cycle.finishedAt,
           readings: [
