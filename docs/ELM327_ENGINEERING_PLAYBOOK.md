@@ -272,3 +272,8 @@ export const BLUETOOTH_RETRY_INTERVAL_MS = 8000;
 ~~~
 
 Não declarar `export const` dentro de `createRealElmSession`. A função apenas consome as constantes exportadas.
+
+
+## Regra final de retry Bluetooth
+
+O ciclo executa no máximo 20 tentativas. O intervalo de 8 segundos ocorre somente após uma falha. Ao obter SUCCESS, o ciclo termina imediatamente e a sessão bem-sucedida é devolvida ao aplicativo. Não existe reabertura ou tentativa adicional depois do sucesso.
