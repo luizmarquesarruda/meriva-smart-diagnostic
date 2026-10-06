@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "standard": "SAE J1979 / ISO 15031-5",
+  "description": "Banco local de fórmulas determinísticas para converter bytes OBD-II em unidades de engenharia. Não usa eval.",
+  "provenance": [
+    {
+      "source": "SAE J1979 / ISO 15031-5",
+      "role": "referência técnica das fórmulas"
+    },
+    {
+      "source": "OBD-II implementations reviewed on GitHub",
+      "role": "comparação cruzada de implementações abertas"
+    }
+  ],
+  "formulas": {
+    "U8": {
+      "operation": "u8"
+    },
+    "U16": {
+      "operation": "u16"
+    },
+    "RPM": {
+      "operation": "u16_div",
+      "divisor": 4
+    },
+    "TEMP_C": {
+      "operation": "u8_offset",
+      "offset": -40
+    },
+    "PERCENT_255": {
+      "operation": "u8_scale",
+      "scale": 100,
+      "divisor": 255
+    },
+    "FUEL_TRIM": {
+      "operation": "u8_offset_scale",
+      "offset": -128,
+      "scale": 100,
+      "divisor": 128
+    },
+    "MAF_GS": {
+      "operation": "u16_div",
+      "divisor": 100
+    },
+    "TIMING_DEG": {
+      "operation": "u8_scale_offset",
+      "scale": 0.5,
+      "offset": -64
+    },
+    "VOLTS_1000": {
+      "operation": "u16_div",
+      "divisor": 1000
+    },
+    "O2_VOLTS": {
+      "operation": "u8_div",
+      "divisor": 200
+    },
+    "DISTANCE_KM": {
+      "operation": "u16"
+    },
+    "FUEL_RATE_LH": {
+      "operation": "u16_div",
+      "divisor": 20
+    },
+    "ETHANOL_PERCENT": {
+      "operation": "u8_scale",
+      "scale": 100,
+      "divisor": 255
+    }
+  }
+}
