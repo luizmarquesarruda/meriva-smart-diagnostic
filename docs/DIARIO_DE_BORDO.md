@@ -54,3 +54,42 @@ Toda nova correção deverá deixar uma trilha mínima no diário:
 **problema → diagnóstico → correção → testes → commit → CI → resultado → próximo passo**
 
 Nenhuma falha de CI será tratada como correção concluída.
+
+
+## 2026-10-06 - Diagnóstico físico Bluetooth: tentativa RFCOMM duplicada
+
+### Problema
+Relatório físico do Android 36, gerado às 13:13:05Z:
+- Bluetooth disponível e ligado.
+- Permissões BLUETOOTH_SCAN/CONNECT e localização concedidas.
+- O relatório mostrou `PAIRED DEVICES: 0`.
+- A conexão falhou com: `Already attempting connection to device 01:23:45:67:89:BA`.
+
+### Diagnóstico
+A causa mais provável foi identificada no fluxo de conexão, e não nas permissões.
+O `BluetoothClassicTransport` tinha proteção de concorrência apenas por instância (`openPromise`). Porém cada nova tentativa de conexão cria uma nova instância do transporte. Após o timeout JavaScript, a operação nativa `connectToDevice()` pode continuar pendente. A próxima tentativa podia então chamar `connectToDevice()` novamente para o mesmo endereço antes de a primeira operação nativa terminar.
+
+Isso explica diretamente o erro `Already attempting connection to device ...`.
+
+Também foi encontrado um segundo problema de fluxo: a tela chamava `ensureBluetoothReady()` e depois `discoverPairedDevices()`, enquanto `discoverPairedDevices()` chamava `ensureBluetoothReady()` novamente. O trace confirmou duas sequências `BLUETOOTH_READY_START` quase simultâneas.
+
+### Correção
+1. Criado bloqueio global por endereço MAC em `src/obd/bluetoothClassicTransport.ts`.
+2. Uma nova instância agora aguarda a tentativa RFCOMM nativa anterior terminar antes de chamar `connectToDevice()` para o mesmo endereço.
+3. O comportamento de timeout foi preservado: a tentativa JavaScript pode terminar por timeout, mas a tentativa nativa tardia continua sob controle e é desconectada quando resolve.
+4. Removida a chamada redundante de `ensureBluetoothReady()` da tela `app/bluetooth.tsx`.
+5. Removida a chamada redundante dentro de `discoverPairedDevices()`, mantendo a função responsável apenas pela descoberta após o fluxo de prontidão do chamador.
+6. Adicionado teste de regressão com duas instâncias do transporte usando o mesmo endereço, verificando que nunca existem duas tentativas RFCOMM nativas simultâneas.
+
+### Arquivos afetados
+- `src/obd/bluetoothClassicTransport.ts`
+- `src/obd/bluetoothManager.ts`
+- `app/bluetooth.tsx`
+- `tests/regression.test.js`
+
+### CI anterior
+- CI #662, run `37465291527`: **sucesso**.
+- CI #663, run `37466052711`: **cancelada** durante a sequência de commits de documentação.
+
+### Próximo passo
+Executar a nova CI desta correção. Se falhar, registrar a causa neste diário antes de outra alteração. Se passar, testar novamente no telefone com o ELM327 pareado e verificar especialmente a ausência de `Already attempting connection` no relatório.
