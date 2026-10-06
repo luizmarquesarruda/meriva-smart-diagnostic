@@ -19,6 +19,7 @@ export class BluetoothClassicTransport implements ObdTransport {
   private disconnectSubscription?: RemovableSubscription;
   private diagnostics: string[] = [];
   private openPromise: Promise<void> | null = null;
+  private connectTimer: ReturnType<typeof setTimeout> | null = null;
 
   private logDiagnostic(event: string, details?: unknown): void {
     const time = new Date().toISOString();
@@ -100,17 +101,18 @@ export class BluetoothClassicTransport implements ObdTransport {
     });
 
     try {
+      const connectPromise = RNBluetoothClassic.connectToDevice(this.deviceAddress, {
+        connectionType: 'delimited',
+        delimiter: '\\r',
+        charset: 'ascii',
+        secureSocket,
+      });
       device = await Promise.race([
-        RNBluetoothClassic.connectToDevice(this.deviceAddress, {
-          connectionType: 'delimited',
-          delimiter: '\\r',
-          charset: 'ascii',
-          secureSocket,
-        }),
-        new Promise<never>((_, reject) => setTimeout(
+        connectPromise,
+        new Promise<never>((_, reject) => { this.connectTimer = setTimeout(
           () => reject(new Error('TIMEOUT CONEXÃO BLUETOOTH')),
           this.config.bluetoothConnectTimeoutMs,
-        )),
+        ); }),
       ]);
 
       this.logDiagnostic('CONNECT_SUCCESS', {
@@ -118,6 +120,13 @@ export class BluetoothClassicTransport implements ObdTransport {
         connectionType: 'delimited',
       });
     } catch (cause) {
+      if (this.connectTimer) { clearTimeout(this.connectTimer); this.connectTimer = null; }
+      if (!device) {
+        try {
+          const lateDevice = await Promise.race([connectPromise, new Promise<null>((resolve) => setTimeout(() => resolve(null), 300))]);
+          if (lateDevice) await this.safeDisconnect(lateDevice);
+        } catch { /* conexão atrasada já falhou */ }
+      }
       this.logDiagnostic('CONNECT_FAILURE', {
         secureSocket,
         connectionType: 'delimited',
@@ -170,6 +179,7 @@ export class BluetoothClassicTransport implements ObdTransport {
   }
 
   async close(): Promise<void> {
+    if (this.connectTimer) { clearTimeout(this.connectTimer); this.connectTimer = null; }
     const device = this.device;
     const wasConnected = this.connected;
     this.removeSubscriptions();
