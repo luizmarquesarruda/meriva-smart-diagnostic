@@ -27,7 +27,7 @@ https://github.com/fr3ts0n/AndrOBD/blob/master/library/src/main/java/com/fr3ts0n
 - The code does not fabricate PID support or fuel data.
 
 ## Important limitation
-A repository audit can prove source-level behavior, but it cannot prove that a specific physical clone ELM327 will respond correctly on every Android phone. Final proof requires a real-device test with the user's adapter at 01:23:45:67:89:BA.
+A repository audit can prove source-level behavior, but it cannot prove that a specific physical clone ELM327 will respond correctly on every Android phone. Final proof requires a real-device test with the user's paired ELM327. The application should choose among paired candidates and validate the ECU with 010C.
 
 ## Validation target
 1. Bluetooth enabled.
