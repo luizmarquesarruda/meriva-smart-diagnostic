@@ -10,7 +10,7 @@ import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
 import type { ObdConnectionState } from '../src/meriva/autosaveState';
 import { gpsTracker, type GpsTripState } from '../src/gps';
 import { ensureMerivaVehicleProfile } from '../src/database/vehicleConfig';
-import { createLearningProfile, initializeCarScannerSeed } from '../src/database/learningProfile';
+import { createLearningProfile, initializeCarScannerSeed, readLearningProfile } from '../src/database/learningProfile';
 import { readAppSettings, type AppSettings } from '../src/database/appSettings';
 import { connectPreferredElm, getSharedObdConnection, getSharedObdLastError, subscribeSharedObd } from '../src/obd/sharedConnection';
 import { autoTripService, type AutoTripServiceState } from '../src/trip/autoTripService';
@@ -66,7 +66,7 @@ export default function IndexScreen() {
       const restored = await initAutoSave(basePath);
       await initializeDriveCycles(basePath);
       await ensureMerivaVehicleProfile(basePath);
-      const learningProfile = await import('../src/database/learningProfile').then((module) => module.readLearningProfile(basePath));
+      const learningProfile = await readLearningProfile(basePath);
       if (!learningProfile) await createLearningProfile(basePath, '2026-09-24T14:48:00.000Z');
       await initializeCarScannerSeed(basePath);
       const storedCycles = await readDriveCycles(basePath);
