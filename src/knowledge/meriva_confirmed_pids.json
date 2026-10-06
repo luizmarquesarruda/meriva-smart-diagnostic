@@ -75,9 +75,10 @@
       "bytes": 1,
       "evidence": "CARSCANNER_SEED",
       "confidence": 0.85,
-      "observed_value": 5.66,
-      "source_note": "Valor observado no baseline CarScanner de 2026-09-24; unidade original registrada em psi.",
-      "status": "CANDIDATO"
+      "observed_value": 39.02,
+      "source_note": "CarScanner exibiu 5.66 psi no baseline de 2026-09-24, equivalente a aproximadamente 39.02 kPa. O valor RAW da ECU ainda deve confirmar o PID.",
+      "status": "CANDIDATO",
+      "observed_unit": "kPa"
     },
     {
       "pid": "010E",
@@ -111,9 +112,10 @@
       "bytes": 2,
       "evidence": "CARSCANNER_SEED",
       "confidence": 0.85,
-      "observed_value": 8.93,
-      "source_note": "Valor observado no baseline CarScanner de 2026-09-24. CarScanner exibiu 8.93 kg/h; conversão aproximada para 2.48 g/s.",
-      "status": "CANDIDATO"
+      "observed_value": 2.48,
+      "source_note": "CarScanner exibiu 8.93 kg/h no baseline de 2026-09-24, equivalente a aproximadamente 2.48 g/s. O valor RAW da ECU ainda deve confirmar o PID.",
+      "status": "CANDIDATO",
+      "observed_unit": "g/s"
     },
     {
       "pid": "0111",
