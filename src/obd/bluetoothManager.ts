@@ -182,8 +182,8 @@ export async function createRealElmSession(
   compatibility?: Partial<Elm327CompatibilityConfig>,
   pidDiscoveryCache?: PidDiscoveryCache | null,
 ): Promise<RealElmConnection> {
-  const MAX_BLUETOOTH_ATTEMPTS = 20;
-  const BLUETOOTH_RETRY_INTERVAL_MS = 8000;
+  export const MAX_BLUETOOTH_ATTEMPTS = 20;
+export const BLUETOOTH_RETRY_INTERVAL_MS = 8000;
   let lastCause: unknown = null;
 
   for (let attempt = 1; attempt <= MAX_BLUETOOTH_ATTEMPTS; attempt++) {
