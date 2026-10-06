@@ -9,6 +9,13 @@ export interface BluetoothDeviceInfo {
   bonded?: boolean;
 }
 
+type NativeConnectPromise = Promise<BluetoothDevice>;
+const pendingNativeConnections = new Map<string, NativeConnectPromise>();
+
+function normalizeBluetoothAddress(address: string): string {
+  return address.replace(/:/g, '').toUpperCase();
+}
+
 type RemovableSubscription = { remove: () => void };
 
 export class BluetoothClassicTransport implements ObdTransport {
@@ -101,19 +108,31 @@ export class BluetoothClassicTransport implements ObdTransport {
     });
 
     let timedOutConnection = false;
-    let connectPromise: Promise<BluetoothDevice> | null = null;
+    let connectPromise: NativeConnectPromise | null = null;
+    const addressKey = normalizeBluetoothAddress(this.deviceAddress);
 
     try {
+      // O timeout do JavaScript não cancela a tentativa RFCOMM nativa.
+      // Se uma nova instância chamar connectToDevice antes da primeira
+      // tentativa terminar, react-native-bluetooth-classic devolve:
+      // "Already attempting connection to device ...".
+      // Portanto, o bloqueio precisa ser GLOBAL por endereço, não por instância.
+      const pending = pendingNativeConnections.get(addressKey);
+      if (pending) {
+        this.logDiagnostic('CONNECT_WAITING_PREVIOUS_NATIVE_ATTEMPT', {
+          address: this.deviceAddress,
+        });
+        try { await pending; } catch { /* a próxima tentativa pode começar após o término */ }
+      }
+
       connectPromise = RNBluetoothClassic.connectToDevice(this.deviceAddress, {
         connectionType: 'delimited',
         delimiter: '\r',
         charset: 'ascii',
         secureSocket,
       });
+      pendingNativeConnections.set(addressKey, connectPromise);
 
-      // Promise.race() não cancela a operação nativa. Se o clone resolver
-      // depois do timeout, descarte imediatamente a conexão tardia para que
-      // ela não fique presa ocupando o RFCOMM do próximo candidato.
       void connectPromise.then(async (lateDevice) => {
         if (!timedOutConnection || !lateDevice) return;
         this.logDiagnostic('LATE_CONNECT_SUCCESS_AFTER_TIMEOUT');
@@ -121,6 +140,10 @@ export class BluetoothClassicTransport implements ObdTransport {
         this.logDiagnostic('LATE_CONNECT_DISCONNECTED');
       }).catch(() => {
         // A tentativa nativa atrasada também pode terminar com erro.
+      }).finally(() => {
+        if (pendingNativeConnections.get(addressKey) === connectPromise) {
+          pendingNativeConnections.delete(addressKey);
+        }
       });
 
       device = await Promise.race([
