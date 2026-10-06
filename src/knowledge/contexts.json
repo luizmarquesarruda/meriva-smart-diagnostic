@@ -1,0 +1,13 @@
+{
+  "version":1,
+  "contexts":[
+    {"id":"MOTOR_FRIO","criteria":["engine_temperature < 70"]},
+    {"id":"MOTOR_AQUECIDO","criteria":["engine_temperature >= 80"]},
+    {"id":"IDLE","criteria":["vehicle_speed = 0","rpm >= 600","rpm <= 1000"]},
+    {"id":"TRANSITO","criteria":["vehicle_speed > 0","vehicle_speed < 60"]},
+    {"id":"ESTRADA","criteria":["vehicle_speed >= 60"]},
+    {"id":"CARGA","criteria":["engine_load >= 50"]},
+    {"id":"AR_CONDICIONADO","criteria":[],"requiresExplicitSignal":true}
+  ],
+  "rules":{"ambiguousContextAllowed":true,"preserveRawInputs":true}
+}
