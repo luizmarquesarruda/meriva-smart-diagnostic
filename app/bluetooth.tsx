@@ -30,7 +30,6 @@ export default function BluetoothScreen() {
     setLoading(true);
     setError('');
     try {
-      await ensureBluetoothReady();
       const paired = await discoverPairedDevices();
       setDevices(paired);
       const active = getSharedObdConnection();
