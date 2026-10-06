@@ -18,6 +18,7 @@ export class BluetoothClassicTransport implements ObdTransport {
   private dataSubscription?: RemovableSubscription;
   private disconnectSubscription?: RemovableSubscription;
   private diagnostics: string[] = [];
+  private openPromise: Promise<void> | null = null;
 
   private logDiagnostic(event: string, details?: unknown): void {
     const time = new Date().toISOString();
@@ -43,6 +44,24 @@ export class BluetoothClassicTransport implements ObdTransport {
   }
 
   async open(): Promise<void> {
+    // Uma instância não pode iniciar duas conexões simultâneas para o mesmo ELM.
+    // react-native-bluetooth-classic mantém a primeira tentativa pendente e rejeita
+    // a segunda com "Já está tentando conectar ao dispositivo...".
+    if (this.openPromise) {
+      this.logDiagnostic('OPEN_REUSED_PENDING');
+      return this.openPromise;
+    }
+
+    const pending = this.openInternal();
+    this.openPromise = pending;
+    try {
+      await pending;
+    } finally {
+      if (this.openPromise === pending) this.openPromise = null;
+    }
+  }
+
+  private async openInternal(): Promise<void> {
     this.clearDiagnostics();
     this.logDiagnostic('OPEN_START', { platform: Platform.OS, deviceAddress: this.deviceAddress });
 
@@ -70,47 +89,43 @@ export class BluetoothClassicTransport implements ObdTransport {
     let device: BluetoothDevice | null = null;
     let lastCause: unknown = null;
 
-    // ELM327 usa Bluetooth Classic SPP. Nesta versão da biblioteca, o transporte
-    // é selecionado pelo connectionType. Para o ELM327 usamos texto delimitado,
-    // com CR como terminador de linha e ASCII.
-    for (const secureSocket of [false, true]) {
-      this.logDiagnostic('CONNECT_ATTEMPT', {
+    // ELM327 genérico 1.5: uma única tentativa por chamada.
+    // Não fazemos fallback imediato para secureSocket=true. Isso criava duas
+    // tentativas concorrentes enquanto a primeira ainda estava pendente.
+    const secureSocket = false;
+    this.logDiagnostic('CONNECT_ATTEMPT', {
+      secureSocket,
+      connectionType: 'delimited',
+      delimiter: '\\r',
+    });
+
+    try {
+      device = await Promise.race([
+        RNBluetoothClassic.connectToDevice(this.deviceAddress, {
+          connectionType: 'delimited',
+          delimiter: '\\r',
+          charset: 'ascii',
+          secureSocket,
+        }),
+        new Promise<never>((_, reject) => setTimeout(
+          () => reject(new Error('TIMEOUT CONEXÃO BLUETOOTH')),
+          this.config.bluetoothConnectTimeoutMs,
+        )),
+      ]);
+
+      this.logDiagnostic('CONNECT_SUCCESS', {
         secureSocket,
         connectionType: 'delimited',
-        delimiter: '\r',
       });
-
-      try {
-        device = await Promise.race([
-          RNBluetoothClassic.connectToDevice(this.deviceAddress, {
-            connectionType: 'delimited',
-            delimiter: '\r',
-            charset: 'ascii',
-            secureSocket,
-          }),
-          new Promise<never>((_, reject) =>
-            setTimeout(
-              () => reject(new Error('TIMEOUT CONEXÃO BLUETOOTH')),
-              this.config.bluetoothConnectTimeoutMs,
-            ),
-          ),
-        ]);
-
-        this.logDiagnostic('CONNECT_SUCCESS', {
-          secureSocket,
-            connectionType: 'delimited',
-        });
-        break;
-      } catch (cause) {
-        this.logDiagnostic('CONNECT_FAILURE', {
-          secureSocket,
-          connectionType: 'delimited',
-          error: cause instanceof Error ? cause.message : String(cause),
-        });
-        lastCause = cause;
-        if (device) await this.safeDisconnect(device);
-        device = null;
-      }
+    } catch (cause) {
+      this.logDiagnostic('CONNECT_FAILURE', {
+        secureSocket,
+        connectionType: 'delimited',
+        error: cause instanceof Error ? cause.message : String(cause),
+      });
+      lastCause = cause;
+      if (device) await this.safeDisconnect(device);
+      device = null;
     }
 
     if (!device) {
