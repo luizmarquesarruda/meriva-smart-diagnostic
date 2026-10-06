@@ -29,3 +29,26 @@ A ECU/cluster podem possuir dados proprietários ou diagnósticos estendidos que
 
 - SAE J1979: Service 01 PID 31 = distance since DTCs cleared.
 - Manual do Proprietário Chevrolet Meriva 2012: o painel possui hodômetro total que registra o total de quilômetros percorridos.
+
+
+## Investigação do painel GM
+
+Pesquisa de referências públicas encontrou evidência de diagnóstico separado do PAINEL da Meriva. Uma tabela Kaptor de 2012 lista `Meriva 02 -> MA#1 PAINEL 7 23`, enquanto Corsa C/Montana aparecem em outra configuração com BCM. Isso confirma que o painel é um módulo de diagnóstico, mas não fornece uma rotina segura de leitura do hodômetro para a Meriva brasileira 1.4 8V 2011/2012. citeturn0search5
+
+Documentação Tech2 para Opel descreve uma função de verificação do hodômetro que consulta IPC e ECU e mostra os dois valores para comparação. É evidência de que GM/Opel pode manter a quilometragem em mais de um módulo, mas não prova que o mesmo serviço, DID ou endereço seja aplicável ao veículo brasileiro alvo. citeturn0search1
+
+Documentação pública do OP-COM também registra suporte de diagnóstico para Meriva e leitura de dados do painel, mas novamente não fornece uma sequência RAW KWP reproduzível para leitura do hodômetro deste veículo. citeturn0search3turn0search6
+
+### Regra de segurança
+
+O aplicativo não deve enviar DIDs proprietários de hodômetro por tentativa aleatória. Uma rotina só entra na base confirmada depois de captura RAW_ECU no veículo alvo, identificação do módulo e repetição bem-sucedida.
+
+### Próximo teste no veículo
+
+- identificar o painel como módulo separado;
+- capturar inicialização KWP e endereço de destino;
+- executar somente identificação/leitura não destrutiva;
+- registrar TX/RX bruto;
+- procurar resposta de identificação e dados de quilometragem;
+- comparar com o número mostrado no painel;
+- só então implementar leitura automática.
