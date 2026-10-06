@@ -44,7 +44,7 @@ A documentação anterior que dizia que o transporte estava em `raw` estava desa
 | Implementação | Transporte | Inicialização | Timeout | Recuperação |
 |---|---|---|---|---|
 | AndrOBD | Android/Java | máquina de estados ELM | adaptativo | BUS/NODATA/RX/DATA separados |
-| python-OBD | serial | ATSP0 + 0100 + ATDPN | configurável | fallback de protocolo |
+| python-OBD | serial | ATSP0 + 0100 + ATDP | configurável | fallback de protocolo |
 | Java OBD | BluetoothSocket RFCOMM/SPP | comandos AT | socket + OBD | dependente da sessão |
 | react-native-bluetooth-classic | ponte nativa | socket nativo | conexão + eventos | evento de desconexão |
 | Meriva Smart Diagnostic | RN -> Java nativo -> RFCOMM/SPP | ATZ + ATI + ATDP | adaptativo no app | estado ELM/ECU + retry de conexão |
