@@ -261,3 +261,14 @@ Para diagnóstico físico, a sessão de conexão usa no máximo **20 tentativas 
 Eventos principais: `BLUETOOTH_ATTEMPT_START`, `BLUETOOTH_ATTEMPT_RESULT`, `BLUETOOTH_RETRY_WAIT_START`, `BLUETOOTH_RETRY_WAIT_END` e `BLUETOOTH_TEST_SESSION_END`.
 
 A contagem é encerrada imediatamente quando a ECU é validada por `010C -> 41 0C XX XX`. Não são executadas 20 tentativas após uma conexão válida.
+
+## Correção da política de retry no TypeScript
+
+As constantes da política de teste ficam no escopo do módulo para serem reutilizadas pela aplicação e pelos testes de regressão:
+
+~~~ts
+export const MAX_BLUETOOTH_ATTEMPTS = 20;
+export const BLUETOOTH_RETRY_INTERVAL_MS = 8000;
+~~~
+
+Não declarar `export const` dentro de `createRealElmSession`. A função apenas consome as constantes exportadas.
