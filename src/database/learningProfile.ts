@@ -292,10 +292,22 @@ export async function updateLearningProfileRealSample(
       const previousSamples = existing.samples;
       const previousM2 =
         existing.stddev * existing.stddev * Math.max(0, previousSamples - 1);
-      existing.samples = previousSamples + 1;
-      existing.realSamples += 1;
-      existing.mean =
-        previousMean + (value - previousMean) / existing.samples;
+
+      if (existing.seedSamples > 0 && existing.realSamples === 0 && profile.seedWeight > 0) {
+        const seedWeight = Math.min(1, Math.max(0, profile.seedWeight));
+        existing.mean = previousMean * seedWeight + value * (1 - seedWeight);
+        existing.samples = existing.seedSamples + 1;
+        existing.realSamples = 1;
+        existing.lastUpdate = now;
+        existing.min = Math.min(existing.min, value);
+        existing.max = Math.max(existing.max, value);
+        existing.stddev = Math.abs(value - previousMean) * Math.sqrt(seedWeight * (1 - seedWeight));
+        existing.confidence = determineConfidence(existing.samples, profile.confidenceThresholds);
+      } else {
+        existing.samples = previousSamples + 1;
+        existing.realSamples += 1;
+        existing.mean =
+          previousMean + (value - previousMean) / existing.samples;
       const delta = value - previousMean;
       const m2 = previousM2 + delta * (value - existing.mean);
       existing.stddev = Math.sqrt(
@@ -307,7 +319,8 @@ export async function updateLearningProfileRealSample(
         existing.samples,
         profile.confidenceThresholds,
       );
-      existing.lastUpdate = now;
+        existing.lastUpdate = now;
+      }
     }
 
     await writeLearningProfileUnsafe(basePath, profile);
