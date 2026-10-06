@@ -164,7 +164,6 @@ export async function openBluetoothAppSettings(): Promise<void> {
 
 export async function discoverPairedDevices(): Promise<BluetoothDeviceInfo[]> {
   logBluetoothDiagnostic('PAIRED_DISCOVERY_START');
-  await ensureBluetoothReady();
   try {
     const devices = await listBondedBluetoothDevices();
     logBluetoothDiagnostic('PAIRED_DISCOVERY_RESULT', {
