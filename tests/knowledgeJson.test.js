@@ -33,6 +33,17 @@ for (const file of required) {
   // 012F é permitido como PID experimental/observado; sua promoção depende de evidência RAW_ECU.
 }
 
+const pids = JSON.parse(fs.readFileSync(path.join(knowledgeDir, 'pids.json'), 'utf8'));
+const fuelLevel = pids.pids.find(p => p.pid === '012F');
+if (!fuelLevel || fuelLevel.classification !== 'EXPERIMENTAL_OBSERVED' || fuelLevel.formulaId !== 'PERCENT_255') {
+  throw new Error('PID 012F deve existir somente como experimental/observado.');
+}
+const confirmed = JSON.parse(fs.readFileSync(path.join(knowledgeDir, 'meriva_confirmed_pids.json'), 'utf8'));
+const confirmed012F = confirmed.confirmed_pids.some(p => p.pid === '012F');
+if (confirmed012F) throw new Error('PID 012F não pode estar confirmado sem evidência RAW_ECU.');
+const candidate012F = confirmed.candidates.find(p => p.pid === '012F');
+if (!candidate012F || candidate012F.status !== 'CANDIDATO') throw new Error('PID 012F deve permanecer candidato.');
+
 const ecu = JSON.parse(fs.readFileSync(path.join(knowledgeDir, 'ecu.json'), 'utf8'));
 if (!ecu.elm327.initialization.includes('ATZ') || !ecu.elm327.initialization.includes('ATSP0')) {
   throw new Error('ecu.json deve conter a sequência ELM de inicialização.');
