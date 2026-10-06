@@ -154,6 +154,15 @@
       "formulaId": "FUEL_RATE_LH",
       "classification": "PADRAO_OBD",
       "description": "Taxa de combustível calculada pela ECU"
+    },
+    {
+      "pid": "012F",
+      "name": "Fuel Level Input",
+      "bytes": 1,
+      "unit": "percent",
+      "formulaId": "PERCENT_255",
+      "classification": "PADRAO_OBD",
+      "description": "Nível de combustível informado pela ECU. Fonte absoluta para combustível/autonomia quando a resposta for válida."
     }
   ]
 }
