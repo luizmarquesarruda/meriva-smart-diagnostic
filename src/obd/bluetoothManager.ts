@@ -177,13 +177,14 @@ export async function discoverPairedDevices(): Promise<BluetoothDeviceInfo[]> {
   }
 }
 
+export const MAX_BLUETOOTH_ATTEMPTS = 20;
+export const BLUETOOTH_RETRY_INTERVAL_MS = 8000;
+
 export async function createRealElmSession(
   device: BluetoothDeviceInfo,
   compatibility?: Partial<Elm327CompatibilityConfig>,
   pidDiscoveryCache?: PidDiscoveryCache | null,
 ): Promise<RealElmConnection> {
-  export const MAX_BLUETOOTH_ATTEMPTS = 20;
-export const BLUETOOTH_RETRY_INTERVAL_MS = 8000;
   let lastCause: unknown = null;
 
   for (let attempt = 1; attempt <= MAX_BLUETOOTH_ATTEMPTS; attempt++) {
