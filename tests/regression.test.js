@@ -369,6 +369,12 @@ async function testCarScannerBaselineAndFuel012F() {
   assert.strictEqual(rpm.realSamples, 0);
   assert.strictEqual(rpm.seedSamples, 1);
   assert.deepStrictEqual(rpm.source, ['CARSCANNER_BASELINE']);
+  await learning.updateLearningProfileRealSample(BASE, 'Engine RPM', 800, 'IDLE_WARM');
+  const learned = await learning.readLearningProfile(BASE);
+  const learnedRpm = learned.contextualData.find((item) => item.condition === 'IDLE_WARM').statistics['Engine RPM'];
+  assert.strictEqual(learned.globalSampleCounts.realSamples, 1);
+  assert.ok(learnedRpm.mean > 778 && learnedRpm.mean < 800);
+  assert.deepStrictEqual(learnedRpm.source, ['CARSCANNER_BASELINE', 'REAL_OBD']);
 }
 
 async function testBluetoothEventTransport() {
