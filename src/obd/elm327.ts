@@ -1,4 +1,5 @@
 import { parsePidResponse } from './parser';
+import { assertObdServiceAllowed } from './knowledgeRuntime';
 import {
   DEFAULT_ELM327_COMPATIBILITY,
   Elm327CompatibilityConfig,
@@ -229,9 +230,19 @@ export class Elm327Session {
     };
   }
 
-  async executeCommand(command: string): Promise<ElmCommandResult> {
+  async executeCommand(command: string, options?: { explicitUserAction?: boolean }): Promise<ElmCommandResult> {
     await this.initialize();
     const normalized = normalizeCommand(command);
+
+    // O banco local de serviços é a barreira de segurança para comandos OBD.
+    // O modo 04 (limpar DTC) nunca pode sair por polling automático.
+    const mode = normalized.length === 2 && /^[0-9A-F]{2}$/.test(normalized)
+      ? normalized
+      : normalized.slice(0, 2);
+    if (/^[0-9A-F]{2}$/.test(mode)) {
+      assertObdServiceAllowed(mode, options?.explicitUserAction === true);
+    }
+
     return this.enqueueCommand(() => this.command(normalized));
   }
 
