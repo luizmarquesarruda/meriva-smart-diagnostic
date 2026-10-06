@@ -162,7 +162,7 @@ class AutoTripService {
           const levelResult = await connection.session.queryPid('012F');
           if (
             levelResult.parsed.status === 'RESPONDEU' &&
-            levelResult.parsed.unit === '%' &&
+            levelResult.parsed.unit === 'percent' &&
             levelResult.parsed.value != null &&
             Number.isFinite(levelResult.parsed.value) &&
             levelResult.parsed.value >= 0 &&
@@ -183,6 +183,23 @@ class AutoTripService {
           ) {
             fuelRateLph = fuelResult.parsed.value;
           }
+        }
+
+        if (fuelLevelPercent != null) {
+          const level = fuelLevelPercent;
+          const persisted = await initAutoSave(this.basePath);
+          const fuelRemainingL = Number((persisted.autonomy.tankCapacityL * level / 100).toFixed(2));
+          const average = Number(persisted.autonomy.averageConsumptionKml) || 0;
+          const estimatedRangeKm = Number((average > 0 ? average * fuelRemainingL : 0).toFixed(1));
+          updateAutoSaveState((state) => {
+            state.autonomy = {
+              ...state.autonomy,
+              fuelLevelPercent: level,
+              estimatedFuelRemainingL: fuelRemainingL,
+              fuelLevelSource: 'PID_012F',
+              estimatedRangeKm,
+            };
+          });
         }
 
         if (obdSpeedSupported) {
