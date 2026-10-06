@@ -97,14 +97,18 @@ export class BluetoothClassicTransport implements ObdTransport {
     let device: BluetoothDevice | null = null;
     let lastCause: unknown = null;
 
-    // ELM327 genérico 1.5: uma única tentativa por chamada.
-    // Não fazemos fallback imediato para secureSocket=true. Isso criava duas
-    // tentativas concorrentes enquanto a primeira ainda estava pendente.
+    // O ELM327 é um terminal serial ASCII: comandos terminam em CR e as
+    // respostas podem chegar fragmentadas. A biblioteca suporta delimiter vazio,
+    // entregando os dados recebidos sem tentar criar mensagens artificiais.
+    // O enquadramento real da resposta é feito nesta classe pelo prompt '>'.
     const secureSocket = false;
+    const connectionType = 'delimited';
+    const delimiter = '';
     this.logDiagnostic('CONNECT_ATTEMPT', {
       secureSocket,
-      connectionType: 'delimited',
-      delimiter: '\r',
+      connectionType,
+      framing: 'STREAM_UNDELIMITED',
+      delimiter,
     });
 
     let timedOutConnection = false;
@@ -126,8 +130,8 @@ export class BluetoothClassicTransport implements ObdTransport {
       }
 
       connectPromise = RNBluetoothClassic.connectToDevice(this.deviceAddress, {
-        connectionType: 'delimited',
-        delimiter: '\r',
+        connectionType,
+        delimiter,
         charset: 'ascii',
         secureSocket,
       });
@@ -156,14 +160,16 @@ export class BluetoothClassicTransport implements ObdTransport {
 
       this.logDiagnostic('CONNECT_SUCCESS', {
         secureSocket,
-        connectionType: 'delimited',
+        connectionType,
+        framing: 'STREAM_UNDELIMITED',
       });
     } catch (cause) {
       timedOutConnection = true;
       if (this.connectTimer) { clearTimeout(this.connectTimer); this.connectTimer = null; }
       this.logDiagnostic('CONNECT_FAILURE', {
         secureSocket,
-        connectionType: 'delimited',
+        connectionType,
+        framing: 'STREAM_UNDELIMITED',
         error: cause instanceof Error ? cause.message : String(cause),
       });
       lastCause = cause;
@@ -197,7 +203,11 @@ export class BluetoothClassicTransport implements ObdTransport {
     this.dataSubscription = device.onDataReceived((event) => {
       if (event?.data) {
         const chunk = String(event.data);
-        this.logDiagnostic('RX', { length: chunk.length, data: chunk });
+        this.logDiagnostic('RX_CHUNK', {
+          length: chunk.length,
+          data: chunk,
+          hex: Array.from(new TextEncoder().encode(chunk)).map((value) => value.toString(16).padStart(2, '0')).join(' '),
+        });
         this.received += chunk;
       }
     });
@@ -282,7 +292,11 @@ export class BluetoothClassicTransport implements ObdTransport {
 
     const partial = this.received.replace(/^\s+|\s+$/g, '');
     this.received = '';
-    this.logDiagnostic('READ_TIMEOUT', { partial });
+    this.logDiagnostic('READ_TIMEOUT', {
+      partial,
+      bufferedLength: this.received.length,
+      promptExpected: true,
+    });
     throw new Error(partial ? 'TIMEOUT: RESPOSTA ELM SEM PROMPT FINAL' : 'TIMEOUT');
   }
 
