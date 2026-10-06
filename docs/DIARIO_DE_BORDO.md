@@ -233,3 +233,61 @@ A política foi corrigida conforme o teste desejado:
 - a sessão que obteve sucesso é devolvida ao aplicativo;
 - não há nova tentativa nem reabertura após sucesso;
 - se todas as 20 falharem, o erro final é retornado.
+
+
+---
+
+## 2026-10-06 - Adaptação ao ELM327 Mini genérico
+
+### Problema observado
+Relatório físico de 2026-10-06 14:25:48Z:
+- Android 36.
+- BLUETOOTH_SCAN/CONNECT concedidos.
+- Bluetooth disponível e ligado.
+- 1 dispositivo pareado encontrado.
+- A primeira tentativa chegou ao transporte RFCOMM, mas terminou em `TIMEOUT CONEXÃO BLUETOOTH` após aproximadamente 5 segundos.
+- Nenhum comando AT foi transmitido, portanto a falha ocorreu antes da validação do adaptador.
+
+### Regra de projeto
+O adaptador usado no teste é um **ELM327 Mini genérico/clonado**. O software não deve tratá-lo como um ELM327 original da Elm Electronics, nem depender de versão de firmware, fabricante ou conjunto completo de comandos AT.
+
+A documentação oficial da Elm Electronics confirma que o ELM327 é uma família de interpretadores OBD com diferentes versões e conjuntos de recursos. Para o projeto, isso é referência de protocolo, não uma prova de que o hardware físico seja um CI original.
+
+### Evidência técnica
+- ELM327 trabalha como interface serial e usa CR para finalizar comandos; o prompt `>` indica que voltou a aceitar comandos.
+- `react-native-bluetooth-classic` suporta Bluetooth Classic e modo de conexão delimitado. O próprio projeto da biblioteca registra que delimiter vazio pode ser usado para receber dados sem impor uma fronteira artificial.
+- Em Bluetooth Classic/RFCOMM, o aplicativo deve tratar a comunicação como fluxo, não presumir que cada evento recebido seja uma mensagem OBD completa.
+
+### Correção
+1. Mantido Bluetooth Classic/RFCOMM/SPP como transporte.
+2. Mantido framing ASCII com delimiter vazio e enquadramento da resposta pelo prompt `>`.
+3. A conexão agora usa **perfil adaptativo para ELM327 Mini genérico**:
+   - primeiro tenta RFCOMM inseguro;
+   - se falhar, tenta RFCOMM seguro;
+   - registra qual modo funcionou.
+4. O estado de timeout de uma tentativa nativa foi isolado por tentativa, evitando que uma tentativa anterior atrasada perca a indicação de timeout ao iniciar o fallback.
+5. O bloqueio global por endereço MAC continua impedindo duas chamadas RFCOMM nativas simultâneas para o mesmo adaptador.
+6. O `ATI` deixou de ser requisito obrigatório de vida do adaptador. Ele continua sendo tentado como comando opcional.
+7. A validação real do caminho OBD continua sendo feita pelo `010C` e por uma resposta `41 0C ...` válida. Isso evita aceitar um clone apenas porque respondeu a um comando AT.
+8. O relatório continua registrando os dados brutos de conexão e RX/TX para diagnóstico físico.
+
+### Arquivos afetados
+- `src/obd/bluetoothClassicTransport.ts`
+- `src/obd/elm327.ts`
+- `docs/DIARIO_DE_BORDO.md`
+
+### Commits
+- `c8a234add426adc777ab05558ba9a286abdc4d3d` - fallback de socket para ELM327 Mini genérico.
+- `c8d56e2e80c49552e05dbb7f9180c270d4d73f5d` - isolamento do timeout tardio por tentativa.
+- `ff317cf9e972e3f751ccd4b06b31acb8891cbae9` - ATI opcional para clones genéricos.
+
+### Próximo teste físico
+Reinstalar o APK produzido pela CI e repetir o teste com o ELM327 Mini pareado.
+
+O trace esperado deve mostrar:
+`CONNECT_PROFILE` → `CONNECT_ATTEMPT secureSocket:false` → sucesso, ou fallback para `secureSocket:true`.
+
+Depois da conexão, o marco decisivo é:
+`TX ATZ` → resposta → demais comandos AT → `TX 010C` → `RX 41 0C XX XX`.
+
+Não considerar `OK` isolado como prova de comunicação com a ECU.
