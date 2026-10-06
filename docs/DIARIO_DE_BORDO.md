@@ -220,3 +220,16 @@ O teste de regressão continua podendo importar os valores e a função usa exat
 
 ### Publicação
 A documentação fica sincronizada com a correção de código.
+
+
+---
+
+## 2026-10-06 - Regra final do retry Bluetooth: parar no primeiro sucesso
+
+A política foi corrigida conforme o teste desejado:
+- máximo de 20 tentativas;
+- intervalo de 8 segundos somente entre falhas;
+- SUCCESS encerra o ciclo imediatamente;
+- a sessão que obteve sucesso é devolvida ao aplicativo;
+- não há nova tentativa nem reabertura após sucesso;
+- se todas as 20 falharem, o erro final é retornado.
