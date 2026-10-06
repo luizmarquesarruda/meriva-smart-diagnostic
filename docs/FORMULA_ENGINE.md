@@ -23,6 +23,7 @@ Ela mantém um banco próprio em JSON:
 - src/knowledge/pids.json: PID, bytes, unidade e fórmula.
 - src/knowledge/units.json: catálogo de unidades.
 - src/knowledge/ranges.json: faixas de plausibilidade.
+- src/knowledge/fuel_types.json: enumeração do PID 0151, separada das fórmulas numéricas.
 - src/obd/formulaEngine.ts: executor seguro das fórmulas, sem eval.
 
 ## Fluxo
@@ -42,7 +43,7 @@ O motor nunca deve inventar uma fórmula para um PID desconhecido.
 
 Se o PID não tiver definição, a resposta bruta é preservada e o valor fica como não interpretado.
 
-Uma faixa de plausibilidade também não é diagnóstico. Ela serve para impedir que um valor absurdo entre no aprendizado como se fosse verdadeiro.
+Enums, como o PID 0151, não devem ser tratados como valores físicos contínuos. Uma faixa de plausibilidade também não é diagnóstico. Ela serve para impedir que um valor absurdo entre no aprendizado como se fosse verdadeiro.
 
 ## IA burrinha, versão 2
 
