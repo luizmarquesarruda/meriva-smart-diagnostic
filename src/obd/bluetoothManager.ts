@@ -155,7 +155,7 @@ export async function createRealElmSession(
 
   try {
     const ecuPolicy = validateEcuPolicy();
-    const initialization = await session.initialize();
+    const initialization = await session.initialize(ecuPolicy.elm327.initialization);
 
     // Primeiro confirme ECU/ELM com um PID real e simples.
     // 010C funciona com a chave ligada mesmo com motor parado e evita
