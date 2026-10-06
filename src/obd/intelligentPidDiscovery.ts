@@ -118,7 +118,7 @@ export async function discoverIntelligentPids(
     ...KNOWN_PIDS,
     ...Array.from(supported),
   ])).filter((pid) =>
-    /^01[0-9A-F]{2}$/i.test(pid) && !priorityPids.includes(pid.toUpperCase()),
+    /^01[0-9A-F]{2}$/i.test(pid) && !priorityPids.includes(pid.toUpperCase()) || confidence[pid] === 0,
   );
 
   for (const pid of candidates) {
