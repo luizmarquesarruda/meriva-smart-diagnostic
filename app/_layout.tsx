@@ -9,7 +9,7 @@ import { connectPreferredElm, disconnectSharedObd } from '../src/obd/sharedConne
 import * as FileSystem from 'expo-file-system';
 import { initAutoSave, updateAutoSaveState } from '../src/meriva/autosaveManager';
 import { autoTripService } from '../src/trip/autoTripService';
-import { addDrivenDistance, readMaintenanceState, setGpsDistanceBaseline } from '../src/maintenance/maintenanceService';
+import { addDrivenDistance, setGpsDistanceBaseline } from '../src/maintenance/maintenanceService';
 
 export default function RootLayout() {
   const checking = useRef(false);
