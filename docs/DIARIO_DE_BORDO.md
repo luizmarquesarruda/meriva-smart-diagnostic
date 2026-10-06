@@ -93,3 +93,47 @@ Também foi encontrado um segundo problema de fluxo: a tela chamava `ensureBluet
 
 ### Próximo passo
 Executar a nova CI desta correção. Se falhar, registrar a causa neste diário antes de outra alteração. Se passar, testar novamente no telefone com o ELM327 pareado e verificar especialmente a ausência de `Already attempting connection` no relatório.
+
+---
+
+## 2026-10-06 - Correção de framing Bluetooth para ELM327
+
+### Problema
+Relatório físico das 13:33:45Z:
+- Bluetooth disponível e ligado.
+- BLUETOOTH_SCAN/CONNECT concedidos.
+- localização concedida.
+- 1 dispositivo pareado encontrado: OBDII.
+- a sessão chegou a `ELM_INITIALIZATION_START`.
+- o primeiro teste físico retornou `ECU NÃO RESPONDEU AO 010C: OK | RX=OK`.
+
+### Diagnóstico
+O pareamento e o RFCOMM não eram mais o primeiro gargalo. A biblioteca `react-native-bluetooth-classic` usa por padrão conexão delimitada, mas permite delimiter vazio para entregar o conteúdo recebido sem segmentação. O código do projeto estava usando delimiter `\\r`.
+
+O ELM327 usa CR (`0x0D`) para terminar comandos e pode produzir CR/linefeed nas respostas. O prompt `>` marca que o ELM voltou ao estado ocioso. Para uma ponte RFCOMM, não é seguro assumir que cada evento recebido representa uma resposta OBD completa.
+
+### Correção
+1. Mantido Bluetooth Classic/RFCOMM e charset ASCII.
+2. Alterado o framing do transporte para `connectionType: delimited` com **delimiter vazio**.
+3. O transporte agora recebe fragmentos sem impor uma fronteira artificial por CR.
+4. `readUntilPrompt()` continua sendo o enquadrador da aplicação e somente conclui uma resposta ao encontrar `>`.
+5. O trace passou a registrar cada `RX_CHUNK` com conteúdo, tamanho e representação hexadecimal ASCII para diagnosticar fragmentação real.
+6. O timeout agora registra também o buffer parcial e a expectativa do prompt.
+7. O teste de regressão foi atualizado para fixar o contrato de delimiter vazio e manter o teste de resposta fragmentada.
+
+### Base técnica
+- Datasheet ELM327: comandos terminam em CR; o prompt `>` indica prontidão.
+- `react-native-bluetooth-classic`: delimiter vazio é suportado para enviar o buffer completo em `read()`/`onDataReceived`; o modo `binary` usa Base64 na ponte Android.
+- Android RFCOMM: a leitura é orientada a fluxo, portanto eventos não devem ser tratados como mensagens OBD inteiras.
+
+### CI
+- Commit anterior de código: `5f45382ffe06c23f220e4466ac2d0211fecf4f91`.
+- Commit de teste: `c8665b15f558cb7e14dd201141590628ba18aaa4`.
+- Commit de documentação: `41eeb1668eff1f01942faf971000c1da3c9848ff`.
+- CI será verificada após o estado final do conjunto de alterações.
+
+### Resultado físico
+Ainda **não confirmado** no ELM327 real. O próximo relatório deve mostrar `RX_CHUNK` e, idealmente, `RESPONSE_COMPLETE` contendo `41 0C ...`.
+
+### Próximo passo
+Executar a CI do estado final e instalar o APK gerado no telefone. O teste físico decisivo é `010C -> 41 0C XX XX`, sem aceitar `OK` isolado como resposta da ECU.
