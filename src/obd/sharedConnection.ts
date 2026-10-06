@@ -3,9 +3,10 @@ import type { BluetoothDeviceInfo } from './bluetoothClassicTransport';
 import { createRealElmSession, discoverPairedDevices, ensureBluetoothReady } from './bluetoothManager';
 import { DEFAULT_ELM327_COMPATIBILITY, Elm327CompatibilityConfig, mergeCompatibilityConfig } from './elm327Compatibility';
 import { getAutoSaveState } from '../meriva/autosaveManager';
-import { readAppSettings } from '../database/appSettings';
+import { readAppSettings, writeAppSettings } from '../database/appSettings';
 import * as FileSystem from 'expo-file-system';
 import { prioritizeBluetoothCandidates } from './bluetoothCandidatePriority';
+import { getBluetoothStartupPolicy, validateBluetoothStartupPolicy } from './bluetoothKnowledge';
 
 export interface SharedObdConnection {
   session: Elm327Session;
@@ -60,12 +61,10 @@ async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm3
   }
   const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
   const settings = await readAppSettings(basePath);
-  await import('../database/appSettings').then(({ writeAppSettings }) =>
-    writeAppSettings(basePath, {
-      ...settings,
-      selectedAdapterAddress: device.address,
-    }),
-  );
+  await writeAppSettings(basePath, {
+    ...settings,
+    selectedAdapterAddress: device.address,
+  });
 
   active = {
     session: connection.session,
@@ -85,6 +84,7 @@ async function connectPreferredElmOnce(
 ): Promise<SharedObdConnection> {
   await ensureBluetoothReady();
 
+  const bluetoothPolicy = validateBluetoothStartupPolicy();
   const devices = await discoverPairedDevices();
   const candidates: BluetoothDeviceInfo[] = [];
   const addCandidate = (device: BluetoothDeviceInfo) => {
@@ -96,12 +96,14 @@ async function connectPreferredElmOnce(
   // os demais dispositivos Classic pareados.
   const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
   const settings = await readAppSettings(basePath);
-  const prioritized = prioritizeBluetoothCandidates(
-    devices,
-    settings.selectedAdapterAddress,
-    looksLikeElm327,
-  );
+  const prioritized = bluetoothPolicy.deviceDiscovery.lastSuccessfulDeviceFirst
+    ? prioritizeBluetoothCandidates(devices, settings.selectedAdapterAddress, looksLikeElm327)
+    : devices;
   for (const device of prioritized) addCandidate(device);
+
+  if (!bluetoothPolicy.deviceDiscovery.fallbackToOtherPairedDevices && candidates.length === 0) {
+    throw new Error('POLÍTICA BLUETOOTH SEM DISPOSITIVOS PAREADOS DISPONÍVEIS.');
+  }
 
   let lastError: unknown = null;
   for (const device of candidates) {
