@@ -346,13 +346,13 @@ async function testCarScannerBaselineAndFuel012F() {
 
   const parsed = parser.parsePidResponse('012F', '41 2F 80');
   assert.strictEqual(parsed.status, 'RESPONDEU');
-  assert.strictEqual(parsed.value, 50);
+  assert.strictEqual(parsed.value, 12800 / 255);
   assert.strictEqual(parsed.unit, 'percent');
   assert.strictEqual(parser.parsePidResponse('012F', 'NO DATA').value, null);
   assert.strictEqual(parser.parsePidResponse('012F', 'NO DATA').status, 'NÃO RESPONDEU');
   assert.strictEqual(fuel.fuelLevelPercentToLiters(0), 0);
   assert.strictEqual(fuel.fuelLevelPercentToLiters(100), 56);
-  assert.strictEqual(fuel.fuelLevelPercentToLiters(parsed.value), 28);
+  assert.ok(Math.abs(fuel.fuelLevelPercentToLiters(parsed.value) - (56 * 128 / 255)) < 1e-12);
   assert.strictEqual(fuel.isFuelReserve(parsed.value), false);
   assert.strictEqual(fuel.isFuelReserve(8), true);
   assert.strictEqual(fuel.estimateRangeFromFuelLevel(50, 10), 280);
