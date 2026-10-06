@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "units": {
+    "rpm": {
+      "symbol": "rpm",
+      "name": "rotações por minuto"
+    },
+    "kmh": {
+      "symbol": "km/h",
+      "name": "quilômetros por hora"
+    },
+    "celsius": {
+      "symbol": "°C",
+      "name": "graus Celsius"
+    },
+    "kpa": {
+      "symbol": "kPa",
+      "name": "quilopascal"
+    },
+    "percent": {
+      "symbol": "%",
+      "name": "por cento"
+    },
+    "grams_per_second": {
+      "symbol": "g/s",
+      "name": "gramas por segundo"
+    },
+    "volts": {
+      "symbol": "V",
+      "name": "volts"
+    },
+    "km": {
+      "symbol": "km",
+      "name": "quilômetros"
+    },
+    "liters_per_hour": {
+      "symbol": "L/h",
+      "name": "litros por hora"
+    },
+    "degrees": {
+      "symbol": "°",
+      "name": "graus"
+    }
+  }
+}
