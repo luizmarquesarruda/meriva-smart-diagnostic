@@ -101,80 +101,99 @@ export class BluetoothClassicTransport implements ObdTransport {
     // respostas podem chegar fragmentadas. A biblioteca suporta delimiter vazio,
     // entregando os dados recebidos sem tentar criar mensagens artificiais.
     // O enquadramento real da resposta é feito nesta classe pelo prompt '>'.
-    const secureSocket = false;
+    // ELM327 Mini genérico: não presumimos fabricante, firmware ou tipo de
+    // socket. A maioria usa SPP/RFCOMM. Começamos com RFCOMM inseguro, comum
+    // em clones baratos, e fazemos fallback para socket seguro quando o
+    // adaptador/pareamento exigir autenticação.
+    const socketModes = [false, true];
     const connectionType = 'delimited';
     const delimiter = '';
-    this.logDiagnostic('CONNECT_ATTEMPT', {
-      secureSocket,
+    this.logDiagnostic('CONNECT_PROFILE', {
+      adapterClass: 'ELM327_MINI_GENERICO',
+      transport: 'BLUETOOTH_CLASSIC_RFCOMM_SPP',
       connectionType,
       framing: 'STREAM_UNDELIMITED',
       delimiter,
+      socketModes: ['INSECURE', 'SECURE'],
     });
 
     let timedOutConnection = false;
     let connectPromise: NativeConnectPromise | null = null;
     const addressKey = normalizeBluetoothAddress(this.deviceAddress);
 
-    try {
-      // O timeout do JavaScript não cancela a tentativa RFCOMM nativa.
-      // Se uma nova instância chamar connectToDevice antes da primeira
-      // tentativa terminar, react-native-bluetooth-classic devolve:
-      // "Already attempting connection to device ...".
-      // Portanto, o bloqueio precisa ser GLOBAL por endereço, não por instância.
-      const pending = pendingNativeConnections.get(addressKey);
-      if (pending) {
-        this.logDiagnostic('CONNECT_WAITING_PREVIOUS_NATIVE_ATTEMPT', {
-          address: this.deviceAddress,
-        });
-        try { await pending; } catch { /* a próxima tentativa pode começar após o término */ }
-      }
-
-      connectPromise = RNBluetoothClassic.connectToDevice(this.deviceAddress, {
-        connectionType,
-        delimiter,
-        charset: 'ascii',
-        secureSocket,
-      });
-      pendingNativeConnections.set(addressKey, connectPromise);
-
-      void connectPromise.then(async (lateDevice) => {
-        if (!timedOutConnection || !lateDevice) return;
-        this.logDiagnostic('LATE_CONNECT_SUCCESS_AFTER_TIMEOUT');
-        await this.safeDisconnect(lateDevice);
-        this.logDiagnostic('LATE_CONNECT_DISCONNECTED');
-      }).catch(() => {
-        // A tentativa nativa atrasada também pode terminar com erro.
-      }).finally(() => {
-        if (pendingNativeConnections.get(addressKey) === connectPromise) {
-          pendingNativeConnections.delete(addressKey);
-        }
-      });
-
-      device = await Promise.race([
-        connectPromise,
-        new Promise<never>((_, reject) => { this.connectTimer = setTimeout(
-          () => reject(new Error('TIMEOUT CONEXÃO BLUETOOTH')),
-          this.config.bluetoothConnectTimeoutMs,
-        ); }),
-      ]);
-
-      this.logDiagnostic('CONNECT_SUCCESS', {
-        secureSocket,
-        connectionType,
-        framing: 'STREAM_UNDELIMITED',
-      });
-    } catch (cause) {
-      timedOutConnection = true;
-      if (this.connectTimer) { clearTimeout(this.connectTimer); this.connectTimer = null; }
-      this.logDiagnostic('CONNECT_FAILURE', {
-        secureSocket,
-        connectionType,
-        framing: 'STREAM_UNDELIMITED',
-        error: cause instanceof Error ? cause.message : String(cause),
-      });
-      lastCause = cause;
-      if (device) await this.safeDisconnect(device);
+    for (const secureSocket of socketModes) {
+      timedOutConnection = false;
+      connectPromise = null;
       device = null;
+
+      try {
+        // O timeout JS não cancela a tentativa RFCOMM nativa. O bloqueio é
+        // GLOBAL por endereço para impedir chamadas concorrentes ao mesmo MAC.
+        const pending = pendingNativeConnections.get(addressKey);
+        if (pending) {
+          this.logDiagnostic('CONNECT_WAITING_PREVIOUS_NATIVE_ATTEMPT', {
+            address: this.deviceAddress,
+          });
+          try { await pending; } catch { /* próxima tentativa após término */ }
+        }
+
+        this.logDiagnostic('CONNECT_ATTEMPT', {
+          secureSocket,
+          connectionType,
+          framing: 'STREAM_UNDELIMITED',
+          delimiter,
+        });
+
+        connectPromise = RNBluetoothClassic.connectToDevice(this.deviceAddress, {
+          connectionType,
+          delimiter,
+          charset: 'ascii',
+          secureSocket,
+        });
+        pendingNativeConnections.set(addressKey, connectPromise);
+
+        const currentPromise = connectPromise;
+        void currentPromise.then(async (lateDevice) => {
+          if (!timedOutConnection || !lateDevice) return;
+          this.logDiagnostic('LATE_CONNECT_SUCCESS_AFTER_TIMEOUT', { secureSocket });
+          await this.safeDisconnect(lateDevice);
+          this.logDiagnostic('LATE_CONNECT_DISCONNECTED', { secureSocket });
+        }).catch(() => {
+          // A tentativa nativa atrasada também pode terminar com erro.
+        }).finally(() => {
+          if (pendingNativeConnections.get(addressKey) === currentPromise) {
+            pendingNativeConnections.delete(addressKey);
+          }
+        });
+
+        device = await Promise.race([
+          connectPromise,
+          new Promise<never>((_, reject) => { this.connectTimer = setTimeout(
+            () => reject(new Error('TIMEOUT CONEXÃO BLUETOOTH')),
+            this.config.bluetoothConnectTimeoutMs,
+          ); }),
+        ]);
+
+        if (this.connectTimer) { clearTimeout(this.connectTimer); this.connectTimer = null; }
+        this.logDiagnostic('CONNECT_SUCCESS', {
+          secureSocket,
+          connectionType,
+          framing: 'STREAM_UNDELIMITED',
+        });
+        break;
+      } catch (cause) {
+        timedOutConnection = true;
+        if (this.connectTimer) { clearTimeout(this.connectTimer); this.connectTimer = null; }
+        this.logDiagnostic('CONNECT_FAILURE', {
+          secureSocket,
+          connectionType,
+          framing: 'STREAM_UNDELIMITED',
+          error: cause instanceof Error ? cause.message : String(cause),
+        });
+        lastCause = cause;
+        if (device) await this.safeDisconnect(device);
+        device = null;
+      }
     }
 
     if (!device) {
