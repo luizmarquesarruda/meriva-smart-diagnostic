@@ -1,0 +1,268 @@
+{
+  "version": 1,
+  "vehicle": {
+    "make": "Chevrolet",
+    "model": "Meriva Maxx",
+    "engine": "1.4 8V ECONO.FLEX",
+    "year": "2011/2012",
+    "displacement_cm3": 1389,
+    "cylinders": 4,
+    "engine_management": "Multec HX14YFH"
+  },
+  "purpose": "Base técnica para monitoramento da saúde da Meriva. Este arquivo separa valores técnicos de referência de limites de diagnóstico. Nenhum limite não confirmado pela documentação é inventado.",
+  "source_policy": {
+    "primary": [
+      "Manual do Proprietário Chevrolet Meriva 2012, edição 08/11",
+      "Manual de serviço GM Meriva 1.4 EconoFlex Multec HX14YFH"
+    ],
+    "secondary": [
+      "Materiais técnicos de treinamento e diagnóstico específicos da Meriva 1.4 EconoFlex"
+    ],
+    "rules": [
+      "Valor de ficha técnica não deve ser tratado automaticamente como limite de alarme.",
+      "Limite de diagnóstico só entra quando houver fonte técnica explícita.",
+      "Quando a documentação não fornecer temperatura numérica de alarme, usar o estado de advertência do veículo e não fabricar um °C.",
+      "Dados CarScanner são sementes de comparação, nunca substituem a referência técnica.",
+      "Dados RAW_ECU válidos têm prioridade sobre sementes."
+    ]
+  },
+  "reference_values": {
+    "engine_idle_rpm": {
+      "pid": "010C",
+      "value_min": 700,
+      "value_max": 800,
+      "unit": "rpm",
+      "context": "motor em marcha lenta",
+      "type": "SPECIFICATION",
+      "source": "Manual do Proprietário Chevrolet Meriva 2012, seção 12, ficha técnica",
+      "diagnostic_use": "Referência de marcha lenta. Fora dessa faixa não significa falha isoladamente."
+    },
+    "engine_cutoff_rpm": {
+      "pid": "010C",
+      "value": 6300,
+      "unit": "rpm",
+      "context": "limite de rotação especificado",
+      "type": "SPECIFICATION",
+      "source": "Manual do Proprietário Chevrolet Meriva 2012, seção 12, ficha técnica",
+      "diagnostic_use": "Referência de limite superior de rotação. Não usar como meta de operação."
+    },
+    "alternator_nominal": {
+      "pid": "0142",
+      "value": 14,
+      "unit": "V",
+      "context": "sistema de carga",
+      "type": "NOMINAL_SPECIFICATION",
+      "source": "Material técnico Meriva 1.4 EconoFlex, sistema elétrico, alternador 14 V / 75 A",
+      "diagnostic_use": "Tensão nominal do alternador. Não transformar diretamente em faixa de alarme sem validação elétrica sob carga."
+    },
+    "alternator_current_nominal": {
+      "value": 75,
+      "unit": "A",
+      "context": "alternador",
+      "type": "NOMINAL_SPECIFICATION",
+      "source": "Material técnico Meriva 1.4 EconoFlex, sistema elétrico",
+      "diagnostic_use": "Capacidade nominal do alternador. Não é corrente instantânea esperada no PID 0142."
+    },
+    "coolant_system_capacity": {
+      "value": 6,
+      "unit": "L",
+      "context": "sistema de arrefecimento completo, inclusive radiador",
+      "type": "CAPACITY",
+      "source": "Manual do Proprietário Chevrolet Meriva 2012, seção 12",
+      "diagnostic_use": "Referência de manutenção, não é limite de temperatura."
+    },
+    "coolant_overheat": {
+      "pid": "0105",
+      "value": null,
+      "unit": "celsius",
+      "context": "superaquecimento",
+      "type": "WARNING_STATE",
+      "source": "Manual do Proprietário Chevrolet Meriva 2012, seção 9",
+      "diagnostic_use": "O manual determina ação quando há advertência de superaquecimento, mas não fornece neste ponto um valor OBD em °C. O aplicativo deve tratar a advertência/condição sustentada como crítica sem inventar temperatura."
+    },
+    "coolant_fan_behavior": {
+      "pid": "0105",
+      "value": null,
+      "unit": "celsius",
+      "context": "superaquecimento",
+      "type": "FUNCTIONAL_REQUIREMENT",
+      "source": "Manual do Proprietário Chevrolet Meriva 2012, seção 9",
+      "diagnostic_use": "Em condição de superaquecimento, o ventilador elétrico deve funcionar. Falha do ventilador é condição de reparo."
+    },
+    "engine_oil_capacity": {
+      "value": 3.25,
+      "unit": "L",
+      "context": "cárter sem filtro",
+      "type": "CAPACITY",
+      "source": "Manual do Proprietário Chevrolet Meriva 2012, seção 12",
+      "diagnostic_use": "Referência de serviço."
+    },
+    "oil_filter_capacity": {
+      "value": 0.25,
+      "unit": "L",
+      "context": "filtro de óleo",
+      "type": "CAPACITY",
+      "source": "Manual do Proprietário Chevrolet Meriva 2012, seção 12",
+      "diagnostic_use": "Referência de serviço."
+    },
+    "steering_fluid_capacity": {
+      "value": 0.95,
+      "unit": "L",
+      "context": "direção hidráulica",
+      "type": "CAPACITY",
+      "source": "Manual do Proprietário Chevrolet Meriva 2012, seção 12",
+      "diagnostic_use": "Referência de serviço."
+    }
+  },
+  "monitoring": {
+    "cooling": {
+      "priority": 1,
+      "continuous": true,
+      "pids": ["0105"],
+      "health_inputs": ["coolant_temperature", "engine_rpm", "vehicle_speed"],
+      "states": ["NORMAL", "ATENCAO", "CRITICO", "SEM_DADOS"],
+      "rules": [
+        {
+          "id": "coolant_overheat_warning",
+          "severity": "CRITICO",
+          "condition": "vehicle_overheat_warning_or_sustained_overheat_evidence",
+          "threshold_c": null,
+          "requires_consecutive_samples": 3,
+          "duration_ms": 3000,
+          "action": "ALERTAR_IMEDIATAMENTE",
+          "reason": "O manual orienta parar o veículo se a temperatura não baixar e desligar o motor se a advertência persistir.",
+          "source": "Manual do Proprietário Chevrolet Meriva 2012, seção 9"
+        },
+        {
+          "id": "coolant_missing",
+          "severity": "SEM_DADOS",
+          "condition": "pid_unavailable_or_invalid",
+          "threshold_c": null,
+          "action": "NAO_DIAGNOSTICAR_NORMAL",
+          "reason": "Ausência de leitura não pode ser confundida com temperatura normal."
+        }
+      ]
+    },
+    "engine": {
+      "priority": 2,
+      "continuous": true,
+      "pids": ["010C", "0104", "010E", "0110", "0111"],
+      "rules": [
+        {
+          "id": "idle_rpm_reference",
+          "severity": "ATENCAO",
+          "pid": "010C",
+          "condition": "engine_running_and_idle_context",
+          "reference_min": 700,
+          "reference_max": 800,
+          "unit": "rpm",
+          "requires_consecutive_samples": 5,
+          "action": "REGISTRAR_TENDENCIA",
+          "reason": "Faixa de marcha lenta especificada na ficha técnica. Desvio isolado não confirma defeito.",
+          "source": "Manual do Proprietário Chevrolet Meriva 2012, seção 12"
+        },
+        {
+          "id": "rpm_near_cutoff",
+          "severity": "ATENCAO",
+          "pid": "010C",
+          "condition": "rpm_above_90_percent_of_reference_cutoff",
+          "reference_cutoff": 6300,
+          "unit": "rpm",
+          "requires_consecutive_samples": 2,
+          "action": "ALERTAR",
+          "reason": "A ficha técnica informa rotação de corte de 6300 rpm.",
+          "source": "Manual do Proprietário Chevrolet Meriva 2012, seção 12"
+        }
+      ]
+    },
+    "electrical": {
+      "priority": 2,
+      "continuous": true,
+      "pids": ["0142"],
+      "reference": {
+        "alternator_nominal_voltage": 14,
+        "alternator_nominal_current": 75,
+        "unit_voltage": "V",
+        "unit_current": "A"
+      },
+      "rules": [
+        {
+          "id": "charging_reference",
+          "severity": "INFO",
+          "pid": "0142",
+          "condition": "engine_running",
+          "reference_value": 14,
+          "unit": "V",
+          "action": "COMPARAR_E_REGISTRAR",
+          "reason": "14 V é a especificação nominal do alternador, não uma faixa universal de alarme.",
+          "source": "Material técnico Meriva 1.4 EconoFlex"
+        }
+      ]
+    },
+    "fueling": {
+      "priority": 3,
+      "continuous": false,
+      "pids": ["0106", "0107", "0114", "0151", "0152", "015E"],
+      "rules": [
+        {
+          "id": "fuel_trim_trend",
+          "severity": "ATENCAO",
+          "pids": ["0106", "0107"],
+          "condition": "persistent_deviation_from_learned_baseline",
+          "threshold": null,
+          "action": "LEARN_AND_CORRELATE",
+          "reason": "Sem limite específico confirmado para esta aplicação, usar tendência, persistência e correlação com outros PIDs."
+        }
+      ]
+    },
+    "movement": {
+      "priority": 2,
+      "continuous": true,
+      "pids": ["010D"],
+      "rules": [
+        {
+          "id": "vehicle_speed_consistency",
+          "severity": "ATENCAO",
+          "condition": "obd_speed_conflicts_with_gps_movement",
+          "threshold": null,
+          "action": "BLOQUEAR_DISTANCIA_GPS_ATE_CONFIRMACAO",
+          "reason": "O OBD deve ser usado como evidência adicional para evitar que deriva do GPS vire quilometragem."
+        }
+      ]
+    },
+    "diagnostics": {
+      "priority": 1,
+      "inputs": ["DTC", "raw_obd_response", "pid_validity", "protocol", "response_latency"],
+      "rules": [
+        {
+          "id": "missing_data_is_not_normal",
+          "severity": "SEM_DADOS",
+          "condition": "required_pid_missing",
+          "action": "REPORTAR_LIMITACAO",
+          "reason": "Um sistema de monitoramento não deve chamar de saudável algo que não conseguiu medir."
+        }
+      ]
+    }
+  },
+  "health_states": {
+    "NORMAL": "Leitura válida e compatível com a referência ou tendência aprendida.",
+    "ATENCAO": "Desvio persistente que merece registro e correlação, sem evidência suficiente para declarar falha.",
+    "CRITICO": "Condição de risco ou advertência explícita do veículo.",
+    "SEM_DADOS": "PID ausente, inválido, desconectado ou sem evidência suficiente."
+  },
+  "learning_policy": {
+    "allow_learning_from": ["RAW_ECU_VALID"],
+    "reference_seed": "CARSCANNER_SEED",
+    "never_overwrite_reference": true,
+    "require_context": true,
+    "contexts": ["IDLE", "TRANSITO", "ESTRADA", "MOTOR_FRIO", "MOTOR_AQUECIDO", "CARGA", "AR_CONDICIONADO"],
+    "outlier_policy": "NAO_APRENDER_OUTLIER_ISOLADO"
+  },
+  "known_gaps": [
+    "Não inserir temperatura numérica de acionamento da ventoinha sem fonte técnica específica.",
+    "Não transformar 14 V nominal do alternador em faixa de alarme sem teste elétrico ou especificação de carga.",
+    "Não usar a rotação de corte de 6300 rpm como faixa normal de operação.",
+    "Limites específicos de pressão de combustível, pressão de óleo, sensores ECT/TPS/MAP e HEGO ainda precisam ser extraídos do manual de serviço Multec HX14YFH antes de virar regra numérica.",
+    "Os valores CarScanner continuam sendo sementes até confirmação RAW_ECU."
+  ]
+}
