@@ -94,13 +94,13 @@ export async function writeMaintenanceState(basePath: string, state: Maintenance
   });
 }
 
-export async function setVehicleOdometer(basePath: string, km: number): Promise<MaintenanceState> {
+export async function setVehicleOdometer(basePath: string, km: number, gpsDistanceBaselineKm = 0): Promise<MaintenanceState> {
   if (!validKm(km)) throw new Error('QUILOMETRAGEM INVÁLIDA.');
   const state = await readMaintenanceState(basePath);
   state.vehicleOdometerKm = km;
   // O valor informado vem do hodômetro real do painel. A partir deste ponto,
   // o aplicativo soma somente a distância GPS confirmada nesta sessão.
-  state.lastGpsDistanceKm = 0;
+  state.lastGpsDistanceKm = validKm(gpsDistanceBaselineKm) ? gpsDistanceBaselineKm : 0;
   await writeMaintenanceState(basePath, state);
   return state;
 }
