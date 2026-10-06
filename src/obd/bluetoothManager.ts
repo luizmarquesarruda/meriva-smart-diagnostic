@@ -35,9 +35,9 @@ function logBluetoothDiagnostic(event: string, details?: unknown): void {
     try { line += ` | ${JSON.stringify(details)}`; }
     catch { line += ` | ${String(details)}`; }
   }
-  lastBluetoothDiagnosticText += (lastBluetoothDiagnosticText ? '\\n' : '') + line;
-  const lines = lastBluetoothDiagnosticText.split('\\n');
-  if (lines.length > 800) lastBluetoothDiagnosticText = lines.slice(-800).join('\\n');
+  lastBluetoothDiagnosticText += (lastBluetoothDiagnosticText ? '\n' : '') + line;
+  const lines = lastBluetoothDiagnosticText.split('\n');
+  if (lines.length > 800) lastBluetoothDiagnosticText = lines.slice(-800).join('\n');
 }
 
 export function getLastBluetoothDiagnosticText(): string { return lastBluetoothDiagnosticText; }
@@ -276,7 +276,7 @@ export async function createRealElmSession(
     };
   } catch (cause) {
     const transportTrace = session.getTransportDiagnosticsText();
-    if (transportTrace) lastBluetoothDiagnosticText += (lastBluetoothDiagnosticText ? '\\n' : '') + transportTrace;
+    if (transportTrace) lastBluetoothDiagnosticText += (lastBluetoothDiagnosticText ? '\n' : '') + transportTrace;
     logBluetoothDiagnostic('ELM_SESSION_FAILURE', cause instanceof Error ? cause.message : String(cause));
     try {
       await session.close();
