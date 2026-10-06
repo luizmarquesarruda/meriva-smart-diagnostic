@@ -254,3 +254,10 @@ Evitar mensagens genéricas como Erro Bluetooth.
 - ELM327 datasheet: prompt, ATST e adaptive timing.
 
 A documentação externa é referência de engenharia. Ela não substitui o comportamento medido no ELM327 real da Meriva.
+## Política de teste Bluetooth
+
+Para diagnóstico físico, a sessão de conexão usa no máximo **20 tentativas automáticas**. Entre falhas há **8 segundos** de espera. Cada tentativa é registrada no trace TXT, incluindo TX/RX e erro de conexão quando disponível.
+
+Eventos principais: `BLUETOOTH_ATTEMPT_START`, `BLUETOOTH_ATTEMPT_RESULT`, `BLUETOOTH_RETRY_WAIT_START`, `BLUETOOTH_RETRY_WAIT_END` e `BLUETOOTH_TEST_SESSION_END`.
+
+A contagem é encerrada imediatamente quando a ECU é validada por `010C -> 41 0C XX XX`. Não são executadas 20 tentativas após uma conexão válida.
