@@ -6,12 +6,12 @@ O hodômetro total exibido no painel da Meriva registra a quilometragem total do
 
 O PID 0131 é **Distance traveled since DTCs cleared**. Ele mede a distância desde o apagamento dos códigos, não a quilometragem total do carro. Por isso não deve ser usado como hodômetro.
 
-A quilometragem usada pela manutenção do aplicativo é composta por:
+A manutenção usa duas métricas separadas:
 
-1. **quilometragem inicial lida no painel pelo usuário**;
-2. **+ distância GPS confirmada pelo filtro de movimento**.
+1. **Hodômetro do painel**: fonte oficial para a quilometragem do veículo e para calcular vencimentos por km.
+2. **Distância monitorada pelo GPS**: métrica de acompanhamento do que o aplicativo observou durante as sessões. Ela pode ficar incompleta quando o telefone não acompanha o veículo e **nunca incrementa o hodômetro**.
 
-O valor resultante é uma **estimativa operacional para o aplicativo**, não uma leitura do hodômetro pela ECU.
+Portanto, se o telefone ficar em casa, o hodômetro continua correto. O aplicativo não transforma uma distância GPS parcial em quilometragem oficial.
 
 ## OBD específico do fabricante
 
@@ -21,7 +21,9 @@ A ECU/cluster podem possuir dados proprietários ou diagnósticos estendidos que
 
 - Nunca chamar PID 0131 de hodômetro.
 - Nunca substituir a quilometragem do painel por PID 0131.
-- GPS pode alimentar a quilometragem operacional da manutenção.
+- GPS é apenas uma métrica monitorada e pode ficar incompleta.
+- GPS nunca altera `vehicleOdometerKm`.
+- O usuário deve atualizar o hodômetro do painel quando necessário.
 - Quando houver divergência, preservar ambos os valores e sinalizar a diferença.
 - Um eventual PID/DID proprietário só entra na base confirmed_pids depois de resposta RAW_ECU reproduzível.
 
@@ -33,11 +35,11 @@ A ECU/cluster podem possuir dados proprietários ou diagnósticos estendidos que
 
 ## Investigação do painel GM
 
-Pesquisa de referências públicas encontrou evidência de diagnóstico separado do PAINEL da Meriva. Uma tabela Kaptor de 2012 lista `Meriva 02 -> MA#1 PAINEL 7 23`, enquanto Corsa C/Montana aparecem em outra configuração com BCM. Isso confirma que o painel é um módulo de diagnóstico, mas não fornece uma rotina segura de leitura do hodômetro para a Meriva brasileira 1.4 8V 2011/2012. citeturn0search5
+Pesquisa de referências públicas encontrou evidência de diagnóstico separado do PAINEL da Meriva. Uma tabela Kaptor de 2012 lista `Meriva 02 -> MA#1 PAINEL 7 23`, enquanto Corsa C/Montana aparecem em outra configuração com BCM. Isso confirma que o painel é um módulo de diagnóstico, mas não fornece uma rotina segura de leitura do hodômetro para a Meriva brasileira 1.4 8V 2011/2012. citeturn0search5
 
-Documentação Tech2 para Opel descreve uma função de verificação do hodômetro que consulta IPC e ECU e mostra os dois valores para comparação. É evidência de que GM/Opel pode manter a quilometragem em mais de um módulo, mas não prova que o mesmo serviço, DID ou endereço seja aplicável ao veículo brasileiro alvo. citeturn0search1
+Documentação Tech2 para Opel descreve uma função de verificação do hodômetro que consulta IPC e ECU e mostra os dois valores para comparação. É evidência de que GM/Opel pode manter a quilometragem em mais de um módulo, mas não prova que o mesmo serviço, DID ou endereço seja aplicável ao veículo brasileiro alvo. citeturn0search1
 
-Documentação pública do OP-COM também registra suporte de diagnóstico para Meriva e leitura de dados do painel, mas novamente não fornece uma sequência RAW KWP reproduzível para leitura do hodômetro deste veículo. citeturn0search3turn0search6
+Documentação pública do OP-COM também registra suporte de diagnóstico para Meriva e leitura de dados do painel, mas novamente não fornece uma sequência RAW KWP reproduzível para leitura do hodômetro deste veículo. citeturn0search3turn0search6
 
 ### Regra de segurança
 
