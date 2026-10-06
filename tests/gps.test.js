@@ -78,40 +78,19 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
   assert.strictEqual(tracker.getState().speedSource, 'PARADO');
 
   watcher({
-    coords: {
-      latitude: 0,
-      longitude: 0,
-      speed: 10,
-      accuracy: 5,
-    },
+    coords: { latitude: 0, longitude: 0, speed: 10, accuracy: 5 },
     timestamp: 1000,
   });
   watcher({
-    coords: {
-      latitude: 0,
-      longitude: 0.0001,
-      speed: 10,
-      accuracy: 5,
-    },
+    coords: { latitude: 0, longitude: 0.0001, speed: 10, accuracy: 5 },
     timestamp: 2000,
   });
-
   watcher({
-    coords: {
-      latitude: 0,
-      longitude: 0.0002,
-      speed: 10,
-      accuracy: 5,
-    },
+    coords: { latitude: 0, longitude: 0.0002, speed: 10, accuracy: 5 },
     timestamp: 3000,
   });
   watcher({
-    coords: {
-      latitude: 0,
-      longitude: 0.0003,
-      speed: 10,
-      accuracy: 5,
-    },
+    coords: { latitude: 0, longitude: 0.0003, speed: 10, accuracy: 5 },
     timestamp: 4000,
   });
 
@@ -125,12 +104,7 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
 
   const distanceBeforeStop = state.distanceKm;
   watcher({
-    coords: {
-      latitude: 0,
-      longitude: 0.0002,
-      speed: 0,
-      accuracy: 5,
-    },
+    coords: { latitude: 0, longitude: 0.0002, speed: 0, accuracy: 5 },
     timestamp: 5000,
   });
   assert.strictEqual(tracker.getState().currentSpeedKmh, 0);
@@ -144,6 +118,9 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
   watcher({ coords: { latitude: 0, longitude: 0.0014, speed: 10, accuracy: 5 }, timestamp: 16000 });
   watcher({ coords: { latitude: 0, longitude: 0.0016, speed: 10, accuracy: 5 }, timestamp: 17000 });
   assert.strictEqual(tracker.getState().speedSource, 'OBD');
+  const distanceAfterObdMovement = tracker.getState().distanceKm;
+  assert.ok(distanceAfterObdMovement > distanceBeforeStop);
+
   tracker.setVehicleSpeedHintKmh(0);
   watcher({ coords: { latitude: 0, longitude: 0.0016, speed: 10, accuracy: 5 }, timestamp: 18000 });
   assert.strictEqual(tracker.getState().currentSpeedKmh, 0);
@@ -165,7 +142,7 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
   assert.strictEqual(tracker.getState().currentSpeedKmh, 0);
 
   watcher({ coords: { latitude: 0, longitude: 0.00175, speed: 10, accuracy: 5 }, timestamp: 29000 });
-  assert.strictEqual(tracker.getState().distanceKm, distanceBeforeStop);
+  assert.strictEqual(tracker.getState().distanceKm, distanceAfterObdMovement);
 
   await tracker.stop();
   assert.strictEqual(tracker.getState().running, false);
