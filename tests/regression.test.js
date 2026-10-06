@@ -673,3 +673,5 @@ async function main() {
 }
 
 main();
+
+// CI trigger: execute regression suite on GitHub Actions.
