@@ -45,3 +45,25 @@ if (!clear || clear.allowed !== false || clear.requiresExplicitUserAction !== tr
 }
 
 console.log('knowledge JSON integrity: PASS');
+
+const runtime = fs.readFileSync(path.join(__dirname, '..', 'src', 'obd', 'knowledgeRuntime.ts'), 'utf8');
+for (const requiredSymbol of [
+  'assertObdServiceAllowed',
+  'getDtcKnowledge',
+  'detectContexts',
+  'canLearnPid',
+  'getDiagnosticCorrelations',
+  'getAlertPolicy',
+]) {
+  if (!runtime.includes(requiredSymbol)) {
+    throw new Error('Runtime knowledge sem consumidor: ' + requiredSymbol);
+  }
+}
+if (!runtime.includes("from '../knowledge/learning.json'")) {
+  throw new Error('learning.json não está ligado ao runtime.');
+}
+if (!runtime.includes("from '../knowledge/obd_services.json'")) {
+  throw new Error('obd_services.json não está ligado ao runtime.');
+}
+
+console.log('knowledge runtime wiring: PASS');
