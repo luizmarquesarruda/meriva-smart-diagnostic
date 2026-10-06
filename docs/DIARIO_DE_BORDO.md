@@ -168,3 +168,29 @@ A CI será disparada pelos commits desta alteração. A correção só será con
 
 ### Próximo teste físico
 Instalar o APK da CI e gerar um novo relatório TXT. Em caso de falha persistente, o relatório deve conter até 20 blocos `BLUETOOTH_ATTEMPT_START`, cada um separado por aproximadamente 8 segundos, além dos erros RX/TX correspondentes.
+
+
+---
+
+## 2026-10-06 - Correção da exportação das constantes de retry Bluetooth
+
+### Problema
+A CI #680 falhou no `npm run typecheck`. O TypeScript acusou `TS1184: Modifiers cannot appear here` nas linhas 185 e 186 de `src/obd/bluetoothManager.ts`.
+
+### Diagnóstico
+As constantes da política de retry foram inseridas por engano dentro do corpo da função `createRealElmSession` usando `export const`. O TypeScript não permite modificadores de exportação nesse ponto.
+
+### Correção
+As constantes foram movidas para o escopo do módulo, antes de `createRealElmSession`:
+- `MAX_BLUETOOTH_ATTEMPTS = 20`
+- `BLUETOOTH_RETRY_INTERVAL_MS = 8000`
+
+O teste de regressão continua podendo importar os valores e a função usa exatamente a mesma política de 20 tentativas com 8 segundos entre falhas.
+
+### CI anterior
+- CI #680, run `37473634724`: **falhou no typecheck** por TS1184.
+- `npm run doctor`: **17/17 passou**.
+- `npm test`: não chegou a executar porque o typecheck falhou primeiro.
+
+### Publicação
+A documentação fica sincronizada com a correção de código. O commit de código será o último da sequência para disparar a CI do estado final.
