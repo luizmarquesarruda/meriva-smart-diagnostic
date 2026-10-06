@@ -42,6 +42,47 @@ export async function discoverIntelligentPids(
   const confidence: Record<string, number> = {};
   const supported = new Set<string>();
 
+  // Fase 1: PIDs essenciais. Isso evita gastar quatro consultas de bitmap
+  // antes de saber se o adaptador/ECU responde aos dados que realmente usamos.
+  const priorityPids = ['010C', '010D', '012F', '015E'];
+  const confirmedCandidates = options?.knownPids ?? [];
+
+  const probePid = async (pid: string): Promise<void> => {
+    let result: ElmCommandResult;
+    try {
+      result = await session.executeCommand(pid);
+    } catch {
+      return;
+    }
+
+    const parsed = result.status === 'OK' ? parsePidResponse(pid, result.response) : null;
+    const valid = Boolean(
+      result.status === 'OK' &&
+      validateOBDResponse(result.response) &&
+      parsed &&
+      parsed.status !== 'VALOR NÃO INTERPRETADO' &&
+      parsed.value !== null &&
+      Number.isFinite(parsed.value),
+    );
+
+    confidence[pid] = valid ? 0.85 : 0;
+    if (valid) supported.add(pid);
+
+    observations.push({
+      pid,
+      status: valid ? 'RESPONDEU' : 'NAO_RESPONDEU',
+      response: result.response,
+      elapsedMs: result.elapsedMs,
+      value: parsed?.value ?? null,
+      unit: parsed?.unit ?? '',
+      confidence: confidence[pid],
+      reason: valid ? 'RESPOSTA VÁLIDA NA FASE PRIORITÁRIA' : 'SEM RESPOSTA VÁLIDA NA FASE PRIORITÁRIA',
+    });
+  };
+
+  for (const pid of priorityPids) await probePid(pid);
+
+  // Fase 2: mapas de suporte OBD-II. Só chegamos aqui depois dos PIDs essenciais.
   for (const supportPid of DISCOVERY_PIDS) {
     let result: ElmCommandResult;
     try {
@@ -71,14 +112,14 @@ export async function discoverIntelligentPids(
     });
   }
 
-  // Ordem segura para o ELM327 v1.5: confirme primeiro os PIDs essenciais.
-  // 012F é fonte absoluta de combustível no projeto e deve ser validado cedo.
-  const priorityPids = ['010C', '010D', '012F', '015E'];
+  // Fase 3: conhecidos do projeto e PIDs apontados pelos bitmaps.
   const candidates = Array.from(new Set([
-    ...priorityPids,
-    ...(options?.knownPids ?? KNOWN_PIDS),
+    ...confirmedCandidates,
+    ...KNOWN_PIDS,
     ...Array.from(supported),
-  ])).filter((pid) => /^01[0-9A-F]{2}$/i.test(pid));
+  ])).filter((pid) =>
+    /^01[0-9A-F]{2}$/i.test(pid) && !priorityPids.includes(pid.toUpperCase()),
+  );
 
   for (const pid of candidates) {
     let result: ElmCommandResult;
@@ -97,22 +138,14 @@ export async function discoverIntelligentPids(
       parsed.value !== null &&
       Number.isFinite(parsed.value),
     );
-
     const confirmedByBitmap = supported.has(pid);
-    const pidConfidence = valid
-      ? (confirmedByBitmap ? 1 : 0.85)
-      : confirmedByBitmap
-        ? 0.35
-        : 0;
+    const pidConfidence = valid ? (confirmedByBitmap ? 1 : 0.85) : confirmedByBitmap ? 0.35 : 0;
 
     if (valid) supported.add(pid);
     confidence[pid] = pidConfidence;
-
     observations.push({
       pid,
-      status: valid
-        ? (confirmedByBitmap ? 'CONFIRMADO' : 'RESPONDEU')
-        : confirmedByBitmap ? 'INVALIDO' : 'NAO_RESPONDEU',
+      status: valid ? (confirmedByBitmap ? 'CONFIRMADO' : 'RESPONDEU') : confirmedByBitmap ? 'INVALIDO' : 'NAO_RESPONDEU',
       response: result.response,
       elapsedMs: result.elapsedMs,
       value: parsed?.value ?? null,
