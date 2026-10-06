@@ -1,4 +1,4 @@
-import fuelTypeCatalog from '../knowledge/fuel_types.json';
+import * as fuelTypeCatalog from '../knowledge/fuel_types.json';
 
 export type FuelIdentificationStatus =
   | 'SEM_DADOS'
