@@ -162,7 +162,8 @@ export async function createRealElmSession(
     let probeIsValid = isValidEcuProbe(ecuProbe);
 
     // ATSP0 é a primeira tentativa. Se o ELM/ECU não fechar a comunicação,
-    // tente protocolos K-Line em ordem de evidência para esta família GM.
+    // tente protocolos em ordem de evidência para esta família GM: primeiro K-Line,
+    // depois CAN como fallback genérico de baixa prioridade.
     // IMPORTANTE: no ELM327, ATSP5 = ISO 14230 KWP FAST,
     // ATSP3 = ISO 9141-2 e ATSP4 = ISO 14230 KWP 5-baud.
     // ATSP6 NÃO é KWP: é CAN 11/500.
@@ -195,8 +196,9 @@ export async function createRealElmSession(
     // comando informativo ATDP/identificação não pode transformar uma ECU
     // comprovadamente ativa em "desconectada".
     const identifiedProtocol = session.getProtocol();
-    const activeProtocol = identifiedProtocol
-      ?? (successfulForcedProtocol ? getElmProtocolName(successfulForcedProtocol) : 'AUTO');
+    const activeProtocol = successfulForcedProtocol && (!identifiedProtocol || identifiedProtocol === 'AUTO')
+      ? getElmProtocolName(successfulForcedProtocol)
+      : (identifiedProtocol ?? 'AUTO');
 
     // A ECU já foi validada. Se já temos uma descoberta persistida para o
     // mesmo protocolo, reutilize-a. Não interrogue novamente os blocos 0100,
