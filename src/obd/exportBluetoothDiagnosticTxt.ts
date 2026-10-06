@@ -34,7 +34,7 @@ function buildReport(): string {
     '',
     '--- FIM DO RELATÓRIO ---',
   ];
-  return lines.join('\\n');
+  return lines.join('\n');
 }
 
 export async function exportBluetoothDiagnosticTxt(): Promise<BluetoothReportResult> {
