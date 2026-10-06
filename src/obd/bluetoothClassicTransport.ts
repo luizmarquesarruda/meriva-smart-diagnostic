@@ -122,6 +122,7 @@ export class BluetoothClassicTransport implements ObdTransport {
     const addressKey = normalizeBluetoothAddress(this.deviceAddress);
 
     for (const secureSocket of socketModes) {
+      let attemptTimedOut = false;
       timedOutConnection = false;
       connectPromise = null;
       device = null;
@@ -154,7 +155,7 @@ export class BluetoothClassicTransport implements ObdTransport {
 
         const currentPromise = connectPromise;
         void currentPromise.then(async (lateDevice) => {
-          if (!timedOutConnection || !lateDevice) return;
+          if (!attemptTimedOut || !lateDevice) return;
           this.logDiagnostic('LATE_CONNECT_SUCCESS_AFTER_TIMEOUT', { secureSocket });
           await this.safeDisconnect(lateDevice);
           this.logDiagnostic('LATE_CONNECT_DISCONNECTED', { secureSocket });
@@ -183,6 +184,7 @@ export class BluetoothClassicTransport implements ObdTransport {
         break;
       } catch (cause) {
         timedOutConnection = true;
+        attemptTimedOut = true;
         if (this.connectTimer) { clearTimeout(this.connectTimer); this.connectTimer = null; }
         this.logDiagnostic('CONNECT_FAILURE', {
           secureSocket,
