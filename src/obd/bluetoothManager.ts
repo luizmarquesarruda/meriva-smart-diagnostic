@@ -182,70 +182,107 @@ export async function createRealElmSession(
   compatibility?: Partial<Elm327CompatibilityConfig>,
   pidDiscoveryCache?: PidDiscoveryCache | null,
 ): Promise<RealElmConnection> {
-  logBluetoothDiagnostic('ELM_SESSION_START', { name: device.name, address: device.address });
+  const MAX_BLUETOOTH_ATTEMPTS = 20;
+  const BLUETOOTH_RETRY_INTERVAL_MS = 8000;
+  let lastCause: unknown = null;
+
+  for (let attempt = 1; attempt <= MAX_BLUETOOTH_ATTEMPTS; attempt++) {
+    logBluetoothDiagnostic('BLUETOOTH_ATTEMPT_START', {
+      attempt,
+      maxAttempts: MAX_BLUETOOTH_ATTEMPTS,
+      retryIntervalMs: BLUETOOTH_RETRY_INTERVAL_MS,
+      name: device.name,
+      address: device.address,
+    });
+
+    try {
+      const result = await createRealElmSessionAttempt(device, compatibility, pidDiscoveryCache, attempt, MAX_BLUETOOTH_ATTEMPTS);
+      logBluetoothDiagnostic('BLUETOOTH_ATTEMPT_RESULT', { attempt, result: 'SUCCESS' });
+      logBluetoothDiagnostic('BLUETOOTH_TEST_SESSION_END', { attemptsTotal: attempt, successes: 1, failures: attempt - 1, reason: 'SUCCESS' });
+      return result;
+    } catch (cause) {
+      lastCause = cause;
+      logBluetoothDiagnostic('BLUETOOTH_ATTEMPT_RESULT', {
+        attempt,
+        result: 'FAILURE',
+        error: cause instanceof Error ? cause.message : String(cause),
+      });
+
+      if (attempt >= MAX_BLUETOOTH_ATTEMPTS) {
+        logBluetoothDiagnostic('BLUETOOTH_TEST_SESSION_END', {
+          attemptsTotal: attempt,
+          successes: 0,
+          failures: attempt,
+          reason: 'MAX_ATTEMPTS_REACHED',
+        });
+        break;
+      }
+
+      logBluetoothDiagnostic('BLUETOOTH_RETRY_WAIT_START', {
+        attempt,
+        nextAttempt: attempt + 1,
+        waitMs: BLUETOOTH_RETRY_INTERVAL_MS,
+      });
+      await new Promise((resolve) => setTimeout(resolve, BLUETOOTH_RETRY_INTERVAL_MS));
+      logBluetoothDiagnostic('BLUETOOTH_RETRY_WAIT_END', { nextAttempt: attempt + 1 });
+    }
+  }
+
+  throw lastCause instanceof Error
+    ? lastCause
+    : new Error(String(lastCause ?? 'FALHA BLUETOOTH SEM CAUSA')); 
+}
+
+async function createRealElmSessionAttempt(
+  device: BluetoothDeviceInfo,
+  compatibility: Partial<Elm327CompatibilityConfig> | undefined,
+  pidDiscoveryCache: PidDiscoveryCache | null | undefined,
+  attempt: number,
+  maxAttempts: number,
+): Promise<RealElmConnection> {
+  logBluetoothDiagnostic('ELM_SESSION_START', {
+    name: device.name,
+    address: device.address,
+    attempt,
+    maxAttempts,
+  });
   await ensureBluetoothReady();
   const config = mergeCompatibilityConfig(compatibility ?? DEFAULT_ELM327_COMPATIBILITY);
   const session = new Elm327Session(new BluetoothClassicTransport(device.address, config), config);
 
   try {
-    logBluetoothDiagnostic('ELM_INITIALIZATION_START');
+    logBluetoothDiagnostic('ELM_INITIALIZATION_START', { attempt, maxAttempts });
     const initialization = await session.initialize();
     logBluetoothDiagnostic('ELM_INITIALIZATION_RESULT', initialization.map((item) => ({ command: item.command, status: item.status, response: item.response })));
 
-    // Primeiro confirme ECU/ELM com um PID real e simples.
-    // 010C funciona com a chave ligada mesmo com motor parado e evita
-    // bombardear a ECU com vários blocos de descoberta antes do primeiro OK.
-    logBluetoothDiagnostic('ECU_PROBE_START', { command: '010C' });
+    logBluetoothDiagnostic('ECU_PROBE_START', { command: '010C', attempt, maxAttempts });
     let ecuProbe = await session.executeCommand('010C');
-    logBluetoothDiagnostic('ECU_PROBE_RESULT', { status: ecuProbe.status, response: ecuProbe.response });
+    logBluetoothDiagnostic('ECU_PROBE_RESULT', { status: ecuProbe.status, response: ecuProbe.response, attempt });
     let probeIsValid = isValidEcuProbe(ecuProbe);
 
-    // ATSP0 é a primeira tentativa. Se o ELM/ECU não fechar a comunicação,
-    // tente protocolos em ordem de evidência para esta família GM: primeiro K-Line,
-    // depois CAN como fallback genérico de baixa prioridade.
-    // IMPORTANTE: no ELM327, ATSP5 = ISO 14230 KWP FAST,
-    // ATSP3 = ISO 9141-2 e ATSP4 = ISO 14230 KWP 5-baud.
-    // ATSP6 NÃO é KWP: é CAN 11/500.
     const protocolFallbacks = ['5', '3', '4', '6', '7', '8', '9'];
     let successfulForcedProtocol: string | null = null;
 
     for (const protocol of protocolFallbacks) {
       if (probeIsValid) break;
-
       const forcedProtocol = await session.executeCommand(`ATSP${protocol}`);
       if (forcedProtocol.status !== 'OK') continue;
-
       ecuProbe = await session.executeCommand('010C');
       probeIsValid = isValidEcuProbe(ecuProbe);
       if (probeIsValid) successfulForcedProtocol = protocol;
     }
 
-    // Bluetooth/ELM e ECU são camadas diferentes. Se a ECU não respondeu,
-    // NÃO crie uma conexão OBD ativa. O relatório deve mostrar a falha e o
-    // próximo candidato pareado poderá ser testado pelo sharedConnection.
     if (!probeIsValid) {
       throw new Error(`ECU NÃO RESPONDEU AO 010C: ${ecuProbe.status} | RX=${ecuProbe.response || 'N/D'}`);
     }
 
-    // Depois do primeiro PID válido, atualize o protocolo efetivamente usado
-    // pela sessão. Em modo automático o ATDP anterior pode ainda representar
-    // somente a seleção AUTO, e não o protocolo negociado na ECU.
     await session.identifyProtocol();
-    // O 010C válido já é a prova de que a ECU respondeu. Uma falha do
-    // comando informativo ATDP/identificação não pode transformar uma ECU
-    // comprovadamente ativa em "desconectada".
     const identifiedProtocol = session.getProtocol();
     const activeProtocol = successfulForcedProtocol && (!identifiedProtocol || identifiedProtocol === 'AUTO')
       ? getElmProtocolName(successfulForcedProtocol)
       : (identifiedProtocol ?? 'AUTO');
-
-    // A ECU já foi validada. Se já temos uma descoberta persistida para o
-    // mesmo protocolo, reutilize-a. Não interrogue novamente os blocos 0100,
-    // 0120, 0140 e 0160.
     const negotiatedProtocol = session.getProtocol() ?? activeProtocol;
-    const cacheMatchesProtocol =
-      Boolean(pidDiscoveryCache) &&
-      pidDiscoveryCache?.protocol === negotiatedProtocol;
+    const cacheMatchesProtocol = Boolean(pidDiscoveryCache) && pidDiscoveryCache?.protocol === negotiatedProtocol;
 
     let supportedPids: string[] = [];
     let pidDiscoverySource: RealElmConnection['pidDiscoverySource'] = 'CACHE';
@@ -273,13 +310,14 @@ export async function createRealElmSession(
     };
   } catch (cause) {
     const transportTrace = session.getTransportDiagnosticsText();
-    if (transportTrace) lastBluetoothDiagnosticText += (lastBluetoothDiagnosticText ? '\n' : '') + transportTrace;
-    logBluetoothDiagnostic('ELM_SESSION_FAILURE', cause instanceof Error ? cause.message : String(cause));
-    try {
-      await session.close();
-    } catch {
-      // preserva o erro original
+    if (transportTrace) {
+      logBluetoothDiagnostic('ATTEMPT_TRANSPORT_TRACE', { attempt, trace: transportTrace });
     }
+    logBluetoothDiagnostic('ELM_SESSION_FAILURE', {
+      attempt,
+      error: cause instanceof Error ? cause.message : String(cause),
+    });
+    try { await session.close(); } catch { /* preserva o erro original */ }
     throw cause;
   }
 }
