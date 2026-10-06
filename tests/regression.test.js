@@ -39,6 +39,9 @@ let fakeDeviceConnected = true;
 let lastBluetoothConnectionOptions = null;
 let lastBluetoothDiscoveryCancelled = false;
 let bluetoothConnectCalls = 0;
+let bluetoothActiveNativeConnections = 0;
+let bluetoothMaxNativeConnections = 0;
+let bluetoothConnectDelayMs = 0;
 
 function parentDir(p) {
   const i = p.lastIndexOf('/');
@@ -155,8 +158,12 @@ const fakeBluetooth = {
   cancelDiscovery: async () => { lastBluetoothDiscoveryCancelled = true; },
   connectToDevice: async (_address, options) => {
     bluetoothConnectCalls++;
+    bluetoothActiveNativeConnections++;
+    bluetoothMaxNativeConnections = Math.max(bluetoothMaxNativeConnections, bluetoothActiveNativeConnections);
     lastBluetoothConnectionOptions = options;
-    return {
+    try {
+      if (bluetoothConnectDelayMs > 0) await wait(bluetoothConnectDelayMs);
+      return {
     address: 'AA:BB:CC:DD:EE:FF',
     name: 'ELM327',
     bonded: true,
@@ -178,7 +185,10 @@ const fakeBluetooth = {
     disconnect: async () => {
       bluetoothListener = null;
     },
-    };
+      };
+    } finally {
+      bluetoothActiveNativeConnections--;
+    }
   },
 };
 
@@ -383,6 +393,9 @@ async function testBluetoothEventTransport() {
   fakeDeviceConnected = true;
   lastBluetoothDiscoveryCancelled = false;
   bluetoothConnectCalls = 0;
+  bluetoothActiveNativeConnections = 0;
+  bluetoothMaxNativeConnections = 0;
+  bluetoothConnectDelayMs = 0;
   const { BluetoothClassicTransport } = loadTs(path.join(ROOT, 'src/obd/bluetoothClassicTransport.ts'));
   const transport = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF');
   await transport.open();
@@ -396,6 +409,22 @@ async function testBluetoothEventTransport() {
   const response = await transport.readUntilPrompt(500);
   assert.strictEqual(response, '41 0C 0C 18');
   await transport.close();
+
+  // O bloqueio deve funcionar entre instâncias diferentes. Sem ele, duas
+  // instâncias chamam connectToDevice simultaneamente e o Android pode retornar
+  // "Already attempting connection to device ...".
+  bluetoothConnectCalls = 0;
+  bluetoothActiveNativeConnections = 0;
+  bluetoothMaxNativeConnections = 0;
+  bluetoothConnectDelayMs = 30;
+  const transportA = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF');
+  const transportB = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF');
+  await Promise.all([transportA.open(), transportB.open()]);
+  assert.strictEqual(bluetoothConnectCalls, 2, 'instâncias diferentes devem serializar as tentativas nativas');
+  assert.strictEqual(bluetoothMaxNativeConnections, 1, 'não pode haver duas tentativas RFCOMM simultâneas');
+  await transportA.close();
+  await transportB.close();
+  bluetoothConnectDelayMs = 0;
 
   bluetoothConnectCalls = 0;
   await Promise.all([transport.open(), transport.open()]);
