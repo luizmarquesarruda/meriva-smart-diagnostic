@@ -97,7 +97,7 @@ export class BluetoothClassicTransport implements ObdTransport {
     this.logDiagnostic('CONNECT_ATTEMPT', {
       secureSocket,
       connectionType: 'delimited',
-      delimiter: '\\r',
+      delimiter: '\r',
     });
 
     let timedOutConnection = false;
