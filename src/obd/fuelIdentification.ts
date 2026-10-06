@@ -1,8 +1,13 @@
+import fuelTypeCatalog from '../knowledge/fuel_types.json';
+
 export type FuelIdentificationStatus =
   | 'SEM_DADOS'
   | 'TIPO_VEICULO'
   | 'COMPOSICAO_ECU'
   | 'DADO_INCOERENTE';
+
+type FuelTypeCatalog = { codes: Record<string, string> };
+const fuelTypes = (fuelTypeCatalog as FuelTypeCatalog).codes;
 
 export interface FuelIdentification {
   status: FuelIdentificationStatus;
@@ -25,7 +30,7 @@ export function identifyFuelFromObd(
     return {
       status: 'DADO_INCOERENTE',
       fuelTypeCode,
-      fuelTypeLabel: fuelTypeCode === 3 ? 'Etanol' : fuelTypeCode === 1 ? 'Gasolina' : null,
+      fuelTypeLabel: fuelTypeCode == null ? null : fuelTypes[String(fuelTypeCode)] ?? 'Código não mapeado',
       alcoholPercent: null,
       confidence: 'BAIXA',
       note: 'Percentual de álcool fora da faixa válida; manter resposta bruta para investigação.',
@@ -44,10 +49,7 @@ export function identifyFuelFromObd(
   }
 
   const fuelTypeLabel =
-    fuelTypeCode === 1 ? 'Gasolina' :
-    fuelTypeCode === 3 ? 'Etanol' :
-    fuelTypeCode == null ? null :
-    'Código não mapeado';
+    fuelTypeCode == null ? null : fuelTypes[String(fuelTypeCode)] ?? 'Código não mapeado';
 
   if (alcoholPercent != null) {
     return {
