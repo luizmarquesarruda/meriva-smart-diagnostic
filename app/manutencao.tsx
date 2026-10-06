@@ -25,7 +25,7 @@ export default function MaintenanceScreen() {
   async function saveOdometer() {
     const km = Number(odometerInput.replace(',', '.'));
     if (!Number.isFinite(km) || km < 0) return setError('Digite uma quilometragem válida.');
-    try { setError(null); setState(await setVehicleOdometer(basePath, km)); setOdometerInput(''); }
+    try { setError(null); setState(await setVehicleOdometer(basePath, km, gpsTracker.getState().distanceKm)); setOdometerInput(''); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Não foi possível salvar.'); }
   }
 
