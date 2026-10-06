@@ -150,6 +150,7 @@ class AutoTripService {
       try {
         let fuelRateLph: number | null = null;
         let obdSpeedKmh: number | null = null;
+        if (obdSpeedSupported) gpsTracker.setVehicleSpeedHintKmh(null);
 
         if (this.state.fuelSupported) {
           const fuelResult = await connection.session.queryPid('015E');
