@@ -302,6 +302,8 @@ export async function updateLearningProfileRealSample(
         existing.min = Math.min(existing.min, value);
         existing.max = Math.max(existing.max, value);
         existing.stddev = Math.abs(value - previousMean) * Math.sqrt(seedWeight * (1 - seedWeight));
+        existing.median = existing.mean;
+        existing.source = Array.from(new Set([...existing.source, 'REAL_OBD']));
         existing.confidence = determineConfidence(existing.samples, profile.confidenceThresholds);
       } else {
         existing.samples = previousSamples + 1;
