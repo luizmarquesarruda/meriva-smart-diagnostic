@@ -164,7 +164,6 @@ export default function IndexScreen() {
 
   const summary = useMemo(() => getDriveCycleSummary(cycles), [cycles]);
   const realConsumptionKml = summary.avgConsumptionKml > 0 ? summary.avgConsumptionKml : null;
-  const fuelLevelLabel = tripState.fuelLevelPct != null ? `${tripState.fuelLevelPct.toFixed(0)}%` : 'N/D';
   const distanceUnit = settings?.distanceUnit ?? 'KM';
 
   return (
@@ -197,17 +196,12 @@ export default function IndexScreen() {
                 </Text>
               </View>
               <View style={styles.heroMetric}>
-                <Text style={styles.heroMetricLabel}>NÍVEL OBD</Text>
-                <Text style={styles.heroMetricValue}>{fuelLevelLabel}</Text>
-              </View>
-              <View style={styles.heroMetric}>
                 <Text style={styles.heroMetricLabel}>COMBUSTÍVEL GASTO</Text>
                 <Text style={styles.heroMetricValue}>
                   {tripState.fuelUsedL > 0 ? (tripState.fuelUsedL.toFixed(3) + ' L') : 'N/D'}
                 </Text>
               </View>
             </View>
-            <Text style={styles.heroHelp}>Nível OBD somente quando a ECU fornecer o PID 012F. Sem assumir defeito de sensor.</Text>
           </View>
 
           <View style={[styles.statusGrid, layout.landscape && styles.statusGridLandscape]}>
