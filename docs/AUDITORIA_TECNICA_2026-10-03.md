@@ -11,7 +11,7 @@ A auditoria priorizou comportamento real do Android/ELM327 e dados observados. N
 ## Correções aplicadas
 
 - Removida a camada da chamada "Bíblia" do runtime.
-- Removida do runtime, UI, testes e bancos locais a camada de PID de nível de combustível.
+- Removida a antiga camada específica de boia/nível físico; o PID OBD 012F permanece no runtime como fonte padrão de nível de combustível quando houver resposta válida.
 - Perfil do veículo voltou a ser independente de fonte documental externa.
 - DTC não recebe diagnóstico automático de catálogo.
 - GPS passou a rejeitar segmentos com intervalo maior que 5 s.
