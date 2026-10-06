@@ -90,8 +90,7 @@ export async function requestBluetoothPermissions(): Promise<void> {
     ]);
 
     logBluetoothDiagnostic('BLUETOOTH_PERMISSIONS_RESULT', result);
-    logBluetoothDiagnostic('LEGACY_LOCATION_PERMISSIONS_RESULT', result);
-  if (Object.values(result).some((value) => value !== PermissionsAndroid.RESULTS.GRANTED)) {
+    if (Object.values(result).some((value) => value !== PermissionsAndroid.RESULTS.GRANTED)) {
       throw new Error('PERMISSÃO DE DISPOSITIVOS PRÓXIMOS NÃO CONCEDIDA. PERMITA O ACESSO NAS CONFIGURAÇÕES DO APLICATIVO.');
     }
 
@@ -177,7 +176,6 @@ export async function discoverPairedDevices(): Promise<BluetoothDeviceInfo[]> {
     logBluetoothDiagnostic('PAIRED_DISCOVERY_FAILURE', cause instanceof Error ? cause.message : String(cause));
     throw cause;
   }
-}
 }
 
 export async function createRealElmSession(
