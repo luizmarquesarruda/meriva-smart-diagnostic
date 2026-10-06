@@ -106,7 +106,7 @@ export class BluetoothClassicTransport implements ObdTransport {
     try {
       connectPromise = RNBluetoothClassic.connectToDevice(this.deviceAddress, {
         connectionType: 'delimited',
-        delimiter: '\\r',
+        delimiter: '\r',
         charset: 'ascii',
         secureSocket,
       });
