@@ -6,6 +6,7 @@ import { forceSaveOnObdEvent } from '../meriva/autosaveIntegration';
 import { updateAutoSaveState, initAutoSave } from '../meriva/autosaveManager';
 import { RealTripRecorder } from './tripRecorder';
 import { INITIAL_DRIVE_CYCLES } from '../data/driveCycles';
+import { estimateRangeFromFuelLevel, fuelLevelPercentToLiters, isFuelReserve } from './fuelLevel';
 
 export interface AutoTripServiceState {
   connected: boolean;
@@ -14,6 +15,7 @@ export interface AutoTripServiceState {
   fuelLevelSupported: boolean;
   fuelLevelPercent: number | null;
   fuelRemainingL: number | null;
+  fuelReserve: boolean | null;
   distanceKm: number;
   fuelUsedL: number;
   consumptionKml: number | null;
@@ -38,6 +40,7 @@ const INITIAL_STATE: AutoTripServiceState = {
   fuelLevelSupported: false,
   fuelLevelPercent: null,
   fuelRemainingL: null,
+  fuelReserve: null,
   distanceKm: 0,
   fuelUsedL: 0,
   consumptionKml: null,
@@ -140,6 +143,7 @@ class AutoTripService {
       fuelLevelSupported,
       fuelLevelPercent: null,
       fuelRemainingL: null,
+      fuelReserve: null,
       error: null,
       averageConsumptionKml: persistedAutonomy.averageConsumptionKml > 0
         ? persistedAutonomy.averageConsumptionKml
@@ -247,9 +251,13 @@ class AutoTripService {
                 : null,
             instantaneousConsumptionKml,
             fuelLevelPercent,
-            fuelRemainingL: fuelLevelPercent != null ? Number((56 * fuelLevelPercent / 100).toFixed(3)) : null,
+            fuelRemainingL: fuelLevelPercentToLiters(fuelLevelPercent),
+            fuelReserve: isFuelReserve(fuelLevelPercent),
             estimatedRangeKm: fuelLevelPercent != null
-              ? Number(((state.distanceKm > 0 && state.fuelUsedL > 0 ? state.distanceKm / state.fuelUsedL : this.state.averageConsumptionKml) * 56 * fuelLevelPercent / 100).toFixed(1))
+              ? (estimateRangeFromFuelLevel(
+                  fuelLevelPercent,
+                  state.distanceKm > 0 && state.fuelUsedL > 0 ? state.distanceKm / state.fuelUsedL : this.state.averageConsumptionKml,
+                ) ?? this.state.estimatedRangeKm)
               : this.state.estimatedRangeKm,
             error: fuelRateLph == null && state.validFuelSamples === 0
               ? 'GPS ATIVO / ECU SEM PID 015E VÁLIDO'
