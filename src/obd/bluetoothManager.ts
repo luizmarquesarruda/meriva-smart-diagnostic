@@ -186,7 +186,6 @@ export async function createRealElmSession(
   pidDiscoveryCache?: PidDiscoveryCache | null,
 ): Promise<RealElmConnection> {
   let lastCause: unknown = null;
-  let successfulAttempts = 0;
 
   for (let attempt = 1; attempt <= MAX_BLUETOOTH_ATTEMPTS; attempt++) {
     logBluetoothDiagnostic('BLUETOOTH_ATTEMPT_START', {
@@ -197,47 +196,44 @@ export async function createRealElmSession(
       address: device.address,
     });
 
-    let session: RealElmConnection | null = null;
-
     try {
-      session = await createRealElmSessionAttempt(
+      const session = await createRealElmSessionAttempt(
         device,
         compatibility,
         pidDiscoveryCache,
         attempt,
         MAX_BLUETOOTH_ATTEMPTS,
       );
-      successfulAttempts += 1;
+
       logBluetoothDiagnostic('BLUETOOTH_ATTEMPT_RESULT', {
         attempt,
         result: 'SUCCESS',
-        successesTotal: successfulAttempts,
       });
+      logBluetoothDiagnostic('BLUETOOTH_TEST_SESSION_END', {
+        attemptsTotal: attempt,
+        successes: 1,
+        failures: attempt - 1,
+        reason: 'SUCCESS_STOPPED',
+      });
+
+      return session;
     } catch (cause) {
       lastCause = cause;
       logBluetoothDiagnostic('BLUETOOTH_ATTEMPT_RESULT', {
         attempt,
         result: 'FAILURE',
         error: cause instanceof Error ? cause.message : String(cause),
-        successesTotal: successfulAttempts,
       });
-    } finally {
-      if (session) {
-        await session.close().catch((cause) => {
-          logBluetoothDiagnostic('BLUETOOTH_ATTEMPT_CLOSE_FAILURE', {
-            attempt,
-            error: cause instanceof Error ? cause.message : String(cause),
-          });
-        });
-      }
-    }
 
-    if (attempt < MAX_BLUETOOTH_ATTEMPTS) {
+      if (attempt === MAX_BLUETOOTH_ATTEMPTS) {
+        break;
+      }
+
       logBluetoothDiagnostic('BLUETOOTH_RETRY_WAIT_START', {
         attempt,
         nextAttempt: attempt + 1,
         waitMs: BLUETOOTH_RETRY_INTERVAL_MS,
-        continueAfterSuccess: true,
+        continueAfterSuccess: false,
       });
       await new Promise((resolve) => setTimeout(resolve, BLUETOOTH_RETRY_INTERVAL_MS));
       logBluetoothDiagnostic('BLUETOOTH_RETRY_WAIT_END', {
@@ -248,23 +244,10 @@ export async function createRealElmSession(
 
   logBluetoothDiagnostic('BLUETOOTH_TEST_SESSION_END', {
     attemptsTotal: MAX_BLUETOOTH_ATTEMPTS,
-    successes: successfulAttempts,
-    failures: MAX_BLUETOOTH_ATTEMPTS - successfulAttempts,
-    reason: successfulAttempts > 0 ? 'ALL_ATTEMPTS_COMPLETED_WITH_SUCCESS' : 'MAX_ATTEMPTS_REACHED',
+    successes: 0,
+    failures: MAX_BLUETOOTH_ATTEMPTS,
+    reason: 'MAX_ATTEMPTS_REACHED',
   });
-
-  if (successfulAttempts > 0) {
-    logBluetoothDiagnostic('BLUETOOTH_REOPEN_AFTER_TEST_START', {
-      successes: successfulAttempts,
-    });
-    return createRealElmSessionAttempt(
-      device,
-      compatibility,
-      pidDiscoveryCache,
-      MAX_BLUETOOTH_ATTEMPTS + 1,
-      MAX_BLUETOOTH_ATTEMPTS + 1,
-    );
-  }
 
   throw lastCause instanceof Error
     ? lastCause
