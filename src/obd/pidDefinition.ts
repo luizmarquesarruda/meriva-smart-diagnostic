@@ -2,7 +2,7 @@ import { decodeFormula } from './formulaEngine';
 import pidCatalog from '../knowledge/pids.json';
 
 export type PidByteLength = 1 | 2 | 4;
-export type PidClassification = 'PADRAO_OBD' | 'MERIVA_CONFIRMADO' | 'MERIVA_NAO_CONFIRMADO' | 'DESCONHECIDO';
+export type PidClassification = 'PADRAO_OBD' | 'MERIVA_CONFIRMADO' | 'MERIVA_NAO_CONFIRMADO' | 'EXPERIMENTAL_OBSERVED' | 'DESCONHECIDO';
 
 export interface PidDefinition {
   pid: string;
@@ -23,6 +23,7 @@ type JsonPid = {
   formulaId: string;
   classification: PidClassification;
   description: string;
+  evidencePolicy?: 'RAW_ECU_VALID_ONLY';
 };
 
 const definitions = new Map<string, JsonPid>(
