@@ -201,6 +201,24 @@ function wait(ms) {
 
 const BASE = '/doc/MERIVA_SMART';
 
+async function testFormulaKnowledgeBank() {
+  const engine = loadTs(path.join(ROOT, 'src/obd/formulaEngine.ts'));
+
+  assert.strictEqual(engine.applyFormula('RPM', [0x1A, 0xF8]), 1726);
+  assert.strictEqual(engine.applyFormula('TEMP_C', [0x69]), 65);
+  assert.strictEqual(engine.applyFormula('MAF_GS', [0x03, 0x7B]), 8.91);
+  assert.strictEqual(engine.applyFormula('FUEL_TRIM', [0x76]), -7.8125);
+  assert.strictEqual(engine.applyFormula('PERCENT_255', [0xFF]), 100);
+
+  const good = engine.decodeFormula('RPM', '010C', [0x1A, 0xF8]);
+  assert.strictEqual(good.valid, true);
+  assert.strictEqual(good.value, 1726);
+
+  const bad = engine.decodeFormula('TEMP_C', '0105', [0xFF]);
+  assert.strictEqual(bad.valid, false, 'valor fora da faixa deve ser rejeitado pelo motor de plausibilidade');
+  assert.match(bad.reason, /fora da faixa/);
+}
+
 async function testParser() {
   const parser = loadTs(path.join(ROOT, 'src/obd/parser.ts'));
   assert.strictEqual(parser.parsePidResponse('0105', '41 05 69').value, 65);
@@ -583,6 +601,7 @@ async function testAutosaveRace() {
 
 async function main() {
   const tests = [
+    ['banco de fórmulas OBD', testFormulaKnowledgeBank],
     ['parser + DTC', testParser],
     ['elm/protocolo/serialização', testElmAndProtocol],
     ['gate de validação ECU/010C', testEcuValidationGate],
