@@ -99,13 +99,11 @@ export async function writeMaintenanceState(basePath: string, state: Maintenance
   });
 }
 
-export async function setVehicleOdometer(basePath: string, km: number, gpsDistanceBaselineKm = 0): Promise<MaintenanceState> {
+export async function setVehicleOdometer(basePath: string, km: number): Promise<MaintenanceState> {
   if (!validKm(km)) throw new Error('QUILOMETRAGEM INVÁLIDA.');
   const state = await readMaintenanceState(basePath);
   state.vehicleOdometerKm = km;
-  // O valor informado vem do hodômetro real do painel. A partir deste ponto,
-  // o aplicativo soma somente a distância GPS confirmada nesta sessão.
-  state.lastGpsDistanceKm = validKm(gpsDistanceBaselineKm) ? gpsDistanceBaselineKm : 0;
+  // Este valor é somente o hodômetro informado pelo painel. GPS nunca o altera.
   await writeMaintenanceState(basePath, state);
   return state;
 }
@@ -217,26 +215,30 @@ export function getMaintenanceStatuses(state: MaintenanceState): MaintenanceItem
       const dependencyRecords = state.records
         .filter((r) => r.itemId === item.dependsOnItemId)
         .sort((a, b) => Date.parse(a.changedAt) - Date.parse(b.changedAt));
-      const lastDependent = record?.changedAt
-        ? dependencyRecords.filter((r) => Date.parse(r.changedAt) > Date.parse(record.changedAt)).length
-        : dependencyRecords.length;
 
-      dependentChangesSinceLast = lastDependent;
+      if (!record) {
+        dependentChangesSinceLast = dependencyRecords.length;
+        if (item.firstChangeWithOil && dependencyRecords[0]) {
+          dueKm = dependencyRecords[0].changedAtKm;
+        }
+      } else {
+        const filterTime = Date.parse(record.changedAt);
+        const changesSinceFilter = dependencyRecords.filter(
+          (r) => Date.parse(r.changedAt) > filterTime,
+        );
+        dependentChangesSinceLast = changesSinceFilter.length;
 
-      if (record) {
-        const nextDependency = dependencyRecords[lastDependent];
+        // After a filter change, the next filter is due on the Nth dependent change.
+        const requiredChanges = item.changeEveryDependentChanges;
+        const nextDependency = changesSinceFilter[requiredChanges - 1];
         if (nextDependency) {
           dueKm = nextDependency.changedAtKm;
         } else {
           const lastOil = latestRecord(state.records, item.dependsOnItemId);
           dueKm = lastOil && kmInterval ? lastOil.changedAtKm + kmInterval : null;
         }
-      } else {
-        const firstDependency = dependencyRecords[0];
-        if (firstDependency) dueKm = firstDependency.changedAtKm;
       }
     }
-
     const remainingKm =
       dueKm != null && state.vehicleOdometerKm != null
         ? dueKm - state.vehicleOdometerKm
