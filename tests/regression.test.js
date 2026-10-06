@@ -214,7 +214,7 @@ async function testFormulaKnowledgeBank() {
   assert.strictEqual(good.valid, true);
   assert.strictEqual(good.value, 1726);
 
-  const bad = engine.decodeFormula('TEMP_C', '0105', [0xFF]);
+  const bad = engine.validatePidValue('010C', 20000);
   assert.strictEqual(bad.valid, false, 'valor fora da faixa deve ser rejeitado pelo motor de plausibilidade');
   assert.match(bad.reason, /fora da faixa/);
 }
