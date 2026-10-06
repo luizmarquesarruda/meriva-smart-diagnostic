@@ -106,11 +106,14 @@ export class Elm327Session {
       // de até ~1,2 s antes de voltar a aceitar comandos e entregar o prompt.
       // Sem essa janela, o primeiro ATZ pode parecer um erro mesmo com RFCOMM aberto.
       const mandatoryAttempts = 3;
-      const mandatory = ['ATZ', 'ATI'];
+      // Adaptador genérico: ATI é útil para identificação, mas não pode ser
+      // requisito de vida. Muitos clones respondem a AT/OBD sem implementar
+      // corretamente ATI. A validação definitiva ocorre depois com 010C.
+      const mandatory = ['ATZ'];
       const forced = this.config.forceInitialization
         ? this.config.forceInitCommands.filter((item) => /^AT[A-Z0-9]+$/.test(item.toUpperCase()))
         : [];
-      const optional = Array.from(new Set([...forced, 'ATE0', 'ATL0', 'ATS0', 'ATH1', 'ATSP0']))
+      const optional = Array.from(new Set(['ATI', ...forced, 'ATE0', 'ATL0', 'ATS0', 'ATH1', 'ATSP0']))
         .map((item) => item.toUpperCase())
         .filter((item) => !mandatory.includes(item));
 
