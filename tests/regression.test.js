@@ -230,8 +230,6 @@ async function testParser() {
   assert.strictEqual(parser.parsePidResponse('010C', '48 6B 10 41 0C 1A F8 82').value, 1726);
   assert.strictEqual(parser.parsePidResponse('010C', '7E8 04 41 0C 1A F8').value, 1726);
   assert.strictEqual(parser.parsePidResponse('010C', '41 0C 1A').value, null);
-  assert.ok(Math.abs(parser.parsePidResponse('012F', '41 2F 80').value - (128 * 100) / 255) < 0.000001);
-  assert.strictEqual(parser.parsePidResponse('012F', '41 2F FF').value, 100);
   assert.strictEqual(parser.parsePidResponse('0199', '41 99 FF').status, 'VALOR NÃO INTERPRETADO');
   assert.strictEqual(parser.parsePidResponse('010C', 'NO DATA').status, 'NÃO RESPONDEU');
   assert.deepStrictEqual(parser.parseDtcResponse('43 01 33 00 00 00'), ['P0133']);
@@ -289,10 +287,8 @@ async function testPidScanner() {
   assert.ok(supported.includes('010F'));
   assert.ok(supported.includes('0111'));
 
-  // 012F fica no bloco descoberto por 0120, não por 0100.
   const supported20 = scanner.decodeSupportedPids('0120', '41 20 00 02 00 00');
-  assert.ok(supported20.includes('012F'));
-  assert.ok(!supported20.includes('012E'));
+  assert.ok(!supported20.includes('012F'), 'PID 012F não participa do aplicativo');
 
   const supported40 = scanner.decodeSupportedPids('0140', '41 40 00 00 00 02');
   assert.ok(supported40.includes('015F'));
@@ -330,19 +326,16 @@ async function testIntelligentPidDiscovery() {
         '010C': { response: '41 0C 1A F8', status: 'OK', elapsedMs: 10 },
         '0105': { response: '41 05 69', status: 'OK', elapsedMs: 10 },
         '010F': { response: '41 0F 80', status: 'OK', elapsedMs: 10 },
-        '012F': { response: '41 2F 80', status: 'OK', elapsedMs: 10 },
       };
       return responses[pid] || { response: 'NO DATA', status: 'ERROR', elapsedMs: 10 };
     },
   };
   const result = await ai.discoverIntelligentPids(fakeSession, {
-    knownPids: ['010C', '012F'],
+    knownPids: ['010C'],
   });
   assert.ok(result.supportedPids.includes('010C'));
-  assert.ok(result.supportedPids.includes('012F'));
   assert.strictEqual(result.confidence['010C'], 1);
   assert.strictEqual(result.observations.find((item) => item.pid === '010C').status, 'CONFIRMADO');
-  assert.strictEqual(result.observations.find((item) => item.pid === '012F').response, '41 2F 80');
   assert.strictEqual(result.observations.find((item) => item.pid === '010C').value, 1726);
 }
 
