@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "vehicle": "Chevrolet Meriva Maxx 1.4 8V ECONO.FLEX 2011/2012",
   "source": {
     "name": "Manual do Proprietário Chevrolet Meriva 2012",
@@ -14,7 +14,7 @@
   },
   "items": [
     {"id":"oleo_motor","name":"Óleo do motor","category":"MOTOR","intervalKmNormal":10000,"intervalMonthsNormal":12,"intervalKmSevere":5000,"intervalMonthsSevere":6,"sourceNote":"API-SL ou superior, SAE 5W30. Capacidade 3,25 L sem filtro e 3,5 L com filtro."},
-    {"id":"filtro_oleo","name":"Filtro de óleo","category":"FILTROS","intervalKmNormal":20000,"firstChangeWithOil":true,"sourceNote":"Trocar na primeira troca de óleo; depois, a cada duas trocas de óleo. 20.000 km é referência quando o óleo é trocado a cada 10.000 km."},
+    {"id":"filtro_oleo","name":"Filtro de óleo","category":"FILTROS","intervalKmNormal":10000,"dependsOnItemId":"oleo_motor","changeEveryDependentChanges":2,"firstChangeWithOil":true,"sourceNote":"Trocar na primeira troca de óleo; depois, a cada duas trocas de óleo do motor. O aplicativo calcula pelo histórico, sem transformar a regra em um intervalo fixo."},
     {"id":"filtro_ar","name":"Filtro de ar do motor","category":"FILTROS","intervalKmNormal":30000,"sourceNote":"Troca a cada 30.000 km em condições normais. Em poeira/areia, substituir com maior frequência."},
     {"id":"filtro_combustivel","name":"Filtro de combustível externo","category":"FILTROS","intervalKmNormal":10000,"sourceNote":"O quadro de manutenção marca substituição nas revisões de 10.000 km."},
     {"id":"velas","name":"Velas de ignição","category":"MOTOR","intervalKmNormal":30000,"sourceNote":"Substituição na 3ª, 6ª e 9ª revisões, equivalentes a 30.000, 60.000 e 90.000 km."},
