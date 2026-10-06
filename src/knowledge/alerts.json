@@ -1,0 +1,18 @@
+{
+  "version":1,
+  "states":["NORMAL","ATENCAO","CRITICO","SEM_DADOS"],
+  "rules":{
+    "temperatureContinuous":true,
+    "criticalRequiresEvidence":true,
+    "wakeScreenOnCritical":true,
+    "neverAlertOnMissingPidAsFault":true,
+    "coolingPriority":1,
+    "enginePriority":2,
+    "fuelingPriority":3
+  },
+  "events":[
+    {"id":"OVERHEAT_REFERENCE","source":"0105","severity":"ATENCAO","condition":"engine_temperature >= 99","note":"Referência de acionamento de ventoinha, não limite máximo do motor."},
+    {"id":"MISFIRE_CONFIRMED","source":"P0301","severity":"CRITICO","condition":"confirmed_dtc = true"},
+    {"id":"NO_DATA","source":"any","severity":"SEM_DADOS","condition":"required_signal_missing"}
+  ]
+}
