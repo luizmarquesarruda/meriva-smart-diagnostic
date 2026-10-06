@@ -291,3 +291,61 @@ Depois da conexão, o marco decisivo é:
 `TX ATZ` → resposta → demais comandos AT → `TX 010C` → `RX 41 0C XX XX`.
 
 Não considerar `OK` isolado como prova de comunicação com a ECU.
+
+
+---
+
+## 2026-10-06 - JSON Bluetooth e aprendizado no relatório TXT
+
+### Solicitação
+O usuário pediu:
+1. atualizar o JSON específico do Bluetooth;
+2. fazer o relatório TXT mostrar o que o aplicativo já aprendeu.
+
+### Diagnóstico
+O projeto ainda não possuía um JSON dedicado para a política de conexão Bluetooth. Os valores de 20 tentativas e 8 segundos estavam no código.
+O aprendizado já era persistido em `APRENDIZADO/dna_meriva.json`, mas o exportador Bluetooth TXT não lia esse perfil. Assim, o relatório mostrava o trace técnico, porém não mostrava o conhecimento acumulado.
+
+### Correção
+1. Criado `src/knowledge/bluetooth_config.json` com:
+   - perfil `ELM327_MINI_GENERICO`;
+   - Bluetooth Classic/RFCOMM/SPP;
+   - tentativa INSECURE seguida de SECURE;
+   - framing delimitado com delimiter vazio e ASCII;
+   - máximo de 20 tentativas;
+   - intervalo de 8000 ms;
+   - parada no primeiro sucesso;
+   - validação `010C -> 41 0C`;
+   - `ATZ` obrigatório e `ATI` opcional.
+2. `bluetoothManager.ts` passou a ler do JSON os valores de quantidade máxima de tentativas e intervalo.
+3. O exportador `exportBluetoothDiagnosticTxt.ts` passou a ler `APRENDIZADO/dna_meriva.json` e incluir no TXT:
+   - status do aprendizado;
+   - fonte e versão do seed Car Scanner;
+   - amostras seed, reais e totais;
+   - última atualização;
+   - peso do seed;
+   - simulações detectadas/filtradas;
+   - condições aprendidas;
+   - estatísticas por PID: média, mínimo, máximo, desvio, amostras, amostras reais, seed, confiança e fonte.
+4. Criado `tests/bluetoothConfig.test.js` para validar o JSON e a integração do relatório.
+5. O teste foi incluído no `npm test`.
+
+### Commits
+- `7da4b2746afaf5355e0225e070eff62481bcc100` - JSON Bluetooth.
+- `ae48a325afae51bba921ce5915d5af172e698e22` - Bluetooth lendo política do JSON.
+- `3cf8bdd11f774f6a0157df6105ff51493dc8a972` - aprendizado incluído no TXT.
+- `28bd582c8558f537cbb2f16a78fd47fc944339c4` - teste do JSON e relatório.
+- `5ad69c9dab86a74a38d3a07369aece43def378e1` - teste integrado ao `npm test`.
+
+### Resultado esperado no TXT
+O relatório agora terá uma seção:
+
+`--- O QUE O APLICATIVO APRENDEU ---`
+
+Ela representa o conteúdo persistido do perfil de aprendizado, sem transformar dados de simulação em aprendizado real.
+
+### CI
+A CI ainda precisa ser executada sobre o estado final desta alteração. A correção não será considerada concluída antes da validação.
+
+### Próximo passo
+Executar a suíte completa e a CI. Depois, gerar um novo TXT no telefone para confirmar que a seção de aprendizado aparece junto do trace Bluetooth.
