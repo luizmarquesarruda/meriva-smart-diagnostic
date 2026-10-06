@@ -268,7 +268,9 @@ async function createRealElmSessionAttempt(
     attempt,
     maxAttempts,
   });
-  await ensureBluetoothReady();
+  // A prontidão do Bluetooth e a descoberta dos pareados pertencem ao fluxo
+  // chamador (sharedConnection). Cada retry deve começar diretamente na sessão
+  // RFCOMM/ELM, sem reabrir permissões ou reiniciar a preparação Bluetooth.
   const config = mergeCompatibilityConfig(compatibility ?? DEFAULT_ELM327_COMPATIBILITY);
   const session = new Elm327Session(new BluetoothClassicTransport(device.address, config), config);
 
