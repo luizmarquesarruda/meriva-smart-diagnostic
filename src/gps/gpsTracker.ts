@@ -32,9 +32,6 @@ const STOP_SPEED_KMH = 2;
 const MIN_MOVING_SAMPLES = 3;
 const MAX_SEGMENT_GAP_MS = 5_000;
 
-// GPS parado pode variar vários metros mesmo com o carro imóvel.
-// O odômetro só aceita um segmento quando o deslocamento supera
-// o ruído esperado pela precisão declarada pelo Android.
 function movementThresholdM(sample: GpsSample, previous: GpsSample): number {
   const accuracies = [sample.accuracyM, previous.accuracyM].filter(
     (value): value is number => value != null && Number.isFinite(value),
@@ -85,6 +82,7 @@ export class GpsTracker {
   private previous: GpsSample | null = null;
   private readonly listeners = new Set<GpsListener>();
   private consecutiveMovingSamples = 0;
+  private pendingMovingDistanceKm = 0;
   private vehicleSpeedHintKmh: number | null = null;
 
   private state: GpsTripState = {
@@ -111,8 +109,6 @@ export class GpsTracker {
     return { ...this.state };
   }
 
-  // OBD 010D é uma confirmação opcional do movimento real do veículo.
-  // null significa que o OBD não está disponível e o GPS decide sozinho.
   setVehicleSpeedHintKmh(speedKmh: number | null): void {
     this.vehicleSpeedHintKmh =
       speedKmh != null && Number.isFinite(speedKmh) && speedKmh >= 0 && speedKmh <= MAX_SPEED_KMH
@@ -193,6 +189,7 @@ export class GpsTracker {
     };
     this.previous = null;
     this.consecutiveMovingSamples = 0;
+    this.pendingMovingDistanceKm = 0;
     this.emit();
 
     try {
@@ -258,22 +255,21 @@ export class GpsTracker {
 
         if (derivedMoving) {
           this.consecutiveMovingSamples += 1;
+          if (segmentKm <= 0.25) this.pendingMovingDistanceKm += segmentKm;
         } else {
           this.consecutiveMovingSamples = 0;
+          this.pendingMovingDistanceKm = 0;
         }
 
-        // Distância só entra no odômetro GPS depois de três amostras consecutivas
-        // que comprovem movimento e velocidade real do fix. Isso elimina o "carro andando parado" causado
-        // por jitter e velocidade stale do Android.
-        if (
-          segmentKm <= 0.25 &&
-          derivedMoving &&
-          this.consecutiveMovingSamples >= MIN_MOVING_SAMPLES
-        ) {
+        if (derivedMoving && this.consecutiveMovingSamples >= MIN_MOVING_SAMPLES) {
           this.state.distanceKm = Number(
-            (this.state.distanceKm + segmentKm).toFixed(3),
+            (this.state.distanceKm + this.pendingMovingDistanceKm).toFixed(3),
           );
+          this.pendingMovingDistanceKm = 0;
         }
+      } else if (elapsedMs > MAX_SEGMENT_GAP_MS) {
+        this.consecutiveMovingSamples = 0;
+        this.pendingMovingDistanceKm = 0;
       }
     }
 
@@ -322,6 +318,7 @@ export class GpsTracker {
     this.subscription = null;
     this.previous = null;
     this.consecutiveMovingSamples = 0;
+    this.pendingMovingDistanceKm = 0;
     this.vehicleSpeedHintKmh = null;
 
     if (options.resetTrip) {
