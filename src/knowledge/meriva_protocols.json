@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "vehicle_family": "Chevrolet Corsa C / Meriva / Montana 1.4 8V Econoflex",
+  "engine_system": "Multec H / X14YFH",
+  "purpose": "Ordem de tentativa de protocolos para recuperar comunicação sem inventar compatibilidade.",
+  "observed_on_meriva": "ISO 14230-4 KWP Fast Init",
+  "elm327_protocols": [
+    {
+      "elm": "0",
+      "name": "AUTO",
+      "standard": "automático",
+      "priority": 1,
+      "role": "primeira tentativa"
+    },
+    {
+      "elm": "5",
+      "name": "ISO 14230-4 KWP FAST",
+      "standard": "ISO 14230-4",
+      "init": "Fast Init",
+      "priority": 2,
+      "confidence": 1,
+      "evidence": "Meriva real + CarScanner"
+    },
+    {
+      "elm": "3",
+      "name": "ISO 9141-2",
+      "standard": "ISO 9141-2",
+      "init": "5-baud/slow",
+      "priority": 3,
+      "confidence": 0.85,
+      "evidence": "Corsa C 1.4 Econoflex relatado em fórum brasileiro"
+    },
+    {
+      "elm": "4",
+      "name": "ISO 14230-4 KWP 5-BAUD",
+      "standard": "ISO 14230-4",
+      "init": "5-baud/slow",
+      "priority": 4,
+      "confidence": 0.65,
+      "evidence": "família K-Line; candidato de recuperação"
+    },
+    {
+      "elm": "6",
+      "name": "ISO 15765-4 CAN 11/500",
+      "standard": "CAN",
+      "init": "CAN",
+      "priority": 5,
+      "confidence": 0.15,
+      "evidence": "fallback genérico OBD, não observado na Meriva"
+    },
+    {
+      "elm": "7",
+      "name": "ISO 15765-4 CAN 29/500",
+      "standard": "CAN",
+      "init": "CAN",
+      "priority": 6,
+      "confidence": 0.1,
+      "evidence": "fallback genérico OBD, não observado na Meriva"
+    },
+    {
+      "elm": "8",
+      "name": "ISO 15765-4 CAN 11/250",
+      "standard": "CAN",
+      "init": "CAN",
+      "priority": 7,
+      "confidence": 0.05,
+      "evidence": "fallback genérico OBD, não observado na Meriva"
+    },
+    {
+      "elm": "9",
+      "name": "ISO 15765-4 CAN 29/250",
+      "standard": "CAN",
+      "init": "CAN",
+      "priority": 8,
+      "confidence": 0.05,
+      "evidence": "fallback genérico OBD, não observado na Meriva"
+    }
+  ],
+  "rules": [
+    "Não testar todos os protocolos indiscriminadamente se o protocolo já respondeu.",
+    "Após ATSP0, validar com 010C.",
+    "Se 010C falhar, testar ATSP5 e repetir 010C.",
+    "Se ainda falhar, testar ATSP3 e repetir 010C.",
+    "ATSP4 é candidato secundário, somente depois de 5 e 3.",
+    "CAN não deve ser priorizado para esta Meriva porque a evidência real aponta K-Line.",
+    "Um protocolo só é considerado confirmado quando um PID válido retorna payload esperado.",
+    "ATSP6 NÃO é KWP Fast. No ELM327, ATSP6 corresponde a ISO 15765-4 CAN 11/500."
+  ],
+  "sources": [
+    "CarScanner baseline da Meriva: ISO 14230-4 KWP Fast Init, 10.4 kbaud, K-Line",
+    "Corsa Clube Brasil: Corsa C 1.4 Econoflex relatado com ISO 9141-2, 10.4 kbaud",
+    "Corsa Clube Brasil: Corsa Sedan Premium 1.4 2008/2009 relatado com ISO 14230-4 KWP Fast",
+    "ELM327 protocol references: ISO 9141-2 e ISO 14230-4 usam K-Line; ISO 15765-4 usa CAN"
+  ]
+}
