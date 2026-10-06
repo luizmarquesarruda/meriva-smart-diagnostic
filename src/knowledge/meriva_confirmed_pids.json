@@ -148,7 +148,7 @@
     "Resposta válida deve passar pelo parser, fórmula conhecida e plausibilidade.",
     "Referências de Corsa/Montana/GM semelhantes continuam como candidatos.",
     "Preservar resposta bruta, protocolo e tempo de resposta.",
-    "Não usar PID de nível de combustível no aplicativo."
+    "PID 012F é fonte absoluta de nível de combustível e autonomia quando a resposta RAW_ECU for válida; nunca inventar valor."
   ],
   "next_confirmation_targets": [
     "0105",
