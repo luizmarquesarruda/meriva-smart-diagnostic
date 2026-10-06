@@ -1,4 +1,5 @@
 import healthReference from '../knowledge/meriva_health.json';
+import { detectContexts, getAlertPolicy, type RuntimeContext } from './knowledgeRuntime';
 
 export type HealthState = 'NORMAL' | 'ATENCAO' | 'CRITICO' | 'SEM_DADOS';
 export type HealthContext =
@@ -36,6 +37,8 @@ export interface HealthSnapshot {
 type CounterMap = Map<string, number>;
 
 const REF = healthReference as any;
+const ALERTS = getAlertPolicy() as any;
+const OVERHEAT_REFERENCE = ALERTS.events.find((event: any) => event.id === 'OVERHEAT_REFERENCE');
 
 function finite(value: number | null | undefined): value is number {
   return value != null && Number.isFinite(value);
@@ -75,11 +78,18 @@ export class MerivaHealthMonitor {
   ): HealthSnapshot {
     const byPid = new Map(samples.map((sample) => [sample.pid.toUpperCase(), sample]));
     const findings: HealthFinding[] = [];
+    const runtimeContexts = detectContexts({
+      engineTemperatureC: byPid.get('0105')?.value,
+      vehicleSpeedKmh: byPid.get('010D')?.value,
+      rpm: byPid.get('010C')?.value,
+      engineLoadPercent: byPid.get('0104')?.value,
+    });
+    const effectiveContext = context ?? (runtimeContexts[0] as RuntimeContext | undefined) ?? null;
 
     this.evaluateCooling(byPid, findings);
-    this.evaluateEngine(byPid, context, findings);
-    this.evaluateElectrical(byPid, context, findings);
-    this.evaluateFueling(byPid, context, findings);
+    this.evaluateEngine(byPid, effectiveContext as HealthContext | null, findings);
+    this.evaluateElectrical(byPid, effectiveContext as HealthContext | null, findings);
+    this.evaluateFueling(byPid, effectiveContext as HealthContext | null, findings);
 
     return {
       state: worstState(findings),
@@ -109,7 +119,7 @@ export class MerivaHealthMonitor {
     count(this.counters, 'coolant_missing', false);
 
     const thermostat = Number(REF.reference_values.coolant_thermostat_open.value);
-    const fanOn = Number(REF.reference_values.coolant_fan_stage1_on.value);
+    const fanOn = Number(OVERHEAT_REFERENCE?.condition.match(/>=\s*(\d+)/)?.[1] ?? REF.reference_values.coolant_fan_stage1_on.value);
     const fanOff = Number(REF.reference_values.coolant_fan_off.value);
 
     const thermostatCrossed = count(
