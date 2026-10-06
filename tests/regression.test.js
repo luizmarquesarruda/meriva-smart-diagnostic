@@ -443,6 +443,18 @@ async function testVehicleProfile() {
   assert.strictEqual(await vehicle.readVehicleProfile(BASE), null);
 }
 
+async function testAutonomyWithFuelLevel012F() {
+  resetFS();
+  const state = loadTs(path.join(ROOT, 'src/meriva/autosaveState.ts'));
+  const initial = state.createEmptyMerivaState();
+  assert.strictEqual(initial.autonomy.tankCapacityL, 56);
+  assert.strictEqual(initial.autonomy.fuelLevelPercent, null);
+  assert.strictEqual(initial.autonomy.fuelLevelSource, 'SEM_DADOS');
+
+  const service = loadTs(path.join(ROOT, 'src/trip/autoTripService.ts'));
+  assert.match(service.toString ? service.toString() : '', /PID_012F/);
+}
+
 async function testDriveCycleValidation() {
   resetFS();
   const storage = loadTs(path.join(ROOT, 'src/storage/driveCycleStorage.ts'));
