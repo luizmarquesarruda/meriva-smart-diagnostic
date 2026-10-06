@@ -123,6 +123,49 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
   assert.strictEqual(tracker.getState().currentSpeedKmh, 0);
   assert.strictEqual(tracker.getState().distanceKm, distanceBeforeStop);
 
+  // Jitter parado de ~7 m não pode virar distância, mesmo com um speed positivo stale.
+  const distanceBeforeJitter = tracker.getState().distanceKm;
+  watcher({
+    coords: {
+      latitude: 0,
+      longitude: 0.00021,
+      speed: 10,
+      accuracy: 5,
+    },
+    timestamp: 4000,
+  });
+  assert.strictEqual(tracker.getState().distanceKm, distanceBeforeJitter);
+
+  // Fixes com speed ausente também não podem transformar deriva do GPS em movimento.
+  watcher({
+    coords: {
+      latitude: 0,
+      longitude: 0.00010,
+      speed: null,
+      accuracy: 5,
+    },
+    timestamp: 11_000,
+  });
+  watcher({
+    coords: {
+      latitude: 0,
+      longitude: 0.00020,
+      speed: null,
+      accuracy: 5,
+    },
+    timestamp: 12_000,
+  });
+  watcher({
+    coords: {
+      latitude: 0,
+      longitude: 0.00030,
+      speed: null,
+      accuracy: 5,
+    },
+    timestamp: 13_000,
+  });
+  assert.strictEqual(tracker.getState().distanceKm, distanceBeforeJitter);
+
   // Velocidade positiva stale do Android não pode indicar movimento com jitter pequeno.
   watcher({
     coords: {
