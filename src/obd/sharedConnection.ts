@@ -58,6 +58,15 @@ async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm3
     try { await connection.session.close(); } catch { /* preserva o estado inválido */ }
     throw new Error('ECU NÃO VALIDADA. OBLIGATÓRIO RECEBER 41 0C PARA MARCAR OBD COMO CONECTADO.');
   }
+  const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
+  const settings = await readAppSettings(basePath);
+  await import('../database/appSettings').then(({ writeAppSettings }) =>
+    writeAppSettings(basePath, {
+      ...settings,
+      selectedAdapterAddress: device.address,
+    }),
+  );
+
   active = {
     session: connection.session,
     device,
