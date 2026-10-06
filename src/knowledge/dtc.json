@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "vehicleScope": "Chevrolet Meriva Maxx 1.4 8V ECONO.FLEX 2011/2012",
+  "rules": {
+    "rawEcuPriority": true,
+    "unknownCodesMustRemainUnknown": true,
+    "neverClearAutomatically": true,
+    "diagnosisRequiresEvidence": true
+  },
+  "codes": [
+    {"code":"P0015","system":"camshaft_timing","meaning":"Camshaft position timing over-retarded, bank 1","severity":"ATTENTION","evidenceRequired":["DTC","RPM","timing","engine_temperature"]},
+    {"code":"P0123","system":"throttle_position","meaning":"Throttle/Pedal Position Sensor/Switch A Circuit High","severity":"ATTENTION","evidenceRequired":["DTC","throttle_position"]},
+    {"code":"P0301","system":"misfire","meaning":"Cylinder 1 misfire detected","severity":"CRITICAL","evidenceRequired":["DTC","RPM","engine_temperature","fuel_trim","oxygen_sensor"]},
+    {"code":"P1693","system":"manufacturer_specific","meaning":"Manufacturer-specific code; decode only with validated Meriva/ECU evidence","severity":"UNKNOWN","evidenceRequired":["DTC","raw_response"]}
+  ]
+}
