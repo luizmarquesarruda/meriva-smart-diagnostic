@@ -42,6 +42,9 @@ export interface AutonomyState {
   cumulativeFuelUsedL: number;
   averageConsumptionKml: number;
   estimatedRangeKm: number;
+  fuelLevelPercent: number | null;
+  estimatedFuelRemainingL: number | null;
+  fuelLevelSource: 'PID_012F' | 'SEM_DADOS';
   realReadingCount: number;
   lastReadingAt: string | null;
   readings: AutonomyReading[];
@@ -75,6 +78,9 @@ export function createEmptyMerivaState(): MerivaPersistedState {
       cumulativeFuelUsedL: 0,
       averageConsumptionKml: 0,
       estimatedRangeKm: 0,
+      fuelLevelPercent: null,
+      estimatedFuelRemainingL: null,
+      fuelLevelSource: 'SEM_DADOS',
       realReadingCount: 0,
       lastReadingAt: null,
       readings: [],
