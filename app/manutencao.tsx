@@ -25,7 +25,7 @@ export default function MaintenanceScreen() {
   async function saveOdometer() {
     const km = Number(odometerInput.replace(',', '.'));
     if (!Number.isFinite(km) || km < 0) return setError('Digite uma quilometragem válida.');
-    try { setError(null); setState(await setVehicleOdometer(basePath, km, gpsTracker.getState().distanceKm)); setOdometerInput(''); }
+    try { setError(null); setState(await setVehicleOdometer(basePath, km)); setOdometerInput(''); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Não foi possível salvar.'); }
   }
 
@@ -42,9 +42,9 @@ export default function MaintenanceScreen() {
     <View style={styles.odometerCard}>
       <Text style={styles.sectionTitle}>QUILOMETRAGEM DO PAINEL</Text>
       <Text style={styles.bigValue}>{state?.vehicleOdometerKm == null ? 'N/D' : Math.round(state.vehicleOdometerKm).toLocaleString('pt-BR') + ' km'}</Text>
-      <Text style={styles.help}>Digite o número do hodômetro do painel uma vez. O OBD-II padrão não fornece o hodômetro total. Depois disso, o aplicativo soma somente a distância GPS confirmada.</Text>
+      <Text style={styles.help}>Digite o número do hodômetro do painel. O OBD-II padrão não fornece o hodômetro total. O GPS fica separado como distância monitorada e nunca altera este valor.</Text>
       <View style={styles.inputRow}><TextInput value={odometerInput} onChangeText={setOdometerInput} keyboardType="numeric" placeholder="Ex.: 128500" placeholderTextColor="#7185a1" style={styles.input}/><TouchableOpacity style={styles.button} onPress={() => void saveOdometer()}><Text style={styles.buttonText}>SALVAR KM</Text></TouchableOpacity></View>
-      <View style={styles.sourceBadge}><Text style={styles.sourceBadgeText}>PAINEL + GPS CONFIRMADO</Text></View>
+      <View style={styles.sourceBadge}><Text style={styles.sourceBadgeText}>HODÔMETRO: PAINEL</Text></View><Text style={styles.monitored}>Distância monitorada pelo GPS: {state?.monitoredDistanceKm == null ? '0' : state.monitoredDistanceKm.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km</Text>
       <View style={styles.switchRow}><View style={{ flex: 1 }}><Text style={styles.switchTitle}>USO SEVERO</Text><Text style={styles.help}>Ative para óleo: 5.000 km ou 6 meses.</Text></View><Switch value={state?.severeUse ?? false} onValueChange={(value) => void setSevereUse(basePath, value).then(setState)}/></View>
     </View>
     {error ? <Text style={styles.error}>{error}</Text> : null}
