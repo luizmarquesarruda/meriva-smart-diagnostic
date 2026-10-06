@@ -151,7 +151,7 @@ Para o teste físico do ELM327, a conexão Bluetooth deve tentar automaticamente
 - Cada ciclo registra `BLUETOOTH_ATTEMPT_START`, inicialização, trace bruto do ELM327 e `BLUETOOTH_ATTEMPT_RESULT`.
 - Entre falhas, registra o início e o fim da espera de 8 segundos.
 - Ao atingir 20 falhas, encerra com `BLUETOOTH_TEST_SESSION_END` e motivo `MAX_ATTEMPTS_REACHED`.
-- Se uma tentativa for bem-sucedida, encerra imediatamente e não executa as demais.
+- Mesmo que uma tentativa seja bem-sucedida, o teste continua até completar as 20 tentativas. Cada tentativa é independente, fecha sua sessão ao terminar e registra SUCCESS ou FAILURE. Ao final, se houve pelo menos um sucesso, uma nova sessão é aberta para devolver uma conexão utilizável ao aplicativo.
 - O fechamento da sessão continua sendo feito em cada falha, evitando deixar uma conexão anterior aberta para a próxima tentativa.
 - O trace é acumulado no relatório TXT, preservando a evidência de cada tentativa.
 
@@ -167,7 +167,7 @@ O teste de regressão agora fixa os valores de 20 tentativas e 8000 ms, evitando
 A CI será disparada pelos commits desta alteração. A correção só será considerada concluída após a validação da CI.
 
 ### Próximo teste físico
-Instalar o APK da CI e gerar um novo relatório TXT. Em caso de falha persistente, o relatório deve conter até 20 blocos `BLUETOOTH_ATTEMPT_START`, cada um separado por aproximadamente 8 segundos, além dos erros RX/TX correspondentes.
+Instalar o APK da CI e gerar um novo relatório TXT. O teste esperado é completar as 20 tentativas, mesmo que a primeira seja SUCCESS, com cada resultado gravado no TXT e intervalo de 8 segundos entre tentativas. Em caso de falha persistente, o relatório deve conter até 20 blocos `BLUETOOTH_ATTEMPT_START`, cada um separado por aproximadamente 8 segundos, além dos erros RX/TX correspondentes.
 
 
 ---
