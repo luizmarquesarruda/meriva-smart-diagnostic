@@ -2,7 +2,7 @@ import * as FileSystem from 'expo-file-system';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { getLastBluetoothDiagnosticText } from '../obd/bluetoothManager';
-import { getSharedObdConnection, getSharedObdLastError } from '../obd/sharedConnection';
+import { getSharedObdConnection, getSharedObdLastError, getSharedObdDiagnosticContext } from '../obd/sharedConnection';
 
 export interface BluetoothReportResult {
   ok: boolean;
@@ -13,7 +13,8 @@ export interface BluetoothReportResult {
 
 function buildReport(): string {
   const connection = getSharedObdConnection();
-  const trace = connection?.getDiagnosticsText() || getLastBluetoothDiagnosticText();
+  const context = getSharedObdDiagnosticContext();
+  const trace = connection?.getDiagnosticsText() || context.trace || getLastBluetoothDiagnosticText();
   const lines = [
     'MERIVA SMART DIAGNOSTIC',
     'BLUETOOTH CLASSIC / ELM327 DIAGNOSTIC REPORT',
@@ -25,6 +26,8 @@ function buildReport(): string {
     `ELM DEVICE: ${connection ? `${connection.device.name} | ${connection.device.address}` : 'NÃO CONECTADO'}`,
     `PROTOCOL: ${connection?.protocol ?? 'N/D'}`,
     `LAST ERROR: ${getSharedObdLastError() ?? 'NENHUM'}`,
+    `PAIRED DEVICES: ${context.devices.length}`,
+    ...context.devices.map((device, index) => `PAIRED ${index + 1}: ${device.name} | ${device.address}`),
     '',
     '--- RAW BLUETOOTH TRACE ---',
     trace || 'NENHUM EVENTO REGISTRADO.',
