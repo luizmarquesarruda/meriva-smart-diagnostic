@@ -1,4 +1,5 @@
 name: CI
+# Manual CI trigger is available through workflow_dispatch; this commit also validates push-triggered CI.
 
 on:
   workflow_dispatch:
