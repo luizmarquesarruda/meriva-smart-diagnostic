@@ -14,7 +14,7 @@
 ### OBD
 - classificação explícita das respostas do ELM327;
 - descoberta de PIDs com decodificação de bitmap;
-- PIDs padrão adicionais, incluindo taxa de combustível 015E;
+- PIDs padrão adicionais, incluindo nível de combustível 012F e taxa de combustível 015E;
 - leitura e persistência de DTCs do modo 03;
 - preservação da distinção entre resposta, erro e ausência de dados.
 
@@ -26,6 +26,7 @@
 
 ### Combustível
 - remoção da entrada manual de litros na tela principal;
+- PID 012F para nível/reserva/autonomia;
 - integração temporal da taxa OBD PID 015E em L/h;
 - rejeição de amostras inválidas e intervalos longos;
 - teste automatizado do acumulador de combustível.
@@ -42,5 +43,5 @@
 - remoção de dependências diretas sem uso.
 
 ### Engenharia
-- CI com Expo Doctor, TypeScript, testes e build Android debug;
+- CI com Expo Doctor, TypeScript, testes e build Android release standalone;
 - documentação de arquitetura, desenvolvimento e auditoria.
