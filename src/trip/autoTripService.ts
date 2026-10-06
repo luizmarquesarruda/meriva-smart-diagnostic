@@ -88,6 +88,7 @@ class AutoTripService {
   async stop(): Promise<void> {
     if (!this.running) return;
     this.running = false;
+    gpsTracker.setVehicleSpeedHintKmh(null);
     this.generation += 1;
     this.unsubscribeConnection?.();
     this.unsubscribeConnection = null;
@@ -176,6 +177,11 @@ class AutoTripService {
             obdSpeedKmh = speedResult.parsed.value;
           }
         }
+
+        // Quando 010D existe, o GPS recebe a velocidade real da ECU como
+        // confirmação de movimento. Zero km/h bloqueia deriva do GPS parado.
+        // Sem 010D, null devolve a decisão ao filtro GPS.
+        gpsTracker.setVehicleSpeedHintKmh(obdSpeedSupported ? obdSpeedKmh : null);
 
         const recorder = this.recorder;
         if (recorder) {
