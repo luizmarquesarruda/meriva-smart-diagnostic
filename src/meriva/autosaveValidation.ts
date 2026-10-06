@@ -6,6 +6,7 @@
 import type { AutoSaveEnvelope } from './autosaveTypes';
 import type { MerivaPersistedState } from './autosaveState';
 import { createEmptyMerivaState } from './autosaveState';
+import { canLearnPid, getLearningPolicy } from '../obd/knowledgeRuntime';
 
 export function isValidEnvelope(value: unknown): value is AutoSaveEnvelope<MerivaPersistedState> {
   if (typeof value !== 'object' || value === null) return false;
@@ -51,6 +52,13 @@ export function shouldFeedLearning(
   source: 'REAL' | 'SIMULACAO',
   status: string,
   value: number | null,
+  pid?: string,
 ): boolean {
-  return source === 'REAL' && status === 'RESPONDEU' && value !== null;
+  const policy = getLearningPolicy();
+  return (
+    source === 'REAL' &&
+    status === 'RESPONDEU' &&
+    value !== null &&
+    (!policy.onlyRawEcuValid || Boolean(pid && canLearnPid(pid)))
+  );
 }
