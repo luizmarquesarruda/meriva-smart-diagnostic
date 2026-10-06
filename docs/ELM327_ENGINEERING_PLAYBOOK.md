@@ -23,8 +23,9 @@ prompt ELM >
 Elm327Session + fila/mutex
         |
         +--> ATZ / ATI / AT...
+        +--> ATSP0 / ATDP
         +--> 010C
-        +--> ATDPN / ATDP
+        +--> fallback de protocolo
         v
 PID / DTC / parser
         v
@@ -34,9 +35,9 @@ histórico / aprendizado / diagnóstico
 ~~~
 
 ## O achado mais importante
-A biblioteca React Native usada pelo projeto oferece modos diferentes de conexão serial. Para um ELM327, o projeto agora usa RAW no transporte.
+A implementação atual usa connectionType `delimited`, delimiter `\r` e charset `ascii`. O transporte acumula os eventos recebidos e `readUntilPrompt()` procura o prompt `>` antes de concluir a resposta. O termo RAW na documentação significa preservar TX/RX recebidos, não significa que o socket esteja configurado como `raw`.
 
-Motivo: o ELM327 fecha uma resposta com o caractere >. Em modo delimitado, a biblioteca pode consumir o delimitador antes de entregar o evento ao JavaScript. Se o app depois procurar > novamente, ele pode esperar até timeout mesmo tendo recebido a resposta. O modo RAW deixa o framing sob controle do nosso parser.
+A documentação anterior que dizia que o transporte estava em `raw` estava desatualizada e foi corrigida nesta auditoria.
 
 ## Comparação com implementações reais
 
@@ -50,7 +51,7 @@ Motivo: o ELM327 fecha uma resposta com o caractere >. Em modo delimitado, a bib
 
 AndrOBD mantém estados explícitos como INITIALIZING, ECU_DETECT, CONNECTED, NODATA, BUSERROR, DATAERROR, RXERROR e DISCONNECTED. O projeto deve seguir a mesma ideia, mesmo com implementação TypeScript.
 
-python-OBD usa ATSP0, envia 0100 como primeira busca real e consulta ATDPN. Também possui fallback de protocolos quando o automático falha.
+python-OBD é referência de engenharia para descoberta e fallback. Neste projeto, o primeiro gate da ECU é 010C porque esse é o PID real de referência disponível para a Meriva.
 
 Implementações Java Android tradicionais usam BluetoothSocket com o UUID SPP conhecido:
 
@@ -81,7 +82,7 @@ Nunca mostrar apenas conectado como diagnóstico final.
 
 ### 2. SPP/RFCOMM
 O alvo atual é Bluetooth Classic, não BLE.
-Endereço configurado da bancada: 01:23:45:67:89:BA.
+O aplicativo trabalha com dispositivos pareados pelo Android e não depende de um MAC fixo.
 O endereço só identifica o dispositivo. A confirmação real exige resposta do ELM.
 
 ### 3. Framing
@@ -175,7 +176,8 @@ A recuperação deve ser cancelável no futuro. O modo infinito de reconexão n�
 
 ### Decisão de engenharia
 Não duplicar o socket Java agora.
-Primeiro corrigir o framing e validar o transporte nativo existente. Só criar uma camada Java própria se o hardware real demonstrar que a ponte não oferece controle suficiente sobre UUID SPP, fallback RFCOMM, leitura por bytes, reconexão, cancelamento de socket ou estados nativos.
+O projeto não versiona `android/` porque o Expo prebuild o gera. A CI usa Java 17 para o build nativo.
+Primeiro validar o transporte nativo existente. Só criar uma camada Java própria se o hardware real demonstrar que a ponte não oferece controle suficiente sobre UUID SPP, fallback RFCOMM, leitura por bytes, reconexão, cancelamento de socket ou estados nativos.
 
 ## UX / Product Design
 A interface deve tratar a conexão como um processo técnico, não como um botão binário.
