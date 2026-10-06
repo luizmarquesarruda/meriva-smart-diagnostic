@@ -10,8 +10,6 @@ export interface AutoTripServiceState {
   connected: boolean;
   active: boolean;
   fuelSupported: boolean;
-  fuelLevelSupported: boolean;
-  fuelLevelPct: number | null;
   distanceKm: number;
   fuelUsedL: number;
   consumptionKml: number | null;
@@ -27,8 +25,6 @@ const INITIAL_STATE: AutoTripServiceState = {
   connected: false,
   active: false,
   fuelSupported: false,
-  fuelLevelSupported: false,
-  fuelLevelPct: null,
   distanceKm: 0,
   fuelUsedL: 0,
   consumptionKml: null,
@@ -113,7 +109,6 @@ class AutoTripService {
     }
 
     const fuelSupported = connection.supportedPids.includes('015E');
-    const fuelLevelSupported = connection.supportedPids.includes('012F');
     const obdSpeedSupported = connection.supportedPids.includes('010D');
     const initialDistanceKm = gpsTracker.getState().distanceKm;
     this.recorder = new RealTripRecorder(Date.now(), initialDistanceKm);
@@ -125,8 +120,6 @@ class AutoTripService {
       connected: true,
       active: true,
       fuelSupported,
-      fuelLevelSupported,
-      fuelLevelPct: null,
       error: null,
       averageConsumptionKml: persistedAutonomy.averageConsumptionKml,
       estimatedRangeKm: persistedAutonomy.estimatedRangeKm,
@@ -155,7 +148,6 @@ class AutoTripService {
 
       try {
         let fuelRateLph: number | null = null;
-        let fuelLevelPct: number | null = this.state.fuelLevelPct;
         let obdSpeedKmh: number | null = null;
 
         if (this.state.fuelSupported) {
@@ -168,20 +160,6 @@ class AutoTripService {
             fuelResult.parsed.value >= 0
           ) {
             fuelRateLph = fuelResult.parsed.value;
-          }
-        }
-
-        if (this.state.fuelLevelSupported) {
-          const fuelLevelResult = await connection.session.queryPid('012F');
-          if (
-            fuelLevelResult.parsed.status === 'RESPONDEU' &&
-            fuelLevelResult.parsed.unit === '%' &&
-            fuelLevelResult.parsed.value != null &&
-            Number.isFinite(fuelLevelResult.parsed.value) &&
-            fuelLevelResult.parsed.value >= 0 &&
-            fuelLevelResult.parsed.value <= 100
-          ) {
-            fuelLevelPct = fuelLevelResult.parsed.value;
           }
         }
 
@@ -218,7 +196,6 @@ class AutoTripService {
           this.setState({
             connected: true,
             active: true,
-            fuelLevelSupported: this.state.fuelLevelSupported,
             distanceKm: state.distanceKm,
             fuelUsedL: state.fuelUsedL,
             consumptionKml:
@@ -226,7 +203,6 @@ class AutoTripService {
                 ? state.distanceKm / state.fuelUsedL
                 : null,
             instantaneousConsumptionKml,
-            fuelLevelPct,
             error: fuelRateLph == null && state.validFuelSamples === 0
               ? 'GPS ATIVO / ECU SEM PID 015E VÁLIDO'
               : null,
@@ -238,7 +214,7 @@ class AutoTripService {
         });
       }
 
-      const intervalMs = this.state.fuelSupported || this.state.fuelLevelSupported || obdSpeedSupported ? 1500 : 5000;
+      const intervalMs = this.state.fuelSupported || obdSpeedSupported ? 1500 : 5000;
       const elapsedMs = Date.now() - loopStartedAt;
       const waitMs = Math.max(150, intervalMs - elapsedMs);
       await new Promise((resolve) => setTimeout(resolve, waitMs));
@@ -272,9 +248,6 @@ class AutoTripService {
       state.driveCycles = storedCycles;
 
       // Autonomia é acumulada somente com viagens reais concluídas.
-      // O nível de combustível OBD (012F), quando suportado, é somente
-      // uma informação adicional. A autonomia histórica continua baseada
-      // em consumo real e capacidade nominal, para não depender desse PID.
       // Não usamos diretamente o sensor físico. A autonomia é estimada pelo
       // consumo médio real acumulado e pela capacidade nominal de 56 L.
       const existingReading = state.autonomy.readings.find((item) => item.id === cycle.id);
