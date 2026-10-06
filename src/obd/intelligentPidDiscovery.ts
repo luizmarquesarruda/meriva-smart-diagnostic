@@ -71,7 +71,11 @@ export async function discoverIntelligentPids(
     });
   }
 
+  // Ordem segura para o ELM327 v1.5: confirme primeiro os PIDs essenciais.
+  // 012F é fonte absoluta de combustível no projeto e deve ser validado cedo.
+  const priorityPids = ['010C', '010D', '012F', '015E'];
   const candidates = Array.from(new Set([
+    ...priorityPids,
     ...(options?.knownPids ?? KNOWN_PIDS),
     ...Array.from(supported),
   ])).filter((pid) => /^01[0-9A-F]{2}$/i.test(pid));
