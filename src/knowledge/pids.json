@@ -111,15 +111,6 @@
       "description": "Tensão do sensor O2 Bank 1 Sensor 1"
     },
     {
-      "pid": "012F",
-      "name": "Fuel Level Input",
-      "bytes": 1,
-      "unit": "percent",
-      "formulaId": "PERCENT_255",
-      "classification": "PADRAO_OBD",
-      "description": "Nível informado pela ECU, somente se respondido"
-    },
-    {
       "pid": "0131",
       "name": "Distance Since DTC Clear",
       "bytes": 2,
