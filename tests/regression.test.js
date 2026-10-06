@@ -402,7 +402,7 @@ async function testBluetoothEventTransport() {
   assert.strictEqual(lastBluetoothDiscoveryCancelled, true);
   assert.strictEqual(bluetoothConnectCalls, 1);
   assert.strictEqual(lastBluetoothConnectionOptions?.connectionType, 'delimited');
-  assert.strictEqual(lastBluetoothConnectionOptions?.delimiter, '\r');
+  assert.strictEqual(lastBluetoothConnectionOptions?.delimiter, '');
   assert.strictEqual(lastBluetoothConnectionOptions?.charset, 'ascii');
   assert.strictEqual(lastBluetoothConnectionOptions?.secureSocket, false);
   await transport.write('010C\r');
