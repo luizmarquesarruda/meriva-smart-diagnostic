@@ -82,11 +82,11 @@ export class Elm327Session {
     this.adaptiveTimeoutMs = Math.min(this.config.ioTimeoutMs, this.config.adaptiveTimeoutMaxMs);
   }
 
-  async initialize(): Promise<ElmCommandResult[]> {
+  async initialize(initializationCommands?: string[]): Promise<ElmCommandResult[]> {
     if (this.initializationPromise) return this.initializationPromise;
     if (this.opened) return [];
 
-    this.initializationPromise = this.performInitialize();
+    this.initializationPromise = this.performInitialize(initializationCommands);
     try {
       return await this.initializationPromise;
     } finally {
@@ -94,7 +94,7 @@ export class Elm327Session {
     }
   }
 
-  private async performInitialize(): Promise<ElmCommandResult[]> {
+  private async performInitialize(initializationCommands?: string[]): Promise<ElmCommandResult[]> {
     await this.transport.open();
     this.opened = true;
     this.protocol = null;
@@ -107,12 +107,17 @@ export class Elm327Session {
       // Sem essa janela, o primeiro ATZ pode parecer um erro mesmo com RFCOMM aberto.
       const mandatoryAttempts = 3;
       const mandatory = ['ATZ', 'ATI'];
-      const forced = this.config.forceInitialization
-        ? this.config.forceInitCommands.filter((item) => /^AT[A-Z0-9]+$/.test(item.toUpperCase()))
-        : [];
-      const optional = Array.from(new Set([...forced, 'ATE0', 'ATL0', 'ATS0', 'ATH1', 'ATSP0']))
+      const configuredInitialization = initializationCommands ?? (this.config.forceInitialization ? this.config.forceInitCommands : []);
+      const optional = Array.from(new Set([
+        ...configuredInitialization,
+        'ATE0',
+        'ATL0',
+        'ATS0',
+        'ATH1',
+        'ATSP0',
+      ]))
         .map((item) => item.toUpperCase())
-        .filter((item) => !mandatory.includes(item));
+        .filter((item) => /^AT[A-Z0-9]+$/.test(item) && !mandatory.includes(item));
 
       for (const command of [...mandatory, ...optional]) {
         if (this.disabledOptionalCommands.has(command)) continue;
