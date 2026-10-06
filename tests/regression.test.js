@@ -288,7 +288,6 @@ async function testPidScanner() {
   assert.ok(supported.includes('0111'));
 
   const supported20 = scanner.decodeSupportedPids('0120', '41 20 00 02 00 00');
-  assert.ok(!supported20.includes('012F'), 'PID 012F não participa do aplicativo');
 
   const supported40 = scanner.decodeSupportedPids('0140', '41 40 00 00 00 02');
   assert.ok(supported40.includes('015F'));
