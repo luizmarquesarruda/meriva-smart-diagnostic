@@ -349,3 +349,36 @@ A CI ainda precisa ser executada sobre o estado final desta alteração. A corre
 
 ### Próximo passo
 Executar a suíte completa e a CI. Depois, gerar um novo TXT no telefone para confirmar que a seção de aprendizado aparece junto do trace Bluetooth.
+
+
+## 2026-10-06 - Correção do fluxo duplicado de prontidão Bluetooth
+
+### Evidência física
+O relatório de 2026-10-06 14:50:57Z mostrou:
+- permissões Bluetooth e localização concedidas;
+- Bluetooth disponível e ligado;
+- 1 dispositivo pareado;
+- ELM_SESSION_START seguido novamente por BLUETOOTH_READY_START;
+- ELM_INITIALIZATION_START seguido de novo PAIRED_DISCOVERY_START;
+- adaptador não conectado e LAST ERROR: NENHUM.
+
+### Diagnóstico
+createRealElmSessionAttempt() chamava ensureBluetoothReady() dentro de cada tentativa. O fluxo superior (sharedConnection) já fazia a preparação e a descoberta antes de iniciar a sessão ELM. Isso misturava responsabilidades e podia reiniciar o fluxo Bluetooth no meio da inicialização do adaptador.
+
+Além disso, o relatório usava somente o erro compartilhado. Em algumas rotas de teste físico, o trace já continha a falha real, mas o campo LAST ERROR continuava como NENHUM.
+
+### Correção
+1. Removida a chamada redundante de ensureBluetoothReady() de createRealElmSessionAttempt().
+2. A preparação Bluetooth e a descoberta de pareados continuam no fluxo chamador, antes dos retries.
+3. Cada retry passa diretamente por RFCOMM → inicialização ELM → 010C, sem reabrir permissões ou repetir a descoberta.
+4. O relatório TXT agora usa o último erro do trace como fallback quando o erro compartilhado não estiver disponível.
+5. Mantida a política de 20 tentativas, 8 segundos entre falhas e parada no primeiro sucesso.
+6. Mantida a validação real da ECU somente com 41 0C válido.
+
+### Arquivos afetados
+- src/obd/bluetoothManager.ts
+- src/obd/exportBluetoothDiagnosticTxt.ts
+- docs/DIARIO_DE_BORDO.md
+
+### Próximo passo
+Executar a CI do estado final e repetir o teste físico. O trace esperado não deve conter BLUETOOTH_READY_START nem PAIRED_DISCOVERY_START entre ELM_SESSION_START e ELM_INITIALIZATION_START de uma mesma tentativa.
