@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "vehicle": {
     "make": "Chevrolet",
     "model": "Meriva Maxx",
@@ -8,26 +8,12 @@
     "displacement_cm3": 1389,
     "cylinders": 4
   },
-  "purpose": "Banco de PIDs confirmados por evidência da ECU da Meriva do projeto. Não substitui o catálogo padrão OBD.",
+  "purpose": "Separar PIDs confirmados pela ECU da Meriva de sementes e candidatos. Este arquivo não substitui o catálogo padrão OBD.",
   "protocol_observed": {
     "protocol": "ISO 14230-4 KWP Fast Init",
     "baud": 10400,
     "bus": "K-Line",
     "ecu_address": "0x11"
-  },
-  "evidence_levels": {
-    "RAW_ECU": {
-      "confidence": 1.0,
-      "meaning": "Resposta bruta registrada da ECU do veículo e decodificada com fórmula padrão."
-    },
-    "CARSCANNER": {
-      "confidence": 0.95,
-      "meaning": "PID associado a dado observado no CarScanner do mesmo veículo. Ainda deve ser confirmado por resposta bruta no app."
-    },
-    "FAMILY_REFERENCE": {
-      "confidence": 0.75,
-      "meaning": "Referência de Corsa/Montana/GM semelhante. Não entra como confirmado."
-    }
   },
   "confirmed_pids": [
     {
@@ -37,23 +23,25 @@
       "formulaId": "RPM",
       "bytes": 2,
       "evidence": "RAW_ECU",
-      "confidence": 1.0,
+      "confidence": 1,
       "observed_response": "41 0C 1A F8",
       "observed_value": 1726,
       "source_note": "Resposta real registrada no teste da Meriva.",
       "status": "CONFIRMADO"
-    },
+    }
+  ],
+  "candidates": [
     {
       "pid": "0105",
       "name": "Coolant Temperature",
       "unit": "celsius",
       "formulaId": "TEMP_C",
       "bytes": 1,
-      "evidence": "CARSCANNER",
-      "confidence": 0.95,
+      "evidence": "CARSCANNER_SEED",
+      "confidence": 0.85,
       "observed_value": 81,
       "source_note": "Valor observado no baseline CarScanner de 2026-09-24.",
-      "status": "CONFIRMAR_RAW"
+      "status": "CANDIDATO"
     },
     {
       "pid": "0106",
@@ -61,11 +49,11 @@
       "unit": "percent",
       "formulaId": "FUEL_TRIM",
       "bytes": 1,
-      "evidence": "CARSCANNER",
-      "confidence": 0.95,
+      "evidence": "CARSCANNER_SEED",
+      "confidence": 0.85,
       "observed_value": -8.59,
       "source_note": "Valor observado no baseline CarScanner de 2026-09-24.",
-      "status": "CONFIRMAR_RAW"
+      "status": "CANDIDATO"
     },
     {
       "pid": "0107",
@@ -73,11 +61,11 @@
       "unit": "percent",
       "formulaId": "FUEL_TRIM",
       "bytes": 1,
-      "evidence": "CARSCANNER",
-      "confidence": 0.95,
+      "evidence": "CARSCANNER_SEED",
+      "confidence": 0.85,
       "observed_value": 10.94,
       "source_note": "Valor observado no baseline CarScanner de 2026-09-24.",
-      "status": "CONFIRMAR_RAW"
+      "status": "CANDIDATO"
     },
     {
       "pid": "010B",
@@ -85,11 +73,11 @@
       "unit": "kpa",
       "formulaId": "U8",
       "bytes": 1,
-      "evidence": "CARSCANNER",
-      "confidence": 0.95,
+      "evidence": "CARSCANNER_SEED",
+      "confidence": 0.85,
       "observed_value": 5.66,
       "source_note": "Valor observado no baseline CarScanner de 2026-09-24; unidade original registrada em psi.",
-      "status": "CONFIRMAR_RAW"
+      "status": "CANDIDATO"
     },
     {
       "pid": "010E",
@@ -97,11 +85,11 @@
       "unit": "degrees",
       "formulaId": "TIMING_DEG",
       "bytes": 1,
-      "evidence": "CARSCANNER",
-      "confidence": 0.95,
+      "evidence": "CARSCANNER_SEED",
+      "confidence": 0.85,
       "observed_value": 8,
       "source_note": "Valor observado no baseline CarScanner de 2026-09-24.",
-      "status": "CONFIRMAR_RAW"
+      "status": "CANDIDATO"
     },
     {
       "pid": "010F",
@@ -109,11 +97,11 @@
       "unit": "celsius",
       "formulaId": "TEMP_C",
       "bytes": 1,
-      "evidence": "CARSCANNER",
-      "confidence": 0.95,
+      "evidence": "CARSCANNER_SEED",
+      "confidence": 0.85,
       "observed_value": 33,
       "source_note": "Valor observado no baseline CarScanner de 2026-09-24.",
-      "status": "CONFIRMAR_RAW"
+      "status": "CANDIDATO"
     },
     {
       "pid": "0110",
@@ -121,11 +109,11 @@
       "unit": "grams_per_second",
       "formulaId": "MAF_GS",
       "bytes": 2,
-      "evidence": "CARSCANNER",
-      "confidence": 0.95,
+      "evidence": "CARSCANNER_SEED",
+      "confidence": 0.85,
       "observed_value": 8.93,
       "source_note": "Valor observado no baseline CarScanner de 2026-09-24. CarScanner exibiu 8.93 kg/h; conversão aproximada para 2.48 g/s.",
-      "status": "CONFIRMAR_RAW"
+      "status": "CANDIDATO"
     },
     {
       "pid": "0111",
@@ -133,11 +121,11 @@
       "unit": "percent",
       "formulaId": "PERCENT_255",
       "bytes": 1,
-      "evidence": "CARSCANNER",
-      "confidence": 0.95,
+      "evidence": "CARSCANNER_SEED",
+      "confidence": 0.85,
       "observed_value": 3.53,
       "source_note": "Valor observado no baseline CarScanner de 2026-09-24.",
-      "status": "CONFIRMAR_RAW"
+      "status": "CANDIDATO"
     },
     {
       "pid": "0114",
@@ -145,21 +133,20 @@
       "unit": "volts",
       "formulaId": "O2_VOLTS",
       "bytes": 1,
-      "evidence": "CARSCANNER",
-      "confidence": 0.95,
+      "evidence": "CARSCANNER_SEED",
+      "confidence": 0.85,
       "observed_value": 0.53,
       "source_note": "Valor observado no baseline CarScanner de 2026-09-24.",
-      "status": "CONFIRMAR_RAW"
+      "status": "CANDIDATO"
     }
   ],
   "rules": [
-    "Somente RAW_ECU pode elevar um PID para CONFIRMADO definitivo.",
-    "CARSCANNER serve como semente de descoberta e comparação, não como verdade absoluta.",
-    "PIDs sem resposta válida da ECU não entram no aprendizado.",
-    "Resposta válida precisa passar pela fórmula conhecida e pela validação de faixa.",
-    "Referências de Corsa/Montana/GM semelhantes são candidatas, nunca confirmação da Meriva.",
-    "Não inventar fórmula para PID desconhecido.",
-    "Manter a resposta bruta para auditoria e reprocessamento."
+    "Somente resposta RAW_ECU válida pode colocar um PID em confirmed_pids.",
+    "CARSCANNER_SEED é referência de descoberta e comparação, não leitura atual da ECU.",
+    "Resposta válida deve passar pelo parser, fórmula conhecida e plausibilidade.",
+    "Referências de Corsa/Montana/GM semelhantes continuam como candidatos.",
+    "Preservar resposta bruta, protocolo e tempo de resposta.",
+    "Não usar PID de nível de combustível no aplicativo."
   ],
   "next_confirmation_targets": [
     "0105",
