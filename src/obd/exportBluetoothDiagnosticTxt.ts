@@ -3,6 +3,42 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { getLastBluetoothDiagnosticText } from '../obd/bluetoothManager';
 import { getSharedObdConnection, getSharedObdLastError, getSharedObdDiagnosticContext } from '../obd/sharedConnection';
+import { readLearningProfile, type MerivaLearningProfile } from '../database/learningProfile';
+
+async function readCurrentLearningProfile(): Promise<MerivaLearningProfile | null> {
+  const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
+  return readLearningProfile(basePath);
+}
+
+function learningReportLines(profile: MerivaLearningProfile | null): string[] {
+  if (!profile) return ['APRENDIZADO: PERFIL NÃO DISPONÍVEL.'];
+  const lines = [
+    '--- O QUE O APLICATIVO APRENDEU ---',
+    `STATUS: ${profile.learningStatus}`,
+    `FONTE: ${profile.source}`,
+    `SEED CARSCANNER: ${profile.seedVersion}`,
+    `AMOSTRAS SEED: ${profile.globalSampleCounts.seedSamples}`,
+    `AMOSTRAS REAIS: ${profile.globalSampleCounts.realSamples}`,
+    `AMOSTRAS TOTAIS: ${profile.globalSampleCounts.totalSamples}`,
+    `ÚLTIMA ATUALIZAÇÃO: ${profile.lastUpdated}`,
+    `PESO DO SEED: ${profile.seedWeight}`,
+    `SIMULAÇÕES DETECTADAS: ${profile.dataContamination.simulationDetected}`,
+    `SIMULAÇÕES FILTRADAS: ${profile.dataContamination.simulationFiltered}`,
+  ];
+
+  for (const context of profile.contextualData) {
+    lines.push(`CONDIÇÃO: ${context.condition} | AMOSTRAS: ${context.sampleCount} | ATUALIZAÇÃO: ${context.lastUpdate}`);
+    for (const [pid, stats] of Object.entries(context.statistics)) {
+      lines.push(
+        `  PID ${pid} | MÉDIA: ${stats.mean} | MIN: ${stats.min} | MAX: ${stats.max} | ` +
+        `DESVIO: ${stats.stddev} | AMOSTRAS: ${stats.samples} | REAIS: ${stats.realSamples} | ` +
+        `SEED: ${stats.seedSamples} | CONFIANÇA: ${stats.confidence} | FONTE: ${stats.source.join(',')}`,
+      );
+    }
+  }
+  if (profile.contextualData.length === 0) lines.push('NENHUM DADO APRENDIDO AINDA.');
+  return lines;
+}
 
 export interface BluetoothReportResult {
   ok: boolean;
@@ -11,10 +47,11 @@ export interface BluetoothReportResult {
   message?: string;
 }
 
-function buildReport(): string {
+async function buildReport(): Promise<string> {
   const connection = getSharedObdConnection();
   const context = getSharedObdDiagnosticContext();
   const trace = connection?.getDiagnosticsText() || context.trace || getLastBluetoothDiagnosticText();
+  const learningProfile = await readCurrentLearningProfile();
   const lines = [
     'MERIVA SMART DIAGNOSTIC',
     'BLUETOOTH CLASSIC / ELM327 DIAGNOSTIC REPORT',
@@ -28,6 +65,8 @@ function buildReport(): string {
     `LAST ERROR: ${getSharedObdLastError() ?? 'NENHUM'}`,
     `PAIRED DEVICES: ${context.devices.length}`,
     ...context.devices.map((device, index) => `PAIRED ${index + 1}: ${device.name} | ${device.address}`),
+    '',
+    ...learningReportLines(learningProfile),
     '',
     '--- RAW BLUETOOTH TRACE ---',
     trace || 'NENHUM EVENTO REGISTRADO.',
@@ -49,7 +88,7 @@ export async function exportBluetoothDiagnosticTxt(): Promise<BluetoothReportRes
       fileName,
       'text/plain',
     );
-    await FileSystem.writeAsStringAsync(uri, buildReport(), {
+    await FileSystem.writeAsStringAsync(uri, await buildReport(), {
       encoding: FileSystem.EncodingType.UTF8,
     });
     return { ok: true, fileName };
