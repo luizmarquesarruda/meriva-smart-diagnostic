@@ -18,6 +18,8 @@ export interface GpsTripState {
   lastTimestamp: number | null;
   lastAccuracyM: number | null;
   error: string | null;
+  signalQuality: 'SEM_FIX' | 'FRACA' | 'BOA' | 'EXCELENTE';
+  speedSource: 'PARADO' | 'GPS' | 'OBD';
 }
 
 export type GpsListener = (state: GpsTripState) => void;
@@ -95,6 +97,8 @@ export class GpsTracker {
     lastTimestamp: null,
     lastAccuracyM: null,
     error: null,
+    signalQuality: 'SEM_FIX',
+    speedSource: 'PARADO',
   };
 
   subscribe(listener: GpsListener): () => void {
@@ -114,6 +118,13 @@ export class GpsTracker {
       speedKmh != null && Number.isFinite(speedKmh) && speedKmh >= 0 && speedKmh <= MAX_SPEED_KMH
         ? speedKmh
         : null;
+  }
+
+  private getSignalQuality(accuracyM: number | null): GpsTripState['signalQuality'] {
+    if (accuracyM == null || !Number.isFinite(accuracyM) || accuracyM > MAX_ACCURACY_M) return 'SEM_FIX';
+    if (accuracyM <= 5) return 'EXCELENTE';
+    if (accuracyM <= 15) return 'BOA';
+    return 'FRACA';
   }
 
   private emit(): void {
@@ -177,6 +188,8 @@ export class GpsTracker {
       lastTimestamp: null,
       lastAccuracyM: null,
       error: null,
+      signalQuality: 'SEM_FIX',
+      speedSource: 'PARADO',
     };
     this.previous = null;
     this.consecutiveMovingSamples = 0;
@@ -283,6 +296,11 @@ export class GpsTracker {
         : (derivedSpeedKmh ?? 0))
       : 0;
     if (!Number.isFinite(speedKmh) || speedKmh < STOP_SPEED_KMH || speedKmh > MAX_SPEED_KMH) speedKmh = 0;
+    const speedSource: GpsTripState['speedSource'] = speedKmh <= 0
+      ? 'PARADO'
+      : this.vehicleSpeedHintKmh != null && this.vehicleSpeedHintKmh >= MIN_MOVEMENT_SPEED_KMH
+        ? 'OBD'
+        : 'GPS';
 
     if (accurate) this.previous = sample;
     this.state = {
@@ -293,6 +311,8 @@ export class GpsTracker {
       lastTimestamp: sample.timestamp,
       lastAccuracyM: sample.accuracyM,
       error: null,
+      signalQuality: this.getSignalQuality(sample.accuracyM),
+      speedSource,
     };
     this.emit();
   }
@@ -314,9 +334,11 @@ export class GpsTracker {
         samples: 0,
         lastTimestamp: null,
         lastAccuracyM: null,
+        signalQuality: 'SEM_FIX',
+        speedSource: 'PARADO',
       };
     } else {
-      this.state = { ...this.state, running: false, currentSpeedKmh: 0 };
+      this.state = { ...this.state, running: false, currentSpeedKmh: 0, speedSource: 'PARADO' };
     }
     this.emit();
   }

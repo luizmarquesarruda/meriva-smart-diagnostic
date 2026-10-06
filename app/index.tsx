@@ -220,6 +220,8 @@ export default function IndexScreen() {
               <Metric label="DISTÂNCIA" value={formatDistance(gpsState.distanceKm, distanceUnit)} />
               <Metric label="ÚLTIMO CONSUMO" value={summary.lastRealCycle ? `${summary.lastRealCycle.avgFuelConsumptionKml.toFixed(2)} km/L` : 'N/D'} />
               <Metric label="PRECISÃO GPS" value={gpsState.lastAccuracyM == null ? 'N/D' : `${gpsState.lastAccuracyM.toFixed(0)} m`} />
+              <Metric label="QUALIDADE" value={gpsState.signalQuality.replace('_', ' ')} />
+              <Metric label="FONTE VELOCIDADE" value={gpsState.speedSource} />
             </View>
             <Text style={styles.tripHelp}>Registro automático. Nenhum botão de iniciar é necessário.</Text>
           </View>
