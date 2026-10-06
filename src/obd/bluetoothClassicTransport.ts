@@ -100,13 +100,29 @@ export class BluetoothClassicTransport implements ObdTransport {
       delimiter: '\\r',
     });
 
+    let timedOutConnection = false;
+    let connectPromise: Promise<BluetoothDevice> | null = null;
+
     try {
-      const connectPromise = RNBluetoothClassic.connectToDevice(this.deviceAddress, {
+      connectPromise = RNBluetoothClassic.connectToDevice(this.deviceAddress, {
         connectionType: 'delimited',
         delimiter: '\\r',
         charset: 'ascii',
         secureSocket,
       });
+
+      // Promise.race() não cancela a operação nativa. Se o clone resolver
+      // depois do timeout, descarte imediatamente a conexão tardia para que
+      // ela não fique presa ocupando o RFCOMM do próximo candidato.
+      void connectPromise.then(async (lateDevice) => {
+        if (!timedOutConnection || !lateDevice) return;
+        this.logDiagnostic('LATE_CONNECT_SUCCESS_AFTER_TIMEOUT');
+        await this.safeDisconnect(lateDevice);
+        this.logDiagnostic('LATE_CONNECT_DISCONNECTED');
+      }).catch(() => {
+        // A tentativa nativa atrasada também pode terminar com erro.
+      });
+
       device = await Promise.race([
         connectPromise,
         new Promise<never>((_, reject) => { this.connectTimer = setTimeout(
@@ -120,13 +136,8 @@ export class BluetoothClassicTransport implements ObdTransport {
         connectionType: 'delimited',
       });
     } catch (cause) {
+      timedOutConnection = true;
       if (this.connectTimer) { clearTimeout(this.connectTimer); this.connectTimer = null; }
-      if (!device) {
-        try {
-          const lateDevice = await Promise.race([connectPromise, new Promise<null>((resolve) => setTimeout(() => resolve(null), 300))]);
-          if (lateDevice) await this.safeDisconnect(lateDevice);
-        } catch { /* conexão atrasada já falhou */ }
-      }
       this.logDiagnostic('CONNECT_FAILURE', {
         secureSocket,
         connectionType: 'delimited',
