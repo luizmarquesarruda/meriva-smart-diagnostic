@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "transport": "BLUETOOTH_CLASSIC",
+  "profile": "ELM327_SPP",
+  "deviceDiscovery": {
+    "source": "PAIRED_DEVICES",
+    "automaticSelection": true,
+    "lastSuccessfulDeviceFirst": true,
+    "fallbackToOtherPairedDevices": true
+  },
+  "connection": {
+    "secureSocket": false,
+    "connectionType": "delimited",
+    "delimiter": "\r",
+    "charset": "ascii"
+  },
+  "validation": {
+    "requireElmResponse": true,
+    "requireEcuResponse": true,
+    "requiredPid": "010C",
+    "requiredResponsePrefix": "41 0C"
+  },
+  "priority": [
+    "LAST_SUCCESSFUL_ELM",
+    "OTHER_ELM_OR_OBD_DEVICES",
+    "OTHER_PAIRED_CLASSIC_DEVICES"
+  ],
+  "rules": {
+    "saveDeviceOnlyAfterEcuValidation": true,
+    "neverTrustDeviceNameAlone": true,
+    "neverAskUserToChooseMacByDefault": true
+  }
+}
