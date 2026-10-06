@@ -270,6 +270,11 @@ async function testElmAndProtocol() {
 
 async function testEcuValidationGate() {
   const manager = loadTs(path.join(ROOT, 'src/obd/bluetoothManager.ts'));
+  assert.strictEqual(manager.getElmProtocolName('5'), 'ISO 14230-4 KWP FAST');
+  assert.strictEqual(manager.getElmProtocolName('3'), 'ISO 9141-2');
+  assert.strictEqual(manager.getElmProtocolName('6'), 'ISO 15765-4 CAN 11/500');
+  assert.strictEqual(manager.getElmProtocolName('9'), 'ISO 15765-4 CAN 29/250');
+  assert.strictEqual(manager.getElmProtocolName('X'), 'ELM327 PROTOCOLO X');
   assert.strictEqual(manager.isValidEcuProbe({ status: 'OK', response: '41 0C 1A F8', command: '010C', elapsedMs: 10, attempt: 1 }), true);
   assert.strictEqual(manager.isValidEcuProbe({ status: 'OK', response: 'NO DATA', command: '010C', elapsedMs: 10, attempt: 1 }), false);
   assert.strictEqual(manager.isValidEcuProbe({ status: 'TIMEOUT', response: '', command: '010C', elapsedMs: 1000, attempt: 1 }), false);
