@@ -32,3 +32,12 @@ for (const token of required) {
 
 console.log('bluetooth priority: último ELM conectado entra primeiro');
 console.log('bluetooth priority: normalização de endereço e fallback de candidatos verificados');
+
+const loader = fs.readFileSync(
+  path.join(__dirname, '..', 'src', 'obd', 'bluetoothKnowledge.ts'),
+  'utf8',
+);
+
+for (const token of ['bluetooth.json', 'getBluetoothStartupPolicy', 'validateBluetoothStartupPolicy']) {
+  if (!loader.includes(token)) throw new Error('Loader da política Bluetooth incompleto: ' + token);
+}
