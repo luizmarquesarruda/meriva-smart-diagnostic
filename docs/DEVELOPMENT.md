@@ -25,15 +25,15 @@ O adaptador ELM327 deve estar pareado nas configurações do Android antes do te
 3. Conceda acesso a dispositivos próximos.
 4. Ligue o Bluetooth.
 5. Liste dispositivos pareados.
-6. Selecione o ELM327.
-7. Conecte e aguarde a inicialização AT.
+6. Confirme que o ELM327 aparece entre os dispositivos pareados.
+7. Deixe o aplicativo escolher automaticamente o candidato e aguarde a inicialização AT.
 8. Confirme o protocolo retornado por ATDP.
 9. Execute um PID.
 10. Verifique TX/RX, tempo e status.
 11. Teste a descoberta de PIDs.
 12. Leia os DTCs atuais.
-13. Consulte o PID `015E` repetidamente e confirme a taxa em `L/h`.
-14. Confirme que o acumulado de litros só aumenta com amostras válidas e intervalos aceitáveis.
+13. Consulte o PID `012F` para nível de combustível e o PID `015E` repetidamente para confirmar a taxa em `L/h` quando suportado.
+14. Confirme que o 012F alimenta litros/reserva/autonomia somente quando válido e que o acumulado de consumo do 015E só aumenta com amostras válidas e intervalos aceitáveis.
 15. Se a ECU não suportar `015E`, mantenha o consumo como indisponível, sem estimativa.
 
 A recepção do Bluetooth deve ocorrer pelo listener de dados. O transporte não deve misturar `onDataReceived` com `available()/read()`.
@@ -69,6 +69,6 @@ Se um PID não estiver na resposta de descoberta, não assuma que ele é suporta
 
 ## CI
 
-O GitHub Actions executa instalação, Expo Doctor, TypeScript, testes e montagem de um APK debug com Java 17.
+O GitHub Actions executa instalação, Expo Doctor, TypeScript, testes e montagem de um APK release standalone com Java 17.
 
 A validação física do Bluetooth e do GPS continua exigindo um Android real.
