@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "vehicle": {
+    "make": "Chevrolet",
+    "model": "Meriva Maxx",
+    "engine": "1.4 8V ECONO.FLEX",
+    "modelYear": "2011/2012",
+    "displacementCc": 1389,
+    "cylinders": 4
+  },
+  "ecu": {
+    "family": "Multec H-X14YFH",
+    "address": "0x11",
+    "transport": "K_LINE",
+    "baudRate": 10400,
+    "preferredProtocol": "ISO_14230_4_KWP_FAST"
+  },
+  "elm327": {
+    "initialization": ["ATZ", "ATE0", "ATL0", "ATS0", "ATH1", "ATSP0", "ATDP"],
+    "validation": {
+      "requiredPid": "010C",
+      "positiveResponsePrefix": "41 0C",
+      "requirePayloadBytes": 2
+    }
+  },
+  "protocolFallback": [
+    { "elmProtocol": "5", "name": "ISO 14230-4 KWP FAST", "transport": "K_LINE" },
+    { "elmProtocol": "3", "name": "ISO 9141-2", "transport": "K_LINE" },
+    { "elmProtocol": "4", "name": "ISO 14230-4 KWP 5-BAUD", "transport": "K_LINE" },
+    { "elmProtocol": "6", "name": "ISO 15765-4 CAN 11/500", "transport": "CAN" },
+    { "elmProtocol": "7", "name": "ISO 15765-4 CAN 29/500", "transport": "CAN" },
+    { "elmProtocol": "8", "name": "ISO 15765-4 CAN 11/250", "transport": "CAN" },
+    { "elmProtocol": "9", "name": "ISO 15765-4 CAN 29/250", "transport": "CAN" }
+  ],
+  "evidence": {
+    "protocolConfidence": "OBSERVED",
+    "observedProtocol": "ISO 14230-4 KWP FAST INIT",
+    "observedBaudRate": 10400,
+    "observedEcuAddress": "0x11",
+    "observedValidation": "010C -> 41 0C 1A F8"
+  },
+  "rules": {
+    "rawTxRxMustBePreserved": true,
+    "stopAfterFirstValidEcuResponse": true,
+    "doNotGuessProprietaryCommands": true,
+    "doNotUseDeviceNameAsEcuProof": true,
+    "ecuIsValidatedOnlyAfterRequiredPidResponse": true,
+    "canFallbackOnlyAfterKLineFailure": true
+  }
+}
