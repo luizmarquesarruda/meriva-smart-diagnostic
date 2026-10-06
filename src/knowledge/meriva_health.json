@@ -1,0 +1,491 @@
+{
+  "version": 2,
+  "vehicle": {
+    "make": "Chevrolet",
+    "model": "Meriva Maxx",
+    "engine": "1.4 8V ECONO.FLEX",
+    "year": "2011/2012",
+    "displacement_cm3": 1389,
+    "cylinders": 4,
+    "engine_management": "Multec H-X14YFH",
+    "application_note": "A referência de diagnóstico X14YFH usada aqui é documentada para Meriva 1.4 a partir de 2008, portanto é compatível com a janela 2011/2012 do projeto."
+  },
+  "purpose": "Base técnica para monitoramento da saúde da Meriva. Separa especificação do veículo, curva de sensor, condição funcional e limite de diagnóstico. Não inventa valores ausentes.",
+  "source_policy": {
+    "primary": [
+      "Manual do Proprietário Chevrolet Meriva, ficha técnica e manutenção",
+      "Material técnico de diagnóstico F-Ciclo, Diag Volume 14 - Flex 2, controle do motor Multec H-X14YFH, Meriva 1.4 a partir de 2008",
+      "Material de treinamento técnico Meriva Econo.Flex 1.4 / Multec HX14YFH"
+    ],
+    "secondary": [
+      "Bíblia Técnica da Chevrolet Meriva baseada no catálogo GM 2021",
+      "Materiais técnicos públicos de diagnóstico de Corsa/Montana/Meriva somente quando a aplicação X14YFH estiver explicitamente indicada"
+    ],
+    "rules": [
+      "Especificação de ficha técnica não é automaticamente limite de alarme.",
+      "Curva de sensor é referência de teste elétrico e não deve ser confundida com valor OBD.",
+      "Limite de diagnóstico entra somente quando a fonte técnica explicita o limite.",
+      "Se a fonte não fornecer um limite numérico, usar estado funcional, persistência e correlação.",
+      "CarScanner é semente de comparação, não referência de fábrica.",
+      "RAW_ECU válido tem prioridade sobre semente.",
+      "Não usar dados de motores 1.8 ou 1.4 16V como referência da nossa Meriva."
+    ]
+  },
+  "reference_values": {
+    "engine_idle_rpm": {
+      "pid": "010C",
+      "value_min": 700,
+      "value_max": 800,
+      "unit": "rpm",
+      "context": "motor em marcha lenta",
+      "type": "SPECIFICATION",
+      "source": "Manual do Proprietário Chevrolet Meriva, seção 12, ficha técnica",
+      "diagnostic_use": "Faixa de referência para marcha lenta. Fora dela não confirma falha isoladamente."
+    },
+    "engine_power_rpm": {
+      "value_alcohol": 6000,
+      "value_gasoline": 6000,
+      "unit": "rpm",
+      "type": "SPECIFICATION",
+      "source": "Manual do Proprietário Chevrolet Meriva, seção 12",
+      "diagnostic_use": "Regime de potência máxima. Não é limite de operação."
+    },
+    "engine_cutoff_rpm": {
+      "pid": "010C",
+      "value": 6300,
+      "unit": "rpm",
+      "context": "corte de injeção",
+      "type": "SPECIFICATION",
+      "source": "Manual do Proprietário Chevrolet Meriva, seção 12",
+      "diagnostic_use": "Limite de corte especificado. Não usar como faixa normal."
+    },
+    "battery_nominal": {
+      "value": 12,
+      "unit": "V",
+      "capacity_ah": 55,
+      "type": "SPECIFICATION",
+      "source": "Manual do Proprietário Chevrolet Meriva, seção 12",
+      "diagnostic_use": "Especificação nominal da bateria."
+    },
+    "alternator": {
+      "value": 60,
+      "value_with_ac": 90,
+      "unit": "A",
+      "type": "SPECIFICATION",
+      "source": "Manual do Proprietário Chevrolet Meriva, seção 12",
+      "diagnostic_use": "Capacidade nominal do alternador. Não é corrente instantânea medida pelo PID 0142."
+    },
+    "ecu_supply": {
+      "value_min_engine_off": 11.0,
+      "value_max_engine_off": 13.5,
+      "value_min_engine_running": 12.0,
+      "value_max_engine_running": 15.0,
+      "unit": "V",
+      "type": "DIAGNOSTIC_REFERENCE",
+      "source": "F-Ciclo Diag Volume 14, Multec H-X14YFH, Meriva 1.4 a partir de 2008",
+      "diagnostic_use": "Faixas de alimentação da UCE medidas durante o procedimento de diagnóstico."
+    },
+    "fuel_line_pressure": {
+      "value_min": 3.9,
+      "value_max": 4.1,
+      "unit": "bar",
+      "type": "DIAGNOSTIC_REFERENCE",
+      "source": "F-Ciclo Diag Volume 14, Multec H-X14YFH, Meriva 1.4 a partir de 2008",
+      "diagnostic_use": "Referência de pressão da linha de combustível. Requer medição física, não é PID OBD padrão."
+    },
+    "coolant_system_capacity": {
+      "value": 6.0,
+      "unit": "L",
+      "type": "CAPACITY",
+      "source": "Manual do Proprietário Chevrolet Meriva, seção 12",
+      "diagnostic_use": "Capacidade do sistema de arrefecimento, inclusive radiador."
+    },
+    "coolant_thermostat_open": {
+      "pid": "0105",
+      "value": 89,
+      "unit": "celsius",
+      "type": "FUNCTIONAL_REFERENCE",
+      "source": "F-Ciclo Diag Volume 14, Multec H-X14YFH, Meriva 1.4 a partir de 2008",
+      "diagnostic_use": "Temperatura de abertura da válvula termostática."
+    },
+    "coolant_fan_stage1_on": {
+      "pid": "0105",
+      "value": 99,
+      "unit": "celsius",
+      "type": "FUNCTIONAL_REFERENCE",
+      "source": "F-Ciclo Diag Volume 14, Multec H-X14YFH, Meriva 1.4 a partir de 2008",
+      "diagnostic_use": "Acionamento documentado da primeira velocidade do eletroventilador."
+    },
+    "coolant_fan_off": {
+      "pid": "0105",
+      "value": 94,
+      "unit": "celsius",
+      "type": "FUNCTIONAL_REFERENCE",
+      "source": "F-Ciclo Diag Volume 14, Multec H-X14YFH, Meriva 1.4 a partir de 2008",
+      "diagnostic_use": "Desacionamento documentado do eletroventilador."
+    },
+    "coolant_overheat_warning": {
+      "pid": "0105",
+      "value": null,
+      "unit": "celsius",
+      "type": "WARNING_STATE",
+      "source": "Manual do Proprietário Chevrolet Meriva, seção 9",
+      "diagnostic_use": "O manual orienta ação diante de superaquecimento, mas o limite de advertência do painel não deve ser inventado. Usar os 99/94 °C somente para lógica da ventoinha."
+    },
+    "coolant_sensor_voltage": {
+      "pid": "0105",
+      "type": "SENSOR_CURVE",
+      "unit_voltage": "V",
+      "points": [
+        {"temperature_c": 0, "voltage_v": 3.02},
+        {"temperature_c": 10, "voltage_v": 2.43},
+        {"temperature_c": 20, "voltage_v": 1.92},
+        {"temperature_c": 30, "voltage_v": 1.49},
+        {"temperature_c": 40, "voltage_v": 1.08},
+        {"temperature_c": 50, "voltage_v": 0.83},
+        {"temperature_c": 60, "voltage_v": 0.63},
+        {"temperature_c": 70, "voltage_v": 0.48},
+        {"temperature_c": 80, "voltage_v": 0.37},
+        {"temperature_c": 90, "voltage_v": 0.28},
+        {"temperature_c": 100, "voltage_v": 0.21},
+        {"temperature_c": 110, "voltage_v": 0.17},
+        {"temperature_c": 120, "voltage_v": 0.13}
+      ],
+      "source": "F-Ciclo Diag Volume 14, gráfico do sensor de temperatura da água, Multec H-X14YFH",
+      "diagnostic_use": "Referência para teste elétrico do ECT. Não substituir o cálculo OBD 0105 por esta curva."
+    },
+    "coolant_sensor_resistance": {
+      "pid": "0105",
+      "type": "SENSOR_CURVE",
+      "unit_resistance": "ohm",
+      "points": [
+        {"temperature_c": 0, "resistance_ohm": 6100},
+        {"temperature_c": 10, "resistance_ohm": 3800},
+        {"temperature_c": 20, "resistance_ohm": 2500},
+        {"temperature_c": 30, "resistance_ohm": 1700},
+        {"temperature_c": 40, "resistance_ohm": 1100},
+        {"temperature_c": 50, "resistance_ohm": 800},
+        {"temperature_c": 60, "resistance_ohm": 580},
+        {"temperature_c": 70, "resistance_ohm": 430},
+        {"temperature_c": 80, "resistance_ohm": 320},
+        {"temperature_c": 90, "resistance_ohm": 240},
+        {"temperature_c": 100, "resistance_ohm": 180},
+        {"temperature_c": 110, "resistance_ohm": 140},
+        {"temperature_c": 120, "resistance_ohm": 110}
+      ],
+      "source": "F-Ciclo Diag Volume 14, gráfico do sensor de temperatura da água, Multec H-X14YFH",
+      "diagnostic_use": "Referência para teste elétrico do ECT desconectado."
+    },
+    "intake_air_sensor_voltage": {
+      "pid": "010F",
+      "type": "SENSOR_CURVE",
+      "unit_voltage": "V",
+      "points": [
+        {"temperature_c": 0, "voltage_v": 4.7},
+        {"temperature_c": 10, "voltage_v": 3.78},
+        {"temperature_c": 20, "voltage_v": 3.36},
+        {"temperature_c": 30, "voltage_v": 2.91},
+        {"temperature_c": 40, "voltage_v": 2.37},
+        {"temperature_c": 50, "voltage_v": 1.98},
+        {"temperature_c": 60, "voltage_v": 1.61},
+        {"temperature_c": 70, "voltage_v": 1.30},
+        {"temperature_c": 80, "voltage_v": 1.04},
+        {"temperature_c": 90, "voltage_v": 0.82},
+        {"temperature_c": 100, "voltage_v": 0.64},
+        {"temperature_c": 110, "voltage_v": 0.54},
+        {"temperature_c": 120, "voltage_v": 0.41}
+      ],
+      "source": "F-Ciclo Diag Volume 14, gráfico do sensor de temperatura do ar, aplicação X14YFH",
+      "diagnostic_use": "Referência de teste elétrico do IAT."
+    },
+    "map_idle": {
+      "pid": "010B",
+      "value_min": 37,
+      "value_max": 37,
+      "unit": "kPa",
+      "context": "marcha lenta, motor aquecido",
+      "type": "OPERATING_REFERENCE",
+      "source": "F-Ciclo Diag Volume 14, sensor MAP, Meriva 1.4 X14YFH a partir de 2008",
+      "diagnostic_use": "A fonte indica cerca de 37 kPa e 1.37-1.5 V em marcha lenta aquecida. Usar como referência de tendência, não como limite universal."
+    },
+    "map_voltage_idle": {
+      "pid": "010B",
+      "value_min": 1.37,
+      "value_max": 1.50,
+      "unit": "V",
+      "context": "marcha lenta, motor aquecido",
+      "type": "OPERATING_REFERENCE",
+      "source": "F-Ciclo Diag Volume 14, sensor MAP, Meriva 1.4 X14YFH",
+      "diagnostic_use": "Faixa observada no procedimento de teste."
+    },
+    "map_sensor_curve": {
+      "pid": "010B",
+      "type": "SENSOR_CURVE",
+      "unit_pressure": "kPa",
+      "unit_voltage": "V",
+      "points": [
+        {"pressure_kpa": 20, "voltage_v": 0.301},
+        {"pressure_kpa": 30, "voltage_v": 0.739},
+        {"pressure_kpa": 40, "voltage_v": 1.177},
+        {"pressure_kpa": 50, "voltage_v": 1.615},
+        {"pressure_kpa": 60, "voltage_v": 2.053},
+        {"pressure_kpa": 70, "voltage_v": 2.491},
+        {"pressure_kpa": 80, "voltage_v": 2.929},
+        {"pressure_kpa": 90, "voltage_v": 3.367},
+        {"pressure_kpa": 100, "voltage_v": 3.805},
+        {"pressure_kpa": 110, "voltage_v": 4.243},
+        {"pressure_kpa": 120, "voltage_v": 4.681}
+      ],
+      "source": "F-Ciclo Diag Volume 14, Bosch 0 261 230 030, aplicação Meriva 1.4 X14YFH",
+      "diagnostic_use": "Curva de teste elétrico. A relação deve ser tratada como referência de sensor, não como PID OBD."
+    },
+    "o2_idle_voltage": {
+      "pid": "0114",
+      "value_min": 0.03,
+      "value_max": 0.95,
+      "unit": "V",
+      "context": "marcha lenta",
+      "type": "OPERATING_REFERENCE",
+      "source": "F-Ciclo Diag Volume 14, sonda lambda, aplicação X14YFH",
+      "diagnostic_use": "Faixa de sinal indicada no procedimento de diagnóstico. O comportamento dinâmico e o tempo de resposta também importam."
+    },
+    "injector_resistance": {
+      "type": "COMPONENT_REFERENCE",
+      "unit": "ohm",
+      "value_min": 10,
+      "value_max": 15,
+      "source": "F-Ciclo Diag Volume 14, eletroinjetores, aplicação X14YFH",
+      "diagnostic_use": "Teste elétrico do injetor. Não é PID OBD."
+    },
+    "crank_sensor_resistance": {
+      "type": "COMPONENT_REFERENCE",
+      "unit": "ohm",
+      "value_min": 470,
+      "value_max": 575.3,
+      "source": "F-Ciclo Diag Volume 14, sensor de rotação e PMS, Meriva 1.4 X14YFH a partir de 2008",
+      "diagnostic_use": "Teste de resistência do sensor CKP."
+    },
+    "purge_valve_resistance": {
+      "type": "COMPONENT_REFERENCE",
+      "unit": "ohm",
+      "value_min": 24,
+      "value_max": 29.37,
+      "source": "F-Ciclo Diag Volume 14, eletroválvula de purga do canister, aplicação X14YFH",
+      "diagnostic_use": "Teste elétrico da válvula de purga."
+    },
+    "cold_start_temperature": {
+      "value": 8,
+      "unit": "celsius",
+      "type": "FUNCTIONAL_REFERENCE",
+      "source": "Material técnico Econoflex 1.4, Multec H-X14YFH",
+      "diagnostic_use": "A UCE aciona a estratégia de partida a frio abaixo de aproximadamente 8 °C."
+    }
+  },
+  "monitoring": {
+    "cooling": {
+      "priority": 1,
+      "continuous": true,
+      "pids": ["0105"],
+      "rules": [
+        {
+          "id": "thermostat_transition",
+          "severity": "INFO",
+          "pid": "0105",
+          "condition": "coolant_crosses_89c_during_warmup",
+          "reference_c": 89,
+          "action": "REGISTRAR_TRANSICAO",
+          "reason": "A válvula termostática tem abertura especificada em 89 °C."
+        },
+        {
+          "id": "fan_stage1",
+          "severity": "INFO",
+          "pid": "0105",
+          "condition": "coolant_reaches_99c",
+          "reference_c": 99,
+          "action": "VERIFICAR_COMANDO_DA_VENTOINHA",
+          "reason": "A primeira velocidade do eletroventilador deve entrar na referência documentada."
+        },
+        {
+          "id": "fan_should_release",
+          "severity": "ATENCAO",
+          "pid": "0105",
+          "condition": "coolant_below_94c_after_fan_stage",
+          "reference_c": 94,
+          "action": "VERIFICAR_DESACIONAMENTO",
+          "reason": "A fonte técnica documenta 94 °C para desacionamento."
+        },
+        {
+          "id": "coolant_overheat_warning",
+          "severity": "CRITICO",
+          "pid": "0105",
+          "condition": "manual_warning_or_sustained_overheat_evidence",
+          "threshold_c": null,
+          "requires_consecutive_samples": 3,
+          "duration_ms": 3000,
+          "action": "ALERTAR_IMEDIATAMENTE",
+          "reason": "O manual trata superaquecimento como condição de emergência. Não inventar um limite OBD de painel."
+        },
+        {
+          "id": "coolant_missing",
+          "severity": "SEM_DADOS",
+          "condition": "pid_unavailable_or_invalid",
+          "action": "NAO_DIAGNOSTICAR_NORMAL"
+        }
+      ]
+    },
+    "engine": {
+      "priority": 2,
+      "continuous": true,
+      "pids": ["010C", "0104", "010E", "0110", "0111"],
+      "rules": [
+        {
+          "id": "idle_rpm_reference",
+          "severity": "ATENCAO",
+          "pid": "010C",
+          "condition": "engine_running_and_idle_context",
+          "reference_min": 700,
+          "reference_max": 800,
+          "unit": "rpm",
+          "requires_consecutive_samples": 5,
+          "action": "REGISTRAR_TENDENCIA",
+          "reason": "Faixa documentada de marcha lenta."
+        },
+        {
+          "id": "rpm_near_cutoff",
+          "severity": "ATENCAO",
+          "pid": "010C",
+          "condition": "rpm_above_90_percent_of_cutoff",
+          "reference_cutoff": 6300,
+          "unit": "rpm",
+          "requires_consecutive_samples": 2,
+          "action": "ALERTAR",
+          "reason": "A ficha técnica informa corte de injeção em 6300 rpm."
+        },
+        {
+          "id": "map_idle_reference",
+          "severity": "ATENCAO",
+          "pid": "010B",
+          "condition": "engine_warm_and_idle",
+          "reference_kpa_min": 37,
+          "reference_kpa_max": 37,
+          "action": "REGISTRAR_TENDENCIA",
+          "reason": "A fonte indica cerca de 37 kPa em marcha lenta aquecida."
+        },
+        {
+          "id": "map_idle_voltage_reference",
+          "severity": "ATENCAO",
+          "pid": "010B",
+          "condition": "engine_warm_and_idle_if_raw_sensor_voltage_available",
+          "reference_v_min": 1.37,
+          "reference_v_max": 1.50,
+          "action": "REGISTRAR_TENDENCIA"
+        }
+      ]
+    },
+    "fueling": {
+      "priority": 3,
+      "continuous": true,
+      "pids": ["0106", "0107", "0114", "0151", "0152", "015E"],
+      "physical_references": {
+        "fuel_pressure_bar_min": 3.9,
+        "fuel_pressure_bar_max": 4.1,
+        "injector_resistance_ohm_min": 10,
+        "injector_resistance_ohm_max": 15
+      },
+      "rules": [
+        {
+          "id": "fuel_trim_trend",
+          "severity": "ATENCAO",
+          "pids": ["0106", "0107"],
+          "condition": "persistent_deviation_from_learned_baseline",
+          "threshold": null,
+          "action": "LEARN_AND_CORRELATE",
+          "reason": "Sem limite específico confirmado para esta aplicação no material consultado."
+        },
+        {
+          "id": "o2_signal_reference",
+          "severity": "INFO",
+          "pid": "0114",
+          "condition": "engine_warm_idle",
+          "reference_v_min": 0.03,
+          "reference_v_max": 0.95,
+          "action": "ANALISAR_SINAL_E_TEMPO_DE_RESPOSTA",
+          "reason": "A faixa é referência de teste da sonda, não uma decisão de mistura baseada em uma amostra única."
+        }
+      ]
+    },
+    "electrical": {
+      "priority": 2,
+      "continuous": true,
+      "pids": ["0142"],
+      "physical_reference": {
+        "battery_nominal_v": 12,
+        "battery_ah": 55,
+        "alternator_a": 60,
+        "alternator_with_ac_a": 90,
+        "ecu_engine_off_v_min": 11.0,
+        "ecu_engine_off_v_max": 13.5,
+        "ecu_engine_running_v_min": 12.0,
+        "ecu_engine_running_v_max": 15.0
+      },
+      "rules": [
+        {
+          "id": "ecu_supply_reference",
+          "severity": "ATENCAO",
+          "pid": "0142",
+          "condition": "engine_running",
+          "reference_v_min": 12.0,
+          "reference_v_max": 15.0,
+          "action": "COMPARAR_E_REGISTRAR"
+        }
+      ]
+    },
+    "movement": {
+      "priority": 2,
+      "continuous": true,
+      "pids": ["010D"],
+      "rules": [
+        {
+          "id": "vehicle_speed_consistency",
+          "severity": "ATENCAO",
+          "condition": "obd_speed_conflicts_with_gps_movement",
+          "action": "BLOQUEAR_DISTANCIA_GPS_ATE_CONFIRMACAO"
+        }
+      ]
+    },
+    "diagnostics": {
+      "priority": 1,
+      "inputs": ["DTC", "raw_obd_response", "pid_validity", "protocol", "response_latency"],
+      "rules": [
+        {
+          "id": "missing_data_is_not_normal",
+          "severity": "SEM_DADOS",
+          "condition": "required_pid_missing",
+          "action": "REPORTAR_LIMITACAO"
+        }
+      ]
+    }
+  },
+  "health_states": {
+    "NORMAL": "Leitura válida e compatível com referência ou tendência aprendida.",
+    "ATENCAO": "Desvio persistente que merece registro e correlação.",
+    "CRITICO": "Condição de risco ou advertência explícita do veículo.",
+    "SEM_DADOS": "PID ausente, inválido, desconectado ou sem evidência suficiente."
+  },
+  "learning_policy": {
+    "allow_learning_from": ["RAW_ECU_VALID"],
+    "reference_seed": "CARSCANNER_SEED",
+    "never_overwrite_reference": true,
+    "require_context": true,
+    "contexts": ["IDLE", "TRANSITO", "ESTRADA", "MOTOR_FRIO", "MOTOR_AQUECIDO", "CARGA", "AR_CONDICIONADO"],
+    "outlier_policy": "NAO_APRENDER_OUTLIER_ISOLADO"
+  },
+  "known_gaps": [
+    "Ainda precisamos extrair da documentação específica os limites de teste do TPS/borboleta motorizada, pedal, CKP em tensão, sensor de detonação e demais atuadores antes de criar regras numéricas.",
+    "Pressão de combustível 3,9-4,1 bar exige instrumento físico; não deve ser simulada como PID OBD.",
+    "A curva ECT é referência de sensor. A ECU/OBD 0105 continua sendo a fonte para monitoramento em tempo real.",
+    "Os 99 °C e 94 °C são referências de comando/desacionamento da ventoinha, não 'temperatura máxima do motor'.",
+    "O catálogo GM da Bíblia Técnica identifica peças e aplicações, mas não fornece sozinho valores elétricos de diagnóstico.",
+    "Os valores CarScanner continuam sementes até confirmação RAW_ECU."
+  ]
+}
