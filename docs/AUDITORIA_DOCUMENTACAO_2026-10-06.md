@@ -40,3 +40,14 @@ O teste físico de 2026-10-06 revelou uma falha de concorrência no RFCOMM: o bl
 Também foi removida a inicialização redundante do Bluetooth durante a descoberta de dispositivos pareados. O trace anterior mostrava duas chamadas `BLUETOOTH_READY_START` na mesma operação.
 
 A regressão foi adicionada ao `tests/regression.test.js` para impedir duas tentativas nativas simultâneas para o mesmo endereço.
+
+
+## Atualização 2026-10-06 - Framing ELM327 por stream
+
+O framing Bluetooth foi revisado após o relatório físico das 13:33:45Z. O transporte deixou de usar CR como delimiter nativo e passou a usar delimiter vazio no modo `delimited` da `react-native-bluetooth-classic`.
+
+A decisão segue a documentação da biblioteca: delimiter vazio permite entregar o conteúdo recebido sem segmentação por delimitador. O projeto então faz o próprio enquadramento usando o prompt `>` do ELM327.
+
+O teste automatizado foi atualizado para impedir regressão para delimiter `\\r`. O trace também registra `RX_CHUNK` e hexadecimal dos bytes ASCII para observar exatamente como o ELM327 chega pelo RFCOMM.
+
+A validação física continua pendente. O critério é observar uma resposta real `41 0C XX XX` para o comando `010C`.
