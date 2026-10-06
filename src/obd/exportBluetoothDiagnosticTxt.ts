@@ -10,6 +10,26 @@ async function readCurrentLearningProfile(): Promise<MerivaLearningProfile | nul
   return readLearningProfile(basePath);
 }
 
+function extractLastTraceError(trace: string): string | null {
+  const lines = trace.split('\n');
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index];
+    if (line.includes('BLUETOOTH_ATTEMPT_RESULT') && line.includes('"result":"FAILURE"')) {
+      const match = line.match(/"error":"((?:\\.|[^"\\])*)"/);
+      if (match?.[1]) {
+        try { return JSON.parse('"' + match[1] + '"'); } catch { return match[1]; }
+      }
+    }
+    if (line.includes('ELM_SESSION_FAILURE') || line.includes('CONNECT_FAILURE')) {
+      const match = line.match(/"error":"((?:\\.|[^"\\])*)"/);
+      if (match?.[1]) {
+        try { return JSON.parse('"' + match[1] + '"'); } catch { return match[1]; }
+      }
+    }
+  }
+  return null;
+}
+
 function learningReportLines(profile: MerivaLearningProfile | null): string[] {
   if (!profile) return ['APRENDIZADO: PERFIL NÃO DISPONÍVEL.'];
   const lines = [
@@ -62,7 +82,7 @@ async function buildReport(): Promise<string> {
     `DEVICE: ${Constants.deviceName ?? 'N/D'}`,
     `ELM DEVICE: ${connection ? `${connection.device.name} | ${connection.device.address}` : 'NÃO CONECTADO'}`,
     `PROTOCOL: ${connection?.protocol ?? 'N/D'}`,
-    `LAST ERROR: ${getSharedObdLastError() ?? 'NENHUM'}`,
+    `LAST ERROR: ${getSharedObdLastError() ?? extractLastTraceError(trace) ?? 'NENHUM'}`,
     `PAIRED DEVICES: ${context.devices.length}`,
     ...context.devices.map((device, index) => `PAIRED ${index + 1}: ${device.name} | ${device.address}`),
     '',
