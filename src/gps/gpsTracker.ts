@@ -83,6 +83,7 @@ export class GpsTracker {
   private previous: GpsSample | null = null;
   private readonly listeners = new Set<GpsListener>();
   private consecutiveMovingSamples = 0;
+  private vehicleSpeedHintKmh: number | null = null;
 
   private state: GpsTripState = {
     running: false,
@@ -104,6 +105,15 @@ export class GpsTracker {
 
   getState(): GpsTripState {
     return { ...this.state };
+  }
+
+  // OBD 010D é uma confirmação opcional do movimento real do veículo.
+  // null significa que o OBD não está disponível e o GPS decide sozinho.
+  setVehicleSpeedHintKmh(speedKmh: number | null): void {
+    this.vehicleSpeedHintKmh =
+      speedKmh != null && Number.isFinite(speedKmh) && speedKmh >= 0 && speedKmh <= MAX_SPEED_KMH
+        ? speedKmh
+        : null;
   }
 
   private emit(): void {
@@ -227,9 +237,11 @@ export class GpsTracker {
           segmentDistanceM >= movementThresholdM(sample, this.previous) &&
           derivedSpeedKmh >= MIN_MOVEMENT_SPEED_KMH &&
           derivedSpeedKmh <= MAX_SPEED_KMH &&
-          sample.speedKmh != null &&
-          sample.speedKmh >= MIN_MOVEMENT_SPEED_KMH &&
-          sample.speedKmh <= MAX_SPEED_KMH;
+          (this.vehicleSpeedHintKmh != null
+            ? this.vehicleSpeedHintKmh >= MIN_MOVEMENT_SPEED_KMH
+            : sample.speedKmh != null &&
+              sample.speedKmh >= MIN_MOVEMENT_SPEED_KMH &&
+              sample.speedKmh <= MAX_SPEED_KMH);
 
         if (derivedMoving) {
           this.consecutiveMovingSamples += 1;
@@ -259,9 +271,11 @@ export class GpsTracker {
       derivedSpeedKmh != null &&
       derivedSpeedKmh >= MIN_MOVEMENT_SPEED_KMH &&
       derivedSpeedKmh <= MAX_SPEED_KMH &&
-      sample.speedKmh != null &&
-      sample.speedKmh >= MIN_MOVEMENT_SPEED_KMH &&
-      sample.speedKmh <= MAX_SPEED_KMH &&
+      (this.vehicleSpeedHintKmh != null
+        ? this.vehicleSpeedHintKmh >= MIN_MOVEMENT_SPEED_KMH
+        : sample.speedKmh != null &&
+          sample.speedKmh >= MIN_MOVEMENT_SPEED_KMH &&
+          sample.speedKmh <= MAX_SPEED_KMH) &&
       this.consecutiveMovingSamples >= MIN_MOVING_SAMPLES;
     let speedKmh = movementConfirmed
       ? (sample.speedKmh != null && sample.speedKmh <= MAX_SPEED_KMH
@@ -288,6 +302,7 @@ export class GpsTracker {
     this.subscription = null;
     this.previous = null;
     this.consecutiveMovingSamples = 0;
+    this.vehicleSpeedHintKmh = null;
 
     if (options.resetTrip) {
       this.state = {
