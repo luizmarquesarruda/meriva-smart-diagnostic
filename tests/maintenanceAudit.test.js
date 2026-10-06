@@ -23,3 +23,9 @@ const history = [
 assert.strictEqual(history.filter((r) => r.itemId === 'oleo_motor').length, 3);
 assert.strictEqual(history.filter((r) => r.itemId === 'filtro_oleo').length, 1);
 console.log('maintenance audit reference: 6 testes PASSARAM');
+
+// O hodômetro do painel é autoritativo. GPS só pode ser métrica monitorada.
+const serviceSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'maintenance', 'maintenanceService.ts'), 'utf8');
+assert.ok(serviceSource.includes('monitoredDistanceKm'), 'estado deve separar distância monitorada do hodômetro');
+assert.ok(!serviceSource.includes('state.vehicleOdometerKm = Number((state.vehicleOdometerKm + delta)'), 'GPS não pode incrementar o hodômetro');
+console.log('odometer authority: 2 testes PASSARAM');
