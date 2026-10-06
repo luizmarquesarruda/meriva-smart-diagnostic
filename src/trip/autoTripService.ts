@@ -17,6 +17,7 @@ export interface AutoTripServiceState {
   error: string | null;
   averageConsumptionKml: number;
   estimatedRangeKm: number;
+  fuelLevelPercent: number | null;
 }
 
 type Listener = (state: AutoTripServiceState) => void;
@@ -32,6 +33,7 @@ const INITIAL_STATE: AutoTripServiceState = {
   error: null,
   averageConsumptionKml: 0,
   estimatedRangeKm: 0,
+  fuelLevelPercent: null,
 };
 
 class AutoTripService {
@@ -73,6 +75,7 @@ class AutoTripService {
       ...this.state,
       averageConsumptionKml: persisted.autonomy.averageConsumptionKml,
       estimatedRangeKm: persisted.autonomy.estimatedRangeKm,
+      fuelLevelPercent: persisted.autonomy.fuelLevelPercent,
     };
     this.emit();
     this.running = true;
@@ -110,6 +113,7 @@ class AutoTripService {
     }
 
     const fuelSupported = connection.supportedPids.includes('015E');
+    const fuelLevelSupported = connection.supportedPids.includes('012F');
     const obdSpeedSupported = connection.supportedPids.includes('010D');
     const initialDistanceKm = gpsTracker.getState().distanceKm;
     this.recorder = new RealTripRecorder(Date.now(), initialDistanceKm);
@@ -124,6 +128,7 @@ class AutoTripService {
       error: null,
       averageConsumptionKml: persistedAutonomy.averageConsumptionKml,
       estimatedRangeKm: persistedAutonomy.estimatedRangeKm,
+      fuelLevelPercent: persistedAutonomy.fuelLevelPercent,
     };
     this.emit();
 
@@ -149,8 +154,23 @@ class AutoTripService {
 
       try {
         let fuelRateLph: number | null = null;
+        let fuelLevelPercent: number | null = null;
         let obdSpeedKmh: number | null = null;
         if (obdSpeedSupported) gpsTracker.setVehicleSpeedHintKmh(null);
+
+        if (fuelLevelSupported) {
+          const levelResult = await connection.session.queryPid('012F');
+          if (
+            levelResult.parsed.status === 'RESPONDEU' &&
+            levelResult.parsed.unit === '%' &&
+            levelResult.parsed.value != null &&
+            Number.isFinite(levelResult.parsed.value) &&
+            levelResult.parsed.value >= 0 &&
+            levelResult.parsed.value <= 100
+          ) {
+            fuelLevelPercent = levelResult.parsed.value;
+          }
+        }
 
         if (this.state.fuelSupported) {
           const fuelResult = await connection.session.queryPid('015E');
@@ -210,6 +230,7 @@ class AutoTripService {
                 ? state.distanceKm / state.fuelUsedL
                 : null,
             instantaneousConsumptionKml,
+            fuelLevelPercent,
             error: fuelRateLph == null && state.validFuelSamples === 0
               ? 'GPS ATIVO / ECU SEM PID 015E VÁLIDO'
               : null,
@@ -254,9 +275,20 @@ class AutoTripService {
     updateAutoSaveState((state) => {
       state.driveCycles = storedCycles;
 
-      // Autonomia é acumulada somente com viagens reais concluídas.
-      // Não usamos diretamente o sensor físico. A autonomia é estimada pelo
-      // consumo médio real acumulado e pela capacidade nominal de 56 L.
+      // Autonomia usa o PID 012F quando a ECU entrega uma leitura válida.
+      // O consumo médio real continua sendo a base em km/L; o nível da boia
+      // define quantos litros ainda estão disponíveis. Pequenas oscilações da
+      // leitura não devem alterar a autonomia de forma brusca.
+      const currentLevel = Number(this.state.fuelLevelPercent);
+      if (Number.isFinite(currentLevel) && currentLevel >= 0 && currentLevel <= 100) {
+        const fuelRemainingL = Number((state.autonomy.tankCapacityL * currentLevel / 100).toFixed(2));
+        const average = Number(state.autonomy.averageConsumptionKml) || 0;
+        state.autonomy.fuelLevelPercent = currentLevel;
+        state.autonomy.estimatedFuelRemainingL = fuelRemainingL;
+        state.autonomy.fuelLevelSource = 'PID_012F';
+        state.autonomy.estimatedRangeKm = Number((average > 0 ? average * fuelRemainingL : 0).toFixed(1));
+      }
+
       const existingReading = state.autonomy.readings.find((item) => item.id === cycle.id);
       if (!existingReading) {
         const previousDistance = Number(state.autonomy.cumulativeDistanceKm) || 0;
