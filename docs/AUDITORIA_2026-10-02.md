@@ -79,6 +79,6 @@ A nova rodada deve passar por:
 2. `npm run typecheck`;
 3. `npm test`;
 4. `npx expo prebuild --clean --platform android --non-interactive`;
-5. `./gradlew :app:assembleDebug --no-daemon --stacktrace`.
+5. `./gradlew :app:assembleRelease --no-daemon --stacktrace`.
 
 A confirmação do Bluetooth Classic, GPS e ECU continua sendo feita em aparelho físico.
