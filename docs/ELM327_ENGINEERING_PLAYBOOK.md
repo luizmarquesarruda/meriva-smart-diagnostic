@@ -35,9 +35,13 @@ histórico / aprendizado / diagnóstico
 ~~~
 
 ## O achado mais importante
-A implementação atual usa connectionType `delimited`, delimiter `\r` e charset `ascii`. O transporte acumula os eventos recebidos e `readUntilPrompt()` procura o prompt `>` antes de concluir a resposta. O termo RAW na documentação significa preservar TX/RX recebidos, não significa que o socket esteja configurado como `raw`.
+A implementação usa `connectionType: delimited`, `charset: ascii` e **delimiter vazio**. A biblioteca documenta que um delimiter vazio entrega todo o conteúdo atualmente recebido sem segmentá-lo artificialmente. Isso combina melhor com o ELM327 porque suas respostas podem ser fragmentadas pelo RFCOMM e o enquadramento final da resposta é o prompt `>`.
 
-A documentação anterior que dizia que o transporte estava em `raw` estava desatualizada e foi corrigida nesta auditoria.
+O projeto mantém `ATL0`, portanto o ELM327 fica sem linefeed extra. O TX continua terminando em CR (`0x0D`). O termo RAW na documentação significa preservar TX/RX recebidos, não significa que o socket esteja configurado como `raw`.
+
+A biblioteca também possui um modo `binary`, mas nele o Android entrega os bytes como Base64 para a ponte React Native. Como o ELM327 deste projeto usa ASCII, optamos por `delimited` com delimiter vazio: mantém os dados legíveis e ainda permite nosso próprio framing por `>`.
+
+Esta decisão foi baseada no código/documentação da `react-native-bluetooth-classic` e no datasheet do ELM327.
 
 ## Comparação com implementações reais
 
@@ -86,9 +90,13 @@ O aplicativo trabalha com dispositivos pareados pelo Android e não depende de u
 O endereço só identifica o dispositivo. A confirmação real exige resposta do ELM.
 
 ### 3. Framing
-TX termina com CR: 010C + CR.
-RX é acumulado em fragmentos até >.
-O prompt não é descartado pelo transporte.
+TX termina com CR: `010C + CR`.
+
+RX é recebido como **stream sem delimitador**. Cada evento é anexado ao buffer local, sem assumir que um evento contém uma resposta inteira.
+
+A resposta somente fecha quando o buffer contém o prompt `>` do ELM327. Tudo antes do primeiro `>` pertence ao comando atual; qualquer cauda depois do prompt fica preservada para o próximo ciclo.
+
+Isso evita depender do particionamento do RFCOMM e evita misturar `OK`, `NO DATA` ou linhas intermediárias com o comando seguinte.
 
 ### 4. Inicialização
 Sequência base:
