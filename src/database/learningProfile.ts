@@ -138,6 +138,28 @@ export async function createLearningProfile(
   return profile;
 }
 
+export interface CarScannerSeedSample {
+  pidName: string;
+  value: number;
+  condition: VehicleCondition;
+  timestamp: string;
+}
+
+export const CARSCANNER_SEED_VERSION = 'CARSCANNER_2026-09-24';
+
+export const CARSCANNER_SEED_SAMPLES: CarScannerSeedSample[] = [
+  { pidName: 'Coolant Temperature', value: 81, condition: 'IDLE_WARM', timestamp: '2026-09-24T14:48:00.000Z' },
+  { pidName: 'STFT Bank 1', value: -8.59, condition: 'IDLE_WARM', timestamp: '2026-09-24T14:48:00.000Z' },
+  { pidName: 'LTFT Bank 1', value: 10.94, condition: 'IDLE_WARM', timestamp: '2026-09-24T14:48:00.000Z' },
+  { pidName: 'MAP', value: 39.02, condition: 'IDLE_WARM', timestamp: '2026-09-24T14:48:00.000Z' },
+  { pidName: 'Engine RPM', value: 778, condition: 'IDLE_WARM', timestamp: '2026-09-24T14:48:00.000Z' },
+  { pidName: 'Timing Advance', value: 8, condition: 'IDLE_WARM', timestamp: '2026-09-24T14:48:00.000Z' },
+  { pidName: 'Intake Air Temperature', value: 33, condition: 'IDLE_WARM', timestamp: '2026-09-24T14:48:00.000Z' },
+  { pidName: 'MAF', value: 2.48, condition: 'IDLE_WARM', timestamp: '2026-09-24T14:48:00.000Z' },
+  { pidName: 'Throttle Position', value: 3.53, condition: 'IDLE_WARM', timestamp: '2026-09-24T14:48:00.000Z' },
+  { pidName: 'O2 Sensor 1 Voltage', value: 0.53, condition: 'IDLE_WARM', timestamp: '2026-09-24T14:48:00.000Z' },
+];
+
 export async function saveLearningProfile(
   basePath: string,
   profile: MerivaLearningProfile,
