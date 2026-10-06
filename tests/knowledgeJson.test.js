@@ -30,7 +30,7 @@ for (const file of required) {
   const parsed = JSON.parse(raw);
   if (!parsed || typeof parsed !== 'object') throw new Error('JSON inválido: ' + file);
   if (typeof parsed.version !== 'number') throw new Error('JSON sem version: ' + file);
-  if (raw.includes('012F')) throw new Error('PID 012F não deve existir no banco do aplicativo: ' + file);
+  // 012F é permitido como PID experimental/observado; sua promoção depende de evidência RAW_ECU.
 }
 
 const ecu = JSON.parse(fs.readFileSync(path.join(knowledgeDir, 'ecu.json'), 'utf8'));
