@@ -41,6 +41,21 @@ export interface RealElmConnection {
 }
 
 /** A conexão só é considerada OBD real quando existe um payload 41 0C válido. */
+const ELM_PROTOCOL_NAMES: Record<string, string> = {
+  '0': 'AUTO',
+  '3': 'ISO 9141-2',
+  '4': 'ISO 14230-4 KWP 5-BAUD',
+  '5': 'ISO 14230-4 KWP FAST',
+  '6': 'ISO 15765-4 CAN 11/500',
+  '7': 'ISO 15765-4 CAN 29/500',
+  '8': 'ISO 15765-4 CAN 11/250',
+  '9': 'ISO 15765-4 CAN 29/250',
+};
+
+export function getElmProtocolName(protocolId: string): string {
+  return ELM_PROTOCOL_NAMES[protocolId] ?? 'ELM327 PROTOCOLO ' + protocolId;
+}
+
 export function isValidEcuProbe(result: ElmCommandResult): boolean {
   const stream = result.response.replace(/[^0-9A-F]/gi, '').toUpperCase();
   const marker = '410C';
@@ -151,7 +166,8 @@ export async function createRealElmSession(
     // IMPORTANTE: no ELM327, ATSP5 = ISO 14230 KWP FAST,
     // ATSP3 = ISO 9141-2 e ATSP4 = ISO 14230 KWP 5-baud.
     // ATSP6 NÃO é KWP: é CAN 11/500.
-    const protocolFallbacks = ['5', '3', '4'];
+    const protocolFallbacks = ['5', '3', '4', '6', '7', '8', '9'];
+    let successfulForcedProtocol: string | null = null;
 
     for (const protocol of protocolFallbacks) {
       if (probeIsValid) break;
@@ -161,6 +177,7 @@ export async function createRealElmSession(
 
       ecuProbe = await session.executeCommand('010C');
       probeIsValid = isValidEcuProbe(ecuProbe);
+      if (probeIsValid) successfulForcedProtocol = protocol;
     }
 
     // Bluetooth/ELM e ECU são camadas diferentes. Se a ECU não respondeu,
@@ -177,7 +194,9 @@ export async function createRealElmSession(
     // O 010C válido já é a prova de que a ECU respondeu. Uma falha do
     // comando informativo ATDP/identificação não pode transformar uma ECU
     // comprovadamente ativa em "desconectada".
-    const activeProtocol = session.getProtocol() ?? 'ISO 14230-4 KWP FAST INIT';
+    const identifiedProtocol = session.getProtocol();
+    const activeProtocol = identifiedProtocol
+      ?? (successfulForcedProtocol ? getElmProtocolName(successfulForcedProtocol) : 'AUTO');
 
     // A ECU já foi validada. Se já temos uma descoberta persistida para o
     // mesmo protocolo, reutilize-a. Não interrogue novamente os blocos 0100,
