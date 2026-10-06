@@ -9,6 +9,7 @@ import { connectPreferredElm, disconnectSharedObd } from '../src/obd/sharedConne
 import * as FileSystem from 'expo-file-system';
 import { initAutoSave, updateAutoSaveState } from '../src/meriva/autosaveManager';
 import { autoTripService } from '../src/trip/autoTripService';
+import { addDrivenDistance, readMaintenanceState, setGpsDistanceBaseline } from '../src/maintenance/maintenanceService';
 
 export default function RootLayout() {
   const checking = useRef(false);
@@ -16,6 +17,7 @@ export default function RootLayout() {
   const gpsChecking = useRef(false);
   const lastGpsFailureAt = useRef(0);
   const permissionsChecked = useRef(false);
+  const maintenanceGpsBaselineSet = useRef(false);
 
   useEffect(() => {
     const loadSettings = async () => readAppSettings(`${FileSystem.documentDirectory}MERIVA_SMART`);
@@ -107,6 +109,16 @@ export default function RootLayout() {
       }
     };
 
+    const maintenanceGpsSubscription = gpsTracker.subscribe((gps) => {
+      if (!gps.running) return;
+      if (!maintenanceGpsBaselineSet.current) {
+        maintenanceGpsBaselineSet.current = true;
+        void setGpsDistanceBaseline(basePath, gps.distanceKm);
+        return;
+      }
+      void addDrivenDistance(basePath, gps.distanceKm);
+    });
+
     void autoTripService.start(basePath);
 
     const startup = async () => {
@@ -146,6 +158,7 @@ export default function RootLayout() {
 
     return () => {
       subscription.remove();
+      maintenanceGpsSubscription();
       void gpsTracker.stop();
       void autoTripService.stop().finally(() => {
         void disconnectSharedObd();
@@ -166,6 +179,7 @@ export default function RootLayout() {
       <Stack.Screen name="laboratorio" options={{ title: 'DIAGNÓSTICO OBD' }} />
       <Stack.Screen name="armazenamento" options={{ title: 'HISTÓRICO E DADOS' }} />
       <Stack.Screen name="configuracoes" options={{ title: 'CONFIGURAÇÕES' }} />
+      <Stack.Screen name="manutencao" options={{ title: 'MANUTENÇÃO' }} />
     </Stack>
   );
 }
