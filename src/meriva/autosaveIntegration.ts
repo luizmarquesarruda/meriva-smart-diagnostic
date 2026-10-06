@@ -41,20 +41,24 @@ export async function registerObdQuery(
       const existing = await readPidConfirmations(basePath);
       const prior = existing.find((entry) => entry.pid === result.parsed.pid);
 
-      const entry: PidConfirmationEntry = {
-        pid: result.parsed.pid,
-        name: result.parsed.name,
-        classification: prior?.classification ?? 'PADRAO_OBD',
-        status: 'CONFIRMADO',
-        firstSeen: prior?.firstSeen ?? now,
-        lastSeen: now,
-        occurrences: (prior?.occurrences ?? 0) + 1,
-        protocol: prior?.protocol ?? result.protocol ?? 'N/D',
-        responseTime: result.elapsedMs,
-        source: 'REAL_OBD',
-        confidence: prior ? prior.confidence + 1 : 1,
-      };
-      await recordPidConfirmation(basePath, entry);
+      // 012F é experimental: a resposta válida é observada e aprendida,
+      // mas não entra no arquivo de PIDs confirmados automaticamente.
+      if (result.parsed.pid !== '012F') {
+        const entry: PidConfirmationEntry = {
+          pid: result.parsed.pid,
+          name: result.parsed.name,
+          classification: prior?.classification ?? 'PADRAO_OBD',
+          status: 'CONFIRMADO',
+          firstSeen: prior?.firstSeen ?? now,
+          lastSeen: now,
+          occurrences: (prior?.occurrences ?? 0) + 1,
+          protocol: prior?.protocol ?? result.protocol ?? 'N/D',
+          responseTime: result.elapsedMs,
+          source: 'REAL_OBD',
+          confidence: prior ? prior.confidence + 1 : 1,
+        };
+        await recordPidConfirmation(basePath, entry);
+      }
 
       await updateLearningProfileRealSample(
         basePath,
