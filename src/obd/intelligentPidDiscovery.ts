@@ -112,6 +112,16 @@ export async function discoverIntelligentPids(
     });
   }
 
+  for (const pid of priorityPids) {
+    const observation = observations.find((item) => item.pid === pid);
+    if (observation && observation.value !== null && supported.has(pid)) {
+      observation.status = 'CONFIRMADO';
+      observation.confidence = 1;
+      observation.reason = 'BITMAP + RESPOSTA VÁLIDA NA FASE PRIORITÁRIA';
+      confidence[pid] = 1;
+    }
+  }
+
   // Fase 3: conhecidos do projeto e PIDs apontados pelos bitmaps.
   const candidates = Array.from(new Set([
     ...confirmedCandidates,
