@@ -55,4 +55,4 @@ A auditoria priorizou comportamento real do Android/ELM327 e dados observados. N
 
 Fontes cruzadas: ELM327, SAE J1979/ISO 15031-5, react-native-bluetooth-classic e implementações abertas de OBD.
 
-Correções desta revisão: transporte documentado como `delimited` em vez de `raw`; fallback de protocolo alinhado ao código; relato do protocolo corrigido após fallback; Expo alinhado ao patch 51.0.39; Java 17 mantido como referência de CI; banco de PIDs confirmado separado de candidatos; unidade de MAP/MAF normalizada; camada de PID de nível de combustível removida novamente do runtime; testes e documentação sincronizados.
+Correções desta revisão: transporte documentado como `delimited` em vez de `raw`; fallback de protocolo alinhado ao código; relato do protocolo corrigido após fallback; Expo alinhado ao patch 51.0.39; Java 17 mantido como referência de CI; banco de PIDs confirmado separado de candidatos; unidade de MAP/MAF normalizada; PID 012F mantido no runtime como fonte absoluta de nível de combustível/autonomia; testes e documentação sincronizados.
