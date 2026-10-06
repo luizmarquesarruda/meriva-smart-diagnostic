@@ -44,6 +44,7 @@ export interface AutonomyState {
   estimatedRangeKm: number;
   fuelLevelPercent: number | null;
   fuelRemainingL: number | null;
+  fuelReserve: boolean | null;
   realReadingCount: number;
   lastReadingAt: string | null;
   readings: AutonomyReading[];
@@ -79,6 +80,7 @@ export function createEmptyMerivaState(): MerivaPersistedState {
       estimatedRangeKm: 0,
       fuelLevelPercent: null,
       fuelRemainingL: null,
+      fuelReserve: null,
       realReadingCount: 0,
       lastReadingAt: null,
       readings: [],
