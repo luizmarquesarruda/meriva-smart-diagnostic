@@ -35,7 +35,7 @@ jobs:
           java -version
           javac -version
           test -n "$JAVA_HOME"
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - run: npm run doctor
       - run: npm run validate
 
@@ -55,7 +55,7 @@ jobs:
           java-version: '17'
           java-package: 'jdk'
           architecture: 'x64'
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - run: npx expo prebuild --clean --platform android --non-interactive
       - name: Assemble Android release APK (standalone)
         working-directory: android
