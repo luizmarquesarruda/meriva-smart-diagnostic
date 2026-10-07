@@ -118,26 +118,17 @@ export async function connectPreferredElm(
   const config = mergeCompatibilityConfig(compatibility ?? DEFAULT_ELM327_COMPATIBILITY);
 
   connecting = (async () => {
-    let lastError: unknown = null;
-    let attempts = 0;
-
-    while (!active) {
-      attempts += 1;
-      try {
-        return await connectPreferredElmOnce(config);
-      } catch (cause) {
-        lastError = cause;
-        setConnectionError(cause);
-        if (config.maxConnectionAttempts > 0 && attempts >= config.maxConnectionAttempts) {
-          throw cause;
-        }
-        // Reconexão agressiva: clones ELM327 costumam liberar o RFCOMM
-        // somente depois de uma pequena janela após uma tentativa falha.
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-      }
+    // O fluxo de tentativa já é controlado por bluetooth_config.json:
+    // cada candidato recebe até 20 tentativas, com 8 s entre elas, e para
+    // imediatamente no primeiro sucesso. Não repetir uma nova rodada inteira
+    // após esgotar os candidatos evita um ciclo de conexão potencialmente
+    // infinito quando nenhum adaptador responde.
+    try {
+      return await connectPreferredElmOnce(config);
+    } catch (cause) {
+      setConnectionError(cause);
+      throw cause;
     }
-
-    throw lastError instanceof Error ? lastError : new Error('ELM327 NÃO CONECTADO');
   })();
 
   try {
