@@ -7,25 +7,6 @@ import { discoverIntelligentPids } from './intelligentPidDiscovery';
 import type { PidDiscoveryCache } from '../meriva/autosaveState';
 import bluetoothConfig from '../knowledge/bluetooth_config.json';
 
-export type BluetoothConnectionStatus =
-  | 'BLUETOOTH INDISPONÍVEL'
-  | 'BLUETOOTH DESLIGADO'
-  | 'BLUETOOTH CONECTANDO'
-  | 'BLUETOOTH CONECTADO'
-  | 'ELM RESPONDENDO'
-  | 'ELM NÃO RESPONDE'
-  | 'ECU RESPONDENDO'
-  | 'ECU NÃO RESPONDE'
-  | 'PROTOCOLO IDENTIFICADO'
-  | 'PROTOCOLO NÃO IDENTIFICADO'
-  | 'ERRO';
-
-export interface BluetoothConnectionState {
-  status: BluetoothConnectionStatus;
-  device?: BluetoothDeviceInfo;
-  error?: string;
-}
-
 let lastBluetoothDiagnosticText = '';
 
 function logBluetoothDiagnostic(event: string, details?: unknown): void {
