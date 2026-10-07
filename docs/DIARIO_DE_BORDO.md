@@ -330,3 +330,28 @@ A implementação está integrada ao `main` e validada por CI. O próximo teste 
 2. validação real da ECU por `41 0C`;
 3. persistência de adaptador/protocolo/validação ECU;
 4. crescimento do TXT único até 200 snapshots e rotação do mais antigo.
+
+
+## 2026-10-07 — Auditoria e centralização das permissões Android
+
+### Análise
+O aplicativo já declarava Bluetooth Classic e localização no `app.json`, e o módulo Bluetooth solicitava `BLUETOOTH_CONNECT/SCAN` no Android 12+. O GPS já solicitava localização em primeiro plano por `expo-location`. Porém, a inicialização fazia essas verificações em fluxos separados, e não havia um único ponto de auditoria das permissões necessárias.
+
+Também foi verificado o armazenamento: o aplicativo usa o diretório privado do app para autosaves e, para exportação escolhida pelo usuário, o Storage Access Framework. Portanto, **não é correto pedir READ/WRITE_EXTERNAL_STORAGE indiscriminadamente**, principalmente nos Androids modernos. Essas permissões não são necessárias para o armazenamento interno nem para o seletor de arquivos do sistema.
+
+### Correção
+- Criado `src/permissions/permissionManager.ts`.
+- A inicialização agora solicita em sequência as permissões realmente necessárias:
+  - Bluetooth/Dispositivos próximos;
+  - localização/GPS em primeiro plano.
+- O módulo retorna estado `GRANTED`, `DENIED`, `BLOCKED` ou `UNAVAILABLE`.
+- O armazenamento é explicitamente classificado como `APP_PRIVATE`, sem pedir uma permissão de armazenamento obsoleta/desnecessária.
+- Mantidas as declarações Android existentes para Bluetooth e localização.
+- Adicionado teste de regressão em `tests/permissions.test.js`.
+- O teste foi incorporado ao comando `npm test`.
+
+### Decisão de segurança
+Não foi implementado um pedido indiscriminado de “todas as permissões”. O aplicativo deve pedir somente permissões compatíveis com funcionalidades reais. Pedir câmera, microfone, contatos, telefone, SMS, notificações ou armazenamento amplo sem uso correspondente aumentaria o acesso concedido ao aplicativo sem benefício técnico.
+
+### Próximo passo
+Executar CI e gerar novo APK Android. No primeiro lançamento, o usuário deverá conceder Bluetooth e localização quando solicitados. Se uma permissão estiver bloqueada com “não perguntar novamente”, o app deve direcionar o usuário para as configurações do aplicativo.
