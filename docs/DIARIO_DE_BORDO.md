@@ -434,3 +434,26 @@ O teste foi incluído no `npm test`.
 
 ### Próximo passo
 Integrar o motor à tela de diagnóstico e ao relatório TXT, depois ampliar as regras usando o histórico real da Meriva e testes confirmatórios.
+
+## 2026-10-07 — Integração da primeira camada de diagnóstico local
+
+### Objetivo
+Conectar o motor de evidências local à tela de diagnóstico e ao relatório TXT, mantendo a separação entre dados reais e simulação.
+
+### Alterações
+- CI temporariamente limitada a execução manual durante esta etapa, para impedir execuções automáticas a cada commit.
+- LastPidReading passou a registrar a origem REAL ou SIMULACAO.
+- O registro OBD passa a preservar essa origem no autosave.
+- A tela DIAGNÓSTICO OBD agora exibe hipóteses locais, score, confiança, evidências e próximos testes.
+- O relatório TXT agora inclui a seção DIAGNÓSTICO LOCAL / MOTOR DE EVIDÊNCIAS.
+- O relatório usa o mesmo estado persistido pelo aplicativo para gerar o diagnóstico.
+- tsconfig.json passou a permitir o carregamento tipado do catálogo JSON de regras.
+
+### Regra de segurança
+Dados de simulação continuam sem aumentar a confiança diagnóstica. A origem agora fica preservada também no último conjunto de leituras, evitando que uma simulação seja confundida com leitura real.
+
+### CI
+A CI **não foi iniciada**. O gatilho automático de push permanece temporariamente desativado durante a integração. A restauração do gatilho automático será feita somente conforme a autorização do usuário, pois restaurá-lo por commit pode disparar uma execução automaticamente.
+
+### Próximo passo
+Executar a validação autorizada pelo usuário, corrigir eventuais falhas encontradas e então decidir a restauração do gatilho automático.
