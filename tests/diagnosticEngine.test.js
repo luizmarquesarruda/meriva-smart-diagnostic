@@ -87,6 +87,13 @@ function main() {
   assert.strictEqual(result.hypotheses.length, 0);
   assert.strictEqual(result.blockedSimulationSamples, 1);
 
+  result = engine.runLocalDiagnostic({
+    ...base,
+    observations: [obs('010B', 80, 'CARSCANNER_BASELINE')],
+  });
+  assert.strictEqual(result.hypotheses.length, 0, 'baseline CarScanner não pode virar diagnóstico de ECU atual');
+
+
   result = engine.runLocalDiagnostic({ ...base, observations: [obs('010B', 80, 'simulacao'), obs('0106', 20, 'REAL_OBD'), obs('0107', 0, 'REAL_OBD')] });
   assert.strictEqual(result.hypotheses.length, 1);
   assert.strictEqual(result.hypotheses[0].id, 'MISTURA_POBRE');
