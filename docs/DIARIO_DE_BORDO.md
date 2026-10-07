@@ -493,3 +493,34 @@ Auditoria estática também revisou o motor diagnóstico, regras JSON, laborató
 Figma: arquivo `MERIVA SMART — Telas Secundárias` criado, file key `xCTeaUHVEG0oc7tq3sp08A`. A edição das telas foi bloqueada pelo limite de chamadas do Figma MCP Starter nesta sessão; não foi declarada como concluída.
 
 A próxima CI está autorizada pelo usuário.
+
+## 2026-10-07 — Correção do CI e unificação visual das telas secundárias
+
+### Falha encontrada
+A CI #726 falhou no teste `tests/diagnosticEngine.test.js`. TypeScript e as demais 17 regressões passaram. A falha final foi `1 !== 0` no caso em que uma observação SIMULACAO não deveria gerar hipótese.
+
+### Correção
+- O motor `src/diagnostics/diagnosticEngine.ts` agora normaliza a origem da observação e filtra SIMULACAO antes de qualquer regra.
+- O contador `blockedSimulationSamples` continua preservando quantas amostras simuladas foram bloqueadas.
+- Foi adicionado teste com `simulacao` em minúsculas junto com dados reais, garantindo que a simulação não contamine a hipótese real.
+
+Commits:
+- `0ef1f5514a0e9045440d4dd610277800a8b7d35b` — `fix: harden simulation isolation in diagnostic engine`
+- `8b3e84576011b44d4cd49bbf5a6a8c8fc1756021` — `test: cover case-insensitive simulation isolation`
+
+### Melhoria visual sem Figma
+Como a edição pelo Figma MCP ficou indisponível nesta sessão, a melhoria visual das telas secundárias foi aplicada diretamente no aplicativo:
+- `app/configuracoes.tsx`
+- `app/armazenamento.tsx`
+
+As duas telas agora seguem a mesma linguagem visual do painel principal MERIVA SMART: fundo escuro, cartões de alto contraste, azul técnico para ações e títulos, bordas discretas e melhor continuidade visual entre as rotas.
+
+Commits:
+- `92b089df17e14e58c4cb22346c04baac51b43b5d`
+- `6aa454820adb33ecb16e005141f665c66c06794d`
+
+### CI
+O usuário autorizou explicitamente executar a CI após a correção. O commit de documentação abaixo é o último da sequência e deve ser usado para validar o estado final.
+
+### Próximo passo
+Aguardar a CI do estado final. Se falhar, analisar o log antes de qualquer nova alteração. Se passar, instalar o APK e revisar as telas no telefone.
