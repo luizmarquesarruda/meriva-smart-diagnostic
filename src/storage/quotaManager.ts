@@ -1,4 +1,5 @@
 import * as FileSystem from 'expo-file-system';
+import { cleanupOldLogs, cleanupOldReadings } from './cleanup';
 
 export interface StorageQuotaConfig {
   limitMb: number;
@@ -50,8 +51,22 @@ export async function checkStorageQuota(
   basePath: string,
   config: StorageQuotaConfig,
 ): Promise<{ warning: boolean; critical: boolean; message: string }> {
-  const { usedMb, limitMb } = await getStorageUsage(basePath, config.limitMb);
-  const percentUsed = usedMb / limitMb;
+  let { usedMb, limitMb } = await getStorageUsage(basePath, config.limitMb);
+  let percentUsed = usedMb / limitMb;
+
+  // autoCleanupEnabled era declarado pela configuração, mas não tinha efeito.
+  // A limpeza automática usa somente LOGS/LEITURAS antigos, exatamente os dados
+  // que a tela de armazenamento já considera descartáveis.
+  if (percentUsed >= 1 && config.autoCleanupEnabled && config.cleanupTargetMb > 0 && config.cleanupTargetMb < limitMb) {
+    try {
+      await cleanupOldLogs(basePath);
+      await cleanupOldReadings(basePath);
+      ({ usedMb, limitMb } = await getStorageUsage(basePath, config.limitMb));
+      percentUsed = usedMb / limitMb;
+    } catch {
+      // Falha de limpeza não pode esconder o estado crítico de armazenamento.
+    }
+  }
 
   if (percentUsed >= 1) {
     return { warning: false, critical: true, message: `LIMITE ATINGIDO: ${usedMb}MB / ${limitMb}MB` };
