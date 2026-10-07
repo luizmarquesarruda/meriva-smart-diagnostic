@@ -43,5 +43,5 @@ export const PID_DATABASE: Record<string, PidDefinition> = Object.fromEntries(
 );
 
 export function getPidDefinition(pid: string): PidDefinition | null {
-  return PID_DATABASE[pid.replace(/\\s/g, '').toUpperCase()] ?? null;
+  return PID_DATABASE[pid.replace(/\s/g, '').toUpperCase()] ?? null;
 }
