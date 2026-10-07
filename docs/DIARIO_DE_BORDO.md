@@ -299,8 +299,14 @@ A exportação TXT existente criava um arquivo novo a cada ação manual. O auto
 - Persistência e restauração dos dados Bluetooth/ECU.
 - Regressão estática para impedir perda da persistência após conexão validada.
 
+### Primeira validação da CI
+A CI #876 (run `37697048651`) executou `npm ci` e Expo Doctor com sucesso (`17/17`), mas o `npm run validate` falhou somente no novo teste 13. A implementação do histórico manteve os 200 snapshots; a asserção do teste procurava `NÚMERO: 5` como substring e também casava com `50`, `51` etc. O erro foi do teste, não da lógica de rotação.
+
+### Correção da validação
+A asserção foi alterada para procurar o marcador exato `NÚMERO: 5` seguido de quebra de linha. Nenhuma lógica de produção foi alterada por causa desta falha.
+
 ### Estado da validação
-Os testes foram adicionados nesta branch, mas a CI ainda precisa executar a validação completa e o Android build. **Não considerar esta alteração concluída até a CI terminar verde.**
+A CI precisa ser executada novamente após esta correção. **Não considerar esta alteração concluída até a CI terminar verde.**
 
 ### Próximo passo
 Executar CI completa. Se houver falha, registrar a causa neste diário antes de qualquer nova correção.
