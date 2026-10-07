@@ -15,13 +15,13 @@ export default function BluetoothScreen() {
   const [status, setStatus] = useState('VERIFICANDO BLUETOOTH');
   const [error, setError] = useState('');
   const [connectedName, setConnectedName] = useState<string | null>(null);
-  const [protocol, setProtocol] = useState<string | null>(null);
+  const [ecuConnected, setEcuConnected] = useState(false);
 
   useEffect(() => {
     const unsubscribe = subscribeSharedObd((connection) => {
       setConnectedName(connection?.device.name ?? null);
-      setProtocol(connection?.protocol ?? null);
-      if (connection) setStatus('ELM327 VALIDADO');
+      setEcuConnected(Boolean(connection?.ecuValidated));
+      if (connection) setStatus('ECU CONECTADA');
     });
     return unsubscribe;
   }, []);
@@ -59,7 +59,7 @@ export default function BluetoothScreen() {
       const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
       const settings = await readAppSettings(basePath);
       await writeAppSettings(basePath, { ...settings, selectedAdapterAddress: device.address });
-      setStatus(connection.protocol ? 'ELM327 CONECTADO E VALIDADO' : 'ELM327 RESPONDEU');
+      setStatus(connection.ecuValidated ? 'ECU CONECTADA' : 'AGUARDANDO ECU');
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'FALHA AO CONECTAR AO ELM327';
       setError(message);
@@ -75,7 +75,6 @@ export default function BluetoothScreen() {
       await disconnectSharedObd();
       setStatus('DESCONECTADO');
       setConnectedName(null);
-      setProtocol(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'FALHA AO DESCONECTAR');
     }
@@ -90,10 +89,13 @@ export default function BluetoothScreen() {
         </View>
 
         <View style={styles.connectionCard}>
-          <Text style={styles.label}>STATUS</Text>
+          <Text style={styles.label}>BLUETOOTH</Text>
           <Text style={connectedName ? styles.online : styles.waiting}>{connectedName ? '🟢 CONECTADO' : '🟡 AGUARDANDO'}</Text>
           <Text style={styles.detail}>{connectedName ?? status}</Text>
-          {protocol ? <Text style={styles.detail}>PROTOCOLO: {protocol}</Text> : null}
+        </View>
+        <View style={styles.connectionCard}>
+          <Text style={styles.label}>ECU</Text>
+          <Text style={ecuConnected ? styles.online : styles.waiting}>{ecuConnected ? '🟢 CONECTADA' : connectedName ? '🟡 CONECTANDO' : '⚪ AGUARDANDO'}</Text>
         </View>
 
         <TouchableOpacity style={styles.primary} onPress={() => void loadPaired()} disabled={loading || connecting}>
@@ -128,12 +130,9 @@ export default function BluetoothScreen() {
 
         <View style={styles.ruleCard}>
           <Text style={styles.ruleTitle}>COMO O APP CONSIDERA CONECTADO</Text>
-          <Text style={styles.rule}>1. Bluetooth do Android autorizado.</Text>
-          <Text style={styles.rule}>2. ELM327 pareado localizado.</Text>
-          <Text style={styles.rule}>3. Bluetooth Classic / SPP aberto.</Text>
-          <Text style={styles.rule}>4. ELM327 responde aos comandos de inicialização.</Text>
-          <Text style={styles.rule}>5. ECU responde ao teste OBD.</Text>
-          <Text style={styles.rule}>Somente depois disso: 🟢 CONECTADO.</Text>
+          <Text style={styles.rule}>1. Bluetooth conecta → 🟢</Text>
+          <Text style={styles.rule}>2. ECU responde → 🟢</Text>
+          <Text style={styles.rule}>O app só considera o carro conectado quando a ECU responde.</Text>
         </View>
 
         <View style={styles.bottomNav}>
