@@ -47,7 +47,7 @@ function diagnosticReportLines(result: DiagnosticResult): string[] {
     lines.push(`HIPÓTESE: ${hypothesis.label}`);
     lines.push(`CONFIANÇA: ${hypothesis.confidence} | SCORE: ${hypothesis.score}`);
     for (const evidence of hypothesis.evidence) {
-      lines.push(`  EVIDÊNCIA: ${evidence}`);
+      lines.push(`  EVIDÊNCIA: ${evidence.text}`);
     }
     for (const nextTest of hypothesis.nextTests) {
       lines.push(`  PRÓXIMO TESTE: ${nextTest}`);
