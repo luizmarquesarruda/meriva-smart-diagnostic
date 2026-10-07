@@ -58,7 +58,7 @@ function main() {
 
   result = engine.runLocalDiagnostic({
     ...base,
-    observations: [obs('0106', 10), obs('0107', 8)],
+    observations: [obs('0106', 10), obs('0107', 4)],
   });
   assert.strictEqual(result.hypotheses.length, 0);
 
