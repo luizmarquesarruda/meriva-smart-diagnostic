@@ -54,6 +54,14 @@ export interface RealElmConnection {
   pidDiscoverySource: 'CACHE' | 'ECU';
 }
 
+export interface RealElmSessionCallbacks {
+  onBluetoothConnected?: () => void;
+  onElmResponding?: () => void;
+  onElmInitialized?: () => void;
+  onEcuResponding?: () => void;
+  onDisconnected?: (reason: string) => void;
+}
+
 /** A conexão só é considerada OBD real quando existe um payload 41 0C válido. */
 const ELM_PROTOCOL_NAMES: Record<string, string> = {
   '0': 'AUTO',
@@ -138,8 +146,13 @@ export async function ensureBluetoothReady(): Promise<boolean> {
     throw new Error('ESTE ANDROID NÃO POSSUI BLUETOOTH COMPATÍVEL');
   }
 
-  const enabled = await bluetoothClassic.isBluetoothEnabled();
+  let enabled = await bluetoothClassic.isBluetoothEnabled();
   logBluetoothDiagnostic('BLUETOOTH_ENABLED', enabled);
+  if (!enabled) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    enabled = await bluetoothClassic.isBluetoothEnabled();
+    logBluetoothDiagnostic('BLUETOOTH_ENABLED_RECHECK', enabled);
+  }
   if (enabled) return true;
 
   const requestBluetoothEnabled = bluetoothClassic.requestBluetoothEnabled;
@@ -190,7 +203,7 @@ export async function createRealElmSession(
   device: BluetoothDeviceInfo,
   compatibility?: Partial<Elm327CompatibilityConfig>,
   pidDiscoveryCache?: PidDiscoveryCache | null,
-  onBluetoothConnected?: () => void,
+  callbacks?: RealElmSessionCallbacks,
 ): Promise<RealElmConnection> {
   let lastCause: unknown = null;
 
@@ -210,7 +223,7 @@ export async function createRealElmSession(
         pidDiscoveryCache,
         attempt,
         MAX_BLUETOOTH_ATTEMPTS,
-        onBluetoothConnected,
+        callbacks,
       );
 
       logBluetoothDiagnostic('BLUETOOTH_ATTEMPT_RESULT', {
@@ -268,7 +281,7 @@ async function createRealElmSessionAttempt(
   pidDiscoveryCache: PidDiscoveryCache | null | undefined,
   attempt: number,
   maxAttempts: number,
-  onBluetoothConnected?: () => void,
+  callbacks?: RealElmSessionCallbacks,
 ): Promise<RealElmConnection> {
   logBluetoothDiagnostic('ELM_SESSION_START', {
     name: device.name,
@@ -280,15 +293,19 @@ async function createRealElmSessionAttempt(
   // chamador (sharedConnection). Cada retry deve começar diretamente na sessão
   // RFCOMM/ELM, sem reabrir permissões ou reiniciar a preparação Bluetooth.
   const config = mergeCompatibilityConfig(compatibility ?? DEFAULT_ELM327_COMPATIBILITY);
-  const session = new Elm327Session(new BluetoothClassicTransport(device.address, config), config);
+  const session = new Elm327Session(
+    new BluetoothClassicTransport(device.address, config, callbacks?.onDisconnected),
+    config,
+  );
 
   try {
     logBluetoothDiagnostic('ELM_INITIALIZATION_START', { attempt, maxAttempts });
     const initialization = await session.initialize();
-    onBluetoothConnected?.();
-    logBluetoothDiagnostic('BLUETOOTH_LINK_CONNECTED', { attempt });
+    callbacks?.onElmInitialized?.();
+    logBluetoothDiagnostic('ELM_INITIALIZED', { attempt });
     logBluetoothDiagnostic('ELM_INITIALIZATION_RESULT', initialization.map((item) => ({ command: item.command, status: item.status, response: item.response })));
 
+    callbacks?.onElmResponding?.();
     logBluetoothDiagnostic('ECU_PROBE_START', { command: '010C', attempt, maxAttempts });
     let ecuProbe = await session.executeCommand('010C');
     logBluetoothDiagnostic('ECU_PROBE_RESULT', { status: ecuProbe.status, response: ecuProbe.response, attempt });
@@ -309,6 +326,7 @@ async function createRealElmSessionAttempt(
     if (!probeIsValid) {
       throw new Error(`ECU NÃO RESPONDEU AO 010C: ${ecuProbe.status} | RX=${ecuProbe.response || 'N/D'}`);
     }
+    callbacks?.onEcuResponding?.();
 
     await session.identifyProtocol();
     const identifiedProtocol = session.getProtocol();
