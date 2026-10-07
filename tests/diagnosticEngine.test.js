@@ -3,31 +3,37 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
-const Module = require('module');
 const ts = require('typescript');
 
 const ROOT = path.resolve(__dirname, '..');
+const DIAGNOSTIC_RULES_PATH = path.join(ROOT, 'src/knowledge/diagnostic_rules.json');
 
 function loadTs(tsPath) {
   const source = fs.readFileSync(tsPath, 'utf8');
   const output = ts.transpileModule(source, {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2019, esModuleInterop: true, resolveJsonModule: true },
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2019,
+      esModuleInterop: true,
+      resolveJsonModule: true,
+    },
   }).outputText;
-  const mod = new Module(tsPath, null);
-  mod.filename = tsPath;
-  mod.paths = Module._nodeModulePaths(path.dirname(tsPath));
-  const original = Module._load;
-  Module._load = function (request, parent, isMain) {
-    if (request.endsWith('diagnostic_rules.json')) {
-      return require(path.join(ROOT, 'src/knowledge/diagnostic_rules.json'));
-    }
-    return original.apply(this, arguments);
+
+  const mod = {
+    exports: {},
+    filename: tsPath,
+    paths: require('module')._nodeModulePaths(path.dirname(tsPath)),
   };
-  try {
-    mod._compile(output, tsPath);
-  } finally {
-    Module._load = original;
-  }
+
+  const localRequire = (request) => {
+    if (request.endsWith('diagnostic_rules.json')) {
+      return require(DIAGNOSTIC_RULES_PATH);
+    }
+    return require(require.resolve(request, { paths: [path.dirname(tsPath)] }));
+  };
+
+  const compiledModule = new Function('exports', 'require', 'module', '__filename', '__dirname', output);
+  compiledModule(mod.exports, localRequire, mod, tsPath, path.dirname(tsPath));
   return mod.exports;
 }
 
@@ -36,6 +42,10 @@ function obs(pid, value, source = 'REAL_OBD') {
 }
 
 function main() {
+  assert.ok(fs.existsSync(DIAGNOSTIC_RULES_PATH), 'diagnostic_rules.json deve existir');
+  const rules = require(DIAGNOSTIC_RULES_PATH);
+  assert.ok(Array.isArray(rules.rules), 'diagnostic_rules.json deve conter rules');
+
   const engine = loadTs(path.join(ROOT, 'src/diagnostics/diagnosticEngine.ts'));
   const base = { observations: [], dtcs: [], condition: 'IDLE_WARM' };
 
