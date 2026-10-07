@@ -388,3 +388,12 @@ Executar a CI do estado final e repetir o teste físico. O trace esperado não d
 ## 2026-10-06 - Decisão de identidade visual: MERIVA SMART
 
 Nome visível do aplicativo aprovado e padronizado como **MERIVA SMART**. O nome anterior, **MERIVA SMART DIAGNOSTIC**, era longo para o cabeçalho das telas móveis. Os termos técnicos **DIAGNÓSTICO**, **OBD** e **GPS** continuam identificando as funções do aplicativo. Slug, pacote Android e identificadores internos permanecem inalterados.
+
+
+## 2026-10-07 — Continuidade do fluxo Bluetooth
+
+- **Diagnóstico:** o fluxo `sharedConnection` podia iniciar uma nova rodada completa de descoberta após esgotar todos os candidatos. Como `maxConnectionAttempts` tinha valor padrão 0, isso podia resultar em reconexão indefinida.
+- **Correção:** removida a repetição externa. O controle de tentativas permanece concentrado no fluxo do ELM327: até **20 tentativas por candidato**, intervalo de **8 segundos** e parada imediata no primeiro sucesso.
+- **Correção adicional:** o log de timeout do transporte agora captura `bufferedLength` antes de limpar o buffer, evitando registrar sempre zero.
+- **Teste:** adicionada regressão estática para impedir o retorno do laço infinito em `sharedConnection`.
+- **Regra preservada:** ELM327 Mini é tratado como adaptador genérico; a conexão só vira OBD válido após resposta real `010C` com `41 0C`.
