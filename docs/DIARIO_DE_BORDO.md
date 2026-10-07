@@ -397,3 +397,40 @@ Nome visível do aplicativo aprovado e padronizado como **MERIVA SMART**. O nome
 - **Correção adicional:** o log de timeout do transporte agora captura `bufferedLength` antes de limpar o buffer, evitando registrar sempre zero.
 - **Teste:** adicionada regressão estática para impedir o retorno do laço infinito em `sharedConnection`.
 - **Regra preservada:** ELM327 Mini é tratado como adaptador genérico; a conexão só vira OBD válido após resposta real `010C` com `41 0C`.
+
+
+## 2026-10-07 - Primeira camada do motor de raciocínio diagnóstico local
+
+### Objetivo
+Transformar a base de PIDs, DTCs e aprendizado em um motor local de hipóteses rastreáveis, sem depender de ChatGPT/OpenAI para funcionar.
+
+### Correção
+Criados:
+- `src/knowledge/diagnostic_rules.json`: catálogo versionado de regras e próximos testes.
+- `src/diagnostics/diagnosticEngine.ts`: motor de evidências local.
+- `tests/diagnosticEngine.test.js`: regressões do motor.
+
+O motor:
+- aceita observações OBD e DTCs;
+- separa dados reais de SIMULAÇÃO;
+- gera hipóteses com score e confiança;
+- registra as evidências que produziram cada hipótese;
+- sugere próximos testes;
+- não trata DTC ou PID isolado como prova de componente defeituoso;
+- mantém CarScanner como referência e não como leitura atual.
+
+Primeiras regras:
+- P0301 -> hipótese de falha de combustão no cilindro 1;
+- P0123 -> hipótese de sinal alto de posição da borboleta;
+- STFT + LTFT >= 15% -> hipótese de mistura pobre;
+- STFT + LTFT <= -15% -> hipótese de mistura rica;
+- MAP >= 45 kPa em IDLE_WARM -> hipótese de vácuo possivelmente anormal.
+
+### Validação
+O teste foi incluído no `npm test`.
+
+### CI
+**Não iniciada.** Conforme regra de trabalho definida pelo usuário, CI só deve ser executada quando ele solicitar explicitamente.
+
+### Próximo passo
+Integrar o motor à tela de diagnóstico e ao relatório TXT, depois ampliar as regras usando o histórico real da Meriva e testes confirmatórios.
