@@ -176,11 +176,16 @@ export default function IndexScreen() {
       <ScrollView contentContainerStyle={[styles.content, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
         <View style={[styles.screenFrame, { maxWidth: layout.maxContentWidth }]}>
           <View style={[styles.midHeader, { paddingHorizontal: layout.cardPadding }]}>
-            <Text style={styles.midBrand}>CHEVROLET</Text>
-            <Text style={styles.midModel}>MERIVA MAXX 1.4</Text>
-            <Text style={styles.midStatus}>
-              {obd.connected ? 'OBD • ONLINE' : bluetoothError ? 'BLUETOOTH • FALHA DE CONEXÃO' : bluetoothSearching ? 'BLUETOOTH • BUSCANDO ELM327' : 'OBD • AGUARDANDO'}
-            </Text>
+            <View style={styles.headerTitleBlock}>
+              <Text style={styles.midBrand}>MERIVA SMART DIAGNOSTIC</Text>
+              <Text style={styles.midStatus}>
+                {obd.connected ? 'OBD • ONLINE' : bluetoothError ? 'BLUETOOTH • FALHA DE CONEXÃO' : bluetoothSearching ? 'BLUETOOTH • BUSCANDO ELM327' : 'OBD • AGUARDANDO'}
+              </Text>
+            </View>
+            <View style={styles.headerDataBlock}>
+              <Text style={styles.headerDataLabel}>PROTOCOLO</Text>
+              <Text style={styles.headerDataValue}>{obd.protocol ?? 'N/D'}</Text>
+            </View>
           </View>
 
           <View style={styles.heroCard}>
@@ -211,6 +216,7 @@ export default function IndexScreen() {
 
           <View style={[styles.statusGrid, layout.landscape && styles.statusGridLandscape]}>
             <StatusCard label="OBD" value={obd.connected ? 'ONLINE' : 'AGUARDANDO'} landscape={layout.landscape} />
+            <StatusCard label="PROTOCOLO" value={obd.protocol ?? 'N/D'} landscape={layout.landscape} />
             <StatusCard label="GPS" value={gpsState.running ? 'ATIVO' : 'AGUARDANDO'} landscape={layout.landscape} />
             <StatusCard label="CONSUMO" value={availableConsumptionKml == null ? 'N/D' : `${availableConsumptionKml.toFixed(1)} km/L`} landscape={layout.landscape} />
             <StatusCard label="FALHAS" value={dtcCount ? String(dtcCount) : 'OK'} danger={dtcCount > 0} landscape={layout.landscape} />
@@ -218,23 +224,23 @@ export default function IndexScreen() {
 
           <View style={styles.tripCard}>
             <View style={styles.cardHeaderRow}>
-              <Text style={styles.sectionTitle}>VIAGEM ATUAL</Text>
+              <Text style={styles.sectionTitle}>VIAGEM E DADOS EM TEMPO REAL</Text>
               <Text style={gpsState.running ? styles.live : styles.muted}>{gpsState.running ? 'AUTOMÁTICA' : 'AGUARDANDO GPS'}</Text>
             </View>
             <View style={[styles.tripGrid, layout.landscape && styles.tripGridLandscape]}>
               <Metric label="DISTÂNCIA" value={formatDistance(gpsState.distanceKm, distanceUnit)} />
               <Metric label="CONSUMO DE REFERÊNCIA" value={summary.lastRealCycle ? `${summary.lastRealCycle.avgFuelConsumptionKml.toFixed(2)} km/L` : availableConsumptionKml == null ? 'N/D' : `${availableConsumptionKml.toFixed(2)} km/L`} />
               <Metric label="PRECISÃO GPS" value={gpsState.lastAccuracyM == null ? 'N/D' : `${gpsState.lastAccuracyM.toFixed(0)} m`} />
-              <Metric label="QUALIDADE" value={gpsState.signalQuality.replace('_', ' ')} />
+              <Metric label="QUALIDADE GPS" value={gpsState.signalQuality.replace('_', ' ')} />
               <Metric label="FONTE VELOCIDADE" value={gpsState.speedSource} />
             </View>
-            <Text style={styles.tripHelp}>Registro automático. Nenhum botão de iniciar é necessário.</Text>
+            <Text style={styles.tripHelp}>GPS inicia automaticamente. Dados OBD e viagem são atualizados sem seleção manual.</Text>
           </View>
 
           <View style={[styles.actionGrid, layout.landscape && styles.actionGridLandscape]}>
             <Link href="/laboratorio" asChild>
               <TouchableOpacity style={[styles.primaryButton, layout.landscape && styles.actionButtonLandscape]}>
-                <Text style={styles.buttonText}>DIAGNÓSTICO OBD</Text>
+                <Text style={styles.buttonText}>LABORATÓRIO OBD</Text>
               </TouchableOpacity>
             </Link>
             <Link href="/armazenamento" asChild>
@@ -296,10 +302,13 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0b1220' },
   content: { flexGrow: 1, paddingVertical: 14, paddingBottom: 30 },
   screenFrame: { width: '100%' },
-  midHeader: { backgroundColor: '#111c2e', borderRadius: 14, borderWidth: 1, borderColor: '#29415f', paddingVertical: 14, marginBottom: 10 },
-  midBrand: { color: '#7db3ff', fontSize: 10, fontWeight: '900', letterSpacing: 2, textAlign: 'center' },
-  midModel: { color: '#f8fafc', fontSize: 22, fontWeight: '900', letterSpacing: 1, textAlign: 'center', marginTop: 1 },
-  midStatus: { color: '#9fb4cf', fontSize: 10, fontWeight: '900', letterSpacing: 1, textAlign: 'center', marginTop: 4 },
+  midHeader: { backgroundColor: '#111c2e', borderRadius: 14, borderWidth: 1, borderColor: '#29415f', paddingVertical: 12, marginBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  headerTitleBlock: { flex: 1 },
+  midBrand: { color: '#f8fafc', fontSize: 14, fontWeight: '900', letterSpacing: 1 },
+  midStatus: { color: '#7db3ff', fontSize: 9, fontWeight: '900', letterSpacing: 0.8, marginTop: 4 },
+  headerDataBlock: { minWidth: 105, alignItems: 'flex-end' },
+  headerDataLabel: { color: '#7185a1', fontSize: 8, fontWeight: '900', letterSpacing: 0.6 },
+  headerDataValue: { color: '#e5edf7', fontSize: 10, fontWeight: '900', marginTop: 3 },
   heroCard: { backgroundColor: '#121f33', borderRadius: 16, borderWidth: 1, borderColor: '#28415f', paddingVertical: 20, paddingHorizontal: 14, alignItems: 'center', marginBottom: 10 },
   heroLabel: { color: '#7db3ff', fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
   heroValue: { color: '#f8fafc', fontSize: 38, lineHeight: 44, fontWeight: '900', fontVariant: ['tabular-nums'], marginTop: 3, letterSpacing: 1 },
