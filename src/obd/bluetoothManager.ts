@@ -292,11 +292,11 @@ async function createRealElmSessionAttempt(
   try {
     logBluetoothDiagnostic('ELM_INITIALIZATION_START', { attempt, maxAttempts });
     const initialization = await session.initialize();
+    callbacks?.onElmResponding?.();
+    logBluetoothDiagnostic('ELM_RESPONDING', { attempt });
     callbacks?.onElmInitialized?.();
     logBluetoothDiagnostic('ELM_INITIALIZED', { attempt });
     logBluetoothDiagnostic('ELM_INITIALIZATION_RESULT', initialization.map((item) => ({ command: item.command, status: item.status, response: item.response })));
-
-    callbacks?.onElmResponding?.();
     logBluetoothDiagnostic('ECU_PROBE_START', { command: '010C', attempt, maxAttempts });
     let ecuProbe = await session.executeCommand('010C');
     logBluetoothDiagnostic('ECU_PROBE_RESULT', { status: ecuProbe.status, response: ecuProbe.response, attempt });
