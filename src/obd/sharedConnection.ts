@@ -270,7 +270,12 @@ export async function connectPreferredElm(
   compatibility?: Partial<Elm327CompatibilityConfig>,
   selectionMode: ConnectionSelectionMode = 'PREFERRED',
 ): Promise<SharedObdConnection> {
-  if (active) return active;
+  if (active) {
+    if (selectionMode === 'EXPLICIT' && preferredAddress && !sameAddress(active.device.address, preferredAddress)) {
+      throw new Error('OUTRO ADAPTADOR JÁ ESTÁ CONECTADO. DESCONECTE O ATUAL ANTES DE TROCAR DE DISPOSITIVO.');
+    }
+    return active;
+  }
   if (connecting) return connecting;
 
   const config = mergeCompatibilityConfig(compatibility ?? DEFAULT_ELM327_COMPATIBILITY);
