@@ -44,3 +44,12 @@ const transport = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'bluetoothClassi
 assert(transport.includes('trailingDiscarded'));
 assert(transport.includes('this.received = \'\';'));
 
+
+const lifecycleState = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'bluetoothState.ts'), 'utf8');
+assert(lifecycleState.includes("export type BluetoothLifecycleState"));
+assert(lifecycleState.includes("return state === 'READY'"));
+assert(transport.includes('onConnected?: () => void'));
+assert(transport.includes('onDisconnected?: (reason: string) => void'));
+assert(sharedConnection.includes('preferredAddress'));
+assert(sharedConnection.includes("setLifecycle('BLUETOOTH_OFF')"));
+assert(sharedConnection.includes("setLifecycle('DISCONNECTED')"));
