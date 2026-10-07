@@ -22,6 +22,8 @@ import {
   getAutoSaveState,
 } from '../src/meriva/autosaveManager';
 import { forceSaveOnObdEvent, registerObdQuery } from '../src/meriva/autosaveIntegration';
+import { runLocalDiagnostic, type DiagnosticResult } from '../src/diagnostics/diagnosticEngine';
+import type { PidObservation } from '../src/types/sourceTypes';
 
 type Mode = 'REAL' | 'SIMULACAO';
 
@@ -385,6 +387,19 @@ export default function LaboratorioScreen() {
 
   const parsed = rx ? parsePidResponse(pid, rx) : null;
   const knownSupported = supportedPids.filter((value) => KNOWN_PIDS.includes(value));
+  const diagnostic: DiagnosticResult = runLocalDiagnostic({
+    observations: getAutoSaveState().lastReadings.map((reading): PidObservation => ({
+      pid: reading.pid,
+      name: reading.name,
+      value: reading.value,
+      unit: reading.unit,
+      source: reading.source === 'SIMULACAO' ? 'SIMULACAO' : 'REAL_OBD',
+      timestamp: reading.timestamp,
+      confidence: reading.source === 'SIMULACAO' ? 'LOW' : 'GOOD',
+    })),
+    dtcs: getAutoSaveState().dtcs,
+    condition: 'UNKNOWN',
+  });
 
   return (
     <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
@@ -468,6 +483,27 @@ export default function LaboratorioScreen() {
         <Text style={styles.secondaryButtonText}>LER DTC ATUAIS</Text>
       </TouchableOpacity>
 
+      <View style={styles.aiPanel}>
+        <View style={styles.aiHeader}>
+          <Text style={styles.aiTitle}>DIAGNÓSTICO DA IA LOCAL</Text>
+          <Text style={styles.aiEngine}>EVIDÊNCIAS v{diagnostic.version}</Text>
+        </View>
+        {diagnostic.hypotheses.length === 0 ? (
+          <Text style={styles.aiMuted}>Nenhuma hipótese com evidência suficiente neste momento.</Text>
+        ) : diagnostic.hypotheses.map((hypothesis) => (
+          <View key={hypothesis.id} style={styles.hypothesis}>
+            <Text style={styles.hypothesisTitle}>{hypothesis.label}</Text>
+            <Text style={styles.hypothesisConfidence}>CONFIANÇA: {hypothesis.confidence} · SCORE: {hypothesis.score.toFixed(2)}</Text>
+            {hypothesis.evidence.map((item) => <Text key={`e-${hypothesis.id}-${item}`} style={styles.aiLine}>• Evidência: {item}</Text>)}
+            {hypothesis.nextTests.map((item) => <Text key={`t-${hypothesis.id}-${item}`} style={styles.aiLine}>→ Próximo teste: {item}</Text>)}
+          </View>
+        ))}
+        {diagnostic.blockedSimulationSamples > 0 ? (
+          <Text style={styles.aiWarning}>SIMULAÇÃO BLOQUEADA: {diagnostic.blockedSimulationSamples} amostra(s) não aumentaram a confiança.</Text>
+        ) : null}
+        <Text style={styles.aiDisclaimer}>{diagnostic.disclaimer}</Text>
+      </View>
+
       <TouchableOpacity style={styles.secondaryButton} onPress={() => setShowTechnicalDetails((value) => !value)}>
         <Text style={styles.secondaryButtonText}>{showTechnicalDetails ? 'OCULTAR DETALHES TÉCNICOS' : 'DETALHES TÉCNICOS'}</Text>
       </TouchableOpacity>
@@ -534,6 +570,17 @@ const styles = StyleSheet.create({
   live: { color: '#15803d', fontWeight: '900', fontSize: 10 },
   muted: { color: '#64748b', fontWeight: '900', fontSize: 10 },
   tripHelp: { color: '#64748b', fontSize: 11, marginTop: 2 },
+  aiPanel: { backgroundColor: '#fff', borderRadius: 10, padding: 13, marginBottom: 10, borderWidth: 1, borderColor: '#93c5fd' },
+  aiHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  aiTitle: { color: '#1557a6', fontWeight: '900', fontSize: 14 },
+  aiEngine: { color: '#64748b', fontSize: 9, fontWeight: '800' },
+  hypothesis: { borderTopWidth: 1, borderTopColor: '#dbeafe', paddingTop: 9, marginTop: 8 },
+  hypothesisTitle: { color: '#1f2937', fontWeight: '900', fontSize: 14 },
+  hypothesisConfidence: { color: '#2563eb', fontWeight: '800', fontSize: 11, marginTop: 3 },
+  aiLine: { color: '#334155', fontSize: 11, marginTop: 4 },
+  aiMuted: { color: '#64748b', fontSize: 11 },
+  aiWarning: { color: '#b45309', fontWeight: '800', fontSize: 11, marginTop: 9 },
+  aiDisclaimer: { color: '#64748b', fontSize: 10, marginTop: 9 },
   panel: { backgroundColor: '#1f2937', borderRadius: 14, padding: 16, marginTop: 8 },
   label: { color: '#93c5fd', marginTop: 8 },
   value: { color: '#f8fafc', fontSize: 16, marginTop: 3 },
