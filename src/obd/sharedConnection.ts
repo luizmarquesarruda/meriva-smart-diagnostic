@@ -3,7 +3,7 @@ import type { BluetoothDeviceInfo } from './bluetoothClassicTransport';
 import { createRealElmSession, discoverPairedDevices, ensureBluetoothReady } from './bluetoothManager';
 import { DEFAULT_ELM327_COMPATIBILITY, Elm327CompatibilityConfig, mergeCompatibilityConfig } from './elm327Compatibility';
 import { getAutoSaveState, saveNow, updateAutoSaveState } from '../meriva/autosaveManager';
-import { clearBluetoothDiagnostic, getLastBluetoothDiagnosticText } from './bluetoothManager';
+import { clearBluetoothDiagnostic, getLastBluetoothDiagnosticText, logBluetoothDiagnostic } from './bluetoothManager';
 import { isBluetoothLinkUp, type BluetoothLifecycleState } from './bluetoothState';
 import RNBluetoothClassic from 'react-native-bluetooth-classic';
 
