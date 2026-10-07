@@ -313,6 +313,39 @@ async function testBluetoothActivationRequest() {
   fakeBluetooth.requestBluetoothEnabled = originalRequest;
 }
 
+async function testConnectionSelectionAndStrictEcuGate() {
+  const shared = loadTs(path.join(ROOT, 'src/obd/sharedConnection.ts'));
+  const manager = loadTs(path.join(ROOT, 'src/obd/bluetoothManager.ts'));
+
+  const devices = [
+    { address: 'AA:BB:CC:DD:EE:01', name: 'ELM327', bonded: true },
+    { address: 'AA:BB:CC:DD:EE:02', name: 'ELM327 OUTRO', bonded: true },
+  ];
+
+  assert.deepStrictEqual(
+    shared.buildCandidateList(devices, devices[1].address, 'EXPLICIT'),
+    [devices[1]],
+    'seleção explícita deve testar somente o adaptador escolhido',
+  );
+  assert.deepStrictEqual(
+    shared.buildCandidateList(devices, 'AA:BB:CC:DD:EE:FF', 'EXPLICIT'),
+    [],
+    'seleção explícita não deve cair silenciosamente em outro adaptador',
+  );
+
+  assert.strictEqual(
+    manager.isValidEcuProbe({ status: 'OK', response: '41 0C 1A F8', command: '010C', elapsedMs: 10, attempt: 1 }),
+    true,
+  );
+  assert.strictEqual(
+    manager.isValidEcuProbe({ status: 'OK', response: '41 0C 1A', command: '010C', elapsedMs: 10, attempt: 1 }),
+    false,
+    'payload incompleto não valida a ECU',
+  );
+
+  console.log('selection/ECU strict gate: OK');
+}
+
 async function testEcuValidationGate() {
   const manager = loadTs(path.join(ROOT, 'src/obd/bluetoothManager.ts'));
   assert.strictEqual(manager.getElmProtocolName('5'), 'ISO 14230-4 KWP FAST');
@@ -727,6 +760,7 @@ async function main() {
     ['parser + DTC', testParser],
     ['elm/protocolo/serialização', testElmAndProtocol],
     ['ativação oficial do Bluetooth', testBluetoothActivationRequest],
+    ['seleção estrita + gate ECU', testConnectionSelectionAndStrictEcuGate],
     ['gate de validação ECU/010C', testEcuValidationGate],
     ['descoberta de PIDs', testPidScanner],
     ['IA burrinha de PIDs', testIntelligentPidDiscovery],
