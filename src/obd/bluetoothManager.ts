@@ -1,4 +1,4 @@
-import { PermissionsAndroid, Platform, Linking } from 'react-native';
+import { PermissionsAndroid, Platform } from 'react-native';
 import * as Location from 'expo-location';
 import RNBluetoothClassic from 'react-native-bluetooth-classic';
 import { BluetoothClassicTransport, BluetoothDeviceInfo, listBondedBluetoothDevices } from './bluetoothClassicTransport';
@@ -103,14 +103,8 @@ export async function requestBluetoothPermissions(): Promise<void> {
       throw new Error('PERMISSÃO DE DISPOSITIVOS PRÓXIMOS NÃO CONCEDIDA. PERMITA O ACESSO NAS CONFIGURAÇÕES DO APLICATIVO.');
     }
 
-    // O app também usa o GPS para velocidade, distância e consumo.
-    // Bluetooth não concede localização automaticamente, então a permissão
-    // do GPS precisa ser solicitada separadamente.
-    const location = await Location.requestForegroundPermissionsAsync();
-    logBluetoothDiagnostic('LOCATION_PERMISSION_RESULT', { status: location.status });
-    if (location.status !== Location.PermissionStatus.GRANTED) {
-      throw new Error('PERMISSÃO DE LOCALIZAÇÃO NÃO CONCEDIDA. O GPS É NECESSÁRIO PARA VELOCIDADE E DISTÂNCIA.');
-    }
+    // No Android 12+, operações Bluetooth usam BLUETOOTH_CONNECT/SCAN.
+    // A permissão de localização do GPS é tratada separadamente pelo app.
     return;
   }
 
@@ -174,11 +168,6 @@ export async function ensureBluetoothReady(): Promise<boolean> {
   }
 
   return true;
-}
-
-export async function openBluetoothAppSettings(): Promise<void> {
-  if (Platform.OS !== 'android') return;
-  await Linking.openSettings();
 }
 
 export async function discoverPairedDevices(): Promise<BluetoothDeviceInfo[]> {
