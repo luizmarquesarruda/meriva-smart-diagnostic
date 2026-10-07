@@ -2,6 +2,7 @@ import { PermissionsAndroid, Platform } from 'react-native';
 import RNBluetoothClassic from 'react-native-bluetooth-classic';
 import { BluetoothClassicTransport, BluetoothDeviceInfo, listBondedBluetoothDevices } from './bluetoothClassicTransport';
 import { ElmCommandResult, Elm327Session } from './elm327';
+import { parsePidResponse } from './parser';
 import { Elm327CompatibilityConfig, DEFAULT_ELM327_COMPATIBILITY, mergeCompatibilityConfig } from './elm327Compatibility';
 import { discoverIntelligentPids } from './intelligentPidDiscovery';
 import type { PidDiscoveryCache } from '../meriva/autosaveState';
@@ -59,10 +60,9 @@ export function getElmProtocolName(protocolId: string): string {
 }
 
 export function isValidEcuProbe(result: ElmCommandResult): boolean {
-  const stream = result.response.replace(/[^0-9A-F]/gi, '').toUpperCase();
-  const marker = '410C';
-  const index = stream.indexOf(marker);
-  return result.status === 'OK' && index >= 0 && stream.length >= index + marker.length + 4;
+  if (result.status !== 'OK' || !result.response.trim()) return false;
+  const parsed = parsePidResponse('010C', result.response);
+  return parsed.status === 'RESPONDEU' && parsed.value !== null && Number.isFinite(parsed.value);
 }
 
 export async function requestBluetoothPermissions(): Promise<void> {
