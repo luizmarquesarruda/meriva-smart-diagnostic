@@ -1,0 +1,29 @@
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'expo-router';
+import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import * as FileSystem from 'expo-file-system';
+import { getAutoSaveState } from '../src/meriva/autosaveManager';
+import { runLocalDiagnostic, type DiagnosticResult } from '../src/diagnostics/diagnosticEngine';
+import type { PidObservation } from '../src/types/sourceTypes';
+
+export default function SaudeScreen() {
+  const [state,setState]=useState(getAutoSaveState());
+  useEffect(()=>{const t=setInterval(()=>setState(getAutoSaveState()),1000);return()=>clearInterval(t)},[]);
+  const diagnostic: DiagnosticResult = useMemo(()=>runLocalDiagnostic({observations:state.lastReadings.map(r=>({pid:r.pid,name:r.name,value:r.value,unit:r.unit,source:r.source==='SIMULACAO'?'SIMULACAO':'REAL_OBD',timestamp:r.timestamp,confidence:r.source==='SIMULACAO'?'LOW':'GOOD'} as PidObservation)),dtcs:state.dtcs,condition:'UNKNOWN'}),[state]);
+  const normal=diagnostic.hypotheses.length===0 && state.dtcs.length===0;
+  return <SafeAreaView style={styles.container}><ScrollView contentContainerStyle={styles.content}>
+    <View style={styles.header}><Text style={styles.title}>CENTRAL DE SAÚDE</Text><Text style={styles.subtitle}>EVIDÊNCIAS • DTC • HIPÓTESES</Text></View>
+    <View style={[styles.health, normal ? styles.healthOk : styles.healthWarn]}><Text style={normal ? styles.bigOk : styles.bigWarn}>{normal ? '● SISTEMA NORMAL' : '● ATENÇÃO NECESSÁRIA'}</Text><Text style={styles.hint}>{state.dtcs.length ? state.dtcs.length + ' DTC registrado(s).' : 'Nenhum DTC registrado no estado atual.'}</Text></View>
+    <Text style={styles.section}>CONEXÃO</Text>
+    <View style={styles.row}><Text style={styles.name}>Bluetooth</Text><Text style={state.obd.connected?styles.ok:styles.muted}>{state.obd.connected?'CONECTADO':'AGUARDANDO'}</Text></View>
+    <View style={styles.row}><Text style={styles.name}>ECU</Text><Text style={state.obd.ecuValidatedAt?styles.ok:styles.muted}>{state.obd.ecuValidatedAt?'VALIDADA':'NÃO VALIDADA'}</Text></View>
+    <Text style={styles.section}>FALHAS</Text>
+    {!state.dtcs.length?<View style={styles.empty}><Text style={styles.emptyText}>Nenhum DTC armazenado.</Text></View>:state.dtcs.map(d=><View key={d.code} style={styles.row}><View><Text style={styles.name}>{d.code}</Text><Text style={styles.detail}>{d.status} • {d.occurrences} ocorrência(s)</Text></View><Text style={styles.warn}>ATENÇÃO</Text></View>)}
+    <Text style={styles.section}>HIPÓTESES LOCAIS</Text>
+    {!diagnostic.hypotheses.length?<View style={styles.empty}><Text style={styles.emptyText}>Ainda não há evidência suficiente para gerar hipótese.</Text></View>:diagnostic.hypotheses.map(h=><View key={h.id} style={styles.hyp}><View style={styles.rowHead}><Text style={styles.name}>{h.label}</Text><Text style={styles.score}>{Math.round(h.score*100)}%</Text></View><Text style={styles.detail}>CONFIANÇA: {h.confidence}</Text>{h.evidence.map((e,i)=><Text key={i} style={styles.evidence}>• {e.text}</Text>)}<Text style={styles.next}>PRÓXIMOS TESTES: {h.nextTests.join(' • ')}</Text></View>)}
+    <Text style={styles.disclaimer}>{diagnostic.disclaimer}</Text>
+    <Link href="/laboratorio" asChild><TouchableOpacity style={styles.primary}><Text style={styles.primaryText}>🔧 EXECUTAR NOVO DIAGNÓSTICO</Text></TouchableOpacity></Link>
+    <Link href="/" asChild><TouchableOpacity style={styles.back}><Text style={styles.backText}>← VOLTAR AO COCKPIT</Text></TouchableOpacity></Link>
+  </ScrollView></SafeAreaView>;
+}
+const styles=StyleSheet.create({container:{flex:1,backgroundColor:'#07111f'},content:{padding:14,paddingBottom:30},header:{marginBottom:12},title:{color:'#f8fafc',fontSize:22,fontWeight:'900',letterSpacing:1},subtitle:{color:'#7db3ff',fontSize:9,fontWeight:'900',marginTop:3},health:{borderRadius:16,borderWidth:1,padding:16,marginBottom:13},healthOk:{backgroundColor:'#10261b',borderColor:'#28613e'},healthWarn:{backgroundColor:'#28151c',borderColor:'#713043'},bigOk:{color:'#4ade80',fontSize:18,fontWeight:'900'},bigWarn:{color:'#fb7185',fontSize:18,fontWeight:'900'},hint:{color:'#a9b9cc',fontSize:10,marginTop:5},section:{color:'#7db3ff',fontSize:10,fontWeight:'900',letterSpacing:1,marginTop:7,marginBottom:7},row:{backgroundColor:'#0e1b2d',borderRadius:11,borderWidth:1,borderColor:'#233a56',padding:12,marginBottom:7,flexDirection:'row',justifyContent:'space-between',alignItems:'center'},rowHead:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},name:{color:'#e5edf7',fontSize:12,fontWeight:'900'},detail:{color:'#7185a1',fontSize:9,marginTop:3},ok:{color:'#4ade80',fontSize:10,fontWeight:'900'},muted:{color:'#94a3b8',fontSize:10,fontWeight:'900'},warn:{color:'#fb7185',fontSize:9,fontWeight:'900'},empty:{backgroundColor:'#0e1b2d',borderRadius:11,padding:14},emptyText:{color:'#94a3b8',fontSize:10,textAlign:'center'},hyp:{backgroundColor:'#0e1b2d',borderRadius:12,borderWidth:1,borderColor:'#304a68',padding:12,marginBottom:8},score:{color:'#7db3ff',fontSize:15,fontWeight:'900'},evidence:{color:'#c2d0df',fontSize:9,lineHeight:15,marginTop:4},next:{color:'#9fc5f7',fontSize:9,fontWeight:'800',marginTop:8},disclaimer:{color:'#64748b',fontSize:9,lineHeight:14,marginTop:4},primary:{backgroundColor:'#2563eb',borderRadius:11,padding:14,alignItems:'center',marginTop:8},primaryText:{color:'#fff',fontSize:10,fontWeight:'900'},back:{padding:14,alignItems:'center'},backText:{color:'#7db3ff',fontSize:10,fontWeight:'900'}});
