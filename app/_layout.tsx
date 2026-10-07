@@ -48,7 +48,7 @@ export default function RootLayout() {
         if (!autoConnectObd) return;
         await ensureBluetoothReady();
         const settings = await loadSettings();
-        const connection = await connectPreferredElm(null);
+        const connection = await connectPreferredElm(settings.selectedAdapterAddress);
         await writeAppSettings(basePath, {
           ...settings,
           selectedAdapterAddress: connection.device.address,
@@ -62,18 +62,20 @@ export default function RootLayout() {
             lastConnectedAt: new Date().toISOString(),
           };
         });
-        if (!connection.protocol) throw new Error('ELM RESPONDEU, MAS O PROTOCOLO NÃO FOI IDENTIFICADO.');
+        // 010C validado é o critério real de ECU. Protocolo pode permanecer N/D.
       } catch (cause) {
         const now = Date.now();
         if (diagnosticAlerts && now - lastFailureAt.current > 2500) {
           lastFailureAt.current = now;
           Alert.alert(
             'Bluetooth necessário',
-            cause instanceof Error
-              ? cause.message
-              : 'Ative o Bluetooth e permita o acesso a dispositivos próximos para usar o ELM327.',
+            cause instanceof Error && /BLUETOOTH.*DESLIGADO|BLUETOOTH CONTINUA DESLIGADO|BLUETOOTH NÃO FOI ATIVADO/i.test(cause.message)
+              ? 'Bluetooth necessário para diagnóstico do veículo.'
+              : cause instanceof Error
+                ? cause.message
+                : 'Bluetooth necessário para diagnóstico do veículo.',
             [
-              { text: 'Abrir configurações', onPress: () => void openBluetoothAppSettings() },
+              { text: 'Ativar Bluetooth', onPress: () => void checkBluetooth(true, true, null) },
               { text: 'Tentar novamente', onPress: () => void checkBluetooth(true, true, null) },
             ],
           );
@@ -132,7 +134,7 @@ export default function RootLayout() {
         checkBluetooth(
           settings.autoConnectObd,
           settings.diagnosticAlerts,
-          null,
+          settings.selectedAdapterAddress,
         ),
         startGps(settings.diagnosticAlerts),
       ]);
