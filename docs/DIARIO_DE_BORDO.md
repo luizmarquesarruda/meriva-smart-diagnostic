@@ -310,3 +310,23 @@ A CI precisa ser executada novamente após esta correção. **Não considerar es
 
 ### Próximo passo
 Executar CI completa. Se houver falha, registrar a causa neste diário antes de qualquer nova correção.
+
+
+### CI final da implementação
+PR #26 foi integrado ao `main` no commit `41497d757d3df4749427a5df90f27dea6d149aa5`.
+
+A CI do PR, run **#880 / 37697159495**, terminou com:
+- `npm ci --no-audit --no-fund`: sucesso;
+- Expo Doctor: **17/17**;
+- `npm run validate`: **sucesso**, incluindo os 14 testes de autosave;
+- `android-build`: **sucesso**;
+- APK Android standalone: compilado, verificado e publicado como artefato.
+
+A primeira execução #876 falhou apenas por uma asserção textual imprecisa no teste do limite de 200 registros; a correção foi registrada antes da nova CI #880, que passou integralmente.
+
+### Estado final
+A implementação está integrada ao `main` e validada por CI. O próximo teste físico deve ser feito com o ELM327 conectado e próximo ao telefone, verificando principalmente:
+1. reutilização automática do MAC Bluetooth salvo;
+2. validação real da ECU por `41 0C`;
+3. persistência de adaptador/protocolo/validação ECU;
+4. crescimento do TXT único até 200 snapshots e rotação do mais antigo.
