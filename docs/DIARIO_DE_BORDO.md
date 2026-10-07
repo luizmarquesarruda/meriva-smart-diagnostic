@@ -207,3 +207,30 @@ O run intermediário que revelou a falha foi cancelado após a criação de novo
 
 ### Próximo passo
 Aguardar a nova CI no commit da correção. Validar novamente `npm ci`, typecheck, todos os testes e Android build antes de considerar o conjunto concluído.
+
+## 2026-10-07 — Consolidação final no main e CI verde
+
+### Consolidação
+O PR #24 foi integrado ao `main` por squash no commit `1e0c8372b33454cc9675f48f18d5cf39b74cd239`.
+
+Foram consolidadas as correções auditadas de:
+- fluxo Bluetooth Classic / ELM327;
+- prevenção de reconexão indefinida;
+- preservação do estado de aprendizado quando o seed CarScanner é inicializado tardiamente;
+- `package-lock.json` real e versionado;
+- CI com `npm ci --no-audit --no-fund`;
+- regressões de Bluetooth e diagnóstico;
+- validação do APK Android standalone.
+
+### CI do main
+Run: `37684972084`
+
+- `validate`: **sucesso** — `npm ci`, Expo Doctor e suíte completa de validação.
+- `android-build`: **sucesso** — APK Release standalone compilado, verificado e publicado como artefato.
+
+### Estado
+A consolidação foi concluída com os dois jobs obrigatórios verdes. O repositório está em estado reproduzível de dependências e com a cadeia principal de validação passando.
+
+### Próximo passo
+Qualquer nova alteração deve iniciar por nova leitura deste diário e deve preservar a regra: problema → diagnóstico → correção → testes → commit → CI → resultado.
+
