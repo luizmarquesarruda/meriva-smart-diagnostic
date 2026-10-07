@@ -495,7 +495,7 @@ test('13. autosave mantém um único TXT histórico e limita a 200 snapshots', a
   const entries = history.split('=== SALVAMENTO_BEGIN ===').slice(1);
   assert.strictEqual(entries.length, 200, 'histórico deve manter exatamente os 200 mais recentes');
   assert.ok(history.includes('NÚMERO: 205'), 'último salvamento deve permanecer');
-  assert.ok(!history.includes('NÚMERO: 5'), 'salvamentos antigos devem ser removidos');
+  assert.ok(!/NÚMERO: 5\n/.test(history), 'salvamentos antigos devem ser removidos');
   assert.strictEqual((history.match(/meriva smart diagnostic/gi) || []).length, 201, 'um cabeçalho + 200 snapshots');
   m.disposeAutoSave();
 });
