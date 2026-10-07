@@ -123,7 +123,19 @@ export function getSharedObdDiagnosticContext(): { devices: BluetoothDeviceInfo[
 }
 
 function looksLikeElm327(device: BluetoothDeviceInfo): boolean {
-  return /ELM327|OBD\s*(?:II|2|Ⅱ)|V-LINK|VLINK|V-GATE|VLINKER|KONNWEI/i.test(device.name);
+  return /ELM327|OBD\\s*(?:II|2|Ⅱ)|V-LINK|VLINK|V-GATE|VLINKER|KONNWEI/i.test(device.name);
+}
+
+export function scoreElmCandidate(device: BluetoothDeviceInfo, preferredAddress: string | null): number {
+  const name = device.name.toUpperCase();
+  let score = 0;
+  if (preferredAddress && sameAddress(device.address, preferredAddress)) score += 1000;
+  if (/ELM327/.test(name)) score += 300;
+  if (/OBD\\s*(?:II|2|Ⅱ)/.test(name)) score += 250;
+  if (/V-LINK|VLINK|V-GATE|VLINKER/.test(name)) score += 200;
+  if (/KONNWEI/.test(name)) score += 150;
+  if (device.bonded !== false) score += 10;
+  return score;
 }
 
 function sameAddress(a: string, b: string): boolean {
@@ -136,23 +148,20 @@ export function buildCandidateList(
   preferredAddress: string | null,
   selectionMode: ConnectionSelectionMode = 'PREFERRED',
 ): BluetoothDeviceInfo[] {
-  const candidates: BluetoothDeviceInfo[] = [];
-  const addCandidate = (device: BluetoothDeviceInfo) => {
-    if (!candidates.some((item) => sameAddress(item.address, device.address))) {
-      candidates.push(device);
-    }
-  };
-
-  if (preferredAddress) {
-    const preferred = devices.find((device) => sameAddress(device.address, preferredAddress));
-    if (preferred) addCandidate(preferred);
+  const unique = new Map<string, BluetoothDeviceInfo>();
+  for (const device of devices) {
+    const key = device.address.replace(/:/g, '').toUpperCase();
+    if (!unique.has(key)) unique.set(key, device);
   }
 
-  if (selectionMode === 'EXPLICIT') return candidates;
+  if (selectionMode === 'EXPLICIT') {
+    const preferred = preferredAddress
+      ? [...unique.values()].find((device) => sameAddress(device.address, preferredAddress))
+      : undefined;
+    return preferred ? [preferred] : [];
+  }
 
-  for (const device of devices.filter(looksLikeElm327)) addCandidate(device);
-  for (const device of devices) addCandidate(device);
-  return candidates;
+  return [...unique.values()].sort((a, b) => scoreElmCandidate(b, preferredAddress) - scoreElmCandidate(a, preferredAddress));
 }
 
 export function getSharedObdConnection(): SharedObdConnection | null {
@@ -247,6 +256,7 @@ async function connectPreferredElmOnce(
   const devices = await discoverPairedDevices();
   lastDiscoveryDevices = devices;
   const candidates = buildCandidateList(devices, preferredAddress, selectionMode);
+  logBluetoothDiagnostic('CANDIDATE_RANKING', candidates.map((candidate, index) => ({ index: index + 1, name: candidate.name, address: candidate.address, score: scoreElmCandidate(candidate, preferredAddress), likelyElm: looksLikeElm327(candidate) })));
   if (selectionMode === 'EXPLICIT' && candidates.length === 0) {
     throw new Error('DISPOSITIVO BLUETOOTH SELECIONADO NÃO ESTÁ MAIS PAREADO.');
   }
