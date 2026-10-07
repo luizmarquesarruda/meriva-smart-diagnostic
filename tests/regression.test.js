@@ -156,6 +156,10 @@ const fakeBluetooth = {
   isBluetoothEnabled: async () => true,
   getBondedDevices: async () => [],
   cancelDiscovery: async () => { lastBluetoothDiscoveryCancelled = true; },
+  onDeviceDisconnected(listener) {
+    bluetoothDisconnectListener = listener;
+    return { remove() { bluetoothDisconnectListener = null; } };
+  },
   connectToDevice: async (_address, options) => {
     bluetoothConnectCalls++;
     bluetoothActiveNativeConnections++;
@@ -388,6 +392,24 @@ async function testCarScannerBaselineAndFuel012F() {
   assert.strictEqual(learned.globalSampleCounts.realSamples, 1);
   assert.ok(learnedRpm.mean > 778 && learnedRpm.mean < 800);
   assert.deepStrictEqual(learnedRpm.source, ['CARSCANNER_BASELINE', 'REAL_OBD']);
+}
+
+async function testBluetoothConnectionCallbacks() {
+  bluetoothListener = null;
+  bluetoothDisconnectListener = null;
+  fakeDeviceConnected = true;
+  const { BluetoothClassicTransport } = loadTs(path.join(ROOT, 'src', 'obd', 'bluetoothClassicTransport.ts'));
+  const events = [];
+  const transport = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF', undefined, {
+    onConnected: () => events.push('connected'),
+    onDisconnected: (reason) => events.push(reason),
+  });
+
+  await transport.open();
+  assert.deepStrictEqual(events, ['connected'], 'conexão real deve emitir somente onConnected');
+  bluetoothDisconnectListener?.({ address: 'AA:BB:CC:DD:EE:FF' });
+  assert.deepStrictEqual(events, ['connected', 'BLUETOOTH DESCONECTADO']);
+  await transport.close();
 }
 
 async function testBluetoothEventTransport() {
@@ -676,6 +698,7 @@ async function main() {
     ['descoberta de PIDs', testPidScanner],
     ['IA burrinha de PIDs', testIntelligentPidDiscovery],
     ['CarScanner baseline + PID 012F', testCarScannerBaselineAndFuel012F],
+    ['Bluetooth callbacks', testBluetoothConnectionCallbacks],
     ['Bluetooth por eventos', testBluetoothEventTransport],
     ['quota configurável', testQuota],
     ['logger TX/RX', testRawLogger],
