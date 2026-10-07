@@ -34,6 +34,7 @@ let bluetoothConnected = false;
 let monitorTimer: ReturnType<typeof setInterval> | null = null;
 let monitorBusy = false;
 let intentionalDisconnect = false;
+let connectionGeneration = 0;
 
 function emit(): void {
   bluetoothConnected = isBluetoothLinkUp(lifecycle);
@@ -65,6 +66,7 @@ async function persistDisconnectedState(): Promise<void> {
 async function handleUnexpectedDisconnect(reason: string): Promise<void> {
   if (intentionalDisconnect) return;
 
+  connectionGeneration += 1;
   lastConnectionError = reason;
   const connection = active;
   active = null;
@@ -153,6 +155,8 @@ async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm3
   intentionalDisconnect = false;
 
   try {
+      const attemptGeneration = connectionGeneration;
+    let disconnectedDuringAttempt = false;
     const connection = await createRealElmSession(
       device,
       compatibility,
@@ -162,9 +166,17 @@ async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm3
         onElmResponding: () => setLifecycle('ELM_RESPONDING'),
         onElmInitialized: () => setLifecycle('ELM_INITIALIZED'),
         onEcuResponding: () => setLifecycle('ECU_RESPONDING'),
-        onDisconnected: (reason) => { void handleUnexpectedDisconnect(reason); },
+        onDisconnected: (reason) => {
+          disconnectedDuringAttempt = true;
+          void handleUnexpectedDisconnect(reason);
+        },
       },
     );
+
+    if (attemptGeneration !== connectionGeneration || disconnectedDuringAttempt || intentionalDisconnect) {
+      try { await connection.session.close(); } catch { /* sessão já perdida */ }
+      throw new Error('CONEXÃO BLUETOOTH CANCELADA OU PERDIDA DURANTE A VALIDAÇÃO.');
+    }
 
     if (!connection.ecuValidated) {
       try { await connection.session.close(); } catch { /* preserva o estado inválido */ }
@@ -271,6 +283,7 @@ export async function connectPreferredElm(
 export async function setSharedObdConnection(connection: SharedObdConnection | null): Promise<void> {
   active = connection;
   intentionalDisconnect = !connection;
+  if (!connection) connectionGeneration += 1;
 
   if (connection) {
     lastConnectionError = null;
@@ -284,6 +297,7 @@ export async function setSharedObdConnection(connection: SharedObdConnection | n
 
 export async function disconnectSharedObd(): Promise<void> {
   intentionalDisconnect = true;
+  connectionGeneration += 1;
   connecting = null;
 
   if (monitorTimer) {
