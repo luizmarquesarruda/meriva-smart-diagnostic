@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Alert, AppState, Linking, Platform } from 'react-native';
 import { Stack } from 'expo-router';
-import { ensureBluetoothReady, requestBluetoothPermissions } from '../src/obd/bluetoothManager';
+import { ensureBluetoothReady } from '../src/obd/bluetoothManager';
 import { gpsTracker } from '../src/gps';
 import { readAppSettings, writeAppSettings } from '../src/database/appSettings';
 import { connectPreferredElm, disconnectSharedObd } from '../src/obd/sharedConnection';
