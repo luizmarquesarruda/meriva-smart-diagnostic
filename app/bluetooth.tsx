@@ -153,7 +153,7 @@ export default function BluetoothScreen() {
         {!devices.length && !loading ? <Text style={styles.empty}>Pareie o ELM327 nas configurações do Android e volte aqui.</Text> : null}
 
         <TouchableOpacity style={[styles.primary, (!selected || connecting) && styles.disabled]} onPress={() => void connectSelected()} disabled={!selected || connecting}>
-          {connecting ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>CONECTAR E VALIDAR ELM327</Text>}
+          {connecting ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>{lifecycle === 'DISCONNECTED' ? 'RECONNECTAR E VALIDAR ELM327' : 'CONECTAR E VALIDAR ELM327'}</Text>}
         </TouchableOpacity>
 
         {connectedName ? (
