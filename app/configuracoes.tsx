@@ -171,13 +171,13 @@ export default function ConfiguracaoScreen() {
           <View style={styles.card}>
             <Text style={styles.label}>Tentativas de conexão</Text>
             <View style={styles.row}>
-              {[0, 3, 10].map((value) => (
+              {[1, 2, 3].map((value) => (
                 <TouchableOpacity key={value} style={[styles.choice, settings.elmMaxConnectionAttempts === value && styles.choiceActive]} onPress={() => void updateSetting('elmMaxConnectionAttempts', value)}>
-                  <Text style={styles.choiceText}>{value === 0 ? 'INFINITO' : String(value)}</Text>
+                  <Text style={styles.choiceText}>{String(value)}</Text>
                 </TouchableOpacity>
               ))}
             </View>
-            <Text style={styles.note}>0 = continuar tentando até o usuário cancelar ou o ELM responder.</Text>
+            <Text style={styles.note}>O padrão é 3 tentativas; falhas terminais da ECU encerram o ciclo antes disso.</Text>
           </View>
 
           <View style={styles.card}>
