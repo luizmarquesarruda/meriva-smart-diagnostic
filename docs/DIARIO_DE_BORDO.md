@@ -382,3 +382,9 @@ Além disso, o relatório usava somente o erro compartilhado. Em algumas rotas d
 
 ### Próximo passo
 Executar a CI do estado final e repetir o teste físico. O trace esperado não deve conter BLUETOOTH_READY_START nem PAIRED_DISCOVERY_START entre ELM_SESSION_START e ELM_INITIALIZATION_START de uma mesma tentativa.
+
+---
+
+## 2026-10-06 - Decisão de identidade visual: MERIVA SMART
+
+Nome visível do aplicativo aprovado e padronizado como **MERIVA SMART**. O nome anterior, **MERIVA SMART DIAGNOSTIC**, era longo para o cabeçalho das telas móveis. Os termos técnicos **DIAGNÓSTICO**, **OBD** e **GPS** continuam identificando as funções do aplicativo. Slug, pacote Android e identificadores internos permanecem inalterados.
