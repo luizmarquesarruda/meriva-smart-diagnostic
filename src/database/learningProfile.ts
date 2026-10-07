@@ -249,7 +249,12 @@ export async function initializeCarScannerSeed(
     const now = new Date().toISOString();
     profile.seedVersion = CARSCANNER_SEED_VERSION;
     profile.seedImportDate = seedImportDate;
-    profile.learningStatus = 'SEED_INITIALIZED';
+    profile.learningStatus =
+      profile.globalSampleCounts.realSamples >= profile.confidenceThresholds.high
+        ? 'CONFIDENT'
+        : profile.globalSampleCounts.realSamples >= profile.confidenceThresholds.low
+          ? 'LEARNING_ACTIVE'
+          : 'SEED_INITIALIZED';
     profile.source = 'HYBRID';
     profile.seedWeight = 0.25;
     profile.globalSampleCounts.seedSamples = CARSCANNER_SEED_SAMPLES.length;
@@ -285,10 +290,13 @@ export async function initializeCarScannerSeed(
         medianWindow: [sample.value],
       };
 
-      profile.overallStatistics[sample.pidName] = {
-        ...context.statistics[sample.pidName],
-        medianWindow: [sample.value],
-      };
+      const overallExisting = profile.overallStatistics[sample.pidName];
+      if (!overallExisting || overallExisting.realSamples === 0) {
+        profile.overallStatistics[sample.pidName] = {
+          ...context.statistics[sample.pidName],
+          medianWindow: [sample.value],
+        };
+      }
     }
 
     await writeLearningProfileUnsafe(basePath, profile);
