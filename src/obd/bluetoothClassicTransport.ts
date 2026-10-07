@@ -247,6 +247,8 @@ export class BluetoothClassicTransport implements ObdTransport {
         this.markDisconnected();
       });
     }
+
+    this.callbacks?.onConnected?.();
   }
 
   async close(): Promise<void> {
