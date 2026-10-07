@@ -49,7 +49,11 @@ export async function appendAutoSaveHistory(
   const path = historyPath(basePath);
   const current = await readAutoSaveHistory(basePath);
   const entries = splitEntries(current);
-  const nextNumber = entries.length + 1;
+  const lastNumber = entries.reduce((max, entry) => {
+    const match = entry.match(/NÚMERO:\s*(\d+)/);
+    return match ? Math.max(max, Number(match[1])) : max;
+  }, 0);
+  const nextNumber = lastNumber + 1;
   const exportedAt = new Date().toISOString();
   const snapshot = formatAutoSaveTxt(state, { appVersion, exportedAt });
   const entry = [
