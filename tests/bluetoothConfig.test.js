@@ -25,6 +25,9 @@ assert(manager.includes("bluetooth_config.json"));
 assert(manager.includes('MAX_BLUETOOTH_ATTEMPTS = bluetoothConfig.retry.maxAttempts'));
 assert(manager.includes('BLUETOOTH_RETRY_INTERVAL_MS = bluetoothConfig.retry.intervalMs'));
 
+const sharedConnection = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'sharedConnection.ts'), 'utf8');
+assert(sharedConnection.includes('cada candidato recebe até 20 tentativas'));
+assert(!sharedConnection.includes('while (!active)'), 'sharedConnection não deve repetir rodadas infinitamente após esgotar os candidatos');
 const exporter = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'exportBluetoothDiagnosticTxt.ts'), 'utf8');
 assert(exporter.includes('readLearningProfile'));
 assert(exporter.includes('O QUE O APLICATIVO APRENDEU'));
