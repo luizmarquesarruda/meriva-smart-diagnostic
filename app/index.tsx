@@ -178,165 +178,59 @@ export default function IndexScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={[styles.content, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
         <View style={[styles.screenFrame, { maxWidth: layout.maxContentWidth }]}>
-          <View style={[styles.midHeader, { paddingHorizontal: layout.cardPadding }]}>
-            <View style={styles.headerTitleBlock}>
-              <Text style={styles.midBrand}>MERIVA SMART</Text>
-              <Text style={styles.midStatus}>
-                {connectionStatus.ecuConnected ? 'ECU • CONECTADA' : connectionStatus.bluetoothConnected ? 'BLUETOOTH • CONECTADO' : bluetoothError ? 'BLUETOOTH • FALHA' : bluetoothSearching ? 'BLUETOOTH • CONECTANDO' : 'AGUARDANDO'}
-              </Text>
-            </View>
+          <View style={styles.header}>
+            <View><Text style={styles.brand}>MERIVA SMART</Text><Text style={styles.subtitle}>COCKPIT DE DIAGNÓSTICO</Text></View>
+            <View style={styles.connectionPill}><View style={[styles.dot, connectionStatus.ecuConnected ? styles.dotOk : bluetoothError ? styles.dotDanger : styles.dotWarn]} /><Text style={styles.connectionText}>{connectionStatus.ecuConnected ? 'ECU' : connectionStatus.bluetoothConnected ? 'BLUETOOTH' : bluetoothSearching ? 'CONECTANDO' : 'OFFLINE'}</Text></View>
           </View>
-
           <View style={styles.heroCard}>
-            <Text style={styles.heroLabel}>AUTONOMIA ESTIMADA</Text>
-            <Text style={styles.heroValue}>
-              {getAutoSaveState().autonomy.estimatedRangeKm > 0
-                ? (getAutoSaveState().autonomy.estimatedRangeKm.toFixed(0) + ' km')
-                : 'N/D'}
-            </Text>
-            <Text style={styles.heroUnit}>TANQUE NOMINAL 56 L</Text>
-            <View style={styles.heroMetrics}>
-              <View style={styles.heroMetric}>
-                <Text style={styles.heroMetricLabel}>CONSUMO</Text>
-                <Text style={styles.heroMetricValue}>
-                  {availableConsumptionKml != null ? `${availableConsumptionKml.toFixed(1)} km/L` : 'N/D'}
-                </Text>
-              </View>
-              <View style={styles.heroMetric}>
-                <Text style={styles.heroMetricLabel}>VELOCIDADE</Text>
-                <Text style={styles.heroMetricValue}>{gpsState.currentSpeedKmh.toFixed(0)} km/h</Text>
-              </View>
+            <Text style={styles.heroEyebrow}>{connectionStatus.ecuConnected ? 'MOTOR • ECU CONECTADA' : 'ESTADO DO VEÍCULO'}</Text>
+            <Text style={styles.heroValue}>{connectionStatus.ecuConnected && getAutoSaveState().lastReadings.find((item) => /rpm/i.test(item.name) && item.value != null) ? (Math.round(getAutoSaveState().lastReadings.find((item) => /rpm/i.test(item.name) && item.value != null)?.value ?? 0) + ' RPM') : getAutoSaveState().autonomy.estimatedRangeKm > 0 ? (getAutoSaveState().autonomy.estimatedRangeKm.toFixed(0) + ' km') : 'PRONTO'}</Text>
+            <Text style={styles.heroState}>{connectionStatus.ecuConnected ? 'DADOS OBD EM TEMPO REAL' : 'CONECTE O ELM327 PARA INICIAR'}</Text>
+            <View style={styles.metricRow}>
+              <CockpitMetric label="VELOCIDADE" value={gpsState.currentSpeedKmh.toFixed(0) + ' km/h'} />
+              <CockpitMetric label="CONSUMO" value={availableConsumptionKml != null ? availableConsumptionKml.toFixed(1) + ' km/L' : 'N/D'} />
+              <CockpitMetric label="AUTONOMIA" value={getAutoSaveState().autonomy.estimatedRangeKm > 0 ? getAutoSaveState().autonomy.estimatedRangeKm.toFixed(0) + ' km' : 'N/D'} />
             </View>
           </View>
-
-          <View style={[styles.statusGrid, layout.landscape && styles.statusGridLandscape]}>
-            <StatusCard label="BLUETOOTH" value={connectionStatus.bluetoothConnected ? 'CONECTADO' : 'AGUARDANDO'} ok={connectionStatus.bluetoothConnected} landscape={layout.landscape} />
-            <StatusCard label="ECU" value={connectionStatus.ecuConnected ? 'CONECTADA' : connectionStatus.bluetoothConnected ? 'CONECTANDO' : 'AGUARDANDO'} ok={connectionStatus.ecuConnected} landscape={layout.landscape} />
-            <StatusCard label="GPS" value={gpsState.running ? 'ATIVO' : 'AGUARDANDO'} landscape={layout.landscape} />
-            <StatusCard label="CONSUMO" value={availableConsumptionKml == null ? 'N/D' : `${availableConsumptionKml.toFixed(1)} km/L`} landscape={layout.landscape} />
-            <StatusCard label="FALHAS" value={dtcCount ? String(dtcCount) : 'OK'} danger={dtcCount > 0} landscape={layout.landscape} />
+          <View style={styles.healthCard}>
+            <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>SAÚDE DO VEÍCULO</Text><Text style={styles.sectionHint}>{dtcCount > 0 ? 'Falhas requerem atenção' : 'Nenhuma falha ativa registrada'}</Text></View><Text style={dtcCount > 0 ? styles.danger : styles.ok}>{dtcCount > 0 ? (dtcCount + ' DTC') : 'NORMAL'}</Text></View>
+            <Link href="/saude" asChild><TouchableOpacity style={styles.outlineButton}><Text style={styles.outlineText}>ABRIR CENTRAL DE SAÚDE →</Text></TouchableOpacity></Link>
           </View>
-
-          <View style={styles.tripCard}>
-            <View style={styles.cardHeaderRow}>
-              <Text style={styles.sectionTitle}>VIAGEM E DADOS EM TEMPO REAL</Text>
-              <Text style={gpsState.running ? styles.live : styles.muted}>{gpsState.running ? 'AUTOMÁTICA' : 'AGUARDANDO GPS'}</Text>
-            </View>
-            <View style={[styles.tripGrid, layout.landscape && styles.tripGridLandscape]}>
-              <Metric label="DISTÂNCIA" value={formatDistance(gpsState.distanceKm, distanceUnit)} />
-              <Metric label="VELOCIDADE" value={`${gpsState.currentSpeedKmh.toFixed(0)} km/h`} />
-              <Metric label="CONSUMO" value={availableConsumptionKml == null ? 'N/D' : `${availableConsumptionKml.toFixed(1)} km/L`} />
-            </View>
-            <Text style={styles.tripHelp}>GPS inicia automaticamente. Dados OBD e viagem são atualizados sem seleção manual.</Text>
+          <View style={styles.connectionCard}>
+            <Text style={styles.sectionTitle}>CADEIA DE CONEXÃO</Text>
+            <View style={styles.chain}><ChainStep label="BLUETOOTH" ok={connectionStatus.bluetoothConnected} /><Text style={styles.chainArrow}>›</Text><ChainStep label="ELM327" ok={Boolean(connectionStatus.bluetoothConnected && (obd.protocol || connectionStatus.ecuConnected))} /><Text style={styles.chainArrow}>›</Text><ChainStep label="ECU" ok={connectionStatus.ecuConnected} /></View>
           </View>
-
           <View style={[styles.actionGrid, layout.landscape && styles.actionGridLandscape]}>
-            <Link href="/laboratorio" asChild>
-              <TouchableOpacity style={[styles.primaryButton, layout.landscape && styles.actionButtonLandscape]}>
-                <Text style={styles.buttonText}>LABORATÓRIO OBD</Text>
-              </TouchableOpacity>
-            </Link>
-            <Link href="/armazenamento" asChild>
-              <TouchableOpacity style={[styles.secondaryButton, layout.landscape && styles.actionButtonLandscape]}>
-                <Text style={styles.secondaryButtonText}>HISTÓRICO E DADOS</Text>
-              </TouchableOpacity>
-            </Link>
-            <Link href="/configuracoes" asChild>
-              <TouchableOpacity style={[styles.secondaryButton, layout.landscape && styles.actionButtonLandscape]}>
-                <Text style={styles.secondaryButtonText}>CONFIGURAÇÕES</Text>
-              </TouchableOpacity>
-            </Link>
+            <Link href="/laboratorio" asChild><TouchableOpacity style={[styles.primaryButton, layout.landscape && styles.actionButtonLandscape]}><Text style={styles.buttonText}>🔧 DIAGNÓSTICO</Text><Text style={styles.buttonSubtext}>SCAN • DTC • ECU</Text></TouchableOpacity></Link>
+            <Link href="/dados" asChild><TouchableOpacity style={[styles.secondaryButton, layout.landscape && styles.actionButtonLandscape]}><Text style={styles.secondaryButtonText}>📊 DADOS EM TEMPO REAL</Text><Text style={styles.buttonSubtextDark}>PIDs • TENDÊNCIAS</Text></TouchableOpacity></Link>
           </View>
-
-          {bluetoothError ? <Text style={styles.error}>BLUETOOTH/ELM327: {bluetoothError}</Text> : null}
-          {gpsState.error ? <Text style={styles.error}>GPS: {gpsState.error}</Text> : null}
-          {saveStatus.lastError ? <Text style={styles.error}>AUTOSAVE: {saveStatus.lastError}</Text> : null}
-
-          <View style={styles.bottomNav}>
-            <Link href="/" asChild>
-              <TouchableOpacity style={styles.bottomNavItem}>
-                <Text style={styles.bottomNavIcon}>🚗</Text>
-                <Text style={styles.bottomNavActive}>CARRO</Text>
-              </TouchableOpacity>
-            </Link>
-            <Link href="/bluetooth" asChild>
-              <TouchableOpacity style={styles.bottomNavItem}>
-                <Text style={styles.bottomNavIcon}>🔵</Text>
-                <Text style={styles.bottomNavText}>BLUETOOTH</Text>
-              </TouchableOpacity>
-            </Link>
+          <View style={styles.statusGrid}>
+            <StatusCard label="GPS" value={gpsState.running ? 'ATIVO' : 'AGUARDANDO'} ok={gpsState.running} />
+            <StatusCard label="FALHAS" value={dtcCount ? String(dtcCount) : 'OK'} danger={dtcCount > 0} ok={dtcCount === 0} />
+            <StatusCard label="VIAGEM" value={formatDistance(gpsState.distanceKm, distanceUnit)} />
+            <StatusCard label="AUTOSAVE" value={isHydrated ? 'ATIVO' : 'CARREGANDO'} ok={isHydrated} />
           </View>
+          <Link href="/mais" asChild><TouchableOpacity style={styles.moreButton}><Text style={styles.moreIcon}>⋯</Text><View style={{ flex: 1 }}><Text style={styles.moreTitle}>MAIS RECURSOS</Text><Text style={styles.moreHint}>Veículo • Viagens • Aprendizado • Bluetooth • Arquivos</Text></View><Text style={styles.moreArrow}>›</Text></TouchableOpacity></Link>
+          {bluetoothError ? <Text style={styles.error}>BLUETOOTH/ELM327: {bluetoothError}</Text> : null}{gpsState.error ? <Text style={styles.error}>GPS: {gpsState.error}</Text> : null}{saveStatus.lastError ? <Text style={styles.error}>AUTOSAVE: {saveStatus.lastError}</Text> : null}
+          <View style={styles.bottomNav}><Link href="/" asChild><TouchableOpacity style={[styles.bottomNavItem, styles.bottomNavActive]}><Text style={styles.bottomNavIcon}>🚗</Text><Text style={styles.bottomNavActiveText}>CARRO</Text></TouchableOpacity></Link><Link href="/bluetooth" asChild><TouchableOpacity style={styles.bottomNavItem}><Text style={styles.bottomNavIcon}>🔵</Text><Text style={styles.bottomNavText}>BLUETOOTH</Text></TouchableOpacity></Link></View>
           <Text style={styles.footerStatus}>{isHydrated ? 'DADOS SALVOS AUTOMATICAMENTE' : 'CARREGANDO DADOS...'}</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
   );
-}
-
-function StatusCard({ label, value, danger = false, ok = false, landscape = false }: { label: string; value: string; danger?: boolean; ok?: boolean; landscape?: boolean }) {
-  return (
-    <View style={[styles.statusCard, landscape && styles.statusCardLandscape]}>
-      <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={danger ? styles.metricDanger : ok ? styles.metricOk : styles.metricValue}>{value}</Text>
-    </View>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.tripMetric}>
-      <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={styles.metricValue}>{value}</Text>
-    </View>
-  );
-}
+function CockpitMetric({ label, value }: { label: string; value: string }) { return <View style={styles.cockpitMetric}><Text style={styles.metricLabel}>{label}</Text><Text style={styles.metricValue}>{value}</Text></View>; }
+function ChainStep({ label, ok }: { label: string; ok: boolean }) { return <View style={styles.chainStep}><View style={[styles.chainCircle, ok && styles.chainCircleOk]}><Text style={[styles.chainCircleText, ok && styles.chainCircleTextOk]}>{ok ? '✓' : '•'}</Text></View><Text style={styles.chainLabel}>{label}</Text></View>; }
+function StatusCard({ label, value, danger = false, ok = false }: { label: string; value: string; danger?: boolean; ok?: boolean }) { return <View style={styles.statusCard}><Text style={styles.metricLabel}>{label}</Text><Text style={danger ? styles.danger : ok ? styles.ok : styles.metricValue}>{value}</Text></View>; }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b1220' },
-  content: { flexGrow: 1, paddingVertical: 14, paddingBottom: 30 },
-  screenFrame: { width: '100%' },
-  midHeader: { backgroundColor: '#111c2e', borderRadius: 14, borderWidth: 1, borderColor: '#29415f', paddingVertical: 12, marginBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerTitleBlock: { flex: 1 },
-  midBrand: { color: '#f8fafc', fontSize: 14, fontWeight: '900', letterSpacing: 1 },
-  midStatus: { color: '#7db3ff', fontSize: 9, fontWeight: '900', letterSpacing: 0.8, marginTop: 4 },
-  heroCard: { backgroundColor: '#121f33', borderRadius: 16, borderWidth: 1, borderColor: '#28415f', paddingVertical: 20, paddingHorizontal: 14, alignItems: 'center', marginBottom: 10 },
-  heroLabel: { color: '#7db3ff', fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
-  heroValue: { color: '#f8fafc', fontSize: 38, lineHeight: 44, fontWeight: '900', fontVariant: ['tabular-nums'], marginTop: 3, letterSpacing: 1 },
-  heroUnit: { color: '#9fb4cf', fontSize: 11, fontWeight: '800', textAlign: 'center' },
-  heroMetrics: { width: '100%', flexDirection: 'row', gap: 8, marginTop: 12 },
-  heroMetric: { flex: 1, backgroundColor: '#0e192a', borderRadius: 10, borderWidth: 1, borderColor: '#243b59', padding: 10, alignItems: 'center' },
-  heroMetricLabel: { color: '#7185a1', fontSize: 8, fontWeight: '900', textAlign: 'center', letterSpacing: 0.4 },
-  heroMetricValue: { color: '#e5edf7', fontSize: 17, fontWeight: '900', marginTop: 4, fontVariant: ['tabular-nums'] },
-  heroHelp: { color: '#7185a1', fontSize: 10, textAlign: 'center', marginTop: 7 },
-  statusGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 2 },
-  statusGridLandscape: { flexWrap: 'nowrap', gap: 8 },
-  statusCard: { width: '48%', backgroundColor: '#111c2e', borderRadius: 12, borderWidth: 1, borderColor: '#243652', padding: 11, marginBottom: 8 },
-  statusCardLandscape: { flex: 1, width: undefined },
-  metricLabel: { color: '#7185a1', fontSize: 9, fontWeight: '900', letterSpacing: 0.7, marginBottom: 2 },
-  metricValue: { color: '#e5edf7', fontWeight: '900', fontSize: 15 },
-  metricDanger: { color: '#fb7185', fontWeight: '900', fontSize: 15 },
-  metricOk: { color: '#4ade80', fontWeight: '900', fontSize: 15 },
-  tripCard: { backgroundColor: '#111c2e', borderRadius: 14, borderWidth: 1, borderColor: '#243652', padding: 13, marginBottom: 10 },
-  cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 },
-  sectionTitle: { color: '#f1f5f9', fontWeight: '900', fontSize: 13, letterSpacing: 0.5 },
-  live: { color: '#4ade80', fontWeight: '900', fontSize: 9 },
-  muted: { color: '#7185a1', fontWeight: '900', fontSize: 9 },
-  tripGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  tripGridLandscape: { flexWrap: 'nowrap', gap: 12 },
-  tripMetric: { width: '31%', minWidth: 90 },
-  tripHelp: { color: '#64748b', fontSize: 10, marginTop: 5 },
-  actionGrid: { gap: 7 },
-  actionGridLandscape: { flexDirection: 'row' },
-  actionButtonLandscape: { flex: 1 },
-  primaryButton: { backgroundColor: '#2563eb', borderRadius: 12, padding: 14, alignItems: 'center' },
-  buttonText: { color: '#fff', fontWeight: '900', fontSize: 11, letterSpacing: 0.3 },
-  secondaryButton: { backgroundColor: '#111c2e', borderRadius: 12, padding: 13, alignItems: 'center', borderWidth: 1, borderColor: '#34506f' },
-  secondaryButtonText: { color: '#dbeafe', fontWeight: '900', fontSize: 11 },
-  error: { color: '#fb7185', fontWeight: '800', fontSize: 10, marginTop: 8 },
-  bottomNav: { flexDirection: 'row', backgroundColor: '#111c2e', borderRadius: 14, borderWidth: 1, borderColor: '#29415f', marginTop: 12, padding: 5 },
-  bottomNavItem: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 10 },
-  bottomNavIcon: { fontSize: 17, marginBottom: 2 },
-  bottomNavActive: { color: '#7db3ff', fontSize: 9, fontWeight: '900', letterSpacing: 0.6 },
-  bottomNavText: { color: '#9fb4cf', fontSize: 9, fontWeight: '900', letterSpacing: 0.6 },
-  footerStatus: { color: '#60748f', textAlign: 'center', fontSize: 9, marginTop: 9 },
+  container:{flex:1,backgroundColor:'#07111f'},content:{flexGrow:1,paddingVertical:14,paddingBottom:30},screenFrame:{width:'100%'},
+  header:{backgroundColor:'#0e1b2d',borderRadius:16,borderWidth:1,borderColor:'#28415f',padding:14,marginBottom:10,flexDirection:'row',alignItems:'center',justifyContent:'space-between'},brand:{color:'#f8fafc',fontSize:18,fontWeight:'900',letterSpacing:1.2},subtitle:{color:'#7db3ff',fontSize:9,fontWeight:'900',letterSpacing:1,marginTop:3},
+  connectionPill:{flexDirection:'row',alignItems:'center',gap:6,backgroundColor:'#091526',borderRadius:20,borderWidth:1,borderColor:'#29415f',paddingHorizontal:10,paddingVertical:7},dot:{width:8,height:8,borderRadius:4},dotOk:{backgroundColor:'#4ade80'},dotWarn:{backgroundColor:'#fbbf24'},dotDanger:{backgroundColor:'#fb7185'},connectionText:{color:'#dbeafe',fontSize:9,fontWeight:'900'},
+  heroCard:{backgroundColor:'#0f2035',borderRadius:18,borderWidth:1,borderColor:'#2d5278',padding:18,alignItems:'center',marginBottom:10},heroEyebrow:{color:'#7db3ff',fontSize:9,fontWeight:'900',letterSpacing:1.4},heroValue:{color:'#f8fafc',fontSize:40,lineHeight:46,fontWeight:'900',marginTop:4,fontVariant:['tabular-nums']},heroState:{color:'#8fa6c1',fontSize:9,fontWeight:'800',letterSpacing:.5},
+  metricRow:{width:'100%',flexDirection:'row',gap:7,marginTop:14},cockpitMetric:{flex:1,backgroundColor:'#091626',borderRadius:11,borderWidth:1,borderColor:'#233d5b',padding:10,alignItems:'center'},metricLabel:{color:'#7185a1',fontSize:8,fontWeight:'900',letterSpacing:.6},metricValue:{color:'#e5edf7',fontSize:14,fontWeight:'900',marginTop:3},
+  healthCard:{backgroundColor:'#0e1b2d',borderRadius:15,borderWidth:1,borderColor:'#28415f',padding:14,marginBottom:10},sectionHeader:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},sectionTitle:{color:'#f1f5f9',fontWeight:'900',fontSize:12,letterSpacing:.6},sectionHint:{color:'#7185a1',fontSize:9,marginTop:3},ok:{color:'#4ade80',fontSize:11,fontWeight:'900'},danger:{color:'#fb7185',fontSize:11,fontWeight:'900'},outlineButton:{borderWidth:1,borderColor:'#315579',borderRadius:9,padding:10,alignItems:'center',marginTop:10},outlineText:{color:'#9fc5f7',fontSize:9,fontWeight:'900'},
+  connectionCard:{backgroundColor:'#0e1b2d',borderRadius:15,borderWidth:1,borderColor:'#28415f',padding:14,marginBottom:10},chain:{flexDirection:'row',alignItems:'center',marginTop:10},chainStep:{flex:1,alignItems:'center'},chainCircle:{width:30,height:30,borderRadius:15,alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:'#3b516b',backgroundColor:'#0a1727'},chainCircleOk:{borderColor:'#3b8c5a',backgroundColor:'#10261b'},chainCircleText:{color:'#7185a1',fontSize:11,fontWeight:'900'},chainCircleTextOk:{color:'#4ade80'},chainLabel:{color:'#9fb4cf',fontSize:8,fontWeight:'900',marginTop:4},chainArrow:{color:'#526a86',fontSize:24,paddingHorizontal:4},
+  actionGrid:{gap:8,marginBottom:10},actionGridLandscape:{flexDirection:'row'},actionButtonLandscape:{flex:1},primaryButton:{backgroundColor:'#2563eb',borderRadius:13,padding:14,alignItems:'center'},buttonText:{color:'#fff',fontWeight:'900',fontSize:11},buttonSubtext:{color:'#bfdbfe',fontWeight:'800',fontSize:8,marginTop:3},secondaryButton:{backgroundColor:'#0e1b2d',borderRadius:13,padding:13,alignItems:'center',borderWidth:1,borderColor:'#34506f'},secondaryButtonText:{color:'#dbeafe',fontWeight:'900',fontSize:11},buttonSubtextDark:{color:'#7185a1',fontWeight:'800',fontSize:8,marginTop:3},
+  statusGrid:{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',marginBottom:2},statusCard:{width:'48%',backgroundColor:'#0e1b2d',borderRadius:12,borderWidth:1,borderColor:'#233a56',padding:11,marginBottom:8},moreButton:{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:'#0e1b2d',borderRadius:14,borderWidth:1,borderColor:'#28415f',padding:13,marginTop:2},moreIcon:{color:'#7db3ff',fontSize:24,fontWeight:'900'},moreTitle:{color:'#e5edf7',fontSize:11,fontWeight:'900'},moreHint:{color:'#7185a1',fontSize:8,marginTop:3},moreArrow:{color:'#7db3ff',fontSize:24},
+  error:{color:'#fb7185',fontWeight:'800',fontSize:10,marginTop:8},bottomNav:{flexDirection:'row',backgroundColor:'#0e1b2d',borderRadius:14,borderWidth:1,borderColor:'#28415f',marginTop:12,padding:5},bottomNavItem:{flex:1,alignItems:'center',paddingVertical:8,borderRadius:10},bottomNavActive:{backgroundColor:'#152a45'},bottomNavIcon:{fontSize:17,marginBottom:2},bottomNavActiveText:{color:'#7db3ff',fontSize:9,fontWeight:'900'},bottomNavText:{color:'#9fb4cf',fontSize:9,fontWeight:'900'},footerStatus:{color:'#60748f',textAlign:'center',fontSize:9,marginTop:9},
 });
