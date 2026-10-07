@@ -175,3 +175,35 @@ O lockfile não autoriza atualizar versões declaradas do projeto por conta pró
 
 ### Próximo passo
 Executar a nova CI completa com `npm ci`. A correção só será considerada concluída quando `validate` e `android-build` terminarem sem falha. Caso `npm ci` revele divergência de lockfile, corrigir o lockfile a partir do erro observado antes de qualquer outra alteração.
+
+
+## 2026-10-07 — Correção revelada pela validação com `npm ci`
+
+### Falha encontrada
+A validação no ambiente Node 20/npm 10 executou `npm ci` com sucesso e `expo-doctor` com **17/17**. O `npm run validate` encontrou uma regressão em `tests/regression.test.js` relacionada ao seed tardio do perfil de aprendizado.
+
+O cenário criava um perfil, registrava uma amostra real e depois inicializava o seed CarScanner. O código alterava o estado de aprendizado para `SEED_INITIALIZED`, embora já existisse aprendizado real.
+
+### Diagnóstico
+A inicialização do seed deve complementar um perfil frio, não reclassificar um perfil que já começou a aprender com dados reais. O estado `COLD_START` continua correto abaixo do limiar mínimo de amostras reais; `LEARNING_ACTIVE` e `CONFIDENT` também devem ser preservados quando atingidos.
+
+### Correção
+Em `src/database/learningProfile.ts`, `initializeCarScannerSeed` passou a decidir o estado com a seguinte prioridade:
+1. `CONFIDENT` quando as amostras reais atingem o limiar alto;
+2. `LEARNING_ACTIVE` quando atingem o limiar mínimo;
+3. `COLD_START` quando existe pelo menos uma amostra real, mas ainda não atingiu o limiar;
+4. `SEED_INITIALIZED` somente quando ainda não existem amostras reais.
+
+O teste existente de seed tardio foi preservado porque expressa a invariável correta.
+
+### Commit
+- `9f65f057355f2cce0eec3cb9fcd3f4d51f18224` — `fix: preserve learning state when seed is initialized late`
+
+### CI
+O run intermediário que revelou a falha foi cancelado após a criação de novos commits, mas seu log comprovou:
+- `npm ci --no-audit --no-fund`: **sucesso**;
+- `npm run doctor`: **17/17**, sucesso;
+- `npm run validate`: falhou somente no cenário do seed tardio descrito acima.
+
+### Próximo passo
+Aguardar a nova CI no commit da correção. Validar novamente `npm ci`, typecheck, todos os testes e Android build antes de considerar o conjunto concluído.
