@@ -18,6 +18,11 @@ function normalizeBluetoothAddress(address: string): string {
 
 type RemovableSubscription = { remove: () => void };
 
+export interface BluetoothTransportCallbacks {
+  onConnected?: () => void;
+  onDisconnected?: (reason: string) => void;
+}
+
 export class BluetoothClassicTransport implements ObdTransport {
   private device: BluetoothDevice | null = null;
   private connected = false;
@@ -47,7 +52,7 @@ export class BluetoothClassicTransport implements ObdTransport {
   constructor(
     private readonly deviceAddress: string,
     config?: Partial<Elm327CompatibilityConfig>,
-    private readonly onDisconnected?: (reason: string) => void,
+    private readonly callbacks?: BluetoothTransportCallbacks,
   ) {
     this.config = mergeCompatibilityConfig(config ?? DEFAULT_ELM327_COMPATIBILITY);
   }
@@ -345,7 +350,7 @@ export class BluetoothClassicTransport implements ObdTransport {
     this.device = null;
     this.connected = false;
     this.received = '';
-    this.onDisconnected?.('BLUETOOTH DESCONECTADO');
+    this.callbacks?.onDisconnected?.('BLUETOOTH DESCONECTADO');
   }
 
   private removeSubscriptions(): void {
