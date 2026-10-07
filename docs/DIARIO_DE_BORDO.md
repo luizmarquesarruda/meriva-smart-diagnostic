@@ -255,3 +255,52 @@ A CI do `main` já comprovou a instalação determinística com:
 ### Estado
 O repositório mantém um único `package-lock.json` versionado. A partir deste ponto, alterações de dependências devem atualizar o `package.json` e o lockfile juntos, e a CI deve continuar usando `npm ci`.
 
+
+
+## 2026-10-07 — Persistência automática de Bluetooth/ECU e histórico TXT rotativo
+
+### Solicitação
+Após teste longe do ELM327, foi solicitado:
+- salvar automaticamente no celular o adaptador Bluetooth validado;
+- preservar a informação de ECU após validação real;
+- deixar os próximos diagnósticos priorizarem o adaptador salvo;
+- substituir a geração de vários TXT por um único histórico TXT alimentado automaticamente;
+- manter no máximo 200 salvamentos no mesmo arquivo, removendo os mais antigos quando o limite for ultrapassado.
+
+### Diagnóstico
+O endereço Bluetooth selecionado já existia em `AppSettings.selectedAdapterAddress`, mas o fluxo de conexão bem-sucedido não o persistia automaticamente. O estado OBD já possuía `ecuAddress`, porém não registrava explicitamente quando e como a ECU havia sido validada.
+
+A exportação TXT existente criava um arquivo novo a cada ação manual. O autosave principal era JSON e não possuía um histórico TXT rotativo único.
+
+### Correção implementada
+- Criado `src/meriva/autosaveHistoryTxt.ts`.
+- Cada `saveNow()` concluído atualiza automaticamente `CONFIG/meriva_smart_autosave_history.txt`.
+- O histórico mantém exatamente os **200 salvamentos mais recentes**; o mais antigo é descartado quando um novo excede o limite.
+- O histórico usa marcadores de entrada para evitar mistura/corrupção entre snapshots.
+- A numeração dos salvamentos permanece monotônica mesmo após a rotação.
+- O autosave JSON continua sendo a fonte principal de restauração; o TXT é histórico legível, não substituto do JSON.
+- Após uma conexão ELM/ECU validada, `sharedConnection` grava automaticamente `selectedAdapterAddress` em `app-settings.json`.
+- A conexão validada também grava no autosave: adaptador, protocolo, horário da conexão, horário da validação ECU e fonte da validação.
+- Quando existe endereço ECU no perfil do veículo, ele é preservado com `ecuValidationSource=VEHICLE_PROFILE`; quando não existe, a validação real continua registrada como `OBD_RESPONSE` sem inventar um endereço.
+- A validação continua condicionada à resposta OBD real `41 0C`.
+
+### Arquivos afetados
+- `src/meriva/autosaveHistoryTxt.ts`
+- `src/meriva/autosaveManager.ts`
+- `src/meriva/autosaveState.ts`
+- `src/meriva/autosaveTxtFormatter.ts`
+- `src/obd/sharedConnection.ts`
+- `tests/merivaAutosave.test.js`
+- `tests/bluetoothLifecycle.test.js`
+
+### Testes adicionados
+- Limite de 200 snapshots no TXT histórico.
+- Remoção dos snapshots antigos após exceder o limite.
+- Persistência e restauração dos dados Bluetooth/ECU.
+- Regressão estática para impedir perda da persistência após conexão validada.
+
+### Estado da validação
+Os testes foram adicionados nesta branch, mas a CI ainda precisa executar a validação completa e o Android build. **Não considerar esta alteração concluída até a CI terminar verde.**
+
+### Próximo passo
+Executar CI completa. Se houver falha, registrar a causa neste diário antes de qualquer nova correção.
