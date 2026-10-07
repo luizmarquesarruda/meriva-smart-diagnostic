@@ -87,6 +87,11 @@ function main() {
   assert.strictEqual(result.hypotheses.length, 0);
   assert.strictEqual(result.blockedSimulationSamples, 1);
 
+  result = engine.runLocalDiagnostic({ ...base, observations: [obs('010B', 80, 'simulacao'), obs('0106', 20, 'REAL_OBD'), obs('0107', 0, 'REAL_OBD')] });
+  assert.strictEqual(result.hypotheses.length, 1);
+  assert.strictEqual(result.hypotheses[0].id, 'MISTURA_POBRE');
+  assert.strictEqual(result.blockedSimulationSamples, 1);
+
   console.log('Diagnostic engine: OK');
 }
 
