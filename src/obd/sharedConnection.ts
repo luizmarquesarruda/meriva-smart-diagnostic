@@ -20,9 +20,13 @@ let lastConnectionError: string | null = null;
 let lastDiscoveryDevices: BluetoothDeviceInfo[] = [];
 
 const listeners = new Set<(connection: SharedObdConnection | null) => void>();
+const statusListeners = new Set<(status: { bluetoothConnected: boolean; ecuConnected: boolean }) => void>();
+let bluetoothConnected = false;
 
 function emit(): void {
   for (const listener of listeners) listener(active);
+  const status = { bluetoothConnected, ecuConnected: Boolean(active?.ecuValidated) };
+  for (const listener of statusListeners) listener(status);
 }
 
 function setConnectionError(cause: unknown): void {
@@ -55,8 +59,23 @@ export function subscribeSharedObd(listener: (connection: SharedObdConnection | 
   return () => listeners.delete(listener);
 }
 
+export function getSharedObdStatus(): { bluetoothConnected: boolean; ecuConnected: boolean } {
+  return { bluetoothConnected, ecuConnected: Boolean(active?.ecuValidated) };
+}
+
+export function subscribeSharedObdStatus(listener: (status: { bluetoothConnected: boolean; ecuConnected: boolean }) => void): () => void {
+  statusListeners.add(listener);
+  listener(getSharedObdStatus());
+  return () => statusListeners.delete(listener);
+}
+
 async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm327CompatibilityConfig): Promise<SharedObdConnection> {
-  const connection = await createRealElmSession(device, compatibility, getAutoSaveState().pidDiscovery);
+  bluetoothConnected = false;
+  emit();
+  const connection = await createRealElmSession(device, compatibility, getAutoSaveState().pidDiscovery, () => {
+    bluetoothConnected = true;
+    emit();
+  });
   if (!connection.ecuValidated) {
     try { await connection.session.close(); } catch { /* preserva o estado inválido */ }
     throw new Error('ECU NÃO VALIDADA. OBLIGATÓRIO RECEBER 41 0C PARA MARCAR OBD COMO CONECTADO.');
@@ -140,6 +159,7 @@ export async function connectPreferredElm(
 
 export async function setSharedObdConnection(connection: SharedObdConnection | null): Promise<void> {
   active = connection;
+  bluetoothConnected = Boolean(connection);
   if (connection) lastConnectionError = null;
   emit();
 }
@@ -148,6 +168,7 @@ export async function disconnectSharedObd(): Promise<void> {
   connecting = null;
   const connection = active;
   active = null;
+  bluetoothConnected = false;
   emit();
   if (connection) await connection.session.close();
 }
