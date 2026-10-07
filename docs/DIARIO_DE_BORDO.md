@@ -234,3 +234,24 @@ A consolidação foi concluída com os dois jobs obrigatórios verdes. O reposit
 ### Próximo passo
 Qualquer nova alteração deve iniciar por nova leitura deste diário e deve preservar a regra: problema → diagnóstico → correção → testes → commit → CI → resultado.
 
+## 2026-10-07 — Verificação do package-lock.json
+
+### Solicitação
+Foi solicitada a inclusão do `package-lock.json` no repositório do aplicativo e a atualização deste Diário de Bordo.
+
+### Resultado
+O `package-lock.json` **já está presente no `main`**, incorporado pela consolidação anterior. O arquivo está versionado com:
+- `lockfileVersion: 3`;
+- nome do projeto: `meriva-smart-diagnostic`;
+- versão do aplicativo: `1.0.1`;
+- blob SHA: `101303c990597eec4f126ce5ee012eda0b5c1c13`.
+
+Não foi criado um segundo lockfile nem substituído o arquivo existente, evitando duplicação ou alteração desnecessária da árvore de dependências.
+
+### Validação
+A CI do `main` já comprovou a instalação determinística com:
+`npm ci --no-audit --no-fund` — **sucesso**.
+
+### Estado
+O repositório mantém um único `package-lock.json` versionado. A partir deste ponto, alterações de dependências devem atualizar o `package.json` e o lockfile juntos, e a CI deve continuar usando `npm ci`.
+
