@@ -233,6 +233,7 @@ async function testParser() {
   const parser = loadTs(path.join(ROOT, 'src/obd/parser.ts'));
   assert.strictEqual(parser.parsePidResponse('0105', '41 05 69').value, 65);
   assert.strictEqual(parser.parsePidResponse('010C', '41 0C 1A F8').value, 1726);
+  assert.strictEqual(parser.parsePidResponse('01 0C', '41 0C 1A F8').value, 1726);
   assert.strictEqual(parser.validateOBDResponse('410C1AF8'), true);
   assert.strictEqual(parser.parsePidResponse('010C', '410C1AF8').value, 1726);
   assert.strictEqual(parser.validateOBDResponse('41 0C 1A F8'), true);
