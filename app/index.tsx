@@ -177,7 +177,7 @@ export default function IndexScreen() {
         <View style={[styles.screenFrame, { maxWidth: layout.maxContentWidth }]}>
           <View style={[styles.midHeader, { paddingHorizontal: layout.cardPadding }]}>
             <View style={styles.headerTitleBlock}>
-              <Text style={styles.midBrand}>MERIVA SMART DIAGNOSTIC</Text>
+              <Text style={styles.midBrand}>MERIVA SMART</Text>
               <Text style={styles.midStatus}>
                 {obd.connected ? 'OBD • ONLINE' : bluetoothError ? 'BLUETOOTH • FALHA DE CONEXÃO' : bluetoothSearching ? 'BLUETOOTH • BUSCANDO ELM327' : 'OBD • AGUARDANDO'}
               </Text>
