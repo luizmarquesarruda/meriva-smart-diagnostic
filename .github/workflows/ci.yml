@@ -3,8 +3,7 @@ name: CI
 
 on:
   workflow_dispatch:
-  push:
-    branches: ['**']
+  # Push trigger temporarily disabled during the IA/diagnostic integration.
   pull_request:
     branches: [main]
 
