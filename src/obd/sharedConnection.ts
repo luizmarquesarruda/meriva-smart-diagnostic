@@ -247,6 +247,9 @@ async function connectPreferredElmOnce(
   const devices = await discoverPairedDevices();
   lastDiscoveryDevices = devices;
   const candidates = buildCandidateList(devices, preferredAddress, selectionMode);
+  if (selectionMode === 'EXPLICIT' && candidates.length === 0) {
+    throw new Error('DISPOSITIVO BLUETOOTH SELECIONADO NÃO ESTÁ MAIS PAREADO.');
+  }
 
   let lastError: unknown = null;
   for (const device of candidates) {
