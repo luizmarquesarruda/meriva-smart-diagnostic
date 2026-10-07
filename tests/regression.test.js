@@ -644,6 +644,33 @@ async function testDtcStorage() {
   });
   const dtcs = await dtcManager.readDtcs(BASE);
   assert.strictEqual(dtcs[0].code, 'P0133');
+
+  writeDelayMs = 25;
+  await Promise.all([
+    dtcManager.recordDtc(BASE, {
+      code: 'P0301',
+      status: 'CURRENT',
+      firstSeen: '2026-10-02T20:01:00.000Z',
+      lastSeen: '2026-10-02T20:01:00.000Z',
+      occurrences: 1,
+      source: 'REAL_OBD',
+      historical: false,
+      confirmed: true,
+    }),
+    dtcManager.recordDtc(BASE, {
+      code: 'P0420',
+      status: 'CURRENT',
+      firstSeen: '2026-10-02T20:02:00.000Z',
+      lastSeen: '2026-10-02T20:02:00.000Z',
+      occurrences: 1,
+      source: 'REAL_OBD',
+      historical: false,
+      confirmed: true,
+    }),
+  ]);
+  writeDelayMs = 0;
+  const concurrentDtcs = await dtcManager.readDtcs(BASE);
+  assert.strictEqual(concurrentDtcs.length, 3, 'gravações concorrentes de DTC não podem perder registros');
 }
 
 async function testBackupCompleteness() {
