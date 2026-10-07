@@ -476,6 +476,56 @@ test('12. debounce agrupa gravações', async () => {
   m.disposeAutoSave();
 });
 
+test('13. autosave mantém um único TXT histórico e limita a 200 snapshots', async () => {
+  const m = manager();
+  m.disposeAutoSave();
+  resetFS();
+  await m.initAutoSave(BASE);
+
+  for (let i = 1; i <= 205; i += 1) {
+    m.updateAutoSaveState((s) => {
+      s.settings.sequence = i;
+    });
+    await m.saveNow('critical');
+  }
+
+  const historyPath = `${CONFIG_DIR}/meriva_smart_autosave_history.txt`;
+  assert.ok(files.has(historyPath), 'histórico TXT deve ser criado automaticamente');
+  const history = files.get(historyPath);
+  const entries = history.split('=== SALVAMENTO_BEGIN ===').slice(1);
+  assert.strictEqual(entries.length, 200, 'histórico deve manter exatamente os 200 mais recentes');
+  assert.ok(history.includes('NÚMERO: 205'), 'último salvamento deve permanecer');
+  assert.ok(!history.includes('NÚMERO: 5'), 'salvamentos antigos devem ser removidos');
+  assert.strictEqual((history.match(/meriva smart diagnostic/gi) || []).length, 201, 'um cabeçalho + 200 snapshots');
+  m.disposeAutoSave();
+});
+
+test('14. persistência local de Bluetooth/ECU não conflita com o autosave', async () => {
+  const state = manager();
+  state.disposeAutoSave();
+  resetFS();
+  await state.initAutoSave(BASE);
+  state.updateAutoSaveState((s) => {
+    s.obd = {
+      connected: true,
+      adapterName: 'OBDII',
+      protocol: 'ISO 14230-4 KWP FAST',
+      ecuAddress: '0x11',
+      ecuValidatedAt: '2026-10-07T22:25:06.831Z',
+      ecuValidationSource: 'VEHICLE_PROFILE',
+      lastConnectedAt: '2026-10-07T22:25:06.831Z',
+    };
+  });
+  await state.saveNow('critical');
+  state.disposeAutoSave();
+  await state.initAutoSave(BASE);
+  const restored = state.getAutoSaveState().obd;
+  assert.strictEqual(restored.adapterName, 'OBDII');
+  assert.strictEqual(restored.ecuAddress, '0x11');
+  assert.strictEqual(restored.ecuValidationSource, 'VEHICLE_PROFILE');
+  state.disposeAutoSave();
+});
+
 // ---------- executor ----------
 async function main() {
   let failed = 0;
