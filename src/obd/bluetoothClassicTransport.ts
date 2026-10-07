@@ -312,10 +312,11 @@ export class BluetoothClassicTransport implements ObdTransport {
     }
 
     const partial = this.received.replace(/^\s+|\s+$/g, '');
+    const bufferedLength = this.received.length;
     this.received = '';
     this.logDiagnostic('READ_TIMEOUT', {
       partial,
-      bufferedLength: this.received.length,
+      bufferedLength,
       promptExpected: true,
     });
     throw new Error(partial ? 'TIMEOUT: RESPOSTA ELM SEM PROMPT FINAL' : 'TIMEOUT');
