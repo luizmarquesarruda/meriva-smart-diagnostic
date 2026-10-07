@@ -40,3 +40,16 @@ assert(bluetoothScreenSource.includes('DIAGNÓSTICO PRONTO'));
 assert(bluetoothScreenSource.includes('BLUETOOTH DESCONECTADO'));
 assert(bluetoothScreenSource.includes('AGUARDANDO RESPOSTA'));
 assert(!bluetoothScreenSource.includes('BLUETOOTH CLASSIC • SPP'));
+
+const orderedStates = [
+  'setLifecycle(\'BLUETOOTH_CONNECTED\')',
+  'setLifecycle(\'ELM_RESPONDING\')',
+  'setLifecycle(\'ELM_INITIALIZED\')',
+  'setLifecycle(\'ECU_RESPONDING\')',
+  'setLifecycle(\'READY\')',
+].map((token) => shared.indexOf(token));
+assert(orderedStates.every((value, index) => value >= 0 && (index === 0 || value > orderedStates[index - 1])), 'estados devem seguir a ordem Bluetooth → ELM → ECU → pronto');
+
+const ecuGate = shared.indexOf("if (!connection.ecuValidated)");
+const activeAssignment = shared.indexOf('    active = {', ecuGate);
+assert(ecuGate >= 0 && activeAssignment > ecuGate, 'active não pode existir antes da validação da ECU');
