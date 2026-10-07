@@ -44,6 +44,8 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
   L.push(`Adaptador: ${or(state.obd?.adapterName)}`);
   L.push(`Protocolo: ${or(state.obd?.protocol)}`);
   L.push(`ECU: ${or(state.obd?.ecuAddress)}`);
+  L.push(`ECU validada em: ${or(state.obd?.ecuValidatedAt)}`);
+  L.push(`Fonte da validação ECU: ${or(state.obd?.ecuValidationSource)}`);
   L.push('');
 
   L.push('[LAST READINGS]');

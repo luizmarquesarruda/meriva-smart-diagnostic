@@ -6,6 +6,8 @@ import { getAutoSaveState, saveNow, updateAutoSaveState } from '../meriva/autosa
 import { clearBluetoothDiagnostic, getLastBluetoothDiagnosticText } from './bluetoothManager';
 import { isBluetoothLinkUp, type BluetoothLifecycleState } from './bluetoothState';
 import RNBluetoothClassic from 'react-native-bluetooth-classic';
+import * as FileSystem from 'expo-file-system';
+import { readAppSettings, writeAppSettings } from '../database/appSettings';
 
 export interface SharedObdConnection {
   session: Elm327Session;
@@ -221,6 +223,34 @@ async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm3
       ecuValidated: connection.ecuValidated,
       getDiagnosticsText: () => connection.session.getTransportDiagnosticsText(),
     };
+
+    // Persistência local: o próximo diagnóstico reutiliza automaticamente o
+    // adaptador validado. A ECU só é marcada como validada após o gate 41 0C.
+    const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
+    try {
+      const settings = await readAppSettings(basePath);
+      await writeAppSettings(basePath, {
+        ...settings,
+        selectedAdapterAddress: device.address.toUpperCase(),
+      });
+      const validatedAt = new Date().toISOString();
+      updateAutoSaveState((state) => {
+        state.obd = {
+          ...state.obd,
+          connected: true,
+          adapterName: device.name,
+          protocol: connection.protocol ?? undefined,
+          ecuAddress: state.vehicle?.ecuAddress ?? state.obd.ecuAddress,
+          ecuValidatedAt: validatedAt,
+          ecuValidationSource: state.vehicle?.ecuAddress ? 'VEHICLE_PROFILE' : 'OBD_RESPONSE',
+          lastConnectedAt: validatedAt,
+        };
+      });
+      await saveNow('critical');
+    } catch (persistCause) {
+      // Falha de persistência não invalida uma conexão já validada pelo ELM/ECU.
+      console.warn('[obd] falha ao persistir adaptador/ECU:', persistCause instanceof Error ? persistCause.message : persistCause);
+    }
     lastConnectionError = null;
     setLifecycle('READY');
     startBluetoothMonitor();

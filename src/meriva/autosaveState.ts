@@ -18,6 +18,8 @@ export interface ObdConnectionState {
   adapterName?: string;
   protocol?: string;
   ecuAddress?: string;
+  ecuValidatedAt?: string;
+  ecuValidationSource?: 'OBD_RESPONSE' | 'VEHICLE_PROFILE';
   lastConnectedAt?: string;
 }
 

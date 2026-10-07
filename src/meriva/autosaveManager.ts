@@ -13,6 +13,7 @@ export type { AutoSaveStatus } from './autosaveTypes';
 import { MerivaPersistedState, createEmptyMerivaState } from './autosaveState';
 import { hydrateState, isValidEnvelope, validatePayload } from './autosaveValidation';
 import { migrateEnvelope } from './autosaveMigrations';
+import { appendAutoSaveHistory } from './autosaveHistoryTxt';
 
 const DEBOUNCE_MS = 1500;
 const CHECKPOINT_MS = 45000;
@@ -136,6 +137,19 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
     runtime.lastSavedAt = envelope.savedAt;
     runtime.lastSaveReason = reason;
     runtime.lastError = null;
+
+    // Cada salvamento bem-sucedido também entra no mesmo TXT histórico.
+    // O histórico mantém no máximo 200 snapshots e descarta os mais antigos.
+    try {
+      await appendAutoSaveHistory(
+        base,
+        runtime.state,
+        runtime.state.metadata?.appVersion ?? 'N/D',
+        reason,
+      );
+    } catch (historyCause) {
+      console.warn('[autosave] falha ao atualizar histórico TXT:', historyCause instanceof Error ? historyCause.message : historyCause);
+    }
     runtime.dirty = runtime.mutationVersion !== mutationVersionAtStart;
     saved = true;
     return true;
