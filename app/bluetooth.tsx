@@ -7,7 +7,7 @@ import { discoverPairedDevices, ensureBluetoothReady } from '../src/obd/bluetoot
 import { connectPreferredElm, getSharedObdConnection, getSharedObdStatus, subscribeSharedObd, subscribeSharedObdStatus, disconnectSharedObd } from '../src/obd/sharedConnection';
 import { readAppSettings, writeAppSettings } from '../src/database/appSettings';
 
-export default function lifecycleLabel(lifecycle: ReturnType<typeof getSharedObdStatus>['lifecycle']): string {
+function lifecycleLabel(lifecycle: ReturnType<typeof getSharedObdStatus>['lifecycle']): string {
   const labels: Record<typeof lifecycle, string> = {
     UNSUPPORTED: 'BLUETOOTH INDISPONÍVEL',
     BLUETOOTH_OFF: 'BLUETOOTH DESLIGADO',
