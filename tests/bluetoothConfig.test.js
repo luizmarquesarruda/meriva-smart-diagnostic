@@ -52,4 +52,4 @@ assert(transport.includes('onConnected?: () => void'));
 assert(transport.includes('onDisconnected?: (reason: string) => void'));
 assert(sharedConnection.includes('preferredAddress'));
 assert(sharedConnection.includes("setLifecycle('BLUETOOTH_OFF')"));
-assert(sharedConnection.includes("setLifecycle('DISCONNECTED')"));
+assert(sharedConnection.includes("lifecycle = 'DISCONNECTED'"));
