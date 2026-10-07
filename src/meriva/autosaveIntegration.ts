@@ -32,6 +32,7 @@ export async function registerObdQuery(
     unit: result.parsed.unit,
     status: result.parsed.status,
     timestamp: new Date().toISOString(),
+    source,
   });
 
   const parsedValue = result.parsed.value;
