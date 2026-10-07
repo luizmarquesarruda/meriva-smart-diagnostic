@@ -346,6 +346,26 @@ async function testConnectionSelectionAndStrictEcuGate() {
   console.log('selection/ECU strict gate: OK');
 }
 
+async function testActiveAdapterCannotBeSilentlySwitched() {
+  const shared = loadTs(path.join(ROOT, 'src/obd/sharedConnection.ts'));
+  const fakeConnection = {
+    session: { close: async () => undefined },
+    device: { address: 'AA:BB:CC:DD:EE:01', name: 'ELM327', bonded: true },
+    protocol: 'TEST',
+    supportedPids: ['010C'],
+    ecuValidated: true,
+    getDiagnosticsText: () => '',
+  };
+
+  await shared.setSharedObdConnection(fakeConnection);
+  await assert.rejects(
+    shared.connectPreferredElm('AA:BB:CC:DD:EE:02', undefined, 'EXPLICIT'),
+    /OUTRO ADAPTADOR JÁ ESTÁ CONECTADO/
+  );
+  await shared.disconnectSharedObd();
+  console.log('active adapter switch guard: OK');
+}
+
 async function testEcuValidationGate() {
   const manager = loadTs(path.join(ROOT, 'src/obd/bluetoothManager.ts'));
   assert.strictEqual(manager.getElmProtocolName('5'), 'ISO 14230-4 KWP FAST');
@@ -465,6 +485,15 @@ async function testCarScannerBaselineAndFuel012F() {
   assert.strictEqual(overallRpm.realSamples, 1);
   assert.strictEqual(overallRpm.seedSamples, 1);
   assert.strictEqual(overallRpm.confidence, 'LOW', 'seed não pode aumentar confiança baseada em amostras reais');
+
+  const lateSeedBase = BASE + '/late-seed';
+  await learning.createLearningProfile(lateSeedBase, '');
+  await learning.updateLearningProfileRealSample(lateSeedBase, 'Engine RPM', 1000, 'IDLE_COLD');
+  await learning.initializeCarScannerSeed(lateSeedBase);
+  const lateSeed = await learning.readLearningProfile(lateSeedBase);
+  assert.strictEqual(lateSeed.learningStatus, 'COLD_START', 'seed tardio não pode rebaixar um aprendizado real em andamento');
+  assert.strictEqual(lateSeed.overallStatistics['Engine RPM'].realSamples, 1, 'seed tardio não pode apagar estatística real global');
+  assert.strictEqual(lateSeed.overallStatistics['Engine RPM'].mean, 1000, 'estatística real global deve sobreviver ao seed tardio');
 }
 
 async function testBluetoothConnectionCallbacks() {
@@ -795,6 +824,7 @@ async function main() {
     ['parser + DTC', testParser],
     ['elm/protocolo/serialização', testElmAndProtocol],
     ['ativação oficial do Bluetooth', testBluetoothActivationRequest],
+    ['bloqueio de troca silenciosa de adaptador', testActiveAdapterCannotBeSilentlySwitched],
     ['seleção estrita + gate ECU', testConnectionSelectionAndStrictEcuGate],
     ['gate de validação ECU/010C', testEcuValidationGate],
     ['descoberta de PIDs', testPidScanner],
