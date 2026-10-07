@@ -299,3 +299,35 @@ Executar a suíte completa pela CI, incluindo `npm ci`, doctor, validação, reg
 - Correção aplicada: exportação explícita de `logBluetoothDiagnostic`.
 - Nenhuma alteração de comportamento Bluetooth adicional foi introduzida nesta correção; trata-se de um erro de integração entre módulos.
 - Próximo passo obrigatório: aguardar o novo CI do PR #25 e corrigir qualquer falha real de compilação/teste antes do merge.
+
+
+## 2026-10-07 — Correção da regressão no ranking de candidatos Bluetooth
+
+### Falha encontrada
+A CI #858 (run `37692961772`) passou por:
+- `npm ci --no-audit --no-fund`: **sucesso**;
+- `npm run doctor`: **17/17**, sucesso;
+- `tsc --noEmit`: **sucesso**;
+- testes anteriores do pacote: **sucesso**.
+
+A falha ocorreu em `tests/regression.test.js`, no cenário `gate de validação ECU/010C`: o ranking retornou `Car BT` em primeiro lugar quando o teste exigia `ELM327` e `OBDII` como candidatos prioritários.
+
+### Causa raiz
+As expressões regulares de identificação de adaptadores em `src/obd/sharedConnection.ts` estavam com `\\\\s` dentro de literais RegExp. Isso procurava uma barra invertida seguida de `s`, em vez de reconhecer espaço em branco. Assim, `OBDII` não recebia o score de compatibilidade e um dispositivo genérico como `Car BT` podia empatar no score base.
+
+### Correção
+Corrigidas as expressões de `looksLikeElm327` e `scoreElmCandidate` para usar `\\s` corretamente.
+
+Com isso, o ranking esperado volta a ser:
+1. `ELM327`;
+2. `OBDII`;
+3. `Car BT`.
+
+### Impacto
+A correção é localizada no reconhecimento/ranking de candidatos. Não altera o gate ECU: a conexão continua exigindo resposta válida `41 0C` ao `010C`.
+
+### CI
+Run que revelou o problema: **#858 / 37692961772 — failure**.
+
+### Próximo passo
+Executar nova CI e validar novamente typecheck, suíte completa e Android Release antes de qualquer merge.
