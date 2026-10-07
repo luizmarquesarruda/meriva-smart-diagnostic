@@ -123,7 +123,7 @@ export function getSharedObdDiagnosticContext(): { devices: BluetoothDeviceInfo[
 }
 
 function looksLikeElm327(device: BluetoothDeviceInfo): boolean {
-  return /ELM327|OBD\\s*(?:II|2|Ⅱ)|V-LINK|VLINK|V-GATE|VLINKER|KONNWEI/i.test(device.name);
+  return /ELM327|OBD\s*(?:II|2|Ⅱ)|V-LINK|VLINK|V-GATE|VLINKER|KONNWEI/i.test(device.name);
 }
 
 export function scoreElmCandidate(device: BluetoothDeviceInfo, preferredAddress: string | null): number {
@@ -131,7 +131,7 @@ export function scoreElmCandidate(device: BluetoothDeviceInfo, preferredAddress:
   let score = 0;
   if (preferredAddress && sameAddress(device.address, preferredAddress)) score += 1000;
   if (/ELM327/.test(name)) score += 300;
-  if (/OBD\\s*(?:II|2|Ⅱ)/.test(name)) score += 250;
+  if (/OBD\s*(?:II|2|Ⅱ)/.test(name)) score += 250;
   if (/V-LINK|VLINK|V-GATE|VLINKER/.test(name)) score += 200;
   if (/KONNWEI/.test(name)) score += 150;
   if (device.bonded !== false) score += 10;
