@@ -13,7 +13,7 @@ export default function ViagensScreen() {
     <Text style={styles.title}>VIAGENS</Text><Text style={styles.subtitle}>CICLOS • CONSUMO • DISTÂNCIA</Text>
     <View style={styles.grid}><Metric l="CICLOS" v={String(cycles.length)} /><Metric l="DISTÂNCIA" v={summary.totalDistanceKm.toFixed(1) + ' km'} /><Metric l="CONSUMO MÉDIO" v={summary.avgConsumptionKml > 0 ? summary.avgConsumptionKml.toFixed(1) + ' km/L' : 'N/D'} /></View>
     <Text style={styles.section}>HISTÓRICO DE CICLOS</Text>
-    {cycles.length ? cycles.slice().reverse().slice(0, 20).map((c, i) => <View style={styles.row} key={String(c.id ?? i)}><Text style={styles.name}>{c.startTime ? new Date(c.startTime).toLocaleString() : 'CICLO ' + (i + 1)}</Text><Text style={styles.detail}>{Number(c.distanceKm ?? 0).toFixed(2)} km</Text></View>) : <View style={styles.empty}><Text style={styles.emptyText}>Nenhuma viagem registrada ainda.</Text></View>}
+    {cycles.length ? cycles.slice().reverse().slice(0, 20).map((c, i) => <View style={styles.row} key={String(c.id ?? i)}><Text style={styles.name}>{c.startedAt ? new Date(c.startedAt).toLocaleString() : 'CICLO ' + (i + 1)}</Text><Text style={styles.detail}>{Number(c.distanceTotalKm ?? 0).toFixed(2)} km</Text></View>) : <View style={styles.empty}><Text style={styles.emptyText}>Nenhuma viagem registrada ainda.</Text></View>}
     <Link href="/armazenamento" asChild><TouchableOpacity style={styles.primary}><Text style={styles.primaryText}>🗂️ ABRIR HISTÓRICO E EXPORTAÇÃO</Text></TouchableOpacity></Link>
     <Link href="/" asChild><TouchableOpacity style={styles.back}><Text style={styles.backText}>← VOLTAR</Text></TouchableOpacity></Link>
   </ScrollView></SafeAreaView>;
