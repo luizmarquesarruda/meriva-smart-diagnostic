@@ -249,12 +249,15 @@ export async function initializeCarScannerSeed(
     const now = new Date().toISOString();
     profile.seedVersion = CARSCANNER_SEED_VERSION;
     profile.seedImportDate = seedImportDate;
-    profile.learningStatus =
-      profile.globalSampleCounts.realSamples >= profile.confidenceThresholds.high
-        ? 'CONFIDENT'
-        : profile.globalSampleCounts.realSamples >= profile.confidenceThresholds.low
-          ? 'LEARNING_ACTIVE'
-          : 'SEED_INITIALIZED';
+    if (profile.globalSampleCounts.realSamples >= profile.confidenceThresholds.high) {
+      profile.learningStatus = 'CONFIDENT';
+    } else if (profile.globalSampleCounts.realSamples >= profile.confidenceThresholds.low) {
+      profile.learningStatus = 'LEARNING_ACTIVE';
+    } else if (profile.globalSampleCounts.realSamples > 0) {
+      profile.learningStatus = 'COLD_START';
+    } else {
+      profile.learningStatus = 'SEED_INITIALIZED';
+    }
     profile.source = 'HYBRID';
     profile.seedWeight = 0.25;
     profile.globalSampleCounts.seedSamples = CARSCANNER_SEED_SAMPLES.length;
