@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "description": "Regras locais e rastreáveis do motor de raciocínio diagnóstico. Uma regra gera evidência ou hipótese; nunca prova isoladamente uma falha.",
+  "principles": [
+    "DTC sozinho não condena componente.",
+    "PIDs precisam de contexto operacional.",
+    "Dados SIMULACAO nunca aumentam confiança.",
+    "Seed CarScanner serve como referência, não como leitura atual.",
+    "Toda conclusão deve listar evidências e próximos testes."
+  ],
+  "rules": [
+    {
+      "id": "DTC_P0301_MISFIRE",
+      "trigger": { "dtc": "P0301" },
+      "hypothesis": "FALHA_DE_COMBUSTAO_CILINDRO_1",
+      "baseScore": 0.55,
+      "tests": ["verificar contagem de falhas", "comparar STFT/LTFT", "avaliar O2", "testar ignição do cilindro 1", "testar injetor e compressão se a falha persistir"]
+    },
+    {
+      "id": "DTC_P0123_THROTTLE",
+      "trigger": { "dtc": "P0123" },
+      "hypothesis": "SINAL_DE_POSICAO_DA_BORBOLETA_ALTO",
+      "baseScore": 0.5,
+      "tests": ["comparar TPS em marcha lenta", "observar variação do TPS", "verificar alimentação e aterramento", "inspecionar chicote e conector"]
+    },
+    {
+      "id": "FUEL_TRIM_LEAN",
+      "trigger": { "combinedTrimMin": 15 },
+      "hypothesis": "MISTURA_POBRE",
+      "baseScore": 0.45,
+      "tests": ["verificar entrada de ar falsa", "pressão de combustível", "injetores", "MAF/MAP", "resposta do O2"]
+    },
+    {
+      "id": "FUEL_TRIM_RICH",
+      "trigger": { "combinedTrimMax": -15 },
+      "hypothesis": "MISTURA_RICA",
+      "baseScore": 0.45,
+      "tests": ["verificar pressão de combustível", "injetor com vazamento", "sensor de temperatura", "MAF/MAP", "resposta do O2"]
+    },
+    {
+      "id": "MAP_HIGH_IDLE",
+      "trigger": { "condition": "IDLE_WARM", "mapMinKpa": 45 },
+      "hypothesis": "VACUO_DO_MOTOR_POSSIVELMENTE_ANORMAL",
+      "baseScore": 0.35,
+      "tests": ["repetir MAP em marcha lenta aquecida", "comparar RPM e carga", "inspecionar admissão e sincronismo se a tendência persistir"]
+    }
+  ]
+}
