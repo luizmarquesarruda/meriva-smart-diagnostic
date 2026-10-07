@@ -355,3 +355,38 @@ Não foi implementado um pedido indiscriminado de “todas as permissões”. O 
 
 ### Próximo passo
 Executar CI e gerar novo APK Android. No primeiro lançamento, o usuário deverá conceder Bluetooth e localização quando solicitados. Se uma permissão estiver bloqueada com “não perguntar novamente”, o app deve direcionar o usuário para as configurações do aplicativo.
+
+## 2026-10-07 — Implementação das fases 1, 2 e 3 da nova experiência de telas
+
+### Objetivo
+Transformar a tela inicial em um cockpit de diagnóstico e distribuir a profundidade técnica em telas secundárias, sem alterar o transporte Bluetooth/ELM327 existente.
+
+### Fase 1 — Cockpit e navegação
+- app/index.tsx foi reorganizado para priorizar estado da ECU, RPM/autonomia como métrica hero, saúde do veículo, cadeia Bluetooth → ELM327 → ECU e ações primárias de Diagnóstico e Dados em Tempo Real.
+- Criada app/mais.tsx como hub de módulos.
+- Mantida a navegação existente para Bluetooth, Laboratório, Armazenamento e Configurações.
+
+### Fase 2 — Telemetria
+- Criada app/dados.tsx.
+- A tela acompanha o estado persistido em tempo quase real e apresenta velocidade, distância, consumo, autonomia e últimas leituras de PID.
+- Leituras continuam diferenciadas entre REAL e SIMULAÇÃO; a tela não fabrica telemetria.
+- O acesso ao Laboratório permite consultar/descobrir PIDs reais.
+
+### Fase 3 — Saúde e raciocínio diagnóstico
+- Criada app/saude.tsx.
+- A Central de Saúde combina DTCs persistidos e runLocalDiagnostic.
+- Hipóteses exibem score, confiança, evidências e próximos testes.
+- Criada app/aprendizado.tsx para expor amostras reais, seed, total, PIDs aprendidos e contaminação por simulação.
+- Criadas app/veiculo.tsx e app/viagens.tsx para separar perfil do veículo/ECU e histórico de ciclos.
+
+### Testes
+- Criado tests/cockpitNavigation.test.js.
+- O teste verifica a presença das novas rotas, telas e integração básica com lastReadings, runLocalDiagnostic e amostras reais.
+- package.json foi atualizado para executar essa regressão junto da suíte existente.
+
+### Regra de arquitetura
+Nenhuma alteração foi feita no protocolo Bluetooth/ELM327 ou no motor de evidências para produzir a nova UI. As telas reutilizam o estado e os serviços existentes.
+
+### Estado
+Código implementado no main. A conclusão técnica depende da nova CI: typecheck, suíte completa e Android build precisam terminar verdes antes de considerar as três fases encerradas.
+
