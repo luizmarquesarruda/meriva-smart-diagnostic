@@ -1,9 +1,9 @@
 name: CI
-# Manual CI trigger is available through workflow_dispatch; this commit also validates push-triggered CI.
 
 on:
   workflow_dispatch:
-  # Push trigger temporarily disabled during the IA/diagnostic integration.
+  push:
+    branches: ['**']
   pull_request:
     branches: [main]
 
