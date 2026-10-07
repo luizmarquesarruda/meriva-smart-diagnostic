@@ -1,5 +1,4 @@
 import { PermissionsAndroid, Platform } from 'react-native';
-import * as Location from 'expo-location';
 import RNBluetoothClassic from 'react-native-bluetooth-classic';
 import { BluetoothClassicTransport, BluetoothDeviceInfo, listBondedBluetoothDevices } from './bluetoothClassicTransport';
 import { ElmCommandResult, Elm327Session } from './elm327';
