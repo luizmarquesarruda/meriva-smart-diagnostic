@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'expo-router';
 import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import * as FileSystem from 'expo-file-system';
 import { getAutoSaveState } from '../src/meriva/autosaveManager';
 import { autoTripService } from '../src/trip/autoTripService';
 
