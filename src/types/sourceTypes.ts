@@ -27,6 +27,8 @@ export interface SampleStatistics {
   confidence: ConfidenceLevel;
   lastUpdate: string;
   source: DataSource[];
+  /** Janela limitada para cálculo de mediana sem crescimento infinito do perfil. */
+  medianWindow?: number[];
 }
 
 export interface PidObservation {
