@@ -32,6 +32,7 @@ export class BluetoothClassicTransport implements ObdTransport {
   private diagnostics: string[] = [];
   private openPromise: Promise<void> | null = null;
   private connectTimer: ReturnType<typeof setTimeout> | null = null;
+  private connectionGeneration = 0;
 
   private logDiagnostic(event: string, details?: unknown): void {
     const time = new Date().toISOString();
@@ -76,6 +77,7 @@ export class BluetoothClassicTransport implements ObdTransport {
   }
 
   private async openInternal(): Promise<void> {
+    const generation = ++this.connectionGeneration;
     this.clearDiagnostics();
     this.logDiagnostic('OPEN_START', { platform: Platform.OS, deviceAddress: this.deviceAddress });
 
@@ -180,6 +182,10 @@ export class BluetoothClassicTransport implements ObdTransport {
         ]);
 
         if (this.connectTimer) { clearTimeout(this.connectTimer); this.connectTimer = null; }
+        if (generation !== this.connectionGeneration) {
+          await this.safeDisconnect(device);
+          throw new Error('TENTATIVA BLUETOOTH INVALIDADA');
+        }
         this.logDiagnostic('CONNECT_SUCCESS', {
           secureSocket,
           connectionType,
@@ -248,6 +254,7 @@ export class BluetoothClassicTransport implements ObdTransport {
   }
 
   async close(): Promise<void> {
+    this.connectionGeneration += 1;
     if (this.connectTimer) { clearTimeout(this.connectTimer); this.connectTimer = null; }
     const device = this.device;
     const wasConnected = this.connected;
@@ -342,6 +349,7 @@ export class BluetoothClassicTransport implements ObdTransport {
   }
 
   private markDisconnected(): void {
+    this.connectionGeneration += 1;
     if (!this.connected && !this.device) return;
     this.logDiagnostic('BLUETOOTH_LINK_LOST', { address: this.deviceAddress });
     this.removeSubscriptions();

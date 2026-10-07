@@ -255,3 +255,79 @@ A CI do `main` já comprovou a instalação determinística com:
 ### Estado
 O repositório mantém um único `package-lock.json` versionado. A partir deste ponto, alterações de dependências devem atualizar o `package.json` e o lockfile juntos, e a CI deve continuar usando `npm ci`.
 
+
+
+## 2026-10-07 — Fortalecimento do Bluetooth Classic / ELM327
+
+### Contexto
+A análise do relatório físico confirmou que o último `UNABLE TO CONNECT` ocorreu com a **ECU desligada**. Portanto, não foi tratado como defeito do Bluetooth. O diagnóstico passou a ser orientado pela cadeia real: rádio Bluetooth → RFCOMM → ELM327 → ECU → resposta válida `41 0C`.
+
+### Alterações
+- `BluetoothClassicTransport` ganhou **generation token** para invalidar conexões nativas que terminem tardiamente depois de `close()`, timeout ou perda do link; uma conexão tardia não pode ressuscitar uma sessão encerrada.
+- O gerenciador passou a classificar falhas e registrar `BLUETOOTH_FAILURE_CLASSIFIED`.
+- Respostas terminais da ECU (`NO DATA`, `UNABLE TO CONNECT`, `BUS INIT`, `BUS ERROR`, `STOPPED`) não provocam uma cascata inútil de `ATSP*`; o erro é registrado e o candidato é encerrado.
+- Retries físicos foram reduzidos de **20 × 8 s** para no máximo **3 tentativas**, com backoff progressivo de **1,5 s → 3 s → 6 s**, preservando a possibilidade de recuperação de falhas transitórias.
+- O padrão de configurações deixou de oferecer tentativa infinita. Valores legados `0` são normalizados para o padrão seguro de 3 tentativas.
+- A seleção de adaptadores passou a usar **ranking de candidatos**, priorizando o adaptador explicitamente escolhido e nomes compatíveis com ELM327/OBD/V-LINK/KONNWEI, além de eliminar duplicidades por endereço.
+- A telemetria registra `CANDIDATE_RANKING` com candidato, endereço, score e indicação de compatibilidade.
+- Testes foram ampliados para cobrir retry limitado, classificação, ranking e invalidação de conexão tardia.
+- O playbook de engenharia ELM327 foi sincronizado com a nova política.
+
+### Arquivos afetados
+- `src/obd/bluetoothClassicTransport.ts`
+- `src/obd/bluetoothManager.ts`
+- `src/obd/sharedConnection.ts`
+- `src/database/appSettings.ts`
+- `src/knowledge/bluetooth_config.json`
+- `app/configuracoes.tsx`
+- `tests/bluetoothConfig.test.js`
+- `tests/regression.test.js`
+- `docs/ELM327_ENGINEERING_PLAYBOOK.md`
+
+### Regra preservada
+A conexão só é considerada OBD/ECU válida depois de uma resposta real ao `010C` contendo `41 0C`. Dispositivo pareado, socket RFCOMM conectado ou ELM inicializado isoladamente não promovem o estado para ECU conectada.
+
+### Próximo passo
+Executar a suíte completa pela CI, incluindo `npm ci`, doctor, validação, regressões e Android Release. Se houver falha, analisar o erro observado antes de qualquer nova alteração.
+
+
+## 2026-10-07 — Correção do bloqueio de typecheck na resiliência Bluetooth
+
+- A primeira correção de CI após o reforço Bluetooth ainda falhou no `typecheck`.
+- Causa exata: `sharedConnection.ts` passou a importar `logBluetoothDiagnostic`, mas a função em `bluetoothManager.ts` não estava exportada.
+- O erro foi reproduzido pelo CI #854 (job `validate`): `TS2724: './bluetoothManager' has no exported member named 'logBluetoothDiagnostic'`.
+- Correção aplicada: exportação explícita de `logBluetoothDiagnostic`.
+- Nenhuma alteração de comportamento Bluetooth adicional foi introduzida nesta correção; trata-se de um erro de integração entre módulos.
+- Próximo passo obrigatório: aguardar o novo CI do PR #25 e corrigir qualquer falha real de compilação/teste antes do merge.
+
+
+## 2026-10-07 — Correção da regressão no ranking de candidatos Bluetooth
+
+### Falha encontrada
+A CI #858 (run `37692961772`) passou por:
+- `npm ci --no-audit --no-fund`: **sucesso**;
+- `npm run doctor`: **17/17**, sucesso;
+- `tsc --noEmit`: **sucesso**;
+- testes anteriores do pacote: **sucesso**.
+
+A falha ocorreu em `tests/regression.test.js`, no cenário `gate de validação ECU/010C`: o ranking retornou `Car BT` em primeiro lugar quando o teste exigia `ELM327` e `OBDII` como candidatos prioritários.
+
+### Causa raiz
+As expressões regulares de identificação de adaptadores em `src/obd/sharedConnection.ts` estavam com `\\\\s` dentro de literais RegExp. Isso procurava uma barra invertida seguida de `s`, em vez de reconhecer espaço em branco. Assim, `OBDII` não recebia o score de compatibilidade e um dispositivo genérico como `Car BT` podia empatar no score base.
+
+### Correção
+Corrigidas as expressões de `looksLikeElm327` e `scoreElmCandidate` para usar `\\s` corretamente.
+
+Com isso, o ranking esperado volta a ser:
+1. `ELM327`;
+2. `OBDII`;
+3. `Car BT`.
+
+### Impacto
+A correção é localizada no reconhecimento/ranking de candidatos. Não altera o gate ECU: a conexão continua exigindo resposta válida `41 0C` ao `010C`.
+
+### CI
+Run que revelou o problema: **#858 / 37692961772 — failure**.
+
+### Próximo passo
+Executar nova CI e validar novamente typecheck, suíte completa e Android Release antes de qualquer merge.

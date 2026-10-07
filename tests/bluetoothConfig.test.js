@@ -12,8 +12,8 @@ assert.deepStrictEqual(config.transport.socketModes, ['INSECURE', 'SECURE']);
 assert.strictEqual(config.transport.connectionType, 'delimited');
 assert.strictEqual(config.transport.delimiter, '');
 assert.strictEqual(config.transport.charset, 'ascii');
-assert.strictEqual(config.retry.maxAttempts, 20);
-assert.strictEqual(config.retry.intervalMs, 8000);
+assert.strictEqual(config.retry.maxAttempts, 3);
+assert.strictEqual(config.retry.intervalMs, 1500);
 assert.strictEqual(config.retry.stopOnSuccess, true);
 assert.strictEqual(config.validation.command, '010C');
 assert.strictEqual(config.validation.responsePrefix, '41 0C');
@@ -26,7 +26,7 @@ assert(manager.includes('MAX_BLUETOOTH_ATTEMPTS = bluetoothConfig.retry.maxAttem
 assert(manager.includes('BLUETOOTH_RETRY_INTERVAL_MS = bluetoothConfig.retry.intervalMs'));
 
 const sharedConnection = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'sharedConnection.ts'), 'utf8');
-assert(sharedConnection.includes('cada candidato recebe até 20 tentativas'));
+assert(sharedConnection.includes('CANDIDATE_RANKING'));
 assert(!sharedConnection.includes('while (!active)'), 'sharedConnection não deve repetir rodadas infinitamente após esgotar os candidatos');
 const exporter = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'exportBluetoothDiagnosticTxt.ts'), 'utf8');
 assert(exporter.includes('readLearningProfile'));
@@ -53,3 +53,7 @@ assert(transport.includes('onDisconnected?: (reason: string) => void'));
 assert(sharedConnection.includes('preferredAddress'));
 assert(sharedConnection.includes("setLifecycle('BLUETOOTH_OFF')"));
 assert(sharedConnection.includes("lifecycle = 'DISCONNECTED'"));
+
+assert(manager.includes('ECU_PROBE_TERMINAL'));
+assert(manager.includes('BLUETOOTH_FAILURE_CLASSIFIED'));
+assert(transport.includes('connectionGeneration'));

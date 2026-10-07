@@ -9,8 +9,8 @@
     "charset": "ascii"
   },
   "retry": {
-    "maxAttempts": 20,
-    "intervalMs": 8000,
+    "maxAttempts": 3,
+    "intervalMs": 1500,
     "stopOnSuccess": true
   },
   "validation": {

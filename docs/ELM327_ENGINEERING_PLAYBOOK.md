@@ -256,7 +256,7 @@ Evitar mensagens genéricas como Erro Bluetooth.
 A documentação externa é referência de engenharia. Ela não substitui o comportamento medido no ELM327 real da Meriva.
 ## Política de teste Bluetooth
 
-Para diagnóstico físico, a sessão de conexão usa no máximo **20 tentativas automáticas**. Entre falhas há **8 segundos** de espera. Cada tentativa é registrada no trace TXT, incluindo TX/RX e erro de conexão quando disponível.
+Para diagnóstico físico, a sessão de conexão usa no máximo **3 tentativas por candidato**, com **backoff progressivo de 1,5 s, 3 s e até 6 s**. Respostas terminais da ECU (`NO DATA`, `UNABLE TO CONNECT`, `BUS INIT`, `BUS ERROR`) não disparam uma cascata de troca de protocolos; a causa é registrada e o candidato é encerrado. Cada tentativa é registrada no trace TXT, incluindo TX/RX e classificação do erro.
 
 Eventos principais: `BLUETOOTH_ATTEMPT_START`, `BLUETOOTH_ATTEMPT_RESULT`, `BLUETOOTH_RETRY_WAIT_START`, `BLUETOOTH_RETRY_WAIT_END` e `BLUETOOTH_TEST_SESSION_END`.
 

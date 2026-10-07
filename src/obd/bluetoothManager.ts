@@ -3,14 +3,14 @@ import RNBluetoothClassic from 'react-native-bluetooth-classic';
 import { BluetoothClassicTransport, BluetoothDeviceInfo, listBondedBluetoothDevices } from './bluetoothClassicTransport';
 import { ElmCommandResult, Elm327Session } from './elm327';
 import { parsePidResponse } from './parser';
-import { Elm327CompatibilityConfig, DEFAULT_ELM327_COMPATIBILITY, mergeCompatibilityConfig } from './elm327Compatibility';
+import { Elm327CompatibilityConfig, DEFAULT_ELM327_COMPATIBILITY, mergeCompatibilityConfig, classifyElmError, ElmErrorType } from './elm327Compatibility';
 import { discoverIntelligentPids } from './intelligentPidDiscovery';
 import type { PidDiscoveryCache } from '../meriva/autosaveState';
 import bluetoothConfig from '../knowledge/bluetooth_config.json';
 
 let lastBluetoothDiagnosticText = '';
 
-function logBluetoothDiagnostic(event: string, details?: unknown): void {
+export function logBluetoothDiagnostic(event: string, details?: unknown): void {
   const time = new Date().toISOString();
   let line = `[${time}] ${event}`;
   if (details !== undefined) {
@@ -57,6 +57,19 @@ const ELM_PROTOCOL_NAMES: Record<string, string> = {
 
 export function getElmProtocolName(protocolId: string): string {
   return ELM_PROTOCOL_NAMES[protocolId] ?? 'ELM327 PROTOCOLO ' + protocolId;
+}
+
+function classifyConnectionFailure(error: unknown): ElmErrorType {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return classifyElmError(message, message);
+}
+
+function shouldTryProtocolFallback(result: ElmCommandResult): boolean {
+  const value = String(result.response || '').toUpperCase();
+  // Quando o ELM já respondeu explicitamente que não conseguiu acessar o barramento,
+  // trocar o protocolo imediatamente só repete timeouts. O retry do candidato fica
+  // sob controle do ciclo externo; aqui preservamos a causa observável.
+  return !/\\b(?:NO DATA|UNABLE TO CONNECT|BUS INIT|BUS ERROR|STOPPED)\\b/.test(value);
 }
 
 export function isValidEcuProbe(result: ElmCommandResult): boolean {
@@ -215,17 +228,22 @@ export async function createRealElmSession(
         error: cause instanceof Error ? cause.message : String(cause),
       });
 
-      if (attempt === MAX_BLUETOOTH_ATTEMPTS) {
+      const failureType = classifyConnectionFailure(cause);
+      logBluetoothDiagnostic('BLUETOOTH_FAILURE_CLASSIFIED', { attempt, failureType });
+      const terminalEcuFailure = /ECU NÃO RESPONDEU AO 010C/i.test(cause instanceof Error ? cause.message : String(cause));
+      if (attempt === MAX_BLUETOOTH_ATTEMPTS || terminalEcuFailure) {
         break;
       }
 
+      const waitMs = Math.min(BLUETOOTH_RETRY_INTERVAL_MS * (2 ** (attempt - 1)), 8000);
       logBluetoothDiagnostic('BLUETOOTH_RETRY_WAIT_START', {
         attempt,
         nextAttempt: attempt + 1,
-        waitMs: BLUETOOTH_RETRY_INTERVAL_MS,
+        waitMs,
+        failureType,
         continueAfterSuccess: false,
       });
-      await new Promise((resolve) => setTimeout(resolve, BLUETOOTH_RETRY_INTERVAL_MS));
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
       logBluetoothDiagnostic('BLUETOOTH_RETRY_WAIT_END', {
         nextAttempt: attempt + 1,
       });
@@ -286,8 +304,16 @@ async function createRealElmSessionAttempt(
     const protocolFallbacks = ['5', '3', '4', '6', '7', '8', '9'];
     let successfulForcedProtocol: string | null = null;
 
+    if (!probeIsValid && !shouldTryProtocolFallback(ecuProbe)) {
+      logBluetoothDiagnostic('ECU_PROBE_TERMINAL', {
+        response: ecuProbe.response,
+        status: ecuProbe.status,
+        action: 'SKIP_PROTOCOL_FALLBACKS',
+      });
+    }
+
     for (const protocol of protocolFallbacks) {
-      if (probeIsValid) break;
+      if (probeIsValid || !shouldTryProtocolFallback(ecuProbe)) break;
       const forcedProtocol = await session.executeCommand(`ATSP${protocol}`);
       if (forcedProtocol.status !== 'OK') continue;
       ecuProbe = await session.executeCommand('010C');
