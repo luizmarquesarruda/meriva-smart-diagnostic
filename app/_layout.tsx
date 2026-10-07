@@ -133,6 +133,7 @@ export default function RootLayout() {
         checkBluetooth(
           settings.autoConnectObd,
           settings.diagnosticAlerts,
+        ),
         startGps(settings.diagnosticAlerts),
       ]);
     };
