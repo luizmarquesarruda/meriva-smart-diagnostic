@@ -4,6 +4,9 @@ import { Platform } from 'react-native';
 import { getLastBluetoothDiagnosticText } from '../obd/bluetoothManager';
 import { getSharedObdConnection, getSharedObdLastError, getSharedObdDiagnosticContext } from '../obd/sharedConnection';
 import { readLearningProfile, type MerivaLearningProfile } from '../database/learningProfile';
+import { getAutoSaveState } from '../meriva/autosaveManager';
+import { runLocalDiagnostic, type DiagnosticResult } from '../diagnostics/diagnosticEngine';
+import type { PidObservation } from '../types/sourceTypes';
 
 async function readCurrentLearningProfile(): Promise<MerivaLearningProfile | null> {
   const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
@@ -28,6 +31,44 @@ function extractLastTraceError(trace: string): string | null {
     }
   }
   return null;
+}
+
+function diagnosticReportLines(result: DiagnosticResult): string[] {
+  const lines = [
+    '--- DIAGNÓSTICO LOCAL / MOTOR DE EVIDÊNCIAS ---',
+    `MOTOR: ${result.engine}`,
+    `VERSÃO: ${result.version}`,
+    `AMOSTRAS DE SIMULAÇÃO BLOQUEADAS: ${result.blockedSimulationSamples}`,
+  ];
+  if (result.hypotheses.length === 0) {
+    lines.push('NENHUMA HIPÓTESE DIAGNÓSTICA GERADA COM AS EVIDÊNCIAS DISPONÍVEIS.');
+  }
+  for (const hypothesis of result.hypotheses) {
+    lines.push(`HIPÓTESE: ${hypothesis.label}`);
+    lines.push(`CONFIANÇA: ${hypothesis.confidence} | SCORE: ${hypothesis.score}`);
+    for (const evidence of hypothesis.evidence) {
+      lines.push(`  EVIDÊNCIA: ${evidence}`);
+    }
+    for (const nextTest of hypothesis.nextTests) {
+      lines.push(`  PRÓXIMO TESTE: ${nextTest}`);
+    }
+  }
+  lines.push(`NOTA: ${result.disclaimer}`);
+  return lines;
+}
+
+function buildLocalDiagnostic(): DiagnosticResult {
+  const state = getAutoSaveState();
+  const observations: PidObservation[] = state.lastReadings.map((reading) => ({
+    pid: reading.pid,
+    name: reading.name,
+    value: reading.value,
+    unit: reading.unit,
+    source: reading.source === 'SIMULACAO' ? 'SIMULACAO' : 'REAL_OBD',
+    timestamp: reading.timestamp,
+    confidence: reading.source === 'SIMULACAO' ? 'LOW' : 'GOOD',
+  }));
+  return runLocalDiagnostic({ observations, dtcs: state.dtcs, condition: 'UNKNOWN' });
 }
 
 function learningReportLines(profile: MerivaLearningProfile | null): string[] {
@@ -72,6 +113,7 @@ async function buildReport(): Promise<string> {
   const context = getSharedObdDiagnosticContext();
   const trace = connection?.getDiagnosticsText() || context.trace || getLastBluetoothDiagnosticText();
   const learningProfile = await readCurrentLearningProfile();
+  const localDiagnostic = buildLocalDiagnostic();
   const lines = [
     'MERIVA SMART',
     'BLUETOOTH CLASSIC / ELM327 DIAGNOSTIC REPORT',
@@ -87,6 +129,8 @@ async function buildReport(): Promise<string> {
     ...context.devices.map((device, index) => `PAIRED ${index + 1}: ${device.name} | ${device.address}`),
     '',
     ...learningReportLines(learningProfile),
+    '',
+    ...diagnosticReportLines(localDiagnostic),
     '',
     '--- RAW BLUETOOTH TRACE ---',
     trace || 'NENHUM EVENTO REGISTRADO.',
