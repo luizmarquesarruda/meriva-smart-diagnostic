@@ -10,7 +10,7 @@ import bluetoothConfig from '../knowledge/bluetooth_config.json';
 
 let lastBluetoothDiagnosticText = '';
 
-function logBluetoothDiagnostic(event: string, details?: unknown): void {
+export function logBluetoothDiagnostic(event: string, details?: unknown): void {
   const time = new Date().toISOString();
   let line = `[${time}] ${event}`;
   if (details !== undefined) {
