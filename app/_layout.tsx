@@ -8,6 +8,7 @@ import { connectPreferredElm, disconnectSharedObd } from '../src/obd/sharedConne
 import * as FileSystem from 'expo-file-system';
 import { initAutoSave, updateAutoSaveState } from '../src/meriva/autosaveManager';
 import { autoTripService } from '../src/trip/autoTripService';
+import { requestAllRequiredPermissions } from '../src/permissions/permissionManager';
 
 export default function RootLayout() {
   const checking = useRef(false);
@@ -23,7 +24,13 @@ export default function RootLayout() {
     const preparePermissions = async () => {
       if (permissionsChecked.current) return;
       if (Platform.OS === 'android') {
-        await requestBluetoothPermissions();
+        const audit = await requestAllRequiredPermissions();
+        if (audit.bluetooth !== 'GRANTED') {
+          throw new Error('PERMISSÃO DE BLUETOOTH/DISPOSITIVOS PRÓXIMOS NÃO CONCEDIDA.');
+        }
+        if (audit.location !== 'GRANTED') {
+          throw new Error('PERMISSÃO DE GPS/LOCALIZAÇÃO NÃO CONCEDIDA.');
+        }
       }
       permissionsChecked.current = true;
     };
