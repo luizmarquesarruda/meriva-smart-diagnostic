@@ -7,6 +7,24 @@ import { discoverPairedDevices, ensureBluetoothReady } from '../src/obd/bluetoot
 import { connectPreferredElm, getSharedObdConnection, getSharedObdStatus, subscribeSharedObd, subscribeSharedObdStatus, disconnectSharedObd } from '../src/obd/sharedConnection';
 import { readAppSettings, writeAppSettings } from '../src/database/appSettings';
 
+export default function lifecycleLabel(lifecycle: ReturnType<typeof getSharedObdStatus>['lifecycle']): string {
+  const labels: Record<typeof lifecycle, string> = {
+    UNSUPPORTED: 'BLUETOOTH INDISPONÍVEL',
+    BLUETOOTH_OFF: 'BLUETOOTH DESLIGADO',
+    BLUETOOTH_ON: 'BLUETOOTH LIGADO',
+    DEVICE_SELECTED: 'DISPOSITIVO SELECIONADO',
+    BLUETOOTH_CONNECTING: 'CONECTANDO BLUETOOTH',
+    BLUETOOTH_CONNECTED: 'BLUETOOTH CONECTADO',
+    ELM_RESPONDING: 'ELM327 RESPONDENDO',
+    ELM_INITIALIZED: 'ELM327 INICIALIZADO',
+    ECU_RESPONDING: 'ECU RESPONDENDO',
+    READY: 'DIAGNÓSTICO PRONTO',
+    DISCONNECTED: 'BLUETOOTH DESCONECTADO',
+    ERROR: 'FALHA DE CONEXÃO',
+  };
+  return labels[lifecycle];
+}
+
 export default function BluetoothScreen() {
   const [devices, setDevices] = useState<BluetoothDeviceInfo[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
@@ -113,19 +131,19 @@ export default function BluetoothScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <Text style={styles.title}>BLUETOOTH</Text>
-          <Text style={styles.subtitle}>ELM327 • BLUETOOTH CLASSIC • SPP</Text>
+          <Text style={styles.subtitle}>ELM327 • BLUETOOTH CLASSIC</Text>
         </View>
 
         <View style={styles.connectionCard}>
           <Text style={styles.label}>BLUETOOTH</Text>
           <Text style={bluetoothConnected ? styles.online : styles.waiting}>{bluetoothConnected ? '🟢 CONECTADO' : '🟡 AGUARDANDO'}</Text>
           <Text style={styles.detail}>{bluetoothConnected ? (connectedName ?? 'ELM327') : status}</Text>
-          <Text style={styles.detail}>ESTADO: {lifecycle}</Text>
+          <Text style={styles.detail}>ESTADO: {lifecycleLabel(lifecycle)}</Text>
         </View>
         <View style={styles.connectionCard}>
           <Text style={styles.label}>ELM327</Text>
           <Text style={lifecycle === 'READY' ? styles.online : styles.waiting}>
-            {lifecycle === 'READY' ? '🟢 PRONTO' : lifecycle === 'ELM_INITIALIZED' ? '🟢 INICIALIZADO' : lifecycle === 'ELM_RESPONDING' ? '🟢 RESPONDENDO' : '⚪ AGUARDANDO'}
+            {lifecycle === 'READY' ? '🟢 PRONTO' : lifecycle === 'ELM_INITIALIZED' ? '🟢 INICIALIZADO' : lifecycle === 'ELM_RESPONDING' ? '🟢 RESPONDENDO' : lifecycle === 'BLUETOOTH_CONNECTED' ? '🟡 AGUARDANDO RESPOSTA' : '⚪ AGUARDANDO'}
           </Text>
         </View>
         <View style={styles.connectionCard}>
