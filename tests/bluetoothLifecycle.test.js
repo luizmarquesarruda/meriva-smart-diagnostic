@@ -34,3 +34,9 @@ assert(bluetoothScreen.includes('bluetoothConnected ? styles.online'));
 assert(dashboard.includes('connectPreferredElm(settings.selectedAdapterAddress'));
 
 console.log('bluetoothLifecycle.test.js: OK');
+
+const bluetoothScreenSource = fs.readFileSync(path.join(ROOT, 'app', 'bluetooth.tsx'), 'utf8');
+assert(bluetoothScreenSource.includes('DIAGNÓSTICO PRONTO'));
+assert(bluetoothScreenSource.includes('BLUETOOTH DESCONECTADO'));
+assert(bluetoothScreenSource.includes('AGUARDANDO RESPOSTA'));
+assert(!bluetoothScreenSource.includes('BLUETOOTH CLASSIC • SPP'));
