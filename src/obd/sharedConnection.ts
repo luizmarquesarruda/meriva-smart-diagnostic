@@ -80,8 +80,13 @@ async function handleUnexpectedDisconnect(reason: string): Promise<void> {
   emit();
 
   if (connection) {
-    await persistDisconnectedState();
-    try { await connection.session.close(); } catch { /* sessão já perdida */ }
+    intentionalDisconnect = true;
+    try {
+      await persistDisconnectedState();
+      try { await connection.session.close(); } catch { /* sessão já perdida */ }
+    } finally {
+      intentionalDisconnect = false;
+    }
   }
 }
 
@@ -123,6 +128,31 @@ function looksLikeElm327(device: BluetoothDeviceInfo): boolean {
 
 function sameAddress(a: string, b: string): boolean {
   return a.replace(/:/g, '').toUpperCase() === b.replace(/:/g, '').toUpperCase();
+}
+export type ConnectionSelectionMode = 'PREFERRED' | 'EXPLICIT';
+
+export function buildCandidateList(
+  devices: BluetoothDeviceInfo[],
+  preferredAddress: string | null,
+  selectionMode: ConnectionSelectionMode = 'PREFERRED',
+): BluetoothDeviceInfo[] {
+  const candidates: BluetoothDeviceInfo[] = [];
+  const addCandidate = (device: BluetoothDeviceInfo) => {
+    if (!candidates.some((item) => sameAddress(item.address, device.address))) {
+      candidates.push(device);
+    }
+  };
+
+  if (preferredAddress) {
+    const preferred = devices.find((device) => sameAddress(device.address, preferredAddress));
+    if (preferred) addCandidate(preferred);
+  }
+
+  if (selectionMode === 'EXPLICIT') return candidates;
+
+  for (const device of devices.filter(looksLikeElm327)) addCandidate(device);
+  for (const device of devices) addCandidate(device);
+  return candidates;
 }
 
 export function getSharedObdConnection(): SharedObdConnection | null {
@@ -207,6 +237,7 @@ async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm3
 async function connectPreferredElmOnce(
   compatibility: Elm327CompatibilityConfig,
   preferredAddress: string | null,
+  selectionMode: ConnectionSelectionMode = 'PREFERRED',
 ): Promise<SharedObdConnection> {
   clearBluetoothDiagnostic();
   lastDiscoveryDevices = [];
@@ -215,20 +246,7 @@ async function connectPreferredElmOnce(
 
   const devices = await discoverPairedDevices();
   lastDiscoveryDevices = devices;
-  const candidates: BluetoothDeviceInfo[] = [];
-  const addCandidate = (device: BluetoothDeviceInfo) => {
-    if (!candidates.some((item) => sameAddress(item.address, device.address))) candidates.push(device);
-  };
-
-  // Um endereço salvo só pode ser priorizado se continuar pareado.
-  // Em seguida, priorizamos nomes que indicam OBD/ELM e só depois outros
-  // dispositivos Classic. Pareamento nunca significa conexão ativa.
-  if (preferredAddress) {
-    const preferred = devices.find((device) => sameAddress(device.address, preferredAddress));
-    if (preferred) addCandidate(preferred);
-  }
-  for (const device of devices.filter(looksLikeElm327)) addCandidate(device);
-  for (const device of devices) addCandidate(device);
+  const candidates = buildCandidateList(devices, preferredAddress, selectionMode);
 
   let lastError: unknown = null;
   for (const device of candidates) {
@@ -247,6 +265,7 @@ async function connectPreferredElmOnce(
 export async function connectPreferredElm(
   preferredAddress: string | null = null,
   compatibility?: Partial<Elm327CompatibilityConfig>,
+  selectionMode: ConnectionSelectionMode = 'PREFERRED',
 ): Promise<SharedObdConnection> {
   if (active) return active;
   if (connecting) return connecting;
@@ -260,7 +279,7 @@ export async function connectPreferredElm(
     // após esgotar os candidatos evita um ciclo de conexão potencialmente
     // infinito quando nenhum adaptador responde.
     try {
-      return await connectPreferredElmOnce(config, preferredAddress);
+      return await connectPreferredElmOnce(config, preferredAddress, selectionMode);
     } catch (cause) {
       setConnectionError(cause);
       const message = cause instanceof Error ? cause.message : String(cause);
