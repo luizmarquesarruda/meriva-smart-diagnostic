@@ -190,6 +190,7 @@ export async function createRealElmSession(
   device: BluetoothDeviceInfo,
   compatibility?: Partial<Elm327CompatibilityConfig>,
   pidDiscoveryCache?: PidDiscoveryCache | null,
+  onBluetoothConnected?: () => void,
 ): Promise<RealElmConnection> {
   let lastCause: unknown = null;
 
@@ -209,6 +210,7 @@ export async function createRealElmSession(
         pidDiscoveryCache,
         attempt,
         MAX_BLUETOOTH_ATTEMPTS,
+        onBluetoothConnected,
       );
 
       logBluetoothDiagnostic('BLUETOOTH_ATTEMPT_RESULT', {
@@ -266,6 +268,7 @@ async function createRealElmSessionAttempt(
   pidDiscoveryCache: PidDiscoveryCache | null | undefined,
   attempt: number,
   maxAttempts: number,
+  onBluetoothConnected?: () => void,
 ): Promise<RealElmConnection> {
   logBluetoothDiagnostic('ELM_SESSION_START', {
     name: device.name,
@@ -282,6 +285,8 @@ async function createRealElmSessionAttempt(
   try {
     logBluetoothDiagnostic('ELM_INITIALIZATION_START', { attempt, maxAttempts });
     const initialization = await session.initialize();
+    onBluetoothConnected?.();
+    logBluetoothDiagnostic('BLUETOOTH_LINK_CONNECTED', { attempt });
     logBluetoothDiagnostic('ELM_INITIALIZATION_RESULT', initialization.map((item) => ({ command: item.command, status: item.status, response: item.response })));
 
     logBluetoothDiagnostic('ECU_PROBE_START', { command: '010C', attempt, maxAttempts });
