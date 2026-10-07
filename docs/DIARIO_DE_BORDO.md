@@ -289,3 +289,13 @@ A conexão só é considerada OBD/ECU válida depois de uma resposta real ao `01
 
 ### Próximo passo
 Executar a suíte completa pela CI, incluindo `npm ci`, doctor, validação, regressões e Android Release. Se houver falha, analisar o erro observado antes de qualquer nova alteração.
+
+
+## 2026-10-07 — Correção do bloqueio de typecheck na resiliência Bluetooth
+
+- A primeira correção de CI após o reforço Bluetooth ainda falhou no `typecheck`.
+- Causa exata: `sharedConnection.ts` passou a importar `logBluetoothDiagnostic`, mas a função em `bluetoothManager.ts` não estava exportada.
+- O erro foi reproduzido pelo CI #854 (job `validate`): `TS2724: './bluetoothManager' has no exported member named 'logBluetoothDiagnostic'`.
+- Correção aplicada: exportação explícita de `logBluetoothDiagnostic`.
+- Nenhuma alteração de comportamento Bluetooth adicional foi introduzida nesta correção; trata-se de um erro de integração entre módulos.
+- Próximo passo obrigatório: aguardar o novo CI do PR #25 e corrigir qualquer falha real de compilação/teste antes do merge.
