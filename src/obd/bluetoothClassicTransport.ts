@@ -302,9 +302,19 @@ export class BluetoothClassicTransport implements ObdTransport {
       const promptIndex = this.received.indexOf('>');
       if (promptIndex >= 0) {
         const response = this.received.slice(0, promptIndex);
-        this.received = this.received.slice(promptIndex + 1);
+        const trailing = this.received.slice(promptIndex + 1);
+        // O ELM327 Mini genérico pode repetir a mesma resposta e prompt no mesmo
+        // pacote (ex.: "UNABLE TO CONNECT\\r>UNABLE TO CONNECT\\r>"). Como não
+        // enviamos outro comando antes de consumir o prompt, qualquer conteúdo
+        // após o primeiro prompt pertence à resposta anterior e não pode vazar
+        // para o próximo comando.
+        this.received = '';
         const clean = response.replace(/^\s+|\s+$/g, '');
-        this.logDiagnostic('RESPONSE_COMPLETE', { response: clean });
+        const stale = trailing.replace(/^\s+|\s+$/g, '');
+        this.logDiagnostic('RESPONSE_COMPLETE', {
+          response: clean,
+          ...(stale ? { trailingDiscarded: stale } : {}),
+        });
         return clean;
       }
 
