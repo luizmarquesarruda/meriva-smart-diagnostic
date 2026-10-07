@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Alert, AppState, Linking, Platform } from 'react-native';
 import { Stack } from 'expo-router';
-import { ensureBluetoothReady, openBluetoothAppSettings, requestBluetoothPermissions } from '../src/obd/bluetoothManager';
+import { ensureBluetoothReady, requestBluetoothPermissions } from '../src/obd/bluetoothManager';
 import * as Location from 'expo-location';
 import { gpsTracker } from '../src/gps';
 import { readAppSettings, writeAppSettings } from '../src/database/appSettings';
@@ -39,7 +39,6 @@ export default function RootLayout() {
     const checkBluetooth = async (
       autoConnectObd: boolean,
       diagnosticAlerts: boolean,
-      selectedAdapterAddress: string | null,
     ) => {
       if (checking.current) return;
       checking.current = true;
@@ -75,8 +74,8 @@ export default function RootLayout() {
                 ? cause.message
                 : 'Bluetooth necessário para diagnóstico do veículo.',
             [
-              { text: 'Ativar Bluetooth', onPress: () => void checkBluetooth(true, true, null) },
-              { text: 'Tentar novamente', onPress: () => void checkBluetooth(true, true, null) },
+              { text: 'Ativar Bluetooth', onPress: () => void checkBluetooth(true, true) },
+              { text: 'Tentar novamente', onPress: () => void checkBluetooth(true, true) },
             ],
           );
         }
@@ -134,8 +133,6 @@ export default function RootLayout() {
         checkBluetooth(
           settings.autoConnectObd,
           settings.diagnosticAlerts,
-          settings.selectedAdapterAddress,
-        ),
         startGps(settings.diagnosticAlerts),
       ]);
     };
