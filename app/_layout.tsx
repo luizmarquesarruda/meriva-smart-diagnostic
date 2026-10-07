@@ -1,8 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Alert, AppState, Linking, Platform } from 'react-native';
 import { Stack } from 'expo-router';
-import { ensureBluetoothReady, openBluetoothAppSettings, requestBluetoothPermissions } from '../src/obd/bluetoothManager';
-import * as Location from 'expo-location';
+import { ensureBluetoothReady, requestBluetoothPermissions } from '../src/obd/bluetoothManager';
 import { gpsTracker } from '../src/gps';
 import { readAppSettings, writeAppSettings } from '../src/database/appSettings';
 import { connectPreferredElm, disconnectSharedObd } from '../src/obd/sharedConnection';
@@ -26,20 +25,12 @@ export default function RootLayout() {
       if (Platform.OS === 'android') {
         await requestBluetoothPermissions();
       }
-      let locationPermission = await Location.getForegroundPermissionsAsync();
-      if (locationPermission.status !== Location.PermissionStatus.GRANTED) {
-        locationPermission = await Location.requestForegroundPermissionsAsync();
-      }
-      if (locationPermission.status !== Location.PermissionStatus.GRANTED) {
-        throw new Error('PERMISSÃO DE LOCALIZAÇÃO NÃO CONCEDIDA. O GPS é necessário para velocidade, distância e viagem automática.');
-      }
       permissionsChecked.current = true;
     };
 
     const checkBluetooth = async (
       autoConnectObd: boolean,
       diagnosticAlerts: boolean,
-      selectedAdapterAddress: string | null,
     ) => {
       if (checking.current) return;
       checking.current = true;
@@ -48,7 +39,7 @@ export default function RootLayout() {
         if (!autoConnectObd) return;
         await ensureBluetoothReady();
         const settings = await loadSettings();
-        const connection = await connectPreferredElm(null);
+        const connection = await connectPreferredElm(settings.selectedAdapterAddress);
         await writeAppSettings(basePath, {
           ...settings,
           selectedAdapterAddress: connection.device.address,
@@ -62,19 +53,21 @@ export default function RootLayout() {
             lastConnectedAt: new Date().toISOString(),
           };
         });
-        if (!connection.protocol) throw new Error('ELM RESPONDEU, MAS O PROTOCOLO NÃO FOI IDENTIFICADO.');
+        // 010C validado é o critério real de ECU. Protocolo pode permanecer N/D.
       } catch (cause) {
         const now = Date.now();
         if (diagnosticAlerts && now - lastFailureAt.current > 2500) {
           lastFailureAt.current = now;
           Alert.alert(
             'Bluetooth necessário',
-            cause instanceof Error
-              ? cause.message
-              : 'Ative o Bluetooth e permita o acesso a dispositivos próximos para usar o ELM327.',
+            cause instanceof Error && /BLUETOOTH.*DESLIGADO|BLUETOOTH CONTINUA DESLIGADO|BLUETOOTH NÃO FOI ATIVADO/i.test(cause.message)
+              ? 'Bluetooth necessário para diagnóstico do veículo.'
+              : cause instanceof Error
+                ? cause.message
+                : 'Bluetooth necessário para diagnóstico do veículo.',
             [
-              { text: 'Abrir configurações', onPress: () => void openBluetoothAppSettings() },
-              { text: 'Tentar novamente', onPress: () => void checkBluetooth(true, true, null) },
+              { text: 'Ativar Bluetooth', onPress: () => void checkBluetooth(true, true) },
+              { text: 'Tentar novamente', onPress: () => void checkBluetooth(true, true) },
             ],
           );
         }
@@ -118,11 +111,11 @@ export default function RootLayout() {
         if (settings.diagnosticAlerts && now - lastFailureAt.current > 2500) {
           lastFailureAt.current = now;
           Alert.alert(
-            'Permissões necessárias',
-            cause instanceof Error ? cause.message : 'O aplicativo precisa de acesso ao Bluetooth e à localização para funcionar.',
+            'Permissão de Bluetooth',
+            cause instanceof Error ? cause.message : 'Permissão de Bluetooth necessária para diagnóstico do veículo.',
             [
-              { text: 'Abrir configurações', onPress: () => void Linking.openSettings() },
               { text: 'Tentar novamente', onPress: () => void startup() },
+              { text: 'Fechar', style: 'cancel' },
             ],
           );
         }
@@ -132,7 +125,6 @@ export default function RootLayout() {
         checkBluetooth(
           settings.autoConnectObd,
           settings.diagnosticAlerts,
-          null,
         ),
         startGps(settings.diagnosticAlerts),
       ]);

@@ -1,31 +1,12 @@
-import { PermissionsAndroid, Platform, Linking } from 'react-native';
-import * as Location from 'expo-location';
+import { PermissionsAndroid, Platform } from 'react-native';
 import RNBluetoothClassic from 'react-native-bluetooth-classic';
 import { BluetoothClassicTransport, BluetoothDeviceInfo, listBondedBluetoothDevices } from './bluetoothClassicTransport';
 import { ElmCommandResult, Elm327Session } from './elm327';
+import { parsePidResponse } from './parser';
 import { Elm327CompatibilityConfig, DEFAULT_ELM327_COMPATIBILITY, mergeCompatibilityConfig } from './elm327Compatibility';
 import { discoverIntelligentPids } from './intelligentPidDiscovery';
 import type { PidDiscoveryCache } from '../meriva/autosaveState';
 import bluetoothConfig from '../knowledge/bluetooth_config.json';
-
-export type BluetoothConnectionStatus =
-  | 'BLUETOOTH INDISPONÍVEL'
-  | 'BLUETOOTH DESLIGADO'
-  | 'BLUETOOTH CONECTANDO'
-  | 'BLUETOOTH CONECTADO'
-  | 'ELM RESPONDENDO'
-  | 'ELM NÃO RESPONDE'
-  | 'ECU RESPONDENDO'
-  | 'ECU NÃO RESPONDE'
-  | 'PROTOCOLO IDENTIFICADO'
-  | 'PROTOCOLO NÃO IDENTIFICADO'
-  | 'ERRO';
-
-export interface BluetoothConnectionState {
-  status: BluetoothConnectionStatus;
-  device?: BluetoothDeviceInfo;
-  error?: string;
-}
 
 let lastBluetoothDiagnosticText = '';
 
@@ -54,6 +35,14 @@ export interface RealElmConnection {
   pidDiscoverySource: 'CACHE' | 'ECU';
 }
 
+export interface RealElmSessionCallbacks {
+  onBluetoothConnected?: () => void;
+  onElmResponding?: () => void;
+  onElmInitialized?: () => void;
+  onEcuResponding?: () => void;
+  onDisconnected?: (reason: string) => void;
+}
+
 /** A conexão só é considerada OBD real quando existe um payload 41 0C válido. */
 const ELM_PROTOCOL_NAMES: Record<string, string> = {
   '0': 'AUTO',
@@ -71,10 +60,9 @@ export function getElmProtocolName(protocolId: string): string {
 }
 
 export function isValidEcuProbe(result: ElmCommandResult): boolean {
-  const stream = result.response.replace(/[^0-9A-F]/gi, '').toUpperCase();
-  const marker = '410C';
-  const index = stream.indexOf(marker);
-  return result.status === 'OK' && index >= 0 && stream.length >= index + marker.length + 4;
+  if (result.status !== 'OK' || !result.response.trim()) return false;
+  const parsed = parsePidResponse('010C', result.response);
+  return parsed.status === 'RESPONDEU' && parsed.value !== null && Number.isFinite(parsed.value);
 }
 
 export async function requestBluetoothPermissions(): Promise<void> {
@@ -95,14 +83,8 @@ export async function requestBluetoothPermissions(): Promise<void> {
       throw new Error('PERMISSÃO DE DISPOSITIVOS PRÓXIMOS NÃO CONCEDIDA. PERMITA O ACESSO NAS CONFIGURAÇÕES DO APLICATIVO.');
     }
 
-    // O app também usa o GPS para velocidade, distância e consumo.
-    // Bluetooth não concede localização automaticamente, então a permissão
-    // do GPS precisa ser solicitada separadamente.
-    const location = await Location.requestForegroundPermissionsAsync();
-    logBluetoothDiagnostic('LOCATION_PERMISSION_RESULT', { status: location.status });
-    if (location.status !== Location.PermissionStatus.GRANTED) {
-      throw new Error('PERMISSÃO DE LOCALIZAÇÃO NÃO CONCEDIDA. O GPS É NECESSÁRIO PARA VELOCIDADE E DISTÂNCIA.');
-    }
+    // No Android 12+, operações Bluetooth usam BLUETOOTH_CONNECT/SCAN.
+    // A permissão de localização do GPS é tratada separadamente pelo app.
     return;
   }
 
@@ -138,8 +120,13 @@ export async function ensureBluetoothReady(): Promise<boolean> {
     throw new Error('ESTE ANDROID NÃO POSSUI BLUETOOTH COMPATÍVEL');
   }
 
-  const enabled = await bluetoothClassic.isBluetoothEnabled();
+  let enabled = await bluetoothClassic.isBluetoothEnabled();
   logBluetoothDiagnostic('BLUETOOTH_ENABLED', enabled);
+  if (!enabled) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    enabled = await bluetoothClassic.isBluetoothEnabled();
+    logBluetoothDiagnostic('BLUETOOTH_ENABLED_RECHECK', enabled);
+  }
   if (enabled) return true;
 
   const requestBluetoothEnabled = bluetoothClassic.requestBluetoothEnabled;
@@ -161,11 +148,6 @@ export async function ensureBluetoothReady(): Promise<boolean> {
   }
 
   return true;
-}
-
-export async function openBluetoothAppSettings(): Promise<void> {
-  if (Platform.OS !== 'android') return;
-  await Linking.openSettings();
 }
 
 export async function discoverPairedDevices(): Promise<BluetoothDeviceInfo[]> {
@@ -190,7 +172,7 @@ export async function createRealElmSession(
   device: BluetoothDeviceInfo,
   compatibility?: Partial<Elm327CompatibilityConfig>,
   pidDiscoveryCache?: PidDiscoveryCache | null,
-  onBluetoothConnected?: () => void,
+  callbacks?: RealElmSessionCallbacks,
 ): Promise<RealElmConnection> {
   let lastCause: unknown = null;
 
@@ -210,7 +192,7 @@ export async function createRealElmSession(
         pidDiscoveryCache,
         attempt,
         MAX_BLUETOOTH_ATTEMPTS,
-        onBluetoothConnected,
+        callbacks,
       );
 
       logBluetoothDiagnostic('BLUETOOTH_ATTEMPT_RESULT', {
@@ -268,7 +250,7 @@ async function createRealElmSessionAttempt(
   pidDiscoveryCache: PidDiscoveryCache | null | undefined,
   attempt: number,
   maxAttempts: number,
-  onBluetoothConnected?: () => void,
+  callbacks?: RealElmSessionCallbacks,
 ): Promise<RealElmConnection> {
   logBluetoothDiagnostic('ELM_SESSION_START', {
     name: device.name,
@@ -280,15 +262,22 @@ async function createRealElmSessionAttempt(
   // chamador (sharedConnection). Cada retry deve começar diretamente na sessão
   // RFCOMM/ELM, sem reabrir permissões ou reiniciar a preparação Bluetooth.
   const config = mergeCompatibilityConfig(compatibility ?? DEFAULT_ELM327_COMPATIBILITY);
-  const session = new Elm327Session(new BluetoothClassicTransport(device.address, config), config);
+  const session = new Elm327Session(
+    new BluetoothClassicTransport(device.address, config, {
+      onConnected: callbacks?.onBluetoothConnected,
+      onDisconnected: callbacks?.onDisconnected,
+    }),
+    config,
+  );
 
   try {
     logBluetoothDiagnostic('ELM_INITIALIZATION_START', { attempt, maxAttempts });
     const initialization = await session.initialize();
-    onBluetoothConnected?.();
-    logBluetoothDiagnostic('BLUETOOTH_LINK_CONNECTED', { attempt });
+    callbacks?.onElmResponding?.();
+    logBluetoothDiagnostic('ELM_RESPONDING', { attempt });
+    callbacks?.onElmInitialized?.();
+    logBluetoothDiagnostic('ELM_INITIALIZED', { attempt });
     logBluetoothDiagnostic('ELM_INITIALIZATION_RESULT', initialization.map((item) => ({ command: item.command, status: item.status, response: item.response })));
-
     logBluetoothDiagnostic('ECU_PROBE_START', { command: '010C', attempt, maxAttempts });
     let ecuProbe = await session.executeCommand('010C');
     logBluetoothDiagnostic('ECU_PROBE_RESULT', { status: ecuProbe.status, response: ecuProbe.response, attempt });
@@ -309,6 +298,7 @@ async function createRealElmSessionAttempt(
     if (!probeIsValid) {
       throw new Error(`ECU NÃO RESPONDEU AO 010C: ${ecuProbe.status} | RX=${ecuProbe.response || 'N/D'}`);
     }
+    callbacks?.onEcuResponding?.();
 
     await session.identifyProtocol();
     const identifiedProtocol = session.getProtocol();

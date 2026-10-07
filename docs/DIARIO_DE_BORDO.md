@@ -135,3 +135,75 @@ Assim o teste fica realmente abaixo do limiar de 15%, sem alterar a regra diagn�
 
 ### Próximo passo
 O próximo push dispara automaticamente a CI. **Não considerar a correção concluída até a nova CI terminar.** Se houver nova falha, analisar o log antes de alterar novamente o código.
+
+
+## 2026-10-07 — Reconciliação do lockfile e reprodutibilidade da CI
+
+### Problema
+O repositório não continha `package-lock.json`, apesar de a engenharia do projeto já depender de um conjunto declarado de versões no `package.json`. A CI usava `npm install`, deixando a árvore transitiva dependente do estado do registry em cada execução.
+
+### Diagnóstico
+A busca no branch e no histórico acessível não encontrou `package-lock.json` nem `npm-shrinkwrap.json`. O `package.json` atual contém as versões declaradas de Expo 51, React Native 0.74.5 e demais dependências. Um lockfile parcial seria incorreto porque não registraria o grafo transitivo completo.
+
+### Correção
+Foi criado um `package-lock.json` real, usando Node 20 + npm da própria CI com:
+`npm install --package-lock-only --ignore-scripts --no-audit --no-fund`.
+
+Validações estruturais:
+- `lockfileVersion: 3`;
+- 1.205 entradas no campo `packages`;
+- dependências da raiz correspondem ao `package.json`;
+- nenhum `npm-shrinkwrap.json` foi introduzido.
+
+O lockfile foi gerado pelo job temporário e gravado pelo commit:
+- `1d4c6db714b98498bc50527386ad8158e4077d0f` — `chore: generate package lock`
+- blob de `package-lock.json`: `101303c990597eec4f126ce5ee012eda0b5c1c13`
+
+O workflow temporário usado para gerar o arquivo será removido imediatamente após esta consolidação; ele não faz parte da arquitetura definitiva do projeto.
+
+### Mudança de CI
+Os dois jobs da CI passam de:
+`npm install --no-audit --no-fund`
+
+para:
+`npm ci --no-audit --no-fund`
+
+Assim, `validate` e `android-build` usam exatamente o grafo registrado no lockfile.
+
+### Regra preservada
+O lockfile não autoriza atualizar versões declaradas do projeto por conta própria. Ele registra a resolução transitiva correspondente ao `package.json` vigente.
+
+### Próximo passo
+Executar a nova CI completa com `npm ci`. A correção só será considerada concluída quando `validate` e `android-build` terminarem sem falha. Caso `npm ci` revele divergência de lockfile, corrigir o lockfile a partir do erro observado antes de qualquer outra alteração.
+
+
+## 2026-10-07 — Correção revelada pela validação com `npm ci`
+
+### Falha encontrada
+A validação no ambiente Node 20/npm 10 executou `npm ci` com sucesso e `expo-doctor` com **17/17**. O `npm run validate` encontrou uma regressão em `tests/regression.test.js` relacionada ao seed tardio do perfil de aprendizado.
+
+O cenário criava um perfil, registrava uma amostra real e depois inicializava o seed CarScanner. O código alterava o estado de aprendizado para `SEED_INITIALIZED`, embora já existisse aprendizado real.
+
+### Diagnóstico
+A inicialização do seed deve complementar um perfil frio, não reclassificar um perfil que já começou a aprender com dados reais. O estado `COLD_START` continua correto abaixo do limiar mínimo de amostras reais; `LEARNING_ACTIVE` e `CONFIDENT` também devem ser preservados quando atingidos.
+
+### Correção
+Em `src/database/learningProfile.ts`, `initializeCarScannerSeed` passou a decidir o estado com a seguinte prioridade:
+1. `CONFIDENT` quando as amostras reais atingem o limiar alto;
+2. `LEARNING_ACTIVE` quando atingem o limiar mínimo;
+3. `COLD_START` quando existe pelo menos uma amostra real, mas ainda não atingiu o limiar;
+4. `SEED_INITIALIZED` somente quando ainda não existem amostras reais.
+
+O teste existente de seed tardio foi preservado porque expressa a invariável correta.
+
+### Commit
+- `9f65f057355f2cce0eec3cb9fcd3f4d51f18224` — `fix: preserve learning state when seed is initialized late`
+
+### CI
+O run intermediário que revelou a falha foi cancelado após a criação de novos commits, mas seu log comprovou:
+- `npm ci --no-audit --no-fund`: **sucesso**;
+- `npm run doctor`: **17/17**, sucesso;
+- `npm run validate`: falhou somente no cenário do seed tardio descrito acima.
+
+### Próximo passo
+Aguardar a nova CI no commit da correção. Validar novamente `npm ci`, typecheck, todos os testes e Android build antes de considerar o conjunto concluído.

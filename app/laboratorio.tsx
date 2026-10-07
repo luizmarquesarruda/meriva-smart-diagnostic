@@ -6,8 +6,9 @@ import { parseDtcResponse, parsePidResponse } from '../src/obd/parser';
 import { SimulatedObdTransport } from '../src/obd/simulatedTransport';
 import { BluetoothDeviceInfo } from '../src/obd/bluetoothClassicTransport';
 import { createRealElmSession, discoverPairedDevices } from '../src/obd/bluetoothManager';
+import { canPollObd } from '../src/obd/bluetoothState';
 import { discoverSupportedPids, KNOWN_PIDS } from '../src/obd/pidScanner';
-import { getSharedObdConnection, setSharedObdConnection, subscribeSharedObd, disconnectSharedObd } from '../src/obd/sharedConnection';
+import { getSharedObdConnection, getSharedObdStatus, setSharedObdConnection, subscribeSharedObd, disconnectSharedObd } from '../src/obd/sharedConnection';
 import { autoTripService } from '../src/trip/autoTripService';
 import { getMidLayout } from '../src/ui/midLayout';
 
@@ -74,7 +75,10 @@ export default function LaboratorioScreen() {
     });
 
     const unsubscribe = subscribeSharedObd((connection) => {
-      if (!connection) return;
+      if (!connection) {
+        sessionRef.current = null;
+        return;
+      }
       sessionRef.current = connection.session;
       setProtocol(connection.protocol ?? 'N/D');
       setStatus('ELM RESPONDENDO / CONEXÃO AUTOMÁTICA');
@@ -284,6 +288,9 @@ export default function LaboratorioScreen() {
     setStatus(mode === 'SIMULACAO' ? 'SIMULAÇÃO LOCAL: CONSULTANDO' : 'ECU CONSULTANDO');
     try {
       const activeSession = mode === 'SIMULACAO' ? simulationSession : sessionRef.current;
+      if (mode === 'REAL' && !canPollObd(getSharedObdStatus().lifecycle)) {
+        throw new Error('DIAGNÓSTICO AINDA NÃO ESTÁ PRONTO. AGUARDE BLUETOOTH, ELM327 E ECU.');
+      }
       if (!activeSession) throw new Error('CONECTE AO ELM327 ANTES DE TESTAR O PID');
       const result = mode === 'REAL'
         ? await autoTripService.withPollingPaused(() => activeSession.queryPid(pid))
@@ -313,6 +320,9 @@ export default function LaboratorioScreen() {
     setStatus(mode === 'SIMULACAO' ? 'SIMULAÇÃO LOCAL: DESCOBRINDO PIDs' : 'ECU: DESCOBRINDO PIDs');
     try {
       const activeSession = mode === 'SIMULACAO' ? simulationSession : sessionRef.current;
+      if (mode === 'REAL' && !canPollObd(getSharedObdStatus().lifecycle)) {
+        throw new Error('DIAGNÓSTICO AINDA NÃO ESTÁ PRONTO. AGUARDE BLUETOOTH, ELM327 E ECU.');
+      }
       if (!activeSession) throw new Error('CONECTE AO ELM327 ANTES DE DESCOBRIR PIDs');
       const items = await discoverSupportedPids(activeSession);
       const discovered = Array.from(new Set(items.flatMap((item) => item.supportedPids))).sort();
@@ -342,6 +352,9 @@ export default function LaboratorioScreen() {
     setStatus(mode === 'SIMULACAO' ? 'SIMULAÇÃO LOCAL: LENDO DTC' : 'ECU: LENDO DTC');
     try {
       const activeSession = mode === 'SIMULACAO' ? simulationSession : sessionRef.current;
+      if (mode === 'REAL' && !canPollObd(getSharedObdStatus().lifecycle)) {
+        throw new Error('DIAGNÓSTICO AINDA NÃO ESTÁ PRONTO. AGUARDE BLUETOOTH, ELM327 E ECU.');
+      }
       if (!activeSession) throw new Error('CONECTE AO ELM327 ANTES DE LER DTC');
 
       const result = mode === 'REAL'

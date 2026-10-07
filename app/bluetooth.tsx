@@ -7,6 +7,24 @@ import { discoverPairedDevices, ensureBluetoothReady } from '../src/obd/bluetoot
 import { connectPreferredElm, getSharedObdConnection, getSharedObdStatus, subscribeSharedObd, subscribeSharedObdStatus, disconnectSharedObd } from '../src/obd/sharedConnection';
 import { readAppSettings, writeAppSettings } from '../src/database/appSettings';
 
+function lifecycleLabel(lifecycle: ReturnType<typeof getSharedObdStatus>['lifecycle']): string {
+  const labels: Record<typeof lifecycle, string> = {
+    UNSUPPORTED: 'BLUETOOTH INDISPONÍVEL',
+    BLUETOOTH_OFF: 'BLUETOOTH DESLIGADO',
+    BLUETOOTH_ON: 'BLUETOOTH LIGADO',
+    DEVICE_SELECTED: 'DISPOSITIVO SELECIONADO',
+    BLUETOOTH_CONNECTING: 'CONECTANDO BLUETOOTH',
+    BLUETOOTH_CONNECTED: 'BLUETOOTH CONECTADO',
+    ELM_RESPONDING: 'ELM327 RESPONDENDO',
+    ELM_INITIALIZED: 'ELM327 INICIALIZADO',
+    ECU_RESPONDING: 'ECU RESPONDENDO',
+    READY: 'DIAGNÓSTICO PRONTO',
+    DISCONNECTED: 'BLUETOOTH DESCONECTADO',
+    ERROR: 'FALHA DE CONEXÃO',
+  };
+  return labels[lifecycle];
+}
+
 export default function BluetoothScreen() {
   const [devices, setDevices] = useState<BluetoothDeviceInfo[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
@@ -17,6 +35,7 @@ export default function BluetoothScreen() {
   const [connectedName, setConnectedName] = useState<string | null>(null);
   const [ecuConnected, setEcuConnected] = useState(getSharedObdStatus().ecuConnected);
   const [bluetoothConnected, setBluetoothConnected] = useState(getSharedObdStatus().bluetoothConnected);
+  const [lifecycle, setLifecycle] = useState(getSharedObdStatus().lifecycle);
 
   useEffect(() => {
     const unsubscribe = subscribeSharedObd((connection) => {
@@ -26,6 +45,7 @@ export default function BluetoothScreen() {
     });
     const unsubscribeStatus = subscribeSharedObdStatus((state) => {
       setBluetoothConnected(state.bluetoothConnected);
+      setLifecycle(state.lifecycle);
       setEcuConnected(state.ecuConnected);
       if (state.ecuConnected) setStatus('ECU CONECTADA');
       else if (state.bluetoothConnected) setStatus('BLUETOOTH CONECTADO');
@@ -37,10 +57,16 @@ export default function BluetoothScreen() {
     setLoading(true);
     setError('');
     try {
+      await ensureBluetoothReady();
       const paired = await discoverPairedDevices();
       setDevices(paired);
       const active = getSharedObdConnection();
-      if (active) setSelected(active.device.address);
+      if (active) {
+        setSelected(active.device.address);
+      } else {
+        const settings = await readAppSettings(`${FileSystem.documentDirectory}MERIVA_SMART`);
+        if (settings.selectedAdapterAddress) setSelected(settings.selectedAdapterAddress);
+      }
       setStatus(paired.length ? `${paired.length} DISPOSITIVO(S) PAREADO(S)` : 'NENHUM DISPOSITIVO PAREADO');
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'NÃO FOI POSSÍVEL ACESSAR O BLUETOOTH';
@@ -53,6 +79,18 @@ export default function BluetoothScreen() {
 
   useEffect(() => { void loadPaired(); }, [loadPaired]);
 
+  async function activateBluetooth() {
+    setError('');
+    setStatus('ATIVANDO BLUETOOTH...');
+    try {
+      await ensureBluetoothReady();
+      await loadPaired();
+    } catch (cause) {
+      setStatus('BLUETOOTH DESLIGADO');
+      setError(cause instanceof Error ? cause.message : 'Bluetooth necessário para diagnóstico do veículo.');
+    }
+  }
+
   async function connectSelected() {
     if (!selected) return;
     const device = devices.find((item) => item.address === selected);
@@ -62,7 +100,8 @@ export default function BluetoothScreen() {
     setError('');
     setStatus('ABRINDO BLUETOOTH CLASSIC...');
     try {
-      const connection = await connectPreferredElm(device.address);
+      await ensureBluetoothReady();
+      const connection = await connectPreferredElm(device.address, undefined, 'EXPLICIT');
       const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
       const settings = await readAppSettings(basePath);
       await writeAppSettings(basePath, { ...settings, selectedAdapterAddress: device.address });
@@ -92,18 +131,31 @@ export default function BluetoothScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <Text style={styles.title}>BLUETOOTH</Text>
-          <Text style={styles.subtitle}>ELM327 • BLUETOOTH CLASSIC • SPP</Text>
+          <Text style={styles.subtitle}>ELM327 • BLUETOOTH CLASSIC</Text>
         </View>
 
         <View style={styles.connectionCard}>
           <Text style={styles.label}>BLUETOOTH</Text>
-          <Text style={connectedName ? styles.online : styles.waiting}>{bluetoothConnected ? '🟢 CONECTADO' : '🟡 AGUARDANDO'}</Text>
+          <Text style={bluetoothConnected ? styles.online : styles.waiting}>{bluetoothConnected ? '🟢 CONECTADO' : '🟡 AGUARDANDO'}</Text>
           <Text style={styles.detail}>{bluetoothConnected ? (connectedName ?? 'ELM327') : status}</Text>
+          <Text style={styles.detail}>ESTADO: {lifecycleLabel(lifecycle)}</Text>
+        </View>
+        <View style={styles.connectionCard}>
+          <Text style={styles.label}>ELM327</Text>
+          <Text style={lifecycle === 'READY' ? styles.online : styles.waiting}>
+            {lifecycle === 'READY' ? '🟢 PRONTO' : lifecycle === 'ELM_INITIALIZED' ? '🟢 INICIALIZADO' : lifecycle === 'ELM_RESPONDING' ? '🟢 RESPONDENDO' : lifecycle === 'BLUETOOTH_CONNECTED' ? '🟡 AGUARDANDO RESPOSTA' : '⚪ AGUARDANDO'}
+          </Text>
         </View>
         <View style={styles.connectionCard}>
           <Text style={styles.label}>ECU</Text>
           <Text style={ecuConnected ? styles.online : styles.waiting}>{ecuConnected ? '🟢 CONECTADA' : connectedName ? '🟡 CONECTANDO' : '⚪ AGUARDANDO'}</Text>
         </View>
+
+        {lifecycle === 'BLUETOOTH_OFF' ? (
+          <TouchableOpacity style={styles.primary} onPress={() => void activateBluetooth()} disabled={loading || connecting}>
+            <Text style={styles.primaryText}>ATIVAR BLUETOOTH</Text>
+          </TouchableOpacity>
+        ) : null}
 
         <TouchableOpacity style={styles.primary} onPress={() => void loadPaired()} disabled={loading || connecting}>
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>BUSCAR DISPOSITIVOS PAREADOS</Text>}
@@ -124,7 +176,7 @@ export default function BluetoothScreen() {
         {!devices.length && !loading ? <Text style={styles.empty}>Pareie o ELM327 nas configurações do Android e volte aqui.</Text> : null}
 
         <TouchableOpacity style={[styles.primary, (!selected || connecting) && styles.disabled]} onPress={() => void connectSelected()} disabled={!selected || connecting}>
-          {connecting ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>CONECTAR E VALIDAR ELM327</Text>}
+          {connecting ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>{lifecycle === 'DISCONNECTED' ? 'RECONECTAR E VALIDAR ELM327' : 'CONECTAR E VALIDAR ELM327'}</Text>}
         </TouchableOpacity>
 
         {connectedName ? (
@@ -136,10 +188,9 @@ export default function BluetoothScreen() {
         {error ? <Text style={styles.error}>ERRO: {error}</Text> : null}
 
         <View style={styles.ruleCard}>
-          <Text style={styles.ruleTitle}>COMO O APP CONSIDERA CONECTADO</Text>
-          <Text style={styles.rule}>1. Bluetooth conecta → 🟢</Text>
-          <Text style={styles.rule}>2. ECU responde → 🟢</Text>
-          <Text style={styles.rule}>O app só considera o carro conectado quando a ECU responde.</Text>
+          <Text style={styles.ruleTitle}>FLUXO REAL DE CONEXÃO</Text>
+          <Text style={styles.rule}>Bluetooth ligado → dispositivo selecionado → Bluetooth conectado → ELM respondendo → ELM inicializado → ECU respondendo → pronto.</Text>
+          <Text style={styles.rule}>Pareado não significa conectado. ECU só fica verde após resposta OBD real.</Text>
         </View>
 
         <View style={styles.bottomNav}>

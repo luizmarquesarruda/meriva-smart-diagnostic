@@ -2,8 +2,10 @@ import type { Elm327Session } from './elm327';
 import type { BluetoothDeviceInfo } from './bluetoothClassicTransport';
 import { createRealElmSession, discoverPairedDevices, ensureBluetoothReady } from './bluetoothManager';
 import { DEFAULT_ELM327_COMPATIBILITY, Elm327CompatibilityConfig, mergeCompatibilityConfig } from './elm327Compatibility';
-import { getAutoSaveState } from '../meriva/autosaveManager';
+import { getAutoSaveState, saveNow, updateAutoSaveState } from '../meriva/autosaveManager';
 import { clearBluetoothDiagnostic, getLastBluetoothDiagnosticText } from './bluetoothManager';
+import { isBluetoothLinkUp, type BluetoothLifecycleState } from './bluetoothState';
+import RNBluetoothClassic from 'react-native-bluetooth-classic';
 
 export interface SharedObdConnection {
   session: Elm327Session;
@@ -14,19 +16,98 @@ export interface SharedObdConnection {
   getDiagnosticsText: () => string;
 }
 
+export interface SharedObdStatus {
+  lifecycle: BluetoothLifecycleState;
+  bluetoothConnected: boolean;
+  ecuConnected: boolean;
+}
+
 let active: SharedObdConnection | null = null;
 let connecting: Promise<SharedObdConnection> | null = null;
 let lastConnectionError: string | null = null;
 let lastDiscoveryDevices: BluetoothDeviceInfo[] = [];
 
 const listeners = new Set<(connection: SharedObdConnection | null) => void>();
-const statusListeners = new Set<(status: { bluetoothConnected: boolean; ecuConnected: boolean }) => void>();
+const statusListeners = new Set<(status: SharedObdStatus) => void>();
+let lifecycle: BluetoothLifecycleState = 'BLUETOOTH_OFF';
 let bluetoothConnected = false;
+let monitorTimer: ReturnType<typeof setInterval> | null = null;
+let monitorBusy = false;
+let intentionalDisconnect = false;
+let connectionGeneration = 0;
 
 function emit(): void {
+  bluetoothConnected = isBluetoothLinkUp(lifecycle);
   for (const listener of listeners) listener(active);
-  const status = { bluetoothConnected, ecuConnected: Boolean(active?.ecuValidated) };
+  const status: SharedObdStatus = {
+    lifecycle,
+    bluetoothConnected,
+    ecuConnected: Boolean(active?.ecuValidated),
+  };
   for (const listener of statusListeners) listener(status);
+}
+
+function setLifecycle(next: BluetoothLifecycleState): void {
+  lifecycle = next;
+  emit();
+}
+
+async function persistDisconnectedState(): Promise<void> {
+  try {
+    updateAutoSaveState((state) => {
+      state.obd = { ...state.obd, connected: false };
+    });
+    await saveNow('critical');
+  } catch {
+    // a perda de conectividade não deve derrubar a interface
+  }
+}
+
+async function handleUnexpectedDisconnect(reason: string): Promise<void> {
+  if (intentionalDisconnect) return;
+
+  connectionGeneration += 1;
+  lastConnectionError = reason;
+  const connection = active;
+  active = null;
+
+  if (monitorTimer) {
+    clearInterval(monitorTimer);
+    monitorTimer = null;
+  }
+
+  lifecycle = reason.includes('DESLIGADO') ? 'BLUETOOTH_OFF' : 'DISCONNECTED';
+  emit();
+
+  if (connection) {
+    intentionalDisconnect = true;
+    try {
+      await persistDisconnectedState();
+      try { await connection.session.close(); } catch { /* sessão já perdida */ }
+    } finally {
+      intentionalDisconnect = false;
+    }
+  }
+}
+
+function startBluetoothMonitor(): void {
+  if (monitorTimer) return;
+
+  monitorTimer = setInterval(() => {
+    if (monitorBusy || !active) return;
+    monitorBusy = true;
+
+    void (async () => {
+      try {
+        const enabled = await RNBluetoothClassic.isBluetoothEnabled();
+        if (!enabled) await handleUnexpectedDisconnect('BLUETOOTH DESLIGADO');
+      } catch {
+        // onDeviceDisconnected continua sendo a primeira linha de detecção
+      } finally {
+        monitorBusy = false;
+      }
+    })();
+  }, 1000);
 }
 
 function setConnectionError(cause: unknown): void {
@@ -48,6 +129,31 @@ function looksLikeElm327(device: BluetoothDeviceInfo): boolean {
 function sameAddress(a: string, b: string): boolean {
   return a.replace(/:/g, '').toUpperCase() === b.replace(/:/g, '').toUpperCase();
 }
+export type ConnectionSelectionMode = 'PREFERRED' | 'EXPLICIT';
+
+export function buildCandidateList(
+  devices: BluetoothDeviceInfo[],
+  preferredAddress: string | null,
+  selectionMode: ConnectionSelectionMode = 'PREFERRED',
+): BluetoothDeviceInfo[] {
+  const candidates: BluetoothDeviceInfo[] = [];
+  const addCandidate = (device: BluetoothDeviceInfo) => {
+    if (!candidates.some((item) => sameAddress(item.address, device.address))) {
+      candidates.push(device);
+    }
+  };
+
+  if (preferredAddress) {
+    const preferred = devices.find((device) => sameAddress(device.address, preferredAddress));
+    if (preferred) addCandidate(preferred);
+  }
+
+  if (selectionMode === 'EXPLICIT') return candidates;
+
+  for (const device of devices.filter(looksLikeElm327)) addCandidate(device);
+  for (const device of devices) addCandidate(device);
+  return candidates;
+}
 
 export function getSharedObdConnection(): SharedObdConnection | null {
   return active;
@@ -59,59 +165,91 @@ export function subscribeSharedObd(listener: (connection: SharedObdConnection | 
   return () => listeners.delete(listener);
 }
 
-export function getSharedObdStatus(): { bluetoothConnected: boolean; ecuConnected: boolean } {
-  return { bluetoothConnected, ecuConnected: Boolean(active?.ecuValidated) };
+export function getSharedObdStatus(): SharedObdStatus {
+  return {
+    lifecycle,
+    bluetoothConnected: isBluetoothLinkUp(lifecycle),
+    ecuConnected: Boolean(active?.ecuValidated),
+  };
 }
 
-export function subscribeSharedObdStatus(listener: (status: { bluetoothConnected: boolean; ecuConnected: boolean }) => void): () => void {
+export function subscribeSharedObdStatus(listener: (status: SharedObdStatus) => void): () => void {
   statusListeners.add(listener);
   listener(getSharedObdStatus());
   return () => statusListeners.delete(listener);
 }
 
 async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm327CompatibilityConfig): Promise<SharedObdConnection> {
-  bluetoothConnected = false;
-  emit();
-  const connection = await createRealElmSession(device, compatibility, getAutoSaveState().pidDiscovery, () => {
-    bluetoothConnected = true;
-    emit();
-  });
-  if (!connection.ecuValidated) {
-    try { await connection.session.close(); } catch { /* preserva o estado inválido */ }
-    throw new Error('ECU NÃO VALIDADA. OBLIGATÓRIO RECEBER 41 0C PARA MARCAR OBD COMO CONECTADO.');
+  setLifecycle('DEVICE_SELECTED');
+  setLifecycle('BLUETOOTH_CONNECTING');
+  intentionalDisconnect = false;
+
+  try {
+      const attemptGeneration = connectionGeneration;
+    let disconnectedDuringAttempt = false;
+    const connection = await createRealElmSession(
+      device,
+      compatibility,
+      getAutoSaveState().pidDiscovery,
+      {
+        onBluetoothConnected: () => setLifecycle('BLUETOOTH_CONNECTED'),
+        onElmResponding: () => setLifecycle('ELM_RESPONDING'),
+        onElmInitialized: () => setLifecycle('ELM_INITIALIZED'),
+        onEcuResponding: () => setLifecycle('ECU_RESPONDING'),
+        onDisconnected: (reason) => {
+          disconnectedDuringAttempt = true;
+          void handleUnexpectedDisconnect(reason);
+        },
+      },
+    );
+
+    if (attemptGeneration !== connectionGeneration || disconnectedDuringAttempt || intentionalDisconnect) {
+      try { await connection.session.close(); } catch { /* sessão já perdida */ }
+      throw new Error('CONEXÃO BLUETOOTH CANCELADA OU PERDIDA DURANTE A VALIDAÇÃO.');
+    }
+
+    if (!connection.ecuValidated) {
+      try { await connection.session.close(); } catch { /* preserva o estado inválido */ }
+      throw new Error('ECU NÃO VALIDADA. OBRIGATÓRIO RECEBER 41 0C PARA MARCAR OBD COMO CONECTADO.');
+    }
+
+    active = {
+      session: connection.session,
+      device,
+      protocol: connection.protocol,
+      supportedPids: connection.supportedPids,
+      ecuValidated: connection.ecuValidated,
+      getDiagnosticsText: () => connection.session.getTransportDiagnosticsText(),
+    };
+    lastConnectionError = null;
+    setLifecycle('READY');
+    startBluetoothMonitor();
+    return active;
+  } catch (cause) {
+    if (!active) {
+      lifecycle = 'DISCONNECTED';
+      emit();
+    }
+    throw cause;
   }
-  active = {
-    session: connection.session,
-    device,
-    protocol: connection.protocol,
-    supportedPids: connection.supportedPids,
-    ecuValidated: connection.ecuValidated,
-    getDiagnosticsText: () => connection.session.getTransportDiagnosticsText(),
-  };
-  lastConnectionError = null;
-  emit();
-  return active;
 }
 
 async function connectPreferredElmOnce(
   compatibility: Elm327CompatibilityConfig,
+  preferredAddress: string | null,
+  selectionMode: ConnectionSelectionMode = 'PREFERRED',
 ): Promise<SharedObdConnection> {
   clearBluetoothDiagnostic();
   lastDiscoveryDevices = [];
   await ensureBluetoothReady();
+  setLifecycle('BLUETOOTH_ON');
 
   const devices = await discoverPairedDevices();
   lastDiscoveryDevices = devices;
-  const candidates: BluetoothDeviceInfo[] = [];
-  const addCandidate = (device: BluetoothDeviceInfo) => {
-    if (!candidates.some((item) => sameAddress(item.address, device.address))) candidates.push(device);
-  };
-
-  // O aplicativo escolhe. Primeiro tenta nomes que indicam adaptador OBD/ELM;
-  // depois testa qualquer dispositivo Classic pareado. O candidato só é aceito
-  // após passar pela inicialização ELM e pelo teste real da ECU.
-  for (const device of devices.filter(looksLikeElm327)) addCandidate(device);
-  for (const device of devices) addCandidate(device);
+  const candidates = buildCandidateList(devices, preferredAddress, selectionMode);
+  if (selectionMode === 'EXPLICIT' && candidates.length === 0) {
+    throw new Error('DISPOSITIVO BLUETOOTH SELECIONADO NÃO ESTÁ MAIS PAREADO.');
+  }
 
   let lastError: unknown = null;
   for (const device of candidates) {
@@ -128,10 +266,16 @@ async function connectPreferredElmOnce(
 }
 
 export async function connectPreferredElm(
-  _ignoredPreferredAddress: string | null = null,
+  preferredAddress: string | null = null,
   compatibility?: Partial<Elm327CompatibilityConfig>,
+  selectionMode: ConnectionSelectionMode = 'PREFERRED',
 ): Promise<SharedObdConnection> {
-  if (active) return active;
+  if (active) {
+    if (selectionMode === 'EXPLICIT' && preferredAddress && !sameAddress(active.device.address, preferredAddress)) {
+      throw new Error('OUTRO ADAPTADOR JÁ ESTÁ CONECTADO. DESCONECTE O ATUAL ANTES DE TROCAR DE DISPOSITIVO.');
+    }
+    return active;
+  }
   if (connecting) return connecting;
 
   const config = mergeCompatibilityConfig(compatibility ?? DEFAULT_ELM327_COMPATIBILITY);
@@ -143,9 +287,15 @@ export async function connectPreferredElm(
     // após esgotar os candidatos evita um ciclo de conexão potencialmente
     // infinito quando nenhum adaptador responde.
     try {
-      return await connectPreferredElmOnce(config);
+      return await connectPreferredElmOnce(config, preferredAddress, selectionMode);
     } catch (cause) {
       setConnectionError(cause);
+      const message = cause instanceof Error ? cause.message : String(cause);
+      if (/BLUETOOTH.*DESLIGADO|BLUETOOTH CONTINUA DESLIGADO|BLUETOOTH NÃO FOI ATIVADO/i.test(message)) {
+        setLifecycle('BLUETOOTH_OFF');
+      } else {
+        setLifecycle('ERROR');
+      }
       throw cause;
     }
   })();
@@ -159,16 +309,34 @@ export async function connectPreferredElm(
 
 export async function setSharedObdConnection(connection: SharedObdConnection | null): Promise<void> {
   active = connection;
-  bluetoothConnected = Boolean(connection);
-  if (connection) lastConnectionError = null;
-  emit();
+  intentionalDisconnect = !connection;
+  if (!connection) connectionGeneration += 1;
+
+  if (connection) {
+    lastConnectionError = null;
+    setLifecycle('READY');
+    startBluetoothMonitor();
+  } else {
+    lifecycle = 'DISCONNECTED';
+    emit();
+  }
 }
 
 export async function disconnectSharedObd(): Promise<void> {
+  intentionalDisconnect = true;
+  connectionGeneration += 1;
   connecting = null;
+
+  if (monitorTimer) {
+    clearInterval(monitorTimer);
+    monitorTimer = null;
+  }
+
   const connection = active;
   active = null;
-  bluetoothConnected = false;
+  lifecycle = 'DISCONNECTED';
   emit();
+
   if (connection) await connection.session.close();
+  intentionalDisconnect = false;
 }

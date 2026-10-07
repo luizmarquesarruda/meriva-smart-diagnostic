@@ -3,36 +3,51 @@ import type { DataSource, DtcStatus, DtcRecord } from '../types/sourceTypes';
 
 export type { DtcRecord } from '../types/sourceTypes';
 
+const dtcQueues = new Map<string, Promise<void>>();
+
+function queueDtcWrite(target: string, operation: () => Promise<void>): Promise<void> {
+  const previous = dtcQueues.get(target) ?? Promise.resolve();
+  const current = previous.catch(() => undefined).then(operation);
+  dtcQueues.set(target, current.catch(() => undefined));
+  return current.finally(() => {
+    if (dtcQueues.get(target) === current) dtcQueues.delete(target);
+  });
+}
+
 export async function recordDtc(basePath: string, dtc: DtcRecord): Promise<void> {
-  await FileSystem.makeDirectoryAsync(`${basePath}/DTC`, { intermediates: true });
   const target = `${basePath}/DTC/dtc_records.txt`;
-  const line = [
-    dtc.code,
-    dtc.description ?? '',
-    dtc.status,
-    dtc.firstSeen,
-    dtc.lastSeen,
-    dtc.occurrences,
-    dtc.source,
-    dtc.historical ? 'true' : 'false',
-    dtc.confirmed ? 'true' : 'false',
-  ].join('|');
+  await queueDtcWrite(target, async () => {
+    await FileSystem.makeDirectoryAsync(`${basePath}/DTC`, { intermediates: true });
 
-  const info = await FileSystem.getInfoAsync(target);
-  if (!info.exists) {
-    await FileSystem.writeAsStringAsync(target, `${line}\n`, { encoding: FileSystem.EncodingType.UTF8 });
-    return;
-  }
+    const line = [
+      dtc.code,
+      dtc.description ?? '',
+      dtc.status,
+      dtc.firstSeen,
+      dtc.lastSeen,
+      dtc.occurrences,
+      dtc.source,
+      dtc.historical ? 'true' : 'false',
+      dtc.confirmed ? 'true' : 'false',
+    ].join('|');
 
-  const current = await FileSystem.readAsStringAsync(target);
-  const lines = current.split('\n').filter((item) => item.trim());
-  const filtered = lines.filter((item) => !item.startsWith(`${dtc.code}|`));
-  filtered.push(line);
-  await FileSystem.writeAsStringAsync(target, `${filtered.join('\n')}\n`, { encoding: FileSystem.EncodingType.UTF8 });
+    const info = await FileSystem.getInfoAsync(target);
+    if (!info.exists) {
+      await FileSystem.writeAsStringAsync(target, `${line}\n`, { encoding: FileSystem.EncodingType.UTF8 });
+      return;
+    }
+
+    const current = await FileSystem.readAsStringAsync(target);
+    const lines = current.split('\n').filter((item) => item.trim());
+    const filtered = lines.filter((item) => !item.startsWith(`${dtc.code}|`));
+    filtered.push(line);
+    await FileSystem.writeAsStringAsync(target, `${filtered.join('\n')}\n`, { encoding: FileSystem.EncodingType.UTF8 });
+  });
 }
 
 export async function readDtcs(basePath: string): Promise<DtcRecord[]> {
   const target = `${basePath}/DTC/dtc_records.txt`;
+  await (dtcQueues.get(target) ?? Promise.resolve()).catch(() => undefined);
   const info = await FileSystem.getInfoAsync(target);
   if (!info.exists) return [];
 

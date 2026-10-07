@@ -18,6 +18,11 @@ function normalizeBluetoothAddress(address: string): string {
 
 type RemovableSubscription = { remove: () => void };
 
+export interface BluetoothTransportCallbacks {
+  onConnected?: () => void;
+  onDisconnected?: (reason: string) => void;
+}
+
 export class BluetoothClassicTransport implements ObdTransport {
   private device: BluetoothDevice | null = null;
   private connected = false;
@@ -47,6 +52,7 @@ export class BluetoothClassicTransport implements ObdTransport {
   constructor(
     private readonly deviceAddress: string,
     config?: Partial<Elm327CompatibilityConfig>,
+    private readonly callbacks?: BluetoothTransportCallbacks,
   ) {
     this.config = mergeCompatibilityConfig(config ?? DEFAULT_ELM327_COMPATIBILITY);
   }
@@ -117,13 +123,11 @@ export class BluetoothClassicTransport implements ObdTransport {
       socketModes: ['INSECURE', 'SECURE'],
     });
 
-    let timedOutConnection = false;
     let connectPromise: NativeConnectPromise | null = null;
     const addressKey = normalizeBluetoothAddress(this.deviceAddress);
 
     for (const secureSocket of socketModes) {
-      let attemptTimedOut = false;
-      timedOutConnection = false;
+      let connectionRaceTimedOut = false;
       connectPromise = null;
       device = null;
 
@@ -155,7 +159,7 @@ export class BluetoothClassicTransport implements ObdTransport {
 
         const currentPromise = connectPromise;
         void currentPromise.then(async (lateDevice) => {
-          if (!attemptTimedOut || !lateDevice) return;
+          if (!connectionRaceTimedOut || !lateDevice) return;
           this.logDiagnostic('LATE_CONNECT_SUCCESS_AFTER_TIMEOUT', { secureSocket });
           await this.safeDisconnect(lateDevice);
           this.logDiagnostic('LATE_CONNECT_DISCONNECTED', { secureSocket });
@@ -170,7 +174,7 @@ export class BluetoothClassicTransport implements ObdTransport {
         device = await Promise.race([
           connectPromise,
           new Promise<never>((_, reject) => { this.connectTimer = setTimeout(
-            () => reject(new Error('TIMEOUT CONEXÃO BLUETOOTH')),
+            () => { connectionRaceTimedOut = true; reject(new Error('TIMEOUT CONEXÃO BLUETOOTH')); },
             this.config.bluetoothConnectTimeoutMs,
           ); }),
         ]);
@@ -183,8 +187,6 @@ export class BluetoothClassicTransport implements ObdTransport {
         });
         break;
       } catch (cause) {
-        timedOutConnection = true;
-        attemptTimedOut = true;
         if (this.connectTimer) { clearTimeout(this.connectTimer); this.connectTimer = null; }
         this.logDiagnostic('CONNECT_FAILURE', {
           secureSocket,
@@ -241,6 +243,8 @@ export class BluetoothClassicTransport implements ObdTransport {
         this.markDisconnected();
       });
     }
+
+    this.callbacks?.onConnected?.();
   }
 
   async close(): Promise<void> {
@@ -338,10 +342,13 @@ export class BluetoothClassicTransport implements ObdTransport {
   }
 
   private markDisconnected(): void {
+    if (!this.connected && !this.device) return;
+    this.logDiagnostic('BLUETOOTH_LINK_LOST', { address: this.deviceAddress });
     this.removeSubscriptions();
     this.device = null;
     this.connected = false;
     this.received = '';
+    this.callbacks?.onDisconnected?.('BLUETOOTH DESCONECTADO');
   }
 
   private removeSubscriptions(): void {

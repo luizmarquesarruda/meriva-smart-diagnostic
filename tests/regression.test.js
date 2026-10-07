@@ -148,14 +148,19 @@ const fakeFS = {
 const fakeRN = {
   AppState: { addEventListener: () => ({ remove() {} }) },
   Platform: { OS: 'android', Version: 35 },
-  PermissionsAndroid: { PERMISSIONS: { BLUETOOTH_CONNECT: 'BLUETOOTH_CONNECT', BLUETOOTH_SCAN: 'BLUETOOTH_SCAN', ACCESS_FINE_LOCATION: 'ACCESS_FINE_LOCATION', ACCESS_COARSE_LOCATION: 'ACCESS_COARSE_LOCATION' }, RESULTS: { GRANTED: 'granted' }, requestMultiple: async () => ({}) },
+  PermissionsAndroid: { PERMISSIONS: { BLUETOOTH_CONNECT: 'BLUETOOTH_CONNECT', BLUETOOTH_SCAN: 'BLUETOOTH_SCAN', ACCESS_FINE_LOCATION: 'ACCESS_FINE_LOCATION', ACCESS_COARSE_LOCATION: 'ACCESS_COARSE_LOCATION' }, RESULTS: { GRANTED: 'granted' }, requestMultiple: async (permissions) => Object.fromEntries(permissions.map((permission) => [permission, 'granted'])) },
 };
 
 const fakeBluetooth = {
   isBluetoothAvailable: async () => true,
   isBluetoothEnabled: async () => true,
+  requestBluetoothEnabled: async () => true,
   getBondedDevices: async () => [],
   cancelDiscovery: async () => { lastBluetoothDiscoveryCancelled = true; },
+  onDeviceDisconnected(listener) {
+    bluetoothDisconnectListener = listener;
+    return { remove() { bluetoothDisconnectListener = null; } };
+  },
   connectToDevice: async (_address, options) => {
     bluetoothConnectCalls++;
     bluetoothActiveNativeConnections++;
@@ -277,6 +282,90 @@ async function testElmAndProtocol() {
   await session.close();
 }
 
+async function testBluetoothActivationRequest() {
+  const manager = loadTs(path.join(ROOT, 'src/obd/bluetoothManager.ts'));
+  const originalEnabled = fakeBluetooth.isBluetoothEnabled;
+  const originalRequest = fakeBluetooth.requestBluetoothEnabled;
+
+  let enabled = false;
+  let requests = 0;
+  fakeBluetooth.isBluetoothEnabled = async () => enabled;
+  fakeBluetooth.requestBluetoothEnabled = async () => {
+    requests += 1;
+    enabled = true;
+    return true;
+  };
+
+  assert.strictEqual(await manager.ensureBluetoothReady(), true);
+  assert.strictEqual(requests, 1, 'quando o Bluetooth está desligado, deve pedir ativação oficial uma vez');
+
+  enabled = false;
+  fakeBluetooth.requestBluetoothEnabled = async () => {
+    requests += 1;
+    return false;
+  };
+  await assert.rejects(
+    manager.ensureBluetoothReady(),
+    /BLUETOOTH CONTINUA DESLIGADO|BLUETOOTH NÃO FOI ATIVADO/,
+  );
+
+  fakeBluetooth.isBluetoothEnabled = originalEnabled;
+  fakeBluetooth.requestBluetoothEnabled = originalRequest;
+}
+
+async function testConnectionSelectionAndStrictEcuGate() {
+  const shared = loadTs(path.join(ROOT, 'src/obd/sharedConnection.ts'));
+  const manager = loadTs(path.join(ROOT, 'src/obd/bluetoothManager.ts'));
+
+  const devices = [
+    { address: 'AA:BB:CC:DD:EE:01', name: 'ELM327', bonded: true },
+    { address: 'AA:BB:CC:DD:EE:02', name: 'ELM327 OUTRO', bonded: true },
+  ];
+
+  assert.deepStrictEqual(
+    shared.buildCandidateList(devices, devices[1].address, 'EXPLICIT'),
+    [devices[1]],
+    'seleção explícita deve testar somente o adaptador escolhido',
+  );
+  assert.deepStrictEqual(
+    shared.buildCandidateList(devices, 'AA:BB:CC:DD:EE:FF', 'EXPLICIT'),
+    [],
+    'seleção explícita não deve cair silenciosamente em outro adaptador',
+  );
+
+  assert.strictEqual(
+    manager.isValidEcuProbe({ status: 'OK', response: '41 0C 1A F8', command: '010C', elapsedMs: 10, attempt: 1 }),
+    true,
+  );
+  assert.strictEqual(
+    manager.isValidEcuProbe({ status: 'OK', response: '41 0C 1A', command: '010C', elapsedMs: 10, attempt: 1 }),
+    false,
+    'payload incompleto não valida a ECU',
+  );
+
+  console.log('selection/ECU strict gate: OK');
+}
+
+async function testActiveAdapterCannotBeSilentlySwitched() {
+  const shared = loadTs(path.join(ROOT, 'src/obd/sharedConnection.ts'));
+  const fakeConnection = {
+    session: { close: async () => undefined },
+    device: { address: 'AA:BB:CC:DD:EE:01', name: 'ELM327', bonded: true },
+    protocol: 'TEST',
+    supportedPids: ['010C'],
+    ecuValidated: true,
+    getDiagnosticsText: () => '',
+  };
+
+  await shared.setSharedObdConnection(fakeConnection);
+  await assert.rejects(
+    shared.connectPreferredElm('AA:BB:CC:DD:EE:02', undefined, 'EXPLICIT'),
+    /OUTRO ADAPTADOR JÁ ESTÁ CONECTADO/
+  );
+  await shared.disconnectSharedObd();
+  console.log('active adapter switch guard: OK');
+}
+
 async function testEcuValidationGate() {
   const manager = loadTs(path.join(ROOT, 'src/obd/bluetoothManager.ts'));
   assert.strictEqual(manager.getElmProtocolName('5'), 'ISO 14230-4 KWP FAST');
@@ -388,6 +477,41 @@ async function testCarScannerBaselineAndFuel012F() {
   assert.strictEqual(learned.globalSampleCounts.realSamples, 1);
   assert.ok(learnedRpm.mean > 778 && learnedRpm.mean < 800);
   assert.deepStrictEqual(learnedRpm.source, ['CARSCANNER_BASELINE', 'REAL_OBD']);
+  assert.ok(Array.isArray(learnedRpm.medianWindow), 'mediana deve manter janela limitada de amostras');
+  assert.strictEqual(learnedRpm.median, 789, 'mediana do seed + primeira amostra real deve ser calculada de forma determinística');
+
+  const overallRpm = learned.overallStatistics['Engine RPM'];
+  assert.ok(overallRpm, 'estatística global do PID deve ser atualizada');
+  assert.strictEqual(overallRpm.realSamples, 1);
+  assert.strictEqual(overallRpm.seedSamples, 1);
+  assert.strictEqual(overallRpm.confidence, 'LOW', 'seed não pode aumentar confiança baseada em amostras reais');
+
+  const lateSeedBase = BASE + '/late-seed';
+  await learning.createLearningProfile(lateSeedBase, '');
+  await learning.updateLearningProfileRealSample(lateSeedBase, 'Engine RPM', 1000, 'IDLE_COLD');
+  await learning.initializeCarScannerSeed(lateSeedBase);
+  const lateSeed = await learning.readLearningProfile(lateSeedBase);
+  assert.strictEqual(lateSeed.learningStatus, 'COLD_START', 'seed tardio não pode rebaixar um aprendizado real em andamento');
+  assert.strictEqual(lateSeed.overallStatistics['Engine RPM'].realSamples, 1, 'seed tardio não pode apagar estatística real global');
+  assert.strictEqual(lateSeed.overallStatistics['Engine RPM'].mean, 1000, 'estatística real global deve sobreviver ao seed tardio');
+}
+
+async function testBluetoothConnectionCallbacks() {
+  bluetoothListener = null;
+  bluetoothDisconnectListener = null;
+  fakeDeviceConnected = true;
+  const { BluetoothClassicTransport } = loadTs(path.join(ROOT, 'src', 'obd', 'bluetoothClassicTransport.ts'));
+  const events = [];
+  const transport = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF', undefined, {
+    onConnected: () => events.push('connected'),
+    onDisconnected: (reason) => events.push(reason),
+  });
+
+  await transport.open();
+  assert.deepStrictEqual(events, ['connected'], 'conexão real deve emitir somente onConnected');
+  bluetoothDisconnectListener?.({ address: 'AA:BB:CC:DD:EE:FF' });
+  assert.deepStrictEqual(events, ['connected', 'BLUETOOTH DESCONECTADO']);
+  await transport.close();
 }
 
 async function testBluetoothEventTransport() {
@@ -557,6 +681,33 @@ async function testDtcStorage() {
   });
   const dtcs = await dtcManager.readDtcs(BASE);
   assert.strictEqual(dtcs[0].code, 'P0133');
+
+  writeDelayMs = 25;
+  await Promise.all([
+    dtcManager.recordDtc(BASE, {
+      code: 'P0301',
+      status: 'CURRENT',
+      firstSeen: '2026-10-02T20:01:00.000Z',
+      lastSeen: '2026-10-02T20:01:00.000Z',
+      occurrences: 1,
+      source: 'REAL_OBD',
+      historical: false,
+      confirmed: true,
+    }),
+    dtcManager.recordDtc(BASE, {
+      code: 'P0420',
+      status: 'CURRENT',
+      firstSeen: '2026-10-02T20:02:00.000Z',
+      lastSeen: '2026-10-02T20:02:00.000Z',
+      occurrences: 1,
+      source: 'REAL_OBD',
+      historical: false,
+      confirmed: true,
+    }),
+  ]);
+  writeDelayMs = 0;
+  const concurrentDtcs = await dtcManager.readDtcs(BASE);
+  assert.strictEqual(concurrentDtcs.length, 3, 'gravações concorrentes de DTC não podem perder registros');
 }
 
 async function testBackupCompleteness() {
@@ -672,10 +823,14 @@ async function main() {
     ['banco de fórmulas OBD', testFormulaKnowledgeBank],
     ['parser + DTC', testParser],
     ['elm/protocolo/serialização', testElmAndProtocol],
+    ['ativação oficial do Bluetooth', testBluetoothActivationRequest],
+    ['bloqueio de troca silenciosa de adaptador', testActiveAdapterCannotBeSilentlySwitched],
+    ['seleção estrita + gate ECU', testConnectionSelectionAndStrictEcuGate],
     ['gate de validação ECU/010C', testEcuValidationGate],
     ['descoberta de PIDs', testPidScanner],
     ['IA burrinha de PIDs', testIntelligentPidDiscovery],
     ['CarScanner baseline + PID 012F', testCarScannerBaselineAndFuel012F],
+    ['Bluetooth callbacks', testBluetoothConnectionCallbacks],
     ['Bluetooth por eventos', testBluetoothEventTransport],
     ['quota configurável', testQuota],
     ['logger TX/RX', testRawLogger],

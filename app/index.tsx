@@ -131,7 +131,7 @@ export default function IndexScreen() {
     }
 
     const elmSettings = settings;
-    void connectPreferredElm(null, {
+    void connectPreferredElm(settings.selectedAdapterAddress, {
       ioTimeoutMs: elmSettings.elmIoTimeoutMs,
       bluetoothConnectTimeoutMs: elmSettings.elmBluetoothTimeoutMs,
       commandDelayMs: elmSettings.elmCommandDelayMs,
@@ -194,7 +194,7 @@ export default function IndexScreen() {
                 ? (getAutoSaveState().autonomy.estimatedRangeKm.toFixed(0) + ' km')
                 : 'N/D'}
             </Text>
-            <Text style={styles.heroUnit}>AUTONOMIA COM 012F • REFERÊNCIA CARSCANNER • TANQUE NOMINAL 56 L</Text>
+            <Text style={styles.heroUnit}>TANQUE NOMINAL 56 L</Text>
             <View style={styles.heroMetrics}>
               <View style={styles.heroMetric}>
                 <Text style={styles.heroMetricLabel}>CONSUMO</Text>
