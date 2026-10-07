@@ -4,7 +4,7 @@ import * as FileSystem from 'expo-file-system';
 import { Link } from 'expo-router';
 import { BluetoothDeviceInfo } from '../src/obd/bluetoothClassicTransport';
 import { discoverPairedDevices, ensureBluetoothReady } from '../src/obd/bluetoothManager';
-import { connectPreferredElm, getSharedObdConnection, subscribeSharedObd, disconnectSharedObd } from '../src/obd/sharedConnection';
+import { connectPreferredElm, getSharedObdConnection, getSharedObdStatus, subscribeSharedObd, subscribeSharedObdStatus, disconnectSharedObd } from '../src/obd/sharedConnection';
 import { readAppSettings, writeAppSettings } from '../src/database/appSettings';
 
 export default function BluetoothScreen() {
@@ -15,7 +15,8 @@ export default function BluetoothScreen() {
   const [status, setStatus] = useState('VERIFICANDO BLUETOOTH');
   const [error, setError] = useState('');
   const [connectedName, setConnectedName] = useState<string | null>(null);
-  const [ecuConnected, setEcuConnected] = useState(false);
+  const [ecuConnected, setEcuConnected] = useState(getSharedObdStatus().ecuConnected);
+  const [bluetoothConnected, setBluetoothConnected] = useState(getSharedObdStatus().bluetoothConnected);
 
   useEffect(() => {
     const unsubscribe = subscribeSharedObd((connection) => {
@@ -23,7 +24,13 @@ export default function BluetoothScreen() {
       setEcuConnected(Boolean(connection?.ecuValidated));
       if (connection) setStatus('ECU CONECTADA');
     });
-    return unsubscribe;
+    const unsubscribeStatus = subscribeSharedObdStatus((state) => {
+      setBluetoothConnected(state.bluetoothConnected);
+      setEcuConnected(state.ecuConnected);
+      if (state.ecuConnected) setStatus('ECU CONECTADA');
+      else if (state.bluetoothConnected) setStatus('BLUETOOTH CONECTADO');
+    });
+    return () => { unsubscribe(); unsubscribeStatus(); };
   }, []);
 
   const loadPaired = useCallback(async () => {
@@ -90,8 +97,8 @@ export default function BluetoothScreen() {
 
         <View style={styles.connectionCard}>
           <Text style={styles.label}>BLUETOOTH</Text>
-          <Text style={connectedName ? styles.online : styles.waiting}>{connectedName ? '🟢 CONECTADO' : '🟡 AGUARDANDO'}</Text>
-          <Text style={styles.detail}>{connectedName ?? status}</Text>
+          <Text style={connectedName ? styles.online : styles.waiting}>{bluetoothConnected ? '🟢 CONECTADO' : '🟡 AGUARDANDO'}</Text>
+          <Text style={styles.detail}>{bluetoothConnected ? (connectedName ?? 'ELM327') : status}</Text>
         </View>
         <View style={styles.connectionCard}>
           <Text style={styles.label}>ECU</Text>
