@@ -294,7 +294,10 @@ async function createRealElmSessionAttempt(
   // RFCOMM/ELM, sem reabrir permissões ou reiniciar a preparação Bluetooth.
   const config = mergeCompatibilityConfig(compatibility ?? DEFAULT_ELM327_COMPATIBILITY);
   const session = new Elm327Session(
-    new BluetoothClassicTransport(device.address, config, callbacks?.onDisconnected),
+    new BluetoothClassicTransport(device.address, config, {
+      onConnected: callbacks?.onBluetoothConnected,
+      onDisconnected: callbacks?.onDisconnected,
+    }),
     config,
   );
 
