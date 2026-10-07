@@ -4,7 +4,7 @@ import { createRealElmSession, discoverPairedDevices, ensureBluetoothReady } fro
 import { DEFAULT_ELM327_COMPATIBILITY, Elm327CompatibilityConfig, mergeCompatibilityConfig } from './elm327Compatibility';
 import { getAutoSaveState, saveNow, updateAutoSaveState } from '../meriva/autosaveManager';
 import { clearBluetoothDiagnostic, getLastBluetoothDiagnosticText } from './bluetoothManager';
-import { BluetoothLifecycleState, isBluetoothLinkUp } from './bluetoothState';
+import { isBluetoothLinkUp, type BluetoothLifecycleState } from './bluetoothState';
 import RNBluetoothClassic from 'react-native-bluetooth-classic';
 
 export interface SharedObdConnection {
