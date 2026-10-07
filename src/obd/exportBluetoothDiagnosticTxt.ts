@@ -73,7 +73,7 @@ async function buildReport(): Promise<string> {
   const trace = connection?.getDiagnosticsText() || context.trace || getLastBluetoothDiagnosticText();
   const learningProfile = await readCurrentLearningProfile();
   const lines = [
-    'MERIVA SMART DIAGNOSTIC',
+    'MERIVA SMART',
     'BLUETOOTH CLASSIC / ELM327 DIAGNOSTIC REPORT',
     '',
     `DATA: ${new Date().toISOString()}`,
