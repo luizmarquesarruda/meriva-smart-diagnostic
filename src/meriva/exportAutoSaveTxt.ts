@@ -8,6 +8,7 @@ import * as FileSystem from 'expo-file-system';
 import { Platform } from 'react-native';
 import type { MerivaPersistedState } from './autosaveState';
 import { formatAutoSaveTxt } from './autosaveTxtFormatter';
+import { appendAutoSaveHistory, AUTOSAVE_HISTORY_FILE, readAutoSaveHistory } from './autosaveHistoryTxt';
 
 export { ND } from './autosaveTxtFormatter';
 
@@ -31,9 +32,14 @@ export async function exportAutoSaveTxt(
     const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
     if (!permissions.granted) return { ok: false, reason: 'CANCELADO' };
 
-    const exportedAt = new Date().toISOString().replace('T', ' ').split('.')[0];
-    const content = formatAutoSaveTxt(state, { appVersion, exportedAt });
-    const fileName = `meriva_smart_save_${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
+    const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
+    let content = await readAutoSaveHistory(basePath);
+    if (!content.includes('=== SALVAMENTO_BEGIN ===')) {
+      await appendAutoSaveHistory(basePath, state, appVersion, 'manual');
+      content = await readAutoSaveHistory(basePath);
+    }
+
+    const fileName = AUTOSAVE_HISTORY_FILE;
     const uri = await FileSystem.StorageAccessFramework.createFileAsync(
       permissions.directoryUri,
       fileName,
