@@ -35,3 +35,12 @@ assert(exporter.includes('AMOSTRAS REAIS'));
 assert(exporter.includes('CONFIANÇA'));
 
 console.log('bluetoothConfig.test.js: OK');
+
+// Regression: o manager não pode acessar APIs do módulo nativo antes de verificar sua existência.
+assert(manager.includes('BLUETOOTH_NATIVE_MODULE_UNAVAILABLE'));
+assert(manager.includes('const bluetoothClassic = RNBluetoothClassic as'));
+// Regression: respostas duplicadas após o prompt não podem vazar para o próximo comando.
+const transport = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'bluetoothClassicTransport.ts'), 'utf8');
+assert(transport.includes('trailingDiscarded'));
+assert(transport.includes('this.received = \'\';'));
+
