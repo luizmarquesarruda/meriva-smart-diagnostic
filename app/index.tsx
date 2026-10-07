@@ -12,7 +12,7 @@ import { gpsTracker, type GpsTripState } from '../src/gps';
 import { ensureMerivaVehicleProfile } from '../src/database/vehicleConfig';
 import { createLearningProfile, initializeCarScannerSeed, readLearningProfile } from '../src/database/learningProfile';
 import { readAppSettings, type AppSettings } from '../src/database/appSettings';
-import { connectPreferredElm, getSharedObdConnection, getSharedObdLastError, subscribeSharedObd } from '../src/obd/sharedConnection';
+import { connectPreferredElm, getSharedObdConnection, getSharedObdLastError, getSharedObdStatus, subscribeSharedObd } from '../src/obd/sharedConnection';
 import { autoTripService, type AutoTripServiceState } from '../src/trip/autoTripService';
 
 function formatDistance(km: number, unit: AppSettings['distanceUnit']): string {
@@ -25,6 +25,7 @@ function formatDistance(km: number, unit: AppSettings['distanceUnit']): string {
 export default function IndexScreen() {
   const [cycles, setCycles] = useState<DriveCycle[]>([]);
   const [obd, setObd] = useState<ObdConnectionState>({ connected: false });
+  const [connectionStatus, setConnectionStatus] = useState(getSharedObdStatus());
   const [bluetoothSearching, setBluetoothSearching] = useState(false);
   const [bluetoothError, setBluetoothError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<AutoSaveStatus>({ lastSavedAt: null, lastSaveReason: null, lastError: null });
@@ -38,17 +39,18 @@ export default function IndexScreen() {
 
   useEffect(() => gpsTracker.subscribe(setGpsState), []);
   useEffect(() => autoTripService.subscribe(setTripState), []);
+  useEffect(() => subscribeSharedObd(() => setConnectionStatus(getSharedObdStatus())), []);
 
   const syncLiveState = useCallback(() => {
     const state = getAutoSaveState();
     const live = getSharedObdConnection();
     const liveConnected = Boolean(live?.ecuValidated);
     setDtcCount(state.dtcs.length);
+    setConnectionStatus(getSharedObdStatus());
     setObd({
       ...state.obd,
       connected: liveConnected,
       adapterName: live?.device.name ?? state.obd.adapterName,
-      protocol: live?.protocol ?? state.obd.protocol,
     });
     setSaveStatus(getAutoSaveStatus());
   }, []);
@@ -81,6 +83,7 @@ export default function IndexScreen() {
       setSettings(nextSettings);
       setCycles(loaded);
       const live = getSharedObdConnection();
+      setConnectionStatus(getSharedObdStatus());
       setObd({ ...restored.obd, connected: Boolean(live?.ecuValidated) });
       setSaveStatus(getAutoSaveStatus());
       setDtcCount(restored.dtcs.length);
@@ -179,12 +182,8 @@ export default function IndexScreen() {
             <View style={styles.headerTitleBlock}>
               <Text style={styles.midBrand}>MERIVA SMART</Text>
               <Text style={styles.midStatus}>
-                {obd.connected ? 'OBD • ONLINE' : bluetoothError ? 'BLUETOOTH • FALHA DE CONEXÃO' : bluetoothSearching ? 'BLUETOOTH • BUSCANDO ELM327' : 'OBD • AGUARDANDO'}
+                {connectionStatus.ecuConnected ? 'ECU • CONECTADA' : connectionStatus.bluetoothConnected ? 'BLUETOOTH • CONECTADO' : bluetoothError ? 'BLUETOOTH • FALHA' : bluetoothSearching ? 'BLUETOOTH • CONECTANDO' : 'AGUARDANDO'}
               </Text>
-            </View>
-            <View style={styles.headerDataBlock}>
-              <Text style={styles.headerDataLabel}>PROTOCOLO</Text>
-              <Text style={styles.headerDataValue}>{obd.protocol ?? 'N/D'}</Text>
             </View>
           </View>
 
@@ -215,8 +214,8 @@ export default function IndexScreen() {
           </View>
 
           <View style={[styles.statusGrid, layout.landscape && styles.statusGridLandscape]}>
-            <StatusCard label="OBD" value={obd.connected ? 'ONLINE' : 'AGUARDANDO'} landscape={layout.landscape} />
-            <StatusCard label="PROTOCOLO" value={obd.protocol ?? 'N/D'} landscape={layout.landscape} />
+            <StatusCard label="BLUETOOTH" value={connectionStatus.bluetoothConnected ? 'CONECTADO' : 'AGUARDANDO'} ok={connectionStatus.bluetoothConnected} landscape={layout.landscape} />
+            <StatusCard label="ECU" value={connectionStatus.ecuConnected ? 'CONECTADA' : connectionStatus.bluetoothConnected ? 'CONECTANDO' : 'AGUARDANDO'} ok={connectionStatus.ecuConnected} landscape={layout.landscape} />
             <StatusCard label="GPS" value={gpsState.running ? 'ATIVO' : 'AGUARDANDO'} landscape={layout.landscape} />
             <StatusCard label="CONSUMO" value={availableConsumptionKml == null ? 'N/D' : `${availableConsumptionKml.toFixed(1)} km/L`} landscape={layout.landscape} />
             <StatusCard label="FALHAS" value={dtcCount ? String(dtcCount) : 'OK'} danger={dtcCount > 0} landscape={layout.landscape} />
@@ -280,11 +279,11 @@ export default function IndexScreen() {
   );
 }
 
-function StatusCard({ label, value, danger = false, landscape = false }: { label: string; value: string; danger?: boolean; landscape?: boolean }) {
+function StatusCard({ label, value, danger = false, ok = false, landscape = false }: { label: string; value: string; danger?: boolean; ok?: boolean; landscape?: boolean }) {
   return (
     <View style={[styles.statusCard, landscape && styles.statusCardLandscape]}>
       <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={danger ? styles.metricDanger : styles.metricValue}>{value}</Text>
+      <Text style={danger ? styles.metricDanger : ok ? styles.metricOk : styles.metricValue}>{value}</Text>
     </View>
   );
 }
@@ -306,9 +305,6 @@ const styles = StyleSheet.create({
   headerTitleBlock: { flex: 1 },
   midBrand: { color: '#f8fafc', fontSize: 14, fontWeight: '900', letterSpacing: 1 },
   midStatus: { color: '#7db3ff', fontSize: 9, fontWeight: '900', letterSpacing: 0.8, marginTop: 4 },
-  headerDataBlock: { minWidth: 105, alignItems: 'flex-end' },
-  headerDataLabel: { color: '#7185a1', fontSize: 8, fontWeight: '900', letterSpacing: 0.6 },
-  headerDataValue: { color: '#e5edf7', fontSize: 10, fontWeight: '900', marginTop: 3 },
   heroCard: { backgroundColor: '#121f33', borderRadius: 16, borderWidth: 1, borderColor: '#28415f', paddingVertical: 20, paddingHorizontal: 14, alignItems: 'center', marginBottom: 10 },
   heroLabel: { color: '#7db3ff', fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
   heroValue: { color: '#f8fafc', fontSize: 38, lineHeight: 44, fontWeight: '900', fontVariant: ['tabular-nums'], marginTop: 3, letterSpacing: 1 },
@@ -324,7 +320,8 @@ const styles = StyleSheet.create({
   statusCardLandscape: { flex: 1, width: undefined },
   metricLabel: { color: '#7185a1', fontSize: 9, fontWeight: '900', letterSpacing: 0.7, marginBottom: 2 },
   metricValue: { color: '#e5edf7', fontWeight: '900', fontSize: 15 },
-  metricDanger: { color: '#b91c1c', fontWeight: '900', fontSize: 15 },
+  metricDanger: { color: '#fb7185', fontWeight: '900', fontSize: 15 },
+  metricOk: { color: '#4ade80', fontWeight: '900', fontSize: 15 },
   tripCard: { backgroundColor: '#111c2e', borderRadius: 14, borderWidth: 1, borderColor: '#243652', padding: 13, marginBottom: 10 },
   cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 },
   sectionTitle: { color: '#f1f5f9', fontWeight: '900', fontSize: 13, letterSpacing: 0.5 },
