@@ -148,12 +148,13 @@ const fakeFS = {
 const fakeRN = {
   AppState: { addEventListener: () => ({ remove() {} }) },
   Platform: { OS: 'android', Version: 35 },
-  PermissionsAndroid: { PERMISSIONS: { BLUETOOTH_CONNECT: 'BLUETOOTH_CONNECT', BLUETOOTH_SCAN: 'BLUETOOTH_SCAN', ACCESS_FINE_LOCATION: 'ACCESS_FINE_LOCATION', ACCESS_COARSE_LOCATION: 'ACCESS_COARSE_LOCATION' }, RESULTS: { GRANTED: 'granted' }, requestMultiple: async () => ({}) },
+  PermissionsAndroid: { PERMISSIONS: { BLUETOOTH_CONNECT: 'BLUETOOTH_CONNECT', BLUETOOTH_SCAN: 'BLUETOOTH_SCAN', ACCESS_FINE_LOCATION: 'ACCESS_FINE_LOCATION', ACCESS_COARSE_LOCATION: 'ACCESS_COARSE_LOCATION' }, RESULTS: { GRANTED: 'granted' }, requestMultiple: async (permissions) => Object.fromEntries(permissions.map((permission) => [permission, 'granted'])) },
 };
 
 const fakeBluetooth = {
   isBluetoothAvailable: async () => true,
   isBluetoothEnabled: async () => true,
+  requestBluetoothEnabled: async () => true,
   getBondedDevices: async () => [],
   cancelDiscovery: async () => { lastBluetoothDiscoveryCancelled = true; },
   onDeviceDisconnected(listener) {
@@ -279,6 +280,37 @@ async function testElmAndProtocol() {
   assert.strictEqual(generic.command, '03');
   assert.strictEqual(generic.status, 'ERROR');
   await session.close();
+}
+
+async function testBluetoothActivationRequest() {
+  const manager = loadTs(path.join(ROOT, 'src/obd/bluetoothManager.ts'));
+  const originalEnabled = fakeBluetooth.isBluetoothEnabled;
+  const originalRequest = fakeBluetooth.requestBluetoothEnabled;
+
+  let enabled = false;
+  let requests = 0;
+  fakeBluetooth.isBluetoothEnabled = async () => enabled;
+  fakeBluetooth.requestBluetoothEnabled = async () => {
+    requests += 1;
+    enabled = true;
+    return true;
+  };
+
+  assert.strictEqual(await manager.ensureBluetoothReady(), true);
+  assert.strictEqual(requests, 1, 'quando o Bluetooth está desligado, deve pedir ativação oficial uma vez');
+
+  enabled = false;
+  fakeBluetooth.requestBluetoothEnabled = async () => {
+    requests += 1;
+    return false;
+  };
+  await assert.rejects(
+    manager.ensureBluetoothReady(),
+    /BLUETOOTH CONTINUA DESLIGADO|BLUETOOTH NÃO FOI ATIVADO/,
+  );
+
+  fakeBluetooth.isBluetoothEnabled = originalEnabled;
+  fakeBluetooth.requestBluetoothEnabled = originalRequest;
 }
 
 async function testEcuValidationGate() {
@@ -694,6 +726,7 @@ async function main() {
     ['banco de fórmulas OBD', testFormulaKnowledgeBank],
     ['parser + DTC', testParser],
     ['elm/protocolo/serialização', testElmAndProtocol],
+    ['ativação oficial do Bluetooth', testBluetoothActivationRequest],
     ['gate de validação ECU/010C', testEcuValidationGate],
     ['descoberta de PIDs', testPidScanner],
     ['IA burrinha de PIDs', testIntelligentPidDiscovery],
