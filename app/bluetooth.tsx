@@ -43,7 +43,12 @@ export default function BluetoothScreen() {
       const paired = await discoverPairedDevices();
       setDevices(paired);
       const active = getSharedObdConnection();
-      if (active) setSelected(active.device.address);
+      if (active) {
+        setSelected(active.device.address);
+      } else {
+        const settings = await readAppSettings(`${FileSystem.documentDirectory}MERIVA_SMART`);
+        if (settings.selectedAdapterAddress) setSelected(settings.selectedAdapterAddress);
+      }
       setStatus(paired.length ? `${paired.length} DISPOSITIVO(S) PAREADO(S)` : 'NENHUM DISPOSITIVO PAREADO');
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'NÃO FOI POSSÍVEL ACESSAR O BLUETOOTH';
@@ -128,7 +133,7 @@ export default function BluetoothScreen() {
           <Text style={ecuConnected ? styles.online : styles.waiting}>{ecuConnected ? '🟢 CONECTADA' : connectedName ? '🟡 CONECTANDO' : '⚪ AGUARDANDO'}</Text>
         </View>
 
-        {!bluetoothConnected ? (
+        {lifecycle === 'BLUETOOTH_OFF' ? (
           <TouchableOpacity style={styles.primary} onPress={() => void activateBluetooth()} disabled={loading || connecting}>
             <Text style={styles.primaryText}>ATIVAR BLUETOOTH</Text>
           </TouchableOpacity>
@@ -153,7 +158,7 @@ export default function BluetoothScreen() {
         {!devices.length && !loading ? <Text style={styles.empty}>Pareie o ELM327 nas configurações do Android e volte aqui.</Text> : null}
 
         <TouchableOpacity style={[styles.primary, (!selected || connecting) && styles.disabled]} onPress={() => void connectSelected()} disabled={!selected || connecting}>
-          {connecting ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>{lifecycle === 'DISCONNECTED' ? 'RECONNECTAR E VALIDAR ELM327' : 'CONECTAR E VALIDAR ELM327'}</Text>}
+          {connecting ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>{lifecycle === 'DISCONNECTED' ? 'RECONECTAR E VALIDAR ELM327' : 'CONECTAR E VALIDAR ELM327'}</Text>}
         </TouchableOpacity>
 
         {connectedName ? (
