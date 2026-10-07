@@ -11,8 +11,12 @@ const rules = ruleCatalog.rules as Rule[];
 function isSimulation(item: PidObservation): boolean {
   return String(item.source ?? '').trim().toUpperCase() === 'SIMULACAO';
 }
+
+function isLiveObd(item: PidObservation): boolean {
+  return String(item.source ?? '').trim().toUpperCase() === 'REAL_OBD';
+}
 function pidValue(observations: PidObservation[], pid: string): PidObservation | undefined {
-  return observations.find((item) => item.pid.toUpperCase() === pid.toUpperCase() && item.value !== null && !isSimulation(item));
+  return observations.find((item) => item.pid.toUpperCase() === pid.toUpperCase() && item.value !== null && isLiveObd(item));
 }
 function confidence(score: number): DiagnosticHypothesis['confidence'] {
   if (score >= 0.75) return 'HIGH';
