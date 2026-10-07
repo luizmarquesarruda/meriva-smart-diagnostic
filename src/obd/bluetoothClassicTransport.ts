@@ -47,6 +47,7 @@ export class BluetoothClassicTransport implements ObdTransport {
   constructor(
     private readonly deviceAddress: string,
     config?: Partial<Elm327CompatibilityConfig>,
+    private readonly onDisconnected?: (reason: string) => void,
   ) {
     this.config = mergeCompatibilityConfig(config ?? DEFAULT_ELM327_COMPATIBILITY);
   }
@@ -338,10 +339,13 @@ export class BluetoothClassicTransport implements ObdTransport {
   }
 
   private markDisconnected(): void {
+    if (!this.connected && !this.device) return;
+    this.logDiagnostic('BLUETOOTH_LINK_LOST', { address: this.deviceAddress });
     this.removeSubscriptions();
     this.device = null;
     this.connected = false;
     this.received = '';
+    this.onDisconnected?.('BLUETOOTH DESCONECTADO');
   }
 
   private removeSubscriptions(): void {
