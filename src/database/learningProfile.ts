@@ -45,6 +45,81 @@ export interface MerivaLearningProfile {
 function profilePath(basePath: string): string {
   return `${basePath}/APRENDIZADO/dna_meriva.json`;
 }
+const MEDIAN_WINDOW_LIMIT = 101;
+
+function medianOf(values: number[]): number {
+  const finite = values.filter((value) => Number.isFinite(value)).sort((a, b) => a - b);
+  if (!finite.length) return 0;
+  const middle = Math.floor(finite.length / 2);
+  return finite.length % 2 === 1
+    ? finite[middle]
+    : (finite[middle - 1] + finite[middle]) / 2;
+}
+
+function extendMedianWindow(existing: SampleStatistics, value: number): number[] {
+  const window = (existing.medianWindow ?? []).filter((item) => Number.isFinite(item)).slice(-MEDIAN_WINDOW_LIMIT);
+  if (!window.length && Number.isFinite(existing.median)) window.push(existing.median);
+  window.push(value);
+  while (window.length > MEDIAN_WINDOW_LIMIT) window.shift();
+  return window;
+}
+
+function createStatistics(
+  value: number,
+  source: 'REAL_OBD' | 'CARSCANNER_BASELINE',
+  realSamples: number,
+  seedSamples: number,
+  thresholds: Record<string, number>,
+): SampleStatistics {
+  return {
+    mean: value,
+    median: value,
+    min: value,
+    max: value,
+    stddev: 0,
+    samples: realSamples + seedSamples,
+    realSamples,
+    seedSamples,
+    confidence: determineConfidence(realSamples, thresholds),
+    lastUpdate: new Date().toISOString(),
+    source: [source],
+    medianWindow: [value],
+  };
+}
+
+function updateStatisticsWithRealSample(
+  existing: SampleStatistics,
+  value: number,
+  profile: MerivaLearningProfile,
+  now: string,
+): void {
+  const previousMean = existing.mean;
+  const previousSamples = existing.samples;
+  const previousM2 = existing.stddev * existing.stddev * Math.max(0, previousSamples - 1);
+
+  if (existing.seedSamples > 0 && existing.realSamples === 0 && profile.seedWeight > 0) {
+    const seedWeight = Math.min(1, Math.max(0, profile.seedWeight));
+    existing.mean = previousMean * seedWeight + value * (1 - seedWeight);
+    existing.samples = existing.seedSamples + 1;
+    existing.realSamples = 1;
+    existing.stddev = Math.abs(value - previousMean) * Math.sqrt(seedWeight * (1 - seedWeight));
+  } else {
+    existing.samples = previousSamples + 1;
+    existing.realSamples += 1;
+    existing.mean = previousMean + (value - previousMean) / existing.samples;
+    const delta = value - previousMean;
+    const m2 = previousM2 + delta * (value - existing.mean);
+    existing.stddev = Math.sqrt(Math.max(0, m2 / Math.max(1, existing.samples - 1)));
+  }
+
+  existing.medianWindow = extendMedianWindow(existing, value);
+  existing.median = medianOf(existing.medianWindow);
+  existing.min = Math.min(existing.min, value);
+  existing.max = Math.max(existing.max, value);
+  existing.confidence = determineConfidence(existing.realSamples, profile.confidenceThresholds);
+  existing.lastUpdate = now;
+  existing.source = Array.from(new Set([...existing.source, 'REAL_OBD']));
+}
 
 async function readLearningProfileUnsafe(
   basePath: string,
@@ -207,6 +282,12 @@ export async function initializeCarScannerSeed(
         confidence: 'LOW',
         lastUpdate: sample.timestamp,
         source: ['CARSCANNER_BASELINE'],
+        medianWindow: [sample.value],
+      };
+
+      profile.overallStatistics[sample.pidName] = {
+        ...context.statistics[sample.pidName],
+        medianWindow: [sample.value],
       };
     }
 
@@ -260,12 +341,7 @@ export async function updateLearningProfileRealSample(
 
     let contextStats = profile.contextualData.find((item) => item.condition === condition);
     if (!contextStats) {
-      contextStats = {
-        condition,
-        statistics: {},
-        lastUpdate: now,
-        sampleCount: 0,
-      };
+      contextStats = { condition, statistics: {}, lastUpdate: now, sampleCount: 0 };
       profile.contextualData.push(contextStats);
     }
 
@@ -274,61 +350,23 @@ export async function updateLearningProfileRealSample(
 
     const existing = contextStats.statistics[pidName];
     if (!existing) {
-      contextStats.statistics[pidName] = {
-        mean: value,
-        median: value,
-        min: value,
-        max: value,
-        stddev: 0,
-        samples: 1,
-        realSamples: 1,
-        seedSamples: 0,
-        confidence: determineConfidence(1, profile.confidenceThresholds),
-        lastUpdate: now,
-        source: ['REAL_OBD'],
-      };
+      contextStats.statistics[pidName] = createStatistics(value, 'REAL_OBD', 1, 0, profile.confidenceThresholds);
+      contextStats.statistics[pidName].lastUpdate = now;
     } else {
-      const previousMean = existing.mean;
-      const previousSamples = existing.samples;
-      const previousM2 =
-        existing.stddev * existing.stddev * Math.max(0, previousSamples - 1);
+      updateStatisticsWithRealSample(existing, value, profile, now);
+    }
 
-      if (existing.seedSamples > 0 && existing.realSamples === 0 && profile.seedWeight > 0) {
-        const seedWeight = Math.min(1, Math.max(0, profile.seedWeight));
-        existing.mean = previousMean * seedWeight + value * (1 - seedWeight);
-        existing.samples = existing.seedSamples + 1;
-        existing.realSamples = 1;
-        existing.lastUpdate = now;
-        existing.min = Math.min(existing.min, value);
-        existing.max = Math.max(existing.max, value);
-        existing.stddev = Math.abs(value - previousMean) * Math.sqrt(seedWeight * (1 - seedWeight));
-        existing.median = existing.mean;
-        existing.source = Array.from(new Set([...existing.source, 'REAL_OBD']));
-        existing.confidence = determineConfidence(existing.samples, profile.confidenceThresholds);
-      } else {
-        existing.samples = previousSamples + 1;
-        existing.realSamples += 1;
-        existing.mean =
-          previousMean + (value - previousMean) / existing.samples;
-      const delta = value - previousMean;
-      const m2 = previousM2 + delta * (value - existing.mean);
-      existing.stddev = Math.sqrt(
-        Math.max(0, m2 / Math.max(1, existing.samples - 1)),
-      );
-      existing.min = Math.min(existing.min, value);
-      existing.max = Math.max(existing.max, value);
-      existing.confidence = determineConfidence(
-        existing.samples,
-        profile.confidenceThresholds,
-      );
-        existing.lastUpdate = now;
-      }
+    const overall = profile.overallStatistics[pidName];
+    if (!overall) {
+      profile.overallStatistics[pidName] = createStatistics(value, 'REAL_OBD', 1, 0, profile.confidenceThresholds);
+      profile.overallStatistics[pidName].lastUpdate = now;
+    } else {
+      updateStatisticsWithRealSample(overall, value, profile, now);
     }
 
     await writeLearningProfileUnsafe(basePath, profile);
   });
 }
-
 export async function blockSimulationLearning(basePath: string): Promise<void> {
   await enqueueProfileTransaction(basePath, async () => {
     const profile = await readLearningProfileUnsafe(basePath);
