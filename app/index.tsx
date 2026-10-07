@@ -131,7 +131,7 @@ export default function IndexScreen() {
     }
 
     const elmSettings = settings;
-    void connectPreferredElm(null, {
+    void connectPreferredElm(settings.selectedAdapterAddress, {
       ioTimeoutMs: elmSettings.elmIoTimeoutMs,
       bluetoothConnectTimeoutMs: elmSettings.elmBluetoothTimeoutMs,
       commandDelayMs: elmSettings.elmCommandDelayMs,
