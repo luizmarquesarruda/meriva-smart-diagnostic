@@ -457,3 +457,24 @@ A CI **não foi iniciada**. O gatilho automático de push permanece temporariame
 
 ### Próximo passo
 Executar a validação autorizada pelo usuário, corrigir eventuais falhas encontradas e então decidir a restauração do gatilho automático.
+
+
+## 2026-10-07 — Correção da apresentação das evidências da IA local
+
+### Problema encontrado
+Na revisão da integração do motor diagnóstico, as evidências eram objetos estruturados, mas a tela e o relatório TXT tentavam renderizar o objeto inteiro como texto. Isso poderia aparecer como `[object Object]` em vez da evidência real.
+
+### Correção
+- A tela `app/laboratorio.tsx` passou a exibir `evidence.text`.
+- O relatório `src/obd/exportBluetoothDiagnosticTxt.ts` passou a exportar `evidence.text`.
+- As chaves React da lista de evidências passaram a usar o índice, evitando chave baseada na conversão do objeto.
+
+### Commits
+- `95fdc3deb9722c4d1af8f7fd95b52c24929a607a` — `fix: render diagnostic evidence text correctly`
+- `f831601504ddfa12a95ec0fa54ccbd80113e5470` — `fix: render diagnostic evidence text in txt`
+
+### Validação
+Os commits de código foram publicados no repositório e devem passar pela CI automática restaurada.
+
+### Próximo passo
+Acompanhar a CI e corrigir somente falhas comprovadas pelo log.
