@@ -40,7 +40,9 @@ export async function exportAutoSaveTxt(
     }
 
     const fileName = AUTOSAVE_HISTORY_FILE;
-    const uri = await FileSystem.StorageAccessFramework.createFileAsync(
+    const existing = (await FileSystem.StorageAccessFramework.readDirectoryAsync(permissions.directoryUri))
+      .find((uri) => uri.endsWith('/' + fileName) || uri.endsWith('%2F' + fileName));
+    const uri = existing ?? await FileSystem.StorageAccessFramework.createFileAsync(
       permissions.directoryUri,
       fileName,
       'text/plain',
