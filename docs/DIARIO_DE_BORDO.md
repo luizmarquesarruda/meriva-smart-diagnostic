@@ -478,3 +478,18 @@ Os commits de código foram publicados no repositório e devem passar pela CI au
 
 ### Próximo passo
 Acompanhar a CI e corrigir somente falhas comprovadas pelo log.
+
+
+## 2026-10-07 — Auditoria e correção do teste do motor diagnóstico
+
+A CI #722 falhou com `RangeError: Maximum call stack size exceeded` em `tests/diagnosticEngine.test.js`. A causa foi o monkey-patch global de `Module._load` usado para interceptar o JSON de regras.
+
+Correção aplicada: o teste agora carrega diretamente `src/knowledge/diagnostic_rules.json` e usa um `localRequire` apenas no módulo TypeScript transpileado, sem substituir o carregador global do Node.
+
+Commit: `af6849b4dd2bfa31e986552309e27ad93e07cb5e` — `fix: load diagnostic rules json directly in test`.
+
+Auditoria estática também revisou o motor diagnóstico, regras JSON, laboratório, relatório TXT, package.json e workflow CI. Nenhuma outra falha bloqueadora foi identificada nessa revisão. A separação REAL/SIMULAÇÃO e `evidence.text` permanecem preservadas.
+
+Figma: arquivo `MERIVA SMART — Telas Secundárias` criado, file key `xCTeaUHVEG0oc7tq3sp08A`. A edição das telas foi bloqueada pelo limite de chamadas do Figma MCP Starter nesta sessão; não foi declarada como concluída.
+
+A próxima CI está autorizada pelo usuário.
