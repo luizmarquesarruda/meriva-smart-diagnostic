@@ -101,7 +101,7 @@ export default function BluetoothScreen() {
     setStatus('ABRINDO BLUETOOTH CLASSIC...');
     try {
       await ensureBluetoothReady();
-      const connection = await connectPreferredElm(device.address);
+      const connection = await connectPreferredElm(device.address, undefined, 'EXPLICIT');
       const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
       const settings = await readAppSettings(basePath);
       await writeAppSettings(basePath, { ...settings, selectedAdapterAddress: device.address });
