@@ -47,6 +47,7 @@ export async function recordDtc(basePath: string, dtc: DtcRecord): Promise<void>
 
 export async function readDtcs(basePath: string): Promise<DtcRecord[]> {
   const target = `${basePath}/DTC/dtc_records.txt`;
+  await (dtcQueues.get(target) ?? Promise.resolve()).catch(() => undefined);
   const info = await FileSystem.getInfoAsync(target);
   if (!info.exists) return [];
 
