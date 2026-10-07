@@ -494,7 +494,9 @@ export default function LaboratorioScreen() {
           <View key={hypothesis.id} style={styles.hypothesis}>
             <Text style={styles.hypothesisTitle}>{hypothesis.label}</Text>
             <Text style={styles.hypothesisConfidence}>CONFIANÇA: {hypothesis.confidence} · SCORE: {hypothesis.score.toFixed(2)}</Text>
-            {hypothesis.evidence.map((item) => <Text key={`e-${hypothesis.id}-${item}`} style={styles.aiLine}>• Evidência: {item}</Text>)}
+            {hypothesis.evidence.map((item, index) => (
+              <Text key={`e-${hypothesis.id}-${index}`} style={styles.aiLine}>• Evidência: {item.text}</Text>
+            ))}
             {hypothesis.nextTests.map((item) => <Text key={`t-${hypothesis.id}-${item}`} style={styles.aiLine}>→ Próximo teste: {item}</Text>)}
           </View>
         ))}
