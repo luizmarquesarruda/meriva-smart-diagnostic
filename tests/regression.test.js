@@ -457,6 +457,14 @@ async function testCarScannerBaselineAndFuel012F() {
   assert.strictEqual(learned.globalSampleCounts.realSamples, 1);
   assert.ok(learnedRpm.mean > 778 && learnedRpm.mean < 800);
   assert.deepStrictEqual(learnedRpm.source, ['CARSCANNER_BASELINE', 'REAL_OBD']);
+  assert.ok(Array.isArray(learnedRpm.medianWindow), 'mediana deve manter janela limitada de amostras');
+  assert.strictEqual(learnedRpm.median, 789, 'mediana do seed + primeira amostra real deve ser calculada de forma determinística');
+
+  const overallRpm = learned.overallStatistics['Engine RPM'];
+  assert.ok(overallRpm, 'estatística global do PID deve ser atualizada');
+  assert.strictEqual(overallRpm.realSamples, 1);
+  assert.strictEqual(overallRpm.seedSamples, 1);
+  assert.strictEqual(overallRpm.confidence, 'LOW', 'seed não pode aumentar confiança baseada em amostras reais');
 }
 
 async function testBluetoothConnectionCallbacks() {
