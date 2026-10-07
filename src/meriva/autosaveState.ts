@@ -10,6 +10,7 @@ export interface LastPidReading {
   unit: string;
   status: string;
   timestamp: string;
+  source: 'REAL' | 'SIMULACAO';
 }
 
 export interface ObdConnectionState {
