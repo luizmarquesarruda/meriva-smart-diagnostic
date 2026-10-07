@@ -123,20 +123,25 @@ export async function ensureBluetoothReady(): Promise<boolean> {
 
   await requestBluetoothPermissions();
 
-  const available = await RNBluetoothClassic.isBluetoothAvailable();
+  const bluetoothClassic = RNBluetoothClassic as (typeof RNBluetoothClassic & {
+    requestBluetoothEnabled?: () => Promise<boolean>;
+  }) | undefined;
+
+  if (!bluetoothClassic) {
+    logBluetoothDiagnostic('BLUETOOTH_NATIVE_MODULE_UNAVAILABLE');
+    throw new Error('MÓDULO BLUETOOTH CLASSIC NÃO ESTÁ DISPONÍVEL NO BUILD NATIVO. REINSTALE/RECONSTRUA O APK.');
+  }
+
+  const available = await bluetoothClassic.isBluetoothAvailable();
   logBluetoothDiagnostic('BLUETOOTH_AVAILABLE', available);
   if (!available) {
     throw new Error('ESTE ANDROID NÃO POSSUI BLUETOOTH COMPATÍVEL');
   }
 
-  const enabled = await RNBluetoothClassic.isBluetoothEnabled();
+  const enabled = await bluetoothClassic.isBluetoothEnabled();
   logBluetoothDiagnostic('BLUETOOTH_ENABLED', enabled);
   if (enabled) return true;
 
-  type BluetoothClassicWithEnable = typeof RNBluetoothClassic & {
-    requestBluetoothEnabled?: () => Promise<boolean>;
-  };
-  const bluetoothClassic = RNBluetoothClassic as BluetoothClassicWithEnable;
   const requestBluetoothEnabled = bluetoothClassic.requestBluetoothEnabled;
 
   if (typeof requestBluetoothEnabled !== 'function') {
@@ -150,7 +155,7 @@ export async function ensureBluetoothReady(): Promise<boolean> {
     throw new Error('BLUETOOTH CONTINUA DESLIGADO. ATIVE-O PARA USAR O ELM327.');
   }
 
-  const enabledAfterRequest = await RNBluetoothClassic.isBluetoothEnabled();
+  const enabledAfterRequest = await bluetoothClassic.isBluetoothEnabled();
   if (!enabledAfterRequest) {
     throw new Error('BLUETOOTH NÃO FOI ATIVADO. ATIVE-O PARA USAR O ELM327.');
   }
