@@ -197,18 +197,14 @@ export default function IndexScreen() {
             <Text style={styles.heroUnit}>AUTONOMIA COM 012F • REFERÊNCIA CARSCANNER • TANQUE NOMINAL 56 L</Text>
             <View style={styles.heroMetrics}>
               <View style={styles.heroMetric}>
-                <Text style={styles.heroMetricLabel}>CONSUMO INSTANTÂNEO</Text>
+                <Text style={styles.heroMetricLabel}>CONSUMO</Text>
                 <Text style={styles.heroMetricValue}>
-                  {tripState.instantaneousConsumptionKml != null
-                    ? (tripState.instantaneousConsumptionKml.toFixed(1) + ' km/L')
-                    : 'N/D'}
+                  {availableConsumptionKml != null ? `${availableConsumptionKml.toFixed(1)} km/L` : 'N/D'}
                 </Text>
               </View>
               <View style={styles.heroMetric}>
-                <Text style={styles.heroMetricLabel}>COMBUSTÍVEL GASTO</Text>
-                <Text style={styles.heroMetricValue}>
-                  {tripState.fuelUsedL > 0 ? (tripState.fuelUsedL.toFixed(3) + ' L') : 'N/D'}
-                </Text>
+                <Text style={styles.heroMetricLabel}>VELOCIDADE</Text>
+                <Text style={styles.heroMetricValue}>{gpsState.currentSpeedKmh.toFixed(0)} km/h</Text>
               </View>
             </View>
           </View>
@@ -228,10 +224,8 @@ export default function IndexScreen() {
             </View>
             <View style={[styles.tripGrid, layout.landscape && styles.tripGridLandscape]}>
               <Metric label="DISTÂNCIA" value={formatDistance(gpsState.distanceKm, distanceUnit)} />
-              <Metric label="CONSUMO DE REFERÊNCIA" value={summary.lastRealCycle ? `${summary.lastRealCycle.avgFuelConsumptionKml.toFixed(2)} km/L` : availableConsumptionKml == null ? 'N/D' : `${availableConsumptionKml.toFixed(2)} km/L`} />
-              <Metric label="PRECISÃO GPS" value={gpsState.lastAccuracyM == null ? 'N/D' : `${gpsState.lastAccuracyM.toFixed(0)} m`} />
-              <Metric label="QUALIDADE GPS" value={gpsState.signalQuality.replace('_', ' ')} />
-              <Metric label="FONTE VELOCIDADE" value={gpsState.speedSource} />
+              <Metric label="VELOCIDADE" value={`${gpsState.currentSpeedKmh.toFixed(0)} km/h`} />
+              <Metric label="CONSUMO" value={availableConsumptionKml == null ? 'N/D' : `${availableConsumptionKml.toFixed(1)} km/L`} />
             </View>
             <Text style={styles.tripHelp}>GPS inicia automaticamente. Dados OBD e viagem são atualizados sem seleção manual.</Text>
           </View>
