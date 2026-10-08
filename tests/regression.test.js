@@ -265,6 +265,48 @@ async function testElmAndProtocol() {
   await session.close();
 }
 
+async function testExclusiveElmCommandTransaction() {
+  const { Elm327Session } = loadTs(path.join(ROOT, 'src/obd/elm327.ts'));
+  const { SimulatedObdTransport } = loadTs(path.join(ROOT, 'src/obd/simulatedTransport.ts'));
+
+  const session = new Elm327Session(new SimulatedObdTransport({ latencyMs: 20 }));
+  await session.initialize();
+
+  const order = [];
+  const exclusive = session.withExclusiveCommandQueue(async (executeCommand) => {
+    order.push('exclusive-start');
+    const first = await executeCommand('0105');
+    assert.strictEqual(first.status, 'OK');
+    order.push('exclusive-mid');
+    await wait(10);
+    const second = await executeCommand('010C');
+    assert.strictEqual(second.status, 'OK');
+    order.push('exclusive-end');
+  });
+
+  await wait(1);
+  const concurrent = session.queryPid('010D').then(() => order.push('concurrent'));
+
+  await Promise.all([exclusive, concurrent]);
+  assert.deepStrictEqual(
+    order,
+    ['exclusive-start', 'exclusive-mid', 'exclusive-end', 'concurrent'],
+    'uma transação exclusiva deve manter os comandos contíguos na fila',
+  );
+
+  const failingExclusive = session.withExclusiveCommandQueue(async (executeCommand) => {
+    await executeCommand('0105');
+    throw new Error('FALHA CONTROLADA');
+  });
+  await assert.rejects(failingExclusive, /FALHA CONTROLADA/);
+
+  const afterFailure = await session.queryPid('010C');
+  assert.strictEqual(afterFailure.parsed.value, 774, 'a fila deve ser liberada mesmo quando a transação falha');
+
+  await session.close();
+  console.log('exclusive ELM command transaction: OK');
+}
+
 async function testConfiguredBluetoothRetryLimit() {
   const managerPath = path.join(ROOT, 'src/obd/bluetoothManager.ts');
   const source = fs.readFileSync(managerPath, 'utf8');
@@ -835,6 +877,7 @@ async function main() {
     ['banco de fórmulas OBD', testFormulaKnowledgeBank],
     ['parser + DTC', testParser],
     ['elm/protocolo/serialização', testElmAndProtocol],
+    ['transação exclusiva de comandos ELM', testExclusiveElmCommandTransaction],
     ['limite configurável de retry Bluetooth', testConfiguredBluetoothRetryLimit],
     ['ativação oficial do Bluetooth', testBluetoothActivationRequest],
     ['bloqueio de troca silenciosa de adaptador', testActiveAdapterCannotBeSilentlySwitched],
