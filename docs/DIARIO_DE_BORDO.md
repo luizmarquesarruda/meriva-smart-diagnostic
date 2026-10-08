@@ -1078,3 +1078,26 @@ A correção foi inspecionada diretamente no código e a suíte de regressão fo
 
 ### Estado
 Aguardando resultado da CI. Se houver falha, a causa será registrada e corrigida antes de considerar a auditoria concluída.
+
+
+## 2026-10-08 — CI #1038: falha de TypeScript na camada de permissões
+
+### CI
+PR #27 — run #1038 / `37766512053`.
+- `npm ci --no-audit --no-fund`: **sucesso**.
+- Expo Doctor: **17/17** — **sucesso**.
+- `npm run validate`: **falha no typecheck**.
+- `android-build`: não executado porque depende de `validate`.
+
+### Falha observada
+O TypeScript reportou:
+- `app/_layout.tsx`: `requestAllRequiredPermissions` não exportado por `src/permissions/permissionManager.ts`.
+- `src/permissions/permissionManager.ts`: referências a `audit` inexistente/recursiva em `requestBluetoothPermissionsOnly`.
+
+### Diagnóstico
+A centralização de permissões registrada anteriormente ficou incompleta: a função agregadora foi removida/omitida enquanto o layout continuou importando-a, e a função Bluetooth recebeu uma implementação recursiva que referencia um objeto de auditoria inexistente. Isso é uma quebra real de compilação, não um falso positivo de teste.
+
+### Regra antes da próxima correção
+Corrigir primeiro o contrato da camada de permissões, mantendo somente permissões runtime realmente necessárias: Bluetooth/Dispositivos próximos no Android 12+ e localização em primeiro plano. O armazenamento permanece `APP_PRIVATE`; não adicionar permissões amplas de armazenamento.
+
+**Não considerar a auditoria concluída.** A próxima correção deve atualizar código/testes, disparar nova CI e exigir `validate` + `android-build` verdes antes do merge.
