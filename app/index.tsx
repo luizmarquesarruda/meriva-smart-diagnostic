@@ -29,7 +29,7 @@ export default function IndexScreen() {
   const [connectionStatus, setConnectionStatus] = useState(getSharedObdStatus());
   const [bluetoothSearching, setBluetoothSearching] = useState(false);
   const [bluetoothError, setBluetoothError] = useState<string | null>(null);
-  const [saveStatus, setSaveStatus] = useState<AutoSaveStatus>({ lastSavedAt: null, lastSaveReason: null, lastError: null });
+  const [saveStatus, setSaveStatus] = useState<AutoSaveStatus>({ lastSavedAt: null, lastSaveReason: null, lastError: null, obdSessionActive: false });
   const [isHydrated, setIsHydrated] = useState(false);
   const [gpsState, setGpsState] = useState<GpsTripState>(gpsTracker.getState());
   const [tripState, setTripState] = useState<AutoTripServiceState>(autoTripService.getState());
@@ -209,12 +209,12 @@ export default function IndexScreen() {
             <StatusCard landscape={layout.landscape} label="GPS" value={gpsState.running ? 'ATIVO' : 'AGUARDANDO'} ok={gpsState.running} />
             <StatusCard landscape={layout.landscape} label="FALHAS" value={dtcCount ? String(dtcCount) : 'OK'} danger={dtcCount > 0} ok={dtcCount === 0} />
             <StatusCard landscape={layout.landscape} label="VIAGEM" value={formatDistance(gpsState.distanceKm, distanceUnit)} />
-            <StatusCard landscape={layout.landscape} label="AUTOSAVE" value={isHydrated ? 'ATIVO' : 'CARREGANDO'} ok={isHydrated} />
+            <StatusCard landscape={layout.landscape} label="AUTOSAVE" value={!isHydrated ? 'CARREGANDO' : saveStatus.obdSessionActive ? 'GRAVANDO ECU' : 'AGUARDANDO ECU'} ok={isHydrated && saveStatus.obdSessionActive} />
           </View>
           <Link href="/mais" asChild><TouchableOpacity style={styles.moreButton}><Text style={styles.moreIcon}>⋯</Text><View style={styles.moreBody}><Text style={styles.moreTitle}>MAIS RECURSOS</Text><Text style={styles.moreHint}>Veículo • Viagens • Aprendizado • Bluetooth • Arquivos</Text></View><Text style={styles.moreArrow}>›</Text></TouchableOpacity></Link>
           {bluetoothError ? <Text style={styles.error}>BLUETOOTH/ELM327: {bluetoothError}</Text> : null}{gpsState.error ? <Text style={styles.error}>GPS: {gpsState.error}</Text> : null}{saveStatus.lastError ? <Text style={styles.error}>AUTOSAVE: {saveStatus.lastError}</Text> : null}
           <View style={styles.bottomNav}><Link href="/" asChild><TouchableOpacity style={[styles.bottomNavItem, styles.bottomNavActive]}><Text style={styles.bottomNavIcon}>🚗</Text><Text style={styles.bottomNavActiveText}>CARRO</Text></TouchableOpacity></Link><Link href="/bluetooth" asChild><TouchableOpacity style={styles.bottomNavItem}><Text style={styles.bottomNavIcon}>🔵</Text><Text style={styles.bottomNavText}>BLUETOOTH</Text></TouchableOpacity></Link></View>
-          <Text style={styles.footerStatus}>{isHydrated ? 'DADOS SALVOS AUTOMATICAMENTE' : 'CARREGANDO DADOS...'}</Text>
+          <Text style={styles.footerStatus}>{!isHydrated ? 'CARREGANDO DADOS...' : saveStatus.obdSessionActive ? 'SESSÃO ECU SALVA AUTOMATICAMENTE' : 'AUTOSAVE AGUARDANDO ECU'}</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
