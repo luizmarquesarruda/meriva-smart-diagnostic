@@ -415,7 +415,7 @@ export default function LaboratorioScreen() {
       );
     } catch (cause) {
       setStatus('FALHA NA VARREDURA DTC');
-      setError(cause instanceof Error ? cause.message : 'ERRO AO VARrer DTC');
+      setError(cause instanceof Error ? cause.message : 'ERRO AO VARRER DTC');
     } finally {
       setDtcScanning(false);
     }
