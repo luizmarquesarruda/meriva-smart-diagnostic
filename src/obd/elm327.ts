@@ -40,10 +40,19 @@ export interface PidQueryResult {
   parsed: ReturnType<typeof parsePidResponse>;
 }
 
-function classifyResponse(response: string): ElmCommandStatus {
+function classifyResponse(response: string, command?: string): ElmCommandStatus {
   const normalized = normalizeElmResponse(response).toUpperCase();
   if (!normalized) return 'NO_RESPONSE';
   if (isUnsupportedAtResponse(normalized)) return 'UNSUPPORTED';
+
+  // For a Mode 01 PID request, accept a matching positive ECU frame even if
+  // the adapter also emitted stale/noisy text such as "NO DATA".
+  const requestedPid = command?.match(/^01([0-9A-F]{2})$/);
+  if (requestedPid) {
+    const compactHex = normalized.replace(/[^0-9A-F]/g, '');
+    if (compactHex.includes(`41${requestedPid[1]}`)) return 'OK';
+  }
+
   if (/\b(NO DATA|UNABLE TO CONNECT|BUS INIT|BUS ERROR|STOPPED|ERROR)\b/.test(normalized)) {
     return 'ERROR';
   }
@@ -340,7 +349,7 @@ export class Elm327Session {
         : (this.config.adaptiveTiming ? this.adaptiveTimeoutMs : this.config.ioTimeoutMs);
       const response = await this.transport.readUntilPrompt(timeout);
       const normalizedResponse = normalizeElmResponse(response);
-      const status = classifyResponse(normalizedResponse);
+      const status = classifyResponse(normalizedResponse, command);
       const errorType = classifyElmError(normalizedResponse);
       this.commands += 1;
       this.totalResponseMs += Date.now() - started;

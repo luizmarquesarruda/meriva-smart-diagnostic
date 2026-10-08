@@ -61,8 +61,13 @@ export function extractHexBytes(rawResponse: string): number[] {
 
 export function validateOBDResponse(response: string, positiveService = '41'): boolean {
   const normalized = normalizeRawResponse(response);
-  if (!normalized || /NO DATA|UNABLE TO CONNECT|ERROR|BUS ERROR/i.test(normalized)) return false;
-  return new RegExp(positiveService + '[0-9A-F]{2}', 'i').test(normalizeHexStream(normalized));
+  if (!normalized) return false;
+
+  // ELM clones may emit diagnostic noise (e.g. "NO DATA") before a valid
+  // positive frame. A positive OBD frame is stronger evidence than that noise.
+  // Callers parsing a specific PID must still verify that the frame matches it.
+  return new RegExp(positiveService + '[0-9A-F]{2}', 'i')
+    .test(normalizeHexStream(normalized));
 }
 
 export function parsePidResponse(pidRequested: string, rawResponse: string, positiveService = '41'): ParsedPidResult {
@@ -71,7 +76,10 @@ export function parsePidResponse(pidRequested: string, rawResponse: string, posi
   const definition = getPidDefinition(pid);
 
   const normalizedResponse = normalizeRawResponse(rawResponse);
-  const hasPositiveFrame = validateOBDResponse(normalizedResponse, positiveService);
+  const responseStream = normalizeHexStream(normalizedResponse);
+  const requestedFrameMarker = `${positiveService}${pid.slice(-2)}`;
+  const hasPositiveFrame = validateOBDResponse(normalizedResponse, positiveService)
+    && responseStream.includes(requestedFrameMarker);
   if (!normalizedResponse || (!hasPositiveFrame && /NO DATA|UNABLE TO CONNECT|ERROR|BUS INIT|BUS ERROR/i.test(normalizedResponse))) {
     return {
       pid,
@@ -102,7 +110,7 @@ export function parsePidResponse(pidRequested: string, rawResponse: string, posi
     };
   }
 
-  if (!validateOBDResponse(rawResponse, positiveService)) {
+  if (!hasPositiveFrame) {
     return {
       pid,
       name: definition.name,

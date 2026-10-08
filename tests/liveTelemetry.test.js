@@ -69,4 +69,9 @@ const parsedNoisy = parsePidResponse('010D', noisyResponse);
 assert.strictEqual(parsedNoisy.status, 'RESPONDEU');
 assert.strictEqual(parsedNoisy.value, 40);
 
-console.log('OBD parser: prompt + noise tolerance: PASS');
+const noDataOnly = parsePidResponse('010D', 'NO DATA\\r>');
+assert.strictEqual(noDataOnly.status, 'NÃO RESPONDEU');
+const wrongPidWithNoise = parsePidResponse('010D', 'NO DATA\\r41 0C 0C 18\\r>');
+assert.strictEqual(wrongPidWithNoise.status, 'NÃO RESPONDEU');
+
+console.log('OBD parser: prompt + noise tolerance + requested PID validation: PASS');
