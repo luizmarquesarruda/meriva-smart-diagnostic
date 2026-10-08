@@ -1440,3 +1440,34 @@ A API `requestBluetoothEnabled()` é suportada pelo `react-native-bluetooth-clas
 
 ### Estado
 Plano registrado antes da próxima correção. Nenhuma alteração de código foi feita nesta etapa.
+
+## 2026-10-08 — Auditoria sênior: integração celular, documentação oficial e autosave
+
+### Objetivo
+Auditar o repositório como um todo com foco adicional na integração Android 36 + Bluetooth Classic/ELM327 + armazenamento local, confrontar as decisões do aplicativo com documentação oficial válida e corrigir o autosave sem degradar a telemetria REAL_OBD, o aprendizado, a validação ECU ou o histórico TXT.
+
+### Evidência física usada na auditoria
+O relatório Bluetooth de 2026-10-08 mostrou: permissões GRANTED, Bluetooth disponível, rádio inicialmente desligado, fluxo chegando a BLUETOOTH_ENABLE_REQUEST e erro "Cannot read property 'requestBluetoothEnabled' of undefined". O erro ocorre antes de descoberta/conexão do ELM327 e não deve ser confundido com ausência de dispositivo pareado.
+
+### Documentação técnica confrontada
+- Android Developers — permissões Bluetooth para Android 12+: BLUETOOTH_SCAN/CONNECT são permissões de execução; BLUETOOTH/BLUETOOTH_ADMIN são legadas e devem ser limitadas a SDK 30 quando mantidas.
+- Android Developers — ACTION_REQUEST_ENABLE: a ativação do rádio é uma solicitação ao sistema, não uma operação de descoberta/conexão.
+- Expo FileSystem — armazenamento privado do aplicativo e Storage Access Framework para exportação escolhida pelo usuário.
+- react-native-bluetooth-classic — autolinking em React Native moderno e matriz de compatibilidade da linha 1.70.x.
+
+### Achados de autosave
+1. O pushLastReading atualiza o estado persistido e agenda debounce de 1,5 s. Como o serviço automático consulta PIDs continuamente, isso pode transformar telemetria de alta frequência em escrita contínua de autosave.json + TXT.
+2. O fingerprint evita duplicação semântica, mas não evita churn quando timestamp/valor de uma leitura realmente mudam.
+3. O histórico TXT é corretamente limitado a 200 e mantém Saved At, mas a persistência automática deve ser desacoplada da frequência da consulta OBD.
+4. A ponte automática já corrige o problema histórico de lastReadings stale: consultas automáticas REAL_OBD entram em lastReadings e não contaminam aprendizado. A correção nova deve preservar isso.
+
+### Plano registrado antes do código
+- separar atualização de telemetria em memória da política de flush do autosave;
+- permitir que consultas automáticas atualizem lastReadings imediatamente, mas coalesçam a persistência em janela controlada;
+- manter registerObdQuery() com persistência própria para consultas manuais/diagnósticas;
+- preservar deduplicação, Saved At, limite de 200, REAL/SIMULACAO, ECU/protocolo e package-lock.json;
+- adicionar regressão específica para impedir tempestade de saves durante polling automático;
+- não executar CI nesta rodada.
+
+### Estado
+Plano registrado antes da correção de código. A validação final deverá ocorrer por typecheck, testes completos e Android Release em CI, mas essa CI não será executada nesta etapa.
