@@ -26,6 +26,8 @@ const vinResponse = [
   '49 02 05 33 34 35 36',
 ].join('\n');
 assert.strictEqual(advanced.parseVinMode09Response(vinResponse), '1D4GP00R55B123456');
+const vinCrOnly = vinResponse.replace(/\n/g, '\r');
+assert.strictEqual(advanced.parseVinMode09Response(vinCrOnly), '1D4GP00R55B123456');
 
 assert.strictEqual(advanced.parseVinMode09Response('49 02 01 00 00 00 31\nNO DATA'), null);
 assert.strictEqual(advanced.parseVinMode09Response('49 02 01 00 00 00 00'), null);
