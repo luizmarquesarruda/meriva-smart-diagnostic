@@ -127,8 +127,18 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
   const trimsCoherent = Boolean(stft && ltft && rpm && hasCoherentSnapshot([stft, ltft, rpm], now));
   const engineRunning = Boolean(rpm && rpm.value !== null && rpm.value > 400);
   if (stft && ltft && isTrimContext(input.condition)) {
-    if (!trimsCoherent) blockedIncoherentSnapshots++;
-    else if (!engineRunning) blockedEngineOffRules++;
+    if (!trimsCoherent) {
+      clearTemporalCandidate('FUEL_TRIM_LEAN');
+      clearTemporalCandidate('FUEL_TRIM_RICH');
+      blockedIncoherentSnapshots++;
+    } else if (!engineRunning) {
+      clearTemporalCandidate('FUEL_TRIM_LEAN');
+      clearTemporalCandidate('FUEL_TRIM_RICH');
+      blockedEngineOffRules++;
+    }
+  } else {
+    clearTemporalCandidate('FUEL_TRIM_LEAN');
+    clearTemporalCandidate('FUEL_TRIM_RICH');
   }
   if (stft && ltft && rpm && trimsCoherent && engineRunning && isTrimContext(input.condition)) {
     const combinedTrim = stft.value! + ltft.value!;
