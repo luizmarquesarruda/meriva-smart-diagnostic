@@ -8,6 +8,7 @@ import { discoverIntelligentPids } from './intelligentPidDiscovery';
 import type { PidDiscoveryCache } from '../meriva/autosaveState';
 import bluetoothConfig from '../knowledge/bluetooth_config.json';
 import { requestBluetoothPermissionsOnly } from '../permissions/permissionManager';
+import { isPidDiscoveryCacheUsable } from './pidDiscoveryCache';
 
 let lastBluetoothDiagnosticText = '';
 
@@ -292,7 +293,8 @@ async function createRealElmSessionAttempt(
       ? getElmProtocolName(successfulForcedProtocol)
       : (identifiedProtocol ?? 'AUTO');
     const negotiatedProtocol = session.getProtocol() ?? activeProtocol;
-    const cacheMatchesProtocol = Boolean(pidDiscoveryCache) && pidDiscoveryCache?.protocol === negotiatedProtocol;
+    const cacheMatchesProtocol = isPidDiscoveryCacheUsable(pidDiscoveryCache, { adapterAddress: device.address })
+      && pidDiscoveryCache?.protocol === negotiatedProtocol;
 
     let supportedPids: string[] = [];
     let pidDiscoverySource: RealElmConnection['pidDiscoverySource'] = 'CACHE';
