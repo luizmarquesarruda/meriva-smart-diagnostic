@@ -1,4 +1,4 @@
-import { PermissionsAndroid, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import RNBluetoothClassic from 'react-native-bluetooth-classic';
 import { BluetoothClassicTransport, BluetoothDeviceInfo, listBondedBluetoothDevices } from './bluetoothClassicTransport';
 import { ElmCommandResult, Elm327Session } from './elm327';
@@ -7,6 +7,7 @@ import { Elm327CompatibilityConfig, DEFAULT_ELM327_COMPATIBILITY, mergeCompatibi
 import { discoverIntelligentPids } from './intelligentPidDiscovery';
 import type { PidDiscoveryCache } from '../meriva/autosaveState';
 import bluetoothConfig from '../knowledge/bluetooth_config.json';
+import { requestBluetoothPermissionsOnly } from '../permissions/permissionManager';
 
 let lastBluetoothDiagnosticText = '';
 
@@ -67,37 +68,18 @@ export function isValidEcuProbe(result: ElmCommandResult): boolean {
 
 export async function requestBluetoothPermissions(): Promise<void> {
   logBluetoothDiagnostic('PERMISSIONS_START', { platform: Platform.OS, version: Platform.Version });
-  if (Platform.OS !== 'android') {
-    logBluetoothDiagnostic('PERMISSIONS_SKIP_NON_ANDROID');
-    return;
+  const status = await requestBluetoothPermissionsOnly();
+  if (status !== 'GRANTED') {
+    throw new Error(
+      status === 'BLOCKED'
+        ? 'PERMISSÃO DE DISPOSITIVOS PRÓXIMOS BLOQUEADA. ABRA AS CONFIGURAÇÕES DO APLICATIVO E PERMITA O BLUETOOTH.'
+        : 'PERMISSÃO DE DISPOSITIVOS PRÓXIMOS NÃO CONCEDIDA. PERMITA O ACESSO NAS CONFIGURAÇÕES DO APLICATIVO.',
+    );
   }
-
-  if (Platform.Version >= 31) {
-    const result = await PermissionsAndroid.requestMultiple([
-      PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
-      PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
-    ]);
-
-    logBluetoothDiagnostic('BLUETOOTH_PERMISSIONS_RESULT', result);
-    if (Object.values(result).some((value) => value !== PermissionsAndroid.RESULTS.GRANTED)) {
-      throw new Error('PERMISSÃO DE DISPOSITIVOS PRÓXIMOS NÃO CONCEDIDA. PERMITA O ACESSO NAS CONFIGURAÇÕES DO APLICATIVO.');
-    }
-
-    // No Android 12+, operações Bluetooth usam BLUETOOTH_CONNECT/SCAN.
-    // A permissão de localização do GPS é tratada separadamente pelo app.
-    return;
-  }
-
-  const result = await PermissionsAndroid.requestMultiple([
-    PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-    PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
-  ]);
-  if (Object.values(result).some((value) => value !== PermissionsAndroid.RESULTS.GRANTED)) {
-    throw new Error('PERMISSÃO DE LOCALIZAÇÃO NECESSÁRIA NO ANDROID ANTIGO. PERMITA O ACESSO NAS CONFIGURAÇÕES DO APLICATIVO.');
-  }
+  logBluetoothDiagnostic('BLUETOOTH_PERMISSIONS_RESULT', status);
 }
 
-export async function ensureBluetoothReady(): Promise<boolean> {
+export async function ensureBluetoothReadydy(): Promise<boolean> {
   logBluetoothDiagnostic('BLUETOOTH_READY_START');
   if (Platform.OS !== 'android') {
     throw new Error('BLUETOOTH CLASSIC DISPONÍVEL SOMENTE NO ANDROID');
