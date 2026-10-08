@@ -1,3 +1,4 @@
+import { parseDtcResponseForService } from './dtcParser';
 import { getPidDefinition } from './pidDefinition';
 import { validatePidValue } from './formulaEngine';
 import type { PidDefinition } from './pidDefinition';

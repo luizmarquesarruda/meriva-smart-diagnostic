@@ -565,3 +565,17 @@ A lógica de parsing DTC foi extraída para `src/obd/dtcParser.ts`, que não pos
 
 ### Estado
 A falha não alterava a lógica de produção do parser OBD; o problema era a estratégia de carregamento do teste. A nova CI deve confirmar a suíte completa e liberar o Android build.
+
+## 2026-10-07 — Correção final do parser DTC revelada pela CI #930
+
+### Falha
+A CI #930 (run 37707510064), no commit `87571e97d68ea993222dbb03b229fdffba17ba20`, confirmou `npm ci` e Expo Doctor **17/17**. O `liveTelemetry.test.js` havia passado e a suíte chegou ao `typecheck`, mas `parser.ts(155,10)` falhou com `TS2304: Cannot find name 'parseDtcResponseForService'`.
+
+### Causa raiz
+Ao extrair o parser DTC para `src/obd/dtcParser.ts`, `parser.ts` ficou apenas com o `export { ... }` e perdeu o import local necessário para a função legada `parseDtcResponse()` continuar delegando ao novo módulo.
+
+### Correção
+Restaurado o import local de `parseDtcResponseForService` em `src/obd/parser.ts`. A API de export permanece compatível e `dtcScanner.ts` continua usando o módulo isolado para evitar dependências de runtime no harness.
+
+### Estado
+A próxima CI deve confirmar TypeScript + testes completos e, em caso de sucesso, liberar o job Android Release.
