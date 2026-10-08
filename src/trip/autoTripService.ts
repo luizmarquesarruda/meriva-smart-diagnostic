@@ -74,12 +74,53 @@ class AutoTripService {
   private pollCycleNumber = 0;
   private readonly latestPidValues = new Map<string, number>();
   private stoppedSinceMs: number | null = null;
+  private lowVoltageSinceMs: number | null = null;
+  private engineOffSinceMs: number | null = null;
+  private lastUiEmitMs = 0;
+  private pendingUiSnapshot: AutoTripServiceState | null = null;
+  private uiEmitTimer: ReturnType<typeof setTimeout> | null = null;
   private state: AutoTripServiceState = { ...INITIAL_STATE };
 
-  subscribe(listener: Listener): () => void {
+  subscribe(listener: Listener, minIntervalMs = 250): () => void {
     this.listeners.add(listener);
     listener({ ...this.state });
-    return () => this.listeners.delete(listener);
+
+    // O loop OBD pode rodar a 500 ms, mas a UI não precisa acompanhar cada ciclo.
+    // O serviço mantém a cadência de aquisição; somente a emissão para telas é
+    // limitada, evitando renderizações em cascata em telas pesadas.
+    const original = listener;
+    const wrapped: Listener = (next) => {
+      const now = Date.now();
+      if (now - this.lastUiEmitMs >= Math.max(0, minIntervalMs)) {
+        this.lastUiEmitMs = now;
+        original({ ...next });
+        return;
+      }
+      this.pendingUiSnapshot = { ...next };
+      if (!this.uiEmitTimer) {
+        const wait = Math.max(0, minIntervalMs - (now - this.lastUiEmitMs));
+        this.uiEmitTimer = setTimeout(() => {
+          this.uiEmitTimer = null;
+          this.lastUiEmitMs = Date.now();
+          if (this.pendingUiSnapshot) {
+            original({ ...this.pendingUiSnapshot });
+            this.pendingUiSnapshot = null;
+          }
+        }, wait);
+      }
+    };
+
+    // Preserve the existing immediate snapshot while throttling subsequent emissions.
+    this.listeners.delete(listener);
+    this.listeners.add(wrapped);
+    return () => {
+      this.listeners.delete(wrapped);
+      if (this.listeners.size === 0 && this.uiEmitTimer) {
+        clearTimeout(this.uiEmitTimer);
+        this.uiEmitTimer = null;
+        this.pendingUiSnapshot = null;
+      }
+    };
   }
 
   getState(): AutoTripServiceState {
@@ -239,7 +280,7 @@ class AutoTripService {
         // Somente PIDs descobertos são elegíveis para o rodízio secundário.
         // O resultado de cada consulta mantém TX/RX pelo autosave existente.
         this.pollCycleNumber += 1;
-        const secondaryPids = ['015E', '012F', '0152', '0110', '010B', '010F', '0105', '0111']
+        const secondaryPids = ['015E', '012F', '0142', '0152', '0110', '010B', '010F', '0105', '0111']
           .filter((pid) => connection.supportedPids.includes(pid))
           .filter((pid) => this.pollCycleNumber >= (this.pidBackoffUntilCycle.get(pid) ?? 0));
         if (secondaryPids.length > 0) {
@@ -266,6 +307,15 @@ class AutoTripService {
           if (secondaryResult.parsed.status === 'RESPONDEU' && Number.isFinite(secondaryResult.parsed.value)) {
             this.latestPidValues.set(secondaryPid, secondaryResult.parsed.value as number);
           }
+          if (secondaryPid === '0142' &&
+              secondaryResult.parsed.status === 'RESPONDEU' &&
+              secondaryResult.parsed.value != null &&
+              Number.isFinite(secondaryResult.parsed.value)) {
+            // 0142 é tensão do módulo, não uma prova isolada de motor desligado.
+            // Só será usado como evidência complementar com RPM/velocidade.
+            this.latestPidValues.set('0142', secondaryResult.parsed.value);
+          }
+
           if (secondaryResult.parsed.status !== 'RESPONDEU') {
             // Respostas sem dados não disparam recuperação: o PID fica em backoff
             // por quatro ciclos de polling e outros PIDs podem avançar.
@@ -285,11 +335,6 @@ class AutoTripService {
             fuelLevelPercent = secondaryResult.parsed.value;
           }
         }
-
-        // Quando 010D existe, o GPS recebe a velocidade real da ECU como
-        // confirmação de movimento. Zero km/h bloqueia deriva do GPS parado.
-        // Sem 010D, null devolve a decisão ao filtro GPS.
-        gpsTracker.setVehicleSpeedHintKmh(obdSpeedSupported ? obdSpeedKmh : null);
 
         const settings = await readAppSettings(this.basePath);
         const fuelComposition = {
@@ -336,18 +381,45 @@ class AutoTripService {
 
         const gps = gpsTracker.getState();
         const vehicleSpeedKmh = obdSpeedKmh ?? gps.currentSpeedKmh;
+        const nowMs = Date.now();
         const moving = (rpm ?? 0) > 0 && vehicleSpeedKmh > 0;
+        const stationary = vehicleSpeedKmh <= 2;
+
+        // OBD 010D é a fonte preferencial para movimento. Após dois minutos
+        // realmente parado, o GPS pode entrar em modo econômico; ao voltar a
+        // movimentar, o tracker restaura a cadência normal.
+        gpsTracker.setVehicleSpeedHintKmh(obdSpeedSupported ? obdSpeedKmh : null);
 
         if (moving) {
           this.stoppedSinceMs = null;
+          this.engineOffSinceMs = null;
+          this.lowVoltageSinceMs = null;
           if (!this.recorder) {
-            this.recorder = new RealTripRecorder(Date.now(), gps.distanceKm);
+            this.recorder = new RealTripRecorder(nowMs, gps.distanceKm);
           }
         } else if (this.recorder) {
-          this.stoppedSinceMs ??= Date.now();
-          if (Date.now() - this.stoppedSinceMs >= 15_000) {
+          this.stoppedSinceMs ??= nowMs;
+
+          const voltage = this.latestPidValues.get('0142') ?? null;
+          const engineOffEvidence =
+            rpm === 0 &&
+            stationary &&
+            voltage != null &&
+            voltage < 12.2;
+
+          if (engineOffEvidence) this.engineOffSinceMs ??= nowMs;
+          else this.engineOffSinceMs = null;
+
+          if (voltage != null && voltage < 12.2) this.lowVoltageSinceMs ??= nowMs;
+          else this.lowVoltageSinceMs = null;
+
+          // Não encerra uma viagem por uma leitura isolada de tensão. Exige
+          // evidência combinada e sustentada por 20 s.
+          if (this.engineOffSinceMs != null && nowMs - this.engineOffSinceMs >= 20_000) {
             await this.finalizeRecorder();
             this.stoppedSinceMs = null;
+            this.engineOffSinceMs = null;
+            this.lowVoltageSinceMs = null;
           }
         }
 
