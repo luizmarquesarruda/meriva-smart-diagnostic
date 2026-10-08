@@ -436,3 +436,48 @@ Foi adicionada uma regressão estática para as novas rotas e integrações prin
 3. Após CI verde, validar a experiência no aparelho Android físico com ELM327 real.
 4. Na validação física, verificar principalmente os estados: offline, conectando, Bluetooth conectado sem ECU validada, ECU conectada, DTC presente e ausência de dados reais.
 
+## 2026-10-07 — Auditoria da CI #901/#902 + pesquisa de referências OBD
+
+### Falha confirmada antes da nova implementação
+As CI #901 (run 37705647976) e #902 (run 37705797381) falharam no mesmo ponto:
+- `npm ci --no-audit --no-fund`: **sucesso**;
+- `npm run doctor`: **17/17**, **sucesso**;
+- `npm run validate`: **falha no TypeScript**;
+- `android-build`: **não executado**, pois depende de `validate`.
+
+Erro exato:
+`app/index.tsx(237,1): error TS1005: '}' expected.`
+
+### Causa raiz
+A remodelação do cockpit deixou o escopo de `HomeScreen` sem a chave de fechamento antes dos componentes auxiliares `CockpitMetric`, `ChainStep` e `StatusCard`. A alteração é sintática e está localizada em `app/index.tsx`.
+
+### Pesquisa de referências
+Foram analisados projetos open-source de diagnóstico/OBD, incluindo OBDvis, obd2-dashboard e Free_OBD, além de referências de modos de serviço OBD-II. O padrão de funcionalidades mais útil para o Meriva Smart foi:
+- telemetria em janela móvel e tendências;
+- classificação por contexto de condução;
+- leitura separada de DTC armazenado, pendente e permanente;
+- freeze frame associado ao DTC;
+- histórico pós-viagem e evidências persistidas;
+- diagnóstico determinístico com evidências e limites explícitos;
+- saúde do adaptador/conexão, mantendo operação robusta em clones ELM327.
+
+A integração será incremental e compatível com a arquitetura local existente. Não serão introduzidos modos bidirecionais, comandos destrutivos ou sensores extras sem necessidade.
+
+### Documentação técnica revisada
+Foi coberta a documentação oficial e as referências técnicas relevantes para esta etapa:
+- Android Bluetooth permissions para Android 12+;
+- Expo permissions e Expo Location;
+- npm `ci` e reprodutibilidade por lockfile;
+- GitHub Actions workflow/concurrency;
+- referências de serviços OBD-II 01/02/03/04/07/09/0A;
+- documentação/referências de ELM327 e padrões de PID.
+
+### Critérios para a nova implementação
+1. Nenhuma telemetria sintética entra como evidência real.
+2. Funções novas devem ser testáveis sem hardware por meio de funções puras/parsers.
+3. DTC não suportado ou sem resposta deve ser classificado como **não disponível**, nunca como ausência de falha.
+4. O fluxo Bluetooth Classic atual e a validação ECU por `41 0C` permanecem intactos.
+5. A CI deve validar TypeScript, testes e APK antes de considerar a etapa concluída.
+
+### Estado
+A falha da CI foi diagnosticada antes de qualquer nova alteração. A próxima sequência é: correção sintática → novas funções diagnósticas → testes/regressões → auditoria → CI.
