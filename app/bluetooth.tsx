@@ -141,36 +141,38 @@ export default function BluetoothScreen() {
           <Text style={styles.subtitle}>ELM327 • BLUETOOTH CLASSIC</Text>
         </View>
 
-        <View style={styles.connectionCard}>
-          <Text style={styles.label}>BLUETOOTH</Text>
-          <Text style={bluetoothConnected ? styles.online : styles.waiting}>{bluetoothConnected ? '🟢 CONECTADO' : '🟡 AGUARDANDO'}</Text>
-          <Text style={styles.detail}>{bluetoothConnected ? (connectedName ?? 'ELM327') : status}</Text>
-          <Text style={styles.detail}>ESTADO: {lifecycleLabel(lifecycle)}</Text>
-        </View>
-        <View style={styles.connectionCard}>
-          <Text style={styles.label}>ELM327</Text>
-          <Text style={lifecycle === 'READY' ? styles.online : styles.waiting}>
-            {lifecycle === 'READY' ? '🟢 PRONTO' : lifecycle === 'ELM_INITIALIZED' ? '🟢 INICIALIZADO' : lifecycle === 'ELM_RESPONDING' ? '🟢 RESPONDENDO' : lifecycle === 'BLUETOOTH_CONNECTED' ? '🟡 AGUARDANDO RESPOSTA' : '⚪ AGUARDANDO'}
-          </Text>
-        </View>
-        <View style={styles.connectionCard}>
-          <Text style={styles.label}>ECU</Text>
-          <Text style={ecuConnected ? styles.online : styles.waiting}>{ecuConnected ? '🟢 CONECTADA' : connectedName ? '🟡 CONECTANDO' : '⚪ AGUARDANDO'}</Text>
-        </View>
-        <View style={styles.connectionCard}>
-          <Text style={styles.label}>SAÚDE DO ELM327</Text>
-          {(() => {
-            const health = getSharedObdConnection()?.session.getHealthSnapshot();
-            return health ? (
-              <>
-                <Text style={styles.detail}>COMANDOS {health.successfulCommands}/{health.commands} • MÉDIA {health.averageResponseMs} ms</Text>
-                <Text style={styles.detail}>TIMEOUTS {health.timeouts} • ERROS {health.errors} • SEM DADOS {health.noData}</Text>
-                <Text style={health.recoveryRecommended ? styles.warning : styles.detail}>
-                  {health.recoveryRecommended ? 'RECUPERAÇÃO RECOMENDADA' : 'COMUNICAÇÃO ESTÁVEL'}
-                </Text>
-              </>
-            ) : <Text style={styles.detail}>Conecte o ELM327 para medir a saúde da sessão.</Text>;
-          })()}
+        <View style={[styles.connectionGrid, layout.landscape && styles.connectionGridLandscape]}>
+          <View style={[styles.connectionCard, layout.landscape && styles.connectionCardLandscape]}>
+            <Text style={styles.label}>BLUETOOTH</Text>
+            <Text style={bluetoothConnected ? styles.online : styles.waiting}>{bluetoothConnected ? '🟢 CONECTADO' : '🟡 AGUARDANDO'}</Text>
+            <Text style={styles.detail}>{bluetoothConnected ? (connectedName ?? 'ELM327') : status}</Text>
+            <Text style={styles.detail}>ESTADO: {lifecycleLabel(lifecycle)}</Text>
+          </View>
+          <View style={[styles.connectionCard, layout.landscape && styles.connectionCardLandscape]}>
+            <Text style={styles.label}>ELM327</Text>
+            <Text style={lifecycle === 'READY' ? styles.online : styles.waiting}>
+              {lifecycle === 'READY' ? '🟢 PRONTO' : lifecycle === 'ELM_INITIALIZED' ? '🟢 INICIALIZADO' : lifecycle === 'ELM_RESPONDING' ? '🟢 RESPONDENDO' : lifecycle === 'BLUETOOTH_CONNECTED' ? '🟡 AGUARDANDO RESPOSTA' : '⚪ AGUARDANDO'}
+            </Text>
+          </View>
+          <View style={[styles.connectionCard, layout.landscape && styles.connectionCardLandscape]}>
+            <Text style={styles.label}>ECU</Text>
+            <Text style={ecuConnected ? styles.online : styles.waiting}>{ecuConnected ? '🟢 CONECTADA' : connectedName ? '🟡 CONECTANDO' : '⚪ AGUARDANDO'}</Text>
+          </View>
+          <View style={[styles.connectionCard, layout.landscape && styles.connectionCardLandscape]}>
+            <Text style={styles.label}>SAÚDE DO ELM327</Text>
+            {(() => {
+              const health = getSharedObdConnection()?.session.getHealthSnapshot();
+              return health ? (
+                <>
+                  <Text style={styles.detail}>COMANDOS {health.successfulCommands}/{health.commands} • MÉDIA {health.averageResponseMs} ms</Text>
+                  <Text style={styles.detail}>TIMEOUTS {health.timeouts} • ERROS {health.errors} • SEM DADOS {health.noData}</Text>
+                  <Text style={health.recoveryRecommended ? styles.warning : styles.detail}>
+                    {health.recoveryRecommended ? 'RECUPERAÇÃO RECOMENDADA' : 'COMUNICAÇÃO ESTÁVEL'}
+                  </Text>
+                </>
+              ) : <Text style={styles.detail}>Conecte o ELM327 para medir a saúde da sessão.</Text>;
+            })()}
+          </View>
         </View>
 
         {lifecycle === 'BLUETOOTH_OFF' ? (
@@ -240,7 +242,10 @@ const styles = StyleSheet.create({
   header: { paddingVertical: 8, marginBottom: 10 },
   title: { color: '#f8fafc', fontSize: 25, fontWeight: '900', letterSpacing: 1 },
   subtitle: { color: '#7db3ff', fontSize: 10, fontWeight: '900', marginTop: 3, letterSpacing: 0.8 },
-  connectionCard: { width: '100%',  backgroundColor: '#111c2e', borderRadius: 14, borderWidth: 1, borderColor: '#29415f', padding: 15, marginBottom: 10 },
+  connectionGrid: { width: '100%' },
+  connectionGridLandscape: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  connectionCardLandscape: { width: '48.5%', marginBottom: 0 },
+  connectionCard: { width: '100%', backgroundColor: '#111c2e', borderRadius: 14, borderWidth: 1, borderColor: '#29415f', padding: 15, marginBottom: 10 },
   label: { color: '#7185a1', fontSize: 9, fontWeight: '900', letterSpacing: 1 },
   online: { color: '#4ade80', fontSize: 24, fontWeight: '900', marginTop: 3 },
   waiting: { color: '#fbbf24', fontSize: 24, fontWeight: '900', marginTop: 3 },
