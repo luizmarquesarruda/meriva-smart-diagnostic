@@ -180,8 +180,9 @@ export class GpsTracker {
   }
 
   async stopBackgroundLocation(): Promise<void> {
-    if (!this.backgroundTaskRunning) return;
     try {
+      // O estado nativo pode sobreviver a um reload/recriação do contexto JS.
+      // Por isso, sempre consultar o TaskManager em vez de depender apenas do flag local.
       const started = await Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK_NAME);
       if (started) await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK_NAME);
     } catch (cause) {

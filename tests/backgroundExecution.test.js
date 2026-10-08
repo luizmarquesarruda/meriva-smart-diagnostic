@@ -32,6 +32,7 @@ assert(gps.includes('this.subscription = null;'));
 assert(gps.includes('notificationTitle: \'MERIVA SMART — Diagnóstico OBD\''));
 assert(gps.includes('handleLocation(location: Location.LocationObject)'));
 assert(gps.includes('stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK_NAME)'));
+assert(!gps.includes('if (!this.backgroundTaskRunning) return;'), 'stop deve consultar o TaskManager mesmo após recriação do JS');
 assert(gps.includes('watchPositionAsync('));
 
 assert(permissions.includes('requestBackgroundLocationPermissionsOnly'));

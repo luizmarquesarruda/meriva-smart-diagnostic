@@ -248,6 +248,9 @@ O `package-lock.json` **já está presente no `main`**, incorporado pela consoli
 
 Não foi criado um segundo lockfile nem substituído o arquivo existente, evitando duplicação ou alteração desnecessária da árvore de dependências.
 
+### Correção de lifecycle após recriação do JavaScript
+O encerramento da localização em segundo plano não depende mais apenas do flag em memória. A implementação consulta sempre o TaskManager nativo antes de parar o serviço, evitando manter a notificação/Foreground Service ativo caso o contexto JS seja recriado.
+
 ### Validação
 A CI do `main` já comprovou a instalação determinística com:
 `npm ci --no-audit --no-fund` — **sucesso**.
