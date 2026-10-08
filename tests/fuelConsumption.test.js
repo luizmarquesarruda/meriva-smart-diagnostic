@@ -1,23 +1,10 @@
 'use strict';
 
 const assert = require('assert');
-const ts = require('typescript');
 const fs = require('fs');
 const path = require('path');
-const Module = require('module');
 
-const sourcePath = path.join(__dirname, '..', 'src', 'obd', 'fuelConsumption.ts');
-const output = ts.transpileModule(fs.readFileSync(sourcePath, 'utf8'), {
-  compilerOptions: {
-    module: ts.ModuleKind.CommonJS,
-    target: ts.ScriptTarget.ES2019,
-  },
-}).outputText;
-
-const mod = new Module(sourcePath, null);
-mod.filename = sourcePath;
-mod.paths = Module._nodeModulePaths(path.dirname(sourcePath));
-mod._compile(output, sourcePath);
+const { loadTs } = require('./helpers/loadTs');
 
 const { integrateFuelRateLph, FuelRateIntegrator } = mod.exports;
 
