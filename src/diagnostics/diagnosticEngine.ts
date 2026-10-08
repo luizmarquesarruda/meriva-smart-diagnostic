@@ -21,6 +21,7 @@ const TEMPORAL_WINDOW_MS = 60_000;
 interface TemporalCandidate { signature: string; timestamps: number[]; lastSample: number; }
 const temporalCandidates = new Map<string, TemporalCandidate>();
 export function resetDiagnosticTemporalState(): void { temporalCandidates.clear(); }
+function clearTemporalCandidate(ruleId: string): void { temporalCandidates.delete(ruleId); }
 function hasCoherentSnapshot(items: PidObservation[], nowMs: number): boolean {
   if (items.length < 2) return false;
   const times = items.map((item) => Date.parse(item.timestamp));
@@ -134,11 +135,16 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
     const lean = rules.find((item) => item.id === 'FUEL_TRIM_LEAN');
     const rich = rules.find((item) => item.id === 'FUEL_TRIM_RICH');
     if (lean && combinedTrim >= (lean.trigger.combinedTrimMin ?? Number.POSITIVE_INFINITY)) {
+      clearTemporalCandidate(rich?.id ?? 'FUEL_TRIM_RICH');
       if (!temporalRuleConfirmed(lean.id, [stft, ltft, rpm], now)) pendingTemporalRules++;
       else add(lean, { ruleId: lean.id, text: 'STFT + LTFT = ' + combinedTrim.toFixed(2) + '% em contexto ' + input.condition + '.', source: 'PID', pid: '0106/0107', value: combinedTrim });
     } else if (rich && combinedTrim <= (rich.trigger.combinedTrimMax ?? Number.NEGATIVE_INFINITY)) {
+      clearTemporalCandidate(lean?.id ?? 'FUEL_TRIM_LEAN');
       if (!temporalRuleConfirmed(rich.id, [stft, ltft, rpm], now)) pendingTemporalRules++;
       else add(rich, { ruleId: rich.id, text: 'STFT + LTFT = ' + combinedTrim.toFixed(2) + '% em contexto ' + input.condition + '.', source: 'PID', pid: '0106/0107', value: combinedTrim });
+    } else {
+      clearTemporalCandidate(lean?.id ?? 'FUEL_TRIM_LEAN');
+      clearTemporalCandidate(rich?.id ?? 'FUEL_TRIM_RICH');
     }
   }
 
@@ -146,11 +152,11 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
   const mapRule = rules.find((item) => item.id === 'MAP_HIGH_IDLE');
   const mapCoherent = Boolean(map && rpm && hasCoherentSnapshot([map, rpm], now));
   if (map && mapRule && input.condition === mapRule.trigger.condition && map.value! >= (mapRule.trigger.mapMinKpa ?? Number.POSITIVE_INFINITY)) {
-    if (!mapCoherent) blockedIncoherentSnapshots++;
-    else if (!engineRunning) blockedEngineOffRules++;
+    if (!mapCoherent) { clearTemporalCandidate(mapRule.id); blockedIncoherentSnapshots++; }
+    else if (!engineRunning) { clearTemporalCandidate(mapRule.id); blockedEngineOffRules++; }
     else if (!temporalRuleConfirmed(mapRule.id, [map, rpm!], now)) pendingTemporalRules++;
     else add(mapRule, { ruleId: mapRule.id, text: 'MAP em marcha lenta aquecida = ' + map.value!.toFixed(2) + ' kPa.', source: 'PID', pid: '010B', value: map.value! });
-  }
+  } else if (mapRule) clearTemporalCandidate(mapRule.id);
 
   return {
     engine: 'LOCAL_EVIDENCE_ENGINE',
