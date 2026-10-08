@@ -555,6 +555,11 @@ test('18. polling automático atualiza lastReadings sem contaminar learning', as
   await m.initAutoSave(BASE);
   const integration = loadTs(path.join(ROOT, 'src/meriva/autosaveIntegration.ts'));
   const parser = loadTs(path.join(ROOT, 'src/obd/parser.ts'));
+  const autoTripSource = fs.readFileSync(path.join(ROOT, 'src/trip/autoTripService.ts'), 'utf8');
+  assert.match(autoTripSource, /recordAutomaticObdQuery\(fuelLevelResult/);
+  assert.match(autoTripSource, /recordAutomaticObdQuery\(fuelResult/);
+  assert.match(autoTripSource, /recordAutomaticObdQuery\(speedResult/);
+  assert.match(autoTripSource, /recordAutomaticObdQuery\(telemetryResult/);
 
   integration.recordAutomaticObdQuery({
     tx: '010C',
