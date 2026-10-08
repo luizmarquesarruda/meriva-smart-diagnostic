@@ -26,7 +26,7 @@ assert.match(midLayout, /size\.width > size\.height/);
 assert.doesNotMatch(index, /screenOrientation|OrientationLock\.(PORTRAIT|LANDSCAPE)/);
 for (const file of screenFiles) {
   const source = fs.readFileSync(file, 'utf8');
-  assert.match(source, /useMidLayout\(\)/, file + ' deve usar o layout responsivo centralizado');
+  assert.ok(/useMidLayout\(\)/.test(source) || /useWindowDimensions\(\)/.test(source) && /getMidLayout\(windowSize\)/.test(source), file + ' deve usar o layout responsivo centralizado');
   assert.match(source, /paddingHorizontal:layout\.horizontalPadding|paddingHorizontal:\s*layout\.horizontalPadding/, file + ' deve aplicar padding responsivo');
   assert.match(source, /maxWidth:layout\.maxContentWidth|maxWidth:\s*layout\.maxContentWidth/, file + ' deve limitar o conteúdo responsivamente');
   assert.match(source, /react-native-safe-area-context/, file + ' deve usar Safe Area moderna');
