@@ -1,6 +1,6 @@
 export type DataSource = 'REAL_OBD' | 'CARSCANNER_BASELINE' | 'USER_REAL_OBSERVATION' | 'SIMULACAO' | 'IMPORTADO';
 export type ConfidenceLevel = 'LOW' | 'MEDIUM' | 'GOOD' | 'HIGH';
-export type DtcStatus = 'CONFIRMED' | 'PENDING' | 'INACTIVE' | 'HISTORICAL' | 'CURRENT' | 'UNKNOWN';
+export type DtcStatus = 'CONFIRMED' | 'PENDING' | 'PERMANENT' | 'INACTIVE' | 'HISTORICAL' | 'CURRENT' | 'UNKNOWN';
 export type VehicleCondition = 'IDLE_COLD' | 'IDLE_WARM' | 'ACCELERATION' | 'CRUISE' | 'DECELERATION' | 'UNKNOWN';
 
 export interface SourceMetadata {
