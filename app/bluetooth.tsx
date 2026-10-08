@@ -164,7 +164,7 @@ export default function BluetoothScreen() {
               return health ? (
                 <>
                   <Text style={styles.detail}>COMANDOS {health.successfulCommands}/{health.commands} • MÉDIA {health.averageResponseMs} ms</Text>
-                  <Text style={styles.detail}>TIMEOUTS {health.timeouts} • ERROS {health.errors} • SEM DADOS {health.noData}</Text>
+                  <Text style={styles.detail}>TIMEOUTS {health.timeouts} • ERROS {health.errors} • SEM DADOS {health.noData}</Text><Text style={styles.detail}>PENDENTES {health.responsePending}</Text>
                   <Text style={health.recoveryRecommended ? styles.warning : styles.detail}>
                     {health.recoveryRecommended ? 'RECUPERAÇÃO RECOMENDADA' : 'COMUNICAÇÃO ESTÁVEL'}
                   </Text>
