@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useMidLayout } from '../src/ui/midLayout';
 import * as FileSystem from 'expo-file-system';
 import { Link } from 'expo-router';
 import { BluetoothDeviceInfo } from '../src/obd/bluetoothClassicTransport';
@@ -26,6 +28,7 @@ function lifecycleLabel(lifecycle: ReturnType<typeof getSharedObdStatus>['lifecy
 }
 
 export default function BluetoothScreen() {
+  const layout = useMidLayout();
   const [devices, setDevices] = useState<BluetoothDeviceInfo[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -130,8 +133,9 @@ export default function BluetoothScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
+    <SafeAreaView style={styles.container} edges={["top","bottom","left","right"]}>
+      <ScrollView contentContainerStyle={[styles.content,{paddingHorizontal:layout.horizontalPadding}]} showsHorizontalScrollIndicator={false}>
+        <View style={[styles.screenFrame,{maxWidth:layout.maxContentWidth}]>
         <View style={styles.header}>
           <Text style={styles.title}>BLUETOOTH</Text>
           <Text style={styles.subtitle}>ELM327 • BLUETOOTH CLASSIC</Text>
@@ -223,6 +227,7 @@ export default function BluetoothScreen() {
             <Text style={styles.bottomActiveText}>BLUETOOTH</Text>
           </TouchableOpacity>
         </View>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -230,11 +235,12 @@ export default function BluetoothScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0b1220' },
-  content: { flexGrow: 1, padding: 14, paddingBottom: 28 },
+  content: { flexGrow: 1, width: '100%', paddingVertical: 14, paddingBottom: 28 },
+  screenFrame: { width: '100%', alignSelf: 'center' },
   header: { paddingVertical: 8, marginBottom: 10 },
   title: { color: '#f8fafc', fontSize: 25, fontWeight: '900', letterSpacing: 1 },
   subtitle: { color: '#7db3ff', fontSize: 10, fontWeight: '900', marginTop: 3, letterSpacing: 0.8 },
-  connectionCard: { backgroundColor: '#111c2e', borderRadius: 14, borderWidth: 1, borderColor: '#29415f', padding: 15, marginBottom: 10 },
+  connectionCard: { width: '100%',  backgroundColor: '#111c2e', borderRadius: 14, borderWidth: 1, borderColor: '#29415f', padding: 15, marginBottom: 10 },
   label: { color: '#7185a1', fontSize: 9, fontWeight: '900', letterSpacing: 1 },
   online: { color: '#4ade80', fontSize: 24, fontWeight: '900', marginTop: 3 },
   waiting: { color: '#fbbf24', fontSize: 24, fontWeight: '900', marginTop: 3 },
@@ -246,7 +252,7 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.45 },
   device: { backgroundColor: '#111c2e', borderRadius: 11, borderWidth: 1, borderColor: '#243652', padding: 13, marginBottom: 8 },
   selected: { borderColor: '#60a5fa', borderWidth: 2 },
-  deviceName: { color: '#f8fafc', fontSize: 14, fontWeight: '900' },
+  deviceName: { color: '#f8fafc', fontSize: 14, fontWeight: '900', flexShrink: 1 },
   address: { color: '#9fb4cf', fontSize: 11, marginTop: 3 },
   deviceType: { color: '#7185a1', fontSize: 9, fontWeight: '800', marginTop: 4 },
   empty: { color: '#94a3b8', fontSize: 11, padding: 10, textAlign: 'center' },
