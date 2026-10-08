@@ -59,3 +59,7 @@ assert(orderedStates.every((value, index) => value >= 0 && (index === 0 || value
 const ecuGate = shared.indexOf("if (!connection.ecuValidated)");
 const activeAssignment = shared.indexOf('    active = {', ecuGate);
 assert(ecuGate >= 0 && activeAssignment > ecuGate, 'active não pode existir antes da validação da ECU');
+
+const simulatedTransport = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'simulatedTransport.ts'), 'utf8');
+assert(simulatedTransport.includes("this.pendingResponse = this.responseFor(command) + '\\r>'"));
+assert(simulatedTransport.includes('chunkSize'));
