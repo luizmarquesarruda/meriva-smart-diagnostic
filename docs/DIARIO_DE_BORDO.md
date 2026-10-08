@@ -891,3 +891,49 @@ O aplicativo consegue consultar PIDs e detectar DTCs da ECU, porém a interface 
 
 ### Estado
 Plano registrado antes das alterações. Próximo passo: implementar a identificação técnica na camada de conhecimento e nas telas, depois registrar os hashes finais neste diário.
+
+
+## Implementação — identificação técnica de PIDs e DTCs
+
+### Achados confirmados
+- O catálogo src/knowledge/pids.json já possuía nomes, descrições, unidade e classificação para os PIDs conhecidos, e getPidDefinition() já existia; a falha era principalmente de apresentação: a descoberta expunha os identificadores sem uma camada clara de identificação técnica.
+- A persistência de DTC já aceitava description, mas os registros gerados no laboratório não preenchiam esse campo.
+- A Central de Saúde mostrava código/status/ocorrências, porém não a descrição técnica do código.
+- A tela de Dados mostrava o nome armazenado do PID, mas não garantia que o usuário visse o código + definição do catálogo.
+- Não havia catálogo local dedicado para os DTCs efetivamente utilizados/observados.
+
+### Correções implementadas
+- Criado src/knowledge/dtc_catalog.json com catálogo mínimo rastreável para P0135, P0420, P0123, P0301 e P0133.
+- Criado src/obd/dtcDefinition.ts para resolução centralizada de descrição de DTC.
+- app/laboratorio.tsx agora identifica os PIDs descobertos com código, nome, descrição, unidade/classificação e sinaliza explicitamente PIDs sem definição local.
+- app/laboratorio.tsx agora identifica DTCs por código + nome + descrição, sem transformar a descrição do código em causa confirmada.
+- app/laboratorio.tsx passa a persistir a descrição catalogada no DtcRecord.
+- app/saude.tsx passa a mostrar código, nome, descrição, estado, ocorrências e fonte do DTC.
+- app/dados.tsx passa a mostrar código + nome + descrição do PID nas últimas leituras reais.
+- tests/knowledgeJson.test.js passou a auditar estrutura, unicidade e conteúdo mínimo do catálogo DTC.
+
+### Interpretação técnica dos códigos observados
+- P0135: circuito do aquecedor do sensor de oxigênio, Banco 1 Sensor 1. Indica uma falha monitorada no circuito do aquecedor; não prova sozinho que o sensor inteiro esteja defeituoso.
+- P0420: eficiência do sistema catalisador abaixo do limite monitorado no Banco 1. Indica uma condição de eficiência abaixo do limiar da ECU; não prova sozinho que o catalisador seja a única causa, pois diagnóstico exige correlação com O2, mistura, falhas de combustão e condições de operação.
+- Os dois códigos acima foram tratados como exemplos do histórico já fornecido; esta alteração não cria novas evidências da ECU.
+
+### Invariantes
+- REAL_OBD continua sendo a fonte de evidência real.
+- SIMULAÇÃO continua explicitamente separada e não aumenta confiança diagnóstica.
+- Ausência de descrição no catálogo é exibida como ausência de conhecimento local, não como diagnóstico inventado.
+- O fluxo de validação ECU 010C → 41 0C não foi alterado.
+- Bluetooth Classic/ELM327 e persistência de autosave não foram alterados nesta rodada.
+- Nenhuma dependência foi adicionada e package-lock.json permanece inalterado.
+
+### Commits
+- 0a785c98101aa0d06b74e0ce98cd7a9a2d0d8321 — plano desta auditoria registrado antes do código.
+- 2d1d436e69a0ed079654da088edf8bf2a2c0a059 — catálogo DTC.
+- 42cfff516db9a6b2fcfbe3821eb5c289e9e0f8e3 — resolvedor de definição DTC.
+- aa8efe60020be1a14a64e096a8c4b4facd62716c — identificação técnica no laboratório.
+- 8c5bce5cea03d99f4e50b67b53def2e8f28e9bd0 — persistência da descrição DTC.
+- fe9a979c3242969879849b7f7c16ecf4e7148eb0 — identificação DTC na Central de Saúde.
+- ec8a435b52cfe79f00394fef500c1d0fd3fe57e9 — identificação PID na tela de Dados.
+- 6728543d5cbfc0dc2852305b74967787b508e74f — auditoria do catálogo DTC.
+
+### Validação
+Foi feita leitura estática e auditoria cruzada do diff. CI não foi executada, conforme solicitado. A próxima CI deve confirmar TypeScript, testes e Android Release.
