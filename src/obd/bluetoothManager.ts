@@ -300,7 +300,9 @@ async function createRealElmSessionAttempt(
     const activeProtocol = successfulForcedProtocol && (!identifiedProtocol || identifiedProtocol === 'AUTO')
       ? getElmProtocolName(successfulForcedProtocol)
       : (identifiedProtocol ?? 'AUTO');
-    const negotiatedProtocol = session.getProtocol() ?? activeProtocol;
+    const negotiatedProtocol = identifiedProtocol && identifiedProtocol !== 'AUTO'
+      ? identifiedProtocol
+      : activeProtocol;
     const cacheMatchesProtocol = isPidDiscoveryCacheUsable(pidDiscoveryCache, { adapterAddress: device.address })
       && pidDiscoveryCache?.protocol === negotiatedProtocol;
 
