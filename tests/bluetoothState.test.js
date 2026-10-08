@@ -3,24 +3,9 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
-const ts = require('typescript');
-const Module = require('module');
 
 const ROOT = path.resolve(__dirname, '..');
-const sourcePath = path.join(ROOT, 'src', 'obd', 'bluetoothState.ts');
-const source = fs.readFileSync(sourcePath, 'utf8');
-const output = ts.transpileModule(source, {
-  compilerOptions: {
-    module: ts.ModuleKind.CommonJS,
-    target: ts.ScriptTarget.ES2019,
-  },
-}).outputText;
-
-const mod = new Module(sourcePath, null);
-mod.filename = sourcePath;
-mod.paths = Module._nodeModulePaths(path.dirname(sourcePath));
-mod._compile(output, sourcePath);
-const state = mod.exports;
+const { loadTs } = require('./helpers/loadTs');
 
 for (const connected of [
   'BLUETOOTH_CONNECTED',
