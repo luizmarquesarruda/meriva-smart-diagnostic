@@ -70,5 +70,7 @@ telemetry.recordLivePidReading({ pid: '010D', name: 'Speed', value: 0, unit: 'km
 telemetry.recordLivePidReading({ pid: '010C', name: 'RPM', value: 800, unit: 'rpm', timestamp: stale, source: 'REAL' });
 telemetry.recordLivePidReading({ pid: '0105', name: 'Coolant', value: 85, unit: 'celsius', timestamp: stale, source: 'REAL' });
 assert.strictEqual(telemetry.getVehicleConditionSnapshot().condition, 'UNKNOWN');
+assert.strictEqual(telemetry.getLivePidCurrent('010C'), null, 'RPM antigo não pode ser tratado como telemetria atual');
+
 
 console.log('Live telemetry: rolling window + context + simulation isolation: PASS');

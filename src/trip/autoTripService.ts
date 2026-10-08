@@ -2,12 +2,12 @@ import { gpsTracker } from '../gps';
 import type { SharedObdConnection } from '../obd/sharedConnection';
 import { getSharedObdConnection, subscribeSharedObd } from '../obd/sharedConnection';
 import { addDriveCycle, readDriveCycles } from '../storage/driveCycleStorage';
-import { forceSaveOnObdEvent } from '../meriva/autosaveIntegration';
+import { forceSaveOnObdEvent, recordAutomaticObdQuery } from '../meriva/autosaveIntegration';
 import { updateAutoSaveState, initAutoSave } from '../meriva/autosaveManager';
 import { RealTripRecorder } from './tripRecorder';
 import { INITIAL_DRIVE_CYCLES } from '../data/driveCycles';
 import { estimateRangeFromFuelLevel, fuelLevelPercentToLiters, isFuelReserve } from './fuelLevel';
-import { recordLivePidQuery, resetLiveTelemetry } from '../obd/liveTelemetry';
+import { resetLiveTelemetry } from '../obd/liveTelemetry';
 
 export interface AutoTripServiceState {
   connected: boolean;
@@ -185,7 +185,7 @@ class AutoTripService {
 
         if (this.state.fuelLevelSupported) {
           const fuelLevelResult = await connection.session.queryPid('012F');
-          recordLivePidQuery(fuelLevelResult);
+          recordAutomaticObdQuery(fuelLevelResult);
           if (
             fuelLevelResult.parsed.status === 'RESPONDEU' &&
             fuelLevelResult.parsed.unit === '%' &&
@@ -200,7 +200,7 @@ class AutoTripService {
 
         if (this.state.fuelSupported) {
           const fuelResult = await connection.session.queryPid('015E');
-          recordLivePidQuery(fuelResult);
+          recordAutomaticObdQuery(fuelResult);
           if (
             fuelResult.parsed.status === 'RESPONDEU' &&
             fuelResult.parsed.unit === 'L/h' &&
@@ -214,7 +214,7 @@ class AutoTripService {
 
         if (obdSpeedSupported) {
           const speedResult = await connection.session.queryPid('010D');
-          recordLivePidQuery(speedResult);
+          recordAutomaticObdQuery(speedResult);
           if (
             speedResult.parsed.status === 'RESPONDEU' &&
             speedResult.parsed.unit === 'km/h' &&
@@ -242,7 +242,7 @@ class AutoTripService {
         this.telemetryCursor += 1;
         if (telemetryPid === '010C' || connection.supportedPids.includes(telemetryPid)) {
           const telemetryResult = await connection.session.queryPid(telemetryPid);
-          recordLivePidQuery(telemetryResult);
+          recordAutomaticObdQuery(telemetryResult);
         }
 
         const recorder = this.recorder;

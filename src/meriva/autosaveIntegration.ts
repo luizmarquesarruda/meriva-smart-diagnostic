@@ -9,9 +9,27 @@ import { logRawObdData, logInterpretedData } from '../database/obdLogger';
 import { PidConfirmationEntry, readPidConfirmations, recordPidConfirmation } from '../database/pidBank';
 import { updateLearningProfileRealSample } from '../database/learningProfile';
 import type { VehicleCondition } from '../types/sourceTypes';
-import { pushLastReading, updateAutoSaveState, scheduleCriticalSave } from './autosaveManager';
+import { pushLastReading, updateAutoSaveState, scheduleCriticalSave, scheduleTelemetrySave } from './autosaveManager';
 import { shouldFeedLearning } from './autosaveValidation';
 import { recordLivePidQuery } from '../obd/liveTelemetry';
+
+export function recordAutomaticObdQuery(
+  result: PidQueryResult,
+  source: 'REAL' | 'SIMULACAO' = 'REAL',
+): void {
+  recordLivePidQuery(result, source);
+
+  pushLastReading({
+    pid: result.parsed.pid,
+    name: result.parsed.name,
+    value: result.parsed.value,
+    unit: result.parsed.unit,
+    status: result.parsed.status,
+    timestamp: new Date().toISOString(),
+    source,
+  }, { schedulePersist: false });
+  scheduleTelemetrySave();
+}
 
 export async function registerObdQuery(
   basePath: string,
@@ -26,17 +44,8 @@ export async function registerObdQuery(
     console.warn('[autosave] falha ao gravar logs OBD:', cause instanceof Error ? cause.message : cause);
   }
 
-  recordLivePidQuery(result, source);
+  recordAutomaticObdQuery(result, source);
 
-  pushLastReading({
-    pid: result.parsed.pid,
-    name: result.parsed.name,
-    value: result.parsed.value,
-    unit: result.parsed.unit,
-    status: result.parsed.status,
-    timestamp: new Date().toISOString(),
-    source,
-  });
 
   const parsedValue = result.parsed.value;
   if (shouldFeedLearning(source, result.parsed.status, parsedValue) && parsedValue !== null) {

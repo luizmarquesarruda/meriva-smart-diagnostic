@@ -86,6 +86,12 @@ export function getLiveSeries(pid: string): LiveTelemetryPoint[] {
   return [...(series.get(normalizePid(pid)) ?? [])];
 }
 
+export function getLivePidCurrent(pid: string): number | null {
+  const trend = getLivePidTrend(pid);
+  if (!trend || trend.ageSeconds * 1000 > STALE_AFTER_MS) return null;
+  return trend.current;
+}
+
 export function getLivePidTrend(pid: string): PidTrend | null {
   const values = getLiveSeries(pid);
   if (!values.length) return null;
