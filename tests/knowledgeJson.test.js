@@ -88,7 +88,7 @@ function main() {
 
   const supportedFormulaOperations = new Set([
     'u8', 'u16', 'u16_div', 'u8_offset', 'u8_scale',
-    'u8_offset_scale', 'u8_scale_offset', 'u8_div',
+    'u8_offset_scale', 'u8_scale_offset', 'u8_div', 'u8_scale_div', 'u16_scale', 'u16_scale_div', 'u16_offset_scale',
   ]);
   const formulaIds = Object.keys(formulas.formulas);
   assertUnique(formulaIds, 'formulaId');
@@ -97,7 +97,7 @@ function main() {
     for (const key of ['offset', 'scale', 'divisor']) {
       if (spec[key] !== undefined) assert.ok(Number.isFinite(spec[key]), 'parâmetro não numérico em fórmula ' + id + ': ' + key);
     }
-    if (['u16_div', 'u8_div', 'u8_scale', 'u8_offset_scale'].includes(spec.operation)) {
+    if (['u16_div', 'u8_div', 'u8_scale', 'u8_offset_scale', 'u8_scale_div', 'u16_scale_div'].includes(spec.operation)) {
       assert.ok(Number.isFinite(spec.divisor) && spec.divisor !== 0, 'divisor inválido na fórmula ' + id);
     }
   }
