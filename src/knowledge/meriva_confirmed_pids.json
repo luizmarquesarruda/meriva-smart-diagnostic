@@ -134,7 +134,7 @@
       "name": "O2 Sensor 1 Voltage",
       "unit": "volts",
       "formulaId": "O2_VOLTS",
-      "bytes": 1,
+      "bytes": 2,
       "evidence": "CARSCANNER_SEED",
       "confidence": 0.85,
       "observed_value": 0.53,
