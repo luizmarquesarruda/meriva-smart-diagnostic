@@ -135,7 +135,7 @@ export default function BluetoothScreen() {
   return (
     <SafeAreaView style={styles.container} edges={["top","bottom","left","right"]}>
       <ScrollView contentContainerStyle={[styles.content,{paddingHorizontal:layout.horizontalPadding}]} showsHorizontalScrollIndicator={false}>
-        <View style={[styles.screenFrame,{maxWidth:layout.maxContentWidth}]>
+        <View style={[styles.screenFrame,{maxWidth:layout.maxContentWidth}]}>
         <View style={styles.header}>
           <Text style={styles.title}>BLUETOOTH</Text>
           <Text style={styles.subtitle}>ELM327 • BLUETOOTH CLASSIC</Text>
