@@ -286,7 +286,7 @@ export async function saveNow(reason: SaveReason = 'critical'): Promise<boolean>
     runtime.debounceTimer = null;
   }
   return persistNow(reason).then((saved) => {
-    if (reason === 'critical') resolveCriticalWaiters(saved);
+    resolveCriticalWaiters(saved);
     return saved;
   });
 }
