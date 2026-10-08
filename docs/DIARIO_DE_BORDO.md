@@ -1040,3 +1040,29 @@ O compare do plano c67dc850e979f935cc80b64dc1432d61601cd749 até o estado 7a6db8
 
 ### Próximo passo
 A próxima etapa deve executar a validação completa do repositório e, separadamente, teste físico na Meriva para confirmar quais PIDs a ECU realmente anuncia/responde. A confirmação de compatibilidade Meriva não deve ser inferida apenas da documentação OBD genérica.
+
+
+## 2026-10-08 — Auditoria profunda pré-CI: correção crítica do retry Bluetooth/ELM327
+
+### Achado crítico
+A auditoria estática do estado atual encontrou uma regressão em `src/obd/bluetoothManager.ts`: `createRealElmSessionAttempt()` recebia `maxAttempts` como parâmetro e redeclarava uma constante com o mesmo nome. Além de ser um erro de compilação TypeScript, a intenção funcional era ambígua: o limite configurável de `maxConnectionAttempts` deveria ser calculado uma única vez e propagado de forma explícita.
+
+### Risco
+Sem a correção, a CI pode falhar no typecheck antes de validar os testes/Android. O comportamento desejado também é manter o limite configurável por candidato, sem reintroduzir rodada externa infinita.
+
+### Plano antes do código
+1. Renomear o limite efetivo para `effectiveMaxAttempts`, eliminando shadowing/duplicidade.
+2. Calcular esse limite a partir de `mergeCompatibilityConfig` uma única vez em `createRealElmSession`.
+3. Propagar o mesmo limite para `createRealElmSessionAttempt` e usar esse valor apenas para telemetria/protocolo de tentativa, sem criar um segundo contador de retry.
+4. Adicionar regressão estática/funcional para garantir que configuração explícita de tentativas seja respeitada.
+5. Rodar a CI completa somente depois das correções, conforme autorização atual.
+6. Se a CI falhar, registrar a causa e corrigir antes de considerar a rodada concluída.
+
+### Invariantes
+- Gate ECU continua sendo resposta real `010C → 41 0C`.
+- Bluetooth Classic/RFCOMM permanece inalterado quanto ao transporte.
+- REAL_OBD/SIMULACAO continuam separados.
+- Autosave, DTC occurrence semantics, catálogos PID/DTC e `package-lock.json` não serão alterados sem evidência específica.
+
+### Estado
+Plano registrado antes da correção. CI ainda não executada nesta etapa.
