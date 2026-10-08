@@ -1,6 +1,12 @@
 import { gpsTracker } from '../gps';
 import type { SharedObdConnection } from '../obd/sharedConnection';
-import { getSharedObdConnection, getSharedObdStatus, subscribeSharedObd } from '../obd/sharedConnection';
+import {
+  getSharedObdConnection,
+  getSharedObdStatus,
+  reportEcuPollResult,
+  recoverEcuIfNeeded,
+  subscribeSharedObd,
+} from '../obd/sharedConnection';
 import { addDriveCycle, readDriveCycles } from '../storage/driveCycleStorage';
 import { forceSaveOnObdEvent, registerObdQuery } from '../meriva/autosaveIntegration';
 import { getAutoSaveState, updateAutoSaveState, initAutoSave } from '../meriva/autosaveManager';
