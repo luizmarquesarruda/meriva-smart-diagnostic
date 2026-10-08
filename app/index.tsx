@@ -45,7 +45,7 @@ export default function IndexScreen() {
     const state = getAutoSaveState();
     const live = getSharedObdConnection();
     const liveConnected = Boolean(live?.ecuValidated);
-    setDtcCount(state.dtcs.length);
+    setDtcCount(state.dtcs.filter((item) => ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(item.status)).length);
     setConnectionStatus(getSharedObdStatus());
     setObd({
       ...state.obd,
@@ -86,7 +86,7 @@ export default function IndexScreen() {
       setConnectionStatus(getSharedObdStatus());
       setObd({ ...restored.obd, connected: Boolean(live?.ecuValidated) });
       setSaveStatus(getAutoSaveStatus());
-      setDtcCount(restored.dtcs.length);
+      setDtcCount(restored.dtcs.filter((item) => ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(item.status)).length);
       setIsHydrated(true);
     } catch {
       setSaveStatus(getAutoSaveStatus());
