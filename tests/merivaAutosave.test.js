@@ -500,6 +500,37 @@ test('13. autosave mantém um único TXT histórico e limita a 200 snapshots', a
   m.disposeAutoSave();
 });
 
+test('15. Saved At é persistido e histórico crítico é coalescido', async () => {
+  const m = manager();
+  m.disposeAutoSave();
+  resetFS();
+  await m.initAutoSave(BASE);
+  m.updateAutoSaveState((s) => { s.settings.fase = 'critico'; });
+  m.scheduleCriticalSave(20);
+  m.scheduleCriticalSave(20);
+  await wait(60);
+  const envelope = JSON.parse(files.get(`${CONFIG_DIR}/autosave.json`));
+  assert.ok(envelope.savedAt, 'envelope deve ter savedAt');
+  assert.strictEqual(envelope.payload.metadata.savedAt, envelope.savedAt, 'payload e envelope devem compartilhar savedAt');
+  const history = files.get(`${CONFIG_DIR}/meriva_smart_autosave_history.txt`);
+  assert.strictEqual((history.match(/=== SALVAMENTO_BEGIN ===/g) || []).length, 1, 'eventos críticos próximos devem gerar um snapshot');
+  m.disposeAutoSave();
+});
+
+test('16. salvamento redundante não cria novo snapshot histórico', async () => {
+  const m = manager();
+  m.disposeAutoSave();
+  resetFS();
+  await m.initAutoSave(BASE);
+  m.updateAutoSaveState((s) => { s.settings.fase = 'uma-vez'; });
+  await m.saveNow('critical');
+  const first = files.get(`${CONFIG_DIR}/meriva_smart_autosave_history.txt`);
+  await m.saveNow('critical');
+  const second = files.get(`${CONFIG_DIR}/meriva_smart_autosave_history.txt`);
+  assert.strictEqual(second, first, 'snapshot idêntico não deve duplicar o histórico');
+  m.disposeAutoSave();
+});
+
 test('14. persistência local de Bluetooth/ECU não conflita com o autosave', async () => {
   const state = manager();
   state.disposeAutoSave();
