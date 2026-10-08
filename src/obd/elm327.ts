@@ -271,6 +271,23 @@ export class Elm327Session {
     return this.enqueueCommand(() => this.command(normalized));
   }
 
+  /**
+   * Executa uma transação exclusiva sobre a fila do ELM327.
+   *
+   * O callback recebe um executor interno que NÃO volta a enfileirar a
+   * operação. Assim, uma transação pode enviar vários comandos consecutivos
+   * sem deadlock, enquanto nenhum outro comando entra no transporte entre eles.
+   */
+  async withExclusiveCommandQueue<T>(
+    operation: (executeCommand: (command: string) => Promise<ElmCommandResult>) => Promise<T>,
+  ): Promise<T> {
+    await this.initialize();
+    return this.enqueueCommand(() => operation(async (command) => {
+      const normalized = normalizeCommand(command);
+      return this.command(normalized);
+    }));
+  }
+
   async close(): Promise<void> {
     const initialization = this.initializationPromise;
     if (initialization) {
