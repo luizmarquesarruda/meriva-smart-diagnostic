@@ -224,6 +224,7 @@ async function testFormulaKnowledgeBank() {
   assert.strictEqual(engine.applyFormula('MAF_GS', [0x03, 0x7B]), 8.91);
   assert.strictEqual(engine.applyFormula('FUEL_TRIM', [0x76]), -7.8125);
   assert.strictEqual(engine.applyFormula('PERCENT_255', [0xFF]), 100);
+  assert.strictEqual(engine.applyFormula('O2_VOLTS', [0x6A, 0x80]), 0.53);
 
   const good = engine.decodeFormula('RPM', '010C', [0x1A, 0xF8]);
   assert.strictEqual(good.valid, true);
@@ -238,6 +239,10 @@ async function testParser() {
   const parser = loadTs(path.join(ROOT, 'src/obd/parser.ts'));
   assert.strictEqual(parser.parsePidResponse('0105', '41 05 69').value, 65);
   assert.strictEqual(parser.parsePidResponse('010C', '41 0C 1A F8').value, 1726);
+  const o2 = parser.parsePidResponse('0114', '41 14 6A 80');
+  assert.strictEqual(o2.status, 'RESPONDEU');
+  assert.strictEqual(o2.value, 0.53);
+  assert.strictEqual(o2.rawBytes.length, 4);
   assert.strictEqual(parser.parsePidResponse('01 0C', '41 0C 1A F8').value, 1726);
   assert.strictEqual(parser.validateOBDResponse('410C1AF8'), true);
   assert.strictEqual(parser.parsePidResponse('010C', '410C1AF8').value, 1726);
