@@ -1,5 +1,6 @@
 import * as Location from 'expo-location';
-import { BACKGROUND_LOCATION_TASK_NAME } from './backgroundLocation';
+
+export const BACKGROUND_LOCATION_TASK_NAME = 'meriva-smart-background-location';
 
 export interface GpsSample {
   latitude: number;
