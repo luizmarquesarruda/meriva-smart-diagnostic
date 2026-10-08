@@ -5,6 +5,7 @@ export interface DtcDefinition {
   name: string;
   description: string;
   system: string;
+  likelyCauses?: string[];
 }
 
 const definitions = new Map<string, DtcDefinition>(
