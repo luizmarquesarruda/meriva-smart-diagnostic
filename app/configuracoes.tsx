@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Constants from 'expo-constants';
 import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
 import { createBackup } from '../src/storage/backup';
 import { cleanupOldLogs, cleanupOldReadings } from '../src/storage/cleanup';
@@ -95,6 +96,7 @@ export default function ConfiguracaoScreen() {
   }
 
   return (
+    <SafeAreaView style={{flex:1,backgroundColor:'#0b1220'}} edges={["top","bottom","left","right"]}>
     <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
       <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
       <Text style={styles.title}>CONFIGURAÇÕES</Text>
@@ -253,6 +255,7 @@ export default function ConfiguracaoScreen() {
       ) : <Text style={styles.info}>Veículo: N/D</Text>}
       </View>
     </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -275,7 +278,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 8, marginTop: 10 },
   choice: { flex: 1, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, padding: 11, alignItems: 'center' },
   choiceActive: { backgroundColor: '#172f52', borderColor: '#3b82f6' },
-  choiceText: { color: '#e5edf7', fontWeight: '700' },
+  choiceText: { color: '#e5edf7', fontWeight: '700', flexShrink: 1, textAlign: 'center' },
   switchRow: { backgroundColor: '#111c2e', borderRadius: 8, padding: 11, marginBottom: 9, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#243652' },
   info: { color: '#e5edf7', marginBottom: 6, fontSize: 12 },
   note: { color: '#8da2bd', fontSize: 10, lineHeight: 15, marginTop: -2, marginBottom: 8 },
