@@ -315,7 +315,11 @@ export function getSharedObdStatus(): SharedObdStatus {
   return {
     lifecycle,
     bluetoothConnected: isBluetoothLinkUp(lifecycle),
-    ecuConnected: Boolean(active?.ecuValidated),
+    ecuConnected: Boolean(active?.ecuValidated && ecuResponseState === 'RESPONDING'),
+    ecuResponseState,
+    consecutiveEcuFailures,
+    lastEcuResponseAt,
+    lastEcuError,
   };
 }
 

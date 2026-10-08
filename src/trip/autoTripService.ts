@@ -3,7 +3,9 @@ import type { SharedObdConnection } from '../obd/sharedConnection';
 import { getSharedObdConnection, getSharedObdStatus, subscribeSharedObd } from '../obd/sharedConnection';
 import { addDriveCycle, readDriveCycles } from '../storage/driveCycleStorage';
 import { forceSaveOnObdEvent, registerObdQuery } from '../meriva/autosaveIntegration';
-import { updateAutoSaveState, initAutoSave } from '../meriva/autosaveManager';
+import { getAutoSaveState, updateAutoSaveState, initAutoSave } from '../meriva/autosaveManager';
+import { readAppSettings } from '../database/appSettings';
+import { MERIVA_MANUAL } from '../database/merivaManual';
 import { RealTripRecorder } from './tripRecorder';
 import { INITIAL_DRIVE_CYCLES } from '../data/driveCycles';
 import { estimateRangeFromFuelLevel, fuelLevelPercentToLiters, isFuelReserve } from './fuelLevel';
@@ -190,6 +192,8 @@ class AutoTripService {
         let fuelRateLph: number | null = null;
         let fuelRateSource: FuelRateSource | undefined;
         let fuelLevelPercent: number | null = null;
+        let alcoholPercentFromObd: number | null = null;
+        let fuelEstimateNote: string | null = null;
         let obdSpeedKmh: number | null = null;
         let rpm: number | null = null;
         if (obdSpeedSupported) gpsTracker.setVehicleSpeedHintKmh(null);
@@ -206,6 +210,20 @@ class AutoTripService {
             fuelLevelResult.parsed.value <= 100
           ) {
             fuelLevelPercent = fuelLevelResult.parsed.value;
+          }
+        }
+
+        if (connection.supportedPids.includes('0152')) {
+          const alcoholResult = await connection.session.queryPid('0152');
+          await registerObdQuery(this.basePath, alcoholResult, 'REAL');
+          if (
+            alcoholResult.parsed.status === 'RESPONDEU' &&
+            alcoholResult.parsed.value != null &&
+            Number.isFinite(alcoholResult.parsed.value) &&
+            alcoholResult.parsed.value >= 0 &&
+            alcoholResult.parsed.value <= 100
+          ) {
+            alcoholPercentFromObd = alcoholResult.parsed.value;
           }
         }
 
@@ -259,25 +277,37 @@ class AutoTripService {
           await registerObdQuery(this.basePath, mafResult, 'REAL');
           const mafGs = mafResult.parsed.status === 'RESPONDEU' ? mafResult.parsed.value : null;
           if (mafGs != null) {
-            const estimate = estimateFuelRateLph({ mafGs });
+            const settings = await readAppSettings(this.basePath);
+            const estimate = estimateFuelRateLph({
+              mafGs,
+              alcoholPercentFromObd,
+              manualFuelType: settings.fuelType,
+              manualAlcoholPercent: settings.manualFuelAlcoholPercent,
+            });
             if (estimate) {
               fuelRateLph = estimate.rateLph;
               fuelRateSource = estimate.source;
+              fuelEstimateNote = 'AFR ' + estimate.airFuelRatio.toFixed(2) + ' | densidade ' + estimate.fuelDensityKgPerL.toFixed(3) + ' kg/L | ' + estimate.fuelModel.assumption;
             }
           } else {
             const mapResult = await connection.session.queryPid('010B');
             const iatResult = await connection.session.queryPid('010F');
             await registerObdQuery(this.basePath, mapResult, 'REAL');
             await registerObdQuery(this.basePath, iatResult, 'REAL');
+            const settings = await readAppSettings(this.basePath);
             const estimate = estimateFuelRateLph({
               mapKpa: mapResult.parsed.status === 'RESPONDEU' ? mapResult.parsed.value : null,
               rpm,
               intakeAirTempC: iatResult.parsed.status === 'RESPONDEU' ? iatResult.parsed.value : null,
-              displacementCm3: getAutoSaveState().vehicle?.displacementCm3 ?? 1598,
+              displacementCm3: getAutoSaveState().vehicle?.displacementCm3 ?? MERIVA_MANUAL.engine.displacementCm3,
+              alcoholPercentFromObd,
+              manualFuelType: settings.fuelType,
+              manualAlcoholPercent: settings.manualFuelAlcoholPercent,
             });
             if (estimate) {
               fuelRateLph = estimate.rateLph;
               fuelRateSource = estimate.source;
+              fuelEstimateNote = 'AFR ' + estimate.airFuelRatio.toFixed(2) + ' | densidade ' + estimate.fuelDensityKgPerL.toFixed(3) + ' kg/L | ' + estimate.fuelModel.assumption;
             }
           }
         }
@@ -348,7 +378,7 @@ class AutoTripService {
             error: rpm === 0 && obdSpeedKmh === 0 && fuelRateLph == null
               ? 'MOTOR DESLIGADO? / ECU SEM TELEMETRIA VÁLIDA'
               : fuelRateSource && fuelRateSource !== 'MEASURED_015E'
-                ? 'CONSUMO ESTIMADO POR ' + fuelRateSource.replace('ESTIMATED_', '')
+                ? 'CONSUMO ESTIMADO POR ' + fuelRateSource.replace('ESTIMATED_', '') + (fuelEstimateNote ? ' | ' + fuelEstimateNote : '')
                 : null,
           });
         }

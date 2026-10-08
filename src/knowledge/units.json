@@ -48,6 +48,14 @@
     "L/h": {
       "symbol": "L/h",
       "name": "litros por hora"
+    },
+    "status": {
+      "symbol": "status",
+      "name": "status dos monitores OBD-II"
+    },
+    "km/h": {
+      "symbol": "km/h",
+      "name": "quilômetros por hora"
     }
   }
 }

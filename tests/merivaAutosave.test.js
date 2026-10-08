@@ -16,7 +16,7 @@ const path = require('path');
 const fs = require('fs');
 const assert = require('assert');
 const Module = require('module');
-const ts = require('typescript');
+const { loadTs } = require('./helpers/loadTs');
 
 // ---------- raiz do projeto ----------
 function findRepoRoot(startDir) {
@@ -32,25 +32,6 @@ const ROOT = findRepoRoot(__dirname);
 
 // ---------- carregador de módulos TS (em memória) ----------
 const compiled = new Map();
-function loadTs(tsPath) {
-  tsPath = path.normalize(tsPath);
-  if (compiled.has(tsPath)) return compiled.get(tsPath).exports;
-  const source = fs.readFileSync(tsPath, 'utf8');
-  const output = ts.transpileModule(source, {
-    compilerOptions: {
-      module: ts.ModuleKind.CommonJS,
-      target: ts.ScriptTarget.ES2019,
-      esModuleInterop: true,
-    },
-  }).outputText;
-  const mod = new Module(tsPath, null);
-  mod.filename = tsPath;
-  mod.paths = Module._nodeModulePaths(path.dirname(tsPath));
-  compiled.set(tsPath, mod); // registra antes de compilar (importação circular)
-  mod._compile(output, tsPath);
-  return mod.exports;
-}
-
 // ---------- FS em memória ----------
 // Objeto único e estável: os módulos transpilados capturam o resultado de
 // require('expo-file-system') na carga; o reset apenas limpa o conteúdo.

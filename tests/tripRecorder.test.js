@@ -1,37 +1,19 @@
 'use strict';
 
 const assert = require('assert');
-const ts = require('typescript');
 const fs = require('fs');
 const path = require('path');
 const Module = require('module');
 
 const ROOT = path.resolve(__dirname, '..');
 
-function loadTs(file) {
-  const sourcePath = path.join(ROOT, file);
-  const output = ts.transpileModule(fs.readFileSync(sourcePath, 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2019 },
-  }).outputText;
-  const mod = new Module(sourcePath, null);
-  mod.filename = sourcePath;
-  mod.paths = Module._nodeModulePaths(path.dirname(sourcePath));
-  mod._compile(output, sourcePath);
-  return mod.exports;
-}
+const { loadTs } = require('./helpers/loadTs');
 
-const fuelPath = path.join(ROOT, 'src', 'obd', 'fuelConsumption.ts');
-const fuelOutput = ts.transpileModule(fs.readFileSync(fuelPath, 'utf8'), {
-  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2019 },
-}).outputText;
-const fuelMod = new Module(fuelPath, null);
-fuelMod.filename = fuelPath;
-fuelMod.paths = Module._nodeModulePaths(path.dirname(fuelPath));
-fuelMod._compile(fuelOutput, fuelPath);
+const fuelMod = loadTs('src/obd/fuelConsumption.ts');
 
 const originalLoad = Module._load;
 Module._load = function(request) {
-  if (request === '../obd/fuelConsumption') return fuelMod.exports;
+  if (request === '../obd/fuelConsumption') return fuelMod;
   if (request === '../data/driveCycles') return {};
   return originalLoad.apply(this, arguments);
 };
