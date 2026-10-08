@@ -56,6 +56,7 @@ function store(point: LiveTelemetryPoint): void {
 export function resetLiveTelemetry(): void {
   series.clear();
   latest.clear();
+  emitAppEvent('OBD_TELEMETRY_UPDATED');
 }
 
 export function recordLivePidReading(
