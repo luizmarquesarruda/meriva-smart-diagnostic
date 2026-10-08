@@ -21,6 +21,8 @@ export interface ObdConnectionState {
   /** Último protocolo validado/conhecido, preservado mesmo após desconexão. */
   lastKnownProtocol?: string;
   ecuAddress?: string;
+  ecuIdentification?: string;
+  ecuName?: string;
   ecuValidatedAt?: string;
   ecuValidationSource?: 'OBD_RESPONSE' | 'VEHICLE_PROFILE';
   lastConnectedAt?: string;
