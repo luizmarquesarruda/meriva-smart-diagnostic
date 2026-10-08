@@ -67,7 +67,7 @@ function main() {
     assert.ok(formulas.formulas[pid.formulaId], 'formulaId sem definição: ' + id + ' -> ' + pid.formulaId);
 
     const operation = formulas.formulas[pid.formulaId].operation;
-    const minimumBytes = ['u8', 'u8_offset', 'u8_scale', 'u8_offset_scale', 'u8_scale_offset', 'u8_div'].includes(operation) ? 1 : 2;
+    const minimumBytes = ['u8', 'u8_offset', 'u8_scale', 'u8_offset_scale', 'u8_scale_offset', 'u8_div', 'u8_scale_div'].includes(operation) ? 1 : 2;
     assert.ok(pid.bytes >= minimumBytes, 'bytes insuficientes para a fórmula: ' + id + ' -> ' + operation);
   }
 
@@ -88,7 +88,7 @@ function main() {
 
   const supportedFormulaOperations = new Set([
     'u8', 'u16', 'u16_div', 'u8_offset', 'u8_scale',
-    'u8_offset_scale', 'u8_scale_offset', 'u8_div', 'u8_scale_div', 'u8_scale_div', 'u16_scale', 'u16_scale_div', 'u16_offset_scale',
+    'u8_offset_scale', 'u8_scale_offset', 'u8_div', 'u8_scale_div', 'u16_scale', 'u16_scale_div', 'u16_offset_scale',
   ]);
   const formulaIds = Object.keys(formulas.formulas);
   assertUnique(formulaIds, 'formulaId');
