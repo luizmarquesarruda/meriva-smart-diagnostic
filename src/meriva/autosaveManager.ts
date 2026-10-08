@@ -248,6 +248,11 @@ export function pushLastReading(reading: MerivaPersistedState['lastReadings'][nu
   });
 }
 
+function resolveCriticalWaiters(saved: boolean): void {
+  const waiters = runtime.criticalWaiters.splice(0);
+  for (const resolve of waiters) resolve(saved);
+}
+
 export function scheduleCriticalSave(delayMs = 500): Promise<boolean> {
   const completion = new Promise<boolean>((resolve) => {
     runtime.criticalWaiters.push(resolve);
@@ -256,10 +261,7 @@ export function scheduleCriticalSave(delayMs = 500): Promise<boolean> {
   if (runtime.criticalTimer) clearTimeout(runtime.criticalTimer);
   runtime.criticalTimer = setTimeout(() => {
     runtime.criticalTimer = null;
-    void saveNow('critical').then((saved) => {
-      const waiters = runtime.criticalWaiters.splice(0);
-      for (const resolve of waiters) resolve(saved);
-    });
+    void saveNow('critical');
   }, delayMs);
 
   return completion;
@@ -283,7 +285,10 @@ export async function saveNow(reason: SaveReason = 'critical'): Promise<boolean>
     clearTimeout(runtime.debounceTimer);
     runtime.debounceTimer = null;
   }
-  return persistNow(reason);
+  return persistNow(reason).then((saved) => {
+    if (reason === 'critical') resolveCriticalWaiters(saved);
+    return saved;
+  });
 }
 
 export function startObdSessionCheckpoint(): void {
