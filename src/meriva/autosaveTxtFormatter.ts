@@ -6,6 +6,7 @@
 
 import type { MerivaPersistedState } from './autosaveState';
 import { AUTOSAVE_SCHEMA_VERSION } from './autosaveTypes';
+import { getDtcDefinition } from '../obd/dtcDefinition';
 
 export const ND = 'N/D';
 
@@ -72,6 +73,7 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
       L.push(
         `${dtc.code} status=${dtc.status} ocorrencias=${dtc.occurrences} fonte=${dtc.source} primeira=${dtc.firstSeen} ultima=${dtc.lastSeen}`,
       );
+      if (dtcDefinition?.likelyCauses?.length) L.push(`  Causas provaveis: ${dtcDefinition.likelyCauses.join('; ')}`);
       if (dtc.freezeFrame) {
         L.push(`  FreezeFrame frame=${dtc.freezeFrame.frame} rpm=${or(dtc.freezeFrame.rpm)} coolantC=${or(dtc.freezeFrame.coolantC)}`);
       }
