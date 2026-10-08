@@ -1564,3 +1564,22 @@ A auditoria do parser de erros identificou que `7F xx 78` pode aparecer depois d
 Na revisão do caminho `ATSPx` → `010C` → `ATDP`, foi identificado que um fallback forçado de protocolo podia ser descoberto com sucesso, mas o valor `AUTO` retornado pela sessão ainda prevalecia em `negotiatedProtocol`. Isso impedia o scheduler de reconhecer CAN e usar multi-PID mesmo após uma seleção forçada válida.
 
 A correção deve priorizar o protocolo identificado explicitamente e, quando `ATDP` continuar em `AUTO`, usar o protocolo forçado que comprovadamente produziu a resposta `41 0C`.
+## 2026-10-08 — Validação final da implementação de hardening
+
+### Testes executados
+- regressões puras do scheduler, cache, barramento de eventos, timeline DTC, compatibilidade ELM327 e bridge de telemetria: **PASS**;
+- teste do plugin de permissões Android com mock de `withAndroidManifest`: **PASS**;
+- casos adicionais: `7E8 03 7F 22 78` reconhecido como `RESPONSE_PENDING`; agrupamento CAN limitado a seis PIDs; cache rejeitado quando adaptador/TTL não correspondem.
+
+### Auditoria final
+- `package-lock.json` permanece inalterado e com `lockfileVersion: 3`;
+- nenhum `BLUETOOTH_ADVERTISE` foi introduzido;
+- permissões legadas recebem `maxSdkVersion=30` pelo plugin;
+- caminhos de conexão compartilhado e laboratório agora aplicam a mesma política de cache contextual;
+- consumo instantâneo e GPS continuam reativos na tela Dados;
+- eventos CAN em rajada são coalescidos no hook de UI;
+- protocolo forçado por `ATSPx` não volta para `AUTO` quando `ATDP` não consegue explicitá-lo;
+- regressões de `requestBluetoothEnabled` continuam cobertas.
+
+### Limitação de execução
+O ambiente desta sessão não conseguiu clonar o repositório por indisponibilidade de resolução externa (`github.com`), portanto a suíte completa `npm test`, o typecheck real e o build Android não foram executados localmente. A validação executada aqui cobre as novas camadas puras e o plugin com testes isolados. CI do GitHub permanece deliberadamente não executada nesta etapa.
