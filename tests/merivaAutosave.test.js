@@ -558,7 +558,7 @@ test('18. polling automático atualiza lastReadings sem contaminar learning', as
   const autoTripSource = fs.readFileSync(path.join(ROOT, 'src/trip/autoTripService.ts'), 'utf8');
   assert.match(
     autoTripSource,
-    /for \(const result of results\)[\\s\\S]*recordAutomaticObdQuery\(result\)/,
+    /for \(const result of results\)[\s\S]*recordAutomaticObdQuery\(result\)/,
     'todo PID consultado pelo polling automático deve passar pelo mesmo caminho de persistência',
   );
 
