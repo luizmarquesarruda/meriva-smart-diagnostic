@@ -19,11 +19,25 @@ export interface ParsedPidResult {
 }
 
 function normalizeHexStream(rawResponse: string): string {
-  return rawResponse.replace(/[^0-9A-F]/gi, '').toUpperCase();
+  const withoutPrompt = rawResponse.replace(/>/g, ' ');
+  const runs = withoutPrompt.match(/(?:[0-9A-F]{2}(?:\\s*)?){2,}/gi) ?? [];
+  return runs
+    .map((run) => run.replace(/\\s+/g, '').toUpperCase())
+    .join('');
+}
+
+function normalizeRawResponse(rawResponse: string): string {
+  return rawResponse
+    .replace(/>/g, '')
+    .replace(/\\r/g, '\\n')
+    .split(/\\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join('\\n');
 }
 
 function findResponsePayload(rawResponse: string, pid: string, byteCount: number, positiveService = '41'): number[] {
-  const stream = normalizeHexStream(rawResponse);
+  const stream = normalizeHexStream(normalizeRawResponse(rawResponse));
   const marker = `${positiveService}${pid.slice(-2)}`;
   const markerIndex = stream.indexOf(marker);
   if (markerIndex < 0) return [];
@@ -46,8 +60,9 @@ export function extractHexBytes(rawResponse: string): number[] {
 }
 
 export function validateOBDResponse(response: string, positiveService = '41'): boolean {
-  if (!response.trim() || /NO DATA|UNABLE TO CONNECT|ERROR|BUS ERROR/i.test(response)) return false;
-  return new RegExp(positiveService + '[0-9A-F]{2}', 'i').test(normalizeHexStream(response));
+  const normalized = normalizeRawResponse(response);
+  if (!normalized || /NO DATA|UNABLE TO CONNECT|ERROR|BUS ERROR/i.test(normalized)) return false;
+  return new RegExp(positiveService + '[0-9A-F]{2}', 'i').test(normalizeHexStream(normalized));
 }
 
 export function parsePidResponse(pidRequested: string, rawResponse: string, positiveService = '41'): ParsedPidResult {
