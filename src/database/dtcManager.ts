@@ -1,5 +1,6 @@
 import * as FileSystem from 'expo-file-system';
 import type { DataSource, DtcStatus, DtcRecord } from '../types/sourceTypes';
+import { emitAppEvent } from '../state/appEventBus';
 
 export type { DtcRecord } from '../types/sourceTypes';
 
