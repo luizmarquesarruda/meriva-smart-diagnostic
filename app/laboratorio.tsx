@@ -398,9 +398,18 @@ export default function LaboratorioScreen() {
 
         for (const record of records) await recordDtc(getBasePath(), record);
         const detectedCodes = new Set(records.map((item) => item.code));
+        const storedCodes = new Set(stored?.codes ?? []);
+        const storedAvailable = stored?.available === true;
+        const becameInactive: DtcRecord[] = storedAvailable
+          ? existing
+            .filter((item) => ['CURRENT', 'CONFIRMED'].includes(item.status) && !storedCodes.has(item.code) && !detectedCodes.has(item.code))
+            .map((item) => ({ ...item, status: 'INACTIVE', historical: true, lastSeen: now }))
+          : [];
+        for (const record of becameInactive) await recordDtc(getBasePath(), record);
+        const allDetectedOrInactive = new Set([...detectedCodes, ...becameInactive.map((item) => item.code)]);
         updateAutoSaveState((state) => {
-          const preserved = state.dtcs.filter((item) => !detectedCodes.has(item.code));
-          state.dtcs = [...records, ...preserved];
+          const preserved = state.dtcs.filter((item) => !allDetectedOrInactive.has(item.code));
+          state.dtcs = [...records, ...becameInactive, ...preserved];
         });
         await forceSaveOnObdEvent();
       }
