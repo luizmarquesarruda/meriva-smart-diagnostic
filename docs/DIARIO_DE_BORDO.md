@@ -1506,3 +1506,20 @@ As fórmulas foram cruzadas com referências públicas de OBD-II/J1979. PID 015E
 
 ### Estado
 Conhecimento estático ampliado e banco local preparado para guardar o significado dos PIDs. A confirmação física dos novos PIDs depende da próxima sessão real com a ECU da Meriva.
+
+## 2026-10-08 — TXT de PIDs compactado e descoberta persistente
+
+### Problema
+O arquivo `BANCO/pids_meriva_confirmados.txt` havia crescido com metadados extensos por linha e, apesar de o banco evitar duplicação por PID, o formato ficou pesado para leitura/exportação.
+
+### Correção
+- Restaurado o formato compacto de **11 campos por PID**, equivalente ao formato inicial do banco.
+- Metadados semânticos detalhados continuam no catálogo JSON da aplicação; não são repetidos no TXT.
+- A escrita do TXT agora reconstrói uma única linha por PID e ordena pelo código, reduzindo crescimento e facilitando auditoria.
+- PIDs anunciados pela bitmap de descoberta OBD agora são gravados automaticamente no TXT com status `DESCOBERTO`.
+- `DESCOBERTO` não significa confirmação individual: somente uma consulta REAL_OBD válida pode promover o PID para `RESPONDEU/CONFIRMADO`.
+- PIDs já confirmados nunca são rebaixados para `DESCOBERTO` durante uma nova descoberta.
+- Adicionada regressão para garantir formato compacto e persistência da descoberta.
+
+### Resultado
+O TXT deixa de repetir descrição, unidade, fórmula e bytes em cada linha. Essas informações permanecem na base JSON, enquanto o TXT funciona como **índice histórico compacto dos PIDs observados**.
