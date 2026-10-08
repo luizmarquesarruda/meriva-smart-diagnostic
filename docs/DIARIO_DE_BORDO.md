@@ -1712,3 +1712,10 @@ Nenhuma CI foi disparada manualmente nesta etapa. A confirmação final ainda de
 - Testes adversariais adicionados para pico isolado, RPM zero, PIDs separados por mais de 2 segundos e persistência por 10 amostras/30 segundos.
 
 **Limitação conhecida:** a tela Saúde usa um refresh periódico de 5 s, não um scheduler dedicado em worker. O motor é pequeno e síncrono; ainda não há benchmark de FPS ou perfil de bateria. Testes e typecheck permanecem pendentes porque nenhuma CI foi disparada.
+
+
+## IA — controle de frequência e limiares temporais declarativos
+- A tela de Saúde agenda a inferência num temporizador próprio de 5 segundos, separado do estado visual; não chama o motor a cada atualização individual de PID.
+- As regras FUEL_TRIM_LEAN, FUEL_TRIM_RICH e MAP_HIGH_IDLE declaram no JSON `requiredSamples: 10` e `requiredDurationMs: 30000`; o motor consome esses parâmetros em vez de depender apenas de constantes implícitas.
+- O intervalo foi mantido em 5 segundos, e não 10, porque a confirmação atual exige 10 avaliações em até 60 segundos; aumentar para 10 segundos inviabilizaria essa condição sem mover a coleta temporal para a camada de ingestão.
+- Não foram executados testes, typecheck ou CI. Alterações aguardam validação executável.
