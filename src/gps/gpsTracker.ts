@@ -122,7 +122,12 @@ export class GpsTracker {
 
     if (this.backgroundTaskRunning) return true;
 
-    if (!this.subscription && !this.state.running) {
+    // Ao assumir o Foreground Service, não manter o watcher de foreground em paralelo:
+    // isso duplicaria callbacks e poderia inflar samples/distância.
+    this.subscription?.remove();
+    this.subscription = null;
+
+    if (!this.state.running) {
       this.state = {
         ...this.state,
         running: true,
