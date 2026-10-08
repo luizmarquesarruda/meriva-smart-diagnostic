@@ -67,6 +67,7 @@ class AutoTripService {
   private telemetryCursor = 0;
   private readonly pidBackoffUntilCycle = new Map<string, number>();
   private pollCycleNumber = 0;
+  private readonly latestPidValues = new Map<string, number>();
   private stoppedSinceMs: number | null = null;
   private state: AutoTripServiceState = { ...INITIAL_STATE };
 
@@ -209,6 +210,7 @@ class AutoTripService {
           await registerObdQuery(this.basePath, rpmResult, 'REAL');
           if (rpmResult.parsed.status === 'RESPONDEU' && Number.isFinite(rpmResult.parsed.value)) {
             rpm = rpmResult.parsed.value;
+            this.latestPidValues.set('010C', rpmResult.parsed.value);
           }
         }
 
@@ -226,6 +228,7 @@ class AutoTripService {
             speedResult.parsed.value <= 220
           ) {
             obdSpeedKmh = speedResult.parsed.value;
+            this.latestPidValues.set('010D', speedResult.parsed.value);
           }
         }
 
@@ -247,6 +250,9 @@ class AutoTripService {
             status: secondaryResult.parsed.status,
           }));
           await registerObdQuery(this.basePath, secondaryResult, 'REAL');
+          if (secondaryResult.parsed.status === 'RESPONDEU' && Number.isFinite(secondaryResult.parsed.value)) {
+            this.latestPidValues.set(secondaryPid, secondaryResult.parsed.value as number);
+          }
           if (secondaryResult.parsed.status !== 'RESPONDEU') {
             // Respostas sem dados não disparam recuperação: o PID fica em backoff
             // por quatro ciclos de polling e outros PIDs podem avançar.
@@ -318,6 +324,38 @@ class AutoTripService {
               fuelRateLph = estimate.rateLph;
               fuelRateSource = estimate.source;
               fuelEstimateNote = 'AFR ' + estimate.airFuelRatio.toFixed(2) + ' | densidade ' + estimate.fuelDensityKgPerL.toFixed(3) + ' kg/L | ' + estimate.fuelModel.assumption;
+            }
+          }
+        }
+
+        // Consumo estimado usa apenas PIDs descobertos e respostas válidas em cache.
+        // A estimativa pode ficar indisponível enquanto o rodízio ainda coleta os insumos.
+        if (fuelRateLph == null && connection.supportedPids.includes('0110')) {
+          const mafGs = this.latestPidValues.get('0110');
+          if (mafGs != null) {
+            const estimate = estimateFuelRateLph({ mafGs });
+            if (estimate) {
+              fuelRateLph = estimate.rateLph;
+              fuelRateSource = estimate.source;
+            }
+          }
+        }
+        if (fuelRateLph == null &&
+            ['010B', '010F', '010C'].every((pid) => connection.supportedPids.includes(pid))) {
+          const mapKpa = this.latestPidValues.get('010B');
+          const intakeAirTempC = this.latestPidValues.get('010F');
+          const cachedRpm = rpm ?? this.latestPidValues.get('010C') ?? null;
+          if (mapKpa != null && intakeAirTempC != null && cachedRpm != null) {
+            const vehicleDisplacement = getAutoSaveState().vehicle?.displacementCm3 ?? MERIVA_MANUAL.engine.displacementCm3;
+            const estimate = estimateFuelRateLph({
+              mapKpa,
+              rpm: cachedRpm,
+              intakeAirTempC,
+              displacementCm3: vehicleDisplacement,
+            });
+            if (estimate) {
+              fuelRateLph = estimate.rateLph;
+              fuelRateSource = estimate.source;
             }
           }
         }
