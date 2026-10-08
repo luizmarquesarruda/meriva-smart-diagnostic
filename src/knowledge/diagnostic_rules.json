@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "description": "Regras locais e rastreáveis do motor de raciocínio diagnóstico. Uma regra gera evidência ou hipótese; nunca prova isoladamente uma falha. Limiares heurísticos não substituem limites de fábrica.",
   "principles": [
     "DTC sozinho não condena componente.",
@@ -11,7 +11,8 @@
     "Limiares locais são heurísticos de triagem e não especificações de fábrica.",
     "Regras que combinam PIDs exigem timestamps separados por no máximo 2 segundos.",
     "Regras de mistura e MAP em marcha lenta exigem evidência de RPM acima de 400.",
-    "Regras baseadas em tendência exigem ao menos 10 snapshots coerentes ao longo de 30 segundos; picos isolados não geram hipótese.",
+    "Regras baseadas em tendência declaram requiredSamples e requiredDurationMs no JSON; mistura e MAP exigem 10 snapshots coerentes ao longo de 30 segundos.",
+    "A inferência da tela de saúde é agendada independentemente da atualização visual, com intervalo mínimo de 5 segundos; não é executada a cada PID recebido.",
     "A tela deve declarar evidência insuficiente quando não há telemetria real recente e ECU validada."
   ],
   "rules": [
@@ -90,6 +91,8 @@
     },
     {
       "id": "FUEL_TRIM_LEAN",
+      "requiredDurationMs": 30000,
+      "requiredSamples": 10,
       "trigger": {
         "combinedTrimMin": 15
       },
@@ -105,6 +108,8 @@
     },
     {
       "id": "FUEL_TRIM_RICH",
+      "requiredDurationMs": 30000,
+      "requiredSamples": 10,
       "trigger": {
         "combinedTrimMax": -15
       },
@@ -120,6 +125,8 @@
     },
     {
       "id": "MAP_HIGH_IDLE",
+      "requiredDurationMs": 30000,
+      "requiredSamples": 10,
       "trigger": {
         "condition": "IDLE_WARM",
         "mapMinKpa": 45
