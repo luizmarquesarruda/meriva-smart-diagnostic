@@ -9,6 +9,8 @@ import { runLocalDiagnostic, type DiagnosticResult } from '../src/diagnostics/di
 import type { PidObservation } from '../src/types/sourceTypes';
 import { getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
 import { getDtcDefinition } from '../src/obd/dtcDefinition';
+import { getLiveTelemetryWindow } from '../src/obd/liveTelemetry';
+import { buildDtcTimeline, summarizeDtcTimeline } from '../src/diagnostics/dtcTimeline';
 
 export default function SaudeScreen() {
   const layout = useMidLayout();
@@ -34,6 +36,16 @@ export default function SaudeScreen() {
     </View>
     <Text style={styles.section}>FALHAS</Text>
     {!activeDtcs.length?<View style={styles.empty}><Text style={styles.emptyText}>{state.dtcs.length ? 'Nenhum DTC ativo. Há apenas histórico registrado.' : 'Nenhum DTC armazenado.'}</Text></View>:activeDtcs.map(d=>{const definition=getDtcDefinition(d.code);return <View key={d.code} style={styles.row}><View style={{flex:1}}><Text style={styles.name}>{d.code} • {definition?.name ?? 'Descrição não catalogada localmente'}</Text><Text style={styles.detail}>{definition?.description ?? 'Código recebido da ECU sem descrição local detalhada.'}</Text><Text style={styles.detail}>{d.status} • {d.occurrences} ocorrência(s) • fonte {d.source}</Text></View><Text style={styles.warn}>ATENÇÃO</Text></View>})}
+    <Text style={styles.section}>LINHA DO TEMPO DOS DTCs</Text>
+    {!activeDtcs.length ? <View style={styles.empty}><Text style={styles.emptyText}>Uma ocorrência real exibirá a telemetria da janela de ±30 segundos, quando ainda estiver disponível nesta sessão.</Text></View> : activeDtcs.slice(0, 5).map((dtc) => {
+      const timeline = buildDtcTimeline(dtc, getLiveTelemetryWindow(dtc.lastSeen));
+      return <View key={dtc.code + '-timeline'} style={styles.hyp}>
+        <View style={styles.rowHead}><Text style={styles.name}>{timeline.code}</Text><Text style={styles.score}>{timeline.samples.length}</Text></View>
+        <Text style={styles.detail}>OCORRÊNCIA: {new Date(timeline.occurrenceAt).toLocaleString()}</Text>
+        <Text style={styles.detail}>{summarizeDtcTimeline(timeline)}</Text>
+        {timeline.samples.slice(-6).map((sample) => <Text key={sample.timestamp + sample.pid} style={styles.evidence}>{sample.pid} • {sample.value.toFixed(2)} {sample.unit} • {new Date(sample.timestamp).toLocaleTimeString()}</Text>)}
+      </View>;
+    })}
     <Text style={styles.section}>HIPÓTESES LOCAIS</Text>
     {!diagnostic.hypotheses.length?<View style={styles.empty}><Text style={styles.emptyText}>Ainda não há evidência suficiente para gerar hipótese.</Text></View>:diagnostic.hypotheses.map(h=><View key={h.id} style={styles.hyp}><View style={styles.rowHead}><Text style={styles.name}>{h.label}</Text><Text style={styles.score}>{Math.round(h.score*100)}%</Text></View><Text style={styles.detail}>CONFIANÇA: {h.confidence}</Text>{h.evidence.map((e,i)=><Text key={i} style={styles.evidence}>• {e.text}</Text>)}<Text style={styles.next}>PRÓXIMOS TESTES: {h.nextTests.join(' • ')}</Text></View>)}
     <Text style={styles.disclaimer}>{diagnostic.disclaimer}</Text>
