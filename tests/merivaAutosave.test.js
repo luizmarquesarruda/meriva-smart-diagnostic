@@ -562,6 +562,43 @@ test('16. salvamento redundante não cria novo snapshot histórico', async () =>
   m.disposeAutoSave();
 });
 
+test('18. sessão de autosave abre na ECU e fecha na desconexão', async () => {
+  const m = manager();
+  m.disposeAutoSave();
+  resetFS();
+  await m.initAutoSave(BASE);
+
+  m.updateAutoSaveState((s) => {
+    s.obd = {
+      connected: true,
+      adapterName: 'OBDII',
+      protocol: 'ISO 14230-4 KWP FAST',
+      lastKnownProtocol: 'ISO 14230-4 KWP FAST',
+      ecuValidatedAt: '2026-10-08T12:00:00.000Z',
+      ecuValidationSource: 'OBD_RESPONSE',
+      lastConnectedAt: '2026-10-08T12:00:00.000Z',
+    };
+  });
+
+  const started = await m.startObdAutosaveSession();
+  assert.strictEqual(started, true, 'ECU conectada deve abrir a sessão de autosave');
+  assert.strictEqual(m.getAutoSaveStatus().obdSessionActive, true);
+  const startHistory = files.get(`${CONFIG_DIR}/meriva_smart_autosave_history.txt`);
+  assert.ok(startHistory.includes('MOTIVO: session_start'));
+
+  await m.closeObdAutosaveSession();
+  assert.strictEqual(m.getAutoSaveStatus().obdSessionActive, false);
+  const envelope = JSON.parse(files.get(`${CONFIG_DIR}/autosave.json`));
+  assert.strictEqual(envelope.payload.obd.connected, false);
+  assert.strictEqual(envelope.payload.obd.lastKnownProtocol, 'ISO 14230-4 KWP FAST');
+
+  const endHistory = files.get(`${CONFIG_DIR}/meriva_smart_autosave_history.txt`);
+  assert.ok(endHistory.includes('MOTIVO: session_end'));
+  assert.strictEqual((endHistory.match(/MOTIVO: session_start/g) || []).length, 1);
+  assert.strictEqual((endHistory.match(/MOTIVO: session_end/g) || []).length, 1);
+  m.disposeAutoSave();
+});
+
 test('14. persistência local de Bluetooth/ECU não conflita com o autosave', async () => {
   const state = manager();
   state.disposeAutoSave();
