@@ -43,6 +43,7 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
   L.push(`Status: ${state.obd?.connected ? 'CONECTADO' : 'DESCONECTADO'}`);
   L.push(`Adaptador: ${or(state.obd?.adapterName)}`);
   L.push(`Protocolo: ${or(state.obd?.protocol)}`);
+  L.push(`Último protocolo conhecido: ${or(state.obd?.lastKnownProtocol)}`);
   L.push(`ECU: ${or(state.obd?.ecuAddress)}`);
   L.push(`ECU validada em: ${or(state.obd?.ecuValidatedAt)}`);
   L.push(`Fonte da validação ECU: ${or(state.obd?.ecuValidationSource)}`);
