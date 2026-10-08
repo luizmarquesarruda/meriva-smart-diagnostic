@@ -8,15 +8,17 @@ import { autoTripService } from '../src/trip/autoTripService';
 import { gpsTracker } from '../src/gps';
 import { getLivePidTrend, formatSparkline, getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
 import { getPidDefinition } from '../src/obd/pidDefinition';
+import { useAppEventRevision } from '../src/ui/useAppEventRevision';
 
 export default function DadosScreen() {
   const layout = useMidLayout();
   const [state, setState] = useState(getAutoSaveState());
   const [trip, setTrip] = useState(autoTripService.getState());
+  const eventRevision = useAppEventRevision();
   useEffect(() => {
-    const timer = setInterval(() => { setState(getAutoSaveState()); setTrip(autoTripService.getState()); }, 1000);
-    return () => clearInterval(timer);
-  }, []);
+    setState(getAutoSaveState());
+    setTrip(autoTripService.getState());
+  }, [eventRevision]);
   const readings = [...state.lastReadings].reverse();
   return <SafeAreaView style={styles.container} edges={["top","bottom","left","right"]}><ScrollView contentContainerStyle={[styles.content,{paddingHorizontal:layout.horizontalPadding}]} showsHorizontalScrollIndicator={false}><View style={[styles.screenFrame,{maxWidth:layout.maxContentWidth}]}>
     <Header title="DADOS EM TEMPO REAL" subtitle="PIDs • TELEMETRIA • TENDÊNCIAS" />
