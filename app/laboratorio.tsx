@@ -342,6 +342,9 @@ export default function LaboratorioScreen() {
               supportedPids: discovered,
               protocol: activeProtocol,
               discoveredAt: new Date().toISOString(),
+              adapterAddress: getSharedObdConnection()?.device.address?.toUpperCase(),
+              vin: state.vehicle?.vin,
+              ecuAddress: state.vehicle?.ecuAddress ?? state.obd.ecuAddress,
             };
           }
         });
