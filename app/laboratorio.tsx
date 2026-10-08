@@ -349,7 +349,11 @@ export default function LaboratorioScreen() {
       if (!activeSession) throw new Error('CONECTE AO ELM327 ANTES DA VARREDURA DTC');
 
       const results = mode === 'REAL'
-        ? await autoTripService.withPollingPaused(() => scanDtcServices(activeSession))
+        ? await autoTripService.withPollingPaused(() =>
+            activeSession.withExclusiveCommandQueue((executeCommand) =>
+              scanDtcServices(activeSession, executeCommand),
+            ),
+          )
         : await scanDtcServices(activeSession);
       setDtcScan(results);
       const stored = results.find((item) => item.kind === 'STORED');
