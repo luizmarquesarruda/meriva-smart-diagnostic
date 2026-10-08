@@ -1688,3 +1688,16 @@ Nenhuma CI foi disparada manualmente nesta etapa. A confirmação final ainda de
 - Estado de validação: revisão estática dos arquivos e gravações confirmadas pelo GitHub; **typecheck, testes automatizados e build Android ainda não foram executados nesta etapa**.
 - CI: **não disparada**, respeitando a instrução de não iniciar novas execuções sem autorização explícita.
 - Próximo passo técnico quando autorizado: executar validação completa, corrigir falhas encontradas e só então considerar o build apto para teste físico na Meriva com ELM327.
+
+## 2026-10-08 — Red Team da IA diagnóstica local
+
+**Escopo:** endurecer o motor de evidências sem adicionar funcionalidades fora do núcleo.
+
+- O motor local agora só aceita amostras de PID com fonte `REAL_OBD`, status `RESPONDEU`, PID válido, valor finito e timestamp recente (janela máxima de 120 s; tolerância futura de 30 s).
+- Fuel trims fora de -100 a 100 e MAP fora de 0 a 255 são bloqueados antes das regras heurísticas.
+- O resultado expõe contagens de amostras ao vivo aceitas, simulações bloqueadas, amostras antigas/inválidas bloqueadas e DTCs não aceitos.
+- As telas Saúde/Laboratório e o relatório TXT passam o status real da consulta para o motor; a Saúde não declara normalidade sem conexão, ECU validada e pelo menos uma amostra ao vivo válida.
+- A lista de DTCs ativos na Saúde agora considera somente registros de origem `REAL_OBD`. O score é apresentado como heurístico, não como probabilidade estatística.
+- Foram adicionados casos adversariais para leitura antiga, valor fora da faixa, timeout e normalização de código DTC.
+
+**Validação:** alterações gravadas na branch `feat/obd-polling-reliability-20261008`. Testes automatizados e typecheck ainda não foram executados nesta etapa. **CI não disparada**, conforme restrição vigente.
