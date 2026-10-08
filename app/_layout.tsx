@@ -9,6 +9,7 @@ import * as FileSystem from 'expo-file-system';
 import { initAutoSave, updateAutoSaveState } from '../src/meriva/autosaveManager';
 import { autoTripService } from '../src/trip/autoTripService';
 import { requestAllRequiredPermissions } from '../src/permissions/permissionManager';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 export default function RootLayout() {
   const checking = useRef(false);
@@ -153,6 +154,7 @@ export default function RootLayout() {
   }, []);
 
   return (
+    <SafeAreaProvider>
     <Stack
       screenOptions={{
         headerStyle: { backgroundColor: '#d9d9d9' },
@@ -166,5 +168,6 @@ export default function RootLayout() {
       <Stack.Screen name="armazenamento" options={{ title: 'HISTÓRICO E DADOS' }} />
       <Stack.Screen name="configuracoes" options={{ title: 'CONFIGURAÇÕES' }} />
     </Stack>
+    </SafeAreaProvider>
   );
 }
