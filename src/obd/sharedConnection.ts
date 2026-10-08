@@ -78,6 +78,76 @@ function setEcuResponseState(next: EcuResponseState, error?: string): void {
   emit();
 }
 
+export async function reportEcuPollResult(valid: boolean, error?: string): Promise<EcuResponseState> {
+  if (!active) {
+    ecuResponseState = 'NOT_VALIDATED';
+    consecutiveEcuFailures = 0;
+    return ecuResponseState;
+  }
+
+  if (valid) {
+    consecutiveEcuFailures = 0;
+    lastEcuResponseAt = new Date().toISOString();
+    lastEcuError = null;
+    setEcuResponseState('RESPONDING');
+
+    // A recuperação pode ter encerrado a sessão de autosave. Uma resposta
+    // positiva reabre somente a sessão da ECU, nunca uma sessão sem evidência.
+    updateAutoSaveState((state) => {
+      state.obd = { ...state.obd, connected: true };
+    });
+    await startObdAutosaveSession();
+    return ecuResponseState;
+  }
+
+  consecutiveEcuFailures += 1;
+  lastEcuError = error || 'ECU SEM RESPOSTA';
+  const threshold = active.session.getCompatibilityConfig().noDataReconnectThreshold;
+
+  if (consecutiveEcuFailures < threshold) {
+    setEcuResponseState('NO_RESPONSE', lastEcuError);
+    return ecuResponseState;
+  }
+
+  setEcuResponseState('RECOVERING', lastEcuError);
+  await closeObdAutosaveSession();
+  return ecuResponseState;
+}
+
+export async function recoverEcuIfNeeded(): Promise<boolean> {
+  if (!active) return false;
+  if (consecutiveEcuFailures < active.session.getCompatibilityConfig().noDataReconnectThreshold) {
+    return ecuResponseState === 'RESPONDING';
+  }
+  if (ecuRecoveryPromise) return ecuRecoveryPromise;
+
+  const connection = active;
+  setEcuResponseState('RECOVERING', lastEcuError ?? 'ECU SEM RESPOSTA');
+  ecuRecoveryPromise = (async () => {
+    try {
+      const recovered = await connection.session.recoverProtocol();
+      if (!recovered) {
+        await handleUnexpectedDisconnect('ECU SEM RESPOSTA / RECUPERAÇÃO FALHOU');
+        return false;
+      }
+
+      consecutiveEcuFailures = 0;
+      lastEcuResponseAt = new Date().toISOString();
+      lastEcuError = null;
+      setEcuResponseState('RESPONDING');
+      updateAutoSaveState((state) => {
+        state.obd = { ...state.obd, connected: true };
+      });
+      await startObdAutosaveSession();
+      return true;
+    } finally {
+      ecuRecoveryPromise = null;
+    }
+  })();
+
+  return ecuRecoveryPromise;
+}
+
 
 async function persistDisconnectedState(): Promise<void> {
   try {
