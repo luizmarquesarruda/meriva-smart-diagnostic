@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
 import { checkStorageQuota, getStorageBreakdown, StorageQuotaConfig } from '../src/storage/quotaManager';
 import { cleanupOldLogs, cleanupOldReadings } from '../src/storage/cleanup';
@@ -59,6 +60,7 @@ export default function ArmazenamentoScreen() {
   }
 
   return (
+    <SafeAreaView style={{flex:1,backgroundColor:'#0b1220'}} edges={["top","bottom","left","right"]}>
     <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
       <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
       <Text style={styles.title}>HISTÓRICO E DADOS</Text>
@@ -95,6 +97,7 @@ export default function ArmazenamentoScreen() {
       </TouchableOpacity>
       </View>
     </ScrollView>
+    </SafeAreaView>
   );
 }
 
