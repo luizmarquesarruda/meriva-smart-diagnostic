@@ -86,6 +86,8 @@ export function parsePidResponse(pidRequested: string, rawResponse: string, posi
     };
   }
 
+  const extractedRawBytes = extractHexBytes(rawResponse);
+
   if (!definition) {
     const rawBytes = extractHexBytes(rawResponse);
     return {
@@ -94,7 +96,7 @@ export function parsePidResponse(pidRequested: string, rawResponse: string, posi
       value: null,
       unit: 'SEM DADOS',
       rawResponse,
-      rawBytes,
+      rawBytes: extractedRawBytes,
       status: 'VALOR NÃO INTERPRETADO',
       errorMessage: 'PID não está no banco de definições',
     };
