@@ -7,6 +7,7 @@ import { getAutoSaveState } from '../src/meriva/autosaveManager';
 import { runLocalDiagnostic, type DiagnosticResult } from '../src/diagnostics/diagnosticEngine';
 import type { PidObservation } from '../src/types/sourceTypes';
 import { getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
+import { getDtcDefinition } from '../src/obd/dtcDefinition';
 
 export default function SaudeScreen() {
   const layout = useMidLayout();
@@ -30,7 +31,7 @@ export default function SaudeScreen() {
       <View style={styles.context}><Text style={styles.contextText}>{context.reason}</Text></View>
     </View>
     <Text style={styles.section}>FALHAS</Text>
-    {!activeDtcs.length?<View style={styles.empty}><Text style={styles.emptyText}>{state.dtcs.length ? 'Nenhum DTC ativo. Há apenas histórico registrado.' : 'Nenhum DTC armazenado.'}</Text></View>:activeDtcs.map(d=><View key={d.code} style={styles.row}><View><Text style={styles.name}>{d.code}</Text><Text style={styles.detail}>{d.status} • {d.occurrences} ocorrência(s)</Text></View><Text style={styles.warn}>ATENÇÃO</Text></View>)}
+    {!activeDtcs.length?<View style={styles.empty}><Text style={styles.emptyText}>{state.dtcs.length ? 'Nenhum DTC ativo. Há apenas histórico registrado.' : 'Nenhum DTC armazenado.'}</Text></View>:activeDtcs.map(d=>{const definition=getDtcDefinition(d.code);return <View key={d.code} style={styles.row}><View style={{flex:1}}><Text style={styles.name}>{d.code} • {definition?.name ?? 'Descrição não catalogada localmente'}</Text><Text style={styles.detail}>{definition?.description ?? 'Código recebido da ECU sem descrição local detalhada.'}</Text><Text style={styles.detail}>{d.status} • {d.occurrences} ocorrência(s) • fonte {d.source}</Text></View><Text style={styles.warn}>ATENÇÃO</Text></View>})}
     <Text style={styles.section}>HIPÓTESES LOCAIS</Text>
     {!diagnostic.hypotheses.length?<View style={styles.empty}><Text style={styles.emptyText}>Ainda não há evidência suficiente para gerar hipótese.</Text></View>:diagnostic.hypotheses.map(h=><View key={h.id} style={styles.hyp}><View style={styles.rowHead}><Text style={styles.name}>{h.label}</Text><Text style={styles.score}>{Math.round(h.score*100)}%</Text></View><Text style={styles.detail}>CONFIANÇA: {h.confidence}</Text>{h.evidence.map((e,i)=><Text key={i} style={styles.evidence}>• {e.text}</Text>)}<Text style={styles.next}>PRÓXIMOS TESTES: {h.nextTests.join(' • ')}</Text></View>)}
     <Text style={styles.disclaimer}>{diagnostic.disclaimer}</Text>
