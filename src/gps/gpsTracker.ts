@@ -1,4 +1,5 @@
 import * as Location from 'expo-location';
+import { BACKGROUND_LOCATION_TASK_NAME } from './backgroundLocation';
 
 export interface GpsSample {
   latitude: number;
@@ -79,6 +80,7 @@ function isAccurate(sample: GpsSample): boolean {
 
 export class GpsTracker {
   private subscription: Location.LocationSubscription | null = null;
+  private backgroundTaskRunning = false;
   private previous: GpsSample | null = null;
   private readonly listeners = new Set<GpsListener>();
   private consecutiveMovingSamples = 0;
@@ -107,6 +109,84 @@ export class GpsTracker {
 
   getState(): GpsTripState {
     return { ...this.state };
+  }
+
+  setBackgroundTaskError(message: string): void {
+    this.state = { ...this.state, error: message || 'ERRO NO SERVIÇO GPS EM SEGUNDO PLANO.' };
+    this.emit();
+  }
+
+  async startBackgroundLocation(): Promise<boolean> {
+    const permitted = await this.requestPermission();
+    if (!permitted) return false;
+
+    if (this.backgroundTaskRunning) return true;
+
+    if (!this.subscription && !this.state.running) {
+      this.state = {
+        ...this.state,
+        running: true,
+        currentSpeedKmh: 0,
+        maxSpeedKmh: 0,
+        distanceKm: 0,
+        samples: 0,
+        lastTimestamp: null,
+        lastAccuracyM: null,
+        error: null,
+        signalQuality: 'SEM_FIX',
+        speedSource: 'PARADO',
+      };
+      this.previous = null;
+      this.consecutiveMovingSamples = 0;
+      this.pendingMovingDistanceKm = 0;
+      this.emit();
+    }
+
+    try {
+      const alreadyStarted = await Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK_NAME);
+      if (!alreadyStarted) {
+        await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK_NAME, {
+          accuracy: Location.Accuracy.BestForNavigation,
+          timeInterval: 1000,
+          distanceInterval: 1,
+          pausesUpdatesAutomatically: false,
+          foregroundService: {
+            notificationTitle: 'MERIVA SMART — Diagnóstico OBD',
+            notificationBody: 'Monitoramento OBD e GPS ativo em segundo plano.',
+            notificationColor: '#1557a6',
+          },
+        });
+      }
+      this.backgroundTaskRunning = true;
+      this.state = { ...this.state, running: true, error: null };
+      this.emit();
+      return true;
+    } catch (cause) {
+      this.backgroundTaskRunning = false;
+      this.state = {
+        ...this.state,
+        running: false,
+        error: cause instanceof Error ? cause.message : 'NÃO FOI POSSÍVEL INICIAR O GPS EM SEGUNDO PLANO.',
+      };
+      this.emit();
+      return false;
+    }
+  }
+
+  async stopBackgroundLocation(): Promise<void> {
+    if (!this.backgroundTaskRunning) return;
+    try {
+      const started = await Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK_NAME);
+      if (started) await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK_NAME);
+    } catch (cause) {
+      console.warn('[gps] falha ao parar localização em segundo plano:', cause instanceof Error ? cause.message : cause);
+    } finally {
+      this.backgroundTaskRunning = false;
+    }
+  }
+
+  isBackgroundLocationRunning(): boolean {
+    return this.backgroundTaskRunning;
   }
 
   setVehicleSpeedHintKmh(speedKmh: number | null): void {
@@ -171,7 +251,7 @@ export class GpsTracker {
       return false;
     }
 
-    if (this.subscription && this.state.running) return true;
+    if ((this.subscription || this.backgroundTaskRunning) && this.state.running) return true;
 
     await this.stop({ resetTrip: true });
     this.state = {
@@ -219,7 +299,7 @@ export class GpsTracker {
     }
   }
 
-  private handleLocation(location: Location.LocationObject): void {
+  handleLocation(location: Location.LocationObject): void {
     const c = location.coords;
     if (!Number.isFinite(c.latitude) || !Number.isFinite(c.longitude)) return;
 
@@ -314,6 +394,7 @@ export class GpsTracker {
   }
 
   async stop(options: { resetTrip?: boolean } = {}): Promise<void> {
+    await this.stopBackgroundLocation();
     this.subscription?.remove();
     this.subscription = null;
     this.previous = null;
