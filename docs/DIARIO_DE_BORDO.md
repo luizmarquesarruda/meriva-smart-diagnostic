@@ -579,3 +579,17 @@ Restaurado o import local de `parseDtcResponseForService` em `src/obd/parser.ts`
 
 ### Estado
 A próxima CI deve confirmar TypeScript + testes completos e, em caso de sucesso, liberar o job Android Release.
+
+## 2026-10-07 — Correção final do loader de testes DTC revelada pela CI #931
+
+### Falha
+A CI #931 (run 37707607771), no commit `dbada2ded42be53a67a89644c2073bcd6385bbd0`, passou por `npm ci`, Expo Doctor e **typecheck**. A falha ocorreu no primeiro teste DTC, com `MODULE_NOT_FOUND: ./dtcParser`.
+
+### Causa raiz
+O novo `dtcParser.ts` está corretamente resolvido pelo bundler TypeScript/Metro, mas o harness JavaScript transpila `dtcScanner.ts` isoladamente e o `require` CommonJS não resolve automaticamente um módulo relativo `.ts` sem extensão.
+
+### Correção
+O loader de `tests/dtcScanner.test.js` agora intercepta apenas o import relativo `./dtcParser` quando a origem é `dtcScanner.ts`, transpila esse módulo e restaura o loader global imediatamente após o carregamento. A lógica de produção não foi alterada.
+
+### Estado
+A próxima CI deve repetir a suíte a partir do mesmo ponto, agora com o harness capaz de carregar a dependência TypeScript isolada.

@@ -14,8 +14,20 @@ function loadTs(file) {
   const mod = new Module(sourcePath, null);
   mod.filename = sourcePath;
   mod.paths = Module._nodeModulePaths(path.dirname(sourcePath));
-  mod._compile(output, sourcePath);
-  return mod.exports;
+
+  const originalLoad = Module._load;
+  Module._load = function(request, parent, isMain) {
+    if (request === './dtcParser' && parent?.filename?.endsWith(path.join('src', 'obd', 'dtcScanner.ts'))) {
+      return loadTs('src/obd/dtcParser.ts');
+    }
+    return originalLoad(request, parent, isMain);
+  };
+  try {
+    mod._compile(output, sourcePath);
+    return mod.exports;
+  } finally {
+    Module._load = originalLoad;
+  }
 }
 
 const { parseDtcResponseForService } = loadTs('src/obd/dtcParser.ts');
