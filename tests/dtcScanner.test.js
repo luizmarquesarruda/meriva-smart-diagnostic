@@ -2,10 +2,14 @@
 
 const assert = require('assert');
 const { loadTs } = require('./helpers/loadTs');
-const { parseDtcResponseForService } = loadTs('src/obd/dtcParser.ts');
+const { parseDtcResponseForService, isValidDtcResponse } = loadTs('src/obd/dtcParser.ts');
 const scanner = loadTs('src/obd/dtcScanner.ts');
 
 assert.deepStrictEqual(parseDtcResponseForService('03', '43 01 30 00 00'), ['P0130']);
+assert.strictEqual(isValidDtcResponse('03', '43 00 00 00'), true);
+assert.strictEqual(isValidDtcResponse('03', 'NO DATA'), false);
+assert.strictEqual(isValidDtcResponse('03', 'UNABLE TO CONNECT'), false);
+assert.strictEqual(isValidDtcResponse('03', '41 0C 1A F8'), false);
 assert.deepStrictEqual(parseDtcResponseForService('07', '47 01 23 00 00'), ['P0123']);
 assert.deepStrictEqual(parseDtcResponseForService('0A', '4A 01 23 00 00'), ['P0123']);
 
