@@ -1186,3 +1186,10 @@ PR #30 — run #1057 / `37767133384`.
 Ajustar o teste para reconhecer tanto o hook central `useMidLayout()` quanto o padrão explícito `useWindowDimensions()` + `getMidLayout()`, sem alterar produção funcionalmente apenas para satisfazer uma regex.
 
 **Não considerar a auditoria concluída.** Nova CI obrigatória.
+
+
+### Correção após CI #1057
+- `21fe1b61ae7890a1ce1d5cba3fa2bfe998191ca1` — teste de rotação ajustado para aceitar `useMidLayout()` ou `useWindowDimensions()` + `getMidLayout(windowSize)`, ambos recalculando o layout conforme as dimensões.
+
+### Próximo passo
+Nova CI completa obrigatória, incluindo Android Release.
