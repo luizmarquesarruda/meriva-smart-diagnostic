@@ -22,13 +22,15 @@ function normalizeHexStream(rawResponse: string): string {
   return rawResponse.replace(/[^0-9A-F]/gi, '').toUpperCase();
 }
 
-function findResponsePayload(rawResponse: string, pid: string, byteCount: number): number[] {
+function findResponsePayload(rawResponse: string, pid: string, byteCount: number, positiveService = '41'): number[] {
   const stream = normalizeHexStream(rawResponse);
-  const marker = `41${pid.slice(-2)}`;
+  const marker = `${positiveService}${pid.slice(-2)}`;
   const markerIndex = stream.indexOf(marker);
   if (markerIndex < 0) return [];
 
-  const payloadHex = stream.slice(markerIndex + marker.length, markerIndex + marker.length + byteCount * 2);
+  const frameOffset = positiveService === '42' ? 2 : 0;
+  const payloadStart = markerIndex + marker.length + frameOffset;
+  const payloadHex = stream.slice(payloadStart, payloadStart + byteCount * 2);
   if (payloadHex.length !== byteCount * 2 || !/^[0-9A-F]+$/.test(payloadHex)) return [];
 
   const bytes: number[] = [];
@@ -48,7 +50,7 @@ export function validateOBDResponse(response: string): boolean {
   return /41[0-9A-F]{2}/i.test(normalizeHexStream(response));
 }
 
-export function parsePidResponse(pidRequested: string, rawResponse: string): ParsedPidResult {
+export function parsePidResponse(pidRequested: string, rawResponse: string, positiveService = '41'): ParsedPidResult {
   const pid = pidRequested.replace(/\s/g, '').toUpperCase();
 
   if (!rawResponse.trim() || /NO DATA|UNABLE TO CONNECT|ERROR/i.test(rawResponse)) {
