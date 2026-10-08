@@ -28,6 +28,8 @@ assert(task.includes('gpsTracker.handleLocation(location)'));
 assert(taskName.includes("BACKGROUND_LOCATION_TASK_NAME = 'meriva-smart-background-location'"));
 assert(gps.includes('startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK_NAME'));
 assert(gps.includes('foregroundService:'));
+assert(gps.includes('this.subscription?.remove();'));
+assert(gps.includes('this.subscription = null;'));
 assert(gps.includes('notificationTitle: \'MERIVA SMART — Diagnóstico OBD\''));
 assert(gps.includes('handleLocation(location: Location.LocationObject)'));
 assert(gps.includes('stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK_NAME)'));
