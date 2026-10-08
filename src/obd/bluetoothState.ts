@@ -24,7 +24,19 @@ export function isBluetoothLinkUp(state: BluetoothLifecycleState): boolean {
   return BLUETOOTH_LINK_STATES.has(state);
 }
 
-/** Consultas OBD reais só são liberadas depois da validação da ECU por 010C. */
-export function canPollObd(state: BluetoothLifecycleState): boolean {
-  return state === 'READY';
+export type EcuResponseState =
+  | 'NOT_VALIDATED'
+  | 'RESPONDING'
+  | 'NO_RESPONSE'
+  | 'RECOVERING';
+
+/**
+ * Consultas OBD reais só são liberadas quando o ciclo Bluetooth/ELM está pronto
+ * e a última evidência da ECU continua válida.
+ */
+export function canPollObd(
+  state: BluetoothLifecycleState,
+  ecuResponseState: EcuResponseState,
+): boolean {
+  return state === 'READY' && ecuResponseState === 'RESPONDING';
 }
