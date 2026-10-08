@@ -4,7 +4,12 @@ import { createRealElmSession, discoverPairedDevices, ensureBluetoothReady } fro
 import { DEFAULT_ELM327_COMPATIBILITY, Elm327CompatibilityConfig, mergeCompatibilityConfig } from './elm327Compatibility';
 import { getAutoSaveState, closeObdAutosaveSession, startObdAutosaveSession, updateAutoSaveState } from '../meriva/autosaveManager';
 import { clearBluetoothDiagnostic, getLastBluetoothDiagnosticText } from './bluetoothManager';
-import { isBluetoothLinkUp, type BluetoothLifecycleState } from './bluetoothState';
+import {
+  isBluetoothLinkUp,
+  type BluetoothLifecycleState,
+  type EcuResponseState,
+} from './bluetoothState';
+export type { EcuResponseState } from './bluetoothState';
 import RNBluetoothClassic from 'react-native-bluetooth-classic';
 import * as FileSystem from 'expo-file-system';
 import { readAppSettings, writeAppSettings } from '../database/appSettings';
@@ -19,8 +24,6 @@ export interface SharedObdConnection {
   ecuValidated: boolean;
   getDiagnosticsText: () => string;
 }
-
-export type EcuResponseState = 'NOT_VALIDATED' | 'RESPONDING' | 'NO_RESPONSE' | 'RECOVERING';
 
 export interface SharedObdStatus {
   lifecycle: BluetoothLifecycleState;
