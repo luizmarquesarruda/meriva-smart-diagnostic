@@ -1415,3 +1415,33 @@ A implementação atual e correta usa o objeto `connection` já validado: `selec
 
 ### Estado
 A correção será limitada ao teste; o fluxo de produção permanece inalterado.
+
+## 2026-10-08 — CI #1236: validação verde da correção de telemetria automática
+
+### Resultado
+PR #35 / run #1236 — `37796216776`, executado sobre `e68c0a4fb2a3fc4a126c08327d08581f9f345ff6`:
+- `npm ci --no-audit --no-fund`: sucesso.
+- Expo Doctor: `17/17`.
+- TypeScript: sucesso.
+- Suíte completa de testes: sucesso.
+- `android-build`: sucesso.
+- `expo prebuild --clean --platform android --non-interactive`: sucesso.
+- Android Release standalone APK: compilado, verificado e publicado como artefato.
+
+### Correção consolidada
+- `src/trip/autoTripService.ts`: removidas as chamadas redundantes a `recordLivePidQuery()`; cada resposta automática passa uma única vez por `registerObdQuery(..., 'REAL')`, evitando duplicação na telemetria em memória.
+- `tests/regression.test.js`: adicionada regressão contra retorno da gravação dupla.
+- `tests/bluetoothLifecycle.test.js`: corrigida a asserção estática para o contrato atual de `connection.device.address.toUpperCase()`.
+- PR #35 foi integrado ao `main` por squash no commit `9d02d4175a108f8d0d19255e3045376509974ce5`.
+
+### Artefato
+`meriva-smart-diagnostic-standalone-apk`
+Artifact ID: `11559191893`
+Tamanho: 27.374.304 bytes (aprox. 27,4 MB)
+Não expirado; expira em 2026-10-22 15:03:49 UTC.
+
+### Observação
+O run #1235 permaneceu como histórico de falha de teste; a causa foi a asserção desatualizada, não a implementação de produção. O run #1236 é a referência verde da correção final desta etapa.
+
+### Estado
+A correção desta etapa está consolidada no `main` e validada por CI. A validação física do ELM327/Meriva continua necessária para confirmar comportamento de hardware e compatibilidade real de PIDs.
