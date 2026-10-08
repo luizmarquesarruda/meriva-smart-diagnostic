@@ -218,6 +218,8 @@ export default function IndexScreen() {
       </ScrollView>
     </SafeAreaView>
   );
+}
+
 function CockpitMetric({ label, value }: { label: string; value: string }) { return <View style={styles.cockpitMetric}><Text style={styles.metricLabel}>{label}</Text><Text style={styles.metricValue}>{value}</Text></View>; }
 function ChainStep({ label, ok }: { label: string; ok: boolean }) { return <View style={styles.chainStep}><View style={[styles.chainCircle, ok && styles.chainCircleOk]}><Text style={[styles.chainCircleText, ok && styles.chainCircleTextOk]}>{ok ? '✓' : '•'}</Text></View><Text style={styles.chainLabel}>{label}</Text></View>; }
 function StatusCard({ label, value, danger = false, ok = false }: { label: string; value: string; danger?: boolean; ok?: boolean }) { return <View style={styles.statusCard}><Text style={styles.metricLabel}>{label}</Text><Text style={danger ? styles.danger : ok ? styles.ok : styles.metricValue}>{value}</Text></View>; }
