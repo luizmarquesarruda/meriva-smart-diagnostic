@@ -1140,3 +1140,22 @@ Ajustar somente a asserção do teste para refletir o limite de responsabilidade
 
 ### Próximo passo
 Nova execução de CI obrigatória. O código de produção de permissões não foi alterado nesta correção.
+
+
+## 2026-10-08 — CI #1051: teste apontando arquivo SAF incorreto
+
+### CI
+PR #29 — run #1051 / `37766933271`.
+- `npm ci`: **sucesso**.
+- Expo Doctor: **17/17**.
+- TypeScript: **sucesso**.
+- Falha em `tests/permissions.test.js` na nova verificação de SAF.
+- `android-build`: não executado.
+
+### Diagnóstico
+O teste passou a procurar `StorageAccessFramework` apenas em `backup.ts` e `app/armazenamento.tsx`, mas a exportação manual está implementada em `src/meriva/exportAutoSaveTxt.ts` e também em `src/obd/exportBluetoothDiagnosticTxt.ts`. A implementação de produção está correta; a asserção apontou para arquivos que não possuem essa responsabilidade.
+
+### Correção planejada
+Alterar o teste para inspecionar explicitamente os módulos de exportação que usam o Storage Access Framework. Nenhuma alteração de produção é necessária.
+
+**Não considerar a auditoria concluída.** Nova CI obrigatória.
