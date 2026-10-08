@@ -29,6 +29,7 @@ function main() {
   const confirmed = readJson('src/knowledge/meriva_confirmed_pids.json');
   const bluetooth = readJson('src/knowledge/bluetooth_config.json');
   const diagnosticRules = readJson('src/knowledge/diagnostic_rules.json');
+  const dtcCatalog = readJson('src/knowledge/dtc_catalog.json');
 
   assert.strictEqual(typeof pids.version, 'number');
   assert.strictEqual(typeof formulas.version, 'number');
@@ -39,6 +40,15 @@ function main() {
   assert.strictEqual(typeof confirmed.version, 'number');
   assert.strictEqual(typeof bluetooth.schemaVersion, 'number');
   assert.strictEqual(typeof diagnosticRules.version, 'number');
+  assert.strictEqual(typeof dtcCatalog.version, 'number');
+  assert.ok(Array.isArray(dtcCatalog.codes) && dtcCatalog.codes.length > 0, 'catálogo DTC vazio');
+  assertUnique(dtcCatalog.codes.map((item) => String(item.code).toUpperCase()), 'DTC catalogado');
+  for (const item of dtcCatalog.codes) {
+    assert.ok(/^[PCBU][0-3][0-9A-F]{3}$/.test(String(item.code).toUpperCase()), 'DTC inválido no catálogo: ' + item.code);
+    assert.ok(typeof item.name === 'string' && item.name.trim(), 'DTC sem nome: ' + item.code);
+    assert.ok(typeof item.description === 'string' && item.description.trim(), 'DTC sem descrição: ' + item.code);
+    assert.ok(typeof item.system === 'string' && item.system.trim(), 'DTC sem sistema: ' + item.code);
+  }
 
   const pidIds = new Set();
   for (const pid of pids.pids) {
