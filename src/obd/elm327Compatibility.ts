@@ -18,6 +18,7 @@ export interface Elm327CompatibilityConfig {
   commandDelayMs: number;
   maxConnectionAttempts: number; // 0 = usar o limite-base finito do catálogo
   noDataReconnectThreshold: number;
+  recoveryBackoffMs: number[];
   partialResponseAction: PartialResponseAction;
   forceInitialization: boolean;
   forceInitCommands: string[];
@@ -39,6 +40,8 @@ export interface ElmHealthSnapshot {
   adaptiveTimeoutMs: number;
   recoveryRecommended: boolean;
   lastErrorType: ElmErrorType;
+  consecutiveFailures: number;
+  lastSuccessfulResponseAt: string | null;
 }
 
 export const DEFAULT_ELM327_COMPATIBILITY: Elm327CompatibilityConfig = {
@@ -46,7 +49,8 @@ export const DEFAULT_ELM327_COMPATIBILITY: Elm327CompatibilityConfig = {
   bluetoothConnectTimeoutMs: 5_000,
   commandDelayMs: 20,
   maxConnectionAttempts: 20,
-  noDataReconnectThreshold: 40,
+  noDataReconnectThreshold: 4,
+  recoveryBackoffMs: [2000, 5000, 15000],
   partialResponseAction: 'RECONNECT_AND_INITIALIZE',
   forceInitialization: true,
   forceInitCommands: ['ATZ', 'ATE0'],
@@ -111,6 +115,9 @@ export function mergeCompatibilityConfig(
     commandDelayMs: Math.max(0, Math.round(merged.commandDelayMs)),
     maxConnectionAttempts: Math.max(0, Math.round(merged.maxConnectionAttempts)),
     noDataReconnectThreshold: Math.max(1, Math.round(merged.noDataReconnectThreshold)),
+    recoveryBackoffMs: Array.isArray(merged.recoveryBackoffMs) && merged.recoveryBackoffMs.length
+      ? merged.recoveryBackoffMs.map((value) => Math.max(500, Math.round(Number(value) || 0))).slice(0, 5)
+      : [2000, 5000, 15000],
     adaptiveTimeoutMinMs: Math.max(1000, Math.round(merged.adaptiveTimeoutMinMs)),
     adaptiveTimeoutMaxMs: Math.max(1000, Math.round(merged.adaptiveTimeoutMaxMs)),
     adaptiveTimeoutStepMs: Math.max(50, Math.round(merged.adaptiveTimeoutStepMs)),
