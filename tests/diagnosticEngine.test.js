@@ -4,6 +4,8 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const { loadTs } = require('./helpers/loadTs');
+const ROOT = path.resolve(__dirname, '..');
+const DIAGNOSTIC_RULES_PATH = path.join(ROOT, 'src/knowledge/diagnostic_rules.json');
 
 function obs(pid, value, source = 'REAL_OBD') {
   return { pid, name: pid, value, unit: 'N/D', source, timestamp: new Date().toISOString(), confidence: 'HIGH' };
