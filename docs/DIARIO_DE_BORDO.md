@@ -870,3 +870,24 @@ Foi feita apenas auditoria por leitura do código e alterações controladas no 
 
 ### Estado final desta rodada
 Todas as alterações desta auditoria estão gravadas no main e o Diário de Bordo foi atualizado com os hashes. Não foi executada CI.
+
+
+## 2026-10-08 — Auditoria sênior: identificação de PIDs e DTCs na interface
+
+### Problema reportado
+O aplicativo consegue consultar PIDs e detectar DTCs da ECU, porém a interface expõe principalmente o identificador bruto (PID/código) e não apresenta de forma suficiente **o que aquele identificador representa**, dificultando a leitura técnica do diagnóstico.
+
+### Auditoria planejada antes do código
+- Mapear o fluxo real de PID: resposta ELM327 → parser → definição do PID → estado persistido → telas.
+- Mapear o fluxo real de DTC: resposta ECU → parser → persistência → Central de Saúde/Laboratório.
+- Reutilizar os catálogos existentes em vez de duplicar nomes na UI.
+- Para DTCs sem descrição local, exibir explicitamente que a descrição não está catalogada, sem inventar diagnóstico.
+- Exibir para cada PID: código, nome, descrição, valor/unidade, status e origem REAL/SIMULAÇÃO quando aplicável.
+- Exibir para cada DTC: código, descrição técnica, estado, ocorrência e origem REAL_OBD.
+- Manter a distinção entre evidência da ECU e hipótese diagnóstica; descrição de código não deve ser apresentada como causa confirmada.
+- Auditar especialmente os códigos já observados no histórico desta sessão, incluindo P0135 e P0420, sem transformar esses exemplos em novos dados da ECU.
+- Adicionar regressões para impedir retorno da UI ao estado “somente código”.
+- Não executar CI nesta rodada.
+
+### Estado
+Plano registrado antes das alterações. Próximo passo: implementar a identificação técnica na camada de conhecimento e nas telas, depois registrar os hashes finais neste diário.
