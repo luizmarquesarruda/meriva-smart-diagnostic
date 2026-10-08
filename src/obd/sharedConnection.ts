@@ -251,21 +251,11 @@ function startBluetoothMonitor(): void {
           await recoverEcuIfNeeded();
         }
       } catch (cause) {
-        consecutiveEcuFailures += 1;
-        lastEcuError = cause instanceof Error ? cause.message : String(cause);
-        if (consecutiveEcuFailures >= (active?.session.getCompatibilityConfig().noDataReconnectThreshold ?? 4)) {
-          setEcuResponseState('RECOVERING', lastEcuError);
-          const recovered = await active?.session.recoverProtocol();
-          if (recovered) {
-            consecutiveEcuFailures = 0;
-            lastEcuResponseAt = new Date().toISOString();
-            lastEcuError = null;
-            setEcuResponseState('RESPONDING');
-          } else {
-            await handleUnexpectedDisconnect('ECU SEM RESPOSTA / RECUPERAÇÃO FALHOU');
-          }
-        } else {
-          setEcuResponseState('NO_RESPONSE', lastEcuError);
+        if (!active) return;
+        const errorMessage = cause instanceof Error ? cause.message : String(cause);
+        await reportEcuPollResult(false, errorMessage);
+        if (ecuResponseState === 'RECOVERING') {
+          await recoverEcuIfNeeded();
         }
       } finally {
         monitorBusy = false;
