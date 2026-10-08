@@ -1623,3 +1623,16 @@ A confirmação definitiva exige uma sessão real na Meriva com ELM327, principa
 - freeze frame 020x;
 - PID 015E, 0110 ou fallback MAP;
 - comportamento com tela apagada/segundo plano.
+
+
+## 2026-10-08 — Auditoria pós-implementação: correções de integração
+
+- Corrigida a validação de respostas de Mode 02 para aceitar o cabeçalho positivo 42; antes, o parser ainda exigia 41 e poderia rejeitar freeze frame válido.
+- O cockpit e a tela Bluetooth passaram a usar o estado de resposta da ECU, evitando exibir ECU como conectada quando somente o enlace Bluetooth permanece ativo.
+- Defaults de reconexão foram reduzidos para 3 tentativas e limiar de 4 falhas consecutivas; as opções da tela de configurações foram alinhadas.
+- Persistência de validação ECU recebeu lista de evidências verificadas.
+- Exportação JSON/CSV foi adicionada à tela de armazenamento.
+- O relatório TXT passou a incluir descrição, causas prováveis e freeze frame dos DTCs quando disponíveis.
+- Nenhuma dependência nova foi adicionada nesta etapa.
+- CI continua deliberadamente não disparada até concluir a revisão estática.
+
