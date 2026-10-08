@@ -1499,3 +1499,9 @@ A arquitetura de Bluetooth foi confrontada com Android Developers e `react-nativ
 - TypeScript/suíte completa/APK: ainda precisam da próxima CI.
 - `package-lock.json`: não alterado; nenhuma dependência foi adicionada.
 - A correção de autosave é considerada implementada no código, mas não declarada como validada até a próxima CI e teste físico.
+
+### Ajuste final do agendamento
+- `src/meriva/autosaveManager.ts`: `saveNow()` agora cancela também um flush de telemetria pendente, evitando timer residual depois de um salvamento explícito.
+- Commit: `85b3fcc6f4ee2af1eb38971c68acda95f061ddb5`.
+
+CI continua não executada nesta rodada.
