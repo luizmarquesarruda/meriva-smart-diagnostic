@@ -256,7 +256,7 @@ Evitar mensagens genéricas como Erro Bluetooth.
 A documentação externa é referência de engenharia. Ela não substitui o comportamento medido no ELM327 real da Meriva.
 ## Política de teste Bluetooth
 
-Para diagnóstico físico, a sessão de conexão usa no máximo **20 tentativas automáticas**. Entre falhas há **8 segundos** de espera. Cada tentativa é registrada no trace TXT, incluindo TX/RX e erro de conexão quando disponível.
+Para diagnóstico físico, a sessão de conexão usa no máximo **20 tentativas automáticas por padrão**. O limite efetivo pode ser reduzido pelas configurações do aplicativo. Entre falhas há **8 segundos** de espera. Cada tentativa é registrada no trace TXT, incluindo TX/RX e erro de conexão quando disponível.
 
 Eventos principais: `BLUETOOTH_ATTEMPT_START`, `BLUETOOTH_ATTEMPT_RESULT`, `BLUETOOTH_RETRY_WAIT_START`, `BLUETOOTH_RETRY_WAIT_END` e `BLUETOOTH_TEST_SESSION_END`.
 
@@ -279,4 +279,4 @@ Não declarar `export const` dentro de `createRealElmSession`. A função apenas
 
 ## Regra final de retry Bluetooth
 
-O ciclo executa no máximo 20 tentativas. O intervalo de 8 segundos ocorre somente após uma falha. Ao obter SUCCESS, o ciclo termina imediatamente e a sessão bem-sucedida é devolvida ao aplicativo. Não existe reabertura ou tentativa adicional depois do sucesso.
+O ciclo executa no máximo o limite efetivo configurado; o padrão seguro é 20 tentativas. O intervalo de 8 segundos ocorre somente após uma falha. Ao obter SUCCESS, o ciclo termina imediatamente e a sessão bem-sucedida é devolvida ao aplicativo. Não existe reabertura ou tentativa adicional depois do sucesso.
