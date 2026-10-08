@@ -40,7 +40,10 @@ assert.strictEqual(state.maxSpeedKmh, 36);
 const noFuel = new RealTripRecorder(0, 0);
 noFuel.addSample({ timestampMs: 0, distanceKm: 0, speedKmh: 0, fuelRateLph: null });
 noFuel.addSample({ timestampMs: 1000, distanceKm: 0.2, speedKmh: 20, fuelRateLph: null });
-assert.strictEqual(noFuel.buildDriveCycle(2000), null);
+const noFuelCycle = noFuel.buildDriveCycle(2000);
+assert.ok(noFuelCycle, 'viagem deve ser persistida mesmo sem evidência de combustível');
+assert.strictEqual(noFuelCycle.fuelConsumptionStatus, 'SEM_DADOS');
+assert.strictEqual(noFuelCycle.avgFuelConsumptionKml, 0);
 
 const cycle = new RealTripRecorder(1000, 0);
 cycle.addSample({ timestampMs: 1000, distanceKm: 0, speedKmh: 0, fuelRateLph: 8 });
