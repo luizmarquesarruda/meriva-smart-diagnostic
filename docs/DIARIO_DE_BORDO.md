@@ -1286,3 +1286,30 @@ A correção anterior eliminou o congelamento do RPM no cockpit, mas a métrica 
 A métrica CONSUMO agora acompanha a condição atual: com velocidade e PID 015E válidos, varia com a taxa de combustível da ECU; parado, sem taxa válida ou sem movimento, mostra `N/D`. A média histórica permanece separada e continua sendo usada para histórico/autonomia.
 
 **CI ainda não executada nesta correção.**
+
+
+## 2026-10-08 — Plano: autosave divergente da telemetria automática
+
+### Evidência apresentada
+O histórico TXT mostrou que o bloco [LAST READINGS] permanece com uma amostra antiga de 010C mesmo enquanto novas leituras de RPM chegam pela ECU. O polling automático de AutoTripService chama recordLivePidQuery(), mas esse caminho não atualiza state.lastReadings do autosave.
+
+Também foi verificado que a implementação atual do formatter já contém Saved At, fonte de leitura e último protocolo conhecido. Portanto, a ausência desses campos no TXT apresentado é compatível com um APK/build anterior e não será tratada como defeito atual sem reproduzir no código vigente.
+
+### Correção planejada
+1. Criar uma ponte específica para registrar consultas OBD automáticas no autosave, sem reutilizar registerObdQuery() e sem disparar logs/aprendizado indevidamente.
+2. Fazer AutoTripService registrar as respostas automáticas reais de PID em lastReadings, mantendo SIMULACAO isolada.
+3. Preservar a regra de uma leitura por PID em lastReadings e o limite atual de 50 leituras persistidas.
+4. Adicionar regressão para garantir que polling automático atualize 010C no autosave.
+5. Validar a semântica DTC existente: nextDtcOccurrences() já impede incremento enquanto o DTC permanece ativo; não alterar essa regra sem evidência de falha no código atual.
+6. Não alterar package-lock.json nem adicionar dependência.
+7. CI somente quando explicitamente autorizada pelo usuário.
+
+### Invariantes
+- Telemetria REAL continua separada de SIMULAÇÃO.
+- Gate ECU 010C → 41 0C permanece inalterado.
+- Autosave é persistência; liveTelemetry continua sendo fonte do indicador ao vivo.
+- DTC CURRENT/CONFIRMED/PENDING/PERMANENT não incrementa ocorrências em detecções repetidas do mesmo ciclo ativo.
+- Histórico TXT permanece limitado a 200 entradas.
+- Saved At deve refletir o timestamp real da persistência quando o snapshot for efetivamente salvo.
+
+**Plano registrado antes da alteração de código.**
