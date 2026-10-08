@@ -220,7 +220,7 @@ async function testParser() {
   const o2 = parser.parsePidResponse('0114', '41 14 6A 80');
   assert.strictEqual(o2.status, 'RESPONDEU');
   assert.strictEqual(o2.value, 0.53);
-  assert.strictEqual(o2.rawBytes.length, 4);
+  assert.deepStrictEqual(o2.rawBytes, [0x6A, 0x80]);
   assert.strictEqual(parser.parsePidResponse('01 0C', '41 0C 1A F8').value, 1726);
   assert.strictEqual(parser.validateOBDResponse('410C1AF8'), true);
   assert.strictEqual(parser.parsePidResponse('010C', '410C1AF8').value, 1726);
