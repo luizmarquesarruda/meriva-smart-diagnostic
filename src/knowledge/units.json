@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "units": {
     "rpm": {
       "symbol": "rpm",
@@ -44,6 +44,10 @@
     "degrees": {
       "symbol": "°",
       "name": "graus"
+    },
+    "L/h": {
+      "symbol": "L/h",
+      "name": "litros por hora"
     }
   }
 }
