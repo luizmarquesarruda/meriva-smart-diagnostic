@@ -25,6 +25,7 @@ export interface ObdConnectionState {
   ecuName?: string;
   ecuValidatedAt?: string;
   ecuValidationSource?: 'OBD_RESPONSE' | 'VEHICLE_PROFILE';
+  ecuValidationChecks?: string[];
   lastConnectedAt?: string;
 }
 
