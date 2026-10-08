@@ -56,7 +56,7 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
         reading.value === null || reading.value === undefined
           ? ND
           : `${reading.value} ${reading.unit}`;
-      L.push(`${reading.pid} ${reading.name}: ${value} [${reading.status}] ${reading.timestamp}`);
+      L.push(`${reading.pid} ${reading.name}: ${value} [${reading.status}] fonte=${reading.source} ${reading.timestamp}`);
     }
   } else {
     L.push(ND);
