@@ -14,6 +14,18 @@ function queueDtcWrite(target: string, operation: () => Promise<void>): Promise<
   });
 }
 
+
+/**
+ * DTC occurrence semantics: repeated reads of the same active code do not
+ * create new fault occurrences. A new occurrence starts after the code was
+ * previously absent/inactive and is detected again.
+ */
+export function nextDtcOccurrences(previous?: DtcRecord): number {
+  if (!previous) return 1;
+  const active = ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(previous.status);
+  return active ? Math.max(1, previous.occurrences || 1) : Math.max(1, previous.occurrences || 0) + 1;
+}
+
 export async function recordDtc(basePath: string, dtc: DtcRecord): Promise<void> {
   const target = `${basePath}/DTC/dtc_records.txt`;
   await queueDtcWrite(target, async () => {
