@@ -158,10 +158,10 @@ export async function createRealElmSession(
 ): Promise<RealElmConnection> {
   let lastCause: unknown = null;
 
-  for (let attempt = 1; attempt <= MAX_BLUETOOTH_ATTEMPTS; attempt++) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     logBluetoothDiagnostic('BLUETOOTH_ATTEMPT_START', {
       attempt,
-      maxAttempts: MAX_BLUETOOTH_ATTEMPTS,
+      maxAttempts,
       retryIntervalMs: BLUETOOTH_RETRY_INTERVAL_MS,
       name: device.name,
       address: device.address,
@@ -197,7 +197,7 @@ export async function createRealElmSession(
         error: cause instanceof Error ? cause.message : String(cause),
       });
 
-      if (attempt === MAX_BLUETOOTH_ATTEMPTS) {
+      if (attempt === maxAttempts) {
         break;
       }
 
@@ -215,9 +215,9 @@ export async function createRealElmSession(
   }
 
   logBluetoothDiagnostic('BLUETOOTH_TEST_SESSION_END', {
-    attemptsTotal: MAX_BLUETOOTH_ATTEMPTS,
+    attemptsTotal: maxAttempts,
     successes: 0,
-    failures: MAX_BLUETOOTH_ATTEMPTS,
+    failures: maxAttempts,
     reason: 'MAX_ATTEMPTS_REACHED',
   });
 
@@ -244,6 +244,7 @@ async function createRealElmSessionAttempt(
   // chamador (sharedConnection). Cada retry deve começar diretamente na sessão
   // RFCOMM/ELM, sem reabrir permissões ou reiniciar a preparação Bluetooth.
   const config = mergeCompatibilityConfig(compatibility ?? DEFAULT_ELM327_COMPATIBILITY);
+  const maxAttempts = config.maxConnectionAttempts > 0 ? config.maxConnectionAttempts : MAX_BLUETOOTH_ATTEMPTS;
   const session = new Elm327Session(
     new BluetoothClassicTransport(device.address, config, {
       onConnected: callbacks?.onBluetoothConnected,
