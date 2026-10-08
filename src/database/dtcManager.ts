@@ -56,6 +56,7 @@ export async function recordDtc(basePath: string, dtc: DtcRecord): Promise<void>
     const filtered = lines.filter((item) => !item.startsWith(`${dtc.code}|`));
     filtered.push(line);
     await FileSystem.writeAsStringAsync(target, `${filtered.join('\n')}\n`, { encoding: FileSystem.EncodingType.UTF8 });
+    emitAppEvent('DTC_UPDATED');
   });
 }
 
