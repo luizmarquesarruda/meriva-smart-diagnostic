@@ -402,6 +402,17 @@ async function testActiveAdapterCannotBeSilentlySwitched() {
 
 async function testEcuValidationGate() {
   const manager = loadTs(path.join(ROOT, 'src/obd/bluetoothManager.ts'));
+  const bluetoothState = loadTs(path.join(ROOT, 'src/obd/bluetoothState.ts'));
+  assert.strictEqual(bluetoothState.canPollObd('READY', 'RESPONDING'), true);
+  assert.strictEqual(bluetoothState.canPollObd('READY', 'NO_RESPONSE'), false);
+  assert.strictEqual(bluetoothState.canPollObd('READY', 'RECOVERING'), false);
+
+  const sharedSource = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'sharedConnection.ts'), 'utf8');
+  const laboratorySource = fs.readFileSync(path.join(ROOT, 'app', 'laboratorio.tsx'), 'utf8');
+  assert.ok(sharedSource.includes('reportEcuPollResult('), 'polling deve alimentar o estado da ECU');
+  assert.ok(sharedSource.includes('await closeObdAutosaveSession()'), 'perda persistente da ECU deve fechar o autosave');
+  assert.ok(laboratorySource.includes('activeSession.withExclusiveCommandQueue(async (executeCommand)'), 'DTC real deve reservar a fila do ELM');
+  assert.ok(laboratorySource.includes('readFreezeFrame(activeSession, executeCommand)'), 'freeze frame deve usar a mesma reserva do ELM');
   assert.strictEqual(manager.getElmProtocolName('5'), 'ISO 14230-4 KWP FAST');
   assert.strictEqual(manager.getElmProtocolName('3'), 'ISO 9141-2');
   assert.strictEqual(manager.getElmProtocolName('6'), 'ISO 15765-4 CAN 11/500');
