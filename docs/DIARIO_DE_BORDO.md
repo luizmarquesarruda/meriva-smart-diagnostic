@@ -1249,3 +1249,15 @@ O serviço automático já consulta o PID 010C e registra leituras reais em live
 - Autosave continua sendo persistência/histórico, não fonte de verdade para o indicador ao vivo.
 - Não alterar package-lock.json nem adicionar dependência.
 - CI somente após a correção estar completa e explicitamente autorizada pelo usuário.
+
+
+### Correção implementada — RPM ao vivo
+- `a43c3db2f1f7277fed9231ea128f043220ecc904` — cockpit passou a usar o RPM da telemetria REAL 010C, atualizado a cada 500 ms, em vez de `autosave.lastReadings` como fonte do indicador ao vivo.
+- `e70cee6d1662fb922901e1259d7d64c15c5c2aa9` — adicionada API `getLivePidCurrent()` que retorna somente amostra REAL dentro da janela de validade de 10 s.
+- `e8c7c1c2d96f07ae1b956742c7f3759df354ef43` — cockpit passou a consumir a API centralizada de validade do RPM.
+- `293eca1ebe2a43143bfe51970036534557a12f70` — regressão adicionada: amostra 010C com 30 s não pode ser exibida como RPM atual.
+
+### Resultado técnico esperado
+Com ECU conectada, uma resposta real `41 0C 00 00` deve resultar em `0 RPM` no cockpit após a próxima consulta 010C. Se a ECU parar de fornecer amostras válidas por mais de 10 s, o cockpit deve mostrar `N/D`, nunca manter artificialmente o último RPM.
+
+**Ainda não considerar a correção validada pela CI.**
