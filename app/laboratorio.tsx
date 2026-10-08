@@ -389,6 +389,7 @@ export default function LaboratorioScreen() {
           const previous = existing.find((item) => item.code === code);
           return {
             code,
+            description: getDtcDefinition(code)?.description,
             status: kind === 'PENDING' ? 'PENDING' : kind === 'PERMANENT' ? 'PERMANENT' : 'CURRENT',
             firstSeen: previous?.firstSeen ?? now,
             lastSeen: now,
@@ -460,6 +461,7 @@ export default function LaboratorioScreen() {
           const previous = existing.find((item) => item.code === code);
           return {
             code,
+            description: getDtcDefinition(code)?.description,
             status: 'CURRENT',
             firstSeen: previous?.firstSeen ?? now,
             lastSeen: now,
