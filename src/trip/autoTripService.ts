@@ -294,33 +294,18 @@ class AutoTripService {
         // Sem 010D, null devolve a decisão ao filtro GPS.
         gpsTracker.setVehicleSpeedHintKmh(obdSpeedSupported ? obdSpeedKmh : null);
 
+        const settings = await readAppSettings(this.basePath);
+        const fuelComposition = {
+          alcoholPercentFromObd: this.latestPidValues.get('0152') ?? null,
+          manualFuelType: settings.fuelType,
+          manualAlcoholPercent: settings.manualFuelAlcoholPercent,
+        };
+
+        // MAF somente quando 0110 foi descoberto.
         if (fuelRateLph == null && connection.supportedPids.includes('0110')) {
           const mafGs = this.latestPidValues.get('0110') ?? null;
           if (mafGs != null) {
-            const settings = await readAppSettings(this.basePath);
-            const estimate = estimateFuelRateLph({
-              mafGs,
-              alcoholPercentFromObd: this.latestPidValues.get('0152') ?? null,
-              manualFuelType: settings.fuelType,
-              manualAlcoholPercent: settings.manualFuelAlcoholPercent,
-            });
-            if (estimate) {
-              fuelRateLph = estimate.rateLph;
-              fuelRateSource = estimate.source;
-              fuelEstimateNote = 'AFR ' + estimate.airFuelRatio.toFixed(2) + ' | densidade ' + estimate.fuelDensityKgPerL.toFixed(3) + ' kg/L | ' + estimate.fuelModel.assumption;
-            }
-        }
-        if (fuelRateLph == null && connection.supportedPids.includes('010B') && connection.supportedPids.includes('010F') && connection.supportedPids.includes('010C')) {
-            const settings = await readAppSettings(this.basePath);
-            const estimate = estimateFuelRateLph({
-              mapKpa: this.latestPidValues.get('010B') ?? null,
-              rpm: this.latestPidValues.get('010C') ?? rpm,
-              intakeAirTempC: this.latestPidValues.get('010F') ?? null,
-              displacementCm3: getAutoSaveState().vehicle?.displacementCm3 ?? MERIVA_MANUAL.engine.displacementCm3,
-              alcoholPercentFromObd,
-              manualFuelType: settings.fuelType,
-              manualAlcoholPercent: settings.manualFuelAlcoholPercent,
-            });
+            const estimate = estimateFuelRateLph({ mafGs, ...fuelComposition });
             if (estimate) {
               fuelRateLph = estimate.rateLph;
               fuelRateSource = estimate.source;
@@ -329,22 +314,11 @@ class AutoTripService {
           }
         }
 
-        // Consumo estimado usa apenas PIDs descobertos e respostas válidas em cache.
-        // A estimativa pode ficar indisponível enquanto o rodízio ainda coleta os insumos.
-        if (fuelRateLph == null && connection.supportedPids.includes('0110')) {
-          const mafGs = this.latestPidValues.get('0110');
-          if (mafGs != null) {
-            const estimate = estimateFuelRateLph({ mafGs });
-            if (estimate) {
-              fuelRateLph = estimate.rateLph;
-              fuelRateSource = estimate.source;
-            }
-          }
-        }
+        // MAP exige 010B + 010F + 010C descobertos e valores reais coletados.
         if (fuelRateLph == null &&
             ['010B', '010F', '010C'].every((pid) => connection.supportedPids.includes(pid))) {
-          const mapKpa = this.latestPidValues.get('010B');
-          const intakeAirTempC = this.latestPidValues.get('010F');
+          const mapKpa = this.latestPidValues.get('010B') ?? null;
+          const intakeAirTempC = this.latestPidValues.get('010F') ?? null;
           const cachedRpm = rpm ?? this.latestPidValues.get('010C') ?? null;
           if (mapKpa != null && intakeAirTempC != null && cachedRpm != null) {
             const vehicleDisplacement = getAutoSaveState().vehicle?.displacementCm3 ?? MERIVA_MANUAL.engine.displacementCm3;
@@ -353,10 +327,12 @@ class AutoTripService {
               rpm: cachedRpm,
               intakeAirTempC,
               displacementCm3: vehicleDisplacement,
+              ...fuelComposition,
             });
             if (estimate) {
               fuelRateLph = estimate.rateLph;
               fuelRateSource = estimate.source;
+              fuelEstimateNote = 'AFR ' + estimate.airFuelRatio.toFixed(2) + ' | densidade ' + estimate.fuelDensityKgPerL.toFixed(3) + ' kg/L | ' + estimate.fuelModel.assumption;
             }
           }
         }
