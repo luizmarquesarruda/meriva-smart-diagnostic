@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "standard": "SAE J1979 / ISO 15031-5",
   "description": "Banco local de fórmulas determinísticas para converter bytes OBD-II em unidades de engenharia. Não usa eval.",
   "provenance": [
@@ -67,6 +67,33 @@
       "operation": "u8_scale",
       "scale": 100,
       "divisor": 255
+    },
+    "U8_X3": {
+      "operation": "u8_scale",
+      "scale": 3,
+      "divisor": 1
+    },
+    "U16_SCALE_255": {
+      "operation": "u16_scale_div",
+      "scale": 100,
+      "divisor": 255
+    },
+    "U16_X10": {
+      "operation": "u16_scale",
+      "scale": 10
+    },
+    "INJECTION_TIMING": {
+      "operation": "u16_offset_scale",
+      "offset": -26880,
+      "scale": 0.0078125
+    },
+    "TORQUE_PERCENT": {
+      "operation": "u8_offset",
+      "offset": -125
+    },
+    "U16_DIV_32768": {
+      "operation": "u16_div",
+      "divisor": 32768
     }
   }
 }
