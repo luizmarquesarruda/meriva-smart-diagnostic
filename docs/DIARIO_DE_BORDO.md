@@ -1475,3 +1475,26 @@ Esse modo permite continuidade com a tela apagada enquanto o Foreground Service 
 
 ### Validação
 A correção aguarda validação pela CI nesta branch antes de ser considerada concluída.
+
+
+## 2026-10-08 — Privacidade: autosave automático desativado
+
+### Motivo
+O autosave automático armazenava dados que podem ser pessoais ou identificadores do veículo/dispositivo, incluindo VIN, identificação do adaptador Bluetooth, estado da ECU, protocolo, horários, leituras OBD, DTCs e histórico. O histórico TXT também replicava snapshots persistidos.
+
+### Correção
+- A persistência automática foi desativada por padrão em `src/meriva/autosaveManager.ts`.
+- `initAutoSave()` não lê nem hidrata `autosave.json` ou `autosave.previous.json`; o estado começa limpo em memória.
+- Atualizações continuam disponíveis em memória para que diagnóstico, OBD, aprendizado em execução e monitoramento funcionem normalmente.
+- `saveNow()`, debounce, salvamento crítico, checkpoint de 45 s e listeners de AppState não persistem dados quando o autosave está desativado.
+- `startObdAutosaveSession()` e `closeObdAutosaveSession()` tornam-se no-ops de persistência; o ciclo ECU/OBD não é interrompido.
+- O histórico TXT deixa de ser criado/atualizado automaticamente porque sua única chamada de escrita está protegida pelo mesmo bloqueio.
+- Arquivos antigos não são apagados automaticamente: permanecem intactos e deixam de ser carregados ou sobrescritos. Isso evita uma exclusão destrutiva sem solicitação explícita.
+
+### Teste
+`tests/merivaAutosave.test.js` ganhou uma regressão que confirma que o modo padrão não hidrata dados antigos nem registra salvamento. Os testes legados do mecanismo de persistência usam apenas um override explícito da suíte para continuar validando o código histórico sem reativá-lo no aplicativo.
+
+### Estado
+**AUTOSAVE AUTOMÁTICO: DESATIVADO.**
+
+OBD, Bluetooth, diagnóstico, GPS e monitoramento em segundo plano continuam independentes dessa persistência e permanecem disponíveis em memória durante a execução.
