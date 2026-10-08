@@ -11,6 +11,8 @@ import { discoverSupportedPids, KNOWN_PIDS } from '../src/obd/pidScanner';
 import { getSharedObdConnection, getSharedObdStatus, setSharedObdConnection, subscribeSharedObd, disconnectSharedObd } from '../src/obd/sharedConnection';
 import { autoTripService } from '../src/trip/autoTripService';
 import { getMidLayout } from '../src/ui/midLayout';
+import { scanDtcServices, type DtcServiceScan } from '../src/obd/dtcScanner';
+import { getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
 
 import { readAppSettings, writeAppSettings } from '../src/database/appSettings';
 
@@ -55,6 +57,8 @@ export default function LaboratorioScreen() {
   const [tripActive, setTripActive] = useState(false);
   const [tripFuelSupported, setTripFuelSupported] = useState<boolean | null>(null);
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
+  const [dtcScan, setDtcScan] = useState<DtcServiceScan[]>([]);
+  const [dtcScanning, setDtcScanning] = useState(false);
   const sessionRef = useRef<Elm327Session | null>(null);
   const autoSaveReadyRef = useRef(false);
 
@@ -347,6 +351,76 @@ export default function LaboratorioScreen() {
     }
   }
 
+  async function readAllDtcs() {
+    setError('');
+    setDtcScanning(true);
+    setStatus(mode === 'SIMULACAO' ? 'SIMULAÇÃO LOCAL: VARREDURA DTC 03/07/0A' : 'ECU: VARREDURA DTC 03/07/0A');
+    try {
+      const activeSession = mode === 'SIMULACAO' ? simulationSession : sessionRef.current;
+      if (mode === 'REAL' && !canPollObd(getSharedObdStatus().lifecycle)) {
+        throw new Error('DIAGNÓSTICO AINDA NÃO ESTÁ PRONTO. AGUARDE BLUETOOTH, ELM327 E ECU.');
+      }
+      if (!activeSession) throw new Error('CONECTE AO ELM327 ANTES DA VARREDURA DTC');
+
+      const results = mode === 'REAL'
+        ? await autoTripService.withPollingPaused(() => scanDtcServices(activeSession))
+        : await scanDtcServices(activeSession);
+      setDtcScan(results);
+      const stored = results.find((item) => item.kind === 'STORED');
+      setDtcCodes(stored?.codes ?? []);
+
+      if (mode === 'REAL') {
+        const existing = await readDtcs(getBasePath());
+        const now = new Date().toISOString();
+        const priorities: Record<DtcServiceScan['kind'], number> = { PENDING: 1, PERMANENT: 2, STORED: 3 };
+        const bestByCode = new Map<string, DtcServiceScan['kind']>();
+        for (const scan of results) {
+          if (!scan.available) continue;
+          for (const code of scan.codes) {
+            const priorKind = bestByCode.get(code);
+            if (!priorKind || priorities[scan.kind] > priorities[priorKind]) bestByCode.set(code, scan.kind);
+          }
+        }
+
+        const records: DtcRecord[] = [...bestByCode.entries()].map(([code, kind]) => {
+          const previous = existing.find((item) => item.code === code);
+          return {
+            code,
+            status: kind === 'PENDING' ? 'PENDING' : kind === 'PERMANENT' ? 'PERMANENT' : 'CURRENT',
+            firstSeen: previous?.firstSeen ?? now,
+            lastSeen: now,
+            occurrences: (previous?.occurrences ?? 0) + 1,
+            source: 'REAL_OBD',
+            historical: false,
+            confirmed: kind !== 'PENDING',
+          };
+        });
+
+        for (const record of records) await recordDtc(getBasePath(), record);
+        const detectedCodes = new Set(records.map((item) => item.code));
+        updateAutoSaveState((state) => {
+          const preserved = state.dtcs.filter((item) => !detectedCodes.has(item.code));
+          state.dtcs = [...records, ...preserved];
+        });
+        await forceSaveOnObdEvent();
+      }
+
+      const available = results.filter((item) => item.available);
+      const unavailable = results.filter((item) => !item.available).map((item) => item.service);
+      const total = new Set(results.flatMap((item) => item.codes)).size;
+      setStatus(
+        total > 0
+          ? 'DTC ENCONTRADOS: ' + total + (unavailable.length ? ' • NÃO DISPONÍVEL: ' + unavailable.join('/') : '')
+          : 'NENHUM DTC NAS FONTES DISPONÍVEIS' + (available.length < results.length ? ' • ALGUNS SERVIÇOS NÃO DISPONÍVEIS' : ''),
+      );
+    } catch (cause) {
+      setStatus('FALHA NA VARREDURA DTC');
+      setError(cause instanceof Error ? cause.message : 'ERRO AO VARrer DTC');
+    } finally {
+      setDtcScanning(false);
+    }
+  }
+
   async function readCurrentDtcs() {
     setError('');
     setStatus(mode === 'SIMULACAO' ? 'SIMULAÇÃO LOCAL: LENDO DTC' : 'ECU: LENDO DTC');
@@ -411,7 +485,7 @@ export default function LaboratorioScreen() {
       confidence: reading.source === 'SIMULACAO' ? 'LOW' : 'GOOD',
     })),
     dtcs: getAutoSaveState().dtcs,
-    condition: 'UNKNOWN',
+    condition: getVehicleConditionSnapshot().condition,
   });
 
   return (
@@ -492,9 +566,24 @@ export default function LaboratorioScreen() {
       <TouchableOpacity style={styles.secondaryButton} onPress={discoverPids} disabled={!storageReady || (mode === 'REAL' && !sessionRef.current)}>
         <Text style={styles.secondaryButtonText}>DESCOBRIR PIDs SUPORTADOS</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.secondaryButton} onPress={readCurrentDtcs} disabled={!storageReady || (mode === 'REAL' && !sessionRef.current)}>
-        <Text style={styles.secondaryButtonText}>LER DTC ATUAIS</Text>
+      <TouchableOpacity style={styles.secondaryButton} onPress={readAllDtcs} disabled={!storageReady || dtcScanning || (mode === 'REAL' && !sessionRef.current)}>
+        <Text style={styles.secondaryButtonText}>{dtcScanning ? 'VARRENDO DTC 03/07/0A...' : 'VARREDURA COMPLETA DE DTC • 03 / 07 / 0A'}</Text>
       </TouchableOpacity>
+      {!!dtcScan.length ? (
+        <View style={styles.dtcPanel}>
+          <Text style={styles.dtcTitle}>ESTADOS DE DTC</Text>
+          {dtcScan.map((scan) => (
+            <View key={scan.service} style={styles.dtcRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.dtcKind}>{scan.service} • {scan.label}</Text>
+                <Text style={styles.dtcCodes}>{scan.codes.length ? scan.codes.join(', ') : 'NENHUM CÓDIGO'}</Text>
+              </View>
+              <Text style={scan.available ? styles.dtcAvailable : styles.dtcUnavailable}>{scan.available ? 'DISPONÍVEL' : 'N/D'}</Text>
+            </View>
+          ))}
+          <Text style={styles.dtcHint}>N/D significa serviço sem resposta utilizável; isso não é interpretado como “sem falhas”.</Text>
+        </View>
+      ) : null}
 
       <View style={styles.aiPanel}>
         <View style={styles.aiHeader}>
@@ -531,7 +620,8 @@ export default function LaboratorioScreen() {
           <Text style={styles.label}>STATUS</Text><Text style={styles.value}>{parsed?.status || 'COMANDO'}</Text>
           <Text style={styles.label}>VALOR</Text><Text style={styles.value}>{parsed?.value === null || !parsed ? 'SEM DADOS' : parsed.value + ' ' + parsed.unit}</Text>
           <Text style={styles.label}>COMBUSTÍVEL INTEGRADO (PID 015E)</Text><Text style={styles.value}>{fuelUsedL.toFixed(6)} L</Text>
-          <Text style={styles.label}>DTC ATUAIS</Text><Text style={styles.value}>{dtcCodes.length ? dtcCodes.join(', ') : 'NENHUM'}</Text>
+          <Text style={styles.label}>CONTEXTO OPERACIONAL</Text><Text style={styles.value}>{getVehicleConditionSnapshot().condition}</Text>
+          <Text style={styles.label}>DTC ARMAZENADOS</Text><Text style={styles.value}>{dtcCodes.length ? dtcCodes.join(', ') : 'NENHUM'}</Text>
           <Text style={styles.label}>PIDs CONHECIDOS SUPORTADOS</Text><Text style={styles.value}>{knownSupported.length ? knownSupported.join(', ') : 'N/D'}</Text>
           <Text style={styles.label}>TOTAL DE PIDs DESCOBERTOS</Text><Text style={styles.value}>{supportedPids.length}</Text>
         </View>
@@ -596,6 +686,14 @@ const styles = StyleSheet.create({
   aiMuted: { color: '#64748b', fontSize: 11 },
   aiWarning: { color: '#b45309', fontWeight: '800', fontSize: 11, marginTop: 9 },
   aiDisclaimer: { color: '#64748b', fontSize: 10, marginTop: 9 },
+  dtcPanel: { backgroundColor: '#fff', borderRadius: 10, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#cbd5e1' },
+  dtcTitle: { color: '#1557a6', fontSize: 13, fontWeight: '900', marginBottom: 6 },
+  dtcRow: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingVertical: 8 },
+  dtcKind: { color: '#334155', fontSize: 10, fontWeight: '900' },
+  dtcCodes: { color: '#64748b', fontSize: 10, marginTop: 3 },
+  dtcAvailable: { color: '#15803d', fontSize: 8, fontWeight: '900' },
+  dtcUnavailable: { color: '#b45309', fontSize: 8, fontWeight: '900' },
+  dtcHint: { color: '#64748b', fontSize: 9, lineHeight: 14, marginTop: 7 },
   panel: { backgroundColor: '#1f2937', borderRadius: 14, padding: 16, marginTop: 8 },
   label: { color: '#93c5fd', marginTop: 8 },
   value: { color: '#f8fafc', fontSize: 16, marginTop: 3 },
