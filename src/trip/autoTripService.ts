@@ -40,6 +40,18 @@ const CARSCANNER_REFERENCE_CONSUMPTION_KML = (() => {
   return fuelL > 0 ? Number((distanceKm / fuelL).toFixed(3)) : 0;
 })();
 
+const SECONDARY_PID_PERIOD_CYCLES: Record<string, number> = {
+  '015E': 2,
+  '012F': 4,
+  '0152': 4,
+  '0105': 8,
+  '0111': 8,
+  '0110': 8,
+  '010B': 8,
+  '010F': 8,
+  '0142': 12,
+};
+
 const INITIAL_STATE: AutoTripServiceState = {
   connected: false,
   active: false,
@@ -271,14 +283,16 @@ class AutoTripService {
           }
         }
 
-        // Somente PIDs descobertos são elegíveis para o rodízio secundário.
-        // O resultado de cada consulta mantém TX/RX pelo autosave existente.
+        // RPM/velocidade permanecem no caminho crítico a cada ciclo.
+        // Auxiliares só entram quando o período individual vence, reduzindo
+        // tráfego no ELM sem perder parâmetros de mudança lenta.
         this.pollCycleNumber += 1;
-        const secondaryPids = ['015E', '012F', '0142', '0152', '0110', '010B', '010F', '0105', '0111']
-          .filter((pid) => connection.supportedPids.includes(pid))
-          .filter((pid) => this.pollCycleNumber >= (this.pidBackoffUntilCycle.get(pid) ?? 0));
-        if (secondaryPids.length > 0) {
-          const secondaryPid = secondaryPids[this.telemetryCursor % secondaryPids.length];
+        const secondaryCandidates = Object.entries(SECONDARY_PID_PERIOD_CYCLES)
+          .filter(([pid, period]) => connection.supportedPids.includes(pid) && this.pollCycleNumber % period === 0)
+          .filter(([pid]) => this.pollCycleNumber >= (this.pidBackoffUntilCycle.get(pid) ?? 0))
+          .map(([pid]) => pid);
+        if (secondaryCandidates.length > 0) {
+          const secondaryPid = secondaryCandidates[this.telemetryCursor % secondaryCandidates.length];
           this.telemetryCursor += 1;
           const secondaryStartedAt = Date.now();
           const secondaryResult = await connection.session.queryPid(secondaryPid);
