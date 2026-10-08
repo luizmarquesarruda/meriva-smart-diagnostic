@@ -150,7 +150,7 @@
       "pid": "015E",
       "name": "Engine Fuel Rate",
       "bytes": 2,
-      "unit": "liters_per_hour",
+      "unit": "L/h",
       "formulaId": "FUEL_RATE_LH",
       "classification": "PADRAO_OBD",
       "description": "Taxa de combustível calculada pela ECU"
