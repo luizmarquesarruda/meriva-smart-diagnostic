@@ -1258,3 +1258,69 @@ O commit posterior `5ee79fa3d8648201671914399773f8b6deeeadbe` apenas consolida e
 **AUDITORIA DE CÓDIGO: CONCLUÍDA E VALIDADA.**
 
 A próxima etapa de validação que permanece fora do alcance da CI é o teste físico na Meriva com o ELM327, especialmente conexão Bluetooth, resposta real `010C → 41 0C`, leitura de PIDs anunciados pela ECU e persistência dos dados validados.
+## 2026-10-08 — Autosave vinculado à sessão real da ECU
+
+### Problema observado
+A análise do histórico `meriva_smart_autosave_history.txt` mostrou que o autosave estava funcionando, porém o ciclo de diagnóstico não tinha uma fronteira explícita: havia múltiplos pontos iniciando/parando checkpoint e a persistência de `obd.connected` era duplicada entre `sharedConnection`, cockpit, layout raiz e laboratório.
+
+Isso permitia snapshots redundantes e aumentava o risco de gravar estado de conexão fora de uma sessão ECU realmente validada.
+
+### Decisão
+A sessão de autosave deve ser controlada pelo estado real da ECU:
+- ECU validada por resposta OBD real `41 0C` → abrir sessão de autosave.
+- ECU/ELM desconectado → fechar sessão de autosave.
+- A sessão aberta mantém checkpoint periódico de 45 s.
+- Ao abrir e fechar a sessão, deve existir um marco explícito no histórico TXT: `session_start` e `session_end`.
+- O fechamento deve persistir `connected=false`, remover o protocolo atual e preservar `lastKnownProtocol`.
+
+Uma ausência isolada de resposta de um PID não é tratada automaticamente como desconexão da ECU; a fronteira de fechamento permanece vinculada ao evento real de perda da sessão Bluetooth/ELM ou à desconexão manual. Isso evita encerrar uma sessão por um único `NO DATA`.
+
+### Correção implementada
+No `autosaveManager`:
+- `SaveReason` recebeu `session_start` e `session_end`.
+- `AutoSaveStatus` passou a expor `obdSessionActive`.
+- Criados `startObdAutosaveSession()` e `closeObdAutosaveSession()`.
+- `startObdAutosaveSession()` só abre após `obd.connected=true`, inicia o checkpoint e faz salvamento imediato.
+- `closeObdAutosaveSession()` interrompe o checkpoint, normaliza o estado para desconectado e faz o salvamento final.
+- `startObdSessionCheckpoint()` passou a respeitar a sessão ECU ativa.
+
+Em `sharedConnection`:
+- a persistência de adaptador validado, ECU e abertura de sessão foi centralizada em `persistValidatedConnection()`;
+- conexão validada pelo gate `41 0C` abre o autosave;
+- desconexão inesperada, desconexão manual e `setSharedObdConnection(null)` fecham o autosave;
+- `lastKnownProtocol` continua preservado após a desconexão.
+
+Na interface:
+- removidos pontos duplicados de persistência no `app/_layout.tsx` e `app/index.tsx`;
+- o laboratório deixou de controlar diretamente o checkpoint;
+- o cockpit passou a mostrar `GRAVANDO ECU` enquanto a sessão de autosave está ativa e `AGUARDANDO ECU` quando não está.
+
+### Testes
+Adicionados:
+- teste de abertura da sessão após ECU conectada;
+- teste de salvamento final ao fechar a sessão;
+- teste de preservação do último protocolo;
+- regressões estáticas para garantir a integração do ciclo ECU → autosave.
+
+### Arquivos principais
+- `src/meriva/autosaveTypes.ts`
+- `src/meriva/autosaveManager.ts`
+- `src/obd/sharedConnection.ts`
+- `app/_layout.tsx`
+- `app/index.tsx`
+- `app/laboratorio.tsx`
+- `app/configuracoes.tsx`
+- `tests/merivaAutosave.test.js`
+- `tests/bluetoothLifecycle.test.js`
+
+### Commits
+Alteração aplicada diretamente no `main` em uma sequência de commits pequenos e auditáveis, do `c1bc3ff76ebac1aad67e1df69a881153e711ed21` ao `827f4b26c8591f0d6329c9a3b80b13ba7d9ff1c0`.
+
+### Validação
+A suíte de CI não foi disparada nesta etapa. Os testes de regressão foram adicionados ao repositório, mas a validação final por CI/Android permanece pendente.
+
+### Estado
+A regra de salvamento agora é:
+`ECU validada → INICIA AUTOSAVE → checkpoints durante a sessão → ECU desconectada → SALVAMENTO FINAL → FECHA AUTOSAVE`
+
+O estado histórico continua separado do estado atual: a desconexão não apaga `lastKnownProtocol` nem os dados históricos já registrados.
