@@ -19,7 +19,7 @@ const REQUESTS: {
   service: '03' | '07' | '0A';
   kind: DtcServiceKind;
   label: string;
-}> = [
+}[] = [
   { service: '03', kind: 'STORED', label: 'ARMAZENADOS / CONFIRMADOS' },
   { service: '07', kind: 'PENDING', label: 'PENDENTES' },
   { service: '0A', kind: 'PERMANENT', label: 'PERMANENTES' },
