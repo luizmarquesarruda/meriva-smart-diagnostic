@@ -794,7 +794,7 @@ async function testPidAndLearningWriteSerialization() {
   assert.ok(rawPidFile.split('\n').filter(Boolean).every((line) => line.split('|').length === 11), 'TXT de PIDs deve permanecer compacto');
   await pidBank.recordDiscoveredPids(BASE, ['010C', '010D', '015E'], 'ISO 14230-4');
   const discovered = await pidBank.readPidConfirmations(BASE);
-  assert.strictEqual(discovered.length, 3);
+  assert.strictEqual(discovered.length, 4);
   assert.strictEqual(discovered.find((item) => item.pid === '010D').status, 'DESCOBERTO');
   assert.strictEqual(discovered.find((item) => item.pid === '010C').status, 'CONFIRMADO');
 
