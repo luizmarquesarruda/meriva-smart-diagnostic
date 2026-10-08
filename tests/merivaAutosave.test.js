@@ -569,6 +569,10 @@ test('18. polling automático atualiza lastReadings sem contaminar learning', as
     parsed: parser.parsePidResponse('010C', '41 0C 0F A0'),
   }, 'REAL');
 
+  assert.match(fs.readFileSync(path.join(ROOT, 'src/meriva/autosaveIntegration.ts'), 'utf8'), /scheduleTelemetrySave\(\)/);
+  assert.match(fs.readFileSync(path.join(ROOT, 'src/meriva/autosaveManager.ts'), 'utf8'), /schedulePersist\?: boolean/);
+  assert.strictEqual(files.has(`${CONFIG_DIR}/autosave.json`), false, 'polling automático não deve disparar escrita imediata por PID');
+
   const reading = m.getAutoSaveState().lastReadings.find((item) => item.pid === '010C');
   assert.ok(reading, 'polling automático deve atualizar lastReadings');
   assert.strictEqual(reading.value, 1000, '010C deve refletir a amostra automática mais recente');
