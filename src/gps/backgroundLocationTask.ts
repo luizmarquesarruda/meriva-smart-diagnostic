@@ -1,7 +1,6 @@
 import * as TaskManager from 'expo-task-manager';
 import type * as Location from 'expo-location';
-import { BACKGROUND_LOCATION_TASK_NAME } from './backgroundLocation';
-import { gpsTracker } from './gpsTracker';
+import { BACKGROUND_LOCATION_TASK_NAME, gpsTracker } from './gpsTracker';
 
 TaskManager.defineTask(BACKGROUND_LOCATION_TASK_NAME, ({ data, error }) => {
   if (error) {
