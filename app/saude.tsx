@@ -12,6 +12,7 @@ import { getDtcDefinition } from '../src/obd/dtcDefinition';
 
 export default function SaudeScreen() {
   const layout = useMidLayout();
+  const eventRevision = useAppEventRevision();
   const [state,setState]=useState(getAutoSaveState());
   useEffect(()=>{ setState(getAutoSaveState()); },[eventRevision]);
   const context = getVehicleConditionSnapshot();
