@@ -39,6 +39,8 @@ export interface PidObservation {
   source: DataSource;
   timestamp: string;
   confidence: ConfidenceLevel;
+  /** Estado da consulta OBD; quando presente, só RESPONDEU é evidência válida. */
+  status?: string;
   derived?: boolean;
   derivedFrom?: string;
   errorMessage?: string;
