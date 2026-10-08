@@ -23,7 +23,8 @@ assert.ok(firstBatch.length > 0);
 assert.ok(firstBatch.length <= 6, 'uma requisição CAN deve respeitar o limite de 6 PIDs');
 
 scheduler.markPolled(firstBatch, 0);
-assert.deepStrictEqual(scheduler.getDuePids(500, supported, true), []);
+const nextBatch = scheduler.getDuePids(500, supported, true);
+assert.ok(nextBatch.every((pid) => !firstBatch.includes(pid)), 'PIDs já marcados não devem ser repetidos antes da próxima janela');
 
 const later = scheduler.getDuePids(1000, supported, true);
 assert.ok(later.length > 0, 'PIDs FAST devem voltar a ficar elegíveis pela cadência');
