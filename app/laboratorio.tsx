@@ -17,12 +17,9 @@ import { getMidLayout } from '../src/ui/midLayout';
 import { scanDtcServices, type DtcServiceScan } from '../src/obd/dtcScanner';
 import { getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
 
-import { readAppSettings, writeAppSettings } from '../src/database/appSettings';
-
 import { DtcRecord, nextDtcOccurrences, readDtcs, recordDtc } from '../src/database/dtcManager';
 import {
   initAutoSave,
-  startObdSessionCheckpoint,
   stopObdSessionCheckpoint,
   updateAutoSaveState,
   getAutoSaveState,
@@ -123,16 +120,12 @@ export default function LaboratorioScreen() {
       void (async () => {
         const activeSession = sessionRef.current;
         sessionRef.current = null;
-        stopObdSessionCheckpoint();
-        try {
+          try {
           if (getSharedObdConnection()?.session !== activeSession) await activeSession?.close();
         } catch {
           // sessão já fechada
         }
-        updateAutoSaveState((state) => {
-          state.obd = { ...state.obd, connected: false, protocol: undefined, lastKnownProtocol: state.obd.protocol ?? state.obd.lastKnownProtocol };
-        });
-        await forceSaveOnObdEvent();
+
       })();
     };
   }, []);
@@ -201,12 +194,16 @@ export default function LaboratorioScreen() {
         getDiagnosticsText: () => connected.session.getTransportDiagnosticsText(),
       });
       setProtocol(connection.protocol ?? 'N/D');
-      startObdSessionCheckpoint();
       updateAutoSaveState((state) => {
         state.obd = {
+          ...state.obd,
           connected: true,
           adapterName: device.name,
           protocol: connected.protocol ?? undefined,
+          lastKnownProtocol: connected.protocol ?? state.obd.lastKnownProtocol,
+          ecuAddress: state.vehicle?.ecuAddress ?? state.obd.ecuAddress,
+          ecuValidatedAt: new Date().toISOString(),
+          ecuValidationSource: state.vehicle?.ecuAddress ? 'VEHICLE_PROFILE' : 'OBD_RESPONSE',
           lastConnectedAt: new Date().toISOString(),
         };
 
@@ -221,12 +218,6 @@ export default function LaboratorioScreen() {
             discoveredAt: new Date().toISOString(),
           };
         }
-      });
-
-      const settings = await readAppSettings(getBasePath());
-      await writeAppSettings(getBasePath(), {
-        ...settings,
-        selectedAdapterAddress: device.address,
       });
 
       setStatus(
@@ -274,10 +265,6 @@ export default function LaboratorioScreen() {
       } else {
         await activeSession?.close();
       }
-      updateAutoSaveState((state) => {
-        state.obd = { ...state.obd, connected: false, protocol: undefined, lastKnownProtocol: state.obd.protocol ?? state.obd.lastKnownProtocol };
-      });
-      await forceSaveOnObdEvent();
       setTripFuelSupported(null);
       setTripConsumptionKml(null);
       setTripDistanceKm(0);
