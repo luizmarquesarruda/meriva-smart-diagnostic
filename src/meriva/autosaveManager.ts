@@ -33,6 +33,7 @@ interface AutosaveRuntime {
   criticalTimer: ReturnType<typeof setTimeout> | null;
   criticalWaiters: Array<(saved: boolean) => void>;
   checkpointTimer: ReturnType<typeof setInterval> | null;
+  obdSessionActive: boolean;
   appStateSubscription: { remove: () => void } | null;
 }
 
@@ -50,6 +51,7 @@ const runtime: AutosaveRuntime = {
   criticalTimer: null,
   criticalWaiters: [],
   checkpointTimer: null,
+  obdSessionActive: false,
   appStateSubscription: null,
 };
 
@@ -230,6 +232,7 @@ export function getAutoSaveStatus(): AutoSaveStatus {
     lastSavedAt: runtime.lastSavedAt,
     lastSaveReason: runtime.lastSaveReason,
     lastError: runtime.lastError,
+    obdSessionActive: runtime.obdSessionActive,
   };
 }
 
@@ -293,10 +296,54 @@ export async function saveNow(reason: SaveReason = 'critical'): Promise<boolean>
 }
 
 export function startObdSessionCheckpoint(): void {
-  if (runtime.checkpointTimer) return;
+  if (runtime.checkpointTimer || !runtime.basePath) return;
   runtime.checkpointTimer = setInterval(() => {
-    if (runtime.dirty) void saveNow('checkpoint');
+    if (runtime.obdSessionActive && runtime.dirty) void saveNow('checkpoint');
   }, CHECKPOINT_MS);
+}
+
+export async function startObdAutosaveSession(): Promise<boolean> {
+  if (runtime.obdSessionActive) return true;
+  if (!runtime.basePath || !runtime.state.obd.connected) return false;
+
+  runtime.obdSessionActive = true;
+  startObdSessionCheckpoint();
+
+  // A abertura da sessão é um marco persistente. Mesmo que o estado lógico
+  // já coincida com o último snapshot, queremos uma entrada explícita no TXT.
+  runtime.lastSavedFingerprint = null;
+  const saved = await saveNow('session_start');
+  if (!saved) {
+    runtime.obdSessionActive = false;
+    stopObdSessionCheckpoint();
+  }
+  return saved;
+}
+
+export async function closeObdAutosaveSession(): Promise<boolean> {
+  const wasActive = runtime.obdSessionActive;
+  runtime.obdSessionActive = false;
+  stopObdSessionCheckpoint();
+
+  if (!runtime.basePath) return false;
+
+  if (wasActive || runtime.state.obd.connected) {
+    runtime.state.obd = {
+      ...runtime.state.obd,
+      connected: false,
+      protocol: undefined,
+      lastKnownProtocol: runtime.state.obd.protocol ?? runtime.state.obd.lastKnownProtocol,
+    };
+    runtime.dirty = true;
+    runtime.mutationVersion += 1;
+  }
+
+  if (!wasActive && !runtime.dirty) return true;
+
+  // Abertura/fechamento são fronteiras de sessão; não devem ser coalescidas
+  // com o snapshot anterior.
+  if (wasActive) runtime.lastSavedFingerprint = null;
+  return saveNow('session_end');
 }
 
 export function stopObdSessionCheckpoint(): void {
@@ -313,6 +360,7 @@ export function disposeAutoSave(): void {
   runtime.debounceTimer = null;
   runtime.criticalTimer = null;
   runtime.checkpointTimer = null;
+  runtime.obdSessionActive = false;
   runtime.criticalWaiters.splice(0).forEach((resolve) => resolve(false));
   runtime.appStateSubscription?.remove();
   runtime.appStateSubscription = null;
