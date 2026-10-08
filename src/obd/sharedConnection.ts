@@ -48,6 +48,7 @@ let consecutiveEcuFailures = 0;
 let lastEcuResponseAt: string | null = null;
 let lastEcuError: string | null = null;
 let reconnecting = false;
+let ecuRecoveryPromise: Promise<boolean> | null = null;
 let intentionalDisconnect = false;
 let connectionGeneration = 0;
 
