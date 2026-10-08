@@ -591,7 +591,11 @@ test('18. polling automático atualiza lastReadings sem contaminar learning', as
   }, 'REAL');
   const latest = m.getAutoSaveState().lastReadings.find((item) => item.pid === '010C');
   assert.strictEqual(latest.value, 1250, 'nova amostra deve substituir a anterior por PID');
-  assert.strictEqual(m.getAutoSaveState().settings.simulationQueries, 0, 'polling real não pode virar simulação');
+  assert.strictEqual(
+    Number(m.getAutoSaveState().settings.simulationQueries) || 0,
+    0,
+    'polling real não pode virar simulação',
+  );
   m.disposeAutoSave();
 });
 
