@@ -1224,3 +1224,37 @@ PR #31 foi integrado ao `main` por squash no commit `2a0189cb51b831c18cf962936ac
 
 ### Estado
 A auditoria de código desta rodada está **concluída e validada pela CI #1063**. A validação física do ELM327/Meriva continua sendo uma etapa de hardware/veículo, não substituída pela CI.
+
+
+## 2026-10-08 — Registro complementar: status confirmado da CI #1063
+
+### Verificação pós-consolidação
+Foi feita uma nova leitura do estado do repositório para confirmar a situação da última CI e do merge do PR #31.
+
+- PR #31 — `audit: validate full suite after responsive test fix`: **merged** no `main`.
+- Run da CI final: **#1063 / 37767314687**.
+- Commit validado pela CI: `a8309abf3e28a18935f710bae971110089cb6e2d` (head do PR #31).
+- Commit de merge por squash no `main`: `2a0189cb51b831c18cf962936ac7051d262172b0`.
+- `validate`: **sucesso**.
+- `android-build`: **sucesso**.
+- `npm ci --no-audit --no-fund`: **sucesso**.
+- Expo Doctor: **17/17**.
+- TypeScript e suíte completa de testes: **sucesso**.
+- `expo prebuild --clean --platform android --non-interactive`: **sucesso**.
+- Android Release standalone APK: **compilado, verificado e publicado**.
+
+### Artefato Android
+Artifact: `meriva-smart-diagnostic-standalone-apk`.
+- Artifact ID: `11545587294`.
+- Estado: **não expirado**.
+- Tamanho: 27.373.870 bytes (aprox. 27,4 MB).
+- SHA-256: `78331142e41756b9862116967d694553923cc5449dae3738e40f79716d8cee52`.
+- Expiração registrada: **2026-10-22 11:08:56 UTC**.
+
+### Observação sobre o commit documental
+O commit posterior `5ee79fa3d8648201671914399773f8b6deeeadbe` apenas consolida este resultado na documentação e não possui nova execução de CI associada. Portanto, a evidência de validação efetiva continua sendo a **CI #1063**.
+
+### Estado atual
+**AUDITORIA DE CÓDIGO: CONCLUÍDA E VALIDADA.**
+
+A próxima etapa de validação que permanece fora do alcance da CI é o teste físico na Meriva com o ELM327, especialmente conexão Bluetooth, resposta real `010C → 41 0C`, leitura de PIDs anunciados pela ECU e persistência dos dados validados.
