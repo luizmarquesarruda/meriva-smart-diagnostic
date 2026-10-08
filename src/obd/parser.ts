@@ -149,13 +149,17 @@ export function parsePidResponse(pidRequested: string, rawResponse: string): Par
   };
 }
 
-export function parseDtcResponse(rawResponse: string): string[] {
+export function parseDtcResponseForService(
+  service: '03' | '07' | '0A',
+  rawResponse: string,
+): string[] {
   const stream = normalizeHexStream(rawResponse);
-  const headerIndex = stream.indexOf('43');
+  const serviceNumber = Number.parseInt(service, 16);
+  const positiveHeader = (0x40 + serviceNumber).toString(16).padStart(2, '0').toUpperCase();
+  const headerIndex = stream.indexOf(positiveHeader);
   if (headerIndex < 0) return [];
 
-  const rawData = stream.slice(headerIndex + 2);
-  // Em respostas com cabeçalho/CRC o final pode ter 1 byte extra.
+  const rawData = stream.slice(headerIndex + positiveHeader.length);
   // DTCs são sempre pares de bytes, então descartamos a sobra incompleta.
   const usableLength = rawData.length - (rawData.length % 4);
   const data = rawData.slice(0, usableLength);
@@ -177,4 +181,8 @@ export function parseDtcResponse(rawResponse: string): string[] {
   }
 
   return codes;
+}
+
+export function parseDtcResponse(rawResponse: string): string[] {
+  return parseDtcResponseForService('03', rawResponse);
 }
