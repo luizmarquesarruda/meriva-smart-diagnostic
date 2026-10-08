@@ -1,23 +1,7 @@
 'use strict';
 
 const assert = require('assert');
-const fs = require('fs');
-const path = require('path');
-const Module = require('module');
-const ts = require('typescript');
-
-function loadTs(file) {
-  const sourcePath = path.join(__dirname, '..', file);
-  const output = ts.transpileModule(fs.readFileSync(sourcePath, 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2019 },
-  }).outputText;
-  const mod = new Module(sourcePath, null);
-  mod.filename = sourcePath;
-  mod.paths = Module._nodeModulePaths(path.dirname(sourcePath));
-  mod._compile(output, sourcePath);
-  return mod.exports;
-}
-
+const { loadTs } = require('./helpers/loadTs');
 const telemetry = loadTs('src/obd/liveTelemetry.ts');
 telemetry.resetLiveTelemetry();
 
