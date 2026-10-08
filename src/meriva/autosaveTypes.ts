@@ -4,7 +4,7 @@ export const AUTOSAVE_SCHEMA_VERSION = 1;
 export const AUTOSAVE_DATA_TYPE = 'APP_STATE';
 export const AUTOSAVE_SOURCE = 'autosaveManager';
 
-export type SaveReason = 'debounce' | 'checkpoint' | 'critical' | 'background' | 'manual';
+export type SaveReason = 'debounce' | 'checkpoint' | 'critical' | 'background' | 'manual' | 'session_start' | 'session_end';
 
 export interface AutoSaveEnvelope<T> {
   schemaVersion: number;
@@ -18,4 +18,5 @@ export interface AutoSaveStatus {
   lastSavedAt: string | null;
   lastSaveReason: SaveReason | null;
   lastError: string | null;
+  obdSessionActive: boolean;
 }
