@@ -60,6 +60,18 @@ export function applyFormula(formulaId: string, data: number[]): number {
     case 'u8_div':
       requireBytes(data, 1);
       return data[0] / (spec.divisor ?? 1);
+    case 'u8_scale_div':
+      requireBytes(data, 1);
+      return (data[0] * (spec.scale ?? 1)) / (spec.divisor ?? 1);
+    case 'u16_scale':
+      requireBytes(data, 2);
+      return (data[0] * 256 + data[1]) * (spec.scale ?? 1);
+    case 'u16_scale_div':
+      requireBytes(data, 2);
+      return ((data[0] * 256 + data[1]) * (spec.scale ?? 1)) / (spec.divisor ?? 1);
+    case 'u16_offset_scale':
+      requireBytes(data, 2);
+      return ((data[0] * 256 + data[1]) + (spec.offset ?? 0)) * (spec.scale ?? 1);
     default:
       throw new Error(`Operação de fórmula desconhecida: ${spec.operation}`);
   }
