@@ -9,7 +9,7 @@ import { logRawObdData, logInterpretedData } from '../database/obdLogger';
 import { PidConfirmationEntry, readPidConfirmations, recordPidConfirmation } from '../database/pidBank';
 import { updateLearningProfileRealSample } from '../database/learningProfile';
 import type { VehicleCondition } from '../types/sourceTypes';
-import { pushLastReading, updateAutoSaveState, scheduleCriticalSave } from './autosaveManager';
+import { pushLastReading, updateAutoSaveState, scheduleCriticalSave, scheduleTelemetrySave } from './autosaveManager';
 import { shouldFeedLearning } from './autosaveValidation';
 import { recordLivePidQuery } from '../obd/liveTelemetry';
 
@@ -27,7 +27,8 @@ export function recordAutomaticObdQuery(
     status: result.parsed.status,
     timestamp: new Date().toISOString(),
     source,
-  });
+  }, { schedulePersist: false });
+  scheduleTelemetrySave();
 }
 
 export async function registerObdQuery(
