@@ -481,3 +481,56 @@ Foi coberta a documentação oficial e as referências técnicas relevantes para
 
 ### Estado
 A falha da CI foi diagnosticada antes de qualquer nova alteração. A próxima sequência é: correção sintática → novas funções diagnósticas → testes/regressões → auditoria → CI.
+
+## 2026-10-07 — Incorporação de funções de referência OBD + auditoria pré-CI
+
+### Correção da CI
+A falha das CI #901/#902 foi corrigida em `app/index.tsx`: faltava o fechamento do componente principal `IndexScreen` antes das funções auxiliares. A causa era sintática e impedia o TypeScript; o Android-build era corretamente bloqueado pelo `needs: validate`.
+
+### Funções absorvidas da pesquisa
+Com base em OBDvis, obd2-dashboard, Free_OBD e referências dos serviços OBD-II, foram incorporadas funções compatíveis com a arquitetura atual:
+- **Telemetria móvel por PID**: janela de até 120 amostras por PID, estatística atual/mínima/máxima/média, delta e mini-gráfico textual.
+- **Contexto operacional**: classificação determinística em `IDLE_COLD`, `IDLE_WARM`, `ACCELERATION`, `DECELERATION`, `CRUISE` ou `UNKNOWN`.
+- **Proteção contra dados envelhecidos**: contexto operacional só usa leituras recentes; dados com mais de 10 s ficam fora da classificação.
+- **DTC multiestado**: varredura separada dos serviços `03`, `07` e `0A` para armazenados, pendentes e permanentes.
+- **Sem falso negativo por indisponibilidade**: serviço OBD sem resposta utilizável aparece como `N/D`, não como “nenhuma falha”.
+- **Persistência semântica de DTC**: códigos armazenados que deixam de aparecer em uma leitura válida do serviço 03 podem passar para `INACTIVE`; o histórico continua preservado.
+- **Saúde do ELM327**: a tela Bluetooth passou a exibir comandos bem-sucedidos, média de resposta, timeouts, erros, ausência de dados e indicação de recuperação.
+
+### Arquitetura preservada
+- Nada de BLE foi introduzido no lugar do Bluetooth Classic já usado pelo aplicativo.
+- Nenhum comando destrutivo foi disparado automaticamente.
+- Não foi adicionada dependência externa para gráficos.
+- Telemetria da janela móvel aceita somente leituras `REAL`; simulação é explicitamente ignorada.
+- O aprendizado existente continua separado da janela de telemetria e das amostras de simulação.
+
+### Arquivos principais adicionados/alterados
+- `src/obd/liveTelemetry.ts`
+- `src/obd/dtcScanner.ts`
+- `src/obd/parser.ts`
+- `src/types/sourceTypes.ts`
+- `src/database/dtcManager.ts`
+- `src/meriva/autosaveIntegration.ts`
+- `src/trip/autoTripService.ts`
+- `app/index.tsx`
+- `app/laboratorio.tsx`
+- `app/dados.tsx`
+- `app/saude.tsx`
+- `app/bluetooth.tsx`
+- `tests/liveTelemetry.test.js`
+- `tests/dtcScanner.test.js`
+- `tests/cockpitNavigation.test.js`
+- `package.json`
+
+### Auditoria realizada
+- Os **14 arquivos JSON** presentes no repositório foram analisados por parsing estrutural; nenhum apresentou JSON inválido.
+- `package-lock.json` mantém `lockfileVersion: 3`, projeto/versão corretos e 1.205 entradas de pacotes. As dependências e devDependencies do root correspondem aos ranges do `package.json`; a diferença de comparação textual foi somente ordem das chaves JSON.
+- O lockfile não foi alterado porque esta etapa não adicionou nem removeu dependências.
+- A regressão estática de cockpit foi ampliada para cobrir tendências, DTC 03/07/0A e saúde do ELM.
+- Foi adicionada cobertura unitária para janela móvel, isolamento de simulação, contexto, dados envelhecidos e parsing/indisponibilidade dos serviços DTC.
+
+### Documentação de referência utilizada
+A etapa revisou a documentação oficial relevante de Android Bluetooth, Expo Permissions/Location, npm `ci` e GitHub Actions, além de referências de serviços OBD-II e projetos open-source do mesmo domínio. A pesquisa não significa “toda a documentação existente na internet”; o escopo foi a documentação técnica diretamente aplicável ao aplicativo e às funções implementadas.
+
+### Estado antes da nova CI
+As correções e auditorias de código estão registradas. A nova CI deve ser o árbitro final de TypeScript, suíte completa e Android Release. Não considerar a etapa concluída até os dois jobs obrigatórios terminarem verdes.
