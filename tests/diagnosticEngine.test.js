@@ -94,6 +94,27 @@ function main() {
   assert.strictEqual(result.hypotheses.length, 0, 'baseline CarScanner não pode virar diagnóstico de ECU atual');
 
 
+
+  result = engine.runLocalDiagnostic({
+    ...base,
+    dtcs: [{ code: 'P0420', status: 'HISTORICAL', firstSeen: '', lastSeen: '', occurrences: 1, source: 'REAL_OBD', historical: true, confirmed: false }],
+  });
+  assert.strictEqual(result.hypotheses.length, 0, 'DTC histórico não pode gerar falha atual');
+  assert.strictEqual(result.blockedNonLiveDtcs, 1);
+
+  result = engine.runLocalDiagnostic({
+    ...base,
+    dtcs: [{ code: 'P0135', status: 'CONFIRMED', firstSeen: '', lastSeen: '', occurrences: 1, source: 'REAL_OBD', historical: false, confirmed: true }],
+  });
+  assert.strictEqual(result.hypotheses[0].id, 'FALHA_CIRCUITO_AQUECEDOR_O2_B1S1');
+
+  result = engine.runLocalDiagnostic({
+    ...base,
+    condition: 'ACCELERATION',
+    observations: [obs('0106', 20), obs('0107', 0)],
+  });
+  assert.strictEqual(result.hypotheses.length, 0, 'fuel trim isolado em aceleração não deve ser classificado pela regra de marcha lenta/cruzeiro');
+
   result = engine.runLocalDiagnostic({ ...base, observations: [obs('010B', 80, 'simulacao'), obs('0106', 20, 'REAL_OBD'), obs('0107', 0, 'REAL_OBD')] });
   assert.strictEqual(result.hypotheses.length, 1);
   assert.strictEqual(result.hypotheses[0].id, 'MISTURA_POBRE');
