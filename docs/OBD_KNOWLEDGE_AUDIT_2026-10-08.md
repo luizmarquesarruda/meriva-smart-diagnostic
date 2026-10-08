@@ -97,3 +97,14 @@ Essa informação não foi transformada em regra genérica de falha de RPM porqu
 - SAE J1979-DA — Digital Annex: https://saemobilus.sae.org/standards/j1979da_202510-j1979-da-digital-annex-e-e-diagnostic-test-modes
 - SAE J2012 — Diagnostic Trouble Code Definitions: https://saemobilus.sae.org/standards/j2012_202509-diagnostic-trouble-code-definitions
 - SAE J2012 Digital Annex: https://saemobilus.sae.org/standards/j2012da_202403-digital-annex-diagnostic-trouble-code-definitions-failure-type-byte-definitions
+
+## 2026-10-08 — Extensão para Mode 02 e Mode 09
+
+### Mode 09 / PID 02
+O aplicativo passa a oferecer leitura opcional do VIN diretamente da ECU por `0902`. A resposta multiline é remontada por índice de frame e o VIN só é aceito quando um identificador ASCII válido de 17 caracteres é encontrado. O datasheet do ELM327 documenta esse fluxo e ressalta que veículos antigos podem não suportar o recurso. citeturn462541search14
+
+### Mode 02 / Freeze Frame
+Foi adicionada uma camada opcional para consultar `02xx` usando os mesmos PIDs já catalogados, exigindo resposta positiva `42 xx`. Os snapshots são persistidos em arquivo privado separado do autosave principal e podem ser associados, na interface, a um DTC ativo selecionado. O padrão SAE J1979 define Mode 02 como solicitação de dados de Freeze Frame e Mode 09 como solicitação de informações do veículo. citeturn418806search0turn418806search8
+
+### Limitações
+A ausência de suporte da ECU para Mode 02/09 é um resultado válido e não é convertida em erro do veículo. Mode 04, Mode 06 e operações de controle permanecem fora desta implementação para evitar ações destrutivas ou interpretações não confirmadas na Meriva.
