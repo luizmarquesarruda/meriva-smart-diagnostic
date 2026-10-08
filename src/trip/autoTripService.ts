@@ -260,7 +260,9 @@ class AutoTripService {
 
         // Caminho crítico: RPM e velocidade são consultados antes de qualquer
         // PID secundário, para que combustível/temperatura não atrasem o cockpit.
-        if (connection.supportedPids.includes('010C')) {
+        // 010C já foi validado no gate de conexão; ele continua sendo a
+        // sonda mínima de saúde mesmo quando a descoberta de PIDs ficou vazia.
+        if (connection.ecuValidated) {
           const rpmStartedAt = Date.now();
           const rpmResult = await connection.session.queryPid('010C');
           console.info('[obd-poll]', JSON.stringify({ pid: '010C', responseTimeMs: Date.now() - rpmStartedAt, cycle: 'FAST' }));
