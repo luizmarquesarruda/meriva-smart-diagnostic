@@ -7,7 +7,7 @@ import { updateAutoSaveState, initAutoSave } from '../meriva/autosaveManager';
 import { RealTripRecorder } from './tripRecorder';
 import { INITIAL_DRIVE_CYCLES } from '../data/driveCycles';
 import { estimateRangeFromFuelLevel, fuelLevelPercentToLiters, isFuelReserve } from './fuelLevel';
-import { recordLivePidQuery, resetLiveTelemetry } from '../obd/liveTelemetry';
+import { resetLiveTelemetry } from '../obd/liveTelemetry';
 
 export interface AutoTripServiceState {
   connected: boolean;
@@ -185,7 +185,6 @@ class AutoTripService {
 
         if (this.state.fuelLevelSupported) {
           const fuelLevelResult = await connection.session.queryPid('012F');
-          recordLivePidQuery(fuelLevelResult);
           await registerObdQuery(this.basePath, fuelLevelResult, 'REAL');
           if (
             fuelLevelResult.parsed.status === 'RESPONDEU' &&
@@ -201,7 +200,6 @@ class AutoTripService {
 
         if (this.state.fuelSupported) {
           const fuelResult = await connection.session.queryPid('015E');
-          recordLivePidQuery(fuelResult);
           await registerObdQuery(this.basePath, fuelResult, 'REAL');
           if (
             fuelResult.parsed.status === 'RESPONDEU' &&
@@ -216,7 +214,6 @@ class AutoTripService {
 
         if (obdSpeedSupported) {
           const speedResult = await connection.session.queryPid('010D');
-          recordLivePidQuery(speedResult);
           await registerObdQuery(this.basePath, speedResult, 'REAL');
           if (
             speedResult.parsed.status === 'RESPONDEU' &&
@@ -245,7 +242,6 @@ class AutoTripService {
         this.telemetryCursor += 1;
         if (telemetryPid === '010C' || connection.supportedPids.includes(telemetryPid)) {
           const telemetryResult = await connection.session.queryPid(telemetryPid);
-          recordLivePidQuery(telemetryResult);
           await registerObdQuery(this.basePath, telemetryResult, 'REAL');
         }
 
