@@ -10,6 +10,7 @@ import { getAutoSaveState, getAutoSaveStatus, initAutoSave } from '../src/meriva
 import { exportAutoSaveTxt } from '../src/meriva/exportAutoSaveTxt';
 import { exportBluetoothDiagnosticTxt } from '../src/obd/exportBluetoothDiagnosticTxt';
 import { AppSettings, readAppSettings, writeAppSettings } from '../src/database/appSettings';
+import { openBluetoothSettings } from '../src/obd/bluetoothManager';
 import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
 import { getMidLayout } from '../src/ui/midLayout';
 
@@ -165,6 +166,10 @@ export default function ConfiguracaoScreen() {
           <SettingSwitch label="Conectar ao ELM327 automaticamente" value={settings.autoConnectObd} onChange={(v) => void updateSetting('autoConnectObd', v)} />
           <SettingSwitch label="Inicialização forçada do ELM (ATZ + ATE0)" value={settings.elmForceInitialization} onChange={(v) => void updateSetting('elmForceInitialization', v)} />
           <SettingSwitch label="Alertas de diagnóstico" value={settings.diagnosticAlerts} onChange={(v) => void updateSetting('diagnosticAlerts', v)} />
+
+          <TouchableOpacity style={styles.button} onPress={() => void openBluetoothSettings()}>
+            <Text style={styles.buttonText}>ABRIR CONFIGURAÇÕES DO BLUETOOTH</Text>
+          </TouchableOpacity>
 
           <Text style={styles.section}>COMPATIBILIDADE ELM327</Text>
           <View style={styles.card}>
