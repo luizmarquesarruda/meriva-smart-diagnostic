@@ -753,3 +753,40 @@ As alterações foram gravadas no `main`. Foi feita somente verificação estrut
 
 ### Próximo passo
 Executar a CI completa somente na próxima etapa. Se houver falha, registrar primeiro a causa e depois corrigir.
+
+## 2026-10-08 — Adaptação completa das telas à rotação do celular
+
+### Objetivo
+Garantir que todas as telas do MERIVA SMART acompanhem a mudança entre portrait e landscape, recalculando dimensões e reorganizando blocos sem travar a orientação nem criar overflow horizontal.
+
+### Correções implementadas
+- app/index.tsx passou a consumir useMidLayout() diretamente, eliminando leitura duplicada de useWindowDimensions().
+- app/mais.tsx ganhou grade de módulos em duas colunas no landscape.
+- app/bluetooth.tsx reorganiza os quatro blocos de conexão em uma grade responsiva no landscape.
+- app/saude.tsx organiza conexão e contexto em colunas quando há largura suficiente.
+- app/veiculo.tsx coloca perfil do veículo e detalhes da ECU lado a lado no landscape.
+- app/armazenamento.tsx coloca uso de espaço e viagens salvas lado a lado no landscape.
+- app/configuracoes.tsx passou a permitir quebra dos grupos de opções, evitando compressão dos botões em telas estreitas.
+- app/dados.tsx protege a área de tendências contra compressão indevida.
+- app/viagens.tsx protege nomes longos e separa o valor da distância sem sobreposição.
+- app/aprendizado.tsx estabiliza as linhas de métricas e valores em larguras menores.
+- app/laboratorio.tsx torna a barra de conexão quebrável e corrige erro sintático existente em dtcKind.
+- Mantido expo.orientation = default e SafeAreaProvider/react-native-safe-area-context; não foi introduzido lock nativo de orientação.
+
+### Regressão
+tests/orientationLayout.test.js foi endurecido para exigir, em todas as 10 telas:
+- useMidLayout();
+- aplicação do padding responsivo;
+- maxContentWidth;
+- Safe Area moderna com edges explícitas;
+- ausência de SafeAreaView legado;
+- ausência de lock de orientação.
+
+### Validação
+As alterações foram gravadas no main. As execuções automáticas de CI disparadas pelos pushes intermediários foram canceladas quando substituídas por commits seguintes; a execução final deve ser considerada a referência para typecheck, suíte e Android build.
+
+### Estado
+A configuração de rotação livre e o layout responsivo estão implementados no código. A validação física continua necessária em Android real, alternando portrait/landscape nas telas principais e secundárias e verificando ausência de clipping, overflow e controles inacessíveis.
+
+### Próximo passo
+Concluir a CI do commit final e, em seguida, validar o APK em um dispositivo Android físico nas duas orientações.
