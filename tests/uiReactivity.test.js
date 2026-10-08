@@ -12,6 +12,9 @@ assert(hook.includes('typesRef'), 'filtro de eventos não deve forçar resubscri
 assert(dados.includes('gpsTracker.subscribe(setGpsState)'), 'Dados deve continuar reativo ao GPS');
 assert(dados.includes('trip.instantaneousConsumptionKml'), 'Dados deve exibir consumo instantâneo');
 assert(laboratorio.includes('isPidDiscoveryCacheUsable'), 'Laboratório deve respeitar o cache contextual');
-assert(laboratorio.includes('adapterAddress: device.address.toUpperCase()'), 'Laboratório deve persistir identidade do adaptador');
+assert(
+  /adapterAddress:\s*[^,\n]*device\.address\??\.toUpperCase\(\)/.test(laboratorio),
+  'Laboratório deve persistir a identidade do adaptador normalizada em maiúsculas',
+);
 
 console.log('uiReactivity.test.js: PASS');
