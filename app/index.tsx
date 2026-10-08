@@ -86,7 +86,6 @@ export default function IndexScreen() {
 
       setSettings(nextSettings);
       setCycles(loaded);
-      const live = getSharedObdConnection();
       setConnectionStatus(getSharedObdStatus());
       setObd({ ...restored.obd, connected: getSharedObdStatus().ecuConnected });
       setSaveStatus(getAutoSaveStatus());
