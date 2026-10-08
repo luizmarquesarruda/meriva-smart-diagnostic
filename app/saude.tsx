@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,7 +15,19 @@ export default function SaudeScreen() {
   useEffect(()=>{const t=setInterval(()=>setState(getAutoSaveState()),5000);return()=>clearInterval(t)},[]);
   const context = getVehicleConditionSnapshot();
   const activeDtcs = state.dtcs.filter((item) => item.source === 'REAL_OBD' && ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(item.status));
-  const diagnostic: DiagnosticResult = useMemo(()=>runLocalDiagnostic({observations:state.lastReadings.map(r=>({pid:r.pid,name:r.name,value:r.value,unit:r.unit,source:r.source==='REAL'?'REAL_OBD':'SIMULACAO',timestamp:r.timestamp,confidence:r.source==='SIMULACAO'?'LOW':'GOOD',status:r.status} as PidObservation)),dtcs:state.dtcs,condition:context.condition}),[state,context.condition]);
+  const [diagnostic, setDiagnostic] = useState<DiagnosticResult>(() => runLocalDiagnostic({observations:state.lastReadings.map(r=>({pid:r.pid,name:r.name,value:r.value,unit:r.unit,source:r.source==='REAL'?'REAL_OBD':'SIMULACAO',timestamp:r.timestamp,confidence:r.source==='SIMULACAO'?'LOW':'GOOD',status:r.status} as PidObservation)),dtcs:state.dtcs,condition:context.condition}));
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const current = getAutoSaveState();
+      const vehicle = getVehicleConditionSnapshot();
+      setDiagnostic(runLocalDiagnostic({
+        observations: current.lastReadings.map(r=>({pid:r.pid,name:r.name,value:r.value,unit:r.unit,source:r.source==='REAL'?'REAL_OBD':'SIMULACAO',timestamp:r.timestamp,confidence:r.source==='SIMULACAO'?'LOW':'GOOD',status:r.status} as PidObservation)),
+        dtcs: current.dtcs,
+        condition: vehicle.condition,
+      }));
+    }, 5000);
+    return () => clearInterval(timer);
+  }, []);
   const hasLiveEvidence = state.obd.connected && Boolean(state.obd.ecuValidatedAt) && diagnostic.acceptedLiveSamples > 0;
   const normal = hasLiveEvidence && diagnostic.hypotheses.length === 0 && activeDtcs.length === 0;
   const healthTitle = normal ? '● SEM ANOMALIA INDICADA' : activeDtcs.length || diagnostic.hypotheses.length ? '● ATENÇÃO NECESSÁRIA' : '● EVIDÊNCIA INSUFICIENTE';
