@@ -177,7 +177,9 @@ const BASE = '/doc/MERIVA_SMART';
 const CONFIG_DIR = `${BASE}/CONFIG`;
 
 function manager() {
-  return loadTs(path.join(ROOT, 'src/meriva/autosaveManager.ts'));
+  const m = loadTs(path.join(ROOT, 'src/meriva/autosaveManager.ts'));
+  m.setAutoSavePersistenceEnabledForTests(true);
+  return m;
 }
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -187,6 +189,23 @@ const TESTS = [];
 function test(name, fn) {
   TESTS.push({ name, fn });
 }
+
+test('0. autosave desativado por padrao', async () => {
+  const m = loadTs(path.join(ROOT, 'src/meriva/autosaveManager.ts'));
+  m.disposeAutoSave();
+  m.setAutoSavePersistenceEnabledForTests(null);
+  resetFS();
+  files.set(`${CONFIG_DIR}/autosave.json`, JSON.stringify({ schemaVersion: 1, savedAt: new Date().toISOString(), dataType: 'APP_STATE', source: 'legacy', payload: { vehicle: { vin: 'PRIVATE' }, obd: { connected: true }, lastReadings: [], dtcs: [], driveCycles: [], learning: null, pidDiscovery: null, autonomy: { tankCapacityL: 56, cumulativeDistanceKm: 0, cumulativeFuelUsedL: 0, averageConsumptionKml: 0, estimatedRangeKm: 0, fuelLevelPercent: null, fuelRemainingL: null, fuelReserve: null, realReadingCount: 0, lastReadingAt: null, readings: [] }, settings: { legacy: 'must-not-load' }, metadata: { savedAt: '', appVersion: '1.0.1' } } }));
+  const state = await m.initAutoSave(BASE);
+  assert.strictEqual(state.vehicle, null);
+  assert.strictEqual(state.obd.connected, false);
+  assert.strictEqual(state.settings.legacy, undefined);
+  m.updateAutoSaveState((s) => { s.settings.runtimeOnly = 'ok'; });
+  await m.saveNow('critical');
+  assert.strictEqual(m.getAutoSaveStatus().lastSavedAt, null);
+  assert.strictEqual(m.getAutoSaveStatus().obdSessionActive, false);
+  assert.strictEqual(JSON.parse(files.get(`${CONFIG_DIR}/autosave.json`)).payload.settings.legacy, 'must-not-load');
+});
 
 test('1. estado vazio -> salvar -> restaurar', async () => {
   const m = manager();
