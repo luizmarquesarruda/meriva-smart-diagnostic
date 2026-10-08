@@ -37,6 +37,10 @@
       "symbol": "L/h",
       "name": "litros por hora"
     },
+    "code": {
+      "symbol": "código",
+      "name": "código enumerado"
+    },
     "degrees": {
       "symbol": "°",
       "name": "graus"
