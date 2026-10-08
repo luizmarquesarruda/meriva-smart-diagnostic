@@ -9,6 +9,7 @@ import RNBluetoothClassic from 'react-native-bluetooth-classic';
 import * as FileSystem from 'expo-file-system';
 import { readAppSettings, writeAppSettings } from '../database/appSettings';
 import { startBackgroundMonitoring, stopBackgroundMonitoring } from '../gps/backgroundMonitoring';
+import { readVehicleIdentity } from './vehicleIdentity';
 
 export interface SharedObdConnection {
   session: Elm327Session;
@@ -358,9 +359,32 @@ async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm3
     }
 
     ecuResponseState = 'RESPONDING';
-  consecutiveEcuFailures = 0;
-  lastEcuResponseAt = new Date().toISOString();
-  lastEcuError = null;
+    consecutiveEcuFailures = 0;
+    lastEcuResponseAt = new Date().toISOString();
+    lastEcuError = null;
+
+    try {
+      const identity = await readVehicleIdentity(connection.session);
+      if (identity.vin || identity.ecuId || identity.ecuName) {
+        updateAutoSaveState((state) => {
+          if (state.vehicle) {
+            state.vehicle = {
+              ...state.vehicle,
+              ...(identity.vin ? { vin: identity.vin } : {}),
+              ...(identity.ecuId ? { ecuAddress: identity.ecuId } : {}),
+              lastModified: new Date().toISOString(),
+            };
+          }
+          state.obd = {
+            ...state.obd,
+            ecuAddress: identity.ecuId ?? state.obd.ecuAddress,
+            ecuValidationSource: 'OBD_RESPONSE',
+          };
+        });
+      }
+    } catch {
+      // Identificação é opcional e não invalida uma ECU já validada.
+    }
 
     active = {
       session: connection.session,
