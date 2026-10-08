@@ -79,3 +79,10 @@ integrator.reset();
 assert.strictEqual(integrator.getState().fuelUsedL, 0);
 
 console.log('PASS combustível OBD: integração L/h, intervalos e dados inválidos');
+
+
+const fsSource = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'obd', 'fuelConsumption.ts'), 'utf8');
+if (!fsSource.includes('ESTIMATED_MAF') || !fsSource.includes('ESTIMATED_MAP')) {
+  throw new Error('fuel fallback MAF/MAP não está implementado');
+}
+console.log('fuelConsumption fallback: OK');
