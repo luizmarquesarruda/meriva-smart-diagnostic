@@ -132,7 +132,7 @@
       "pid": "0151",
       "name": "Fuel Type",
       "bytes": 1,
-      "unit": "U8",
+      "unit": "code",
       "formulaId": "U8",
       "classification": "PADRAO_OBD",
       "description": "Código de tipo de combustível"
