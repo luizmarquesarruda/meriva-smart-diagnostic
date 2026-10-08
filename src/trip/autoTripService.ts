@@ -273,8 +273,8 @@ class AutoTripService {
               && Number.isFinite(rpmResult.parsed.value),
             rpmResult.rx || rpmResult.commandStatus || 'ECU SEM RESPOSTA',
           );
-          if (ecuState === 'RECOVERING') {
-            await recoverEcuIfNeeded();
+          if (ecuState !== 'RESPONDING') {
+            if (ecuState === 'RECOVERING') await recoverEcuIfNeeded();
             continue;
           }
 
