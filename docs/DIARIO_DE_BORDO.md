@@ -1111,3 +1111,7 @@ A correção preserva `APP_PRIVATE` para armazenamento e não adiciona permissõ
 
 ### Próximo passo
 Criar nova execução verificável da CI sobre o estado corrigido. Exigir `npm ci`, Expo Doctor, typecheck/testes e Android Release antes do merge.
+
+
+### 2026-10-08 — Segunda execução da CI da auditoria
+A branch `audit-deep-ci-2026-10-08-r2` foi criada a partir do `main` já corrigido após a falha #1038. Esta execução existe para validar a correção da camada de permissões e todo o estado acumulado da auditoria profunda.
