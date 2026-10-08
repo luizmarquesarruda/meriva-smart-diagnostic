@@ -377,7 +377,9 @@ async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm3
           }
           state.obd = {
             ...state.obd,
-            ecuAddress: identity.ecuId ?? state.obd.ecuAddress,
+            ecuAddress: state.obd.ecuAddress,
+            ecuIdentification: identity.ecuId ?? state.obd.ecuIdentification,
+            ecuName: identity.ecuName ?? state.obd.ecuName,
             ecuValidationSource: 'OBD_RESPONSE',
           };
         });
