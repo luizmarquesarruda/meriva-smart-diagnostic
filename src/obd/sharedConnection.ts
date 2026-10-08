@@ -93,10 +93,12 @@ export async function reportEcuPollResult(valid: boolean, error?: string): Promi
 
     // A recuperação pode ter encerrado a sessão de autosave. Uma resposta
     // positiva reabre somente a sessão da ECU, nunca uma sessão sem evidência.
-    updateAutoSaveState((state) => {
-      state.obd = { ...state.obd, connected: true };
-    });
-    await startObdAutosaveSession();
+    if (!getAutoSaveState().obd.connected) {
+      updateAutoSaveState((state) => {
+        state.obd = { ...state.obd, connected: true };
+      });
+      await startObdAutosaveSession();
+    }
     return ecuResponseState;
   }
 
