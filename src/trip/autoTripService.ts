@@ -265,6 +265,19 @@ class AutoTripService {
           const rpmResult = await connection.session.queryPid('010C');
           console.info('[obd-poll]', JSON.stringify({ pid: '010C', responseTimeMs: Date.now() - rpmStartedAt, cycle: 'FAST' }));
           await registerObdQuery(this.basePath, rpmResult, 'REAL');
+
+          const ecuState = await reportEcuPollResult(
+            rpmResult.commandStatus === 'OK'
+              && rpmResult.parsed.status === 'RESPONDEU'
+              && rpmResult.parsed.value != null
+              && Number.isFinite(rpmResult.parsed.value),
+            rpmResult.rx || rpmResult.commandStatus || 'ECU SEM RESPOSTA',
+          );
+          if (ecuState === 'RECOVERING') {
+            await recoverEcuIfNeeded();
+            continue;
+          }
+
           if (rpmResult.parsed.status === 'RESPONDEU' && rpmResult.parsed.value != null && Number.isFinite(rpmResult.parsed.value)) {
             rpm = rpmResult.parsed.value;
             this.latestPidValues.set('010C', rpmResult.parsed.value);
