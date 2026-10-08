@@ -1066,3 +1066,15 @@ Sem a correção, a CI pode falhar no typecheck antes de validar os testes/Andro
 
 ### Estado
 Plano registrado antes da correção. CI ainda não executada nesta etapa.
+
+
+### Correção executada após o plano
+- `f628ed748aacba4ba633f84fc2d2a85c3843f992` — registro pré-correção no Diário de Bordo.
+- `a2348d22c7cffd40e3118257fd64fc96c793be04` — corrigido o retry do `createRealElmSession`: cálculo único de `effectiveMaxAttempts`, remoção do shadowing/identificador inexistente e propagação explícita do limite configurado.
+- `825d6d66d0ff67e91e1915296ef55cbc45785c88` — regressão que protege o limite configurável de retry e impede o retorno do shadowing.
+
+### Validação antes da CI
+A correção foi inspecionada diretamente no código e a suíte de regressão foi ampliada. A CI completa foi autorizada pelo usuário nesta rodada e será usada como validação final de TypeScript, testes, Expo Doctor e Android Release.
+
+### Estado
+Aguardando resultado da CI. Se houver falha, a causa será registrada e corrigida antes de considerar a auditoria concluída.
