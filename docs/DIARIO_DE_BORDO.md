@@ -1505,3 +1505,40 @@ A arquitetura de Bluetooth foi confrontada com Android Developers e `react-nativ
 - Commit: `85b3fcc6f4ee2af1eb38971c68acda95f061ddb5`.
 
 CI continua não executada nesta rodada.
+## 2026-10-08 — Implementação das melhorias de robustez OBD e integração reativa
+
+### Escopo
+Implementação do backlog de melhorias definido após comparação com documentação Android/ELM327/Expo e projetos open source. CI não executada nesta etapa.
+
+### Alterações de produção
+- scheduler FAST/MEDIUM/SLOW por PID;
+- agrupamento de até 6 PIDs somente em protocolo CAN, com fallback individual;
+- tratamento explícito de RESPONSE_PENDING;
+- cache de descoberta com identidade e TTL de 24 h;
+- separação entre última leitura válida e última tentativa inválida;
+- timeline DTC de ±30 s usando telemetria em memória;
+- barramento de eventos para reduzir polling de estado nas telas;
+- fingerprint do módulo Bluetooth Classic no trace/relatório;
+- política Android de permissões legadas limitada a API 30 e neverForLocation no scan;
+- testes de regressão adicionados ao pacote.
+
+### Commits principais
+- d2c932bc7ddb5c5c4c8dec140c19e91ae4a27b8e — RESPONSE_PENDING e configuração;
+- bb6157a694c58a6a11043fef71dac5018b37496b — pending retry e multi-PID;
+- 0b0fce1237fa05cbce6b9d58ea4d64b359e17c7c — leituras válidas/tentativas e cache;
+- 6c2c8815f32b77b3e9b8cf8de42e13e98a21ef28 — scheduler na viagem automática;
+- 5f2d796e8d039517748c323d5fce7a793ad01f58 — cache contextual;
+- 1ff38378d9059e3359309b06e54a490a374724fe — janela de telemetria/eventos;
+- e46a61438a8a82023208cd70668ba24e3d601683 — timeline DTC na Saúde;
+- b2900a463d8b6b170bfb1b51e583f6f29db49532 — consumo instantâneo/tentativas;
+- f2ad06eb9e7ba2308de827ab419e1e49d507219f — fingerprint Bluetooth;
+- 497b6302866f4d250c8d31f115d4537be751b320 — fingerprint no relatório;
+- 467ce251565d4cd6f1e88943ea8364f81fa131aa — plugin de permissões Android;
+- a1e95844475ba9dc16c98416e3c409beaf9f8b7d — correção da regressão da tela Saúde;
+- 8e1f3740cee3e232b13ed3221423e73040f61e65 — evento de DTC no caminho de atualização.
+
+### Validação intermediária
+A primeira execução local encontrou uma expectativa incorreta no teste do scheduler: depois de marcar um lote CAN de até 6 PIDs, outros PIDs ainda podem estar devidos. A implementação não foi alterada por isso; o teste será ajustado para validar ausência de repetição.
+
+### Limites
+Foreground service Android para operação contínua em background e Android Auto permanecem fora desta rodada por exigirem camada nativa e validação específica.
