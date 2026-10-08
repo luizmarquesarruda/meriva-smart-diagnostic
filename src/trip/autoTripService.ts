@@ -1,6 +1,6 @@
 import { gpsTracker } from '../gps';
 import type { SharedObdConnection } from '../obd/sharedConnection';
-import { getSharedObdConnection, subscribeSharedObd } from '../obd/sharedConnection';
+import { getSharedObdConnection, getSharedObdStatus, subscribeSharedObd } from '../obd/sharedConnection';
 import { addDriveCycle, readDriveCycles } from '../storage/driveCycleStorage';
 import { forceSaveOnObdEvent, registerObdQuery } from '../meriva/autosaveIntegration';
 import { updateAutoSaveState, initAutoSave } from '../meriva/autosaveManager';
@@ -170,6 +170,12 @@ class AutoTripService {
       generation === this.generation &&
       getSharedObdConnection()?.session === connection.session
     ) {
+      if (!getSharedObdStatus().ecuConnected) {
+        this.setState({ connected: true, active: false, error: 'ADAPTADOR OK / ECU SEM RESPOSTA' });
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        continue;
+      }
+
       if (this.pollingPauseCount > 0) {
         await new Promise((resolve) => setTimeout(resolve, 100));
         continue;
