@@ -1133,3 +1133,10 @@ A falha é do teste, não da implementação de permissões. A asserção mistur
 Ajustar somente a asserção do teste para refletir o limite de responsabilidade da camada, sem adicionar texto artificial ao código de produção apenas para satisfazer o teste.
 
 **Não considerar a auditoria concluída.** Nova CI é obrigatória.
+
+
+### Correção após CI #1045
+- `4ef72f789dbef758919afee76137d7fbb530e25b` — corrigida a regressão do teste de permissões: `APP_PRIVATE` permanece responsabilidade do permission manager e o teste verifica SAF na camada de armazenamento/exportação.
+
+### Próximo passo
+Nova execução de CI obrigatória. O código de produção de permissões não foi alterado nesta correção.
