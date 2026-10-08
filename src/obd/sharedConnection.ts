@@ -262,7 +262,8 @@ async function persistValidatedConnection(
       lastKnownProtocol: connection.protocol ?? state.obd.lastKnownProtocol,
       ecuAddress: state.vehicle?.ecuAddress ?? state.obd.ecuAddress,
       ecuValidatedAt: validatedAt,
-      ecuValidationSource: state.vehicle?.ecuAddress ? 'VEHICLE_PROFILE' : 'OBD_RESPONSE',
+      ecuValidationSource: 'OBD_RESPONSE',
+      ecuValidationChecks: ['010C/41 0C', 'PROTOCOLO ' + (connection.protocol ?? 'N/D'), 'PIDS ' + connection.supportedPids.length, ...(state.vehicle?.vin ? ['VIN'] : [])],
       lastConnectedAt: validatedAt,
     };
   });
