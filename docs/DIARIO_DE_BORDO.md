@@ -1558,3 +1558,9 @@ Essa correção mantém a regra 010C → 41 0C e não altera a semântica de DTC
 ## 2026-10-08 — Correção de enquadramento CAN para RESPONSE_PENDING
 
 A auditoria do parser de erros identificou que `7F xx 78` pode aparecer depois do cabeçalho CAN quando `ATH1` está ativo (por exemplo, `7E8 03 7F 22 78`). O detector será ajustado para reconhecer a sequência em qualquer posição do fluxo hexadecimal, preservando a categoria `RESPONSE_PENDING`.
+
+## 2026-10-08 — Correção final de protocolo negociado
+
+Na revisão do caminho `ATSPx` → `010C` → `ATDP`, foi identificado que um fallback forçado de protocolo podia ser descoberto com sucesso, mas o valor `AUTO` retornado pela sessão ainda prevalecia em `negotiatedProtocol`. Isso impedia o scheduler de reconhecer CAN e usar multi-PID mesmo após uma seleção forçada válida.
+
+A correção deve priorizar o protocolo identificado explicitamente e, quando `ATDP` continuar em `AUTO`, usar o protocolo forçado que comprovadamente produziu a resposta `41 0C`.
