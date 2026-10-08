@@ -9,6 +9,8 @@ import { BluetoothDeviceInfo } from '../src/obd/bluetoothClassicTransport';
 import { createRealElmSession, discoverPairedDevices } from '../src/obd/bluetoothManager';
 import { canPollObd } from '../src/obd/bluetoothState';
 import { discoverSupportedPids, KNOWN_PIDS } from '../src/obd/pidScanner';
+import { getPidDefinition } from '../src/obd/pidDefinition';
+import { getDtcDefinition } from '../src/obd/dtcDefinition';
 import { getSharedObdConnection, getSharedObdStatus, setSharedObdConnection, subscribeSharedObd, disconnectSharedObd } from '../src/obd/sharedConnection';
 import { autoTripService } from '../src/trip/autoTripService';
 import { getMidLayout } from '../src/ui/midLayout';
@@ -484,6 +486,7 @@ export default function LaboratorioScreen() {
 
   const parsed = rx ? parsePidResponse(pid, rx) : null;
   const knownSupported = supportedPids.filter((value) => KNOWN_PIDS.includes(value));
+  const identifiedSupportedPids = supportedPids.map((value) => ({ pid: value, definition: getPidDefinition(value) }));
   const diagnostic: DiagnosticResult = runLocalDiagnostic({
     observations: getAutoSaveState().lastReadings.map((reading): PidObservation => ({
       pid: reading.pid,
@@ -577,6 +580,21 @@ export default function LaboratorioScreen() {
       <TouchableOpacity style={styles.secondaryButton} onPress={discoverPids} disabled={!storageReady || (mode === 'REAL' && !sessionRef.current)}>
         <Text style={styles.secondaryButtonText}>DESCOBRIR PIDs SUPORTADOS</Text>
       </TouchableOpacity>
+      {!!supportedPids.length ? (
+        <View style={styles.pidPanel}>
+          <Text style={styles.dtcTitle}>PIDs ENCONTRADOS NA ECU</Text>
+          {identifiedSupportedPids.map(({ pid: value, definition }) => (
+            <View key={value} style={styles.pidRow}>
+              <Text style={styles.pidCode}>{value}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.pidName}>{definition?.name ?? 'PID sem definição local'}</Text>
+                <Text style={styles.pidDescription}>{definition?.description ?? 'A ECU informou este PID como suportado, mas o catálogo local ainda não possui decodificação deste identificador.'}</Text>
+                <Text style={styles.pidMeta}>{definition ? definition.unit + ' • ' + definition.classification : 'DESCONHECIDO'}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      ) : null}
       <TouchableOpacity style={styles.secondaryButton} onPress={readAllDtcs} disabled={!storageReady || dtcScanning || (mode === 'REAL' && !sessionRef.current)}>
         <Text style={styles.secondaryButtonText}>{dtcScanning ? 'VARRENDO DTC 03/07/0A...' : 'VARREDURA COMPLETA DE DTC • 03 / 07 / 0A'}</Text>
       </TouchableOpacity>
@@ -592,6 +610,23 @@ export default function LaboratorioScreen() {
               <Text style={scan.available ? styles.dtcAvailable : styles.dtcUnavailable}>{scan.available ? 'DISPONÍVEL' : 'N/D'}</Text>
             </View>
           ))}
+          {dtcScan.flatMap((scan) => scan.codes).length ? (
+            <View style={styles.dtcDetails}>
+              <Text style={styles.dtcTitle}>IDENTIFICAÇÃO DOS DTCs</Text>
+              {Array.from(new Set(dtcScan.flatMap((scan) => scan.codes))).map((code) => {
+                const definition = getDtcDefinition(code);
+                return (
+                  <View key={code} style={styles.dtcDetailRow}>
+                    <Text style={styles.dtcDetailCode}>{code}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.dtcDetailName}>{definition?.name ?? 'Descrição não catalogada localmente'}</Text>
+                      <Text style={styles.dtcDetailText}>{definition?.description ?? 'O código foi recebido da ECU, mas este catálogo local não possui descrição detalhada. Não inferir a causa sem evidência adicional.'}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          ) : null}
           <Text style={styles.dtcHint}>N/D significa serviço sem resposta utilizável; isso não é interpretado como “sem falhas”.</Text>
         </View>
       ) : null}
@@ -706,6 +741,17 @@ const styles = StyleSheet.create({
   dtcAvailable: { color: '#15803d', fontSize: 8, fontWeight: '900' },
   dtcUnavailable: { color: '#b45309', fontSize: 8, fontWeight: '900' },
   dtcHint: { color: '#64748b', fontSize: 9, lineHeight: 14, marginTop: 7 },
+  dtcDetails: { marginTop: 10, borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingTop: 8 },
+  dtcDetailRow: { flexDirection: 'row', gap: 8, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#eef2f7' },
+  dtcDetailCode: { color: '#1557a6', fontWeight: '900', fontSize: 12, width: 52 },
+  dtcDetailName: { color: '#1f2937', fontWeight: '900', fontSize: 11 },
+  dtcDetailText: { color: '#64748b', fontSize: 9, lineHeight: 14, marginTop: 2 },
+  pidPanel: { backgroundColor: '#fff', borderRadius: 10, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#93c5fd' },
+  pidRow: { flexDirection: 'row', gap: 9, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#e2e8f0' },
+  pidCode: { color: '#1557a6', fontWeight: '900', fontSize: 11, width: 42 },
+  pidName: { color: '#1f2937', fontWeight: '900', fontSize: 11 },
+  pidDescription: { color: '#64748b', fontSize: 9, lineHeight: 14, marginTop: 2 },
+  pidMeta: { color: '#2563eb', fontSize: 8, fontWeight: '800', marginTop: 3 },
   panel: { backgroundColor: '#1f2937', borderRadius: 14, padding: 16, marginTop: 8 },
   label: { color: '#93c5fd', marginTop: 8 },
   value: { color: '#f8fafc', fontSize: 16, marginTop: 3 },
