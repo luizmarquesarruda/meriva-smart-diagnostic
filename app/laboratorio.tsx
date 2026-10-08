@@ -60,6 +60,7 @@ export default function LaboratorioScreen() {
   const [dtcScan, setDtcScan] = useState<DtcServiceScan[]>([]);
   const [dtcScanning, setDtcScanning] = useState(false);
   const sessionRef = useRef<Elm327Session | null>(null);
+  const dtcAbsenceScansRef = useRef<Map<string, number>>(new Map());
   const autoSaveReadyRef = useRef(false);
 
   const simulationSession = useMemo(
@@ -389,12 +390,22 @@ export default function LaboratorioScreen() {
         for (const record of records) await recordDtc(getBasePath(), record);
         const detectedCodes = new Set(records.map((item) => item.code));
         const storedCodes = new Set(stored?.codes ?? []);
-        const storedAvailable = stored?.available === true;
-        const becameInactive: DtcRecord[] = storedAvailable
-          ? existing
-            .filter((item) => ['CURRENT', 'CONFIRMED'].includes(item.status) && !storedCodes.has(item.code) && !detectedCodes.has(item.code))
-            .map((item) => ({ ...item, status: 'INACTIVE', historical: true, lastSeen: now }))
-          : [];
+        const completeScan = results.length === 3 && results.every((item) => item.available);
+        const becameInactive: DtcRecord[] = [];
+        if (completeScan) {
+          for (const item of existing) {
+            if (!['CURRENT', 'CONFIRMED'].includes(item.status) || storedCodes.has(item.code) || detectedCodes.has(item.code)) {
+              dtcAbsenceScansRef.current.delete(item.code);
+              continue;
+            }
+            const absenceCount = (dtcAbsenceScansRef.current.get(item.code) ?? 0) + 1;
+            dtcAbsenceScansRef.current.set(item.code, absenceCount);
+            if (absenceCount >= 2) {
+              becameInactive.push({ ...item, status: 'INACTIVE', historical: true, lastSeen: now });
+              dtcAbsenceScansRef.current.delete(item.code);
+            }
+          }
+        }
         for (const record of becameInactive) await recordDtc(getBasePath(), record);
         const allDetectedOrInactive = new Set([...detectedCodes, ...becameInactive.map((item) => item.code)]);
         updateAutoSaveState((state) => {
