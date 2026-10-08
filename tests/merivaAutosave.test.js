@@ -295,6 +295,7 @@ test('6. SIMULACAO não contamina learning nem banco de PIDs', async () => {
   const learning = loadTs(path.join(ROOT, 'src/database/learningProfile.ts'));
   const pidBank = loadTs(path.join(ROOT, 'src/database/pidBank.ts'));
   const integration = loadTs(path.join(ROOT, 'src/meriva/autosaveIntegration.ts'));
+  const csvLogger = loadTs(path.join(ROOT, 'src/database/csvLogger.ts'));
   const parser = loadTs(path.join(ROOT, 'src/obd/parser.ts'));
   await learning.createLearningProfile(BASE, new Date().toISOString());
   await integration.registerObdQuery(
@@ -359,6 +360,7 @@ test('8. REAL + RESPONDEU entra no learning e no banco', async () => {
   });
   await integration.registerObdQuery(BASE, query('41 0C 1A F8'), 'REAL');
   await integration.registerObdQuery(BASE, query('41 0C 0F A0'), 'REAL');
+  await csvLogger.flushCsvLogger();
 
   const profile = await learning.readLearningProfile(BASE);
   assert.strictEqual(profile.globalSampleCounts.realSamples, 2, 'duas amostras reais');
