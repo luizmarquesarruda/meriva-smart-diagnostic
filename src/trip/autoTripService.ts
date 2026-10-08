@@ -8,6 +8,8 @@ import { RealTripRecorder } from './tripRecorder';
 import { INITIAL_DRIVE_CYCLES } from '../data/driveCycles';
 import { estimateRangeFromFuelLevel, fuelLevelPercentToLiters, isFuelReserve } from './fuelLevel';
 import { resetLiveTelemetry } from '../obd/liveTelemetry';
+import { TelemetryScheduler } from '../obd/telemetryScheduler';
+import { emitAppEvent } from '../state/appEventBus';
 
 export interface AutoTripServiceState {
   connected: boolean;
@@ -62,6 +64,8 @@ class AutoTripService {
   private unsubscribeConnection: (() => void) | null = null;
   private readonly listeners = new Set<Listener>();
   private telemetryCursor = 0;
+  private readonly telemetryScheduler = new TelemetryScheduler();
+  private readonly liveValues = new Map<string, { value: number; timestampMs: number }>();
   private state: AutoTripServiceState = { ...INITIAL_STATE };
 
   subscribe(listener: Listener): () => void {
@@ -125,6 +129,8 @@ class AutoTripService {
 
     resetLiveTelemetry();
     this.telemetryCursor = 0;
+    this.telemetryScheduler.reset();
+    this.liveValues.clear();
 
     if (!connection || !this.running) {
       this.state = { ...INITIAL_STATE };
@@ -165,6 +171,8 @@ class AutoTripService {
     generation: number,
     obdSpeedSupported: boolean,
   ): Promise<void> {
+    const isCanProtocol = /ISO\s*15765-4|CAN/i.test(connection.protocol ?? '');
+
     while (
       this.running &&
       generation === this.generation &&
@@ -178,78 +186,52 @@ class AutoTripService {
       const loopStartedAt = Date.now();
 
       try {
-        let fuelRateLph: number | null = null;
-        let fuelLevelPercent: number | null = null;
-        let obdSpeedKmh: number | null = null;
-        if (obdSpeedSupported) gpsTracker.setVehicleSpeedHintKmh(null);
+        const now = Date.now();
+        const supported = connection.supportedPids;
+        const duePids = this.telemetryScheduler.getDuePids(now, supported, isCanProtocol);
 
-        if (this.state.fuelLevelSupported) {
-          const fuelLevelResult = await connection.session.queryPid('012F');
-          recordAutomaticObdQuery(fuelLevelResult);
-          if (
-            fuelLevelResult.parsed.status === 'RESPONDEU' &&
-            fuelLevelResult.parsed.unit === '%' &&
-            fuelLevelResult.parsed.value != null &&
-            Number.isFinite(fuelLevelResult.parsed.value) &&
-            fuelLevelResult.parsed.value >= 0 &&
-            fuelLevelResult.parsed.value <= 100
-          ) {
-            fuelLevelPercent = fuelLevelResult.parsed.value;
+        if (duePids.length) {
+          const results = isCanProtocol && duePids.length > 1
+            ? await connection.session.queryPids(duePids)
+            : [await connection.session.queryPid(duePids[0])];
+
+          this.telemetryScheduler.markPolled(
+            results.map((result) => result.tx),
+            Date.now(),
+          );
+
+          for (const result of results) {
+            recordAutomaticObdQuery(result);
+            if (
+              result.parsed.status === 'RESPONDEU' &&
+              result.parsed.value != null &&
+              Number.isFinite(result.parsed.value)
+            ) {
+              this.liveValues.set(result.parsed.pid.toUpperCase(), {
+                value: result.parsed.value,
+                timestampMs: Date.now(),
+              });
+            }
           }
         }
 
-        if (this.state.fuelSupported) {
-          const fuelResult = await connection.session.queryPid('015E');
-          recordAutomaticObdQuery(fuelResult);
-          if (
-            fuelResult.parsed.status === 'RESPONDEU' &&
-            fuelResult.parsed.unit === 'L/h' &&
-            fuelResult.parsed.value != null &&
-            Number.isFinite(fuelResult.parsed.value) &&
-            fuelResult.parsed.value >= 0
-          ) {
-            fuelRateLph = fuelResult.parsed.value;
-          }
-        }
+        const readLive = (pid: string, maxAgeMs: number): number | null => {
+          const item = this.liveValues.get(pid);
+          if (!item || Date.now() - item.timestampMs > maxAgeMs) return null;
+          return item.value;
+        };
 
-        if (obdSpeedSupported) {
-          const speedResult = await connection.session.queryPid('010D');
-          recordAutomaticObdQuery(speedResult);
-          if (
-            speedResult.parsed.status === 'RESPONDEU' &&
-            speedResult.parsed.unit === 'km/h' &&
-            speedResult.parsed.value != null &&
-            Number.isFinite(speedResult.parsed.value) &&
-            speedResult.parsed.value >= 0 &&
-            speedResult.parsed.value <= 220
-          ) {
-            obdSpeedKmh = speedResult.parsed.value;
-          }
-        }
+        const fuelRateLph = this.state.fuelSupported ? readLive('015E', 15_000) : null;
+        const fuelLevelPercent = this.state.fuelLevelSupported ? readLive('012F', 15_000) : null;
+        const obdSpeedKmh = obdSpeedSupported ? readLive('010D', 5_000) : null;
 
-        // Quando 010D existe, o GPS recebe a velocidade real da ECU como
-        // confirmação de movimento. Zero km/h bloqueia deriva do GPS parado.
-        // Sem 010D, null devolve a decisão ao filtro GPS.
+        // A velocidade OBD é a fonte primária quando disponível; GPS continua
+        // responsável pela rota/distância e atua como fallback.
         gpsTracker.setVehicleSpeedHintKmh(obdSpeedSupported ? obdSpeedKmh : null);
-
-        // Telemetria móvel: um PID secundário por ciclo evita saturar ELMs lentos,
-        // mas mantém RPM/temperatura/MAP/TPS em uma janela contínua para tendências.
-        const telemetryCandidates = ['010C', '0105', '010B', '0111'];
-        const supportedTelemetry = telemetryCandidates.filter((item) => connection.supportedPids.includes(item));
-        const telemetryPid = supportedTelemetry.length > 0
-          ? supportedTelemetry[this.telemetryCursor % supportedTelemetry.length]
-          : '010C';
-        this.telemetryCursor += 1;
-        if (telemetryPid === '010C' || connection.supportedPids.includes(telemetryPid)) {
-          const telemetryResult = await connection.session.queryPid(telemetryPid);
-          recordAutomaticObdQuery(telemetryResult);
-        }
 
         const recorder = this.recorder;
         if (recorder) {
           const gps = gpsTracker.getState();
-          // Quando a ECU fornece 010D, ele é a fonte primária de velocidade do veículo.
-          // GPS continua responsável por rota/distância e serve de fallback.
           const vehicleSpeedKmh = obdSpeedKmh ?? gps.currentSpeedKmh;
           const state = recorder.addSample({
             timestampMs: Date.now(),
@@ -257,10 +239,12 @@ class AutoTripService {
             speedKmh: vehicleSpeedKmh,
             fuelRateLph,
           });
+
           const instantaneousConsumptionKml =
             fuelRateLph != null && fuelRateLph > 0 && vehicleSpeedKmh > 0
               ? vehicleSpeedKmh / fuelRateLph
               : null;
+
           this.setState({
             connected: true,
             active: true,
@@ -277,7 +261,9 @@ class AutoTripService {
             estimatedRangeKm: fuelLevelPercent != null
               ? (estimateRangeFromFuelLevel(
                   fuelLevelPercent,
-                  state.distanceKm > 0 && state.fuelUsedL > 0 ? state.distanceKm / state.fuelUsedL : this.state.averageConsumptionKml,
+                  state.distanceKm > 0 && state.fuelUsedL > 0
+                    ? state.distanceKm / state.fuelUsedL
+                    : this.state.averageConsumptionKml,
                 ) ?? this.state.estimatedRangeKm)
               : this.state.estimatedRangeKm,
             error: fuelRateLph == null && state.validFuelSamples === 0
@@ -291,9 +277,10 @@ class AutoTripService {
         });
       }
 
-      const intervalMs = this.state.fuelSupported || obdSpeedSupported ? 1500 : 5000;
-      const elapsedMs = Date.now() - loopStartedAt;
-      const waitMs = Math.max(150, intervalMs - elapsedMs);
+      const now = Date.now();
+      const scheduleDelay = this.telemetryScheduler.getNextDueDelayMs(now, connection.supportedPids);
+      const elapsedMs = now - loopStartedAt;
+      const waitMs = Math.max(150, Math.min(1500, scheduleDelay - elapsedMs));
       await new Promise((resolve) => setTimeout(resolve, waitMs));
     }
   }
@@ -381,6 +368,7 @@ class AutoTripService {
   private setState(patch: Partial<AutoTripServiceState>): void {
     this.state = { ...this.state, ...patch };
     this.emit();
+    emitAppEvent('TRIP_UPDATED');
   }
 
   private emit(): void {
