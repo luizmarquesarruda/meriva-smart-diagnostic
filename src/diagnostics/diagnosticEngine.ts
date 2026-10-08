@@ -4,7 +4,7 @@ import ruleCatalog from '../knowledge/diagnostic_rules.json';
 export interface DiagnosticInput { observations: PidObservation[]; dtcs?: DtcRecord[]; condition?: VehicleCondition; }
 export interface DiagnosticEvidence { ruleId: string; text: string; source: 'DTC' | 'PID'; pid?: string; dtc?: string; value?: number; }
 export interface DiagnosticHypothesis { id: string; label: string; score: number; confidence: 'LOW' | 'MEDIUM' | 'HIGH'; evidence: DiagnosticEvidence[]; nextTests: string[]; }
-export interface DiagnosticResult { engine: 'LOCAL_EVIDENCE_ENGINE'; version: 1; generatedAt: string; hypotheses: DiagnosticHypothesis[]; acceptedLiveSamples: number; blockedSimulationSamples: number; blockedStaleSamples: number; blockedInvalidSamples: number; blockedNonLiveDtcs: number; disclaimer: string; }
+export interface DiagnosticResult { engine: 'LOCAL_EVIDENCE_ENGINE'; version: 1; generatedAt: string; hypotheses: DiagnosticHypothesis[]; acceptedLiveSamples: number; blockedIncoherentSnapshots: number; blockedEngineOffRules: number; pendingTemporalRules: number; blockedSimulationSamples: number; blockedStaleSamples: number; blockedInvalidSamples: number; blockedNonLiveDtcs: number; disclaimer: string; }
 
 interface Rule { id: string; trigger: { dtc?: string; combinedTrimMin?: number; combinedTrimMax?: number; condition?: VehicleCondition; mapMinKpa?: number; }; hypothesis: string; baseScore: number; tests: string[]; }
 
@@ -14,6 +14,32 @@ const ACTIVE_DTC_STATUSES = new Set(['CONFIRMED', 'PENDING', 'PERMANENT', 'CURRE
 function isSimulation(item: PidObservation): boolean { return String(item.source ?? '').trim().toUpperCase() === 'SIMULACAO'; }
 const MAX_OBSERVATION_AGE_MS = 120_000;
 const MAX_FUTURE_SKEW_MS = 30_000;
+const MAX_SNAPSHOT_SKEW_MS = 2_000;
+const TEMPORAL_MIN_SAMPLES = 10;
+const TEMPORAL_MIN_DURATION_MS = 30_000;
+const TEMPORAL_WINDOW_MS = 60_000;
+interface TemporalCandidate { signature: string; timestamps: number[]; lastSample: number; }
+const temporalCandidates = new Map<string, TemporalCandidate>();
+export function resetDiagnosticTemporalState(): void { temporalCandidates.clear(); }
+function hasCoherentSnapshot(items: PidObservation[], nowMs: number): boolean {
+  if (items.length < 2) return false;
+  const times = items.map((item) => Date.parse(item.timestamp));
+  return times.every(Number.isFinite) && Math.max(...times) - Math.min(...times) <= MAX_SNAPSHOT_SKEW_MS && Math.max(...times) <= nowMs + MAX_FUTURE_SKEW_MS;
+}
+function temporalRuleConfirmed(ruleId: string, items: PidObservation[], nowMs: number): boolean {
+  const times = items.map((item) => Date.parse(item.timestamp));
+  if (!hasCoherentSnapshot(items, nowMs)) return false;
+  const sampleTime = Math.max(...times);
+  const signature = items.map((item) => item.pid + ':' + item.timestamp + ':' + item.value).sort().join('|');
+  const previous = temporalCandidates.get(ruleId);
+  const timestamps = previous ? previous.timestamps.filter((time) => sampleTime - time <= TEMPORAL_WINDOW_MS) : [];
+  if (!previous || previous.signature !== signature) {
+    if (timestamps[timestamps.length - 1] !== sampleTime) timestamps.push(sampleTime);
+    temporalCandidates.set(ruleId, { signature, timestamps, lastSample: sampleTime });
+  }
+  const current = temporalCandidates.get(ruleId)!;
+  return current.timestamps.length >= TEMPORAL_MIN_SAMPLES && current.timestamps[current.timestamps.length - 1] - current.timestamps[0] >= TEMPORAL_MIN_DURATION_MS;
+}
 
 function isLiveObd(item: PidObservation): boolean { return String(item.source ?? '').trim().toUpperCase() === 'REAL_OBD'; }
 function isFresh(item: PidObservation, nowMs: number): boolean {
@@ -59,6 +85,9 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
   const blockedStaleSamples = rawObservations.filter((item) => isLiveObd(item) && !isFresh(item, now)).length;
   const blockedInvalidSamples = rawObservations.filter((item) => isLiveObd(item) && isFresh(item, now) && !isValidObservation(item, now)).length;
   const blockedNonLiveDtcs = rawDtcs.length - liveDtcs.length;
+  let blockedIncoherentSnapshots = 0;
+  let blockedEngineOffRules = 0;
+  let pendingTemporalRules = 0;
   const hypotheses = new Map<string, DiagnosticHypothesis>();
 
   const add = (rule: Rule, evidence: DiagnosticEvidence): void => {
@@ -93,21 +122,34 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
 
   const stft = pidValue(observations, '0106');
   const ltft = pidValue(observations, '0107');
+  const rpm = pidValue(observations, '010C');
+  const trimsCoherent = Boolean(stft && ltft && rpm && hasCoherentSnapshot([stft, ltft, rpm], now));
+  const engineRunning = Boolean(rpm && rpm.value !== null && rpm.value > 400);
   if (stft && ltft && isTrimContext(input.condition)) {
+    if (!trimsCoherent) blockedIncoherentSnapshots++;
+    else if (!engineRunning) blockedEngineOffRules++;
+  }
+  if (stft && ltft && rpm && trimsCoherent && engineRunning && isTrimContext(input.condition)) {
     const combinedTrim = stft.value! + ltft.value!;
     const lean = rules.find((item) => item.id === 'FUEL_TRIM_LEAN');
     const rich = rules.find((item) => item.id === 'FUEL_TRIM_RICH');
     if (lean && combinedTrim >= (lean.trigger.combinedTrimMin ?? Number.POSITIVE_INFINITY)) {
-      add(lean, { ruleId: lean.id, text: 'STFT + LTFT = ' + combinedTrim.toFixed(2) + '% em contexto ' + input.condition + '.', source: 'PID', pid: '0106/0107', value: combinedTrim });
+      if (!temporalRuleConfirmed(lean.id, [stft, ltft, rpm], now)) pendingTemporalRules++;
+      else add(lean, { ruleId: lean.id, text: 'STFT + LTFT = ' + combinedTrim.toFixed(2) + '% em contexto ' + input.condition + '.', source: 'PID', pid: '0106/0107', value: combinedTrim });
     } else if (rich && combinedTrim <= (rich.trigger.combinedTrimMax ?? Number.NEGATIVE_INFINITY)) {
-      add(rich, { ruleId: rich.id, text: 'STFT + LTFT = ' + combinedTrim.toFixed(2) + '% em contexto ' + input.condition + '.', source: 'PID', pid: '0106/0107', value: combinedTrim });
+      if (!temporalRuleConfirmed(rich.id, [stft, ltft, rpm], now)) pendingTemporalRules++;
+      else add(rich, { ruleId: rich.id, text: 'STFT + LTFT = ' + combinedTrim.toFixed(2) + '% em contexto ' + input.condition + '.', source: 'PID', pid: '0106/0107', value: combinedTrim });
     }
   }
 
   const map = pidValue(observations, '010B');
   const mapRule = rules.find((item) => item.id === 'MAP_HIGH_IDLE');
+  const mapCoherent = Boolean(map && rpm && hasCoherentSnapshot([map, rpm], now));
   if (map && mapRule && input.condition === mapRule.trigger.condition && map.value! >= (mapRule.trigger.mapMinKpa ?? Number.POSITIVE_INFINITY)) {
-    add(mapRule, { ruleId: mapRule.id, text: 'MAP em marcha lenta aquecida = ' + map.value!.toFixed(2) + ' kPa.', source: 'PID', pid: '010B', value: map.value! });
+    if (!mapCoherent) blockedIncoherentSnapshots++;
+    else if (!engineRunning) blockedEngineOffRules++;
+    else if (!temporalRuleConfirmed(mapRule.id, [map, rpm!], now)) pendingTemporalRules++;
+    else add(mapRule, { ruleId: mapRule.id, text: 'MAP em marcha lenta aquecida = ' + map.value!.toFixed(2) + ' kPa.', source: 'PID', pid: '010B', value: map.value! });
   }
 
   return {
@@ -116,10 +158,13 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
     generatedAt: new Date(now).toISOString(),
     hypotheses: [...hypotheses.values()].sort((a, b) => b.score - a.score),
     acceptedLiveSamples: observations.length,
+    blockedIncoherentSnapshots,
+    blockedEngineOffRules,
+    pendingTemporalRules,
     blockedSimulationSamples,
     blockedStaleSamples,
     blockedInvalidSamples,
     blockedNonLiveDtcs,
-    disclaimer: 'Score é prioridade heurística, não probabilidade estatística. Hipóteses usam apenas leituras REAL_OBD recentes (até 120 s), válidas e respondidas. Não condenar peça por um DTC ou PID isolado; histórico, simulação, seed, dados antigos e inválidos não geram hipótese atual.'
+    disclaimer: 'Score é prioridade heurística, não probabilidade estatística. Hipóteses usam apenas leituras REAL_OBD recentes (até 120 s), válidas e respondidas; regras combinadas exigem timestamps a até 2 s, RPM > 400 e persistência mínima de 10 amostras por 30 s. Não condenar peça por um DTC ou PID isolado; histórico, simulação, seed, dados antigos e inválidos não geram hipótese atual.'
   };
 }
