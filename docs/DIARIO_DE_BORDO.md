@@ -1680,3 +1680,11 @@ A confirmação definitiva exige uma sessão real na Meriva com ELM327, principa
 ### CI
 Nenhuma CI foi disparada manualmente nesta etapa. A confirmação final ainda depende de execução de typecheck, suíte completa e build Android.
 
+## 2026-10-08 — Atualização do diário após correções da auditoria
+
+- Consolidado neste diário o registro das correções no gate de polling, monitoramento de saúde da ECU, autosave, fila exclusiva DTC/freeze-frame e validação de respostas positivas.
+- Revisado o registro de commits e corrigida a referência do commit da validação DTC.
+- Branch de trabalho: `feat/obd-polling-reliability-20261008`.
+- Estado de validação: revisão estática dos arquivos e gravações confirmadas pelo GitHub; **typecheck, testes automatizados e build Android ainda não foram executados nesta etapa**.
+- CI: **não disparada**, respeitando a instrução de não iniciar novas execuções sem autorização explícita.
+- Próximo passo técnico quando autorizado: executar validação completa, corrigir falhas encontradas e só então considerar o build apto para teste físico na Meriva com ELM327.
