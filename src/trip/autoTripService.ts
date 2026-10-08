@@ -198,52 +198,22 @@ class AutoTripService {
         let rpm: number | null = null;
         if (obdSpeedSupported) gpsTracker.setVehicleSpeedHintKmh(null);
 
-        if (this.state.fuelLevelSupported) {
-          const fuelLevelResult = await connection.session.queryPid('012F');
-          await registerObdQuery(this.basePath, fuelLevelResult, 'REAL');
-          if (
-            fuelLevelResult.parsed.status === 'RESPONDEU' &&
-            fuelLevelResult.parsed.unit === '%' &&
-            fuelLevelResult.parsed.value != null &&
-            Number.isFinite(fuelLevelResult.parsed.value) &&
-            fuelLevelResult.parsed.value >= 0 &&
-            fuelLevelResult.parsed.value <= 100
-          ) {
-            fuelLevelPercent = fuelLevelResult.parsed.value;
+        // Caminho crítico: RPM e velocidade são consultados antes de qualquer
+        // PID secundário, para que combustível/temperatura não atrasem o cockpit.
+        if (connection.supportedPids.includes('010C')) {
+          const rpmStartedAt = Date.now();
+          const rpmResult = await connection.session.queryPid('010C');
+          console.info('[obd-poll]', JSON.stringify({ pid: '010C', responseTimeMs: Date.now() - rpmStartedAt, cycle: 'FAST' }));
+          await registerObdQuery(this.basePath, rpmResult, 'REAL');
+          if (rpmResult.parsed.status === 'RESPONDEU' && Number.isFinite(rpmResult.parsed.value)) {
+            rpm = rpmResult.parsed.value;
           }
         }
 
-        if (connection.supportedPids.includes('0152')) {
-          const alcoholResult = await connection.session.queryPid('0152');
-          await registerObdQuery(this.basePath, alcoholResult, 'REAL');
-          if (
-            alcoholResult.parsed.status === 'RESPONDEU' &&
-            alcoholResult.parsed.value != null &&
-            Number.isFinite(alcoholResult.parsed.value) &&
-            alcoholResult.parsed.value >= 0 &&
-            alcoholResult.parsed.value <= 100
-          ) {
-            alcoholPercentFromObd = alcoholResult.parsed.value;
-          }
-        }
-
-        if (this.state.fuelSupported) {
-          const fuelResult = await connection.session.queryPid('015E');
-          await registerObdQuery(this.basePath, fuelResult, 'REAL');
-          if (
-            fuelResult.parsed.status === 'RESPONDEU' &&
-            fuelResult.parsed.unit === 'L/h' &&
-            fuelResult.parsed.value != null &&
-            Number.isFinite(fuelResult.parsed.value) &&
-            fuelResult.parsed.value >= 0
-          ) {
-            fuelRateLph = fuelResult.parsed.value;
-            fuelRateSource = 'MEASURED_015E';
-          }
-        }
-
-        if (obdSpeedSupported) {
+        if (obdSpeedSupported && connection.supportedPids.includes('010D')) {
+          const speedStartedAt = Date.now();
           const speedResult = await connection.session.queryPid('010D');
+          console.info('[obd-poll]', JSON.stringify({ pid: '010D', responseTimeMs: Date.now() - speedStartedAt, cycle: 'FAST' }));
           await registerObdQuery(this.basePath, speedResult, 'REAL');
           if (
             speedResult.parsed.status === 'RESPONDEU' &&
@@ -254,6 +224,35 @@ class AutoTripService {
             speedResult.parsed.value <= 220
           ) {
             obdSpeedKmh = speedResult.parsed.value;
+          }
+        }
+
+        // Somente PIDs descobertos são elegíveis para o rodízio secundário.
+        // O resultado de cada consulta mantém TX/RX pelo autosave existente.
+        const secondaryPids = ['015E', '012F', '0110', '010B', '010F', '0105', '0111']
+          .filter((pid) => connection.supportedPids.includes(pid));
+        if (secondaryPids.length > 0) {
+          const secondaryPid = secondaryPids[this.telemetryCursor % secondaryPids.length];
+          this.telemetryCursor += 1;
+          const secondaryStartedAt = Date.now();
+          const secondaryResult = await connection.session.queryPid(secondaryPid);
+          console.info('[obd-poll]', JSON.stringify({
+            pid: secondaryPid,
+            responseTimeMs: Date.now() - secondaryStartedAt,
+            cycle: 'SECONDARY',
+            status: secondaryResult.parsed.status,
+          }));
+          await registerObdQuery(this.basePath, secondaryResult, 'REAL');
+          if (secondaryPid === '015E' && secondaryResult.parsed.status === 'RESPONDEU' &&
+              secondaryResult.parsed.value != null && Number.isFinite(secondaryResult.parsed.value) &&
+              secondaryResult.parsed.value >= 0) {
+            fuelRateLph = secondaryResult.parsed.value;
+            fuelRateSource = 'MEASURED_015E';
+          }
+          if (secondaryPid === '012F' && secondaryResult.parsed.status === 'RESPONDEU' &&
+              secondaryResult.parsed.value != null && Number.isFinite(secondaryResult.parsed.value) &&
+              secondaryResult.parsed.value >= 0 && secondaryResult.parsed.value <= 100) {
+            fuelLevelPercent = secondaryResult.parsed.value;
           }
         }
 
@@ -310,16 +309,6 @@ class AutoTripService {
               fuelEstimateNote = 'AFR ' + estimate.airFuelRatio.toFixed(2) + ' | densidade ' + estimate.fuelDensityKgPerL.toFixed(3) + ' kg/L | ' + estimate.fuelModel.assumption;
             }
           }
-        }
-
-        // Mantém um PID secundário por ciclo para tendências sem monopolizar o ELM.
-        const telemetryCandidates = ['0105', '010B', '0111'];
-        const supportedTelemetry = telemetryCandidates.filter((item) => connection.supportedPids.includes(item));
-        if (supportedTelemetry.length > 0) {
-          const telemetryPid = supportedTelemetry[this.telemetryCursor % supportedTelemetry.length];
-          this.telemetryCursor += 1;
-          const telemetryResult = await connection.session.queryPid(telemetryPid);
-          await registerObdQuery(this.basePath, telemetryResult, 'REAL');
         }
 
         const gps = gpsTracker.getState();
@@ -388,9 +377,10 @@ class AutoTripService {
         });
       }
 
-      const intervalMs = this.state.fuelSupported || obdSpeedSupported ? 1500 : 5000;
+      const intervalMs = 500;
       const elapsedMs = Date.now() - loopStartedAt;
-      const waitMs = Math.max(150, intervalMs - elapsedMs);
+      const waitMs = Math.max(0, intervalMs - elapsedMs);
+      console.info('[obd-poll-cycle]', JSON.stringify({ cycleTimeMs: elapsedMs, targetMs: intervalMs }));
       await new Promise((resolve) => setTimeout(resolve, waitMs));
     }
   }
