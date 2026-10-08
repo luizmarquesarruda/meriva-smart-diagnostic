@@ -10,7 +10,11 @@ for (const route of ['/dados', '/saude', '/mais']) assert.match(index, new RegEx
 for (const file of ['app/dados.tsx', 'app/saude.tsx', 'app/mais.tsx', 'app/veiculo.tsx', 'app/viagens.tsx', 'app/aprendizado.tsx']) {
   assert.equal(fs.existsSync(path.join(ROOT, file)), true, file + ' deve existir');
 }
-assert.match(read('app/dados.tsx'), /lastReadings/);
+assert.match(read('app/dados.tsx'), /getLivePidTrend/);
+assert.match(read('app/dados.tsx'), /formatSparkline/);
 assert.match(read('app/saude.tsx'), /runLocalDiagnostic/);
+assert.match(read('app/saude.tsx'), /activeDtcs/);
 assert.match(read('app/aprendizado.tsx'), /realSamples/);
+assert.match(read('app/laboratorio.tsx'), /03 \/ 07 \/ 0A/);
+assert.match(read('app/bluetooth.tsx'), /SAÚDE DO ELM327/);
 console.log('Cockpit e telas secundárias: OK');
