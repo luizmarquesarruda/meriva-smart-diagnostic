@@ -1555,3 +1555,6 @@ Correção a ser aplicada: usar o mesmo `isPidDiscoveryCacheUsable()` no caminho
 
 `app/laboratorio.tsx` recebeu auditoria adicional porque o caminho manual de conexão deve persistir a mesma evidência do fluxo compartilhado: protocolo atual, último protocolo conhecido, validação ECU e identidade do adaptador.
 Essa correção mantém a regra 010C → 41 0C e não altera a semântica de DTC/learning.
+## 2026-10-08 — Correção de enquadramento CAN para RESPONSE_PENDING
+
+A auditoria do parser de erros identificou que `7F xx 78` pode aparecer depois do cabeçalho CAN quando `ATH1` está ativo (por exemplo, `7E8 03 7F 22 78`). O detector será ajustado para reconhecer a sequência em qualquer posição do fluxo hexadecimal, preservando a categoria `RESPONSE_PENDING`.
