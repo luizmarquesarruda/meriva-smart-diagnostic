@@ -1324,3 +1324,41 @@ A regra de salvamento agora é:
 `ECU validada → INICIA AUTOSAVE → checkpoints durante a sessão → ECU desconectada → SALVAMENTO FINAL → FECHA AUTOSAVE`
 
 O estado histórico continua separado do estado atual: a desconexão não apaga `lastKnownProtocol` nem os dados históricos já registrados.
+## 2026-10-08 — Correção: histórico e dados não eram alimentados pela telemetria automática
+
+### Problema
+Após a centralização do autosave na sessão ECU, o aplicativo passou a conectar/validar a ECU, mas o fluxo automático de PIDs não alimentava o mesmo pipeline usado pelas consultas manuais.
+
+### Causa raiz
+`src/trip/autoTripService.ts` executava `queryPid()` para 012F, 015E, 010D e os PIDs de telemetria, porém chamava somente `recordLivePidQuery()`. Esse módulo atualiza as tendências em memória, mas não grava:
+- últimas leituras no autosave;
+- logs OBD TX/RX;
+- banco de PIDs confirmados;
+- aprendizado real.
+
+Por isso a tela de Dados podia mostrar pouca ou nenhuma leitura persistida e o histórico não acompanhava as consultas automáticas.
+
+### Correção
+O serviço automático passou a enviar cada resultado real para `registerObdQuery(..., 'REAL')`, mantendo também `recordLivePidQuery()` para as tendências em memória.
+
+Agora o fluxo automático é:
+`ECU → queryPid → liveTelemetry + registerObdQuery → logs + lastReadings + banco de PIDs + aprendizado + autosave`
+
+Os quatro caminhos automáticos corrigidos são:
+- PID 012F — nível de combustível;
+- PID 015E — taxa de combustível;
+- PID 010D — velocidade da ECU;
+- PID 010C/0105/010B/0111 — telemetria móvel.
+
+### Teste
+Adicionada regressão estática em `tests/regression.test.js` garantindo que todos os quatro caminhos usem `registerObdQuery` com fonte `REAL`.
+
+### Commit
+- `e1113adf75dd26619936ce1ec982a62dc5ade1c7` — `fix: persist automatic OBD readings into history pipeline`
+- `4d3b5ac966a6f839dfe7d208b496de51406a82dd` — `test: guard automatic OBD history feeding`
+
+### Estado
+A alimentação automática de dados foi religada ao pipeline persistente. O histórico de viagem continua sendo fechado como um ciclo real ao encerrar a sessão, evitando gerar dezenas de viagens parciais.
+
+### Validação
+Ainda não há nova CI registrada para esta correção. A validação automática deve confirmar typecheck, suíte completa e Android Release antes de considerar o ajuste definitivamente concluído.
