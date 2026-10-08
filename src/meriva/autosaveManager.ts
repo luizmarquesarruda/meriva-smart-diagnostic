@@ -31,6 +31,7 @@ interface AutosaveRuntime {
   lastSavedFingerprint: string | null;
   debounceTimer: ReturnType<typeof setTimeout> | null;
   criticalTimer: ReturnType<typeof setTimeout> | null;
+  criticalWaiters: Array<(saved: boolean) => void>;
   checkpointTimer: ReturnType<typeof setInterval> | null;
   appStateSubscription: { remove: () => void } | null;
 }
@@ -47,6 +48,7 @@ const runtime: AutosaveRuntime = {
   lastSavedFingerprint: null,
   debounceTimer: null,
   criticalTimer: null,
+  criticalWaiters: [],
   checkpointTimer: null,
   appStateSubscription: null,
 };
@@ -246,12 +248,21 @@ export function pushLastReading(reading: MerivaPersistedState['lastReadings'][nu
   });
 }
 
-export function scheduleCriticalSave(delayMs = 500): void {
+export function scheduleCriticalSave(delayMs = 500): Promise<boolean> {
+  const completion = new Promise<boolean>((resolve) => {
+    runtime.criticalWaiters.push(resolve);
+  });
+
   if (runtime.criticalTimer) clearTimeout(runtime.criticalTimer);
   runtime.criticalTimer = setTimeout(() => {
     runtime.criticalTimer = null;
-    void saveNow('critical');
+    void saveNow('critical').then((saved) => {
+      const waiters = runtime.criticalWaiters.splice(0);
+      for (const resolve of waiters) resolve(saved);
+    });
   }, delayMs);
+
+  return completion;
 }
 
 function scheduleDebouncedSave(): void {
@@ -296,6 +307,7 @@ export function disposeAutoSave(): void {
   runtime.debounceTimer = null;
   runtime.criticalTimer = null;
   runtime.checkpointTimer = null;
+  runtime.criticalWaiters.splice(0).forEach((resolve) => resolve(false));
   runtime.appStateSubscription?.remove();
   runtime.appStateSubscription = null;
   runtime.basePath = '';
