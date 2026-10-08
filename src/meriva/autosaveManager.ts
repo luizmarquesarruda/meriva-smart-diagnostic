@@ -28,6 +28,7 @@ interface AutosaveRuntime {
   lastSavedAt: string | null;
   lastSaveReason: SaveReason | null;
   lastError: string | null;
+  lastSavedFingerprint: string | null;
   debounceTimer: ReturnType<typeof setTimeout> | null;
   criticalTimer: ReturnType<typeof setTimeout> | null;
   checkpointTimer: ReturnType<typeof setInterval> | null;
