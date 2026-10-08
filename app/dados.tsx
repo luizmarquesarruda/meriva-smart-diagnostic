@@ -14,17 +14,19 @@ export default function DadosScreen() {
   const layout = useMidLayout();
   const [state, setState] = useState(getAutoSaveState());
   const [trip, setTrip] = useState(autoTripService.getState());
+  const [gpsState, setGpsState] = useState(gpsTracker.getState());
   const eventRevision = useAppEventRevision();
   useEffect(() => {
     setState(getAutoSaveState());
     setTrip(autoTripService.getState());
   }, [eventRevision]);
+  useEffect(() => gpsTracker.subscribe(setGpsState), []);
   const readings = [...state.lastReadings].reverse();
   return <SafeAreaView style={styles.container} edges={["top","bottom","left","right"]}><ScrollView contentContainerStyle={[styles.content,{paddingHorizontal:layout.horizontalPadding}]} showsHorizontalScrollIndicator={false}><View style={[styles.screenFrame,{maxWidth:layout.maxContentWidth}]}>
     <Header title="DADOS EM TEMPO REAL" subtitle="PIDs • TELEMETRIA • TENDÊNCIAS" />
     <View style={styles.liveCard}><Text style={styles.liveTitle}>{state.obd.connected ? '● ECU CONECTADA' : '○ ECU AGUARDANDO'}</Text><Text style={styles.liveHint}>{state.obd.protocol ? 'PROTOCOLO ' + state.obd.protocol : 'Conecte o ELM327 para receber PIDs reais.'}</Text></View>
     <View style={styles.grid}>
-      <Metric landscape={layout.landscape} label="VELOCIDADE" value={gpsTracker.getState().currentSpeedKmh.toFixed(0) + ' km/h'} />
+      <Metric landscape={layout.landscape} label="VELOCIDADE" value={gpsState.currentSpeedKmh.toFixed(0) + ' km/h'} />
       <Metric landscape={layout.landscape} label="DISTÂNCIA" value={trip.distanceKm.toFixed(2) + ' km'} />
       <Metric landscape={layout.landscape} label="CONSUMO" value={trip.instantaneousConsumptionKml != null && trip.instantaneousConsumptionKml > 0 ? trip.instantaneousConsumptionKml.toFixed(1) + ' km/L' : 'N/D'} />
       <Metric landscape={layout.landscape} label="AUTONOMIA" value={state.autonomy.estimatedRangeKm > 0 ? state.autonomy.estimatedRangeKm.toFixed(0) + ' km' : 'N/D'} />
