@@ -40,14 +40,13 @@ function decodeAscii(bytes: number[]): string {
 
 export function parseVinMode09Response(rawResponse: string): string | null {
   const frames: Array<{ index: number; bytes: number[] }> = [];
-  for (const line of rawResponse.split(/\r?\n/)) {
+  for (const line of rawResponse.split(/\r\n|\n|\r/)) {
     const bytes = hexByteTokens(line);
     for (let i = 0; i < bytes.length - 2; i += 1) {
       if (bytes[i] !== '49' || bytes[i + 1] !== '02') continue;
       const frameIndex = Number.parseInt(bytes[i + 2], 16);
       const payload = bytes.slice(i + 3, i + 7).map((value) => Number.parseInt(value, 16));
       if (Number.isFinite(frameIndex) && payload.length > 0) frames.push({ index: frameIndex, bytes: payload });
-      break;
     }
   }
   if (!frames.length) return null;
