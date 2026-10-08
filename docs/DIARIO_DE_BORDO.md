@@ -1502,7 +1502,7 @@ A descoberta de PIDs identificava códigos suportados pela ECU, mas o catálogo 
 O catálogo explica o PID; ele não confirma que a ECU da Meriva realmente o suporta. A confirmação continua exigindo resposta RAW_ECU válida, parser, fórmula e plausibilidade. Dados de simulação e seed permanecem fora do aprendizado real.
 
 ### Referências técnicas
-As fórmulas foram cruzadas com referências públicas de OBD-II/J1979. PID 015E continua definido como Engine Fuel Rate em L/h, com `((A×256)+B)/20`. cite não usar em arquivo local — referência externa registrada na análise desta alteração.
+As fórmulas foram cruzadas com referências públicas de OBD-II/J1979. PID 015E continua definido como Engine Fuel Rate em L/h, com `((A×256)+B)/20`.
 
 ### Estado
 Conhecimento estático ampliado e banco local preparado para guardar o significado dos PIDs. A confirmação física dos novos PIDs depende da próxima sessão real com a ECU da Meriva.
