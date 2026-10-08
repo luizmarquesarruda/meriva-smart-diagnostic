@@ -1551,3 +1551,7 @@ Foreground service Android para operação contínua em background e Android Aut
 
 `app/laboratorio.tsx` ainda possuía um caminho direto para `createRealElmSession()` que não aplicava o validador de cache contextual usado por `sharedConnection` e gravava o cache sem endereço do adaptador. Isso poderia reintroduzir cache antigo após uma conexão manual pelo laboratório.
 Correção a ser aplicada: usar o mesmo `isPidDiscoveryCacheUsable()` no caminho manual e persistir adaptador/VIN/ECU no cache. O objetivo é manter uma única política de conexão/cache em todas as telas.
+## 2026-10-08 — Alinhamento do estado persistido no laboratório
+
+`app/laboratorio.tsx` recebeu auditoria adicional porque o caminho manual de conexão deve persistir a mesma evidência do fluxo compartilhado: protocolo atual, último protocolo conhecido, validação ECU e identidade do adaptador.
+Essa correção mantém a regra 010C → 41 0C e não altera a semântica de DTC/learning.
