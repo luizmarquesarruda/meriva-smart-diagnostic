@@ -1542,3 +1542,8 @@ A primeira execução local encontrou uma expectativa incorreta no teste do sche
 
 ### Limites
 Foreground service Android para operação contínua em background e Android Auto permanecem fora desta rodada por exigirem camada nativa e validação específica.
+## 2026-10-08 — Correções encontradas pela auditoria pós-implementação
+
+- A retirada dos timers da tela `app/dados.tsx` revelou que o GPS não possuía, naquela tela, uma assinatura reativa equivalente; sem correção, velocidade/distância poderiam ficar estáticas.
+- O barramento `appEventBus` pode receber vários eventos consecutivos quando uma consulta CAN agrupa múltiplos PIDs; o hook de UI será coalescido por microtask para evitar renderização em rajada.
+- A lógica OBD não será alterada por essa auditoria: a correção fica restrita à camada de atualização da interface.
