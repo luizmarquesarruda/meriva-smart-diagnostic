@@ -9,7 +9,7 @@ assert(source.includes('BLUETOOTH_CONNECT'));
 assert(source.includes('BLUETOOTH_SCAN'));
 assert(source.includes('requestForegroundPermissionsAsync'));
 assert(source.includes('APP_PRIVATE'));
-const storageSource = fs.readFileSync('src/storage/backup.ts', 'utf8') + fs.readFileSync('app/armazenamento.tsx', 'utf8');
+const storageSource = fs.readFileSync('src/meriva/exportAutoSaveTxt.ts', 'utf8') + fs.readFileSync('src/obd/exportBluetoothDiagnosticTxt.ts', 'utf8');
 assert(storageSource.includes('StorageAccessFramework') || storageSource.includes('Storage Access Framework'));
 assert(layout.includes('requestAllRequiredPermissions'));
 assert(!layout.includes('requestBluetoothPermissions'));
