@@ -9,11 +9,12 @@ import {
   SaveReason,
   AutoSaveStatus,
 } from './autosaveTypes';
-export type { AutoSaveStatus } from './autosaveTypes';
 import { MerivaPersistedState, createEmptyMerivaState } from './autosaveState';
 import { hydrateState, isValidEnvelope, validatePayload } from './autosaveValidation';
 import { migrateEnvelope } from './autosaveMigrations';
 import { appendAutoSaveHistory } from './autosaveHistoryTxt';
+
+export type { AutoSaveStatus } from './autosaveTypes';
 
 const DEBOUNCE_MS = 1500;
 const CHECKPOINT_MS = 45000;
@@ -32,7 +33,7 @@ interface AutosaveRuntime {
   lastSavedFingerprint: string | null;
   debounceTimer: ReturnType<typeof setTimeout> | null;
   criticalTimer: ReturnType<typeof setTimeout> | null;
-  criticalWaiters: Array<(saved: boolean) => void>;
+  criticalWaiters: ((saved: boolean) => void)[];
   checkpointTimer: ReturnType<typeof setInterval> | null;
   obdSessionActive: boolean;
   appStateSubscription: { remove: () => void } | null;

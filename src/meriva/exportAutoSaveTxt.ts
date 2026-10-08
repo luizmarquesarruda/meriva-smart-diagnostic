@@ -7,7 +7,6 @@
 import * as FileSystem from 'expo-file-system';
 import { Platform } from 'react-native';
 import type { MerivaPersistedState } from './autosaveState';
-import { formatAutoSaveTxt } from './autosaveTxtFormatter';
 import { appendAutoSaveHistory, AUTOSAVE_HISTORY_FILE, readAutoSaveHistory } from './autosaveHistoryTxt';
 
 export { ND } from './autosaveTxtFormatter';

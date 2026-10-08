@@ -3,7 +3,7 @@ import { validateOBDResponse } from './parser';
 import pidCatalog from '../knowledge/pids.json';
 
 export const DISCOVERY_PIDS = ['0100', '0120', '0140', '0160'];
-export const KNOWN_PIDS = (pidCatalog.pids as Array<{ pid: string }>).map((item) => item.pid.toUpperCase());
+export const KNOWN_PIDS = (pidCatalog.pids as { pid: string }[]).map((item) => item.pid.toUpperCase());
 
 export interface DiscoveryItem {
   pid: string;

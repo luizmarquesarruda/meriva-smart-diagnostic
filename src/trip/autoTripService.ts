@@ -148,7 +148,6 @@ class AutoTripService {
     const fuelSupported = connection.supportedPids.includes('015E');
     const fuelLevelSupported = connection.supportedPids.includes('012F');
     const obdSpeedSupported = connection.supportedPids.includes('010D');
-    const initialDistanceKm = gpsTracker.getState().distanceKm;
     this.recorder = null;
     this.stoppedSinceMs = null;
     const generation = ++this.generation;
@@ -201,7 +200,6 @@ class AutoTripService {
         let fuelRateLph: number | null = null;
         let fuelRateSource: FuelRateSource | undefined;
         let fuelLevelPercent: number | null = null;
-        let alcoholPercentFromObd: number | null = null;
         let fuelEstimateNote: string | null = null;
         let obdSpeedKmh: number | null = null;
         let rpm: number | null = null;
@@ -274,9 +272,6 @@ class AutoTripService {
             this.pidBackoffUntilCycle.set(secondaryPid, this.pollCycleNumber + 4);
           } else {
             this.pidBackoffUntilCycle.delete(secondaryPid);
-          }
-          if (secondaryPid === '0152' && secondaryResult.parsed.status === 'RESPONDEU' && secondaryResult.parsed.value != null && Number.isFinite(secondaryResult.parsed.value)) {
-            alcoholPercentFromObd = secondaryResult.parsed.value;
           }
           if (secondaryPid === '015E' && secondaryResult.parsed.status === 'RESPONDEU' &&
               secondaryResult.parsed.value != null && Number.isFinite(secondaryResult.parsed.value) &&

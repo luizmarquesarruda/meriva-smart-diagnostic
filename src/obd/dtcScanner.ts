@@ -15,7 +15,7 @@ export interface DtcServiceScan {
   reason?: string;
 }
 
-const REQUESTS: Array<{
+const REQUESTS: {
   service: '03' | '07' | '0A';
   kind: DtcServiceKind;
   label: string;

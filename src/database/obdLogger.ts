@@ -1,4 +1,3 @@
-import * as FileSystem from 'expo-file-system';
 import { appendCsvRowBuffered, CsvRow } from './csvLogger';
 import { PidQueryResult } from '../obd/elm327';
 
