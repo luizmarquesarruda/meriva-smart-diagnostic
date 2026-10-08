@@ -4,15 +4,37 @@ const path = require('path');
 const Module = require('module');
 const ts = require('typescript');
 
-function loadTs(file) {
-  const sourcePath = path.join(__dirname, '..', file);
-  const output = ts.transpileModule(fs.readFileSync(sourcePath, 'utf8'), {
+const originalResolveFilename = Module._resolveFilename;
+const originalTsExtension = Module._extensions['.ts'];
+
+Module._extensions['.ts'] = function compileTypeScript(module, filename) {
+  const source = fs.readFileSync(filename, 'utf8');
+  const output = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2019 },
   }).outputText;
+  module._compile(output, filename);
+};
+
+Module._resolveFilename = function resolveFilename(request, parent, isMain, options) {
+  try {
+    return originalResolveFilename.call(this, request, parent, isMain, options);
+  } catch (error) {
+    if (typeof request === 'string' && parent?.filename && request.startsWith('.')) {
+      const candidate = path.resolve(path.dirname(parent.filename), request + '.ts');
+      if (fs.existsSync(candidate)) return candidate;
+    }
+    throw error;
+  }
+};
+
+function loadTs(file) {
+  const sourcePath = path.join(__dirname, '..', file);
   const mod = new Module(sourcePath, null);
   mod.filename = sourcePath;
   mod.paths = Module._nodeModulePaths(path.dirname(sourcePath));
-  mod._compile(output, sourcePath);
+  mod._compile(ts.transpileModule(fs.readFileSync(sourcePath, 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2019 },
+  }).outputText, sourcePath);
   return mod.exports;
 }
 
@@ -45,3 +67,8 @@ assert.strictEqual(truncated.value, null);
 assert.strictEqual(truncated.status, 'VALOR_NAO_INTERPRETADO');
 
 console.log('advancedDiagnostics.test.js: PASS');
+
+
+Module._resolveFilename = originalResolveFilename;
+if (originalTsExtension) Module._extensions['.ts'] = originalTsExtension;
+else delete Module._extensions['.ts'];
