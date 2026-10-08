@@ -11,6 +11,7 @@ import { updateLearningProfileRealSample } from '../database/learningProfile';
 import type { VehicleCondition } from '../types/sourceTypes';
 import { pushLastReading, updateAutoSaveState, saveNow } from './autosaveManager';
 import { shouldFeedLearning } from './autosaveValidation';
+import { recordLivePidQuery } from '../obd/liveTelemetry';
 
 export async function registerObdQuery(
   basePath: string,
@@ -24,6 +25,8 @@ export async function registerObdQuery(
   } catch (cause) {
     console.warn('[autosave] falha ao gravar logs OBD:', cause instanceof Error ? cause.message : cause);
   }
+
+  recordLivePidQuery(result, source);
 
   pushLastReading({
     pid: result.parsed.pid,
