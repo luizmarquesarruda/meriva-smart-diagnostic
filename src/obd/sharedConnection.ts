@@ -137,10 +137,12 @@ export async function recoverEcuIfNeeded(): Promise<boolean> {
       lastEcuResponseAt = new Date().toISOString();
       lastEcuError = null;
       setEcuResponseState('RESPONDING');
-      updateAutoSaveState((state) => {
-        state.obd = { ...state.obd, connected: true };
-      });
-      await startObdAutosaveSession();
+      if (!getAutoSaveState().obd.connected) {
+        updateAutoSaveState((state) => {
+          state.obd = { ...state.obd, connected: true };
+        });
+        await startObdAutosaveSession();
+      }
       return true;
     } finally {
       ecuRecoveryPromise = null;
