@@ -46,6 +46,7 @@ export async function recordDtc(basePath: string, dtc: DtcRecord): Promise<void>
     const info = await FileSystem.getInfoAsync(target);
     if (!info.exists) {
       await FileSystem.writeAsStringAsync(target, `${line}\n`, { encoding: FileSystem.EncodingType.UTF8 });
+      emitAppEvent('DTC_UPDATED');
       return;
     }
 
