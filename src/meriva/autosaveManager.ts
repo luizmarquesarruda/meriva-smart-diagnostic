@@ -235,11 +235,18 @@ export function getAutoSaveStatus(): AutoSaveStatus {
   };
 }
 
-export function updateAutoSaveState(mutate: (state: MerivaPersistedState) => void): void {
+export interface UpdateAutoSaveOptions {
+  schedulePersist?: boolean;
+}
+
+export function updateAutoSaveState(
+  mutate: (state: MerivaPersistedState) => void,
+  options: UpdateAutoSaveOptions = {},
+): void {
   mutate(runtime.state);
   runtime.dirty = true;
   runtime.mutationVersion += 1;
-  scheduleDebouncedSave();
+  if (options.schedulePersist !== false) scheduleDebouncedSave();
 }
 
 export interface PushLastReadingOptions {
@@ -257,13 +264,7 @@ export function pushLastReading(
       reading,
       ...state.lastReadings.filter((item) => item.pid !== reading.pid),
     ].slice(0, MAX_LAST_READINGS);
-  });
-  if (!schedulePersist) {
-    if (runtime.debounceTimer) {
-      clearTimeout(runtime.debounceTimer);
-      runtime.debounceTimer = null;
-    }
-  }
+  }, { schedulePersist });
 }
 
 export function scheduleTelemetrySave(delayMs = 5000): void {
