@@ -1609,3 +1609,14 @@ A documentação SAE J1979 mantém o Mode 02 para Powertrain Freeze Frame Data e
 - CI será executada após a implementação completa.
 
 **Plano registrado antes da alteração de código.**
+
+
+## 2026-10-08 — Correção pré-CI do parser de VIN multiline
+
+### Achado
+A revisão estática da nova camada Mode 09 mostrou que algumas respostas ELM podem chegar com separação por CR isolado. O parser inicial dividia somente por CRLF/LF e, nesse caso, poderia processar apenas o primeiro frame multiline.
+
+### Correção planejada
+Aceitar CR, CRLF e LF como separadores e processar todas as ocorrências `49 02 frame` encontradas, preservando a ordenação pelo índice do frame.
+
+**Plano registrado antes da correção.**
