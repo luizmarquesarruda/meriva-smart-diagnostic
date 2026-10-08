@@ -63,6 +63,8 @@ export class Elm327Session {
   private initializationPromise: Promise<ElmCommandResult[]> | null = null;
   private commandQueue: Promise<void> = Promise.resolve();
   private noDataCount = 0;
+  private consecutiveFailures = 0;
+  private lastSuccessfulResponseAt: string | null = null;
   private adaptiveTimeoutMs: number;
   private commands = 0;
   private successfulCommands = 0;
@@ -202,13 +204,40 @@ export class Elm327Session {
       errors: this.errors,
       averageResponseMs: this.commands ? Math.round(this.totalResponseMs / this.commands) : 0,
       adaptiveTimeoutMs: this.adaptiveTimeoutMs,
-      recoveryRecommended: this.noDataCount >= this.config.noDataReconnectThreshold || this.timeouts >= 3,
+      recoveryRecommended: this.consecutiveFailures >= this.config.noDataReconnectThreshold || this.timeouts >= 3,
       lastErrorType: this.lastErrorType,
+      consecutiveFailures: this.consecutiveFailures,
+      lastSuccessfulResponseAt: this.lastSuccessfulResponseAt,
     };
   }
 
   shouldRecover(): boolean {
     return this.getHealthSnapshot().recoveryRecommended;
+  }
+
+  /** Reinicializa o ELM e renegocia o protocolo sem destruir o transporte Bluetooth. */
+  async recoverProtocol(): Promise<boolean> {
+    if (!this.opened) return false;
+    const protocol = (this.protocol ?? '').toUpperCase();
+    const preferred = /KWP|14230/.test(protocol) ? 'ATSP5' : 'ATSP0';
+    const reset = await this.command('ATZ');
+    if (reset.status !== 'OK') return false;
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    const selected = await this.command(preferred);
+    if (selected.status !== 'OK') return false;
+    const probe = await this.command('010C');
+    if (probe.status !== 'OK' || !/41\\s*0C/i.test(probe.response.replace(/\\s/g, ''))) return false;
+    this.noDataCount = 0;
+    this.consecutiveFailures = 0;
+    this.lastSuccessfulResponseAt = new Date().toISOString();
+    await this.identifyProtocol();
+    return true;
+  }
+
+  /** KWP2000 TesterPresent (3E 00) para manter a sessão diagnóstica viva. */
+  async keepAlive(): Promise<ElmCommandResult> {
+    if (!this.opened) throw new Error('ELM NÃO INICIALIZADO');
+    return this.executeCommand('3E00');
   }
 
   async queryPid(pid: string): Promise<PidQueryResult> {
@@ -290,7 +319,13 @@ export class Elm327Session {
       this.commands += 1;
       this.totalResponseMs += Date.now() - started;
       this.lastErrorType = errorType;
-      if (status === 'OK') this.successfulCommands += 1;
+      if (status === 'OK') {
+        this.successfulCommands += 1;
+        this.consecutiveFailures = 0;
+        this.lastSuccessfulResponseAt = new Date().toISOString();
+      } else {
+        this.consecutiveFailures += 1;
+      }
       if (status === 'UNSUPPORTED') {
         this.unsupported += 1;
         if (this.config.allowUnsupportedAtCommands && /^AT[A-Z0-9]+$/.test(command)) {
@@ -324,6 +359,7 @@ export class Elm327Session {
     } catch (cause) {
       this.commands += 1;
       this.timeouts += 1;
+      this.consecutiveFailures += 1;
       this.lastErrorType = classifyElmError('', cause instanceof Error ? cause.message : '');
       if (this.config.adaptiveTiming) {
         this.adaptiveTimeoutMs = Math.min(this.config.adaptiveTimeoutMaxMs, this.adaptiveTimeoutMs + this.config.adaptiveTimeoutStepMs);
