@@ -38,7 +38,11 @@ function diagnosticReportLines(result: DiagnosticResult): string[] {
     '--- DIAGNÓSTICO LOCAL / MOTOR DE EVIDÊNCIAS ---',
     `MOTOR: ${result.engine}`,
     `VERSÃO: ${result.version}`,
+    `AMOSTRAS REAL_OBD ACEITAS: ${result.acceptedLiveSamples}`,
+    `AMOSTRAS ANTIGAS BLOQUEADAS (>120 s): ${result.blockedStaleSamples}`,
+    `AMOSTRAS INVÁLIDAS BLOQUEADAS: ${result.blockedInvalidSamples}`,
     `AMOSTRAS DE SIMULAÇÃO BLOQUEADAS: ${result.blockedSimulationSamples}`,
+    `DTCs NÃO ATIVOS OU NÃO REAIS BLOQUEADOS: ${result.blockedNonLiveDtcs}`,
   ];
   if (result.hypotheses.length === 0) {
     lines.push('NENHUMA HIPÓTESE DIAGNÓSTICA GERADA COM AS EVIDÊNCIAS DISPONÍVEIS.');
