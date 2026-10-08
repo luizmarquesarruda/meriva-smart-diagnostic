@@ -1,12 +1,9 @@
 'use strict';
 
 const assert = require('assert');
-const fs = require('fs');
-const path = require('path');
-
 const { loadTs } = require('./helpers/loadTs');
 
-const { integrateFuelRateLph, FuelRateIntegrator } = mod.exports;
+const { integrateFuelRateLph, FuelRateIntegrator } = loadTs('src/obd/fuelConsumption.ts');
 
 function assertApprox(actual, expected, epsilon = 1e-12) {
   assert.ok(Math.abs(actual - expected) <= epsilon, `expected ${actual} ≈ ${expected}`);
