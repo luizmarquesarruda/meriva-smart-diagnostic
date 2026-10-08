@@ -1396,8 +1396,11 @@ Consequentemente, estas correções estão registradas como **implementadas e te
 ### Estado atual do branch
 Branch: `fix-live-rpm-stale-2026-10-08`
 
-HEAD registrado após a última atualização do diário:
-- `5c2e781893d000c4f380e8a9180bcc8ba9a79b32` — atualização deste Diário de Bordo.
+HEAD anterior à presente atualização:
+- `5c2e781893d000c4f380e8a9180bcc8ba9a79b32` — atualização anterior do Diário de Bordo.
+
+HEAD após a presente atualização:
+- será o commit retornado por esta operação de atualização.
 
 ### Próximo passo obrigatório
 Antes de qualquer nova correção:
