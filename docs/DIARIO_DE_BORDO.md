@@ -1261,3 +1261,18 @@ O serviço automático já consulta o PID 010C e registra leituras reais em live
 Com ECU conectada, uma resposta real `41 0C 00 00` deve resultar em `0 RPM` no cockpit após a próxima consulta 010C. Se a ECU parar de fornecer amostras válidas por mais de 10 s, o cockpit deve mostrar `N/D`, nunca manter artificialmente o último RPM.
 
 **Ainda não considerar a correção validada pela CI.**
+
+
+## 2026-10-08 — Complemento: consumo atual também estava usando estado histórico
+
+### Diagnóstico
+A correção anterior eliminou o congelamento do RPM no cockpit, mas a métrica `CONSUMO` ainda não representa consumo instantâneo. `app/index.tsx` usa `tripState.averageConsumptionKml`, que é carregado da autonomia persistida/referência e só é atualizado no fechamento de uma viagem em `finalizeRecorder()`. Durante a condução, `AutoTripService` já calcula `instantaneousConsumptionKml` a partir de velocidade real e PID 015E, mas o cockpit ignora esse campo.
+
+### Correção planejada
+- Usar `instantaneousConsumptionKml` como fonte primária da métrica CONSUMO atual.
+- Manter `averageConsumptionKml` somente para média/histórico e autonomia.
+- Se não houver velocidade > 0 ou taxa 015E válida, exibir `N/D` em vez de congelar uma média antiga.
+- Preservar a regra: GPS sozinho não fabrica litros; consumo atual exige taxa de combustível OBD válida.
+- Adicionar regressão de UI/estado para impedir uso de `averageConsumptionKml` como consumo atual.
+
+**Ainda não considerar a correção validada pela CI.**
