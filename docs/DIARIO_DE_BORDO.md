@@ -1193,3 +1193,7 @@ Ajustar o teste para reconhecer tanto o hook central `useMidLayout()` quanto o p
 
 ### Próximo passo
 Nova CI completa obrigatória, incluindo Android Release.
+
+
+### 2026-10-08 — Quinta execução da CI da auditoria
+Branch `audit-deep-ci-2026-10-08-r5` criada a partir do `main` após a correção do teste responsivo. Validar novamente toda a suíte e Android Release.
