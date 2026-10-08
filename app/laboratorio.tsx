@@ -11,7 +11,7 @@ import { canPollObd } from '../src/obd/bluetoothState';
 import { discoverSupportedPids, KNOWN_PIDS } from '../src/obd/pidScanner';
 import { getPidDefinition } from '../src/obd/pidDefinition';
 import { getDtcDefinition } from '../src/obd/dtcDefinition';
-import { getSharedObdConnection, getSharedObdStatus, setSharedObdConnection, subscribeSharedObd, disconnectSharedObd } from '../src/obd/sharedConnection';
+import { getSharedObdConnection, getSharedObdStatus, subscribeSharedObdStatus, setSharedObdConnection, subscribeSharedObd, disconnectSharedObd } from '../src/obd/sharedConnection';
 import { autoTripService } from '../src/trip/autoTripService';
 import { getMidLayout } from '../src/ui/midLayout';
 import { scanDtcServices, readFreezeFrame, type DtcServiceScan } from '../src/obd/dtcScanner';
@@ -44,6 +44,7 @@ export default function LaboratorioScreen() {
   const [rx, setRx] = useState('');
   const [elapsedMs, setElapsedMs] = useState<number | null>(null);
   const [status, setStatus] = useState('VERIFICANDO ARMAZENAMENTO');
+  const [ecuResponseState, setEcuResponseState] = useState(getSharedObdStatus().ecuResponseState);
   const [protocol, setProtocol] = useState('N/D');
   const [error, setError] = useState('');
   const [loadingDevices, setLoadingDevices] = useState(false);
@@ -77,6 +78,11 @@ export default function LaboratorioScreen() {
       setFuelUsedL(trip.fuelUsedL);
       setTripConsumptionKml(trip.consumptionKml);
       if (trip.error) setError(trip.error);
+    });
+
+    const unsubscribeStatus = subscribeSharedObdStatus((ecuStatus) => {
+      setEcuResponseState(ecuStatus.ecuResponseState);
+      if (ecuStatus.ecuResponseState === 'NO_RESPONSE' || ecuStatus.ecuResponseState === 'RECOVERING') setStatus('ECU SEM RESPOSTA');
     });
 
     const unsubscribe = subscribeSharedObd((connection) => {
@@ -114,6 +120,7 @@ export default function LaboratorioScreen() {
 
     return () => {
       unsubscribeTrip();
+      unsubscribeStatus();
       unsubscribe();
       mounted = false;
       if (!autoSaveReadyRef.current) return;
@@ -509,6 +516,7 @@ export default function LaboratorioScreen() {
       <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
       <Text style={styles.title}>DIAGNÓSTICO OBD</Text>
       <Text style={styles.status}>{status}</Text>
+      <Text style={styles.status}>{ecuResponseState === 'NO_RESPONSE' || ecuResponseState === 'RECOVERING' ? 'ECU SEM RESPOSTA — ADAPTADOR BLUETOOTH CONECTADO' : ecuResponseState === 'RESPONDING' ? 'ECU RESPONDENDO' : status}</Text>
       <View style={styles.connectionSummary}>
         <View style={styles.connectionItem}><Text style={styles.connectionLabel}>ELM327</Text><Text style={styles.connectionValue}>{sessionRef.current ? 'CONECTADO' : 'AGUARDANDO'}</Text></View>
         <View style={styles.connectionItem}><Text style={styles.connectionLabel}>PROTOCOLO</Text><Text style={styles.connectionValue}>{protocol}</Text></View>
