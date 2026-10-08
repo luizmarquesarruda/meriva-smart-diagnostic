@@ -287,6 +287,15 @@ async function testElmAndProtocol() {
   await session.close();
 }
 
+async function testConfiguredBluetoothRetryLimit() {
+  const managerPath = path.join(ROOT, 'src/obd/bluetoothManager.ts');
+  const source = fs.readFileSync(managerPath, 'utf8');
+  assert.ok(source.includes('const effectiveMaxAttempts = config.maxConnectionAttempts > 0'), 'retry deve derivar do maxConnectionAttempts configurado');
+  assert.ok(source.includes('attempt <= effectiveMaxAttempts'), 'loop de retry deve respeitar o limite efetivo');
+  assert.ok(!source.includes('const maxAttempts = config.maxConnectionAttempts'), 'não pode haver shadowing de maxAttempts');
+  console.log('configured Bluetooth retry limit: OK');
+}
+
 async function testBluetoothActivationRequest() {
   const manager = loadTs(path.join(ROOT, 'src/obd/bluetoothManager.ts'));
   const originalEnabled = fakeBluetooth.isBluetoothEnabled;
@@ -835,6 +844,7 @@ async function main() {
     ['banco de fórmulas OBD', testFormulaKnowledgeBank],
     ['parser + DTC', testParser],
     ['elm/protocolo/serialização', testElmAndProtocol],
+    ['limite configurável de retry Bluetooth', testConfiguredBluetoothRetryLimit],
     ['ativação oficial do Bluetooth', testBluetoothActivationRequest],
     ['bloqueio de troca silenciosa de adaptador', testActiveAdapterCannotBeSilentlySwitched],
     ['seleção estrita + gate ECU', testConnectionSelectionAndStrictEcuGate],
