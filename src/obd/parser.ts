@@ -109,7 +109,7 @@ export function parsePidResponse(pidRequested: string, rawResponse: string, posi
       value: null,
       unit: definition.unit,
       rawResponse,
-      rawBytes,
+      rawBytes: extractedRawBytes,
       status: 'VALOR NÃO INTERPRETADO',
       errorMessage: 'Resposta não contém resposta OBD positiva',
       definition,
