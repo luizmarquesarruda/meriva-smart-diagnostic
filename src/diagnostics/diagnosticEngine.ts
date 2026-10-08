@@ -6,7 +6,7 @@ export interface DiagnosticEvidence { ruleId: string; text: string; source: 'DTC
 export interface DiagnosticHypothesis { id: string; label: string; score: number; confidence: 'LOW' | 'MEDIUM' | 'HIGH'; evidence: DiagnosticEvidence[]; nextTests: string[]; }
 export interface DiagnosticResult { engine: 'LOCAL_EVIDENCE_ENGINE'; version: 1; generatedAt: string; hypotheses: DiagnosticHypothesis[]; acceptedLiveSamples: number; blockedIncoherentSnapshots: number; blockedEngineOffRules: number; pendingTemporalRules: number; blockedSimulationSamples: number; blockedStaleSamples: number; blockedInvalidSamples: number; blockedNonLiveDtcs: number; disclaimer: string; }
 
-interface Rule { id: string; trigger: { dtc?: string; combinedTrimMin?: number; combinedTrimMax?: number; condition?: VehicleCondition; mapMinKpa?: number; }; hypothesis: string; baseScore: number; tests: string[]; }
+interface Rule { id: string; trigger: { dtc?: string; combinedTrimMin?: number; combinedTrimMax?: number; condition?: VehicleCondition; mapMinKpa?: number; }; hypothesis: string; baseScore: number; tests: string[]; requiredDurationMs?: number; requiredSamples?: number; }
 
 const rules = ruleCatalog.rules as Rule[];
 const ACTIVE_DTC_STATUSES = new Set(['CONFIRMED', 'PENDING', 'PERMANENT', 'CURRENT']);
@@ -27,7 +27,8 @@ function hasCoherentSnapshot(items: PidObservation[], nowMs: number): boolean {
   const times = items.map((item) => Date.parse(item.timestamp));
   return times.every(Number.isFinite) && Math.max(...times) - Math.min(...times) <= MAX_SNAPSHOT_SKEW_MS && Math.max(...times) <= nowMs + MAX_FUTURE_SKEW_MS;
 }
-function temporalRuleConfirmed(ruleId: string, items: PidObservation[], nowMs: number): boolean {
+function temporalRuleConfirmed(rule: Rule, items: PidObservation[], nowMs: number): boolean {
+  const ruleId = rule.id;
   const times = items.map((item) => Date.parse(item.timestamp));
   if (!hasCoherentSnapshot(items, nowMs)) return false;
   const sampleTime = Math.max(...times);
@@ -39,7 +40,9 @@ function temporalRuleConfirmed(ruleId: string, items: PidObservation[], nowMs: n
     temporalCandidates.set(ruleId, { signature, timestamps, lastSample: sampleTime });
   }
   const current = temporalCandidates.get(ruleId)!;
-  return current.timestamps.length >= TEMPORAL_MIN_SAMPLES && current.timestamps[current.timestamps.length - 1] - current.timestamps[0] >= TEMPORAL_MIN_DURATION_MS;
+  const requiredSamples = rule.requiredSamples ?? TEMPORAL_MIN_SAMPLES;
+  const requiredDurationMs = rule.requiredDurationMs ?? TEMPORAL_MIN_DURATION_MS;
+  return current.timestamps.length >= requiredSamples && current.timestamps[current.timestamps.length - 1] - current.timestamps[0] >= requiredDurationMs;
 }
 
 function isLiveObd(item: PidObservation): boolean { return String(item.source ?? '').trim().toUpperCase() === 'REAL_OBD'; }
@@ -146,11 +149,11 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
     const rich = rules.find((item) => item.id === 'FUEL_TRIM_RICH');
     if (lean && combinedTrim >= (lean.trigger.combinedTrimMin ?? Number.POSITIVE_INFINITY)) {
       clearTemporalCandidate(rich?.id ?? 'FUEL_TRIM_RICH');
-      if (!temporalRuleConfirmed(lean.id, [stft, ltft, rpm], now)) pendingTemporalRules++;
+      if (!temporalRuleConfirmed(lean, [stft, ltft, rpm], now)) pendingTemporalRules++;
       else add(lean, { ruleId: lean.id, text: 'STFT + LTFT = ' + combinedTrim.toFixed(2) + '% em contexto ' + input.condition + '.', source: 'PID', pid: '0106/0107', value: combinedTrim });
     } else if (rich && combinedTrim <= (rich.trigger.combinedTrimMax ?? Number.NEGATIVE_INFINITY)) {
       clearTemporalCandidate(lean?.id ?? 'FUEL_TRIM_LEAN');
-      if (!temporalRuleConfirmed(rich.id, [stft, ltft, rpm], now)) pendingTemporalRules++;
+      if (!temporalRuleConfirmed(rich, [stft, ltft, rpm], now)) pendingTemporalRules++;
       else add(rich, { ruleId: rich.id, text: 'STFT + LTFT = ' + combinedTrim.toFixed(2) + '% em contexto ' + input.condition + '.', source: 'PID', pid: '0106/0107', value: combinedTrim });
     } else {
       clearTemporalCandidate(lean?.id ?? 'FUEL_TRIM_LEAN');
@@ -164,7 +167,7 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
   if (map && mapRule && input.condition === mapRule.trigger.condition && map.value! >= (mapRule.trigger.mapMinKpa ?? Number.POSITIVE_INFINITY)) {
     if (!mapCoherent) { clearTemporalCandidate(mapRule.id); blockedIncoherentSnapshots++; }
     else if (!engineRunning) { clearTemporalCandidate(mapRule.id); blockedEngineOffRules++; }
-    else if (!temporalRuleConfirmed(mapRule.id, [map, rpm!], now)) pendingTemporalRules++;
+    else if (!temporalRuleConfirmed(mapRule, [map, rpm!], now)) pendingTemporalRules++;
     else add(mapRule, { ruleId: mapRule.id, text: 'MAP em marcha lenta aquecida = ' + map.value!.toFixed(2) + ' kPa.', source: 'PID', pid: '010B', value: map.value! });
   } else if (mapRule) clearTemporalCandidate(mapRule.id);
 
