@@ -7,6 +7,7 @@ import { cleanupOldLogs, cleanupOldReadings } from '../src/storage/cleanup';
 import { getMidLayout } from '../src/ui/midLayout';
 import { readDriveCycles } from '../src/storage/driveCycleStorage';
 import type { DriveCycle } from '../src/data/driveCycles';
+import { exportDiagnosticsJson, exportDriveCyclesCsv } from '../src/storage/exportDiagnostics';
 
 const DEFAULT_QUOTA: StorageQuotaConfig = {
   limitMb: 2048,
@@ -59,6 +60,24 @@ export default function ArmazenamentoScreen() {
     }
   }
 
+
+
+  async function handleExport(format: 'JSON' | 'CSV') {
+    if (!basePath || busy) return;
+    setBusy(true);
+    setMessage('EXPORTANDO...');
+    try {
+      const path = format === 'JSON'
+        ? await exportDiagnosticsJson(basePath)
+        : await exportDriveCyclesCsv(basePath);
+      setMessage(`EXPORTADO ${format}: ${path}`);
+    } catch {
+      setMessage(`FALHA AO EXPORTAR ${format}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <SafeAreaView style={{flex:1,backgroundColor:'#0b1220'}} edges={["top","bottom","left","right"]}>
     <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
@@ -92,6 +111,11 @@ export default function ArmazenamentoScreen() {
           </View>
         )) : <Text style={styles.empty}>Nenhuma viagem salva ainda.</Text>}
       </View>
+      </View>
+
+      <View style={styles.exportRow}>
+        <TouchableOpacity style={styles.button} onPress={() => void handleExport('JSON')} disabled={!basePath || busy}><Text style={styles.buttonText}>EXPORTAR JSON</Text></TouchableOpacity>
+        <TouchableOpacity style={styles.button} onPress={() => void handleExport('CSV')} disabled={!basePath || busy}><Text style={styles.buttonText}>EXPORTAR CSV</Text></TouchableOpacity>
       </View>
 
       <TouchableOpacity style={styles.button} onPress={handleClean} disabled={!basePath || busy}>
@@ -129,6 +153,7 @@ const styles = StyleSheet.create({
   note: { color: '#8da2bd', fontSize: 10, lineHeight: 15, marginTop: 8 },
   label: { color: '#e5edf7', fontWeight: '600' },
   value: { color: '#2563eb', fontWeight: '700' },
-  button: { backgroundColor: '#1557a6', borderRadius: 7, padding: 13, alignItems: 'center', marginTop: 4 },
+  exportRow: { width: '100%', flexDirection: 'row', gap: 8, marginTop: 4 },
+  button: { flex: 1, backgroundColor: '#1557a6', borderRadius: 7, padding: 13, alignItems: 'center', marginTop: 4 },
   buttonText: { color: '#fff', fontWeight: '700' },
 });
