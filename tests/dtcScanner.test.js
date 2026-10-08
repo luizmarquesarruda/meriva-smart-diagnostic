@@ -18,7 +18,7 @@ function loadTs(file) {
   return mod.exports;
 }
 
-const { parseDtcResponseForService } = loadTs('src/obd/parser.ts');
+const { parseDtcResponseForService } = loadTs('src/obd/dtcParser.ts');
 const scanner = loadTs('src/obd/dtcScanner.ts');
 
 assert.deepStrictEqual(parseDtcResponseForService('03', '43 01 30 00 00'), ['P0130']);

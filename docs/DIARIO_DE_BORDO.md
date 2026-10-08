@@ -554,3 +554,14 @@ Nenhuma dependência foi adicionada nem o contrato Bluetooth/ELM327 foi alterado
 
 ### Estado
 Os quatro erros do #926 foram corrigidos antes do fechamento da nova execução. A próxima CI é obrigatória para confirmar TypeScript, suíte completa e Android Release.
+
+## 2026-10-07 — Correção do harness DTC revelada pela CI #929
+
+### Falha
+A CI #929 (run 37707396660), no commit `38911b8e79b43dcdfcdc18b18cca39c1a138151c`, passou por `npm ci`, Expo Doctor e **typecheck**. A nova suíte `liveTelemetry.test.js` também passou. O primeiro teste DTC falhou por infraestrutura do próprio teste: o loader CommonJS transpila `parser.ts` isoladamente, mas o parser depende em runtime de `pidDefinition.ts` e `formulaEngine.ts`, que continuam como TypeScript e não podem ser resolvidos pelo `require` padrão do harness.
+
+### Correção
+A lógica de parsing DTC foi extraída para `src/obd/dtcParser.ts`, que não possui dependências de runtime. `parser.ts` continua exportando `parseDtcResponseForService` para preservar a API existente, enquanto `dtcScanner.ts` e o teste passam a usar o módulo isolado.
+
+### Estado
+A falha não alterava a lógica de produção do parser OBD; o problema era a estratégia de carregamento do teste. A nova CI deve confirmar a suíte completa e liberar o Android build.
