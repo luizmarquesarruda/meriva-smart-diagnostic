@@ -863,3 +863,10 @@ Foi feita apenas auditoria por leitura do código e alterações controladas no 
 - app/index.tsx: mesma correção no cockpit principal; a atualização visual/persistente de conexão agora preserva ECU validada e último protocolo conhecido.
 - Commits: 2ecaee6031720dd291a67a6a0003575a34c2ee03 e 17e88015991e9ecf9856e4944a162f6171283dc3.
 
+
+### Correção final do coalescedor crítico
+- src/meriva/autosaveManager.ts: quando um flush já está em andamento, uma nova chamada agora aguarda a persistência atual antes de decidir o resultado, evitando que await forceSaveOnObdEvent() retorne false apenas por concorrência interna.
+- Commit: 2264d67edcc43adcbbbf70f3baad341a5bf1caaf.
+
+### Estado final desta rodada
+Todas as alterações desta auditoria estão gravadas no main e o Diário de Bordo foi atualizado com os hashes. Não foi executada CI.
