@@ -94,6 +94,9 @@
     "U16_DIV_32768": {
       "operation": "u16_div",
       "divisor": 32768
+    },
+    "U32": {
+      "operation": "u32"
     }
   }
 }
