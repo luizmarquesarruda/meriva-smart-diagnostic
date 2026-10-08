@@ -76,7 +76,26 @@ export class FuelRateIntegrator {
 
 export type FuelRateSource = 'MEASURED_015E' | 'ESTIMATED_MAF' | 'ESTIMATED_MAP';
 
-export interface FuelRateEstimateInput {
+export type ManualFuelType = 'FLEX' | 'ETANOL' | 'GASOLINA';
+export type FuelCompositionSource = 'REAL_OBD_0152' | 'ESTIMATED_MANUAL_PERCENT' | 'ESTIMATED_MANUAL_ETHANOL' | 'ESTIMATED_BRAZIL_GASOLINE_E32' | 'ESTIMATED_DEFAULT_GASOLINE_A';
+export type FuelEstimateConfidence = 'DIRETA' | 'BAIXA';
+
+export interface FuelModel {
+  ethanolPercent: number;
+  airFuelRatio: number;
+  fuelDensityKgPerL: number;
+  source: FuelCompositionSource;
+  confidence: FuelEstimateConfidence;
+  assumption: string;
+}
+
+export interface FuelCompositionInput {
+  alcoholPercentFromObd?: number | null;
+  manualFuelType?: ManualFuelType | null;
+  manualAlcoholPercent?: number | null;
+}
+
+export interface FuelRateEstimateInput extends FuelCompositionInput {
   mafGs?: number | null;
   mapKpa?: number | null;
   rpm?: number | null;
@@ -87,13 +106,51 @@ export interface FuelRateEstimateInput {
   fuelDensityKgPerL?: number;
 }
 
-export function estimateFuelRateLph(input: FuelRateEstimateInput): { rateLph: number; source: FuelRateSource } | null {
-  const afr = input.airFuelRatio ?? 14.7;
-  const density = input.fuelDensityKgPerL ?? 0.745;
+export interface FuelRateEstimate {
+  rateLph: number;
+  source: Exclude<FuelRateSource, 'MEASURED_015E'>;
+  airFuelRatio: number;
+  fuelDensityKgPerL: number;
+  fuelModel: FuelModel;
+}
+
+const GASOLINE_A_AFR = 14.7;
+const ETHANOL_AFR = 9.0;
+const GASOLINE_A_DENSITY_KG_PER_L = 0.750;
+const ETHANOL_DENSITY_KG_PER_L = 0.794;
+const BRAZIL_GASOLINE_C_ETHANOL_PERCENT = 32;
+
+function validAlcoholPercent(value: number | null | undefined): value is number {
+  return value != null && Number.isFinite(value) && value >= 0 && value <= 100;
+}
+
+function buildFuelModel(ethanolPercent: number, source: FuelCompositionSource, confidence: FuelEstimateConfidence, assumption: string): FuelModel {
+  const ethanolVolumeFraction = ethanolPercent / 100;
+  const gasolineVolumeFraction = 1 - ethanolVolumeFraction;
+  const ethanolMassFraction = (ethanolVolumeFraction * ETHANOL_DENSITY_KG_PER_L) /
+    (ethanolVolumeFraction * ETHANOL_DENSITY_KG_PER_L + gasolineVolumeFraction * GASOLINE_A_DENSITY_KG_PER_L);
+  const gasolineMassFraction = 1 - ethanolMassFraction;
+  const airFuelRatio = 1 / (gasolineMassFraction / GASOLINE_A_AFR + ethanolMassFraction / ETHANOL_AFR);
+  const fuelDensityKgPerL = gasolineVolumeFraction * GASOLINE_A_DENSITY_KG_PER_L + ethanolVolumeFraction * ETHANOL_DENSITY_KG_PER_L;
+  return { ethanolPercent, airFuelRatio, fuelDensityKgPerL, source, confidence, assumption };
+}
+
+export function resolveFuelModel(input: FuelCompositionInput = {}): FuelModel {
+  if (validAlcoholPercent(input.alcoholPercentFromObd)) return buildFuelModel(input.alcoholPercentFromObd, 'REAL_OBD_0152', 'DIRETA', '0152 ECU: ' + input.alcoholPercentFromObd.toFixed(1) + '% álcool');
+  if (validAlcoholPercent(input.manualAlcoholPercent)) return buildFuelModel(input.manualAlcoholPercent, 'ESTIMATED_MANUAL_PERCENT', 'BAIXA', 'percentual manual informado: ' + input.manualAlcoholPercent.toFixed(1) + '% álcool');
+  if (input.manualFuelType === 'ETANOL') return buildFuelModel(100, 'ESTIMATED_MANUAL_ETHANOL', 'BAIXA', 'combustível manual: etanol');
+  if (input.manualFuelType === 'GASOLINA') return buildFuelModel(BRAZIL_GASOLINE_C_ETHANOL_PERCENT, 'ESTIMATED_BRAZIL_GASOLINE_E32', 'BAIXA', 'combustível manual: gasolina C comum brasileira E' + BRAZIL_GASOLINE_C_ETHANOL_PERCENT);
+  return buildFuelModel(0, 'ESTIMATED_DEFAULT_GASOLINE_A', 'BAIXA', 'nenhuma composição válida disponível; AFR 14,7 assumido como fallback');
+}
+
+export function estimateFuelRateLph(input: FuelRateEstimateInput): FuelRateEstimate | null {
+  const fuelModel = resolveFuelModel(input);
+  const afr = input.airFuelRatio ?? fuelModel.airFuelRatio;
+  const density = input.fuelDensityKgPerL ?? fuelModel.fuelDensityKgPerL;
 
   if (Number.isFinite(input.mafGs) && (input.mafGs ?? 0) >= 0 && afr > 0 && density > 0) {
     const fuelKgPerSecond = (input.mafGs as number) / 1000 / afr;
-    return { rateLph: fuelKgPerSecond * 3600 / density, source: 'ESTIMATED_MAF' };
+    return { rateLph: fuelKgPerSecond * 3600 / density, source: 'ESTIMATED_MAF', airFuelRatio: afr, fuelDensityKgPerL: density, fuelModel };
   }
 
   const map = input.mapKpa;
@@ -114,7 +171,7 @@ export function estimateFuelRateLph(input: FuelRateEstimateInput): { rateLph: nu
     const volumetricFlowLPerSecond = displacementL * (rpm as number) / 120 * ve;
     const mafGs = airDensityGPerL * volumetricFlowLPerSecond;
     const fuelKgPerSecond = mafGs / 1000 / afr;
-    return { rateLph: fuelKgPerSecond * 3600 / density, source: 'ESTIMATED_MAP' };
+    return { rateLph: fuelKgPerSecond * 3600 / density, source: 'ESTIMATED_MAP', airFuelRatio: afr, fuelDensityKgPerL: density, fuelModel };
   }
 
   return null;
