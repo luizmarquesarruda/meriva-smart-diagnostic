@@ -128,7 +128,7 @@ export default function LaboratorioScreen() {
           // sessão já fechada
         }
         updateAutoSaveState((state) => {
-          state.obd = { ...state.obd, connected: false };
+          state.obd = { ...state.obd, connected: false, protocol: undefined, lastKnownProtocol: state.obd.protocol ?? state.obd.lastKnownProtocol };
         });
         await forceSaveOnObdEvent();
       })();
@@ -273,7 +273,7 @@ export default function LaboratorioScreen() {
         await activeSession?.close();
       }
       updateAutoSaveState((state) => {
-        state.obd = { ...state.obd, connected: false };
+        state.obd = { ...state.obd, connected: false, protocol: undefined, lastKnownProtocol: state.obd.protocol ?? state.obd.lastKnownProtocol };
       });
       await forceSaveOnObdEvent();
       setTripFuelSupported(null);
