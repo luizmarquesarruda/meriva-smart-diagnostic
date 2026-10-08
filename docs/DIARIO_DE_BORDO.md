@@ -1362,3 +1362,13 @@ A alimentação automática de dados foi religada ao pipeline persistente. O his
 
 ### Validação
 Ainda não há nova CI registrada para esta correção. A validação automática deve confirmar typecheck, suíte completa e Android Release antes de considerar o ajuste definitivamente concluído.
+### 2026-10-08 — Validação intermediária e correção de tipagem
+
+A CI #1231 / run `37793417849`, disparada pelo commit documental `e0ef80b84844b958e45b12620b0bd0e57bb1deb6`, executou `npm ci` e Expo Doctor `17/17` com sucesso, mas o typecheck parou em `app/laboratorio.tsx:204` porque `connected.protocol` continuava tipado como `string | null` dentro do callback de `updateAutoSaveState`.
+
+Correção aplicada em `152945f227836c1a7954bb0359c76c6a33dba24b`: o valor foi estreitado para `discoveredProtocol` antes do callback. O `android-build` da CI #1231 foi corretamente pulado por depender de `validate`.
+
+### Reforço dos testes de alimentação de dados
+O teste de persistência REAL foi ampliado para verificar também `lastReadings` e a criação do log OBD, enquanto a regressão de `autoTripService` garante que os PIDs automáticos passem pelo `registerObdQuery`.
+
+Commit adicional: `ae1672fd00342891a7272bbd435aedac2e5b73f3`.
