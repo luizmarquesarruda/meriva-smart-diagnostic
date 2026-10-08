@@ -14,7 +14,7 @@ import { getDtcDefinition } from '../src/obd/dtcDefinition';
 import { getSharedObdConnection, getSharedObdStatus, setSharedObdConnection, subscribeSharedObd, disconnectSharedObd } from '../src/obd/sharedConnection';
 import { autoTripService } from '../src/trip/autoTripService';
 import { getMidLayout } from '../src/ui/midLayout';
-import { scanDtcServices, type DtcServiceScan } from '../src/obd/dtcScanner';
+import { scanDtcServices, readFreezeFrame, type DtcServiceScan } from '../src/obd/dtcScanner';
 import { getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
 
 import { DtcRecord, nextDtcOccurrences, readDtcs, recordDtc } from '../src/database/dtcManager';
@@ -345,6 +345,9 @@ export default function LaboratorioScreen() {
         : await scanDtcServices(activeSession);
       setDtcScan(results);
       const stored = results.find((item) => item.kind === 'STORED');
+      const freezeFrame = mode === 'REAL'
+        ? await autoTripService.withPollingPaused(() => readFreezeFrame(activeSession))
+        : null;
       setDtcCodes(stored?.codes ?? []);
 
       if (mode === 'REAL') {
@@ -372,6 +375,14 @@ export default function LaboratorioScreen() {
             source: 'REAL_OBD',
             historical: false,
             confirmed: kind !== 'PENDING',
+            ...(freezeFrame?.available ? {
+              freezeFrame: {
+                frame: freezeFrame.frame,
+                dtc: freezeFrame.dtc,
+                rpm: freezeFrame.rpm,
+                coolantC: freezeFrame.coolantC,
+              },
+            } : {}),
           };
         });
 
