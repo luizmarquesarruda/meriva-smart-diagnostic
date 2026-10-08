@@ -95,9 +95,10 @@ export class RealTripRecorder {
 
   buildDriveCycle(finishedAtMs = Date.now()): DriveCycle | null {
     const state = this.getState();
-    if (state.distanceKm < 0.1 || state.fuelUsedL <= 0 || state.validFuelSamples < 2) return null;
+    if (state.distanceKm < 0.1 || state.durationMs <= 0) return null;
 
-    const avgFuelConsumptionKml = state.distanceKm / state.fuelUsedL;
+    const hasFuelEvidence = state.fuelUsedL > 0 && state.validFuelSamples >= 2;
+    const avgFuelConsumptionKml = hasFuelEvidence ? state.distanceKm / state.fuelUsedL : 0;
     const avgDrivingSpeedKmh = state.movingTimeMs > 0
       ? state.distanceKm / (state.movingTimeMs / 3_600_000)
       : 0;
@@ -108,13 +109,14 @@ export class RealTripRecorder {
       finishedAt: new Date(finishedAtMs).toISOString(),
       distanceTotalKm: state.distanceKm,
       distanceIceKm: state.distanceKm,
-      fuelUsedL: state.fuelUsedL,
+      fuelUsedL: hasFuelEvidence ? state.fuelUsedL : 0,
       totalTimeHms: formatDuration(state.durationMs),
       drivingTimeHms: formatDuration(state.movingTimeMs),
       standingTimeHms: formatDuration(Math.max(0, state.durationMs - state.movingTimeMs)),
       avgDrivingSpeedKmh: Number(avgDrivingSpeedKmh.toFixed(3)),
       avgFuelConsumptionKml: Number(avgFuelConsumptionKml.toFixed(3)),
       source: 'REAL_OBD',
+      fuelConsumptionStatus: hasFuelEvidence ? 'AVAILABLE' : 'SEM_DADOS',
       fuelRateSource: this.fuelRateSources.size === 1
         ? [...this.fuelRateSources][0]
         : this.fuelRateSources.size > 1 ? 'MIXED' : undefined,
