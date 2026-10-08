@@ -17,6 +17,7 @@ function loadTs(file) {
 const compat = loadTs('src/obd/elm327Compatibility.ts');
 assert.strictEqual(compat.classifyElmError('7F 22 78'), 'RESPONSE_PENDING');
 assert.strictEqual(compat.classifyElmError('RESPONSE PENDING'), 'RESPONSE_PENDING');
+assert.strictEqual(compat.classifyElmError('7E8 03 7F 22 78'), 'RESPONSE_PENDING');
 const cfg = compat.mergeCompatibilityConfig();
 assert.strictEqual(cfg.responsePendingMaxRetries, 3);
 assert.strictEqual(cfg.responsePendingDelayMs, 150);
