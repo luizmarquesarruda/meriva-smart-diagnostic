@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
 import { Elm327Session } from '../src/obd/elm327';
 import { parseDtcResponse, parsePidResponse } from '../src/obd/parser';
@@ -498,6 +499,7 @@ export default function LaboratorioScreen() {
   });
 
   return (
+    <SafeAreaView style={{flex:1,backgroundColor:'#eef3fb'}} edges={["top","bottom","left","right"]}>
     <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
       <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
       <Text style={styles.title}>DIAGNÓSTICO OBD</Text>
@@ -639,6 +641,7 @@ export default function LaboratorioScreen() {
       {!!error && <Text style={styles.error}>{error}</Text>}
       </View>
     </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -648,7 +651,7 @@ const styles = StyleSheet.create({
   status: { color: '#2563eb', fontWeight: '700', marginBottom: 6 },
   protocol: { color: '#475569', fontWeight: '600', marginBottom: 8 },
   connectionSummary: { flexDirection: 'row', gap: 8, marginBottom: 10 },
-  connectionItem: { flex: 1, backgroundColor: '#fff', borderRadius: 7, borderWidth: 1, borderColor: '#d1d9e2', padding: 9 },
+  connectionItem: { flex: 1, minWidth: 0, backgroundColor: '#fff', borderRadius: 7, borderWidth: 1, borderColor: '#d1d9e2', padding: 9 },
   connectionLabel: { color: '#64748b', fontSize: 9, fontWeight: '900' },
   connectionValue: { color: '#1f2937', fontSize: 12, fontWeight: '900', marginTop: 3 },
   modeRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
@@ -698,7 +701,7 @@ const styles = StyleSheet.create({
   dtcPanel: { backgroundColor: '#fff', borderRadius: 10, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#cbd5e1' },
   dtcTitle: { color: '#1557a6', fontSize: 13, fontWeight: '900', marginBottom: 6 },
   dtcRow: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingVertical: 8 },
-  dtcKind: { color: '#334155', fontSize: 10, fontWeight: '900' },
+  dtcKind: { color: '#334155', flexShrink: 1,, fontSize: 10, fontWeight: '900' },
   dtcCodes: { color: '#64748b', fontSize: 10, marginTop: 3 },
   dtcAvailable: { color: '#15803d', fontSize: 8, fontWeight: '900' },
   dtcUnavailable: { color: '#b45309', fontSize: 8, fontWeight: '900' },
