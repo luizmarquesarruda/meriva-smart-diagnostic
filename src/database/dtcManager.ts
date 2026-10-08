@@ -84,7 +84,7 @@ export async function readDtcs(basePath: string): Promise<DtcRecord[]> {
 
 export async function getCurrentDtcs(basePath: string): Promise<DtcRecord[]> {
   const all = await readDtcs(basePath);
-  return all.filter((dtc) => ['CURRENT', 'CONFIRMED', 'PENDING'].includes(dtc.status));
+  return all.filter((dtc) => ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(dtc.status));
 }
 
 export async function getHistoricalDtcs(basePath: string): Promise<DtcRecord[]> {
