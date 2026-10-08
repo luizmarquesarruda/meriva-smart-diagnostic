@@ -937,3 +937,31 @@ Plano registrado antes das alterações. Próximo passo: implementar a identific
 
 ### Validação
 Foi feita leitura estática e auditoria cruzada do diff. CI não foi executada, conforme solicitado. A próxima CI deve confirmar TypeScript, testes e Android Release.
+
+
+## 2026-10-08 — Auditoria sênior documental de PIDs, DTCs e motor diagnóstico
+
+### Solicitação
+Pesquisar documentação técnica da Chevrolet Meriva, referências de PIDs OBD-II e DTCs, auditar os catálogos e as fórmulas do aplicativo e corrigir o que estiver tecnicamente inconsistente. O foco é o veículo Meriva 1.4 8V Econo.Flex 2011/2012 já documentado no projeto, sem transformar dados de outras motorizações Meriva em compatibilidade confirmada.
+
+### Evidência documental pesquisada
+- Manual oficial Chevrolet Meriva MY12 / Brasil, usado como referência de configuração física e faixa de marcha lenta do veículo do projeto.
+- Chevrolet Brasil: página oficial de manuais de anos anteriores confirma disponibilidade dos manuais Meriva 2008–2012.
+- SAE J1979 / ISO 15031-5: referência para fórmulas e descoberta de PIDs OBD-II.
+- SAE J2012: referência para formato e definições padronizadas de DTC.
+- Tabelas de aplicação automotiva foram usadas somente para corroborar família de ECU/protocolo; não serão tratadas como prova de PID individual.
+
+### Plano técnico antes do código
+1. Auditar cada PID do catálogo contra bytes e fórmula.
+2. Corrigir qualquer inconsistência de bytes/formula, começando pelo PID 0114, que deve transportar dois bytes no padrão OBD-II embora a tensão do primeiro byte seja a grandeza exibida.
+3. Manter PIDs padrão separados de PIDs realmente confirmados na Meriva; seed CarScanner continua sendo referência, não evidência atual.
+4. Auditar DTCs pelo padrão SAE J2012 e separar definição padronizada de diagnóstico específico da Meriva.
+5. Impedir que DTCs históricos/inativos sejam tratados pelo motor como falhas atuais.
+6. Aprimorar o motor local para usar contexto operacional e evidência corroborativa, sem transformar limiares heurísticos em limites de fábrica.
+7. Usar o Manual Meriva para contextualizar a marcha lenta do veículo documentado, sem aplicar essa faixa a outras motorizações.
+8. Adicionar regressões para fórmulas, bytes, DTCs e regras de diagnóstico.
+9. Atualizar documentação técnica e Diário de Bordo com fontes e hashes.
+10. **Não executar CI nesta rodada.**
+
+### Invariantes
+Bluetooth Classic/ELM327, gate ECU 010C → 41 0C, separação REAL_OBD/SIMULACAO, autosave e package-lock não devem ser alterados nesta auditoria.
