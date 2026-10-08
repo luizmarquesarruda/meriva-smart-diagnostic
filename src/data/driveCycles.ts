@@ -13,6 +13,7 @@ export interface DriveCycle {
   avgDrivingSpeedKmh: number;
   avgFuelConsumptionKml: number;
   source: DriveCycleSource;
+  fuelRateSource?: 'MEASURED_015E' | 'ESTIMATED_MAF' | 'ESTIMATED_MAP' | 'MIXED';
   importedAt: string;
 }
 
