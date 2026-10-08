@@ -1445,3 +1445,27 @@ O run #1235 permaneceu como histórico de falha de teste; a causa foi a asserç�
 
 ### Estado
 A correção desta etapa está consolidada no `main` e validada por CI. A validação física do ELM327/Meriva continua necessária para confirmar comportamento de hardware e compatibilidade real de PIDs.
+
+## 2026-10-08 — Execução em segundo plano com tela apagada
+
+### Problema
+O monitoramento automático usava setTimeout/setInterval no JavaScript e watchPositionAsync. Esses mecanismos não constituem um serviço persistente de Android: com a aplicação em segundo plano ou a tela apagada, a execução poderia ser suspensa e o histórico deixaria de receber telemetria.
+
+### Decisão arquitetural
+Em vez de criar um segundo serviço nativo concorrente ao Bluetooth Classic, foi adotado o Foreground Service do próprio expo-location, combinado com expo-task-manager. O serviço é iniciado somente depois da validação real da ECU (010C -> 41 0C) e é encerrado quando a sessão OBD é desconectada.
+
+### Implementação
+- adicionado expo-task-manager ~11.8.2, alinhado à árvore Expo SDK 51;
+- src/gps/backgroundLocationTask.ts registra uma tarefa global com TaskManager.defineTask;
+- GpsTracker ganhou startBackgroundLocation()/stopBackgroundLocation() e mantém o mesmo filtro de precisão, movimento e velocidade;
+- Location.startLocationUpdatesAsync() usa foregroundService com notificação persistente;
+- app.json habilita ACCESS_BACKGROUND_LOCATION e o config plugin do expo-location para localização em segundo plano + Foreground Service;
+- sharedConnection inicia o monitoramento após a sessão OBD/autosave e o interrompe em desconexão;
+- app/_layout.tsx registra a tarefa antes do Router;
+- testes estáticos cobrem dependência, lockfile, permissões, tarefa headless e vínculo com o ciclo ECU.
+
+### Limites
+Esse modo permite continuidade com a tela apagada enquanto o Foreground Service estiver ativo e as permissões estiverem concedidas. Não equivale a sobrevivência após force-stop/encerramento explícito do aplicativo, e otimizações agressivas de bateria do fabricante podem impor restrições adicionais.
+
+### Validação
+A correção aguarda validação pela CI nesta branch antes de ser considerada concluída.
