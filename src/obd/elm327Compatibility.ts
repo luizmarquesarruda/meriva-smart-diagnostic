@@ -16,7 +16,7 @@ export interface Elm327CompatibilityConfig {
   ioTimeoutMs: number;
   bluetoothConnectTimeoutMs: number;
   commandDelayMs: number;
-  maxConnectionAttempts: number; // 0 = infinite
+  maxConnectionAttempts: number; // 0 = usar o limite-base finito do catálogo
   noDataReconnectThreshold: number;
   partialResponseAction: PartialResponseAction;
   forceInitialization: boolean;
@@ -45,7 +45,7 @@ export const DEFAULT_ELM327_COMPATIBILITY: Elm327CompatibilityConfig = {
   ioTimeoutMs: 15_000,
   bluetoothConnectTimeoutMs: 5_000,
   commandDelayMs: 20,
-  maxConnectionAttempts: 2,
+  maxConnectionAttempts: 20,
   noDataReconnectThreshold: 40,
   partialResponseAction: 'RECONNECT_AND_INITIALIZE',
   forceInitialization: true,
