@@ -818,6 +818,13 @@ async function testAutosaveRace() {
   m.disposeAutoSave();
 }
 
+(function testDtcOccurrenceSemantics() {
+  const dtcManager = loadTs(path.join(ROOT, 'src/database/dtcManager.ts'));
+  assert.strictEqual(dtcManager.nextDtcOccurrences(undefined), 1, 'novo DTC deve iniciar em 1');
+  assert.strictEqual(dtcManager.nextDtcOccurrences({ status: 'CURRENT', occurrences: 4 }), 4, 'leitura repetida não deve inflar ocorrências');
+  assert.strictEqual(dtcManager.nextDtcOccurrences({ status: 'INACTIVE', occurrences: 4 }), 5, 'novo ciclo após inatividade deve incrementar ocorrência');
+})();
+
 async function main() {
   const tests = [
     ['banco de fórmulas OBD', testFormulaKnowledgeBank],
