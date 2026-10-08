@@ -790,3 +790,7 @@ A configuração de rotação livre e o layout responsivo estão implementados n
 
 ### Próximo passo
 Concluir a CI do commit final e, em seguida, validar o APK em um dispositivo Android físico nas duas orientações.
+### Correção pós-CI
+A CI intermediária detectou erro de compilação JSX em app/bluetooth.tsx: o View screenFrame ficou com o fechamento incompleto durante a transformação responsiva.
+Correção aplicada: fechamento do componente restaurado e tela Bluetooth mantida com grade responsiva de conexão.
+A execução final de CI correspondente ao commit de correção foi disparada automaticamente e ainda está pendente no momento deste registro.
