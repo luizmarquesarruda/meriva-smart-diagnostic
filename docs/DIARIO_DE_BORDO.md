@@ -1701,3 +1701,14 @@ Nenhuma CI foi disparada manualmente nesta etapa. A confirmação final ainda de
 - Foram adicionados casos adversariais para leitura antiga, valor fora da faixa, timeout e normalização de código DTC.
 
 **Validação:** alterações gravadas na branch `feat/obd-polling-reliability-20261008`. Testes automatizados e typecheck ainda não foram executados nesta etapa. **CI não disparada**, conforme restrição vigente.
+
+### Complemento — coerência temporal e contexto do motor
+
+- Regras combinadas de fuel trim e MAP exigem snapshots cujos timestamps diferem no máximo 2 segundos.
+- Regras de mistura e MAP em marcha lenta são bloqueadas quando o RPM é igual ou inferior a 400.
+- Picos isolados não geram hipótese PID: a regra exige 10 amostras coerentes distribuídas por pelo menos 30 segundos dentro de uma janela de 60 segundos. Se a condição desaparece, a contagem temporal é reiniciada.
+- A tela Saúde atualiza o estado observado a cada 5 segundos (em vez de cada segundo), reduzindo a frequência de reavaliação da árvore diagnóstica. Não foi adicionado lodash ou uma dependência nova.
+- A base JSON agora documenta esses requisitos; o TXT de diagnóstico inclui contadores de snapshots incoerentes, regras pendentes e regras bloqueadas com o motor desligado.
+- Testes adversariais adicionados para pico isolado, RPM zero, PIDs separados por mais de 2 segundos e persistência por 10 amostras/30 segundos.
+
+**Limitação conhecida:** a tela Saúde usa um refresh periódico de 5 s, não um scheduler dedicado em worker. O motor é pequeno e síncrono; ainda não há benchmark de FPS ou perfil de bateria. Testes e typecheck permanecem pendentes porque nenhuma CI foi disparada.
