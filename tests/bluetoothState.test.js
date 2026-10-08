@@ -1,11 +1,8 @@
 'use strict';
 
 const assert = require('assert');
-const fs = require('fs');
-const path = require('path');
-
-const ROOT = path.resolve(__dirname, '..');
 const { loadTs } = require('./helpers/loadTs');
+const state = loadTs('src/obd/bluetoothState.ts');
 
 for (const connected of [
   'BLUETOOTH_CONNECTED',
