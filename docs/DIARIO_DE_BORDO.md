@@ -1397,3 +1397,6 @@ A duplicação não corrompe o autosave principal, mas distorce a série tempora
 
 ### Estado
 Plano registrado antes da alteração de código. A CI anterior continua sendo apenas a referência da versão anterior; a nova CI será o árbitro desta correção.
+
+### Preparação da CI de validação
+As correções desta auditoria já estão no `main`. Esta branch de verificação preserva exatamente o código corrigido e adiciona somente este registro documental para forçar uma execução verificável do GitHub Actions sobre o estado atual.
