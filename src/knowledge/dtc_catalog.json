@@ -1,36 +1,42 @@
 {
-  "version": 1,
-  "description": "Catálogo local mínimo de DTCs efetivamente utilizados/observados pelo aplicativo. Ausência no catálogo não autoriza inferência.",
+  "version": 2,
+  "description": "Catálogo local de DTCs padronizados SAE J2012 usados pelo aplicativo. A definição do código descreve a condição monitorada; não é, isoladamente, diagnóstico da causa nem prova de componente defeituoso.",
+  "standard": "SAE J2012",
   "codes": [
     {
-      "code": "P0135",
-      "name": "Circuito do aquecedor do sensor de oxigênio",
-      "description": "Falha no circuito do aquecedor do sensor O2, Banco 1 Sensor 1.",
-      "system": "POWERTRAIN / EMISSÕES"
-    },
-    {
-      "code": "P0420",
-      "name": "Eficiência do sistema catalisador abaixo do limite",
-      "description": "A ECU detectou eficiência do catalisador do Banco 1 abaixo do limiar monitorado.",
-      "system": "POWERTRAIN / EMISSÕES"
-    },
-    {
       "code": "P0123",
-      "name": "Sinal do sensor de posição da borboleta alto",
-      "description": "Sinal do circuito de posição da borboleta acima do esperado pelo monitor.",
-      "system": "POWERTRAIN / ADMISSÃO"
-    },
-    {
-      "code": "P0301",
-      "name": "Falha de combustão detectada no cilindro 1",
-      "description": "A ECU registrou falha de combustão associada ao cilindro 1.",
-      "system": "POWERTRAIN / IGNIÇÃO"
+      "name": "Sensor/interruptor de posição da borboleta/pedal A — sinal alto",
+      "description": "O circuito A de posição da borboleta/pedal apresentou sinal acima do esperado pelo monitor da ECU.",
+      "system": "POWERTRAIN / ADMISSÃO",
+      "standardized": true
     },
     {
       "code": "P0133",
-      "name": "Resposta lenta do sensor de oxigênio",
-      "description": "Resposta do sensor O2 considerada lenta pelo monitor da ECU.",
-      "system": "POWERTRAIN / EMISSÕES"
+      "name": "Resposta lenta do sensor de oxigênio — Banco 1 Sensor 1",
+      "description": "A resposta monitorada do sensor de oxigênio do Banco 1 Sensor 1 foi considerada lenta pela ECU.",
+      "system": "POWERTRAIN / EMISSÕES",
+      "standardized": true
+    },
+    {
+      "code": "P0135",
+      "name": "Circuito do aquecedor do sensor de oxigênio — Banco 1 Sensor 1",
+      "description": "Foi detectada uma condição de falha no circuito do aquecedor do sensor de oxigênio do Banco 1 Sensor 1.",
+      "system": "POWERTRAIN / EMISSÕES",
+      "standardized": true
+    },
+    {
+      "code": "P0301",
+      "name": "Falha de combustão detectada — cilindro 1",
+      "description": "A ECU detectou uma condição de falha de combustão associada ao cilindro 1.",
+      "system": "POWERTRAIN / COMBUSTÃO",
+      "standardized": true
+    },
+    {
+      "code": "P0420",
+      "name": "Eficiência do sistema catalisador abaixo do limite — Banco 1",
+      "description": "A ECU detectou eficiência monitorada do sistema catalisador do Banco 1 abaixo do limiar definido pelo monitor.",
+      "system": "POWERTRAIN / EMISSÕES",
+      "standardized": true
     }
   ]
 }
