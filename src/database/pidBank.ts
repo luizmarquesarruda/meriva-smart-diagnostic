@@ -14,6 +14,10 @@ export interface PidConfirmationEntry {
   responseTime: number;
   source: DataSource;
   confidence: number;
+  unit?: string;
+  formulaId?: string;
+  bytes?: number;
+  description?: string;
 }
 
 const fileQueues = new Map<string, Promise<void>>();
@@ -41,6 +45,10 @@ export async function recordPidConfirmation(
         entry.responseTime,
         entry.source,
         entry.confidence,
+        entry.unit ?? '',
+        entry.formulaId ?? '',
+        entry.bytes ?? '',
+        entry.description ?? '',
       ].join('|');
 
       const info = await FileSystem.getInfoAsync(target);
@@ -100,6 +108,10 @@ export async function readPidConfirmations(
         responseTime,
         source,
         confidence,
+        unit,
+        formulaId,
+        bytes,
+        description,
       ] = line.split('|');
 
       const parsedClassification: PidClassification =
@@ -136,6 +148,10 @@ export async function readPidConfirmations(
         responseTime: Number.isFinite(Number(responseTime)) ? Number(responseTime) : 0,
         source: parsedSource,
         confidence: Number.isFinite(Number(confidence)) ? Number(confidence) : 0,
+        unit: unit || undefined,
+        formulaId: formulaId || undefined,
+        bytes: Number.isFinite(Number(bytes)) && bytes !== '' ? Number(bytes) : undefined,
+        description: description || undefined,
       };
     })
     .filter((entry) => Boolean(entry.pid));
