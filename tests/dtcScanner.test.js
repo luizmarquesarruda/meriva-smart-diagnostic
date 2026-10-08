@@ -20,6 +20,9 @@ function loadTs(file) {
     if (request === './dtcParser' && parent?.filename?.endsWith(path.join('src', 'obd', 'dtcScanner.ts'))) {
       return loadTs('src/obd/dtcParser.ts');
     }
+    if (request === './parser' && parent?.filename?.endsWith(path.join('src', 'obd', 'dtcScanner.ts'))) {
+      return loadTs('src/obd/parser.ts');
+    }
     return originalLoad(request, parent, isMain);
   };
   try {
