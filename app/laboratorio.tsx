@@ -383,6 +383,7 @@ export default function LaboratorioScreen() {
             source: 'REAL_OBD',
             historical: false,
             confirmed: kind !== 'PENDING',
+            intermittent: Boolean(previous?.intermittent || previous?.historical || previous?.status === 'INACTIVE'),
             ...(freezeFrame?.available ? {
               freezeFrame: {
                 frame: freezeFrame.frame,
@@ -396,19 +397,18 @@ export default function LaboratorioScreen() {
 
         for (const record of records) await recordDtc(getBasePath(), record);
         const detectedCodes = new Set(records.map((item) => item.code));
-        const storedCodes = new Set(stored?.codes ?? []);
         const completeScan = results.length === 3 && results.every((item) => item.available);
         const becameInactive: DtcRecord[] = [];
         if (completeScan) {
           for (const item of existing) {
-            if (!['CURRENT', 'CONFIRMED'].includes(item.status) || storedCodes.has(item.code) || detectedCodes.has(item.code)) {
+            if (!['CURRENT', 'CONFIRMED'].includes(item.status) || detectedCodes.has(item.code)) {
               dtcAbsenceScansRef.current.delete(item.code);
               continue;
             }
             const absenceCount = (dtcAbsenceScansRef.current.get(item.code) ?? 0) + 1;
             dtcAbsenceScansRef.current.set(item.code, absenceCount);
             if (absenceCount >= 2) {
-              becameInactive.push({ ...item, status: 'INACTIVE', historical: true, lastSeen: now });
+              becameInactive.push({ ...item, status: 'INACTIVE', historical: true, intermittent: true, lastSeen: now });
               dtcAbsenceScansRef.current.delete(item.code);
             }
           }
