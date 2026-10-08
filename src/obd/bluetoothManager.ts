@@ -79,7 +79,7 @@ export async function requestBluetoothPermissions(): Promise<void> {
   logBluetoothDiagnostic('BLUETOOTH_PERMISSIONS_RESULT', status);
 }
 
-export async function ensureBluetoothReadydy(): Promise<boolean> {
+export async function ensureBluetoothReady(): Promise<boolean> {
   logBluetoothDiagnostic('BLUETOOTH_READY_START');
   if (Platform.OS !== 'android') {
     throw new Error('BLUETOOTH CLASSIC DISPONÍVEL SOMENTE NO ANDROID');
