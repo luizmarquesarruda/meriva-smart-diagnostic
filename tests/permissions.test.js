@@ -24,3 +24,8 @@ assert(permissionManager.includes('export async function requestBluetoothPermiss
 const bluetoothManager = fs.readFileSync('src/obd/bluetoothManager.ts', 'utf8');
 assert(bluetoothManager.includes('requestBluetoothPermissionsOnly'));
 assert(!bluetoothManager.includes('PermissionsAndroid.requestMultiple'), 'bluetoothManager não deve duplicar a implementação de permissões');
+
+const permissionSource = fs.readFileSync('src/permissions/permissionManager.ts', 'utf8');
+assert(permissionSource.includes('export async function requestAllRequiredPermissions'));
+assert(permissionSource.includes('export async function requestLocationPermissionsOnly'));
+assert(!permissionSource.includes('audit.bluetooth = await requestBluetoothPermissionsOnly'));
