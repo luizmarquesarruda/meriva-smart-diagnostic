@@ -7,6 +7,7 @@ import { getAutoSaveState } from '../src/meriva/autosaveManager';
 import { autoTripService } from '../src/trip/autoTripService';
 import { gpsTracker } from '../src/gps';
 import { getLivePidTrend, formatSparkline, getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
+import { getPidDefinition } from '../src/obd/pidDefinition';
 
 export default function DadosScreen() {
   const layout = useMidLayout();
@@ -50,7 +51,7 @@ export default function DadosScreen() {
       );
     })}
     <Text style={styles.section}>ÚLTIMAS LEITURAS REAIS</Text>
-    {!readings.length ? <Empty text="Nenhum PID real registrado ainda. Use DIAGNÓSTICO para consultar a ECU." /> : readings.slice(0, 12).map((item) => <View key={item.timestamp + item.pid} style={styles.row}><View style={{flex:1}}><Text style={styles.name} numberOfLines={2}>{item.name}</Text><Text style={styles.pid}>{item.pid} • {item.status}</Text></View><Text style={styles.value}>{item.value == null ? 'N/D' : String(item.value) + (item.unit ? ' ' + item.unit : '')}</Text></View>)}
+    {!readings.length ? <Empty text="Nenhum PID real registrado ainda. Use DIAGNÓSTICO para consultar a ECU." /> : readings.slice(0, 12).map((item) => { const definition=getPidDefinition(item.pid); return <View key={item.timestamp + item.pid} style={styles.row}><View style={{flex:1}}><Text style={styles.name} numberOfLines={2}>{item.pid} • {definition?.name ?? item.name}</Text><Text style={styles.pid}>{definition?.description ?? 'Descrição não catalogada localmente'} • {item.status}</Text></View><Text style={styles.value}>{item.value == null ? 'N/D' : String(item.value) + (item.unit ? ' ' + item.unit : '')}</Text></View>})}
     <View style={styles.note}><Text style={styles.noteText}>A tela não inventa telemetria: somente leituras marcadas como REAL entram como evidência do veículo.</Text></View>
     <Link href="/laboratorio" asChild><TouchableOpacity style={styles.primary}><Text style={styles.primaryText}>🔧 CONSULTAR / DESCOBRIR PIDs</Text></TouchableOpacity></Link>
     <Back />
