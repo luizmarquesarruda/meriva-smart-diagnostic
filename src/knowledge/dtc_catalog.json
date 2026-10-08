@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "description": "Catálogo local mínimo de DTCs efetivamente utilizados/observados pelo aplicativo. Ausência no catálogo não autoriza inferência.",
+  "codes": [
+    {
+      "code": "P0135",
+      "name": "Circuito do aquecedor do sensor de oxigênio",
+      "description": "Falha no circuito do aquecedor do sensor O2, Banco 1 Sensor 1.",
+      "system": "POWERTRAIN / EMISSÕES"
+    },
+    {
+      "code": "P0420",
+      "name": "Eficiência do sistema catalisador abaixo do limite",
+      "description": "A ECU detectou eficiência do catalisador do Banco 1 abaixo do limiar monitorado.",
+      "system": "POWERTRAIN / EMISSÕES"
+    },
+    {
+      "code": "P0123",
+      "name": "Sinal do sensor de posição da borboleta alto",
+      "description": "Sinal do circuito de posição da borboleta acima do esperado pelo monitor.",
+      "system": "POWERTRAIN / ADMISSÃO"
+    },
+    {
+      "code": "P0301",
+      "name": "Falha de combustão detectada no cilindro 1",
+      "description": "A ECU registrou falha de combustão associada ao cilindro 1.",
+      "system": "POWERTRAIN / IGNIÇÃO"
+    },
+    {
+      "code": "P0133",
+      "name": "Resposta lenta do sensor de oxigênio",
+      "description": "Resposta do sensor O2 considerada lenta pelo monitor da ECU.",
+      "system": "POWERTRAIN / EMISSÕES"
+    }
+  ]
+}
