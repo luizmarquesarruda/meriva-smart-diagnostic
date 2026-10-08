@@ -399,5 +399,4 @@ export function disposeAutoSave(): void {
   runtime.lastSaveReason = null;
   runtime.lastError = null;
   runtime.lastSavedFingerprint = null;
-  persistenceOverrideForTests = null;
 }
