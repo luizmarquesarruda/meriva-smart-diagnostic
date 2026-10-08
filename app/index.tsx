@@ -166,7 +166,8 @@ export default function IndexScreen() {
 
   const summary = useMemo(() => getDriveCycleSummary(cycles), [cycles]);
   const realConsumptionKml = summary.avgConsumptionKml > 0 ? summary.avgConsumptionKml : null;
-  const availableConsumptionKml = tripState.averageConsumptionKml > 0 ? tripState.averageConsumptionKml : realConsumptionKml;
+  const historicalConsumptionKml = realConsumptionKml ?? (tripState.averageConsumptionKml > 0 ? tripState.averageConsumptionKml : null);
+  const historicalConsumptionSource = realConsumptionKml != null ? 'REAL_OBD' : tripState.averageConsumptionKml > 0 ? 'CARSCANNER_BASELINE' : 'SEM DADOS';
   const distanceUnit = settings?.distanceUnit ?? 'KM';
 
   return (
@@ -185,6 +186,12 @@ export default function IndexScreen() {
               <Text style={styles.subtitle} numberOfLines={1}>COCKPIT DE DIAGNÓSTICO</Text>
             </View>
             <View style={styles.connectionPill}><View style={[styles.dot, connectionStatus.ecuConnected ? styles.dotOk : bluetoothError ? styles.dotDanger : styles.dotWarn]} /><Text style={styles.connectionText}>{connectionStatus.ecuResponseState === 'NO_RESPONSE' ? 'ECU SEM RESPOSTA' : connectionStatus.ecuResponseState === 'RECOVERING' ? 'RECUPERANDO' : connectionStatus.ecuConnected ? 'ECU' : connectionStatus.bluetoothConnected ? 'BLUETOOTH' : bluetoothSearching ? 'CONECTANDO' : 'OFFLINE'}</Text></View>
+          </View>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>CONSUMO — FONTES SEPARADAS</Text>
+            <Text style={styles.cardText}>Instantâneo: {tripState.instantaneousConsumptionKml != null ? tripState.instantaneousConsumptionKml.toFixed(2) + ' km/L' : 'SEM DADOS'} • {tripState.instantaneousConsumptionSource}</Text>
+            <Text style={styles.cardText}>Viagem atual: {tripState.consumptionKml != null ? tripState.consumptionKml.toFixed(2) + ' km/L' : 'SEM DADOS'} • {tripState.tripConsumptionSource}</Text>
+            <Text style={styles.cardText}>Média histórica: {historicalConsumptionKml != null ? historicalConsumptionKml.toFixed(2) + ' km/L' : 'SEM DADOS'} • {historicalConsumptionSource}</Text>
           </View>
           <View style={styles.heroCard}>
             <Text style={styles.heroEyebrow}>{connectionStatus.ecuResponseState === 'NO_RESPONSE' ? 'ADAPTADOR OK • ECU SEM RESPOSTA' : connectionStatus.ecuResponseState === 'RECOVERING' ? 'RECUPERANDO PROTOCOLO ECU' : connectionStatus.ecuConnected ? 'MOTOR • ECU CONECTADA' : 'ESTADO DO VEÍCULO'}</Text>
