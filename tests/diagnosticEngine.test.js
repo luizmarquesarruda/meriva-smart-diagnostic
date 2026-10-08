@@ -11,6 +11,21 @@ function obs(pid, value, source = 'REAL_OBD') {
   return { pid, name: pid, value, unit: 'N/D', source, timestamp: new Date().toISOString(), confidence: 'HIGH', status: 'RESPONDEU' };
 }
 
+function obsAt(pid, value, timestamp, source = 'REAL_OBD', status = 'RESPONDEU') {
+  return { pid, name: pid, value, unit: 'N/D', source, timestamp: new Date(timestamp).toISOString(), confidence: 'HIGH', status };
+}
+
+function runPersistent(engine, condition, values) {
+  engine.resetDiagnosticTemporalState();
+  let result;
+  const now = Date.now();
+  for (let i = 0; i < 10; i++) {
+    const timestamp = now - (9 - i) * 4_000;
+    result = engine.runLocalDiagnostic({ condition, dtcs: [], observations: values.map(([pid, value, source = 'REAL_OBD']) => obsAt(pid, value, timestamp, source)) });
+  }
+  return result;
+}
+
 function main() {
   assert.ok(fs.existsSync(DIAGNOSTIC_RULES_PATH), 'diagnostic_rules.json deve existir');
   const rules = require(DIAGNOSTIC_RULES_PATH);
@@ -34,22 +49,14 @@ function main() {
   });
   assert.strictEqual(result.hypotheses.length, 0);
 
-  result = engine.runLocalDiagnostic({
-    ...base,
-    observations: [obs('0106', 12), obs('0107', 5)],
-  });
+  result = runPersistent(engine, 'IDLE_WARM', [['0106', 12], ['0107', 5], ['010C', 800]]);
   assert.strictEqual(result.hypotheses[0].id, 'MISTURA_POBRE');
+  assert.strictEqual(result.pendingTemporalRules, 0, 'regra persistente deve confirmar após 10 amostras em 30 s');
 
-  result = engine.runLocalDiagnostic({
-    ...base,
-    observations: [obs('0106', -20), obs('0107', -5)],
-  });
+  result = runPersistent(engine, 'IDLE_WARM', [['0106', -20], ['0107', -5], ['010C', 800]]);
   assert.strictEqual(result.hypotheses[0].id, 'MISTURA_RICA');
 
-  result = engine.runLocalDiagnostic({
-    ...base,
-    observations: [obs('010B', 50)],
-  });
+  result = runPersistent(engine, 'IDLE_WARM', [['010B', 50], ['010C', 800]]);
   assert.strictEqual(result.hypotheses[0].id, 'VACUO_DO_MOTOR_POSSIVELMENTE_ANORMAL');
 
   result = engine.runLocalDiagnostic({
@@ -87,12 +94,13 @@ function main() {
   });
   assert.strictEqual(result.hypotheses.length, 0, 'fuel trim isolado em aceleração não deve ser classificado pela regra de marcha lenta/cruzeiro');
 
-  result = engine.runLocalDiagnostic({ ...base, observations: [obs('010B', 80, 'simulacao'), obs('0106', 20, 'REAL_OBD'), obs('0107', 0, 'REAL_OBD')] });
-  assert.strictEqual(result.hypotheses.length, 1);
-  assert.strictEqual(result.hypotheses[0].id, 'MISTURA_POBRE');
+  engine.resetDiagnosticTemporalState();
+  result = engine.runLocalDiagnostic({ ...base, observations: [obs('010B', 80, 'simulacao'), obs('0106', 20, 'REAL_OBD'), obs('0107', 0, 'REAL_OBD'), obs('010C', 800, 'REAL_OBD')] });
+  assert.strictEqual(result.hypotheses.length, 0, 'mistura sem snapshot temporal completo não deve gerar hipótese');
   assert.strictEqual(result.blockedSimulationSamples, 1);
 
   // Red-team: leitura antiga, valor impossível e resposta com falha não podem virar hipótese.
+  engine.resetDiagnosticTemporalState();
   result = engine.runLocalDiagnostic({
     ...base,
     observations: [
@@ -104,6 +112,16 @@ function main() {
   assert.strictEqual(result.hypotheses.length, 0, 'leituras antigas, fora de faixa ou sem resposta válida devem ser bloqueadas');
   assert.strictEqual(result.blockedStaleSamples, 1);
   assert.strictEqual(result.blockedInvalidSamples, 2);
+
+  engine.resetDiagnosticTemporalState();
+  result = engine.runLocalDiagnostic({ ...base, observations: [obs('0106', 20), obs('0107', 0), obs('010C', 0)] });
+  assert.strictEqual(result.hypotheses.length, 0, 'RPM zero deve bloquear regras de mistura');
+  assert.ok(result.blockedEngineOffRules > 0);
+
+  engine.resetDiagnosticTemporalState();
+  result = engine.runLocalDiagnostic({ ...base, observations: [obsAt('0106', 20, Date.now()), obsAt('0107', 0, Date.now() - 5_000), obs('010C', 800)] });
+  assert.strictEqual(result.hypotheses.length, 0, 'PIDs separados por mais de 2 s não formam snapshot coerente');
+  assert.ok(result.blockedIncoherentSnapshots > 0);
 
   result = engine.runLocalDiagnostic({
     ...base,
