@@ -236,38 +236,19 @@ function startBluetoothMonitor(): void {
           if (keepAlive.status !== 'OK') lastEcuError = keepAlive.errorMessage ?? 'KEEP-ALIVE KWP SEM RESPOSTA';
         }
 
-        // A cada 3 ciclos (~15 s), valida a ECU com um PID real. O Bluetooth
-        // pode permanecer conectado enquanto a ECU deixa de responder.
+        // A cada 3 ciclos (~15 s), valida a ECU com um PID real como
+        // redundância. O polling normal também alimenta o mesmo estado.
         if (healthTick % 3 !== 0) return;
         const probe = await connection.session.queryPid('010C');
         const valid = probe.commandStatus === 'OK'
           && probe.parsed.status === 'RESPONDEU'
           && Number.isFinite(probe.parsed.value);
-
-        if (valid) {
-          consecutiveEcuFailures = 0;
-          lastEcuResponseAt = new Date().toISOString();
-          lastEcuError = null;
-          setEcuResponseState('RESPONDING');
-          return;
-        }
-
-        consecutiveEcuFailures += 1;
-        lastEcuError = probe.rx || probe.commandStatus || 'ECU SEM RESPOSTA';
-        if (consecutiveEcuFailures < connection.session.getCompatibilityConfig().noDataReconnectThreshold) {
-          setEcuResponseState('NO_RESPONSE', lastEcuError);
-          return;
-        }
-
-        setEcuResponseState('RECOVERING', lastEcuError);
-        const recovered = await connection.session.recoverProtocol();
-        if (recovered) {
-          consecutiveEcuFailures = 0;
-          lastEcuResponseAt = new Date().toISOString();
-          lastEcuError = null;
-          setEcuResponseState('RESPONDING');
-        } else {
-          await handleUnexpectedDisconnect('ECU SEM RESPOSTA APÓS RECUPERAÇÃO DE PROTOCOLO');
+        await reportEcuPollResult(
+          valid,
+          probe.rx || probe.commandStatus || 'ECU SEM RESPOSTA',
+        );
+        if (ecuResponseState === 'RECOVERING') {
+          await recoverEcuIfNeeded();
         }
       } catch (cause) {
         consecutiveEcuFailures += 1;
