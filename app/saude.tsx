@@ -3,6 +3,7 @@ import { Link } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMidLayout } from '../src/ui/midLayout';
+import { useAppEventRevision } from '../src/ui/useAppEventRevision';
 import { getAutoSaveState } from '../src/meriva/autosaveManager';
 import { runLocalDiagnostic, type DiagnosticResult } from '../src/diagnostics/diagnosticEngine';
 import type { PidObservation } from '../src/types/sourceTypes';
@@ -12,7 +13,7 @@ import { getDtcDefinition } from '../src/obd/dtcDefinition';
 export default function SaudeScreen() {
   const layout = useMidLayout();
   const [state,setState]=useState(getAutoSaveState());
-  useEffect(()=>{const t=setInterval(()=>setState(getAutoSaveState()),1000);return()=>clearInterval(t)},[]);
+  useEffect(()=>{ setState(getAutoSaveState()); },[eventRevision]);
   const context = getVehicleConditionSnapshot();
   const activeDtcs = state.dtcs.filter((item) => ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(item.status));
   const diagnostic: DiagnosticResult = useMemo(()=>runLocalDiagnostic({observations:state.lastReadings.map(r=>({pid:r.pid,name:r.name,value:r.value,unit:r.unit,source:r.source==='SIMULACAO'?'SIMULACAO':'REAL_OBD',timestamp:r.timestamp,confidence:r.source==='SIMULACAO'?'LOW':'GOOD'} as PidObservation)),dtcs:state.dtcs,condition:context.condition}),[state,context.condition]);
