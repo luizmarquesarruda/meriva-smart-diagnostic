@@ -632,3 +632,124 @@ A implementação foi alinhada à documentação oficial do Expo para `orientati
 
 ### Estado
 A configuração de rotação está implementada no repositório. A conclusão da etapa depende da CI completa: typecheck, suíte de testes e Android Release devem terminar verdes. Após isso, o APK deve ser validado fisicamente em retrato e paisagem, incluindo rotação durante a tela principal e nas telas de diagnóstico.
+
+
+## 2026-10-08 — Auditoria de integridade: Safe Area, JSON e retry Bluetooth
+
+### Objetivo
+Continuar a auditoria de integridade solicitada após a etapa de rotação livre, sem executar a CI nesta rodada.
+
+### Achados confirmados e correções
+
+#### Interface e rotação
+As dez telas do aplicativo passaram a usar `react-native-safe-area-context` com `SafeAreaView` e edges explícitas. Foi criada a função `useMidLayout()` em `src/ui/midLayout.ts` para centralizar a leitura responsiva de largura/altura.
+
+As telas secundárias passaram a aplicar `horizontalPadding` e `maxContentWidth`. Dados, Viagens e Aprendizado receberam distribuição específica para landscape nos cartões métricos. Textos e linhas críticas receberam proteção contra compressão/overflow.
+
+Arquivos principais:
+- `src/ui/midLayout.ts`
+- `app/mais.tsx`
+- `app/dados.tsx`
+- `app/saude.tsx`
+- `app/veiculo.tsx`
+- `app/viagens.tsx`
+- `app/aprendizado.tsx`
+- `app/bluetooth.tsx`
+- `app/armazenamento.tsx`
+- `app/configuracoes.tsx`
+- `app/laboratorio.tsx`
+
+#### Auditoria cruzada dos JSON
+Foi encontrada e corrigida uma inconsistência real no catálogo: o PID `0151` usava `unit: "U8"`, mas essa chave não existia em `units.json`. O metadado passou a usar `unit: "code"` e `units.json` ganhou a definição de código enumerado.
+
+O teste `tests/knowledgeJson.test.js` foi ampliado para validar:
+- presença e tipo das versões dos catálogos;
+- nomes, bytes, unidade e formulaId de cada PID;
+- cruzamento PID ↔ unidade;
+- cruzamento PID ↔ fórmula;
+- compatibilidade mínima entre bytes e operação da fórmula;
+- igualdade dos conjuntos PID ↔ ranges;
+- parâmetros das fórmulas e operações realmente implementadas;
+- consistência entre PIDs confirmados/candidatos e o catálogo principal;
+- confiança e evidência RAW;
+- alvos de confirmação;
+- estrutura de combustíveis;
+- IDs/prioridades dos protocolos;
+- contrato do `bluetooth_config.json`;
+- estrutura, score, DTCs e condições das regras diagnósticas.
+
+Arquivos:
+- `src/knowledge/pids.json`
+- `src/knowledge/units.json`
+- `tests/knowledgeJson.test.js`
+
+#### Permissões
+A implementação de permissões Bluetooth foi centralizada. `bluetoothManager.ts` deixou de manter uma segunda implementação de `PermissionsAndroid.requestMultiple` e passou a delegar ao `permissionManager`.
+
+Foi adicionada regressão para impedir o retorno da implementação duplicada.
+
+Arquivos:
+- `src/permissions/permissionManager.ts`
+- `src/obd/bluetoothManager.ts`
+- `tests/permissions.test.js`
+
+#### Retry Bluetooth/ELM327
+A auditoria encontrou uma divergência funcional: `AppSettings.elmMaxConnectionAttempts` era exposto na interface e passado à conexão, mas o loop real usava apenas o limite fixo do catálogo, ignorando essa configuração.
+
+Correção:
+- o limite efetivo passou a respeitar `maxConnectionAttempts` quando positivo;
+- valor 0 legado/ausente cai para o limite-base finito de 20;
+- o default do aplicativo passou a ser 20;
+- a interface deixou de oferecer “INFINITO” e passa a oferecer 3, 10 ou 20;
+- `elm327Compatibility.ts` passou a refletir o mesmo default seguro;
+- comentários e documentação foram sincronizados;
+- documentação histórica foi complementada para distinguir o estado antigo do comportamento atual.
+
+Arquivos:
+- `src/database/appSettings.ts`
+- `src/obd/elm327Compatibility.ts`
+- `src/obd/bluetoothManager.ts`
+- `src/obd/sharedConnection.ts`
+- `app/configuracoes.tsx`
+- `tests/bluetoothConfig.test.js`
+- `docs/ELM327_ENGINEERING_PLAYBOOK.md`
+- `docs/AUDITORIA_DOCUMENTACAO_2026-10-06.md`
+
+### Commits desta rodada
+- `8ba1a6f0f5a652a26f0020b7a9aa47821585f203`
+- `e15060455e5294d5f16073635be33e12683b3969`
+- `89810074e46011f434e6eb42853a4fd0d3cc0c04`
+- `01066f517762d5717807848014c5c4fa090d2577`
+- `ec3cd07d7c69f18311daa2087492ae1d1e6393d0`
+- `563ea877cc47ba3494a28371507feb8424465383`
+- `83600e943d4596ddc5031f1eaedac24c06bc5c40`
+- `65488d7bcaa29db89d425306327d5a81a86d7e7e`
+- `cfc7fdbf2d1a7ab61f439f2cb39a350fe35e7e83`
+- `e96d706f0e14538b6710d38af35b769ae6e01670`
+- `fa1d8380bec0cc07b0a853e74417d03c919f1f44`
+- `a7a72677610a8b3af41fbd5203300e34b609c336`
+- `f065d19d86b99098cc470430ee8c1c602de02a87`
+- `6bbd8c0105233b583fad9b67340d342ada5a1ba5`
+- `808b8ab828e80cb5443b77a52aa6e4247c7d636b`
+- `f91f0ea2575e44ee1d333b9ca53f5f7fc85724e7`
+- `55f60d75777ecf77c7d0768a2a02c2c4b57bc357`
+- `1ccdf37ff1f3dc464dee46051ebdbda5d10da571`
+- `01519e9f39fe9c4941abddb632e2634ab0a818ba`
+- `d14e0f1ba1cb0ce3939f8be6bed7ec43651971f9`
+- `103243b10222f77fc33ec067522addd45671854e`
+- `42ff34266390a61f0034c62a226f37a235cb97a7`
+- `502e52faad1d81323b3d2cb0617bfa26ccbb2c69`
+- `fe0512dfdf901289809bfa238ae4b08bc663ce61`
+- `c6c99cb82315f21d62c8edf7041956303b383b41`
+- `02f671f142c13ad01f8f0e311f5b4f8e54b19d2a`
+- `354f9ec31c7f684fe19e92d4429de5007f621cad`
+- `59453ebcb089153280990ccb066141a990ed7fce`
+
+### CI
+A CI **não foi executada nesta rodada**, conforme solicitado.
+
+### Estado
+As alterações foram gravadas no `main`. Foi feita somente verificação estrutural por leitura do conteúdo do repositório e checagens estáticas; TypeScript, suíte completa e APK ainda precisam ser confirmados pela próxima CI.
+
+### Próximo passo
+Executar a CI completa somente na próxima etapa. Se houver falha, registrar primeiro a causa e depois corrigir.
