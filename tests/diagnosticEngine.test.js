@@ -49,6 +49,11 @@ function main() {
   });
   assert.strictEqual(result.hypotheses.length, 0);
 
+  engine.resetDiagnosticTemporalState();
+  result = engine.runLocalDiagnostic({ ...base, observations: [obs('0106', 12), obs('0107', 5), obs('010C', 800)] });
+  assert.strictEqual(result.hypotheses.length, 0, 'pico isolado não deve gerar diagnóstico de mistura');
+  assert.ok(result.pendingTemporalRules > 0, 'a regra deve aguardar persistência temporal');
+
   result = runPersistent(engine, 'IDLE_WARM', [['0106', 12], ['0107', 5], ['010C', 800]]);
   assert.strictEqual(result.hypotheses[0].id, 'MISTURA_POBRE');
   assert.strictEqual(result.pendingTemporalRules, 0, 'regra persistente deve confirmar após 10 amostras em 30 s');
