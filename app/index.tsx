@@ -16,6 +16,7 @@ import { readAppSettings, type AppSettings } from '../src/database/appSettings';
 import { connectPreferredElm, getSharedObdConnection, getSharedObdLastError, getSharedObdStatus, subscribeSharedObd } from '../src/obd/sharedConnection';
 import { autoTripService, type AutoTripServiceState } from '../src/trip/autoTripService';
 import { getLivePidCurrent } from '../src/obd/liveTelemetry';
+import { useAppEventRevision } from '../src/ui/useAppEventRevision';
 
 function formatDistance(km: number, unit: AppSettings['distanceUnit']): string {
   if (!Number.isFinite(km) || km < 0) return 'N/D';
@@ -38,6 +39,7 @@ export default function IndexScreen() {
   const [dtcCount, setDtcCount] = useState(0);
   const [liveRpm, setLiveRpm] = useState<number | null>(null);
   const layout = useMidLayout();
+  const eventRevision = useAppEventRevision();
 
   useEffect(() => gpsTracker.subscribe(setGpsState), []);
   useEffect(() => autoTripService.subscribe(setTripState), []);
@@ -60,9 +62,7 @@ export default function IndexScreen() {
 
   useEffect(() => {
     syncLiveState();
-    const timer = setInterval(syncLiveState, 500);
-    return () => clearInterval(timer);
-  }, [syncLiveState]);
+  }, [syncLiveState, eventRevision]);
 
   const reloadStoredState = useCallback(async () => {
     const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
