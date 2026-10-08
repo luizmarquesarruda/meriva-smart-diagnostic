@@ -37,7 +37,7 @@ async function readPidConfirmationsUnlocked(basePath: string): Promise<PidConfir
 
   const content = await FileSystem.readAsStringAsync(target);
   return content
-    .split('\\n')
+    .split('\n')
     .filter((line) => line.trim())
     .map((line) => {
       const [
@@ -136,7 +136,7 @@ export async function recordDiscoveredPids(
   const previous = fileQueues.get(target) ?? Promise.resolve();
   const current = previous.catch(() => undefined).then(async () => {
     await FileSystem.makeDirectoryAsync(basePath + '/BANCO', { intermediates: true });
-    const existing = await readPidConfirmations(basePath);
+    const existing = await readPidConfirmationsUnlocked(basePath);
     const byPid = new Map(existing.map((item) => [item.pid, item]));
     const now = new Date().toISOString();
 
@@ -161,7 +161,7 @@ export async function recordDiscoveredPids(
     await writeCompactFile(target, Array.from(byPid.values()));
   });
 
-  fileQueues.set(target, current.catch(() => undefined));
+  fileQueues.set(target, current);
   try {
     await current;
   } finally {
