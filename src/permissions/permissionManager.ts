@@ -14,31 +14,54 @@ function mapAndroid(status: string): PermissionAudit['bluetooth'] {
 }
 
 /**
- * Solicita somente permissões que o aplicativo realmente usa.
- * Android moderno não exige READ/WRITE_EXTERNAL_STORAGE para os dados
- * internos do aplicativo; pedir essa permissão seria incorreto e não
- * resolveria a exportação via Storage Access Framework.
+ * Bluetooth Classic em Android 12+ usa BLUETOOTH_CONNECT/SCAN como
+ * permissões runtime. Em versões anteriores, a descoberta Classic depende
+ * da permissão de localização, tratada separadamente por
+ * requestLocationPermissionsOnly().
  */
 export async function requestBluetoothPermissionsOnly(): Promise<PermissionAudit['bluetooth']> {
   if (Platform.OS !== 'android') return 'UNAVAILABLE';
 
-  audit.bluetooth = await requestBluetoothPermissionsOnly();
+  if (Platform.Version < 31) return 'GRANTED';
 
-  const servicesEnabled = await Location.hasServicesEnabledAsync();
-  if (!servicesEnabled) {
-    audit.location = 'DENIED';
-    return audit;
+  const result = await PermissionsAndroid.requestMultiple([
+    PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+    PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+  ]);
+
+  const statuses = [
+    result[PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT],
+    result[PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN],
+  ];
+
+  if (statuses.every((status) => status === PermissionsAndroid.RESULTS.GRANTED)) return 'GRANTED';
+  if (statuses.some((status) => status === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN)) return 'BLOCKED';
+  return 'DENIED';
+}
+
+export async function requestLocationPermissionsOnly(): Promise<PermissionAudit['location']> {
+  if (Platform.OS !== 'android') return 'UNAVAILABLE';
+
+  let permission = await Location.getForegroundPermissionsAsync();
+  if (permission.status !== Location.PermissionStatus.GRANTED) {
+    permission = await Location.requestForegroundPermissionsAsync();
   }
 
-  let location = await Location.getForegroundPermissionsAsync();
-  if (location.status !== Location.PermissionStatus.GRANTED) {
-    location = await Location.requestForegroundPermissionsAsync();
-  }
-  audit.location = location.status === Location.PermissionStatus.GRANTED
-    ? 'GRANTED'
-    : location.canAskAgain === false
-      ? 'BLOCKED'
-      : 'DENIED';
+  if (permission.status === Location.PermissionStatus.GRANTED) return 'GRANTED';
+  return permission.canAskAgain === false ? 'BLOCKED' : 'DENIED';
+}
 
-  return audit;
+/**
+ * Auditoria única das permissões runtime necessárias ao aplicativo.
+ * O armazenamento interno do app não requer uma permissão Android ampla.
+ */
+export async function requestAllRequiredPermissions(): Promise<PermissionAudit> {
+  const bluetooth = await requestBluetoothPermissionsOnly();
+  const location = await requestLocationPermissionsOnly();
+
+  return {
+    bluetooth,
+    location,
+    storage: 'APP_PRIVATE',
+  };
 }
