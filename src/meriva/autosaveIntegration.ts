@@ -9,7 +9,7 @@ import { logRawObdData, logInterpretedData } from '../database/obdLogger';
 import { PidConfirmationEntry, readPidConfirmations, recordPidConfirmation } from '../database/pidBank';
 import { updateLearningProfileRealSample } from '../database/learningProfile';
 import type { VehicleCondition } from '../types/sourceTypes';
-import { pushLastReading, updateAutoSaveState, saveNow } from './autosaveManager';
+import { pushLastReading, updateAutoSaveState, scheduleCriticalSave } from './autosaveManager';
 import { shouldFeedLearning } from './autosaveValidation';
 import { recordLivePidQuery } from '../obd/liveTelemetry';
 
@@ -79,5 +79,6 @@ export async function registerObdQuery(
 }
 
 export async function forceSaveOnObdEvent(): Promise<void> {
-  await saveNow('critical');
+  // Eventos críticos próximos no tempo são consolidados em um único snapshot.
+  scheduleCriticalSave();
 }
