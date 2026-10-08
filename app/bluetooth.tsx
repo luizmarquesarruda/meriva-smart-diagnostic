@@ -37,6 +37,7 @@ export default function BluetoothScreen() {
   const [error, setError] = useState('');
   const [connectedName, setConnectedName] = useState<string | null>(null);
   const [ecuConnected, setEcuConnected] = useState(getSharedObdStatus().ecuConnected);
+  const [ecuResponseState, setEcuResponseState] = useState(getSharedObdStatus().ecuResponseState);
   const [bluetoothConnected, setBluetoothConnected] = useState(getSharedObdStatus().bluetoothConnected);
   const [lifecycle, setLifecycle] = useState(getSharedObdStatus().lifecycle);
   const [healthTick, setHealthTick] = useState(0);
@@ -53,7 +54,10 @@ export default function BluetoothScreen() {
       setBluetoothConnected(state.bluetoothConnected);
       setLifecycle(state.lifecycle);
       setEcuConnected(state.ecuConnected);
-      if (state.ecuConnected) setStatus('ECU CONECTADA');
+      setEcuResponseState(state.ecuResponseState);
+      if (state.ecuResponseState === 'NO_RESPONSE') setStatus('ADAPTADOR OK / ECU SEM RESPOSTA');
+      else if (state.ecuResponseState === 'RECOVERING') setStatus('RECUPERANDO PROTOCOLO DA ECU');
+      else if (state.ecuConnected) setStatus('ECU CONECTADA');
       else if (state.bluetoothConnected) setStatus('BLUETOOTH CONECTADO');
     });
     return () => { unsubscribe(); unsubscribeStatus(); };
@@ -156,7 +160,7 @@ export default function BluetoothScreen() {
           </View>
           <View style={[styles.connectionCard, layout.landscape && styles.connectionCardLandscape]}>
             <Text style={styles.label}>ECU</Text>
-            <Text style={ecuConnected ? styles.online : styles.waiting}>{ecuConnected ? '🟢 CONECTADA' : connectedName ? '🟡 CONECTANDO' : '⚪ AGUARDANDO'}</Text>
+            <Text style={ecuConnected ? styles.online : styles.waiting}>{ecuConnected ? '🟢 CONECTADA' : ecuResponseState === 'NO_RESPONSE' ? '🟠 SEM RESPOSTA' : ecuResponseState === 'RECOVERING' ? '🟡 RECUPERANDO' : connectedName ? '🟡 CONECTANDO' : '⚪ AGUARDANDO'}</Text>
           </View>
           <View style={[styles.connectionCard, layout.landscape && styles.connectionCardLandscape]}>
             <Text style={styles.label}>SAÚDE DO ELM327</Text>
