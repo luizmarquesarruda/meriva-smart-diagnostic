@@ -17,6 +17,7 @@ export interface ObdTransport {
   close(): Promise<void>;
   write(data: string): Promise<void>;
   readUntilPrompt(timeoutMs?: number): Promise<string>;
+  clearInputBuffer?(): void;
 }
 
 export type ElmCommandStatus = 'OK' | 'TIMEOUT' | 'ERROR' | 'NO_RESPONSE' | 'UNSUPPORTED';
@@ -217,7 +218,10 @@ export class Elm327Session {
 
   /** Reinicializa o ELM e renegocia o protocolo sem destruir o transporte Bluetooth. */
   async recoverProtocol(): Promise<boolean> {
-    if (!this.opened) return false;
+    return this.enqueueCommand(async () => {
+      if (!this.opened) return false;
+      const transportWithBuffer = this.transport as ObdTransport & { clearInputBuffer?: () => void };
+      transportWithBuffer.clearInputBuffer?.();
     const protocol = (this.protocol ?? '').toUpperCase();
     const preferred = /KWP|14230/.test(protocol) ? 'ATSP5' : 'ATSP0';
     const reset = await this.command('ATZ');
@@ -231,7 +235,9 @@ export class Elm327Session {
     this.consecutiveFailures = 0;
     this.lastSuccessfulResponseAt = new Date().toISOString();
     await this.identifyProtocol();
-    return true;
+      transportWithBuffer.clearInputBuffer?.();
+      return true;
+    });
   }
 
   /** KWP2000 TesterPresent (3E 00) para manter a sessão diagnóstica viva. */
