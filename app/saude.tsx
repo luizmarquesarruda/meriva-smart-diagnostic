@@ -12,7 +12,7 @@ import { getDtcDefinition } from '../src/obd/dtcDefinition';
 export default function SaudeScreen() {
   const layout = useMidLayout();
   const [state,setState]=useState(getAutoSaveState());
-  useEffect(()=>{const t=setInterval(()=>setState(getAutoSaveState()),1000);return()=>clearInterval(t)},[]);
+  useEffect(()=>{const t=setInterval(()=>setState(getAutoSaveState()),5000);return()=>clearInterval(t)},[]);
   const context = getVehicleConditionSnapshot();
   const activeDtcs = state.dtcs.filter((item) => item.source === 'REAL_OBD' && ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(item.status));
   const diagnostic: DiagnosticResult = useMemo(()=>runLocalDiagnostic({observations:state.lastReadings.map(r=>({pid:r.pid,name:r.name,value:r.value,unit:r.unit,source:r.source==='REAL'?'REAL_OBD':'SIMULACAO',timestamp:r.timestamp,confidence:r.source==='SIMULACAO'?'LOW':'GOOD',status:r.status} as PidObservation)),dtcs:state.dtcs,condition:context.condition}),[state,context.condition]);
@@ -21,7 +21,7 @@ export default function SaudeScreen() {
   const healthTitle = normal ? '● SEM ANOMALIA INDICADA' : activeDtcs.length || diagnostic.hypotheses.length ? '● ATENÇÃO NECESSÁRIA' : '● EVIDÊNCIA INSUFICIENTE';
   return <SafeAreaView style={styles.container} edges={["top","bottom","left","right"]}><ScrollView contentContainerStyle={[styles.content,{paddingHorizontal:layout.horizontalPadding}]} showsHorizontalScrollIndicator={false}><View style={[styles.screenFrame,{maxWidth:layout.maxContentWidth}]}>
     <View style={styles.header}><Text style={styles.title}>CENTRAL DE SAÚDE</Text><Text style={styles.subtitle}>EVIDÊNCIAS • DTC • HIPÓTESES</Text></View>
-    <View style={[styles.health, normal ? styles.healthOk : styles.healthWarn]}><Text style={normal ? styles.bigOk : styles.bigWarn}>{healthTitle}</Text><Text style={styles.hint}>{!hasLiveEvidence ? 'Sem leitura REAL_OBD recente e validada; não é possível declarar o sistema normal.' : activeDtcs.length ? activeDtcs.length + ' DTC ativo(s) recebido(s) da ECU.' : state.dtcs.length ? state.dtcs.length + ' registro(s) histórico(s), sem DTC ativo.' : 'Sem DTC ativo nas evidências disponíveis.'}</Text></View>
+    <View style={[styles.health, normal ? styles.healthOk : styles.healthWarn]}><Text style={normal ? styles.bigOk : styles.bigWarn}>{healthTitle}</Text><Text style={styles.hint}>{!hasLiveEvidence ? 'Sem leitura REAL_OBD recente e validada; não é possível declarar o sistema normal.' : activeDtcs.length ? activeDtcs.length + ' DTC ativo(s) recebido(s) da ECU.' : state.dtcs.length ? state.dtcs.length + ' registro(s) histórico(s), sem DTC ativo.' : 'Sem DTC ativo nas evidências disponíveis.'}{'\n'}Motor de evidências: {diagnostic.acceptedLiveSamples} amostras aceitas · {diagnostic.blockedStaleSamples} antigas · {diagnostic.blockedInvalidSamples} inválidas · {diagnostic.blockedIncoherentSnapshots} snapshots incoerentes · {diagnostic.pendingTemporalRules} regras aguardando persistência.</Text></View>
     <Text style={styles.section}>CONEXÃO</Text>
     <View style={[styles.infoGrid, layout.landscape && styles.infoGridLandscape]}>
       <View style={[styles.row, layout.landscape && styles.gridRow]}><Text style={styles.name}>Bluetooth</Text><Text style={state.obd.connected?styles.ok:styles.muted}>{state.obd.connected?'CONECTADO':'AGUARDANDO'}</Text></View>
