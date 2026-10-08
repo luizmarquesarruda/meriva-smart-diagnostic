@@ -7,6 +7,7 @@ import { updateAutoSaveState, initAutoSave } from '../meriva/autosaveManager';
 import { RealTripRecorder } from './tripRecorder';
 import { INITIAL_DRIVE_CYCLES } from '../data/driveCycles';
 import { estimateRangeFromFuelLevel, fuelLevelPercentToLiters, isFuelReserve } from './fuelLevel';
+import { recordLivePidQuery, resetLiveTelemetry } from '../obd/liveTelemetry';
 
 export interface AutoTripServiceState {
   connected: boolean;
@@ -60,6 +61,7 @@ class AutoTripService {
   private transition: Promise<void> = Promise.resolve();
   private unsubscribeConnection: (() => void) | null = null;
   private readonly listeners = new Set<Listener>();
+  private telemetryCursor = 0;
   private state: AutoTripServiceState = { ...INITIAL_STATE };
 
   subscribe(listener: Listener): () => void {
@@ -121,6 +123,9 @@ class AutoTripService {
     await this.stopCurrentLoop();
     await this.finalizeRecorder();
 
+    resetLiveTelemetry();
+    this.telemetryCursor = 0;
+
     if (!connection || !this.running) {
       this.state = { ...INITIAL_STATE };
       this.emit();
@@ -180,6 +185,7 @@ class AutoTripService {
 
         if (this.state.fuelLevelSupported) {
           const fuelLevelResult = await connection.session.queryPid('012F');
+          recordLivePidQuery(fuelLevelResult);
           if (
             fuelLevelResult.parsed.status === 'RESPONDEU' &&
             fuelLevelResult.parsed.unit === '%' &&
@@ -194,6 +200,7 @@ class AutoTripService {
 
         if (this.state.fuelSupported) {
           const fuelResult = await connection.session.queryPid('015E');
+          recordLivePidQuery(fuelResult);
           if (
             fuelResult.parsed.status === 'RESPONDEU' &&
             fuelResult.parsed.unit === 'L/h' &&
@@ -207,6 +214,7 @@ class AutoTripService {
 
         if (obdSpeedSupported) {
           const speedResult = await connection.session.queryPid('010D');
+          recordLivePidQuery(speedResult);
           if (
             speedResult.parsed.status === 'RESPONDEU' &&
             speedResult.parsed.unit === 'km/h' &&
@@ -223,6 +231,19 @@ class AutoTripService {
         // confirmação de movimento. Zero km/h bloqueia deriva do GPS parado.
         // Sem 010D, null devolve a decisão ao filtro GPS.
         gpsTracker.setVehicleSpeedHintKmh(obdSpeedSupported ? obdSpeedKmh : null);
+
+        // Telemetria móvel: um PID secundário por ciclo evita saturar ELMs lentos,
+        // mas mantém RPM/temperatura/MAP/TPS em uma janela contínua para tendências.
+        const telemetryCandidates = ['010C', '0105', '010B', '0111'];
+        const supportedTelemetry = telemetryCandidates.filter((item) => connection.supportedPids.includes(item));
+        const telemetryPid = supportedTelemetry.length > 0
+          ? supportedTelemetry[this.telemetryCursor % supportedTelemetry.length]
+          : '010C';
+        this.telemetryCursor += 1;
+        if (telemetryPid === '010C' || connection.supportedPids.includes(telemetryPid)) {
+          const telemetryResult = await connection.session.queryPid(telemetryPid);
+          recordLivePidQuery(telemetryResult);
+        }
 
         const recorder = this.recorder;
         if (recorder) {
