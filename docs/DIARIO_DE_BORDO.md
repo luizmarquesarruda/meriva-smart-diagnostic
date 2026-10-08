@@ -1140,3 +1140,7 @@ Ajustar somente a asserção do teste para refletir o limite de responsabilidade
 
 ### Próximo passo
 Nova execução de CI obrigatória. O código de produção de permissões não foi alterado nesta correção.
+
+
+### 2026-10-08 — Terceira execução da CI da auditoria
+Branch `audit-deep-ci-2026-10-08-r3` criada a partir do `main` após a correção da regressão do teste de permissões. Esta execução valida novamente a suíte completa e o Android Release.
