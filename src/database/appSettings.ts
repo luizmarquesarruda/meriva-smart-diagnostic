@@ -29,7 +29,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   elmIoTimeoutMs: 10_000,
   elmBluetoothTimeoutMs: 5_000,
   elmCommandDelayMs: 20,
-  elmMaxConnectionAttempts: 0,
+  elmMaxConnectionAttempts: 20,
   elmNoDataReconnectThreshold: 40,
   elmPartialResponseAction: 'RECONNECT_AND_INITIALIZE',
   elmForceInitialization: true,
@@ -71,7 +71,7 @@ export async function readAppSettings(basePath: string): Promise<AppSettings> {
       elmIoTimeoutMs: numberSetting(parsed.elmIoTimeoutMs, 10000, 1000, 30000),
       elmBluetoothTimeoutMs: numberSetting(parsed.elmBluetoothTimeoutMs, 5000, 1000, 30000),
       elmCommandDelayMs: numberSetting(parsed.elmCommandDelayMs, 20, 0, 1000),
-      elmMaxConnectionAttempts: numberSetting(parsed.elmMaxConnectionAttempts, 0, 0, 100),
+      elmMaxConnectionAttempts: numberSetting(parsed.elmMaxConnectionAttempts, 20, 0, 100) || 20,
       elmNoDataReconnectThreshold: numberSetting(parsed.elmNoDataReconnectThreshold, 40, 1, 1000),
       elmPartialResponseAction: parsed.elmPartialResponseAction === 'RECONNECT' || parsed.elmPartialResponseAction === 'IGNORE'
         ? parsed.elmPartialResponseAction
