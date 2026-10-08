@@ -17,3 +17,10 @@ assert(appJson.expo.android.permissions.includes('BLUETOOTH_SCAN'));
 assert(appJson.expo.android.permissions.includes('ACCESS_FINE_LOCATION'));
 
 console.log('permissionManager: OK');
+
+
+const permissionManager = fs.readFileSync('src/permissions/permissionManager.ts', 'utf8');
+assert(permissionManager.includes('export async function requestBluetoothPermissionsOnly'));
+const bluetoothManager = fs.readFileSync('src/obd/bluetoothManager.ts', 'utf8');
+assert(bluetoothManager.includes('requestBluetoothPermissionsOnly'));
+assert(!bluetoothManager.includes('PermissionsAndroid.requestMultiple'), 'bluetoothManager não deve duplicar a implementação de permissões');
