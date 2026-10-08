@@ -18,6 +18,7 @@ import { appendAutoSaveHistory } from './autosaveHistoryTxt';
 const DEBOUNCE_MS = 1500;
 const CHECKPOINT_MS = 45000;
 const MAX_LAST_READINGS = 50;
+const MIN_READING_SAVE_INTERVAL_MS = 10_000;
 
 interface AutosaveRuntime {
   basePath: string;
@@ -35,6 +36,7 @@ interface AutosaveRuntime {
   checkpointTimer: ReturnType<typeof setInterval> | null;
   obdSessionActive: boolean;
   appStateSubscription: { remove: () => void } | null;
+  lastReadingMutationAt: Map<string, number>;
 }
 
 const runtime: AutosaveRuntime = {
@@ -53,6 +55,7 @@ const runtime: AutosaveRuntime = {
   checkpointTimer: null,
   obdSessionActive: false,
   appStateSubscription: null,
+  lastReadingMutationAt: new Map(),
 };
 
 function mainPath(basePath: string): string {
@@ -244,11 +247,31 @@ export function updateAutoSaveState(mutate: (state: MerivaPersistedState) => voi
 }
 
 export function pushLastReading(reading: MerivaPersistedState['lastReadings'][number]): void {
+  const previous = runtime.state.lastReadings.find((item) => item.pid === reading.pid);
+  const now = Date.now();
+  const lastMutation = runtime.lastReadingMutationAt.get(reading.pid) ?? 0;
+  const materiallyChanged = !previous
+    || previous.value !== reading.value
+    || previous.status !== reading.status
+    || previous.unit !== reading.unit
+    || previous.source !== reading.source;
+
+  const next = [
+    reading,
+    ...runtime.state.lastReadings.filter((item) => item.pid !== reading.pid),
+  ].slice(0, MAX_LAST_READINGS);
+
+  // A telemetria continua atualizando em memória, mas leituras idênticas não
+  // geram um autosave por consulta. Uma janela de 10 s limita a persistência
+  // de amostras estáveis sem perder uma mudança real de valor/estado.
+  if (!materiallyChanged && now - lastMutation < MIN_READING_SAVE_INTERVAL_MS) {
+    runtime.state.lastReadings = next;
+    return;
+  }
+
+  runtime.lastReadingMutationAt.set(reading.pid, now);
   updateAutoSaveState((state) => {
-    state.lastReadings = [
-      reading,
-      ...state.lastReadings.filter((item) => item.pid !== reading.pid),
-    ].slice(0, MAX_LAST_READINGS);
+    state.lastReadings = next;
   });
 }
 
@@ -373,4 +396,5 @@ export function disposeAutoSave(): void {
   runtime.lastSaveReason = null;
   runtime.lastError = null;
   runtime.lastSavedFingerprint = null;
+  runtime.lastReadingMutationAt.clear();
 }
