@@ -36,6 +36,9 @@ export default function BluetoothScreen() {
   const [ecuConnected, setEcuConnected] = useState(getSharedObdStatus().ecuConnected);
   const [bluetoothConnected, setBluetoothConnected] = useState(getSharedObdStatus().bluetoothConnected);
   const [lifecycle, setLifecycle] = useState(getSharedObdStatus().lifecycle);
+  const [healthTick, setHealthTick] = useState(0);
+  useEffect(() => { const timer = setInterval(() => setHealthTick((value) => value + 1), 1000); return () => clearInterval(timer); }, []);
+  void healthTick;
 
   useEffect(() => {
     const unsubscribe = subscribeSharedObd((connection) => {
@@ -149,6 +152,21 @@ export default function BluetoothScreen() {
         <View style={styles.connectionCard}>
           <Text style={styles.label}>ECU</Text>
           <Text style={ecuConnected ? styles.online : styles.waiting}>{ecuConnected ? '🟢 CONECTADA' : connectedName ? '🟡 CONECTANDO' : '⚪ AGUARDANDO'}</Text>
+        </View>
+        <View style={styles.connectionCard}>
+          <Text style={styles.label}>SAÚDE DO ELM327</Text>
+          {(() => {
+            const health = getSharedObdConnection()?.session.getHealthSnapshot();
+            return health ? (
+              <>
+                <Text style={styles.detail}>COMANDOS {health.successfulCommands}/{health.commands} • MÉDIA {health.averageResponseMs} ms</Text>
+                <Text style={styles.detail}>TIMEOUTS {health.timeouts} • ERROS {health.errors} • SEM DADOS {health.noData}</Text>
+                <Text style={health.recoveryRecommended ? styles.warning : styles.detail}>
+                  {health.recoveryRecommended ? 'RECUPERAÇÃO RECOMENDADA' : 'COMUNICAÇÃO ESTÁVEL'}
+                </Text>
+              </>
+            ) : <Text style={styles.detail}>Conecte o ELM327 para medir a saúde da sessão.</Text>;
+          })()}
         </View>
 
         {lifecycle === 'BLUETOOTH_OFF' ? (
