@@ -19,6 +19,20 @@ const DEBOUNCE_MS = 1500;
 const CHECKPOINT_MS = 45000;
 const MAX_LAST_READINGS = 50;
 
+// Privacidade: a persistência automática de estado está desativada por padrão.
+// O estado continua disponível em memória para diagnóstico/OBD durante a execução.
+const AUTOSAVE_PERSISTENCE_ENABLED = false;
+let persistenceOverrideForTests: boolean | null = null;
+
+function isPersistenceEnabled(): boolean {
+  return persistenceOverrideForTests ?? AUTOSAVE_PERSISTENCE_ENABLED;
+}
+
+/** Apenas para a suíte Node: permite validar o mecanismo legado sem habilitá-lo no app. */
+export function setAutoSavePersistenceEnabledForTests(enabled: boolean | null): void {
+  persistenceOverrideForTests = enabled;
+}
+
 interface AutosaveRuntime {
   basePath: string;
   state: MerivaPersistedState;
@@ -111,6 +125,8 @@ async function loadLastValidEnvelope(
 }
 
 async function persistNow(reason: SaveReason): Promise<boolean> {
+  if (!isPersistenceEnabled()) return false;
+
   if (runtime.saving) {
     runtime.dirty = true;
     await new Promise<void>((resolve) => setTimeout(resolve, 25));
@@ -202,16 +218,17 @@ export async function initAutoSave(basePath: string): Promise<MerivaPersistedSta
   await ensureStorageDirs(basePath);
   runtime.basePath = basePath;
 
-  const envelope = await loadLastValidEnvelope(basePath);
-  runtime.state = envelope ? hydrateState(envelope.payload) : createEmptyMerivaState();
-  runtime.lastSavedAt = envelope?.savedAt ?? null;
+  // Nunca hidratar autosaves anteriores: eles podem conter VIN, identificadores
+  // do adaptador, ECU, leituras, DTCs e histórico pessoal. O estado inicia limpo.
+  runtime.state = createEmptyMerivaState();
+  runtime.lastSavedAt = null;
   runtime.lastSaveReason = null;
   runtime.lastError = null;
-  runtime.lastSavedFingerprint = envelope ? snapshotFingerprint(runtime.state) : null;
+  runtime.lastSavedFingerprint = null;
   runtime.dirty = false;
   runtime.mutationVersion = 0;
 
-  if (!runtime.appStateSubscription) {
+  if (isPersistenceEnabled() && !runtime.appStateSubscription) {
     runtime.appStateSubscription = AppState.addEventListener(
       'change',
       (status: AppStateStatus) => {
@@ -238,9 +255,9 @@ export function getAutoSaveStatus(): AutoSaveStatus {
 
 export function updateAutoSaveState(mutate: (state: MerivaPersistedState) => void): void {
   mutate(runtime.state);
-  runtime.dirty = true;
+  runtime.dirty = isPersistenceEnabled();
   runtime.mutationVersion += 1;
-  scheduleDebouncedSave();
+  if (isPersistenceEnabled()) scheduleDebouncedSave();
 }
 
 export function pushLastReading(reading: MerivaPersistedState['lastReadings'][number]): void {
@@ -258,6 +275,7 @@ function resolveCriticalWaiters(saved: boolean): void {
 }
 
 export function scheduleCriticalSave(delayMs = 500): Promise<boolean> {
+  if (!isPersistenceEnabled()) return Promise.resolve(true);
   const completion = new Promise<boolean>((resolve) => {
     runtime.criticalWaiters.push(resolve);
   });
@@ -272,6 +290,7 @@ export function scheduleCriticalSave(delayMs = 500): Promise<boolean> {
 }
 
 function scheduleDebouncedSave(): void {
+  if (!isPersistenceEnabled()) return;
   if (runtime.saving) return;
   if (runtime.debounceTimer) clearTimeout(runtime.debounceTimer);
   runtime.debounceTimer = setTimeout(() => {
@@ -281,6 +300,7 @@ function scheduleDebouncedSave(): void {
 }
 
 export async function saveNow(reason: SaveReason = 'critical'): Promise<boolean> {
+  if (!isPersistenceEnabled()) return true;
   if (runtime.criticalTimer) {
     clearTimeout(runtime.criticalTimer);
     runtime.criticalTimer = null;
@@ -296,13 +316,14 @@ export async function saveNow(reason: SaveReason = 'critical'): Promise<boolean>
 }
 
 export function startObdSessionCheckpoint(): void {
-  if (runtime.checkpointTimer || !runtime.basePath) return;
+  if (!isPersistenceEnabled() || runtime.checkpointTimer || !runtime.basePath) return;
   runtime.checkpointTimer = setInterval(() => {
     if (runtime.obdSessionActive && runtime.dirty) void saveNow('checkpoint');
   }, CHECKPOINT_MS);
 }
 
 export async function startObdAutosaveSession(): Promise<boolean> {
+  if (!isPersistenceEnabled()) return true;
   if (runtime.obdSessionActive) return true;
   if (!runtime.basePath || !runtime.state.obd.connected) return false;
 
@@ -321,6 +342,11 @@ export async function startObdAutosaveSession(): Promise<boolean> {
 }
 
 export async function closeObdAutosaveSession(): Promise<boolean> {
+  if (!isPersistenceEnabled()) {
+    runtime.obdSessionActive = false;
+    stopObdSessionCheckpoint();
+    return true;
+  }
   const wasActive = runtime.obdSessionActive;
   runtime.obdSessionActive = false;
   stopObdSessionCheckpoint();
@@ -373,4 +399,5 @@ export function disposeAutoSave(): void {
   runtime.lastSaveReason = null;
   runtime.lastError = null;
   runtime.lastSavedFingerprint = null;
+  persistenceOverrideForTests = null;
 }
