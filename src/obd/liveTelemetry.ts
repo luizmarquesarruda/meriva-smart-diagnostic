@@ -31,6 +31,7 @@ export interface VehicleConditionSnapshot {
 }
 
 const MAX_POINTS_PER_PID = 120;
+const STALE_AFTER_MS = 10_000;
 const series = new Map<string, LiveTelemetryPoint[]>();
 const latest = new Map<string, LiveTelemetryPoint>();
 
@@ -152,10 +153,19 @@ export function classifyVehicleCondition(
 }
 
 export function getVehicleConditionSnapshot(): VehicleConditionSnapshot {
+  const now = Date.now();
   const values = new Map<string, number>();
-  for (const [pid, point] of latest.entries()) values.set(pid, point.value);
+  for (const [pid, point] of latest.entries()) {
+    const timestamp = Date.parse(point.timestamp);
+    if (Number.isFinite(timestamp) && now - timestamp <= STALE_AFTER_MS) {
+      values.set(pid, point.value);
+    }
+  }
 
-  const speedSeries = series.get('010D') ?? [];
+  const speedSeries = (series.get('010D') ?? []).filter((point) => {
+    const timestamp = Date.parse(point.timestamp);
+    return Number.isFinite(timestamp) && now - timestamp <= STALE_AFTER_MS;
+  });
   const previousSpeed = speedSeries.length > 1
     ? speedSeries[speedSeries.length - 2].value
     : null;
@@ -202,3 +212,4 @@ export function getLiveTelemetryPidCount(): number {
 }
 
 export const LIVE_TELEMETRY_MAX_POINTS = MAX_POINTS_PER_PID;
+export const LIVE_TELEMETRY_STALE_AFTER_MS = STALE_AFTER_MS;
