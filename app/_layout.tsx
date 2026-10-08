@@ -6,7 +6,7 @@ import { gpsTracker } from '../src/gps';
 import { readAppSettings, writeAppSettings } from '../src/database/appSettings';
 import { connectPreferredElm, disconnectSharedObd } from '../src/obd/sharedConnection';
 import * as FileSystem from 'expo-file-system';
-import { initAutoSave, updateAutoSaveState } from '../src/meriva/autosaveManager';
+import { initAutoSave } from '../src/meriva/autosaveManager';
 import { autoTripService } from '../src/trip/autoTripService';
 import { requestAllRequiredPermissions } from '../src/permissions/permissionManager';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -53,16 +53,7 @@ export default function RootLayout() {
           selectedAdapterAddress: connection.device.address,
         });
         await initAutoSave(basePath);
-        updateAutoSaveState((state) => {
-          state.obd = {
-            ...state.obd,
-            connected: true,
-            adapterName: connection.device.name,
-            protocol: connection.protocol ?? undefined,
-            lastKnownProtocol: connection.protocol ?? state.obd.lastKnownProtocol,
-            lastConnectedAt: new Date().toISOString(),
-          };
-        });
+        // A persistência da sessão ECU é centralizada em sharedConnection.
         // 010C validado é o critério real de ECU. Protocolo pode permanecer N/D.
       } catch (cause) {
         const now = Date.now();
