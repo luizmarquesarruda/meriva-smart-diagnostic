@@ -58,13 +58,13 @@ assert.strictEqual(telemetry.getVehicleConditionSnapshot().condition, 'UNKNOWN')
 console.log('Live telemetry: rolling window + context + simulation isolation: PASS');
 
 const { parsePidResponse } = loadTs('src/obd/parser.ts');
-const fragmentedElmResponse = '\\r41 0C 0C 18\\r>';
+const fragmentedElmResponse = '\r41 0C 0C 18\r>';
 const parsedFragmented = parsePidResponse('010C', fragmentedElmResponse);
 assert.strictEqual(parsedFragmented.status, 'RESPONDEU');
 assert.strictEqual(parsedFragmented.value, 774);
 assert.deepStrictEqual(parsedFragmented.rawBytes, [0x0c, 0x18]);
 
-const noisyResponse = 'garbage / NO DATA / 41 0D 28 \\r>';
+const noisyResponse = 'garbage / NO DATA / 41 0D 28 \r>';
 const parsedNoisy = parsePidResponse('010D', noisyResponse);
 assert.strictEqual(parsedNoisy.status, 'RESPONDEU');
 assert.strictEqual(parsedNoisy.value, 40);
