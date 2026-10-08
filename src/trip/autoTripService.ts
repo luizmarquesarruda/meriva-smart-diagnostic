@@ -76,50 +76,44 @@ class AutoTripService {
   private stoppedSinceMs: number | null = null;
   private lowVoltageSinceMs: number | null = null;
   private engineOffSinceMs: number | null = null;
-  private lastUiEmitMs = 0;
-  private pendingUiSnapshot: AutoTripServiceState | null = null;
-  private uiEmitTimer: ReturnType<typeof setTimeout> | null = null;
   private state: AutoTripServiceState = { ...INITIAL_STATE };
 
   subscribe(listener: Listener, minIntervalMs = 250): () => void {
-    this.listeners.add(listener);
-    listener({ ...this.state });
+    const interval = Math.max(0, minIntervalMs);
+    let lastEmitAt = 0;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let pending: AutoTripServiceState | null = null;
 
-    // O loop OBD pode rodar a 500 ms, mas a UI não precisa acompanhar cada ciclo.
-    // O serviço mantém a cadência de aquisição; somente a emissão para telas é
-    // limitada, evitando renderizações em cascata em telas pesadas.
-    const original = listener;
     const wrapped: Listener = (next) => {
       const now = Date.now();
-      if (now - this.lastUiEmitMs >= Math.max(0, minIntervalMs)) {
-        this.lastUiEmitMs = now;
-        original({ ...next });
+      if (now - lastEmitAt >= interval) {
+        lastEmitAt = now;
+        listener({ ...next });
         return;
       }
-      this.pendingUiSnapshot = { ...next };
-      if (!this.uiEmitTimer) {
-        const wait = Math.max(0, minIntervalMs - (now - this.lastUiEmitMs));
-        this.uiEmitTimer = setTimeout(() => {
-          this.uiEmitTimer = null;
-          this.lastUiEmitMs = Date.now();
-          if (this.pendingUiSnapshot) {
-            original({ ...this.pendingUiSnapshot });
-            this.pendingUiSnapshot = null;
+
+      pending = { ...next };
+      if (!timer) {
+        const wait = Math.max(0, interval - (now - lastEmitAt));
+        timer = setTimeout(() => {
+          timer = null;
+          lastEmitAt = Date.now();
+          if (pending) {
+            listener({ ...pending });
+            pending = null;
           }
         }, wait);
       }
     };
 
-    // Preserve the existing immediate snapshot while throttling subsequent emissions.
-    this.listeners.delete(listener);
     this.listeners.add(wrapped);
+    listener({ ...this.state });
+
     return () => {
       this.listeners.delete(wrapped);
-      if (this.listeners.size === 0 && this.uiEmitTimer) {
-        clearTimeout(this.uiEmitTimer);
-        this.uiEmitTimer = null;
-        this.pendingUiSnapshot = null;
-      }
+      if (timer) clearTimeout(timer);
+      timer = null;
+      pending = null;
     };
   }
 
