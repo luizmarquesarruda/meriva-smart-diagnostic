@@ -1,6 +1,7 @@
 import type { LastPidReading } from '../meriva/autosaveState';
 import type { VehicleCondition } from '../types/sourceTypes';
 import type { PidQueryResult } from './elm327';
+import { emitAppEvent } from '../state/appEventBus';
 
 export interface LiveTelemetryPoint {
   pid: string;
@@ -49,6 +50,7 @@ function store(point: LiveTelemetryPoint): void {
   const next = [...current, point].slice(-MAX_POINTS_PER_PID);
   series.set(pid, next);
   latest.set(pid, point);
+  emitAppEvent('OBD_TELEMETRY_UPDATED', { pid });
 }
 
 export function resetLiveTelemetry(): void {
@@ -90,6 +92,15 @@ export function getLivePidCurrent(pid: string): number | null {
   const trend = getLivePidTrend(pid);
   if (!trend || trend.ageSeconds * 1000 > STALE_AFTER_MS) return null;
   return trend.current;
+}
+
+export function getLiveTelemetryWindow(timestamp: string, beforeMs = 30_000, afterMs = 30_000): LiveTelemetryPoint[] {
+  const center = Date.parse(timestamp);
+  if (!Number.isFinite(center)) return [];
+  return Array.from(series.values()).flat().filter((point) => {
+    const time = Date.parse(point.timestamp);
+    return Number.isFinite(time) && time >= center - beforeMs && time <= center + afterMs;
+  }).sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));
 }
 
 export function getLivePidTrend(pid: string): PidTrend | null {
