@@ -8,23 +8,27 @@ import { autoTripService } from '../src/trip/autoTripService';
 import { gpsTracker } from '../src/gps';
 import { getLivePidTrend, formatSparkline, getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
 import { getPidDefinition } from '../src/obd/pidDefinition';
+import { useAppEventRevision } from '../src/ui/useAppEventRevision';
 
 export default function DadosScreen() {
   const layout = useMidLayout();
   const [state, setState] = useState(getAutoSaveState());
   const [trip, setTrip] = useState(autoTripService.getState());
+  const [gpsState, setGpsState] = useState(gpsTracker.getState());
+  const eventRevision = useAppEventRevision();
   useEffect(() => {
-    const timer = setInterval(() => { setState(getAutoSaveState()); setTrip(autoTripService.getState()); }, 1000);
-    return () => clearInterval(timer);
-  }, []);
+    setState(getAutoSaveState());
+    setTrip(autoTripService.getState());
+  }, [eventRevision]);
+  useEffect(() => gpsTracker.subscribe(setGpsState), []);
   const readings = [...state.lastReadings].reverse();
   return <SafeAreaView style={styles.container} edges={["top","bottom","left","right"]}><ScrollView contentContainerStyle={[styles.content,{paddingHorizontal:layout.horizontalPadding}]} showsHorizontalScrollIndicator={false}><View style={[styles.screenFrame,{maxWidth:layout.maxContentWidth}]}>
     <Header title="DADOS EM TEMPO REAL" subtitle="PIDs • TELEMETRIA • TENDÊNCIAS" />
     <View style={styles.liveCard}><Text style={styles.liveTitle}>{state.obd.connected ? '● ECU CONECTADA' : '○ ECU AGUARDANDO'}</Text><Text style={styles.liveHint}>{state.obd.protocol ? 'PROTOCOLO ' + state.obd.protocol : 'Conecte o ELM327 para receber PIDs reais.'}</Text></View>
     <View style={styles.grid}>
-      <Metric landscape={layout.landscape} label="VELOCIDADE" value={gpsTracker.getState().currentSpeedKmh.toFixed(0) + ' km/h'} />
+      <Metric landscape={layout.landscape} label="VELOCIDADE" value={gpsState.currentSpeedKmh.toFixed(0) + ' km/h'} />
       <Metric landscape={layout.landscape} label="DISTÂNCIA" value={trip.distanceKm.toFixed(2) + ' km'} />
-      <Metric landscape={layout.landscape} label="CONSUMO" value={trip.consumptionKml != null && trip.consumptionKml > 0 ? trip.consumptionKml.toFixed(1) + ' km/L' : 'N/D'} />
+      <Metric landscape={layout.landscape} label="CONSUMO" value={trip.instantaneousConsumptionKml != null && trip.instantaneousConsumptionKml > 0 ? trip.instantaneousConsumptionKml.toFixed(1) + ' km/L' : 'N/D'} />
       <Metric landscape={layout.landscape} label="AUTONOMIA" value={state.autonomy.estimatedRangeKm > 0 ? state.autonomy.estimatedRangeKm.toFixed(0) + ' km' : 'N/D'} />
     </View>
     <Text style={styles.section}>CONTEXTO OPERACIONAL</Text>
@@ -52,6 +56,13 @@ export default function DadosScreen() {
     })}
     <Text style={styles.section}>ÚLTIMAS LEITURAS REAIS</Text>
     {!readings.length ? <Empty text="Nenhum PID real registrado ainda. Use DIAGNÓSTICO para consultar a ECU." /> : readings.slice(0, 12).map((item) => { const definition=getPidDefinition(item.pid); return <View key={item.timestamp + item.pid} style={styles.row}><View style={{flex:1}}><Text style={styles.name} numberOfLines={2}>{item.pid} • {definition?.name ?? item.name}</Text><Text style={styles.pid}>{definition?.description ?? 'Descrição não catalogada localmente'} • {item.status}</Text></View><Text style={styles.value}>{item.value == null ? 'N/D' : String(item.value) + (item.unit ? ' ' + item.unit : '')}</Text></View>})}
+    <Text style={styles.section}>ÚLTIMAS TENTATIVAS DE CONSULTA</Text>
+    {!state.lastQueryAttempts.length ? <View style={styles.empty}><Text style={styles.emptyText}>Nenhuma tentativa sem valor válido registrada.</Text></View> : state.lastQueryAttempts.slice(0, 8).map((attempt) => (
+      <View key={attempt.timestamp + attempt.pid} style={styles.row}>
+        <View style={{flex:1}}><Text style={styles.name}>{attempt.pid} • {attempt.source}</Text><Text style={styles.pid}>{attempt.status} • {new Date(attempt.timestamp).toLocaleTimeString()}</Text><Text style={styles.pid}>{attempt.errorMessage ?? 'Sem valor válido retornado.'}</Text></View>
+        <Text style={styles.value}>{attempt.value == null ? 'N/D' : String(attempt.value)}</Text>
+      </View>
+    ))}
     <View style={styles.note}><Text style={styles.noteText}>A tela não inventa telemetria: somente leituras marcadas como REAL entram como evidência do veículo.</Text></View>
     <Link href="/laboratorio" asChild><TouchableOpacity style={styles.primary}><Text style={styles.primaryText}>🔧 CONSULTAR / DESCOBRIR PIDs</Text></TouchableOpacity></Link>
     <Back />

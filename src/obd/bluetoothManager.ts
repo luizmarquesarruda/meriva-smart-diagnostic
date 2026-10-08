@@ -8,6 +8,7 @@ import { discoverIntelligentPids } from './intelligentPidDiscovery';
 import type { PidDiscoveryCache } from '../meriva/autosaveState';
 import bluetoothConfig from '../knowledge/bluetooth_config.json';
 import { requestBluetoothPermissionsOnly } from '../permissions/permissionManager';
+import { isPidDiscoveryCacheUsable } from './pidDiscoveryCache';
 
 let lastBluetoothDiagnosticText = '';
 
@@ -95,6 +96,14 @@ export async function ensureBluetoothReady(): Promise<boolean> {
     logBluetoothDiagnostic('BLUETOOTH_NATIVE_MODULE_UNAVAILABLE');
     throw new Error('MÓDULO BLUETOOTH CLASSIC NÃO ESTÁ DISPONÍVEL NO BUILD NATIVO. REINSTALE/RECONSTRUA O APK.');
   }
+
+  logBluetoothDiagnostic('BLUETOOTH_NATIVE_FINGERPRINT', {
+    moduleAvailable: true,
+    hasIsBluetoothAvailable: typeof bluetoothClassic.isBluetoothAvailable === 'function',
+    hasIsBluetoothEnabled: typeof bluetoothClassic.isBluetoothEnabled === 'function',
+    hasRequestBluetoothEnabled: typeof bluetoothClassic.requestBluetoothEnabled === 'function',
+    reactNativeBluetoothClassic: '1.73.0-rc.17',
+  });
 
   const available = await bluetoothClassic.isBluetoothAvailable();
   logBluetoothDiagnostic('BLUETOOTH_AVAILABLE', available);
@@ -291,8 +300,11 @@ async function createRealElmSessionAttempt(
     const activeProtocol = successfulForcedProtocol && (!identifiedProtocol || identifiedProtocol === 'AUTO')
       ? getElmProtocolName(successfulForcedProtocol)
       : (identifiedProtocol ?? 'AUTO');
-    const negotiatedProtocol = session.getProtocol() ?? activeProtocol;
-    const cacheMatchesProtocol = Boolean(pidDiscoveryCache) && pidDiscoveryCache?.protocol === negotiatedProtocol;
+    const negotiatedProtocol = identifiedProtocol && identifiedProtocol !== 'AUTO'
+      ? identifiedProtocol
+      : activeProtocol;
+    const cacheMatchesProtocol = isPidDiscoveryCacheUsable(pidDiscoveryCache, { adapterAddress: device.address })
+      && pidDiscoveryCache?.protocol === negotiatedProtocol;
 
     let supportedPids: string[] = [];
     let pidDiscoverySource: RealElmConnection['pidDiscoverySource'] = 'CACHE';

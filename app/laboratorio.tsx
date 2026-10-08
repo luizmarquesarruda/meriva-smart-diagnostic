@@ -12,6 +12,7 @@ import { discoverSupportedPids, KNOWN_PIDS } from '../src/obd/pidScanner';
 import { getPidDefinition } from '../src/obd/pidDefinition';
 import { getDtcDefinition } from '../src/obd/dtcDefinition';
 import { getSharedObdConnection, getSharedObdStatus, setSharedObdConnection, subscribeSharedObd, disconnectSharedObd } from '../src/obd/sharedConnection';
+import { isPidDiscoveryCacheUsable } from '../src/obd/pidDiscoveryCache';
 import { autoTripService } from '../src/trip/autoTripService';
 import { getMidLayout } from '../src/ui/midLayout';
 import { scanDtcServices, type DtcServiceScan } from '../src/obd/dtcScanner';
@@ -178,7 +179,13 @@ export default function LaboratorioScreen() {
       for (const candidate of candidates) {
         try {
           setStatus(`TESTANDO ELM327: ${candidate.name || candidate.address}`);
-          const candidateConnection = await createRealElmSession(candidate, undefined, getAutoSaveState().pidDiscovery);
+          const persistedState = getAutoSaveState();
+          const reusableCache = isPidDiscoveryCacheUsable(persistedState.pidDiscovery, {
+            adapterAddress: candidate.address,
+            vin: persistedState.vehicle?.vin,
+            ecuAddress: persistedState.vehicle?.ecuAddress ?? persistedState.obd.ecuAddress,
+          }) ? persistedState.pidDiscovery : null;
+          const candidateConnection = await createRealElmSession(candidate, undefined, reusableCache);
           selectedDevice = candidate;
           connection = candidateConnection;
           break;
@@ -203,11 +210,17 @@ export default function LaboratorioScreen() {
       setProtocol(connection.protocol ?? 'N/D');
       startObdSessionCheckpoint();
       updateAutoSaveState((state) => {
+        const validatedAt = new Date().toISOString();
         state.obd = {
+          ...state.obd,
           connected: true,
           adapterName: device.name,
           protocol: connected.protocol ?? undefined,
-          lastConnectedAt: new Date().toISOString(),
+          lastKnownProtocol: connected.protocol ?? state.obd.lastKnownProtocol,
+          ecuAddress: state.vehicle?.ecuAddress ?? state.obd.ecuAddress,
+          ecuValidatedAt: validatedAt,
+          ecuValidationSource: state.vehicle?.ecuAddress ? 'VEHICLE_PROFILE' : 'OBD_RESPONSE',
+          lastConnectedAt: validatedAt,
         };
 
         if (
@@ -342,6 +355,9 @@ export default function LaboratorioScreen() {
               supportedPids: discovered,
               protocol: activeProtocol,
               discoveredAt: new Date().toISOString(),
+              adapterAddress: getSharedObdConnection()?.device.address?.toUpperCase(),
+              vin: state.vehicle?.vin,
+              ecuAddress: state.vehicle?.ecuAddress ?? state.obd.ecuAddress,
             };
           }
         });

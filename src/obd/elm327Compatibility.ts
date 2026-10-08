@@ -9,6 +9,7 @@ export type ElmErrorType =
   | 'BUFFER_FULL'
   | 'RX_ERROR'
   | 'DATA_ERROR'
+  | 'RESPONSE_PENDING'
   | 'DISCONNECTED'
   | 'UNKNOWN';
 
@@ -26,6 +27,8 @@ export interface Elm327CompatibilityConfig {
   adaptiveTimeoutMinMs: number;
   adaptiveTimeoutMaxMs: number;
   adaptiveTimeoutStepMs: number;
+  responsePendingDelayMs: number;
+  responsePendingMaxRetries: number;
 }
 
 export interface ElmHealthSnapshot {
@@ -39,6 +42,7 @@ export interface ElmHealthSnapshot {
   adaptiveTimeoutMs: number;
   recoveryRecommended: boolean;
   lastErrorType: ElmErrorType;
+  responsePending: number;
 }
 
 export const DEFAULT_ELM327_COMPATIBILITY: Elm327CompatibilityConfig = {
@@ -55,6 +59,8 @@ export const DEFAULT_ELM327_COMPATIBILITY: Elm327CompatibilityConfig = {
   adaptiveTimeoutMinMs: 3_000,
   adaptiveTimeoutMaxMs: 15_000,
   adaptiveTimeoutStepMs: 500,
+  responsePendingDelayMs: 150,
+  responsePendingMaxRetries: 3,
 };
 
 export function normalizeElmResponse(response: string): string {
@@ -80,11 +86,18 @@ export function isNoDataResponse(response: string): boolean {
   return /(^|\n)\s*NO DATA\s*($|\n)/i.test(normalizeElmResponse(response));
 }
 
+export function isResponsePendingResponse(response: string): boolean {
+  const normalized = normalizeElmResponse(response).toUpperCase();
+  return /(?:^|\s)7F\s*[0-9A-F]{2}\s*78\b/i.test(normalized)
+    || /RESPONSE PENDING/.test(normalized);
+}
+
 export function classifyElmError(response: string, message = ''): ElmErrorType {
   const value = normalizeElmResponse(response).toUpperCase();
   const detail = message.toUpperCase();
   if (isUnsupportedAtResponse(value)) return 'UNSUPPORTED';
   if (isNoDataResponse(value)) return 'NO_DATA';
+  if (isResponsePendingResponse(value)) return 'RESPONSE_PENDING';
   if (/BUFFER FULL/.test(value)) return 'BUFFER_FULL';
   if (/BUS INIT/.test(value)) return 'BUS_INIT_ERROR';
   if (/BUS ERROR|CAN ERROR|CAN ERROR/.test(value)) return 'BUS_ERROR';
@@ -114,5 +127,7 @@ export function mergeCompatibilityConfig(
     adaptiveTimeoutMinMs: Math.max(1000, Math.round(merged.adaptiveTimeoutMinMs)),
     adaptiveTimeoutMaxMs: Math.max(1000, Math.round(merged.adaptiveTimeoutMaxMs)),
     adaptiveTimeoutStepMs: Math.max(50, Math.round(merged.adaptiveTimeoutStepMs)),
+    responsePendingDelayMs: Math.max(50, Math.round(merged.responsePendingDelayMs)),
+    responsePendingMaxRetries: Math.max(0, Math.round(merged.responsePendingMaxRetries)),
   };
 }

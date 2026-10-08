@@ -1,5 +1,6 @@
 import * as FileSystem from 'expo-file-system';
 import type { DataSource, DtcStatus, DtcRecord } from '../types/sourceTypes';
+import { emitAppEvent } from '../state/appEventBus';
 
 export type { DtcRecord } from '../types/sourceTypes';
 
@@ -46,6 +47,7 @@ export async function recordDtc(basePath: string, dtc: DtcRecord): Promise<void>
     const info = await FileSystem.getInfoAsync(target);
     if (!info.exists) {
       await FileSystem.writeAsStringAsync(target, `${line}\n`, { encoding: FileSystem.EncodingType.UTF8 });
+      emitAppEvent('DTC_UPDATED');
       return;
     }
 
@@ -54,6 +56,7 @@ export async function recordDtc(basePath: string, dtc: DtcRecord): Promise<void>
     const filtered = lines.filter((item) => !item.startsWith(`${dtc.code}|`));
     filtered.push(line);
     await FileSystem.writeAsStringAsync(target, `${filtered.join('\n')}\n`, { encoding: FileSystem.EncodingType.UTF8 });
+    emitAppEvent('DTC_UPDATED');
   });
 }
 

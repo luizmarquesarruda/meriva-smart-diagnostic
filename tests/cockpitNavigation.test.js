@@ -12,6 +12,8 @@ for (const file of ['app/dados.tsx', 'app/saude.tsx', 'app/mais.tsx', 'app/veicu
 }
 assert.match(read('app/dados.tsx'), /getLivePidTrend/);
 assert.match(read('app/dados.tsx'), /formatSparkline/);
+assert.match(index, /instantaneousConsumptionKml/);
+assert.doesNotMatch(index, /const availableConsumptionKml = tripState\.averageConsumptionKml/);
 assert.match(read('app/saude.tsx'), /runLocalDiagnostic/);
 assert.match(read('app/saude.tsx'), /activeDtcs/);
 assert.match(read('app/aprendizado.tsx'), /realSamples/);

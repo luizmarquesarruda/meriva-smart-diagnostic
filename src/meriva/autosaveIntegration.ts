@@ -9,9 +9,44 @@ import { logRawObdData, logInterpretedData } from '../database/obdLogger';
 import { PidConfirmationEntry, readPidConfirmations, recordPidConfirmation } from '../database/pidBank';
 import { updateLearningProfileRealSample } from '../database/learningProfile';
 import type { VehicleCondition } from '../types/sourceTypes';
-import { pushLastReading, updateAutoSaveState, scheduleCriticalSave } from './autosaveManager';
+import { pushLastReading, updateAutoSaveState, scheduleCriticalSave, scheduleTelemetrySave } from './autosaveManager';
 import { shouldFeedLearning } from './autosaveValidation';
 import { recordLivePidQuery } from '../obd/liveTelemetry';
+import { emitAppEvent } from '../state/appEventBus';
+
+export function recordAutomaticObdQuery(
+  result: PidQueryResult,
+  source: 'REAL' | 'SIMULACAO' = 'REAL',
+): void {
+  recordLivePidQuery(result, source);
+
+  if (result.parsed.status === 'RESPONDEU' && result.parsed.value !== null && Number.isFinite(result.parsed.value)) {
+    pushLastReading({
+      pid: result.parsed.pid,
+      name: result.parsed.name,
+      value: result.parsed.value,
+      unit: result.parsed.unit,
+      status: result.parsed.status,
+      timestamp: new Date().toISOString(),
+      source,
+    }, { schedulePersist: false });
+  } else {
+    updateAutoSaveState((state) => {
+      state.lastQueryAttempts = [
+        {
+          pid: result.parsed.pid,
+          timestamp: new Date().toISOString(),
+          status: result.parsed.status,
+          value: result.parsed.value,
+          errorMessage: result.parsed.errorMessage,
+          source,
+        },
+        ...state.lastQueryAttempts,
+      ].slice(0, 50);
+    }, { schedulePersist: false });
+  }
+  scheduleTelemetrySave();
+}
 
 export async function registerObdQuery(
   basePath: string,
@@ -26,17 +61,8 @@ export async function registerObdQuery(
     console.warn('[autosave] falha ao gravar logs OBD:', cause instanceof Error ? cause.message : cause);
   }
 
-  recordLivePidQuery(result, source);
+  recordAutomaticObdQuery(result, source);
 
-  pushLastReading({
-    pid: result.parsed.pid,
-    name: result.parsed.name,
-    value: result.parsed.value,
-    unit: result.parsed.unit,
-    status: result.parsed.status,
-    timestamp: new Date().toISOString(),
-    source,
-  });
 
   const parsedValue = result.parsed.value;
   if (shouldFeedLearning(source, result.parsed.status, parsedValue) && parsedValue !== null) {
@@ -66,6 +92,7 @@ export async function registerObdQuery(
         parsedValue,
         condition,
       );
+      emitAppEvent('LEARNING_UPDATED');
     } catch (cause) {
       console.warn('[autosave] falha ao registrar confirmação de PID:', cause instanceof Error ? cause.message : cause);
     }

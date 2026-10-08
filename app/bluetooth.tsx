@@ -8,6 +8,7 @@ import { BluetoothDeviceInfo } from '../src/obd/bluetoothClassicTransport';
 import { discoverPairedDevices, ensureBluetoothReady } from '../src/obd/bluetoothManager';
 import { connectPreferredElm, getSharedObdConnection, getSharedObdStatus, subscribeSharedObd, subscribeSharedObdStatus, disconnectSharedObd } from '../src/obd/sharedConnection';
 import { readAppSettings, writeAppSettings } from '../src/database/appSettings';
+import { useAppEventRevision } from '../src/ui/useAppEventRevision';
 
 function lifecycleLabel(lifecycle: ReturnType<typeof getSharedObdStatus>['lifecycle']): string {
   const labels: Record<typeof lifecycle, string> = {
@@ -39,9 +40,7 @@ export default function BluetoothScreen() {
   const [ecuConnected, setEcuConnected] = useState(getSharedObdStatus().ecuConnected);
   const [bluetoothConnected, setBluetoothConnected] = useState(getSharedObdStatus().bluetoothConnected);
   const [lifecycle, setLifecycle] = useState(getSharedObdStatus().lifecycle);
-  const [healthTick, setHealthTick] = useState(0);
-  useEffect(() => { const timer = setInterval(() => setHealthTick((value) => value + 1), 1000); return () => clearInterval(timer); }, []);
-  void healthTick;
+  useAppEventRevision();
 
   useEffect(() => {
     const unsubscribe = subscribeSharedObd((connection) => {
@@ -165,7 +164,7 @@ export default function BluetoothScreen() {
               return health ? (
                 <>
                   <Text style={styles.detail}>COMANDOS {health.successfulCommands}/{health.commands} • MÉDIA {health.averageResponseMs} ms</Text>
-                  <Text style={styles.detail}>TIMEOUTS {health.timeouts} • ERROS {health.errors} • SEM DADOS {health.noData}</Text>
+                  <Text style={styles.detail}>TIMEOUTS {health.timeouts} • ERROS {health.errors} • SEM DADOS {health.noData}</Text><Text style={styles.detail}>PENDENTES {health.responsePending}</Text>
                   <Text style={health.recoveryRecommended ? styles.warning : styles.detail}>
                     {health.recoveryRecommended ? 'RECUPERAÇÃO RECOMENDADA' : 'COMUNICAÇÃO ESTÁVEL'}
                   </Text>

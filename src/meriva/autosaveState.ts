@@ -13,6 +13,15 @@ export interface LastPidReading {
   source: 'REAL' | 'SIMULACAO';
 }
 
+export interface LastQueryAttempt {
+  pid: string;
+  timestamp: string;
+  status: string;
+  value: number | null;
+  errorMessage?: string;
+  source: 'REAL' | 'SIMULACAO';
+}
+
 export interface ObdConnectionState {
   connected: boolean;
   adapterName?: string;
@@ -30,6 +39,9 @@ export interface PidDiscoveryCache {
   supportedPids: string[];
   protocol: string;
   discoveredAt: string;
+  adapterAddress?: string;
+  vin?: string;
+  ecuAddress?: string;
 }
 
 export interface AutonomyReading {
@@ -60,6 +72,7 @@ export interface MerivaPersistedState {
   vehicle: VehicleProfile | null;
   obd: ObdConnectionState;
   lastReadings: LastPidReading[];
+  lastQueryAttempts: LastQueryAttempt[];
   dtcs: DtcRecord[];
   driveCycles: DriveCycle[];
   learning: MerivaLearningProfile | null;
@@ -74,6 +87,7 @@ export function createEmptyMerivaState(): MerivaPersistedState {
     vehicle: null,
     obd: { connected: false },
     lastReadings: [],
+    lastQueryAttempts: [],
     dtcs: [],
     driveCycles: [],
     learning: null,

@@ -8,6 +8,8 @@ import { isBluetoothLinkUp, type BluetoothLifecycleState } from './bluetoothStat
 import RNBluetoothClassic from 'react-native-bluetooth-classic';
 import * as FileSystem from 'expo-file-system';
 import { readAppSettings, writeAppSettings } from '../database/appSettings';
+import { emitAppEvent } from '../state/appEventBus';
+import { isPidDiscoveryCacheUsable } from './pidDiscoveryCache';
 
 export interface SharedObdConnection {
   session: Elm327Session;
@@ -52,6 +54,7 @@ function emit(): void {
 function setLifecycle(next: BluetoothLifecycleState): void {
   lifecycle = next;
   emit();
+  emitAppEvent('BLUETOOTH_STATUS_CHANGED');
 }
 
 async function persistDisconnectedState(): Promise<void> {
@@ -194,10 +197,15 @@ async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm3
   try {
       const attemptGeneration = connectionGeneration;
     let disconnectedDuringAttempt = false;
+    const persisted = getAutoSaveState();
     const connection = await createRealElmSession(
       device,
       compatibility,
-      getAutoSaveState().pidDiscovery,
+      isPidDiscoveryCacheUsable(persisted.pidDiscovery, {
+        adapterAddress: device.address,
+        vin: persisted.vehicle?.vin,
+        ecuAddress: persisted.vehicle?.ecuAddress ?? persisted.obd.ecuAddress,
+      }) ? persisted.pidDiscovery : null,
       {
         onBluetoothConnected: () => setLifecycle('BLUETOOTH_CONNECTED'),
         onElmResponding: () => setLifecycle('ELM_RESPONDING'),
@@ -228,6 +236,7 @@ async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm3
       ecuValidated: connection.ecuValidated,
       getDiagnosticsText: () => connection.session.getTransportDiagnosticsText(),
     };
+    emitAppEvent('BLUETOOTH_STATUS_CHANGED');
 
     // Persistência local: o próximo diagnóstico reutiliza automaticamente o
     // adaptador validado. A ECU só é marcada como validada após o gate 41 0C.
@@ -252,6 +261,18 @@ async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm3
           lastConnectedAt: validatedAt,
         };
       });
+      if (connection.pidDiscoverySource === 'ECU' && connection.protocol && connection.supportedPids.length > 0) {
+        updateAutoSaveState((state) => {
+          state.pidDiscovery = {
+            supportedPids: connection.supportedPids,
+            protocol: connection.protocol ?? 'AUTO',
+            discoveredAt: validatedAt,
+            adapterAddress: device.address.toUpperCase(),
+            vin: state.vehicle?.vin,
+            ecuAddress: state.vehicle?.ecuAddress ?? state.obd.ecuAddress,
+          };
+        });
+      }
       await saveNow('critical');
     } catch (persistCause) {
       // Falha de persistência não invalida uma conexão já validada pelo ELM/ECU.

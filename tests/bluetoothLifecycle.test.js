@@ -18,6 +18,9 @@ assert(transport.includes('this.callbacks?.onConnected?.()'));
 assert(transport.includes("this.callbacks?.onDisconnected?.('BLUETOOTH DESCONECTADO')"));
 assert(manager.includes('callbacks?.onBluetoothConnected'));
 assert(manager.includes('callbacks?.onDisconnected'));
+assert(manager.includes('typeof requestBluetoothEnabled !== \'function\''));
+assert(manager.includes('MÓDULO BLUETOOTH CLASSIC NÃO ESTÁ DISPONÍVEL NO BUILD NATIVO'));
+assert(manager.includes('BIBLIOTECA BLUETOOTH SEM SUPORTE PARA ATIVAÇÃO DO RÁDIO'));
 assert(shared.includes("setLifecycle('BLUETOOTH_CONNECTED')"));
 assert(shared.includes("setLifecycle('ELM_RESPONDING')"));
 assert(shared.includes("setLifecycle('ELM_INITIALIZED')"));
@@ -56,3 +59,7 @@ assert(orderedStates.every((value, index) => value >= 0 && (index === 0 || value
 const ecuGate = shared.indexOf("if (!connection.ecuValidated)");
 const activeAssignment = shared.indexOf('    active = {', ecuGate);
 assert(ecuGate >= 0 && activeAssignment > ecuGate, 'active não pode existir antes da validação da ECU');
+
+
+const bluetoothManagerSource = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'bluetoothManager.ts'), 'utf8');
+assert(bluetoothManagerSource.includes("identifiedProtocol && identifiedProtocol !== 'AUTO'"), 'protocolo forçado não pode ser perdido quando ATDP retorna AUTO');

@@ -1,5 +1,6 @@
 import * as FileSystem from 'expo-file-system';
 import { MERIVA_MANUAL } from './merivaManual';
+import { emitAppEvent } from '../state/appEventBus';
 
 export interface VehicleProfile {
   vehicleName: string;
@@ -25,6 +26,7 @@ export async function createVehicleProfile(basePath: string, profile: VehiclePro
   await FileSystem.makeDirectoryAsync(`${basePath}/CONFIG`, { intermediates: true });
   const target = `${basePath}/CONFIG/veiculo.json`;
   await FileSystem.writeAsStringAsync(target, JSON.stringify(profile, null, 2), { encoding: FileSystem.EncodingType.UTF8 });
+  emitAppEvent('VEHICLE_UPDATED');
 }
 
 export async function readVehicleProfile(basePath: string): Promise<VehicleProfile | null> {

@@ -1224,3 +1224,435 @@ PR #31 foi integrado ao `main` por squash no commit `2a0189cb51b831c18cf962936ac
 
 ### Estado
 A auditoria de código desta rodada está **concluída e validada pela CI #1063**. A validação física do ELM327/Meriva continua sendo uma etapa de hardware/veículo, não substituída pela CI.
+
+
+## 2026-10-08 — Plano: RPM do cockpit preso em valor antigo
+
+### Sintoma reportado
+RPM exibido no cockpit não acompanha a leitura atual da ECU e pode permanecer próximo de ~900 rpm mesmo após o motor ser desligado.
+
+### Hipótese técnica verificada no código
+O serviço automático já consulta o PID 010C e registra leituras reais em liveTelemetry, mas o app/index.tsx do cockpit exibe RPM a partir de getAutoSaveState().lastReadings. Essa coleção é persistência de último valor e não uma fonte de telemetria em tempo real. Além disso, a tela não assina/atualiza diretamente a telemetria viva. Resultado: um valor antigo de RPM pode permanecer visualmente congelado mesmo quando novas leituras 010C chegam pela ECU.
+
+### Correção planejada
+1. Usar a telemetria viva 010C como fonte primária do RPM exibido no cockpit.
+2. Atualizar o componente em intervalo curto para refletir novas amostras sem depender do autosave.
+3. Aplicar a validade temporal já definida na camada de telemetria (10 s): se não houver amostra REAL recente, mostrar N/D em vez de congelar um RPM antigo.
+4. Manter REAL_OBD isolado de SIMULAÇÃO; nenhuma semente ou valor persistido será usado como RPM vivo.
+5. Adicionar regressão para impedir que leitura antiga seja tratada como RPM atual.
+6. Atualizar este diário antes da alteração de produção e registrar os hashes exatos depois.
+
+### Invariantes
+- PID 010C continua com fórmula (256*A+B)/4.
+- ECU só é considerada validada após 41 0C.
+- SIMULAÇÃO não alimenta telemetria REAL.
+- Autosave continua sendo persistência/histórico, não fonte de verdade para o indicador ao vivo.
+- Não alterar package-lock.json nem adicionar dependência.
+- CI somente após a correção estar completa e explicitamente autorizada pelo usuário.
+
+
+### Correção implementada — RPM ao vivo
+- `a43c3db2f1f7277fed9231ea128f043220ecc904` — cockpit passou a usar o RPM da telemetria REAL 010C, atualizado a cada 500 ms, em vez de `autosave.lastReadings` como fonte do indicador ao vivo.
+- `e70cee6d1662fb922901e1259d7d64c15c5c2aa9` — adicionada API `getLivePidCurrent()` que retorna somente amostra REAL dentro da janela de validade de 10 s.
+- `e8c7c1c2d96f07ae1b956742c7f3759df354ef43` — cockpit passou a consumir a API centralizada de validade do RPM.
+- `293eca1ebe2a43143bfe51970036534557a12f70` — regressão adicionada: amostra 010C com 30 s não pode ser exibida como RPM atual.
+
+### Resultado técnico esperado
+Com ECU conectada, uma resposta real `41 0C 00 00` deve resultar em `0 RPM` no cockpit após a próxima consulta 010C. Se a ECU parar de fornecer amostras válidas por mais de 10 s, o cockpit deve mostrar `N/D`, nunca manter artificialmente o último RPM.
+
+**Ainda não considerar a correção validada pela CI.**
+
+
+## 2026-10-08 — Complemento: consumo atual também estava usando estado histórico
+
+### Diagnóstico
+A correção anterior eliminou o congelamento do RPM no cockpit, mas a métrica `CONSUMO` ainda não representa consumo instantâneo. `app/index.tsx` usa `tripState.averageConsumptionKml`, que é carregado da autonomia persistida/referência e só é atualizado no fechamento de uma viagem em `finalizeRecorder()`. Durante a condução, `AutoTripService` já calcula `instantaneousConsumptionKml` a partir de velocidade real e PID 015E, mas o cockpit ignora esse campo.
+
+### Correção planejada
+- Usar `instantaneousConsumptionKml` como fonte primária da métrica CONSUMO atual.
+- Manter `averageConsumptionKml` somente para média/histórico e autonomia.
+- Se não houver velocidade > 0 ou taxa 015E válida, exibir `N/D` em vez de congelar uma média antiga.
+- Preservar a regra: GPS sozinho não fabrica litros; consumo atual exige taxa de combustível OBD válida.
+- Adicionar regressão de UI/estado para impedir uso de `averageConsumptionKml` como consumo atual.
+
+**Ainda não considerar a correção validada pela CI.**
+
+
+### Correção do consumo atual
+- `47afd09d88e8a4a58f0d8c0ed1a094dd5c0ba8c0` — cockpit passou a usar `instantaneousConsumptionKml`, calculado em tempo real pelo `AutoTripService` a partir de velocidade válida + PID 015E, em vez de `averageConsumptionKml` persistido.
+- `a2696353e05b19537345d09ba841eefb0376b383` — regressão no teste do cockpit garante que a métrica atual não volte a usar a média histórica.
+
+### Resultado técnico esperado
+A métrica CONSUMO agora acompanha a condição atual: com velocidade e PID 015E válidos, varia com a taxa de combustível da ECU; parado, sem taxa válida ou sem movimento, mostra `N/D`. A média histórica permanece separada e continua sendo usada para histórico/autonomia.
+
+**CI ainda não executada nesta correção.**
+
+
+## 2026-10-08 — Plano: autosave divergente da telemetria automática
+
+### Evidência apresentada
+O histórico TXT mostrou que o bloco [LAST READINGS] permanece com uma amostra antiga de 010C mesmo enquanto novas leituras de RPM chegam pela ECU. O polling automático de AutoTripService chama recordLivePidQuery(), mas esse caminho não atualiza state.lastReadings do autosave.
+
+Também foi verificado que a implementação atual do formatter já contém Saved At, fonte de leitura e último protocolo conhecido. Portanto, a ausência desses campos no TXT apresentado é compatível com um APK/build anterior e não será tratada como defeito atual sem reproduzir no código vigente.
+
+### Correção planejada
+1. Criar uma ponte específica para registrar consultas OBD automáticas no autosave, sem reutilizar registerObdQuery() e sem disparar logs/aprendizado indevidamente.
+2. Fazer AutoTripService registrar as respostas automáticas reais de PID em lastReadings, mantendo SIMULACAO isolada.
+3. Preservar a regra de uma leitura por PID em lastReadings e o limite atual de 50 leituras persistidas.
+4. Adicionar regressão para garantir que polling automático atualize 010C no autosave.
+5. Validar a semântica DTC existente: nextDtcOccurrences() já impede incremento enquanto o DTC permanece ativo; não alterar essa regra sem evidência de falha no código atual.
+6. Não alterar package-lock.json nem adicionar dependência.
+7. CI somente quando explicitamente autorizada pelo usuário.
+
+### Invariantes
+- Telemetria REAL continua separada de SIMULAÇÃO.
+- Gate ECU 010C → 41 0C permanece inalterado.
+- Autosave é persistência; liveTelemetry continua sendo fonte do indicador ao vivo.
+- DTC CURRENT/CONFIRMED/PENDING/PERMANENT não incrementa ocorrências em detecções repetidas do mesmo ciclo ativo.
+- Histórico TXT permanece limitado a 200 entradas.
+- Saved At deve refletir o timestamp real da persistência quando o snapshot for efetivamente salvo.
+
+**Plano registrado antes da alteração de código.**
+
+
+### Correção implementada — sincronização do polling automático com autosave
+- `d87de14a2f60de840669e3eee1f8e7f85ae865d2` — criada `recordAutomaticObdQuery()`, uma ponte mínima que registra telemetria automática em `liveTelemetry` e `lastReadings`, sem executar logs, banco de PIDs ou aprendizado do fluxo manual.
+- `cc126ad8fd9d0bf956d62a1a492df81962c27514` — `AutoTripService` passou a usar essa ponte para 012F, 015E, 010D e o polling secundário (incluindo 010C), mantendo REAL separado de SIMULAÇÃO.
+- `6372e63b00fb06413429e7592016c7b7f214c187` — regressão cobre a integração do polling automático com o autosave e garante que uma nova amostra 010C substitua a anterior sem contaminar `simulationQueries`.
+
+### Observação sobre o TXT apresentado
+A implementação vigente no branch já contém `Saved At`, `Último protocolo conhecido` e `fonte=REAL/SIMULACAO` no formatter. O TXT apresentado pelo usuário não contém esses campos e, portanto, não será usado como evidência de uma falha atual nesses pontos sem reprodução no build vigente. Já a divergência de `010C` entre polling e [LAST READINGS] foi reproduzida por inspeção do fluxo e corrigida.
+
+### DTC
+A implementação vigente de `nextDtcOccurrences()` já preserva a ocorrência enquanto o DTC permanece ativo. O histórico apresentado com P0135/P0420 em `1 → 2 → 3 → 4` não justifica alterar essa regra sem reproduzir o comportamento no código atual; a regressão existente continua protegendo CURRENT repetido.
+
+### Estado
+Correção de código e regressões concluídas. **CI não executada**, pois não foi solicitada. A validação física ainda requer novo APK/build após a CI autorizada e teste com ELM327/Meriva.
+
+
+## 2026-10-08 — Consolidação do estado do Diário de Bordo após as últimas correções
+
+### Regra operacional reafirmada
+O Diário de Bordo foi lido **antes desta atualização**, conforme a regra do projeto. A partir desta consolidação, qualquer nova alteração de código, teste, JSON, configuração ou documentação deverá seguir a sequência:
+
+**ler o diário → registrar o plano/correção pretendida → alterar → registrar arquivos e commits → registrar testes/CI → registrar resultado e próximo passo.**
+
+Nenhuma nova correção será iniciada ignorando o estado registrado aqui.
+
+### Alterações realizadas desde a última consolidação
+
+#### 1. RPM em tempo real
+- O cockpit deixou de usar `getAutoSaveState().lastReadings` como fonte do RPM vivo.
+- O PID `010C` REAL_OBD passou a ser obtido da telemetria viva.
+- Foi criada a leitura centralizada `getLivePidCurrent()`, com validade temporal de **10 segundos**.
+- Amostras antigas não são mais apresentadas como RPM atual.
+- Regressão adicionada para impedir que uma amostra de 30 segundos seja tratada como atual.
+- Commits:
+  - `a43c3db2f1f7277fed9231ea128f043220ecc904`
+  - `e70cee6d1662fb922901e1259d7d64c15c5c2aa9`
+  - `e8c7c1c2d96f07ae1b956742c7f3759df354ef43`
+  - `293eca1ebe2a43143bfe51970036534557a12f70`
+
+#### 2. Consumo atual
+- O cockpit deixou de usar `averageConsumptionKml` persistido como se fosse consumo instantâneo.
+- A métrica atual passou a usar `instantaneousConsumptionKml`.
+- O cálculo continua condicionado a velocidade válida e taxa de combustível OBD `015E`.
+- GPS sozinho não é tratado como medição de litros.
+- A média histórica continua separada para histórico/autonomia.
+- Regressão adicionada para impedir o retorno da média histórica como consumo atual.
+- Commits:
+  - `47afd09d88e8a4a58f0d8c0ed1a094dd5c0ba8c0`
+  - `a2696353e05b19537345d09ba841eefb0376b383`
+
+#### 3. Sincronização do polling automático com o autosave
+- Identificada a divergência entre `recordLivePidQuery()` e `state.lastReadings`: o polling automático recebia dados novos da ECU, mas o autosave podia permanecer com uma leitura antiga.
+- Criada a ponte `recordAutomaticObdQuery()`.
+- A ponte registra a leitura automática em telemetria viva e em `lastReadings`, sem reutilizar indevidamente o fluxo manual de aprendizado/logs.
+- `AutoTripService` passou a utilizar essa ponte para as respostas automáticas de PID, incluindo `010C`.
+- REAL_OBD e SIMULAÇÃO permanecem separados.
+- Regressão garante que uma nova leitura `010C` substitua a anterior em `lastReadings` sem incrementar `simulationQueries`.
+- Commits:
+  - `d87de14a2f60de840669e3eee1f8e7f85ae865d2`
+  - `cc126ad8fd9d0bf956d62a1a492df81962c27514`
+  - `6372e63b00fb06413429e7592016c7b7f214c187`
+
+### Estado do formatter TXT
+Foi rechecado o código vigente: o formatter atual já contempla **Saved At**, **fonte REAL/SIMULACAO** e **último protocolo conhecido**. Portanto, esses campos ausentes no TXT apresentado anteriormente não foram artificialmente adicionados apenas para reproduzir um arquivo possivelmente gerado por build anterior.
+
+### Estado dos DTCs
+A regra vigente de `nextDtcOccurrences()` foi preservada. Ela evita incrementar ocorrência repetidamente enquanto o mesmo DTC permanece ativo no ciclo correspondente. O histórico apresentado anteriormente não foi usado, isoladamente, para modificar essa semântica sem reprodução no código vigente.
+
+### Dependências e JSON
+- `package-lock.json` não foi alterado nesta rodada.
+- Nenhum novo pacote foi adicionado.
+- Nenhum catálogo JSON foi alterado nesta rodada.
+- As correções de PID/DTC previamente auditadas permanecem preservadas.
+
+### CI
+**CI não executada nesta rodada.** Essa decisão foi deliberada: as últimas alterações foram feitas sob a regra de não executar CI sem autorização explícita do usuário.
+
+Consequentemente, estas correções estão registradas como **implementadas e testadas por regressões locais/estáticas quando indicado, mas ainda não validadas pela CI completa**.
+
+### Estado atual do branch
+Branch: `fix-live-rpm-stale-2026-10-08`
+
+HEAD anterior à presente atualização:
+- `5c2e781893d000c4f380e8a9180bcc8ba9a79b32` — atualização anterior do Diário de Bordo.
+
+HEAD após a presente atualização:
+- será o commit retornado por esta operação de atualização.
+
+### Próximo passo obrigatório
+Antes de qualquer nova correção:
+1. reler este Diário de Bordo;
+2. verificar o HEAD atual da branch;
+3. registrar no diário o plano da nova alteração;
+4. somente então modificar código/testes/JSON;
+5. atualizar novamente o diário com os hashes exatos;
+6. executar CI somente se houver autorização explícita.
+
+
+
+## 2026-10-08 — Plano pré-correção: falha ao solicitar ativação do Bluetooth no Android 36
+
+### Evidência recebida
+Relatório físico em Android 36 / SM-A065M registrou:
+- permissões Bluetooth: GRANTED;
+- Bluetooth disponível: true;
+- rádio Bluetooth: false;
+- rechecagem: false;
+- tentativa de ativação iniciada;
+- erro final: `Cannot read property 'requestBluetoothEnabled' of undefined`;
+- ELM não conectado e 0 dispositivos pareados reportados.
+
+### Diagnóstico inicial
+O erro ocorre exatamente na transição **Bluetooth disponível + rádio desligado → solicitação de ativação**. O código atual do branch já possui uma guarda contra módulo nativo ausente e contra método inexistente; portanto, o texto exato do erro é um forte indício de que o APK testado não contém a implementação atualizada dessa guarda ou que há uma diferença entre a superfície JS efetivamente carregada e o módulo nativo instalado.
+
+A API `requestBluetoothEnabled()` é suportada pelo `react-native-bluetooth-classic`, mas depende do módulo nativo estar corretamente incorporado no build. O aplicativo usa Expo prebuild/EAS e React Native 0.74.5, portanto a próxima correção deve tratar explicitamente a disponibilidade do módulo e do método sem permitir TypeError cru.
+
+### Plano antes do código
+1. Auditar o ponto de ativação em `src/obd/bluetoothManager.ts` e o caminho de inicialização/autolinking do módulo.
+2. Tornar a chamada de ativação tolerante a módulo/método ausente, registrando diagnóstico específico e orientando o usuário para ativação manual quando a API nativa não estiver disponível.
+3. Adicionar regressão para impedir acesso direto a `requestBluetoothEnabled` quando o objeto/método estiver ausente.
+4. Verificar se o APK precisa ser reconstruído para que a correção efetivamente chegue ao dispositivo; não tratar um APK antigo como evidência de que o código atual falhou.
+5. Não alterar gate ECU `010C → 41 0C`, autosave, aprendizado, PIDs/DTCs ou `package-lock.json` sem evidência específica.
+6. **Não executar CI nesta etapa**, pois o usuário não autorizou CI.
+
+### Estado
+Plano registrado antes da próxima correção. Nenhuma alteração de código foi feita nesta etapa.
+
+## 2026-10-08 — Auditoria sênior: integração celular, documentação oficial e autosave
+
+### Objetivo
+Auditar o repositório como um todo com foco adicional na integração Android 36 + Bluetooth Classic/ELM327 + armazenamento local, confrontar as decisões do aplicativo com documentação oficial válida e corrigir o autosave sem degradar a telemetria REAL_OBD, o aprendizado, a validação ECU ou o histórico TXT.
+
+### Evidência física usada na auditoria
+O relatório Bluetooth de 2026-10-08 mostrou: permissões GRANTED, Bluetooth disponível, rádio inicialmente desligado, fluxo chegando a BLUETOOTH_ENABLE_REQUEST e erro "Cannot read property 'requestBluetoothEnabled' of undefined". O erro ocorre antes de descoberta/conexão do ELM327 e não deve ser confundido com ausência de dispositivo pareado.
+
+### Documentação técnica confrontada
+- Android Developers — permissões Bluetooth para Android 12+: BLUETOOTH_SCAN/CONNECT são permissões de execução; BLUETOOTH/BLUETOOTH_ADMIN são legadas e devem ser limitadas a SDK 30 quando mantidas.
+- Android Developers — ACTION_REQUEST_ENABLE: a ativação do rádio é uma solicitação ao sistema, não uma operação de descoberta/conexão.
+- Expo FileSystem — armazenamento privado do aplicativo e Storage Access Framework para exportação escolhida pelo usuário.
+- react-native-bluetooth-classic — autolinking em React Native moderno e matriz de compatibilidade da linha 1.70.x.
+
+### Achados de autosave
+1. O pushLastReading atualiza o estado persistido e agenda debounce de 1,5 s. Como o serviço automático consulta PIDs continuamente, isso pode transformar telemetria de alta frequência em escrita contínua de autosave.json + TXT.
+2. O fingerprint evita duplicação semântica, mas não evita churn quando timestamp/valor de uma leitura realmente mudam.
+3. O histórico TXT é corretamente limitado a 200 e mantém Saved At, mas a persistência automática deve ser desacoplada da frequência da consulta OBD.
+4. A ponte automática já corrige o problema histórico de lastReadings stale: consultas automáticas REAL_OBD entram em lastReadings e não contaminam aprendizado. A correção nova deve preservar isso.
+
+### Plano registrado antes do código
+- separar atualização de telemetria em memória da política de flush do autosave;
+- permitir que consultas automáticas atualizem lastReadings imediatamente, mas coalesçam a persistência em janela controlada;
+- manter registerObdQuery() com persistência própria para consultas manuais/diagnósticas;
+- preservar deduplicação, Saved At, limite de 200, REAL/SIMULACAO, ECU/protocolo e package-lock.json;
+- adicionar regressão específica para impedir tempestade de saves durante polling automático;
+- não executar CI nesta rodada.
+
+### Estado
+Plano registrado antes da correção de código. A validação final deverá ocorrer por typecheck, testes completos e Android Release em CI, mas essa CI não será executada nesta etapa.
+
+
+### Implementação da correção do autosave
+
+- `src/meriva/autosaveManager.ts`: `pushLastReading()` passou a aceitar `schedulePersist=false`; foi criado `scheduleTelemetrySave()` com janela mínima de 5 s para coalescer flushes originados de polling automático. A atualização em memória continua imediata.
+- `src/meriva/autosaveIntegration.ts`: `recordAutomaticObdQuery()` agora atualiza `lastReadings` sem criar debounce de 1,5 s por PID e agenda um único flush de telemetria controlado. `registerObdQuery()` preserva o comportamento tradicional para consultas manuais/diagnósticas.
+- `tests/merivaAutosave.test.js`: regressão confirma que polling automático atualiza `lastReadings` sem criar `autosave.json` imediatamente por cada PID e exige a política de flush coalescida.
+- `tests/bluetoothLifecycle.test.js`: regressão reforça a proteção contra acesso direto a `requestBluetoothEnabled` quando o módulo nativo ou o método não estiverem disponíveis.
+
+### Commits desta correção
+- `db342b6f22fa7d146171a5e07aa9502bbfc77ca3` — registrar plano da auditoria sênior.
+- `1af31d0ec2b6eb1e4e22c7944f162ea2ceed65f9` — coalescer flush do autosave de telemetria.
+- `72b282c8acbd87b4e64b6d5e6ed195ecb6d42dc0` — aplicar flush controlado ao polling OBD automático.
+- `26f30a79058fab585236ecd8d13f75526ecb155b` — regressão contra tempestade de salvamentos automáticos.
+- `740cfaf0913ba6831f6e67049d4ed1f9e2c35b0c` — manter debounce manual independente do polling automático.
+- `0810d03f3137da72b9a151971c485881693f1c65` — regressão de segurança do ativador Bluetooth.
+
+### Auditoria do repositório / integração celular
+A leitura cruzada confirmou ausência de `TODO/FIXME/HACK` no código pesquisado, ausência de `AsyncStorage` em produção, ausência de permissões `READ_EXTERNAL_STORAGE/WRITE_EXTERNAL_STORAGE`, ausência de `BLUETOOTH_ADVERTISE` desnecessário, e ausência de endpoints HTTP/OpenAI embutidos. O armazenamento privado continua em `documentDirectory`; exportações escolhidas pelo usuário usam Storage Access Framework. A orientação permanece livre (`expo.orientation=default`) e as telas usam Safe Area moderna/layout responsivo.
+
+### Confronto com documentação válida
+A arquitetura de Bluetooth foi confrontada com Android Developers e `react-native-bluetooth-classic`. O Android exige `BLUETOOTH_CONNECT` para comunicação com dispositivos pareados e `BLUETOOTH_SCAN` quando há descoberta; a ativação do rádio é uma etapa distinta (`ACTION_REQUEST_ENABLE`). A implementação atual já protege o acesso ao método opcional `requestBluetoothEnabled`. Portanto, o erro físico `Cannot read property 'requestBluetoothEnabled' of undefined` não foi usado como justificativa para alterar o transporte ELM327 sem reprodução; a hipótese prioritária continua sendo APK/JS bundle antigo ou incompatibilidade de build nativo.
+
+### Estado de validação
+- CI: **não executada nesta rodada**, conforme regra do projeto.
+- TypeScript/suíte completa/APK: ainda precisam da próxima CI.
+- `package-lock.json`: não alterado; nenhuma dependência foi adicionada.
+- A correção de autosave é considerada implementada no código, mas não declarada como validada até a próxima CI e teste físico.
+
+### Ajuste final do agendamento
+- `src/meriva/autosaveManager.ts`: `saveNow()` agora cancela também um flush de telemetria pendente, evitando timer residual depois de um salvamento explícito.
+- Commit: `85b3fcc6f4ee2af1eb38971c68acda95f061ddb5`.
+
+CI continua não executada nesta rodada.
+## 2026-10-08 — Implementação das melhorias de robustez OBD e integração reativa
+
+### Escopo
+Implementação do backlog de melhorias definido após comparação com documentação Android/ELM327/Expo e projetos open source. CI não executada nesta etapa.
+
+### Alterações de produção
+- scheduler FAST/MEDIUM/SLOW por PID;
+- agrupamento de até 6 PIDs somente em protocolo CAN, com fallback individual;
+- tratamento explícito de RESPONSE_PENDING;
+- cache de descoberta com identidade e TTL de 24 h;
+- separação entre última leitura válida e última tentativa inválida;
+- timeline DTC de ±30 s usando telemetria em memória;
+- barramento de eventos para reduzir polling de estado nas telas;
+- fingerprint do módulo Bluetooth Classic no trace/relatório;
+- política Android de permissões legadas limitada a API 30 e neverForLocation no scan;
+- testes de regressão adicionados ao pacote.
+
+### Commits principais
+- d2c932bc7ddb5c5c4c8dec140c19e91ae4a27b8e — RESPONSE_PENDING e configuração;
+- bb6157a694c58a6a11043fef71dac5018b37496b — pending retry e multi-PID;
+- 0b0fce1237fa05cbce6b9d58ea4d64b359e17c7c — leituras válidas/tentativas e cache;
+- 6c2c8815f32b77b3e9b8cf8de42e13e98a21ef28 — scheduler na viagem automática;
+- 5f2d796e8d039517748c323d5fce7a793ad01f58 — cache contextual;
+- 1ff38378d9059e3359309b06e54a490a374724fe — janela de telemetria/eventos;
+- e46a61438a8a82023208cd70668ba24e3d601683 — timeline DTC na Saúde;
+- b2900a463d8b6b170bfb1b51e583f6f29db49532 — consumo instantâneo/tentativas;
+- f2ad06eb9e7ba2308de827ab419e1e49d507219f — fingerprint Bluetooth;
+- 497b6302866f4d250c8d31f115d4537be751b320 — fingerprint no relatório;
+- 467ce251565d4cd6f1e88943ea8364f81fa131aa — plugin de permissões Android;
+- a1e95844475ba9dc16c98416e3c409beaf9f8b7d — correção da regressão da tela Saúde;
+- 8e1f3740cee3e232b13ed3221423e73040f61e65 — evento de DTC no caminho de atualização.
+
+### Validação intermediária
+A primeira execução local encontrou uma expectativa incorreta no teste do scheduler: depois de marcar um lote CAN de até 6 PIDs, outros PIDs ainda podem estar devidos. A implementação não foi alterada por isso; o teste será ajustado para validar ausência de repetição.
+
+### Limites
+Foreground service Android para operação contínua em background e Android Auto permanecem fora desta rodada por exigirem camada nativa e validação específica.
+## 2026-10-08 — Correções encontradas pela auditoria pós-implementação
+
+- A retirada dos timers da tela `app/dados.tsx` revelou que o GPS não possuía, naquela tela, uma assinatura reativa equivalente; sem correção, velocidade/distância poderiam ficar estáticas.
+- O barramento `appEventBus` pode receber vários eventos consecutivos quando uma consulta CAN agrupa múltiplos PIDs; o hook de UI será coalescido por microtask para evitar renderização em rajada.
+- A lógica OBD não será alterada por essa auditoria: a correção fica restrita à camada de atualização da interface.
+## 2026-10-08 — Correção de bypass descoberto na auditoria
+
+`app/laboratorio.tsx` ainda possuía um caminho direto para `createRealElmSession()` que não aplicava o validador de cache contextual usado por `sharedConnection` e gravava o cache sem endereço do adaptador. Isso poderia reintroduzir cache antigo após uma conexão manual pelo laboratório.
+Correção a ser aplicada: usar o mesmo `isPidDiscoveryCacheUsable()` no caminho manual e persistir adaptador/VIN/ECU no cache. O objetivo é manter uma única política de conexão/cache em todas as telas.
+## 2026-10-08 — Alinhamento do estado persistido no laboratório
+
+`app/laboratorio.tsx` recebeu auditoria adicional porque o caminho manual de conexão deve persistir a mesma evidência do fluxo compartilhado: protocolo atual, último protocolo conhecido, validação ECU e identidade do adaptador.
+Essa correção mantém a regra 010C → 41 0C e não altera a semântica de DTC/learning.
+## 2026-10-08 — Correção de enquadramento CAN para RESPONSE_PENDING
+
+A auditoria do parser de erros identificou que `7F xx 78` pode aparecer depois do cabeçalho CAN quando `ATH1` está ativo (por exemplo, `7E8 03 7F 22 78`). O detector será ajustado para reconhecer a sequência em qualquer posição do fluxo hexadecimal, preservando a categoria `RESPONSE_PENDING`.
+
+## 2026-10-08 — Correção final de protocolo negociado
+
+Na revisão do caminho `ATSPx` → `010C` → `ATDP`, foi identificado que um fallback forçado de protocolo podia ser descoberto com sucesso, mas o valor `AUTO` retornado pela sessão ainda prevalecia em `negotiatedProtocol`. Isso impedia o scheduler de reconhecer CAN e usar multi-PID mesmo após uma seleção forçada válida.
+
+A correção deve priorizar o protocolo identificado explicitamente e, quando `ATDP` continuar em `AUTO`, usar o protocolo forçado que comprovadamente produziu a resposta `41 0C`.
+## 2026-10-08 — Validação final da implementação de hardening
+
+### Testes executados
+- regressões puras do scheduler, cache, barramento de eventos, timeline DTC, compatibilidade ELM327 e bridge de telemetria: **PASS**;
+- teste do plugin de permissões Android com mock de `withAndroidManifest`: **PASS**;
+- casos adicionais: `7E8 03 7F 22 78` reconhecido como `RESPONSE_PENDING`; agrupamento CAN limitado a seis PIDs; cache rejeitado quando adaptador/TTL não correspondem.
+
+### Auditoria final
+- `package-lock.json` permanece inalterado e com `lockfileVersion: 3`;
+- nenhum `BLUETOOTH_ADVERTISE` foi introduzido;
+- permissões legadas recebem `maxSdkVersion=30` pelo plugin;
+- caminhos de conexão compartilhado e laboratório agora aplicam a mesma política de cache contextual;
+- consumo instantâneo e GPS continuam reativos na tela Dados;
+- eventos CAN em rajada são coalescidos no hook de UI;
+- protocolo forçado por `ATSPx` não volta para `AUTO` quando `ATDP` não consegue explicitá-lo;
+- regressões de `requestBluetoothEnabled` continuam cobertas.
+
+### Limitação de execução
+O ambiente desta sessão não conseguiu clonar o repositório por indisponibilidade de resolução externa (`github.com`), portanto a suíte completa `npm test`, o typecheck real e o build Android não foram executados localmente. A validação executada aqui cobre as novas camadas puras e o plugin com testes isolados. CI do GitHub permanece deliberadamente não executada nesta etapa.
+
+## 2026-10-08 — Plano: diagnóstico OBD avançado e identificação real do veículo
+
+### Objetivo
+Implementar as melhorias de maior valor identificadas nas auditorias externas e no backlog: Mode 09/PID 02 para identificação do veículo e Mode 02 para Freeze Frame, com persistência local e apresentação no aplicativo.
+
+### Evidência técnica
+A documentação SAE J1979 mantém o Mode 02 para Powertrain Freeze Frame Data e o Mode 09 para Vehicle Information. O datasheet do ELM327 documenta o VIN via Mode 09 PID 02 e respostas multiline. Essas funções serão tratadas como opcionais: ausência de resposta não será convertida em compatibilidade presumida.
+
+### Plano antes do código
+1. Criar parser isolado para Mode 09 PID 02, montando respostas multiline e validando VIN de 17 caracteres.
+2. Criar parser isolado para Mode 02, reutilizando definições/fórmulas dos PIDs existentes, mas exigindo resposta positiva 42 xx.
+3. Criar armazenamento privado separado para snapshots Freeze Frame, limitado e validado, sem alterar o schema principal do autosave.
+4. Criar tela de Diagnóstico Avançado com leitura de VIN e captura de Freeze Frame associada opcionalmente a um DTC real ativo.
+5. Persistir VIN real no perfil do veículo somente quando obtido de resposta OBD válida.
+6. Adicionar regressões para VIN multiline, resposta Freeze Frame, rejeição de payload truncado e isolamento do armazenamento.
+7. Atualizar navegação, package.json e documentação.
+8. Preservar Bluetooth/ELM327, gate 010C → 41 0C, REAL_OBD/SIMULACAO, autosave principal e package-lock.
+
+### Invariantes
+- Nenhum VIN será inventado a partir do modelo cadastrado.
+- Freeze Frame só será marcado como REAL_OBD quando vier da sessão OBD real.
+- Mode 04 (limpeza de DTC), Mode 06 e Android Auto/background continuam fora desta rodada.
+- CI será executada após a implementação completa.
+
+**Plano registrado antes da alteração de código.**
+
+
+## 2026-10-08 — Correção pré-CI do parser de VIN multiline
+
+### Achado
+A revisão estática da nova camada Mode 09 mostrou que algumas respostas ELM podem chegar com separação por CR isolado. O parser inicial dividia somente por CRLF/LF e, nesse caso, poderia processar apenas o primeiro frame multiline.
+
+### Correção planejada
+Aceitar CR, CRLF e LF como separadores e processar todas as ocorrências `49 02 frame` encontradas, preservando a ordenação pelo índice do frame.
+
+**Plano registrado antes da correção.**
+
+
+## 2026-10-08 — Implementação concluída: OBD avançado
+
+### Melhorias entregues
+- Mode 09 / PID 02 para leitura do VIN real da ECU, com montagem multiline por índice de frame.
+- Parser de VIN tolerante a CRLF, LF e CR isolado.
+- Mode 02 para leitura de Freeze Frame dos PIDs já catalogados, exigindo resposta positiva `42 xx`.
+- Persistência privada dos Freeze Frames em `DTC/freeze_frames.json`, limitada a 20 snapshots e validada antes da leitura.
+- Nova tela `app/avancado.tsx`, acessível em MAIS RECURSOS, para leitura de VIN, captura de Freeze Frame e consulta do histórico.
+- VIN retornado pela ECU é gravado no perfil do veículo e sincronizado com o autosave.
+- Regressões adicionadas para VIN multiline, CR isolado, Freeze Frame válido e payload truncado.
+
+### Commits
+- `173daf84e961c23b8bdc0ff3a4a515d9be2e7740` — parser Mode 09/02 e Freeze Frame.
+- `971d3f809d0e778588008063007dd7b308d8a585` — armazenamento privado de snapshots.
+- `879fa951ae53a28922342be5518b3de97926a647` — tela de diagnóstico avançado.
+- `e1a4e78d929ee988a947bca420e59692550cd813` — regressões dos parsers.
+- `88a65adb88ee7ed3bcaed5297d93bbc55c92c5aa` — navegação para Diagnóstico Avançado.
+- `6a0a2b0d4f8eccb13b72b91fea2d0faaf289025a` — registro da regressão avançada no npm test.
+- `0213b9f53953d4c02be6cd10954feb682c1f3046` — documentação técnica da extensão.
+- `127da00fb9033b952dbb24171675e6b40072fb5a` — plano da correção de framing VIN.
+- `a6bcad374c8ce1e836a480928c18741ec2d32a8a` — parser tolerante a CR isolado.
+- `8d65ca77067a0bd2557fe41ed3af0bf9777ee0cd` — teste de CR isolado.
+
+### Invariantes preservadas
+- Bluetooth Classic/ELM327 e gate `010C → 41 0C` preservados.
+- REAL_OBD continua separado de SIMULAÇÃO.
+- Autosave principal e `package-lock.json` não foram alterados estruturalmente.
+- Não foram adicionadas permissões, dependências ou operações destrutivas.
+
+### Validação pré-CI
+Os arquivos novos foram auditados estaticamente após a implementação. A CI completa ainda deve confirmar typecheck, suíte integral, Expo Doctor e Android Release.
+
+### Próximo passo
+Disparar a CI completa da PR #33. Se houver falha, registrar a causa aqui antes da próxima correção.
