@@ -15,7 +15,7 @@ import { createLearningProfile, initializeCarScannerSeed, readLearningProfile } 
 import { readAppSettings, type AppSettings } from '../src/database/appSettings';
 import { connectPreferredElm, getSharedObdConnection, getSharedObdLastError, getSharedObdStatus, subscribeSharedObd } from '../src/obd/sharedConnection';
 import { autoTripService, type AutoTripServiceState } from '../src/trip/autoTripService';
-import { getLivePidTrend, LIVE_TELEMETRY_STALE_AFTER_MS } from '../src/obd/liveTelemetry';
+import { getLivePidCurrent } from '../src/obd/liveTelemetry';
 
 function formatDistance(km: number, unit: AppSettings['distanceUnit']): string {
   if (!Number.isFinite(km) || km < 0) return 'N/D';
@@ -55,8 +55,7 @@ export default function IndexScreen() {
       adapterName: live?.device.name ?? state.obd.adapterName,
     });
     setSaveStatus(getAutoSaveStatus());
-    const rpmTrend = getLivePidTrend('010C');
-    setLiveRpm(rpmTrend && rpmTrend.ageSeconds * 1000 <= LIVE_TELEMETRY_STALE_AFTER_MS ? rpmTrend.current : null);
+    setLiveRpm(getLivePidCurrent('010C'));
   }, []);
 
   useEffect(() => {
