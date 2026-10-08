@@ -128,6 +128,34 @@ function looksLikeElm327(device: BluetoothDeviceInfo): boolean {
 function sameAddress(a: string, b: string): boolean {
   return a.replace(/:/g, '').toUpperCase() === b.replace(/:/g, '').toUpperCase();
 }
+
+async function persistValidatedConnection(
+  connection: SharedObdConnection,
+): Promise<boolean> {
+  const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
+  const settings = await readAppSettings(basePath);
+  await writeAppSettings(basePath, {
+    ...settings,
+    selectedAdapterAddress: connection.device.address.toUpperCase(),
+  });
+
+  const validatedAt = new Date().toISOString();
+  updateAutoSaveState((state) => {
+    state.obd = {
+      ...state.obd,
+      connected: true,
+      adapterName: connection.device.name,
+      protocol: connection.protocol ?? undefined,
+      lastKnownProtocol: connection.protocol ?? state.obd.lastKnownProtocol,
+      ecuAddress: state.vehicle?.ecuAddress ?? state.obd.ecuAddress,
+      ecuValidatedAt: validatedAt,
+      ecuValidationSource: state.vehicle?.ecuAddress ? 'VEHICLE_PROFILE' : 'OBD_RESPONSE',
+      lastConnectedAt: validatedAt,
+    };
+  });
+
+  return startObdAutosaveSession();
+}
 export type ConnectionSelectionMode = 'PREFERRED' | 'EXPLICIT';
 
 export function buildCandidateList(
@@ -223,28 +251,15 @@ async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm3
 
     // Persistência local: o próximo diagnóstico reutiliza automaticamente o
     // adaptador validado. A ECU só é marcada como validada após o gate 41 0C.
-    const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
     try {
-      const settings = await readAppSettings(basePath);
-      await writeAppSettings(basePath, {
-        ...settings,
-        selectedAdapterAddress: device.address.toUpperCase(),
+      const sessionSaved = await persistValidatedConnection({
+        session: connection.session,
+        device,
+        protocol: connection.protocol,
+        supportedPids: connection.supportedPids,
+        ecuValidated: connection.ecuValidated,
+        getDiagnosticsText: () => connection.session.getTransportDiagnosticsText(),
       });
-      const validatedAt = new Date().toISOString();
-      updateAutoSaveState((state) => {
-        state.obd = {
-          ...state.obd,
-          connected: true,
-          adapterName: device.name,
-          protocol: connection.protocol ?? undefined,
-          lastKnownProtocol: connection.protocol ?? state.obd.lastKnownProtocol,
-          ecuAddress: state.vehicle?.ecuAddress ?? state.obd.ecuAddress,
-          ecuValidatedAt: validatedAt,
-          ecuValidationSource: state.vehicle?.ecuAddress ? 'VEHICLE_PROFILE' : 'OBD_RESPONSE',
-          lastConnectedAt: validatedAt,
-        };
-      });
-      const sessionSaved = await startObdAutosaveSession();
       if (!sessionSaved) {
         console.warn('[obd] ECU validada, mas não foi possível iniciar o autosave da sessão.');
       }
@@ -347,9 +362,13 @@ export async function setSharedObdConnection(connection: SharedObdConnection | n
     lastConnectionError = null;
     setLifecycle('READY');
     if (connection.ecuValidated) {
-      const sessionSaved = await startObdAutosaveSession();
-      if (!sessionSaved) {
-        console.warn('[obd] ECU validada, mas não foi possível iniciar o autosave da sessão.');
+      try {
+        const sessionSaved = await persistValidatedConnection(connection);
+        if (!sessionSaved) {
+          console.warn('[obd] ECU validada, mas não foi possível iniciar o autosave da sessão.');
+        }
+      } catch (persistCause) {
+        console.warn('[obd] falha ao persistir adaptador/ECU:', persistCause instanceof Error ? persistCause.message : persistCause);
       }
     }
     startBluetoothMonitor();
