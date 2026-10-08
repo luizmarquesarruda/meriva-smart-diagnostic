@@ -1276,3 +1276,13 @@ A correção anterior eliminou o congelamento do RPM no cockpit, mas a métrica 
 - Adicionar regressão de UI/estado para impedir uso de `averageConsumptionKml` como consumo atual.
 
 **Ainda não considerar a correção validada pela CI.**
+
+
+### Correção do consumo atual
+- `47afd09d88e8a4a58f0d8c0ed1a094dd5c0ba8c0` — cockpit passou a usar `instantaneousConsumptionKml`, calculado em tempo real pelo `AutoTripService` a partir de velocidade válida + PID 015E, em vez de `averageConsumptionKml` persistido.
+- `a2696353e05b19537345d09ba841eefb0376b383` — regressão no teste do cockpit garante que a métrica atual não volte a usar a média histórica.
+
+### Resultado técnico esperado
+A métrica CONSUMO agora acompanha a condição atual: com velocidade e PID 015E válidos, varia com a taxa de combustível da ECU; parado, sem taxa válida ou sem movimento, mostra `N/D`. A média histórica permanece separada e continua sendo usada para histórico/autonomia.
+
+**CI ainda não executada nesta correção.**
