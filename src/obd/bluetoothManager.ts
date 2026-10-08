@@ -157,11 +157,15 @@ export async function createRealElmSession(
   callbacks?: RealElmSessionCallbacks,
 ): Promise<RealElmConnection> {
   let lastCause: unknown = null;
+  const config = mergeCompatibilityConfig(compatibility ?? DEFAULT_ELM327_COMPATIBILITY);
+  const effectiveMaxAttempts = config.maxConnectionAttempts > 0
+    ? config.maxConnectionAttempts
+    : MAX_BLUETOOTH_ATTEMPTS;
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+  for (let attempt = 1; attempt <= effectiveMaxAttempts; attempt++) {
     logBluetoothDiagnostic('BLUETOOTH_ATTEMPT_START', {
       attempt,
-      maxAttempts,
+      maxAttempts: effectiveMaxAttempts,
       retryIntervalMs: BLUETOOTH_RETRY_INTERVAL_MS,
       name: device.name,
       address: device.address,
@@ -170,10 +174,10 @@ export async function createRealElmSession(
     try {
       const session = await createRealElmSessionAttempt(
         device,
-        compatibility,
+        config,
         pidDiscoveryCache,
         attempt,
-        MAX_BLUETOOTH_ATTEMPTS,
+        effectiveMaxAttempts,
         callbacks,
       );
 
@@ -197,7 +201,7 @@ export async function createRealElmSession(
         error: cause instanceof Error ? cause.message : String(cause),
       });
 
-      if (attempt === maxAttempts) {
+      if (attempt === effectiveMaxAttempts) {
         break;
       }
 
@@ -215,9 +219,9 @@ export async function createRealElmSession(
   }
 
   logBluetoothDiagnostic('BLUETOOTH_TEST_SESSION_END', {
-    attemptsTotal: maxAttempts,
+    attemptsTotal: effectiveMaxAttempts,
     successes: 0,
-    failures: maxAttempts,
+    failures: effectiveMaxAttempts,
     reason: 'MAX_ATTEMPTS_REACHED',
   });
 
@@ -244,7 +248,6 @@ async function createRealElmSessionAttempt(
   // chamador (sharedConnection). Cada retry deve começar diretamente na sessão
   // RFCOMM/ELM, sem reabrir permissões ou reiniciar a preparação Bluetooth.
   const config = mergeCompatibilityConfig(compatibility ?? DEFAULT_ELM327_COMPATIBILITY);
-  const maxAttempts = config.maxConnectionAttempts > 0 ? config.maxConnectionAttempts : MAX_BLUETOOTH_ATTEMPTS;
   const session = new Elm327Session(
     new BluetoothClassicTransport(device.address, config, {
       onConnected: callbacks?.onBluetoothConnected,
