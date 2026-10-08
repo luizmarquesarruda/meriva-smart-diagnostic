@@ -1483,3 +1483,26 @@ A correção aguarda validação pela CI nesta branch antes de ser considerada c
 - Mantida a regra: somente dados `REAL_OBD` válidos alimentam aprendizado; simulação continua bloqueada.
 - O autosave continua registrando as leituras reais durante a sessão.
 - Limitação mantida: sem uma taxa OBD `015E` válida, o aplicativo não deve fabricar consumo.
+
+## 2026-10-08 — Varredura de conhecimento OBD e enriquecimento do banco local
+
+### Problema
+A descoberta de PIDs identificava códigos suportados pela ECU, mas o catálogo local continha poucos PIDs. Quando um PID estava fora de `src/knowledge/pids.json`, o parser retornava `PID DESCONHECIDO` e o aplicativo não conseguia apresentar significado, unidade ou fórmula. Isso também limitava o aprendizado e o banco local de PIDs confirmados.
+
+### Correção aplicada
+- Expandido `src/knowledge/pids.json` com PIDs OBD-II adicionais e descrições semânticas, incluindo pressão de combustível, EGR, purga EVAP, pressão barométrica, carga absoluta, posição relativa da borboleta, temperatura ambiente, pressão absoluta do rail, pedal do acelerador, temperatura do óleo, temporização de injeção e torque.
+- Expandido `src/knowledge/formulas.json` com operações determinísticas necessárias aos novos PIDs.
+- Expandido `src/knowledge/ranges.json` com faixas de plausibilidade correspondentes.
+- Atualizado `src/knowledge/meriva_confirmed_pids.json` para ampliar os alvos de confirmação da Meriva sem transformar seed em evidência real.
+- O banco local `BANCO/pids_meriva_confirmados.txt` passou a persistir, além da confirmação, unidade, formulaId, quantidade de bytes e descrição do PID.
+- `registerObdQuery()` passou a alimentar esses metadados diretamente da definição do PID quando a leitura REAL_OBD é válida.
+- Teste de integridade dos JSONs ampliado para reconhecer as novas operações de fórmula.
+
+### Regra de evidência
+O catálogo explica o PID; ele não confirma que a ECU da Meriva realmente o suporta. A confirmação continua exigindo resposta RAW_ECU válida, parser, fórmula e plausibilidade. Dados de simulação e seed permanecem fora do aprendizado real.
+
+### Referências técnicas
+As fórmulas foram cruzadas com referências públicas de OBD-II/J1979. PID 015E continua definido como Engine Fuel Rate em L/h, com `((A×256)+B)/20`. cite não usar em arquivo local — referência externa registrada na análise desta alteração.
+
+### Estado
+Conhecimento estático ampliado e banco local preparado para guardar o significado dos PIDs. A confirmação física dos novos PIDs depende da próxima sessão real com a ECU da Meriva.
