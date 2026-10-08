@@ -29,6 +29,7 @@ interface AutosaveRuntime {
   lastSaveReason: SaveReason | null;
   lastError: string | null;
   debounceTimer: ReturnType<typeof setTimeout> | null;
+  criticalTimer: ReturnType<typeof setTimeout> | null;
   checkpointTimer: ReturnType<typeof setInterval> | null;
   appStateSubscription: { remove: () => void } | null;
 }
@@ -42,7 +43,9 @@ const runtime: AutosaveRuntime = {
   lastSavedAt: null,
   lastSaveReason: null,
   lastError: null,
+  lastSavedFingerprint: null,
   debounceTimer: null,
+  criticalTimer: null,
   checkpointTimer: null,
   appStateSubscription: null,
 };
@@ -55,6 +58,15 @@ function tmpPath(basePath: string): string {
 }
 function previousPath(basePath: string): string {
   return `${basePath}/CONFIG/autosave.previous.json`;
+}
+
+function snapshotFingerprint(state: MerivaPersistedState): string {
+  // savedAt is metadata of the persistence operation, not application state.
+  const payload = {
+    ...state,
+    metadata: { ...state.metadata, savedAt: '' },
+  };
+  return JSON.stringify(payload);
 }
 
 async function ensureDir(path: string): Promise<void> {
@@ -99,14 +111,23 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
     return false;
   }
 
+  const fingerprintBeforeSave = snapshotFingerprint(runtime.state);
+  if (runtime.lastSavedFingerprint === fingerprintBeforeSave) {
+    runtime.dirty = false;
+    runtime.lastError = null;
+    return true;
+  }
+
   runtime.saving = true;
   const mutationVersionAtStart = runtime.mutationVersion;
   let saved = false;
 
   try {
+    const savedAt = new Date().toISOString();
+    runtime.state.metadata = { ...runtime.state.metadata, savedAt };
     const envelope: AutoSaveEnvelope<MerivaPersistedState> = {
       schemaVersion: AUTOSAVE_SCHEMA_VERSION,
-      savedAt: new Date().toISOString(),
+      savedAt,
       dataType: AUTOSAVE_DATA_TYPE,
       source: AUTOSAVE_SOURCE,
       payload: runtime.state,
@@ -134,12 +155,11 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
     await FileSystem.copyAsync({ from: tmpPath(base), to: mainPath(base) });
     await FileSystem.deleteAsync(tmpPath(base), { idempotent: true });
 
-    runtime.lastSavedAt = envelope.savedAt;
+    runtime.lastSavedAt = savedAt;
     runtime.lastSaveReason = reason;
     runtime.lastError = null;
+    runtime.lastSavedFingerprint = fingerprintBeforeSave;
 
-    // Cada salvamento bem-sucedido também entra no mesmo TXT histórico.
-    // O histórico mantém no máximo 200 snapshots e descarta os mais antigos.
     try {
       await appendAutoSaveHistory(
         base,
@@ -181,6 +201,7 @@ export async function initAutoSave(basePath: string): Promise<MerivaPersistedSta
   runtime.lastSavedAt = envelope?.savedAt ?? null;
   runtime.lastSaveReason = null;
   runtime.lastError = null;
+  runtime.lastSavedFingerprint = envelope ? snapshotFingerprint(runtime.state) : null;
   runtime.dirty = false;
   runtime.mutationVersion = 0;
 
@@ -224,6 +245,14 @@ export function pushLastReading(reading: MerivaPersistedState['lastReadings'][nu
   });
 }
 
+export function scheduleCriticalSave(delayMs = 500): void {
+  if (runtime.criticalTimer) clearTimeout(runtime.criticalTimer);
+  runtime.criticalTimer = setTimeout(() => {
+    runtime.criticalTimer = null;
+    void saveNow('critical');
+  }, delayMs);
+}
+
 function scheduleDebouncedSave(): void {
   if (runtime.saving) return;
   if (runtime.debounceTimer) clearTimeout(runtime.debounceTimer);
@@ -234,6 +263,10 @@ function scheduleDebouncedSave(): void {
 }
 
 export async function saveNow(reason: SaveReason = 'critical'): Promise<boolean> {
+  if (runtime.criticalTimer) {
+    clearTimeout(runtime.criticalTimer);
+    runtime.criticalTimer = null;
+  }
   if (runtime.debounceTimer) {
     clearTimeout(runtime.debounceTimer);
     runtime.debounceTimer = null;
@@ -257,8 +290,10 @@ export function stopObdSessionCheckpoint(): void {
 
 export function disposeAutoSave(): void {
   if (runtime.debounceTimer) clearTimeout(runtime.debounceTimer);
+  if (runtime.criticalTimer) clearTimeout(runtime.criticalTimer);
   if (runtime.checkpointTimer) clearInterval(runtime.checkpointTimer);
   runtime.debounceTimer = null;
+  runtime.criticalTimer = null;
   runtime.checkpointTimer = null;
   runtime.appStateSubscription?.remove();
   runtime.appStateSubscription = null;
@@ -270,4 +305,5 @@ export function disposeAutoSave(): void {
   runtime.lastSavedAt = null;
   runtime.lastSaveReason = null;
   runtime.lastError = null;
+  runtime.lastSavedFingerprint = null;
 }
