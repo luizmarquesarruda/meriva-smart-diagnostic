@@ -8,7 +8,7 @@ A documentação oficial Chevrolet é usada para configuração do veículo e co
 ## Fontes pesquisadas
 1. Chevrolet Brasil — manuais de proprietários de anos anteriores: Meriva 2008–2012.
 2. Manual do Proprietário Chevrolet Meriva MY12, Brasil.
-3. SAE J1979 / ISO 15031-5 — serviços OBD-II e fórmulas de PIDs.
+3. SAE J1979_202505 / SAE J1979-DA — serviços OBD-II, mensagens e registro global de identificadores de dados.
 4. SAE J2012 — formato e definições padronizadas de DTC.
 5. Referências abertas de implementação OBD-II foram usadas somente para conferência cruzada, não como autoridade de compatibilidade da Meriva.
 
@@ -93,5 +93,7 @@ Essa informação não foi transformada em regra genérica de falha de RPM porqu
 ## Fontes externas
 - Chevrolet Brasil — manuais: https://www.chevrolet.com.br/servicos/manuais-veiculos/anos-anteriores
 - Manual Chevrolet Meriva MY12: https://meu.chevrolet.com.br/content/dam/gmownercenter/gmsa/gmbr/dynamic/manuals/2012/chevrolet/Meriva/pt/om_ng-chevrolet_Meriva_my12-pt_BR.pdf
+- SAE J1979_202505 — E/E Diagnostic Test Modes: https://saemobilus.sae.org/standards/j1979_202505-e-e-diagnostic-test-modes
+- SAE J1979-DA — Digital Annex: https://saemobilus.sae.org/standards/j1979da_202510-j1979-da-digital-annex-e-e-diagnostic-test-modes
 - SAE J2012 — Diagnostic Trouble Code Definitions: https://saemobilus.sae.org/standards/j2012_202509-diagnostic-trouble-code-definitions
 - SAE J2012 Digital Annex: https://saemobilus.sae.org/standards/j2012da_202403-digital-annex-diagnostic-trouble-code-definitions-failure-type-byte-definitions
