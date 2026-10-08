@@ -191,7 +191,7 @@ export default function IndexScreen() {
             <Text style={styles.sectionTitle}>CONSUMO — FONTES SEPARADAS</Text>
             <Text style={styles.sectionHint}>Instantâneo: {tripState.instantaneousConsumptionKml != null ? tripState.instantaneousConsumptionKml.toFixed(2) + ' km/L' : 'SEM DADOS'} • {tripState.instantaneousConsumptionSource}</Text>
             <Text style={styles.sectionHint}>Viagem atual: {tripState.consumptionKml != null ? tripState.consumptionKml.toFixed(2) + ' km/L' : 'SEM DADOS'} • {tripState.tripConsumptionSource}</Text>
-            <Text style={styles.cardText}>Média histórica: {historicalConsumptionKml != null ? historicalConsumptionKml.toFixed(2) + ' km/L' : 'SEM DADOS'} • {historicalConsumptionSource}</Text>
+            <Text style={styles.sectionHint}>Média histórica: {historicalConsumptionKml != null ? historicalConsumptionKml.toFixed(2) + ' km/L' : 'SEM DADOS'} • {historicalConsumptionSource}</Text>
           </View>
           <View style={styles.heroCard}>
             <Text style={styles.heroEyebrow}>{connectionStatus.ecuResponseState === 'NO_RESPONSE' ? 'ADAPTADOR OK • ECU SEM RESPOSTA' : connectionStatus.ecuResponseState === 'RECOVERING' ? 'RECUPERANDO PROTOCOLO ECU' : connectionStatus.ecuConnected ? 'MOTOR • ECU CONECTADA' : 'ESTADO DO VEÍCULO'}</Text>
