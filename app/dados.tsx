@@ -26,7 +26,7 @@ export default function DadosScreen() {
     <View style={styles.grid}>
       <Metric landscape={layout.landscape} label="VELOCIDADE" value={gpsTracker.getState().currentSpeedKmh.toFixed(0) + ' km/h'} />
       <Metric landscape={layout.landscape} label="DISTÂNCIA" value={trip.distanceKm.toFixed(2) + ' km'} />
-      <Metric landscape={layout.landscape} label="CONSUMO" value={trip.consumptionKml != null && trip.consumptionKml > 0 ? trip.consumptionKml.toFixed(1) + ' km/L' : 'N/D'} />
+      <Metric landscape={layout.landscape} label="CONSUMO" value={trip.instantaneousConsumptionKml != null && trip.instantaneousConsumptionKml > 0 ? trip.instantaneousConsumptionKml.toFixed(1) + ' km/L' : 'N/D'} />
       <Metric landscape={layout.landscape} label="AUTONOMIA" value={state.autonomy.estimatedRangeKm > 0 ? state.autonomy.estimatedRangeKm.toFixed(0) + ' km' : 'N/D'} />
     </View>
     <Text style={styles.section}>CONTEXTO OPERACIONAL</Text>
@@ -54,6 +54,13 @@ export default function DadosScreen() {
     })}
     <Text style={styles.section}>ÚLTIMAS LEITURAS REAIS</Text>
     {!readings.length ? <Empty text="Nenhum PID real registrado ainda. Use DIAGNÓSTICO para consultar a ECU." /> : readings.slice(0, 12).map((item) => { const definition=getPidDefinition(item.pid); return <View key={item.timestamp + item.pid} style={styles.row}><View style={{flex:1}}><Text style={styles.name} numberOfLines={2}>{item.pid} • {definition?.name ?? item.name}</Text><Text style={styles.pid}>{definition?.description ?? 'Descrição não catalogada localmente'} • {item.status}</Text></View><Text style={styles.value}>{item.value == null ? 'N/D' : String(item.value) + (item.unit ? ' ' + item.unit : '')}</Text></View>})}
+    <Text style={styles.section}>ÚLTIMAS TENTATIVAS DE CONSULTA</Text>
+    {!state.lastQueryAttempts.length ? <View style={styles.empty}><Text style={styles.emptyText}>Nenhuma tentativa sem valor válido registrada.</Text></View> : state.lastQueryAttempts.slice(0, 8).map((attempt) => (
+      <View key={attempt.timestamp + attempt.pid} style={styles.row}>
+        <View style={{flex:1}}><Text style={styles.name}>{attempt.pid} • {attempt.source}</Text><Text style={styles.pid}>{attempt.status} • {new Date(attempt.timestamp).toLocaleTimeString()}</Text><Text style={styles.pid}>{attempt.errorMessage ?? 'Sem valor válido retornado.'}</Text></View>
+        <Text style={styles.value}>{attempt.value == null ? 'N/D' : String(attempt.value)}</Text>
+      </View>
+    ))}
     <View style={styles.note}><Text style={styles.noteText}>A tela não inventa telemetria: somente leituras marcadas como REAL entram como evidência do veículo.</Text></View>
     <Link href="/laboratorio" asChild><TouchableOpacity style={styles.primary}><Text style={styles.primaryText}>🔧 CONSULTAR / DESCOBRIR PIDs</Text></TouchableOpacity></Link>
     <Back />
