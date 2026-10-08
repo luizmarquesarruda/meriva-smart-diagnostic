@@ -1547,3 +1547,7 @@ Foreground service Android para operação contínua em background e Android Aut
 - A retirada dos timers da tela `app/dados.tsx` revelou que o GPS não possuía, naquela tela, uma assinatura reativa equivalente; sem correção, velocidade/distância poderiam ficar estáticas.
 - O barramento `appEventBus` pode receber vários eventos consecutivos quando uma consulta CAN agrupa múltiplos PIDs; o hook de UI será coalescido por microtask para evitar renderização em rajada.
 - A lógica OBD não será alterada por essa auditoria: a correção fica restrita à camada de atualização da interface.
+## 2026-10-08 — Correção de bypass descoberto na auditoria
+
+`app/laboratorio.tsx` ainda possuía um caminho direto para `createRealElmSession()` que não aplicava o validador de cache contextual usado por `sharedConnection` e gravava o cache sem endereço do adaptador. Isso poderia reintroduzir cache antigo após uma conexão manual pelo laboratório.
+Correção a ser aplicada: usar o mesmo `isPidDiscoveryCacheUsable()` no caminho manual e persistir adaptador/VIN/ECU no cache. O objetivo é manter uma única política de conexão/cache em todas as telas.
