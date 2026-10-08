@@ -1583,3 +1583,29 @@ A correção deve priorizar o protocolo identificado explicitamente e, quando `A
 
 ### Limitação de execução
 O ambiente desta sessão não conseguiu clonar o repositório por indisponibilidade de resolução externa (`github.com`), portanto a suíte completa `npm test`, o typecheck real e o build Android não foram executados localmente. A validação executada aqui cobre as novas camadas puras e o plugin com testes isolados. CI do GitHub permanece deliberadamente não executada nesta etapa.
+
+## 2026-10-08 — Plano: diagnóstico OBD avançado e identificação real do veículo
+
+### Objetivo
+Implementar as melhorias de maior valor identificadas nas auditorias externas e no backlog: Mode 09/PID 02 para identificação do veículo e Mode 02 para Freeze Frame, com persistência local e apresentação no aplicativo.
+
+### Evidência técnica
+A documentação SAE J1979 mantém o Mode 02 para Powertrain Freeze Frame Data e o Mode 09 para Vehicle Information. O datasheet do ELM327 documenta o VIN via Mode 09 PID 02 e respostas multiline. Essas funções serão tratadas como opcionais: ausência de resposta não será convertida em compatibilidade presumida.
+
+### Plano antes do código
+1. Criar parser isolado para Mode 09 PID 02, montando respostas multiline e validando VIN de 17 caracteres.
+2. Criar parser isolado para Mode 02, reutilizando definições/fórmulas dos PIDs existentes, mas exigindo resposta positiva 42 xx.
+3. Criar armazenamento privado separado para snapshots Freeze Frame, limitado e validado, sem alterar o schema principal do autosave.
+4. Criar tela de Diagnóstico Avançado com leitura de VIN e captura de Freeze Frame associada opcionalmente a um DTC real ativo.
+5. Persistir VIN real no perfil do veículo somente quando obtido de resposta OBD válida.
+6. Adicionar regressões para VIN multiline, resposta Freeze Frame, rejeição de payload truncado e isolamento do armazenamento.
+7. Atualizar navegação, package.json e documentação.
+8. Preservar Bluetooth/ELM327, gate 010C → 41 0C, REAL_OBD/SIMULACAO, autosave principal e package-lock.
+
+### Invariantes
+- Nenhum VIN será inventado a partir do modelo cadastrado.
+- Freeze Frame só será marcado como REAL_OBD quando vier da sessão OBD real.
+- Mode 04 (limpeza de DTC), Mode 06 e Android Auto/background continuam fora desta rodada.
+- CI será executada após a implementação completa.
+
+**Plano registrado antes da alteração de código.**
