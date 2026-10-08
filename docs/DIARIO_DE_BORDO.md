@@ -1372,3 +1372,28 @@ Correção aplicada em `152945f227836c1a7954bb0359c76c6a33dba24b`: o valor foi e
 O teste de persistência REAL foi ampliado para verificar também `lastReadings` e a criação do log OBD, enquanto a regressão de `autoTripService` garante que os PIDs automáticos passem pelo `registerObdQuery`.
 
 Commit adicional: `ae1672fd00342891a7272bbd435aedac2e5b73f3`.
+
+## 2026-10-08 — Auditoria: duplicação na telemetria automática
+
+### Problema identificado antes da nova CI
+Na revisão da correção que religou a alimentação automática do histórico, foi confirmado um efeito colateral: `src/trip/autoTripService.ts` chamava `recordLivePidQuery()` diretamente e, logo depois, `registerObdQuery()`, que também chama `recordLivePidQuery()`. Assim, uma única resposta real da ECU podia entrar duas vezes na janela de telemetria em memória.
+
+### Risco
+A duplicação não corrompe o autosave principal, mas distorce a série temporal, o número aparente de amostras e a análise de tendência/contexto. O histórico persistente recebe o evento uma vez; a telemetria em memória é que fica duplicada.
+
+### Plano antes do código
+1. Remover as chamadas diretas redundantes a `recordLivePidQuery()` de `autoTripService.ts`.
+2. Manter `registerObdQuery(..., 'REAL')` como único ponto de entrada para logs, lastReadings, banco de PIDs, aprendizado e telemetria ao processar cada consulta automática.
+3. Manter uma única gravação de tendência por resposta real da ECU.
+4. Adicionar regressão estática garantindo que os caminhos automáticos não voltem a duplicar `recordLivePidQuery()`.
+5. Executar a CI completa após a correção e tratar qualquer falha pela causa observada.
+
+### Invariantes
+- Gate ECU `010C → 41 0C` permanece intacto.
+- Bluetooth Classic/ELM327 permanece intacto.
+- `REAL_OBD` continua sendo a única fonte de evidência real.
+- Autosave de sessão, histórico TXT de até 200 entradas, aprendizado e package-lock não serão alterados nesta correção.
+- Nenhuma dependência nova será adicionada.
+
+### Estado
+Plano registrado antes da alteração de código. A CI anterior continua sendo apenas a referência da versão anterior; a nova CI será o árbitro desta correção.
