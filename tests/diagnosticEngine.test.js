@@ -90,6 +90,27 @@ function main() {
   assert.strictEqual(result.hypotheses[0].id, 'MISTURA_POBRE');
   assert.strictEqual(result.blockedSimulationSamples, 1);
 
+  // Red-team: leitura antiga, valor impossível e resposta com falha não podem virar hipótese.
+  result = engine.runLocalDiagnostic({
+    ...base,
+    observations: [
+      { ...obs('010B', 80), timestamp: new Date(Date.now() - 180_000).toISOString() },
+      obs('0106', 140),
+      { ...obs('0107', 0), status: 'TIMEOUT' },
+    ],
+  });
+  assert.strictEqual(result.hypotheses.length, 0, 'leituras antigas, fora de faixa ou sem resposta válida devem ser bloqueadas');
+  assert.strictEqual(result.blockedStaleSamples, 1);
+  assert.strictEqual(result.blockedInvalidSamples, 2);
+
+  result = engine.runLocalDiagnostic({
+    ...base,
+    observations: [obs('0106', 20), obs('0107', 0)],
+    dtcs: [{ code: 'p0301', status: 'CONFIRMED', firstSeen: '', lastSeen: '', occurrences: 1, source: 'REAL_OBD', historical: false, confirmed: true }],
+  });
+  assert.strictEqual(result.hypotheses.length, 1, 'normalização do DTC não deve depender de caixa');
+  assert.strictEqual(result.hypotheses[0].id, 'FALHA_DE_COMBUSTAO_CILINDRO_1');
+
   console.log('Diagnostic engine: OK');
 }
 
