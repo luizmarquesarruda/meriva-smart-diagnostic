@@ -10,7 +10,7 @@ const originalTsExtension = Module._extensions['.ts'];
 Module._extensions['.ts'] = function compileTypeScript(module, filename) {
   const source = fs.readFileSync(filename, 'utf8');
   const output = ts.transpileModule(source, {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2019 },
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2019, esModuleInterop: true, allowSyntheticDefaultImports: true },
   }).outputText;
   module._compile(output, filename);
 };
