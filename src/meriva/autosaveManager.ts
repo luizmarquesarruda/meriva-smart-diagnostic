@@ -218,13 +218,15 @@ export async function initAutoSave(basePath: string): Promise<MerivaPersistedSta
   await ensureStorageDirs(basePath);
   runtime.basePath = basePath;
 
-  // Nunca hidratar autosaves anteriores: eles podem conter VIN, identificadores
-  // do adaptador, ECU, leituras, DTCs e histórico pessoal. O estado inicia limpo.
-  runtime.state = createEmptyMerivaState();
-  runtime.lastSavedAt = null;
+  // Em produção, nunca hidratar autosaves anteriores: eles podem conter VIN,
+  // identificadores do adaptador, ECU, leituras, DTCs e histórico pessoal.
+  // A suíte pode habilitar explicitamente a persistência para testar o mecanismo legado.
+  const envelope = isPersistenceEnabled() ? await loadLastValidEnvelope(basePath) : null;
+  runtime.state = envelope ? hydrateState(envelope.payload) : createEmptyMerivaState();
+  runtime.lastSavedAt = envelope?.savedAt ?? null;
   runtime.lastSaveReason = null;
   runtime.lastError = null;
-  runtime.lastSavedFingerprint = null;
+  runtime.lastSavedFingerprint = envelope ? snapshotFingerprint(runtime.state) : null;
   runtime.dirty = false;
   runtime.mutationVersion = 0;
 
