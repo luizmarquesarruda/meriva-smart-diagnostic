@@ -1620,3 +1620,39 @@ A revisão estática da nova camada Mode 09 mostrou que algumas respostas ELM po
 Aceitar CR, CRLF e LF como separadores e processar todas as ocorrências `49 02 frame` encontradas, preservando a ordenação pelo índice do frame.
 
 **Plano registrado antes da correção.**
+
+
+## 2026-10-08 — Implementação concluída: OBD avançado
+
+### Melhorias entregues
+- Mode 09 / PID 02 para leitura do VIN real da ECU, com montagem multiline por índice de frame.
+- Parser de VIN tolerante a CRLF, LF e CR isolado.
+- Mode 02 para leitura de Freeze Frame dos PIDs já catalogados, exigindo resposta positiva `42 xx`.
+- Persistência privada dos Freeze Frames em `DTC/freeze_frames.json`, limitada a 20 snapshots e validada antes da leitura.
+- Nova tela `app/avancado.tsx`, acessível em MAIS RECURSOS, para leitura de VIN, captura de Freeze Frame e consulta do histórico.
+- VIN retornado pela ECU é gravado no perfil do veículo e sincronizado com o autosave.
+- Regressões adicionadas para VIN multiline, CR isolado, Freeze Frame válido e payload truncado.
+
+### Commits
+- `173daf84e961c23b8bdc0ff3a4a515d9be2e7740` — parser Mode 09/02 e Freeze Frame.
+- `971d3f809d0e778588008063007dd7b308d8a585` — armazenamento privado de snapshots.
+- `879fa951ae53a28922342be5518b3de97926a647` — tela de diagnóstico avançado.
+- `e1a4e78d929ee988a947bca420e59692550cd813` — regressões dos parsers.
+- `88a65adb88ee7ed3bcaed5297d93bbc55c92c5aa` — navegação para Diagnóstico Avançado.
+- `6a0a2b0d4f8eccb13b72b91fea2d0faaf289025a` — registro da regressão avançada no npm test.
+- `0213b9f53953d4c02be6cd10954feb682c1f3046` — documentação técnica da extensão.
+- `127da00fb9033b952dbb24171675e6b40072fb5a` — plano da correção de framing VIN.
+- `a6bcad374c8ce1e836a480928c18741ec2d32a8a` — parser tolerante a CR isolado.
+- `8d65ca77067a0bd2557fe41ed3af0bf9777ee0cd` — teste de CR isolado.
+
+### Invariantes preservadas
+- Bluetooth Classic/ELM327 e gate `010C → 41 0C` preservados.
+- REAL_OBD continua separado de SIMULAÇÃO.
+- Autosave principal e `package-lock.json` não foram alterados estruturalmente.
+- Não foram adicionadas permissões, dependências ou operações destrutivas.
+
+### Validação pré-CI
+Os arquivos novos foram auditados estaticamente após a implementação. A CI completa ainda deve confirmar typecheck, suíte integral, Expo Doctor e Android Release.
+
+### Próximo passo
+Disparar a CI completa da PR #33. Se houver falha, registrar a causa aqui antes da próxima correção.
