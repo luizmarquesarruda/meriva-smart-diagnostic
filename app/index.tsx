@@ -106,16 +106,6 @@ export default function IndexScreen() {
     let cancelled = false;
     const unsubscribe = subscribeSharedObd((connection) => {
       if (cancelled || !connection) return;
-      updateAutoSaveState((state) => {
-        state.obd = {
-          ...state.obd,
-          connected: true,
-          adapterName: connection.device.name,
-          protocol: connection.protocol ?? undefined,
-          lastKnownProtocol: connection.protocol ?? state.obd.lastKnownProtocol,
-          lastConnectedAt: new Date().toISOString(),
-        };
-      });
       setObd((current) => ({
         ...current,
         connected: true,
