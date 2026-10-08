@@ -70,6 +70,7 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
   L.push('[DTC]');
   if (state.dtcs.length) {
     for (const dtc of state.dtcs) {
+      const dtcDefinition = getDtcDefinition(dtc.code);
       L.push(
         `${dtc.code} status=${dtc.status} ocorrencias=${dtc.occurrences} fonte=${dtc.source} primeira=${dtc.firstSeen} ultima=${dtc.lastSeen}`,
       );
