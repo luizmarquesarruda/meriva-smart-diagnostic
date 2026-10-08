@@ -8,6 +8,7 @@ import { isBluetoothLinkUp, type BluetoothLifecycleState } from './bluetoothStat
 import RNBluetoothClassic from 'react-native-bluetooth-classic';
 import * as FileSystem from 'expo-file-system';
 import { readAppSettings, writeAppSettings } from '../database/appSettings';
+import { startBackgroundMonitoring, stopBackgroundMonitoring } from '../gps/backgroundMonitoring';
 
 export interface SharedObdConnection {
   session: Elm327Session;
@@ -56,6 +57,7 @@ function setLifecycle(next: BluetoothLifecycleState): void {
 
 async function persistDisconnectedState(): Promise<void> {
   try {
+    await stopBackgroundMonitoring();
     await closeObdAutosaveSession();
   } catch {
     // a perda de conectividade não deve derrubar a interface
@@ -154,7 +156,12 @@ async function persistValidatedConnection(
     };
   });
 
-  return startObdAutosaveSession();
+  const sessionSaved = await startObdAutosaveSession();
+  const backgroundStarted = await startBackgroundMonitoring();
+  if (!backgroundStarted) {
+    console.warn('[obd] ECU validada, mas o monitoramento em segundo plano não foi iniciado.');
+  }
+  return sessionSaved;
 }
 export type ConnectionSelectionMode = 'PREFERRED' | 'EXPLICIT';
 
@@ -397,6 +404,7 @@ export async function disconnectSharedObd(): Promise<void> {
   try {
     if (connection) await connection.session.close();
   } finally {
+    await stopBackgroundMonitoring();
     await closeObdAutosaveSession();
     intentionalDisconnect = false;
   }

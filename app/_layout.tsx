@@ -1,3 +1,4 @@
+import '../src/gps/backgroundLocationTask';
 import { useEffect, useRef } from 'react';
 import { Alert, AppState, Linking, Platform } from 'react-native';
 import { Stack } from 'expo-router';

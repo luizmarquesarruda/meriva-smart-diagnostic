@@ -155,3 +155,11 @@ A inicialização separa Bluetooth, ELM e ECU. O primeiro teste real da ECU é 0
 Este commit é um gatilho técnico para confirmar que o workflow `.github/workflows/ci.yml` continua disparando em `push` e executando a validação e o build Android nativo.
 
 O teste de transporte Bluetooth usa `connectionType: delimited`, `delimiter: \r` e buffering local até o prompt `>`. Esse contrato corresponde ao código atual e é protegido pela regressão automatizada.
+
+## Execução em segundo plano
+
+Após a ECU ser validada pelo gate real 010C -> 41 0C, o aplicativo inicia o monitoramento persistente de GPS pelo Foreground Service do Android usando expo-location. A tarefa global em expo-task-manager continua alimentando o mesmo GpsTracker, enquanto o ciclo OBD mantém as consultas e o autosave da sessão.
+
+Com a tela apagada, o objetivo é manter OBD + histórico + GPS em execução enquanto o Foreground Service estiver ativo. Isso não cobre force-stop/encerramento explícito do app nem garante comportamento idêntico entre fabricantes que impõem políticas próprias de economia de bateria.
+
+O Android solicita localização em segundo plano para esse modo. A notificação persistente identifica que o diagnóstico do veículo está ativo.

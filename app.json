@@ -6,7 +6,9 @@
     "version": "1.0.1",
     "orientation": "default",
     "userInterfaceStyle": "light",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
     "android": {
       "package": "com.meriva.smartdiagnostic",
       "permissions": [
@@ -15,10 +17,25 @@
         "BLUETOOTH_CONNECT",
         "BLUETOOTH_SCAN",
         "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION"
       ]
     },
-    "assetBundlePatterns": ["**/*"],
-    "experiments": { "typedRoutes": true, "tsconfigPaths": true }
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "tsconfigPaths": true
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ]
+    ]
   }
 }
