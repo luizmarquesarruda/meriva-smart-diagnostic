@@ -22,7 +22,7 @@ function isFresh(item: PidObservation, nowMs: number): boolean {
 }
 function isValidObservation(item: PidObservation, nowMs: number): boolean {
   if (!/^01[0-9A-F]{2}$/i.test(String(item.pid ?? '')) || typeof item.value !== 'number' || !Number.isFinite(item.value)) return false;
-  if (item.status !== undefined && String(item.status).trim().toUpperCase() !== 'RESPONDEU') return false;
+  if (String(item.status ?? '').trim().toUpperCase() !== 'RESPONDEU') return false;
   if (!isFresh(item, nowMs)) return false;
   const pid = item.pid.toUpperCase();
   if ((pid === '0106' || pid === '0107') && (item.value < -100 || item.value > 100)) return false;
