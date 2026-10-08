@@ -53,20 +53,22 @@ export function validateOBDResponse(response: string): boolean {
 export function parsePidResponse(pidRequested: string, rawResponse: string, positiveService = '41'): ParsedPidResult {
   const pid = pidRequested.replace(/\s/g, '').toUpperCase();
 
-  if (!rawResponse.trim() || /NO DATA|UNABLE TO CONNECT|ERROR/i.test(rawResponse)) {
+  const definition = getPidDefinition(pid);
+
+  if (!rawResponse.trim() || /NO DATA|UNABLE TO CONNECT|ERROR|BUS INIT|BUS ERROR/i.test(rawResponse)) {
     return {
       pid,
-      name: 'DESCONHECIDO',
+      name: definition?.name ?? `PID ${pid}`,
       value: null,
-      unit: 'SEM DADOS',
+      unit: definition?.unit ?? 'SEM DADOS',
       rawResponse,
       rawBytes: [],
       status: 'NÃO RESPONDEU',
       errorMessage: 'ECU sem resposta válida',
+      ...(definition ? { definition } : {}),
     };
   }
 
-  const definition = getPidDefinition(pid);
   const rawBytes = extractHexBytes(rawResponse);
 
   if (!definition) {
