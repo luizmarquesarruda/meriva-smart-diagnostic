@@ -20,7 +20,6 @@ import { getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
 import { DtcRecord, nextDtcOccurrences, readDtcs, recordDtc } from '../src/database/dtcManager';
 import {
   initAutoSave,
-  stopObdSessionCheckpoint,
   updateAutoSaveState,
   getAutoSaveState,
 } from '../src/meriva/autosaveManager';
@@ -194,31 +193,19 @@ export default function LaboratorioScreen() {
         getDiagnosticsText: () => connected.session.getTransportDiagnosticsText(),
       });
       setProtocol(connection.protocol ?? 'N/D');
-      updateAutoSaveState((state) => {
-        state.obd = {
-          ...state.obd,
-          connected: true,
-          adapterName: device.name,
-          protocol: connected.protocol ?? undefined,
-          lastKnownProtocol: connected.protocol ?? state.obd.lastKnownProtocol,
-          ecuAddress: state.vehicle?.ecuAddress ?? state.obd.ecuAddress,
-          ecuValidatedAt: new Date().toISOString(),
-          ecuValidationSource: state.vehicle?.ecuAddress ? 'VEHICLE_PROFILE' : 'OBD_RESPONSE',
-          lastConnectedAt: new Date().toISOString(),
-        };
-
-        if (
-          connected.pidDiscoverySource === 'ECU' &&
-          connected.protocol &&
-          connected.supportedPids.length > 0
-        ) {
+      if (
+        connected.pidDiscoverySource === 'ECU' &&
+        connected.protocol &&
+        connected.supportedPids.length > 0
+      ) {
+        updateAutoSaveState((state) => {
           state.pidDiscovery = {
             supportedPids: connected.supportedPids,
             protocol: connected.protocol,
             discoveredAt: new Date().toISOString(),
           };
-        }
-      });
+        });
+      }
 
       setStatus(
         connected.pidDiscoverySource === 'CACHE'
@@ -239,7 +226,6 @@ export default function LaboratorioScreen() {
     } catch (cause) {
       const failedSession = sessionRef.current;
       sessionRef.current = null;
-      stopObdSessionCheckpoint();
       try {
         await failedSession?.close();
       } catch {
@@ -257,7 +243,6 @@ export default function LaboratorioScreen() {
     const activeSession = sessionRef.current;
     sessionRef.current = null;
     setProtocol('N/D');
-    stopObdSessionCheckpoint();
 
     try {
       if (getSharedObdConnection()?.session === activeSession) {
