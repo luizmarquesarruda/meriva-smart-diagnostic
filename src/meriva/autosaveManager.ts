@@ -31,6 +31,7 @@ interface AutosaveRuntime {
   lastSavedFingerprint: string | null;
   debounceTimer: ReturnType<typeof setTimeout> | null;
   criticalTimer: ReturnType<typeof setTimeout> | null;
+  telemetryTimer: ReturnType<typeof setTimeout> | null;
   criticalWaiters: Array<(saved: boolean) => void>;
   checkpointTimer: ReturnType<typeof setInterval> | null;
   appStateSubscription: { remove: () => void } | null;
@@ -48,6 +49,7 @@ const runtime: AutosaveRuntime = {
   lastSavedFingerprint: null,
   debounceTimer: null,
   criticalTimer: null,
+  telemetryTimer: null,
   criticalWaiters: [],
   checkpointTimer: null,
   appStateSubscription: null,
@@ -240,13 +242,37 @@ export function updateAutoSaveState(mutate: (state: MerivaPersistedState) => voi
   scheduleDebouncedSave();
 }
 
-export function pushLastReading(reading: MerivaPersistedState['lastReadings'][number]): void {
+export interface PushLastReadingOptions {
+  /** Persistência imediata/debounce tradicional. Desative para polling automático. */
+  schedulePersist?: boolean;
+}
+
+export function pushLastReading(
+  reading: MerivaPersistedState['lastReadings'][number],
+  options: PushLastReadingOptions = {},
+): void {
+  const schedulePersist = options.schedulePersist !== false;
   updateAutoSaveState((state) => {
     state.lastReadings = [
       reading,
       ...state.lastReadings.filter((item) => item.pid !== reading.pid),
     ].slice(0, MAX_LAST_READINGS);
   });
+  if (!schedulePersist) {
+    if (runtime.debounceTimer) {
+      clearTimeout(runtime.debounceTimer);
+      runtime.debounceTimer = null;
+    }
+  }
+}
+
+export function scheduleTelemetrySave(delayMs = 5000): void {
+  if (!runtime.basePath || !runtime.dirty) return;
+  if (runtime.telemetryTimer) return;
+  runtime.telemetryTimer = setTimeout(() => {
+    runtime.telemetryTimer = null;
+    if (runtime.dirty) void saveNow('checkpoint');
+  }, Math.max(1000, delayMs));
 }
 
 function resolveCriticalWaiters(saved: boolean): void {
@@ -310,8 +336,10 @@ export function disposeAutoSave(): void {
   if (runtime.debounceTimer) clearTimeout(runtime.debounceTimer);
   if (runtime.criticalTimer) clearTimeout(runtime.criticalTimer);
   if (runtime.checkpointTimer) clearInterval(runtime.checkpointTimer);
+  if (runtime.telemetryTimer) clearTimeout(runtime.telemetryTimer);
   runtime.debounceTimer = null;
   runtime.criticalTimer = null;
+  runtime.telemetryTimer = null;
   runtime.checkpointTimer = null;
   runtime.criticalWaiters.splice(0).forEach((resolve) => resolve(false));
   runtime.appStateSubscription?.remove();
