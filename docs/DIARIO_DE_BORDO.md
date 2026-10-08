@@ -1475,3 +1475,11 @@ Esse modo permite continuidade com a tela apagada enquanto o Foreground Service 
 
 ### Validação
 A correção aguarda validação pela CI nesta branch antes de ser considerada concluída.
+
+### Correção 2026-10-08 — PID 015E, consumo e aprendizado contextual
+- Identificada uma inconsistência entre o catálogo `src/knowledge/pids.json` e o serviço automático: o PID `015E` era decodificado pela fórmula, mas sua unidade vinha como `liters_per_hour`, enquanto `src/trip/autoTripService.ts` aceitava exclusivamente `L/h`. A ECU podia responder validamente e a taxa ainda era descartada para o cálculo de consumo.
+- Corrigido o catálogo do `015E` para `L/h`.
+- Corrigido o pipeline de aprendizado: `registerObdQuery()` passa a obter automaticamente o contexto operacional real quando a consulta vem da ECU e nenhuma condição é informada.
+- Mantida a regra: somente dados `REAL_OBD` válidos alimentam aprendizado; simulação continua bloqueada.
+- O autosave continua registrando as leituras reais durante a sessão.
+- Limitação mantida: sem uma taxa OBD `015E` válida, o aplicativo não deve fabricar consumo.
