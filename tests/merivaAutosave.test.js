@@ -385,6 +385,11 @@ test('8. REAL + RESPONDEU entra no learning e no banco', async () => {
   assert.strictEqual(bank.length, 1, 'um PID confirmado');
   assert.strictEqual(bank[0].occurrences, 2, 'ocorrências acumuladas');
   assert.ok(bank[0].firstSeen, 'firstSeen preservado');
+
+  const persistedReadings = m.getAutoSaveState().lastReadings;
+  assert.strictEqual(persistedReadings.length, 1, 'leitura REAL também deve entrar nas últimas leituras persistidas');
+  assert.strictEqual(persistedReadings[0].pid, '010C');
+  assert.ok(Array.from(files.keys()).some((p) => p.includes('/LOGS/obd_raw_')), 'leitura REAL deve alimentar log OBD');
   m.disposeAutoSave();
 });
 
