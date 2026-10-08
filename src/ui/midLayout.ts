@@ -1,4 +1,4 @@
-import { Dimensions, type ScaledSize } from 'react-native';
+import { Dimensions, useWindowDimensions, type ScaledSize } from 'react-native';
 
 export interface MidLayout {
   landscape: boolean;
@@ -29,5 +29,11 @@ export function getMidLayout(size: Pick<ScaledSize, 'width' | 'height'>): MidLay
 
 export function getInitialMidLayout(): MidLayout {
   const { width, height } = Dimensions.get('window');
+  return getMidLayout({ width, height });
+}
+
+
+export function useMidLayout(): MidLayout {
+  const { width, height } = useWindowDimensions();
   return getMidLayout({ width, height });
 }
