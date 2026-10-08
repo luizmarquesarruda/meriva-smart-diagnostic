@@ -26,7 +26,7 @@ export default function ConfiguracaoScreen() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [status, setStatus] = useState('INICIALIZANDO...');
   const [busy, setBusy] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<AutoSaveStatus>({ lastSavedAt: null, lastSaveReason: null, lastError: null });
+  const [saveStatus, setSaveStatus] = useState<AutoSaveStatus>({ lastSavedAt: null, lastSaveReason: null, lastError: null, obdSessionActive: false });
   const appVersion = Constants.expoConfig?.version ?? '1.0.1';
 
   useEffect(() => {
