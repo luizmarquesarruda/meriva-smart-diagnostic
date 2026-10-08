@@ -55,9 +55,11 @@ export default function RootLayout() {
         await initAutoSave(basePath);
         updateAutoSaveState((state) => {
           state.obd = {
+            ...state.obd,
             connected: true,
             adapterName: connection.device.name,
             protocol: connection.protocol ?? undefined,
+            lastKnownProtocol: connection.protocol ?? state.obd.lastKnownProtocol,
             lastConnectedAt: new Date().toISOString(),
           };
         });
