@@ -72,7 +72,7 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
     for (const dtc of state.dtcs) {
       const dtcDefinition = getDtcDefinition(dtc.code);
       L.push(
-        `${dtc.code} status=${dtc.status} ocorrencias=${dtc.occurrences} fonte=${dtc.source} primeira=${dtc.firstSeen} ultima=${dtc.lastSeen}`,
+        `${dtc.code} status=${dtc.status} ocorrencias=${dtc.occurrences} fonte=${dtc.source} primeira=${dtc.firstSeen} ultima=${dtc.lastSeen} descricao=${or(dtcDefinition?.description)}`,
       );
       if (dtcDefinition?.likelyCauses?.length) L.push(`  Causas provaveis: ${dtcDefinition.likelyCauses.join('; ')}`);
       if (dtc.freezeFrame) {
