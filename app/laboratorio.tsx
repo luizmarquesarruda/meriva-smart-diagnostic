@@ -405,6 +405,9 @@ export default function LaboratorioScreen() {
               dtcAbsenceScansRef.current.delete(item.code);
             }
           }
+        } else {
+          // Uma varredura parcial interrompe a sequência: não conta como ausência.
+          dtcAbsenceScansRef.current.clear();
         }
         for (const record of becameInactive) await recordDtc(getBasePath(), record);
         const allDetectedOrInactive = new Set([...detectedCodes, ...becameInactive.map((item) => item.code)]);
