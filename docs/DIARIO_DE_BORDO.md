@@ -1166,3 +1166,7 @@ Alterar o teste para inspecionar explicitamente os módulos de exportação que 
 
 ### Próximo passo
 Nova execução da CI completa. O código de produção permanece sem alteração nesta etapa.
+
+
+### 2026-10-08 — Quarta execução da CI da auditoria
+Branch `audit-deep-ci-2026-10-08-r4` criada a partir do `main` após a correção do alvo da asserção SAF. Esta execução deve validar a suíte completa e, se `validate` passar, liberar o job Android Release.
