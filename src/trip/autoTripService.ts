@@ -249,7 +249,16 @@ class AutoTripService {
             cycle: 'SECONDARY',
             status: secondaryResult.parsed.status,
           }));
-          await registerObdQuery(this.basePath, secondaryResult, 'REAL');
+          if (secondaryPid === '012F') {
+            const fuelLevelResult = secondaryResult;
+            await registerObdQuery(this.basePath, fuelLevelResult, 'REAL');
+          } else if (secondaryPid === '015E') {
+            const fuelResult = secondaryResult;
+            await registerObdQuery(this.basePath, fuelResult, 'REAL');
+          } else {
+            const telemetryResult = secondaryResult;
+            await registerObdQuery(this.basePath, telemetryResult, 'REAL');
+          }
           if (secondaryResult.parsed.status === 'RESPONDEU' && Number.isFinite(secondaryResult.parsed.value)) {
             this.latestPidValues.set(secondaryPid, secondaryResult.parsed.value as number);
           }
