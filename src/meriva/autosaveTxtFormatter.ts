@@ -71,6 +71,9 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
       L.push(
         `${dtc.code} status=${dtc.status} ocorrencias=${dtc.occurrences} fonte=${dtc.source} primeira=${dtc.firstSeen} ultima=${dtc.lastSeen}`,
       );
+      if (dtc.freezeFrame) {
+        L.push(`  FreezeFrame frame=${dtc.freezeFrame.frame} rpm=${or(dtc.freezeFrame.rpm)} coolantC=${or(dtc.freezeFrame.coolantC)}`);
+      }
     }
   } else {
     L.push(ND);
