@@ -9,8 +9,6 @@
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
-    "ios": "expo run:ios",
-    "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "prebuild": "expo prebuild --clean",
     "test": "node tests/liveTelemetry.test.js && node tests/dtcScanner.test.js && node tests/permissions.test.js && node tests/cockpitNavigation.test.js && node tests/orientationLayout.test.js && node tests/knowledgeJson.test.js && node tests/bluetoothConfig.test.js && node tests/bluetoothState.test.js && node tests/ecuHealth.test.js && node tests/bluetoothLifecycle.test.js && node tests/merivaAutosave.test.js && node tests/regression.test.js && node tests/gps.test.js && node tests/backgroundExecution.test.js && node tests/fuelConsumption.test.js && node tests/fuelIdentification.test.js && node tests/tripRecorder.test.js && node tests/elm327Compatibility.test.js && node tests/diagnosticEngine.test.js",
@@ -35,7 +33,7 @@
     "expo-task-manager": "~11.8.2"
   },
   "devDependencies": {
-    "@babel/core": "^7.0.0",
+    "@babel/core": "7.29.7",
     "@types/react": "~18.2.0",
     "typescript": "~5.3.3"
   }
