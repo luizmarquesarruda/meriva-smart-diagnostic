@@ -26,7 +26,9 @@ assert(manager.includes('MAX_BLUETOOTH_ATTEMPTS = bluetoothConfig.retry.maxAttem
 assert(manager.includes('BLUETOOTH_RETRY_INTERVAL_MS = bluetoothConfig.retry.intervalMs'));
 
 const sharedConnection = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'sharedConnection.ts'), 'utf8');
-assert(sharedConnection.includes('cada candidato recebe até 20 tentativas'));
+assert(sharedConnection.includes('cada candidato usa o limite efetivo configurado'));
+assert(sharedConnection.includes('20 por padrão'));
+assert(sharedConnection.includes('Não repetir uma nova rodada inteira'));
 assert(!sharedConnection.includes('while (!active)'), 'sharedConnection não deve repetir rodadas infinitamente após esgotar os candidatos');
 const exporter = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'exportBluetoothDiagnosticTxt.ts'), 'utf8');
 assert(exporter.includes('readLearningProfile'));
