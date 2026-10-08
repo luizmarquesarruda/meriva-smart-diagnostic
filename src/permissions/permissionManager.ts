@@ -19,32 +19,10 @@ function mapAndroid(status: string): PermissionAudit['bluetooth'] {
  * internos do aplicativo; pedir essa permissão seria incorreto e não
  * resolveria a exportação via Storage Access Framework.
  */
-export async function requestAllRequiredPermissions(): Promise<PermissionAudit> {
-  const audit: PermissionAudit = {
-    bluetooth: 'UNAVAILABLE',
-    location: 'UNAVAILABLE',
-    storage: Platform.OS === 'android' ? 'APP_PRIVATE' : 'UNAVAILABLE',
-  };
+export async function requestBluetoothPermissionsOnly(): Promise<PermissionAudit['bluetooth']> {
+  if (Platform.OS !== 'android') return 'UNAVAILABLE';
 
-  if (Platform.OS !== 'android') return audit;
-
-  const bluetoothPermissions = Platform.Version >= 31
-    ? [
-        PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
-        PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
-      ]
-    : [
-        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
-      ];
-
-  const bluetoothResult = await PermissionsAndroid.requestMultiple(bluetoothPermissions);
-  const bluetoothValues = Object.values(bluetoothResult);
-  audit.bluetooth = bluetoothValues.every((v) => v === PermissionsAndroid.RESULTS.GRANTED)
-    ? 'GRANTED'
-    : bluetoothValues.some((v) => v === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN)
-      ? 'BLOCKED'
-      : 'DENIED';
+  audit.bluetooth = await requestBluetoothPermissionsOnly();
 
   const servicesEnabled = await Location.hasServicesEnabledAsync();
   if (!servicesEnabled) {
