@@ -1,14 +1,30 @@
 {
-  "version": 1,
-  "description": "Regras locais e rastreáveis do motor de raciocínio diagnóstico. Uma regra gera evidência ou hipótese; nunca prova isoladamente uma falha.",
+  "version": 2,
+  "description": "Regras locais e rastreáveis do motor de raciocínio diagnóstico. Uma regra gera evidência ou hipótese; nunca prova isoladamente uma falha. Limiares heurísticos não substituem limites de fábrica.",
   "principles": [
     "DTC sozinho não condena componente.",
-    "PIDs precisam de contexto operacional.",
+    "Somente DTC REAL_OBD ativo pode gerar hipótese de falha atual.",
+    "PIDs precisam de contexto operacional e, quando possível, evidência corroborativa.",
     "Dados SIMULACAO nunca aumentam confiança.",
-    "Seed CarScanner serve como referência, não como leitura atual.",
-    "Toda conclusão deve listar evidências e próximos testes."
+    "Seed CarScanner serve como referência, não como leitura atual da ECU.",
+    "Toda conclusão deve listar evidências e próximos testes.",
+    "Limiares locais são heurísticos de triagem e não especificações de fábrica."
   ],
   "rules": [
+    {
+      "id": "DTC_P0135_O2_HEATER",
+      "trigger": { "dtc": "P0135" },
+      "hypothesis": "FALHA_CIRCUITO_AQUECEDOR_O2_B1S1",
+      "baseScore": 0.5,
+      "tests": ["verificar alimentação do aquecedor", "verificar resistência do aquecedor conforme especificação do sensor", "inspecionar fusível/relé quando aplicável", "inspecionar chicote e conectores", "verificar comando da ECU antes de substituir o sensor"]
+    },
+    {
+      "id": "DTC_P0420_CATALYST_EFFICIENCY",
+      "trigger": { "dtc": "P0420" },
+      "hypothesis": "EFICIENCIA_CATALISADOR_BAIXA",
+      "baseScore": 0.5,
+      "tests": ["correlacionar sinais dos sensores O2 antes/depois do catalisador quando disponíveis", "verificar STFT/LTFT", "descartar falhas de combustão e mistura fora de controle", "verificar temperatura e condições de operação", "só condenar o catalisador após eliminar causas a montante"]
+    },
     {
       "id": "DTC_P0301_MISFIRE",
       "trigger": { "dtc": "P0301" },
@@ -24,18 +40,25 @@
       "tests": ["comparar TPS em marcha lenta", "observar variação do TPS", "verificar alimentação e aterramento", "inspecionar chicote e conector"]
     },
     {
+      "id": "DTC_P0133_O2_SLOW",
+      "trigger": { "dtc": "P0133" },
+      "hypothesis": "RESPOSTA_LENTA_O2_B1S1",
+      "baseScore": 0.45,
+      "tests": ["verificar temperatura de operação", "avaliar mistura e fuel trims", "verificar resposta do O2 em condições de malha fechada", "inspecionar entrada de ar e vazamento de escape antes do sensor"]
+    },
+    {
       "id": "FUEL_TRIM_LEAN",
       "trigger": { "combinedTrimMin": 15 },
       "hypothesis": "MISTURA_POBRE",
       "baseScore": 0.45,
-      "tests": ["verificar entrada de ar falsa", "pressão de combustível", "injetores", "MAF/MAP", "resposta do O2"]
+      "tests": ["confirmar motor aquecido e malha fechada", "verificar entrada de ar falsa", "verificar pressão de combustível", "avaliar injetores", "correlacionar MAF/MAP e resposta do O2"]
     },
     {
       "id": "FUEL_TRIM_RICH",
       "trigger": { "combinedTrimMax": -15 },
       "hypothesis": "MISTURA_RICA",
       "baseScore": 0.45,
-      "tests": ["verificar pressão de combustível", "injetor com vazamento", "sensor de temperatura", "MAF/MAP", "resposta do O2"]
+      "tests": ["confirmar motor aquecido e malha fechada", "verificar pressão de combustível", "verificar injetor com vazamento", "verificar sensor de temperatura", "correlacionar MAF/MAP e resposta do O2"]
     },
     {
       "id": "MAP_HIGH_IDLE",
