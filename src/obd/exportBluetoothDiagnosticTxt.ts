@@ -124,6 +124,7 @@ async function buildReport(): Promise<string> {
     `DEVICE: ${Constants.deviceName ?? 'N/D'}`,
     `ELM DEVICE: ${connection ? `${connection.device.name} | ${connection.device.address}` : 'NÃO CONECTADO'}`,
     `PROTOCOL: ${connection?.protocol ?? 'N/D'}`,
+    `NATIVE FINGERPRINT: ${trace.includes('BLUETOOTH_NATIVE_FINGERPRINT') ? 'REGISTRADA NO TRACE' : 'N/D'}`,
     `LAST ERROR: ${getSharedObdLastError() ?? extractLastTraceError(trace) ?? 'NENHUM'}`,
     `PAIRED DEVICES: ${context.devices.length}`,
     ...context.devices.map((device, index) => `PAIRED ${index + 1}: ${device.name} | ${device.address}`),
