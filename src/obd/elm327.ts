@@ -234,7 +234,10 @@ export class Elm327Session {
     this.noDataCount = 0;
     this.consecutiveFailures = 0;
     this.lastSuccessfulResponseAt = new Date().toISOString();
-    await this.identifyProtocol();
+    const protocolResult = await this.command('ATDP');
+    if (protocolResult.status === 'OK') {
+      this.protocol = normalizeElmResponse(protocolResult.response) || this.protocol;
+    }
       transportWithBuffer.clearInputBuffer?.();
       return true;
     });
