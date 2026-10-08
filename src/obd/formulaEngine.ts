@@ -42,6 +42,9 @@ export function applyFormula(formulaId: string, data: number[]): number {
     case 'u16':
       requireBytes(data, 2);
       return data[0] * 256 + data[1];
+    case 'u32':
+      requireBytes(data, 4);
+      return data[0] * 16777216 + data[1] * 65536 + data[2] * 256 + data[3];
     case 'u16_div':
       requireBytes(data, 2);
       return (data[0] * 256 + data[1]) / (spec.divisor ?? 1);
