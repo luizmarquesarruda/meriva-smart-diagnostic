@@ -16,7 +16,10 @@ export interface LastPidReading {
 export interface ObdConnectionState {
   connected: boolean;
   adapterName?: string;
+  /** Protocolo da conexão atualmente ativa. Fica ausente quando desconectado. */
   protocol?: string;
+  /** Último protocolo validado/conhecido, preservado mesmo após desconexão. */
+  lastKnownProtocol?: string;
   ecuAddress?: string;
   ecuValidatedAt?: string;
   ecuValidationSource?: 'OBD_RESPONSE' | 'VEHICLE_PROFILE';
