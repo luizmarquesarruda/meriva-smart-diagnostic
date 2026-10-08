@@ -77,7 +77,9 @@ function main() {
 
   const pidList = [...pidIds];
   const rangeIds = Object.keys(ranges.ranges).map((id) => id.toUpperCase());
-  assert.deepStrictEqual(new Set(rangeIds), pidIds, 'ranges.json deve ter exatamente os mesmos PIDs do catálogo');
+  const rangeExcludedPids = new Set(['0101']); // bitfield de status; não possui faixa escalar de engenharia.
+  const rangedPidIds = new Set([...pidIds].filter((id) => !rangeExcludedPids.has(id)));
+  assert.deepStrictEqual(new Set(rangeIds), rangedPidIds, 'ranges.json deve ter exatamente os PIDs escalares do catálogo');
 
   for (const id of rangeIds) {
     const range = ranges.ranges[id];
