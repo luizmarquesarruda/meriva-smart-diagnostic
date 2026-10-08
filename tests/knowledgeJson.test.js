@@ -88,7 +88,7 @@ function main() {
 
   const supportedFormulaOperations = new Set([
     'u8', 'u16', 'u16_div', 'u8_offset', 'u8_scale',
-    'u8_offset_scale', 'u8_scale_offset', 'u8_div', 'u8_scale_div', 'u16_scale', 'u16_scale_div', 'u16_offset_scale',
+    'u8_offset_scale', 'u8_scale_offset', 'u8_div', 'u8_scale_div', 'u8_scale_div', 'u16_scale', 'u16_scale_div', 'u16_offset_scale',
   ]);
   const formulaIds = Object.keys(formulas.formulas);
   assertUnique(formulaIds, 'formulaId');
