@@ -30,6 +30,12 @@ function main() {
   assert.ok(fs.existsSync(DIAGNOSTIC_RULES_PATH), 'diagnostic_rules.json deve existir');
   const rules = require(DIAGNOSTIC_RULES_PATH);
   assert.ok(Array.isArray(rules.rules), 'diagnostic_rules.json deve conter rules');
+  for (const id of ['FUEL_TRIM_LEAN', 'FUEL_TRIM_RICH', 'MAP_HIGH_IDLE']) {
+    const rule = rules.rules.find((item) => item.id === id);
+    assert.ok(rule, 'regra temporal ' + id + ' deve existir');
+    assert.strictEqual(rule.requiredDurationMs, 30000, id + ' deve declarar duração mínima no JSON');
+    assert.strictEqual(rule.requiredSamples, 10, id + ' deve declarar número mínimo de amostras no JSON');
+  }
 
   const engine = loadTs('src/diagnostics/diagnosticEngine.ts');
   const emptyResult = engine.runLocalDiagnostic({ observations: [], dtcs: [], condition: 'UNKNOWN' });
