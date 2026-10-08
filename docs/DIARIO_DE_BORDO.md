@@ -1166,3 +1166,23 @@ Alterar o teste para inspecionar explicitamente os módulos de exportação que 
 
 ### Próximo passo
 Nova execução da CI completa. O código de produção permanece sem alteração nesta etapa.
+
+
+## 2026-10-08 — CI #1057: teste de rotação desatualizado
+
+### CI
+PR #30 — run #1057 / `37767133384`.
+- `npm ci`: **sucesso**.
+- Expo Doctor: **17/17**.
+- TypeScript: **sucesso**.
+- Permissões: **sucesso**.
+- Falha em `tests/orientationLayout.test.js`.
+- `android-build`: não executado.
+
+### Diagnóstico
+`app/armazenamento.tsx` usa `useWindowDimensions()` + `getMidLayout(windowSize)`, que é um mecanismo responsivo válido e recalcula o layout quando as dimensões da janela mudam. O teste exigia literalmente `useMidLayout()`, embora o comportamento implementado seja equivalente para rotação.
+
+### Correção planejada
+Ajustar o teste para reconhecer tanto o hook central `useMidLayout()` quanto o padrão explícito `useWindowDimensions()` + `getMidLayout()`, sem alterar produção funcionalmente apenas para satisfazer uma regex.
+
+**Não considerar a auditoria concluída.** Nova CI obrigatória.
