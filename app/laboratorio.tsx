@@ -210,11 +210,17 @@ export default function LaboratorioScreen() {
       setProtocol(connection.protocol ?? 'N/D');
       startObdSessionCheckpoint();
       updateAutoSaveState((state) => {
+        const validatedAt = new Date().toISOString();
         state.obd = {
+          ...state.obd,
           connected: true,
           adapterName: device.name,
           protocol: connected.protocol ?? undefined,
-          lastConnectedAt: new Date().toISOString(),
+          lastKnownProtocol: connected.protocol ?? state.obd.lastKnownProtocol,
+          ecuAddress: state.vehicle?.ecuAddress ?? state.obd.ecuAddress,
+          ecuValidatedAt: validatedAt,
+          ecuValidationSource: state.vehicle?.ecuAddress ? 'VEHICLE_PROFILE' : 'OBD_RESPONSE',
+          lastConnectedAt: validatedAt,
         };
 
         if (
