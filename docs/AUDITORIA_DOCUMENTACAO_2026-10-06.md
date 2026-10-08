@@ -51,3 +51,12 @@ A decisão segue a documentação da biblioteca: delimiter vazio permite entrega
 O teste automatizado foi atualizado para impedir regressão para delimiter `\\r`. O trace também registra `RX_CHUNK` e hexadecimal dos bytes ASCII para observar exatamente como o ELM327 chega pelo RFCOMM.
 
 A validação física continua pendente. O critério é observar uma resposta real `41 0C XX XX` para o comando `010C`.
+
+
+## Atualização 2026-10-08 - retry Bluetooth finito e configurável
+
+A implementação atual não usa mais o modo infinito exposto pela configuração antiga. O valor padrão passou a ser **20 tentativas**, com fallback seguro para 20 quando um estado legado armazenado contiver 0. A interface oferece limites finitos de 3, 10 ou 20 tentativas.
+
+O `bluetooth_config.json` continua sendo a fonte da política-base de 20 tentativas e 8 segundos entre falhas. O `maxConnectionAttempts` efetivo pode reduzir esse limite por configuração, mas nunca reabre uma rodada externa indefinida.
+
+A documentação anterior que registrava default 2 e modo infinito permanece como registro histórico de 2026-10-06; esta seção define o comportamento atual de 2026-10-08.
