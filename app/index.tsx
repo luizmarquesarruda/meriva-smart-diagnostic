@@ -190,7 +190,7 @@ export default function IndexScreen() {
           <View style={styles.healthCard}>
             <Text style={styles.sectionTitle}>CONSUMO — FONTES SEPARADAS</Text>
             <Text style={styles.sectionHint}>Instantâneo: {tripState.instantaneousConsumptionKml != null ? tripState.instantaneousConsumptionKml.toFixed(2) + ' km/L' : 'SEM DADOS'} • {tripState.instantaneousConsumptionSource}</Text>
-            <Text style={styles.cardText}>Viagem atual: {tripState.consumptionKml != null ? tripState.consumptionKml.toFixed(2) + ' km/L' : 'SEM DADOS'} • {tripState.tripConsumptionSource}</Text>
+            <Text style={styles.sectionHint}>Viagem atual: {tripState.consumptionKml != null ? tripState.consumptionKml.toFixed(2) + ' km/L' : 'SEM DADOS'} • {tripState.tripConsumptionSource}</Text>
             <Text style={styles.cardText}>Média histórica: {historicalConsumptionKml != null ? historicalConsumptionKml.toFixed(2) + ' km/L' : 'SEM DADOS'} • {historicalConsumptionSource}</Text>
           </View>
           <View style={styles.heroCard}>
@@ -199,7 +199,7 @@ export default function IndexScreen() {
             <Text style={styles.heroState}>{connectionStatus.ecuResponseState === 'NO_RESPONSE' ? 'POLLING PAUSADO • RECUPERAÇÃO AUTOMÁTICA' : connectionStatus.ecuResponseState === 'RECOVERING' ? 'REINICIALIZANDO PROTOCOLO' : connectionStatus.ecuConnected ? 'DADOS OBD EM TEMPO REAL' : 'CONECTE O ELM327 PARA INICIAR'}</Text>
             <View style={styles.metricRow}>
               <CockpitMetric label="VELOCIDADE" value={gpsState.currentSpeedKmh.toFixed(0) + ' km/h'} />
-              <CockpitMetric label="CONSUMO" value={availableConsumptionKml != null ? availableConsumptionKml.toFixed(1) + ' km/L' : 'N/D'} />
+              <CockpitMetric label="CONSUMO" value={historicalConsumptionKml != null ? historicalConsumptionKml.toFixed(1) + ' km/L' : 'N/D'} />
               <CockpitMetric label="AUTONOMIA" value={getAutoSaveState().autonomy.estimatedRangeKm > 0 ? getAutoSaveState().autonomy.estimatedRangeKm.toFixed(0) + ' km' : 'N/D'} />
             </View>
           </View>
