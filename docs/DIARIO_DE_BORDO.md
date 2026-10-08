@@ -1667,7 +1667,7 @@ A confirmação definitiva exige uma sessão real na Meriva com ELM327, principa
 - `225e45a503702915af3dd105930edb92ca146b4b` — polling automático como evidência ECU
 - `6ce31b48b62453d17d7378a79295e80589fc4781` — parar polling após perda da ECU
 - `1f53b84248e7af1a4742a7aedd861aec5a5c5f86` — bloqueio de consultas na tela
-- `e1a3bd793cb983234415932dbb03b229fdffba17ba20` — resposta positiva DTC (histórico de correção consolidado no branch)
+- `e1a3bd793cb983234415932db03f69a7eeded6a95` — resposta positiva DTC (histórico de correção consolidado no branch)
 - `0adc960a05bf40e222e08169e106b3bdc4bc1e4f` — scanner DTC com validação positiva
 - `ae6aaff9b1f0d71d6c64b6b7f206ad6e51542b8b` — tipo ECU unificado
 - `215694cbf199f57d3bfd0dc65c6d05b1edd49eea` — testes do gate ECU
