@@ -517,6 +517,37 @@ test('15. Saved At é persistido e histórico crítico é coalescido', async () 
   m.disposeAutoSave();
 });
 
+test('17. estado desconectado preserva ECU e separa último protocolo', async () => {
+  const m = manager();
+  m.disposeAutoSave();
+  resetFS();
+  await m.initAutoSave(BASE);
+  m.updateAutoSaveState((s) => {
+    s.obd = {
+      connected: true,
+      protocol: 'ISO 14230-4 KWP FAST',
+      lastKnownProtocol: 'ISO 14230-4 KWP FAST',
+      ecuAddress: '0x11',
+      ecuValidatedAt: '2026-10-08T10:00:00Z',
+      ecuValidationSource: 'OBD_RESPONSE',
+    };
+  });
+  await m.saveNow('critical');
+  m.updateAutoSaveState((s) => {
+    s.obd = { ...s.obd, connected: false, protocol: undefined, lastKnownProtocol: s.obd.protocol ?? s.obd.lastKnownProtocol };
+  });
+  await m.saveNow('critical');
+  m.disposeAutoSave();
+  await m.initAutoSave(BASE);
+  const restored = m.getAutoSaveState().obd;
+  assert.strictEqual(restored.connected, false);
+  assert.strictEqual(restored.protocol, undefined);
+  assert.strictEqual(restored.lastKnownProtocol, 'ISO 14230-4 KWP FAST');
+  assert.strictEqual(restored.ecuValidatedAt, '2026-10-08T10:00:00Z');
+  assert.strictEqual(restored.ecuValidationSource, 'OBD_RESPONSE');
+  m.disposeAutoSave();
+});
+
 test('16. salvamento redundante não cria novo snapshot histórico', async () => {
   const m = manager();
   m.disposeAutoSave();
