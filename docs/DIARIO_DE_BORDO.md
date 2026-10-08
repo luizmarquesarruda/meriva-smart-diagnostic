@@ -965,3 +965,78 @@ Pesquisar documentação técnica da Chevrolet Meriva, referências de PIDs OBD-
 
 ### Invariantes
 Bluetooth Classic/ELM327, gate ECU 010C → 41 0C, separação REAL_OBD/SIMULACAO, autosave e package-lock não devem ser alterados nesta auditoria.
+
+
+## 2026-10-08 — Resultado da auditoria documental de PIDs, DTCs e motor diagnóstico
+
+### Pesquisa concluída
+Foram consultadas referências oficiais e técnicas antes da correção:
+- Chevrolet Brasil — página oficial de manuais de anos anteriores, que lista Meriva 2008–2012.
+- Manual do Proprietário Chevrolet Meriva MY12, Brasil, já referenciado pelo projeto.
+- SAE J1979_202505 e SAE J1979-DA para serviços OBD-II e registro de identificadores de dados.
+- SAE J2012 para definições padronizadas de DTC.
+- Referências abertas de implementação OBD-II apenas para conferência cruzada.
+
+### Achado principal em PID
+Foi encontrada uma inconsistência real no PID 0114: o catálogo declarava bytes=1, embora a resposta padronizada do PID tenha dois bytes. A tensão usa o byte A; o segundo byte carrega informação adicional de ajuste do sensor.
+
+Correção aplicada:
+- src/knowledge/pids.json: 0114.bytes = 2.
+- src/knowledge/meriva_confirmed_pids.json: candidato 0114.bytes = 2.
+- src/knowledge/formulas.json: documentação explícita de que O2_VOLTS usa o byte A.
+- tests/regression.test.js: resposta 41 14 6A 80 deve produzir 0,53 V e preservar os bytes recebidos.
+
+### Auditoria dos demais PIDs
+As fórmulas catalogadas para 0104, 0105, 0106, 0107, 010B, 010C, 010D, 010E, 010F, 0110, 0111, 012F, 0131, 0142, 0151, 0152 e 015E foram mantidas após cruzamento com o modelo padrão OBD-II. O PID 0151 permanece enumerado pelo catálogo de combustível e não é tratado como medição da composição do tanque.
+
+### Auditoria dos DTCs
+O catálogo src/knowledge/dtc_catalog.json passou a declarar explicitamente SAE J2012 e standardized=true para P0123, P0133, P0135, P0301 e P0420.
+
+A definição de DTC continua separada da causa. Nenhum DTC proprietário da Meriva foi inventado sem fonte documental adequada.
+
+### Aprimoramento do motor diagnóstico
+src/diagnostics/diagnosticEngine.ts foi endurecido para:
+- aceitar somente DTC REAL_OBD com status ativo (CONFIRMED, PENDING, PERMANENT, CURRENT) como evidência de falha atual;
+- bloquear DTC histórico/inativo e fonte não real;
+- selecionar a observação REAL_OBD mais recente por PID;
+- analisar STFT + LTFT somente em IDLE_WARM ou CRUISE;
+- manter ±15% como heurística de triagem, não especificação de fábrica;
+- preservar a separação entre evidência e hipótese;
+- ampliar regras para P0135, P0420, P0133, P0123 e P0301.
+
+### Contexto específico da Meriva
+O alvo documentado continua sendo Meriva Maxx 1.4 8V ECONO.FLEX MY12. O manual registrado informa marcha lenta de 700–800 rpm para essa configuração. Essa faixa não foi transformada em diagnóstico automático de RPM para evitar falso positivo sem contexto de carga, temperatura e acessórios.
+
+### Documentação criada
+- docs/OBD_KNOWLEDGE_AUDIT_2026-10-08.md: fontes, fórmulas auditadas, correção do 0114, DTCs e regras do motor.
+
+### Commits desta rodada
+- c67dc850e979f935cc80b64dc1432d61601cd749 — plano da auditoria registrado antes do código.
+- cfe415e67125ffa0ccb782d0eca0d5c19be1c895 — corrigir largura do payload do PID 0114.
+- 715ce24cf6e0aa3190fc95930bdb4c31ea936edc — documentar decodificação do PID O2.
+- 67802f6e87ab84fad7d5071f135a0f3050112b52 — alinhar catálogo DTC ao SAE J2012.
+- f918dabd341f1f84691d5c1d0bff70fdafb7a446 — ampliar regras diagnósticas.
+- 9dd346a7bbd98ad351e2e0592f2be436f5ef0dfc — tornar motor sensível a fonte, status e contexto.
+- 405a71f20a6c8e729e7aa7702e80f10bf89ce4f5 — reforçar auditoria de PID O2 e DTC.
+- 6f6cc7418a24758877c7b49197d9ee6af8d0a864 — cobrir DTC ativo/histórico e contexto operacional.
+- 260be781abb09b8ea39ecc8884fcbe6d27370b8e — alinhar PID 0114 candidato ao payload OBD.
+- d1c810935a72a2e2981c5a5868e634934f4d5de1 — validar PID O2 com payload completo.
+- 5abc56426df553ddf32f8c8a45938f4124e838fe — documentação da auditoria.
+- 7a6db82a525135ddf70a27235e4093cda4ff23dc — atualizar referências SAE na auditoria.
+
+### Invariantes preservadas
+- Bluetooth Classic / ELM327 não alterado.
+- Gate ECU 010C → 41 0C não alterado.
+- REAL_OBD continua sendo a fonte de evidência atual.
+- SIMULACAO continua isolada.
+- Autosave/persistência não alterados.
+- package-lock.json não alterado.
+- Nenhuma dependência adicionada.
+
+### Validação
+Foi feita auditoria estática, cruzamento documental e inspeção dos diffs. CI não foi executada, conforme solicitado.
+
+O compare do plano c67dc850e979f935cc80b64dc1432d61601cd749 até o estado 7a6db82a525135ddf70a27235e4093cda4ff23dc mostra 10 commits posteriores ao plano e nenhuma divergência para trás.
+
+### Próximo passo
+A próxima etapa deve executar a validação completa do repositório e, separadamente, teste físico na Meriva para confirmar quais PIDs a ECU realmente anuncia/responde. A confirmação de compatibilidade Meriva não deve ser inferida apenas da documentação OBD genérica.
