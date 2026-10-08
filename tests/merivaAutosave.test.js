@@ -31,7 +31,6 @@ function findRepoRoot(startDir) {
 const ROOT = findRepoRoot(__dirname);
 
 // ---------- carregador de módulos TS (em memória) ----------
-const compiled = new Map();
 // ---------- FS em memória ----------
 // Objeto único e estável: os módulos transpilados capturam o resultado de
 // require('expo-file-system') na carga; o reset apenas limpa o conteúdo.

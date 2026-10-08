@@ -75,7 +75,6 @@ function main() {
   assert.strictEqual(o2Pid.bytes, 2, 'PID 0114 deve carregar os dois bytes da resposta padronizada');
   assert.strictEqual(o2Pid.formulaId, 'O2_VOLTS');
 
-  const pidList = [...pidIds];
   const rangeIds = Object.keys(ranges.ranges).map((id) => id.toUpperCase());
   const rangeExcludedPids = new Set(['0101']); // bitfield de status; não possui faixa escalar de engenharia.
   const rangedPidIds = new Set([...pidIds].filter((id) => !rangeExcludedPids.has(id)));

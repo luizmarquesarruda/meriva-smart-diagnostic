@@ -2,8 +2,6 @@
 
 const assert = require('assert');
 const { loadTs } = require('./helpers/loadTs');
-const fs = require('fs');
-const path = require('path');
 
 let watcher = null;
 const fakeLocation = {

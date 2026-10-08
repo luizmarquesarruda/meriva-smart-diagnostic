@@ -1,11 +1,9 @@
 'use strict';
 
 const assert = require('assert');
-const fs = require('fs');
 const path = require('path');
 const Module = require('module');
 
-const ROOT = path.resolve(__dirname, '..');
 
 const { loadTs } = require('./helpers/loadTs');
 
