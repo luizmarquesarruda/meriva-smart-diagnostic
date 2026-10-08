@@ -1636,3 +1636,47 @@ A confirmação definitiva exige uma sessão real na Meriva com ELM327, principa
 - Nenhuma dependência nova foi adicionada nesta etapa.
 - CI continua deliberadamente não disparada até concluir a revisão estática.
 
+## 2026-10-08 — Auditoria Gemini: fechamento do ciclo de saúde ECU
+
+### Problemas confirmados
+- O gate `canPollObd` verificava somente o lifecycle `READY` e ignorava `ecuResponseState`, permitindo novas consultas após a ECU entrar em `NO_RESPONSE`.
+- O polling automático não alimentava diretamente o mesmo contador/estado de saúde usado pelo monitor.
+- A sessão de autosave permanecia aberta até a perda do enlace Bluetooth, mesmo depois de a ECU atingir o limiar persistente de falhas.
+- A varredura de freeze frame ocorria fora da reserva exclusiva usada pelos serviços DTC 03/07/0A.
+- `scanDtcServices` tratava `status=OK` como disponibilidade, sem exigir cabeçalho OBD positivo do serviço.
+- A sonda 010C do polling dependia da lista descoberta de PIDs, embora 010C já fosse uma evidência obrigatória na validação da ECU.
+
+### Correções
+- `canPollObd(lifecycle, ecuResponseState)` agora libera OBD real somente com `READY + RESPONDING`.
+- Criado um único contrato de `EcuResponseState` em `bluetoothState.ts`; `sharedConnection` reutiliza e reexporta o tipo.
+- Criados `reportEcuPollResult()` e `recoverEcuIfNeeded()` em `sharedConnection`, centralizando falhas, recuperação e reabertura do autosave somente após nova resposta válida.
+- O PID 010C do polling automático passou a ser a sonda de saúde da própria ECU.
+- Após atingir `noDataReconnectThreshold`, a sessão de autosave é fechada antes da recuperação.
+- DTC 03/07/0A e freeze frame 020200/020C00/020500 agora compartilham a mesma transação exclusiva da fila ELM.
+- Criada `isValidDtcResponse()`; serviço DTC somente é marcado como disponível quando existe resposta OBD positiva compatível.
+- Os testes de estado Bluetooth e DTC foram fortalecidos contra regressões, incluindo respostas positivas/negativas e o bloqueio de polling sem ECU respondendo.
+
+### Commits
+- `57f23ca3adbab33569a33a87a8bca03856f9da11` — gate de polling por estado ECU
+- `efc8e47266bfa0e32a62c7552593c58e1e0ef020` — preparação do estado de recuperação
+- `db63e78f6fa9526d373fe5f2938604949c238394` — saúde/recuperação centralizadas
+- `0a63ecd0b90e386c5ad16a6d0adc19e9becc7145` — monitor usando o mesmo contrato
+- `85619903334f58d2594f6e20fd21ff5a338fb2b2` — tratamento de exceções do monitor
+- `91d93ed22b6e222ceddbfde8ce269170a813696d` — evitar alterações desnecessárias no autosave
+- `aa8bf89db9e54f8ed70ebdf6d811ee33de8ec578` — recuperação sem checkpoints redundantes
+- `225e45a503702915af3dd105930edb92ca146b4b` — polling automático como evidência ECU
+- `6ce31b48b62453d17d7378a79295e80589fc4781` — parar polling após perda da ECU
+- `1f53b84248e7af1a4742a7aedd861aec5a5c5f86` — bloqueio de consultas na tela
+- `e1a3bd793cb983234415932dbb03b229fdffba17ba20` — resposta positiva DTC (histórico de correção consolidado no branch)
+- `0adc960a05bf40e222e08169e106b3bdc4bc1e4f` — scanner DTC com validação positiva
+- `ae6aaff9b1f0d71d6c64b6b7f206ad6e51542b8b` — tipo ECU unificado
+- `215694cbf199f57d3bfd0dc65c6d05b1edd49eea` — testes do gate ECU
+- `00becd4df6f830d0f8bee5b4dd1f5628b00e6d67` — testes de resposta DTC
+- `efbe581665486ee7859bf1fe555e10d48f3e2c12` — correção das asserções DTC
+- `0f2dd878127ff1430ffb2d7b58a01ee71d8ab7a4` — 010C como sonda de saúde independente da descoberta
+- `ab7e6bdeb780a736379a674b219c584edc93f6bc` — freeze frame dentro da transação exclusiva
+- `3824e5597ec6e3ce35e5ee4788861452c07e167c` — regressões de estado ECU/DTC
+
+### CI
+Nenhuma CI foi disparada manualmente nesta etapa. A confirmação final ainda depende de execução de typecheck, suíte completa e build Android.
+
