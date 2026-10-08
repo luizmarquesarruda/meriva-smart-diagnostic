@@ -24,6 +24,8 @@ export interface AutoTripServiceState {
   fuelUsedL: number;
   consumptionKml: number | null;
   instantaneousConsumptionKml: number | null;
+  instantaneousConsumptionSource: 'MEDIDO_015E' | 'ESTIMADO_MAF' | 'ESTIMADO_MAP' | 'SEM DADOS';
+  tripConsumptionSource: 'MEDIDO_015E' | 'ESTIMADO_MAF' | 'ESTIMADO_MAP' | 'SEM DADOS';
   error: string | null;
   averageConsumptionKml: number;
   estimatedRangeKm: number;
@@ -49,6 +51,8 @@ const INITIAL_STATE: AutoTripServiceState = {
   fuelUsedL: 0,
   consumptionKml: null,
   instantaneousConsumptionKml: null,
+  instantaneousConsumptionSource: 'SEM DADOS',
+  tripConsumptionSource: 'SEM DADOS',
   error: null,
   averageConsumptionKml: 0,
   estimatedRangeKm: 0,
@@ -401,6 +405,8 @@ class AutoTripService {
                 ? state.distanceKm / state.fuelUsedL
                 : null,
             instantaneousConsumptionKml,
+            instantaneousConsumptionSource: fuelRateSource === 'MEASURED_015E' ? 'MEDIDO_015E' : fuelRateSource === 'ESTIMATED_MAF' ? 'ESTIMADO_MAF' : fuelRateSource === 'ESTIMATED_MAP' ? 'ESTIMADO_MAP' : 'SEM DADOS',
+            tripConsumptionSource: fuelRateSource === 'MEASURED_015E' ? 'MEDIDO_015E' : fuelRateSource === 'ESTIMATED_MAF' ? 'ESTIMADO_MAF' : fuelRateSource === 'ESTIMATED_MAP' ? 'ESTIMADO_MAP' : this.state.tripConsumptionSource,
             fuelLevelPercent,
             fuelRemainingL: fuelLevelPercentToLiters(fuelLevelPercent),
             fuelReserve: isFuelReserve(fuelLevelPercent),
