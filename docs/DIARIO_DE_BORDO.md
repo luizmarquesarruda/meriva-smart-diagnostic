@@ -794,3 +794,21 @@ Concluir a CI do commit final e, em seguida, validar o APK em um dispositivo And
 A CI intermediária detectou erro de compilação JSX em app/bluetooth.tsx: o View screenFrame ficou com o fechamento incompleto durante a transformação responsiva.
 Correção aplicada: fechamento do componente restaurado e tela Bluetooth mantida com grade responsiva de conexão.
 A execução final de CI correspondente ao commit de correção foi disparada automaticamente e ainda está pendente no momento deste registro.
+
+## 2026-10-08 — Auditoria e correção do autosave/persistência
+
+### Objetivo
+Corrigir os problemas evidenciados pelo histórico de salvamentos automáticos: tempestade de snapshots críticos, estados redundantes, `Saved At: N/D`, perda da validação ECU ao desconectar, ambiguidade entre conexão atual e último protocolo, semântica incorreta de ocorrências DTC e mistura de estado REAL_OBD/SIMULACAO.
+
+### Plano de correção registrado antes do código
+- Coalescer solicitações de salvamento crítico em uma janela curta, preservando salvamento imediato para transições realmente críticas de conexão quando necessário.
+- Evitar histórico TXT redundante quando o estado persistido efetivo não mudou.
+- Persistir `metadata.savedAt` junto do snapshot e mantê-lo sincronizado com o envelope.
+- Preservar `ecuValidatedAt` e `ecuValidationSource` quando o estado de conexão passar para desconectado; a conexão atual e a última validação passam a ser conceitos independentes.
+- Representar protocolo atual somente quando conectado e manter o último protocolo conhecido em campo separado.
+- Não incrementar `DtcRecord.occurrences` a cada leitura repetida do mesmo DTC; a contagem passa a representar novas detecções após ausência/inatividade, enquanto leituras repetidas atualizam `lastSeen`.
+- Manter `REAL_OBD` como única fonte de evidência real e registrar consultas de simulação somente como telemetria/configuração de simulação.
+- Preservar limite de 200 snapshots e descarte FIFO dos mais antigos.
+
+### Estado
+Esta entrada foi registrada antes das alterações de código. A CI permanece deliberadamente não executada nesta etapa.
