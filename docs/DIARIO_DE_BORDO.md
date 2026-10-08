@@ -1471,3 +1471,31 @@ O relatório Bluetooth de 2026-10-08 mostrou: permissões GRANTED, Bluetooth dis
 
 ### Estado
 Plano registrado antes da correção de código. A validação final deverá ocorrer por typecheck, testes completos e Android Release em CI, mas essa CI não será executada nesta etapa.
+
+
+### Implementação da correção do autosave
+
+- `src/meriva/autosaveManager.ts`: `pushLastReading()` passou a aceitar `schedulePersist=false`; foi criado `scheduleTelemetrySave()` com janela mínima de 5 s para coalescer flushes originados de polling automático. A atualização em memória continua imediata.
+- `src/meriva/autosaveIntegration.ts`: `recordAutomaticObdQuery()` agora atualiza `lastReadings` sem criar debounce de 1,5 s por PID e agenda um único flush de telemetria controlado. `registerObdQuery()` preserva o comportamento tradicional para consultas manuais/diagnósticas.
+- `tests/merivaAutosave.test.js`: regressão confirma que polling automático atualiza `lastReadings` sem criar `autosave.json` imediatamente por cada PID e exige a política de flush coalescida.
+- `tests/bluetoothLifecycle.test.js`: regressão reforça a proteção contra acesso direto a `requestBluetoothEnabled` quando o módulo nativo ou o método não estiverem disponíveis.
+
+### Commits desta correção
+- `db342b6f22fa7d146171a5e07aa9502bbfc77ca3` — registrar plano da auditoria sênior.
+- `1af31d0ec2b6eb1e4e22c7944f162ea2ceed65f9` — coalescer flush do autosave de telemetria.
+- `72b282c8acbd87b4e64b6d5e6ed195ecb6d42dc0` — aplicar flush controlado ao polling OBD automático.
+- `26f30a79058fab585236ecd8d13f75526ecb155b` — regressão contra tempestade de salvamentos automáticos.
+- `740cfaf0913ba6831f6e67049d4ed1f9e2c35b0c` — manter debounce manual independente do polling automático.
+- `0810d03f3137da72b9a151971c485881693f1c65` — regressão de segurança do ativador Bluetooth.
+
+### Auditoria do repositório / integração celular
+A leitura cruzada confirmou ausência de `TODO/FIXME/HACK` no código pesquisado, ausência de `AsyncStorage` em produção, ausência de permissões `READ_EXTERNAL_STORAGE/WRITE_EXTERNAL_STORAGE`, ausência de `BLUETOOTH_ADVERTISE` desnecessário, e ausência de endpoints HTTP/OpenAI embutidos. O armazenamento privado continua em `documentDirectory`; exportações escolhidas pelo usuário usam Storage Access Framework. A orientação permanece livre (`expo.orientation=default`) e as telas usam Safe Area moderna/layout responsivo.
+
+### Confronto com documentação válida
+A arquitetura de Bluetooth foi confrontada com Android Developers e `react-native-bluetooth-classic`. O Android exige `BLUETOOTH_CONNECT` para comunicação com dispositivos pareados e `BLUETOOTH_SCAN` quando há descoberta; a ativação do rádio é uma etapa distinta (`ACTION_REQUEST_ENABLE`). A implementação atual já protege o acesso ao método opcional `requestBluetoothEnabled`. Portanto, o erro físico `Cannot read property 'requestBluetoothEnabled' of undefined` não foi usado como justificativa para alterar o transporte ELM327 sem reprodução; a hipótese prioritária continua sendo APK/JS bundle antigo ou incompatibilidade de build nativo.
+
+### Estado de validação
+- CI: **não executada nesta rodada**, conforme regra do projeto.
+- TypeScript/suíte completa/APK: ainda precisam da próxima CI.
+- `package-lock.json`: não alterado; nenhuma dependência foi adicionada.
+- A correção de autosave é considerada implementada no código, mas não declarada como validada até a próxima CI e teste físico.
