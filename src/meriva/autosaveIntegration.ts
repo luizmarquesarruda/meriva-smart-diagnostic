@@ -11,13 +11,13 @@ import { updateLearningProfileRealSample } from '../database/learningProfile';
 import type { VehicleCondition } from '../types/sourceTypes';
 import { pushLastReading, updateAutoSaveState, scheduleCriticalSave } from './autosaveManager';
 import { shouldFeedLearning } from './autosaveValidation';
-import { recordLivePidQuery } from '../obd/liveTelemetry';
+import { getVehicleConditionSnapshot, recordLivePidQuery } from '../obd/liveTelemetry';
 
 export async function registerObdQuery(
   basePath: string,
   result: PidQueryResult,
   source: 'REAL' | 'SIMULACAO',
-  condition: VehicleCondition = 'UNKNOWN',
+  condition?: VehicleCondition,
 ): Promise<void> {
   try {
     await logRawObdData(basePath, result, result.parsed.pid, source);
@@ -39,6 +39,7 @@ export async function registerObdQuery(
   });
 
   const parsedValue = result.parsed.value;
+  const learningCondition = condition ?? (source === 'REAL' ? getVehicleConditionSnapshot().condition : 'UNKNOWN');
   if (shouldFeedLearning(source, result.parsed.status, parsedValue) && parsedValue !== null) {
     try {
       const now = new Date().toISOString();
@@ -64,7 +65,7 @@ export async function registerObdQuery(
         basePath,
         result.parsed.name,
         parsedValue,
-        condition,
+        learningCondition,
       );
     } catch (cause) {
       console.warn('[autosave] falha ao registrar confirmação de PID:', cause instanceof Error ? cause.message : cause);
