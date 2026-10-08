@@ -70,7 +70,7 @@ export default function ArmazenamentoScreen() {
       </Text>
       {!!message && <Text style={styles.cleanMessage}>{message}</Text>}
       <View style={[styles.dataColumns, layout.landscape && styles.dataColumnsLandscape]}>
-      <View style={styles.card}>
+      <View style={[styles.card, layout.landscape && styles.dataColumnCard]}>
         <Text style={styles.cardTitle}>ESPAÇO UTILIZADO</Text>
         {Object.entries(usageBreakdown).map(([dir, sizesMb]) => (
           <View key={dir} style={styles.row}>
@@ -80,7 +80,7 @@ export default function ArmazenamentoScreen() {
         ))}
         <Text style={styles.note}>Limite configurado: 2 GB. A limpeza remove somente dados antigos permitidos pelo sistema.</Text>
       </View>
-      <View style={styles.historyCard}>
+      <View style={[styles.historyCard, layout.landscape && styles.dataColumnCard]}>
         <Text style={styles.cardTitle}>VIAGENS SALVAS</Text>
         {cycles.length ? cycles.slice(0, 6).map((cycle) => (
           <View key={cycle.id} style={styles.historyRow}>
@@ -107,6 +107,7 @@ const styles = StyleSheet.create({
   container: { flexGrow: 1, paddingVertical: 16, backgroundColor: '#0b1220' },
   dataColumns: { width: '100%' },
   dataColumnsLandscape: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
+  dataColumnCard: { flex: 1, minWidth: 0 },
   title: { fontSize: 23, fontWeight: '900', color: '#7db3ff', letterSpacing: 0.5, marginBottom: 5 },
   subtitle: { color: '#8da2bd', fontSize: 11, lineHeight: 16, marginBottom: 12 },
   status: { fontWeight: '700', marginBottom: 16 },
