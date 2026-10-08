@@ -51,7 +51,7 @@
     },
     "status": {
       "symbol": "status",
-      "name": "status dos monitores OBD-II"
+      "name": "bitfield de estado OBD-II"
     },
     "km/h": {
       "symbol": "km/h",
