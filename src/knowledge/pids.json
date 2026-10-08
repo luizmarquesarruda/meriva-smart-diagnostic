@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "source": "SAE J1979 / ISO 15031-5 cross-checked against open OBD implementations",
   "pids": [
     {
@@ -163,6 +163,141 @@
       "formulaId": "PERCENT_255",
       "classification": "PADRAO_OBD",
       "description": "Nível de combustível informado pela ECU. Fonte absoluta para combustível/autonomia quando a resposta for válida."
+    },
+    {
+      "pid": "010A",
+      "name": "Fuel Pressure",
+      "bytes": 1,
+      "unit": "kpa",
+      "formulaId": "U8_X3",
+      "classification": "PADRAO_OBD",
+      "description": "Pressão de combustível em relação à pressão atmosférica (gauge)."
+    },
+    {
+      "pid": "012C",
+      "name": "Commanded EGR",
+      "bytes": 1,
+      "unit": "percent",
+      "formulaId": "PERCENT_255",
+      "classification": "PADRAO_OBD",
+      "description": "Percentual de EGR comandado pela ECU."
+    },
+    {
+      "pid": "012D",
+      "name": "EGR Error",
+      "bytes": 1,
+      "unit": "percent",
+      "formulaId": "FUEL_TRIM",
+      "classification": "PADRAO_OBD",
+      "description": "Erro relativo do comando EGR."
+    },
+    {
+      "pid": "012E",
+      "name": "Commanded Evaporative Purge",
+      "bytes": 1,
+      "unit": "percent",
+      "formulaId": "PERCENT_255",
+      "classification": "PADRAO_OBD",
+      "description": "Percentual de purga do sistema EVAP comandado."
+    },
+    {
+      "pid": "0130",
+      "name": "Warmups Since DTC Clear",
+      "bytes": 1,
+      "unit": "code",
+      "formulaId": "U8",
+      "classification": "PADRAO_OBD",
+      "description": "Número de ciclos de aquecimento desde a limpeza dos DTCs."
+    },
+    {
+      "pid": "0133",
+      "name": "Barometric Pressure",
+      "bytes": 1,
+      "unit": "kpa",
+      "formulaId": "U8",
+      "classification": "PADRAO_OBD",
+      "description": "Pressão barométrica absoluta."
+    },
+    {
+      "pid": "0143",
+      "name": "Absolute Load",
+      "bytes": 1,
+      "unit": "percent",
+      "formulaId": "U16_SCALE_255",
+      "classification": "PADRAO_OBD",
+      "description": "Carga absoluta calculada do motor."
+    },
+    {
+      "pid": "0145",
+      "name": "Relative Throttle Position",
+      "bytes": 1,
+      "unit": "percent",
+      "formulaId": "PERCENT_255",
+      "classification": "PADRAO_OBD",
+      "description": "Posição relativa da borboleta."
+    },
+    {
+      "pid": "0146",
+      "name": "Ambient Air Temperature",
+      "bytes": 1,
+      "unit": "celsius",
+      "formulaId": "TEMP_C",
+      "classification": "PADRAO_OBD",
+      "description": "Temperatura do ar ambiente."
+    },
+    {
+      "pid": "0159",
+      "name": "Fuel Rail Absolute Pressure",
+      "bytes": 2,
+      "unit": "kpa",
+      "formulaId": "U16_X10",
+      "classification": "PADRAO_OBD",
+      "description": "Pressão absoluta do rail de combustível."
+    },
+    {
+      "pid": "015A",
+      "name": "Accelerator Pedal Position",
+      "bytes": 1,
+      "unit": "percent",
+      "formulaId": "PERCENT_255",
+      "classification": "PADRAO_OBD",
+      "description": "Posição relativa do pedal do acelerador."
+    },
+    {
+      "pid": "015C",
+      "name": "Engine Oil Temperature",
+      "bytes": 1,
+      "unit": "celsius",
+      "formulaId": "TEMP_C",
+      "classification": "PADRAO_OBD",
+      "description": "Temperatura do óleo do motor."
+    },
+    {
+      "pid": "015D",
+      "name": "Fuel Injection Timing",
+      "bytes": 2,
+      "unit": "degrees",
+      "formulaId": "INJECTION_TIMING",
+      "classification": "PADRAO_OBD",
+      "description": "Ângulo de temporização da injeção de combustível."
+    },
+    {
+      "pid": "0161",
+      "name": "Driver Demand Engine Torque",
+      "bytes": 1,
+      "unit": "percent",
+      "formulaId": "TORQUE_PERCENT",
+      "classification": "PADRAO_OBD",
+      "description": "Torque solicitado pelo motorista."
+    },
+    {
+      "pid": "0162",
+      "name": "Actual Engine Torque",
+      "bytes": 1,
+      "unit": "percent",
+      "formulaId": "TORQUE_PERCENT",
+      "classification": "PADRAO_OBD",
+      "description": "Torque efetivamente produzido pelo motor."
     }
   ]
 }
