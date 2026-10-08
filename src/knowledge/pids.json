@@ -221,7 +221,7 @@
     {
       "pid": "0143",
       "name": "Absolute Load",
-      "bytes": 1,
+      "bytes": 2,
       "unit": "percent",
       "formulaId": "U16_SCALE_255",
       "classification": "PADRAO_OBD",
