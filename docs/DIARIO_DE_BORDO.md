@@ -1411,3 +1411,32 @@ Antes de qualquer nova correção:
 5. atualizar novamente o diário com os hashes exatos;
 6. executar CI somente se houver autorização explícita.
 
+
+
+## 2026-10-08 — Plano pré-correção: falha ao solicitar ativação do Bluetooth no Android 36
+
+### Evidência recebida
+Relatório físico em Android 36 / SM-A065M registrou:
+- permissões Bluetooth: GRANTED;
+- Bluetooth disponível: true;
+- rádio Bluetooth: false;
+- rechecagem: false;
+- tentativa de ativação iniciada;
+- erro final: `Cannot read property 'requestBluetoothEnabled' of undefined`;
+- ELM não conectado e 0 dispositivos pareados reportados.
+
+### Diagnóstico inicial
+O erro ocorre exatamente na transição **Bluetooth disponível + rádio desligado → solicitação de ativação**. O código atual do branch já possui uma guarda contra módulo nativo ausente e contra método inexistente; portanto, o texto exato do erro é um forte indício de que o APK testado não contém a implementação atualizada dessa guarda ou que há uma diferença entre a superfície JS efetivamente carregada e o módulo nativo instalado.
+
+A API `requestBluetoothEnabled()` é suportada pelo `react-native-bluetooth-classic`, mas depende do módulo nativo estar corretamente incorporado no build. O aplicativo usa Expo prebuild/EAS e React Native 0.74.5, portanto a próxima correção deve tratar explicitamente a disponibilidade do módulo e do método sem permitir TypeError cru.
+
+### Plano antes do código
+1. Auditar o ponto de ativação em `src/obd/bluetoothManager.ts` e o caminho de inicialização/autolinking do módulo.
+2. Tornar a chamada de ativação tolerante a módulo/método ausente, registrando diagnóstico específico e orientando o usuário para ativação manual quando a API nativa não estiver disponível.
+3. Adicionar regressão para impedir acesso direto a `requestBluetoothEnabled` quando o objeto/método estiver ausente.
+4. Verificar se o APK precisa ser reconstruído para que a correção efetivamente chegue ao dispositivo; não tratar um APK antigo como evidência de que o código atual falhou.
+5. Não alterar gate ECU `010C → 41 0C`, autosave, aprendizado, PIDs/DTCs ou `package-lock.json` sem evidência específica.
+6. **Não executar CI nesta etapa**, pois o usuário não autorizou CI.
+
+### Estado
+Plano registrado antes da próxima correção. Nenhuma alteração de código foi feita nesta etapa.
