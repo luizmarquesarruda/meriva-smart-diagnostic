@@ -70,7 +70,9 @@ export function parsePidResponse(pidRequested: string, rawResponse: string, posi
 
   const definition = getPidDefinition(pid);
 
-  if (!rawResponse.trim() || /NO DATA|UNABLE TO CONNECT|ERROR|BUS INIT|BUS ERROR/i.test(rawResponse)) {
+  const normalizedResponse = normalizeRawResponse(rawResponse);
+  const hasPositiveFrame = validateOBDResponse(normalizedResponse, positiveService);
+  if (!normalizedResponse || (!hasPositiveFrame && /NO DATA|UNABLE TO CONNECT|ERROR|BUS INIT|BUS ERROR/i.test(normalizedResponse))) {
     return {
       pid,
       name: definition?.name ?? `PID ${pid}`,
