@@ -13,7 +13,7 @@ const screenFiles = [
 
 // Expo's default orientation means no orientation lock; do not introduce a native portrait/landscape lock.
 assert.equal(appJson.expo.orientation, 'default');
-assert.match(index, /useWindowDimensions/);
+assert.match(index, /useMidLayout\(\)/);
 assert.match(index, /layout\.landscape/);
 assert.match(index, /contentContainerStyle/);
 assert.match(index, /flexGrow:1/);
@@ -26,6 +26,9 @@ assert.match(midLayout, /size\.width > size\.height/);
 assert.doesNotMatch(index, /screenOrientation|OrientationLock\.(PORTRAIT|LANDSCAPE)/);
 for (const file of screenFiles) {
   const source = fs.readFileSync(file, 'utf8');
+  assert.match(source, /useMidLayout\(\)/, file + ' deve usar o layout responsivo centralizado');
+  assert.match(source, /paddingHorizontal:layout\.horizontalPadding|paddingHorizontal:\s*layout\.horizontalPadding/, file + ' deve aplicar padding responsivo');
+  assert.match(source, /maxWidth:layout\.maxContentWidth|maxWidth:\s*layout\.maxContentWidth/, file + ' deve limitar o conteúdo responsivamente');
   assert.match(source, /react-native-safe-area-context/, file + ' deve usar Safe Area moderna');
   assert.match(source, /<SafeAreaView/, file + ' deve ter SafeAreaView');
   assert.doesNotMatch(source, /import\s*\{[^}]*SafeAreaView[^}]*\}\s*from ['"]react-native['"]/, file + ' não deve usar SafeAreaView legado');
