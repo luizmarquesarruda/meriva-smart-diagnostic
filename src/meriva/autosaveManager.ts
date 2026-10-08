@@ -305,6 +305,10 @@ function scheduleDebouncedSave(): void {
 }
 
 export async function saveNow(reason: SaveReason = 'critical'): Promise<boolean> {
+  if (runtime.telemetryTimer) {
+    clearTimeout(runtime.telemetryTimer);
+    runtime.telemetryTimer = null;
+  }
   if (runtime.criticalTimer) {
     clearTimeout(runtime.criticalTimer);
     runtime.criticalTimer = null;
