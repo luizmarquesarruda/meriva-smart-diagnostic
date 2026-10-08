@@ -193,15 +193,16 @@ export default function LaboratorioScreen() {
         getDiagnosticsText: () => connected.session.getTransportDiagnosticsText(),
       });
       setProtocol(connection.protocol ?? 'N/D');
+      const discoveredProtocol = connected.protocol;
       if (
         connected.pidDiscoverySource === 'ECU' &&
-        connected.protocol &&
+        discoveredProtocol &&
         connected.supportedPids.length > 0
       ) {
         updateAutoSaveState((state) => {
           state.pidDiscovery = {
             supportedPids: connected.supportedPids,
-            protocol: connected.protocol,
+            protocol: discoveredProtocol,
             discoveredAt: new Date().toISOString(),
           };
         });
