@@ -198,7 +198,7 @@ export default function ConfiguracaoScreen() {
           <View style={styles.card}>
             <Text style={styles.label}>NO DATA antes de recuperação</Text>
             <View style={styles.row}>
-              {[20, 40, 80].map((value) => (
+              {[3, 4, 6].map((value) => (
                 <TouchableOpacity key={value} style={[styles.choice, settings.elmNoDataReconnectThreshold === value && styles.choiceActive]} onPress={() => void updateSetting('elmNoDataReconnectThreshold', value)}>
                   <Text style={styles.choiceText}>{value}</Text>
                 </TouchableOpacity>
