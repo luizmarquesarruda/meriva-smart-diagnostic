@@ -1328,3 +1328,83 @@ A implementação vigente de `nextDtcOccurrences()` já preserva a ocorrência e
 
 ### Estado
 Correção de código e regressões concluídas. **CI não executada**, pois não foi solicitada. A validação física ainda requer novo APK/build após a CI autorizada e teste com ELM327/Meriva.
+
+
+## 2026-10-08 — Consolidação do estado do Diário de Bordo após as últimas correções
+
+### Regra operacional reafirmada
+O Diário de Bordo foi lido **antes desta atualização**, conforme a regra do projeto. A partir desta consolidação, qualquer nova alteração de código, teste, JSON, configuração ou documentação deverá seguir a sequência:
+
+**ler o diário → registrar o plano/correção pretendida → alterar → registrar arquivos e commits → registrar testes/CI → registrar resultado e próximo passo.**
+
+Nenhuma nova correção será iniciada ignorando o estado registrado aqui.
+
+### Alterações realizadas desde a última consolidação
+
+#### 1. RPM em tempo real
+- O cockpit deixou de usar `getAutoSaveState().lastReadings` como fonte do RPM vivo.
+- O PID `010C` REAL_OBD passou a ser obtido da telemetria viva.
+- Foi criada a leitura centralizada `getLivePidCurrent()`, com validade temporal de **10 segundos**.
+- Amostras antigas não são mais apresentadas como RPM atual.
+- Regressão adicionada para impedir que uma amostra de 30 segundos seja tratada como atual.
+- Commits:
+  - `a43c3db2f1f7277fed9231ea128f043220ecc904`
+  - `e70cee6d1662fb922901e1259d7d64c15c5c2aa9`
+  - `e8c7c1c2d96f07ae1b956742c7f3759df354ef43`
+  - `293eca1ebe2a43143bfe51970036534557a12f70`
+
+#### 2. Consumo atual
+- O cockpit deixou de usar `averageConsumptionKml` persistido como se fosse consumo instantâneo.
+- A métrica atual passou a usar `instantaneousConsumptionKml`.
+- O cálculo continua condicionado a velocidade válida e taxa de combustível OBD `015E`.
+- GPS sozinho não é tratado como medição de litros.
+- A média histórica continua separada para histórico/autonomia.
+- Regressão adicionada para impedir o retorno da média histórica como consumo atual.
+- Commits:
+  - `47afd09d88e8a4a58f0d8c0ed1a094dd5c0ba8c0`
+  - `a2696353e05b19537345d09ba841eefb0376b383`
+
+#### 3. Sincronização do polling automático com o autosave
+- Identificada a divergência entre `recordLivePidQuery()` e `state.lastReadings`: o polling automático recebia dados novos da ECU, mas o autosave podia permanecer com uma leitura antiga.
+- Criada a ponte `recordAutomaticObdQuery()`.
+- A ponte registra a leitura automática em telemetria viva e em `lastReadings`, sem reutilizar indevidamente o fluxo manual de aprendizado/logs.
+- `AutoTripService` passou a utilizar essa ponte para as respostas automáticas de PID, incluindo `010C`.
+- REAL_OBD e SIMULAÇÃO permanecem separados.
+- Regressão garante que uma nova leitura `010C` substitua a anterior em `lastReadings` sem incrementar `simulationQueries`.
+- Commits:
+  - `d87de14a2f60de840669e3eee1f8e7f85ae865d2`
+  - `cc126ad8fd9d0bf956d62a1a492df81962c27514`
+  - `6372e63b00fb06413429e7592016c7b7f214c187`
+
+### Estado do formatter TXT
+Foi rechecado o código vigente: o formatter atual já contempla **Saved At**, **fonte REAL/SIMULACAO** e **último protocolo conhecido**. Portanto, esses campos ausentes no TXT apresentado anteriormente não foram artificialmente adicionados apenas para reproduzir um arquivo possivelmente gerado por build anterior.
+
+### Estado dos DTCs
+A regra vigente de `nextDtcOccurrences()` foi preservada. Ela evita incrementar ocorrência repetidamente enquanto o mesmo DTC permanece ativo no ciclo correspondente. O histórico apresentado anteriormente não foi usado, isoladamente, para modificar essa semântica sem reprodução no código vigente.
+
+### Dependências e JSON
+- `package-lock.json` não foi alterado nesta rodada.
+- Nenhum novo pacote foi adicionado.
+- Nenhum catálogo JSON foi alterado nesta rodada.
+- As correções de PID/DTC previamente auditadas permanecem preservadas.
+
+### CI
+**CI não executada nesta rodada.** Essa decisão foi deliberada: as últimas alterações foram feitas sob a regra de não executar CI sem autorização explícita do usuário.
+
+Consequentemente, estas correções estão registradas como **implementadas e testadas por regressões locais/estáticas quando indicado, mas ainda não validadas pela CI completa**.
+
+### Estado atual do branch
+Branch: `fix-live-rpm-stale-2026-10-08`
+
+HEAD registrado após a última atualização do diário:
+- `5c2e781893d000c4f380e8a9180bcc8ba9a79b32` — atualização deste Diário de Bordo.
+
+### Próximo passo obrigatório
+Antes de qualquer nova correção:
+1. reler este Diário de Bordo;
+2. verificar o HEAD atual da branch;
+3. registrar no diário o plano da nova alteração;
+4. somente então modificar código/testes/JSON;
+5. atualizar novamente o diário com os hashes exatos;
+6. executar CI somente se houver autorização explícita.
+
