@@ -105,7 +105,7 @@ function main() {
 
   result = engine.runLocalDiagnostic({
     ...base,
-    observations: [obs('0106', 20), obs('0107', 0)],
+    observations: [obs('0106', 0), obs('0107', 0)],
     dtcs: [{ code: 'p0301', status: 'CONFIRMED', firstSeen: '', lastSeen: '', occurrences: 1, source: 'REAL_OBD', historical: false, confirmed: true }],
   });
   assert.strictEqual(result.hypotheses.length, 1, 'normalização do DTC não deve depender de caixa');
