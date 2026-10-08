@@ -8,6 +8,7 @@ import { RealTripRecorder } from './tripRecorder';
 import { INITIAL_DRIVE_CYCLES } from '../data/driveCycles';
 import { estimateRangeFromFuelLevel, fuelLevelPercentToLiters, isFuelReserve } from './fuelLevel';
 import { resetLiveTelemetry } from '../obd/liveTelemetry';
+import { estimateFuelRateLph, type FuelRateSource } from '../obd/fuelConsumption';
 
 export interface AutoTripServiceState {
   connected: boolean;
@@ -62,6 +63,7 @@ class AutoTripService {
   private unsubscribeConnection: (() => void) | null = null;
   private readonly listeners = new Set<Listener>();
   private telemetryCursor = 0;
+  private stoppedSinceMs: number | null = null;
   private state: AutoTripServiceState = { ...INITIAL_STATE };
 
   subscribe(listener: Listener): () => void {
@@ -136,14 +138,15 @@ class AutoTripService {
     const fuelLevelSupported = connection.supportedPids.includes('012F');
     const obdSpeedSupported = connection.supportedPids.includes('010D');
     const initialDistanceKm = gpsTracker.getState().distanceKm;
-    this.recorder = new RealTripRecorder(Date.now(), initialDistanceKm);
+    this.recorder = null;
+    this.stoppedSinceMs = null;
     const generation = ++this.generation;
 
     const persistedAutonomy = (await initAutoSave(this.basePath)).autonomy;
     this.state = {
       ...INITIAL_STATE,
       connected: true,
-      active: true,
+      active: false,
       fuelSupported,
       fuelLevelSupported,
       fuelLevelPercent: null,
@@ -185,8 +188,10 @@ class AutoTripService {
 
       try {
         let fuelRateLph: number | null = null;
+        let fuelRateSource: FuelRateSource | undefined;
         let fuelLevelPercent: number | null = null;
         let obdSpeedKmh: number | null = null;
+        let rpm: number | null = null;
         if (obdSpeedSupported) gpsTracker.setVehicleSpeedHintKmh(null);
 
         if (this.state.fuelLevelSupported) {
@@ -215,6 +220,7 @@ class AutoTripService {
             fuelResult.parsed.value >= 0
           ) {
             fuelRateLph = fuelResult.parsed.value;
+            fuelRateSource = 'MEASURED_015E';
           }
         }
 
@@ -238,17 +244,69 @@ class AutoTripService {
         // Sem 010D, null devolve a decisão ao filtro GPS.
         gpsTracker.setVehicleSpeedHintKmh(obdSpeedSupported ? obdSpeedKmh : null);
 
-        // Telemetria móvel: um PID secundário por ciclo evita saturar ELMs lentos,
-        // mas mantém RPM/temperatura/MAP/TPS em uma janela contínua para tendências.
-        const telemetryCandidates = ['010C', '0105', '010B', '0111'];
+        // RPM é consultado a cada ciclo porque também define o estado do motor
+        // e a abertura/fechamento automático do trajeto.
+        if (connection.supportedPids.includes('010C')) {
+          const rpmResult = await connection.session.queryPid('010C');
+          await registerObdQuery(this.basePath, rpmResult, 'REAL');
+          if (rpmResult.parsed.status === 'RESPONDEU' && Number.isFinite(rpmResult.parsed.value)) {
+            rpm = rpmResult.parsed.value;
+          }
+        }
+
+        if (fuelRateLph == null) {
+          const mafResult = await connection.session.queryPid('0110');
+          await registerObdQuery(this.basePath, mafResult, 'REAL');
+          const mafGs = mafResult.parsed.status === 'RESPONDEU' ? mafResult.parsed.value : null;
+          if (mafGs != null) {
+            const estimate = estimateFuelRateLph({ mafGs });
+            if (estimate) {
+              fuelRateLph = estimate.rateLph;
+              fuelRateSource = estimate.source;
+            }
+          } else {
+            const mapResult = await connection.session.queryPid('010B');
+            const iatResult = await connection.session.queryPid('010F');
+            await registerObdQuery(this.basePath, mapResult, 'REAL');
+            await registerObdQuery(this.basePath, iatResult, 'REAL');
+            const estimate = estimateFuelRateLph({
+              mapKpa: mapResult.parsed.status === 'RESPONDEU' ? mapResult.parsed.value : null,
+              rpm,
+              intakeAirTempC: iatResult.parsed.status === 'RESPONDEU' ? iatResult.parsed.value : null,
+              displacementCm3: getAutoSaveState().vehicle?.displacementCm3 ?? 1598,
+            });
+            if (estimate) {
+              fuelRateLph = estimate.rateLph;
+              fuelRateSource = estimate.source;
+            }
+          }
+        }
+
+        // Mantém um PID secundário por ciclo para tendências sem monopolizar o ELM.
+        const telemetryCandidates = ['0105', '010B', '0111'];
         const supportedTelemetry = telemetryCandidates.filter((item) => connection.supportedPids.includes(item));
-        const telemetryPid = supportedTelemetry.length > 0
-          ? supportedTelemetry[this.telemetryCursor % supportedTelemetry.length]
-          : '010C';
-        this.telemetryCursor += 1;
-        if (telemetryPid === '010C' || connection.supportedPids.includes(telemetryPid)) {
+        if (supportedTelemetry.length > 0) {
+          const telemetryPid = supportedTelemetry[this.telemetryCursor % supportedTelemetry.length];
+          this.telemetryCursor += 1;
           const telemetryResult = await connection.session.queryPid(telemetryPid);
           await registerObdQuery(this.basePath, telemetryResult, 'REAL');
+        }
+
+        const gps = gpsTracker.getState();
+        const vehicleSpeedKmh = obdSpeedKmh ?? gps.currentSpeedKmh;
+        const moving = (rpm ?? 0) > 0 && vehicleSpeedKmh > 0;
+
+        if (moving) {
+          this.stoppedSinceMs = null;
+          if (!this.recorder) {
+            this.recorder = new RealTripRecorder(Date.now(), gps.distanceKm);
+          }
+        } else if (this.recorder) {
+          this.stoppedSinceMs ??= Date.now();
+          if (Date.now() - this.stoppedSinceMs >= 15_000) {
+            await this.finalizeRecorder();
+            this.stoppedSinceMs = null;
+          }
         }
 
         const recorder = this.recorder;
@@ -262,6 +320,7 @@ class AutoTripService {
             distanceKm: gps.distanceKm,
             speedKmh: vehicleSpeedKmh,
             fuelRateLph,
+            fuelRateSource,
           });
           const instantaneousConsumptionKml =
             fuelRateLph != null && fuelRateLph > 0 && vehicleSpeedKmh > 0
@@ -269,7 +328,7 @@ class AutoTripService {
               : null;
           this.setState({
             connected: true,
-            active: true,
+            active: Boolean(this.recorder),
             distanceKm: state.distanceKm,
             fuelUsedL: state.fuelUsedL,
             consumptionKml:
@@ -286,9 +345,11 @@ class AutoTripService {
                   state.distanceKm > 0 && state.fuelUsedL > 0 ? state.distanceKm / state.fuelUsedL : this.state.averageConsumptionKml,
                 ) ?? this.state.estimatedRangeKm)
               : this.state.estimatedRangeKm,
-            error: fuelRateLph == null && state.validFuelSamples === 0
-              ? 'GPS ATIVO / ECU SEM PID 015E VÁLIDO'
-              : null,
+            error: rpm === 0 && obdSpeedKmh === 0 && fuelRateLph == null
+              ? 'MOTOR DESLIGADO? / ECU SEM TELEMETRIA VÁLIDA'
+              : fuelRateSource && fuelRateSource !== 'MEASURED_015E'
+                ? 'CONSUMO ESTIMADO POR ' + fuelRateSource.replace('ESTIMATED_', '')
+                : null,
           });
         }
       } catch (cause) {
