@@ -18,6 +18,7 @@ import { scanDtcServices, type DtcServiceScan } from '../src/obd/dtcScanner';
 import { getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
 
 import { DtcRecord, nextDtcOccurrences, readDtcs, recordDtc } from '../src/database/dtcManager';
+import { recordDiscoveredPids } from '../src/database/pidBank';
 import {
   initAutoSave,
   updateAutoSaveState,
@@ -308,7 +309,8 @@ export default function LaboratorioScreen() {
       const discovered = Array.from(new Set(items.flatMap((item) => item.supportedPids))).sort();
       setSupportedPids(discovered);
       if (mode === 'REAL') {
-        const activeProtocol = activeSession.getProtocol();
+        const activeProtocol = activeSession.getProtocol() ?? 'N/D';
+        await recordDiscoveredPids(getBasePath(), discovered, activeProtocol);
         updateAutoSaveState((state) => {
           if (activeProtocol && discovered.length > 0) {
             state.pidDiscovery = {
