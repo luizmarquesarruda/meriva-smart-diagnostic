@@ -17,7 +17,7 @@ import { getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
 
 import { readAppSettings, writeAppSettings } from '../src/database/appSettings';
 
-import { DtcRecord, readDtcs, recordDtc } from '../src/database/dtcManager';
+import { DtcRecord, nextDtcOccurrences, readDtcs, recordDtc } from '../src/database/dtcManager';
 import {
   initAutoSave,
   startObdSessionCheckpoint,
@@ -390,7 +390,7 @@ export default function LaboratorioScreen() {
             status: kind === 'PENDING' ? 'PENDING' : kind === 'PERMANENT' ? 'PERMANENT' : 'CURRENT',
             firstSeen: previous?.firstSeen ?? now,
             lastSeen: now,
-            occurrences: (previous?.occurrences ?? 0) + 1,
+            occurrences: nextDtcOccurrences(previous),
             source: 'REAL_OBD',
             historical: false,
             confirmed: kind !== 'PENDING',
@@ -461,7 +461,7 @@ export default function LaboratorioScreen() {
             status: 'CURRENT',
             firstSeen: previous?.firstSeen ?? now,
             lastSeen: now,
-            occurrences: (previous?.occurrences ?? 0) + 1,
+            occurrences: nextDtcOccurrences(previous),
             source: 'REAL_OBD',
             historical: false,
             confirmed: true,
