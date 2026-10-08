@@ -35,7 +35,7 @@ export class SimulatedObdTransport implements ObdTransport {
     }
 
     const command = data.trim().toUpperCase();
-    this.pendingResponse = this.responseFor(command) + '\\r>';
+    this.pendingResponse = this.responseFor(command) + '\r>';
   }
 
   async readUntilPrompt(timeoutMs = 1000): Promise<string> {
