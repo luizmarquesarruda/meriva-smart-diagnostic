@@ -48,6 +48,10 @@
     "L/h": {
       "symbol": "L/h",
       "name": "litros por hora"
+    },
+    "status": {
+      "symbol": "status",
+      "name": "status dos monitores OBD-II"
     }
   }
 }

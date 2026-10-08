@@ -4,31 +4,10 @@ const path = require('path');
 const fs = require('fs');
 const assert = require('assert');
 const Module = require('module');
-const ts = require('typescript');
+const { loadTs } = require('./helpers/loadTs');
 
 const ROOT = path.resolve(__dirname, '..');
 const compiled = new Map();
-
-function loadTs(tsPath) {
-  tsPath = path.normalize(tsPath);
-  if (compiled.has(tsPath)) return compiled.get(tsPath).exports;
-
-  const source = fs.readFileSync(tsPath, 'utf8');
-  const output = ts.transpileModule(source, {
-    compilerOptions: {
-      module: ts.ModuleKind.CommonJS,
-      target: ts.ScriptTarget.ES2019,
-      esModuleInterop: true,
-    },
-  }).outputText;
-
-  const mod = new Module(tsPath, null);
-  mod.filename = tsPath;
-  mod.paths = Module._nodeModulePaths(path.dirname(tsPath));
-  compiled.set(tsPath, mod);
-  mod._compile(output, tsPath);
-  return mod.exports;
-}
 
 const files = new Map();
 const dirs = new Set(['/doc']);

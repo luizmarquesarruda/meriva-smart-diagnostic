@@ -3,39 +3,7 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
-const ts = require('typescript');
-
-const ROOT = path.resolve(__dirname, '..');
-const DIAGNOSTIC_RULES_PATH = path.join(ROOT, 'src/knowledge/diagnostic_rules.json');
-
-function loadTs(tsPath) {
-  const source = fs.readFileSync(tsPath, 'utf8');
-  const output = ts.transpileModule(source, {
-    compilerOptions: {
-      module: ts.ModuleKind.CommonJS,
-      target: ts.ScriptTarget.ES2019,
-      esModuleInterop: true,
-      resolveJsonModule: true,
-    },
-  }).outputText;
-
-  const mod = {
-    exports: {},
-    filename: tsPath,
-    paths: require('module')._nodeModulePaths(path.dirname(tsPath)),
-  };
-
-  const localRequire = (request) => {
-    if (request.endsWith('diagnostic_rules.json')) {
-      return require(DIAGNOSTIC_RULES_PATH);
-    }
-    return require(require.resolve(request, { paths: [path.dirname(tsPath)] }));
-  };
-
-  const compiledModule = new Function('exports', 'require', 'module', '__filename', '__dirname', output);
-  compiledModule(mod.exports, localRequire, mod, tsPath, path.dirname(tsPath));
-  return mod.exports;
-}
+const { loadTs } = require('./helpers/loadTs');
 
 function obs(pid, value, source = 'REAL_OBD') {
   return { pid, name: pid, value, unit: 'N/D', source, timestamp: new Date().toISOString(), confidence: 'HIGH' };
@@ -46,7 +14,7 @@ function main() {
   const rules = require(DIAGNOSTIC_RULES_PATH);
   assert.ok(Array.isArray(rules.rules), 'diagnostic_rules.json deve conter rules');
 
-  const engine = loadTs(path.join(ROOT, 'src/diagnostics/diagnosticEngine.ts'));
+  const engine = loadTs('src/diagnostics/diagnosticEngine.ts');
   const base = { observations: [], dtcs: [], condition: 'IDLE_WARM' };
 
   let result = engine.runLocalDiagnostic({
