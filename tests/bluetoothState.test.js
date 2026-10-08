@@ -26,10 +26,13 @@ for (const disconnected of [
   assert.strictEqual(state.isBluetoothLinkUp(disconnected), false, disconnected + ' não é link conectado');
 }
 
-assert.strictEqual(state.canPollObd('READY'), true);
-assert.strictEqual(state.canPollObd('ECU_RESPONDING'), false);
-assert.strictEqual(state.canPollObd('ELM_INITIALIZED'), false);
-assert.strictEqual(state.canPollObd('BLUETOOTH_CONNECTED'), false);
-assert.strictEqual(state.canPollObd('BLUETOOTH_OFF'), false);
+assert.strictEqual(state.canPollObd('READY', 'RESPONDING'), true);
+assert.strictEqual(state.canPollObd('READY', 'NO_RESPONSE'), false);
+assert.strictEqual(state.canPollObd('READY', 'RECOVERING'), false);
+assert.strictEqual(state.canPollObd('READY', 'NOT_VALIDATED'), false);
+assert.strictEqual(state.canPollObd('ECU_RESPONDING', 'RESPONDING'), false);
+assert.strictEqual(state.canPollObd('ELM_INITIALIZED', 'RESPONDING'), false);
+assert.strictEqual(state.canPollObd('BLUETOOTH_CONNECTED', 'RESPONDING'), false);
+assert.strictEqual(state.canPollObd('BLUETOOTH_OFF', 'RESPONDING'), false);
 
 console.log('bluetoothState.test.js: OK');
