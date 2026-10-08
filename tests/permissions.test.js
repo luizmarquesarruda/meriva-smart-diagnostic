@@ -16,6 +16,9 @@ assert(!layout.includes('requestBluetoothPermissions'));
 assert(appJson.expo.android.permissions.includes('BLUETOOTH_CONNECT'));
 assert(appJson.expo.android.permissions.includes('BLUETOOTH_SCAN'));
 assert(appJson.expo.android.permissions.includes('ACCESS_FINE_LOCATION'));
+assert(appJson.expo.android.permissions.includes('ACCESS_BACKGROUND_LOCATION'));
+assert(permissionManager.includes('requestBackgroundLocationPermissionsOnly'));
+assert(permissionManager.includes('requestBackgroundPermissionsAsync'));
 
 console.log('permissionManager: OK');
 
