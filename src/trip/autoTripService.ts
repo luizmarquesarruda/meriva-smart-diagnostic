@@ -4,6 +4,7 @@ import { getSharedObdConnection, getSharedObdStatus, subscribeSharedObd } from '
 import { addDriveCycle, readDriveCycles } from '../storage/driveCycleStorage';
 import { forceSaveOnObdEvent, registerObdQuery } from '../meriva/autosaveIntegration';
 import { getAutoSaveState, updateAutoSaveState, initAutoSave } from '../meriva/autosaveManager';
+import { flushCsvLogger } from '../database/csvLogger';
 import { readAppSettings } from '../database/appSettings';
 import { MERIVA_MANUAL } from '../database/merivaManual';
 import { RealTripRecorder } from './tripRecorder';
@@ -126,6 +127,7 @@ class AutoTripService {
     await this.transition;
     await this.stopCurrentLoop();
     await this.finalizeRecorder();
+    await flushCsvLogger();
     this.state = { ...INITIAL_STATE };
     this.emit();
   }
