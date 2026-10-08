@@ -10,6 +10,7 @@ import {
   isUnsupportedAtResponse,
   mergeCompatibilityConfig,
   normalizeElmResponse,
+  isResponsePendingResponse,
 } from './elm327Compatibility';
 
 export interface ObdTransport {
@@ -19,7 +20,7 @@ export interface ObdTransport {
   readUntilPrompt(timeoutMs?: number): Promise<string>;
 }
 
-export type ElmCommandStatus = 'OK' | 'TIMEOUT' | 'ERROR' | 'NO_RESPONSE' | 'UNSUPPORTED';
+export type ElmCommandStatus = 'OK' | 'TIMEOUT' | 'ERROR' | 'NO_RESPONSE' | 'UNSUPPORTED' | 'RESPONSE_PENDING';
 
 export interface ElmCommandResult {
   command: string;
@@ -43,6 +44,7 @@ function classifyResponse(response: string): ElmCommandStatus {
   const normalized = normalizeElmResponse(response).toUpperCase();
   if (!normalized) return 'NO_RESPONSE';
   if (isUnsupportedAtResponse(normalized)) return 'UNSUPPORTED';
+  if (isResponsePendingResponse(normalized)) return 'RESPONSE_PENDING';
   if (/\b(NO DATA|UNABLE TO CONNECT|BUS INIT|BUS ERROR|STOPPED|ERROR)\b/.test(normalized)) {
     return 'ERROR';
   }
@@ -68,6 +70,7 @@ export class Elm327Session {
   private successfulCommands = 0;
   private timeouts = 0;
   private unsupported = 0;
+  private responsePending = 0;
   private errors = 0;
   private totalResponseMs = 0;
   private lastErrorType: ElmErrorType = 'NONE';
@@ -199,6 +202,7 @@ export class Elm327Session {
       noData: this.noDataCount,
       timeouts: this.timeouts,
       unsupported: this.unsupported,
+      responsePending: this.responsePending,
       errors: this.errors,
       averageResponseMs: this.commands ? Math.round(this.totalResponseMs / this.commands) : 0,
       adaptiveTimeoutMs: this.adaptiveTimeoutMs,
@@ -209,6 +213,26 @@ export class Elm327Session {
 
   shouldRecover(): boolean {
     return this.getHealthSnapshot().recoveryRecommended;
+  }
+
+  async queryPids(pids: string[]): Promise<PidQueryResult[]> {
+    await this.initialize();
+    const normalizedPids = Array.from(new Set(pids.map(normalizeCommand))).filter((item) => /^01[0-9A-F]{2}$/.test(item));
+    if (!normalizedPids.length) return [];
+    if (!/ISO\s*15765-4|CAN/i.test(this.protocol ?? '')) {
+      const results: PidQueryResult[] = [];
+      for (const pid of normalizedPids) results.push(await this.queryPid(pid));
+      return results;
+    }
+    const results: PidQueryResult[] = [];
+    for (let index = 0; index < normalizedPids.length; index += 6) {
+      const group = normalizedPids.slice(index, index + 6);
+      const reply = await this.executeCommand('01' + group.map((item) => item.slice(-2)).join(''));
+      for (const pid of group) {
+        results.push({ tx: pid, rx: reply.response, elapsedMs: reply.elapsedMs, commandStatus: reply.status, protocol: this.protocol, parsed: parsePidResponse(pid, reply.response) });
+      }
+    }
+    return results;
   }
 
   async queryPid(pid: string): Promise<PidQueryResult> {
@@ -230,7 +254,14 @@ export class Elm327Session {
   async executeCommand(command: string): Promise<ElmCommandResult> {
     await this.initialize();
     const normalized = normalizeCommand(command);
-    return this.enqueueCommand(() => this.command(normalized));
+    return this.enqueueCommand(async () => {
+      let result = await this.command(normalized);
+      for (let retry = 0; retry < this.config.responsePendingMaxRetries && result.status === 'RESPONSE_PENDING'; retry += 1) {
+        await new Promise((resolve) => setTimeout(resolve, this.config.responsePendingDelayMs));
+        result = await this.command(normalized, retry + 2);
+      }
+      return result;
+    });
   }
 
   async close(): Promise<void> {
@@ -291,6 +322,7 @@ export class Elm327Session {
       this.totalResponseMs += Date.now() - started;
       this.lastErrorType = errorType;
       if (status === 'OK') this.successfulCommands += 1;
+      if (status === 'RESPONSE_PENDING') this.responsePending += 1;
       if (status === 'UNSUPPORTED') {
         this.unsupported += 1;
         if (this.config.allowUnsupportedAtCommands && /^AT[A-Z0-9]+$/.test(command)) {
