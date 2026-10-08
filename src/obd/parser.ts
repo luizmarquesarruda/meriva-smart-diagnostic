@@ -15,6 +15,7 @@ export interface ParsedPidResult {
   status: ParseStatus;
   errorMessage?: string;
   definition?: PidDefinition;
+  interpretation?: string;
 }
 
 function normalizeHexStream(rawResponse: string): string {
@@ -109,6 +110,17 @@ export function parsePidResponse(pidRequested: string, rawResponse: string): Par
   }
 
   const value = definition.formula(data);
+  const interpretation = pid === '0101'
+    ? (() => {
+        const [a, b, c, d] = data;
+        const mil = (a & 0x80) !== 0;
+        const dtcCount = a & 0x7f;
+        const sparkIncomplete = ['CATALYST', 'HEATED_CATALYST', 'EVAP', 'SECONDARY_AIR', 'O2_SENSOR', 'O2_HEATER', 'EGR'].filter((_, index) => (b & (0x20 >> index)) !== 0);
+        const compressionIncomplete = ['NMHC_CATALYST', 'NOX_SCR', 'BOOST', 'PM_FILTER', 'EXHAUST_GAS_SENSOR', 'EGR'].filter((_, index) => (d & (0x20 >> index)) !== 0);
+        const incomplete = sparkIncomplete.length ? sparkIncomplete : compressionIncomplete;
+        return 'MIL=' + (mil ? 'ON' : 'OFF') + ' | DTCs=' + dtcCount + ' | MONITORES=' + (incomplete.length ? 'INCOMPLETOS: ' + incomplete.join(', ') : 'PRONTOS');
+      })()
+    : undefined;
   const validation = validatePidValue(pid, value);
   if (!validation.valid) {
     return {
@@ -147,6 +159,7 @@ export function parsePidResponse(pidRequested: string, rawResponse: string): Par
     rawBytes,
     status: 'RESPONDEU',
     definition,
+    interpretation,
   };
 }
 
