@@ -6,17 +6,20 @@ import { useMidLayout } from '../src/ui/midLayout';
 import * as FileSystem from 'expo-file-system';
 import { ensureMerivaVehicleProfile, type VehicleProfile } from '../src/database/vehicleConfig';
 import { getAutoSaveState } from '../src/meriva/autosaveManager';
+import { useAppEventRevision } from '../src/ui/useAppEventRevision';
 
 export default function VeiculoScreen() {
   const layout = useMidLayout();
   const [profile, setProfile] = useState<VehicleProfile | null>(null);
   const [state, setState] = useState(getAutoSaveState());
+  const eventRevision = useAppEventRevision();
   useEffect(() => {
     const base = FileSystem.documentDirectory + 'MERIVA_SMART';
     void ensureMerivaVehicleProfile(base).then(setProfile);
-    const t = setInterval(() => setState(getAutoSaveState()), 1000);
-    return () => clearInterval(t);
   }, []);
+  useEffect(() => {
+    setState(getAutoSaveState());
+  }, [eventRevision]);
   return <SafeAreaView style={styles.container} edges={["top","bottom","left","right"]}><ScrollView contentContainerStyle={[styles.content,{paddingHorizontal:layout.horizontalPadding}]} showsHorizontalScrollIndicator={false}><View style={[styles.screenFrame,{maxWidth:layout.maxContentWidth}]}>
     <Text style={styles.title}>VEÍCULO</Text><Text style={styles.subtitle}>PERFIL DO MERIVA + ECU</Text>
     <View style={[styles.vehicleColumns, layout.landscape && styles.vehicleColumnsLandscape]}>
