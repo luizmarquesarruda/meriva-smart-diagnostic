@@ -65,6 +65,8 @@ class AutoTripService {
   private unsubscribeConnection: (() => void) | null = null;
   private readonly listeners = new Set<Listener>();
   private telemetryCursor = 0;
+  private readonly pidBackoffUntilCycle = new Map<string, number>();
+  private pollCycleNumber = 0;
   private stoppedSinceMs: number | null = null;
   private state: AutoTripServiceState = { ...INITIAL_STATE };
 
@@ -229,8 +231,10 @@ class AutoTripService {
 
         // Somente PIDs descobertos são elegíveis para o rodízio secundário.
         // O resultado de cada consulta mantém TX/RX pelo autosave existente.
+        this.pollCycleNumber += 1;
         const secondaryPids = ['015E', '012F', '0110', '010B', '010F', '0105', '0111']
-          .filter((pid) => connection.supportedPids.includes(pid));
+          .filter((pid) => connection.supportedPids.includes(pid))
+          .filter((pid) => this.pollCycleNumber >= (this.pidBackoffUntilCycle.get(pid) ?? 0));
         if (secondaryPids.length > 0) {
           const secondaryPid = secondaryPids[this.telemetryCursor % secondaryPids.length];
           this.telemetryCursor += 1;
@@ -243,6 +247,13 @@ class AutoTripService {
             status: secondaryResult.parsed.status,
           }));
           await registerObdQuery(this.basePath, secondaryResult, 'REAL');
+          if (secondaryResult.parsed.status !== 'RESPONDEU') {
+            // Respostas sem dados não disparam recuperação: o PID fica em backoff
+            // por quatro ciclos de polling e outros PIDs podem avançar.
+            this.pidBackoffUntilCycle.set(secondaryPid, this.pollCycleNumber + 4);
+          } else {
+            this.pidBackoffUntilCycle.delete(secondaryPid);
+          }
           if (secondaryPid === '015E' && secondaryResult.parsed.status === 'RESPONDEU' &&
               secondaryResult.parsed.value != null && Number.isFinite(secondaryResult.parsed.value) &&
               secondaryResult.parsed.value >= 0) {
