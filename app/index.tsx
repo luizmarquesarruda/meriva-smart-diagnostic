@@ -13,7 +13,7 @@ import { gpsTracker, type GpsTripState } from '../src/gps';
 import { ensureMerivaVehicleProfile } from '../src/database/vehicleConfig';
 import { createLearningProfile, initializeCarScannerSeed, readLearningProfile } from '../src/database/learningProfile';
 import { readAppSettings, type AppSettings } from '../src/database/appSettings';
-import { connectPreferredElm, getSharedObdConnection, getSharedObdLastError, getSharedObdStatus, subscribeSharedObd } from '../src/obd/sharedConnection';
+import { connectPreferredElm, getSharedObdConnection, getSharedObdLastError, getSharedObdStatus, subscribeSharedObd, subscribeSharedObdStatus } from '../src/obd/sharedConnection';
 import { autoTripService, type AutoTripServiceState } from '../src/trip/autoTripService';
 
 function formatDistance(km: number, unit: AppSettings['distanceUnit']): string {
@@ -39,12 +39,16 @@ export default function IndexScreen() {
 
   useEffect(() => gpsTracker.subscribe(setGpsState), []);
   useEffect(() => autoTripService.subscribe(setTripState), []);
-  useEffect(() => subscribeSharedObd(() => setConnectionStatus(getSharedObdStatus())), []);
+  useEffect(() => {
+    const unsubscribeConnection = subscribeSharedObd(() => setConnectionStatus(getSharedObdStatus()));
+    const unsubscribeHealth = subscribeSharedObdStatus((status) => setConnectionStatus(status));
+    return () => { unsubscribeConnection(); unsubscribeHealth(); };
+  }, []);
 
   const syncLiveState = useCallback(() => {
     const state = getAutoSaveState();
     const live = getSharedObdConnection();
-    const liveConnected = Boolean(live?.ecuValidated);
+    const liveConnected = getSharedObdStatus().ecuConnected;
     setDtcCount(state.dtcs.filter((item) => ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(item.status)).length);
     setConnectionStatus(getSharedObdStatus());
     setObd({
@@ -84,7 +88,7 @@ export default function IndexScreen() {
       setCycles(loaded);
       const live = getSharedObdConnection();
       setConnectionStatus(getSharedObdStatus());
-      setObd({ ...restored.obd, connected: Boolean(live?.ecuValidated) });
+      setObd({ ...restored.obd, connected: getSharedObdStatus().ecuConnected });
       setSaveStatus(getAutoSaveStatus());
       setDtcCount(restored.dtcs.filter((item) => ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(item.status)).length);
       setIsHydrated(true);
