@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link } from 'expo-router';
 import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as FileSystem from 'expo-file-system';
-import { readDriveCycles, type DriveCycle } from '../src/storage/driveCycleStorage';
-import { getDriveCycleSummary } from '../src/data/driveCycles';
+import { readDriveCycles } from '../src/storage/driveCycleStorage';
+import { getDriveCycleSummary, type DriveCycle } from '../src/data/driveCycles';
 
 export default function ViagensScreen() {
   const [cycles, setCycles] = useState<DriveCycle[]>([]);

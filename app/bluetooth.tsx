@@ -239,6 +239,7 @@ const styles = StyleSheet.create({
   online: { color: '#4ade80', fontSize: 24, fontWeight: '900', marginTop: 3 },
   waiting: { color: '#fbbf24', fontSize: 24, fontWeight: '900', marginTop: 3 },
   detail: { color: '#cbd5e1', fontSize: 11, marginTop: 4 },
+  warning: { color: '#fbbf24', fontSize: 10, fontWeight: '900', marginTop: 5 },
   section: { color: '#7db3ff', fontSize: 10, fontWeight: '900', letterSpacing: 1, marginTop: 7, marginBottom: 7 },
   primary: { backgroundColor: '#2563eb', borderRadius: 11, padding: 14, alignItems: 'center', marginBottom: 9 },
   primaryText: { color: '#fff', fontSize: 11, fontWeight: '900' },

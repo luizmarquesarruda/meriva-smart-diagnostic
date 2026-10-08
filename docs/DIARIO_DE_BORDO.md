@@ -534,3 +534,23 @@ A etapa revisou a documentação oficial relevante de Android Bluetooth, Expo Pe
 
 ### Estado antes da nova CI
 As correções e auditorias de código estão registradas. A nova CI deve ser o árbitro final de TypeScript, suíte completa e Android Release. Não considerar a etapa concluída até os dois jobs obrigatórios terminarem verdes.
+
+## 2026-10-07 — Correção revelada pela CI #926 antes do fechamento
+
+### Falha observada
+A CI #926 (run 37707128150), executada sobre o commit `e9f3b92c719ebbb579f5770a2c95a683749200bc`, confirmou `npm ci` e Expo Doctor **17/17**. O `npm run validate` falhou no TypeScript com quatro erros:
+- `app/bluetooth.tsx(164,66)`: estilo `warning` inexistente;
+- `app/dados.tsx(20,46)`: `AutoTripServiceState` não possui `currentSpeedKmh`;
+- `app/dados.tsx(22,38)` e `(22,64)`: `consumptionKml` pode ser `null`;
+- `app/viagens.tsx(5,32)`: `DriveCycle` importado de módulo que não o exporta.
+
+### Correção
+- adicionado o estilo `warning` em Bluetooth;
+- velocidade da tela Dados passou a vir do `gpsTracker.getState()`;
+- consumo recebeu narrowing explícito para lidar com `null`;
+- `DriveCycle` passou a ser importado de `src/data/driveCycles`, que é a origem do tipo.
+
+Nenhuma dependência foi adicionada nem o contrato Bluetooth/ELM327 foi alterado.
+
+### Estado
+Os quatro erros do #926 foram corrigidos antes do fechamento da nova execução. A próxima CI é obrigatória para confirmar TypeScript, suíte completa e Android Release.

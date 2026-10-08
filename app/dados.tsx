@@ -3,6 +3,7 @@ import { Link } from 'expo-router';
 import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { getAutoSaveState } from '../src/meriva/autosaveManager';
 import { autoTripService } from '../src/trip/autoTripService';
+import { gpsTracker } from '../src/gps';
 import { getLivePidTrend, formatSparkline, getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
 
 export default function DadosScreen() {
@@ -17,9 +18,9 @@ export default function DadosScreen() {
     <Header title="DADOS EM TEMPO REAL" subtitle="PIDs • TELEMETRIA • TENDÊNCIAS" />
     <View style={styles.liveCard}><Text style={styles.liveTitle}>{state.obd.connected ? '● ECU CONECTADA' : '○ ECU AGUARDANDO'}</Text><Text style={styles.liveHint}>{state.obd.protocol ? 'PROTOCOLO ' + state.obd.protocol : 'Conecte o ELM327 para receber PIDs reais.'}</Text></View>
     <View style={styles.grid}>
-      <Metric label="VELOCIDADE" value={trip.currentSpeedKmh.toFixed(0) + ' km/h'} />
+      <Metric label="VELOCIDADE" value={gpsTracker.getState().currentSpeedKmh.toFixed(0) + ' km/h'} />
       <Metric label="DISTÂNCIA" value={trip.distanceKm.toFixed(2) + ' km'} />
-      <Metric label="CONSUMO" value={trip.consumptionKml > 0 ? trip.consumptionKml.toFixed(1) + ' km/L' : 'N/D'} />
+      <Metric label="CONSUMO" value={trip.consumptionKml != null && trip.consumptionKml > 0 ? trip.consumptionKml.toFixed(1) + ' km/L' : 'N/D'} />
       <Metric label="AUTONOMIA" value={state.autonomy.estimatedRangeKm > 0 ? state.autonomy.estimatedRangeKm.toFixed(0) + ' km' : 'N/D'} />
     </View>
     <Text style={styles.section}>CONTEXTO OPERACIONAL</Text>
