@@ -72,6 +72,7 @@ export interface DtcRecord {
   source: DataSource;
   historical: boolean;
   confirmed?: boolean;
+  freezeFrame?: { frame: number; dtc: string | null; rpm: number | null; coolantC: number | null };
 }
 
 export interface ConsumptionReference {
