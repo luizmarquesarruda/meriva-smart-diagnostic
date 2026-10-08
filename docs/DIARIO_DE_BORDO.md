@@ -812,3 +812,47 @@ Corrigir os problemas evidenciados pelo histórico de salvamentos automáticos: 
 
 ### Estado
 Esta entrada foi registrada antes das alterações de código. A CI permanece deliberadamente não executada nesta etapa.
+
+
+### Implementação desta auditoria
+
+#### Alterações efetivamente aplicadas
+- src/meriva/autosaveManager.ts: introduzido fingerprint do estado persistível, ignorando apenas metadata.savedAt; snapshots semanticamente idênticos deixam de gerar nova entrada no TXT. metadata.savedAt agora é preenchido no momento da persistência e fica igual ao envelope.savedAt.
+- src/meriva/autosaveManager.ts: eventos críticos passaram a usar um coalescedor de 500 ms. A API continua retornando Promise<boolean>, preservando a semântica de await forceSaveOnObdEvent(); múltiplas solicitações próximas compartilham o mesmo flush.
+- src/meriva/autosaveState.ts: adicionado lastKnownProtocol, separado de protocol, para distinguir conexão atual de último protocolo conhecido.
+- src/obd/sharedConnection.ts: ao desconectar, protocol atual é limpo, lastKnownProtocol é preservado e a validação ECU (ecuValidatedAt/ecuValidationSource) continua persistida. Ao conectar, o protocolo validado atualiza também lastKnownProtocol.
+- app/laboratorio.tsx: os dois fluxos locais de desconexão adotam a mesma separação de protocolo e preservação de validação ECU.
+- src/meriva/autosaveTxtFormatter.ts: o TXT passa a mostrar Último protocolo conhecido e explicita fonte=REAL ou fonte=SIMULACAO em cada leitura.
+- src/database/dtcManager.ts: criada nextDtcOccurrences(). Leituras repetidas de um DTC ainda ativo não inflacionam occurrences; uma nova contagem só começa depois de o código estar inativo/histórico e voltar a ser detectado.
+- app/laboratorio.tsx: varredura 03/07/0A e leitura 03 passaram a usar a nova semântica de ocorrências.
+- tests/merivaAutosave.test.js: adicionados testes para Saved At, coalescência crítica, deduplicação de snapshot e preservação da ECU/protocolo após desconexão.
+- tests/regression.test.js: adicionada regressão para a semântica de ocorrências DTC.
+
+#### Invariantes preservadas
+- Histórico TXT continua com limite de 200 salvamentos, removendo os mais antigos.
+- Bluetooth Classic/ELM327 permanece inalterado quanto ao transporte.
+- A ECU só é considerada validada após a resposta real exigida pelo fluxo existente (010C/41 0C).
+- Dados de SIMULACAO continuam fora do aprendizado/banco de evidências reais.
+- Nenhuma dependência foi adicionada e package-lock.json não foi alterado.
+
+#### Commits desta implementação
+- 3642b6018315948a467d1a9e388b7f383aff5325 — registrar plano de correção antes do código (diário)
+- 049952c9cfbc46613a82f140a245f1eed3010141 — separar protocolo atual do último conhecido
+- e6bd62eed725a1235a76a4fd80c42d4000048cfe — coalescer/deduplicar autosave
+- 853dcc37b107b44e09c5572799677af013474749 — declarar fingerprint no runtime
+- 24742c8cda29825b9beb05118d99c06a129f0242 — consolidar eventos críticos OBD
+- 06ce75489bcc5e9950fe918f96825b51641ba918 — preservar último protocolo na conexão compartilhada
+- 5275acc3fb847abb5ce8f1f50a54d43bc8bd0819 — alinhar desconexão do laboratório
+- 5bceb865ec99a7cc0e5a4d6e94899fef82d91f1a — corrigir semântica de ocorrências DTC
+- 1f1aea30b4a604ac3b671dc0c701887677870b2e — aplicar semântica DTC no laboratório
+- a7cc63e20253205697d7ecff54749420fe3d0061 — explicitar último protocolo no TXT
+- 338e4bf43a4b6bf4a569c3126bef4c2830047404 — explicitar fonte REAL/SIMULACAO nas leituras
+- 295a7a9990cee1a4c1555664a2015006e4388762 — testes de deduplicação/Saved At/coalescência
+- 505bc0f1cfabbd425d295fd02a3b2ac7d5119688 — teste da semântica de ocorrências DTC
+- c5733ff0f2e30a0188ce3efd790282b06ce69bee — preservar await no coalescedor crítico
+- 36380e7d991bd3807714bb35891018c700786802 — resolver aguardantes do coalescedor
+- 846ef5ee3a0a15a4509e07041694ecd42cc0a6ce — resolver aguardantes em qualquer flush efetivo
+- ed2c1fbe18f13ed2af1961bdbb290e75d3e9692b — teste de persistência da ECU após desconexão
+
+### Validação desta rodada
+Foi feita apenas auditoria por leitura do código e alterações controladas no repositório. CI não foi executada, conforme solicitado. A próxima validação deve verificar TypeScript, suíte completa e Android Release.
