@@ -64,4 +64,11 @@ assert.strictEqual(telemetry.classifyVehicleCondition(new Map([['010D', 20], ['0
 assert.strictEqual(telemetry.classifyVehicleCondition(new Map([['010D', 60], ['010C', 2000]]), 61), 'CRUISE');
 assert.strictEqual(telemetry.classifyVehicleCondition(new Map()), 'UNKNOWN');
 
+telemetry.resetLiveTelemetry();
+const stale = new Date(Date.now() - 30_000).toISOString();
+telemetry.recordLivePidReading({ pid: '010D', name: 'Speed', value: 0, unit: 'km/h', timestamp: stale, source: 'REAL' });
+telemetry.recordLivePidReading({ pid: '010C', name: 'RPM', value: 800, unit: 'rpm', timestamp: stale, source: 'REAL' });
+telemetry.recordLivePidReading({ pid: '0105', name: 'Coolant', value: 85, unit: 'celsius', timestamp: stale, source: 'REAL' });
+assert.strictEqual(telemetry.getVehicleConditionSnapshot().condition, 'UNKNOWN');
+
 console.log('Live telemetry: rolling window + context + simulation isolation: PASS');
