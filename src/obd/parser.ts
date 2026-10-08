@@ -86,9 +86,8 @@ export function parsePidResponse(pidRequested: string, rawResponse: string, posi
     };
   }
 
-  const rawBytes = extractHexBytes(rawResponse);
-
   if (!definition) {
+    const rawBytes = extractHexBytes(rawResponse);
     return {
       pid,
       name: 'PID DESCONHECIDO',
@@ -116,6 +115,7 @@ export function parsePidResponse(pidRequested: string, rawResponse: string, posi
   }
 
   const data = findResponsePayload(rawResponse, pid, definition.bytes, positiveService);
+  const rawBytes = data.slice();
   if (data.length !== definition.bytes) {
     return {
       pid,
