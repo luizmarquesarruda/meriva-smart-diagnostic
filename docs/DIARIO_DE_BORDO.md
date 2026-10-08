@@ -1636,3 +1636,41 @@ A confirmação definitiva exige uma sessão real na Meriva com ELM327, principa
 - Nenhuma dependência nova foi adicionada nesta etapa.
 - CI continua deliberadamente não disparada até concluir a revisão estática.
 
+
+
+## 2026-10-08 — Auditoria de testes, qualidade e estimativa de combustível
+
+### Problema
+A validação encontrou três falhas de teste e, após as primeiras correções, inconsistências adicionais no catálogo de conhecimento. A infraestrutura de testes também mantinha vários carregadores TypeScript duplicados. O estimador de consumo usava AFR 14,7 e densidade fixa sem considerar o caráter flex da Meriva.
+
+### Diagnóstico
+- `tests/dtcScanner.test.js` interceptava `./dtcParser`, mas o código real também importa `./parser`.
+- `tests/bluetoothLifecycle.test.js` procurava uma expressão antiga; o código atual persiste `ecuValidationSource: 'OBD_RESPONSE'`.
+- PID 0101 já tinha fórmula `U32`, mas a unidade `status` não existia no catálogo; por ser bitfield, também não deve exigir faixa escalar.
+- PID 010D usa `km/h`, enquanto o catálogo só possuía o identificador `kmh`.
+- O carregamento de TS estava duplicado em vários testes.
+- O estimador precisava priorizar evidência real do PID 0152, depois configuração manual, sem usar abastecimento ou tanque cheio.
+
+### Correção
+- Criado `tests/helpers/loadTs.js` para transpilar TS, resolver imports relativos e JSON.
+- O script `test` passou para `node --test`, mantendo os 19 arquivos existentes.
+- Corrigidas as asserções e unidades de conhecimento sem alterar a lógica OBD.
+- Adicionado suporte a composição de combustível por percentual do PID 0152, combustível manual ou percentual manual.
+- O fallback permanece explicitamente `ESTIMATED_DEFAULT_GASOLINE_A` e registra o AFR assumido.
+- A gasolina manual brasileira usa a hipótese `ESTIMATED_BRAZIL_GASOLINE_E32`, baseada na regra temporária vigente, com baixa confiança.
+- O deslocamento cúbico do estimador deixou de usar o literal `1598`; o fallback agora vem de `MERIVA_MANUAL.engine.displacementCm3` (1389 cm³).
+- ESLint/Prettier foram adicionados sem aplicar uma reformatação massiva no repositório. O lint verifica qualidade sem transformar estilo em bloqueio; `npm run format` fica disponível para formatação deliberada.
+- A seção operacional de validação da CI foi removida do README e registrada no CHANGELOG.
+
+### Testes
+- `npm ci --no-audit --no-fund`: sucesso.
+- `npm run doctor`: 17/17 checks, sucesso.
+- `npm run validate`: sucesso no commit final desta etapa.
+- Node test runner: 19 arquivos executados, todos passaram.
+- O Android release standalone segue sendo validado pelo job `android-build`.
+
+### Resultado
+A validação final da infraestrutura passou por TypeScript, ESLint e os 19 testes. As advertências de lint existentes permanecem registradas como warnings e não exigiram alteração da lógica do aplicativo.
+
+### Limitações deliberadas
+A composição manual e a densidade/AFR são estimativas. Nenhum caminho depende de abastecimento, tanque cheio ou calibração por litros adicionados. A composição real continua tendo prioridade quando o PID 0152 responder validamente.
