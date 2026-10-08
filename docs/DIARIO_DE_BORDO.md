@@ -1078,3 +1078,7 @@ A correção foi inspecionada diretamente no código e a suíte de regressão fo
 
 ### Estado
 Aguardando resultado da CI. Se houver falha, a causa será registrada e corrigida antes de considerar a auditoria concluída.
+
+
+### 2026-10-08 — Branch de validação da CI
+Para obter uma execução verificável da suíte completa no fluxo de Pull Request, foi criada a branch `audit-deep-ci-2026-10-08` a partir do `main` corrigido. Esta branch não altera a lógica do aplicativo; serve para disparar e observar a CI da auditoria. O objetivo é validar exatamente o estado corrigido antes da consolidação final.
