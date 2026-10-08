@@ -20,20 +20,20 @@ export interface ParsedPidResult {
 
 function normalizeHexStream(rawResponse: string): string {
   const withoutPrompt = rawResponse.replace(/>/g, ' ');
-  const runs = withoutPrompt.match(/(?:[0-9A-F]{2}(?:\\s*)?){2,}/gi) ?? [];
+  const runs = withoutPrompt.match(/(?:[0-9A-F]{2}(?:\s*)?){2,}/gi) ?? [];
   return runs
-    .map((run) => run.replace(/\\s+/g, '').toUpperCase())
+    .map((run) => run.replace(/\s+/g, '').toUpperCase())
     .join('');
 }
 
 function normalizeRawResponse(rawResponse: string): string {
   return rawResponse
     .replace(/>/g, '')
-    .replace(/\\r/g, '\\n')
-    .split(/\\n+/)
+    .replace(/\\r/g, '\n')
+    .split(/\n+/)
     .map((line) => line.trim())
     .filter(Boolean)
-    .join('\\n');
+    .join('\n');
 }
 
 function findResponsePayload(rawResponse: string, pid: string, byteCount: number, positiveService = '41'): number[] {
