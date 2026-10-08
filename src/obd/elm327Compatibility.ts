@@ -88,7 +88,7 @@ export function isNoDataResponse(response: string): boolean {
 
 export function isResponsePendingResponse(response: string): boolean {
   const normalized = normalizeElmResponse(response).toUpperCase();
-  return /(?:^|\n)\s*7F\s*[0-9A-F]{2}\s*78\b/i.test(normalized)
+  return /(?:^|\s)7F\s*[0-9A-F]{2}\s*78\b/i.test(normalized)
     || /RESPONSE PENDING/.test(normalized);
 }
 
