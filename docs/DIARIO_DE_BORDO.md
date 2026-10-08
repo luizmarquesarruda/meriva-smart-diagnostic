@@ -856,3 +856,10 @@ Esta entrada foi registrada antes das alterações de código. A CI permanece de
 
 ### Validação desta rodada
 Foi feita apenas auditoria por leitura do código e alterações controladas no repositório. CI não foi executada, conforme solicitado. A próxima validação deve verificar TypeScript, suíte completa e Android Release.
+
+
+### Correção complementar após auditoria cruzada
+- app/_layout.tsx: o bootstrap de conexão não pode reconstruir state.obd do zero, pois isso apagava a validação ECU e o último protocolo persistidos pelo sharedConnection. O estado agora é mesclado e lastKnownProtocol é preservado.
+- app/index.tsx: mesma correção no cockpit principal; a atualização visual/persistente de conexão agora preserva ECU validada e último protocolo conhecido.
+- Commits: 2ecaee6031720dd291a67a6a0003575a34c2ee03 e 17e88015991e9ecf9856e4944a162f6171283dc3.
+
