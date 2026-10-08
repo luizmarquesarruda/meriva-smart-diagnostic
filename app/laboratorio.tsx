@@ -348,18 +348,18 @@ export default function LaboratorioScreen() {
       }
       if (!activeSession) throw new Error('CONECTE AO ELM327 ANTES DA VARREDURA DTC');
 
-      const results = mode === 'REAL'
+      const scanBundle = mode === 'REAL'
         ? await autoTripService.withPollingPaused(() =>
-            activeSession.withExclusiveCommandQueue((executeCommand) =>
-              scanDtcServices(activeSession, executeCommand),
-            ),
+            activeSession.withExclusiveCommandQueue(async (executeCommand) => {
+              const results = await scanDtcServices(activeSession, executeCommand);
+              const freezeFrame = await readFreezeFrame(activeSession, executeCommand);
+              return { results, freezeFrame };
+            }),
           )
-        : await scanDtcServices(activeSession);
+        : { results: await scanDtcServices(activeSession), freezeFrame: null };
+      const { results, freezeFrame } = scanBundle;
       setDtcScan(results);
       const stored = results.find((item) => item.kind === 'STORED');
-      const freezeFrame = mode === 'REAL'
-        ? await autoTripService.withPollingPaused(() => readFreezeFrame(activeSession))
-        : null;
       setDtcCodes(stored?.codes ?? []);
 
       if (mode === 'REAL') {
