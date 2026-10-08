@@ -1159,3 +1159,10 @@ O teste passou a procurar `StorageAccessFramework` apenas em `backup.ts` e `app/
 Alterar o teste para inspecionar explicitamente os módulos de exportação que usam o Storage Access Framework. Nenhuma alteração de produção é necessária.
 
 **Não considerar a auditoria concluída.** Nova CI obrigatória.
+
+
+### Correção após CI #1051
+- `2e5de7369435dbe86347bc10e6ba697cb215a535` — teste de permissões corrigido para verificar SAF nos módulos de exportação reais.
+
+### Próximo passo
+Nova execução da CI completa. O código de produção permanece sem alteração nesta etapa.
