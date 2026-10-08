@@ -277,7 +277,7 @@ export default function LaboratorioScreen() {
     setStatus(mode === 'SIMULACAO' ? 'SIMULAÇÃO LOCAL: CONSULTANDO' : 'ECU CONSULTANDO');
     try {
       const activeSession = mode === 'SIMULACAO' ? simulationSession : sessionRef.current;
-      if (mode === 'REAL' && !canPollObd(getSharedObdStatus().lifecycle)) {
+      if (mode === 'REAL' && !canPollObd(getSharedObdStatus().lifecycle, getSharedObdStatus().ecuResponseState)) {
         throw new Error('DIAGNÓSTICO AINDA NÃO ESTÁ PRONTO. AGUARDE BLUETOOTH, ELM327 E ECU.');
       }
       if (!activeSession) throw new Error('CONECTE AO ELM327 ANTES DE TESTAR O PID');
@@ -309,7 +309,7 @@ export default function LaboratorioScreen() {
     setStatus(mode === 'SIMULACAO' ? 'SIMULAÇÃO LOCAL: DESCOBRINDO PIDs' : 'ECU: DESCOBRINDO PIDs');
     try {
       const activeSession = mode === 'SIMULACAO' ? simulationSession : sessionRef.current;
-      if (mode === 'REAL' && !canPollObd(getSharedObdStatus().lifecycle)) {
+      if (mode === 'REAL' && !canPollObd(getSharedObdStatus().lifecycle, getSharedObdStatus().ecuResponseState)) {
         throw new Error('DIAGNÓSTICO AINDA NÃO ESTÁ PRONTO. AGUARDE BLUETOOTH, ELM327 E ECU.');
       }
       if (!activeSession) throw new Error('CONECTE AO ELM327 ANTES DE DESCOBRIR PIDs');
@@ -343,7 +343,7 @@ export default function LaboratorioScreen() {
     setStatus(mode === 'SIMULACAO' ? 'SIMULAÇÃO LOCAL: VARREDURA DTC 03/07/0A' : 'ECU: VARREDURA DTC 03/07/0A');
     try {
       const activeSession = mode === 'SIMULACAO' ? simulationSession : sessionRef.current;
-      if (mode === 'REAL' && !canPollObd(getSharedObdStatus().lifecycle)) {
+      if (mode === 'REAL' && !canPollObd(getSharedObdStatus().lifecycle, getSharedObdStatus().ecuResponseState)) {
         throw new Error('DIAGNÓSTICO AINDA NÃO ESTÁ PRONTO. AGUARDE BLUETOOTH, ELM327 E ECU.');
       }
       if (!activeSession) throw new Error('CONECTE AO ELM327 ANTES DA VARREDURA DTC');
@@ -450,7 +450,7 @@ export default function LaboratorioScreen() {
     setStatus(mode === 'SIMULACAO' ? 'SIMULAÇÃO LOCAL: LENDO DTC' : 'ECU: LENDO DTC');
     try {
       const activeSession = mode === 'SIMULACAO' ? simulationSession : sessionRef.current;
-      if (mode === 'REAL' && !canPollObd(getSharedObdStatus().lifecycle)) {
+      if (mode === 'REAL' && !canPollObd(getSharedObdStatus().lifecycle, getSharedObdStatus().ecuResponseState)) {
         throw new Error('DIAGNÓSTICO AINDA NÃO ESTÁ PRONTO. AGUARDE BLUETOOTH, ELM327 E ECU.');
       }
       if (!activeSession) throw new Error('CONECTE AO ELM327 ANTES DE LER DTC');
