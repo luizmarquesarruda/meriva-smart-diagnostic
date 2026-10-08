@@ -31,7 +31,7 @@ assert(shared.includes('startBluetoothMonitor'));
 assert(shared.includes('preferredAddress'));
 assert(shared.includes('selectedAdapterAddress: connection.device.address.toUpperCase()'));
 assert(shared.includes('ecuValidatedAt: validatedAt'));
-assert(shared.includes("ecuValidationSource: state.vehicle?.ecuAddress ? 'VEHICLE_PROFILE' : 'OBD_RESPONSE'"));
+assert(shared.includes("ecuValidationSource: 'OBD_RESPONSE'"));
 assert(rootLayout.includes('connectPreferredElm(settings.selectedAdapterAddress)'));
 assert(rootLayout.includes('Bluetooth necessário para diagnóstico do veículo.'));
 assert(bluetoothScreen.includes('ATIVAR BLUETOOTH'));
@@ -59,3 +59,7 @@ assert(orderedStates.every((value, index) => value >= 0 && (index === 0 || value
 const ecuGate = shared.indexOf("if (!connection.ecuValidated)");
 const activeAssignment = shared.indexOf('    active = {', ecuGate);
 assert(ecuGate >= 0 && activeAssignment > ecuGate, 'active não pode existir antes da validação da ECU');
+
+const simulatedTransport = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'simulatedTransport.ts'), 'utf8');
+assert(simulatedTransport.includes("this.pendingResponse = this.responseFor(command) + '\\r>'"));
+assert(simulatedTransport.includes('chunkSize'));

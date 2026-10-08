@@ -166,7 +166,8 @@ export default function IndexScreen() {
 
   const summary = useMemo(() => getDriveCycleSummary(cycles), [cycles]);
   const realConsumptionKml = summary.avgConsumptionKml > 0 ? summary.avgConsumptionKml : null;
-  const availableConsumptionKml = tripState.averageConsumptionKml > 0 ? tripState.averageConsumptionKml : realConsumptionKml;
+  const historicalConsumptionKml = realConsumptionKml ?? (tripState.averageConsumptionKml > 0 ? tripState.averageConsumptionKml : null);
+  const historicalConsumptionSource = realConsumptionKml != null ? 'REAL_OBD' : tripState.averageConsumptionKml > 0 ? 'CARSCANNER_BASELINE' : 'SEM DADOS';
   const distanceUnit = settings?.distanceUnit ?? 'KM';
 
   return (
@@ -186,13 +187,19 @@ export default function IndexScreen() {
             </View>
             <View style={styles.connectionPill}><View style={[styles.dot, connectionStatus.ecuConnected ? styles.dotOk : bluetoothError ? styles.dotDanger : styles.dotWarn]} /><Text style={styles.connectionText}>{connectionStatus.ecuResponseState === 'NO_RESPONSE' ? 'ECU SEM RESPOSTA' : connectionStatus.ecuResponseState === 'RECOVERING' ? 'RECUPERANDO' : connectionStatus.ecuConnected ? 'ECU' : connectionStatus.bluetoothConnected ? 'BLUETOOTH' : bluetoothSearching ? 'CONECTANDO' : 'OFFLINE'}</Text></View>
           </View>
+          <View style={styles.healthCard}>
+            <Text style={styles.sectionTitle}>CONSUMO — FONTES SEPARADAS</Text>
+            <Text style={styles.sectionHint}>Instantâneo: {tripState.instantaneousConsumptionKml != null ? tripState.instantaneousConsumptionKml.toFixed(2) + ' km/L' : 'SEM DADOS'} • {tripState.instantaneousConsumptionSource}</Text>
+            <Text style={styles.sectionHint}>Viagem atual: {tripState.consumptionKml != null ? tripState.consumptionKml.toFixed(2) + ' km/L' : 'SEM DADOS'} • {tripState.tripConsumptionSource}</Text>
+            <Text style={styles.sectionHint}>Média histórica: {historicalConsumptionKml != null ? historicalConsumptionKml.toFixed(2) + ' km/L' : 'SEM DADOS'} • {historicalConsumptionSource}</Text>
+          </View>
           <View style={styles.heroCard}>
             <Text style={styles.heroEyebrow}>{connectionStatus.ecuResponseState === 'NO_RESPONSE' ? 'ADAPTADOR OK • ECU SEM RESPOSTA' : connectionStatus.ecuResponseState === 'RECOVERING' ? 'RECUPERANDO PROTOCOLO ECU' : connectionStatus.ecuConnected ? 'MOTOR • ECU CONECTADA' : 'ESTADO DO VEÍCULO'}</Text>
             <Text style={styles.heroValue}>{connectionStatus.ecuConnected && getAutoSaveState().lastReadings.find((item) => /rpm/i.test(item.name) && item.value != null) ? (Math.round(getAutoSaveState().lastReadings.find((item) => /rpm/i.test(item.name) && item.value != null)?.value ?? 0) + ' RPM') : getAutoSaveState().autonomy.estimatedRangeKm > 0 ? (getAutoSaveState().autonomy.estimatedRangeKm.toFixed(0) + ' km') : 'PRONTO'}</Text>
             <Text style={styles.heroState}>{connectionStatus.ecuResponseState === 'NO_RESPONSE' ? 'POLLING PAUSADO • RECUPERAÇÃO AUTOMÁTICA' : connectionStatus.ecuResponseState === 'RECOVERING' ? 'REINICIALIZANDO PROTOCOLO' : connectionStatus.ecuConnected ? 'DADOS OBD EM TEMPO REAL' : 'CONECTE O ELM327 PARA INICIAR'}</Text>
             <View style={styles.metricRow}>
               <CockpitMetric label="VELOCIDADE" value={gpsState.currentSpeedKmh.toFixed(0) + ' km/h'} />
-              <CockpitMetric label="CONSUMO" value={availableConsumptionKml != null ? availableConsumptionKml.toFixed(1) + ' km/L' : 'N/D'} />
+              <CockpitMetric label="CONSUMO" value={historicalConsumptionKml != null ? historicalConsumptionKml.toFixed(1) + ' km/L' : 'N/D'} />
               <CockpitMetric label="AUTONOMIA" value={getAutoSaveState().autonomy.estimatedRangeKm > 0 ? getAutoSaveState().autonomy.estimatedRangeKm.toFixed(0) + ' km' : 'N/D'} />
             </View>
           </View>

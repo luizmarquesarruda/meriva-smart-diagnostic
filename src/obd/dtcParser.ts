@@ -2,6 +2,18 @@ function normalizeHexStream(rawResponse: string): string {
   return rawResponse.replace(/[^0-9A-F]/gi, '').toUpperCase();
 }
 
+export function isValidDtcResponse(
+  service: '03' | '07' | '0A',
+  rawResponse: string,
+): boolean {
+  const stream = normalizeHexStream(rawResponse);
+  const serviceNumber = Number.parseInt(service, 16);
+  const positiveHeader = (0x40 + serviceNumber).toString(16).padStart(2, '0').toUpperCase();
+  const headerIndex = stream.indexOf(positiveHeader);
+  if (headerIndex < 0) return false;
+  return stream.slice(headerIndex + positiveHeader.length).length >= 4;
+}
+
 export function parseDtcResponseForService(
   service: '03' | '07' | '0A',
   rawResponse: string,

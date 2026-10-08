@@ -33,6 +33,19 @@ const MIN_MOVEMENT_DISTANCE_M = 8;
 const STOP_SPEED_KMH = 2;
 const MIN_MOVING_SAMPLES = 3;
 const MAX_SEGMENT_GAP_MS = 5_000;
+const STATIONARY_POWER_SAVE_MS = 2 * 60_000;
+const NORMAL_LOCATION_OPTIONS = {
+  accuracy: Location.Accuracy.BestForNavigation,
+  timeInterval: 1000,
+  distanceInterval: 1,
+  pausesUpdatesAutomatically: false,
+};
+const POWER_SAVE_LOCATION_OPTIONS = {
+  accuracy: Location.Accuracy.Balanced,
+  timeInterval: 10_000,
+  distanceInterval: 10,
+  pausesUpdatesAutomatically: false,
+};
 
 function movementThresholdM(sample: GpsSample, previous: GpsSample): number {
   const accuracies = [sample.accuracyM, previous.accuracyM].filter(
@@ -87,6 +100,9 @@ export class GpsTracker {
   private consecutiveMovingSamples = 0;
   private pendingMovingDistanceKm = 0;
   private vehicleSpeedHintKmh: number | null = null;
+  private stationarySinceMs: number | null = null;
+  private powerSaveEnabled = false;
+  private reconfigurePromise: Promise<void> | null = null;
 
   private state: GpsTripState = {
     running: false,
@@ -152,10 +168,7 @@ export class GpsTracker {
       const alreadyStarted = await Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK_NAME);
       if (!alreadyStarted) {
         await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK_NAME, {
-          accuracy: Location.Accuracy.BestForNavigation,
-          timeInterval: 1000,
-          distanceInterval: 1,
-          pausesUpdatesAutomatically: false,
+          ...NORMAL_LOCATION_OPTIONS,
           foregroundService: {
             notificationTitle: 'MERIVA SMART — Diagnóstico OBD',
             notificationBody: 'Monitoramento OBD e GPS ativo em segundo plano.',
@@ -189,6 +202,8 @@ export class GpsTracker {
       console.warn('[gps] falha ao parar localização em segundo plano:', cause instanceof Error ? cause.message : cause);
     } finally {
       this.backgroundTaskRunning = false;
+      this.powerSaveEnabled = false;
+      this.stationarySinceMs = null;
     }
   }
 
@@ -201,6 +216,62 @@ export class GpsTracker {
       speedKmh != null && Number.isFinite(speedKmh) && speedKmh >= 0 && speedKmh <= MAX_SPEED_KMH
         ? speedKmh
         : null;
+
+    const now = Date.now();
+    const stationary = this.vehicleSpeedHintKmh != null && this.vehicleSpeedHintKmh <= STOP_SPEED_KMH;
+    if (!stationary) {
+      this.stationarySinceMs = null;
+      if (this.powerSaveEnabled) void this.setPowerSaveMode(false);
+      return;
+    }
+
+    this.stationarySinceMs ??= now;
+    if (now - this.stationarySinceMs >= STATIONARY_POWER_SAVE_MS && !this.powerSaveEnabled) {
+      void this.setPowerSaveMode(true);
+    }
+  }
+
+  private async setPowerSaveMode(enabled: boolean): Promise<void> {
+    if (this.reconfigurePromise) return this.reconfigurePromise;
+    if (enabled === this.powerSaveEnabled) return;
+
+    this.reconfigurePromise = (async () => {
+      const started = await Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK_NAME);
+      if (!started) {
+        this.powerSaveEnabled = enabled;
+        return;
+      }
+
+      // Expo Location não oferece atualização parcial das opções; reiniciar a
+      // task é a forma determinística de alterar a cadência.
+      await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK_NAME);
+      await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK_NAME, {
+        ...(enabled ? POWER_SAVE_LOCATION_OPTIONS : NORMAL_LOCATION_OPTIONS),
+        foregroundService: {
+          notificationTitle: 'MERIVA SMART — Diagnóstico OBD',
+          notificationBody: enabled
+            ? 'Diagnóstico OBD ativo; GPS em modo econômico enquanto o veículo está parado.'
+            : 'Monitoramento OBD e GPS ativo em segundo plano.',
+          notificationColor: '#1557a6',
+        },
+      });
+      this.powerSaveEnabled = enabled;
+      this.state = {
+        ...this.state,
+        error: null,
+      };
+      this.emit();
+    })().catch((cause) => {
+      this.state = {
+        ...this.state,
+        error: cause instanceof Error ? cause.message : 'FALHA AO AJUSTAR ECONOMIA DO GPS.',
+      };
+      this.emit();
+    }).finally(() => {
+      this.reconfigurePromise = null;
+    });
+
+    return this.reconfigurePromise;
   }
 
   private getSignalQuality(accuracyM: number | null): GpsTripState['signalQuality'] {

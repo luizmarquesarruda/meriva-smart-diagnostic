@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,14 +12,28 @@ import { getDtcDefinition } from '../src/obd/dtcDefinition';
 export default function SaudeScreen() {
   const layout = useMidLayout();
   const [state,setState]=useState(getAutoSaveState());
-  useEffect(()=>{const t=setInterval(()=>setState(getAutoSaveState()),1000);return()=>clearInterval(t)},[]);
+  useEffect(()=>{const t=setInterval(()=>setState(getAutoSaveState()),5000);return()=>clearInterval(t)},[]);
   const context = getVehicleConditionSnapshot();
-  const activeDtcs = state.dtcs.filter((item) => ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(item.status));
-  const diagnostic: DiagnosticResult = useMemo(()=>runLocalDiagnostic({observations:state.lastReadings.map(r=>({pid:r.pid,name:r.name,value:r.value,unit:r.unit,source:r.source==='SIMULACAO'?'SIMULACAO':'REAL_OBD',timestamp:r.timestamp,confidence:r.source==='SIMULACAO'?'LOW':'GOOD'} as PidObservation)),dtcs:state.dtcs,condition:context.condition}),[state,context.condition]);
-  const normal=diagnostic.hypotheses.length===0 && activeDtcs.length===0;
+  const activeDtcs = state.dtcs.filter((item) => item.source === 'REAL_OBD' && ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(item.status));
+  const [diagnostic, setDiagnostic] = useState<DiagnosticResult>(() => runLocalDiagnostic({observations:state.lastReadings.map(r=>({pid:r.pid,name:r.name,value:r.value,unit:r.unit,source:r.source==='REAL'?'REAL_OBD':'SIMULACAO',timestamp:r.timestamp,confidence:r.source==='SIMULACAO'?'LOW':'GOOD',status:r.status} as PidObservation)),dtcs:state.dtcs,condition:context.condition}));
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const current = getAutoSaveState();
+      const vehicle = getVehicleConditionSnapshot();
+      setDiagnostic(runLocalDiagnostic({
+        observations: current.lastReadings.map(r=>({pid:r.pid,name:r.name,value:r.value,unit:r.unit,source:r.source==='REAL'?'REAL_OBD':'SIMULACAO',timestamp:r.timestamp,confidence:r.source==='SIMULACAO'?'LOW':'GOOD',status:r.status} as PidObservation)),
+        dtcs: current.dtcs,
+        condition: vehicle.condition,
+      }));
+    }, 5000);
+    return () => clearInterval(timer);
+  }, []);
+  const hasLiveEvidence = state.obd.connected && Boolean(state.obd.ecuValidatedAt) && diagnostic.acceptedLiveSamples > 0;
+  const normal = hasLiveEvidence && diagnostic.hypotheses.length === 0 && activeDtcs.length === 0;
+  const healthTitle = normal ? '● SEM ANOMALIA INDICADA' : activeDtcs.length || diagnostic.hypotheses.length ? '● ATENÇÃO NECESSÁRIA' : '● EVIDÊNCIA INSUFICIENTE';
   return <SafeAreaView style={styles.container} edges={["top","bottom","left","right"]}><ScrollView contentContainerStyle={[styles.content,{paddingHorizontal:layout.horizontalPadding}]} showsHorizontalScrollIndicator={false}><View style={[styles.screenFrame,{maxWidth:layout.maxContentWidth}]}>
     <View style={styles.header}><Text style={styles.title}>CENTRAL DE SAÚDE</Text><Text style={styles.subtitle}>EVIDÊNCIAS • DTC • HIPÓTESES</Text></View>
-    <View style={[styles.health, normal ? styles.healthOk : styles.healthWarn]}><Text style={normal ? styles.bigOk : styles.bigWarn}>{normal ? '● SISTEMA NORMAL' : '● ATENÇÃO NECESSÁRIA'}</Text><Text style={styles.hint}>{activeDtcs.length ? activeDtcs.length + ' DTC ativo(s).' : (state.dtcs.length ? state.dtcs.length + ' registro(s) histórico(s), sem DTC ativo.' : 'Nenhum DTC registrado.')}</Text></View>
+    <View style={[styles.health, normal ? styles.healthOk : styles.healthWarn]}><Text style={normal ? styles.bigOk : styles.bigWarn}>{healthTitle}</Text><Text style={styles.hint}>{!hasLiveEvidence ? 'Sem leitura REAL_OBD recente e validada; não é possível declarar o sistema normal.' : activeDtcs.length ? activeDtcs.length + ' DTC ativo(s) recebido(s) da ECU.' : state.dtcs.length ? state.dtcs.length + ' registro(s) histórico(s), sem DTC ativo.' : 'Sem DTC ativo nas evidências disponíveis.'}{'\n'}Motor de evidências: {diagnostic.acceptedLiveSamples} amostras aceitas · {diagnostic.blockedStaleSamples} antigas · {diagnostic.blockedInvalidSamples} inválidas · {diagnostic.blockedIncoherentSnapshots} snapshots incoerentes · {diagnostic.pendingTemporalRules} regras aguardando persistência.</Text></View>
     <Text style={styles.section}>CONEXÃO</Text>
     <View style={[styles.infoGrid, layout.landscape && styles.infoGridLandscape]}>
       <View style={[styles.row, layout.landscape && styles.gridRow]}><Text style={styles.name}>Bluetooth</Text><Text style={state.obd.connected?styles.ok:styles.muted}>{state.obd.connected?'CONECTADO':'AGUARDANDO'}</Text></View>
@@ -33,7 +47,7 @@ export default function SaudeScreen() {
     <Text style={styles.section}>FALHAS</Text>
     {!activeDtcs.length?<View style={styles.empty}><Text style={styles.emptyText}>{state.dtcs.length ? 'Nenhum DTC ativo. Há apenas histórico registrado.' : 'Nenhum DTC armazenado.'}</Text></View>:activeDtcs.map(d=>{const definition=getDtcDefinition(d.code);return <View key={d.code} style={styles.row}><View style={{flex:1}}><Text style={styles.name}>{d.code} • {definition?.name ?? 'Descrição não catalogada localmente'}</Text><Text style={styles.detail}>{definition?.description ?? 'Código recebido da ECU sem descrição local detalhada.'}</Text><Text style={styles.detail}>{d.status} • {d.occurrences} ocorrência(s) • fonte {d.source}</Text></View><Text style={styles.warn}>ATENÇÃO</Text></View>})}
     <Text style={styles.section}>HIPÓTESES LOCAIS</Text>
-    {!diagnostic.hypotheses.length?<View style={styles.empty}><Text style={styles.emptyText}>Ainda não há evidência suficiente para gerar hipótese.</Text></View>:diagnostic.hypotheses.map(h=><View key={h.id} style={styles.hyp}><View style={styles.rowHead}><Text style={styles.name}>{h.label}</Text><Text style={styles.score}>{Math.round(h.score*100)}%</Text></View><Text style={styles.detail}>CONFIANÇA: {h.confidence}</Text>{h.evidence.map((e,i)=><Text key={i} style={styles.evidence}>• {e.text}</Text>)}<Text style={styles.next}>PRÓXIMOS TESTES: {h.nextTests.join(' • ')}</Text></View>)}
+    {!diagnostic.hypotheses.length?<View style={styles.empty}><Text style={styles.emptyText}>Ainda não há evidência suficiente para gerar hipótese.</Text></View>:diagnostic.hypotheses.map(h=><View key={h.id} style={styles.hyp}><View style={styles.rowHead}><Text style={styles.name}>{h.label}</Text><Text style={styles.score}>SCORE {Math.round(h.score*100)}/100</Text></View><Text style={styles.detail}>CONFIANÇA: {h.confidence}</Text>{h.evidence.map((e,i)=><Text key={i} style={styles.evidence}>• {e.text}</Text>)}<Text style={styles.next}>PRÓXIMOS TESTES: {h.nextTests.join(' • ')}</Text></View>)}
     <Text style={styles.disclaimer}>{diagnostic.disclaimer}</Text>
     <Link href="/laboratorio" asChild><TouchableOpacity style={styles.primary}><Text style={styles.primaryText}>🔧 EXECUTAR NOVO DIAGNÓSTICO</Text></TouchableOpacity></Link>
     <Link href="/" asChild><TouchableOpacity style={styles.back}><Text style={styles.backText}>← VOLTAR AO COCKPIT</Text></TouchableOpacity></Link>

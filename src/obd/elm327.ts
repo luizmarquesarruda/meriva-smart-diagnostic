@@ -17,6 +17,7 @@ export interface ObdTransport {
   close(): Promise<void>;
   write(data: string): Promise<void>;
   readUntilPrompt(timeoutMs?: number): Promise<string>;
+  clearInputBuffer?(): void;
 }
 
 export type ElmCommandStatus = 'OK' | 'TIMEOUT' | 'ERROR' | 'NO_RESPONSE' | 'UNSUPPORTED';
@@ -39,10 +40,19 @@ export interface PidQueryResult {
   parsed: ReturnType<typeof parsePidResponse>;
 }
 
-function classifyResponse(response: string): ElmCommandStatus {
+function classifyResponse(response: string, command?: string): ElmCommandStatus {
   const normalized = normalizeElmResponse(response).toUpperCase();
   if (!normalized) return 'NO_RESPONSE';
   if (isUnsupportedAtResponse(normalized)) return 'UNSUPPORTED';
+
+  // For a Mode 01 PID request, accept a matching positive ECU frame even if
+  // the adapter also emitted stale/noisy text such as "NO DATA".
+  const requestedPid = command?.match(/^01([0-9A-F]{2})$/);
+  if (requestedPid) {
+    const compactHex = normalized.replace(/[^0-9A-F]/g, '');
+    if (compactHex.includes(`41${requestedPid[1]}`)) return 'OK';
+  }
+
   if (/\b(NO DATA|UNABLE TO CONNECT|BUS INIT|BUS ERROR|STOPPED|ERROR)\b/.test(normalized)) {
     return 'ERROR';
   }
@@ -217,7 +227,10 @@ export class Elm327Session {
 
   /** Reinicializa o ELM e renegocia o protocolo sem destruir o transporte Bluetooth. */
   async recoverProtocol(): Promise<boolean> {
-    if (!this.opened) return false;
+    return this.enqueueCommand(async () => {
+      if (!this.opened) return false;
+      const transportWithBuffer = this.transport as ObdTransport & { clearInputBuffer?: () => void };
+      transportWithBuffer.clearInputBuffer?.();
     const protocol = (this.protocol ?? '').toUpperCase();
     const preferred = /KWP|14230/.test(protocol) ? 'ATSP5' : 'ATSP0';
     const reset = await this.command('ATZ');
@@ -230,8 +243,13 @@ export class Elm327Session {
     this.noDataCount = 0;
     this.consecutiveFailures = 0;
     this.lastSuccessfulResponseAt = new Date().toISOString();
-    await this.identifyProtocol();
-    return true;
+    const protocolResult = await this.command('ATDP');
+    if (protocolResult.status === 'OK') {
+      this.protocol = normalizeElmResponse(protocolResult.response) || this.protocol;
+    }
+      transportWithBuffer.clearInputBuffer?.();
+      return true;
+    });
   }
 
   /** KWP2000 TesterPresent (3E 00) para manter a sessão diagnóstica viva. */
@@ -260,6 +278,23 @@ export class Elm327Session {
     await this.initialize();
     const normalized = normalizeCommand(command);
     return this.enqueueCommand(() => this.command(normalized));
+  }
+
+  /**
+   * Executa uma transação exclusiva sobre a fila do ELM327.
+   *
+   * O callback recebe um executor interno que NÃO volta a enfileirar a
+   * operação. Assim, uma transação pode enviar vários comandos consecutivos
+   * sem deadlock, enquanto nenhum outro comando entra no transporte entre eles.
+   */
+  async withExclusiveCommandQueue<T>(
+    operation: (executeCommand: (command: string) => Promise<ElmCommandResult>) => Promise<T>,
+  ): Promise<T> {
+    await this.initialize();
+    return this.enqueueCommand(() => operation(async (command) => {
+      const normalized = normalizeCommand(command);
+      return this.command(normalized);
+    }));
   }
 
   async close(): Promise<void> {
@@ -314,7 +349,7 @@ export class Elm327Session {
         : (this.config.adaptiveTiming ? this.adaptiveTimeoutMs : this.config.ioTimeoutMs);
       const response = await this.transport.readUntilPrompt(timeout);
       const normalizedResponse = normalizeElmResponse(response);
-      const status = classifyResponse(normalizedResponse);
+      const status = classifyResponse(normalizedResponse, command);
       const errorType = classifyElmError(normalizedResponse);
       this.commands += 1;
       this.totalResponseMs += Date.now() - started;

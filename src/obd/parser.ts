@@ -19,11 +19,25 @@ export interface ParsedPidResult {
 }
 
 function normalizeHexStream(rawResponse: string): string {
-  return rawResponse.replace(/[^0-9A-F]/gi, '').toUpperCase();
+  const withoutPrompt = rawResponse.replace(/>/g, ' ');
+  const runs = withoutPrompt.match(/(?:[0-9A-F]{2}(?:\s*)?){2,}/gi) ?? [];
+  return runs
+    .map((run) => run.replace(/\s+/g, '').toUpperCase())
+    .join('');
+}
+
+function normalizeRawResponse(rawResponse: string): string {
+  return rawResponse
+    .replace(/>/g, '')
+    .replace(/\\r/g, '\n')
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join('\n');
 }
 
 function findResponsePayload(rawResponse: string, pid: string, byteCount: number, positiveService = '41'): number[] {
-  const stream = normalizeHexStream(rawResponse);
+  const stream = normalizeHexStream(normalizeRawResponse(rawResponse));
   const marker = `${positiveService}${pid.slice(-2)}`;
   const markerIndex = stream.indexOf(marker);
   if (markerIndex < 0) return [];
@@ -46,8 +60,14 @@ export function extractHexBytes(rawResponse: string): number[] {
 }
 
 export function validateOBDResponse(response: string, positiveService = '41'): boolean {
-  if (!response.trim() || /NO DATA|UNABLE TO CONNECT|ERROR|BUS ERROR/i.test(response)) return false;
-  return new RegExp(positiveService + '[0-9A-F]{2}', 'i').test(normalizeHexStream(response));
+  const normalized = normalizeRawResponse(response);
+  if (!normalized) return false;
+
+  // ELM clones may emit diagnostic noise (e.g. "NO DATA") before a valid
+  // positive frame. A positive OBD frame is stronger evidence than that noise.
+  // Callers parsing a specific PID must still verify that the frame matches it.
+  return new RegExp(positiveService + '[0-9A-F]{2}', 'i')
+    .test(normalizeHexStream(normalized));
 }
 
 export function parsePidResponse(pidRequested: string, rawResponse: string, positiveService = '41'): ParsedPidResult {
@@ -55,7 +75,12 @@ export function parsePidResponse(pidRequested: string, rawResponse: string, posi
 
   const definition = getPidDefinition(pid);
 
-  if (!rawResponse.trim() || /NO DATA|UNABLE TO CONNECT|ERROR|BUS INIT|BUS ERROR/i.test(rawResponse)) {
+  const normalizedResponse = normalizeRawResponse(rawResponse);
+  const responseStream = normalizeHexStream(normalizedResponse);
+  const requestedFrameMarker = `${positiveService}${pid.slice(-2)}`;
+  const hasPositiveFrame = validateOBDResponse(normalizedResponse, positiveService)
+    && responseStream.includes(requestedFrameMarker);
+  if (!normalizedResponse || (!hasPositiveFrame && /NO DATA|UNABLE TO CONNECT|ERROR|BUS INIT|BUS ERROR/i.test(normalizedResponse))) {
     return {
       pid,
       name: definition?.name ?? `PID ${pid}`,
@@ -69,29 +94,30 @@ export function parsePidResponse(pidRequested: string, rawResponse: string, posi
     };
   }
 
-  const rawBytes = extractHexBytes(rawResponse);
+  const extractedRawBytes = extractHexBytes(rawResponse);
 
   if (!definition) {
+    const rawBytes = extractHexBytes(rawResponse);
     return {
       pid,
       name: 'PID DESCONHECIDO',
       value: null,
       unit: 'SEM DADOS',
       rawResponse,
-      rawBytes,
+      rawBytes: extractedRawBytes,
       status: 'VALOR NÃO INTERPRETADO',
       errorMessage: 'PID não está no banco de definições',
     };
   }
 
-  if (!validateOBDResponse(rawResponse, positiveService)) {
+  if (!hasPositiveFrame) {
     return {
       pid,
       name: definition.name,
       value: null,
       unit: definition.unit,
       rawResponse,
-      rawBytes,
+      rawBytes: extractedRawBytes,
       status: 'VALOR NÃO INTERPRETADO',
       errorMessage: 'Resposta não contém resposta OBD positiva',
       definition,
@@ -99,6 +125,7 @@ export function parsePidResponse(pidRequested: string, rawResponse: string, posi
   }
 
   const data = findResponsePayload(rawResponse, pid, definition.bytes, positiveService);
+  const rawBytes = data.slice();
   if (data.length !== definition.bytes) {
     return {
       pid,

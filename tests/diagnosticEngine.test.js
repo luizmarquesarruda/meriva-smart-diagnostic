@@ -3,50 +3,43 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
-const ts = require('typescript');
-
+const { loadTs } = require('./helpers/loadTs');
 const ROOT = path.resolve(__dirname, '..');
 const DIAGNOSTIC_RULES_PATH = path.join(ROOT, 'src/knowledge/diagnostic_rules.json');
 
-function loadTs(tsPath) {
-  const source = fs.readFileSync(tsPath, 'utf8');
-  const output = ts.transpileModule(source, {
-    compilerOptions: {
-      module: ts.ModuleKind.CommonJS,
-      target: ts.ScriptTarget.ES2019,
-      esModuleInterop: true,
-      resolveJsonModule: true,
-    },
-  }).outputText;
-
-  const mod = {
-    exports: {},
-    filename: tsPath,
-    paths: require('module')._nodeModulePaths(path.dirname(tsPath)),
-  };
-
-  const localRequire = (request) => {
-    if (request.endsWith('diagnostic_rules.json')) {
-      return require(DIAGNOSTIC_RULES_PATH);
-    }
-    return require(require.resolve(request, { paths: [path.dirname(tsPath)] }));
-  };
-
-  const compiledModule = new Function('exports', 'require', 'module', '__filename', '__dirname', output);
-  compiledModule(mod.exports, localRequire, mod, tsPath, path.dirname(tsPath));
-  return mod.exports;
+function obs(pid, value, source = 'REAL_OBD') {
+  return { pid, name: pid, value, unit: 'N/D', source, timestamp: new Date().toISOString(), confidence: 'HIGH', status: 'RESPONDEU' };
 }
 
-function obs(pid, value, source = 'REAL_OBD') {
-  return { pid, name: pid, value, unit: 'N/D', source, timestamp: new Date().toISOString(), confidence: 'HIGH' };
+function obsAt(pid, value, timestamp, source = 'REAL_OBD', status = 'RESPONDEU') {
+  return { pid, name: pid, value, unit: 'N/D', source, timestamp: new Date(timestamp).toISOString(), confidence: 'HIGH', status };
+}
+
+function runPersistent(engine, condition, values) {
+  engine.resetDiagnosticTemporalState();
+  let result;
+  const now = Date.now();
+  for (let i = 0; i < 10; i++) {
+    const timestamp = now - (9 - i) * 4_000;
+    result = engine.runLocalDiagnostic({ condition, dtcs: [], observations: values.map(([pid, value, source = 'REAL_OBD']) => obsAt(pid, value, timestamp, source)) });
+  }
+  return result;
 }
 
 function main() {
   assert.ok(fs.existsSync(DIAGNOSTIC_RULES_PATH), 'diagnostic_rules.json deve existir');
   const rules = require(DIAGNOSTIC_RULES_PATH);
   assert.ok(Array.isArray(rules.rules), 'diagnostic_rules.json deve conter rules');
+  for (const id of ['FUEL_TRIM_LEAN', 'FUEL_TRIM_RICH', 'MAP_HIGH_IDLE']) {
+    const rule = rules.rules.find((item) => item.id === id);
+    assert.ok(rule, 'regra temporal ' + id + ' deve existir');
+    assert.strictEqual(rule.requiredDurationMs, 30000, id + ' deve declarar duração mínima no JSON');
+    assert.strictEqual(rule.requiredSamples, 10, id + ' deve declarar número mínimo de amostras no JSON');
+  }
 
-  const engine = loadTs(path.join(ROOT, 'src/diagnostics/diagnosticEngine.ts'));
+  const engine = loadTs('src/diagnostics/diagnosticEngine.ts');
+  const emptyResult = engine.runLocalDiagnostic({ observations: [], dtcs: [], condition: 'UNKNOWN' });
+  assert.strictEqual(emptyResult.acceptedLiveSamples, 0, 'sem amostras válidas, a IA deve declarar evidência insuficiente');
   const base = { observations: [], dtcs: [], condition: 'IDLE_WARM' };
 
   let result = engine.runLocalDiagnostic({
@@ -62,22 +55,19 @@ function main() {
   });
   assert.strictEqual(result.hypotheses.length, 0);
 
-  result = engine.runLocalDiagnostic({
-    ...base,
-    observations: [obs('0106', 12), obs('0107', 5)],
-  });
-  assert.strictEqual(result.hypotheses[0].id, 'MISTURA_POBRE');
+  engine.resetDiagnosticTemporalState();
+  result = engine.runLocalDiagnostic({ ...base, observations: [obs('0106', 12), obs('0107', 5), obs('010C', 800)] });
+  assert.strictEqual(result.hypotheses.length, 0, 'pico isolado não deve gerar diagnóstico de mistura');
+  assert.ok(result.pendingTemporalRules > 0, 'a regra deve aguardar persistência temporal');
 
-  result = engine.runLocalDiagnostic({
-    ...base,
-    observations: [obs('0106', -20), obs('0107', -5)],
-  });
+  result = runPersistent(engine, 'IDLE_WARM', [['0106', 12], ['0107', 5], ['010C', 800]]);
+  assert.strictEqual(result.hypotheses[0].id, 'MISTURA_POBRE');
+  assert.strictEqual(result.pendingTemporalRules, 0, 'regra persistente deve confirmar após 10 amostras em 30 s');
+
+  result = runPersistent(engine, 'IDLE_WARM', [['0106', -20], ['0107', -5], ['010C', 800]]);
   assert.strictEqual(result.hypotheses[0].id, 'MISTURA_RICA');
 
-  result = engine.runLocalDiagnostic({
-    ...base,
-    observations: [obs('010B', 50)],
-  });
+  result = runPersistent(engine, 'IDLE_WARM', [['010B', 50], ['010C', 800]]);
   assert.strictEqual(result.hypotheses[0].id, 'VACUO_DO_MOTOR_POSSIVELMENTE_ANORMAL');
 
   result = engine.runLocalDiagnostic({
@@ -115,10 +105,42 @@ function main() {
   });
   assert.strictEqual(result.hypotheses.length, 0, 'fuel trim isolado em aceleração não deve ser classificado pela regra de marcha lenta/cruzeiro');
 
-  result = engine.runLocalDiagnostic({ ...base, observations: [obs('010B', 80, 'simulacao'), obs('0106', 20, 'REAL_OBD'), obs('0107', 0, 'REAL_OBD')] });
-  assert.strictEqual(result.hypotheses.length, 1);
-  assert.strictEqual(result.hypotheses[0].id, 'MISTURA_POBRE');
+  engine.resetDiagnosticTemporalState();
+  result = engine.runLocalDiagnostic({ ...base, observations: [obs('010B', 80, 'simulacao'), obs('0106', 20, 'REAL_OBD'), obs('0107', 0, 'REAL_OBD'), obs('010C', 800, 'REAL_OBD')] });
+  assert.strictEqual(result.hypotheses.length, 0, 'mistura sem snapshot temporal completo não deve gerar hipótese');
   assert.strictEqual(result.blockedSimulationSamples, 1);
+
+  // Red-team: leitura antiga, valor impossível e resposta com falha não podem virar hipótese.
+  engine.resetDiagnosticTemporalState();
+  result = engine.runLocalDiagnostic({
+    ...base,
+    observations: [
+      { ...obs('010B', 80), timestamp: new Date(Date.now() - 180_000).toISOString() },
+      obs('0106', 140),
+      { ...obs('0107', 0), status: 'TIMEOUT' },
+    ],
+  });
+  assert.strictEqual(result.hypotheses.length, 0, 'leituras antigas, fora de faixa ou sem resposta válida devem ser bloqueadas');
+  assert.strictEqual(result.blockedStaleSamples, 1);
+  assert.strictEqual(result.blockedInvalidSamples, 2);
+
+  engine.resetDiagnosticTemporalState();
+  result = engine.runLocalDiagnostic({ ...base, observations: [obs('0106', 20), obs('0107', 0), obs('010C', 0)] });
+  assert.strictEqual(result.hypotheses.length, 0, 'RPM zero deve bloquear regras de mistura');
+  assert.ok(result.blockedEngineOffRules > 0);
+
+  engine.resetDiagnosticTemporalState();
+  result = engine.runLocalDiagnostic({ ...base, observations: [obsAt('0106', 20, Date.now()), obsAt('0107', 0, Date.now() - 5_000), obs('010C', 800)] });
+  assert.strictEqual(result.hypotheses.length, 0, 'PIDs separados por mais de 2 s não formam snapshot coerente');
+  assert.ok(result.blockedIncoherentSnapshots > 0);
+
+  result = engine.runLocalDiagnostic({
+    ...base,
+    observations: [obs('0106', 0), obs('0107', 0)],
+    dtcs: [{ code: 'p0301', status: 'CONFIRMED', firstSeen: '', lastSeen: '', occurrences: 1, source: 'REAL_OBD', historical: false, confirmed: true }],
+  });
+  assert.strictEqual(result.hypotheses.length, 1, 'normalização do DTC não deve depender de caixa');
+  assert.strictEqual(result.hypotheses[0].id, 'FALHA_DE_COMBUSTAO_CILINDRO_1');
 
   console.log('Diagnostic engine: OK');
 }

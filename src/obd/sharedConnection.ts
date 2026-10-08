@@ -4,7 +4,12 @@ import { createRealElmSession, discoverPairedDevices, ensureBluetoothReady } fro
 import { DEFAULT_ELM327_COMPATIBILITY, Elm327CompatibilityConfig, mergeCompatibilityConfig } from './elm327Compatibility';
 import { getAutoSaveState, closeObdAutosaveSession, startObdAutosaveSession, updateAutoSaveState } from '../meriva/autosaveManager';
 import { clearBluetoothDiagnostic, getLastBluetoothDiagnosticText } from './bluetoothManager';
-import { isBluetoothLinkUp, type BluetoothLifecycleState } from './bluetoothState';
+import {
+  isBluetoothLinkUp,
+  type BluetoothLifecycleState,
+  type EcuResponseState,
+} from './bluetoothState';
+export type { EcuResponseState } from './bluetoothState';
 import RNBluetoothClassic from 'react-native-bluetooth-classic';
 import * as FileSystem from 'expo-file-system';
 import { readAppSettings, writeAppSettings } from '../database/appSettings';
@@ -19,8 +24,6 @@ export interface SharedObdConnection {
   ecuValidated: boolean;
   getDiagnosticsText: () => string;
 }
-
-export type EcuResponseState = 'NOT_VALIDATED' | 'RESPONDING' | 'NO_RESPONSE' | 'RECOVERING';
 
 export interface SharedObdStatus {
   lifecycle: BluetoothLifecycleState;
@@ -48,6 +51,7 @@ let consecutiveEcuFailures = 0;
 let lastEcuResponseAt: string | null = null;
 let lastEcuError: string | null = null;
 let reconnecting = false;
+let ecuRecoveryPromise: Promise<boolean> | null = null;
 let intentionalDisconnect = false;
 let connectionGeneration = 0;
 
@@ -75,6 +79,80 @@ function setEcuResponseState(next: EcuResponseState, error?: string): void {
   ecuResponseState = next;
   if (error) lastEcuError = error;
   emit();
+}
+
+export async function reportEcuPollResult(valid: boolean, error?: string): Promise<EcuResponseState> {
+  if (!active) {
+    ecuResponseState = 'NOT_VALIDATED';
+    consecutiveEcuFailures = 0;
+    return ecuResponseState;
+  }
+
+  if (valid) {
+    consecutiveEcuFailures = 0;
+    lastEcuResponseAt = new Date().toISOString();
+    lastEcuError = null;
+    setEcuResponseState('RESPONDING');
+
+    // A recuperação pode ter encerrado a sessão de autosave. Uma resposta
+    // positiva reabre somente a sessão da ECU, nunca uma sessão sem evidência.
+    if (!getAutoSaveState().obd.connected) {
+      updateAutoSaveState((state) => {
+        state.obd = { ...state.obd, connected: true };
+      });
+      await startObdAutosaveSession();
+    }
+    return ecuResponseState;
+  }
+
+  consecutiveEcuFailures += 1;
+  lastEcuError = error || 'ECU SEM RESPOSTA';
+  const threshold = active.session.getCompatibilityConfig().noDataReconnectThreshold;
+
+  if (consecutiveEcuFailures < threshold) {
+    setEcuResponseState('NO_RESPONSE', lastEcuError);
+    return ecuResponseState;
+  }
+
+  setEcuResponseState('RECOVERING', lastEcuError);
+  await closeObdAutosaveSession();
+  return ecuResponseState;
+}
+
+export async function recoverEcuIfNeeded(): Promise<boolean> {
+  if (!active) return false;
+  if (consecutiveEcuFailures < active.session.getCompatibilityConfig().noDataReconnectThreshold) {
+    return ecuResponseState === 'RESPONDING';
+  }
+  if (ecuRecoveryPromise) return ecuRecoveryPromise;
+
+  const connection = active;
+  setEcuResponseState('RECOVERING', lastEcuError ?? 'ECU SEM RESPOSTA');
+  ecuRecoveryPromise = (async () => {
+    try {
+      const recovered = await connection.session.recoverProtocol();
+      if (!recovered) {
+        await handleUnexpectedDisconnect('ECU SEM RESPOSTA / RECUPERAÇÃO FALHOU');
+        return false;
+      }
+
+      consecutiveEcuFailures = 0;
+      lastEcuResponseAt = new Date().toISOString();
+      lastEcuError = null;
+      setEcuResponseState('RESPONDING');
+      if (!getAutoSaveState().obd.connected) {
+        updateAutoSaveState((state) => {
+          state.obd = { ...state.obd, connected: true };
+        });
+        await startObdAutosaveSession();
+      }
+      return true;
+    } finally {
+      ecuRecoveryPromise = null;
+    }
+  })();
+
+  return ecuRecoveryPromise;
 }
 
 
@@ -165,55 +243,26 @@ function startBluetoothMonitor(): void {
           if (keepAlive.status !== 'OK') lastEcuError = keepAlive.errorMessage ?? 'KEEP-ALIVE KWP SEM RESPOSTA';
         }
 
-        // A cada 3 ciclos (~15 s), valida a ECU com um PID real. O Bluetooth
-        // pode permanecer conectado enquanto a ECU deixa de responder.
+        // A cada 3 ciclos (~15 s), valida a ECU com um PID real como
+        // redundância. O polling normal também alimenta o mesmo estado.
         if (healthTick % 3 !== 0) return;
         const probe = await connection.session.queryPid('010C');
         const valid = probe.commandStatus === 'OK'
           && probe.parsed.status === 'RESPONDEU'
           && Number.isFinite(probe.parsed.value);
-
-        if (valid) {
-          consecutiveEcuFailures = 0;
-          lastEcuResponseAt = new Date().toISOString();
-          lastEcuError = null;
-          setEcuResponseState('RESPONDING');
-          return;
-        }
-
-        consecutiveEcuFailures += 1;
-        lastEcuError = probe.rx || probe.commandStatus || 'ECU SEM RESPOSTA';
-        if (consecutiveEcuFailures < connection.session.getCompatibilityConfig().noDataReconnectThreshold) {
-          setEcuResponseState('NO_RESPONSE', lastEcuError);
-          return;
-        }
-
-        setEcuResponseState('RECOVERING', lastEcuError);
-        const recovered = await connection.session.recoverProtocol();
-        if (recovered) {
-          consecutiveEcuFailures = 0;
-          lastEcuResponseAt = new Date().toISOString();
-          lastEcuError = null;
-          setEcuResponseState('RESPONDING');
-        } else {
-          await handleUnexpectedDisconnect('ECU SEM RESPOSTA APÓS RECUPERAÇÃO DE PROTOCOLO');
+        await reportEcuPollResult(
+          valid,
+          probe.rx || probe.commandStatus || 'ECU SEM RESPOSTA',
+        );
+        if (ecuResponseState === 'RECOVERING') {
+          await recoverEcuIfNeeded();
         }
       } catch (cause) {
-        consecutiveEcuFailures += 1;
-        lastEcuError = cause instanceof Error ? cause.message : String(cause);
-        if (consecutiveEcuFailures >= (active?.session.getCompatibilityConfig().noDataReconnectThreshold ?? 4)) {
-          setEcuResponseState('RECOVERING', lastEcuError);
-          const recovered = await active?.session.recoverProtocol();
-          if (recovered) {
-            consecutiveEcuFailures = 0;
-            lastEcuResponseAt = new Date().toISOString();
-            lastEcuError = null;
-            setEcuResponseState('RESPONDING');
-          } else {
-            await handleUnexpectedDisconnect('ECU SEM RESPOSTA / RECUPERAÇÃO FALHOU');
-          }
-        } else {
-          setEcuResponseState('NO_RESPONSE', lastEcuError);
+        if (!active) return;
+        const errorMessage = cause instanceof Error ? cause.message : String(cause);
+        await reportEcuPollResult(false, errorMessage);
+        if (ecuResponseState === 'RECOVERING') {
+          await recoverEcuIfNeeded();
         }
       } finally {
         monitorBusy = false;
@@ -315,7 +364,11 @@ export function getSharedObdStatus(): SharedObdStatus {
   return {
     lifecycle,
     bluetoothConnected: isBluetoothLinkUp(lifecycle),
-    ecuConnected: Boolean(active?.ecuValidated),
+    ecuConnected: Boolean(active?.ecuValidated && ecuResponseState === 'RESPONDING'),
+    ecuResponseState,
+    consecutiveEcuFailures,
+    lastEcuResponseAt,
+    lastEcuError,
   };
 }
 

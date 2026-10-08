@@ -1,37 +1,17 @@
 'use strict';
 
 const assert = require('assert');
-const ts = require('typescript');
-const fs = require('fs');
 const path = require('path');
 const Module = require('module');
 
-const ROOT = path.resolve(__dirname, '..');
 
-function loadTs(file) {
-  const sourcePath = path.join(ROOT, file);
-  const output = ts.transpileModule(fs.readFileSync(sourcePath, 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2019 },
-  }).outputText;
-  const mod = new Module(sourcePath, null);
-  mod.filename = sourcePath;
-  mod.paths = Module._nodeModulePaths(path.dirname(sourcePath));
-  mod._compile(output, sourcePath);
-  return mod.exports;
-}
+const { loadTs } = require('./helpers/loadTs');
 
-const fuelPath = path.join(ROOT, 'src', 'obd', 'fuelConsumption.ts');
-const fuelOutput = ts.transpileModule(fs.readFileSync(fuelPath, 'utf8'), {
-  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2019 },
-}).outputText;
-const fuelMod = new Module(fuelPath, null);
-fuelMod.filename = fuelPath;
-fuelMod.paths = Module._nodeModulePaths(path.dirname(fuelPath));
-fuelMod._compile(fuelOutput, fuelPath);
+const fuelMod = loadTs('src/obd/fuelConsumption.ts');
 
 const originalLoad = Module._load;
 Module._load = function(request) {
-  if (request === '../obd/fuelConsumption') return fuelMod.exports;
+  if (request === '../obd/fuelConsumption') return fuelMod;
   if (request === '../data/driveCycles') return {};
   return originalLoad.apply(this, arguments);
 };
@@ -58,7 +38,10 @@ assert.strictEqual(state.maxSpeedKmh, 36);
 const noFuel = new RealTripRecorder(0, 0);
 noFuel.addSample({ timestampMs: 0, distanceKm: 0, speedKmh: 0, fuelRateLph: null });
 noFuel.addSample({ timestampMs: 1000, distanceKm: 0.2, speedKmh: 20, fuelRateLph: null });
-assert.strictEqual(noFuel.buildDriveCycle(2000), null);
+const noFuelCycle = noFuel.buildDriveCycle(2000);
+assert.ok(noFuelCycle, 'viagem deve ser persistida mesmo sem evidência de combustível');
+assert.strictEqual(noFuelCycle.fuelConsumptionStatus, 'SEM_DADOS');
+assert.strictEqual(noFuelCycle.avgFuelConsumptionKml, 0);
 
 const cycle = new RealTripRecorder(1000, 0);
 cycle.addSample({ timestampMs: 1000, distanceKm: 0, speedKmh: 0, fuelRateLph: 8 });

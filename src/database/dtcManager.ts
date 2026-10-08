@@ -41,6 +41,7 @@ export async function recordDtc(basePath: string, dtc: DtcRecord): Promise<void>
       dtc.source,
       dtc.historical ? 'true' : 'false',
       dtc.confirmed ? 'true' : 'false',
+      dtc.intermittent ? 'true' : 'false',
     ].join('|');
 
     const info = await FileSystem.getInfoAsync(target);

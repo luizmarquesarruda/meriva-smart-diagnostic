@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { Linking, Platform } from 'react-native';
 import RNBluetoothClassic from 'react-native-bluetooth-classic';
 import { BluetoothClassicTransport, BluetoothDeviceInfo, listBondedBluetoothDevices } from './bluetoothClassicTransport';
 import { ElmCommandResult, Elm327Session } from './elm327';
@@ -25,6 +25,15 @@ function logBluetoothDiagnostic(event: string, details?: unknown): void {
 
 export function getLastBluetoothDiagnosticText(): string { return lastBluetoothDiagnosticText; }
 export function clearBluetoothDiagnostic(): void { lastBluetoothDiagnosticText = ''; }
+
+export async function openBluetoothSettings(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+  try {
+    await Linking.sendIntent?.('android.settings.BLUETOOTH_SETTINGS');
+  } catch {
+    await Linking.openSettings();
+  }
+}
 
 export interface RealElmConnection {
   session: Elm327Session;
@@ -121,7 +130,8 @@ export async function ensureBluetoothReady(): Promise<boolean> {
   const requested = await requestBluetoothEnabled();
   logBluetoothDiagnostic('BLUETOOTH_ENABLE_RESULT', requested);
   if (!requested) {
-    throw new Error('BLUETOOTH CONTINUA DESLIGADO. ATIVE-O PARA USAR O ELM327.');
+    logBluetoothDiagnostic('BLUETOOTH_ENABLE_REJECTED');
+    throw new Error('BLUETOOTH CONTINUA DESLIGADO. ATIVE-O NAS CONFIGURAÇÕES DO SISTEMA PARA USAR O ELM327.');
   }
 
   const enabledAfterRequest = await bluetoothClassic.isBluetoothEnabled();

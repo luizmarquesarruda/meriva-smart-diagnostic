@@ -7,12 +7,6 @@ export interface PermissionAudit {
   storage: 'APP_PRIVATE' | 'GRANTED' | 'DENIED' | 'UNAVAILABLE';
 }
 
-function mapAndroid(status: string): PermissionAudit['bluetooth'] {
-  if (status === PermissionsAndroid.RESULTS.GRANTED) return 'GRANTED';
-  if (status === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) return 'BLOCKED';
-  return 'DENIED';
-}
-
 /**
  * Bluetooth Classic em Android 12+ usa BLUETOOTH_CONNECT/SCAN como
  * permissões runtime. Em versões anteriores, a descoberta Classic depende

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Constants from 'expo-constants';
-import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
 import { createBackup } from '../src/storage/backup';
@@ -10,6 +10,7 @@ import { getAutoSaveState, getAutoSaveStatus, initAutoSave } from '../src/meriva
 import { exportAutoSaveTxt } from '../src/meriva/exportAutoSaveTxt';
 import { exportBluetoothDiagnosticTxt } from '../src/obd/exportBluetoothDiagnosticTxt';
 import { AppSettings, readAppSettings, writeAppSettings } from '../src/database/appSettings';
+import { openBluetoothSettings } from '../src/obd/bluetoothManager';
 import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
 import { getMidLayout } from '../src/ui/midLayout';
 
@@ -24,6 +25,7 @@ export default function ConfiguracaoScreen() {
   const [storageBase, setStorageBase] = useState<string | null>(null);
   const [profile, setProfile] = useState<VehicleProfile | null>(null);
   const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [manualFuelPercentText, setManualFuelPercentText] = useState('');
   const [status, setStatus] = useState('INICIALIZANDO...');
   const [busy, setBusy] = useState(false);
   const [saveStatus, setSaveStatus] = useState<AutoSaveStatus>({ lastSavedAt: null, lastSaveReason: null, lastError: null, obdSessionActive: false });
@@ -34,7 +36,9 @@ export default function ConfiguracaoScreen() {
       const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
       const state = await initAutoSave(basePath);
       setProfile(state.vehicle);
-      setSettings(await readAppSettings(basePath));
+      const loadedSettings = await readAppSettings(basePath);
+      setSettings(loadedSettings);
+      setManualFuelPercentText(loadedSettings.manualFuelAlcoholPercent == null ? '' : String(loadedSettings.manualFuelAlcoholPercent));
       setSaveStatus(getAutoSaveStatus());
       setStatus('PRONTO');
       setStorageBase(basePath);
@@ -121,6 +125,33 @@ export default function ConfiguracaoScreen() {
           </View>
 
           <View style={styles.card}>
+            <Text style={styles.label}>Percentual manual de álcool</Text>
+            <TextInput
+              value={manualFuelPercentText}
+              onChangeText={setManualFuelPercentText}
+              onEndEditing={() => {
+                const text = manualFuelPercentText.trim();
+                if (!text) {
+                  void updateSetting('manualFuelAlcoholPercent', null);
+                  return;
+                }
+                const value = Number(text.replace(',', '.'));
+                if (Number.isFinite(value) && value >= 0 && value <= 100) {
+                  void updateSetting('manualFuelAlcoholPercent', value);
+                } else {
+                  setManualFuelPercentText(settings.manualFuelAlcoholPercent == null ? '' : String(settings.manualFuelAlcoholPercent));
+                  setStatus('PERCENTUAL INVÁLIDO: USE 0 A 100');
+                }
+              }}
+              keyboardType="decimal-pad"
+              placeholder="ex.: 32"
+              placeholderTextColor="#6b7f99"
+              style={styles.input}
+            />
+            <Text style={styles.note}>Usado somente se o PID 0152 não responder. Um valor manual é estimativa e tem baixa confiança.</Text>
+          </View>
+
+          <View style={styles.card}>
             <Text style={styles.label}>Unidade de distância</Text>
             <View style={styles.row}>
               <TouchableOpacity style={[styles.choice, settings.distanceUnit === 'KM' && styles.choiceActive]} onPress={() => void updateSetting('distanceUnit', 'KM')}>
@@ -135,6 +166,10 @@ export default function ConfiguracaoScreen() {
           <SettingSwitch label="Conectar ao ELM327 automaticamente" value={settings.autoConnectObd} onChange={(v) => void updateSetting('autoConnectObd', v)} />
           <SettingSwitch label="Inicialização forçada do ELM (ATZ + ATE0)" value={settings.elmForceInitialization} onChange={(v) => void updateSetting('elmForceInitialization', v)} />
           <SettingSwitch label="Alertas de diagnóstico" value={settings.diagnosticAlerts} onChange={(v) => void updateSetting('diagnosticAlerts', v)} />
+
+          <TouchableOpacity style={styles.button} onPress={() => void openBluetoothSettings()}>
+            <Text style={styles.buttonText}>ABRIR CONFIGURAÇÕES DO BLUETOOTH</Text>
+          </TouchableOpacity>
 
           <Text style={styles.section}>COMPATIBILIDADE ELM327</Text>
           <View style={styles.card}>
@@ -278,6 +313,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
   choice: { flexGrow: 1, flexBasis: 86, minWidth: 86, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, padding: 11, alignItems: 'center' },
   choiceActive: { backgroundColor: '#172f52', borderColor: '#3b82f6' },
+  input: { color: '#e5edf7', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, padding: 10, marginTop: 8 },
   choiceText: { color: '#e5edf7', fontWeight: '700', flexShrink: 1, textAlign: 'center', lineHeight: 16 },
   switchRow: { backgroundColor: '#111c2e', borderRadius: 8, padding: 11, marginBottom: 9, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#243652' },
   info: { color: '#e5edf7', marginBottom: 6, fontSize: 12 },

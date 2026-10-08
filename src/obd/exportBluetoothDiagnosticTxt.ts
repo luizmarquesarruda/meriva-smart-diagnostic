@@ -38,7 +38,14 @@ function diagnosticReportLines(result: DiagnosticResult): string[] {
     '--- DIAGNÓSTICO LOCAL / MOTOR DE EVIDÊNCIAS ---',
     `MOTOR: ${result.engine}`,
     `VERSÃO: ${result.version}`,
+    `AMOSTRAS REAL_OBD ACEITAS: ${result.acceptedLiveSamples}`,
+    `SNAPSHOTS INCOERENTES BLOQUEADOS: ${result.blockedIncoherentSnapshots}`,
+    `REGRAS TEMPORAIS AGUARDANDO CONFIRMAÇÃO: ${result.pendingTemporalRules}`,
+    `REGRAS BLOQUEADAS COM MOTOR DESLIGADO: ${result.blockedEngineOffRules}`,
+    `AMOSTRAS ANTIGAS BLOQUEADAS (>120 s): ${result.blockedStaleSamples}`,
+    `AMOSTRAS INVÁLIDAS BLOQUEADAS: ${result.blockedInvalidSamples}`,
     `AMOSTRAS DE SIMULAÇÃO BLOQUEADAS: ${result.blockedSimulationSamples}`,
+    `DTCs NÃO ATIVOS OU NÃO REAIS BLOQUEADOS: ${result.blockedNonLiveDtcs}`,
   ];
   if (result.hypotheses.length === 0) {
     lines.push('NENHUMA HIPÓTESE DIAGNÓSTICA GERADA COM AS EVIDÊNCIAS DISPONÍVEIS.');
@@ -64,9 +71,10 @@ function buildLocalDiagnostic(): DiagnosticResult {
     name: reading.name,
     value: reading.value,
     unit: reading.unit,
-    source: reading.source === 'SIMULACAO' ? 'SIMULACAO' : 'REAL_OBD',
+    source: reading.source === 'REAL' ? 'REAL_OBD' : 'SIMULACAO',
     timestamp: reading.timestamp,
     confidence: reading.source === 'SIMULACAO' ? 'LOW' : 'GOOD',
+    status: reading.status,
   }));
   return runLocalDiagnostic({ observations, dtcs: state.dtcs, condition: 'UNKNOWN' });
 }

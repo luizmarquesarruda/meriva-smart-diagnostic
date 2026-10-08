@@ -39,6 +39,8 @@ export interface PidObservation {
   source: DataSource;
   timestamp: string;
   confidence: ConfidenceLevel;
+  /** Estado da consulta OBD; quando presente, só RESPONDEU é evidência válida. */
+  status?: string;
   derived?: boolean;
   derivedFrom?: string;
   errorMessage?: string;
@@ -72,6 +74,7 @@ export interface DtcRecord {
   source: DataSource;
   historical: boolean;
   confirmed?: boolean;
+  intermittent?: boolean;
   freezeFrame?: { frame: number; dtc: string | null; rpm: number | null; coolantC: number | null };
 }
 

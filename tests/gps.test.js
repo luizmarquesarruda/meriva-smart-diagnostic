@@ -1,20 +1,7 @@
 'use strict';
 
 const assert = require('assert');
-const ts = require('typescript');
-const fs = require('fs');
-const path = require('path');
-const Module = require('module');
-
-const ROOT = path.resolve(__dirname, '..');
-const sourcePath = path.join(ROOT, 'src/gps/gpsTracker.ts');
-const output = ts.transpileModule(fs.readFileSync(sourcePath, 'utf8'), {
-  compilerOptions: {
-    module: ts.ModuleKind.CommonJS,
-    target: ts.ScriptTarget.ES2019,
-    esModuleInterop: true,
-  },
-}).outputText;
+const { loadTs } = require('./helpers/loadTs');
 
 let watcher = null;
 const fakeLocation = {
@@ -33,24 +20,12 @@ const fakeLocation = {
   },
 };
 
-const originalLoad = Module._load;
-Module._load = function(request) {
-  if (request === 'expo-location') return fakeLocation;
-  return originalLoad.apply(this, arguments);
-};
-
-const mod = new Module(sourcePath, null);
-mod.filename = sourcePath;
-mod.paths = Module._nodeModulePaths(path.dirname(sourcePath));
-mod._compile(output, sourcePath);
-Module._load = originalLoad;
-
 const {
   GpsTracker,
   haversineDistanceKm,
   normalizeGpsSpeedKmh,
   calculateConsumptionKml,
-} = mod.exports;
+} = loadTs('src/gps/gpsTracker.ts', { mocks: { 'expo-location': fakeLocation } });
 
 assert.strictEqual(normalizeGpsSpeedKmh(10), 36);
 assert.strictEqual(normalizeGpsSpeedKmh(null), 0);

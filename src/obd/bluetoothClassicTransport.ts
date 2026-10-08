@@ -47,6 +47,14 @@ export class BluetoothClassicTransport implements ObdTransport {
   getDiagnosticsText(): string { return this.diagnostics.join('\n'); }
   clearDiagnostics(): void { this.diagnostics = []; }
 
+  clearInputBuffer(): void {
+    // O stream RFCOMM não possui uma API portátil de flush no módulo RN.
+    // Esvaziar o acumulador local é o ponto de sincronização determinístico
+    // antes de uma nova sequência ATZ/ATSP.
+    this.received = '';
+    this.logDiagnostic('RX_BUFFER_FLUSHED');
+  }
+
   private readonly config: Elm327CompatibilityConfig;
 
   constructor(

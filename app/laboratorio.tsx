@@ -11,7 +11,7 @@ import { canPollObd } from '../src/obd/bluetoothState';
 import { discoverSupportedPids, KNOWN_PIDS } from '../src/obd/pidScanner';
 import { getPidDefinition } from '../src/obd/pidDefinition';
 import { getDtcDefinition } from '../src/obd/dtcDefinition';
-import { getSharedObdConnection, getSharedObdStatus, setSharedObdConnection, subscribeSharedObd, disconnectSharedObd } from '../src/obd/sharedConnection';
+import { getSharedObdConnection, getSharedObdStatus, subscribeSharedObdStatus, setSharedObdConnection, subscribeSharedObd, disconnectSharedObd } from '../src/obd/sharedConnection';
 import { autoTripService } from '../src/trip/autoTripService';
 import { getMidLayout } from '../src/ui/midLayout';
 import { scanDtcServices, readFreezeFrame, type DtcServiceScan } from '../src/obd/dtcScanner';
@@ -44,6 +44,7 @@ export default function LaboratorioScreen() {
   const [rx, setRx] = useState('');
   const [elapsedMs, setElapsedMs] = useState<number | null>(null);
   const [status, setStatus] = useState('VERIFICANDO ARMAZENAMENTO');
+  const [ecuResponseState, setEcuResponseState] = useState(getSharedObdStatus().ecuResponseState);
   const [protocol, setProtocol] = useState('N/D');
   const [error, setError] = useState('');
   const [loadingDevices, setLoadingDevices] = useState(false);
@@ -51,8 +52,8 @@ export default function LaboratorioScreen() {
   const [supportedPids, setSupportedPids] = useState<string[]>([]);
   const [dtcCodes, setDtcCodes] = useState<string[]>([]);
   const [fuelUsedL, setFuelUsedL] = useState(0);
-  const [tripDistanceKm, setTripDistanceKm] = useState(0);
   const [tripFuelUsedL, setTripFuelUsedL] = useState(0);
+  const [tripDistanceKm, setTripDistanceKm] = useState(0);
   const [tripConsumptionKml, setTripConsumptionKml] = useState<number | null>(null);
   const [tripActive, setTripActive] = useState(false);
   const [tripFuelSupported, setTripFuelSupported] = useState<boolean | null>(null);
@@ -60,6 +61,7 @@ export default function LaboratorioScreen() {
   const [dtcScan, setDtcScan] = useState<DtcServiceScan[]>([]);
   const [dtcScanning, setDtcScanning] = useState(false);
   const sessionRef = useRef<Elm327Session | null>(null);
+  const dtcAbsenceScansRef = useRef<Map<string, number>>(new Map());
   const autoSaveReadyRef = useRef(false);
 
   const simulationSession = useMemo(
@@ -76,6 +78,11 @@ export default function LaboratorioScreen() {
       setFuelUsedL(trip.fuelUsedL);
       setTripConsumptionKml(trip.consumptionKml);
       if (trip.error) setError(trip.error);
+    }, 1000);
+
+    const unsubscribeStatus = subscribeSharedObdStatus((ecuStatus) => {
+      setEcuResponseState(ecuStatus.ecuResponseState);
+      if (ecuStatus.ecuResponseState === 'NO_RESPONSE' || ecuStatus.ecuResponseState === 'RECOVERING') setStatus('ECU SEM RESPOSTA');
     });
 
     const unsubscribe = subscribeSharedObd((connection) => {
@@ -113,6 +120,7 @@ export default function LaboratorioScreen() {
 
     return () => {
       unsubscribeTrip();
+      unsubscribeStatus();
       unsubscribe();
       mounted = false;
       if (!autoSaveReadyRef.current) return;
@@ -269,7 +277,7 @@ export default function LaboratorioScreen() {
     setStatus(mode === 'SIMULACAO' ? 'SIMULAÇÃO LOCAL: CONSULTANDO' : 'ECU CONSULTANDO');
     try {
       const activeSession = mode === 'SIMULACAO' ? simulationSession : sessionRef.current;
-      if (mode === 'REAL' && !canPollObd(getSharedObdStatus().lifecycle)) {
+      if (mode === 'REAL' && !canPollObd(getSharedObdStatus().lifecycle, getSharedObdStatus().ecuResponseState)) {
         throw new Error('DIAGNÓSTICO AINDA NÃO ESTÁ PRONTO. AGUARDE BLUETOOTH, ELM327 E ECU.');
       }
       if (!activeSession) throw new Error('CONECTE AO ELM327 ANTES DE TESTAR O PID');
@@ -301,7 +309,7 @@ export default function LaboratorioScreen() {
     setStatus(mode === 'SIMULACAO' ? 'SIMULAÇÃO LOCAL: DESCOBRINDO PIDs' : 'ECU: DESCOBRINDO PIDs');
     try {
       const activeSession = mode === 'SIMULACAO' ? simulationSession : sessionRef.current;
-      if (mode === 'REAL' && !canPollObd(getSharedObdStatus().lifecycle)) {
+      if (mode === 'REAL' && !canPollObd(getSharedObdStatus().lifecycle, getSharedObdStatus().ecuResponseState)) {
         throw new Error('DIAGNÓSTICO AINDA NÃO ESTÁ PRONTO. AGUARDE BLUETOOTH, ELM327 E ECU.');
       }
       if (!activeSession) throw new Error('CONECTE AO ELM327 ANTES DE DESCOBRIR PIDs');
@@ -335,19 +343,23 @@ export default function LaboratorioScreen() {
     setStatus(mode === 'SIMULACAO' ? 'SIMULAÇÃO LOCAL: VARREDURA DTC 03/07/0A' : 'ECU: VARREDURA DTC 03/07/0A');
     try {
       const activeSession = mode === 'SIMULACAO' ? simulationSession : sessionRef.current;
-      if (mode === 'REAL' && !canPollObd(getSharedObdStatus().lifecycle)) {
+      if (mode === 'REAL' && !canPollObd(getSharedObdStatus().lifecycle, getSharedObdStatus().ecuResponseState)) {
         throw new Error('DIAGNÓSTICO AINDA NÃO ESTÁ PRONTO. AGUARDE BLUETOOTH, ELM327 E ECU.');
       }
       if (!activeSession) throw new Error('CONECTE AO ELM327 ANTES DA VARREDURA DTC');
 
-      const results = mode === 'REAL'
-        ? await autoTripService.withPollingPaused(() => scanDtcServices(activeSession))
-        : await scanDtcServices(activeSession);
+      const scanBundle = mode === 'REAL'
+        ? await autoTripService.withPollingPaused(() =>
+            activeSession.withExclusiveCommandQueue(async (executeCommand) => {
+              const results = await scanDtcServices(activeSession, executeCommand);
+              const freezeFrame = await readFreezeFrame(activeSession, executeCommand);
+              return { results, freezeFrame };
+            }),
+          )
+        : { results: await scanDtcServices(activeSession), freezeFrame: null };
+      const { results, freezeFrame } = scanBundle;
       setDtcScan(results);
       const stored = results.find((item) => item.kind === 'STORED');
-      const freezeFrame = mode === 'REAL'
-        ? await autoTripService.withPollingPaused(() => readFreezeFrame(activeSession))
-        : null;
       setDtcCodes(stored?.codes ?? []);
 
       if (mode === 'REAL') {
@@ -375,6 +387,7 @@ export default function LaboratorioScreen() {
             source: 'REAL_OBD',
             historical: false,
             confirmed: kind !== 'PENDING',
+            intermittent: Boolean(previous?.intermittent || previous?.historical || previous?.status === 'INACTIVE'),
             ...(freezeFrame?.available ? {
               freezeFrame: {
                 frame: freezeFrame.frame,
@@ -388,13 +401,25 @@ export default function LaboratorioScreen() {
 
         for (const record of records) await recordDtc(getBasePath(), record);
         const detectedCodes = new Set(records.map((item) => item.code));
-        const storedCodes = new Set(stored?.codes ?? []);
-        const storedAvailable = stored?.available === true;
-        const becameInactive: DtcRecord[] = storedAvailable
-          ? existing
-            .filter((item) => ['CURRENT', 'CONFIRMED'].includes(item.status) && !storedCodes.has(item.code) && !detectedCodes.has(item.code))
-            .map((item) => ({ ...item, status: 'INACTIVE', historical: true, lastSeen: now }))
-          : [];
+        const completeScan = results.length === 3 && results.every((item) => item.available);
+        const becameInactive: DtcRecord[] = [];
+        if (completeScan) {
+          for (const item of existing) {
+            if (!['CURRENT', 'CONFIRMED'].includes(item.status) || detectedCodes.has(item.code)) {
+              dtcAbsenceScansRef.current.delete(item.code);
+              continue;
+            }
+            const absenceCount = (dtcAbsenceScansRef.current.get(item.code) ?? 0) + 1;
+            dtcAbsenceScansRef.current.set(item.code, absenceCount);
+            if (absenceCount >= 2) {
+              becameInactive.push({ ...item, status: 'INACTIVE', historical: true, intermittent: true, lastSeen: now });
+              dtcAbsenceScansRef.current.delete(item.code);
+            }
+          }
+        } else {
+          // Uma varredura parcial interrompe a sequência: não conta como ausência.
+          dtcAbsenceScansRef.current.clear();
+        }
         for (const record of becameInactive) await recordDtc(getBasePath(), record);
         const allDetectedOrInactive = new Set([...detectedCodes, ...becameInactive.map((item) => item.code)]);
         updateAutoSaveState((state) => {
@@ -425,7 +450,7 @@ export default function LaboratorioScreen() {
     setStatus(mode === 'SIMULACAO' ? 'SIMULAÇÃO LOCAL: LENDO DTC' : 'ECU: LENDO DTC');
     try {
       const activeSession = mode === 'SIMULACAO' ? simulationSession : sessionRef.current;
-      if (mode === 'REAL' && !canPollObd(getSharedObdStatus().lifecycle)) {
+      if (mode === 'REAL' && !canPollObd(getSharedObdStatus().lifecycle, getSharedObdStatus().ecuResponseState)) {
         throw new Error('DIAGNÓSTICO AINDA NÃO ESTÁ PRONTO. AGUARDE BLUETOOTH, ELM327 E ECU.');
       }
       if (!activeSession) throw new Error('CONECTE AO ELM327 ANTES DE LER DTC');
@@ -481,9 +506,10 @@ export default function LaboratorioScreen() {
       name: reading.name,
       value: reading.value,
       unit: reading.unit,
-      source: reading.source === 'SIMULACAO' ? 'SIMULACAO' : 'REAL_OBD',
+      source: reading.source === 'REAL' ? 'REAL_OBD' : 'SIMULACAO',
       timestamp: reading.timestamp,
       confidence: reading.source === 'SIMULACAO' ? 'LOW' : 'GOOD',
+      status: reading.status,
     })),
     dtcs: getAutoSaveState().dtcs,
     condition: getVehicleConditionSnapshot().condition,
@@ -495,6 +521,7 @@ export default function LaboratorioScreen() {
       <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
       <Text style={styles.title}>DIAGNÓSTICO OBD</Text>
       <Text style={styles.status}>{status}</Text>
+      <Text style={styles.status}>{ecuResponseState === 'NO_RESPONSE' || ecuResponseState === 'RECOVERING' ? 'ECU SEM RESPOSTA — ADAPTADOR BLUETOOTH CONECTADO' : ecuResponseState === 'RESPONDING' ? 'ECU RESPONDENDO' : status}</Text>
       <View style={styles.connectionSummary}>
         <View style={styles.connectionItem}><Text style={styles.connectionLabel}>ELM327</Text><Text style={styles.connectionValue}>{sessionRef.current ? 'CONECTADO' : 'AGUARDANDO'}</Text></View>
         <View style={styles.connectionItem}><Text style={styles.connectionLabel}>PROTOCOLO</Text><Text style={styles.connectionValue}>{protocol}</Text></View>
@@ -629,7 +656,7 @@ export default function LaboratorioScreen() {
         ) : diagnostic.hypotheses.map((hypothesis) => (
           <View key={hypothesis.id} style={styles.hypothesis}>
             <Text style={styles.hypothesisTitle}>{hypothesis.label}</Text>
-            <Text style={styles.hypothesisConfidence}>CONFIANÇA: {hypothesis.confidence} · SCORE: {hypothesis.score.toFixed(2)}</Text>
+            <Text style={styles.hypothesisConfidence}>CONFIANÇA: {hypothesis.confidence} · SCORE HEURÍSTICO: {Math.round(hypothesis.score * 100)}/100</Text>
             {hypothesis.evidence.map((item, index) => (
               <Text key={`e-${hypothesis.id}-${index}`} style={styles.aiLine}>• Evidência: {item.text}</Text>
             ))}

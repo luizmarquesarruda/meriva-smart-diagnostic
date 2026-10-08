@@ -14,6 +14,7 @@ export interface DriveCycle {
   avgFuelConsumptionKml: number;
   source: DriveCycleSource;
   fuelRateSource?: 'MEASURED_015E' | 'ESTIMATED_MAF' | 'ESTIMATED_MAP' | 'MIXED';
+  fuelConsumptionStatus?: 'AVAILABLE' | 'SEM_DADOS';
   importedAt: string;
 }
 

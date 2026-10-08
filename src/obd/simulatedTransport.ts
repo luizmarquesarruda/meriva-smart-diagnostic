@@ -4,9 +4,21 @@ import { ObdTransport } from './elm327';
  * Transporte local exclusivamente para desenvolvimento e demonstração.
  * Não representa uma leitura de uma ECU real e nunca deve alimentar o aprendizado.
  */
+export interface SimulatedTransportOptions {
+  latencyMs?: number;
+  chunkSize?: number;
+}
+
 export class SimulatedObdTransport implements ObdTransport {
   private opened = false;
   private pendingResponse = '';
+  private readonly latencyMs: number;
+  private readonly chunkSize: number;
+
+  constructor(options: SimulatedTransportOptions = {}) {
+    this.latencyMs = Math.max(0, options.latencyMs ?? 35);
+    this.chunkSize = Math.max(1, Math.floor(options.chunkSize ?? 0));
+  }
 
   async open(): Promise<void> {
     this.opened = true;
@@ -23,7 +35,7 @@ export class SimulatedObdTransport implements ObdTransport {
     }
 
     const command = data.trim().toUpperCase();
-    this.pendingResponse = this.responseFor(command);
+    this.pendingResponse = this.responseFor(command) + '\r>';
   }
 
   async readUntilPrompt(timeoutMs = 1000): Promise<string> {
@@ -35,8 +47,20 @@ export class SimulatedObdTransport implements ObdTransport {
       throw new Error('TIMEOUT');
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 35));
-    return this.pendingResponse;
+    const response = this.pendingResponse;
+    if (response.length === 0) return response;
+    const delay = Math.min(this.latencyMs, timeoutMs);
+    if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
+    if (this.chunkSize <= 0 || this.chunkSize >= response.length) return response;
+
+    // O transporte simulado entrega o mesmo tipo de fragmentação que o stream
+    // RFCOMM real: o framing final continua sendo responsabilidade do consumidor.
+    let assembled = '';
+    for (let index = 0; index < response.length; index += this.chunkSize) {
+      if (index > 0) await new Promise((resolve) => setTimeout(resolve, 1));
+      assembled += response.slice(index, index + this.chunkSize);
+    }
+    return assembled;
   }
 
   private responseFor(command: string): string {

@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 4,
   "description": "Regras locais e rastreáveis do motor de raciocínio diagnóstico. Uma regra gera evidência ou hipótese; nunca prova isoladamente uma falha. Limiares heurísticos não substituem limites de fábrica.",
   "principles": [
     "DTC sozinho não condena componente.",
@@ -8,64 +8,136 @@
     "Dados SIMULACAO nunca aumentam confiança.",
     "Seed CarScanner serve como referência, não como leitura atual da ECU.",
     "Toda conclusão deve listar evidências e próximos testes.",
-    "Limiares locais são heurísticos de triagem e não especificações de fábrica."
+    "Limiares locais são heurísticos de triagem e não especificações de fábrica.",
+    "Regras que combinam PIDs exigem timestamps separados por no máximo 2 segundos.",
+    "Regras de mistura e MAP em marcha lenta exigem evidência de RPM acima de 400.",
+    "Regras baseadas em tendência declaram requiredSamples e requiredDurationMs no JSON; mistura e MAP exigem 10 snapshots coerentes ao longo de 30 segundos.",
+    "A inferência da tela de saúde é agendada independentemente da atualização visual, com intervalo mínimo de 5 segundos; não é executada a cada PID recebido.",
+    "A tela deve declarar evidência insuficiente quando não há telemetria real recente e ECU validada."
   ],
   "rules": [
     {
       "id": "DTC_P0135_O2_HEATER",
-      "trigger": { "dtc": "P0135" },
+      "trigger": {
+        "dtc": "P0135"
+      },
       "hypothesis": "FALHA_CIRCUITO_AQUECEDOR_O2_B1S1",
       "baseScore": 0.5,
-      "tests": ["verificar alimentação do aquecedor", "verificar resistência do aquecedor conforme especificação do sensor", "inspecionar fusível/relé quando aplicável", "inspecionar chicote e conectores", "verificar comando da ECU antes de substituir o sensor"]
+      "tests": [
+        "verificar alimentação do aquecedor",
+        "verificar resistência do aquecedor conforme especificação do sensor",
+        "inspecionar fusível/relé quando aplicável",
+        "inspecionar chicote e conectores",
+        "verificar comando da ECU antes de substituir o sensor"
+      ]
     },
     {
       "id": "DTC_P0420_CATALYST_EFFICIENCY",
-      "trigger": { "dtc": "P0420" },
+      "trigger": {
+        "dtc": "P0420"
+      },
       "hypothesis": "EFICIENCIA_CATALISADOR_BAIXA",
       "baseScore": 0.5,
-      "tests": ["correlacionar sinais dos sensores O2 antes/depois do catalisador quando disponíveis", "verificar STFT/LTFT", "descartar falhas de combustão e mistura fora de controle", "verificar temperatura e condições de operação", "só condenar o catalisador após eliminar causas a montante"]
+      "tests": [
+        "correlacionar sinais dos sensores O2 antes/depois do catalisador quando disponíveis",
+        "verificar STFT/LTFT",
+        "descartar falhas de combustão e mistura fora de controle",
+        "verificar temperatura e condições de operação",
+        "só condenar o catalisador após eliminar causas a montante"
+      ]
     },
     {
       "id": "DTC_P0301_MISFIRE",
-      "trigger": { "dtc": "P0301" },
+      "trigger": {
+        "dtc": "P0301"
+      },
       "hypothesis": "FALHA_DE_COMBUSTAO_CILINDRO_1",
       "baseScore": 0.55,
-      "tests": ["verificar contagem de falhas", "comparar STFT/LTFT", "avaliar O2", "testar ignição do cilindro 1", "testar injetor e compressão se a falha persistir"]
+      "tests": [
+        "verificar contagem de falhas",
+        "comparar STFT/LTFT",
+        "avaliar O2",
+        "testar ignição do cilindro 1",
+        "testar injetor e compressão se a falha persistir"
+      ]
     },
     {
       "id": "DTC_P0123_THROTTLE",
-      "trigger": { "dtc": "P0123" },
+      "trigger": {
+        "dtc": "P0123"
+      },
       "hypothesis": "SINAL_DE_POSICAO_DA_BORBOLETA_ALTO",
       "baseScore": 0.5,
-      "tests": ["comparar TPS em marcha lenta", "observar variação do TPS", "verificar alimentação e aterramento", "inspecionar chicote e conector"]
+      "tests": [
+        "comparar TPS em marcha lenta",
+        "observar variação do TPS",
+        "verificar alimentação e aterramento",
+        "inspecionar chicote e conector"
+      ]
     },
     {
       "id": "DTC_P0133_O2_SLOW",
-      "trigger": { "dtc": "P0133" },
+      "trigger": {
+        "dtc": "P0133"
+      },
       "hypothesis": "RESPOSTA_LENTA_O2_B1S1",
       "baseScore": 0.45,
-      "tests": ["verificar temperatura de operação", "avaliar mistura e fuel trims", "verificar resposta do O2 em condições de malha fechada", "inspecionar entrada de ar e vazamento de escape antes do sensor"]
+      "tests": [
+        "verificar temperatura de operação",
+        "avaliar mistura e fuel trims",
+        "verificar resposta do O2 em condições de malha fechada",
+        "inspecionar entrada de ar e vazamento de escape antes do sensor"
+      ]
     },
     {
       "id": "FUEL_TRIM_LEAN",
-      "trigger": { "combinedTrimMin": 15 },
+      "requiredDurationMs": 30000,
+      "requiredSamples": 10,
+      "trigger": {
+        "combinedTrimMin": 15
+      },
       "hypothesis": "MISTURA_POBRE",
       "baseScore": 0.45,
-      "tests": ["confirmar motor aquecido e malha fechada", "verificar entrada de ar falsa", "verificar pressão de combustível", "avaliar injetores", "correlacionar MAF/MAP e resposta do O2"]
+      "tests": [
+        "confirmar motor aquecido e malha fechada",
+        "verificar entrada de ar falsa",
+        "verificar pressão de combustível",
+        "avaliar injetores",
+        "correlacionar MAF/MAP e resposta do O2"
+      ]
     },
     {
       "id": "FUEL_TRIM_RICH",
-      "trigger": { "combinedTrimMax": -15 },
+      "requiredDurationMs": 30000,
+      "requiredSamples": 10,
+      "trigger": {
+        "combinedTrimMax": -15
+      },
       "hypothesis": "MISTURA_RICA",
       "baseScore": 0.45,
-      "tests": ["confirmar motor aquecido e malha fechada", "verificar pressão de combustível", "verificar injetor com vazamento", "verificar sensor de temperatura", "correlacionar MAF/MAP e resposta do O2"]
+      "tests": [
+        "confirmar motor aquecido e malha fechada",
+        "verificar pressão de combustível",
+        "verificar injetor com vazamento",
+        "verificar sensor de temperatura",
+        "correlacionar MAF/MAP e resposta do O2"
+      ]
     },
     {
       "id": "MAP_HIGH_IDLE",
-      "trigger": { "condition": "IDLE_WARM", "mapMinKpa": 45 },
+      "requiredDurationMs": 30000,
+      "requiredSamples": 10,
+      "trigger": {
+        "condition": "IDLE_WARM",
+        "mapMinKpa": 45
+      },
       "hypothesis": "VACUO_DO_MOTOR_POSSIVELMENTE_ANORMAL",
       "baseScore": 0.35,
-      "tests": ["repetir MAP em marcha lenta aquecida", "comparar RPM e carga", "inspecionar admissão e sincronismo se a tendência persistir"]
+      "tests": [
+        "repetir MAP em marcha lenta aquecida",
+        "comparar RPM e carga",
+        "inspecionar admissão e sincronismo se a tendência persistir"
+      ]
     }
   ]
 }

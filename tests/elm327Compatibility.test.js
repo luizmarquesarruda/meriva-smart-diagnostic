@@ -1,24 +1,6 @@
 const assert = require('assert');
-const fs = require('fs');
 const path = require('path');
-const Module = require('module');
-const ts = require('typescript');
-
-function loadTs(tsPath) {
-  const source = fs.readFileSync(tsPath, 'utf8');
-  const output = ts.transpileModule(source, {
-    compilerOptions: {
-      module: ts.ModuleKind.CommonJS,
-      target: ts.ScriptTarget.ES2019,
-      esModuleInterop: true,
-    },
-  }).outputText;
-  const mod = new Module(tsPath, null);
-  mod.filename = tsPath;
-  mod.paths = Module._nodeModulePaths(path.dirname(tsPath));
-  mod._compile(output, tsPath);
-  return mod.exports;
-}
+const { loadTs } = require('./helpers/loadTs');
 
 function normalize(response) { return response.replace(/\0/g, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/[ \t]+$/gm, '').trim(); }
 function unsupported(response) { const value = normalize(response).toUpperCase(); return value === '?' || value.includes('UNKNOWN COMMAND') || value.includes('UNSUPPORTED'); }

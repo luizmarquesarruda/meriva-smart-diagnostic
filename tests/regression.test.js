@@ -4,31 +4,9 @@ const path = require('path');
 const fs = require('fs');
 const assert = require('assert');
 const Module = require('module');
-const ts = require('typescript');
+const { loadTs } = require('./helpers/loadTs');
 
 const ROOT = path.resolve(__dirname, '..');
-const compiled = new Map();
-
-function loadTs(tsPath) {
-  tsPath = path.normalize(tsPath);
-  if (compiled.has(tsPath)) return compiled.get(tsPath).exports;
-
-  const source = fs.readFileSync(tsPath, 'utf8');
-  const output = ts.transpileModule(source, {
-    compilerOptions: {
-      module: ts.ModuleKind.CommonJS,
-      target: ts.ScriptTarget.ES2019,
-      esModuleInterop: true,
-    },
-  }).outputText;
-
-  const mod = new Module(tsPath, null);
-  mod.filename = tsPath;
-  mod.paths = Module._nodeModulePaths(path.dirname(tsPath));
-  compiled.set(tsPath, mod);
-  mod._compile(output, tsPath);
-  return mod.exports;
-}
 
 const files = new Map();
 const dirs = new Set(['/doc']);
@@ -242,7 +220,7 @@ async function testParser() {
   const o2 = parser.parsePidResponse('0114', '41 14 6A 80');
   assert.strictEqual(o2.status, 'RESPONDEU');
   assert.strictEqual(o2.value, 0.53);
-  assert.strictEqual(o2.rawBytes.length, 4);
+  assert.deepStrictEqual(o2.rawBytes, [0x6A, 0x80]);
   assert.strictEqual(parser.parsePidResponse('01 0C', '41 0C 1A F8').value, 1726);
   assert.strictEqual(parser.validateOBDResponse('410C1AF8'), true);
   assert.strictEqual(parser.parsePidResponse('010C', '410C1AF8').value, 1726);
@@ -285,6 +263,48 @@ async function testElmAndProtocol() {
   assert.strictEqual(generic.command, '03');
   assert.strictEqual(generic.status, 'ERROR');
   await session.close();
+}
+
+async function testExclusiveElmCommandTransaction() {
+  const { Elm327Session } = loadTs(path.join(ROOT, 'src/obd/elm327.ts'));
+  const { SimulatedObdTransport } = loadTs(path.join(ROOT, 'src/obd/simulatedTransport.ts'));
+
+  const session = new Elm327Session(new SimulatedObdTransport({ latencyMs: 20 }));
+  await session.initialize();
+
+  const order = [];
+  const exclusive = session.withExclusiveCommandQueue(async (executeCommand) => {
+    order.push('exclusive-start');
+    const first = await executeCommand('0105');
+    assert.strictEqual(first.status, 'OK');
+    order.push('exclusive-mid');
+    await wait(10);
+    const second = await executeCommand('010C');
+    assert.strictEqual(second.status, 'OK');
+    order.push('exclusive-end');
+  });
+
+  await wait(1);
+  const concurrent = session.queryPid('010D').then(() => order.push('concurrent'));
+
+  await Promise.all([exclusive, concurrent]);
+  assert.deepStrictEqual(
+    order,
+    ['exclusive-start', 'exclusive-mid', 'exclusive-end', 'concurrent'],
+    'uma transação exclusiva deve manter os comandos contíguos na fila',
+  );
+
+  const failingExclusive = session.withExclusiveCommandQueue(async (executeCommand) => {
+    await executeCommand('0105');
+    throw new Error('FALHA CONTROLADA');
+  });
+  await assert.rejects(failingExclusive, /FALHA CONTROLADA/);
+
+  const afterFailure = await session.queryPid('010C');
+  assert.strictEqual(afterFailure.parsed.value, 774, 'a fila deve ser liberada mesmo quando a transação falha');
+
+  await session.close();
+  console.log('exclusive ELM command transaction: OK');
 }
 
 async function testConfiguredBluetoothRetryLimit() {
@@ -382,6 +402,17 @@ async function testActiveAdapterCannotBeSilentlySwitched() {
 
 async function testEcuValidationGate() {
   const manager = loadTs(path.join(ROOT, 'src/obd/bluetoothManager.ts'));
+  const bluetoothState = loadTs(path.join(ROOT, 'src/obd/bluetoothState.ts'));
+  assert.strictEqual(bluetoothState.canPollObd('READY', 'RESPONDING'), true);
+  assert.strictEqual(bluetoothState.canPollObd('READY', 'NO_RESPONSE'), false);
+  assert.strictEqual(bluetoothState.canPollObd('READY', 'RECOVERING'), false);
+
+  const sharedSource = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'sharedConnection.ts'), 'utf8');
+  const laboratorySource = fs.readFileSync(path.join(ROOT, 'app', 'laboratorio.tsx'), 'utf8');
+  assert.ok(sharedSource.includes('reportEcuPollResult('), 'polling deve alimentar o estado da ECU');
+  assert.ok(sharedSource.includes('await closeObdAutosaveSession()'), 'perda persistente da ECU deve fechar o autosave');
+  assert.ok(laboratorySource.includes('activeSession.withExclusiveCommandQueue(async (executeCommand)'), 'DTC real deve reservar a fila do ELM');
+  assert.ok(laboratorySource.includes('readFreezeFrame(activeSession, executeCommand)'), 'freeze frame deve usar a mesma reserva do ELM');
   assert.strictEqual(manager.getElmProtocolName('5'), 'ISO 14230-4 KWP FAST');
   assert.strictEqual(manager.getElmProtocolName('3'), 'ISO 9141-2');
   assert.strictEqual(manager.getElmProtocolName('6'), 'ISO 15765-4 CAN 11/500');
@@ -402,8 +433,6 @@ async function testPidScanner() {
   assert.ok(supported.includes('010C'));
   assert.ok(supported.includes('010F'));
   assert.ok(supported.includes('0111'));
-
-  const supported20 = scanner.decodeSupportedPids('0120', '41 20 00 02 00 00');
 
   const supported40 = scanner.decodeSupportedPids('0140', '41 40 00 00 00 02');
   assert.ok(supported40.includes('015F'));
@@ -605,6 +634,7 @@ async function testRawLogger() {
   resetFS();
   const parser = loadTs(path.join(ROOT, 'src/obd/parser.ts'));
   const logger = loadTs(path.join(ROOT, 'src/database/obdLogger.ts'));
+  const csvLogger = loadTs(path.join(ROOT, 'src/database/csvLogger.ts'));
   const parsed = parser.parsePidResponse('010C', '41 0C 1A F8');
 
   const query = {
@@ -618,6 +648,7 @@ async function testRawLogger() {
 
   await logger.logRawObdData(BASE, query, '010C', 'REAL');
   await logger.logInterpretedData(BASE, query, '010C', 'REAL');
+  await csvLogger.flushCsvLogger();
 
   const rawFile = Array.from(files.keys()).find((p) => p.includes('/LOGS/obd_raw_'));
   const interpretedFile = Array.from(files.keys()).find((p) => p.includes('/LOGS/obd_interpreted_'));
@@ -857,6 +888,7 @@ async function main() {
     ['banco de fórmulas OBD', testFormulaKnowledgeBank],
     ['parser + DTC', testParser],
     ['elm/protocolo/serialização', testElmAndProtocol],
+    ['transação exclusiva de comandos ELM', testExclusiveElmCommandTransaction],
     ['limite configurável de retry Bluetooth', testConfiguredBluetoothRetryLimit],
     ['ativação oficial do Bluetooth', testBluetoothActivationRequest],
     ['bloqueio de troca silenciosa de adaptador', testActiveAdapterCannotBeSilentlySwitched],

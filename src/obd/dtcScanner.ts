@@ -1,5 +1,5 @@
 import type { Elm327Session } from './elm327';
-import { parseDtcResponseForService } from './dtcParser';
+import { isValidDtcResponse, parseDtcResponseForService } from './dtcParser';
 import { parsePidResponse } from './parser';
 
 export type DtcServiceKind = 'STORED' | 'PENDING' | 'PERMANENT';
@@ -15,19 +15,15 @@ export interface DtcServiceScan {
   reason?: string;
 }
 
-const REQUESTS: Array<{
+const REQUESTS: {
   service: '03' | '07' | '0A';
   kind: DtcServiceKind;
   label: string;
-}> = [
+}[] = [
   { service: '03', kind: 'STORED', label: 'ARMAZENADOS / CONFIRMADOS' },
   { service: '07', kind: 'PENDING', label: 'PENDENTES' },
   { service: '0A', kind: 'PERMANENT', label: 'PERMANENTES' },
 ];
-
-function isNoCodeResponse(response: string): boolean {
-  return /NO DATA|NO CODES?|NENHUM/i.test(response);
-}
 
 export async function scanDtcServices(
   session: Elm327Session,
@@ -40,7 +36,7 @@ export async function scanDtcServices(
     try {
       const reply = await execute(request.service);
       const response = reply.response ?? '';
-      const available = reply.status === 'OK' || isNoCodeResponse(response);
+      const available = reply.status === 'OK' && isValidDtcResponse(request.service, response);
 
       results.push({
         ...request,
@@ -49,7 +45,7 @@ export async function scanDtcServices(
         response,
         elapsedMs: reply.elapsedMs,
         ...(available ? {} : {
-          reason: reply.errorMessage || ('SERVIÇO ' + request.service + ' NÃO DISPONÍVEL'),
+          reason: reply.errorMessage || ('SERVIÇO ' + request.service + ' SEM RESPOSTA OBD POSITIVA'),
         }),
       });
     } catch (cause) {
@@ -82,7 +78,6 @@ export function summarizeDtcScan(results: DtcServiceScan[]): {
 }
 
 export const DTC_SERVICE_REQUESTS = REQUESTS;
-
 
 export interface FreezeFrameSnapshot {
   frame: number;

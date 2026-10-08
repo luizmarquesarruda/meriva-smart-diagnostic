@@ -1636,3 +1636,86 @@ A confirmação definitiva exige uma sessão real na Meriva com ELM327, principa
 - Nenhuma dependência nova foi adicionada nesta etapa.
 - CI continua deliberadamente não disparada até concluir a revisão estática.
 
+## 2026-10-08 — Auditoria Gemini: fechamento do ciclo de saúde ECU
+
+### Problemas confirmados
+- O gate `canPollObd` verificava somente o lifecycle `READY` e ignorava `ecuResponseState`, permitindo novas consultas após a ECU entrar em `NO_RESPONSE`.
+- O polling automático não alimentava diretamente o mesmo contador/estado de saúde usado pelo monitor.
+- A sessão de autosave permanecia aberta até a perda do enlace Bluetooth, mesmo depois de a ECU atingir o limiar persistente de falhas.
+- A varredura de freeze frame ocorria fora da reserva exclusiva usada pelos serviços DTC 03/07/0A.
+- `scanDtcServices` tratava `status=OK` como disponibilidade, sem exigir cabeçalho OBD positivo do serviço.
+- A sonda 010C do polling dependia da lista descoberta de PIDs, embora 010C já fosse uma evidência obrigatória na validação da ECU.
+
+### Correções
+- `canPollObd(lifecycle, ecuResponseState)` agora libera OBD real somente com `READY + RESPONDING`.
+- Criado um único contrato de `EcuResponseState` em `bluetoothState.ts`; `sharedConnection` reutiliza e reexporta o tipo.
+- Criados `reportEcuPollResult()` e `recoverEcuIfNeeded()` em `sharedConnection`, centralizando falhas, recuperação e reabertura do autosave somente após nova resposta válida.
+- O PID 010C do polling automático passou a ser a sonda de saúde da própria ECU.
+- Após atingir `noDataReconnectThreshold`, a sessão de autosave é fechada antes da recuperação.
+- DTC 03/07/0A e freeze frame 020200/020C00/020500 agora compartilham a mesma transação exclusiva da fila ELM.
+- Criada `isValidDtcResponse()`; serviço DTC somente é marcado como disponível quando existe resposta OBD positiva compatível.
+- Os testes de estado Bluetooth e DTC foram fortalecidos contra regressões, incluindo respostas positivas/negativas e o bloqueio de polling sem ECU respondendo.
+
+### Commits
+- `57f23ca3adbab33569a33a87a8bca03856f9da11` — gate de polling por estado ECU
+- `efc8e47266bfa0e32a62c7552593c58e1e0ef020` — preparação do estado de recuperação
+- `db63e78f6fa9526d373fe5f2938604949c238394` — saúde/recuperação centralizadas
+- `0a63ecd0b90e386c5ad16a6d0adc19e9becc7145` — monitor usando o mesmo contrato
+- `85619903334f58d2594f6e20fd21ff5a338fb2b2` — tratamento de exceções do monitor
+- `91d93ed22b6e222ceddbfde8ce269170a813696d` — evitar alterações desnecessárias no autosave
+- `aa8bf89db9e54f8ed70ebdf6d811ee33de8ec578` — recuperação sem checkpoints redundantes
+- `225e45a503702915af3dd105930edb92ca146b4b` — polling automático como evidência ECU
+- `6ce31b48b62453d17d7378a79295e80589fc4781` — parar polling após perda da ECU
+- `1f53b84248e7af1a4742a7aedd861aec5a5c5f86` — bloqueio de consultas na tela
+- `e1a3bd793cb983234415932db03f69a7eeded6a95` — resposta positiva DTC (histórico de correção consolidado no branch)
+- `0adc960a05bf40e222e08169e106b3bdc4bc1e4f` — scanner DTC com validação positiva
+- `ae6aaff9b1f0d71d6c64b6b7f206ad6e51542b8b` — tipo ECU unificado
+- `215694cbf199f57d3bfd0dc65c6d05b1edd49eea` — testes do gate ECU
+- `00becd4df6f830d0f8bee5b4dd1f5628b00e6d67` — testes de resposta DTC
+- `efbe581665486ee7859bf1fe555e10d48f3e2c12` — correção das asserções DTC
+- `0f2dd878127ff1430ffb2d7b58a01ee71d8ab7a4` — 010C como sonda de saúde independente da descoberta
+- `ab7e6bdeb780a736379a674b219c584edc93f6bc` — freeze frame dentro da transação exclusiva
+- `3824e5597ec6e3ce35e5ee4788861452c07e167c` — regressões de estado ECU/DTC
+
+### CI
+Nenhuma CI foi disparada manualmente nesta etapa. A confirmação final ainda depende de execução de typecheck, suíte completa e build Android.
+
+## 2026-10-08 — Atualização do diário após correções da auditoria
+
+- Consolidado neste diário o registro das correções no gate de polling, monitoramento de saúde da ECU, autosave, fila exclusiva DTC/freeze-frame e validação de respostas positivas.
+- Revisado o registro de commits e corrigida a referência do commit da validação DTC.
+- Branch de trabalho: `feat/obd-polling-reliability-20261008`.
+- Estado de validação: revisão estática dos arquivos e gravações confirmadas pelo GitHub; **typecheck, testes automatizados e build Android ainda não foram executados nesta etapa**.
+- CI: **não disparada**, respeitando a instrução de não iniciar novas execuções sem autorização explícita.
+- Próximo passo técnico quando autorizado: executar validação completa, corrigir falhas encontradas e só então considerar o build apto para teste físico na Meriva com ELM327.
+
+## 2026-10-08 — Red Team da IA diagnóstica local
+
+**Escopo:** endurecer o motor de evidências sem adicionar funcionalidades fora do núcleo.
+
+- O motor local agora só aceita amostras de PID com fonte `REAL_OBD`, status `RESPONDEU`, PID válido, valor finito e timestamp recente (janela máxima de 120 s; tolerância futura de 30 s).
+- Fuel trims fora de -100 a 100 e MAP fora de 0 a 255 são bloqueados antes das regras heurísticas.
+- O resultado expõe contagens de amostras ao vivo aceitas, simulações bloqueadas, amostras antigas/inválidas bloqueadas e DTCs não aceitos.
+- As telas Saúde/Laboratório e o relatório TXT passam o status real da consulta para o motor; a Saúde não declara normalidade sem conexão, ECU validada e pelo menos uma amostra ao vivo válida.
+- A lista de DTCs ativos na Saúde agora considera somente registros de origem `REAL_OBD`. O score é apresentado como heurístico, não como probabilidade estatística.
+- Foram adicionados casos adversariais para leitura antiga, valor fora da faixa, timeout e normalização de código DTC.
+
+**Validação:** alterações gravadas na branch `feat/obd-polling-reliability-20261008`. Testes automatizados e typecheck ainda não foram executados nesta etapa. **CI não disparada**, conforme restrição vigente.
+
+### Complemento — coerência temporal e contexto do motor
+
+- Regras combinadas de fuel trim e MAP exigem snapshots cujos timestamps diferem no máximo 2 segundos.
+- Regras de mistura e MAP em marcha lenta são bloqueadas quando o RPM é igual ou inferior a 400.
+- Picos isolados não geram hipótese PID: a regra exige 10 amostras coerentes distribuídas por pelo menos 30 segundos dentro de uma janela de 60 segundos. Se a condição desaparece, a contagem temporal é reiniciada.
+- A tela Saúde atualiza o estado observado a cada 5 segundos (em vez de cada segundo), reduzindo a frequência de reavaliação da árvore diagnóstica. Não foi adicionado lodash ou uma dependência nova.
+- A base JSON agora documenta esses requisitos; o TXT de diagnóstico inclui contadores de snapshots incoerentes, regras pendentes e regras bloqueadas com o motor desligado.
+- Testes adversariais adicionados para pico isolado, RPM zero, PIDs separados por mais de 2 segundos e persistência por 10 amostras/30 segundos.
+
+**Limitação conhecida:** a tela Saúde usa um refresh periódico de 5 s, não um scheduler dedicado em worker. O motor é pequeno e síncrono; ainda não há benchmark de FPS ou perfil de bateria. Testes e typecheck permanecem pendentes porque nenhuma CI foi disparada.
+
+
+## IA — controle de frequência e limiares temporais declarativos
+- A tela de Saúde agenda a inferência num temporizador próprio de 5 segundos, separado do estado visual; não chama o motor a cada atualização individual de PID.
+- As regras FUEL_TRIM_LEAN, FUEL_TRIM_RICH e MAP_HIGH_IDLE declaram no JSON `requiredSamples: 10` e `requiredDurationMs: 30000`; o motor consome esses parâmetros em vez de depender apenas de constantes implícitas.
+- O intervalo foi mantido em 5 segundos, e não 10, porque a confirmação atual exige 10 avaliações em até 60 segundos; aumentar para 10 segundos inviabilizaria essa condição sem mover a coleta temporal para a camada de ingestão.
+- Não foram executados testes, typecheck ou CI. Alterações aguardam validação executável.

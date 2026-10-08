@@ -1,26 +1,8 @@
 'use strict';
 
 const assert = require('assert');
-const fs = require('fs');
-const path = require('path');
-const ts = require('typescript');
-const Module = require('module');
-
-const ROOT = path.resolve(__dirname, '..');
-const sourcePath = path.join(ROOT, 'src', 'obd', 'bluetoothState.ts');
-const source = fs.readFileSync(sourcePath, 'utf8');
-const output = ts.transpileModule(source, {
-  compilerOptions: {
-    module: ts.ModuleKind.CommonJS,
-    target: ts.ScriptTarget.ES2019,
-  },
-}).outputText;
-
-const mod = new Module(sourcePath, null);
-mod.filename = sourcePath;
-mod.paths = Module._nodeModulePaths(path.dirname(sourcePath));
-mod._compile(output, sourcePath);
-const state = mod.exports;
+const { loadTs } = require('./helpers/loadTs');
+const state = loadTs('src/obd/bluetoothState.ts');
 
 for (const connected of [
   'BLUETOOTH_CONNECTED',
@@ -44,10 +26,13 @@ for (const disconnected of [
   assert.strictEqual(state.isBluetoothLinkUp(disconnected), false, disconnected + ' não é link conectado');
 }
 
-assert.strictEqual(state.canPollObd('READY'), true);
-assert.strictEqual(state.canPollObd('ECU_RESPONDING'), false);
-assert.strictEqual(state.canPollObd('ELM_INITIALIZED'), false);
-assert.strictEqual(state.canPollObd('BLUETOOTH_CONNECTED'), false);
-assert.strictEqual(state.canPollObd('BLUETOOTH_OFF'), false);
+assert.strictEqual(state.canPollObd('READY', 'RESPONDING'), true);
+assert.strictEqual(state.canPollObd('READY', 'NO_RESPONSE'), false);
+assert.strictEqual(state.canPollObd('READY', 'RECOVERING'), false);
+assert.strictEqual(state.canPollObd('READY', 'NOT_VALIDATED'), false);
+assert.strictEqual(state.canPollObd('ECU_RESPONDING', 'RESPONDING'), false);
+assert.strictEqual(state.canPollObd('ELM_INITIALIZED', 'RESPONDING'), false);
+assert.strictEqual(state.canPollObd('BLUETOOTH_CONNECTED', 'RESPONDING'), false);
+assert.strictEqual(state.canPollObd('BLUETOOTH_OFF', 'RESPONDING'), false);
 
 console.log('bluetoothState.test.js: OK');
