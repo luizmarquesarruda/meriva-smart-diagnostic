@@ -2,7 +2,7 @@ import type { Elm327Session } from './elm327';
 import type { BluetoothDeviceInfo } from './bluetoothClassicTransport';
 import { createRealElmSession, discoverPairedDevices, ensureBluetoothReady } from './bluetoothManager';
 import { DEFAULT_ELM327_COMPATIBILITY, Elm327CompatibilityConfig, mergeCompatibilityConfig } from './elm327Compatibility';
-import { getAutoSaveState, saveNow, updateAutoSaveState } from '../meriva/autosaveManager';
+import { getAutoSaveState, closeObdAutosaveSession, startObdAutosaveSession, updateAutoSaveState } from '../meriva/autosaveManager';
 import { clearBluetoothDiagnostic, getLastBluetoothDiagnosticText } from './bluetoothManager';
 import { isBluetoothLinkUp, type BluetoothLifecycleState } from './bluetoothState';
 import RNBluetoothClassic from 'react-native-bluetooth-classic';
@@ -56,15 +56,7 @@ function setLifecycle(next: BluetoothLifecycleState): void {
 
 async function persistDisconnectedState(): Promise<void> {
   try {
-    updateAutoSaveState((state) => {
-      state.obd = {
-        ...state.obd,
-        connected: false,
-        protocol: undefined,
-        lastKnownProtocol: state.obd.protocol ?? state.obd.lastKnownProtocol,
-      };
-    });
-    await saveNow('critical');
+    await closeObdAutosaveSession();
   } catch {
     // a perda de conectividade não deve derrubar a interface
   }
@@ -252,7 +244,10 @@ async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm3
           lastConnectedAt: validatedAt,
         };
       });
-      await saveNow('critical');
+      const sessionSaved = await startObdAutosaveSession();
+      if (!sessionSaved) {
+        console.warn('[obd] ECU validada, mas não foi possível iniciar o autosave da sessão.');
+      }
     } catch (persistCause) {
       // Falha de persistência não invalida uma conexão já validada pelo ELM/ECU.
       console.warn('[obd] falha ao persistir adaptador/ECU:', persistCause instanceof Error ? persistCause.message : persistCause);
@@ -351,10 +346,17 @@ export async function setSharedObdConnection(connection: SharedObdConnection | n
   if (connection) {
     lastConnectionError = null;
     setLifecycle('READY');
+    if (connection.ecuValidated) {
+      const sessionSaved = await startObdAutosaveSession();
+      if (!sessionSaved) {
+        console.warn('[obd] ECU validada, mas não foi possível iniciar o autosave da sessão.');
+      }
+    }
     startBluetoothMonitor();
   } else {
     lifecycle = 'DISCONNECTED';
     emit();
+    await closeObdAutosaveSession();
   }
 }
 
@@ -373,6 +375,10 @@ export async function disconnectSharedObd(): Promise<void> {
   lifecycle = 'DISCONNECTED';
   emit();
 
-  if (connection) await connection.session.close();
-  intentionalDisconnect = false;
+  try {
+    if (connection) await connection.session.close();
+  } finally {
+    await closeObdAutosaveSession();
+    intentionalDisconnect = false;
+  }
 }
