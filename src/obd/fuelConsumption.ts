@@ -72,3 +72,50 @@ export class FuelRateIntegrator {
     return { ...this.state };
   }
 }
+
+
+export type FuelRateSource = 'MEASURED_015E' | 'ESTIMATED_MAF' | 'ESTIMATED_MAP';
+
+export interface FuelRateEstimateInput {
+  mafGs?: number | null;
+  mapKpa?: number | null;
+  rpm?: number | null;
+  intakeAirTempC?: number | null;
+  displacementCm3?: number | null;
+  volumetricEfficiency?: number;
+  airFuelRatio?: number;
+  fuelDensityKgPerL?: number;
+}
+
+export function estimateFuelRateLph(input: FuelRateEstimateInput): { rateLph: number; source: FuelRateSource } | null {
+  const afr = input.airFuelRatio ?? 14.7;
+  const density = input.fuelDensityKgPerL ?? 0.745;
+
+  if (Number.isFinite(input.mafGs) && (input.mafGs ?? 0) >= 0 && afr > 0 && density > 0) {
+    const fuelKgPerSecond = (input.mafGs as number) / 1000 / afr;
+    return { rateLph: fuelKgPerSecond * 3600 / density, source: 'ESTIMATED_MAF' };
+  }
+
+  const map = input.mapKpa;
+  const rpm = input.rpm;
+  const iat = input.intakeAirTempC;
+  const displacementL = (input.displacementCm3 ?? 0) / 1000;
+  const ve = input.volumetricEfficiency ?? 0.80;
+  if (
+    Number.isFinite(map) && (map ?? 0) > 0
+    && Number.isFinite(rpm) && (rpm ?? 0) > 0
+    && Number.isFinite(iat)
+    && displacementL > 0
+    && afr > 0 && density > 0 && ve > 0
+  ) {
+    const absolutePressurePa = (map as number) * 1000;
+    const temperatureK = (iat as number) + 273.15;
+    const airDensityGPerL = absolutePressurePa / (287.05 * temperatureK);
+    const volumetricFlowLPerSecond = displacementL * (rpm as number) / 120 * ve;
+    const mafGs = airDensityGPerL * volumetricFlowLPerSecond;
+    const fuelKgPerSecond = mafGs / 1000 / afr;
+    return { rateLph: fuelKgPerSecond * 3600 / density, source: 'ESTIMATED_MAP' };
+  }
+
+  return null;
+}
