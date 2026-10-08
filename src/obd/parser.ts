@@ -45,9 +45,9 @@ export function extractHexBytes(rawResponse: string): number[] {
   return tokens.map((token) => Number.parseInt(token.trim(), 16));
 }
 
-export function validateOBDResponse(response: string): boolean {
+export function validateOBDResponse(response: string, positiveService = '41'): boolean {
   if (!response.trim() || /NO DATA|UNABLE TO CONNECT|ERROR|BUS ERROR/i.test(response)) return false;
-  return /41[0-9A-F]{2}/i.test(normalizeHexStream(response));
+  return new RegExp(positiveService + '[0-9A-F]{2}', 'i').test(normalizeHexStream(response));
 }
 
 export function parsePidResponse(pidRequested: string, rawResponse: string, positiveService = '41'): ParsedPidResult {
@@ -84,7 +84,7 @@ export function parsePidResponse(pidRequested: string, rawResponse: string, posi
     };
   }
 
-  if (!validateOBDResponse(rawResponse)) {
+  if (!validateOBDResponse(rawResponse, positiveService)) {
     return {
       pid,
       name: definition.name,
@@ -98,7 +98,7 @@ export function parsePidResponse(pidRequested: string, rawResponse: string, posi
     };
   }
 
-  const data = findResponsePayload(rawResponse, pid, definition.bytes);
+  const data = findResponsePayload(rawResponse, pid, definition.bytes, positiveService);
   if (data.length !== definition.bytes) {
     return {
       pid,
