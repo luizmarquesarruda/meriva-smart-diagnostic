@@ -57,7 +57,12 @@ function setLifecycle(next: BluetoothLifecycleState): void {
 async function persistDisconnectedState(): Promise<void> {
   try {
     updateAutoSaveState((state) => {
-      state.obd = { ...state.obd, connected: false };
+      state.obd = {
+        ...state.obd,
+        connected: false,
+        protocol: undefined,
+        lastKnownProtocol: state.obd.protocol ?? state.obd.lastKnownProtocol,
+      };
     });
     await saveNow('critical');
   } catch {
@@ -240,6 +245,7 @@ async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm3
           connected: true,
           adapterName: device.name,
           protocol: connection.protocol ?? undefined,
+          lastKnownProtocol: connection.protocol ?? state.obd.lastKnownProtocol,
           ecuAddress: state.vehicle?.ecuAddress ?? state.obd.ecuAddress,
           ecuValidatedAt: validatedAt,
           ecuValidationSource: state.vehicle?.ecuAddress ? 'VEHICLE_PROFILE' : 'OBD_RESPONSE',
