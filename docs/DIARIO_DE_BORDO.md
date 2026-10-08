@@ -390,3 +390,49 @@ Nenhuma alteração foi feita no protocolo Bluetooth/ELM327 ou no motor de evid�
 ### Estado
 Código implementado no main. A conclusão técnica depende da nova CI: typecheck, suíte completa e Android build precisam terminar verdes antes de considerar as três fases encerradas.
 
+## 2026-10-07 — Consolidação do Diário após as fases 1, 2 e 3
+
+### Registro consolidado
+A nova arquitetura de experiência do aplicativo foi registrada neste diário após a implementação do cockpit e das telas secundárias. O foco da mudança foi melhorar a hierarquia de informação sem acoplar a UI ao transporte Bluetooth/ELM327.
+
+### Fluxo de navegação atual
+- Cockpit: estado imediato do veículo, conexão, saúde e ações principais.
+- Diagnóstico: laboratório OBD existente, responsável pelas operações técnicas.
+- Dados em Tempo Real: telemetria e últimas leituras de PID.
+- Central de Saúde: DTCs, evidências e hipóteses locais.
+- Mais Recursos: entrada organizada para módulos secundários.
+- Veículo: perfil do Meriva e estado de ECU/adaptador.
+- Viagens: ciclos, distância e consumo registrados.
+- Aprendizado: amostras reais, seed e contaminação por simulação.
+- Bluetooth / Histórico / Configurações: fluxos existentes preservados.
+
+### Arquivos principais envolvidos
+- app/index.tsx
+- app/dados.tsx
+- app/saude.tsx
+- app/mais.tsx
+- app/veiculo.tsx
+- app/viagens.tsx
+- app/aprendizado.tsx
+- tests/cockpitNavigation.test.js
+- package.json
+
+### Correção durante a implementação
+A tela de Viagens foi ajustada para usar o schema real de DriveCycle, utilizando startedAt e distanceTotalKm em vez de campos inexistentes. Isso evita uma quebra de integração entre a nova UI e a camada de dados existente.
+
+### Princípios preservados
+1. A UI não cria telemetria falsa.
+2. Dados de simulação continuam separados de evidência REAL_OBD.
+3. O protocolo de comunicação Bluetooth/ELM327 não foi alterado pela remodelação visual.
+4. A persistência/autosave existente continua sendo a fonte de estado.
+5. O Diário de Bordo deve registrar correções de integração antes de novas mudanças estruturais.
+
+### Validação
+Foi adicionada uma regressão estática para as novas rotas e integrações principais. O último commit de documentação ainda não possui status de CI associado disponível no momento deste registro; portanto, não declarar a nova versão como validada por CI até a execução terminar verde.
+
+### Próximas ações
+1. Executar/acompanhar CI completa.
+2. Corrigir eventuais erros de TypeScript, testes ou Android build antes de novas mudanças visuais.
+3. Após CI verde, validar a experiência no aparelho Android físico com ELM327 real.
+4. Na validação física, verificar principalmente os estados: offline, conectando, Bluetooth conectado sem ECU validada, ECU conectada, DTC presente e ausência de dados reais.
+
