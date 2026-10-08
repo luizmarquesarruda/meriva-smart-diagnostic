@@ -33,6 +33,16 @@ assert.deepStrictEqual(parseDtcResponseForService('0A', '4A 01 23 00 00'), ['P01
   assert.deepStrictEqual(summary.permanent, []);
   assert.deepStrictEqual(summary.unavailable, ['0A']);
 
+  const invalidResponseResults = await scanner.scanDtcServices({}, async (command) => ({
+    response: command === '03' ? '41 0C 1A F8' : 'NO DATA',
+    status: 'OK',
+    elapsedMs: 20,
+  }));
+  assert.strictEqual(invalidResponseResults.every((item) => item.available === false), false);
+  assert.strictEqual(invalidResponseResults.find((item) => item.service === '03').available, false);
+  assert.strictEqual(invalidResponseResults.find((item) => item.service === '07').available, false);
+  assert.strictEqual(invalidResponseResults.find((item) => item.service === '0A').available, false);
+
   console.log('DTC services: mode 03/07/0A parsing + unsupported handling: PASS');
 })().catch((error) => {
   console.error(error);
