@@ -69,6 +69,7 @@ export default function ArmazenamentoScreen() {
         {quota?.message || 'VERIFICANDO'}
       </Text>
       {!!message && <Text style={styles.cleanMessage}>{message}</Text>}
+      <View style={[styles.dataColumns, layout.landscape && styles.dataColumnsLandscape]}>
       <View style={styles.card}>
         <Text style={styles.cardTitle}>ESPAÇO UTILIZADO</Text>
         {Object.entries(usageBreakdown).map(([dir, sizesMb]) => (
@@ -91,6 +92,7 @@ export default function ArmazenamentoScreen() {
           </View>
         )) : <Text style={styles.empty}>Nenhuma viagem salva ainda.</Text>}
       </View>
+      </View>
 
       <TouchableOpacity style={styles.button} onPress={handleClean} disabled={!basePath || busy}>
         <Text style={styles.buttonText}>{busy ? 'LIMPANDO...' : 'LIMPAR DADOS ANTIGOS'}</Text>
@@ -103,6 +105,8 @@ export default function ArmazenamentoScreen() {
 
 const styles = StyleSheet.create({
   container: { flexGrow: 1, paddingVertical: 16, backgroundColor: '#0b1220' },
+  dataColumns: { width: '100%' },
+  dataColumnsLandscape: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
   title: { fontSize: 23, fontWeight: '900', color: '#7db3ff', letterSpacing: 0.5, marginBottom: 5 },
   subtitle: { color: '#8da2bd', fontSize: 11, lineHeight: 16, marginBottom: 12 },
   status: { fontWeight: '700', marginBottom: 16 },
@@ -112,7 +116,7 @@ const styles = StyleSheet.create({
   cleanMessage: { color: '#e5edf7', marginBottom: 12 },
   historyCard: { backgroundColor: '#111c2e', borderRadius: 8, padding: 11, borderWidth: 1, borderColor: '#243652', marginBottom: 10 },
   historyRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#243652' },
-  historyMain: { flex: 1 },
+  historyMain: { flex: 1, minWidth: 0 },
   historyDate: { color: '#e5edf7', fontWeight: '800', fontSize: 11 },
   historyMeta: { color: '#8da2bd', fontSize: 10, marginTop: 2 },
   real: { color: '#15803d', fontWeight: '900', fontSize: 9 },
