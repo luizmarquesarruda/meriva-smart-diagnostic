@@ -29,7 +29,7 @@ assert(shared.includes('closeObdAutosaveSession'));
 assert(shared.includes('persistValidatedConnection'));
 assert(shared.includes('startBluetoothMonitor'));
 assert(shared.includes('preferredAddress'));
-assert(shared.includes('selectedAdapterAddress: device.address.toUpperCase()'));
+assert(shared.includes('selectedAdapterAddress: connection.device.address.toUpperCase()'));
 assert(shared.includes('ecuValidatedAt: validatedAt'));
 assert(shared.includes("ecuValidationSource: state.vehicle?.ecuAddress ? 'VEHICLE_PROFILE' : 'OBD_RESPONSE'"));
 assert(rootLayout.includes('connectPreferredElm(settings.selectedAdapterAddress)'));

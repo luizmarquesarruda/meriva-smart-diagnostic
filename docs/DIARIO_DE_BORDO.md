@@ -1397,3 +1397,21 @@ A duplicação não corrompe o autosave principal, mas distorce a série tempora
 
 ### Estado
 Plano registrado antes da alteração de código. A CI anterior continua sendo apenas a referência da versão anterior; a nova CI será o árbitro desta correção.
+
+### Preparação da CI de validação
+As correções desta auditoria já estão no `main`. Esta branch de verificação preserva exatamente o código corrigido e adiciona somente este registro documental para forçar uma execução verificável do GitHub Actions sobre o estado atual.
+
+## 2026-10-08 — CI #1235: regressão estática no teste de ciclo Bluetooth
+### Falha observada
+A CI #1235 / run `37795969222` executou `npm ci`, Expo Doctor `17/17` e TypeScript com sucesso. A suíte falhou em `tests/bluetoothLifecycle.test.js:32` porque o teste procurava literalmente `selectedAdapterAddress: device.address.toUpperCase()`.
+
+### Diagnóstico
+A implementação atual e correta usa o objeto `connection` já validado: `selectedAdapterAddress: connection.device.address.toUpperCase()`. O teste ficou desatualizado após a centralização da persistência da conexão. Não há evidência de defeito na produção neste ponto.
+
+### Plano antes da correção
+1. Atualizar somente a asserção estática para refletir o contrato atual de `persistValidatedConnection()`.
+2. Não alterar o fluxo Bluetooth/ELM327 nem a persistência de produção.
+3. Rodar novamente a CI completa e exigir `validate` verde antes do Android Release.
+
+### Estado
+A correção será limitada ao teste; o fluxo de produção permanece inalterado.
