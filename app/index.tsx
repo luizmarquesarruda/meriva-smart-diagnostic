@@ -15,6 +15,7 @@ import { createLearningProfile, initializeCarScannerSeed, readLearningProfile } 
 import { readAppSettings, type AppSettings } from '../src/database/appSettings';
 import { connectPreferredElm, getSharedObdConnection, getSharedObdLastError, getSharedObdStatus, subscribeSharedObd } from '../src/obd/sharedConnection';
 import { autoTripService, type AutoTripServiceState } from '../src/trip/autoTripService';
+import { getLivePidTrend, LIVE_TELEMETRY_STALE_AFTER_MS } from '../src/obd/liveTelemetry';
 
 function formatDistance(km: number, unit: AppSettings['distanceUnit']): string {
   if (!Number.isFinite(km) || km < 0) return 'N/D';
@@ -35,6 +36,7 @@ export default function IndexScreen() {
   const [tripState, setTripState] = useState<AutoTripServiceState>(autoTripService.getState());
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [dtcCount, setDtcCount] = useState(0);
+  const [liveRpm, setLiveRpm] = useState<number | null>(null);
   const layout = useMidLayout();
 
   useEffect(() => gpsTracker.subscribe(setGpsState), []);
@@ -53,11 +55,13 @@ export default function IndexScreen() {
       adapterName: live?.device.name ?? state.obd.adapterName,
     });
     setSaveStatus(getAutoSaveStatus());
+    const rpmTrend = getLivePidTrend('010C');
+    setLiveRpm(rpmTrend && rpmTrend.ageSeconds * 1000 <= LIVE_TELEMETRY_STALE_AFTER_MS ? rpmTrend.current : null);
   }, []);
 
   useEffect(() => {
     syncLiveState();
-    const timer = setInterval(syncLiveState, 1000);
+    const timer = setInterval(syncLiveState, 500);
     return () => clearInterval(timer);
   }, [syncLiveState]);
 
@@ -195,7 +199,7 @@ export default function IndexScreen() {
           </View>
           <View style={styles.heroCard}>
             <Text style={styles.heroEyebrow}>{connectionStatus.ecuConnected ? 'MOTOR • ECU CONECTADA' : 'ESTADO DO VEÍCULO'}</Text>
-            <Text style={styles.heroValue}>{connectionStatus.ecuConnected && getAutoSaveState().lastReadings.find((item) => /rpm/i.test(item.name) && item.value != null) ? (Math.round(getAutoSaveState().lastReadings.find((item) => /rpm/i.test(item.name) && item.value != null)?.value ?? 0) + ' RPM') : getAutoSaveState().autonomy.estimatedRangeKm > 0 ? (getAutoSaveState().autonomy.estimatedRangeKm.toFixed(0) + ' km') : 'PRONTO'}</Text>
+            <Text style={styles.heroValue}>{connectionStatus.ecuConnected && liveRpm != null ? (Math.round(liveRpm) + ' RPM') : getAutoSaveState().autonomy.estimatedRangeKm > 0 ? (getAutoSaveState().autonomy.estimatedRangeKm.toFixed(0) + ' km') : 'PRONTO'}</Text>
             <Text style={styles.heroState}>{connectionStatus.ecuConnected ? 'DADOS OBD EM TEMPO REAL' : 'CONECTE O ELM327 PARA INICIAR'}</Text>
             <View style={styles.metricRow}>
               <CockpitMetric label="VELOCIDADE" value={gpsState.currentSpeedKmh.toFixed(0) + ' km/h'} />
