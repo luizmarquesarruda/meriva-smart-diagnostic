@@ -97,6 +97,14 @@ export async function ensureBluetoothReady(): Promise<boolean> {
     throw new Error('MÓDULO BLUETOOTH CLASSIC NÃO ESTÁ DISPONÍVEL NO BUILD NATIVO. REINSTALE/RECONSTRUA O APK.');
   }
 
+  logBluetoothDiagnostic('BLUETOOTH_NATIVE_FINGERPRINT', {
+    moduleAvailable: true,
+    hasIsBluetoothAvailable: typeof bluetoothClassic.isBluetoothAvailable === 'function',
+    hasIsBluetoothEnabled: typeof bluetoothClassic.isBluetoothEnabled === 'function',
+    hasRequestBluetoothEnabled: typeof bluetoothClassic.requestBluetoothEnabled === 'function',
+    reactNativeBluetoothClassic: '1.73.0-rc.17',
+  });
+
   const available = await bluetoothClassic.isBluetoothAvailable();
   logBluetoothDiagnostic('BLUETOOTH_AVAILABLE', available);
   if (!available) {
