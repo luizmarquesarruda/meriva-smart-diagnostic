@@ -16,6 +16,9 @@ function main() {
   const rules = require(DIAGNOSTIC_RULES_PATH);
   assert.ok(Array.isArray(rules.rules), 'diagnostic_rules.json deve conter rules');
 
+  const emptyResult = loadTs('src/diagnostics/diagnosticEngine.ts').runLocalDiagnostic({ observations: [], dtcs: [], condition: 'UNKNOWN' });
+  assert.strictEqual(emptyResult.acceptedLiveSamples, 0, 'sem amostras válidas, a IA deve declarar evidência insuficiente');
+
   const engine = loadTs('src/diagnostics/diagnosticEngine.ts');
   const base = { observations: [], dtcs: [], condition: 'IDLE_WARM' };
 
