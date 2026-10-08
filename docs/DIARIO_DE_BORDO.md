@@ -1224,3 +1224,28 @@ PR #31 foi integrado ao `main` por squash no commit `2a0189cb51b831c18cf962936ac
 
 ### Estado
 A auditoria de código desta rodada está **concluída e validada pela CI #1063**. A validação física do ELM327/Meriva continua sendo uma etapa de hardware/veículo, não substituída pela CI.
+
+
+## 2026-10-08 — Plano: RPM do cockpit preso em valor antigo
+
+### Sintoma reportado
+RPM exibido no cockpit não acompanha a leitura atual da ECU e pode permanecer próximo de ~900 rpm mesmo após o motor ser desligado.
+
+### Hipótese técnica verificada no código
+O serviço automático já consulta o PID 010C e registra leituras reais em liveTelemetry, mas o app/index.tsx do cockpit exibe RPM a partir de getAutoSaveState().lastReadings. Essa coleção é persistência de último valor e não uma fonte de telemetria em tempo real. Além disso, a tela não assina/atualiza diretamente a telemetria viva. Resultado: um valor antigo de RPM pode permanecer visualmente congelado mesmo quando novas leituras 010C chegam pela ECU.
+
+### Correção planejada
+1. Usar a telemetria viva 010C como fonte primária do RPM exibido no cockpit.
+2. Atualizar o componente em intervalo curto para refletir novas amostras sem depender do autosave.
+3. Aplicar a validade temporal já definida na camada de telemetria (10 s): se não houver amostra REAL recente, mostrar N/D em vez de congelar um RPM antigo.
+4. Manter REAL_OBD isolado de SIMULAÇÃO; nenhuma semente ou valor persistido será usado como RPM vivo.
+5. Adicionar regressão para impedir que leitura antiga seja tratada como RPM atual.
+6. Atualizar este diário antes da alteração de produção e registrar os hashes exatos depois.
+
+### Invariantes
+- PID 010C continua com fórmula (256*A+B)/4.
+- ECU só é considerada validada após 41 0C.
+- SIMULAÇÃO não alimenta telemetria REAL.
+- Autosave continua sendo persistência/histórico, não fonte de verdade para o indicador ao vivo.
+- Não alterar package-lock.json nem adicionar dependência.
+- CI somente após a correção estar completa e explicitamente autorizada pelo usuário.
