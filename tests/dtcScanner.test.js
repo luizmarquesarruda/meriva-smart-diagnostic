@@ -38,7 +38,7 @@ assert.deepStrictEqual(parseDtcResponseForService('0A', '4A 01 23 00 00'), ['P01
     status: 'OK',
     elapsedMs: 20,
   }));
-  assert.strictEqual(invalidResponseResults.every((item) => item.available === false), false);
+  assert.strictEqual(invalidResponseResults.every((item) => item.available === false), true);
   assert.strictEqual(invalidResponseResults.find((item) => item.service === '03').available, false);
   assert.strictEqual(invalidResponseResults.find((item) => item.service === '07').available, false);
   assert.strictEqual(invalidResponseResults.find((item) => item.service === '0A').available, false);
