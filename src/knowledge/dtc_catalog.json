@@ -8,35 +8,68 @@
       "name": "Sensor/interruptor de posição da borboleta/pedal A — sinal alto",
       "description": "O circuito A de posição da borboleta/pedal apresentou sinal acima do esperado pelo monitor da ECU.",
       "system": "POWERTRAIN / ADMISSÃO",
-      "standardized": true
+      "standardized": true,
+      "likelyCauses": [
+        "alimentação/aterramento do TPS",
+        "chicote ou conector",
+        "sensor de posição da borboleta",
+        "falha no circuito de referência"
+      ]
     },
     {
       "code": "P0133",
       "name": "Resposta lenta do sensor de oxigênio — Banco 1 Sensor 1",
       "description": "A resposta monitorada do sensor de oxigênio do Banco 1 Sensor 1 foi considerada lenta pela ECU.",
       "system": "POWERTRAIN / EMISSÕES",
-      "standardized": true
+      "standardized": true,
+      "likelyCauses": [
+        "sensor O2 envelhecido",
+        "vazamento de escape antes do sensor",
+        "mistura fora de controle",
+        "problema de aquecimento ou alimentação do sensor"
+      ]
     },
     {
       "code": "P0135",
       "name": "Circuito do aquecedor do sensor de oxigênio — Banco 1 Sensor 1",
       "description": "Foi detectada uma condição de falha no circuito do aquecedor do sensor de oxigênio do Banco 1 Sensor 1.",
       "system": "POWERTRAIN / EMISSÕES",
-      "standardized": true
+      "standardized": true,
+      "likelyCauses": [
+        "resistência do aquecedor fora da especificação",
+        "fusível/relé",
+        "chicote ou conector",
+        "alimentação/aterramento",
+        "sensor O2"
+      ]
     },
     {
       "code": "P0301",
       "name": "Falha de combustão detectada — cilindro 1",
       "description": "A ECU detectou uma condição de falha de combustão associada ao cilindro 1.",
       "system": "POWERTRAIN / COMBUSTÃO",
-      "standardized": true
+      "standardized": true,
+      "likelyCauses": [
+        "vela ou bobina",
+        "injetor do cilindro 1",
+        "entrada de ar falsa",
+        "compressão",
+        "mistura/combustível"
+      ]
     },
     {
       "code": "P0420",
       "name": "Eficiência do sistema catalisador abaixo do limite — Banco 1",
       "description": "A ECU detectou eficiência monitorada do sistema catalisador do Banco 1 abaixo do limiar definido pelo monitor.",
       "system": "POWERTRAIN / EMISSÕES",
-      "standardized": true
+      "standardized": true,
+      "likelyCauses": [
+        "catalisador degradado",
+        "falha de combustão",
+        "mistura rica/pobre persistente",
+        "vazamento de escape",
+        "sensor O2 ou sua fiação"
+      ]
     }
   ]
 }
