@@ -53,7 +53,8 @@
     },
     "O2_VOLTS": {
       "operation": "u8_div",
-      "divisor": 200
+      "divisor": 200,
+      "notes": "PID 0114: tensão no byte A; o byte B é informação adicional de ajuste STFT do sensor e não entra no valor de tensão."
     },
     "DISTANCE_KM": {
       "operation": "u16"
