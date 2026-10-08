@@ -656,7 +656,7 @@ export default function LaboratorioScreen() {
         ) : diagnostic.hypotheses.map((hypothesis) => (
           <View key={hypothesis.id} style={styles.hypothesis}>
             <Text style={styles.hypothesisTitle}>{hypothesis.label}</Text>
-            <Text style={styles.hypothesisConfidence}>CONFIANÇA: {hypothesis.confidence} · SCORE: {hypothesis.score.toFixed(2)}</Text>
+            <Text style={styles.hypothesisConfidence}>CONFIANÇA: {hypothesis.confidence} · SCORE HEURÍSTICO: {Math.round(hypothesis.score * 100)}/100</Text>
             {hypothesis.evidence.map((item, index) => (
               <Text key={`e-${hypothesis.id}-${index}`} style={styles.aiLine}>• Evidência: {item.text}</Text>
             ))}
