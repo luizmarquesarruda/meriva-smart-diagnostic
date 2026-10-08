@@ -42,12 +42,14 @@ function main() {
   assert.strictEqual(typeof diagnosticRules.version, 'number');
   assert.strictEqual(typeof dtcCatalog.version, 'number');
   assert.ok(Array.isArray(dtcCatalog.codes) && dtcCatalog.codes.length > 0, 'catálogo DTC vazio');
+  assert.strictEqual(dtcCatalog.standard, 'SAE J2012');
   assertUnique(dtcCatalog.codes.map((item) => String(item.code).toUpperCase()), 'DTC catalogado');
   for (const item of dtcCatalog.codes) {
     assert.ok(/^[PCBU][0-3][0-9A-F]{3}$/.test(String(item.code).toUpperCase()), 'DTC inválido no catálogo: ' + item.code);
     assert.ok(typeof item.name === 'string' && item.name.trim(), 'DTC sem nome: ' + item.code);
     assert.ok(typeof item.description === 'string' && item.description.trim(), 'DTC sem descrição: ' + item.code);
     assert.ok(typeof item.system === 'string' && item.system.trim(), 'DTC sem sistema: ' + item.code);
+    assert.strictEqual(item.standardized, true, 'DTC deve ser explicitamente padronizado: ' + item.code);
   }
 
   const pidIds = new Set();
@@ -68,6 +70,10 @@ function main() {
     const minimumBytes = ['u8', 'u8_offset', 'u8_scale', 'u8_offset_scale', 'u8_scale_offset', 'u8_div'].includes(operation) ? 1 : 2;
     assert.ok(pid.bytes >= minimumBytes, 'bytes insuficientes para a fórmula: ' + id + ' -> ' + operation);
   }
+
+  const o2Pid = pids.pids.find((item) => item.pid === '0114');
+  assert.strictEqual(o2Pid.bytes, 2, 'PID 0114 deve carregar os dois bytes da resposta padronizada');
+  assert.strictEqual(o2Pid.formulaId, 'O2_VOLTS');
 
   const pidList = [...pidIds];
   const rangeIds = Object.keys(ranges.ranges).map((id) => id.toUpperCase());
