@@ -1523,3 +1523,103 @@ O arquivo `BANCO/pids_meriva_confirmados.txt` havia crescido com metadados exten
 
 ### Resultado
 O TXT deixa de repetir descrição, unidade, fórmula e bytes em cada linha. Essas informações permanecem na base JSON, enquanto o TXT funciona como **índice histórico compacto dos PIDs observados**.
+
+
+## 2026-10-08 — Pacote prioritário: saúde da ECU, DTC, identificação, consumo e persistência
+
+### Objetivo
+Implementar os problemas observados no histórico real do aplicativo sem tratar perda de resposta da ECU como simples desconexão Bluetooth.
+
+### Implementações
+1. **Saúde da ECU separada do Bluetooth**
+   - SharedObdStatus agora distingue link Bluetooth, estado da ECU e recuperação.
+   - Estados: RESPONDING, NO_RESPONSE e RECOVERING.
+   - Probe periódico 010C detecta perda real de resposta.
+   - Após o limiar configurado, o polling normal é pausado, o ELM executa ATZ + renegociação ATSP e valida novamente 010C.
+   - Falha de recuperação gera desconexão controlada e reconexão automática.
+   - Backoff configurado em 2 s / 5 s / 15 s.
+   - O diagnóstico do adaptador continua registrando NO DATA, BUS INIT, BUS ERROR, UNABLE TO CONNECT, timeout e outros erros classificados.
+
+2. **KWP FAST**
+   - Durante sessão KWP/ISO 14230 é enviado 3E00 como TesterPresent/keep-alive.
+   - A documentação de ISO 14230 confirma o TesterPresent como mecanismo de manutenção da sessão diagnóstica.
+
+3. **DTC**
+   - Mantidos modos 03, 07 e 0A.
+   - Ocorrências continuam sendo contadas por ocorrência confirmada/retorno após ausência, e não por cada leitura repetida.
+   - Uma falha de comunicação não transforma um DTC em INACTIVE.
+   - Adicionado freeze frame via 020200, 020C00 e 020500, preservando DTC do frame, RPM e temperatura do líquido quando disponíveis.
+   - Catálogo DTC recebeu causas prováveis para os códigos já conhecidos.
+
+4. **PID 0101**
+   - Adicionado ao catálogo e interpretado como MIL, quantidade de DTCs, tipo de ignição e readiness.
+   - O estado do catalisador passou a ser explicitamente reportado como suportado/pronto/não pronto.
+   - A interpretação segue o layout de bytes A-D de PID 01; bytes C/D dependem do tipo de ignição.
+
+5. **Identificação do veículo/ECU**
+   - Após validação 010C -> 41 0C, são tentados 0902, 0904 e 090A.
+   - VIN, identificação de ECU e nome da ECU são persistidos somente quando retornados pela ECU.
+   - A validação passa a registrar evidências concretas (010C/41 0C, protocolo, quantidade de PIDs e VIN quando disponível), não apenas horário.
+
+6. **Autosave**
+   - Leituras idênticas não rearmam o debounce indefinidamente.
+   - A telemetria permanece atualizada em memória, mas a persistência de leitura estável é coalescida em janela de 10 s.
+   - Checkpoint da sessão permanece em 45 s.
+   - Saved At continua vindo de metadata.savedAt; novos snapshots recebem timestamp sempre que persistidos.
+
+7. **Viagens e consumo**
+   - O trajeto real só abre quando RPM > 0 e velocidade > 0.
+   - Parada prolongada de 15 s fecha o trajeto atual.
+   - PID 015E é marcado como medido.
+   - Na ausência de 015E, o aplicativo estima taxa de combustível por MAF; se MAF não estiver disponível, tenta MAP + RPM + IAT com hipóteses explícitas de AFR, densidade e eficiência volumétrica.
+   - Viagens registram fuelRateSource como medido, estimado por MAF, estimado por MAP ou misto.
+   - Referências CARSCANNER_SEED continuam separadas de REAL_OBD.
+
+8. **Exportação**
+   - Criados exportadores JSON completo e CSV de viagens em BACKUP/EXPORTS.
+   - A tela de armazenamento recebeu os controles de exportação.
+
+9. **Nomenclatura**
+   - PID catalogado continua exibindo seu nome mesmo quando a ECU não responde.
+   - PID DESCONHECIDO fica restrito a códigos realmente ausentes do catálogo.
+
+### Correção adicional encontrada durante a implementação
+O PID 010D estava catalogado com unidade kmh, enquanto o serviço automático validava km/h; isso fazia uma resposta válida de velocidade ser descartada. O catálogo foi normalizado para km/h.
+
+### Arquivos principais
+- src/obd/elm327.ts
+- src/obd/elm327Compatibility.ts
+- src/obd/sharedConnection.ts
+- src/obd/vehicleIdentity.ts
+- src/obd/parser.ts
+- src/obd/dtcScanner.ts
+- src/obd/dtcDefinition.ts
+- src/knowledge/pids.json
+- src/knowledge/formulas.json
+- src/knowledge/dtc_catalog.json
+- src/trip/autoTripService.ts
+- src/trip/tripRecorder.ts
+- src/obd/fuelConsumption.ts
+- src/meriva/autosaveManager.ts
+- src/meriva/autosaveState.ts
+- src/meriva/autosaveTxtFormatter.ts
+- src/storage/exportDiagnostics.ts
+- app/bluetooth.tsx
+- app/armazenamento.tsx
+- app/laboratorio.tsx
+- tests/ecuHealth.test.js
+- tests/fuelConsumption.test.js
+- package.json
+
+### CI
+**Não disparada nesta etapa.** A alteração ainda precisa passar por typecheck, suíte completa e Android Release antes de ser considerada pronta para hardware.
+
+### Validação física pendente
+A confirmação definitiva exige uma sessão real na Meriva com ELM327, principalmente:
+- perda de resposta deliberada/real da ECU;
+- KWP TesterPresent;
+- retorno de 0101;
+- suporte real de 0902/0904/090A;
+- freeze frame 020x;
+- PID 015E, 0110 ou fallback MAP;
+- comportamento com tela apagada/segundo plano.
