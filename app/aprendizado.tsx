@@ -5,17 +5,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMidLayout } from '../src/ui/midLayout';
 import * as FileSystem from 'expo-file-system';
 import { readLearningProfile, type MerivaLearningProfile } from '../src/database/learningProfile';
+import { useAppEventRevision } from '../src/ui/useAppEventRevision';
 
 export default function AprendizadoScreen() {
   const layout = useMidLayout();
   const [profile, setProfile] = useState<MerivaLearningProfile | null>(null);
+  const eventRevision = useAppEventRevision();
   useEffect(() => {
     const base = FileSystem.documentDirectory + 'MERIVA_SMART';
-    const load = () => void readLearningProfile(base).then(setProfile);
-    load();
-    const timer = setInterval(load, 2000);
-    return () => clearInterval(timer);
-  }, []);
+    void readLearningProfile(base).then(setProfile);
+  }, [eventRevision]);
   return <SafeAreaView style={styles.container} edges={["top","bottom","left","right"]}><ScrollView contentContainerStyle={[styles.content,{paddingHorizontal:layout.horizontalPadding}]} showsHorizontalScrollIndicator={false}><View style={[styles.screenFrame,{maxWidth:layout.maxContentWidth}]}>
     <Text style={styles.title}>APRENDIZADO</Text><Text style={styles.subtitle}>DNA DO MERIVA • EVIDÊNCIA REAL</Text>
     {profile ? <>
