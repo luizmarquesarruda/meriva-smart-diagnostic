@@ -1101,3 +1101,13 @@ A centralização de permissões registrada anteriormente ficou incompleta: a fu
 Corrigir primeiro o contrato da camada de permissões, mantendo somente permissões runtime realmente necessárias: Bluetooth/Dispositivos próximos no Android 12+ e localização em primeiro plano. O armazenamento permanece `APP_PRIVATE`; não adicionar permissões amplas de armazenamento.
 
 **Não considerar a auditoria concluída.** A próxima correção deve atualizar código/testes, disparar nova CI e exigir `validate` + `android-build` verdes antes do merge.
+
+
+### Correção da camada de permissões após CI #1038
+- `58195bf524a22b343f9a017eb3042f687155e71b` — restaurado o contrato completo de `permissionManager.ts`: Bluetooth runtime Android 12+, localização em primeiro plano e auditoria agregada; removida a recursão/variável inexistente.
+- `f123be1ac890d3ddc327aa4614785edb4ca7f272` — adicionadas regressões para os exports obrigatórios e para impedir a implementação recursiva defeituosa.
+
+A correção preserva `APP_PRIVATE` para armazenamento e não adiciona permissões amplas de armazenamento.
+
+### Próximo passo
+Criar nova execução verificável da CI sobre o estado corrigido. Exigir `npm ci`, Expo Doctor, typecheck/testes e Android Release antes do merge.
