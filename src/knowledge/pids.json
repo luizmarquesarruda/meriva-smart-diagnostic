@@ -3,6 +3,15 @@
   "source": "SAE J1979 / ISO 15031-5 cross-checked against open OBD implementations",
   "pids": [
     {
+      "pid": "0101",
+      "name": "Monitor Status Since DTCs Cleared",
+      "bytes": 4,
+      "unit": "status",
+      "formulaId": "U32",
+      "classification": "PADRAO_OBD",
+      "description": "Status do MIL, quantidade de DTCs e monitores de prontidão desde a limpeza dos DTCs."
+    },
+    {
       "pid": "0104",
       "name": "Calculated Engine Load",
       "bytes": 1,
@@ -39,6 +48,15 @@
       "description": "Ajuste de combustível longo prazo Bank 1"
     },
     {
+      "pid": "010A",
+      "name": "Fuel Pressure",
+      "bytes": 1,
+      "unit": "kpa",
+      "formulaId": "U8_X3",
+      "classification": "PADRAO_OBD",
+      "description": "Pressão de combustível em relação à pressão atmosférica (gauge)."
+    },
+    {
       "pid": "010B",
       "name": "MAP",
       "bytes": 1,
@@ -60,7 +78,7 @@
       "pid": "010D",
       "name": "Vehicle Speed",
       "bytes": 1,
-      "unit": "kmh",
+      "unit": "km/h",
       "formulaId": "U8",
       "classification": "PADRAO_OBD",
       "description": "Velocidade do veículo"
@@ -111,69 +129,6 @@
       "description": "Tensão do sensor O2 Banco 1 Sensor 1; a resposta padronizada também carrega o ajuste de curto prazo do sensor no segundo byte."
     },
     {
-      "pid": "0131",
-      "name": "Distance Since DTC Clear",
-      "bytes": 2,
-      "unit": "km",
-      "formulaId": "DISTANCE_KM",
-      "classification": "PADRAO_OBD",
-      "description": "Distância desde limpeza dos DTCs"
-    },
-    {
-      "pid": "0142",
-      "name": "ECU Voltage",
-      "bytes": 2,
-      "unit": "volts",
-      "formulaId": "VOLTS_1000",
-      "classification": "PADRAO_OBD",
-      "description": "Tensão informada pela ECU"
-    },
-    {
-      "pid": "0151",
-      "name": "Fuel Type",
-      "bytes": 1,
-      "unit": "code",
-      "formulaId": "U8",
-      "classification": "PADRAO_OBD",
-      "description": "Código de tipo de combustível"
-    },
-    {
-      "pid": "0152",
-      "name": "Alcohol Fuel Percentage",
-      "bytes": 1,
-      "unit": "percent",
-      "formulaId": "ETHANOL_PERCENT",
-      "classification": "PADRAO_OBD",
-      "description": "Percentual de álcool informado pela ECU"
-    },
-    {
-      "pid": "015E",
-      "name": "Engine Fuel Rate",
-      "bytes": 2,
-      "unit": "L/h",
-      "formulaId": "FUEL_RATE_LH",
-      "classification": "PADRAO_OBD",
-      "description": "Taxa de combustível calculada pela ECU"
-    },
-    {
-      "pid": "012F",
-      "name": "Fuel Level Input",
-      "bytes": 1,
-      "unit": "percent",
-      "formulaId": "PERCENT_255",
-      "classification": "PADRAO_OBD",
-      "description": "Nível de combustível informado pela ECU. Fonte absoluta para combustível/autonomia quando a resposta for válida."
-    },
-    {
-      "pid": "010A",
-      "name": "Fuel Pressure",
-      "bytes": 1,
-      "unit": "kpa",
-      "formulaId": "U8_X3",
-      "classification": "PADRAO_OBD",
-      "description": "Pressão de combustível em relação à pressão atmosférica (gauge)."
-    },
-    {
       "pid": "012C",
       "name": "Commanded EGR",
       "bytes": 1,
@@ -201,6 +156,15 @@
       "description": "Percentual de purga do sistema EVAP comandado."
     },
     {
+      "pid": "012F",
+      "name": "Fuel Level Input",
+      "bytes": 1,
+      "unit": "percent",
+      "formulaId": "PERCENT_255",
+      "classification": "PADRAO_OBD",
+      "description": "Nível de combustível informado pela ECU. Fonte absoluta para combustível/autonomia quando a resposta for válida."
+    },
+    {
       "pid": "0130",
       "name": "Warmups Since DTC Clear",
       "bytes": 1,
@@ -210,6 +174,15 @@
       "description": "Número de ciclos de aquecimento desde a limpeza dos DTCs."
     },
     {
+      "pid": "0131",
+      "name": "Distance Since DTC Clear",
+      "bytes": 2,
+      "unit": "km",
+      "formulaId": "DISTANCE_KM",
+      "classification": "PADRAO_OBD",
+      "description": "Distância desde limpeza dos DTCs"
+    },
+    {
       "pid": "0133",
       "name": "Barometric Pressure",
       "bytes": 1,
@@ -217,6 +190,15 @@
       "formulaId": "U8",
       "classification": "PADRAO_OBD",
       "description": "Pressão barométrica absoluta."
+    },
+    {
+      "pid": "0142",
+      "name": "ECU Voltage",
+      "bytes": 2,
+      "unit": "volts",
+      "formulaId": "VOLTS_1000",
+      "classification": "PADRAO_OBD",
+      "description": "Tensão informada pela ECU"
     },
     {
       "pid": "0143",
@@ -244,6 +226,24 @@
       "formulaId": "TEMP_C",
       "classification": "PADRAO_OBD",
       "description": "Temperatura do ar ambiente."
+    },
+    {
+      "pid": "0151",
+      "name": "Fuel Type",
+      "bytes": 1,
+      "unit": "code",
+      "formulaId": "U8",
+      "classification": "PADRAO_OBD",
+      "description": "Código de tipo de combustível"
+    },
+    {
+      "pid": "0152",
+      "name": "Alcohol Fuel Percentage",
+      "bytes": 1,
+      "unit": "percent",
+      "formulaId": "ETHANOL_PERCENT",
+      "classification": "PADRAO_OBD",
+      "description": "Percentual de álcool informado pela ECU"
     },
     {
       "pid": "0159",
@@ -280,6 +280,15 @@
       "formulaId": "INJECTION_TIMING",
       "classification": "PADRAO_OBD",
       "description": "Ângulo de temporização da injeção de combustível."
+    },
+    {
+      "pid": "015E",
+      "name": "Engine Fuel Rate",
+      "bytes": 2,
+      "unit": "L/h",
+      "formulaId": "FUEL_RATE_LH",
+      "classification": "PADRAO_OBD",
+      "description": "Taxa de combustível calculada pela ECU"
     },
     {
       "pid": "0161",
