@@ -62,5 +62,5 @@ export async function logInterpretedData(
     condicao: query.parsed.status,
   };
 
-  await appendCsvRow(filePath, row);
+  appendCsvRowBuffered(filePath, row);
 }
