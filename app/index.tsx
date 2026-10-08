@@ -176,7 +176,9 @@ export default function IndexScreen() {
 
   const summary = useMemo(() => getDriveCycleSummary(cycles), [cycles]);
   const realConsumptionKml = summary.avgConsumptionKml > 0 ? summary.avgConsumptionKml : null;
-  const availableConsumptionKml = tripState.averageConsumptionKml > 0 ? tripState.averageConsumptionKml : realConsumptionKml;
+  const availableConsumptionKml = tripState.instantaneousConsumptionKml != null && tripState.instantaneousConsumptionKml > 0
+    ? tripState.instantaneousConsumptionKml
+    : null;
   const distanceUnit = settings?.distanceUnit ?? 'KM';
 
   return (
