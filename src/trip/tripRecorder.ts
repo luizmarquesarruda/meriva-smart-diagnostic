@@ -1,11 +1,13 @@
 import { FuelRateIntegrator } from '../obd/fuelConsumption';
 import type { DriveCycle } from '../data/driveCycles';
+import type { FuelRateSource } from '../obd/fuelConsumption';
 
 export interface RealTripSample {
   timestampMs: number;
   distanceKm: number;
   speedKmh: number;
   fuelRateLph: number | null;
+  fuelRateSource?: FuelRateSource;
 }
 
 export interface RealTripRecorderState {
@@ -40,6 +42,7 @@ export class RealTripRecorder {
   private durationMs = 0;
   private movingTimeMs = 0;
   private maxSpeedKmh = 0;
+  private fuelRateSources = new Set<FuelRateSource>();
 
   constructor(startedAtMs = Date.now(), initialDistanceKm = 0) {
     this.startedAtMs = startedAtMs;
@@ -70,6 +73,7 @@ export class RealTripRecorder {
 
     if (sample.fuelRateLph != null && Number.isFinite(sample.fuelRateLph)) {
       this.fuelIntegrator.addSample(sample.fuelRateLph, timestampMs);
+      if (sample.fuelRateSource) this.fuelRateSources.add(sample.fuelRateSource);
     }
 
     return this.getState();
@@ -111,6 +115,9 @@ export class RealTripRecorder {
       avgDrivingSpeedKmh: Number(avgDrivingSpeedKmh.toFixed(3)),
       avgFuelConsumptionKml: Number(avgFuelConsumptionKml.toFixed(3)),
       source: 'REAL_OBD',
+      fuelRateSource: this.fuelRateSources.size === 1
+        ? [...this.fuelRateSources][0]
+        : this.fuelRateSources.size > 1 ? 'MIXED' : undefined,
       importedAt: new Date().toISOString(),
     };
   }
