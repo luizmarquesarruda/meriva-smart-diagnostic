@@ -1197,3 +1197,30 @@ Nova CI completa obrigatória, incluindo Android Release.
 
 ### 2026-10-08 — Quinta execução da CI da auditoria
 Branch `audit-deep-ci-2026-10-08-r5` criada a partir do `main` após a correção do teste responsivo. Validar novamente toda a suíte e Android Release.
+
+
+## 2026-10-08 — CI #1063 verde e consolidação da auditoria
+
+### Resultado final da CI
+PR #31 — run #1063 / `37767314687`:
+- `validate`: **sucesso**.
+- `npm ci --no-audit --no-fund`: **sucesso**.
+- Expo Doctor: **17/17**.
+- TypeScript: **sucesso**.
+- Suíte completa de testes: **sucesso**.
+- `android-build`: **sucesso**.
+- `expo prebuild --clean --platform android --non-interactive`: **sucesso**.
+- Android Release standalone APK: **compilado, verificado e publicado como artefato**.
+
+### Consolidação
+PR #31 foi integrado ao `main` por squash no commit `2a0189cb51b831c18cf962936ac7051d262172b0`.
+
+### Correções efetivamente consolidadas nesta auditoria
+1. Retry Bluetooth/ELM327: remoção de shadowing/variável inconsistente e respeito ao limite configurável de tentativas.
+2. Permission manager: contrato centralizado restaurado, Bluetooth runtime Android 12+, localização em primeiro plano e armazenamento `APP_PRIVATE`.
+3. Testes de permissões: separação correta entre responsabilidade de permissões e exportação SAF.
+4. Teste de rotação: alinhamento com as duas implementações responsivas válidas do projeto.
+5. PIDs/DTCs e motor diagnóstico: preservadas as correções documentais anteriores, incluindo PID 0114 com payload de 2 bytes, DTC SAE J2012 e bloqueio de evidência não-REAL_OBD/histórica.
+
+### Estado
+A auditoria de código desta rodada está **concluída e validada pela CI #1063**. A validação física do ELM327/Meriva continua sendo uma etapa de hardware/veículo, não substituída pela CI.
