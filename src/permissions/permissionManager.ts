@@ -39,6 +39,19 @@ export async function requestBluetoothPermissionsOnly(): Promise<PermissionAudit
   return 'DENIED';
 }
 
+export async function requestBackgroundLocationPermissionsOnly(): Promise<PermissionAudit['location']> {
+  if (Platform.OS !== 'android') return 'UNAVAILABLE';
+  if (Platform.Version < 29) return 'GRANTED';
+
+  let permission = await Location.getBackgroundPermissionsAsync();
+  if (permission.status !== Location.PermissionStatus.GRANTED) {
+    permission = await Location.requestBackgroundPermissionsAsync();
+  }
+
+  if (permission.status === Location.PermissionStatus.GRANTED) return 'GRANTED';
+  return permission.canAskAgain === false ? 'BLOCKED' : 'DENIED';
+}
+
 export async function requestLocationPermissionsOnly(): Promise<PermissionAudit['location']> {
   if (Platform.OS !== 'android') return 'UNAVAILABLE';
 
