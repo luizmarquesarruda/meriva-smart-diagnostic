@@ -187,9 +187,9 @@ export default function IndexScreen() {
             </View>
             <View style={styles.connectionPill}><View style={[styles.dot, connectionStatus.ecuConnected ? styles.dotOk : bluetoothError ? styles.dotDanger : styles.dotWarn]} /><Text style={styles.connectionText}>{connectionStatus.ecuResponseState === 'NO_RESPONSE' ? 'ECU SEM RESPOSTA' : connectionStatus.ecuResponseState === 'RECOVERING' ? 'RECUPERANDO' : connectionStatus.ecuConnected ? 'ECU' : connectionStatus.bluetoothConnected ? 'BLUETOOTH' : bluetoothSearching ? 'CONECTANDO' : 'OFFLINE'}</Text></View>
           </View>
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>CONSUMO — FONTES SEPARADAS</Text>
-            <Text style={styles.cardText}>Instantâneo: {tripState.instantaneousConsumptionKml != null ? tripState.instantaneousConsumptionKml.toFixed(2) + ' km/L' : 'SEM DADOS'} • {tripState.instantaneousConsumptionSource}</Text>
+          <View style={styles.healthCard}>
+            <Text style={styles.sectionTitle}>CONSUMO — FONTES SEPARADAS</Text>
+            <Text style={styles.sectionHint}>Instantâneo: {tripState.instantaneousConsumptionKml != null ? tripState.instantaneousConsumptionKml.toFixed(2) + ' km/L' : 'SEM DADOS'} • {tripState.instantaneousConsumptionSource}</Text>
             <Text style={styles.cardText}>Viagem atual: {tripState.consumptionKml != null ? tripState.consumptionKml.toFixed(2) + ' km/L' : 'SEM DADOS'} • {tripState.tripConsumptionSource}</Text>
             <Text style={styles.cardText}>Média histórica: {historicalConsumptionKml != null ? historicalConsumptionKml.toFixed(2) + ' km/L' : 'SEM DADOS'} • {historicalConsumptionSource}</Text>
           </View>
