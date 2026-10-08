@@ -1,4 +1,4 @@
-import { Elm327Session } from './elm327';
+import type { Elm327Session } from './elm327';
 import { parseDtcResponseForService } from './parser';
 
 export type DtcServiceKind = 'STORED' | 'PENDING' | 'PERMANENT';
