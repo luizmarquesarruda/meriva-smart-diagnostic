@@ -1313,3 +1313,18 @@ Também foi verificado que a implementação atual do formatter já contém Save
 - Saved At deve refletir o timestamp real da persistência quando o snapshot for efetivamente salvo.
 
 **Plano registrado antes da alteração de código.**
+
+
+### Correção implementada — sincronização do polling automático com autosave
+- `d87de14a2f60de840669e3eee1f8e7f85ae865d2` — criada `recordAutomaticObdQuery()`, uma ponte mínima que registra telemetria automática em `liveTelemetry` e `lastReadings`, sem executar logs, banco de PIDs ou aprendizado do fluxo manual.
+- `cc126ad8fd9d0bf956d62a1a492df81962c27514` — `AutoTripService` passou a usar essa ponte para 012F, 015E, 010D e o polling secundário (incluindo 010C), mantendo REAL separado de SIMULAÇÃO.
+- `6372e63b00fb06413429e7592016c7b7f214c187` — regressão cobre a integração do polling automático com o autosave e garante que uma nova amostra 010C substitua a anterior sem contaminar `simulationQueries`.
+
+### Observação sobre o TXT apresentado
+A implementação vigente no branch já contém `Saved At`, `Último protocolo conhecido` e `fonte=REAL/SIMULACAO` no formatter. O TXT apresentado pelo usuário não contém esses campos e, portanto, não será usado como evidência de uma falha atual nesses pontos sem reprodução no build vigente. Já a divergência de `010C` entre polling e [LAST READINGS] foi reproduzida por inspeção do fluxo e corrigida.
+
+### DTC
+A implementação vigente de `nextDtcOccurrences()` já preserva a ocorrência enquanto o DTC permanece ativo. O histórico apresentado com P0135/P0420 em `1 → 2 → 3 → 4` não justifica alterar essa regra sem reproduzir o comportamento no código atual; a regressão existente continua protegendo CURRENT repetido.
+
+### Estado
+Correção de código e regressões concluídas. **CI não executada**, pois não foi solicitada. A validação física ainda requer novo APK/build após a CI autorizada e teste com ELM327/Meriva.
