@@ -229,7 +229,18 @@ export class Elm327Session {
       const group = normalizedPids.slice(index, index + 6);
       const reply = await this.executeCommand('01' + group.map((item) => item.slice(-2)).join(''));
       for (const pid of group) {
-        results.push({ tx: pid, rx: reply.response, elapsedMs: reply.elapsedMs, commandStatus: reply.status, protocol: this.protocol, parsed: parsePidResponse(pid, reply.response) });
+        let parsed = parsePidResponse(pid, reply.response);
+        let commandStatus = reply.status;
+        if (commandStatus !== 'OK' || parsed.status !== 'RESPONDEU') {
+          try {
+            const individual = await this.queryPid(pid);
+            parsed = individual.parsed;
+            commandStatus = individual.commandStatus;
+          } catch {
+            // Mantém o resultado agrupado quando a consulta individual também falha.
+          }
+        }
+        results.push({ tx: pid, rx: reply.response, elapsedMs: reply.elapsedMs, commandStatus, protocol: this.protocol, parsed });
       }
     }
     return results;
