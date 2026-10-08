@@ -801,6 +801,11 @@ async function testPidAndLearningWriteSerialization() {
   assert.strictEqual(profile.globalSampleCounts.realSamples, 2);
   assert.strictEqual(profile.globalSampleCounts.totalSamples, 2);
   assert.strictEqual(profile.learningStatus, 'COLD_START');
+  const autoTripServiceSource = fs.readFileSync(path.join(ROOT, 'src', 'trip', 'autoTripService.ts'), 'utf8');
+  assert.ok(autoTripServiceSource.includes('registerObdQuery(this.basePath, fuelLevelResult, \'REAL\')'), 'PID 012F automático deve alimentar o pipeline de persistência');
+  assert.ok(autoTripServiceSource.includes('registerObdQuery(this.basePath, fuelResult, \'REAL\')'), 'PID 015E automático deve alimentar o pipeline de persistência');
+  assert.ok(autoTripServiceSource.includes('registerObdQuery(this.basePath, speedResult, \'REAL\')'), 'PID 010D automático deve alimentar o pipeline de persistência');
+  assert.ok(autoTripServiceSource.includes('registerObdQuery(this.basePath, telemetryResult, \'REAL\')'), 'telemetria automática deve alimentar o pipeline de persistência');
   writeDelayMs = 0;
 }
 
