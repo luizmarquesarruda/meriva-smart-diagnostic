@@ -5,7 +5,6 @@ const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 const appJson = JSON.parse(fs.readFileSync('app.json', 'utf8'));
 const gps = fs.readFileSync('src/gps/gpsTracker.ts', 'utf8');
 const task = fs.readFileSync('src/gps/backgroundLocationTask.ts', 'utf8');
-const taskName = fs.readFileSync('src/gps/backgroundLocation.ts', 'utf8');
 const monitoring = fs.readFileSync('src/gps/backgroundMonitoring.ts', 'utf8');
 const shared = fs.readFileSync('src/obd/sharedConnection.ts', 'utf8');
 const layout = fs.readFileSync('app/_layout.tsx', 'utf8');
@@ -25,7 +24,7 @@ assert.strictEqual(locationPlugin[1].isAndroidForegroundServiceEnabled, true);
 
 assert(task.includes('TaskManager.defineTask(BACKGROUND_LOCATION_TASK_NAME'));
 assert(task.includes('gpsTracker.handleLocation(location)'));
-assert(taskName.includes("BACKGROUND_LOCATION_TASK_NAME = 'meriva-smart-background-location'"));
+assert(gps.includes("BACKGROUND_LOCATION_TASK_NAME = 'meriva-smart-background-location'"));
 assert(gps.includes('startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK_NAME'));
 assert(gps.includes('foregroundService:'));
 assert(gps.includes('this.subscription?.remove();'));
