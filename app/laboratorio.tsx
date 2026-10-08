@@ -78,7 +78,7 @@ export default function LaboratorioScreen() {
       setFuelUsedL(trip.fuelUsedL);
       setTripConsumptionKml(trip.consumptionKml);
       if (trip.error) setError(trip.error);
-    });
+    }, 1000);
 
     const unsubscribeStatus = subscribeSharedObdStatus((ecuStatus) => {
       setEcuResponseState(ecuStatus.ecuResponseState);
