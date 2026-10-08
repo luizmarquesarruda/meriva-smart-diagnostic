@@ -13,6 +13,23 @@ import { pushLastReading, updateAutoSaveState, scheduleCriticalSave } from './au
 import { shouldFeedLearning } from './autosaveValidation';
 import { recordLivePidQuery } from '../obd/liveTelemetry';
 
+export function recordAutomaticObdQuery(
+  result: PidQueryResult,
+  source: 'REAL' | 'SIMULACAO' = 'REAL',
+): void {
+  recordLivePidQuery(result, source);
+
+  pushLastReading({
+    pid: result.parsed.pid,
+    name: result.parsed.name,
+    value: result.parsed.value,
+    unit: result.parsed.unit,
+    status: result.parsed.status,
+    timestamp: new Date().toISOString(),
+    source,
+  });
+}
+
 export async function registerObdQuery(
   basePath: string,
   result: PidQueryResult,
@@ -26,17 +43,8 @@ export async function registerObdQuery(
     console.warn('[autosave] falha ao gravar logs OBD:', cause instanceof Error ? cause.message : cause);
   }
 
-  recordLivePidQuery(result, source);
+  recordAutomaticObdQuery(result, source);
 
-  pushLastReading({
-    pid: result.parsed.pid,
-    name: result.parsed.name,
-    value: result.parsed.value,
-    unit: result.parsed.unit,
-    status: result.parsed.status,
-    timestamp: new Date().toISOString(),
-    source,
-  });
 
   const parsedValue = result.parsed.value;
   if (shouldFeedLearning(source, result.parsed.status, parsedValue) && parsedValue !== null) {
