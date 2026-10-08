@@ -45,3 +45,14 @@
 ### Engenharia
 - CI com Expo Doctor, TypeScript, testes e build Android release standalone;
 - documentação de arquitetura, desenvolvimento e auditoria.
+
+
+## 2026-10-08 — Validação de infraestrutura
+
+- A nota operacional de gatilho da CI foi movida do README para este changelog.
+- O script de validação passou a executar TypeScript, ESLint e os 19 testes pelo runner nativo do Node.
+- A suíte mantém o carregamento em memória dos módulos TypeScript e ganhou um helper único para resolução de imports relativos e JSON.
+- Foram corrigidas inconsistências do catálogo de conhecimento detectadas pela suíte: unidade `status`, alias `km/h` e tratamento do PID 0101 como bitfield sem faixa escalar.
+- A configuração Android removeu os scripts web/ios e fixou `@babel/core` em 7.29.7.
+- A infraestrutura de lint usa `eslint-config-expo@7.1.2`, compatível com o fluxo legado do Expo SDK 51, e Prettier permanece disponível como formatter.
+- A estimativa de consumo passou a considerar composição de combustível por PID 0152, configuração manual ou fallback explicitamente estimado, sem dados de abastecimento.
