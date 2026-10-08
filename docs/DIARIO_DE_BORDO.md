@@ -593,3 +593,42 @@ O loader de `tests/dtcScanner.test.js` agora intercepta apenas o import relativo
 
 ### Estado
 A próxima CI deve repetir a suíte a partir do mesmo ponto, agora com o harness capaz de carregar a dependência TypeScript isolada.
+
+
+## 2026-10-08 — Rotação livre do Android + proteção responsiva do cockpit
+
+### Objetivo
+Permitir rotação livre da aplicação Android, sem alterar o protocolo Bluetooth/ELM327, a persistência ou o fluxo diagnóstico, e impedir que a mudança de orientação cause overflow, compressão indevida ou perda de acessibilidade visual na tela principal.
+
+### Configuração nativa/Expo
+A auditoria confirmou que o projeto já usa:
+- `app.json → expo.orientation: "default"`;
+- `npx expo prebuild --clean --platform android` na CI.
+
+A documentação oficial do Expo define `orientation: "default"` como ausência de bloqueio de orientação. Portanto, **não foi adicionado `android:screenOrientation="portrait"` nem uma trava equivalente no `MainActivity`**. Isso é importante porque alterações manuais no Android gerado poderiam ser sobrescritas pelo prebuild.
+
+### Proteção da UI
+- `app/index.tsx` continua usando `useWindowDimensions()`, que reage à mudança de largura/altura causada pela rotação.
+- O cockpit mantém `ScrollView` vertical com `contentContainerStyle`, largura de conteúdo controlada e `maxContentWidth`.
+- Em landscape, ações principais passam para duas colunas.
+- Em landscape, os quatro cartões de status usam distribuição horizontal sem largura fixa.
+- Cabeçalho, botões e bloco “Mais Recursos” receberam proteção contra compressão/overflow de texto.
+- O conteúdo passou a usar `react-native-safe-area-context`.
+- `app/_layout.tsx` agora fornece `SafeAreaProvider` para as telas.
+
+### Testes
+Criado `tests/orientationLayout.test.js`, cobrindo:
+1. `orientation: "default"` no app config;
+2. presença de `useWindowDimensions`;
+3. estratégia de layout para landscape;
+4. `ScrollView` com conteúdo flexível;
+5. Safe Area Provider;
+6. ausência de locks de orientação no código da tela.
+
+O teste foi incorporado ao comando `npm test`. Nenhuma dependência nova foi adicionada; portanto, `package-lock.json` não precisa ser regenerado.
+
+### Referências técnicas
+A implementação foi alinhada à documentação oficial do Expo para `orientation`/Prebuild e à documentação do React Native para `useWindowDimensions` e `ScrollView`. A escolha de `useWindowDimensions` é deliberada porque a API atualiza os valores quando a janela muda de tamanho, inclusive durante rotação.
+
+### Estado
+A configuração de rotação está implementada no repositório. A conclusão da etapa depende da CI completa: typecheck, suíte de testes e Android Release devem terminar verdes. Após isso, o APK deve ser validado fisicamente em retrato e paisagem, incluindo rotação durante a tela principal e nas telas de diagnóstico.
