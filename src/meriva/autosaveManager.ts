@@ -111,7 +111,8 @@ async function loadLastValidEnvelope(
 async function persistNow(reason: SaveReason): Promise<boolean> {
   if (runtime.saving) {
     runtime.dirty = true;
-    return false;
+    await new Promise<void>((resolve) => setTimeout(resolve, 25));
+    return persistNow(reason);
   }
 
   const fingerprintBeforeSave = snapshotFingerprint(runtime.state);
