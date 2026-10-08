@@ -58,6 +58,10 @@ export async function registerObdQuery(
         responseTime: result.elapsedMs,
         source: 'REAL_OBD',
         confidence: prior ? prior.confidence + 1 : 1,
+        unit: result.parsed.unit,
+        formulaId: result.parsed.definition?.formulaId,
+        bytes: result.parsed.definition?.bytes,
+        description: result.parsed.definition?.description,
       };
       await recordPidConfirmation(basePath, entry);
 
