@@ -1464,6 +1464,9 @@ Em vez de criar um segundo serviço nativo concorrente ao Bluetooth Classic, foi
 - app/_layout.tsx registra a tarefa antes do Router;
 - testes estáticos cobrem dependência, lockfile, permissões, tarefa headless e vínculo com o ciclo ECU.
 
+### Revisão de concorrência GPS
+Na migração do watcher de foreground para a tarefa persistente, o watcher existente é encerrado antes de iniciar o Foreground Service. Isso evita callbacks duplicados e dupla contagem de amostras/distância.
+
 ### Limites
 Esse modo permite continuidade com a tela apagada enquanto o Foreground Service estiver ativo e as permissões estiverem concedidas. Não equivale a sobrevivência após force-stop/encerramento explícito do aplicativo, e otimizações agressivas de bateria do fabricante podem impor restrições adicionais.
 
