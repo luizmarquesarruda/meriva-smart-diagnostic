@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'expo-router';
 import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import * as FileSystem from 'expo-file-system';
 import { getAutoSaveState } from '../src/meriva/autosaveManager';
 import { runLocalDiagnostic, type DiagnosticResult } from '../src/diagnostics/diagnosticEngine';
 import type { PidObservation } from '../src/types/sourceTypes';
@@ -10,7 +9,8 @@ import { getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
 export default function SaudeScreen() {
   const [state,setState]=useState(getAutoSaveState());
   useEffect(()=>{const t=setInterval(()=>setState(getAutoSaveState()),1000);return()=>clearInterval(t)},[]);
-  const diagnostic: DiagnosticResult = useMemo(()=>runLocalDiagnostic({observations:state.lastReadings.map(r=>({pid:r.pid,name:r.name,value:r.value,unit:r.unit,source:r.source==='SIMULACAO'?'SIMULACAO':'REAL_OBD',timestamp:r.timestamp,confidence:r.source==='SIMULACAO'?'LOW':'GOOD'} as PidObservation)),dtcs:state.dtcs,condition:'UNKNOWN'}),[state]);
+  const context = getVehicleConditionSnapshot();
+  const diagnostic: DiagnosticResult = useMemo(()=>runLocalDiagnostic({observations:state.lastReadings.map(r=>({pid:r.pid,name:r.name,value:r.value,unit:r.unit,source:r.source==='SIMULACAO'?'SIMULACAO':'REAL_OBD',timestamp:r.timestamp,confidence:r.source==='SIMULACAO'?'LOW':'GOOD'} as PidObservation)),dtcs:state.dtcs,condition:context.condition}),[state,context.condition]);
   const normal=diagnostic.hypotheses.length===0 && state.dtcs.length===0;
   return <SafeAreaView style={styles.container}><ScrollView contentContainerStyle={styles.content}>
     <View style={styles.header}><Text style={styles.title}>CENTRAL DE SAÚDE</Text><Text style={styles.subtitle}>EVIDÊNCIAS • DTC • HIPÓTESES</Text></View>
@@ -19,8 +19,8 @@ export default function SaudeScreen() {
     <View style={styles.row}><Text style={styles.name}>Bluetooth</Text><Text style={state.obd.connected?styles.ok:styles.muted}>{state.obd.connected?'CONECTADO':'AGUARDANDO'}</Text></View>
     <View style={styles.row}><Text style={styles.name}>ECU</Text><Text style={state.obd.ecuValidatedAt?styles.ok:styles.muted}>{state.obd.ecuValidatedAt?'VALIDADA':'NÃO VALIDADA'}</Text></View>
     <Text style={styles.section}>CONTEXTO OPERACIONAL</Text>
-    <View style={styles.row}><Text style={styles.name}>Condição</Text><Text style={styles.ok}>{getVehicleConditionSnapshot().condition}</Text></View>
-    <View style={styles.context}><Text style={styles.contextText}>{getVehicleConditionSnapshot().reason}</Text></View>
+    <View style={styles.row}><Text style={styles.name}>Condição</Text><Text style={styles.ok}>{context.condition}</Text></View>
+    <View style={styles.context}><Text style={styles.contextText}>{context.reason}</Text></View>
     <Text style={styles.section}>FALHAS</Text>
     {!state.dtcs.length?<View style={styles.empty}><Text style={styles.emptyText}>Nenhum DTC armazenado.</Text></View>:state.dtcs.map(d=><View key={d.code} style={styles.row}><View><Text style={styles.name}>{d.code}</Text><Text style={styles.detail}>{d.status} • {d.occurrences} ocorrência(s)</Text></View><Text style={styles.warn}>ATENÇÃO</Text></View>)}
     <Text style={styles.section}>HIPÓTESES LOCAIS</Text>
