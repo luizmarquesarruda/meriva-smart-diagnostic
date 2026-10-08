@@ -104,11 +104,11 @@
     {
       "pid": "0114",
       "name": "O2 Sensor 1 Voltage",
-      "bytes": 1,
+      "bytes": 2,
       "unit": "volts",
       "formulaId": "O2_VOLTS",
       "classification": "PADRAO_OBD",
-      "description": "Tensão do sensor O2 Bank 1 Sensor 1"
+      "description": "Tensão do sensor O2 Banco 1 Sensor 1; a resposta padronizada também carrega o ajuste de curto prazo do sensor no segundo byte."
     },
     {
       "pid": "0131",
