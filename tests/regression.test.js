@@ -814,6 +814,7 @@ async function testAutosaveRace() {
   resetFS();
   const m = loadTs(path.join(ROOT, 'src/meriva/autosaveManager.ts'));
   m.disposeAutoSave();
+  m.setAutoSavePersistenceEnabledForTests(true);
   await m.initAutoSave(BASE);
 
   m.updateAutoSaveState((state) => {
@@ -836,6 +837,7 @@ async function testAutosaveRace() {
   const envelope = JSON.parse(files.get(`${BASE}/CONFIG/autosave.json`));
   assert.strictEqual(envelope.payload.settings.fase, 'segunda');
   m.disposeAutoSave();
+  m.setAutoSavePersistenceEnabledForTests(null);
 }
 
 (function testDtcOccurrenceSemantics() {
