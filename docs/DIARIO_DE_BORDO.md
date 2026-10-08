@@ -1111,3 +1111,25 @@ A correção preserva `APP_PRIVATE` para armazenamento e não adiciona permissõ
 
 ### Próximo passo
 Criar nova execução verificável da CI sobre o estado corrigido. Exigir `npm ci`, Expo Doctor, typecheck/testes e Android Release antes do merge.
+
+
+## 2026-10-08 — CI #1045: regressão de teste de permissões
+
+### CI
+PR #28 — run #1045 / `37766789224`.
+- `npm ci`: **sucesso**.
+- Expo Doctor: **17/17** — **sucesso**.
+- TypeScript: **sucesso**.
+- A suíte parou em `tests/permissions.test.js` antes dos demais testes.
+- `android-build`: não executado por dependência de `validate`.
+
+### Falha observada
+O teste exigia que `src/permissions/permissionManager.ts` contivesse literalmente a expressão `Storage Access Framework`. A implementação corrigida não deve conhecer a camada de exportação via SAF; ela apenas classifica o armazenamento interno como `APP_PRIVATE`.
+
+### Diagnóstico
+A falha é do teste, não da implementação de permissões. A asserção mistura duas responsabilidades: permissões runtime e exportação de arquivos. A verificação correta deve validar `APP_PRIVATE` no permission manager e, separadamente, a existência do fluxo SAF no módulo de armazenamento/exportação.
+
+### Regra antes da próxima correção
+Ajustar somente a asserção do teste para refletir o limite de responsabilidade da camada, sem adicionar texto artificial ao código de produção apenas para satisfazer o teste.
+
+**Não considerar a auditoria concluída.** Nova CI é obrigatória.
