@@ -10,11 +10,12 @@ export default function SaudeScreen() {
   const [state,setState]=useState(getAutoSaveState());
   useEffect(()=>{const t=setInterval(()=>setState(getAutoSaveState()),1000);return()=>clearInterval(t)},[]);
   const context = getVehicleConditionSnapshot();
+  const activeDtcs = state.dtcs.filter((item) => ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(item.status));
   const diagnostic: DiagnosticResult = useMemo(()=>runLocalDiagnostic({observations:state.lastReadings.map(r=>({pid:r.pid,name:r.name,value:r.value,unit:r.unit,source:r.source==='SIMULACAO'?'SIMULACAO':'REAL_OBD',timestamp:r.timestamp,confidence:r.source==='SIMULACAO'?'LOW':'GOOD'} as PidObservation)),dtcs:state.dtcs,condition:context.condition}),[state,context.condition]);
-  const normal=diagnostic.hypotheses.length===0 && state.dtcs.length===0;
+  const normal=diagnostic.hypotheses.length===0 && activeDtcs.length===0;
   return <SafeAreaView style={styles.container}><ScrollView contentContainerStyle={styles.content}>
     <View style={styles.header}><Text style={styles.title}>CENTRAL DE SAÚDE</Text><Text style={styles.subtitle}>EVIDÊNCIAS • DTC • HIPÓTESES</Text></View>
-    <View style={[styles.health, normal ? styles.healthOk : styles.healthWarn]}><Text style={normal ? styles.bigOk : styles.bigWarn}>{normal ? '● SISTEMA NORMAL' : '● ATENÇÃO NECESSÁRIA'}</Text><Text style={styles.hint}>{state.dtcs.length ? state.dtcs.length + ' DTC registrado(s).' : 'Nenhum DTC registrado no estado atual.'}</Text></View>
+    <View style={[styles.health, normal ? styles.healthOk : styles.healthWarn]}><Text style={normal ? styles.bigOk : styles.bigWarn}>{normal ? '● SISTEMA NORMAL' : '● ATENÇÃO NECESSÁRIA'}</Text><Text style={styles.hint}>{activeDtcs.length ? activeDtcs.length + ' DTC ativo(s).' : (state.dtcs.length ? state.dtcs.length + ' registro(s) histórico(s), sem DTC ativo.' : 'Nenhum DTC registrado.')}</Text></View>
     <Text style={styles.section}>CONEXÃO</Text>
     <View style={styles.row}><Text style={styles.name}>Bluetooth</Text><Text style={state.obd.connected?styles.ok:styles.muted}>{state.obd.connected?'CONECTADO':'AGUARDANDO'}</Text></View>
     <View style={styles.row}><Text style={styles.name}>ECU</Text><Text style={state.obd.ecuValidatedAt?styles.ok:styles.muted}>{state.obd.ecuValidatedAt?'VALIDADA':'NÃO VALIDADA'}</Text></View>
@@ -22,7 +23,7 @@ export default function SaudeScreen() {
     <View style={styles.row}><Text style={styles.name}>Condição</Text><Text style={styles.ok}>{context.condition}</Text></View>
     <View style={styles.context}><Text style={styles.contextText}>{context.reason}</Text></View>
     <Text style={styles.section}>FALHAS</Text>
-    {!state.dtcs.length?<View style={styles.empty}><Text style={styles.emptyText}>Nenhum DTC armazenado.</Text></View>:state.dtcs.map(d=><View key={d.code} style={styles.row}><View><Text style={styles.name}>{d.code}</Text><Text style={styles.detail}>{d.status} • {d.occurrences} ocorrência(s)</Text></View><Text style={styles.warn}>ATENÇÃO</Text></View>)}
+    {!activeDtcs.length?<View style={styles.empty}><Text style={styles.emptyText}>{state.dtcs.length ? 'Nenhum DTC ativo. Há apenas histórico registrado.' : 'Nenhum DTC armazenado.'}</Text></View>:activeDtcs.map(d=><View key={d.code} style={styles.row}><View><Text style={styles.name}>{d.code}</Text><Text style={styles.detail}>{d.status} • {d.occurrences} ocorrência(s)</Text></View><Text style={styles.warn}>ATENÇÃO</Text></View>)}
     <Text style={styles.section}>HIPÓTESES LOCAIS</Text>
     {!diagnostic.hypotheses.length?<View style={styles.empty}><Text style={styles.emptyText}>Ainda não há evidência suficiente para gerar hipótese.</Text></View>:diagnostic.hypotheses.map(h=><View key={h.id} style={styles.hyp}><View style={styles.rowHead}><Text style={styles.name}>{h.label}</Text><Text style={styles.score}>{Math.round(h.score*100)}%</Text></View><Text style={styles.detail}>CONFIANÇA: {h.confidence}</Text>{h.evidence.map((e,i)=><Text key={i} style={styles.evidence}>• {e.text}</Text>)}<Text style={styles.next}>PRÓXIMOS TESTES: {h.nextTests.join(' • ')}</Text></View>)}
     <Text style={styles.disclaimer}>{diagnostic.disclaimer}</Text>
