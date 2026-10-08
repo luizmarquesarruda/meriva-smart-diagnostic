@@ -548,6 +548,40 @@ test('17. estado desconectado preserva ECU e separa último protocolo', async ()
   m.disposeAutoSave();
 });
 
+test('18. polling automático atualiza lastReadings sem contaminar learning', async () => {
+  const m = manager();
+  m.disposeAutoSave();
+  resetFS();
+  await m.initAutoSave(BASE);
+  const integration = loadTs(path.join(ROOT, 'src/meriva/autosaveIntegration.ts'));
+  const parser = loadTs(path.join(ROOT, 'src/obd/parser.ts'));
+
+  integration.recordAutomaticObdQuery({
+    tx: '010C',
+    rx: '41 0C 0F A0',
+    elapsedMs: 12,
+    commandStatus: 'OK',
+    parsed: parser.parsePidResponse('010C', '41 0C 0F A0'),
+  }, 'REAL');
+
+  const reading = m.getAutoSaveState().lastReadings.find((item) => item.pid === '010C');
+  assert.ok(reading, 'polling automático deve atualizar lastReadings');
+  assert.strictEqual(reading.value, 1000, '010C deve refletir a amostra automática mais recente');
+  assert.strictEqual(reading.source, 'REAL');
+
+  integration.recordAutomaticObdQuery({
+    tx: '010C',
+    rx: '41 0C 13 88',
+    elapsedMs: 12,
+    commandStatus: 'OK',
+    parsed: parser.parsePidResponse('010C', '41 0C 13 88'),
+  }, 'REAL');
+  const latest = m.getAutoSaveState().lastReadings.find((item) => item.pid === '010C');
+  assert.strictEqual(latest.value, 1250, 'nova amostra deve substituir a anterior por PID');
+  assert.strictEqual(m.getAutoSaveState().settings.simulationQueries, 0, 'polling real não pode virar simulação');
+  m.disposeAutoSave();
+});
+
 test('16. salvamento redundante não cria novo snapshot histórico', async () => {
   const m = manager();
   m.disposeAutoSave();
