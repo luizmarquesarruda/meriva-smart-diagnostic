@@ -267,8 +267,11 @@ A contagem é encerrada imediatamente quando a ECU é validada por `010C -> 41 0
 As constantes da política de teste ficam no escopo do módulo para serem reutilizadas pela aplicação e pelos testes de regressão:
 
 ~~~ts
-export const MAX_BLUETOOTH_ATTEMPTS = 20;
-export const BLUETOOTH_RETRY_INTERVAL_MS = 8000;
+export const MAX_BLUETOOTH_ATTEMPTS = 20; // limite-base do catálogo Bluetooth
+export const BLUETOOTH_RETRY_INTERVAL_MS = 8000; // intervalo-base do catálogo Bluetooth
+
+// O limite efetivo de tentativas pode ser reduzido pela configuração do aplicativo;
+// valor 0/ausente usa o limite-base finito de 20 para impedir ciclos infinitos.
 ~~~
 
 Não declarar `export const` dentro de `createRealElmSession`. A função apenas consome as constantes exportadas.
