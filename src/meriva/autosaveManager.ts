@@ -14,6 +14,7 @@ import { MerivaPersistedState, createEmptyMerivaState } from './autosaveState';
 import { hydrateState, isValidEnvelope, validatePayload } from './autosaveValidation';
 import { migrateEnvelope } from './autosaveMigrations';
 import { appendAutoSaveHistory } from './autosaveHistoryTxt';
+import { emitAppEvent } from '../state/appEventBus';
 
 const DEBOUNCE_MS = 1500;
 const CHECKPOINT_MS = 45000;
@@ -178,6 +179,7 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
     }
     runtime.dirty = runtime.mutationVersion !== mutationVersionAtStart;
     saved = true;
+    emitAppEvent('AUTOSAVE_UPDATED');
     return true;
   } catch (cause) {
     runtime.dirty = true;
