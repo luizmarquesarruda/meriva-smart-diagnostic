@@ -235,7 +235,7 @@ class AutoTripService {
         // Somente PIDs descobertos são elegíveis para o rodízio secundário.
         // O resultado de cada consulta mantém TX/RX pelo autosave existente.
         this.pollCycleNumber += 1;
-        const secondaryPids = ['015E', '012F', '0110', '010B', '010F', '0105', '0111']
+        const secondaryPids = ['015E', '012F', '0152', '0110', '010B', '010F', '0105', '0111']
           .filter((pid) => connection.supportedPids.includes(pid))
           .filter((pid) => this.pollCycleNumber >= (this.pidBackoffUntilCycle.get(pid) ?? 0));
         if (secondaryPids.length > 0) {
@@ -269,6 +269,9 @@ class AutoTripService {
           } else {
             this.pidBackoffUntilCycle.delete(secondaryPid);
           }
+          if (secondaryPid === '0152' && secondaryResult.parsed.status === 'RESPONDEU' && secondaryResult.parsed.value != null && Number.isFinite(secondaryResult.parsed.value)) {
+            alcoholPercentFromObd = secondaryResult.parsed.value;
+          }
           if (secondaryPid === '015E' && secondaryResult.parsed.status === 'RESPONDEU' &&
               secondaryResult.parsed.value != null && Number.isFinite(secondaryResult.parsed.value) &&
               secondaryResult.parsed.value >= 0) {
@@ -287,25 +290,13 @@ class AutoTripService {
         // Sem 010D, null devolve a decisão ao filtro GPS.
         gpsTracker.setVehicleSpeedHintKmh(obdSpeedSupported ? obdSpeedKmh : null);
 
-        // RPM é consultado a cada ciclo porque também define o estado do motor
-        // e a abertura/fechamento automático do trajeto.
-        if (connection.supportedPids.includes('010C')) {
-          const rpmResult = await connection.session.queryPid('010C');
-          await registerObdQuery(this.basePath, rpmResult, 'REAL');
-          if (rpmResult.parsed.status === 'RESPONDEU' && Number.isFinite(rpmResult.parsed.value)) {
-            rpm = rpmResult.parsed.value;
-          }
-        }
-
-        if (fuelRateLph == null) {
-          const mafResult = await connection.session.queryPid('0110');
-          await registerObdQuery(this.basePath, mafResult, 'REAL');
-          const mafGs = mafResult.parsed.status === 'RESPONDEU' ? mafResult.parsed.value : null;
+        if (fuelRateLph == null && connection.supportedPids.includes('0110')) {
+          const mafGs = this.latestPidValues.get('0110') ?? null;
           if (mafGs != null) {
             const settings = await readAppSettings(this.basePath);
             const estimate = estimateFuelRateLph({
               mafGs,
-              alcoholPercentFromObd,
+              alcoholPercentFromObd: this.latestPidValues.get('0152') ?? null,
               manualFuelType: settings.fuelType,
               manualAlcoholPercent: settings.manualFuelAlcoholPercent,
             });
@@ -314,16 +305,13 @@ class AutoTripService {
               fuelRateSource = estimate.source;
               fuelEstimateNote = 'AFR ' + estimate.airFuelRatio.toFixed(2) + ' | densidade ' + estimate.fuelDensityKgPerL.toFixed(3) + ' kg/L | ' + estimate.fuelModel.assumption;
             }
-          } else {
-            const mapResult = await connection.session.queryPid('010B');
-            const iatResult = await connection.session.queryPid('010F');
-            await registerObdQuery(this.basePath, mapResult, 'REAL');
-            await registerObdQuery(this.basePath, iatResult, 'REAL');
+        }
+        if (fuelRateLph == null && connection.supportedPids.includes('010B') && connection.supportedPids.includes('010F') && connection.supportedPids.includes('010C')) {
             const settings = await readAppSettings(this.basePath);
             const estimate = estimateFuelRateLph({
-              mapKpa: mapResult.parsed.status === 'RESPONDEU' ? mapResult.parsed.value : null,
-              rpm,
-              intakeAirTempC: iatResult.parsed.status === 'RESPONDEU' ? iatResult.parsed.value : null,
+              mapKpa: this.latestPidValues.get('010B') ?? null,
+              rpm: this.latestPidValues.get('010C') ?? rpm,
+              intakeAirTempC: this.latestPidValues.get('010F') ?? null,
               displacementCm3: getAutoSaveState().vehicle?.displacementCm3 ?? MERIVA_MANUAL.engine.displacementCm3,
               alcoholPercentFromObd,
               manualFuelType: settings.fuelType,
