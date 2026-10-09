@@ -173,6 +173,12 @@ class AutoTripService {
         continue;
       }
 
+      // A recuperação também precisa limpar o estado de erro quando o veículo
+      // está parado e o gravador ainda não existe.
+      if (this.state.error === 'ADAPTADOR OK / ECU SEM RESPOSTA') {
+        this.setState({ connected: true, error: null });
+      }
+
       if (this.pollingPauseCount > 0) {
         await new Promise((resolve) => setTimeout(resolve, 100));
         continue;
