@@ -1,12 +1,15 @@
 import type { Elm327Session, ElmCommandResult } from './elm327';
 import { parsePidResponse, validateOBDResponse } from './parser';
 import { DISCOVERY_PIDS, KNOWN_PIDS, decodeSupportedPids } from './pidScanner';
+import { getPidDefinition } from './pidDefinition';
+import { readPidConfirmations, type PidConfirmationEntry } from '../database/pidBank';
 
 export type IntelligentPidStatus =
   | 'CONFIRMADO'
   | 'RESPONDEU'
   | 'NAO_RESPONDEU'
-  | 'INVALIDO';
+  | 'INVALIDO'
+  | 'SEM_DEFINICAO';
 
 export interface IntelligentPidObservation {
   pid: string;
@@ -17,6 +20,9 @@ export interface IntelligentPidObservation {
   unit: string;
   confidence: number;
   reason: string;
+  knowledgeSource: 'CATALOGO_PADRAO' | 'BANCO_LOCAL' | 'BITMAP_ECU' | 'SEM_DEFINICAO';
+  definitionName: string | null;
+  formulaId: string | null;
 }
 
 export interface IntelligentPidDiscoveryResult {
@@ -35,9 +41,32 @@ export interface IntelligentPidDiscoveryResult {
  */
 export async function discoverIntelligentPids(
   session: Elm327Session,
-  options?: { knownPids?: string[] },
+  options?: { knownPids?: string[]; basePath?: string },
 ): Promise<IntelligentPidDiscoveryResult> {
   const observations: IntelligentPidObservation[] = [];
+  const storedKnowledge: PidConfirmationEntry[] = options?.basePath
+    ? await readPidConfirmations(options.basePath).catch(() => [])
+    : [];
+  const storedByPid = new Map(storedKnowledge.map((entry) => [entry.pid.toUpperCase(), entry]));
+  const knownFromBank = storedKnowledge
+    .filter((entry) => entry.source === 'REAL_OBD' &&
+      (entry.status === 'CONFIRMADO' || entry.status === 'RESPONDEU' || entry.status === 'DESCOBERTO'))
+    .map((entry) => entry.pid.toUpperCase())
+    .filter((pid) => /^01[0-9A-F]{2}$/.test(pid));
+
+  const getKnowledge = (pid: string, bitmapOnly = false) => {
+    const normalized = pid.toUpperCase();
+    const definition = getPidDefinition(normalized);
+    const stored = storedByPid.get(normalized);
+    return {
+      knowledgeSource: definition ? 'CATALOGO_PADRAO' as const
+        : stored ? 'BANCO_LOCAL' as const
+        : bitmapOnly ? 'BITMAP_ECU' as const
+        : 'SEM_DEFINICAO' as const,
+      definitionName: definition?.name ?? stored?.name ?? null,
+      formulaId: definition?.formulaId ?? stored?.formulaId ?? null,
+    };
+  };
   const supportResponses: Record<string, string> = {};
   const confidence: Record<string, number> = {};
   const supported = new Set<string>();
@@ -77,6 +106,7 @@ export async function discoverIntelligentPids(
       unit: parsed?.unit ?? '',
       confidence: confidence[pid],
       reason: valid ? 'RESPOSTA VÁLIDA NA FASE PRIORITÁRIA' : 'SEM RESPOSTA VÁLIDA NA FASE PRIORITÁRIA',
+      ...getKnowledge(pid),
     });
   };
 
@@ -109,6 +139,7 @@ export async function discoverIntelligentPids(
       reason: mapped.length > 0
         ? 'MAPA DE PIDs ACEITO PELA ECU'
         : 'MAPA SEM PIDs CONFIRMADOS',
+      ...getKnowledge(supportPid, true),
     });
   }
 
@@ -125,10 +156,11 @@ export async function discoverIntelligentPids(
   // Fase 3: conhecidos do projeto e PIDs apontados pelos bitmaps.
   const candidates = Array.from(new Set([
     ...confirmedCandidates,
+    ...knownFromBank,
     ...KNOWN_PIDS,
     ...Array.from(supported),
   ])).filter((pid) =>
-    /^01[0-9A-F]{2}$/i.test(pid) && !priorityPids.includes(pid.toUpperCase()) || confidence[pid] === 0,
+    (/^01[0-9A-F]{2}$/i.test(pid) && !priorityPids.includes(pid.toUpperCase())) || confidence[pid] === 0,
   );
 
   for (const pid of candidates) {
@@ -149,21 +181,29 @@ export async function discoverIntelligentPids(
       Number.isFinite(parsed.value),
     );
     const confirmedByBitmap = supported.has(pid);
+    const rawResponseValid = result.status === 'OK' && validateOBDResponse(result.response);
+    const knowledge = getKnowledge(pid, confirmedByBitmap);
+    const hasDefinition = Boolean(getPidDefinition(pid) || storedByPid.get(pid.toUpperCase())?.formulaId);
+    const missingDefinition = rawResponseValid && !hasDefinition;
     const pidConfidence = valid ? (confirmedByBitmap ? 1 : 0.85) : confirmedByBitmap ? 0.35 : 0;
 
     if (valid) supported.add(pid);
     confidence[pid] = pidConfidence;
     observations.push({
       pid,
-      status: valid ? (confirmedByBitmap ? 'CONFIRMADO' : 'RESPONDEU') : confirmedByBitmap ? 'INVALIDO' : 'NAO_RESPONDEU',
+      status: missingDefinition ? 'SEM_DEFINICAO'
+        : valid ? (confirmedByBitmap ? 'CONFIRMADO' : 'RESPONDEU')
+        : confirmedByBitmap ? 'INVALIDO' : 'NAO_RESPONDEU',
       response: result.response,
       elapsedMs: result.elapsedMs,
       value: parsed?.value ?? null,
       unit: parsed?.unit ?? '',
       confidence: pidConfidence,
-      reason: valid
-        ? confirmedByBitmap ? 'BITMAP + RESPOSTA VÁLIDA' : 'RESPOSTA VÁLIDA'
+      reason: missingDefinition
+        ? 'RESPOSTA RAW VÁLIDA, MAS NÃO HÁ FÓRMULA LOCAL VALIDADA; MANTER SEM INTERPRETAÇÃO'
+        : valid ? confirmedByBitmap ? 'BITMAP + RESPOSTA VÁLIDA' : 'RESPOSTA VÁLIDA'
         : confirmedByBitmap ? 'BITMAP INDICA SUPORTE, MAS RESPOSTA NÃO FOI VALIDADA' : 'SEM RESPOSTA VÁLIDA',
+      ...knowledge,
     });
   }
 
