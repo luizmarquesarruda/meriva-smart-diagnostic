@@ -1636,3 +1636,29 @@ A confirmação definitiva exige uma sessão real na Meriva com ELM327, principa
 - Nenhuma dependência nova foi adicionada nesta etapa.
 - CI continua deliberadamente não disparada até concluir a revisão estática.
 
+
+
+## 2026-10-09 — Trip formula integrity
+
+- Ignore duplicate/out-of-order samples before they can rewind trip state.
+- Do not persist a trip whose integrated fuel is below 0.05 L; this avoids presenting a highly unstable km/L average from only a few millilitres. Raw sensor collection and seed data are not changed.
+- Calculate aggregate real-trip average speed from total real distance / total real moving time, not the unweighted mean of each trip's speed.
+- Add regression cases for tiny fuel totals and out-of-order timestamps.
+- CARSCANNER_SEED remains historical reference data and is excluded from REAL_OBD totals; seed values are never promoted to real measurements.
+- The exact cause of 122.819 km/L remains unconfirmed until raw fuel-rate samples, timestamps and distance deltas from that session are available.
+
+
+## 2026-10-09 — Histórico diário de sessões ECU e tela ativa
+
+### Problema observado
+O relatório diário exibia o último estado mutável, o que não preserva por si só todas as partidas/reconexões ocorridas no mesmo dia. O TXT geral de autosave é rotativo (200 snapshots) e não é um diário por data.
+
+### Correções
+- Criado `src/meriva/dailyObdHistory.ts`: arquivo compacto `VIAGENS/meriva_smart_daily_obd_history.txt`, com uma única página lógica por data local e eventos separados para cada início/fim de sessão ECU validada.
+- Cada evento guarda adaptador/protocolo, PIDs reais mais recentes com timestamps, DTCs registrados e viagens reais recentes. Não promove seed a dado real.
+- O histórico diário preserva até 365 datas, para limitar crescimento; as várias sessões do mesmo dia não substituem umas às outras.
+- `autosaveManager` acrescenta eventos diários somente nas fronteiras `session_start`/`session_end`, evitando um evento por PID e reduzindo tamanho.
+- `expo-keep-awake` já estava presente no lockfile; passou a dependência direta e `useKeepAwake` mantém a tela ligada enquanto o RootLayout está montado.
+
+### Limitações / validação
+A sessão é definida por conexão/desconexão validada da ECU, não pela posição física da chave de ignição. O histórico diário é complementar ao JSON de autosave e não o substitui. CI e teste no aparelho ainda são necessários para confirmar persistência e comportamento da tela.
