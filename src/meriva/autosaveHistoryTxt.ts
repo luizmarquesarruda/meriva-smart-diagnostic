@@ -8,11 +8,7 @@ const DAY_BEGIN = '========== DIA: ';
 const DAY_END = '========== FIM DO DIA ==========';
 const HEADER = [
   'MERIVA SMART DIAGNOSTIC',
-  'HISTÓRICO TXT POR DIA',
-  'Cada bloco de data equivale a uma página lógica de até 50 linhas.',
-  'O relatório diário é atualizado durante o dia; o histórico não tem limite de dias.',
-  'Os dados estruturados completos permanecem no armazenamento interno.',
-  '',
+  'HISTÓRICO TXT DIÁRIO — CADA BLOCO DE DATA É UMA PÁGINA LÓGICA.',
 ].join('\n');
 
 type DailyReports = Record<string, string>;
