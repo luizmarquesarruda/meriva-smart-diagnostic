@@ -105,4 +105,7 @@ if (!tripServiceSource.includes('fuelRateLph == null && fuelEstimationSupport.ma
 if (tripServiceSource.includes('displacementCm3 ?? 1598')) {
   throw new Error('cilindrada genérica de 1598 cm³ não pode ser usada como fallback');
 }
-console.log('AutoTripService supported-PID guards: OK');
+if (!tripServiceSource.includes("!queriedPids.has(item)")) {
+  throw new Error('telemetria secundária não deve consultar um PID já consultado no ciclo');
+}
+console.log('AutoTripService supported-PID and duplicate-query guards: OK');
