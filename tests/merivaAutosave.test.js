@@ -481,7 +481,7 @@ test('12. debounce agrupa gravações', async () => {
   m.disposeAutoSave();
 });
 
-test('13. autosave mantém um único TXT histórico e limita a 200 snapshots', async () => {
+test('13. histórico TXT mantém um bloco diário compacto sem limite total de dias', async () => {
   const m = manager();
   m.disposeAutoSave();
   resetFS();
@@ -497,12 +497,19 @@ test('13. autosave mantém um único TXT histórico e limita a 200 snapshots', a
   const historyPath = `${CONFIG_DIR}/meriva_smart_autosave_history.txt`;
   assert.ok(files.has(historyPath), 'histórico TXT deve ser criado automaticamente');
   const history = files.get(historyPath);
-  const entries = history.split('=== SALVAMENTO_BEGIN ===').slice(1);
-  assert.strictEqual(entries.length, 200, 'histórico deve manter exatamente os 200 eventos mais recentes');
-  assert.ok(history.includes('NÚMERO: 205'), 'último salvamento deve permanecer');
-  assert.ok(!/NÚMERO: 5\n/.test(history), 'salvamentos antigos devem ser removidos');
-  assert.strictEqual((history.match(/meriva smart diagnostic/gi) || []).length, 201, 'um cabeçalho + 200 eventos compactos');
-  assert.ok(history.split(/\r?\n/).length <= 500, 'TXT nunca deve ultrapassar 10 páginas lógicas de 50 linhas');
+  const dayMarkers = history.match(/========== DIA: \\d{4}-\\d{2}-\\d{2} ==========/g) || [];
+  assert.strictEqual(dayMarkers.length, 1, 'vários salvamentos no mesmo dia devem atualizar um único bloco');
+  assert.ok(history.includes('HISTÓRICO TXT POR DIA'));
+  assert.ok(history.includes('MOTIVO: critical'), 'o relatório diário deve conter o motivo do salvamento mais recente');
+  assert.ok(!history.includes('=== SALVAMENTO_BEGIN ==='), 'formato antigo por snapshot não deve ser reintroduzido');
+  const dayBlock = history.split(/========== DIA: \\d{4}-\\d{2}-\\d{2} ==========/)[1].split('========== FIM DO DIA ==========')[0];
+  assert.ok(dayBlock.trim().split(/\\r?\\n/).length <= 45, 'conteúdo de cada dia deve respeitar o limite compacto');
+  const historyModule = loadTs(path.join(ROOT, 'src/meriva/autosaveHistoryTxt.ts'));
+  const dates = await historyModule.getAutoSaveHistoryDates(BASE);
+  assert.strictEqual(dates.length, 1, 'a lista de datas deve conter o dia gravado');
+  const selected = await historyModule.readAutoSaveHistory(BASE, dates[0]);
+  assert.ok(selected.includes(`========== DIA: ${dates[0]} ==========`), 'a leitura por data deve retornar o dia selecionado');
+  assert.ok(!selected.includes('========== DIA: 1900-01-01 =========='), 'não deve incluir dias não selecionados');
   m.disposeAutoSave();
 });
 
@@ -519,7 +526,8 @@ test('15. Saved At é persistido e histórico crítico é coalescido', async () 
   assert.ok(envelope.savedAt, 'envelope deve ter savedAt');
   assert.strictEqual(envelope.payload.metadata.savedAt, envelope.savedAt, 'payload e envelope devem compartilhar savedAt');
   const history = files.get(`${CONFIG_DIR}/meriva_smart_autosave_history.txt`);
-  assert.strictEqual((history.match(/=== SALVAMENTO_BEGIN ===/g) || []).length, 1, 'eventos críticos próximos devem gerar um snapshot');
+  assert.strictEqual((history.match(/========== DIA: \\d{4}-\\d{2}-\\d{2} ==========/g) || []).length, 1, 'eventos críticos no mesmo dia devem atualizar um único relatório');
+  assert.ok(history.includes('MOTIVO: critical'), 'o motivo mais recente deve ficar registrado');
   m.disposeAutoSave();
 });
 
@@ -599,9 +607,8 @@ test('18. sessão de autosave abre na ECU e fecha na desconexão', async () => {
   assert.strictEqual(envelope.payload.obd.lastKnownProtocol, 'ISO 14230-4 KWP FAST');
 
   const endHistory = files.get(`${CONFIG_DIR}/meriva_smart_autosave_history.txt`);
-  assert.ok(endHistory.includes('MOTIVO: session_end'));
-  assert.strictEqual((endHistory.match(/MOTIVO: session_start/g) || []).length, 1);
-  assert.strictEqual((endHistory.match(/MOTIVO: session_end/g) || []).length, 1);
+  assert.ok(endHistory.includes('MOTIVO: session_end'), 'o bloco diário deve refletir o encerramento mais recente');
+  assert.strictEqual((endHistory.match(/========== DIA: \\d{4}-\\d{2}-\\d{2} ==========/g) || []).length, 1, 'a sessão deve manter um único bloco por dia');
   m.disposeAutoSave();
 });
 
