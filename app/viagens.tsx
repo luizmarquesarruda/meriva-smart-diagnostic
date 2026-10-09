@@ -27,10 +27,30 @@ export default function ViagensScreen() {
   const [, setRefresh] = useState(0);
 
   useEffect(() => {
-    void readDriveCycles(FileSystem.documentDirectory + 'MERIVA_SMART').then(setCycles).catch(() => setCycles([]));
+    let cancelled = false;
+    let loadingCycles = false;
+    const refreshCycles = async () => {
+      if (loadingCycles) return;
+      loadingCycles = true;
+      try {
+        const stored = await readDriveCycles(FileSystem.documentDirectory + 'MERIVA_SMART');
+        if (!cancelled) setCycles(stored);
+      } catch {
+        if (!cancelled) setCycles([]);
+      } finally {
+        loadingCycles = false;
+      }
+    };
+    void refreshCycles();
     const unsubscribe = autoTripService.subscribe(setTrip);
-    const timer = setInterval(() => setRefresh((value) => value + 1), 2000);
-    return () => { unsubscribe(); clearInterval(timer); };
+    const renderTimer = setInterval(() => setRefresh((value) => value + 1), 2000);
+    const historyTimer = setInterval(() => { void refreshCycles(); }, 10_000);
+    return () => {
+      cancelled = true;
+      unsubscribe();
+      clearInterval(renderTimer);
+      clearInterval(historyTimer);
+    };
   }, []);
 
   const summary = getDriveCycleSummary(cycles);
@@ -48,9 +68,9 @@ export default function ViagensScreen() {
 
   return <SafeAreaView style={styles.container} edges={['top','bottom','left','right']}><ScrollView contentContainerStyle={[styles.content,{paddingHorizontal:layout.horizontalPadding}]} showsHorizontalScrollIndicator={false}><View style={[styles.screenFrame,{maxWidth:layout.maxContentWidth}]}>
     <Text style={styles.title}>VIAGENS</Text>
-    <Text style={styles.subtitle}>DADOS REAIS DA ECU • SEM TRAJETOS IMPORTADOS</Text>
+    <Text style={styles.subtitle}>TELEMETRIA ECU + DISTÂNCIA GPS • SEM TRAJETOS IMPORTADOS</Text>
     <View style={[styles.status, trip.connected ? styles.statusOn : styles.statusOff]}>
-      <Text style={styles.statusText}>{trip.connected ? trip.active ? '● VIAGEM EM ANDAMENTO' : '● ECU CONECTADA — AGUARDANDO MOVIMENTO' : '○ AGUARDANDO CONEXÃO COM A ECU'}</Text>
+      <Text style={styles.statusText}>{trip.connected ? trip.error?.includes('ECU SEM RESPOSTA') ? '● ADAPTADOR OK — ECU SEM RESPOSTA' : trip.active ? '● VIAGEM EM ANDAMENTO' : '● ECU CONECTADA — AGUARDANDO MOVIMENTO' : '○ AGUARDANDO CONEXÃO COM A ECU'}</Text>
     </View>
     <View style={styles.grid}>
       <Metric l="DISTÂNCIA ATUAL" v={trip.active ? trip.distanceKm.toFixed(2) + ' km' : '—'} />
