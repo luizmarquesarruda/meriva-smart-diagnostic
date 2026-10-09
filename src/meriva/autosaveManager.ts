@@ -14,6 +14,7 @@ import { MerivaPersistedState, createEmptyMerivaState } from './autosaveState';
 import { hydrateState, isValidEnvelope, validatePayload } from './autosaveValidation';
 import { migrateEnvelope } from './autosaveMigrations';
 import { appendAutoSaveHistory } from './autosaveHistoryTxt';
+import { appendDailyObdSessionEvent } from './dailyObdHistory';
 
 const DEBOUNCE_MS = 1500;
 const CHECKPOINT_MS = 45000;
@@ -178,6 +179,18 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
       );
     } catch (historyCause) {
       console.warn('[autosave] falha ao atualizar histórico TXT:', historyCause instanceof Error ? historyCause.message : historyCause);
+    }
+    if (reason === 'session_start' || reason === 'session_end') {
+      try {
+        await appendDailyObdSessionEvent(
+          base,
+          runtime.state,
+          reason === 'session_start' ? 'SESSION_START' : 'SESSION_END',
+          savedAt,
+        );
+      } catch (dailyHistoryCause) {
+        console.warn('[autosave] falha ao atualizar histórico diário ECU:', dailyHistoryCause instanceof Error ? dailyHistoryCause.message : dailyHistoryCause);
+      }
     }
     runtime.dirty = runtime.mutationVersion !== mutationVersionAtStart;
     saved = true;
