@@ -1768,3 +1768,66 @@ Todos os commits de código e testes deste conjunto usam `[skip ci]`; a CI foi i
 
 ### Estado e próximo passo
 As falhas identificadas por inspeção estática foram corrigidas e as regressões foram adicionadas. O repositório **não deve ser declarado livre de erros nem pronto para release** até a execução autorizada de typecheck, testes e build Android. A próxima correção técnica recomendada, antes da validação final, é tornar explícitas e coerentes as hipóteses de AFR/densidade no estimador flex e definir a persistência de viagens quando o combustível estiver indisponível.
+
+
+## 2026-10-09 — Catálogo de referência de PIDs e consulta do banco durante descoberta
+
+### Objetivo
+Usar um catálogo público de PIDs OBD-II como referência offline e fazer a lógica local de descoberta consultar o banco de conhecimento antes de classificar PIDs encontrados, sem assumir que todos os PIDs padronizados existem na ECU específica da Meriva.
+
+### Alterações aplicadas
+1. **Catálogo de referência local adicionado**
+   - Novo arquivo `src/knowledge/pid_reference_catalog.json` com 56 PIDs padrão adicionais, descrições e unidades de referência.
+   - Fontes registradas no próprio arquivo: OBD2 PID Knowledge (`https://obd2pid.com/pids`) e SAE J1979/ISO 15031-5.
+   - Cada item é marcado `REFERENCE_ONLY` e `NAO_CONFIRMADO`; o catálogo não ativa polling e não fornece fórmula executável.
+   - O catálogo é genérico, não uma alegação de que todos os PIDs sejam suportados pela Meriva. O bitmap real da ECU permanece a fonte de suporte observado.
+
+2. **Consulta central de conhecimento**
+   - `src/obd/pidDefinition.ts` agora separa `getPidDefinition()` (somente decodificadores executáveis) de `getPidReference()` (metadados sem fórmula).
+   - A lógica `discoverIntelligentPids()` consulta o banco persistido quando recebe `basePath`, acrescenta PIDs reais anteriormente descobertos à lista de candidatos e marca a origem do conhecimento: catálogo executável, referência padrão, banco local, bitmap da ECU ou ausência de definição.
+   - Uma resposta válida de PID sem decodificador continua `SEM_DEFINICAO`, sem valor físico interpretado. A existência de uma entrada no banco, por si só, não habilita uma fórmula.
+
+3. **Banco de PIDs persistido enriquecido**
+   - `src/database/pidBank.ts` grava unidade, `formulaId`, bytes e descrição quando conhecidos.
+   - O formato de 15 colunas preserva leitura dos registros legados de 11 colunas.
+   - Ao gravar PIDs anunciados pela ECU, o banco preenche metadados a partir do catálogo executável ou do catálogo de referência; registros já confirmados podem receber metadados ausentes sem rebaixar seu status.
+   - Campos de texto são sanitizados para impedir que pipes ou quebras de linha corrompam o formato compacto.
+
+4. **Descoberta real no Laboratório**
+   - O fluxo de descoberta consulta o banco antes da gravação, cruza os PIDs anunciados com os catálogos locais e apresenta contagens separadas para decodificadores ativos, referências, PIDs já conhecidos e PIDs sem referência.
+   - Não são adicionadas sondagens extras à K-Line apenas para classificar os PIDs; o fluxo continua usando os mapas de suporte já consultados.
+   - A simulação não é promovida a confirmação real nem gravada como descoberta de ECU.
+
+5. **Regressões/documentação**
+   - `tests/knowledgeJson.test.js` valida IDs únicos, ausência de colisão com decodificadores ativos e marcação de referência não confirmada.
+   - `tests/regression.test.js` cobre persistência de metadados e consulta de um PID previamente descoberto que não tem fórmula.
+   - `docs/FORMULA_ENGINE.md` descreve fontes, formatos, fluxo e política de não inventar fórmulas.
+
+### Limites e cautelas
+- O catálogo adicionado contém **56 referências padrão adicionais**, não o catálogo público integral de 252 PIDs nem uma lista OEM exclusiva da Meriva.
+- A existência de um PID na lista padrão não significa que a ECU do veículo o suporte. A confirmação depende do bitmap/da resposta real.
+- PIDs presentes apenas no catálogo de referência permanecem sem interpretação numérica até existir um decodificador implementado, testado e associado a uma resposta válida.
+- A lógica de descoberta inteligente é local e determinística; não é uma chamada a um LLM externo. Seu comportamento é auditável e não requer internet durante o uso.
+- Nenhuma CI ou suíte de testes foi executada nesta alteração, conforme a instrução de manter a CI parada.
+
+### Commits desta etapa
+- `fee7ca155fdb52e539a55afc6cf0b87eb7bf92d0` — persistir metadados de conhecimento dos PIDs.
+- `b96850cc39ab03df9e0458bea9c09e09ba914da9` — consultar banco local durante descoberta inteligente.
+- `6f009ea57135e74b96eb4d54a1a2bcc1bdc78777` — preencher metadados em registros já confirmados.
+- `8e7a1f93aafcda41ae0347b6ead6444e53d3ae55` — corrigir normalização de PID.
+- `d104a9802a596b3cbe3672b0635096d1f3e94d40` — cruzar descoberta do Laboratório com o banco local.
+- `60007e9bf7d74893842bb4bf46fd9749dc5a8aa2` — regressão de consulta do banco e segurança para PID desconhecido.
+- `c1cd995fc3115201386a834d6a2ffeeb2f6e7997` — aceitar linhas legadas e enriquecidas do banco.
+- `8d248dce3e9d0fca165761f724a845c843bd6ba4` — catálogo de referência padrão.
+- `29bfcd1baa2e6bdbf59e4854a5d208e9249bda93` — separar referência de decodificador executável.
+- `aec09e03ead56547a9810820c2e2d197636d87db` — enriquecer banco com metadados de referência.
+- `8f039b6f6b432e7528c10ca6c0225a613ab6213a` — usar referência padrão sem inventar decodificador.
+- `99424d58a7cea3051a79b16dbddd41e3b8c02c75` — mostrar categorias de conhecimento na descoberta real.
+- `4ff2155b0010ef93ae7205f9a514e735dc60266d` — manter PID desconhecido separado do catálogo de referência.
+- `a3012bb09c8a276a438f9267981b1bfd02a6158f` — validar o catálogo de referência.
+- `0fec7f4512203fb9fa671a9618914d48b2b7fb20` — exigir decodificador executável para interpretação.
+- `81d68dec14a5d677ea2c96f4d6d9fb845eb78729` — documentar o catálogo e a política de consulta.
+
+### Validação
+- **CI: não disparada.**
+- TypeScript, testes de regressão e build Android não foram executados. Asserções adicionadas são cobertura planejada, não evidência de execução bem-sucedida.
