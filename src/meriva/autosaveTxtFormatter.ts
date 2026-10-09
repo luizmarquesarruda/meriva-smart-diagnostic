@@ -84,7 +84,8 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
   }
   L.push('');
 
-  L.push('[HISTORY - ULTIMAS VIAGENS REAIS]');
+  L.push('[HISTORY]');
+  L.push('Últimas viagens reais:');
   const realCycles = state.driveCycles
     .filter((cycle) => cycle.source === 'REAL_OBD')
     .slice(-5);

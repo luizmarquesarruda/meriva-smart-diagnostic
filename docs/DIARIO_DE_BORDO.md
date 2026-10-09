@@ -1973,3 +1973,24 @@ Ao encontrar e salvar um PID real, a descoberta deve seguir para outros candidat
 ### Validação
 - A CI #1686 (run `37918462256`) falhou nesta asserção de lifecycle e pulou o build Android.
 - A nova execução precisa confirmar a suíte completa e o build antes de declarar sucesso.
+
+## 2026-10-09 — Restaurar cabeçalho estável da seção de histórico TXT
+
+### Falha revelada pela CI #1687/#1688
+- `npm ci` passou, Expo Doctor passou em **17/17**, typecheck, catálogo JSON e ciclo de conexão Bluetooth/ECU passaram.
+- `tests/merivaAutosave.test.js` falhou no teste 10 porque a exportação não continha a seção exata `[HISTORY]`.
+
+### Causa raiz
+O formatador renomeou a seção para `[HISTORY - ULTIMAS VIAGENS REAIS]`. O conteúdo estava limitado às últimas cinco viagens reais, mas o cabeçalho deixou de cumprir o contrato estável de exportação verificado pelo teste.
+
+### Correção
+- Restaurado o cabeçalho `[HISTORY]`.
+- Mantida a informação descritiva `Últimas viagens reais:` logo abaixo, sem ampliar a quantidade de viagens exportadas ou gerar mais páginas.
+
+### Arquivos
+- `src/meriva/autosaveTxtFormatter.ts`
+- `docs/DIARIO_DE_BORDO.md`
+
+### Validação
+- CI #1687 (run `37918597049`) e #1688 (run `37918604681`) falharam somente no teste 10 de exportação TXT depois de passar pelas verificações anteriores; o build Android foi ignorado.
+- A correção precisa ser comprovada pela próxima CI completa.
