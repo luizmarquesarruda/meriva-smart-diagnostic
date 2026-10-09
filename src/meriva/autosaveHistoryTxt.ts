@@ -42,37 +42,36 @@ function parseDailyReports(content: string): DailyReports {
   let match: RegExpExecArray | null;
   while ((match = marker.exec(content)) !== null) reports[match[1]] = match[2].trim();
 
-  // Migra snapshots do formato anterior preservando o dia do campo Exported At.
-  // Quando há vários snapshots no mesmo dia, o último substitui os anteriores.
-  if (!Object.keys(reports).length && content.trim()) {
-    const legacyEntry = /=== SALVAMENTO_BEGIN ===([\s\S]*?)=== SALVAMENTO_END ===/g;
-    let entryMatch: RegExpExecArray | null;
-    while ((entryMatch = legacyEntry.exec(content)) !== null) {
-      const entry = entryMatch[1].trim();
-      const timestamp = entry.match(/^Exported At:\s*(.+)$/im)?.[1]
-        ?? entry.match(/^Saved At:\s*(.+)$/im)?.[1];
-      if (!timestamp) continue;
-      const parsedTimestamp = Date.parse(timestamp.trim());
-      if (!Number.isFinite(parsedTimestamp)) continue;
-      const day = dateKey(new Date(parsedTimestamp).toISOString());
-      if (entry) reports[day] = capDailyReport(entry);
-    }
+  // Migra snapshots legados mesmo se uma gravação interrompida deixar
+  // o arquivo com blocos novos e antigos misturados. O bloco diário já
+  // convertido tem precedência; snapshots antigos só preenchem dias ausentes.
+  const legacyEntry = /=== SALVAMENTO_BEGIN ===([\s\S]*?)=== SALVAMENTO_END ===/g;
+  let entryMatch: RegExpExecArray | null;
+  while ((entryMatch = legacyEntry.exec(content)) !== null) {
+    const entry = entryMatch[1].trim();
+    const timestamp = entry.match(/^Exported At:\s*(.+)$/im)?.[1]
+      ?? entry.match(/^Saved At:\s*(.+)$/im)?.[1];
+    if (!timestamp) continue;
+    const parsedTimestamp = Date.parse(timestamp.trim());
+    if (!Number.isFinite(parsedTimestamp)) continue;
+    const day = dateKey(new Date(parsedTimestamp).toISOString());
+    if (entry && !reports[day]) reports[day] = capDailyReport(entry);
+  }
 
-    // Para variantes antigas sem marcadores de snapshot, mantém uma cópia
-    // compacta em data inferida do conteúdo, sem descartar o texto legado.
-    if (!Object.keys(reports).length) {
-      const legacy = content
-        .replace(/^MERIVA SMART DIAGNOSTIC\s*/i, '')
-        .replace(/^RELATÓRIO TXT COMPACTO\s*/im, '')
-        .replace(/^LIMITE:.*\n/im, '')
-        .replace(/^O relatório atual.*\n/im, '')
-        .replace(/^O estado completo.*\n/im, '')
-        .replace(/=== RELATORIO_ATUAL_BEGIN ===/g, '')
-        .replace(/=== RELATORIO_ATUAL_END ===/g, '')
-        .replace(/=== EVENTOS_RECENTES_BEGIN ===[\s\S]*$/g, '')
-        .trim();
-      if (legacy) reports[dateKey(new Date().toISOString())] = capDailyReport(legacy);
-    }
+  // Variantes antigas sem marcadores de snapshot: conserva uma cópia
+  // compacta apenas quando nem blocos diários nem snapshots foram recuperados.
+  if (!Object.keys(reports).length && content.trim()) {
+    const legacy = content
+      .replace(/^MERIVA SMART DIAGNOSTIC\s*/i, '')
+      .replace(/^RELATÓRIO TXT COMPACTO\s*/im, '')
+      .replace(/^LIMITE:.*\n/im, '')
+      .replace(/^O relatório atual.*\n/im, '')
+      .replace(/^O estado completo.*\n/im, '')
+      .replace(/=== RELATORIO_ATUAL_BEGIN ===/g, '')
+      .replace(/=== RELATORIO_ATUAL_END ===/g, '')
+      .replace(/=== EVENTOS_RECENTES_BEGIN ===[\s\S]*$/g, '')
+      .trim();
+    if (legacy) reports[dateKey(new Date().toISOString())] = capDailyReport(legacy);
   }
   return reports;
 }
