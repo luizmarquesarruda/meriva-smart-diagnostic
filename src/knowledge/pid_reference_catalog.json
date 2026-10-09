@@ -1,0 +1,530 @@
+{
+  "version": 1,
+  "catalogType": "STANDARD_REFERENCE_ONLY",
+  "vehicleApplicability": "GENERIC_SAE_J1979_NOT_CONFIRMED_FOR_MERIVA",
+  "sources": [
+    {
+      "name": "OBD2 PID Knowledge — Standard PIDs",
+      "url": "https://obd2pid.com/pids",
+      "accessedAt": "2026-10-09",
+      "note": "Referência pública para nomes, unidades e descrições. A presença no catálogo não prova suporte pela ECU."
+    },
+    {
+      "name": "SAE J1979 / ISO 15031-5",
+      "url": "https://saemobilus.sae.org/standards/j1979_201408-e-e-diagnostic-test-modes",
+      "note": "Definições padronizadas e regras de solicitação/resposta OBD."
+    }
+  ],
+  "rules": [
+    "Este arquivo é somente referência para pesquisa local; não habilita polling automático.",
+    "A presença do PID não confirma que a ECU da Chevrolet Meriva o suporte.",
+    "Sem formulaId validado em pids.json, a resposta bruta permanece sem interpretação numérica.",
+    "PIDs específicos da ECU/GM devem ser tratados separadamente e não inferidos deste catálogo."
+  ],
+  "pids": [
+    {
+      "pid": "0103",
+      "name": "Fuel System Status",
+      "unit": "enum",
+      "description": "Estado de malha/controle dos sistemas de combustível.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0108",
+      "name": "Short-Term Fuel Trim Bank 2",
+      "unit": "percent",
+      "description": "Correção de combustível de curto prazo do banco 2; normalmente irrelevante em motor de quatro cilindros com um banco.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0109",
+      "name": "Long-Term Fuel Trim Bank 2",
+      "unit": "percent",
+      "description": "Correção de combustível de longo prazo do banco 2.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0112",
+      "name": "Commanded Secondary Air Status",
+      "unit": "status",
+      "description": "Estado comandado do sistema de injeção de ar secundário.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0113",
+      "name": "Oxygen Sensors Present",
+      "unit": "bitmap",
+      "description": "Mapa dos sensores de oxigênio presentes.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0115",
+      "name": "Oxygen Sensor 2 Voltage / STFT",
+      "unit": "volts_percent",
+      "description": "Tensão e correção curta do sensor de oxigênio 2.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "011C",
+      "name": "OBD Standards Compliance",
+      "unit": "enum",
+      "description": "Norma OBD declarada pela ECU.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "011F",
+      "name": "Run Time Since Engine Start",
+      "unit": "seconds",
+      "description": "Tempo de funcionamento desde a partida.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0121",
+      "name": "Distance With MIL On",
+      "unit": "km",
+      "description": "Distância percorrida com a luz de avaria MIL acesa.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0122",
+      "name": "Fuel Rail Pressure Relative to Manifold",
+      "unit": "kpa",
+      "description": "Pressão do combustível relativa ao vácuo do coletor.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0123",
+      "name": "Fuel Rail Gauge Pressure",
+      "unit": "kpa",
+      "description": "Pressão manométrica do rail de combustível; aplicação depende do sistema de injeção.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0124",
+      "name": "Wide-Range O2 Sensor 1 Lambda / Voltage",
+      "unit": "ratio_volts",
+      "description": "Lambda e tensão do sensor de oxigênio de banda larga.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0125",
+      "name": "Wide-Range O2 Sensor 2 Lambda / Voltage",
+      "unit": "ratio_volts",
+      "description": "Lambda e tensão do sensor de oxigênio 2 de banda larga.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0126",
+      "name": "Wide-Range O2 Sensor 3 Lambda / Voltage",
+      "unit": "ratio_volts",
+      "description": "Lambda e tensão do sensor de oxigênio 3 de banda larga.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0127",
+      "name": "Wide-Range O2 Sensor 4 Lambda / Voltage",
+      "unit": "ratio_volts",
+      "description": "Lambda e tensão do sensor de oxigênio 4 de banda larga.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0128",
+      "name": "Wide-Range O2 Sensor 5 Lambda / Voltage",
+      "unit": "ratio_volts",
+      "description": "Lambda e tensão do sensor de oxigênio 5 de banda larga.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0129",
+      "name": "Wide-Range O2 Sensor 6 Lambda / Voltage",
+      "unit": "ratio_volts",
+      "description": "Lambda e tensão do sensor de oxigênio 6 de banda larga.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "012A",
+      "name": "Wide-Range O2 Sensor 7 Lambda / Voltage",
+      "unit": "ratio_volts",
+      "description": "Lambda e tensão do sensor de oxigênio 7 de banda larga.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "012B",
+      "name": "Wide-Range O2 Sensor 8 Lambda / Voltage",
+      "unit": "ratio_volts",
+      "description": "Lambda e tensão do sensor de oxigênio 8 de banda larga.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0132",
+      "name": "Evaporative System Vapor Pressure",
+      "unit": "pa",
+      "description": "Pressão de vapor do sistema EVAP; resposta usa valor assinado.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "013C",
+      "name": "Catalyst Temperature Bank 1 Sensor 1",
+      "unit": "celsius",
+      "description": "Temperatura do catalisador/banco 1 sensor 1.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "013D",
+      "name": "Catalyst Temperature Bank 2 Sensor 1",
+      "unit": "celsius",
+      "description": "Temperatura do catalisador/banco 2 sensor 1.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "013E",
+      "name": "Catalyst Temperature Bank 1 Sensor 2",
+      "unit": "celsius",
+      "description": "Temperatura do catalisador/banco 1 sensor 2.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "013F",
+      "name": "Catalyst Temperature Bank 2 Sensor 2",
+      "unit": "celsius",
+      "description": "Temperatura do catalisador/banco 2 sensor 2.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0141",
+      "name": "Monitor Status This Drive Cycle",
+      "unit": "status",
+      "description": "Estado dos monitores de prontidão neste ciclo de condução.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0144",
+      "name": "Commanded Air-Fuel Equivalence Ratio",
+      "unit": "ratio",
+      "description": "Lambda comandada pela ECU; não é leitura direta da mistura real.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0147",
+      "name": "Absolute Throttle Position B",
+      "unit": "percent",
+      "description": "Segunda leitura absoluta de posição da borboleta.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0148",
+      "name": "Absolute Throttle Position C",
+      "unit": "percent",
+      "description": "Terceira leitura absoluta de posição da borboleta.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0149",
+      "name": "Accelerator Pedal Position D",
+      "unit": "percent",
+      "description": "Posição do pedal do acelerador, canal D.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "014A",
+      "name": "Accelerator Pedal Position E",
+      "unit": "percent",
+      "description": "Posição do pedal do acelerador, canal E.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "014B",
+      "name": "Accelerator Pedal Position F",
+      "unit": "percent",
+      "description": "Posição do pedal do acelerador, canal F.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "014C",
+      "name": "Commanded Throttle Actuator",
+      "unit": "percent",
+      "description": "Posição comandada do atuador da borboleta.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "014D",
+      "name": "Time Run With MIL On",
+      "unit": "minutes",
+      "description": "Tempo de funcionamento com a luz MIL acesa.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "014E",
+      "name": "Time Since Trouble Codes Cleared",
+      "unit": "minutes",
+      "description": "Tempo desde a limpeza dos códigos de avaria.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "014F",
+      "name": "Maximum Values for Lambda / O2 / MAP",
+      "unit": "mixed",
+      "description": "Valores máximos/calibração para sinais de lambda, O2 e MAP.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0150",
+      "name": "Maximum MAF Air Flow Rate",
+      "unit": "grams_per_second",
+      "description": "Valor máximo/calibração do fluxo de ar MAF.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0153",
+      "name": "Absolute EVAP System Vapor Pressure",
+      "unit": "kpa",
+      "description": "Pressão absoluta de vapor no sistema EVAP.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0154",
+      "name": "EVAP System Vapor Pressure",
+      "unit": "pa",
+      "description": "Pressão de vapor do sistema EVAP em valor assinado.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0155",
+      "name": "Short-Term Secondary O2 Trim Banks 1/3",
+      "unit": "percent",
+      "description": "Correção curta de sensores secundários de oxigênio.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0156",
+      "name": "Long-Term Secondary O2 Trim Banks 1/3",
+      "unit": "percent",
+      "description": "Correção longa de sensores secundários de oxigênio.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0157",
+      "name": "Short-Term Secondary O2 Trim Banks 2/4",
+      "unit": "percent",
+      "description": "Correção curta dos bancos secundários 2/4.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0158",
+      "name": "Long-Term Secondary O2 Trim Banks 2/4",
+      "unit": "percent",
+      "description": "Correção longa dos bancos secundários 2/4.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "015F",
+      "name": "Emission Requirements",
+      "unit": "bitmap",
+      "description": "Conjunto de requisitos de emissões declarado pelo veículo.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0163",
+      "name": "Engine Reference Torque",
+      "unit": "nm",
+      "description": "Torque de referência para escalar os PIDs de torque percentual.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0164",
+      "name": "Engine Percent Torque Data",
+      "unit": "percent",
+      "description": "Pontos de torque indicado do motor, com codificação padronizada.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0165",
+      "name": "Auxiliary Input/Output Supported",
+      "unit": "bitmap",
+      "description": "Mapa de entradas e saídas auxiliares suportadas.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0166",
+      "name": "Mass Air Flow Sensor (Extended)",
+      "unit": "mixed",
+      "description": "Dados estendidos de sensores MAF.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0167",
+      "name": "Engine Coolant Temperature Sensors",
+      "unit": "celsius",
+      "description": "Dados de sensores duplos de temperatura do líquido de arrefecimento.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0168",
+      "name": "Intake Air Temperature Sensors",
+      "unit": "celsius",
+      "description": "Dados de sensores duplos de temperatura de admissão.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0169",
+      "name": "EGR Actual / Commanded / Error",
+      "unit": "mixed",
+      "description": "Dados combinados de posição real, comando e erro EGR.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "016B",
+      "name": "Exhaust Gas Recirculation Temperature",
+      "unit": "celsius",
+      "description": "Temperatura do sistema de recirculação de gases.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "016C",
+      "name": "Commanded Throttle Actuator Control",
+      "unit": "percent",
+      "description": "Comando e posição relativa do atuador de borboleta.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "016D",
+      "name": "Fuel Pressure Control System",
+      "unit": "status",
+      "description": "Estado do sistema de controle da pressão de combustível.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "016E",
+      "name": "Injection Pressure Control System",
+      "unit": "status",
+      "description": "Estado do sistema de controle da pressão de injeção.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "016F",
+      "name": "Turbocharger Compressor Inlet Pressure",
+      "unit": "kpa",
+      "description": "Pressão na entrada do compressor do turbo; normalmente não aplicável ao motor aspirado original.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    },
+    {
+      "pid": "0170",
+      "name": "Boost Pressure Control",
+      "unit": "kpa",
+      "description": "Controle de pressão de sobrealimentação; normalmente não aplicável ao motor aspirado original.",
+      "classification": "PADRAO_OBD_REFERENCIA",
+      "decodingStatus": "REFERENCE_ONLY",
+      "vehicleStatus": "NAO_CONFIRMADO"
+    }
+  ]
+}

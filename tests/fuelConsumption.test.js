@@ -19,7 +19,12 @@ mod.filename = sourcePath;
 mod.paths = Module._nodeModulePaths(path.dirname(sourcePath));
 mod._compile(output, sourcePath);
 
-const { integrateFuelRateLph, FuelRateIntegrator } = mod.exports;
+const { integrateFuelRateLph, FuelRateIntegrator, getFuelEstimationSupport } = mod.exports;
+
+assert.deepStrictEqual(getFuelEstimationSupport(['010C', '015E']), { maf: false, mapAndIat: false }, 'PIDs ausentes não devem habilitar consultas de estimativa');
+assert.deepStrictEqual(getFuelEstimationSupport(['0110']), { maf: true, mapAndIat: false }, 'MAF só habilita a própria consulta');
+assert.deepStrictEqual(getFuelEstimationSupport(['010B', '010F', '010C']), { maf: false, mapAndIat: true }, 'MAP exige também IAT');
+assert.deepStrictEqual(getFuelEstimationSupport([' 010b ', '010F']), { maf: false, mapAndIat: true }, 'IDs devem ser normalizados');
 
 function assertApprox(actual, expected, epsilon = 1e-12) {
   assert.ok(Math.abs(actual - expected) <= epsilon, `expected ${actual} ≈ ${expected}`);
@@ -86,3 +91,21 @@ if (!fsSource.includes('ESTIMATED_MAF') || !fsSource.includes('ESTIMATED_MAP')) 
   throw new Error('fuel fallback MAF/MAP não está implementado');
 }
 console.log('fuelConsumption fallback: OK');
+
+const tripServiceSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'trip', 'autoTripService.ts'), 'utf8');
+if (!tripServiceSource.includes('getFuelEstimationSupport(connection.supportedPids)')) {
+  throw new Error('AutoTripService deve planejar consultas pelos PIDs suportados');
+}
+if (!tripServiceSource.includes('fuelRateLph == null && fuelEstimationSupport.maf')) {
+  throw new Error('consulta MAF deve depender de suporte confirmado');
+}
+if (!tripServiceSource.includes('fuelRateLph == null && fuelEstimationSupport.mapAndIat && rpm != null')) {
+  throw new Error('fallback MAP/IAT deve depender de suporte confirmado e RPM válido');
+}
+if (tripServiceSource.includes('displacementCm3 ?? 1598')) {
+  throw new Error('cilindrada genérica de 1598 cm³ não pode ser usada como fallback');
+}
+if (!tripServiceSource.includes("!queriedPids.has(item)")) {
+  throw new Error('telemetria secundária não deve consultar um PID já consultado no ciclo');
+}
+console.log('AutoTripService supported-PID and duplicate-query guards: OK');

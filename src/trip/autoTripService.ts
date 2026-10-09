@@ -3,12 +3,11 @@ import type { SharedObdConnection } from '../obd/sharedConnection';
 import { getSharedObdConnection, getSharedObdStatus, subscribeSharedObd } from '../obd/sharedConnection';
 import { addDriveCycle, readDriveCycles } from '../storage/driveCycleStorage';
 import { forceSaveOnObdEvent, registerObdQuery } from '../meriva/autosaveIntegration';
-import { updateAutoSaveState, initAutoSave } from '../meriva/autosaveManager';
+import { getAutoSaveState, updateAutoSaveState, initAutoSave } from '../meriva/autosaveManager';
 import { RealTripRecorder } from './tripRecorder';
-import { INITIAL_DRIVE_CYCLES } from '../data/driveCycles';
 import { estimateRangeFromFuelLevel, fuelLevelPercentToLiters, isFuelReserve } from './fuelLevel';
 import { resetLiveTelemetry } from '../obd/liveTelemetry';
-import { estimateFuelRateLph, type FuelRateSource } from '../obd/fuelConsumption';
+import { estimateFuelRateLph, getFuelEstimationSupport, type FuelRateSource } from '../obd/fuelConsumption';
 
 export interface AutoTripServiceState {
   connected: boolean;
@@ -28,12 +27,6 @@ export interface AutoTripServiceState {
 }
 
 type Listener = (state: AutoTripServiceState) => void;
-
-const CARSCANNER_REFERENCE_CONSUMPTION_KML = (() => {
-  const distanceKm = INITIAL_DRIVE_CYCLES.reduce((sum, cycle) => sum + cycle.distanceTotalKm, 0);
-  const fuelL = INITIAL_DRIVE_CYCLES.reduce((sum, cycle) => sum + cycle.fuelUsedL, 0);
-  return fuelL > 0 ? Number((distanceKm / fuelL).toFixed(3)) : 0;
-})();
 
 const INITIAL_STATE: AutoTripServiceState = {
   connected: false,
@@ -93,7 +86,7 @@ class AutoTripService {
       ...this.state,
       averageConsumptionKml: persisted.autonomy.averageConsumptionKml > 0
         ? persisted.autonomy.averageConsumptionKml
-        : CARSCANNER_REFERENCE_CONSUMPTION_KML,
+        : 0,
       estimatedRangeKm: persisted.autonomy.estimatedRangeKm,
     };
     this.emit();
@@ -155,7 +148,7 @@ class AutoTripService {
       error: null,
       averageConsumptionKml: persistedAutonomy.averageConsumptionKml > 0
         ? persistedAutonomy.averageConsumptionKml
-        : CARSCANNER_REFERENCE_CONSUMPTION_KML,
+        : 0,
       estimatedRangeKm: persistedAutonomy.estimatedRangeKm,
     };
     this.emit();
@@ -168,6 +161,7 @@ class AutoTripService {
     generation: number,
     obdSpeedSupported: boolean,
   ): Promise<void> {
+    const fuelEstimationSupport = getFuelEstimationSupport(connection.supportedPids);
     while (
       this.running &&
       generation === this.generation &&
@@ -179,6 +173,12 @@ class AutoTripService {
         continue;
       }
 
+      // A recuperação também precisa limpar o estado de erro quando o veículo
+      // está parado e o gravador ainda não existe.
+      if (this.state.error === 'ADAPTADOR OK / ECU SEM RESPOSTA') {
+        this.setState({ connected: true, error: null });
+      }
+
       if (this.pollingPauseCount > 0) {
         await new Promise((resolve) => setTimeout(resolve, 100));
         continue;
@@ -187,6 +187,7 @@ class AutoTripService {
       const loopStartedAt = Date.now();
 
       try {
+        const queriedPids = new Set<string>();
         let fuelRateLph: number | null = null;
         let fuelRateSource: FuelRateSource | undefined;
         let fuelLevelPercent: number | null = null;
@@ -196,6 +197,7 @@ class AutoTripService {
 
         if (this.state.fuelLevelSupported) {
           const fuelLevelResult = await connection.session.queryPid('012F');
+          queriedPids.add('012F');
           await registerObdQuery(this.basePath, fuelLevelResult, 'REAL');
           if (
             fuelLevelResult.parsed.status === 'RESPONDEU' &&
@@ -211,6 +213,7 @@ class AutoTripService {
 
         if (this.state.fuelSupported) {
           const fuelResult = await connection.session.queryPid('015E');
+          queriedPids.add('015E');
           await registerObdQuery(this.basePath, fuelResult, 'REAL');
           if (
             fuelResult.parsed.status === 'RESPONDEU' &&
@@ -226,6 +229,7 @@ class AutoTripService {
 
         if (obdSpeedSupported) {
           const speedResult = await connection.session.queryPid('010D');
+          queriedPids.add('010D');
           await registerObdQuery(this.basePath, speedResult, 'REAL');
           if (
             speedResult.parsed.status === 'RESPONDEU' &&
@@ -248,14 +252,18 @@ class AutoTripService {
         // e a abertura/fechamento automático do trajeto.
         if (connection.supportedPids.includes('010C')) {
           const rpmResult = await connection.session.queryPid('010C');
+          queriedPids.add('010C');
           await registerObdQuery(this.basePath, rpmResult, 'REAL');
           if (rpmResult.parsed.status === 'RESPONDEU' && Number.isFinite(rpmResult.parsed.value)) {
             rpm = rpmResult.parsed.value;
           }
         }
 
-        if (fuelRateLph == null) {
+        // Respeita a bitmap de suporte da ECU: não bombardeia a K-Line com
+        // PIDs que já foram descobertos como não suportados.
+        if (fuelRateLph == null && fuelEstimationSupport.maf) {
           const mafResult = await connection.session.queryPid('0110');
+          queriedPids.add('0110');
           await registerObdQuery(this.basePath, mafResult, 'REAL');
           const mafGs = mafResult.parsed.status === 'RESPONDEU' ? mafResult.parsed.value : null;
           if (mafGs != null) {
@@ -264,16 +272,25 @@ class AutoTripService {
               fuelRateLph = estimate.rateLph;
               fuelRateSource = estimate.source;
             }
-          } else {
+          }
+        }
+
+        // O cálculo MAP só é possível com MAP + IAT + RPM e cilindrada conhecida.
+        // Não usar cilindrada genérica para fabricar um consumo para o veículo.
+        if (fuelRateLph == null && fuelEstimationSupport.mapAndIat && rpm != null) {
+          const displacementCm3 = getAutoSaveState().vehicle?.displacementCm3;
+          if (displacementCm3 != null && Number.isFinite(displacementCm3) && displacementCm3 > 0) {
             const mapResult = await connection.session.queryPid('010B');
+            queriedPids.add('010B');
             const iatResult = await connection.session.queryPid('010F');
+            queriedPids.add('010F');
             await registerObdQuery(this.basePath, mapResult, 'REAL');
             await registerObdQuery(this.basePath, iatResult, 'REAL');
             const estimate = estimateFuelRateLph({
               mapKpa: mapResult.parsed.status === 'RESPONDEU' ? mapResult.parsed.value : null,
               rpm,
               intakeAirTempC: iatResult.parsed.status === 'RESPONDEU' ? iatResult.parsed.value : null,
-              displacementCm3: getAutoSaveState().vehicle?.displacementCm3 ?? 1598,
+              displacementCm3,
             });
             if (estimate) {
               fuelRateLph = estimate.rateLph;
@@ -284,11 +301,12 @@ class AutoTripService {
 
         // Mantém um PID secundário por ciclo para tendências sem monopolizar o ELM.
         const telemetryCandidates = ['0105', '010B', '0111'];
-        const supportedTelemetry = telemetryCandidates.filter((item) => connection.supportedPids.includes(item));
+        const supportedTelemetry = telemetryCandidates.filter((item) => connection.supportedPids.includes(item) && !queriedPids.has(item));
         if (supportedTelemetry.length > 0) {
           const telemetryPid = supportedTelemetry[this.telemetryCursor % supportedTelemetry.length];
           this.telemetryCursor += 1;
           const telemetryResult = await connection.session.queryPid(telemetryPid);
+          queriedPids.add(telemetryPid);
           await registerObdQuery(this.basePath, telemetryResult, 'REAL');
         }
 
@@ -381,6 +399,7 @@ class AutoTripService {
   private async finalizeRecorder(): Promise<void> {
     const recorder = this.recorder;
     this.recorder = null;
+    if (this.state.active) this.setState({ active: false });
     if (!recorder || !this.basePath) return;
 
     const cycle = recorder.buildDriveCycle();

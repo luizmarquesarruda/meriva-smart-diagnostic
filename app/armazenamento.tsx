@@ -7,7 +7,6 @@ import { cleanupOldLogs, cleanupOldReadings } from '../src/storage/cleanup';
 import { getMidLayout } from '../src/ui/midLayout';
 import { readDriveCycles } from '../src/storage/driveCycleStorage';
 import type { DriveCycle } from '../src/data/driveCycles';
-import { exportDiagnosticsJson, exportDriveCyclesCsv } from '../src/storage/exportDiagnostics';
 
 const DEFAULT_QUOTA: StorageQuotaConfig = {
   limitMb: 2048,
@@ -31,7 +30,7 @@ export default function ArmazenamentoScreen() {
     setQuota(status);
     const breakdown = await getStorageBreakdown(path);
     setUsageBreakdown(breakdown);
-    setCycles((await readDriveCycles(path)).sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()));
+    setCycles((await readDriveCycles(path)).filter((cycle) => cycle.source === 'REAL_OBD').sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()));
   }
 
   useEffect(() => {
@@ -62,28 +61,13 @@ export default function ArmazenamentoScreen() {
 
 
 
-  async function handleExport(format: 'JSON' | 'CSV') {
-    if (!basePath || busy) return;
-    setBusy(true);
-    setMessage('EXPORTANDO...');
-    try {
-      const path = format === 'JSON'
-        ? await exportDiagnosticsJson(basePath)
-        : await exportDriveCyclesCsv(basePath);
-      setMessage(`EXPORTADO ${format}: ${path}`);
-    } catch {
-      setMessage(`FALHA AO EXPORTAR ${format}`);
-    } finally {
-      setBusy(false);
-    }
-  }
 
   return (
     <SafeAreaView style={{flex:1,backgroundColor:'#0b1220'}} edges={["top","bottom","left","right"]}>
     <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
       <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
       <Text style={styles.title}>HISTÓRICO E DADOS</Text>
-      <Text style={styles.subtitle}>O app salva as viagens e leituras automaticamente. Esta tela serve para acompanhar o espaço usado e fazer limpeza quando necessário.</Text>
+      <Text style={styles.subtitle}>O app salva as viagens e leituras automaticamente. Esta tela acompanha o espaço usado e as viagens reais. Somente viagens registradas com dados reais da ECU aparecem aqui. Histórico importado não é exibido. Para exportar o relatório TXT compacto, use Configurações.</Text>
       <Text style={[styles.status, quota?.critical ? styles.critical : quota?.warning ? styles.warning : styles.ok]}>
         {quota?.message || 'VERIFICANDO'}
       </Text>
@@ -107,15 +91,10 @@ export default function ArmazenamentoScreen() {
               <Text style={styles.historyDate}>{cycle.startedAt}</Text>
               <Text style={styles.historyMeta}>{cycle.distanceTotalKm.toFixed(2)} km • {cycle.avgFuelConsumptionKml.toFixed(2)} km/L</Text>
             </View>
-            <Text style={cycle.source === 'REAL_OBD' ? styles.real : styles.reference}>{cycle.source === 'REAL_OBD' ? 'REAL' : 'REF.'}</Text>
+            <Text style={styles.real}>REAL OBD</Text>
           </View>
-        )) : <Text style={styles.empty}>Nenhuma viagem salva ainda.</Text>}
+        )) : <Text style={styles.empty}>Nenhuma viagem real registrada pela ECU ainda.</Text>}
       </View>
-      </View>
-
-      <View style={styles.exportRow}>
-        <TouchableOpacity style={styles.button} onPress={() => void handleExport('JSON')} disabled={!basePath || busy}><Text style={styles.buttonText}>EXPORTAR JSON</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.button} onPress={() => void handleExport('CSV')} disabled={!basePath || busy}><Text style={styles.buttonText}>EXPORTAR CSV</Text></TouchableOpacity>
       </View>
 
       <TouchableOpacity style={styles.button} onPress={handleClean} disabled={!basePath || busy}>
@@ -153,7 +132,6 @@ const styles = StyleSheet.create({
   note: { color: '#8da2bd', fontSize: 10, lineHeight: 15, marginTop: 8 },
   label: { color: '#e5edf7', fontWeight: '600' },
   value: { color: '#2563eb', fontWeight: '700' },
-  exportRow: { width: '100%', flexDirection: 'row', gap: 8, marginTop: 4 },
   button: { flex: 1, backgroundColor: '#1557a6', borderRadius: 7, padding: 13, alignItems: 'center', marginTop: 4 },
   buttonText: { color: '#fff', fontWeight: '700' },
 });

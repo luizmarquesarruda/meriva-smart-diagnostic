@@ -1,12 +1,15 @@
 import type { Elm327Session, ElmCommandResult } from './elm327';
 import { parsePidResponse, validateOBDResponse } from './parser';
 import { DISCOVERY_PIDS, KNOWN_PIDS, decodeSupportedPids } from './pidScanner';
+import { getPidDefinition, getPidReference, getPidReferenceIds } from './pidDefinition';
+import { readPidConfirmations, type PidConfirmationEntry } from '../database/pidBank';
 
 export type IntelligentPidStatus =
   | 'CONFIRMADO'
   | 'RESPONDEU'
   | 'NAO_RESPONDEU'
-  | 'INVALIDO';
+  | 'INVALIDO'
+  | 'SEM_DEFINICAO';
 
 export interface IntelligentPidObservation {
   pid: string;
@@ -17,6 +20,9 @@ export interface IntelligentPidObservation {
   unit: string;
   confidence: number;
   reason: string;
+  knowledgeSource: 'CATALOGO_PADRAO' | 'REFERENCIA_PADRAO' | 'BANCO_LOCAL' | 'BITMAP_ECU' | 'SEM_DEFINICAO';
+  definitionName: string | null;
+  formulaId: string | null;
 }
 
 export interface IntelligentPidDiscoveryResult {
@@ -27,20 +33,54 @@ export interface IntelligentPidDiscoveryResult {
 }
 
 /**
- * "IA burrinha": descoberta determinística e adaptativa.
- *
- * Ela não inventa PID. Primeiro lê os mapas OBD-II de suporte e depois
- * confirma somente candidatos de uma lista segura/conhecida. Cada resposta
- * bruta é preservada para permitir auditoria e aprendizado posterior.
+ * Descoberta local agressiva, porém limitada a PIDs Mode 01 documentados.
+ * Primeiro consulta PIDs prioritários e bitmaps; depois testa o catálogo ativo,
+ * os PIDs encontrados anteriormente e referências padrão, inclusive os que a
+ * ECU pode responder apesar de um bitmap incompleto. Nenhuma fórmula é inferida.
  */
 export async function discoverIntelligentPids(
   session: Elm327Session,
-  options?: { knownPids?: string[] },
+  options?: { knownPids?: string[]; basePath?: string },
 ): Promise<IntelligentPidDiscoveryResult> {
   const observations: IntelligentPidObservation[] = [];
+  const storedKnowledge: PidConfirmationEntry[] = options?.basePath
+    ? await readPidConfirmations(options.basePath).catch(() => [])
+    : [];
+  const storedByPid = new Map(storedKnowledge.map((entry) => [entry.pid.toUpperCase(), entry]));
+  // Só uma resposta real validada torna o PID elegível para bloqueio de novas sondagens.
+  // Registros antigos DESCOBERTO podem ter vindo apenas do bitmap e devem ser testados.
+  const alreadyFound = new Set(storedKnowledge
+    .filter((entry) => {
+      if (entry.source !== 'REAL_OBD') return false;
+      const pid = entry.pid.replace(/\s/g, '').toUpperCase();
+      if (!/^01[0-9A-F]{2}$/.test(pid)) return false;
+      // Registros antigos RESPONDEU sem decodificador podiam vir de resposta raw
+      // sem valor validado; reavaliá-los em vez de bloqueá-los permanentemente.
+      return entry.status === 'CONFIRMADO' ||
+        (entry.status === 'RESPONDEU' && Boolean(getPidDefinition(pid)));
+    })
+    .map((entry) => entry.pid.replace(/\s/g, '').toUpperCase()));
+  const knownFromBank = Array.from(alreadyFound);
+
+  const getKnowledge = (pid: string, bitmapOnly = false) => {
+    const normalized = pid.toUpperCase();
+    const definition = getPidDefinition(normalized);
+    const reference = getPidReference(normalized);
+    const stored = storedByPid.get(normalized);
+    return {
+      knowledgeSource: definition ? 'CATALOGO_PADRAO' as const
+        : reference ? 'REFERENCIA_PADRAO' as const
+        : stored ? 'BANCO_LOCAL' as const
+        : bitmapOnly ? 'BITMAP_ECU' as const
+        : 'SEM_DEFINICAO' as const,
+      definitionName: definition?.name ?? reference?.name ?? stored?.name ?? null,
+      formulaId: definition?.formulaId ?? stored?.formulaId ?? null,
+    };
+  };
   const supportResponses: Record<string, string> = {};
   const confidence: Record<string, number> = {};
   const supported = new Set<string>();
+  const bitmapSupported = new Set<string>();
 
   // Fase 1: PIDs essenciais. Isso evita gastar quatro consultas de bitmap
   // antes de saber se o adaptador/ECU responde aos dados que realmente usamos.
@@ -77,10 +117,14 @@ export async function discoverIntelligentPids(
       unit: parsed?.unit ?? '',
       confidence: confidence[pid],
       reason: valid ? 'RESPOSTA VÁLIDA NA FASE PRIORITÁRIA' : 'SEM RESPOSTA VÁLIDA NA FASE PRIORITÁRIA',
+      ...getKnowledge(pid),
     });
   };
 
-  for (const pid of priorityPids) await probePid(pid);
+  for (const pid of priorityPids) {
+    if (alreadyFound.has(pid)) continue;
+    await probePid(pid);
+  }
 
   // Fase 2: mapas de suporte OBD-II. Só chegamos aqui depois dos PIDs essenciais.
   for (const supportPid of DISCOVERY_PIDS) {
@@ -96,7 +140,13 @@ export async function discoverIntelligentPids(
       ? decodeSupportedPids(supportPid, result.response)
       : [];
 
-    for (const pid of mapped) supported.add(pid);
+    for (const pid of mapped) {
+      // Bitmap é consultada para descobrir novos IDs, mas IDs já salvos não
+      // voltam ao resultado nem à gravação em cada varredura.
+      if (alreadyFound.has(pid)) continue;
+      supported.add(pid);
+      bitmapSupported.add(pid);
+    }
 
     observations.push({
       pid: supportPid,
@@ -109,12 +159,13 @@ export async function discoverIntelligentPids(
       reason: mapped.length > 0
         ? 'MAPA DE PIDs ACEITO PELA ECU'
         : 'MAPA SEM PIDs CONFIRMADOS',
+      ...getKnowledge(supportPid, true),
     });
   }
 
   for (const pid of priorityPids) {
     const observation = observations.find((item) => item.pid === pid);
-    if (observation && observation.value !== null && supported.has(pid)) {
+    if (observation && observation.value !== null && bitmapSupported.has(pid)) {
       observation.status = 'CONFIRMADO';
       observation.confidence = 1;
       observation.reason = 'RESPOSTA RAW_ECU VÁLIDA NA FASE PRIORITÁRIA';
@@ -125,10 +176,14 @@ export async function discoverIntelligentPids(
   // Fase 3: conhecidos do projeto e PIDs apontados pelos bitmaps.
   const candidates = Array.from(new Set([
     ...confirmedCandidates,
+    ...knownFromBank,
     ...KNOWN_PIDS,
+    ...getPidReferenceIds(),
     ...Array.from(supported),
-  ])).filter((pid) =>
-    /^01[0-9A-F]{2}$/i.test(pid) && !priorityPids.includes(pid.toUpperCase()) || confidence[pid] === 0,
+  ])).map((pid) => pid.replace(/\s/g, '').toUpperCase()).filter((pid) =>
+    /^01[0-9A-F]{2}$/.test(pid) &&
+    !priorityPids.includes(pid) &&
+    !alreadyFound.has(pid),
   );
 
   for (const pid of candidates) {
@@ -149,21 +204,29 @@ export async function discoverIntelligentPids(
       Number.isFinite(parsed.value),
     );
     const confirmedByBitmap = supported.has(pid);
+    const rawResponseValid = result.status === 'OK' && validateOBDResponse(result.response);
+    const knowledge = getKnowledge(pid, confirmedByBitmap);
+    const hasDefinition = Boolean(getPidDefinition(pid));
+    const missingDefinition = rawResponseValid && !hasDefinition;
     const pidConfidence = valid ? (confirmedByBitmap ? 1 : 0.85) : confirmedByBitmap ? 0.35 : 0;
 
     if (valid) supported.add(pid);
     confidence[pid] = pidConfidence;
     observations.push({
       pid,
-      status: valid ? (confirmedByBitmap ? 'CONFIRMADO' : 'RESPONDEU') : confirmedByBitmap ? 'INVALIDO' : 'NAO_RESPONDEU',
+      status: missingDefinition ? 'SEM_DEFINICAO'
+        : valid ? (confirmedByBitmap ? 'CONFIRMADO' : 'RESPONDEU')
+        : confirmedByBitmap ? 'INVALIDO' : 'NAO_RESPONDEU',
       response: result.response,
       elapsedMs: result.elapsedMs,
       value: parsed?.value ?? null,
       unit: parsed?.unit ?? '',
       confidence: pidConfidence,
-      reason: valid
-        ? confirmedByBitmap ? 'BITMAP + RESPOSTA VÁLIDA' : 'RESPOSTA VÁLIDA'
+      reason: missingDefinition
+        ? 'RESPOSTA RAW VÁLIDA, MAS NÃO HÁ FÓRMULA LOCAL VALIDADA; MANTER SEM INTERPRETAÇÃO'
+        : valid ? confirmedByBitmap ? 'BITMAP + RESPOSTA VÁLIDA' : 'RESPOSTA VÁLIDA'
         : confirmedByBitmap ? 'BITMAP INDICA SUPORTE, MAS RESPOSTA NÃO FOI VALIDADA' : 'SEM RESPOSTA VÁLIDA',
+      ...knowledge,
     });
   }
 

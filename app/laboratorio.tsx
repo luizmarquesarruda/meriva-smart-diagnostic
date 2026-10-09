@@ -8,8 +8,9 @@ import { SimulatedObdTransport } from '../src/obd/simulatedTransport';
 import { BluetoothDeviceInfo } from '../src/obd/bluetoothClassicTransport';
 import { createRealElmSession, discoverPairedDevices } from '../src/obd/bluetoothManager';
 import { canPollObd } from '../src/obd/bluetoothState';
-import { discoverSupportedPids, KNOWN_PIDS } from '../src/obd/pidScanner';
-import { getPidDefinition } from '../src/obd/pidDefinition';
+import { KNOWN_PIDS } from '../src/obd/pidScanner';
+import { discoverIntelligentPids } from '../src/obd/intelligentPidDiscovery';
+import { getPidDefinition, getPidReference } from '../src/obd/pidDefinition';
 import { getDtcDefinition } from '../src/obd/dtcDefinition';
 import { getSharedObdConnection, getSharedObdStatus, setSharedObdConnection, subscribeSharedObd, disconnectSharedObd } from '../src/obd/sharedConnection';
 import { autoTripService } from '../src/trip/autoTripService';
@@ -18,7 +19,7 @@ import { scanDtcServices, readFreezeFrame, type DtcServiceScan } from '../src/ob
 import { getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
 
 import { DtcRecord, nextDtcOccurrences, readDtcs, recordDtc } from '../src/database/dtcManager';
-import { recordDiscoveredPids } from '../src/database/pidBank';
+import { readPidConfirmations, recordDiscoveredPids } from '../src/database/pidBank';
 import {
   initAutoSave,
   updateAutoSaveState,
@@ -305,12 +306,40 @@ export default function LaboratorioScreen() {
         throw new Error('DIAGNÓSTICO AINDA NÃO ESTÁ PRONTO. AGUARDE BLUETOOTH, ELM327 E ECU.');
       }
       if (!activeSession) throw new Error('CONECTE AO ELM327 ANTES DE DESCOBRIR PIDs');
-      const items = await discoverSupportedPids(activeSession);
-      const discovered = Array.from(new Set(items.flatMap((item) => item.supportedPids))).sort();
+      const result = await autoTripService.withPollingPaused(() =>
+        discoverIntelligentPids(activeSession, {
+          ...(mode === 'REAL' ? { basePath: getBasePath() } : {}),
+          knownPids: KNOWN_PIDS,
+        }),
+      );
+      // Bitmap e catálogo apenas indicam candidatos. Só PIDs com resposta
+      // interpretada e valor finito entram como descobertos funcionais/salváveis.
+      const discovered = Array.from(new Set(
+        result.observations
+          .filter((item) =>
+            (item.status === 'CONFIRMADO' || item.status === 'RESPONDEU') &&
+            item.value !== null &&
+            Number.isFinite(item.value),
+          )
+          .map((item) => item.pid),
+      )).sort();
       setSupportedPids(discovered);
       if (mode === 'REAL') {
         const activeProtocol = activeSession.getProtocol() ?? 'N/D';
-        await recordDiscoveredPids(getBasePath(), discovered, activeProtocol);
+        const priorKnowledge = await readPidConfirmations(getBasePath());
+        const priorIds = new Set(priorKnowledge.map((entry) => entry.pid.toUpperCase()));
+        const catalogued = discovered.filter((value) => getPidDefinition(value) !== null).length;
+        const referenceOnly = discovered.filter((value) => !getPidDefinition(value) && getPidReference(value)).length;
+        const alreadyStored = discovered.filter((value) => priorIds.has(value)).length;
+        const withoutDefinition = discovered.filter((value) => !getPidDefinition(value) && !getPidReference(value));
+        const respondedPids = result.observations
+          .filter((item) =>
+            (item.status === 'CONFIRMADO' || item.status === 'RESPONDEU') &&
+            item.value !== null &&
+            Number.isFinite(item.value),
+          )
+          .map((item) => item.pid);
+        await recordDiscoveredPids(getBasePath(), discovered, activeProtocol, respondedPids);
         updateAutoSaveState((state) => {
           if (activeProtocol && discovered.length > 0) {
             state.pidDiscovery = {
@@ -321,8 +350,13 @@ export default function LaboratorioScreen() {
           }
         });
         await forceSaveOnObdEvent();
+        const responded = respondedPids.length;
+        setStatus(
+          `VARREDURA AMPLA: ${discovered.length} PIDs salvos • ${responded} respostas úteis • decodificadores: ${catalogued} • referência: ${referenceOnly} • já no banco: ${alreadyStored} • sem referência: ${withoutDefinition.length}`,
+        );
+      } else {
+        setStatus(`SIMULAÇÃO: ${discovered.length} PIDs detectados • nenhuma descoberta real gravada`);
       }
-      setStatus(`DESCOBERTA CONCLUÍDA: ${discovered.length} PIDs`);
     } catch (cause) {
       setStatus('FALHA NA DESCOBERTA');
       setError(cause instanceof Error ? cause.message : 'ERRO AO DESCOBRIR PIDs');

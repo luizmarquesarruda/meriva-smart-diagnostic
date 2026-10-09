@@ -1,5 +1,5 @@
 import * as FileSystem from 'expo-file-system';
-import type { PidClassification } from '../obd/pidDefinition';
+import { getPidDefinition, getPidReference, type PidClassification } from '../obd/pidDefinition';
 import type { DataSource } from '../types/sourceTypes';
 
 export interface PidConfirmationEntry {
@@ -22,12 +22,17 @@ export interface PidConfirmationEntry {
 
 const fileQueues = new Map<string, Promise<void>>();
 
+function safeField(value: string | number | undefined): string {
+  return String(value ?? '').replace(/[|\r\n]/g, ' ').trim();
+}
+
 function compactLine(entry: PidConfirmationEntry): string {
   return [
     entry.pid, entry.name, entry.classification, entry.status,
     entry.firstSeen, entry.lastSeen, entry.occurrences,
     entry.protocol, entry.responseTime, entry.source, entry.confidence,
-  ].join('|');
+    entry.unit, entry.formulaId, entry.bytes, entry.description,
+  ].map(safeField).join('|');
 }
 
 async function readPidConfirmationsUnlocked(basePath: string): Promise<PidConfirmationEntry[]> {
@@ -43,6 +48,7 @@ async function readPidConfirmationsUnlocked(basePath: string): Promise<PidConfir
       const [
         pid, name, classification, status, firstSeen, lastSeen,
         occurrences, protocol, responseTime, source, confidence,
+        unit, formulaId, bytes, description,
       ] = line.split('|');
 
       const parsedClassification: PidClassification =
@@ -82,6 +88,10 @@ async function readPidConfirmationsUnlocked(basePath: string): Promise<PidConfir
         responseTime: Number.isFinite(Number(responseTime)) ? Number(responseTime) : 0,
         source: parsedSource,
         confidence: Number.isFinite(Number(confidence)) ? Number(confidence) : 0,
+        unit: unit || undefined,
+        formulaId: formulaId || undefined,
+        bytes: bytes && Number.isInteger(Number(bytes)) ? Number(bytes) : undefined,
+        description: description || undefined,
       };
     })
     .filter((entry) => Boolean(entry.pid));
@@ -121,15 +131,20 @@ export async function recordPidConfirmation(
 }
 
 /**
- * Salva PIDs anunciados pela bitmap OBD.
- * DESCOBERTO não significa CONFIRMADO: é apenas suporte anunciado pela ECU.
+ * Persiste somente PIDs que tiveram resposta real validada pelo decodificador.
+ * Bitmap de suporte é pista para sondagem, nunca evidência suficiente para salvar.
  */
 export async function recordDiscoveredPids(
   basePath: string,
   pids: string[],
   protocol: string,
+  respondedPids: string[] = [],
 ): Promise<void> {
-  const unique = Array.from(new Set(pids.map((value) => value.toUpperCase()))).sort();
+  const normalize = (value: string) => value.replace(/\s/g, '').toUpperCase();
+  const responded = new Set(respondedPids.map(normalize));
+  const unique = Array.from(new Set(pids.map(normalize)))
+    .filter((pid) => responded.has(pid) && Boolean(getPidDefinition(pid)) && /^01[0-9A-F]{2}$/.test(pid))
+    .sort();
   if (!unique.length) return;
 
   const target = basePath + '/BANCO/pids_meriva_confirmados.txt';
@@ -142,19 +157,35 @@ export async function recordDiscoveredPids(
 
     for (const pid of unique) {
       const prior = byPid.get(pid);
-      if (prior?.status === 'CONFIRMADO' || prior?.status === 'RESPONDEU') continue;
+      const definition = getPidDefinition(pid);
+      const reference = getPidReference(pid);
+      if (prior?.status === 'CONFIRMADO' || prior?.status === 'RESPONDEU') {
+        byPid.set(pid, {
+          ...prior,
+          name: prior.name && prior.name !== 'PID DESCOBERTO' ? prior.name : definition?.name || reference?.name || prior.name,
+          unit: prior.unit || definition?.unit || reference?.unit,
+          formulaId: prior.formulaId || definition?.formulaId,
+          bytes: prior.bytes || definition?.bytes,
+          description: prior.description || definition?.description || reference?.description,
+        });
+        continue;
+      }
       byPid.set(pid, {
         pid,
-        name: prior?.name || 'PID DESCOBERTO',
-        classification: prior?.classification || 'PADRAO_OBD',
-        status: 'DESCOBERTO',
+        name: prior?.name && prior.name !== 'PID DESCOBERTO' ? prior.name : definition?.name || reference?.name || 'PID DESCOBERTO',
+        classification: prior?.classification || definition?.classification || 'PADRAO_OBD',
+        status: 'RESPONDEU',
         firstSeen: prior?.firstSeen || now,
         lastSeen: now,
         occurrences: (prior?.occurrences || 0) + 1,
         protocol: protocol || prior?.protocol || 'N/D',
         responseTime: prior?.responseTime || 0,
         source: 'REAL_OBD',
-        confidence: prior?.confidence || 0,
+        confidence: Math.max(prior?.confidence || 0, 0.85),
+        unit: prior?.unit || definition?.unit || reference?.unit,
+        formulaId: prior?.formulaId || definition?.formulaId,
+        bytes: prior?.bytes || definition?.bytes,
+        description: prior?.description || definition?.description || reference?.description,
       });
     }
 
@@ -167,6 +198,17 @@ export async function recordDiscoveredPids(
   } finally {
     if (fileQueues.get(target) === current) fileQueues.delete(target);
   }
+}
+
+/** Busca o registro persistido sem elevar suporte anunciado a confirmação de resposta. */
+export async function lookupPidConfirmation(
+  basePath: string,
+  pid: string,
+): Promise<PidConfirmationEntry | null> {
+  const normalized = pid.replace(/\s/g, '').toUpperCase();
+  if (!/^01[0-9A-F]{2}$/.test(normalized)) return null;
+  const entries = await readPidConfirmations(basePath);
+  return entries.find((entry) => entry.pid === normalized) ?? null;
 }
 
 export async function readPidConfirmations(

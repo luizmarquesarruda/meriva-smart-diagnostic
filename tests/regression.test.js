@@ -431,8 +431,10 @@ async function testPidScanner() {
 
 async function testIntelligentPidDiscovery() {
   const ai = loadTs(path.join(ROOT, 'src/obd/intelligentPidDiscovery.ts'));
+  const probedPids = [];
   const fakeSession = {
     async executeCommand(pid) {
+      probedPids.push(pid);
       const responses = {
         '0100': { response: '41 00 BE 3E B8 13', status: 'OK', elapsedMs: 8 },
         '0120': { response: '41 20 00 02 00 00', status: 'OK', elapsedMs: 8 },
@@ -452,6 +454,31 @@ async function testIntelligentPidDiscovery() {
   assert.strictEqual(result.confidence['010C'], 1);
   assert.strictEqual(result.observations.find((item) => item.pid === '010C').status, 'CONFIRMADO');
   assert.strictEqual(result.observations.find((item) => item.pid === '010C').value, 1726);
+  assert.ok(probedPids.includes('0103'), 'varredura ampliada deve sondar referências padrão');
+  assert.ok(probedPids.includes('0170'), 'varredura ampliada deve sondar PIDs de referência menos comuns');
+
+  resetFS();
+  const pidBank = loadTs(path.join(ROOT, 'src/database/pidBank.ts'));
+  await pidBank.recordDiscoveredPids(BASE, ['01F0'], 'ISO 14230-4 KWP FAST');
+  await pidBank.recordDiscoveredPids(BASE, ['010C'], 'ISO 14230-4 KWP FAST', ['010C']);
+  const persisted = await pidBank.readPidConfirmations(BASE);
+  assert.strictEqual(persisted.find((item) => item.pid === '010C').status, 'RESPONDEU', 'resposta válida deve ser salva como RESPONDEU');
+  assert.ok(!persisted.some((item) => item.pid === '01F0'), 'PID apenas listado no bitmap não deve ser salvo');
+  const repeatProbePids = [];
+  const unknownSession = {
+    async executeCommand(pid) {
+      repeatProbePids.push(pid);
+      if (pid === '01F0') return { response: '41 F0 01', status: 'OK', elapsedMs: 12 };
+      return fakeSession.executeCommand(pid);
+    },
+  };
+  const bankAware = await ai.discoverIntelligentPids(unknownSession, { basePath: BASE, knownPids: ['01F0'] });
+  assert.ok(repeatProbePids.includes('01F0'), 'PID sem valor validado não é persistido, mas pode ser novamente sondado quando informado como candidato');
+  assert.ok(bankAware.observations.some((item) => item.pid === '01F0'), 'bitmap-only PID is tested rather than skipped');
+  assert.ok(!bankAware.supportedPids.includes('010C'), 'previously saved functional PID is omitted');
+  assert.ok(!repeatProbePids.includes('010C'), 'previously saved functional PID is not queried again');
+  assert.ok(repeatProbePids.includes('0170'), 'unsaved reference PIDs remain candidates');
+  assert.ok(bankAware.observations.some((item) => item.pid === '0170'), 'new candidates are still checked');
 }
 
 async function testCarScannerBaselineAndFuel012F() {
@@ -791,12 +818,17 @@ async function testPidAndLearningWriteSerialization() {
   const confirmations = await pidBank.readPidConfirmations(BASE);
   assert.strictEqual(confirmations.length, 2);
   const rawPidFile = files.get(path.join(BASE, 'BANCO', 'pids_meriva_confirmados.txt'));
-  assert.ok(rawPidFile.split('\n').filter(Boolean).every((line) => line.split('|').length === 11), 'TXT de PIDs deve permanecer compacto');
-  await pidBank.recordDiscoveredPids(BASE, ['010C', '010D', '015E'], 'ISO 14230-4');
+  assert.ok(rawPidFile.split('\n').filter(Boolean).every((line) => [11, 15].includes(line.split('|').length)), 'TXT de PIDs deve aceitar formato legado de 11 colunas e enriquecido de 15');
+  await pidBank.recordDiscoveredPids(BASE, ['010C', '010D', '015E', '0170'], 'ISO 14230-4', ['010C', '010D', '015E', '0170']);
   const discovered = await pidBank.readPidConfirmations(BASE);
-  assert.strictEqual(discovered.length, 4);
-  assert.strictEqual(discovered.find((item) => item.pid === '010D').status, 'DESCOBERTO');
+  assert.strictEqual(discovered.length, 4, 'só PIDs com resposta validada e decodificador podem ser persistidos');
+  assert.strictEqual(discovered.find((item) => item.pid === '010D').status, 'RESPONDEU', 'PID com decodificador e resposta validada deve ficar RESPONDEU');
   assert.strictEqual(discovered.find((item) => item.pid === '010C').status, 'CONFIRMADO');
+  assert.strictEqual(discovered.find((item) => item.pid === '010D').unit, 'km/h', 'banco deve guardar unidade do catálogo padrão');
+  assert.strictEqual(discovered.find((item) => item.pid === '015E').formulaId, 'FUEL_RATE_LH', 'banco deve guardar fórmula para reutilização pela IA');
+  assert.ok(!discovered.some((item) => item.pid === '0170'), 'PID sem decodificador não deve ser persistido como funcional');
+  const pidDefinition = loadTs(path.join(ROOT, 'src/obd/pidDefinition.ts'));
+  assert.strictEqual(pidDefinition.getPidDefinition('0170'), null, 'PID sem definição local não pode receber fórmula inventada');
 
   const learning = loadTs(path.join(ROOT, 'src/database/learningProfile.ts'));
   await learning.createLearningProfile(BASE, '');  

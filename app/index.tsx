@@ -11,10 +11,11 @@ import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
 import type { ObdConnectionState } from '../src/meriva/autosaveState';
 import { gpsTracker, type GpsTripState } from '../src/gps';
 import { ensureMerivaVehicleProfile } from '../src/database/vehicleConfig';
-import { createLearningProfile, initializeCarScannerSeed, readLearningProfile } from '../src/database/learningProfile';
+import { createLearningProfile, readLearningProfile } from '../src/database/learningProfile';
 import { readAppSettings, type AppSettings } from '../src/database/appSettings';
 import { connectPreferredElm, getSharedObdConnection, getSharedObdLastError, getSharedObdStatus, subscribeSharedObd, subscribeSharedObdStatus } from '../src/obd/sharedConnection';
 import { autoTripService, type AutoTripServiceState } from '../src/trip/autoTripService';
+import { getLivePidTrend } from '../src/obd/liveTelemetry';
 
 function formatDistance(km: number, unit: AppSettings['distanceUnit']): string {
   if (!Number.isFinite(km) || km < 0) return 'N/D';
@@ -74,7 +75,6 @@ export default function IndexScreen() {
       await ensureMerivaVehicleProfile(basePath);
       const learningProfile = await readLearningProfile(basePath);
       if (!learningProfile) await createLearningProfile(basePath, '2026-09-24T14:48:00.000Z');
-      await initializeCarScannerSeed(basePath);
       const storedCycles = await readDriveCycles(basePath);
       const loaded = restored.driveCycles.length ? restored.driveCycles : storedCycles;
 
@@ -168,6 +168,10 @@ export default function IndexScreen() {
   const realConsumptionKml = summary.avgConsumptionKml > 0 ? summary.avgConsumptionKml : null;
   const availableConsumptionKml = tripState.averageConsumptionKml > 0 ? tripState.averageConsumptionKml : realConsumptionKml;
   const distanceUnit = settings?.distanceUnit ?? 'KM';
+  const coolantTrend = getLivePidTrend('0105');
+  const coolantFresh = Boolean(coolantTrend && coolantTrend.ageSeconds <= 10);
+  const coolantValue = coolantFresh && coolantTrend ? coolantTrend.current.toFixed(0) + ' °C' : 'AGUARDANDO ECU';
+  const coolantState = !coolantFresh ? 'SEM LEITURA RECENTE' : coolantTrend!.current >= 115 ? 'TEMPERATURA MUITO ALTA' : coolantTrend!.current >= 105 ? 'TEMPERATURA ELEVADA' : coolantTrend!.current < 70 ? 'MOTOR AQUECENDO' : 'LEITURA ATUAL';
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
@@ -200,6 +204,10 @@ export default function IndexScreen() {
             <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>SAÚDE DO VEÍCULO</Text><Text style={styles.sectionHint}>{dtcCount > 0 ? 'Falhas requerem atenção' : 'Nenhuma falha ativa registrada'}</Text></View><Text style={dtcCount > 0 ? styles.danger : styles.ok}>{dtcCount > 0 ? (dtcCount + ' DTC') : 'NORMAL'}</Text></View>
             <Link href="/saude" asChild><TouchableOpacity style={styles.outlineButton}><Text style={styles.outlineText}>ABRIR CENTRAL DE SAÚDE →</Text></TouchableOpacity></Link>
           </View>
+          <Link href="/arrefecimento" asChild><TouchableOpacity style={styles.coolantCard}>
+            <View style={styles.coolantCopy}><Text style={styles.sectionTitle}>🌡️ TEMPERATURA DO ARREFECIMENTO</Text><Text style={styles.sectionHint}>PID 0105 • somente resposta real recente da ECU</Text><Text style={[styles.coolantState, coolantFresh && coolantTrend && coolantTrend.current >= 105 ? styles.coolantWarn : styles.coolantOk]}>{coolantState}</Text></View>
+            <View style={styles.coolantValueWrap}><Text style={styles.coolantValue}>{coolantValue}</Text><Text style={styles.coolantArrow}>DETALHES ›</Text></View>
+          </TouchableOpacity></Link>
           <View style={styles.connectionCard}>
             <Text style={styles.sectionTitle}>CADEIA DE CONEXÃO</Text>
             <View style={styles.chain}><ChainStep label="BLUETOOTH" ok={connectionStatus.bluetoothConnected} /><Text style={styles.chainArrow}>›</Text><ChainStep label="ELM327" ok={Boolean(connectionStatus.bluetoothConnected && (obd.protocol || connectionStatus.ecuConnected))} /><Text style={styles.chainArrow}>›</Text><ChainStep label="ECU" ok={connectionStatus.ecuConnected} /></View>
@@ -235,6 +243,7 @@ const styles = StyleSheet.create({
   heroCard:{backgroundColor:'#0f2035',borderRadius:18,borderWidth:1,borderColor:'#2d5278',padding:18,alignItems:'center',marginBottom:10},heroEyebrow:{color:'#7db3ff',fontSize:9,fontWeight:'900',letterSpacing:1.4},heroValue:{color:'#f8fafc',fontSize:40,lineHeight:46,fontWeight:'900',marginTop:4,fontVariant:['tabular-nums']},heroState:{color:'#8fa6c1',fontSize:9,fontWeight:'800',letterSpacing:.5},
   metricRow:{width:'100%',flexDirection:'row',gap:7,marginTop:14},cockpitMetric:{flex:1,backgroundColor:'#091626',borderRadius:11,borderWidth:1,borderColor:'#233d5b',padding:10,alignItems:'center'},metricLabel:{color:'#7185a1',fontSize:8,fontWeight:'900',letterSpacing:.6},metricValue:{color:'#e5edf7',fontSize:14,fontWeight:'900',marginTop:3},
   healthCard:{backgroundColor:'#0e1b2d',borderRadius:15,borderWidth:1,borderColor:'#28415f',padding:14,marginBottom:10},sectionHeader:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},sectionTitle:{color:'#f1f5f9',fontWeight:'900',fontSize:12,letterSpacing:.6},sectionHint:{color:'#7185a1',fontSize:9,marginTop:3},ok:{color:'#4ade80',fontSize:11,fontWeight:'900'},danger:{color:'#fb7185',fontSize:11,fontWeight:'900'},outlineButton:{borderWidth:1,borderColor:'#315579',borderRadius:9,padding:10,alignItems:'center',marginTop:10},outlineText:{color:'#9fc5f7',fontSize:9,fontWeight:'900'},
+  coolantCard:{backgroundColor:'#102033',borderRadius:15,borderWidth:1,borderColor:'#38617d',padding:14,marginBottom:10,flexDirection:'row',alignItems:'center',gap:10},coolantCopy:{flex:1,minWidth:0},coolantState:{fontSize:9,fontWeight:'900',marginTop:6},coolantOk:{color:'#4ade80'},coolantWarn:{color:'#fbbf24'},coolantValueWrap:{alignItems:'flex-end'},coolantValue:{color:'#f8fafc',fontSize:22,fontWeight:'900',fontVariant:['tabular-nums']},coolantArrow:{color:'#7db3ff',fontSize:8,fontWeight:'900',marginTop:5},
   connectionCard:{backgroundColor:'#0e1b2d',borderRadius:15,borderWidth:1,borderColor:'#28415f',padding:14,marginBottom:10},chain:{flexDirection:'row',alignItems:'center',marginTop:10},chainStep:{flex:1,alignItems:'center'},chainCircle:{width:30,height:30,borderRadius:15,alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:'#3b516b',backgroundColor:'#0a1727'},chainCircleOk:{borderColor:'#3b8c5a',backgroundColor:'#10261b'},chainCircleText:{color:'#7185a1',fontSize:11,fontWeight:'900'},chainCircleTextOk:{color:'#4ade80'},chainLabel:{color:'#9fb4cf',fontSize:8,fontWeight:'900',marginTop:4},chainArrow:{color:'#526a86',fontSize:24,paddingHorizontal:4},
   actionGrid:{gap:8,marginBottom:10},actionGridLandscape:{flexDirection:'row'},actionButtonLandscape:{flex:1,minWidth:0},primaryButton:{backgroundColor:'#2563eb',borderRadius:13,padding:14,alignItems:'center'},buttonText:{color:'#fff',fontWeight:'900',fontSize:11},buttonSubtext:{color:'#bfdbfe',fontWeight:'800',fontSize:8,marginTop:3},secondaryButton:{backgroundColor:'#0e1b2d',borderRadius:13,padding:13,alignItems:'center',borderWidth:1,borderColor:'#34506f'},secondaryButtonText:{color:'#dbeafe',fontWeight:'900',fontSize:11},buttonSubtextDark:{color:'#7185a1',fontWeight:'800',fontSize:8,marginTop:3},
   statusGrid:{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',marginBottom:2},statusGridLandscape:{flexWrap:'nowrap',gap:8},statusCardLandscape:{width:'auto',flex:1},statusCard:{width:'48%',minWidth:0,backgroundColor:'#0e1b2d',borderRadius:12,borderWidth:1,borderColor:'#233a56',padding:11,marginBottom:8},moreButton:{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:'#0e1b2d',borderRadius:14,borderWidth:1,borderColor:'#28415f',padding:13,marginTop:2},moreIcon:{color:'#7db3ff',fontSize:24,fontWeight:'900'},moreBody:{flex:1,minWidth:0},moreTitle:{color:'#e5edf7',fontSize:11,fontWeight:'900'},moreHint:{color:'#7185a1',fontSize:8,marginTop:3,flexShrink:1},moreArrow:{color:'#7db3ff',fontSize:24},

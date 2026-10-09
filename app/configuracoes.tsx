@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Constants from 'expo-constants';
-import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
 import { createBackup } from '../src/storage/backup';
@@ -8,6 +8,7 @@ import { cleanupOldLogs, cleanupOldReadings } from '../src/storage/cleanup';
 import { VehicleProfile } from '../src/database/vehicleConfig';
 import { getAutoSaveState, getAutoSaveStatus, initAutoSave } from '../src/meriva/autosaveManager';
 import { exportAutoSaveTxt } from '../src/meriva/exportAutoSaveTxt';
+import { getAutoSaveHistoryDates } from '../src/meriva/autosaveHistoryTxt';
 import { exportBluetoothDiagnosticTxt } from '../src/obd/exportBluetoothDiagnosticTxt';
 import { AppSettings, readAppSettings, writeAppSettings } from '../src/database/appSettings';
 import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
@@ -26,21 +27,70 @@ export default function ConfiguracaoScreen() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [status, setStatus] = useState('INICIALIZANDO...');
   const [busy, setBusy] = useState(false);
+  const [selectedReportDate, setSelectedReportDate] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; });
+  const [reportDates, setReportDates] = useState<string[]>([]);
   const [saveStatus, setSaveStatus] = useState<AutoSaveStatus>({ lastSavedAt: null, lastSaveReason: null, lastError: null, obdSessionActive: false });
   const appVersion = Constants.expoConfig?.version ?? '1.0.1';
 
   useEffect(() => {
+    let cancelled = false;
     async function initStorage() {
       const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
-      const state = await initAutoSave(basePath);
-      setProfile(state.vehicle);
-      setSettings(await readAppSettings(basePath));
-      setSaveStatus(getAutoSaveStatus());
-      setStatus('PRONTO');
-      setStorageBase(basePath);
+      try {
+        const state = await initAutoSave(basePath);
+        const [nextSettings, dates] = await Promise.all([
+          readAppSettings(basePath),
+          getAutoSaveHistoryDates(basePath),
+        ]);
+        if (cancelled) return;
+        setProfile(state.vehicle);
+        setSettings(nextSettings);
+        setSaveStatus(getAutoSaveStatus());
+        setReportDates(dates);
+        setStatus('PRONTO');
+        setStorageBase(basePath);
+      } catch (cause) {
+        if (!cancelled) setStatus(cause instanceof Error ? `FALHA AO INICIALIZAR: ${cause.message}` : 'FALHA AO INICIALIZAR');
+      }
     }
     void initStorage();
+    return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    if (!storageBase) return;
+    let loadingDates = false;
+    const refreshReportDates = async () => {
+      if (loadingDates) return;
+      loadingDates = true;
+      try {
+        setReportDates(await getAutoSaveHistoryDates(storageBase));
+        setSaveStatus(getAutoSaveStatus());
+      } finally {
+        loadingDates = false;
+      }
+    };
+    const timer = setInterval(() => { void refreshReportDates(); }, 15_000);
+    return () => clearInterval(timer);
+  }, [storageBase]);
+
+  const selectedReportDateIndex = reportDates.indexOf(selectedReportDate);
+
+  function selectOlderReportDate() {
+    if (!reportDates.length) return;
+    const nextIndex = selectedReportDateIndex < 0
+      ? 0
+      : Math.min(reportDates.length - 1, selectedReportDateIndex + 1);
+    setSelectedReportDate(reportDates[nextIndex]);
+  }
+
+  function selectNewerReportDate() {
+    if (!reportDates.length) return;
+    const nextIndex = selectedReportDateIndex < 0
+      ? 0
+      : Math.max(0, selectedReportDateIndex - 1);
+    setSelectedReportDate(reportDates[nextIndex]);
+  }
 
   async function updateSetting<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
     if (!storageBase || !settings) return;
@@ -85,10 +135,13 @@ export default function ConfiguracaoScreen() {
   }
 
   async function handleExport() {
-    if (busy) return;
+    if (!storageBase || busy) return;
     setBusy(true);
     try {
-      const result = await exportAutoSaveTxt(getAutoSaveState(), appVersion);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(selectedReportDate)) { setStatus('DATA INVÁLIDA: USE AAAA-MM-DD'); return; }
+      const availableDates = await getAutoSaveHistoryDates(storageBase);
+      if (!availableDates.includes(selectedReportDate)) { setStatus('NÃO HÁ RELATÓRIO SALVO PARA ESSA DATA'); return; }
+      const result = await exportAutoSaveTxt(getAutoSaveState(), appVersion, selectedReportDate);
       if (result.ok) setStatus(`EXPORTADO: ${result.fileName}`);
       else if (result.reason === 'CANCELADO') setStatus('EXPORTAÇÃO CANCELADA');
       else setStatus(`FALHA NA EXPORTAÇÃO: ${result.message ?? result.reason}`);
@@ -242,8 +295,40 @@ export default function ConfiguracaoScreen() {
       <TouchableOpacity style={styles.button} onPress={handleBluetoothReport} disabled={busy}>
         <Text style={styles.buttonText}>{busy ? 'AGUARDE...' : 'EXPORTAR RELATÓRIO BLUETOOTH (.TXT)'}</Text>
       </TouchableOpacity>
+      <View style={styles.card}>
+        <Text style={styles.label}>Data do relatório TXT (AAAA-MM-DD)</Text>
+        <TextInput
+          value={selectedReportDate}
+          onChangeText={setSelectedReportDate}
+          placeholder="2026-10-08"
+          placeholderTextColor="#8da2bd"
+          keyboardType="numbers-and-punctuation"
+          maxLength={10}
+          style={styles.dateInput}
+          accessibilityLabel="Data do relatório TXT"
+        />
+        <View style={styles.row}>
+          <TouchableOpacity
+            style={styles.choice}
+            onPress={selectOlderReportDate}
+            disabled={!reportDates.length || selectedReportDateIndex === reportDates.length - 1}
+            accessibilityLabel="Selecionar dia anterior disponível"
+          >
+            <Text style={styles.choiceText}>DIA ANTERIOR</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.choice}
+            onPress={selectNewerReportDate}
+            disabled={!reportDates.length || selectedReportDateIndex === 0}
+            accessibilityLabel="Selecionar dia mais recente disponível"
+          >
+            <Text style={styles.choiceText}>MAIS RECENTE</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.note}>Dias com histórico: {reportDates.length} • Mais recente: {reportDates[0] ?? 'N/D'}</Text>
+      </View>
       <TouchableOpacity style={styles.button} onPress={handleExport} disabled={busy}>
-        <Text style={styles.buttonText}>{busy ? 'AGUARDE...' : 'EXPORTAR SALVAMENTO (.TXT)'}</Text>
+        <Text style={styles.buttonText}>{busy ? 'AGUARDE...' : 'EXPORTAR TXT DO DIA SELECIONADO'}</Text>
       </TouchableOpacity>
       {profile ? (
         <>
@@ -285,4 +370,5 @@ const styles = StyleSheet.create({
   error: { color: '#dc2626', fontWeight: '600', marginBottom: 12 },
   button: { backgroundColor: '#2563eb', borderRadius: 10, padding: 14, alignItems: 'center', marginBottom: 10, marginTop: 6 },
   buttonText: { color: '#fff', fontWeight: '700' },
+  dateInput: { color: '#e5edf7', borderWidth: 1, borderColor: '#3b82f6', borderRadius: 8, padding: 12, marginTop: 8, fontSize: 16 },
 });

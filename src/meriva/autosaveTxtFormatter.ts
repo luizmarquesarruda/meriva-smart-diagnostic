@@ -2,7 +2,7 @@
 // Arquivo para copiar em: <repo>/src/meriva/autosaveTxtFormatter.ts
 //
 // Valores ausentes aparecem como N/D. Nunca são preenchidos com ficção.
-// Seeds aparecem sempre com o rótulo da sua fonte (CARSCANNER_SEED etc.).
+// O relatório só apresenta telemetria REAL e ciclos REAL_OBD; dados importados não são exibidos.
 
 import type { MerivaPersistedState } from './autosaveState';
 import { AUTOSAVE_SCHEMA_VERSION } from './autosaveTypes';
@@ -13,6 +13,15 @@ export const ND = 'N/D';
 function or(value: string | number | boolean | null | undefined): string {
   if (value === null || value === undefined || value === '') return ND;
   return String(value);
+}
+
+function ageLabel(timestamp: string, exportedAt: string): string {
+  const sampleAt = Date.parse(timestamp);
+  const referenceAt = Date.parse(exportedAt);
+  if (!Number.isFinite(sampleAt) || !Number.isFinite(referenceAt)) return 'idade=N/D validade=INDETERMINADA';
+  const seconds = Math.max(0, Math.floor((referenceAt - sampleAt) / 1000));
+  const age = seconds < 60 ? seconds + 's' : seconds < 3600 ? Math.floor(seconds / 60) + 'min' : Math.floor(seconds / 3600) + 'h';
+  return 'idade=' + age + ' validade=' + (seconds <= 10 ? 'RECENTE' : 'ANTIGA');
 }
 
 export interface ExportTxtOptions {
@@ -41,7 +50,8 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
   L.push('');
 
   L.push('[OBD]');
-  L.push(`Status: ${state.obd?.connected ? 'CONECTADO' : 'DESCONECTADO'}`);
+  L.push(`Estado registrado no snapshot: ${state.obd?.connected ? 'CONECTADO' : 'DESCONECTADO'}`);
+  L.push('Nota: estado salvo não comprova conexão ativa no momento da leitura deste arquivo.');
   L.push(`Adaptador: ${or(state.obd?.adapterName)}`);
   L.push(`Protocolo: ${or(state.obd?.protocol)}`);
   L.push(`Último protocolo conhecido: ${or(state.obd?.lastKnownProtocol)}`);
@@ -54,16 +64,17 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
   L.push('');
 
   L.push('[LAST READINGS]');
-  if (state.lastReadings.length) {
-    for (const reading of state.lastReadings) {
+  const realReadings = state.lastReadings.filter((reading) => reading.source === 'REAL');
+  if (realReadings.length) {
+    for (const reading of realReadings) {
       const value =
         reading.value === null || reading.value === undefined
           ? ND
           : `${reading.value} ${reading.unit}`;
-      L.push(`${reading.pid} ${reading.name}: ${value} [${reading.status}] fonte=${reading.source} ${reading.timestamp}`);
+      L.push(`${reading.pid} ${reading.name}: ${value} [${reading.status}] fonte=REAL ${reading.timestamp} ${ageLabel(reading.timestamp, options.exportedAt)}`);
     }
   } else {
-    L.push(ND);
+    L.push('Nenhuma leitura REAL registrada neste snapshot.');
   }
   L.push('');
 
@@ -80,15 +91,19 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
       }
     }
   } else {
-    L.push(ND);
+    L.push('Nenhum DTC incluído neste snapshot; isso não confirma ausência de falhas na ECU.');
   }
   L.push('');
 
   L.push('[HISTORY]');
-  if (state.driveCycles.length) {
-    for (const cycle of state.driveCycles) {
+  L.push('Últimas viagens reais:');
+  const realCycles = state.driveCycles
+    .filter((cycle) => cycle.source === 'REAL_OBD')
+    .slice(-5);
+  if (realCycles.length) {
+    for (const cycle of realCycles) {
       L.push(
-        `${cycle.startedAt} -> ${cycle.finishedAt} | ${cycle.distanceTotalKm} km | ${cycle.fuelUsedL} L | ${cycle.avgFuelConsumptionKml} km/L | fonte=${cycle.source} | combustivel=${or(cycle.fuelRateSource)}`,
+        `${cycle.startedAt} -> ${cycle.finishedAt} | ${cycle.distanceTotalKm} km | ${cycle.fuelUsedL} L | ${cycle.avgFuelConsumptionKml} km/L | fonte=REAL_OBD | combustivel=${or(cycle.fuelRateSource)}`,
       );
     }
   } else {
@@ -101,7 +116,7 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
     L.push(`Status: ${or(state.learning.learningStatus)}`);
     L.push(`Atualizado: ${or(state.learning.lastUpdated)}`);
     L.push(
-      `Amostras reais: ${or(state.learning.globalSampleCounts?.realSamples)} / seed: ${or(state.learning.globalSampleCounts?.seedSamples)}`,
+      `Amostras reais: ${or(state.learning.globalSampleCounts?.realSamples)}`,
     );
     if (state.learning.contextualData?.length) {
       for (const context of state.learning.contextualData) {

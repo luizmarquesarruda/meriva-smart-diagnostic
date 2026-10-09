@@ -1636,3 +1636,433 @@ A confirmação definitiva exige uma sessão real na Meriva com ELM327, principa
 - Nenhuma dependência nova foi adicionada nesta etapa.
 - CI continua deliberadamente não disparada até concluir a revisão estática.
 
+
+
+## 2026-10-08 — Histórico TXT diário e seleção de data
+
+### Solicitação
+Simplificar o diário de diagnóstico exportável: escolher a data, gerar um bloco/página lógica por dia, sem limite total de dias e sem linhas repetitivas de rodagem. A orientação vigente é **não disparar CI nesta rodada**.
+
+### Auditoria do estado anterior
+- A implementação de histórico diário já existia em `src/meriva/autosaveHistoryTxt.ts`, mas o teste 13 ainda esperava o formato legado de até 200 snapshots (`SALVAMENTO_BEGIN`), tornando as expectativas incompatíveis com o formato atual.
+- A exportação de uma data sem relatório podia criar um snapshot manual do dia atual e depois tentar exportar novamente a data antiga; isso era um efeito colateral indevido.
+- A tela de configurações reconstruía o caminho de armazenamento em vez de reutilizar o caminho já inicializado.
+
+### Correções nesta atualização
+- Atualizados os testes de autosave para verificar o bloco diário único, o limite compacto de linhas e a leitura por data, em vez da rotação legada de 200 snapshots.
+- Ajustadas as regressões de salvamento crítico e de encerramento de sessão para refletir a regra: o relatório do dia é atualizado, não se anexam snapshots repetidos.
+- O exportador agora recusa explicitamente uma data selecionada sem relatório e **não grava** um snapshot de hoje como efeito colateral.
+- A tela de configurações reutiliza `storageBase` e impede exportação antes da inicialização do armazenamento.
+
+### Arquivos alterados
+- `tests/merivaAutosave.test.js`
+- `src/meriva/exportAutoSaveTxt.ts`
+- `app/configuracoes.tsx`
+
+### Commits desta atualização
+- `9927d17ddf8a4ea916e7f69dd339d99d10a40da9` — testes do histórico diário.
+- `577c76a0479ac9d890b0271ffd1268ba67720310` — exportação sem escrita colateral.
+- `0aaaa5c5207084fb4119ea4bcae102b11f526b2b` — caminho de armazenamento consistente.
+- `4573e92bc14de23834e541638c446ef006cd9eeb` — correção de escape nas expressões regulares dos testes diários.
+
+### Validação e CI
+- A CI **não foi executada nem disparada**, conforme a instrução vigente.
+- As alterações foram revisadas estruturalmente por comparação com os contratos e funções existentes; isso não equivale a typecheck, execução de testes ou build Android.
+- Permanecem pendentes a execução local da suíte de autosave e a validação TypeScript/Android quando houver autorização para validar por CI.
+
+### Próximo passo
+Quando autorizado, executar a validação completa. Em teste físico, conferir que a seleção exporta somente a data escolhida, que dias antigos continuam disponíveis e que o TXT não atribui dados simulados/seed como dados reais.
+
+
+## 2026-10-08 — Auditoria estática sênior: viagens reais, polling OBD e histórico TXT
+
+### Solicitação e restrição
+Foi solicitada uma revisão técnica do repositório para procurar erros, com a instrução explícita de **não disparar CI**. A revisão ocorreu pela leitura dos arquivos e comparação dos contratos; nenhum workflow foi executado, nenhum merge foi feito e nenhum hardware real foi apresentado para validação nesta rodada.
+
+### Falhas e inconsistências confirmadas corrigidas
+
+1. **Polling de combustível consultava PIDs que a ECU não anunciou como suportados.**
+   - Criado `getFuelEstimationSupport()` para normalizar e consultar a bitmap real dos PIDs suportados.
+   - A tentativa por MAF (`0110`) agora depende do suporte anunciado; o fallback por MAP + IAT (`010B` + `010F`) exige ambos os PIDs, RPM válido e cilindrada real conhecida no perfil.
+   - Removido o fallback genérico de cilindrada `1598 cm³`, que não corresponde à especificação confirmada do veículo.
+   - Adicionadas asserções para PIDs ausentes, normalização dos códigos e guards do serviço de viagem.
+
+2. **Consulta duplicada na K-Line dentro do mesmo ciclo.**
+   - MAP podia ser consultado para estimar a taxa e depois ser consultado novamente como PID secundário de telemetria.
+   - `autoTripService` mantém agora um conjunto de PIDs consultados em cada ciclo e exclui duplicatas da rotação de telemetria.
+
+3. **Proveniência do consumo apresentada de forma enganosa.**
+   - A tela não chama mais o valor de “CONSUMO MÉDIO REAL” ou simplesmente “MEDIDO” quando o combustível pode vir de uma estimativa.
+   - O indicador distingue `CONSUMO MÉDIO (015E + GPS)`, estimado/misto e fonte não confirmada.
+   - Cada viagem salva mostra a origem da taxa de combustível (`MEASURED_015E`, estimativa MAF, estimativa MAP, fonte mista ou não confirmada).
+   - O subtítulo explicita que a distância da viagem vem do GPS e a telemetria vem da ECU.
+
+4. **Estado visual da viagem ficava ativo após finalizar o gravador.**
+   - `finalizeRecorder()` agora limpa o estado `active` assim que o gravador é encerrado, mesmo quando o trajeto não atinge os critérios mínimos para ser salvo.
+   - A regressão cobre a limpeza do estado.
+
+5. **Aviso de falta de resposta da ECU podia ficar preso após a recuperação.**
+   - Quando a ECU volta a responder e o carro está parado, o estado `ADAPTADOR OK / ECU SEM RESPOSTA` agora é limpo sem depender de existir um gravador de viagem.
+   - A tela Viagens apresenta o estado de adaptador sem resposta separadamente de ECU conectada.
+
+6. **Histórico de viagens não era atualizado com a tela aberta.**
+   - A lista salva é recarregada a cada 10 segundos, com proteção contra consultas concorrentes e cancelamento em desmontagem da tela.
+
+7. **Migração antiga podia atribuir snapshots históricos ao dia atual.**
+   - A migração passa a extrair `Exported At` (ou `Saved At`) de cada entrada legada `SALVAMENTO_BEGIN/END`, mantendo a data de cada snapshot e reduzindo múltiplos snapshots do mesmo dia a um bloco diário.
+   - Se o arquivo contiver uma mistura de blocos diários novos e snapshots antigos, blocos convertidos têm precedência e os snapshots antigos preenchem somente dias que ainda não existem.
+   - Variantes legadas sem qualquer timestamp recuperável ainda exigem fallback para a data de migração; a data original não pode ser reconstruída com segurança nesses casos.
+
+8. **Página lógica diária podia exceder 50 linhas por causa do cabeçalho.**
+   - Cabeçalho do TXT reduzido a duas linhas.
+   - O teste do histórico exige que o relatório gerado tenha no máximo 50 linhas lógicas no cenário de um dia, além de manter conteúdo diário limitado.
+
+9. **Seletor de datas podia transformar um histórico ilimitado em uma linha enorme.**
+   - A interface exibe quantidade de dias e dia mais recente, em vez de concatenar toda a lista de datas.
+   - Foram adicionadas ações para navegar ao dia anterior disponível e retornar ao mais recente; o campo manual `AAAA-MM-DD` permanece disponível.
+   - A lista e o estado de último salvamento são atualizados periodicamente enquanto Configurações permanece aberta.
+
+10. **Limpeza de código.**
+    - Removido import obsoleto do formatador legado em `exportAutoSaveTxt.ts`.
+    - A exportação de uma data sem relatório permanece sem escrita colateral: não cria snapshot atual para tentar preencher uma data ausente.
+
+### Arquivos principais revisados/alterados
+- `src/obd/fuelConsumption.ts`
+- `src/trip/autoTripService.ts`
+- `src/trip/tripRecorder.ts` (contrato revisto; teste de regressão ampliado)
+- `app/viagens.tsx`
+- `app/configuracoes.tsx`
+- `src/meriva/autosaveHistoryTxt.ts`
+- `src/meriva/exportAutoSaveTxt.ts`
+- `tests/fuelConsumption.test.js`
+- `tests/tripRecorder.test.js`
+- `tests/merivaAutosave.test.js`
+
+### Commits significativos desta revisão
+Todos os commits de código e testes deste conjunto usam `[skip ci]`; a CI foi intencionalmente deixada parada.
+- `c61e593bf6d365e4ce99e418b45af2ba5f7ab6ac` — consultar fallback de combustível somente conforme suporte OBD.
+- `ad581ae61c4115b87985bee62d68bf84a125c757` — impedir consultas duplicadas de PID no mesmo ciclo.
+- `cefbdbebedfe23ed441373d4545139cc451b36f0` — limpar estado de viagem ao finalizar o gravador.
+- `f7c52d9b7bc9162241ecc7f57043d92afea1366c` — limpar aviso de ECU sem resposta após recuperação.
+- `f8a4aa61d21572c176f4100462fd4cb642cf9934` — atualizar histórico na tela e separar estado da ECU.
+- `bca6cb079a7d530b4a30c9011ab9182927cd49c6` — explicitar a composição da métrica de consumo (PID 015E + GPS).
+- `cce35fed4677ca874245e62ad31671468b5c1847` — preservar dias de snapshots legados.
+- `ea796c1a8ebddd8d0ad7320ac10be3efda270477` — preservar datas quando formatos antigo e novo coexistem.
+- `36d8cb4e99977512b4f16e1809d22b21acdf55db` — limitar cabeçalho do TXT a duas linhas.
+- `e2bcf612f854f24b68a8f9a7252c3ee721e844d0` — manter o seletor de datas compacto e atualizar o estado de salvamento.
+- `99b7163087405095fad40610aa13d54a750b55d4` — navegação entre datas antigas e a mais recente.
+- `1c08be9db63760cfc28d504955a1ceeca4d0e7f6` — regressão da navegação compacta por data.
+- `4738cdbb1a75bfad02a67ad4df8e9f746c5659a5` — remover import obsoleto do exportador.
+- `035fb1383d91d8299fdf8b0f7092ab6cc58fee40` — corrigir separadores de linha no fixture da migração.
+
+### Riscos remanescentes identificados
+- **Composição do combustível:** `estimateFuelRateLph()` ainda usa defaults AFR 14,7 e densidade 0,745 quando o serviço de viagem não fornece parâmetros. A configuração `fuelType` e a possível composição real do tanque (por exemplo, álcool informado via PID 0152) não são integradas neste caminho. A tela sinaliza que a taxa é estimada, mas o valor numérico pode ficar enviesado em veículo flex. Não inventar composição; integrar uma fonte confiável/seleção explícita antes de promover esse valor a medido.
+- **Persistência de viagens com combustível indisponível:** `RealTripRecorder.buildDriveCycle()` exige distância mínima de 0,1 km, combustível acumulado maior que zero e ao menos duas amostras válidas de taxa. Assim, um deslocamento real sem taxa utilizável pode não entrar no histórico. Preservar viagens com combustível desconhecido exigiria representar `N/D` no modelo em vez de gravar zero como se fosse consumo medido.
+- **Migração sem timestamp:** históricos legados sem marcadores e sem um timestamp legível não contêm evidência suficiente para reconstruir o dia original.
+
+### Validação e CI
+- **CI: NÃO EXECUTADA / NÃO DISPARADA**, por instrução do usuário.
+- `npm run typecheck`, `npm test`, Expo Doctor e Android Release **não foram executados**.
+- As novas regressões foram adicionadas ao conjunto existente, mas ainda não foram executadas; sua presença no repositório não equivale a testes passando.
+- Não foi feita validação física com ELM327/ECU nesta revisão.
+
+### Estado e próximo passo
+As falhas identificadas por inspeção estática foram corrigidas e as regressões foram adicionadas. O repositório **não deve ser declarado livre de erros nem pronto para release** até a execução autorizada de typecheck, testes e build Android. A próxima correção técnica recomendada, antes da validação final, é tornar explícitas e coerentes as hipóteses de AFR/densidade no estimador flex e definir a persistência de viagens quando o combustível estiver indisponível.
+
+
+## 2026-10-09 — Catálogo de referência de PIDs e consulta do banco durante descoberta
+
+### Objetivo
+Usar um catálogo público de PIDs OBD-II como referência offline e fazer a lógica local de descoberta consultar o banco de conhecimento antes de classificar PIDs encontrados, sem assumir que todos os PIDs padronizados existem na ECU específica da Meriva.
+
+### Alterações aplicadas
+1. **Catálogo de referência local adicionado**
+   - Novo arquivo `src/knowledge/pid_reference_catalog.json` com 56 PIDs padrão adicionais, descrições e unidades de referência.
+   - Fontes registradas no próprio arquivo: OBD2 PID Knowledge (`https://obd2pid.com/pids`) e SAE J1979/ISO 15031-5.
+   - Cada item é marcado `REFERENCE_ONLY` e `NAO_CONFIRMADO`; o catálogo não ativa polling e não fornece fórmula executável.
+   - O catálogo é genérico, não uma alegação de que todos os PIDs sejam suportados pela Meriva. O bitmap real da ECU permanece a fonte de suporte observado.
+
+2. **Consulta central de conhecimento**
+   - `src/obd/pidDefinition.ts` agora separa `getPidDefinition()` (somente decodificadores executáveis) de `getPidReference()` (metadados sem fórmula).
+   - A lógica `discoverIntelligentPids()` consulta o banco persistido quando recebe `basePath`, acrescenta PIDs reais anteriormente descobertos à lista de candidatos e marca a origem do conhecimento: catálogo executável, referência padrão, banco local, bitmap da ECU ou ausência de definição.
+   - Uma resposta válida de PID sem decodificador continua `SEM_DEFINICAO`, sem valor físico interpretado. A existência de uma entrada no banco, por si só, não habilita uma fórmula.
+
+3. **Banco de PIDs persistido enriquecido**
+   - `src/database/pidBank.ts` grava unidade, `formulaId`, bytes e descrição quando conhecidos.
+   - O formato de 15 colunas preserva leitura dos registros legados de 11 colunas.
+   - Ao gravar PIDs anunciados pela ECU, o banco preenche metadados a partir do catálogo executável ou do catálogo de referência; registros já confirmados podem receber metadados ausentes sem rebaixar seu status.
+   - Campos de texto são sanitizados para impedir que pipes ou quebras de linha corrompam o formato compacto.
+
+4. **Descoberta real no Laboratório**
+   - O fluxo de descoberta consulta o banco antes da gravação, cruza os PIDs anunciados com os catálogos locais e apresenta contagens separadas para decodificadores ativos, referências, PIDs já conhecidos e PIDs sem referência.
+   - Não são adicionadas sondagens extras à K-Line apenas para classificar os PIDs; o fluxo continua usando os mapas de suporte já consultados.
+   - A simulação não é promovida a confirmação real nem gravada como descoberta de ECU.
+
+5. **Regressões/documentação**
+   - `tests/knowledgeJson.test.js` valida IDs únicos, ausência de colisão com decodificadores ativos e marcação de referência não confirmada.
+   - `tests/regression.test.js` cobre persistência de metadados e consulta de um PID previamente descoberto que não tem fórmula.
+   - `docs/FORMULA_ENGINE.md` descreve fontes, formatos, fluxo e política de não inventar fórmulas.
+
+### Limites e cautelas
+- O catálogo adicionado contém **56 referências padrão adicionais**, não o catálogo público integral de 252 PIDs nem uma lista OEM exclusiva da Meriva.
+- A existência de um PID na lista padrão não significa que a ECU do veículo o suporte. A confirmação depende do bitmap/da resposta real.
+- PIDs presentes apenas no catálogo de referência permanecem sem interpretação numérica até existir um decodificador implementado, testado e associado a uma resposta válida.
+- A lógica de descoberta inteligente é local e determinística; não é uma chamada a um LLM externo. Seu comportamento é auditável e não requer internet durante o uso.
+- Nenhuma CI ou suíte de testes foi executada nesta alteração, conforme a instrução de manter a CI parada.
+
+### Commits desta etapa
+- `fee7ca155fdb52e539a55afc6cf0b87eb7bf92d0` — persistir metadados de conhecimento dos PIDs.
+- `b96850cc39ab03df9e0458bea9c09e09ba914da9` — consultar banco local durante descoberta inteligente.
+- `6f009ea57135e74b96eb4d54a1a2bcc1bdc78777` — preencher metadados em registros já confirmados.
+- `8e7a1f93aafcda41ae0347b6ead6444e53d3ae55` — corrigir normalização de PID.
+- `d104a9802a596b3cbe3672b0635096d1f3e94d40` — cruzar descoberta do Laboratório com o banco local.
+- `60007e9bf7d74893842bb4bf46fd9749dc5a8aa2` — regressão de consulta do banco e segurança para PID desconhecido.
+- `c1cd995fc3115201386a834d6a2ffeeb2f6e7997` — aceitar linhas legadas e enriquecidas do banco.
+- `8d248dce3e9d0fca165761f724a845c843bd6ba4` — catálogo de referência padrão.
+- `29bfcd1baa2e6bdbf59e4854a5d208e9249bda93` — separar referência de decodificador executável.
+- `aec09e03ead56547a9810820c2e2d197636d87db` — enriquecer banco com metadados de referência.
+- `8f039b6f6b432e7528c10ca6c0225a613ab6213a` — usar referência padrão sem inventar decodificador.
+- `99424d58a7cea3051a79b16dbddd41e3b8c02c75` — mostrar categorias de conhecimento na descoberta real.
+- `4ff2155b0010ef93ae7205f9a514e735dc60266d` — manter PID desconhecido separado do catálogo de referência.
+- `a3012bb09c8a276a438f9267981b1bfd02a6158f` — validar o catálogo de referência.
+- `0fec7f4512203fb9fa671a9618914d48b2b7fb20` — exigir decodificador executável para interpretação.
+- `81d68dec14a5d677ea2c96f4d6d9fb845eb78729` — documentar o catálogo e a política de consulta.
+
+### Validação
+- **CI: não disparada.**
+- TypeScript, testes de regressão e build Android não foram executados. Asserções adicionadas são cobertura planejada, não evidência de execução bem-sucedida.
+
+
+## 2026-10-09 — Varredura de PIDs mais ampla e salvamento das respostas
+
+### Solicitação
+Tornar a descoberta mais agressiva e salvar os PIDs encontrados automaticamente, sem disparar CI.
+
+### Implementação
+- A descoberta inteligente agora inclui os PIDs do catálogo executável, PIDs reais já registrados, PIDs anunciados nos bitmaps e os 56 PIDs do catálogo de referência padrão.
+- A lista de referência é usada para sondagem deliberada em Mode 01; sua presença não significa suporte confirmado nem habilita fórmula.
+- A tela Laboratório pausa o polling normal durante a varredura, chama a descoberta inteligente e consolida PIDs anunciados e respostas brutas válidas.
+- Ao concluir a varredura real, os resultados são gravados no banco local. PIDs com resposta válida ficam como `RESPONDEU`; PIDs apenas anunciados no bitmap ficam como `DESCOBERTO`. Simulação continua sem gravação como dado real.
+- O banco normaliza IDs e mantém a distinção entre resposta observada e suporte apenas anunciado.
+- Foram adicionadas regressões para garantir que PIDs de referência menos comuns sejam sondados e que o banco não confunda uma descoberta sem resposta com um PID que respondeu.
+
+### Limites e segurança
+- A varredura agora executa mais comandos sequenciais na K-Line e pode demorar mais; foi ampliada para PIDs Mode 01 documentados, não para comandos arbitrários ou PIDs específicos de fabricante inventados.
+- Um retorno bruto válido sem decodificador é armazenado para investigação, mas permanece sem valor físico interpretado.
+- O status `RESPONDEU` significa que houve resposta útil observada; não garante, sozinho, que a definição física do PID esteja validada para a ECU da Meriva.
+
+### Commits
+- `f503be426e1b4a3f5dce331cf7c79c7270b0296a` — expor IDs de referência para sondagem.
+- `bd22bf75a9e34b47f97d878cab5c1bc2f391e34f` — ampliar candidatos da descoberta adaptativa.
+- `fc7052657f8d1a9e735cd7663182157b067a9443` — salvar descobertas reais no fluxo do Laboratório.
+- `bf75ade9c5d097a9f4b1438e2a4688e5053e90cf` — persistir resposta observada separada de bitmap.
+- `450fce07d088fbb18f41b615371883ac48cc64da` — salvar evidência de resposta no banco.
+- `ea2cd0139cf8421f0ebfa34bb6a89b9644d0f3ed` — cobrir sondagem ampliada e status de persistência nos testes.
+- `cb8c192c108015aee974b1e8b354705863251961` — distinguir suporte declarado pelo bitmap de uma resposta isolada válida, evitando promover esta última a confirmação.
+
+### Validação
+- **CI não disparada**, conforme a instrução vigente.
+- TypeScript, testes, Expo Doctor, build Android e validação física com ELM327 ainda não foram executados nesta etapa.
+
+
+## 2026-10-09 — Não sondar novamente PIDs já salvos
+
+### Regra solicitada
+Ao encontrar e salvar um PID real, a descoberta deve seguir para outros candidatos, sem consultar novamente os PIDs já registrados.
+
+### Ajustes
+- A descoberta carrega os registros reais salvos e exclui PIDs com status `CONFIRMADO`, `RESPONDEU` ou `DESCOBERTO` das consultas prioritárias e da fila ampliada.
+- Os PIDs previamente salvos também são omitidos dos resultados da nova varredura, mesmo quando reaparecem nos bitmaps de suporte. Os bitmaps continuam sendo consultados para descobrir outros IDs.
+- A regra vale para registros persistidos como achados reais; PIDs que apenas falharam numa tentativa não são marcados como encontrados e podem ser tentados em outra varredura.
+- Teste de regressão atualizado para verificar que `010C` e `01F0`, já salvos, não sejam consultados outra vez, enquanto candidatos ainda não salvos continuem elegíveis.
+
+### Commits
+- `b1b84e8f75814bf57d69940e2c64ff2b1530f6e5` — ignorar PIDs reais já salvos na fila de sondagem.
+- `7071745efc52e276b7ca85eb497d53f60b0a73f4` — remover PIDs já salvos dos resultados da nova varredura.
+- `7453b5df82aca4a6998d019ac5f7b197f3007887` — cobrir a regra com regressão.
+
+### Validação
+- CI permanece parada por instrução.
+- Testes e build não foram executados; esta alteração foi registrada, mas ainda precisa de validação autorizada.
+
+
+## 2026-10-09 — Salvar PIDs somente após resposta funcional validada
+
+### Regra corrigida
+- Bitmap de suporte e catálogo são fontes de candidatos; não autorizam persistência por si só.
+- A varredura só apresenta como descoberto funcional e grava no banco um PID Mode 01 que respondeu à ECU, passou pela validação OBD, foi interpretado pelo decodificador e produziu valor numérico finito.
+- PIDs anunciados apenas no bitmap e PIDs sem valor interpretável permanecem fora do banco de descobertos funcionais e podem ser sondados novamente.
+- Registros legados com status `DESCOBERTO` não bloqueiam sondagens, pois podem ter sido gravados somente a partir do bitmap. `CONFIRMADO` evita repetição; `RESPONDEU` só evita repetição quando existe decodificador local, pois versões anteriores podiam salvar respostas raw sem valor interpretado.
+- Corrigida a normalização de espaços em IDs na persistência.
+
+### Validação e CI
+- Atualizada a regressão para exigir que o PID funcional seja salvo e que o PID apenas anunciado não seja salvo nem bloqueie nova sondagem.
+- No momento do registro, testes, typecheck e build Android ainda não tinham sido executados; esta revisão solicita validação pela CI.
+
+## 2026-10-09 — Corrigir carregamento do parser no teste DTC
+
+### Falha da CI #1677
+- `npm run doctor`: **17/17 verificações passaram**.
+- O typecheck terminou sem erro e a suíte começou a executar.
+- `tests/dtcScanner.test.js` falhou ao carregar `src/obd/dtcScanner.ts`, com `Cannot find module './parser'`.
+- `src/obd/parser.ts` existe. A falha vinha do carregador CommonJS do teste: ele tratava `./dtcParser`, mas não resolvia/transpilava as dependências locais TypeScript, incluindo `./parser`. O build Android foi ignorado porque a validação falhou.
+
+### Correção
+- Generalizado o carregador de `tests/dtcScanner.test.js` para transpilar e cachear módulos TypeScript locais importados por caminhos relativos, preservando a resolução normal para dependências externas e JSON.
+- Adicionada cobertura de `readFreezeFrame` validando DTC, RPM e temperatura do líquido de arrefecimento, para confirmar que o parser real é carregado e utilizado.
+- A nova CI identificou um erro real no deslocamento do DTC do freeze frame: o parser incluía o byte do número do quadro no código. Corrigido para ler os dois bytes DTC após o byte de identificação do quadro; a regressão espera `P0130` para a resposta `42 02 01 01 30 00 00`.
+- Nenhuma lógica de comunicação OBD/KWP em produção foi alterada para silenciar o teste.
+
+### Arquivos
+- `tests/dtcScanner.test.js`
+- `docs/DIARIO_DE_BORDO.md`
+
+### CI e status
+- CI anterior: #1677, run `37916715018`, falhou em `tests/dtcScanner.test.js`.
+- Esta correção será enviada em um único commit; o push da branch dispara a nova CI automaticamente.
+- A correção só será considerada concluída depois de conferir os testes e, se a validação passar, o build Android. Nenhuma aprovação de CI é presumida neste registro.
+
+## 2026-10-09 — Corrigir inconsistência de unidade e operação no catálogo de PIDs
+
+### Falha observada na CI #1681/#1682
+- Ambas as execuções falharam em `tests/knowledgeJson.test.js:78`.
+- Erro: `PID com unidade inexistente em units.json: 0101 -> status`.
+- `npm ci` passou, Expo Doctor passou em **17/17** verificações, o typecheck passou e os testes do parser DTC/freeze-frame passaram antes desta falha.
+- O build Android foi ignorado porque `npm run validate` parou no teste de integridade do catálogo.
+
+### Causa raiz
+- `src/knowledge/pids.json` declara o PID `0101` com quatro bytes, fórmula `U32` e unidade `status`, mas `src/knowledge/units.json` não definia essa unidade.
+- O motor `src/obd/formulaEngine.ts` já implementava a operação `u32`; porém, a lista de operações permitidas no teste de integridade não a incluía e a regra do próprio teste não exigia quatro bytes para essa operação.
+
+### Correção
+- Adicionada a unidade `status`, identificada na apresentação como `bitmap` de status OBD de 32 bits.
+- Incrementada a versão do catálogo de unidades para registrar a atualização.
+- Atualizada a validação do catálogo para reconhecer `u32` como operação suportada e exigir quatro bytes para essa fórmula.
+- Uma segunda varredura dos invariantes revelou duas falhas encadeadas: faltava a faixa de plausibilidade para `0101` e `010D` usava a chave `km/h` no catálogo de PIDs, embora `units.json` defina a chave normalizada `kmh`. Adicionada a faixa de bitmap de 32 bits (`0` a `4294967295`) e normalizada a chave de unidade de `010D`.
+- A implementação do transporte Bluetooth/ELM327 e a lógica da ECU não foram alteradas.
+
+### Arquivos alterados
+- `src/knowledge/units.json`
+- `src/knowledge/pids.json`
+- `src/knowledge/ranges.json`
+- `tests/knowledgeJson.test.js`
+- `docs/DIARIO_DE_BORDO.md`
+
+### Validação
+- As CI #1681 (run `37917975258`) e #1682 (run `37917982324`) falharam no mesmo erro de integridade do catálogo.
+- Esta correção precisa ser validada pela nova execução automática da CI. Não declarar a correção concluída até confirmar testes e build Android.
+
+## 2026-10-09 — Preservar a origem correta da validação da ECU no autosave
+
+### Falha revelada pela CI #1686
+- `npm ci` passou, Expo Doctor passou em **17/17** e o typecheck passou.
+- O catálogo JSON também passou após a correção anterior.
+- A suíte falhou em `tests/bluetoothLifecycle.test.js:34`, na verificação da origem da validação da ECU.
+
+### Causa raiz
+`persistValidatedConnection` gravava sempre `ecuValidationSource: 'OBD_RESPONSE'`, mesmo quando o perfil do veículo já tinha `ecuAddress`. Isso contradizia a regra de persistência: um endereço existente no perfil deve ser marcado como `VEHICLE_PROFILE`; na ausência dele, a validação sustentada pela resposta real permanece `OBD_RESPONSE`.
+
+### Correção
+- Restaurada a escolha condicional da origem da validação no objeto persistido: `VEHICLE_PROFILE` quando `state.vehicle?.ecuAddress` existe; caso contrário, `OBD_RESPONSE`.
+- Não foi alterada a validação de conexão por resposta OBD `010C/41 0C`, nem o transporte Bluetooth/KWP.
+
+### Arquivos
+- `src/obd/sharedConnection.ts`
+- `docs/DIARIO_DE_BORDO.md`
+
+### Validação
+- A CI #1686 (run `37918462256`) falhou nesta asserção de lifecycle e pulou o build Android.
+- A nova execução precisa confirmar a suíte completa e o build antes de declarar sucesso.
+
+## 2026-10-09 — Restaurar cabeçalho estável da seção de histórico TXT
+
+### Falha revelada pela CI #1687/#1688
+- `npm ci` passou, Expo Doctor passou em **17/17**, typecheck, catálogo JSON e ciclo de conexão Bluetooth/ECU passaram.
+- `tests/merivaAutosave.test.js` falhou no teste 10 porque a exportação não continha a seção exata `[HISTORY]`.
+
+### Causa raiz
+O formatador renomeou a seção para `[HISTORY - ULTIMAS VIAGENS REAIS]`. O conteúdo estava limitado às últimas cinco viagens reais, mas o cabeçalho deixou de cumprir o contrato estável de exportação verificado pelo teste.
+
+### Correção
+- Restaurado o cabeçalho `[HISTORY]`.
+- Mantida a informação descritiva `Últimas viagens reais:` logo abaixo, sem ampliar a quantidade de viagens exportadas ou gerar mais páginas.
+
+### Arquivos
+- `src/meriva/autosaveTxtFormatter.ts`
+- `docs/DIARIO_DE_BORDO.md`
+
+### Validação
+- CI #1687 (run `37918597049`) e #1688 (run `37918604681`) falharam somente no teste 10 de exportação TXT depois de passar pelas verificações anteriores; o build Android foi ignorado.
+- A correção precisa ser comprovada pela próxima CI completa.
+
+## 2026-10-09 — Alinhar persistência funcional de PIDs e regressões legadas
+
+### Falhas reveladas pela CI #1689/#1690
+- A suíte de autosave (20 testes) e o lifecycle de conexão passaram após as correções anteriores.
+- Duas regressões falharam em `tests/regression.test.js`: um candidato sem valor validado não era reconsultado no cenário sintético; e a serialização de PIDs esperava entradas `DESCOBERTO` criadas apenas com uma lista de IDs, contrariando a regra de persistência funcional.
+
+### Diagnóstico
+- `recordDiscoveredPids` verificava `respondedPids`, mas ainda aceitava um PID sem decodificador quando esse ID aparecia na lista recebida.
+- O teste do candidato `01F0` pressupunha que a função o guardaria no banco mesmo sem resposta/valor validado. Isso conflita com a regra vigente: o candidato pode ser testado novamente quando apresentado como candidato, mas não deve ser gravado como funcional sem definição e valor validado.
+- A unidade de velocidade `010D` deve continuar em formato de apresentação `km/h`; a ausência dessa chave como alias no catálogo de unidades era uma inconsistência do catálogo, não motivo para alterar o texto exibido na telemetria.
+
+### Correção
+- A camada `pidBank` agora também exige definição/decodificador local antes de persistir um PID como funcional.
+- Atualizados os testes para fornecer explicitamente o PID candidato à próxima sondagem, e verificar que o banco rejeita `0170` sem decodificador mesmo quando listado em `respondedPids`.
+- Preservada a unidade de apresentação `km/h` de `010D` e incluído o alias correspondente em `units.json`.
+- Mantidos os gates reais de resposta, interpretação numérica e finitude no fluxo da tela Laboratório.
+
+### Arquivos
+- `src/database/pidBank.ts`
+- `src/knowledge/pids.json`
+- `src/knowledge/units.json`
+- `tests/regression.test.js`
+- `docs/DIARIO_DE_BORDO.md`
+
+### Validação
+- CI #1689 (run `37918766881`) e #1690 (run `37918771446`) passaram por `npm ci`, Expo Doctor 17/17, typecheck, catálogo JSON, lifecycle e os 20 testes de autosave, mas falharam nas duas regressões descritas.
+- A próxima CI precisa concluir a suíte completa e o build Android antes de declarar a validação concluída.
+
+## 2026-10-09 — Corrigir expectativa de status no teste de serialização de PID
+
+### Falha observada na CI #1691/#1692
+- A suíte passou pelo teste `IA burrinha de PIDs` após a correção anterior.
+- A única falha restante foi a asserção de `tests/regression.test.js:825`: o teste esperava `010D` como `DESCOBERTO`, mas a entrada foi passada explicitamente como PID que respondeu.
+
+### Causa e correção
+- `recordDiscoveredPids` usa o conjunto `respondedPids` para distinguir uma resposta observada de um ID meramente descoberto por bitmap.
+- Como `010D` tem decodificador local e foi listado explicitamente como resposta validada no cenário de teste, seu status correto é `RESPONDEU`, não `DESCOBERTO`.
+- Atualizada somente a expectativa desse teste. O gate de produção que exige resposta validada e decodificador local para persistência permanece ativo.
+
+### Arquivos
+- `tests/regression.test.js`
+- `docs/DIARIO_DE_BORDO.md`
+
+### Validação
+- CI #1691 (run `37919060536`) e #1692 (run `37919067790`) passaram por `npm ci`, Expo Doctor 17/17, typecheck, catálogo JSON, lifecycle Bluetooth/ECU, 20 testes de autosave e regressão de descoberta de PIDs.
+- A única falha remanescente foi essa expectativa de status. A nova CI precisa concluir todos os testes e o build Android.
+
+
+
+## 2026-10-09 — Telemetria térmica visível e exclusão de seed do Car Scanner
+
+### Objetivo
+Tornar a temperatura do líquido de arrefecimento imediatamente visível e separar leituras atuais de dados antigos/importados.
+
+### Alterações
+- Cockpit passa a mostrar temperatura do líquido (PID 0105) apenas quando há amostra real com até 10 segundos; inclui estado de aquecimento/atenção e abre uma tela térmica dedicada.
+- Nova tela `app/arrefecimento.tsx`: leitura de arrefecimento, indicador visual, tendência/min/média/máx da sessão, temperatura do ar de admissão (PID 010F), idade da amostra e estado real da ECU.
+- Menu Mais Recursos inclui Monitor Térmico.
+- Removida a inicialização automática do seed Car Scanner no cockpit; a tela de viagens e o TXT continuam restritos a ciclos REAL_OBD.
+- TXT passa a omitir leituras simuladas, informar idade/validade de leituras reais, rotular a conexão como estado registrado no snapshot e não interpretar lista de DTC vazia como prova de ausência de falhas.
+- Testes de navegação e exportação ampliados.
+
+### Referências de interface
+- Torque Pro: painel personalizável com medidores, dados OBD e alertas de temperatura — https://play.google.com/store/apps/details?id=org.prowl.torque
+- Car Scanner ELM OBD2: painéis e gráficos de sensores em tempo real — https://play.google.com/store/apps/details?id=com.ovz.carscanner
+- Adaptação própria: foco em uma métrica térmica prioritária, validade explícita das amostras e nenhuma telemetria fictícia.
+
+### Validação
+- Aguardando CI após este commit. A tela não substitui validação com o veículo real; o PID 0105 só aparece quando a ECU efetivamente responde.
+
+- Complemento: a tela Histórico e Dados agora filtra viagens para `REAL_OBD`; removido o marcador `REF.`. A tela Aprendizado não expõe métricas de seed/importação, mantendo visíveis amostras reais e simulações descartadas.

@@ -353,7 +353,7 @@ test('7. CARSCANNER_SEED nunca vira histórico real', async () => {
     appVersion: '1.0.0',
     exportedAt: '2026-10-01 13:00:00',
   });
-  assert.ok(txt.includes('fonte=CARSCANNER_SEED'), 'seed deve permanecer identificado como referência');
+  assert.ok(!txt.includes('fonte=CARSCANNER_SEED'), 'referências Car Scanner não devem ser semeadas no histórico de viagens');
   assert.ok(!txt.includes('fonte=REAL_OBD'), 'nenhum ciclo seed pode aparecer como REAL');
   m.disposeAutoSave();
 });
@@ -440,6 +440,18 @@ test('10. exportação TXT legível, sem inventar valores', async () => {
   const filled = formatter.formatAutoSaveTxt(m.getAutoSaveState(), opts);
   assert.ok(filled.includes('ISO 14230-4 KWP'));
   assert.ok(filled.includes('ECU: 11'));
+  assert.ok(filled.includes('Estado registrado no snapshot: CONECTADO'));
+  assert.ok(filled.includes('Nenhum DTC incluído neste snapshot'));
+  m.updateAutoSaveState((s) => {
+    s.lastReadings = [
+      { pid: '0105', name: 'Temperatura do líquido de arrefecimento', value: 92, unit: '°C', status: 'RESPONDEU', timestamp: '2026-10-01T12:59:55.000Z', source: 'REAL' },
+      { pid: '010C', name: 'RPM simulada', value: 800, unit: 'rpm', status: 'RESPONDEU', timestamp: '2026-10-01T12:59:59.000Z', source: 'SIMULACAO' },
+    ];
+  });
+  const report = formatter.formatAutoSaveTxt(m.getAutoSaveState(), { appVersion: '1.0.0', exportedAt: '2026-10-01T13:00:00.000Z' });
+  assert.ok(report.includes('0105 Temperatura do líquido de arrefecimento: 92 °C'));
+  assert.ok(report.includes('idade=5s validade=RECENTE'));
+  assert.ok(!report.includes('RPM simulada'), 'TXT não deve apresentar simulação como telemetria real');
   m.disposeAutoSave();
 });
 
@@ -481,7 +493,7 @@ test('12. debounce agrupa gravações', async () => {
   m.disposeAutoSave();
 });
 
-test('13. autosave mantém um único TXT histórico e limita a 200 snapshots', async () => {
+test('13. histórico TXT mantém um bloco diário compacto sem limite total de dias', async () => {
   const m = manager();
   m.disposeAutoSave();
   resetFS();
@@ -497,12 +509,88 @@ test('13. autosave mantém um único TXT histórico e limita a 200 snapshots', a
   const historyPath = `${CONFIG_DIR}/meriva_smart_autosave_history.txt`;
   assert.ok(files.has(historyPath), 'histórico TXT deve ser criado automaticamente');
   const history = files.get(historyPath);
-  const entries = history.split('=== SALVAMENTO_BEGIN ===').slice(1);
-  assert.strictEqual(entries.length, 200, 'histórico deve manter exatamente os 200 mais recentes');
-  assert.ok(history.includes('NÚMERO: 205'), 'último salvamento deve permanecer');
-  assert.ok(!/NÚMERO: 5\n/.test(history), 'salvamentos antigos devem ser removidos');
-  assert.strictEqual((history.match(/meriva smart diagnostic/gi) || []).length, 201, 'um cabeçalho + 200 snapshots');
+  const dayMarkers = history.match(/========== DIA: \d{4}-\d{2}-\d{2} ==========/g) || [];
+  assert.strictEqual(dayMarkers.length, 1, 'vários salvamentos no mesmo dia devem atualizar um único bloco');
+  assert.ok(history.includes('HISTÓRICO TXT POR DIA'));
+  assert.ok(history.includes('MOTIVO: critical'), 'o relatório diário deve conter o motivo do salvamento mais recente');
+  assert.ok(!history.includes('=== SALVAMENTO_BEGIN ==='), 'formato antigo por snapshot não deve ser reintroduzido');
+  const dayBlock = history.split(/========== DIA: \d{4}-\d{2}-\d{2} ==========/)[1].split('========== FIM DO DIA ==========')[0];
+  assert.ok(dayBlock.trim().split(/\r?\n/).length <= 45, 'conteúdo de cada dia deve respeitar o limite compacto');
+  assert.ok(history.trimEnd().split(/\r?\n/).length <= 50, 'o primeiro bloco diário também deve caber em até 50 linhas lógicas');
+  const historyModule = loadTs(path.join(ROOT, 'src/meriva/autosaveHistoryTxt.ts'));
+  const dates = await historyModule.getAutoSaveHistoryDates(BASE);
+  assert.strictEqual(dates.length, 1, 'a lista de datas deve conter o dia gravado');
+  const selected = await historyModule.readAutoSaveHistory(BASE, dates[0]);
+  assert.ok(selected.includes(`========== DIA: ${dates[0]} ==========`), 'a leitura por data deve retornar o dia selecionado');
+  assert.ok(!selected.includes('========== DIA: 1900-01-01 =========='), 'não deve incluir dias não selecionados');
   m.disposeAutoSave();
+});
+
+
+test('19. migração do histórico TXT antigo preserva as datas dos snapshots', async () => {
+  const m = manager();
+  m.disposeAutoSave();
+  resetFS();
+  await m.initAutoSave(BASE);
+
+  const historyPath = `${CONFIG_DIR}/meriva_smart_autosave_history.txt`;
+  const legacyEntry = (number, exportedAt) => [
+    '=== SALVAMENTO_BEGIN ===',
+    `NÚMERO: ${number}`,
+    'MOTIVO: critical',
+    'MERIVA SMART DIAGNOSTIC',
+    'SAVE EXPORT',
+    `Exported At: ${exportedAt}`,
+    '[VEHICLE]',
+    'Modelo: Meriva Maxx',
+    '=== SALVAMENTO_END ===',
+  ].join('\n');
+  files.set(historyPath, [
+    'MERIVA SMART DIAGNOSTIC',
+    'HISTÓRICO DE SALVAMENTOS AUTOMÁTICOS',
+    legacyEntry(1, '2026-09-28T12:00:00.000Z'),
+    legacyEntry(2, '2026-09-29T12:00:00.000Z'),
+  ].join('\n\n'));
+
+  const historyModule = loadTs(path.join(ROOT, 'src/meriva/autosaveHistoryTxt.ts'));
+  const dates = await historyModule.getAutoSaveHistoryDates(BASE);
+  assert.deepStrictEqual(dates, ['2026-09-29', '2026-09-28'], 'cada snapshot antigo deve manter sua data');
+
+  const selected = await historyModule.readAutoSaveHistory(BASE, '2026-09-28');
+  assert.ok(selected.includes('========== DIA: 2026-09-28 =========='), 'a data antiga precisa ser exportável separadamente');
+  assert.ok(selected.includes('NÚMERO: 1'), 'o relatório deve corresponder ao snapshot da data selecionada');
+  assert.ok(!selected.includes('NÚMERO: 2'), 'não misturar snapshots de dias diferentes');
+
+  await historyModule.appendAutoSaveHistory(BASE, m.getAutoSaveState(), '1.0.1', 'migration_test');
+  const datesAfterWrite = await historyModule.getAutoSaveHistoryDates(BASE);
+  assert.ok(datesAfterWrite.includes('2026-09-28'), 'a primeira gravação no formato novo não pode apagar o dia 28');
+  assert.ok(datesAfterWrite.includes('2026-09-29'), 'a primeira gravação no formato novo não pode apagar o dia 29');
+
+  // Simula uma atualização interrompida: já existe um bloco diário e também
+  // restam snapshots antigos de datas que ainda não foram migradas.
+  files.set(historyPath, [
+    'MERIVA SMART DIAGNOSTIC',
+    'HISTÓRICO TXT DIÁRIO',
+    '========== DIA: 2026-09-30 ==========',
+    'DATA: 2026-09-30 | ATUALIZADO: 2026-09-30T12:00:00.000Z',
+    'RELATÓRIO NOVO',
+    '========== FIM DO DIA ==========',
+    legacyEntry(1, '2026-09-28T12:00:00.000Z'),
+  ].join('\n'));
+  const mixedDates = await historyModule.getAutoSaveHistoryDates(BASE);
+  assert.deepStrictEqual(mixedDates, ['2026-09-30', '2026-09-28'], 'mistura de formatos deve preservar dias antigos sem sobrescrever o diário novo');
+  m.disposeAutoSave();
+});
+
+
+test('20. seletor de data não despeja o histórico ilimitado na tela', async () => {
+  const settingsSource = fs.readFileSync(path.join(ROOT, 'app/configuracoes.tsx'), 'utf8');
+  assert.ok(settingsSource.includes('Dias com histórico: {reportDates.length}'), 'mostrar quantidade de dias, não a lista completa');
+  assert.ok(settingsSource.includes('reportDates[0]'), 'mostrar a data mais recente');
+  assert.ok(settingsSource.includes('selectOlderReportDate'), 'navegar para datas mais antigas sem despejar a lista');
+  assert.ok(settingsSource.includes('selectNewerReportDate'), 'navegar para datas mais recentes');
+  assert.ok(!settingsSource.includes('reportDates.join('), 'não concatenar todas as datas na interface');
+  assert.ok(settingsSource.includes('setInterval(() => { void refreshReportDates(); }, 15_000)'), 'recarregar datas enquanto configurações está aberta');
 });
 
 test('15. Saved At é persistido e histórico crítico é coalescido', async () => {
@@ -518,7 +606,8 @@ test('15. Saved At é persistido e histórico crítico é coalescido', async () 
   assert.ok(envelope.savedAt, 'envelope deve ter savedAt');
   assert.strictEqual(envelope.payload.metadata.savedAt, envelope.savedAt, 'payload e envelope devem compartilhar savedAt');
   const history = files.get(`${CONFIG_DIR}/meriva_smart_autosave_history.txt`);
-  assert.strictEqual((history.match(/=== SALVAMENTO_BEGIN ===/g) || []).length, 1, 'eventos críticos próximos devem gerar um snapshot');
+  assert.strictEqual((history.match(/========== DIA: \d{4}-\d{2}-\d{2} ==========/g) || []).length, 1, 'eventos críticos no mesmo dia devem atualizar um único relatório');
+  assert.ok(history.includes('MOTIVO: critical'), 'o motivo mais recente deve ficar registrado');
   m.disposeAutoSave();
 });
 
@@ -598,9 +687,8 @@ test('18. sessão de autosave abre na ECU e fecha na desconexão', async () => {
   assert.strictEqual(envelope.payload.obd.lastKnownProtocol, 'ISO 14230-4 KWP FAST');
 
   const endHistory = files.get(`${CONFIG_DIR}/meriva_smart_autosave_history.txt`);
-  assert.ok(endHistory.includes('MOTIVO: session_end'));
-  assert.strictEqual((endHistory.match(/MOTIVO: session_start/g) || []).length, 1);
-  assert.strictEqual((endHistory.match(/MOTIVO: session_end/g) || []).length, 1);
+  assert.ok(endHistory.includes('MOTIVO: session_end'), 'o bloco diário deve refletir o encerramento mais recente');
+  assert.strictEqual((endHistory.match(/========== DIA: \d{4}-\d{2}-\d{2} ==========/g) || []).length, 1, 'a sessão deve manter um único bloco por dia');
   m.disposeAutoSave();
 });
 
