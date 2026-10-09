@@ -33,18 +33,45 @@ export default function ConfiguracaoScreen() {
   const appVersion = Constants.expoConfig?.version ?? '1.0.1';
 
   useEffect(() => {
+    let cancelled = false;
     async function initStorage() {
       const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
-      const state = await initAutoSave(basePath);
-      setProfile(state.vehicle);
-      setSettings(await readAppSettings(basePath));
-      setSaveStatus(getAutoSaveStatus());
-      setReportDates(await getAutoSaveHistoryDates(basePath));
-      setStatus('PRONTO');
-      setStorageBase(basePath);
+      try {
+        const state = await initAutoSave(basePath);
+        const [nextSettings, dates] = await Promise.all([
+          readAppSettings(basePath),
+          getAutoSaveHistoryDates(basePath),
+        ]);
+        if (cancelled) return;
+        setProfile(state.vehicle);
+        setSettings(nextSettings);
+        setSaveStatus(getAutoSaveStatus());
+        setReportDates(dates);
+        setStatus('PRONTO');
+        setStorageBase(basePath);
+      } catch (cause) {
+        if (!cancelled) setStatus(cause instanceof Error ? `FALHA AO INICIALIZAR: ${cause.message}` : 'FALHA AO INICIALIZAR');
+      }
     }
     void initStorage();
+    return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    if (!storageBase) return;
+    let loadingDates = false;
+    const refreshReportDates = async () => {
+      if (loadingDates) return;
+      loadingDates = true;
+      try {
+        setReportDates(await getAutoSaveHistoryDates(storageBase));
+      } finally {
+        loadingDates = false;
+      }
+    };
+    const timer = setInterval(() => { void refreshReportDates(); }, 15_000);
+    return () => clearInterval(timer);
+  }, [storageBase]);
 
   async function updateSetting<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
     if (!storageBase || !settings) return;
@@ -261,7 +288,7 @@ export default function ConfiguracaoScreen() {
           style={styles.dateInput}
           accessibilityLabel="Data do relatório TXT"
         />
-        <Text style={styles.note}>Dias com histórico: {reportDates.length ? reportDates.join(', ') : 'nenhum registro diário disponível'}</Text>
+        <Text style={styles.note}>Dias com histórico: {reportDates.length} • Mais recente: {reportDates[0] ?? 'N/D'}</Text>
       </View>
       <TouchableOpacity style={styles.button} onPress={handleExport} disabled={busy}>
         <Text style={styles.buttonText}>{busy ? 'AGUARDE...' : 'EXPORTAR TXT DO DIA SELECIONADO'}</Text>
