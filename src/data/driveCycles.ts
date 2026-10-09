@@ -17,68 +17,7 @@ export interface DriveCycle {
   importedAt: string;
 }
 
-export const INITIAL_DRIVE_CYCLES: DriveCycle[] = [
-  {
-    id: 'seed_cycle_2026_07_25_01',
-    startedAt: '2026-07-25 13:36:08',
-    finishedAt: '2026-07-25 14:06:49',
-    distanceTotalKm: 20.32,
-    distanceIceKm: 20.32,
-    fuelUsedL: 1.678,
-    totalTimeHms: '00:30:40',
-    drivingTimeHms: '00:28:22',
-    standingTimeHms: '00:02:18',
-    avgDrivingSpeedKmh: 42.977,
-    avgFuelConsumptionKml: 12.109,
-    source: 'CARSCANNER_SEED',
-    importedAt: '2026-09-29T00:00:00.000Z',
-  },
-  {
-    id: 'seed_cycle_2026_07_23_02',
-    startedAt: '2026-07-23 10:34:53',
-    finishedAt: '2026-07-23 10:39:25',
-    distanceTotalKm: 1.503,
-    distanceIceKm: 1.503,
-    fuelUsedL: 0.176,
-    totalTimeHms: '00:04:31',
-    drivingTimeHms: '00:03:55',
-    standingTimeHms: '00:00:36',
-    avgDrivingSpeedKmh: 23.004,
-    avgFuelConsumptionKml: 8.546,
-    source: 'CARSCANNER_SEED',
-    importedAt: '2026-09-29T00:00:00.000Z',
-  },
-  {
-    id: 'seed_cycle_2026_07_23_03',
-    startedAt: '2026-07-23 10:19:03',
-    finishedAt: '2026-07-23 10:27:15',
-    distanceTotalKm: 3.582,
-    distanceIceKm: 3.582,
-    fuelUsedL: 0.341,
-    totalTimeHms: '00:08:12',
-    drivingTimeHms: '00:07:29',
-    standingTimeHms: '00:00:43',
-    avgDrivingSpeedKmh: 28.716,
-    avgFuelConsumptionKml: 10.498,
-    source: 'CARSCANNER_SEED',
-    importedAt: '2026-09-29T00:00:00.000Z',
-  },
-  {
-    id: 'seed_cycle_2026_07_23_04',
-    startedAt: '2026-07-23 09:16:19',
-    finishedAt: '2026-07-23 09:27:02',
-    distanceTotalKm: 3.697,
-    distanceIceKm: 3.697,
-    fuelUsedL: 0.434,
-    totalTimeHms: '00:10:42',
-    drivingTimeHms: '00:08:08',
-    standingTimeHms: '00:02:33',
-    avgDrivingSpeedKmh: 27.226,
-    avgFuelConsumptionKml: 8.525,
-    source: 'CARSCANNER_SEED',
-    importedAt: '2026-09-29T00:00:00.000Z',
-  },
-];
+export const INITIAL_DRIVE_CYCLES: DriveCycle[] = [];
 
 export interface DriveCycleSummary {
   totalDistanceKm: number;
@@ -93,16 +32,11 @@ export interface DriveCycleSummary {
 
 export function getDriveCycleSummary(cycles: DriveCycle[]): DriveCycleSummary {
   const realCycles = cycles.filter((cycle) => cycle.source === 'REAL_OBD');
-  const referenceCycles = cycles.filter((cycle) => cycle.source === 'CARSCANNER_SEED');
   const realDistanceKm = realCycles.reduce((sum, cycle) => sum + cycle.distanceTotalKm, 0);
   const realFuelL = realCycles.reduce((sum, cycle) => sum + cycle.fuelUsedL, 0);
   const realAvgSpeedKmh = realCycles.length
     ? realCycles.reduce((sum, cycle) => sum + cycle.avgDrivingSpeedKmh, 0) / realCycles.length
     : 0;
-
-  const ordered = [...cycles].sort(
-    (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
-  );
   const orderedReal = [...realCycles].sort(
     (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
   );
@@ -110,13 +44,11 @@ export function getDriveCycleSummary(cycles: DriveCycle[]): DriveCycleSummary {
   return {
     totalDistanceKm: Number(realDistanceKm.toFixed(2)),
     totalFuelL: Number(realFuelL.toFixed(3)),
-    avgConsumptionKml: Number(
-      (realFuelL > 0 ? realDistanceKm / realFuelL : 0).toFixed(2),
-    ),
+    avgConsumptionKml: Number((realFuelL > 0 ? realDistanceKm / realFuelL : 0).toFixed(2)),
     avgSpeedKmh: Number(realAvgSpeedKmh.toFixed(1)),
     realCycleCount: realCycles.length,
-    referenceCycleCount: referenceCycles.length,
-    lastCycle: ordered[0] ?? null,
+    referenceCycleCount: 0,
+    lastCycle: orderedReal[0] ?? null,
     lastRealCycle: orderedReal[0] ?? null,
   };
 }
