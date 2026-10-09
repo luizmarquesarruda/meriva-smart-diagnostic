@@ -21,6 +21,7 @@ function assertUnique(values, label) {
 
 function main() {
   const pids = readJson('src/knowledge/pids.json');
+  const pidReference = readJson('src/knowledge/pid_reference_catalog.json');
   const ranges = readJson('src/knowledge/ranges.json');
   const formulas = readJson('src/knowledge/formulas.json');
   const units = readJson('src/knowledge/units.json');
@@ -32,6 +33,18 @@ function main() {
   const dtcCatalog = readJson('src/knowledge/dtc_catalog.json');
 
   assert.strictEqual(typeof pids.version, 'number');
+  assert.strictEqual(pidReference.catalogType, 'STANDARD_REFERENCE_ONLY');
+  assert.ok(Array.isArray(pidReference.sources) && pidReference.sources.some((source) => source.url === 'https://obd2pid.com/pids'));
+  assert.ok(Array.isArray(pidReference.pids) && pidReference.pids.length >= 50, 'catálogo de referência deve conter PIDs padrão adicionais');
+  assertUnique(pidReference.pids.map((item) => String(item.pid).toUpperCase()), 'PID de referência');
+  for (const item of pidReference.pids) {
+    const id = String(item.pid).toUpperCase();
+    assert.ok(/^01[0-9A-F]{2}$/.test(id), 'PID de referência inválido: ' + id);
+    assert.ok(!pids.pids.some((active) => active.pid === id), 'PID de referência não pode duplicar um decodificador ativo: ' + id);
+    assert.strictEqual(item.decodingStatus, 'REFERENCE_ONLY', 'referência não pode habilitar decodificação: ' + id);
+    assert.strictEqual(item.vehicleStatus, 'NAO_CONFIRMADO', 'referência genérica não confirma compatibilidade da Meriva: ' + id);
+    assert.ok(item.name && item.unit && item.description, 'metadados de referência incompletos: ' + id);
+  }
   assert.strictEqual(typeof formulas.version, 'number');
   assert.strictEqual(typeof ranges.version, 'number');
   assert.strictEqual(typeof units.version, 'number');
