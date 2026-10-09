@@ -7,7 +7,7 @@ import { getAutoSaveState, updateAutoSaveState, initAutoSave } from '../meriva/a
 import { RealTripRecorder } from './tripRecorder';
 import { estimateRangeFromFuelLevel, fuelLevelPercentToLiters, isFuelReserve } from './fuelLevel';
 import { resetLiveTelemetry } from '../obd/liveTelemetry';
-import { estimateFuelRateLph, type FuelRateSource } from '../obd/fuelConsumption';
+import { estimateFuelRateLph, getFuelEstimationSupport, type FuelRateSource } from '../obd/fuelConsumption';
 
 export interface AutoTripServiceState {
   connected: boolean;
@@ -161,6 +161,7 @@ class AutoTripService {
     generation: number,
     obdSpeedSupported: boolean,
   ): Promise<void> {
+    const fuelEstimationSupport = getFuelEstimationSupport(connection.supportedPids);
     while (
       this.running &&
       generation === this.generation &&
@@ -247,7 +248,9 @@ class AutoTripService {
           }
         }
 
-        if (fuelRateLph == null) {
+        // Respeita a bitmap de suporte da ECU: não bombardeia a K-Line com
+        // PIDs que já foram descobertos como não suportados.
+        if (fuelRateLph == null && fuelEstimationSupport.maf) {
           const mafResult = await connection.session.queryPid('0110');
           await registerObdQuery(this.basePath, mafResult, 'REAL');
           const mafGs = mafResult.parsed.status === 'RESPONDEU' ? mafResult.parsed.value : null;
@@ -257,7 +260,14 @@ class AutoTripService {
               fuelRateLph = estimate.rateLph;
               fuelRateSource = estimate.source;
             }
-          } else {
+          }
+        }
+
+        // O cálculo MAP só é possível com MAP + IAT + RPM e cilindrada conhecida.
+        // Não usar cilindrada genérica para fabricar um consumo para o veículo.
+        if (fuelRateLph == null && fuelEstimationSupport.mapAndIat && rpm != null) {
+          const displacementCm3 = getAutoSaveState().vehicle?.displacementCm3;
+          if (displacementCm3 != null && Number.isFinite(displacementCm3) && displacementCm3 > 0) {
             const mapResult = await connection.session.queryPid('010B');
             const iatResult = await connection.session.queryPid('010F');
             await registerObdQuery(this.basePath, mapResult, 'REAL');
@@ -266,7 +276,7 @@ class AutoTripService {
               mapKpa: mapResult.parsed.status === 'RESPONDEU' ? mapResult.parsed.value : null,
               rpm,
               intakeAirTempC: iatResult.parsed.status === 'RESPONDEU' ? iatResult.parsed.value : null,
-              displacementCm3: getAutoSaveState().vehicle?.displacementCm3 ?? 1598,
+              displacementCm3,
             });
             if (estimate) {
               fuelRateLph = estimate.rateLph;
