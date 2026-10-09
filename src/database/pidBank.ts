@@ -1,7 +1,6 @@
 import * as FileSystem from 'expo-file-system';
-import type { PidClassification } from '../obd/pidDefinition';
+import { getPidDefinition, type PidClassification } from '../obd/pidDefinition';
 import type { DataSource } from '../types/sourceTypes';
-import { getPidDefinition } from '../obd/pidDefinition';
 
 export interface PidConfirmationEntry {
   pid: string;
@@ -24,7 +23,7 @@ export interface PidConfirmationEntry {
 const fileQueues = new Map<string, Promise<void>>();
 
 function safeField(value: string | number | undefined): string {
-  return String(value ?? '').replace(/[|\\r\\n]/g, ' ').trim();
+  return String(value ?? '').replace(/[|\r\n]/g, ' ').trim();
 }
 
 function compactLine(entry: PidConfirmationEntry): string {
@@ -153,8 +152,17 @@ export async function recordDiscoveredPids(
 
     for (const pid of unique) {
       const prior = byPid.get(pid);
-      if (prior?.status === 'CONFIRMADO' || prior?.status === 'RESPONDEU') continue;
       const definition = getPidDefinition(pid);
+      if (prior?.status === 'CONFIRMADO' || prior?.status === 'RESPONDEU') {
+        byPid.set(pid, {
+          ...prior,
+          unit: prior.unit || definition?.unit,
+          formulaId: prior.formulaId || definition?.formulaId,
+          bytes: prior.bytes || definition?.bytes,
+          description: prior.description || definition?.description,
+        });
+        continue;
+      }
       byPid.set(pid, {
         pid,
         name: prior?.name && prior.name !== 'PID DESCOBERTO' ? prior.name : definition?.name || 'PID DESCOBERTO',
