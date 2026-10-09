@@ -180,18 +180,6 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
     } catch (historyCause) {
       console.warn('[autosave] falha ao atualizar histórico TXT:', historyCause instanceof Error ? historyCause.message : historyCause);
     }
-    if (reason === 'session_start' || reason === 'session_end') {
-      try {
-        await appendDailyObdSessionEvent(
-          base,
-          runtime.state,
-          reason === 'session_start' ? 'SESSION_START' : 'SESSION_END',
-          savedAt,
-        );
-      } catch (dailyHistoryCause) {
-        console.warn('[autosave] falha ao atualizar histórico diário ECU:', dailyHistoryCause instanceof Error ? dailyHistoryCause.message : dailyHistoryCause);
-      }
-    }
     runtime.dirty = runtime.mutationVersion !== mutationVersionAtStart;
     saved = true;
     return true;
@@ -338,6 +326,21 @@ export function startObdSessionCheckpoint(): void {
   }, CHECKPOINT_MS);
 }
 
+async function appendDailySessionBoundary(event: 'SESSION_START' | 'SESSION_END'): Promise<void> {
+  if (!runtime.basePath) return;
+  try {
+    await appendDailyObdSessionEvent(
+      runtime.basePath,
+      runtime.state,
+      event,
+      new Date().toISOString(),
+    );
+  } catch (cause) {
+    // O histórico diário é complementar: falha no TXT não invalida o autosave JSON.
+    console.warn('[autosave] falha ao registrar fronteira da sessão ECU:', cause instanceof Error ? cause.message : cause);
+  }
+}
+
 export async function startObdAutosaveSession(): Promise<boolean> {
   if (runtime.obdSessionActive) return true;
   if (!runtime.basePath || !runtime.state.obd.connected) return false;
@@ -352,8 +355,13 @@ export async function startObdAutosaveSession(): Promise<boolean> {
   if (!saved) {
     runtime.obdSessionActive = false;
     stopObdSessionCheckpoint();
+    return false;
   }
-  return saved;
+
+  // Persistir o evento após a conclusão do autosave evita que o ciclo de
+  // salvamento/coalescência suprima uma reconexão do histórico diário.
+  await appendDailySessionBoundary('SESSION_START');
+  return true;
 }
 
 export async function closeObdAutosaveSession(): Promise<boolean> {
@@ -379,7 +387,11 @@ export async function closeObdAutosaveSession(): Promise<boolean> {
   // Abertura/fechamento são fronteiras de sessão; não devem ser coalescidas
   // com o snapshot anterior.
   if (wasActive) runtime.lastSavedFingerprint = null;
-  return saveNow('session_end');
+  const saved = await saveNow('session_end');
+  if (saved && wasActive) {
+    await appendDailySessionBoundary('SESSION_END');
+  }
+  return saved;
 }
 
 export function stopObdSessionCheckpoint(): void {
