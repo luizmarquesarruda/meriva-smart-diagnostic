@@ -1,7 +1,7 @@
 import type { Elm327Session, ElmCommandResult } from './elm327';
 import { parsePidResponse, validateOBDResponse } from './parser';
 import { DISCOVERY_PIDS, KNOWN_PIDS, decodeSupportedPids } from './pidScanner';
-import { getPidDefinition, getPidReference } from './pidDefinition';
+import { getPidDefinition, getPidReference, getPidReferenceIds } from './pidDefinition';
 import { readPidConfirmations, type PidConfirmationEntry } from '../database/pidBank';
 
 export type IntelligentPidStatus =
@@ -33,11 +33,10 @@ export interface IntelligentPidDiscoveryResult {
 }
 
 /**
- * "IA burrinha": descoberta determinística e adaptativa.
- *
- * Ela não inventa PID. Primeiro lê os mapas OBD-II de suporte e depois
- * confirma somente candidatos de uma lista segura/conhecida. Cada resposta
- * bruta é preservada para permitir auditoria e aprendizado posterior.
+ * Descoberta local agressiva, porém limitada a PIDs Mode 01 documentados.
+ * Primeiro consulta PIDs prioritários e bitmaps; depois testa o catálogo ativo,
+ * os PIDs encontrados anteriormente e referências padrão, inclusive os que a
+ * ECU pode responder apesar de um bitmap incompleto. Nenhuma fórmula é inferida.
  */
 export async function discoverIntelligentPids(
   session: Elm327Session,
@@ -160,9 +159,10 @@ export async function discoverIntelligentPids(
     ...confirmedCandidates,
     ...knownFromBank,
     ...KNOWN_PIDS,
+    ...getPidReferenceIds(),
     ...Array.from(supported),
-  ])).filter((pid) =>
-    (/^01[0-9A-F]{2}$/i.test(pid) && !priorityPids.includes(pid.toUpperCase())) || confidence[pid] === 0,
+  ])).map((pid) => pid.replace(/\s/g, '').toUpperCase()).filter((pid) =>
+    /^01[0-9A-F]{2}$/.test(pid) && !priorityPids.includes(pid),
   );
 
   for (const pid of candidates) {
