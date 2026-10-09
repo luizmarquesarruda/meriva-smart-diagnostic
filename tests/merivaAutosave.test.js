@@ -575,6 +575,8 @@ test('20. seletor de data não despeja o histórico ilimitado na tela', async ()
   const settingsSource = fs.readFileSync(path.join(ROOT, 'app/configuracoes.tsx'), 'utf8');
   assert.ok(settingsSource.includes('Dias com histórico: {reportDates.length}'), 'mostrar quantidade de dias, não a lista completa');
   assert.ok(settingsSource.includes('reportDates[0]'), 'mostrar a data mais recente');
+  assert.ok(settingsSource.includes('selectOlderReportDate'), 'navegar para datas mais antigas sem despejar a lista');
+  assert.ok(settingsSource.includes('selectNewerReportDate'), 'navegar para datas mais recentes');
   assert.ok(!settingsSource.includes('reportDates.join('), 'não concatenar todas as datas na interface');
   assert.ok(settingsSource.includes('setInterval(() => { void refreshReportDates(); }, 15_000)'), 'recarregar datas enquanto configurações está aberta');
 });
