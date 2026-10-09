@@ -1858,6 +1858,7 @@ Tornar a descoberta mais agressiva e salvar os PIDs encontrados automaticamente,
 - `bf75ade9c5d097a9f4b1438e2a4688e5053e90cf` — persistir resposta observada separada de bitmap.
 - `450fce07d088fbb18f41b615371883ac48cc64da` — salvar evidência de resposta no banco.
 - `ea2cd0139cf8421f0ebfa34bb6a89b9644d0f3ed` — cobrir sondagem ampliada e status de persistência nos testes.
+- `cb8c192c108015aee974b1e8b354705863251961` — distinguir suporte declarado pelo bitmap de uma resposta isolada válida, evitando promover esta última a confirmação.
 
 ### Validação
 - **CI não disparada**, conforme a instrução vigente.
