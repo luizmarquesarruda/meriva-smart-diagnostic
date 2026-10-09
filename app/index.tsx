@@ -203,9 +203,9 @@ export default function IndexScreen() {
               <Text style={styles.segmentLabel}>LINK BT</Text>
               <Text style={styles.segmentValue}>{connectionStatus.bluetoothConnected ? 'CONECTADO' : bluetoothSearching ? 'CONECTANDO' : 'OFFLINE'}</Text>
             </View>
-            <View style={[styles.connectionSegment, connectionStatus.bluetoothConnected && (obd.protocol || connectionStatus.ecuConnected) ? styles.segmentOk : connectionStatus.bluetoothConnected ? styles.segmentWarn : styles.segmentIdle]}>
+            <View style={[styles.connectionSegment, connectionStatus.bluetoothConnected && Boolean(getSharedObdConnection()) ? styles.segmentOk : connectionStatus.bluetoothConnected ? styles.segmentWarn : styles.segmentIdle]}>
               <Text style={styles.segmentLabel}>ELM327</Text>
-              <Text style={styles.segmentValue}>{connectionStatus.bluetoothConnected && (obd.protocol || connectionStatus.ecuConnected) ? 'DETECTADO' : connectionStatus.bluetoothConnected ? 'AGUARDANDO' : 'SEM LINK'}</Text>
+              <Text style={styles.segmentValue}>{connectionStatus.bluetoothConnected && Boolean(getSharedObdConnection()) ? 'DETECTADO' : connectionStatus.bluetoothConnected ? 'AGUARDANDO' : 'SEM LINK'}</Text>
             </View>
             <View style={[styles.connectionSegment, connectionStatus.ecuConnected ? styles.segmentOk : connectionStatus.ecuResponseState === 'NO_RESPONSE' ? styles.segmentCritical : connectionStatus.ecuResponseState === 'RECOVERING' ? styles.segmentWarn : styles.segmentIdle]}>
               <Text style={styles.segmentLabel}>ECU / K-LINE</Text>
@@ -215,9 +215,9 @@ export default function IndexScreen() {
           <View style={styles.heroCard}>
             <Text style={styles.heroEyebrow}>{connectionStatus.ecuResponseState === 'NO_RESPONSE' ? 'ADAPTADOR OK • ECU SEM RESPOSTA' : connectionStatus.ecuResponseState === 'RECOVERING' ? 'RECUPERANDO PROTOCOLO ECU' : connectionStatus.ecuConnected && liveRpm ? 'RPM REAL • ECU RESPONDENDO' : connectionStatus.ecuConnected ? 'ECU CONECTADA • AGUARDANDO RPM' : 'ESTADO DO VEÍCULO'}</Text>
             <Text style={styles.heroValue}>{connectionStatus.ecuConnected && liveRpm ? Math.round(liveRpm.value ?? 0) + ' RPM' : connectionStatus.ecuResponseState === 'NO_RESPONSE' ? '— RPM' : 'AGUARDANDO'}</Text>
-            <Text style={styles.heroState}>{connectionStatus.ecuResponseState === 'NO_RESPONSE' ? 'POLLING PAUSADO • RECUPERAÇÃO AUTOMÁTICA' : connectionStatus.ecuResponseState === 'RECOVERING' ? 'REINICIALIZANDO PROTOCOLO' : liveRpm ? 'PID 010C • RESPOSTA REAL RECENTE' : connectionStatus.ecuConnected ? 'AGUARDANDO LEITURA RECENTE' : 'CONECTE O ELM327 PARA INICIAR'}</Text>
+            <Text style={styles.heroState}>{connectionStatus.ecuResponseState === 'NO_RESPONSE' ? 'POLLING PAUSADO • RECUPERAÇÃO AUTOMÁTICA' : connectionStatus.ecuResponseState === 'RECOVERING' ? 'REINICIALIZANDO PROTOCOLO' : connectionStatus.ecuConnected && liveRpm ? 'PID 010C • RESPOSTA REAL RECENTE' : connectionStatus.ecuConnected ? 'AGUARDANDO LEITURA RECENTE' : 'CONECTE O ELM327 PARA INICIAR'}</Text>
             <View style={styles.metricRow}>
-              <CockpitMetric label="VELOCIDADE OBD" value={liveSpeed ? Math.round(liveSpeed.value ?? 0) + ' km/h' : 'AGUARDANDO'} />
+              <CockpitMetric label="VELOCIDADE OBD" value={connectionStatus.ecuConnected && liveSpeed ? Math.round(liveSpeed.value ?? 0) + ' km/h' : 'AGUARDANDO'} />
               <CockpitMetric label="AUTONOMIA ESTIMADA" value={getAutoSaveState().autonomy.estimatedRangeKm > 0 ? getAutoSaveState().autonomy.estimatedRangeKm.toFixed(0) + ' km' : 'N/D'} />
             </View>
           </View>
