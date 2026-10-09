@@ -36,8 +36,11 @@ export async function exportAutoSaveTxt(
     const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
     let content = await readAutoSaveHistory(basePath, selectedDate);
     if (!content.includes('========== DIA:')) {
+      if (selectedDate) {
+        return { ok: false, reason: 'ERRO', message: 'NÃO HÁ RELATÓRIO SALVO PARA A DATA SELECIONADA' };
+      }
       await appendAutoSaveHistory(basePath, state, appVersion, 'manual');
-      content = await readAutoSaveHistory(basePath, selectedDate);
+      content = await readAutoSaveHistory(basePath);
     }
 
     const fileName = selectedDate ? `meriva_diagnostico_${selectedDate}.txt` : AUTOSAVE_HISTORY_FILE;
