@@ -1892,7 +1892,7 @@ Ao encontrar e salvar um PID real, a descoberta deve seguir para outros candidat
 - Bitmap de suporte e catálogo são fontes de candidatos; não autorizam persistência por si só.
 - A varredura só apresenta como descoberto funcional e grava no banco um PID Mode 01 que respondeu à ECU, passou pela validação OBD, foi interpretado pelo decodificador e produziu valor numérico finito.
 - PIDs anunciados apenas no bitmap e PIDs sem valor interpretável permanecem fora do banco de descobertos funcionais e podem ser sondados novamente.
-- Registros legados com status `DESCOBERTO` não bloqueiam sondagens, pois podem ter sido gravados somente a partir do bitmap. Somente `RESPONDEU` e `CONFIRMADO` de origem `REAL_OBD` evitam repetição.
+- Registros legados com status `DESCOBERTO` não bloqueiam sondagens, pois podem ter sido gravados somente a partir do bitmap. `CONFIRMADO` evita repetição; `RESPONDEU` só evita repetição quando existe decodificador local, pois versões anteriores podiam salvar respostas raw sem valor interpretado.
 - Corrigida a normalização de espaços em IDs na persistência.
 
 ### Validação e CI
