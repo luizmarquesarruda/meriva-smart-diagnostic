@@ -312,16 +312,17 @@ export default function LaboratorioScreen() {
           knownPids: KNOWN_PIDS,
         }),
       );
-      // Salvar tanto PIDs anunciados pelos bitmaps quanto PIDs com resposta
-      // bruta válida fora do bitmap/sem decodificador. Isso amplia a descoberta
-      // sem transformar uma referência de catálogo em suporte confirmado.
-      const observedWithoutDecoder = result.observations
-        .filter((item) => item.status === 'SEM_DEFINICAO')
-        .map((item) => item.pid);
-      const discovered = Array.from(new Set([
-        ...result.supportedPids,
-        ...observedWithoutDecoder,
-      ])).sort();
+      // Bitmap e catálogo apenas indicam candidatos. Só PIDs com resposta
+      // interpretada e valor finito entram como descobertos funcionais/salváveis.
+      const discovered = Array.from(new Set(
+        result.observations
+          .filter((item) =>
+            (item.status === 'CONFIRMADO' || item.status === 'RESPONDEU') &&
+            item.value !== null &&
+            Number.isFinite(item.value),
+          )
+          .map((item) => item.pid),
+      )).sort();
       setSupportedPids(discovered);
       if (mode === 'REAL') {
         const activeProtocol = activeSession.getProtocol() ?? 'N/D';
@@ -332,7 +333,11 @@ export default function LaboratorioScreen() {
         const alreadyStored = discovered.filter((value) => priorIds.has(value)).length;
         const withoutDefinition = discovered.filter((value) => !getPidDefinition(value) && !getPidReference(value));
         const respondedPids = result.observations
-          .filter((item) => item.status === 'CONFIRMADO' || item.status === 'RESPONDEU' || item.status === 'SEM_DEFINICAO')
+          .filter((item) =>
+            (item.status === 'CONFIRMADO' || item.status === 'RESPONDEU') &&
+            item.value !== null &&
+            Number.isFinite(item.value),
+          )
           .map((item) => item.pid);
         await recordDiscoveredPids(getBasePath(), discovered, activeProtocol, respondedPids);
         updateAutoSaveState((state) => {
@@ -345,9 +350,7 @@ export default function LaboratorioScreen() {
           }
         });
         await forceSaveOnObdEvent();
-        const responded = result.observations.filter((item) =>
-          item.status === 'CONFIRMADO' || item.status === 'RESPONDEU' || item.status === 'SEM_DEFINICAO',
-        ).length;
+        const responded = respondedPids.length;
         setStatus(
           `VARREDURA AMPLA: ${discovered.length} PIDs salvos • ${responded} respostas úteis • decodificadores: ${catalogued} • referência: ${referenceOnly} • já no banco: ${alreadyStored} • sem referência: ${withoutDefinition.length}`,
         );
