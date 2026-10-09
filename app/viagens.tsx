@@ -58,7 +58,7 @@ export default function ViagensScreen() {
   const consumptionLabel = realCycles.length === 0
     ? 'CONSUMO MÉDIO (SEM VIAGENS)'
     : realCycles.every((cycle) => cycle.fuelRateSource === 'MEASURED_015E')
-      ? 'CONSUMO MÉDIO MEDIDO'
+      ? 'CONSUMO MÉDIO (015E + GPS)'
       : realCycles.some((cycle) => ['ESTIMATED_MAF', 'ESTIMATED_MAP', 'MIXED'].includes(cycle.fuelRateSource ?? ''))
         ? 'CONSUMO MÉDIO ESTIMADO/MISTO'
         : 'CONSUMO MÉDIO (FONTE NÃO CONFIRMADA)';
