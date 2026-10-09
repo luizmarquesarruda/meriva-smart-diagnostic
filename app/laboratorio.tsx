@@ -515,31 +515,77 @@ export default function LaboratorioScreen() {
     condition: getVehicleConditionSnapshot().condition,
   });
 
+  // Somente condições de apresentação: não altera o ciclo de polling nem as assinaturas existentes.
+  const liveConnectionStatus = getSharedObdStatus();
+  const latestRpm = getAutoSaveState().lastReadings
+    .filter((reading) => reading.pid === '010C' && reading.source === 'REAL' && reading.status === 'RESPONDEU' && reading.value != null)
+    .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))[0];
+  const rpmTimestamp = latestRpm ? Date.parse(latestRpm.timestamp) : Number.NaN;
+  const rpmIsFresh = Number.isFinite(rpmTimestamp) && Date.now() - rpmTimestamp >= 0 && Date.now() - rpmTimestamp <= 10_000;
+  const ecuRespondingNow = mode === 'REAL' && liveConnectionStatus.ecuConnected && ecuResponseState === 'RESPONDING';
+  const engineRunning = ecuRespondingNow && rpmIsFresh && (latestRpm?.value ?? 0) > 0;
+  const tripMetricsReady = engineRunning && tripActive;
+  const tripWaitMessage = mode === 'SIMULACAO'
+    ? 'SIMULADOR ATIVO — NÃO GERA MÉTRICAS DE VIAGEM REAL'
+    : !ecuRespondingNow
+      ? 'SEM RESPOSTA ATIVA DA ECU'
+      : !rpmIsFresh
+        ? 'AGUARDANDO LEITURA REAL RECENTE DE RPM'
+        : (latestRpm?.value ?? 0) <= 0
+          ? 'MOTOR PARADO — AGUARDANDO ARRANQUE'
+          : !tripActive
+            ? 'AGUARDANDO MOVIMENTO DO VEÍCULO'
+            : 'TELEMETRIA REAL ATIVA';
+
   return (
-    <SafeAreaView style={{flex:1,backgroundColor:'#eef3fb'}} edges={["top","bottom","left","right"]}>
+    <SafeAreaView style={styles.safeArea} edges={["top","bottom","left","right"]}>
     <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
       <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
       <Text style={styles.title}>DIAGNÓSTICO OBD</Text>
       <Text style={styles.status}>{status}</Text>
-      <Text style={styles.status}>{ecuResponseState === 'NO_RESPONSE' || ecuResponseState === 'RECOVERING' ? 'ECU SEM RESPOSTA — ADAPTADOR BLUETOOTH CONECTADO' : ecuResponseState === 'RESPONDING' ? 'ECU RESPONDENDO' : status}</Text>
+      <Text style={[styles.status, ecuResponseState === 'RESPONDING' ? styles.ecuStateOk : ecuResponseState === 'NO_RESPONSE' ? styles.ecuStateCritical : ecuResponseState === 'RECOVERING' ? styles.ecuStateWarn : null]}>{ecuResponseState === 'NO_RESPONSE' || ecuResponseState === 'RECOVERING' ? 'ECU SEM RESPOSTA — ADAPTADOR BLUETOOTH CONECTADO' : ecuResponseState === 'RESPONDING' ? 'ECU RESPONDENDO' : 'AGUARDANDO VALIDAÇÃO DA ECU'}</Text>
+      {mode === 'SIMULACAO' ? <View style={styles.simulatorBadge}><Text style={styles.simulatorBadgeText}>SIMULADOR ATIVO • DADOS SINTÉTICOS • NÃO É ECU REAL</Text></View> : null}
       <View style={styles.connectionSummary}>
-        <View style={styles.connectionItem}><Text style={styles.connectionLabel}>ELM327</Text><Text style={styles.connectionValue}>{sessionRef.current ? 'CONECTADO' : 'AGUARDANDO'}</Text></View>
-        <View style={styles.connectionItem}><Text style={styles.connectionLabel}>PROTOCOLO</Text><Text style={styles.connectionValue}>{protocol}</Text></View>
-        <View style={styles.connectionItem}><Text style={styles.connectionLabel}>PIDs</Text><Text style={styles.connectionValue}>{supportedPids.length || 'N/D'}</Text></View>
+        <View style={[styles.connectionItem, liveConnectionStatus.bluetoothConnected ? styles.connectionItemOk : styles.connectionItemIdle]}>
+          <Text style={styles.connectionLabel}>LINK BT</Text>
+          <Text style={styles.connectionValue}>{liveConnectionStatus.bluetoothConnected ? 'CONECTADO' : 'OFFLINE'}</Text>
+        </View>
+        <View style={[styles.connectionItem, sessionRef.current ? styles.connectionItemOk : styles.connectionItemIdle]}>
+          <Text style={styles.connectionLabel}>ELM327</Text>
+          <Text style={styles.connectionValue}>{sessionRef.current ? 'CONECTADO' : 'AGUARDANDO'}</Text>
+        </View>
+        <View style={[styles.connectionItem, ecuResponseState === 'RESPONDING' ? styles.connectionItemOk : ecuResponseState === 'NO_RESPONSE' ? styles.connectionItemCritical : ecuResponseState === 'RECOVERING' ? styles.connectionItemWarn : styles.connectionItemIdle]}>
+          <Text style={styles.connectionLabel}>ECU / K-LINE</Text>
+          <Text style={styles.connectionValue}>{ecuResponseState === 'RESPONDING' ? 'RESPONDENDO' : ecuResponseState === 'RECOVERING' ? 'RECUPERANDO' : ecuResponseState === 'NO_RESPONSE' ? 'SEM RESPOSTA' : 'AGUARDANDO'}</Text>
+        </View>
       </View>
+      <Text style={styles.protocol}>PROTOCOLO {protocol} • {supportedPids.length} PIDs DESCOBERTOS</Text>
       {!storageReady ? <Text style={styles.warning}>PREPARANDO AUTOSAVE...</Text> : null}
       <View style={[styles.tripPanel, layout.landscape && styles.tripPanelLandscape]}>
         <View style={styles.tripHeader}>
           <Text style={styles.tripTitle}>VIAGEM AUTOMÁTICA</Text>
-          <Text style={tripActive ? styles.live : styles.muted}>{tripActive ? 'GRAVANDO' : 'AGUARDANDO'}</Text>
+          <Text style={tripMetricsReady ? styles.live : styles.muted}>{tripMetricsReady ? 'DADOS REAIS ATIVOS' : 'AGUARDANDO'}</Text>
         </View>
         <View style={[styles.tripGrid, layout.landscape && styles.tripGridLandscape]}>
-          <View style={[styles.tripMetric, layout.landscape && styles.tripMetricLandscape]}><Text style={styles.tripLabel}>DISTÂNCIA GPS</Text><Text style={styles.tripValue}>{tripDistanceKm.toFixed(2)} km</Text></View>
-          <View style={[styles.tripMetric, layout.landscape && styles.tripMetricLandscape]}><Text style={styles.tripLabel}>CONSUMO</Text><Text style={styles.tripValue}>{tripConsumptionKml == null ? 'N/D' : tripConsumptionKml.toFixed(2) + ' km/L'}</Text></View>
-          <View style={[styles.tripMetric, layout.landscape && styles.tripMetricLandscape]}><Text style={styles.tripLabel}>PID 015E</Text><Text style={styles.tripValue}>{tripFuelSupported === null ? 'N/D' : (tripFuelSupported ? 'OK' : 'NÃO')}</Text></View>
-          <View style={[styles.tripMetric, layout.landscape && styles.tripMetricLandscape]}><Text style={styles.tripLabel}>AUTONOMIA ESTIMADA</Text><Text style={styles.tripValue}>{autoTripService.getState().estimatedRangeKm > 0 ? autoTripService.getState().estimatedRangeKm.toFixed(0) + ' km' : 'N/D'}</Text></View>
+          <View style={[styles.tripMetric, layout.landscape && styles.tripMetricLandscape]}>
+            <Text style={styles.tripLabel}>DISTÂNCIA REGISTRADA</Text>
+            <Text style={[styles.tripValue, !tripMetricsReady && styles.tripWaiting]}>{tripMetricsReady ? tripDistanceKm.toFixed(2) + ' km' : 'Aguardando arranque...'}</Text>
+          </View>
+          <View style={[styles.tripMetric, layout.landscape && styles.tripMetricLandscape]}>
+            <Text style={styles.tripLabel}>COMBUSTÍVEL CONSUMIDO</Text>
+            <Text style={[styles.tripValue, !tripMetricsReady && styles.tripWaiting]}>{tripMetricsReady ? tripFuelUsedL.toFixed(3) + ' L' : 'Aguardando arranque...'}</Text>
+          </View>
+          <View style={[styles.tripMetric, layout.landscape && styles.tripMetricLandscape]}>
+            <Text style={styles.tripLabel}>MÉDIA DA VIAGEM</Text>
+            <Text style={[styles.tripValue, !tripMetricsReady && styles.tripWaiting]}>{!tripMetricsReady ? 'Aguardando arranque...' : tripConsumptionKml == null ? 'Sem leitura válida' : tripConsumptionKml.toFixed(2) + ' km/L'}</Text>
+          </View>
+          <View style={[styles.tripMetric, layout.landscape && styles.tripMetricLandscape]}>
+            <Text style={styles.tripLabel}>AUTONOMIA ESTIMADA</Text>
+            <Text style={[styles.tripValue, !tripMetricsReady && styles.tripWaiting]}>{tripMetricsReady && autoTripService.getState().estimatedRangeKm > 0 ? autoTripService.getState().estimatedRangeKm.toFixed(0) + ' km' : 'Aguardando arranque...'}</Text>
+          </View>
         </View>
-        <Text style={styles.tripHelp}>Sem botão iniciar. O app registra somente dados reais válidos.</Text>
+        <Text style={[styles.tripHelp, !tripMetricsReady && styles.tripWaiting]}>{tripWaitMessage}</Text>
+        <Text style={styles.tripHelp}>PID 015E: {tripFuelSupported === null ? 'aguardando validação' : tripFuelSupported ? 'suportado pela ECU' : 'não suportado pela ECU'}. Taxa e média não são inventadas quando faltam amostras válidas.</Text>
       </View>
 
       <View style={[styles.modeRow, layout.landscape && styles.rowLandscape]}>
@@ -563,7 +609,7 @@ export default function LaboratorioScreen() {
               style={styles.device}
             >
               <Text style={styles.deviceName}>{device.name || 'DISPOSITIVO SEM NOME'}</Text>
-              <Text>{device.address}</Text>
+              <Text style={styles.deviceAddress}>{device.address}</Text>
             </View>
           ))}
 
@@ -696,79 +742,91 @@ export default function LaboratorioScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, paddingVertical: 16, backgroundColor: '#eef3fb' },
-  title: { fontSize: 22, fontWeight: '900', color: '#1557a6', letterSpacing: 0.5, marginBottom: 6 },
-  status: { color: '#2563eb', fontWeight: '700', marginBottom: 6 },
-  protocol: { color: '#475569', fontWeight: '600', marginBottom: 8 },
-  connectionSummary: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
-  connectionItem: { flexGrow: 1, flexBasis: 110, minWidth: 110, backgroundColor: '#fff', borderRadius: 7, borderWidth: 1, borderColor: '#d1d9e2', padding: 9 },
-  connectionLabel: { color: '#64748b', fontSize: 9, fontWeight: '900' },
-  connectionValue: { color: '#1f2937', fontSize: 12, fontWeight: '900', marginTop: 3 },
-  modeRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  safeArea: { flex: 1, backgroundColor: '#0A0A0C' },
+  container: { flexGrow: 1, paddingVertical: 14, backgroundColor: '#0A0A0C' },
+  title: { fontSize: 23, fontWeight: '900', color: '#F9FAFB', letterSpacing: 0.7, marginBottom: 6 },
+  status: { color: '#0EA5E9', fontWeight: '800', fontSize: 10, marginBottom: 6 },
+  ecuStateOk: { color: '#10B981' },
+  ecuStateWarn: { color: '#F59E0B' },
+  ecuStateCritical: { color: '#EF4444' },
+  protocol: { color: '#9CA3AF', fontWeight: '700', fontSize: 9, marginBottom: 10 },
+  simulatorBadge: { alignSelf: 'flex-start', backgroundColor: '#30220A', borderColor: '#F59E0B', borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, marginBottom: 10 },
+  simulatorBadgeText: { color: '#FCD34D', fontWeight: '900', fontSize: 9, letterSpacing: 0.2 },
+  connectionSummary: { flexDirection: 'row', gap: 6, marginBottom: 4 },
+  connectionItem: { flex: 1, minWidth: 0, borderRadius: 10, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 9 },
+  connectionItemOk: { backgroundColor: '#09231C', borderColor: '#10B981' },
+  connectionItemWarn: { backgroundColor: '#30220A', borderColor: '#F59E0B' },
+  connectionItemCritical: { backgroundColor: '#2C1012', borderColor: '#EF4444' },
+  connectionItemIdle: { backgroundColor: '#141418', borderColor: '#303039' },
+  connectionLabel: { color: '#9CA3AF', fontSize: 8, fontWeight: '900', letterSpacing: 0.3 },
+  connectionValue: { color: '#F3F4F6', fontSize: 9, fontWeight: '900', marginTop: 4 },
+  modeRow: { flexDirection: 'row', gap: 8, marginBottom: 10, marginTop: 4 },
   rowLandscape: { alignItems: 'stretch' },
   flexButton: { flex: 1 },
   tripPanelLandscape: { padding: 14 },
   tripGridLandscape: { flexWrap: 'nowrap', gap: 12 },
   commandCardLandscape: { maxWidth: 620 },
-  modeButton: { flex: 1, padding: 10, borderRadius: 7, borderWidth: 1, borderColor: '#94a3b8', alignItems: 'center' },
-  modeText: { color: '#1f2937', fontWeight: '900', fontSize: 11 },
-  active: { backgroundColor: '#dbeafe', borderColor: '#2563eb' },
-  simActive: { backgroundColor: '#fef3c7', borderColor: '#d97706' },
-  commandCard: { backgroundColor: '#fff', borderRadius: 8, padding: 11, marginBottom: 10, borderWidth: 1, borderColor: '#d1d9e2' },
-  commandTitle: { color: '#1f2937', fontSize: 12, fontWeight: '900', marginBottom: 7 },
-  button: { backgroundColor: '#1557a6', borderRadius: 7, padding: 13, alignItems: 'center', marginBottom: 9 },
-  secondaryButton: { backgroundColor: '#fff', borderColor: '#94a3b8', borderWidth: 1, borderRadius: 7, padding: 12, alignItems: 'center', marginBottom: 9 },
-  secondaryButtonText: { color: '#1f2937', fontWeight: '700' },
-  disconnect: { backgroundColor: '#64748b' },
-  buttonText: { color: '#fff', fontWeight: '700' },
-  device: { backgroundColor: '#fff', borderRadius: 10, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: '#cbd5e1' },
-  selected: { borderColor: '#2563eb', borderWidth: 2 },
-  deviceName: { fontWeight: '700', color: '#1f2937' },
-  warning: { color: '#b45309', marginBottom: 12 },
-  input: { backgroundColor: '#fff', borderColor: '#cbd5e1', borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 12, color: '#0f172a' },
-  tripPanel: { backgroundColor: '#fff', borderRadius: 10, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#cbd5e1' },
-  tripHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  tripTitle: { color: '#1f2937', fontWeight: '900', fontSize: 14 },
-  tripGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  tripMetric: { width: '48%', marginBottom: 8 },
+  modeButton: { flex: 1, padding: 11, borderRadius: 9, borderWidth: 1, borderColor: '#3A3A44', alignItems: 'center', backgroundColor: '#141418' },
+  modeText: { color: '#E5E7EB', fontWeight: '900', fontSize: 11 },
+  active: { backgroundColor: '#082F49', borderColor: '#0EA5E9' },
+  simActive: { backgroundColor: '#30220A', borderColor: '#F59E0B' },
+  commandCard: { backgroundColor: '#131318', borderRadius: 12, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#303039' },
+  commandTitle: { color: '#F3F4F6', fontSize: 12, fontWeight: '900', marginBottom: 7 },
+  button: { backgroundColor: '#0284C7', borderRadius: 9, padding: 13, alignItems: 'center', marginBottom: 9 },
+  secondaryButton: { backgroundColor: '#15151A', borderColor: '#3A3A44', borderWidth: 1, borderRadius: 9, padding: 12, alignItems: 'center', marginBottom: 9 },
+  secondaryButtonText: { color: '#E5E7EB', fontWeight: '800' },
+  disconnect: { backgroundColor: '#991B1B' },
+  buttonText: { color: '#FFFFFF', fontWeight: '900' },
+  device: { backgroundColor: '#131318', borderRadius: 10, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: '#303039' },
+  selected: { borderColor: '#0EA5E9', borderWidth: 2 },
+  deviceName: { fontWeight: '800', color: '#F3F4F6' },
+  deviceAddress: { color: '#9CA3AF', fontSize: 10, marginTop: 3 },
+  warning: { color: '#F59E0B', marginBottom: 12, fontWeight: '800', fontSize: 10 },
+  input: { backgroundColor: '#09090B', borderColor: '#3A3A44', borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 12, color: '#F9FAFB' },
+  tripPanel: { backgroundColor: '#131318', borderRadius: 13, padding: 13, marginBottom: 12, borderWidth: 1, borderColor: '#303039' },
+  tripHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 9, gap: 8 },
+  tripTitle: { color: '#F3F4F6', fontWeight: '900', fontSize: 14 },
+  tripGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 4 },
+  tripMetric: { width: '48%', minWidth: 0, backgroundColor: '#0C0C0F', borderRadius: 10, borderWidth: 1, borderColor: '#292930', padding: 10, marginBottom: 7 },
   tripMetricLandscape: { width: '23%', marginBottom: 0 },
-  tripLabel: { color: '#64748b', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
-  tripValue: { color: '#1f2937', fontWeight: '800', fontSize: 16, marginTop: 2 },
-  live: { color: '#15803d', fontWeight: '900', fontSize: 10 },
-  muted: { color: '#64748b', fontWeight: '900', fontSize: 10 },
-  tripHelp: { color: '#64748b', fontSize: 11, marginTop: 2 },
-  aiPanel: { backgroundColor: '#fff', borderRadius: 10, padding: 13, marginBottom: 10, borderWidth: 1, borderColor: '#93c5fd' },
-  aiHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  aiTitle: { color: '#1557a6', fontWeight: '900', fontSize: 14 },
-  aiEngine: { color: '#64748b', fontSize: 9, fontWeight: '800' },
-  hypothesis: { borderTopWidth: 1, borderTopColor: '#dbeafe', paddingTop: 9, marginTop: 8 },
-  hypothesisTitle: { color: '#1f2937', fontWeight: '900', fontSize: 14 },
-  hypothesisConfidence: { color: '#2563eb', fontWeight: '800', fontSize: 11, marginTop: 3 },
-  aiLine: { color: '#334155', fontSize: 11, marginTop: 4 },
-  aiMuted: { color: '#64748b', fontSize: 11 },
-  aiWarning: { color: '#b45309', fontWeight: '800', fontSize: 11, marginTop: 9 },
-  aiDisclaimer: { color: '#64748b', fontSize: 10, marginTop: 9 },
-  dtcPanel: { backgroundColor: '#fff', borderRadius: 10, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#cbd5e1' },
-  dtcTitle: { color: '#1557a6', fontSize: 13, fontWeight: '900', marginBottom: 6 },
-  dtcRow: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingVertical: 8 },
-  dtcKind: { color: '#334155', flexShrink: 1, fontSize: 10, fontWeight: '900' },
-  dtcCodes: { color: '#64748b', fontSize: 10, marginTop: 3 },
-  dtcAvailable: { color: '#15803d', fontSize: 8, fontWeight: '900' },
-  dtcUnavailable: { color: '#b45309', fontSize: 8, fontWeight: '900' },
-  dtcHint: { color: '#64748b', fontSize: 9, lineHeight: 14, marginTop: 7 },
-  dtcDetails: { marginTop: 10, borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingTop: 8 },
-  dtcDetailRow: { flexDirection: 'row', gap: 8, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#eef2f7' },
-  dtcDetailCode: { color: '#1557a6', fontWeight: '900', fontSize: 12, width: 52 },
-  dtcDetailName: { color: '#1f2937', fontWeight: '900', fontSize: 11 },
-  dtcDetailText: { color: '#64748b', fontSize: 9, lineHeight: 14, marginTop: 2 },
-  pidPanel: { backgroundColor: '#fff', borderRadius: 10, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#93c5fd' },
-  pidRow: { flexDirection: 'row', gap: 9, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#e2e8f0' },
-  pidCode: { color: '#1557a6', fontWeight: '900', fontSize: 11, width: 42 },
-  pidName: { color: '#1f2937', fontWeight: '900', fontSize: 11 },
-  pidDescription: { color: '#64748b', fontSize: 9, lineHeight: 14, marginTop: 2 },
-  pidMeta: { color: '#2563eb', fontSize: 8, fontWeight: '800', marginTop: 3 },
-  panel: { backgroundColor: '#1f2937', borderRadius: 14, padding: 16, marginTop: 8 },
-  label: { color: '#93c5fd', marginTop: 8 },
-  value: { color: '#f8fafc', fontSize: 16, marginTop: 3 },
-  error: { color: '#c2410c', marginTop: 16 },
+  tripLabel: { color: '#9CA3AF', fontSize: 9, fontWeight: '900', letterSpacing: 0.2 },
+  tripValue: { color: '#F9FAFB', fontWeight: '900', fontSize: 15, marginTop: 5, fontVariant: ['tabular-nums'] },
+  tripWaiting: { color: '#F59E0B', fontSize: 10 },
+  live: { color: '#10B981', fontWeight: '900', fontSize: 10 },
+  muted: { color: '#F59E0B', fontWeight: '900', fontSize: 10 },
+  tripHelp: { color: '#9CA3AF', fontSize: 10, lineHeight: 15, marginTop: 5 },
+  aiPanel: { backgroundColor: '#131318', borderRadius: 12, padding: 13, marginBottom: 10, borderWidth: 1, borderColor: '#303039' },
+  aiHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 },
+  aiTitle: { color: '#7DD3FC', fontWeight: '900', fontSize: 14 },
+  aiEngine: { color: '#9CA3AF', fontSize: 9, fontWeight: '800' },
+  hypothesis: { borderTopWidth: 1, borderTopColor: '#303039', paddingTop: 9, marginTop: 8 },
+  hypothesisTitle: { color: '#F3F4F6', fontWeight: '900', fontSize: 14 },
+  hypothesisConfidence: { color: '#0EA5E9', fontWeight: '800', fontSize: 11, marginTop: 3 },
+  aiLine: { color: '#D1D5DB', fontSize: 11, lineHeight: 16, marginTop: 4 },
+  aiMuted: { color: '#9CA3AF', fontSize: 11 },
+  aiWarning: { color: '#F59E0B', fontWeight: '900', fontSize: 11, marginTop: 9 },
+  aiDisclaimer: { color: '#9CA3AF', fontSize: 10, lineHeight: 15, marginTop: 9 },
+  dtcPanel: { backgroundColor: '#131318', borderRadius: 12, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#303039' },
+  dtcTitle: { color: '#7DD3FC', fontSize: 13, fontWeight: '900', marginBottom: 6 },
+  dtcRow: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#303039', paddingVertical: 8, gap: 8 },
+  dtcKind: { color: '#E5E7EB', flexShrink: 1, fontSize: 10, fontWeight: '900' },
+  dtcCodes: { color: '#D1D5DB', fontSize: 10, marginTop: 3 },
+  dtcAvailable: { color: '#10B981', fontSize: 8, fontWeight: '900' },
+  dtcUnavailable: { color: '#F59E0B', fontSize: 8, fontWeight: '900' },
+  dtcHint: { color: '#9CA3AF', fontSize: 9, lineHeight: 14, marginTop: 7 },
+  dtcDetails: { marginTop: 10, borderTopWidth: 1, borderTopColor: '#303039', paddingTop: 8 },
+  dtcDetailRow: { flexDirection: 'row', gap: 8, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#24242B' },
+  dtcDetailCode: { color: '#7DD3FC', fontWeight: '900', fontSize: 12, width: 52 },
+  dtcDetailName: { color: '#F3F4F6', fontWeight: '900', fontSize: 11 },
+  dtcDetailText: { color: '#9CA3AF', fontSize: 9, lineHeight: 14, marginTop: 2 },
+  pidPanel: { backgroundColor: '#131318', borderRadius: 12, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#303039' },
+  pidRow: { flexDirection: 'row', gap: 9, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#303039' },
+  pidCode: { color: '#7DD3FC', fontWeight: '900', fontSize: 11, width: 42 },
+  pidName: { color: '#F3F4F6', fontWeight: '900', fontSize: 11 },
+  pidDescription: { color: '#9CA3AF', fontSize: 9, lineHeight: 14, marginTop: 2 },
+  pidMeta: { color: '#0EA5E9', fontSize: 8, fontWeight: '900', marginTop: 3 },
+  panel: { backgroundColor: '#15151A', borderRadius: 12, padding: 15, marginTop: 8, borderWidth: 1, borderColor: '#303039' },
+  label: { color: '#7DD3FC', marginTop: 8, fontWeight: '800' },
+  value: { color: '#F3F4F6', fontSize: 15, marginTop: 3, fontVariant: ['tabular-nums'] },
+  error: { color: '#EF4444', marginTop: 16, fontWeight: '800' },
 });
