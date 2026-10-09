@@ -440,6 +440,18 @@ test('10. exportação TXT legível, sem inventar valores', async () => {
   const filled = formatter.formatAutoSaveTxt(m.getAutoSaveState(), opts);
   assert.ok(filled.includes('ISO 14230-4 KWP'));
   assert.ok(filled.includes('ECU: 11'));
+  assert.ok(filled.includes('Estado registrado no snapshot: CONECTADO'));
+  assert.ok(filled.includes('Nenhum DTC incluído neste snapshot'));
+  m.updateAutoSaveState((s) => {
+    s.lastReadings = [
+      { pid: '0105', name: 'Temperatura do líquido de arrefecimento', value: 92, unit: '°C', status: 'RESPONDEU', timestamp: '2026-10-01T12:59:55.000Z', source: 'REAL' },
+      { pid: '010C', name: 'RPM simulada', value: 800, unit: 'rpm', status: 'RESPONDEU', timestamp: '2026-10-01T12:59:59.000Z', source: 'SIMULACAO' },
+    ];
+  });
+  const report = formatter.formatAutoSaveTxt(m.getAutoSaveState(), { appVersion: '1.0.0', exportedAt: '2026-10-01T13:00:00.000Z' });
+  assert.ok(report.includes('0105 Temperatura do líquido de arrefecimento: 92 °C'));
+  assert.ok(report.includes('idade=5s validade=RECENTE'));
+  assert.ok(!report.includes('RPM simulada'), 'TXT não deve apresentar simulação como telemetria real');
   m.disposeAutoSave();
 });
 

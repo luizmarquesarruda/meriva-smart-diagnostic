@@ -2042,3 +2042,25 @@ O formatador renomeou a seção para `[HISTORY - ULTIMAS VIAGENS REAIS]`. O cont
 - CI #1691 (run `37919060536`) e #1692 (run `37919067790`) passaram por `npm ci`, Expo Doctor 17/17, typecheck, catálogo JSON, lifecycle Bluetooth/ECU, 20 testes de autosave e regressão de descoberta de PIDs.
 - A única falha remanescente foi essa expectativa de status. A nova CI precisa concluir todos os testes e o build Android.
 
+
+
+## 2026-10-09 — Telemetria térmica visível e exclusão de seed do Car Scanner
+
+### Objetivo
+Tornar a temperatura do líquido de arrefecimento imediatamente visível e separar leituras atuais de dados antigos/importados.
+
+### Alterações
+- Cockpit passa a mostrar temperatura do líquido (PID 0105) apenas quando há amostra real com até 10 segundos; inclui estado de aquecimento/atenção e abre uma tela térmica dedicada.
+- Nova tela `app/arrefecimento.tsx`: leitura de arrefecimento, indicador visual, tendência/min/média/máx da sessão, temperatura do ar de admissão (PID 010F), idade da amostra e estado real da ECU.
+- Menu Mais Recursos inclui Monitor Térmico.
+- Removida a inicialização automática do seed Car Scanner no cockpit; a tela de viagens e o TXT continuam restritos a ciclos REAL_OBD.
+- TXT passa a omitir leituras simuladas, informar idade/validade de leituras reais, rotular a conexão como estado registrado no snapshot e não interpretar lista de DTC vazia como prova de ausência de falhas.
+- Testes de navegação e exportação ampliados.
+
+### Referências de interface
+- Torque Pro: painel personalizável com medidores, dados OBD e alertas de temperatura — https://play.google.com/store/apps/details?id=org.prowl.torque
+- Car Scanner ELM OBD2: painéis e gráficos de sensores em tempo real — https://play.google.com/store/apps/details?id=com.ovz.carscanner
+- Adaptação própria: foco em uma métrica térmica prioritária, validade explícita das amostras e nenhuma telemetria fictícia.
+
+### Validação
+- Aguardando CI após este commit. A tela não substitui validação com o veículo real; o PID 0105 só aparece quando a ECU efetivamente responde.
