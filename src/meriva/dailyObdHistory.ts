@@ -64,8 +64,8 @@ function renderEvent(state: MerivaPersistedState, event: 'SESSION_START' | 'SESS
   return lines.join('\n');
 }
 
-function splitPages(content: string): Map<string, string[]> {
-  const pages = new Map<string, string[]>();
+function splitPages(content: string): Map<string, string> {
+  const pages = new Map<string, string>();
   const re = /^========== DIA: (\d{4}-\d{2}-\d{2}) ==========\n([\s\S]*?)(?=^========== DIA: \d{4}-\d{2}-\d{2} ==========\n|$)/gm;
   let match: RegExpExecArray | null;
   while ((match = re.exec(content)) !== null) {
@@ -95,15 +95,16 @@ export async function appendDailyObdSessionEvent(
   }
 
   const pages = splitPages(content);
-  const events = pages.get(date) ?? [];
-  events.push(renderEvent(state, event, timestamp));
-  pages.set(date, events);
+  const previousEvents = pages.get(date) ?? '';
+  const updatedEvents = [previousEvents, renderEvent(state, event, timestamp)].filter(Boolean).join('\\n\\n');
+  pages.set(date, updatedEvents);
+  const eventCount = (updatedEvents.match(/--- EVENTO: SESSION_(?:START|END) \\|/g) ?? []).length;
 
   const sortedDates = Array.from(pages.keys()).sort().slice(-MAX_DAYS);
   const output = [HEADER.trimEnd()];
   for (const day of sortedDates) {
-    output.push('', `========== DIA: ${day} ==========`, ...(pages.get(day) ?? []), `========== FIM DO DIA ==========`);
+    output.push('', `========== DIA: ${day} ==========`, pages.get(day) ?? '', `========== FIM DO DIA ==========`);
   }
   await FileSystem.writeAsStringAsync(path, `${output.join('\n')}\n`, { encoding: FileSystem.EncodingType.UTF8 });
-  return { date, eventCount: events.length };
+  return { date, eventCount };
 }
