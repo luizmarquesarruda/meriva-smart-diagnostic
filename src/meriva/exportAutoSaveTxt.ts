@@ -64,8 +64,8 @@ export async function exportDailyObdHistoryTxt(): Promise<ExportTxtResult> {
     return { ok: false, reason: 'INDISPONIVEL', message: 'EXPORTAÇÃO DISPONÍVEL SOMENTE NO ANDROID' };
   }
   try {
-    const basePath = \`\${FileSystem.documentDirectory}MERIVA_SMART\`;
-    const dailyPath = \`\${basePath}/VIAGENS/meriva_smart_daily_obd_history.txt\`;
+    const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
+    const dailyPath = `${basePath}/VIAGENS/meriva_smart_daily_obd_history.txt`;
     const info = await FileSystem.getInfoAsync(dailyPath);
     if (!info.exists || info.isDirectory) {
       return { ok: false, reason: 'ERRO', message: 'AINDA NÃO HÁ SESSÕES ECU NO HISTÓRICO DIÁRIO' };
