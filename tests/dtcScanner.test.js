@@ -17,8 +17,12 @@ function loadTs(file) {
 
   const originalLoad = Module._load;
   Module._load = function(request, parent, isMain) {
-    if (request === './dtcParser' && parent?.filename?.endsWith(path.join('src', 'obd', 'dtcScanner.ts'))) {
-      return loadTs('src/obd/dtcParser.ts');
+    if (
+      parent?.filename?.includes(path.join('src', 'obd')) &&
+      request.startsWith('./')
+    ) {
+      const candidate = path.resolve(path.dirname(parent.filename), request) + '.ts';
+      if (fs.existsSync(candidate)) return loadTs(path.relative(path.join(__dirname, '..'), candidate));
     }
     return originalLoad(request, parent, isMain);
   };
