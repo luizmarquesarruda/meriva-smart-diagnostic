@@ -1663,6 +1663,7 @@ Simplificar o diário de diagnóstico exportável: escolher a data, gerar um blo
 - `9927d17ddf8a4ea916e7f69dd339d99d10a40da9` — testes do histórico diário.
 - `577c76a0479ac9d890b0271ffd1268ba67720310` — exportação sem escrita colateral.
 - `0aaaa5c5207084fb4119ea4bcae102b11f526b2b` — caminho de armazenamento consistente.
+- `4573e92bc14de23834e541638c446ef006cd9eeb` — correção de escape nas expressões regulares dos testes diários.
 
 ### Validação e CI
 - A CI **não foi executada nem disparada**, conforme a instrução vigente.
