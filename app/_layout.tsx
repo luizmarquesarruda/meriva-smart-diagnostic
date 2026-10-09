@@ -1,5 +1,6 @@
 import '../src/gps/backgroundLocationTask';
 import { useEffect, useRef } from 'react';
+import { useKeepAwake } from 'expo-keep-awake';
 import { Alert, AppState, Linking, Platform } from 'react-native';
 import { Stack } from 'expo-router';
 import { ensureBluetoothReady } from '../src/obd/bluetoothManager';
@@ -13,6 +14,9 @@ import { requestAllRequiredPermissions } from '../src/permissions/permissionMana
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 export default function RootLayout() {
+  // Mantém o ecrã ligado enquanto o aplicativo está aberto; não altera o bloqueio do sistema fora do app.
+  useKeepAwake('meriva-smart-diagnostic-active');
+
   const checking = useRef(false);
   const lastFailureAt = useRef(0);
   const gpsChecking = useRef(false);
