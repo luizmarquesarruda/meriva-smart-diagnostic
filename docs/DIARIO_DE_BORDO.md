@@ -1922,3 +1922,29 @@ Ao encontrar e salvar um PID real, a descoberta deve seguir para outros candidat
 - Esta correção será enviada em um único commit; o push da branch dispara a nova CI automaticamente.
 - A correção só será considerada concluída depois de conferir os testes e, se a validação passar, o build Android. Nenhuma aprovação de CI é presumida neste registro.
 
+## 2026-10-09 — Corrigir inconsistência de unidade e operação no catálogo de PIDs
+
+### Falha observada na CI #1681/#1682
+- Ambas as execuções falharam em `tests/knowledgeJson.test.js:78`.
+- Erro: `PID com unidade inexistente em units.json: 0101 -> status`.
+- `npm ci` passou, Expo Doctor passou em **17/17** verificações, o typecheck passou e os testes do parser DTC/freeze-frame passaram antes desta falha.
+- O build Android foi ignorado porque `npm run validate` parou no teste de integridade do catálogo.
+
+### Causa raiz
+- `src/knowledge/pids.json` declara o PID `0101` com quatro bytes, fórmula `U32` e unidade `status`, mas `src/knowledge/units.json` não definia essa unidade.
+- O motor `src/obd/formulaEngine.ts` já implementava a operação `u32`; porém, a lista de operações permitidas no teste de integridade não a incluía e a regra do próprio teste não exigia quatro bytes para essa operação.
+
+### Correção
+- Adicionada a unidade `status`, identificada na apresentação como `bitmap` de status OBD de 32 bits.
+- Incrementada a versão do catálogo de unidades para registrar a atualização.
+- Atualizada a validação do catálogo para reconhecer `u32` como operação suportada e exigir quatro bytes para essa fórmula.
+- A implementação do transporte Bluetooth/ELM327 e a lógica da ECU não foram alteradas.
+
+### Arquivos alterados
+- `src/knowledge/units.json`
+- `tests/knowledgeJson.test.js`
+- `docs/DIARIO_DE_BORDO.md`
+
+### Validação
+- As CI #1681 (run `37917975258`) e #1682 (run `37917982324`) falharam no mesmo erro de integridade do catálogo.
+- Esta correção precisa ser validada pela nova execução automática da CI. Não declarar a correção concluída até confirmar testes e build Android.

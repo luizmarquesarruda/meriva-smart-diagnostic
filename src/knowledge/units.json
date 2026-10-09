@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "units": {
     "rpm": {
       "symbol": "rpm",
@@ -48,6 +48,10 @@
     "L/h": {
       "symbol": "L/h",
       "name": "litros por hora"
+    },
+    "status": {
+      "symbol": "bitmap",
+      "name": "bitmap de status dos monitores OBD (32 bits)"
     }
   }
 }
