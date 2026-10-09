@@ -8,7 +8,8 @@ import { SimulatedObdTransport } from '../src/obd/simulatedTransport';
 import { BluetoothDeviceInfo } from '../src/obd/bluetoothClassicTransport';
 import { createRealElmSession, discoverPairedDevices } from '../src/obd/bluetoothManager';
 import { canPollObd } from '../src/obd/bluetoothState';
-import { discoverSupportedPids, KNOWN_PIDS } from '../src/obd/pidScanner';
+import { KNOWN_PIDS } from '../src/obd/pidScanner';
+import { discoverIntelligentPids } from '../src/obd/intelligentPidDiscovery';
 import { getPidDefinition, getPidReference } from '../src/obd/pidDefinition';
 import { getDtcDefinition } from '../src/obd/dtcDefinition';
 import { getSharedObdConnection, getSharedObdStatus, setSharedObdConnection, subscribeSharedObd, disconnectSharedObd } from '../src/obd/sharedConnection';
@@ -305,13 +306,25 @@ export default function LaboratorioScreen() {
         throw new Error('DIAGNÓSTICO AINDA NÃO ESTÁ PRONTO. AGUARDE BLUETOOTH, ELM327 E ECU.');
       }
       if (!activeSession) throw new Error('CONECTE AO ELM327 ANTES DE DESCOBRIR PIDs');
-      const items = await discoverSupportedPids(activeSession);
-      const discovered = Array.from(new Set(items.flatMap((item) => item.supportedPids))).sort();
+      const result = await autoTripService.withPollingPaused(() =>
+        discoverIntelligentPids(activeSession, {
+          ...(mode === 'REAL' ? { basePath: getBasePath() } : {}),
+          knownPids: KNOWN_PIDS,
+        }),
+      );
+      // Salvar tanto PIDs anunciados pelos bitmaps quanto PIDs com resposta
+      // bruta válida fora do bitmap/sem decodificador. Isso amplia a descoberta
+      // sem transformar uma referência de catálogo em suporte confirmado.
+      const observedWithoutDecoder = result.observations
+        .filter((item) => item.status === 'SEM_DEFINICAO')
+        .map((item) => item.pid);
+      const discovered = Array.from(new Set([
+        ...result.supportedPids,
+        ...observedWithoutDecoder,
+      ])).sort();
       setSupportedPids(discovered);
       if (mode === 'REAL') {
         const activeProtocol = activeSession.getProtocol() ?? 'N/D';
-        // Consultar o banco antes de gravar: assim a interface distingue PIDs
-        // já conhecidos dos recém-observados sem executar sondagens extras na K-Line.
         const priorKnowledge = await readPidConfirmations(getBasePath());
         const priorIds = new Set(priorKnowledge.map((entry) => entry.pid.toUpperCase()));
         const catalogued = discovered.filter((value) => getPidDefinition(value) !== null).length;
@@ -329,11 +342,14 @@ export default function LaboratorioScreen() {
           }
         });
         await forceSaveOnObdEvent();
+        const responded = result.observations.filter((item) =>
+          item.status === 'CONFIRMADO' || item.status === 'RESPONDEU' || item.status === 'SEM_DEFINICAO',
+        ).length;
         setStatus(
-          `DESCOBERTA: ${discovered.length} PIDs • decodificadores: ${catalogued} • referência: ${referenceOnly} • já no banco: ${alreadyStored} • sem referência: ${withoutDefinition.length}`,
+          `VARREDURA AMPLA: ${discovered.length} PIDs salvos • ${responded} respostas úteis • decodificadores: ${catalogued} • referência: ${referenceOnly} • já no banco: ${alreadyStored} • sem referência: ${withoutDefinition.length}`,
         );
       } else {
-        setStatus(`SIMULAÇÃO: ${discovered.length} PIDs anunciados • nenhuma confirmação real gravada`);
+        setStatus(`SIMULAÇÃO: ${discovered.length} PIDs detectados • nenhuma descoberta real gravada`);
       }
     } catch (cause) {
       setStatus('FALHA NA DESCOBERTA');
