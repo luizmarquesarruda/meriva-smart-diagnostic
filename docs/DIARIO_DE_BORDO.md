@@ -1662,3 +1662,10 @@ O relatório diário exibia o último estado mutável, o que não preserva por s
 
 ### Limitações / validação
 A sessão é definida por conexão/desconexão validada da ECU, não pela posição física da chave de ignição. O histórico diário é complementar ao JSON de autosave e não o substitui. CI e teste no aparelho ainda são necessários para confirmar persistência e comportamento da tela.
+
+
+### Ajuste após a primeira CI do PR #49
+
+- A primeira execução de `npm run validate` falhou no typecheck: `getSharedObdStatus()` não retornava todos os campos de `SharedObdStatus`, e `autoTripService.ts` usava `getAutoSaveState` sem importá-lo.
+- Corrigido o retorno para refletir `ecuResponseState`, falhas consecutivas, horário da última resposta e último erro; `ecuConnected` agora também exige estado `RESPONDING`.
+- Adicionado o import faltante de `getAutoSaveState` no serviço de viagens. A CI deve ser repetida para confirmar o resultado.
