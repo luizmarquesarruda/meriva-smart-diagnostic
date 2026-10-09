@@ -1,6 +1,7 @@
 import * as FileSystem from 'expo-file-system';
 import type { PidClassification } from '../obd/pidDefinition';
 import type { DataSource } from '../types/sourceTypes';
+import { getPidDefinition } from '../obd/pidDefinition';
 
 export interface PidConfirmationEntry {
   pid: string;
@@ -22,12 +23,17 @@ export interface PidConfirmationEntry {
 
 const fileQueues = new Map<string, Promise<void>>();
 
+function safeField(value: string | number | undefined): string {
+  return String(value ?? '').replace(/[|\\r\\n]/g, ' ').trim();
+}
+
 function compactLine(entry: PidConfirmationEntry): string {
   return [
     entry.pid, entry.name, entry.classification, entry.status,
     entry.firstSeen, entry.lastSeen, entry.occurrences,
     entry.protocol, entry.responseTime, entry.source, entry.confidence,
-  ].join('|');
+    entry.unit, entry.formulaId, entry.bytes, entry.description,
+  ].map(safeField).join('|');
 }
 
 async function readPidConfirmationsUnlocked(basePath: string): Promise<PidConfirmationEntry[]> {
@@ -43,6 +49,7 @@ async function readPidConfirmationsUnlocked(basePath: string): Promise<PidConfir
       const [
         pid, name, classification, status, firstSeen, lastSeen,
         occurrences, protocol, responseTime, source, confidence,
+        unit, formulaId, bytes, description,
       ] = line.split('|');
 
       const parsedClassification: PidClassification =
@@ -82,6 +89,10 @@ async function readPidConfirmationsUnlocked(basePath: string): Promise<PidConfir
         responseTime: Number.isFinite(Number(responseTime)) ? Number(responseTime) : 0,
         source: parsedSource,
         confidence: Number.isFinite(Number(confidence)) ? Number(confidence) : 0,
+        unit: unit || undefined,
+        formulaId: formulaId || undefined,
+        bytes: bytes && Number.isInteger(Number(bytes)) ? Number(bytes) : undefined,
+        description: description || undefined,
       };
     })
     .filter((entry) => Boolean(entry.pid));
@@ -143,10 +154,11 @@ export async function recordDiscoveredPids(
     for (const pid of unique) {
       const prior = byPid.get(pid);
       if (prior?.status === 'CONFIRMADO' || prior?.status === 'RESPONDEU') continue;
+      const definition = getPidDefinition(pid);
       byPid.set(pid, {
         pid,
-        name: prior?.name || 'PID DESCOBERTO',
-        classification: prior?.classification || 'PADRAO_OBD',
+        name: prior?.name && prior.name !== 'PID DESCOBERTO' ? prior.name : definition?.name || 'PID DESCOBERTO',
+        classification: prior?.classification || definition?.classification || 'PADRAO_OBD',
         status: 'DESCOBERTO',
         firstSeen: prior?.firstSeen || now,
         lastSeen: now,
@@ -155,6 +167,10 @@ export async function recordDiscoveredPids(
         responseTime: prior?.responseTime || 0,
         source: 'REAL_OBD',
         confidence: prior?.confidence || 0,
+        unit: prior?.unit || definition?.unit,
+        formulaId: prior?.formulaId || definition?.formulaId,
+        bytes: prior?.bytes || definition?.bytes,
+        description: prior?.description || definition?.description,
       });
     }
 
@@ -167,6 +183,18 @@ export async function recordDiscoveredPids(
   } finally {
     if (fileQueues.get(target) === current) fileQueues.delete(target);
   }
+}
+
+
+/** Busca o registro persistido sem elevar suporte anunciado a confirmação de resposta. */
+export async function lookupPidConfirmation(
+  basePath: string,
+  pid: string,
+): Promise<PidConfirmationEntry | null> {
+  const normalized = pid.replace(/\\s/g, '').toUpperCase();
+  if (!/^01[0-9A-F]{2}$/.test(normalized)) return null;
+  const entries = await readPidConfirmations(basePath);
+  return entries.find((entry) => entry.pid === normalized) ?? null;
 }
 
 export async function readPidConfirmations(
