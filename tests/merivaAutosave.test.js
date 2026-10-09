@@ -564,7 +564,7 @@ test('19. migração do histórico TXT antigo preserva as datas dos snapshots', 
     'RELATÓRIO NOVO',
     '========== FIM DO DIA ==========',
     legacyEntry(1, '2026-09-28T12:00:00.000Z'),
-  ].join('\\n'));
+  ].join('\n'));
   const mixedDates = await historyModule.getAutoSaveHistoryDates(BASE);
   assert.deepStrictEqual(mixedDates, ['2026-09-30', '2026-09-28'], 'mistura de formatos deve preservar dias antigos sem sobrescrever o diário novo');
   m.disposeAutoSave();
