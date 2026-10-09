@@ -91,3 +91,18 @@ if (!fsSource.includes('ESTIMATED_MAF') || !fsSource.includes('ESTIMATED_MAP')) 
   throw new Error('fuel fallback MAF/MAP não está implementado');
 }
 console.log('fuelConsumption fallback: OK');
+
+const tripServiceSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'trip', 'autoTripService.ts'), 'utf8');
+if (!tripServiceSource.includes('getFuelEstimationSupport(connection.supportedPids)')) {
+  throw new Error('AutoTripService deve planejar consultas pelos PIDs suportados');
+}
+if (!tripServiceSource.includes('fuelRateLph == null && fuelEstimationSupport.maf')) {
+  throw new Error('consulta MAF deve depender de suporte confirmado');
+}
+if (!tripServiceSource.includes('fuelRateLph == null && fuelEstimationSupport.mapAndIat && rpm != null')) {
+  throw new Error('fallback MAP/IAT deve depender de suporte confirmado e RPM válido');
+}
+if (tripServiceSource.includes('displacementCm3 ?? 1598')) {
+  throw new Error('cilindrada genérica de 1598 cm³ não pode ser usada como fallback');
+}
+console.log('AutoTripService supported-PID guards: OK');
