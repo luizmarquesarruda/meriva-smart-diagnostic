@@ -1,5 +1,5 @@
 import * as FileSystem from 'expo-file-system';
-import { getPidDefinition, type PidClassification } from '../obd/pidDefinition';
+import { getPidDefinition, getPidReference, type PidClassification } from '../obd/pidDefinition';
 import type { DataSource } from '../types/sourceTypes';
 
 export interface PidConfirmationEntry {
@@ -153,19 +153,21 @@ export async function recordDiscoveredPids(
     for (const pid of unique) {
       const prior = byPid.get(pid);
       const definition = getPidDefinition(pid);
+      const reference = getPidReference(pid);
       if (prior?.status === 'CONFIRMADO' || prior?.status === 'RESPONDEU') {
         byPid.set(pid, {
           ...prior,
-          unit: prior.unit || definition?.unit,
+          name: prior.name && prior.name !== 'PID DESCOBERTO' ? prior.name : definition?.name || reference?.name || prior.name,
+          unit: prior.unit || definition?.unit || reference?.unit,
           formulaId: prior.formulaId || definition?.formulaId,
           bytes: prior.bytes || definition?.bytes,
-          description: prior.description || definition?.description,
+          description: prior.description || definition?.description || reference?.description,
         });
         continue;
       }
       byPid.set(pid, {
         pid,
-        name: prior?.name && prior.name !== 'PID DESCOBERTO' ? prior.name : definition?.name || 'PID DESCOBERTO',
+        name: prior?.name && prior.name !== 'PID DESCOBERTO' ? prior.name : definition?.name || reference?.name || 'PID DESCOBERTO',
         classification: prior?.classification || definition?.classification || 'PADRAO_OBD',
         status: 'DESCOBERTO',
         firstSeen: prior?.firstSeen || now,
@@ -175,10 +177,10 @@ export async function recordDiscoveredPids(
         responseTime: prior?.responseTime || 0,
         source: 'REAL_OBD',
         confidence: prior?.confidence || 0,
-        unit: prior?.unit || definition?.unit,
+        unit: prior?.unit || definition?.unit || reference?.unit,
         formulaId: prior?.formulaId || definition?.formulaId,
         bytes: prior?.bytes || definition?.bytes,
-        description: prior?.description || definition?.description,
+        description: prior?.description || definition?.description || reference?.description,
       });
     }
 
