@@ -61,6 +61,11 @@ export function getPidReference(pid: string): PidReference | null {
   return PID_REFERENCE_DATABASE.get(pid.replace(/\s/g, '').toUpperCase()) ?? null;
 }
 
+/** IDs de referência padrão para sondagem deliberada; não são suporte confirmado do veículo. */
+export function getPidReferenceIds(): string[] {
+  return Array.from(PID_REFERENCE_DATABASE.keys()).sort();
+}
+
 export function getPidDefinition(pid: string): PidDefinition | null {
   return PID_DATABASE[pid.replace(/\s/g, '').toUpperCase()] ?? null;
 }
