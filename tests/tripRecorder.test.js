@@ -85,4 +85,12 @@ assert.ok(!tripScreenSource.includes('CONSUMO MÉDIO REAL'), 'não chamar de rea
 assert.ok(tripScreenSource.includes('consumo estimado por MAF'), 'histórico deve indicar estimativa MAF');
 assert.ok(tripScreenSource.includes('consumo estimado por MAP'), 'histórico deve indicar estimativa MAP');
 
+const tripServiceSource = fs.readFileSync(path.join(ROOT, 'src', 'trip', 'autoTripService.ts'), 'utf8');
+assert.ok(tripServiceSource.includes('if (this.state.active) this.setState({ active: false });'), 'finalizar a viagem deve limpar o estado ativo');
+assert.ok(tripServiceSource.includes('fuelEstimationSupport.maf'), 'consulta MAF depende do suporte anunciado pela ECU');
+assert.ok(tripServiceSource.includes('!queriedPids.has(item)'), 'não repetir PID de telemetria no mesmo ciclo de polling');
+assert.ok(tripScreenSource.includes('TELEMETRIA ECU + DISTÂNCIA GPS'), 'a origem GPS da distância deve ficar explícita');
+assert.ok(tripScreenSource.includes('ADAPTADOR OK — ECU SEM RESPOSTA'), 'a tela não pode mostrar ECU conectada quando o serviço detecta falta de resposta');
+assert.ok(tripScreenSource.includes('historyTimer'), 'histórico salvo deve atualizar enquanto a tela permanece aberta');
+
 console.log('PASS trip recorder: GPS + PID 015E + persistência de ciclo real');
