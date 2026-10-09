@@ -92,7 +92,7 @@ export default function ConfiguracaoScreen() {
     if (busy) return;
     setBusy(true);
     try {
-      if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(selectedReportDate)) { setStatus('DATA INVÁLIDA: USE AAAA-MM-DD'); return; }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(selectedReportDate)) { setStatus('DATA INVÁLIDA: USE AAAA-MM-DD'); return; }
       const availableDates = await getAutoSaveHistoryDates(`${FileSystem.documentDirectory}MERIVA_SMART`);
       if (!availableDates.includes(selectedReportDate)) { setStatus('NÃO HÁ RELATÓRIO SALVO PARA ESSA DATA'); return; }
       const result = await exportAutoSaveTxt(getAutoSaveState(), appVersion, selectedReportDate);
