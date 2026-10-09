@@ -76,6 +76,20 @@ export class FuelRateIntegrator {
 
 export type FuelRateSource = 'MEASURED_015E' | 'ESTIMATED_MAF' | 'ESTIMATED_MAP';
 
+export interface FuelEstimationSupport {
+  maf: boolean;
+  mapAndIat: boolean;
+}
+
+/** Only request fallback PIDs that the ECU advertised as supported. */
+export function getFuelEstimationSupport(supportedPids: readonly string[]): FuelEstimationSupport {
+  const normalized = new Set(supportedPids.map((pid) => pid.replace(/\\s/g, '').toUpperCase()));
+  return {
+    maf: normalized.has('0110'),
+    mapAndIat: normalized.has('010B') && normalized.has('010F'),
+  };
+}
+
 export interface FuelRateEstimateInput {
   mafGs?: number | null;
   mapKpa?: number | null;
