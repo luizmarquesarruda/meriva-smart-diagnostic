@@ -1,5 +1,4 @@
 import * as FileSystem from 'expo-file-system';
-import { appendCsvRow, CsvRow } from '../database/csvLogger';
 import { DriveCycle } from '../data/driveCycles';
 
 function isDriveCycle(value: unknown): value is DriveCycle {
@@ -97,6 +96,8 @@ export async function addDriveCycle(basePath: string, cycle: DriveCycle): Promis
     // Índice ausente ou inválido: recria apenas com dados reais.
   }
 
+  // O índice JSON permanece interno para leitura eficiente pelo app; CSV não é exportado
+  // nem gerado automaticamente para evitar arquivos duplicados e difíceis de manter.
   cycles.push(cycle);
   await FileSystem.writeAsStringAsync(indexFile, JSON.stringify({
     version: '1.0',
@@ -104,21 +105,4 @@ export async function addDriveCycle(basePath: string, cycle: DriveCycle): Promis
     totalCount: cycles.length,
     lastModified: new Date().toISOString(),
   }, null, 2), { encoding: FileSystem.EncodingType.UTF8 });
-
-  const today = new Date().toISOString().split('T')[0];
-  const csvFile = `${viagensDir}/viagens_${today}.csv`;
-  const row: CsvRow = {
-    id: cycle.id,
-    timestamp: cycle.startedAt,
-    distanceTotalKm: cycle.distanceTotalKm,
-    distanceIceKm: cycle.distanceIceKm,
-    fuelUsedL: cycle.fuelUsedL,
-    totalTime: cycle.totalTimeHms,
-    drivingTime: cycle.drivingTimeHms,
-    standingTime: cycle.standingTimeHms,
-    avgSpeed: cycle.avgDrivingSpeedKmh,
-    avgConsumption: cycle.avgFuelConsumptionKml,
-    source: cycle.source,
-  };
-  await appendCsvRow(csvFile, row);
 }
