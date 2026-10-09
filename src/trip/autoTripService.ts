@@ -181,6 +181,7 @@ class AutoTripService {
       const loopStartedAt = Date.now();
 
       try {
+        const queriedPids = new Set<string>();
         let fuelRateLph: number | null = null;
         let fuelRateSource: FuelRateSource | undefined;
         let fuelLevelPercent: number | null = null;
@@ -190,6 +191,7 @@ class AutoTripService {
 
         if (this.state.fuelLevelSupported) {
           const fuelLevelResult = await connection.session.queryPid('012F');
+          queriedPids.add('012F');
           await registerObdQuery(this.basePath, fuelLevelResult, 'REAL');
           if (
             fuelLevelResult.parsed.status === 'RESPONDEU' &&
@@ -205,6 +207,7 @@ class AutoTripService {
 
         if (this.state.fuelSupported) {
           const fuelResult = await connection.session.queryPid('015E');
+          queriedPids.add('015E');
           await registerObdQuery(this.basePath, fuelResult, 'REAL');
           if (
             fuelResult.parsed.status === 'RESPONDEU' &&
@@ -220,6 +223,7 @@ class AutoTripService {
 
         if (obdSpeedSupported) {
           const speedResult = await connection.session.queryPid('010D');
+          queriedPids.add('010D');
           await registerObdQuery(this.basePath, speedResult, 'REAL');
           if (
             speedResult.parsed.status === 'RESPONDEU' &&
@@ -242,6 +246,7 @@ class AutoTripService {
         // e a abertura/fechamento automático do trajeto.
         if (connection.supportedPids.includes('010C')) {
           const rpmResult = await connection.session.queryPid('010C');
+          queriedPids.add('010C');
           await registerObdQuery(this.basePath, rpmResult, 'REAL');
           if (rpmResult.parsed.status === 'RESPONDEU' && Number.isFinite(rpmResult.parsed.value)) {
             rpm = rpmResult.parsed.value;
@@ -252,6 +257,7 @@ class AutoTripService {
         // PIDs que já foram descobertos como não suportados.
         if (fuelRateLph == null && fuelEstimationSupport.maf) {
           const mafResult = await connection.session.queryPid('0110');
+          queriedPids.add('0110');
           await registerObdQuery(this.basePath, mafResult, 'REAL');
           const mafGs = mafResult.parsed.status === 'RESPONDEU' ? mafResult.parsed.value : null;
           if (mafGs != null) {
@@ -269,7 +275,9 @@ class AutoTripService {
           const displacementCm3 = getAutoSaveState().vehicle?.displacementCm3;
           if (displacementCm3 != null && Number.isFinite(displacementCm3) && displacementCm3 > 0) {
             const mapResult = await connection.session.queryPid('010B');
+            queriedPids.add('010B');
             const iatResult = await connection.session.queryPid('010F');
+            queriedPids.add('010F');
             await registerObdQuery(this.basePath, mapResult, 'REAL');
             await registerObdQuery(this.basePath, iatResult, 'REAL');
             const estimate = estimateFuelRateLph({
@@ -287,11 +295,12 @@ class AutoTripService {
 
         // Mantém um PID secundário por ciclo para tendências sem monopolizar o ELM.
         const telemetryCandidates = ['0105', '010B', '0111'];
-        const supportedTelemetry = telemetryCandidates.filter((item) => connection.supportedPids.includes(item));
+        const supportedTelemetry = telemetryCandidates.filter((item) => connection.supportedPids.includes(item) && !queriedPids.has(item));
         if (supportedTelemetry.length > 0) {
           const telemetryPid = supportedTelemetry[this.telemetryCursor % supportedTelemetry.length];
           this.telemetryCursor += 1;
           const telemetryResult = await connection.session.queryPid(telemetryPid);
+          queriedPids.add(telemetryPid);
           await registerObdQuery(this.basePath, telemetryResult, 'REAL');
         }
 
