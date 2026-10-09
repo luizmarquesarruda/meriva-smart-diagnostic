@@ -431,8 +431,10 @@ async function testPidScanner() {
 
 async function testIntelligentPidDiscovery() {
   const ai = loadTs(path.join(ROOT, 'src/obd/intelligentPidDiscovery.ts'));
+  const probedPids = [];
   const fakeSession = {
     async executeCommand(pid) {
+      probedPids.push(pid);
       const responses = {
         '0100': { response: '41 00 BE 3E B8 13', status: 'OK', elapsedMs: 8 },
         '0120': { response: '41 20 00 02 00 00', status: 'OK', elapsedMs: 8 },
@@ -452,10 +454,16 @@ async function testIntelligentPidDiscovery() {
   assert.strictEqual(result.confidence['010C'], 1);
   assert.strictEqual(result.observations.find((item) => item.pid === '010C').status, 'CONFIRMADO');
   assert.strictEqual(result.observations.find((item) => item.pid === '010C').value, 1726);
+  assert.ok(probedPids.includes('0103'), 'varredura ampliada deve sondar referências padrão');
+  assert.ok(probedPids.includes('0170'), 'varredura ampliada deve sondar PIDs de referência menos comuns');
 
   resetFS();
   const pidBank = loadTs(path.join(ROOT, 'src/database/pidBank.ts'));
   await pidBank.recordDiscoveredPids(BASE, ['01F0'], 'ISO 14230-4 KWP FAST');
+  await pidBank.recordDiscoveredPids(BASE, ['010C'], 'ISO 14230-4 KWP FAST', ['010C']);
+  const persisted = await pidBank.readPidConfirmations(BASE);
+  assert.strictEqual(persisted.find((item) => item.pid === '010C').status, 'RESPONDEU', 'resposta válida deve ser salva como RESPONDEU');
+  assert.strictEqual(persisted.find((item) => item.pid === '01F0').status, 'DESCOBERTO', 'PID apenas listado não deve virar resposta confirmada');
   const unknownSession = {
     async executeCommand(pid) {
       if (pid === '01F0') return { response: '41 F0 01', status: 'OK', elapsedMs: 12 };
