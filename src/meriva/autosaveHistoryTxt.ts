@@ -1,6 +1,5 @@
 import * as FileSystem from 'expo-file-system';
 import type { MerivaPersistedState } from './autosaveState';
-import { formatAutoSaveTxt } from './autosaveTxtFormatter';
 
 export const AUTOSAVE_HISTORY_FILE = 'meriva_smart_autosave_history.txt';
 export const AUTOSAVE_HISTORY_LINES_PER_DAY = 50;
@@ -27,7 +26,8 @@ function isDateKey(value: string): boolean {
 }
 
 function dateKey(iso: string): string {
-  return iso.slice(0, 10);
+  const date = new Date(iso);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
 function capDailyReport(report: string): string {
@@ -118,18 +118,33 @@ export async function appendAutoSaveHistory(
   const reports = parseDailyReports(current);
   const exportedAt = new Date().toISOString();
   const day = dateKey(exportedAt);
-  const snapshot = formatAutoSaveTxt(state, { appVersion, exportedAt });
+  const readings = state.lastReadings
+    .filter((reading) => reading.source === 'REAL' && reading.value != null)
+    .slice(0, 12);
+  const realTrips = state.driveCycles.filter((cycle) => cycle.source === 'REAL_OBD').slice(-3);
   const compact = [
-    `DATA: ${day}`,
-    `ÚLTIMA ATUALIZAÇÃO: ${exportedAt}`,
+    `MERIVA SMART DIAGNOSTIC | VERSÃO: ${appVersion}`,
+    `DATA: ${day} | ATUALIZADO: ${exportedAt}`,
     `MOTIVO: ${reason}`,
-    `ECU: ${state.obd?.connected ? 'CONECTADA' : 'DESCONECTADA'}`,
-    `PROTOCOLO: ${state.obd?.protocol ?? state.obd?.lastKnownProtocol ?? 'N/D'}`,
-    `LEITURAS: ${state.lastReadings?.length ?? 0}`,
-    `DTCs: ${state.dtcs?.length ?? 0}`,
+    `VEÍCULO: ${state.vehicle?.make ?? 'N/D'} ${state.vehicle?.model ?? ''} | MOTOR: ${state.vehicle?.engine ?? 'N/D'}`,
+    `ADAPTADOR: ${state.obd?.adapterName ?? 'N/D'}`,
+    `BLUETOOTH/OBD: ${state.obd?.connected ? 'CONECTADO' : 'DESCONECTADO'} | ECU: ${state.obd?.ecuAddress ?? 'N/D'}`,
+    `PROTOCOLO: ${state.obd?.protocol ?? state.obd?.lastKnownProtocol ?? 'N/D'} | VALIDADA EM: ${state.obd?.ecuValidatedAt ?? 'N/D'}`,
     '',
-    snapshot,
-  ].join('\n');
+    '[PIDs REAIS MAIS RECENTES]',
+    ...(readings.length ? readings.map((reading) => `${reading.pid} ${reading.name}: ${reading.value} ${reading.unit} | ${reading.status} | ${reading.timestamp}`) : ['N/D - sem leituras reais registradas']),
+    '',
+    '[CÓDIGOS DE FALHA]',
+    ...(state.dtcs.length ? state.dtcs.slice(0, 8).map((dtc) => `${dtc.code} | ${dtc.status} | ocorrências=${dtc.occurrences} | última=${dtc.lastSeen}`) : ['Nenhum DTC registrado nesta captura']),
+    ...(state.dtcs.length > 8 ? [`Mais ${state.dtcs.length - 8} DTCs no armazenamento interno.`] : []),
+    '',
+    '[VIAGENS REAIS RECENTES]',
+    ...(realTrips.length ? realTrips.map((cycle) => `${cycle.startedAt} -> ${cycle.finishedAt} | ${cycle.distanceTotalKm} km | ${cycle.avgFuelConsumptionKml > 0 ? cycle.avgFuelConsumptionKml + ' km/L' : 'consumo N/D'} | REAL_OBD`) : ['Nenhuma viagem real salva']),
+    '',
+    '[APRENDIZADO]',
+    `Estado: ${state.learning?.learningStatus ?? 'N/D'} | amostras reais: ${state.learning?.globalSampleCounts?.realSamples ?? 0}`,
+    '[NOTA] O relatório é um resumo diário; dados detalhados continuam no armazenamento interno.',
+  ].join('\\n');
   reports[day] = capDailyReport(compact);
   await FileSystem.writeAsStringAsync(path, renderDailyReports(reports), { encoding: FileSystem.EncodingType.UTF8 });
   return { count: Object.keys(reports).length };
