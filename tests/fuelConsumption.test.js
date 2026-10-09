@@ -19,7 +19,12 @@ mod.filename = sourcePath;
 mod.paths = Module._nodeModulePaths(path.dirname(sourcePath));
 mod._compile(output, sourcePath);
 
-const { integrateFuelRateLph, FuelRateIntegrator } = mod.exports;
+const { integrateFuelRateLph, FuelRateIntegrator, getFuelEstimationSupport } = mod.exports;
+
+assert.deepStrictEqual(getFuelEstimationSupport(['010C', '015E']), { maf: false, mapAndIat: false }, 'PIDs ausentes não devem habilitar consultas de estimativa');
+assert.deepStrictEqual(getFuelEstimationSupport(['0110']), { maf: true, mapAndIat: false }, 'MAF só habilita a própria consulta');
+assert.deepStrictEqual(getFuelEstimationSupport(['010B', '010F', '010C']), { maf: false, mapAndIat: true }, 'MAP exige também IAT');
+assert.deepStrictEqual(getFuelEstimationSupport([' 010b ', '010F']), { maf: false, mapAndIat: true }, 'IDs devem ser normalizados');
 
 function assertApprox(actual, expected, epsilon = 1e-12) {
   assert.ok(Math.abs(actual - expected) <= epsilon, `expected ${actual} ≈ ${expected}`);
