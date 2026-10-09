@@ -1831,3 +1831,34 @@ Usar um catálogo público de PIDs OBD-II como referência offline e fazer a ló
 ### Validação
 - **CI: não disparada.**
 - TypeScript, testes de regressão e build Android não foram executados. Asserções adicionadas são cobertura planejada, não evidência de execução bem-sucedida.
+
+
+## 2026-10-09 — Varredura de PIDs mais ampla e salvamento das respostas
+
+### Solicitação
+Tornar a descoberta mais agressiva e salvar os PIDs encontrados automaticamente, sem disparar CI.
+
+### Implementação
+- A descoberta inteligente agora inclui os PIDs do catálogo executável, PIDs reais já registrados, PIDs anunciados nos bitmaps e os 56 PIDs do catálogo de referência padrão.
+- A lista de referência é usada para sondagem deliberada em Mode 01; sua presença não significa suporte confirmado nem habilita fórmula.
+- A tela Laboratório pausa o polling normal durante a varredura, chama a descoberta inteligente e consolida PIDs anunciados e respostas brutas válidas.
+- Ao concluir a varredura real, os resultados são gravados no banco local. PIDs com resposta válida ficam como `RESPONDEU`; PIDs apenas anunciados no bitmap ficam como `DESCOBERTO`. Simulação continua sem gravação como dado real.
+- O banco normaliza IDs e mantém a distinção entre resposta observada e suporte apenas anunciado.
+- Foram adicionadas regressões para garantir que PIDs de referência menos comuns sejam sondados e que o banco não confunda uma descoberta sem resposta com um PID que respondeu.
+
+### Limites e segurança
+- A varredura agora executa mais comandos sequenciais na K-Line e pode demorar mais; foi ampliada para PIDs Mode 01 documentados, não para comandos arbitrários ou PIDs específicos de fabricante inventados.
+- Um retorno bruto válido sem decodificador é armazenado para investigação, mas permanece sem valor físico interpretado.
+- O status `RESPONDEU` significa que houve resposta útil observada; não garante, sozinho, que a definição física do PID esteja validada para a ECU da Meriva.
+
+### Commits
+- `f503be426e1b4a3f5dce331cf7c79c7270b0296a` — expor IDs de referência para sondagem.
+- `bd22bf75a9e34b47f97d878cab5c1bc2f391e34f` — ampliar candidatos da descoberta adaptativa.
+- `fc7052657f8d1a9e735cd7663182157b067a9443` — salvar descobertas reais no fluxo do Laboratório.
+- `bf75ade9c5d097a9f4b1438e2a4688e5053e90cf` — persistir resposta observada separada de bitmap.
+- `450fce07d088fbb18f41b615371883ac48cc64da` — salvar evidência de resposta no banco.
+- `ea2cd0139cf8421f0ebfa34bb6a89b9644d0f3ed` — cobrir sondagem ampliada e status de persistência nos testes.
+
+### Validação
+- **CI não disparada**, conforme a instrução vigente.
+- TypeScript, testes, Expo Doctor, build Android e validação física com ELM327 ainda não foram executados nesta etapa.
