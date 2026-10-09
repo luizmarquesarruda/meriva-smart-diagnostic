@@ -463,7 +463,7 @@ async function testIntelligentPidDiscovery() {
   await pidBank.recordDiscoveredPids(BASE, ['010C'], 'ISO 14230-4 KWP FAST', ['010C']);
   const persisted = await pidBank.readPidConfirmations(BASE);
   assert.strictEqual(persisted.find((item) => item.pid === '010C').status, 'RESPONDEU', 'resposta válida deve ser salva como RESPONDEU');
-  assert.strictEqual(persisted.find((item) => item.pid === '01F0').status, 'DESCOBERTO', 'PID apenas listado não deve virar resposta confirmada');
+  assert.ok(!persisted.some((item) => item.pid === '01F0'), 'PID apenas listado no bitmap não deve ser salvo');
   const repeatProbePids = [];
   const unknownSession = {
     async executeCommand(pid) {
@@ -473,10 +473,10 @@ async function testIntelligentPidDiscovery() {
     },
   };
   const bankAware = await ai.discoverIntelligentPids(unknownSession, { basePath: BASE });
-  assert.ok(!repeatProbePids.includes('01F0'), 'saved PID is skipped');
-  assert.ok(!bankAware.observations.some((item) => item.pid === '01F0'), 'saved PID is omitted from new scan');
-  assert.ok(!bankAware.supportedPids.includes('010C'), 'previously saved PID is omitted');
-  assert.ok(!repeatProbePids.includes('010C'), 'previously saved PID is not queried again');
+  assert.ok(repeatProbePids.includes('01F0'), 'PID not saved because it lacked a validated value remains a candidate');
+  assert.ok(bankAware.observations.some((item) => item.pid === '01F0'), 'bitmap-only PID is tested rather than skipped');
+  assert.ok(!bankAware.supportedPids.includes('010C'), 'previously saved functional PID is omitted');
+  assert.ok(!repeatProbePids.includes('010C'), 'previously saved functional PID is not queried again');
   assert.ok(repeatProbePids.includes('0170'), 'unsaved reference PIDs remain candidates');
   assert.ok(bankAware.observations.some((item) => item.pid === '0170'), 'new candidates are still checked');
 }
