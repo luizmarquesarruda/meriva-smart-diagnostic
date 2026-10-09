@@ -30,7 +30,7 @@ export default function ArmazenamentoScreen() {
     setQuota(status);
     const breakdown = await getStorageBreakdown(path);
     setUsageBreakdown(breakdown);
-    setCycles((await readDriveCycles(path)).sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()));
+    setCycles((await readDriveCycles(path)).filter((cycle) => cycle.source === 'REAL_OBD').sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()));
   }
 
   useEffect(() => {
@@ -67,7 +67,7 @@ export default function ArmazenamentoScreen() {
     <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
       <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
       <Text style={styles.title}>HISTÓRICO E DADOS</Text>
-      <Text style={styles.subtitle}>O app salva as viagens e leituras automaticamente. Esta tela acompanha o espaço usado e as viagens reais. Para exportar o relatório TXT compacto, use Configurações.</Text>
+      <Text style={styles.subtitle}>O app salva as viagens e leituras automaticamente. Esta tela acompanha o espaço usado e as viagens reais. Somente viagens registradas com dados reais da ECU aparecem aqui. Histórico importado não é exibido. Para exportar o relatório TXT compacto, use Configurações.</Text>
       <Text style={[styles.status, quota?.critical ? styles.critical : quota?.warning ? styles.warning : styles.ok]}>
         {quota?.message || 'VERIFICANDO'}
       </Text>
@@ -91,9 +91,9 @@ export default function ArmazenamentoScreen() {
               <Text style={styles.historyDate}>{cycle.startedAt}</Text>
               <Text style={styles.historyMeta}>{cycle.distanceTotalKm.toFixed(2)} km • {cycle.avgFuelConsumptionKml.toFixed(2)} km/L</Text>
             </View>
-            <Text style={cycle.source === 'REAL_OBD' ? styles.real : styles.reference}>{cycle.source === 'REAL_OBD' ? 'REAL' : 'REF.'}</Text>
+            <Text style={styles.real}>REAL OBD</Text>
           </View>
-        )) : <Text style={styles.empty}>Nenhuma viagem salva ainda.</Text>}
+        )) : <Text style={styles.empty}>Nenhuma viagem real registrada pela ECU ainda.</Text>}
       </View>
       </View>
 

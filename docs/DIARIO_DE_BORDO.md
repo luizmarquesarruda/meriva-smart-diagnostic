@@ -2064,3 +2064,5 @@ Tornar a temperatura do líquido de arrefecimento imediatamente visível e separ
 
 ### Validação
 - Aguardando CI após este commit. A tela não substitui validação com o veículo real; o PID 0105 só aparece quando a ECU efetivamente responde.
+
+- Complemento: a tela Histórico e Dados agora filtra viagens para `REAL_OBD`; removido o marcador `REF.`. A tela Aprendizado não expõe métricas de seed/importação, mantendo visíveis amostras reais e simulações descartadas.

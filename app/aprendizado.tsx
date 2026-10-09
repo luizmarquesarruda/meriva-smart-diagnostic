@@ -17,11 +17,11 @@ export default function AprendizadoScreen() {
     return () => clearInterval(timer);
   }, []);
   return <SafeAreaView style={styles.container} edges={["top","bottom","left","right"]}><ScrollView contentContainerStyle={[styles.content,{paddingHorizontal:layout.horizontalPadding}]} showsHorizontalScrollIndicator={false}><View style={[styles.screenFrame,{maxWidth:layout.maxContentWidth}]}>
-    <Text style={styles.title}>APRENDIZADO</Text><Text style={styles.subtitle}>DNA DO MERIVA • EVIDÊNCIA REAL</Text>
+    <Text style={styles.title}>APRENDIZADO</Text><Text style={styles.subtitle}>DNA DO MERIVA • SOMENTE EVIDÊNCIA REAL</Text>
     {profile ? <>
       <View style={styles.hero}><Text style={styles.status}>{profile.learningStatus}</Text><Text style={styles.source}>FONTE: {profile.source}</Text></View>
-      <View style={styles.grid}><Metric landscape={layout.landscape} l="AMOSTRAS REAIS" v={String(profile.globalSampleCounts.realSamples)} /><Metric landscape={layout.landscape} l="BASE SEED" v={String(profile.globalSampleCounts.seedSamples)} /><Metric landscape={layout.landscape} l="TOTAL" v={String(profile.globalSampleCounts.totalSamples)} /><Metric landscape={layout.landscape} l="PIDs APRENDIDOS" v={String(Object.keys(profile.overallStatistics).length)} /></View>
-      <View style={styles.card}><Row l="PESO DO SEED" v={profile.seedWeight.toFixed(2)} /><Row l="SIMULAÇÕES DETECTADAS" v={String(profile.dataContamination.simulationDetected)} /><Row l="SIMULAÇÕES FILTRADAS" v={String(profile.dataContamination.simulationFiltered)} /><Row l="ATUALIZADO" v={new Date(profile.lastUpdated).toLocaleString()} /></View>
+      <View style={styles.grid}><Metric landscape={layout.landscape} l="AMOSTRAS REAIS" v={String(profile.globalSampleCounts.realSamples)} /><Metric landscape={layout.landscape} l="SIMULAÇÕES FILTRADAS" v={String(profile.dataContamination.simulationFiltered)} /><Metric landscape={layout.landscape} l="PIDs APRENDIDOS" v={String(Object.keys(profile.overallStatistics).length)} /></View>
+      <View style={styles.card}><Row l="SIMULAÇÕES DETECTADAS (DESCARTADAS)" v={String(profile.dataContamination.simulationDetected)} /><Row l="ATUALIZADO" v={new Date(profile.lastUpdated).toLocaleString()} /></View>
     </> : <View style={styles.empty}><Text style={styles.emptyText}>Perfil de aprendizado ainda não disponível.</Text></View>}
     <Text style={styles.note}>Somente amostras REAL_OBD alimentam o raciocínio diagnóstico. Dados de simulação permanecem bloqueados para aprendizado.</Text>
     <Link href="/saude" asChild><TouchableOpacity style={styles.primary}><Text style={styles.primaryText}>🚨 VER EVIDÊNCIAS E HIPÓTESES</Text></TouchableOpacity></Link>
