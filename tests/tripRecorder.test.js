@@ -79,7 +79,7 @@ assert.strictEqual(gap.getState().durationMs, 0);
 assert.strictEqual(gap.getState().fuelUsedL, 0);
 
 const tripScreenSource = fs.readFileSync(path.join(ROOT, 'app', 'viagens.tsx'), 'utf8');
-assert.ok(tripScreenSource.includes('CONSUMO MÉDIO MEDIDO'), 'consumo só pode ser rotulado medido quando a fonte for PID 015E');
+assert.ok(tripScreenSource.includes('CONSUMO MÉDIO (015E + GPS)'), 'a fonte do combustível e a distância GPS precisam ficar explícitas');
 assert.ok(tripScreenSource.includes('CONSUMO MÉDIO ESTIMADO/MISTO'), 'consumo calculado por MAF/MAP deve ser rotulado como estimado/misto');
 assert.ok(!tripScreenSource.includes('CONSUMO MÉDIO REAL'), 'não chamar de real um consumo que pode ser estimado');
 assert.ok(tripScreenSource.includes('consumo estimado por MAF'), 'histórico deve indicar estimativa MAF');
@@ -87,6 +87,7 @@ assert.ok(tripScreenSource.includes('consumo estimado por MAP'), 'histórico dev
 
 const tripServiceSource = fs.readFileSync(path.join(ROOT, 'src', 'trip', 'autoTripService.ts'), 'utf8');
 assert.ok(tripServiceSource.includes('if (this.state.active) this.setState({ active: false });'), 'finalizar a viagem deve limpar o estado ativo');
+assert.ok(tripServiceSource.includes("if (this.state.error === 'ADAPTADOR OK / ECU SEM RESPOSTA')"), 'estado de falta de resposta deve ser limpo após recuperação da ECU');
 assert.ok(tripServiceSource.includes('fuelEstimationSupport.maf'), 'consulta MAF depende do suporte anunciado pela ECU');
 assert.ok(tripServiceSource.includes('!queriedPids.has(item)'), 'não repetir PID de telemetria no mesmo ciclo de polling');
 assert.ok(tripScreenSource.includes('TELEMETRIA ECU + DISTÂNCIA GPS'), 'a origem GPS da distância deve ficar explícita');
