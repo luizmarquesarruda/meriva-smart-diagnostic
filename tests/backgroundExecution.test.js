@@ -8,12 +8,18 @@ const task = fs.readFileSync('src/gps/backgroundLocationTask.ts', 'utf8');
 const monitoring = fs.readFileSync('src/gps/backgroundMonitoring.ts', 'utf8');
 const shared = fs.readFileSync('src/obd/sharedConnection.ts', 'utf8');
 const layout = fs.readFileSync('app/_layout.tsx', 'utf8');
+const keepAwakePackage = require('../package.json').dependencies['expo-keep-awake'];
 const permissions = fs.readFileSync('src/permissions/permissionManager.ts', 'utf8');
 const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
 
 assert.strictEqual(packageJson.dependencies['expo-task-manager'], '~11.8.2');
 assert.strictEqual(lock.packages[''].dependencies['expo-task-manager'], '~11.8.2');
 assert.strictEqual(lock.packages['node_modules/expo-task-manager'].version, '11.8.2');
+assert.strictEqual(keepAwakePackage, '~13.0.2');
+assert.strictEqual(lock.packages[''].dependencies['expo-keep-awake'], '~13.0.2');
+assert.strictEqual(lock.packages['node_modules/expo-keep-awake'].version, '13.0.2');
+assert(layout.includes("import { useKeepAwake } from 'expo-keep-awake'"));
+assert(layout.includes("useKeepAwake('meriva-smart-diagnostic-active')"));
 assert.strictEqual(lock.packages['node_modules/unimodules-app-loader'].version, '4.6.0');
 
 assert(appJson.expo.android.permissions.includes('ACCESS_BACKGROUND_LOCATION'));
