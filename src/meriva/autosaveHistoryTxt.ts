@@ -8,7 +8,7 @@ const DAY_BEGIN = '========== DIA: ';
 const DAY_END = '========== FIM DO DIA ==========';
 const HEADER = [
   'MERIVA SMART DIAGNOSTIC',
-  'HISTÓRICO TXT DIÁRIO — CADA BLOCO DE DATA É UMA PÁGINA LÓGICA.',
+  'HISTÓRICO TXT POR DIA — CADA DATA É UMA PÁGINA LÓGICA.',
 ].join('\n');
 
 type DailyReports = Record<string, string>;
