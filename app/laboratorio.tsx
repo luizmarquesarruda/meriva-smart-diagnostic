@@ -9,7 +9,7 @@ import { BluetoothDeviceInfo } from '../src/obd/bluetoothClassicTransport';
 import { createRealElmSession, discoverPairedDevices } from '../src/obd/bluetoothManager';
 import { canPollObd } from '../src/obd/bluetoothState';
 import { discoverSupportedPids, KNOWN_PIDS } from '../src/obd/pidScanner';
-import { getPidDefinition } from '../src/obd/pidDefinition';
+import { getPidDefinition, getPidReference } from '../src/obd/pidDefinition';
 import { getDtcDefinition } from '../src/obd/dtcDefinition';
 import { getSharedObdConnection, getSharedObdStatus, setSharedObdConnection, subscribeSharedObd, disconnectSharedObd } from '../src/obd/sharedConnection';
 import { autoTripService } from '../src/trip/autoTripService';
@@ -315,8 +315,9 @@ export default function LaboratorioScreen() {
         const priorKnowledge = await readPidConfirmations(getBasePath());
         const priorIds = new Set(priorKnowledge.map((entry) => entry.pid.toUpperCase()));
         const catalogued = discovered.filter((value) => getPidDefinition(value) !== null).length;
+        const referenceOnly = discovered.filter((value) => !getPidDefinition(value) && getPidReference(value)).length;
         const alreadyStored = discovered.filter((value) => priorIds.has(value)).length;
-        const withoutDefinition = discovered.filter((value) => getPidDefinition(value) === null);
+        const withoutDefinition = discovered.filter((value) => !getPidDefinition(value) && !getPidReference(value));
         await recordDiscoveredPids(getBasePath(), discovered, activeProtocol);
         updateAutoSaveState((state) => {
           if (activeProtocol && discovered.length > 0) {
@@ -329,7 +330,7 @@ export default function LaboratorioScreen() {
         });
         await forceSaveOnObdEvent();
         setStatus(
-          `DESCOBERTA: ${discovered.length} PIDs • catálogo: ${catalogued} • já no banco: ${alreadyStored} • sem fórmula local: ${withoutDefinition.length}`,
+          `DESCOBERTA: ${discovered.length} PIDs • decodificadores: ${catalogued} • referência: ${referenceOnly} • já no banco: ${alreadyStored} • sem referência: ${withoutDefinition.length}`,
         );
       } else {
         setStatus(`SIMULAÇÃO: ${discovered.length} PIDs anunciados • nenhuma confirmação real gravada`);
