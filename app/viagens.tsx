@@ -34,6 +34,14 @@ export default function ViagensScreen() {
   }, []);
 
   const summary = getDriveCycleSummary(cycles);
+  const realCycles = cycles.filter((cycle) => cycle.source === 'REAL_OBD');
+  const consumptionLabel = realCycles.length === 0
+    ? 'CONSUMO MÉDIO (SEM VIAGENS)'
+    : realCycles.every((cycle) => cycle.fuelRateSource === 'MEASURED_015E')
+      ? 'CONSUMO MÉDIO MEDIDO'
+      : realCycles.some((cycle) => ['ESTIMATED_MAF', 'ESTIMATED_MAP', 'MIXED'].includes(cycle.fuelRateSource ?? ''))
+        ? 'CONSUMO MÉDIO ESTIMADO/MISTO'
+        : 'CONSUMO MÉDIO (FONTE NÃO CONFIRMADA)';
   const live = LIVE_PIDS.map((item) => ({ ...item, reading: getLivePidTrend(item.pid) }));
   const format = (value: number | null | undefined, digits = 1) =>
     value == null || !Number.isFinite(value) ? 'AGUARDANDO PID' : value.toFixed(digits);
@@ -68,7 +76,7 @@ export default function ViagensScreen() {
     <View style={styles.grid}>
       <Metric l="VIAGENS SALVAS" v={String(summary.realCycleCount)} />
       <Metric l="DISTÂNCIA ACUMULADA" v={summary.totalDistanceKm.toFixed(1) + ' km'} />
-      <Metric l="CONSUMO MÉDIO REAL" v={summary.avgConsumptionKml > 0 ? summary.avgConsumptionKml.toFixed(1) + ' km/L' : 'N/D'} />
+      <Metric l={consumptionLabel} v={summary.avgConsumptionKml > 0 ? summary.avgConsumptionKml.toFixed(1) + ' km/L' : 'N/D'} />
     </View>
     <Text style={styles.section}>ÚLTIMAS VIAGENS</Text>
     {cycles.filter((cycle) => cycle.source === 'REAL_OBD').slice().reverse().slice(0, 20).map((c, i) =>
@@ -76,6 +84,7 @@ export default function ViagensScreen() {
         <View style={styles.historyMain}>
           <Text style={styles.name}>{c.startedAt ? new Date(c.startedAt).toLocaleString() : 'VIAGEM ' + (i + 1)}</Text>
           <Text style={styles.historyMeta}>{c.distanceTotalKm.toFixed(2)} km • {c.avgFuelConsumptionKml > 0 ? c.avgFuelConsumptionKml.toFixed(2) + ' km/L' : 'consumo N/D'}</Text>
+          <Text style={styles.historyMeta}>{c.fuelRateSource === 'MEASURED_015E' ? 'taxa medida pelo PID 015E' : c.fuelRateSource === 'ESTIMATED_MAF' ? 'consumo estimado por MAF' : c.fuelRateSource === 'ESTIMATED_MAP' ? 'consumo estimado por MAP' : c.fuelRateSource === 'MIXED' ? 'fonte de combustível mista' : 'fonte do consumo não confirmada'}</Text>
         </View>
         <Text style={styles.realBadge}>REAL OBD</Text>
       </View>
