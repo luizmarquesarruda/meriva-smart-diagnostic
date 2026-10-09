@@ -51,6 +51,9 @@ export class RealTripRecorder {
 
   addSample(sample: RealTripSample): RealTripRecorderState {
     const timestampMs = Number.isFinite(sample.timestampMs) ? sample.timestampMs : Date.now();
+    // Ignore stale/duplicate samples before they can rewind trip state.
+    if (this.lastTimestampMs != null && timestampMs <= this.lastTimestampMs) return this.getState();
+
     const absoluteDistanceKm = toFiniteNonNegative(sample.distanceKm);
     const speedKmh = toFiniteNonNegative(sample.speedKmh);
     const deltaDistanceKm = absoluteDistanceKm >= this.initialDistanceKm
@@ -71,7 +74,7 @@ export class RealTripRecorder {
     }
     this.lastTimestampMs = timestampMs;
 
-    if (sample.fuelRateLph != null && Number.isFinite(sample.fuelRateLph)) {
+    if (sample.fuelRateLph != null && Number.isFinite(sample.fuelRateLph) && sample.fuelRateLph >= 0) {
       this.fuelIntegrator.addSample(sample.fuelRateLph, timestampMs);
       if (sample.fuelRateSource) this.fuelRateSources.add(sample.fuelRateSource);
     }
@@ -95,7 +98,8 @@ export class RealTripRecorder {
 
   buildDriveCycle(finishedAtMs = Date.now()): DriveCycle | null {
     const state = this.getState();
-    if (state.distanceKm < 0.1 || state.fuelUsedL <= 0 || state.validFuelSamples < 2) return null;
+    // Avoid publishing a misleading economy average dominated by a few millilitres.
+    if (state.distanceKm < 0.1 || state.fuelUsedL < 0.05 || state.validFuelSamples < 2) return null;
 
     const avgFuelConsumptionKml = state.distanceKm / state.fuelUsedL;
     const avgDrivingSpeedKmh = state.movingTimeMs > 0
