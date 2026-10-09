@@ -65,6 +65,7 @@ export default function ConfiguracaoScreen() {
       loadingDates = true;
       try {
         setReportDates(await getAutoSaveHistoryDates(storageBase));
+        setSaveStatus(getAutoSaveStatus());
       } finally {
         loadingDates = false;
       }
@@ -72,6 +73,24 @@ export default function ConfiguracaoScreen() {
     const timer = setInterval(() => { void refreshReportDates(); }, 15_000);
     return () => clearInterval(timer);
   }, [storageBase]);
+
+  const selectedReportDateIndex = reportDates.indexOf(selectedReportDate);
+
+  function selectOlderReportDate() {
+    if (!reportDates.length) return;
+    const nextIndex = selectedReportDateIndex < 0
+      ? 0
+      : Math.min(reportDates.length - 1, selectedReportDateIndex + 1);
+    setSelectedReportDate(reportDates[nextIndex]);
+  }
+
+  function selectNewerReportDate() {
+    if (!reportDates.length) return;
+    const nextIndex = selectedReportDateIndex < 0
+      ? 0
+      : Math.max(0, selectedReportDateIndex - 1);
+    setSelectedReportDate(reportDates[nextIndex]);
+  }
 
   async function updateSetting<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
     if (!storageBase || !settings) return;
@@ -288,6 +307,24 @@ export default function ConfiguracaoScreen() {
           style={styles.dateInput}
           accessibilityLabel="Data do relatório TXT"
         />
+        <View style={styles.row}>
+          <TouchableOpacity
+            style={styles.choice}
+            onPress={selectOlderReportDate}
+            disabled={!reportDates.length || selectedReportDateIndex === reportDates.length - 1}
+            accessibilityLabel="Selecionar dia anterior disponível"
+          >
+            <Text style={styles.choiceText}>DIA ANTERIOR</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.choice}
+            onPress={selectNewerReportDate}
+            disabled={!reportDates.length || selectedReportDateIndex === 0}
+            accessibilityLabel="Selecionar dia mais recente disponível"
+          >
+            <Text style={styles.choiceText}>MAIS RECENTE</Text>
+          </TouchableOpacity>
+        </View>
         <Text style={styles.note}>Dias com histórico: {reportDates.length} • Mais recente: {reportDates[0] ?? 'N/D'}</Text>
       </View>
       <TouchableOpacity style={styles.button} onPress={handleExport} disabled={busy}>
