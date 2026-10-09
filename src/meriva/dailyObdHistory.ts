@@ -70,8 +70,8 @@ function splitPages(content: string): Map<string, string> {
   let match: RegExpExecArray | null;
   while ((match = re.exec(content)) !== null) {
     const date = match[1];
-    const body = match[2].replace(/\s+$/, '');
-    pages.set(date, body ? [body] : []);
+    const body = match[2].replace(/\s*========== FIM DO DIA ==========\s*$/, '').trim();
+    pages.set(date, body);
   }
   return pages;
 }
@@ -96,9 +96,9 @@ export async function appendDailyObdSessionEvent(
 
   const pages = splitPages(content);
   const previousEvents = pages.get(date) ?? '';
-  const updatedEvents = [previousEvents, renderEvent(state, event, timestamp)].filter(Boolean).join('\\n\\n');
+  const updatedEvents = [previousEvents, renderEvent(state, event, timestamp)].filter(Boolean).join('\n\n');
   pages.set(date, updatedEvents);
-  const eventCount = (updatedEvents.match(/--- EVENTO: SESSION_(?:START|END) \\|/g) ?? []).length;
+  const eventCount = (updatedEvents.match(/--- EVENTO: SESSION_(?:START|END) \|/g) ?? []).length;
 
   const sortedDates = Array.from(pages.keys()).sort().slice(-MAX_DAYS);
   const output = [HEADER.trimEnd()];
