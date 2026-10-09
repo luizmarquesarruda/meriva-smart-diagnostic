@@ -822,7 +822,7 @@ async function testPidAndLearningWriteSerialization() {
   await pidBank.recordDiscoveredPids(BASE, ['010C', '010D', '015E', '0170'], 'ISO 14230-4', ['010C', '010D', '015E', '0170']);
   const discovered = await pidBank.readPidConfirmations(BASE);
   assert.strictEqual(discovered.length, 4, 'só PIDs com resposta validada e decodificador podem ser persistidos');
-  assert.strictEqual(discovered.find((item) => item.pid === '010D').status, 'DESCOBERTO');
+  assert.strictEqual(discovered.find((item) => item.pid === '010D').status, 'RESPONDEU', 'PID com decodificador e resposta validada deve ficar RESPONDEU');
   assert.strictEqual(discovered.find((item) => item.pid === '010C').status, 'CONFIRMADO');
   assert.strictEqual(discovered.find((item) => item.pid === '010D').unit, 'km/h', 'banco deve guardar unidade do catálogo padrão');
   assert.strictEqual(discovered.find((item) => item.pid === '015E').formulaId, 'FUEL_RATE_LH', 'banco deve guardar fórmula para reutilização pela IA');

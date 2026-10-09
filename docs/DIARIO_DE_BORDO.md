@@ -2023,3 +2023,22 @@ O formatador renomeou a seção para `[HISTORY - ULTIMAS VIAGENS REAIS]`. O cont
 - CI #1689 (run `37918766881`) e #1690 (run `37918771446`) passaram por `npm ci`, Expo Doctor 17/17, typecheck, catálogo JSON, lifecycle e os 20 testes de autosave, mas falharam nas duas regressões descritas.
 - A próxima CI precisa concluir a suíte completa e o build Android antes de declarar a validação concluída.
 
+## 2026-10-09 — Corrigir expectativa de status no teste de serialização de PID
+
+### Falha observada na CI #1691/#1692
+- A suíte passou pelo teste `IA burrinha de PIDs` após a correção anterior.
+- A única falha restante foi a asserção de `tests/regression.test.js:825`: o teste esperava `010D` como `DESCOBERTO`, mas a entrada foi passada explicitamente como PID que respondeu.
+
+### Causa e correção
+- `recordDiscoveredPids` usa o conjunto `respondedPids` para distinguir uma resposta observada de um ID meramente descoberto por bitmap.
+- Como `010D` tem decodificador local e foi listado explicitamente como resposta validada no cenário de teste, seu status correto é `RESPONDEU`, não `DESCOBERTO`.
+- Atualizada somente a expectativa desse teste. O gate de produção que exige resposta validada e decodificador local para persistência permanece ativo.
+
+### Arquivos
+- `tests/regression.test.js`
+- `docs/DIARIO_DE_BORDO.md`
+
+### Validação
+- CI #1691 (run `37919060536`) e #1692 (run `37919067790`) passaram por `npm ci`, Expo Doctor 17/17, typecheck, catálogo JSON, lifecycle Bluetooth/ECU, 20 testes de autosave e regressão de descoberta de PIDs.
+- A única falha remanescente foi essa expectativa de status. A nova CI precisa concluir todos os testes e o build Android.
+
