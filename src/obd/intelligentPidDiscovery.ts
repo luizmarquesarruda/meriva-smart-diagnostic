@@ -134,6 +134,9 @@ export async function discoverIntelligentPids(
       : [];
 
     for (const pid of mapped) {
+      // Bitmap é consultada para descobrir novos IDs, mas IDs já salvos não
+      // voltam ao resultado nem à gravação em cada varredura.
+      if (alreadyFound.has(pid)) continue;
       supported.add(pid);
       bitmapSupported.add(pid);
     }
