@@ -131,8 +131,8 @@ export async function recordPidConfirmation(
 }
 
 /**
- * Salva PIDs anunciados pela bitmap OBD.
- * DESCOBERTO não significa CONFIRMADO: é apenas suporte anunciado pela ECU.
+ * Persiste somente PIDs que tiveram resposta real validada pelo decodificador.
+ * Bitmap de suporte é pista para sondagem, nunca evidência suficiente para salvar.
  */
 export async function recordDiscoveredPids(
   basePath: string,
@@ -140,8 +140,11 @@ export async function recordDiscoveredPids(
   protocol: string,
   respondedPids: string[] = [],
 ): Promise<void> {
-  const unique = Array.from(new Set(pids.map((value) => value.replace(/\\s/g, '').toUpperCase()))).sort();
-  const responded = new Set(respondedPids.map((value) => value.replace(/\\s/g, '').toUpperCase()));
+  const normalize = (value: string) => value.replace(/\s/g, '').toUpperCase();
+  const responded = new Set(respondedPids.map(normalize));
+  const unique = Array.from(new Set(pids.map(normalize)))
+    .filter((pid) => responded.has(pid) && /^01[0-9A-F]{2}$/.test(pid))
+    .sort();
   if (!unique.length) return;
 
   const target = basePath + '/BANCO/pids_meriva_confirmados.txt';
@@ -171,14 +174,14 @@ export async function recordDiscoveredPids(
         pid,
         name: prior?.name && prior.name !== 'PID DESCOBERTO' ? prior.name : definition?.name || reference?.name || 'PID DESCOBERTO',
         classification: prior?.classification || definition?.classification || 'PADRAO_OBD',
-        status: responded.has(pid) ? 'RESPONDEU' : 'DESCOBERTO',
+        status: 'RESPONDEU',
         firstSeen: prior?.firstSeen || now,
         lastSeen: now,
         occurrences: (prior?.occurrences || 0) + 1,
         protocol: protocol || prior?.protocol || 'N/D',
         responseTime: prior?.responseTime || 0,
         source: 'REAL_OBD',
-        confidence: responded.has(pid) ? Math.max(prior?.confidence || 0, 0.85) : prior?.confidence || 0,
+        confidence: Math.max(prior?.confidence || 0, 0.85),
         unit: prior?.unit || definition?.unit || reference?.unit,
         formulaId: prior?.formulaId || definition?.formulaId,
         bytes: prior?.bytes || definition?.bytes,
@@ -196,7 +199,6 @@ export async function recordDiscoveredPids(
     if (fileQueues.get(target) === current) fileQueues.delete(target);
   }
 }
-
 
 /** Busca o registro persistido sem elevar suporte anunciado a confirmação de resposta. */
 export async function lookupPidConfirmation(
