@@ -464,18 +464,21 @@ async function testIntelligentPidDiscovery() {
   const persisted = await pidBank.readPidConfirmations(BASE);
   assert.strictEqual(persisted.find((item) => item.pid === '010C').status, 'RESPONDEU', 'resposta válida deve ser salva como RESPONDEU');
   assert.strictEqual(persisted.find((item) => item.pid === '01F0').status, 'DESCOBERTO', 'PID apenas listado não deve virar resposta confirmada');
+  const repeatProbePids = [];
   const unknownSession = {
     async executeCommand(pid) {
+      repeatProbePids.push(pid);
       if (pid === '01F0') return { response: '41 F0 01', status: 'OK', elapsedMs: 12 };
       return fakeSession.executeCommand(pid);
     },
   };
   const bankAware = await ai.discoverIntelligentPids(unknownSession, { basePath: BASE });
-  const unknownObservation = bankAware.observations.find((item) => item.pid === '01F0');
-  assert.ok(unknownObservation, 'PID previamente descoberto no banco deve ser reconsiderado');
-  assert.strictEqual(unknownObservation.knowledgeSource, 'BANCO_LOCAL', 'a IA deve consultar o banco local antes de classificar o PID');
-  assert.strictEqual(unknownObservation.status, 'SEM_DEFINICAO', 'resposta sem fórmula validada deve continuar sem interpretação');
-  assert.strictEqual(unknownObservation.value, null, 'não inferir valor físico para PID sem definição');
+  assert.ok(!repeatProbePids.includes('01F0'), 'saved PID is skipped');
+  assert.ok(!bankAware.observations.some((item) => item.pid === '01F0'), 'saved PID is omitted from new scan');
+  assert.ok(!bankAware.supportedPids.includes('010C'), 'previously saved PID is omitted');
+  assert.ok(!repeatProbePids.includes('010C'), 'previously saved PID is not queried again');
+  assert.ok(repeatProbePids.includes('0170'), 'unsaved reference PIDs remain candidates');
+  assert.ok(bankAware.observations.some((item) => item.pid === '0170'), 'new candidates are still checked');
 }
 
 async function testCarScannerBaselineAndFuel012F() {
