@@ -96,9 +96,18 @@ export function getDriveCycleSummary(cycles: DriveCycle[]): DriveCycleSummary {
   const referenceCycles = cycles.filter((cycle) => cycle.source === 'CARSCANNER_SEED');
   const realDistanceKm = realCycles.reduce((sum, cycle) => sum + cycle.distanceTotalKm, 0);
   const realFuelL = realCycles.reduce((sum, cycle) => sum + cycle.fuelUsedL, 0);
-  const realAvgSpeedKmh = realCycles.length
-    ? realCycles.reduce((sum, cycle) => sum + cycle.avgDrivingSpeedKmh, 0) / realCycles.length
-    : 0;
+  const parseDurationMs = (value: string): number => {
+    const match = /^(\d{2,}):(\d{2}):(\d{2})$/.exec(value);
+    if (!match) return 0;
+    const hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    const seconds = Number(match[3]);
+    if (minutes >= 60 || seconds >= 60) return 0;
+    return ((hours * 60 + minutes) * 60 + seconds) * 1000;
+  };
+  // Aggregate speed must be weighted by the total real moving time.
+  const realMovingTimeMs = realCycles.reduce((sum, cycle) => sum + parseDurationMs(cycle.drivingTimeHms), 0);
+  const realAvgSpeedKmh = realMovingTimeMs > 0 ? realDistanceKm / (realMovingTimeMs / 3_600_000) : 0;
 
   const ordered = [...cycles].sort(
     (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
