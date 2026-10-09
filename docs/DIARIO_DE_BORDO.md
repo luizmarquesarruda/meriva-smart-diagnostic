@@ -1884,3 +1884,17 @@ Ao encontrar e salvar um PID real, a descoberta deve seguir para outros candidat
 ### Validação
 - CI permanece parada por instrução.
 - Testes e build não foram executados; esta alteração foi registrada, mas ainda precisa de validação autorizada.
+
+
+## 2026-10-09 — Salvar PIDs somente após resposta funcional validada
+
+### Regra corrigida
+- Bitmap de suporte e catálogo são fontes de candidatos; não autorizam persistência por si só.
+- A varredura só apresenta como descoberto funcional e grava no banco um PID Mode 01 que respondeu à ECU, passou pela validação OBD, foi interpretado pelo decodificador e produziu valor numérico finito.
+- PIDs anunciados apenas no bitmap e PIDs sem valor interpretável permanecem fora do banco de descobertos funcionais e podem ser sondados novamente.
+- Registros legados com status `DESCOBERTO` não bloqueiam sondagens, pois podem ter sido gravados somente a partir do bitmap. Somente `RESPONDEU` e `CONFIRMADO` de origem `REAL_OBD` evitam repetição.
+- Corrigida a normalização de espaços em IDs na persistência.
+
+### Validação e CI
+- Atualizada a regressão para exigir que o PID funcional seja salvo e que o PID apenas anunciado não seja salvo nem bloqueie nova sondagem.
+- CI continua parada; testes, typecheck e build Android não foram executados.
