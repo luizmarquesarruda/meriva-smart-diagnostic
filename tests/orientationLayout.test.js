@@ -16,7 +16,7 @@ assert.equal(appJson.expo.orientation, 'default');
 assert.match(index, /useMidLayout\(\)/);
 assert.match(index, /layout\.landscape/);
 assert.match(index, /contentContainerStyle/);
-assert.match(index, /flexGrow:1/);
+assert.match(index, /flexGrow:\s*1/);
 assert.match(index, /maxContentWidth/);
 assert.match(index, /statusGridLandscape/);
 assert.match(index, /actionGridLandscape/);
