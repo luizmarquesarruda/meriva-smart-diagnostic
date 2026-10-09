@@ -1672,3 +1672,99 @@ Simplificar o diário de diagnóstico exportável: escolher a data, gerar um blo
 
 ### Próximo passo
 Quando autorizado, executar a validação completa. Em teste físico, conferir que a seleção exporta somente a data escolhida, que dias antigos continuam disponíveis e que o TXT não atribui dados simulados/seed como dados reais.
+
+
+## 2026-10-08 — Auditoria estática sênior: viagens reais, polling OBD e histórico TXT
+
+### Solicitação e restrição
+Foi solicitada uma revisão técnica do repositório para procurar erros, com a instrução explícita de **não disparar CI**. A revisão ocorreu pela leitura dos arquivos e comparação dos contratos; nenhum workflow foi executado, nenhum merge foi feito e nenhum hardware real foi apresentado para validação nesta rodada.
+
+### Falhas e inconsistências confirmadas corrigidas
+
+1. **Polling de combustível consultava PIDs que a ECU não anunciou como suportados.**
+   - Criado `getFuelEstimationSupport()` para normalizar e consultar a bitmap real dos PIDs suportados.
+   - A tentativa por MAF (`0110`) agora depende do suporte anunciado; o fallback por MAP + IAT (`010B` + `010F`) exige ambos os PIDs, RPM válido e cilindrada real conhecida no perfil.
+   - Removido o fallback genérico de cilindrada `1598 cm³`, que não corresponde à especificação confirmada do veículo.
+   - Adicionadas asserções para PIDs ausentes, normalização dos códigos e guards do serviço de viagem.
+
+2. **Consulta duplicada na K-Line dentro do mesmo ciclo.**
+   - MAP podia ser consultado para estimar a taxa e depois ser consultado novamente como PID secundário de telemetria.
+   - `autoTripService` mantém agora um conjunto de PIDs consultados em cada ciclo e exclui duplicatas da rotação de telemetria.
+
+3. **Proveniência do consumo apresentada de forma enganosa.**
+   - A tela não chama mais o valor de “CONSUMO MÉDIO REAL” ou simplesmente “MEDIDO” quando o combustível pode vir de uma estimativa.
+   - O indicador distingue `CONSUMO MÉDIO (015E + GPS)`, estimado/misto e fonte não confirmada.
+   - Cada viagem salva mostra a origem da taxa de combustível (`MEASURED_015E`, estimativa MAF, estimativa MAP, fonte mista ou não confirmada).
+   - O subtítulo explicita que a distância da viagem vem do GPS e a telemetria vem da ECU.
+
+4. **Estado visual da viagem ficava ativo após finalizar o gravador.**
+   - `finalizeRecorder()` agora limpa o estado `active` assim que o gravador é encerrado, mesmo quando o trajeto não atinge os critérios mínimos para ser salvo.
+   - A regressão cobre a limpeza do estado.
+
+5. **Aviso de falta de resposta da ECU podia ficar preso após a recuperação.**
+   - Quando a ECU volta a responder e o carro está parado, o estado `ADAPTADOR OK / ECU SEM RESPOSTA` agora é limpo sem depender de existir um gravador de viagem.
+   - A tela Viagens apresenta o estado de adaptador sem resposta separadamente de ECU conectada.
+
+6. **Histórico de viagens não era atualizado com a tela aberta.**
+   - A lista salva é recarregada a cada 10 segundos, com proteção contra consultas concorrentes e cancelamento em desmontagem da tela.
+
+7. **Migração antiga podia atribuir snapshots históricos ao dia atual.**
+   - A migração passa a extrair `Exported At` (ou `Saved At`) de cada entrada legada `SALVAMENTO_BEGIN/END`, mantendo a data de cada snapshot e reduzindo múltiplos snapshots do mesmo dia a um bloco diário.
+   - Se o arquivo contiver uma mistura de blocos diários novos e snapshots antigos, blocos convertidos têm precedência e os snapshots antigos preenchem somente dias que ainda não existem.
+   - Variantes legadas sem qualquer timestamp recuperável ainda exigem fallback para a data de migração; a data original não pode ser reconstruída com segurança nesses casos.
+
+8. **Página lógica diária podia exceder 50 linhas por causa do cabeçalho.**
+   - Cabeçalho do TXT reduzido a duas linhas.
+   - O teste do histórico exige que o relatório gerado tenha no máximo 50 linhas lógicas no cenário de um dia, além de manter conteúdo diário limitado.
+
+9. **Seletor de datas podia transformar um histórico ilimitado em uma linha enorme.**
+   - A interface exibe quantidade de dias e dia mais recente, em vez de concatenar toda a lista de datas.
+   - Foram adicionadas ações para navegar ao dia anterior disponível e retornar ao mais recente; o campo manual `AAAA-MM-DD` permanece disponível.
+   - A lista e o estado de último salvamento são atualizados periodicamente enquanto Configurações permanece aberta.
+
+10. **Limpeza de código.**
+    - Removido import obsoleto do formatador legado em `exportAutoSaveTxt.ts`.
+    - A exportação de uma data sem relatório permanece sem escrita colateral: não cria snapshot atual para tentar preencher uma data ausente.
+
+### Arquivos principais revisados/alterados
+- `src/obd/fuelConsumption.ts`
+- `src/trip/autoTripService.ts`
+- `src/trip/tripRecorder.ts` (contrato revisto; teste de regressão ampliado)
+- `app/viagens.tsx`
+- `app/configuracoes.tsx`
+- `src/meriva/autosaveHistoryTxt.ts`
+- `src/meriva/exportAutoSaveTxt.ts`
+- `tests/fuelConsumption.test.js`
+- `tests/tripRecorder.test.js`
+- `tests/merivaAutosave.test.js`
+
+### Commits significativos desta revisão
+Todos os commits de código e testes deste conjunto usam `[skip ci]`; a CI foi intencionalmente deixada parada.
+- `c61e593bf6d365e4ce99e418b45af2ba5f7ab6ac` — consultar fallback de combustível somente conforme suporte OBD.
+- `ad581ae61c4115b87985bee62d68bf84a125c757` — impedir consultas duplicadas de PID no mesmo ciclo.
+- `cefbdbebedfe23ed441373d4545139cc451b36f0` — limpar estado de viagem ao finalizar o gravador.
+- `f7c52d9b7bc9162241ecc7f57043d92afea1366c` — limpar aviso de ECU sem resposta após recuperação.
+- `f8a4aa61d21572c176f4100462fd4cb642cf9934` — atualizar histórico na tela e separar estado da ECU.
+- `bca6cb079a7d530b4a30c9011ab9182927cd49c6` — explicitar a composição da métrica de consumo (PID 015E + GPS).
+- `cce35fed4677ca874245e62ad31671468b5c1847` — preservar dias de snapshots legados.
+- `ea796c1a8ebddd8d0ad7320ac10be3efda270477` — preservar datas quando formatos antigo e novo coexistem.
+- `36d8cb4e99977512b4f16e1809d22b21acdf55db` — limitar cabeçalho do TXT a duas linhas.
+- `e2bcf612f854f24b68a8f9a7252c3ee721e844d0` — manter o seletor de datas compacto e atualizar o estado de salvamento.
+- `99b7163087405095fad40610aa13d54a750b55d4` — navegação entre datas antigas e a mais recente.
+- `1c08be9db63760cfc28d504955a1ceeca4d0e7f6` — regressão da navegação compacta por data.
+- `4738cdbb1a75bfad02a67ad4df8e9f746c5659a5` — remover import obsoleto do exportador.
+- `035fb1383d91d8299fdf8b0f7092ab6cc58fee40` — corrigir separadores de linha no fixture da migração.
+
+### Riscos remanescentes identificados
+- **Composição do combustível:** `estimateFuelRateLph()` ainda usa defaults AFR 14,7 e densidade 0,745 quando o serviço de viagem não fornece parâmetros. A configuração `fuelType` e a possível composição real do tanque (por exemplo, álcool informado via PID 0152) não são integradas neste caminho. A tela sinaliza que a taxa é estimada, mas o valor numérico pode ficar enviesado em veículo flex. Não inventar composição; integrar uma fonte confiável/seleção explícita antes de promover esse valor a medido.
+- **Persistência de viagens com combustível indisponível:** `RealTripRecorder.buildDriveCycle()` exige distância mínima de 0,1 km, combustível acumulado maior que zero e ao menos duas amostras válidas de taxa. Assim, um deslocamento real sem taxa utilizável pode não entrar no histórico. Preservar viagens com combustível desconhecido exigiria representar `N/D` no modelo em vez de gravar zero como se fosse consumo medido.
+- **Migração sem timestamp:** históricos legados sem marcadores e sem um timestamp legível não contêm evidência suficiente para reconstruir o dia original.
+
+### Validação e CI
+- **CI: NÃO EXECUTADA / NÃO DISPARADA**, por instrução do usuário.
+- `npm run typecheck`, `npm test`, Expo Doctor e Android Release **não foram executados**.
+- As novas regressões foram adicionadas ao conjunto existente, mas ainda não foram executadas; sua presença no repositório não equivale a testes passando.
+- Não foi feita validação física com ELM327/ECU nesta revisão.
+
+### Estado e próximo passo
+As falhas identificadas por inspeção estática foram corrigidas e as regressões foram adicionadas. O repositório **não deve ser declarado livre de erros nem pronto para release** até a execução autorizada de typecheck, testes e build Android. A próxima correção técnica recomendada, antes da validação final, é tornar explícitas e coerentes as hipóteses de AFR/densidade no estimador flex e definir a persistência de viagens quando o combustível estiver indisponível.
