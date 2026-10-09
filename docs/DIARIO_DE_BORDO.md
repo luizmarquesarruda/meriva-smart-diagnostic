@@ -1636,3 +1636,38 @@ A confirmação definitiva exige uma sessão real na Meriva com ELM327, principa
 - Nenhuma dependência nova foi adicionada nesta etapa.
 - CI continua deliberadamente não disparada até concluir a revisão estática.
 
+
+
+## 2026-10-08 — Histórico TXT diário e seleção de data
+
+### Solicitação
+Simplificar o diário de diagnóstico exportável: escolher a data, gerar um bloco/página lógica por dia, sem limite total de dias e sem linhas repetitivas de rodagem. A orientação vigente é **não disparar CI nesta rodada**.
+
+### Auditoria do estado anterior
+- A implementação de histórico diário já existia em `src/meriva/autosaveHistoryTxt.ts`, mas o teste 13 ainda esperava o formato legado de até 200 snapshots (`SALVAMENTO_BEGIN`), tornando as expectativas incompatíveis com o formato atual.
+- A exportação de uma data sem relatório podia criar um snapshot manual do dia atual e depois tentar exportar novamente a data antiga; isso era um efeito colateral indevido.
+- A tela de configurações reconstruía o caminho de armazenamento em vez de reutilizar o caminho já inicializado.
+
+### Correções nesta atualização
+- Atualizados os testes de autosave para verificar o bloco diário único, o limite compacto de linhas e a leitura por data, em vez da rotação legada de 200 snapshots.
+- Ajustadas as regressões de salvamento crítico e de encerramento de sessão para refletir a regra: o relatório do dia é atualizado, não se anexam snapshots repetidos.
+- O exportador agora recusa explicitamente uma data selecionada sem relatório e **não grava** um snapshot de hoje como efeito colateral.
+- A tela de configurações reutiliza `storageBase` e impede exportação antes da inicialização do armazenamento.
+
+### Arquivos alterados
+- `tests/merivaAutosave.test.js`
+- `src/meriva/exportAutoSaveTxt.ts`
+- `app/configuracoes.tsx`
+
+### Commits desta atualização
+- `9927d17ddf8a4ea916e7f69dd339d99d10a40da9` — testes do histórico diário.
+- `577c76a0479ac9d890b0271ffd1268ba67720310` — exportação sem escrita colateral.
+- `0aaaa5c5207084fb4119ea4bcae102b11f526b2b` — caminho de armazenamento consistente.
+
+### Validação e CI
+- A CI **não foi executada nem disparada**, conforme a instrução vigente.
+- As alterações foram revisadas estruturalmente por comparação com os contratos e funções existentes; isso não equivale a typecheck, execução de testes ou build Android.
+- Permanecem pendentes a execução local da suíte de autosave e a validação TypeScript/Android quando houver autorização para validar por CI.
+
+### Próximo passo
+Quando autorizado, executar a validação completa. Em teste físico, conferir que a seleção exporta somente a data escolhida, que dias antigos continuam disponíveis e que o TXT não atribui dados simulados/seed como dados reais.
