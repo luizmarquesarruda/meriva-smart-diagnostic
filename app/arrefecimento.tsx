@@ -44,7 +44,7 @@ export default function ArrefecimentoScreen() {
       <Text style={styles.eyebrow}>TEMPERATURA DO LÍQUIDO DE ARREFECIMENTO</Text>
       <Text style={styles.heroValue}>{fresh && trend ? trend.current.toFixed(0) + ' °C' : '— °C'}</Text>
       <Text style={[styles.status, styles[status.tone]]}>{status.label}</Text>
-      <View style={styles.gauge}><View style={[styles.gaugeFill,{width: gaugePercent + '%'}]} /></View>
+      <View style={styles.gauge}><View style={[styles.gaugeFill,{width: (gaugePercent + '%') as `${number}%`}]} /></View>
       <View style={styles.gaugeLabels}><Text style={styles.small}>40 °C</Text><Text style={styles.small}>80 °C</Text><Text style={styles.small}>120 °C</Text></View>
       <Text style={styles.note}>PID padrão OBD-II 0105 • {fresh && trend ? 'resposta há ' + Math.floor(trend.ageSeconds) + ' s' : 'sem resposta recente'}</Text>
     </View>
