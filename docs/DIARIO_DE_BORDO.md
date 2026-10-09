@@ -1897,4 +1897,4 @@ Ao encontrar e salvar um PID real, a descoberta deve seguir para outros candidat
 
 ### Validação e CI
 - Atualizada a regressão para exigir que o PID funcional seja salvo e que o PID apenas anunciado não seja salvo nem bloqueie nova sondagem.
-- CI continua parada; testes, typecheck e build Android não foram executados.
+- No momento do registro, testes, typecheck e build Android ainda não tinham sido executados; esta revisão solicita validação pela CI.
