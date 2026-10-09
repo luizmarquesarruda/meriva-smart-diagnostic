@@ -90,9 +90,9 @@ export default function ConfiguracaoScreen() {
     setBusy(true);
     try {
       const result = await exportDailyObdHistoryTxt();
-      if (result.ok) setStatus(\`HISTÓRICO DIÁRIO EXPORTADO: \${result.fileName}\`);
+      if (result.ok) setStatus(`HISTÓRICO DIÁRIO EXPORTADO: ${result.fileName}`);
       else if (result.reason === 'CANCELADO') setStatus('EXPORTAÇÃO CANCELADA');
-      else setStatus(\`FALHA NO HISTÓRICO DIÁRIO: \${result.message ?? result.reason}\`);
+      else setStatus(`FALHA NO HISTÓRICO DIÁRIO: ${result.message ?? result.reason}`);
     } finally { setBusy(false); setSaveStatus(getAutoSaveStatus()); }
   }
 
