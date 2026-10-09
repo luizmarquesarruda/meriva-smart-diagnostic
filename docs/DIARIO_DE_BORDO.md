@@ -1938,10 +1938,13 @@ Ao encontrar e salvar um PID real, a descoberta deve seguir para outros candidat
 - Adicionada a unidade `status`, identificada na apresentação como `bitmap` de status OBD de 32 bits.
 - Incrementada a versão do catálogo de unidades para registrar a atualização.
 - Atualizada a validação do catálogo para reconhecer `u32` como operação suportada e exigir quatro bytes para essa fórmula.
+- Uma segunda varredura dos invariantes revelou duas falhas encadeadas: faltava a faixa de plausibilidade para `0101` e `010D` usava a chave `km/h` no catálogo de PIDs, embora `units.json` defina a chave normalizada `kmh`. Adicionada a faixa de bitmap de 32 bits (`0` a `4294967295`) e normalizada a chave de unidade de `010D`.
 - A implementação do transporte Bluetooth/ELM327 e a lógica da ECU não foram alteradas.
 
 ### Arquivos alterados
 - `src/knowledge/units.json`
+- `src/knowledge/pids.json`
+- `src/knowledge/ranges.json`
 - `tests/knowledgeJson.test.js`
 - `docs/DIARIO_DE_BORDO.md`
 
