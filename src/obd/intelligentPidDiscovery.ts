@@ -185,7 +185,7 @@ export async function discoverIntelligentPids(
     const confirmedByBitmap = supported.has(pid);
     const rawResponseValid = result.status === 'OK' && validateOBDResponse(result.response);
     const knowledge = getKnowledge(pid, confirmedByBitmap);
-    const hasDefinition = Boolean(getPidDefinition(pid) || storedByPid.get(pid.toUpperCase())?.formulaId);
+    const hasDefinition = Boolean(getPidDefinition(pid));
     const missingDefinition = rawResponseValid && !hasDefinition;
     const pidConfidence = valid ? (confirmedByBitmap ? 1 : 0.85) : confirmedByBitmap ? 0.35 : 0;
 
