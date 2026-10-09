@@ -50,10 +50,16 @@ export async function discoverIntelligentPids(
   // Só uma resposta real validada torna o PID elegível para bloqueio de novas sondagens.
   // Registros antigos DESCOBERTO podem ter vindo apenas do bitmap e devem ser testados.
   const alreadyFound = new Set(storedKnowledge
-    .filter((entry) => entry.source === 'REAL_OBD' &&
-      (entry.status === 'CONFIRMADO' || entry.status === 'RESPONDEU'))
-    .map((entry) => entry.pid.replace(/\s/g, '').toUpperCase())
-    .filter((pid) => /^01[0-9A-F]{2}$/.test(pid)));
+    .filter((entry) => {
+      if (entry.source !== 'REAL_OBD') return false;
+      const pid = entry.pid.replace(/\s/g, '').toUpperCase();
+      if (!/^01[0-9A-F]{2}$/.test(pid)) return false;
+      // Registros antigos RESPONDEU sem decodificador podiam vir de resposta raw
+      // sem valor validado; reavaliá-los em vez de bloqueá-los permanentemente.
+      return entry.status === 'CONFIRMADO' ||
+        (entry.status === 'RESPONDEU' && Boolean(getPidDefinition(pid)));
+    })
+    .map((entry) => entry.pid.replace(/\s/g, '').toUpperCase()));
   const knownFromBank = Array.from(alreadyFound);
 
   const getKnowledge = (pid: string, bitmapOnly = false) => {
