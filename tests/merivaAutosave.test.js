@@ -353,7 +353,7 @@ test('7. CARSCANNER_SEED nunca vira histórico real', async () => {
     appVersion: '1.0.0',
     exportedAt: '2026-10-01 13:00:00',
   });
-  assert.ok(txt.includes('fonte=CARSCANNER_SEED'), 'seed deve permanecer identificado como referência');
+  assert.ok(!txt.includes('fonte=CARSCANNER_SEED'), 'referências Car Scanner não devem ser semeadas no histórico de viagens');
   assert.ok(!txt.includes('fonte=REAL_OBD'), 'nenhum ciclo seed pode aparecer como REAL');
   m.disposeAutoSave();
 });
