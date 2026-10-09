@@ -89,11 +89,11 @@ export default function ConfiguracaoScreen() {
   }
 
   async function handleExport() {
-    if (busy) return;
+    if (!storageBase || busy) return;
     setBusy(true);
     try {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(selectedReportDate)) { setStatus('DATA INVÁLIDA: USE AAAA-MM-DD'); return; }
-      const availableDates = await getAutoSaveHistoryDates(`${FileSystem.documentDirectory}MERIVA_SMART`);
+      const availableDates = await getAutoSaveHistoryDates(storageBase);
       if (!availableDates.includes(selectedReportDate)) { setStatus('NÃO HÁ RELATÓRIO SALVO PARA ESSA DATA'); return; }
       const result = await exportAutoSaveTxt(getAutoSaveState(), appVersion, selectedReportDate);
       if (result.ok) setStatus(`EXPORTADO: ${result.fileName}`);
