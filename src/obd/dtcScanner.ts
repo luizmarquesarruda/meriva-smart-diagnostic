@@ -97,7 +97,7 @@ function parseFreezeFrameDtc(response: string): string | null {
   const stream = response.replace(/[^0-9A-F]/gi, '').toUpperCase();
   const marker = stream.indexOf('4202');
   if (marker < 0) return null;
-  const data = stream.slice(marker + 8, marker + 12);
+  const data = stream.slice(marker + 6, marker + 10);
   if (data.length !== 4 || /^0{4}$/.test(data)) return null;
   const high = Number.parseInt(data.slice(0, 2), 16);
   const low = Number.parseInt(data.slice(2), 16);

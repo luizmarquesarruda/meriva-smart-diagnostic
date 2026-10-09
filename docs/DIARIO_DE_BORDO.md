@@ -1910,6 +1910,7 @@ Ao encontrar e salvar um PID real, a descoberta deve seguir para outros candidat
 ### Correção
 - Generalizado o carregador de `tests/dtcScanner.test.js` para transpilar e cachear módulos TypeScript locais importados por caminhos relativos, preservando a resolução normal para dependências externas e JSON.
 - Adicionada cobertura de `readFreezeFrame` validando DTC, RPM e temperatura do líquido de arrefecimento, para confirmar que o parser real é carregado e utilizado.
+- A nova CI identificou um erro real no deslocamento do DTC do freeze frame: o parser incluía o byte do número do quadro no código. Corrigido para ler os dois bytes DTC após o byte de identificação do quadro; a regressão espera `P0130` para a resposta `42 02 01 01 30 00 00`.
 - Nenhuma lógica de comunicação OBD/KWP em produção foi alterada para silenciar o teste.
 
 ### Arquivos
@@ -1920,3 +1921,4 @@ Ao encontrar e salvar um PID real, a descoberta deve seguir para outros candidat
 - CI anterior: #1677, run `37916715018`, falhou em `tests/dtcScanner.test.js`.
 - Esta correção será enviada em um único commit; o push da branch dispara a nova CI automaticamente.
 - A correção só será considerada concluída depois de conferir os testes e, se a validação passar, o build Android. Nenhuma aprovação de CI é presumida neste registro.
+
