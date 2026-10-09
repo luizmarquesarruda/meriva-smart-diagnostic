@@ -199,7 +199,7 @@ export async function lookupPidConfirmation(
   basePath: string,
   pid: string,
 ): Promise<PidConfirmationEntry | null> {
-  const normalized = pid.replace(/\\s/g, '').toUpperCase();
+  const normalized = pid.replace(/\s/g, '').toUpperCase();
   if (!/^01[0-9A-F]{2}$/.test(normalized)) return null;
   const entries = await readPidConfirmations(basePath);
   return entries.find((entry) => entry.pid === normalized) ?? null;
