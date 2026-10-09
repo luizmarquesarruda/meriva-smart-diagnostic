@@ -807,7 +807,7 @@ async function testPidAndLearningWriteSerialization() {
   const confirmations = await pidBank.readPidConfirmations(BASE);
   assert.strictEqual(confirmations.length, 2);
   const rawPidFile = files.get(path.join(BASE, 'BANCO', 'pids_meriva_confirmados.txt'));
-  assert.ok(rawPidFile.split('\n').filter(Boolean).every((line) => line.split('|').length === 11), 'TXT de PIDs deve permanecer compacto');
+  assert.ok(rawPidFile.split('\n').filter(Boolean).every((line) => [11, 15].includes(line.split('|').length)), 'TXT de PIDs deve aceitar formato legado de 11 colunas e enriquecido de 15');
   await pidBank.recordDiscoveredPids(BASE, ['010C', '010D', '015E'], 'ISO 14230-4');
   const discovered = await pidBank.readPidConfirmations(BASE);
   assert.strictEqual(discovered.length, 4);
