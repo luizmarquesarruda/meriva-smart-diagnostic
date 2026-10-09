@@ -1636,3 +1636,13 @@ A confirmação definitiva exige uma sessão real na Meriva com ELM327, principa
 - Nenhuma dependência nova foi adicionada nesta etapa.
 - CI continua deliberadamente não disparada até concluir a revisão estática.
 
+
+
+## 2026-10-09 — Trip formula integrity
+
+- Ignore duplicate/out-of-order samples before they can rewind trip state.
+- Do not persist a trip whose integrated fuel is below 0.05 L; this avoids presenting a highly unstable km/L average from only a few millilitres. Raw sensor collection and seed data are not changed.
+- Calculate aggregate real-trip average speed from total real distance / total real moving time, not the unweighted mean of each trip's speed.
+- Add regression cases for tiny fuel totals and out-of-order timestamps.
+- CARSCANNER_SEED remains historical reference data and is excluded from REAL_OBD totals; seed values are never promoted to real measurements.
+- The exact cause of 122.819 km/L remains unconfirmed until raw fuel-rate samples, timestamps and distance deltas from that session are available.
