@@ -138,8 +138,10 @@ export async function recordDiscoveredPids(
   basePath: string,
   pids: string[],
   protocol: string,
+  respondedPids: string[] = [],
 ): Promise<void> {
-  const unique = Array.from(new Set(pids.map((value) => value.toUpperCase()))).sort();
+  const unique = Array.from(new Set(pids.map((value) => value.replace(/\\s/g, '').toUpperCase()))).sort();
+  const responded = new Set(respondedPids.map((value) => value.replace(/\\s/g, '').toUpperCase()));
   if (!unique.length) return;
 
   const target = basePath + '/BANCO/pids_meriva_confirmados.txt';
@@ -169,14 +171,14 @@ export async function recordDiscoveredPids(
         pid,
         name: prior?.name && prior.name !== 'PID DESCOBERTO' ? prior.name : definition?.name || reference?.name || 'PID DESCOBERTO',
         classification: prior?.classification || definition?.classification || 'PADRAO_OBD',
-        status: 'DESCOBERTO',
+        status: responded.has(pid) ? 'RESPONDEU' : 'DESCOBERTO',
         firstSeen: prior?.firstSeen || now,
         lastSeen: now,
         occurrences: (prior?.occurrences || 0) + 1,
         protocol: protocol || prior?.protocol || 'N/D',
         responseTime: prior?.responseTime || 0,
         source: 'REAL_OBD',
-        confidence: prior?.confidence || 0,
+        confidence: responded.has(pid) ? Math.max(prior?.confidence || 0, 0.85) : prior?.confidence || 0,
         unit: prior?.unit || definition?.unit || reference?.unit,
         formulaId: prior?.formulaId || definition?.formulaId,
         bytes: prior?.bytes || definition?.bytes,
