@@ -78,4 +78,11 @@ gap.addSample({ timestampMs: 40_001, distanceKm: 1, speedKmh: 30, fuelRateLph: 1
 assert.strictEqual(gap.getState().durationMs, 0);
 assert.strictEqual(gap.getState().fuelUsedL, 0);
 
+const tripScreenSource = fs.readFileSync(path.join(ROOT, 'app', 'viagens.tsx'), 'utf8');
+assert.ok(tripScreenSource.includes('CONSUMO MÉDIO MEDIDO'), 'consumo só pode ser rotulado medido quando a fonte for PID 015E');
+assert.ok(tripScreenSource.includes('CONSUMO MÉDIO ESTIMADO/MISTO'), 'consumo calculado por MAF/MAP deve ser rotulado como estimado/misto');
+assert.ok(!tripScreenSource.includes('CONSUMO MÉDIO REAL'), 'não chamar de real um consumo que pode ser estimado');
+assert.ok(tripScreenSource.includes('consumo estimado por MAF'), 'histórico deve indicar estimativa MAF');
+assert.ok(tripScreenSource.includes('consumo estimado por MAP'), 'histórico deve indicar estimativa MAP');
+
 console.log('PASS trip recorder: GPS + PID 015E + persistência de ciclo real');
