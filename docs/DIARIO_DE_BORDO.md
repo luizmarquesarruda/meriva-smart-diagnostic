@@ -1898,3 +1898,25 @@ Ao encontrar e salvar um PID real, a descoberta deve seguir para outros candidat
 ### Validação e CI
 - Atualizada a regressão para exigir que o PID funcional seja salvo e que o PID apenas anunciado não seja salvo nem bloqueie nova sondagem.
 - No momento do registro, testes, typecheck e build Android ainda não tinham sido executados; esta revisão solicita validação pela CI.
+
+## 2026-10-09 — Corrigir carregamento do parser no teste DTC
+
+### Falha da CI #1677
+- `npm run doctor`: **17/17 verificações passaram**.
+- O typecheck terminou sem erro e a suíte começou a executar.
+- `tests/dtcScanner.test.js` falhou ao carregar `src/obd/dtcScanner.ts`, com `Cannot find module './parser'`.
+- `src/obd/parser.ts` existe. A falha vinha do carregador CommonJS do teste: ele tratava `./dtcParser`, mas não resolvia/transpilava as dependências locais TypeScript, incluindo `./parser`. O build Android foi ignorado porque a validação falhou.
+
+### Correção
+- Generalizado o carregador de `tests/dtcScanner.test.js` para transpilar e cachear módulos TypeScript locais importados por caminhos relativos, preservando a resolução normal para dependências externas e JSON.
+- Adicionada cobertura de `readFreezeFrame` validando DTC, RPM e temperatura do líquido de arrefecimento, para confirmar que o parser real é carregado e utilizado.
+- Nenhuma lógica de comunicação OBD/KWP em produção foi alterada para silenciar o teste.
+
+### Arquivos
+- `tests/dtcScanner.test.js`
+- `docs/DIARIO_DE_BORDO.md`
+
+### CI e status
+- CI anterior: #1677, run `37916715018`, falhou em `tests/dtcScanner.test.js`.
+- Esta correção será enviada em um único commit; o push da branch dispara a nova CI automaticamente.
+- A correção só será considerada concluída depois de conferir os testes e, se a validação passar, o build Android. Nenhuma aprovação de CI é presumida neste registro.
