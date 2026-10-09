@@ -1951,3 +1951,25 @@ Ao encontrar e salvar um PID real, a descoberta deve seguir para outros candidat
 ### Validação
 - As CI #1681 (run `37917975258`) e #1682 (run `37917982324`) falharam no mesmo erro de integridade do catálogo.
 - Esta correção precisa ser validada pela nova execução automática da CI. Não declarar a correção concluída até confirmar testes e build Android.
+
+## 2026-10-09 — Preservar a origem correta da validação da ECU no autosave
+
+### Falha revelada pela CI #1686
+- `npm ci` passou, Expo Doctor passou em **17/17** e o typecheck passou.
+- O catálogo JSON também passou após a correção anterior.
+- A suíte falhou em `tests/bluetoothLifecycle.test.js:34`, na verificação da origem da validação da ECU.
+
+### Causa raiz
+`persistValidatedConnection` gravava sempre `ecuValidationSource: 'OBD_RESPONSE'`, mesmo quando o perfil do veículo já tinha `ecuAddress`. Isso contradizia a regra de persistência: um endereço existente no perfil deve ser marcado como `VEHICLE_PROFILE`; na ausência dele, a validação sustentada pela resposta real permanece `OBD_RESPONSE`.
+
+### Correção
+- Restaurada a escolha condicional da origem da validação no objeto persistido: `VEHICLE_PROFILE` quando `state.vehicle?.ecuAddress` existe; caso contrário, `OBD_RESPONSE`.
+- Não foi alterada a validação de conexão por resposta OBD `010C/41 0C`, nem o transporte Bluetooth/KWP.
+
+### Arquivos
+- `src/obd/sharedConnection.ts`
+- `docs/DIARIO_DE_BORDO.md`
+
+### Validação
+- A CI #1686 (run `37918462256`) falhou nesta asserção de lifecycle e pulou o build Android.
+- A nova execução precisa confirmar a suíte completa e o build antes de declarar sucesso.
