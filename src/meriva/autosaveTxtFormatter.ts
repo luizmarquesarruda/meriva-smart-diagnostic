@@ -84,11 +84,14 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
   }
   L.push('');
 
-  L.push('[HISTORY]');
-  if (state.driveCycles.length) {
-    for (const cycle of state.driveCycles) {
+  L.push('[HISTORY - ULTIMAS VIAGENS REAIS]');
+  const realCycles = state.driveCycles
+    .filter((cycle) => cycle.source === 'REAL_OBD')
+    .slice(-5);
+  if (realCycles.length) {
+    for (const cycle of realCycles) {
       L.push(
-        `${cycle.startedAt} -> ${cycle.finishedAt} | ${cycle.distanceTotalKm} km | ${cycle.fuelUsedL} L | ${cycle.avgFuelConsumptionKml} km/L | fonte=${cycle.source} | combustivel=${or(cycle.fuelRateSource)}`,
+        `${cycle.startedAt} -> ${cycle.finishedAt} | ${cycle.distanceTotalKm} km | ${cycle.fuelUsedL} L | ${cycle.avgFuelConsumptionKml} km/L | fonte=REAL_OBD | combustivel=${or(cycle.fuelRateSource)}`,
       );
     }
   } else {
