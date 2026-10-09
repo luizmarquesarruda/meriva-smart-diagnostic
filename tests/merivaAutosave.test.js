@@ -599,6 +599,13 @@ test('18. sessão de autosave abre na ECU e fecha na desconexão', async () => {
 
   const endHistory = files.get(`${CONFIG_DIR}/meriva_smart_autosave_history.txt`);
   assert.ok(endHistory.includes('MOTIVO: session_end'));
+  const dailyPath = `${BASE}/VIAGENS/meriva_smart_daily_obd_history.txt`;
+  assert.ok(files.has(dailyPath), 'histórico diário deve ser criado');
+  const dailyHistory = files.get(dailyPath);
+  assert.strictEqual((dailyHistory.match(/========== DIA: 2026-10-08 ==========/g) || []).length, 1, 'a data deve existir como uma única página lógica');
+  assert.ok(dailyHistory.includes('--- EVENTO: SESSION_START | 2026-10-08T12:00:00.000Z ---'));
+  assert.ok(dailyHistory.includes('--- EVENTO: SESSION_END | '));
+  assert.ok(dailyHistory.includes('========== FIM DO DIA =========='));
   assert.strictEqual((endHistory.match(/MOTIVO: session_start/g) || []).length, 1);
   assert.strictEqual((endHistory.match(/MOTIVO: session_end/g) || []).length, 1);
   m.disposeAutoSave();
