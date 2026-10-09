@@ -83,7 +83,7 @@ export interface FuelEstimationSupport {
 
 /** Only request fallback PIDs that the ECU advertised as supported. */
 export function getFuelEstimationSupport(supportedPids: readonly string[]): FuelEstimationSupport {
-  const normalized = new Set(supportedPids.map((pid) => pid.replace(/\\s/g, '').toUpperCase()));
+  const normalized = new Set(supportedPids.map((pid) => pid.replace(/\s/g, '').toUpperCase()));
   return {
     maf: normalized.has('0110'),
     mapAndIat: normalized.has('010B') && normalized.has('010F'),
