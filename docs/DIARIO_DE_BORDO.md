@@ -1669,3 +1669,5 @@ A sessão é definida por conexão/desconexão validada da ECU, não pela posiç
 - A primeira execução de `npm run validate` falhou no typecheck: `getSharedObdStatus()` não retornava todos os campos de `SharedObdStatus`, e `autoTripService.ts` usava `getAutoSaveState` sem importá-lo.
 - Corrigido o retorno para refletir `ecuResponseState`, falhas consecutivas, horário da última resposta e último erro; `ecuConnected` agora também exige estado `RESPONDING`.
 - Adicionado o import faltante de `getAutoSaveState` no serviço de viagens. A CI deve ser repetida para confirmar o resultado.
+
+- A exportação do diário diário foi adicionada em Configurações como ação separada `EXPORTAR HISTÓRICO DIÁRIO ECU (.TXT)`, preservando a exportação antiga de snapshots de autosave.
