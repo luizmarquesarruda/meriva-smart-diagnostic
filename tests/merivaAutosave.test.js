@@ -504,6 +504,7 @@ test('13. histórico TXT mantém um bloco diário compacto sem limite total de d
   assert.ok(!history.includes('=== SALVAMENTO_BEGIN ==='), 'formato antigo por snapshot não deve ser reintroduzido');
   const dayBlock = history.split(/========== DIA: \d{4}-\d{2}-\d{2} ==========/)[1].split('========== FIM DO DIA ==========')[0];
   assert.ok(dayBlock.trim().split(/\r?\n/).length <= 45, 'conteúdo de cada dia deve respeitar o limite compacto');
+  assert.ok(history.trimEnd().split(/\r?\n/).length <= 50, 'o primeiro bloco diário também deve caber em até 50 linhas lógicas');
   const historyModule = loadTs(path.join(ROOT, 'src/meriva/autosaveHistoryTxt.ts'));
   const dates = await historyModule.getAutoSaveHistoryDates(BASE);
   assert.strictEqual(dates.length, 1, 'a lista de datas deve conter o dia gravado');
