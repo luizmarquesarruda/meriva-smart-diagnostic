@@ -452,6 +452,22 @@ async function testIntelligentPidDiscovery() {
   assert.strictEqual(result.confidence['010C'], 1);
   assert.strictEqual(result.observations.find((item) => item.pid === '010C').status, 'CONFIRMADO');
   assert.strictEqual(result.observations.find((item) => item.pid === '010C').value, 1726);
+
+  resetFS();
+  const pidBank = loadTs(path.join(ROOT, 'src/database/pidBank.ts'));
+  await pidBank.recordDiscoveredPids(BASE, ['0170'], 'ISO 14230-4 KWP FAST');
+  const unknownSession = {
+    async executeCommand(pid) {
+      if (pid === '0170') return { response: '41 70 01', status: 'OK', elapsedMs: 12 };
+      return fakeSession.executeCommand(pid);
+    },
+  };
+  const bankAware = await ai.discoverIntelligentPids(unknownSession, { basePath: BASE });
+  const unknownObservation = bankAware.observations.find((item) => item.pid === '0170');
+  assert.ok(unknownObservation, 'PID previamente descoberto no banco deve ser reconsiderado');
+  assert.strictEqual(unknownObservation.knowledgeSource, 'BANCO_LOCAL', 'a IA deve consultar o banco local antes de classificar o PID');
+  assert.strictEqual(unknownObservation.status, 'SEM_DEFINICAO', 'resposta sem fórmula validada deve continuar sem interpretação');
+  assert.strictEqual(unknownObservation.value, null, 'não inferir valor físico para PID sem definição');
 }
 
 async function testCarScannerBaselineAndFuel012F() {
@@ -797,6 +813,9 @@ async function testPidAndLearningWriteSerialization() {
   assert.strictEqual(discovered.length, 4);
   assert.strictEqual(discovered.find((item) => item.pid === '010D').status, 'DESCOBERTO');
   assert.strictEqual(discovered.find((item) => item.pid === '010C').status, 'CONFIRMADO');
+  assert.strictEqual(discovered.find((item) => item.pid === '010D').unit, 'km/h', 'banco deve guardar unidade do catálogo padrão');
+  assert.strictEqual(discovered.find((item) => item.pid === '015E').formulaId, 'FUEL_RATE_LH', 'banco deve guardar fórmula para reutilização pela IA');
+  assert.strictEqual(discovered.find((item) => item.pid === '0170').formulaId, undefined, 'PID sem definição não pode receber fórmula inventada');
 
   const learning = loadTs(path.join(ROOT, 'src/database/learningProfile.ts'));
   await learning.createLearningProfile(BASE, '');  
