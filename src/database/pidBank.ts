@@ -143,7 +143,7 @@ export async function recordDiscoveredPids(
   const normalize = (value: string) => value.replace(/\s/g, '').toUpperCase();
   const responded = new Set(respondedPids.map(normalize));
   const unique = Array.from(new Set(pids.map(normalize)))
-    .filter((pid) => responded.has(pid) && /^01[0-9A-F]{2}$/.test(pid))
+    .filter((pid) => responded.has(pid) && Boolean(getPidDefinition(pid)) && /^01[0-9A-F]{2}$/.test(pid))
     .sort();
   if (!unique.length) return;
 

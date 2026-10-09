@@ -1994,3 +1994,32 @@ O formatador renomeou a seção para `[HISTORY - ULTIMAS VIAGENS REAIS]`. O cont
 ### Validação
 - CI #1687 (run `37918597049`) e #1688 (run `37918604681`) falharam somente no teste 10 de exportação TXT depois de passar pelas verificações anteriores; o build Android foi ignorado.
 - A correção precisa ser comprovada pela próxima CI completa.
+
+## 2026-10-09 — Alinhar persistência funcional de PIDs e regressões legadas
+
+### Falhas reveladas pela CI #1689/#1690
+- A suíte de autosave (20 testes) e o lifecycle de conexão passaram após as correções anteriores.
+- Duas regressões falharam em `tests/regression.test.js`: um candidato sem valor validado não era reconsultado no cenário sintético; e a serialização de PIDs esperava entradas `DESCOBERTO` criadas apenas com uma lista de IDs, contrariando a regra de persistência funcional.
+
+### Diagnóstico
+- `recordDiscoveredPids` verificava `respondedPids`, mas ainda aceitava um PID sem decodificador quando esse ID aparecia na lista recebida.
+- O teste do candidato `01F0` pressupunha que a função o guardaria no banco mesmo sem resposta/valor validado. Isso conflita com a regra vigente: o candidato pode ser testado novamente quando apresentado como candidato, mas não deve ser gravado como funcional sem definição e valor validado.
+- A unidade de velocidade `010D` deve continuar em formato de apresentação `km/h`; a ausência dessa chave como alias no catálogo de unidades era uma inconsistência do catálogo, não motivo para alterar o texto exibido na telemetria.
+
+### Correção
+- A camada `pidBank` agora também exige definição/decodificador local antes de persistir um PID como funcional.
+- Atualizados os testes para fornecer explicitamente o PID candidato à próxima sondagem, e verificar que o banco rejeita `0170` sem decodificador mesmo quando listado em `respondedPids`.
+- Preservada a unidade de apresentação `km/h` de `010D` e incluído o alias correspondente em `units.json`.
+- Mantidos os gates reais de resposta, interpretação numérica e finitude no fluxo da tela Laboratório.
+
+### Arquivos
+- `src/database/pidBank.ts`
+- `src/knowledge/pids.json`
+- `src/knowledge/units.json`
+- `tests/regression.test.js`
+- `docs/DIARIO_DE_BORDO.md`
+
+### Validação
+- CI #1689 (run `37918766881`) e #1690 (run `37918771446`) passaram por `npm ci`, Expo Doctor 17/17, typecheck, catálogo JSON, lifecycle e os 20 testes de autosave, mas falharam nas duas regressões descritas.
+- A próxima CI precisa concluir a suíte completa e o build Android antes de declarar a validação concluída.
+

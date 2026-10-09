@@ -78,7 +78,7 @@
       "pid": "010D",
       "name": "Vehicle Speed",
       "bytes": 1,
-      "unit": "kmh",
+      "unit": "km/h",
       "formulaId": "U8",
       "classification": "PADRAO_OBD",
       "description": "Velocidade do veículo"

@@ -52,6 +52,10 @@
     "status": {
       "symbol": "bitmap",
       "name": "bitmap de status dos monitores OBD (32 bits)"
+    },
+    "km/h": {
+      "symbol": "km/h",
+      "name": "quilômetros por hora"
     }
   }
 }
