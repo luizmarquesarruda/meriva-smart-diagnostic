@@ -1,7 +1,7 @@
 import type { Elm327Session, ElmCommandResult } from './elm327';
 import { parsePidResponse, validateOBDResponse } from './parser';
 import { DISCOVERY_PIDS, KNOWN_PIDS, decodeSupportedPids } from './pidScanner';
-import { getPidDefinition } from './pidDefinition';
+import { getPidDefinition, getPidReference } from './pidDefinition';
 import { readPidConfirmations, type PidConfirmationEntry } from '../database/pidBank';
 
 export type IntelligentPidStatus =
@@ -20,7 +20,7 @@ export interface IntelligentPidObservation {
   unit: string;
   confidence: number;
   reason: string;
-  knowledgeSource: 'CATALOGO_PADRAO' | 'BANCO_LOCAL' | 'BITMAP_ECU' | 'SEM_DEFINICAO';
+  knowledgeSource: 'CATALOGO_PADRAO' | 'REFERENCIA_PADRAO' | 'BANCO_LOCAL' | 'BITMAP_ECU' | 'SEM_DEFINICAO';
   definitionName: string | null;
   formulaId: string | null;
 }
@@ -57,13 +57,15 @@ export async function discoverIntelligentPids(
   const getKnowledge = (pid: string, bitmapOnly = false) => {
     const normalized = pid.toUpperCase();
     const definition = getPidDefinition(normalized);
+    const reference = getPidReference(normalized);
     const stored = storedByPid.get(normalized);
     return {
       knowledgeSource: definition ? 'CATALOGO_PADRAO' as const
+        : reference ? 'REFERENCIA_PADRAO' as const
         : stored ? 'BANCO_LOCAL' as const
         : bitmapOnly ? 'BITMAP_ECU' as const
         : 'SEM_DEFINICAO' as const,
-      definitionName: definition?.name ?? stored?.name ?? null,
+      definitionName: definition?.name ?? reference?.name ?? stored?.name ?? null,
       formulaId: definition?.formulaId ?? stored?.formulaId ?? null,
     };
   };
