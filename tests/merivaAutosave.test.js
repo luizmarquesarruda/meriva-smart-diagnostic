@@ -513,6 +513,48 @@ test('13. histórico TXT mantém um bloco diário compacto sem limite total de d
   m.disposeAutoSave();
 });
 
+
+test('19. migração do histórico TXT antigo preserva as datas dos snapshots', async () => {
+  const m = manager();
+  m.disposeAutoSave();
+  resetFS();
+  await m.initAutoSave(BASE);
+
+  const historyPath = `${CONFIG_DIR}/meriva_smart_autosave_history.txt`;
+  const legacyEntry = (number, exportedAt) => [
+    '=== SALVAMENTO_BEGIN ===',
+    `NÚMERO: ${number}`,
+    'MOTIVO: critical',
+    'MERIVA SMART DIAGNOSTIC',
+    'SAVE EXPORT',
+    `Exported At: ${exportedAt}`,
+    '[VEHICLE]',
+    'Modelo: Meriva Maxx',
+    '=== SALVAMENTO_END ===',
+  ].join('\\n');
+  files.set(historyPath, [
+    'MERIVA SMART DIAGNOSTIC',
+    'HISTÓRICO DE SALVAMENTOS AUTOMÁTICOS',
+    legacyEntry(1, '2026-09-28T12:00:00.000Z'),
+    legacyEntry(2, '2026-09-29T12:00:00.000Z'),
+  ].join('\\n\\n'));
+
+  const historyModule = loadTs(path.join(ROOT, 'src/meriva/autosaveHistoryTxt.ts'));
+  const dates = await historyModule.getAutoSaveHistoryDates(BASE);
+  assert.deepStrictEqual(dates, ['2026-09-29', '2026-09-28'], 'cada snapshot antigo deve manter sua data');
+
+  const selected = await historyModule.readAutoSaveHistory(BASE, '2026-09-28');
+  assert.ok(selected.includes('========== DIA: 2026-09-28 =========='), 'a data antiga precisa ser exportável separadamente');
+  assert.ok(selected.includes('NÚMERO: 1'), 'o relatório deve corresponder ao snapshot da data selecionada');
+  assert.ok(!selected.includes('NÚMERO: 2'), 'não misturar snapshots de dias diferentes');
+
+  await historyModule.appendAutoSaveHistory(BASE, m.getAutoSaveState(), '1.0.1', 'migration_test');
+  const datesAfterWrite = await historyModule.getAutoSaveHistoryDates(BASE);
+  assert.ok(datesAfterWrite.includes('2026-09-28'), 'a primeira gravação no formato novo não pode apagar o dia 28');
+  assert.ok(datesAfterWrite.includes('2026-09-29'), 'a primeira gravação no formato novo não pode apagar o dia 29');
+  m.disposeAutoSave();
+});
+
 test('15. Saved At é persistido e histórico crítico é coalescido', async () => {
   const m = manager();
   m.disposeAutoSave();
