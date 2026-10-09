@@ -2,124 +2,102 @@ import * as FileSystem from 'expo-file-system';
 import type { MerivaPersistedState } from './autosaveState';
 import { formatAutoSaveTxt } from './autosaveTxtFormatter';
 
-export const AUTOSAVE_HISTORY_MAX_ENTRIES = 200;
 export const AUTOSAVE_HISTORY_FILE = 'meriva_smart_autosave_history.txt';
-export const AUTOSAVE_HISTORY_MAX_PAGES = 10;
-export const AUTOSAVE_HISTORY_LINES_PER_PAGE = 50;
-const MAX_HISTORY_LINES = AUTOSAVE_HISTORY_MAX_PAGES * AUTOSAVE_HISTORY_LINES_PER_PAGE;
-const MAX_REPORT_LINES = 280;
-const ENTRY_BEGIN = '=== SALVAMENTO_BEGIN ===';
-const ENTRY_END = '=== SALVAMENTO_END ===';
-const REPORT_BEGIN = '=== RELATORIO_ATUAL_BEGIN ===';
-const REPORT_END = '=== RELATORIO_ATUAL_END ===';
-const EVENTS_BEGIN = '=== EVENTOS_RECENTES_BEGIN ===';
-const HISTORY_HEADER = [
+export const AUTOSAVE_HISTORY_LINES_PER_DAY = 50;
+const MAX_DAILY_REPORT_LINES = AUTOSAVE_HISTORY_LINES_PER_DAY - 5;
+const DAY_BEGIN = '========== DIA: ';
+const DAY_END = '========== FIM DO DIA ==========';
+const HEADER = [
   'MERIVA SMART DIAGNOSTIC',
-  'RELATÓRIO TXT COMPACTO',
-  'LIMITE: 10 páginas lógicas de 50 linhas (500 linhas no total).',
-  'O relatório atual é substituído; os eventos recentes são resumidos em uma linha.',
-  'O estado completo continua no armazenamento interno do aplicativo.',
+  'HISTÓRICO TXT POR DIA',
+  'Cada bloco de data equivale a uma página lógica de até 50 linhas.',
+  'O relatório diário é atualizado durante o dia; o histórico não tem limite de dias.',
+  'Os dados estruturados completos permanecem no armazenamento interno.',
   '',
 ].join('\n');
 
-interface ParsedHistory {
-  report: string;
-  events: string[];
-}
+type DailyReports = Record<string, string>;
 
 function historyPath(basePath: string): string {
   return `${basePath}/CONFIG/${AUTOSAVE_HISTORY_FILE}`;
 }
 
-function splitEntries(content: string): string[] {
-  return content
-    .split(ENTRY_BEGIN)
-    .slice(1)
-    .map((part) => `${ENTRY_BEGIN}${part}`.trim())
-    .filter((entry) => entry.includes(ENTRY_END));
+function isDateKey(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
-function capReport(report: string): string {
+function dateKey(iso: string): string {
+  return iso.slice(0, 10);
+}
+
+function capDailyReport(report: string): string {
   const lines = report.trim().split(/\r?\n/);
-  // O cabeçalho principal já identifica o relatório; evita repeti-lo a cada snapshot.
   if (lines[0]?.trim().toUpperCase() === 'MERIVA SMART DIAGNOSTIC') lines.shift();
-  if (lines.length <= MAX_REPORT_LINES) return lines.join('\n');
+  if (lines.length <= MAX_DAILY_REPORT_LINES) return lines.join('\n');
   return [
-    ...lines.slice(0, MAX_REPORT_LINES - 1),
-    '[RELATÓRIO RESUMIDO: limite de linhas atingido; estado completo preservado internamente.]',
+    ...lines.slice(0, MAX_DAILY_REPORT_LINES - 1),
+    '[RESUMO COMPACTADO: limite diário atingido; estado completo preservado internamente.]',
   ].join('\n');
 }
 
-function parseHistory(content: string): ParsedHistory {
-  if (content.includes(REPORT_BEGIN) && content.includes(EVENTS_BEGIN)) {
-    const reportStart = content.indexOf(REPORT_BEGIN) + REPORT_BEGIN.length;
-    const reportEnd = content.indexOf(REPORT_END, reportStart);
-    const eventsStart = content.indexOf(EVENTS_BEGIN) + EVENTS_BEGIN.length;
-    const report = reportEnd >= reportStart ? content.slice(reportStart, reportEnd).trim() : '';
-    const events = content
-      .slice(eventsStart)
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter((line) => line.startsWith(ENTRY_BEGIN) && line.includes(ENTRY_END));
-    return { report, events: events.slice(-AUTOSAVE_HISTORY_MAX_ENTRIES) };
-  }
+function parseDailyReports(content: string): DailyReports {
+  const reports: DailyReports = {};
+  const marker = /========== DIA: (\d{4}-\d{2}-\d{2}) ==========\n([\s\S]*?)\n========== FIM DO DIA ==========/g;
+  let match: RegExpExecArray | null;
+  while ((match = marker.exec(content)) !== null) reports[match[1]] = match[2].trim();
 
-  // Migração do formato antigo, que repetia um relatório inteiro por salvamento.
-  const legacyEntries = splitEntries(content);
-  const lastEntry = legacyEntries[legacyEntries.length - 1];
-  let report = '';
-  if (lastEntry) {
-    report = lastEntry
-      .replace(/^=== SALVAMENTO_BEGIN ===\s*\n?/, '')
-      .replace(/^NÚMERO:\s*\d+\s*\n?/m, '')
-      .replace(/^MOTIVO:\s*[^\n]*\n?/m, '')
-      .replace(/\n?=== SALVAMENTO_END ===\s*$/, '')
+  // Migração de históricos antigos: preserva o último relatório disponível no dia atual.
+  if (!Object.keys(reports).length && content.trim()) {
+    const legacy = content
+      .replace(/^MERIVA SMART DIAGNOSTIC\s*/i, '')
+      .replace(/^RELATÓRIO TXT COMPACTO\s*/im, '')
+      .replace(/^LIMITE:.*\n/im, '')
+      .replace(/^O relatório atual.*\n/im, '')
+      .replace(/^O estado completo.*\n/im, '')
+      .replace(/=== RELATORIO_ATUAL_BEGIN ===/g, '')
+      .replace(/=== RELATORIO_ATUAL_END ===/g, '')
+      .replace(/=== EVENTOS_RECENTES_BEGIN ===[\s\S]*$/g, '')
       .trim();
+    if (legacy) reports[dateKey(new Date().toISOString())] = capDailyReport(legacy);
   }
-  const events = legacyEntries.map((entry) => {
-    const number = entry.match(/NÚMERO:\s*(\d+)/)?.[1] ?? '0';
-    const reason = entry.match(/MOTIVO:\s*([^\n]+)/)?.[1] ?? 'legacy';
-    const timestamp = entry.match(/Exported At:\s*([^\n]+)/)?.[1] ?? 'data anterior';
-    return `${ENTRY_BEGIN} MERIVA SMART DIAGNOSTIC | NÚMERO: ${number} | DATA: ${timestamp} | MOTIVO: ${reason} | MIGRADO: resumo histórico antigo ${ENTRY_END}`;
-  });
-  return { report, events: events.slice(-AUTOSAVE_HISTORY_MAX_ENTRIES) };
+  return reports;
 }
 
-function renderHistory(report: string, events: string[]): string {
-  const cappedReport = capReport(report);
-  const fixedLines = HISTORY_HEADER.split('\n').length + 4;
-  const reportLines = cappedReport ? cappedReport.split('\n') : [];
-  const allowedReportLines = Math.max(0, MAX_HISTORY_LINES - fixedLines - events.length);
-  const safeReport = reportLines.length > allowedReportLines
-    ? [
-        ...reportLines.slice(0, Math.max(0, allowedReportLines - 1)),
-        '[RELATÓRIO RESUMIDO PARA RESPEITAR O LIMITE DE 10 PÁGINAS.]',
-      ].join('\n')
-    : reportLines.join('\n');
-
+function renderDailyReports(reports: DailyReports): string {
+  const days = Object.keys(reports).filter(isDateKey).sort();
   return [
-    HISTORY_HEADER.trimEnd(),
-    REPORT_BEGIN,
-    safeReport,
-    REPORT_END,
-    EVENTS_BEGIN,
-    ...events.slice(-AUTOSAVE_HISTORY_MAX_ENTRIES),
+    HEADER.trimEnd(),
+    ...days.flatMap((day) => [
+      '',
+      `${DAY_BEGIN}${day} ==========`,
+      capDailyReport(reports[day]),
+      DAY_END,
+    ]),
     '',
   ].join('\n');
 }
 
-export async function readAutoSaveHistory(basePath: string): Promise<string> {
+export async function readAutoSaveHistory(basePath: string, selectedDate?: string): Promise<string> {
   try {
     const path = historyPath(basePath);
     const info = await FileSystem.getInfoAsync(path);
-    if (!info.exists || info.isDirectory) return renderHistory('', []);
-    const content = await FileSystem.readAsStringAsync(path, {
-      encoding: FileSystem.EncodingType.UTF8,
-    });
-    const parsed = parseHistory(content);
-    return renderHistory(parsed.report, parsed.events);
+    if (!info.exists || info.isDirectory) return renderDailyReports({});
+    const content = await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 });
+    const reports = parseDailyReports(content);
+    return selectedDate ? renderDailyReports(reports[selectedDate] ? { [selectedDate]: reports[selectedDate] } : {}) : renderDailyReports(reports);
   } catch {
-    return renderHistory('', []);
+    return renderDailyReports({});
+  }
+}
+
+export async function getAutoSaveHistoryDates(basePath: string): Promise<string[]> {
+  try {
+    const path = historyPath(basePath);
+    const info = await FileSystem.getInfoAsync(path);
+    if (!info.exists || info.isDirectory) return [];
+    return Object.keys(parseDailyReports(await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 }))).sort().reverse();
+  } catch {
+    return [];
   }
 }
 
@@ -133,41 +111,30 @@ export async function appendAutoSaveHistory(
   let current = '';
   try {
     const info = await FileSystem.getInfoAsync(path);
-    if (info.exists && !info.isDirectory) {
-      current = await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 });
-    }
+    if (info.exists && !info.isDirectory) current = await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 });
   } catch {
-    // Histórico ausente ou ilegível: inicia um relatório compacto novo.
+    // Cria o primeiro relatório se ainda não houver histórico.
   }
-  const parsed = parseHistory(current);
-  const lastNumber = parsed.events.reduce((max, entry) => {
-    const match = entry.match(/NÚMERO:\s*(\d+)/);
-    return match ? Math.max(max, Number(match[1])) : max;
-  }, 0);
-  const nextNumber = lastNumber + 1;
+  const reports = parseDailyReports(current);
   const exportedAt = new Date().toISOString();
+  const day = dateKey(exportedAt);
   const snapshot = formatAutoSaveTxt(state, { appVersion, exportedAt });
-  const event = [
-    ENTRY_BEGIN,
-    'MERIVA SMART DIAGNOSTIC',
-    `NÚMERO: ${nextNumber}`,
-    `DATA: ${exportedAt}`,
+  const compact = [
+    `DATA: ${day}`,
+    `ÚLTIMA ATUALIZAÇÃO: ${exportedAt}`,
     `MOTIVO: ${reason}`,
     `ECU: ${state.obd?.connected ? 'CONECTADA' : 'DESCONECTADA'}`,
     `PROTOCOLO: ${state.obd?.protocol ?? state.obd?.lastKnownProtocol ?? 'N/D'}`,
     `LEITURAS: ${state.lastReadings?.length ?? 0}`,
     `DTCs: ${state.dtcs?.length ?? 0}`,
-    `VIAGENS_REAIS: ${state.driveCycles?.filter((cycle) => cycle.source === 'REAL_OBD').length ?? 0}`,
-    ENTRY_END,
-  ].join(' | ');
-  const kept = [...parsed.events, event].slice(-AUTOSAVE_HISTORY_MAX_ENTRIES);
-  await FileSystem.writeAsStringAsync(path, renderHistory(snapshot, kept), {
-    encoding: FileSystem.EncodingType.UTF8,
-  });
-  return { count: kept.length };
+    '',
+    snapshot,
+  ].join('\n');
+  reports[day] = capDailyReport(compact);
+  await FileSystem.writeAsStringAsync(path, renderDailyReports(reports), { encoding: FileSystem.EncodingType.UTF8 });
+  return { count: Object.keys(reports).length };
 }
 
 export async function getAutoSaveHistoryCount(basePath: string): Promise<number> {
-  const content = await readAutoSaveHistory(basePath);
-  return splitEntries(content).length;
+  return (await getAutoSaveHistoryDates(basePath)).length;
 }
