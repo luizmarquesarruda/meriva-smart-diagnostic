@@ -455,15 +455,15 @@ async function testIntelligentPidDiscovery() {
 
   resetFS();
   const pidBank = loadTs(path.join(ROOT, 'src/database/pidBank.ts'));
-  await pidBank.recordDiscoveredPids(BASE, ['0170'], 'ISO 14230-4 KWP FAST');
+  await pidBank.recordDiscoveredPids(BASE, ['01F0'], 'ISO 14230-4 KWP FAST');
   const unknownSession = {
     async executeCommand(pid) {
-      if (pid === '0170') return { response: '41 70 01', status: 'OK', elapsedMs: 12 };
+      if (pid === '01F0') return { response: '41 F0 01', status: 'OK', elapsedMs: 12 };
       return fakeSession.executeCommand(pid);
     },
   };
   const bankAware = await ai.discoverIntelligentPids(unknownSession, { basePath: BASE });
-  const unknownObservation = bankAware.observations.find((item) => item.pid === '0170');
+  const unknownObservation = bankAware.observations.find((item) => item.pid === '01F0');
   assert.ok(unknownObservation, 'PID previamente descoberto no banco deve ser reconsiderado');
   assert.strictEqual(unknownObservation.knowledgeSource, 'BANCO_LOCAL', 'a IA deve consultar o banco local antes de classificar o PID');
   assert.strictEqual(unknownObservation.status, 'SEM_DEFINICAO', 'resposta sem fórmula validada deve continuar sem interpretação');
