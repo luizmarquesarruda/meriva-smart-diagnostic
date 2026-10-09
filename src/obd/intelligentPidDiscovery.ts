@@ -71,6 +71,7 @@ export async function discoverIntelligentPids(
   const supportResponses: Record<string, string> = {};
   const confidence: Record<string, number> = {};
   const supported = new Set<string>();
+  const bitmapSupported = new Set<string>();
 
   // Fase 1: PIDs essenciais. Isso evita gastar quatro consultas de bitmap
   // antes de saber se o adaptador/ECU responde aos dados que realmente usamos.
@@ -127,7 +128,10 @@ export async function discoverIntelligentPids(
       ? decodeSupportedPids(supportPid, result.response)
       : [];
 
-    for (const pid of mapped) supported.add(pid);
+    for (const pid of mapped) {
+      supported.add(pid);
+      bitmapSupported.add(pid);
+    }
 
     observations.push({
       pid: supportPid,
@@ -146,7 +150,7 @@ export async function discoverIntelligentPids(
 
   for (const pid of priorityPids) {
     const observation = observations.find((item) => item.pid === pid);
-    if (observation && observation.value !== null && supported.has(pid)) {
+    if (observation && observation.value !== null && bitmapSupported.has(pid)) {
       observation.status = 'CONFIRMADO';
       observation.confidence = 1;
       observation.reason = 'RESPOSTA RAW_ECU VÁLIDA NA FASE PRIORITÁRIA';
