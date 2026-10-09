@@ -593,14 +593,26 @@ test('18. sessão de autosave abre na ECU e fecha na desconexão', async () => {
 
   await m.closeObdAutosaveSession();
   assert.strictEqual(m.getAutoSaveStatus().obdSessionActive, false);
-  const envelope = JSON.parse(files.get(`${CONFIG_DIR}/autosave.json`));
+  const envelope = JSON.parse(files.get(CONFIG_DIR + '/autosave.json'));
   assert.strictEqual(envelope.payload.obd.connected, false);
   assert.strictEqual(envelope.payload.obd.lastKnownProtocol, 'ISO 14230-4 KWP FAST');
 
-  const endHistory = files.get(`${CONFIG_DIR}/meriva_smart_autosave_history.txt`);
+  // A second ignition/reconnection on the same day must append, not replace, the first session.
+  m.updateAutoSaveState((s) => { s.obd = { ...s.obd, connected: true, protocol: 'ISO 14230-4 KWP FAST' }; });
+  assert.strictEqual(await m.startObdAutosaveSession(), true);
+  await m.closeObdAutosaveSession();
+
+  const endHistory = files.get(CONFIG_DIR + '/meriva_smart_autosave_history.txt');
   assert.ok(endHistory.includes('MOTIVO: session_end'));
-  assert.strictEqual((endHistory.match(/MOTIVO: session_start/g) || []).length, 1);
-  assert.strictEqual((endHistory.match(/MOTIVO: session_end/g) || []).length, 1);
+  const dailyPath = BASE + '/VIAGENS/meriva_smart_daily_obd_history.txt';
+  assert.ok(files.has(dailyPath), 'daily history file must be created');
+  const dailyHistory = files.get(dailyPath);
+  assert.strictEqual((dailyHistory.match(/^========== DIA: .+ ==========$/gm) || []).length, 1, 'same date must remain one logical page');
+  assert.strictEqual((dailyHistory.match(/--- EVENTO: SESSION_START \|/g) || []).length, 2, 'both sessions must remain in TXT');
+  assert.strictEqual((dailyHistory.match(/--- EVENTO: SESSION_END \|/g) || []).length, 2, 'both session endings must remain in TXT');
+  assert.ok(dailyHistory.includes('========== FIM DO DIA =========='));
+  assert.strictEqual((endHistory.match(/MOTIVO: session_start/g) || []).length, 2);
+  assert.strictEqual((endHistory.match(/MOTIVO: session_end/g) || []).length, 2);
   m.disposeAutoSave();
 });
 
