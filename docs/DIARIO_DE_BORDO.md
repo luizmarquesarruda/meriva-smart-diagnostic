@@ -1863,3 +1863,24 @@ Tornar a descoberta mais agressiva e salvar os PIDs encontrados automaticamente,
 ### Validação
 - **CI não disparada**, conforme a instrução vigente.
 - TypeScript, testes, Expo Doctor, build Android e validação física com ELM327 ainda não foram executados nesta etapa.
+
+
+## 2026-10-09 — Não sondar novamente PIDs já salvos
+
+### Regra solicitada
+Ao encontrar e salvar um PID real, a descoberta deve seguir para outros candidatos, sem consultar novamente os PIDs já registrados.
+
+### Ajustes
+- A descoberta carrega os registros reais salvos e exclui PIDs com status `CONFIRMADO`, `RESPONDEU` ou `DESCOBERTO` das consultas prioritárias e da fila ampliada.
+- Os PIDs previamente salvos também são omitidos dos resultados da nova varredura, mesmo quando reaparecem nos bitmaps de suporte. Os bitmaps continuam sendo consultados para descobrir outros IDs.
+- A regra vale para registros persistidos como achados reais; PIDs que apenas falharam numa tentativa não são marcados como encontrados e podem ser tentados em outra varredura.
+- Teste de regressão atualizado para verificar que `010C` e `01F0`, já salvos, não sejam consultados outra vez, enquanto candidatos ainda não salvos continuem elegíveis.
+
+### Commits
+- `b1b84e8f75814bf57d69940e2c64ff2b1530f6e5` — ignorar PIDs reais já salvos na fila de sondagem.
+- `7071745efc52e276b7ca85eb497d53f60b0a73f4` — remover PIDs já salvos dos resultados da nova varredura.
+- `7453b5df82aca4a6998d019ac5f7b197f3007887` — cobrir a regra com regressão.
+
+### Validação
+- CI permanece parada por instrução.
+- Testes e build não foram executados; esta alteração foi registrada, mas ainda precisa de validação autorizada.
