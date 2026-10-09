@@ -47,11 +47,13 @@ export async function discoverIntelligentPids(
     ? await readPidConfirmations(options.basePath).catch(() => [])
     : [];
   const storedByPid = new Map(storedKnowledge.map((entry) => [entry.pid.toUpperCase(), entry]));
-  const knownFromBank = storedKnowledge
+  // Achou e salvou um PID real? Ele sai da fila de sondagem nas próximas varreduras.
+  const alreadyFound = new Set(storedKnowledge
     .filter((entry) => entry.source === 'REAL_OBD' &&
       (entry.status === 'CONFIRMADO' || entry.status === 'RESPONDEU' || entry.status === 'DESCOBERTO'))
-    .map((entry) => entry.pid.toUpperCase())
-    .filter((pid) => /^01[0-9A-F]{2}$/.test(pid));
+    .map((entry) => entry.pid.replace(/\s/g, '').toUpperCase())
+    .filter((pid) => /^01[0-9A-F]{2}$/.test(pid)));
+  const knownFromBank = Array.from(alreadyFound);
 
   const getKnowledge = (pid: string, bitmapOnly = false) => {
     const normalized = pid.toUpperCase();
@@ -112,7 +114,10 @@ export async function discoverIntelligentPids(
     });
   };
 
-  for (const pid of priorityPids) await probePid(pid);
+  for (const pid of priorityPids) {
+    if (alreadyFound.has(pid)) continue;
+    await probePid(pid);
+  }
 
   // Fase 2: mapas de suporte OBD-II. Só chegamos aqui depois dos PIDs essenciais.
   for (const supportPid of DISCOVERY_PIDS) {
@@ -166,7 +171,9 @@ export async function discoverIntelligentPids(
     ...getPidReferenceIds(),
     ...Array.from(supported),
   ])).map((pid) => pid.replace(/\s/g, '').toUpperCase()).filter((pid) =>
-    /^01[0-9A-F]{2}$/.test(pid) && !priorityPids.includes(pid),
+    /^01[0-9A-F]{2}$/.test(pid) &&
+    !priorityPids.includes(pid) &&
+    !alreadyFound.has(pid),
   );
 
   for (const pid of candidates) {
