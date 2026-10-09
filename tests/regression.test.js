@@ -808,9 +808,9 @@ async function testPidAndLearningWriteSerialization() {
   assert.strictEqual(confirmations.length, 2);
   const rawPidFile = files.get(path.join(BASE, 'BANCO', 'pids_meriva_confirmados.txt'));
   assert.ok(rawPidFile.split('\n').filter(Boolean).every((line) => [11, 15].includes(line.split('|').length)), 'TXT de PIDs deve aceitar formato legado de 11 colunas e enriquecido de 15');
-  await pidBank.recordDiscoveredPids(BASE, ['010C', '010D', '015E'], 'ISO 14230-4');
+  await pidBank.recordDiscoveredPids(BASE, ['010C', '010D', '015E', '0170'], 'ISO 14230-4');
   const discovered = await pidBank.readPidConfirmations(BASE);
-  assert.strictEqual(discovered.length, 4);
+  assert.strictEqual(discovered.length, 5);
   assert.strictEqual(discovered.find((item) => item.pid === '010D').status, 'DESCOBERTO');
   assert.strictEqual(discovered.find((item) => item.pid === '010C').status, 'CONFIRMADO');
   assert.strictEqual(discovered.find((item) => item.pid === '010D').unit, 'km/h', 'banco deve guardar unidade do catálogo padrão');
