@@ -553,6 +553,20 @@ test('19. migração do histórico TXT antigo preserva as datas dos snapshots', 
   const datesAfterWrite = await historyModule.getAutoSaveHistoryDates(BASE);
   assert.ok(datesAfterWrite.includes('2026-09-28'), 'a primeira gravação no formato novo não pode apagar o dia 28');
   assert.ok(datesAfterWrite.includes('2026-09-29'), 'a primeira gravação no formato novo não pode apagar o dia 29');
+
+  // Simula uma atualização interrompida: já existe um bloco diário e também
+  // restam snapshots antigos de datas que ainda não foram migradas.
+  files.set(historyPath, [
+    'MERIVA SMART DIAGNOSTIC',
+    'HISTÓRICO TXT DIÁRIO',
+    '========== DIA: 2026-09-30 ==========',
+    'DATA: 2026-09-30 | ATUALIZADO: 2026-09-30T12:00:00.000Z',
+    'RELATÓRIO NOVO',
+    '========== FIM DO DIA ==========',
+    legacyEntry(1, '2026-09-28T12:00:00.000Z'),
+  ].join('\\n'));
+  const mixedDates = await historyModule.getAutoSaveHistoryDates(BASE);
+  assert.deepStrictEqual(mixedDates, ['2026-09-30', '2026-09-28'], 'mistura de formatos deve preservar dias antigos sem sobrescrever o diário novo');
   m.disposeAutoSave();
 });
 
