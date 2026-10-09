@@ -62,15 +62,27 @@ assert.strictEqual(noFuel.buildDriveCycle(2000), null);
 
 const cycle = new RealTripRecorder(1000, 0);
 cycle.addSample({ timestampMs: 1000, distanceKm: 0, speedKmh: 0, fuelRateLph: 8 });
-cycle.addSample({ timestampMs: 11000, distanceKm: 1, speedKmh: 36, fuelRateLph: 8 });
-cycle.addSample({ timestampMs: 21000, distanceKm: 2, speedKmh: 36, fuelRateLph: 8 });
-const saved = cycle.buildDriveCycle(22000);
+cycle.addSample({ timestampMs: 16000, distanceKm: 1, speedKmh: 36, fuelRateLph: 8 });
+cycle.addSample({ timestampMs: 31000, distanceKm: 2, speedKmh: 36, fuelRateLph: 8 });
+const saved = cycle.buildDriveCycle(32000);
 
 assert.ok(saved);
 assert.strictEqual(saved.source, 'REAL_OBD');
 assert.strictEqual(saved.distanceTotalKm, 2);
-assertApprox(saved.fuelUsedL, 8 * 20_000 / 3_600_000, 1e-6);
+assertApprox(saved.fuelUsedL, 8 * 30_000 / 3_600_000, 1e-6);
 assert.strictEqual(saved.avgFuelConsumptionKml, Number((2 / saved.fuelUsedL).toFixed(3)));
+
+const tinyFuel = new RealTripRecorder(0, 0);
+tinyFuel.addSample({ timestampMs: 0, distanceKm: 0, speedKmh: 0, fuelRateLph: 0.5 });
+tinyFuel.addSample({ timestampMs: 10_000, distanceKm: 1, speedKmh: 36, fuelRateLph: 0.5 });
+tinyFuel.addSample({ timestampMs: 20_000, distanceKm: 1.1, speedKmh: 36, fuelRateLph: 0.5 });
+assert.strictEqual(tinyFuel.buildDriveCycle(21_000), null, 'tiny fuel totals must not publish a misleading economy average');
+
+const outOfOrder = new RealTripRecorder(0, 0);
+outOfOrder.addSample({ timestampMs: 10_000, distanceKm: 1, speedKmh: 30, fuelRateLph: 8 });
+outOfOrder.addSample({ timestampMs: 5_000, distanceKm: 5, speedKmh: 100, fuelRateLph: 100 });
+assert.strictEqual(outOfOrder.getState().distanceKm, 1, 'out-of-order sample must not change distance');
+assert.strictEqual(outOfOrder.getState().maxSpeedKmh, 30, 'out-of-order sample must not change max speed');
 
 const gap = new RealTripRecorder(0, 0);
 gap.addSample({ timestampMs: 0, distanceKm: 0, speedKmh: 0, fuelRateLph: 10 });
