@@ -1,6 +1,6 @@
 import * as FileSystem from 'expo-file-system';
 import { appendCsvRow, CsvRow } from '../database/csvLogger';
-import { DriveCycle, INITIAL_DRIVE_CYCLES } from '../data/driveCycles';
+import { DriveCycle } from '../data/driveCycles';
 
 function isDriveCycle(value: unknown): value is DriveCycle {
   if (typeof value !== 'object' || value === null) return false;
@@ -22,113 +22,91 @@ function isDriveCycle(value: unknown): value is DriveCycle {
   );
 }
 
-function cyclesFromUnknown(value: unknown): DriveCycle[] {
+function realCyclesOnly(value: unknown): DriveCycle[] {
   if (!Array.isArray(value)) return [];
-  return value.filter(isDriveCycle);
+  return value.filter(isDriveCycle).filter((cycle) => cycle.source === 'REAL_OBD');
 }
 
 export async function initializeDriveCycles(basePath: string): Promise<void> {
   const viagensDir = `${basePath}/VIAGENS`;
   const indexFile = `${viagensDir}/index.json`;
-
-  const indexInfo = await FileSystem.getInfoAsync(indexFile);
-  if (indexInfo.exists) return;
-
   await FileSystem.makeDirectoryAsync(viagensDir, { intermediates: true });
 
-  const seedData = {
+  const info = await FileSystem.getInfoAsync(indexFile);
+  if (info.exists && !info.isDirectory) {
+    try {
+      const parsed = JSON.parse(await FileSystem.readAsStringAsync(indexFile)) as { cycles?: unknown; version?: string };
+      const cycles = realCyclesOnly(parsed.cycles);
+      await FileSystem.writeAsStringAsync(indexFile, JSON.stringify({
+        version: typeof parsed.version === 'string' ? parsed.version : '1.0',
+        initializedAt: new Date().toISOString(),
+        cycles,
+        totalCount: cycles.length,
+      }, null, 2), { encoding: FileSystem.EncodingType.UTF8 });
+    } catch {
+      await FileSystem.writeAsStringAsync(indexFile, JSON.stringify({ version: '1.0', cycles: [], totalCount: 0 }, null, 2), { encoding: FileSystem.EncodingType.UTF8 });
+    }
+    return;
+  }
+
+  await FileSystem.writeAsStringAsync(indexFile, JSON.stringify({
     version: '1.0',
     initializedAt: new Date().toISOString(),
-    cycles: INITIAL_DRIVE_CYCLES,
-    totalCount: INITIAL_DRIVE_CYCLES.length,
-  };
-
-  await FileSystem.writeAsStringAsync(
-    indexFile,
-    JSON.stringify(seedData, null, 2),
-    { encoding: FileSystem.EncodingType.UTF8 },
-  );
-
-  const today = new Date().toISOString().split('T')[0];
-  const csvFile = `${viagensDir}/viagens_${today}.csv`;
-
-  for (const cycle of INITIAL_DRIVE_CYCLES) {
-    const row: CsvRow = {
-      id: cycle.id,
-      timestamp: cycle.startedAt,
-      distanceTotalKm: cycle.distanceTotalKm,
-      distanceIceKm: cycle.distanceIceKm,
-      fuelUsedL: cycle.fuelUsedL,
-      totalTime: cycle.totalTimeHms,
-      drivingTime: cycle.drivingTimeHms,
-      standingTime: cycle.standingTimeHms,
-      avgSpeed: cycle.avgDrivingSpeedKmh,
-      avgConsumption: cycle.avgFuelConsumptionKml,
-      source: cycle.source,
-    };
-
-    await appendCsvRow(csvFile, row);
-  }
+    cycles: [],
+    totalCount: 0,
+  }, null, 2), { encoding: FileSystem.EncodingType.UTF8 });
 }
 
 export async function readDriveCycles(basePath: string): Promise<DriveCycle[]> {
   const indexFile = `${basePath}/VIAGENS/index.json`;
-
   try {
     const info = await FileSystem.getInfoAsync(indexFile);
     if (!info.exists || info.isDirectory) return [];
-
     const content = await FileSystem.readAsStringAsync(indexFile);
-    const data = JSON.parse(content) as { cycles?: unknown };
-    return cyclesFromUnknown(data.cycles);
+    const data = JSON.parse(content) as { cycles?: unknown; version?: string };
+    const cycles = realCyclesOnly(data.cycles);
+    // Migração local: remove trajetos importados/simulados do índice persistido.
+    if (Array.isArray(data.cycles) && cycles.length !== data.cycles.length) {
+      await FileSystem.writeAsStringAsync(indexFile, JSON.stringify({
+        version: typeof data.version === 'string' ? data.version : '1.0',
+        initializedAt: new Date().toISOString(),
+        cycles,
+        totalCount: cycles.length,
+      }, null, 2), { encoding: FileSystem.EncodingType.UTF8 });
+    }
+    return cycles;
   } catch {
     return [];
   }
 }
 
 export async function addDriveCycle(basePath: string, cycle: DriveCycle): Promise<void> {
+  if (cycle.source !== 'REAL_OBD') return;
   const viagensDir = `${basePath}/VIAGENS`;
   const indexFile = `${viagensDir}/index.json`;
-
   await FileSystem.makeDirectoryAsync(viagensDir, { intermediates: true });
 
-  let data: { version: string; cycles: DriveCycle[]; totalCount: number; lastModified?: string } = {
-    version: '1.0',
-    cycles: [],
-    totalCount: 0,
-  };
-
+  let cycles: DriveCycle[] = [];
   try {
     const info = await FileSystem.getInfoAsync(indexFile);
     if (info.exists && !info.isDirectory) {
-      const parsed = JSON.parse(await FileSystem.readAsStringAsync(indexFile)) as {
-        version?: string;
-        cycles?: unknown;
-        totalCount?: number;
-      };
-      data = {
-        version: typeof parsed.version === 'string' ? parsed.version : '1.0',
-        cycles: cyclesFromUnknown(parsed.cycles),
-        totalCount: Number.isFinite(parsed.totalCount) ? Number(parsed.totalCount) : cyclesFromUnknown(parsed.cycles).length,
-      };
+      const parsed = JSON.parse(await FileSystem.readAsStringAsync(indexFile)) as { cycles?: unknown };
+      cycles = realCyclesOnly(parsed.cycles);
     }
   } catch {
-    // arquivo ausente ou corrompido: começa um índice vazio seguro
+    // Índice ausente ou inválido: recria apenas com dados reais.
   }
 
-  data.cycles.push(cycle);
-  data.totalCount = data.cycles.length;
-  data.lastModified = new Date().toISOString();
-
-  await FileSystem.writeAsStringAsync(
-    indexFile,
-    JSON.stringify(data, null, 2),
-    { encoding: FileSystem.EncodingType.UTF8 },
-  );
+  cycles.push(cycle);
+  await FileSystem.writeAsStringAsync(indexFile, JSON.stringify({
+    version: '1.0',
+    cycles,
+    totalCount: cycles.length,
+    lastModified: new Date().toISOString(),
+  }, null, 2), { encoding: FileSystem.EncodingType.UTF8 });
 
   const today = new Date().toISOString().split('T')[0];
   const csvFile = `${viagensDir}/viagens_${today}.csv`;
-
   const row: CsvRow = {
     id: cycle.id,
     timestamp: cycle.startedAt,
@@ -142,6 +120,5 @@ export async function addDriveCycle(basePath: string, cycle: DriveCycle): Promis
     avgConsumption: cycle.avgFuelConsumptionKml,
     source: cycle.source,
   };
-
   await appendCsvRow(csvFile, row);
 }
