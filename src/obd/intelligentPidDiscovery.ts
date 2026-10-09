@@ -47,10 +47,11 @@ export async function discoverIntelligentPids(
     ? await readPidConfirmations(options.basePath).catch(() => [])
     : [];
   const storedByPid = new Map(storedKnowledge.map((entry) => [entry.pid.toUpperCase(), entry]));
-  // Achou e salvou um PID real? Ele sai da fila de sondagem nas próximas varreduras.
+  // Só uma resposta real validada torna o PID elegível para bloqueio de novas sondagens.
+  // Registros antigos DESCOBERTO podem ter vindo apenas do bitmap e devem ser testados.
   const alreadyFound = new Set(storedKnowledge
     .filter((entry) => entry.source === 'REAL_OBD' &&
-      (entry.status === 'CONFIRMADO' || entry.status === 'RESPONDEU' || entry.status === 'DESCOBERTO'))
+      (entry.status === 'CONFIRMADO' || entry.status === 'RESPONDEU'))
     .map((entry) => entry.pid.replace(/\s/g, '').toUpperCase())
     .filter((pid) => /^01[0-9A-F]{2}$/.test(pid)));
   const knownFromBank = Array.from(alreadyFound);
