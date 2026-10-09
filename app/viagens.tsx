@@ -20,13 +20,6 @@ const LIVE_PIDS = [
   { pid: '010B', label: 'PRESSÃO DO COLETOR', unit: 'kPa', digits: 1 },
 ];
 
-const EMPTY_TRIP: AutoTripServiceState = {
-  connected: false, active: false, fuelSupported: false, fuelLevelSupported: false,
-  fuelLevelPercent: null, fuelRemainingL: null, fuelReserve: null, distanceKm: 0,
-  fuelUsedL: 0, consumptionKml: null, instantaneousConsumptionKml: null, error: null,
-  averageConsumptionKml: 0, estimatedRangeKm: 0,
-};
-
 export default function ViagensScreen() {
   const layout = useMidLayout();
   const [cycles, setCycles] = useState<DriveCycle[]>([]);
