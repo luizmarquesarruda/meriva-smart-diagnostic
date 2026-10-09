@@ -531,13 +531,13 @@ test('19. migração do histórico TXT antigo preserva as datas dos snapshots', 
     '[VEHICLE]',
     'Modelo: Meriva Maxx',
     '=== SALVAMENTO_END ===',
-  ].join('\\n');
+  ].join('\n');
   files.set(historyPath, [
     'MERIVA SMART DIAGNOSTIC',
     'HISTÓRICO DE SALVAMENTOS AUTOMÁTICOS',
     legacyEntry(1, '2026-09-28T12:00:00.000Z'),
     legacyEntry(2, '2026-09-29T12:00:00.000Z'),
-  ].join('\\n\\n'));
+  ].join('\n\n'));
 
   const historyModule = loadTs(path.join(ROOT, 'src/meriva/autosaveHistoryTxt.ts'));
   const dates = await historyModule.getAutoSaveHistoryDates(BASE);
