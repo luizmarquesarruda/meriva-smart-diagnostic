@@ -57,3 +57,40 @@ export async function exportAutoSaveTxt(
     };
   }
 }
+
+/** Exporta o diário por data sem misturá-lo aos snapshots de autosave. */
+export async function exportDailyObdHistoryTxt(): Promise<ExportTxtResult> {
+  if (Platform.OS !== 'android') {
+    return { ok: false, reason: 'INDISPONIVEL', message: 'EXPORTAÇÃO DISPONÍVEL SOMENTE NO ANDROID' };
+  }
+  try {
+    const basePath = \`\${FileSystem.documentDirectory}MERIVA_SMART\`;
+    const dailyPath = \`\${basePath}/VIAGENS/meriva_smart_daily_obd_history.txt\`;
+    const info = await FileSystem.getInfoAsync(dailyPath);
+    if (!info.exists || info.isDirectory) {
+      return { ok: false, reason: 'ERRO', message: 'AINDA NÃO HÁ SESSÕES ECU NO HISTÓRICO DIÁRIO' };
+    }
+    const content = await FileSystem.readAsStringAsync(dailyPath, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
+    const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+    if (!permissions.granted) return { ok: false, reason: 'CANCELADO' };
+
+    const fileName = 'meriva_smart_daily_obd_history.txt';
+    const existing = (await FileSystem.StorageAccessFramework.readDirectoryAsync(permissions.directoryUri))
+      .find((uri) => uri.endsWith('/' + fileName) || uri.endsWith('%2F' + fileName));
+    const uri = existing ?? await FileSystem.StorageAccessFramework.createFileAsync(
+      permissions.directoryUri,
+      fileName,
+      'text/plain',
+    );
+    await FileSystem.writeAsStringAsync(uri, content, { encoding: FileSystem.EncodingType.UTF8 });
+    return { ok: true, fileName, uri };
+  } catch (cause) {
+    return {
+      ok: false,
+      reason: 'ERRO',
+      message: cause instanceof Error ? cause.message : 'DESCONHECIDO',
+    };
+  }
+}
