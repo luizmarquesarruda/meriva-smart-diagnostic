@@ -144,7 +144,7 @@ export async function appendAutoSaveHistory(
     '[APRENDIZADO]',
     `Estado: ${state.learning?.learningStatus ?? 'N/D'} | amostras reais: ${state.learning?.globalSampleCounts?.realSamples ?? 0}`,
     '[NOTA] O relatório é um resumo diário; dados detalhados continuam no armazenamento interno.',
-  ].join('\\n');
+  ].join('\n');
   reports[day] = capDailyReport(compact);
   await FileSystem.writeAsStringAsync(path, renderDailyReports(reports), { encoding: FileSystem.EncodingType.UTF8 });
   return { count: Object.keys(reports).length };
