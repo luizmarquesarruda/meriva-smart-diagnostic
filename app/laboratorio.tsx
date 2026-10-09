@@ -18,7 +18,7 @@ import { scanDtcServices, readFreezeFrame, type DtcServiceScan } from '../src/ob
 import { getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
 
 import { DtcRecord, nextDtcOccurrences, readDtcs, recordDtc } from '../src/database/dtcManager';
-import { recordDiscoveredPids } from '../src/database/pidBank';
+import { readPidConfirmations, recordDiscoveredPids } from '../src/database/pidBank';
 import {
   initAutoSave,
   updateAutoSaveState,
@@ -310,6 +310,13 @@ export default function LaboratorioScreen() {
       setSupportedPids(discovered);
       if (mode === 'REAL') {
         const activeProtocol = activeSession.getProtocol() ?? 'N/D';
+        // Consultar o banco antes de gravar: assim a interface distingue PIDs
+        // já conhecidos dos recém-observados sem executar sondagens extras na K-Line.
+        const priorKnowledge = await readPidConfirmations(getBasePath());
+        const priorIds = new Set(priorKnowledge.map((entry) => entry.pid.toUpperCase()));
+        const catalogued = discovered.filter((value) => getPidDefinition(value) !== null).length;
+        const alreadyStored = discovered.filter((value) => priorIds.has(value)).length;
+        const withoutDefinition = discovered.filter((value) => getPidDefinition(value) === null);
         await recordDiscoveredPids(getBasePath(), discovered, activeProtocol);
         updateAutoSaveState((state) => {
           if (activeProtocol && discovered.length > 0) {
@@ -321,8 +328,12 @@ export default function LaboratorioScreen() {
           }
         });
         await forceSaveOnObdEvent();
+        setStatus(
+          `DESCOBERTA: ${discovered.length} PIDs • catálogo: ${catalogued} • já no banco: ${alreadyStored} • sem fórmula local: ${withoutDefinition.length}`,
+        );
+      } else {
+        setStatus(`SIMULAÇÃO: ${discovered.length} PIDs anunciados • nenhuma confirmação real gravada`);
       }
-      setStatus(`DESCOBERTA CONCLUÍDA: ${discovered.length} PIDs`);
     } catch (cause) {
       setStatus('FALHA NA DESCOBERTA');
       setError(cause instanceof Error ? cause.message : 'ERRO AO DESCOBRIR PIDs');
