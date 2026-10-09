@@ -9,7 +9,12 @@ const ts = require('typescript');
 function loadTs(file) {
   const sourcePath = path.join(__dirname, '..', file);
   const output = ts.transpileModule(fs.readFileSync(sourcePath, 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2019 },
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2019,
+      esModuleInterop: true,
+      resolveJsonModule: true,
+    },
   }).outputText;
   const mod = new Module(sourcePath, null);
   mod.filename = sourcePath;
