@@ -24,6 +24,7 @@ export interface ExportTxtResult {
 export async function exportAutoSaveTxt(
   state: MerivaPersistedState,
   appVersion: string,
+  selectedDate?: string,
 ): Promise<ExportTxtResult> {
   if (Platform.OS !== 'android') {
     return { ok: false, reason: 'INDISPONIVEL', message: 'EXPORTACAO DISPONIVEL SOMENTE NO ANDROID' };
@@ -33,10 +34,10 @@ export async function exportAutoSaveTxt(
     if (!permissions.granted) return { ok: false, reason: 'CANCELADO' };
 
     const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
-    let content = await readAutoSaveHistory(basePath);
-    if (!content.includes('=== SALVAMENTO_BEGIN ===')) {
+    let content = await readAutoSaveHistory(basePath, selectedDate);
+    if (!content.includes('========== DIA:')) {
       await appendAutoSaveHistory(basePath, state, appVersion, 'manual');
-      content = await readAutoSaveHistory(basePath);
+      content = await readAutoSaveHistory(basePath, selectedDate);
     }
 
     const fileName = AUTOSAVE_HISTORY_FILE;
