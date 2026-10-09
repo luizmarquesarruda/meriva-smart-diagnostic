@@ -498,10 +498,11 @@ test('13. autosave mantém um único TXT histórico e limita a 200 snapshots', a
   assert.ok(files.has(historyPath), 'histórico TXT deve ser criado automaticamente');
   const history = files.get(historyPath);
   const entries = history.split('=== SALVAMENTO_BEGIN ===').slice(1);
-  assert.strictEqual(entries.length, 200, 'histórico deve manter exatamente os 200 mais recentes');
+  assert.strictEqual(entries.length, 200, 'histórico deve manter exatamente os 200 eventos mais recentes');
   assert.ok(history.includes('NÚMERO: 205'), 'último salvamento deve permanecer');
   assert.ok(!/NÚMERO: 5\n/.test(history), 'salvamentos antigos devem ser removidos');
-  assert.strictEqual((history.match(/meriva smart diagnostic/gi) || []).length, 201, 'um cabeçalho + 200 snapshots');
+  assert.strictEqual((history.match(/meriva smart diagnostic/gi) || []).length, 201, 'um cabeçalho + 200 eventos compactos');
+  assert.ok(history.split(/\r?\n/).length <= 500, 'TXT nunca deve ultrapassar 10 páginas lógicas de 50 linhas');
   m.disposeAutoSave();
 });
 
