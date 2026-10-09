@@ -393,6 +393,7 @@ class AutoTripService {
   private async finalizeRecorder(): Promise<void> {
     const recorder = this.recorder;
     this.recorder = null;
+    if (this.state.active) this.setState({ active: false });
     if (!recorder || !this.basePath) return;
 
     const cycle = recorder.buildDriveCycle();
