@@ -40,7 +40,7 @@ export async function exportAutoSaveTxt(
       content = await readAutoSaveHistory(basePath, selectedDate);
     }
 
-    const fileName = AUTOSAVE_HISTORY_FILE;
+    const fileName = selectedDate ? `meriva_diagnostico_${selectedDate}.txt` : AUTOSAVE_HISTORY_FILE;
     const existing = (await FileSystem.StorageAccessFramework.readDirectoryAsync(permissions.directoryUri))
       .find((uri) => uri.endsWith('/' + fileName) || uri.endsWith('%2F' + fileName));
     const uri = existing ?? await FileSystem.StorageAccessFramework.createFileAsync(
