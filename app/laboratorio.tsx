@@ -331,7 +331,10 @@ export default function LaboratorioScreen() {
         const referenceOnly = discovered.filter((value) => !getPidDefinition(value) && getPidReference(value)).length;
         const alreadyStored = discovered.filter((value) => priorIds.has(value)).length;
         const withoutDefinition = discovered.filter((value) => !getPidDefinition(value) && !getPidReference(value));
-        await recordDiscoveredPids(getBasePath(), discovered, activeProtocol);
+        const respondedPids = result.observations
+          .filter((item) => item.status === 'CONFIRMADO' || item.status === 'RESPONDEU' || item.status === 'SEM_DEFINICAO')
+          .map((item) => item.pid);
+        await recordDiscoveredPids(getBasePath(), discovered, activeProtocol, respondedPids);
         updateAutoSaveState((state) => {
           if (activeProtocol && discovered.length > 0) {
             state.pidDiscovery = {
