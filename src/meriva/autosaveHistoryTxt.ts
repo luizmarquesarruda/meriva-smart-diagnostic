@@ -26,6 +26,18 @@ function splitEntries(content: string): string[] {
     .filter((entry) => entry.includes(ENTRY_END));
 }
 
+/** Remove imported seed trips from old snapshots before displaying/exporting them. */
+function removeCarScannerTripsFromSnapshot(entry: string): string {
+  const match = entry.match(/(\[HISTORY\]\r?\n)([\s\S]*?)(?=\r?\n\[[^\]\r\n]+\]|$)/);
+  if (!match) return entry;
+
+  const rows = match[2]
+    .split(/\r?\n/)
+    .filter((line) => line.trim() && !/fonte=CARSCANNER_SEED|seed_cycle_/i.test(line));
+  const historyBody = rows.length ? rows.join('\n') : 'N/D';
+  return entry.replace(match[0], match[1] + historyBody);
+}
+
 export async function readAutoSaveHistory(basePath: string): Promise<string> {
   try {
     const info = await FileSystem.getInfoAsync(historyPath(basePath));
@@ -33,9 +45,10 @@ export async function readAutoSaveHistory(basePath: string): Promise<string> {
     const content = await FileSystem.readAsStringAsync(historyPath(basePath), {
       encoding: FileSystem.EncodingType.UTF8,
     });
-    const entries = splitEntries(content).slice(-AUTOSAVE_HISTORY_MAX_ENTRIES);
-    return entries.length ? `${HISTORY_HEADER}${entries.join('\n\n')}\n` : HISTORY_HEADER;
-  } catch {
+    const entries = splitEntries(content)
+      .slice(-AUTOSAVE_HISTORY_MAX_ENTRIES)
+      .map(removeCarScannerTripsFromSnapshot);
+    return entries.length ? `${HISTORY_HEADER}${entries.join('\n\n')}\n` : HISTORY_HEADER;  } catch {
     return HISTORY_HEADER;
   }
 }
