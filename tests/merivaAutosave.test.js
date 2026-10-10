@@ -360,6 +360,30 @@ test('7. CARSCANNER_SEED nunca vira histórico real', async () => {
   m.disposeAutoSave();
 });
 
+test('7a. TXT antigo remove linhas CarScanner sem apagar os demais dados', async () => {
+  resetFS();
+  const history = loadTs(path.join(ROOT, 'src/meriva/autosaveHistoryTxt.ts'));
+  const target = CONFIG_DIR + '/meriva_smart_autosave_history.txt';
+  files.set(target, [
+    'MERIVA SMART DIAGNOSTIC',
+    'HISTÓRICO DE SALVAMENTOS AUTOMÁTICOS',
+    '=== SALVAMENTO_BEGIN ===',
+    'NÚMERO: 1',
+    'MOTIVO: manual',
+    'MERIVA SMART DIAGNOSTIC',
+    '[HISTORY]',
+    '2026-07-25 13:36:08 -> 2026-07-25 14:06:49 | 20.32 km | fonte=CARSCANNER_SEED',
+    '[LEARNING]',
+    'Amostras reais: 0 / seed: 10',
+    '=== SALVAMENTO_END ===',
+  ].join('\n'));
+
+  const cleaned = await history.readAutoSaveHistory(BASE);
+  assert.ok(!cleaned.includes('CARSCANNER_SEED'), 'export must remove legacy seed trip lines');
+  assert.ok(cleaned.includes('[HISTORY]\nN/D'), 'empty operational history must show N/D');
+  assert.ok(cleaned.includes('Amostras reais: 0 / seed: 10'), 'learning provenance must be preserved');
+});
+
 test('8. REAL + RESPONDEU entra no learning e no banco', async () => {
   const m = manager();
   m.disposeAutoSave();
@@ -631,6 +655,15 @@ test('18. sessão de autosave abre na ECU e fecha na desconexão', async () => {
 
   // A second ignition/reconnection on the same day must append, not replace, the first session.
   m.updateAutoSaveState((s) => {
+    s.lastReadings = [{
+      pid: '010C',
+      name: 'Engine RPM',
+      value: 900,
+      unit: 'rpm',
+      status: 'RESPONDEU',
+      timestamp: new Date(Date.now() - 1000).toISOString(),
+      source: 'REAL',
+    }];
     s.obd = {
       ...s.obd,
       connected: true,
@@ -643,11 +676,12 @@ test('18. sessão de autosave abre na ECU e fecha na desconexão', async () => {
 
   const endHistory = files.get(CONFIG_DIR + '/meriva_smart_autosave_history.txt');
   assert.ok(endHistory.includes('MOTIVO: session_end'));
-  const dailyPath = BASE + '/VIAGENS/meriva_smart_daily_obd_history.txt';
   assert.ok(files.has(dailyPath), 'daily history file must be created');
   const dailyHistory = files.get(dailyPath);
   assert.strictEqual((dailyHistory.match(/^========== DIA: .+ ==========$/gm) || []).length, 1, 'same date must remain one logical page');
-  assert.strictEqual((dailyHistory.match(/--- EVENTO: SESSION_START \|/g) || []).length, 2, 'both sessions must remain in TXT');
+  const startEvents = dailyHistory.match(/--- EVENTO: SESSION_START \|[\s\S]*?--- FIM DO EVENTO ---/g) || [];
+  assert.strictEqual(startEvents.length, 2, 'both sessions must remain in TXT');
+  assert.ok(startEvents.every((event) => !event.includes('010C Engine RPM')), 'each session start must exclude readings from the previous session');
   assert.strictEqual((dailyHistory.match(/--- EVENTO: SESSION_END \|/g) || []).length, 2, 'both session endings must remain in TXT');
   assert.ok(dailyHistory.includes('========== FIM DO DIA =========='));
   assert.strictEqual((endHistory.match(/MOTIVO: session_start/g) || []).length, 2);
