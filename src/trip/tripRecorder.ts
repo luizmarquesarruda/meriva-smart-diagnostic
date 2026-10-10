@@ -114,13 +114,13 @@ export class RealTripRecorder {
 
   buildDriveCycle(finishedAtMs = Date.now()): DriveCycle | null {
     const state = this.getState();
-    if (
-      state.distanceKm < 0.1 ||
-      state.fuelUsedL < MIN_TRIP_FUEL_L ||
-      state.validFuelSamples < 2
-    ) return null;
+    // Persist a real trip when distance is valid even if fuel telemetry is
+    // missing/too small. In that case consumption is explicitly unavailable;
+    // never discard the trip or publish an unstable km/L value.
+    if (state.distanceKm < 0.1) return null;
 
-    const avgFuelConsumptionKml = state.distanceKm / state.fuelUsedL;
+    const fuelDataValid = state.fuelUsedL >= MIN_TRIP_FUEL_L && state.validFuelSamples >= 2;
+    const avgFuelConsumptionKml = fuelDataValid ? state.distanceKm / state.fuelUsedL : 0;
     const avgDrivingSpeedKmh = state.movingTimeMs > 0
       ? state.distanceKm / (state.movingTimeMs / 3_600_000)
       : 0;
@@ -137,6 +137,7 @@ export class RealTripRecorder {
       standingTimeHms: formatDuration(Math.max(0, state.durationMs - state.movingTimeMs)),
       avgDrivingSpeedKmh: Number(avgDrivingSpeedKmh.toFixed(3)),
       avgFuelConsumptionKml: Number(avgFuelConsumptionKml.toFixed(3)),
+      fuelDataValid,
       source: 'REAL_OBD',
       fuelRateSource: this.fuelRateSources.size === 1
         ? [...this.fuelRateSources][0]
