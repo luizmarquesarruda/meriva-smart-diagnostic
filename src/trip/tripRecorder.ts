@@ -10,6 +10,9 @@ export interface RealTripSample {
   fuelRateSource?: FuelRateSource;
 }
 
+/** Minimum integrated fuel required before persisting a consumption average. */
+export const MIN_TRIP_FUEL_L = 0.05;
+
 export interface RealTripRecorderState {
   startedAtMs: number;
   distanceKm: number;
@@ -35,7 +38,7 @@ function toFiniteNonNegative(value: number): number {
 
 export class RealTripRecorder {
   private readonly startedAtMs: number;
-  private readonly initialDistanceKm: number;
+  private lastAbsoluteDistanceKm: number;
   private readonly fuelIntegrator = new FuelRateIntegrator();
   private lastTimestampMs: number | null = null;
   private distanceKm = 0;
@@ -46,23 +49,35 @@ export class RealTripRecorder {
 
   constructor(startedAtMs = Date.now(), initialDistanceKm = 0) {
     this.startedAtMs = startedAtMs;
-    this.initialDistanceKm = toFiniteNonNegative(initialDistanceKm);
+    this.lastAbsoluteDistanceKm = toFiniteNonNegative(initialDistanceKm);
   }
 
   addSample(sample: RealTripSample): RealTripRecorderState {
-    const timestampMs = Number.isFinite(sample.timestampMs) ? sample.timestampMs : Date.now();
+    const timestampMs = sample.timestampMs;
+
+    // Older/duplicate samples must not rewind the integration clock, distance,
+    // or max speed. A sample without a real timestamp is not usable telemetry.
+    if (
+      !Number.isFinite(timestampMs) ||
+      (this.lastTimestampMs !== null && timestampMs <= this.lastTimestampMs)
+    ) {
+      return this.getState();
+    }
+
     const absoluteDistanceKm = toFiniteNonNegative(sample.distanceKm);
     const speedKmh = toFiniteNonNegative(sample.speedKmh);
-    const deltaDistanceKm = absoluteDistanceKm >= this.initialDistanceKm
-      ? absoluteDistanceKm - this.initialDistanceKm
-      : 0;
 
-    this.distanceKm = Number(deltaDistanceKm.toFixed(3));
+    // GPS distance can reset when its provider/session restarts. Rebase the
+    // absolute counter, but keep accumulated trip distance monotonic.
+    if (absoluteDistanceKm >= this.lastAbsoluteDistanceKm) {
+      const deltaDistanceKm = absoluteDistanceKm - this.lastAbsoluteDistanceKm;
+      this.distanceKm = Number((this.distanceKm + deltaDistanceKm).toFixed(3));
+    }
+    this.lastAbsoluteDistanceKm = absoluteDistanceKm;
     this.maxSpeedKmh = Number(Math.max(this.maxSpeedKmh, speedKmh).toFixed(1));
 
     if (
-      this.lastTimestampMs != null &&
-      timestampMs > this.lastTimestampMs &&
+      this.lastTimestampMs !== null &&
       timestampMs - this.lastTimestampMs <= 30_000
     ) {
       const deltaMs = timestampMs - this.lastTimestampMs;
@@ -71,7 +86,11 @@ export class RealTripRecorder {
     }
     this.lastTimestampMs = timestampMs;
 
-    if (sample.fuelRateLph != null && Number.isFinite(sample.fuelRateLph)) {
+    if (
+      sample.fuelRateLph !== null &&
+      Number.isFinite(sample.fuelRateLph) &&
+      sample.fuelRateLph >= 0
+    ) {
       this.fuelIntegrator.addSample(sample.fuelRateLph, timestampMs);
       if (sample.fuelRateSource) this.fuelRateSources.add(sample.fuelRateSource);
     }
@@ -95,7 +114,11 @@ export class RealTripRecorder {
 
   buildDriveCycle(finishedAtMs = Date.now()): DriveCycle | null {
     const state = this.getState();
-    if (state.distanceKm < 0.1 || state.fuelUsedL <= 0 || state.validFuelSamples < 2) return null;
+    if (
+      state.distanceKm < 0.1 ||
+      state.fuelUsedL < MIN_TRIP_FUEL_L ||
+      state.validFuelSamples < 2
+    ) return null;
 
     const avgFuelConsumptionKml = state.distanceKm / state.fuelUsedL;
     const avgDrivingSpeedKmh = state.movingTimeMs > 0
