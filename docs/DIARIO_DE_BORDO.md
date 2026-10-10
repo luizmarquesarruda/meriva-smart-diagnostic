@@ -1693,3 +1693,45 @@ A sessão é definida por conexão/desconexão validada da ECU, não pela posiç
 ### Estado
 Plano registrado antes das alterações de produção. A correção só será considerada concluída após a nova CI e leitura dos resultados.
 
+
+
+## 2026-10-10 — Consolidação das correções de viagens e registro de auditoria
+
+### Regra aplicada
+O diário foi lido antes de alterar o código. Esta entrada segue o fluxo obrigatório: problema → diagnóstico → correção → testes → commit → CI → resultado → próximo passo. Não foi feito merge na `main`.
+
+### Problema e diagnóstico
+A regra anterior de rejeitar ciclos com combustível integrado inferior a `0,05 L` evitava publicar médias instáveis, mas também eliminava viagens reais com distância válida. A correção separa a existência da viagem da disponibilidade de cálculo de consumo. A média de velocidade agregada também precisava usar distância real total dividida pelo tempo total em movimento, sem ponderação artificial por quantidade de viagens.
+
+### Modificações registradas
+- `src/trip/tripRecorder.ts`: rejeita amostras sem timestamp válido, duplicadas ou fora de ordem antes de modificar o estado; acumula distância sem retrocesso quando o contador GPS reinicia; aceita persistir viagem com distância válida mesmo sem combustível suficiente; marca `fuelDataValid` e deixa consumo numérico em zero interno quando não calculável, para a apresentação/exportação exibir `N/D`.
+- `src/data/driveCycles.ts`: adiciona metadado opcional `fuelDataValid`; exclui ciclos sem combustível confiável do cálculo de km/L; calcula velocidade média agregada por distância real total / tempo real total em movimento; remove `CARSCANNER_SEED` da lista operacional visível e mantém a origem de referência separada.
+- `src/meriva/autosaveTxtFormatter.ts`: não inclui viagens `CARSCANNER_SEED` na seção operacional do TXT; consumo de viagens sem evidência suficiente aparece como `N/D`.
+- `src/meriva/dailyObdHistory.ts`: o evento diário apresenta consumo como `N/D` quando a viagem não tem combustível confiável, mantendo o histórico de sessões separado do snapshot rotativo.
+- `src/trip/autoTripService.ts`: viagens sem combustível confiável continuam no histórico de viagens, mas não incrementam distância/combustível acumulados usados para média de consumo e autonomia.
+- `src/storage/driveCycleStorage.ts`: valida o campo opcional `fuelDataValid`; instalações novas começam sem viagens artificiais; leitura/migração do índice operacional remove somente ciclos explicitamente marcados `CARSCANNER_SEED`, preservando os demais registros válidos.
+- `tests/tripRecorder.test.js`: adiciona regressões para viagens sem combustível, combustível abaixo do limiar, amostras fora de ordem/duplicadas e reinício do contador de distância.
+- `tests/regression.test.js`: adiciona regressões para migração/filtro de seeds, instalação nova vazia, velocidade agregada ponderada e viagens reais sem combustível confiável. Durante a auditoria estática, as expectativas de contagem/última viagem foram alinhadas para incluir a viagem real sem combustível.
+- `docs/DIARIO_DE_BORDO.md`: atualiza a regra operacional para que o registro de viagens e a disponibilidade do consumo sejam conceitos separados.
+
+### Commits
+- `4738f4f8115c2702b925663acd09fcdf4ce4bc84` — alterações iniciais de viagem e fórmulas.
+- `357cf3a1d2f0e47d35c34744a6c166d30a6ec7b3` — não contaminar autonomia com viagens sem combustível confiável.
+- `d17855b8e1c1cf2ff11644a60ea35c7fac62519f` — validar o metadado opcional na persistência.
+- `aa74c73a9cf43da817c385f03ed1a961ec2f9fc5` — regressão para metadado de combustível.
+- `d79106abd76575df6f1933a4739cd92820937005` e `4348fbec1b12ee3b6810ca682fc2118d46bfc722` — regressões para médias e viagens reais sem combustível.
+- `4a356f47a8aa0b989b4ed3da34d1ed77135621fd` — documentação inicial da regra.
+- `b89025537cfd9b3f0111d144f539fe54fec1c8f3` — correção final das expectativas de contagem/última viagem no teste de regressão.
+- Branch: `fix/daily-obd-history-keep-screen-awake-main`; PR #49: https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/49.
+
+### CI e estado de validação
+- CI anteriormente aprovada: run `38016538322`, com jobs `validate` e `android-build` aprovados no commit `7436e408a7ba227c8a738e158afa2e2e869f4d4e`. **Esse resultado é anterior às alterações listadas acima e não as valida.**
+- No momento deste registro, não há resultado de CI confirmado para o head atualizado `b89025537cfd9b3f0111d144f539fe54fec1c8f3`. Typecheck, suíte completa, Expo Doctor e APK Android Release permanecem pendentes de confirmação automatizada.
+- Teste físico na Meriva/ELM327 permanece pendente; CI verde não comprova compatibilidade real com ECU KWP/K-Line.
+
+### Próximos passos obrigatórios
+1. Confirmar a CI do head atual e examinar o resultado de cada job.
+2. Se a CI falhar, registrar o erro exato e corrigir sua causa antes de nova tentativa.
+3. Revisar a apresentação de consumo `N/D` em todas as telas/exportações e confirmar que nenhuma fórmula transforma o zero interno em medição.
+4. Confirmar o comportamento do diário com várias sessões no mesmo dia, falha de gravação e reinício abrupto do app.
+5. Não fazer merge nem declarar versão pronta para uso real antes da validação completa e, para comunicação OBD, do teste físico.
