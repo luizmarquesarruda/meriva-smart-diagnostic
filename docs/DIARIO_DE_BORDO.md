@@ -1641,7 +1641,7 @@ A confirmação definitiva exige uma sessão real na Meriva com ELM327, principa
 ## 2026-10-09 — Trip formula integrity
 
 - Ignore duplicate/out-of-order samples before they can rewind trip state.
-- Do not persist a trip whose integrated fuel is below 0.05 L; this avoids presenting a highly unstable km/L average from only a few millilitres. Raw sensor collection and seed data are not changed.
+- Persist a real trip when distance is valid even if integrated fuel is below 0.05 L or fuel samples are unavailable; mark its consumption as unavailable (N/D) and exclude it from consumption averages/autonomy totals. Never fabricate a km/L value.
 - Calculate aggregate real-trip average speed from total real distance / total real moving time, not the unweighted mean of each trip's speed.
 - Add regression cases for tiny fuel totals and out-of-order timestamps.
 - CARSCANNER_SEED remains historical reference data and is excluded from REAL_OBD totals; seed values are never promoted to real measurements.
@@ -1683,7 +1683,7 @@ A sessão é definida por conexão/desconexão validada da ECU, não pela posiç
 
 ### Plano antes da implementação
 1. Reforçar o gravador para ignorar amostras duplicadas/fora de ordem e manter distância não decrescente quando o contador GPS reiniciar.
-2. Não persistir viagem real quando o combustível integrado for inferior a 0,05 L; não alterar leituras brutas nem rotular estimativas como medições.
+2. Preservar viagens reais com distância válida mesmo sem combustível suficiente; mostrar consumo como N/D e excluí-las das médias de consumo/autonomia, sem alterar leituras brutas nem rotular estimativas como medições.
 3. Calcular a velocidade média agregada REAL_OBD como distância total dividida pelo tempo total em movimento.
 4. Remover `CARSCANNER_SEED` do histórico exibido em Viagens, do relatório TXT e dos valores médios apresentados como consumo real; manter separação/origem no armazenamento e aprendizado.
 5. Fazer novas instalações iniciarem com histórico de viagens vazio e filtrar seeds antigos na leitura/migração, sem apagá-los às cegas de arquivos brutos de backup.
