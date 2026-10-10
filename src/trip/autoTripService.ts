@@ -58,6 +58,7 @@ class AutoTripService {
   private unsubscribeConnection: (() => void) | null = null;
   private readonly listeners = new Set<Listener>();
   private telemetryCursor = 0;
+  private pollCycleNumber = 0;
   private stoppedSinceMs: number | null = null;
   private state: AutoTripServiceState = { ...INITIAL_STATE };
 
@@ -122,6 +123,7 @@ class AutoTripService {
 
     resetLiveTelemetry();
     this.telemetryCursor = 0;
+    this.pollCycleNumber = 0;
 
     if (!connection || !this.running) {
       this.state = { ...INITIAL_STATE };
@@ -180,6 +182,7 @@ class AutoTripService {
       }
 
       const loopStartedAt = Date.now();
+      this.pollCycleNumber += 1;
 
       try {
         let fuelRateLph: number | null = null;
@@ -189,36 +192,8 @@ class AutoTripService {
         let rpm: number | null = null;
         if (obdSpeedSupported) gpsTracker.setVehicleSpeedHintKmh(null);
 
-        if (this.state.fuelLevelSupported) {
-          const fuelLevelResult = await connection.session.queryPid('012F');
-          await registerObdQuery(this.basePath, fuelLevelResult, 'REAL');
-          if (
-            fuelLevelResult.parsed.status === 'RESPONDEU' &&
-            fuelLevelResult.parsed.unit === '%' &&
-            fuelLevelResult.parsed.value != null &&
-            Number.isFinite(fuelLevelResult.parsed.value) &&
-            fuelLevelResult.parsed.value >= 0 &&
-            fuelLevelResult.parsed.value <= 100
-          ) {
-            fuelLevelPercent = fuelLevelResult.parsed.value;
-          }
-        }
-
-        if (this.state.fuelSupported) {
-          const fuelResult = await connection.session.queryPid('015E');
-          await registerObdQuery(this.basePath, fuelResult, 'REAL');
-          if (
-            fuelResult.parsed.status === 'RESPONDEU' &&
-            fuelResult.parsed.unit === 'L/h' &&
-            fuelResult.parsed.value != null &&
-            Number.isFinite(fuelResult.parsed.value) &&
-            fuelResult.parsed.value >= 0
-          ) {
-            fuelRateLph = fuelResult.parsed.value;
-            fuelRateSource = 'MEASURED_015E';
-          }
-        }
-
+        // Caminho crítico primeiro: velocidade e RPM alimentam o cockpit e
+        // a detecção de movimento antes das consultas secundárias.
         if (obdSpeedSupported) {
           const speedResult = await connection.session.queryPid('010D');
           await registerObdQuery(this.basePath, speedResult, 'REAL');
@@ -234,19 +209,54 @@ class AutoTripService {
           }
         }
 
-        // Quando 010D existe, o GPS recebe a velocidade real da ECU como
-        // confirmação de movimento. Zero km/h bloqueia deriva do GPS parado.
-        // Sem 010D, null devolve a decisão ao filtro GPS.
-        gpsTracker.setVehicleSpeedHintKmh(obdSpeedSupported ? obdSpeedKmh : null);
-
-        // RPM é consultado a cada ciclo porque também define o estado do motor
-        // e a abertura/fechamento automático do trajeto.
+        // 010C é consultado antes dos PIDs lentos para reduzir a latência
+        // da detecção de motor ligado/desligado.
         if (connection.supportedPids.includes('010C')) {
           const rpmResult = await connection.session.queryPid('010C');
           await registerObdQuery(this.basePath, rpmResult, 'REAL');
-          if (rpmResult.parsed.status === 'RESPONDEU' && Number.isFinite(rpmResult.parsed.value)) {
+          if (
+            rpmResult.parsed.status === 'RESPONDEU' &&
+            rpmResult.parsed.value != null &&
+            Number.isFinite(rpmResult.parsed.value)
+          ) {
             rpm = rpmResult.parsed.value;
           }
+        }
+
+        // O consumo medido (015E) continua sendo consultado em cada ciclo
+        // para manter o indicador responsivo sempre que a ECU o suporta.
+        if (this.state.fuelSupported) {
+          const fuelResult = await connection.session.queryPid('015E');
+          await registerObdQuery(this.basePath, fuelResult, 'REAL');
+          if (
+            fuelResult.parsed.status === 'RESPONDEU' &&
+            fuelResult.parsed.unit === 'L/h' &&
+            fuelResult.parsed.value != null &&
+            Number.isFinite(fuelResult.parsed.value) &&
+            fuelResult.parsed.value >= 0
+          ) {
+            fuelRateLph = fuelResult.parsed.value;
+            fuelRateSource = 'MEASURED_015E';
+          }
+        }
+
+        // O nível do tanque muda lentamente: consultar a cada quatro ciclos
+        // reduz tráfego serial sem limpar o último valor válido da interface.
+        if (this.state.fuelLevelSupported && this.pollCycleNumber % 4 === 1) {
+          const fuelLevelResult = await connection.session.queryPid('012F');
+          await registerObdQuery(this.basePath, fuelLevelResult, 'REAL');
+          if (
+            fuelLevelResult.parsed.status === 'RESPONDEU' &&
+            fuelLevelResult.parsed.unit === '%' &&
+            fuelLevelResult.parsed.value != null &&
+            Number.isFinite(fuelLevelResult.parsed.value) &&
+            fuelLevelResult.parsed.value >= 0 &&
+            fuelLevelResult.parsed.value <= 100
+          ) {
+            fuelLevelPercent = fuelLevelResult.parsed.value;
+          }
+        } else {
+          fuelLevelPercent = this.state.fuelLevelPercent;
         }
 
         if (fuelRateLph == null) {
@@ -277,6 +287,9 @@ class AutoTripService {
           }
         }
 
+        // Quando 010D existe, o GPS recebe a velocidade da ECU como confirmação.
+        gpsTracker.setVehicleSpeedHintKmh(obdSpeedSupported ? obdSpeedKmh : null);
+
         // Mantém um PID secundário por ciclo para tendências sem monopolizar o ELM.
         const telemetryCandidates = ['0105', '010B', '0111'];
         const supportedTelemetry = telemetryCandidates.filter((item) => connection.supportedPids.includes(item));
@@ -305,10 +318,10 @@ class AutoTripService {
         }
 
         const recorder = this.recorder;
-        const gps = gpsTracker.getState();
+        const tripGps = gpsTracker.getState();
         // A leitura instantânea deve ser publicada a cada ciclo OBD válido,
-        // mesmo antes de iniciar uma viagem ou enquanto o veículo está parado.
-        const vehicleSpeedKmh = obdSpeedKmh ?? gps.currentSpeedKmh;
+        // mesmo antes de iniciar uma viagem ou enquanto não existe viagem ativa.
+        const tripVehicleSpeedKmh = obdSpeedKmh ?? tripGps.currentSpeedKmh;
         let tripDistanceKm = 0;
         let tripFuelUsedL = 0;
         let tripConsumptionKml: number | null = null;
@@ -316,8 +329,8 @@ class AutoTripService {
         if (recorder) {
           const sampleState = recorder.addSample({
             timestampMs: Date.now(),
-            distanceKm: gps.distanceKm,
-            speedKmh: vehicleSpeedKmh,
+            distanceKm: tripGps.distanceKm,
+            speedKmh: tripVehicleSpeedKmh,
             fuelRateLph,
             fuelRateSource,
           });
@@ -330,8 +343,8 @@ class AutoTripService {
         }
 
         const instantaneousConsumptionKml =
-          fuelRateLph != null && fuelRateLph > 0 && vehicleSpeedKmh > 0
-            ? vehicleSpeedKmh / fuelRateLph
+          fuelRateLph != null && fuelRateLph > 0 && tripVehicleSpeedKmh > 0
+            ? tripVehicleSpeedKmh / fuelRateLph
             : null;
 
         this.setState({
