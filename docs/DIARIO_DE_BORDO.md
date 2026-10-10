@@ -1671,3 +1671,25 @@ A sessão é definida por conexão/desconexão validada da ECU, não pela posiç
 - Adicionado o import faltante de `getAutoSaveState` no serviço de viagens. A CI deve ser repetida para confirmar o resultado.
 
 - A exportação do diário diário foi adicionada em Configurações como ação separada `EXPORTAR HISTÓRICO DIÁRIO ECU (.TXT)`, preservando a exportação antiga de snapshots de autosave.
+
+## 2026-10-09 — Plano de auditoria cruzada TXT/viagens (registrado antes do código)
+
+### Evidências do histórico TXT recebido
+- O arquivo contém 116 blocos completos, numerados de 1 e 4–118; os identificadores 2 e 3 não aparecem no arquivo fornecido. Não renumerar automaticamente dados históricos sem evidência da origem da lacuna.
+- Foram contados 52 snapshots `debounce`, 40 `critical`, 10 `checkpoint`, 8 `background`, 3 `session_start`, 2 `session_end` e 1 `manual`.
+- Há snapshots com `Status: CONECTADO` e vários PIDs simultaneamente `NÃO RESPONDEU`; o status precisa diferenciar link/sessão ativa de ECU respondendo. A correção do getter `getSharedObdStatus()` já está na branch deste PR e exige `RESPONDING` para declarar ECU conectada.
+- O relatório repete viagens `CARSCANNER_SEED` como histórico, enquanto a tela de viagens carrega ciclos sem filtrar essa origem.
+- A implementação atual de `RealTripRecorder` ainda aceita amostras com timestamp repetido/anterior como estado novo, pode reduzir a distância acumulada se a amostra GPS recuar e permite salvar viagens com menos de 0,05 L. A média agregada de velocidade usa média aritmética de velocidades por viagem, não a razão distância total/tempo total em movimento.
+
+### Plano antes da implementação
+1. Reforçar o gravador para ignorar amostras duplicadas/fora de ordem e manter distância não decrescente quando o contador GPS reiniciar.
+2. Não persistir viagem real quando o combustível integrado for inferior a 0,05 L; não alterar leituras brutas nem rotular estimativas como medições.
+3. Calcular a velocidade média agregada REAL_OBD como distância total dividida pelo tempo total em movimento.
+4. Remover `CARSCANNER_SEED` do histórico exibido em Viagens, do relatório TXT e dos valores médios apresentados como consumo real; manter separação/origem no armazenamento e aprendizado.
+5. Fazer novas instalações iniciarem com histórico de viagens vazio e filtrar seeds antigos na leitura/migração, sem apagá-los às cegas de arquivos brutos de backup.
+6. No histórico diário de sessões, só listar leituras reais cujo timestamp pertença à sessão corrente; preservar timestamps e não converter falhas em valores.
+7. Acrescentar regressões direcionadas e executar CI completa (doctor, typecheck/testes e APK Release). Não alterar framing, protocolo KWP/K-Line, fórmulas OBD nem gate ECU `010C → 41 0C` nesta rodada.
+
+### Estado
+Plano registrado antes das alterações de produção. A correção só será considerada concluída após a nova CI e leitura dos resultados.
+
