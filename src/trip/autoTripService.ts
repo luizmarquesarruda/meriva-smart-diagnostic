@@ -21,6 +21,7 @@ export interface AutoTripServiceState {
   fuelUsedL: number;
   consumptionKml: number | null;
   instantaneousConsumptionKml: number | null;
+  instantaneousConsumptionSource: FuelRateSource | null;
   error: string | null;
   averageConsumptionKml: number;
   estimatedRangeKm: number;
@@ -40,6 +41,7 @@ const INITIAL_STATE: AutoTripServiceState = {
   fuelUsedL: 0,
   consumptionKml: null,
   instantaneousConsumptionKml: null,
+  instantaneousConsumptionSource: null,
   error: null,
   averageConsumptionKml: 0,
   estimatedRangeKm: 0,
@@ -303,48 +305,58 @@ class AutoTripService {
         }
 
         const recorder = this.recorder;
+        const gps = gpsTracker.getState();
+        // A leitura instantânea deve ser publicada a cada ciclo OBD válido,
+        // mesmo antes de iniciar uma viagem ou enquanto o veículo está parado.
+        const vehicleSpeedKmh = obdSpeedKmh ?? gps.currentSpeedKmh;
+        let tripDistanceKm = 0;
+        let tripFuelUsedL = 0;
+        let tripConsumptionKml: number | null = null;
+
         if (recorder) {
-          const gps = gpsTracker.getState();
-          // Quando a ECU fornece 010D, ele é a fonte primária de velocidade do veículo.
-          // GPS continua responsável por rota/distância e serve de fallback.
-          const vehicleSpeedKmh = obdSpeedKmh ?? gps.currentSpeedKmh;
-          const state = recorder.addSample({
+          const sampleState = recorder.addSample({
             timestampMs: Date.now(),
             distanceKm: gps.distanceKm,
             speedKmh: vehicleSpeedKmh,
             fuelRateLph,
             fuelRateSource,
           });
-          const instantaneousConsumptionKml =
-            fuelRateLph != null && fuelRateLph > 0 && vehicleSpeedKmh > 0
-              ? vehicleSpeedKmh / fuelRateLph
+          tripDistanceKm = sampleState.distanceKm;
+          tripFuelUsedL = sampleState.fuelUsedL;
+          tripConsumptionKml =
+            sampleState.distanceKm > 0 && sampleState.fuelUsedL > 0
+              ? sampleState.distanceKm / sampleState.fuelUsedL
               : null;
-          this.setState({
-            connected: true,
-            active: Boolean(this.recorder),
-            distanceKm: state.distanceKm,
-            fuelUsedL: state.fuelUsedL,
-            consumptionKml:
-              state.distanceKm > 0 && state.fuelUsedL > 0
-                ? state.distanceKm / state.fuelUsedL
-                : null,
-            instantaneousConsumptionKml,
-            fuelLevelPercent,
-            fuelRemainingL: fuelLevelPercentToLiters(fuelLevelPercent),
-            fuelReserve: isFuelReserve(fuelLevelPercent),
-            estimatedRangeKm: fuelLevelPercent != null
-              ? (estimateRangeFromFuelLevel(
-                  fuelLevelPercent,
-                  state.distanceKm > 0 && state.fuelUsedL > 0 ? state.distanceKm / state.fuelUsedL : this.state.averageConsumptionKml,
-                ) ?? this.state.estimatedRangeKm)
-              : this.state.estimatedRangeKm,
-            error: rpm === 0 && obdSpeedKmh === 0 && fuelRateLph == null
-              ? 'MOTOR DESLIGADO? / ECU SEM TELEMETRIA VÁLIDA'
-              : fuelRateSource && fuelRateSource !== 'MEASURED_015E'
-                ? 'CONSUMO ESTIMADO POR ' + fuelRateSource.replace('ESTIMATED_', '')
-                : null,
-          });
         }
+
+        const instantaneousConsumptionKml =
+          fuelRateLph != null && fuelRateLph > 0 && vehicleSpeedKmh > 0
+            ? vehicleSpeedKmh / fuelRateLph
+            : null;
+
+        this.setState({
+          connected: true,
+          active: Boolean(recorder),
+          distanceKm: tripDistanceKm,
+          fuelUsedL: tripFuelUsedL,
+          consumptionKml: tripConsumptionKml,
+          instantaneousConsumptionKml,
+          instantaneousConsumptionSource: instantaneousConsumptionKml != null ? (fuelRateSource ?? null) : null,
+          fuelLevelPercent,
+          fuelRemainingL: fuelLevelPercentToLiters(fuelLevelPercent),
+          fuelReserve: isFuelReserve(fuelLevelPercent),
+          estimatedRangeKm: fuelLevelPercent != null
+            ? (estimateRangeFromFuelLevel(
+                fuelLevelPercent,
+                tripConsumptionKml ?? this.state.averageConsumptionKml,
+              ) ?? this.state.estimatedRangeKm)
+            : this.state.estimatedRangeKm,
+          error: rpm === 0 && obdSpeedKmh === 0 && fuelRateLph == null
+            ? 'MOTOR DESLIGADO? / ECU SEM TELEMETRIA VÁLIDA'
+            : fuelRateSource && fuelRateSource !== 'MEASURED_015E'
+              ? 'CONSUMO ESTIMADO POR ' + fuelRateSource.replace('ESTIMATED_', '')
+              : null,
+        });
       } catch (cause) {
         this.setState({
           error: cause instanceof Error ? cause.message : 'FALHA NA LEITURA AUTOMÁTICA OBD',
