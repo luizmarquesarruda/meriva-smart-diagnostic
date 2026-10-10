@@ -10,7 +10,11 @@ import { getDriveCycleSummary, type DriveCycle } from '../src/data/driveCycles';
 export default function ViagensScreen() {
   const layout = useMidLayout();
   const [cycles, setCycles] = useState<DriveCycle[]>([]);
-  useEffect(() => { void readDriveCycles(FileSystem.documentDirectory + 'MERIVA_SMART').then(setCycles).catch(() => setCycles([])); }, []);
+  useEffect(() => {
+    void readDriveCycles(FileSystem.documentDirectory + 'MERIVA_SMART')
+      .then((items) => setCycles(items.filter((cycle) => cycle.source === 'REAL_OBD')))
+      .catch(() => setCycles([]));
+  }, []);
   const summary = getDriveCycleSummary(cycles);
   return <SafeAreaView style={styles.container} edges={["top","bottom","left","right"]}><ScrollView contentContainerStyle={[styles.content,{paddingHorizontal:layout.horizontalPadding}]} showsHorizontalScrollIndicator={false}><View style={[styles.screenFrame,{maxWidth:layout.maxContentWidth}]}>
     <Text style={styles.title}>VIAGENS</Text><Text style={styles.subtitle}>CICLOS • CONSUMO • DISTÂNCIA</Text>
