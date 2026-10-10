@@ -259,31 +259,42 @@ class AutoTripService {
           fuelLevelPercent = this.state.fuelLevelPercent;
         }
 
-        if (fuelRateLph == null) {
+        if (fuelRateLph == null && connection.supportedPids.includes('0110')) {
+          // Não consultar MAF se a ECU não declarou suporte ao PID.
           const mafResult = await connection.session.queryPid('0110');
           await registerObdQuery(this.basePath, mafResult, 'REAL');
           const mafGs = mafResult.parsed.status === 'RESPONDEU' ? mafResult.parsed.value : null;
-          if (mafGs != null) {
+          if (mafGs != null && Number.isFinite(mafGs) && mafGs >= 0) {
             const estimate = estimateFuelRateLph({ mafGs });
             if (estimate) {
               fuelRateLph = estimate.rateLph;
               fuelRateSource = estimate.source;
             }
-          } else {
-            const mapResult = await connection.session.queryPid('010B');
-            const iatResult = await connection.session.queryPid('010F');
-            await registerObdQuery(this.basePath, mapResult, 'REAL');
-            await registerObdQuery(this.basePath, iatResult, 'REAL');
-            const estimate = estimateFuelRateLph({
-              mapKpa: mapResult.parsed.status === 'RESPONDEU' ? mapResult.parsed.value : null,
-              rpm,
-              intakeAirTempC: iatResult.parsed.status === 'RESPONDEU' ? iatResult.parsed.value : null,
-              displacementCm3: getAutoSaveState().vehicle?.displacementCm3 ?? 1598,
-            });
-            if (estimate) {
-              fuelRateLph = estimate.rateLph;
-              fuelRateSource = estimate.source;
-            }
+          }
+        }
+
+        if (
+          fuelRateLph == null &&
+          connection.supportedPids.includes('010B') &&
+          connection.supportedPids.includes('010F') &&
+          connection.supportedPids.includes('010C')
+        ) {
+          // MAP e IAT só são consultados quando ambos foram descobertos.
+          const mapResult = await connection.session.queryPid('010B');
+          const iatResult = await connection.session.queryPid('010F');
+          await registerObdQuery(this.basePath, mapResult, 'REAL');
+          await registerObdQuery(this.basePath, iatResult, 'REAL');
+          const mapKpa = mapResult.parsed.status === 'RESPONDEU' ? mapResult.parsed.value : null;
+          const intakeAirTempC = iatResult.parsed.status === 'RESPONDEU' ? iatResult.parsed.value : null;
+          const estimate = estimateFuelRateLph({
+            mapKpa: mapKpa != null && Number.isFinite(mapKpa) ? mapKpa : null,
+            rpm,
+            intakeAirTempC: intakeAirTempC != null && Number.isFinite(intakeAirTempC) ? intakeAirTempC : null,
+            displacementCm3: getAutoSaveState().vehicle?.displacementCm3 ?? 1598,
+          });
+          if (estimate) {
+            fuelRateLph = estimate.rateLph;
+            fuelRateSource = estimate.source;
           }
         }
 
