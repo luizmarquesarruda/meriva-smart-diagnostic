@@ -64,7 +64,7 @@ function renderEvent(state: MerivaPersistedState, event: 'SESSION_START' | 'SESS
   const realTrips = state.driveCycles.filter((cycle) => cycle.source === 'REAL_OBD').slice(-10);
   if (realTrips.length) {
     for (const trip of realTrips) {
-      lines.push(`${trip.startedAt} -> ${trip.finishedAt} | ${trip.distanceTotalKm} km | ${trip.avgFuelConsumptionKml} km/L | REAL_OBD`);
+      lines.push(`${trip.startedAt} -> ${trip.finishedAt} | ${trip.distanceTotalKm} km | ${(trip.fuelDataValid === false || trip.fuelUsedL < 0.05 || trip.avgFuelConsumptionKml <= 0) ? 'N/D' : `${trip.avgFuelConsumptionKml} km/L`} | REAL_OBD`);
     }
   } else {
     lines.push('N/D');
