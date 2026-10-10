@@ -35,7 +35,16 @@ function renderEvent(state: MerivaPersistedState, event: 'SESSION_START' | 'SESS
     `PROTOCOLO ATUAL: ${state.obd.protocol ?? 'N/D'} | ÚLTIMO CONHECIDO: ${state.obd.lastKnownProtocol ?? 'N/D'}`,
     '[PIDs REAIS MAIS RECENTES]',
   ];
-  const realReadings = state.lastReadings.filter((reading) => reading.source === 'REAL');
+  const eventTimestampMs = Date.parse(timestamp);
+  const sessionStartedAtMs = Date.parse(state.obd.lastConnectedAt ?? '');
+  const realReadings = state.lastReadings.filter((reading) => {
+    if (reading.source !== 'REAL') return false;
+    const readingTimestampMs = Date.parse(reading.timestamp);
+    if (!Number.isFinite(readingTimestampMs) || readingTimestampMs > eventTimestampMs) return false;
+    // Older snapshots may not have lastConnectedAt; preserve them rather than
+    // guessing. When present, use it to exclude stale readings from prior sessions.
+    return !Number.isFinite(sessionStartedAtMs) || readingTimestampMs >= sessionStartedAtMs;
+  });
   if (realReadings.length) {
     for (const reading of realReadings) {
       lines.push(`${reading.pid} ${reading.name}: ${reading.value ?? 'N/D'} ${reading.unit} | ${reading.status} | ${reading.timestamp}`);
