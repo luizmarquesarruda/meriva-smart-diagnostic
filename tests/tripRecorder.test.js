@@ -60,17 +60,51 @@ noFuel.addSample({ timestampMs: 0, distanceKm: 0, speedKmh: 0, fuelRateLph: null
 noFuel.addSample({ timestampMs: 1000, distanceKm: 0.2, speedKmh: 20, fuelRateLph: null });
 assert.strictEqual(noFuel.buildDriveCycle(2000), null);
 
+const tinyFuel = new RealTripRecorder(1000, 0);
+tinyFuel.addSample({ timestampMs: 1000, distanceKm: 0, speedKmh: 0, fuelRateLph: 8 });
+tinyFuel.addSample({ timestampMs: 11000, distanceKm: 1, speedKmh: 36, fuelRateLph: 8 });
+tinyFuel.addSample({ timestampMs: 21000, distanceKm: 2, speedKmh: 36, fuelRateLph: 8 });
+assert.strictEqual(tinyFuel.getState().fuelUsedL < 0.05, true);
+assert.strictEqual(tinyFuel.buildDriveCycle(22000), null, 'trip under 0.05 L must not publish an unstable km/L average');
+
 const cycle = new RealTripRecorder(1000, 0);
-cycle.addSample({ timestampMs: 1000, distanceKm: 0, speedKmh: 0, fuelRateLph: 8 });
-cycle.addSample({ timestampMs: 11000, distanceKm: 1, speedKmh: 36, fuelRateLph: 8 });
-cycle.addSample({ timestampMs: 21000, distanceKm: 2, speedKmh: 36, fuelRateLph: 8 });
+cycle.addSample({ timestampMs: 1000, distanceKm: 0, speedKmh: 0, fuelRateLph: 12 });
+cycle.addSample({ timestampMs: 11000, distanceKm: 1, speedKmh: 36, fuelRateLph: 12 });
+cycle.addSample({ timestampMs: 21000, distanceKm: 2, speedKmh: 36, fuelRateLph: 12 });
 const saved = cycle.buildDriveCycle(22000);
 
 assert.ok(saved);
 assert.strictEqual(saved.source, 'REAL_OBD');
 assert.strictEqual(saved.distanceTotalKm, 2);
-assertApprox(saved.fuelUsedL, 8 * 20_000 / 3_600_000, 1e-6);
+assertApprox(saved.fuelUsedL, 12 * 20_000 / 3_600_000, 1e-6);
 assert.strictEqual(saved.avgFuelConsumptionKml, Number((2 / saved.fuelUsedL).toFixed(3)));
+
+// Older/duplicate timestamps cannot corrupt distance, speed, duration, or fuel.
+const ordered = new RealTripRecorder(0, 10);
+const orderedFirst = ordered.addSample({ timestampMs: 1000, distanceKm: 10, speedKmh: 10, fuelRateLph: 12 });
+assert.deepStrictEqual(
+  ordered.addSample({ timestampMs: 900, distanceKm: 100, speedKmh: 180, fuelRateLph: 12 }),
+  orderedFirst,
+  'out-of-order sample is ignored without mutating trip state',
+);
+assert.deepStrictEqual(
+  ordered.addSample({ timestampMs: 1000, distanceKm: 100, speedKmh: 180, fuelRateLph: 12 }),
+  orderedFirst,
+  'duplicate timestamp is ignored',
+);
+const orderedNext = ordered.addSample({ timestampMs: 2000, distanceKm: 10.02, speedKmh: 30, fuelRateLph: 12 });
+assert.strictEqual(orderedNext.distanceKm, 0.02);
+assertApprox(orderedNext.fuelUsedL, 12 * 1000 / 3_600_000, 1e-12);
+assert.strictEqual(orderedNext.maxSpeedKmh, 30);
+
+// GPS cumulative-distance reset is rebased without rewinding accumulated trip distance.
+const gpsReset = new RealTripRecorder(0, 10);
+gpsReset.addSample({ timestampMs: 1000, distanceKm: 10, speedKmh: 0, fuelRateLph: 12 });
+gpsReset.addSample({ timestampMs: 2000, distanceKm: 10.1, speedKmh: 30, fuelRateLph: 12 });
+const afterReset = gpsReset.addSample({ timestampMs: 3000, distanceKm: 0.1, speedKmh: 30, fuelRateLph: 12 });
+assert.strictEqual(afterReset.distanceKm, 0.1);
+const recoveredDistance = gpsReset.addSample({ timestampMs: 4000, distanceKm: 0.2, speedKmh: 30, fuelRateLph: 12 });
+assert.strictEqual(recoveredDistance.distanceKm, 0.2, 'GPS reset must not rewind accumulated trip distance');
 
 const gap = new RealTripRecorder(0, 0);
 gap.addSample({ timestampMs: 0, distanceKm: 0, speedKmh: 0, fuelRateLph: 10 });
@@ -78,4 +112,4 @@ gap.addSample({ timestampMs: 40_001, distanceKm: 1, speedKmh: 30, fuelRateLph: 1
 assert.strictEqual(gap.getState().durationMs, 0);
 assert.strictEqual(gap.getState().fuelUsedL, 0);
 
-console.log('PASS trip recorder: GPS + PID 015E + persistência de ciclo real');
+console.log('PASS trip recorder: GPS monotônico, timestamps, limiar de combustível e persistência REAL_OBD');
