@@ -387,8 +387,11 @@ class AutoTripService {
       // O PID 012F é a fonte absoluta de nível de combustível para autonomia.
       // A capacidade nominal de 56 L converte o percentual da ECU em litros.
       // O histórico de consumo continua vindo de viagens reais.
+      // Trips remain in history even when fuel telemetry is insufficient, but
+      // they must not contaminate cumulative consumption/autonomy calculations.
+      const consumptionIsValid = cycle.fuelDataValid !== false && cycle.fuelUsedL >= 0.05 && cycle.avgFuelConsumptionKml > 0;
       const existingReading = state.autonomy.readings.find((item) => item.id === cycle.id);
-      if (!existingReading) {
+      if (consumptionIsValid && !existingReading) {
         const previousDistance = Number(state.autonomy.cumulativeDistanceKm) || 0;
         const previousFuel = Number(state.autonomy.cumulativeFuelUsedL) || 0;
         const distanceKm = Math.max(0, Number(cycle.distanceTotalKm) || 0);
