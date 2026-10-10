@@ -35,7 +35,16 @@ function renderEvent(state: MerivaPersistedState, event: 'SESSION_START' | 'SESS
     `PROTOCOLO ATUAL: ${state.obd.protocol ?? 'N/D'} | ÚLTIMO CONHECIDO: ${state.obd.lastKnownProtocol ?? 'N/D'}`,
     '[PIDs REAIS MAIS RECENTES]',
   ];
-  const realReadings = state.lastReadings.filter((reading) => reading.source === 'REAL');
+  const eventTimestampMs = Date.parse(timestamp);
+  const sessionStartedAtMs = Date.parse(state.obd.lastConnectedAt ?? '');
+  const realReadings = state.lastReadings.filter((reading) => {
+    if (reading.source !== 'REAL') return false;
+    const readingTimestampMs = Date.parse(reading.timestamp);
+    if (!Number.isFinite(readingTimestampMs) || readingTimestampMs > eventTimestampMs) return false;
+    // Older snapshots may not have lastConnectedAt; preserve them rather than
+    // guessing. When present, use it to exclude stale readings from prior sessions.
+    return !Number.isFinite(sessionStartedAtMs) || readingTimestampMs >= sessionStartedAtMs;
+  });
   if (realReadings.length) {
     for (const reading of realReadings) {
       lines.push(`${reading.pid} ${reading.name}: ${reading.value ?? 'N/D'} ${reading.unit} | ${reading.status} | ${reading.timestamp}`);
@@ -66,13 +75,29 @@ function renderEvent(state: MerivaPersistedState, event: 'SESSION_START' | 'SESS
 
 function splitPages(content: string): Map<string, string> {
   const pages = new Map<string, string>();
-  const re = /^========== DIA: (\d{4}-\d{2}-\d{2}) ==========\n([\s\S]*?)(?=^========== DIA: \d{4}-\d{2}-\d{2} ==========\n|$)/gm;
-  let match: RegExpExecArray | null;
-  while ((match = re.exec(content)) !== null) {
-    const date = match[1];
-    const body = match[2].replace(/\s*========== FIM DO DIA ==========\s*$/, '').trim();
-    pages.set(date, body);
+  // Capture apenas os marcadores de página. Não usar "$" como fim do conteúdo
+  // em uma regex multiline: nesse modo, "$" também casa no fim de cada linha
+  // e descartaria todos os eventos após a primeira linha de cada data.
+  const markers = Array.from(
+    content.matchAll(/^========== DIA: (\d{4}-\d{2}-\d{2}) ==========\r?$/gm),
+  );
+
+  for (let index = 0; index < markers.length; index += 1) {
+    const marker = markers[index];
+    const bodyStart = (marker.index ?? 0) + marker[0].length;
+    const bodyEnd = markers[index + 1]?.index ?? content.length;
+    const rawBody = content.slice(bodyStart, bodyEnd);
+    const body = rawBody
+      .replace(/^\r?\n/, '')
+      .replace(/(?:\r?\n)?========== FIM DO DIA ==========\s*$/, '')
+      .trim();
+    const date = marker[1];
+
+    // Se houver duplicatas antigas da mesma data, preservar ambos os blocos.
+    const previous = pages.get(date);
+    pages.set(date, [previous, body].filter(Boolean).join('\n\n'));
   }
+
   return pages;
 }
 
