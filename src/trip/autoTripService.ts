@@ -5,7 +5,6 @@ import { addDriveCycle, readDriveCycles } from '../storage/driveCycleStorage';
 import { forceSaveOnObdEvent, registerObdQuery } from '../meriva/autosaveIntegration';
 import { getAutoSaveState, updateAutoSaveState, initAutoSave } from '../meriva/autosaveManager';
 import { RealTripRecorder } from './tripRecorder';
-import { INITIAL_DRIVE_CYCLES } from '../data/driveCycles';
 import { estimateRangeFromFuelLevel, fuelLevelPercentToLiters, isFuelReserve } from './fuelLevel';
 import { resetLiveTelemetry } from '../obd/liveTelemetry';
 import { estimateFuelRateLph, type FuelRateSource } from '../obd/fuelConsumption';
@@ -28,12 +27,6 @@ export interface AutoTripServiceState {
 }
 
 type Listener = (state: AutoTripServiceState) => void;
-
-const CARSCANNER_REFERENCE_CONSUMPTION_KML = (() => {
-  const distanceKm = INITIAL_DRIVE_CYCLES.reduce((sum, cycle) => sum + cycle.distanceTotalKm, 0);
-  const fuelL = INITIAL_DRIVE_CYCLES.reduce((sum, cycle) => sum + cycle.fuelUsedL, 0);
-  return fuelL > 0 ? Number((distanceKm / fuelL).toFixed(3)) : 0;
-})();
 
 const INITIAL_STATE: AutoTripServiceState = {
   connected: false,
@@ -93,7 +86,7 @@ class AutoTripService {
       ...this.state,
       averageConsumptionKml: persisted.autonomy.averageConsumptionKml > 0
         ? persisted.autonomy.averageConsumptionKml
-        : CARSCANNER_REFERENCE_CONSUMPTION_KML,
+        : 0,
       estimatedRangeKm: persisted.autonomy.estimatedRangeKm,
     };
     this.emit();
@@ -155,7 +148,7 @@ class AutoTripService {
       error: null,
       averageConsumptionKml: persistedAutonomy.averageConsumptionKml > 0
         ? persistedAutonomy.averageConsumptionKml
-        : CARSCANNER_REFERENCE_CONSUMPTION_KML,
+        : 0,
       estimatedRangeKm: persistedAutonomy.estimatedRangeKm,
     };
     this.emit();
