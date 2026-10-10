@@ -756,10 +756,10 @@ async function testDriveCycleSummaryUsesWeightedRealSpeed() {
   assert.strictEqual(summary.avgSpeedKmh, 20, 'aggregate speed must use all real distance / real moving time, even when fuel data is unavailable');
   assert.strictEqual(summary.totalDistanceKm, 15, 'seed distance must not enter real totals, while fuel-incomplete real trips still count for distance');
   assert.strictEqual(summary.avgConsumptionKml, 12.5, 'trips without valid fuel data must not distort the consumption average');
-  assert.strictEqual(summary.realCycleCount, 2);
+  assert.strictEqual(summary.realCycleCount, 3, 'fuel-incomplete real trips still count as real trips');
   assert.strictEqual(summary.referenceCycleCount, 1);
-  assert.strictEqual(summary.lastCycle.id, 'real-short', 'the last operational cycle cannot be a seed');
-  assert.strictEqual(summary.lastRealCycle.id, 'real-short');
+  assert.strictEqual(summary.lastCycle.id, 'real-no-fuel', 'the latest operational cycle cannot be a seed');
+  assert.strictEqual(summary.lastRealCycle.id, 'real-no-fuel');
 }
 
 async function testDtcStorage() {
