@@ -1764,3 +1764,28 @@ O consumo exibido no cockpit podia parecer congelado ou atualizar tarde, mesmo c
 - CI da cabeça atual ainda precisa ser consultada; não declarar a correção validada até `validate` e `android-build` passarem.
 - Teste físico na Meriva continua necessário para validar a latência percebida e a plausibilidade dos valores. Consumo estimado deve permanecer identificado como estimativa.
 
+
+
+## 2026-10-10 — Otimização do polling do consumo e correção de escopo TypeScript
+
+### Evidência encontrada
+Na revisão da atualização anterior, a publicação de estado adicionada ao `runLoop` declarava novamente `gps` e `vehicleSpeedKmh` no mesmo bloco `try`. Isso é uma colisão de identificadores e poderia impedir o typecheck/build. Também havia consultas lentas antes de velocidade/RPM e consultas de fallback a PIDs sem verificar suporte confirmado da ECU.
+
+### Correções aplicadas
+- `src/trip/autoTripService.ts`: reorganizado o ciclo para consultar primeiro velocidade `010D`, RPM `010C` e taxa de combustível medida `015E`; o nível do tanque `012F`, que muda lentamente, é consultado a cada quatro ciclos e conserva o último percentual válido entre consultas.
+- Corrigida a colisão de identificadores do bloco de publicação de consumo usando nomes locais explícitos para a amostra da viagem (`tripGps`, `tripVehicleSpeedKmh`).
+- Os fallbacks por MAF (`0110`) e MAP/IAT (`010B`, `010F`) agora só executam quando os PIDs correspondentes constam como suportados pela ECU. Valores precisam ser finitos antes de entrar na estimativa.
+- `tests/regression.test.js`: adicionadas asserções de ordem do caminho crítico, cadência do nível do tanque e gate de suporte para PIDs de estimativa.
+
+### Commits
+- `3d47930f559e04fc13179b1a99aa75cd7ddc5351` — priorização do polling e correção das declarações duplicadas.
+- `7fc5f3a8d78de59a02ba1093244e8d4ef1e54d10` — consultas de fallback restritas a PIDs suportados.
+- `d5d45f52e928c842e8bef98ac4d0411feff9e473` — regressões para ordem e cadência do polling.
+
+### Estado de validação
+As alterações foram gravadas na branch `fix/daily-obd-history-keep-screen-awake-main`, PR #49. A CI disparada pelo GitHub precisa ser consultada após este conjunto de commits; nenhum resultado anterior valida estes commits. Não foi feito merge na `main`.
+
+### Limites conhecidos
+- O intervalo de 1,5 s é um alvo de cadência, não uma garantia: o transporte serial e o tempo de resposta da ECU continuam determinando a latência real.
+- Se `015E` não for suportado, a estimativa depende de MAF ou MAP/RPM/IAT e continua menos confiável; a interface deve identificá-la como estimativa.
+- A atualização em tempo real precisa ser medida com ELM327 e ECU reais na Meriva. Testes de código e CI não substituem validação física.
