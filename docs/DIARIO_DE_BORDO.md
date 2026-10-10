@@ -1735,3 +1735,32 @@ A regra anterior de rejeitar ciclos com combustível integrado inferior a `0,05 
 3. Revisar a apresentação de consumo `N/D` em todas as telas/exportações e confirmar que nenhuma fórmula transforma o zero interno em medição.
 4. Confirmar o comportamento do diário com várias sessões no mesmo dia, falha de gravação e reinício abrupto do app.
 5. Não fazer merge nem declarar versão pronta para uso real antes da validação completa e, para comunicação OBD, do teste físico.
+
+
+## 2026-10-10 — Auditoria e correção da atualização do consumo em tempo real
+
+### Sintoma
+O consumo exibido no cockpit podia parecer congelado ou atualizar tarde, mesmo com a conexão OBD ativa.
+
+### Causa encontrada
+- O serviço publicava o estado de consumo somente dentro do bloco condicionado à existência de um gravador de viagem ativo.
+- O cockpit priorizava a média histórica/persistida em vez da leitura instantânea mais recente.
+- O indicador genérico “CONSUMO” não diferenciava explicitamente valor medido pelo PID 015E de estimativa por MAF/MAP.
+
+### Correção
+- `src/trip/autoTripService.ts`: o estado de telemetria e consumo instantâneo agora é publicado a cada ciclo OBD válido, inclusive antes de uma viagem começar ou quando não existe gravador ativo. Os dados de distância/combustível da viagem continuam zerados quando não há viagem ativa, sem fabricar acumulados.
+- A origem do consumo instantâneo é preservada no estado como `MEASURED_015E`, `ESTIMATED_MAF` ou `ESTIMATED_MAP`.
+- `app/index.tsx`: o cockpit prioriza a leitura instantânea; o rótulo informa se é consumo instantâneo OBD medido, instantâneo estimado, média da viagem ou média histórica.
+- `tests/regression.test.js`: adicionadas asserções de regressão para a publicação do consumo fora da condição de viagem ativa e preservação da origem.
+
+### Commits
+- `e55fc0355264eac295406927960de42312ffd5cf` — publicação do consumo instantâneo fora da viagem ativa.
+- `cc4848d006587782a91836a768a8e3079bf06abf` — prioridade do consumo em tempo real no cockpit.
+- `6b7e8dd9f8c9158a0c2bc23d9526952f3d716b43` — asserções de regressão.
+
+### Limitações e validação pendente
+- A cadência continua limitada pela fila serial do ELM327 e pelo tempo de resposta de cada PID; esta correção remove o bloqueio de atualização da interface, mas não garante por si só uma taxa fixa de atualização.
+- A frequência real deve ser medida por `elapsedMs`/`cycleTimeMs` em uso com o adaptador e a ECU reais.
+- CI da cabeça atual ainda precisa ser consultada; não declarar a correção validada até `validate` e `android-build` passarem.
+- Teste físico na Meriva continua necessário para validar a latência percebida e a plausibilidade dos valores. Consumo estimado deve permanecer identificado como estimativa.
+
