@@ -897,6 +897,14 @@ async function testPidAndLearningWriteSerialization() {
   assert.ok(autoTripServiceSource.includes('registerObdQuery(this.basePath, telemetryResult, \'REAL\')'), 'telemetria automática deve alimentar o pipeline de persistência');
   assert.ok(autoTripServiceSource.includes('instantaneousConsumptionSource'), 'origem do consumo instantâneo deve ser preservada para a interface');
   assert.ok(autoTripServiceSource.includes('A leitura instantânea deve ser publicada a cada ciclo OBD válido'), 'consumo instantâneo deve atualizar mesmo sem viagem ativa');
+  const speedQueryIndex = autoTripServiceSource.indexOf("queryPid('010D')");
+  const rpmQueryIndex = autoTripServiceSource.indexOf("queryPid('010C')");
+  const measuredFuelQueryIndex = autoTripServiceSource.indexOf("queryPid('015E')");
+  const fuelLevelQueryIndex = autoTripServiceSource.indexOf("queryPid('012F')");
+  assert.ok(speedQueryIndex >= 0 && rpmQueryIndex > speedQueryIndex && measuredFuelQueryIndex > rpmQueryIndex && fuelLevelQueryIndex > measuredFuelQueryIndex, 'velocidade, RPM e taxa de combustível devem preceder o nível lento do tanque');
+  assert.ok(autoTripServiceSource.includes("this.pollCycleNumber % 4 === 1"), 'nível do tanque deve ser consultado em cadência reduzida');
+  assert.ok(autoTripServiceSource.includes("fuelRateLph == null && connection.supportedPids.includes('0110')"), 'MAF só deve ser consultado como fallback quando suportado pela ECU');
+  assert.ok(autoTripServiceSource.includes("connection.supportedPids.includes('010B') &&\n          connection.supportedPids.includes('010F')"), 'fallback MAP exige suporte confirmado aos PIDs MAP e IAT');
   assert.ok(!autoTripServiceSource.includes('recordLivePidQuery('), 'telemetria automática deve registrar cada resposta uma única vez via registerObdQuery');
   writeDelayMs = 0;
 }
