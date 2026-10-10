@@ -676,8 +676,80 @@ async function testDriveCycleValidation() {
   assert.strictEqual(read.length, 1);
   assert.strictEqual(read[0].id, 'test-1');
 
-  files.set(`${BASE}/VIAGENS/index.json`, JSON.stringify({ cycles: 'corrompido' }));
+  const indexFile = `${BASE}/VIAGENS/index.json`;
+  files.set(indexFile, JSON.stringify({
+    version: '1.0',
+    cycles: [
+      { ...cycle, id: 'legacy-seed', source: 'CARSCANNER_SEED' },
+      cycle,
+    ],
+    totalCount: 2,
+  }));
+  const filtered = await storage.readDriveCycles(BASE);
+  assert.deepStrictEqual(filtered.map((item) => item.id), ['test-1'], 'legacy seed trips must not appear in operational trip history');
+
+  await storage.addDriveCycle(BASE, { ...cycle, id: 'test-2' });
+  const migratedIndex = JSON.parse(files.get(indexFile));
+  assert.ok(migratedIndex.cycles.every((item) => item.source !== 'CARSCANNER_SEED'), 'adding a real trip must remove legacy seeds from active index');
+
+  files.set(indexFile, JSON.stringify({ cycles: 'corrompido' }));
   assert.deepStrictEqual(await storage.readDriveCycles(BASE), []);
+
+  resetFS();
+  await storage.initializeDriveCycles(BASE);
+  const emptyIndex = JSON.parse(files.get(indexFile));
+  assert.deepStrictEqual(emptyIndex.cycles, [], 'new installations must start with an empty operational trip history');
+  assert.strictEqual(
+    Array.from(files.keys()).some((name) => name.includes('/VIAGENS/viagens_')),
+    false,
+    'seed rows must not be written to the operational trip CSV',
+  );
+}
+
+async function testDriveCycleSummaryUsesWeightedRealSpeed() {
+  const driveCycles = loadTs(path.join(ROOT, 'src/data/driveCycles.ts'));
+  const slowLongTrip = {
+    id: 'real-long',
+    startedAt: '2026-10-01T10:00:00.000Z',
+    finishedAt: '2026-10-01T10:20:00.000Z',
+    distanceTotalKm: 2,
+    distanceIceKm: 2,
+    fuelUsedL: 0.2,
+    totalTimeHms: '00:20:00',
+    drivingTimeHms: '00:20:00',
+    standingTimeHms: '00:00:00',
+    avgDrivingSpeedKmh: 6,
+    avgFuelConsumptionKml: 10,
+    source: 'REAL_OBD',
+    importedAt: '2026-10-01T10:20:00.000Z',
+  };
+  const shortFastTrip = {
+    ...slowLongTrip,
+    id: 'real-short',
+    startedAt: '2026-10-02T10:00:00.000Z',
+    finishedAt: '2026-10-02T10:05:00.000Z',
+    distanceTotalKm: 3,
+    distanceIceKm: 3,
+    fuelUsedL: 0.2,
+    totalTimeHms: '00:05:00',
+    drivingTimeHms: '00:05:00',
+    avgDrivingSpeedKmh: 36,
+  };
+  const latestSeed = {
+    ...slowLongTrip,
+    id: 'seed-latest',
+    startedAt: '2026-10-03T10:00:00.000Z',
+    source: 'CARSCANNER_SEED',
+    distanceTotalKm: 100,
+    avgDrivingSpeedKmh: 100,
+  };
+  const summary = driveCycles.getDriveCycleSummary([slowLongTrip, shortFastTrip, latestSeed]);
+  assert.strictEqual(summary.avgSpeedKmh, 12, 'aggregate speed must use real distance / real moving time');
+  assert.strictEqual(summary.totalDistanceKm, 5, 'seed distance must not enter real totals');
+  assert.strictEqual(summary.realCycleCount, 2);
+  assert.strictEqual(summary.referenceCycleCount, 1);
+  assert.strictEqual(summary.lastCycle.id, 'real-short', 'the last operational cycle cannot be a seed');
+  assert.strictEqual(summary.lastRealCycle.id, 'real-short');
 }
 
 async function testDtcStorage() {
@@ -871,6 +943,7 @@ async function main() {
     ['logger TX/RX', testRawLogger],
     ['perfil do veículo', testVehicleProfile],
     ['drive cycles', testDriveCycleValidation],
+    ['resumo de velocidade real ponderado', testDriveCycleSummaryUsesWeightedRealSpeed],
     ['DTC persistência', testDtcStorage],
     ['backup completo', testBackupCompleteness],
     ['CSV serializado', testCsvWriteSerialization],
