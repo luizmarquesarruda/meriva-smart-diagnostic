@@ -17,6 +17,7 @@ function isDriveCycle(value: unknown): value is DriveCycle {
     typeof cycle.standingTimeHms === 'string' &&
     typeof cycle.avgDrivingSpeedKmh === 'number' &&
     typeof cycle.avgFuelConsumptionKml === 'number' &&
+    (cycle.fuelDataValid === undefined || typeof cycle.fuelDataValid === 'boolean') &&
     ['CARSCANNER_SEED', 'REAL_OBD', 'SIMULACAO'].includes(cycle.source as string) &&
     typeof cycle.importedAt === 'string'
   );
