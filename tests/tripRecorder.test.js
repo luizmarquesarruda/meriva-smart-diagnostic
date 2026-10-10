@@ -58,14 +58,20 @@ assert.strictEqual(state.maxSpeedKmh, 36);
 const noFuel = new RealTripRecorder(0, 0);
 noFuel.addSample({ timestampMs: 0, distanceKm: 0, speedKmh: 0, fuelRateLph: null });
 noFuel.addSample({ timestampMs: 1000, distanceKm: 0.2, speedKmh: 20, fuelRateLph: null });
-assert.strictEqual(noFuel.buildDriveCycle(2000), null);
+const noFuelCycle = noFuel.buildDriveCycle(2000);
+assert.ok(noFuelCycle, 'a real trip with distance must be retained even without fuel telemetry');
+assert.strictEqual(noFuelCycle.fuelDataValid, false);
+assert.strictEqual(noFuelCycle.avgFuelConsumptionKml, 0, 'unavailable consumption must not be fabricated');
 
 const tinyFuel = new RealTripRecorder(1000, 0);
 tinyFuel.addSample({ timestampMs: 1000, distanceKm: 0, speedKmh: 0, fuelRateLph: 8 });
 tinyFuel.addSample({ timestampMs: 11000, distanceKm: 1, speedKmh: 36, fuelRateLph: 8 });
 tinyFuel.addSample({ timestampMs: 21000, distanceKm: 2, speedKmh: 36, fuelRateLph: 8 });
 assert.strictEqual(tinyFuel.getState().fuelUsedL < 0.05, true);
-assert.strictEqual(tinyFuel.buildDriveCycle(22000), null, 'trip under 0.05 L must not publish an unstable km/L average');
+const tinyFuelCycle = tinyFuel.buildDriveCycle(22000);
+assert.ok(tinyFuelCycle, 'trip below 0.05 L must remain in the real-trip history');
+assert.strictEqual(tinyFuelCycle.fuelDataValid, false, 'trip under 0.05 L must not publish an unstable km/L average');
+assert.strictEqual(tinyFuelCycle.avgFuelConsumptionKml, 0);
 
 const cycle = new RealTripRecorder(1000, 0);
 cycle.addSample({ timestampMs: 1000, distanceKm: 0, speedKmh: 0, fuelRateLph: 12 });
