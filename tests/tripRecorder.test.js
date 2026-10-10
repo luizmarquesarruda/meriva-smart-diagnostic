@@ -84,6 +84,7 @@ assert.strictEqual(saved.source, 'REAL_OBD');
 assert.strictEqual(saved.distanceTotalKm, 2);
 assertApprox(saved.fuelUsedL, 12 * 20_000 / 3_600_000, 1e-6);
 assert.strictEqual(saved.avgFuelConsumptionKml, Number((2 / saved.fuelUsedL).toFixed(3)));
+assert.strictEqual(saved.fuelDataValid, true, 'sufficient fuel samples must be marked valid');
 
 // Older/duplicate timestamps cannot corrupt distance, speed, duration, or fuel.
 const ordered = new RealTripRecorder(0, 10);
