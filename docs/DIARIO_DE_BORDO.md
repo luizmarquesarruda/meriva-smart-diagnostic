@@ -1789,3 +1789,24 @@ As alterações foram gravadas na branch `fix/daily-obd-history-keep-screen-awak
 - O intervalo de 1,5 s é um alvo de cadência, não uma garantia: o transporte serial e o tempo de resposta da ECU continuam determinando a latência real.
 - Se `015E` não for suportado, a estimativa depende de MAF ou MAP/RPM/IAT e continua menos confiável; a interface deve identificá-la como estimativa.
 - A atualização em tempo real precisa ser medida com ELM327 e ECU reais na Meriva. Testes de código e CI não substituem validação física.
+
+## 2026-10-10 — Temperatura do líquido de arrefecimento no cockpit inicial
+
+### Auditoria
+- A página inicial já tinha polling secundário do PID OBD `0105` no serviço de viagens, mas não apresentava a temperatura em um cartão visível no cockpit. Portanto, a telemetria existia no fluxo de consulta, mas faltava a métrica na tela inicial.
+
+### Correção
+- `app/index.tsx`: adicionado cartão dinâmico **LÍQUIDO DE ARREFECIMENTO**, alimentado exclusivamente pela leitura `REAL` do PID `0105` (temperatura do líquido de arrefecimento).
+- A tela só mostra o valor se a ECU estiver respondendo e a leitura tiver timestamp válido com no máximo 30 segundos; leitura ausente, simulada, desconectada ou obsoleta aparece como `N/D`.
+- Indicador visual informa a origem do dado e destaca valores a partir de 110 °C como atenção e 115 °C como temperatura alta. Esses limites são avisos conservadores de interface, não substituem a especificação técnica do veículo nem um diagnóstico mecânico.
+- `tests/regression.test.js`: adicionadas regressões estáticas para presença do cartão, origem real, expiração de leitura obsoleta e alerta de temperatura alta.
+- O serviço continua consultando `0105` apenas se a ECU anunciar suporte, dentro da rotação de telemetria secundária; a cadência depende do tempo de resposta do ELM327/ECU.
+
+### Commits
+- `68ccaec58db85a71cdc495e6d1a188bcb4047508` — cartão dinâmico de temperatura no cockpit.
+- `f0da30ef659f80404f26b663b13c8da5531197ef` — regressões para a métrica de temperatura.
+
+### Validação e próximo passo
+- Os commits disparam uma nova CI; confirmar `validate` e `android-build` no head atualizado antes de declarar a correção aprovada.
+- Teste físico permanece necessário: confirmar que a ECU da Meriva anuncia o PID `0105`, que o valor acompanha o aquecimento real e que os avisos fazem sentido no veículo. Se o PID não for suportado/responder, o app deve manter `N/D`, sem estimar a temperatura.
+- Nenhum merge foi realizado.
