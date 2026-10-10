@@ -753,8 +753,8 @@ async function testDriveCycleSummaryUsesWeightedRealSpeed() {
     fuelDataValid: false,
   };
   const summary = driveCycles.getDriveCycleSummary([slowLongTrip, shortFastTrip, latestSeed, noFuelTrip]);
-  assert.strictEqual(summary.avgSpeedKmh, 12, 'aggregate speed must use real distance / real moving time');
-  assert.strictEqual(summary.totalDistanceKm, 5, 'seed distance must not enter real totals');
+  assert.strictEqual(summary.avgSpeedKmh, 20, 'aggregate speed must use all real distance / real moving time, even when fuel data is unavailable');
+  assert.strictEqual(summary.totalDistanceKm, 15, 'seed distance must not enter real totals, while fuel-incomplete real trips still count for distance');
   assert.strictEqual(summary.avgConsumptionKml, 12.5, 'trips without valid fuel data must not distort the consumption average');
   assert.strictEqual(summary.realCycleCount, 2);
   assert.strictEqual(summary.referenceCycleCount, 1);
