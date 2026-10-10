@@ -12,6 +12,8 @@ export interface DriveCycle {
   standingTimeHms: string;
   avgDrivingSpeedKmh: number;
   avgFuelConsumptionKml: number;
+  /** False when a real trip is retained but fuel data cannot support km/L. */
+  fuelDataValid?: boolean;
   source: DriveCycleSource;
   fuelRateSource?: 'MEASURED_015E' | 'ESTIMATED_MAF' | 'ESTIMATED_MAP' | 'MIXED';
   importedAt: string;
@@ -101,7 +103,13 @@ export function getDriveCycleSummary(cycles: DriveCycle[]): DriveCycleSummary {
   const realCycles = cycles.filter((cycle) => cycle.source === 'REAL_OBD');
   const referenceCycles = cycles.filter((cycle) => cycle.source === 'CARSCANNER_SEED');
   const realDistanceKm = realCycles.reduce((sum, cycle) => sum + cycle.distanceTotalKm, 0);
-  const realFuelL = realCycles.reduce((sum, cycle) => sum + cycle.fuelUsedL, 0);
+  const consumptionCycles = realCycles.filter((cycle) =>
+    cycle.fuelDataValid === false
+      ? false
+      : cycle.fuelUsedL >= 0.05 && cycle.avgFuelConsumptionKml > 0,
+  );
+  const realFuelL = consumptionCycles.reduce((sum, cycle) => sum + cycle.fuelUsedL, 0);
+  const consumptionDistanceKm = consumptionCycles.reduce((sum, cycle) => sum + cycle.distanceTotalKm, 0);
   const realMovingTimeMs = realCycles.reduce(
     (sum, cycle) => sum + durationHmsToMs(cycle.drivingTimeHms),
     0,
@@ -124,7 +132,7 @@ export function getDriveCycleSummary(cycles: DriveCycle[]): DriveCycleSummary {
     totalDistanceKm: Number(realDistanceKm.toFixed(2)),
     totalFuelL: Number(realFuelL.toFixed(3)),
     avgConsumptionKml: Number(
-      (realFuelL > 0 ? realDistanceKm / realFuelL : 0).toFixed(2),
+      (realFuelL > 0 ? consumptionDistanceKm / realFuelL : 0).toFixed(2),
     ),
     avgSpeedKmh: Number(realAvgSpeedKmh.toFixed(1)),
     realCycleCount: realCycles.length,
