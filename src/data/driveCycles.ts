@@ -91,16 +91,29 @@ export interface DriveCycleSummary {
   lastRealCycle: DriveCycle | null;
 }
 
+function durationHmsToMs(value: string): number {
+  const match = /^(\d+):([0-5]\d):([0-5]\d)$/.exec(value);
+  if (!match) return 0;
+  return ((Number(match[1]) * 3600) + (Number(match[2]) * 60) + Number(match[3])) * 1000;
+}
+
 export function getDriveCycleSummary(cycles: DriveCycle[]): DriveCycleSummary {
   const realCycles = cycles.filter((cycle) => cycle.source === 'REAL_OBD');
   const referenceCycles = cycles.filter((cycle) => cycle.source === 'CARSCANNER_SEED');
   const realDistanceKm = realCycles.reduce((sum, cycle) => sum + cycle.distanceTotalKm, 0);
   const realFuelL = realCycles.reduce((sum, cycle) => sum + cycle.fuelUsedL, 0);
-  const realAvgSpeedKmh = realCycles.length
-    ? realCycles.reduce((sum, cycle) => sum + cycle.avgDrivingSpeedKmh, 0) / realCycles.length
+  const realMovingTimeMs = realCycles.reduce(
+    (sum, cycle) => sum + durationHmsToMs(cycle.drivingTimeHms),
+    0,
+  );
+  // Aggregate velocity is total real distance / total real moving time.
+  // An unweighted mean gives a 1 km trip the same weight as a 20 km trip.
+  const realAvgSpeedKmh = realMovingTimeMs > 0
+    ? realDistanceKm / (realMovingTimeMs / 3_600_000)
     : 0;
 
-  const ordered = [...cycles].sort(
+  const visibleCycles = cycles.filter((cycle) => cycle.source !== 'CARSCANNER_SEED');
+  const ordered = [...visibleCycles].sort(
     (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
   );
   const orderedReal = [...realCycles].sort(
