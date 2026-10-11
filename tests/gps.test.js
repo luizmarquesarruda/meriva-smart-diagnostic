@@ -194,7 +194,24 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
   );
   await noSpeedTracker.stop();
 
-  console.log('PASS GPS: distância adaptativa, evidência de velocidade e consumo');
+  // Precisão ausente/desconhecida deve ser rejeitada como fix para distância.
+  const unknownAccuracyTracker = new GpsTracker();
+  assert.strictEqual(await unknownAccuracyTracker.start(), true);
+  unknownAccuracyTracker.setVehicleSpeedHintKmh(36);
+  for (let index = 0; index <= 6; index += 1) {
+    watcher({
+      coords: { latitude: 0, longitude: index * 0.00004, speed: 10, accuracy: null },
+      timestamp: 300000 + index * 1000,
+    });
+  }
+  assert.strictEqual(
+    unknownAccuracyTracker.getState().distanceKm,
+    0,
+    'GPS fixes without reported accuracy must not contribute distance',
+  );
+  await unknownAccuracyTracker.stop();
+
+  console.log('PASS GPS: precisão obrigatória, distância adaptativa e consumo');
 })().catch((error) => {
   console.error(error);
   process.exitCode = 1;
