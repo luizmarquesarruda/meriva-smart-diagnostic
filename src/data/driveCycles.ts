@@ -114,7 +114,7 @@ export function isCycleConsumptionValid(cycle: DriveCycle): boolean {
   const distanceKm = finiteNonNegative(cycle.distanceTotalKm);
   const fuelUsedL = finiteNonNegative(cycle.fuelUsedL);
   if (
-    cycle.dataQuality === 'INCOMPLETE' ||
+    cycle.dataQuality !== 'COMPLETE' ||
     distanceKm < 0.1 ||
     fuelUsedL < 0.05 ||
     !Number.isFinite(cycle.avgFuelConsumptionKml) ||
