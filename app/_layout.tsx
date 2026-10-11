@@ -1,6 +1,6 @@
 import '../src/gps/backgroundLocationTask';
 import { useEffect, useRef } from 'react';
-import { useKeepAwake } from 'expo-keep-awake';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { Alert, AppState, Linking, Platform } from 'react-native';
 import { Stack } from 'expo-router';
 import { ensureBluetoothReady } from '../src/obd/bluetoothManager';
@@ -14,8 +14,30 @@ import { requestAllRequiredPermissions } from '../src/permissions/permissionMana
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 export default function RootLayout() {
-  // Mantém o ecrã ligado enquanto o aplicativo está aberto; não altera o bloqueio do sistema fora do app.
-  useKeepAwake('meriva-smart-diagnostic-active');
+  // Ativa o bloqueio de tela de forma explícita e o restaura quando o app volta ao primeiro plano.
+  useEffect(() => {
+    const tag = 'meriva-smart-diagnostic-active';
+    let disposed = false;
+
+    const activate = () => {
+      if (disposed || AppState.currentState === 'background' || AppState.currentState === 'inactive') return;
+      void activateKeepAwakeAsync(tag).catch((error) => {
+        console.warn('[KeepAwake] Falha ao manter a tela ligada:', error);
+      });
+    };
+
+    activate();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') activate();
+      else void deactivateKeepAwake(tag);
+    });
+
+    return () => {
+      disposed = true;
+      subscription.remove();
+      void deactivateKeepAwake(tag);
+    };
+  }, []);
 
   const checking = useRef(false);
   const lastFailureAt = useRef(0);
