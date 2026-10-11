@@ -65,6 +65,11 @@ assert.deepStrictEqual(integrator.addSample(10, 1000), {
 const state = integrator.addSample(10, 3700);
 assert.strictEqual(state.validSamples, 2);
 assert.strictEqual(state.fuelUsedL, 0.0075);
+const beforeStaleFuel = integrator.getState();
+assert.deepStrictEqual(integrator.addSample(100, 2000), beforeStaleFuel, 'timestamp atrasado deve ser descartado sem alterar o integrador');
+assert.deepStrictEqual(integrator.addSample(100, 3700), beforeStaleFuel, 'timestamp duplicado deve ser descartado sem alterar o integrador');
+assert.deepStrictEqual(integrator.addSample(100, Number.NaN), beforeStaleFuel, 'timestamp inválido deve ser descartado sem alterar o integrador');
+assertApprox(integrator.addSample(10, 6700).fuelUsedL, 0.01583333333333333, 1e-12);
 assert.strictEqual(integrator.addSample(NaN, 4700).fuelUsedL, 0.0075);
 integrator.reset();
 assert.deepStrictEqual(integrator.addSample(0, 1000), {
