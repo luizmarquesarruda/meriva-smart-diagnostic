@@ -10,7 +10,7 @@ Versão: 1.0.1 | Plataforma: Android | Transporte: Bluetooth Classic | ECU: OBD-
 
 O projeto prioriza dados reais, rastreabilidade e diagnóstico explicável. Uma resposta ausente não vira um valor inventado.
 
-O GPS do celular inicia automaticamente ao abrir o aplicativo. Ele fornece velocidade e distância em primeiro plano, mesmo quando a ECU não oferece o PID 015E. A gravação de litros e consumo depende de taxa de combustível OBD válida. Litros consumidos só entram no cálculo quando a ECU fornece uma taxa de combustível válida pelo PID OBD 015E. O GPS sozinho não mede litros. O aplicativo não aceita litros digitados manualmente na tela principal.
+A distância da viagem vem do GPS filtrado; o GPS não mede combustível. A taxa de combustível prefere o PID OBD 015E (medida pela ECU). Se ele não fornecer valor válido, o aplicativo tenta estimar a taxa pelo MAF (PID 0110) e, se não for possível, por MAP + RPM + IAT (PIDs 010B, 010C e 010F). A interface distingue taxa medida de taxa estimada. Essas estimativas dependem de hipóteses físicas e podem divergir do consumo real, especialmente em motor flex. Se não houver distância e combustível válidos, o consumo aparece como N/D. O app não aceita litros digitados manualmente na tela principal.
 
 Bluetooth Classic exige build nativo Android. Expo Go não é o ambiente de validação do transporte.
 
@@ -57,18 +57,19 @@ O sistema diferencia Bluetooth, ELM327 e ECU. Estar conectado ao ELM327 não sig
 ```text
 Root Layout
  ↓
-GpsTracker singleton
+GpsTracker singleton + tarefa global TaskManager
  ↓
-watchPositionAsync
+watchPositionAsync (primeiro plano)
+ou Location.startLocationUpdatesAsync (segundo plano)
  ↓
-filtro por precisão + salto + velocidade
+precisão <= 30 m + segmentos plausíveis + evidência de velocidade GPS/OBD
  ↓
-velocidade / distância
+distância filtrada
  ↓
-cálculo km/L somente com litros válidos
+distância GPS / combustível integrado = km/L
 ```
 
-O rastreador é criado uma vez por sessão do aplicativo para continuar ativo enquanto o usuário navega entre as telas. A coleta é de primeiro plano e requer permissão de localização.
+O rastreador é compartilhado entre telas. Depois da validação real da ECU, o Android tenta manter o GPS em segundo plano por meio de uma tarefa Expo Location/TaskManager e um Foreground Service com notificação persistente. Isso exige build nativa e permissões concedidas; economia de bateria do fabricante pode limitar a coleta, e o modo não garante recuperação após force-stop. A tarefa em segundo plano e o watcher de primeiro plano não devem coletar em paralelo.
 
 ## Regras de dados
 
@@ -82,7 +83,7 @@ O rastreador é criado uma vez por sessão do aplicativo para continuar ativo en
 
 ## PIDs e combustível
 
-A base cobre PIDs padrão úteis para telemetria e diagnóstico, incluindo velocidade, RPM, temperatura, MAF, posição da borboleta, nível de combustível (PID 012F) e taxa de combustível do motor (PID 015E). O PID 012F é a fonte absoluta de nível de combustível usada para litros, reserva e autonomia quando a resposta for válida. O PID 015E representa taxa de combustível em L/h quando suportado pela ECU; o aplicativo integra essa taxa ao longo do tempo usando os intervalos entre amostras, ignorando amostras inválidas e intervalos excessivamente longos.
+A base inclui PIDs como velocidade (010D), RPM (010C), temperatura do líquido (0105), MAF (0110), MAP (010B), IAT (010F), nível de combustível (012F) e taxa de combustível do motor (015E). O PID 012F informa percentual de nível e só alimenta litros restantes/reserva/autonomia quando a resposta é válida e a capacidade do tanque está configurada. O PID 015E representa taxa em L/h e é a fonte preferida para integrar combustível. Quando não há taxa 015E válida, o serviço tenta estimar por MAF; se isso falhar, tenta MAP + RPM + IAT. A estimativa MAP usa a cilindrada configurada ou a especificação da Meriva 1.4 (1389 cm³), além de hipóteses padrão de AFR, densidade e eficiência volumétrica. Origem medida/estimada fica marcada no registro da viagem; esses cálculos não devem ser tratados como medição direta da ECU.
 
 ## Identificação de combustível
 
@@ -120,7 +121,7 @@ O ELM327 deve estar previamente pareado no Android. O aplicativo escolhe automat
 ## Testes
 
 ```bash
-npm install
+npm ci --no-audit --no-fund
 npm run doctor
 npm run typecheck
 npm test
@@ -143,23 +144,18 @@ A suíte automatizada cobre autosave, parser, DTC, descoberta de PIDs, fila de c
 **Evidência antes de conclusão.**
 
 
-<!-- CI validation: 2026-10-06 -->
 ## Engenharia ELM327
 
-A camada Bluetooth usa o transporte nativo do react-native-bluetooth-classic com `connectionType: delimited`, `delimiter: \r` e `charset: ascii`. O aplicativo mantém um buffer local e só conclui a resposta quando encontra o prompt `>` do ELM327. O termo RAW no projeto significa preservar TX/RX recebidos.
+O transporte Bluetooth Classic usa `react-native-bluetooth-classic` com `connectionType: delimited`, `charset: ascii` e **delimiter vazio**. A aplicação acumula os fragmentos RX e encerra a resposta quando recebe o prompt `>`; cada comando TX termina em CR (`0x0D`). O uso de `delimiter: \\r` na configuração do transporte é documentação antiga e não representa o código atual. Detalhes em [docs/ELM327_ENGINEERING_PLAYBOOK.md](docs/ELM327_ENGINEERING_PLAYBOOK.md).
 
-A inicialização separa Bluetooth, ELM e ECU. O primeiro teste real da ECU é 010C. A documentação detalhada e a matriz de comparação com AndrOBD, python-OBD e implementações Java estão em docs/ELM327_ENGINEERING_PLAYBOOK.md.
-
-## Validação CI
-
-Este commit é um gatilho técnico para confirmar que o workflow `.github/workflows/ci.yml` continua disparando em `push` e executando a validação e o build Android nativo.
-
-O teste de transporte Bluetooth usa `connectionType: delimited`, `delimiter: \r` e buffering local até o prompt `>`. Esse contrato corresponde ao código atual e é protegido pela regressão automatizada.
+A conexão só é considerada OBD válido depois do teste de resposta real da ECU `010C -> 41 0C`. A recuperação de protocolo é serializada com a fila de comandos para evitar interleaving entre consultas e comandos AT.
 
 ## Execução em segundo plano
 
-Após a ECU ser validada pelo gate real 010C -> 41 0C, o aplicativo inicia o monitoramento persistente de GPS pelo Foreground Service do Android usando expo-location. A tarefa global em expo-task-manager continua alimentando o mesmo GpsTracker, enquanto o ciclo OBD mantém as consultas e o autosave da sessão.
+Após validar a ECU, o aplicativo tenta iniciar o monitoramento persistente de GPS por Expo Location + TaskManager e Foreground Service Android. Com a tela apagada, a coleta depende das permissões, da sessão ativa e das políticas do fabricante para bateria. Force-stop ou encerramento explícito não é coberto como garantia de continuidade.
 
-Com a tela apagada, o objetivo é manter OBD + histórico + GPS em execução enquanto o Foreground Service estiver ativo. Isso não cobre force-stop/encerramento explícito do app nem garante comportamento idêntico entre fabricantes que impõem políticas próprias de economia de bateria.
+## CI e validação
 
-O Android solicita localização em segundo plano para esse modo. A notificação persistente identifica que o diagnóstico do veículo está ativo.
+O workflow [.github/workflows/ci.yml](.github/workflows/ci.yml) executa `npm ci`, Expo Doctor, TypeScript, testes automatizados e build APK Release standalone com Java 17. Commits marcados com `[skip ci]` não devem ser descritos como validados por CI. A validação física de Bluetooth, GPS, PIDs e consumo exige um Android real e a ECU da Meriva.
+
+**Princípio de validação:** distinguir testes escritos, testes executados, CI executada e ensaio físico. Não declarar uma etapa concluída sem evidência do respectivo teste.
