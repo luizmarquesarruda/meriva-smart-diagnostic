@@ -75,7 +75,7 @@ A recepção Bluetooth usa o listener de dados como fonte única. A `Elm327Sessi
 
 `src/meriva/` contém o estado persistido e o autosave.
 
-`src/database/merivaManual.ts` contém somente especificações confirmadas no Manual do Proprietário 2012. Elas servem para configurar o veículo e cálculos físicos, como a capacidade de 56 L do tanque. Não criam PIDs, não substituem a ECU e não confirmam protocolo.
+`src/database/merivaManual.ts` contém somente especificações confirmadas no Manual do Proprietário 2012. A capacidade nominal de 56 L inclui cerca de 5 L de reserva; aproximadamente 51 L ficam antes da faixa de reserva. O PID 012F é convertido em litros sobre o total de 56 L, e a autonomia restante inclui a reserva. Não criam PIDs, não substituem a ECU e não confirmam protocolo.
 
 ### Storage
 
