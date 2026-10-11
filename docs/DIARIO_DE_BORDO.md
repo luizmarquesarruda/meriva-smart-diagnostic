@@ -1636,3 +1636,37 @@ A confirmação definitiva exige uma sessão real na Meriva com ELM327, principa
 - Nenhuma dependência nova foi adicionada nesta etapa.
 - CI continua deliberadamente não disparada até concluir a revisão estática.
 
+## 2026-10-11 — Integração da distância GPS ao consumo real
+
+### Problema observado
+O serviço de viagem já combinava distância acumulada pelo GPS com combustível integrado a partir de uma taxa OBD. Porém, o filtro de movimento comparava cada pequeno segmento de GPS, individualmente, com um limite adaptativo baseado na precisão. Com precisão mediana e deslocamentos curtos, segmentos válidos podiam ser descartados continuamente, deixando a distância da viagem subestimada ou em zero.
+
+Também foi encontrada uma fonte de confusão no cockpit: quando ainda não havia histórico de viagens reais, o serviço usava uma média derivada dos dados de referência do Car Scanner como fallback para o indicador de consumo. Isso podia parecer consumo real mesmo sem uma viagem real calculada.
+
+### Correções aplicadas na branch
+- O rastreador GPS agora confirma o movimento com várias amostras consecutivas plausíveis e deslocamento acumulado, em vez de exigir que cada segmento isolado ultrapasse a margem de precisão.
+- O filtro preserva distância pendente somente após movimento confirmado, mantém limites para saltos, velocidade e intervalos entre posições e descarta trechos sem evidência suficiente.
+- A tela principal prioriza o consumo da viagem ativa. A média persistida usada como consumo real depende de leituras reais acumuladas; os dados de referência `CARSCANNER_SEED` não servem mais de fallback para esse indicador.
+- As telas Dados e Laboratório distinguem os rótulos de distância GPS e consumo real, e Dados informa a condição/precisão atual do GPS e a origem do combustível integrado/estimado.
+- Foi acrescentado um teste de regressão com precisão GPS mediana e segmentos individuais curtos.
+- A documentação `docs/GPS_DRIFT_AND_DISTANCE.md` foi atualizada para refletir as regras e os limites atuais.
+
+### Arquivos alterados
+- `src/gps/gpsTracker.ts`
+- `src/trip/autoTripService.ts`
+- `tests/gps.test.js`
+- `app/index.tsx`
+- `app/dados.tsx`
+- `app/laboratorio.tsx`
+- `docs/GPS_DRIFT_AND_DISTANCE.md`
+- `docs/DIARIO_DE_BORDO.md`
+
+### Validação e CI
+- Commit de implementação: `40ae77a07c01a1d185c151fe631cfdd17798101f`.
+- CI **não disparada**, conforme solicitado; os commits usam `[skip ci]`.
+- Os testes foram adicionados, mas ainda **não foram executados** neste ciclo. A correção não deve ser considerada validada até executar typecheck, testes e build Android em uma etapa autorizada.
+- Continua necessária validação física em percurso real com a Meriva e o telefone: comparar distância GPS com distância conhecida, conferir taxa de combustível/PID disponível e confirmar consumo médio.
+
+### Próximo passo
+Executar validação local ou CI em momento autorizado, corrigir eventuais regressões e só então integrar ao `main`.
+
