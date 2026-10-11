@@ -67,14 +67,14 @@ assert.ok(incomplete.incompleteReason.includes('INSUFFICIENT_FUEL_VOLUME'));
 
 const cycle = new RealTripRecorder(1000, 0);
 cycle.addSample({ timestampMs: 1000, distanceKm: 0, speedKmh: 0, fuelRateLph: 8 });
-cycle.addSample({ timestampMs: 11000, distanceKm: 1, speedKmh: 36, fuelRateLph: 8 });
-cycle.addSample({ timestampMs: 21000, distanceKm: 2, speedKmh: 36, fuelRateLph: 8 });
-const saved = cycle.buildDriveCycle(22000);
+cycle.addSample({ timestampMs: 16000, distanceKm: 1, speedKmh: 36, fuelRateLph: 8 });
+cycle.addSample({ timestampMs: 31000, distanceKm: 2, speedKmh: 36, fuelRateLph: 8 });
+const saved = cycle.buildDriveCycle(32000);
 assert.ok(saved);
 assert.strictEqual(saved.source, 'REAL_OBD');
 assert.strictEqual(saved.dataQuality, 'COMPLETE');
 assert.strictEqual(saved.distanceTotalKm, 2);
-assertApprox(saved.fuelUsedL, 8 * 20_000 / 3_600_000, 1e-6);
+assertApprox(saved.fuelUsedL, 8 * 30_000 / 3_600_000, 1e-6);
 assert.strictEqual(saved.avgFuelConsumptionKml, Number((2 / saved.fuelUsedL).toFixed(3)));
 
 const shortTrip = new RealTripRecorder(1000, 0);
