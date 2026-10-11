@@ -1836,3 +1836,20 @@ A correção só será considerada concluída após a nova CI completar `npm run
 
 ### Validação
 A CI #1898 falhou apenas em `npm run validate` após instalação, Expo Doctor e TypeScript bem-sucedidos. A nova execução precisa confirmar o restante dos testes e o build Android. Não houve merge em `main`.
+
+## 2026-10-11 — Alinhamento do teste de ciclo de vida Bluetooth/ECU (CI #1899)
+
+### Falha encontrada
+- Commit testado: `c2334baa07da99613dffeee638eaf7ade178ec4a`.
+- `npm ci`, Expo Doctor (17/17), TypeScript e `tests/knowledgeJson.test.js` passaram.
+- `tests/bluetoothLifecycle.test.js` falhou porque esperava a antiga atribuição condicional `VEHICLE_PROFILE/OBD_RESPONSE` em `ecuValidationSource`.
+
+### Diagnóstico
+A implementação atual só chega a `persistValidatedConnection()` depois que a conexão passa pelo gate `connection.ecuValidated`, que depende de resposta OBD real. O endereço de ECU do perfil do veículo ajuda a preencher a identidade, mas não é prova de resposta da ECU. Logo, o valor correto para a origem da validação da sessão é sempre `OBD_RESPONSE`; a asserção literal do teste estava obsoleta.
+
+### Correção
+- Atualizado `tests/bluetoothLifecycle.test.js` para exigir `ecuValidationSource: 'OBD_RESPONSE'`, de acordo com a implementação e o gate real de validação.
+- A lógica de conexão Bluetooth/ELM327 não foi alterada para satisfazer uma expectativa de teste desatualizada.
+
+### Validação
+CI #1899: instalação, Expo Doctor e TypeScript passaram; a suíte chegou ao teste de ciclo de vida Bluetooth e interrompeu nele. A nova CI deverá confirmar o restante da suíte e o build Android. Nenhum merge em `main`.

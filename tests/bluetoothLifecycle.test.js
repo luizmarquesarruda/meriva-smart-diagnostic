@@ -31,7 +31,7 @@ assert(shared.includes('startBluetoothMonitor'));
 assert(shared.includes('preferredAddress'));
 assert(shared.includes('selectedAdapterAddress: connection.device.address.toUpperCase()'));
 assert(shared.includes('ecuValidatedAt: validatedAt'));
-assert(shared.includes("ecuValidationSource: state.vehicle?.ecuAddress ? 'VEHICLE_PROFILE' : 'OBD_RESPONSE'"));
+assert(shared.includes("ecuValidationSource: 'OBD_RESPONSE'"));
 assert(rootLayout.includes('connectPreferredElm(settings.selectedAdapterAddress)'));
 assert(rootLayout.includes('Bluetooth necessário para diagnóstico do veículo.'));
 assert(bluetoothScreen.includes('ATIVAR BLUETOOTH'));
