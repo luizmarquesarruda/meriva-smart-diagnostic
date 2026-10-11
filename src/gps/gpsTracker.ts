@@ -76,7 +76,10 @@ export function normalizeGpsSpeedKmh(speedMs: number | null | undefined): number
 }
 
 function isAccurate(sample: GpsSample): boolean {
-  return sample.accuracyM == null || sample.accuracyM <= MAX_ACCURACY_M;
+  return sample.accuracyM != null &&
+    Number.isFinite(sample.accuracyM) &&
+    sample.accuracyM >= 0 &&
+    sample.accuracyM <= MAX_ACCURACY_M;
 }
 
 export class GpsTracker {
