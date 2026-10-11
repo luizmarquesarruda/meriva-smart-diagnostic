@@ -28,7 +28,7 @@ assert(!exported.includes('Meu celular'), 'nome do dispositivo não deve sair');
 assert(exported.includes('Meriva Maxx'), 'dados técnicos não sensíveis devem ser preservados');
 
 const legacyTxt = redactSensitiveIdentifiers(
-  'VIN: 1HGCM82633A004352\\nIdentificação ECU: SERIAL-123-PRIVATE\\nNome ECU: ECU de Luiz\\nAdaptador: Luiz OBD\\nselectedAdapterAddress: A1:B2:C3:D4:E5:F6\\nModelo: Meriva Maxx\\n',
+  'VIN: 1HGCM82633A004352\nIdentificação ECU: SERIAL-123-PRIVATE\nNome ECU: ECU de Luiz\nAdaptador: Luiz OBD\nselectedAdapterAddress: A1:B2:C3:D4:E5:F6\nModelo: Meriva Maxx\n',
 );
 for (const privateValue of ['1HGCM82633A004352', 'SERIAL-123-PRIVATE', 'ECU de Luiz', 'Luiz OBD', 'A1:B2:C3:D4:E5:F6']) {
   assert(!legacyTxt.includes(privateValue), 'legacy TXT não deve exportar identificador: ' + privateValue);
