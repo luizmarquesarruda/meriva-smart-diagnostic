@@ -180,4 +180,13 @@ const guardedSummary = getDriveCycleSummary([summaryCycleA, summaryCycleB, inval
 assert.strictEqual(guardedSummary.avgConsumptionKml, 10, 'ciclos legados sem combustível válido ou com fórmula inconsistente não podem inflar a média km/L');
 assert.strictEqual(guardedSummary.totalDistanceKm, 150, 'distância observada continua no total mesmo quando o consumo é inválido');
 
-console.log('PASS trip recorder: GPS monotônico, timestamps, viagens curtas e consumo incompleto');
+// Regression: all trip-consumption surfaces must reject legacy/incomplete values.
+const storageScreenSource = fs.readFileSync(path.join(ROOT, 'app', 'armazenamento.tsx'), 'utf8');
+const exportSource = fs.readFileSync(path.join(ROOT, 'src', 'storage', 'exportDiagnostics.ts'), 'utf8');
+assert.ok(storageScreenSource.includes("cycle.source === 'REAL_OBD'"), 'storage UI must hide Car Scanner/reference history');
+assert.ok(storageScreenSource.includes('isCycleConsumptionValid(cycle)'), 'storage UI must validate consumption before display');
+assert.ok(exportSource.includes("csv(isCycleConsumptionValid(cycle) ? cycle.avgFuelConsumptionKml : 'N/D')"), 'CSV must export invalid/legacy consumption as N/D');
+assert.ok(exportSource.includes("avgFuelConsumptionKml: consumptionValid ? cycle.avgFuelConsumptionKml : null"), 'JSON must null out unverified consumption');
+assert.ok(exportSource.includes("'LEGACY_UNVERIFIED'"), 'exports must label cycles without a quality marker as legacy/unverified');
+
+console.log('PASS trip recorder: GPS monotônico, histórico real e consumo validado em telas/exportações');
