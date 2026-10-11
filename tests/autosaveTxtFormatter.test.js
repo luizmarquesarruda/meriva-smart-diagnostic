@@ -56,7 +56,7 @@ const options = { appVersion: '1.0.1', exportedAt: '2026-10-11T12:00:00.000Z' };
 
 const compact = formatAutoSaveTxt(state, { ...options, historyLimit: 10 });
 const compactHistory = compact.split('[HISTORY]')[1].split('[LEARNING]')[0];
-const compactRows = compactHistory.split(/\r?\n/).filter((line) => /km \| fonte=REAL_OBD/.test(line));
+const compactRows = compactHistory.split(/\r?\n/).filter((line) => line.includes('fonte=REAL_OBD') && /km \|/.test(line));
 assert.strictEqual(compactRows.length, 10, 'autosave TXT should include only the newest ten real trips');
 assert.ok(compactHistory.includes('24 km |'), 'compact TXT should preserve the newest trip');
 assert.ok(!compactHistory.includes('10 km |'), 'compact TXT should omit older trip rows');
@@ -64,7 +64,7 @@ assert.ok(!compactHistory.includes('999 km'), 'compact TXT must not include Car 
 
 const full = formatAutoSaveTxt(state, options);
 const fullHistory = full.split('[HISTORY]')[1].split('[LEARNING]')[0];
-const fullRows = fullHistory.split(/\r?\n/).filter((line) => /km \| fonte=REAL_OBD/.test(line));
+const fullRows = fullHistory.split(/\r?\n/).filter((line) => line.includes('fonte=REAL_OBD') && /km \|/.test(line));
 assert.strictEqual(fullRows.length, 15, 'full export should preserve the complete real-trip history');
 assert.ok(!fullHistory.includes('999 km'), 'full export must continue excluding Car Scanner seed trips');
 
