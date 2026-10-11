@@ -87,6 +87,8 @@ const gapIntegrator = new FuelRateIntegrator();
 gapIntegrator.addSample(10, 1000);
 const beforeGap = gapIntegrator.addSample(10, 2000).fuelUsedL;
 gapIntegrator.markGap();
+const gapState = gapIntegrator.getState();
+assert.deepStrictEqual(gapIntegrator.addSample(100, 1500), gapState, 'timestamp antigo após lacuna não pode reiniciar o integrador');
 assert.strictEqual(gapIntegrator.addSample(10, 3000).fuelUsedL, beforeGap, 'não interpolar combustível durante lacuna de telemetria');
 assertApprox(gapIntegrator.addSample(10, 4000).fuelUsedL, beforeGap + 10 / 3600, 1e-12);
 
