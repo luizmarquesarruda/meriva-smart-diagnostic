@@ -63,19 +63,56 @@ assert.ok(incomplete, 'trajeto observado deve ser preservado mesmo sem combustí
 assert.strictEqual(incomplete.source, 'REAL_OBD');
 assert.strictEqual(incomplete.dataQuality, 'INCOMPLETE');
 assert.strictEqual(incomplete.avgFuelConsumptionKml, 0, 'não inventar consumo sem taxa de combustível válida');
-assert.ok(incomplete.incompleteReason.includes('NO_VALID_FUEL_INTEGRATION'));
+assert.ok(incomplete.incompleteReason.includes('INSUFFICIENT_FUEL_VOLUME'));
 
 const cycle = new RealTripRecorder(1000, 0);
 cycle.addSample({ timestampMs: 1000, distanceKm: 0, speedKmh: 0, fuelRateLph: 8 });
 cycle.addSample({ timestampMs: 11000, distanceKm: 1, speedKmh: 36, fuelRateLph: 8 });
 cycle.addSample({ timestampMs: 21000, distanceKm: 2, speedKmh: 36, fuelRateLph: 8 });
 const saved = cycle.buildDriveCycle(22000);
-
 assert.ok(saved);
 assert.strictEqual(saved.source, 'REAL_OBD');
+assert.strictEqual(saved.dataQuality, 'COMPLETE');
 assert.strictEqual(saved.distanceTotalKm, 2);
 assertApprox(saved.fuelUsedL, 8 * 20_000 / 3_600_000, 1e-6);
 assert.strictEqual(saved.avgFuelConsumptionKml, Number((2 / saved.fuelUsedL).toFixed(3)));
+
+const shortTrip = new RealTripRecorder(1000, 0);
+shortTrip.addSample({ timestampMs: 1000, distanceKm: 0, speedKmh: 0, fuelRateLph: 8 });
+shortTrip.addSample({ timestampMs: 11000, distanceKm: 0.04, speedKmh: 12, fuelRateLph: 8 });
+const shortCycle = shortTrip.buildDriveCycle(12000);
+assert.ok(shortCycle, 'viagem real curta deve permanecer no histórico');
+assert.strictEqual(shortCycle.dataQuality, 'INCOMPLETE');
+assert.strictEqual(shortCycle.avgFuelConsumptionKml, 0);
+assert.ok(shortCycle.incompleteReason.includes('DISTANCE_TOO_SHORT'));
+
+const outOfOrder = new RealTripRecorder(0, 0);
+outOfOrder.addSample({ timestampMs: 10000, distanceKm: 1, speedKmh: 30, fuelRateLph: 8 });
+const afterFirst = outOfOrder.getState();
+const rejectedLate = outOfOrder.addSample({ timestampMs: 5000, distanceKm: 5, speedKmh: 100, fuelRateLph: 100 });
+assert.deepStrictEqual(rejectedLate, afterFirst, 'amostra atrasada não deve alterar nenhum acumulador');
+const rejectedDuplicate = outOfOrder.addSample({ timestampMs: 10000, distanceKm: 7, speedKmh: 150, fuelRateLph: 100 });
+assert.deepStrictEqual(rejectedDuplicate, afterFirst, 'timestamp duplicado não deve alterar nenhum acumulador');
+assert.strictEqual(outOfOrder.getState().distanceKm, 1);
+assert.strictEqual(outOfOrder.getState().maxSpeedKmh, 30);
+
+const gpsReset = new RealTripRecorder(0, 10);
+gpsReset.addSample({ timestampMs: 1000, distanceKm: 10, speedKmh: 0, fuelRateLph: 8 });
+gpsReset.addSample({ timestampMs: 2000, distanceKm: 10.1, speedKmh: 20, fuelRateLph: 8 });
+const afterReset = gpsReset.addSample({ timestampMs: 3000, distanceKm: 0.1, speedKmh: 20, fuelRateLph: 8 });
+assert.strictEqual(afterReset.distanceKm, 0.1, 'reset GPS não pode apagar distância acumulada');
+const afterResetRecovery = gpsReset.addSample({ timestampMs: 4000, distanceKm: 0.2, speedKmh: 20, fuelRateLph: 8 });
+assert.strictEqual(afterResetRecovery.distanceKm, 0.2, 'distância deve voltar a acumular depois do reset');
+
+const invalidDistance = new RealTripRecorder(0, 10);
+invalidDistance.addSample({ timestampMs: 1000, distanceKm: Number.NaN, speedKmh: 10, fuelRateLph: null });
+const validAfterInvalid = invalidDistance.addSample({ timestampMs: 2000, distanceKm: 10.02, speedKmh: 20, fuelRateLph: null });
+assert.strictEqual(validAfterInvalid.distanceKm, 0.02, 'distância inválida não pode substituir a última referência válida');
+
+const invalidTimestamp = new RealTripRecorder(0, 0);
+const initial = invalidTimestamp.addSample({ timestampMs: 1000, distanceKm: 0, speedKmh: 0, fuelRateLph: 8 });
+const invalidTimeState = invalidTimestamp.addSample({ timestampMs: Number.NaN, distanceKm: 5, speedKmh: 200, fuelRateLph: 100 });
+assert.deepStrictEqual(invalidTimeState, initial, 'timestamp inválido deve ser descartado sem mutar o estado');
 
 const gap = new RealTripRecorder(0, 0);
 gap.addSample({ timestampMs: 0, distanceKm: 0, speedKmh: 0, fuelRateLph: 10 });
@@ -84,12 +121,9 @@ assert.strictEqual(gap.getState().durationMs, 0);
 assert.strictEqual(gap.getState().fuelUsedL, 0);
 
 const { getDriveCycleSummary } = loadTs('src/data/driveCycles.ts');
-const completeSummary = getDriveCycleSummary([
-  saved,
-  incomplete,
-]);
-assert.strictEqual(completeSummary.realCycleCount, 2, 'o histórico conta os dois trajetos reais');
-assert.strictEqual(completeSummary.totalDistanceKm, 2.2, 'distância incompleta continua no total observado');
-assert.strictEqual(completeSummary.avgConsumptionKml, Number((2 / saved.fuelUsedL).toFixed(2)), 'a média usa apenas o ciclo completo');
+const completeSummary = getDriveCycleSummary([saved, incomplete, shortCycle]);
+assert.strictEqual(completeSummary.realCycleCount, 3, 'histórico deve contar trajetos completos e incompletos');
+assert.strictEqual(completeSummary.totalDistanceKm, 2.24, 'distância de viagens incompletas continua no total observado');
+assert.strictEqual(completeSummary.avgConsumptionKml, Number((2 / saved.fuelUsedL).toFixed(2)), 'média de consumo usa apenas ciclos completos');
 
-console.log('PASS trip recorder: GPS + OBD + preservação de ciclos incompletos');
+console.log('PASS trip recorder: GPS monotônico, timestamps, viagens curtas e consumo incompleto');
