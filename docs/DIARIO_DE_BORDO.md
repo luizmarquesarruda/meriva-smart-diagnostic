@@ -1890,3 +1890,17 @@ A correção depende da nova CI, incluindo todos os testes e o build Android. N�
 
 ### Validação
 A nova CI precisa confirmar a suíte completa e o build Android. Não houve merge em main.
+
+## 2026-10-11 — Adequação dos testes de CSV ao buffer de escrita (CI #1902)
+
+### Falhas encontradas
+- Commit testado: 71e07776023db3b3cd2ca3779e6d7d8cfb5f3935.
+- npm ci, Expo Doctor (17/17), TypeScript e os 18 testes de merivaAutosave passaram, incluindo o lote de amostras reais.
+- Duas regressões falharam porque liam os arquivos CSV antes de chamar flushCsvRows(): logger TX/RX e serialização concorrente.
+
+### Correção
+- tests/regression.test.js agora chama flushCsvRows() antes de ler os arquivos OBD; o teste de serialização descarrega o arquivo específico enquanto o atraso artificial de gravação continua ativo.
+- A implementação do buffer CSV foi preservada; não se voltou a gravar sincronamente cada leitura OBD.
+
+### Validação
+A nova CI deverá confirmar todas as regressões restantes e o build Android. Não houve merge em main.

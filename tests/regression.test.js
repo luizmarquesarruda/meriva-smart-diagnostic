@@ -624,6 +624,8 @@ async function testRawLogger() {
 
   await logger.logRawObdData(BASE, query, '010C', 'REAL');
   await logger.logInterpretedData(BASE, query, '010C', 'REAL');
+  const csvLogger = loadTs(path.join(ROOT, 'src/database/csvLogger.ts'));
+  await csvLogger.flushCsvRows();
 
   const rawFile = Array.from(files.keys()).find((p) => p.includes('/LOGS/obd_raw_'));
   const interpretedFile = Array.from(files.keys()).find((p) => p.includes('/LOGS/obd_interpreted_'));
@@ -766,6 +768,7 @@ async function testCsvWriteSerialization() {
     logger.appendCsvRow(target, { id: 'A', timestamp: 't1' }),
     logger.appendCsvRow(target, { id: 'B', timestamp: 't2' }),
   ]);
+  await logger.flushCsvRows(target);
   writeDelayMs = 0;
 
   const content = files.get(target);
