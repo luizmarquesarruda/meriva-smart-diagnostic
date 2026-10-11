@@ -290,7 +290,7 @@ class AutoTripService {
             mapKpa: mapKpa != null && Number.isFinite(mapKpa) ? mapKpa : null,
             rpm,
             intakeAirTempC: intakeAirTempC != null && Number.isFinite(intakeAirTempC) ? intakeAirTempC : null,
-            displacementCm3: getAutoSaveState().vehicle?.displacementCm3 ?? 1598,
+            displacementCm3: getAutoSaveState().vehicle?.displacementCm3 ?? 1389,
           });
           if (estimate) {
             fuelRateLph = estimate.rateLph;
