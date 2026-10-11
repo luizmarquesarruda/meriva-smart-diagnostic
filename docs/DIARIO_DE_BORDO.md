@@ -1846,6 +1846,10 @@ As alterações foram gravadas na branch `fix/daily-obd-history-keep-screen-awak
 - `015E` só pode ser tratado como consumo medido quando a ECU realmente o suportar e responder com dados válidos. MAF/MAP continuam estimativas explicitamente identificadas; sem base confiável, exibir `N/D`.
 - O TXT diário permanece um resumo de sessões; para séries temporais, usar os CSVs existentes e os gráficos/tendências, sem prometer que o TXT contém cada leitura.
 
+- `src/meriva/autosaveIntegration.ts`: resposta OBD válida passa a registrar o estado `RESPONDEU`; uma amostra isolada não promove automaticamente um PID para `CONFIRMADO`. Confirmação física/validação no veículo exige evidência independente.
+- `src/knowledge/ranges.json`: faixa do PID `0143` corrigida para até 25700%, compatível com a fórmula padronizada `((A × 256 + B) × 100) / 255`; regressão adicionada para o limite superior.
+- Criado `docs/RELATORIO_PIDS_E_FORMULAS.md`, com inventário dos 34 PIDs, 20 fórmulas, faixas, 1 PID com evidência RAW_ECU, 10 candidatos e alvos de confirmação.
+
 ### Validação pendente
 - Esta rodada foi gravada na PR #49 e dispara CI automaticamente por causa da política de `push` do repositório. Confirmar os jobs no head final antes de declarar os testes aprovados.
 - O teste de sessões concorrentes e a regressão da tela foram adicionados, mas ainda precisam ser executados pela CI.
