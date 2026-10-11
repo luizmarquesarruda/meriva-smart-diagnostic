@@ -2,6 +2,7 @@ import * as FileSystem from 'expo-file-system';
 import { getAutoSaveState } from '../meriva/autosaveManager';
 import { readDtcs } from '../database/dtcManager';
 import { readDriveCycles } from './driveCycleStorage';
+import { flushCsvRows } from '../database/csvLogger';
 
 function csv(value: unknown): string {
   const text = String(value ?? '');
@@ -15,6 +16,7 @@ async function ensureExportDir(basePath: string): Promise<string> {
 }
 
 export async function exportDiagnosticsJson(basePath: string): Promise<string> {
+  await flushCsvRows();
   const state = getAutoSaveState();
   const dtcs = await readDtcs(basePath);
   const driveCycles = await readDriveCycles(basePath);
@@ -37,6 +39,7 @@ export async function exportDiagnosticsJson(basePath: string): Promise<string> {
 }
 
 export async function exportDriveCyclesCsv(basePath: string): Promise<string> {
+  await flushCsvRows();
   const cycles = await readDriveCycles(basePath);
   const dir = await ensureExportDir(basePath);
   const path = `${dir}/drive_cycles_${Date.now()}.csv`;
