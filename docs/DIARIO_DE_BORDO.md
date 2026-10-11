@@ -1671,3 +1671,31 @@ Também foi encontrada uma fonte de confusão no cockpit: quando ainda não havi
 ### Próximo passo
 Executar validação local ou CI em momento autorizado, corrigir eventuais regressões e só então integrar ao `main`.
 
+
+
+## 2026-10-11 — Auditoria de gargalos e otimização de aquisição
+
+### Correções nesta etapa
+- A recuperação do ELM327 agora é executada como uma operação exclusiva na mesma fila de comandos que as consultas OBD. O probe e a renegociação de protocolo não chamam mais `identifyProtocol()` por dentro da fila, evitando deadlock e impedindo que consultas normais se intercalem com `ATZ/ATSP`.
+- O filtro GPS rejeita posições sem precisão declarada, não finita, negativa ou acima do limite configurado. A distância não pode ser construída a partir de um fix cuja precisão é desconhecida.
+- A tela Viagens calcula resumo e lista somente com ciclos `REAL_OBD`, evitando misturar registros de referência importados na apresentação de viagens reais.
+- A telemetria em memória continua recebendo cada resposta OBD; persistência de confirmação/perfil de aprendizado foi limitada a uma gravação por PID a cada 60 segundos para evitar leitura/regravação repetida do mesmo banco durante polling. O limite não muda a frequência das consultas OBD nem a integração do combustível.
+
+### Pesquisa de fontes técnicas
+- Expo FileSystem: documentação oficial descreve APIs diferentes entre a API legada e a atual. Como o projeto está em Expo SDK 51 / expo-file-system 17, não foi feita migração para API de versão recente sem prova de compatibilidade.
+- Expo Location / TaskManager: documentação oficial confirma que a tarefa de localização em segundo plano precisa ser registrada no escopo global e que o Android não garante reinício de uma aplicação terminada apenas por evento de localização. O serviço precisa ser testado em build nativa e no aparelho alvo.
+- Android Developers: localização em segundo plano é sujeita a limites de frequência e restrições de bateria; isso precisa ser tratado como limite de plataforma, não corrigido aumentando indiscriminadamente o polling.
+
+### Arquivos alterados
+- `src/obd/elm327.ts`
+- `src/gps/gpsTracker.ts`
+- `src/meriva/autosaveIntegration.ts`
+- `app/viagens.tsx`
+- `tests/gps.test.js`
+- `tests/ecuHealth.test.js`
+- `docs/DIARIO_DE_BORDO.md`
+
+### Limitações restantes
+- `src/database/csvLogger.ts` ainda lê e reescreve o CSV diário a cada linha. A solução de longo prazo é implementar append real compatível com a versão instalada ou migrar o logger para armazenamento incremental com rotação e flush seguro. Não foi alterado neste lote porque exige testar comportamento da API legada, concorrência e recuperação após encerramento do processo.
+- O intervalo de 60 segundos do aprendizado reduz I/O, mas ocorrências passam a representar confirmações persistidas, não cada resposta bruta recebida. A contagem bruta deve ser consultada no log de telemetria, não interpretada como contador de amostras.
+- Não executada CI; os commits usam `[skip ci]`. Typecheck, suíte de testes e build Android continuam pendentes.
