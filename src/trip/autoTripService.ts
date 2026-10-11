@@ -4,7 +4,7 @@ import { getSharedObdConnection, getSharedObdStatus, subscribeSharedObd } from '
 import { addDriveCycle, readDriveCycles } from '../storage/driveCycleStorage';
 import { forceSaveOnObdEvent, registerObdQuery } from '../meriva/autosaveIntegration';
 import { getAutoSaveState, updateAutoSaveState, initAutoSave } from '../meriva/autosaveManager';
-import { RealTripRecorder } from './tripRecorder';
+import { RealTripRecorder, shouldFinalizeStoppedTrip } from './tripRecorder';
 import { estimateRangeFromFuelLevel, fuelLevelPercentToLiters, isFuelReserve } from './fuelLevel';
 import { getLivePidTrend, resetLiveTelemetry } from '../obd/liveTelemetry';
 import { estimateFuelRateLph, type FuelRateSource } from '../obd/fuelConsumption';
@@ -313,7 +313,8 @@ class AutoTripService {
 
         const gps = gpsTracker.getState();
         const vehicleSpeedKmh = obdSpeedKmh ?? gps.currentSpeedKmh;
-        const moving = (rpm ?? 0) > 0 && vehicleSpeedKmh > 0;
+        // If RPM is temporarily unavailable, valid vehicle speed is still movement evidence.
+        const moving = vehicleSpeedKmh > 0 && (rpm == null || rpm > 0);
 
         if (moving) {
           this.stoppedSinceMs = null;
@@ -322,7 +323,7 @@ class AutoTripService {
           }
         } else if (this.recorder) {
           this.stoppedSinceMs ??= Date.now();
-          if (Date.now() - this.stoppedSinceMs >= 15_000) {
+          if (shouldFinalizeStoppedTrip(Date.now() - this.stoppedSinceMs, rpm)) {
             await this.finalizeRecorder();
             this.stoppedSinceMs = null;
           }
