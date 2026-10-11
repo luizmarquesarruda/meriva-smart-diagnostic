@@ -7,6 +7,7 @@
 import type { MerivaPersistedState } from './autosaveState';
 import { AUTOSAVE_SCHEMA_VERSION } from './autosaveTypes';
 import { getDtcDefinition } from '../obd/dtcDefinition';
+import { isCycleConsumptionValid } from '../data/driveCycles';
 
 export const ND = 'N/D';
 
@@ -87,8 +88,20 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
   L.push('[HISTORY]');
   if (state.driveCycles.length) {
     for (const cycle of state.driveCycles) {
+      const distance = Number.isFinite(cycle.distanceTotalKm) && cycle.distanceTotalKm >= 0
+        ? `${cycle.distanceTotalKm} km`
+        : ND;
+      const fuel = Number.isFinite(cycle.fuelUsedL) && cycle.fuelUsedL >= 0
+        ? `${cycle.fuelUsedL} L`
+        : ND;
+      const consumption = isCycleConsumptionValid(cycle)
+        ? `${cycle.avgFuelConsumptionKml} km/L`
+        : ND;
+      const quality = cycle.dataQuality === 'INCOMPLETE' || !isCycleConsumptionValid(cycle)
+        ? 'qualidade=INCOMPLETA'
+        : 'qualidade=VALIDADA';
       L.push(
-        `${cycle.startedAt} -> ${cycle.finishedAt} | ${cycle.distanceTotalKm} km | ${cycle.fuelUsedL} L | ${cycle.avgFuelConsumptionKml} km/L | fonte=${cycle.source} | combustivel=${or(cycle.fuelRateSource)}`,
+        `${cycle.startedAt} -> ${cycle.finishedAt} | ${distance} | ${fuel} | consumo=${consumption} | fonte=${cycle.source} | ${quality} | combustivel=${or(cycle.fuelRateSource)}`,
       );
     }
   } else {
