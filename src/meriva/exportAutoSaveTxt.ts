@@ -9,6 +9,7 @@ import { Platform } from 'react-native';
 import type { MerivaPersistedState } from './autosaveState';
 import { formatAutoSaveTxt } from './autosaveTxtFormatter';
 import { appendAutoSaveHistory, AUTOSAVE_HISTORY_FILE, readAutoSaveHistory } from './autosaveHistoryTxt';
+import { redactSensitiveIdentifiers } from '../storage/privacyRedaction';
 
 export { ND } from './autosaveTxtFormatter';
 
@@ -47,7 +48,8 @@ export async function exportAutoSaveTxt(
       fileName,
       'text/plain',
     );
-    await FileSystem.writeAsStringAsync(uri, content, { encoding: FileSystem.EncodingType.UTF8 });
+    // A redação se aplica apenas ao arquivo exportado; o histórico local original não é alterado.
+    await FileSystem.writeAsStringAsync(uri, redactSensitiveIdentifiers(content), { encoding: FileSystem.EncodingType.UTF8 });
     return { ok: true, fileName, uri };
   } catch (cause) {
     return {
