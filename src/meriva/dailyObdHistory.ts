@@ -143,7 +143,7 @@ const dailyHistoryQueues = new Map<string, Promise<unknown>>();
 export function appendDailyObdSessionEvent(
   basePath: string,
   state: MerivaPersistedState,
-  event: 'SESSION_START' | 'SESSION_END',
+  event: 'SESSION_START' | 'SESSION_END' | 'SESSION_RECOVERED',
   timestamp = new Date().toISOString(),
 ): Promise<{ date: string; eventCount: number }> {
   const path = historyPath(basePath);
