@@ -40,7 +40,7 @@ function assertApprox(actual, expected, epsilon = 1e-9) {
   assert.ok(Math.abs(actual - expected) <= epsilon, `expected ${actual} ≈ ${expected}`);
 }
 
-const { RealTripRecorder } = loadTs('src/trip/tripRecorder.ts');
+const { RealTripRecorder, shouldFinalizeStoppedTrip } = loadTs('src/trip/tripRecorder.ts');
 Module._load = originalLoad;
 
 const recorder = new RealTripRecorder(1000, 5.000);
@@ -134,5 +134,14 @@ gap.addSample({ timestampMs: 0, distanceKm: 0, speedKmh: 0, fuelRateLph: 10 });
 gap.addSample({ timestampMs: 40_001, distanceKm: 1, speedKmh: 30, fuelRateLph: 10 });
 assert.strictEqual(gap.getState().durationMs, 0);
 assert.strictEqual(gap.getState().fuelUsedL, 0);
+
+// Short stationary periods must not fragment a real drive into tiny trips.
+assert.strictEqual(shouldFinalizeStoppedTrip(15_000, 850), false, 'idle at a traffic light must not close a trip after 15 seconds');
+assert.strictEqual(shouldFinalizeStoppedTrip(299_999, 850), false, 'engine-running stop remains open until the longer threshold');
+assert.strictEqual(shouldFinalizeStoppedTrip(300_000, 850), true, 'long stationary engine-running period can close the trip');
+assert.strictEqual(shouldFinalizeStoppedTrip(59_999, 0), false, 'explicit engine-off needs a sustained zero-RPM period');
+assert.strictEqual(shouldFinalizeStoppedTrip(60_000, 0), true, 'sustained explicit zero RPM closes the trip');
+assert.strictEqual(shouldFinalizeStoppedTrip(300_000, null), true, 'missing RPM uses the conservative longer threshold');
+assert.strictEqual(shouldFinalizeStoppedTrip(Number.NaN, 0), false, 'invalid elapsed time must not close a trip');
 
 console.log('PASS trip recorder: GPS monotônico, timestamps, limiar de combustível e persistência REAL_OBD');
