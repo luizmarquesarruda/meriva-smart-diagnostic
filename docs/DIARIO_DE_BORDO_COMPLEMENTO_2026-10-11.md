@@ -39,7 +39,7 @@ O perfil técnico da Meriva MY12 já usa `tankCapacityL: 56` e `reserveCapacityL
 - `src/obd/fuelConsumption.ts`: integrador rejeita timestamps inválidos/atrasados/duplicados e aceita `markGap()` para quebrar a janela quando não há taxa válida, sem zerar o combustível já integrado.
 - `src/trip/tripRecorder.ts`: taxa nula/inválida quebra a janela de integração; não interpolar através de telemetria de combustível ausente.
 - `src/gps/gpsTracker.ts`: callback GPS com timestamp inválido, repetido ou anterior ao último estado aceito é descartado integralmente.
-- `src/data/driveCycles.ts`: velocidade média global usa distância total / tempo total em movimento; média km/L só inclui ciclos com distância >= 0,1 km, combustível integrado >= 0,05 L, valor calculado positivo e qualidade não marcada incompleta.
+- `src/data/driveCycles.ts`: velocidade média global usa distância total / tempo total em movimento; média km/L só inclui ciclos explicitamente marcados `COMPLETE`, com distância >= 0,1 km, combustível integrado >= 0,05 L e fórmula consistente; ciclos legados sem qualidade explícita ficam como `N/D`.
 - `app/viagens.tsx`: inclui velocidade média e mostra `N/D` em consumo inválido, sem exibir sentinela zero como dado real.
 - `src/meriva/autosaveTxtFormatter.ts`: exportação identifica consumo inválido como `N/D`, e distingue ciclos incompletos, válidos e legados sem qualidade verificada.
 - `src/trip/autoTripService.ts`: média histórica exige distância e volume mínimos; estimativas MAF/MAP usam os parâmetros aproximados da preferência de combustível configurada. Corrigido também o import ausente de `getAutoSaveState` detectado pelo typecheck.
