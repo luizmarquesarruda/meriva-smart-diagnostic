@@ -57,3 +57,16 @@ A run #1894 (commit `4b383349b29ca3544e112ca4f232cb67bb3db1dd`) falhou no typech
 3. Confirmar o lifecycle GPS em foreground/background no Android físico; o teste unitário não substitui validação de callbacks nativos.
 4. Testar estimativas MAF/MAP e PID 015E na Meriva real, anotando a fonte e comparando com abastecimentos medidos antes de calibrar parâmetros.
 5. Não fazer merge nem release até passar typecheck, suíte de testes, Expo Doctor e build Android.
+
+
+## Marco seguinte — consumo coerente em armazenamento e exportações
+
+- Auditoria estática de consumidores adicionais de `avgFuelConsumptionKml` encontrou a tela `app/armazenamento.tsx` e `src/storage/exportDiagnostics.ts` ainda capazes de apresentar consumo legado ou sentinela zero como dado real.
+- `app/armazenamento.tsx`: o histórico visível agora lista somente ciclos `REAL_OBD`; ciclos de referência do Car Scanner não aparecem nessa tela. O consumo é exibido apenas quando `isCycleConsumptionValid(cycle)` valida qualidade, distância, combustível e consistência da fórmula.
+- `src/storage/exportDiagnostics.ts`: CSV usa `N/D` para consumo não validado e acrescenta `consumptionQuality`; JSON exporta `avgFuelConsumptionKml: null` para consumo inválido/não verificado e classifica a qualidade como `INCOMPLETE`, `INCONSISTENT` ou `LEGACY_UNVERIFIED`.
+- `tests/tripRecorder.test.js`: adicionadas verificações de regressão para impedir que a tela de armazenamento volte a exibir ciclos de referência e para exigir tratamento explícito de consumo inválido nas exportações.
+- Commits: `1dc9ecd8cc4777df1b30463c5a050d6c76d750af` (tela de armazenamento) e `7c3430d1d29b7368d8f701845c61c87e3481822e` (exportações). Os commits usam `[skip ci]`.
+
+### Situação após esta correção
+
+A revisão de código e a atualização dos testes foram feitas pela API do GitHub. **Os testes ainda não foram executados**, e nenhum resultado de typecheck/build pode ser inferido a partir da inspeção dos arquivos. A próxima validação precisa executar `npm ci`, `npm run typecheck`, `npm test`, `npm run doctor` e o build Android sem violar a instrução de não disparar CI. Como o clone local falhou por indisponibilidade de rede/DNS no ambiente anterior, o marco permanece em revisão estática até haver um executor local/remoto autorizado.
