@@ -19,7 +19,7 @@ mod.filename = sourcePath;
 mod.paths = Module._nodeModulePaths(path.dirname(sourcePath));
 mod._compile(output, sourcePath);
 
-const { integrateFuelRateLph, FuelRateIntegrator } = mod.exports;
+const { integrateFuelRateLph, FuelRateIntegrator, estimateFuelRateLph } = mod.exports;
 
 function assertApprox(actual, expected, epsilon = 1e-12) {
   assert.ok(Math.abs(actual - expected) <= epsilon, `expected ${actual} ≈ ${expected}`);
@@ -85,7 +85,24 @@ const fsSource = require('fs').readFileSync(require('path').join(__dirname, '..'
 if (!fsSource.includes('ESTIMATED_MAF') || !fsSource.includes('ESTIMATED_MAP')) {
   throw new Error('fuel fallback MAF/MAP não está implementado');
 }
-console.log('fuelConsumption fallback: OK');
+const zeroMafEstimate = estimateFuelRateLph({ mafGs: 0 });
+if (zeroMafEstimate !== null) throw new Error('MAF zero não deve ser tratado como taxa válida de combustível');
+const mapEstimate = estimateFuelRateLph({
+  mafGs: 0,
+  mapKpa: 35,
+  rpm: 1500,
+  intakeAirTempC: 25,
+  displacementCm3: 1389,
+});
+if (!mapEstimate || mapEstimate.source !== 'ESTIMATED_MAP' || !(mapEstimate.rateLph > 0)) {
+  throw new Error('MAF zero deve permitir fallback MAP quando há dados válidos');
+}
+if (!autoTripSource.includes("connection.supportedPids.includes('0110')") ||
+    !autoTripSource.includes("connection.supportedPids.includes('010B')") ||
+    !autoTripSource.includes("connection.supportedPids.includes('010F')")) {
+  throw new Error('PIDs MAF/MAP/IAT precisam ser verificados contra os PIDs suportados pela ECU');
+}
+console.log('fuelConsumption fallback MAF zero, MAP e suporte da ECU: OK');
 
 const autoTripSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'trip', 'autoTripService.ts'), 'utf8');
 const manualSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'database', 'merivaManual.ts'), 'utf8');
