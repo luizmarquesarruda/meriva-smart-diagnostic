@@ -1723,3 +1723,14 @@ O cruzamento entre `src/database/merivaManual.ts` e `src/trip/autoTripService.ts
 ### Resultado desta etapa
 
 A documentação foi reconciliada com o comportamento observado e o fallback de cilindrada da estimativa MAP foi corrigido, com regressão adicionada. **Não foram executados typecheck, `npm test`, build Android nem CI nesta rodada.** Não fazer merge nem declarar o conjunto validado antes dos testes numa etapa autorizada pelo usuário.
+
+
+## 2026-10-11 — Correção da capacidade total do tanque e da reserva
+
+- Especificação confirmada no perfil técnico: tanque nominal de **56 L no total**, com aproximadamente **5 L de reserva incluídos**. Portanto, não somar 5 L à capacidade nominal: há cerca de **51 L antes da faixa de reserva**.
+- `src/trip/fuelLevel.ts` deixou de manter 56 e 5 como números duplicados; agora deriva ambos de `MERIVA_MANUAL.capacities`. O limiar de reserva é calculado como 5/56 × 100 ≈ **8,93%** do PID 012F.
+- O cálculo de litros restantes usa o percentual sobre os 56 L totais e inclui a reserva. A autonomia estimada a partir do nível também inclui a reserva, enquanto `fuelReserve` sinaliza quando o nível está em aproximadamente 5 L ou menos. O nível 012F continua sendo uma estimativa baseada em percentual, não medição direta em litros.
+- `src/meriva/autosaveState.ts` e `src/trip/autoTripService.ts` agora usam a capacidade do manual em vez de repetir o literal 56.
+- Documentação atualizada em `README.md`, `docs/ARCHITECTURE.md` e `docs/MANUAL_MERIVA_2012.md`.
+- Regressão adicionada a `tests/fuelConsumption.test.js` para conferir a origem dos valores, a capacidade útil antes da reserva e o limiar aproximado de 8,93%.
+- Validação: teste adicionado, mas **não executado**. CI continua sem disparar; não houve build nem validação no veículo.
