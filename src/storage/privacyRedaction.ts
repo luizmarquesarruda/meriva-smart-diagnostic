@@ -13,5 +13,5 @@ export function redactSensitiveIdentifiers(content: string): string {
     .replace(/^DEVICE:.*$/gim, 'DEVICE: [REDACTED FOR PRIVACY]')
     // Sanitiza também snapshots TXT antigos, que podem conter campos de identidade ainda sem o novo formatador.
     .replace(/^(VIN|Identificação ECU|Nome ECU|Adaptador):.*$/gim, '$1: [OMITIDO POR PRIVACIDADE]')
-    .replace(/^(\\s*(?:selectedAdapterAddress|adapterAddress|deviceAddress|macAddress|bluetoothAddress|adapterName|deviceName|ecuIdentification|ecuName|vin|serialNumber)\\s*):.*$/gim, '$1: [OMITIDO POR PRIVACIDADE]');
+    .replace(/^(\s*(?:selectedAdapterAddress|adapterAddress|deviceAddress|macAddress|bluetoothAddress|adapterName|deviceName|ecuIdentification|ecuName|vin|serialNumber)\s*):.*$/gim, '$1: [OMITIDO POR PRIVACIDADE]');
 }
