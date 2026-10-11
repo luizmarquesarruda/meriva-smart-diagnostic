@@ -1,5 +1,5 @@
 import * as FileSystem from 'expo-file-system';
-import { appendCsvRow, CsvRow } from '../database/csvLogger';
+import { appendCsvRow, flushCsvRows, CsvRow } from '../database/csvLogger';
 import { DriveCycle, INITIAL_DRIVE_CYCLES } from '../data/driveCycles';
 
 function isDriveCycle(value: unknown): value is DriveCycle {
@@ -71,6 +71,7 @@ export async function initializeDriveCycles(basePath: string): Promise<void> {
 
     await appendCsvRow(csvFile, row);
   }
+  await flushCsvRows(csvFile);
 }
 
 export async function readDriveCycles(basePath: string): Promise<DriveCycle[]> {
@@ -148,4 +149,5 @@ export async function addDriveCycle(basePath: string, cycle: DriveCycle): Promis
   };
 
   await appendCsvRow(csvFile, row);
+  await flushCsvRows(csvFile);
 }
