@@ -227,7 +227,7 @@ export class Elm327Session {
       const selected = await this.command(preferred);
       if (selected.status !== 'OK') return false;
       const probe = await this.command('010C');
-      if (probe.status !== 'OK' || !/41\\s*0C/i.test(probe.response.replace(/\\s/g, ''))) return false;
+      if (probe.status !== 'OK' || !/410C/i.test(probe.response.replace(/\s/g, ''))) return false;
       this.noDataCount = 0;
       this.consecutiveFailures = 0;
       this.lastSuccessfulResponseAt = new Date().toISOString();
