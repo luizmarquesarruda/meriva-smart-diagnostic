@@ -8,14 +8,30 @@ import { discoverIntelligentPids } from './intelligentPidDiscovery';
 import type { PidDiscoveryCache } from '../meriva/autosaveState';
 import bluetoothConfig from '../knowledge/bluetooth_config.json';
 import { requestBluetoothPermissionsOnly } from '../permissions/permissionManager';
+import { redactSensitiveIdentifiers } from '../storage/privacyRedaction';
 
 let lastBluetoothDiagnosticText = '';
+
+/** Redige recursivamente identificadores antes mesmo de guardar o trace em memória. */
+function sanitizeDiagnosticDetails(value: unknown, key = ''): unknown {
+  if (/^(name|address|deviceName|adapterName|pairedDeviceName|device_name|adapter_name|deviceAddress|adapterAddress|bluetoothAddress|macAddress|selectedAdapterAddress)$/i.test(key)) {
+    return /name/i.test(key) ? '[NOME DO DISPOSITIVO REDIGIDO]' : '[ENDEREÇO BLUETOOTH REDIGIDO]';
+  }
+  if (Array.isArray(value)) return value.map((item) => sanitizeDiagnosticDetails(item));
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .map(([childKey, childValue]) => [childKey, sanitizeDiagnosticDetails(childValue, childKey)]),
+    );
+  }
+  return typeof value === 'string' ? redactSensitiveIdentifiers(value) : value;
+}
 
 function logBluetoothDiagnostic(event: string, details?: unknown): void {
   const time = new Date().toISOString();
   let line = `[${time}] ${event}`;
   if (details !== undefined) {
-    try { line += ` | ${JSON.stringify(details)}`; }
+    try { line += ` | ${JSON.stringify(sanitizeDiagnosticDetails(details))}`; }
     catch { line += ` | ${String(details)}`; }
   }
   lastBluetoothDiagnosticText += (lastBluetoothDiagnosticText ? '\n' : '') + line;
