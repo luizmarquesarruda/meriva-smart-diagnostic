@@ -220,6 +220,7 @@ async function testFormulaKnowledgeBank() {
   const engine = loadTs(path.join(ROOT, 'src/obd/formulaEngine.ts'));
 
   assert.strictEqual(engine.applyFormula('RPM', [0x1A, 0xF8]), 1726);
+  assert.strictEqual(engine.applyFormula('U32', [0x12, 0x34, 0x56, 0x78]), 0x12345678);
   assert.strictEqual(engine.applyFormula('TEMP_C', [0x69]), 65);
   assert.strictEqual(engine.applyFormula('MAF_GS', [0x03, 0x7B]), 8.91);
   assert.strictEqual(engine.applyFormula('FUEL_TRIM', [0x76]), -7.8125);
@@ -237,6 +238,11 @@ async function testFormulaKnowledgeBank() {
 
 async function testParser() {
   const parser = loadTs(path.join(ROOT, 'src/obd/parser.ts'));
+  const monitorStatus = parser.parsePidResponse('0101', '41 01 81 00 03 00');
+  assert.strictEqual(monitorStatus.status, 'RESPONDEU');
+  assert.strictEqual(monitorStatus.value, 0x81000300);
+  assert.match(monitorStatus.interpretation, /MIL=ON/);
+  assert.match(monitorStatus.interpretation, /DTCs=1/);
   assert.strictEqual(parser.parsePidResponse('0105', '41 05 69').value, 65);
   assert.strictEqual(parser.parsePidResponse('010C', '41 0C 1A F8').value, 1726);
   const o2 = parser.parsePidResponse('0114', '41 14 6A 80');

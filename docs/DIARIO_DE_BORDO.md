@@ -1803,3 +1803,22 @@ A documentação foi reconciliada com o comportamento observado e o fallback de 
 
 
 - Complemento: o formatador TXT também omite settings cujas chaves pareçam conter VIN, MAC/endereço, nome de dispositivo/adaptador, serial ou identificação de ECU. A documentação de privacidade correspondente foi adicionada ao README. A implementação e as regressões permanecem sem execução de testes nesta rodada.
+
+## 2026-10-11 — Correção da validação do PID 0101 e da fórmula U32
+
+### Falha encontrada — CI #1897
+- Commit de origem: `335979c67267f0f5e6efddd2b78577cf6c6ecb2e`.
+- `npm ci`, Expo Doctor (17/17) e TypeScript passaram.
+- `npm test` parou em `tests/knowledgeJson.test.js`: o PID `0101` declara unidade `status`, ausente de `src/knowledge/units.json`.
+
+### Diagnóstico
+O PID padrão OBD-II 0101 contém quatro bytes com um estado compactado de MIL, quantidade de DTCs e prontidão dos monitores. O parser já interpreta esses bits e a fórmula `U32` já combina os quatro bytes num inteiro sem sinal. O catálogo de unidade e as faixas estavam incompletos, e o teste de conhecimento não reconhecia a operação `u32` nem exigia quatro bytes para ela.
+
+### Correção
+- Adicionada a unidade sem dimensão `status` em `src/knowledge/units.json`.
+- Adicionada a faixa integral unsigned de 32 bits (0 a 4.294.967.295) para PID `0101` em `src/knowledge/ranges.json`. Essa faixa valida o campo bruto, não representa uma grandeza física contínua.
+- Atualizado `tests/knowledgeJson.test.js` para reconhecer `u32` como operação suportada e exigir quatro bytes.
+- Adicionadas regressões em `tests/regression.test.js` para a conversão U32 e a interpretação do PID 0101.
+
+### Validação
+A correção só será considerada concluída após a nova CI completar `npm run validate` e o build Android aplicável. Não foi feito merge em `main`.

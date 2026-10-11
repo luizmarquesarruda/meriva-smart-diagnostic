@@ -2,6 +2,10 @@
   "version": 2,
   "description": "Faixas de plausibilidade, não limites de diagnóstico. Valores fora delas viram evidência para revisão, não prova de defeito.",
   "ranges": {
+    "0101": {
+      "min": 0,
+      "max": 4294967295
+    },
     "0104": {
       "min": 0,
       "max": 100
