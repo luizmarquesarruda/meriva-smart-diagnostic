@@ -81,6 +81,14 @@ O rastreador é compartilhado entre telas. Depois da validação real da ECU, o 
 - Respostas sem interpretação ficam como NÃO RESPONDEU, VALOR NÃO INTERPRETADO ou SEM DADOS.
 - Nunca inventar valores.
 
+## Privacidade e exportação
+
+- O autosave operacional permanece local no armazenamento privado do aplicativo; ele não é um mecanismo de upload para o repositório GitHub.
+- Novos snapshots TXT omitem VIN, nome do adaptador, identificadores da ECU e configurações com chaves que aparentem conter identificadores pessoais.
+- Exportações manuais TXT/JSON e o relatório Bluetooth aplicam redação adicional a VINs, endereços Bluetooth e nomes/endereço dos adaptadores; o trace Bluetooth também mascara nomes e endereços antes de mantê-los em memória.
+- Os snapshots TXT antigos já armazenados localmente não são apagados automaticamente. A exportação manual os sanitiza ao gerar o arquivo.
+- O backup manual copia diretórios locais de logs, configuração, viagens e aprendizado; esses arquivos podem conter dados brutos. Revise o backup antes de compartilhar.
+
 ## PIDs e combustível
 
 A base inclui PIDs como velocidade (010D), RPM (010C), temperatura do líquido (0105), MAF (0110), MAP (010B), IAT (010F), nível de combustível (012F) e taxa de combustível do motor (015E). O PID 012F informa percentual de nível; para a Meriva, a capacidade total é 56 L e já inclui aproximadamente 5 L de reserva (cerca de 51 L antes da reserva). Litros restantes são estimados sobre os 56 L totais; o alerta de reserva começa perto de 5 L (8,93%). A autonomia calculada com o combustível restante inclui a reserva. O PID 015E representa taxa em L/h e é a fonte preferida para integrar combustível. Quando não há taxa 015E válida, o serviço tenta estimar por MAF; se isso falhar, tenta MAP + RPM + IAT. A estimativa MAP usa a cilindrada configurada ou a especificação da Meriva 1.4 (1389 cm³), além de hipóteses padrão de AFR, densidade e eficiência volumétrica. Origem medida/estimada fica marcada no registro da viagem; esses cálculos não devem ser tratados como medição direta da ECU.
