@@ -49,6 +49,15 @@ export class FuelRateIntegrator {
     };
   }
 
+  /** Breaks the integration window without erasing fuel already accumulated. */
+  markGap(): void {
+    this.state = {
+      ...this.state,
+      lastRateLph: null,
+      lastTimestampMs: null,
+    };
+  }
+
   addSample(fuelRateLph: number, timestampMs = Date.now()): FuelIntegrationState {
     const current: FuelRateSample = { fuelRateLph, timestampMs };
     if (!Number.isFinite(fuelRateLph) || fuelRateLph < 0 || !Number.isFinite(timestampMs)) return { ...this.state };
