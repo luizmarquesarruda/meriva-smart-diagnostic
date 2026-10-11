@@ -123,6 +123,36 @@ export class GpsTracker {
     this.emit();
   }
 
+  private async restoreForegroundWatcherAfterBackgroundFailure(reason: string): Promise<boolean> {
+    try {
+      this.subscription = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.BestForNavigation,
+          timeInterval: 1000,
+          distanceInterval: 1,
+          mayShowUserSettingsDialog: true,
+        },
+        (location) => this.handleLocation(location),
+      );
+      this.state = {
+        ...this.state,
+        running: true,
+        error: `GPS em segundo plano indisponível (${reason}); monitoramento mantido em primeiro plano.`,
+      };
+      this.emit();
+      return true;
+    } catch (cause) {
+      this.subscription = null;
+      this.state = {
+        ...this.state,
+        running: false,
+        error: `Falha no GPS em segundo plano: ${reason}. Também não foi possível restaurar o GPS em primeiro plano: ${cause instanceof Error ? cause.message : 'erro desconhecido'}.`,
+      };
+      this.emit();
+      return false;
+    }
+  }
+
   async startBackgroundLocation(): Promise<boolean> {
     const permitted = await this.requestPermission();
     if (!permitted) return false;
@@ -174,12 +204,17 @@ export class GpsTracker {
       return true;
     } catch (cause) {
       this.backgroundTaskRunning = false;
-      this.state = {
-        ...this.state,
-        running: false,
-        error: cause instanceof Error ? cause.message : 'NÃO FOI POSSÍVEL INICIAR O GPS EM SEGUNDO PLANO.',
-      };
-      this.emit();
+      const reason = cause instanceof Error ? cause.message : 'NÃO FOI POSSÍVEL INICIAR O GPS EM SEGUNDO PLANO.';
+      // Um start nativo pode falhar depois de registrar parcialmente a tarefa.
+      // Limpar o estado nativo antes de reativar o watcher evita callbacks duplicados.
+      try {
+        const started = await Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK_NAME);
+        if (started) await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK_NAME);
+      } catch {
+        // O watcher de primeiro plano ainda será tentado; o erro original permanece.
+      }
+      await this.restoreForegroundWatcherAfterBackgroundFailure(reason);
+      // false informa que o serviço background não foi iniciado, mesmo quando o fallback funciona.
       return false;
     }
   }
@@ -209,7 +244,7 @@ export class GpsTracker {
   }
 
   private getSignalQuality(accuracyM: number | null): GpsTripState['signalQuality'] {
-    if (accuracyM == null || !Number.isFinite(accuracyM) || accuracyM > MAX_ACCURACY_M) return 'SEM_FIX';
+    if (accuracyM == null || !Number.isFinite(accuracyM) || accuracyM < 0 || accuracyM > MAX_ACCURACY_M) return 'SEM_FIX';
     if (accuracyM <= 5) return 'EXCELENTE';
     if (accuracyM <= 15) return 'BOA';
     return 'FRACA';
