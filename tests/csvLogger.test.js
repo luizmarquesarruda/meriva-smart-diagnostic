@@ -29,6 +29,13 @@ const fakeFileSystem = {
     writes += 1;
     files.set(filePath, value);
   },
+  async copyAsync({ from, to }) {
+    if (!files.has(from)) throw new Error('temporary file missing');
+    files.set(to, files.get(from));
+  },
+  async deleteAsync(filePath) {
+    files.delete(filePath);
+  },
 };
 
 const originalLoad = Module._load;
