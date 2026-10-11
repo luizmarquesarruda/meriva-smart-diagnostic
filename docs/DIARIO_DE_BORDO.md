@@ -1960,3 +1960,25 @@ Começar a implementação das melhorias de produto com uma entrega que reaprove
 ### Próxima etapa
 - Continuar a auditoria da persistência de viagens e do histórico diário, priorizando falhas de leitura/escrita, concorrência e recuperação segura sem apagar silenciosamente registros existentes.
 
+## 2026-10-11 — Fase 5: preservar o TXT diário quando a leitura falha
+
+### Evidência e risco
+- `src/meriva/dailyObdHistory.ts` capturava qualquer erro ao consultar/ler o arquivo e continuava como se o histórico estivesse vazio.
+- Se o arquivo existisse, mas a leitura falhasse temporariamente, o próximo evento poderia ser escrito sobre um conteúdo vazio, apagando silenciosamente sessões anteriores. Isso contrariava o requisito de manter várias partidas no mesmo dia.
+
+### Correção aplicada
+- A rotina agora cria o diretório pai explicitamente e diferencia arquivo inexistente de arquivo existente.
+- Se o caminho existente for um diretório ou a leitura do arquivo falhar, a operação é interrompida e o erro é propagado. O arquivo anterior não é substituído por um histórico recém-criado.
+- `tests/merivaAutosave.test.js`: regressão com falha de leitura simulada; exige rejeição da operação e preservação byte a byte do conteúdo anterior.
+
+### Commits
+- `01faaff` — correção para não sobrescrever histórico diário ilegível.
+- `09a7aa1` — teste de regressão para falha de leitura.
+- `1f66b0c` — registro da proteção de distância GPS na fase anterior.
+- Todas as mensagens de commit usam `[skip ci]`; nenhuma CI foi disparada manualmente e nenhum merge foi feito.
+
+### Validação pendente
+- Os testes foram adicionados, mas não executados nesta etapa. Typecheck, suíte completa e build Android continuam pendentes.
+- A proteção evita sobrescrita causada por erro de leitura. Falhas de gravação ainda precisam ser verificadas em dispositivo e tratadas conforme o comportamento real da API de arquivos do Expo.
+- Testar exportação no Android: cancelar o seletor deve deixar o arquivo local intacto; falha de permissão/escrita deve retornar erro explícito sem alegar exportação concluída.
+
