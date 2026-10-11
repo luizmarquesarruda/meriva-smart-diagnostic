@@ -109,7 +109,23 @@ const mapEstimate = estimateFuelRateLph({
 if (!mapEstimate || mapEstimate.source !== 'ESTIMATED_MAP' || !(mapEstimate.rateLph > 0)) {
   throw new Error('MAF zero deve permitir fallback MAP quando há dados válidos');
 }
-console.log('fuelConsumption fallback MAF zero, MAP e suporte da ECU: OK');
+const impossibleTemperature = estimateFuelRateLph({
+  mapKpa: 35,
+  rpm: 1500,
+  intakeAirTempC: -300,
+  displacementCm3: 1389,
+});
+if (impossibleTemperature !== null) throw new Error('temperatura abaixo do zero absoluto não pode gerar taxa de combustível');
+const impossibleMap = estimateFuelRateLph({
+  mapKpa: 900,
+  rpm: 1500,
+  intakeAirTempC: 25,
+  displacementCm3: 1389,
+});
+if (impossibleMap !== null) throw new Error('MAP fora da faixa plausível não pode gerar taxa de combustível');
+const impossibleAfr = estimateFuelRateLph({ mafGs: 5, airFuelRatio: 0 });
+if (impossibleAfr !== null) throw new Error('AFR inválida não pode gerar taxa de combustível');
+console.log('fuelConsumption fallback MAF zero, MAP, limites físicos e suporte da ECU: OK');
 
 const autoTripSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'trip', 'autoTripService.ts'), 'utf8');
 const manualSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'database', 'merivaManual.ts'), 'utf8');
