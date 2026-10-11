@@ -97,9 +97,11 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
       const consumption = isCycleConsumptionValid(cycle)
         ? `${cycle.avgFuelConsumptionKml} km/L`
         : ND;
-      const quality = cycle.dataQuality === 'INCOMPLETE' || !isCycleConsumptionValid(cycle)
-        ? 'qualidade=INCOMPLETA'
-        : 'qualidade=VALIDADA';
+      const quality = cycle.dataQuality === 'COMPLETE' && isCycleConsumptionValid(cycle)
+        ? 'qualidade=VALIDADA'
+        : cycle.dataQuality === 'INCOMPLETE' || !isCycleConsumptionValid(cycle)
+          ? 'qualidade=INCOMPLETA'
+          : 'qualidade=LEGADO_NAO_VERIFICADO';
       L.push(
         `${cycle.startedAt} -> ${cycle.finishedAt} | ${distance} | ${fuel} | consumo=${consumption} | fonte=${cycle.source} | ${quality} | combustivel=${or(cycle.fuelRateSource)}`,
       );
