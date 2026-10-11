@@ -147,5 +147,11 @@ export async function addDriveCycle(basePath: string, cycle: DriveCycle): Promis
   };
 
   await appendCsvRow(csvFile, row);
-  await flushCsvRows(csvFile);
+  try {
+    await flushCsvRows(csvFile);
+  } catch (cause) {
+    // O índice JSON é a fonte de verdade das viagens e já foi persistido. Uma falha no CSV
+    // não deve impedir o autosave/fechamento do trajeto; o logger conserva as linhas para retry.
+    console.warn('[viagens] falha ao descarregar CSV; ciclo preservado no índice JSON:', cause instanceof Error ? cause.message : cause);
+  }
 }
