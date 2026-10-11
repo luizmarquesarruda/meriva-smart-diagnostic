@@ -51,7 +51,7 @@ export async function registerObdQuery(
         name: result.parsed.name,
         classification: prior?.classification ?? 'PADRAO_OBD',
         // Uma resposta válida confirma que o PID respondeu; não valida a exatidão física do sensor.
-        status: prior?.status === 'CONFIRMADO' ? 'CONFIRMADO' : 'RESPONDEU',
+        status: prior?.status === 'CONFIRMADO' && prior.source === 'USER_REAL_OBSERVATION' ? 'CONFIRMADO' : 'RESPONDEU',
         firstSeen: prior?.firstSeen ?? now,
         lastSeen: now,
         occurrences: (prior?.occurrences ?? 0) + 1,
