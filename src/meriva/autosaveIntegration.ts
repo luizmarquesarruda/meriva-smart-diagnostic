@@ -13,30 +13,59 @@ import { pushLastReading, updateAutoSaveState, scheduleCriticalSave } from './au
 import { shouldFeedLearning } from './autosaveValidation';
 import { getVehicleConditionSnapshot, recordLivePidQuery } from '../obd/liveTelemetry';
 
-// Limita a persistência de aprendizado por PID: a telemetria continua sendo
-// registrada em toda amostra, mas o banco/perfil não é reescrito a cada polling.
-const learningPersistedAt = new Map<string, number>();
-const learningPersistenceInFlight = new Set<string>();
+// Telemetria em memória/log continua por amostra; as duas gravações caras têm janelas
+// independentes para que a falha de um arquivo não bloqueie a retentativa do outro.
+const pidConfirmationPersistedAt = new Map<string, number>();
+const learningProfilePersistedAt = new Map<string, number>();
+const pidConfirmationInFlight = new Set<string>();
+const learningProfileInFlight = new Set<string>();
+const pidConfirmationRetryAfter = new Map<string, number>();
+const learningProfileRetryAfter = new Map<string, number>();
 const LEARNING_PERSIST_INTERVAL_MS = 60_000;
+const LEARNING_PERSIST_RETRY_DELAY_MS = 5_000;
+
+type PersistedAtMap = Map<string, number>;
+type InFlightSet = Set<string>;
 
 function learningPersistenceKey(basePath: string, pid: string): string {
   return `${basePath}::${pid}`;
 }
 
-function beginLearningPersistence(basePath: string, pid: string, nowMs = Date.now()): boolean {
+function beginPersistence(
+  basePath: string,
+  pid: string,
+  persistedAt: PersistedAtMap,
+  inFlight: InFlightSet,
+  retryAfter: PersistedAtMap,
+  nowMs = Date.now(),
+): boolean {
   const key = learningPersistenceKey(basePath, pid);
-  const previous = learningPersistedAt.get(key);
-  if (learningPersistenceInFlight.has(key)) return false;
+  const previous = persistedAt.get(key);
+  if (inFlight.has(key)) return false;
   if (previous != null && nowMs - previous < LEARNING_PERSIST_INTERVAL_MS) return false;
-  learningPersistenceInFlight.add(key);
+  if (nowMs < (retryAfter.get(key) ?? 0)) return false;
+  inFlight.add(key);
   return true;
 }
 
-/** Marca a janela somente após gravar a confirmação; falhas anteriores ficam elegíveis para retentativa. */
-function finishLearningPersistence(basePath: string, pid: string, confirmed: boolean, nowMs = Date.now()): void {
+function finishPersistence(
+  basePath: string,
+  pid: string,
+  persistedAt: PersistedAtMap,
+  inFlight: InFlightSet,
+  retryAfter: PersistedAtMap,
+  succeeded: boolean,
+  nowMs = Date.now(),
+): void {
   const key = learningPersistenceKey(basePath, pid);
-  if (confirmed) learningPersistedAt.set(key, nowMs);
-  learningPersistenceInFlight.delete(key);
+  if (succeeded) {
+    persistedAt.set(key, nowMs);
+    retryAfter.delete(key);
+  } else {
+    // Falha libera retentativa após 5 s, em vez de bloquear por toda a janela de 60 s.
+    retryAfter.set(key, nowMs + LEARNING_PERSIST_RETRY_DELAY_MS);
+  }
+  inFlight.delete(key);
 }
 
 export async function registerObdQuery(
@@ -65,48 +94,59 @@ export async function registerObdQuery(
   });
 
   const parsedValue = result.parsed.value;
+  const pid = result.parsed.pid;
   const learningCondition = condition ?? (source === 'REAL' ? getVehicleConditionSnapshot().condition : 'UNKNOWN');
-  if (
-    shouldFeedLearning(source, result.parsed.status, parsedValue) &&
-    parsedValue !== null &&
-    beginLearningPersistence(basePath, result.parsed.pid)
-  ) {
-    try {
-      const now = new Date().toISOString();
-      const existing = await readPidConfirmations(basePath);
-      const prior = existing.find((entry) => entry.pid === result.parsed.pid);
+  if (shouldFeedLearning(source, result.parsed.status, parsedValue) && parsedValue !== null) {
+    if (beginPersistence(
+      basePath, pid, pidConfirmationPersistedAt, pidConfirmationInFlight, pidConfirmationRetryAfter,
+    )) {
+      try {
+        const now = new Date().toISOString();
+        const existing = await readPidConfirmations(basePath);
+        const prior = existing.find((entry) => entry.pid === pid);
+        const entry: PidConfirmationEntry = {
+          pid,
+          name: result.parsed.name,
+          classification: prior?.classification ?? 'PADRAO_OBD',
+          status: 'CONFIRMADO',
+          firstSeen: prior?.firstSeen ?? now,
+          lastSeen: now,
+          occurrences: (prior?.occurrences ?? 0) + 1,
+          protocol: prior?.protocol ?? result.protocol ?? 'N/D',
+          responseTime: result.elapsedMs,
+          source: 'REAL_OBD',
+          confidence: prior ? prior.confidence + 1 : 1,
+          unit: result.parsed.unit,
+          formulaId: result.parsed.definition?.formulaId,
+          bytes: result.parsed.definition?.bytes,
+          description: result.parsed.definition?.description,
+        };
+        await recordPidConfirmation(basePath, entry);
+        finishPersistence(
+          basePath, pid, pidConfirmationPersistedAt, pidConfirmationInFlight, pidConfirmationRetryAfter, true,
+        );
+      } catch (cause) {
+        finishPersistence(
+          basePath, pid, pidConfirmationPersistedAt, pidConfirmationInFlight, pidConfirmationRetryAfter, false,
+        );
+        console.warn('[autosave] falha ao persistir confirmação de PID:', cause instanceof Error ? cause.message : cause);
+      }
+    }
 
-      const entry: PidConfirmationEntry = {
-        pid: result.parsed.pid,
-        name: result.parsed.name,
-        classification: prior?.classification ?? 'PADRAO_OBD',
-        status: 'CONFIRMADO',
-        firstSeen: prior?.firstSeen ?? now,
-        lastSeen: now,
-        occurrences: (prior?.occurrences ?? 0) + 1,
-        protocol: prior?.protocol ?? result.protocol ?? 'N/D',
-        responseTime: result.elapsedMs,
-        source: 'REAL_OBD',
-        confidence: prior ? prior.confidence + 1 : 1,
-        unit: result.parsed.unit,
-        formulaId: result.parsed.definition?.formulaId,
-        bytes: result.parsed.definition?.bytes,
-        description: result.parsed.definition?.description,
-      };
-      await recordPidConfirmation(basePath, entry);
-      // A confirmação do PID é a gravação que altera ocorrências. Marcar após sucesso evita
-      // bloquear 60 s quando a leitura/gravação falha antes de persistir qualquer confirmação.
-      finishLearningPersistence(basePath, result.parsed.pid, true);
-
-      await updateLearningProfileRealSample(
-        basePath,
-        result.parsed.name,
-        parsedValue,
-        learningCondition,
-      );
-    } catch (cause) {
-      finishLearningPersistence(basePath, result.parsed.pid, false);
-      console.warn('[autosave] falha ao registrar confirmação de PID:', cause instanceof Error ? cause.message : cause);
+    if (beginPersistence(
+      basePath, pid, learningProfilePersistedAt, learningProfileInFlight, learningProfileRetryAfter,
+    )) {
+      try {
+        await updateLearningProfileRealSample(basePath, result.parsed.name, parsedValue, learningCondition);
+        finishPersistence(
+          basePath, pid, learningProfilePersistedAt, learningProfileInFlight, learningProfileRetryAfter, true,
+        );
+      } catch (cause) {
+        finishPersistence(
+          basePath, pid, learningProfilePersistedAt, learningProfileInFlight, learningProfileRetryAfter, false,
+        );
+        console.warn('[autosave] falha ao persistir perfil de aprendizado:', cause instanceof Error ? cause.message : cause);
+      }
     }
   }
 
