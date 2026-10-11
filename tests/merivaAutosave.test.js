@@ -715,6 +715,35 @@ test('14. persistência local de Bluetooth/ECU não conflita com o autosave', as
   state.disposeAutoSave();
 });
 
+test('15. diário de sessões preserva eventos concorrentes no mesmo arquivo', async () => {
+  resetFS();
+  const history = loadTs(path.join(ROOT, 'src/meriva/dailyObdHistory.ts'));
+  const stateModule = loadTs(path.join(ROOT, 'src/meriva/autosaveState.ts'));
+  const state = stateModule.createEmptyMerivaState();
+  state.obd = {
+    connected: true,
+    adapterName: 'ELM327',
+    protocol: 'ISO 14230-4 KWP FAST',
+    lastConnectedAt: '2026-10-10T12:00:00.000Z',
+    ecuValidatedAt: '2026-10-10T12:00:00.000Z',
+    ecuValidationSource: 'OBD_RESPONSE',
+  };
+
+  await Promise.all([
+    history.appendDailyObdSessionEvent(BASE, state, 'SESSION_START', '2026-10-10T12:00:01.000Z'),
+    history.appendDailyObdSessionEvent(BASE, { ...state, obd: { ...state.obd, connected: false } }, 'SESSION_END', '2026-10-10T12:00:02.000Z'),
+    history.appendDailyObdSessionEvent(BASE, state, 'SESSION_START', '2026-10-10T12:00:03.000Z'),
+  ]);
+
+  const saved = files.get(BASE + '/VIAGENS/meriva_smart_daily_obd_history.txt');
+  assert.ok(saved, 'diário deve ser criado');
+  assert.strictEqual((saved.match(/--- EVENTO: SESSION_START \|/g) || []).length, 2);
+  assert.strictEqual((saved.match(/--- EVENTO: SESSION_END \|/g) || []).length, 1);
+  assert.ok(saved.includes('2026-10-10T12:00:01.000Z'));
+  assert.ok(saved.includes('2026-10-10T12:00:02.000Z'));
+  assert.ok(saved.includes('2026-10-10T12:00:03.000Z'));
+});
+
 // ---------- executor ----------
 async function main() {
   let failed = 0;
