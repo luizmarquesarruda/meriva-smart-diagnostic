@@ -27,6 +27,13 @@ assert(shared.includes('handleUnexpectedDisconnect'));
 assert(shared.includes('startObdAutosaveSession'));
 assert(shared.includes('closeObdAutosaveSession'));
 assert(shared.includes('persistValidatedConnection'));
+assert(shared.includes("await initAutoSave(basePath)"), 'o autosave deve estar hidratado antes da abertura da sessão ECU');
+const initCall = shared.indexOf('await initAutoSave(basePath)');
+const startSessionCall = shared.indexOf('await startObdAutosaveSession()', initCall);
+assert(initCall >= 0 && startSessionCall > initCall, 'a sessão diária só pode iniciar após a inicialização do autosave');
+const autosaveManager = fs.readFileSync(path.join(ROOT, 'src', 'meriva', 'autosaveManager.ts'), 'utf8');
+assert(autosaveManager.includes('initializationPromise'), 'initAutoSave deve serializar inicializações concorrentes');
+
 assert(shared.includes('startBluetoothMonitor'));
 assert(shared.includes('preferredAddress'));
 assert(shared.includes('selectedAdapterAddress: connection.device.address.toUpperCase()'));
