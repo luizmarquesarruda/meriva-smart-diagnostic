@@ -215,6 +215,21 @@ export async function initAutoSave(basePath: string): Promise<MerivaPersistedSta
   runtime.dirty = false;
   runtime.mutationVersion = 0;
 
+  // Android pode encerrar o processo sem executar o fechamento da sessão.
+  // Nunca reutilizar uma conexão persistida como se ainda estivesse viva.
+  const interruptedObdSession = runtime.state.obd.connected;
+  if (interruptedObdSession) {
+    runtime.state.obd = {
+      ...runtime.state.obd,
+      connected: false,
+      protocol: undefined,
+      lastKnownProtocol: runtime.state.obd.protocol ?? runtime.state.obd.lastKnownProtocol,
+    };
+    runtime.dirty = true;
+    runtime.mutationVersion += 1;
+    runtime.lastSavedFingerprint = null;
+  }
+
   if (!runtime.appStateSubscription) {
     runtime.appStateSubscription = AppState.addEventListener(
       'change',
@@ -222,6 +237,11 @@ export async function initAutoSave(basePath: string): Promise<MerivaPersistedSta
         if (status !== 'active' && runtime.dirty) void saveNow('background');
       },
     );
+  }
+
+  if (interruptedObdSession) {
+    const recovered = await saveNow('session_recovery');
+    if (recovered) await appendDailySessionBoundary('SESSION_RECOVERED');
   }
 
   return runtime.state;
@@ -326,7 +346,7 @@ export function startObdSessionCheckpoint(): void {
   }, CHECKPOINT_MS);
 }
 
-async function appendDailySessionBoundary(event: 'SESSION_START' | 'SESSION_END'): Promise<void> {
+async function appendDailySessionBoundary(event: 'SESSION_START' | 'SESSION_END' | 'SESSION_RECOVERED'): Promise<void> {
   if (!runtime.basePath) return;
   try {
     await appendDailyObdSessionEvent(

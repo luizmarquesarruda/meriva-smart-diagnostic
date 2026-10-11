@@ -744,6 +744,32 @@ test('15. diário de sessões preserva eventos concorrentes no mesmo arquivo', a
   assert.ok(saved.includes('2026-10-10T12:00:03.000Z'));
 });
 
+test('recuperação após encerramento abrupto limpa conexão fantasma e registra evento', async () => {
+  const m = manager();
+  m.disposeAutoSave();
+  resetFS();
+  await m.initAutoSave(BASE);
+  m.updateAutoSaveState((s) => {
+    s.obd.connected = true;
+    s.obd.protocol = 'ISO 14230-4 KWP FAST';
+    s.obd.lastConnectedAt = '2026-10-10T12:00:00.000Z';
+  });
+  assert.strictEqual(await m.saveNow('critical'), true);
+  m.disposeAutoSave();
+
+  const recovered = await m.initAutoSave(BASE);
+  assert.strictEqual(recovered.obd.connected, false, 'conexão anterior não pode aparecer como viva após reiniciar');
+  assert.strictEqual(recovered.obd.protocol, undefined, 'protocolo ativo deve ser removido');
+  assert.strictEqual(recovered.obd.lastKnownProtocol, 'ISO 14230-4 KWP FAST', 'preservar último protocolo conhecido');
+  const historyPath = `${BASE}/VIAGENS/meriva_smart_daily_obd_history.txt`;
+  assert.ok(files.has(historyPath), 'a recuperação deve deixar evento no histórico diário');
+  assert.ok(files.get(historyPath).includes('--- EVENTO: SESSION_RECOVERED |'), 'marcar explicitamente sessão interrompida');
+  assert.ok(files.get(historyPath).includes('BLUETOOTH/OBD: DESCONECTADO'), 'não declarar conexão viva');
+  const envelope = JSON.parse(files.get(`${CONFIG_DIR}/autosave.json`));
+  assert.strictEqual(envelope.payload.obd.connected, false, 'estado desconectado deve persistir');
+  m.disposeAutoSave();
+});
+
 // ---------- executor ----------
 async function main() {
   let failed = 0;

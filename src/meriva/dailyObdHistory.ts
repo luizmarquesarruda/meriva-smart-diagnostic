@@ -11,7 +11,7 @@ const MAX_DAYS = 365;
 const HEADER = [
   'MERIVA SMART DIAGNOSTIC',
   'HISTÓRICO TXT POR DIA — CADA DATA É UMA PÁGINA LÓGICA.',
-  'REGRA: cada sessão ECU validada gera eventos de início e encerramento.',
+  'REGRA: cada sessão ECU validada gera eventos de início e encerramento; sessão interrompida é marcada na próxima abertura.',
   'FONTE: estado local do aplicativo; valores mantêm fonte e horário quando disponíveis.',
   '',
 ].join('\n');
@@ -27,7 +27,7 @@ function historyPath(basePath: string): string {
   return `${basePath}/VIAGENS/${DAILY_OBD_HISTORY_FILE}`;
 }
 
-function renderEvent(state: MerivaPersistedState, event: 'SESSION_START' | 'SESSION_END', timestamp: string): string {
+function renderEvent(state: MerivaPersistedState, event: 'SESSION_START' | 'SESSION_END' | 'SESSION_RECOVERED', timestamp: string): string {
   const lines = [
     `--- EVENTO: ${event} | ${timestamp} ---`,
     `ADAPTADOR: ${state.obd.adapterName ?? 'N/D'}`,
@@ -104,7 +104,7 @@ function splitPages(content: string): Map<string, string> {
 async function appendDailyObdSessionEventUnsafe(
   basePath: string,
   state: MerivaPersistedState,
-  event: 'SESSION_START' | 'SESSION_END',
+  event: 'SESSION_START' | 'SESSION_END' | 'SESSION_RECOVERED',
   timestamp = new Date().toISOString(),
 ): Promise<{ date: string; eventCount: number }> {
   const path = historyPath(basePath);
@@ -123,7 +123,7 @@ async function appendDailyObdSessionEventUnsafe(
   const previousEvents = pages.get(date) ?? '';
   const updatedEvents = [previousEvents, renderEvent(state, event, timestamp)].filter(Boolean).join('\n\n');
   pages.set(date, updatedEvents);
-  const eventCount = (updatedEvents.match(/--- EVENTO: SESSION_(?:START|END) \|/g) ?? []).length;
+  const eventCount = (updatedEvents.match(/--- EVENTO: SESSION_(?:START|END|RECOVERED) \|/g) ?? []).length;
 
   const sortedDates = Array.from(pages.keys()).sort().slice(-MAX_DAYS);
   const output = [HEADER.trimEnd()];

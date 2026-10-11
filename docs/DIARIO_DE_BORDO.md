@@ -1855,3 +1855,18 @@ As alterações foram gravadas na branch `fix/daily-obd-history-keep-screen-awak
 - O teste de sessões concorrentes e a regressão da tela foram adicionados, mas ainda precisam ser executados pela CI.
 - Validar no aparelho a persistência após encerramento forçado, a exportação pelo seletor Android e a cadência real do ELM327 na Meriva. Um encerramento inesperado ainda pode impedir o evento explícito `SESSION_END`; os CSVs de telemetria são a trilha complementar, não uma garantia de encerramento físico.
 - Não foi feito merge na `main`.
+
+
+## 2026-10-11 — Recuperação de sessão OBD interrompida
+
+### Problema
+O Android pode encerrar o processo sem executar o fechamento normal. O último snapshot poderia manter `obd.connected = true`, levando a uma conexão antiga ser restaurada como se estivesse ativa.
+
+### Correção
+- `src/meriva/autosaveManager.ts`: na inicialização, quando o snapshot anterior indicar conexão OBD, limpar conexão/protocolo ativo, preservar `lastKnownProtocol`, persistir o estado seguro e registrar a recuperação.
+- `src/meriva/autosaveTypes.ts`: adicionar o motivo de salvamento `session_recovery`.
+- `src/meriva/dailyObdHistory.ts`: evento distinto `SESSION_RECOVERED`; o horário é o da detecção na próxima abertura, não uma alegação sobre o instante exato da queda.
+- `tests/merivaAutosave.test.js`: regressão comportamental para simular encerramento abrupto e verificar estado desconectado, protocolo preservado e evento no TXT.
+
+### Limites e validação
+A recuperação detecta a interrupção na próxima inicialização. Os CSVs continuam sendo a trilha temporal de consultas individuais. Esta alteração dispara nova CI; confirmar `validate` e `android-build` no commit resultante. Teste físico com ELM327/ECU permanece pendente. Não foi feito merge na `main`.
