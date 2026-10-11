@@ -797,6 +797,31 @@ test('diário diário não sobrescreve arquivo existente quando a leitura falha'
   assert.strictEqual(files.get(target), originalContent, 'o histórico anterior deve permanecer intacto');
 });
 
+test('histórico de autosave não sobrescreve arquivo existente quando a leitura falha', async () => {
+  resetFS();
+  const history = loadTs(path.join(ROOT, 'src/meriva/autosaveHistoryTxt.ts'));
+  const target = CONFIG_DIR + '/meriva_smart_autosave_history.txt';
+  const originalContent = 'HISTÓRICO AUTOSAVE EXISTENTE — CONTEÚDO A PRESERVAR';
+  files.set(target, originalContent);
+
+  const originalRead = currentFS.readAsStringAsync;
+  currentFS.readAsStringAsync = async (p, ...args) => {
+    if (p === target) throw new Error('falha simulada de leitura do autosave');
+    return originalRead.call(currentFS, p, ...args);
+  };
+  try {
+    await assert.rejects(
+      history.appendAutoSaveHistory(BASE, loadTs(path.join(ROOT, 'src/meriva/autosaveState.ts')).createEmptyMerivaState(), '1.0.1', 'critical'),
+      /falha simulada de leitura do autosave/,
+      'falha de leitura deve interromper a gravação do histórico',
+    );
+  } finally {
+    currentFS.readAsStringAsync = originalRead;
+  }
+
+  assert.strictEqual(files.get(target), originalContent, 'o histórico autosave anterior deve permanecer intacto');
+});
+
 // ---------- executor ----------
 async function main() {
   let failed = 0;
