@@ -31,6 +31,7 @@ export async function exportDiagnosticsJson(basePath: string): Promise<string> {
       ...state.obd,
       adapterName: undefined,
       ecuIdentification: undefined,
+      ecuName: undefined,
     },
     lastReadings: state.lastReadings,
     dtcs,
