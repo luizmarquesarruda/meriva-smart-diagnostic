@@ -355,6 +355,24 @@ test('7. CARSCANNER_SEED nunca vira histórico real', async () => {
   });
   assert.ok(txt.includes('fonte=CARSCANNER_SEED'), 'seed deve permanecer identificado como referência');
   assert.ok(!txt.includes('fonte=REAL_OBD'), 'nenhum ciclo seed pode aparecer como REAL');
+
+  const incompleteCycle = {
+    ...driveCycles.INITIAL_DRIVE_CYCLES[0],
+    id: 'real-incomplete-no-fuel',
+    source: 'REAL_OBD',
+    distanceTotalKm: 0.2,
+    fuelUsedL: 0,
+    avgFuelConsumptionKml: 0,
+    dataQuality: 'INCOMPLETE',
+    incompleteReason: 'INSUFFICIENT_FUEL_VOLUME',
+  };
+  m.updateAutoSaveState((s) => { s.driveCycles = [incompleteCycle]; });
+  const incompleteTxt = formatter.formatAutoSaveTxt(m.getAutoSaveState(), {
+    appVersion: '1.0.0',
+    exportedAt: '2026-10-11 13:00:00',
+  });
+  assert.ok(incompleteTxt.includes('consumo=N/D'), 'viagem sem combustível suficiente deve ser N/D no TXT');
+  assert.ok(!incompleteTxt.includes('| 0 km/L'), 'sentinela zero não pode ser exibida como consumo real');
   m.disposeAutoSave();
 });
 
