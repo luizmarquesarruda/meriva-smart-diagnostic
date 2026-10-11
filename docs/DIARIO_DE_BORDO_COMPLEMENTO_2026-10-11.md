@@ -33,3 +33,27 @@ O perfil técnico da Meriva MY12 já usa `tankCapacityL: 56` e `reserveCapacityL
 - `4137e50153031886bb724f09c55e8306d5220fe9` — testes para reset GPS, timestamps e viagens incompletas.
 - `7d49a62ca9400a0bbd0e6f8811e63b4c41f4e246` — amostras de teste com distâncias fisicamente mais plausíveis.
 - `fcc6dbb4d02d4a644b3dee0838e00fec26b26e80` — teste de regressão para segmentos pequenos.
+
+## Continuidade da auditoria — correções adicionais
+
+- `src/obd/fuelConsumption.ts`: integrador rejeita timestamps inválidos/atrasados/duplicados e aceita `markGap()` para quebrar a janela quando não há taxa válida, sem zerar o combustível já integrado.
+- `src/trip/tripRecorder.ts`: taxa nula/inválida quebra a janela de integração; não interpolar através de telemetria de combustível ausente.
+- `src/gps/gpsTracker.ts`: callback GPS com timestamp inválido, repetido ou anterior ao último estado aceito é descartado integralmente.
+- `src/data/driveCycles.ts`: velocidade média global usa distância total / tempo total em movimento; média km/L só inclui ciclos com distância >= 0,1 km, combustível integrado >= 0,05 L, valor calculado positivo e qualidade não marcada incompleta.
+- `app/viagens.tsx`: inclui velocidade média e mostra `N/D` em consumo inválido, sem exibir sentinela zero como dado real.
+- `src/meriva/autosaveTxtFormatter.ts`: exportação identifica consumo inválido como `N/D`, e distingue ciclos incompletos, válidos e legados sem qualidade verificada.
+- `src/trip/autoTripService.ts`: média histórica exige distância e volume mínimos; estimativas MAF/MAP usam os parâmetros aproximados da preferência de combustível configurada. Corrigido também o import ausente de `getAutoSaveState` detectado pelo typecheck.
+- `src/obd/sharedConnection.ts`: corrigido `getSharedObdStatus()` para devolver todos os campos obrigatórios e manter consistência entre snapshot e eventos. O estado da ECU exige conexão validada e resposta atual em `RESPONDING`.
+- Testes ampliados em `tests/fuelConsumption.test.js`, `tests/gps.test.js`, `tests/tripRecorder.test.js`, `tests/merivaAutosave.test.js` e `tests/ecuHealth.test.js`.
+
+### Estado de CI
+
+A run #1894 (commit `4b383349b29ca3544e112ca4f232cb67bb3db1dd`) falhou no typecheck com dois erros: campos faltantes em `getSharedObdStatus` e import ausente de `getAutoSaveState`. Ambos foram corrigidos em commits posteriores. Não foi disparada nova CI manualmente; os commits desta continuação usam `[skip ci]`. Testes, typecheck e build Android da ponta atual ainda não estão validados.
+
+### Próximos passos seguros
+
+1. Executar validação completa quando autorizado, sem presumir que os novos testes passam.
+2. Revisar a autonomia persistida e os relatórios TXT com ciclos legados/incompletos.
+3. Confirmar o lifecycle GPS em foreground/background no Android físico; o teste unitário não substitui validação de callbacks nativos.
+4. Testar estimativas MAF/MAP e PID 015E na Meriva real, anotando a fonte e comparando com abastecimentos medidos antes de calibrar parâmetros.
+5. Não fazer merge nem release até passar typecheck, suíte de testes, Expo Doctor e build Android.
