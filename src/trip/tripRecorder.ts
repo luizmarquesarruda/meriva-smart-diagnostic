@@ -69,16 +69,21 @@ export class RealTripRecorder {
       return this.getState();
     }
 
-    const absoluteDistanceKm = toFiniteNonNegative(sample.distanceKm);
+    const hasValidAbsoluteDistance = Number.isFinite(sample.distanceKm) && sample.distanceKm >= 0;
+    const absoluteDistanceKm = hasValidAbsoluteDistance ? sample.distanceKm : null;
     const speedKmh = toFiniteNonNegative(sample.speedKmh);
 
     // GPS distance can reset when its provider/session restarts. Rebase the
-    // absolute counter, but keep accumulated trip distance monotonic.
-    if (absoluteDistanceKm >= this.lastAbsoluteDistanceKm) {
-      const deltaDistanceKm = absoluteDistanceKm - this.lastAbsoluteDistanceKm;
-      this.distanceKm = Number((this.distanceKm + deltaDistanceKm).toFixed(3));
+    // absolute counter, but keep accumulated trip distance monotonic. An
+    // invalid distance is missing evidence, not a real zero: do not let it
+    // reset the baseline and inflate the next valid delta.
+    if (absoluteDistanceKm !== null) {
+      if (absoluteDistanceKm >= this.lastAbsoluteDistanceKm) {
+        const deltaDistanceKm = absoluteDistanceKm - this.lastAbsoluteDistanceKm;
+        this.distanceKm = Number((this.distanceKm + deltaDistanceKm).toFixed(3));
+      }
+      this.lastAbsoluteDistanceKm = absoluteDistanceKm;
     }
-    this.lastAbsoluteDistanceKm = absoluteDistanceKm;
     this.maxSpeedKmh = Number(Math.max(this.maxSpeedKmh, speedKmh).toFixed(1));
 
     if (
