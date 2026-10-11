@@ -18,6 +18,7 @@ export interface RealTripRecorderState {
   movingTimeMs: number;
   maxSpeedKmh: number;
   validFuelSamples: number;
+  sampleCount: number;
   lastTimestampMs: number | null;
 }
 
@@ -42,6 +43,7 @@ export class RealTripRecorder {
   private durationMs = 0;
   private movingTimeMs = 0;
   private maxSpeedKmh = 0;
+  private sampleCount = 0;
   private fuelRateSources = new Set<FuelRateSource>();
 
   constructor(startedAtMs = Date.now(), initialDistanceKm = 0) {
@@ -50,6 +52,7 @@ export class RealTripRecorder {
   }
 
   addSample(sample: RealTripSample): RealTripRecorderState {
+    this.sampleCount += 1;
     const timestampMs = Number.isFinite(sample.timestampMs) ? sample.timestampMs : Date.now();
     const absoluteDistanceKm = toFiniteNonNegative(sample.distanceKm);
     const speedKmh = toFiniteNonNegative(sample.speedKmh);
@@ -89,15 +92,22 @@ export class RealTripRecorder {
       movingTimeMs: this.movingTimeMs,
       maxSpeedKmh: this.maxSpeedKmh,
       validFuelSamples: fuelState.validSamples,
+      sampleCount: this.sampleCount,
       lastTimestampMs: this.lastTimestampMs,
     };
   }
 
   buildDriveCycle(finishedAtMs = Date.now()): DriveCycle | null {
     const state = this.getState();
-    if (state.distanceKm < 0.1 || state.fuelUsedL <= 0 || state.validFuelSamples < 2) return null;
+    if (state.sampleCount < 1) return null;
 
-    const avgFuelConsumptionKml = state.distanceKm / state.fuelUsedL;
+    const reasons: string[] = [];
+    if (state.distanceKm < 0.1) reasons.push('DISTANCE_TOO_SHORT');
+    if (state.fuelUsedL <= 0) reasons.push('NO_VALID_FUEL_INTEGRATION');
+    if (state.validFuelSamples < 2) reasons.push('INSUFFICIENT_FUEL_SAMPLES');
+    const dataQuality: 'COMPLETE' | 'INCOMPLETE' = reasons.length === 0 ? 'COMPLETE' : 'INCOMPLETE';
+    // Não inventar consumo para viagens curtas ou sem amostras de combustível suficientes.
+    const avgFuelConsumptionKml = dataQuality === 'COMPLETE' ? state.distanceKm / state.fuelUsedL : 0;
     const avgDrivingSpeedKmh = state.movingTimeMs > 0
       ? state.distanceKm / (state.movingTimeMs / 3_600_000)
       : 0;
@@ -115,6 +125,8 @@ export class RealTripRecorder {
       avgDrivingSpeedKmh: Number(avgDrivingSpeedKmh.toFixed(3)),
       avgFuelConsumptionKml: Number(avgFuelConsumptionKml.toFixed(3)),
       source: 'REAL_OBD',
+      dataQuality,
+      ...(reasons.length ? { incompleteReason: reasons.join(',') } : {}),
       fuelRateSource: this.fuelRateSources.size === 1
         ? [...this.fuelRateSources][0]
         : this.fuelRateSources.size > 1 ? 'MIXED' : undefined,
