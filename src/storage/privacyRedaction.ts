@@ -10,5 +10,8 @@ export function redactSensitiveIdentifiers(content: string): string {
     .replace(/("(?:deviceAddress|adapterAddress|bluetoothAddress|macAddress|selectedAdapterAddress)"\s*:\s*")[^"]*(")/gi, '$1[ENDEREÇO BLUETOOTH REDIGIDO]$2')
     // Nome de adaptador pode ter sido personalizado com um nome pessoal.
     .replace(/^(Adaptador|ELM DEVICE):.*$/gim, '$1: [REDACTED FOR PRIVACY]')
-    .replace(/^DEVICE:.*$/gim, 'DEVICE: [REDACTED FOR PRIVACY]');
+    .replace(/^DEVICE:.*$/gim, 'DEVICE: [REDACTED FOR PRIVACY]')
+    // Sanitiza também snapshots TXT antigos, que podem conter campos de identidade ainda sem o novo formatador.
+    .replace(/^(VIN|Identificação ECU|Nome ECU|Adaptador):.*$/gim, '$1: [OMITIDO POR PRIVACIDADE]')
+    .replace(/^(\\s*(?:selectedAdapterAddress|adapterAddress|deviceAddress|macAddress|bluetoothAddress|adapterName|deviceName|ecuIdentification|ecuName|vin|serialNumber)\\s*):.*$/gim, '$1: [OMITIDO POR PRIVACIDADE]');
 }
