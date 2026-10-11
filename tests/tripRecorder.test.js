@@ -116,6 +116,19 @@ assert.strictEqual(afterReset.distanceKm, 0.1);
 const recoveredDistance = gpsReset.addSample({ timestampMs: 4000, distanceKm: 0.2, speedKmh: 30, fuelRateLph: 12 });
 assert.strictEqual(recoveredDistance.distanceKm, 0.2, 'GPS reset must not rewind accumulated trip distance');
 
+// An invalid GPS distance must not be coerced to zero and poison the next
+// cumulative-distance delta.
+const invalidDistance = new RealTripRecorder(0, 10);
+invalidDistance.addSample({ timestampMs: 1000, distanceKm: Number.NaN, speedKmh: 10, fuelRateLph: null });
+const afterInvalidDistance = invalidDistance.addSample({
+  timestampMs: 2000, distanceKm: 10.02, speedKmh: 20, fuelRateLph: null,
+});
+assert.strictEqual(
+  afterInvalidDistance.distanceKm,
+  0.02,
+  'invalid GPS distance must preserve the last valid baseline',
+);
+
 const gap = new RealTripRecorder(0, 0);
 gap.addSample({ timestampMs: 0, distanceKm: 0, speedKmh: 0, fuelRateLph: 10 });
 gap.addSample({ timestampMs: 40_001, distanceKm: 1, speedKmh: 30, fuelRateLph: 10 });
