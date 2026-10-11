@@ -38,17 +38,28 @@ function removeCarScannerTripsFromSnapshot(entry: string): string {
   return entry.replace(match[0], match[1] + historyBody);
 }
 
+async function readAutoSaveHistoryUnsafe(basePath: string): Promise<string> {
+  const path = historyPath(basePath);
+  const info = await FileSystem.getInfoAsync(path);
+  if (!info.exists) return HISTORY_HEADER;
+  if (info.isDirectory) {
+    throw new Error('O caminho do histórico de autosave aponta para um diretório; arquivo existente preservado.');
+  }
+  const content = await FileSystem.readAsStringAsync(path, {
+    encoding: FileSystem.EncodingType.UTF8,
+  });
+  const entries = splitEntries(content)
+    .slice(-AUTOSAVE_HISTORY_MAX_ENTRIES)
+    .map(removeCarScannerTripsFromSnapshot);
+  return entries.length ? `${HISTORY_HEADER}${entries.join('\\n\\n')}\\n` : HISTORY_HEADER;
+}
+
 export async function readAutoSaveHistory(basePath: string): Promise<string> {
   try {
-    const info = await FileSystem.getInfoAsync(historyPath(basePath));
-    if (!info.exists || info.isDirectory) return HISTORY_HEADER;
-    const content = await FileSystem.readAsStringAsync(historyPath(basePath), {
-      encoding: FileSystem.EncodingType.UTF8,
-    });
-    const entries = splitEntries(content)
-      .slice(-AUTOSAVE_HISTORY_MAX_ENTRIES)
-      .map(removeCarScannerTripsFromSnapshot);
-    return entries.length ? `${HISTORY_HEADER}${entries.join('\n\n')}\n` : HISTORY_HEADER;  } catch {
+    return await readAutoSaveHistoryUnsafe(basePath);
+  } catch {
+    // The read-only UI may show an empty-state header, but append operations
+    // use the strict reader below and never replace an unreadable existing file.
     return HISTORY_HEADER;
   }
 }
@@ -60,7 +71,7 @@ export async function appendAutoSaveHistory(
   reason: string,
 ): Promise<{ count: number }> {
   const path = historyPath(basePath);
-  const current = await readAutoSaveHistory(basePath);
+  const current = await readAutoSaveHistoryUnsafe(basePath);
   const entries = splitEntries(current);
   const lastNumber = entries.reduce((max, entry) => {
     const match = entry.match(/NÚMERO:\s*(\d+)/);
