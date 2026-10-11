@@ -121,7 +121,9 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
   L.push('');
 
   L.push('[SETTINGS]');
-  const settings = Object.entries(state.settings ?? {});
+  const settings = Object.entries(state.settings ?? {}).filter(([key]) =>
+    !/(vin|mac|address|device.?name|adapter.?name|serial|ecu.?identification)/i.test(key),
+  );
   if (settings.length) {
     for (const [key, value] of settings) {
       L.push(`${key}: ${or(value)}`);
