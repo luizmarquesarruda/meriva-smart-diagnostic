@@ -20,8 +20,8 @@ O perfil técnico da Meriva MY12 já usa `tankCapacityL: 56` e `reserveCapacityL
 
 ## Validação e pendências
 
-- **CI não disparada**, conforme a restrição vigente.
-- Testes automatizados, TypeScript, Expo Doctor e build Android ainda não foram executados nesta etapa.
+- **CI não foi disparada manualmente.** O GitHub Actions foi iniciado automaticamente por eventos de push; a execução mais recente observada foi a run #1887, em fila no momento da consulta. A integração disponível não expõe uma ação de cancelamento para essa execução.
+- Não considerar a CI aprovada até consultar o resultado final. Testes automatizados, TypeScript, Expo Doctor e build Android não foram executados manualmente nesta etapa.
 - A validação física com Meriva/ELM327 e trajeto GPS permanece pendente.
 - O histórico diário de sessões ECU continua sendo mantido separadamente em `VIAGENS/meriva_smart_daily_obd_history.txt`; o TXT diário é resumo de sessões, enquanto CSVs são a trilha amostral.
 - Próxima auditoria: confirmar todos os consumidores de `avgFuelConsumptionKml` para garantir que registros incompletos sejam apresentados como N/D em todas as telas/exportações; revisar limites de integração de combustível e lifecycle GPS; depois validar tudo em conjunto antes de abrir/atualizar PR ou disparar CI.
