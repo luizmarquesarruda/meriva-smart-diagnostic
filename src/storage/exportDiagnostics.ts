@@ -4,6 +4,7 @@ import { readDtcs } from '../database/dtcManager';
 import { readDriveCycles } from './driveCycleStorage';
 import { flushCsvRows } from '../database/csvLogger';
 import { redactSensitiveIdentifiers } from './privacyRedaction';
+import { isCycleConsumptionValid } from '../data/driveCycles';
 
 function csv(value: unknown): string {
   const text = String(value ?? '');
@@ -35,7 +36,21 @@ export async function exportDiagnosticsJson(basePath: string): Promise<string> {
     },
     lastReadings: state.lastReadings,
     dtcs,
-    driveCycles,
+    driveCycles: driveCycles.map((cycle) => {
+      const consumptionValid = isCycleConsumptionValid(cycle);
+      return {
+        ...cycle,
+        // Não exportar o sentinela zero nem valores legados como consumo verificado.
+        avgFuelConsumptionKml: consumptionValid ? cycle.avgFuelConsumptionKml : null,
+        consumptionQuality: consumptionValid
+          ? 'VALIDATED'
+          : cycle.dataQuality === 'INCOMPLETE'
+            ? 'INCOMPLETE'
+            : cycle.dataQuality === 'COMPLETE'
+              ? 'INCONSISTENT'
+              : 'LEGACY_UNVERIFIED',
+      };
+    }),
     autonomy: state.autonomy,
     sourcePolicy: {
       realObd: 'REAL_OBD',
@@ -52,7 +67,7 @@ export async function exportDriveCyclesCsv(basePath: string): Promise<string> {
   const cycles = await readDriveCycles(basePath);
   const dir = await ensureExportDir(basePath);
   const path = `${dir}/drive_cycles_${Date.now()}.csv`;
-  const header = ['startedAt','finishedAt','distanceKm','fuelUsedL','consumptionKml','source','fuelRateSource','dataQuality','incompleteReason'];
+  const header = ['startedAt','finishedAt','distanceKm','fuelUsedL','consumptionKml','source','fuelRateSource','dataQuality','consumptionQuality','incompleteReason'];
   const lines = [
     header.join(','),
     ...cycles.map((cycle) => [
@@ -60,10 +75,17 @@ export async function exportDriveCyclesCsv(basePath: string): Promise<string> {
       csv(cycle.finishedAt),
       csv(cycle.distanceTotalKm),
       csv(cycle.fuelUsedL),
-      csv(cycle.avgFuelConsumptionKml),
+      csv(isCycleConsumptionValid(cycle) ? cycle.avgFuelConsumptionKml : 'N/D'),
       csv(cycle.source),
       csv(cycle.fuelRateSource),
-      csv(cycle.dataQuality ?? 'COMPLETE'),
+      csv(cycle.dataQuality ?? 'LEGACY_UNVERIFIED'),
+      csv(isCycleConsumptionValid(cycle)
+        ? 'VALIDATED'
+        : cycle.dataQuality === 'INCOMPLETE'
+          ? 'INCOMPLETE'
+          : cycle.dataQuality === 'COMPLETE'
+            ? 'INCONSISTENT'
+            : 'LEGACY_UNVERIFIED'),
       csv(cycle.incompleteReason ?? ''),
     ].join(',')),
   ];
