@@ -22,14 +22,15 @@ O manual oficial confirma que a Chevrolet Meriva 2012 está disponível na pági
 
 ## Capacidades importantes
 
-- Tanque: 56 L
-- Reserva aproximada: 5 L
+- Capacidade nominal total do tanque: 56 L (inclui a reserva)
+- Reserva aproximada: 5 L, já incluída nos 56 L
+- Capacidade aproximada antes de entrar na reserva: 51 L (56 L − 5 L)
 - Óleo do motor: 3,25 L sem troca do filtro; 3,5 L com troca do filtro
 - Sistema de arrefecimento: 6 L
 - Direção hidráulica: 0,95 L
 - Reservatório de partida a frio: 0,58 L
 
-A capacidade de 56 L permanece como especificação física do veículo. A boia física não é usada como entrada de diagnóstico. O aplicativo pode usar o PID OBD 012F como leitura de nível de combustível quando a ECU responder validamente.
+A capacidade de 56 L é o volume total do tanque e já inclui aproximadamente 5 L de reserva; não somar a reserva por cima da capacidade nominal. Assim, há cerca de 51 L antes da faixa de reserva. O PID 012F é percentual do tanque total: litros estimados = percentual × 56 L, e a reserva é sinalizada por volta de 5 L (aprox. 8,93%). Como o PID informa percentual e não uma medição direta em litros, esses números são estimativas sujeitas à resolução e calibração da boia. A boia física não é usada como entrada de diagnóstico. O aplicativo pode usar o PID OBD 012F como leitura de nível de combustível quando a ECU responder validamente.
 
 ## Lubrificantes e manutenção
 
