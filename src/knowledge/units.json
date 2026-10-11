@@ -9,6 +9,10 @@
       "symbol": "km/h",
       "name": "quilômetros por hora"
     },
+    "km/h": {
+      "symbol": "km/h",
+      "name": "quilômetros por hora"
+    },
     "celsius": {
       "symbol": "°C",
       "name": "graus Celsius"

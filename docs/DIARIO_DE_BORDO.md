@@ -1822,3 +1822,17 @@ O PID padrão OBD-II 0101 contém quatro bytes com um estado compactado de MIL, 
 
 ### Validação
 A correção só será considerada concluída após a nova CI completar `npm run validate` e o build Android aplicável. Não foi feito merge em `main`.
+
+## 2026-10-11 — Alinhamento da chave de unidade de velocidade (CI #1898)
+
+### Falha encontrada
+- Commit testado: `fb9607a4b8cb4d8075de9a1bf17a935d44b97a1a`.
+- `npm ci`, Expo Doctor (17/17) e TypeScript passaram.
+- O teste de conhecimento avançou após corrigir `status` e falhou no PID `010D`, cuja unidade declarada é `km/h`. O catálogo tinha `kmh`, mas não a chave literal `km/h` usada pelo catálogo de PIDs.
+
+### Correção
+- Adicionado alias `km/h` em `src/knowledge/units.json`, com símbolo e descrição corretos, preservando a unidade que o parser já expõe.
+- Auditoria cruzada do catálogo mostrou que esta era a única unidade ainda ausente dos PIDs atuais.
+
+### Validação
+A CI #1898 falhou apenas em `npm run validate` após instalação, Expo Doctor e TypeScript bem-sucedidos. A nova execução precisa confirmar o restante dos testes e o build Android. Não houve merge em `main`.
