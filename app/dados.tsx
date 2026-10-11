@@ -25,7 +25,7 @@ export default function DadosScreen() {
     <View style={styles.grid}>
       <Metric landscape={layout.landscape} label="VELOCIDADE" value={gpsTracker.getState().currentSpeedKmh.toFixed(0) + ' km/h'} />
       <Metric landscape={layout.landscape} label="DISTÂNCIA GPS" value={trip.distanceKm.toFixed(2) + ' km'} />
-      <Metric landscape={layout.landscape} label="CONSUMO REAL" value={trip.consumptionKml != null && trip.consumptionKml > 0 ? trip.consumptionKml.toFixed(1) + ' km/L' : 'N/D'} />
+      <Metric landscape={layout.landscape} label="CONSUMO DA VIAGEM" value={trip.consumptionKml != null && trip.consumptionKml > 0 ? trip.consumptionKml.toFixed(1) + ' km/L' : 'N/D'} />
       <Metric landscape={layout.landscape} label="AUTONOMIA" value={state.autonomy.estimatedRangeKm > 0 ? state.autonomy.estimatedRangeKm.toFixed(0) + ' km' : 'N/D'} />
     </View>
     <View style={styles.note}>
