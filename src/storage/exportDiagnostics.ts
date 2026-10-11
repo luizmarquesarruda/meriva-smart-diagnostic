@@ -3,6 +3,7 @@ import { getAutoSaveState } from '../meriva/autosaveManager';
 import { readDtcs } from '../database/dtcManager';
 import { readDriveCycles } from './driveCycleStorage';
 import { flushCsvRows } from '../database/csvLogger';
+import { redactSensitiveIdentifiers } from './privacyRedaction';
 
 function csv(value: unknown): string {
   const text = String(value ?? '');
@@ -22,10 +23,15 @@ export async function exportDiagnosticsJson(basePath: string): Promise<string> {
   const driveCycles = await readDriveCycles(basePath);
   const dir = await ensureExportDir(basePath);
   const path = `${dir}/diagnostic_${Date.now()}.json`;
-  await FileSystem.writeAsStringAsync(path, JSON.stringify({
+  const exportPayload = {
     exportedAt: new Date().toISOString(),
-    vehicle: state.vehicle,
-    obd: state.obd,
+    // O perfil local mantém os dados originais; os identificadores não são necessários no relatório padrão.
+    vehicle: state.vehicle ? { ...state.vehicle, vin: undefined } : null,
+    obd: {
+      ...state.obd,
+      adapterName: undefined,
+      ecuIdentification: undefined,
+    },
     lastReadings: state.lastReadings,
     dtcs,
     driveCycles,
@@ -34,7 +40,9 @@ export async function exportDiagnosticsJson(basePath: string): Promise<string> {
       realObd: 'REAL_OBD',
       importedReference: 'CARSCANNER_SEED',
     },
-  }, null, 2), { encoding: FileSystem.EncodingType.UTF8 });
+  };
+  const exportedJson = redactSensitiveIdentifiers(JSON.stringify(exportPayload, null, 2));
+  await FileSystem.writeAsStringAsync(path, exportedJson, { encoding: FileSystem.EncodingType.UTF8 });
   return path;
 }
 
