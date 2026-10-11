@@ -18,4 +18,7 @@ if (!autoTrip.includes("ADAPTADOR OK / ECU SEM RESPOSTA")) {
   throw new Error('polling automático não pausa diante de perda de resposta da ECU');
 }
 
+if (!elm.includes("return this.enqueueCommand(async () => {") || !elm.includes("const protocolResult = await this.command('ATDP')")) {
+  throw new Error('recuperação ELM não está serializada com a fila de comandos');
+}
 console.log('ecuHealth.test.js: OK');
