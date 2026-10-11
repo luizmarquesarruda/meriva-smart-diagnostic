@@ -14,6 +14,10 @@ export interface DriveCycle {
   avgFuelConsumptionKml: number;
   source: DriveCycleSource;
   fuelRateSource?: 'MEASURED_015E' | 'ESTIMATED_MAF' | 'ESTIMATED_MAP' | 'MIXED';
+  /** Registro de trajeto real com dados suficientes ou incompletos. Ausente em ciclos legados. */
+  dataQuality?: 'COMPLETE' | 'INCOMPLETE';
+  /** Motivos legíveis por máquina, separados por vírgula quando houver mais de um. */
+  incompleteReason?: string;
   importedAt: string;
 }
 
@@ -92,7 +96,9 @@ export interface DriveCycleSummary {
 }
 
 export function getDriveCycleSummary(cycles: DriveCycle[]): DriveCycleSummary {
-  const realCycles = cycles.filter((cycle) => cycle.source === 'REAL_OBD');
+  // Ciclos legados sem dataQuality são tratados como completos por compatibilidade.
+  // Ciclos reais incompletos permanecem no histórico, mas não contaminam médias/totais de consumo.
+  const realCycles = cycles.filter((cycle) => cycle.source === 'REAL_OBD' && cycle.dataQuality !== 'INCOMPLETE');
   const referenceCycles = cycles.filter((cycle) => cycle.source === 'CARSCANNER_SEED');
   const realDistanceKm = realCycles.reduce((sum, cycle) => sum + cycle.distanceTotalKm, 0);
   const realFuelL = realCycles.reduce((sum, cycle) => sum + cycle.fuelUsedL, 0);
