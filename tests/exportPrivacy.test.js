@@ -38,4 +38,19 @@ const structuredTrace = redactSensitiveIdentifiers(
 assert(!structuredTrace.includes('Adaptador com nome pessoal'), 'deviceName estruturado deve ser redigido');
 assert(!structuredTrace.includes('OBD particular'), 'adapterName estruturado deve ser redigido');
 assert(!structuredTrace.includes('A1:B2:C3:D4:E5:F6'), 'endereços em campos estruturados devem ser redigidos');
-console.log('PASS privacidade: VIN, MAC e nomes de dispositivo redigidos em exportações');
+const formatter = fs.readFileSync(path.join(__dirname, '..', 'src', 'meriva', 'autosaveTxtFormatter.ts'), 'utf8');
+for (const forbidden of [
+  'or(state.vehicle?.vin)',
+  'or(state.obd?.adapterName)',
+  'or(state.obd?.ecuIdentification)',
+  'or(state.obd?.ecuName)',
+]) {
+  assert(!formatter.includes(forbidden), `autosave TXT não deve imprimir identificadores brutos: ${forbidden}`);
+}
+assert(formatter.includes('VIN: [OMITIDO POR PRIVACIDADE]'));
+assert(formatter.includes('Adaptador: [NOME OMITIDO POR PRIVACIDADE]'));
+
+const bluetoothManager = fs.readFileSync(path.join(__dirname, '..', 'src', 'obd', 'bluetoothManager.ts'), 'utf8');
+assert(bluetoothManager.includes('sanitizeDiagnosticDetails(details)'), 'trace não deve armazenar nomes/endereço sem redação');
+
+console.log('PASS privacidade: identificadores ocultados em exportação e trace TXT');
