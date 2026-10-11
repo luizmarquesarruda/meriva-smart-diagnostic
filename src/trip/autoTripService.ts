@@ -6,7 +6,7 @@ import { forceSaveOnObdEvent, registerObdQuery } from '../meriva/autosaveIntegra
 import { getAutoSaveState, updateAutoSaveState, initAutoSave } from '../meriva/autosaveManager';
 import { RealTripRecorder } from './tripRecorder';
 import { estimateRangeFromFuelLevel, fuelLevelPercentToLiters, isFuelReserve } from './fuelLevel';
-import { resetLiveTelemetry } from '../obd/liveTelemetry';
+import { getLivePidTrend, resetLiveTelemetry } from '../obd/liveTelemetry';
 import { estimateFuelRateLph, type FuelRateSource } from '../obd/fuelConsumption';
 
 export interface AutoTripServiceState {
@@ -344,6 +344,8 @@ class AutoTripService {
             speedKmh: tripVehicleSpeedKmh,
             fuelRateLph,
             fuelRateSource,
+            rpm: (() => { const trend = getLivePidTrend('010C'); return trend && trend.ageSeconds <= 10 ? trend.current : null; })(),
+            coolantTempC: (() => { const trend = getLivePidTrend('0105'); return trend && trend.ageSeconds <= 10 ? trend.current : null; })(),
           });
           tripDistanceKm = sampleState.distanceKm;
           tripFuelUsedL = sampleState.fuelUsedL;

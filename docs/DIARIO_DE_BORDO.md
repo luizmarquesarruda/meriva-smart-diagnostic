@@ -1870,3 +1870,35 @@ O Android pode encerrar o processo sem executar o fechamento normal. O último s
 
 ### Limites e validação
 A recuperação detecta a interrupção na próxima inicialização. Os CSVs continuam sendo a trilha temporal de consultas individuais. Esta alteração dispara nova CI; confirmar `validate` e `android-build` no commit resultante. Teste físico com ELM327/ECU permanece pendente. Não foi feito merge na `main`.
+
+
+## 2026-10-10 — Fase 1: relatório detalhado de viagem e telemetria por trajeto
+
+### Objetivo
+Começar a implementação das melhorias de produto com uma entrega que reaproveita o registro de viagens existente, sem importar dados do Car Scanner e sem aumentar a frequência de consultas OBD.
+
+### Alterações preparadas
+- `app/viagens.tsx`: histórico interativo com filtros de período, cartões com data, distância, duração, velocidade média/máxima e consumo apenas quando válido; detalhe individual da viagem; resumo de combustível com origem da taxa; resumo e gráfico compacto de temperatura do arrefecimento; contagem de amostras de RPM/velocidade/ECT; mensagens explícitas para dados ausentes.
+- `src/data/driveCycles.ts`: campos opcionais compatíveis com viagens antigas para velocidade máxima e amostras temporais.
+- `src/trip/tripRecorder.ts`: persistência de pontos de telemetria esparsos, com intervalo mínimo de 10 segundos e limite de 720 pontos por viagem; preserva timestamp, velocidade, RPM e ECT quando atuais.
+- `src/trip/autoTripService.ts`: leitura de tendências existentes de RPM/ECT somente quando a amostra tiver até 10 segundos; nenhuma nova consulta PID foi adicionada por causa do gráfico.
+- `src/storage/driveCycleStorage.ts` e `src/database/csvLogger.ts`: validação dos novos campos e exportação de velocidade máxima/contagem de amostras; consumo inválido permanece em branco no CSV.
+- `src/meriva/dailyObdHistory.ts`: o resumo das viagens no TXT diário passa a incluir velocidade máxima e número de amostras, sem transformar o TXT em log de cada leitura.
+- `tests/tripRecorder.test.js`: regressão para garantir persistência de velocidade máxima e série temporal.
+
+### Limites conhecidos
+- Viagens antigas não possuem os novos campos e devem mostrar N/D; não serão preenchidas retroativamente com valores inventados.
+- O gráfico mostra apenas amostras reais armazenadas. Não comprova a saúde do sensor e não substitui teste físico com a ECU.
+- O armazenamento de pontos é limitado a 720 por viagem, amostrados no máximo a cada 10 segundos, para manter o índice local sob controle.
+- Esta alteração foi preparada como objeto Git sem atualizar branch/ref; por isso não dispara CI. Nenhuma CI foi iniciada manualmente e não houve merge.
+
+### Validação pendente
+- Executar typecheck, testes de regressão e build Android somente após autorização explícita para publicar a branch e disparar CI.
+- Validar no aparelho a persistência de novas viagens, o gráfico ECT e o TXT diário com a Meriva/ELM327 reais.
+
+### Próximas fases de implementação
+1. Integridade e exportação do histórico diário; cenários de múltiplas partidas e recuperação.
+2. Validação cruzada de sensores, alertas com histerese e painel de saúde.
+3. DTC/freeze frame e relatório de diagnóstico com evidências.
+4. Diário de manutenção/abastecimento, comparação de viagens, backup/restauração e auditoria de qualidade do adaptador.
+5. Revisão visual de todas as telas e navegação integrada, sem duplicar lógica OBD.

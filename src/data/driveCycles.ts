@@ -1,5 +1,12 @@
 export type DriveCycleSource = 'CARSCANNER_SEED' | 'REAL_OBD' | 'SIMULACAO';
 
+export interface TripTelemetrySample {
+  timestamp: string;
+  speedKmh: number | null;
+  rpm: number | null;
+  coolantTempC: number | null;
+}
+
 export interface DriveCycle {
   id: string;
   startedAt: string;
@@ -14,6 +21,10 @@ export interface DriveCycle {
   avgFuelConsumptionKml: number;
   /** False when a real trip is retained but fuel data cannot support km/L. */
   fuelDataValid?: boolean;
+  /** Maximum valid speed observed during this trip; absent in legacy records. */
+  maxSpeedKmh?: number;
+  /** Sparse timestamped telemetry captured for this trip. */
+  telemetrySamples?: TripTelemetrySample[];
   source: DriveCycleSource;
   fuelRateSource?: 'MEASURED_015E' | 'ESTIMATED_MAF' | 'ESTIMATED_MAP' | 'MIXED';
   importedAt: string;

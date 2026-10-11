@@ -74,9 +74,9 @@ assert.strictEqual(tinyFuelCycle.fuelDataValid, false, 'trip under 0.05 L must n
 assert.strictEqual(tinyFuelCycle.avgFuelConsumptionKml, 0);
 
 const cycle = new RealTripRecorder(1000, 0);
-cycle.addSample({ timestampMs: 1000, distanceKm: 0, speedKmh: 0, fuelRateLph: 12 });
-cycle.addSample({ timestampMs: 11000, distanceKm: 1, speedKmh: 36, fuelRateLph: 12 });
-cycle.addSample({ timestampMs: 21000, distanceKm: 2, speedKmh: 36, fuelRateLph: 12 });
+cycle.addSample({ timestampMs: 1000, distanceKm: 0, speedKmh: 0, fuelRateLph: 12, rpm: 800, coolantTempC: 25 });
+cycle.addSample({ timestampMs: 11000, distanceKm: 1, speedKmh: 36, fuelRateLph: 12, rpm: 1800, coolantTempC: 40 });
+cycle.addSample({ timestampMs: 21000, distanceKm: 2, speedKmh: 36, fuelRateLph: 12, rpm: 2200, coolantTempC: 78 });
 const saved = cycle.buildDriveCycle(22000);
 
 assert.ok(saved);
@@ -85,6 +85,9 @@ assert.strictEqual(saved.distanceTotalKm, 2);
 assertApprox(saved.fuelUsedL, 12 * 20_000 / 3_600_000, 1e-6);
 assert.strictEqual(saved.avgFuelConsumptionKml, Number((2 / saved.fuelUsedL).toFixed(3)));
 assert.strictEqual(saved.fuelDataValid, true, 'sufficient fuel samples must be marked valid');
+assert.strictEqual(saved.maxSpeedKmh, 36, 'maximum speed must be persisted for the trip report');
+assert.ok(Array.isArray(saved.telemetrySamples), 'trip must persist a bounded telemetry series');
+assert.strictEqual(saved.telemetrySamples.length, 3, 'chart samples are stored no more often than every ten seconds');
 
 // Older/duplicate timestamps cannot corrupt distance, speed, duration, or fuel.
 const ordered = new RealTripRecorder(0, 10);

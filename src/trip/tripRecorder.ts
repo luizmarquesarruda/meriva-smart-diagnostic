@@ -1,5 +1,5 @@
 import { FuelRateIntegrator } from '../obd/fuelConsumption';
-import type { DriveCycle } from '../data/driveCycles';
+import type { DriveCycle, TripTelemetrySample } from '../data/driveCycles';
 import type { FuelRateSource } from '../obd/fuelConsumption';
 
 export interface RealTripSample {
@@ -8,6 +8,8 @@ export interface RealTripSample {
   speedKmh: number;
   fuelRateLph: number | null;
   fuelRateSource?: FuelRateSource;
+  rpm?: number | null;
+  coolantTempC?: number | null;
 }
 
 /** Minimum integrated fuel required before persisting a consumption average. */
@@ -22,6 +24,7 @@ export interface RealTripRecorderState {
   maxSpeedKmh: number;
   validFuelSamples: number;
   lastTimestampMs: number | null;
+  telemetrySamples: TripTelemetrySample[];
 }
 
 function formatDuration(ms: number): string {
@@ -46,6 +49,8 @@ export class RealTripRecorder {
   private movingTimeMs = 0;
   private maxSpeedKmh = 0;
   private fuelRateSources = new Set<FuelRateSource>();
+  private telemetrySamples: TripTelemetrySample[] = [];
+  private lastTelemetrySampleAtMs: number | null = null;
 
   constructor(startedAtMs = Date.now(), initialDistanceKm = 0) {
     this.startedAtMs = startedAtMs;
@@ -86,6 +91,20 @@ export class RealTripRecorder {
     }
     this.lastTimestampMs = timestampMs;
 
+    // Sparse chart points keep the trip index compact on long journeys.
+    if (this.lastTelemetrySampleAtMs === null || timestampMs - this.lastTelemetrySampleAtMs >= 10_000) {
+      const optionalValue = (value: number | null | undefined): number | null =>
+        value != null && Number.isFinite(value) ? value : null;
+      this.telemetrySamples.push({
+        timestamp: new Date(timestampMs).toISOString(),
+        speedKmh,
+        rpm: optionalValue(sample.rpm),
+        coolantTempC: optionalValue(sample.coolantTempC),
+      });
+      this.telemetrySamples = this.telemetrySamples.slice(-720);
+      this.lastTelemetrySampleAtMs = timestampMs;
+    }
+
     if (
       sample.fuelRateLph !== null &&
       Number.isFinite(sample.fuelRateLph) &&
@@ -109,6 +128,7 @@ export class RealTripRecorder {
       maxSpeedKmh: this.maxSpeedKmh,
       validFuelSamples: fuelState.validSamples,
       lastTimestampMs: this.lastTimestampMs,
+      telemetrySamples: this.telemetrySamples.map((sample) => ({ ...sample })),
     };
   }
 
@@ -137,6 +157,8 @@ export class RealTripRecorder {
       standingTimeHms: formatDuration(Math.max(0, state.durationMs - state.movingTimeMs)),
       avgDrivingSpeedKmh: Number(avgDrivingSpeedKmh.toFixed(3)),
       avgFuelConsumptionKml: Number(avgFuelConsumptionKml.toFixed(3)),
+      maxSpeedKmh: Number(state.maxSpeedKmh.toFixed(1)),
+      telemetrySamples: state.telemetrySamples,
       fuelDataValid,
       source: 'REAL_OBD',
       fuelRateSource: this.fuelRateSources.size === 1

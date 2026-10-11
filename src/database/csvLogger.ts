@@ -13,6 +13,8 @@ export interface CsvRow {
   temperatura?: number | string | null;
   velocidade?: number | string | null;
   condicao?: string;
+  maxSpeed?: number | string | null;
+  telemetrySamples?: number | string | null;
 }
 
 const fileQueues = new Map<string, Promise<void>>();

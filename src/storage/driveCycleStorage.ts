@@ -18,6 +18,14 @@ function isDriveCycle(value: unknown): value is DriveCycle {
     typeof cycle.avgDrivingSpeedKmh === 'number' &&
     typeof cycle.avgFuelConsumptionKml === 'number' &&
     (cycle.fuelDataValid === undefined || typeof cycle.fuelDataValid === 'boolean') &&
+    (cycle.maxSpeedKmh === undefined || (typeof cycle.maxSpeedKmh === 'number' && Number.isFinite(cycle.maxSpeedKmh) && cycle.maxSpeedKmh >= 0)) &&
+    (cycle.telemetrySamples === undefined || (Array.isArray(cycle.telemetrySamples) && cycle.telemetrySamples.every((sample) =>
+      typeof sample === 'object' && sample !== null &&
+      typeof sample.timestamp === 'string' &&
+      (sample.speedKmh === null || (typeof sample.speedKmh === 'number' && Number.isFinite(sample.speedKmh))) &&
+      (sample.rpm === null || (typeof sample.rpm === 'number' && Number.isFinite(sample.rpm))) &&
+      (sample.coolantTempC === null || (typeof sample.coolantTempC === 'number' && Number.isFinite(sample.coolantTempC)))
+    ))) &&
     ['CARSCANNER_SEED', 'REAL_OBD', 'SIMULACAO'].includes(cycle.source as string) &&
     typeof cycle.importedAt === 'string'
   );
@@ -156,7 +164,9 @@ export async function addDriveCycle(basePath: string, cycle: DriveCycle): Promis
     drivingTime: cycle.drivingTimeHms,
     standingTime: cycle.standingTimeHms,
     avgSpeed: cycle.avgDrivingSpeedKmh,
-    avgConsumption: cycle.avgFuelConsumptionKml,
+    maxSpeed: cycle.maxSpeedKmh ?? '',
+    avgConsumption: cycle.fuelDataValid === false ? '' : cycle.avgFuelConsumptionKml,
+    telemetrySamples: cycle.telemetrySamples?.length ?? 0,
     source: cycle.source,
   };
 
