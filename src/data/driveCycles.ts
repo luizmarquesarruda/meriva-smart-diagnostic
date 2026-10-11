@@ -95,20 +95,44 @@ export interface DriveCycleSummary {
   lastRealCycle: DriveCycle | null;
 }
 
+function parseDurationSeconds(value: string): number {
+  const match = /^(\d{2,}):(\d{2}):(\d{2})$/.exec(value);
+  if (!match) return 0;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const seconds = Number(match[3]);
+  if (minutes > 59 || seconds > 59) return 0;
+  return hours * 3600 + minutes * 60 + seconds;
+}
+
+function finiteNonNegative(value: number): number {
+  return Number.isFinite(value) && value >= 0 ? value : 0;
+}
+
+/** Validates that a stored trip has enough trustworthy data to show a km/L value. */
+export function isCycleConsumptionValid(cycle: DriveCycle): boolean {
+  return cycle.dataQuality !== 'INCOMPLETE' &&
+    finiteNonNegative(cycle.distanceTotalKm) >= 0.1 &&
+    finiteNonNegative(cycle.fuelUsedL) >= 0.05 &&
+    Number.isFinite(cycle.avgFuelConsumptionKml) &&
+    cycle.avgFuelConsumptionKml > 0;
+}
+
 export function getDriveCycleSummary(cycles: DriveCycle[]): DriveCycleSummary {
-  // Ciclos legados sem dataQuality são tratados como completos por compatibilidade.
-  // A distância e o combustível observados continuam no total do histórico; apenas a média
-  // km/L utiliza ciclos completos com distância e integração de combustível confiáveis.
   const realCycles = cycles.filter((cycle) => cycle.source === 'REAL_OBD');
-  const completeCycles = realCycles.filter((cycle) => cycle.dataQuality !== 'INCOMPLETE');
+  const completeCycles = realCycles.filter(isCycleConsumptionValid);
   const referenceCycles = cycles.filter((cycle) => cycle.source === 'CARSCANNER_SEED');
-  const realDistanceKm = realCycles.reduce((sum, cycle) => sum + cycle.distanceTotalKm, 0);
-  const realFuelL = realCycles.reduce((sum, cycle) => sum + cycle.fuelUsedL, 0);
-  const completeDistanceKm = completeCycles.reduce((sum, cycle) => sum + cycle.distanceTotalKm, 0);
-  const completeFuelL = completeCycles.reduce((sum, cycle) => sum + cycle.fuelUsedL, 0);
-  const realAvgSpeedKmh = realCycles.length
-    ? realCycles.reduce((sum, cycle) => sum + cycle.avgDrivingSpeedKmh, 0) / realCycles.length
-    : 0;
+  const realDistanceKm = realCycles.reduce((sum, cycle) => sum + finiteNonNegative(cycle.distanceTotalKm), 0);
+  const realFuelL = realCycles.reduce((sum, cycle) => sum + finiteNonNegative(cycle.fuelUsedL), 0);
+  const completeDistanceKm = completeCycles.reduce((sum, cycle) => sum + finiteNonNegative(cycle.distanceTotalKm), 0);
+  const completeFuelL = completeCycles.reduce((sum, cycle) => sum + finiteNonNegative(cycle.fuelUsedL), 0);
+  // Aggregate by total distance / total moving time, not the arithmetic mean of trip averages.
+  const speedDistanceKm = realCycles.reduce((sum, cycle) => {
+    const seconds = parseDurationSeconds(cycle.drivingTimeHms);
+    return seconds > 0 ? sum + finiteNonNegative(cycle.distanceTotalKm) : sum;
+  }, 0);
+  const movingSeconds = realCycles.reduce((sum, cycle) => sum + parseDurationSeconds(cycle.drivingTimeHms), 0);
+  const realAvgSpeedKmh = movingSeconds > 0 ? speedDistanceKm / (movingSeconds / 3600) : 0;
 
   const ordered = [...cycles].sort(
     (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
