@@ -97,11 +97,15 @@ export interface DriveCycleSummary {
 
 export function getDriveCycleSummary(cycles: DriveCycle[]): DriveCycleSummary {
   // Ciclos legados sem dataQuality são tratados como completos por compatibilidade.
-  // Ciclos reais incompletos permanecem no histórico, mas não contaminam médias/totais de consumo.
-  const realCycles = cycles.filter((cycle) => cycle.source === 'REAL_OBD' && cycle.dataQuality !== 'INCOMPLETE');
+  // A distância e o combustível observados continuam no total do histórico; apenas a média
+  // km/L utiliza ciclos completos com distância e integração de combustível confiáveis.
+  const realCycles = cycles.filter((cycle) => cycle.source === 'REAL_OBD');
+  const completeCycles = realCycles.filter((cycle) => cycle.dataQuality !== 'INCOMPLETE');
   const referenceCycles = cycles.filter((cycle) => cycle.source === 'CARSCANNER_SEED');
   const realDistanceKm = realCycles.reduce((sum, cycle) => sum + cycle.distanceTotalKm, 0);
   const realFuelL = realCycles.reduce((sum, cycle) => sum + cycle.fuelUsedL, 0);
+  const completeDistanceKm = completeCycles.reduce((sum, cycle) => sum + cycle.distanceTotalKm, 0);
+  const completeFuelL = completeCycles.reduce((sum, cycle) => sum + cycle.fuelUsedL, 0);
   const realAvgSpeedKmh = realCycles.length
     ? realCycles.reduce((sum, cycle) => sum + cycle.avgDrivingSpeedKmh, 0) / realCycles.length
     : 0;
@@ -117,7 +121,7 @@ export function getDriveCycleSummary(cycles: DriveCycle[]): DriveCycleSummary {
     totalDistanceKm: Number(realDistanceKm.toFixed(2)),
     totalFuelL: Number(realFuelL.toFixed(3)),
     avgConsumptionKml: Number(
-      (realFuelL > 0 ? realDistanceKm / realFuelL : 0).toFixed(2),
+      (completeFuelL > 0 ? completeDistanceKm / completeFuelL : 0).toFixed(2),
     ),
     avgSpeedKmh: Number(realAvgSpeedKmh.toFixed(1)),
     realCycleCount: realCycles.length,
