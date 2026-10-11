@@ -227,6 +227,7 @@ export default function ConfiguracaoScreen() {
       )}
 
       <Text style={styles.section}>DADOS E MANUTENÇÃO</Text>
+      <Text style={styles.note}>PRIVACIDADE: exportações manuais TXT/JSON/relatório Bluetooth ocultam VIN, endereços Bluetooth e nomes de dispositivo por padrão. O salvamento automático local continua ativo. O backup manual pode conter logs brutos e dados de identificação; revise antes de compartilhar.</Text>
       <Text style={styles.info}>VERSÃO: {appVersion}</Text>
       
       <Text style={styles.info}>SALVAMENTO AUTOMÁTICO: ATIVO</Text>
