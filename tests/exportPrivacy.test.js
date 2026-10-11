@@ -49,6 +49,8 @@ for (const forbidden of [
 }
 assert(formatter.includes('VIN: [OMITIDO POR PRIVACIDADE]'));
 assert(formatter.includes('Adaptador: [NOME OMITIDO POR PRIVACIDADE]'));
+assert(formatter.includes('VIN: [OMITIDO POR PRIVACIDADE]'));
+assert(formatter.includes('!/(vin|mac|address|device.?name|adapter.?name|serial|ecu.?identification)/i.test(key)'), 'settings de identificação devem ser omitidas do TXT');
 
 const bluetoothManager = fs.readFileSync(path.join(__dirname, '..', 'src', 'obd', 'bluetoothManager.ts'), 'utf8');
 assert(bluetoothManager.includes('sanitizeDiagnosticDetails(details)'), 'trace não deve armazenar nomes/endereço sem redação');
