@@ -7,7 +7,7 @@ O GPS do Android pode entregar pequenas mudanças de latitude/longitude mesmo co
 ## Regra adotada no Meriva Smart Diagnostic
 
 1. Só são usadas posições com precisão declarada de até 30 m.
-2. A velocidade do PID OBD 010D confirma movimento quando válida; sem ela, o rastreador usa a velocidade GPS e, quando ausente, a velocidade derivada de posições consecutivas válidas.
+2. A velocidade do PID OBD 010D confirma movimento quando válida; sem ela, é exigida velocidade reportada pelo GPS. A velocidade derivada das coordenadas é usada como validação adicional do segmento, nunca como única evidência de movimento.
 3. A velocidade derivada deve ficar entre 5 e 220 km/h, o intervalo entre fixes não pode superar 5 s e cada segmento bruto deve ter no máximo 250 m.
 4. O movimento só é confirmado após pelo menos três segmentos consecutivos plausíveis e um deslocamento acumulado de pelo menos max(12 m, 1,5 × a pior precisão informada).
 5. Depois de confirmado o movimento, os segmentos plausíveis são acumulados em um buffer. A distância só é adicionada ao total quando o deslocamento entre a âncora de distância e o fix atual supera o limite adaptativo. Isso permite contar vários segmentos curtos sem reduzir o filtro a uma soma de jitter.
@@ -29,4 +29,4 @@ A revisão considerou os padrões de filtragem adaptativa, detecção de movimen
 
 ## Teste automatizado
 
-tests/gps.test.js verifica distância com fixes limpos, rejeição de deriva parado e movimento com precisão mediana, em que cada segmento individual é menor que a margem de erro do GPS.
+tests/gps.test.js verifica distância com fixes limpos, rejeição de deriva parado, movimento com precisão mediana e rejeição de distância quando falta evidência de velocidade do GPS/ECU.
