@@ -83,4 +83,13 @@ gap.addSample({ timestampMs: 40_001, distanceKm: 1, speedKmh: 30, fuelRateLph: 1
 assert.strictEqual(gap.getState().durationMs, 0);
 assert.strictEqual(gap.getState().fuelUsedL, 0);
 
-console.log('PASS trip recorder: GPS + PID 015E + persistência de ciclo real');
+const { getDriveCycleSummary } = loadTs('src/data/driveCycles.ts');
+const completeSummary = getDriveCycleSummary([
+  saved,
+  incomplete,
+]);
+assert.strictEqual(completeSummary.realCycleCount, 1, 'ciclos incompletos não entram na média');
+assert.strictEqual(completeSummary.totalDistanceKm, 2);
+assert.ok(completeSummary.avgConsumptionKml > 0);
+
+console.log('PASS trip recorder: GPS + OBD + preservação de ciclos incompletos');
