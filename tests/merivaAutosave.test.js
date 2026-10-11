@@ -770,6 +770,33 @@ test('recuperação após encerramento abrupto limpa conexão fantasma e registr
   m.disposeAutoSave();
 });
 
+test('diário diário não sobrescreve arquivo existente quando a leitura falha', async () => {
+  resetFS();
+  const history = loadTs(path.join(ROOT, 'src/meriva/dailyObdHistory.ts'));
+  const stateModule = loadTs(path.join(ROOT, 'src/meriva/autosaveState.ts'));
+  const state = stateModule.createEmptyMerivaState();
+  const target = BASE + '/VIAGENS/meriva_smart_daily_obd_history.txt';
+  const originalContent = 'HISTÓRICO EXISTENTE — CONTEÚDO A PRESERVAR';
+  files.set(target, originalContent);
+
+  const originalRead = currentFS.readAsStringAsync;
+  currentFS.readAsStringAsync = async (p, ...args) => {
+    if (p === target) throw new Error('falha simulada de leitura');
+    return originalRead.call(currentFS, p, ...args);
+  };
+  try {
+    await assert.rejects(
+      history.appendDailyObdSessionEvent(BASE, state, 'SESSION_START', '2026-10-11T12:00:00.000Z'),
+      /falha simulada de leitura/,
+      'falha de leitura deve interromper a gravação',
+    );
+  } finally {
+    currentFS.readAsStringAsync = originalRead;
+  }
+
+  assert.strictEqual(files.get(target), originalContent, 'o histórico anterior deve permanecer intacto');
+});
+
 // ---------- executor ----------
 async function main() {
   let failed = 0;
