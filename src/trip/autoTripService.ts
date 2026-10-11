@@ -3,7 +3,7 @@ import type { SharedObdConnection } from '../obd/sharedConnection';
 import { getSharedObdConnection, getSharedObdStatus, subscribeSharedObd } from '../obd/sharedConnection';
 import { addDriveCycle, readDriveCycles } from '../storage/driveCycleStorage';
 import { forceSaveOnObdEvent, registerObdQuery } from '../meriva/autosaveIntegration';
-import { updateAutoSaveState, initAutoSave } from '../meriva/autosaveManager';
+import { updateAutoSaveState, initAutoSave, getAutoSaveState } from '../meriva/autosaveManager';
 import { RealTripRecorder } from './tripRecorder';
 import { INITIAL_DRIVE_CYCLES } from '../data/driveCycles';
 import { estimateRangeFromFuelLevel, fuelLevelPercentToLiters, isFuelReserve } from './fuelLevel';
@@ -30,6 +30,15 @@ export interface AutoTripServiceState {
 
 type Listener = (state: AutoTripServiceState) => void;
 
+function getFuelEstimateParameters(): { airFuelRatio: number; fuelDensityKgPerL: number } {
+  const fuelType = getAutoSaveState().settings.fuelType;
+  // Approximate stoichiometric assumptions for a flex-fuel vehicle; they are not a
+  // measurement of the current tank blend. PID 015E remains the preferred source.
+  if (fuelType === 'ETANOL') return { airFuelRatio: 9.0, fuelDensityKgPerL: 0.789 };
+  if (fuelType === 'GASOLINA') return { airFuelRatio: 13.0, fuelDensityKgPerL: 0.755 };
+  // FLEX/unspecified: conservative approximate blend assumption; label remains ESTIMATED.
+  return { airFuelRatio: 12.9, fuelDensityKgPerL: 0.755 };
+}
 
 function getPersistedRealAverageConsumption(autonomy: {
   realReadingCount: number;
@@ -274,7 +283,7 @@ class AutoTripService {
           await registerObdQuery(this.basePath, mafResult, 'REAL');
           const mafGs = mafResult.parsed.status === 'RESPONDEU' ? mafResult.parsed.value : null;
           if (mafGs != null) {
-            const estimate = estimateFuelRateLph({ mafGs });
+            const estimate = estimateFuelRateLph({ mafGs, ...getFuelEstimateParameters() });
             if (estimate) {
               fuelRateLph = estimate.rateLph;
               fuelRateSource = estimate.source;
@@ -297,6 +306,7 @@ class AutoTripService {
             rpm,
             intakeAirTempC: iatResult.parsed.status === 'RESPONDEU' ? iatResult.parsed.value : null,
             displacementCm3: getAutoSaveState().vehicle?.displacementCm3 ?? MERIVA_MANUAL.engine.displacementCm3,
+            ...getFuelEstimateParameters(),
           });
           if (estimate) {
             fuelRateLph = estimate.rateLph;
