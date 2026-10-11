@@ -102,10 +102,14 @@ export interface FuelRateEstimateInput {
 export function estimateFuelRateLph(input: FuelRateEstimateInput): { rateLph: number; source: FuelRateSource } | null {
   const afr = input.airFuelRatio ?? 14.7;
   const density = input.fuelDensityKgPerL ?? 0.745;
+  if (!Number.isFinite(afr) || afr < 5 || afr > 30 || !Number.isFinite(density) || density < 0.5 || density > 1.2) return null;
 
-  if (Number.isFinite(input.mafGs) && (input.mafGs ?? 0) > 0 && Number.isFinite(afr) && afr > 0 && Number.isFinite(density) && density > 0) {
+  if (Number.isFinite(input.mafGs) && (input.mafGs ?? 0) > 0 && (input.mafGs ?? 0) <= 300) {
     const fuelKgPerSecond = (input.mafGs as number) / 1000 / afr;
-    return { rateLph: fuelKgPerSecond * 3600 / density, source: 'ESTIMATED_MAF' };
+    const rateLph = fuelKgPerSecond * 3600 / density;
+    return Number.isFinite(rateLph) && rateLph > 0 && rateLph <= 500
+      ? { rateLph, source: 'ESTIMATED_MAF' }
+      : null;
   }
 
   const map = input.mapKpa;
@@ -114,19 +118,23 @@ export function estimateFuelRateLph(input: FuelRateEstimateInput): { rateLph: nu
   const displacementL = (input.displacementCm3 ?? 0) / 1000;
   const ve = input.volumetricEfficiency ?? 0.80;
   if (
-    Number.isFinite(map) && (map ?? 0) > 0
-    && Number.isFinite(rpm) && (rpm ?? 0) > 0
-    && Number.isFinite(iat)
-    && displacementL > 0
-    && Number.isFinite(afr) && afr > 0 && Number.isFinite(density) && density > 0 && Number.isFinite(ve) && ve > 0
+    Number.isFinite(map) && (map ?? 0) > 0 && (map ?? 0) <= 300
+    && Number.isFinite(rpm) && (rpm ?? 0) > 0 && (rpm ?? 0) <= 12_000
+    && Number.isFinite(iat) && (iat as number) > -273.15 && (iat as number) <= 150
+    && displacementL > 0 && displacementL <= 10
+    && Number.isFinite(ve) && ve > 0 && ve <= 1.5
   ) {
     const absolutePressurePa = (map as number) * 1000;
     const temperatureK = (iat as number) + 273.15;
+    if (!Number.isFinite(temperatureK) || temperatureK <= 0) return null;
     const airDensityGPerL = absolutePressurePa / (287.05 * temperatureK);
     const volumetricFlowLPerSecond = displacementL * (rpm as number) / 120 * ve;
     const mafGs = airDensityGPerL * volumetricFlowLPerSecond;
     const fuelKgPerSecond = mafGs / 1000 / afr;
-    return { rateLph: fuelKgPerSecond * 3600 / density, source: 'ESTIMATED_MAP' };
+    const rateLph = fuelKgPerSecond * 3600 / density;
+    return Number.isFinite(rateLph) && rateLph > 0 && rateLph <= 500
+      ? { rateLph, source: 'ESTIMATED_MAP' }
+      : null;
   }
 
   return null;
