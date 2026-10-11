@@ -134,6 +134,15 @@ if (!autoTripSource.includes("connection.supportedPids.includes('0110')") ||
     !autoTripSource.includes("connection.supportedPids.includes('010F')")) {
   throw new Error('PIDs MAF/MAP/IAT precisam ser verificados contra os PIDs suportados pela ECU');
 }
+if (!autoTripSource.includes("import { updateAutoSaveState, initAutoSave, getAutoSaveState } from '../meriva/autosaveManager';")) {
+  throw new Error('autoTripService deve importar getAutoSaveState explicitamente');
+}
+if (!autoTripSource.includes("getAutoSaveState().settings.fuelType")) {
+  throw new Error('estimativas MAF/MAP devem respeitar o combustível configurado');
+}
+if (!autoTripSource.includes("airFuelRatio: 9.0")) {
+  throw new Error('estimativa por etanol deve usar hipótese estequiométrica própria');
+}
 if (!autoTripSource.includes('MERIVA_MANUAL.engine.displacementCm3')) {
   throw new Error('Estimativa MAP deve usar a cilindrada documentada da Meriva, sem fallback 1598 cm³');
 }
