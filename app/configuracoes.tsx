@@ -118,6 +118,7 @@ export default function ConfiguracaoScreen() {
                 <Text style={styles.choiceText}>GASOLINA</Text>
               </TouchableOpacity>
             </View>
+            <Text style={styles.note}>A taxa do PID 015E é preferida quando disponível. Estimativas MAF/MAP usam parâmetros aproximados conforme esta seleção; FLEX não identifica a mistura real presente no tanque.</Text>
           </View>
 
           <View style={styles.card}>
