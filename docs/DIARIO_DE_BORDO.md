@@ -1902,3 +1902,27 @@ Começar a implementação das melhorias de produto com uma entrega que reaprove
 3. DTC/freeze frame e relatório de diagnóstico com evidências.
 4. Diário de manutenção/abastecimento, comparação de viagens, backup/restauração e auditoria de qualidade do adaptador.
 5. Revisão visual de todas as telas e navegação integrada, sem duplicar lógica OBD.
+
+## 2026-10-11 — Fase 2: correção de tipagem da recuperação do histórico diário
+
+### Auditoria
+- `src/meriva/autosaveManager.ts` registra `SESSION_RECOVERED` quando detecta, na inicialização, que o snapshot anterior deixou a sessão OBD marcada como conectada.
+- `src/meriva/dailyObdHistory.ts` já renderizava `SESSION_RECOVERED` e contabilizava esse evento, mas a assinatura pública de `appendDailyObdSessionEvent` aceitava somente `SESSION_START` e `SESSION_END`. Isso criava incompatibilidade de TypeScript no caminho de recuperação, embora o teste que transpila arquivos isoladamente pudesse não detectá-la.
+
+### Correção aplicada
+- Ampliado o tipo do evento público para aceitar `SESSION_RECOVERED`, alinhando a API à chamada existente no autosave.
+- Nenhuma alteração no protocolo OBD, no formato persistido ou na política de reconexão.
+- A exportação TXT diária já possui botão próprio em Configurações; não foi criado um fluxo duplicado.
+- `app/_layout.tsx` já usa `expo-keep-awake` para manter a tela ativa enquanto o app está em uso; não foi adicionado outro mecanismo concorrente.
+
+### Validação e limites
+- Alteração publicada na branch de trabalho com commit `c19d4607e41e9a636c8d5f166c2ec7898b0b2cd7` (`[skip ci]`); nenhuma CI foi disparada manualmente e não houve merge.
+- Typecheck, testes completos e build Android continuam pendentes. Não declarar a branch validada até executar essas verificações com autorização para CI.
+- Teste físico com a Meriva e o ELM327 continua obrigatório para validar comunicação, leituras e reconexão.
+
+### Próximas prioridades
+1. Executar auditoria estática e regressões do relatório de viagens/telemetria recém-adicionado, corrigindo erros antes de publicar novas mudanças.
+2. Validar integridade de gravação e exportação após várias partidas no mesmo dia, incluindo cancelamento do seletor Android e falha de escrita.
+3. Revisar limites e histerese dos alertas de temperatura com documentação técnica específica da Meriva; não inferir defeito de sensor apenas por uma leitura.
+4. Auditar leitura de DTC e freeze frame para distinguir serviço indisponível, resposta vazia e ausência confirmada de códigos.
+
