@@ -17,12 +17,16 @@ const output = ts.transpileModule(fs.readFileSync(sourcePath, 'utf8'), {
 }).outputText;
 
 let watcher = null;
+let backgroundStartFails = false;
 const fakeLocation = {
   Accuracy: { BestForNavigation: 6 },
   PermissionStatus: { GRANTED: 'granted' },
   hasServicesEnabledAsync: async () => true,
   getForegroundPermissionsAsync: async () => ({ status: 'granted' }),
   requestForegroundPermissionsAsync: async () => ({ status: 'granted' }),
+  hasStartedLocationUpdatesAsync: async () => false,
+  startLocationUpdatesAsync: async () => { if (backgroundStartFails) throw new Error('foreground service indisponível'); },
+  stopLocationUpdatesAsync: async () => {},
   watchPositionAsync: async (_options, callback) => {
     watcher = callback;
     return {
@@ -147,6 +151,27 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
   await tracker.stop();
   assert.strictEqual(tracker.getState().running, false);
   unsubscribe();
+
+  // Precisão negativa nunca pode ser classificada como excelente nem contribuir com distância.
+  const invalidAccuracyTracker = new GpsTracker();
+  assert.strictEqual(await invalidAccuracyTracker.start(), true);
+  watcher({ coords: { latitude: 0, longitude: 0, speed: 20, accuracy: -1 }, timestamp: 50000 });
+  assert.strictEqual(invalidAccuracyTracker.getState().signalQuality, 'SEM_FIX');
+  assert.strictEqual(invalidAccuracyTracker.getState().distanceKm, 0);
+  await invalidAccuracyTracker.stop();
+
+  // Se o serviço de segundo plano falhar, recuperar watcher em primeiro plano sem zerar o estado.
+  const fallbackTracker = new GpsTracker();
+  assert.strictEqual(await fallbackTracker.start(), true);
+  backgroundStartFails = true;
+  assert.strictEqual(await fallbackTracker.startBackgroundLocation(), false);
+  assert.strictEqual(fallbackTracker.getState().running, true);
+  assert.match(fallbackTracker.getState().error, /primeiro plano/i);
+  assert.strictEqual(typeof watcher, 'function', 'watcher foreground deve ser restaurado');
+  watcher({ coords: { latitude: 0, longitude: 0, speed: 0, accuracy: 5 }, timestamp: 60000 });
+  assert.ok(fallbackTracker.getState().samples >= 1);
+  await fallbackTracker.stop();
+  backgroundStartFails = false;
 
   // Com precisão mediana, cada segmento pode ser menor que 1,5x a precisão.
   // O filtro deve confirmar o deslocamento acumulado, usando o OBD como sinal
