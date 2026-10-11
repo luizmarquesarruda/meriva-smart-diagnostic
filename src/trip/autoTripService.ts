@@ -264,7 +264,9 @@ class AutoTripService {
           }
         }
 
-        if (fuelRateLph == null) {
+        // Só consultar PIDs declarados como suportados pela ECU; isso reduz timeouts
+        // e impede que respostas ausentes sejam tratadas como leituras válidas.
+        if (fuelRateLph == null && connection.supportedPids.includes('0110')) {
           const mafResult = await connection.session.queryPid('0110');
           await registerObdQuery(this.basePath, mafResult, 'REAL');
           const mafGs = mafResult.parsed.status === 'RESPONDEU' ? mafResult.parsed.value : null;
@@ -274,21 +276,28 @@ class AutoTripService {
               fuelRateLph = estimate.rateLph;
               fuelRateSource = estimate.source;
             }
-          } else {
-            const mapResult = await connection.session.queryPid('010B');
-            const iatResult = await connection.session.queryPid('010F');
-            await registerObdQuery(this.basePath, mapResult, 'REAL');
-            await registerObdQuery(this.basePath, iatResult, 'REAL');
-            const estimate = estimateFuelRateLph({
-              mapKpa: mapResult.parsed.status === 'RESPONDEU' ? mapResult.parsed.value : null,
-              rpm,
-              intakeAirTempC: iatResult.parsed.status === 'RESPONDEU' ? iatResult.parsed.value : null,
-              displacementCm3: getAutoSaveState().vehicle?.displacementCm3 ?? MERIVA_MANUAL.engine.displacementCm3,
-            });
-            if (estimate) {
-              fuelRateLph = estimate.rateLph;
-              fuelRateSource = estimate.source;
-            }
+          }
+        }
+
+        if (
+          fuelRateLph == null &&
+          rpm != null && rpm > 0 &&
+          connection.supportedPids.includes('010B') &&
+          connection.supportedPids.includes('010F')
+        ) {
+          const mapResult = await connection.session.queryPid('010B');
+          await registerObdQuery(this.basePath, mapResult, 'REAL');
+          const iatResult = await connection.session.queryPid('010F');
+          await registerObdQuery(this.basePath, iatResult, 'REAL');
+          const estimate = estimateFuelRateLph({
+            mapKpa: mapResult.parsed.status === 'RESPONDEU' ? mapResult.parsed.value : null,
+            rpm,
+            intakeAirTempC: iatResult.parsed.status === 'RESPONDEU' ? iatResult.parsed.value : null,
+            displacementCm3: getAutoSaveState().vehicle?.displacementCm3 ?? MERIVA_MANUAL.engine.displacementCm3,
+          });
+          if (estimate) {
+            fuelRateLph = estimate.rateLph;
+            fuelRateSource = estimate.source;
           }
         }
 
