@@ -11,6 +11,14 @@ const autoTrip = fs.readFileSync(path.join(root, 'src', 'trip', 'autoTripService
 if (!shared.includes("ecuResponseState") || !shared.includes("'NO_RESPONSE'") || !shared.includes("'RECOVERING'")) {
   throw new Error('estado separado da ECU não encontrado');
 }
+if (
+  !shared.includes("ecuConnected: Boolean(active?.ecuValidated && ecuResponseState === 'RESPONDING')") ||
+  !shared.includes('ecuResponseState,') ||
+  !shared.includes('lastEcuResponseAt,') ||
+  !shared.includes('lastEcuError,')
+) {
+  throw new Error('status público não pode declarar ECU conectada sem resposta recente nem omitir diagnóstico de saúde');
+}
 if (!elm.includes("async recoverProtocol()") || !elm.includes("async keepAlive()")) {
   throw new Error('recuperação/keep-alive do ELM ausente');
 }

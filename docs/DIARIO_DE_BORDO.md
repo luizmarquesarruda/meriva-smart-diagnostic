@@ -1636,3 +1636,269 @@ A confirmação definitiva exige uma sessão real na Meriva com ELM327, principa
 - Nenhuma dependência nova foi adicionada nesta etapa.
 - CI continua deliberadamente não disparada até concluir a revisão estática.
 
+
+
+## 2026-10-09 — Trip formula integrity
+
+- Ignore duplicate/out-of-order samples before they can rewind trip state.
+- Persist a real trip when distance is valid even if integrated fuel is below 0.05 L or fuel samples are unavailable; mark its consumption as unavailable (N/D) and exclude it from consumption averages/autonomy totals. Never fabricate a km/L value.
+- Calculate aggregate real-trip average speed from total real distance / total real moving time, not the unweighted mean of each trip's speed.
+- Add regression cases for tiny fuel totals and out-of-order timestamps.
+- CARSCANNER_SEED remains historical reference data and is excluded from REAL_OBD totals; seed values are never promoted to real measurements.
+- The exact cause of 122.819 km/L remains unconfirmed until raw fuel-rate samples, timestamps and distance deltas from that session are available.
+
+
+## 2026-10-09 — Histórico diário de sessões ECU e tela ativa
+
+### Problema observado
+O relatório diário exibia o último estado mutável, o que não preserva por si só todas as partidas/reconexões ocorridas no mesmo dia. O TXT geral de autosave é rotativo (200 snapshots) e não é um diário por data.
+
+### Correções
+- Criado `src/meriva/dailyObdHistory.ts`: arquivo compacto `VIAGENS/meriva_smart_daily_obd_history.txt`, com uma única página lógica por data local e eventos separados para cada início/fim de sessão ECU validada.
+- Cada evento guarda adaptador/protocolo, PIDs reais mais recentes com timestamps, DTCs registrados e viagens reais recentes. Não promove seed a dado real.
+- O histórico diário preserva até 365 datas, para limitar crescimento; as várias sessões do mesmo dia não substituem umas às outras.
+- `autosaveManager` acrescenta eventos diários somente nas fronteiras `session_start`/`session_end`, evitando um evento por PID e reduzindo tamanho.
+- `expo-keep-awake` já estava presente no lockfile; passou a dependência direta e `useKeepAwake` mantém a tela ligada enquanto o RootLayout está montado.
+
+### Limitações / validação
+A sessão é definida por conexão/desconexão validada da ECU, não pela posição física da chave de ignição. O histórico diário é complementar ao JSON de autosave e não o substitui. CI e teste no aparelho ainda são necessários para confirmar persistência e comportamento da tela.
+
+
+### Ajuste após a primeira CI do PR #49
+
+- A primeira execução de `npm run validate` falhou no typecheck: `getSharedObdStatus()` não retornava todos os campos de `SharedObdStatus`, e `autoTripService.ts` usava `getAutoSaveState` sem importá-lo.
+- Corrigido o retorno para refletir `ecuResponseState`, falhas consecutivas, horário da última resposta e último erro; `ecuConnected` agora também exige estado `RESPONDING`.
+- Adicionado o import faltante de `getAutoSaveState` no serviço de viagens. A CI deve ser repetida para confirmar o resultado.
+
+- A exportação do diário diário foi adicionada em Configurações como ação separada `EXPORTAR HISTÓRICO DIÁRIO ECU (.TXT)`, preservando a exportação antiga de snapshots de autosave.
+
+## 2026-10-09 — Plano de auditoria cruzada TXT/viagens (registrado antes do código)
+
+### Evidências do histórico TXT recebido
+- O arquivo contém 116 blocos completos, numerados de 1 e 4–118; os identificadores 2 e 3 não aparecem no arquivo fornecido. Não renumerar automaticamente dados históricos sem evidência da origem da lacuna.
+- Foram contados 52 snapshots `debounce`, 40 `critical`, 10 `checkpoint`, 8 `background`, 3 `session_start`, 2 `session_end` e 1 `manual`.
+- Há snapshots com `Status: CONECTADO` e vários PIDs simultaneamente `NÃO RESPONDEU`; o status precisa diferenciar link/sessão ativa de ECU respondendo. A correção do getter `getSharedObdStatus()` já está na branch deste PR e exige `RESPONDING` para declarar ECU conectada.
+- O relatório repete viagens `CARSCANNER_SEED` como histórico, enquanto a tela de viagens carrega ciclos sem filtrar essa origem.
+- A implementação atual de `RealTripRecorder` ainda aceita amostras com timestamp repetido/anterior como estado novo, pode reduzir a distância acumulada se a amostra GPS recuar e permite salvar viagens com menos de 0,05 L. A média agregada de velocidade usa média aritmética de velocidades por viagem, não a razão distância total/tempo total em movimento.
+
+### Plano antes da implementação
+1. Reforçar o gravador para ignorar amostras duplicadas/fora de ordem e manter distância não decrescente quando o contador GPS reiniciar.
+2. Preservar viagens reais com distância válida mesmo sem combustível suficiente; mostrar consumo como N/D e excluí-las das médias de consumo/autonomia, sem alterar leituras brutas nem rotular estimativas como medições.
+3. Calcular a velocidade média agregada REAL_OBD como distância total dividida pelo tempo total em movimento.
+4. Remover `CARSCANNER_SEED` do histórico exibido em Viagens, do relatório TXT e dos valores médios apresentados como consumo real; manter separação/origem no armazenamento e aprendizado.
+5. Fazer novas instalações iniciarem com histórico de viagens vazio e filtrar seeds antigos na leitura/migração, sem apagá-los às cegas de arquivos brutos de backup.
+6. No histórico diário de sessões, só listar leituras reais cujo timestamp pertença à sessão corrente; preservar timestamps e não converter falhas em valores.
+7. Acrescentar regressões direcionadas e executar CI completa (doctor, typecheck/testes e APK Release). Não alterar framing, protocolo KWP/K-Line, fórmulas OBD nem gate ECU `010C → 41 0C` nesta rodada.
+
+### Estado
+Plano registrado antes das alterações de produção. A correção só será considerada concluída após a nova CI e leitura dos resultados.
+
+
+
+## 2026-10-10 — Consolidação das correções de viagens e registro de auditoria
+
+### Regra aplicada
+O diário foi lido antes de alterar o código. Esta entrada segue o fluxo obrigatório: problema → diagnóstico → correção → testes → commit → CI → resultado → próximo passo. Não foi feito merge na `main`.
+
+### Problema e diagnóstico
+A regra anterior de rejeitar ciclos com combustível integrado inferior a `0,05 L` evitava publicar médias instáveis, mas também eliminava viagens reais com distância válida. A correção separa a existência da viagem da disponibilidade de cálculo de consumo. A média de velocidade agregada também precisava usar distância real total dividida pelo tempo total em movimento, sem ponderação artificial por quantidade de viagens.
+
+### Modificações registradas
+- `src/trip/tripRecorder.ts`: rejeita amostras sem timestamp válido, duplicadas ou fora de ordem antes de modificar o estado; acumula distância sem retrocesso quando o contador GPS reinicia; aceita persistir viagem com distância válida mesmo sem combustível suficiente; marca `fuelDataValid` e deixa consumo numérico em zero interno quando não calculável, para a apresentação/exportação exibir `N/D`.
+- `src/data/driveCycles.ts`: adiciona metadado opcional `fuelDataValid`; exclui ciclos sem combustível confiável do cálculo de km/L; calcula velocidade média agregada por distância real total / tempo real total em movimento; remove `CARSCANNER_SEED` da lista operacional visível e mantém a origem de referência separada.
+- `src/meriva/autosaveTxtFormatter.ts`: não inclui viagens `CARSCANNER_SEED` na seção operacional do TXT; consumo de viagens sem evidência suficiente aparece como `N/D`.
+- `src/meriva/dailyObdHistory.ts`: o evento diário apresenta consumo como `N/D` quando a viagem não tem combustível confiável, mantendo o histórico de sessões separado do snapshot rotativo.
+- `src/trip/autoTripService.ts`: viagens sem combustível confiável continuam no histórico de viagens, mas não incrementam distância/combustível acumulados usados para média de consumo e autonomia.
+- `src/storage/driveCycleStorage.ts`: valida o campo opcional `fuelDataValid`; instalações novas começam sem viagens artificiais; leitura/migração do índice operacional remove somente ciclos explicitamente marcados `CARSCANNER_SEED`, preservando os demais registros válidos.
+- `tests/tripRecorder.test.js`: adiciona regressões para viagens sem combustível, combustível abaixo do limiar, amostras fora de ordem/duplicadas e reinício do contador de distância.
+- `tests/regression.test.js`: adiciona regressões para migração/filtro de seeds, instalação nova vazia, velocidade agregada ponderada e viagens reais sem combustível confiável. Durante a auditoria estática, as expectativas de contagem/última viagem foram alinhadas para incluir a viagem real sem combustível.
+- `docs/DIARIO_DE_BORDO.md`: atualiza a regra operacional para que o registro de viagens e a disponibilidade do consumo sejam conceitos separados.
+
+### Commits
+- `4738f4f8115c2702b925663acd09fcdf4ce4bc84` — alterações iniciais de viagem e fórmulas.
+- `357cf3a1d2f0e47d35c34744a6c166d30a6ec7b3` — não contaminar autonomia com viagens sem combustível confiável.
+- `d17855b8e1c1cf2ff11644a60ea35c7fac62519f` — validar o metadado opcional na persistência.
+- `aa74c73a9cf43da817c385f03ed1a961ec2f9fc5` — regressão para metadado de combustível.
+- `d79106abd76575df6f1933a4739cd92820937005` e `4348fbec1b12ee3b6810ca682fc2118d46bfc722` — regressões para médias e viagens reais sem combustível.
+- `4a356f47a8aa0b989b4ed3da34d1ed77135621fd` — documentação inicial da regra.
+- `b89025537cfd9b3f0111d144f539fe54fec1c8f3` — correção final das expectativas de contagem/última viagem no teste de regressão.
+- Branch: `fix/daily-obd-history-keep-screen-awake-main`; PR #49: https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/49.
+
+### CI e estado de validação
+- CI anteriormente aprovada: run `38016538322`, com jobs `validate` e `android-build` aprovados no commit `7436e408a7ba227c8a738e158afa2e2e869f4d4e`. **Esse resultado é anterior às alterações listadas acima e não as valida.**
+- No momento deste registro, não há resultado de CI confirmado para o head atualizado `b89025537cfd9b3f0111d144f539fe54fec1c8f3`. Typecheck, suíte completa, Expo Doctor e APK Android Release permanecem pendentes de confirmação automatizada.
+- Teste físico na Meriva/ELM327 permanece pendente; CI verde não comprova compatibilidade real com ECU KWP/K-Line.
+
+### Próximos passos obrigatórios
+1. Confirmar a CI do head atual e examinar o resultado de cada job.
+2. Se a CI falhar, registrar o erro exato e corrigir sua causa antes de nova tentativa.
+3. Revisar a apresentação de consumo `N/D` em todas as telas/exportações e confirmar que nenhuma fórmula transforma o zero interno em medição.
+4. Confirmar o comportamento do diário com várias sessões no mesmo dia, falha de gravação e reinício abrupto do app.
+5. Não fazer merge nem declarar versão pronta para uso real antes da validação completa e, para comunicação OBD, do teste físico.
+
+
+## 2026-10-10 — Auditoria e correção da atualização do consumo em tempo real
+
+### Sintoma
+O consumo exibido no cockpit podia parecer congelado ou atualizar tarde, mesmo com a conexão OBD ativa.
+
+### Causa encontrada
+- O serviço publicava o estado de consumo somente dentro do bloco condicionado à existência de um gravador de viagem ativo.
+- O cockpit priorizava a média histórica/persistida em vez da leitura instantânea mais recente.
+- O indicador genérico “CONSUMO” não diferenciava explicitamente valor medido pelo PID 015E de estimativa por MAF/MAP.
+
+### Correção
+- `src/trip/autoTripService.ts`: o estado de telemetria e consumo instantâneo agora é publicado a cada ciclo OBD válido, inclusive antes de uma viagem começar ou quando não existe gravador ativo. Os dados de distância/combustível da viagem continuam zerados quando não há viagem ativa, sem fabricar acumulados.
+- A origem do consumo instantâneo é preservada no estado como `MEASURED_015E`, `ESTIMATED_MAF` ou `ESTIMATED_MAP`.
+- `app/index.tsx`: o cockpit prioriza a leitura instantânea; o rótulo informa se é consumo instantâneo OBD medido, instantâneo estimado, média da viagem ou média histórica.
+- `tests/regression.test.js`: adicionadas asserções de regressão para a publicação do consumo fora da condição de viagem ativa e preservação da origem.
+
+### Commits
+- `e55fc0355264eac295406927960de42312ffd5cf` — publicação do consumo instantâneo fora da viagem ativa.
+- `cc4848d006587782a91836a768a8e3079bf06abf` — prioridade do consumo em tempo real no cockpit.
+- `6b7e8dd9f8c9158a0c2bc23d9526952f3d716b43` — asserções de regressão.
+
+### Limitações e validação pendente
+- A cadência continua limitada pela fila serial do ELM327 e pelo tempo de resposta de cada PID; esta correção remove o bloqueio de atualização da interface, mas não garante por si só uma taxa fixa de atualização.
+- A frequência real deve ser medida por `elapsedMs`/`cycleTimeMs` em uso com o adaptador e a ECU reais.
+- CI da cabeça atual ainda precisa ser consultada; não declarar a correção validada até `validate` e `android-build` passarem.
+- Teste físico na Meriva continua necessário para validar a latência percebida e a plausibilidade dos valores. Consumo estimado deve permanecer identificado como estimativa.
+
+
+
+## 2026-10-10 — Otimização do polling do consumo e correção de escopo TypeScript
+
+### Evidência encontrada
+Na revisão da atualização anterior, a publicação de estado adicionada ao `runLoop` declarava novamente `gps` e `vehicleSpeedKmh` no mesmo bloco `try`. Isso é uma colisão de identificadores e poderia impedir o typecheck/build. Também havia consultas lentas antes de velocidade/RPM e consultas de fallback a PIDs sem verificar suporte confirmado da ECU.
+
+### Correções aplicadas
+- `src/trip/autoTripService.ts`: reorganizado o ciclo para consultar primeiro velocidade `010D`, RPM `010C` e taxa de combustível medida `015E`; o nível do tanque `012F`, que muda lentamente, é consultado a cada quatro ciclos e conserva o último percentual válido entre consultas.
+- Corrigida a colisão de identificadores do bloco de publicação de consumo usando nomes locais explícitos para a amostra da viagem (`tripGps`, `tripVehicleSpeedKmh`).
+- Os fallbacks por MAF (`0110`) e MAP/IAT (`010B`, `010F`) agora só executam quando os PIDs correspondentes constam como suportados pela ECU. Valores precisam ser finitos antes de entrar na estimativa.
+- `tests/regression.test.js`: adicionadas asserções de ordem do caminho crítico, cadência do nível do tanque e gate de suporte para PIDs de estimativa.
+
+### Commits
+- `3d47930f559e04fc13179b1a99aa75cd7ddc5351` — priorização do polling e correção das declarações duplicadas.
+- `7fc5f3a8d78de59a02ba1093244e8d4ef1e54d10` — consultas de fallback restritas a PIDs suportados.
+- `d5d45f52e928c842e8bef98ac4d0411feff9e473` — regressões para ordem e cadência do polling.
+
+### Estado de validação
+As alterações foram gravadas na branch `fix/daily-obd-history-keep-screen-awake-main`, PR #49. A CI disparada pelo GitHub precisa ser consultada após este conjunto de commits; nenhum resultado anterior valida estes commits. Não foi feito merge na `main`.
+
+### Limites conhecidos
+- O intervalo de 1,5 s é um alvo de cadência, não uma garantia: o transporte serial e o tempo de resposta da ECU continuam determinando a latência real.
+- Se `015E` não for suportado, a estimativa depende de MAF ou MAP/RPM/IAT e continua menos confiável; a interface deve identificá-la como estimativa.
+- A atualização em tempo real precisa ser medida com ELM327 e ECU reais na Meriva. Testes de código e CI não substituem validação física.
+
+## 2026-10-10 — Temperatura do líquido de arrefecimento no cockpit inicial
+
+### Auditoria
+- A página inicial já tinha polling secundário do PID OBD `0105` no serviço de viagens, mas não apresentava a temperatura em um cartão visível no cockpit. Portanto, a telemetria existia no fluxo de consulta, mas faltava a métrica na tela inicial.
+
+### Correção
+- `app/index.tsx`: adicionado cartão dinâmico **LÍQUIDO DE ARREFECIMENTO**, alimentado exclusivamente pela leitura `REAL` do PID `0105` (temperatura do líquido de arrefecimento).
+- A tela só mostra o valor se a ECU estiver respondendo e a leitura tiver timestamp válido com no máximo 30 segundos; leitura ausente, simulada, desconectada ou obsoleta aparece como `N/D`.
+- Indicador visual informa a origem do dado e destaca valores a partir de 110 °C como atenção e 115 °C como temperatura alta. Esses limites são avisos conservadores de interface, não substituem a especificação técnica do veículo nem um diagnóstico mecânico.
+- `tests/regression.test.js`: adicionadas regressões estáticas para presença do cartão, origem real, expiração de leitura obsoleta e alerta de temperatura alta.
+- O serviço continua consultando `0105` apenas se a ECU anunciar suporte, dentro da rotação de telemetria secundária; a cadência depende do tempo de resposta do ELM327/ECU.
+
+### Commits
+- `68ccaec58db85a71cdc495e6d1a188bcb4047508` — cartão dinâmico de temperatura no cockpit.
+- `f0da30ef659f80404f26b663b13c8da5531197ef` — regressões para a métrica de temperatura.
+
+### Validação e próximo passo
+- Os commits disparam uma nova CI; confirmar `validate` e `android-build` no head atualizado antes de declarar a correção aprovada.
+- Teste físico permanece necessário: confirmar que a ECU da Meriva anuncia o PID `0105`, que o valor acompanha o aquecimento real e que os avisos fazem sentido no veículo. Se o PID não for suportado/responder, o app deve manter `N/D`, sem estimar a temperatura.
+- Nenhum merge foi realizado.
+
+
+## 2026-10-10 — Auditoria consolidada de histórico, consumo e telemetria
+
+### Evidências verificadas no repositório
+- A exportação do diário diário já está integrada em **Configurações** por `handleDailyHistoryExport()` e `exportDailyObdHistoryTxt()`. A hipótese anterior de que faltava o botão na interface estava incorreta; não duplicar o fluxo.
+- O TXT diário registra fronteiras de sessão ECU (`SESSION_START`/`SESSION_END`), não cada amostra individual.
+- As amostras são registradas separadamente em `LOGS/obd_raw_YYYY-MM-DD.csv` e `LOGS/obd_interpreted_YYYY-MM-DD.csv`, incluindo timestamp, TX/RX, PID, latência, protocolo, estado e origem. Essa trilha CSV é a fonte adequada para análise temporal e falhas de comunicação; não confundir o TXT de sessões com um logger de cada amostra.
+- Já existem catálogo de PIDs, parser, motor de fórmulas, descoberta dos bitmaps de suporte, laboratório OBD, tendências de telemetria em memória e registro CSV. Não criar módulos duplicados; melhorar validação e apresentação em cima desses componentes.
+- O suporte OBD depende de resposta válida da ECU. Uma observação bem-sucedida comprova que o PID respondeu, mas não comprova, por si só, que o valor foi validado eletricamente contra um instrumento de referência.
+
+### Correções aplicadas nesta rodada
+- `src/meriva/dailyObdHistory.ts`: serializada a operação leitura-modificação-gravação por caminho. Chamadas concorrentes não devem mais sobrescrever silenciosamente o evento de outra sessão.
+- `src/database/csvLogger.ts`: corrigida a limpeza da fila de gravação. Antes, o mapa armazenava a promessa derivada de `catch()` e o `finally` comparava outra promessa, impedindo a remoção da entrada concluída. A fila continua serializando escritas por arquivo.
+- `app/armazenamento.tsx`: a tela mostra apenas viagens `REAL_OBD`, sem misturar viagens-semente do Car Scanner com viagens registradas pelo aplicativo.
+- `app/armazenamento.tsx`: consumo só é mostrado em km/L quando `fuelDataValid` não é falso, combustível acumulado é suficiente e o resultado é finito e positivo; caso contrário, apresenta `Consumo: N/D`, sem transformar sentinela zero em medição.
+- `tests/merivaAutosave.test.js`: acrescentado teste comportamental para três eventos de sessão concorrentes, exigindo que todos permaneçam no mesmo arquivo e na mesma data.
+- `tests/regression.test.js`: acrescentada regressão para impedir que a tela de histórico volte a apresentar seed como viagem real ou consumo inválido como número.
+
+### Referências de documentação consultadas
+- Car Scanner — Custom Sensors/PIDs: https://www.carscanner.info/2019/07/
+- Car Scanner — Data Recording: https://www.carscanner.info/records/
+- Car Scanner — Optimizing connection speed: https://www.carscanner.info/optimizing-connection-speed/
+- Car Scanner — FAQ sobre suporte de PIDs: https://www.carscanner.info/faq/
+- OBDLink — Get Started with Logs: https://support.obdlink.com/support/solutions/articles/43000709894
+- OBDLink — Dashboards: https://support.obdlink.com/support/solutions/articles/43000678883
+- OBDLink — Settings, alerts e user-defined PIDs: https://support.obdlink.com/support/solutions/articles/43000714809
+- OBD Auto Doctor — Supported OBD parameters: https://www.obdautodoctor.com/help/articles/supported-obd-parameters/
+- OBD Auto Doctor — Manual iOS: https://www.obdautodoctor.com/OBD-Auto-Doctor-User-Manual-iOS.pdf
+
+### Critérios de engenharia preservados
+- Priorizar PIDs essenciais e limitar consultas sequenciais: mais PIDs aumentam a latência, especialmente em K-Line; não transportar pressupostos de otimização CAN para a Meriva sem medição.
+- Manter resposta bruta, fórmula e valor calculado auditáveis. Separar `DESCOBERTO`, `RESPONDEU` e `VALIDADO NO VEÍCULO`; não promover seed/importação a confirmação da ECU.
+- `015E` só pode ser tratado como consumo medido quando a ECU realmente o suportar e responder com dados válidos. MAF/MAP continuam estimativas explicitamente identificadas; sem base confiável, exibir `N/D`.
+- O TXT diário permanece um resumo de sessões; para séries temporais, usar os CSVs existentes e os gráficos/tendências, sem prometer que o TXT contém cada leitura.
+
+- `src/meriva/autosaveIntegration.ts`: resposta OBD válida passa a registrar `RESPONDEU`; só preserva `CONFIRMADO` se a evidência anterior estiver explicitamente marcada como `USER_REAL_OBSERVATION`. Confirmação física/validação no veículo exige evidência independente.
+- `src/knowledge/ranges.json`: faixa do PID `0143` corrigida para até 25700%, compatível com a fórmula padronizada `((A × 256 + B) × 100) / 255`; regressão adicionada para o limite superior.
+- Criado `docs/RELATORIO_PIDS_E_FORMULAS.md`, com inventário dos 34 PIDs, 20 fórmulas, faixas, 1 PID com evidência RAW_ECU, 10 candidatos e alvos de confirmação.
+
+### Validação pendente
+- Esta rodada foi gravada na PR #49 e dispara CI automaticamente por causa da política de `push` do repositório. Confirmar os jobs no head final antes de declarar os testes aprovados.
+- O teste de sessões concorrentes e a regressão da tela foram adicionados, mas ainda precisam ser executados pela CI.
+- Validar no aparelho a persistência após encerramento forçado, a exportação pelo seletor Android e a cadência real do ELM327 na Meriva. Um encerramento inesperado ainda pode impedir o evento explícito `SESSION_END`; os CSVs de telemetria são a trilha complementar, não uma garantia de encerramento físico.
+- Não foi feito merge na `main`.
+
+
+## 2026-10-11 — Recuperação de sessão OBD interrompida
+
+### Problema
+O Android pode encerrar o processo sem executar o fechamento normal. O último snapshot poderia manter `obd.connected = true`, levando a uma conexão antiga ser restaurada como se estivesse ativa.
+
+### Correção
+- `src/meriva/autosaveManager.ts`: na inicialização, quando o snapshot anterior indicar conexão OBD, limpar conexão/protocolo ativo, preservar `lastKnownProtocol`, persistir o estado seguro e registrar a recuperação.
+- `src/meriva/autosaveTypes.ts`: adicionar o motivo de salvamento `session_recovery`.
+- `src/meriva/dailyObdHistory.ts`: evento distinto `SESSION_RECOVERED`; o horário é o da detecção na próxima abertura, não uma alegação sobre o instante exato da queda.
+- `tests/merivaAutosave.test.js`: regressão comportamental para simular encerramento abrupto e verificar estado desconectado, protocolo preservado e evento no TXT.
+
+### Limites e validação
+A recuperação detecta a interrupção na próxima inicialização. Os CSVs continuam sendo a trilha temporal de consultas individuais. Esta alteração dispara nova CI; confirmar `validate` e `android-build` no commit resultante. Teste físico com ELM327/ECU permanece pendente. Não foi feito merge na `main`.
+
+
+## 2026-10-10 — Fase 1: relatório detalhado de viagem e telemetria por trajeto
+
+### Objetivo
+Começar a implementação das melhorias de produto com uma entrega que reaproveita o registro de viagens existente, sem importar dados do Car Scanner e sem aumentar a frequência de consultas OBD.
+
+### Alterações preparadas
+- `app/viagens.tsx`: histórico interativo com filtros de período, cartões com data, distância, duração, velocidade média/máxima e consumo apenas quando válido; detalhe individual da viagem; resumo de combustível com origem da taxa; resumo e gráfico compacto de temperatura do arrefecimento; contagem de amostras de RPM/velocidade/ECT; mensagens explícitas para dados ausentes.
+- `src/data/driveCycles.ts`: campos opcionais compatíveis com viagens antigas para velocidade máxima e amostras temporais.
+- `src/trip/tripRecorder.ts`: persistência de pontos de telemetria esparsos, com intervalo mínimo de 10 segundos e limite de 720 pontos por viagem; preserva timestamp, velocidade, RPM e ECT quando atuais.
+- `src/trip/autoTripService.ts`: leitura de tendências existentes de RPM/ECT somente quando a amostra tiver até 10 segundos; nenhuma nova consulta PID foi adicionada por causa do gráfico.
+- `src/storage/driveCycleStorage.ts` e `src/database/csvLogger.ts`: validação dos novos campos e exportação de velocidade máxima/contagem de amostras; consumo inválido permanece em branco no CSV.
+- `src/meriva/dailyObdHistory.ts`: o resumo das viagens no TXT diário passa a incluir velocidade máxima e número de amostras, sem transformar o TXT em log de cada leitura.
+- `tests/tripRecorder.test.js`: regressão para garantir persistência de velocidade máxima e série temporal.
+
+### Limites conhecidos
+- Viagens antigas não possuem os novos campos e devem mostrar N/D; não serão preenchidas retroativamente com valores inventados.
+- O gráfico mostra apenas amostras reais armazenadas. Não comprova a saúde do sensor e não substitui teste físico com a ECU.
+- O armazenamento de pontos é limitado a 720 por viagem, amostrados no máximo a cada 10 segundos, para manter o índice local sob controle.
+- Esta alteração foi preparada como objeto Git sem atualizar branch/ref; por isso não dispara CI. Nenhuma CI foi iniciada manualmente e não houve merge.
+
+### Validação pendente
+- Executar typecheck, testes de regressão e build Android somente após autorização explícita para publicar a branch e disparar CI.
+- Validar no aparelho a persistência de novas viagens, o gráfico ECT e o TXT diário com a Meriva/ELM327 reais.
+
+### Próximas fases de implementação
+1. Integridade e exportação do histórico diário; cenários de múltiplas partidas e recuperação.
+2. Validação cruzada de sensores, alertas com histerese e painel de saúde.
+3. DTC/freeze frame e relatório de diagnóstico com evidências.
+4. Diário de manutenção/abastecimento, comparação de viagens, backup/restauração e auditoria de qualidade do adaptador.
+5. Revisão visual de todas as telas e navegação integrada, sem duplicar lógica OBD.

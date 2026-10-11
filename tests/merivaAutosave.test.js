@@ -353,9 +353,35 @@ test('7. CARSCANNER_SEED nunca vira histórico real', async () => {
     appVersion: '1.0.0',
     exportedAt: '2026-10-01 13:00:00',
   });
-  assert.ok(txt.includes('fonte=CARSCANNER_SEED'), 'seed deve permanecer identificado como referência');
+  assert.ok(!txt.includes('fonte=CARSCANNER_SEED'), 'referências CarScanner não entram no histórico operacional TXT');
+  assert.ok(!txt.includes('seed_cycle_'), 'IDs dos ciclos seed não devem ser exportados como viagens operacionais');
+  assert.ok(txt.includes('[HISTORY]\nN/D'), 'sem ciclos reais, a seção de histórico deve mostrar N/D');
   assert.ok(!txt.includes('fonte=REAL_OBD'), 'nenhum ciclo seed pode aparecer como REAL');
   m.disposeAutoSave();
+});
+
+test('7a. TXT antigo remove linhas CarScanner sem apagar os demais dados', async () => {
+  resetFS();
+  const history = loadTs(path.join(ROOT, 'src/meriva/autosaveHistoryTxt.ts'));
+  const target = CONFIG_DIR + '/meriva_smart_autosave_history.txt';
+  files.set(target, [
+    'MERIVA SMART DIAGNOSTIC',
+    'HISTÓRICO DE SALVAMENTOS AUTOMÁTICOS',
+    '=== SALVAMENTO_BEGIN ===',
+    'NÚMERO: 1',
+    'MOTIVO: manual',
+    'MERIVA SMART DIAGNOSTIC',
+    '[HISTORY]',
+    '2026-07-25 13:36:08 -> 2026-07-25 14:06:49 | 20.32 km | fonte=CARSCANNER_SEED',
+    '[LEARNING]',
+    'Amostras reais: 0 / seed: 10',
+    '=== SALVAMENTO_END ===',
+  ].join('\n'));
+
+  const cleaned = await history.readAutoSaveHistory(BASE);
+  assert.ok(!cleaned.includes('CARSCANNER_SEED'), 'export must remove legacy seed trip lines');
+  assert.ok(cleaned.includes('[HISTORY]\nN/D'), 'empty operational history must show N/D');
+  assert.ok(cleaned.includes('Amostras reais: 0 / seed: 10'), 'learning provenance must be preserved');
 });
 
 test('8. REAL + RESPONDEU entra no learning e no banco', async () => {
@@ -573,16 +599,27 @@ test('18. sessão de autosave abre na ECU e fecha na desconexão', async () => {
   resetFS();
   await m.initAutoSave(BASE);
 
+  const sessionStartedAtMs = Date.now() - 5000;
+  const staleReadingTimestamp = new Date(sessionStartedAtMs - 10_000).toISOString();
   m.updateAutoSaveState((s) => {
     s.obd = {
       connected: true,
       adapterName: 'OBDII',
       protocol: 'ISO 14230-4 KWP FAST',
       lastKnownProtocol: 'ISO 14230-4 KWP FAST',
-      ecuValidatedAt: '2026-10-08T12:00:00.000Z',
+      ecuValidatedAt: new Date(sessionStartedAtMs).toISOString(),
       ecuValidationSource: 'OBD_RESPONSE',
-      lastConnectedAt: '2026-10-08T12:00:00.000Z',
+      lastConnectedAt: new Date(sessionStartedAtMs).toISOString(),
     };
+    s.lastReadings = [{
+      pid: '010C',
+      name: 'Engine RPM',
+      value: 1000,
+      unit: 'rpm',
+      status: 'RESPONDEU',
+      timestamp: staleReadingTimestamp,
+      source: 'REAL',
+    }];
   });
 
   const started = await m.startObdAutosaveSession();
@@ -590,17 +627,65 @@ test('18. sessão de autosave abre na ECU e fecha na desconexão', async () => {
   assert.strictEqual(m.getAutoSaveStatus().obdSessionActive, true);
   const startHistory = files.get(`${CONFIG_DIR}/meriva_smart_autosave_history.txt`);
   assert.ok(startHistory.includes('MOTIVO: session_start'));
+  const dailyPath = BASE + '/VIAGENS/meriva_smart_daily_obd_history.txt';
+  const dailyAfterFirstStart = files.get(dailyPath);
+  const firstStartEvent = dailyAfterFirstStart.match(/--- EVENTO: SESSION_START \|[\s\S]*?--- FIM DO EVENTO ---/)?.[0];
+  assert.ok(firstStartEvent, 'daily history must record the first session start');
+  assert.ok(!firstStartEvent.includes('010C Engine RPM'), 'start event must not copy a PID read before the current ECU session');
+  m.updateAutoSaveState((s) => {
+    s.lastReadings = [{
+      pid: '010C',
+      name: 'Engine RPM',
+      value: 900,
+      unit: 'rpm',
+      status: 'RESPONDEU',
+      timestamp: new Date().toISOString(),
+      source: 'REAL',
+    }];
+  });
 
   await m.closeObdAutosaveSession();
+  const dailyAfterFirstEnd = files.get(dailyPath);
+  const firstEndEvent = dailyAfterFirstEnd.match(/--- EVENTO: SESSION_END \|[\s\S]*?--- FIM DO EVENTO ---/)?.[0];
+  assert.ok(firstEndEvent?.includes('010C Engine RPM'), 'session end should preserve readings captured during this session');
   assert.strictEqual(m.getAutoSaveStatus().obdSessionActive, false);
-  const envelope = JSON.parse(files.get(`${CONFIG_DIR}/autosave.json`));
+  const envelope = JSON.parse(files.get(CONFIG_DIR + '/autosave.json'));
   assert.strictEqual(envelope.payload.obd.connected, false);
   assert.strictEqual(envelope.payload.obd.lastKnownProtocol, 'ISO 14230-4 KWP FAST');
 
-  const endHistory = files.get(`${CONFIG_DIR}/meriva_smart_autosave_history.txt`);
+  // A second ignition/reconnection on the same day must append, not replace, the first session.
+  m.updateAutoSaveState((s) => {
+    s.lastReadings = [{
+      pid: '010C',
+      name: 'Engine RPM',
+      value: 900,
+      unit: 'rpm',
+      status: 'RESPONDEU',
+      timestamp: new Date(Date.now() - 1000).toISOString(),
+      source: 'REAL',
+    }];
+    s.obd = {
+      ...s.obd,
+      connected: true,
+      protocol: 'ISO 14230-4 KWP FAST',
+      lastConnectedAt: new Date().toISOString(),
+    };
+  });
+  assert.strictEqual(await m.startObdAutosaveSession(), true);
+  await m.closeObdAutosaveSession();
+
+  const endHistory = files.get(CONFIG_DIR + '/meriva_smart_autosave_history.txt');
   assert.ok(endHistory.includes('MOTIVO: session_end'));
-  assert.strictEqual((endHistory.match(/MOTIVO: session_start/g) || []).length, 1);
-  assert.strictEqual((endHistory.match(/MOTIVO: session_end/g) || []).length, 1);
+  assert.ok(files.has(dailyPath), 'daily history file must be created');
+  const dailyHistory = files.get(dailyPath);
+  assert.strictEqual((dailyHistory.match(/^========== DIA: .+ ==========$/gm) || []).length, 1, 'same date must remain one logical page');
+  const startEvents = dailyHistory.match(/--- EVENTO: SESSION_START \|[\s\S]*?--- FIM DO EVENTO ---/g) || [];
+  assert.strictEqual(startEvents.length, 2, 'both sessions must remain in TXT');
+  assert.ok(startEvents.every((event) => !event.includes('010C Engine RPM')), 'each session start must exclude readings from the previous session');
+  assert.strictEqual((dailyHistory.match(/--- EVENTO: SESSION_END \|/g) || []).length, 2, 'both session endings must remain in TXT');
+  assert.ok(dailyHistory.includes('========== FIM DO DIA =========='));
+  assert.strictEqual((endHistory.match(/MOTIVO: session_start/g) || []).length, 2);
+  assert.strictEqual((endHistory.match(/MOTIVO: session_end/g) || []).length, 2);
   m.disposeAutoSave();
 });
 
@@ -628,6 +713,61 @@ test('14. persistência local de Bluetooth/ECU não conflita com o autosave', as
   assert.strictEqual(restored.ecuAddress, '0x11');
   assert.strictEqual(restored.ecuValidationSource, 'VEHICLE_PROFILE');
   state.disposeAutoSave();
+});
+
+test('15. diário de sessões preserva eventos concorrentes no mesmo arquivo', async () => {
+  resetFS();
+  const history = loadTs(path.join(ROOT, 'src/meriva/dailyObdHistory.ts'));
+  const stateModule = loadTs(path.join(ROOT, 'src/meriva/autosaveState.ts'));
+  const state = stateModule.createEmptyMerivaState();
+  state.obd = {
+    connected: true,
+    adapterName: 'ELM327',
+    protocol: 'ISO 14230-4 KWP FAST',
+    lastConnectedAt: '2026-10-10T12:00:00.000Z',
+    ecuValidatedAt: '2026-10-10T12:00:00.000Z',
+    ecuValidationSource: 'OBD_RESPONSE',
+  };
+
+  await Promise.all([
+    history.appendDailyObdSessionEvent(BASE, state, 'SESSION_START', '2026-10-10T12:00:01.000Z'),
+    history.appendDailyObdSessionEvent(BASE, { ...state, obd: { ...state.obd, connected: false } }, 'SESSION_END', '2026-10-10T12:00:02.000Z'),
+    history.appendDailyObdSessionEvent(BASE, state, 'SESSION_START', '2026-10-10T12:00:03.000Z'),
+  ]);
+
+  const saved = files.get(BASE + '/VIAGENS/meriva_smart_daily_obd_history.txt');
+  assert.ok(saved, 'diário deve ser criado');
+  assert.strictEqual((saved.match(/--- EVENTO: SESSION_START \|/g) || []).length, 2);
+  assert.strictEqual((saved.match(/--- EVENTO: SESSION_END \|/g) || []).length, 1);
+  assert.ok(saved.includes('2026-10-10T12:00:01.000Z'));
+  assert.ok(saved.includes('2026-10-10T12:00:02.000Z'));
+  assert.ok(saved.includes('2026-10-10T12:00:03.000Z'));
+});
+
+test('recuperação após encerramento abrupto limpa conexão fantasma e registra evento', async () => {
+  const m = manager();
+  m.disposeAutoSave();
+  resetFS();
+  await m.initAutoSave(BASE);
+  m.updateAutoSaveState((s) => {
+    s.obd.connected = true;
+    s.obd.protocol = 'ISO 14230-4 KWP FAST';
+    s.obd.lastConnectedAt = '2026-10-10T12:00:00.000Z';
+  });
+  assert.strictEqual(await m.saveNow('critical'), true);
+  m.disposeAutoSave();
+
+  const recovered = await m.initAutoSave(BASE);
+  assert.strictEqual(recovered.obd.connected, false, 'conexão anterior não pode aparecer como viva após reiniciar');
+  assert.strictEqual(recovered.obd.protocol, undefined, 'protocolo ativo deve ser removido');
+  assert.strictEqual(recovered.obd.lastKnownProtocol, 'ISO 14230-4 KWP FAST', 'preservar último protocolo conhecido');
+  const historyPath = `${BASE}/VIAGENS/meriva_smart_daily_obd_history.txt`;
+  assert.ok(files.has(historyPath), 'a recuperação deve deixar evento no histórico diário');
+  assert.ok(files.get(historyPath).includes('--- EVENTO: SESSION_RECOVERED |'), 'marcar explicitamente sessão interrompida');
+  assert.ok(files.get(historyPath).includes('BLUETOOTH/OBD: DESCONECTADO'), 'não declarar conexão viva');
+  const envelope = JSON.parse(files.get(`${CONFIG_DIR}/autosave.json`));
+  assert.strictEqual(envelope.payload.obd.connected, false, 'estado desconectado deve persistir');
+  m.disposeAutoSave();
 });
 
 // ---------- executor ----------

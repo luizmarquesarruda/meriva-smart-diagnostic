@@ -9,7 +9,12 @@ const ts = require('typescript');
 function loadTs(file) {
   const sourcePath = path.join(__dirname, '..', file);
   const output = ts.transpileModule(fs.readFileSync(sourcePath, 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2019 },
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2019,
+      esModuleInterop: true,
+      resolveJsonModule: true,
+    },
   }).outputText;
   const mod = new Module(sourcePath, null);
   mod.filename = sourcePath;
@@ -17,8 +22,12 @@ function loadTs(file) {
 
   const originalLoad = Module._load;
   Module._load = function(request, parent, isMain) {
-    if (request === './dtcParser' && parent?.filename?.endsWith(path.join('src', 'obd', 'dtcScanner.ts'))) {
-      return loadTs('src/obd/dtcParser.ts');
+    if (
+      parent?.filename?.includes(path.join('src', 'obd')) &&
+      request.startsWith('./')
+    ) {
+      const candidate = path.resolve(path.dirname(parent.filename), request) + '.ts';
+      if (fs.existsSync(candidate)) return loadTs(path.relative(path.join(__dirname, '..'), candidate));
     }
     return originalLoad(request, parent, isMain);
   };

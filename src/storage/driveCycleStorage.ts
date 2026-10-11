@@ -1,6 +1,6 @@
 import * as FileSystem from 'expo-file-system';
 import { appendCsvRow, CsvRow } from '../database/csvLogger';
-import { DriveCycle, INITIAL_DRIVE_CYCLES } from '../data/driveCycles';
+import { DriveCycle } from '../data/driveCycles';
 
 function isDriveCycle(value: unknown): value is DriveCycle {
   if (typeof value !== 'object' || value === null) return false;
@@ -17,6 +17,15 @@ function isDriveCycle(value: unknown): value is DriveCycle {
     typeof cycle.standingTimeHms === 'string' &&
     typeof cycle.avgDrivingSpeedKmh === 'number' &&
     typeof cycle.avgFuelConsumptionKml === 'number' &&
+    (cycle.fuelDataValid === undefined || typeof cycle.fuelDataValid === 'boolean') &&
+    (cycle.maxSpeedKmh === undefined || (typeof cycle.maxSpeedKmh === 'number' && Number.isFinite(cycle.maxSpeedKmh) && cycle.maxSpeedKmh >= 0)) &&
+    (cycle.telemetrySamples === undefined || (Array.isArray(cycle.telemetrySamples) && cycle.telemetrySamples.every((sample) =>
+      typeof sample === 'object' && sample !== null &&
+      typeof sample.timestamp === 'string' &&
+      (sample.speedKmh === null || (typeof sample.speedKmh === 'number' && Number.isFinite(sample.speedKmh))) &&
+      (sample.rpm === null || (typeof sample.rpm === 'number' && Number.isFinite(sample.rpm))) &&
+      (sample.coolantTempC === null || (typeof sample.coolantTempC === 'number' && Number.isFinite(sample.coolantTempC)))
+    ))) &&
     ['CARSCANNER_SEED', 'REAL_OBD', 'SIMULACAO'].includes(cycle.source as string) &&
     typeof cycle.importedAt === 'string'
   );
@@ -31,44 +40,60 @@ export async function initializeDriveCycles(basePath: string): Promise<void> {
   const viagensDir = `${basePath}/VIAGENS`;
   const indexFile = `${viagensDir}/index.json`;
 
-  const indexInfo = await FileSystem.getInfoAsync(indexFile);
-  if (indexInfo.exists) return;
-
   await FileSystem.makeDirectoryAsync(viagensDir, { intermediates: true });
+  const indexInfo = await FileSystem.getInfoAsync(indexFile);
+  if (indexInfo.exists) {
+    // Upgrade old installations in place, retaining real/simulated records and
+    // removing only the explicitly imported CarScanner reference trips.
+    if (!indexInfo.isDirectory) {
+      try {
+        const parsed = JSON.parse(await FileSystem.readAsStringAsync(indexFile)) as {
+          version?: string;
+          initializedAt?: string;
+          cycles?: unknown;
+          totalCount?: number;
+          [key: string]: unknown;
+        };
+        const originalCycles = Array.isArray(parsed.cycles) ? parsed.cycles : [];
+        const hasSeed = originalCycles.some(
+          (cycle) => typeof cycle === 'object' && cycle !== null &&
+            (cycle as { source?: unknown }).source === 'CARSCANNER_SEED',
+        );
+        if (hasSeed) {
+          const cycles = cyclesFromUnknown(parsed.cycles).filter(
+            (cycle) => cycle.source !== 'CARSCANNER_SEED',
+          );
+          await FileSystem.writeAsStringAsync(
+            indexFile,
+            JSON.stringify({
+              ...parsed,
+              cycles,
+              totalCount: cycles.length,
+              lastModified: new Date().toISOString(),
+            }, null, 2),
+            { encoding: FileSystem.EncodingType.UTF8 },
+          );
+        }
+      } catch {
+        // Do not overwrite an index whose contents cannot be read safely.
+      }
+    }
+    return;
+  }
 
-  const seedData = {
+  // New installations start with no trips. CarScanner seed data remains
+  // available only as a separately identified learning/reference baseline.
+  const emptyData = {
     version: '1.0',
     initializedAt: new Date().toISOString(),
-    cycles: INITIAL_DRIVE_CYCLES,
-    totalCount: INITIAL_DRIVE_CYCLES.length,
+    cycles: [] as DriveCycle[],
+    totalCount: 0,
   };
-
   await FileSystem.writeAsStringAsync(
     indexFile,
-    JSON.stringify(seedData, null, 2),
+    JSON.stringify(emptyData, null, 2),
     { encoding: FileSystem.EncodingType.UTF8 },
   );
-
-  const today = new Date().toISOString().split('T')[0];
-  const csvFile = `${viagensDir}/viagens_${today}.csv`;
-
-  for (const cycle of INITIAL_DRIVE_CYCLES) {
-    const row: CsvRow = {
-      id: cycle.id,
-      timestamp: cycle.startedAt,
-      distanceTotalKm: cycle.distanceTotalKm,
-      distanceIceKm: cycle.distanceIceKm,
-      fuelUsedL: cycle.fuelUsedL,
-      totalTime: cycle.totalTimeHms,
-      drivingTime: cycle.drivingTimeHms,
-      standingTime: cycle.standingTimeHms,
-      avgSpeed: cycle.avgDrivingSpeedKmh,
-      avgConsumption: cycle.avgFuelConsumptionKml,
-      source: cycle.source,
-    };
-
-    await appendCsvRow(csvFile, row);
-  }
 }
 
 export async function readDriveCycles(basePath: string): Promise<DriveCycle[]> {
@@ -80,7 +105,7 @@ export async function readDriveCycles(basePath: string): Promise<DriveCycle[]> {
 
     const content = await FileSystem.readAsStringAsync(indexFile);
     const data = JSON.parse(content) as { cycles?: unknown };
-    return cyclesFromUnknown(data.cycles);
+    return cyclesFromUnknown(data.cycles).filter((cycle) => cycle.source !== 'CARSCANNER_SEED');
   } catch {
     return [];
   }
@@ -108,8 +133,8 @@ export async function addDriveCycle(basePath: string, cycle: DriveCycle): Promis
       };
       data = {
         version: typeof parsed.version === 'string' ? parsed.version : '1.0',
-        cycles: cyclesFromUnknown(parsed.cycles),
-        totalCount: Number.isFinite(parsed.totalCount) ? Number(parsed.totalCount) : cyclesFromUnknown(parsed.cycles).length,
+        cycles: cyclesFromUnknown(parsed.cycles).filter((item) => item.source !== 'CARSCANNER_SEED'),
+        totalCount: cyclesFromUnknown(parsed.cycles).filter((item) => item.source !== 'CARSCANNER_SEED').length,
       };
     }
   } catch {
@@ -139,7 +164,9 @@ export async function addDriveCycle(basePath: string, cycle: DriveCycle): Promis
     drivingTime: cycle.drivingTimeHms,
     standingTime: cycle.standingTimeHms,
     avgSpeed: cycle.avgDrivingSpeedKmh,
-    avgConsumption: cycle.avgFuelConsumptionKml,
+    maxSpeed: cycle.maxSpeedKmh ?? '',
+    avgConsumption: cycle.fuelDataValid === false ? '' : cycle.avgFuelConsumptionKml,
+    telemetrySamples: cycle.telemetrySamples?.length ?? 0,
     source: cycle.source,
   };
 

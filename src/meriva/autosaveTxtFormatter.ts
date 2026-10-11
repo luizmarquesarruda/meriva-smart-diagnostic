@@ -85,10 +85,11 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
   L.push('');
 
   L.push('[HISTORY]');
-  if (state.driveCycles.length) {
-    for (const cycle of state.driveCycles) {
+  const displayedCycles = state.driveCycles.filter((cycle) => cycle.source !== 'CARSCANNER_SEED');
+  if (displayedCycles.length) {
+    for (const cycle of displayedCycles) {
       L.push(
-        `${cycle.startedAt} -> ${cycle.finishedAt} | ${cycle.distanceTotalKm} km | ${cycle.fuelUsedL} L | ${cycle.avgFuelConsumptionKml} km/L | fonte=${cycle.source} | combustivel=${or(cycle.fuelRateSource)}`,
+        `${cycle.startedAt} -> ${cycle.finishedAt} | ${cycle.distanceTotalKm} km | ${cycle.fuelUsedL} L | ${(cycle.fuelDataValid === false || cycle.fuelUsedL < 0.05 || cycle.avgFuelConsumptionKml <= 0) ? ND : `${cycle.avgFuelConsumptionKml} km/L`} | fonte=${cycle.source} | combustivel=${or(cycle.fuelRateSource)}`,
       );
     }
   } else {

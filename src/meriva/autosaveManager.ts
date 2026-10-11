@@ -14,6 +14,7 @@ import { MerivaPersistedState, createEmptyMerivaState } from './autosaveState';
 import { hydrateState, isValidEnvelope, validatePayload } from './autosaveValidation';
 import { migrateEnvelope } from './autosaveMigrations';
 import { appendAutoSaveHistory } from './autosaveHistoryTxt';
+import { appendDailyObdSessionEvent } from './dailyObdHistory';
 
 const DEBOUNCE_MS = 1500;
 const CHECKPOINT_MS = 45000;
@@ -214,6 +215,21 @@ export async function initAutoSave(basePath: string): Promise<MerivaPersistedSta
   runtime.dirty = false;
   runtime.mutationVersion = 0;
 
+  // Android pode encerrar o processo sem executar o fechamento da sessão.
+  // Nunca reutilizar uma conexão persistida como se ainda estivesse viva.
+  const interruptedObdSession = runtime.state.obd.connected;
+  if (interruptedObdSession) {
+    runtime.state.obd = {
+      ...runtime.state.obd,
+      connected: false,
+      protocol: undefined,
+      lastKnownProtocol: runtime.state.obd.protocol ?? runtime.state.obd.lastKnownProtocol,
+    };
+    runtime.dirty = true;
+    runtime.mutationVersion += 1;
+    runtime.lastSavedFingerprint = null;
+  }
+
   if (!runtime.appStateSubscription) {
     runtime.appStateSubscription = AppState.addEventListener(
       'change',
@@ -221,6 +237,11 @@ export async function initAutoSave(basePath: string): Promise<MerivaPersistedSta
         if (status !== 'active' && runtime.dirty) void saveNow('background');
       },
     );
+  }
+
+  if (interruptedObdSession) {
+    const recovered = await saveNow('session_recovery');
+    if (recovered) await appendDailySessionBoundary('SESSION_RECOVERED');
   }
 
   return runtime.state;
@@ -325,6 +346,21 @@ export function startObdSessionCheckpoint(): void {
   }, CHECKPOINT_MS);
 }
 
+async function appendDailySessionBoundary(event: 'SESSION_START' | 'SESSION_END' | 'SESSION_RECOVERED'): Promise<void> {
+  if (!runtime.basePath) return;
+  try {
+    await appendDailyObdSessionEvent(
+      runtime.basePath,
+      runtime.state,
+      event,
+      new Date().toISOString(),
+    );
+  } catch (cause) {
+    // O histórico diário é complementar: falha no TXT não invalida o autosave JSON.
+    console.warn('[autosave] falha ao registrar fronteira da sessão ECU:', cause instanceof Error ? cause.message : cause);
+  }
+}
+
 export async function startObdAutosaveSession(): Promise<boolean> {
   if (runtime.obdSessionActive) return true;
   if (!runtime.basePath || !runtime.state.obd.connected) return false;
@@ -339,8 +375,13 @@ export async function startObdAutosaveSession(): Promise<boolean> {
   if (!saved) {
     runtime.obdSessionActive = false;
     stopObdSessionCheckpoint();
+    return false;
   }
-  return saved;
+
+  // Persistir o evento após a conclusão do autosave evita que o ciclo de
+  // salvamento/coalescência suprima uma reconexão do histórico diário.
+  await appendDailySessionBoundary('SESSION_START');
+  return true;
 }
 
 export async function closeObdAutosaveSession(): Promise<boolean> {
@@ -366,7 +407,11 @@ export async function closeObdAutosaveSession(): Promise<boolean> {
   // Abertura/fechamento são fronteiras de sessão; não devem ser coalescidas
   // com o snapshot anterior.
   if (wasActive) runtime.lastSavedFingerprint = null;
-  return saveNow('session_end');
+  const saved = await saveNow('session_end');
+  if (saved && wasActive) {
+    await appendDailySessionBoundary('SESSION_END');
+  }
+  return saved;
 }
 
 export function stopObdSessionCheckpoint(): void {
