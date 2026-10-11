@@ -1644,11 +1644,11 @@ O serviço de viagem já combinava distância acumulada pelo GPS com combustíve
 Também foi encontrada uma fonte de confusão no cockpit: quando ainda não havia histórico de viagens reais, o serviço usava uma média derivada dos dados de referência do Car Scanner como fallback para o indicador de consumo. Isso podia parecer consumo real mesmo sem uma viagem real calculada.
 
 ### Correções aplicadas na branch
-- O rastreador GPS agora confirma o movimento com várias amostras consecutivas plausíveis e deslocamento acumulado, em vez de exigir que cada segmento isolado ultrapasse a margem de precisão.
+- O rastreador GPS agora confirma o movimento com várias amostras consecutivas plausíveis e deslocamento acumulado, em vez de exigir que cada segmento isolado ultrapasse a margem de precisão. A revisão final também exige velocidade reportada pelo GPS ou confirmada pela ECU; diferença de coordenadas sozinha nunca confirma movimento.
 - O filtro preserva distância pendente somente após movimento confirmado, mantém limites para saltos, velocidade e intervalos entre posições e descarta trechos sem evidência suficiente.
 - A tela principal prioriza o consumo da viagem ativa. A média persistida usada como consumo real depende de leituras reais acumuladas; os dados de referência `CARSCANNER_SEED` não servem mais de fallback para esse indicador.
 - As telas Dados e Laboratório distinguem os rótulos de distância GPS e consumo real, e Dados informa a condição/precisão atual do GPS e a origem do combustível integrado/estimado.
-- Foi acrescentado um teste de regressão com precisão GPS mediana e segmentos individuais curtos.
+- Foram acrescentados testes de regressão com precisão GPS mediana e segmentos individuais curtos, além de rejeição de distância quando não há evidência de velocidade do GPS/ECU.
 - A documentação `docs/GPS_DRIFT_AND_DISTANCE.md` foi atualizada para refletir as regras e os limites atuais.
 
 ### Arquivos alterados
@@ -1663,6 +1663,7 @@ Também foi encontrada uma fonte de confusão no cockpit: quando ainda não havi
 
 ### Validação e CI
 - Commit de implementação: `40ae77a07c01a1d185c151fe631cfdd17798101f`.
+- Salvaguarda adicional de velocidade GPS/ECU, teste de regressão e atualização da documentação: `1b420d57d05c4488a845fda075fdfb4548e56b15`, `0872d8d65a64fe12387d39960a7f06c6b509b369` e `15d14b5d6ad06b29e87133a2563ac5c9d2862262`.
 - CI **não disparada**, conforme solicitado; os commits usam `[skip ci]`.
 - Os testes foram adicionados, mas ainda **não foram executados** neste ciclo. A correção não deve ser considerada validada até executar typecheck, testes e build Android em uma etapa autorizada.
 - Continua necessária validação física em percurso real com a Meriva e o telefone: comparar distância GPS com distância conhecida, conferir taxa de combustível/PID disponível e confirmar consumo médio.
