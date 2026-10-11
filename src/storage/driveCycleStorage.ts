@@ -72,13 +72,16 @@ async function serializeWrites<T>(basePath: string, operation: () => Promise<T>)
   const previous = writeQueues.get(basePath) ?? Promise.resolve();
   let release!: () => void;
   const current = new Promise<void>((resolve) => { release = resolve; });
-  writeQueues.set(basePath, previous.catch(() => undefined).then(() => current));
+  // Store the exact queued promise so cleanup only removes this operation's own tail.
+  const queued = previous.catch(() => undefined).then(() => current);
+  writeQueues.set(basePath, queued);
   await previous.catch(() => undefined);
   try {
     return await operation();
   } finally {
     release();
-    if (writeQueues.get(basePath) === current) writeQueues.delete(basePath);
+    // A later operation may already have replaced this entry; never remove its queue.
+    if (writeQueues.get(basePath) === queued) writeQueues.delete(basePath);
   }
 }
 
