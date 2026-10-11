@@ -345,11 +345,11 @@ export class GpsTracker {
       if (elapsedMs > 0 && elapsedMs <= MAX_SEGMENT_GAP_MS) {
         const segmentKm = haversineDistanceKm(previous, sample);
         derivedSpeedKmh = segmentKm / (elapsedMs / 3_600_000);
+        // Nunca inferir velocidade apenas da diferença de coordenadas: deriva do GPS
+        // pode parecer movimento. Exigir velocidade reportada pelo GPS ou confirmada pela ECU.
         const speedEvidenceKmh = this.vehicleSpeedHintKmh != null
           ? this.vehicleSpeedHintKmh
-          : sample.speedKmh != null
-            ? sample.speedKmh
-            : derivedSpeedKmh;
+          : sample.speedKmh;
         const speedEvidenceValid =
           speedEvidenceKmh != null &&
           Number.isFinite(speedEvidenceKmh) &&
