@@ -67,15 +67,15 @@ assert.ok(incomplete.incompleteReason.includes('INSUFFICIENT_FUEL_VOLUME'));
 
 const cycle = new RealTripRecorder(1000, 0);
 cycle.addSample({ timestampMs: 1000, distanceKm: 0, speedKmh: 0, fuelRateLph: 8 });
-cycle.addSample({ timestampMs: 16000, distanceKm: 1, speedKmh: 36, fuelRateLph: 8 });
-cycle.addSample({ timestampMs: 31000, distanceKm: 2, speedKmh: 36, fuelRateLph: 8 });
+cycle.addSample({ timestampMs: 16000, distanceKm: 0.2, speedKmh: 36, fuelRateLph: 8 });
+cycle.addSample({ timestampMs: 31000, distanceKm: 0.4, speedKmh: 36, fuelRateLph: 8 });
 const saved = cycle.buildDriveCycle(32000);
 assert.ok(saved);
 assert.strictEqual(saved.source, 'REAL_OBD');
 assert.strictEqual(saved.dataQuality, 'COMPLETE');
-assert.strictEqual(saved.distanceTotalKm, 2);
+assert.strictEqual(saved.distanceTotalKm, 0.4);
 assertApprox(saved.fuelUsedL, 8 * 30_000 / 3_600_000, 1e-6);
-assert.strictEqual(saved.avgFuelConsumptionKml, Number((2 / saved.fuelUsedL).toFixed(3)));
+assert.strictEqual(saved.avgFuelConsumptionKml, Number((0.4 / saved.fuelUsedL).toFixed(3)));
 
 const shortTrip = new RealTripRecorder(1000, 0);
 shortTrip.addSample({ timestampMs: 1000, distanceKm: 0, speedKmh: 0, fuelRateLph: 8 });
@@ -123,7 +123,7 @@ assert.strictEqual(gap.getState().fuelUsedL, 0);
 const { getDriveCycleSummary } = loadTs('src/data/driveCycles.ts');
 const completeSummary = getDriveCycleSummary([saved, incomplete, shortCycle]);
 assert.strictEqual(completeSummary.realCycleCount, 3, 'histórico deve contar trajetos completos e incompletos');
-assert.strictEqual(completeSummary.totalDistanceKm, 2.24, 'distância de viagens incompletas continua no total observado');
-assert.strictEqual(completeSummary.avgConsumptionKml, Number((2 / saved.fuelUsedL).toFixed(2)), 'média de consumo usa apenas ciclos completos');
+assert.strictEqual(completeSummary.totalDistanceKm, 0.64, 'distância de viagens incompletas continua no total observado');
+assert.strictEqual(completeSummary.avgConsumptionKml, Number((0.4 / saved.fuelUsedL).toFixed(2)), 'média de consumo usa apenas ciclos completos');
 
 console.log('PASS trip recorder: GPS monotônico, timestamps, viagens curtas e consumo incompleto');
