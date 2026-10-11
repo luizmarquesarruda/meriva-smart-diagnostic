@@ -30,15 +30,15 @@ function formatDuration(ms: number): string {
   return [hours, minutes, seconds].map((part) => String(part).padStart(2, '0')).join(':');
 }
 
-function toFiniteNonNegative(value: number): number {
-  return Number.isFinite(value) && value >= 0 ? value : 0;
+function finiteNonNegative(value: number): number | null {
+  return Number.isFinite(value) && value >= 0 ? value : null;
 }
 
 export class RealTripRecorder {
   private readonly startedAtMs: number;
-  private readonly initialDistanceKm: number;
-  private readonly fuelIntegrator = new FuelRateIntegrator();
   private lastTimestampMs: number | null = null;
+  private lastAbsoluteDistanceKm: number;
+  private readonly fuelIntegrator = new FuelRateIntegrator();
   private distanceKm = 0;
   private durationMs = 0;
   private movingTimeMs = 0;
@@ -47,34 +47,46 @@ export class RealTripRecorder {
   private fuelRateSources = new Set<FuelRateSource>();
 
   constructor(startedAtMs = Date.now(), initialDistanceKm = 0) {
-    this.startedAtMs = startedAtMs;
-    this.initialDistanceKm = toFiniteNonNegative(initialDistanceKm);
+    this.startedAtMs = Number.isFinite(startedAtMs) ? startedAtMs : Date.now();
+    this.lastAbsoluteDistanceKm = finiteNonNegative(initialDistanceKm) ?? 0;
   }
 
   addSample(sample: RealTripSample): RealTripRecorderState {
-    this.sampleCount += 1;
-    const timestampMs = Number.isFinite(sample.timestampMs) ? sample.timestampMs : Date.now();
-    const absoluteDistanceKm = toFiniteNonNegative(sample.distanceKm);
-    const speedKmh = toFiniteNonNegative(sample.speedKmh);
-    const deltaDistanceKm = absoluteDistanceKm >= this.initialDistanceKm
-      ? absoluteDistanceKm - this.initialDistanceKm
-      : 0;
+    // A timestamp must be valid and strictly newer. Reject the whole stale sample
+    // before it can alter distance, speed, duration, or fuel integration.
+    if (!Number.isFinite(sample.timestampMs)) return this.getState();
+    const timestampMs = sample.timestampMs;
+    if (this.lastTimestampMs != null && timestampMs <= this.lastTimestampMs) {
+      return this.getState();
+    }
 
-    this.distanceKm = Number(deltaDistanceKm.toFixed(3));
+    this.sampleCount += 1;
+    const absoluteDistanceKm = finiteNonNegative(sample.distanceKm);
+    const speedKmh = finiteNonNegative(sample.speedKmh) ?? 0;
+
+    if (absoluteDistanceKm != null) {
+      if (absoluteDistanceKm >= this.lastAbsoluteDistanceKm) {
+        this.distanceKm += absoluteDistanceKm - this.lastAbsoluteDistanceKm;
+      }
+      // If GPS cumulative distance resets backwards, rebase the baseline without
+      // subtracting already accumulated trip distance. Invalid distances do not
+      // replace the last valid baseline.
+      this.lastAbsoluteDistanceKm = absoluteDistanceKm;
+      this.distanceKm = Number(this.distanceKm.toFixed(3));
+    }
+
     this.maxSpeedKmh = Number(Math.max(this.maxSpeedKmh, speedKmh).toFixed(1));
 
-    if (
-      this.lastTimestampMs != null &&
-      timestampMs > this.lastTimestampMs &&
-      timestampMs - this.lastTimestampMs <= 30_000
-    ) {
+    if (this.lastTimestampMs != null) {
       const deltaMs = timestampMs - this.lastTimestampMs;
-      this.durationMs += deltaMs;
-      if (speedKmh >= 3) this.movingTimeMs += deltaMs;
+      if (deltaMs <= 30_000) {
+        this.durationMs += deltaMs;
+        if (speedKmh >= 3) this.movingTimeMs += deltaMs;
+      }
     }
     this.lastTimestampMs = timestampMs;
 
-    if (sample.fuelRateLph != null && Number.isFinite(sample.fuelRateLph)) {
+    if (sample.fuelRateLph != null && Number.isFinite(sample.fuelRateLph) && sample.fuelRateLph >= 0) {
       this.fuelIntegrator.addSample(sample.fuelRateLph, timestampMs);
       if (sample.fuelRateSource) this.fuelRateSources.add(sample.fuelRateSource);
     }
@@ -103,10 +115,12 @@ export class RealTripRecorder {
 
     const reasons: string[] = [];
     if (state.distanceKm < 0.1) reasons.push('DISTANCE_TOO_SHORT');
-    if (state.fuelUsedL <= 0) reasons.push('NO_VALID_FUEL_INTEGRATION');
+    if (state.fuelUsedL < 0.05) reasons.push('INSUFFICIENT_FUEL_VOLUME');
     if (state.validFuelSamples < 2) reasons.push('INSUFFICIENT_FUEL_SAMPLES');
+
     const dataQuality: 'COMPLETE' | 'INCOMPLETE' = reasons.length === 0 ? 'COMPLETE' : 'INCOMPLETE';
-    // Não inventar consumo para viagens curtas ou sem amostras de combustível suficientes.
+    // Keep observed real trips even when short or fuel telemetry is incomplete.
+    // Zero is an internal sentinel only; the UI must render it as N/D for incomplete trips.
     const avgFuelConsumptionKml = dataQuality === 'COMPLETE' ? state.distanceKm / state.fuelUsedL : 0;
     const avgDrivingSpeedKmh = state.movingTimeMs > 0
       ? state.distanceKm / (state.movingTimeMs / 3_600_000)
