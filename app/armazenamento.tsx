@@ -6,7 +6,7 @@ import { checkStorageQuota, getStorageBreakdown, StorageQuotaConfig } from '../s
 import { cleanupOldLogs, cleanupOldReadings } from '../src/storage/cleanup';
 import { getMidLayout } from '../src/ui/midLayout';
 import { readDriveCycles } from '../src/storage/driveCycleStorage';
-import type { DriveCycle } from '../src/data/driveCycles';
+import { isCycleConsumptionValid, type DriveCycle } from '../src/data/driveCycles';
 import { exportDiagnosticsJson, exportDriveCyclesCsv } from '../src/storage/exportDiagnostics';
 
 const DEFAULT_QUOTA: StorageQuotaConfig = {
@@ -31,7 +31,9 @@ export default function ArmazenamentoScreen() {
     setQuota(status);
     const breakdown = await getStorageBreakdown(path);
     setUsageBreakdown(breakdown);
-    setCycles((await readDriveCycles(path)).sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()));
+    setCycles((await readDriveCycles(path))
+      .filter((cycle) => cycle.source === 'REAL_OBD')
+      .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()));
   }
 
   useEffect(() => {
@@ -105,9 +107,15 @@ export default function ArmazenamentoScreen() {
           <View key={cycle.id} style={styles.historyRow}>
             <View style={styles.historyMain}>
               <Text style={styles.historyDate}>{cycle.startedAt}</Text>
-              <Text style={styles.historyMeta}>{cycle.dataQuality === 'INCOMPLETE' ? `${cycle.distanceTotalKm.toFixed(2)} km • INCOMPLETA • CONSUMO N/D` : `${cycle.distanceTotalKm.toFixed(2)} km • ${cycle.avgFuelConsumptionKml.toFixed(2)} km/L`}</Text>
+              <Text style={styles.historyMeta}>
+                {cycle.distanceTotalKm.toFixed(2)} km • {isCycleConsumptionValid(cycle)
+                  ? `${cycle.avgFuelConsumptionKml.toFixed(2)} km/L`
+                  : 'CONSUMO N/D'}
+              </Text>
             </View>
-            <Text style={cycle.dataQuality === 'INCOMPLETE' ? styles.warning : cycle.source === 'REAL_OBD' ? styles.real : styles.reference}>{cycle.dataQuality === 'INCOMPLETE' ? 'INCOMPLETA' : cycle.source === 'REAL_OBD' ? 'REAL' : 'REF.'}</Text>
+            <Text style={cycle.dataQuality === 'INCOMPLETE' || !isCycleConsumptionValid(cycle) ? styles.warning : styles.real}>
+              {cycle.dataQuality === 'INCOMPLETE' ? 'INCOMPLETA' : isCycleConsumptionValid(cycle) ? 'REAL' : 'DADOS N/D'}
+            </Text>
           </View>
         )) : <Text style={styles.empty}>Nenhuma viagem salva ainda.</Text>}
       </View>
