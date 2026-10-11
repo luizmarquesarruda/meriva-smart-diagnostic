@@ -8,6 +8,7 @@ import { RealTripRecorder } from './tripRecorder';
 import { INITIAL_DRIVE_CYCLES } from '../data/driveCycles';
 import { estimateRangeFromFuelLevel, fuelLevelPercentToLiters, isFuelReserve } from './fuelLevel';
 import { resetLiveTelemetry } from '../obd/liveTelemetry';
+import { MERIVA_MANUAL } from '../database/merivaManual';
 import { estimateFuelRateLph, type FuelRateSource } from '../obd/fuelConsumption';
 
 export interface AutoTripServiceState {
@@ -282,7 +283,7 @@ class AutoTripService {
               mapKpa: mapResult.parsed.status === 'RESPONDEU' ? mapResult.parsed.value : null,
               rpm,
               intakeAirTempC: iatResult.parsed.status === 'RESPONDEU' ? iatResult.parsed.value : null,
-              displacementCm3: getAutoSaveState().vehicle?.displacementCm3 ?? 1598,
+              displacementCm3: getAutoSaveState().vehicle?.displacementCm3 ?? MERIVA_MANUAL.engine.displacementCm3,
             });
             if (estimate) {
               fuelRateLph = estimate.rateLph;
