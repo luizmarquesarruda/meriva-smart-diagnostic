@@ -1800,3 +1800,6 @@ A documentação foi reconciliada com o comportamento observado e o fallback de 
 - O formatador TXT também passou a omitir VIN, nome do adaptador e identificadores/nome da ECU nos **novos snapshots** de histórico local. Exportação TXT manual continua com uma segunda camada de redação.
 - Snapshots TXT mais antigos já armazenados localmente não foram apagados nem reescritos automaticamente. A exportação manual os sanitiza ao criar o arquivo; backups dos arquivos brutos ainda devem ser revisados antes de compartilhar.
 - Cobertura estática adicionada em tests/exportPrivacy.test.js para garantir que os campos de identidade não voltem ao formatador TXT nem ao trace Bluetooth sem redação. A suíte não foi executada.
+
+
+- Complemento: o formatador TXT também omite settings cujas chaves pareçam conter VIN, MAC/endereço, nome de dispositivo/adaptador, serial ou identificação de ECU. A documentação de privacidade correspondente foi adicionada ao README. A implementação e as regressões permanecem sem execução de testes nesta rodada.
