@@ -18,8 +18,11 @@ assert.strictEqual(lock.packages['node_modules/expo-task-manager'].version, '11.
 assert.strictEqual(keepAwakePackage, '~13.0.2');
 assert.strictEqual(lock.packages[''].dependencies['expo-keep-awake'], '~13.0.2');
 assert.strictEqual(lock.packages['node_modules/expo-keep-awake'].version, '13.0.2');
-assert(layout.includes("import { useKeepAwake } from 'expo-keep-awake'"));
-assert(layout.includes("useKeepAwake('meriva-smart-diagnostic-active')"));
+assert(layout.includes("import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake'"));
+assert(layout.includes("activateKeepAwakeAsync(tag)"), 'tela deve ser mantida ligada com ativação explícita');
+assert(layout.includes("AppState.addEventListener('change'"), 'bloqueio de tela deve acompanhar o ciclo de vida do app');
+assert(layout.includes("if (state === 'active') activate()"), 'bloqueio de tela deve ser reativado ao voltar ao primeiro plano');
+assert(layout.includes('deactivateKeepAwake(tag)'), 'bloqueio deve ser liberado ao sair do app e desmontar a raiz');
 assert.strictEqual(lock.packages['node_modules/unimodules-app-loader'].version, '4.6.0');
 
 assert(appJson.expo.android.permissions.includes('ACCESS_BACKGROUND_LOCATION'));
