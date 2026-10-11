@@ -117,7 +117,7 @@ const reserveThresholdPercent = reserveCapacityL / tankCapacityL * 100;
 if (usableBeforeReserveL !== 51 || Math.abs(reserveThresholdPercent - 8.9285714286) > 0.000001) {
   throw new Error('Cálculo de tanque/reserva incorreto: esperado 51 L antes da reserva e reserva ≈ 8,93%');
 }
-if (!fuelLevelSource.includes('litros de reserva')) {
+if (!fuelLevelSource.includes('incluindo a reserva')) {
   throw new Error('A documentação no código deve explicitar que os litros restantes incluem a reserva');
 }
 console.log('fuelLevel tanque Meriva 56 L total / reserva 5 L: OK');
