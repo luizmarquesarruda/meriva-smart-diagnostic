@@ -125,7 +125,7 @@ Os valores de baseline são úteis para escolher o que testar e comparar; não s
 4. **VALIDADO_NO_VEICULO:** comparação documentada com instrumento de referência ou procedimento técnico independente, nas condições especificadas. Guardar método, instrumento, data, condição do motor e tolerância.
 5. **NÃO RESPONDEU / VALOR NÃO INTERPRETADO:** manter como falha observada, sem preencher zero e sem inferir ausência definitiva de sensor.
 
-A rotina de registro automático foi ajustada para salvar uma resposta válida como `RESPONDEU`, preservando um estado `CONFIRMADO` preexistente, em vez de promover toda leitura automaticamente. A classificação de um PID como padrão OBD também não equivale a validação específica da Meriva.
+A rotina de registro automático foi ajustada para salvar uma resposta válida como `RESPONDEU`. Só preserva `CONFIRMADO` quando a evidência anterior está explicitamente marcada como `USER_REAL_OBSERVATION`; registros legados gerados automaticamente a partir de consultas `REAL_OBD` não são tratados como validação manual. A classificação de um PID como padrão OBD também não equivale a validação específica da Meriva.
 
 ## 6. Correção de plausibilidade incluída nesta rodada
 
