@@ -71,7 +71,12 @@ export async function initializeDriveCycles(basePath: string): Promise<void> {
 
     await appendCsvRow(csvFile, row);
   }
-  await flushCsvRows(csvFile);
+  try {
+    await flushCsvRows(csvFile);
+  } catch (cause) {
+    // O índice JSON já foi inicializado; a falha do CSV auxiliar não deve bloquear a tela de viagens.
+    console.warn('[viagens] falha ao descarregar CSV inicial:', cause instanceof Error ? cause.message : cause);
+  }
 }
 
 export async function readDriveCycles(basePath: string): Promise<DriveCycle[]> {
