@@ -172,7 +172,29 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
   assert.strictEqual(adaptiveTracker.getState().speedSource, 'OBD');
   await adaptiveTracker.stop();
 
-  console.log('PASS GPS: automático, velocidade, distância acumulada e consumo');
+  // Sem velocidade válida do GPS e sem confirmação da ECU, coordenadas isoladas
+  // não podem gerar quilômetros a partir de deriva espacial.
+  const noSpeedTracker = new GpsTracker();
+  assert.strictEqual(await noSpeedTracker.start(), true);
+  for (let index = 0; index <= 6; index += 1) {
+    watcher({
+      coords: {
+        latitude: 0,
+        longitude: index * 0.00004,
+        speed: null,
+        accuracy: 15,
+      },
+      timestamp: 200000 + index * 1000,
+    });
+  }
+  assert.strictEqual(
+    noSpeedTracker.getState().distanceKm,
+    0,
+    'GPS coordinates without GPS/OBD speed evidence must not create trip distance',
+  );
+  await noSpeedTracker.stop();
+
+  console.log('PASS GPS: distância adaptativa, evidência de velocidade e consumo');
 })().catch((error) => {
   console.error(error);
   process.exitCode = 1;
