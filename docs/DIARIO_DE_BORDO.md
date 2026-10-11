@@ -1941,4 +1941,22 @@ Começar a implementação das melhorias de produto com uma entrega que reaprove
 - O teste foi adicionado, mas não executado neste ambiente; não declarar PASS até executar `npm test`/`npm run validate` com autorização para CI.
 - O formato de resposta pode variar entre adaptadores ELM327; confirmar no log bruto da ECU antes de concluir que o frame está disponível. Não limpar DTCs automaticamente.
 
+## 2026-10-11 — Fase 4: integridade da distância em amostras GPS inválidas
+
+### Evidência e risco
+- Na auditoria de `src/trip/tripRecorder.ts`, a distância acumulada do GPS era normalizada por uma função que convertia qualquer valor não finito ou negativo em zero.
+- Se uma amostra inválida chegasse durante uma viagem, esse zero poderia substituir a última referência absoluta válida. A próxima amostra válida poderia então ser contabilizada como se toda a distância desde zero tivesse sido percorrida, inflando a distância e os indicadores derivados.
+
+### Correção aplicada
+- `src/trip/tripRecorder.ts`: distância absoluta inválida agora é tratada como ausência de evidência; não altera a última referência GPS válida. A distância acumulada continua monotônica e o delta seguinte é calculado contra a última referência válida.
+- `tests/tripRecorder.test.js`: adicionada regressão com `NaN` entre duas leituras válidas, exigindo que o incremento seja somente o delta real entre a referência anterior e a próxima leitura válida.
+
+### Limites e validação
+- Commits: `6fc36c5` (correção) e `256834a` (teste), publicados na branch `fix/daily-obd-history-keep-screen-awake-main`, com `[skip ci]`.
+- Nenhuma CI foi disparada manualmente; testes, typecheck e build Android não foram executados nesta etapa. Não declarar o teste como aprovado até executá-lo em ambiente autorizado.
+- O teste de código não substitui a validação de distância GPS/velocidade em viagem real na Meriva.
+- Nenhum merge foi realizado.
+
+### Próxima etapa
+- Continuar a auditoria da persistência de viagens e do histórico diário, priorizando falhas de leitura/escrita, concorrência e recuperação segura sem apagar silenciosamente registros existentes.
 
