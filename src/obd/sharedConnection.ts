@@ -318,7 +318,13 @@ export function getSharedObdStatus(): SharedObdStatus {
   return {
     lifecycle,
     bluetoothConnected: isBluetoothLinkUp(lifecycle),
-    ecuConnected: Boolean(active?.ecuValidated),
+    // Keep the synchronous snapshot consistent with emit(): an adapter link alone
+    // is not proof that the ECU is responding to valid OBD requests.
+    ecuConnected: Boolean(active?.ecuValidated && ecuResponseState === 'RESPONDING'),
+    ecuResponseState,
+    consecutiveEcuFailures,
+    lastEcuResponseAt,
+    lastEcuError,
   };
 }
 
