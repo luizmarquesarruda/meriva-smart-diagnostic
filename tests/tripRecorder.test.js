@@ -89,7 +89,7 @@ const completeSummary = getDriveCycleSummary([
   incomplete,
 ]);
 assert.strictEqual(completeSummary.realCycleCount, 1, 'ciclos incompletos não entram na média');
-assert.strictEqual(completeSummary.totalDistanceKm, 2);
+assert.strictEqual(completeSummary.totalDistanceKm, 2.2, 'distância incompleta continua no total observado');
 assert.ok(completeSummary.avgConsumptionKml > 0);
 
 console.log('PASS trip recorder: GPS + OBD + preservação de ciclos incompletos');
