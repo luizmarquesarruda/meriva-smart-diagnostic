@@ -43,11 +43,14 @@ function getPersistedRealAverageConsumption(autonomy: {
     !Number.isFinite(distanceKm) ||
     distanceKm <= 0 ||
     !Number.isFinite(fuelUsedL) ||
-    fuelUsedL <= 0
+    fuelUsedL < 0.05
   ) {
     return 0;
   }
-  return Number((distanceKm / fuelUsedL).toFixed(3));
+  const consumptionKml = distanceKm / fuelUsedL;
+  return Number.isFinite(consumptionKml) && consumptionKml > 0
+    ? Number(consumptionKml.toFixed(3))
+    : 0;
 }
 
 const INITIAL_STATE: AutoTripServiceState = {
