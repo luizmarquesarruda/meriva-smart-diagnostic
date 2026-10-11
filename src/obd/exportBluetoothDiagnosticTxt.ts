@@ -7,6 +7,7 @@ import { readLearningProfile, type MerivaLearningProfile } from '../database/lea
 import { getAutoSaveState } from '../meriva/autosaveManager';
 import { runLocalDiagnostic, type DiagnosticResult } from '../diagnostics/diagnosticEngine';
 import type { PidObservation } from '../types/sourceTypes';
+import { redactSensitiveIdentifiers } from '../storage/privacyRedaction';
 
 async function readCurrentLearningProfile(): Promise<MerivaLearningProfile | null> {
   const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
@@ -121,12 +122,12 @@ async function buildReport(): Promise<string> {
     `DATA: ${new Date().toISOString()}`,
     `APP VERSION: ${Constants.expoConfig?.version ?? 'N/D'}`,
     `PLATFORM: ${Platform.OS} ${Platform.Version}`,
-    `DEVICE: ${Constants.deviceName ?? 'N/D'}`,
-    `ELM DEVICE: ${connection ? `${connection.device.name} | ${connection.device.address}` : 'NÃO CONECTADO'}`,
+    'DEVICE: [REDACTED FOR PRIVACY]',
+    `ELM DEVICE: ${connection ? 'ADAPTADOR CONECTADO' : 'NÃO CONECTADO'}`,
     `PROTOCOL: ${connection?.protocol ?? 'N/D'}`,
     `LAST ERROR: ${getSharedObdLastError() ?? extractLastTraceError(trace) ?? 'NENHUM'}`,
     `PAIRED DEVICES: ${context.devices.length}`,
-    ...context.devices.map((device, index) => `PAIRED ${index + 1}: ${device.name} | ${device.address}`),
+    // Mantém a contagem de adaptadores, sem exportar nomes ou endereços pareados.
     '',
     ...learningReportLines(learningProfile),
     '',
@@ -137,7 +138,7 @@ async function buildReport(): Promise<string> {
     '',
     '--- FIM DO RELATÓRIO ---',
   ];
-  return lines.join('\n');
+  return redactSensitiveIdentifiers(lines.join('\n'));
 }
 
 export async function exportBluetoothDiagnosticTxt(): Promise<BluetoothReportResult> {
