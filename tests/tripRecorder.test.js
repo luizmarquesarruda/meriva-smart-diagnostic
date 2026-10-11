@@ -114,6 +114,18 @@ const initial = invalidTimestamp.addSample({ timestampMs: 1000, distanceKm: 0, s
 const invalidTimeState = invalidTimestamp.addSample({ timestampMs: Number.NaN, distanceKm: 5, speedKmh: 200, fuelRateLph: 100 });
 assert.deepStrictEqual(invalidTimeState, initial, 'timestamp inválido deve ser descartado sem mutar o estado');
 
+const subMeterSegments = new RealTripRecorder(0, 0);
+subMeterSegments.addSample({ timestampMs: 0, distanceKm: 0, speedKmh: 0, fuelRateLph: null });
+for (let i = 1; i <= 100; i += 1) {
+  subMeterSegments.addSample({
+    timestampMs: i * 1000,
+    distanceKm: i * 0.0004,
+    speedKmh: 2,
+    fuelRateLph: null,
+  });
+}
+assert.strictEqual(subMeterSegments.getState().distanceKm, 0.04, 'segmentos pequenos não podem desaparecer por arredondamento acumulado');
+
 const gap = new RealTripRecorder(0, 0);
 gap.addSample({ timestampMs: 0, distanceKm: 0, speedKmh: 0, fuelRateLph: 10 });
 gap.addSample({ timestampMs: 40_001, distanceKm: 1, speedKmh: 30, fuelRateLph: 10 });
