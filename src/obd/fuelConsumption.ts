@@ -91,7 +91,7 @@ export function estimateFuelRateLph(input: FuelRateEstimateInput): { rateLph: nu
   const afr = input.airFuelRatio ?? 14.7;
   const density = input.fuelDensityKgPerL ?? 0.745;
 
-  if (Number.isFinite(input.mafGs) && (input.mafGs ?? 0) >= 0 && afr > 0 && density > 0) {
+  if (Number.isFinite(input.mafGs) && (input.mafGs ?? 0) > 0 && Number.isFinite(afr) && afr > 0 && Number.isFinite(density) && density > 0) {
     const fuelKgPerSecond = (input.mafGs as number) / 1000 / afr;
     return { rateLph: fuelKgPerSecond * 3600 / density, source: 'ESTIMATED_MAF' };
   }
@@ -106,7 +106,7 @@ export function estimateFuelRateLph(input: FuelRateEstimateInput): { rateLph: nu
     && Number.isFinite(rpm) && (rpm ?? 0) > 0
     && Number.isFinite(iat)
     && displacementL > 0
-    && afr > 0 && density > 0 && ve > 0
+    && Number.isFinite(afr) && afr > 0 && Number.isFinite(density) && density > 0 && Number.isFinite(ve) && ve > 0
   ) {
     const absolutePressurePa = (map as number) * 1000;
     const temperatureK = (iat as number) + 273.15;
