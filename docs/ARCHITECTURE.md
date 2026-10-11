@@ -41,24 +41,25 @@
 
 ### UI
 
-`app/` contém as quatro áreas de uso do aplicativo:
+`app/` reúne as principais áreas de uso do aplicativo, incluindo:
 
 1. **Início**: autonomia estimada, estado OBD/GPS, consumo, falhas e viagem atual.
 2. **Diagnóstico OBD**: conexão ELM327, consulta de PID, DTC e detalhes técnicos.
 3. **Histórico e dados**: espaço usado, limpeza e manutenção dos dados.
-4. **Configurações**: somente preferências básicas que fazem sentido para o motorista.
+4. **Viagens**: histórico e resumo apenas dos ciclos `REAL_OBD`.
+5. **Configurações e armazenamento**: preferências, manutenção, backup e exportação de dados.
 
 A interface usa um layout responsivo comum em `src/ui/midLayout.ts`. Em retrato, as informações ficam empilhadas; em paisagem, métricas e ações ocupam a largura disponível. Dados RAW e informações de engenharia ficam escondidos em detalhes técnicos para não poluir a tela de uso diário.
 
 ### GPS
 
-`src/gps/` concentra o rastreador em primeiro plano, permissões, filtragem de precisão, cálculo de distância e conversão de velocidade.
+`src/gps/` concentra o `GpsTracker`, permissões, filtragem, cálculo de distância e conversão de velocidade. O singleton serve tanto o watcher foreground quanto a tarefa global `expo-task-manager`; quando o monitoramento persistente inicia, o watcher foreground é encerrado para evitar callbacks e distâncias duplicados.
 
-O `GpsTracker` é singleton no runtime para não parar ao navegar entre telas. O cálculo de consumo recebe quilômetros do GPS e litros integrados a partir de uma taxa OBD válida. O PID 015E fornece L/h quando suportado; a integração usa o intervalo entre amostras e rejeita dados inválidos ou intervalos longos.
+A distância só acumula posições com precisão declarada de até 30 m, segmentos plausíveis e evidência de velocidade reportada pelo GPS ou pelo PID OBD 010D. A diferença de coordenadas sozinha não confirma movimento. O serviço tenta iniciar o Foreground Service após validar a ECU, mas a continuidade com tela apagada depende de permissões, build nativa e políticas de bateria Android; não há garantia após force-stop.
 
 ### Combustível OBD
 
-`src/obd/fuelConsumption.ts` integra a taxa do PID 015E em litros consumidos. O integrador não fabrica combustível: sem amostras válidas, o acumulado permanece inalterado.
+`src/obd/fuelConsumption.ts` integra uma taxa válida em L/h entre amostras com intervalo positivo de até 30 segundos. O serviço prefere a taxa medida pelo PID 015E. Se indisponível, tenta uma estimativa pelo MAF (0110) e depois por MAP + RPM + IAT (010B + 010C + 010F). A estimativa MAP usa a cilindrada do perfil do veículo ou o dado de referência da Meriva (`MERIVA_MANUAL.engine.displacementCm3`, 1389 cm³), com hipóteses de AFR, densidade de combustível e eficiência volumétrica. A fonte é preservada como `MEASURED_015E`, `ESTIMATED_MAF`, `ESTIMATED_MAP` ou `MIXED`. Estimativa não equivale a medição; combustível flex e hipóteses fixas podem causar viés. Sem taxa válida medida ou estimada, o combustível consumido permanece zero e o consumo da viagem deve aparecer como N/D.
 
 ### OBD
 
