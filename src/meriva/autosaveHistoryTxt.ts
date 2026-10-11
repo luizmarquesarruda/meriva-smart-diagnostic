@@ -68,7 +68,10 @@ export async function appendAutoSaveHistory(
   }, 0);
   const nextNumber = lastNumber + 1;
   const exportedAt = new Date().toISOString();
-  const snapshot = formatAutoSaveTxt(state, { appVersion, exportedAt });
+  // The JSON autosave remains the complete source of truth. Repeating every
+  // trip in each of 200 TXT snapshots caused quadratic file growth; keep only
+  // the ten most recent REAL_OBD trips in this diagnostic snapshot history.
+  const snapshot = formatAutoSaveTxt(state, { appVersion, exportedAt, historyLimit: 10 });
   const entry = [
     ENTRY_BEGIN,
     `NÚMERO: ${nextNumber}`,
