@@ -1982,3 +1982,24 @@ Começar a implementação das melhorias de produto com uma entrega que reaprove
 - A proteção evita sobrescrita causada por erro de leitura. Falhas de gravação ainda precisam ser verificadas em dispositivo e tratadas conforme o comportamento real da API de arquivos do Expo.
 - Testar exportação no Android: cancelar o seletor deve deixar o arquivo local intacto; falha de permissão/escrita deve retornar erro explícito sem alegar exportação concluída.
 
+
+## 2026-10-11 — Fase 6: reduzir fragmentação de viagens e crescimento do TXT
+
+### Evidência
+- O TXT de autosave continha até 200 snapshots completos, cada um repetindo quase todo o histórico de viagens. Isso ampliava o arquivo sem acrescentar eventos de viagem únicos.
+- O histórico de campo mostrou trajetos de poucos segundos e poucos metros, compatíveis com o fechamento do recorder após apenas 15 segundos parado.
+- A rotina de append do histórico de autosave convertia falha de leitura em arquivo vazio e poderia substituir um TXT existente ilegível.
+- O estimador MAP ainda usava cilindrada fallback de 1598 cm³, incompatível com a especificação manual confirmada da Meriva de 1389 cm³.
+
+### Correções aplicadas na branch de trabalho
+- `src/trip/tripRecorder.ts`: centraliza a regra de encerramento por parada; usa 60 s quando há evidência explícita de RPM zero e 300 s quando o RPM está positivo ou indisponível.
+- `src/trip/autoTripService.ts`: não fecha a viagem após 15 s parado; permite reconhecer movimento pela velocidade válida quando RPM está temporariamente indisponível; ajusta a cilindrada fallback do cálculo MAP para 1389 cm³.
+- `src/meriva/autosaveTxtFormatter.ts` e `src/meriva/autosaveHistoryTxt.ts`: os snapshots do TXT de autosave mostram no máximo as 10 viagens REAL_OBD mais recentes. O autosave JSON e a exportação TXT completa continuam preservando o histórico integral; seeds CARSCANNER_SEED continuam excluídos.
+- `src/meriva/autosaveHistoryTxt.ts`: a operação de append agora propaga falha de leitura e preserva o arquivo existente; a leitura para a interface continua podendo apresentar o cabeçalho de estado vazio sem escrever sobre o arquivo.
+- Testes adicionados/atualizados para os limiares de parada, compactação dos snapshots e proteção contra sobrescrita após falha de leitura. `package.json` inclui o teste do formatador no script de validação.
+
+### Validação e CI
+- A CI #1879 (run `38133297852`) foi iniciada automaticamente pelo GitHub após um commit sem `[skip ci]`; não foi disparada manualmente.
+- `npm ci` e Expo Doctor (17/17) passaram. TypeScript passou. A suíte falhou no novo teste do formatador por um matcher incorreto das linhas de viagem; a asserção foi corrigida depois desse run.
+- A CI #1879 executou um commit anterior ao conjunto final de correções. A versão final desta branch ainda não foi validada por TypeScript, suíte completa ou build Android.
+- Nenhum merge foi realizado. Validação física com a Meriva/ELM327 continua pendente.
