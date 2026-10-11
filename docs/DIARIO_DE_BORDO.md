@@ -2024,3 +2024,14 @@ O diário por data podia deixar de registrar a abertura de uma sessão ECU valid
 - Testes automatizados e validação física no Android ainda pendentes; não declarar a correção validada até esses resultados.
 - PR #49 permanece sem merge; `main` não foi alterada.
 
+## 2026-10-11 — Correção da CI #1911: teste de tela ligada desatualizado
+
+### Falha observada
+A CI #1911 executou `npm run doctor` com sucesso e passou pelo TypeScript e por diversos testes, mas falhou em `tests/backgroundExecution.test.js:21`. O teste exigia o import antigo `useKeepAwake` e a chamada do hook, embora `app/_layout.tsx` já tivesse sido alterado para ativação explícita via `activateKeepAwakeAsync`, reativação no retorno ao primeiro plano e limpeza com `deactivateKeepAwake`.
+
+### Correção
+Atualizadas as asserções de `tests/backgroundExecution.test.js` para verificar o contrato atual de ativação explícita e os eventos de ciclo de vida do aplicativo. Nenhuma alteração na implementação OBD ou no formato do diário diário foi necessária para esta falha.
+
+### Estado
+A correção do teste foi gravada na branch `fix/daily-obd-history-keep-screen-awake-main`. A nova CI deve confirmar o resultado; não considerar validado até a execução terminar verde. O job Android build da execução #1911 foi ignorado porque o job de validação falhou.
+
