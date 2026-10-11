@@ -72,7 +72,6 @@ export class RealTripRecorder {
       // subtracting already accumulated trip distance. Invalid distances do not
       // replace the last valid baseline.
       this.lastAbsoluteDistanceKm = absoluteDistanceKm;
-      this.distanceKm = Number(this.distanceKm.toFixed(3));
     }
 
     this.maxSpeedKmh = Number(Math.max(this.maxSpeedKmh, speedKmh).toFixed(1));
@@ -98,7 +97,9 @@ export class RealTripRecorder {
     const fuelState = this.fuelIntegrator.getState();
     return {
       startedAtMs: this.startedAtMs,
-      distanceKm: this.distanceKm,
+      // Keep full precision internally; round only at the public state boundary so
+      // repeated sub-meter segments are not individually rounded away.
+      distanceKm: Number(this.distanceKm.toFixed(3)),
       fuelUsedL: fuelState.fuelUsedL,
       durationMs: this.durationMs,
       movingTimeMs: this.movingTimeMs,
