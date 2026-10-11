@@ -72,7 +72,11 @@ async function appendCsvRowsUnsafe(filePath: string, rows: CsvRow[]): Promise<vo
   if (verifiedContent !== content) throw new Error('CSV_TEMPORARY_READBACK_MISMATCH');
 
   await FileSystem.copyAsync({ from: temporaryPath, to: filePath });
-  await FileSystem.deleteAsync(temporaryPath, { idempotent: true });
+  try {
+    await FileSystem.deleteAsync(temporaryPath, { idempotent: true });
+  } catch {
+    // O CSV principal já foi atualizado; um temporário órfão será sobrescrito no próximo flush.
+  }
 }
 
 function scheduleFlush(filePath: string, queue: FileQueue, delayMs = FLUSH_DELAY_MS): void {
