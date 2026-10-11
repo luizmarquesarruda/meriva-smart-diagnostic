@@ -10,8 +10,8 @@ Antes de qualquer correção de código:
 3. Evitar repetir uma tentativa que já falhou sem analisar a causa.
 4. Fazer a correção no código e, quando aplicável, nos testes e dados JSON.
 5. Registrar no diário a causa, a alteração, os arquivos afetados, o commit e a CI.
-6. Validar a CI antes de considerar a correção concluída.
-7. Se a CI falhar, registrar a falha e somente então iniciar a próxima correção.
+6. Executar e validar CI quando a execução estiver autorizada; se o usuário pedir para não dispará-la ou o commit usar `[skip ci]`, registrar a validação como pendente, sem afirmar que a correção foi validada.
+7. Se a CI falhar, registrar a falha e analisar o log antes da próxima correção.
 8. Manter documentação e repositório sincronizados.
 
 ## 2026-10-06 - Correção do carregamento do catálogo de combustível
@@ -1664,6 +1664,7 @@ Também foi encontrada uma fonte de confusão no cockpit: quando ainda não havi
 ### Validação e CI
 - Commit de implementação: `40ae77a07c01a1d185c151fe631cfdd17798101f`.
 - Salvaguarda adicional de velocidade GPS/ECU, teste de regressão e atualização da documentação: `1b420d57d05c4488a845fda075fdfb4548e56b15`, `0872d8d65a64fe12387d39960a7f06c6b509b369` e `15d14b5d6ad06b29e87133a2563ac5c9d2862262`.
+- Ajuste da interface para distinguir consumo da viagem de taxa medida: `e06cb9d033561fa2d99ce1e7fe7ff28c8e6210e0`, `97552a463fdc7ebadc7911e152e4f5588a2eb15b`, `df799f9a155d12b583282dc18262681d32545dc3` e `817c3afa39dd78b15b605dfc0b264ef95dabe8a0`; documentação de evidência de velocidade: `43f5d032`.
 - CI **não disparada**, conforme solicitado; os commits usam `[skip ci]`.
 - Os testes foram adicionados, mas ainda **não foram executados** neste ciclo. A correção não deve ser considerada validada até executar typecheck, testes e build Android em uma etapa autorizada.
 - Continua necessária validação física em percurso real com a Meriva e o telefone: comparar distância GPS com distância conhecida, conferir taxa de combustível/PID disponível e confirmar consumo médio.
@@ -1673,29 +1674,52 @@ Executar validação local ou CI em momento autorizado, corrigir eventuais regre
 
 
 
-## 2026-10-11 — Auditoria de gargalos e otimização de aquisição
+## 2026-10-11 — Auditoria de gargalos, correções e reconciliação documental
 
-### Correções nesta etapa
-- A recuperação do ELM327 agora é executada como uma operação exclusiva na mesma fila de comandos que as consultas OBD. O probe e a renegociação de protocolo não chamam mais `identifyProtocol()` por dentro da fila, evitando deadlock e impedindo que consultas normais se intercalem com `ATZ/ATSP`.
-- O filtro GPS rejeita posições sem precisão declarada, não finita, negativa ou acima do limite configurado. A distância não pode ser construída a partir de um fix cuja precisão é desconhecida.
-- A tela Viagens calcula resumo e lista somente com ciclos `REAL_OBD`, evitando misturar registros de referência importados na apresentação de viagens reais.
-- A telemetria em memória continua recebendo cada resposta OBD; persistência de confirmação/perfil de aprendizado foi limitada a uma gravação por PID a cada 60 segundos para evitar leitura/regravação repetida do mesmo banco durante polling. O limite não muda a frequência das consultas OBD nem a integração do combustível.
+### Fonte de verdade e estado de validação
 
-### Pesquisa de fontes técnicas
-- Expo FileSystem: documentação oficial descreve APIs diferentes entre a API legada e a atual. Como o projeto está em Expo SDK 51 / expo-file-system 17, não foi feita migração para API de versão recente sem prova de compatibilidade.
-- Expo Location / TaskManager: documentação oficial confirma que a tarefa de localização em segundo plano precisa ser registrada no escopo global e que o Android não garante reinício de uma aplicação terminada apenas por evento de localização. O serviço precisa ser testado em build nativa e no aparelho alvo.
-- Android Developers: localização em segundo plano é sujeita a limites de frequência e restrições de bateria; isso precisa ser tratado como limite de plataforma, não corrigido aumentando indiscriminadamente o polling.
+- Branch de trabalho: `fix/gps-distance-consumption-2026-10-11`.
+- Base funcional auditada: `c46689e712aeda8703b33f9e15a4b3af9761762b` — exclusão de ciclos de referência da contagem/lista de viagens reais.
+- O histórico da branch registra a recuperação ELM serializada, filtro GPS com precisão obrigatória, throttling do aprendizado e atualização da apresentação de consumo. Os hashes específicos estão registrados abaixo e na seção anterior.
+- Os commits deste ciclo usam `[skip ci]`. A branch não tem execução de GitHub Actions para o conjunto atual. Typecheck, suíte completa de testes, build Android e validação física continuam pendentes.
+- Regra operacional: teste escrito não equivale a teste executado; commit com `[skip ci]` não é evidência de CI verde.
 
-### Arquivos alterados
-- `src/obd/elm327.ts`
-- `src/gps/gpsTracker.ts`
-- `src/meriva/autosaveIntegration.ts`
-- `app/viagens.tsx`
-- `tests/gps.test.js`
-- `tests/ecuHealth.test.js`
-- `docs/DIARIO_DE_BORDO.md`
+### Alterações de código confirmadas no histórico
 
-### Limitações restantes
-- `src/database/csvLogger.ts` ainda lê e reescreve o CSV diário a cada linha. A solução de longo prazo é implementar append real compatível com a versão instalada ou migrar o logger para armazenamento incremental com rotação e flush seguro. Não foi alterado neste lote porque exige testar comportamento da API legada, concorrência e recuperação após encerramento do processo.
-- O intervalo de 60 segundos do aprendizado reduz I/O, mas ocorrências passam a representar confirmações persistidas, não cada resposta bruta recebida. A contagem bruta deve ser consultada no log de telemetria, não interpretada como contador de amostras.
-- Não executada CI; os commits usam `[skip ci]`. Typecheck, suíte de testes e build Android continuam pendentes.
+1. **Distância GPS e consumo de viagem** — `src/gps/gpsTracker.ts`, `src/trip/autoTripService.ts`, telas Início/Dados/Laboratório e testes. A distância usa fixes com precisão conhecida de até 30 m, amostras consecutivas plausíveis, limites de salto/intervalo e evidência de velocidade reportada pelo GPS ou pelo PID 010D. Diferença de coordenadas sozinha não confirma movimento. A taxa de combustível prioriza 015E medido e pode recorrer a estimativas MAF/MAP identificadas.
+2. **Interface do consumo** — commits `e06cb9d033561fa2d99ce1e7fe7ff28c8e6210e0`, `97552a463fdc7ebadc7911e152e4f5588a2eb15b`, `df799f9a155d12b583282dc18262681d32545dc3` e `817c3afa39dd78b15b605dfc0b264ef95dabe8a0` distinguem consumo médio calculado da viagem de taxa medida diretamente pela ECU. Km/L de uma viagem não é o mesmo dado que L/h do PID 015E.
+3. **Evidência de velocidade GPS/ECU** — commits `40ae77a07c01a1d185c151fe631cfdd17798101f`, `1b420d57d05c4488a845fda075fdfb4548e56b15`, `0872d8d65a64fe12387d39960a7f06c6b509b369`, `15d14b5d6ad06b29e87133a2563ac5c9d2862262` e documentação complementar `43f5d032`.
+4. **Recuperação ELM327 serializada** — `src/obd/elm327.ts` executa a recuperação na mesma fila das consultas OBD, evitando interleaving entre leitura normal e sequência AT. A revisão posterior exige status OK e resposta positiva `410C` no probe, antes de considerar a recuperação válida. Commits `c0b6979a33e5a1f3ed8adc1c54150860ef367d7a` e `1fbe0fb4f27f03eba2933f4e1cd047aee59c4b21`.
+5. **Precisão GPS obrigatória** — `isAccurate()` rejeita amostras sem precisão declarada, não finita, negativa ou acima de 30 m; regressão adicionada em `tests/gps.test.js`. Commit `6e95c733b54b94e848734be1b401f74937181a2a`.
+6. **Redução de gravações de aprendizado** — `src/meriva/autosaveIntegration.ts` limita as tentativas de persistência de confirmação/perfil por PID a uma janela de 60 s. Log RAW/interpretado e telemetria continuam sendo registrados por resposta OBD. A propriedade `occurrences` do banco de confirmação não representa todas as respostas recebidas. Commit `e0c013db3a4090f70370ce628e4beb135c08b737`.
+7. **Histórico de viagens reais** — `app/viagens.tsx` calcula total de ciclos, resumo e lista somente com `source === 'REAL_OBD'`; ciclos de referência não são apresentados como viagens reais. Commits `1fbe0fb4f27f03eba2933f4e1cd047aee59c4b21` e `c46689e712aeda8703b33f9e15a4b3af9761762b`.
+8. **Regressão da recuperação ELM** — `tests/ecuHealth.test.js` verifica que a recuperação permanece serializada e consulta o protocolo após o probe. Commit `2c2ed58102522702cad9b63c41f4f21ae226d109`.
+
+### Correção de consistência da cilindrada da estimativa MAP
+
+O cruzamento entre `src/database/merivaManual.ts` e `src/trip/autoTripService.ts` encontrou um fallback antigo de **1598 cm³**, incompatível com a Meriva 1.4 ECONO.FLEX documentada em `MERIVA_MANUAL.engine.displacementCm3 = 1389`. O serviço agora usa `MERIVA_MANUAL.engine.displacementCm3` quando o perfil não informa cilindrada. Foi acrescentada regressão estática em `tests/fuelConsumption.test.js` para impedir o retorno do valor incorreto.
+
+- Código: `c383be98374a05833ab220263026573443c50b3a`.
+- Teste: `60b91d3627e3465d4807c2c1dcc018a961c8ddb4`.
+- A estimativa MAP continua aproximada: AFR, densidade de combustível e eficiência volumétrica são hipóteses, não medições da ECU; a composição real gasolina/etanol pode introduzir viés.
+
+### Documentação corrigida nesta rodada
+
+- `README.md` — corrige o consumo medido/estimado, GPS em segundo plano, ressalvas do Android e framing ELM327 (delimiter vazio, buffer RX até `>`, TX terminado em CR). Remove a afirmação antiga de que o transporte usa `delimiter: \\r` e substitui o texto histórico de “gatilho de CI” por descrição do workflow atual. Commit `e241223c4041503711ac316e2947fa811e67e9f7`.
+- `docs/ARCHITECTURE.md` — atualiza o papel do GPS foreground/background e a distinção entre taxa medida e estimativa. Commit `c47ce2d5f064f78e603be661928ec0fed9ff14dc`.
+- `docs/DEVELOPMENT.md` — corrige os passos de teste dos fallbacks de combustível e inclui teste do Foreground Service com tela apagada e permissão ausente. Commit `a1262be2ccf2a0612892467aca831211934c9430`.
+- `docs/GPS_DRIFT_AND_DISTANCE.md` e `docs/ELM327_ENGINEERING_PLAYBOOK.md` foram comparados com a implementação e mantidos: descrevem corretamente filtros GPS e framing ELM com delimiter vazio.
+- A orientação de trabalho no início deste diário foi ajustada para permitir registrar CI pendente quando sua execução não estiver autorizada.
+
+### Gargalos e riscos ainda abertos — não declarar resolvidos
+
+1. **Logger CSV não incremental:** `src/database/csvLogger.ts` serializa gravações por arquivo, mas relê e reescreve o CSV inteiro em cada linha. Continua sendo o maior gargalo de I/O identificado. A próxima solução precisa ser compatível com Expo SDK 51 / `expo-file-system` 17 e testar escrita incremental, fila, flush, rotação e recuperação após interrupção.
+2. **Polling sequencial de PIDs:** `src/trip/autoTripService.ts` consulta PIDs em sequência. Os PIDs de fallback 0110/010B/010F não são todos protegidos por verificação prévia de suporte em todos os caminhos, o que pode acrescentar latência. O intervalo nominal do loop não deve ser descrito como frequência garantida de cada PID.
+3. **Viagens curtas/incompletas:** `RealTripRecorder.buildDriveCycle()` descarta a viagem quando a distância é inferior a 0,1 km, combustível integrado é zero ou há menos de duas amostras válidas de combustível. Isso evita publicar consumo sem base suficiente, mas viagens curtas ou sem taxa válida não entram no histórico atual.
+4. **Fallback GPS se o background falhar:** `startBackgroundLocation()` remove o watcher foreground antes de iniciar a tarefa background. Se o serviço não iniciar, a função não reinicia automaticamente o watcher foreground. Corrigir e testar esse caminho antes de declarar robusto o ciclo de vida do GPS.
+5. **Tentativa de persistência de aprendizado:** o limitador por PID reserva o intervalo antes de confirmar a escrita. Se falhar a persistência, novas tentativas desse PID podem ficar bloqueadas até o fim dos 60 s. Alterar o mecanismo para confirmar o timestamp após sucesso e adicionar teste de falha/retentativa.
+6. **Validação física:** não há comprovação nesta branch de distância contra percurso conhecido, estabilidade do PID 015E, viés MAF/MAP em gasolina/etanol, continuidade com tela apagada ou recuperação física de ELM327/ECU.
+
+### Resultado desta etapa
+
+A documentação foi reconciliada com o comportamento observado e o fallback de cilindrada da estimativa MAP foi corrigido, com regressão adicionada. **Não foram executados typecheck, `npm test`, build Android nem CI nesta rodada.** Não fazer merge nem declarar o conjunto validado antes dos testes numa etapa autorizada pelo usuário.
