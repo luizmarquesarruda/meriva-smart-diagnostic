@@ -97,15 +97,15 @@ const mapEstimate = estimateFuelRateLph({
 if (!mapEstimate || mapEstimate.source !== 'ESTIMATED_MAP' || !(mapEstimate.rateLph > 0)) {
   throw new Error('MAF zero deve permitir fallback MAP quando há dados válidos');
 }
+console.log('fuelConsumption fallback MAF zero, MAP e suporte da ECU: OK');
+
+const autoTripSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'trip', 'autoTripService.ts'), 'utf8');
+const manualSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'database', 'merivaManual.ts'), 'utf8');
 if (!autoTripSource.includes("connection.supportedPids.includes('0110')") ||
     !autoTripSource.includes("connection.supportedPids.includes('010B')") ||
     !autoTripSource.includes("connection.supportedPids.includes('010F')")) {
   throw new Error('PIDs MAF/MAP/IAT precisam ser verificados contra os PIDs suportados pela ECU');
 }
-console.log('fuelConsumption fallback MAF zero, MAP e suporte da ECU: OK');
-
-const autoTripSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'trip', 'autoTripService.ts'), 'utf8');
-const manualSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'database', 'merivaManual.ts'), 'utf8');
 if (!autoTripSource.includes('MERIVA_MANUAL.engine.displacementCm3')) {
   throw new Error('Estimativa MAP deve usar a cilindrada documentada da Meriva, sem fallback 1598 cm³');
 }
