@@ -10,6 +10,7 @@ import * as FileSystem from 'expo-file-system';
 import { readAppSettings, writeAppSettings } from '../database/appSettings';
 import { startBackgroundMonitoring, stopBackgroundMonitoring } from '../gps/backgroundMonitoring';
 import { readVehicleIdentity } from './vehicleIdentity';
+import { flushCsvRows } from '../database/csvLogger';
 
 export interface SharedObdConnection {
   session: Elm327Session;
@@ -82,8 +83,10 @@ async function persistDisconnectedState(): Promise<void> {
   try {
     await stopBackgroundMonitoring();
     await closeObdAutosaveSession();
-  } catch {
-    // a perda de conectividade não deve derrubar a interface
+    await flushCsvRows();
+  } catch (cause) {
+    // A perda de conectividade não deve derrubar a interface; o logger mantém falhas pendentes para retentativa.
+    console.warn('[obd] falha ao descarregar logs CSV na desconexão:', cause instanceof Error ? cause.message : cause);
   }
 }
 
@@ -560,6 +563,11 @@ export async function disconnectSharedObd(): Promise<void> {
   } finally {
     await stopBackgroundMonitoring();
     await closeObdAutosaveSession();
+    try {
+      await flushCsvRows();
+    } catch (cause) {
+      console.warn('[obd] falha ao descarregar logs CSV ao desconectar:', cause instanceof Error ? cause.message : cause);
+    }
     intentionalDisconnect = false;
   }
 }
