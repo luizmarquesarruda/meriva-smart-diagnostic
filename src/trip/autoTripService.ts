@@ -405,7 +405,7 @@ class AutoTripService {
       // A capacidade nominal de 56 L converte o percentual da ECU em litros.
       // O histórico de consumo continua vindo de viagens reais.
       const existingReading = state.autonomy.readings.find((item) => item.id === cycle.id);
-      if (!existingReading) {
+      if (!existingReading && cycle.dataQuality !== 'INCOMPLETE') {
         const previousDistance = Number(state.autonomy.cumulativeDistanceKm) || 0;
         const previousFuel = Number(state.autonomy.cumulativeFuelUsedL) || 0;
         const distanceKm = Math.max(0, Number(cycle.distanceTotalKm) || 0);
