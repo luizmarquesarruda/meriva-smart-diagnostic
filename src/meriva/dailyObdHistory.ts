@@ -101,7 +101,7 @@ function splitPages(content: string): Map<string, string> {
   return pages;
 }
 
-export async function appendDailyObdSessionEvent(
+async function appendDailyObdSessionEventUnsafe(
   basePath: string,
   state: MerivaPersistedState,
   event: 'SESSION_START' | 'SESSION_END',
@@ -132,4 +132,29 @@ export async function appendDailyObdSessionEvent(
   }
   await FileSystem.writeAsStringAsync(path, `${output.join('\n')}\n`, { encoding: FileSystem.EncodingType.UTF8 });
   return { date, eventCount };
+}
+
+
+// Serialize read-modify-write operations per daily-history file. Without this
+// queue, simultaneous start/end events can both read the same old content and
+// the last write silently discards the other event.
+const dailyHistoryQueues = new Map<string, Promise<unknown>>();
+
+export function appendDailyObdSessionEvent(
+  basePath: string,
+  state: MerivaPersistedState,
+  event: 'SESSION_START' | 'SESSION_END',
+  timestamp = new Date().toISOString(),
+): Promise<{ date: string; eventCount: number }> {
+  const path = historyPath(basePath);
+  const previous = dailyHistoryQueues.get(path) ?? Promise.resolve();
+  const current = previous
+    .catch(() => undefined)
+    .then(() => appendDailyObdSessionEventUnsafe(basePath, state, event, timestamp));
+
+  dailyHistoryQueues.set(path, current);
+  void current.finally(() => {
+    if (dailyHistoryQueues.get(path) === current) dailyHistoryQueues.delete(path);
+  }).catch(() => undefined);
+  return current;
 }
