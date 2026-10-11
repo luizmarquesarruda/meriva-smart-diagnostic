@@ -915,6 +915,12 @@ async function testPidAndLearningWriteSerialization() {
   writeDelayMs = 0;
 }
 
+function testPidResponseIsNotVehicleValidation() {
+  const integration = fs.readFileSync(path.join(ROOT, 'src/meriva/autosaveIntegration.ts'), 'utf8');
+  assert.ok(integration.includes("status: prior?.status === 'CONFIRMADO' ? 'CONFIRMADO' : 'RESPONDEU'"), 'resposta válida não deve promover automaticamente PID para confirmado');
+  assert.ok(integration.includes('não valida a exatidão física do sensor'), 'o código deve documentar que resposta OBD não comprova exatidão elétrica do sensor');
+}
+
 function testStorageScreenDoesNotPromoteSeedOrInvalidFuel() {
   const storageScreen = fs.readFileSync(path.join(ROOT, 'app/armazenamento.tsx'), 'utf8');
   assert.ok(storageScreen.includes("filter((cycle) => cycle.source === 'REAL_OBD')"), 'tela de histórico não deve apresentar viagens seed do Car Scanner como viagens do app');
@@ -983,6 +989,7 @@ async function main() {
     ['backup completo', testBackupCompleteness],
     ['CSV serializado', testCsvWriteSerialization],
     ['PID + DNA serializados', testPidAndLearningWriteSerialization],
+    ['PID respondeu não significa sensor validado', testPidResponseIsNotVehicleValidation],
     ['histórico sem seed e consumo N/D', testStorageScreenDoesNotPromoteSeedOrInvalidFuel],
 
     ['autosave race', testAutosaveRace],
