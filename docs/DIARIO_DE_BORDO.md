@@ -1792,3 +1792,11 @@ A documentação foi reconciliada com o comportamento observado e o fallback de 
 - Ainda é necessária validação real no Android com tela apagada, permissão em falta, falha/retomada de tarefa GPS, desconexão ELM327 e reinício do aplicativo. Também é necessário comparar distância com percurso conhecido e validar consumo MAF/MAP contra dados reais, levando em conta a composição gasolina/etanol.
 - O logger foi melhorado por batching, mas ainda não é append incremental do sistema de arquivos. As filas são em memória; um encerramento abrupto antes do flush ainda pode perder o lote que não chegou a ser persistido.
 - Não fazer merge em main nem marcar a versão como validada até passar por typecheck, testes, build e validação física numa etapa autorizada.
+
+
+### Complemento de privacidade (mesma etapa)
+
+- O trace Bluetooth é sanitizado antes de ser mantido em memória: nomes e endereços dos dispositivos pareados são mascarados recursivamente, inclusive nos objetos da lista de pareados e das tentativas de conexão.
+- O formatador TXT também passou a omitir VIN, nome do adaptador e identificadores/nome da ECU nos **novos snapshots** de histórico local. Exportação TXT manual continua com uma segunda camada de redação.
+- Snapshots TXT mais antigos já armazenados localmente não foram apagados nem reescritos automaticamente. A exportação manual os sanitiza ao criar o arquivo; backups dos arquivos brutos ainda devem ser revisados antes de compartilhar.
+- Cobertura estática adicionada em tests/exportPrivacy.test.js para garantir que os campos de identidade não voltem ao formatador TXT nem ao trace Bluetooth sem redação. A suíte não foi executada.
