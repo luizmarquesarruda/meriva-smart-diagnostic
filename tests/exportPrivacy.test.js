@@ -26,4 +26,16 @@ assert(!exported.includes(mac), 'endereço Bluetooth não deve sair em texto exp
 assert(!exported.includes('Luiz OBD'), 'nome personalizado do adaptador não deve sair');
 assert(!exported.includes('Meu celular'), 'nome do dispositivo não deve sair');
 assert(exported.includes('Meriva Maxx'), 'dados técnicos não sensíveis devem ser preservados');
+
+const structuredTrace = redactSensitiveIdentifiers(
+  JSON.stringify({
+    deviceName: 'Adaptador com nome pessoal',
+    selectedAdapterAddress: 'A1:B2:C3:D4:E5:F6',
+    adapterName: 'OBD particular',
+    adapterAddress: 'A1:B2:C3:D4:E5:F6',
+  }),
+);
+assert(!structuredTrace.includes('Adaptador com nome pessoal'), 'deviceName estruturado deve ser redigido');
+assert(!structuredTrace.includes('OBD particular'), 'adapterName estruturado deve ser redigido');
+assert(!structuredTrace.includes('A1:B2:C3:D4:E5:F6'), 'endereços em campos estruturados devem ser redigidos');
 console.log('PASS privacidade: VIN, MAC e nomes de dispositivo redigidos em exportações');
