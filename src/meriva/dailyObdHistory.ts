@@ -109,14 +109,16 @@ async function appendDailyObdSessionEventUnsafe(
 ): Promise<{ date: string; eventCount: number }> {
   const path = historyPath(basePath);
   const date = localDayKey(new Date(timestamp));
+  await FileSystem.makeDirectoryAsync(`${basePath}/VIAGENS`, { intermediates: true });
   let content = '';
-  try {
-    const info = await FileSystem.getInfoAsync(path);
-    if (info.exists && !info.isDirectory) {
-      content = await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 });
-    }
-  } catch {
-    // Arquivo ausente/corrompido: começa um histórico novo, sem afetar o autosave JSON.
+  const info = await FileSystem.getInfoAsync(path);
+  if (info.exists && info.isDirectory) {
+    throw new Error('O caminho do histórico diário aponta para um diretório; arquivo existente preservado.');
+  }
+  if (info.exists) {
+    // A failure to read an existing file is not equivalent to an empty history.
+    // Abort the append instead of overwriting unreadable data with a new file.
+    content = await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 });
   }
 
   const pages = splitPages(content);
