@@ -105,9 +105,9 @@ export default function ArmazenamentoScreen() {
           <View key={cycle.id} style={styles.historyRow}>
             <View style={styles.historyMain}>
               <Text style={styles.historyDate}>{cycle.startedAt}</Text>
-              <Text style={styles.historyMeta}>{cycle.distanceTotalKm.toFixed(2)} km • {cycle.avgFuelConsumptionKml.toFixed(2)} km/L</Text>
+              <Text style={styles.historyMeta}>{cycle.dataQuality === 'INCOMPLETE' ? `${cycle.distanceTotalKm.toFixed(2)} km • INCOMPLETA • CONSUMO N/D` : `${cycle.distanceTotalKm.toFixed(2)} km • ${cycle.avgFuelConsumptionKml.toFixed(2)} km/L`}</Text>
             </View>
-            <Text style={cycle.source === 'REAL_OBD' ? styles.real : styles.reference}>{cycle.source === 'REAL_OBD' ? 'REAL' : 'REF.'}</Text>
+            <Text style={cycle.dataQuality === 'INCOMPLETE' ? styles.warning : cycle.source === 'REAL_OBD' ? styles.real : styles.reference}>{cycle.dataQuality === 'INCOMPLETE' ? 'INCOMPLETA' : cycle.source === 'REAL_OBD' ? 'REAL' : 'REF.'}</Text>
           </View>
         )) : <Text style={styles.empty}>Nenhuma viagem salva ainda.</Text>}
       </View>
