@@ -111,11 +111,22 @@ function finiteNonNegative(value: number): number {
 
 /** Validates that a stored trip has enough trustworthy data to show a km/L value. */
 export function isCycleConsumptionValid(cycle: DriveCycle): boolean {
-  return cycle.dataQuality !== 'INCOMPLETE' &&
-    finiteNonNegative(cycle.distanceTotalKm) >= 0.1 &&
-    finiteNonNegative(cycle.fuelUsedL) >= 0.05 &&
-    Number.isFinite(cycle.avgFuelConsumptionKml) &&
-    cycle.avgFuelConsumptionKml > 0;
+  const distanceKm = finiteNonNegative(cycle.distanceTotalKm);
+  const fuelUsedL = finiteNonNegative(cycle.fuelUsedL);
+  if (
+    cycle.dataQuality === 'INCOMPLETE' ||
+    distanceKm < 0.1 ||
+    fuelUsedL < 0.05 ||
+    !Number.isFinite(cycle.avgFuelConsumptionKml) ||
+    cycle.avgFuelConsumptionKml <= 0
+  ) return false;
+
+  const calculatedKml = distanceKm / fuelUsedL;
+  // The persisted metric must agree with distance/fuel and stay inside a broad
+  // plausibility envelope; otherwise the cycle remains in history but is N/D.
+  return Number.isFinite(calculatedKml) &&
+    calculatedKml <= 60 &&
+    Math.abs(cycle.avgFuelConsumptionKml - calculatedKml) <= Math.max(0.02, calculatedKml * 0.02);
 }
 
 export function getDriveCycleSummary(cycles: DriveCycle[]): DriveCycleSummary {
