@@ -83,6 +83,13 @@ assertApprox(integrator.addSample(-1, 3000).fuelUsedL, 0.002777777777777778, 1e-
 integrator.reset();
 assert.strictEqual(integrator.getState().fuelUsedL, 0);
 
+const gapIntegrator = new FuelRateIntegrator();
+gapIntegrator.addSample(10, 1000);
+const beforeGap = gapIntegrator.addSample(10, 2000).fuelUsedL;
+gapIntegrator.markGap();
+assert.strictEqual(gapIntegrator.addSample(10, 3000).fuelUsedL, beforeGap, 'não interpolar combustível durante lacuna de telemetria');
+assertApprox(gapIntegrator.addSample(10, 4000).fuelUsedL, beforeGap + 10 / 3600, 1e-12);
+
 console.log('PASS combustível OBD: integração L/h, intervalos e dados inválidos');
 
 
