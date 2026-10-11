@@ -11,12 +11,13 @@ export default function ViagensScreen() {
   const layout = useMidLayout();
   const [cycles, setCycles] = useState<DriveCycle[]>([]);
   useEffect(() => { void readDriveCycles(FileSystem.documentDirectory + 'MERIVA_SMART').then(setCycles).catch(() => setCycles([])); }, []);
-  const summary = getDriveCycleSummary(cycles);
+  const realCycles = cycles.filter((cycle) => cycle.source === 'REAL_OBD');
+  const summary = getDriveCycleSummary(realCycles);
   return <SafeAreaView style={styles.container} edges={["top","bottom","left","right"]}><ScrollView contentContainerStyle={[styles.content,{paddingHorizontal:layout.horizontalPadding}]} showsHorizontalScrollIndicator={false}><View style={[styles.screenFrame,{maxWidth:layout.maxContentWidth}]}>
     <Text style={styles.title}>VIAGENS</Text><Text style={styles.subtitle}>CICLOS • CONSUMO • DISTÂNCIA</Text>
     <View style={styles.grid}><Metric landscape={layout.landscape} l="CICLOS" v={String(cycles.length)} /><Metric landscape={layout.landscape} l="DISTÂNCIA" v={summary.totalDistanceKm.toFixed(1) + ' km'} /><Metric landscape={layout.landscape} l="CONSUMO MÉDIO" v={summary.avgConsumptionKml > 0 ? summary.avgConsumptionKml.toFixed(1) + ' km/L' : 'N/D'} /></View>
     <Text style={styles.section}>HISTÓRICO DE CICLOS</Text>
-    {cycles.length ? cycles.slice().reverse().slice(0, 20).map((c, i) => <View style={styles.row} key={String(c.id ?? i)}><Text style={styles.name}>{c.startedAt ? new Date(c.startedAt).toLocaleString() : 'CICLO ' + (i + 1)}</Text><Text style={styles.detail}>{Number(c.distanceTotalKm ?? 0).toFixed(2)} km</Text></View>) : <View style={styles.empty}><Text style={styles.emptyText}>Nenhuma viagem registrada ainda.</Text></View>}
+    {realCycles.length ? realCycles.slice().reverse().slice(0, 20).map((c, i) => <View style={styles.row} key={String(c.id ?? i)}><Text style={styles.name}>{c.startedAt ? new Date(c.startedAt).toLocaleString() : 'CICLO ' + (i + 1)}</Text><Text style={styles.detail}>{Number(c.distanceTotalKm ?? 0).toFixed(2)} km</Text></View>) : <View style={styles.empty}><Text style={styles.emptyText}>Nenhuma viagem registrada ainda.</Text></View>}
     <Link href="/armazenamento" asChild><TouchableOpacity style={styles.primary}><Text style={styles.primaryText}>🗂️ ABRIR HISTÓRICO E EXPORTAÇÃO</Text></TouchableOpacity></Link>
     <Link href="/" asChild><TouchableOpacity style={styles.back}><Text style={styles.backText}>← VOLTAR</Text></TouchableOpacity></Link>
   </View></ScrollView></SafeAreaView>;
