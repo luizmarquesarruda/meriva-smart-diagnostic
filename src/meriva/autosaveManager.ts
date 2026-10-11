@@ -14,6 +14,7 @@ import { MerivaPersistedState, createEmptyMerivaState } from './autosaveState';
 import { hydrateState, isValidEnvelope, validatePayload } from './autosaveValidation';
 import { migrateEnvelope } from './autosaveMigrations';
 import { appendAutoSaveHistory } from './autosaveHistoryTxt';
+import { flushCsvRows } from '../database/csvLogger';
 
 const DEBOUNCE_MS = 1500;
 const CHECKPOINT_MS = 45000;
@@ -218,7 +219,14 @@ export async function initAutoSave(basePath: string): Promise<MerivaPersistedSta
     runtime.appStateSubscription = AppState.addEventListener(
       'change',
       (status: AppStateStatus) => {
-        if (status !== 'active' && runtime.dirty) void saveNow('background');
+        if (status !== 'active') {
+          if (runtime.dirty) void saveNow('background');
+          // Tenta gravar a telemetria que está em lote antes de o Android suspender o processo.
+          // Isso é uma tentativa best-effort; force-stop do sistema não permite garantia absoluta.
+          void flushCsvRows().catch((cause) => {
+            console.warn('[autosave] falha ao descarregar logs CSV ao ir para segundo plano:', cause instanceof Error ? cause.message : cause);
+          });
+        }
       },
     );
   }
