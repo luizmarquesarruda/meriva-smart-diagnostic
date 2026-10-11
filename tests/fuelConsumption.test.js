@@ -96,3 +96,28 @@ if (!manualSource.includes('displacementCm3: 1389')) {
   throw new Error('Cilindrada padrão da Meriva 1.4 deve permanecer alinhada ao manual técnico');
 }
 console.log('fuelConsumption cilindrada Meriva 1.4: OK');
+
+const fuelLevelSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'trip', 'fuelLevel.ts'), 'utf8');
+if (!fuelLevelSource.includes('MERIVA_MANUAL.capacities.fuelTankL')) {
+  throw new Error('Capacidade total deve vir da especificação técnica do veículo');
+}
+if (!fuelLevelSource.includes('MERIVA_MANUAL.capacities.fuelReserveApproxL')) {
+  throw new Error('Reserva deve vir da especificação técnica do veículo');
+}
+if (!fuelLevelSource.includes('USABLE_BEFORE_RESERVE_L = TANK_CAPACITY_L - RESERVE_CAPACITY_L')) {
+  throw new Error('A reserva de 5 L deve estar incluída no tanque total de 56 L');
+}
+if (!fuelLevelSource.includes('TANK_CAPACITY_L * percent / 100')) {
+  throw new Error('Litros restantes devem ser calculados sobre o tanque total, incluindo a reserva');
+}
+const tankCapacityL = 56;
+const reserveCapacityL = 5;
+const usableBeforeReserveL = tankCapacityL - reserveCapacityL;
+const reserveThresholdPercent = reserveCapacityL / tankCapacityL * 100;
+if (usableBeforeReserveL !== 51 || Math.abs(reserveThresholdPercent - 8.9285714286) > 0.000001) {
+  throw new Error('Cálculo de tanque/reserva incorreto: esperado 51 L antes da reserva e reserva ≈ 8,93%');
+}
+if (!fuelLevelSource.includes('litros de reserva')) {
+  throw new Error('A documentação no código deve explicitar que os litros restantes incluem a reserva');
+}
+console.log('fuelLevel tanque Meriva 56 L total / reserva 5 L: OK');
