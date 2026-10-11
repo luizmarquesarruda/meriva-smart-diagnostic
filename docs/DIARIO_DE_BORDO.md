@@ -1734,3 +1734,61 @@ A documentação foi reconciliada com o comportamento observado e o fallback de 
 - Documentação atualizada em `README.md`, `docs/ARCHITECTURE.md` e `docs/MANUAL_MERIVA_2012.md`.
 - Regressão adicionada a `tests/fuelConsumption.test.js` para conferir a origem dos valores, a capacidade útil antes da reserva e o limiar aproximado de 8,93%.
 - Validação: teste adicionado, mas **não executado**. CI continua sem disparar; não houve build nem validação no veículo.
+
+
+## 2026-10-11 — Correções prioritárias: histórico, GPS, logs CSV, fallback OBD e privacidade
+
+### Histórico de viagens reais
+
+- src/trip/tripRecorder.ts deixou de descartar todo trajeto apenas por ter menos de 0,1 km, nenhuma integração de combustível ou menos de duas amostras de combustível. Quando há ao menos uma amostra, o registro é preservado no histórico como REAL_OBD com dataQuality: INCOMPLETE e motivos explícitos.
+- Viagens incompletas usam consumo 0 como sentinela interna; as telas mostram CONSUMO N/D e não anunciam esse valor como medição. O cálculo de consumo médio considera apenas ciclos completos; a contagem e a distância observada continuam incluindo os registros reais incompletos.
+- src/trip/autoTripService.ts não adiciona ciclos incompletos às leituras acumuladas de autonomia/consumo. A qualidade do ciclo é preservada no índice JSON e na exportação CSV manual; o CSV diário legado mantém seu cabeçalho para evitar incompatibilidade com arquivos existentes.
+- app/viagens.tsx e app/armazenamento.tsx distinguem visualmente viagens incompletas.
+
+### GPS e ciclo de vida em segundo plano
+
+- src/gps/gpsTracker.ts tenta recuperar o watcher de primeiro plano quando o start nativo do serviço GPS em segundo plano falha, após tentar parar uma tarefa que possa ter sido registrada parcialmente.
+- A restauração preserva a distância e o estado da viagem já observados, e deixa erro explícito se também falhar a inicialização em primeiro plano.
+- Precisão GPS negativa agora é classificada como SEM_FIX pela função de qualidade, consistente com o filtro que rejeita essa amostra.
+- src/meriva/autosaveManager.ts tenta descarregar lotes CSV quando o Android envia o aplicativo para segundo plano. É best-effort; não garante gravação após force-stop ou encerramento abrupto do processo.
+
+### Logger CSV e proteção da escrita
+
+- src/database/csvLogger.ts agora mantém uma fila por arquivo, enfileira amostras sem aguardar I/O em cada chamada, forma lotes de até 16 linhas e faz flush programado/forçado. Falhas preservam as linhas pendentes e acionam retentativa com backoff.
+- O serializador CSV trata vírgulas, aspas, CR e LF, preserva o conteúdo existente sem trim() e escreve primeiro em arquivo temporário com leitura de confirmação antes da substituição do arquivo principal.
+- O logger agora expõe flushCsvRows(). O código tenta descarregar os logs no encerramento/conexão, na ida do app para segundo plano, e antes das exportações. Uma falha no CSV auxiliar não aborta o fechamento da viagem quando o índice JSON já foi salvo.
+- Limite restante: apesar de o batching reduzir bastante o número de operações, cada lote ainda lê e regrava o CSV diário completo. O custo de I/O continua crescendo com o tamanho do arquivo. Rotação/segmentação ou armazenamento incremental/SQLite deve ser avaliado numa etapa seguinte compatível com Expo SDK 51 e expo-file-system 17.
+
+### Fallback de combustível OBD
+
+- Fallback MAF (0110) só é consultado quando anunciado pela ECU; MAP (010B) + IAT (010F) exigem que ambos estejam na lista de suporte e que RPM seja válido/positivo.
+- estimateFuelRateLph() não interpreta MAF igual a zero como uma taxa MAF válida de combustível. Isso permite tentar o fallback MAP quando a leitura MAF é zero. AFR, densidade e eficiência volumétrica também são validados como finitos e positivos.
+
+### Retentativa de persistência do aprendizado
+
+- src/meriva/autosaveIntegration.ts mantém janelas independentes para a confirmação do PID e o perfil de aprendizado; a falha de uma gravação não segura a outra.
+- Uma persistência bem-sucedida recebe intervalo de 60 s. Falhas liberam retentativa após backoff de 5 s, sem reservar por engano toda a janela de 60 s. A telemetria em tempo real/log continua separada desse throttling.
+
+### Privacidade nas exportações
+
+- Foi criado src/storage/privacyRedaction.ts para mascarar VINs, endereços Bluetooth/MAC e nomes/endereço do adaptador em texto exportado, incluindo campos estruturados conhecidos de traces.
+- src/meriva/exportAutoSaveTxt.ts e src/obd/exportBluetoothDiagnosticTxt.ts aplicam redação antes da exportação. O relatório Bluetooth não lista mais nomes/endereço dos dispositivos pareados e usa rótulos genéricos para o adaptador/dispositivo.
+- src/storage/exportDiagnostics.ts remove campos pessoais explícitos do JSON exportado, aplica a redação textual e descarrega primeiro os lotes CSV pendentes. app/configuracoes.tsx informa que exportações padrão são sanitizadas, enquanto o salvamento automático local segue ativo e o backup manual pode conter logs brutos/dados identificadores.
+- Isso reduz exposição em exports; não desativa o autosave local e não é garantia de que todo identificador proprietário em qualquer futuro formato será reconhecido pelo redator. Revisar backups antes de compartilhar.
+
+### Testes acrescentados/ajustados — ainda não executados
+
+- tests/tripRecorder.test.js cobre preservação de viagem incompleta e exclusão dessas viagens da média de consumo.
+- tests/gps.test.js cobre precisão negativa e restauração do watcher de primeiro plano após falha no serviço em segundo plano.
+- tests/csvLogger.test.js cobre batching, ordem, escape CSV e ausência de cabeçalho duplicado.
+- tests/exportPrivacy.test.js cobre redação de VIN/MAC/nomes em texto e campos estruturados.
+- tests/backgroundExecution.test.js verifica que existe tentativa de flush ao ir para segundo plano; tests/fuelConsumption.test.js confere MAF zero e os gates de PIDs suportados.
+- package.json inclui os dois novos testes no script npm test.
+
+### Estado de validação e pendências
+
+- As alterações foram gravadas na branch fix/gps-distance-consumption-2026-10-11 com mensagens de commit contendo [skip ci]. CI não disparada, conforme instrução.
+- Não foram executados npm run typecheck, npm test, Expo Doctor, build Android ou testes físicos nesta etapa. Testes escritos não equivalem a testes aprovados.
+- Ainda é necessária validação real no Android com tela apagada, permissão em falta, falha/retomada de tarefa GPS, desconexão ELM327 e reinício do aplicativo. Também é necessário comparar distância com percurso conhecido e validar consumo MAF/MAP contra dados reais, levando em conta a composição gasolina/etanol.
+- O logger foi melhorado por batching, mas ainda não é append incremental do sistema de arquivos. As filas são em memória; um encerramento abrupto antes do flush ainda pode perder o lote que não chegou a ser persistido.
+- Não fazer merge em main nem marcar a versão como validada até passar por typecheck, testes, build e validação física numa etapa autorizada.
