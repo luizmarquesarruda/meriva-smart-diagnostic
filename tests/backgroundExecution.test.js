@@ -4,6 +4,7 @@ const fs = require('fs');
 const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 const appJson = JSON.parse(fs.readFileSync('app.json', 'utf8'));
 const gps = fs.readFileSync('src/gps/gpsTracker.ts', 'utf8');
+const autosaveManager = fs.readFileSync('src/meriva/autosaveManager.ts', 'utf8');
 const task = fs.readFileSync('src/gps/backgroundLocationTask.ts', 'utf8');
 const monitoring = fs.readFileSync('src/gps/backgroundMonitoring.ts', 'utf8');
 const shared = fs.readFileSync('src/obd/sharedConnection.ts', 'utf8');
@@ -41,6 +42,7 @@ assert(monitoring.includes('startBackgroundMonitoring'));
 assert(monitoring.includes('stopBackgroundMonitoring'));
 assert(shared.includes('startBackgroundMonitoring()'));
 assert(shared.includes('stopBackgroundMonitoring()'));
+assert(autosaveManager.includes('flushCsvRows()'), 'pending CSV rows must be flushed when app backgrounds');
 assert(layout.includes("import '../src/gps/backgroundLocationTask';"));
 
 console.log('background execution: Android FGS + TaskManager + lifecycle: OK');
