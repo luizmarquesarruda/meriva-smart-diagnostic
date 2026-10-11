@@ -39,3 +39,17 @@ A revisão considerou padrões de filtragem adaptativa, detecção de movimento 
 `tests/tripRecorder.test.js` cobre timestamps fora de ordem/duplicados, reset da distância cumulativa, distância inválida, preservação de viagens curtas/incompletas e prevenção de perda por arredondamento de segmentos pequenos.
 
 **Status desta revisão:** os testes foram adicionados/atualizados no código, mas não foram executados nesta etapa. CI, TypeScript, suíte completa, build Android e validação física permanecem pendentes.
+
+## Revisão de integração — 2026-10-11
+
+- O integrador de combustível rejeita timestamps inválidos, repetidos e atrasados sem alterar o estado. `markGap()` encerra a janela de integração quando uma amostra de taxa falta, preservando o volume já integrado e evitando interpolação através de um período desconhecido.
+- Estimativas MAF/MAP rejeitam parâmetros fisicamente impossíveis (AFR/densidade fora da faixa, temperatura abaixo do zero absoluto, MAP/RPM/cilindrada/VE fora dos limites de plausibilidade e taxa resultante excessiva). Esses limites são guardas de entrada, não especificações OEM.
+- As estimativas usam a preferência de combustível configurada: etanol (AFR 9,0; densidade 0,789 kg/L), gasolina brasileira (AFR 13,0; densidade 0,755 kg/L) e FLEX/indefinido (hipótese aproximada AFR 12,9; densidade 0,755 kg/L). São valores aproximados para cálculo, não identificação da mistura atual do tanque. Quando suportado e válido, PID 015E continua sendo a fonte preferencial.
+- O snapshot síncrono de saúde OBD agora retorna os campos completos de estado da ECU e usa o mesmo critério de resposta real do emissor de eventos.
+- A média de velocidade de múltiplas viagens é agregada por distância total / tempo total em movimento, não pela média aritmética das médias de cada viagem.
+- O formatador TXT e a tela Viagens exibem consumo como `N/D` quando a qualidade do ciclo é incompleta ou não atinge 0,1 km e 0,05 L integrados. Ciclos legados com valores plausíveis mas sem marca de qualidade são identificados como legado não verificado na exportação.
+- O autosave agora importa explicitamente `getAutoSaveState` no serviço de viagem; a validação anterior acusou esse identificador ausente. A mesma execução acusou retorno incompleto de `getSharedObdStatus`; os campos foram adicionados.
+
+## Status de validação
+
+A run #1894 (commit anterior a estas correções finais) falhou no `tsc --noEmit` por dois erros: retorno incompleto de `getSharedObdStatus` e import ausente de `getAutoSaveState`. As alterações correspondentes foram gravadas depois dessa execução. Por orientação para não disparar CI, não foi solicitada nova execução; a validação da ponta atual permanece pendente. A clonagem local também não pôde ser usada porque o ambiente não conseguiu resolver `github.com`. Não declarar os testes ou o build Android como aprovados até validação posterior.
