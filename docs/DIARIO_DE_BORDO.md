@@ -1810,3 +1810,44 @@ As alterações foram gravadas na branch `fix/daily-obd-history-keep-screen-awak
 - Os commits disparam uma nova CI; confirmar `validate` e `android-build` no head atualizado antes de declarar a correção aprovada.
 - Teste físico permanece necessário: confirmar que a ECU da Meriva anuncia o PID `0105`, que o valor acompanha o aquecimento real e que os avisos fazem sentido no veículo. Se o PID não for suportado/responder, o app deve manter `N/D`, sem estimar a temperatura.
 - Nenhum merge foi realizado.
+
+
+## 2026-10-10 — Auditoria consolidada de histórico, consumo e telemetria
+
+### Evidências verificadas no repositório
+- A exportação do diário diário já está integrada em **Configurações** por `handleDailyHistoryExport()` e `exportDailyObdHistoryTxt()`. A hipótese anterior de que faltava o botão na interface estava incorreta; não duplicar o fluxo.
+- O TXT diário registra fronteiras de sessão ECU (`SESSION_START`/`SESSION_END`), não cada amostra individual.
+- As amostras são registradas separadamente em `LOGS/obd_raw_YYYY-MM-DD.csv` e `LOGS/obd_interpreted_YYYY-MM-DD.csv`, incluindo timestamp, TX/RX, PID, latência, protocolo, estado e origem. Essa trilha CSV é a fonte adequada para análise temporal e falhas de comunicação; não confundir o TXT de sessões com um logger de cada amostra.
+- Já existem catálogo de PIDs, parser, motor de fórmulas, descoberta dos bitmaps de suporte, laboratório OBD, tendências de telemetria em memória e registro CSV. Não criar módulos duplicados; melhorar validação e apresentação em cima desses componentes.
+- O suporte OBD depende de resposta válida da ECU. Uma observação bem-sucedida comprova que o PID respondeu, mas não comprova, por si só, que o valor foi validado eletricamente contra um instrumento de referência.
+
+### Correções aplicadas nesta rodada
+- `src/meriva/dailyObdHistory.ts`: serializada a operação leitura-modificação-gravação por caminho. Chamadas concorrentes não devem mais sobrescrever silenciosamente o evento de outra sessão.
+- `src/database/csvLogger.ts`: corrigida a limpeza da fila de gravação. Antes, o mapa armazenava a promessa derivada de `catch()` e o `finally` comparava outra promessa, impedindo a remoção da entrada concluída. A fila continua serializando escritas por arquivo.
+- `app/armazenamento.tsx`: a tela mostra apenas viagens `REAL_OBD`, sem misturar viagens-semente do Car Scanner com viagens registradas pelo aplicativo.
+- `app/armazenamento.tsx`: consumo só é mostrado em km/L quando `fuelDataValid` não é falso, combustível acumulado é suficiente e o resultado é finito e positivo; caso contrário, apresenta `Consumo: N/D`, sem transformar sentinela zero em medição.
+- `tests/merivaAutosave.test.js`: acrescentado teste comportamental para três eventos de sessão concorrentes, exigindo que todos permaneçam no mesmo arquivo e na mesma data.
+- `tests/regression.test.js`: acrescentada regressão para impedir que a tela de histórico volte a apresentar seed como viagem real ou consumo inválido como número.
+
+### Referências de documentação consultadas
+- Car Scanner — Custom Sensors/PIDs: https://www.carscanner.info/2019/07/
+- Car Scanner — Data Recording: https://www.carscanner.info/records/
+- Car Scanner — Optimizing connection speed: https://www.carscanner.info/optimizing-connection-speed/
+- Car Scanner — FAQ sobre suporte de PIDs: https://www.carscanner.info/faq/
+- OBDLink — Get Started with Logs: https://support.obdlink.com/support/solutions/articles/43000709894
+- OBDLink — Dashboards: https://support.obdlink.com/support/solutions/articles/43000678883
+- OBDLink — Settings, alerts e user-defined PIDs: https://support.obdlink.com/support/solutions/articles/43000714809
+- OBD Auto Doctor — Supported OBD parameters: https://www.obdautodoctor.com/help/articles/supported-obd-parameters/
+- OBD Auto Doctor — Manual iOS: https://www.obdautodoctor.com/OBD-Auto-Doctor-User-Manual-iOS.pdf
+
+### Critérios de engenharia preservados
+- Priorizar PIDs essenciais e limitar consultas sequenciais: mais PIDs aumentam a latência, especialmente em K-Line; não transportar pressupostos de otimização CAN para a Meriva sem medição.
+- Manter resposta bruta, fórmula e valor calculado auditáveis. Separar `DESCOBERTO`, `RESPONDEU` e `VALIDADO NO VEÍCULO`; não promover seed/importação a confirmação da ECU.
+- `015E` só pode ser tratado como consumo medido quando a ECU realmente o suportar e responder com dados válidos. MAF/MAP continuam estimativas explicitamente identificadas; sem base confiável, exibir `N/D`.
+- O TXT diário permanece um resumo de sessões; para séries temporais, usar os CSVs existentes e os gráficos/tendências, sem prometer que o TXT contém cada leitura.
+
+### Validação pendente
+- Esta rodada foi gravada na PR #49 e dispara CI automaticamente por causa da política de `push` do repositório. Confirmar os jobs no head final antes de declarar os testes aprovados.
+- O teste de sessões concorrentes e a regressão da tela foram adicionados, mas ainda precisam ser executados pela CI.
+- Validar no aparelho a persistência após encerramento forçado, a exportação pelo seletor Android e a cadência real do ELM327 na Meriva. Um encerramento inesperado ainda pode impedir o evento explícito `SESSION_END`; os CSVs de telemetria são a trilha complementar, não uma garantia de encerramento físico.
+- Não foi feito merge na `main`.
