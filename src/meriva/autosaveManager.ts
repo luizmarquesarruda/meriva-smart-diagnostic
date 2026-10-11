@@ -196,7 +196,7 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
   }
 }
 
-export async function initAutoSave(basePath: string): Promise<MerivaPersistedState> {
+async function initAutoSaveUnsafe(basePath: string): Promise<MerivaPersistedState> {
   if (runtime.basePath === basePath) return runtime.state;
 
   if (runtime.basePath && runtime.basePath !== basePath) {
@@ -245,6 +245,35 @@ export async function initAutoSave(basePath: string): Promise<MerivaPersistedSta
   }
 
   return runtime.state;
+}
+
+let initializationPromise: Promise<MerivaPersistedState> | null = null;
+let initializationBasePath: string | null = null;
+
+/**
+ * Garante que chamadas simultâneas aguardem a mesma leitura/migração do autosave.
+ * Sem single-flight, uma segunda chamada podia receber o estado vazio enquanto
+ * a primeira ainda estava hidratando o arquivo persistido.
+ */
+export async function initAutoSave(basePath: string): Promise<MerivaPersistedState> {
+  if (initializationPromise) {
+    if (initializationBasePath === basePath) return initializationPromise;
+    await initializationPromise.catch(() => undefined);
+  }
+
+  if (runtime.basePath === basePath) return runtime.state;
+
+  const pending = initAutoSaveUnsafe(basePath);
+  initializationPromise = pending;
+  initializationBasePath = basePath;
+  try {
+    return await pending;
+  } finally {
+    if (initializationPromise === pending) {
+      initializationPromise = null;
+      initializationBasePath = null;
+    }
+  }
 }
 
 export function getAutoSaveState(): MerivaPersistedState {
