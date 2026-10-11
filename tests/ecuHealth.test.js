@@ -8,6 +8,14 @@ const shared = fs.readFileSync(path.join(root, 'src', 'obd', 'sharedConnection.t
 const elm = fs.readFileSync(path.join(root, 'src', 'obd', 'elm327.ts'), 'utf8');
 const autoTrip = fs.readFileSync(path.join(root, 'src', 'trip', 'autoTripService.ts'), 'utf8');
 
+const statusGetter = shared.slice(shared.indexOf('export function getSharedObdStatus()'), shared.indexOf('export function subscribeSharedObdStatus'));
+for (const field of ['ecuResponseState', 'consecutiveEcuFailures', 'lastEcuResponseAt', 'lastEcuError']) {
+  if (!statusGetter.includes(field)) throw new Error(`getSharedObdStatus must include ${field}`);
+}
+if (!statusGetter.includes("ecuResponseState === 'RESPONDING'")) {
+  throw new Error('ECU conectada deve refletir resposta real, não apenas adaptador conectado');
+}
+
 if (!shared.includes("ecuResponseState") || !shared.includes("'NO_RESPONSE'") || !shared.includes("'RECOVERING'")) {
   throw new Error('estado separado da ECU não encontrado');
 }
