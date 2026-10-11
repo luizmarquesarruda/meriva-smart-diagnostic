@@ -13,6 +13,19 @@ import { pushLastReading, updateAutoSaveState, scheduleCriticalSave } from './au
 import { shouldFeedLearning } from './autosaveValidation';
 import { getVehicleConditionSnapshot, recordLivePidQuery } from '../obd/liveTelemetry';
 
+// Limita a persistência de aprendizado por PID: a telemetria continua sendo
+// registrada em toda amostra, mas o banco/perfil não é reescrito a cada polling.
+const learningPersistedAt = new Map<string, number>();
+const LEARNING_PERSIST_INTERVAL_MS = 60_000;
+
+function reserveLearningPersistence(basePath: string, pid: string, nowMs = Date.now()): boolean {
+  const key = `${basePath}::${pid}`;
+  const previous = learningPersistedAt.get(key) ?? 0;
+  if (nowMs - previous < LEARNING_PERSIST_INTERVAL_MS) return false;
+  learningPersistedAt.set(key, nowMs);
+  return true;
+}
+
 export async function registerObdQuery(
   basePath: string,
   result: PidQueryResult,
@@ -40,7 +53,11 @@ export async function registerObdQuery(
 
   const parsedValue = result.parsed.value;
   const learningCondition = condition ?? (source === 'REAL' ? getVehicleConditionSnapshot().condition : 'UNKNOWN');
-  if (shouldFeedLearning(source, result.parsed.status, parsedValue) && parsedValue !== null) {
+  if (
+    shouldFeedLearning(source, result.parsed.status, parsedValue) &&
+    parsedValue !== null &&
+    reserveLearningPersistence(basePath, result.parsed.pid)
+  ) {
     try {
       const now = new Date().toISOString();
       const existing = await readPidConfirmations(basePath);
