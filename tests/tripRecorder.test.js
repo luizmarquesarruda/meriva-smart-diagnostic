@@ -165,10 +165,19 @@ const invalidLegacyCycle = {
   drivingTimeHms: '00:00:00',
   dataQuality: undefined,
 };
+const mismatchedLegacyCycle = {
+  ...saved,
+  id: 'legacy-mismatched-consumption',
+  distanceTotalKm: 10,
+  fuelUsedL: 0.1,
+  avgFuelConsumptionKml: 20,
+  drivingTimeHms: '00:10:00',
+  dataQuality: undefined,
+};
 const weightedSummary = getDriveCycleSummary([summaryCycleA, summaryCycleB]);
 assert.strictEqual(weightedSummary.avgSpeedKmh, 40, 'velocidade média agregada deve ser distância total / tempo total em movimento');
-const guardedSummary = getDriveCycleSummary([summaryCycleA, summaryCycleB, invalidLegacyCycle]);
-assert.strictEqual(guardedSummary.avgConsumptionKml, 10, 'ciclos legados sem combustível válido não podem inflar a média km/L');
-assert.strictEqual(guardedSummary.totalDistanceKm, 140, 'distância observada continua no total mesmo quando o consumo é inválido');
+const guardedSummary = getDriveCycleSummary([summaryCycleA, summaryCycleB, invalidLegacyCycle, mismatchedLegacyCycle]);
+assert.strictEqual(guardedSummary.avgConsumptionKml, 10, 'ciclos legados sem combustível válido ou com fórmula inconsistente não podem inflar a média km/L');
+assert.strictEqual(guardedSummary.totalDistanceKm, 150, 'distância observada continua no total mesmo quando o consumo é inválido');
 
 console.log('PASS trip recorder: GPS monotônico, timestamps, viagens curtas e consumo incompleto');
