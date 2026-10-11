@@ -45,34 +45,34 @@ async function appendCsvRowsUnsafe(filePath: string, rows: CsvRow[]): Promise<vo
   const serializedRows = rows.map((row) => keys.map((key) => formatCsvValue(row[key])).join(','));
   const info = await FileSystem.getInfoAsync(filePath);
 
+  let content: string;
   if (!info.exists) {
-    await FileSystem.writeAsStringAsync(
-      filePath,
-      `${keys.join(',')}\n${serializedRows.join('\n')}\n`,
-      { encoding: FileSystem.EncodingType.UTF8 },
-    );
-    return;
+    content = `${keys.join(',')}\n${serializedRows.join('\n')}\n`;
+  } else {
+    const current = await FileSystem.readAsStringAsync(filePath, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
+    if (current.length === 0) {
+      content = `${keys.join(',')}\n${serializedRows.join('\n')}\n`;
+    } else {
+      // Preserva o conteúdo existente sem trim(), que poderia remover espaços válidos da última linha.
+      const separator = current.endsWith('\n') || current.endsWith('\r') ? '' : '\n';
+      content = `${current}${separator}${serializedRows.join('\n')}\n`;
+    }
   }
 
-  const current = await FileSystem.readAsStringAsync(filePath, {
+  // Escrever e validar um temporário evita truncar o CSV principal se a serialização/gravação falhar.
+  const temporaryPath = `${filePath}.tmp`;
+  await FileSystem.writeAsStringAsync(temporaryPath, content, {
     encoding: FileSystem.EncodingType.UTF8,
   });
-  if (current.length === 0) {
-    await FileSystem.writeAsStringAsync(
-      filePath,
-      `${keys.join(',')}\n${serializedRows.join('\n')}\n`,
-      { encoding: FileSystem.EncodingType.UTF8 },
-    );
-    return;
-  }
+  const verifiedContent = await FileSystem.readAsStringAsync(temporaryPath, {
+    encoding: FileSystem.EncodingType.UTF8,
+  });
+  if (verifiedContent !== content) throw new Error('CSV_TEMPORARY_READBACK_MISMATCH');
 
-  // Preserva o conteúdo existente sem trim(), que poderia remover espaços válidos da última linha.
-  const separator = current.endsWith('\n') || current.endsWith('\r') ? '' : '\n';
-  await FileSystem.writeAsStringAsync(
-    filePath,
-    `${current}${separator}${serializedRows.join('\n')}\n`,
-    { encoding: FileSystem.EncodingType.UTF8 },
-  );
+  await FileSystem.copyAsync({ from: temporaryPath, to: filePath });
+  await FileSystem.deleteAsync(temporaryPath, { idempotent: true });
 }
 
 function scheduleFlush(filePath: string, queue: FileQueue, delayMs = FLUSH_DELAY_MS): void {
