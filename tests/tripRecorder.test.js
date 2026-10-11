@@ -138,4 +138,37 @@ assert.strictEqual(completeSummary.realCycleCount, 3, 'histórico deve contar tr
 assert.strictEqual(completeSummary.totalDistanceKm, 0.64, 'distância de viagens incompletas continua no total observado');
 assert.strictEqual(completeSummary.avgConsumptionKml, Number((0.4 / saved.fuelUsedL).toFixed(2)), 'média de consumo usa apenas ciclos completos');
 
+const summaryCycleA = {
+  ...saved,
+  id: 'summary-a',
+  distanceTotalKm: 10,
+  fuelUsedL: 1,
+  avgFuelConsumptionKml: 10,
+  drivingTimeHms: '00:30:00',
+  dataQuality: 'COMPLETE',
+};
+const summaryCycleB = {
+  ...saved,
+  id: 'summary-b',
+  distanceTotalKm: 30,
+  fuelUsedL: 3,
+  avgFuelConsumptionKml: 10,
+  drivingTimeHms: '00:30:00',
+  dataQuality: 'COMPLETE',
+};
+const invalidLegacyCycle = {
+  ...saved,
+  id: 'legacy-invalid',
+  distanceTotalKm: 100,
+  fuelUsedL: 0,
+  avgFuelConsumptionKml: 0,
+  drivingTimeHms: '00:00:00',
+  dataQuality: undefined,
+};
+const weightedSummary = getDriveCycleSummary([summaryCycleA, summaryCycleB]);
+assert.strictEqual(weightedSummary.avgSpeedKmh, 40, 'velocidade média agregada deve ser distância total / tempo total em movimento');
+const guardedSummary = getDriveCycleSummary([summaryCycleA, summaryCycleB, invalidLegacyCycle]);
+assert.strictEqual(guardedSummary.avgConsumptionKml, 10, 'ciclos legados sem combustível válido não podem inflar a média km/L');
+assert.strictEqual(guardedSummary.totalDistanceKm, 140, 'distância observada continua no total mesmo quando o consumo é inválido');
+
 console.log('PASS trip recorder: GPS monotônico, timestamps, viagens curtas e consumo incompleto');
