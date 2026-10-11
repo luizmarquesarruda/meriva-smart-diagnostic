@@ -88,6 +88,10 @@ export class RealTripRecorder {
     if (sample.fuelRateLph != null && Number.isFinite(sample.fuelRateLph) && sample.fuelRateLph >= 0) {
       this.fuelIntegrator.addSample(sample.fuelRateLph, timestampMs);
       if (sample.fuelRateSource) this.fuelRateSources.add(sample.fuelRateSource);
+    } else {
+      // Missing/invalid fuel telemetry is a real gap, not permission to interpolate
+      // fuel across an interval whose rate was unknown.
+      this.fuelIntegrator.markGap();
     }
 
     return this.getState();
