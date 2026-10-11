@@ -2,6 +2,7 @@ import type { VehicleProfile } from '../database/vehicleConfig';
 import type { DriveCycle } from '../data/driveCycles';
 import type { DtcRecord } from '../types/sourceTypes';
 import type { MerivaLearningProfile } from '../database/learningProfile';
+import { MERIVA_MANUAL } from '../database/merivaManual';
 
 export interface LastPidReading {
   pid: string;
@@ -82,7 +83,7 @@ export function createEmptyMerivaState(): MerivaPersistedState {
     learning: null,
     pidDiscovery: null,
     autonomy: {
-      tankCapacityL: 56,
+      tankCapacityL: MERIVA_MANUAL.capacities.fuelTankL,
       cumulativeDistanceKm: 0,
       cumulativeFuelUsedL: 0,
       averageConsumptionKml: 0,
