@@ -17,6 +17,7 @@ export function integrateFuelRateLph(
   current: FuelRateSample,
 ): number {
   if (!previous) return 0;
+  if (!Number.isFinite(previous.timestampMs) || !Number.isFinite(current.timestampMs)) return 0;
   if (
     !Number.isFinite(previous.fuelRateLph) ||
     previous.fuelRateLph < 0 ||
@@ -50,13 +51,15 @@ export class FuelRateIntegrator {
 
   addSample(fuelRateLph: number, timestampMs = Date.now()): FuelIntegrationState {
     const current: FuelRateSample = { fuelRateLph, timestampMs };
+    if (!Number.isFinite(fuelRateLph) || fuelRateLph < 0 || !Number.isFinite(timestampMs)) return { ...this.state };
+    if (this.state.lastTimestampMs != null && timestampMs <= this.state.lastTimestampMs) return { ...this.state };
     const previous =
       this.state.lastRateLph != null && this.state.lastTimestampMs != null
         ? { fuelRateLph: this.state.lastRateLph, timestampMs: this.state.lastTimestampMs }
         : null;
 
     const increment = integrateFuelRateLph(previous, current);
-    const valid = Number.isFinite(fuelRateLph) && fuelRateLph >= 0 && Number.isFinite(timestampMs);
+    const valid = true;
 
     this.state = {
       fuelUsedL: this.state.fuelUsedL + increment,
