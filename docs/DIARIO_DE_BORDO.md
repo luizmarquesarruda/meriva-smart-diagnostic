@@ -1926,3 +1926,19 @@ Começar a implementação das melhorias de produto com uma entrega que reaprove
 3. Revisar limites e histerese dos alertas de temperatura com documentação técnica específica da Meriva; não inferir defeito de sensor apenas por uma leitura.
 4. Auditar leitura de DTC e freeze frame para distinguir serviço indisponível, resposta vazia e ausência confirmada de códigos.
 
+## 2026-10-11 — Fase 3: correção do DTC no freeze frame
+
+### Evidência e causa
+- `src/obd/dtcScanner.ts` buscava o DTC do serviço Mode 02/PID 02 a partir de `marker + 8`. A resposta positiva contém o cabeçalho `42 02`, um byte de número do frame e só então os dois bytes do DTC. O deslocamento anterior pulava bytes do código e podia fazer um freeze frame válido aparecer sem DTC.
+- A tela/relatório não deve interpretar esse resultado como “sem falhas”; a ausência de código parseável significa apenas que não foi extraído um DTC dessa resposta.
+
+### Correção e regressão
+- Ajustado o início do DTC para `marker + 6`, mantendo o parser restrito ao payload após o número do frame.
+- `tests/dtcScanner.test.js`: adicionado caso com resposta `42 02 00 01 30`, que deve resultar em `P0130` e frame `0`.
+- Alteração de produção e teste foram publicadas com commits `450cfc6` e `9057785`, ambos com `[skip ci]`. Nenhuma CI foi iniciada e não houve merge.
+
+### Validação pendente
+- O teste foi adicionado, mas não executado neste ambiente; não declarar PASS até executar `npm test`/`npm run validate` com autorização para CI.
+- O formato de resposta pode variar entre adaptadores ELM327; confirmar no log bruto da ECU antes de concluir que o frame está disponível. Não limpar DTCs automaticamente.
+
+
