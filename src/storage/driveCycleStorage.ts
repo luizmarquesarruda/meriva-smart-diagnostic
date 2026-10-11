@@ -1,6 +1,6 @@
 import * as FileSystem from 'expo-file-system';
 import { appendCsvRow, flushCsvRows, CsvRow } from '../database/csvLogger';
-import { DriveCycle, INITIAL_DRIVE_CYCLES } from '../data/driveCycles';
+import { DriveCycle, INITIAL_DRIVE_CYCLES, isCycleConsumptionValid } from '../data/driveCycles';
 
 interface DriveCycleIndex {
   version: string;
@@ -154,7 +154,7 @@ async function writeCycleCsv(viagensDir: string, cycle: DriveCycle): Promise<voi
     drivingTime: cycle.drivingTimeHms,
     standingTime: cycle.standingTimeHms,
     avgSpeed: cycle.avgDrivingSpeedKmh,
-    avgConsumption: cycle.avgFuelConsumptionKml,
+    avgConsumption: isCycleConsumptionValid(cycle) ? cycle.avgFuelConsumptionKml : 'N/D',
     source: cycle.source,
   };
   await appendCsvRow(csvFile, row);
