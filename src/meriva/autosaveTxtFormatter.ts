@@ -18,6 +18,8 @@ function or(value: string | number | boolean | null | undefined): string {
 export interface ExportTxtOptions {
   appVersion: string;
   exportedAt: string;
+  /** When set, include only the newest N REAL_OBD trips in a compact snapshot. */
+  historyLimit?: number;
 }
 
 export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTxtOptions): string {
@@ -85,7 +87,16 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
   L.push('');
 
   L.push('[HISTORY]');
-  const displayedCycles = state.driveCycles.filter((cycle) => cycle.source !== 'CARSCANNER_SEED');
+  const displayedCycles = options.historyLimit == null
+    ? state.driveCycles.filter((cycle) => cycle.source !== 'CARSCANNER_SEED')
+    : options.historyLimit <= 0
+      ? []
+      : state.driveCycles
+          .filter((cycle) => cycle.source === 'REAL_OBD')
+          .slice(-Math.floor(options.historyLimit));
+  if (options.historyLimit != null) {
+    L.push(`Exibindo até as últimas ${Math.max(0, Math.floor(options.historyLimit))} viagens reais; histórico completo preservado no autosave JSON.`);
+  }
   if (displayedCycles.length) {
     for (const cycle of displayedCycles) {
       L.push(
