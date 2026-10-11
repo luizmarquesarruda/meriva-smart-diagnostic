@@ -106,6 +106,13 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
   assert.strictEqual(state.speedSource, 'GPS');
   assert.ok(receivedStates.length >= 3);
 
+  // Callbacks GPS atrasados não podem retroceder timestamp, velocidade ou distância.
+  watcher({
+    coords: { latitude: 0, longitude: 0.001, speed: 100, accuracy: 5 },
+    timestamp: 3500,
+  });
+  assert.deepStrictEqual(tracker.getState(), state, 'GPS timestamp atrasado deve ser ignorado integralmente');
+
   const distanceBeforeStop = state.distanceKm;
   watcher({
     coords: { latitude: 0, longitude: 0.0002, speed: 0, accuracy: 5 },
