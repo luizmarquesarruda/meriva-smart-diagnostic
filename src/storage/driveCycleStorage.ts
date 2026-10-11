@@ -17,6 +17,8 @@ function isDriveCycle(value: unknown): value is DriveCycle {
     typeof cycle.standingTimeHms === 'string' &&
     typeof cycle.avgDrivingSpeedKmh === 'number' &&
     typeof cycle.avgFuelConsumptionKml === 'number' &&
+    (cycle.dataQuality == null || cycle.dataQuality === 'COMPLETE' || cycle.dataQuality === 'INCOMPLETE') &&
+    (cycle.incompleteReason == null || typeof cycle.incompleteReason === 'string') &&
     ['CARSCANNER_SEED', 'REAL_OBD', 'SIMULACAO'].includes(cycle.source as string) &&
     typeof cycle.importedAt === 'string'
   );
@@ -141,6 +143,8 @@ export async function addDriveCycle(basePath: string, cycle: DriveCycle): Promis
     avgSpeed: cycle.avgDrivingSpeedKmh,
     avgConsumption: cycle.avgFuelConsumptionKml,
     source: cycle.source,
+    dataQuality: cycle.dataQuality ?? 'COMPLETE',
+    incompleteReason: cycle.incompleteReason ?? '',
   };
 
   await appendCsvRow(csvFile, row);
