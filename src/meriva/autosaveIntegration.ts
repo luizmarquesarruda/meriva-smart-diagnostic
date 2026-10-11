@@ -16,14 +16,27 @@ import { getVehicleConditionSnapshot, recordLivePidQuery } from '../obd/liveTele
 // Limita a persistência de aprendizado por PID: a telemetria continua sendo
 // registrada em toda amostra, mas o banco/perfil não é reescrito a cada polling.
 const learningPersistedAt = new Map<string, number>();
+const learningPersistenceInFlight = new Set<string>();
 const LEARNING_PERSIST_INTERVAL_MS = 60_000;
 
-function reserveLearningPersistence(basePath: string, pid: string, nowMs = Date.now()): boolean {
-  const key = `${basePath}::${pid}`;
-  const previous = learningPersistedAt.get(key) ?? 0;
-  if (nowMs - previous < LEARNING_PERSIST_INTERVAL_MS) return false;
-  learningPersistedAt.set(key, nowMs);
+function learningPersistenceKey(basePath: string, pid: string): string {
+  return `${basePath}::${pid}`;
+}
+
+function beginLearningPersistence(basePath: string, pid: string, nowMs = Date.now()): boolean {
+  const key = learningPersistenceKey(basePath, pid);
+  const previous = learningPersistedAt.get(key);
+  if (learningPersistenceInFlight.has(key)) return false;
+  if (previous != null && nowMs - previous < LEARNING_PERSIST_INTERVAL_MS) return false;
+  learningPersistenceInFlight.add(key);
   return true;
+}
+
+/** Marca a janela somente após gravar a confirmação; falhas anteriores ficam elegíveis para retentativa. */
+function finishLearningPersistence(basePath: string, pid: string, confirmed: boolean, nowMs = Date.now()): void {
+  const key = learningPersistenceKey(basePath, pid);
+  if (confirmed) learningPersistedAt.set(key, nowMs);
+  learningPersistenceInFlight.delete(key);
 }
 
 export async function registerObdQuery(
@@ -56,7 +69,7 @@ export async function registerObdQuery(
   if (
     shouldFeedLearning(source, result.parsed.status, parsedValue) &&
     parsedValue !== null &&
-    reserveLearningPersistence(basePath, result.parsed.pid)
+    beginLearningPersistence(basePath, result.parsed.pid)
   ) {
     try {
       const now = new Date().toISOString();
@@ -81,6 +94,9 @@ export async function registerObdQuery(
         description: result.parsed.definition?.description,
       };
       await recordPidConfirmation(basePath, entry);
+      // A confirmação do PID é a gravação que altera ocorrências. Marcar após sucesso evita
+      // bloquear 60 s quando a leitura/gravação falha antes de persistir qualquer confirmação.
+      finishLearningPersistence(basePath, result.parsed.pid, true);
 
       await updateLearningProfileRealSample(
         basePath,
@@ -89,6 +105,7 @@ export async function registerObdQuery(
         learningCondition,
       );
     } catch (cause) {
+      finishLearningPersistence(basePath, result.parsed.pid, false);
       console.warn('[autosave] falha ao registrar confirmação de PID:', cause instanceof Error ? cause.message : cause);
     }
   }
