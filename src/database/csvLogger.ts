@@ -59,7 +59,7 @@ export async function appendCsvRow(filePath: string, row: CsvRow): Promise<void>
     .catch(() => undefined)
     .then(() => appendCsvRowUnsafe(filePath, row));
 
-  fileQueues.set(filePath, current.catch(() => undefined));
+  fileQueues.set(filePath, current);
 
   try {
     await current;
