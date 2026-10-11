@@ -15,6 +15,25 @@ export interface RealTripSample {
 /** Minimum integrated fuel required before persisting a consumption average. */
 export const MIN_TRIP_FUEL_L = 0.05;
 
+/**
+ * Do not split a drive every time the vehicle stops briefly at a traffic light.
+ * An explicit zero RPM is stronger evidence of engine-off than missing RPM data.
+ */
+export const STOPPED_ENGINE_OFF_CLOSE_DELAY_MS = 60_000;
+export const STOPPED_OTHER_CLOSE_DELAY_MS = 300_000;
+
+export function shouldFinalizeStoppedTrip(
+  stoppedDurationMs: number,
+  rpm: number | null | undefined,
+): boolean {
+  if (!Number.isFinite(stoppedDurationMs) || stoppedDurationMs < 0) return false;
+  const engineExplicitlyOff = rpm != null && Number.isFinite(rpm) && rpm <= 0;
+  const threshold = engineExplicitlyOff
+    ? STOPPED_ENGINE_OFF_CLOSE_DELAY_MS
+    : STOPPED_OTHER_CLOSE_DELAY_MS;
+  return stoppedDurationMs >= threshold;
+}
+
 export interface RealTripRecorderState {
   startedAtMs: number;
   distanceKm: number;
