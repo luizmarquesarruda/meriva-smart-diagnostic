@@ -324,59 +324,81 @@ export async function readLearningProfile(
   return readLearningProfileUnsafe(basePath);
 }
 
-export async function updateLearningProfileRealSample(
+export interface RealLearningSample {
+  pidName: string;
+  value: number;
+  condition: VehicleCondition;
+}
+
+/** Persiste um lote de amostras reais numa única transação de arquivo. */
+export async function updateLearningProfileRealSamples(
   basePath: string,
-  pidName: string,
-  value: number,
-  condition: VehicleCondition,
+  samples: RealLearningSample[],
 ): Promise<void> {
-  if (!Number.isFinite(value)) return;
+  const validSamples = samples.filter(
+    (sample) => sample.pidName.trim().length > 0 && Number.isFinite(sample.value),
+  );
+  if (!validSamples.length) return;
 
   await enqueueProfileTransaction(basePath, async () => {
     const profile = await readLearningProfileUnsafe(basePath);
     if (!profile) return;
 
     const now = new Date().toISOString();
-    profile.lastUpdated = now;
-    profile.globalSampleCounts.realSamples += 1;
-    profile.globalSampleCounts.totalSamples += 1;
+    for (const sample of validSamples) {
+      profile.lastUpdated = now;
+      profile.globalSampleCounts.realSamples += 1;
+      profile.globalSampleCounts.totalSamples += 1;
 
-    const realSamples = profile.globalSampleCounts.realSamples;
-    if (realSamples >= profile.confidenceThresholds.high) {
-      profile.learningStatus = 'CONFIDENT';
-    } else if (realSamples >= profile.confidenceThresholds.low) {
-      profile.learningStatus = 'LEARNING_ACTIVE';
-    } else {
-      profile.learningStatus = 'COLD_START';
-    }
+      const realSamples = profile.globalSampleCounts.realSamples;
+      if (realSamples >= profile.confidenceThresholds.high) {
+        profile.learningStatus = 'CONFIDENT';
+      } else if (realSamples >= profile.confidenceThresholds.low) {
+        profile.learningStatus = 'LEARNING_ACTIVE';
+      } else {
+        profile.learningStatus = 'COLD_START';
+      }
 
-    let contextStats = profile.contextualData.find((item) => item.condition === condition);
-    if (!contextStats) {
-      contextStats = { condition, statistics: {}, lastUpdate: now, sampleCount: 0 };
-      profile.contextualData.push(contextStats);
-    }
+      let contextStats = profile.contextualData.find((item) => item.condition === sample.condition);
+      if (!contextStats) {
+        contextStats = { condition: sample.condition, statistics: {}, lastUpdate: now, sampleCount: 0 };
+        profile.contextualData.push(contextStats);
+      }
+      contextStats.sampleCount += 1;
+      contextStats.lastUpdate = now;
 
-    contextStats.sampleCount += 1;
-    contextStats.lastUpdate = now;
+      const existing = contextStats.statistics[sample.pidName];
+      if (!existing) {
+        contextStats.statistics[sample.pidName] = createStatistics(
+          sample.value, 'REAL_OBD', 1, 0, profile.confidenceThresholds,
+        );
+        contextStats.statistics[sample.pidName].lastUpdate = now;
+      } else {
+        updateStatisticsWithRealSample(existing, sample.value, profile, now);
+      }
 
-    const existing = contextStats.statistics[pidName];
-    if (!existing) {
-      contextStats.statistics[pidName] = createStatistics(value, 'REAL_OBD', 1, 0, profile.confidenceThresholds);
-      contextStats.statistics[pidName].lastUpdate = now;
-    } else {
-      updateStatisticsWithRealSample(existing, value, profile, now);
-    }
-
-    const overall = profile.overallStatistics[pidName];
-    if (!overall) {
-      profile.overallStatistics[pidName] = createStatistics(value, 'REAL_OBD', 1, 0, profile.confidenceThresholds);
-      profile.overallStatistics[pidName].lastUpdate = now;
-    } else {
-      updateStatisticsWithRealSample(overall, value, profile, now);
+      const overall = profile.overallStatistics[sample.pidName];
+      if (!overall) {
+        profile.overallStatistics[sample.pidName] = createStatistics(
+          sample.value, 'REAL_OBD', 1, 0, profile.confidenceThresholds,
+        );
+        profile.overallStatistics[sample.pidName].lastUpdate = now;
+      } else {
+        updateStatisticsWithRealSample(overall, sample.value, profile, now);
+      }
     }
 
     await writeLearningProfileUnsafe(basePath, profile);
   });
+}
+
+export async function updateLearningProfileRealSample(
+  basePath: string,
+  pidName: string,
+  value: number,
+  condition: VehicleCondition,
+): Promise<void> {
+  await updateLearningProfileRealSamples(basePath, [{ pidName, value, condition }]);
 }
 export async function blockSimulationLearning(basePath: string): Promise<void> {
   await enqueueProfileTransaction(basePath, async () => {

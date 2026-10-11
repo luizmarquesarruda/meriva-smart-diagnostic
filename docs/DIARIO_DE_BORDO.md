@@ -1853,3 +1853,24 @@ A implementação atual só chega a `persistValidatedConnection()` depois que a 
 
 ### Validação
 CI #1899: instalação, Expo Doctor e TypeScript passaram; a suíte chegou ao teste de ciclo de vida Bluetooth e interrompeu nele. A nova CI deverá confirmar o restante da suíte e o build Android. Nenhum merge em `main`.
+
+## 2026-10-11 — Correção de perda de amostras reais sob throttle (CI #1900)
+
+### Falha encontrada
+- Commit testado: d5226629a67c4bb3f6868714105e325293398d35.
+- npm ci, Expo Doctor (17/17), TypeScript, auditoria JSON e ciclo de vida Bluetooth passaram.
+- O caso 8 de tests/merivaAutosave.test.js revelou que duas respostas reais válidas do PID 010C produziam somente uma amostra persistida (1 !== 2).
+
+### Diagnóstico
+A janela de 60 segundos estava descartando amostras subsequentes do mesmo PID em vez de apenas reduzir a frequência de escrita. Isso subcontabiliza aprendizado real e ocorrências do banco de PIDs durante uma viagem.
+
+### Correção
+- Mantida a janela de persistência para limitar I/O; amostras dentro dela agora são acumuladas em lotes por PID sem descarte.
+- Adicionado updateLearningProfileRealSamples(): contabiliza cada amostra e atualiza estatísticas com uma única escrita do perfil.
+- O banco de PIDs acumula ocorrências recebidas em vez de incrementá-las só uma vez por janela.
+- Os lotes são descarregados por temporizador, ao ir para segundo plano e via flushPendingObdLearningPersistence().
+- Falhas de escrita repõem os lotes na fila com retentativa após 5 segundos; simulação permanece excluída do aprendizado e do banco.
+- Ajustado o teste para forçar o flush antes de verificar as contagens persistidas.
+
+### Validação
+A correção depende da nova CI, incluindo todos os testes e o build Android. Não houve merge em main.
