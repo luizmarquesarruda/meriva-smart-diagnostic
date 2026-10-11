@@ -31,7 +31,7 @@ export default function ArmazenamentoScreen() {
     setQuota(status);
     const breakdown = await getStorageBreakdown(path);
     setUsageBreakdown(breakdown);
-    setCycles((await readDriveCycles(path)).sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()));
+    setCycles((await readDriveCycles(path)).filter((cycle) => cycle.source === 'REAL_OBD').sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()));
   }
 
   useEffect(() => {
@@ -105,7 +105,7 @@ export default function ArmazenamentoScreen() {
           <View key={cycle.id} style={styles.historyRow}>
             <View style={styles.historyMain}>
               <Text style={styles.historyDate}>{cycle.startedAt}</Text>
-              <Text style={styles.historyMeta}>{cycle.distanceTotalKm.toFixed(2)} km • {cycle.avgFuelConsumptionKml.toFixed(2)} km/L</Text>
+              <Text style={styles.historyMeta}>{cycle.distanceTotalKm.toFixed(2)} km • {(cycle.fuelDataValid !== false && Number.isFinite(cycle.fuelUsedL) && cycle.fuelUsedL >= 0.05 && Number.isFinite(cycle.avgFuelConsumptionKml) && cycle.avgFuelConsumptionKml > 0) ? `${cycle.avgFuelConsumptionKml.toFixed(2)} km/L` : 'Consumo: N/D'}</Text>
             </View>
             <Text style={cycle.source === 'REAL_OBD' ? styles.real : styles.reference}>{cycle.source === 'REAL_OBD' ? 'REAL' : 'REF.'}</Text>
           </View>
