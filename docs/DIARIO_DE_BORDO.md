@@ -2003,3 +2003,24 @@ Começar a implementação das melhorias de produto com uma entrega que reaprove
 - `npm ci` e Expo Doctor (17/17) passaram. TypeScript passou. A suíte falhou no novo teste do formatador por um matcher incorreto das linhas de viagem; a asserção foi corrigida depois desse run.
 - A CI #1879 executou um commit anterior ao conjunto final de correções. A versão final desta branch ainda não foi validada por TypeScript, suíte completa ou build Android.
 - Nenhum merge foi realizado. Validação física com a Meriva/ELM327 continua pendente.
+
+## 2026-10-11 — Regressão no início do histórico diário por concorrência de inicialização
+
+### Sintoma
+O diário por data podia deixar de registrar a abertura de uma sessão ECU validada, especialmente na primeira conexão após iniciar o aplicativo.
+
+### Causa técnica identificada
+`app/_layout.tsx` inicia o serviço automático de viagens e o fluxo de conexão no mesmo ciclo de inicialização. Ambos podem chamar `initAutoSave()`. A função anterior retornava o estado em memória assim que `runtime.basePath` coincidia, mesmo quando outra chamada ainda estava lendo e hidratando o arquivo JSON. Além disso, `persistValidatedConnection()` tentava iniciar a sessão sem aguardar explicitamente a hidratação.
+
+### Correção aplicada
+- `src/meriva/autosaveManager.ts`: inicialização single-flight; chamadas concorrentes para a mesma pasta aguardam a mesma Promise de hidratação.
+- `src/obd/sharedConnection.ts`: aguarda `initAutoSave(basePath)` antes de persistir a conexão validada e abrir a sessão.
+- `tests/bluetoothLifecycle.test.js`: adicionadas asserções de regressão para ordem de inicialização e proteção contra concorrência.
+- Mantido o contrato do diário `VIAGENS/meriva_smart_daily_obd_history.txt`: eventos por data, múltiplas sessões sem substituir os eventos anteriores.
+
+### Validação e estado
+- Alterações gravadas na branch `fix/daily-obd-history-keep-screen-awake-main`.
+- CI não foi disparada manualmente nesta etapa.
+- Testes automatizados e validação física no Android ainda pendentes; não declarar a correção validada até esses resultados.
+- PR #49 permanece sem merge; `main` não foi alterada.
+
