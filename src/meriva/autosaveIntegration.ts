@@ -9,6 +9,7 @@ import { logRawObdData, logInterpretedData } from '../database/obdLogger';
 import { PidConfirmationEntry, readPidConfirmations, recordPidConfirmation } from '../database/pidBank';
 import { updateLearningProfileRealSamples, type RealLearningSample } from '../database/learningProfile';
 import { AppState } from 'react-native';
+import { flushCsvRows } from '../database/csvLogger';
 import type { VehicleCondition } from '../types/sourceTypes';
 import { pushLastReading, updateAutoSaveState, scheduleCriticalSave } from './autosaveManager';
 import { shouldFeedLearning } from './autosaveValidation';
@@ -264,6 +265,8 @@ export async function flushPendingObdLearningPersistence(basePath?: string): Pro
     flushPendingPidBatch(pair.basePath, pair.pid, true),
     flushPendingLearningBatch(pair.basePath, pair.pid, true),
   ]));
+  // Também descarrega os logs OBD em buffer, especialmente antes de o app ser suspenso.
+  await flushCsvRows();
 }
 
 function ensureBackgroundFlushListener(): void {

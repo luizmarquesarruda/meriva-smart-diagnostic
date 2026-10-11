@@ -1874,3 +1874,19 @@ A janela de 60 segundos estava descartando amostras subsequentes do mesmo PID em
 
 ### Validação
 A correção depende da nova CI, incluindo todos os testes e o build Android. Não houve merge em main.
+
+## 2026-10-11 — Flush dos logs OBD bufferizados (CI #1901)
+
+### Falha encontrada
+- Commit testado: be67ce0bfd50b921b4100e289b6c844d2c34fe09.
+- npm ci, Expo Doctor (17/17), TypeScript e os testes anteriores ao caso 8 passaram.
+- Após corrigir a contabilização das amostras, a asserção final do caso 8 não encontrou o arquivo obd_raw_*.csv.
+
+### Diagnóstico e correção
+- src/database/csvLogger.ts acumula linhas para reduzir I/O e programa a gravação assíncrona (750 ms); appendCsvRow() enfileira a linha, não promete que o arquivo já existe ao retornar.
+- O teste exigia a presença imediata do arquivo sem descarregar explicitamente o buffer.
+- flushPendingObdLearningPersistence() agora também chama flushCsvRows(), garantindo que a transição para background descarregue logs OBD pendentes junto das amostras de aprendizado.
+- O buffer permanece ativo durante o polling normal, e o teste já usa o mesmo flush explícito para avaliar persistência durável.
+
+### Validação
+A nova CI precisa confirmar a suíte completa e o build Android. Não houve merge em main.
