@@ -226,6 +226,10 @@ async function testFormulaKnowledgeBank() {
   assert.strictEqual(engine.applyFormula('PERCENT_255', [0xFF]), 100);
   assert.strictEqual(engine.applyFormula('O2_VOLTS', [0x6A, 0x80]), 0.53);
 
+  const absoluteLoad = engine.decodeFormula('U16_SCALE_255', '0143', [0xFF, 0xFF]);
+  assert.strictEqual(absoluteLoad.value, 25700);
+  assert.strictEqual(absoluteLoad.valid, true, 'PID 0143 admite a faixa padronizada de até 25700%, não apenas 100%');
+
   const good = engine.decodeFormula('RPM', '010C', [0x1A, 0xF8]);
   assert.strictEqual(good.valid, true);
   assert.strictEqual(good.value, 1726);
