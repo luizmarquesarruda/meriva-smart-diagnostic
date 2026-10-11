@@ -1647,7 +1647,7 @@ Também foi encontrada uma fonte de confusão no cockpit: quando ainda não havi
 - O rastreador GPS agora confirma o movimento com várias amostras consecutivas plausíveis e deslocamento acumulado, em vez de exigir que cada segmento isolado ultrapasse a margem de precisão. A revisão final também exige velocidade reportada pelo GPS ou confirmada pela ECU; diferença de coordenadas sozinha nunca confirma movimento.
 - O filtro preserva distância pendente somente após movimento confirmado, mantém limites para saltos, velocidade e intervalos entre posições e descarta trechos sem evidência suficiente.
 - A tela principal prioriza o consumo da viagem ativa. A média persistida usada como consumo real depende de leituras reais acumuladas; os dados de referência `CARSCANNER_SEED` não servem mais de fallback para esse indicador.
-- As telas Dados e Laboratório distinguem os rótulos de distância GPS e consumo real, e Dados informa a condição/precisão atual do GPS e a origem do combustível integrado/estimado.
+- As telas Dados e Laboratório distinguem distância GPS e consumo da viagem. Dados informa a condição/precisão atual do GPS e a origem OBD integrada/estimada; o rótulo evita apresentar a estimativa MAF/MAP como se fosse medição direta pelo PID 015E.
 - Foram acrescentados testes de regressão com precisão GPS mediana e segmentos individuais curtos, além de rejeição de distância quando não há evidência de velocidade do GPS/ECU.
 - A documentação `docs/GPS_DRIFT_AND_DISTANCE.md` foi atualizada para refletir as regras e os limites atuais.
 
