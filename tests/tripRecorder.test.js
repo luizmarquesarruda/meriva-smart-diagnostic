@@ -188,5 +188,7 @@ assert.ok(storageScreenSource.includes('isCycleConsumptionValid(cycle)'), 'stora
 assert.ok(exportSource.includes("csv(isCycleConsumptionValid(cycle) ? cycle.avgFuelConsumptionKml : 'N/D')"), 'CSV must export invalid/legacy consumption as N/D');
 assert.ok(exportSource.includes("avgFuelConsumptionKml: consumptionValid ? cycle.avgFuelConsumptionKml : null"), 'JSON must null out unverified consumption');
 assert.ok(exportSource.includes("'LEGACY_UNVERIFIED'"), 'exports must label cycles without a quality marker as legacy/unverified');
+const tripStorageSource = fs.readFileSync(path.join(ROOT, 'src', 'storage', 'driveCycleStorage.ts'), 'utf8');
+assert.ok(tripStorageSource.includes("avgConsumption: isCycleConsumptionValid(cycle) ? cycle.avgFuelConsumptionKml : 'N/D'"), 'daily trip CSV must not treat unverified consumption as real');
 
 console.log('PASS trip recorder: GPS monotônico, histórico real e consumo validado em telas/exportações');
