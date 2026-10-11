@@ -86,3 +86,13 @@ if (!fsSource.includes('ESTIMATED_MAF') || !fsSource.includes('ESTIMATED_MAP')) 
   throw new Error('fuel fallback MAF/MAP não está implementado');
 }
 console.log('fuelConsumption fallback: OK');
+
+const autoTripSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'trip', 'autoTripService.ts'), 'utf8');
+const manualSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'database', 'merivaManual.ts'), 'utf8');
+if (!autoTripSource.includes('MERIVA_MANUAL.engine.displacementCm3')) {
+  throw new Error('Estimativa MAP deve usar a cilindrada documentada da Meriva, sem fallback 1598 cm³');
+}
+if (!manualSource.includes('displacementCm3: 1389')) {
+  throw new Error('Cilindrada padrão da Meriva 1.4 deve permanecer alinhada ao manual técnico');
+}
+console.log('fuelConsumption cilindrada Meriva 1.4: OK');
