@@ -421,7 +421,7 @@ class AutoTripService {
 
         state.autonomy = {
           ...state.autonomy,
-          tankCapacityL: 56,
+          tankCapacityL: MERIVA_MANUAL.capacities.fuelTankL,
           cumulativeDistanceKm: Number(cumulativeDistanceKm.toFixed(3)),
           cumulativeFuelUsedL: Number(cumulativeFuelUsedL.toFixed(3)),
           averageConsumptionKml: Number(averageConsumptionKml.toFixed(3)),
