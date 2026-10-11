@@ -37,17 +37,17 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
   L.push(`Modelo: ${or(state.vehicle?.model)}`);
   L.push(`Motor: ${or(state.vehicle?.engine)}`);
   L.push(`Ano: ${or(state.vehicle?.year)}`);
-  L.push(`VIN: ${or(state.vehicle?.vin)}`);
+  L.push('VIN: [OMITIDO POR PRIVACIDADE]');
   L.push('');
 
   L.push('[OBD]');
   L.push(`Status: ${state.obd?.connected ? 'CONECTADO' : 'DESCONECTADO'}`);
-  L.push(`Adaptador: ${or(state.obd?.adapterName)}`);
+  L.push('Adaptador: [NOME OMITIDO POR PRIVACIDADE]');
   L.push(`Protocolo: ${or(state.obd?.protocol)}`);
   L.push(`Último protocolo conhecido: ${or(state.obd?.lastKnownProtocol)}`);
   L.push(`ECU: ${or(state.obd?.ecuAddress)}`);
-  L.push(`Identificação ECU: ${or(state.obd?.ecuIdentification)}`);
-  L.push(`Nome ECU: ${or(state.obd?.ecuName)}`);
+  L.push('Identificação ECU: [OMITIDA POR PRIVACIDADE]');
+  L.push('Nome ECU: [OMITIDO POR PRIVACIDADE]');
   L.push(`ECU validada em: ${or(state.obd?.ecuValidatedAt)}`);
   L.push(`Fonte da validação ECU: ${or(state.obd?.ecuValidationSource)}`);
   L.push(`Validações: ${or(state.obd?.ecuValidationChecks?.join(', '))}`);
