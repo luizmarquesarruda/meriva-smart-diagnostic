@@ -64,8 +64,9 @@ A run #1894 (commit `4b383349b29ca3544e112ca4f232cb67bb3db1dd`) falhou no typech
 - Auditoria estática de consumidores adicionais de `avgFuelConsumptionKml` encontrou a tela `app/armazenamento.tsx` e `src/storage/exportDiagnostics.ts` ainda capazes de apresentar consumo legado ou sentinela zero como dado real.
 - `app/armazenamento.tsx`: o histórico visível agora lista somente ciclos `REAL_OBD`; ciclos de referência do Car Scanner não aparecem nessa tela. O consumo é exibido apenas quando `isCycleConsumptionValid(cycle)` valida qualidade, distância, combustível e consistência da fórmula.
 - `src/storage/exportDiagnostics.ts`: CSV usa `N/D` para consumo não validado e acrescenta `consumptionQuality`; JSON exporta `avgFuelConsumptionKml: null` para consumo inválido/não verificado e classifica a qualidade como `INCOMPLETE`, `INCONSISTENT` ou `LEGACY_UNVERIFIED`.
+- `src/storage/driveCycleStorage.ts`: CSV diário de viagens também grava `N/D` para ciclos incompletos, legados ou inconsistentes; a correção preserva o esquema de colunas existente.
 - `tests/tripRecorder.test.js`: adicionadas verificações de regressão para impedir que a tela de armazenamento volte a exibir ciclos de referência e para exigir tratamento explícito de consumo inválido nas exportações.
-- Commits: `1dc9ecd8cc4777df1b30463c5a050d6c76d750af` (tela de armazenamento) e `7c3430d1d29b7368d8f701845c61c87e3481822e` (exportações). Os commits usam `[skip ci]`.
+- Commits: `1dc9ecd8cc4777df1b30463c5a050d6c76d750af` (tela de armazenamento), `7c3430d1d29b7368d8f701845c61c87e3481822e` (exportações) e `371d4d60036bcb560e4615c292ac7143c38a3185` (CSV diário de viagens). Os commits usam `[skip ci]`.
 
 ### Situação após esta correção
 
