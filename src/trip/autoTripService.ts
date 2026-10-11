@@ -29,11 +29,25 @@ export interface AutoTripServiceState {
 
 type Listener = (state: AutoTripServiceState) => void;
 
-const CARSCANNER_REFERENCE_CONSUMPTION_KML = (() => {
-  const distanceKm = INITIAL_DRIVE_CYCLES.reduce((sum, cycle) => sum + cycle.distanceTotalKm, 0);
-  const fuelL = INITIAL_DRIVE_CYCLES.reduce((sum, cycle) => sum + cycle.fuelUsedL, 0);
-  return fuelL > 0 ? Number((distanceKm / fuelL).toFixed(3)) : 0;
-})();
+
+function getPersistedRealAverageConsumption(autonomy: {
+  realReadingCount: number;
+  cumulativeDistanceKm: number;
+  cumulativeFuelUsedL: number;
+}): number {
+  const distanceKm = autonomy.cumulativeDistanceKm;
+  const fuelUsedL = autonomy.cumulativeFuelUsedL;
+  if (
+    autonomy.realReadingCount < 1 ||
+    !Number.isFinite(distanceKm) ||
+    distanceKm <= 0 ||
+    !Number.isFinite(fuelUsedL) ||
+    fuelUsedL <= 0
+  ) {
+    return 0;
+  }
+  return Number((distanceKm / fuelUsedL).toFixed(3));
+}
 
 const INITIAL_STATE: AutoTripServiceState = {
   connected: false,
@@ -91,9 +105,7 @@ class AutoTripService {
     const persisted = await initAutoSave(basePath);
     this.state = {
       ...this.state,
-      averageConsumptionKml: persisted.autonomy.averageConsumptionKml > 0
-        ? persisted.autonomy.averageConsumptionKml
-        : CARSCANNER_REFERENCE_CONSUMPTION_KML,
+      averageConsumptionKml: getPersistedRealAverageConsumption(persisted.autonomy),
       estimatedRangeKm: persisted.autonomy.estimatedRangeKm,
     };
     this.emit();
@@ -137,7 +149,6 @@ class AutoTripService {
     const fuelSupported = connection.supportedPids.includes('015E');
     const fuelLevelSupported = connection.supportedPids.includes('012F');
     const obdSpeedSupported = connection.supportedPids.includes('010D');
-    const initialDistanceKm = gpsTracker.getState().distanceKm;
     this.recorder = null;
     this.stoppedSinceMs = null;
     const generation = ++this.generation;
@@ -153,9 +164,7 @@ class AutoTripService {
       fuelRemainingL: null,
       fuelReserve: null,
       error: null,
-      averageConsumptionKml: persistedAutonomy.averageConsumptionKml > 0
-        ? persistedAutonomy.averageConsumptionKml
-        : CARSCANNER_REFERENCE_CONSUMPTION_KML,
+      averageConsumptionKml: getPersistedRealAverageConsumption(persistedAutonomy),
       estimatedRangeKm: persistedAutonomy.estimatedRangeKm,
     };
     this.emit();

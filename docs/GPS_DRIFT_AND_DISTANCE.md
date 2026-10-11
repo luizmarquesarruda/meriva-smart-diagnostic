@@ -1,51 +1,32 @@
-# GPS: controle de deriva e distância fantasma
+# GPS: controle de deriva e distância da viagem
 
 ## Problema
 
-O GPS do Android pode entregar pequenas mudanças de latitude/longitude mesmo com o veículo parado. Se cada mudança for somada ao odômetro, o aplicativo parece estar andando sozinho.
-
-O código anterior aceitava segmentos de apenas 5 m, permitia velocidade derivada a partir do deslocamento e confirmava movimento depois de duas amostras. Isso é permissivo demais para um carro parado.
-
-## Referências pesquisadas
-
-- expo-geopulse: usa filtro de Kalman, rejeição de outliers, detecção de movimento e controle adaptativo de GPS.
-- react-native-background-geolocation: usa detecção de movimento e distanceFilter, evitando tratar GPS bruto como odômetro.
-- react-native-background-location: recomenda evitar inscrições duplicadas de atualizações e oferece distanceFilter.
-- react-native-kalman-location: demonstra filtragem de posições do Google Play Services com Kalman.
-
-Estas referências foram usadas como direção arquitetural. O Meriva Smart Diagnostic não copia código dessas bibliotecas.
+O GPS do Android pode entregar pequenas mudanças de latitude/longitude mesmo com o veículo parado. Somar cada segmento bruto transforma ruído em distância fantasma; exigir que cada segmento isolado supere a margem de erro, por outro lado, pode zerar a distância real em deslocamentos curtos ou com precisão mediana.
 
 ## Regra adotada no Meriva Smart Diagnostic
 
-1. precisão do fix deve ser aceitável, no máximo 30 m quando informada;
-2. deslocamento mínimo é 8 m;
-3. quando há precisão declarada, o deslocamento precisa superar 1,5x a pior precisão entre os dois fixes;
-4. velocidade derivada precisa ser de pelo menos 5 km/h;
-5. a velocidade informada pelo próprio Android também precisa confirmar pelo menos 5 km/h;
-6. são necessários 3 segmentos consecutivos confirmando movimento, o que exige 4 posições válidas consecutivas;
-7. segmentos acima de 250 m são descartados;
-8. speed stale ou ausência de speed não gera distância;
-9. a velocidade exibida deixa de usar max(GPS speed, velocidade derivada), evitando inflar o valor com um fix inconsistente.
+1. Só são usadas posições com precisão declarada de até 30 m.
+2. A velocidade do PID OBD 010D confirma movimento quando válida; sem ela, o rastreador usa a velocidade GPS e, quando ausente, a velocidade derivada de posições consecutivas válidas.
+3. A velocidade derivada deve ficar entre 5 e 220 km/h, o intervalo entre fixes não pode superar 5 s e cada segmento bruto deve ter no máximo 250 m.
+4. O movimento só é confirmado após pelo menos três segmentos consecutivos plausíveis e um deslocamento acumulado de pelo menos max(12 m, 1,5 × a pior precisão informada).
+5. Depois de confirmado o movimento, os segmentos plausíveis são acumulados em um buffer. A distância só é adicionada ao total quando o deslocamento entre a âncora de distância e o fix atual supera o limite adaptativo. Isso permite contar vários segmentos curtos sem reduzir o filtro a uma soma de jitter.
+6. Ao parar, um trecho final só é descarregado se o movimento já estava confirmado e seus segmentos passaram pelos filtros; uma tentativa de movimento ainda não confirmada é descartada.
+7. Sem posições GPS aceitáveis, não é inventada distância. Se o GPS perder sinal por um intervalo longo, o rastreador reinicia a janela em vez de interpolar o trecho ausente.
 
-## Por que não usar um Kalman agora?
+## Consumo: fontes separadas
 
-Um filtro Kalman completo é útil, mas aumenta bastante a complexidade e introduz parâmetros que precisam ser calibrados para o telefone e para o uso automotivo.
+- **Distância:** GPS filtrado do telefone.
+- **Combustível:** taxa válida do PID 015E (L/h), integrada ao longo do tempo. Se o PID não estiver disponível, o serviço tenta estimativas por MAF ou MAP + RPM + IAT e marca a origem como estimada.
+- **Consumo médio da viagem:** distância GPS acumulada dividida pelos litros integrados. Se qualquer parte faltar ou for inválida, a tela mostra N/D, sem fabricar km/L.
+- Os ciclos de referência CARSCANNER_SEED não alimentam o indicador de consumo real nem são usados como média real inicial.
 
-Primeiro eliminamos a causa mais clara do erro: transformar jitter em distância. Depois, se os testes reais ainda mostrarem ruído, podemos adicionar um filtro adaptativo de posição e velocidade.
+O GPS não é um odômetro perfeito. A nova regra favorece distância rastreável e impede que um único salto defina a viagem. A calibração final ainda depende de um trajeto real no telefone e na Meriva.
 
-## Próxima evolução
+## Referências pesquisadas
 
-Para o modo de viagem automotiva, a melhor arquitetura é combinar:
+A revisão considerou os padrões de filtragem adaptativa, detecção de movimento e prevenção de distância fantasma descritos em projetos públicos de rastreamento de localização. A implementação do Meriva Smart Diagnostic permanece própria e não copia código dessas bibliotecas.
 
-- GPS para posição e rota;
-- PID OBD 010D para confirmar movimento do veículo quando disponível;
-- GPS como fallback quando 010D não responder;
-- persistência de pontos brutos para auditoria;
-- confiança por amostra;
-- filtro adaptativo somente depois de medir o comportamento real do aparelho.
+## Teste automatizado
 
-O GPS não deve ser tratado como um odômetro perfeito.
-
-## Regra de teste 2026-10-06
-
-O primeiro fix estabelece a referência. Três segmentos consecutivos precisam confirmar movimento antes de somar distância. Portanto, o teste automatizado de movimento usa quatro posições válidas.
+tests/gps.test.js verifica distância com fixes limpos, rejeição de deriva parado e movimento com precisão mediana, em que cada segmento individual é menor que a margem de erro do GPS.

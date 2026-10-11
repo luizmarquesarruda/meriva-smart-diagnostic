@@ -18,14 +18,22 @@ export default function DadosScreen() {
     return () => clearInterval(timer);
   }, []);
   const readings = [...state.lastReadings].reverse();
+  const gps = gpsTracker.getState();
   return <SafeAreaView style={styles.container} edges={["top","bottom","left","right"]}><ScrollView contentContainerStyle={[styles.content,{paddingHorizontal:layout.horizontalPadding}]} showsHorizontalScrollIndicator={false}><View style={[styles.screenFrame,{maxWidth:layout.maxContentWidth}]}>
     <Header title="DADOS EM TEMPO REAL" subtitle="PIDs • TELEMETRIA • TENDÊNCIAS" />
     <View style={styles.liveCard}><Text style={styles.liveTitle}>{state.obd.connected ? '● ECU CONECTADA' : '○ ECU AGUARDANDO'}</Text><Text style={styles.liveHint}>{state.obd.protocol ? 'PROTOCOLO ' + state.obd.protocol : 'Conecte o ELM327 para receber PIDs reais.'}</Text></View>
     <View style={styles.grid}>
       <Metric landscape={layout.landscape} label="VELOCIDADE" value={gpsTracker.getState().currentSpeedKmh.toFixed(0) + ' km/h'} />
-      <Metric landscape={layout.landscape} label="DISTÂNCIA" value={trip.distanceKm.toFixed(2) + ' km'} />
-      <Metric landscape={layout.landscape} label="CONSUMO" value={trip.consumptionKml != null && trip.consumptionKml > 0 ? trip.consumptionKml.toFixed(1) + ' km/L' : 'N/D'} />
+      <Metric landscape={layout.landscape} label="DISTÂNCIA GPS" value={trip.distanceKm.toFixed(2) + ' km'} />
+      <Metric landscape={layout.landscape} label="CONSUMO REAL" value={trip.consumptionKml != null && trip.consumptionKml > 0 ? trip.consumptionKml.toFixed(1) + ' km/L' : 'N/D'} />
       <Metric landscape={layout.landscape} label="AUTONOMIA" value={state.autonomy.estimatedRangeKm > 0 ? state.autonomy.estimatedRangeKm.toFixed(0) + ' km' : 'N/D'} />
+    </View>
+    <View style={styles.note}>
+      <Text style={styles.noteText}>
+        {gps.running
+          ? 'GPS ' + gps.signalQuality + (gps.lastAccuracyM != null ? ' • precisão ' + gps.lastAccuracyM.toFixed(0) + ' m' : ' • aguardando posição') + '. A distância da viagem vem do GPS filtrado; litros vêm da taxa OBD integrada ou da estimativa MAF/MAP.'
+          : 'GPS inativo. Quando ativo, a distância da viagem vem do GPS filtrado; litros vêm da taxa OBD integrada ou da estimativa MAF/MAP.'}
+      </Text>
     </View>
     <Text style={styles.section}>CONTEXTO OPERACIONAL</Text>
     <View style={styles.contextCard}>

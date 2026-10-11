@@ -147,7 +147,32 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
   await tracker.stop();
   assert.strictEqual(tracker.getState().running, false);
   unsubscribe();
-  console.log('PASS GPS: automático, velocidade, distância e consumo');
+
+  // Com precisão mediana, cada segmento pode ser menor que 1,5x a precisão.
+  // O filtro deve confirmar o deslocamento acumulado, usando o OBD como sinal
+  // de movimento quando a velocidade GPS não estiver disponível.
+  const adaptiveTracker = new GpsTracker();
+  assert.strictEqual(await adaptiveTracker.start(), true);
+  adaptiveTracker.setVehicleSpeedHintKmh(36);
+  for (let index = 0; index <= 6; index += 1) {
+    watcher({
+      coords: {
+        latitude: 0,
+        longitude: index * 0.00004,
+        speed: null,
+        accuracy: 15,
+      },
+      timestamp: 100000 + index * 1000,
+    });
+  }
+  assert.ok(
+    adaptiveTracker.getState().distanceKm > 0.02,
+    'GPS distance should accumulate across short, accurate fixes',
+  );
+  assert.strictEqual(adaptiveTracker.getState().speedSource, 'OBD');
+  await adaptiveTracker.stop();
+
+  console.log('PASS GPS: automático, velocidade, distância acumulada e consumo');
 })().catch((error) => {
   console.error(error);
   process.exitCode = 1;
