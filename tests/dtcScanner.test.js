@@ -7,7 +7,7 @@ const Module = require('module');
 const ts = require('typescript');
 
 function loadTs(file) {
-  const sourcePath = path.join(__dirname, '..', file);
+  const sourcePath = path.isAbsolute(file) ? file : path.join(__dirname, '..', file);
   const output = ts.transpileModule(fs.readFileSync(sourcePath, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2019 },
   }).outputText;
@@ -17,8 +17,16 @@ function loadTs(file) {
 
   const originalLoad = Module._load;
   Module._load = function(request, parent, isMain) {
-    if (request === './dtcParser' && parent?.filename?.endsWith(path.join('src', 'obd', 'dtcScanner.ts'))) {
-      return loadTs('src/obd/dtcParser.ts');
+    // Node does not resolve extensionless TypeScript imports in this test harness.
+    // Resolve relative imports from loaded TS modules through the same transpiler.
+    if (parent?.filename?.endsWith('.ts') && request.startsWith('.')) {
+      const candidate = path.resolve(
+        path.dirname(parent.filename),
+        request.endsWith('.ts') ? request : request + '.ts',
+      );
+      if (candidate.endsWith('.ts') && fs.existsSync(candidate)) {
+        return loadTs(candidate);
+      }
     }
     return originalLoad(request, parent, isMain);
   };
