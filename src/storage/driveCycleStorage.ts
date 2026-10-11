@@ -144,8 +144,6 @@ export async function addDriveCycle(basePath: string, cycle: DriveCycle): Promis
     avgSpeed: cycle.avgDrivingSpeedKmh,
     avgConsumption: cycle.avgFuelConsumptionKml,
     source: cycle.source,
-    dataQuality: cycle.dataQuality ?? 'COMPLETE',
-    incompleteReason: cycle.incompleteReason ?? '',
   };
 
   await appendCsvRow(csvFile, row);
