@@ -363,6 +363,10 @@ export class GpsTracker {
   handleLocation(location: Location.LocationObject): void {
     const c = location.coords;
     if (!Number.isFinite(c.latitude) || !Number.isFinite(c.longitude)) return;
+    if (!Number.isFinite(location.timestamp)) return;
+    // Callbacks may arrive late from the native location queue. Reject them before
+    // changing speed, distance, signal state, or the previous accepted fix.
+    if (this.state.lastTimestamp != null && location.timestamp <= this.state.lastTimestamp) return;
 
     const sample: GpsSample = {
       latitude: c.latitude,
@@ -371,7 +375,7 @@ export class GpsTracker {
         ? normalizeGpsSpeedKmh(c.speed)
         : null,
       accuracyM: c.accuracy ?? null,
-      timestamp: Number.isFinite(location.timestamp) ? location.timestamp : Date.now(),
+      timestamp: location.timestamp,
     };
 
     const accurate = isAccurate(sample);
