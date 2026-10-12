@@ -79,7 +79,7 @@ export interface GpsTripState {
   lastAccuracyM: number | null;
   error: string | null;
   signalQuality: 'SEM_FIX' | 'FRACA' | 'BOA' | 'EXCELENTE';
-  speedSource: 'PARADO' | 'GPS' | 'OBD' | 'INDISPONIVEL';
+  speedSource: 'INDISPONIVEL' | 'GPS' | 'OBD' | 'INDISPONIVEL';
   lastSample: GpsJsonRecord | null;
 }
 
@@ -158,7 +158,7 @@ export class GpsTracker {
     lastAccuracyM: null,
     error: null,
     signalQuality: 'SEM_FIX',
-    speedSource: 'PARADO',
+    speedSource: 'INDISPONIVEL',
     lastSample: null,
   };
 
@@ -173,7 +173,13 @@ export class GpsTracker {
   }
 
   setBackgroundTaskError(message: string): void {
-    this.state = { ...this.state, error: message || 'ERRO NO SERVIÇO GPS EM SEGUNDO PLANO.' };
+    this.state = {
+      ...this.state,
+      currentSpeedKmh: null,
+      signalQuality: 'SEM_FIX',
+      speedSource: 'INDISPONIVEL',
+      error: message || 'ERRO NO SERVIÇO GPS EM SEGUNDO PLANO.',
+    };
     this.emit();
   }
 
@@ -200,7 +206,7 @@ export class GpsTracker {
         lastAccuracyM: null,
         error: null,
         signalQuality: 'SEM_FIX',
-        speedSource: 'PARADO',
+        speedSource: 'INDISPONIVEL',
         lastSample: null,
       };
       this.previous = null;
@@ -333,7 +339,7 @@ export class GpsTracker {
       lastAccuracyM: null,
       error: null,
       signalQuality: 'SEM_FIX',
-      speedSource: 'PARADO',
+      speedSource: 'INDISPONIVEL',
       lastSample: null,
     };
     this.previous = null;
@@ -490,11 +496,11 @@ export class GpsTracker {
         lastTimestamp: null,
         lastAccuracyM: null,
         signalQuality: 'SEM_FIX',
-        speedSource: 'PARADO',
+        speedSource: 'INDISPONIVEL',
         lastSample: null,
       };
     } else {
-      this.state = { ...this.state, running: false, currentSpeedKmh: null, speedSource: 'PARADO' };
+      this.state = { ...this.state, running: false, currentSpeedKmh: null, speedSource: 'INDISPONIVEL' };
     }
     await gpsHistoryStore.flush();
     this.emit();
