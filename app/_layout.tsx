@@ -5,6 +5,7 @@ import { Alert, AppState, Linking, Platform } from 'react-native';
 import { Stack } from 'expo-router';
 import { ensureBluetoothReady } from '../src/obd/bluetoothManager';
 import { gpsTracker } from '../src/gps';
+import { gpsHistoryStore } from '../src/gps/gpsHistory';
 import { readAppSettings, writeAppSettings } from '../src/database/appSettings';
 import { connectPreferredElm, disconnectSharedObd } from '../src/obd/sharedConnection';
 import * as FileSystem from 'expo-file-system';
@@ -48,6 +49,7 @@ export default function RootLayout() {
   useEffect(() => {
     const loadSettings = async () => readAppSettings(`${FileSystem.documentDirectory}MERIVA_SMART`);
     const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
+    gpsHistoryStore.configure(basePath);
 
     const preparePermissions = async () => {
       if (permissionsChecked.current) return;
@@ -162,11 +164,13 @@ export default function RootLayout() {
 
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') void startup();
+      else if (state === 'inactive' || state === 'background') void gpsHistoryStore.flush();
     });
 
     return () => {
       subscription.remove();
       void gpsTracker.stop();
+      void gpsHistoryStore.flush();
       void autoTripService.stop().finally(() => {
         void disconnectSharedObd();
       });
