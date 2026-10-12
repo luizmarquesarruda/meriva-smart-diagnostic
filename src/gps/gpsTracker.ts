@@ -44,7 +44,7 @@ export function normalizeGpsJsonRecord(location: Location.LocationObject): GpsJs
       : accuracyMeters <= 5 ? 'EXCELENTE'
         : accuracyMeters <= 15 ? 'BOA' : 'FRACA';
   const rawSpeed = c.speed;
-  const speedKmh = valid && rawSpeed != null && Number.isFinite(rawSpeed) && rawSpeed >= 0
+  const speedKmh = valid && rawSpeed != null && Number.isFinite(rawSpeed) && rawSpeed >= 0 && rawSpeed * 3.6 <= MAX_SPEED_KMH
     ? Number((rawSpeed * 3.6).toFixed(1))
     : null;
   const altitudeMeters = c.altitude != null && Number.isFinite(c.altitude) ? c.altitude : null;
@@ -366,6 +366,9 @@ export class GpsTracker {
   handleLocation(location: Location.LocationObject): void {
     const normalized = normalizeGpsJsonRecord(location);
     if (!normalized) return;
+    // Location callbacks can arrive late after a background/foreground transition.
+    // Never let an older fix rewind the trip's current state.
+    if (this.state.lastTimestamp != null && normalized.timestamp <= this.state.lastTimestamp) return;
 
     const c = location.coords;
     const sample: GpsSample = {
