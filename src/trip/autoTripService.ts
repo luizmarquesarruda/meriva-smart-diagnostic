@@ -104,12 +104,20 @@ class AutoTripService {
           error: cause instanceof Error ? cause.message : 'FALHA NO SERVIÇO AUTOMÁTICO DA VIAGEM',
         }));
     });
-    // ECU validation/response is the authoritative gate for GPS history.
-    // Bluetooth adapter presence alone must never start a GPS recording session.
+    // A validated ECU plus a live Bluetooth link gates GPS history.
+    // Keep the same GPS session through brief NO_RESPONSE/RECOVERING states:
+    // a single missed health probe is not proof that the ECU was disconnected.
+    // Confirmed disconnect clears the shared connection or drops the Bluetooth link.
     this.unsubscribeEcuStatus = subscribeSharedObdStatus((status) => {
       this.gpsRecordingTransition = this.gpsRecordingTransition
         .then(async () => {
-          if (!this.running || !status.ecuConnected) {
+          const connection = getSharedObdConnection();
+          const ecuSessionEligible = Boolean(
+            connection?.ecuValidated &&
+            status.bluetoothConnected &&
+            status.ecuResponseState !== 'NOT_VALIDATED'
+          );
+          if (!this.running || !ecuSessionEligible) {
             await gpsHistoryStore.stopSession();
             return;
           }
