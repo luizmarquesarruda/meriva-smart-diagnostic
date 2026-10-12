@@ -1,90 +1,157 @@
-// MERIVA SMART DIAGNOSTIC: Ponte OBD -> armazenamento -> autosave
-//
-// Integra os módulos que já existem (obdLogger, pidBank, learningProfile)
-// ao autosave. Dados de simulação são gravados nos logs, mas nunca alimentam
-// o banco de PIDs confirmados nem o aprendizado.
-
+// MERIVA SMART DIAGNOSTIC: Ponte OBD -> telemetria em memória -> persistência.
 import type { PidQueryResult } from '../obd/elm327';
 import { logRawObdData, logInterpretedData } from '../database/obdLogger';
-import { PidConfirmationEntry, readPidConfirmations, recordPidConfirmation } from '../database/pidBank';
+import { type PidConfirmationEntry, readPidConfirmations, recordPidConfirmation } from '../database/pidBank';
 import { updateLearningProfileRealSample } from '../database/learningProfile';
 import type { VehicleCondition } from '../types/sourceTypes';
 import { pushLastReading, updateAutoSaveState, scheduleCriticalSave } from './autosaveManager';
 import { shouldFeedLearning } from './autosaveValidation';
 import { getVehicleConditionSnapshot, recordLivePidQuery } from '../obd/liveTelemetry';
+import { flushBufferedCsvRows } from '../database/csvLogger';
+
+export interface RegisterObdQueryOptions {
+  /**
+   * Keeps the display/polling path non-blocking. Disk logging is buffered and
+   * slower PID-bank/learning writes run behind a per-profile queue.
+   */
+  deferPersistence?: boolean;
+}
+
+const backgroundPersistenceQueues = new Map<string, Promise<void>>();
+const lastBackgroundLearningAt = new Map<string, number>();
+const BACKGROUND_LEARNING_MIN_INTERVAL_MS = 30_000;
+
+async function persistObdQuery(
+  basePath: string,
+  result: PidQueryResult,
+  source: 'REAL' | 'SIMULACAO',
+  learningCondition: VehicleCondition,
+  options: { bufferedLogs: boolean; persistLearning: boolean },
+): Promise<void> {
+  try {
+    await Promise.all([
+      logRawObdData(basePath, result, result.parsed.pid, source, { buffered: options.bufferedLogs }),
+      logInterpretedData(basePath, result, result.parsed.pid, source, { buffered: options.bufferedLogs }),
+    ]);
+  } catch (cause) {
+    console.warn('[autosave] falha ao gravar logs OBD:', cause instanceof Error ? cause.message : cause);
+  }
+
+  const parsedValue = result.parsed.value;
+  if (!options.persistLearning || !shouldFeedLearning(source, result.parsed.status, parsedValue) || parsedValue === null) {
+    return;
+  }
+
+  try {
+    const now = new Date().toISOString();
+    const existing = await readPidConfirmations(basePath);
+    const prior = existing.find((entry) => entry.pid === result.parsed.pid);
+
+    const entry: PidConfirmationEntry = {
+      pid: result.parsed.pid,
+      name: result.parsed.name,
+      classification: prior?.classification ?? 'PADRAO_OBD',
+      // A resposta prova que o PID respondeu, não que o sensor esteja fisicamente calibrado.
+      status: prior?.status === 'CONFIRMADO' && prior.source === 'USER_REAL_OBSERVATION' ? 'CONFIRMADO' : 'RESPONDEU',
+      firstSeen: prior?.firstSeen ?? now,
+      lastSeen: now,
+      occurrences: (prior?.occurrences ?? 0) + 1,
+      protocol: prior?.protocol ?? result.protocol ?? 'N/D',
+      responseTime: result.elapsedMs,
+      source: 'REAL_OBD',
+      confidence: prior ? prior.confidence + 1 : 1,
+      unit: result.parsed.unit,
+      formulaId: result.parsed.definition?.formulaId,
+      bytes: result.parsed.definition?.bytes,
+      description: result.parsed.definition?.description,
+    };
+    await recordPidConfirmation(basePath, entry);
+    await updateLearningProfileRealSample(basePath, result.parsed.name, parsedValue, learningCondition);
+  } catch (cause) {
+    console.warn('[autosave] falha ao registrar confirmação de PID:', cause instanceof Error ? cause.message : cause);
+  }
+}
+
+function enqueueBackgroundPersistence(basePath: string, task: () => Promise<void>): void {
+  const previous = backgroundPersistenceQueues.get(basePath) ?? Promise.resolve();
+  const current = previous.catch(() => undefined).then(task);
+  backgroundPersistenceQueues.set(basePath, current);
+  void current.finally(() => {
+    if (backgroundPersistenceQueues.get(basePath) === current) backgroundPersistenceQueues.delete(basePath);
+  }).catch(() => undefined);
+}
 
 export async function registerObdQuery(
   basePath: string,
   result: PidQueryResult,
   source: 'REAL' | 'SIMULACAO',
   condition?: VehicleCondition,
+  options: RegisterObdQueryOptions = {},
 ): Promise<void> {
-  try {
-    await logRawObdData(basePath, result, result.parsed.pid, source);
-    await logInterpretedData(basePath, result, result.parsed.pid, source);
-  } catch (cause) {
-    console.warn('[autosave] falha ao gravar logs OBD:', cause instanceof Error ? cause.message : cause);
-  }
-
+  // Update live state before any filesystem operation so the cockpit can render
+  // a new reading without waiting for CSV, PID-bank, or learning-profile I/O.
   recordLivePidQuery(result, source);
-
+  const observedAt = new Date().toISOString();
   pushLastReading({
     pid: result.parsed.pid,
     name: result.parsed.name,
     value: result.parsed.value,
     unit: result.parsed.unit,
     status: result.parsed.status,
-    timestamp: new Date().toISOString(),
+    timestamp: observedAt,
     source,
   });
-
-  const parsedValue = result.parsed.value;
-  const learningCondition = condition ?? (source === 'REAL' ? getVehicleConditionSnapshot().condition : 'UNKNOWN');
-  if (shouldFeedLearning(source, result.parsed.status, parsedValue) && parsedValue !== null) {
-    try {
-      const now = new Date().toISOString();
-      const existing = await readPidConfirmations(basePath);
-      const prior = existing.find((entry) => entry.pid === result.parsed.pid);
-
-      const entry: PidConfirmationEntry = {
-        pid: result.parsed.pid,
-        name: result.parsed.name,
-        classification: prior?.classification ?? 'PADRAO_OBD',
-        // Uma resposta válida confirma que o PID respondeu; não valida a exatidão física do sensor.
-        status: prior?.status === 'CONFIRMADO' && prior.source === 'USER_REAL_OBSERVATION' ? 'CONFIRMADO' : 'RESPONDEU',
-        firstSeen: prior?.firstSeen ?? now,
-        lastSeen: now,
-        occurrences: (prior?.occurrences ?? 0) + 1,
-        protocol: prior?.protocol ?? result.protocol ?? 'N/D',
-        responseTime: result.elapsedMs,
-        source: 'REAL_OBD',
-        confidence: prior ? prior.confidence + 1 : 1,
-        unit: result.parsed.unit,
-        formulaId: result.parsed.definition?.formulaId,
-        bytes: result.parsed.definition?.bytes,
-        description: result.parsed.definition?.description,
-      };
-      await recordPidConfirmation(basePath, entry);
-
-      await updateLearningProfileRealSample(
-        basePath,
-        result.parsed.name,
-        parsedValue,
-        learningCondition,
-      );
-    } catch (cause) {
-      console.warn('[autosave] falha ao registrar confirmação de PID:', cause instanceof Error ? cause.message : cause);
-    }
-  }
 
   if (source === 'SIMULACAO') {
     updateAutoSaveState((state) => {
       state.settings.simulationQueries = (Number(state.settings.simulationQueries) || 0) + 1;
     });
   }
+
+  const parsedValue = result.parsed.value;
+  const persistLearning = shouldFeedLearning(source, result.parsed.status, parsedValue) && parsedValue !== null;
+  const learningCondition = condition ?? (source === 'REAL' ? getVehicleConditionSnapshot().condition : 'UNKNOWN');
+
+  if (options.deferPersistence) {
+    // Learning only needs a representative sample per PID every 30 seconds;
+    // live telemetry and raw CSV evidence still capture every OBD response.
+    const learningKey = `${basePath}|${result.parsed.pid}`;
+    const now = Date.now();
+    const lastLearningAt = lastBackgroundLearningAt.get(learningKey) ?? 0;
+    const persistThisLearningSample = persistLearning && (
+      lastLearningAt === 0 || now - lastLearningAt >= BACKGROUND_LEARNING_MIN_INTERVAL_MS
+    );
+    if (persistThisLearningSample) lastBackgroundLearningAt.set(learningKey, now);
+
+    enqueueBackgroundPersistence(basePath, () => persistObdQuery(
+      basePath,
+      result,
+      source,
+      learningCondition,
+      { bufferedLogs: true, persistLearning: persistThisLearningSample },
+    ));
+    return;
+  }
+
+  await persistObdQuery(
+    basePath,
+    result,
+    source,
+    learningCondition,
+    { bufferedLogs: false, persistLearning },
+  );
+}
+
+export async function flushObdPersistence(basePath?: string): Promise<void> {
+  const queues = basePath
+    ? [backgroundPersistenceQueues.get(basePath)].filter((queue): queue is Promise<void> => Boolean(queue))
+    : Array.from(backgroundPersistenceQueues.values());
+  await Promise.all(queues.map((queue) => queue.catch(() => undefined)));
+  await flushBufferedCsvRows();
 }
 
 export async function forceSaveOnObdEvent(): Promise<void> {
-  // Eventos críticos próximos no tempo são consolidados em um único snapshot.
-  scheduleCriticalSave();
+  // Drain queued telemetry logs/learning before an event-triggered snapshot.
+  await flushObdPersistence();
+  await scheduleCriticalSave();
 }
