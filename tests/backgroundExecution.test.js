@@ -8,6 +8,7 @@ const task = fs.readFileSync('src/gps/backgroundLocationTask.ts', 'utf8');
 const monitoring = fs.readFileSync('src/gps/backgroundMonitoring.ts', 'utf8');
 const shared = fs.readFileSync('src/obd/sharedConnection.ts', 'utf8');
 const layout = fs.readFileSync('app/_layout.tsx', 'utf8');
+const autoTrip = fs.readFileSync('src/trip/autoTripService.ts', 'utf8');
 const keepAwakePackage = require('../package.json').dependencies['expo-keep-awake'];
 const permissions = fs.readFileSync('src/permissions/permissionManager.ts', 'utf8');
 const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
@@ -51,5 +52,10 @@ assert(monitoring.includes('stopBackgroundMonitoring'));
 assert(shared.includes('startBackgroundMonitoring()'));
 assert(shared.includes('stopBackgroundMonitoring()'));
 assert(layout.includes("import '../src/gps/backgroundLocationTask';"));
+assert(!layout.includes('const startGps ='), 'layout não deve iniciar GPS independentemente da ECU');
+assert(!layout.includes('startGps(settings.diagnosticAlerts)'), 'startup não deve criar trilha GPS sem ECU');
+assert(autoTrip.includes('await this.ensureGpsForEcu()'), 'serviço de viagem inicia GPS somente após a ECU responder');
+assert(autoTrip.includes('await this.stopGpsForEcu()'), 'serviço de viagem para GPS quando ECU perde resposta/desconecta');
+assert(autoTrip.includes("if (!getSharedObdStatus().ecuConnected)"), 'gravação deve exigir estado ECU conectado');
 
 console.log('background execution: Android FGS + TaskManager + lifecycle: OK');
