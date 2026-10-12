@@ -215,6 +215,9 @@ export default function IndexScreen() {
     : coolantValue != null && coolantValue >= 110
       ? 'ATENÇÃO'
       : coolantValue != null ? 'LEITURA REAL • PID 0105' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0105' : 'ECU DESCONECTADA';
+  const tripStorageWarning = /VIAGEM PENDENTE DE SALVAMENTO|VIAGEM SALVA, MAS FALHOU A ATUALIZAÇÃO DO SNAPSHOT/.test(tripState.error ?? '')
+    ? tripState.error
+    : null;
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
@@ -269,6 +272,11 @@ export default function IndexScreen() {
             <Link href="/dados" asChild><TouchableOpacity style={[styles.secondaryButton, styles.dashboardAction]}><Text style={styles.secondaryButtonText} numberOfLines={1}>📊 DADOS</Text></TouchableOpacity></Link>
             <Link href="/viagens" asChild><TouchableOpacity style={[styles.secondaryButton, styles.dashboardAction]}><Text style={styles.secondaryButtonText} numberOfLines={1}>🛣️ VIAGENS</Text></TouchableOpacity></Link>
           </View>
+          {tripStorageWarning ? (
+            <Text accessibilityRole="alert" style={styles.error} numberOfLines={3}>
+              {tripStorageWarning}
+            </Text>
+          ) : null}
           {!layout.landscape && (
             <>
               <View style={styles.bottomNav}>
