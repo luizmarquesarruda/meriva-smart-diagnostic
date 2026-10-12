@@ -49,11 +49,12 @@ const {
   GpsTracker,
   haversineDistanceKm,
   normalizeGpsSpeedKmh,
+  normalizeGpsJsonRecord,
   calculateConsumptionKml,
 } = mod.exports;
 
 assert.strictEqual(normalizeGpsSpeedKmh(10), 36);
-assert.strictEqual(normalizeGpsSpeedKmh(null), 0);
+assert.strictEqual(normalizeGpsSpeedKmh(null), null);
 assert.ok(
   Math.abs(
     haversineDistanceKm(
@@ -75,7 +76,28 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
   assert.strictEqual(tracker.getState().running, true);
   assert.strictEqual(tracker.getState().permissionGranted, true);
   assert.strictEqual(tracker.getState().signalQuality, 'SEM_FIX');
+  assert.strictEqual(tracker.getState().currentSpeedKmh, null);
   assert.strictEqual(tracker.getState().speedSource, 'PARADO');
+
+  const missingAccuracyRecord = normalizeGpsJsonRecord({
+    coords: { latitude: -23.55, longitude: -46.63, speed: 12, accuracy: null, altitude: null, heading: null, altitudeAccuracy: null },
+    timestamp: 1700000000000,
+  });
+  assert.strictEqual(missingAccuracyRecord.valid, false);
+  assert.strictEqual(missingAccuracyRecord.speedKmh, null);
+  assert.strictEqual(missingAccuracyRecord.signalQuality, 'SEM_FIX');
+  const goodRecord = normalizeGpsJsonRecord({
+    coords: { latitude: -23.55, longitude: -46.63, speed: 10, accuracy: 4, altitude: 700, heading: 370, altitudeAccuracy: 5 },
+    timestamp: 1700000000000,
+  });
+  assert.strictEqual(goodRecord.valid, true);
+  assert.strictEqual(goodRecord.speedKmh, 36);
+  assert.strictEqual(goodRecord.headingDegrees, 10);
+  assert.strictEqual(goodRecord.signalQuality, 'EXCELENTE');
+  assert.strictEqual(normalizeGpsJsonRecord({
+    coords: { latitude: 91, longitude: 0, speed: 0, accuracy: 1, altitude: null, heading: null, altitudeAccuracy: null },
+    timestamp: 1700000000000,
+  }), null);
 
   watcher({
     coords: { latitude: 0, longitude: 0, speed: 10, accuracy: 5 },
@@ -125,6 +147,11 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
   watcher({ coords: { latitude: 0, longitude: 0.0016, speed: 10, accuracy: 5 }, timestamp: 18000 });
   assert.strictEqual(tracker.getState().currentSpeedKmh, 0);
 
+  // Sem precisão válida, a velocidade é indisponível, não zero.
+  watcher({ coords: { latitude: 0, longitude: 0.0016, speed: 0, accuracy: null }, timestamp: 17500 });
+  assert.strictEqual(tracker.getState().currentSpeedKmh, null);
+  assert.strictEqual(tracker.getState().signalQuality, 'SEM_FIX');
+
   // Jitter parado de poucos metros não pode virar distância, mesmo com speed stale positivo.
   const distanceBeforeJitter = tracker.getState().distanceKm;
   watcher({ coords: { latitude: 0, longitude: 0.00161, speed: 10, accuracy: 5 }, timestamp: 19000 });
@@ -147,7 +174,7 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
   await tracker.stop();
   assert.strictEqual(tracker.getState().running, false);
   unsubscribe();
-  console.log('PASS GPS: automático, velocidade, distância e consumo');
+  console.log('PASS GPS: JSON validado, precisão, velocidade, distância e consumo');
 })().catch((error) => {
   console.error(error);
   process.exitCode = 1;
