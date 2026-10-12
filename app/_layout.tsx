@@ -1,7 +1,7 @@
 import '../src/gps/backgroundLocationTask';
 import { useEffect, useRef } from 'react';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
-import { Alert, AppState, Linking, Platform } from 'react-native';
+import { Alert, AppState, Platform } from 'react-native';
 import { Stack } from 'expo-router';
 import { ensureBluetoothReady } from '../src/obd/bluetoothManager';
 import { gpsTracker } from '../src/gps';
@@ -41,8 +41,6 @@ export default function RootLayout() {
 
   const checking = useRef(false);
   const lastFailureAt = useRef(0);
-  const gpsChecking = useRef(false);
-  const lastGpsFailureAt = useRef(0);
   const permissionsChecked = useRef(false);
 
   useEffect(() => {
@@ -104,29 +102,6 @@ export default function RootLayout() {
       }
     };
 
-    const startGps = async (diagnosticAlerts: boolean) => {
-      if (gpsChecking.current) return;
-      gpsChecking.current = true;
-      try {
-        const started = await gpsTracker.start();
-        if (!started) {
-          const now = Date.now();
-          if (diagnosticAlerts && now - lastGpsFailureAt.current > 3000) {
-            lastGpsFailureAt.current = now;
-            Alert.alert(
-              'GPS do celular',
-              gpsTracker.getState().error ?? 'Não foi possível iniciar o GPS automaticamente.',
-              [
-                { text: 'Abrir configurações', onPress: () => void Linking.openSettings() },
-                { text: 'Tentar novamente', onPress: () => void startGps(true) },
-              ],
-            );
-          }
-        }
-      } finally {
-        gpsChecking.current = false;
-      }
-    };
 
     void autoTripService.start(basePath);
 
@@ -149,13 +124,13 @@ export default function RootLayout() {
         }
         return;
       }
-      await Promise.all([
-        checkBluetooth(
-          settings.autoConnectObd,
-          settings.diagnosticAlerts,
-        ),
-        startGps(settings.diagnosticAlerts),
-      ]);
+      // A aquisição GPS pertence ao autoTripService e só começa depois da
+      // validação da resposta ECU. Iniciar o watcher aqui cria trilha antes
+      // da sessão OBD e compete com o Foreground Service nativo.
+      await checkBluetooth(
+        settings.autoConnectObd,
+        settings.diagnosticAlerts,
+      );
     };
 
     void startup();
