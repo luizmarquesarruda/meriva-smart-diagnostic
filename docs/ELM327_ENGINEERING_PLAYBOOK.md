@@ -111,7 +111,7 @@ ATSP0
 ATDP
 ~~~
 
-`ATZ` é a etapa obrigatória que reinicializa o adaptador. `ATI` é best-effort e não é gate universal: alguns clones não o implementam corretamente; comandos AT opcionais são classificados individualmente. O gate real da ECU permanece `010C -> 41 0C`, independentemente do texto de identificação do adaptador.
+`ATZ` é a etapa obrigatória que reinicializa o adaptador. `ATI` é best-effort e não é gate universal: alguns clones não o implementam corretamente; comandos AT opcionais são classificados individualmente. Se o adaptador responder explicitamente `?`/`UNKNOWN COMMAND`, o comando opcional é marcado como não suportado e não é repetido com retries e atrasos fixos. Timeouts e falhas transitórias continuam sujeitos à política de retry limitada. O gate real da ECU permanece `010C -> 41 0C`, independentemente do texto de identificação do adaptador.
 
 ### 5. Primeiro teste da ECU
 O primeiro PID real da Meriva é 010C.
@@ -289,3 +289,8 @@ O ciclo executa no máximo o limite efetivo configurado; o padrão seguro é 20 
 - O ELM327L possui adaptive timing com timeout baseado nos tempos reais de resposta, limitado pelo `ATST`; portanto, não se deve reduzir timeouts sem captura de latência real: https://www.elmelectronics.com/wp-content/uploads/2016/07/ELM327L_Data_Sheet.pdf
 - A aplicação reaproveita a resposta de validação `010C`, percorre apenas páginas bitmap anunciadas, remove do conjunto operacional os PIDs que não devolvem payload válido, e distribui fallback MAF/MAP e nível de tanque em ciclos separados. I/O CSV e persistência repetida do perfil PID foram tirados do caminho crítico sempre que possível.
 - Não foi aplicada alteração em `ATST`, `ATAT` ou protocolo KWP nesta rodada, porque ainda falta benchmark físico da mesma ECU/adaptador. O esperado é menor carga de consultas redundantes, não um valor prometido em milissegundos.
+
+
+### Retry rápido para comando opcional não suportado — 2026-10-12
+
+Quando um comando AT opcional retorna `UNSUPPORTED`, repetir o mesmo comando não oferece nova informação e só acrescenta latência de inicialização. `Elm327Session.performInitialize()` agora interrompe os retries deste caso explícito. `TIMEOUT` e `ERROR` mantêm a política de repetição limitada porque podem ser transitórios. Foi adicionada uma regressão com transporte falso que responde `?` para `ATI` e verifica uma única tentativa. Não foram alterados o reset obrigatório `ATZ`, os atrasos de assentamento do firmware, o protocolo KWP ou ATST.
