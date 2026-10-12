@@ -2084,3 +2084,10 @@ A correção do teste foi gravada na branch `fix/daily-obd-history-keep-screen-a
 - `src/trip/autoTripService.ts`: viagens finalizadas agora entram em uma fila de persistência e o gravador ativo é liberado sem descartar o objeto da viagem pendente.
 - Se não for possível gravar o índice nem o sidecar por uma falha de I/O, o ciclo permanece em memória, o aplicativo mostra um erro de salvamento pendente e tenta novamente com intervalo limitado; novas viagens são mantidas separadas.
 - A recuperação em memória cobre erros transitórios enquanto o processo continua ativo. Se o Android encerrar o processo e nenhum arquivo puder ser gravado, nenhuma aplicação pode garantir persistência dessa amostra; o sidecar write-ahead cobre o caminho normal em que há espaço/permissão para gravar a cópia lateral.
+
+ 
+### Descarregamento OBD no ciclo de vida Android
+
+- `autosaveManager.ts`: na transição do app para segundo plano, o serviço agora chama um hook registrado pela integração OBD, aguarda a fila de persistência de cada perfil e só então descarrega os buffers CSV. Se o hook ainda não estiver registrado, usa o flush CSV direto como fallback.
+- `autosaveIntegration.ts`: registra `flushObdPersistence()` como handler para essa transição, sem fazer o módulo de autosave importar o serviço OBD e criar dependência circular.
+- `tests/obdFastPath.test.js`: adicionadas verificações estáticas para garantir a ligação entre o ciclo de vida Android e o descarregamento da fila OBD.
