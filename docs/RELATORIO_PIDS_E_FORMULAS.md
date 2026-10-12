@@ -194,3 +194,8 @@ A comparação foi feita com documentação pública de projetos e fabricantes, 
 ### Validação pendente
 
 A alteração do código/testes não é prova de compilação. A CI deve executar Expo Doctor, TypeScript, a suíte completa de regressão e Android Release APK. Também é obrigatório teste físico na Meriva com a ECU ligada/desligada, observando tempo de conexão, frequência de atualização, manutenção do histórico diário e não acúmulo de GPS sem ECU. Não alterar `ATST`, `ATAT` ou temporizações do protocolo sem registrar latências reais e comparar estabilidade antes/depois.
+
+
+### Otimização adicional de conexão — 2026-10-12
+
+`src/obd/elm327.ts`: comandos AT opcionais que retornam `UNSUPPORTED` deixam de ser repetidos três vezes durante a inicialização. Isso remove atrasos fixos para adaptadores que não implementam determinado comando, sem mudar a recuperação para timeouts/erros transitórios e sem relaxar a validação real da ECU (`010C`). A regressão em `tests/regression.test.js` exige exatamente uma tentativa de `ATI` quando a resposta é `?`. A CI #1921 passou na validação automatizada; o build APK daquela execução estava em andamento ao registrar a observação, mas o código desta otimização requer uma nova CI.
