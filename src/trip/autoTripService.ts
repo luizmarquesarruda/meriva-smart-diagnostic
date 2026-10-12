@@ -8,6 +8,8 @@ import { RealTripRecorder, shouldFinalizeStoppedTrip } from './tripRecorder';
 import { estimateRangeFromFuelLevel, fuelLevelPercentToLiters, isFuelReserve } from './fuelLevel';
 import { getLivePidTrend, resetLiveTelemetry } from '../obd/liveTelemetry';
 import { estimateFuelRateLph, type FuelRateSource } from '../obd/fuelConsumption';
+import { startBackgroundMonitoring } from '../gps/backgroundMonitoring';
+import pollingPolicy from '../knowledge/polling_policy.json';
 
 export interface AutoTripServiceState {
   connected: boolean;
@@ -28,6 +30,10 @@ export interface AutoTripServiceState {
 }
 
 type Listener = (state: AutoTripServiceState) => void;
+
+const FUEL_ESTIMATE_EVERY_N_CYCLES = pollingPolicy.polling.estimatedFuelRate.everyCycles;
+const FUEL_RATE_DISPLAY_STALE_AFTER_MS = pollingPolicy.polling.estimatedFuelRate.displayStaleAfterMs;
+const FUEL_LEVEL_EVERY_N_CYCLES = pollingPolicy.polling.fuelLevel.everyCycles;
 
 const INITIAL_STATE: AutoTripServiceState = {
   connected: false,
@@ -60,6 +66,8 @@ class AutoTripService {
   private telemetryCursor = 0;
   private pollCycleNumber = 0;
   private stoppedSinceMs: number | null = null;
+  private gpsStartedForEcu = false;
+  private lastEstimatedFuelRate: { rateLph: number; source: FuelRateSource; timestampMs: number } | null = null;
   private state: AutoTripServiceState = { ...INITIAL_STATE };
 
   subscribe(listener: Listener): () => void {
@@ -112,18 +120,25 @@ class AutoTripService {
     this.unsubscribeConnection = null;
     await this.transition;
     await this.stopCurrentLoop();
+    await this.stopGpsForEcu();
+    this.lastEstimatedFuelRate = null;
     await this.finalizeRecorder();
     this.state = { ...INITIAL_STATE };
     this.emit();
   }
 
   private async applyConnection(connection: SharedObdConnection | null): Promise<void> {
+    const hadTrackingSession = Boolean(this.loopPromise || this.recorder || this.gpsStartedForEcu);
     await this.stopCurrentLoop();
+    // A conexão inicial pode já ter iniciado o GPS pelo serviço nativo em
+    // sharedConnection; não o desligar e ligar novamente sem necessidade.
+    if (!connection || hadTrackingSession) await this.stopGpsForEcu();
     await this.finalizeRecorder();
 
     resetLiveTelemetry();
     this.telemetryCursor = 0;
     this.pollCycleNumber = 0;
+    this.lastEstimatedFuelRate = null;
 
     if (!connection || !this.running) {
       this.state = { ...INITIAL_STATE };
@@ -171,6 +186,11 @@ class AutoTripService {
       getSharedObdConnection()?.session === connection.session
     ) {
       if (!getSharedObdStatus().ecuConnected) {
+        // A ECU perdeu a resposta: encerrar a captura de localização e fechar a
+        // viagem com a última evidência válida, sem acumular GPS offline.
+        await this.stopGpsForEcu();
+        await this.finalizeRecorder();
+        this.stoppedSinceMs = null;
         this.setState({ connected: true, active: false, error: 'ADAPTADOR OK / ECU SEM RESPOSTA' });
         await new Promise((resolve) => setTimeout(resolve, 1000));
         continue;
@@ -181,12 +201,18 @@ class AutoTripService {
         continue;
       }
 
+      if (!this.gpsStartedForEcu) await this.ensureGpsForEcu();
+
       const loopStartedAt = Date.now();
       this.pollCycleNumber += 1;
 
       try {
         let fuelRateLph: number | null = null;
         let fuelRateSource: FuelRateSource | undefined;
+        let fuelRateForDisplayLph: number | null = null;
+        let fuelRateForDisplaySource: FuelRateSource | null = null;
+        let mapFallbackQueriedThisCycle = false;
+        const fuelEstimateDue = this.pollCycleNumber % FUEL_ESTIMATE_EVERY_N_CYCLES === 1;
         let fuelLevelPercent: number | null = null;
         let obdSpeedKmh: number | null = null;
         let rpm: number | null = null;
@@ -237,12 +263,15 @@ class AutoTripService {
           ) {
             fuelRateLph = fuelResult.parsed.value;
             fuelRateSource = 'MEASURED_015E';
+            fuelRateForDisplayLph = fuelRateLph;
+            fuelRateForDisplaySource = fuelRateSource;
+            this.lastEstimatedFuelRate = null;
           }
         }
 
         // O nível do tanque muda lentamente: consultar a cada quatro ciclos
         // reduz tráfego serial sem limpar o último valor válido da interface.
-        if (this.state.fuelLevelSupported && this.pollCycleNumber % 4 === 1) {
+        if (this.state.fuelLevelSupported && this.pollCycleNumber % FUEL_LEVEL_EVERY_N_CYCLES === 1) {
           const fuelLevelResult = await connection.session.queryPid('012F');
           await registerObdQuery(this.basePath, fuelLevelResult, 'REAL');
           if (
@@ -259,27 +288,38 @@ class AutoTripService {
           fuelLevelPercent = this.state.fuelLevelPercent;
         }
 
-        if (fuelRateLph == null && connection.supportedPids.includes('0110')) {
-          // Não consultar MAF se a ECU não declarou suporte ao PID.
+        if (fuelRateLph == null && fuelEstimateDue && connection.supportedPids.includes('0110')) {
+          // MAF é estimativa secundária: amostrar a cada quatro ciclos reduz tráfego
+          // K-Line. Só valores positivos produzem estimativa de taxa de combustível.
           const mafResult = await connection.session.queryPid('0110');
           await registerObdQuery(this.basePath, mafResult, 'REAL');
           const mafGs = mafResult.parsed.status === 'RESPONDEU' ? mafResult.parsed.value : null;
-          if (mafGs != null && Number.isFinite(mafGs) && mafGs > 0) {
-            const estimate = estimateFuelRateLph({ mafGs });
-            if (estimate) {
-              fuelRateLph = estimate.rateLph;
-              fuelRateSource = estimate.source;
-            }
+          const estimate = mafGs != null && Number.isFinite(mafGs)
+            ? estimateFuelRateLph({ mafGs })
+            : null;
+          if (estimate) {
+            fuelRateLph = estimate.rateLph;
+            fuelRateSource = estimate.source;
+            fuelRateForDisplayLph = estimate.rateLph;
+            fuelRateForDisplaySource = estimate.source;
+            this.lastEstimatedFuelRate = {
+              rateLph: estimate.rateLph,
+              source: estimate.source,
+              timestampMs: Date.now(),
+            };
           }
         }
 
         if (
           fuelRateLph == null &&
+          fuelEstimateDue &&
           connection.supportedPids.includes('010B') &&
           connection.supportedPids.includes('010F') &&
           connection.supportedPids.includes('010C')
         ) {
-          // MAP e IAT só são consultados quando ambos foram descobertos.
+          // MAP e IAT são consultados juntos e só na cadência de estimativa.
+          // Marcar MAP evita repetir o mesmo PID na telemetria rotativa deste ciclo.
+          mapFallbackQueriedThisCycle = true;
           const mapResult = await connection.session.queryPid('010B');
           const iatResult = await connection.session.queryPid('010F');
           await registerObdQuery(this.basePath, mapResult, 'REAL');
@@ -295,6 +335,26 @@ class AutoTripService {
           if (estimate) {
             fuelRateLph = estimate.rateLph;
             fuelRateSource = estimate.source;
+            fuelRateForDisplayLph = estimate.rateLph;
+            fuelRateForDisplaySource = estimate.source;
+            this.lastEstimatedFuelRate = {
+              rateLph: estimate.rateLph,
+              source: estimate.source,
+              timestampMs: Date.now(),
+            };
+          }
+        }
+
+        // Exibir a última estimativa por até 10 s para evitar piscar N/D entre
+        // amostras lentas. A integração da viagem continua usando apenas a amostra
+        // recém-calculada acima, não valores estimados reaproveitados.
+        if (fuelRateForDisplayLph == null && this.lastEstimatedFuelRate) {
+          const estimateAgeMs = Date.now() - this.lastEstimatedFuelRate.timestampMs;
+          if (estimateAgeMs <= FUEL_RATE_DISPLAY_STALE_AFTER_MS) {
+            fuelRateForDisplayLph = this.lastEstimatedFuelRate.rateLph;
+            fuelRateForDisplaySource = this.lastEstimatedFuelRate.source;
+          } else {
+            this.lastEstimatedFuelRate = null;
           }
         }
 
@@ -302,8 +362,11 @@ class AutoTripService {
         gpsTracker.setVehicleSpeedHintKmh(obdSpeedSupported ? obdSpeedKmh : null);
 
         // Mantém um PID secundário por ciclo para tendências sem monopolizar o ELM.
-        const telemetryCandidates = ['0105', '010B', '0111', '0142'];
-        const supportedTelemetry = telemetryCandidates.filter((item) => connection.supportedPids.includes(item));
+        const telemetryCandidates = pollingPolicy.polling.rotatingTelemetryPids;
+        const supportedTelemetry = telemetryCandidates.filter((item) =>
+          connection.supportedPids.includes(item) &&
+          !(mapFallbackQueriedThisCycle && item === pollingPolicy.polling.estimatedFuelRate.mapPid)
+        );
         if (supportedTelemetry.length > 0) {
           const telemetryPid = supportedTelemetry[this.telemetryCursor % supportedTelemetry.length];
           this.telemetryCursor += 1;
@@ -357,8 +420,8 @@ class AutoTripService {
         }
 
         const instantaneousConsumptionKml =
-          fuelRateLph != null && fuelRateLph > 0 && tripVehicleSpeedKmh > 0
-            ? tripVehicleSpeedKmh / fuelRateLph
+          fuelRateForDisplayLph != null && fuelRateForDisplayLph > 0 && tripVehicleSpeedKmh > 0
+            ? tripVehicleSpeedKmh / fuelRateForDisplayLph
             : null;
 
         this.setState({
@@ -368,7 +431,7 @@ class AutoTripService {
           fuelUsedL: tripFuelUsedL,
           consumptionKml: tripConsumptionKml,
           instantaneousConsumptionKml,
-          instantaneousConsumptionSource: instantaneousConsumptionKml != null ? (fuelRateSource ?? null) : null,
+          instantaneousConsumptionSource: instantaneousConsumptionKml != null ? fuelRateForDisplaySource : null,
           fuelLevelPercent,
           fuelRemainingL: fuelLevelPercentToLiters(fuelLevelPercent),
           fuelReserve: isFuelReserve(fuelLevelPercent),
@@ -378,10 +441,10 @@ class AutoTripService {
                 tripConsumptionKml ?? this.state.averageConsumptionKml,
               ) ?? this.state.estimatedRangeKm)
             : this.state.estimatedRangeKm,
-          error: rpm === 0 && obdSpeedKmh === 0 && fuelRateLph == null
+          error: rpm === 0 && obdSpeedKmh === 0 && fuelRateForDisplayLph == null
             ? 'MOTOR DESLIGADO? / ECU SEM TELEMETRIA VÁLIDA'
-            : fuelRateSource && fuelRateSource !== 'MEASURED_015E'
-              ? 'CONSUMO ESTIMADO POR ' + fuelRateSource.replace('ESTIMATED_', '')
+            : fuelRateForDisplaySource && fuelRateForDisplaySource !== 'MEASURED_015E'
+              ? 'CONSUMO ESTIMADO POR ' + fuelRateForDisplaySource.replace('ESTIMATED_', '')
               : null,
         });
       } catch (cause) {
@@ -395,6 +458,35 @@ class AutoTripService {
       const waitMs = Math.max(150, intervalMs - elapsedMs);
       await new Promise((resolve) => setTimeout(resolve, waitMs));
     }
+  }
+
+  private async ensureGpsForEcu(): Promise<void> {
+    if (this.gpsStartedForEcu) return;
+    if (gpsTracker.getState().running) {
+      this.gpsStartedForEcu = true;
+      return;
+    }
+
+    // No Android, priorizar o serviço nativo para continuar registrando em
+    // segundo plano. Se a permissão ou o serviço falhar, manter fallback em
+    // primeiro plano sem bloquear a leitura OBD.
+    let backgroundStarted = false;
+    try {
+      backgroundStarted = await startBackgroundMonitoring();
+    } catch {
+      backgroundStarted = false;
+    }
+    if (!backgroundStarted) await gpsTracker.start();
+    this.gpsStartedForEcu = gpsTracker.getState().running || gpsTracker.isBackgroundLocationRunning();
+  }
+
+  private async stopGpsForEcu(): Promise<void> {
+    const gps = gpsTracker.getState();
+    if (this.gpsStartedForEcu || gps.running || gpsTracker.isBackgroundLocationRunning()) {
+      await gpsTracker.stop();
+    }
+    this.gpsStartedForEcu = false;
+    gpsTracker.setVehicleSpeedHintKmh(null);
   }
 
   private async stopCurrentLoop(): Promise<void> {
