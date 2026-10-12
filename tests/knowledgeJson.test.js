@@ -30,6 +30,7 @@ function main() {
   const bluetooth = readJson('src/knowledge/bluetooth_config.json');
   const diagnosticRules = readJson('src/knowledge/diagnostic_rules.json');
   const dtcCatalog = readJson('src/knowledge/dtc_catalog.json');
+  const pollingPolicy = readJson('src/knowledge/polling_policy.json');
 
   assert.strictEqual(typeof pids.version, 'number');
   assert.strictEqual(typeof formulas.version, 'number');
@@ -41,6 +42,8 @@ function main() {
   assert.strictEqual(typeof bluetooth.schemaVersion, 'number');
   assert.strictEqual(typeof diagnosticRules.version, 'number');
   assert.strictEqual(typeof dtcCatalog.version, 'number');
+  assert.strictEqual(typeof pollingPolicy.version, 'number');
+  assert.ok(pollingPolicy.version >= 1, 'polling policy precisa ter versão positiva');
   assert.ok(Array.isArray(dtcCatalog.codes) && dtcCatalog.codes.length > 0, 'catálogo DTC vazio');
   assert.strictEqual(dtcCatalog.standard, 'SAE J2012');
   assertUnique(dtcCatalog.codes.map((item) => String(item.code).toUpperCase()), 'DTC catalogado');
@@ -77,6 +80,24 @@ function main() {
 
   const pidList = [...pidIds];
   const rangeIds = Object.keys(ranges.ranges).map((id) => id.toUpperCase());
+  const polling = pollingPolicy.polling;
+  assert.ok(Array.isArray(polling.corePids) && polling.corePids.length > 0);
+  assert.strictEqual(polling.measuredFuelRate.everyCycles, 1, 'taxa de combustível medida deve continuar na cadência principal');
+  assert.ok(Number.isInteger(polling.estimatedFuelRate.everyCycles) && polling.estimatedFuelRate.everyCycles >= 2);
+  assert.ok(Number.isInteger(polling.fuelLevel.everyCycles) && polling.fuelLevel.everyCycles >= 2);
+  assert.ok(Number.isFinite(polling.estimatedFuelRate.displayStaleAfterMs) && polling.estimatedFuelRate.displayStaleAfterMs > 0);
+  const policyPids = [
+    ...polling.corePids,
+    polling.measuredFuelRate.pid,
+    polling.estimatedFuelRate.mafPid,
+    polling.estimatedFuelRate.mapPid,
+    polling.estimatedFuelRate.intakeAirTempPid,
+    polling.fuelLevel.pid,
+    ...polling.rotatingTelemetryPids,
+  ];
+  for (const id of policyPids) {
+    assert.ok(pidIds.has(String(id).toUpperCase()), 'polling policy referencia PID ausente no catálogo: ' + id);
+  }
   assert.deepStrictEqual(new Set(rangeIds), pidIds, 'ranges.json deve ter exatamente os mesmos PIDs do catálogo');
 
   for (const id of rangeIds) {
