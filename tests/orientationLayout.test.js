@@ -21,7 +21,7 @@ assert.match(index, /content:\{flex:1,width:'100%'/);
 assert.match(index, /maxContentWidth/);
 assert.match(index, /const rpmReading/);
 assert.match(index, /coolantValue/);
-assert.match(index, /setInterval\(\(\) => setActiveHeroMetric/);
+assert.match(index, /setInterval\(\s*\(\) => setActiveHeroMetric/, 'a rotação automática deve usar um timer de ciclo de vida');
 assert.match(index, /10_000/);
 assert.match(index, /VELOCIDADE GPS/);
 assert.match(index, /POSIÇÃO DA BORBOLETA/);
