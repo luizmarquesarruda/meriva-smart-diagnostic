@@ -19,13 +19,15 @@ mod.filename = sourcePath;
 mod.paths = Module._nodeModulePaths(path.dirname(sourcePath));
 mod._compile(output, sourcePath);
 
-const { integrateFuelRateLph, FuelRateIntegrator } = mod.exports;
+const { integrateFuelRateLph, FuelRateIntegrator, estimateFuelRateLph } = mod.exports;
 
 function assertApprox(actual, expected, epsilon = 1e-12) {
   assert.ok(Math.abs(actual - expected) <= epsilon, `expected ${actual} ≈ ${expected}`);
 }
 
 assert.strictEqual(integrateFuelRateLph(null, { fuelRateLph: 12, timestampMs: 1000 }), 0);
+assert.strictEqual(estimateFuelRateLph({ mafGs: 0 }), null, 'MAF zero não pode gerar taxa estimada de combustível');
+assert.ok(estimateFuelRateLph({ mafGs: 2.5 }).rateLph > 0, 'MAF positivo deve continuar calculável');
 assertApprox(
   integrateFuelRateLph(
     { fuelRateLph: 12, timestampMs: 1000 },
