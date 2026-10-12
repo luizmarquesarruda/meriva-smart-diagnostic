@@ -187,7 +187,7 @@ A comparação foi feita com documentação pública de projetos e fabricantes, 
 ### Impacto esperado e limites
 
 - Menos round trips na conexão inicial quando a ECU não anuncia páginas bitmap posteriores ou quando uma sonda já foi feita.
-- Menos trabalho bloqueante de disco por amostra; a telemetria continua enfileirada e os CSVs continuam contendo cada resposta recebida, enquanto o TXT diário continua sendo resumo de sessões.
+- Menos trabalho bloqueante de disco por amostra; cada resposta bruta/interpretada entra na fila CSV e é gravada em lote normalmente, enquanto o TXT diário continua sendo resumo de sessões. Como em qualquer buffer em memória, um encerramento forçado do processo antes do flush pode perder o lote ainda pendente; o aplicativo descarrega no intervalo de 1 s, ao entrar em background/inactive, ao desconectar e antes de exportar/limpar.
 - Menos consultas secundárias no ciclo principal e menos disputa entre PIDs lentos.
 - A precisão e a velocidade reais dependem da latência medida da ECU, do ELM327/clone, do protocolo KWP/K-Line e da qualidade do Bluetooth. Nenhum ganho numérico de milissegundos é alegado sem benchmark no mesmo carro e adaptador.
 
