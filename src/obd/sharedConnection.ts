@@ -7,6 +7,7 @@ import { clearBluetoothDiagnostic, getLastBluetoothDiagnosticText } from './blue
 import { isBluetoothLinkUp, type BluetoothLifecycleState } from './bluetoothState';
 import RNBluetoothClassic from 'react-native-bluetooth-classic';
 import * as FileSystem from 'expo-file-system';
+import { flushCsvLogs } from '../database/csvLogger';
 import { readAppSettings, writeAppSettings } from '../database/appSettings';
 import { startBackgroundMonitoring, stopBackgroundMonitoring } from '../gps/backgroundMonitoring';
 import { readVehicleIdentity } from './vehicleIdentity';
@@ -84,6 +85,9 @@ async function persistDisconnectedState(): Promise<void> {
     await closeObdAutosaveSession();
   } catch {
     // a perda de conectividade não deve derrubar a interface
+  } finally {
+    // Não perder amostras pendentes quando o link ECU/Bluetooth cair.
+    try { await flushCsvLogs(); } catch { /* a fila retenta sem bloquear a reconexão */ }
   }
 }
 
