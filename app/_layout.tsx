@@ -6,7 +6,7 @@ import { Stack } from 'expo-router';
 import { ensureBluetoothReady } from '../src/obd/bluetoothManager';
 import { gpsTracker } from '../src/gps';
 import { readAppSettings, writeAppSettings } from '../src/database/appSettings';
-import { connectPreferredElm, disconnectSharedObd } from '../src/obd/sharedConnection';
+import { connectPreferredElm, disconnectSharedObd, getSharedObdStatus, subscribeSharedObdStatus } from '../src/obd/sharedConnection';
 import * as FileSystem from 'expo-file-system';
 import { initAutoSave } from '../src/meriva/autosaveManager';
 import { autoTripService } from '../src/trip/autoTripService';
@@ -44,6 +44,8 @@ export default function RootLayout() {
   const gpsChecking = useRef(false);
   const lastGpsFailureAt = useRef(0);
   const permissionsChecked = useRef(false);
+  const gpsEcuConnected = useRef<boolean | null>(null);
+  const unsubscribeEcuStatus = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     const loadSettings = async () => readAppSettings(`${FileSystem.documentDirectory}MERIVA_SMART`);
@@ -104,8 +106,8 @@ export default function RootLayout() {
       }
     };
 
-    const startGps = async (diagnosticAlerts: boolean) => {
-      if (gpsChecking.current) return;
+    const startGps = async (diagnosticAlerts: boolean): Promise<boolean> => {
+      if (gpsChecking.current) return gpsTracker.getState().running;
       gpsChecking.current = true;
       try {
         const started = await gpsTracker.start();
@@ -123,9 +125,24 @@ export default function RootLayout() {
             );
           }
         }
+        return started;
       } finally {
         gpsChecking.current = false;
       }
+    };
+
+    const syncGpsWithEcu = async (ecuConnected: boolean, diagnosticAlerts: boolean) => {
+      if (gpsEcuConnected.current === ecuConnected) return;
+      if (!ecuConnected) {
+        gpsEcuConnected.current = false;
+        gpsTracker.setVehicleSpeedHintKmh(null);
+        await gpsTracker.stop();
+        return;
+      }
+      const started = await startGps(diagnosticAlerts);
+      // Só memoriza a transição positiva quando o watcher realmente iniciou;
+      // isso permite nova tentativa caso a permissão/provider falhe.
+      gpsEcuConnected.current = started ? true : null;
     };
 
     void autoTripService.start(basePath);
@@ -149,13 +166,15 @@ export default function RootLayout() {
         }
         return;
       }
-      await Promise.all([
-        checkBluetooth(
-          settings.autoConnectObd,
-          settings.diagnosticAlerts,
-        ),
-        startGps(settings.diagnosticAlerts),
-      ]);
+      // O GPS só registra deslocamento enquanto a ECU estiver validada e respondendo.
+      // Não iniciar localização apenas porque o aplicativo abriu ou o Bluetooth pareou.
+      if (!unsubscribeEcuStatus.current) {
+        unsubscribeEcuStatus.current = subscribeSharedObdStatus((status) => {
+          void syncGpsWithEcu(status.ecuConnected, settings.diagnosticAlerts);
+        });
+      }
+      await syncGpsWithEcu(getSharedObdStatus().ecuConnected, settings.diagnosticAlerts);
+      await checkBluetooth(settings.autoConnectObd, settings.diagnosticAlerts);
     };
 
     void startup();
@@ -166,6 +185,9 @@ export default function RootLayout() {
 
     return () => {
       subscription.remove();
+      unsubscribeEcuStatus.current?.();
+      unsubscribeEcuStatus.current = null;
+      gpsEcuConnected.current = null;
       void gpsTracker.stop();
       void autoTripService.stop().finally(() => {
         void disconnectSharedObd();
