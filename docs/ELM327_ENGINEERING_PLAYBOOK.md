@@ -94,9 +94,9 @@ TX termina com CR: `010C + CR`.
 
 RX é recebido como **stream sem delimitador**. Cada evento é anexado ao buffer local, sem assumir que um evento contém uma resposta inteira.
 
-A resposta somente fecha quando o buffer contém o prompt `>` do ELM327. Tudo antes do primeiro `>` pertence ao comando atual; qualquer cauda depois do prompt fica preservada para o próximo ciclo.
+A resposta somente fecha quando o buffer contém o prompt `>` do ELM327. Tudo antes do primeiro `>` pertence ao comando atual. A implementação atual descarta qualquer cauda após o primeiro prompt recebido no mesmo evento e registra essa cauda como `trailingDiscarded`; isso impede que clones que repetem uma resposta/prompt contaminem a resposta do próximo comando.
 
-Isso evita depender do particionamento do RFCOMM e evita misturar `OK`, `NO DATA` ou linhas intermediárias com o comando seguinte.
+Isso evita depender do particionamento do RFCOMM e evita misturar `OK`, `NO DATA` ou linhas intermediárias com o comando seguinte. A sessão mantém fila/mutex e não envia dois comandos em paralelo.
 
 ### 4. Inicialização
 Sequência base:
@@ -111,8 +111,7 @@ ATSP0
 ATDP
 ~~~
 
-ATZ e ATI são portas de entrada obrigatórias.
-Comandos AT opcionais podem ser desabilitados individualmente se o adaptador responder ?.
+`ATZ` é a etapa obrigatória que reinicializa o adaptador. `ATI` é best-effort e não é gate universal: alguns clones não o implementam corretamente; comandos AT opcionais são classificados individualmente. O gate real da ECU permanece `010C -> 41 0C`, independentemente do texto de identificação do adaptador.
 
 ### 5. Primeiro teste da ECU
 O primeiro PID real da Meriva é 010C.
@@ -280,3 +279,13 @@ Não declarar `export const` dentro de `createRealElmSession`. A função apenas
 ## Regra final de retry Bluetooth
 
 O ciclo executa no máximo o limite efetivo configurado; o padrão seguro é 20 tentativas. O intervalo de 8 segundos ocorre somente após uma falha. Ao obter SUCCESS, o ciclo termina imediatamente e a sessão bem-sucedida é devolvida ao aplicativo. Não existe reabertura ou tentativa adicional depois do sucesso.
+
+
+## Aquisição e redução de latência — 2026-10-12
+
+- O projeto mantém comandos OBD serializados porque a interface ELM327/K-Line usa ciclos request/reply.
+- `python-OBD` oferece um loop assíncrono `watch/start` que atualiza respostas em background e permite retornar o último valor conhecido sem bloquear o chamador: https://python-obd.readthedocs.io/en/latest/Async%20Connections/
+- OBD Auto Doctor declara que atualiza os PIDs sequencialmente tão rápido quanto carro/adaptador/conexão permitem e que PIDs adicionais de logging reduzem a atualização dos demais: https://www.obdautodoctor.com/features/ e https://support.obdlink.com/support/solutions/articles/43000709894
+- O ELM327L possui adaptive timing com timeout baseado nos tempos reais de resposta, limitado pelo `ATST`; portanto, não se deve reduzir timeouts sem captura de latência real: https://www.elmelectronics.com/wp-content/uploads/2016/07/ELM327L_Data_Sheet.pdf
+- A aplicação reaproveita a resposta de validação `010C`, percorre apenas páginas bitmap anunciadas, remove do conjunto operacional os PIDs que não devolvem payload válido, e distribui fallback MAF/MAP e nível de tanque em ciclos separados. I/O CSV e persistência repetida do perfil PID foram tirados do caminho crítico sempre que possível.
+- Não foi aplicada alteração em `ATST`, `ATAT` ou protocolo KWP nesta rodada, porque ainda falta benchmark físico da mesma ECU/adaptador. O esperado é menor carga de consultas redundantes, não um valor prometido em milissegundos.
