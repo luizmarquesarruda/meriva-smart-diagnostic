@@ -13,13 +13,21 @@ export interface RawObdLogEntry {
   source: 'REAL' | 'SIMULACAO';
 }
 
+/** Uses device-local date for daily file partitioning; timestamps stay ISO UTC. */
+export function getObdLogLocalDateKey(date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export async function logRawObdData(
   basePath: string,
   query: PidQueryResult,
   pid: string,
   source: 'REAL' | 'SIMULACAO',
 ): Promise<void> {
-  const today = new Date().toISOString().split('T')[0];
+  const today = getObdLogLocalDateKey();
   const fileName = `obd_raw_${today}.csv`;
   const filePath = `${basePath}/LOGS/${fileName}`;
 
