@@ -42,9 +42,11 @@ export async function discoverIntelligentPids(
   const confidence: Record<string, number> = {};
   const supported = new Set<string>();
 
-  // Fase 1: PIDs essenciais. Isso evita gastar quatro consultas de bitmap
-  // antes de saber se o adaptador/ECU responde aos dados que realmente usamos.
-  const priorityPids = ['010C', '010D', '012F', '015E'];
+  // Fase 1: validar ECU/RPM e velocidade. O comando 010C validado durante a
+  // conexão é reaproveitado; nível de tanque e combustível medido só serão
+  // consultados depois se a bitmap indicar suporte. Isso evita sondagens
+  // desnecessárias em ECUs K-Line antigas.
+  const priorityPids = ['010C', '010D'];
   const confirmedCandidates = options?.knownPids ?? [];
 
   const probePid = async (pid: string, prevalidated?: ElmCommandResult): Promise<void> => {
@@ -133,11 +135,19 @@ export async function discoverIntelligentPids(
 
   for (const pid of priorityPids) {
     const observation = observations.find((item) => item.pid === pid);
-    if (observation && observation.value !== null && supported.has(pid)) {
-      observation.status = 'CONFIRMADO';
-      observation.confidence = 1;
-      observation.reason = 'RESPOSTA RAW_ECU VÁLIDA NA FASE PRIORITÁRIA';
-      confidence[pid] = 1;
+    if (observation && observation.value !== null) {
+      // Bitmap anuncia capacidade, mas a resposta individual é a prova de que
+      // o PID é funcional nesta sessão. Não deixar um PID sem resposta entrar
+      // no polling simplesmente porque seu bit veio marcado.
+      if (supported.has(pid)) {
+        observation.status = 'CONFIRMADO';
+        observation.confidence = 1;
+        observation.reason = 'RESPOSTA RAW_ECU VÁLIDA NA FASE PRIORITÁRIA';
+        confidence[pid] = 1;
+      }
+    } else {
+      supported.delete(pid);
+      confidence[pid] = 0;
     }
   }
 
