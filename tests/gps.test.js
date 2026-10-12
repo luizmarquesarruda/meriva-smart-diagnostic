@@ -152,6 +152,7 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
   watcher({ coords: { latitude: 0, longitude: 0.0016, speed: 0, accuracy: null }, timestamp: 18500 });
   assert.strictEqual(tracker.getState().currentSpeedKmh, null);
   assert.strictEqual(tracker.getState().signalQuality, 'SEM_FIX');
+  assert.strictEqual(tracker.getState().speedSource, 'INDISPONIVEL');
   // A delayed, out-of-order location callback must not rewind the last valid state.
   watcher({ coords: { latitude: 0, longitude: 0.0016, speed: 20, accuracy: 4 }, timestamp: 18400 });
   assert.strictEqual(tracker.getState().currentSpeedKmh, null);
