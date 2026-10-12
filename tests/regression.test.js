@@ -306,13 +306,14 @@ async function testElmAndProtocol() {
     async write(data) {
       const command = data.trim();
       initCommands.push(command);
-      currentResponse = command === 'ATZ'
-        ? 'ELM327 v1.5\\r\\n>'
+      const payload = command === 'ATZ'
+        ? 'ELM327 v1.5'
         : command === 'ATI'
-          ? '?\\r\\n>'
+          ? '?'
           : command === 'ATDP'
-            ? 'ISO 14230-4 (KWP FAST)\\r\\n>'
-            : 'OK\\r\\n>';
+            ? 'ISO 14230-4 (KWP FAST)'
+            : 'OK';
+      currentResponse = payload + String.fromCharCode(13, 10) + '>';
     },
     async readUntilPrompt() { return currentResponse; },
   };
