@@ -31,12 +31,6 @@ export default function IndexScreen() {
   const [activeHeroMetric, setActiveHeroMetric] = useState(0);
   const layout = useMidLayout();
 
-  // O destaque alterna sozinho a cada 10 s; tocar no painel avança imediatamente.
-  useEffect(() => {
-    const timer = setInterval(() => setActiveHeroMetric((current) => (current + 1) % 5), 10_000);
-    return () => clearInterval(timer);
-  }, []);
-
   useEffect(() => gpsTracker.subscribe(setGpsState), []);
   useEffect(() => autoTripService.subscribe(setTripState), []);
   useEffect(() => {
@@ -195,6 +189,17 @@ export default function IndexScreen() {
     { label: 'POSIÇÃO DA BORBOLETA', value: throttleValue != null ? throttleValue.toFixed(1) : 'N/D', unit: throttleValue != null ? '%' : '', hint: throttleValue != null ? 'LEITURA REAL • PID 0111' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0111' : 'ECU DESCONECTADA', tone: 'normal' },
     { label: 'ROTAÇÃO DO MOTOR', value: rpmValue != null ? String(Math.round(rpmValue)) : 'N/D', unit: rpmValue != null ? 'RPM' : '', hint: rpmValue != null ? 'LEITURA REAL • PID 010C' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 010C' : 'ECU DESCONECTADA', tone: 'normal' },
   ];
+
+  // The displayed metric count is the single source of truth for both timed
+  // and touch-driven rotation; adding/removing metrics cannot desynchronize it.
+  useEffect(() => {
+    const timer = setInterval(
+      () => setActiveHeroMetric((current) => (current + 1) % Math.max(1, heroMetrics.length)),
+      10_000,
+    );
+    return () => clearInterval(timer);
+  }, [heroMetrics.length]);
+
   const selectedHeroMetric = heroMetrics[activeHeroMetric] ?? heroMetrics[0];
   const coolantStatus = coolantValue != null && coolantValue >= 115
     ? 'TEMPERATURA ALTA'
@@ -217,7 +222,7 @@ export default function IndexScreen() {
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel={selectedHeroMetric.label + '. Toque para trocar o indicador'}
-              onPress={() => setActiveHeroMetric((current) => (current + 1) % heroMetrics.length)}
+              onPress={() => setActiveHeroMetric((current) => (current + 1) % Math.max(1, heroMetrics.length))}
               activeOpacity={0.82}
               style={styles.heroReadout}
             >
@@ -227,7 +232,7 @@ export default function IndexScreen() {
                 {!!selectedHeroMetric.unit && <Text style={styles.heroUnit}>{selectedHeroMetric.unit}</Text>}
               </View>
               <Text style={styles.heroState}>{selectedHeroMetric.hint}</Text>
-              <Text style={styles.heroSwitchHint}>◉ {activeHeroMetric + 1}/5  •  TOQUE PARA TROCAR  •  10 S</Text>
+              <Text style={styles.heroSwitchHint}>◉ {activeHeroMetric + 1}/{heroMetrics.length}  •  TOQUE PARA TROCAR  •  10 S</Text>
             </TouchableOpacity>
             <View style={[styles.metricRow, layout.landscape && styles.metricRowLandscape]}>
               <CockpitMetric label={consumptionLabel} value={availableConsumptionKml != null ? availableConsumptionKml.toFixed(1) + ' km/L' : 'N/D'} />
