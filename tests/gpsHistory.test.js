@@ -225,8 +225,8 @@ function linesInDirectory(directory) {
   names = await fakeFS.readDirectoryAsync(dir);
   const segmentedFiles = names.filter((name) => name.startsWith('gps_' + segmentDate + '_')).sort();
   assert.strictEqual(segmentedFiles.length, 2, 'segment should roll over after 300 persisted rows');
-  assert.strictEqual(files.get(dir + '/' + segmentedFiles[0]).split(/\\r?\\n/).filter(Boolean).length, GPS_HISTORY_SEGMENT_RECORDS);
-  assert.strictEqual(files.get(dir + '/' + segmentedFiles[1]).split(/\\r?\\n/).filter(Boolean).length, 2);
+  assert.strictEqual(files.get(dir + '/' + segmentedFiles[0]).split(/\r?\n/).filter(Boolean).length, GPS_HISTORY_SEGMENT_RECORDS);
+  assert.strictEqual(files.get(dir + '/' + segmentedFiles[1]).split(/\r?\n/).filter(Boolean).length, 2);
 
   // The daily hard cap is enforced using the number of existing persisted lines.
   files.clear();
