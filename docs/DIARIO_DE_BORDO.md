@@ -2035,3 +2035,30 @@ Atualizadas as asserções de `tests/backgroundExecution.test.js` para verificar
 ### Estado
 A correção do teste foi gravada na branch `fix/daily-obd-history-keep-screen-awake-main`. A nova CI deve confirmar o resultado; não considerar validado até a execução terminar verde. O job Android build da execução #1911 foi ignorado porque o job de validação falhou.
 
+
+
+## 2026-10-11 — Normalização JSON e validação de sinal GPS
+
+### Problema
+O normalizador de velocidade convertia velocidade ausente em `0`, e a ausência de precisão horizontal podia ser tratada como amostra precisa. Na tela principal, isso permitia apresentar `0 km/h` mesmo sem um fix GPS confiável.
+
+### Correção
+- Criado contrato JSON GPS versão 1 em `src/gps/gps_sample.schema.json`.
+- `normalizeGpsJsonRecord` normaliza timestamp, coordenadas, velocidade em km/h, precisão, altitude, direção, validade e qualidade do sinal.
+- Coordenadas fora dos limites geográficos ou timestamps inválidos são rejeitados.
+- Velocidade e qualidade ficam indisponíveis quando não há precisão horizontal válida (até 30 m).
+- `normalizeGpsSpeedKmh(null)` passa a retornar `null`, preservando a diferença entre ausência de dado e veículo parado.
+- A home passa a mostrar `N/D` e `SEM FIX GPS VÁLIDO` quando não existe amostra confiável.
+- Testes de regressão cobrem precisão ausente, coordenadas inválidas, velocidade nula e normalização do heading.
+
+### Arquivos
+- `src/gps/gpsTracker.ts`
+- `src/gps/index.ts`
+- `src/gps/gps_sample.schema.json`
+- `app/index.tsx`
+- `tests/gps.test.js`
+
+### Validação e CI
+- Testes locais e typecheck: ainda precisam ser executados em ambiente de projeto.
+- CI: **não disparada**, conforme orientação explícita do usuário.
+- Teste físico no Android: pendente.
