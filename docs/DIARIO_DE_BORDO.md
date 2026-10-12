@@ -2103,6 +2103,7 @@ A correção do teste foi gravada na branch `fix/daily-obd-history-keep-screen-a
 ### Correções gravadas nesta branch
 - `app/_layout.tsx`: GPS passa a seguir `subscribeSharedObdStatus`; só inicia quando `ecuConnected` está verdadeiro e para quando a ECU perde resposta. Pairing Bluetooth ou abertura do app não inicia gravação GPS.
 - `tests/backgroundExecution.test.js`: adicionadas verificações para impedir retorno da inicialização incondicional do GPS e exigir o vínculo ao estado da ECU.
+- `tests/fuelConsumption.test.js`: regressão explícita para exigir que MAF zero retorne ausência de estimativa e que MAF positivo continue calculável.
 - `src/obd/fuelConsumption.ts`: o fallback por MAF não calcula taxa a partir de `0 g/s`; sem fluxo de ar positivo, retorna ausência de estimativa em vez de uma taxa zero artificial.
 
 ### Limites e validação pendente
