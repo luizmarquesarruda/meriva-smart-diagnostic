@@ -465,7 +465,7 @@ async function testIntelligentPidDiscovery() {
   assert.strictEqual(result.observations.find((item) => item.pid === '010C').status, 'CONFIRMADO');
   assert.strictEqual(result.observations.find((item) => item.pid === '010C').value, 1726);
   assert.strictEqual(commands.filter((pid) => pid === '010C').length, 0, 'descoberta deve reaproveitar a sonda 010C validada');
-  assert.ok(!commands.includes('012F'), 'não consultar nível de tanque sem bitmap indicando suporte');
+  assert.strictEqual(commands.filter((pid) => pid === '012F').length, 1, 'PID de nível de tanque anunciado pela bitmap deve ser consultado uma vez e validado pela resposta real');
   assert.ok(!commands.includes('015E'), 'não consultar taxa de combustível sem bitmap indicando suporte');
   assert.ok(!commands.includes('0110'), 'não consultar PID fora da lista anunciada pela bitmap');
   assert.ok(!commands.includes('0140') && !commands.includes('0160'), 'não consultar páginas bitmap que a ECU não anunciou');
