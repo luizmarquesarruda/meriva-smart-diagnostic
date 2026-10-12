@@ -36,6 +36,7 @@ const fakeLocation = {
 const originalLoad = Module._load;
 Module._load = function(request) {
   if (request === 'expo-location') return fakeLocation;
+  if (request === './gpsHistory') return { gpsHistoryStore: { record: async () => undefined, flush: async () => undefined } };
   return originalLoad.apply(this, arguments);
 };
 
