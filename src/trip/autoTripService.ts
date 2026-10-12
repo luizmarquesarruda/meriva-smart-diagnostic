@@ -9,6 +9,7 @@ import { RealTripRecorder, shouldFinalizeStoppedTrip } from './tripRecorder';
 import { estimateRangeFromFuelLevel, fuelLevelPercentToLiters, isFuelReserve } from './fuelLevel';
 import { getLivePidTrend, resetLiveTelemetry } from '../obd/liveTelemetry';
 import { estimateFuelRateLph, type FuelRateSource } from '../obd/fuelConsumption';
+import { shouldKeepGpsHistorySession } from './gpsRecordingGate';
 
 export interface AutoTripServiceState {
   connected: boolean;
@@ -111,13 +112,12 @@ class AutoTripService {
     this.unsubscribeEcuStatus = subscribeSharedObdStatus((status) => {
       this.gpsRecordingTransition = this.gpsRecordingTransition
         .then(async () => {
-          const connection = getSharedObdConnection();
-          const ecuSessionEligible = Boolean(
-            connection?.ecuValidated &&
-            status.bluetoothConnected &&
-            status.ecuResponseState !== 'NOT_VALIDATED'
+          const ecuSessionEligible = shouldKeepGpsHistorySession(
+            this.running,
+            getSharedObdConnection(),
+            status,
           );
-          if (!this.running || !ecuSessionEligible) {
+          if (!ecuSessionEligible) {
             await gpsHistoryStore.stopSession();
             return;
           }
