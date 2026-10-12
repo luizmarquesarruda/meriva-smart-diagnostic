@@ -469,6 +469,9 @@ async function testIntelligentPidDiscovery() {
   assert.ok(!commands.includes('015E'), 'não consultar taxa de combustível sem bitmap indicando suporte');
   assert.ok(!commands.includes('0110'), 'não consultar PID fora da lista anunciada pela bitmap');
   assert.ok(!commands.includes('0140') && !commands.includes('0160'), 'não consultar páginas bitmap que a ECU não anunciou');
+  assert.ok(!result.supportedPids.includes('010D'), 'bitmap não deve transformar PID sem payload válido em PID operacional');
+  assert.ok(!result.supportedPids.includes('012F'), 'PID anunciado mas sem resposta individual não deve entrar no polling runtime');
+  assert.ok(result.supportedPids.includes('0105'), 'PID com resposta real válida deve continuar disponível');
 }
 
 async function testCarScannerBaselineAndFuel012F() {
@@ -942,6 +945,8 @@ async function testPidAndLearningWriteSerialization() {
   assert.ok(autoTripServiceSource.includes("this.pollCycleNumber % FUEL_LEVEL_EVERY_N_CYCLES === 1"), 'nível do tanque deve seguir cadência centralizada no JSON');
   assert.ok(autoTripServiceSource.includes("fuelRateLph == null && fuelEstimateDue && connection.supportedPids.includes('0110')"), 'MAF só deve ser consultado como fallback quando suportado e na cadência reduzida');
   assert.ok(autoTripServiceSource.includes("connection.supportedPids.includes('010B') &&\n          connection.supportedPids.includes('010F')"), 'fallback MAP exige suporte confirmado aos PIDs MAP e IAT');
+  assert.ok(autoTripServiceSource.includes('!(mapFallbackQueriedThisCycle && item === pollingPolicy.polling.estimatedFuelRate.mapPid)'), 'MAP usado no fallback não deve ser consultado novamente na telemetria rotativa');
+  assert.ok(autoTripServiceSource.includes('FUEL_RATE_DISPLAY_STALE_AFTER_MS'), 'valor em cache deve ter prazo explícito de expiração para exibição');
   assert.ok(!autoTripServiceSource.includes('recordLivePidQuery('), 'telemetria automática deve registrar cada resposta uma única vez via registerObdQuery');
   writeDelayMs = 0;
 }
