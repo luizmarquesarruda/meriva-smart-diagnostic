@@ -19,11 +19,13 @@
       "mapPid": "010B",
       "intakeAirTempPid": "010F",
       "everyCycles": 4,
-      "displayStaleAfterMs": 10000
+      "displayStaleAfterMs": 10000,
+      "phase": 1
     },
     "fuelLevel": {
       "pid": "012F",
-      "everyCycles": 4
+      "everyCycles": 4,
+      "phase": 3
     },
     "rotatingTelemetryPids": [
       "0105",
