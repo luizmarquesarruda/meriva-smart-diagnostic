@@ -375,7 +375,6 @@ export class GpsTracker {
     // Never let an older fix rewind the trip's current state.
     if (this.state.lastTimestamp != null && normalized.timestamp <= this.state.lastTimestamp) return;
 
-    const c = location.coords;
     const sample: GpsSample = {
       latitude: normalized.latitude,
       longitude: normalized.longitude,
