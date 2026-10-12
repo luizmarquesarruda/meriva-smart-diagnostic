@@ -264,7 +264,7 @@ class AutoTripService {
           const mafResult = await connection.session.queryPid('0110');
           await registerObdQuery(this.basePath, mafResult, 'REAL');
           const mafGs = mafResult.parsed.status === 'RESPONDEU' ? mafResult.parsed.value : null;
-          if (mafGs != null && Number.isFinite(mafGs) && mafGs >= 0) {
+          if (mafGs != null && Number.isFinite(mafGs) && mafGs > 0) {
             const estimate = estimateFuelRateLph({ mafGs });
             if (estimate) {
               fuelRateLph = estimate.rateLph;
