@@ -570,6 +570,7 @@ export async function disconnectSharedObd(): Promise<void> {
   } finally {
     await stopBackgroundMonitoring();
     await closeObdAutosaveSession();
+    try { await flushCsvLogs(); } catch { /* fila tenta preservar/retentar sem bloquear desconexão */ }
     intentionalDisconnect = false;
   }
 }
