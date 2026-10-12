@@ -32,7 +32,7 @@ export function normalizeGpsJsonRecord(location: Location.LocationObject): GpsJs
   if (
     !Number.isFinite(c.latitude) || c.latitude < -90 || c.latitude > 90 ||
     !Number.isFinite(c.longitude) || c.longitude < -180 || c.longitude > 180 ||
-    !Number.isFinite(location.timestamp) || location.timestamp <= 0
+    !Number.isInteger(location.timestamp) || location.timestamp <= 0
   ) return null;
 
   const accuracyMeters = c.accuracy != null && Number.isFinite(c.accuracy) && c.accuracy >= 0
