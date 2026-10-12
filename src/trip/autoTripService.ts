@@ -2,13 +2,12 @@ import { gpsTracker } from '../gps';
 import type { SharedObdConnection } from '../obd/sharedConnection';
 import { getSharedObdConnection, getSharedObdStatus, subscribeSharedObd } from '../obd/sharedConnection';
 import { addDriveCycle, readDriveCycles } from '../storage/driveCycleStorage';
-import { forceSaveOnObdEvent, registerObdQuery } from '../meriva/autosaveIntegration';
+import { flushObdPersistence, forceSaveOnObdEvent, registerObdQuery } from '../meriva/autosaveIntegration';
 import { getAutoSaveState, updateAutoSaveState, initAutoSave } from '../meriva/autosaveManager';
 import { RealTripRecorder, shouldFinalizeStoppedTrip } from './tripRecorder';
 import { estimateRangeFromFuelLevel, fuelLevelPercentToLiters, isFuelReserve } from './fuelLevel';
 import { getLivePidTrend, resetLiveTelemetry } from '../obd/liveTelemetry';
 import { estimateFuelRateLph, type FuelRateSource } from '../obd/fuelConsumption';
-import { flushObdPersistence } from '../meriva/autosaveIntegration';
 
 export interface AutoTripServiceState {
   connected: boolean;
@@ -66,6 +65,7 @@ class AutoTripService {
   private lastFuelRateLph: number | null = null;
   private lastFuelRateSource: FuelRateSource | null = null;
   private lastFuelRateAtMs = 0;
+  private lastFuelFallbackAttemptAtMs = 0;
   private state: AutoTripServiceState = { ...INITIAL_STATE };
 
   private canQueryPid(pid: string): boolean {
@@ -97,6 +97,7 @@ class AutoTripService {
     this.lastFuelRateLph = null;
     this.lastFuelRateSource = null;
     this.lastFuelRateAtMs = 0;
+    this.lastFuelFallbackAttemptAtMs = 0;
   }
 
   subscribe(listener: Listener): () => void {
@@ -304,9 +305,9 @@ class AutoTripService {
           fuelLevelPercent = this.state.fuelLevelPercent;
         }
 
-        const fuelFallbackDue = this.lastFuelRateAtMs === 0 ||
-          Date.now() - this.lastFuelRateAtMs >= 5_000 ||
-          this.pollCycleNumber % 4 === 1;
+        const fuelFallbackDue = fuelRateLph == null &&
+          Date.now() - this.lastFuelFallbackAttemptAtMs >= 5_000;
+        if (fuelFallbackDue) this.lastFuelFallbackAttemptAtMs = Date.now();
 
         if (
           fuelRateLph == null &&
