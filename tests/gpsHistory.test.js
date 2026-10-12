@@ -216,6 +216,7 @@ function linesInDirectory(directory) {
   assert.strictEqual(linesInDirectory(dir).filter((line) => line.includes('"schemaVersion":1')).length, 5,
     'samples received while ECU is disconnected must not be stored');
   await store.startSession();
+  clock += 10_000;
   await store.record(makeSample(clock), 36);
   await store.flush();
   const afterReconnect = linesInDirectory(dir).map((line) => JSON.parse(line));
