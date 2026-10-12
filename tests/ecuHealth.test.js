@@ -25,12 +25,8 @@ if (!elm.includes("async recoverProtocol()") || !elm.includes("async keepAlive()
 if (!autoTrip.includes("ADAPTADOR OK / ECU SEM RESPOSTA")) {
   throw new Error('polling automático não pausa diante de perda de resposta da ECU');
 }
-if (
-  !autoTrip.includes('status.bluetoothConnected') ||
-  !autoTrip.includes("status.ecuResponseState !== 'NOT_VALIDATED'") ||
-  !autoTrip.includes('getSharedObdConnection()')
-) {
-  throw new Error('histórico GPS deve tolerar falhas transitórias, mas exigir conexão Bluetooth e ECU validada');
+if (!autoTrip.includes('shouldKeepGpsHistorySession(')) {
+  throw new Error('serviço automático deve delegar a decisão do gate GPS ao predicado testável');
 }
 
 console.log('ecuHealth.test.js: OK');
