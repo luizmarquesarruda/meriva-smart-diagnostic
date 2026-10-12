@@ -1,6 +1,6 @@
 import { Link, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMidLayout } from '../src/ui/midLayout';
 import * as FileSystem from 'expo-file-system';
@@ -16,16 +16,9 @@ import { readAppSettings, type AppSettings } from '../src/database/appSettings';
 import { connectPreferredElm, getSharedObdConnection, getSharedObdLastError, getSharedObdStatus, subscribeSharedObd, subscribeSharedObdStatus } from '../src/obd/sharedConnection';
 import { autoTripService, type AutoTripServiceState } from '../src/trip/autoTripService';
 
-function formatDistance(km: number, unit: AppSettings['distanceUnit']): string {
-  if (!Number.isFinite(km) || km < 0) return 'N/D';
-  if (unit === 'MI') return `${(km * 0.621371).toFixed(2)} mi`;
-  if (km < 1) return `${Math.round(km * 1000)} m`;
-  return `${km.toFixed(2)} km`;
-}
-
 export default function IndexScreen() {
   const [cycles, setCycles] = useState<DriveCycle[]>([]);
-  const [obd, setObd] = useState<ObdConnectionState>({ connected: false });
+  const [, setObd] = useState<ObdConnectionState>({ connected: false });
   const [connectionStatus, setConnectionStatus] = useState(getSharedObdStatus());
   const [bluetoothSearching, setBluetoothSearching] = useState(false);
   const [bluetoothError, setBluetoothError] = useState<string | null>(null);
@@ -173,6 +166,12 @@ export default function IndexScreen() {
   const consumptionLabel = tripState.instantaneousConsumptionKml != null
     ? tripState.instantaneousConsumptionSource === 'MEASURED_015E' ? 'CONSUMO INSTANTÂNEO OBD' : 'INSTANTÂNEO ESTIMADO'
     : tripState.consumptionKml != null && tripState.consumptionKml > 0 ? 'MÉDIA DA VIAGEM' : 'MÉDIA HISTÓRICA';
+  const rpmReading = getAutoSaveState().lastReadings.find((item) => {
+    if (!/rpm/i.test(item.name) || item.source !== 'REAL' || item.value == null || !Number.isFinite(item.value)) return false;
+    const timestampMs = Date.parse(item.timestamp);
+    return connectionStatus.ecuConnected && Number.isFinite(timestampMs) && Date.now() - timestampMs >= 0 && Date.now() - timestampMs <= 30_000;
+  });
+  const rpmValue = rpmReading?.value ?? null;
   const coolantReading = getAutoSaveState().lastReadings.find((item) => {
     if (item.pid !== '0105' || item.source !== 'REAL' || item.value == null || !Number.isFinite(item.value)) return false;
     const timestampMs = Date.parse(item.timestamp);
@@ -184,17 +183,10 @@ export default function IndexScreen() {
     : coolantValue != null && coolantValue >= 110
       ? 'ATENÇÃO'
       : coolantValue != null ? 'LEITURA REAL • PID 0105' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0105' : 'ECU DESCONECTADA';
-  const distanceUnit = settings?.distanceUnit ?? 'KM';
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={[styles.content, { paddingHorizontal: layout.horizontalPadding }]}
-        showsHorizontalScrollIndicator={false}
-        showsVerticalScrollIndicator={false}
-        bounces={false}
-      >
+      <View style={[styles.content, { paddingHorizontal: layout.horizontalPadding }]}>
         <View style={[styles.screenFrame, { maxWidth: layout.maxContentWidth }]}>
           <View style={[styles.header, layout.landscape && styles.headerLandscape]}>
             <View style={styles.headerTitle}>
@@ -203,16 +195,16 @@ export default function IndexScreen() {
             </View>
             <View style={styles.connectionPill}><View style={[styles.dot, connectionStatus.ecuConnected ? styles.dotOk : bluetoothError ? styles.dotDanger : styles.dotWarn]} /><Text style={styles.connectionText}>{connectionStatus.ecuResponseState === 'NO_RESPONSE' ? 'ECU SEM RESPOSTA' : connectionStatus.ecuResponseState === 'RECOVERING' ? 'RECUPERANDO' : connectionStatus.ecuConnected ? 'ECU' : connectionStatus.bluetoothConnected ? 'BLUETOOTH' : bluetoothSearching ? 'CONECTANDO' : 'OFFLINE'}</Text></View>
           </View>
-          <View style={styles.heroCard}>
+          <View style={[styles.heroCard, layout.landscape && styles.heroCardLandscape]}>
             <Text style={styles.heroEyebrow}>{connectionStatus.ecuResponseState === 'NO_RESPONSE' ? 'ADAPTADOR OK • ECU SEM RESPOSTA' : connectionStatus.ecuResponseState === 'RECOVERING' ? 'RECUPERANDO PROTOCOLO ECU' : connectionStatus.ecuConnected ? 'MOTOR • ECU CONECTADA' : 'ESTADO DO VEÍCULO'}</Text>
-            <Text style={styles.heroValue}>{connectionStatus.ecuConnected && getAutoSaveState().lastReadings.find((item) => /rpm/i.test(item.name) && item.value != null) ? (Math.round(getAutoSaveState().lastReadings.find((item) => /rpm/i.test(item.name) && item.value != null)?.value ?? 0) + ' RPM') : getAutoSaveState().autonomy.estimatedRangeKm > 0 ? (getAutoSaveState().autonomy.estimatedRangeKm.toFixed(0) + ' km') : 'PRONTO'}</Text>
-            <Text style={styles.heroState}>{connectionStatus.ecuResponseState === 'NO_RESPONSE' ? 'POLLING PAUSADO • RECUPERAÇÃO AUTOMÁTICA' : connectionStatus.ecuResponseState === 'RECOVERING' ? 'REINICIALIZANDO PROTOCOLO' : connectionStatus.ecuConnected ? 'DADOS OBD EM TEMPO REAL' : 'CONECTE O ELM327 PARA INICIAR'}</Text>
-            <View style={styles.metricRow}>
-              <CockpitMetric label="VELOCIDADE" value={gpsState.currentSpeedKmh.toFixed(0) + ' km/h'} />
+            <Text style={[styles.heroValue, layout.landscape && styles.heroValueLandscape]}>{gpsState.running ? Math.round(gpsState.currentSpeedKmh) + ' km/h' : 'N/D'}</Text>
+            <Text style={styles.heroState}>{connectionStatus.ecuResponseState === 'NO_RESPONSE' ? 'ECU SEM RESPOSTA • RECUPERAÇÃO AUTOMÁTICA' : connectionStatus.ecuResponseState === 'RECOVERING' ? 'RECUPERANDO CONEXÃO ECU' : connectionStatus.ecuConnected ? 'VELOCIDADE GPS • DADOS OBD ATIVOS' : 'VELOCIDADE GPS • ELM327 DESCONECTADO'} • {dtcCount} DTC</Text>
+            <View style={[styles.metricRow, layout.landscape && styles.metricRowLandscape]}>
+              <CockpitMetric label="ROTAÇÃO DO MOTOR" value={rpmValue != null ? Math.round(rpmValue) + ' RPM' : 'N/D'} />
               <CockpitMetric label={consumptionLabel} value={availableConsumptionKml != null ? availableConsumptionKml.toFixed(1) + ' km/L' : 'N/D'} />
               <CockpitMetric label="AUTONOMIA" value={getAutoSaveState().autonomy.estimatedRangeKm > 0 ? getAutoSaveState().autonomy.estimatedRangeKm.toFixed(0) + ' km' : 'N/D'} />
             </View>
-            <View style={styles.coolantCard}>
+            <View style={[styles.coolantCard, layout.landscape && styles.coolantCardLandscape]}>
               <View style={styles.coolantCopy}>
                 <Text style={styles.coolantLabel}>🌡️ LÍQUIDO DE ARREFECIMENTO</Text>
                 <Text style={styles.coolantStatus}>{coolantStatus}</Text>
@@ -222,48 +214,44 @@ export default function IndexScreen() {
               </Text>
             </View>
           </View>
-          <View style={styles.healthCard}>
-            <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>SAÚDE DO VEÍCULO</Text><Text style={styles.sectionHint}>{dtcCount > 0 ? 'Falhas requerem atenção' : 'Nenhuma falha ativa registrada'}</Text></View><Text style={dtcCount > 0 ? styles.danger : styles.ok}>{dtcCount > 0 ? (dtcCount + ' DTC') : 'NORMAL'}</Text></View>
-            <Link href="/saude" asChild><TouchableOpacity style={styles.outlineButton}><Text style={styles.outlineText}>ABRIR CENTRAL DE SAÚDE →</Text></TouchableOpacity></Link>
-          </View>
-          <View style={styles.connectionCard}>
-            <Text style={styles.sectionTitle}>CADEIA DE CONEXÃO</Text>
-            <View style={styles.chain}><ChainStep label="BLUETOOTH" ok={connectionStatus.bluetoothConnected} /><Text style={styles.chainArrow}>›</Text><ChainStep label="ELM327" ok={Boolean(connectionStatus.bluetoothConnected && (obd.protocol || connectionStatus.ecuConnected))} /><Text style={styles.chainArrow}>›</Text><ChainStep label="ECU" ok={connectionStatus.ecuConnected} /></View>
-          </View>
+          {!layout.landscape && (
+            <View style={styles.healthCard}>
+              <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>SAÚDE DO VEÍCULO</Text><Text style={styles.sectionHint}>{dtcCount > 0 ? 'Falhas requerem atenção' : 'Nenhuma falha ativa registrada'}</Text></View><Text style={dtcCount > 0 ? styles.danger : styles.ok}>{dtcCount > 0 ? (dtcCount + ' DTC') : 'NORMAL'}</Text></View>
+              <Link href="/saude" asChild><TouchableOpacity style={styles.outlineButton}><Text style={styles.outlineText}>ABRIR CENTRAL DE SAÚDE →</Text></TouchableOpacity></Link>
+            </View>
+          )}
           <View style={[styles.actionGrid, layout.landscape && styles.actionGridLandscape]}>
-            <Link href="/laboratorio" asChild><TouchableOpacity style={[styles.primaryButton, layout.landscape && styles.actionButtonLandscape]}><Text style={styles.buttonText} numberOfLines={1}>🔧 DIAGNÓSTICO</Text><Text style={styles.buttonSubtext}>SCAN • DTC • ECU</Text></TouchableOpacity></Link>
-            <Link href="/dados" asChild><TouchableOpacity style={[styles.secondaryButton, layout.landscape && styles.actionButtonLandscape]}><Text style={styles.secondaryButtonText} numberOfLines={2}>📊 DADOS EM TEMPO REAL</Text><Text style={styles.buttonSubtextDark}>PIDs • TENDÊNCIAS</Text></TouchableOpacity></Link>
+            <Link href="/laboratorio" asChild><TouchableOpacity style={[styles.primaryButton, styles.dashboardAction]}><Text style={styles.buttonText} numberOfLines={1}>🔧 DIAGNÓSTICO</Text></TouchableOpacity></Link>
+            <Link href="/dados" asChild><TouchableOpacity style={[styles.secondaryButton, styles.dashboardAction]}><Text style={styles.secondaryButtonText} numberOfLines={1}>📊 DADOS</Text></TouchableOpacity></Link>
+            <Link href="/viagens" asChild><TouchableOpacity style={[styles.secondaryButton, styles.dashboardAction]}><Text style={styles.secondaryButtonText} numberOfLines={1}>🛣️ VIAGENS</Text></TouchableOpacity></Link>
           </View>
-          <View style={[styles.statusGrid, layout.landscape && styles.statusGridLandscape]}>
-            <StatusCard landscape={layout.landscape} label="GPS" value={gpsState.running ? 'ATIVO' : 'AGUARDANDO'} ok={gpsState.running} />
-            <StatusCard landscape={layout.landscape} label="FALHAS" value={dtcCount ? String(dtcCount) : 'OK'} danger={dtcCount > 0} ok={dtcCount === 0} />
-            <StatusCard landscape={layout.landscape} label="VIAGEM" value={formatDistance(gpsState.distanceKm, distanceUnit)} />
-            <StatusCard landscape={layout.landscape} label="AUTOSAVE" value={!isHydrated ? 'CARREGANDO' : saveStatus.obdSessionActive ? 'GRAVANDO ECU' : 'AGUARDANDO ECU'} ok={isHydrated && saveStatus.obdSessionActive} />
-          </View>
-          <Link href="/mais" asChild><TouchableOpacity style={styles.moreButton}><Text style={styles.moreIcon}>⋯</Text><View style={styles.moreBody}><Text style={styles.moreTitle}>MAIS RECURSOS</Text><Text style={styles.moreHint}>Veículo • Viagens • Aprendizado • Bluetooth • Arquivos</Text></View><Text style={styles.moreArrow}>›</Text></TouchableOpacity></Link>
-          {bluetoothError ? <Text style={styles.error}>BLUETOOTH/ELM327: {bluetoothError}</Text> : null}{gpsState.error ? <Text style={styles.error}>GPS: {gpsState.error}</Text> : null}{saveStatus.lastError ? <Text style={styles.error}>AUTOSAVE: {saveStatus.lastError}</Text> : null}
-          <View style={styles.bottomNav}><Link href="/" asChild><TouchableOpacity style={[styles.bottomNavItem, styles.bottomNavActive]}><Text style={styles.bottomNavIcon}>🚗</Text><Text style={styles.bottomNavActiveText}>CARRO</Text></TouchableOpacity></Link><Link href="/bluetooth" asChild><TouchableOpacity style={styles.bottomNavItem}><Text style={styles.bottomNavIcon}>🔵</Text><Text style={styles.bottomNavText}>BLUETOOTH</Text></TouchableOpacity></Link></View>
-          <Text style={styles.footerStatus}>{!isHydrated ? 'CARREGANDO DADOS...' : saveStatus.obdSessionActive ? 'SESSÃO ECU SALVA AUTOMATICAMENTE' : 'AUTOSAVE AGUARDANDO ECU'}</Text>
+          {!layout.landscape && (
+            <>
+              <View style={styles.bottomNav}>
+                <Link href="/bluetooth" asChild><TouchableOpacity style={styles.bottomNavItem}><Text style={styles.bottomNavIcon}>🔵</Text><Text style={styles.bottomNavText}>BLUETOOTH</Text></TouchableOpacity></Link>
+                <Link href="/mais" asChild><TouchableOpacity style={styles.bottomNavItem}><Text style={styles.bottomNavIcon}>⋯</Text><Text style={styles.bottomNavText}>MAIS RECURSOS</Text></TouchableOpacity></Link>
+              </View>
+              <Text style={styles.footerStatus}>{!isHydrated ? 'CARREGANDO...' : saveStatus.obdSessionActive ? 'DIÁRIO DE BORDO • GRAVANDO' : 'DIÁRIO DE BORDO • AGUARDANDO ECU'}</Text>
+            </>
+          )}
         </View>
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
 
 function CockpitMetric({ label, value }: { label: string; value: string }) { return <View style={styles.cockpitMetric}><Text style={styles.metricLabel}>{label}</Text><Text style={styles.metricValue}>{value}</Text></View>; }
-function ChainStep({ label, ok }: { label: string; ok: boolean }) { return <View style={styles.chainStep}><View style={[styles.chainCircle, ok && styles.chainCircleOk]}><Text style={[styles.chainCircleText, ok && styles.chainCircleTextOk]}>{ok ? '✓' : '•'}</Text></View><Text style={styles.chainLabel}>{label}</Text></View>; }
-function StatusCard({ label, value, danger = false, ok = false, landscape = false }: { label: string; value: string; danger?: boolean; ok?: boolean; landscape?: boolean }) { return <View style={[styles.statusCard, landscape && styles.statusCardLandscape]}><Text style={styles.metricLabel}>{label}</Text><Text style={danger ? styles.danger : ok ? styles.ok : styles.metricValue}>{value}</Text></View>; }
 
 const styles = StyleSheet.create({
-  container:{flex:1,backgroundColor:'#07111f'},scroll:{flex:1},content:{flexGrow:1,width:'100%',paddingVertical:14,paddingBottom:30},screenFrame:{width:'100%',alignSelf:'center'},
+  container:{flex:1,backgroundColor:'#07111f'},content:{flex:1,width:'100%',paddingVertical:6,paddingBottom:6},screenFrame:{width:'100%',flex:1,alignSelf:'center',justifyContent:'space-between'},
   header:{backgroundColor:'#0e1b2d',borderRadius:16,borderWidth:1,borderColor:'#28415f',padding:14,marginBottom:10,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:10},headerLandscape:{paddingVertical:12},headerTitle:{flex:1,minWidth:0},brand:{color:'#f8fafc',fontSize:18,fontWeight:'900',letterSpacing:1.2},subtitle:{color:'#7db3ff',fontSize:9,fontWeight:'900',letterSpacing:1,marginTop:3},
   connectionPill:{flexDirection:'row',alignItems:'center',gap:6,flexShrink:0,backgroundColor:'#091526',borderRadius:20,borderWidth:1,borderColor:'#29415f',paddingHorizontal:10,paddingVertical:7},dot:{width:8,height:8,borderRadius:4},dotOk:{backgroundColor:'#4ade80'},dotWarn:{backgroundColor:'#fbbf24'},dotDanger:{backgroundColor:'#fb7185'},connectionText:{color:'#dbeafe',fontSize:9,fontWeight:'900'},
-  heroCard:{backgroundColor:'#0f2035',borderRadius:18,borderWidth:1,borderColor:'#2d5278',padding:18,alignItems:'center',marginBottom:10},heroEyebrow:{color:'#7db3ff',fontSize:9,fontWeight:'900',letterSpacing:1.4},heroValue:{color:'#f8fafc',fontSize:40,lineHeight:46,fontWeight:'900',marginTop:4,fontVariant:['tabular-nums']},heroState:{color:'#8fa6c1',fontSize:9,fontWeight:'800',letterSpacing:.5},
-  metricRow:{width:'100%',flexDirection:'row',gap:7,marginTop:14},cockpitMetric:{flex:1,backgroundColor:'#091626',borderRadius:11,borderWidth:1,borderColor:'#233d5b',padding:10,alignItems:'center'},metricLabel:{color:'#7185a1',fontSize:8,fontWeight:'900',letterSpacing:.6},metricValue:{color:'#e5edf7',fontSize:14,fontWeight:'900',marginTop:3},
-  coolantCard:{width:'100%',flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:12,marginTop:9,paddingHorizontal:13,paddingVertical:11,backgroundColor:'#091626',borderRadius:12,borderWidth:1,borderColor:'#315579'},coolantCopy:{flex:1,minWidth:0},coolantLabel:{color:'#c5d8f2',fontSize:9,fontWeight:'900',letterSpacing:.4},coolantStatus:{color:'#7185a1',fontSize:8,fontWeight:'800',marginTop:4},coolantValue:{fontSize:23,fontWeight:'900',fontVariant:['tabular-nums']},coolantOk:{color:'#4ade80'},coolantWarning:{color:'#fbbf24'},
-  healthCard:{backgroundColor:'#0e1b2d',borderRadius:15,borderWidth:1,borderColor:'#28415f',padding:14,marginBottom:10},sectionHeader:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},sectionTitle:{color:'#f1f5f9',fontWeight:'900',fontSize:12,letterSpacing:.6},sectionHint:{color:'#7185a1',fontSize:9,marginTop:3},ok:{color:'#4ade80',fontSize:11,fontWeight:'900'},danger:{color:'#fb7185',fontSize:11,fontWeight:'900'},outlineButton:{borderWidth:1,borderColor:'#315579',borderRadius:9,padding:10,alignItems:'center',marginTop:10},outlineText:{color:'#9fc5f7',fontSize:9,fontWeight:'900'},
+  heroCard:{backgroundColor:'#0f2035',borderRadius:18,borderWidth:1,borderColor:'#2d5278',padding:12,alignItems:'center',marginBottom:8},heroCardLandscape:{padding:7,marginBottom:4},heroEyebrow:{color:'#7db3ff',fontSize:9,fontWeight:'900',letterSpacing:1.4},heroValue:{color:'#f8fafc',fontSize:50,lineHeight:56,fontWeight:'900',marginTop:2,fontVariant:['tabular-nums']},heroValueLandscape:{fontSize:36,lineHeight:40,marginTop:0},heroState:{color:'#8fa6c1',fontSize:9,fontWeight:'800',letterSpacing:.5,textAlign:'center'},
+  metricRow:{width:'100%',flexDirection:'row',gap:6,marginTop:10},metricRowLandscape:{marginTop:4},cockpitMetric:{flex:1,minWidth:0,backgroundColor:'#091626',borderRadius:11,borderWidth:1,borderColor:'#233d5b',paddingVertical:9,paddingHorizontal:5,alignItems:'center'},metricLabel:{color:'#9aacc4',fontSize:8,fontWeight:'900',letterSpacing:.3,textAlign:'center'},metricValue:{color:'#e5edf7',fontSize:12,fontWeight:'900',marginTop:3,textAlign:'center'},
+  coolantCard:{width:'100%',flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:12,marginTop:9,paddingHorizontal:13,paddingVertical:11,backgroundColor:'#091626',borderRadius:12,borderWidth:1,borderColor:'#315579'},coolantCardLandscape:{marginTop:4,paddingVertical:5,paddingHorizontal:9},coolantCopy:{flex:1,minWidth:0},coolantLabel:{color:'#c5d8f2',fontSize:9,fontWeight:'900',letterSpacing:.4},coolantStatus:{color:'#7185a1',fontSize:8,fontWeight:'800',marginTop:4},coolantValue:{fontSize:23,fontWeight:'900',fontVariant:['tabular-nums']},coolantOk:{color:'#4ade80'},coolantWarning:{color:'#fbbf24'},
+  healthCard:{backgroundColor:'#0e1b2d',borderRadius:15,borderWidth:1,borderColor:'#28415f',padding:11,marginBottom:8},sectionHeader:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},sectionTitle:{color:'#f1f5f9',fontWeight:'900',fontSize:12,letterSpacing:.6},sectionHint:{color:'#7185a1',fontSize:9,marginTop:3},ok:{color:'#4ade80',fontSize:11,fontWeight:'900'},danger:{color:'#fb7185',fontSize:11,fontWeight:'900'},outlineButton:{borderWidth:1,borderColor:'#315579',borderRadius:9,padding:10,alignItems:'center',marginTop:10},outlineText:{color:'#9fc5f7',fontSize:9,fontWeight:'900'},
   connectionCard:{backgroundColor:'#0e1b2d',borderRadius:15,borderWidth:1,borderColor:'#28415f',padding:14,marginBottom:10},chain:{flexDirection:'row',alignItems:'center',marginTop:10},chainStep:{flex:1,alignItems:'center'},chainCircle:{width:30,height:30,borderRadius:15,alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:'#3b516b',backgroundColor:'#0a1727'},chainCircleOk:{borderColor:'#3b8c5a',backgroundColor:'#10261b'},chainCircleText:{color:'#7185a1',fontSize:11,fontWeight:'900'},chainCircleTextOk:{color:'#4ade80'},chainLabel:{color:'#9fb4cf',fontSize:8,fontWeight:'900',marginTop:4},chainArrow:{color:'#526a86',fontSize:24,paddingHorizontal:4},
-  actionGrid:{gap:8,marginBottom:10},actionGridLandscape:{flexDirection:'row'},actionButtonLandscape:{flex:1,minWidth:0},primaryButton:{backgroundColor:'#2563eb',borderRadius:13,padding:14,alignItems:'center'},buttonText:{color:'#fff',fontWeight:'900',fontSize:11},buttonSubtext:{color:'#bfdbfe',fontWeight:'800',fontSize:8,marginTop:3},secondaryButton:{backgroundColor:'#0e1b2d',borderRadius:13,padding:13,alignItems:'center',borderWidth:1,borderColor:'#34506f'},secondaryButtonText:{color:'#dbeafe',fontWeight:'900',fontSize:11},buttonSubtextDark:{color:'#7185a1',fontWeight:'800',fontSize:8,marginTop:3},
+  actionGrid:{flexDirection:'row',gap:7,marginBottom:8},actionGridLandscape:{flexDirection:'row'},actionButtonLandscape:{flex:1,minWidth:0},dashboardAction:{flex:1,minWidth:0,paddingVertical:15,paddingHorizontal:4},primaryButton:{backgroundColor:'#2563eb',borderRadius:13,padding:14,alignItems:'center'},buttonText:{color:'#fff',fontWeight:'900',fontSize:10,textAlign:'center'},buttonSubtext:{color:'#bfdbfe',fontWeight:'800',fontSize:8,marginTop:3},secondaryButton:{backgroundColor:'#0e1b2d',borderRadius:13,padding:13,alignItems:'center',borderWidth:1,borderColor:'#34506f'},secondaryButtonText:{color:'#dbeafe',fontWeight:'900',fontSize:10,textAlign:'center'},buttonSubtextDark:{color:'#7185a1',fontWeight:'800',fontSize:8,marginTop:3},
   statusGrid:{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',marginBottom:2},statusGridLandscape:{flexWrap:'nowrap',gap:8},statusCardLandscape:{width:'auto',flex:1},statusCard:{width:'48%',minWidth:0,backgroundColor:'#0e1b2d',borderRadius:12,borderWidth:1,borderColor:'#233a56',padding:11,marginBottom:8},moreButton:{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:'#0e1b2d',borderRadius:14,borderWidth:1,borderColor:'#28415f',padding:13,marginTop:2},moreIcon:{color:'#7db3ff',fontSize:24,fontWeight:'900'},moreBody:{flex:1,minWidth:0},moreTitle:{color:'#e5edf7',fontSize:11,fontWeight:'900'},moreHint:{color:'#7185a1',fontSize:8,marginTop:3,flexShrink:1},moreArrow:{color:'#7db3ff',fontSize:24},
-  error:{color:'#fb7185',fontWeight:'800',fontSize:10,marginTop:8},bottomNav:{flexDirection:'row',backgroundColor:'#0e1b2d',borderRadius:14,borderWidth:1,borderColor:'#28415f',marginTop:12,padding:5},bottomNavItem:{flex:1,alignItems:'center',paddingVertical:8,borderRadius:10},bottomNavActive:{backgroundColor:'#152a45'},bottomNavIcon:{fontSize:17,marginBottom:2},bottomNavActiveText:{color:'#7db3ff',fontSize:9,fontWeight:'900'},bottomNavText:{color:'#9fb4cf',fontSize:9,fontWeight:'900'},footerStatus:{color:'#60748f',textAlign:'center',fontSize:9,marginTop:9},
+  error:{color:'#fb7185',fontWeight:'800',fontSize:10,marginTop:8},bottomNav:{flexDirection:'row',backgroundColor:'#0e1b2d',borderRadius:14,borderWidth:1,borderColor:'#28415f',marginTop:0,padding:3},bottomNavItem:{flex:1,alignItems:'center',paddingVertical:8,borderRadius:10},bottomNavActive:{backgroundColor:'#152a45'},bottomNavIcon:{fontSize:17,marginBottom:2},bottomNavActiveText:{color:'#7db3ff',fontSize:9,fontWeight:'900'},bottomNavText:{color:'#9fb4cf',fontSize:9,fontWeight:'900'},footerStatus:{color:'#60748f',textAlign:'center',fontSize:9,marginTop:9},
 });

@@ -15,10 +15,14 @@ const screenFiles = [
 assert.equal(appJson.expo.orientation, 'default');
 assert.match(index, /useMidLayout\(\)/);
 assert.match(index, /layout\.landscape/);
-assert.match(index, /contentContainerStyle/);
-assert.match(index, /flexGrow:1/);
+assert.doesNotMatch(index, /ScrollView/);
+assert.match(index, /content:\{flex:1,width:'100%'/);
 assert.match(index, /maxContentWidth/);
-assert.match(index, /statusGridLandscape/);
+assert.match(index, /const rpmReading/);
+assert.match(index, /coolantValue/);
+assert.match(index, /href="[^"]*viagens"/);
+assert.match(index, /href="[^"]*dados"/);
+assert.match(index, /dashboardAction/);
 assert.match(index, /actionGridLandscape/);
 assert.match(index, /react-native-safe-area-context/);
 assert.match(layout, /SafeAreaProvider/);
