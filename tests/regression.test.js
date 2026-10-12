@@ -920,6 +920,8 @@ async function testPidAndLearningWriteSerialization() {
   assert.ok(autoTripServiceSource.includes("fuelRateLph == null &&\n          fuelFallbackDue &&\n          connection.supportedPids.includes('0110')"), 'MAF só deve ser consultado em cadência limitada e quando suportado pela ECU');
   assert.ok(autoTripServiceSource.includes("connection.supportedPids.includes('010B') &&\n          connection.supportedPids.includes('010F')"), 'fallback MAP exige suporte confirmado aos PIDs MAP e IAT');
   assert.ok(!autoTripServiceSource.includes('recordLivePidQuery('), 'telemetria automática deve registrar cada resposta uma única vez via registerObdQuery');
+  assert.ok(autoTripServiceSource.includes('pendingFinalizedCycles'), 'viagens finalizadas devem permanecer em fila enquanto a persistência falha');
+  assert.ok(autoTripServiceSource.includes('VIAGEM PENDENTE DE SALVAMENTO'), 'falha de storage deve ficar visível em vez de descartar uma viagem');
   writeDelayMs = 0;
 }
 
