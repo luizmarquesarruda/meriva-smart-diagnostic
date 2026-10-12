@@ -2100,3 +2100,27 @@ Guardar amostras GPS úteis para inspecionar o sinal e o trajeto sem duplicar o 
 - Cada amostra persistida inclui `sessionId`, permitindo separar sessões após reconexões no mesmo arquivo diário sem criar trajetos falsos.
 - Ao reconectar, uma nova sessão recebe outro identificador; o rastreador GPS pode continuar coletando posição em background, mas o histórico não grava enquanto a ECU estiver desconectada.
 - A regra não altera o cálculo de distância ou consumo da viagem.
+
+
+## 2026-10-12 — Preservar sessão GPS durante recuperação transitória da ECU
+
+### Problema
+Uma única falha de consulta do PID de saúde mudava o estado para `NO_RESPONSE`. Como o gravador GPS usava diretamente `status.ecuConnected`, a sessão era encerrada imediatamente e, após a recuperação, uma nova sessão era aberta. Isso podia fragmentar o histórico por falhas transitórias de comunicação, sem desconexão confirmada do adaptador/ECU.
+
+### Correção
+- O gate do histórico GPS exige agora uma conexão compartilhada ainda presente, ECU validada e link Bluetooth ativo.
+- Estados transitórios `NO_RESPONSE` e `RECOVERING` não encerram por si só a sessão GPS enquanto a conexão validada e o link Bluetooth permanecem ativos.
+- Na desconexão confirmada, a conexão compartilhada é removida e/ou o link Bluetooth cai, encerrando a sessão GPS.
+- O estado de saúde ainda é exposto normalmente à interface e o polling OBD pode pausar enquanto a ECU não responde; a alteração afeta apenas a continuidade do histórico GPS.
+
+### Arquivos afetados
+- `src/trip/autoTripService.ts`
+- `tests/ecuHealth.test.js`
+
+### Validação
+- Atualizado o teste estático para exigir ECU validada, Bluetooth ativo e tolerância aos estados transitórios.
+- **Typecheck, testes completos e validação em Android físico ainda não foram executados.**
+- A CI não foi disparada; commits usam `[skip ci]` conforme a restrição do projeto.
+
+### Próximo passo
+Executar a validação completa em ambiente autorizado e confirmar no Android que o histórico continua usando o mesmo `sessionId` durante recuperação transitória, mas encerra a sessão após desconexão confirmada.
