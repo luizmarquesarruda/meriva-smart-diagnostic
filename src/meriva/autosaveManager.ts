@@ -15,6 +15,7 @@ import { hydrateState, isValidEnvelope, validatePayload } from './autosaveValida
 import { migrateEnvelope } from './autosaveMigrations';
 import { appendAutoSaveHistory } from './autosaveHistoryTxt';
 import { appendDailyObdSessionEvent } from './dailyObdHistory';
+import { flushBufferedCsvRows } from '../database/csvLogger';
 
 const DEBOUNCE_MS = 1500;
 const CHECKPOINT_MS = 45000;
@@ -234,7 +235,13 @@ async function initAutoSaveUnsafe(basePath: string): Promise<MerivaPersistedStat
     runtime.appStateSubscription = AppState.addEventListener(
       'change',
       (status: AppStateStatus) => {
-        if (status !== 'active' && runtime.dirty) void saveNow('background');
+        if (status !== 'active') {
+          if (runtime.dirty) void saveNow('background');
+          // Drain batched OBD evidence before Android suspends the JS runtime.
+          void flushBufferedCsvRows().catch((cause) => {
+            console.warn('[autosave] falha ao descarregar CSV OBD em segundo plano:', cause instanceof Error ? cause.message : cause);
+          });
+        }
       },
     );
   }
