@@ -66,7 +66,8 @@ function parseSample(line: string): GpsJsonRecord | null {
       !finiteOrNull(value.headingDegrees) ||
       (value.headingDegrees !== null && (value.headingDegrees < 0 || value.headingDegrees >= 360)) ||
       typeof value.valid !== 'boolean' ||
-      !['SEM_FIX', 'FRACA', 'BOA', 'EXCELENTE'].includes(String(value.signalQuality))
+      !['SEM_FIX', 'FRACA', 'BOA', 'EXCELENTE'].includes(String(value.signalQuality)) ||
+      (value.sessionId !== undefined && (typeof value.sessionId !== 'string' || value.sessionId.length === 0))
     ) return null;
     return value as GpsJsonRecord;
   } catch {
@@ -96,6 +97,8 @@ export class GpsHistoryStore {
   private queue: Promise<void> = Promise.resolve();
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private lastErrorLoggedAt = 0;
+  private activeSessionId: string | null = null;
+  private sessionCounter = 0;
   private readonly nowProvider: () => number;
 
   constructor(
@@ -131,9 +134,32 @@ export class GpsHistoryStore {
     this.pending = [];
   }
 
+  async startSession(): Promise<void> {
+    if (this.activeSessionId) return;
+    await this.queue;
+    this.sessionCounter += 1;
+    this.activeSessionId = `ecu-${Math.trunc(this.nowProvider())}-${this.sessionCounter}`;
+  }
+
+  async stopSession(): Promise<void> {
+    if (!this.activeSessionId) return;
+    // Stop accepting new samples immediately, then drain and persist samples
+    // already queued under the session that just ended.
+    this.activeSessionId = null;
+    await this.queue;
+    await this.flush();
+  }
+
+  isSessionActive(): boolean {
+    return this.activeSessionId !== null;
+  }
+
   record(sample: GpsJsonRecord, effectiveSpeedKmh: number | null): Promise<void> {
+    const sessionId = this.activeSessionId;
+    if (!sessionId) return Promise.resolve();
+    const sessionSample: GpsJsonRecord = { ...sample, sessionId };
     const operation = this.queue.then(async () => {
-      await this.recordUnsafe(sample, effectiveSpeedKmh);
+      await this.recordUnsafe(sessionSample, effectiveSpeedKmh);
     });
     this.queue = operation.catch((cause) => {
       this.reportError(cause);
