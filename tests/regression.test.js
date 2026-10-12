@@ -472,6 +472,8 @@ async function testIntelligentPidDiscovery() {
   assert.strictEqual(result.observations.find((item) => item.pid === '010C').status, 'CONFIRMADO');
   assert.strictEqual(result.observations.find((item) => item.pid === '010C').value, 1726);
   assert.strictEqual(commands.filter((pid) => pid === '010C').length, 0, 'descoberta deve reaproveitar a sonda 010C validada');
+  assert.strictEqual(commands.filter((pid) => pid === '010D').length, 1, 'PID de velocidade deve ser testado uma vez após a bitmap');
+  assert.ok(commands.indexOf('010D') > commands.indexOf('0100'), 'PID fora do gate ECU deve aguardar o anúncio de suporte');
   assert.strictEqual(commands.filter((pid) => pid === '012F').length, 1, 'PID de nível de tanque anunciado pela bitmap deve ser consultado uma vez e validado pela resposta real');
   assert.ok(!commands.includes('015E'), 'não consultar taxa de combustível sem bitmap indicando suporte');
   assert.ok(!commands.includes('0110'), 'não consultar PID fora da lista anunciada pela bitmap');
