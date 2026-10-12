@@ -13,6 +13,7 @@ export default function DadosScreen() {
   const layout = useMidLayout();
   const [state, setState] = useState(getAutoSaveState());
   const [trip, setTrip] = useState(autoTripService.getState());
+  const gpsSpeedKmh = gpsTracker.getState().currentSpeedKmh;
   useEffect(() => {
     const timer = setInterval(() => { setState(getAutoSaveState()); setTrip(autoTripService.getState()); }, 1000);
     return () => clearInterval(timer);
@@ -22,7 +23,7 @@ export default function DadosScreen() {
     <Header title="DADOS EM TEMPO REAL" subtitle="PIDs • TELEMETRIA • TENDÊNCIAS" />
     <View style={styles.liveCard}><Text style={styles.liveTitle}>{state.obd.connected ? '● ECU CONECTADA' : '○ ECU AGUARDANDO'}</Text><Text style={styles.liveHint}>{state.obd.protocol ? 'PROTOCOLO ' + state.obd.protocol : 'Conecte o ELM327 para receber PIDs reais.'}</Text></View>
     <View style={styles.grid}>
-      <Metric landscape={layout.landscape} label="VELOCIDADE" value={gpsTracker.getState().currentSpeedKmh != null ? gpsTracker.getState().currentSpeedKmh.toFixed(0) + ' km/h' : 'N/D'} />
+      <Metric landscape={layout.landscape} label="VELOCIDADE" value={gpsSpeedKmh != null ? gpsSpeedKmh.toFixed(0) + ' km/h' : 'N/D'} />
       <Metric landscape={layout.landscape} label="DISTÂNCIA" value={trip.distanceKm.toFixed(2) + ' km'} />
       <Metric landscape={layout.landscape} label="CONSUMO" value={trip.consumptionKml != null && trip.consumptionKml > 0 ? trip.consumptionKml.toFixed(1) + ' km/L' : 'N/D'} />
       <Metric landscape={layout.landscape} label="AUTONOMIA" value={state.autonomy.estimatedRangeKm > 0 ? state.autonomy.estimatedRangeKm.toFixed(0) + ' km' : 'N/D'} />
