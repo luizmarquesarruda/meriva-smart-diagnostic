@@ -2091,3 +2091,22 @@ A correção do teste foi gravada na branch `fix/daily-obd-history-keep-screen-a
 - `autosaveManager.ts`: na transição do app para segundo plano, o serviço agora chama um hook registrado pela integração OBD, aguarda a fila de persistência de cada perfil e só então descarrega os buffers CSV. Se o hook ainda não estiver registrado, usa o flush CSV direto como fallback.
 - `autosaveIntegration.ts`: registra `flushObdPersistence()` como handler para essa transição, sem fazer o módulo de autosave importar o serviço OBD e criar dependência circular.
 - `tests/obdFastPath.test.js`: adicionadas verificações estáticas para garantir a ligação entre o ciclo de vida Android e o descarregamento da fila OBD.
+
+
+## 2026-10-12 — Cruzamento TXT × diário × código: bloqueio de GPS sem ECU e proteção do consumo
+
+### Evidência cruzada
+- O TXT de campo mostrou segmentos com distância positiva e combustível integrado extremamente baixo. Isso torna o consumo calculado impróprio para alimentar autonomia sem uma validação de qualidade.
+- A leitura do código confirmou que `app/_layout.tsx` iniciava o GPS durante o startup, mesmo antes de existir confirmação de ECU. Isso contradiz o requisito operacional: gravar distância apenas enquanto a ECU estiver validada e respondendo.
+- O estimador MAF aceitava `0 g/s` como amostra de consumo estimado. Com motor respondendo a RPM, MAF igual a zero não é evidência suficiente para calcular combustível; aceitar esse valor pode reduzir artificialmente o combustível integrado.
+
+### Correções gravadas nesta branch
+- `app/_layout.tsx`: GPS passa a seguir `subscribeSharedObdStatus`; só inicia quando `ecuConnected` está verdadeiro e para quando a ECU perde resposta. Pairing Bluetooth ou abertura do app não inicia gravação GPS.
+- `tests/backgroundExecution.test.js`: adicionadas verificações para impedir retorno da inicialização incondicional do GPS e exigir o vínculo ao estado da ECU.
+- `src/obd/fuelConsumption.ts`: o fallback por MAF não calcula taxa a partir de `0 g/s`; sem fluxo de ar positivo, retorna ausência de estimativa em vez de uma taxa zero artificial.
+
+### Limites e validação pendente
+- O histórico existente não foi reescrito nem corrigido retroativamente; registros antigos com combustível insuficiente devem continuar exibidos como consumo indisponível.
+- Esta alteração não prova que o cálculo MAF/MAP está calibrado para a mistura de etanol usada na Meriva. A estimativa depende da relação ar/combustível, densidade do combustível e qualidade das amostras; o consumo medido por PID 015E continua sendo preferível quando realmente suportado pela ECU.
+- Testes, TypeScript, build Android e ensaio físico ainda não foram executados nesta etapa. CI não foi disparada e nenhuma PR foi mesclada.
+- Próximo passo: executar validação autorizada e testar conexão ECU → GPS ativo → perda de resposta ECU → GPS parado, além de confirmar que viagens com combustível insuficiente exibem N/D e não contaminam média/autonomia.
