@@ -70,7 +70,13 @@ export default function IndexScreen() {
     try {
       const nextSettings = await readAppSettings(basePath);
       const restored = await initAutoSave(basePath);
-      await initializeDriveCycles(basePath);
+      try {
+        await initializeDriveCycles(basePath);
+      } catch (cause) {
+        // A damaged trip index must not prevent the rest of the dashboard from
+        // hydrating; readDriveCycles still exposes recoverable backups/sidecars.
+        console.warn('[trips] índice não pôde ser reconciliado; preservando arquivos para recuperação:', cause instanceof Error ? cause.message : cause);
+      }
       await ensureMerivaVehicleProfile(basePath);
       const learningProfile = await readLearningProfile(basePath);
       if (!learningProfile) await createLearningProfile(basePath, '2026-09-24T14:48:00.000Z');
