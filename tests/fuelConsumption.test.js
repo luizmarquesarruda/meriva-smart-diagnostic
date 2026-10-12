@@ -19,7 +19,7 @@ mod.filename = sourcePath;
 mod.paths = Module._nodeModulePaths(path.dirname(sourcePath));
 mod._compile(output, sourcePath);
 
-const { integrateFuelRateLph, FuelRateIntegrator } = mod.exports;
+const { integrateFuelRateLph, FuelRateIntegrator, estimateFuelRateLph } = mod.exports;
 
 function assertApprox(actual, expected, epsilon = 1e-12) {
   assert.ok(Math.abs(actual - expected) <= epsilon, `expected ${actual} ≈ ${expected}`);
@@ -85,4 +85,11 @@ const fsSource = require('fs').readFileSync(require('path').join(__dirname, '..'
 if (!fsSource.includes('ESTIMATED_MAF') || !fsSource.includes('ESTIMATED_MAP')) {
   throw new Error('fuel fallback MAF/MAP não está implementado');
 }
+assert.strictEqual(estimateFuelRateLph({ mafGs: 0 }), null, 'MAF zero não pode ser convertido em uma estimativa de consumo válida');
+const positiveMafEstimate = estimateFuelRateLph({ mafGs: 2.5 });
+assert.ok(positiveMafEstimate, 'MAF positivo deve gerar estimativa');
+assert.strictEqual(positiveMafEstimate.source, 'ESTIMATED_MAF');
+assert.ok(positiveMafEstimate.rateLph > 0);
+assert.strictEqual(estimateFuelRateLph({ mafGs: NaN }), null);
+
 console.log('fuelConsumption fallback: OK');
