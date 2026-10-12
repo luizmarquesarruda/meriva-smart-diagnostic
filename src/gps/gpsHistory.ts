@@ -42,7 +42,7 @@ function parseLines(content: string): string[] {
 function parseSample(line: string): GpsJsonRecord | null {
   try {
     const value = JSON.parse(line) as Partial<GpsJsonRecord>;
-    const finiteOrNull = (candidate: unknown): boolean =>
+    const finiteOrNull = (candidate: unknown): candidate is number | null =>
       candidate === null || (typeof candidate === 'number' && Number.isFinite(candidate));
     if (
       value.schemaVersion !== 1 ||
