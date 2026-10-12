@@ -2067,3 +2067,13 @@ A correção do teste foi gravada na branch `fix/daily-obd-history-keep-screen-a
 - **CI não disparada:** commits foram criados com `[skip ci]` para preservar a restrição operacional.
 - A medição de melhoria percentual de latência ainda depende de benchmark real em dispositivo e registro de `elapsedMs` antes/depois.
 - Próximo passo: validar a branch inteira, revisar os resultados, então resolver a ordem de integração com as PRs de viagens/OBD/GPS já abertas.
+
+
+### Reforço adicional — write-ahead das viagens finalizadas
+
+- `src/storage/driveCycleStorage.ts`: cada ciclo finalizado é validado e salvo primeiro em `VIAGENS/PENDING_CYCLES` como JSON independente. O índice principal só é atualizado depois dessa cópia de recuperação passar na validação.
+- Se o índice principal e o backup estiverem inválidos, o app não cria um índice vazio nem apaga o original; a viagem permanece na fila lateral, e `readDriveCycles()` a apresenta junto com qualquer índice/backup ainda legível.
+- A inicialização tenta reconciliar as viagens pendentes com um índice recuperável e só remove os sidecars depois de validar o índice final.
+- `app/index.tsx`: a falha ao reconciliar um índice danificado não aborta mais a hidratação do cockpit; o app continua a carregar o estado restante e as viagens recuperáveis.
+- `tests/driveCycleStorageSafety.test.js`: cenário expandido para confirmar que uma viagem permanece durável e visível quando não há backup, e que é reconciliada após restaurar um backup válido.
+- Essa mudança reduz o risco de perder a última viagem encerrada quando o armazenamento principal precisa de intervenção manual; não substitui backup externo periódico do diretório do aplicativo.
