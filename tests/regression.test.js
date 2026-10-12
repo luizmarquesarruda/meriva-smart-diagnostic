@@ -901,10 +901,10 @@ async function testPidAndLearningWriteSerialization() {
   assert.ok(cockpitSource.includes("Date.now() - timestampMs <= 30_000"), 'cockpit deve descartar temperatura OBD obsoleta após 30 segundos');
   assert.ok(cockpitSource.includes('LÍQUIDO DE ARREFECIMENTO'), 'página inicial deve apresentar métrica de temperatura do arrefecimento');
   assert.ok(cockpitSource.includes("'TEMPERATURA ALTA'"), 'cockpit deve destacar temperatura alta sem esconder o valor numérico');
-  assert.ok(autoTripServiceSource.includes('registerObdQuery(this.basePath, fuelLevelResult, \'REAL\')'), 'PID 012F automático deve alimentar o pipeline de persistência');
-  assert.ok(autoTripServiceSource.includes('registerObdQuery(this.basePath, fuelResult, \'REAL\')'), 'PID 015E automático deve alimentar o pipeline de persistência');
-  assert.ok(autoTripServiceSource.includes('registerObdQuery(this.basePath, speedResult, \'REAL\')'), 'PID 010D automático deve alimentar o pipeline de persistência');
-  assert.ok(autoTripServiceSource.includes('registerObdQuery(this.basePath, telemetryResult, \'REAL\')'), 'telemetria automática deve alimentar o pipeline de persistência');
+  assert.ok(autoTripServiceSource.includes("registerObdQuery(this.basePath, fuelLevelResult, 'REAL', undefined, { deferPersistence: true })"), 'PID 012F deve usar persistência não bloqueante no polling automático');
+  assert.ok(autoTripServiceSource.includes("registerObdQuery(this.basePath, fuelResult, 'REAL', undefined, { deferPersistence: true })"), 'PID 015E deve usar persistência não bloqueante no polling automático');
+  assert.ok(autoTripServiceSource.includes("registerObdQuery(this.basePath, speedResult, 'REAL', undefined, { deferPersistence: true })"), 'PID 010D deve publicar telemetria sem aguardar persistência');
+  assert.ok(autoTripServiceSource.includes("registerObdQuery(this.basePath, telemetryResult, 'REAL', undefined, { deferPersistence: true })"), 'telemetria secundária deve usar persistência não bloqueante');
   assert.ok(autoTripServiceSource.includes('instantaneousConsumptionSource'), 'origem do consumo instantâneo deve ser preservada para a interface');
   assert.ok(autoTripServiceSource.includes('A leitura instantânea deve ser publicada a cada ciclo OBD válido'), 'consumo instantâneo deve atualizar mesmo sem viagem ativa');
   const speedQueryIndex = autoTripServiceSource.indexOf("queryPid('010D')");
