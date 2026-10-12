@@ -2054,3 +2054,68 @@ A correção do teste foi gravada na branch `fix/daily-obd-history-keep-screen-a
 2. Confirmar no diff/testes se GPS só inicia com ECU respondendo e para ao perder resposta.
 3. Conferir histórico diário com várias sessões no mesmo dia, keep-awake, relatório de PIDs/fórmulas e build APK standalone.
 4. Encerrar PRs abertas somente após preservar as alterações úteis e verificar que não há trabalho exclusivo perdido.
+
+
+## 2026-10-12 — Auditoria de desempenho OBD, integridade de PIDs e persistência em lote
+
+### Pesquisa comparativa
+Foram comparados os caminhos de atualização documentados pelo `python-OBD`, OBD Auto Doctor e OBDLink com a implementação deste aplicativo:
+- `python-OBD Async` mantém um loop de atualização e retorna a última resposta conhecida sem bloquear a interface: https://python-obd.readthedocs.io/en/latest/Async%20Connections/
+- OBD Auto Doctor diz que atualiza sensores sequencialmente, conforme a capacidade do veículo, adaptador e conexão: https://www.obdautodoctor.com/features/
+- OBDLink documenta que cada PID de logging precisa ser monitorado continuamente e pode reduzir a taxa de atualização dos demais; a opção de trigger por frame de PID prioriza a taxa de amostragem: https://support.obdlink.com/support/solutions/articles/43000709894-get-started-with-logs
+- O datasheet ELM327L descreve adaptive timing baseado nas latências de resposta reais, limitado por ATST: https://www.elmelectronics.com/wp-content/uploads/2016/07/ELM327L_Data_Sheet.pdf
+
+### Defeitos encontrados e alterações
+1. **Descoberta PIDs / round trips**
+   - Reutilizar a resposta real `010C` usada no gate de validação da ECU, não consultar esse PID outra vez na fase de descoberta.
+   - Os demais PIDs só são sondados depois de a bitmap atual anunciar suporte. PIDs salvos de sessões anteriores servem apenas para priorizar a ordem, não para contornar o suporte da ECU atual.
+   - Consultar a próxima bitmap (`0120`, `0140`, `0160`) somente se a página anterior anunciar o PID de continuação. Um PID só entra no conjunto operacional depois de resposta individual válida; bitmap não é prova de que a consulta do PID funciona.
+   - Arquivos: `src/obd/intelligentPidDiscovery.ts`, `src/obd/bluetoothManager.ts`.
+
+2. **Polling / unidade e consumo**
+   - Criado contrato de cadência versionado em `src/knowledge/polling_policy.json`: RPM/velocidade no caminho principal; taxa medida `015E` em cada ciclo quando funcional; MAF/MAP como fallback e nível `012F` em cada quatro ciclos, com fases diferentes; telemetria auxiliar rotativa `0105`, `010B`, `0111`, `0142`.
+   - MAP não é consultado de novo para a telemetria rotativa quando já foi consultado no fallback MAP/IAT no mesmo ciclo.
+   - Corrigido PID `012F`: o parser usa a unidade `percent`, não `%`. A comparação anterior descartava a leitura e afetava nível, litros restantes, reserva e autonomia. Em falha do PID, o último nível válido permanece disponível.
+   - MAF zero não gera estimativa de combustível. A estimativa anterior pode permanecer visível por até 10 s, mas só a amostra calculada no ciclo atual alimenta a integração da viagem.
+   - Arquivos: `src/trip/autoTripService.ts`, `src/obd/fuelConsumption.ts`, `src/knowledge/polling_policy.json`.
+
+3. **I/O de CSV e persistência de aprendizado**
+   - Cada amostra bruta/interpretada é enfileirada sem regravar o CSV inteiro no caminho crítico do PID. A fila escreve em lote ao atingir oito linhas ou um segundo e descarrega ao entrar em `background/inactive`, na desconexão ECU/Bluetooth, antes de exportar e antes de limpar dados.
+   - Se uma leitura ou escrita do arquivo falhar, o lote pendente é restaurado e agendado para nova tentativa; a falha continua explícita para o chamador.
+   - A partição do CSV diário usa a data local do aparelho; a coluna timestamp continua em ISO UTC. Isso evita que um log feito à noite no Brasil seja arquivado no dia seguinte por causa da conversão UTC.
+   - O banco persistente de PIDs/perfil de aprendizado não regrava a mesma amostra do mesmo PID mais de uma vez a cada 5 segundos; cada resposta continua no CSV, e a janela é independente por PID.
+   - Arquivos: `src/database/csvLogger.ts`, `src/database/obdLogger.ts`, `src/meriva/autosaveIntegration.ts`, `src/obd/sharedConnection.ts`, `app/armazenamento.tsx`.
+
+4. **GPS e lifecycle**
+   - Removido o início independente do GPS em `app/_layout.tsx`; o serviço automático de viagem passa a ser o dono do ciclo de vida GPS. GPS inicia somente quando a ECU está validada/respondendo e para quando a ECU perde resposta, desconecta ou o serviço da viagem é encerrado.
+   - Removida a chamada duplicada concorrente de `gpsTracker.stop()` durante o desmontar da raiz; o encerramento segue pelo serviço de viagem.
+   - Logs CSV são descarregados inclusive na desconexão intencional mesmo se uma operação de teardown falhar.
+
+5. **Documentação**
+   - Atualizados `README.md`, `docs/ELM327_ENGINEERING_PLAYBOOK.md` e `docs/RELATORIO_PIDS_E_FORMULAS.md`: alinhada a configuração atual do transporte Bluetooth (framing local pelo prompt `>`, delimiter vazio), `ATI` descrito como best-effort e não como gate universal, política de aquisição, fronteira de durabilidade do buffer e limitações sem teste físico.
+   - O TXT diário continua representando fronteiras de sessão/eventos; os CSVs diários continuam sendo a trilha por amostra.
+
+### Testes/regressões adicionados ou atualizados
+- Descoberta adaptativa: reaproveita `010C`, percorre somente bitmaps anunciadas, não permite que cache de PID contorne bitmap atual, não operacionaliza PID sem resposta válida.
+- CSV em lote: preserva duas amostras por arquivo, não faz I/O na chamada de enfileiramento e restaura/regrava lote após falha simulada de leitura.
+- Persistência de aprendizado: janela mínima por PID e sem inflar ocorrências a cada ciclo de polling.
+- Contrato JSON: IDs PIDs no catálogo, fases de polling válidas/não coincidentes, intervalo de aprendizado, unidade de PID `012F`.
+- Combustível: MAF zero rejeitado.
+- Data diária: partição local do arquivo não muda de dia apenas por converter timestamp para UTC.
+- Lifecycle: GPS condicionado à resposta real da ECU.
+
+Arquivos de testes: `tests/regression.test.js`, `tests/merivaAutosave.test.js`, `tests/knowledgeJson.test.js`, `tests/fuelConsumption.test.js`, `tests/backgroundExecution.test.js`.
+
+### Commits de referência desta fase
+- `af294e71`, `824ce95b`, `85a0c8c7`, `b63563e6` — logging em lote e recuperação de lote.
+- `d2739741`, `62f43c3b`, `6e05ccd6`, `709fcb1a` — descoberta por bitmap e regressões.
+- `0e943cb5`, `7ad9769a`, `dfa40d5f` — cadência de polling, unidade/nível combustível e limpeza.
+- `36a49c14`, `fec5f625` — data local dos arquivos diários e teste.
+- `044efd08`, `7ae45f07`, `8f20e2c9` — README, playbook ELM327 e relatório técnico.
+- `58d2808c` — garante flush de CSV no teardown da conexão.
+
+### Validação e limites
+- O contrato JSON e as regressões foram adicionados ao script de validação da CI existente. A conclusão deste registro dispara a CI por `push`; o resultado de TypeScript, suíte completa, Expo Doctor e build Android deve ser confirmado no GitHub Actions antes de declarar a fase verde.
+- **Sem benchmark alegado:** não há medição nova no mesmo carro/adaptador após essas alterações. A latência depende da ECU KWP/K-Line, do ELM327/clone e do Bluetooth. Não foram alterados `ATST`, `ATAT` nem o protocolo físico sem evidência medida.
+- O buffer CSV tem flush de até um segundo e em eventos de lifecycle; um encerramento forçado do processo antes do flush pode perder linhas ainda em memória. A fila preserva o lote quando a API de arquivos informa falha, mas o teste automatizado não substitui teste de armazenamento no Android real.
+- Pesquisa de PRs abertas do repositório em 2026-10-12 não retornou PR aberta; não há PR pendente para fechar nesta fase.
