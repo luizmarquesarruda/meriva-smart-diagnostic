@@ -905,6 +905,8 @@ async function testPidAndLearningWriteSerialization() {
   assert.ok(cockpitSource.includes("Date.now() - timestampMs <= 30_000"), 'cockpit deve descartar temperatura OBD obsoleta após 30 segundos');
   assert.ok(cockpitSource.includes('LÍQUIDO DE ARREFECIMENTO'), 'página inicial deve apresentar métrica de temperatura do arrefecimento');
   assert.ok(cockpitSource.includes("'TEMPERATURA ALTA'"), 'cockpit deve destacar temperatura alta sem esconder o valor numérico');
+  assert.ok(cockpitSource.includes('const mergedCycles = new Map<string, DriveCycle>()'), 'dashboard deve reconciliar autosave e viagens recuperáveis do armazenamento');
+  assert.ok(cockpitSource.includes('for (const cycle of storedCycles) mergedCycles.set(cycle.id, cycle)'), 'índice/backup/sidecar de viagens deve prevalecer para IDs duplicados');
   assert.ok(autoTripServiceSource.includes("registerObdQuery(this.basePath, fuelLevelResult, 'REAL', undefined, { deferPersistence: true })"), 'PID 012F deve usar persistência não bloqueante no polling automático');
   assert.ok(autoTripServiceSource.includes("registerObdQuery(this.basePath, fuelResult, 'REAL', undefined, { deferPersistence: true })"), 'PID 015E deve usar persistência não bloqueante no polling automático');
   assert.ok(autoTripServiceSource.includes("registerObdQuery(this.basePath, speedResult, 'REAL', undefined, { deferPersistence: true })"), 'PID 010D deve publicar telemetria sem aguardar persistência');
