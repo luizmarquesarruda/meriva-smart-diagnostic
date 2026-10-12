@@ -2119,3 +2119,19 @@ Arquivos de testes: `tests/regression.test.js`, `tests/merivaAutosave.test.js`, 
 - **Sem benchmark alegado:** não há medição nova no mesmo carro/adaptador após essas alterações. A latência depende da ECU KWP/K-Line, do ELM327/clone e do Bluetooth. Não foram alterados `ATST`, `ATAT` nem o protocolo físico sem evidência medida.
 - O buffer CSV tem flush de até um segundo e em eventos de lifecycle; um encerramento forçado do processo antes do flush pode perder linhas ainda em memória. A fila preserva o lote quando a API de arquivos informa falha, mas o teste automatizado não substitui teste de armazenamento no Android real.
 - Pesquisa de PRs abertas do repositório em 2026-10-12 não retornou PR aberta; não há PR pendente para fechar nesta fase.
+
+
+## 2026-10-12 — Ajuste da regressão de rotação do cockpit identificada na CI
+
+### Evidência
+- A execução CI #1918 (run `38251558555`) passou por instalação de dependências e Expo Doctor, mas falhou em `npm run validate` no teste `tests/orientationLayout.test.js`.
+- O log terminava numa asserção que esperava o texto estático `activeHeroMetric + 1/5`. O cockpit atual usa a lista `heroMetrics`, e o serviço OBD passou a ler os PIDs rotativos a partir de `polling_policy.json`; a suite continuava exigindo o array literal anterior `['0105', '010B', '0111', '0142']`.
+- A CI #1919 foi iniciada no commit anterior à correção desses testes. Ela não é evidência suficiente para validar o estado final depois dos commits subsequentes.
+
+### Correção
+- `app/index.tsx`: tempo e toque agora giram usando `heroMetrics.length`, e o contador mostra o total real da lista, evitando mais um ponto fixo de `5` caso a coleção de métricas mude.
+- `tests/orientationLayout.test.js`: atualizadas as verificações para a cadência da lista de PIDs configurada via JSON, a rotação dinâmica, o contador dinâmico e o timer em formatação multilinha.
+- Commits: `b7ca3228` (rotação dinâmica), `412d0829` e `0d38f0d4` (contrato dos testes alinhado ao código atual).
+
+### Validação
+A nova CI foi disparada ao registrar esta correção. Não declarar TypeScript, testes e build Android como aprovados até a execução mais recente chegar a `completed/success`. Se outra asserção de contrato antigo surgir, corrigir o teste para o comportamento real apenas quando a implementação já estiver coerente; não relaxar testes funcionais.
