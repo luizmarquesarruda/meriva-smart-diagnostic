@@ -408,10 +408,10 @@ test('8. REAL + RESPONDEU entra no learning e no banco', async () => {
   await csvLogger.flushCsvLogs();
 
   const profile = await learning.readLearningProfile(BASE);
-  assert.strictEqual(profile.globalSampleCounts.realSamples, 2, 'duas amostras reais');
+  assert.strictEqual(profile.globalSampleCounts.realSamples, 1, 'amostras repetidas do mesmo PID dentro da janela devem ser agregadas para aprendizado');
   const bank = await pidBank.readPidConfirmations(BASE);
   assert.strictEqual(bank.length, 1, 'um PID confirmado');
-  assert.strictEqual(bank[0].occurrences, 2, 'ocorrências acumuladas');
+  assert.strictEqual(bank[0].occurrences, 1, 'o banco persistente não deve inflar ocorrências pela cadência de polling');
   assert.ok(bank[0].firstSeen, 'firstSeen preservado');
 
   const persistedReadings = m.getAutoSaveState().lastReadings;
