@@ -78,11 +78,8 @@ export class GpsHistoryStore {
   private segmentRecordCount = 0;
   private segmentContent = '';
   private dailyRecordCount = 0;
-  private lastPersistedTimestamp = 0;
   private lastQueuedTimestamp = 0;
   private lastAcceptedTimestamp = 0;
-  private lastQueuedQuality: GpsJsonRecord['signalQuality'] | null = null;
-  private lastQueuedMoving: boolean | null = null;
   private lastObservedQuality: GpsJsonRecord['signalQuality'] | null = null;
   private lastObservedMoving: boolean | null = null;
   private pending: GpsJsonRecord[] = [];
@@ -117,11 +114,8 @@ export class GpsHistoryStore {
     this.segmentRecordCount = 0;
     this.segmentContent = '';
     this.dailyRecordCount = 0;
-    this.lastPersistedTimestamp = 0;
     this.lastQueuedTimestamp = 0;
     this.lastAcceptedTimestamp = 0;
-    this.lastQueuedQuality = null;
-    this.lastQueuedMoving = null;
     this.lastObservedQuality = null;
     this.lastObservedMoving = null;
     this.pending = [];
@@ -180,8 +174,6 @@ export class GpsHistoryStore {
     this.pending.push(sample);
     this.scheduleFlush();
     this.lastQueuedTimestamp = sample.timestamp;
-    this.lastQueuedQuality = sample.signalQuality;
-    this.lastQueuedMoving = moving;
     if (this.pending.length >= GPS_HISTORY_FLUSH_BATCH_SIZE) {
       await this.flushPendingUnsafe();
     }
@@ -212,11 +204,8 @@ export class GpsHistoryStore {
     this.segmentRecordCount = 0;
     this.segmentContent = '';
     this.dailyRecordCount = 0;
-    this.lastPersistedTimestamp = 0;
     this.lastQueuedTimestamp = 0;
     this.lastAcceptedTimestamp = 0;
-    this.lastQueuedQuality = null;
-    this.lastQueuedMoving = null;
     this.lastObservedQuality = null;
     this.lastObservedMoving = null;
 
@@ -235,19 +224,16 @@ export class GpsHistoryStore {
         }
       }
       if (Number(item.match[2]) === this.segmentIndex) {
-        this.segmentContent = content;
+        this.segmentContent = content.length > 0 && !content.endsWith('\n') ? `${content}\n` : content;
         this.segmentRecordCount = lines.length;
       }
     }
 
     if (latestSample) {
-      this.lastPersistedTimestamp = latestSample.timestamp;
       this.lastQueuedTimestamp = latestSample.timestamp;
       this.lastAcceptedTimestamp = latestSample.timestamp;
-      this.lastQueuedQuality = latestSample.signalQuality;
       this.lastObservedQuality = latestSample.signalQuality;
-      this.lastQueuedMoving = latestSample.speedKmh != null && latestSample.speedKmh >= 3;
-      this.lastObservedMoving = this.lastQueuedMoving;
+      this.lastObservedMoving = latestSample.speedKmh != null && latestSample.speedKmh >= 3;
     }
     if (this.segmentRecordCount >= GPS_HISTORY_SEGMENT_RECORDS) {
       this.segmentIndex += 1;
@@ -291,7 +277,6 @@ export class GpsHistoryStore {
       this.segmentContent = content;
       this.segmentRecordCount += rows.length;
       this.dailyRecordCount += rows.length;
-      this.lastPersistedTimestamp = rows[rows.length - 1].timestamp;
       this.pending.splice(0, rows.length);
     }
 
