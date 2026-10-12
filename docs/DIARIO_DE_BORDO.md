@@ -2166,3 +2166,11 @@ A gravação deste registro dispara a CI seguinte. A CI #1920 não terminou verd
 
 ### Estado da validação
 Este registro dispara a CI #1922 no head atualizado para cobrir a otimização AT e gerar/validar o APK standalone desse conjunto exato de código. A CI #1921 comprova a validação automatizada do head anterior, não a nova mudança AT; o APK ainda precisa de uma conclusão bem-sucedida na execução mais recente.
+
+
+## 2026-10-12 — Fixture ELM327 do teste de fast-fail corrigida
+
+- O teste de regressão de comando AT opcional foi ajustado para emitir uma resposta serial realista: payload + CR/LF + prompt `>` do ELM327. A fixture anterior usava barras invertidas literais e não reproduzia o enquadramento real; por isso não classificava `ATI` como `UNSUPPORTED`.
+- O teste agora verifica que `ATI` explícito `?` é executado uma única vez durante a inicialização. Timeout e erro transitório continuam elegíveis aos retries limitados do produto.
+- Commit: `f1f2001a` — `test: model actual CRLF and ELM prompt in unsupported AT fixture`.
+- CI #1922 foi iniciada no head imediatamente anterior a este ajuste. O registro atual dispara a CI seguinte para validar exatamente esta fixture e a mudança de `Elm327Session`. Não usar o resultado de #1922 como prova do estado final.
