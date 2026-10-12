@@ -5,6 +5,7 @@ const appJson = JSON.parse(fs.readFileSync('app.json', 'utf8'));
 const index = fs.readFileSync('app/index.tsx', 'utf8');
 const layout = fs.readFileSync('app/_layout.tsx', 'utf8');
 const midLayout = fs.readFileSync('src/ui/midLayout.ts', 'utf8');
+const tripService = fs.readFileSync('src/trip/autoTripService.ts', 'utf8');
 const screenFiles = [
   'app/mais.tsx', 'app/dados.tsx', 'app/saude.tsx', 'app/veiculo.tsx',
   'app/viagens.tsx', 'app/aprendizado.tsx', 'app/bluetooth.tsx',
@@ -28,6 +29,7 @@ assert.match(index, /VOLTAGEM DO SISTEMA/);
 assert.match(index, /heroSwitchHint/);
 assert.match(index, /item\.source !== 'REAL'/);
 assert.match(index, /item\.pid === '0142'/);
+assert.match(tripService, /telemetryCandidates = \['0105', '010B', '0111', '0142'\]/);
 assert.match(index, /item\.pid === '0111'/);
 assert.match(index, /item\.pid === '010C'/);
 assert.match(index, /activeHeroMetric \+ 1\/5/);
