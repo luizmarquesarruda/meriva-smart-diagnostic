@@ -135,7 +135,10 @@ export class GpsHistoryStore {
     const operation = this.queue.then(async () => {
       await this.recordUnsafe(sample, effectiveSpeedKmh);
     });
-    this.queue = operation.catch((cause) => this.reportError(cause));
+    this.queue = operation.catch((cause) => {
+      this.reportError(cause);
+      if (this.pending.length > 0) this.scheduleFlush();
+    });
     return this.queue;
   }
 
@@ -143,7 +146,10 @@ export class GpsHistoryStore {
     const operation = this.queue.then(async () => {
       await this.flushPendingUnsafe();
     });
-    this.queue = operation.catch((cause) => this.reportError(cause));
+    this.queue = operation.catch((cause) => {
+      this.reportError(cause);
+      if (this.pending.length > 0) this.scheduleFlush();
+    });
     return this.queue;
   }
 
