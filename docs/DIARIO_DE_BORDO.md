@@ -2150,3 +2150,19 @@ A nova CI foi disparada ao registrar esta correção. Não declarar TypeScript, 
 
 ### Estado
 A gravação deste registro dispara a CI seguinte. A CI #1920 não terminou verde e não deve ser usada como validação final. É preciso confirmar novamente o script completo, inclusive GPS, persistência e build Android.
+
+
+## 2026-10-12 — CI #1921 verde na validação e redução dos retries AT opcionais
+
+### Resultado confirmado
+- CI #1921, run `38258162611`, commit `5d8eca2a`: `npm ci`, Expo Doctor, TypeScript e `npm test` concluíram com sucesso.
+- O job `android-build` já havia passado por `expo prebuild --clean` e estava em `Assemble Android release APK (standalone)` no momento da consulta. Esse resultado ainda não é considerado concluído neste registro.
+
+### Otimização adicional de inicialização
+- Evidência: `Elm327Session.performInitialize()` repetia até três vezes um comando AT opcional mesmo quando o adaptador respondia explicitamente `?` (`UNSUPPORTED`). Cada retry adicionava atraso fixo sem chance de a mesma capacidade passar a existir durante a sessão.
+- Correção: `src/obd/elm327.ts` interrompe o retry no status `UNSUPPORTED`. Timeout/erro transitório continua usando retries limitados; `ATZ` obrigatório e a janela de assentamento do firmware não foram alterados.
+- Teste: `tests/regression.test.js` usa transporte falso e exige exatamente uma emissão de `ATI` quando a resposta é `?`.
+- Commits: `65721bf6` (correção) e `83ebd2eb` (regressão); documentação atualizada em `96eaba69` e `4e7c19bd`.
+
+### Estado da validação
+Este registro dispara a CI #1922 no head atualizado para cobrir a otimização AT e gerar/validar o APK standalone desse conjunto exato de código. A CI #1921 comprova a validação automatizada do head anterior, não a nova mudança AT; o APK ainda precisa de uma conclusão bem-sucedida na execução mais recente.
