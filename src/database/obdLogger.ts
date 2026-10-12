@@ -1,5 +1,5 @@
 import * as FileSystem from 'expo-file-system';
-import { appendCsvRow, CsvRow } from './csvLogger';
+import { queueCsvRow, CsvRow } from './csvLogger';
 import { PidQueryResult } from '../obd/elm327';
 
 export interface RawObdLogEntry {
@@ -34,7 +34,7 @@ export async function logRawObdData(
     source,
   };
 
-  await appendCsvRow(filePath, row);
+  queueCsvRow(filePath, row);
 }
 
 export async function logInterpretedData(
@@ -62,5 +62,5 @@ export async function logInterpretedData(
     condicao: query.parsed.status,
   };
 
-  await appendCsvRow(filePath, row);
+  queueCsvRow(filePath, row);
 }
