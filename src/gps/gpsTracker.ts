@@ -8,12 +8,68 @@ export interface GpsSample {
   speedKmh: number | null;
   accuracyM: number | null;
   timestamp: number;
+  altitudeMeters?: number | null;
+  headingDegrees?: number | null;
+}
+
+export interface GpsJsonRecord {
+  schemaVersion: 1;
+  timestamp: number;
+  latitude: number;
+  longitude: number;
+  speedKmh: number | null;
+  accuracyMeters: number | null;
+  altitudeMeters: number | null;
+  headingDegrees: number | null;
+  source: 'GPS';
+  valid: boolean;
+  signalQuality: 'SEM_FIX' | 'FRACA' | 'BOA' | 'EXCELENTE';
+}
+
+export function normalizeGpsJsonRecord(location: Location.LocationObject): GpsJsonRecord | null {
+  const c = location.coords;
+  if (
+    !Number.isFinite(c.latitude) || c.latitude < -90 || c.latitude > 90 ||
+    !Number.isFinite(c.longitude) || c.longitude < -180 || c.longitude > 180 ||
+    !Number.isFinite(location.timestamp) || location.timestamp <= 0
+  ) return null;
+
+  const accuracyMeters = c.accuracy != null && Number.isFinite(c.accuracy) && c.accuracy >= 0
+    ? c.accuracy
+    : null;
+  const valid = accuracyMeters != null && accuracyMeters <= MAX_ACCURACY_M;
+  const signalQuality: GpsJsonRecord['signalQuality'] = !valid
+    ? 'SEM_FIX'
+    : accuracyMeters <= 5 ? 'EXCELENTE'
+      : accuracyMeters <= 15 ? 'BOA' : 'FRACA';
+  const rawSpeed = c.speed;
+  const speedKmh = valid && rawSpeed != null && Number.isFinite(rawSpeed) && rawSpeed >= 0
+    ? Number((rawSpeed * 3.6).toFixed(1))
+    : null;
+  const altitudeMeters = c.altitude != null && Number.isFinite(c.altitude) ? c.altitude : null;
+  const headingDegrees = c.heading != null && Number.isFinite(c.heading) && c.heading >= 0
+    ? Number((c.heading % 360).toFixed(1))
+    : null;
+
+  return {
+    schemaVersion: 1,
+    timestamp: location.timestamp,
+    latitude: c.latitude,
+    longitude: c.longitude,
+    speedKmh,
+    accuracyMeters,
+    altitudeMeters,
+    headingDegrees,
+    source: 'GPS',
+    valid,
+    signalQuality,
+  };
 }
 
 export interface GpsTripState {
   running: boolean;
   permissionGranted: boolean;
-  currentSpeedKmh: number;
+  currentSpeedKmh: number | null;
   maxSpeedKmh: number;
   distanceKm: number;
   samples: number;
@@ -69,14 +125,14 @@ export function calculateConsumptionKml(distanceKm: number, fuelUsedL: number): 
   return distanceKm / fuelUsedL;
 }
 
-export function normalizeGpsSpeedKmh(speedMs: number | null | undefined): number {
+export function normalizeGpsSpeedKmh(speedMs: number | null | undefined): number | null {
   return Number.isFinite(speedMs) && (speedMs as number) >= 0
     ? (speedMs as number) * 3.6
-    : 0;
+    : null;
 }
 
 function isAccurate(sample: GpsSample): boolean {
-  return sample.accuracyM == null || sample.accuracyM <= MAX_ACCURACY_M;
+  return sample.accuracyM != null && Number.isFinite(sample.accuracyM) && sample.accuracyM >= 0 && sample.accuracyM <= MAX_ACCURACY_M;
 }
 
 export class GpsTracker {
@@ -91,7 +147,7 @@ export class GpsTracker {
   private state: GpsTripState = {
     running: false,
     permissionGranted: false,
-    currentSpeedKmh: 0,
+    currentSpeedKmh: null,
     maxSpeedKmh: 0,
     distanceKm: 0,
     samples: 0,
@@ -132,7 +188,7 @@ export class GpsTracker {
       this.state = {
         ...this.state,
         running: true,
-        currentSpeedKmh: 0,
+        currentSpeedKmh: null,
         maxSpeedKmh: 0,
         distanceKm: 0,
         samples: 0,
@@ -264,7 +320,7 @@ export class GpsTracker {
     this.state = {
       ...this.state,
       running: true,
-      currentSpeedKmh: 0,
+      currentSpeedKmh: null,
       maxSpeedKmh: 0,
       distanceKm: 0,
       samples: 0,
@@ -296,7 +352,7 @@ export class GpsTracker {
       this.state = {
         ...this.state,
         running: false,
-        currentSpeedKmh: 0,
+        currentSpeedKmh: null,
         error: cause instanceof Error
           ? cause.message
           : 'NÃO FOI POSSÍVEL INICIAR O MONITORAMENTO GPS.',
@@ -307,17 +363,18 @@ export class GpsTracker {
   }
 
   handleLocation(location: Location.LocationObject): void {
-    const c = location.coords;
-    if (!Number.isFinite(c.latitude) || !Number.isFinite(c.longitude)) return;
+    const normalized = normalizeGpsJsonRecord(location);
+    if (!normalized) return;
 
+    const c = location.coords;
     const sample: GpsSample = {
-      latitude: c.latitude,
-      longitude: c.longitude,
-      speedKmh: Number.isFinite(c.speed) && (c.speed as number) >= 0
-        ? normalizeGpsSpeedKmh(c.speed)
-        : null,
-      accuracyM: c.accuracy ?? null,
-      timestamp: Number.isFinite(location.timestamp) ? location.timestamp : Date.now(),
+      latitude: normalized.latitude,
+      longitude: normalized.longitude,
+      speedKmh: normalized.speedKmh,
+      accuracyM: normalized.accuracyMeters,
+      timestamp: normalized.timestamp,
+      altitudeMeters: normalized.altitudeMeters,
+      headingDegrees: normalized.headingDegrees,
     };
 
     const accurate = isAccurate(sample);
@@ -373,13 +430,13 @@ export class GpsTracker {
           sample.speedKmh >= MIN_MOVEMENT_SPEED_KMH &&
           sample.speedKmh <= MAX_SPEED_KMH) &&
       this.consecutiveMovingSamples >= MIN_MOVING_SAMPLES;
-    let speedKmh = movementConfirmed
+    let speedKmh: number | null = !accurate ? null : movementConfirmed
       ? (sample.speedKmh != null && sample.speedKmh <= MAX_SPEED_KMH
         ? sample.speedKmh
         : (derivedSpeedKmh ?? 0))
       : 0;
-    if (!Number.isFinite(speedKmh) || speedKmh < STOP_SPEED_KMH || speedKmh > MAX_SPEED_KMH) speedKmh = 0;
-    const speedSource: GpsTripState['speedSource'] = speedKmh <= 0
+    if (speedKmh != null && (!Number.isFinite(speedKmh) || speedKmh < STOP_SPEED_KMH || speedKmh > MAX_SPEED_KMH)) speedKmh = 0;
+    const speedSource: GpsTripState['speedSource'] = speedKmh == null || speedKmh <= 0
       ? 'PARADO'
       : this.vehicleSpeedHintKmh != null && this.vehicleSpeedHintKmh >= MIN_MOVEMENT_SPEED_KMH
         ? 'OBD'
@@ -390,7 +447,7 @@ export class GpsTracker {
       ...this.state,
       samples: this.state.samples + 1,
       currentSpeedKmh: Number(speedKmh.toFixed(1)),
-      maxSpeedKmh: Number(Math.max(this.state.maxSpeedKmh, speedKmh).toFixed(1)),
+      maxSpeedKmh: Number(Math.max(this.state.maxSpeedKmh, speedKmh ?? 0).toFixed(1)),
       lastTimestamp: sample.timestamp,
       lastAccuracyM: sample.accuracyM,
       error: null,
@@ -413,7 +470,7 @@ export class GpsTracker {
       this.state = {
         ...this.state,
         running: false,
-        currentSpeedKmh: 0,
+        currentSpeedKmh: null,
         maxSpeedKmh: 0,
         distanceKm: 0,
         samples: 0,
@@ -423,7 +480,7 @@ export class GpsTracker {
         speedSource: 'PARADO',
       };
     } else {
-      this.state = { ...this.state, running: false, currentSpeedKmh: 0, speedSource: 'PARADO' };
+      this.state = { ...this.state, running: false, currentSpeedKmh: null, speedSource: 'PARADO' };
     }
     this.emit();
   }
