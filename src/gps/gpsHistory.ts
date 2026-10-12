@@ -93,7 +93,7 @@ export class GpsHistoryStore {
     basePath = FileSystem.documentDirectory ? `${FileSystem.documentDirectory}MERIVA_SMART` : '',
     nowProvider: () => number = () => Date.now(),
   ) {
-    this.basePath = basePath.replace(/\\/+$/, '');
+    this.basePath = basePath.replace(/[/]+$/, '');
     this.nowProvider = nowProvider;
   }
 
