@@ -212,8 +212,8 @@ class AutoTripService {
         let fuelRateForDisplayLph: number | null = null;
         let fuelRateForDisplaySource: FuelRateSource | null = null;
         let mapFallbackQueriedThisCycle = false;
-        const fuelEstimateDue = this.pollCycleNumber % FUEL_ESTIMATE_EVERY_N_CYCLES === 1;
-        let fuelLevelPercent: number | null = null;
+        const fuelEstimateDue = this.pollCycleNumber % FUEL_ESTIMATE_EVERY_N_CYCLES === pollingPolicy.polling.estimatedFuelRate.phase;
+        let fuelLevelPercent: number | null = this.state.fuelLevelPercent;
         let obdSpeedKmh: number | null = null;
         let rpm: number | null = null;
         if (obdSpeedSupported) gpsTracker.setVehicleSpeedHintKmh(null);
@@ -271,12 +271,12 @@ class AutoTripService {
 
         // O nível do tanque muda lentamente: consultar a cada quatro ciclos
         // reduz tráfego serial sem limpar o último valor válido da interface.
-        if (this.state.fuelLevelSupported && this.pollCycleNumber % FUEL_LEVEL_EVERY_N_CYCLES === 1) {
+        if (this.state.fuelLevelSupported && this.pollCycleNumber % FUEL_LEVEL_EVERY_N_CYCLES === pollingPolicy.polling.fuelLevel.phase) {
           const fuelLevelResult = await connection.session.queryPid('012F');
           await registerObdQuery(this.basePath, fuelLevelResult, 'REAL');
           if (
             fuelLevelResult.parsed.status === 'RESPONDEU' &&
-            fuelLevelResult.parsed.unit === '%' &&
+            fuelLevelResult.parsed.unit === 'percent' &&
             fuelLevelResult.parsed.value != null &&
             Number.isFinite(fuelLevelResult.parsed.value) &&
             fuelLevelResult.parsed.value >= 0 &&
