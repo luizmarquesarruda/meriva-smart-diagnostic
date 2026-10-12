@@ -181,6 +181,11 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
   watcher({ coords: { latitude: 0, longitude: 0.00175, speed: 10, accuracy: 5 }, timestamp: 29000 });
   assert.strictEqual(tracker.getState().distanceKm, distanceAfterObdMovement);
 
+  tracker.setBackgroundTaskError('TESTE DE ERRO GPS');
+  assert.strictEqual(tracker.getState().currentSpeedKmh, null);
+  assert.strictEqual(tracker.getState().lastSample, null);
+  assert.strictEqual(tracker.getState().signalQuality, 'SEM_FIX');
+
   await tracker.stop();
   assert.strictEqual(tracker.getState().running, false);
   unsubscribe();
