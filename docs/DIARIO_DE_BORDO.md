@@ -2135,3 +2135,18 @@ Arquivos de testes: `tests/regression.test.js`, `tests/merivaAutosave.test.js`, 
 
 ### Validação
 A nova CI foi disparada ao registrar esta correção. Não declarar TypeScript, testes e build Android como aprovados até a execução mais recente chegar a `completed/success`. Se outra asserção de contrato antigo surgir, corrigir o teste para o comportamento real apenas quando a implementação já estiver coerente; não relaxar testes funcionais.
+
+
+## 2026-10-12 — Correção de asserções antigas da CI #1920
+
+### Evidência do run
+- CI #1920, run `38257980970`, iniciou com commit `7c07a5cb`. `npm ci`, Expo Doctor e TypeScript terminaram com sucesso.
+- A regressão `PID + DNA serializados` falhou em `tests/regression.test.js`: asserção exigia `item.pid !== '0105'`, invertendo o comportamento necessário para encontrar a temperatura do arrefecimento, e verificava uma forma antiga de comparação do timestamp.
+- O código do cockpit usa `item.pid === '0105'` e calcula `ageMs`, exigindo `ageMs >= 0 && ageMs <= 30_000`. Essa regra é a correta: aceita apenas leitura real, não futura e com no máximo 30 s.
+
+### Correção
+- Atualizadas as asserções para verificar identificação positiva do PID `0105` e janela de frescor real, em vez de exigir a expressão antiga.
+- Commit: `304c2bde` — `test: assert real coolant PID and freshness window semantics`.
+
+### Estado
+A gravação deste registro dispara a CI seguinte. A CI #1920 não terminou verde e não deve ser usada como validação final. É preciso confirmar novamente o script completo, inclusive GPS, persistência e build Android.
