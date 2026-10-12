@@ -157,14 +157,16 @@ export async function discoverIntelligentPids(
   // Só testar PIDs do catálogo que a bitmap anunciou, além de PIDs já conhecidos.
   // Antes, KNOWN_PIDS inteiro era consultado em toda conexão: até 30+ round trips
   // desnecessários, inclusive para PIDs que a própria ECU não anunciava.
-  const candidates = Array.from(new Set([
-    ...confirmedCandidates.map((pid) => pid.replace(/\s/g, '').toUpperCase()),
-    ...Array.from(bitmapAdvertised),
-  ])).filter((pid) =>
+  const knownCandidateSet = new Set(
+    confirmedCandidates.map((pid) => pid.replace(/\s/g, '').toUpperCase()),
+  );
+  // Prior knowledge changes ordering only. A PID absent from the current ECU
+  // bitmap is not probed in this session, even if it worked on an earlier ECU.
+  const candidates = Array.from(bitmapAdvertised).filter((pid) =>
     /^01[0-9A-F]{2}$/.test(pid) &&
     KNOWN_PIDS.includes(pid) &&
     !priorityPids.includes(pid),
-  );
+  ).sort((a, b) => Number(knownCandidateSet.has(b)) - Number(knownCandidateSet.has(a)));
 
   for (const pid of candidates) {
     let result: ElmCommandResult;
