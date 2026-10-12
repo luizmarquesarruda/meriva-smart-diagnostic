@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/luizmarquesarruda/meriva-smart-diagnostic/blob/main/src/gps/gps_sample.schema.json",
+  "title": "Meriva Smart GPS sample",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "timestamp",
+    "latitude",
+    "longitude",
+    "speedKmh",
+    "accuracyMeters",
+    "altitudeMeters",
+    "headingDegrees",
+    "source",
+    "valid",
+    "signalQuality"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "timestamp": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "latitude": {
+      "type": "number",
+      "minimum": -90,
+      "maximum": 90
+    },
+    "longitude": {
+      "type": "number",
+      "minimum": -180,
+      "maximum": 180
+    },
+    "speedKmh": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 220
+    },
+    "accuracyMeters": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "altitudeMeters": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "headingDegrees": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "exclusiveMaximum": 360
+    },
+    "source": {
+      "const": "GPS"
+    },
+    "valid": {
+      "type": "boolean"
+    },
+    "signalQuality": {
+      "enum": [
+        "SEM_FIX",
+        "FRACA",
+        "BOA",
+        "EXCELENTE"
+      ]
+    }
+  }
+}
