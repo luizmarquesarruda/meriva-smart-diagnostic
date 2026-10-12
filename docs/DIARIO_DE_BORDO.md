@@ -2047,7 +2047,7 @@ A correção do teste foi gravada na branch `fix/daily-obd-history-keep-screen-a
 - O índice de viagens não tinha serialização própria, deduplicação confiável por ID nem uma validação completa de valores numéricos.
 
 ### Correções implementadas na branch `perf/obd-telemetry-and-storage-safety`
-- `src/meriva/autosaveIntegration.ts`: publica a telemetria e as últimas leituras antes de I/O; o loop automático pode enfileirar persistência de forma não bloqueante. A atualização do banco de PIDs/aprendizado é limitada a uma amostra representativa por PID a cada 30 s no caminho de alta frequência; a telemetria em memória continua recebendo cada resposta.
+- `src/meriva/autosaveIntegration.ts`: publica a telemetria e as últimas leituras antes de I/O; o loop automático pode enfileirar persistência de forma não bloqueante. A atualização do banco de PIDs/aprendizado é limitada a uma amostra representativa por PID a cada 10 s no caminho de alta frequência; a telemetria em memória continua recebendo cada resposta.
 - `src/database/csvLogger.ts`: adiciona buffer de CSV, lote de até 8 linhas antes da descarga, intervalo de 3 s, flush explícito e reencaminhamento das linhas se uma descarga falhar.
 - `src/database/obdLogger.ts`: suporta modo buffer para streams RAW e interpretado, sem alterar o formato dos CSVs atuais.
 - `src/meriva/autosaveManager.ts`: tenta descarregar logs CSV quando o aplicativo sai do estado ativo.
