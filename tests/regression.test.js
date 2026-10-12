@@ -697,7 +697,11 @@ async function testDriveCycleValidation() {
   assert.ok(migratedIndex.cycles.every((item) => item.source !== 'CARSCANNER_SEED'), 'adding a real trip must remove legacy seeds from active index');
 
   files.set(indexFile, JSON.stringify({ cycles: 'corrompido' }));
-  assert.deepStrictEqual(await storage.readDriveCycles(BASE), []);
+  assert.deepStrictEqual(
+    (await storage.readDriveCycles(BASE)).map((item) => item.id),
+    ['test-1', 'test-2'],
+    'índice principal corrompido deve cair no último backup válido sem apagar o histórico',
+  );
 
   resetFS();
   await storage.initializeDriveCycles(BASE);
@@ -913,7 +917,7 @@ async function testPidAndLearningWriteSerialization() {
   const fuelLevelQueryIndex = autoTripServiceSource.indexOf("queryPid('012F')");
   assert.ok(speedQueryIndex >= 0 && rpmQueryIndex > speedQueryIndex && measuredFuelQueryIndex > rpmQueryIndex && fuelLevelQueryIndex > measuredFuelQueryIndex, 'velocidade, RPM e taxa de combustível devem preceder o nível lento do tanque');
   assert.ok(autoTripServiceSource.includes("this.pollCycleNumber % 4 === 1"), 'nível do tanque deve ser consultado em cadência reduzida');
-  assert.ok(autoTripServiceSource.includes("fuelRateLph == null && connection.supportedPids.includes('0110')"), 'MAF só deve ser consultado como fallback quando suportado pela ECU');
+  assert.ok(autoTripServiceSource.includes("fuelRateLph == null &&\n          fuelFallbackDue &&\n          connection.supportedPids.includes('0110')"), 'MAF só deve ser consultado em cadência limitada e quando suportado pela ECU');
   assert.ok(autoTripServiceSource.includes("connection.supportedPids.includes('010B') &&\n          connection.supportedPids.includes('010F')"), 'fallback MAP exige suporte confirmado aos PIDs MAP e IAT');
   assert.ok(!autoTripServiceSource.includes('recordLivePidQuery('), 'telemetria automática deve registrar cada resposta uma única vez via registerObdQuery');
   writeDelayMs = 0;
