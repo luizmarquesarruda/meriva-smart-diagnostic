@@ -2090,3 +2090,13 @@ Guardar amostras GPS úteis para inspecionar o sinal e o trajeto sem duplicar o 
 - Testes e TypeScript ainda não executados em checkout local.
 - CI **não disparada**, conforme orientação do usuário.
 - Teste em aparelho Android e inspeção de arquivos reais pendentes.
+
+
+### 2026-10-12 — GPS vinculado ao estado real da ECU
+
+- A gravação do histórico GPS só começa quando o estado compartilhado confirma ECU conectada/respondendo, após validação real da ECU.
+- A presença isolada do adaptador Bluetooth/ELM327 não inicia a gravação.
+- Ao perder a conectividade válida da ECU, a sessão GPS para de aceitar novas amostras e descarrega a fila já aceita antes de encerrar.
+- Cada amostra persistida inclui `sessionId`, permitindo separar sessões após reconexões no mesmo arquivo diário sem criar trajetos falsos.
+- Ao reconectar, uma nova sessão recebe outro identificador; o rastreador GPS pode continuar coletando posição em background, mas o histórico não grava enquanto a ECU estiver desconectada.
+- A regra não altera o cálculo de distância ou consumo da viagem.
