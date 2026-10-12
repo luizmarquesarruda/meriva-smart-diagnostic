@@ -174,3 +174,8 @@ O Android solicita localização em segundo plano para esse modo. A notificaçã
 - PIDs secundários em falha recebem espera progressiva; os PIDs críticos de velocidade/RPM continuam prioritários.
 - O índice JSON de viagens tem escrita temporária validada, backup, serialização por arquivo e deduplicação por ID. Um índice inválido sem backup válido bloqueia nova gravação em vez de apagar silenciosamente o arquivo existente.
 - Esta etapa precisa passar por `npm run validate`, Expo Doctor, build APK Release e teste físico. Nenhum desses resultados deve ser presumido por uma revisão estática.
+
+
+### Recuperação de viagens pendentes
+
+Cada viagem finalizada é primeiro escrita como um arquivo JSON individual em `VIAGENS/PENDING_CYCLES`. Só depois o índice principal é atualizado. Se o índice e o backup não puderem ser lidos, o app preserva a viagem na fila lateral e `readDriveCycles()` continua exibindo-a; uma inicialização posterior pode incorporá-la ao índice assim que existir uma base recuperável. Arquivos laterais só são removidos após confirmar a presença da viagem no índice validado.
