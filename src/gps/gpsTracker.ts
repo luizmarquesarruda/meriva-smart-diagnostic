@@ -25,6 +25,7 @@ export interface GpsJsonRecord {
   source: 'GPS';
   valid: boolean;
   signalQuality: 'SEM_FIX' | 'FRACA' | 'BOA' | 'EXCELENTE';
+  sessionId?: string;
 }
 
 export function normalizeGpsJsonRecord(location: Location.LocationObject): GpsJsonRecord | null {
