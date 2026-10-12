@@ -149,7 +149,6 @@ class AutoTripService {
     const fuelSupported = connection.supportedPids.includes('015E');
     const fuelLevelSupported = connection.supportedPids.includes('012F');
     const obdSpeedSupported = connection.supportedPids.includes('010D');
-    const initialDistanceKm = gpsTracker.getState().distanceKm;
     this.recorder = null;
     this.stoppedSinceMs = null;
     const generation = ++this.generation;
