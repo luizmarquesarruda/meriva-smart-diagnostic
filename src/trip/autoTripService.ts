@@ -1,4 +1,5 @@
 import { gpsTracker } from '../gps';
+import { gpsHistoryStore } from '../gps/gpsHistory';
 import type { SharedObdConnection } from '../obd/sharedConnection';
 import { getSharedObdConnection, getSharedObdStatus, subscribeSharedObd, subscribeSharedObdStatus } from '../obd/sharedConnection';
 import { addDriveCycle, readDriveCycles } from '../storage/driveCycleStorage';
