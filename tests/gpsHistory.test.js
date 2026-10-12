@@ -18,7 +18,6 @@ const output = ts.transpileModule(fs.readFileSync(sourcePath, 'utf8'), {
 
 let files;
 let directories;
-const indexCalls = [];
 
 function parentDir(value) {
   const index = value.lastIndexOf('/');
@@ -83,24 +82,37 @@ function createMemoryFS() {
 files = new Map();
 directories = new Set(['/doc']);
 const fakeFS = createMemoryFS();
+const compiledCache = new Map();
+function loadTs(tsPath) {
+  tsPath = path.resolve(tsPath);
+  if (compiledCache.has(tsPath)) return compiledCache.get(tsPath).exports;
+  const source = fs.readFileSync(tsPath, 'utf8');
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2019,
+      esModuleInterop: true,
+    },
+  }).outputText;
+  const loaded = new Module(tsPath, null);
+  loaded.filename = tsPath;
+  loaded.paths = Module._nodeModulePaths(path.dirname(tsPath));
+  compiledCache.set(tsPath, loaded);
+  loaded._compile(compiled, tsPath);
+  return loaded.exports;
+}
+
 const originalLoad = Module._load;
 Module._load = function(request) {
   if (request === 'expo-file-system') return fakeFS;
   if (request === '../meriva/dailyObdHistory') {
-    return {
-      appendDailyGpsHistoryIndex: async (basePath, date) => {
-        indexCalls.push({ basePath, date });
-        return { basePath, date, added: true };
-      },
-    };
+    return loadTs(path.join(ROOT, 'src/meriva/dailyObdHistory.ts'));
   }
   return originalLoad.apply(this, arguments);
 };
 
-const compiledModule = new Module(sourcePath, null);
-compiledModule.filename = sourcePath;
-compiledModule.paths = Module._nodeModulePaths(path.dirname(sourcePath));
-compiledModule._compile(output, sourcePath);
+const dailyHistoryModule = loadTs(path.join(ROOT, 'src/meriva/dailyObdHistory.ts'));
+const compiledModule = loadTs(sourcePath);
 Module._load = originalLoad;
 
 const {
@@ -110,6 +122,7 @@ const {
   GPS_HISTORY_MAX_SAMPLES_PER_DAY,
   GPS_HISTORY_SEGMENT_RECORDS,
 } = compiledModule.exports;
+const { appendDailyGpsHistoryIndex } = dailyHistoryModule;
 
 function localKey(timestamp) {
   const date = new Date(timestamp);
@@ -169,7 +182,12 @@ function linesInDirectory(directory) {
   assert(records.every((record) => record.source === 'GPS' && record.schemaVersion === 1));
   assert.strictEqual(records[0].latitude, -23.55);
   assert.strictEqual(records[0].speedKmh, 36);
-  assert(indexCalls.some((call) => call.date === localKey(noon.getTime())), 'daily TXT should receive a GPS archive index');
+  const dayKey = localKey(noon.getTime());
+  const dailyIndexResult = await appendDailyGpsHistoryIndex('/doc/MERIVA_SMART', dayKey);
+  assert.strictEqual(dailyIndexResult.added, false, 'GPS archive index should be idempotent');
+  const dailyTxtPath = '/doc/MERIVA_SMART/VIAGENS/meriva_smart_daily_obd_history.txt';
+  const dailyTxt = await fakeFS.readAsStringAsync(dailyTxtPath);
+  assert.strictEqual((dailyTxt.match(/--- REGISTRO GPS LOCAL ---/g) || []).length, 1);
 
   // Duplicate timestamps must not create duplicate JSONL records.
   await store.record(makeSample(clock - 10_000), 36);
@@ -188,6 +206,27 @@ function linesInDirectory(directory) {
   await store.flush();
   count = linesInDirectory(dir).filter((line) => line.includes('"schemaVersion":1')).length;
   assert.strictEqual(count, 5, 'stationary heartbeat should be written at the configured interval');
+
+  // Segment rollover is deterministic and never writes more than the configured chunk size.
+  files.clear();
+  directories.clear();
+  directories.add('/doc');
+  await fakeFS.makeDirectoryAsync(dir, { intermediates: true });
+  let segmentClock = new Date(clock);
+  segmentClock.setHours(13, 0, 0, 0);
+  let segmentNow = segmentClock.getTime();
+  const segmentDate = localKey(segmentNow);
+  const segmentStore = new GpsHistoryStore('/doc/MERIVA_SMART', () => segmentNow);
+  for (let index = 0; index < GPS_HISTORY_SEGMENT_RECORDS + 2; index += 1) {
+    await segmentStore.record(makeSample(segmentNow), 36);
+    segmentNow += 10_000;
+  }
+  await segmentStore.flush();
+  names = await fakeFS.readDirectoryAsync(dir);
+  const segmentedFiles = names.filter((name) => name.startsWith('gps_' + segmentDate + '_')).sort();
+  assert.strictEqual(segmentedFiles.length, 2, 'segment should roll over after 300 persisted rows');
+  assert.strictEqual(files.get(dir + '/' + segmentedFiles[0]).split(/\\r?\\n/).filter(Boolean).length, GPS_HISTORY_SEGMENT_RECORDS);
+  assert.strictEqual(files.get(dir + '/' + segmentedFiles[1]).split(/\\r?\\n/).filter(Boolean).length, 2);
 
   // The daily hard cap is enforced using the number of existing persisted lines.
   files.clear();
