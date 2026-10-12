@@ -4,7 +4,6 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { Alert, AppState, Platform } from 'react-native';
 import { Stack } from 'expo-router';
 import { ensureBluetoothReady } from '../src/obd/bluetoothManager';
-import { gpsTracker } from '../src/gps';
 import { readAppSettings, writeAppSettings } from '../src/database/appSettings';
 import { connectPreferredElm, disconnectSharedObd } from '../src/obd/sharedConnection';
 import * as FileSystem from 'expo-file-system';
@@ -141,7 +140,8 @@ export default function RootLayout() {
 
     return () => {
       subscription.remove();
-      void gpsTracker.stop();
+      // O serviço de viagens é o único dono do ciclo de vida GPS; serializar
+      // o fechamento evita stop() concorrente com o fechamento da sessão OBD.
       void autoTripService.stop().finally(() => {
         void disconnectSharedObd();
       });
