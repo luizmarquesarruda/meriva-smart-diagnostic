@@ -78,7 +78,7 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
   assert.strictEqual(tracker.getState().permissionGranted, true);
   assert.strictEqual(tracker.getState().signalQuality, 'SEM_FIX');
   assert.strictEqual(tracker.getState().currentSpeedKmh, null);
-  assert.strictEqual(tracker.getState().speedSource, 'PARADO');
+  assert.strictEqual(tracker.getState().speedSource, 'INDISPONIVEL');
 
   const missingAccuracyRecord = normalizeGpsJsonRecord({
     coords: { latitude: -23.55, longitude: -46.63, speed: 12, accuracy: null, altitude: null, heading: null, altitudeAccuracy: null },
