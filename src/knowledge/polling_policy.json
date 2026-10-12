@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Política de adquisición por prioridades para ELM327 sobre K-Line/KWP. PIDs lentos se distribuyen; las estimaciones se muestrean menos a menudo que la telemetría principal.",
+  "description": "Política de aquisição priorizada para ELM327 em K-Line/KWP. Os PIDs lentos são distribuídos entre ciclos; estimativas usam cadência inferior à telemetria principal.",
   "polling": {
     "corePids": [
       "010D",
@@ -33,9 +33,10 @@
     ]
   },
   "invariants": [
-    "No consultar PIDs fora de supportedPids validados.",
-    "Uma amostra estimada só entra na integração de combustível quando foi calculada nesta rodada.",
-    "PIDs de aquisição lenta não devem ser consultados repetidamente no mesmo ciclo se já foram usados no cálculo.",
-    "Não aplicar temporizações específicas de CAN a uma sessão K-Line sem medição física."
+    "Consultar somente PIDs com suporte declarado pela ECU e validação individual positiva na sessão.",
+    "Somente uma estimativa recém-calculada pode alimentar a integração de combustível da viagem.",
+    "Uma estimativa em cache pode ser exibida por até displayStaleAfterMs, mas não pode ser integrada novamente.",
+    "PIDs usados no cálculo de consumo não devem ser consultados novamente no mesmo ciclo para telemetria rotativa.",
+    "Não aplicar temporizações específicas de CAN a uma sessão K-Line sem medições no adaptador e veículo reais."
   ]
 }
