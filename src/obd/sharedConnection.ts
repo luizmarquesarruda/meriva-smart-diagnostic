@@ -2,7 +2,7 @@ import type { Elm327Session } from './elm327';
 import type { BluetoothDeviceInfo } from './bluetoothClassicTransport';
 import { createRealElmSession, discoverPairedDevices, ensureBluetoothReady } from './bluetoothManager';
 import { DEFAULT_ELM327_COMPATIBILITY, Elm327CompatibilityConfig, mergeCompatibilityConfig } from './elm327Compatibility';
-import { getAutoSaveState, closeObdAutosaveSession, startObdAutosaveSession, updateAutoSaveState } from '../meriva/autosaveManager';
+import { getAutoSaveState, closeObdAutosaveSession, startObdAutosaveSession, updateAutoSaveState, initAutoSave } from '../meriva/autosaveManager';
 import { clearBluetoothDiagnostic, getLastBluetoothDiagnosticText } from './bluetoothManager';
 import { isBluetoothLinkUp, type BluetoothLifecycleState } from './bluetoothState';
 import RNBluetoothClassic from 'react-native-bluetooth-classic';
@@ -246,6 +246,8 @@ async function persistValidatedConnection(
   connection: SharedObdConnection,
 ): Promise<boolean> {
   const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
+  // Aguarda a hidratação do estado antes de marcar a ECU e abrir a sessão diária.
+  await initAutoSave(basePath);
   const settings = await readAppSettings(basePath);
   await writeAppSettings(basePath, {
     ...settings,
@@ -315,7 +317,11 @@ export function getSharedObdStatus(): SharedObdStatus {
   return {
     lifecycle,
     bluetoothConnected: isBluetoothLinkUp(lifecycle),
-    ecuConnected: Boolean(active?.ecuValidated),
+    ecuConnected: Boolean(active?.ecuValidated && ecuResponseState === 'RESPONDING'),
+    ecuResponseState,
+    consecutiveEcuFailures,
+    lastEcuResponseAt,
+    lastEcuError,
   };
 }
 

@@ -7,7 +7,7 @@ import { createBackup } from '../src/storage/backup';
 import { cleanupOldLogs, cleanupOldReadings } from '../src/storage/cleanup';
 import { VehicleProfile } from '../src/database/vehicleConfig';
 import { getAutoSaveState, getAutoSaveStatus, initAutoSave } from '../src/meriva/autosaveManager';
-import { exportAutoSaveTxt } from '../src/meriva/exportAutoSaveTxt';
+import { exportAutoSaveTxt, exportDailyObdHistoryTxt } from '../src/meriva/exportAutoSaveTxt';
 import { exportBluetoothDiagnosticTxt } from '../src/obd/exportBluetoothDiagnosticTxt';
 import { AppSettings, readAppSettings, writeAppSettings } from '../src/database/appSettings';
 import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
@@ -81,6 +81,18 @@ export default function ConfiguracaoScreen() {
       if (result.ok) setStatus(`RELATÓRIO BLUETOOTH EXPORTADO: ${result.fileName}`);
       else if (result.reason === 'CANCELADO') setStatus('EXPORTAÇÃO CANCELADA');
       else setStatus(`FALHA NO RELATÓRIO BLUETOOTH: ${result.message ?? result.reason}`);
+    } finally { setBusy(false); setSaveStatus(getAutoSaveStatus()); }
+  }
+
+
+  async function handleDailyHistoryExport() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const result = await exportDailyObdHistoryTxt();
+      if (result.ok) setStatus(`HISTÓRICO DIÁRIO EXPORTADO: ${result.fileName}`);
+      else if (result.reason === 'CANCELADO') setStatus('EXPORTAÇÃO CANCELADA');
+      else setStatus(`FALHA NO HISTÓRICO DIÁRIO: ${result.message ?? result.reason}`);
     } finally { setBusy(false); setSaveStatus(getAutoSaveStatus()); }
   }
 
@@ -241,6 +253,9 @@ export default function ConfiguracaoScreen() {
       </TouchableOpacity>
       <TouchableOpacity style={styles.button} onPress={handleBluetoothReport} disabled={busy}>
         <Text style={styles.buttonText}>{busy ? 'AGUARDE...' : 'EXPORTAR RELATÓRIO BLUETOOTH (.TXT)'}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.button} onPress={handleDailyHistoryExport} disabled={busy}>
+        <Text style={styles.buttonText}>{busy ? 'AGUARDE...' : 'EXPORTAR HISTÓRICO DIÁRIO ECU (.TXT)'}</Text>
       </TouchableOpacity>
       <TouchableOpacity style={styles.button} onPress={handleExport} disabled={busy}>
         <Text style={styles.buttonText}>{busy ? 'AGUARDE...' : 'EXPORTAR SALVAMENTO (.TXT)'}</Text>

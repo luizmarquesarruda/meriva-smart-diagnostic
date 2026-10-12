@@ -226,6 +226,10 @@ async function testFormulaKnowledgeBank() {
   assert.strictEqual(engine.applyFormula('PERCENT_255', [0xFF]), 100);
   assert.strictEqual(engine.applyFormula('O2_VOLTS', [0x6A, 0x80]), 0.53);
 
+  const absoluteLoad = engine.decodeFormula('U16_SCALE_255', '0143', [0xFF, 0xFF]);
+  assert.strictEqual(absoluteLoad.value, 25700);
+  assert.strictEqual(absoluteLoad.valid, true, 'PID 0143 admite a faixa padronizada de até 25700%, não apenas 100%');
+
   const good = engine.decodeFormula('RPM', '010C', [0x1A, 0xF8]);
   assert.strictEqual(good.valid, true);
   assert.strictEqual(good.value, 1726);
@@ -676,8 +680,90 @@ async function testDriveCycleValidation() {
   assert.strictEqual(read.length, 1);
   assert.strictEqual(read[0].id, 'test-1');
 
-  files.set(`${BASE}/VIAGENS/index.json`, JSON.stringify({ cycles: 'corrompido' }));
+  const indexFile = `${BASE}/VIAGENS/index.json`;
+  files.set(indexFile, JSON.stringify({
+    version: '1.0',
+    cycles: [
+      { ...cycle, id: 'legacy-seed', source: 'CARSCANNER_SEED' },
+      cycle,
+    ],
+    totalCount: 2,
+  }));
+  const filtered = await storage.readDriveCycles(BASE);
+  assert.deepStrictEqual(filtered.map((item) => item.id), ['test-1'], 'legacy seed trips must not appear in operational trip history');
+
+  await storage.addDriveCycle(BASE, { ...cycle, id: 'test-2' });
+  const migratedIndex = JSON.parse(files.get(indexFile));
+  assert.ok(migratedIndex.cycles.every((item) => item.source !== 'CARSCANNER_SEED'), 'adding a real trip must remove legacy seeds from active index');
+
+  files.set(indexFile, JSON.stringify({ cycles: 'corrompido' }));
   assert.deepStrictEqual(await storage.readDriveCycles(BASE), []);
+
+  resetFS();
+  await storage.initializeDriveCycles(BASE);
+  const emptyIndex = JSON.parse(files.get(indexFile));
+  assert.deepStrictEqual(emptyIndex.cycles, [], 'new installations must start with an empty operational trip history');
+  assert.strictEqual(
+    Array.from(files.keys()).some((name) => name.includes('/VIAGENS/viagens_')),
+    false,
+    'seed rows must not be written to the operational trip CSV',
+  );
+}
+
+async function testDriveCycleSummaryUsesWeightedRealSpeed() {
+  const driveCycles = loadTs(path.join(ROOT, 'src/data/driveCycles.ts'));
+  const slowLongTrip = {
+    id: 'real-long',
+    startedAt: '2026-10-01T10:00:00.000Z',
+    finishedAt: '2026-10-01T10:20:00.000Z',
+    distanceTotalKm: 2,
+    distanceIceKm: 2,
+    fuelUsedL: 0.2,
+    totalTimeHms: '00:20:00',
+    drivingTimeHms: '00:20:00',
+    standingTimeHms: '00:00:00',
+    avgDrivingSpeedKmh: 6,
+    avgFuelConsumptionKml: 10,
+    source: 'REAL_OBD',
+    importedAt: '2026-10-01T10:20:00.000Z',
+  };
+  const shortFastTrip = {
+    ...slowLongTrip,
+    id: 'real-short',
+    startedAt: '2026-10-02T10:00:00.000Z',
+    finishedAt: '2026-10-02T10:05:00.000Z',
+    distanceTotalKm: 3,
+    distanceIceKm: 3,
+    fuelUsedL: 0.2,
+    totalTimeHms: '00:05:00',
+    drivingTimeHms: '00:05:00',
+    avgDrivingSpeedKmh: 36,
+  };
+  const latestSeed = {
+    ...slowLongTrip,
+    id: 'seed-latest',
+    startedAt: '2026-10-03T10:00:00.000Z',
+    source: 'CARSCANNER_SEED',
+    distanceTotalKm: 100,
+    avgDrivingSpeedKmh: 100,
+  };
+  const noFuelTrip = {
+    ...slowLongTrip,
+    id: 'real-no-fuel',
+    startedAt: '2026-10-04T10:00:00.000Z',
+    distanceTotalKm: 10,
+    fuelUsedL: 0.01,
+    avgFuelConsumptionKml: 0,
+    fuelDataValid: false,
+  };
+  const summary = driveCycles.getDriveCycleSummary([slowLongTrip, shortFastTrip, latestSeed, noFuelTrip]);
+  assert.strictEqual(summary.avgSpeedKmh, 20, 'aggregate speed must use all real distance / real moving time, even when fuel data is unavailable');
+  assert.strictEqual(summary.totalDistanceKm, 15, 'seed distance must not enter real totals, while fuel-incomplete real trips still count for distance');
+  assert.strictEqual(summary.avgConsumptionKml, 12.5, 'trips without valid fuel data must not distort the consumption average');
+  assert.strictEqual(summary.realCycleCount, 3, 'fuel-incomplete real trips still count as real trips');
+  assert.strictEqual(summary.referenceCycleCount, 1);
+  assert.strictEqual(summary.lastCycle.id, 'real-no-fuel', 'the latest operational cycle cannot be a seed');
+  assert.strictEqual(summary.lastRealCycle.id, 'real-no-fuel');
 }
 
 async function testDtcStorage() {
@@ -809,13 +895,44 @@ async function testPidAndLearningWriteSerialization() {
   assert.strictEqual(profile.globalSampleCounts.totalSamples, 2);
   assert.strictEqual(profile.learningStatus, 'COLD_START');
   const autoTripServiceSource = fs.readFileSync(path.join(ROOT, 'src', 'trip', 'autoTripService.ts'), 'utf8');
+  const cockpitSource = fs.readFileSync(path.join(ROOT, 'app', 'index.tsx'), 'utf8');
+  assert.ok(cockpitSource.includes("item.pid !== '0105'"), 'cockpit deve identificar temperatura do líquido pelo PID 0105');
+  assert.ok(cockpitSource.includes("item.source !== 'REAL'"), 'cockpit não deve exibir temperatura simulada como dado real');
+  assert.ok(cockpitSource.includes("Date.now() - timestampMs <= 30_000"), 'cockpit deve descartar temperatura OBD obsoleta após 30 segundos');
+  assert.ok(cockpitSource.includes('LÍQUIDO DE ARREFECIMENTO'), 'página inicial deve apresentar métrica de temperatura do arrefecimento');
+  assert.ok(cockpitSource.includes("'TEMPERATURA ALTA'"), 'cockpit deve destacar temperatura alta sem esconder o valor numérico');
   assert.ok(autoTripServiceSource.includes('registerObdQuery(this.basePath, fuelLevelResult, \'REAL\')'), 'PID 012F automático deve alimentar o pipeline de persistência');
   assert.ok(autoTripServiceSource.includes('registerObdQuery(this.basePath, fuelResult, \'REAL\')'), 'PID 015E automático deve alimentar o pipeline de persistência');
   assert.ok(autoTripServiceSource.includes('registerObdQuery(this.basePath, speedResult, \'REAL\')'), 'PID 010D automático deve alimentar o pipeline de persistência');
   assert.ok(autoTripServiceSource.includes('registerObdQuery(this.basePath, telemetryResult, \'REAL\')'), 'telemetria automática deve alimentar o pipeline de persistência');
+  assert.ok(autoTripServiceSource.includes('instantaneousConsumptionSource'), 'origem do consumo instantâneo deve ser preservada para a interface');
+  assert.ok(autoTripServiceSource.includes('A leitura instantânea deve ser publicada a cada ciclo OBD válido'), 'consumo instantâneo deve atualizar mesmo sem viagem ativa');
+  const speedQueryIndex = autoTripServiceSource.indexOf("queryPid('010D')");
+  const rpmQueryIndex = autoTripServiceSource.indexOf("queryPid('010C')");
+  const measuredFuelQueryIndex = autoTripServiceSource.indexOf("queryPid('015E')");
+  const fuelLevelQueryIndex = autoTripServiceSource.indexOf("queryPid('012F')");
+  assert.ok(speedQueryIndex >= 0 && rpmQueryIndex > speedQueryIndex && measuredFuelQueryIndex > rpmQueryIndex && fuelLevelQueryIndex > measuredFuelQueryIndex, 'velocidade, RPM e taxa de combustível devem preceder o nível lento do tanque');
+  assert.ok(autoTripServiceSource.includes("this.pollCycleNumber % 4 === 1"), 'nível do tanque deve ser consultado em cadência reduzida');
+  assert.ok(autoTripServiceSource.includes("fuelRateLph == null && connection.supportedPids.includes('0110')"), 'MAF só deve ser consultado como fallback quando suportado pela ECU');
+  assert.ok(autoTripServiceSource.includes("connection.supportedPids.includes('010B') &&\n          connection.supportedPids.includes('010F')"), 'fallback MAP exige suporte confirmado aos PIDs MAP e IAT');
   assert.ok(!autoTripServiceSource.includes('recordLivePidQuery('), 'telemetria automática deve registrar cada resposta uma única vez via registerObdQuery');
   writeDelayMs = 0;
 }
+
+function testPidResponseIsNotVehicleValidation() {
+  const integration = fs.readFileSync(path.join(ROOT, 'src/meriva/autosaveIntegration.ts'), 'utf8');
+  assert.ok(integration.includes("status: prior?.status === 'CONFIRMADO' && prior.source === 'USER_REAL_OBSERVATION' ? 'CONFIRMADO' : 'RESPONDEU'"), 'resposta válida não deve promover automaticamente PID para confirmado');
+  assert.ok(integration.includes('não valida a exatidão física do sensor'), 'o código deve documentar que resposta OBD não comprova exatidão elétrica do sensor');
+}
+
+function testStorageScreenDoesNotPromoteSeedOrInvalidFuel() {
+  const storageScreen = fs.readFileSync(path.join(ROOT, 'app/armazenamento.tsx'), 'utf8');
+  assert.ok(storageScreen.includes("filter((cycle) => cycle.source === 'REAL_OBD')"), 'tela de histórico não deve apresentar viagens seed do Car Scanner como viagens do app');
+  assert.ok(storageScreen.includes("cycle.fuelDataValid !== false"), 'consumo precisa respeitar o indicador de confiabilidade');
+  assert.ok(storageScreen.includes("cycle.fuelUsedL >= 0.05"), 'consumo deve exigir volume de combustível válido');
+  assert.ok(storageScreen.includes("'Consumo: N/D'"), 'consumo inválido deve ser apresentado como N/D, nunca 0,00 km/L');
+}
+
 
 async function testAutosaveRace() {
   resetFS();
@@ -871,10 +988,14 @@ async function main() {
     ['logger TX/RX', testRawLogger],
     ['perfil do veículo', testVehicleProfile],
     ['drive cycles', testDriveCycleValidation],
+    ['resumo de velocidade real ponderado', testDriveCycleSummaryUsesWeightedRealSpeed],
     ['DTC persistência', testDtcStorage],
     ['backup completo', testBackupCompleteness],
     ['CSV serializado', testCsvWriteSerialization],
     ['PID + DNA serializados', testPidAndLearningWriteSerialization],
+    ['PID respondeu não significa sensor validado', testPidResponseIsNotVehicleValidation],
+    ['histórico sem seed e consumo N/D', testStorageScreenDoesNotPromoteSeedOrInvalidFuel],
+
     ['autosave race', testAutosaveRace],
   ];
 

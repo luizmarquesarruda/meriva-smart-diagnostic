@@ -27,11 +27,21 @@ assert(shared.includes('handleUnexpectedDisconnect'));
 assert(shared.includes('startObdAutosaveSession'));
 assert(shared.includes('closeObdAutosaveSession'));
 assert(shared.includes('persistValidatedConnection'));
+assert(shared.includes("await initAutoSave(basePath)"), 'o autosave deve estar hidratado antes da abertura da sessão ECU');
+const initCall = shared.indexOf('await initAutoSave(basePath)');
+const startSessionCall = shared.indexOf('await startObdAutosaveSession()', initCall);
+assert(initCall >= 0 && startSessionCall > initCall, 'a sessão diária só pode iniciar após a inicialização do autosave');
+const autosaveManager = fs.readFileSync(path.join(ROOT, 'src', 'meriva', 'autosaveManager.ts'), 'utf8');
+assert(autosaveManager.includes('initializationPromise'), 'initAutoSave deve serializar inicializações concorrentes');
+
 assert(shared.includes('startBluetoothMonitor'));
 assert(shared.includes('preferredAddress'));
 assert(shared.includes('selectedAdapterAddress: connection.device.address.toUpperCase()'));
 assert(shared.includes('ecuValidatedAt: validatedAt'));
-assert(shared.includes("ecuValidationSource: state.vehicle?.ecuAddress ? 'VEHICLE_PROFILE' : 'OBD_RESPONSE'"));
+// ECU validation must be attributed to a real OBD response, never a vehicle profile alone.
+assert(shared.includes("ecuValidationSource: 'OBD_RESPONSE'"));
+assert(shared.includes("probe.parsed.status === 'RESPONDEU'"));
+assert(shared.includes("probe.commandStatus === 'OK'"));
 assert(rootLayout.includes('connectPreferredElm(settings.selectedAdapterAddress)'));
 assert(rootLayout.includes('Bluetooth necessário para diagnóstico do veículo.'));
 assert(bluetoothScreen.includes('ATIVAR BLUETOOTH'));

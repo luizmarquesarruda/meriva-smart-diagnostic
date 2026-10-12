@@ -13,6 +13,8 @@ export interface CsvRow {
   temperatura?: number | string | null;
   velocidade?: number | string | null;
   condicao?: string;
+  maxSpeed?: number | string | null;
+  telemetrySamples?: number | string | null;
 }
 
 const fileQueues = new Map<string, Promise<void>>();
@@ -59,7 +61,7 @@ export async function appendCsvRow(filePath: string, row: CsvRow): Promise<void>
     .catch(() => undefined)
     .then(() => appendCsvRowUnsafe(filePath, row));
 
-  fileQueues.set(filePath, current.catch(() => undefined));
+  fileQueues.set(filePath, current);
 
   try {
     await current;

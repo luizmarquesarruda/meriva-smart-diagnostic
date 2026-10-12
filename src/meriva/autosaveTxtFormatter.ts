@@ -18,6 +18,8 @@ function or(value: string | number | boolean | null | undefined): string {
 export interface ExportTxtOptions {
   appVersion: string;
   exportedAt: string;
+  /** When set, include only the newest N REAL_OBD trips in a compact snapshot. */
+  historyLimit?: number;
 }
 
 export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTxtOptions): string {
@@ -85,10 +87,20 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
   L.push('');
 
   L.push('[HISTORY]');
-  if (state.driveCycles.length) {
-    for (const cycle of state.driveCycles) {
+  const displayedCycles = options.historyLimit == null
+    ? state.driveCycles.filter((cycle) => cycle.source !== 'CARSCANNER_SEED')
+    : options.historyLimit <= 0
+      ? []
+      : state.driveCycles
+          .filter((cycle) => cycle.source === 'REAL_OBD')
+          .slice(-Math.floor(options.historyLimit));
+  if (options.historyLimit != null) {
+    L.push(`Exibindo até as últimas ${Math.max(0, Math.floor(options.historyLimit))} viagens reais; histórico completo preservado no autosave JSON.`);
+  }
+  if (displayedCycles.length) {
+    for (const cycle of displayedCycles) {
       L.push(
-        `${cycle.startedAt} -> ${cycle.finishedAt} | ${cycle.distanceTotalKm} km | ${cycle.fuelUsedL} L | ${cycle.avgFuelConsumptionKml} km/L | fonte=${cycle.source} | combustivel=${or(cycle.fuelRateSource)}`,
+        `${cycle.startedAt} -> ${cycle.finishedAt} | ${cycle.distanceTotalKm} km | ${cycle.fuelUsedL} L | ${(cycle.fuelDataValid === false || cycle.fuelUsedL < 0.05 || cycle.avgFuelConsumptionKml <= 0) ? ND : `${cycle.avgFuelConsumptionKml} km/L`} | fonte=${cycle.source} | combustivel=${or(cycle.fuelRateSource)}`,
       );
     }
   } else {
