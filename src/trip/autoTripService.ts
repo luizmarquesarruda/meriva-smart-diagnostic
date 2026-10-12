@@ -302,7 +302,7 @@ class AutoTripService {
         gpsTracker.setVehicleSpeedHintKmh(obdSpeedSupported ? obdSpeedKmh : null);
 
         // Mantém um PID secundário por ciclo para tendências sem monopolizar o ELM.
-        const telemetryCandidates = ['0105', '010B', '0111'];
+        const telemetryCandidates = ['0105', '010B', '0111', '0142'];
         const supportedTelemetry = telemetryCandidates.filter((item) => connection.supportedPids.includes(item));
         if (supportedTelemetry.length > 0) {
           const telemetryPid = supportedTelemetry[this.telemetryCursor % supportedTelemetry.length];
