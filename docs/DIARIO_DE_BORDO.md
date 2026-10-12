@@ -2048,7 +2048,7 @@ A correção do teste foi gravada na branch `fix/daily-obd-history-keep-screen-a
 
 ### Correções implementadas na branch `perf/obd-telemetry-and-storage-safety`
 - `src/meriva/autosaveIntegration.ts`: publica a telemetria e as últimas leituras antes de I/O; o loop automático pode enfileirar persistência de forma não bloqueante. A atualização do banco de PIDs/aprendizado é limitada a uma amostra representativa por PID a cada 30 s no caminho de alta frequência; a telemetria em memória continua recebendo cada resposta.
-- `src/database/csvLogger.ts`: adiciona buffer de CSV, lote de até 8 linhas antes da descarga, intervalo de 1,5 s, flush explícito e reencaminhamento das linhas se uma descarga falhar.
+- `src/database/csvLogger.ts`: adiciona buffer de CSV, lote de até 8 linhas antes da descarga, intervalo de 3 s, flush explícito e reencaminhamento das linhas se uma descarga falhar.
 - `src/database/obdLogger.ts`: suporta modo buffer para streams RAW e interpretado, sem alterar o formato dos CSVs atuais.
 - `src/meriva/autosaveManager.ts`: tenta descarregar logs CSV quando o aplicativo sai do estado ativo.
 - `src/trip/autoTripService.ts`: usa persistência não bloqueante no polling, mantém velocidade/RPM como caminho prioritário, evita consultar o mesmo PID secundário duas vezes no ciclo e aplica backoff exponencial de 1 a 30 s para PIDs não críticos em falha. Taxa MAF/MAP de fallback é tentada no máximo uma vez a cada 5 s quando a taxa corrente está indisponível; taxa em cache só é reutilizada por até 5 s.
