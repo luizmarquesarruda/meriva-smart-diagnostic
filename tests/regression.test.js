@@ -458,6 +458,7 @@ async function testIntelligentPidDiscovery() {
     },
   };
   const result = await ai.discoverIntelligentPids(fakeSession, {
+    knownPids: ['015E', '0110'],
     prevalidatedResults: [{
       command: '010C',
       response: '41 0C 1A F8',
