@@ -1,6 +1,5 @@
-import * as FileSystem from 'expo-file-system';
 import { appendCsvRow, appendCsvRowBuffered, type CsvRow } from './csvLogger';
-import { PidQueryResult } from '../obd/elm327';
+import type { PidQueryResult } from '../obd/elm327';
 
 export interface RawObdLogEntry {
   timestamp: string;
@@ -23,7 +22,6 @@ export async function logRawObdData(
   const today = new Date().toISOString().split('T')[0];
   const fileName = `obd_raw_${today}.csv`;
   const filePath = `${basePath}/LOGS/${fileName}`;
-
   const row: CsvRow = {
     timestamp: new Date().toISOString(),
     tx: query.tx,
@@ -35,10 +33,6 @@ export async function logRawObdData(
     source,
   };
 
-  if (options.buffered) {
-    appendCsvRowBuffered(filePath, row);
-    return;
-  }
   if (options.buffered) {
     appendCsvRowBuffered(filePath, row);
     return;
@@ -56,7 +50,6 @@ export async function logInterpretedData(
   const today = new Date().toISOString().split('T')[0];
   const fileName = `obd_interpreted_${today}.csv`;
   const filePath = `${basePath}/LOGS/${fileName}`;
-
   const row: CsvRow = {
     timestamp: new Date().toISOString(),
     tx: query.tx,
@@ -72,5 +65,9 @@ export async function logInterpretedData(
     condicao: query.parsed.status,
   };
 
+  if (options.buffered) {
+    appendCsvRowBuffered(filePath, row);
+    return;
+  }
   await appendCsvRow(filePath, row);
 }
