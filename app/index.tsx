@@ -202,12 +202,6 @@ export default function IndexScreen() {
       ? 'ATENÇÃO'
       : coolantValue != null ? 'LEITURA REAL • PID 0105' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0105' : 'ECU DESCONECTADA';
 
-  const coolantStatus = coolantValue != null && coolantValue >= 115
-    ? 'TEMPERATURA ALTA'
-    : coolantValue != null && coolantValue >= 110
-      ? 'ATENÇÃO'
-      : coolantValue != null ? 'LEITURA REAL • PID 0105' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0105' : 'ECU DESCONECTADA';
-
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
       <View style={[styles.content, { paddingHorizontal: layout.horizontalPadding }]}>
