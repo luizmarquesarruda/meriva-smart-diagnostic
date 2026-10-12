@@ -160,3 +160,60 @@ export function appendDailyObdSessionEvent(
   }).catch(() => undefined);
   return current;
 }
+
+
+const GPS_INDEX_MARKER = '--- REGISTRO GPS LOCAL ---';
+
+async function appendDailyGpsHistoryIndexUnsafe(basePath: string, date: string): Promise<{ date: string; added: boolean }> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Data inválida para índice do GPS.');
+  const path = historyPath(basePath);
+  await FileSystem.makeDirectoryAsync(`${basePath}/VIAGENS`, { intermediates: true });
+  let content = '';
+  const info = await FileSystem.getInfoAsync(path);
+  if (info.exists && info.isDirectory) {
+    throw new Error('O caminho do histórico diário aponta para um diretório; arquivo existente preservado.');
+  }
+  if (info.exists) {
+    // Preserve the existing history if it cannot be read; never replace it with a blank file.
+    content = await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 });
+  }
+
+  const pages = splitPages(content);
+  const existing = pages.get(date) ?? '';
+  if (existing.includes(GPS_INDEX_MARKER)) return { date, added: false };
+
+  const note = [
+    GPS_INDEX_MARKER,
+    `ARQUIVOS: VIAGENS/GPS/gps_${date}_NNNN.jsonl (um arquivo por segmento)`,
+    'FORMATO: JSON Lines; cada linha é um objeto GPS schemaVersion=1.',
+    'CADÊNCIA: aproximadamente 10 s em movimento e 5 min parado; transições de estado/qualidade são registradas.',
+    `RETENÇÃO: ${14} dias; limite de 4320 amostras por dia.`,
+    'CONTEÚDO: posição, velocidade GPS quando disponível, precisão, altitude, rumo, horário e qualidade do sinal.',
+    'ARMAZENAMENTO: local no aparelho; este log não altera a distância nem o consumo calculado da viagem.',
+    '--- FIM DO REGISTRO GPS ---',
+  ].join('\n');
+  pages.set(date, [existing, note].filter(Boolean).join('\n\n'));
+
+  const sortedDates = Array.from(pages.keys()).sort().slice(-MAX_DAYS);
+  const output = [HEADER.trimEnd()];
+  for (const day of sortedDates) {
+    output.push('', `========== DIA: ${day} ==========`, pages.get(day) ?? '', '========== FIM DO DIA ==========');
+  }
+  await FileSystem.writeAsStringAsync(path, `${output.join('\n')}\n`, { encoding: FileSystem.EncodingType.UTF8 });
+  return { date, added: true };
+}
+
+/** Add one idempotent index entry to the existing daily TXT, sharing its write queue with ECU events. */
+export function appendDailyGpsHistoryIndex(basePath: string, date: string): Promise<{ date: string; added: boolean }> {
+  const path = historyPath(basePath);
+  const previous = dailyHistoryQueues.get(path) ?? Promise.resolve();
+  const current = previous
+    .catch(() => undefined)
+    .then(() => appendDailyGpsHistoryIndexUnsafe(basePath, date));
+
+  dailyHistoryQueues.set(path, current);
+  void current.finally(() => {
+    if (dailyHistoryQueues.get(path) === current) dailyHistoryQueues.delete(path);
+  }).catch(() => undefined);
+  return current;
+}
