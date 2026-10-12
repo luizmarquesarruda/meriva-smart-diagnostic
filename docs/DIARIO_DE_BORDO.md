@@ -2118,7 +2118,9 @@ Uma única falha de consulta do PID de saúde mudava o estado para `NO_RESPONSE`
 - `tests/ecuHealth.test.js`
 
 ### Validação
-- Atualizado o teste estático para exigir ECU validada, Bluetooth ativo e tolerância aos estados transitórios.
+- Criado o predicado puro `src/trip/gpsRecordingGate.ts`, usado pelo serviço automático para decidir se a sessão GPS deve permanecer ativa.
+- Adicionado `tests/gpsRecordingGate.test.js` com cenários de ECU respondendo, falha transitória, recuperação, Bluetooth desconectado, conexão ausente/não validada e serviço parado; integrado ao script `npm test`.
+- O teste `ecuHealth.test.js` também confirma a integração do predicado no serviço.
 - **Typecheck, testes completos e validação em Android físico ainda não foram executados.**
 - A CI não foi disparada; commits usam `[skip ci]` conforme a restrição do projeto.
 
