@@ -13,6 +13,7 @@ interface DriveCycleIndex {
 
 const INDEX_FILE = 'index.json';
 const BACKUP_FILE = 'index.previous.json';
+const PENDING_CYCLES_DIRECTORY = 'PENDING_CYCLES';
 const MAX_CORRUPT_ARCHIVES = 3;
 
 function indexPath(basePath: string): string {
@@ -21,6 +22,95 @@ function indexPath(basePath: string): string {
 
 function backupPath(basePath: string): string {
   return `${basePath}/VIAGENS/${BACKUP_FILE}`;
+}
+
+function pendingCyclesDirectory(basePath: string): string {
+  return `${basePath}/VIAGENS/${PENDING_CYCLES_DIRECTORY}`;
+}
+
+function pendingCycleStem(id: string): string {
+  // Stable compact key; the full ID is still verified in the saved JSON.
+  let hash = 2166136261;
+  for (let index = 0; index < id.length; index += 1) {
+    hash ^= id.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  const slug = id.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 36) || 'trip';
+  return `pending_${(hash >>> 0).toString(16).padStart(8, '0')}_${slug}`;
+}
+
+interface PendingCycleEntry {
+  path: string;
+  cycle: DriveCycle;
+}
+
+async function readPendingCycles(basePath: string): Promise<PendingCycleEntry[]> {
+  const directory = pendingCyclesDirectory(basePath);
+  try {
+    const info = await FileSystem.getInfoAsync(directory);
+    if (!info.exists || !info.isDirectory) return [];
+    const names = await FileSystem.readDirectoryAsync(directory);
+    const entries: PendingCycleEntry[] = [];
+    for (const name of names.filter((item) => /^pending_.+\.json$/.test(item))) {
+      const path = `${directory}/${name}`;
+      try {
+        const raw = JSON.parse(await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 }));
+        if (isDriveCycle(raw)) entries.push({ path, cycle: raw });
+      } catch {
+        // Keep a damaged sidecar for manual recovery; never delete it by guessing.
+      }
+    }
+    return entries;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Write-ahead copy for each finalized trip. A valid sidecar remains available
+ * even when the main index and its backup cannot be safely rewritten.
+ */
+async function persistPendingCycle(basePath: string, cycle: DriveCycle): Promise<string> {
+  const directory = pendingCyclesDirectory(basePath);
+  await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
+  const stem = pendingCycleStem(cycle.id);
+
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const suffix = attempt === 0 ? '' : `_${attempt}`;
+    const target = `${directory}/${stem}${suffix}.json`;
+    const info = await FileSystem.getInfoAsync(target);
+    if (info.exists) {
+      if (info.isDirectory) continue;
+      try {
+        const existing = JSON.parse(await FileSystem.readAsStringAsync(target, { encoding: FileSystem.EncodingType.UTF8 }));
+        if (isDriveCycle(existing) && existing.id === cycle.id) return target;
+      } catch {
+        // Don't overwrite an unreadable sidecar; try a collision suffix.
+      }
+      continue;
+    }
+
+    const temporary = `${target}.tmp`;
+    const serialized = JSON.stringify(cycle, null, 2);
+    await FileSystem.writeAsStringAsync(temporary, serialized, { encoding: FileSystem.EncodingType.UTF8 });
+    const written = JSON.parse(await FileSystem.readAsStringAsync(temporary, { encoding: FileSystem.EncodingType.UTF8 }));
+    if (!isDriveCycle(written) || written.id !== cycle.id) {
+      throw new Error('VALIDAÇÃO DA CÓPIA DE RECUPERAÇÃO DA VIAGEM FALHOU.');
+    }
+    await FileSystem.copyAsync({ from: temporary, to: target });
+    const committed = JSON.parse(await FileSystem.readAsStringAsync(target, { encoding: FileSystem.EncodingType.UTF8 }));
+    if (!isDriveCycle(committed) || committed.id !== cycle.id) {
+      throw new Error('CÓPIA DE RECUPERAÇÃO DA VIAGEM NÃO PASSOU NA VALIDAÇÃO.');
+    }
+    await FileSystem.deleteAsync(temporary, { idempotent: true });
+    return target;
+  }
+
+  throw new Error('NÃO FOI POSSÍVEL RESERVAR UM ARQUIVO DE RECUPERAÇÃO PARA A VIAGEM.');
+}
+
+async function removePendingCycle(path: string): Promise<void> {
+  await FileSystem.deleteAsync(path, { idempotent: true });
 }
 
 function isFiniteNonNegative(value: unknown): value is number {
@@ -224,8 +314,19 @@ async function initializeDriveCyclesUnsafe(basePath: string): Promise<void> {
     index = (await readValidIndex(backupPath(basePath))) ?? emptyIndex();
   }
 
+  const pendingEntries = await readPendingCycles(basePath);
   const operationalCycles = index.cycles.filter((cycle) => cycle.source !== 'CARSCANNER_SEED');
-  const changed = operationalCycles.length !== index.cycles.length;
+  const ids = new Set(operationalCycles.map((cycle) => cycle.id));
+  for (const entry of pendingEntries) {
+    if (entry.cycle.source !== 'CARSCANNER_SEED' && !ids.has(entry.cycle.id)) {
+      operationalCycles.push(entry.cycle);
+      ids.add(entry.cycle.id);
+    }
+  }
+  const originalIds = index.cycles.map((cycle) => cycle.id);
+  const nextIds = operationalCycles.map((cycle) => cycle.id);
+  const changed = originalIds.length !== nextIds.length ||
+    originalIds.some((id, indexValue) => id !== nextIds[indexValue]);
   if (changed || !info.exists || !(await readValidIndex(target))) {
     await writeIndexSafely(basePath, { ...index, cycles: operationalCycles, totalCount: operationalCycles.length });
   } else {
@@ -244,6 +345,15 @@ async function initializeDriveCyclesUnsafe(basePath: string): Promise<void> {
       await FileSystem.copyAsync({ from: target, to: backupPathValue });
     }
   }
+
+  // Delete sidecars only after their IDs are durably present in the main index.
+  const committed = await readValidIndex(target);
+  if (committed) {
+    const committedIds = new Set(committed.cycles.map((cycle) => cycle.id));
+    for (const entry of pendingEntries) {
+      if (committedIds.has(entry.cycle.id)) await removePendingCycle(entry.path);
+    }
+  }
 }
 
 export async function initializeDriveCycles(basePath: string): Promise<void> {
@@ -257,32 +367,67 @@ export async function readDriveCycles(basePath: string): Promise<DriveCycle[]> {
   await (indexQueues.get(target) ?? Promise.resolve()).catch(() => undefined);
 
   const primary = await readValidIndex(target);
-  if (primary) return primary.cycles.filter((cycle) => cycle.source !== 'CARSCANNER_SEED');
+  const backup = primary ? null : await readValidIndex(backupPath(basePath));
+  const baseCycles = (primary ?? backup)?.cycles.filter((cycle) => cycle.source !== 'CARSCANNER_SEED') ?? [];
+  const byId = new Map(baseCycles.map((cycle) => [cycle.id, cycle]));
 
-  const backup = await readValidIndex(backupPath(basePath));
-  if (backup) return backup.cycles.filter((cycle) => cycle.source !== 'CARSCANNER_SEED');
-
-  return [];
+  // Sidecar trips remain visible if the index is too damaged to rewrite safely.
+  for (const entry of await readPendingCycles(basePath)) {
+    if (entry.cycle.source !== 'CARSCANNER_SEED' && !byId.has(entry.cycle.id)) {
+      byId.set(entry.cycle.id, entry.cycle);
+    }
+  }
+  return Array.from(byId.values());
 }
 
 export async function addDriveCycle(basePath: string, cycle: DriveCycle): Promise<void> {
   if (!isDriveCycle(cycle)) throw new Error('VIAGEM INVÁLIDA; NÃO FOI PERSISTIDA.');
+  if (cycle.source === 'CARSCANNER_SEED') throw new Error('VIAGEM DE REFERÊNCIA NÃO PODE SER SALVA COMO TRAJETO OPERACIONAL.');
 
   const target = indexPath(basePath);
   await queueIndexMutation(target, async () => {
     await FileSystem.makeDirectoryAsync(`${basePath}/VIAGENS`, { intermediates: true });
-    const data = await loadIndexForMutation(basePath);
+
+    // Write-ahead sidecar before touching the main index. If the index and its
+    // backup are both unreadable, the just-finished trip is still durable.
+    const pendingPath = await persistPendingCycle(basePath, cycle);
+    let data: DriveCycleIndex;
+    try {
+      data = await loadIndexForMutation(basePath);
+    } catch (cause) {
+      console.warn(
+        '[trips] viagem preservada na fila de recuperação; índice principal não pôde ser atualizado:',
+        cause instanceof Error ? cause.message : cause,
+      );
+      return;
+    }
+
     const operationalCycles = data.cycles.filter((item) => item.source !== 'CARSCANNER_SEED');
     const duplicate = operationalCycles.some((item) => item.id === cycle.id);
-    if (duplicate) return;
+    if (duplicate) {
+      await removePendingCycle(pendingPath);
+      return;
+    }
 
     const nextCycles = [...operationalCycles, cycle];
-    await writeIndexSafely(basePath, {
-      ...data,
-      cycles: nextCycles,
-      totalCount: nextCycles.length,
-      lastModified: new Date().toISOString(),
-    });
+    try {
+      await writeIndexSafely(basePath, {
+        ...data,
+        cycles: nextCycles,
+        totalCount: nextCycles.length,
+        lastModified: new Date().toISOString(),
+      });
+    } catch (cause) {
+      // The validated sidecar remains the durable source for readDriveCycles
+      // and for later startup reconciliation.
+      console.warn(
+        '[trips] viagem preservada na fila de recuperação; índice não pôde ser confirmado:',
+        cause instanceof Error ? cause.message : cause,
+      );
+      return;
+    }
+
+    await removePendingCycle(pendingPath);
 
     const today = new Date().toISOString().split('T')[0];
     const csvFile = `${basePath}/VIAGENS/viagens_${today}.csv`;
