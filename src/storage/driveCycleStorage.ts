@@ -144,22 +144,29 @@ async function writeIndexSafely(basePath: string, index: DriveCycleIndex): Promi
   }
 
   const targetInfo = await FileSystem.getInfoAsync(target);
-  if (targetInfo.exists && !targetInfo.isDirectory) {
+  if (targetInfo.exists && targetInfo.isDirectory) {
+    throw new Error('O ÍNDICE DE VIAGENS É UM DIRETÓRIO; HISTÓRICO NÃO ALTERADO.');
+  }
+  const backupInfo = await FileSystem.getInfoAsync(backup);
+  if (backupInfo.exists && backupInfo.isDirectory) {
+    throw new Error('O BACKUP DO ÍNDICE DE VIAGENS É UM DIRETÓRIO; HISTÓRICO NÃO ALTERADO.');
+  }
+  if (targetInfo.exists) {
     const current = await readValidIndex(target);
     if (current) {
       // Keep the last valid snapshot before replacing the primary index.
       await FileSystem.copyAsync({ from: target, to: backup });
     }
-  } else {
-    const backupInfo = await FileSystem.getInfoAsync(backup);
-    if (!backupInfo.exists) {
-      await FileSystem.copyAsync({ from: temporary, to: backup });
-    }
+  } else if (!backupInfo.exists) {
+    await FileSystem.copyAsync({ from: temporary, to: backup });
   }
 
   await FileSystem.copyAsync({ from: temporary, to: target });
   const committed = await readValidIndex(target);
-  if (!committed || committed.cycles.length !== validIndex.cycles.length) {
+  const committedIds = committed?.cycles.map((cycle) => cycle.id) ?? [];
+  const expectedIds = validIndex.cycles.map((cycle) => cycle.id);
+  if (!committed || committedIds.length !== expectedIds.length ||
+      committedIds.some((id, index) => id !== expectedIds[index])) {
     throw new Error('ÍNDICE FINAL NÃO PASSOU NA VALIDAÇÃO; CÓPIA DE SEGURANÇA PRESERVADA.');
   }
   await FileSystem.copyAsync({ from: target, to: backup });
@@ -224,8 +231,17 @@ async function initializeDriveCyclesUnsafe(basePath: string): Promise<void> {
   } else {
     // Repair a missing/stale backup without touching valid operational history.
     const backup = await readValidIndex(backupPath(basePath));
-    if (!backup || backup.cycles.length !== index.cycles.length) {
-      await FileSystem.copyAsync({ from: target, to: backupPath(basePath) });
+    const primaryIds = index.cycles.map((cycle) => cycle.id);
+    const backupIds = backup?.cycles.map((cycle) => cycle.id) ?? [];
+    const backupMatches = primaryIds.length === backupIds.length &&
+      primaryIds.every((id, indexValue) => id === backupIds[indexValue]);
+    if (!backupMatches) {
+      const backupPathValue = backupPath(basePath);
+      const backupInfo = await FileSystem.getInfoAsync(backupPathValue);
+      if (backupInfo.exists && backupInfo.isDirectory) {
+        throw new Error('O BACKUP DO ÍNDICE DE VIAGENS É UM DIRETÓRIO; HISTÓRICO PRESERVADO.');
+      }
+      await FileSystem.copyAsync({ from: target, to: backupPathValue });
     }
   }
 }
