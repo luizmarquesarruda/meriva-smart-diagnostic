@@ -38,17 +38,18 @@ export function normalizeGpsJsonRecord(location: Location.LocationObject): GpsJs
     ? c.accuracy
     : null;
   const valid = accuracyMeters != null && accuracyMeters <= MAX_ACCURACY_M;
-  const signalQuality: GpsJsonRecord['signalQuality'] = !valid
-    ? 'SEM_FIX'
-    : accuracyMeters <= 5 ? 'EXCELENTE'
-      : accuracyMeters <= 15 ? 'BOA' : 'FRACA';
+  const signalQuality: GpsJsonRecord['signalQuality'] =
+    accuracyMeters == null || accuracyMeters > MAX_ACCURACY_M
+      ? 'SEM_FIX'
+      : accuracyMeters <= 5 ? 'EXCELENTE'
+        : accuracyMeters <= 15 ? 'BOA' : 'FRACA';
   const rawSpeed = c.speed;
   const speedKmh = valid && rawSpeed != null && Number.isFinite(rawSpeed) && rawSpeed >= 0
     ? Number((rawSpeed * 3.6).toFixed(1))
     : null;
   const altitudeMeters = c.altitude != null && Number.isFinite(c.altitude) ? c.altitude : null;
   const headingDegrees = c.heading != null && Number.isFinite(c.heading) && c.heading >= 0
-    ? Number((c.heading % 360).toFixed(1))
+    ? Number((Number((c.heading % 360).toFixed(1)) % 360).toFixed(1))
     : null;
 
   return {
@@ -446,7 +447,7 @@ export class GpsTracker {
     this.state = {
       ...this.state,
       samples: this.state.samples + 1,
-      currentSpeedKmh: Number(speedKmh.toFixed(1)),
+      currentSpeedKmh: speedKmh == null ? null : Number(speedKmh.toFixed(1)),
       maxSpeedKmh: Number(Math.max(this.state.maxSpeedKmh, speedKmh ?? 0).toFixed(1)),
       lastTimestamp: sample.timestamp,
       lastAccuracyM: sample.accuracyM,
