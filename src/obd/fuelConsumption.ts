@@ -91,7 +91,7 @@ export function estimateFuelRateLph(input: FuelRateEstimateInput): { rateLph: nu
   const afr = input.airFuelRatio ?? 14.7;
   const density = input.fuelDensityKgPerL ?? 0.745;
 
-  if (Number.isFinite(input.mafGs) && (input.mafGs ?? 0) >= 0 && afr > 0 && density > 0) {
+  if (Number.isFinite(input.mafGs) && (input.mafGs ?? 0) > 0 && afr > 0 && density > 0) {
     const fuelKgPerSecond = (input.mafGs as number) / 1000 / afr;
     return { rateLph: fuelKgPerSecond * 3600 / density, source: 'ESTIMATED_MAF' };
   }
