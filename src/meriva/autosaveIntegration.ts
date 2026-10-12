@@ -4,7 +4,12 @@ import { logRawObdData, logInterpretedData } from '../database/obdLogger';
 import { type PidConfirmationEntry, readPidConfirmations, recordPidConfirmation } from '../database/pidBank';
 import { updateLearningProfileRealSample } from '../database/learningProfile';
 import type { VehicleCondition } from '../types/sourceTypes';
-import { pushLastReading, updateAutoSaveState, scheduleCriticalSave } from './autosaveManager';
+import {
+  pushLastReading,
+  updateAutoSaveState,
+  scheduleCriticalSave,
+  registerBackgroundPersistenceFlushHandler,
+} from './autosaveManager';
 import { shouldFeedLearning } from './autosaveValidation';
 import { getVehicleConditionSnapshot, recordLivePidQuery } from '../obd/liveTelemetry';
 import { flushBufferedCsvRows } from '../database/csvLogger';
@@ -149,6 +154,9 @@ export async function flushObdPersistence(basePath?: string): Promise<void> {
   await Promise.all(queues.map((queue) => queue.catch(() => undefined)));
   await flushBufferedCsvRows();
 }
+
+// Let the app-state handler drain the per-profile queue before its final CSV flush.
+registerBackgroundPersistenceFlushHandler(() => flushObdPersistence());
 
 export async function forceSaveOnObdEvent(): Promise<void> {
   // Drain queued telemetry logs/learning before an event-triggered snapshot.
