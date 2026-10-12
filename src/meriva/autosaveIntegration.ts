@@ -12,6 +12,19 @@ import type { VehicleCondition } from '../types/sourceTypes';
 import { pushLastReading, updateAutoSaveState, scheduleCriticalSave } from './autosaveManager';
 import { shouldFeedLearning } from './autosaveValidation';
 import { getVehicleConditionSnapshot, recordLivePidQuery } from '../obd/liveTelemetry';
+import pollingPolicy from '../knowledge/polling_policy.json';
+
+const lastLearningPersistedAt = new Map<string, number>();
+const LEARNING_SAMPLE_MIN_INTERVAL_MS = pollingPolicy.learningSampleMinIntervalMs;
+
+/** Deduplicate high-frequency repeats for persistence/learning without dropping raw CSV samples. */
+export function shouldPersistRealPidSample(basePath: string, pid: string, nowMs = Date.now()): boolean {
+  const key = `${basePath}:${pid.toUpperCase()}`;
+  const last = lastLearningPersistedAt.get(key);
+  if (last !== undefined && nowMs - last < LEARNING_SAMPLE_MIN_INTERVAL_MS) return false;
+  lastLearningPersistedAt.set(key, nowMs);
+  return true;
+}
 
 export async function registerObdQuery(
   basePath: string,
@@ -40,7 +53,11 @@ export async function registerObdQuery(
 
   const parsedValue = result.parsed.value;
   const learningCondition = condition ?? (source === 'REAL' ? getVehicleConditionSnapshot().condition : 'UNKNOWN');
-  if (shouldFeedLearning(source, result.parsed.status, parsedValue) && parsedValue !== null) {
+  if (
+    shouldFeedLearning(source, result.parsed.status, parsedValue) &&
+    parsedValue !== null &&
+    shouldPersistRealPidSample(basePath, result.parsed.pid)
+  ) {
     try {
       const now = new Date().toISOString();
       const existing = await readPidConfirmations(basePath);
