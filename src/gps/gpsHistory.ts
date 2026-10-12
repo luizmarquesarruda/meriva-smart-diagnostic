@@ -12,6 +12,7 @@ export const GPS_HISTORY_STATIONARY_INTERVAL_MS = 5 * 60_000;
 const MAX_SAMPLE_AGE_MS = 10 * 60_000;
 const MAX_FUTURE_SKEW_MS = 5 * 60_000;
 const ERROR_LOG_INTERVAL_MS = 60_000;
+const GPS_HISTORY_FLUSH_INTERVAL_MS = 30_000;
 const GPS_FILE_RE = /^gps_(\d{4}-\d{2}-\d{2})_(\d{4})\.jsonl$/;
 
 function localDayKey(timestampMs: number): string {
@@ -86,6 +87,7 @@ export class GpsHistoryStore {
   private lastObservedMoving: boolean | null = null;
   private pending: GpsJsonRecord[] = [];
   private queue: Promise<void> = Promise.resolve();
+  private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private lastErrorLoggedAt = 0;
   private readonly nowProvider: () => number;
 
@@ -108,6 +110,8 @@ export class GpsHistoryStore {
   }
 
   private resetRuntimeState(): void {
+    if (this.flushTimer) clearTimeout(this.flushTimer);
+    this.flushTimer = null;
     this.currentDayKey = null;
     this.segmentIndex = 1;
     this.segmentRecordCount = 0;
@@ -174,6 +178,7 @@ export class GpsHistoryStore {
     if (this.dailyRecordCount + this.pending.length >= GPS_HISTORY_MAX_SAMPLES_PER_DAY) return;
 
     this.pending.push(sample);
+    this.scheduleFlush();
     this.lastQueuedTimestamp = sample.timestamp;
     this.lastQueuedQuality = sample.signalQuality;
     this.lastQueuedMoving = moving;
@@ -254,7 +259,17 @@ export class GpsHistoryStore {
     void appendDailyGpsHistoryIndex(this.basePath, day).catch((cause) => this.reportError(cause));
   }
 
+  private scheduleFlush(): void {
+    if (this.flushTimer) return;
+    this.flushTimer = setTimeout(() => {
+      this.flushTimer = null;
+      void this.flush();
+    }, GPS_HISTORY_FLUSH_INTERVAL_MS);
+  }
+
   private async flushPendingUnsafe(): Promise<void> {
+    if (this.flushTimer) clearTimeout(this.flushTimer);
+    this.flushTimer = null;
     if (!this.basePath || this.pending.length === 0 || !this.currentDayKey) return;
     const directory = gpsDirectory(this.basePath);
     await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
