@@ -85,6 +85,10 @@ function main() {
   assert.strictEqual(polling.measuredFuelRate.everyCycles, 1, 'taxa de combustível medida deve continuar na cadência principal');
   assert.ok(Number.isInteger(polling.estimatedFuelRate.everyCycles) && polling.estimatedFuelRate.everyCycles >= 2);
   assert.ok(Number.isInteger(polling.fuelLevel.everyCycles) && polling.fuelLevel.everyCycles >= 2);
+  assert.ok(Number.isInteger(polling.estimatedFuelRate.phase) && polling.estimatedFuelRate.phase >= 0 && polling.estimatedFuelRate.phase < polling.estimatedFuelRate.everyCycles);
+  assert.ok(Number.isInteger(polling.fuelLevel.phase) && polling.fuelLevel.phase >= 0 && polling.fuelLevel.phase < polling.fuelLevel.everyCycles);
+  assert.notStrictEqual(polling.estimatedFuelRate.phase, polling.fuelLevel.phase,
+    'PIDs lentos de estimativa e nível não devem cair no mesmo ciclo serial');
   assert.ok(Number.isFinite(polling.estimatedFuelRate.displayStaleAfterMs) && polling.estimatedFuelRate.displayStaleAfterMs > 0);
   assert.ok(Number.isInteger(pollingPolicy.learningSampleMinIntervalMs) && pollingPolicy.learningSampleMinIntervalMs >= 1000,
     'persistência do aprendizado deve ter cadência mínima para evitar inflar amostras por polling rápido');
