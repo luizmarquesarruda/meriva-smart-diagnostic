@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Política de aquisição priorizada para ELM327 em K-Line/KWP. Os PIDs lentos são distribuídos entre ciclos; estimativas usam cadência inferior à telemetria principal.",
+  "description": "Política de aquisição priorizada para ELM327 em K-Line/KWP. As leituras essenciais têm prioridade; estimativas e nível do tanque usam menor cadência; logs CSV são agrupados e o aprendizado descarta amostras repetidas do mesmo PID dentro da janela mínima.",
   "polling": {
     "corePids": [
       "010D",
@@ -37,6 +37,8 @@
     "Somente uma estimativa recém-calculada pode alimentar a integração de combustível da viagem.",
     "Uma estimativa em cache pode ser exibida por até displayStaleAfterMs, mas não pode ser integrada novamente.",
     "PIDs usados no cálculo de consumo não devem ser consultados novamente no mesmo ciclo para telemetria rotativa.",
-    "Não aplicar temporizações específicas de CAN a uma sessão K-Line sem medições no adaptador e veículo reais."
-  ]
+    "Não aplicar temporizações específicas de CAN a uma sessão K-Line sem medições no adaptador e veículo reais.",
+    "A confirmação e a estatística de aprendizado do mesmo PID não são persistidas mais de uma vez em learningSampleMinIntervalMs, mas cada resposta real continua na fila CSV."
+  ],
+  "learningSampleMinIntervalMs": 5000
 }
