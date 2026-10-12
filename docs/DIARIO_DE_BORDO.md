@@ -2062,3 +2062,30 @@ O normalizador de velocidade convertia velocidade ausente em `0`, e a ausência 
 - Testes locais e typecheck: ainda precisam ser executados em ambiente de projeto.
 - CI: **não disparada**, conforme orientação explícita do usuário.
 - Teste físico no Android: pendente.
+
+
+## 2026-10-11 — Diário GPS persistente em JSONL
+
+### Objetivo
+Guardar amostras GPS úteis para inspecionar o sinal e o trajeto sem duplicar o cálculo de distância/consumo já feito pelo rastreador e pelo gravador de viagens OBD.
+
+### Implementação
+- Criado `src/gps/gpsHistory.ts`, com arquivos JSON Lines em `VIAGENS/GPS/gps_YYYY-MM-DD_NNNN.jsonl`; cada linha usa o contrato `GpsJsonRecord` versão 1.
+- A coleta é deduplicada por timestamp e ignora amostras muito antigas ou timestamps no futuro fora da tolerância.
+- Cadência: aproximadamente 10 s quando o rastreador confirma movimento, 5 min quando parado, além de transições de movimento/qualidade de sinal.
+- Gravações em lote e flush periódico/ciclo de vida evitam reescrever o arquivo inteiro a cada leitura e reduzem a perda de amostras pendentes.
+- Segmentos limitados a 300 registros, no máximo 4320 amostras por dia e retenção de 14 dias.
+- O diário TXT `meriva_smart_daily_obd_history.txt` recebe um índice idempotente que aponta para os arquivos GPS do dia.
+- A persistência é observacional: não alimenta nem soma novamente a distância, velocidade média ou consumo das viagens.
+- `app/dados.tsx` e a home representam velocidade GPS indisponível como `N/D`, evitando chamar ausência de leitura de veículo parado.
+
+### Testes adicionados
+- `tests/gpsHistory.test.js`: JSONL, segmentação, deduplicação, retenção, cadência quando parado e limite diário.
+- `tests/gps.test.js`: origem de velocidade indisponível quando falta fix GPS válido.
+- O teste GPS history foi incluído no script `npm test`.
+
+### Validação
+- Revisão estática do fluxo e dos pontos de integração feita nesta etapa.
+- Testes e TypeScript ainda não executados em checkout local.
+- CI **não disparada**, conforme orientação do usuário.
+- Teste em aparelho Android e inspeção de arquivos reais pendentes.
