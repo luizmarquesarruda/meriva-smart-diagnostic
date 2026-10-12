@@ -187,7 +187,7 @@ async function appendDailyGpsHistoryIndexUnsafe(basePath: string, date: string):
     `ARQUIVOS: VIAGENS/GPS/gps_${date}_NNNN.jsonl (um arquivo por segmento)`,
     'FORMATO: JSON Lines; cada linha é um objeto GPS schemaVersion=1.',
     'CADÊNCIA: aproximadamente 10 s em movimento e 5 min parado; transições de estado/qualidade são registradas.',
-    `RETENÇÃO: ${14} dias; limite de 4320 amostras por dia.`,
+    'RETENÇÃO: 14 dias; limite de 4320 amostras por dia.',
     'CONTEÚDO: posição, velocidade GPS quando disponível, precisão, altitude, rumo, horário e qualidade do sinal.',
     'ARMAZENAMENTO: local no aparelho; este log não altera a distância nem o consumo calculado da viagem.',
     '--- FIM DO REGISTRO GPS ---',
