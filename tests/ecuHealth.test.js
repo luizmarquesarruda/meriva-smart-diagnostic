@@ -25,5 +25,12 @@ if (!elm.includes("async recoverProtocol()") || !elm.includes("async keepAlive()
 if (!autoTrip.includes("ADAPTADOR OK / ECU SEM RESPOSTA")) {
   throw new Error('polling automático não pausa diante de perda de resposta da ECU');
 }
+if (
+  !autoTrip.includes('status.bluetoothConnected') ||
+  !autoTrip.includes("status.ecuResponseState !== 'NOT_VALIDATED'") ||
+  !autoTrip.includes('getSharedObdConnection()')
+) {
+  throw new Error('histórico GPS deve tolerar falhas transitórias, mas exigir conexão Bluetooth e ECU validada');
+}
 
 console.log('ecuHealth.test.js: OK');
