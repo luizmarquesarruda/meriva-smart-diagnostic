@@ -357,7 +357,7 @@ class AutoTripService {
         }
 
         const instantaneousConsumptionKml =
-          fuelRateLph != null && fuelRateLph > 0 && tripVehicleSpeedKmh > 0
+          fuelRateLph != null && fuelRateLph > 0 && tripVehicleSpeedKmh != null && tripVehicleSpeedKmh > 0
             ? tripVehicleSpeedKmh / fuelRateLph
             : null;
 
