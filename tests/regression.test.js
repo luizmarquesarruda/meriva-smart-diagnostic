@@ -622,6 +622,7 @@ async function testRawLogger() {
   resetFS();
   const parser = loadTs(path.join(ROOT, 'src/obd/parser.ts'));
   const logger = loadTs(path.join(ROOT, 'src/database/obdLogger.ts'));
+  const csvLogger = loadTs(path.join(ROOT, 'src/database/csvLogger.ts'));
   const parsed = parser.parsePidResponse('010C', '41 0C 1A F8');
 
   const query = {
@@ -635,6 +636,8 @@ async function testRawLogger() {
 
   await logger.logRawObdData(BASE, query, '010C', 'REAL');
   await logger.logInterpretedData(BASE, query, '010C', 'REAL');
+  assert.strictEqual(files.size, 0, 'logs de alta frequência devem ser enfileirados sem bloquear o caminho de leitura');
+  await csvLogger.flushCsvLogs();
 
   const rawFile = Array.from(files.keys()).find((p) => p.includes('/LOGS/obd_raw_'));
   const interpretedFile = Array.from(files.keys()).find((p) => p.includes('/LOGS/obd_interpreted_'));
