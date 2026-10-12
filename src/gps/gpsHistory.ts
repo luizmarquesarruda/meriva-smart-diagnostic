@@ -42,11 +42,14 @@ function parseLines(content: string): string[] {
 function parseSample(line: string): GpsJsonRecord | null {
   try {
     const value = JSON.parse(line) as Partial<GpsJsonRecord>;
+    const finiteOrNull = (candidate: unknown): boolean =>
+      candidate === null || (typeof candidate === 'number' && Number.isFinite(candidate));
     if (
       value.schemaVersion !== 1 ||
       value.source !== 'GPS' ||
       typeof value.timestamp !== 'number' ||
-      !Number.isFinite(value.timestamp) ||
+      !Number.isInteger(value.timestamp) ||
+      value.timestamp <= 0 ||
       typeof value.latitude !== 'number' ||
       !Number.isFinite(value.latitude) ||
       value.latitude < -90 ||
@@ -55,6 +58,13 @@ function parseSample(line: string): GpsJsonRecord | null {
       !Number.isFinite(value.longitude) ||
       value.longitude < -180 ||
       value.longitude > 180 ||
+      !finiteOrNull(value.speedKmh) ||
+      (value.speedKmh !== null && (value.speedKmh < 0 || value.speedKmh > 220)) ||
+      !finiteOrNull(value.accuracyMeters) ||
+      (value.accuracyMeters !== null && value.accuracyMeters < 0) ||
+      !finiteOrNull(value.altitudeMeters) ||
+      !finiteOrNull(value.headingDegrees) ||
+      (value.headingDegrees !== null && (value.headingDegrees < 0 || value.headingDegrees >= 360)) ||
       typeof value.valid !== 'boolean' ||
       !['SEM_FIX', 'FRACA', 'BOA', 'EXCELENTE'].includes(String(value.signalQuality))
     ) return null;
@@ -145,7 +155,7 @@ export class GpsHistoryStore {
   }
 
   private async recordUnsafe(sample: GpsJsonRecord, effectiveSpeedKmh: number | null): Promise<void> {
-    if (!this.basePath) return;
+    if (!this.basePath || !parseSample(JSON.stringify(sample))) return;
     const now = this.nowProvider();
     if (!Number.isFinite(sample.timestamp) || sample.timestamp <= 0) return;
     // Avoid persisting cached fixes that arrive long after they were measured.
