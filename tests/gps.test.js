@@ -99,6 +99,10 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
     coords: { latitude: 91, longitude: 0, speed: 0, accuracy: 1, altitude: null, heading: null, altitudeAccuracy: null },
     timestamp: 1700000000000,
   }), null);
+  assert.strictEqual(normalizeGpsJsonRecord({
+    coords: { latitude: 0, longitude: 0, speed: 0, accuracy: 1, altitude: null, heading: null, altitudeAccuracy: null },
+    timestamp: 1700000000.5,
+  }), null, 'fractional timestamps must not violate the GPS JSON schema');
 
   watcher({
     coords: { latitude: 0, longitude: 0, speed: 10, accuracy: 5 },
