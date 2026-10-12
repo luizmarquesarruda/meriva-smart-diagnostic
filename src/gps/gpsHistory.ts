@@ -120,6 +120,7 @@ export class GpsHistoryStore {
   }
 
   private resetRuntimeState(): void {
+    this.activeSessionId = null;
     if (this.flushTimer) clearTimeout(this.flushTimer);
     this.flushTimer = null;
     this.currentDayKey = null;
