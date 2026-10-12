@@ -2035,3 +2035,22 @@ Atualizadas as asserções de `tests/backgroundExecution.test.js` para verificar
 ### Estado
 A correção do teste foi gravada na branch `fix/daily-obd-history-keep-screen-awake-main`. A nova CI deve confirmar o resultado; não considerar validado até a execução terminar verde. O job Android build da execução #1911 foi ignorado porque o job de validação falhou.
 
+
+
+## 2026-10-12 — Auditoria de consumo estimado e disparo de CI
+
+### Evidência e correção
+- Na leitura de `src/trip/autoTripService.ts`, o fallback MAF aceitava `0 g/s` como entrada válida para estimar combustível. Fluxo de ar zero não sustenta uma estimativa positiva de consumo e podia produzir telemetria enganosa.
+- Corrigido o predicado para aceitar somente MAF finito e estritamente maior que zero. Quando o valor é zero, o fluxo segue para a próxima fonte disponível ou mantém consumo como indisponível, sem inventar uma taxa.
+- Commit: `f28b5bc63fc77f8bf5596c17241ca7797067ab76` — `fix: reject zero MAF flow as fuel estimate`.
+
+### Validação
+- O commit foi gravado diretamente em `main`, o que deve acionar o workflow `CI` configurado para push.
+- Resultado de TypeScript, testes, Expo Doctor e build Android: pendente de confirmação no GitHub Actions. Não declarar a correção validada até o workflow terminar.
+- A auditoria confirmou que `autoTripService.ts` pausa a gravação de viagem enquanto `ecuConnected` está falso, mas esta inspeção isolada não comprova que todas as rotas de inicialização/parada do GPS estejam condicionadas à ECU. Esse ponto permanece como verificação obrigatória no resultado da PR #55 e no teste físico.
+
+### Próximos passos
+1. Verificar o resultado da CI do commit acima e corrigir qualquer falha pela evidência do log.
+2. Confirmar no diff/testes se GPS só inicia com ECU respondendo e para ao perder resposta.
+3. Conferir histórico diário com várias sessões no mesmo dia, keep-awake, relatório de PIDs/fórmulas e build APK standalone.
+4. Encerrar PRs abertas somente após preservar as alterações úteis e verificar que não há trabalho exclusivo perdido.
