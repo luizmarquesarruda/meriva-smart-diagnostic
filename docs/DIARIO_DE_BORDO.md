@@ -2077,3 +2077,10 @@ A correção do teste foi gravada na branch `fix/daily-obd-history-keep-screen-a
 - `app/index.tsx`: a falha ao reconciliar um índice danificado não aborta mais a hidratação do cockpit; o app continua a carregar o estado restante e as viagens recuperáveis.
 - `tests/driveCycleStorageSafety.test.js`: cenário expandido para confirmar que uma viagem permanece durável e visível quando não há backup, e que é reconciliada após restaurar um backup válido.
 - Essa mudança reduz o risco de perder a última viagem encerrada quando o armazenamento principal precisa de intervenção manual; não substitui backup externo periódico do diretório do aplicativo.
+
+
+### Preservação em memória se a gravação física falhar
+
+- `src/trip/autoTripService.ts`: viagens finalizadas agora entram em uma fila de persistência e o gravador ativo é liberado sem descartar o objeto da viagem pendente.
+- Se não for possível gravar o índice nem o sidecar por uma falha de I/O, o ciclo permanece em memória, o aplicativo mostra um erro de salvamento pendente e tenta novamente com intervalo limitado; novas viagens são mantidas separadas.
+- A recuperação em memória cobre erros transitórios enquanto o processo continua ativo. Se o Android encerrar o processo e nenhum arquivo puder ser gravado, nenhuma aplicação pode garantir persistência dessa amostra; o sidecar write-ahead cobre o caminho normal em que há espaço/permissão para gravar a cópia lateral.
