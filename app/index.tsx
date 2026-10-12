@@ -82,9 +82,17 @@ export default function IndexScreen() {
       if (!learningProfile) await createLearningProfile(basePath, '2026-09-24T14:48:00.000Z');
       await initializeCarScannerSeed(basePath);
       const storedCycles = await readDriveCycles(basePath);
-      const loaded = restored.driveCycles.length ? restored.driveCycles : storedCycles;
+      // Merge the autosave snapshot with the validated index/backup and pending
+      // write-ahead sidecars. Prefer the storage copy for duplicate IDs, since
+      // it is the authoritative operational trip record.
+      const mergedCycles = new Map<string, DriveCycle>();
+      for (const cycle of restored.driveCycles) mergedCycles.set(cycle.id, cycle);
+      for (const cycle of storedCycles) mergedCycles.set(cycle.id, cycle);
+      const loaded = Array.from(mergedCycles.values());
+      const cyclesChanged = loaded.length !== restored.driveCycles.length ||
+        loaded.some((cycle, index) => JSON.stringify(cycle) !== JSON.stringify(restored.driveCycles[index]));
 
-      if (!restored.driveCycles.length && loaded.length) {
+      if (cyclesChanged) {
         updateAutoSaveState((state) => {
           state.driveCycles = loaded;
         });
