@@ -1,5 +1,6 @@
 import { gpsTracker } from '../gps';
 import type { SharedObdConnection } from '../obd/sharedConnection';
+import type { DriveCycle } from '../data/driveCycles';
 import { getSharedObdConnection, getSharedObdStatus, subscribeSharedObd } from '../obd/sharedConnection';
 import { addDriveCycle, readDriveCycles } from '../storage/driveCycleStorage';
 import { flushObdPersistence, forceSaveOnObdEvent, registerObdQuery } from '../meriva/autosaveIntegration';
@@ -66,6 +67,10 @@ class AutoTripService {
   private lastFuelRateSource: FuelRateSource | null = null;
   private lastFuelRateAtMs = 0;
   private lastFuelFallbackAttemptAtMs = 0;
+  private readonly pendingFinalizedCycles: DriveCycle[] = [];
+  private nextPendingCycleRetryAtMs = 0;
+  private pendingCycleFlushPromise: Promise<void> | null = null;
+  private pendingCycleRetryTimer: ReturnType<typeof setTimeout> | null = null;
   private state: AutoTripServiceState = { ...INITIAL_STATE };
 
   private canQueryPid(pid: string): boolean {
@@ -132,6 +137,7 @@ class AutoTripService {
     };
     this.emit();
     this.running = true;
+    if (this.pendingFinalizedCycles.length > 0) void this.flushPendingFinalizedCycles();
     this.unsubscribeConnection = subscribeSharedObd((connection) => {
       this.transition = this.transition
         .then(() => this.applyConnection(connection))
@@ -479,6 +485,13 @@ class AutoTripService {
         });
       }
 
+      if (
+        this.pendingFinalizedCycles.length > 0 &&
+        Date.now() >= this.nextPendingCycleRetryAtMs
+      ) {
+        void this.flushPendingFinalizedCycles();
+      }
+
       const intervalMs = this.state.fuelSupported || obdSpeedSupported ? 1500 : 5000;
       const elapsedMs = Date.now() - loopStartedAt;
       const waitMs = Math.max(150, intervalMs - elapsedMs);
@@ -499,25 +512,81 @@ class AutoTripService {
     }
   }
 
-  private async finalizeRecorder(): Promise<void> {
-    const recorder = this.recorder;
-    this.recorder = null;
-    if (!recorder || !this.basePath) return;
+  private schedulePendingCycleRetry(): void {
+    if (this.pendingCycleRetryTimer || this.pendingFinalizedCycles.length === 0) return;
+    const delayMs = Math.max(250, this.nextPendingCycleRetryAtMs - Date.now());
+    this.pendingCycleRetryTimer = setTimeout(() => {
+      this.pendingCycleRetryTimer = null;
+      void this.flushPendingFinalizedCycles();
+    }, delayMs);
+  }
 
-    const cycle = recorder.buildDriveCycle();
-    if (!cycle) return;
+  private async flushPendingFinalizedCycles(): Promise<void> {
+    if (this.pendingCycleFlushPromise) return this.pendingCycleFlushPromise;
+    const operation = this.flushPendingFinalizedCyclesUnsafe();
+    this.pendingCycleFlushPromise = operation;
+    try {
+      await operation;
+    } finally {
+      if (this.pendingCycleFlushPromise === operation) this.pendingCycleFlushPromise = null;
+    }
+  }
 
-    await addDriveCycle(this.basePath, cycle);
+  private async flushPendingFinalizedCyclesUnsafe(): Promise<void> {
+    if (!this.basePath || this.pendingFinalizedCycles.length === 0) return;
+    if (Date.now() < this.nextPendingCycleRetryAtMs) {
+      this.schedulePendingCycleRetry();
+      return;
+    }
+
+    while (this.pendingFinalizedCycles.length > 0) {
+      const cycle = this.pendingFinalizedCycles[0];
+      try {
+        // addDriveCycle writes a write-ahead sidecar before touching the main
+        // index. If the index is corrupt, it can preserve this trip for later
+        // reconciliation without destroying existing history.
+        await addDriveCycle(this.basePath, cycle);
+      } catch (cause) {
+        this.nextPendingCycleRetryAtMs = Date.now() + 5_000;
+        this.setState({
+          error: 'VIAGEM PENDENTE DE SALVAMENTO: ' +
+            (cause instanceof Error ? cause.message : 'FALHA DE ARMAZENAMENTO'),
+        });
+        this.schedulePendingCycleRetry();
+        return;
+      }
+
+      this.pendingFinalizedCycles.shift();
+      this.nextPendingCycleRetryAtMs = 0;
+      if (this.pendingCycleRetryTimer) {
+        clearTimeout(this.pendingCycleRetryTimer);
+        this.pendingCycleRetryTimer = null;
+      }
+
+      try {
+        await this.persistFinalizedCycleState(cycle);
+      } catch (cause) {
+        this.setState({
+          error: 'VIAGEM SALVA, MAS FALHOU A ATUALIZAÇÃO DO SNAPSHOT: ' +
+            (cause instanceof Error ? cause.message : 'FALHA DE AUTOSAVE'),
+        });
+        return;
+      }
+    }
+  }
+
+  private async persistFinalizedCycleState(cycle: DriveCycle): Promise<void> {
     const storedCycles = await readDriveCycles(this.basePath);
     updateAutoSaveState((state) => {
       state.driveCycles = storedCycles;
 
-      // O PID 012F é a fonte absoluta de nível de combustível para autonomia.
+      // O PID 012F é a fonte absoluta do nível de combustível para autonomia.
       // A capacidade nominal de 56 L converte o percentual da ECU em litros.
-      // O histórico de consumo continua vindo de viagens reais.
-      // Trips remain in history even when fuel telemetry is insufficient, but
-      // they must not contaminate cumulative consumption/autonomy calculations.
-      const consumptionIsValid = cycle.fuelDataValid !== false && cycle.fuelUsedL >= 0.05 && cycle.avgFuelConsumptionKml > 0;
+      // Viagens sem telemetria de combustível continuam no histórico, mas não
+      // contaminam os totais cumulativos usados para consumo/autonomia.
+      const consumptionIsValid = cycle.fuelDataValid !== false &&
+        cycle.fuelUsedL >= 0.05 &&
+        cycle.avgFuelConsumptionKml > 0;
       const existingReading = state.autonomy.readings.find((item) => item.id === cycle.id);
       if (consumptionIsValid && !existingReading) {
         const previousDistance = Number(state.autonomy.cumulativeDistanceKm) || 0;
@@ -562,11 +631,27 @@ class AutoTripService {
     });
 
     const autonomy = (await initAutoSave(this.basePath)).autonomy;
+    const retryResolved = this.state.error?.startsWith('VIAGEM PENDENTE DE SALVAMENTO')
+      ? null
+      : this.state.error;
     this.setState({
       averageConsumptionKml: autonomy.averageConsumptionKml,
       estimatedRangeKm: autonomy.estimatedRangeKm,
+      error: retryResolved,
     });
     await forceSaveOnObdEvent();
+  }
+
+  private async finalizeRecorder(): Promise<void> {
+    const recorder = this.recorder;
+    this.recorder = null;
+    if (recorder && this.basePath) {
+      const cycle = recorder.buildDriveCycle();
+      if (cycle && !this.pendingFinalizedCycles.some((pending) => pending.id === cycle.id)) {
+        this.pendingFinalizedCycles.push(cycle);
+      }
+    }
+    await this.flushPendingFinalizedCycles();
   }
 
   private setState(patch: Partial<AutoTripServiceState>): void {
