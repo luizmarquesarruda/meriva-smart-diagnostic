@@ -2035,3 +2035,35 @@ Atualizadas as asserções de `tests/backgroundExecution.test.js` para verificar
 ### Estado
 A correção do teste foi gravada na branch `fix/daily-obd-history-keep-screen-awake-main`. A nova CI deve confirmar o resultado; não considerar validado até a execução terminar verde. O job Android build da execução #1911 foi ignorado porque o job de validação falhou.
 
+
+
+## 2026-10-12 — Auditoria de velocidade OBD e segurança do armazenamento
+
+### Problemas encontrados
+- `registerObdQuery` esperava a gravação sequencial de dois CSVs antes de publicar a leitura em memória; depois, uma resposta válida ainda podia esperar leitura/gravação do banco de PIDs e atualização do perfil de aprendizado.
+- `appendCsvRow` lia e reescrevia o arquivo CSV completo para cada amostra OBD, elevando o custo de I/O à medida que os logs cresciam.
+- O polling de fallback por MAF/MAP podia repetir consultas secundárias em cada ciclo quando não havia uma taxa válida; uma ECU que anuncia um PID mas não o responde podia adicionar latência ao ciclo.
+- `addDriveCycle` tratava falha de leitura/parsing do índice como índice vazio e podia sobrescrever o histórico sem recuperar as viagens existentes.
+- O índice de viagens não tinha serialização própria, deduplicação confiável por ID nem uma validação completa de valores numéricos.
+
+### Correções implementadas na branch `perf/obd-telemetry-and-storage-safety`
+- `src/meriva/autosaveIntegration.ts`: publica a telemetria e as últimas leituras antes de I/O; o loop automático pode enfileirar persistência de forma não bloqueante. A atualização do banco de PIDs/aprendizado é limitada a uma amostra representativa por PID a cada 30 s no caminho de alta frequência; a telemetria em memória continua recebendo cada resposta.
+- `src/database/csvLogger.ts`: adiciona buffer de CSV, lote de até 8 linhas antes da descarga, intervalo de 1,5 s, flush explícito e reencaminhamento das linhas se uma descarga falhar.
+- `src/database/obdLogger.ts`: suporta modo buffer para streams RAW e interpretado, sem alterar o formato dos CSVs atuais.
+- `src/meriva/autosaveManager.ts`: tenta descarregar logs CSV quando o aplicativo sai do estado ativo.
+- `src/trip/autoTripService.ts`: usa persistência não bloqueante no polling, mantém velocidade/RPM como caminho prioritário, evita consultar o mesmo PID secundário duas vezes no ciclo e aplica backoff exponencial de 1 a 30 s para PIDs não críticos em falha. Taxa MAF/MAP de fallback é tentada no máximo uma vez a cada 5 s quando a taxa corrente está indisponível; taxa em cache só é reutilizada por até 5 s.
+- `src/storage/driveCycleStorage.ts`: valida ciclos, serializa mutações do índice, escreve e valida um temporário, mantém `index.previous.json`, deduplica por ID e arquiva um índice primário corrompido antes da recuperação. Se não houver backup válido, a gravação é bloqueada e o arquivo original é preservado.
+- Adicionados `tests/csvLoggerPerformance.test.js`, `tests/driveCycleStorageSafety.test.js` e `tests/obdFastPath.test.js`; todos foram incluídos em `npm test`.
+- `README.md`: alinhado ao fluxo de localização em segundo plano, distinção entre taxa medida/estimada e nova estratégia de persistência.
+
+### Critérios de segurança e desempenho
+- Não foram paralelizadas consultas PID no mesmo ELM327; o canal serial continua a exigir ordenação.
+- Os arquivos CSV atuais e as colunas de exportação foram mantidos.
+- Uma falha de exportação CSV não invalida uma viagem já confirmada no índice JSON.
+- O índice inválido sem cópia de segurança válida nunca é substituído por um índice vazio automaticamente.
+
+### Validação e próximos passos
+- **Não executados nesta etapa:** `npm run typecheck`, `npm test`, `npm run doctor`, build APK Release e teste físico com Android/ELM327/ECU.
+- **CI não disparada:** commits foram criados com `[skip ci]` para preservar a restrição operacional.
+- A medição de melhoria percentual de latência ainda depende de benchmark real em dispositivo e registro de `elapsedMs` antes/depois.
+- Próximo passo: validar a branch inteira, revisar os resultados, então resolver a ordem de integração com as PRs de viagens/OBD/GPS já abertas.
