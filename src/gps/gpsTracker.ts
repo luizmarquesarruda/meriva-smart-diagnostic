@@ -502,7 +502,7 @@ export class GpsTracker {
         lastSample: null,
       };
     } else {
-      this.state = { ...this.state, running: false, currentSpeedKmh: null, lastAccuracyM: null, lastSample: null, speedSource: 'INDISPONIVEL' };
+      this.state = { ...this.state, running: false, currentSpeedKmh: null, lastAccuracyM: null, lastSample: null, signalQuality: 'SEM_FIX', speedSource: 'INDISPONIVEL' };
     }
     await gpsHistoryStore.flush();
     this.emit();
