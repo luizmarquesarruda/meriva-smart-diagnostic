@@ -148,9 +148,13 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
   assert.strictEqual(tracker.getState().currentSpeedKmh, 0);
 
   // Sem precisão válida, a velocidade é indisponível, não zero.
-  watcher({ coords: { latitude: 0, longitude: 0.0016, speed: 0, accuracy: null }, timestamp: 17500 });
+  watcher({ coords: { latitude: 0, longitude: 0.0016, speed: 0, accuracy: null }, timestamp: 18500 });
   assert.strictEqual(tracker.getState().currentSpeedKmh, null);
   assert.strictEqual(tracker.getState().signalQuality, 'SEM_FIX');
+  // A delayed, out-of-order location callback must not rewind the last valid state.
+  watcher({ coords: { latitude: 0, longitude: 0.0016, speed: 20, accuracy: 4 }, timestamp: 18400 });
+  assert.strictEqual(tracker.getState().currentSpeedKmh, null);
+  assert.strictEqual(tracker.getState().lastTimestamp, 18500);
 
   // Jitter parado de poucos metros não pode virar distância, mesmo com speed stale positivo.
   const distanceBeforeJitter = tracker.getState().distanceKm;
