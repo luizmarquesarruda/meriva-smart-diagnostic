@@ -22,7 +22,7 @@ const bufferedRows = new Map<string, CsvRow[]>();
 const bufferedTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const bufferedFlushes = new Map<string, Promise<void>>();
 
-export const CSV_BUFFER_FLUSH_INTERVAL_MS = 1_500;
+export const CSV_BUFFER_FLUSH_INTERVAL_MS = 3_000;
 export const CSV_BUFFER_BATCH_SIZE = 8;
 const CSV_WRITE_BATCH_LIMIT = 64;
 
