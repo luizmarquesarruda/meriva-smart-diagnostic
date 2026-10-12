@@ -1,5 +1,6 @@
 import * as FileSystem from 'expo-file-system';
 import type { GpsJsonRecord } from './gpsTracker';
+import { appendDailyGpsHistoryIndex } from '../meriva/dailyObdHistory';
 
 export const GPS_HISTORY_DIRECTORY = 'VIAGENS/GPS';
 export const GPS_HISTORY_RETENTION_DAYS = 14;
@@ -243,6 +244,9 @@ export class GpsHistoryStore {
       this.segmentRecordCount = 0;
       this.segmentContent = '';
     }
+
+    // The daily TXT becomes the human-readable index; raw points remain in bounded JSONL segments.
+    void appendDailyGpsHistoryIndex(this.basePath, day).catch((cause) => this.reportError(cause));
   }
 
   private async flushPendingUnsafe(): Promise<void> {
