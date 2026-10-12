@@ -942,7 +942,9 @@ async function testPidAndLearningWriteSerialization() {
   const measuredFuelQueryIndex = autoTripServiceSource.indexOf("queryPid('015E')");
   const fuelLevelQueryIndex = autoTripServiceSource.indexOf("queryPid('012F')");
   assert.ok(speedQueryIndex >= 0 && rpmQueryIndex > speedQueryIndex && measuredFuelQueryIndex > rpmQueryIndex && fuelLevelQueryIndex > measuredFuelQueryIndex, 'velocidade, RPM e taxa de combustível devem preceder o nível lento do tanque');
-  assert.ok(autoTripServiceSource.includes("this.pollCycleNumber % FUEL_LEVEL_EVERY_N_CYCLES === 1"), 'nível do tanque deve seguir cadência centralizada no JSON');
+  assert.ok(autoTripServiceSource.includes("this.pollCycleNumber % FUEL_LEVEL_EVERY_N_CYCLES === pollingPolicy.polling.fuelLevel.phase"), 'nível do tanque deve seguir a cadência centralizada no JSON');
+  assert.ok(autoTripServiceSource.includes("fuelLevelResult.parsed.unit === 'percent'"), 'o nível do tanque deve aceitar a unidade real do parser (percent)');
+  assert.ok(!autoTripServiceSource.includes("fuelLevelResult.parsed.unit === '%'"), 'a unidade incompatível não deve invalidar o PID 012F');
   assert.ok(autoTripServiceSource.includes("fuelRateLph == null && fuelEstimateDue && connection.supportedPids.includes('0110')"), 'MAF só deve ser consultado como fallback quando suportado e na cadência reduzida');
   assert.ok(autoTripServiceSource.includes("connection.supportedPids.includes('010B') &&\n          connection.supportedPids.includes('010F')"), 'fallback MAP exige suporte confirmado aos PIDs MAP e IAT');
   assert.ok(autoTripServiceSource.includes('!(mapFallbackQueriedThisCycle && item === pollingPolicy.polling.estimatedFuelRate.mapPid)'), 'MAP usado no fallback não deve ser consultado novamente na telemetria rotativa');
