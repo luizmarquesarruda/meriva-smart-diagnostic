@@ -271,7 +271,9 @@ export class GpsHistoryStore {
   private async flushPendingUnsafe(): Promise<void> {
     if (this.flushTimer) clearTimeout(this.flushTimer);
     this.flushTimer = null;
-    if (!this.basePath || this.pending.length === 0 || !this.currentDayKey) return;
+    if (!this.basePath || this.pending.length === 0) return;
+    const day = this.currentDayKey;
+    if (!day) return;
     const directory = gpsDirectory(this.basePath);
     await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
 
@@ -287,7 +289,7 @@ export class GpsHistoryStore {
       if (count <= 0) break;
       const rows = this.pending.slice(0, count);
       const content = `${this.segmentContent}${rows.map((row) => JSON.stringify(row)).join('\n')}\n`;
-      const path = `${directory}/${gpsFileName(this.currentDayKey, this.segmentIndex)}`;
+      const path = `${directory}/${gpsFileName(day, this.segmentIndex)}`;
       await FileSystem.writeAsStringAsync(path, content, { encoding: FileSystem.EncodingType.UTF8 });
       this.segmentContent = content;
       this.segmentRecordCount += rows.length;
