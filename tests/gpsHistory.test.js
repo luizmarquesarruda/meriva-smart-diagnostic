@@ -208,12 +208,16 @@ function linesInDirectory(directory) {
   count = linesInDirectory(dir).filter((line) => line.includes('"schemaVersion":1')).length;
   assert.strictEqual(count, 5, 'stationary heartbeat should be written at the configured interval');
 
-  // ECU disconnect ends the session and flushes queued data; reconnect starts a new ID.
+  // ECU disconnect flushes the final queued sample and ignores later GPS fixes.
   const firstSessionId = records[0].sessionId;
+  clock += 10_000;
+  await store.record(makeSample(clock, 36), 36);
   await store.stopSession();
-  await store.record(makeSample(clock), 36);
+  assert.strictEqual(linesInDirectory(dir).filter((line) => line.includes('"schemaVersion":1')).length, 6,
+    'disconnect must flush the last sample accepted during the ECU session');
+  await store.record(makeSample(clock + 10_000), 36);
   await store.flush();
-  assert.strictEqual(linesInDirectory(dir).filter((line) => line.includes('"schemaVersion":1')).length, 5,
+  assert.strictEqual(linesInDirectory(dir).filter((line) => line.includes('"schemaVersion":1')).length, 6,
     'samples received while ECU is disconnected must not be stored');
   await store.startSession();
   clock += 10_000;
