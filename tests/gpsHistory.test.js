@@ -166,6 +166,7 @@ function linesInDirectory(directory) {
   await fakeFS.writeAsStringAsync(dir + '/' + expiredName, '{"expired":true}\n');
 
   const store = new GpsHistoryStore('/doc/MERIVA_SMART', () => clock);
+  await store.startSession();
   for (let index = 0; index < 3; index += 1) {
     const timestamp = clock;
     await store.record(makeSample(timestamp), 36);
@@ -179,7 +180,7 @@ function linesInDirectory(directory) {
   assert.strictEqual(linesInDirectory(dir).filter((line) => line.includes('"schemaVersion":1')).length, 3);
   assert(!names.includes(expiredName), 'expired date segments should be removed by retention cleanup');
   const records = linesInDirectory(dir).map((line) => JSON.parse(line));
-  assert(records.every((record) => record.source === 'GPS' && record.schemaVersion === 1));
+  assert(records.every((record) => record.source === 'GPS' && record.schemaVersion === 1 && typeof record.sessionId === 'string'));
   assert.strictEqual(records[0].latitude, -23.55);
   assert.strictEqual(records[0].speedKmh, 36);
   const dayKey = localKey(noon.getTime());
@@ -207,6 +208,20 @@ function linesInDirectory(directory) {
   count = linesInDirectory(dir).filter((line) => line.includes('"schemaVersion":1')).length;
   assert.strictEqual(count, 5, 'stationary heartbeat should be written at the configured interval');
 
+  // ECU disconnect ends the session and flushes queued data; reconnect starts a new ID.
+  const firstSessionId = records[0].sessionId;
+  await store.stopSession();
+  await store.record(makeSample(clock), 36);
+  await store.flush();
+  assert.strictEqual(linesInDirectory(dir).filter((line) => line.includes('"schemaVersion":1')).length, 5,
+    'samples received while ECU is disconnected must not be stored');
+  await store.startSession();
+  await store.record(makeSample(clock), 36);
+  await store.flush();
+  const afterReconnect = linesInDirectory(dir).map((line) => JSON.parse(line));
+  assert.notStrictEqual(afterReconnect[afterReconnect.length - 1].sessionId, firstSessionId,
+    'ECU reconnection must create a new GPS recording session');
+
   // Segment rollover is deterministic and never writes more than the configured chunk size.
   files.clear();
   directories.clear();
@@ -217,6 +232,7 @@ function linesInDirectory(directory) {
   let segmentNow = segmentClock.getTime();
   const segmentDate = localKey(segmentNow);
   const segmentStore = new GpsHistoryStore('/doc/MERIVA_SMART', () => segmentNow);
+  await segmentStore.startSession();
   for (let index = 0; index < GPS_HISTORY_SEGMENT_RECORDS + 2; index += 1) {
     await segmentStore.record(makeSample(segmentNow), 36);
     segmentNow += 10_000;
@@ -257,6 +273,7 @@ function linesInDirectory(directory) {
   const finalSampleTime = timestamp - 10_000;
   const cappedClock = finalSampleTime + 10_000;
   const cappedStore = new GpsHistoryStore('/doc/MERIVA_SMART', () => cappedClock);
+  await cappedStore.startSession();
   await cappedStore.record(makeSample(cappedClock), 36);
   await cappedStore.flush();
   const totalLines = linesInDirectory(dir).length;
