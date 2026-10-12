@@ -167,18 +167,47 @@ function makeCycle(id, overrides = {}) {
   );
   assert.strictEqual((await storage.readDriveCycles(BASE)).length, 4);
 
-  // With no valid backup, a corrupt index must remain byte-for-byte intact.
+  // With no valid backup, keep the corrupt index intact while writing the
+  // completed trip to a separate durable sidecar.
   files.clear();
   directories.clear();
   directories.add('/doc');
   await fakeFS.makeDirectoryAsync(BASE + '/VIAGENS', { intermediates: true });
   files.set(indexPath, damagedOriginal);
-  await assert.rejects(
-    storage.addDriveCycle(BASE, makeCycle('trip-blocked')),
-    /CORROMPIDO E SEM BACKUP VÁLIDO/,
-  );
+  await storage.addDriveCycle(BASE, makeCycle('trip-blocked'));
   assert.strictEqual(files.get(indexPath), damagedOriginal, 'sem backup válido, não sobrescrever o índice danificado');
-  assert.strictEqual(files.has(indexPath + '.tmp'), false);
+  assert.ok(
+    Array.from(files.keys()).some((name) => name.includes('/PENDING_CYCLES/pending_') && name.endsWith('.json')),
+    'viagem concluída deve ficar em uma fila de recuperação independente',
+  );
+  assert.deepStrictEqual((await storage.readDriveCycles(BASE)).map((cycle) => cycle.id), ['trip-blocked'],
+    'a viagem pendente deve continuar visível mesmo com índice principal corrompido');
+
+  await assert.rejects(storage.initializeDriveCycles(BASE), /CORROMPIDO E SEM BACKUP VÁLIDO/);
+  assert.strictEqual(files.get(indexPath), damagedOriginal);
+
+  // Once a valid backup is restored, startup reconciliation moves the sidecar
+  // into the primary index and removes the pending file only after validation.
+  files.set(backupPath, JSON.stringify({
+    version: '1.0',
+    cycles: [makeCycle('trip-prior')],
+    totalCount: 1,
+  }));
+  await storage.initializeDriveCycles(BASE);
+  assert.deepStrictEqual(
+    (await storage.readDriveCycles(BASE)).map((cycle) => cycle.id).sort(),
+    ['trip-blocked', 'trip-prior'],
+  );
+  assert.ok(
+    Array.from(files.keys()).some((name) => name.endsWith('.corrupt.' + Date.now() + '.json')) ||
+    Array.from(files.keys()).some((name) => name.includes('index.json.corrupt.')),
+    'o índice corrompido deve permanecer arquivado para recuperação manual',
+  );
+  assert.strictEqual(
+    Array.from(files.keys()).some((name) => name.includes('/PENDING_CYCLES/pending_') && name.endsWith('.json')),
+    false,
+    'sidecar só é removido depois que a viagem aparece no índice validado',
+  );
 
   console.log('driveCycleStorageSafety.test.js: OK');
 })().catch((error) => {
