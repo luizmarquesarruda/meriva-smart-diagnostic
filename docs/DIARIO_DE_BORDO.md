@@ -2073,7 +2073,8 @@ Guardar amostras GPS úteis para inspecionar o sinal e o trajeto sem duplicar o 
 - Criado `src/gps/gpsHistory.ts`, com arquivos JSON Lines em `VIAGENS/GPS/gps_YYYY-MM-DD_NNNN.jsonl`; cada linha usa o contrato `GpsJsonRecord` versão 1.
 - A coleta é deduplicada por timestamp e ignora amostras muito antigas ou timestamps no futuro fora da tolerância.
 - Cadência: aproximadamente 10 s quando o rastreador confirma movimento, 5 min quando parado, além de transições de movimento/qualidade de sinal.
-- Gravações em lote e flush periódico/ciclo de vida evitam reescrever o arquivo inteiro a cada leitura e reduzem a perda de amostras pendentes.
+- Gravações em lote e flush periódico/ciclo de vida evitam reescrever um arquivo ilimitado a cada leitura; falhas transitórias tentam novamente gravar amostras pendentes.
+- Falha do serviço GPS e encerramento do monitoramento limpam velocidade/precisão atuais para não preservar telemetria stale na interface.
 - Segmentos limitados a 300 registros, no máximo 4320 amostras por dia e retenção de 14 dias.
 - O diário TXT `meriva_smart_daily_obd_history.txt` recebe um índice idempotente que aponta para os arquivos GPS do dia.
 - A persistência é observacional: não alimenta nem soma novamente a distância, velocidade média ou consumo das viagens.
