@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
+import { flushCsvLogs } from '../src/database/csvLogger';
 import { checkStorageQuota, getStorageBreakdown, StorageQuotaConfig } from '../src/storage/quotaManager';
 import { cleanupOldLogs, cleanupOldReadings } from '../src/storage/cleanup';
 import { getMidLayout } from '../src/ui/midLayout';
@@ -49,6 +50,7 @@ export default function ArmazenamentoScreen() {
     setBusy(true);
     setMessage('LIMPANDO...');
     try {
+      await flushCsvLogs();
       const logs = await cleanupOldLogs(basePath);
       const readings = await cleanupOldReadings(basePath);
       setMessage(`REMOVIDOS: ${logs} LOGS, ${readings} LEITURAS`);
@@ -67,6 +69,7 @@ export default function ArmazenamentoScreen() {
     setBusy(true);
     setMessage('EXPORTANDO...');
     try {
+      await flushCsvLogs();
       const path = format === 'JSON'
         ? await exportDiagnosticsJson(basePath)
         : await exportDriveCyclesCsv(basePath);
