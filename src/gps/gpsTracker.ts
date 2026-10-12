@@ -1,4 +1,5 @@
 import * as Location from 'expo-location';
+import { gpsHistoryStore } from './gpsHistory';
 
 export const BACKGROUND_LOCATION_TASK_NAME = 'meriva-smart-background-location';
 
@@ -78,7 +79,8 @@ export interface GpsTripState {
   lastAccuracyM: number | null;
   error: string | null;
   signalQuality: 'SEM_FIX' | 'FRACA' | 'BOA' | 'EXCELENTE';
-  speedSource: 'PARADO' | 'GPS' | 'OBD';
+  speedSource: 'PARADO' | 'GPS' | 'OBD' | 'INDISPONIVEL';
+  lastSample: GpsJsonRecord | null;
 }
 
 export type GpsListener = (state: GpsTripState) => void;
@@ -157,6 +159,7 @@ export class GpsTracker {
     error: null,
     signalQuality: 'SEM_FIX',
     speedSource: 'PARADO',
+    lastSample: null,
   };
 
   subscribe(listener: GpsListener): () => void {
@@ -198,6 +201,7 @@ export class GpsTracker {
         error: null,
         signalQuality: 'SEM_FIX',
         speedSource: 'PARADO',
+        lastSample: null,
       };
       this.previous = null;
       this.consecutiveMovingSamples = 0;
@@ -330,6 +334,7 @@ export class GpsTracker {
       error: null,
       signalQuality: 'SEM_FIX',
       speedSource: 'PARADO',
+      lastSample: null,
     };
     this.previous = null;
     this.consecutiveMovingSamples = 0;
@@ -440,11 +445,13 @@ export class GpsTracker {
         : (derivedSpeedKmh ?? 0))
       : 0;
     if (speedKmh != null && (!Number.isFinite(speedKmh) || speedKmh < STOP_SPEED_KMH || speedKmh > MAX_SPEED_KMH)) speedKmh = 0;
-    const speedSource: GpsTripState['speedSource'] = speedKmh == null || speedKmh <= 0
-      ? 'PARADO'
-      : this.vehicleSpeedHintKmh != null && this.vehicleSpeedHintKmh >= MIN_MOVEMENT_SPEED_KMH
-        ? 'OBD'
-        : 'GPS';
+    const speedSource: GpsTripState['speedSource'] = speedKmh == null
+      ? 'INDISPONIVEL'
+      : speedKmh <= 0
+        ? 'PARADO'
+        : this.vehicleSpeedHintKmh != null && this.vehicleSpeedHintKmh >= MIN_MOVEMENT_SPEED_KMH
+          ? 'OBD'
+          : 'GPS';
 
     if (accurate) this.previous = sample;
     this.state = {
@@ -457,8 +464,11 @@ export class GpsTracker {
       error: null,
       signalQuality: this.getSignalQuality(sample.accuracyM),
       speedSource,
+      lastSample: normalized,
     };
     this.emit();
+    // Keep the GPS journal side-effect isolated from trip distance/fuel accounting.
+    void gpsHistoryStore.record(normalized, speedKmh);
   }
 
   async stop(options: { resetTrip?: boolean } = {}): Promise<void> {
@@ -482,10 +492,12 @@ export class GpsTracker {
         lastAccuracyM: null,
         signalQuality: 'SEM_FIX',
         speedSource: 'PARADO',
+        lastSample: null,
       };
     } else {
       this.state = { ...this.state, running: false, currentSpeedKmh: null, speedSource: 'PARADO' };
     }
+    await gpsHistoryStore.flush();
     this.emit();
   }
 }
