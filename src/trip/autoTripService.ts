@@ -271,17 +271,18 @@ class AutoTripService {
           const fuelResult = await connection.session.queryPid('015E');
           queriedPidsThisCycle.add('015E');
           await registerObdQuery(this.basePath, fuelResult, 'REAL', undefined, { deferPersistence: true });
+          const measuredRateLph = fuelResult.parsed.value;
           const measuredFuelValid = fuelResult.commandStatus === 'OK' &&
             fuelResult.parsed.status === 'RESPONDEU' &&
             fuelResult.parsed.unit === 'L/h' &&
-            fuelResult.parsed.value != null &&
-            Number.isFinite(fuelResult.parsed.value) &&
-            fuelResult.parsed.value >= 0;
+            measuredRateLph != null &&
+            Number.isFinite(measuredRateLph) &&
+            measuredRateLph >= 0;
           this.notePidResult('015E', measuredFuelValid);
-          if (measuredFuelValid) {
-            fuelRateLph = fuelResult.parsed.value;
+          if (measuredFuelValid && measuredRateLph != null) {
+            fuelRateLph = measuredRateLph;
             fuelRateSource = 'MEASURED_015E';
-            this.cacheFuelRate(fuelRateLph, fuelRateSource);
+            this.cacheFuelRate(measuredRateLph, 'MEASURED_015E');
           }
         }
 
@@ -327,7 +328,7 @@ class AutoTripService {
             if (estimate) {
               fuelRateLph = estimate.rateLph;
               fuelRateSource = estimate.source;
-              this.cacheFuelRate(fuelRateLph, fuelRateSource);
+              this.cacheFuelRate(estimate.rateLph, estimate.source);
             }
           }
         }
@@ -363,7 +364,7 @@ class AutoTripService {
           if (estimate) {
             fuelRateLph = estimate.rateLph;
             fuelRateSource = estimate.source;
-            this.cacheFuelRate(fuelRateLph, fuelRateSource);
+            this.cacheFuelRate(estimate.rateLph, estimate.source);
           }
         }
 
