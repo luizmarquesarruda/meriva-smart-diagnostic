@@ -35,7 +35,7 @@ export interface IntelligentPidDiscoveryResult {
  */
 export async function discoverIntelligentPids(
   session: Elm327Session,
-  options?: { knownPids?: string[] },
+  options?: { knownPids?: string[]; prevalidatedResults?: ElmCommandResult[] },
 ): Promise<IntelligentPidDiscoveryResult> {
   const observations: IntelligentPidObservation[] = [];
   const supportResponses: Record<string, string> = {};
@@ -47,10 +47,10 @@ export async function discoverIntelligentPids(
   const priorityPids = ['010C', '010D', '012F', '015E'];
   const confirmedCandidates = options?.knownPids ?? [];
 
-  const probePid = async (pid: string): Promise<void> => {
+  const probePid = async (pid: string, prevalidated?: ElmCommandResult): Promise<void> => {
     let result: ElmCommandResult;
     try {
-      result = await session.executeCommand(pid);
+      result = prevalidated ?? await session.executeCommand(pid);
     } catch {
       return;
     }
@@ -80,10 +80,24 @@ export async function discoverIntelligentPids(
     });
   };
 
-  for (const pid of priorityPids) await probePid(pid);
+  const prevalidatedByPid = new Map(
+    (options?.prevalidatedResults ?? []).map((item) => [
+      item.command.replace(/\s/g, '').toUpperCase(),
+      item,
+    ]),
+  );
+  for (const pid of priorityPids) await probePid(pid, prevalidatedByPid.get(pid));
 
-  // Fase 2: mapas de suporte OBD-II. Só chegamos aqui depois dos PIDs essenciais.
-  for (const supportPid of DISCOVERY_PIDS) {
+  // Fase 2: consulta as páginas bitmap em cadeia. A próxima página só existe
+  // quando o bit de continuação da página anterior declara esse PID.
+  // Isso evita até três round trips inúteis em ECUs K-Line antigas.
+  const bitmapSupport = new Map<string, string[]>();
+  for (let index = 0; index < DISCOVERY_PIDS.length; index += 1) {
+    const supportPid = DISCOVERY_PIDS[index];
+    if (index > 0 && !bitmapSupport.get(DISCOVERY_PIDS[index - 1])?.includes(supportPid)) {
+      break;
+    }
+
     let result: ElmCommandResult;
     try {
       result = await session.executeCommand(supportPid);
@@ -95,6 +109,7 @@ export async function discoverIntelligentPids(
     const mapped = result.status === 'OK'
       ? decodeSupportedPids(supportPid, result.response)
       : [];
+    bitmapSupport.set(supportPid, mapped);
 
     for (const pid of mapped) supported.add(pid);
 
@@ -110,6 +125,10 @@ export async function discoverIntelligentPids(
         ? 'MAPA DE PIDs ACEITO PELA ECU'
         : 'MAPA SEM PIDs CONFIRMADOS',
     });
+
+    if (index + 1 < DISCOVERY_PIDS.length && !mapped.includes(DISCOVERY_PIDS[index + 1])) {
+      break;
+    }
   }
 
   for (const pid of priorityPids) {
@@ -123,12 +142,16 @@ export async function discoverIntelligentPids(
   }
 
   // Fase 3: conhecidos do projeto e PIDs apontados pelos bitmaps.
+  // Só testar PIDs do catálogo que a bitmap anunciou, além de PIDs já conhecidos.
+  // Antes, KNOWN_PIDS inteiro era consultado em toda conexão: até 30+ round trips
+  // desnecessários, inclusive para PIDs que a própria ECU não anunciava.
   const candidates = Array.from(new Set([
-    ...confirmedCandidates,
-    ...KNOWN_PIDS,
+    ...confirmedCandidates.map((pid) => pid.replace(/\s/g, '').toUpperCase()),
     ...Array.from(supported),
   ])).filter((pid) =>
-    /^01[0-9A-F]{2}$/i.test(pid) && !priorityPids.includes(pid.toUpperCase()) || confidence[pid] === 0,
+    /^01[0-9A-F]{2}$/.test(pid) &&
+    KNOWN_PIDS.includes(pid) &&
+    !priorityPids.includes(pid),
   );
 
   for (const pid of candidates) {
@@ -152,6 +175,7 @@ export async function discoverIntelligentPids(
     const pidConfidence = valid ? (confirmedByBitmap ? 1 : 0.85) : confirmedByBitmap ? 0.35 : 0;
 
     if (valid) supported.add(pid);
+    else supported.delete(pid);
     confidence[pid] = pidConfidence;
     observations.push({
       pid,
