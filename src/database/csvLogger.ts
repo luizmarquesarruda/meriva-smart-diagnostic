@@ -144,6 +144,11 @@ export async function flushCsvLogs(): Promise<void> {
 
   try {
     await flushPromise;
+  } catch (cause) {
+    // Keep retrying after export/disconnect-triggered flushes too, not only
+    // after the timer-driven flush path. Rows were restored to pendingRows.
+    if (pendingRows.size > 0) scheduleBatchFlush();
+    throw cause;
   } finally {
     flushPromise = null;
   }
