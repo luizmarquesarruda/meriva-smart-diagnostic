@@ -1,6 +1,6 @@
 import { gpsTracker } from '../gps';
 import type { SharedObdConnection } from '../obd/sharedConnection';
-import { getSharedObdConnection, getSharedObdStatus, subscribeSharedObd } from '../obd/sharedConnection';
+import { getSharedObdConnection, getSharedObdStatus, subscribeSharedObd, subscribeSharedObdStatus } from '../obd/sharedConnection';
 import { addDriveCycle, readDriveCycles } from '../storage/driveCycleStorage';
 import { forceSaveOnObdEvent, registerObdQuery } from '../meriva/autosaveIntegration';
 import { getAutoSaveState, updateAutoSaveState, initAutoSave } from '../meriva/autosaveManager';
@@ -56,6 +56,8 @@ class AutoTripService {
   private pollingPauseCount = 0;
   private transition: Promise<void> = Promise.resolve();
   private unsubscribeConnection: (() => void) | null = null;
+  private unsubscribeEcuStatus: (() => void) | null = null;
+  private gpsRecordingTransition: Promise<void> = Promise.resolve();
   private readonly listeners = new Set<Listener>();
   private telemetryCursor = 0;
   private pollCycleNumber = 0;
@@ -101,6 +103,21 @@ class AutoTripService {
           error: cause instanceof Error ? cause.message : 'FALHA NO SERVIÇO AUTOMÁTICO DA VIAGEM',
         }));
     });
+    // ECU validation/response is the authoritative gate for GPS history.
+    // Bluetooth adapter presence alone must never start a GPS recording session.
+    this.unsubscribeEcuStatus = subscribeSharedObdStatus((status) => {
+      this.gpsRecordingTransition = this.gpsRecordingTransition
+        .then(async () => {
+          if (!this.running || !status.ecuConnected) {
+            await gpsHistoryStore.stopSession();
+            return;
+          }
+          await gpsHistoryStore.startSession();
+        })
+        .catch((cause) => this.setState({
+          error: cause instanceof Error ? cause.message : 'FALHA AO ALTERAR SESSÃO DE GRAVAÇÃO GPS',
+        }));
+    });
   }
 
   async stop(): Promise<void> {
@@ -110,6 +127,10 @@ class AutoTripService {
     this.generation += 1;
     this.unsubscribeConnection?.();
     this.unsubscribeConnection = null;
+    this.unsubscribeEcuStatus?.();
+    this.unsubscribeEcuStatus = null;
+    await this.gpsRecordingTransition;
+    await gpsHistoryStore.stopSession();
     await this.transition;
     await this.stopCurrentLoop();
     await this.finalizeRecorder();
