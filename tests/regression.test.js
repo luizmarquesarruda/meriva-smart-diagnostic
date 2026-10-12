@@ -636,6 +636,13 @@ async function testRawLogger() {
 
   await logger.logRawObdData(BASE, query, '010C', 'REAL');
   await logger.logInterpretedData(BASE, query, '010C', 'REAL');
+  const secondQuery = {
+    ...query,
+    rx: '41 0C 0F A0',
+    parsed: parser.parsePidResponse('010C', '41 0C 0F A0'),
+  };
+  await logger.logRawObdData(BASE, secondQuery, '010C', 'REAL');
+  await logger.logInterpretedData(BASE, secondQuery, '010C', 'REAL');
   assert.strictEqual(files.size, 0, 'logs de alta frequência devem ser enfileirados sem bloquear o caminho de leitura');
   await csvLogger.flushCsvLogs();
 
@@ -648,7 +655,11 @@ async function testRawLogger() {
   const interpreted = files.get(interpretedFile);
   assert.ok(raw.startsWith('timestamp,tx,rx,pid,responseTimeMs,commandStatus,protocol,source'));
   assert.ok(raw.includes('010C,41 0C 1A F8'));
+  assert.ok(raw.includes('010C,41 0C 0F A0'));
+  assert.strictEqual(raw.trim().split('\n').length, 3, 'o flush deve gravar cabeçalho e duas amostras raw em um lote');
   assert.ok(interpreted.includes('010C,41 0C 1A F8'));
+  assert.ok(interpreted.includes('010C,41 0C 0F A0'));
+  assert.strictEqual(interpreted.trim().split('\n').length, 3, 'o flush deve preservar todas as amostras interpretadas');
   assert.ok(interpreted.includes('ISO 14230-4 (KWP FAST)'));
 }
 
