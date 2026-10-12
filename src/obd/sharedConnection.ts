@@ -568,9 +568,9 @@ export async function disconnectSharedObd(): Promise<void> {
   try {
     if (connection) await connection.session.close();
   } finally {
-    await stopBackgroundMonitoring();
-    await closeObdAutosaveSession();
-    try { await flushCsvLogs(); } catch { /* fila tenta preservar/retentar sem bloquear desconexão */ }
+    try { await stopBackgroundMonitoring(); } catch { /* continuar o fechamento da sessão */ }
+    try { await closeObdAutosaveSession(); } catch { /* continuar o flush dos logs */ }
+    try { await flushCsvLogs(); } catch { /* fila retém o lote e agenda nova tentativa */ }
     intentionalDisconnect = false;
   }
 }
