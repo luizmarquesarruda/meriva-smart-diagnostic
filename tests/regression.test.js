@@ -635,6 +635,8 @@ async function testRawLogger() {
   const parser = loadTs(path.join(ROOT, 'src/obd/parser.ts'));
   const logger = loadTs(path.join(ROOT, 'src/database/obdLogger.ts'));
   const csvLogger = loadTs(path.join(ROOT, 'src/database/csvLogger.ts'));
+  assert.strictEqual(logger.getObdLogLocalDateKey(new Date(2026, 9, 12, 23, 59)), '2026-10-12',
+    'a partição diária deve usar a data local do aparelho, sem virar de dia pelo timestamp UTC');
   const parsed = parser.parsePidResponse('010C', '41 0C 1A F8');
 
   const query = {
