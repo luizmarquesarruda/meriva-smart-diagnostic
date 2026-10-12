@@ -435,8 +435,10 @@ async function testPidScanner() {
 
 async function testIntelligentPidDiscovery() {
   const ai = loadTs(path.join(ROOT, 'src/obd/intelligentPidDiscovery.ts'));
+  const commands = [];
   const fakeSession = {
     async executeCommand(pid) {
+      commands.push(pid);
       const responses = {
         '0100': { response: '41 00 BE 3E B8 13', status: 'OK', elapsedMs: 8 },
         '0120': { response: '41 20 00 02 00 00', status: 'OK', elapsedMs: 8 },
@@ -450,12 +452,23 @@ async function testIntelligentPidDiscovery() {
     },
   };
   const result = await ai.discoverIntelligentPids(fakeSession, {
-    knownPids: ['010C'],
+    prevalidatedResults: [{
+      command: '010C',
+      response: '41 0C 1A F8',
+      status: 'OK',
+      elapsedMs: 10,
+      attempt: 1,
+    }],
   });
   assert.ok(result.supportedPids.includes('010C'));
   assert.strictEqual(result.confidence['010C'], 1);
   assert.strictEqual(result.observations.find((item) => item.pid === '010C').status, 'CONFIRMADO');
   assert.strictEqual(result.observations.find((item) => item.pid === '010C').value, 1726);
+  assert.strictEqual(commands.filter((pid) => pid === '010C').length, 0, 'descoberta deve reaproveitar a sonda 010C validada');
+  assert.ok(!commands.includes('012F'), 'não consultar nível de tanque sem bitmap indicando suporte');
+  assert.ok(!commands.includes('015E'), 'não consultar taxa de combustível sem bitmap indicando suporte');
+  assert.ok(!commands.includes('0110'), 'não consultar PID fora da lista anunciada pela bitmap');
+  assert.ok(!commands.includes('0140') && !commands.includes('0160'), 'não consultar páginas bitmap que a ECU não anunciou');
 }
 
 async function testCarScannerBaselineAndFuel012F() {
@@ -912,8 +925,8 @@ async function testPidAndLearningWriteSerialization() {
   const measuredFuelQueryIndex = autoTripServiceSource.indexOf("queryPid('015E')");
   const fuelLevelQueryIndex = autoTripServiceSource.indexOf("queryPid('012F')");
   assert.ok(speedQueryIndex >= 0 && rpmQueryIndex > speedQueryIndex && measuredFuelQueryIndex > rpmQueryIndex && fuelLevelQueryIndex > measuredFuelQueryIndex, 'velocidade, RPM e taxa de combustível devem preceder o nível lento do tanque');
-  assert.ok(autoTripServiceSource.includes("this.pollCycleNumber % 4 === 1"), 'nível do tanque deve ser consultado em cadência reduzida');
-  assert.ok(autoTripServiceSource.includes("fuelRateLph == null && connection.supportedPids.includes('0110')"), 'MAF só deve ser consultado como fallback quando suportado pela ECU');
+  assert.ok(autoTripServiceSource.includes("this.pollCycleNumber % FUEL_LEVEL_EVERY_N_CYCLES === 1"), 'nível do tanque deve seguir cadência centralizada no JSON');
+  assert.ok(autoTripServiceSource.includes("fuelRateLph == null && fuelEstimateDue && connection.supportedPids.includes('0110')"), 'MAF só deve ser consultado como fallback quando suportado e na cadência reduzida');
   assert.ok(autoTripServiceSource.includes("connection.supportedPids.includes('010B') &&\n          connection.supportedPids.includes('010F')"), 'fallback MAP exige suporte confirmado aos PIDs MAP e IAT');
   assert.ok(!autoTripServiceSource.includes('recordLivePidQuery('), 'telemetria automática deve registrar cada resposta uma única vez via registerObdQuery');
   writeDelayMs = 0;
