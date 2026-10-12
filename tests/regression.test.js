@@ -295,6 +295,33 @@ async function testElmAndProtocol() {
   assert.strictEqual(generic.command, '03');
   assert.strictEqual(generic.status, 'ERROR');
   await session.close();
+
+  // Optional AT commands that explicitly return '?' are unsupported, not
+  // transient failures; retrying them only adds fixed delays to every connect.
+  const initCommands = [];
+  let currentResponse = '';
+  const unsupportedAtTransport = {
+    async open() {},
+    async close() {},
+    async write(data) {
+      const command = data.trim();
+      initCommands.push(command);
+      currentResponse = command === 'ATZ'
+        ? 'ELM327 v1.5\\r\\n>'
+        : command === 'ATI'
+          ? '?\\r\\n>'
+          : command === 'ATDP'
+            ? 'ISO 14230-4 (KWP FAST)\\r\\n>'
+            : 'OK\\r\\n>';
+    },
+    async readUntilPrompt() { return currentResponse; },
+  };
+  const unsupportedAtSession = new Elm327Session(unsupportedAtTransport, { commandDelayMs: 0 });
+  const initResults = await unsupportedAtSession.initialize();
+  assert.strictEqual(initCommands.filter((command) => command === 'ATI').length, 1,
+    'ATI explicitamente não suportado não deve esperar dois retries inúteis');
+  assert.strictEqual(initResults.find((result) => result.command === 'ATI').status, 'UNSUPPORTED');
+  await unsupportedAtSession.close();
 }
 
 async function testConfiguredBluetoothRetryLimit() {
