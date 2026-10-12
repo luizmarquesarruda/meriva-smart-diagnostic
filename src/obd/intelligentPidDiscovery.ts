@@ -44,11 +44,10 @@ export async function discoverIntelligentPids(
   const bitmapAdvertised = new Set<string>();
   const supported = new Set<string>();
 
-  // Fase 1: validar ECU/RPM e velocidade. O comando 010C validado durante a
-  // conexão é reaproveitado; nível de tanque e combustível medido só serão
-  // consultados depois se a bitmap indicar suporte. Isso evita sondagens
-  // desnecessárias em ECUs K-Line antigas.
-  const priorityPids = ['010C', '010D'];
+  // Fase 1: reutilizar a resposta 010C que já validou a ECU. Os demais PIDs,
+  // inclusive velocidade, só são sondados individualmente depois de a bitmap
+  // atual anunciar suporte. Isso reduz tráfego e respeita o conjunto da sessão.
+  const priorityPids = ['010C'];
   const confirmedCandidates = options?.knownPids ?? [];
 
   const probePid = async (pid: string, prevalidated?: ElmCommandResult): Promise<void> => {
