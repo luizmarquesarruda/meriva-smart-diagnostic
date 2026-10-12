@@ -53,3 +53,9 @@ assert(shared.includes('stopBackgroundMonitoring()'));
 assert(layout.includes("import '../src/gps/backgroundLocationTask';"));
 
 console.log('background execution: Android FGS + TaskManager + lifecycle: OK');
+
+// GPS must be gated by a validated, responding ECU, not app startup or Bluetooth pairing.
+assert(layout.includes('subscribeSharedObdStatus('), 'GPS deve acompanhar mudanças do estado real da ECU');
+assert(layout.includes('getSharedObdStatus().ecuConnected'), 'GPS deve respeitar o estado atual da ECU ao iniciar');
+assert(layout.includes('if (!ecuConnected)'), 'GPS deve ser parado quando a ECU perder resposta');
+assert(!layout.includes('startGps(settings.diagnosticAlerts),'), 'startup não pode iniciar GPS incondicionalmente');
