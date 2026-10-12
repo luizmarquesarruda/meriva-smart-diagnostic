@@ -11,7 +11,12 @@ const sourcePath = path.join(ROOT, 'src/meriva/autosaveIntegration.ts');
 const integrationSource = fs.readFileSync(sourcePath, 'utf8');
 const autoTripSource = fs.readFileSync(path.join(ROOT, 'src/trip/autoTripService.ts'), 'utf8');
 const csvSource = fs.readFileSync(path.join(ROOT, 'src/database/csvLogger.ts'), 'utf8');
+const autosaveManagerSource = fs.readFileSync(path.join(ROOT, 'src/meriva/autosaveManager.ts'), 'utf8');
 
+assert.ok(integrationSource.includes('registerBackgroundPersistenceFlushHandler(() => flushObdPersistence())'),
+  'app-state deve poder drenar a fila de persistência OBD antes de suspender');
+assert.ok(autosaveManagerSource.includes('backgroundPersistenceFlushHandler()'),
+  'transição para segundo plano deve descarregar a fila OBD antes dos CSVs');
 assert.ok(integrationSource.indexOf('recordLivePidQuery(result, source)') < integrationSource.indexOf('await persistObdQuery('),
   'live telemetry must be published before awaited persistence');
 assert.ok(integrationSource.includes('options.deferPersistence'), 'polling must support non-blocking persistence');
