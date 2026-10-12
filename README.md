@@ -10,7 +10,7 @@ Versão: 1.0.1 | Plataforma: Android | Transporte: Bluetooth Classic | ECU: OBD-
 
 O projeto prioriza dados reais, rastreabilidade e diagnóstico explicável. Uma resposta ausente não vira um valor inventado.
 
-O GPS do celular inicia automaticamente ao abrir o aplicativo. Ele fornece velocidade e distância em primeiro plano, mesmo quando a ECU não oferece o PID 015E. A gravação de litros e consumo depende de taxa de combustível OBD válida. Litros consumidos só entram no cálculo quando a ECU fornece uma taxa de combustível válida pelo PID OBD 015E. O GPS sozinho não mede litros. O aplicativo não aceita litros digitados manualmente na tela principal.
+O GPS do celular fornece velocidade e distância desde a abertura do aplicativo. Quando a ECU é validada e o Android concede a permissão necessária, o aplicativo também tenta manter a localização em segundo plano com Foreground Service. A taxa de combustível medida pelo PID 015E tem prioridade; quando ela não está disponível, o código pode estimar a taxa por MAF/MAP com hipóteses explícitas. Estimativa não é medição física do tanque e pode ter viés relevante com etanol; a origem da taxa deve permanecer visível em cada viagem. O GPS sozinho não mede litros.
 
 Bluetooth Classic exige build nativo Android. Expo Go não é o ambiente de validação do transporte.
 
@@ -68,7 +68,7 @@ velocidade / distância
 cálculo km/L somente com litros válidos
 ```
 
-O rastreador é criado uma vez por sessão do aplicativo para continuar ativo enquanto o usuário navega entre as telas. A coleta é de primeiro plano e requer permissão de localização.
+O rastreador é um singleton do layout raiz, então a navegação entre telas não deve criar watchers duplicados. O monitoramento em segundo plano usa `expo-task-manager` + `expo-location` e uma notificação persistente do Android quando iniciado com as permissões necessárias. O comportamento exato com tela apagada depende do ciclo de vida do Android e do fabricante; force-stop não é coberto.
 
 ## Regras de dados
 
@@ -163,3 +163,14 @@ Após a ECU ser validada pelo gate real 010C -> 41 0C, o aplicativo inicia o mon
 Com a tela apagada, o objetivo é manter OBD + histórico + GPS em execução enquanto o Foreground Service estiver ativo. Isso não cobre force-stop/encerramento explícito do app nem garante comportamento idêntico entre fabricantes que impõem políticas próprias de economia de bateria.
 
 O Android solicita localização em segundo plano para esse modo. A notificação persistente identifica que o diagnóstico do veículo está ativo.
+
+
+## Latência da telemetria e persistência de logs
+
+- O caminho de leitura publica a telemetria em memória antes de aguardar persistência secundária.
+- Consultas do loop automático usam gravação em segundo plano para que CSV, confirmação de PIDs e aprendizado não bloqueiem a atualização visual.
+- Os logs RAW e interpretados continuam preservando TX/RX, status, protocolo, latência e origem; as linhas de alta frequência são agrupadas em lotes e descarregadas ao ir para segundo plano.
+- Os comandos do ELM327 continuam serializados. Não executar consultas PID em paralelo no mesmo canal Bluetooth, pois isso pode misturar respostas.
+- PIDs secundários em falha recebem espera progressiva; os PIDs críticos de velocidade/RPM continuam prioritários.
+- O índice JSON de viagens tem escrita temporária validada, backup, serialização por arquivo e deduplicação por ID. Um índice inválido sem backup válido bloqueia nova gravação em vez de apagar silenciosamente o arquivo existente.
+- Esta etapa precisa passar por `npm run validate`, Expo Doctor, build APK Release e teste físico. Nenhum desses resultados deve ser presumido por uma revisão estática.
