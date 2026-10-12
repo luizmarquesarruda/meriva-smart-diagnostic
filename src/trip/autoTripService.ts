@@ -8,6 +8,7 @@ import { RealTripRecorder, shouldFinalizeStoppedTrip } from './tripRecorder';
 import { estimateRangeFromFuelLevel, fuelLevelPercentToLiters, isFuelReserve } from './fuelLevel';
 import { getLivePidTrend, resetLiveTelemetry } from '../obd/liveTelemetry';
 import { estimateFuelRateLph, type FuelRateSource } from '../obd/fuelConsumption';
+import { flushObdPersistence } from '../meriva/autosaveIntegration';
 
 export interface AutoTripServiceState {
   connected: boolean;
@@ -60,7 +61,43 @@ class AutoTripService {
   private telemetryCursor = 0;
   private pollCycleNumber = 0;
   private stoppedSinceMs: number | null = null;
+  private readonly pidFailureCount = new Map<string, number>();
+  private readonly pidNextEligibleAt = new Map<string, number>();
+  private lastFuelRateLph: number | null = null;
+  private lastFuelRateSource: FuelRateSource | null = null;
+  private lastFuelRateAtMs = 0;
   private state: AutoTripServiceState = { ...INITIAL_STATE };
+
+  private canQueryPid(pid: string): boolean {
+    return Date.now() >= (this.pidNextEligibleAt.get(pid) ?? 0);
+  }
+
+  private notePidResult(pid: string, valid: boolean): void {
+    if (valid) {
+      this.pidFailureCount.delete(pid);
+      this.pidNextEligibleAt.delete(pid);
+      return;
+    }
+    const failures = (this.pidFailureCount.get(pid) ?? 0) + 1;
+    this.pidFailureCount.set(pid, failures);
+    const delayMs = Math.min(30_000, 1_000 * (2 ** Math.min(failures - 1, 5)));
+    this.pidNextEligibleAt.set(pid, Date.now() + delayMs);
+  }
+
+  private cacheFuelRate(rateLph: number, source: FuelRateSource): void {
+    if (!Number.isFinite(rateLph) || rateLph < 0) return;
+    this.lastFuelRateLph = rateLph;
+    this.lastFuelRateSource = source;
+    this.lastFuelRateAtMs = Date.now();
+  }
+
+  private resetPollingCaches(): void {
+    this.pidFailureCount.clear();
+    this.pidNextEligibleAt.clear();
+    this.lastFuelRateLph = null;
+    this.lastFuelRateSource = null;
+    this.lastFuelRateAtMs = 0;
+  }
 
   subscribe(listener: Listener): () => void {
     this.listeners.add(listener);
@@ -112,6 +149,7 @@ class AutoTripService {
     this.unsubscribeConnection = null;
     await this.transition;
     await this.stopCurrentLoop();
+    await flushObdPersistence(this.basePath);
     await this.finalizeRecorder();
     this.state = { ...INITIAL_STATE };
     this.emit();
@@ -119,11 +157,13 @@ class AutoTripService {
 
   private async applyConnection(connection: SharedObdConnection | null): Promise<void> {
     await this.stopCurrentLoop();
+    await flushObdPersistence(this.basePath);
     await this.finalizeRecorder();
 
     resetLiveTelemetry();
     this.telemetryCursor = 0;
     this.pollCycleNumber = 0;
+    this.resetPollingCaches();
 
     if (!connection || !this.running) {
       this.state = { ...INITIAL_STATE };
@@ -190,13 +230,14 @@ class AutoTripService {
         let fuelLevelPercent: number | null = null;
         let obdSpeedKmh: number | null = null;
         let rpm: number | null = null;
+        const queriedPidsThisCycle = new Set<string>();
         if (obdSpeedSupported) gpsTracker.setVehicleSpeedHintKmh(null);
 
         // Caminho crítico primeiro: velocidade e RPM alimentam o cockpit e
         // a detecção de movimento antes das consultas secundárias.
         if (obdSpeedSupported) {
           const speedResult = await connection.session.queryPid('010D');
-          await registerObdQuery(this.basePath, speedResult, 'REAL');
+          await registerObdQuery(this.basePath, speedResult, 'REAL', undefined, { deferPersistence: true });
           if (
             speedResult.parsed.status === 'RESPONDEU' &&
             speedResult.parsed.unit === 'km/h' &&
@@ -213,7 +254,7 @@ class AutoTripService {
         // da detecção de motor ligado/desligado.
         if (connection.supportedPids.includes('010C')) {
           const rpmResult = await connection.session.queryPid('010C');
-          await registerObdQuery(this.basePath, rpmResult, 'REAL');
+          await registerObdQuery(this.basePath, rpmResult, 'REAL', undefined, { deferPersistence: true });
           if (
             rpmResult.parsed.status === 'RESPONDEU' &&
             rpmResult.parsed.value != null &&
@@ -225,77 +266,114 @@ class AutoTripService {
 
         // O consumo medido (015E) continua sendo consultado em cada ciclo
         // para manter o indicador responsivo sempre que a ECU o suporta.
-        if (this.state.fuelSupported) {
+        if (this.state.fuelSupported && this.canQueryPid('015E')) {
           const fuelResult = await connection.session.queryPid('015E');
-          await registerObdQuery(this.basePath, fuelResult, 'REAL');
-          if (
+          queriedPidsThisCycle.add('015E');
+          await registerObdQuery(this.basePath, fuelResult, 'REAL', undefined, { deferPersistence: true });
+          const measuredFuelValid = fuelResult.commandStatus === 'OK' &&
             fuelResult.parsed.status === 'RESPONDEU' &&
             fuelResult.parsed.unit === 'L/h' &&
             fuelResult.parsed.value != null &&
             Number.isFinite(fuelResult.parsed.value) &&
-            fuelResult.parsed.value >= 0
-          ) {
+            fuelResult.parsed.value >= 0;
+          this.notePidResult('015E', measuredFuelValid);
+          if (measuredFuelValid) {
             fuelRateLph = fuelResult.parsed.value;
             fuelRateSource = 'MEASURED_015E';
+            this.cacheFuelRate(fuelRateLph, fuelRateSource);
           }
         }
 
         // O nível do tanque muda lentamente: consultar a cada quatro ciclos
         // reduz tráfego serial sem limpar o último valor válido da interface.
-        if (this.state.fuelLevelSupported && this.pollCycleNumber % 4 === 1) {
+        if (this.state.fuelLevelSupported && this.pollCycleNumber % 4 === 1 && this.canQueryPid('012F')) {
           const fuelLevelResult = await connection.session.queryPid('012F');
-          await registerObdQuery(this.basePath, fuelLevelResult, 'REAL');
-          if (
+          queriedPidsThisCycle.add('012F');
+          await registerObdQuery(this.basePath, fuelLevelResult, 'REAL', undefined, { deferPersistence: true });
+          const fuelLevelValid = fuelLevelResult.commandStatus === 'OK' &&
             fuelLevelResult.parsed.status === 'RESPONDEU' &&
             fuelLevelResult.parsed.unit === '%' &&
             fuelLevelResult.parsed.value != null &&
             Number.isFinite(fuelLevelResult.parsed.value) &&
             fuelLevelResult.parsed.value >= 0 &&
-            fuelLevelResult.parsed.value <= 100
-          ) {
-            fuelLevelPercent = fuelLevelResult.parsed.value;
-          }
+            fuelLevelResult.parsed.value <= 100;
+          this.notePidResult('012F', fuelLevelValid);
+          if (fuelLevelValid) fuelLevelPercent = fuelLevelResult.parsed.value;
+          else fuelLevelPercent = this.state.fuelLevelPercent;
         } else {
           fuelLevelPercent = this.state.fuelLevelPercent;
         }
 
-        if (fuelRateLph == null && connection.supportedPids.includes('0110')) {
-          // Não consultar MAF se a ECU não declarou suporte ao PID.
+        const fuelFallbackDue = this.lastFuelRateAtMs === 0 ||
+          Date.now() - this.lastFuelRateAtMs >= 5_000 ||
+          this.pollCycleNumber % 4 === 1;
+
+        if (
+          fuelRateLph == null &&
+          fuelFallbackDue &&
+          connection.supportedPids.includes('0110') &&
+          this.canQueryPid('0110')
+        ) {
+          // Fallback MAF é amostrado com menor cadência que velocidade/RPM.
           const mafResult = await connection.session.queryPid('0110');
-          await registerObdQuery(this.basePath, mafResult, 'REAL');
+          queriedPidsThisCycle.add('0110');
+          await registerObdQuery(this.basePath, mafResult, 'REAL', undefined, { deferPersistence: true });
           const mafGs = mafResult.parsed.status === 'RESPONDEU' ? mafResult.parsed.value : null;
-          if (mafGs != null && Number.isFinite(mafGs) && mafGs >= 0) {
+          const mafValid = mafResult.commandStatus === 'OK' && mafGs != null && Number.isFinite(mafGs) && mafGs >= 0;
+          this.notePidResult('0110', mafValid);
+          if (mafValid) {
             const estimate = estimateFuelRateLph({ mafGs });
             if (estimate) {
               fuelRateLph = estimate.rateLph;
               fuelRateSource = estimate.source;
+              this.cacheFuelRate(fuelRateLph, fuelRateSource);
             }
           }
         }
 
         if (
           fuelRateLph == null &&
+          fuelFallbackDue &&
           connection.supportedPids.includes('010B') &&
           connection.supportedPids.includes('010F') &&
-          connection.supportedPids.includes('010C')
+          connection.supportedPids.includes('010C') &&
+          this.canQueryPid('010B') &&
+          this.canQueryPid('010F')
         ) {
-          // MAP e IAT só são consultados quando ambos foram descobertos.
+          // MAP/IAT nunca competem com as leituras primárias e não repetem PID neste ciclo.
           const mapResult = await connection.session.queryPid('010B');
+          queriedPidsThisCycle.add('010B');
           const iatResult = await connection.session.queryPid('010F');
-          await registerObdQuery(this.basePath, mapResult, 'REAL');
-          await registerObdQuery(this.basePath, iatResult, 'REAL');
+          queriedPidsThisCycle.add('010F');
+          await registerObdQuery(this.basePath, mapResult, 'REAL', undefined, { deferPersistence: true });
+          await registerObdQuery(this.basePath, iatResult, 'REAL', undefined, { deferPersistence: true });
           const mapKpa = mapResult.parsed.status === 'RESPONDEU' ? mapResult.parsed.value : null;
           const intakeAirTempC = iatResult.parsed.status === 'RESPONDEU' ? iatResult.parsed.value : null;
+          const mapValid = mapResult.commandStatus === 'OK' && mapKpa != null && Number.isFinite(mapKpa) && mapKpa > 0;
+          const iatValid = iatResult.commandStatus === 'OK' && intakeAirTempC != null && Number.isFinite(intakeAirTempC);
+          this.notePidResult('010B', mapValid);
+          this.notePidResult('010F', iatValid);
           const estimate = estimateFuelRateLph({
-            mapKpa: mapKpa != null && Number.isFinite(mapKpa) ? mapKpa : null,
+            mapKpa: mapValid ? mapKpa : null,
             rpm,
-            intakeAirTempC: intakeAirTempC != null && Number.isFinite(intakeAirTempC) ? intakeAirTempC : null,
+            intakeAirTempC: iatValid ? intakeAirTempC : null,
             displacementCm3: getAutoSaveState().vehicle?.displacementCm3 ?? 1389,
           });
           if (estimate) {
             fuelRateLph = estimate.rateLph;
             fuelRateSource = estimate.source;
+            this.cacheFuelRate(fuelRateLph, fuelRateSource);
           }
+        }
+
+        // Retain only a very recent valid rate through skipped/backoff cycles.
+        if (
+          fuelRateLph == null &&
+          this.lastFuelRateLph != null &&
+          Date.now() - this.lastFuelRateAtMs <= 5_000
+        ) {
+          fuelRateLph = this.lastFuelRateLph;
+          fuelRateSource = this.lastFuelRateSource ?? undefined;
         }
 
         // Quando 010D existe, o GPS recebe a velocidade da ECU como confirmação.
@@ -303,12 +381,21 @@ class AutoTripService {
 
         // Mantém um PID secundário por ciclo para tendências sem monopolizar o ELM.
         const telemetryCandidates = ['0105', '010B', '0111', '0142'];
-        const supportedTelemetry = telemetryCandidates.filter((item) => connection.supportedPids.includes(item));
+        const supportedTelemetry = telemetryCandidates.filter((pid) =>
+          connection.supportedPids.includes(pid) &&
+          !queriedPidsThisCycle.has(pid) &&
+          this.canQueryPid(pid)
+        );
         if (supportedTelemetry.length > 0) {
           const telemetryPid = supportedTelemetry[this.telemetryCursor % supportedTelemetry.length];
           this.telemetryCursor += 1;
           const telemetryResult = await connection.session.queryPid(telemetryPid);
-          await registerObdQuery(this.basePath, telemetryResult, 'REAL');
+          await registerObdQuery(this.basePath, telemetryResult, 'REAL', undefined, { deferPersistence: true });
+          const telemetryValid = telemetryResult.commandStatus === 'OK' &&
+            telemetryResult.parsed.status === 'RESPONDEU' &&
+            telemetryResult.parsed.value != null &&
+            Number.isFinite(telemetryResult.parsed.value);
+          this.notePidResult(telemetryPid, telemetryValid);
         }
 
         const gps = gpsTracker.getState();
