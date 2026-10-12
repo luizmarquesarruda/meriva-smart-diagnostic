@@ -79,7 +79,7 @@ export interface GpsTripState {
   lastAccuracyM: number | null;
   error: string | null;
   signalQuality: 'SEM_FIX' | 'FRACA' | 'BOA' | 'EXCELENTE';
-  speedSource: 'INDISPONIVEL' | 'GPS' | 'OBD' | 'INDISPONIVEL';
+  speedSource: 'PARADO' | 'GPS' | 'OBD' | 'INDISPONIVEL';
   lastSample: GpsJsonRecord | null;
 }
 
