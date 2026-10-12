@@ -173,7 +173,9 @@ class AutoTripService {
     this.resetPollingCaches();
 
     if (!connection || !this.running) {
-      this.state = { ...INITIAL_STATE };
+      this.state = this.pendingFinalizedCycles.length > 0
+        ? { ...INITIAL_STATE, error: 'VIAGEM PENDENTE DE SALVAMENTO; MANTIDA NA FILA DE RECUPERAÇÃO.' }
+        : { ...INITIAL_STATE };
       this.emit();
       return;
     }
@@ -201,6 +203,9 @@ class AutoTripService {
         ? persistedAutonomy.averageConsumptionKml
         : 0,
       estimatedRangeKm: persistedAutonomy.estimatedRangeKm,
+      error: this.pendingFinalizedCycles.length > 0
+        ? 'VIAGEM PENDENTE DE SALVAMENTO; MANTIDA NA FILA DE RECUPERAÇÃO.'
+        : null,
     };
     this.emit();
 
