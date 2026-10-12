@@ -302,7 +302,7 @@ async function createRealElmSessionAttempt(
     } else {
       pidDiscoverySource = 'ECU';
       try {
-        const discovery = await discoverIntelligentPids(session);
+        const discovery = await discoverIntelligentPids(session, { prevalidatedResults: [ecuProbe] });
         supportedPids = discovery.supportedPids;
       } catch {
         supportedPids = [];
