@@ -122,7 +122,13 @@ export class Elm327Session {
       for (const command of [...mandatory, ...optional]) {
         if (this.disabledOptionalCommands.has(command)) continue;
         let result = await this.command(command);
-        for (let retry = 1; retry < mandatoryAttempts && result.status !== 'OK'; retry += 1) {
+        for (
+          let retry = 1;
+          retry < mandatoryAttempts &&
+          result.status !== 'OK' &&
+          result.status !== 'UNSUPPORTED';
+          retry += 1
+        ) {
           if (command === 'ATZ') {
             await new Promise((resolve) => setTimeout(resolve, 1200));
           } else {
