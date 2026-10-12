@@ -939,6 +939,17 @@ function testPidResponseIsNotVehicleValidation() {
   const integration = fs.readFileSync(path.join(ROOT, 'src/meriva/autosaveIntegration.ts'), 'utf8');
   assert.ok(integration.includes("status: prior?.status === 'CONFIRMADO' && prior.source === 'USER_REAL_OBSERVATION' ? 'CONFIRMADO' : 'RESPONDEU'"), 'resposta válida não deve promover automaticamente PID para confirmado');
   assert.ok(integration.includes('não valida a exatidão física do sensor'), 'o código deve documentar que resposta OBD não comprova exatidão elétrica do sensor');
+
+  const runtime = loadTs(path.join(ROOT, 'src/meriva/autosaveIntegration.ts'));
+  const basePath = '/doc/learning-throttle-regression';
+  assert.strictEqual(runtime.shouldPersistRealPidSample(basePath, '010C', 1000), true);
+  assert.strictEqual(runtime.shouldPersistRealPidSample(basePath, '010C', 2000), false,
+    'mesmo PID não deve regravar aprendizado antes da janela mínima');
+  assert.strictEqual(runtime.shouldPersistRealPidSample(basePath, '010C', 5999), false);
+  assert.strictEqual(runtime.shouldPersistRealPidSample(basePath, '010C', 6000), true,
+    'o PID volta a alimentar o aprendizado quando termina a janela mínima');
+  assert.strictEqual(runtime.shouldPersistRealPidSample(basePath, '0105', 2000), true,
+    'a cadência deve ser independente por PID');
 }
 
 function testStorageScreenDoesNotPromoteSeedOrInvalidFuel() {
