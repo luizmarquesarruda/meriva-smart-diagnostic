@@ -77,6 +77,11 @@
         "BOA",
         "EXCELENTE"
       ]
+    },
+    "sessionId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Identifier for the ECU-connected GPS recording session."
     }
   }
 }
