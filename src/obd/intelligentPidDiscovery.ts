@@ -40,6 +40,8 @@ export async function discoverIntelligentPids(
   const observations: IntelligentPidObservation[] = [];
   const supportResponses: Record<string, string> = {};
   const confidence: Record<string, number> = {};
+  // A bitmap is an advertisement, not proof that a PID returned a valid payload.
+  const bitmapAdvertised = new Set<string>();
   const supported = new Set<string>();
 
   // Fase 1: validar ECU/RPM e velocidade. O comando 010C validado durante a
@@ -113,7 +115,7 @@ export async function discoverIntelligentPids(
       : [];
     bitmapSupport.set(supportPid, mapped);
 
-    for (const pid of mapped) supported.add(pid);
+    for (const pid of mapped) bitmapAdvertised.add(pid);
 
     observations.push({
       pid: supportPid,
@@ -157,7 +159,7 @@ export async function discoverIntelligentPids(
   // desnecessários, inclusive para PIDs que a própria ECU não anunciava.
   const candidates = Array.from(new Set([
     ...confirmedCandidates.map((pid) => pid.replace(/\s/g, '').toUpperCase()),
-    ...Array.from(supported),
+    ...Array.from(bitmapAdvertised),
   ])).filter((pid) =>
     /^01[0-9A-F]{2}$/.test(pid) &&
     KNOWN_PIDS.includes(pid) &&
@@ -181,7 +183,7 @@ export async function discoverIntelligentPids(
       parsed.value !== null &&
       Number.isFinite(parsed.value),
     );
-    const confirmedByBitmap = supported.has(pid);
+    const confirmedByBitmap = bitmapAdvertised.has(pid);
     const pidConfidence = valid ? (confirmedByBitmap ? 1 : 0.85) : confirmedByBitmap ? 0.35 : 0;
 
     if (valid) supported.add(pid);
