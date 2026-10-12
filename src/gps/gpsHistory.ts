@@ -87,9 +87,14 @@ export class GpsHistoryStore {
   private pending: GpsJsonRecord[] = [];
   private queue: Promise<void> = Promise.resolve();
   private lastErrorLoggedAt = 0;
+  private readonly nowProvider: () => number;
 
-  constructor(basePath = FileSystem.documentDirectory ? `${FileSystem.documentDirectory}MERIVA_SMART` : '') {
-    this.basePath = basePath.replace(/\/+$/, '');
+  constructor(
+    basePath = FileSystem.documentDirectory ? `${FileSystem.documentDirectory}MERIVA_SMART` : '',
+    nowProvider: () => number = () => Date.now(),
+  ) {
+    this.basePath = basePath.replace(/\\/+$/, '');
+    this.nowProvider = nowProvider;
   }
 
   configure(basePath: string): void {
@@ -143,7 +148,7 @@ export class GpsHistoryStore {
 
   private async recordUnsafe(sample: GpsJsonRecord, effectiveSpeedKmh: number | null): Promise<void> {
     if (!this.basePath) return;
-    const now = Date.now();
+    const now = this.nowProvider();
     if (!Number.isFinite(sample.timestamp) || sample.timestamp <= 0) return;
     // Avoid persisting cached fixes that arrive long after they were measured.
     if (sample.timestamp < now - MAX_SAMPLE_AGE_MS || sample.timestamp > now + MAX_FUTURE_SKEW_MS) return;
