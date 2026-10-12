@@ -19,7 +19,7 @@ export interface RegisterObdQueryOptions {
 
 const backgroundPersistenceQueues = new Map<string, Promise<void>>();
 const lastBackgroundLearningAt = new Map<string, number>();
-const BACKGROUND_LEARNING_MIN_INTERVAL_MS = 30_000;
+const BACKGROUND_LEARNING_MIN_INTERVAL_MS = 10_000;
 
 async function persistObdQuery(
   basePath: string,
@@ -113,7 +113,7 @@ export async function registerObdQuery(
   const learningCondition = condition ?? (source === 'REAL' ? getVehicleConditionSnapshot().condition : 'UNKNOWN');
 
   if (options.deferPersistence) {
-    // Learning only needs a representative sample per PID every 30 seconds;
+    // Learning only needs a representative sample per PID every 10 seconds.
     // live telemetry and raw CSV evidence still capture every OBD response.
     const learningKey = `${basePath}|${result.parsed.pid}`;
     const now = Date.now();
