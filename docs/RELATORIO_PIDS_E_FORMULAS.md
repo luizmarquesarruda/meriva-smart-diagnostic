@@ -156,3 +156,41 @@ Como a entrada é um inteiro de 16 bits, a faixa matemática da fórmula pode ch
 - [ ] Confirmar CI no head final da PR; depois, validar no aparelho com o ELM327 físico.
 
 **Limitação atual:** este documento é uma auditoria do catálogo e do código versionados. Não representa uma sessão nova de aquisição com a ECU da Meriva nem uma validação elétrica do sensor.
+
+
+---
+
+## 2026-10-12 — Auditoria de velocidade de aquisição, PIDs e persistência
+
+### Comparação com projetos e aplicativos OBD
+
+A comparação foi feita com documentação pública de projetos e fabricantes, não por benchmark físico com o mesmo carro/adaptador:
+
+- **python-OBD** implementa um laço de atualização assíncrono com subscrições (*watch*) e devolve a última resposta conhecida sem bloquear a interface. Referência: https://python-obd.readthedocs.io/en/latest/Async%20Connections/
+- **OBD Auto Doctor** declara que atualiza os sensores em ordem sequencial, tão rápido quanto veículo, adaptador e conexão permitirem; a lista de PIDs mostrada é específica do veículo. Referências: https://www.obdautodoctor.com/features/ e https://www.obdautodoctor.com/help/articles/supported-obd-parameters/
+- **OBDLink** alerta que cada PID marcado para logging precisa ser monitorado continuamente, o que reduz a taxa de atualização dos outros PIDs. Referência: https://support.obdlink.com/support/solutions/articles/43000709894
+- A folha de dados **ELM327L** documenta timing adaptativo baseado nos tempos de resposta medidos do próprio veículo. Isso é preferível a baixar arbitrariamente timeouts fixos; não foi alterado timeout/protocolo da Meriva sem medição de hardware. Referência: https://www.elmelectronics.com/wp-content/uploads/2016/07/ELM327L_Data_Sheet.pdf
+
+**Conclusão:** não se deve paralelizar comandos OBD sobre o mesmo transporte RFCOMM/K-Line, porque o protocolo é request/reply serial. O ganho seguro vem de remover sondas redundantes, respeitar os bitmaps da ECU, não consultar a mesma fonte duas vezes no ciclo e tirar I/O de disco do caminho crítico de leitura.
+
+### Correções efetuadas
+
+- `src/obd/intelligentPidDiscovery.ts`: reutiliza a resposta `010C` já usada para validar a ECU; valida `010D`/outros PIDs com resposta individual antes de adicioná-los ao conjunto operacional; percorre páginas bitmap somente quando o bit de continuação anuncia a próxima página; restringe as sondas a candidatos conhecidos e anunciados/solicitados. Uma bitmap, sozinha, não é tratada como prova de resposta funcional.
+- `src/obd/bluetoothManager.ts`: encaminha a sonda de ECU já obtida para a descoberta, evitando novo round trip idêntico.
+- `src/knowledge/polling_policy.json`: novo contrato versionado para frequência e prioridade. RPM/velocidade seguem no caminho principal; `015E` medido mantém a cadência principal se individualmente suportado; fallback por MAF/MAP e nível `012F` usam cadência de quatro ciclos, com fases diferentes para não concentrar as consultas lentas no mesmo ciclo. Telemetria auxiliar roda em rotação e MAP não é consultado de novo quando já foi usado no fallback do mesmo ciclo.
+- `src/trip/autoTripService.ts`: amostra MAF/MAP com menor frequência; preserva a última leitura de combustível quando uma consulta do PID `012F` falha; valida a unidade `percent` retornada pelo parser (e não o símbolo `%`, que era incompatível com o catálogo); rejeita estimativa baseada em MAF zero; mantém um valor estimado no painel por até 10 segundos, mas só integra no cálculo da viagem a amostra recém-calculada. Não inventa consumo quando os dados não sustentam o cálculo.
+- `app/_layout.tsx` + serviço de viagem: retiram a inicialização GPS independente no arranque; o rastreamento passa a pertencer ao serviço de viagem após ECU conectada/respondendo e é encerrado quando a ECU perde resposta/desconecta. O fechamento GPS é serializado para evitar dois `stop()` concorrentes.
+- `src/database/csvLogger.ts` e `src/database/obdLogger.ts`: respostas brutas e interpretadas são enfileiradas, agrupadas até oito linhas ou um segundo, e escritas em lote. A fila é descarregada em background/inactive, ao desconectar, antes de exportar e antes de limpar logs. Falhas de escrita restauram o lote pendente para nova tentativa.
+- `src/meriva/autosaveIntegration.ts`: mantém cada resposta na trilha CSV, mas limita persistência repetida no banco de PIDs/perfil de aprendizado para uma amostra por PID a cada 5 segundos. Isso reduz gravações redundantes e impede que a cadência de polling seja confundida com confirmação independente.
+- `src/knowledge/polling_policy.json`, `tests/knowledgeJson.test.js`, `tests/regression.test.js`, `tests/fuelConsumption.test.js`, `tests/merivaAutosave.test.js` e `tests/backgroundExecution.test.js`: contrato JSON testado, regressões para MAF zero, descoberta adaptativa, saída de PIDs sem resposta do conjunto operacional, lote CSV, throttle de aprendizado, unidade de `012F`, fases não coincidentes e lifecycle GPS.
+
+### Impacto esperado e limites
+
+- Menos round trips na conexão inicial quando a ECU não anuncia páginas bitmap posteriores ou quando uma sonda já foi feita.
+- Menos trabalho bloqueante de disco por amostra; a telemetria continua enfileirada e os CSVs continuam contendo cada resposta recebida, enquanto o TXT diário continua sendo resumo de sessões.
+- Menos consultas secundárias no ciclo principal e menos disputa entre PIDs lentos.
+- A precisão e a velocidade reais dependem da latência medida da ECU, do ELM327/clone, do protocolo KWP/K-Line e da qualidade do Bluetooth. Nenhum ganho numérico de milissegundos é alegado sem benchmark no mesmo carro e adaptador.
+
+### Validação pendente
+
+A alteração do código/testes não é prova de compilação. A CI deve executar Expo Doctor, TypeScript, a suíte completa de regressão e Android Release APK. Também é obrigatório teste físico na Meriva com a ECU ligada/desligada, observando tempo de conexão, frequência de atualização, manutenção do histórico diário e não acúmulo de GPS sem ECU. Não alterar `ATST`, `ATAT` ou temporizações do protocolo sem registrar latências reais e comparar estabilidade antes/depois.
