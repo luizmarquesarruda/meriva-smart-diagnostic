@@ -41,6 +41,14 @@ interface AutosaveRuntime {
   lastReadingMutationAt: Map<string, number>;
 }
 
+let backgroundPersistenceFlushHandler: (() => Promise<void>) | null = null;
+
+export function registerBackgroundPersistenceFlushHandler(
+  handler: (() => Promise<void>) | null,
+): void {
+  backgroundPersistenceFlushHandler = handler;
+}
+
 const runtime: AutosaveRuntime = {
   basePath: '',
   state: createEmptyMerivaState(),
@@ -237,9 +245,13 @@ async function initAutoSaveUnsafe(basePath: string): Promise<MerivaPersistedStat
       (status: AppStateStatus) => {
         if (status !== 'active') {
           if (runtime.dirty) void saveNow('background');
-          // Drain batched OBD evidence before Android suspends the JS runtime.
-          void flushBufferedCsvRows().catch((cause) => {
-            console.warn('[autosave] falha ao descarregar CSV OBD em segundo plano:', cause instanceof Error ? cause.message : cause);
+          // Drain queued PID-bank/learning work first, then the buffered CSVs,
+          // before Android suspends the JavaScript runtime.
+          const flush = backgroundPersistenceFlushHandler
+            ? backgroundPersistenceFlushHandler()
+            : flushBufferedCsvRows();
+          void flush.catch((cause) => {
+            console.warn('[autosave] falha ao descarregar evidências OBD em segundo plano:', cause instanceof Error ? cause.message : cause);
           });
         }
       },
