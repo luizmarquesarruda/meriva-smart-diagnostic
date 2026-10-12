@@ -35,7 +35,7 @@
     ]
   },
   "invariants": [
-    "Consultar somente PIDs com suporte declarado pela ECU e validação individual positiva na sessão.",
+    "Exceto o PID 010C usado como gate de resposta real da ECU, consultar somente PIDs anunciados pela bitmap atual e validar a resposta individual na sessão.",
     "Somente uma estimativa recém-calculada pode alimentar a integração de combustível da viagem.",
     "Uma estimativa em cache pode ser exibida por até displayStaleAfterMs, mas não pode ser integrada novamente.",
     "PIDs usados no cálculo de consumo não devem ser consultados novamente no mesmo ciclo para telemetria rotativa.",
