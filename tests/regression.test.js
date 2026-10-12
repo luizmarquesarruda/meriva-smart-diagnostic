@@ -33,6 +33,7 @@ function loadTs(tsPath) {
 const files = new Map();
 const dirs = new Set(['/doc']);
 let writeDelayMs = 0;
+let failReadPath = null;
 let bluetoothListener = null;
 let bluetoothDisconnectListener = null;
 let fakeDeviceConnected = true;
@@ -62,6 +63,7 @@ function resetFS() {
   dirs.clear();
   dirs.add('/doc');
   writeDelayMs = 0;
+  failReadPath = null;
 }
 
 const fakeFS = {
@@ -87,6 +89,10 @@ const fakeFS = {
   },
 
   async readAsStringAsync(p) {
+    if (failReadPath === p) {
+      failReadPath = null;
+      throw new Error('READ IO FAILURE: ' + p);
+    }
     if (!files.has(p)) throw new Error('ARQUIVO NAO EXISTE: ' + p);
     return files.get(p);
   },
@@ -663,6 +669,21 @@ async function testRawLogger() {
   assert.ok(interpreted.includes('010C,41 0C 1A F8'));
   assert.ok(interpreted.includes('010C,41 0C 0F A0'));
   assert.strictEqual(interpreted.trim().split('\n').length, 3, 'o flush deve preservar todas as amostras interpretadas');
+  const thirdQuery = {
+    ...secondQuery,
+    rx: '41 0C 20 00',
+    parsed: parser.parsePidResponse('010C', '41 0C 20 00'),
+  };
+  await logger.logRawObdData(BASE, thirdQuery, '010C', 'REAL');
+  await logger.logInterpretedData(BASE, thirdQuery, '010C', 'REAL');
+  failReadPath = rawFile;
+  await assert.rejects(() => csvLogger.flushCsvLogs(), /READ IO FAILURE/,
+    'falha de leitura deve permanecer explícita e não descartar o lote');
+  await csvLogger.flushCsvLogs();
+  const rawAfterRetry = files.get(rawFile);
+  const interpretedAfterRetry = files.get(interpretedFile);
+  assert.ok(rawAfterRetry.includes('010C,41 0C 20 00'), 'lote raw deve permanecer pendente e ser gravado na tentativa seguinte');
+  assert.ok(interpretedAfterRetry.includes('010C,41 0C 20 00'), 'lote interpretado deve permanecer pendente e ser gravado na tentativa seguinte');
   assert.ok(interpreted.includes('ISO 14230-4 (KWP FAST)'));
 }
 
