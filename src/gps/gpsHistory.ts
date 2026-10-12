@@ -242,7 +242,12 @@ export class GpsHistoryStore {
     }
 
     // The daily TXT becomes the human-readable index; raw points remain in bounded JSONL segments.
-    void appendDailyGpsHistoryIndex(this.basePath, day).catch((cause) => this.reportError(cause));
+    try {
+      await appendDailyGpsHistoryIndex(this.basePath, day);
+    } catch (cause) {
+      // An index failure must never disable or block the GPS sample journal.
+      this.reportError(cause);
+    }
   }
 
   private scheduleFlush(): void {
