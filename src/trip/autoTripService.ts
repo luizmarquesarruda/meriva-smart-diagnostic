@@ -314,7 +314,7 @@ class AutoTripService {
         const gps = gpsTracker.getState();
         const vehicleSpeedKmh = obdSpeedKmh ?? gps.currentSpeedKmh;
         // If RPM is temporarily unavailable, valid vehicle speed is still movement evidence.
-        const moving = vehicleSpeedKmh > 0 && (rpm == null || rpm > 0);
+        const moving = vehicleSpeedKmh != null && vehicleSpeedKmh > 0 && (rpm == null || rpm > 0);
 
         if (moving) {
           this.stoppedSinceMs = null;
@@ -342,7 +342,7 @@ class AutoTripService {
           const sampleState = recorder.addSample({
             timestampMs: Date.now(),
             distanceKm: tripGps.distanceKm,
-            speedKmh: tripVehicleSpeedKmh,
+            speedKmh: tripVehicleSpeedKmh ?? 0,
             fuelRateLph,
             fuelRateSource,
             rpm: (() => { const trend = getLivePidTrend('010C'); return trend && trend.ageSeconds <= 10 ? trend.current : null; })(),
