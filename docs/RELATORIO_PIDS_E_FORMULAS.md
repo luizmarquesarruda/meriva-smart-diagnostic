@@ -268,3 +268,10 @@ Regras implementadas:
 ### Limite de evidência
 
 O TXT traz leituras e viagens incompletas; não constitui benchmark do tempo de resposta da ECU. As alterações foram cobertas por novos testes de contrato/regressão, mas precisam da CI para verificar o commit final e de uma captura física comparável para quantificar qualquer ganho de latência. Médias de viagem abaixo do limiar de combustível válido continuam marcadas como indisponíveis, não convertidas em zero nem publicadas como consumo confiável.
+
+
+### Complemento de performance — autosave das leituras
+
+A auditoria adicional encontrou que o limite de persistência de 10 s cobria leituras idênticas, mas uma alteração constante de valor (por exemplo, RPM/velocidade) ainda fazia cada consulta disparar uma gravação completa. `pushLastReading` agora sempre atualiza a última leitura em memória, mas persiste mudanças numéricas ordinárias uma vez por PID por janela de 10 s. PIDs novos e mudanças de status/unidade/origem permanecem imediatas. Ao entrar em background, o serviço compara o fingerprint entre o estado em memória e o último snapshot gravado para salvar a leitura mais recente ainda não persistida. O CSV bruto/interpretado continua mantendo cada consulta real.
+
+Regressão adicionada: mudar o mesmo PID dentro da janela altera o cache imediato, não regrava o JSON; o evento background salva o último valor; após vencer a janela, a próxima amostra volta a ser persistida.
