@@ -5,6 +5,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const configPath = path.join(ROOT, 'src', 'knowledge', 'bluetooth_config.json');
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+assert.strictEqual(config.schemaVersion, 2, 'mudança do contrato JSON exige versão explícita');
 
 assert.strictEqual(config.adapterProfile, 'ELM327_MINI_GENERICO');
 assert.strictEqual(config.transport.type, 'BLUETOOTH_CLASSIC_RFCOMM_SPP');
