@@ -320,3 +320,37 @@ Esta alteração reduz a pior espera provocada por comandos AT locais que não r
 
 ### Validação
 As regressões foram atualizadas, mas **não foi executada CI** conforme a instrução desta etapa. A alteração deve ser validada localmente/na próxima CI autorizada antes de ser considerada pronta para uso físico.
+
+
+## 2026-10-13 — Nova auditoria: latência de polling, combustível e integridade
+
+### O que o TXT real demonstrou
+
+O arquivo de autosave enviado tinha 205 blocos, porém 200 números únicos; os números 262–266 reapareciam após o 302. O código passou a deduplicar registros antigos por número e a serializar o ciclo de leitura/atualização/escrita do histórico. O arquivo local será normalizado no próximo append de autosave; não foi possível modificá-lo remotamente no telefone.
+
+### O que foi comparado externamente
+
+- [python-OBD Async Connections](https://github.com/tkaracan/python-OBD/blob/master/docs/Async%20Connections.md): a interface consulta o último valor de um loop assíncrono de atualização; isso reduz espera da UI, mas não diminui magicamente a latência física do PID.
+- [OBDLink logging](https://support.obdlink.com/support/solutions/articles/43000709894): cada PID monitorado compete por tempo de aquisição; logging por PID-frame evita produzir diversas linhas repetidas quando a taxa desejada excede a taxa real.
+- [Car Scanner connection speed](https://www.carscanner.info/optimizing-connection-speed/): diminuir a lista de sensores aumenta a frequência por sensor; a otimização específica para CAN não deve ser aplicada à sessão K-Line sem suporte técnico.
+
+### Correções confirmadas no código
+
+1. **Fila serial do ELM327 preservada.** A sessão permanece request/reply; não é correto executar comandos PID em paralelo pelo mesmo RFCOMM/K-Line. A descoberta reaproveita a resposta do gate `010C`, percorre somente bitmaps anunciadas e consulta cada PID candidato uma vez para confirmar resposta.
+2. **Trabalho de disco removido da parte lenta de aprendizado.** `registerObdQuery` continua enfileirando as amostras RAW/interpretadas e atualizando a telemetria e a última leitura em memória. A persistência do banco e do perfil de aprendizado corre em uma fila serializada própria; isso reduz o tempo que cada volta do polling fica aguardando JSON read-modify-write.
+3. **Timeout de inicialização controlado por JSON.** Comandos AT locais opcionais têm limite padrão de 2500 ms e não são tentados repetidamente em falhas transitórias; `ATZ` continua obrigatório e `ATSP0` conserva até 15000 ms para negociação. Os contratos foram versionados e testados.
+4. **Combustível específico e composição FLEX.** O estimador MAF/MAP utiliza a opção ETANOL/GASOLINA; FLEX exige composição válida do PID 0152 quando não há taxa medida disponível. PID 015E medido mantém precedência. Os parâmetros AFR/densidade são aproximações de referência e ainda não foram calibrados no veículo.
+5. **Integridade temporal dos logs.** CSV RAW e interpretado agora usam a mesma data local do aparelho no nome do arquivo; timestamps das amostras continuam ISO UTC.
+6. **Integrador de combustível.** Uma amostra com timestamp anterior à referência atual não pode recuar a linha de base nem modificar o total integrado.
+7. **Histórico autosave.** Deduplicação legada e fila read-modify-write impedem novas colisões de número entre o autosave e uma exportação simultânea.
+
+### Limites da otimização
+
+A alteração da fila de aprendizado visa reduzir espera no caminho crítico, mas não foi medida em milissegundos neste dispositivo. A frequência dos dados continua limitada por: ECU KWP/K-Line, adaptador ELM327, Bluetooth, timeout/resposta da consulta e número de PIDs solicitados. Não se deve alegar fator de aceleração antes de uma comparação empírica com o mesmo conjunto de PIDs e as mesmas condições do motor.
+
+### Verificações obrigatórias
+
+- CI verde no commit final (TypeScript, regressões completas, Expo Doctor e build APK Android).
+- No Meriva físico: tempo de início até a primeira resposta válida `010C`, intervalo entre respostas `010D` e `010C`, taxa de falha `NO DATA`/timeout e cadência do PID rotativo.
+- Teste de consumo com combustível explicitamente selecionado e, para FLEX, somente com PID 0152 confirmado. Comparar a taxa `015E` quando disponível com estimativa MAF/MAP, registrando a diferença.
+- Confirmar que o autosave exportado após a atualização contém até 200 números únicos, em ordem, sem blocos repetidos.
