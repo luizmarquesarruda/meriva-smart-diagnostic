@@ -51,7 +51,7 @@ export async function logInterpretedData(
   pid: string,
   source: 'REAL' | 'SIMULACAO',
 ): Promise<void> {
-  const today = new Date().toISOString().split('T')[0];
+  const today = getObdLogLocalDateKey();
   const fileName = `obd_interpreted_${today}.csv`;
   const filePath = `${basePath}/LOGS/${fileName}`;
 
