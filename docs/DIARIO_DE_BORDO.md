@@ -2296,3 +2296,15 @@ Conclusão: interfaces assíncronas melhoram a disponibilidade do último valor,
 - Esta entrada de diário será o commit final da rodada e deve disparar a CI automática por `push`.
 - **A validação TypeScript/testes/Expo Doctor/build APK ainda está pendente para este commit** até a execução aparecer concluída no GitHub Actions. Não declarar sucesso antecipado.
 - Não há benchmark de latência físico novo. Após a CI, validar com o Meriva/ELM327 real: tempo até primeira resposta `010C`, intervalo de `010D`/`010C`, taxa de `NO DATA`, consistência de PID 0152/015E e número de blocos únicos no TXT exportado.
+
+
+### Registro adicional — resultado e correção da CI #1925
+
+- Execução: https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/38342099678
+- `npm ci`: sucesso.
+- Expo Doctor: **17/17** checks aprovados.
+- TypeScript: sucesso.
+- Suíte de testes: os novos testes de throttle de autosave, deduplicação/concorrência, combustível por tipo, logger diário e contratos JSON passaram.
+- Uma única regressão antiga falhou em `tests/regression.test.js`: a asserção verificava a frase em português `não valida a exatidão física do sensor`; uma refatoração anterior havia deixado a mesma explicação somente em inglês. O comportamento funcional não falhou, mas a documentação do contrato local ficou incompatível com a regressão.
+- Correção: restaurado em `src/meriva/autosaveIntegration.ts` o comentário em português que explicita que resposta OBD válida não comprova exatidão elétrica do sensor. Commit `e67ed815`.
+- A CI #1925 não chegou ao build Android porque `validate` falhou na asserção de texto. O próximo commit desta documentação inicia a CI #1926 para verificar exatamente a correção e o build; ainda não declarar a rodada validada até essa execução terminar verde.
