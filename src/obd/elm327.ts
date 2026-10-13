@@ -150,8 +150,8 @@ export class Elm327Session {
           await new Promise((resolve) => setTimeout(resolve, 1000));
         }
 
-        // ATI/ATZ prove that the adapter is alive. Other AT commands are
-        // best-effort because real-world ELM327 clones expose different subsets.
+        // Only ATZ is a connection gate. ATI is diagnostic metadata, while
+        // all other AT commands are best-effort because clones expose different subsets.
         if (mandatory.includes(command) && result.status !== 'OK') {
           throw new Error(`ELM NÃO RESPONDEU CORRETAMENTE A ${command}: ${result.status}`);
         }
