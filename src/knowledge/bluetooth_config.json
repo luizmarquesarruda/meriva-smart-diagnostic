@@ -3,7 +3,10 @@
   "adapterProfile": "ELM327_MINI_GENERICO",
   "transport": {
     "type": "BLUETOOTH_CLASSIC_RFCOMM_SPP",
-    "socketModes": ["INSECURE", "SECURE"],
+    "socketModes": [
+      "INSECURE",
+      "SECURE"
+    ],
     "connectionType": "delimited",
     "delimiter": "",
     "charset": "ascii"
@@ -18,7 +21,13 @@
     "responsePrefix": "41 0C"
   },
   "initialization": {
-    "required": ["ATZ"],
-    "optional": ["ATI"]
+    "required": [
+      "ATZ"
+    ],
+    "optional": [
+      "ATI"
+    ],
+    "optionalCommandTimeoutMs": 2500,
+    "protocolSelectionTimeoutMs": 15000
   }
 }
