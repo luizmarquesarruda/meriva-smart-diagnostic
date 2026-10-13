@@ -9,6 +9,8 @@ import { estimateRangeFromFuelLevel, fuelLevelPercentToLiters, isFuelReserve } f
 import { getLivePidTrend, resetLiveTelemetry } from '../obd/liveTelemetry';
 import { estimateFuelRateLph, type FuelRateSource } from '../obd/fuelConsumption';
 import { startBackgroundMonitoring } from '../gps/backgroundMonitoring';
+import { readAppSettings, subscribeAppSettings } from '../database/appSettings';
+import type { FuelType } from '../database/appSettings';
 import pollingPolicy from '../knowledge/polling_policy.json';
 
 export interface AutoTripServiceState {
@@ -68,6 +70,9 @@ class AutoTripService {
   private stoppedSinceMs: number | null = null;
   private gpsStartedForEcu = false;
   private lastEstimatedFuelRate: { rateLph: number; source: FuelRateSource; timestampMs: number } | null = null;
+  private fuelType: FuelType = 'FLEX';
+  private lastFuelEthanolPercent: number | null = null;
+  private unsubscribeAppSettings: (() => void) | null = null;
   private state: AutoTripServiceState = { ...INITIAL_STATE };
 
   subscribe(listener: Listener): () => void {
@@ -92,6 +97,16 @@ class AutoTripService {
   async start(basePath: string): Promise<void> {
     if (this.running) return;
     this.basePath = basePath;
+    const settings = await readAppSettings(basePath);
+    this.fuelType = settings.fuelType;
+    this.unsubscribeAppSettings?.();
+    this.unsubscribeAppSettings = subscribeAppSettings((nextSettings) => {
+      if (nextSettings.fuelType !== this.fuelType) {
+        this.fuelType = nextSettings.fuelType;
+        this.lastFuelEthanolPercent = null;
+        this.lastEstimatedFuelRate = null;
+      }
+    });
     const persisted = await initAutoSave(basePath);
     this.state = {
       ...this.state,
@@ -118,6 +133,8 @@ class AutoTripService {
     this.generation += 1;
     this.unsubscribeConnection?.();
     this.unsubscribeConnection = null;
+    this.unsubscribeAppSettings?.();
+    this.unsubscribeAppSettings = null;
     await this.transition;
     await this.stopCurrentLoop();
     await this.stopGpsForEcu();
@@ -139,6 +156,7 @@ class AutoTripService {
     this.telemetryCursor = 0;
     this.pollCycleNumber = 0;
     this.lastEstimatedFuelRate = null;
+    this.lastFuelEthanolPercent = null;
 
     if (!connection || !this.running) {
       this.state = { ...INITIAL_STATE };
@@ -287,6 +305,30 @@ class AutoTripService {
           fuelLevelPercent = this.state.fuelLevelPercent;
         }
 
+        // FLEX composition is stable and expensive enough to keep off the hot
+        // path; sample it rarely, only when the ECU bitmap announces PID 0152.
+        // Without a valid composition reading, do not silently estimate as gasoline.
+        const fuelCompositionPolicy = pollingPolicy.polling.fuelComposition;
+        if (
+          !this.state.fuelSupported &&
+          this.fuelType === 'FLEX' &&
+          connection.supportedPids.includes(fuelCompositionPolicy.pid) &&
+          this.pollCycleNumber % fuelCompositionPolicy.everyCycles === fuelCompositionPolicy.phase
+        ) {
+          const compositionResult = await connection.session.queryPid(fuelCompositionPolicy.pid);
+          await registerObdQuery(this.basePath, compositionResult, 'REAL');
+          if (
+            compositionResult.parsed.status === 'RESPONDEU' &&
+            compositionResult.parsed.unit === 'percent' &&
+            compositionResult.parsed.value != null &&
+            Number.isFinite(compositionResult.parsed.value) &&
+            compositionResult.parsed.value >= 0 &&
+            compositionResult.parsed.value <= 100
+          ) {
+            this.lastFuelEthanolPercent = compositionResult.parsed.value;
+          }
+        }
+
         if (fuelRateLph == null && fuelEstimateDue && connection.supportedPids.includes('0110')) {
           // MAF é estimativa secundária: amostrar a cada quatro ciclos reduz tráfego
           // K-Line. Só valores positivos produzem estimativa de taxa de combustível.
@@ -294,7 +336,7 @@ class AutoTripService {
           await registerObdQuery(this.basePath, mafResult, 'REAL');
           const mafGs = mafResult.parsed.status === 'RESPONDEU' ? mafResult.parsed.value : null;
           const estimate = mafGs != null && Number.isFinite(mafGs)
-            ? estimateFuelRateLph({ mafGs })
+            ? estimateFuelRateLph({ mafGs, fuelType: this.fuelType, ethanolPercent: this.lastFuelEthanolPercent })
             : null;
           if (estimate) {
             fuelRateLph = estimate.rateLph;
@@ -330,6 +372,8 @@ class AutoTripService {
             rpm,
             intakeAirTempC: intakeAirTempC != null && Number.isFinite(intakeAirTempC) ? intakeAirTempC : null,
             displacementCm3: getAutoSaveState().vehicle?.displacementCm3 ?? 1389,
+            fuelType: this.fuelType,
+            ethanolPercent: this.lastFuelEthanolPercent,
           });
           if (estimate) {
             fuelRateLph = estimate.rateLph;
