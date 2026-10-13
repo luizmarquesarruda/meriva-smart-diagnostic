@@ -121,20 +121,25 @@ export class Elm327Session {
 
       for (const command of [...mandatory, ...optional]) {
         if (this.disabledOptionalCommands.has(command)) continue;
-        let result = await this.command(command);
+        // ATZ is the only mandatory initialization command and the only one
+        // retried. Local optional AT commands should fail fast instead of
+        // stalling the whole connection for multiple full I/O timeouts.
+        // ATSP0 keeps the full timeout because cheap K-Line adapters may need
+        // several seconds to negotiate the protocol.
+        const optionalTimeoutMs = !mandatory.includes(command) && command !== 'ATSP0'
+          ? 2500
+          : undefined;
+        let result = await this.command(command, 1, optionalTimeoutMs);
         for (
           let retry = 1;
+          mandatory.includes(command) &&
           retry < mandatoryAttempts &&
           result.status !== 'OK' &&
           result.status !== 'UNSUPPORTED';
           retry += 1
         ) {
-          if (command === 'ATZ') {
-            await new Promise((resolve) => setTimeout(resolve, 1200));
-          } else {
-            await new Promise((resolve) => setTimeout(resolve, 350));
-          }
-          result = await this.command(command, retry + 1);
+          await new Promise((resolve) => setTimeout(resolve, 1200));
+          result = await this.command(command, retry + 1, optionalTimeoutMs);
         }
         results.push(result);
 
@@ -302,7 +307,7 @@ export class Elm327Session {
     return previous.then(operation).finally(() => release());
   }
 
-  private async command(command: string, attempt = 1): Promise<ElmCommandResult> {
+  private async command(command: string, attempt = 1, timeoutOverrideMs?: number): Promise<ElmCommandResult> {
     if (!this.opened) throw new Error('ELM NÃO INICIALIZADO');
 
     const started = Date.now();
@@ -315,9 +320,11 @@ export class Elm327Session {
       // ATSP0 can spend several seconds searching protocols on inexpensive
       // ELM327 v1.5 clones. Keep the generic adaptive timeout, but never let
       // protocol auto-detection expire before the configured I/O ceiling.
-      const timeout = command === 'ATSP0'
-        ? this.config.ioTimeoutMs
-        : (this.config.adaptiveTiming ? this.adaptiveTimeoutMs : this.config.ioTimeoutMs);
+      const timeout = timeoutOverrideMs != null
+        ? Math.min(this.config.ioTimeoutMs, Math.max(1000, timeoutOverrideMs))
+        : command === 'ATSP0'
+          ? this.config.ioTimeoutMs
+          : (this.config.adaptiveTiming ? this.adaptiveTimeoutMs : this.config.ioTimeoutMs);
       const response = await this.transport.readUntilPrompt(timeout);
       const normalizedResponse = normalizeElmResponse(response);
       const status = classifyResponse(normalizedResponse);
