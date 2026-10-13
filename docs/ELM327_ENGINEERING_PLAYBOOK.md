@@ -294,3 +294,29 @@ O ciclo executa no máximo o limite efetivo configurado; o padrão seguro é 20 
 ### Retry rápido para comando opcional não suportado — 2026-10-12
 
 Quando um comando AT opcional retorna `UNSUPPORTED`, repetir o mesmo comando não oferece nova informação e só acrescenta latência de inicialização. `Elm327Session.performInitialize()` agora interrompe os retries deste caso explícito. `TIMEOUT` e `ERROR` mantêm a política de repetição limitada porque podem ser transitórios. Foi adicionada uma regressão com transporte falso que responde `?` para `ATI` e verifica uma única tentativa. Não foram alterados o reset obrigatório `ATZ`, os atrasos de assentamento do firmware, o protocolo KWP ou ATST.
+
+
+## 2026-10-13 — Timeout de inicialização sem bloquear a conexão
+
+### Evidência e comparação
+Implementações abertas consultadas:
+- `python-OBD` separa a aquisição contínua da interface por meio de uma conexão assíncrona e callbacks/watchers: https://github.com/tkaracan/python-OBD/blob/master/docs/Async%20Connections.md
+- `Free_OBD` organiza o transporte por uma fila serializada de comandos, separa comandos AT de comandos OBD e usa bitmap para descoberta: https://github.com/3badguys/Free_OBD
+- `AndroidOBD` executa cada comando sobre um socket Bluetooth, calcula o PID após a resposta e deixa clara a dependência da transação serial: https://github.com/barnhill/AndroidOBD
+- `obd-scanner-android` separa os fluxos Dashboard, Diagnostics e Telemetry e define cadências diferentes por grupo de sensor: https://github.com/ETSoftwareStudio/obd-scanner-android
+
+A regra comum é não permitir que uma operação opcional de inicialização bloqueie a sessão inteira e manter apenas um comando em voo sobre RFCOMM/K-Line. Não se deve paralelizar consultas OBD no mesmo ELM327: isso mistura respostas e não aumenta a taxa física do barramento.
+
+### Correção implementada nesta branch
+- Somente `ATZ`, comando obrigatório, conserva tentativas de recuperação.
+- Comandos AT locais opcionais (`ATI`, `ATE0`, `ATL0`, `ATS0`, `ATH1`) usam timeout curto configurável de **2500 ms** e não são repetidos em erro/timeout.
+- `ATSP0` mantém timeout de negociação configurável de **15000 ms**, mas não entra em três tentativas completas.
+- A aplicação continua validando a ECU por resposta OBD real de `010C`; ATI e comandos de configuração opcionais não passam a ser requisitos de conexão.
+- Os limites são configurados em `src/knowledge/bluetooth_config.json`, normalizados em `src/obd/elm327Compatibility.ts` e aplicados pelo `src/obd/bluetoothManager.ts`.
+- Testes adicionados para timeout curto, timeout completo de seleção de protocolo, valores default e falha transitória de comando opcional sem retry.
+
+### Limites e segurança
+Esta alteração reduz a pior espera provocada por comandos AT locais que não respondem; não garante menor latência em toda conexão e não altera os tempos de `ATZ`, a negociação K-Line ou a cadência dos PIDs em sessão. Não ajustar `ATST`/timing do barramento sem medição real no Meriva/ELM327.
+
+### Validação
+As regressões foram atualizadas, mas **não foi executada CI** conforme a instrução desta etapa. A alteração deve ser validada localmente/na próxima CI autorizada antes de ser considerada pronta para uso físico.
