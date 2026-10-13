@@ -191,3 +191,8 @@ A revisão cruzou código, catálogos JSON, testes e o TXT de autosaves fornecid
 - [Car Scanner — otimização da velocidade](https://www.carscanner.info/optimizing-connection-speed/): lista extensa de sensores reduz a frequência de cada um. As otimizações de até 6× mencionadas são específicas de CAN e não foram transplantadas para a K-Line da Meriva.
 
 **Limite da validação:** esta rodada não tem uma nova medição cronometrada no Meriva/ELM327 físico. A CI é necessária para validar TypeScript, testes e build nativo; a avaliação física deve comparar os mesmos PIDs, adaptador, motor e condição de conexão antes/depois.
+
+
+### Throttle do autosave de telemetria
+
+As últimas leituras em memória são atualizadas a cada resposta; mudanças contínuas de RPM/velocidade não regravam todo o autosave e o histórico TXT a cada ciclo. A persistência ordinária por PID fica limitada a uma vez por 10 segundos; PID novo e mudanças de status/unidade/origem são persistidos imediatamente. Ao sair para background, o app compara o fingerprint do estado para descarregar também valores em memória que ainda não venceram a janela. A fila CSV continua preservando cada amostra real.
