@@ -76,6 +76,15 @@ assert.deepStrictEqual(integrator.addSample(0, 1000), {
 assertApprox(integrator.addSample(20, 2000).fuelUsedL, 0.002777777777777778, 1e-12);
 assertApprox(integrator.addSample(-1, 3000).fuelUsedL, 0.002777777777777778, 1e-12);
 integrator.reset();
+integrator.addSample(10, 2000);
+const beforeOutOfOrder = integrator.getState();
+assert.deepStrictEqual(integrator.addSample(100, 1500), beforeOutOfOrder,
+  'sample com timestamp antigo deve ser ignorada sem rebobinar o integrador');
+assert.strictEqual(integrator.getState().lastTimestampMs, 2000,
+  'timestamp de referência deve continuar monotônico');
+assertApprox(integrator.addSample(10, 3000).fuelUsedL, 10 / 3600, 1e-12,
+  'amostra válida após timestamp antigo deve integrar apenas o intervalo correto');
+integrator.reset();
 assert.strictEqual(integrator.getState().fuelUsedL, 0);
 
 console.log('PASS combustível OBD: integração L/h, intervalos e dados inválidos');
