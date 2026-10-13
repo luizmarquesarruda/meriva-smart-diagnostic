@@ -85,6 +85,11 @@ function main() {
   assert.strictEqual(polling.measuredFuelRate.everyCycles, 1, 'taxa de combustível medida deve continuar na cadência principal');
   assert.ok(Number.isInteger(polling.estimatedFuelRate.everyCycles) && polling.estimatedFuelRate.everyCycles >= 2);
   assert.ok(Number.isInteger(polling.fuelLevel.everyCycles) && polling.fuelLevel.everyCycles >= 2);
+  assert.strictEqual(polling.fuelComposition.pid, '0152', 'composição FLEX usa o PID padrão de percentual de etanol');
+  assert.ok(Number.isInteger(polling.fuelComposition.everyCycles) && polling.fuelComposition.everyCycles >= 10,
+    'composição do combustível deve usar cadência baixa para não atrasar PIDs críticos');
+  assert.ok(Number.isInteger(polling.fuelComposition.phase) && polling.fuelComposition.phase >= 0 &&
+    polling.fuelComposition.phase < polling.fuelComposition.everyCycles);
   assert.ok(Number.isInteger(polling.estimatedFuelRate.phase) && polling.estimatedFuelRate.phase >= 0 && polling.estimatedFuelRate.phase < polling.estimatedFuelRate.everyCycles);
   assert.ok(Number.isInteger(polling.fuelLevel.phase) && polling.fuelLevel.phase >= 0 && polling.fuelLevel.phase < polling.fuelLevel.everyCycles);
   assert.notStrictEqual(polling.estimatedFuelRate.phase, polling.fuelLevel.phase,
@@ -99,6 +104,7 @@ function main() {
     polling.estimatedFuelRate.mapPid,
     polling.estimatedFuelRate.intakeAirTempPid,
     polling.fuelLevel.pid,
+    polling.fuelComposition.pid,
     ...polling.rotatingTelemetryPids,
   ];
   for (const id of policyPids) {
