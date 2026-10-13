@@ -2308,3 +2308,12 @@ Conclusão: interfaces assíncronas melhoram a disponibilidade do último valor,
 - Uma única regressão antiga falhou em `tests/regression.test.js`: a asserção verificava a frase em português `não valida a exatidão física do sensor`; uma refatoração anterior havia deixado a mesma explicação somente em inglês. O comportamento funcional não falhou, mas a documentação do contrato local ficou incompatível com a regressão.
 - Correção: restaurado em `src/meriva/autosaveIntegration.ts` o comentário em português que explicita que resposta OBD válida não comprova exatidão elétrica do sensor. Commit `e67ed815`.
 - A CI #1925 não chegou ao build Android porque `validate` falhou na asserção de texto. O próximo commit desta documentação inicia a CI #1926 para verificar exatamente a correção e o build; ainda não declarar a rodada validada até essa execução terminar verde.
+
+
+### Registro adicional — CI #1926 repetiu a falha de contrato textual
+
+- Execução: https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/38342200992
+- Instalação, Expo Doctor e TypeScript passaram; os testes de autosave e o restante da regressão passaram, mas a mesma asserção de `testPidResponseIsNotVehicleValidation` falhou.
+- A causa foi a diferença literal entre o comentário em português e a frase exigida pelo teste. A frase foi alinhada ao contrato existente, sem alterar a regra funcional: uma resposta positiva válida comprova resposta do PID, não exatidão física/elétrica do sensor.
+- Commit da correção textual: `54548936`.
+- Esta atualização de diário dispara a CI seguinte (#1927 esperada) para validar o head corrigido e executar o build Android; até essa execução acabar verde, a rodada permanece **não validada por CI**.
