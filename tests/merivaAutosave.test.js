@@ -154,8 +154,14 @@ function createMemoryFS() {
 }
 
 // ---------- stub react-native ----------
+const appStateListeners = new Set();
 const fakeRN = {
-  AppState: { addEventListener: () => ({ remove() {} }) },
+  AppState: {
+    addEventListener: (_event, listener) => {
+      appStateListeners.add(listener);
+      return { remove: () => appStateListeners.delete(listener) };
+    },
+  },
   Platform: { OS: 'android' },
   NativeModules: {},
 };
@@ -206,6 +212,52 @@ test('1. estado vazio -> salvar -> restaurar', async () => {
   m.disposeAutoSave();
   state = await m.initAutoSave(BASE);
   assert.strictEqual(state.settings.teste, 42, 'estado deve ser restaurado');
+});
+
+test('1b. leituras rápidas atualizam memória sem regravar TXT a cada mudança; background salva o valor mais recente', async () => {
+  const m = manager();
+  m.disposeAutoSave();
+  resetFS();
+  await m.initAutoSave(BASE);
+  const realNow = Date.now;
+  let clock = 100_000;
+  Date.now = () => clock;
+  const reading = (value, timestamp) => ({
+    pid: '010C',
+    name: 'Engine RPM',
+    value,
+    unit: 'rpm',
+    status: 'RESPONDEU',
+    timestamp,
+    source: 'REAL',
+  });
+  try {
+    m.pushLastReading(reading(1000, '2026-10-13T10:00:00.000Z'));
+    assert.strictEqual(await m.saveNow('critical'), true);
+    const autosavePath = CONFIG_DIR + '/autosave.json';
+    assert.strictEqual(JSON.parse(files.get(autosavePath)).payload.lastReadings[0].value, 1000);
+
+    clock = 101_000;
+    m.pushLastReading(reading(1100, '2026-10-13T10:00:01.000Z'));
+    assert.strictEqual(m.getAutoSaveState().lastReadings[0].value, 1100,
+      'telemetria em memória deve atualizar em toda resposta');
+    assert.strictEqual(JSON.parse(files.get(autosavePath)).payload.lastReadings[0].value, 1000,
+      'mudança numérica dentro da janela não deve iniciar outra gravação completa');
+
+    for (const listener of Array.from(appStateListeners)) listener('background');
+    await wait(50);
+    assert.strictEqual(JSON.parse(files.get(autosavePath)).payload.lastReadings[0].value, 1100,
+      'sair para background deve descarregar a leitura em memória ainda não persistida');
+
+    clock = 112_000;
+    m.pushLastReading(reading(1200, '2026-10-13T10:00:12.000Z'));
+    assert.strictEqual(await m.saveNow('critical'), true);
+    assert.strictEqual(JSON.parse(files.get(autosavePath)).payload.lastReadings[0].value, 1200,
+      'a cadência mínima deve persistir a leitura mais recente quando vencer');
+  } finally {
+    Date.now = realNow;
+    m.disposeAutoSave();
+  }
 });
 
 test('2. salvar -> modificar -> salvar -> restaura última versão', async () => {
