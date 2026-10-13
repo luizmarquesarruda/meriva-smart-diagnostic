@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Política de aquisição priorizada para ELM327 em K-Line/KWP. As leituras essenciais têm prioridade; estimativas e nível do tanque usam menor cadência; logs CSV são agrupados e o aprendizado descarta amostras repetidas do mesmo PID dentro da janela mínima.",
+  "description": "Política de aquisição priorizada para ELM327 em K-Line/KWP. PIDs críticos têm prioridade; estimativas e nível do tanque usam menor cadência; composição do combustível é consultada raramente e somente quando a ECU a anuncia; logs CSV são agrupados.",
   "polling": {
     "corePids": [
       "010D",
@@ -32,13 +32,20 @@
       "010B",
       "0111",
       "0142"
-    ]
+    ],
+    "fuelComposition": {
+      "pid": "0152",
+      "everyCycles": 30,
+      "phase": 1
+    }
   },
   "invariants": [
     "Exceto o PID 010C usado como gate de resposta real da ECU, consultar somente PIDs anunciados pela bitmap atual e validar a resposta individual na sessão.",
     "Somente uma estimativa recém-calculada pode alimentar a integração de combustível da viagem.",
     "Uma estimativa em cache pode ser exibida por até displayStaleAfterMs, mas não pode ser integrada novamente.",
     "PIDs usados no cálculo de consumo não devem ser consultados novamente no mesmo ciclo para telemetria rotativa.",
+    "No modo FLEX, a estimativa MAF/MAP exige composição de etanol válida via PID 0152; nunca assumir gasolina como fallback silencioso.",
+    "PID 015E medido tem precedência sobre estimativas derivadas de MAF/MAP.",
     "Não aplicar temporizações específicas de CAN a uma sessão K-Line sem medições no adaptador e veículo reais.",
     "A confirmação e a estatística de aprendizado do mesmo PID não são persistidas mais de uma vez em learningSampleMinIntervalMs, mas cada resposta real continua na fila CSV."
   ],
