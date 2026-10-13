@@ -199,3 +199,21 @@ A alteração do código/testes não é prova de compilação. A CI deve executa
 ### Otimização adicional de conexão — 2026-10-12
 
 `src/obd/elm327.ts`: comandos AT opcionais que retornam `UNSUPPORTED` deixam de ser repetidos três vezes durante a inicialização. Isso remove atrasos fixos para adaptadores que não implementam determinado comando, sem mudar a recuperação para timeouts/erros transitórios e sem relaxar a validação real da ECU (`010C`). A regressão em `tests/regression.test.js` exige exatamente uma tentativa de `ATI` quando a resposta é `?`. A CI #1921 passou na validação automatizada; o build APK daquela execução estava em andamento ao registrar a observação, mas o código desta otimização requer uma nova CI.
+
+
+## 8. Auditoria de aquisição e política de timeout — 2026-10-13
+
+### PIDs e JSON
+- Os JSONs `pids.json`, `formulas.json`, `ranges.json`, `meriva_confirmed_pids.json` e `polling_policy.json` foram lidos e validados sintaticamente.
+- O catálogo padrão não equivale a suporte confirmado na ECU: o conjunto operacional continua dependente da bitmap da sessão e de resposta individual validada. No registro atual da Meriva, `010C` permanece o único PID confirmado por evidência RAW_ECU no arquivo de referência; candidatos importados de ferramentas externas continuam explicitamente separados.
+- Não foram inventados PIDs específicos de GM nem promovidos dados CarScanner a confirmação atual da ECU.
+- `bluetooth_config.json` agora declara `optionalCommandTimeoutMs=2500` e `protocolSelectionTimeoutMs=15000`; ambos têm teste de contrato. A mudança de JSON é uma política de inicialização do ELM, não uma nova fórmula de PID.
+
+### Comparação de aquisição
+A pesquisa comparou `python-OBD` (aquisição assíncrona/watchers), `Free_OBD` (fila/mutex, separação AT/OBD e bitmap), `AndroidOBD` (transações RFCOMM) e `obd-scanner-android` (cadência por grupos). O ganho seguro para este projeto é reduzir round trips desnecessários e limitar esperas opcionais, sem concorrência sobre a mesma sessão serial.
+
+### Correção de inicialização
+`Elm327Session` agora limita comandos AT locais opcionais ao timeout curto configurado e não os repete em falha transitória. `ATZ` permanece obrigatório e com tentativas limitadas; `ATSP0` conserva timeout completo de negociação, porém sem repetir automaticamente toda a espera. A prova de ECU continua sendo uma resposta real e válida ao PID `010C`.
+
+### Validação pendente
+A suíte e o TypeScript foram atualizados, mas não foram executados nesta etapa para respeitar a instrução explícita de não disparar CI. Não há benchmark físico novo; a latência real depende da ECU K-Line, do adaptador e do telefone.
