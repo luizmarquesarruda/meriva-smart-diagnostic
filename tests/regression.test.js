@@ -732,6 +732,33 @@ async function testRawLogger() {
   assert.ok(rawAfterRetry.includes('010C,41 0C 20 00'), 'lote raw deve permanecer pendente e ser gravado na tentativa seguinte');
   assert.ok(interpretedAfterRetry.includes('010C,41 0C 20 00'), 'lote interpretado deve permanecer pendente e ser gravado na tentativa seguinte');
   assert.ok(interpreted.includes('ISO 14230-4 (KWP FAST)'));
+
+  // Boundary regression: a local-day partition near midnight must match even
+  // though ISO timestamps are already on the following UTC date.
+  resetFS();
+  const NativeDate = global.Date;
+  class BoundaryDate extends NativeDate {
+    constructor(...args) {
+      super(...(args.length ? args : ['2026-10-13T02:00:00.000Z']));
+    }
+    getFullYear() { return 2026; }
+    getMonth() { return 9; }
+    getDate() { return 12; }
+    toISOString() { return '2026-10-13T02:00:00.000Z'; }
+    static now() { return NativeDate.parse('2026-10-13T02:00:00.000Z'); }
+  }
+  global.Date = BoundaryDate;
+  try {
+    await logger.logRawObdData(BASE, query, '010C', 'REAL');
+    await logger.logInterpretedData(BASE, query, '010C', 'REAL');
+    await csvLogger.flushCsvLogs();
+  } finally {
+    global.Date = NativeDate;
+  }
+  assert.ok(files.has(BASE + '/LOGS/obd_raw_2026-10-12.csv'),
+    'raw log must use the local calendar date');
+  assert.ok(files.has(BASE + '/LOGS/obd_interpreted_2026-10-12.csv'),
+    'interpreted log must use the same local date, not the UTC day');
 }
 
 async function testVehicleProfile() {
