@@ -427,6 +427,20 @@ test('7b. histórico autosave elimina duplicatas legadas e serializa gravações
   assert.deepStrictEqual(finalNumbers, [...finalNumbers].sort((a, b) => a - b), 'snapshots devem permanecer em ordem crescente');
 });
 
+test('7c. mudança de combustível é publicada sem reler configurações a cada PID', async () => {
+  resetFS();
+  const settingsModule = loadTs(path.join(ROOT, 'src/database/appSettings.ts'));
+  const initial = await settingsModule.readAppSettings(BASE);
+  let activeFuelType = null;
+  const unsubscribe = settingsModule.subscribeAppSettings((settings) => {
+    activeFuelType = settings.fuelType;
+  });
+  assert.strictEqual(activeFuelType, initial.fuelType);
+  await settingsModule.writeAppSettings(BASE, { ...initial, fuelType: 'ETANOL' });
+  assert.strictEqual(activeFuelType, 'ETANOL', 'serviço de viagem deve receber a troca de combustível imediatamente');
+  unsubscribe();
+});
+
 test('8. REAL + RESPONDEU entra no learning e no banco', async () => {
   const m = manager();
   m.disposeAutoSave();
