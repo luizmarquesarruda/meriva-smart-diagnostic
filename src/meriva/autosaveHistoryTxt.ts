@@ -26,6 +26,27 @@ function splitEntries(content: string): string[] {
     .filter((entry) => entry.includes(ENTRY_END));
 }
 
+/**
+ * A manual export and an automatic autosave can overlap on older app versions.
+ * Keep the last snapshot for each sequence number and restore numeric order.
+ */
+function deduplicateEntries(entries: string[]): string[] {
+  const numbered = new Map<number, string>();
+  const unnumbered: string[] = [];
+  for (const entry of entries) {
+    const match = entry.match(/NÚMERO:\s*(\d+)/);
+    if (!match) {
+      unnumbered.push(entry);
+      continue;
+    }
+    numbered.set(Number(match[1]), entry);
+  }
+  const ordered = Array.from(numbered.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([, entry]) => entry);
+  return [...ordered, ...unnumbered];
+}
+
 /** Remove imported seed trips from old snapshots before displaying/exporting them. */
 function removeCarScannerTripsFromSnapshot(entry: string): string {
   const match = entry.match(/(\[HISTORY\]\r?\n)([\s\S]*?)(?=\r?\n\[[^\]\r\n]+\]|$)/);
@@ -48,7 +69,7 @@ async function readAutoSaveHistoryUnsafe(basePath: string): Promise<string> {
   const content = await FileSystem.readAsStringAsync(path, {
     encoding: FileSystem.EncodingType.UTF8,
   });
-  const entries = splitEntries(content)
+  const entries = deduplicateEntries(splitEntries(content))
     .slice(-AUTOSAVE_HISTORY_MAX_ENTRIES)
     .map(removeCarScannerTripsFromSnapshot);
   return entries.length ? `${HISTORY_HEADER}${entries.join('\n\n')}\n` : HISTORY_HEADER;
@@ -64,7 +85,7 @@ export async function readAutoSaveHistory(basePath: string): Promise<string> {
   }
 }
 
-export async function appendAutoSaveHistory(
+async function appendAutoSaveHistoryUnsafe(
   basePath: string,
   state: MerivaPersistedState,
   appVersion: string,
@@ -72,7 +93,7 @@ export async function appendAutoSaveHistory(
 ): Promise<{ count: number }> {
   const path = historyPath(basePath);
   const current = await readAutoSaveHistoryUnsafe(basePath);
-  const entries = splitEntries(current);
+  const entries = deduplicateEntries(splitEntries(current));
   const lastNumber = entries.reduce((max, entry) => {
     const match = entry.match(/NÚMERO:\s*(\d+)/);
     return match ? Math.max(max, Number(match[1])) : max;
@@ -95,6 +116,28 @@ export async function appendAutoSaveHistory(
     encoding: FileSystem.EncodingType.UTF8,
   });
   return { count: kept.length };
+}
+
+// Serialize every read-modify-write to avoid duplicate sequence numbers or lost
+// snapshots when background autosave and manual export initialize concurrently.
+const historyQueues = new Map<string, Promise<unknown>>();
+
+export function appendAutoSaveHistory(
+  basePath: string,
+  state: MerivaPersistedState,
+  appVersion: string,
+  reason: string,
+): Promise<{ count: number }> {
+  const path = historyPath(basePath);
+  const previous = historyQueues.get(path) ?? Promise.resolve();
+  const current = previous
+    .catch(() => undefined)
+    .then(() => appendAutoSaveHistoryUnsafe(basePath, state, appVersion, reason));
+  historyQueues.set(path, current);
+  void current.finally(() => {
+    if (historyQueues.get(path) === current) historyQueues.delete(path);
+  }).catch(() => undefined);
+  return current;
 }
 
 export async function getAutoSaveHistoryCount(basePath: string): Promise<number> {
