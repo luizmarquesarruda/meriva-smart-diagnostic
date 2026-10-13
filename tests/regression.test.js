@@ -299,12 +299,15 @@ async function testElmAndProtocol() {
   // Optional AT commands that explicitly return '?' are unsupported, not
   // transient failures; retrying them only adds fixed delays to every connect.
   const initCommands = [];
+  const readTimeouts = [];
   let currentResponse = '';
+  let currentCommand = '';
   const unsupportedAtTransport = {
     async open() {},
     async close() {},
     async write(data) {
       const command = data.trim();
+      currentCommand = command;
       initCommands.push(command);
       const payload = command === 'ATZ'
         ? 'ELM327 v1.5'
@@ -315,13 +318,22 @@ async function testElmAndProtocol() {
             : 'OK';
       currentResponse = payload + String.fromCharCode(13, 10) + '>';
     },
-    async readUntilPrompt() { return currentResponse; },
+    async readUntilPrompt(timeoutMs) {
+      readTimeouts.push({ command: currentCommand, timeoutMs });
+      return currentResponse;
+    },
   };
   const unsupportedAtSession = new Elm327Session(unsupportedAtTransport, { commandDelayMs: 0 });
   const initResults = await unsupportedAtSession.initialize();
   assert.strictEqual(initCommands.filter((command) => command === 'ATI').length, 1,
-    'ATI explicitamente não suportado não deve esperar dois retries inúteis');
+    'ATI explicitamente não suportado não deve esperar retries inúteis');
+  assert.strictEqual(initCommands.filter((command) => command === 'ATE0').length, 1,
+    'comandos AT opcionais não devem repetir erros transitórios durante a inicialização');
   assert.strictEqual(initResults.find((result) => result.command === 'ATI').status, 'UNSUPPORTED');
+  assert.strictEqual(readTimeouts.find((item) => item.command === 'ATI').timeoutMs, 2500,
+    'comandos AT locais opcionais devem ter timeout curto');
+  assert.strictEqual(readTimeouts.find((item) => item.command === 'ATSP0').timeoutMs, 15000,
+    'ATSP0 deve manter o timeout completo para negociação K-Line');
   await unsupportedAtSession.close();
 }
 
