@@ -1048,6 +1048,42 @@ async function testPidAndLearningWriteSerialization() {
   writeDelayMs = 0;
 }
 
+function testAcquisitionPolicyConsistency() {
+  const root = path.join(ROOT, 'src');
+  const autoTrip = fs.readFileSync(path.join(root, 'trip/autoTripService.ts'), 'utf8');
+  const settings = fs.readFileSync(path.join(root, 'database/appSettings.ts'), 'utf8');
+  const learning = fs.readFileSync(path.join(root, 'meriva/autosaveIntegration.ts'), 'utf8');
+  const history = fs.readFileSync(path.join(root, 'meriva/autosaveHistoryTxt.ts'), 'utf8');
+  const logger = fs.readFileSync(path.join(root, 'database/obdLogger.ts'), 'utf8');
+  const policy = JSON.parse(fs.readFileSync(path.join(root, 'knowledge/polling_policy.json'), 'utf8'));
+  const bluetooth = JSON.parse(fs.readFileSync(path.join(root, 'knowledge/bluetooth_config.json'), 'utf8'));
+  const settingsUi = fs.readFileSync(path.join(ROOT, 'app/configuracoes.tsx'), 'utf8');
+
+  assert.strictEqual(policy.version, 2);
+  assert.strictEqual(policy.polling.fuelComposition.pid, '0152');
+  assert.strictEqual(policy.polling.fuelComposition.everyCycles, 30);
+  assert.strictEqual(bluetooth.schemaVersion, 2);
+  assert.strictEqual(bluetooth.initialization.optionalCommandTimeoutMs, 2500);
+  assert.strictEqual(bluetooth.initialization.protocolSelectionTimeoutMs, 15000);
+  assert.ok(autoTrip.includes('readAppSettings(basePath)'), 'serviço deve carregar combustível selecionado');
+  assert.ok(autoTrip.includes('subscribeAppSettings'), 'mudança de combustível deve chegar ao serviço ativo sem polling de arquivo');
+  assert.ok(autoTrip.includes('fuelType: this.fuelType, ethanolPercent: this.lastFuelEthanolPercent'),
+    'cálculos MAF/MAP devem usar tipo e composição de combustível');
+  assert.ok(autoTrip.includes('(!this.state.fuelSupported || fuelRateLph == null)'),
+    'PID 0152 deve poder alimentar o fallback quando PID 015E falha');
+  assert.ok(autoTrip.includes('queryPid(fuelCompositionPolicy.pid)'), 'composição do combustível deve ser consultada apenas pela política centralizada');
+  assert.ok(settings.includes('subscribeAppSettings') && settings.includes('publishSettings(settings)'),
+    'configurações devem notificar serviços ativos após leitura/escrita');
+  assert.ok(learning.includes('enqueueLearningPersistence(async () => {'),
+    'I/O de aprendizado deve ficar fora do caminho crítico de polling serial');
+  assert.ok(history.includes('deduplicateEntries') && history.includes('historyQueues'),
+    'histórico deve deduplicar registros legados e serializar read-modify-write');
+  assert.ok((logger.match(/const today = getObdLogLocalDateKey\(\);/g) || []).length >= 2,
+    'logs RAW e interpretados devem usar a mesma chave de data local do dispositivo');
+  assert.ok(settingsUi.includes('PID 0152') && settingsUi.includes('PID 015E'),
+    'UI deve explicar requisito de composição no modo FLEX e precedência de combustível medido');
+}
+
 function testPidResponseIsNotVehicleValidation() {
   const integration = fs.readFileSync(path.join(ROOT, 'src/meriva/autosaveIntegration.ts'), 'utf8');
   assert.ok(integration.includes("status: prior?.status === 'CONFIRMADO' && prior.source === 'USER_REAL_OBSERVATION' ? 'CONFIRMADO' : 'RESPONDEU'"), 'resposta válida não deve promover automaticamente PID para confirmado');
@@ -1133,6 +1169,7 @@ async function main() {
     ['backup completo', testBackupCompleteness],
     ['CSV serializado', testCsvWriteSerialization],
     ['PID + DNA serializados', testPidAndLearningWriteSerialization],
+    ['contratos de aquisição e persistência', testAcquisitionPolicyConsistency],
     ['PID respondeu não significa sensor validado', testPidResponseIsNotVehicleValidation],
     ['histórico sem seed e consumo N/D', testStorageScreenDoesNotPromoteSeedOrInvalidFuel],
 
