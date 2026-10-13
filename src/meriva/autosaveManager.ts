@@ -234,7 +234,16 @@ async function initAutoSaveUnsafe(basePath: string): Promise<MerivaPersistedStat
     runtime.appStateSubscription = AppState.addEventListener(
       'change',
       (status: AppStateStatus) => {
-        if (status !== 'active' && runtime.dirty) void saveNow('background');
+        // pushLastReading updates the in-memory latest-value cache on every
+        // response but persists ordinary value churn at a bounded cadence.
+        // Compare fingerprints on lifecycle exit so the final in-memory values
+        // are still saved even when the throttle window has not elapsed.
+        if (
+          status !== 'active' &&
+          (runtime.dirty || snapshotFingerprint(runtime.state) !== runtime.lastSavedFingerprint)
+        ) {
+          void saveNow('background');
+        }
       },
     );
   }
@@ -300,8 +309,7 @@ export function pushLastReading(reading: MerivaPersistedState['lastReadings'][nu
   const previous = runtime.state.lastReadings.find((item) => item.pid === reading.pid);
   const now = Date.now();
   const lastMutation = runtime.lastReadingMutationAt.get(reading.pid) ?? 0;
-  const materiallyChanged = !previous
-    || previous.value !== reading.value
+  const connectionSemanticsChanged = !previous
     || previous.status !== reading.status
     || previous.unit !== reading.unit
     || previous.source !== reading.source;
@@ -311,13 +319,13 @@ export function pushLastReading(reading: MerivaPersistedState['lastReadings'][nu
     ...runtime.state.lastReadings.filter((item) => item.pid !== reading.pid),
   ].slice(0, MAX_LAST_READINGS);
 
-  // A telemetria continua atualizando em memória, mas leituras idênticas não
-  // geram um autosave por consulta. Uma janela de 10 s limita a persistência
-  // de amostras estáveis sem perder uma mudança real de valor/estado.
-  if (!materiallyChanged && now - lastMutation < MIN_READING_SAVE_INTERVAL_MS) {
-    runtime.state.lastReadings = next;
-    return;
-  }
+  // Always refresh the in-memory cache. Constantly changing RPM/speed values
+  // must not trigger a full autosave/TXT rewrite every OBD cycle; persist the
+  // latest value at most once per PID per interval, except for new PIDs and
+  // status/unit/source transitions which are operationally significant.
+  runtime.state.lastReadings = next;
+  const persistenceDue = now - lastMutation >= MIN_READING_SAVE_INTERVAL_MS;
+  if (!connectionSemanticsChanged && !persistenceDue) return;
 
   runtime.lastReadingMutationAt.set(reading.pid, now);
   updateAutoSaveState((state) => {
