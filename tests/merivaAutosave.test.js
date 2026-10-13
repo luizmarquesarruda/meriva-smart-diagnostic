@@ -385,6 +385,48 @@ test('7a. TXT antigo remove linhas CarScanner sem apagar os demais dados', async
   assert.ok(cleaned.includes('Amostras reais: 0 / seed: 10'), 'learning provenance must be preserved');
 });
 
+test('7b. histórico autosave elimina duplicatas legadas e serializa gravações concorrentes', async () => {
+  resetFS();
+  const history = loadTs(path.join(ROOT, 'src/meriva/autosaveHistoryTxt.ts'));
+  const state = loadTs(path.join(ROOT, 'src/meriva/autosaveState.ts')).createEmptyMerivaState();
+  const target = CONFIG_DIR + '/meriva_smart_autosave_history.txt';
+  const header = [
+    'MERIVA SMART DIAGNOSTIC',
+    'HISTÓRICO DE SALVAMENTOS AUTOMÁTICOS',
+  ].join('\n');
+  const entry = (number, marker) => [
+    '=== SALVAMENTO_BEGIN ===',
+    'NÚMERO: ' + number,
+    'MOTIVO: manual',
+    marker,
+    '[HISTORY]',
+    'N/D',
+    '=== SALVAMENTO_END ===',
+  ].join('\n');
+  files.set(target, [
+    header,
+    entry(1, 'SNAPSHOT_1'),
+    entry(2, 'SNAPSHOT_2_OLD'),
+    entry(2, 'SNAPSHOT_2_LATEST'),
+    entry(3, 'SNAPSHOT_3'),
+  ].join('\n\n'));
+
+  const compacted = await history.readAutoSaveHistory(BASE);
+  const originalNumbers = Array.from(compacted.matchAll(/NÚMERO:\s*(\d+)/g), (match) => Number(match[1]));
+  assert.deepStrictEqual(originalNumbers, [1, 2, 3], 'duplicatas antigas devem ser deduplicadas e ordenadas por número');
+  assert.ok(compacted.includes('SNAPSHOT_2_LATEST'));
+  assert.ok(!compacted.includes('SNAPSHOT_2_OLD'));
+
+  await Promise.all(Array.from({ length: 6 }, (_, index) =>
+    history.appendAutoSaveHistory(BASE, state, '1.0.1', 'concurrent-' + index),
+  ));
+  const finalText = await history.readAutoSaveHistory(BASE);
+  const finalNumbers = Array.from(finalText.matchAll(/NÚMERO:\s*(\d+)/g), (match) => Number(match[1]));
+  assert.strictEqual(finalNumbers.length, 9, 'cada escrita concorrente deve gerar um snapshot sem perder os demais');
+  assert.strictEqual(new Set(finalNumbers).size, finalNumbers.length, 'números de salvamento devem ser únicos');
+  assert.deepStrictEqual(finalNumbers, [...finalNumbers].sort((a, b) => a - b), 'snapshots devem permanecer em ordem crescente');
+});
+
 test('8. REAL + RESPONDEU entra no learning e no banco', async () => {
   const m = manager();
   m.disposeAutoSave();
