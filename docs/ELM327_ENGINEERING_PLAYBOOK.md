@@ -354,3 +354,10 @@ A alteração da fila de aprendizado visa reduzir espera no caminho crítico, ma
 - No Meriva físico: tempo de início até a primeira resposta válida `010C`, intervalo entre respostas `010D` e `010C`, taxa de falha `NO DATA`/timeout e cadência do PID rotativo.
 - Teste de consumo com combustível explicitamente selecionado e, para FLEX, somente com PID 0152 confirmado. Comparar a taxa `015E` quando disponível com estimativa MAF/MAP, registrando a diferença.
 - Confirmar que o autosave exportado após a atualização contém até 200 números únicos, em ordem, sem blocos repetidos.
+
+
+### Complemento — limite de persistência das leituras
+
+O app separa o cache vivo do autosave persistente. `pushLastReading` atualiza a última leitura na memória em todas as respostas, mas evita a regravação completa do JSON/TXT para cada mudança numérica: uma vez por PID por janela de 10 s é a cadência normal de persistência. PID novo e alterações de status/unidade/origem continuam imediatas. Ao sair do primeiro plano, a persistência compara o fingerprint do estado em memória com o snapshot persistido e descarrega o valor mais recente mesmo dentro da janela. Nenhuma amostra RAW/interpretada do CSV é removida por essa regra.
+
+Essa diferença é importante: o painel segue rápido e responsivo, enquanto o armazenamento reduz operações completas no filesystem. O ganho precisa ser medido na próxima captura física; não se deve inferir taxa de atualização do ELM a partir da frequência de snapshots TXT.
