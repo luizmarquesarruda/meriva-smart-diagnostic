@@ -217,3 +217,54 @@ A pesquisa comparou `python-OBD` (aquisição assíncrona/watchers), `Free_OBD` 
 
 ### Validação pendente
 A suíte e o TypeScript foram atualizados, mas não foram executados nesta etapa para respeitar a instrução explícita de não disparar CI. Não há benchmark físico novo; a latência real depende da ECU K-Line, do adaptador e do telefone.
+
+
+## 9. Auditoria cruzada com o TXT de autosaves — 2026-10-13
+
+### Integridade do histórico
+
+O TXT entregue para análise continha 205 blocos `SALVAMENTO_BEGIN`, mas somente 200 números distintos no intervalo 103–302. Os números 262–266 reapareciam no fim, depois do número 302. Esse padrão é compatível com gravações concorrentes usando um estado desatualizado do contador; o arquivo sozinho não permite provar qual operação causou cada repetição.
+
+Correção no código:
+- `src/meriva/autosaveHistoryTxt.ts` remove números repetidos na representação lida/exportada, preserva a última ocorrência de cada número e ordena por número.
+- A operação read-modify-write agora é serializada por arquivo para evitar que autosave e exportação simultâneos gerem o mesmo número ou percam um bloco.
+- O próximo append grava o histórico compactado com o limite de 200 entradas.
+- Os testes cobrem números legados repetidos e seis gravações concorrentes.
+
+A normalização é aplicada na leitura/exportação desde já. A versão física do TXT no telefone é reescrita normalizada no próximo append de autosave; esta alteração de código não modifica retroativamente o arquivo local enquanto o aplicativo não executar.
+
+### Correção do cálculo de consumo estimado
+
+A versão anterior usava AFR 14,7 e densidade 0,745 kg/L como defaults também quando a configuração estava em ETANOL ou FLEX. Isso gerava uma estimativa com hipótese de gasolina mesmo que o usuário tivesse selecionado outro combustível.
+
+Valores de referência adotados para estimativa:
+- Gasolina: AFR estequiométrico aproximado 14,7; densidade de referência 0,745 kg/L.
+- Etanol: AFR estequiométrico aproximado 9,0; densidade de referência 0,789 kg/L.
+- FLEX: interpolação de primeira ordem entre esses valores a partir de uma composição de etanol válida de 0–100% reportada por PID 0152. É uma aproximação de engenharia, não uma calibração do combustível vendido no Brasil nem validação da ECU da Meriva.
+
+Fontes técnicas: [propriedades de gasolina e etanol (ACS/PubMed Central)](https://pmc.ncbi.nlm.nih.gov/articles/PMC8495882/) e [tabela de propriedades do etanol](https://www.sciencedirect.com/topics/agricultural-and-biological-sciences/ethanol-fermentation).
+
+Regras implementadas:
+1. PID 015E (taxa de combustível em L/h) continua sendo a fonte medida preferida, quando a ECU o suporta e responde validamente.
+2. O caminho MAF/MAP é sempre uma estimativa.
+3. Em ETANOL e GASOLINA, o estimador usa o combustível explicitamente selecionado nas configurações.
+4. Em FLEX, o estimador MAF/MAP exige composição válida do PID 0152. A consulta é rara (uma vez a cada 30 ciclos, apenas quando necessária e suportada); sem esse dado não assume gasolina silenciosamente.
+5. A troca de combustível nas configurações é propagada ao serviço ativo sem polling de arquivo.
+6. Amostras de combustível com timestamp antigo são ignoradas sem recuar o relógio interno do integrador.
+
+### Aquisição e persistência
+
+- Escritas de confirmação de PIDs e perfil de aprendizado foram retiradas do caminho bloqueante de cada iteração OBD e executadas em fila serializada. Logs RAW/interpretado continuam registrando as respostas enfileiradas.
+- Ambos os CSV diários, RAW e interpretado, usam a data local do aparelho para particionamento; o timestamp de cada amostra continua ISO UTC.
+- O contrato de `polling_policy.json` e de `bluetooth_config.json` foi incrementado para refletir os campos/comportamentos adicionados, e a suíte verifica suas versões.
+- A política de aquisição continua estritamente serial pela sessão ELM327. Não adotamos concorrência por PID nem parâmetros de timing CAN em um transporte K-Line.
+
+### Referências comparadas
+
+- [python-OBD Async Connections](https://github.com/tkaracan/python-OBD/blob/master/docs/Async%20Connections.md): loop assíncrono de atualização e leitura do último valor conhecido pela interface.
+- [OBDLink — Get Started with Logs](https://support.obdlink.com/support/solutions/articles/43000709894): vários PIDs continuamente monitorados reduzem a taxa de atualização de cada PID; registro por PID frame segue a taxa de aquisição real.
+- [Car Scanner — Optimizing connection speed](https://www.carscanner.info/optimizing-connection-speed/): a quantidade de parâmetros é um fator dominante de atualização; otimização de requisições anunciada para CAN não se aplica automaticamente a K-Line.
+
+### Limite de evidência
+
+O TXT traz leituras e viagens incompletas; não constitui benchmark do tempo de resposta da ECU. As alterações foram cobertas por novos testes de contrato/regressão, mas precisam da CI para verificar o commit final e de uma captura física comparável para quantificar qualquer ganho de latência. Médias de viagem abaixo do limiar de combustível válido continuam marcadas como indisponíveis, não convertidas em zero nem publicadas como consumo confiável.
