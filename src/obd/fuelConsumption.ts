@@ -76,6 +76,8 @@ export class FuelRateIntegrator {
 
 export type FuelRateSource = 'MEASURED_015E' | 'ESTIMATED_MAF' | 'ESTIMATED_MAP';
 
+export type FuelTypeForEstimate = 'FLEX' | 'ETANOL' | 'GASOLINA';
+
 export interface FuelRateEstimateInput {
   mafGs?: number | null;
   mapKpa?: number | null;
@@ -83,13 +85,44 @@ export interface FuelRateEstimateInput {
   intakeAirTempC?: number | null;
   displacementCm3?: number | null;
   volumetricEfficiency?: number;
+  /** Explicit fuel mixture from app settings or compatible ECU PID 0152. */
+  fuelType?: FuelTypeForEstimate;
+  ethanolPercent?: number | null;
+  /** Advanced overrides are retained for calibration/tests. */
   airFuelRatio?: number;
   fuelDensityKgPerL?: number;
 }
 
+/**
+ * Approximate stoichiometric values for MAF/MAP-derived fuel flow.
+ * Flex fuel requires measured ethanol percentage; never silently assume gasoline.
+ * These are estimates, not a substitute for directly measured PID 015E.
+ */
+export function resolveFuelEstimateProperties(
+  fuelType: FuelTypeForEstimate | undefined,
+  ethanolPercent?: number | null,
+): { airFuelRatio: number; fuelDensityKgPerL: number } | null {
+  if (fuelType === 'GASOLINA') return { airFuelRatio: 14.7, fuelDensityKgPerL: 0.745 };
+  if (fuelType === 'ETANOL') return { airFuelRatio: 9.0, fuelDensityKgPerL: 0.789 };
+  if (fuelType !== 'FLEX' || !Number.isFinite(ethanolPercent) || ethanolPercent! < 0 || ethanolPercent! > 100) {
+    return null;
+  }
+
+  // First-order volumetric blend interpolation, documented as an estimate.
+  const ethanolFraction = ethanolPercent! / 100;
+  return {
+    airFuelRatio: 14.7 * (1 - ethanolFraction) + 9.0 * ethanolFraction,
+    fuelDensityKgPerL: 0.745 * (1 - ethanolFraction) + 0.789 * ethanolFraction,
+  };
+}
+
 export function estimateFuelRateLph(input: FuelRateEstimateInput): { rateLph: number; source: FuelRateSource } | null {
-  const afr = input.airFuelRatio ?? 14.7;
-  const density = input.fuelDensityKgPerL ?? 0.745;
+  const fuelProperties = resolveFuelEstimateProperties(input.fuelType, input.ethanolPercent);
+  const afr = input.airFuelRatio ?? fuelProperties?.airFuelRatio;
+  const density = input.fuelDensityKgPerL ?? fuelProperties?.fuelDensityKgPerL;
+  if (!Number.isFinite(afr) || !Number.isFinite(density) || (afr ?? 0) <= 0 || (density ?? 0) <= 0) {
+    return null;
+  }
 
   if (Number.isFinite(input.mafGs) && (input.mafGs ?? 0) > 0 && afr > 0 && density > 0) {
     const fuelKgPerSecond = (input.mafGs as number) / 1000 / afr;
