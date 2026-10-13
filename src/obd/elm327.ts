@@ -127,7 +127,7 @@ export class Elm327Session {
         // ATSP0 keeps the full timeout because cheap K-Line adapters may need
         // several seconds to negotiate the protocol.
         const optionalTimeoutMs = !mandatory.includes(command) && command !== 'ATSP0'
-          ? 2500
+          ? this.config.optionalAtTimeoutMs
           : undefined;
         let result = await this.command(command, 1, optionalTimeoutMs);
         for (
@@ -323,7 +323,7 @@ export class Elm327Session {
       const timeout = timeoutOverrideMs != null
         ? Math.min(this.config.ioTimeoutMs, Math.max(1000, timeoutOverrideMs))
         : command === 'ATSP0'
-          ? this.config.ioTimeoutMs
+          ? Math.min(this.config.ioTimeoutMs, this.config.protocolSelectionTimeoutMs)
           : (this.config.adaptiveTiming ? this.adaptiveTimeoutMs : this.config.ioTimeoutMs);
       const response = await this.transport.readUntilPrompt(timeout);
       const normalizedResponse = normalizeElmResponse(response);
