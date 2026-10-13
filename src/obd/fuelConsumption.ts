@@ -120,9 +120,11 @@ export function estimateFuelRateLph(input: FuelRateEstimateInput): { rateLph: nu
   const fuelProperties = resolveFuelEstimateProperties(input.fuelType, input.ethanolPercent);
   const afr = input.airFuelRatio ?? fuelProperties?.airFuelRatio;
   const density = input.fuelDensityKgPerL ?? fuelProperties?.fuelDensityKgPerL;
-  if (!Number.isFinite(afr) || !Number.isFinite(density) || (afr ?? 0) <= 0 || (density ?? 0) <= 0) {
-    return null;
-  }
+  if (
+    afr == null || density == null ||
+    !Number.isFinite(afr) || !Number.isFinite(density) ||
+    afr <= 0 || density <= 0
+  ) return null;
 
   if (Number.isFinite(input.mafGs) && (input.mafGs ?? 0) > 0 && afr > 0 && density > 0) {
     const fuelKgPerSecond = (input.mafGs as number) / 1000 / afr;
