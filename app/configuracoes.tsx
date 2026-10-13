@@ -130,6 +130,14 @@ export default function ConfiguracaoScreen() {
                 <Text style={styles.choiceText}>GASOLINA</Text>
               </TouchableOpacity>
             </View>
+            <Text style={styles.note}>
+              {settings.fuelType === 'FLEX'
+                ? 'No modo FLEX, a estimativa MAF/MAP exige composição de etanol válida via PID 0152; sem ela, o consumo estimado fica indisponível em vez de assumir gasolina.'
+                : settings.fuelType === 'ETANOL'
+                  ? 'Estimativa MAF/MAP usa parâmetros aproximados de etanol.'
+                  : 'Estimativa MAF/MAP usa parâmetros aproximados de gasolina.'}
+              {' '}A leitura medida PID 015E sempre tem precedência.
+            </Text>
           </View>
 
           <View style={styles.card}>
