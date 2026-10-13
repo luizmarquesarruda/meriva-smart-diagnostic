@@ -2236,3 +2236,63 @@ A inicialização podia repetir comandos AT opcionais com erro/timeout até trê
 - Após a política de timeout, corrigido também o comentário em `src/obd/elm327.ts`: apenas `ATZ` é gate obrigatório; `ATI` fornece metadados e não valida por si só o adaptador nem a ECU.
 - Commit: `80a53a0d` — `docs: clarify mandatory ELM initialization gate [skip ci]`.
 - O registro não altera a regra de validação da ECU por resposta OBD real `010C` e não inicia CI.
+
+
+## 2026-10-13 — Auditoria cruzada do TXT real, performance OBD, cálculo de combustível e integridade do autosave
+
+### Escopo
+- Lido o histórico `meriva_smart_autosave_history.txt` fornecido nesta etapa e cruzado com os serviços de telemetria, polling, combustível, logger CSV, autosave, catálogo de PIDs/JSON, suíte de regressão e documentação.
+- Comparação externa com implementações e documentação de aplicativos OBD: `python-OBD`, OBDLink e Car Scanner; pesquisas científicas de propriedades estequiométricas gasolina/etanol.
+- As alterações foram aplicadas na `main`. Não foi usado dado pessoal/identificador do veículo no código ou documentação.
+
+### Evidência objetiva do TXT entregue
+1. O arquivo tinha **205 blocos** `SALVAMENTO_BEGIN`, mas apenas **200 números distintos** no intervalo 103–302. Os números 262, 263, 264, 265 e 266 apareciam duas vezes, com as cópias fora da ordem numérica no final do arquivo.
+2. A seção de leituras mantinha uma amostra antiga de PID `010F` (temperatura do ar admitido) datada vários minutos antes de outras leituras. Isso não prova defeito do parser atual; o valor antigo deve continuar submetido às regras de frescor do painel.
+3. Algumas viagens mantêm `fuelDataValid=false`/consumo `N/D` quando a amostragem de combustível não sustenta uma média confiável. O limiar de volume continua protegendo o app de médias enormes ou falsas; não foi convertido em consumo zero.
+4. Os DTCs `P0135` e `P0420` do arquivo são evidências do veículo, não defeitos de software; esta etapa não altera nem apaga esses registros.
+
+### Correções em aquisição/performance
+- `src/meriva/autosaveIntegration.ts`: persistência do banco de PIDs/perfil de aprendizado passa por fila serializada fora da parte bloqueante de cada ciclo OBD. A leitura atual, telemetria em memória e filas RAW/interpretadas continuam a ser atualizadas, sem esperar I/O de JSON do perfil em cada PID.
+- `src/meriva/autosaveManager.ts`: `pushLastReading` sempre atualiza o cache em memória. Mudanças numéricas contínuas (RPM/velocidade) não disparam uma gravação completa de autosave/TXT a cada volta: a persistência normal é limitada a uma vez por PID a cada 10 s. PID novo e mudança de status, unidade ou origem continuam imediatos.
+- Ao entrar em background/inactive, o autosave compara o fingerprint do estado atual com o snapshot persistido. Assim, a última leitura atualizada em memória é gravada mesmo se a janela normal de 10 s ainda não venceu.
+- `src/database/obdLogger.ts`: CSV bruto e interpretado usam agora a mesma data local do aparelho no nome dos arquivos, enquanto os timestamps permanecem ISO UTC. Corrigida uma divisão de um mesmo dia entre arquivos pela data UTC.
+- A sessão ELM327 permanece serial. Nenhuma requisição paralela foi introduzida. A otimização remove I/O de perfil do caminho crítico, limita autosaves repetidos e mantém a cadência de PIDs lentos centralizada em JSON.
+
+### Correções de fórmula de combustível
+- Causa encontrada: o cálculo por MAF/MAP usava, por omissão, AFR 14,7 e densidade 0,745 kg/L — parâmetros de referência para gasolina — mesmo quando o usuário escolhia ETANOL ou FLEX nas configurações.
+- `src/obd/fuelConsumption.ts`: adicionada seleção explícita de propriedades de combustível. Os valores de referência aproximados são gasolina AFR 14,7/densidade 0,745 kg/L e etanol AFR 9,0/densidade 0,789 kg/L. Esses valores são aproximações de literatura e não calibração específica para a gasolina/etanol local.
+- Para FLEX, a estimativa MAF/MAP exige uma composição válida entre 0 e 100% vinda do PID `0152`; o app não presume gasolina silenciosamente. O PID `0152` é consultado apenas quando necessário, anunciado pela bitmap da ECU e com cadência baixa definida em `src/knowledge/polling_policy.json` (30 ciclos).
+- `015E` medido em L/h continua com precedência sobre estimativas. A preferência de combustível se propaga para o serviço de viagem sem precisar reler o arquivo de configurações em cada PID. Se faltar composição FLEX e não houver taxa medida válida, a estimativa é indisponível em vez de apresentar um número potencialmente errado.
+- `FuelRateIntegrator.addSample` passa a ignorar timestamp antigo sem recuar a referência temporal e corromper integrações subsequentes.
+
+### Integridade do histórico TXT
+- `src/meriva/autosaveHistoryTxt.ts`: adicionado dedup por número, retenção da última ocorrência, ordenação crescente e fila serializada de read-modify-write para autosave e exportação simultâneos.
+- O próximo append mantém o limite de 200 blocos únicos. Leitura/exportação já apresenta o histórico normalizado; a cópia física local do telefone será compactada quando ocorrer o próximo append/autosave, pois não foi possível executar código remotamente no armazenamento do aparelho.
+- Os testes incluem os duplicados de um histórico legado e seis gravações concorrentes; devem terminar com números únicos e ordenados.
+
+### JSON e documentação
+- `src/knowledge/polling_policy.json`: versão 2, inclui a política de composição FLEX e invariantes de uso do PID 0152 e prioridade do PID 015E.
+- `src/knowledge/bluetooth_config.json`: versão de schema 2, com limites declarados de 2500 ms para comandos AT locais opcionais e até 15000 ms para seleção de protocolo.
+- Documentação atualizada em `README.md`, `docs/ELM327_ENGINEERING_PLAYBOOK.md` e `docs/RELATORIO_PIDS_E_FORMULAS.md`.
+
+### Pesquisa externa e decisões técnicas
+- `python-OBD` mantém um loop assíncrono de atualização e retorna o último valor conhecido à interface: https://github.com/tkaracan/python-OBD/blob/master/docs/Async%20Connections.md
+- A documentação OBDLink esclarece que cada PID continuamente monitorado reduz a taxa de atualização dos demais e que o logging por PID-frame acompanha a taxa efetiva de aquisição: https://support.obdlink.com/support/solutions/articles/43000709894
+- O Car Scanner também destaca o número de parâmetros como fator dominante, mas as otimizações multi-requisição mencionadas são para CAN e não foram transplantadas automaticamente para a K-Line: https://www.carscanner.info/optimizing-connection-speed/
+- Propriedades aproximadas dos combustíveis: https://pmc.ncbi.nlm.nih.gov/articles/PMC8495882/ e https://www.sciencedirect.com/topics/agricultural-and-biological-sciences/ethanol-fermentation
+
+Conclusão: interfaces assíncronas melhoram a disponibilidade do último valor, mas não aceleram por si só a consulta física. A velocidade real está limitada por resposta ECU, adaptador, protocolo e número de PIDs. A otimização segura aqui é eliminar consultas e persistências redundantes e manter amostragem por prioridade.
+
+### Testes adicionados/atualizados
+- Combustível: gasolina versus etanol, modo FLEX sem composição, composição 0/100%, override de calibração e timestamp de amostra fora de ordem.
+- Autosave: mudanças numéricas dentro de 10 s atualizam memória sem regravar imediatamente, background salva o valor mais recente e amostras futuras voltam a persistir ao vencer a janela.
+- Histórico TXT: dedup dos blocos repetidos e serialização de escritas concorrentes.
+- Logs diários: RAW/interpretado permanecem no mesmo dia local perto da meia-noite UTC.
+- Contratos JSON: versão de schema/polling, PID de composição e cadência baixa.
+- Configurações: alteração do tipo de combustível notifica o serviço ativo.
+- Regressão geral: alinhamento entre política JSON, fluxo de combustível e fila de aprendizado.
+
+### Estado de validação e CI
+- Esta entrada de diário será o commit final da rodada e deve disparar a CI automática por `push`.
+- **A validação TypeScript/testes/Expo Doctor/build APK ainda está pendente para este commit** até a execução aparecer concluída no GitHub Actions. Não declarar sucesso antecipado.
+- Não há benchmark de latência físico novo. Após a CI, validar com o Meriva/ELM327 real: tempo até primeira resposta `010C`, intervalo de `010D`/`010C`, taxa de `NO DATA`, consistência de PID 0152/015E e número de blocos únicos no TXT exportado.
