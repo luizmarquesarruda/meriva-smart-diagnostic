@@ -2317,3 +2317,16 @@ Conclusão: interfaces assíncronas melhoram a disponibilidade do último valor,
 - A causa foi a diferença literal entre o comentário em português e a frase exigida pelo teste. A frase foi alinhada ao contrato existente, sem alterar a regra funcional: uma resposta positiva válida comprova resposta do PID, não exatidão física/elétrica do sensor.
 - Commit da correção textual: `54548936`.
 - Esta atualização de diário dispara a CI seguinte (#1927 esperada) para validar o head corrigido e executar o build Android; até essa execução acabar verde, a rodada permanece **não validada por CI**.
+
+
+### Fechamento da rodada de 13/10 — CI #1927 verde
+
+- **Commit validado:** `e6d788c6ca68a520ae9afecfc4dd9de35e12d988`.
+- **CI:** [#1927 — execução 38342310092](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/38342310092).
+- **Resultado final:** `success`, execução concluída em 13/10/2026.
+- **Job `validate`:** sucesso. `npm ci`, Expo Doctor (`npm run doctor`) e `npm run validate` concluíram sem falha.
+- **Job `android-build`:** sucesso. Expo prebuild, montagem do APK release standalone, verificação e upload do artefato concluíram sem falha.
+- **Causa encerrada nesta rodada:** a regressão textual que bloqueou as CIs #1925 e #1926 foi corrigida no commit `54548936`; a CI #1927 confirmou a validação e a compilação Android do commit `e6d788c`.
+- **Escopo deste registro:** somente documentação do resultado já observado; não declara que os defeitos funcionais listados nas próximas etapas foram corrigidos.
+- **Próximo passo:** iniciar cada correção funcional em commit isolado, revisar o diff e os contratos/testes afetados antes do push; acompanhar `validate` e `android-build` até ambos terminarem verdes antes de avançar.
+
