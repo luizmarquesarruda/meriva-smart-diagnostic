@@ -187,6 +187,8 @@ function main() {
   assert.strictEqual(bluetooth.validation.responsePrefix, '41 0C');
   assert.ok(bluetooth.initialization.required.includes('ATZ'));
   assert.ok(bluetooth.initialization.optional.includes('ATI'));
+  assert.ok(Number.isInteger(bluetooth.initialization.optionalCommandTimeoutMs) && bluetooth.initialization.optionalCommandTimeoutMs >= 1000);
+  assert.ok(Number.isInteger(bluetooth.initialization.protocolSelectionTimeoutMs) && bluetooth.initialization.protocolSelectionTimeoutMs >= bluetooth.initialization.optionalCommandTimeoutMs);
 
   assert.ok(Array.isArray(diagnosticRules.rules) && diagnosticRules.rules.length > 0);
   assertUnique(diagnosticRules.rules.map((rule) => rule.id), 'regra diagnóstica');
