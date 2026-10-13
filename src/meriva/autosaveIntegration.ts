@@ -17,6 +17,25 @@ import pollingPolicy from '../knowledge/polling_policy.json';
 const lastLearningPersistedAt = new Map<string, number>();
 const LEARNING_SAMPLE_MIN_INTERVAL_MS = pollingPolicy.learningSampleMinIntervalMs;
 
+// Learning/profile file I/O must not hold the serial OBD polling loop. Mutations
+// are serialized so simultaneous PIDs cannot overwrite each other's profile updates.
+let learningPersistenceQueue: Promise<void> = Promise.resolve();
+
+function enqueueLearningPersistence(operation: () => Promise<void>): void {
+  learningPersistenceQueue = learningPersistenceQueue
+    .catch(() => undefined)
+    .then(operation)
+    .catch((cause) => {
+      console.warn('[autosave] falha ao registrar aprendizado OBD em segundo plano:',
+        cause instanceof Error ? cause.message : cause);
+    });
+}
+
+/** Test/lifecycle hook for callers that require all queued learning writes to finish. */
+export async function flushLearningPersistenceQueue(): Promise<void> {
+  await learningPersistenceQueue;
+}
+
 /** Deduplicate high-frequency repeats for persistence/learning without dropping raw CSV samples. */
 export function shouldPersistRealPidSample(basePath: string, pid: string, nowMs = Date.now()): boolean {
   const key = `${basePath}:${pid.toUpperCase()}`;
@@ -58,40 +77,51 @@ export async function registerObdQuery(
     parsedValue !== null &&
     shouldPersistRealPidSample(basePath, result.parsed.pid)
   ) {
-    try {
-      const now = new Date().toISOString();
+    // Snapshot the query data before leaving the real-time path. Persist the
+    // learning/bank updates in order, but don't make the next ECU request wait
+    // on JSON read-modify-write operations.
+    const learningInput = {
+      pid: result.parsed.pid,
+      name: result.parsed.name,
+      value: parsedValue,
+      unit: result.parsed.unit,
+      formulaId: result.parsed.definition?.formulaId,
+      bytes: result.parsed.definition?.bytes,
+      description: result.parsed.definition?.description,
+      responseTime: result.elapsedMs,
+      protocol: result.protocol ?? 'N/D',
+      condition: learningCondition,
+      timestamp: new Date().toISOString(),
+    };
+    enqueueLearningPersistence(async () => {
       const existing = await readPidConfirmations(basePath);
-      const prior = existing.find((entry) => entry.pid === result.parsed.pid);
-
+      const prior = existing.find((entry) => entry.pid === learningInput.pid);
       const entry: PidConfirmationEntry = {
-        pid: result.parsed.pid,
-        name: result.parsed.name,
+        pid: learningInput.pid,
+        name: learningInput.name,
         classification: prior?.classification ?? 'PADRAO_OBD',
-        // Uma resposta válida confirma que o PID respondeu; não valida a exatidão física do sensor.
+        // A valid payload proves response, not physical sensor accuracy.
         status: prior?.status === 'CONFIRMADO' && prior.source === 'USER_REAL_OBSERVATION' ? 'CONFIRMADO' : 'RESPONDEU',
-        firstSeen: prior?.firstSeen ?? now,
-        lastSeen: now,
+        firstSeen: prior?.firstSeen ?? learningInput.timestamp,
+        lastSeen: learningInput.timestamp,
         occurrences: (prior?.occurrences ?? 0) + 1,
-        protocol: prior?.protocol ?? result.protocol ?? 'N/D',
-        responseTime: result.elapsedMs,
+        protocol: prior?.protocol ?? learningInput.protocol,
+        responseTime: learningInput.responseTime,
         source: 'REAL_OBD',
         confidence: prior ? prior.confidence + 1 : 1,
-        unit: result.parsed.unit,
-        formulaId: result.parsed.definition?.formulaId,
-        bytes: result.parsed.definition?.bytes,
-        description: result.parsed.definition?.description,
+        unit: learningInput.unit,
+        formulaId: learningInput.formulaId,
+        bytes: learningInput.bytes,
+        description: learningInput.description,
       };
       await recordPidConfirmation(basePath, entry);
-
       await updateLearningProfileRealSample(
         basePath,
-        result.parsed.name,
-        parsedValue,
-        learningCondition,
+        learningInput.name,
+        learningInput.value,
+        learningInput.condition,
       );
-    } catch (cause) {
-      console.warn('[autosave] falha ao registrar confirmação de PID:', cause instanceof Error ? cause.message : cause);
-    }
+    });
   }
 
   if (source === 'SIMULACAO') {
