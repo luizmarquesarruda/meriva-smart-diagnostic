@@ -55,14 +55,20 @@ export class FuelRateIntegrator {
         ? { fuelRateLph: this.state.lastRateLph, timestampMs: this.state.lastTimestampMs }
         : null;
 
-    const increment = integrateFuelRateLph(previous, current);
     const valid = Number.isFinite(fuelRateLph) && fuelRateLph >= 0 && Number.isFinite(timestampMs);
+    const timestampIsMonotonic = previous === null || timestampMs > previous.timestampMs;
 
+    // Ignore stale/out-of-order samples entirely. Integrating zero for an
+    // invalid interval but then moving the baseline backward would corrupt the
+    // next otherwise-valid interval and can over/under-count fuel.
+    if (!valid || !timestampIsMonotonic) return { ...this.state };
+
+    const increment = integrateFuelRateLph(previous, current);
     this.state = {
       fuelUsedL: this.state.fuelUsedL + increment,
-      validSamples: this.state.validSamples + (valid ? 1 : 0),
-      lastRateLph: valid ? fuelRateLph : this.state.lastRateLph,
-      lastTimestampMs: valid ? timestampMs : this.state.lastTimestampMs,
+      validSamples: this.state.validSamples + 1,
+      lastRateLph: fuelRateLph,
+      lastTimestampMs: timestampMs,
     };
 
     return { ...this.state };
