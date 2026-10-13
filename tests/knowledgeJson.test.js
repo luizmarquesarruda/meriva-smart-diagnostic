@@ -43,7 +43,7 @@ function main() {
   assert.strictEqual(typeof diagnosticRules.version, 'number');
   assert.strictEqual(typeof dtcCatalog.version, 'number');
   assert.strictEqual(typeof pollingPolicy.version, 'number');
-  assert.ok(pollingPolicy.version >= 1, 'polling policy precisa ter versão positiva');
+  assert.strictEqual(pollingPolicy.version, 2, 'cadência flex-fuel exige versão de contrato atualizada');
   assert.ok(Array.isArray(dtcCatalog.codes) && dtcCatalog.codes.length > 0, 'catálogo DTC vazio');
   assert.strictEqual(dtcCatalog.standard, 'SAE J2012');
   assertUnique(dtcCatalog.codes.map((item) => String(item.code).toUpperCase()), 'DTC catalogado');
