@@ -2230,3 +2230,9 @@ A inicialização podia repetir comandos AT opcionais com erro/timeout até trê
 - **CI não foi disparada.** TypeScript, testes e APK não estão validados para este conjunto exato de commits.
 - Não há benchmark numérico novo, pois não foi feita captura com o Meriva/ELM327 físico após a alteração.
 - Próxima validação autorizada: executar `npm run validate`, confirmar build Android e medir tempo de conexão e intervalo real entre respostas de `010D`/`010C` no mesmo adaptador antes/depois.
+
+
+### Complemento — precisão da regra de inicialização
+- Após a política de timeout, corrigido também o comentário em `src/obd/elm327.ts`: apenas `ATZ` é gate obrigatório; `ATI` fornece metadados e não valida por si só o adaptador nem a ECU.
+- Commit: `80a53a0d` — `docs: clarify mandatory ELM initialization gate [skip ci]`.
+- O registro não altera a regra de validação da ECU por resposta OBD real `010C` e não inicia CI.
