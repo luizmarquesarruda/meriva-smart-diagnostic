@@ -2330,3 +2330,16 @@ Conclusão: interfaces assíncronas melhoram a disponibilidade do último valor,
 - **Escopo deste registro:** somente documentação do resultado já observado; não declara que os defeitos funcionais listados nas próximas etapas foram corrigidos.
 - **Próximo passo:** iniciar cada correção funcional em commit isolado, revisar o diff e os contratos/testes afetados antes do push; acompanhar `validate` e `android-build` até ambos terminarem verdes antes de avançar.
 
+
+
+### Diagnóstico da CI #1928 — falha de heap no build Android
+
+- **Commit testado:** `3de674bebcf42bab309ece6f12b953613136bae0` (registro documental da CI #1927).
+- **Execução:** [CI #1928 — run 38395716356](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/38395716356).
+- **Resultado:** job `validate` verde; job `android-build` falhou. `npm ci` e Expo prebuild passaram.
+- **Causa real no log:** `java.lang.OutOfMemoryError: Java heap space` dentro de `com.android.tools.build.jetifier.processor.archive.Archive$Builder.extractFile`, durante `JetifyTransform`; a montagem falhou após 3m19s. Não há evidência de falha TypeScript/testes nem de erro no código da aplicação.
+- **Correção isolada:** ajustar somente a invocação Gradle do job Android para heap de 4 GiB, metaspace de 1 GiB e no máximo 2 workers, reduzindo o pico de memória nas transformações Jetifier. Nenhuma lógica do app foi alterada.
+- **Revisão do diff:** uma linha do comando Gradle em `.github/workflows/ci.yml` e este registro no diário; sem imports, contratos JSON, testes ou comentários de código alterados.
+- **Validação da correção:** pendente da próxima CI. Não considerar resolvido até `validate` e `android-build` concluírem verdes.
+- **Próximo passo:** acompanhar a CI disparada por este commit. Se o build voltar a falhar, analisar o novo log antes de qualquer alteração adicional.
+

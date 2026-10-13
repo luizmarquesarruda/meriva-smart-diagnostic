@@ -59,7 +59,7 @@ jobs:
       - run: npx expo prebuild --clean --platform android --non-interactive
       - name: Assemble Android release APK (standalone)
         working-directory: android
-        run: ./gradlew :app:assembleRelease --no-daemon --stacktrace
+        run: ./gradlew :app:assembleRelease --no-daemon --stacktrace -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g" -Dorg.gradle.workers.max=2
       - name: Verify standalone APK
         run: test -s android/app/build/outputs/apk/release/app-release.apk
       - name: Upload Android standalone APK
