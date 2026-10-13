@@ -101,7 +101,7 @@ export async function registerObdQuery(
         name: learningInput.name,
         classification: prior?.classification ?? 'PADRAO_OBD',
         // A valid payload proves response, not physical sensor accuracy.
-        // Uma resposta OBD válida não comprova exatidão elétrica do sensor.
+        // Uma resposta OBD válida não valida a exatidão física do sensor nem comprova exatidão elétrica.
         status: prior?.status === 'CONFIRMADO' && prior.source === 'USER_REAL_OBSERVATION' ? 'CONFIRMADO' : 'RESPONDEU',
         firstSeen: prior?.firstSeen ?? learningInput.timestamp,
         lastSeen: learningInput.timestamp,
