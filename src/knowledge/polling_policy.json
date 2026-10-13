@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "description": "Política de aquisição priorizada para ELM327 em K-Line/KWP. PIDs críticos têm prioridade; estimativas e nível do tanque usam menor cadência; composição do combustível é consultada raramente e somente quando a ECU a anuncia; logs CSV são agrupados.",
   "polling": {
     "corePids": [
