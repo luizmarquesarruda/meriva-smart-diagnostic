@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "adapterProfile": "ELM327_MINI_GENERICO",
   "transport": {
     "type": "BLUETOOTH_CLASSIC_RFCOMM_SPP",
