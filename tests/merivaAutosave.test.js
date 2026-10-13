@@ -406,6 +406,7 @@ test('8. REAL + RESPONDEU entra no learning e no banco', async () => {
   });
   await integration.registerObdQuery(BASE, query('41 0C 1A F8'), 'REAL');
   await integration.registerObdQuery(BASE, query('41 0C 0F A0'), 'REAL');
+  await integration.flushLearningPersistenceQueue();
   await csvLogger.flushCsvLogs();
 
   const profile = await learning.readLearningProfile(BASE);
