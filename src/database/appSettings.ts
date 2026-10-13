@@ -20,6 +20,23 @@ export interface AppSettings {
   elmAdaptiveTimeoutMaxMs: number;
 }
 
+const settingsListeners = new Set<(settings: AppSettings) => void>();
+let latestSettings: AppSettings | null = null;
+
+function publishSettings(settings: AppSettings): void {
+  latestSettings = { ...settings };
+  for (const listener of settingsListeners) {
+    try { listener({ ...settings }); } catch { /* settings observers must not block persistence */ }
+  }
+}
+
+/** Observe settings changed by the Settings UI without polling the file system. */
+export function subscribeAppSettings(listener: (settings: AppSettings) => void): () => void {
+  settingsListeners.add(listener);
+  if (latestSettings) listener({ ...latestSettings });
+  return () => settingsListeners.delete(listener);
+}
+
 const DEFAULT_SETTINGS: AppSettings = {
   fuelType: 'FLEX',
   distanceUnit: 'KM',
@@ -81,6 +98,7 @@ export async function readAppSettings(basePath: string): Promise<AppSettings> {
       elmAdaptiveTimeoutMinMs: numberSetting(parsed.elmAdaptiveTimeoutMinMs, 3000, 1000, 15000),
       elmAdaptiveTimeoutMaxMs: numberSetting(parsed.elmAdaptiveTimeoutMaxMs, 15000, 3000, 30000),
     };
+    publishSettings(settings);
     return settings;
   } catch {
     await writeAppSettings(basePath, DEFAULT_SETTINGS);
@@ -93,6 +111,7 @@ export async function writeAppSettings(basePath: string, settings: AppSettings):
   await FileSystem.writeAsStringAsync(target, JSON.stringify(settings, null, 2), {
     encoding: FileSystem.EncodingType.UTF8,
   });
+  publishSettings(settings);
 }
 
 export { DEFAULT_SETTINGS };
