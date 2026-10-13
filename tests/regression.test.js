@@ -313,7 +313,9 @@ async function testElmAndProtocol() {
         ? 'ELM327 v1.5'
         : command === 'ATI'
           ? '?'
-          : command === 'ATDP'
+          : command === 'ATE0'
+            ? 'NO DATA'
+            : command === 'ATDP'
             ? 'ISO 14230-4 (KWP FAST)'
             : 'OK';
       currentResponse = payload + String.fromCharCode(13, 10) + '>';
