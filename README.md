@@ -170,3 +170,24 @@ O Android solicita localização em segundo plano para esse modo. A notificaçã
 Os comandos OBD continuam serializados pela fila da sessão ELM327; não enviamos requisições simultâneas pela mesma ligação RFCOMM/K-Line. A descoberta reaproveita a sonda `010C`, segue apenas as páginas bitmap anunciadas e só publica um PID como operacional depois de uma resposta individual válida. A política de cadência fica versionada em `src/knowledge/polling_policy.json`: leituras principais primeiro, consultas lentas distribuídas por ciclo, telemetria auxiliar rotativa e logs CSV em lote.
 
 Essa é uma redução de trabalho redundante, não um benchmark de latência. O tempo real depende da ECU, do protocolo KWP/K-Line, do adaptador e do Bluetooth; a validação física e a CI no commit final continuam obrigatórias.
+
+
+## Auditoria técnica baseada no histórico real — 2026-10-13
+
+A revisão cruzou código, catálogos JSON, testes e o TXT de autosaves fornecido. Foram corrigidos pontos que afetam aquisição, interpretação de consumo e integridade do histórico:
+
+- O TXT analisado continha **205 blocos** com **200 números de salvamento únicos** e cinco números repetidos (262–266) fora da ordem numérica. O histórico agora serializa operações concorrentes, deduplica números repetidos na leitura/exportação e grava o conteúdo normalizado no próximo autosave.
+- Os cálculos estimados por MAF/MAP deixaram de assumir silenciosamente AFR/densidade de gasolina. A configuração ETANOL usa parâmetros aproximados de etanol; FLEX requer composição válida via PID 0152 ou a taxa diretamente medida pelo PID 015E. Sem evidência, o estimador retorna indisponível em vez de apresentar número enganoso.
+- O serviço de viagem recebe mudanças da preferência de combustível em tempo real, sem reabrir o arquivo de configurações a cada PID.
+- A gravação do banco de aprendizado e das confirmações de PID foi colocada em uma fila serializada fora do caminho crítico de aquisição. As respostas reais continuam a ser enfileiradas para log RAW/interpretado.
+- Logs RAW e interpretados passaram a usar a mesma data **local do aparelho**, mantendo timestamps em ISO UTC. Isso evita separar a mesma sessão em arquivos de dias diferentes perto da meia-noite.
+- O integrador de combustível ignora amostras com timestamp antigo sem retroceder a referência temporal.
+- Os contratos JSON de Bluetooth e polling foram versionados; testes de regressão cobrem os novos limites, seleção de combustível, composição FLEX, timestamps e concorrência do histórico.
+
+### Base da pesquisa de desempenho
+
+- [python-OBD — conexões assíncronas](https://github.com/tkaracan/python-OBD/blob/master/docs/Async%20Connections.md): mantém um loop de atualização e retorna a última resposta conhecida à interface sem bloquear a chamada de visualização.
+- [OBDLink — logging e taxa de atualização](https://support.obdlink.com/support/solutions/articles/43000709894): cada PID adicionado ao logging disputa tempo de aquisição; o modo de amostragem por frame PID registra no ritmo real de atualização.
+- [Car Scanner — otimização da velocidade](https://www.carscanner.info/optimizing-connection-speed/): lista extensa de sensores reduz a frequência de cada um. As otimizações de até 6× mencionadas são específicas de CAN e não foram transplantadas para a K-Line da Meriva.
+
+**Limite da validação:** esta rodada não tem uma nova medição cronometrada no Meriva/ELM327 físico. A CI é necessária para validar TypeScript, testes e build nativo; a avaliação física deve comparar os mesmos PIDs, adaptador, motor e condição de conexão antes/depois.
