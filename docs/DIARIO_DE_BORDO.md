@@ -2343,3 +2343,13 @@ Conclusão: interfaces assíncronas melhoram a disponibilidade do último valor,
 - **Validação da correção:** pendente da próxima CI. Não considerar resolvido até `validate` e `android-build` concluírem verdes.
 - **Próximo passo:** acompanhar a CI disparada por este commit. Se o build voltar a falhar, analisar o novo log antes de qualquer alteração adicional.
 
+### Resultado final da CI #1929 — correção de heap validada
+
+- **Commit validado:** `8443126e982dfb75c733d4495d8a051b83876e53` (`ci: increase Gradle heap for Android Jetifier build`).
+- **Execução:** [CI #1929 — run 38396421856](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/38396421856).
+- **Resultado final:** `success`, concluída em 13/10/2026.
+- **Job `validate`:** sucesso; `npm ci`, Expo Doctor e `npm run validate` passaram.
+- **Job `android-build`:** sucesso; Expo prebuild, APK release standalone, verificação do APK e upload do artefato passaram.
+- **Conclusão:** o aumento de heap Gradle e o limite de dois workers eliminaram a falha de memória observada na CI #1928 nesta execução. A validação confirma o workflow e a compilação, sem alterar a lógica funcional do aplicativo.
+- **Próximo passo:** registrar este resultado em commit documental isolado e aguardar a CI disparada por ele antes de avançar para correções funcionais.
+
