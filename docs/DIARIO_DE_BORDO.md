@@ -2174,3 +2174,59 @@ Este registro dispara a CI #1922 no head atualizado para cobrir a otimização A
 - O teste agora verifica que `ATI` explícito `?` é executado uma única vez durante a inicialização. Timeout e erro transitório continuam elegíveis aos retries limitados do produto.
 - Commit: `f1f2001a` — `test: model actual CRLF and ELM prompt in unsupported AT fixture`.
 - CI #1922 foi iniciada no head imediatamente anterior a este ajuste. O registro atual dispara a CI seguinte para validar exatamente esta fixture e a mudança de `Elm327Session`. Não usar o resultado de #1922 como prova do estado final.
+
+
+## 2026-10-13 — Auditoria de performance, política JSON e fast-fail de inicialização
+
+### Escopo e restrição operacional
+- Revisão do estado atual de `main`, dos arquivos de transporte/parser/descoberta/polling, catálogos JSON, testes e documentação.
+- Pesquisa comparativa em repositórios públicos: `python-OBD`, `Free_OBD`, `AndroidOBD` e `obd-scanner-android`.
+- **Não disparar CI**: todas as alterações desta etapa foram feitas na branch `perf/elm327-init-fast-fail-20261013`; commits desta etapa incluem `[skip ci]`. Nenhuma execução de CI foi solicitada ou iniciada por esta etapa.
+
+### Evidências da comparação
+- `python-OBD` usa conexão assíncrona/watchers para manter leituras atualizadas sem bloquear a consulta da interface.
+- `Free_OBD` mantém uma fila serializada de comandos, diferencia transações AT e OBD e usa bitmaps para descoberta.
+- `AndroidOBD` evidencia a transação por socket Bluetooth: enviar comando, aguardar resposta e só então calcular o valor.
+- `obd-scanner-android` separa dashboard/diagnóstico/telemetria e cadencia grupos de sensores.
+- Referências: https://github.com/tkaracan/python-OBD/blob/master/docs/Async%20Connections.md ; https://github.com/3badguys/Free_OBD ; https://github.com/barnhill/AndroidOBD ; https://github.com/ETSoftwareStudio/obd-scanner-android
+
+### Defeito de performance corrigido
+A inicialização podia repetir comandos AT opcionais com erro/timeout até três vezes. Em adaptadores lentos ou que não implementam um comando, cada tentativa podia bloquear a conexão por vários segundos. A falha explícita `?` já era tratada como não suportada; a nova correção estende o fast-fail aos demais erros dos comandos opcionais.
+
+### Modificações
+1. `src/obd/elm327.ts`
+   - Só `ATZ` (obrigatório) mantém retries de inicialização.
+   - `ATI`, `ATE0`, `ATL0`, `ATS0`, `ATH1` recebem timeout curto configurável e não são repetidos em falha transitória.
+   - `ATSP0` conserva timeout de seleção de protocolo e não repete a janela longa automaticamente.
+2. `src/obd/elm327Compatibility.ts`
+   - Adicionados e normalizados `optionalAtTimeoutMs` e `protocolSelectionTimeoutMs`.
+3. `src/knowledge/bluetooth_config.json`
+   - Adicionados `optionalCommandTimeoutMs: 2500` e `protocolSelectionTimeoutMs: 15000`.
+4. `src/obd/bluetoothManager.ts`
+   - Aplica os tempos do JSON ao contrato de compatibilidade, respeitando sobrescritas explícitas.
+5. Testes
+   - `tests/regression.test.js`: verifica timeout curto, timeout de `ATSP0`, ATI não suportado sem retry e erro de AT opcional sem retry.
+   - `tests/elm327Compatibility.test.js`: verifica defaults e sobrescrita dos timeouts.
+   - `tests/knowledgeJson.test.js`: verifica os campos de timeout no JSON.
+6. Documentação
+   - Atualizados `docs/ELM327_ENGINEERING_PLAYBOOK.md` e `docs/RELATORIO_PIDS_E_FORMULAS.md` com a política, comparação e limites de validação.
+
+### Auditoria de PIDs/JSON
+- `pids.json`, `formulas.json`, `ranges.json`, `meriva_confirmed_pids.json` e `polling_policy.json` foram lidos; todos passaram por parsing JSON nesta auditoria.
+- Foi preservada a regra: bitmap anuncia suporte, mas não confirma funcionalidade; um PID só se torna operacional após resposta individual válida.
+- A referência do veículo continua com `010C` como único PID confirmado por RAW_ECU. Valores CarScanner permanecem candidatos, não evidência atual.
+- Não foram encontrados motivos para alterar fórmulas padrão apenas para aparentar mais suporte. A velocidade do barramento K-Line é serial; não paralelizar comandos no mesmo ELM327.
+
+### Estado dos commits na branch
+- `cc4927c1` — timeout curto para comandos opcionais e retry restrito ao ATZ.
+- `6128f26e` / `e34f1631` — regressões de timeout e erro opcional.
+- `e493a964` — contrato de timeout configurável.
+- `b0d68932` — política JSON.
+- `355f5ca0` / `446ac4ec` — uso dos timeouts e ligação da política JSON.
+- `964385e5` / `92bae46b` — testes de contrato JSON e defaults.
+- Documentação adicionada nesta branch; commits marcados `[skip ci]`.
+
+### Validação e próximos passos
+- **CI não foi disparada.** TypeScript, testes e APK não estão validados para este conjunto exato de commits.
+- Não há benchmark numérico novo, pois não foi feita captura com o Meriva/ELM327 físico após a alteração.
+- Próxima validação autorizada: executar `npm run validate`, confirmar build Android e medir tempo de conexão e intervalo real entre respostas de `010D`/`010C` no mesmo adaptador antes/depois.
