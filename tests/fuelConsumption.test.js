@@ -86,10 +86,20 @@ if (!fsSource.includes('ESTIMATED_MAF') || !fsSource.includes('ESTIMATED_MAP')) 
   throw new Error('fuel fallback MAF/MAP não está implementado');
 }
 assert.strictEqual(estimateFuelRateLph({ mafGs: 0 }), null, 'MAF zero não pode ser convertido em uma estimativa de consumo válida');
-const positiveMafEstimate = estimateFuelRateLph({ mafGs: 2.5 });
-assert.ok(positiveMafEstimate, 'MAF positivo deve gerar estimativa');
-assert.strictEqual(positiveMafEstimate.source, 'ESTIMATED_MAF');
-assert.ok(positiveMafEstimate.rateLph > 0);
-assert.strictEqual(estimateFuelRateLph({ mafGs: NaN }), null);
+const gasolineMafEstimate = estimateFuelRateLph({ mafGs: 2.5, fuelType: 'GASOLINA' });
+assert.ok(gasolineMafEstimate, 'MAF positivo com combustível selecionado deve gerar estimativa');
+assert.strictEqual(gasolineMafEstimate.source, 'ESTIMATED_MAF');
+assert.ok(gasolineMafEstimate.rateLph > 0);
+const ethanolMafEstimate = estimateFuelRateLph({ mafGs: 2.5, fuelType: 'ETANOL' });
+assert.ok(ethanolMafEstimate, 'Etanol deve usar AFR e densidade próprios');
+assert.ok(ethanolMafEstimate.rateLph > gasolineMafEstimate.rateLph,
+  'para a mesma massa de ar, estimativa volumétrica com etanol deve superar a estimativa com gasolina');
+assert.strictEqual(estimateFuelRateLph({ mafGs: 2.5, fuelType: 'FLEX' }), null,
+  'FLEX sem composição medida não pode assumir gasolina silenciosamente');
+assert.ok(estimateFuelRateLph({ mafGs: 2.5, fuelType: 'FLEX', ethanolPercent: 100 }));
+assert.ok(estimateFuelRateLph({ mafGs: 2.5, fuelType: 'FLEX', ethanolPercent: 0 }));
+assert.strictEqual(estimateFuelRateLph({ mafGs: NaN, fuelType: 'ETANOL' }), null);
+assert.strictEqual(estimateFuelRateLph({ mafGs: 2.5, airFuelRatio: 14.7, fuelDensityKgPerL: 0.745 }).source,
+  'ESTIMATED_MAF', 'calibração explícita deve continuar disponível');
 
 console.log('fuelConsumption fallback: OK');
