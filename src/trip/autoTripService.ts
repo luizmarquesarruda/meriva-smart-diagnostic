@@ -310,7 +310,7 @@ class AutoTripService {
         // Without a valid composition reading, do not silently estimate as gasoline.
         const fuelCompositionPolicy = pollingPolicy.polling.fuelComposition;
         if (
-          !this.state.fuelSupported &&
+          (!this.state.fuelSupported || fuelRateLph == null) &&
           this.fuelType === 'FLEX' &&
           connection.supportedPids.includes(fuelCompositionPolicy.pid) &&
           this.pollCycleNumber % fuelCompositionPolicy.everyCycles === fuelCompositionPolicy.phase
