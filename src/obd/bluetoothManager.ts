@@ -157,7 +157,11 @@ export async function createRealElmSession(
   callbacks?: RealElmSessionCallbacks,
 ): Promise<RealElmConnection> {
   let lastCause: unknown = null;
-  const config = mergeCompatibilityConfig(compatibility ?? DEFAULT_ELM327_COMPATIBILITY);
+  const config = mergeCompatibilityConfig({
+    ...(compatibility ?? DEFAULT_ELM327_COMPATIBILITY),
+    optionalAtTimeoutMs: compatibility?.optionalAtTimeoutMs ?? bluetoothConfig.initialization.optionalCommandTimeoutMs,
+    protocolSelectionTimeoutMs: compatibility?.protocolSelectionTimeoutMs ?? bluetoothConfig.initialization.protocolSelectionTimeoutMs,
+  });
   const effectiveMaxAttempts = config.maxConnectionAttempts > 0
     ? config.maxConnectionAttempts
     : MAX_BLUETOOTH_ATTEMPTS;
