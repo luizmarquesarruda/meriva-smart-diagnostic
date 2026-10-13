@@ -27,6 +27,8 @@ export interface Elm327CompatibilityConfig {
   adaptiveTimeoutMinMs: number;
   adaptiveTimeoutMaxMs: number;
   adaptiveTimeoutStepMs: number;
+  optionalAtTimeoutMs: number;
+  protocolSelectionTimeoutMs: number;
 }
 
 export interface ElmHealthSnapshot {
@@ -59,6 +61,8 @@ export const DEFAULT_ELM327_COMPATIBILITY: Elm327CompatibilityConfig = {
   adaptiveTimeoutMinMs: 3_000,
   adaptiveTimeoutMaxMs: 15_000,
   adaptiveTimeoutStepMs: 500,
+  optionalAtTimeoutMs: 2500,
+  protocolSelectionTimeoutMs: 15000,
 };
 
 export function normalizeElmResponse(response: string): string {
@@ -121,5 +125,7 @@ export function mergeCompatibilityConfig(
     adaptiveTimeoutMinMs: Math.max(1000, Math.round(merged.adaptiveTimeoutMinMs)),
     adaptiveTimeoutMaxMs: Math.max(1000, Math.round(merged.adaptiveTimeoutMaxMs)),
     adaptiveTimeoutStepMs: Math.max(50, Math.round(merged.adaptiveTimeoutStepMs)),
+    optionalAtTimeoutMs: Math.max(1000, Math.round(merged.optionalAtTimeoutMs)),
+    protocolSelectionTimeoutMs: Math.max(1000, Math.round(merged.protocolSelectionTimeoutMs)),
   };
 }
