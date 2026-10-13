@@ -19,11 +19,15 @@ assert.strictEqual(config.validation.command, '010C');
 assert.strictEqual(config.validation.responsePrefix, '41 0C');
 assert.deepStrictEqual(config.initialization.required, ['ATZ']);
 assert.deepStrictEqual(config.initialization.optional, ['ATI']);
+assert.strictEqual(config.initialization.optionalCommandTimeoutMs, 2500);
+assert.strictEqual(config.initialization.protocolSelectionTimeoutMs, 15000);
 
 const manager = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'bluetoothManager.ts'), 'utf8');
 assert(manager.includes("bluetooth_config.json"));
 assert(manager.includes('MAX_BLUETOOTH_ATTEMPTS = bluetoothConfig.retry.maxAttempts'));
 assert(manager.includes('BLUETOOTH_RETRY_INTERVAL_MS = bluetoothConfig.retry.intervalMs'));
+assert(manager.includes('bluetoothConfig.initialization.optionalCommandTimeoutMs'));
+assert(manager.includes('bluetoothConfig.initialization.protocolSelectionTimeoutMs'));
 
 const sharedConnection = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'sharedConnection.ts'), 'utf8');
 assert(sharedConnection.includes('cada candidato usa o limite efetivo configurado'));
