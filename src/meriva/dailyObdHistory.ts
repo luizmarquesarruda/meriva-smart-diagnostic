@@ -66,13 +66,36 @@ function renderEvent(state: MerivaPersistedState, event: 'SESSION_START' | 'SESS
   lines.push('', '[CÓDIGOS DE FALHA REGISTRADOS]');
   if (state.dtcs.length) {
     for (const dtc of state.dtcs) {
-      lines.push(`${dtc.code} | status=${dtc.status} | ocorrências=${dtc.occurrences} | última=${dtc.lastSeen} | fonte=${dtc.source}`);
+      const dtcLastSeenMs = Date.parse(dtc.lastSeen);
+      const dtcSessionEvidence = !Number.isFinite(dtcLastSeenMs)
+        ? 'HORÁRIO_NÃO_VALIDADO'
+        : dtcLastSeenMs > eventTimestampMs
+          ? 'HORÁRIO_POSTERIOR_AO_EVENTO_REVISAR'
+          : Number.isFinite(sessionStartedAtMs) && dtcLastSeenMs < sessionStartedAtMs
+            ? 'REGISTRO_ANTERIOR_À_SESSÃO'
+            : Number.isFinite(sessionStartedAtMs)
+              ? 'ATUALIZADO_NESTA_SESSÃO'
+              : 'SESSÃO_NÃO_CORRELACIONADA';
+      lines.push(`${dtc.code} | status=${dtc.status} | evidência=${dtcSessionEvidence} | ocorrências=${dtc.occurrences} | última=${dtc.lastSeen} | fonte=${dtc.source}`);
     }
   } else {
     lines.push('N/D');
   }
   lines.push('', '[VIAGENS REAIS RECENTES]');
-  const realTrips = state.driveCycles.filter((cycle) => cycle.source === 'REAL_OBD').slice(-10);
+  const realTrips = state.driveCycles.filter((cycle) => {
+    if (cycle.source !== 'REAL_OBD') return false;
+    const tripStartMs = Date.parse(cycle.startedAt);
+    const tripFinishMs = Date.parse(cycle.finishedAt);
+    if (
+      !Number.isFinite(tripStartMs)
+      || !Number.isFinite(tripFinishMs)
+      || tripStartMs > eventTimestampMs
+      || tripFinishMs > eventTimestampMs
+    ) return false;
+    // Attach a trip only to the ECU session in which it started. This prevents
+    // every future connection snapshot from repeating trips from prior ignitions.
+    return !Number.isFinite(sessionStartedAtMs) || tripStartMs >= sessionStartedAtMs;
+  }).slice(-10);
   if (realTrips.length) {
     for (const trip of realTrips) {
       lines.push(`${trip.startedAt} -> ${trip.finishedAt} | ${trip.distanceTotalKm} km | ${(trip.fuelDataValid === false || trip.fuelUsedL < 0.05 || trip.avgFuelConsumptionKml <= 0 || trip.avgFuelConsumptionKml > MAX_VALID_TRIP_CONSUMPTION_KML) ? 'N/D' : `${trip.avgFuelConsumptionKml} km/L`} | máxima=${trip.maxSpeedKmh ?? 'N/D'} km/h | amostras=${trip.telemetrySamples?.length ?? 0} | REAL_OBD`);
