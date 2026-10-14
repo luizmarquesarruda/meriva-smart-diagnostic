@@ -2437,3 +2437,11 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - `tests/tripRecorder.test.js`: acrescentado cenário de regressão com 2 km e taxa de 10 L/h em 20 s, que produz média matemática superior a 30 km/L e deve ser rejeitada.
 - Isso não substitui a validação de cobertura temporal de MAF/velocidade nem a interpolação de gaps; esses pontos continuam pendentes e não devem ser inferidos como resolvidos por este teto.
 - Validação automatizada ainda pendente; CI não foi disparada nesta etapa.
+
+## 2026-10-14 — Histórico de autosave agrupado por data
+
+- O TXT de autosave mantém até 1.000 snapshots, em vez de 20.
+- Cada snapshot recebe `DATA LOCAL: YYYY-MM-DD`; a leitura/exportação agrupa as entradas em blocos `DIA` e `FIM DO DIA`, mantendo numeração e ordem.
+- O diário de sessões ECU (`meriva_smart_daily_obd_history.txt`) continua separado do histórico de snapshots.
+- A suíte de regressão permanece em arquivo de teste separado: `tests/merivaAutosave.test.js`; o teste 13 agora cobre o limite de 1.000, data local e agrupamento por dia.
+- Validação pendente: executar `node tests/merivaAutosave.test.js`/CI antes de considerar aprovado. Não foi feita validação local ou em hardware nesta alteração.
