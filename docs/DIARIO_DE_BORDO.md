@@ -2416,3 +2416,10 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Corrigido o normalizador e acrescentado teste de regressão: normalizeSensorPid('01 0C') deve resultar em '010C'. A página já removia whitespace corretamente.
 - Nenhuma regra de suporte ou conclusão de sensor foi alterada.
 - CI desta correção: TypeScript, testes, Expo Doctor e build Android.
+
+
+### 2026-10-14 — Limite do histórico de autosave
+- `src/meriva/autosaveHistoryTxt.ts`: reduzido o limite de snapshots TXT de 200 para 20, mantendo a regra de retenção dos mais recentes e a deduplicação existente.
+- Motivo: o histórico de snapshots repete seções extensas de diagnóstico e viagens, fazendo o TXT crescer para milhares de páginas.
+- Limitação desta alteração: ela reduz o arquivo de snapshots; ainda não implementa o resumo diário permanente independente. Isso precisa ser concluído antes de afirmar que viagens antigas ficam preservadas após a rotação.
+- Validação: alteração ainda depende da CI; os logs reais `meriva_smart_autosave_history.txt` e `meriva_smart_daily_obd_history.txt` devem ser usados para confirmar o limite de 20 e a preservação do diário por data.
