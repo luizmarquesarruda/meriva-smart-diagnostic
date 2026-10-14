@@ -479,6 +479,43 @@ test('7b. histórico autosave elimina duplicatas legadas e serializa gravações
   assert.deepStrictEqual(finalNumbers, [...finalNumbers].sort((a, b) => a - b), 'snapshots devem permanecer em ordem crescente');
 });
 
+
+test('7d. snapshots legados agrupam Exported At pela data local do aparelho', async () => {
+  resetFS();
+  const previousTimezone = process.env.TZ;
+  process.env.TZ = 'America/Sao_Paulo';
+  const history = loadTs(path.join(ROOT, 'src/meriva/autosaveHistoryTxt.ts'));
+  const target = CONFIG_DIR + '/meriva_smart_autosave_history.txt';
+  try {
+    files.set(target, [
+      'MERIVA SMART DIAGNOSTIC',
+      'HISTÓRICO DE SALVAMENTOS AUTOMÁTICOS',
+      '=== SALVAMENTO_BEGIN ===',
+      'NÚMERO: 1',
+      'MOTIVO: legado',
+      'MERIVA SMART DIAGNOSTIC',
+      'SAVE EXPORT',
+      'Exported At: 2026-10-11T01:00:00.000Z',
+      '[HISTORY]',
+      'N/D',
+      '=== SALVAMENTO_END ===',
+    ].join('\\n'));
+
+    const rendered = await history.readAutoSaveHistory(BASE);
+    assert.ok(
+      rendered.includes('========== DIA: 2026-10-10 =========='),
+      '01:00 UTC deve ser agrupado no dia anterior no fuso America/Sao_Paulo',
+    );
+    assert.ok(
+      !rendered.includes('========== DIA: 2026-10-11 =========='),
+      'não agrupar snapshots legados pela data UTC quando diverge do dia local',
+    );
+  } finally {
+    if (previousTimezone === undefined) delete process.env.TZ;
+    else process.env.TZ = previousTimezone;
+  }
+});
+
 test('7c. mudança de combustível é publicada sem reler configurações a cada PID', async () => {
   resetFS();
   const settingsModule = loadTs(path.join(ROOT, 'src/database/appSettings.ts'));
