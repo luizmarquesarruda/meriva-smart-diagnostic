@@ -8,6 +8,7 @@ import type { MerivaPersistedState } from './autosaveState';
 import { AUTOSAVE_SCHEMA_VERSION } from './autosaveTypes';
 import { getDtcDefinition } from '../obd/dtcDefinition';
 import { MAX_VALID_TRIP_CONSUMPTION_KML } from '../trip/tripRecorder';
+import autosavePolicy from '../knowledge/autosave_policy.json';
 
 export const ND = 'N/D';
 
@@ -64,7 +65,7 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
   L.push('');
 
   L.push('[LAST READINGS]');
-  const readings = options.compact ? state.lastReadings.slice(0, 10) : state.lastReadings;
+  const readings = options.compact ? state.lastReadings.slice(0, autosavePolicy.history.compactLatestReadings) : state.lastReadings;
   if (options.compact && state.lastReadings.length > readings.length) {
     L.push(`Exibindo as ${readings.length} leituras mais recentes; todas permanecem no autosave JSON.`);
   }
@@ -82,7 +83,7 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
   L.push('');
 
   L.push('[DTC]');
-  const dtcs = options.compact ? state.dtcs.slice(-8) : state.dtcs;
+  const dtcs = options.compact ? state.dtcs.slice(-autosavePolicy.history.compactLatestDtcs) : state.dtcs;
   if (options.compact && state.dtcs.length > dtcs.length) {
     L.push(`Exibindo os ${dtcs.length} DTCs mais recentes; histórico completo permanece no autosave JSON.`);
   }
@@ -152,7 +153,7 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
 
   L.push('[SETTINGS]');
   const allSettings = Object.entries(state.settings ?? {});
-  const settings = options.compact ? allSettings.slice(0, 8) : allSettings;
+  const settings = options.compact ? allSettings.slice(0, autosavePolicy.history.compactSettings) : allSettings;
   if (settings.length) {
     for (const [key, value] of settings) {
       L.push(`${key}: ${or(value)}`);
