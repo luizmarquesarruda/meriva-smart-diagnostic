@@ -2547,3 +2547,12 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Nos TXT fornecidos, viagens com menos de 0,05 L ou com amostras de combustível insuficientes continuam preservadas com consumo `N/D`; elas não são apagadas nem transformadas em médias inventadas. Registros antigos com `amostras=0` são preservados como dados legados, não evidência de que a versão atual não registra amostras.
 - Validação ainda depende da CI após o último commit e do teste físico OBD/GPS; esta entrada documenta o código e os testes acrescentados, não uma aprovação de CI.
 
+## 2026-10-14 — Consumo de viagem com cobertura de integração incompleta
+
+- Evidência de contexto: alguns TXT anteriores continham viagens curtas com consumo `N/D`, litros quase nulos ou amostras ausentes; os valores são mantidos como registros históricos, não usados como prova do comportamento da versão atual.
+- `src/obd/fuelConsumption.ts`: o intervalo máximo de integração de 30 s agora está exposto como constante única, usada pela integração e pela gravação da viagem.
+- `src/trip/tripRecorder.ts`: se o intervalo entre duas amostras válidas de taxa de combustível exceder 30 s, a viagem marca `fuelCoverageComplete=false`. A informação também fica falsa quando não existem ao menos duas amostras de taxa de combustível.
+- `DriveCycle.fuelCoverageComplete` é opcional para compatibilidade com viagens legadas.
+- A média deixa de ser válida quando a integração perdeu cobertura temporal. Os formatadores dos TXT mostram `N/D (cobertura insuficiente)` para litros parciais e `N/D` para a média, preservando a distância e a viagem.
+- Testes adicionados para lacuna superior a 30 s e para os dois formatos TXT. Validação da CI ainda pendente; não houve teste físico com a ECU/ELM327 real.
+
