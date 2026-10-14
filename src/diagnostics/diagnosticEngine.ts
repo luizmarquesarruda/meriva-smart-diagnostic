@@ -131,6 +131,9 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
     hypotheses: [...hypotheses.values()].sort((a, b) => b.score - a.score),
     blockedSimulationSamples,
     blockedNonLiveDtcs,
-    disclaimer: 'Hipóteses baseadas em evidências locais. Não condenar peça apenas por um DTC ou um PID isolado; status histórico/inativo e dados não-REAL_OBD não geram falha atual.',
+    blockedStaleObservations,
+    blockedStaleDtcs,
+    disconnectedEvidenceIgnored,
+    disclaimer: 'Hipóteses baseadas em evidências locais recentes. Amostras com mais de 120 s, valores não finitos, DTCs sem atualização recente e dados não-REAL_OBD não geram falha atual. Sem resposta da ECU, o motor de hipóteses não usa evidência OBD armazenada como estado atual.',
   };
 }
