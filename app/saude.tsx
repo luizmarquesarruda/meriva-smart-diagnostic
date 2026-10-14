@@ -4,26 +4,42 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMidLayout } from '../src/ui/midLayout';
 import { getAutoSaveState } from '../src/meriva/autosaveManager';
-import { runLocalDiagnostic, type DiagnosticResult } from '../src/diagnostics/diagnosticEngine';
+import { isFreshDiagnosticTimestamp, runLocalDiagnostic, type DiagnosticResult } from '../src/diagnostics/diagnosticEngine';
 import type { PidObservation } from '../src/types/sourceTypes';
 import { getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
 import { getDtcDefinition } from '../src/obd/dtcDefinition';
+import { getSharedObdStatus } from '../src/obd/sharedConnection';
 
 export default function SaudeScreen() {
   const layout = useMidLayout();
   const [state,setState]=useState(getAutoSaveState());
   useEffect(()=>{const t=setInterval(()=>setState(getAutoSaveState()),1000);return()=>clearInterval(t)},[]);
   const context = getVehicleConditionSnapshot();
-  const activeDtcs = state.dtcs.filter((item) => ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(item.status));
-  const diagnostic: DiagnosticResult = useMemo(()=>runLocalDiagnostic({observations:state.lastReadings.map(r=>({pid:r.pid,name:r.name,value:r.value,unit:r.unit,source:r.source==='SIMULACAO'?'SIMULACAO':'REAL_OBD',timestamp:r.timestamp,confidence:r.source==='SIMULACAO'?'LOW':'GOOD'} as PidObservation)),dtcs:state.dtcs,condition:context.condition}),[state,context.condition]);
-  const normal=diagnostic.hypotheses.length===0 && activeDtcs.length===0;
+  const obdStatus = getSharedObdStatus();
+  const activeDtcStatuses = ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'];
+  const activeDtcs = obdStatus.ecuConnected ? state.dtcs.filter((item) =>
+    activeDtcStatuses.includes(item.status) && isFreshDiagnosticTimestamp(item.lastSeen),
+  ) : [];
+  const hasFreshEvidence = obdStatus.ecuConnected && (
+    state.lastReadings.some((reading) => reading.source === 'REAL' && reading.value !== null && Number.isFinite(reading.value) && isFreshDiagnosticTimestamp(reading.timestamp))
+    || activeDtcs.length > 0
+  );
+  const diagnostic: DiagnosticResult = useMemo(()=>runLocalDiagnostic({observations:state.lastReadings.map(r=>({pid:r.pid,name:r.name,value:r.value,unit:r.unit,source:r.source==='SIMULACAO'?'SIMULACAO':'REAL_OBD',timestamp:r.timestamp,confidence:r.source==='SIMULACAO'?'LOW':'GOOD'} as PidObservation)),dtcs:state.dtcs,condition:context.condition,ecuConnected:obdStatus.ecuConnected}),[state,context.condition,obdStatus.ecuConnected]);
+  const normal=hasFreshEvidence && diagnostic.hypotheses.length===0 && activeDtcs.length===0;
+  const headline = !obdStatus.ecuConnected ? '● ECU SEM RESPOSTA' : !hasFreshEvidence ? '● SEM EVIDÊNCIA ATUAL' : normal ? '● SEM ALERTAS IDENTIFICADOS' : '● ATENÇÃO NECESSÁRIA';
+  const healthHint = !obdStatus.ecuConnected
+    ? (state.dtcs.length ? 'ECU sem resposta; registros anteriores foram preservados, mas não são tratados como atuais.' : 'ECU sem resposta atual; não é possível confirmar o estado dos DTCs.')
+    : !hasFreshEvidence ? 'Aguardando leituras reais recentes da ECU.'
+    : activeDtcs.length ? activeDtcs.length + ' DTC(s) atualizado(s) recentemente pela ECU.'
+    : state.dtcs.length ? 'Nenhum DTC atual revalidado; registros anteriores permanecem no histórico.'
+    : 'Nenhum DTC registrado.';
   return <SafeAreaView style={styles.container} edges={["top","bottom","left","right"]}><ScrollView contentContainerStyle={[styles.content,{paddingHorizontal:layout.horizontalPadding}]} showsHorizontalScrollIndicator={false}><View style={[styles.screenFrame,{maxWidth:layout.maxContentWidth}]}>
     <View style={styles.header}><Text style={styles.title}>CENTRAL DE SAÚDE</Text><Text style={styles.subtitle}>EVIDÊNCIAS • DTC • HIPÓTESES</Text></View>
-    <View style={[styles.health, normal ? styles.healthOk : styles.healthWarn]}><Text style={normal ? styles.bigOk : styles.bigWarn}>{normal ? '● SISTEMA NORMAL' : '● ATENÇÃO NECESSÁRIA'}</Text><Text style={styles.hint}>{activeDtcs.length ? activeDtcs.length + ' DTC ativo(s).' : (state.dtcs.length ? state.dtcs.length + ' registro(s) histórico(s), sem DTC ativo.' : 'Nenhum DTC registrado.')}</Text></View>
+    <View style={[styles.health, normal ? styles.healthOk : styles.healthWarn]}><Text style={normal ? styles.bigOk : styles.bigWarn}>{headline}</Text><Text style={styles.hint}>{healthHint}</Text></View>
     <Text style={styles.section}>CONEXÃO</Text>
     <View style={[styles.infoGrid, layout.landscape && styles.infoGridLandscape]}>
       <View style={[styles.row, layout.landscape && styles.gridRow]}><Text style={styles.name}>Bluetooth</Text><Text style={state.obd.connected?styles.ok:styles.muted}>{state.obd.connected?'CONECTADO':'AGUARDANDO'}</Text></View>
-      <View style={[styles.row, layout.landscape && styles.gridRow]}><Text style={styles.name}>ECU</Text><Text style={state.obd.ecuValidatedAt?styles.ok:styles.muted}>{state.obd.ecuValidatedAt?'VALIDADA':'NÃO VALIDADA'}</Text></View>
+      <View style={[styles.row, layout.landscape && styles.gridRow]}><Text style={styles.name}>ECU</Text><Text style={obdStatus.ecuConnected?styles.ok:styles.muted}>{obdStatus.ecuConnected?'RESPONDENDO':'SEM RESPOSTA ATUAL'}</Text></View>
     </View>
     <Text style={styles.section}>CONTEXTO OPERACIONAL</Text>
     <View style={[styles.contextGrid, layout.landscape && styles.infoGridLandscape]}>
@@ -31,9 +47,12 @@ export default function SaudeScreen() {
       <View style={styles.context}><Text style={styles.contextText}>{context.reason}</Text></View>
     </View>
     <Text style={styles.section}>FALHAS</Text>
-    {!activeDtcs.length?<View style={styles.empty}><Text style={styles.emptyText}>{state.dtcs.length ? 'Nenhum DTC ativo. Há apenas histórico registrado.' : 'Nenhum DTC armazenado.'}</Text></View>:activeDtcs.map(d=>{const definition=getDtcDefinition(d.code);return <View key={d.code} style={styles.row}><View style={{flex:1}}><Text style={styles.name}>{d.code} • {definition?.name ?? 'Descrição não catalogada localmente'}</Text><Text style={styles.detail}>{definition?.description ?? 'Código recebido da ECU sem descrição local detalhada.'}</Text><Text style={styles.detail}>{d.status} • {d.occurrences} ocorrência(s) • fonte {d.source}</Text></View><Text style={styles.warn}>ATENÇÃO</Text></View>})}
+    {!activeDtcs.length?<View style={styles.empty}><Text style={styles.emptyText}>{!obdStatus.ecuConnected ? (state.dtcs.length ? 'ECU sem resposta; códigos anteriores ficam preservados no histórico.' : 'ECU sem resposta atual; não é possível confirmar DTCs.') : (state.dtcs.length ? 'Nenhum DTC atual revalidado; registros anteriores permanecem no histórico.' : 'Nenhum DTC armazenado.')}</Text></View>:activeDtcs.map(d=>{const definition=getDtcDefinition(d.code);return <View key={d.code} style={styles.row}><View style={{flex:1}}><Text style={styles.name}>{d.code} • {definition?.name ?? 'Descrição não catalogada localmente'}</Text><Text style={styles.detail}>{definition?.description ?? 'Código recebido da ECU sem descrição local detalhada.'}</Text><Text style={styles.detail}>{d.status} • {d.occurrences} ocorrência(s) • fonte {d.source}</Text></View><Text style={styles.warn}>ATENÇÃO</Text></View>})}
     <Text style={styles.section}>HIPÓTESES LOCAIS</Text>
     {!diagnostic.hypotheses.length?<View style={styles.empty}><Text style={styles.emptyText}>Ainda não há evidência suficiente para gerar hipótese.</Text></View>:diagnostic.hypotheses.map(h=><View key={h.id} style={styles.hyp}><View style={styles.rowHead}><Text style={styles.name}>{h.label}</Text><Text style={styles.score}>{Math.round(h.score*100)}%</Text></View><Text style={styles.detail}>CONFIANÇA: {h.confidence}</Text>{h.evidence.map((e,i)=><Text key={i} style={styles.evidence}>• {e.text}</Text>)}<Text style={styles.next}>PRÓXIMOS TESTES: {h.nextTests.join(' • ')}</Text></View>)}
+    {diagnostic.blockedStaleObservations>0?<Text style={styles.detail}>LEITURAS ANTIGAS IGNORADAS: {diagnostic.blockedStaleObservations}.</Text>:null}
+    {diagnostic.blockedStaleDtcs>0?<Text style={styles.detail}>DTCs SEM ATUALIZAÇÃO RECENTE IGNORADOS: {diagnostic.blockedStaleDtcs}.</Text>:null}
+    {diagnostic.disconnectedEvidenceIgnored?<Text style={styles.detail}>SEM RESPOSTA DA ECU: evidências OBD armazenadas não foram usadas como diagnóstico atual.</Text>:null}
     <Text style={styles.disclaimer}>{diagnostic.disclaimer}</Text>
     <Link href="/laboratorio" asChild><TouchableOpacity style={styles.primary}><Text style={styles.primaryText}>🔧 EXECUTAR NOVO DIAGNÓSTICO</Text></TouchableOpacity></Link>
     <Link href="/" asChild><TouchableOpacity style={styles.back}><Text style={styles.backText}>← VOLTAR AO COCKPIT</Text></TouchableOpacity></Link>
