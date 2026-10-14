@@ -83,7 +83,7 @@ function renderEvent(state: MerivaPersistedState, event: 'SESSION_START' | 'SESS
       const dtcLastSeenMs = Date.parse(dtc.lastSeen);
       const dtcSessionEvidence = !Number.isFinite(dtcLastSeenMs)
         ? 'HORÁRIO_NÃO_VALIDADO'
-        : dtcLastSeenMs > eventTimestampMs
+        : dtcLastSeenMs > eventTimestampMs + diagnosticPolicy.freshness.maxFutureClockSkewMs
           ? 'HORÁRIO_POSTERIOR_AO_EVENTO_REVISAR'
           : Number.isFinite(sessionStartedAtMs) && dtcLastSeenMs < sessionStartedAtMs
             ? 'REGISTRO_ANTERIOR_À_SESSÃO'
