@@ -156,7 +156,7 @@ function normalizeAdapterAddress(address: string | undefined | null): string {
 }
 
 function normalizeVehicleVin(vin: string | undefined | null): string | null {
-  const normalized = (vin ?? '').trim().replace(/\\s+/g, '').toUpperCase();
+  const normalized = (vin ?? '').trim().replace(/\s+/g, '').toUpperCase();
   return normalized || null;
 }
 
@@ -182,7 +182,7 @@ export function isPidDiscoveryCacheReusable(
   const ageMs = nowMs - discoveredAtMs;
   if (!Number.isFinite(discoveredAtMs) || ageMs < 0 || ageMs > PID_DISCOVERY_CACHE_TTL_MS) return false;
 
-  const supported = new Set(cache.supportedPids.map((pid) => String(pid).replace(/\\s/g, '').toUpperCase()));
+  const supported = new Set(cache.supportedPids.map((pid) => String(pid).replace(/\s/g, '').toUpperCase()));
   if (!supported.has('010C') || Array.from(supported).some((pid) => !/^01[0-9A-F]{2}$/.test(pid))) return false;
 
   const cacheVin = normalizeVehicleVin(cache.vehicleVin);
@@ -354,7 +354,7 @@ async function createRealElmSessionAttempt(
     let pidDiscoverySource: RealElmConnection['pidDiscoverySource'] = 'CACHE';
 
     if (cacheReusable && pidDiscoveryCache) {
-      supportedPids = Array.from(new Set(pidDiscoveryCache.supportedPids.map((pid) => pid.replace(/\\s/g, '').toUpperCase()))).sort();
+      supportedPids = Array.from(new Set(pidDiscoveryCache.supportedPids.map((pid) => pid.replace(/\s/g, '').toUpperCase()))).sort();
       logBluetoothDiagnostic('PID_DISCOVERY_CACHE_REUSED', {
         adapterAddress: device.address,
         protocol: negotiatedProtocol,
