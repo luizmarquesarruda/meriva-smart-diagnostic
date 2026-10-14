@@ -1012,7 +1012,7 @@ test('diário mostra leituras recentes por PID e rotula DTC antigo sem revalidar
   state.lastReadings = [
     { pid: '010C', name: 'Engine RPM', value: 700, unit: 'rpm', status: 'RESPONDEU', timestamp: '2026-10-14T11:00:10.000Z', source: 'REAL' },
     { pid: '010C', name: 'Engine RPM', value: 900, unit: 'rpm', status: 'RESPONDEU', timestamp: '2026-10-14T12:00:10.000Z', source: 'REAL' },
-    { pid: '010C', name: 'Engine RPM', value: 800, unit: 'rpm', status: 'RESPONDEU', timestamp: '2026-10-14T12:00:19.000Z', source: 'REAL' },
+    { pid: '01 0C', name: 'Engine RPM', value: 800, unit: 'rpm', status: 'RESPONDEU', timestamp: '2026-10-14T12:00:19.000Z', source: 'REAL' },
     { pid: '010D', name: 'Vehicle Speed', value: 35, unit: 'km/h', status: 'RESPONDEU', timestamp: '2026-10-14T12:02:00.000Z', source: 'REAL' },
   ];
   state.dtcs = [{
