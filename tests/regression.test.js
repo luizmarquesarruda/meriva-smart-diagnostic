@@ -454,6 +454,50 @@ async function testEcuValidationGate() {
   assert.strictEqual(manager.isValidEcuProbe({ status: 'OK', response: '41 0B 25', command: '010C', elapsedMs: 10, attempt: 1 }), false);
   assert.strictEqual(manager.MAX_BLUETOOTH_ATTEMPTS, 20);
   assert.strictEqual(manager.BLUETOOTH_RETRY_INTERVAL_MS, 8000);
+
+  const now = Date.now();
+  const cache = {
+    supportedPids: ['0105', '010C', '010D'],
+    protocol: 'ISO 14230-4 KWP FAST',
+    discoveredAt: new Date(now - 60_000).toISOString(),
+    adapterAddress: 'AA:BB:CC:DD:EE:01',
+    vehicleVin: '1HGCM82633A004352',
+  };
+  assert.strictEqual(
+    manager.isPidDiscoveryCacheReusable(cache, 'aa:bb:cc:dd:ee:01', cache.protocol, cache.vehicleVin, now),
+    true,
+    'fresh cache should reuse the same adapter, protocol, and VIN',
+  );
+  assert.strictEqual(
+    manager.isPidDiscoveryCacheReusable(cache, 'AA:BB:CC:DD:EE:02', cache.protocol, cache.vehicleVin, now),
+    false,
+    'cache must not cross Bluetooth adapters',
+  );
+  assert.strictEqual(
+    manager.isPidDiscoveryCacheReusable(cache, 'AA:BB:CC:DD:EE:01', 'ISO 9141-2', cache.vehicleVin, now),
+    false,
+    'cache must not cross negotiated protocols',
+  );
+  assert.strictEqual(
+    manager.isPidDiscoveryCacheReusable(cache, 'AA:BB:CC:DD:EE:01', cache.protocol, '2HGFA16584H000001', now),
+    false,
+    'cache must not cross known vehicle VINs',
+  );
+  assert.strictEqual(
+    manager.isPidDiscoveryCacheReusable(cache, 'AA:BB:CC:DD:EE:01', cache.protocol, undefined, now),
+    false,
+    'VIN-specific cache cannot be reused when the current vehicle VIN is unknown',
+  );
+  assert.strictEqual(
+    manager.isPidDiscoveryCacheReusable(cache, 'AA:BB:CC:DD:EE:01', cache.protocol, cache.vehicleVin, now + manager.PID_DISCOVERY_CACHE_TTL_MS + 1),
+    false,
+    'cache older than 24 hours must be rediscovered',
+  );
+  assert.strictEqual(
+    manager.isPidDiscoveryCacheReusable({ ...cache, adapterAddress: undefined }, 'AA:BB:CC:DD:EE:01', cache.protocol, cache.vehicleVin, now),
+    false,
+    'legacy caches without adapter identity must be rebuilt safely',
+  );
 }
 
 async function testPidScanner() {
