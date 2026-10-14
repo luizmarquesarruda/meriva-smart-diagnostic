@@ -39,7 +39,7 @@ function renderHistory(entries: string[]): string {
   // labels alphabetically moves legacy "DATA DESCONHECIDA" entries after newer
   // snapshots and makes the global sequence look corrupted.
   const firstSequence = (items: string[]) => Math.min(...items.map((entry) => {
-    const match = entry.match(/NÚMERO:\\s*(\\d+)/);
+    const match = entry.match(/NÚMERO:\s*(\d+)/);
     return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
   }));
   const orderedDates = Array.from(groups.keys()).sort((a, b) => {
