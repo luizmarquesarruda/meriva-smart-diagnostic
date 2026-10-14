@@ -1,6 +1,9 @@
 import * as FileSystem from 'expo-file-system';
 import type { MerivaPersistedState } from './autosaveState';
 import { MAX_VALID_TRIP_CONSUMPTION_KML } from '../trip/tripRecorder';
+import diagnosticPolicy from '../knowledge/diagnostic_policy.json';
+
+const ACTIVE_DTC_STATUSES = new Set<string>(diagnosticPolicy.activeDtcStatuses);
 
 /**
  * Histórico compacto de sessões ECU, separado do snapshot mutável do autosave.
@@ -52,20 +55,27 @@ function renderEvent(state: MerivaPersistedState, event: 'SESSION_START' | 'SESS
   ];
   const eventTimestampMs = Date.parse(timestamp);
   const sessionStartedAtMs = Date.parse(state.obd.lastConnectedAt ?? '');
-  const realReadings = state.lastReadings.filter((reading) => {
-    if (reading.source !== 'REAL') return false;
+  const latestReadingByPid = new Map<string, MerivaPersistedState['lastReadings'][number]>();
+  for (const reading of state.lastReadings) {
+    if (reading.source !== 'REAL') continue;
     const readingTimestampMs = Date.parse(reading.timestamp);
-    if (!Number.isFinite(readingTimestampMs) || readingTimestampMs > eventTimestampMs) return false;
-    // Older snapshots may not have lastConnectedAt; preserve them rather than
-    // guessing. When present, use it to exclude stale readings from prior sessions.
-    return !Number.isFinite(sessionStartedAtMs) || readingTimestampMs >= sessionStartedAtMs;
-  });
+    if (!Number.isFinite(readingTimestampMs)) continue;
+    if (readingTimestampMs > eventTimestampMs + diagnosticPolicy.freshness.maxFutureClockSkewMs) continue;
+    if (eventTimestampMs - readingTimestampMs > diagnosticPolicy.freshness.dailyReadingWindowMs) continue;
+    // When available, the session boundary also excludes readings from a prior ignition.
+    if (Number.isFinite(sessionStartedAtMs) && readingTimestampMs < sessionStartedAtMs) continue;
+    const pid = reading.pid.replace(/\\s/g, '').toUpperCase();
+    const previous = latestReadingByPid.get(pid);
+    if (!previous || Date.parse(reading.timestamp) > Date.parse(previous.timestamp)) latestReadingByPid.set(pid, reading);
+  }
+  const realReadings = Array.from(latestReadingByPid.values())
+    .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp));
   if (realReadings.length) {
     for (const reading of realReadings) {
       lines.push(`${reading.pid} ${reading.name}: ${reading.value ?? 'N/D'} ${reading.unit} | ${reading.status} | ${reading.timestamp}`);
     }
   } else {
-    lines.push('N/D');
+    lines.push('N/D (nenhuma leitura REAL_OBD nos últimos 120 s)');
   }
   lines.push('', '[CÓDIGOS DE FALHA REGISTRADOS]');
   if (state.dtcs.length) {
@@ -80,7 +90,15 @@ function renderEvent(state: MerivaPersistedState, event: 'SESSION_START' | 'SESS
             : Number.isFinite(sessionStartedAtMs)
               ? 'ATUALIZADO_NESTA_SESSÃO'
               : 'SESSÃO_NÃO_CORRELACIONADA';
-      lines.push(`${dtc.code} | status=${dtc.status} | evidência=${dtcSessionEvidence} | ocorrências=${dtc.occurrences} | última=${dtc.lastSeen} | fonte=${dtc.source}`);
+      const dtcStatus = String(dtc.status ?? '').toUpperCase();
+      const dtcIsFresh = dtc.source === 'REAL_OBD'
+        && ACTIVE_DTC_STATUSES.has(dtcStatus)
+        && Number.isFinite(dtcLastSeenMs)
+        && dtcLastSeenMs <= eventTimestampMs + diagnosticPolicy.freshness.maxFutureClockSkewMs
+        && eventTimestampMs - dtcLastSeenMs <= diagnosticPolicy.freshness.maxEvidenceAgeMs
+        && (!Number.isFinite(sessionStartedAtMs) || dtcLastSeenMs >= sessionStartedAtMs);
+      const displayedStatus = dtcIsFresh ? dtc.status : 'HISTÓRICO/SEM_REVALIDAÇÃO';
+      lines.push(`${dtc.code} | status=${displayedStatus} | status original=${dtc.status} | evidência=${dtcSessionEvidence} | ocorrências=${dtc.occurrences} | última=${dtc.lastSeen} | fonte=${dtc.source}`);
     }
   } else {
     lines.push('N/D');
