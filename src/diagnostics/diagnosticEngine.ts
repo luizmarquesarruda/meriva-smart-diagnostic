@@ -2,10 +2,10 @@ import type { DtcRecord, PidObservation, VehicleCondition } from '../types/sourc
 import ruleCatalog from '../knowledge/diagnostic_rules.json';
 import sensorTestCatalogJson from '../knowledge/sensor_tests.json';
 
-export interface DiagnosticInput { observations: PidObservation[]; dtcs?: DtcRecord[]; condition?: VehicleCondition; }
+export interface DiagnosticInput { observations: PidObservation[]; dtcs?: DtcRecord[]; condition?: VehicleCondition; ecuConnected?: boolean; }
 export interface DiagnosticEvidence { ruleId: string; text: string; source: 'DTC' | 'PID'; pid?: string; dtc?: string; value?: number; }
 export interface DiagnosticHypothesis { id: string; label: string; score: number; confidence: 'LOW' | 'MEDIUM' | 'HIGH'; evidence: DiagnosticEvidence[]; nextTests: string[]; }
-export interface DiagnosticResult { engine: 'LOCAL_EVIDENCE_ENGINE'; version: 1; generatedAt: string; hypotheses: DiagnosticHypothesis[]; blockedSimulationSamples: number; blockedNonLiveDtcs: number; disclaimer: string; }
+export interface DiagnosticResult { engine: 'LOCAL_EVIDENCE_ENGINE'; version: 1; generatedAt: string; hypotheses: DiagnosticHypothesis[]; blockedSimulationSamples: number; blockedNonLiveDtcs: number; blockedStaleObservations: number; blockedStaleDtcs: number; disconnectedEvidenceIgnored: boolean; disclaimer: string; }
 
 interface Rule { id: string; trigger: { dtc?: string; combinedTrimMin?: number; combinedTrimMax?: number; condition?: VehicleCondition; mapMinKpa?: number; }; hypothesis: string; baseScore: number; tests: string[]; }
 
@@ -20,6 +20,15 @@ const ACTIVE_DTC_STATUSES = new Set(['CONFIRMED', 'PENDING', 'PERMANENT', 'CURRE
 
 function isSimulation(item: PidObservation): boolean { return String(item.source ?? '').trim().toUpperCase() === 'SIMULACAO'; }
 function isLiveObd(item: PidObservation): boolean { return String(item.source ?? '').trim().toUpperCase() === 'REAL_OBD'; }
+
+/** Evidence older than two minutes is not presented as a current diagnosis. */
+export const MAX_DIAGNOSTIC_EVIDENCE_AGE_MS = 120_000;
+export function isFreshDiagnosticTimestamp(timestamp: string, nowMs = Date.now()): boolean {
+  const timestampMs = Date.parse(timestamp);
+  return Number.isFinite(timestampMs)
+    && timestampMs <= nowMs + 5_000
+    && nowMs - timestampMs <= MAX_DIAGNOSTIC_EVIDENCE_AGE_MS;
+}
 
 function pidValue(observations: PidObservation[], pid: string): PidObservation | undefined {
   return observations
@@ -38,15 +47,32 @@ function isTrimContext(condition?: VehicleCondition): boolean {
 }
 
 export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
+  const nowMs = Date.now();
   const rawObservations = input.observations ?? [];
-  const observations = rawObservations.filter((item) => !isSimulation(item));
+  const realSourceObservations = rawObservations.filter(isLiveObd);
+  const blockedStaleObservations = realSourceObservations.filter((item) =>
+    !isFreshDiagnosticTimestamp(item.timestamp, nowMs),
+  ).length;
+  const observations = input.ecuConnected === false ? [] : realSourceObservations.filter((item) =>
+    item.value !== null
+    && Number.isFinite(item.value)
+    && isFreshDiagnosticTimestamp(item.timestamp, nowMs),
+  );
   const rawDtcs = input.dtcs ?? [];
-  const liveDtcs = rawDtcs.filter((item) =>
+  const activeSourceDtcs = rawDtcs.filter((item) =>
     String(item.source ?? '').trim().toUpperCase() === 'REAL_OBD'
     && ACTIVE_DTC_STATUSES.has(String(item.status ?? '').trim().toUpperCase()),
   );
+  const blockedStaleDtcs = activeSourceDtcs.filter((item) =>
+    !isFreshDiagnosticTimestamp(item.lastSeen, nowMs),
+  ).length;
+  const liveDtcs = input.ecuConnected === false ? [] : activeSourceDtcs.filter((item) =>
+    isFreshDiagnosticTimestamp(item.lastSeen, nowMs),
+  );
   const blockedSimulationSamples = rawObservations.filter(isSimulation).length;
-  const blockedNonLiveDtcs = rawDtcs.length - liveDtcs.length;
+  const blockedNonLiveDtcs = rawDtcs.length - activeSourceDtcs.length;
+  const disconnectedEvidenceIgnored = input.ecuConnected === false
+    && (realSourceObservations.length > 0 || activeSourceDtcs.length > 0);
   const hypotheses = new Map<string, DiagnosticHypothesis>();
 
   const add = (rule: Rule, evidence: DiagnosticEvidence): void => {
@@ -73,7 +99,7 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
     if (!dtc) continue;
     add(rule, {
       ruleId: rule.id,
-      text: 'DTC ' + dtc.code + ' presente com status ' + dtc.status + '; fonte REAL_OBD.',
+      text: 'DTC ' + dtc.code + ' presente com status ' + dtc.status + '; última leitura válida em ' + dtc.lastSeen + '; fonte REAL_OBD.',
       source: 'DTC',
       dtc: dtc.code,
     });
