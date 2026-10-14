@@ -89,8 +89,8 @@ const fullHistory = full.split('[HISTORY]')[1].split('[LEARNING]')[0];
 const fullRows = fullHistory.split(/\r?\n/).filter((line) => line.includes('fonte=REAL_OBD') && /km \|/.test(line));
 assert.strictEqual(fullRows.length, 17, 'full export should preserve all real trips, including rows with invalid fuel coverage');
 assert.ok(
-  fullHistory.includes('10 km | 1 L | N/D | fonte=REAL_OBD'),
-  'legacy consumption above 30 km/L must display N/D without discarding its trip row',
+  fullHistory.includes('10 km | N/D (consumo implausível) | N/D | fonte=REAL_OBD'),
+  'legacy consumption above 30 km/L must mark both fuel amount and average unavailable without discarding its trip row',
 );
 assert.ok(!fullHistory.includes('122.819 km/L'), 'implausible legacy consumption must not appear as valid');
 assert.ok(fullHistory.includes('25 km | N/D (cobertura insuficiente) | N/D | fonte=REAL_OBD'), 'full TXT must disclose a dropped fuel-integration interval');
