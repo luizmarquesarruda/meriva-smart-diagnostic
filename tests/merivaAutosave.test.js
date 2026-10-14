@@ -999,6 +999,66 @@ test('diário correlaciona viagens e DTCs com a sessão ECU correta', async () =
   assert.ok(rendered.includes('evidência=REGISTRO_ANTERIOR_À_SESSÃO'), 'DTCs last seen before the current session must be labelled as prior evidence');
 });
 
+test('diário mostra leituras recentes por PID e rotula DTC antigo sem revalidar', async () => {
+  resetFS();
+  const history = loadTs(path.join(ROOT, 'src/meriva/dailyObdHistory.ts'));
+  const stateModule = loadTs(path.join(ROOT, 'src/meriva/autosaveState.ts'));
+  const state = stateModule.createEmptyMerivaState();
+  state.obd = {
+    connected: false,
+    adapterName: 'OBDII',
+    lastConnectedAt: '2026-10-14T11:00:00.000Z',
+  };
+  state.lastReadings = [
+    { pid: '010C', name: 'Engine RPM', value: 700, unit: 'rpm', status: 'RESPONDEU', timestamp: '2026-10-14T11:00:10.000Z', source: 'REAL' },
+    { pid: '010C', name: 'Engine RPM', value: 900, unit: 'rpm', status: 'RESPONDEU', timestamp: '2026-10-14T12:00:10.000Z', source: 'REAL' },
+    { pid: '010C', name: 'Engine RPM', value: 800, unit: 'rpm', status: 'RESPONDEU', timestamp: '2026-10-14T12:00:19.000Z', source: 'REAL' },
+    { pid: '010D', name: 'Vehicle Speed', value: 35, unit: 'km/h', status: 'RESPONDEU', timestamp: '2026-10-14T12:02:00.000Z', source: 'REAL' },
+  ];
+  state.dtcs = [{
+    code: 'P0135',
+    status: 'CURRENT',
+    firstSeen: '2026-10-10T10:00:00.000Z',
+    lastSeen: '2026-10-10T10:00:00.000Z',
+    occurrences: 5,
+    source: 'REAL_OBD',
+    historical: false,
+    confirmed: true,
+  }];
+
+  const target = BASE + '/VIAGENS/meriva_smart_daily_obd_history.txt';
+  await history.appendDailyObdSessionEvent(BASE, state, 'SESSION_END', '2026-10-14T12:00:20.000Z');
+  const rendered = files.get(target);
+  assert.ok(rendered.includes('010C Engine RPM: 800 rpm'), 'resumo deve exibir a leitura mais recente do PID');
+  assert.ok(!rendered.includes('010C Engine RPM: 700 rpm'), 'leitura de uma hora atrás deve ser excluída');
+  assert.ok(!rendered.includes('010C Engine RPM: 900 rpm'), 'leitura mais antiga do mesmo PID não deve duplicar a linha');
+  assert.ok(!rendered.includes('010D Vehicle Speed'), 'timestamp muito posterior ao evento deve ser excluído');
+  assert.ok(rendered.includes('status=HISTÓRICO/SEM_REVALIDAÇÃO | status original=CURRENT'),
+    'DTC antigo não deve ser apresentado como atual só porque o status persistido era CURRENT');
+});
+
+test('formatador TXT distingue DTC recente de registro sem revalidação', async () => {
+  resetFS();
+  const formatter = loadTs(path.join(ROOT, 'src/meriva/autosaveTxtFormatter.ts'));
+  const state = loadTs(path.join(ROOT, 'src/meriva/autosaveState.ts')).createEmptyMerivaState();
+  state.dtcs = [{
+    code: 'P0420',
+    status: 'CURRENT',
+    firstSeen: '2026-10-10T10:00:00.000Z',
+    lastSeen: '2026-10-10T10:00:00.000Z',
+    occurrences: 5,
+    source: 'REAL_OBD',
+    historical: false,
+    confirmed: true,
+  }];
+  const rendered = formatter.formatAutoSaveTxt(state, {
+    appVersion: '1.0.1',
+    exportedAt: '2026-10-14T12:00:00.000Z',
+  });
+  assert.ok(rendered.includes('status=CURRENT validade=HISTÓRICO_SEM_REVALIDAÇÃO'),
+    'o status original deve ser preservado, mas marcado como não revalidado recentemente');
+});
+
 test('diário sanitiza médias legadas acima de 30 km/L ao acrescentar evento', async () => {
   resetFS();
   const history = loadTs(path.join(ROOT, 'src/meriva/dailyObdHistory.ts'));
