@@ -20,9 +20,9 @@ function historyPath(basePath: string): string {
 }
 
 function entryLocalDate(entry: string): string {
-  const explicit = entry.match(/DATA LOCAL:\\s*(\\d{4}-\\d{2}-\\d{2})/);
+  const explicit = entry.match(/DATA LOCAL:\s*(\d{4}-\d{2}-\d{2})/);
   if (explicit) return explicit[1];
-  const exportedAt = entry.match(/Exported At:\\s*(\\d{4}-\\d{2}-\\d{2})/);
+  const exportedAt = entry.match(/Exported At:\s*(\d{4}-\d{2}-\d{2})/);
   if (exportedAt) return exportedAt[1];
   return 'DATA DESCONHECIDA';
 }
@@ -40,7 +40,7 @@ function renderHistory(entries: string[]): string {
     output.push('', `========== DIA: ${date} ==========`, ...(groups.get(date) ?? []));
     output.push(`========== FIM DO DIA ==========`);
   }
-  return `${output.join('\\n\\n')}\\n`;
+  return `${output.join('\n\n')}\n`;
 }
 
 function splitEntries(content: string): string[] {
