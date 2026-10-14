@@ -927,6 +927,49 @@ test('recuperação após encerramento abrupto limpa conexão fantasma e registr
 });
 
 
+
+test('diário correlaciona viagens e DTCs com a sessão ECU correta', async () => {
+  resetFS();
+  const history = loadTs(path.join(ROOT, 'src/meriva/dailyObdHistory.ts'));
+  const state = loadTs(path.join(ROOT, 'src/meriva/autosaveState.ts')).createEmptyMerivaState();
+  state.obd = {
+    connected: false,
+    adapterName: 'OBDII',
+    lastConnectedAt: '2026-10-10T12:00:00.000Z',
+  };
+  state.driveCycles = [
+    {
+      id: 'previous-session-trip', source: 'REAL_OBD',
+      startedAt: '2026-10-09T12:00:00.000Z', finishedAt: '2026-10-09T12:01:00.000Z',
+      distanceTotalKm: 1, fuelUsedL: 0.1, avgFuelConsumptionKml: 10, fuelDataValid: true,
+      maxSpeedKmh: 40, telemetrySamples: [],
+    },
+    {
+      id: 'current-session-trip', source: 'REAL_OBD',
+      startedAt: '2026-10-10T12:00:02.000Z', finishedAt: '2026-10-10T12:00:09.000Z',
+      distanceTotalKm: 0.2, fuelUsedL: 0.02, avgFuelConsumptionKml: 10, fuelDataValid: true,
+      maxSpeedKmh: 25, telemetrySamples: [],
+    },
+    {
+      id: 'future-trip', source: 'REAL_OBD',
+      startedAt: '2026-10-10T12:00:25.000Z', finishedAt: '2026-10-10T12:01:00.000Z',
+      distanceTotalKm: 0.5, fuelUsedL: 0.05, avgFuelConsumptionKml: 10, fuelDataValid: true,
+      maxSpeedKmh: 30, telemetrySamples: [],
+    },
+  ];
+  state.dtcs = [{
+    code: 'P0135', status: 'CURRENT', occurrences: 1,
+    firstSeen: '2026-10-09T10:00:00.000Z', lastSeen: '2026-10-09T10:00:00.000Z', source: 'REAL_OBD',
+  }];
+  await history.appendDailyObdSessionEvent(BASE, state, 'SESSION_END', '2026-10-10T12:00:20.000Z');
+  const rendered = files.get(BASE + '/VIAGENS/meriva_smart_daily_obd_history.txt');
+  assert.ok(rendered.includes('current-session-trip') === false, 'trip IDs are not exported; assert using the unique start time');
+  assert.ok(rendered.includes('2026-10-10T12:00:02.000Z -> 2026-10-10T12:00:09.000Z'), 'trip from the active session should be retained');
+  assert.ok(!rendered.includes('2026-10-09T12:00:00.000Z -> 2026-10-09T12:01:00.000Z'), 'trip from a prior session must not be repeated');
+  assert.ok(!rendered.includes('2026-10-10T12:00:25.000Z -> 2026-10-10T12:01:00.000Z'), 'trip ending after the event must not appear in the snapshot');
+  assert.ok(rendered.includes('evidência=REGISTRO_ANTERIOR_À_SESSÃO'), 'DTCs last seen before the current session must be labelled as prior evidence');
+});
+
 test('diário sanitiza médias legadas acima de 30 km/L ao acrescentar evento', async () => {
   resetFS();
   const history = loadTs(path.join(ROOT, 'src/meriva/dailyObdHistory.ts'));
