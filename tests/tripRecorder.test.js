@@ -145,3 +145,12 @@ assert.strictEqual(shouldFinalizeStoppedTrip(300_000, null), true, 'missing RPM 
 assert.strictEqual(shouldFinalizeStoppedTrip(Number.NaN, 0), false, 'invalid elapsed time must not close a trip');
 
 console.log('PASS trip recorder: GPS monotônico, timestamps, limiar de combustível e persistência REAL_OBD');
+// A mathematically calculable but implausible average must be invalidated.
+const implausible = new RealTripRecorder(1000, 0);
+implausible.addSample({ timestampMs: 1000, distanceKm: 0, speedKmh: 0, fuelRateLph: 10 });
+implausible.addSample({ timestampMs: 11000, distanceKm: 1, speedKmh: 36, fuelRateLph: 10 });
+implausible.addSample({ timestampMs: 21000, distanceKm: 2, speedKmh: 36, fuelRateLph: 10 });
+const implausibleCycle = implausible.buildDriveCycle(22000);
+assert.ok(implausibleCycle);
+assert.strictEqual(implausibleCycle.fuelDataValid, false, 'consumption above 30 km/L must be marked invalid');
+assert.strictEqual(implausibleCycle.avgFuelConsumptionKml, 0, 'invalid consumption must not be stored as a real average');
