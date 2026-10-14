@@ -926,6 +926,35 @@ test('recuperação após encerramento abrupto limpa conexão fantasma e registr
   m.disposeAutoSave();
 });
 
+
+test('diário sanitiza médias legadas acima de 30 km/L ao acrescentar evento', async () => {
+  resetFS();
+  const history = loadTs(path.join(ROOT, 'src/meriva/dailyObdHistory.ts'));
+  const stateModule = loadTs(path.join(ROOT, 'src/meriva/autosaveState.ts'));
+  const state = stateModule.createEmptyMerivaState();
+  state.obd = { connected: true, adapterName: 'OBDII' };
+  const target = BASE + '/VIAGENS/meriva_smart_daily_obd_history.txt';
+  files.set(target, [
+    'MERIVA SMART DIAGNOSTIC',
+    '========== DIA: 2026-10-10 ==========',
+    '--- EVENTO: SESSION_END | 2026-10-10T17:15:18.994Z ---',
+    '[VIAGENS REAIS RECENTES]',
+    '2026-10-09T12:28:24.188Z -> 2026-10-09T12:32:15.418Z | 1.025 km | 122.819 km/L | REAL_OBD',
+    '2026-10-10T17:10:20.279Z -> 2026-10-10T17:10:33.716Z | 0.223 km | 31.784 km/L | REAL_OBD',
+    '2026-10-10T17:10:36.631Z -> 2026-10-10T17:10:47.538Z | 0.156 km | 25.318 km/L | REAL_OBD',
+    '--- FIM DO EVENTO ---',
+    '========== FIM DO DIA ==========',
+  ].join('\\n'));
+
+  await history.appendDailyObdSessionEvent(BASE, state, 'SESSION_START', '2026-10-14T13:00:00.000Z');
+  const rendered = files.get(target);
+  assert.ok(rendered, 'diário atualizado deve continuar existindo');
+  assert.ok(!rendered.includes('122.819 km/L'), 'média legada extrema não deve continuar sendo apresentada como válida');
+  assert.ok(!rendered.includes('31.784 km/L'), 'média acima do teto deve ser substituída por N/D');
+  assert.ok(rendered.includes('| N/D | REAL_OBD'), 'a viagem deve ser preservada com consumo indisponível');
+  assert.ok(rendered.includes('25.318 km/L'), 'valores abaixo do teto não devem ser alterados por este filtro');
+});
+
 test('diário diário não sobrescreve arquivo existente quando a leitura falha', async () => {
   resetFS();
   const history = loadTs(path.join(ROOT, 'src/meriva/dailyObdHistory.ts'));
