@@ -2517,3 +2517,23 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Objetivo funcional: manter a validação conservadora do cache de PIDs por adaptador, protocolo e VIN conhecido, sem remover a proteção contra reutilização entre veículos.
 - Commit: `b6964df2151b548b101c6b87383f443b6a7c36d7`.
 - Validação: commit enviado para a branch de trabalho; aguardar a nova CI. Ainda não há evidência de TypeScript/testes/build aprovados após esta correção, nem validação física na Meriva/ELM327.
+
+## 2026-10-14 — Política JSON de autosave, histórico TXT e validação de PID
+
+### Performance de persistência
+- Criado `src/knowledge/autosave_policy.json` para centralizar debounce (1,5 s), checkpoint (45 s), janela de leituras (10 s), máximo de 50 leituras recentes, intervalo mínimo de 30 s entre snapshots TXT e limite de 1.000 snapshots.
+- `src/meriva/autosaveManager.ts` usa os valores da política em JSON e serializa `autosave.json` sem indentação, reduzindo o tamanho e o custo da serialização.
+- O autosave JSON continua recebendo o estado atual na cadência existente. O TXT histórico não é reescrito em cada alteração numérica: salva no intervalo configurado e sempre para os motivos forçados definidos no JSON (crítico, manual, background e fronteiras/recuperação de sessão).
+- O resumo TXT usa os limites de leituras, DTCs, viagens e configurações centralizados na política. A renderização foi ajustada para reduzir linhas em branco, mantendo os blocos diários.
+- Testes adicionados: validação do contrato JSON e regressão que comprova que o JSON recebe atualizações mesmo quando o snapshot TXT está dentro da janela de espera, e que o salvamento manual força uma nova entrada.
+
+### Revisão técnica do OBD-II
+- Referências consultadas: documentação Expo FileSystem, tabela de PIDs do projeto comunitário `obd2-elm327-pid-reference` e documentação do `python-OBD`.
+- `src/obd/parser.ts`: corrigida a interpretação do segundo byte do PID `0114`. Pela fórmula padronizada, o byte B calcula STFT como `(B × 100 / 128) - 100`; `0xFF` resulta em `99,21875%` (aprox. `99,22%`), não em um sentinela universal de ausência.
+- Atualizado `tests/regression.test.js` para proteger a tensão independente do byte A e o STFT de faixa completa; também foram adicionadas verificações da fórmula de `015E` (L/h) e `0152` (percentual de etanol).
+- Disponibilidade de qualquer PID continua dependente de bitmap e resposta real validada. A referência padrão não comprova suporte específico da ECU da Meriva.
+
+### Documentação e validação
+- Criado `docs/AUDITORIA_CONTINUIDADE_2026-10-14.md` com as mudanças, fórmulas, fontes e limites de evidência.
+- Validação pendente: a CI mais recente precisa concluir TypeScript, testes e build Android. Não declarar aprovação antes de ler os resultados. Não houve teste físico com ELM327/ECU nesta rodada.
+
