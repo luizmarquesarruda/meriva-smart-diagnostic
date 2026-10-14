@@ -1059,6 +1059,42 @@ test('formatador TXT distingue DTC recente de registro sem revalidação', async
     'o status original deve ser preservado, mas marcado como não revalidado recentemente');
 });
 
+test('diário marca litros e consumo N/D quando a integração teve lacunas', async () => {
+  resetFS();
+  const history = loadTs(path.join(ROOT, 'src/meriva/dailyObdHistory.ts'));
+  const stateModule = loadTs(path.join(ROOT, 'src/meriva/autosaveState.ts'));
+  const state = stateModule.createEmptyMerivaState();
+  state.obd = {
+    connected: false,
+    adapterName: 'OBDII',
+    lastConnectedAt: '2026-10-14T12:00:00.000Z',
+  };
+  state.driveCycles = [{
+    id: 'gap-trip',
+    source: 'REAL_OBD',
+    startedAt: '2026-10-14T12:00:00.000Z',
+    finishedAt: '2026-10-14T12:00:40.000Z',
+    distanceTotalKm: 1.2,
+    distanceIceKm: 1.2,
+    fuelUsedL: 0.12,
+    avgFuelConsumptionKml: 10,
+    fuelDataValid: false,
+    fuelCoverageComplete: false,
+    totalTimeHms: '00:00:40',
+    drivingTimeHms: '00:00:40',
+    standingTimeHms: '00:00:00',
+    avgDrivingSpeedKmh: 108,
+    maxSpeedKmh: 110,
+    telemetrySamples: [],
+    importedAt: '2026-10-14T12:00:40.000Z',
+  }];
+  const target = BASE + '/VIAGENS/meriva_smart_daily_obd_history.txt';
+  await history.appendDailyObdSessionEvent(BASE, state, 'SESSION_END', '2026-10-14T12:00:45.000Z');
+  const rendered = files.get(target);
+  assert.ok(rendered.includes('1.2 km | N/D (cobertura insuficiente) | N/D'),
+    'não apresentar combustível parcial como total válido depois de uma lacuna superior a 30 s');
+});
+
 test('diário sanitiza médias legadas acima de 30 km/L ao acrescentar evento', async () => {
   resetFS();
   const history = loadTs(path.join(ROOT, 'src/meriva/dailyObdHistory.ts'));
