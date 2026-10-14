@@ -2409,3 +2409,10 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Sem paralelismo ELM327; preservada a fila serial K-Line.
 - Ausência de resposta é tentativa sem valor inventado. Parada/perda mantém TXT parcial e não marca sucesso.
 - A CI deste commit deve confirmar TypeScript, testes, Expo Doctor e APK. Validação física segue pendente no veículo real.
+
+
+### Correção de robustez — normalização de identificadores PID
+- A auditoria do código identificou que normalizeSensorPid tinha uma regex escapada para corresponder a caracteres literais, em vez de whitespace real.
+- Corrigido o normalizador e acrescentado teste de regressão: normalizeSensorPid('01 0C') deve resultar em '010C'. A página já removia whitespace corretamente.
+- Nenhuma regra de suporte ou conclusão de sensor foi alterada.
+- CI desta correção: TypeScript, testes, Expo Doctor e build Android.

@@ -10,6 +10,7 @@ new Function('exports','require','module','__filename','__dirname',js)(mod.expor
 const c=require('../src/knowledge/sensor_tests.json'),e=mod.exports;
 const sample=(pid,value,status='RESPONDEU',readingNumber=1)=>({pid,name:pid,value,unit:['010B','0133'].includes(pid)?'kpa':'N/D',status,rawResponse:'41 '+pid.slice(2)+' RAW',elapsedMs:20,timestamp:new Date().toISOString(),readingNumber});
 const three=(pid,value,status='RESPONDEU')=>[sample(pid,value,status,1),sample(pid,value,status,2),sample(pid,value,status,3)];
+assert.equal(e.normalizeSensorPid('01 0C'),'010C','normaliza PID com espaços');
 assert.equal(e.MIN_SENSOR_TEST_READINGS,3);assert.equal(c.minimumReadingsPerPid,3);
 const plan=e.createSensorTestPlan(['010C','010B','0133','015E'],pid=>pid!=='015E');
 assert.deepEqual(plan.map(x=>x.pid),['010C','010B','0133']);

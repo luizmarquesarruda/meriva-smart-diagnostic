@@ -8,7 +8,7 @@ interface SensorTestCatalog{schemaVersion:number;catalogId:string;minimumReading
 const catalog=sensorTestCatalogJson as unknown as SensorTestCatalog;
 export const MIN_SENSOR_TEST_READINGS=catalog.minimumReadingsPerPid;
 export function getSensorTestCatalog():SensorTestCatalog{return catalog;}
-export function normalizeSensorPid(pid:string):string{return pid.replace(/\\s/g,'').toUpperCase();}
+export function normalizeSensorPid(pid:string):string{return pid.replace(/\s/g,'').toUpperCase();}
 export function createSensorTestPlan(supportedPids:string[],hasDefinition:(pid:string)=>boolean=()=>true):SensorTestDefinition[]{
  const supported=new Set(supportedPids.map(normalizeSensorPid));
  return catalog.tests.filter(test=>supported.has(normalizeSensorPid(test.pid))&&test.modes.length>0&&hasDefinition(test.pid));
