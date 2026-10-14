@@ -2478,3 +2478,35 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - A nova CI deve executar TypeScript, suíte completa, Expo Doctor e build/validação do APK Android. **Não considerar a rodada aprovada antes de todos os jobs terminarem com sucesso.**
 - Não houve teste de bancada, multímetro nem teste de estrada nesta rodada. Após CI verde, validar no veículo a resposta real da ECU, o agrupamento TXT e o início/parada do GPS conforme a conexão.
 
+
+
+## 2026-10-14 — Auditoria dos TXT, integridade de sessão e ordenação do autosave
+
+### Evidências nos arquivos fornecidos
+- meriva_smart_autosave_history.txt tinha 401 blocos para 200 números únicos (201 entradas duplicadas), embora o cabeçalho declarasse limite de 200. Também havia saltos na sequência.
+- meriva_smart_daily_obd_history.txt continha viagens de datas/sessões anteriores repetidas em vários eventos; por exemplo, um início de sessão em 10/10 listava uma viagem de 09/10. Também faltava um rótulo claro indicando quando o DTC havia sido registrado antes da sessão atual.
+- Foram encontradas médias históricas implausíveis como 122,819 km/L e 31,784 km/L. O gravador já tinha teto heurístico de 30 km/L, mas os TXT antigos e a exportação de autosave não aplicavam a mesma regra de apresentação.
+
+### Correções no código e regressões
+- src/meriva/autosaveHistoryTxt.ts: corrigida regex de ordenação numérica que estava escapada duas vezes; números são novamente reconhecidos na sequência de salvamentos.
+- O agrupamento de snapshots legados agora deriva DATA LOCAL do timestamp Exported At no fuso local do aparelho quando não existe a nova chave DATA LOCAL.
+- src/meriva/dailyObdHistory.ts: corrigida a quebra de linha real no saneamento de valores legados; sem isso o arquivo inteiro virava uma linha e eventos anteriores deixavam de ser reconhecidos/preservados.
+- O diário passa a marcar DTCs cuja última leitura antecede lastConnectedAt como evidência anterior à sessão, sem alterar o status persistido do código.
+- Resumos de viagem no diário são limitados à sessão ECU correspondente e ao horário do evento. Viagens futuras ou anteriores não são repetidas como se pertencessem à ignição atual.
+- src/meriva/autosaveTxtFormatter.ts e o diário passam a exibir N/D para consumo fora do intervalo heurístico válido, mantendo a linha da viagem e sem inventar outro valor.
+- Adicionados testes para: ordenação e deduplicação; conversão de data UTC para data local; preservação de quebras de linha e eventos concorrentes; separação de viagens por sessão; marcação temporal dos DTCs; ocultação de médias históricas acima de 30 km/L.
+
+### Commits desta rodada
+- f9088d50b251f703f70338e2333529b16880f516 — corrigir ordem numérica por blocos de data.
+- 76c090028692859b4ae0ee33f85000e89433785f e 05f6522ef187909c0ded55c3a6346702d8df27fe — migração de data local e teste de regressão.
+- 0b93f3806d71b7edd25b59048af2353706b5ee71, f3ed5ca36a6e39386789ba3e9fdf30e3178c44ec e 5684105caa7636c195eb19dead545a6f98995466 — saneamento de consumo legado e correções/testes de regex e quebra de linha.
+- 598add27ccd2178c61e184854efe90b89fc43c7a e 1666d432c7250ab72036ded570aba18199f1ba86 — quebra de linha corrigida no diário e nas fixtures de teste.
+- 3e85dd194897e15029a3b2568599d5dc240bd0a1 e 5f3bb78b854436a43f653baa4b9a58a1b86dbd1f — viagens e evidências DTC correlacionadas à sessão.
+- 4f7ea0117a359c991a4d69f625b41a80e4589c25 e ab83208f7718b3e205c76549c6f804ed9712bf78 — teto de consumo no exportador TXT e teste correspondente.
+
+### Validação e limites
+- A CI #1987 concluiu validate com sucesso, mas a compilação Android daquela execução foi cancelada por novos commits.
+- Uma execução intermediária (#1995) falhou em três testes; a causa foi a quebra de linha incorreta no saneamento/fixtures. As correções foram enviadas depois dessa execução.
+- A CI #2009 foi disparada para o código mais recente (ab83208f7718b3e205c76549c6f804ed9712bf78). Não declarar a rodada aprovada antes de validate e android-build terminarem com sucesso.
+- Nenhuma dessas validações substitui teste com ELM327/ECU no veículo. Os 30 km/L são um teto de plausibilidade heurístico, não uma especificação OEM nem uma medição de consumo real.
+
