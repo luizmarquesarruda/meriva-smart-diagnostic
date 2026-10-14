@@ -2445,3 +2445,36 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - O diário de sessões ECU (`meriva_smart_daily_obd_history.txt`) continua separado do histórico de snapshots.
 - A suíte de regressão permanece em arquivo de teste separado: `tests/merivaAutosave.test.js`; o teste 13 agora cobre o limite de 1.000, data local e agrupamento por dia.
 - Validação pendente: executar `node tests/merivaAutosave.test.js`/CI antes de considerar aprovado. Não foi feita validação local ou em hardware nesta alteração.
+
+## 2026-10-14 — Correção de integridade do histórico e evidências diagnósticas
+
+### Histórico TXT
+- Corrigidas as expressões de data do autosave: o leitor agora reconhece corretamente `DATA LOCAL: YYYY-MM-DD` e `Exported At`.
+- Corrigida a renderização de `DIA` e `FIM DO DIA`: o TXT usa quebras de linha reais, não os caracteres literais `\\n`. Isso também mantém o parser de blocos compatível com os próximos salvamentos.
+- O limite de 1.000 snapshots e o diário de sessões ECU independente são mantidos. O histórico do autosave não substitui o diário de eventos diários.
+
+### Testes de sensores
+- A contagem regressiva agora chega a `00:00` quando a estimativa expira, sem voltar artificialmente para um segundo.
+- Confirmado por leitura estática que os resultados da Central de Testes são gravados em `MERIVA_SMART/testes-sensores/`, separados dos snapshots e do diário de sessões.
+- O fluxo continua serial, usa somente PIDs anunciados pela ECU e exige três tentativas por PID; os limiares são heurísticos e não certificam saúde física/elétrica.
+
+### IA local e Central de Saúde
+- `src/diagnostics/diagnosticEngine.ts`: hipóteses com base em PIDs agora exigem fonte `REAL_OBD`, valor numérico finito e timestamp recente (até 120 segundos). Leituras ausentes, futuras ou antigas são excluídas e contabilizadas.
+- DTCs só alimentam hipóteses quando a fonte é `REAL_OBD`, o status é elegível e `lastSeen` está dentro da janela de 120 segundos.
+- Quando a ECU deixa de responder, observações/dados DTC guardados não são usados como evidência de defeito atual. O resultado informa quantas observações/DTCs antigos foram bloqueados e se a evidência foi ignorada por desconexão.
+- `app/saude.tsx`, `app/laboratorio.tsx` e a exportação TXT passam o estado da conexão ao motor de diagnóstico. A Central de Saúde copia o snapshot de estado mutável a cada atualização para refletir desconexões e novas leituras.
+
+### Auditoria de funcionalidades existentes
+- O ciclo OBD+GPS já bloqueia o começo da captura até haver ECU respondendo, encerra o registro GPS/viagem quando a ECU perde resposta e retoma apenas depois de recuperar resposta válida. Nenhuma consulta paralela foi introduzida.
+- A tela ligada usa `expo-keep-awake`; o relatório de sensores já fica em arquivo TXT independente e o consumo por viagem já rejeita médias acima do teto heurístico de 30 km/L. Estes fluxos foram revisados nesta rodada, mas não foram testados fisicamente no carro nesta alteração.
+
+### Regressões acrescentadas
+- `tests/merivaAutosave.test.js`: valida a data ISO, a correspondência do bloco diário e quebras de linha reais, além do limite de 1.000 snapshots.
+- `tests/diagnosticEngine.test.js`: cobre evidência antiga, timestamp futuro, DTC antigo e ECU desconectada.
+- `tests/sensorTestEngine.test.js`: protege a expiração da contagem regressiva, três leituras mínimas e o diretório separado do relatório.
+
+### Estado de validação
+- Alterações enviadas para a branch `fix/obd-trip-integrity-and-autosave-cap-20261014`.
+- A nova CI deve executar TypeScript, suíte completa, Expo Doctor e build/validação do APK Android. **Não considerar a rodada aprovada antes de todos os jobs terminarem com sucesso.**
+- Não houve teste de bancada, multímetro nem teste de estrada nesta rodada. Após CI verde, validar no veículo a resposta real da ECU, o agrupamento TXT e o início/parada do GPS conforme a conexão.
+
