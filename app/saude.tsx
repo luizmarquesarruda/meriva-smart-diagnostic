@@ -12,8 +12,18 @@ import { getSharedObdStatus } from '../src/obd/sharedConnection';
 
 export default function SaudeScreen() {
   const layout = useMidLayout();
-  const [state,setState]=useState(getAutoSaveState());
-  useEffect(()=>{const t=setInterval(()=>setState(getAutoSaveState()),1000);return()=>clearInterval(t)},[]);
+  const readHealthSnapshot = () => {
+    const current = getAutoSaveState();
+    return {
+      ...current,
+      obd: { ...current.obd },
+      lastReadings: [...current.lastReadings],
+      dtcs: [...current.dtcs],
+      driveCycles: [...current.driveCycles],
+    };
+  };
+  const [state,setState]=useState(readHealthSnapshot);
+  useEffect(()=>{const t=setInterval(()=>setState(readHealthSnapshot()),1000);return()=>clearInterval(t)},[]);
   const context = getVehicleConditionSnapshot();
   const obdStatus = getSharedObdStatus();
   const activeDtcStatuses = ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'];
