@@ -1,0 +1,909 @@
+{
+  "schemaVersion": 1,
+  "catalogId": "MERIVA_SMART_SENSOR_TESTS",
+  "updatedAt": "2026-10-14",
+  "vehicleProfile": {
+    "make": "Chevrolet",
+    "model": "Meriva Maxx",
+    "engine": "1.4 8V ECONO.FLEX",
+    "yearReference": "2011/2012",
+    "displacementCm3": 1389,
+    "note": "Perfil de referência; não inferir ECU instalada nem suporte de PID por modelo/ano."
+  },
+  "supportPolicy": {
+    "requiredEvidence": "Bitmap de suporte anunciada em runtime e definição válida em src/knowledge/pids.json.",
+    "distinctions": [
+      "STANDARD_DEFINITION_IS_NOT_VEHICLE_SUPPORT",
+      "BITMAP_ANNOUNCED_IS_DISCOVERED_NOT_PHYSICAL_SENSOR_VALIDATION",
+      "POSITIVE_RESPONSE_IS_NOT_SENSOR_ACCURACY_PROOF",
+      "CARSCANNER_BASELINE_IS_NOT_REAL_ECU_EVIDENCE"
+    ],
+    "confirmedPids": [
+      "010C"
+    ],
+    "confirmedPidEvidence": "RAW_ECU",
+    "priorProtocolObservation": {
+      "protocol": "ISO 14230-4 KWP Fast Init",
+      "baud": 10400,
+      "bus": "K-Line",
+      "note": "Observado em sessão do projeto; validar no veículo antes de generalizar."
+    }
+  },
+  "minimumReadingsPerPid": 3,
+  "timing": {
+    "defaultCommandLatencyMs": 2500,
+    "minimumEstimatedCommandLatencyMs": 500,
+    "perCommandSafetyMarginMs": 500,
+    "finalizationMarginMs": 1200,
+    "note": "ETA é recalculada com latência observada; conclusão depende de três tentativas por PID suportado."
+  },
+  "resultStates": [
+    "CONSISTENTE",
+    "INVESTIGAR",
+    "SEM_RESPOSTA",
+    "NAO_CONCLUSIVO"
+  ],
+  "assessmentPolicy": [
+    "CONSISTENTE significa compatibilidade com a heurística da condição, não saúde certificada do sensor.",
+    "INVESTIGAR é gatilho de acompanhamento, não ordem para trocar peça.",
+    "SEM_RESPOSTA é resultado de comunicação/parser, não prova de dano físico.",
+    "NAO_CONCLUSIVO cobre PID opcional, leituras insuficientes ou necessidade de teste dinâmico/elétrico."
+  ],
+  "sources": [
+    {
+      "id": "SAE_J1979_PUBLIC_COPY",
+      "title": "SAE J1979 — E/E Diagnostic Test Modes (cópia pública de edição anterior)",
+      "url": "https://law.resource.org/pub/us/cfr/ibr/005/sae.j1979.2002.pdf",
+      "usedFor": "Semântica de Mode 01, blocos bitmap e definições padronizadas.",
+      "limitation": "Edição pública antiga; não declarar conformidade com revisão SAE mais recente."
+    },
+    {
+      "id": "DASHLOGIC_PID_REFERENCE",
+      "title": "Dashlogic OBD-II J1979 PID Listing",
+      "url": "https://www.dashlogic.com/docs/technical/obdii_pids",
+      "usedFor": "Conferência cruzada de nomes, fórmulas e unidades.",
+      "limitation": "Referência OBD genérica, não certifica suporte na ECU da Meriva."
+    },
+    {
+      "id": "OBD2PID_REFERENCE",
+      "title": "OBD2 PID Knowledge — Standard PIDs",
+      "url": "https://obd2pid.com/pids",
+      "usedFor": "Conferência independente de semântica de PIDs.",
+      "limitation": "Referência genérica, não lista OEM de compatibilidade específica."
+    },
+    {
+      "id": "MERIVA_OWNER_MANUAL",
+      "title": "Manual do Proprietário Chevrolet Meriva 2012 — Brasil",
+      "url": "https://meu.chevrolet.com.br/content/dam/gmownercenter/gmsa/gmbr/dynamic/manuals/2012/chevrolet/Meriva/pt/om_ng-chevrolet_Meriva_my12-pt_BR.pdf",
+      "usedFor": "Identidade do veículo e contexto operacional.",
+      "limitation": "Manual não informa bitmap de suporte OBD."
+    },
+    {
+      "id": "MERIVA_BIBLE_LOCAL_AUDIT",
+      "title": "Auditoria técnica — Bíblia da Meriva",
+      "repositoryPath": "docs/AUDITORIA_BIBLIA_MERIVA.md",
+      "usedFor": "Catálogo de peças não determina PID, pinagem nem suporte live.",
+      "limitation": "Contexto técnico, não resposta da ECU."
+    },
+    {
+      "id": "ECONOFLEX_TRAINING_DOCUMENT",
+      "title": "Sistema Econoflex 1.4 — Diagnóstico e Funcionamento (documento secundário)",
+      "url": "https://pt.scribd.com/document/556603216/ECONOFLEX-1-4",
+      "usedFor": "Contexto de MAP/IAT, ECT, O2, rotação e acelerador da família Econoflex.",
+      "limitation": "Cita Multec H X14YFH e alerta para anos 2007–2008; não transferir especificações para 2011/2012."
+    },
+    {
+      "id": "LOCAL_PID_CATALOG",
+      "title": "Meriva Smart Diagnostic — catálogo/inventário RAW_ECU",
+      "repositoryPath": "src/knowledge/pids.json; src/knowledge/meriva_confirmed_pids.json",
+      "usedFor": "Fórmulas e evidência real específica atual.",
+      "limitation": "Somente 010C tem resposta RAW_ECU documentada atualmente."
+    }
+  ],
+  "tests": [
+    {
+      "id": "PID_010C",
+      "pid": "010C",
+      "label": "Rotação do motor",
+      "catalogName": "Engine RPM",
+      "unit": "rpm",
+      "formulaId": "RPM",
+      "category": "motor",
+      "evaluator": "RPM_BY_MODE",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [],
+      "minimumReadings": 3,
+      "thresholds": {
+        "engineOffMaxRpm": 50,
+        "engineOnMinRpm": 400
+      },
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "CONFIRMED_REAL_ECU",
+      "diagnosticRuleIds": [
+        "DTC_P0301_MISFIRE"
+      ],
+      "aiGuidance": "Confirme RPM em três leituras e compare com a condição selecionada. Resposta do PID não comprova integridade elétrica do CKP."
+    },
+    {
+      "id": "PID_010D",
+      "pid": "010D",
+      "label": "Velocidade informada pela ECU",
+      "catalogName": "Vehicle Speed",
+      "unit": "km/h",
+      "formulaId": "U8",
+      "category": "movimento",
+      "evaluator": "STATIONARY_SPEED",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [],
+      "minimumReadings": 3,
+      "thresholds": {
+        "maxStationarySpeedKmh": 3
+      },
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
+      "diagnosticRuleIds": [],
+      "aiGuidance": "Com o carro parado, velocidade reportada deve ficar próxima de zero. Não conduza durante o teste."
+    },
+    {
+      "id": "PID_0104",
+      "pid": "0104",
+      "label": "Carga calculada do motor",
+      "catalogName": "Calculated Engine Load",
+      "unit": "percent",
+      "formulaId": "PERCENT_255",
+      "category": "carga",
+      "evaluator": "PLAUSIBILITY_RANGE",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [],
+      "minimumReadings": 3,
+      "thresholds": {
+        "min": 0,
+        "max": 100
+      },
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
+      "diagnosticRuleIds": [
+        "DTC_P0301_MISFIRE"
+      ],
+      "aiGuidance": "Carga é calculada pela ECU; use como contexto, não como medição de sensor independente."
+    },
+    {
+      "id": "PID_0105",
+      "pid": "0105",
+      "label": "Temperatura do líquido de arrefecimento",
+      "catalogName": "Coolant Temperature",
+      "unit": "celsius",
+      "formulaId": "TEMP_C",
+      "category": "temperatura",
+      "evaluator": "TEMPERATURE_PLAUSIBILITY",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [],
+      "minimumReadings": 3,
+      "thresholds": {
+        "min": -40,
+        "max": 215
+      },
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
+      "diagnosticRuleIds": [
+        "DTC_P0301_MISFIRE"
+      ],
+      "aiGuidance": "Compare com IAT após repouso a frio e acompanhe aquecimento. Três valores plausíveis não comprovam calibração."
+    },
+    {
+      "id": "PID_0106",
+      "pid": "0106",
+      "label": "Correção de combustível de curto prazo (STFT)",
+      "catalogName": "STFT Bank 1",
+      "unit": "percent",
+      "formulaId": "FUEL_TRIM",
+      "category": "mistura",
+      "evaluator": "FUEL_TRIM_CONTEXT",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [
+        "010C",
+        "0105"
+      ],
+      "minimumReadings": 3,
+      "thresholds": {
+        "min": -100,
+        "max": 99.2,
+        "warmCoolantMinC": 70,
+        "idleMinRpm": 500,
+        "idleMaxRpm": 1100,
+        "investigateAbsPercent": 20
+      },
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
+      "diagnosticRuleIds": [
+        "FUEL_TRIM_LEAN",
+        "FUEL_TRIM_RICH",
+        "DTC_P0301_MISFIRE"
+      ],
+      "aiGuidance": "Interprete em motor aquecido e condição estável. Sem confirmação de malha fechada, mantenha a conclusão limitada."
+    },
+    {
+      "id": "PID_0107",
+      "pid": "0107",
+      "label": "Correção de combustível de longo prazo (LTFT)",
+      "catalogName": "LTFT Bank 1",
+      "unit": "percent",
+      "formulaId": "FUEL_TRIM",
+      "category": "mistura",
+      "evaluator": "FUEL_TRIM_CONTEXT",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [
+        "010C",
+        "0105"
+      ],
+      "minimumReadings": 3,
+      "thresholds": {
+        "min": -100,
+        "max": 99.2,
+        "warmCoolantMinC": 70,
+        "idleMinRpm": 500,
+        "idleMaxRpm": 1100,
+        "investigateAbsPercent": 20
+      },
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
+      "diagnosticRuleIds": [
+        "FUEL_TRIM_LEAN",
+        "FUEL_TRIM_RICH",
+        "DTC_P0301_MISFIRE"
+      ],
+      "aiGuidance": "Considere junto do STFT e da condição de funcionamento. Valor isolado não condena injetor, sonda ou pressão."
+    },
+    {
+      "id": "PID_010A",
+      "pid": "010A",
+      "label": "Pressão de combustível informada (gauge)",
+      "catalogName": "Fuel Pressure",
+      "unit": "kpa",
+      "formulaId": "U8_X3",
+      "category": "combustivel",
+      "evaluator": "PLAUSIBILITY_RANGE",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [],
+      "minimumReadings": 3,
+      "thresholds": {
+        "min": 0,
+        "max": 765
+      },
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
+      "diagnosticRuleIds": [
+        "FUEL_TRIM_LEAN",
+        "FUEL_TRIM_RICH"
+      ],
+      "aiGuidance": "PID opcional. Definição padronizada não equivale a teste de pressão com manômetro."
+    },
+    {
+      "id": "PID_010B",
+      "pid": "010B",
+      "label": "Pressão absoluta do coletor (MAP)",
+      "catalogName": "MAP",
+      "unit": "kpa",
+      "formulaId": "U8",
+      "category": "admissao",
+      "evaluator": "MAP_BY_MODE",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [
+        "0133",
+        "010C",
+        "0105"
+      ],
+      "minimumReadings": 3,
+      "thresholds": {
+        "min": 0,
+        "max": 255,
+        "engineOffMaxDifferenceKpa": 10,
+        "warmCoolantMinC": 70,
+        "idleMinRpm": 500,
+        "idleMaxRpm": 1100,
+        "investigateFromKpa": 45
+      },
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
+      "diagnosticRuleIds": [
+        "MAP_HIGH_IDLE",
+        "DTC_P0301_MISFIRE",
+        "FUEL_TRIM_LEAN"
+      ],
+      "aiGuidance": "Motor parado: compare medianas MAP/BARO. Motor aquecido: avalie com RPM. MAP alto cria hipótese de vácuo/entrada de ar/sincronismo, não prova sensor ruim."
+    },
+    {
+      "id": "PID_010E",
+      "pid": "010E",
+      "label": "Avanço de ignição",
+      "catalogName": "Timing Advance",
+      "unit": "degrees",
+      "formulaId": "TIMING_DEG",
+      "category": "ignicao",
+      "evaluator": "PLAUSIBILITY_RANGE",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [],
+      "minimumReadings": 3,
+      "thresholds": {
+        "min": -64,
+        "max": 63.5
+      },
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
+      "diagnosticRuleIds": [
+        "DTC_P0301_MISFIRE"
+      ],
+      "aiGuidance": "A ECU relata/calcula avanço; sem referência independente, não atribua falha de ignição por esse valor."
+    },
+    {
+      "id": "PID_010F",
+      "pid": "010F",
+      "label": "Temperatura do ar de admissão (IAT)",
+      "catalogName": "Intake Air Temperature",
+      "unit": "celsius",
+      "formulaId": "TEMP_C",
+      "category": "temperatura",
+      "evaluator": "TEMPERATURE_PLAUSIBILITY",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [],
+      "minimumReadings": 3,
+      "thresholds": {
+        "min": -40,
+        "max": 215
+      },
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
+      "diagnosticRuleIds": [
+        "MAP_HIGH_IDLE",
+        "DTC_P0301_MISFIRE"
+      ],
+      "aiGuidance": "Após repouso prolongado, compare com ECT e ambiente. Resposta OBD isolada não confirma exatidão física."
+    },
+    {
+      "id": "PID_0110",
+      "pid": "0110",
+      "label": "Fluxo de ar (MAF)",
+      "catalogName": "MAF",
+      "unit": "grams_per_second",
+      "formulaId": "MAF_GS",
+      "category": "admissao",
+      "evaluator": "PLAUSIBILITY_RANGE",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [],
+      "minimumReadings": 3,
+      "thresholds": {
+        "min": 0,
+        "max": 655.35
+      },
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
+      "diagnosticRuleIds": [
+        "DTC_P0301_MISFIRE",
+        "FUEL_TRIM_LEAN",
+        "FUEL_TRIM_RICH"
+      ],
+      "aiGuidance": "Correlacione MAF com RPM, carga e MAP. Catálogo padrão e valor isolado não confirmam suporte nem calibração."
+    },
+    {
+      "id": "PID_0111",
+      "pid": "0111",
+      "label": "Posição da borboleta",
+      "catalogName": "Throttle Position",
+      "unit": "percent",
+      "formulaId": "PERCENT_255",
+      "category": "acelerador",
+      "evaluator": "PERCENT_PLAUSIBILITY",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [],
+      "minimumReadings": 3,
+      "thresholds": {
+        "min": 0,
+        "max": 100
+      },
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
+      "diagnosticRuleIds": [
+        "DTC_P0123_THROTTLE"
+      ],
+      "aiGuidance": "Observe repetibilidade sem acelerar durante este teste parado; progressão exige procedimento dedicado."
+    },
+    {
+      "id": "PID_0114",
+      "pid": "0114",
+      "label": "Tensão da sonda de oxigênio B1S1",
+      "catalogName": "O2 Sensor 1 Voltage",
+      "unit": "volts",
+      "formulaId": "O2_VOLTS",
+      "category": "emissoes",
+      "evaluator": "O2_NARROWBAND_LIMITATION",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [
+        "0105"
+      ],
+      "minimumReadings": 3,
+      "thresholds": {
+        "min": 0,
+        "max": 1.275,
+        "warmCoolantMinC": 70
+      },
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
+      "diagnosticRuleIds": [
+        "DTC_P0135_O2_HEATER",
+        "DTC_P0420_CATALYST_EFFICIENCY",
+        "DTC_P0133_O2_SLOW",
+        "DTC_P0301_MISFIRE"
+      ],
+      "aiGuidance": "Três leituras servem como triagem; alternância, resposta dinâmica e aquecedor exigem amostragem temporal/teste elétrico."
+    },
+    {
+      "id": "PID_012C",
+      "pid": "012C",
+      "label": "Comando EGR calculado",
+      "catalogName": "Commanded EGR",
+      "unit": "percent",
+      "formulaId": "PERCENT_255",
+      "category": "emissoes",
+      "evaluator": "PERCENT_PLAUSIBILITY",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [],
+      "minimumReadings": 3,
+      "thresholds": {
+        "min": 0,
+        "max": 100
+      },
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
+      "diagnosticRuleIds": [],
+      "aiGuidance": "PID de comando calculado; não prova abertura física da válvula nem resposta elétrica."
+    },
+    {
+      "id": "PID_012D",
+      "pid": "012D",
+      "label": "Erro reportado do EGR",
+      "catalogName": "EGR Error",
+      "unit": "percent",
+      "formulaId": "FUEL_TRIM",
+      "category": "emissoes",
+      "evaluator": "PLAUSIBILITY_RANGE",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [],
+      "minimumReadings": 3,
+      "thresholds": {
+        "min": -100,
+        "max": 99.2
+      },
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
+      "diagnosticRuleIds": [],
+      "aiGuidance": "Interprete com comando EGR e estratégia da ECU; sem contexto não confirma falha mecânica."
+    },
+    {
+      "id": "PID_012E",
+      "pid": "012E",
+      "label": "Comando de purga EVAP",
+      "catalogName": "Commanded Evaporative Purge",
+      "unit": "percent",
+      "formulaId": "PERCENT_255",
+      "category": "emissoes",
+      "evaluator": "PERCENT_PLAUSIBILITY",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [],
+      "minimumReadings": 3,
+      "thresholds": {
+        "min": 0,
+        "max": 100
+      },
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
+      "diagnosticRuleIds": [],
+      "aiGuidance": "Percentual de comando não comprova fluxo nem estanqueidade do EVAP."
+    },
+    {
+      "id": "PID_012F",
+      "pid": "012F",
+      "label": "Nível de combustível reportado",
+      "catalogName": "Fuel Level Input",
+      "unit": "percent",
+      "formulaId": "PERCENT_255",
+      "category": "combustivel",
+      "evaluator": "PERCENT_PLAUSIBILITY",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [],
+      "minimumReadings": 3,
+      "thresholds": {
+        "min": 0,
+        "max": 100
+      },
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
+      "diagnosticRuleIds": [],
+      "aiGuidance": "Boia/filtro da ECU podem produzir leitura lenta; sem nível físico conhecido não confirme exatidão."
+    },
+    {
+      "id": "PID_0133",
+      "pid": "0133",
+      "label": "Pressão barométrica (BARO)",
+      "catalogName": "Barometric Pressure",
+      "unit": "kpa",
+      "formulaId": "U8",
+      "category": "admissao",
+      "evaluator": "BARO_PLAUSIBILITY",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [],
+      "minimumReadings": 3,
+      "thresholds": {
+        "min": 10,
+        "max": 110
+      },
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
+      "diagnosticRuleIds": [
+        "MAP_HIGH_IDLE"
+      ],
+      "aiGuidance": "Use BARO como referência MAP com motor parado. Falta de resposta não condena o MAP."
+    },
+    {
+      "id": "PID_0142",
+      "pid": "0142",
+      "label": "Tensão do módulo de controle",
+      "catalogName": "ECU Voltage",
+      "unit": "volts",
+      "formulaId": "VOLTS_1000",
+      "category": "eletrica",
+      "evaluator": "ECU_VOLTAGE_BY_MODE",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [],
+      "minimumReadings": 3,
+      "thresholds": {
+        "engineOffMinV": 11.5,
+        "engineOnMinV": 12.5,
+        "maxV": 15.5
+      },
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
+      "diagnosticRuleIds": [],
+      "aiGuidance": "Limites heurísticos; confirme bateria/alternador com multímetro antes de decidir por reparo."
+    },
+    {
+      "id": "PID_0143",
+      "pid": "0143",
+      "label": "Carga absoluta calculada",
+      "catalogName": "Absolute Load",
+      "unit": "percent",
+      "formulaId": "U16_SCALE_255",
+      "category": "carga",
+      "evaluator": "PLAUSIBILITY_RANGE",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [],
+      "minimumReadings": 3,
+      "thresholds": {
+        "min": 0,
+        "max": 25700
+      },
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
+      "diagnosticRuleIds": [
+        "DTC_P0301_MISFIRE"
+      ],
+      "aiGuidance": "Carga absoluta pode ultrapassar 100% pela fórmula padronizada; não aplique limite da carga relativa."
+    },
+    {
+      "id": "PID_0145",
+      "pid": "0145",
+      "label": "Posição relativa da borboleta",
+      "catalogName": "Relative Throttle Position",
+      "unit": "percent",
+      "formulaId": "PERCENT_255",
+      "category": "acelerador",
+      "evaluator": "PERCENT_PLAUSIBILITY",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [],
+      "minimumReadings": 3,
+      "thresholds": {
+        "min": 0,
+        "max": 100
+      },
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
+      "diagnosticRuleIds": [
+        "DTC_P0123_THROTTLE"
+      ],
+      "aiGuidance": "Compare com outros sinais de posição se disponíveis; não condene corpo de borboleta por uma leitura."
+    },
+    {
+      "id": "PID_0146",
+      "pid": "0146",
+      "label": "Temperatura ambiente reportada",
+      "catalogName": "Ambient Air Temperature",
+      "unit": "celsius",
+      "formulaId": "TEMP_C",
+      "category": "temperatura",
+      "evaluator": "TEMPERATURE_PLAUSIBILITY",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [],
+      "minimumReadings": 3,
+      "thresholds": {
+        "min": -40,
+        "max": 215
+      },
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
+      "diagnosticRuleIds": [],
+      "aiGuidance": "Considere estabilização e calor do cofre; plausibilidade não comprova calibração."
+    },
+    {
+      "id": "PID_0152",
+      "pid": "0152",
+      "label": "Percentual de álcool informado pela ECU",
+      "catalogName": "Alcohol Fuel Percentage",
+      "unit": "percent",
+      "formulaId": "ETHANOL_PERCENT",
+      "category": "flex",
+      "evaluator": "FLEX_COMPOSITION",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [],
+      "minimumReadings": 3,
+      "thresholds": {
+        "min": 0,
+        "max": 100
+      },
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
+      "diagnosticRuleIds": [
+        "FUEL_TRIM_LEAN",
+        "FUEL_TRIM_RICH"
+      ],
+      "aiGuidance": "Registre o valor informado pela ECU, se suportado; não equivale a análise laboratorial nem pode ser inferido de STFT/LTFT."
+    },
+    {
+      "id": "PID_0159",
+      "pid": "0159",
+      "label": "Pressão absoluta do rail de combustível",
+      "catalogName": "Fuel Rail Absolute Pressure",
+      "unit": "kpa",
+      "formulaId": "U16_X10",
+      "category": "combustivel",
+      "evaluator": "PLAUSIBILITY_RANGE",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [],
+      "minimumReadings": 3,
+      "thresholds": {
+        "min": 0,
+        "max": 655350
+      },
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
+      "diagnosticRuleIds": [
+        "FUEL_TRIM_LEAN",
+        "FUEL_TRIM_RICH"
+      ],
+      "aiGuidance": "PID opcional; confirme arquitetura e unidade antes de comparar com especificação."
+    },
+    {
+      "id": "PID_015A",
+      "pid": "015A",
+      "label": "Posição do pedal do acelerador",
+      "catalogName": "Accelerator Pedal Position",
+      "unit": "percent",
+      "formulaId": "PERCENT_255",
+      "category": "acelerador",
+      "evaluator": "PERCENT_PLAUSIBILITY",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [],
+      "minimumReadings": 3,
+      "thresholds": {
+        "min": 0,
+        "max": 100
+      },
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
+      "diagnosticRuleIds": [
+        "DTC_P0123_THROTTLE"
+      ],
+      "aiGuidance": "Não pressione o pedal durante o teste parado; três leituras estáticas só verificam resposta e plausibilidade."
+    },
+    {
+      "id": "PID_015C",
+      "pid": "015C",
+      "label": "Temperatura do óleo do motor",
+      "catalogName": "Engine Oil Temperature",
+      "unit": "celsius",
+      "formulaId": "TEMP_C",
+      "category": "temperatura",
+      "evaluator": "TEMPERATURE_PLAUSIBILITY",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [],
+      "minimumReadings": 3,
+      "thresholds": {
+        "min": -40,
+        "max": 210
+      },
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
+      "diagnosticRuleIds": [],
+      "aiGuidance": "PID opcional: ausência de resposta indica suporte desconhecido, não falha física do sensor."
+    },
+    {
+      "id": "PID_015D",
+      "pid": "015D",
+      "label": "Tempo de injeção reportado",
+      "catalogName": "Fuel Injection Timing",
+      "unit": "degrees",
+      "formulaId": "INJECTION_TIMING",
+      "category": "combustivel",
+      "evaluator": "PLAUSIBILITY_RANGE",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [],
+      "minimumReadings": 3,
+      "thresholds": {
+        "min": -210,
+        "max": 301.99
+      },
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
+      "diagnosticRuleIds": [
+        "FUEL_TRIM_LEAN",
+        "FUEL_TRIM_RICH",
+        "DTC_P0301_MISFIRE"
+      ],
+      "aiGuidance": "Parâmetro dependente da ECU; use como contexto, não medição física direta do injetor."
+    },
+    {
+      "id": "PID_015E",
+      "pid": "015E",
+      "label": "Taxa de combustível informada",
+      "catalogName": "Engine Fuel Rate",
+      "unit": "L/h",
+      "formulaId": "FUEL_RATE_LH",
+      "category": "combustivel",
+      "evaluator": "FUEL_RATE_BY_MODE",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [],
+      "minimumReadings": 3,
+      "thresholds": {
+        "min": 0,
+        "max": 3276.75
+      },
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
+      "diagnosticRuleIds": [
+        "FUEL_TRIM_LEAN",
+        "FUEL_TRIM_RICH"
+      ],
+      "aiGuidance": "Valor calculado/reportado pela ECU; confirme suporte e respostas reais antes de integrar ao consumo."
+    },
+    {
+      "id": "PID_0161",
+      "pid": "0161",
+      "label": "Torque solicitado pelo motorista",
+      "catalogName": "Driver Demand Engine Torque",
+      "unit": "percent",
+      "formulaId": "TORQUE_PERCENT",
+      "category": "torque",
+      "evaluator": "PLAUSIBILITY_RANGE",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [],
+      "minimumReadings": 3,
+      "thresholds": {
+        "min": -125,
+        "max": 130
+      },
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
+      "diagnosticRuleIds": [],
+      "aiGuidance": "Torque é calculado/reportado, não uma leitura direta de sensor; disponibilidade opcional."
+    },
+    {
+      "id": "PID_0162",
+      "pid": "0162",
+      "label": "Torque efetivo reportado pelo motor",
+      "catalogName": "Actual Engine Torque",
+      "unit": "percent",
+      "formulaId": "TORQUE_PERCENT",
+      "category": "torque",
+      "evaluator": "PLAUSIBILITY_RANGE",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [],
+      "minimumReadings": 3,
+      "thresholds": {
+        "min": -125,
+        "max": 130
+      },
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
+      "diagnosticRuleIds": [],
+      "aiGuidance": "Torque reportado não substitui dinamômetro nem comprova desempenho sem referência independente."
+    }
+  ]
+}

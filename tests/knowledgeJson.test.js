@@ -29,6 +29,7 @@ function main() {
   const confirmed = readJson('src/knowledge/meriva_confirmed_pids.json');
   const bluetooth = readJson('src/knowledge/bluetooth_config.json');
   const diagnosticRules = readJson('src/knowledge/diagnostic_rules.json');
+  const sensorTests = readJson('src/knowledge/sensor_tests.json');
   const dtcCatalog = readJson('src/knowledge/dtc_catalog.json');
   const pollingPolicy = readJson('src/knowledge/polling_policy.json');
 
@@ -41,6 +42,11 @@ function main() {
   assert.strictEqual(typeof confirmed.version, 'number');
   assert.strictEqual(typeof bluetooth.schemaVersion, 'number');
   assert.strictEqual(typeof diagnosticRules.version, 'number');
+  assert.strictEqual(typeof sensorTests.schemaVersion, 'number');
+  assert.strictEqual(sensorTests.catalogId, 'MERIVA_SMART_SENSOR_TESTS');
+  assert.strictEqual(sensorTests.minimumReadingsPerPid, 3, 'cada PID suportado exige três tentativas');
+  assert.ok(Array.isArray(sensorTests.tests) && sensorTests.tests.length > 0, 'catálogo de testes vazio');
+  assert.ok(Array.isArray(sensorTests.sources) && sensorTests.sources.length >= 5, 'fontes pesquisadas ausentes');
   assert.strictEqual(typeof dtcCatalog.version, 'number');
   assert.strictEqual(typeof pollingPolicy.version, 'number');
   assert.strictEqual(pollingPolicy.version, 2, 'cadência flex-fuel exige versão de contrato atualizada');
@@ -211,6 +217,39 @@ function main() {
     for (const key of ['combinedTrimMin', 'combinedTrimMax', 'mapMinKpa']) {
       if (rule.trigger[key] !== undefined) assert.ok(Number.isFinite(rule.trigger[key]), 'parâmetro inválido na regra ' + rule.id + ': ' + key);
     }
+  }
+
+
+  const sensorTestItems = sensorTests.tests;
+  assertUnique(sensorTestItems.map((item) => item.id), 'ID de teste de sensor');
+  assertUnique(sensorTestItems.map((item) => item.pid), 'PID do catálogo de testes');
+  const allowedSensorEvaluators = new Set(['RPM_BY_MODE','STATIONARY_SPEED','PLAUSIBILITY_RANGE','TEMPERATURE_PLAUSIBILITY','FUEL_TRIM_CONTEXT','MAP_BY_MODE','O2_NARROWBAND_LIMITATION','PERCENT_PLAUSIBILITY','BARO_PLAUSIBILITY','ECU_VOLTAGE_BY_MODE','FLEX_COMPOSITION','FUEL_RATE_BY_MODE']);
+  const validSensorModes = new Set(['ENGINE_OFF','ENGINE_ON']);
+  for (const test of sensorTestItems) {
+    const id = String(test.pid).toUpperCase();
+    assert.ok(pidIds.has(id), 'sensor_tests.json referencia PID ausente: ' + id);
+    assert.strictEqual(test.minimumReadings, 3, 'teste exige três tentativas: ' + id);
+    assert.ok(typeof test.label === 'string' && test.label.trim(), 'teste sem rótulo: ' + id);
+    assert.ok(allowedSensorEvaluators.has(test.evaluator), 'avaliador não implementado: ' + test.evaluator);
+    assert.ok(Array.isArray(test.modes) && test.modes.length > 0 && test.modes.every((mode) => validSensorModes.has(mode)), 'modo inválido: ' + id);
+    assert.ok(Array.isArray(test.requiredPids), 'requiredPids ausente: ' + id);
+    for (const dependency of test.requiredPids) assert.ok(pidIds.has(dependency), 'pré-requisito ausente: ' + id + ' -> ' + dependency);
+    const pidDef = pids.pids.find((item) => item.pid === id);
+    assert.strictEqual(test.catalogName, pidDef.name, 'nome divergente: ' + id);
+    assert.strictEqual(test.unit, pidDef.unit, 'unidade divergente: ' + id);
+    assert.strictEqual(test.formulaId, pidDef.formulaId, 'fórmula divergente: ' + id);
+    assert.ok(['CONFIRMED_REAL_ECU','UNCONFIRMED_FOR_THIS_ECU'].includes(test.vehicleEvidenceStatus), 'estado de evidência inválido: ' + id);
+    assert.strictEqual(test.evidenceClass, 'STANDARD_OBD_OPTIONAL_ECU_SUPPORT', 'catálogo genérico não garante suporte: ' + id);
+    assert.ok(Array.isArray(test.diagnosticRuleIds), 'links da IA ausentes: ' + id);
+    for (const ruleId of test.diagnosticRuleIds) assert.ok(diagnosticRules.rules.some((rule) => rule.id === ruleId), 'regra IA inexistente: ' + ruleId);
+    assert.ok(typeof test.aiGuidance === 'string' && test.aiGuidance.trim(), 'guia IA vazio: ' + id);
+    for (const [key, value] of Object.entries(test.thresholds)) assert.ok(Number.isFinite(value), 'limiar não numérico: ' + id + '.' + key);
+  }
+  assert.deepStrictEqual(sensorTestItems.filter((item) => item.vehicleEvidenceStatus === 'CONFIRMED_REAL_ECU').map((item) => item.pid), ['010C'], 'somente RPM tem resposta RAW_ECU documentada');
+  for (const source of sensorTests.sources) {
+    assert.ok(typeof source.id === 'string' && source.id.trim(), 'fonte sem ID');
+    assert.ok(typeof source.title === 'string' && source.title.trim(), 'fonte sem título');
+    assert.ok(typeof source.usedFor === 'string' && source.usedFor.trim(), 'uso da fonte ausente');
   }
 
   assert.ok(diagnosticRules.principles?.length >= 1, 'princípios diagnósticos ausentes');

@@ -6,79 +6,109 @@ import * as FileSystem from 'expo-file-system';
 import {useMidLayout} from '../src/ui/midLayout';
 import {getSharedObdConnection,getSharedObdStatus,subscribeSharedObd,subscribeSharedObdStatus} from '../src/obd/sharedConnection';
 import {getPidDefinition} from '../src/obd/pidDefinition';
-import {assessSensorSample,type SensorTestMode,type SensorTestSample,type SensorAssessment} from '../src/diagnostics/sensorTestEngine';
-
-const PIDS=['010C','010D','0104','0105','0106','0107','010A','010B','010E','010F','0110','0111','0114','012C','012D','012E','012F','0133','0142','0143','0145','0146','0152','0159','015A','015C','015D','015E','0161','0162'];
+import {assessSensorSample,createSensorTestPlan,getSensorTestCatalog,MIN_SENSOR_TEST_READINGS,type SensorTestDefinition,type SensorTestMode,type SensorTestSample,type SensorAssessment} from '../src/diagnostics/sensorTestEngine';
+const catalog=getSensorTestCatalog();
 const labels:Record<SensorAssessment['state'],string>={CONSISTENTE:'COERENTE',INVESTIGAR:'INVESTIGAR',SEM_RESPOSTA:'SEM RESPOSTA',NAO_CONCLUSIVO:'NÃO CONCLUSIVO'};
 const colors:Record<SensorAssessment['state'],string>={CONSISTENTE:'#4ade80',INVESTIGAR:'#fbbf24',SEM_RESPOSTA:'#fb7185',NAO_CONCLUSIVO:'#93c5fd'};
-const valueText=(s:SensorTestSample)=>s.value==null?'N/D':`${s.value.toFixed(2)} ${s.unit}`;
-
+const median=(values:number[])=>{if(!values.length)return null;const a=[...values].sort((x,y)=>x-y),i=Math.floor(a.length/2);return a.length%2?a[i]:(a[i-1]+a[i])/2;};
+const valueText=(value:number|null,unit:string)=>value==null?'N/D':value.toFixed(2)+' '+unit;
+const clock=(milliseconds:number)=>{const seconds=Math.max(0,Math.ceil(milliseconds/1000));return String(Math.floor(seconds/60)).padStart(2,'0')+':'+String(seconds%60).padStart(2,'0');};
 export default function TestesSensoresScreen(){
- const layout=useMidLayout(); const [mode,setMode]=useState<SensorTestMode>('ENGINE_OFF');
- const [running,setRunning]=useState(false); const [progress,setProgress]=useState(0);
- const [samples,setSamples]=useState<SensorTestSample[]>([]); const [message,setMessage]=useState('Conecte o ELM327 e valide a ECU.');
- const [error,setError]=useState(''); const [savedPath,setSavedPath]=useState(''); const [revision,setRevision]=useState(0);
- const cancelled=useRef(false);
+ const layout=useMidLayout(),[mode,setMode]=useState<SensorTestMode>('ENGINE_OFF'),[running,setRunning]=useState(false),[completed,setCompleted]=useState(false),[aborted,setAborted]=useState(false);
+ const [samples,setSamples]=useState<SensorTestSample[]>([]),[testPlan,setTestPlan]=useState<SensorTestDefinition[]>([]);
+ const [plannedReads,setPlannedReads]=useState(0),[commandProgress,setCommandProgress]=useState(0),[commandPlan,setCommandPlan]=useState(0),[countdownMs,setCountdownMs]=useState(0);
+ const [round,setRound]=useState(0),[currentPid,setCurrentPid]=useState(''),[message,setMessage]=useState('Conecte o ELM327 e valide a ECU.');
+ const [error,setError]=useState(''),[savedPath,setSavedPath]=useState(''),[revision,setRevision]=useState(0);
+ const cancelled=useRef(false),deadline=useRef(0),runStartedAt=useRef(0),commandsDone=useRef(0),commandElapsedTotal=useRef(0),connectedAtStart=useRef(false);
  useEffect(()=>{const refresh=()=>setRevision(n=>n+1);const a=subscribeSharedObd(refresh),b=subscribeSharedObdStatus(refresh);return()=>{cancelled.current=true;a();b();};},[]);
- const connection=getSharedObdConnection(), status=getSharedObdStatus();
- const connected=Boolean(connection?.ecuValidated&&status.ecuConnected);
- const supported=useMemo(()=>new Set((connection?.supportedPids??[]).map(p=>p.replace(/\s/g,'').toUpperCase())),[revision,connection?.supportedPids]);
- const assessments=useMemo(()=>samples.map(sample=>({sample,assessment:assessSensorSample(sample,mode,samples)})),[samples,mode]);
- async function runTests(){
-  cancelled.current=false;setRunning(true);setProgress(0);setSamples([]);setError('');setSavedPath('');
-  try{
-   const active=getSharedObdConnection();
-   if(!active?.ecuValidated||!getSharedObdStatus().ecuConnected)throw new Error('ECU não validada. Conecte pelo módulo Bluetooth/ELM327 antes de testar.');
-   if(!supported.has('010C'))throw new Error('A ECU não anunciou o PID 010C (RPM), necessário para confirmar a condição do motor. Nenhum teste foi iniciado.');
-   const available=PIDS.filter(pid=>supported.has(pid)&&getPidDefinition(pid));
-   if(!available.length)throw new Error('Nenhum PID do catálogo foi anunciado como suportado. Nenhum comando será enviado por tentativa.');
-   setMessage('Confirmando a condição do motor pela RPM real…');
-   const pre=await active.session.queryPid('010C'), rpm=pre.parsed.value;
-   if(pre.parsed.status!=='RESPONDEU'||rpm==null)throw new Error('Não foi possível confirmar a condição do motor pela RPM.');
-   if(mode==='ENGINE_OFF'&&rpm>50)throw new Error(`RPM ${rpm.toFixed(0)}: o motor parece ligado. Desligue-o ou selecione Motor ligado.`);
-   if(mode==='ENGINE_ON'&&rpm<400)throw new Error(`RPM ${rpm.toFixed(0)}: não foi possível confirmar motor funcionando em marcha lenta.`);
-   setMessage(`Consultando ${available.length} PIDs suportados, um por vez…`);
-   for(let i=0;i<available.length;i++){
-    if(cancelled.current)break;
-    const current=getSharedObdConnection();
-    if(!current?.ecuValidated||!getSharedObdStatus().ecuConnected)throw new Error('Conexão ECU perdida. As amostras concluídas foram mantidas.');
-    const pid=available[i], r=await current.session.queryPid(pid);
-    const sample:SensorTestSample={pid,name:r.parsed.name,value:r.parsed.status==='RESPONDEU'?r.parsed.value:null,unit:r.parsed.unit,status:r.parsed.status,rawResponse:r.rx,elapsedMs:r.elapsedMs,timestamp:new Date().toISOString()};
-    setSamples(prev=>[...prev,sample]);setProgress(i+1);
-   }
-   setMessage(cancelled.current?'Teste interrompido; resultados parciais mantidos.':'Varredura concluída. Revise as evidências e salve o relatório TXT.');
-  }catch(e){setError(e instanceof Error?e.message:'Falha desconhecida');setMessage('O teste não foi concluído normalmente.');}
-  finally{setRunning(false);}
+ useEffect(()=>{if(!running)return;const timer=setInterval(()=>{const remain=deadline.current-Date.now();setCountdownMs(remain>0?remain:1000);},1000);return()=>clearInterval(timer);},[running]);
+ const connection=getSharedObdConnection(),status=getSharedObdStatus(),connected=Boolean(connection?.ecuValidated&&status.ecuConnected);
+ const supported=new Set((connection?.supportedPids??[]).map(p=>p.replace(/\s/g,'').toUpperCase()));
+ const grouped=useMemo(()=>testPlan.map(test=>{
+  const rows=samples.filter(sample=>sample.pid===test.pid),values=rows.filter(sample=>sample.status==='RESPONDEU'&&sample.value!==null&&Number.isFinite(sample.value)).map(sample=>sample.value as number),last=rows[rows.length-1];
+  const representative:SensorTestSample={pid:test.pid,name:test.label,value:median(values),unit:last?.unit??getPidDefinition(test.pid)?.unit??'N/D',status:last?.status??'AINDA_NAO_TESTADO',rawResponse:last?.rawResponse??'',elapsedMs:last?.elapsedMs??0,timestamp:last?.timestamp??new Date().toISOString(),readingNumber:last?.readingNumber};
+  return {test,rows,values,representative,assessment:assessSensorSample(representative,mode,samples)};
+ }),[testPlan,samples,mode]);
+ const attention=grouped.filter(x=>x.assessment.state==='INVESTIGAR').length;
+ function updateCountdown(remainingCommands:number){
+  const timing=catalog.timing,average=commandsDone.current>0?commandElapsedTotal.current/commandsDone.current:timing.defaultCommandLatencyMs;
+  const perCommand=Math.max(timing.minimumEstimatedCommandLatencyMs,average+timing.perCommandSafetyMarginMs),ms=Math.max(1000,Math.max(0,remainingCommands)*perCommand+timing.finalizationMarginMs);
+  deadline.current=Date.now()+ms;setCountdownMs(ms);
  }
+ function recordCommand(elapsedMs:number,totalCommands:number){commandsDone.current+=1;commandElapsedTotal.current+=Math.max(0,elapsedMs);setCommandProgress(commandsDone.current);updateCountdown(totalCommands-commandsDone.current);}
+ async function runTests(){
+  cancelled.current=false;setRunning(true);setCompleted(false);setAborted(false);setCommandProgress(0);setPlannedReads(0);setTestPlan([]);setSamples([]);setError('');setSavedPath('');setRound(0);setCurrentPid('');setMessage('Preparando a varredura e estimando o tempo…');
+  runStartedAt.current=Date.now();commandsDone.current=0;commandElapsedTotal.current=0;
+  const active=getSharedObdConnection(),activeStatus=getSharedObdStatus();connectedAtStart.current=Boolean(active?.ecuValidated&&activeStatus.ecuConnected);
+  const plan=createSensorTestPlan(active?.supportedPids??[],pid=>Boolean(getPidDefinition(pid))),expectedReads=plan.length*MIN_SENSOR_TEST_READINGS,expectedCommands=expectedReads+1;
+  setTestPlan(plan);setPlannedReads(expectedReads);setCommandPlan(expectedCommands);setCommandProgress(0);updateCountdown(expectedCommands);
+  if(!active?.ecuValidated||!activeStatus.ecuConnected){setError('ECU não validada. Conecte pelo módulo Bluetooth/ELM327 antes de testar.');setMessage('Teste não iniciado: ECU sem resposta válida.');setRunning(false);setAborted(true);setCountdownMs(0);return;}
+  if(!supported.has('010C')){setError('A ECU não anunciou o PID 010C (RPM), obrigatório para verificar a condição do motor. Nenhum teste iniciado.');setMessage('Teste não iniciado: condição do motor não validada.');setRunning(false);setAborted(true);setCountdownMs(0);return;}
+  if(!plan.some(test=>test.pid==='010C')||plan.length===0){setError('Nenhum PID do catálogo foi anunciado como suportado. Nenhum comando será enviado por tentativa.');setMessage('Teste não iniciado: bitmap sem PIDs catalogados.');setRunning(false);setAborted(true);setCountdownMs(0);return;}
+  const readings:SensorTestSample[]=[];let finished=false;
+  try{
+   setMessage('Confirmando a condição do motor com uma leitura inicial de RPM…');
+   const pre=await active.session.queryPid('010C');recordCommand(pre.elapsedMs,expectedCommands);
+   const rpm=pre.parsed.status==='RESPONDEU'?pre.parsed.value:null;
+   if(pre.parsed.status!=='RESPONDEU'||rpm==null)throw new Error('Não foi possível confirmar a condição do motor pela RPM.');
+   if(mode==='ENGINE_OFF'&&rpm>50)throw new Error('RPM '+rpm.toFixed(0)+': o motor parece ligado. Desligue-o ou selecione Motor ligado.');
+   if(mode==='ENGINE_ON'&&rpm<400)throw new Error('RPM '+rpm.toFixed(0)+': não foi possível confirmar motor funcionando em marcha lenta.');
+   setMessage('Executando três rodadas sequenciais. Respostas ausentes também serão registradas como tentativas; nenhum PID será consultado em paralelo.');
+   outer:for(let sampleRound=1;sampleRound<=MIN_SENSOR_TEST_READINGS;sampleRound++){
+    setRound(sampleRound);
+    for(const test of plan){
+     if(cancelled.current)break outer;
+     const current=getSharedObdConnection(),currentStatus=getSharedObdStatus();
+     if(!current?.ecuValidated||!currentStatus.ecuConnected)throw new Error('Conexão ECU perdida. As amostras concluídas permanecem disponíveis para relatório.');
+     setCurrentPid(test.pid);
+     const response=await current.session.queryPid(test.pid);
+     const sample:SensorTestSample={pid:test.pid,name:test.label,value:response.parsed.status==='RESPONDEU'?response.parsed.value:null,unit:response.parsed.unit||getPidDefinition(test.pid)?.unit||'N/D',status:response.parsed.status,rawResponse:response.rx,elapsedMs:response.elapsedMs,timestamp:new Date().toISOString(),readingNumber:sampleRound};
+     readings.push(sample);setSamples([...readings]);recordCommand(response.elapsedMs,expectedCommands);
+    }
+   }
+   finished=!cancelled.current&&readings.length===expectedReads;setCompleted(finished);setAborted(!finished);
+   setMessage(finished?'Varredura concluída: cada PID suportado teve três tentativas. Revise as evidências antes de reparar.':'Teste interrompido; as leituras concluídas foram mantidas para relatório parcial.');
+   setRound(finished?MIN_SENSOR_TEST_READINGS:0);
+  }catch(cause){setError(cause instanceof Error?cause.message:'Falha desconhecida durante a consulta.');setMessage('Varredura não concluída normalmente; leituras finalizadas permanecem disponíveis.');setAborted(true);}
+  finally{setRunning(false);setCountdownMs(0);setCurrentPid('');}
+ }
+ const stop=()=>{cancelled.current=true;setMessage('Parada solicitada; a consulta OBD atual será concluída antes de interromper.');};
  async function saveReport(){
   if(!samples.length){setError('Ainda não há amostras para salvar.');return;}
   try{
-   const dir=`${FileSystem.documentDirectory}MERIVA_SMART/testes-sensores`;await FileSystem.makeDirectoryAsync(dir,{intermediates:true});
-   const path=`${dir}/teste-sensores-${new Date().toISOString().replace(/[:.]/g,'-')}.txt`;
-   const lines=['MERIVA SMART DIAGNOSTIC — TESTE DE SENSORES',`Data: ${new Date().toLocaleString()}`,`Condição: ${mode==='ENGINE_OFF'?'IGNIÇÃO LIGADA / MOTOR DESLIGADO':'MOTOR LIGADO'}`,`ECU validada: ${getSharedObdConnection()?.ecuValidated?'SIM':'NÃO'}`,`Protocolo: ${getSharedObdConnection()?.protocol??'N/D'}`,'','RESULTADOS'];
-   for(const s of samples){const a=assessSensorSample(s,mode,samples);lines.push(`${s.pid} — ${s.name}`,`Valor: ${valueText(s)} | Parser: ${s.status}`,`Avaliação: ${a.title} [${a.state}]`,a.explanation,`Latência: ${s.elapsedMs} ms | ${s.timestamp}`,`RX bruto: ${s.rawResponse||'VAZIO'}`,'');}
-   lines.push('LIMITAÇÃO: resposta OBD válida não comprova exatidão física/elétrica. Limiares são heurísticos e não substituem especificações de fábrica ou instrumentos externos.');
+   const dir=(FileSystem.documentDirectory??'')+'MERIVA_SMART/testes-sensores';await FileSystem.makeDirectoryAsync(dir,{intermediates:true});
+   const path=dir+'/teste-sensores-'+new Date().toISOString().replace(/[:.]/g,'-')+'.txt';
+   const lines=['MERIVA SMART DIAGNOSTIC — CENTRAL DE TESTES DE SENSORES','Catálogo: '+catalog.catalogId+' v'+catalog.schemaVersion,'Data: '+new Date().toLocaleString(),'Veículo de referência: Chevrolet Meriva Maxx 1.4 8V ECONO.FLEX 2011/2012','Condição: '+(mode==='ENGINE_OFF'?'IGNIÇÃO LIGADA / MOTOR DESLIGADO':'MOTOR LIGADO, VEÍCULO PARADO'),'ECU validada no início: '+(connectedAtStart.current?'SIM':'NÃO'),'Protocolo observado: '+(getSharedObdConnection()?.protocol??'N/D'),'Leituras mínimas por PID: '+MIN_SENSOR_TEST_READINGS,'PIDs selecionados pela bitmap: '+testPlan.length,'Tentativas previstas: '+plannedReads,'Tentativas registradas: '+samples.length,'Execução completa: '+(completed?'SIM':'NÃO — RELATÓRIO PARCIAL'),'Tempo decorrido: '+Math.round((Date.now()-runStartedAt.current)/1000)+' s','','AVALIAÇÃO POR PID'];
+   for(const item of grouped){
+    lines.push('',item.test.pid+' — '+item.test.label,'Resultado: '+item.assessment.state+' — '+item.assessment.title,'Explicação: '+item.assessment.explanation,'Guia da IA local: '+item.test.aiGuidance,'Leituras válidas: '+item.values.length+'/'+MIN_SENSOR_TEST_READINGS);
+    for(const row of item.rows)lines.push('Leitura '+row.readingNumber+': '+valueText(row.value,row.unit)+' | Parser: '+row.status+' | Latência: '+row.elapsedMs+' ms | '+row.timestamp,'RX bruto: '+(row.rawResponse||'VAZIO'));
+   }
+   lines.push('','POLÍTICA: resposta positiva confirma resposta do PID, não exatidão física/elétrica do sensor. PIDs fora da bitmap não foram consultados.','REFERÊNCIAS: SAE J1979 supported-PID bitmap; Dashlogic PID listing; OBD2 PID Knowledge; auditoria da Bíblia da Meriva.','Limiares são heurísticos, não especificações OEM. Algumas verificações exigem multímetro, osciloscópio ou condições controladas.');
    await FileSystem.writeAsStringAsync(path,lines.join('\n'));setSavedPath(path);setError('');setMessage('Relatório TXT salvo no armazenamento privado do aplicativo.');
-  }catch(e){setError(e instanceof Error?e.message:'Falha ao salvar TXT.');}
+  }catch(cause){setError(cause instanceof Error?cause.message:'Falha ao salvar relatório TXT.');}
  }
- const stop=()=>{cancelled.current=true;setMessage('Parada solicitada; a consulta atual será concluída antes de parar.');};
- const valid=samples.filter(s=>s.status==='RESPONDEU').length, attention=assessments.filter(x=>x.assessment.state==='INVESTIGAR').length;
  return <SafeAreaView style={st.container} edges={['top','bottom','left','right']}><ScrollView contentContainerStyle={[st.content,{paddingHorizontal:layout.horizontalPadding}]}><View style={[st.frame,{maxWidth:layout.maxContentWidth}]}>
- <Text style={st.title}>CENTRAL DE TESTES</Text><Text style={st.subtitle}>DADOS REAIS • AVALIAÇÃO LOCAL • RELATÓRIO TXT</Text>
- <View style={[st.connection,connected?st.good:st.warn]}><Text style={connected?st.goodTitle:st.warnTitle}>{connected?'● ECU VALIDADA':'● ECU NÃO VALIDADA'}</Text><Text style={st.muted}>{connection?.device.name??'Nenhum adaptador ativo'} · {connection?.protocol??'Protocolo N/D'}</Text><Text style={st.muted}>Só serão consultados PIDs anunciados como suportados pela ECU.</Text></View>
- <Text style={st.section}>CONDIÇÃO DO MOTOR</Text><View style={[st.modes,layout.landscape&&st.modesWide]}>
- <TouchableOpacity disabled={running} onPress={()=>setMode('ENGINE_OFF')} style={[st.mode,mode==='ENGINE_OFF'&&st.selected]}><Text style={st.icon}>⏻</Text><Text style={st.modeTitle}>Motor desligado</Text><Text style={st.muted}>Ignição ligada, motor parado</Text></TouchableOpacity>
- <TouchableOpacity disabled={running} onPress={()=>setMode('ENGINE_ON')} style={[st.mode,mode==='ENGINE_ON'&&st.selected]}><Text style={st.icon}>◉</Text><Text style={st.modeTitle}>Motor ligado</Text><Text style={st.muted}>Teste parado, sem conduzir</Text></TouchableOpacity></View>
- <View style={st.notice}><Text style={st.noticeTitle}>Antes de iniciar</Text><Text style={st.noticeText}>Estacione em local seguro. Motor ligado: mantenha o veículo parado e o freio de estacionamento aplicado. Não use esta tela durante a condução.</Text></View>
- <TouchableOpacity disabled={!connected||running} onPress={()=>void runTests()} style={[st.primary,(!connected||running)&&st.disabled]}>{running?<ActivityIndicator color="#06111f"/>:<Text style={st.primaryText}>▶ INICIAR VARREDURA</Text>}</TouchableOpacity>
- {running&&<TouchableOpacity onPress={stop} style={st.stop}><Text style={st.stopText}>PARAR APÓS CONSULTA ATUAL</Text></TouchableOpacity>}
- <Text style={st.message}>{message}</Text>{error?<Text style={st.error}>{error}</Text>:null}
- {running&&<Text style={st.muted}>Progresso: {progress} PIDs consultados</Text>}
- {samples.length>0&&<><View style={st.summary}><View style={st.summaryCell}><Text style={st.count}>{samples.length}</Text><Text style={st.muted}>Consultados</Text></View><View style={st.summaryCell}><Text style={st.count}>{valid}</Text><Text style={st.muted}>Válidos</Text></View><View style={st.summaryCell}><Text style={[st.count,{color:'#fbbf24'}]}>{attention}</Text><Text style={st.muted}>Investigar</Text></View></View>
- <Text style={st.section}>RESULTADOS POR SENSOR</Text>{assessments.map(({sample,assessment})=><View key={sample.pid} style={st.card}><View style={st.resultHead}><View style={{flex:1}}><Text style={st.sensor}>{sample.name}</Text><Text style={st.pid}>{sample.pid} · {sample.elapsedMs} ms</Text></View><View style={{alignItems:'flex-end',maxWidth:'55%'}}><Text style={st.value}>{valueText(sample)}</Text><Text style={[st.state,{color:colors[assessment.state]}]}>{labels[assessment.state]}</Text></View></View><Text style={st.resultTitle}>{assessment.title}</Text><Text style={st.explanation}>{assessment.explanation}</Text><Text style={st.raw}>RX: {sample.rawResponse||'SEM RESPOSTA BRUTA'}</Text></View>)}
- <TouchableOpacity onPress={()=>void saveReport()} style={st.save}><Text style={st.saveText}>SALVAR RELATÓRIO TXT</Text></TouchableOpacity>{savedPath?<Text selectable style={st.saved}>{savedPath}</Text>:null}</>}
- <View style={st.disclaimer}><Text style={st.resultTitle}>Critério técnico</Text><Text style={st.explanation}>Resposta válida não significa sensor perfeito. A avaliação separa resposta, plausibilidade e hipótese. Alguns defeitos exigem séries temporais, condições específicas ou medição elétrica externa.</Text></View>
- <Link href="/mais" asChild><TouchableOpacity style={st.back}><Text style={st.backText}>← MAIS RECURSOS</Text></TouchableOpacity></Link><Link href="/" asChild><TouchableOpacity style={st.back}><Text style={st.backText}>← COCKPIT</Text></TouchableOpacity></Link>
+  <Text style={st.title}>CENTRAL DE TESTES</Text><Text style={st.subtitle}>CATÁLOGO JSON • DADOS REAIS • 3 LEITURAS MÍNIMAS POR PID</Text>
+  <View style={[st.connection,connected?st.good:st.warn]}><Text style={connected?st.goodTitle:st.warnTitle}>{connected?'● ECU VALIDADA':'● ECU NÃO VALIDADA'}</Text><Text style={st.muted}>{connection?.device.name??'Nenhum adaptador ativo'} · {connection?.protocol??'Protocolo N/D'}</Text><Text style={st.muted}>Só PIDs anunciados pela ECU e cadastrados no catálogo entram na varredura.</Text></View>
+  <Text style={st.section}>CONDIÇÃO DO MOTOR</Text><View style={[st.modes,layout.landscape&&st.modesWide]}>
+   <TouchableOpacity disabled={running} onPress={()=>setMode('ENGINE_OFF')} style={[st.mode,mode==='ENGINE_OFF'&&st.selected]}><Text style={st.icon}>⏻</Text><Text style={st.modeTitle}>Motor desligado</Text><Text style={st.muted}>Ignição ligada, motor parado</Text></TouchableOpacity>
+   <TouchableOpacity disabled={running} onPress={()=>setMode('ENGINE_ON')} style={[st.mode,mode==='ENGINE_ON'&&st.selected]}><Text style={st.icon}>◉</Text><Text style={st.modeTitle}>Motor ligado</Text><Text style={st.muted}>Motor funcionando, carro parado</Text></TouchableOpacity>
+  </View>
+  <View style={st.notice}><Text style={st.noticeTitle}>Antes de iniciar</Text><Text style={st.noticeText}>Estacione em local seguro, aplique o freio de estacionamento e não use esta tela durante a condução. A duração depende da latência K-Line/ELM327 e da quantidade de PIDs suportados.</Text></View>
+  <TouchableOpacity disabled={!connected||running} onPress={()=>void runTests()} style={[st.primary,(!connected||running)&&st.disabled]}>{running?<ActivityIndicator color="#06111f"/>:<Text style={st.primaryText}>▶ INICIAR TESTE COMPLETO</Text>}</TouchableOpacity>
+  {running&&<TouchableOpacity onPress={stop} style={st.stop}><Text style={st.stopText}>PARAR APÓS A CONSULTA ATUAL</Text></TouchableOpacity>}
+  <View style={st.timerCard}><Text style={st.timerLabel}>{running?'TEMPO ESTIMADO RESTANTE':completed?'TESTE CONCLUÍDO':aborted?'TESTE INTERROMPIDO':'CONTAGEM REGRESSIVA'}</Text><Text style={[st.timer,{color:running?'#60a5fa':completed?'#4ade80':aborted?'#fb7185':'#a3b4ca'}]}>{clock(countdownMs)}</Text><Text style={st.muted}>{running?'Estimativa adaptativa; só encerra após todas as tentativas terminarem.':completed?'Todos os PIDs planejados tiveram três tentativas.':aborted?'Contagem parada por erro/interrupção, não por conclusão completa.':'O contador começa quando você inicia a varredura.'}</Text></View>
+  <Text style={st.message}>{message}</Text>{error?<Text style={st.error}>{error}</Text>:null}
+  {testPlan.length>0&&<><View style={st.summary}><View style={st.summaryCell}><Text style={st.count}>{testPlan.length}</Text><Text style={st.muted}>PIDs suportados</Text></View><View style={st.summaryCell}><Text style={st.count}>{samples.length}/{plannedReads}</Text><Text style={st.muted}>Tentativas</Text></View><View style={st.summaryCell}><Text style={[st.count,{color:'#fbbf24'}]}>{attention}</Text><Text style={st.muted}>Investigar</Text></View></View>
+  {running&&<Text style={st.progress}>Comandos: {commandProgress}/{commandPlan} · rodada {round}/{MIN_SENSOR_TEST_READINGS}{currentPid?' · PID '+currentPid:''}</Text>}
+  <Text style={st.section}>RESULTADOS POR PID</Text>
+  {grouped.map(({test,rows,values,representative,assessment})=><View key={test.pid} style={st.card}>
+   <View style={st.resultHead}><View style={{flex:1}}><Text style={st.sensor}>{test.label}</Text><Text style={st.pid}>{test.pid} · {test.category} · {rows.length}/{MIN_SENSOR_TEST_READINGS} leituras</Text></View><View style={{alignItems:'flex-end',maxWidth:'55%'}}><Text style={st.value}>{valueText(representative.value,representative.unit)}</Text><Text style={[st.state,{color:colors[assessment.state]}]}>{labels[assessment.state]}</Text></View></View>
+   <Text style={st.resultTitle}>{assessment.title}</Text><Text style={st.explanation}>{assessment.explanation}</Text><Text style={st.readings}>Valores: {rows.length?rows.map(row=>row.value==null?'N/D':row.value.toFixed(2)).join(' · '):'aguardando'} {representative.unit} | válidas {values.length}/{MIN_SENSOR_TEST_READINGS}</Text><Text style={st.raw}>RX mais recente: {representative.rawResponse||'AINDA SEM RESPOSTA'}</Text>
+  </View>)}
+  <TouchableOpacity onPress={()=>void saveReport()} style={st.save}><Text style={st.saveText}>SALVAR RELATÓRIO TXT</Text></TouchableOpacity>{savedPath?<Text selectable style={st.saved}>{savedPath}</Text>:null}</>}
+  <View style={st.disclaimer}><Text style={st.resultTitle}>Critério da IA local</Text><Text style={st.explanation}>O JSON orienta PIDs, pré-requisitos, faixas heurísticas e recomendações. “Coerente” não certifica o sensor; “investigar” não ordena troca de peça. Três tentativas registram repetibilidade, mas O2, aquecedor, chicote e vácuo podem exigir testes próprios.</Text></View>
+  <Link href="/mais" asChild><TouchableOpacity style={st.back}><Text style={st.backText}>← MAIS RECURSOS</Text></TouchableOpacity></Link><Link href="/" asChild><TouchableOpacity style={st.back}><Text style={st.backText}>← COCKPIT</Text></TouchableOpacity></Link>
  </View></ScrollView></SafeAreaView>;
 }
 const st=StyleSheet.create({
@@ -87,7 +117,9 @@ const st=StyleSheet.create({
  connection:{borderRadius:13,borderWidth:1,padding:13,marginBottom:12},good:{backgroundColor:'#10261b',borderColor:'#28613e'},warn:{backgroundColor:'#28151c',borderColor:'#713043'},goodTitle:{color:'#4ade80',fontSize:12,fontWeight:'900',marginBottom:4},warnTitle:{color:'#fb7185',fontSize:12,fontWeight:'900',marginBottom:4},muted:{color:'#a3b4ca',fontSize:10,marginTop:3},
  section:{color:'#7db3ff',fontSize:10,fontWeight:'900',letterSpacing:1,marginTop:13,marginBottom:8},modes:{gap:9},modesWide:{flexDirection:'row'},mode:{flex:1,backgroundColor:'#0e1b2d',borderRadius:13,borderWidth:1,borderColor:'#233a56',padding:14,minHeight:112},selected:{borderColor:'#3b82f6',backgroundColor:'#122a43'},icon:{color:'#60a5fa',fontSize:23,fontWeight:'900'},modeTitle:{color:'#f8fafc',fontSize:13,fontWeight:'900',marginTop:6},
  notice:{backgroundColor:'#152238',borderRadius:11,borderWidth:1,borderColor:'#304767',padding:12,marginTop:12,marginBottom:12},noticeTitle:{color:'#fbbf24',fontSize:11,fontWeight:'900'},noticeText:{color:'#c4d2e4',fontSize:10,lineHeight:16,marginTop:4},
- primary:{backgroundColor:'#60a5fa',padding:15,borderRadius:12,alignItems:'center',justifyContent:'center',minHeight:48},primaryText:{color:'#06111f',fontSize:11,fontWeight:'900'},disabled:{opacity:.4},stop:{borderColor:'#fb7185',borderWidth:1,padding:13,borderRadius:12,alignItems:'center',marginTop:8},stopText:{color:'#fb7185',fontSize:10,fontWeight:'900'},message:{color:'#a3b4ca',fontSize:10,lineHeight:15,marginTop:10},error:{color:'#fb7185',backgroundColor:'#28151c',borderRadius:9,padding:10,fontSize:10,marginTop:8},
- summary:{flexDirection:'row',gap:7,marginTop:13},summaryCell:{flex:1,backgroundColor:'#0e1b2d',borderRadius:10,padding:10,alignItems:'center'},count:{color:'#f8fafc',fontSize:19,fontWeight:'900'},card:{backgroundColor:'#0e1b2d',borderColor:'#233a56',borderWidth:1,borderRadius:12,padding:12,marginBottom:8},resultHead:{flexDirection:'row',alignItems:'flex-start',gap:8},sensor:{color:'#e5edf7',fontSize:12,fontWeight:'900'},pid:{color:'#7185a1',fontSize:9,marginTop:3},value:{color:'#f8fafc',fontSize:14,fontWeight:'900',textAlign:'right'},state:{fontSize:9,fontWeight:'900',marginTop:3,textAlign:'right'},resultTitle:{color:'#dbeafe',fontSize:10,fontWeight:'900',marginTop:9},explanation:{color:'#9fb0c6',fontSize:10,lineHeight:15,marginTop:4},raw:{color:'#647b98',fontSize:9,marginTop:8},
+ primary:{backgroundColor:'#60a5fa',padding:15,borderRadius:12,alignItems:'center',justifyContent:'center',minHeight:48},primaryText:{color:'#06111f',fontSize:11,fontWeight:'900'},disabled:{opacity:.4},stop:{borderColor:'#fb7185',borderWidth:1,padding:13,borderRadius:12,alignItems:'center',marginTop:8},stopText:{color:'#fb7185',fontSize:10,fontWeight:'900'},
+ timerCard:{backgroundColor:'#0e1b2d',borderColor:'#233a56',borderWidth:1,borderRadius:14,padding:15,alignItems:'center',marginTop:12},timerLabel:{color:'#7db3ff',fontSize:9,fontWeight:'900',letterSpacing:1},timer:{color:'#a3b4ca',fontSize:31,fontWeight:'900',fontVariant:['tabular-nums'],marginTop:4},progress:{color:'#93c5fd',fontSize:10,marginTop:8},
+ message:{color:'#a3b4ca',fontSize:10,lineHeight:15,marginTop:10},error:{color:'#fb7185',backgroundColor:'#28151c',borderRadius:9,padding:10,fontSize:10,marginTop:8},
+ summary:{flexDirection:'row',gap:7,marginTop:13},summaryCell:{flex:1,backgroundColor:'#0e1b2d',borderRadius:10,padding:10,alignItems:'center'},count:{color:'#f8fafc',fontSize:17,fontWeight:'900'},card:{backgroundColor:'#0e1b2d',borderColor:'#233a56',borderWidth:1,borderRadius:12,padding:12,marginBottom:8},resultHead:{flexDirection:'row',alignItems:'flex-start',gap:8},sensor:{color:'#e5edf7',fontSize:12,fontWeight:'900'},pid:{color:'#7185a1',fontSize:9,marginTop:3},value:{color:'#f8fafc',fontSize:14,fontWeight:'900',textAlign:'right'},state:{fontSize:9,fontWeight:'900',marginTop:3,textAlign:'right'},resultTitle:{color:'#dbeafe',fontSize:10,fontWeight:'900',marginTop:9},explanation:{color:'#9fb0c6',fontSize:10,lineHeight:15,marginTop:4},readings:{color:'#93c5fd',fontSize:9,lineHeight:14,marginTop:8},raw:{color:'#647b98',fontSize:9,marginTop:8},
  save:{backgroundColor:'#173c2b',borderColor:'#28613e',borderWidth:1,padding:14,borderRadius:11,alignItems:'center',marginTop:4},saveText:{color:'#4ade80',fontSize:10,fontWeight:'900'},saved:{color:'#93c5fd',fontSize:9,marginTop:7},disclaimer:{backgroundColor:'#101b2a',borderRadius:11,padding:12,marginTop:14},back:{padding:14,alignItems:'center'},backText:{color:'#7db3ff',fontSize:10,fontWeight:'900'}
 });

@@ -2386,3 +2386,26 @@ Revisão estática feita contra os contratos de `sharedConnection`, `Elm327Sessi
 
 ### Próximo passo
 Revisar o diff completo, executar validação TypeScript/testes e build Android, depois testar fisicamente no veículo: primeiro motor desligado, depois motor aquecido em marcha lenta. Não testar durante a condução.
+
+
+## 2026-10-14 — Catálogo JSON, IA de triagem e três leituras por PID
+
+### Pesquisa técnica e limites de evidência
+- Consultadas referências públicas SAE J1979/OBD-II e tabelas abertas de PIDs para conferir definição/fórmula, além do Manual do Proprietário Meriva 2012, auditoria da Bíblia e material técnico secundário Econoflex.
+- A fonte secundária Multec H X14YFH alerta para aplicação 2007–2008; seus valores/compatibilidade não foram generalizados para o veículo 2011/2012.
+- Definição padrão não garante suporte na ECU. O runtime exige bitmap atual e definição em pids.json; PIDs ausentes não são consultados.
+- Só 010C permanece confirmado por RAW_ECU; baseline CarScanner não vira evidência de ECU atual.
+
+### Alterações
+- Criado src/knowledge/sensor_tests.json com 30 parâmetros candidatos, fontes, limitações, pré-requisitos, regras de avaliação e vínculos da IA offline.
+- Refatorado sensorTestEngine.ts para consumir o JSON, exigir três tentativas por PID e três valores válidos para correlação por mediana.
+- A Central executa três rodadas seriais dos PIDs suportados, verifica modo do motor pela RPM, mantém RX bruto e gera TXT por tentativa.
+- Cronômetro regressivo inicia ao iniciar, estima por comandos/latência observada e só marca conclusão depois de o plano terminar.
+- diagnosticEngine.ts consome vínculos do catálogo e acrescenta recomendações às hipóteses DTC/PID.
+- Adicionados testes do catálogo, avaliadores com três leituras e recomendação O2/P0135. Criado docs/AUDITORIA_TESTES_SENSORES_2026-10-14.md.
+
+### Riscos e validação
+- Cortes são heurísticos, não especificações OEM. Resposta OBD não prova precisão física/elétrica.
+- Sem paralelismo ELM327; preservada a fila serial K-Line.
+- Ausência de resposta é tentativa sem valor inventado. Parada/perda mantém TXT parcial e não marca sucesso.
+- A CI deste commit deve confirmar TypeScript, testes, Expo Doctor e APK. Validação física segue pendente no veículo real.

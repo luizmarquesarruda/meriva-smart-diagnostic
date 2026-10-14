@@ -107,6 +107,7 @@ function main() {
     dtcs: [{ code: 'P0135', status: 'CONFIRMED', firstSeen: '', lastSeen: '', occurrences: 1, source: 'REAL_OBD', historical: false, confirmed: true }],
   });
   assert.strictEqual(result.hypotheses[0].id, 'FALHA_CIRCUITO_AQUECEDOR_O2_B1S1');
+  assert.ok(result.hypotheses[0].nextTests.some((item) => item.includes('0114')), 'IA usa sensor_tests.json para recomendar avaliação O2 no P0135');
 
   result = engine.runLocalDiagnostic({
     ...base,

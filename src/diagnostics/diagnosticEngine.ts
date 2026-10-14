@@ -1,5 +1,6 @@
 import type { DtcRecord, PidObservation, VehicleCondition } from '../types/sourceTypes';
 import ruleCatalog from '../knowledge/diagnostic_rules.json';
+import sensorTestCatalogJson from '../knowledge/sensor_tests.json';
 
 export interface DiagnosticInput { observations: PidObservation[]; dtcs?: DtcRecord[]; condition?: VehicleCondition; }
 export interface DiagnosticEvidence { ruleId: string; text: string; source: 'DTC' | 'PID'; pid?: string; dtc?: string; value?: number; }
@@ -9,6 +10,12 @@ export interface DiagnosticResult { engine: 'LOCAL_EVIDENCE_ENGINE'; version: 1;
 interface Rule { id: string; trigger: { dtc?: string; combinedTrimMin?: number; combinedTrimMax?: number; condition?: VehicleCondition; mapMinKpa?: number; }; hypothesis: string; baseScore: number; tests: string[]; }
 
 const rules = ruleCatalog.rules as Rule[];
+interface SensorTestLink { pid: string; label: string; aiGuidance: string; diagnosticRuleIds: string[]; }
+const sensorTestLinks = (sensorTestCatalogJson as unknown as { tests: SensorTestLink[] }).tests;
+function linkedSensorRecommendations(ruleId: string): string[] {
+ return sensorTestLinks.filter((test)=>test.diagnosticRuleIds.includes(ruleId)).slice(0,3)
+  .map((test)=>test.label+' (PID '+test.pid+'): '+test.aiGuidance);
+}
 const ACTIVE_DTC_STATUSES = new Set(['CONFIRMED', 'PENDING', 'PERMANENT', 'CURRENT']);
 
 function isSimulation(item: PidObservation): boolean { return String(item.source ?? '').trim().toUpperCase() === 'SIMULACAO'; }
@@ -56,7 +63,7 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
       score: rule.baseScore,
       confidence: confidence(rule.baseScore),
       evidence: [evidence],
-      nextTests: [...rule.tests],
+      nextTests: [...new Set([...rule.tests, ...linkedSensorRecommendations(rule.id)])],
     });
   };
 
