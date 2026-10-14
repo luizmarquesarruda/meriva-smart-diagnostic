@@ -1,6 +1,7 @@
 import type { DtcRecord, PidObservation, VehicleCondition } from '../types/sourceTypes';
 import ruleCatalog from '../knowledge/diagnostic_rules.json';
 import sensorTestCatalogJson from '../knowledge/sensor_tests.json';
+import diagnosticPolicy from '../knowledge/diagnostic_policy.json';
 
 export interface DiagnosticInput { observations: PidObservation[]; dtcs?: DtcRecord[]; condition?: VehicleCondition; ecuConnected?: boolean; }
 export interface DiagnosticEvidence { ruleId: string; text: string; source: 'DTC' | 'PID'; pid?: string; dtc?: string; value?: number; }
@@ -16,17 +17,18 @@ function linkedSensorRecommendations(ruleId: string): string[] {
  return sensorTestLinks.filter((test)=>test.diagnosticRuleIds.includes(ruleId)).slice(0,3)
   .map((test)=>test.label+' (PID '+test.pid+'): '+test.aiGuidance);
 }
-const ACTIVE_DTC_STATUSES = new Set(['CONFIRMED', 'PENDING', 'PERMANENT', 'CURRENT']);
+const ACTIVE_DTC_STATUSES = new Set<string>(diagnosticPolicy.activeDtcStatuses);
 
 function isSimulation(item: PidObservation): boolean { return String(item.source ?? '').trim().toUpperCase() === 'SIMULACAO'; }
 function isLiveObd(item: PidObservation): boolean { return String(item.source ?? '').trim().toUpperCase() === 'REAL_OBD'; }
 
 /** Evidence older than two minutes is not presented as a current diagnosis. */
-export const MAX_DIAGNOSTIC_EVIDENCE_AGE_MS = 120_000;
+export const MAX_DIAGNOSTIC_EVIDENCE_AGE_MS = diagnosticPolicy.freshness.maxEvidenceAgeMs;
+const MAX_FUTURE_DIAGNOSTIC_CLOCK_SKEW_MS = diagnosticPolicy.freshness.maxFutureClockSkewMs;
 export function isFreshDiagnosticTimestamp(timestamp: string, nowMs = Date.now()): boolean {
   const timestampMs = Date.parse(timestamp);
   return Number.isFinite(timestampMs)
-    && timestampMs <= nowMs + 5_000
+    && timestampMs <= nowMs + MAX_FUTURE_DIAGNOSTIC_CLOCK_SKEW_MS
     && nowMs - timestampMs <= MAX_DIAGNOSTIC_EVIDENCE_AGE_MS;
 }
 
