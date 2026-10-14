@@ -7,7 +7,6 @@ import type { MerivaPersistedState } from './autosaveState';
  * eventos de início/fim sem substituir os eventos anteriores daquele dia.
  */
 export const DAILY_OBD_HISTORY_FILE = 'meriva_smart_daily_obd_history.txt';
-const MAX_DAYS = 365;
 const HEADER = [
   'MERIVA SMART DIAGNOSTIC',
   'HISTÓRICO TXT POR DIA — CADA DATA É UMA PÁGINA LÓGICA.',
@@ -15,6 +14,16 @@ const HEADER = [
   'FONTE: estado local do aplicativo; valores mantêm fonte e horário quando disponíveis.',
   '',
 ].join('\n');
+
+function formatLocalTimestamp(timestamp: string): string {
+  const date = new Date(timestamp);
+  if (!Number.isFinite(date.getTime())) return 'N/D';
+  const pad = (value: number) => String(value).padStart(2, '0');
+  const offsetMinutes = -date.getTimezoneOffset();
+  const sign = offsetMinutes >= 0 ? '+' : '-';
+  const offset = `${sign}${pad(Math.floor(Math.abs(offsetMinutes) / 60))}:${pad(Math.abs(offsetMinutes) % 60)}`;
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())} ${offset}`;
+}
 
 function localDayKey(date = new Date()): string {
   const year = date.getFullYear();
@@ -29,7 +38,8 @@ function historyPath(basePath: string): string {
 
 function renderEvent(state: MerivaPersistedState, event: 'SESSION_START' | 'SESSION_END' | 'SESSION_RECOVERED', timestamp: string): string {
   const lines = [
-    `--- EVENTO: ${event} | ${timestamp} ---`,
+    `--- EVENTO: ${event} | UTC=${timestamp} ---`,
+    `HORA LOCAL: ${formatLocalTimestamp(timestamp)}`,
     `ADAPTADOR: ${state.obd.adapterName ?? 'N/D'}`,
     `BLUETOOTH/OBD: ${state.obd.connected ? 'CONECTADO' : 'DESCONECTADO'} | ECU VALIDADA EM: ${state.obd.ecuValidatedAt ?? 'N/D'}`,
     `PROTOCOLO ATUAL: ${state.obd.protocol ?? 'N/D'} | ÚLTIMO CONHECIDO: ${state.obd.lastKnownProtocol ?? 'N/D'}`,
@@ -127,7 +137,9 @@ async function appendDailyObdSessionEventUnsafe(
   pages.set(date, updatedEvents);
   const eventCount = (updatedEvents.match(/--- EVENTO: SESSION_(?:START|END|RECOVERED) \|/g) ?? []).length;
 
-  const sortedDates = Array.from(pages.keys()).sort().slice(-MAX_DAYS);
+  // The daily journal is the durable summary; do not evict older dates when
+  // the bounded autosave snapshot file rotates.
+  const sortedDates = Array.from(pages.keys()).sort();
   const output = [HEADER.trimEnd()];
   for (const day of sortedDates) {
     output.push('', `========== DIA: ${day} ==========`, pages.get(day) ?? '', `========== FIM DO DIA ==========`);
