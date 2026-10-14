@@ -10,12 +10,37 @@ const HISTORY_HEADER = [
   'MERIVA SMART DIAGNOSTIC',
   'HISTÓRICO DE SALVAMENTOS AUTOMÁTICOS',
   'LIMITE: 1000 SALVAMENTOS',
-  'REGRA: quando ultrapassar o limite, o salvamento mais antigo é removido; o diário por dia é independente.',
+  'ORGANIZAÇÃO: salvamentos agrupados por DATA LOCAL; sessões ECU ficam no diário diário independente.',
+  'REGRA: quando ultrapassar o limite, o salvamento mais antigo é removido.',
   '',
 ].join('\n');
 
 function historyPath(basePath: string): string {
   return `${basePath}/CONFIG/${AUTOSAVE_HISTORY_FILE}`;
+}
+
+function entryLocalDate(entry: string): string {
+  const explicit = entry.match(/DATA LOCAL:\\s*(\\d{4}-\\d{2}-\\d{2})/);
+  if (explicit) return explicit[1];
+  const exportedAt = entry.match(/Exported At:\\s*(\\d{4}-\\d{2}-\\d{2})/);
+  if (exportedAt) return exportedAt[1];
+  return 'DATA DESCONHECIDA';
+}
+
+function renderHistory(entries: string[]): string {
+  const groups = new Map<string, string[]>();
+  for (const entry of entries) {
+    const date = entryLocalDate(entry);
+    const group = groups.get(date) ?? [];
+    group.push(entry);
+    groups.set(date, group);
+  }
+  const output = [HISTORY_HEADER.trimEnd()];
+  for (const date of Array.from(groups.keys()).sort()) {
+    output.push('', `========== DIA: ${date} ==========`, ...(groups.get(date) ?? []));
+    output.push(`========== FIM DO DIA ==========`);
+  }
+  return `${output.join('\\n\\n')}\\n`;
 }
 
 function splitEntries(content: string): string[] {
@@ -72,7 +97,7 @@ async function readAutoSaveHistoryUnsafe(basePath: string): Promise<string> {
   const entries = deduplicateEntries(splitEntries(content))
     .slice(-AUTOSAVE_HISTORY_MAX_ENTRIES)
     .map(removeCarScannerTripsFromSnapshot);
-  return entries.length ? `${HISTORY_HEADER}${entries.join('\n\n')}\n` : HISTORY_HEADER;
+  return entries.length ? renderHistory(entries) : HISTORY_HEADER;
 }
 
 export async function readAutoSaveHistory(basePath: string): Promise<string> {
@@ -104,15 +129,18 @@ async function appendAutoSaveHistoryUnsafe(
   // trip in each of 200 TXT snapshots caused quadratic file growth; keep only
   // the ten most recent REAL_OBD trips in this diagnostic snapshot history.
   const snapshot = formatAutoSaveTxt(state, { appVersion, exportedAt, historyLimit: 10 });
+  const exportedDate = new Date(exportedAt);
+  const localDate = `${exportedDate.getFullYear()}-${String(exportedDate.getMonth() + 1).padStart(2, '0')}-${String(exportedDate.getDate()).padStart(2, '0')}`;
   const entry = [
     ENTRY_BEGIN,
+    `DATA LOCAL: ${localDate}`,
     `NÚMERO: ${nextNumber}`,
     `MOTIVO: ${reason}`,
     snapshot.trim(),
     ENTRY_END,
   ].join('\n');
   const kept = [...entries, entry].slice(-AUTOSAVE_HISTORY_MAX_ENTRIES);
-  await FileSystem.writeAsStringAsync(path, `${HISTORY_HEADER}${kept.join('\n\n')}\n`, {
+  await FileSystem.writeAsStringAsync(path, renderHistory(kept), {
     encoding: FileSystem.EncodingType.UTF8,
   });
   return { count: kept.length };
