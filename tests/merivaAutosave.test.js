@@ -641,6 +641,11 @@ test('13. autosave agrupa snapshots por data e limita a 1000 entradas', async ()
   assert.ok(!/NÚMERO: 5\n/.test(history), 'salvamentos antigos devem ser removidos');
   assert.ok(history.includes('========== DIA: '), 'histórico deve ser agrupado por data');
   assert.ok(history.includes('DATA LOCAL: '), 'cada snapshot deve registrar sua data local');
+  const localDateMatch = history.match(/DATA LOCAL: (\d{4}-\d{2}-\d{2})/);
+  assert.ok(localDateMatch, 'data local deve estar em formato ISO');
+  assert.ok(history.includes(`========== DIA: ${localDateMatch[1]} ==========`), 'o agrupamento deve usar a mesma data do snapshot');
+  assert.match(history, /\n========== DIA: \d{4}-\d{2}-\d{2} ==========\n/, 'blocos diários devem usar quebras de linha reais');
+  assert.match(history, /\n========== FIM DO DIA ==========\n/, 'fim de cada dia deve ocupar uma linha própria');
   assert.strictEqual((history.match(/meriva smart diagnostic/gi) || []).length, 1001, 'um cabeçalho + 1000 snapshots');
   m.disposeAutoSave();
 });
