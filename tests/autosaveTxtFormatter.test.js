@@ -109,14 +109,14 @@ const compactSnapshot = formatAutoSaveTxt(verboseState, { ...options, compact: t
 const compactSnapshotReadings = compactSnapshot
   .split('[LAST READINGS]')[1]
   .split('[DTC]')[0]
-  .split(/\\r?\\n/)
+  .split(/\r?\n/)
   .filter((line) => /^010C RPM_/.test(line));
 assert.strictEqual(compactSnapshotReadings.length, 10, 'compact snapshots must cap recent PID readings at ten');
 assert.ok(!compactSnapshot.includes('MODO_TESTE_EXPANDIDO'), 'compact autosave must not duplicate contextual learning tables');
 assert.ok(compactSnapshot.includes('Detalhes de estatísticas por contexto preservados no autosave JSON.'));
 assert.ok(!compactSnapshot.includes('setting_8:'), 'compact snapshots must cap repeated settings');
 assert.strictEqual(
-  compactSnapshot.split('[HISTORY]')[1].split('[LEARNING]')[0].split(/\\r?\\n/).filter((line) => line.includes('fonte=REAL_OBD') && /km \\|/.test(line)).length,
+  compactSnapshot.split('[HISTORY]')[1].split('[LEARNING]')[0].split(/\r?\n/).filter((line) => line.includes('fonte=REAL_OBD') && /km \|/.test(line)).length,
   3,
   'compact snapshots must include at most three trip rows',
 );
