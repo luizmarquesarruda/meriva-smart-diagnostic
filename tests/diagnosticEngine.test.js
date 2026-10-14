@@ -121,6 +121,9 @@ function main() {
   assert.strictEqual(result.hypotheses[0].id, 'MISTURA_POBRE');
   assert.strictEqual(result.blockedSimulationSamples, 1);
 
+  assert.strictEqual(engine.isFreshDiagnosticTimestamp(new Date().toISOString()), true, 'timestamp atual deve ser aceito');
+  assert.strictEqual(engine.isFreshDiagnosticTimestamp(new Date(Date.now() + 10_000).toISOString()), false, 'timestamp futuro inválido deve ser bloqueado');
+
   const staleObservation = obs('010B', 80);
   staleObservation.timestamp = new Date(Date.now() - engine.MAX_DIAGNOSTIC_EVIDENCE_AGE_MS - 1000).toISOString();
   result = engine.runLocalDiagnostic({ ...base, observations: [staleObservation] });
