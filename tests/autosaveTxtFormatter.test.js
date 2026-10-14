@@ -80,4 +80,48 @@ assert.ok(
 assert.ok(!fullHistory.includes('122.819 km/L'), 'implausible legacy consumption must not appear as valid');
 assert.ok(!fullHistory.includes('999 km'), 'full export must continue excluding Car Scanner seed trips');
 
+const verboseState = {
+  ...state,
+  lastReadings: Array.from({ length: 20 }, (_, index) => ({
+    pid: '010C',
+    name: 'RPM_' + index,
+    value: 800 + index / 4,
+    unit: 'rpm',
+    status: 'RESPONDEU',
+    timestamp: '2026-10-11T10:00:00.000Z',
+    source: 'REAL',
+  })),
+  learning: {
+    learningStatus: 'LEARNING_ACTIVE',
+    lastUpdated: '2026-10-11T10:00:00.000Z',
+    globalSampleCounts: { realSamples: 55, seedSamples: 10 },
+    contextualData: [{
+      condition: 'MODO_TESTE_EXPANDIDO',
+      sampleCount: 20,
+      statistics: {
+        '010C': { mean: 900.125, min: 800, max: 1000, confidence: 'HIGH' },
+      },
+    }],
+  },
+  settings: Object.fromEntries(Array.from({ length: 12 }, (_, index) => ['setting_' + index, index])),
+};
+const compactSnapshot = formatAutoSaveTxt(verboseState, { ...options, compact: true, historyLimit: 3 });
+const compactSnapshotReadings = compactSnapshot
+  .split('[LAST READINGS]')[1]
+  .split('[DTC]')[0]
+  .split(/\\r?\\n/)
+  .filter((line) => /^010C RPM_/.test(line));
+assert.strictEqual(compactSnapshotReadings.length, 10, 'compact snapshots must cap recent PID readings at ten');
+assert.ok(!compactSnapshot.includes('MODO_TESTE_EXPANDIDO'), 'compact autosave must not duplicate contextual learning tables');
+assert.ok(compactSnapshot.includes('Detalhes de estatísticas por contexto preservados no autosave JSON.'));
+assert.ok(!compactSnapshot.includes('setting_8:'), 'compact snapshots must cap repeated settings');
+assert.strictEqual(
+  compactSnapshot.split('[HISTORY]')[1].split('[LEARNING]')[0].split(/\\r?\\n/).filter((line) => line.includes('fonte=REAL_OBD') && /km \\|/.test(line)).length,
+  3,
+  'compact snapshots must include at most three trip rows',
+);
+for (const section of ['[VEHICLE]', '[OBD]', '[LAST READINGS]', '[DTC]', '[HISTORY]', '[LEARNING]', '[SETTINGS]']) {
+  assert.ok(compactSnapshot.includes(section), 'compact snapshot missing section ' + section);
+}
+
 console.log('PASS autosave TXT formatter: compact snapshots without losing full export history');
