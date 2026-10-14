@@ -209,7 +209,7 @@ test('1. estado vazio -> salvar -> restaurar', async () => {
   const envelope = JSON.parse(files.get(`${CONFIG_DIR}/autosave.json`));
   assert.strictEqual(envelope.schemaVersion, 1);
   assert.strictEqual(envelope.dataType, 'APP_STATE');
-  assert.ok(!files.get(\`${CONFIG_DIR}/autosave.json\`).includes('\n  "schemaVersion"'), 'autosave JSON deve ser compacto para reduzir bytes serializados/escritos');
+  assert.ok(!files.get(`${CONFIG_DIR}/autosave.json`).includes('\n  "schemaVersion"'), 'autosave JSON deve ser compacto para reduzir bytes serializados/escritos');
   m.disposeAutoSave();
   state = await m.initAutoSave(BASE);
   assert.strictEqual(state.settings.teste, 42, 'estado deve ser restaurado');
