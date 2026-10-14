@@ -31,4 +31,9 @@ assert.equal(e.assessSensorSample(sample('0114',0.5),'ENGINE_ON',[...three('0114
 assert.equal(e.assessSensorSample(sample('0142',10.8),'ENGINE_OFF',three('0142',10.8)).state,'INVESTIGAR');
 assert.equal(e.assessSensorSample(sample('0105',230),'ENGINE_ON',three('0105',230)).state,'INVESTIGAR');
 assert.ok(e.getSensorRecommendationsForRule('DTC_P0135_O2_HEATER').some(x=>x.includes('0114')));
+const screen = fs.readFileSync(path.resolve(__dirname, '../app/testes-sensores.tsx'), 'utf8');
+assert.match(screen, /setCountdownMs\(Math\.max\(0,remain\)\)/, 'contagem regressiva não deve voltar a 1 s ao expirar');
+assert.match(screen, /MERIVA_SMART\/testes-sensores/, 'relatórios de testes devem ficar em diretório separado');
+assert.match(screen, /MIN_SENSOR_TEST_READINGS/, 'central deve aplicar o mínimo de três leituras por PID');
+
 console.log('Motor de avaliação dos testes de sensores: OK');
