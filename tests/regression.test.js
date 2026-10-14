@@ -253,7 +253,7 @@ async function testParser() {
   assert.strictEqual(o2.status, 'RESPONDEU');
   assert.strictEqual(o2.value, 0.53);
   assert.strictEqual(o2.rawBytes.length, 4);
-  assert.ok(o2.interpretation.includes('STFT B1S1=0%'), 'PID 0114 byte B should decode STFT independently of voltage');
+  assert.ok(o2.interpretation.includes('STFT B1S1=0.00%'), 'PID 0114 byte B should decode STFT independently of voltage');
   const o2NoTrim = parser.parsePidResponse('0114', '41 14 6A FF');
   assert.strictEqual(o2NoTrim.value, 0.53, '0xFF trim sentinel must not invalidate the O2 voltage byte');
   assert.ok(o2NoTrim.interpretation.includes('STFT B1S1=N/D (0xFF)'), 'PID 0114 byte B 0xFF means trim unavailable, not +99.2%');
