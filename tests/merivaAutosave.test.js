@@ -619,13 +619,13 @@ test('12. debounce agrupa gravações', async () => {
   m.disposeAutoSave();
 });
 
-test('13. autosave mantém um único TXT histórico e limita a 200 snapshots', async () => {
+test('13. autosave agrupa snapshots por data e limita a 1000 entradas', async () => {
   const m = manager();
   m.disposeAutoSave();
   resetFS();
   await m.initAutoSave(BASE);
 
-  for (let i = 1; i <= 205; i += 1) {
+  for (let i = 1; i <= 1005; i += 1) {
     m.updateAutoSaveState((s) => {
       s.settings.sequence = i;
     });
@@ -636,10 +636,12 @@ test('13. autosave mantém um único TXT histórico e limita a 200 snapshots', a
   assert.ok(files.has(historyPath), 'histórico TXT deve ser criado automaticamente');
   const history = files.get(historyPath);
   const entries = history.split('=== SALVAMENTO_BEGIN ===').slice(1);
-  assert.strictEqual(entries.length, 200, 'histórico deve manter exatamente os 200 mais recentes');
-  assert.ok(history.includes('NÚMERO: 205'), 'último salvamento deve permanecer');
+  assert.strictEqual(entries.length, 1000, 'histórico deve manter exatamente os 1000 mais recentes');
+  assert.ok(history.includes('NÚMERO: 1005'), 'último salvamento deve permanecer');
   assert.ok(!/NÚMERO: 5\n/.test(history), 'salvamentos antigos devem ser removidos');
-  assert.strictEqual((history.match(/meriva smart diagnostic/gi) || []).length, 201, 'um cabeçalho + 200 snapshots');
+  assert.ok(history.includes('========== DIA: '), 'histórico deve ser agrupado por data');
+  assert.ok(history.includes('DATA LOCAL: '), 'cada snapshot deve registrar sua data local');
+  assert.strictEqual((history.match(/meriva smart diagnostic/gi) || []).length, 1001, 'um cabeçalho + 1000 snapshots');
   m.disposeAutoSave();
 });
 
