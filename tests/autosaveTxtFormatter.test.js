@@ -54,13 +54,22 @@ const implausibleTrip = {
   avgFuelConsumptionKml: 122.819,
   fuelDataValid: true,
 };
+const gapTrip = {
+  ...realTrips[0],
+  id: 'gap_trip',
+  distanceTotalKm: 25,
+  fuelUsedL: 0.12,
+  avgFuelConsumptionKml: 20,
+  fuelDataValid: false,
+  fuelCoverageComplete: false,
+};
 const seedTrip = { ...realTrips[0], id: 'seed_trip', distanceTotalKm: 999, source: 'CARSCANNER_SEED' };
 const state = {
   vehicle: null,
   obd: { connected: false },
   lastReadings: [],
   dtcs: [],
-  driveCycles: [...realTrips.slice(0, 4), implausibleTrip, ...realTrips.slice(4), seedTrip],
+  driveCycles: [...realTrips.slice(0, 4), implausibleTrip, ...realTrips.slice(4), gapTrip, seedTrip],
   learning: null,
   settings: {},
   metadata: { savedAt: '2026-10-11T10:00:00.000Z', appVersion: '1.0.1' },
@@ -71,19 +80,20 @@ const compact = formatAutoSaveTxt(state, { ...options, historyLimit: 10 });
 const compactHistory = compact.split('[HISTORY]')[1].split('[LEARNING]')[0];
 const compactRows = compactHistory.split(/\r?\n/).filter((line) => line.includes('fonte=REAL_OBD') && /km \|/.test(line));
 assert.strictEqual(compactRows.length, 10, 'autosave TXT should include only the newest ten real trips');
-assert.ok(compactHistory.includes('24 km |'), 'compact TXT should preserve the newest trip');
+assert.ok(compactHistory.includes('25 km | N/D (cobertura insuficiente) | N/D | fonte=REAL_OBD'), 'compact TXT should label missing fuel coverage instead of showing a partial fuel total');
 assert.ok(!compactHistory.includes('10 km |'), 'compact TXT should omit older trip rows');
 assert.ok(!compactHistory.includes('999 km'), 'compact TXT must not include Car Scanner seed trips');
 
 const full = formatAutoSaveTxt(state, options);
 const fullHistory = full.split('[HISTORY]')[1].split('[LEARNING]')[0];
 const fullRows = fullHistory.split(/\r?\n/).filter((line) => line.includes('fonte=REAL_OBD') && /km \|/.test(line));
-assert.strictEqual(fullRows.length, 16, 'full export should preserve all real trips, including rows with invalid consumption');
+assert.strictEqual(fullRows.length, 17, 'full export should preserve all real trips, including rows with invalid fuel coverage');
 assert.ok(
   fullHistory.includes('10 km | 1 L | N/D | fonte=REAL_OBD'),
   'legacy consumption above 30 km/L must display N/D without discarding its trip row',
 );
 assert.ok(!fullHistory.includes('122.819 km/L'), 'implausible legacy consumption must not appear as valid');
+assert.ok(fullHistory.includes('25 km | N/D (cobertura insuficiente) | N/D | fonte=REAL_OBD'), 'full TXT must disclose a dropped fuel-integration interval');
 assert.ok(!fullHistory.includes('999 km'), 'full export must continue excluding Car Scanner seed trips');
 
 const verboseState = {
