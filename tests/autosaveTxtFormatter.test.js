@@ -16,6 +16,7 @@ const originalLoad = Module._load;
 Module._load = function (request) {
   if (request === './autosaveTypes') return { AUTOSAVE_SCHEMA_VERSION: 1 };
   if (request === '../obd/dtcDefinition') return { getDtcDefinition: () => undefined };
+  if (request === '../trip/tripRecorder') return { MAX_VALID_TRIP_CONSUMPTION_KML: 30 };
   return originalLoad.apply(this, arguments);
 };
 
@@ -41,13 +42,19 @@ const realTrips = Array.from({ length: 15 }, (_, index) => ({
   source: 'REAL_OBD',
   importedAt: '2026-10-11T10:00:00.000Z',
 }));
+const implausibleTrip = {
+  ...realTrips[0],
+  id: 'implausible_legacy_trip',
+  avgFuelConsumptionKml: 122.819,
+  fuelDataValid: true,
+};
 const seedTrip = { ...realTrips[0], id: 'seed_trip', distanceTotalKm: 999, source: 'CARSCANNER_SEED' };
 const state = {
   vehicle: null,
   obd: { connected: false },
   lastReadings: [],
   dtcs: [],
-  driveCycles: [...realTrips, seedTrip],
+  driveCycles: [...realTrips.slice(0, 4), implausibleTrip, ...realTrips.slice(4), seedTrip],
   learning: null,
   settings: {},
   metadata: { savedAt: '2026-10-11T10:00:00.000Z', appVersion: '1.0.1' },
@@ -65,7 +72,12 @@ assert.ok(!compactHistory.includes('999 km'), 'compact TXT must not include Car 
 const full = formatAutoSaveTxt(state, options);
 const fullHistory = full.split('[HISTORY]')[1].split('[LEARNING]')[0];
 const fullRows = fullHistory.split(/\r?\n/).filter((line) => line.includes('fonte=REAL_OBD') && /km \|/.test(line));
-assert.strictEqual(fullRows.length, 15, 'full export should preserve the complete real-trip history');
+assert.strictEqual(fullRows.length, 16, 'full export should preserve all real trips, including rows with invalid consumption');
+assert.ok(
+  fullHistory.includes('10 km | 1 L | N/D | fonte=REAL_OBD'),
+  'legacy consumption above 30 km/L must display N/D without discarding its trip row',
+);
+assert.ok(!fullHistory.includes('122.819 km/L'), 'implausible legacy consumption must not appear as valid');
 assert.ok(!fullHistory.includes('999 km'), 'full export must continue excluding Car Scanner seed trips');
 
 console.log('PASS autosave TXT formatter: compact snapshots without losing full export history');
