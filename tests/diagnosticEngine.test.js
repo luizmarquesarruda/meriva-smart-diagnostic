@@ -68,6 +68,17 @@ function main() {
   });
   assert.strictEqual(result.hypotheses[0].id, 'MISTURA_POBRE');
 
+  const olderTrim = obs('0106', 25);
+  olderTrim.timestamp = new Date(Date.now() - 5000).toISOString();
+  const latestTrim = obs('0106', 2);
+  latestTrim.timestamp = new Date().toISOString();
+  result = engine.runLocalDiagnostic({
+    ...base,
+    // A amostra antiga fica por último no array; a evidência mais recente deve vencer.
+    observations: [latestTrim, obs('0107', 2), olderTrim],
+  });
+  assert.strictEqual(result.hypotheses.length, 0, 'índice deve selecionar a amostra atual, não a última posição do array');
+
   result = engine.runLocalDiagnostic({
     ...base,
     observations: [obs('0106', -20), obs('0107', -5)],
