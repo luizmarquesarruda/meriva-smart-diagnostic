@@ -149,12 +149,55 @@ export async function discoverPairedDevices(): Promise<BluetoothDeviceInfo[]> {
 
 export const MAX_BLUETOOTH_ATTEMPTS = bluetoothConfig.retry.maxAttempts;
 export const BLUETOOTH_RETRY_INTERVAL_MS = bluetoothConfig.retry.intervalMs;
+export const PID_DISCOVERY_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+function normalizeAdapterAddress(address: string | undefined | null): string {
+  return (address ?? '').replace(/[^0-9A-F]/gi, '').toUpperCase();
+}
+
+function normalizeVehicleVin(vin: string | undefined | null): string | null {
+  const normalized = (vin ?? '').trim().replace(/\\s+/g, '').toUpperCase();
+  return normalized || null;
+}
+
+/**
+ * Reuse only recent PIDs that were individually validated on the same adapter,
+ * under the same protocol, and—when known—the same vehicle VIN.
+ * Old caches without adapter metadata deliberately miss once and are rebuilt.
+ */
+export function isPidDiscoveryCacheReusable(
+  cache: PidDiscoveryCache | null | undefined,
+  adapterAddress: string,
+  protocol: string,
+  currentVehicleVin?: string | null,
+  nowMs = Date.now(),
+): boolean {
+  if (!cache || !Array.isArray(cache.supportedPids) || !cache.adapterAddress) return false;
+  const requestedAdapter = normalizeAdapterAddress(adapterAddress);
+  const cachedAdapter = normalizeAdapterAddress(cache.adapterAddress);
+  if (!requestedAdapter || requestedAdapter !== cachedAdapter) return false;
+  if ((cache.protocol ?? '').trim().toUpperCase() !== protocol.trim().toUpperCase()) return false;
+
+  const discoveredAtMs = Date.parse(cache.discoveredAt);
+  const ageMs = nowMs - discoveredAtMs;
+  if (!Number.isFinite(discoveredAtMs) || ageMs < 0 || ageMs > PID_DISCOVERY_CACHE_TTL_MS) return false;
+
+  const supported = new Set(cache.supportedPids.map((pid) => String(pid).replace(/\\s/g, '').toUpperCase()));
+  if (!supported.has('010C') || Array.from(supported).some((pid) => !/^01[0-9A-F]{2}$/.test(pid))) return false;
+
+  const cacheVin = normalizeVehicleVin(cache.vehicleVin);
+  const currentVin = normalizeVehicleVin(currentVehicleVin);
+  if (cacheVin || currentVin) return Boolean(cacheVin && currentVin && cacheVin === currentVin);
+  return true;
+}
+
 
 export async function createRealElmSession(
   device: BluetoothDeviceInfo,
   compatibility?: Partial<Elm327CompatibilityConfig>,
   pidDiscoveryCache?: PidDiscoveryCache | null,
   callbacks?: RealElmSessionCallbacks,
+  currentVehicleVin?: string | null,
 ): Promise<RealElmConnection> {
   let lastCause: unknown = null;
   const config = mergeCompatibilityConfig({
@@ -300,15 +343,30 @@ async function createRealElmSessionAttempt(
       ? getElmProtocolName(successfulForcedProtocol)
       : (identifiedProtocol ?? 'AUTO');
     const negotiatedProtocol = session.getProtocol() ?? activeProtocol;
-    const cacheMatchesProtocol = Boolean(pidDiscoveryCache) && pidDiscoveryCache?.protocol === negotiatedProtocol;
+    const cacheReusable = isPidDiscoveryCacheReusable(
+      pidDiscoveryCache,
+      device.address,
+      negotiatedProtocol,
+      currentVehicleVin,
+    );
 
     let supportedPids: string[] = [];
     let pidDiscoverySource: RealElmConnection['pidDiscoverySource'] = 'CACHE';
 
-    if (cacheMatchesProtocol && pidDiscoveryCache) {
-      supportedPids = Array.from(new Set(pidDiscoveryCache.supportedPids)).sort();
+    if (cacheReusable && pidDiscoveryCache) {
+      supportedPids = Array.from(new Set(pidDiscoveryCache.supportedPids.map((pid) => pid.replace(/\\s/g, '').toUpperCase()))).sort();
+      logBluetoothDiagnostic('PID_DISCOVERY_CACHE_REUSED', {
+        adapterAddress: device.address,
+        protocol: negotiatedProtocol,
+        pidCount: supportedPids.length,
+      });
     } else {
       pidDiscoverySource = 'ECU';
+      logBluetoothDiagnostic('PID_DISCOVERY_CACHE_MISS', {
+        adapterAddress: device.address,
+        protocol: negotiatedProtocol,
+        hasCache: Boolean(pidDiscoveryCache),
+      });
       try {
         const discovery = await discoverIntelligentPids(session, { prevalidatedResults: [ecuProbe] });
         supportedPids = discovery.supportedPids;
