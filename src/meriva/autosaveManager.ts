@@ -15,11 +15,13 @@ import { hydrateState, isValidEnvelope, validatePayload } from './autosaveValida
 import { migrateEnvelope } from './autosaveMigrations';
 import { appendAutoSaveHistory } from './autosaveHistoryTxt';
 import { appendDailyObdSessionEvent } from './dailyObdHistory';
+import autosavePolicy from '../knowledge/autosave_policy.json';
 
-const DEBOUNCE_MS = 1500;
-const CHECKPOINT_MS = 45000;
-const MAX_LAST_READINGS = 50;
-const MIN_READING_SAVE_INTERVAL_MS = 10_000;
+const DEBOUNCE_MS = autosavePolicy.persistence.debounceMs;
+const CHECKPOINT_MS = autosavePolicy.persistence.checkpointMs;
+const MAX_LAST_READINGS = autosavePolicy.persistence.maxLastReadings;
+const MIN_READING_SAVE_INTERVAL_MS = autosavePolicy.persistence.minReadingSaveIntervalMs;
+const FORCE_HISTORY_REASONS = new Set<string>(autosavePolicy.history.forceRecordReasons);
 
 interface AutosaveRuntime {
   basePath: string;
@@ -31,6 +33,7 @@ interface AutosaveRuntime {
   lastSaveReason: SaveReason | null;
   lastError: string | null;
   lastSavedFingerprint: string | null;
+  lastHistorySnapshotAt: number | null;
   debounceTimer: ReturnType<typeof setTimeout> | null;
   criticalTimer: ReturnType<typeof setTimeout> | null;
   criticalWaiters: Array<(saved: boolean) => void>;
@@ -50,6 +53,7 @@ const runtime: AutosaveRuntime = {
   lastSaveReason: null,
   lastError: null,
   lastSavedFingerprint: null,
+  lastHistorySnapshotAt: null,
   debounceTimer: null,
   criticalTimer: null,
   criticalWaiters: [],
@@ -114,6 +118,12 @@ async function loadLastValidEnvelope(
   return readEnvelope(previousPath(basePath));
 }
 
+function shouldRecordHistorySnapshot(reason: SaveReason, nowMs: number): boolean {
+  if (FORCE_HISTORY_REASONS.has(reason)) return true;
+  if (runtime.lastHistorySnapshotAt === null) return true;
+  return nowMs - runtime.lastHistorySnapshotAt >= autosavePolicy.history.snapshotIntervalMs;
+}
+
 async function persistNow(reason: SaveReason): Promise<boolean> {
   if (runtime.saving) {
     runtime.dirty = true;
@@ -142,7 +152,10 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
       source: AUTOSAVE_SOURCE,
       payload: runtime.state,
     };
-    const content = JSON.stringify(envelope, null, 2);
+    // Compact JSON reduces serialization CPU, bytes written and previous-file copy cost.
+    const content = autosavePolicy.persistence.compactJson
+      ? JSON.stringify(envelope)
+      : JSON.stringify(envelope, null, 2);
     const base = runtime.basePath;
 
     await FileSystem.writeAsStringAsync(tmpPath(base), content, {
@@ -170,15 +183,20 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
     runtime.lastError = null;
     runtime.lastSavedFingerprint = fingerprintBeforeSave;
 
-    try {
-      await appendAutoSaveHistory(
-        base,
-        runtime.state,
-        runtime.state.metadata?.appVersion ?? 'N/D',
-        reason,
-      );
-    } catch (historyCause) {
-      console.warn('[autosave] falha ao atualizar histórico TXT:', historyCause instanceof Error ? historyCause.message : historyCause);
+    if (shouldRecordHistorySnapshot(reason, Date.parse(savedAt))) {
+      try {
+        await appendAutoSaveHistory(
+          base,
+          runtime.state,
+          runtime.state.metadata?.appVersion ?? 'N/D',
+          reason,
+        );
+        runtime.lastHistorySnapshotAt = Date.parse(savedAt);
+      } catch (historyCause) {
+        // A falha do resumo TXT não invalida o estado JSON principal. Como o
+        // checkpoint não foi marcado, a próxima gravação poderá tentar de novo.
+        console.warn('[autosave] falha ao atualizar histórico TXT:', historyCause instanceof Error ? historyCause.message : historyCause);
+      }
     }
     runtime.dirty = runtime.mutationVersion !== mutationVersionAtStart;
     saved = true;
@@ -478,5 +496,6 @@ export function disposeAutoSave(): void {
   runtime.lastSaveReason = null;
   runtime.lastError = null;
   runtime.lastSavedFingerprint = null;
+  runtime.lastHistorySnapshotAt = null;
   runtime.lastReadingMutationAt.clear();
 }
