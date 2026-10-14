@@ -408,14 +408,13 @@ async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm3
       && connection.supportedPids.length >= 3
     ) {
       updateAutoSaveState((state) => {
+        const vehicleVin = state.vehicle?.vin?.trim().toUpperCase();
         state.pidDiscovery = {
           supportedPids: Array.from(new Set(connection.supportedPids)).sort(),
           protocol: connection.protocol ?? 'AUTO',
           discoveredAt: new Date().toISOString(),
           adapterAddress: device.address.toUpperCase(),
-          ...(state.vehicle?.vin?.trim()
-            ? { vehicleVin: state.vehicle.vin.trim().toUpperCase() }
-            : {}),
+          ...(vehicleVin ? { vehicleVin } : {}),
         };
       });
     }
