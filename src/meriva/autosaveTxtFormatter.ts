@@ -9,6 +9,9 @@ import { AUTOSAVE_SCHEMA_VERSION } from './autosaveTypes';
 import { getDtcDefinition } from '../obd/dtcDefinition';
 import { MAX_VALID_TRIP_CONSUMPTION_KML } from '../trip/tripRecorder';
 import autosavePolicy from '../knowledge/autosave_policy.json';
+import diagnosticPolicy from '../knowledge/diagnostic_policy.json';
+
+const ACTIVE_DTC_STATUSES = new Set<string>(diagnosticPolicy.activeDtcStatuses);
 
 export const ND = 'N/D';
 
@@ -90,8 +93,18 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
   if (dtcs.length) {
     for (const dtc of dtcs) {
       const dtcDefinition = getDtcDefinition(dtc.code);
+      const exportTimestampMs = Date.parse(options.exportedAt);
+      const dtcLastSeenMs = Date.parse(dtc.lastSeen);
+      const normalizedStatus = String(dtc.status ?? '').toUpperCase();
+      const hasRecentDtcEvidence = dtc.source === 'REAL_OBD'
+        && ACTIVE_DTC_STATUSES.has(normalizedStatus)
+        && Number.isFinite(exportTimestampMs)
+        && Number.isFinite(dtcLastSeenMs)
+        && dtcLastSeenMs <= exportTimestampMs + diagnosticPolicy.freshness.maxFutureClockSkewMs
+        && exportTimestampMs - dtcLastSeenMs <= diagnosticPolicy.freshness.maxEvidenceAgeMs;
+      const validity = hasRecentDtcEvidence ? 'EVIDÊNCIA_RECENTE' : 'HISTÓRICO_SEM_REVALIDAÇÃO';
       L.push(
-        `${dtc.code} status=${dtc.status} ocorrencias=${dtc.occurrences} fonte=${dtc.source} primeira=${dtc.firstSeen} ultima=${dtc.lastSeen} descricao=${or(dtcDefinition?.description)}`,
+        `${dtc.code} status=${dtc.status} validade=${validity} ocorrencias=${dtc.occurrences} fonte=${dtc.source} primeira=${dtc.firstSeen} ultima=${dtc.lastSeen} descricao=${or(dtcDefinition?.description)}`,
       );
       if (dtcDefinition?.likelyCauses?.length) L.push(`  Causas provaveis: ${dtcDefinition.likelyCauses.join('; ')}`);
       if (dtc.freezeFrame) {
