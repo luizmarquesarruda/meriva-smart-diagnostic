@@ -226,6 +226,7 @@ export async function createRealElmSession(
         attempt,
         effectiveMaxAttempts,
         callbacks,
+        currentVehicleVin,
       );
 
       logBluetoothDiagnostic('BLUETOOTH_ATTEMPT_RESULT', {
@@ -284,6 +285,7 @@ async function createRealElmSessionAttempt(
   attempt: number,
   maxAttempts: number,
   callbacks?: RealElmSessionCallbacks,
+  currentVehicleVin?: string | null,
 ): Promise<RealElmConnection> {
   logBluetoothDiagnostic('ELM_SESSION_START', {
     name: device.name,
