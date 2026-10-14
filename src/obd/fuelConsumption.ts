@@ -10,7 +10,8 @@ export interface FuelIntegrationState {
   lastTimestampMs: number | null;
 }
 
-const MAX_INTERVAL_MS = 30_000;
+/** Gaps longer than this cannot support a trustworthy fuel integration interval. */
+export const MAX_FUEL_INTEGRATION_INTERVAL_MS = 30_000;
 
 export function integrateFuelRateLph(
   previous: FuelRateSample | null,
@@ -25,7 +26,7 @@ export function integrateFuelRateLph(
   ) return 0;
 
   const elapsedMs = current.timestampMs - previous.timestampMs;
-  if (!Number.isFinite(elapsedMs) || elapsedMs <= 0 || elapsedMs > MAX_INTERVAL_MS) return 0;
+  if (!Number.isFinite(elapsedMs) || elapsedMs <= 0 || elapsedMs > MAX_FUEL_INTEGRATION_INTERVAL_MS) return 0;
 
   const averageLph = (previous.fuelRateLph + current.fuelRateLph) / 2;
   return averageLph * (elapsedMs / 3_600_000);
