@@ -22,9 +22,21 @@ function historyPath(basePath: string): string {
 function entryLocalDate(entry: string): string {
   const explicit = entry.match(/DATA LOCAL:\s*(\d{4}-\d{2}-\d{2})/);
   if (explicit) return explicit[1];
-  const exportedAt = entry.match(/Exported At:\s*(\d{4}-\d{2}-\d{2})/);
-  if (exportedAt) return exportedAt[1];
-  return 'DATA DESCONHECIDA';
+
+  // Legacy snapshots have only "Exported At" (usually a UTC ISO timestamp).
+  // Convert those timestamps using the device's local timezone instead of
+  // grouping by the UTC calendar date. Preserve date-only legacy values as-is.
+  const exportedAt = entry.match(/Exported At:\s*([^\r\n]+)/);
+  if (!exportedAt) return 'DATA DESCONHECIDA';
+  const rawTimestamp = exportedAt[1].trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(rawTimestamp)) return rawTimestamp;
+
+  const date = new Date(rawTimestamp);
+  if (!Number.isFinite(date.getTime())) return 'DATA DESCONHECIDA';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function renderHistory(entries: string[]): string {
