@@ -131,7 +131,9 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
     for (const cycle of displayedCycles) {
       const fuelUsedLabel = cycle.fuelCoverageComplete === false
         ? 'N/D (cobertura insuficiente)'
-        : `${formatNumber(cycle.fuelUsedL, 3)} L`;
+        : cycle.avgFuelConsumptionKml > MAX_VALID_TRIP_CONSUMPTION_KML
+          ? 'N/D (consumo implausível)'
+          : `${formatNumber(cycle.fuelUsedL, 3)} L`;
       const consumptionLabel = cycle.fuelDataValid === false
         || cycle.fuelUsedL < 0.05
         || cycle.avgFuelConsumptionKml <= 0
