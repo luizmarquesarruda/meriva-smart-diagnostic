@@ -17,6 +17,12 @@ Module._load = function (request) {
   if (request === './autosaveTypes') return { AUTOSAVE_SCHEMA_VERSION: 1 };
   if (request === '../obd/dtcDefinition') return { getDtcDefinition: () => undefined };
   if (request === '../trip/tripRecorder') return { MAX_VALID_TRIP_CONSUMPTION_KML: 30 };
+  if (request === '../knowledge/autosave_policy.json') {
+    return { default: require(path.resolve(__dirname, '..', 'src', 'knowledge', 'autosave_policy.json')) };
+  }
+  if (request === '../knowledge/diagnostic_policy.json') {
+    return { default: require(path.resolve(__dirname, '..', 'src', 'knowledge', 'diagnostic_policy.json')) };
+  }
   return originalLoad.apply(this, arguments);
 };
 
