@@ -8,6 +8,10 @@ import { MAX_VALID_TRIP_CONSUMPTION_KML } from '../trip/tripRecorder';
  * eventos de início/fim sem substituir os eventos anteriores daquele dia.
  */
 export const DAILY_OBD_HISTORY_FILE = 'meriva_smart_daily_obd_history.txt';
+function formatNumber(value: number, decimals = 2): string {
+  if (!Number.isFinite(value)) return 'N/D';
+  return Number(value.toFixed(decimals)).toString();
+}
 const HEADER = [
   'MERIVA SMART DIAGNOSTIC',
   'HISTÓRICO TXT POR DIA — CADA DATA É UMA PÁGINA LÓGICA.',
@@ -98,7 +102,7 @@ function renderEvent(state: MerivaPersistedState, event: 'SESSION_START' | 'SESS
   }).slice(-10);
   if (realTrips.length) {
     for (const trip of realTrips) {
-      lines.push(`${trip.startedAt} -> ${trip.finishedAt} | ${trip.distanceTotalKm} km | ${(trip.fuelDataValid === false || trip.fuelUsedL < 0.05 || trip.avgFuelConsumptionKml <= 0 || trip.avgFuelConsumptionKml > MAX_VALID_TRIP_CONSUMPTION_KML) ? 'N/D' : `${trip.avgFuelConsumptionKml} km/L`} | máxima=${trip.maxSpeedKmh ?? 'N/D'} km/h | amostras=${trip.telemetrySamples?.length ?? 0} | REAL_OBD`);
+      lines.push(`${trip.startedAt} -> ${trip.finishedAt} | ${formatNumber(trip.distanceTotalKm, 3)} km | ${formatNumber(trip.fuelUsedL, 3)} L | ${(trip.fuelDataValid === false || trip.fuelUsedL < 0.05 || trip.avgFuelConsumptionKml <= 0 || trip.avgFuelConsumptionKml > MAX_VALID_TRIP_CONSUMPTION_KML) ? 'N/D' : `${formatNumber(trip.avgFuelConsumptionKml, 2)} km/L`} | máxima=${formatNumber(trip.maxSpeedKmh ?? 0, 1) === 'N/D' ? 'N/D' : formatNumber(trip.maxSpeedKmh ?? 0, 1)} km/h | amostras=${trip.telemetrySamples?.length ?? 0} | REAL_OBD`);
     }
   } else {
     lines.push('N/D');
