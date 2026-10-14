@@ -123,7 +123,7 @@ function sanitizeLegacyTripConsumption(content: string): string {
       return line.replace(match[0], `${match[1]}N/D${match[3]}`);
     }
     return line;
-  }).join('\\n');
+  }).join('\n');
 }
 
 async function appendDailyObdSessionEventUnsafe(
