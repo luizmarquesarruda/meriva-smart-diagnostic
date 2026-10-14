@@ -1,16 +1,17 @@
 import * as FileSystem from 'expo-file-system';
 import type { MerivaPersistedState } from './autosaveState';
 import { formatAutoSaveTxt } from './autosaveTxtFormatter';
+import autosavePolicy from '../knowledge/autosave_policy.json';
 
-export const AUTOSAVE_HISTORY_MAX_ENTRIES = 1000;
+export const AUTOSAVE_HISTORY_MAX_ENTRIES = autosavePolicy.history.maxSnapshots;
 export const AUTOSAVE_HISTORY_FILE = 'meriva_smart_autosave_history.txt';
 const ENTRY_BEGIN = '=== SALVAMENTO_BEGIN ===';
 const ENTRY_END = '=== SALVAMENTO_END ===';
 const HISTORY_HEADER = [
   'MERIVA SMART DIAGNOSTIC',
   'HISTÓRICO DE SALVAMENTOS AUTOMÁTICOS',
-  'LIMITE: 1000 SALVAMENTOS',
-  'ORGANIZAÇÃO: salvamentos agrupados por DATA LOCAL; sessões ECU ficam no diário diário independente.',
+  `LIMITE: ${AUTOSAVE_HISTORY_MAX_ENTRIES} SALVAMENTOS`,
+  'ORGANIZAÇÃO: agrupado por data local; eventos de sessão ficam no diário de sessões independente.',
   'REGRA: quando ultrapassar o limite, o salvamento mais antigo é removido.',
   '',
 ].join('\n');
@@ -60,10 +61,13 @@ function renderHistory(entries: string[]): string {
   });
   const output = [HISTORY_HEADER.trimEnd()];
   for (const date of orderedDates) {
-    output.push('', `========== DIA: ${date} ==========`, ...(groups.get(date) ?? []));
-    output.push(`========== FIM DO DIA ==========`);
+    output.push('', `========== DIA: ${date} ==========`, '');
+    for (const entry of groups.get(date) ?? []) output.push(entry, '');
+    output.push('========== FIM DO DIA ==========');
   }
-  return `${output.join('\n\n')}\n`;
+  // Um único separador em branco entre snapshots deixa o arquivo mais escaneável
+  // no celular, sem acrescentar páginas vazias a cada seção.
+  return `${output.join('\n').replace(/\n{3,}/g, '\n\n')}\n`;
 }
 
 function splitEntries(content: string): string[] {
@@ -154,7 +158,7 @@ async function appendAutoSaveHistoryUnsafe(
   const snapshot = formatAutoSaveTxt(state, {
     appVersion,
     exportedAt,
-    historyLimit: 3,
+    historyLimit: autosavePolicy.history.compactLatestTrips,
     compact: true,
   });
   const exportedDate = new Date(exportedAt);
