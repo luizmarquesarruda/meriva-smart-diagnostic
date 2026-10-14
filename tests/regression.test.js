@@ -253,6 +253,15 @@ async function testParser() {
   assert.strictEqual(o2.status, 'RESPONDEU');
   assert.strictEqual(o2.value, 0.53);
   assert.strictEqual(o2.rawBytes.length, 4);
+  assert.ok(o2.interpretation.includes('STFT B1S1=0%'), 'PID 0114 byte B should decode STFT independently of voltage');
+  const o2NoTrim = parser.parsePidResponse('0114', '41 14 6A FF');
+  assert.strictEqual(o2NoTrim.value, 0.53, '0xFF trim sentinel must not invalidate the O2 voltage byte');
+  assert.ok(o2NoTrim.interpretation.includes('STFT B1S1=N/D (0xFF)'), 'PID 0114 byte B 0xFF means trim unavailable, not +99.2%');
+  for (const pid of ['0106', '0107', '012D']) {
+    const maxTrim = parser.parsePidResponse(pid, `41 ${pid.slice(-2)} FF`);
+    assert.strictEqual(maxTrim.status, 'RESPONDEU', pid + ' must accept the exact standard maximum fuel-trim value');
+    assert.strictEqual(maxTrim.value, 99.21875, pid + ' full-range maximum formula');
+  }
   assert.strictEqual(parser.parsePidResponse('01 0C', '41 0C 1A F8').value, 1726);
   assert.strictEqual(parser.validateOBDResponse('410C1AF8'), true);
   assert.strictEqual(parser.parsePidResponse('010C', '410C1AF8').value, 1726);
