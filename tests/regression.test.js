@@ -262,6 +262,12 @@ async function testParser() {
     assert.strictEqual(maxTrim.status, 'RESPONDEU', pid + ' must accept the exact standard maximum fuel-trim value');
     assert.strictEqual(maxTrim.value, 99.21875, pid + ' full-range maximum formula');
   }
+  const fuelRate = parser.parsePidResponse('015E', '41 5E 01 2C');
+  assert.strictEqual(fuelRate.status, 'RESPONDEU');
+  assert.strictEqual(fuelRate.value, 15, 'PID 015E must decode ((A × 256) + B) / 20 L/h');
+  const ethanol = parser.parsePidResponse('0152', '41 52 80');
+  assert.strictEqual(ethanol.status, 'RESPONDEU');
+  assert.ok(Math.abs(ethanol.value - (128 * 100 / 255)) < 1e-9, 'PID 0152 must decode ethanol percentage from the full byte range');
   assert.strictEqual(parser.parsePidResponse('01 0C', '41 0C 1A F8').value, 1726);
   assert.strictEqual(parser.validateOBDResponse('410C1AF8'), true);
   assert.strictEqual(parser.parsePidResponse('010C', '410C1AF8').value, 1726);
