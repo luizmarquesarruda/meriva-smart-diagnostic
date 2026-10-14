@@ -64,7 +64,7 @@ function renderEvent(state: MerivaPersistedState, event: 'SESSION_START' | 'SESS
     if (eventTimestampMs - readingTimestampMs > diagnosticPolicy.freshness.dailyReadingWindowMs) continue;
     // When available, the session boundary also excludes readings from a prior ignition.
     if (Number.isFinite(sessionStartedAtMs) && readingTimestampMs < sessionStartedAtMs) continue;
-    const pid = reading.pid.replace(/\\s/g, '').toUpperCase();
+    const pid = reading.pid.replace(/\s/g, '').toUpperCase();
     const previous = latestReadingByPid.get(pid);
     if (!previous || Date.parse(reading.timestamp) > Date.parse(previous.timestamp)) latestReadingByPid.set(pid, reading);
   }
