@@ -2510,3 +2510,10 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - A CI #2009 foi disparada para o código mais recente (ab83208f7718b3e205c76549c6f804ed9712bf78). Não declarar a rodada aprovada antes de validate e android-build terminarem com sucesso.
 - Nenhuma dessas validações substitui teste com ELM327/ECU no veículo. Os 30 km/L são um teto de plausibilidade heurístico, não uma especificação OEM nem uma medição de consumo real.
 
+## 2026-10-14 — Correção da falha TypeScript na validação do cache de PIDs
+
+- Evidência: a CI #2039 falhou em `npm run typecheck` com `src/obd/bluetoothManager.ts(350,7): error TS2304: Cannot find name 'currentVehicleVin'.`
+- Correção: `createRealElmSession` já recebia o VIN atual, mas não o propagava para `createRealElmSessionAttempt`; o parâmetro foi adicionado à assinatura interna e à chamada.
+- Objetivo funcional: manter a validação conservadora do cache de PIDs por adaptador, protocolo e VIN conhecido, sem remover a proteção contra reutilização entre veículos.
+- Commit: `b6964df2151b548b101c6b87383f443b6a7c36d7`.
+- Validação: commit enviado para a branch de trabalho; aguardar a nova CI. Ainda não há evidência de TypeScript/testes/build aprovados após esta correção, nem validação física na Meriva/ELM327.
