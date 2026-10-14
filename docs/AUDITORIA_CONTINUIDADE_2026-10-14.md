@@ -68,3 +68,5 @@ Correção:
 - Os novos campos são retrocompatíveis (`fuelCoverageComplete` opcional em `DriveCycle`). TXT mostra `N/D (cobertura insuficiente)` para quantidade parcial e `N/D` para média, sem apagar a distância/viagem.
 - Testes cobrem o gap de 40 s, recusa de média e a apresentação TXT de um total parcial.
 
+Quando a média legada ou recém-calculada excede 30 km/L, os formatadores agora deixam tanto o total de combustível quanto a média como `N/D`, com motivo explícito para o total (`consumo implausível`). Isso evita que um volume provavelmente subestimado continue aparecendo isoladamente como se fosse confiável. A origem persistida não é apagada; somente o relatório evita afirmá-la como dado válido.
+
