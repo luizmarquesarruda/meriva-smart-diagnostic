@@ -75,7 +75,7 @@ function renderEvent(state: MerivaPersistedState, event: 'SESSION_START' | 'SESS
       lines.push(`${reading.pid} ${reading.name}: ${reading.value ?? 'N/D'} ${reading.unit} | ${reading.status} | ${reading.timestamp}`);
     }
   } else {
-    lines.push('N/D (nenhuma leitura REAL_OBD nos últimos 120 s)');
+    lines.push(`N/D (nenhuma leitura REAL_OBD nos últimos ${Math.round(diagnosticPolicy.freshness.dailyReadingWindowMs / 1000)} s)`);
   }
   lines.push('', '[CÓDIGOS DE FALHA REGISTRADOS]');
   if (state.dtcs.length) {
