@@ -2430,3 +2430,10 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Cada evento diário mantém o timestamp UTC ISO e agora acrescenta uma linha de hora local com deslocamento UTC explícito.
 - A chave de data lógica continua derivada do relógio local do aparelho.
 - Validação pendente: executar `npm run validate` e confirmar com o TXT real que os eventos de 11/10 à tarde estão presentes. A alteração impede descarte futuro de dias, mas não recria eventos históricos que já não estejam no arquivo.
+
+
+### 2026-10-14 — Validação conservadora de consumo por viagem
+- `src/trip/tripRecorder.ts`: o consumo médio calculado acima de 30 km/L agora invalida o campo e mantém `avgFuelConsumptionKml` em zero interno; a apresentação/exportação deve exibir `N/D`/`—` conforme `fuelDataValid=false`.
+- `tests/tripRecorder.test.js`: acrescentado cenário de regressão com 2 km e taxa de 10 L/h em 20 s, que produz média matemática superior a 30 km/L e deve ser rejeitada.
+- Isso não substitui a validação de cobertura temporal de MAF/velocidade nem a interpolação de gaps; esses pontos continuam pendentes e não devem ser inferidos como resolvidos por este teto.
+- Validação automatizada ainda pendente; CI não foi disparada nesta etapa.
