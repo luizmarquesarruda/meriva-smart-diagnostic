@@ -57,3 +57,14 @@ Os TXT históricos de outubro mostram DTCs `P0135/P0420` com status persistido `
 
 Os TXT também continham viagens curtas, algumas com `amostras=0`, e consumos acima de 30 km/L. A implementação atual do `RealTripRecorder` adiciona amostras de telemetria quando inicia uma viagem; os registros antigos sem amostras são tratados como legados. Consumo insuficiente/implausível continua representado como `N/D`, mantendo a distância e a viagem preservadas.
 
+## Continuação — Cobertura temporal do consumo
+
+O integrador já descartava amostras separadas por mais de 30 s. A lacuna, porém, não era exposta no resultado da viagem. Isso poderia produzir um total subestimado e uma média numericamente plausível, mas calculada sobre apenas parte do trajeto.
+
+Correção:
+- A taxa máxima de intervalo é uma constante compartilhada, `MAX_FUEL_INTEGRATION_INTERVAL_MS = 30000`.
+- A viagem recebe `fuelCoverageComplete=false` se houver um intervalo perdido ou menos de duas amostras válidas de taxa de combustível.
+- `fuelDataValid` passa a exigir cobertura completa além do volume mínimo, de pelo menos duas amostras e da plausibilidade da média.
+- Os novos campos são retrocompatíveis (`fuelCoverageComplete` opcional em `DriveCycle`). TXT mostra `N/D (cobertura insuficiente)` para quantidade parcial e `N/D` para média, sem apagar a distância/viagem.
+- Testes cobrem o gap de 40 s, recusa de média e a apresentação TXT de um total parcial.
+
