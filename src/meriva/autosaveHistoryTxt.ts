@@ -35,8 +35,19 @@ function renderHistory(entries: string[]): string {
     group.push(entry);
     groups.set(date, group);
   }
+  // Keep day blocks in the order their first snapshot appeared. Sorting date
+  // labels alphabetically moves legacy "DATA DESCONHECIDA" entries after newer
+  // snapshots and makes the global sequence look corrupted.
+  const firstSequence = (items: string[]) => Math.min(...items.map((entry) => {
+    const match = entry.match(/NÚMERO:\\s*(\\d+)/);
+    return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
+  }));
+  const orderedDates = Array.from(groups.keys()).sort((a, b) => {
+    const sequenceDelta = firstSequence(groups.get(a) ?? []) - firstSequence(groups.get(b) ?? []);
+    return sequenceDelta || a.localeCompare(b);
+  });
   const output = [HISTORY_HEADER.trimEnd()];
-  for (const date of Array.from(groups.keys()).sort()) {
+  for (const date of orderedDates) {
     output.push('', `========== DIA: ${date} ==========`, ...(groups.get(date) ?? []));
     output.push(`========== FIM DO DIA ==========`);
   }
