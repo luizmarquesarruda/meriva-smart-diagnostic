@@ -111,19 +111,23 @@ function removeCarScannerTripsFromSnapshot(entry: string): string {
   return entry.replace(match[0], match[1] + historyBody);
 }
 
-async function readAutoSaveHistoryUnsafe(basePath: string): Promise<string> {
+async function readAutoSaveEntriesUnsafe(basePath: string): Promise<string[]> {
   const path = historyPath(basePath);
   const info = await FileSystem.getInfoAsync(path);
-  if (!info.exists) return HISTORY_HEADER;
+  if (!info.exists) return [];
   if (info.isDirectory) {
     throw new Error('O caminho do histórico de autosave aponta para um diretório; arquivo existente preservado.');
   }
   const content = await FileSystem.readAsStringAsync(path, {
     encoding: FileSystem.EncodingType.UTF8,
   });
-  const entries = deduplicateEntries(splitEntries(content))
+  return deduplicateEntries(splitEntries(content))
     .slice(-AUTOSAVE_HISTORY_MAX_ENTRIES)
     .map(removeCarScannerTripsFromSnapshot);
+}
+
+async function readAutoSaveHistoryUnsafe(basePath: string): Promise<string> {
+  const entries = await readAutoSaveEntriesUnsafe(basePath);
   return entries.length ? renderHistory(entries) : HISTORY_HEADER;
 }
 
@@ -144,8 +148,9 @@ async function appendAutoSaveHistoryUnsafe(
   reason: string,
 ): Promise<{ count: number }> {
   const path = historyPath(basePath);
-  const current = await readAutoSaveHistoryUnsafe(basePath);
-  const entries = deduplicateEntries(splitEntries(current));
+  // Read and normalize the stored entries directly. Rendering them to TXT and
+  // parsing that same TXT again doubled CPU/allocation cost on every checkpoint.
+  const entries = await readAutoSaveEntriesUnsafe(basePath);
   const lastNumber = entries.reduce((max, entry) => {
     const match = entry.match(/NÚMERO:\s*(\d+)/);
     return match ? Math.max(max, Number(match[1])) : max;
@@ -201,6 +206,9 @@ export function appendAutoSaveHistory(
 }
 
 export async function getAutoSaveHistoryCount(basePath: string): Promise<number> {
-  const content = await readAutoSaveHistory(basePath);
-  return splitEntries(content).length;
+  try {
+    return (await readAutoSaveEntriesUnsafe(basePath)).length;
+  } catch {
+    return 0;
+  }
 }
