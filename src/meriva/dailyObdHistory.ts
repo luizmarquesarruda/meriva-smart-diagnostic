@@ -72,7 +72,7 @@ function renderEvent(state: MerivaPersistedState, event: 'SESSION_START' | 'SESS
     .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp));
   if (realReadings.length) {
     for (const reading of realReadings) {
-      lines.push(`${reading.pid} ${reading.name}: ${reading.value ?? 'N/D'} ${reading.unit} | ${reading.status} | ${reading.timestamp}`);
+      lines.push(`${reading.pid.replace(/\s/g, '').toUpperCase()} ${reading.name}: ${reading.value ?? 'N/D'} ${reading.unit} | ${reading.status} | ${reading.timestamp}`);
     }
   } else {
     lines.push(`N/D (nenhuma leitura REAL_OBD nos últimos ${Math.round(diagnosticPolicy.freshness.dailyReadingWindowMs / 1000)} s)`);
