@@ -209,6 +209,7 @@ test('1. estado vazio -> salvar -> restaurar', async () => {
   const envelope = JSON.parse(files.get(`${CONFIG_DIR}/autosave.json`));
   assert.strictEqual(envelope.schemaVersion, 1);
   assert.strictEqual(envelope.dataType, 'APP_STATE');
+  assert.ok(!files.get(`${CONFIG_DIR}/autosave.json`).includes('\n  \"schemaVersion\"'), 'autosave JSON deve ser compacto para reduzir bytes serializados/escritos');
   m.disposeAutoSave();
   state = await m.initAutoSave(BASE);
   assert.strictEqual(state.settings.teste, 42, 'estado deve ser restaurado');
@@ -256,6 +257,34 @@ test('1b. leituras rápidas atualizam memória sem regravar TXT a cada mudança;
       'a cadência mínima deve persistir a leitura mais recente quando vencer');
   } finally {
     Date.now = realNow;
+    m.disposeAutoSave();
+  }
+});
+
+test('1c. JSON compacto salva sempre o estado atual sem reescrever TXT em cada atualização numérica', async () => {
+  const m = manager();
+  m.disposeAutoSave();
+  resetFS();
+  await m.initAutoSave(BASE);
+  const historyPath = `${CONFIG_DIR}/meriva_smart_autosave_history.txt`;
+  try {
+    m.updateAutoSaveState((state) => { state.settings.performanceProbe = 1; });
+    assert.strictEqual(await m.saveNow('debounce'), true);
+    const firstText = files.get(historyPath);
+    assert.ok(firstText, 'primeiro snapshot TXT deve existir');
+    const countEntries = (value) => value.split('=== SALVAMENTO_BEGIN ===').length - 1;
+    const firstCount = countEntries(firstText);
+
+    m.updateAutoSaveState((state) => { state.settings.performanceProbe = 2; });
+    assert.strictEqual(await m.saveNow('debounce'), true);
+    const envelope = JSON.parse(files.get(`${CONFIG_DIR}/autosave.json`));
+    assert.strictEqual(envelope.payload.settings.performanceProbe, 2, 'o JSON principal precisa receber a atualização mesmo quando o TXT é limitado por cadência');
+    assert.strictEqual(countEntries(files.get(historyPath)), firstCount, 'atualização numérica dentro do intervalo não deve reescrever/acrescentar ao TXT');
+
+    m.updateAutoSaveState((state) => { state.settings.performanceProbe = 3; });
+    assert.strictEqual(await m.saveNow('manual'), true);
+    assert.strictEqual(countEntries(files.get(historyPath)), firstCount + 1, 'salvamento manual deve sempre gerar snapshot TXT');
+  } finally {
     m.disposeAutoSave();
   }
 });
