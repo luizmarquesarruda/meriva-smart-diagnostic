@@ -2537,3 +2537,13 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Criado `docs/AUDITORIA_CONTINUIDADE_2026-10-14.md` com as mudanças, fórmulas, fontes e limites de evidência.
 - Validação pendente: a CI mais recente precisa concluir TypeScript, testes e build Android. Não declarar aprovação antes de ler os resultados. Não houve teste físico com ELM327/ECU nesta rodada.
 
+## 2026-10-14 — Evidência temporal nos relatórios e otimização de raciocínio
+
+- Criado `src/knowledge/diagnostic_policy.json` para centralizar a janela de evidência atual (120 s), tolerância de relógio futuro (5 s) e status DTC elegíveis.
+- `src/diagnostics/diagnosticEngine.ts` agora usa a política JSON; leituras e DTCs são indexados uma vez por execução para evitar filtrar/ordenar arrays repetidamente dentro das regras.
+- `src/meriva/dailyObdHistory.ts` agora apresenta apenas a leitura REAL mais recente por PID dentro da janela válida e da sessão correta. Valores velhos ou timestamps futuros não são exibidos como leituras recentes.
+- `src/meriva/dailyObdHistory.ts` e `src/meriva/autosaveTxtFormatter.ts` preservam o status original dos DTCs, mas rotulam os códigos sem evidência recente como `HISTÓRICO/SEM_REVALIDAÇÃO` ou `HISTÓRICO_SEM_REVALIDAÇÃO`, evitando sugerir que um registro de dias atrás prova uma falha ativa agora.
+- Testes novos cobrem seleção da leitura mais recente por PID, exclusão de amostra velha/futura, e rotulagem de DTC antigo com status original `CURRENT`.
+- Nos TXT fornecidos, viagens com menos de 0,05 L ou com amostras de combustível insuficientes continuam preservadas com consumo `N/D`; elas não são apagadas nem transformadas em médias inventadas. Registros antigos com `amostras=0` são preservados como dados legados, não evidência de que a versão atual não registra amostras.
+- Validação ainda depende da CI após o último commit e do teste físico OBD/GPS; esta entrada documenta o código e os testes acrescentados, não uma aprovação de CI.
+
