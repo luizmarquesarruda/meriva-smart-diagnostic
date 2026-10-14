@@ -1,0 +1,14 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),ts=require('typescript');
+const p=path.resolve(__dirname,'../src/diagnostics/sensorTestEngine.ts'),source=fs.readFileSync(p,'utf8');
+const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2019}}).outputText;
+const mod={exports:{},filename:p,paths:require('module')._nodeModulePaths(path.dirname(p))};
+new Function('exports','require','module','__filename','__dirname',js)(mod.exports,require,mod,p,path.dirname(p));
+const sample=(pid,value,status='RESPONDEU')=>({pid,name:pid,value,unit:'kPa',status,rawResponse:'',elapsedMs:20,timestamp:new Date().toISOString()});
+assert.equal(mod.exports.assessSensorSample(sample('010B',36),'ENGINE_OFF',[sample('010B',36),sample('0133',38)]).state,'CONSISTENTE');
+assert.equal(mod.exports.assessSensorSample(sample('010B',55),'ENGINE_OFF',[sample('010B',55),sample('0133',38)]).state,'INVESTIGAR');
+assert.equal(mod.exports.assessSensorSample(sample('010B',52),'ENGINE_ON',[sample('010B',52),sample('010C',800),sample('0105',90)]).state,'INVESTIGAR');
+assert.equal(mod.exports.assessSensorSample(sample('010B',35),'ENGINE_ON',[sample('010B',35),sample('010C',800),sample('0105',90)]).state,'CONSISTENTE');
+assert.equal(mod.exports.assessSensorSample(sample('010B',null,'NÃO RESPONDEU'),'ENGINE_ON',[]).state,'SEM_RESPOSTA');
+assert.equal(mod.exports.assessSensorSample(sample('0105',90),'ENGINE_ON',[sample('0105',90)]).state,'NAO_CONCLUSIVO');
+console.log('Motor de avaliação dos testes de sensores: OK');

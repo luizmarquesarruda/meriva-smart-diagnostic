@@ -2353,3 +2353,36 @@ Conclusão: interfaces assíncronas melhoram a disponibilidade do último valor,
 - **Conclusão:** o aumento de heap Gradle e o limite de dois workers eliminaram a falha de memória observada na CI #1928 nesta execução. A validação confirma o workflow e a compilação, sem alterar a lógica funcional do aplicativo.
 - **Próximo passo:** registrar este resultado em commit documental isolado e aguardar a CI disparada por ele antes de avançar para correções funcionais.
 
+
+
+## 2026-10-14 — Central de Testes de Sensores (primeira versão)
+
+### Implementação nesta branch
+- Criada a rota `app/testes-sensores.tsx`, acessível em Mais Recursos.
+- Reutiliza a sessão compartilhada ELM327/ECU; não cria conexão paralela.
+- Exige ECU validada e PID `010C` anunciado. Uma leitura real de RPM confirma se o modo selecionado (motor desligado/ligado) é coerente antes de iniciar.
+- Consulta em sequência apenas os PIDs conhecidos anunciados pela ECU; permite interromper após a consulta em andamento.
+- Guarda PID, valor/unidade, estado do parser, RX bruto, latência e timestamp na tela.
+- Criado `src/diagnostics/sensorTestEngine.ts` para separar resposta OBD válida, plausibilidade e hipótese. MAP compara com BARO no modo motor desligado e usa regra heurística contextual na marcha lenta aquecida; temperatura e posição não são declaradas aprovadas só por retornarem número.
+- Relatórios TXT são salvos no armazenamento privado do app em `MERIVA_SMART/testes-sensores`.
+- Criado `tests/sensorTestEngine.test.js` e incluído no script `npm test`.
+
+### Limitações e segurança
+- Limiares são heurísticos e não especificações de fábrica; resposta OBD válida não comprova integridade física/elétrica.
+- Sensores que exigem série temporal, malha fechada, comando ativo ou multímetro/osciloscópio ficam explicitamente como não conclusivos.
+- As consultas usam a fila serial do ELM327. A duração depende do número de PIDs e da K-Line/KWP; não foram introduzidas consultas paralelas.
+- A tela orienta realizar testes com o veículo parado e não usar o telefone durante a condução.
+
+### Arquivos
+- `app/testes-sensores.tsx`
+- `app/mais.tsx`
+- `src/diagnostics/sensorTestEngine.ts`
+- `tests/sensorTestEngine.test.js`
+- `package.json`
+- `docs/DIARIO_DE_BORDO.md`
+
+### Validação
+Revisão estática feita contra os contratos de `sharedConnection`, `Elm327Session.queryPid`, `getPidDefinition` e catálogo de PIDs. Testes locais, Expo Doctor e CI não foram executados nesta etapa; não declarar a branch validada até `npm run validate` e build Android terminarem com sucesso.
+
+### Próximo passo
+Revisar o diff completo, executar validação TypeScript/testes e build Android, depois testar fisicamente no veículo: primeiro motor desligado, depois motor aquecido em marcha lenta. Não testar durante a condução.
