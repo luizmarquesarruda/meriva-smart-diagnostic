@@ -14,6 +14,8 @@ export interface RealTripSample {
 
 /** Minimum integrated fuel required before persisting a consumption average. */
 export const MIN_TRIP_FUEL_L = 0.05;
+/** Consumption above this ceiling is treated as invalid telemetry, not displayed. */
+export const MAX_VALID_TRIP_CONSUMPTION_KML = 30;
 
 /**
  * Do not split a drive every time the vehicle stops briefly at a traffic light.
@@ -163,8 +165,13 @@ export class RealTripRecorder {
     // never discard the trip or publish an unstable km/L value.
     if (state.distanceKm < 0.1) return null;
 
-    const fuelDataValid = state.fuelUsedL >= MIN_TRIP_FUEL_L && state.validFuelSamples >= 2;
-    const avgFuelConsumptionKml = fuelDataValid ? state.distanceKm / state.fuelUsedL : 0;
+    const hasMinimumFuelEvidence = state.fuelUsedL >= MIN_TRIP_FUEL_L && state.validFuelSamples >= 2;
+    const calculatedConsumptionKml = hasMinimumFuelEvidence ? state.distanceKm / state.fuelUsedL : 0;
+    const fuelDataValid = hasMinimumFuelEvidence
+      && Number.isFinite(calculatedConsumptionKml)
+      && calculatedConsumptionKml > 0
+      && calculatedConsumptionKml <= MAX_VALID_TRIP_CONSUMPTION_KML;
+    const avgFuelConsumptionKml = fuelDataValid ? calculatedConsumptionKml : 0;
     const avgDrivingSpeedKmh = state.movingTimeMs > 0
       ? state.distanceKm / (state.movingTimeMs / 3_600_000)
       : 0;
