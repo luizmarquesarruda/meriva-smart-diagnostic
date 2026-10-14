@@ -115,8 +115,8 @@ function splitPages(content: string): Map<string, string> {
 function sanitizeLegacyTripConsumption(content: string): string {
   // Older daily logs may already contain implausible averages from tiny trips.
   // Keep the trip record but replace only the invalid consumption field.
-  return content.split(/\\r?\\n/).map((line) => {
-    const match = line.match(/(\\|\\s*)(\\d+(?:\\.\\d+)?)\\s*km\\/L(\\s*\\|)/i);
+  return content.split(/\r?\n/).map((line) => {
+    const match = line.match(/(\|\s*)(\d+(?:\.\d+)?)\s*km\/L(\s*\|)/i);
     if (!match) return line;
     const consumption = Number(match[2]);
     if (!Number.isFinite(consumption) || consumption <= 0 || consumption > MAX_VALID_TRIP_CONSUMPTION_KML) {
