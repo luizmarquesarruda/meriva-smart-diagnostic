@@ -44,3 +44,16 @@ O repositório de referência OBD-II é uma implementação comunitária que afi
 - Adicionados testes para política JSON, gravação compacta e desacoplamento da atualização TXT em relação ao salvamento do estado.
 - Adicionada regressão para o PID 0114 com byte B `0xFF`, além de exemplos para os cálculos de `0152` e `015E`.
 - Esta documentação registra mudanças no código; não declara a CI aprovada nem teste físico executado. O teste automatizado/TypeScript/build deve ser confirmado pela CI mais recente. Compatibilidade com o ELM327 real, suporte dos PIDs e acurácia física dos sensores exigem teste separado na Meriva.
+
+## Continuação — Atualidade dos relatórios e custo do motor de regras
+
+Os TXT históricos de outubro mostram DTCs `P0135/P0420` com status persistido `CURRENT` mas última observação datada de dias antes da sessão. O motor de diagnóstico já bloqueia evidências com mais de 120 s; a apresentação do TXT não era igualmente explícita. Por isso:
+
+- Criado `src/knowledge/diagnostic_policy.json` com janela de evidência de 120 s, tolerância futura de 5 s e status DTC que podem ser considerados ativos.
+- O motor de diagnóstico indexa a leitura mais recente por PID e o DTC mais recente por código em uma única passagem por diagnóstico.
+- O diário de sessões limita as leituras apresentadas ao intervalo temporal configurado e mostra no máximo uma linha atual por PID; os registros antigos continuam no autosave JSON e no histórico bruto.
+- Os DTCs preservam seu status original, mas o TXT marca evidências antigas como `HISTÓRICO/SEM_REVALIDAÇÃO` em vez de apresentá-las como se tivessem sido reconsultadas agora.
+- Testes automatizados protegem a janela temporal, a escolha da amostra mais recente e a rotulagem de DTCs antigos.
+
+Os TXT também continham viagens curtas, algumas com `amostras=0`, e consumos acima de 30 km/L. A implementação atual do `RealTripRecorder` adiciona amostras de telemetria quando inicia uma viagem; os registros antigos sem amostras são tratados como legados. Consumo insuficiente/implausível continua representado como `N/D`, mantendo a distância e a viagem preservadas.
+
