@@ -117,7 +117,7 @@ export function getDriveCycleSummary(cycles: DriveCycle[]): DriveCycleSummary {
   const referenceCycles = cycles.filter((cycle) => cycle.source === 'CARSCANNER_SEED');
   const realDistanceKm = realCycles.reduce((sum, cycle) => sum + cycle.distanceTotalKm, 0);
   const consumptionCycles = realCycles.filter((cycle) =>
-    cycle.fuelDataValid === false
+    cycle.fuelDataValid === false || cycle.fuelCoverageComplete === false
       ? false
       : cycle.fuelUsedL >= 0.05 && cycle.avgFuelConsumptionKml > 0,
   );
