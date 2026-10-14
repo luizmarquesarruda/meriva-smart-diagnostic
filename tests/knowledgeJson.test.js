@@ -33,6 +33,7 @@ function main() {
   const dtcCatalog = readJson('src/knowledge/dtc_catalog.json');
   const pollingPolicy = readJson('src/knowledge/polling_policy.json');
   const autosavePolicy = readJson('src/knowledge/autosave_policy.json');
+  const diagnosticPolicy = readJson('src/knowledge/diagnostic_policy.json');
 
   assert.strictEqual(typeof pids.version, 'number');
   assert.strictEqual(typeof formulas.version, 'number');
@@ -51,6 +52,12 @@ function main() {
   assert.strictEqual(typeof dtcCatalog.version, 'number');
   assert.strictEqual(typeof pollingPolicy.version, 'number');
   assert.strictEqual(autosavePolicy.schemaVersion, 1, 'autosave policy schema');
+  assert.strictEqual(diagnosticPolicy.schemaVersion, 1, 'diagnostic policy schema');
+  assert.strictEqual(diagnosticPolicy.freshness.maxEvidenceAgeMs, 120000);
+  assert.strictEqual(diagnosticPolicy.freshness.maxFutureClockSkewMs, 5000);
+  assert.strictEqual(diagnosticPolicy.freshness.dailyReadingWindowMs, diagnosticPolicy.freshness.maxEvidenceAgeMs);
+  assertUnique(diagnosticPolicy.activeDtcStatuses, 'status DTC ativo');
+  assert.ok(diagnosticPolicy.activeDtcStatuses.includes('CURRENT') && diagnosticPolicy.activeDtcStatuses.includes('PENDING'));
   assert.strictEqual(autosavePolicy.persistence.compactJson, true, 'JSON principal deve ser gravado sem indentação');
   assert.ok(Number.isInteger(autosavePolicy.persistence.debounceMs) && autosavePolicy.persistence.debounceMs >= 250);
   assert.ok(Number.isInteger(autosavePolicy.persistence.checkpointMs) && autosavePolicy.persistence.checkpointMs >= autosavePolicy.persistence.debounceMs);
