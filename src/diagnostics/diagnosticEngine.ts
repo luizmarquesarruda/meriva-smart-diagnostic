@@ -30,10 +30,20 @@ export function isFreshDiagnosticTimestamp(timestamp: string, nowMs = Date.now()
     && nowMs - timestampMs <= MAX_DIAGNOSTIC_EVIDENCE_AGE_MS;
 }
 
-function pidValue(observations: PidObservation[], pid: string): PidObservation | undefined {
-  return observations
-    .filter((item) => item.pid.toUpperCase() === pid.toUpperCase() && item.value !== null && isLiveObd(item))
-    .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))[0];
+/** Indexa a leitura REAL mais recente de cada PID em uma única passagem. */
+function indexLatestPidObservations(observations: PidObservation[]): Map<string, PidObservation> {
+  const latest = new Map<string, PidObservation>();
+  for (const item of observations) {
+    if (item.value === null || !Number.isFinite(item.value) || !isLiveObd(item)) continue;
+    const pid = item.pid.trim().toUpperCase();
+    const previous = latest.get(pid);
+    if (!previous || Date.parse(item.timestamp) > Date.parse(previous.timestamp)) latest.set(pid, item);
+  }
+  return latest;
+}
+
+function pidValue(index: Map<string, PidObservation>, pid: string): PidObservation | undefined {
+  return index.get(pid.toUpperCase());
 }
 
 function confidence(score: number): DiagnosticHypothesis['confidence'] {
@@ -58,6 +68,7 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
     && Number.isFinite(item.value)
     && isFreshDiagnosticTimestamp(item.timestamp, nowMs),
   );
+  const latestPidById = indexLatestPidObservations(observations);
   const rawDtcs = input.dtcs ?? [];
   const activeSourceDtcs = rawDtcs.filter((item) =>
     String(item.source ?? '').trim().toUpperCase() === 'REAL_OBD'
@@ -69,6 +80,12 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
   const liveDtcs = input.ecuConnected === false ? [] : activeSourceDtcs.filter((item) =>
     isFreshDiagnosticTimestamp(item.lastSeen, nowMs),
   );
+  const liveDtcsByCode = new Map<string, DtcRecord>();
+  for (const dtc of liveDtcs) {
+    const code = dtc.code.toUpperCase();
+    const previous = liveDtcsByCode.get(code);
+    if (!previous || Date.parse(dtc.lastSeen) > Date.parse(previous.lastSeen)) liveDtcsByCode.set(code, dtc);
+  }
   const blockedSimulationSamples = rawObservations.filter(isSimulation).length;
   const blockedNonLiveDtcs = rawDtcs.length - activeSourceDtcs.length;
   const disconnectedEvidenceIgnored = input.ecuConnected === false
@@ -95,7 +112,7 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
 
   for (const rule of rules) {
     if (!rule.trigger.dtc) continue;
-    const dtc = liveDtcs.find((item) => item.code.toUpperCase() === rule.trigger.dtc);
+    const dtc = liveDtcsByCode.get(rule.trigger.dtc);
     if (!dtc) continue;
     add(rule, {
       ruleId: rule.id,
@@ -105,8 +122,8 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
     });
   }
 
-  const stft = pidValue(observations, '0106');
-  const ltft = pidValue(observations, '0107');
+  const stft = pidValue(latestPidById, '0106');
+  const ltft = pidValue(latestPidById, '0107');
   if (stft && ltft && isTrimContext(input.condition)) {
     const combinedTrim = stft.value! + ltft.value!;
     const lean = rules.find((item) => item.id === 'FUEL_TRIM_LEAN');
@@ -118,7 +135,7 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
     }
   }
 
-  const map = pidValue(observations, '010B');
+  const map = pidValue(latestPidById, '010B');
   const mapRule = rules.find((item) => item.id === 'MAP_HIGH_IDLE');
   if (map && mapRule && input.condition === mapRule.trigger.condition && map.value! >= (mapRule.trigger.mapMinKpa ?? Number.POSITIVE_INFINITY)) {
     add(mapRule, { ruleId: mapRule.id, text: 'MAP em marcha lenta aquecida = ' + map.value!.toFixed(2) + ' kPa.', source: 'PID', pid: '010B', value: map.value! });
