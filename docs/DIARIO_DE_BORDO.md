@@ -2556,3 +2556,7 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - A média deixa de ser válida quando a integração perdeu cobertura temporal. Os formatadores dos TXT mostram `N/D (cobertura insuficiente)` para litros parciais e `N/D` para a média, preservando a distância e a viagem.
 - Testes adicionados para lacuna superior a 30 s e para os dois formatos TXT. Validação da CI ainda pendente; não houve teste físico com a ECU/ELM327 real.
 
+### Ajuste adicional — total de combustível com média implausível
+- Os formatadores do autosave TXT e do diário TXT agora exibem também o volume como `N/D (consumo implausível)` quando a média excede 30 km/L; uma quantidade parcial não fica visível como se fosse um total confiável.
+- O valor numérico legado é preservado na origem JSON/registro, mas a interface de relatório não o apresenta como medição válida. Teste adicionado para impedir regressão.
+
