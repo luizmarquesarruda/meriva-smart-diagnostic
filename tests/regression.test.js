@@ -948,6 +948,19 @@ async function testDriveCycleSummaryUsesWeightedRealSpeed() {
   assert.strictEqual(summary.referenceCycleCount, 1);
   assert.strictEqual(summary.lastCycle.id, 'real-no-fuel', 'the latest operational cycle cannot be a seed');
   assert.strictEqual(summary.lastRealCycle.id, 'real-no-fuel');
+
+  const incompleteCoverage = {
+    ...slowLongTrip,
+    id: 'real-incomplete-fuel-coverage',
+    distanceTotalKm: 1,
+    fuelUsedL: 0.05,
+    avgFuelConsumptionKml: 20,
+    fuelDataValid: true,
+    fuelCoverageComplete: false,
+  };
+  const coverageSummary = driveCycles.getDriveCycleSummary([slowLongTrip, incompleteCoverage]);
+  assert.strictEqual(coverageSummary.avgConsumptionKml, 10,
+    'trip with incomplete fuel integration must not influence the aggregate even if a legacy record says fuelDataValid=true');
 }
 
 async function testDtcStorage() {
