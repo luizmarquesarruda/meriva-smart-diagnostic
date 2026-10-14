@@ -499,7 +499,7 @@ test('7d. snapshots legados agrupam Exported At pela data local do aparelho', as
       '[HISTORY]',
       'N/D',
       '=== SALVAMENTO_END ===',
-    ].join('\\n'));
+    ].join('\n'));
 
     const rendered = await history.readAutoSaveHistory(BASE);
     assert.ok(
@@ -944,7 +944,7 @@ test('diário sanitiza médias legadas acima de 30 km/L ao acrescentar evento', 
     '2026-10-10T17:10:36.631Z -> 2026-10-10T17:10:47.538Z | 0.156 km | 25.318 km/L | REAL_OBD',
     '--- FIM DO EVENTO ---',
     '========== FIM DO DIA ==========',
-  ].join('\\n'));
+  ].join('\n'));
 
   await history.appendDailyObdSessionEvent(BASE, state, 'SESSION_START', '2026-10-14T13:00:00.000Z');
   const rendered = files.get(target);
