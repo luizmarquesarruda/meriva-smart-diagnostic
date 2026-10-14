@@ -21,6 +21,8 @@ export interface DriveCycle {
   avgFuelConsumptionKml: number;
   /** False when a real trip is retained but fuel data cannot support km/L. */
   fuelDataValid?: boolean;
+  /** False when more than 30 s elapsed between valid fuel-rate samples; old records may omit it. */
+  fuelCoverageComplete?: boolean;
   /** Maximum valid speed observed during this trip; absent in legacy records. */
   maxSpeedKmh?: number;
   /** Sparse timestamped telemetry captured for this trip. */
