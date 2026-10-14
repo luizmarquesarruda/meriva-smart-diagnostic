@@ -122,7 +122,9 @@ function renderEvent(state: MerivaPersistedState, event: 'SESSION_START' | 'SESS
     for (const trip of realTrips) {
       const fuelUsedLabel = trip.fuelCoverageComplete === false
         ? 'N/D (cobertura insuficiente)'
-        : `${formatNumber(trip.fuelUsedL, 3)} L`;
+        : trip.avgFuelConsumptionKml > MAX_VALID_TRIP_CONSUMPTION_KML
+          ? 'N/D (consumo implausível)'
+          : `${formatNumber(trip.fuelUsedL, 3)} L`;
       const consumptionLabel = trip.fuelDataValid === false
         || trip.fuelUsedL < 0.05
         || trip.avgFuelConsumptionKml <= 0
