@@ -2423,3 +2423,10 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Motivo: o histórico de snapshots repete seções extensas de diagnóstico e viagens, fazendo o TXT crescer para milhares de páginas.
 - Limitação desta alteração: ela reduz o arquivo de snapshots; ainda não implementa o resumo diário permanente independente. Isso precisa ser concluído antes de afirmar que viagens antigas ficam preservadas após a rotação.
 - Validação: alteração ainda depende da CI; os logs reais `meriva_smart_autosave_history.txt` e `meriva_smart_daily_obd_history.txt` devem ser usados para confirmar o limite de 20 e a preservação do diário por data.
+
+
+### 2026-10-14 — Diário diário permanente e horário local
+- `src/meriva/dailyObdHistory.ts`: removido o corte fixo de 365 dias; o diário compacto passa a preservar todas as datas já registradas, independentemente da rotação do autosave.
+- Cada evento diário mantém o timestamp UTC ISO e agora acrescenta uma linha de hora local com deslocamento UTC explícito.
+- A chave de data lógica continua derivada do relógio local do aparelho.
+- Validação pendente: executar `npm run validate` e confirmar com o TXT real que os eventos de 11/10 à tarde estão presentes. A alteração impede descarte futuro de dias, mas não recria eventos históricos que já não estejam no arquivo.
