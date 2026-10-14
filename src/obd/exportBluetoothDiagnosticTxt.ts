@@ -2,7 +2,7 @@ import * as FileSystem from 'expo-file-system';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { getLastBluetoothDiagnosticText } from '../obd/bluetoothManager';
-import { getSharedObdConnection, getSharedObdLastError, getSharedObdDiagnosticContext } from '../obd/sharedConnection';
+import { getSharedObdConnection, getSharedObdLastError, getSharedObdDiagnosticContext, getSharedObdStatus } from '../obd/sharedConnection';
 import { readLearningProfile, type MerivaLearningProfile } from '../database/learningProfile';
 import { getAutoSaveState } from '../meriva/autosaveManager';
 import { runLocalDiagnostic, type DiagnosticResult } from '../diagnostics/diagnosticEngine';
@@ -39,6 +39,9 @@ function diagnosticReportLines(result: DiagnosticResult): string[] {
     `MOTOR: ${result.engine}`,
     `VERSÃO: ${result.version}`,
     `AMOSTRAS DE SIMULAÇÃO BLOQUEADAS: ${result.blockedSimulationSamples}`,
+    `LEITURAS OBD ANTIGAS BLOQUEADAS: ${result.blockedStaleObservations}`,
+    `DTCs SEM ATUALIZAÇÃO RECENTE BLOQUEADOS: ${result.blockedStaleDtcs}`,
+    `EVIDÊNCIAS IGNORADAS POR ECU DESCONECTADA: ${result.disconnectedEvidenceIgnored ? 'SIM' : 'NÃO'}`,
   ];
   if (result.hypotheses.length === 0) {
     lines.push('NENHUMA HIPÓTESE DIAGNÓSTICA GERADA COM AS EVIDÊNCIAS DISPONÍVEIS.');
@@ -68,7 +71,7 @@ function buildLocalDiagnostic(): DiagnosticResult {
     timestamp: reading.timestamp,
     confidence: reading.source === 'SIMULACAO' ? 'LOW' : 'GOOD',
   }));
-  return runLocalDiagnostic({ observations, dtcs: state.dtcs, condition: 'UNKNOWN' });
+  return runLocalDiagnostic({ observations, dtcs: state.dtcs, condition: 'UNKNOWN', ecuConnected: Boolean(getSharedObdConnection()?.ecuValidated && getSharedObdStatus().ecuConnected) });
 }
 
 function learningReportLines(profile: MerivaLearningProfile | null): string[] {
