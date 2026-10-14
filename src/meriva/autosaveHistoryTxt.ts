@@ -2,14 +2,14 @@ import * as FileSystem from 'expo-file-system';
 import type { MerivaPersistedState } from './autosaveState';
 import { formatAutoSaveTxt } from './autosaveTxtFormatter';
 
-export const AUTOSAVE_HISTORY_MAX_ENTRIES = 20;
+export const AUTOSAVE_HISTORY_MAX_ENTRIES = 1000;
 export const AUTOSAVE_HISTORY_FILE = 'meriva_smart_autosave_history.txt';
 const ENTRY_BEGIN = '=== SALVAMENTO_BEGIN ===';
 const ENTRY_END = '=== SALVAMENTO_END ===';
 const HISTORY_HEADER = [
   'MERIVA SMART DIAGNOSTIC',
   'HISTÓRICO DE SALVAMENTOS AUTOMÁTICOS',
-  'LIMITE: 20 SALVAMENTOS',
+  'LIMITE: 1000 SALVAMENTOS',
   'REGRA: quando ultrapassar o limite, o salvamento mais antigo é removido; o diário por dia é independente.',
   '',
 ].join('\n');
