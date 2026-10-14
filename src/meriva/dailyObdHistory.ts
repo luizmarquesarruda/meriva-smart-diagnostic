@@ -1,5 +1,6 @@
 import * as FileSystem from 'expo-file-system';
 import type { MerivaPersistedState } from './autosaveState';
+import { MAX_VALID_TRIP_CONSUMPTION_KML } from '../trip/tripRecorder';
 
 /**
  * Histórico compacto de sessões ECU, separado do snapshot mutável do autosave.
@@ -74,7 +75,7 @@ function renderEvent(state: MerivaPersistedState, event: 'SESSION_START' | 'SESS
   const realTrips = state.driveCycles.filter((cycle) => cycle.source === 'REAL_OBD').slice(-10);
   if (realTrips.length) {
     for (const trip of realTrips) {
-      lines.push(`${trip.startedAt} -> ${trip.finishedAt} | ${trip.distanceTotalKm} km | ${(trip.fuelDataValid === false || trip.fuelUsedL < 0.05 || trip.avgFuelConsumptionKml <= 0) ? 'N/D' : `${trip.avgFuelConsumptionKml} km/L`} | máxima=${trip.maxSpeedKmh ?? 'N/D'} km/h | amostras=${trip.telemetrySamples?.length ?? 0} | REAL_OBD`);
+      lines.push(`${trip.startedAt} -> ${trip.finishedAt} | ${trip.distanceTotalKm} km | ${(trip.fuelDataValid === false || trip.fuelUsedL < 0.05 || trip.avgFuelConsumptionKml <= 0 || trip.avgFuelConsumptionKml > MAX_VALID_TRIP_CONSUMPTION_KML) ? 'N/D' : `${trip.avgFuelConsumptionKml} km/L`} | máxima=${trip.maxSpeedKmh ?? 'N/D'} km/h | amostras=${trip.telemetrySamples?.length ?? 0} | REAL_OBD`);
     }
   } else {
     lines.push('N/D');
@@ -111,6 +112,20 @@ function splitPages(content: string): Map<string, string> {
   return pages;
 }
 
+function sanitizeLegacyTripConsumption(content: string): string {
+  // Older daily logs may already contain implausible averages from tiny trips.
+  // Keep the trip record but replace only the invalid consumption field.
+  return content.split(/\\r?\\n/).map((line) => {
+    const match = line.match(/(\\|\\s*)(\\d+(?:\\.\\d+)?)\\s*km\\/L(\\s*\\|)/i);
+    if (!match) return line;
+    const consumption = Number(match[2]);
+    if (!Number.isFinite(consumption) || consumption <= 0 || consumption > MAX_VALID_TRIP_CONSUMPTION_KML) {
+      return line.replace(match[0], `${match[1]}N/D${match[3]}`);
+    }
+    return line;
+  }).join('\\n');
+}
+
 async function appendDailyObdSessionEventUnsafe(
   basePath: string,
   state: MerivaPersistedState,
@@ -131,6 +146,7 @@ async function appendDailyObdSessionEventUnsafe(
     content = await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 });
   }
 
+  content = sanitizeLegacyTripConsumption(content);
   const pages = splitPages(content);
   const previousEvents = pages.get(date) ?? '';
   const updatedEvents = [previousEvents, renderEvent(state, event, timestamp)].filter(Boolean).join('\n\n');
