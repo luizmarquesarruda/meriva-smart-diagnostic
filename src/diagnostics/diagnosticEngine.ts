@@ -28,7 +28,7 @@ export const MAX_DIAGNOSTIC_PID_AGE_MS = 30_000;
 function pidValue(observations: PidObservation[], pid: string, nowMs = Date.now()): PidObservation | undefined {
   return observations
     .filter((item) => {
-      if (item.pid.toUpperCase() !== pid.toUpperCase() || !isLiveObd(item)) return false;
+      if (!item || typeof item.pid !== 'string' || item.pid.toUpperCase() !== pid.toUpperCase() || !isLiveObd(item)) return false;
       if (typeof item.value !== 'number' || !Number.isFinite(item.value)) return false;
       if (item.status !== undefined && item.status !== 'RESPONDEU') return false;
       const timestampMs = Date.parse(item.timestamp);
@@ -53,8 +53,11 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
   const observations = rawObservations.filter((item) => !isSimulation(item));
   const rawDtcs = input.dtcs ?? [];
   const liveDtcs = rawDtcs.filter((item) =>
-    String(item.source ?? '').trim().toUpperCase() === 'REAL_OBD'
-    && ACTIVE_DTC_STATUSES.has(String(item.status ?? '').trim().toUpperCase()),
+    Boolean(item) &&
+    typeof item.code === 'string' &&
+    /^[PCBU][0-9A-F]{4}$/i.test(item.code) &&
+    String(item.source ?? '').trim().toUpperCase() === 'REAL_OBD' &&
+    ACTIVE_DTC_STATUSES.has(String(item.status ?? '').trim().toUpperCase()),
   );
   const blockedSimulationSamples = rawObservations.filter(isSimulation).length;
   const blockedNonLiveDtcs = rawDtcs.length - liveDtcs.length;
