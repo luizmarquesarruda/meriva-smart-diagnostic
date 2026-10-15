@@ -72,13 +72,20 @@ function normalizeVehicle(value: unknown): VehicleProfile | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const item = value as Record<string, unknown>;
   if (
-    typeof item.vehicleName !== 'string' ||
+    typeof item.vehicleName !== 'string' || !item.vehicleName.trim() ||
     typeof item.year !== 'number' || !Number.isFinite(item.year) ||
-    typeof item.make !== 'string' ||
-    typeof item.model !== 'string' ||
-    typeof item.engine !== 'string' ||
-    typeof item.createdAt !== 'string' ||
-    typeof item.lastModified !== 'string' ||
+    typeof item.make !== 'string' || !item.make.trim() ||
+    typeof item.model !== 'string' || !item.model.trim() ||
+    typeof item.engine !== 'string' || !item.engine.trim() ||
+    typeof item.displacementCm3 !== 'number' || !Number.isFinite(item.displacementCm3) || item.displacementCm3 <= 0 ||
+    typeof item.cylinders !== 'number' || !Number.isFinite(item.cylinders) || item.cylinders <= 0 ||
+    typeof item.fuel !== 'string' || !item.fuel.trim() ||
+    typeof item.modelYearReference !== 'string' ||
+    typeof item.tankCapacityL !== 'number' || !Number.isFinite(item.tankCapacityL) || item.tankCapacityL <= 0 ||
+    typeof item.reserveCapacityL !== 'number' || !Number.isFinite(item.reserveCapacityL) || item.reserveCapacityL < 0 ||
+    typeof item.manualSource !== 'string' ||
+    typeof item.createdAt !== 'string' || normalizeTimestamp(item.createdAt) === null ||
+    typeof item.lastModified !== 'string' || normalizeTimestamp(item.lastModified) === null ||
     typeof item.protocolBaseline !== 'string'
   ) return null;
   return value as VehicleProfile;
@@ -187,6 +194,7 @@ export function hydrateState(payload: MerivaPersistedState): MerivaPersistedStat
         .filter((pid) => /^[0-9A-F]{4}$/.test(pid))
     : [];
   hydrated.pidDiscovery = typeof rawDiscovery.protocol === 'string' &&
+    discoveredPids.length > 0 &&
     normalizeTimestamp(rawDiscovery.discoveredAt) !== null
       ? { supportedPids: Array.from(new Set(discoveredPids)), protocol: rawDiscovery.protocol, discoveredAt: normalizeTimestamp(rawDiscovery.discoveredAt)! }
       : null;
