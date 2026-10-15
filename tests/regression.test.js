@@ -1190,7 +1190,7 @@ async function testPidBankWriteRollback() {
   resetFS();
   const pidBank = loadTs(path.join(ROOT, 'src/database/pidBank.ts'));
   const target = `${BASE}/BANCO/pids_meriva_confirmados.txt`;
-  const original = '010C|RPM|PADRAO_OBD|CONFIRMADO|2026-10-01T10:00:00.000Z|2026-10-01T10:00:00.000Z|2|KWP|10|REAL_OBD|1\\n';
+  const original = '010C|RPM|PADRAO_OBD|CONFIRMADO|2026-10-01T10:00:00.000Z|2026-10-01T10:00:00.000Z|2|KWP|10|REAL_OBD|1\n';
   files.set(target, original);
   failCopyToPath = target;
 
