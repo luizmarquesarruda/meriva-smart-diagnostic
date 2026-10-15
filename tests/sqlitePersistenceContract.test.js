@@ -83,6 +83,17 @@ assert.match(storageScreen, /Amostras reais de PID/, 'contadores SQLite devem se
 assert.match(storageScreen, /Achados diagnósticos/, 'contagem de achados da Central de Saúde deve ser visível');
 assert.match(database, /SQLITE_SCHEMA_NEWER_THAN_APP/, 'app não deve abrir silenciosamente banco de esquema futuro');
 
+assert.deepEqual(parse('src/data/driveCycles.ts') && [], [], 'placeholder');
+assert.match(driveCycles, /INITIAL_DRIVE_CYCLES: DriveCycle\[\] = \[\]/, 'novas instalações não devem ter viagens importadas');
+assert.doesNotMatch(homeScreen, /initializeCarScannerSeed/, 'startup não deve reinstalar seeds CarScanner');
+assert.match(homeScreen, /purgeCarScannerHistory/, 'startup deve limpar perfil legado');
+assert.match(learningProfile, /globalSampleCounts\.seedSamples = 0/, 'purga deve zerar contador seed');
+assert.match(learningProfile, /source = 'REAL_ONLY'/, 'aprendizado deve ficar real-only');
+assert.match(hydration, /cycle\.source === 'REAL_OBD'/, 'autosave legado deve recuperar apenas viagens reais');
+assert.match(hydration, /CARSCANNER_BASELINE/, 'estatísticas misturadas devem ser removidas na hidratação');
+assert.match(historyTxt, /Histórico legado removido/, 'TXT legado não deve exibir aprendizado contaminado');
+assert.match(txtFormatter, /state\.driveCycles\.filter\(\(cycle\) => cycle\.source === 'REAL_OBD'\)/, 'relatórios TXT devem incluir apenas viagens reais');
+assert.ok(pidCatalog.candidates.every((pid) => pid.evidence !== 'CARSCANNER_SEED' && pid.observed_value === undefined), 'catálogo não deve conter valores importados como baseline');
 assert.match(reportDocs, /TXT/i);
 assert.match(reportDocs, /JSON/i);
 assert.match(diary, /2026-10-15 — Evolução de persistência SQLite/);
