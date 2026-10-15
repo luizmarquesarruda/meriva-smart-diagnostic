@@ -5,6 +5,7 @@ type Database = Awaited<ReturnType<typeof SQLite.openDatabaseAsync>>;
 const DATABASE_NAME = 'meriva-smart-diagnostic.db';
 const SCHEMA_VERSION = 1;
 let databasePromise: Promise<Database> | null = null;
+let transactionQueue: Promise<void> = Promise.resolve();
 
 export interface LocalSessionEvent {
   date: string;
@@ -122,12 +123,18 @@ export async function getLocalDatabase(): Promise<Database> {
 
 /** Serialize multi-table writes in an exclusive transaction. */
 export async function withLocalTransaction<T>(operation: (transaction: Database) => Promise<T>): Promise<T> {
-  const db = await getLocalDatabase();
-  let result!: T;
-  await db.withExclusiveTransactionAsync(async (transaction) => {
-    result = await operation(transaction);
+  // Serialize app-originated writes: SDK 51 opens a dedicated connection for
+  // exclusive transactions and competing writers can otherwise receive SQLITE_BUSY.
+  const pending = transactionQueue.catch(() => undefined).then(async () => {
+    const db = await getLocalDatabase();
+    let result!: T;
+    await db.withExclusiveTransactionAsync(async (transaction) => {
+      result = await operation(transaction);
+    });
+    return result;
   });
-  return result;
+  transactionQueue = pending.then(() => undefined, () => undefined);
+  return pending;
 }
 
 export async function getLocalMetadata(key: string): Promise<string | null> {
@@ -149,8 +156,7 @@ async function setMetadataInTransaction(db: Database, key: string, value: string
 }
 
 export async function setLocalMetadata(key: string, value: string): Promise<void> {
-  const db = await getLocalDatabase();
-  await setMetadataInTransaction(db, key, value);
+  await withLocalTransaction(async (transaction) => setMetadataInTransaction(transaction, key, value));
 }
 
 async function writeCycle(db: Database, cycle: DriveCycle, ignoreExisting: boolean): Promise<void> {
