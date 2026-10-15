@@ -1102,11 +1102,16 @@ function testPidResponseIsNotVehicleValidation() {
 }
 
 function testStorageScreenDoesNotPromoteSeedOrInvalidFuel() {
-  const storageScreen = fs.readFileSync(path.join(ROOT, 'app/armazenamento.tsx'), 'utf8');
-  assert.ok(storageScreen.includes("filter((cycle) => cycle.source === 'REAL_OBD')"), 'tela de histórico não deve apresentar viagens seed do Car Scanner como viagens do app');
-  assert.ok(storageScreen.includes("cycle.fuelDataValid !== false"), 'consumo precisa respeitar o indicador de confiabilidade');
-  assert.ok(storageScreen.includes("cycle.fuelUsedL >= 0.05"), 'consumo deve exigir volume de combustível válido');
-  assert.ok(storageScreen.includes("'Consumo: N/D'"), 'consumo inválido deve ser apresentado como N/D, nunca 0,00 km/L');
+  // A lista de viagens vive em app/viagens.tsx; app/armazenamento.tsx é a central de relatórios.
+  const tripsScreen = fs.readFileSync(path.join(ROOT, 'app/viagens.tsx'), 'utf8');
+  assert.ok(tripsScreen.includes("items.filter(cycle => cycle.source === 'REAL_OBD')"), 'tela de viagens não deve apresentar viagens seed do CarScanner como viagens do app');
+  assert.ok(tripsScreen.includes("cycle.fuelDataValid === false || cycle.fuelUsedL < 0.05 || cycle.avgFuelConsumptionKml <= 0 ? 'CONSUMO N/D'"), 'tela de viagens deve exibir N/D quando os dados de consumo não forem confiáveis');
+
+  // A exportação TXT também deve excluir viagens não reais e não inventar consumo.
+  const exports = fs.readFileSync(path.join(ROOT, 'src/storage/exportDiagnostics.ts'), 'utf8');
+  assert.ok(exports.includes(".filter((cycle) => cycle.source === 'REAL_OBD')"), 'relatórios TXT não devem promover viagens importadas como reais');
+  assert.ok(exports.includes("cycle.fuelDataValid === false || !Number.isFinite(cycle.fuelUsedL) || cycle.fuelUsedL < 0.05"), 'consumo no TXT deve respeitar a validação mínima de combustível');
+  assert.ok(exports.includes("return 'N/D'"), 'consumo inválido deve ser apresentado como N/D, nunca como zero presumido');
 }
 
 
