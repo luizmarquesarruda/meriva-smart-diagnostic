@@ -300,7 +300,7 @@ async function testParser() {
 
   // On compression-ignition engines C/D encode NMHC, NOx/SCR, boost,
   // exhaust-sensor and particulate-filter monitors—not gasoline EVAP/O2 bits.
-  const dieselReadiness = parser.parsePidResponse('0101', '41 01 00 78 A9 A9');
+  const dieselReadiness = parser.parsePidResponse('0101', '41 01 00 78 AB AB');
   assert.ok(dieselReadiness.interpretation.includes('DIESEL/CI'));
   assert.ok(dieselReadiness.interpretation.includes('CATALISADOR_NMHC=NÃO PRONTO'));
   assert.ok(dieselReadiness.interpretation.includes('NOX_SCR'));
@@ -977,7 +977,7 @@ async function testDriveCycleSummaryUsesWeightedRealSpeed() {
   const noMovingTimeTrip = {
     ...slowLongTrip,
     id: 'real-no-moving-time',
-    startedAt: '2026-10-05T10:00:00.000Z',
+    startedAt: '2026-10-03T10:00:00.000Z',
     distanceTotalKm: 8,
     drivingTimeHms: '00:00:00',
   };
@@ -985,7 +985,7 @@ async function testDriveCycleSummaryUsesWeightedRealSpeed() {
   assert.strictEqual(summary.avgSpeedKmh, 20, 'trips without moving time must not inflate aggregate speed');
   assert.strictEqual(summary.totalDistanceKm, 23, 'seed distance is excluded, but all real trip distance remains included');
   assert.strictEqual(summary.avgConsumptionKml, 12.5, 'trips without valid fuel data must not distort the consumption average');
-  assert.strictEqual(summary.realCycleCount, 3, 'fuel-incomplete real trips still count as real trips');
+  assert.strictEqual(summary.realCycleCount, 4, 'fuel-incomplete and movement-incomplete real trips remain in trip count');
   assert.strictEqual(summary.referenceCycleCount, 1);
   assert.strictEqual(summary.lastCycle.id, 'real-no-fuel', 'the latest operational cycle cannot be a seed');
   assert.strictEqual(summary.lastRealCycle.id, 'real-no-fuel');
