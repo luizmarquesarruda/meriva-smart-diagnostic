@@ -15,6 +15,8 @@ assert.match(dataScreen, /item\.source === 'REAL'/, 'lista de últimas leituras 
 assert.match(dataScreen, /item\.status === 'RESPONDEU'/, 'leituras sem resposta não devem aparecer como reais');
 assert.match(dataScreen, /Number\.isFinite\(item\.value\)/, 'leituras exibidas devem ser finitas');
 assert.match(index, /ASSISTENTE DE ECONOMIA/, 'cockpit deve conter o assistente de economia');
+assert.match(index, /fuelCoachConnectionStartedAt/, 'amostras do coach devem pertencer à sessão atual');
+assert.match(index, /timestampMs < fuelCoachConnectionStartedAt\.current/, 'amostra anterior à conexão atual deve ser rejeitada');
 assert.doesNotMatch(index, />SAÚDE DO VEÍCULO<\/Text>/, 'painel grande de saúde não deve estar duplicado no cockpit');
 assert.match(read('src/obd/fuelCoach.ts'), /referenceMinimumTrips/, 'assistente deve exigir referência pessoal');
 assert.match(read('src/obd/fuelCoach.ts'), /referenceSpeedDifferenceRatio/, 'referência deve limitar diferenças de velocidade');
