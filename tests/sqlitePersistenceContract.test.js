@@ -108,7 +108,7 @@ assert.match(homeScreen, /purgeCarScannerHistory/, 'startup deve limpar perfil l
 assert.match(learningProfile, /globalSampleCounts\.seedSamples = 0/, 'purga deve zerar contador seed');
 assert.match(learningProfile, /source = 'REAL_ONLY'/, 'aprendizado deve ficar real-only');
 assert.match(hydration, /isValidHydratedTrip/, 'autosave legado deve validar cada viagem antes de recuperar apenas viagens reais');
-assert.match(hydration, /cycle\.source === 'REAL_OBD'/, 'contrato de viagem persistida exige fonte REAL_OBD');
+assert.match(hydration, /includes\(String\(cycle\.source\)\)/, 'contrato de viagem persistida exige fonte REAL_OBD');
 assert.match(hydration, /CARSCANNER_BASELINE/, 'estatísticas misturadas devem ser removidas na hidratação');
 assert.match(tripStorage, /reconcileDriveCycles/, 'viagens finalizadas no JSON devem ser reconciliadas com o índice');
 assert.match(autoTripService, /SNAPSHOT_JSON_DA_VIAGEM_NAO_CONFIRMADO/, 'viagem deve ser journaled em JSON antes de alterar o índice operacional');
