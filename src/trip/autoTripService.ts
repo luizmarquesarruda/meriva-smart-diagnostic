@@ -27,6 +27,9 @@ export interface AutoTripServiceState {
   consumptionKml: number | null;
   instantaneousConsumptionKml: number | null;
   instantaneousConsumptionSource: FuelRateSource | null;
+  instantaneousConsumptionTimestampMs: number | null;
+  instantaneousSpeedKmh: number | null;
+  activeFuelType: FuelType | null;
   error: string | null;
   averageConsumptionKml: number;
   estimatedRangeKm: number;
@@ -51,7 +54,10 @@ const INITIAL_STATE: AutoTripServiceState = {
   consumptionKml: null,
   instantaneousConsumptionKml: null,
   instantaneousConsumptionSource: null,
-  error: null,
+  instantaneousConsumptionTimestampMs: null,
+  instantaneousSpeedKmh: null,
+  activeFuelType: null,
+  error: null;
   averageConsumptionKml: 0,
   estimatedRangeKm: 0,
 };
@@ -60,6 +66,8 @@ class AutoTripService {
   private basePath = '';
   private running = false;
   private recorder: RealTripRecorder | null = null;
+  /** Fuel type captured at trip start; do not mix estimator formulas within one trip. */
+  private recorderFuelType: FuelType | null = null;
   private pendingFinalizedTrips: DriveCycle[] = [];
   private lastPendingTripRetryAt = 0;
   private loopPromise: Promise<void> | null = null;
@@ -106,7 +114,8 @@ class AutoTripService {
     this.unsubscribeAppSettings = subscribeAppSettings((nextSettings) => {
       if (nextSettings.fuelType !== this.fuelType) {
         this.fuelType = nextSettings.fuelType;
-        this.lastFuelEthanolPercent = null;
+        // Preserve measured FLEX composition only while an active FLEX trip depends on it.
+        if (this.recorderFuelType !== 'FLEX') this.lastFuelEthanolPercent = null;
         this.lastEstimatedFuelRate = null;
       }
     });
@@ -286,6 +295,9 @@ class AutoTripService {
         let fuelRateSource: FuelRateSource | undefined;
         let fuelRateForDisplayLph: number | null = null;
         let fuelRateForDisplaySource: FuelRateSource | null = null;
+        let fuelRateForDisplayTimestampMs: number | null = null;
+        // An active trip keeps the fuel configuration captured when it began.
+        const estimateFuelType = this.recorderFuelType ?? this.fuelType;
         let mapFallbackQueriedThisCycle = false;
         const fuelEstimateDue = this.pollCycleNumber % FUEL_ESTIMATE_EVERY_N_CYCLES === pollingPolicy.polling.estimatedFuelRate.phase;
         let fuelLevelPercent: number | null = this.state.fuelLevelPercent;
@@ -340,6 +352,7 @@ class AutoTripService {
             fuelRateSource = 'MEASURED_015E';
             fuelRateForDisplayLph = fuelRateLph;
             fuelRateForDisplaySource = fuelRateSource;
+            fuelRateForDisplayTimestampMs = Date.now();
             this.lastEstimatedFuelRate = null;
           }
         }
@@ -369,7 +382,7 @@ class AutoTripService {
         const fuelCompositionPolicy = pollingPolicy.polling.fuelComposition;
         if (
           (!this.state.fuelSupported || fuelRateLph == null) &&
-          this.fuelType === 'FLEX' &&
+          estimateFuelType === 'FLEX' &&
           connection.supportedPids.includes(fuelCompositionPolicy.pid) &&
           this.pollCycleNumber % fuelCompositionPolicy.everyCycles === fuelCompositionPolicy.phase
         ) {
@@ -394,18 +407,20 @@ class AutoTripService {
           await registerObdQuery(this.basePath, mafResult, 'REAL');
           const mafGs = mafResult.parsed.status === 'RESPONDEU' ? mafResult.parsed.value : null;
           const estimate = mafGs != null && Number.isFinite(mafGs)
-            ? estimateFuelRateLph({ mafGs, fuelType: this.fuelType, ethanolPercent: this.lastFuelEthanolPercent })
+            ? estimateFuelRateLph({ mafGs, fuelType: estimateFuelType, ethanolPercent: this.lastFuelEthanolPercent })
             : null;
           if (estimate) {
             fuelRateLph = estimate.rateLph;
             fuelRateSource = estimate.source;
             fuelRateForDisplayLph = estimate.rateLph;
             fuelRateForDisplaySource = estimate.source;
+            const estimateTimestampMs = Date.now();
             this.lastEstimatedFuelRate = {
               rateLph: estimate.rateLph,
               source: estimate.source,
-              timestampMs: Date.now(),
+              timestampMs: estimateTimestampMs,
             };
+            fuelRateForDisplayTimestampMs = estimateTimestampMs;
           }
         }
 
@@ -430,7 +445,7 @@ class AutoTripService {
             rpm,
             intakeAirTempC: intakeAirTempC != null && Number.isFinite(intakeAirTempC) ? intakeAirTempC : null,
             displacementCm3: getAutoSaveState().vehicle?.displacementCm3 ?? 1389,
-            fuelType: this.fuelType,
+            fuelType: estimateFuelType,
             ethanolPercent: this.lastFuelEthanolPercent,
           });
           if (estimate) {
@@ -438,11 +453,13 @@ class AutoTripService {
             fuelRateSource = estimate.source;
             fuelRateForDisplayLph = estimate.rateLph;
             fuelRateForDisplaySource = estimate.source;
+            const estimateTimestampMs = Date.now();
             this.lastEstimatedFuelRate = {
               rateLph: estimate.rateLph,
               source: estimate.source,
-              timestampMs: Date.now(),
+              timestampMs: estimateTimestampMs,
             };
+            fuelRateForDisplayTimestampMs = estimateTimestampMs;
           }
         }
 
@@ -454,6 +471,7 @@ class AutoTripService {
           if (estimateAgeMs <= FUEL_RATE_DISPLAY_STALE_AFTER_MS) {
             fuelRateForDisplayLph = this.lastEstimatedFuelRate.rateLph;
             fuelRateForDisplaySource = this.lastEstimatedFuelRate.source;
+            fuelRateForDisplayTimestampMs = this.lastEstimatedFuelRate.timestampMs;
           } else {
             this.lastEstimatedFuelRate = null;
           }
@@ -483,7 +501,8 @@ class AutoTripService {
         if (moving) {
           this.stoppedSinceMs = null;
           if (!this.recorder) {
-            this.recorder = new RealTripRecorder(Date.now(), gps.distanceKm);
+            this.recorderFuelType = this.fuelType;
+            this.recorder = new RealTripRecorder(Date.now(), gps.distanceKm, this.recorderFuelType);
           }
         } else if (this.recorder) {
           this.stoppedSinceMs ??= Date.now();
@@ -533,6 +552,9 @@ class AutoTripService {
           consumptionKml: tripConsumptionKml,
           instantaneousConsumptionKml,
           instantaneousConsumptionSource: instantaneousConsumptionKml != null ? fuelRateForDisplaySource : null,
+          instantaneousConsumptionTimestampMs: instantaneousConsumptionKml != null ? fuelRateForDisplayTimestampMs : null,
+          instantaneousSpeedKmh: tripVehicleSpeedKmh,
+          activeFuelType: recorder ? (this.recorderFuelType ?? this.fuelType) : null,
           fuelLevelPercent,
           fuelRemainingL: fuelLevelPercentToLiters(fuelLevelPercent),
           fuelReserve: isFuelReserve(fuelLevelPercent),
@@ -611,7 +633,14 @@ class AutoTripService {
       const cycle = recorder.buildDriveCycle();
       // Freeze the previous session once. Rebuilding later would generate a
       // different finishedAt/id and could duplicate a trip after partial I/O.
+      const finalizedFuelType = this.recorderFuelType;
       this.recorder = null;
+      this.recorderFuelType = null;
+      // Do not let a cached estimate using the previous trip's fuel parameters seed the next trip.
+      if (finalizedFuelType && finalizedFuelType !== this.fuelType) {
+        this.lastEstimatedFuelRate = null;
+        if (this.fuelType !== 'FLEX') this.lastFuelEthanolPercent = null;
+      }
       if (cycle) this.pendingFinalizedTrips.push(cycle);
     }
 
