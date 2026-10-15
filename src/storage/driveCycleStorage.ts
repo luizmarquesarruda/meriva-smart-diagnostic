@@ -2,32 +2,76 @@ import * as FileSystem from 'expo-file-system';
 import { appendCsvRow, CsvRow } from '../database/csvLogger';
 import { DriveCycle } from '../data/driveCycles';
 
+interface DriveCycleIndex {
+  version?: string;
+  initializedAt?: string;
+  lastModified?: string;
+  cycles?: unknown;
+  totalCount?: number;
+  [key: string]: unknown;
+}
+
+const indexQueues = new Map<string, Promise<unknown>>();
+
+function serializeIndexOperation<T>(indexFile: string, operation: () => Promise<T>): Promise<T> {
+  const previous = indexQueues.get(indexFile) ?? Promise.resolve();
+  const current = previous.catch(() => undefined).then(operation);
+  indexQueues.set(indexFile, current);
+  void current.finally(() => {
+    if (indexQueues.get(indexFile) === current) indexQueues.delete(indexFile);
+  }).catch(() => undefined);
+  return current;
+}
+
+function previousIndexPath(indexFile: string): string {
+  return indexFile + '.previous';
+}
+
+function temporaryIndexPath(indexFile: string): string {
+  return indexFile + '.tmp';
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isValidTimestamp(value: unknown): value is string {
+  if (typeof value !== 'string' || !value.trim()) return false;
+  // Older app records used "YYYY-MM-DD HH:mm:ss"; normalize that legacy form
+  // before validation because Hermes/date parsers are stricter across versions.
+  const normalized = value.trim().replace(
+    /^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?)/,
+    '$1T$2',
+  );
+  return Number.isFinite(Date.parse(normalized));
+}
+
 function isDriveCycle(value: unknown): value is DriveCycle {
   if (typeof value !== 'object' || value === null) return false;
   const cycle = value as Partial<DriveCycle>;
   return (
-    typeof cycle.id === 'string' &&
-    typeof cycle.startedAt === 'string' &&
-    typeof cycle.finishedAt === 'string' &&
-    typeof cycle.distanceTotalKm === 'number' &&
-    typeof cycle.distanceIceKm === 'number' &&
-    typeof cycle.fuelUsedL === 'number' &&
+    typeof cycle.id === 'string' && cycle.id.trim().length > 0 &&
+    isValidTimestamp(cycle.startedAt) &&
+    isValidTimestamp(cycle.finishedAt) &&
+    isFiniteNumber(cycle.distanceTotalKm) && cycle.distanceTotalKm >= 0 &&
+    isFiniteNumber(cycle.distanceIceKm) && cycle.distanceIceKm >= 0 &&
+    isFiniteNumber(cycle.fuelUsedL) && cycle.fuelUsedL >= 0 &&
     typeof cycle.totalTimeHms === 'string' &&
     typeof cycle.drivingTimeHms === 'string' &&
     typeof cycle.standingTimeHms === 'string' &&
-    typeof cycle.avgDrivingSpeedKmh === 'number' &&
-    typeof cycle.avgFuelConsumptionKml === 'number' &&
+    isFiniteNumber(cycle.avgDrivingSpeedKmh) && cycle.avgDrivingSpeedKmh >= 0 &&
+    isFiniteNumber(cycle.avgFuelConsumptionKml) && cycle.avgFuelConsumptionKml >= 0 &&
     (cycle.fuelDataValid === undefined || typeof cycle.fuelDataValid === 'boolean') &&
-    (cycle.maxSpeedKmh === undefined || (typeof cycle.maxSpeedKmh === 'number' && Number.isFinite(cycle.maxSpeedKmh) && cycle.maxSpeedKmh >= 0)) &&
+    (cycle.maxSpeedKmh === undefined || (isFiniteNumber(cycle.maxSpeedKmh) && cycle.maxSpeedKmh >= 0)) &&
     (cycle.telemetrySamples === undefined || (Array.isArray(cycle.telemetrySamples) && cycle.telemetrySamples.every((sample) =>
       typeof sample === 'object' && sample !== null &&
-      typeof sample.timestamp === 'string' &&
-      (sample.speedKmh === null || (typeof sample.speedKmh === 'number' && Number.isFinite(sample.speedKmh))) &&
-      (sample.rpm === null || (typeof sample.rpm === 'number' && Number.isFinite(sample.rpm))) &&
-      (sample.coolantTempC === null || (typeof sample.coolantTempC === 'number' && Number.isFinite(sample.coolantTempC)))
+      isValidTimestamp(sample.timestamp) &&
+      (sample.speedKmh === null || (isFiniteNumber(sample.speedKmh) && sample.speedKmh >= 0)) &&
+      (sample.rpm === null || (isFiniteNumber(sample.rpm) && sample.rpm >= 0)) &&
+      (sample.coolantTempC === null || isFiniteNumber(sample.coolantTempC))
     ))) &&
     ['CARSCANNER_SEED', 'REAL_OBD', 'SIMULACAO'].includes(cycle.source as string) &&
-    typeof cycle.importedAt === 'string'
+    isValidTimestamp(cycle.importedAt)
   );
 }
 
@@ -36,123 +80,113 @@ function cyclesFromUnknown(value: unknown): DriveCycle[] {
   return value.filter(isDriveCycle);
 }
 
-export async function initializeDriveCycles(basePath: string): Promise<void> {
-  const viagensDir = `${basePath}/VIAGENS`;
-  const indexFile = `${viagensDir}/index.json`;
+async function readIndexCandidate(path: string): Promise<DriveCycleIndex | null> {
+  const info = await FileSystem.getInfoAsync(path);
+  if (!info.exists) return null;
+  if (info.isDirectory) throw new Error('DRIVE_CYCLE_INDEX_IS_DIRECTORY:' + path);
 
-  await FileSystem.makeDirectoryAsync(viagensDir, { intermediates: true });
-  const indexInfo = await FileSystem.getInfoAsync(indexFile);
-  if (indexInfo.exists) {
-    // Upgrade old installations in place, retaining real/simulated records and
-    // removing only the explicitly imported CarScanner reference trips.
-    if (!indexInfo.isDirectory) {
-      try {
-        const parsed = JSON.parse(await FileSystem.readAsStringAsync(indexFile)) as {
-          version?: string;
-          initializedAt?: string;
-          cycles?: unknown;
-          totalCount?: number;
-          [key: string]: unknown;
-        };
-        const originalCycles = Array.isArray(parsed.cycles) ? parsed.cycles : [];
-        const hasSeed = originalCycles.some(
-          (cycle) => typeof cycle === 'object' && cycle !== null &&
-            (cycle as { source?: unknown }).source === 'CARSCANNER_SEED',
-        );
-        if (hasSeed) {
-          const cycles = cyclesFromUnknown(parsed.cycles).filter(
-            (cycle) => cycle.source !== 'CARSCANNER_SEED',
-          );
-          await FileSystem.writeAsStringAsync(
-            indexFile,
-            JSON.stringify({
-              ...parsed,
-              cycles,
-              totalCount: cycles.length,
-              lastModified: new Date().toISOString(),
-            }, null, 2),
-            { encoding: FileSystem.EncodingType.UTF8 },
-          );
-        }
-      } catch {
-        // Do not overwrite an index whose contents cannot be read safely.
-      }
-    }
-    return;
+  const parsed = JSON.parse(await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 })) as unknown;
+  if (typeof parsed !== 'object' || parsed === null || !Array.isArray((parsed as DriveCycleIndex).cycles)) {
+    throw new Error('DRIVE_CYCLE_INDEX_INVALID_SCHEMA:' + path);
   }
-
-  // New installations start with no trips. CarScanner seed data remains
-  // available only as a separately identified learning/reference baseline.
-  const emptyData = {
-    version: '1.0',
-    initializedAt: new Date().toISOString(),
-    cycles: [] as DriveCycle[],
-    totalCount: 0,
-  };
-  await FileSystem.writeAsStringAsync(
-    indexFile,
-    JSON.stringify(emptyData, null, 2),
-    { encoding: FileSystem.EncodingType.UTF8 },
-  );
+  return parsed as DriveCycleIndex;
 }
 
-export async function readDriveCycles(basePath: string): Promise<DriveCycle[]> {
-  const indexFile = `${basePath}/VIAGENS/index.json`;
+/**
+ * Keep a last-known-good mirror of the index. If the current index is unreadable,
+ * restore the backup instead of silently interpreting I/O/JSON failure as an empty history.
+ */
+async function readIndexWithRecovery(indexFile: string): Promise<DriveCycleIndex | null> {
+  const primaryInfo = await FileSystem.getInfoAsync(indexFile);
+  if (primaryInfo.exists && primaryInfo.isDirectory) {
+    throw new Error('DRIVE_CYCLE_INDEX_IS_DIRECTORY:' + indexFile);
+  }
 
   try {
-    const info = await FileSystem.getInfoAsync(indexFile);
-    if (!info.exists || info.isDirectory) return [];
+    const primary = await readIndexCandidate(indexFile);
+    if (primary) return primary;
+  } catch (primaryError) {
+    const backup = await readIndexCandidate(previousIndexPath(indexFile)).catch(() => null);
+    if (!backup) {
+      throw new Error(
+        'DRIVE_CYCLE_INDEX_UNREADABLE: preservado sem sobrescrita. ' +
+        (primaryError instanceof Error ? primaryError.message : String(primaryError)),
+      );
+    }
+    await FileSystem.copyAsync({ from: previousIndexPath(indexFile), to: indexFile });
+    return backup;
+  }
 
-    const content = await FileSystem.readAsStringAsync(indexFile);
-    const data = JSON.parse(content) as { cycles?: unknown };
-    return cyclesFromUnknown(data.cycles).filter((cycle) => cycle.source !== 'CARSCANNER_SEED');
-  } catch {
-    return [];
+  const backup = await readIndexCandidate(previousIndexPath(indexFile)).catch(() => null);
+  if (backup) {
+    await FileSystem.copyAsync({ from: previousIndexPath(indexFile), to: indexFile });
+    return backup;
+  }
+  return null;
+}
+
+async function writeIndexSafely(indexFile: string, data: DriveCycleIndex, requireRecoveryCopy = true): Promise<void> {
+  const tempPath = temporaryIndexPath(indexFile);
+  const backupPath = previousIndexPath(indexFile);
+  const encoded = JSON.stringify(data, null, 2);
+
+  await FileSystem.writeAsStringAsync(tempPath, encoded, { encoding: FileSystem.EncodingType.UTF8 });
+  const staged = await readIndexCandidate(tempPath);
+  if (!staged || !Array.isArray(staged.cycles)) {
+    throw new Error('DRIVE_CYCLE_INDEX_STAGING_VALIDATION_FAILED');
+  }
+
+  const targetInfo = await FileSystem.getInfoAsync(indexFile);
+  if (targetInfo.exists && !targetInfo.isDirectory) {
+    await FileSystem.copyAsync({ from: indexFile, to: backupPath });
+  }
+
+  try {
+    await FileSystem.copyAsync({ from: tempPath, to: indexFile });
+    const committed = await readIndexCandidate(indexFile);
+    if (!committed) throw new Error('DRIVE_CYCLE_INDEX_COMMIT_VALIDATION_FAILED');
+  } catch (cause) {
+    const backupInfo = await FileSystem.getInfoAsync(backupPath).catch(() => ({ exists: false, isDirectory: false }));
+    if (backupInfo.exists && !backupInfo.isDirectory) {
+      try { await FileSystem.copyAsync({ from: backupPath, to: indexFile }); } catch { /* manter backup recuperável */ }
+    }
+    throw cause;
+  } finally {
+    try { await FileSystem.deleteAsync(tempPath, { idempotent: true }); } catch { /* temp pode ser removido na próxima escrita */ }
+  }
+
+  // Refresh the recovery point as part of the successful operation. Existing
+  // history writes require this copy, so callers retain the trip for retry.
+  // A brand-new empty index has no prior history to protect and must not block
+  // startup solely because this optional first backup copy is unavailable.
+  try {
+    await FileSystem.copyAsync({ from: indexFile, to: backupPath });
+  } catch (cause) {
+    if (requireRecoveryCopy) throw cause;
   }
 }
 
-export async function addDriveCycle(basePath: string, cycle: DriveCycle): Promise<void> {
-  const viagensDir = `${basePath}/VIAGENS`;
-  const indexFile = `${viagensDir}/index.json`;
+function localDayKey(date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
-  await FileSystem.makeDirectoryAsync(viagensDir, { intermediates: true });
-
-  let data: { version: string; cycles: DriveCycle[]; totalCount: number; lastModified?: string } = {
-    version: '1.0',
-    cycles: [],
-    totalCount: 0,
-  };
-
-  try {
-    const info = await FileSystem.getInfoAsync(indexFile);
-    if (info.exists && !info.isDirectory) {
-      const parsed = JSON.parse(await FileSystem.readAsStringAsync(indexFile)) as {
-        version?: string;
-        cycles?: unknown;
-        totalCount?: number;
-      };
-      data = {
-        version: typeof parsed.version === 'string' ? parsed.version : '1.0',
-        cycles: cyclesFromUnknown(parsed.cycles).filter((item) => item.source !== 'CARSCANNER_SEED'),
-        totalCount: cyclesFromUnknown(parsed.cycles).filter((item) => item.source !== 'CARSCANNER_SEED').length,
-      };
-    }
-  } catch {
-    // arquivo ausente ou corrompido: começa um índice vazio seguro
-  }
-
-  data.cycles.push(cycle);
-  data.totalCount = data.cycles.length;
-  data.lastModified = new Date().toISOString();
-
-  await FileSystem.writeAsStringAsync(
-    indexFile,
-    JSON.stringify(data, null, 2),
-    { encoding: FileSystem.EncodingType.UTF8 },
+async function appendTripCsvOnce(viagensDir: string, cycle: DriveCycle): Promise<void> {
+  const normalizedStartedAt = cycle.startedAt.trim().replace(
+    /^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?)/,
+    '$1T$2',
   );
-
-  const today = new Date().toISOString().split('T')[0];
-  const csvFile = `${viagensDir}/viagens_${today}.csv`;
+  const startedAtDate = new Date(normalizedStartedAt);
+  const dayKey = Number.isFinite(startedAtDate.getTime()) ? localDayKey(startedAtDate) : localDayKey();
+  const csvFile = `${viagensDir}/viagens_${dayKey}.csv`;
+  const info = await FileSystem.getInfoAsync(csvFile);
+  if (info.exists && !info.isDirectory) {
+    const content = await FileSystem.readAsStringAsync(csvFile, { encoding: FileSystem.EncodingType.UTF8 });
+    const hasId = content.split(/\r?\n/).slice(1).some((line) => line.split(',')[0] === cycle.id);
+    if (hasId) return;
+  }
 
   const row: CsvRow = {
     id: cycle.id,
@@ -165,10 +199,151 @@ export async function addDriveCycle(basePath: string, cycle: DriveCycle): Promis
     standingTime: cycle.standingTimeHms,
     avgSpeed: cycle.avgDrivingSpeedKmh,
     maxSpeed: cycle.maxSpeedKmh ?? '',
-    avgConsumption: cycle.fuelDataValid === false ? '' : cycle.avgFuelConsumptionKml,
+    avgConsumption: cycle.fuelDataValid !== false && cycle.fuelUsedL >= 0.05 && cycle.avgFuelConsumptionKml > 0
+      ? cycle.avgFuelConsumptionKml
+      : '',
     telemetrySamples: cycle.telemetrySamples?.length ?? 0,
     source: cycle.source,
   };
-
   await appendCsvRow(csvFile, row);
+}
+
+export async function initializeDriveCycles(basePath: string): Promise<void> {
+  const viagensDir = `${basePath}/VIAGENS`;
+  const indexFile = `${viagensDir}/index.json`;
+
+  await serializeIndexOperation(indexFile, async () => {
+    await FileSystem.makeDirectoryAsync(viagensDir, { intermediates: true });
+    const parsed = await readIndexWithRecovery(indexFile);
+    if (parsed) {
+      const originalCycles = Array.isArray(parsed.cycles) ? parsed.cycles : [];
+      const hasNonOperationalCycle = originalCycles.some(
+        (cycle) => typeof cycle !== 'object' || cycle === null ||
+          (cycle as { source?: unknown }).source !== 'REAL_OBD',
+      );
+      if (hasNonOperationalCycle) {
+        const cycles = cyclesFromUnknown(originalCycles).filter((cycle) => cycle.source === 'REAL_OBD');
+        await writeIndexSafely(indexFile, {
+          ...parsed,
+          cycles,
+          totalCount: cycles.length,
+          lastModified: new Date().toISOString(),
+        });
+      }
+      return;
+    }
+
+    const emptyData: DriveCycleIndex = {
+      version: '1.0',
+      initializedAt: new Date().toISOString(),
+      cycles: [],
+      totalCount: 0,
+    };
+    await writeIndexSafely(indexFile, emptyData, false);
+  });
+}
+
+/**
+ * Reconcile real trips recovered from the JSON snapshot with the operational
+ * index after an interrupted finalization. One serialized read/modify/write
+ * prevents startup recovery from overwriting concurrently recorded trips.
+ */
+export async function reconcileDriveCycles(basePath: string, recoveredCycles: DriveCycle[]): Promise<DriveCycle[]> {
+  const viagensDir = `${basePath}/VIAGENS`;
+  const indexFile = `${viagensDir}/index.json`;
+
+  return serializeIndexOperation(indexFile, async () => {
+    await FileSystem.makeDirectoryAsync(viagensDir, { intermediates: true });
+    const parsed = await readIndexWithRecovery(indexFile);
+    const originalCycles = Array.isArray(parsed?.cycles) ? parsed.cycles : [];
+    const hadNonOperationalCycles = originalCycles.some(
+      (cycle) => !isDriveCycle(cycle) || cycle.source !== 'REAL_OBD',
+    );
+    const cycles = cyclesFromUnknown(originalCycles).filter((cycle) => cycle.source === 'REAL_OBD');
+    const byId = new Map(cycles.map((cycle) => [cycle.id, cycle]));
+    let changed = !parsed || hadNonOperationalCycles;
+
+    for (const candidate of Array.isArray(recoveredCycles) ? recoveredCycles : []) {
+      if (!isDriveCycle(candidate) || candidate.source !== 'REAL_OBD') continue;
+      if (!byId.has(candidate.id)) {
+        byId.set(candidate.id, candidate);
+        changed = true;
+      }
+    }
+
+    const reconciled = Array.from(byId.values());
+    if (changed) {
+      await writeIndexSafely(indexFile, {
+        ...(parsed ?? {
+          version: '1.0',
+          initializedAt: new Date().toISOString(),
+        }),
+        cycles: reconciled,
+        totalCount: reconciled.length,
+        lastModified: new Date().toISOString(),
+      });
+    }
+
+    // If a previous attempt wrote the index but failed before the CSV append,
+    // verify every recovered ID against its day file and repair the CSV too.
+    for (const candidate of Array.isArray(recoveredCycles) ? recoveredCycles : []) {
+      if (isDriveCycle(candidate) && candidate.source === 'REAL_OBD' && byId.has(candidate.id)) {
+        await appendTripCsvOnce(viagensDir, candidate);
+      }
+    }
+    return reconciled;
+  });
+}
+
+export async function readDriveCycles(basePath: string): Promise<DriveCycle[]> {
+  const indexFile = `${basePath}/VIAGENS/index.json`;
+  return serializeIndexOperation(indexFile, async () => {
+    try {
+      const data = await readIndexWithRecovery(indexFile);
+      if (!data) return [];
+      return cyclesFromUnknown(data.cycles).filter((cycle) => cycle.source === 'REAL_OBD');
+    } catch {
+      // Keep read-only UI resilient. Mutating operations fail closed on an unreadable index.
+      return [];
+    }
+  });
+}
+
+export async function addDriveCycle(basePath: string, cycle: DriveCycle): Promise<void> {
+  const viagensDir = `${basePath}/VIAGENS`;
+  const indexFile = `${viagensDir}/index.json`;
+
+  if (cycle?.source !== 'REAL_OBD') {
+    throw new Error('NON_REAL_TRIP_NOT_ALLOWED_IN_OPERATIONAL_HISTORY');
+  }
+  if (!isDriveCycle(cycle)) {
+    throw new Error('DRIVE_CYCLE_INVALID: ciclo de viagem não atende ao contrato de persistência.');
+  }
+
+  await serializeIndexOperation(indexFile, async () => {
+    await FileSystem.makeDirectoryAsync(viagensDir, { intermediates: true });
+    const parsed = await readIndexWithRecovery(indexFile);
+    const original = parsed ?? {
+      version: '1.0',
+      initializedAt: new Date().toISOString(),
+      cycles: [],
+      totalCount: 0,
+    };
+    const sourceCycles = Array.isArray(original.cycles) ? cyclesFromUnknown(original.cycles) : [];
+    const cycles = sourceCycles.filter((item) => item.source === 'REAL_OBD');
+    const existingIndex = cycles.findIndex((item) => item.id === cycle.id);
+    if (existingIndex >= 0) cycles[existingIndex] = cycle;
+    else cycles.push(cycle);
+
+    const updated: DriveCycleIndex = {
+      ...original,
+      version: typeof original.version === 'string' ? original.version : '1.0',
+      cycles,
+      totalCount: cycles.length,
+      lastModified: new Date().toISOString(),
+    };
+
+    await writeIndexSafely(indexFile, updated);
+    await appendTripCsvOnce(viagensDir, cycle);
+  });
 }

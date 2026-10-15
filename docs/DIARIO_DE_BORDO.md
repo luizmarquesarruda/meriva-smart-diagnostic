@@ -2446,16 +2446,168 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Commit da correção de navegação: `f258796d2da04071173293e023c5697d3366de01`.
 - A alteração permanece numa branch de revisão; **CI e testes automatizados continuam sem execução**, conforme solicitado.
 
+## 2026-10-15 — Remoção do histórico CarScanner
 
-
-## 2026-10-15 — Aumento e redistribuição dos botões inferiores
+### Decisão
+O histórico operacional do aplicativo deve refletir dados próprios da Meriva, não viagens ou estatísticas importadas de outra ferramenta.
 
 ### Alterações
-- Atualizado `src/ui/BottomNavigation.tsx`: cada um dos quatro destinos principais agora tem superfície própria, borda individual e espaçamento de 8 dp em vez de parecer parte de uma única barra compacta.
-- Aumentada a altura mínima dos alvos de toque de 48 para 78 dp; ícones ampliados de 16 para 24 e rótulos de 8 para 10, mantendo os quatro destinos com largura equivalente.
-- O estado selecionado recebe realce azul também na borda; rotas, rótulos de acessibilidade e comportamento de navegação foram preservados.
-- Atualizado `tests/cockpitNavigation.test.js` para proteger os tamanhos e o espaçamento da navegação inferior.
+- `src/data/driveCycles.ts`: novas instalações começam sem viagens predefinidas.
+- `app/index.tsx`: startup não inicializa mais o seed; chama a purga do perfil legado.
+- `src/database/learningProfile.ts`: remove estatísticas seed/mistas, preservando somente estatísticas comprovadamente `REAL_OBD`; amostras reais limpas permanecem.
+- `src/meriva/autosaveValidation.ts`: sanitiza snapshots JSON antigos durante a recuperação, filtrando viagens não reais e aprendizado contaminado; `autosaveManager.ts` detecta a diferença e força a regravação do JSON limpo.
+- `purgeLegacyCarScannerHistoryTxt` reescreve o TXT legado já sanitizado durante a inicialização. Se a leitura falhar, o arquivo original não é sobrescrito.
+- `src/meriva/autosaveHistoryTxt.ts` e `autosaveTxtFormatter.ts`: limpam linhas e blocos contaminados e exportam somente viagens reais.
+- `src/knowledge/meriva_confirmed_pids.json`: valores CarScanner são removidos dos candidatos; PIDs ficam não validados até resposta RAW_ECU.
+- `tests/regression.test.js` e `tests/sqlitePersistenceContract.test.js`: cobertura para purga e filtros de legado.
+
+### Proteção dos dados
+Estatísticas que misturavam seed e dados reais são descartadas, pois não há como reconstruir a média real com exatidão a partir de uma média já misturada. Leituras reais limpas e o autosave JSON como mecanismo de recuperação são preservados.
 
 ### Validação
-- Alteração estática e cobertura de contrato foram preparadas; a suíte de testes, TypeScript, Expo Doctor e build Android **não foram executados nesta etapa**.
-- A CI permanece sem disparo. O visual precisa ser conferido no dispositivo em retrato e paisagem, especialmente em telas estreitas, antes de considerar a mudança visualmente validada.
+A CI não foi disparada. A suíte de testes e o build Android ainda precisam ser executados antes de considerar a limpeza validada no dispositivo.
+
+---
+
+## 2026-10-15 — Evolução de persistência SQLite
+
+### Objetivo e arquitetura
+- Adicionada a camada operacional SQLite em `src/storage/merivaDatabase.ts`, com `expo-sqlite ~14.0.6` para Expo SDK 51. O SQLite complementa o autosave; não substitui a recuperação JSON.
+- Mantido `CONFIG/autosave.json` como snapshot interno com validação e cópia anterior. TXT continua sendo o único formato de relatório entregue ao usuário: histórico ECU diário e relatório individual da Central de Testes.
+- Criadas migrações versionadas 1 e 2 (`PRAGMA user_version` + `schema_migrations`), WAL, chaves estrangeiras e índices por data/sessão/PID.
+
+### Dados operacionais e integridade
+- Migração 1: `obd_sessions`, `pid_readings`, `dtc_events` e `learned_pids`.
+- Migração 2: `sensor_tests`, `sensor_test_readings`, `trip_records` e `diagnostic_findings`.
+- Sessões ECU registram abertura/fechamento; sessões que ficaram abertas após encerramento do processo são marcadas como recuperadas, nunca como conexão viva.
+- A telemetria detalhada é limitada a uma amostra por PID a cada 2 segundos, só para fonte `REAL`, status `RESPONDEU`, valor finito e sessão ativa. A tela continua livre para atualizar valores mais rapidamente em memória.
+- O arquivo `meriva-smart-diagnostic.db` usa o diretório privado padrão do Expo SQLite (a linha v14 do SDK 51 não recebe o argumento de diretório customizado). A Central de Relatórios exibe tamanho lógico via `PRAGMA page_count × page_size`; fingerprints evitam UPSERTs repetidos de DTCs/viagens inalterados. Em falha de transação, os fingerprints são limpos para repetir a sincronização.
+- DTCs e viagens são sincronizados apenas quando sua origem é `REAL_OBD`; dados seed/CarScanner e simulações não são importados para a evidência operacional. A migração do snapshot JSON é idempotente e não remove o arquivo legado.
+- A Central de Testes continua salvando TXT primeiro e também registra cabeçalho, avaliações e tentativas no SQLite. A falha de SQLite não invalida o TXT.
+- A Central de Saúde salva achados com evidência, score/confiança e próximos testes na tabela `diagnostic_findings`; IDs determinísticos por sessão/identidade da evidência evitam duplicação por render. Oscilações numéricas são atualizadas no máximo a cada 30 segundos, mudanças estruturais são imediatas e falhas transitórias tentam novamente após 5 segundos.
+- A Central de Relatórios exibe métricas do SQLite (versão do esquema, sessões abertas, amostras reais, DTCs, testes, viagens e PIDs aprendidos). Leituras dessas métricas entram na fila serial para não concorrer com transações de escrita.
+
+### Dependências, teste de contrato e documentação
+- Atualizados `package.json` e `package-lock.json` com `expo-sqlite ~14.0.6` e dependências transitivas necessárias.
+- Criado `tests/sqlitePersistenceContract.test.js` para proteger esquema, migrações, lockfile, filtros de origem, throttling, integração do autosave e continuidade dos relatórios TXT.
+- Criado `docs/SQLITE_PERSISTENCIA.md` com divisão de responsabilidades, tabelas, regras de qualidade e limites da migração.
+- Arquivos funcionais: `src/storage/merivaDatabase.ts`, `src/meriva/autosaveManager.ts`, `app/testes-sensores.tsx`, `app/saude.tsx`, `app/armazenamento.tsx`, `package.json`, `package-lock.json`, `tests/sqlitePersistenceContract.test.js` e `docs/SQLITE_PERSISTENCIA.md`.
+
+### Validação, limites e próximo passo
+- Revisão estática final em 15/10/2026: **20/20 verificações de contrato passaram**, incluindo sincronização de dependências/lockfile, tabelas e migrações, filtros de fonte real, limitação de gravação, continuidade JSON/TXT, telas consumidoras e exclusão do gatilho de push nesta branch. É uma verificação de código/estrutura, não execução de testes.
+- Não foram executados `npm run validate`, Expo Doctor, prebuild/build Android nem testes com o ELM327/ECU físico. **Não afirmar que a integração nativa está validada** até esses passos terminarem.
+- A CI não foi disparada por solicitação. A branch `feat/sqlite-persistencia-20261015` está temporariamente excluída do gatilho de push em `.github/workflows/ci.yml` para evitar execução automática durante esta fase; a exceção deve ser removida ao autorizar a validação/integração.
+- Próximo passo: executar typecheck, suíte de testes, Expo Doctor e build standalone Android; corrigir qualquer divergência observada e depois testar com o veículo parado, primeiro com motor desligado e depois aquecido em marcha lenta.
+
+
+## 2026-10-15 — Correção da regressão estática do histórico CarScanner
+
+### Falha confirmada na CI #2154, tentativa 2
+- Run: `38680512586`
+- Commit testado: `bef78989c1eb0c5e39572f3f3cec9654681808b3`
+- `npm ci`: sucesso.
+- `npm run doctor`: **17/17** verificações aprovadas.
+- `tsc --noEmit`: sucesso.
+- A suíte de testes falhou em `tests/regression.test.js`, caso `histórico sem seed e consumo N/D`, linha 1106. O job Android foi ignorado em consequência da falha de validação.
+
+### Causa raiz
+O teste procurava as regras de filtro de viagens dentro de `app/armazenamento.tsx`, que é a central de relatórios TXT e armazenamento SQLite, e exigia trechos textuais antigos. A tela de viagens é `app/viagens.tsx`; nela, a lista já filtra `source === 'REAL_OBD'` e mostra `CONSUMO N/D` quando os dados não atendem aos critérios mínimos. A exportação em `src/storage/exportDiagnostics.ts` também filtra viagens reais e valida o consumo antes de exportar.
+
+Portanto, a falha observada é uma regressão do próprio teste estático por apontar para o arquivo errado/contratos de texto desatualizados; não é evidência de que a tela atual esteja mostrando viagens seed.
+
+### Correção
+- Atualizado `tests/regression.test.js` para verificar a tela real de viagens (`app/viagens.tsx`) e a lógica de exportação TXT (`src/storage/exportDiagnostics.ts`).
+- Mantidas verificações para impedir viagens não reais no histórico/exportação e consumo inválido apresentado como valor numérico.
+- Nenhuma regra de produção foi enfraquecida para fazer o teste passar.
+
+### Commit da correção
+- `a384fdc859f71d85f17acfb4d26a810d9e9e17cc` — `test: align CarScanner regression with trips screen`
+
+### Próxima etapa
+Ajustar este registro ao resultado da nova CI após a atualização do diário. A correção só estará validada quando a nova execução concluir `validate` e o `android-build` sem falhas. Não tratar o resultado anterior como CI verde.
+
+## 2026-10-15 — Mega auditoria de integridade, recuperação e proveniência
+
+### Estado de partida e evidência
+- A tentativa anterior da CI #2154 (run `38680512586`, tentativa 2) testou o commit `bef78989c1eb0c5e39572f3f3cec9654681808b3`, não os ajustes mais recentes. Nesse commit, `npm ci`, Expo Doctor (17/17) e `tsc --noEmit` passaram; a suíte falhou num contrato antigo de histórico/CarScanner em `tests/regression.test.js`, e `android-build` ficou ignorado porque `validate` falhou.
+- Não considerar aquela execução como validação das correções desta auditoria. O teste de viagens atual verifica `app/viagens.tsx` e a exportação TXT, mas a CI completa precisa ser executada no novo head.
+
+### Defeitos confirmados e correções aplicadas
+1. **Proveniência diagnóstica promovida indevidamente** — Central de Saúde, Laboratório e exportação Bluetooth tratavam qualquer origem diferente de SIMULACAO como REAL_OBD. Corrigido: só `source === 'REAL'` pode ser convertido para `REAL_OBD`; origem desconhecida/importada permanece não operacional. O motor de hipóteses exige valor finito, status RESPONDEU quando disponível e leitura do PID com no máximo 30 s de idade; DTCs malformados são ignorados.
+2. **Histórico de viagens podia perder dados ou aceitar simulação** — o índice podia ser reconstruído como vazio depois de erro de leitura, e as gravações concorrentes não eram serializadas. Corrigido: fila por índice, staging, leitura de confirmação, cópia recuperável, ID idempotente e erro explícito quando o arquivo está ilegível sem backup. O armazenamento e a reconciliação operacional aceitam apenas viagens REAL_OBD; sementes e simulações não entram.
+3. **Janela de perda ao finalizar viagem** — a viagem podia ficar somente em memória se o processo fosse interrompido ou a gravação falhasse. Corrigido: a viagem finalizada, com ID/timestamps estáveis, é journaled no autosave JSON antes de atualizar o índice e é reconciliada na inicialização. Falhas mantêm a viagem pendente; as novas tentativas desconectadas são limitadas por intervalo e o serviço informa que existe salvamento pendente.
+4. **CSV de viagem no dia errado** — o arquivo diário era escolhido pela data da gravação, não pela data local de início da viagem. Corrigido: caminho derivado da data inicial da viagem, com detecção de ID para evitar repetição durante retries.
+5. **Resumo de velocidade podia inflar** — uma viagem com distância positiva e zero tempo em movimento podia aumentar a velocidade agregada. Corrigido: o numerador e denominador da média de velocidade usam apenas viagens que têm tempo de deslocamento positivo; a distância total histórica continua preservada.
+6. **DTC legado podia contaminar o histórico** — a leitura filtrava fonte não real, mas a camada de gravação ainda aceitava DTC importado/malformado. Corrigido: limite de escrita rejeita fonte diferente de REAL_OBD, código inválido, status inválido e contagem de ocorrências não finita; a purga antiga usa arquivo temporário, validação e cópia de recuperação, preservando DTCs reais válidos.
+7. **JSON parcial podia quebrar o app ou inflar confiança do aprendizado** — hidratação agora valida subobjetos de OBD, veículo, autonomia, descoberta de PIDs, DTCs, viagens e estatísticas de aprendizado. Estatísticas mistas/desconhecidas não são tratadas como puramente reais; o contador global real não é estimado somando amostras de PIDs diferentes. O perfil independente `dna_meriva.json` também é validado e escrito com staging/read-back; conteúdo inválido é preservado em `.invalid` antes da criação de um perfil frio seguro.
+8. **Sessão SQLite podia ficar atribuída ao ID anterior** — abertura/fechamento agora remove o identificador em memória antes do I/O aguardado; a abertura é transacional e fecha sessões órfãs antes de inserir a nova. O fechamento preserva os metadados existentes e acrescenta apenas o contexto de fechamento.
+9. **Falha de escrita TXT ou encerramento do processo** — histórico diário e histórico de autosave usam temporário validado, cópia anterior e leitura de confirmação; arquivos existentes ilegíveis ou de formato desconhecido não viram histórico vazio. O temporário válido pode ser recuperado na próxima tentativa.
+10. **Hora de fim incorreta em teste de sensores** — `finishedAt` era calculado na hora do salvamento/exportação; agora registra o término real da varredura.
+11. **Contratos adicionados** — regressões cobrem concorrência/recuperação do índice, reconciliação JSON/índice, recusa de viagens simuladas, DTC importado, leitura antiga/NaN, hidratação parcial do perfil de aprendizado, tempo de conclusão dos testes e fontes diagnósticas.
+
+### Commits representativos desta rodada
+- `e218d87210f607e3dfc15f2df15cd05f957868a5` — histórico operacional só aceita viagens reais.
+- `91c92163fde1e3da136ed081b1b9c4fe098ef589` — frescor e validade da evidência PID.
+- `c66f34781b81d7d504338bdd71f8aa3b49750a7b` — validação de fonte na gravação DTC.
+- `cdb8762b895314ac151124f906cc8673652c6f75` e `f538d5fbd09973c0aceffc3b53a9916c257c0750` — perfil de aprendizado validado e escrita recuperável.
+- `0348276a85c73fc5e6603eec152b71dd0325a4e6` — reconciliação no startup sem bloquear a hidratação principal.
+- `4076d69600d804d8a09d36791153d9ec083c0fef` — retries da finalização de viagem limitados e estado pendente visível.
+
+### Status e próximo passo
+- A revisão de código e a adição de testes/contratos foram enviadas à branch `feat/sqlite-persistencia-20261015`; o `main` não foi alterado por esta rodada.
+- O workflow observado no head atual inclui gatilho de push para todas as branches (`push: branches: ['**']`). Os commits intermediários da correção foram marcados para não disparar CI; o registro final abaixo dispara a validação do head consolidado. A execução precisa ser acompanhada até `validate` e `android-build` concluírem.
+- **Estado desta entrada: validação integral pendente.** Ainda não há prova de que TypeScript, toda a suíte, Expo Doctor e build standalone Android passaram no commit final desta auditoria. Testes em veículo, ELM327 e ECU física permanecem separados e pendentes.
+
+
+## 2026-10-15 — Escrita recuperável no banco operacional de PIDs
+
+### Defeito confirmado
+- `recordPidConfirmation` e `recordDiscoveredPids` chamavam a escrita direta do TXT operacional. Diferentemente da purga legada, esse caminho não validava o conteúdo antes de substituir o arquivo nem preservava o banco atual para rollback.
+- Uma interrupção ou falha de I/O durante a substituição podia deixar `BANCO/pids_meriva_confirmados.txt` incompleto. Isso poderia remover confirmações reais já registradas.
+
+### Correção aplicada
+- O gravador normaliza e valida PID/origem antes da escrita.
+- A nova versão é preparada em `.tmp`, lida de volta e validada quanto à estrutura e proveniência `REAL_OBD`.
+- O arquivo anterior é preservado em `.previous` e conferido antes de tocar no alvo.
+- A versão nova só é aceita após leitura de confirmação; em falha, o gravador restaura e confere exatamente o conteúdo anterior. Falha também no rollback gera erro explícito e indica o caminho recuperável.
+- Adicionada regressão de I/O que força a cópia final a falhar e verifica preservação exata do arquivo anterior. O contrato de persistência também protege staging, backup e rollback.
+
+### Validação
+- A correção foi preparada na branch `feat/sqlite-persistencia-20261015`.
+- `npm run validate`, Expo Doctor e build Android ainda precisam confirmar o código no head final; teste físico OBD/ECU continua separado.
+- A CI automática será observada após o push final desta correção. Não declarar a rodada verde antes dos dois jobs `validate` e `android-build` terminarem com sucesso.
+
+
+### Revisão final do patch do banco de PIDs — 15/10/2026
+
+- Na revisão do diff antes da CI, foram corrigidos escapes de whitespace e separadores de linha no novo gravador e no fixture da regressão; o código final usa regex de whitespace real e TXT delimitado por novas linhas.
+- A regressão `testPidBankWriteRollback` simula falha na cópia para o arquivo operacional e exige restauração byte a byte do conteúdo anterior, preservação do `.previous` e remoção do temporário.
+- O contrato SQLite também verifica a presença das barreiras de staging, backup e rollback; isso complementa, mas não substitui, o teste real com Expo SQLite/Android.
+- **Estado atual: CI pendente no head consolidado.** Não há evidência suficiente para declarar a alteração validada até `npm run validate`, Expo Doctor e build Android terminarem na execução disparada por este registro. O teste físico com ELM327/ECU continua pendente.
+
+
+## 2026-10-15 — Validação de frescor temporal no SQLite
+
+- `recordRealPidReading` antes usava `Date.now()` como fallback apenas para o limitador de amostras, mas ainda gravava a string original de timestamp. Um timestamp inválido poderia entrar na base; um timestamp muito futuro também podia deslocar o relógio de amostragem e bloquear leituras seguintes.
+- Adicionada a regra explícita de elegibilidade temporal: leitura até 30 segundos de idade e tolerância futura máxima de 5 segundos. Amostras fora da janela ou com data inválida são descartadas; o SQLite recebe ISO normalizado.
+- Adicionado teste determinístico de limites temporais e contrato estrutural da regra. Isso é validação do comportamento puro do guard, não teste do módulo nativo Expo SQLite.
+- Validar no CI do head final: `npm run validate`, Expo Doctor e APK Android; hardware real continua pendente.
+
+## 2026-10-15 — Auditoria de CI e consolidação de persistência
+
+### Causa da falha identificada
+- A CI do commit anterior `7db27f00f5f23fe4f9d63e34ce820372faa7025d` falhou em `tests/regression.test.js`, no contrato `testStorageScreenDoesNotPromoteSeedOrInvalidFuel`.
+- O teste ainda exigia filtros de viagens dentro de `app/armazenamento.tsx`, mas a tela de viagens é `app/viagens.tsx` e a exportação TXT é implementada por `src/storage/exportDiagnostics.ts`. O requisito de produto estava certo; a localização da asserção ficou desatualizada após a reorganização da interface.
+- A validação TypeScript passou, Expo Doctor passou 17/17, e os testes executados antes desse contrato passaram. O job Android foi pulado pelo `needs: validate`, não falhou compilando Java/Android.
+
+### Correções e consolidação
+- Corrigido o contrato para verificar que `app/viagens.tsx` mostra somente viagens `REAL_OBD`, que os exportadores TXT também filtram viagens reais e que combustível sem evidência válida permanece como `N/D`.
+- Consolidada nesta branch a implementação de persistência SQLite do SDK 51 já existente em `feat/sqlite-persistencia-20261015`, incluindo `expo-sqlite ~14.0.6`, lockfile correspondente, migrações versionadas, persistência de sessões ECU/leitura PID/DTC/testes/viagens/PIDs aprendidos/achados diagnósticos e leitura do tamanho lógico do banco.
+- Mantidos JSON de autosave/configuração/catálogos como recuperação e formatos internos, sem conversão destrutiva; TXT continua sendo o formato exportado ao usuário.
+- Mantido o controle de proveniência: somente `REAL_OBD` entra em viagens e entidades operacionais; seed/importação/simulação não devem ser promovidos a evidência real.
+- Reaplicado o layout inferior solicitado: quatro cartões separados, altura mínima 78 dp, ícones 24, rótulos 10 e distância de 8 dp. Rotas e acessibilidade permanecem.
+- Java 17 e configuração Gradle existentes são mantidos: o log da falha não apontou erro Java. A etapa Android será validada pela nova CI com o módulo SQLite integrado.
+
+### Limites da validação
+- A nova CI deve confirmar TypeScript, toda a suíte, Expo Doctor e montagem do APK standalone.
+- O contrato SQLite verifica esquema e integrações estruturais, mas não substitui um lançamento real no Android, teste de migração de dados do usuário nem validação física com ELM327/ECU. Esses testes seguem necessários antes de declarar validação de campo.

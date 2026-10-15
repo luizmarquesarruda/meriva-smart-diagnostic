@@ -7,6 +7,7 @@ import {useMidLayout} from '../src/ui/midLayout';
 import {getSharedObdConnection,getSharedObdStatus,subscribeSharedObd,subscribeSharedObdStatus} from '../src/obd/sharedConnection';
 import {getPidDefinition} from '../src/obd/pidDefinition';
 import {assessSensorSample,createSensorTestPlan,getSensorTestCatalog,MIN_SENSOR_TEST_READINGS,type SensorTestDefinition,type SensorTestMode,type SensorTestSample,type SensorAssessment} from '../src/diagnostics/sensorTestEngine';
+import {getActiveSqliteSessionId,persistSensorTestReport} from '../src/storage/merivaDatabase';
 const catalog=getSensorTestCatalog();
 const labels:Record<SensorAssessment['state'],string>={CONSISTENTE:'COERENTE',INVESTIGAR:'INVESTIGAR',SEM_RESPOSTA:'SEM RESPOSTA',NAO_CONCLUSIVO:'NÃO CONCLUSIVO'};
 const colors:Record<SensorAssessment['state'],string>={CONSISTENTE:'#4ade80',INVESTIGAR:'#fbbf24',SEM_RESPOSTA:'#fb7185',NAO_CONCLUSIVO:'#93c5fd'};
@@ -19,7 +20,7 @@ export default function TestesSensoresScreen(){
  const [plannedReads,setPlannedReads]=useState(0),[commandProgress,setCommandProgress]=useState(0),[commandPlan,setCommandPlan]=useState(0),[countdownMs,setCountdownMs]=useState(0);
  const [round,setRound]=useState(0),[currentPid,setCurrentPid]=useState(''),[message,setMessage]=useState('Conecte o ELM327 e valide a ECU.');
  const [error,setError]=useState(''),[savedPath,setSavedPath]=useState(''),[revision,setRevision]=useState(0);
- const cancelled=useRef(false),deadline=useRef(0),runStartedAt=useRef(0),commandsDone=useRef(0),commandElapsedTotal=useRef(0),connectedAtStart=useRef(false);
+ const cancelled=useRef(false),deadline=useRef(0),runStartedAt=useRef(0),runFinishedAt=useRef(0),runSessionId=useRef<string|null>(null),commandsDone=useRef(0),commandElapsedTotal=useRef(0),connectedAtStart=useRef(false);
  useEffect(()=>{const refresh=()=>setRevision(n=>n+1);const a=subscribeSharedObd(refresh),b=subscribeSharedObdStatus(refresh);return()=>{cancelled.current=true;a();b();};},[]);
  useEffect(()=>{if(!running)return;const timer=setInterval(()=>{const remain=deadline.current-Date.now();setCountdownMs(remain>0?remain:1000);},1000);return()=>clearInterval(timer);},[running]);
  const connection=getSharedObdConnection(),status=getSharedObdStatus(),connected=Boolean(connection?.ecuValidated&&status.ecuConnected);
@@ -38,13 +39,14 @@ export default function TestesSensoresScreen(){
  function recordCommand(elapsedMs:number,totalCommands:number){commandsDone.current+=1;commandElapsedTotal.current+=Math.max(0,elapsedMs);setCommandProgress(commandsDone.current);updateCountdown(totalCommands-commandsDone.current);}
  async function runTests(){
   cancelled.current=false;setRunning(true);setCompleted(false);setAborted(false);setCommandProgress(0);setPlannedReads(0);setTestPlan([]);setSamples([]);setError('');setSavedPath('');setRound(0);setCurrentPid('');setMessage('Preparando a varredura e estimando o tempo…');
-  runStartedAt.current=Date.now();commandsDone.current=0;commandElapsedTotal.current=0;
+  runStartedAt.current=Date.now();runFinishedAt.current=0;commandsDone.current=0;commandElapsedTotal.current=0;
   const active=getSharedObdConnection(),activeStatus=getSharedObdStatus();connectedAtStart.current=Boolean(active?.ecuValidated&&activeStatus.ecuConnected);
   const plan=createSensorTestPlan(active?.supportedPids??[],pid=>Boolean(getPidDefinition(pid))),expectedReads=plan.length*MIN_SENSOR_TEST_READINGS,expectedCommands=expectedReads+1;
   setTestPlan(plan);setPlannedReads(expectedReads);setCommandPlan(expectedCommands);setCommandProgress(0);updateCountdown(expectedCommands);
   if(!active?.ecuValidated||!activeStatus.ecuConnected){setError('ECU não validada. Conecte pelo módulo Bluetooth/ELM327 antes de testar.');setMessage('Teste não iniciado: ECU sem resposta válida.');setRunning(false);setAborted(true);setCountdownMs(0);return;}
   if(!supported.has('010C')){setError('A ECU não anunciou o PID 010C (RPM), obrigatório para verificar a condição do motor. Nenhum teste iniciado.');setMessage('Teste não iniciado: condição do motor não validada.');setRunning(false);setAborted(true);setCountdownMs(0);return;}
   if(!plan.some(test=>test.pid==='010C')||plan.length===0){setError('Nenhum PID do catálogo foi anunciado como suportado. Nenhum comando será enviado por tentativa.');setMessage('Teste não iniciado: bitmap sem PIDs catalogados.');setRunning(false);setAborted(true);setCountdownMs(0);return;}
+  runSessionId.current=getActiveSqliteSessionId();
   const readings:SensorTestSample[]=[];let finished=false;
   try{
    setMessage('Confirmando a condição do motor com uma leitura inicial de RPM…');
@@ -70,7 +72,7 @@ export default function TestesSensoresScreen(){
    setMessage(finished?'Varredura concluída: cada PID suportado teve três tentativas. Revise as evidências antes de reparar.':'Teste interrompido; as leituras concluídas foram mantidas para relatório parcial.');
    setRound(finished?MIN_SENSOR_TEST_READINGS:0);
   }catch(cause){setError(cause instanceof Error?cause.message:'Falha desconhecida durante a consulta.');setMessage('Varredura não concluída normalmente; leituras finalizadas permanecem disponíveis.');setAborted(true);}
-  finally{setRunning(false);setCountdownMs(0);setCurrentPid('');}
+  finally{runFinishedAt.current=Date.now();setRunning(false);setCountdownMs(0);setCurrentPid('');}
  }
  const stop=()=>{cancelled.current=true;setMessage('Parada solicitada; a consulta OBD atual será concluída antes de interromper.');};
  async function saveReport(){
@@ -78,13 +80,33 @@ export default function TestesSensoresScreen(){
   try{
    const dir=(FileSystem.documentDirectory??'')+'MERIVA_SMART/RELATORIOS/TESTES';await FileSystem.makeDirectoryAsync(dir,{intermediates:true});
    const path=dir+'/teste-sensores-'+new Date().toISOString().replace(/[:.]/g,'-')+'.txt';
-   const lines=['MERIVA SMART DIAGNOSTIC — CENTRAL DE TESTES DE SENSORES','Catálogo: '+catalog.catalogId+' v'+catalog.schemaVersion,'Data: '+new Date().toLocaleString(),'Veículo de referência: Chevrolet Meriva Maxx 1.4 8V ECONO.FLEX 2011/2012','Condição: '+(mode==='ENGINE_OFF'?'IGNIÇÃO LIGADA / MOTOR DESLIGADO':'MOTOR LIGADO, VEÍCULO PARADO'),'ECU validada no início: '+(connectedAtStart.current?'SIM':'NÃO'),'Protocolo observado: '+(getSharedObdConnection()?.protocol??'N/D'),'Leituras mínimas por PID: '+MIN_SENSOR_TEST_READINGS,'PIDs selecionados pela bitmap: '+testPlan.length,'Tentativas previstas: '+plannedReads,'Tentativas registradas: '+samples.length,'Execução completa: '+(completed?'SIM':'NÃO — RELATÓRIO PARCIAL'),'Tempo decorrido: '+Math.round((Date.now()-runStartedAt.current)/1000)+' s','','AVALIAÇÃO POR PID'];
+   const lines=['MERIVA SMART DIAGNOSTIC — CENTRAL DE TESTES DE SENSORES','Catálogo: '+catalog.catalogId+' v'+catalog.schemaVersion,'Data: '+new Date().toLocaleString(),'Veículo de referência: Chevrolet Meriva Maxx 1.4 8V ECONO.FLEX 2011/2012','Condição: '+(mode==='ENGINE_OFF'?'IGNIÇÃO LIGADA / MOTOR DESLIGADO':'MOTOR LIGADO, VEÍCULO PARADO'),'ECU validada no início: '+(connectedAtStart.current?'SIM':'NÃO'),'Protocolo observado: '+(getSharedObdConnection()?.protocol??'N/D'),'Leituras mínimas por PID: '+MIN_SENSOR_TEST_READINGS,'PIDs selecionados pela bitmap: '+testPlan.length,'Tentativas previstas: '+plannedReads,'Tentativas registradas: '+samples.length,'Execução completa: '+(completed?'SIM':'NÃO — RELATÓRIO PARCIAL'),'Tempo decorrido: '+Math.round(((runFinishedAt.current||Date.now())-runStartedAt.current)/1000)+' s','','AVALIAÇÃO POR PID'];
    for(const item of grouped){
     lines.push('',item.test.pid+' — '+item.test.label,'Resultado: '+item.assessment.state+' — '+item.assessment.title,'Explicação: '+item.assessment.explanation,'Guia da IA local: '+item.test.aiGuidance,'Leituras válidas: '+item.values.length+'/'+MIN_SENSOR_TEST_READINGS);
     for(const row of item.rows)lines.push('Leitura '+row.readingNumber+': '+valueText(row.value,row.unit)+' | Parser: '+row.status+' | Latência: '+row.elapsedMs+' ms | '+row.timestamp,'RX bruto: '+(row.rawResponse||'VAZIO'));
    }
    lines.push('','POLÍTICA: resposta positiva confirma resposta do PID, não exatidão física/elétrica do sensor. PIDs fora da bitmap não foram consultados.','REFERÊNCIAS: SAE J1979 supported-PID bitmap; Dashlogic PID listing; OBD2 PID Knowledge; auditoria da Bíblia da Meriva.','Limiares são heurísticos, não especificações OEM. Algumas verificações exigem multímetro, osciloscópio ou condições controladas.');
-   await FileSystem.writeAsStringAsync(path,lines.join('\n'),{encoding:FileSystem.EncodingType.UTF8});setSavedPath(path);setError('');setMessage('Relatório TXT salvo no armazenamento privado do aplicativo.');
+   await FileSystem.writeAsStringAsync(path,lines.join('\n'),{encoding:FileSystem.EncodingType.UTF8});
+   setSavedPath(path);setError('');
+   try {
+    await persistSensorTestReport({
+     id:'sensor-test-'+String(runStartedAt.current||Date.now()),
+     sessionId:runSessionId.current,
+     startedAt:new Date(runStartedAt.current||Date.now()).toISOString(),
+     finishedAt:new Date(runFinishedAt.current||Date.now()).toISOString(),
+     mode,
+     status:completed?'COMPLETED':'PARTIAL',
+     protocol:getSharedObdConnection()?.protocol??null,
+     supportedPidCount:testPlan.length,
+     reportPath:path,
+     summary:grouped.map(item=>({pid:item.test.pid,label:item.test.label,state:item.assessment.state,title:item.assessment.title,validReadings:item.values.length,requiredReadings:MIN_SENSOR_TEST_READINGS})),
+     readings:samples,
+    });
+    setMessage('Relatório TXT salvo e execução registrada no banco SQLite.');
+   } catch(databaseCause) {
+    console.warn('[sqlite] TXT salvo, mas o registro estruturado falhou:',databaseCause instanceof Error?databaseCause.message:databaseCause);
+    setMessage('Relatório TXT salvo. O registro interno SQLite falhou; o arquivo TXT continua válido.');
+   }
   }catch(cause){setError(cause instanceof Error?cause.message:'Falha ao salvar relatório TXT.');}
  }
  return <SafeAreaView style={st.container} edges={['top','bottom','left','right']}><ScrollView contentContainerStyle={[st.content,{paddingHorizontal:layout.horizontalPadding}]}><View style={[st.frame,{maxWidth:layout.maxContentWidth}]}>

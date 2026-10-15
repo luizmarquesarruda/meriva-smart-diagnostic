@@ -11,6 +11,7 @@ assert.ok(index.includes('href="/mais"'), 'Mais recursos deve continuar acessív
 const bottomNav = read('src/ui/BottomNavigation.tsx');
 for (const route of ['/', '/laboratorio', '/testes-sensores', '/armazenamento']) assert.ok(bottomNav.includes(route), 'navegação inferior deve expor ' + route);
 assert.match(bottomNav, /minHeight:\s*78/, 'botões inferiores devem ter alvos de toque ampliados');
+assert.match(bottomNav, /justifyContent:\s*'space-between'/, 'botões devem usar a largura disponível');
 assert.match(bottomNav, /gap:\s*8/, 'botões inferiores devem ter espaçamento entre si');
 assert.match(bottomNav, /fontSize:\s*24/, 'ícones da navegação inferior devem ser maiores');
 assert.match(bottomNav, /fontSize:\s*10/, 'rótulos da navegação inferior devem ser legíveis');

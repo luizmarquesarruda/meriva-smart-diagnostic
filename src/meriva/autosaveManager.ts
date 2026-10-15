@@ -13,8 +13,16 @@ export type { AutoSaveStatus } from './autosaveTypes';
 import { MerivaPersistedState, createEmptyMerivaState } from './autosaveState';
 import { hydrateState, isValidEnvelope, validatePayload } from './autosaveValidation';
 import { migrateEnvelope } from './autosaveMigrations';
-import { appendAutoSaveHistory } from './autosaveHistoryTxt';
+import { appendAutoSaveHistory, purgeLegacyCarScannerHistoryTxt } from './autosaveHistoryTxt';
 import { appendDailyObdSessionEvent } from './dailyObdHistory';
+import {
+  closeSqliteObdSession,
+  initializeMerivaDatabase,
+  migrateLegacyStateToSqlite,
+  openSqliteObdSession,
+  persistOperationalStateToSqlite,
+  recordRealPidReading,
+} from '../storage/merivaDatabase';
 
 const DEBOUNCE_MS = 1500;
 const CHECKPOINT_MS = 45000;
@@ -170,6 +178,14 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
     runtime.lastError = null;
     runtime.lastSavedFingerprint = fingerprintBeforeSave;
 
+    // SQLite é secundário ao autosave JSON: falhas de banco não invalidam
+    // o snapshot recuperável nem impedem o histórico TXT.
+    try {
+      await persistOperationalStateToSqlite(runtime.state.dtcs, runtime.state.driveCycles);
+    } catch (databaseCause) {
+      console.warn('[sqlite] falha ao persistir DTCs/viagens; JSON e TXT preservados:', databaseCause instanceof Error ? databaseCause.message : databaseCause);
+    }
+
     try {
       await appendAutoSaveHistory(
         base,
@@ -204,16 +220,40 @@ async function initAutoSaveUnsafe(basePath: string): Promise<MerivaPersistedStat
   }
 
   await ensureStorageDirs(basePath);
+  try {
+    await purgeLegacyCarScannerHistoryTxt(basePath);
+  } catch (historyCleanupCause) {
+    // A limpeza do TXT é complementar; nunca truncar um arquivo que não pôde ser lido.
+    console.warn('[autosave] não foi possível migrar o TXT legado:', historyCleanupCause instanceof Error ? historyCleanupCause.message : historyCleanupCause);
+  }
   runtime.basePath = basePath;
+
+  try {
+    await initializeMerivaDatabase();
+  } catch (databaseCause) {
+    // SQLite não deve impedir a recuperação do estado JSON em dispositivos
+    // com armazenamento temporariamente indisponível.
+    console.warn('[sqlite] inicialização adiada; autosave JSON continua ativo:', databaseCause instanceof Error ? databaseCause.message : databaseCause);
+  }
 
   const envelope = await loadLastValidEnvelope(basePath);
   runtime.state = envelope ? hydrateState(envelope.payload) : createEmptyMerivaState();
+  const legacySnapshotNeedsCleanup = Boolean(
+    envelope && JSON.stringify(envelope.payload) !== JSON.stringify(runtime.state),
+  );
+  try {
+    await migrateLegacyStateToSqlite(runtime.state);
+  } catch (databaseCause) {
+    console.warn('[sqlite] migração idempotente do snapshot JSON falhou; o JSON foi preservado:', databaseCause instanceof Error ? databaseCause.message : databaseCause);
+  }
   runtime.lastSavedAt = envelope?.savedAt ?? null;
   runtime.lastSaveReason = null;
   runtime.lastError = null;
-  runtime.lastSavedFingerprint = envelope ? snapshotFingerprint(runtime.state) : null;
-  runtime.dirty = false;
-  runtime.mutationVersion = 0;
+  // Se a hidratação removeu dados CarScanner, forçar a gravação do snapshot
+  // sanitizado para que a remoção seja persistente, não apenas visual.
+  runtime.lastSavedFingerprint = envelope && !legacySnapshotNeedsCleanup ? snapshotFingerprint(runtime.state) : null;
+  runtime.dirty = legacySnapshotNeedsCleanup;
+  runtime.mutationVersion = legacySnapshotNeedsCleanup ? 1 : 0;
 
   // Android pode encerrar o processo sem executar o fechamento da sessão.
   // Nunca reutilizar uma conexão persistida como se ainda estivesse viva.
@@ -324,6 +364,15 @@ export function pushLastReading(reading: MerivaPersistedState['lastReadings'][nu
   // latest value at most once per PID per interval, except for new PIDs and
   // status/unit/source transitions which are operationally significant.
   runtime.state.lastReadings = next;
+
+  // Histórico temporal detalhado: somente leituras reais respondidas durante
+  // uma sessão ECU. A camada SQLite limita amostras a 1 por PID a cada 2 s.
+  if (runtime.obdSessionActive) {
+    void recordRealPidReading(reading).catch((databaseCause) => {
+      console.warn('[sqlite] falha ao registrar amostra PID:', databaseCause instanceof Error ? databaseCause.message : databaseCause);
+    });
+  }
+
   const persistenceDue = now - lastMutation >= MIN_READING_SAVE_INTERVAL_MS;
   if (!connectionSemanticsChanged && !persistenceDue) return;
 
@@ -417,6 +466,12 @@ export async function startObdAutosaveSession(): Promise<boolean> {
 
   // Persistir o evento após a conclusão do autosave evita que o ciclo de
   // salvamento/coalescência suprima uma reconexão do histórico diário.
+  try {
+    await openSqliteObdSession(runtime.state.obd);
+  } catch (databaseCause) {
+    console.warn('[sqlite] sessão ECU não registrada no banco; histórico TXT preservado:', databaseCause instanceof Error ? databaseCause.message : databaseCause);
+  }
+
   await appendDailySessionBoundary('SESSION_START');
   return true;
 }
@@ -426,7 +481,10 @@ export async function closeObdAutosaveSession(): Promise<boolean> {
   runtime.obdSessionActive = false;
   stopObdSessionCheckpoint();
 
-  if (!runtime.basePath) return false;
+  if (!runtime.basePath) {
+    try { await closeSqliteObdSession('ECU_DISCONNECTED', runtime.state.obd); } catch { /* não bloqueia encerramento */ }
+    return false;
+  }
 
   if (wasActive || runtime.state.obd.connected) {
     runtime.state.obd = {
@@ -439,12 +497,24 @@ export async function closeObdAutosaveSession(): Promise<boolean> {
     runtime.mutationVersion += 1;
   }
 
-  if (!wasActive && !runtime.dirty) return true;
+  if (!wasActive && !runtime.dirty) {
+    try {
+      await closeSqliteObdSession('ECU_DISCONNECTED', runtime.state.obd);
+    } catch (databaseCause) {
+      console.warn('[sqlite] falha ao fechar sessão ECU:', databaseCause instanceof Error ? databaseCause.message : databaseCause);
+    }
+    return true;
+  }
 
   // Abertura/fechamento são fronteiras de sessão; não devem ser coalescidas
   // com o snapshot anterior.
   if (wasActive) runtime.lastSavedFingerprint = null;
   const saved = await saveNow('session_end');
+  try {
+    await closeSqliteObdSession('ECU_DISCONNECTED', runtime.state.obd);
+  } catch (databaseCause) {
+    console.warn('[sqlite] falha ao fechar sessão ECU; estado JSON já tratado:', databaseCause instanceof Error ? databaseCause.message : databaseCause);
+  }
   if (saved && wasActive) {
     await appendDailySessionBoundary('SESSION_END');
   }
@@ -459,6 +529,11 @@ export function stopObdSessionCheckpoint(): void {
 }
 
 export function disposeAutoSave(): void {
+  // Fechamento best-effort evita sessões SQLite órfãs em troca de diretório
+  // ou desmontagem da infraestrutura de autosave.
+  void closeSqliteObdSession('APP_DISPOSE').catch((databaseCause) => {
+    console.warn('[sqlite] fechamento na desmontagem falhou:', databaseCause instanceof Error ? databaseCause.message : databaseCause);
+  });
   if (runtime.debounceTimer) clearTimeout(runtime.debounceTimer);
   if (runtime.criticalTimer) clearTimeout(runtime.criticalTimer);
   if (runtime.checkpointTimer) clearInterval(runtime.checkpointTimer);

@@ -31,8 +31,8 @@ export default function BottomNavigation({ active = null }: Props) {
 }
 
 const styles = StyleSheet.create({
-  // Cada destino agora é um botão separado; o espaço entre eles reduz a sensação de
-  // barra apertada e facilita acertar o alvo de toque sem alterar as rotas.
+  // Botões individuais deixam espaço visual e aumentam a área de toque sem
+  // alterar a hierarquia, os destinos ou os rótulos de acessibilidade.
   bar: { flexDirection: 'row', alignItems: 'stretch', justifyContent: 'space-between', gap: 8, width: '100%', marginTop: 12 },
   item: { flex: 1, minWidth: 0, minHeight: 78, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, paddingVertical: 10, borderRadius: 14, borderWidth: 1, borderColor: '#28415f', backgroundColor: '#0e1b2d', gap: 6 },
   selected: { backgroundColor: '#152a45', borderColor: '#3b82f6' },

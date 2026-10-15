@@ -66,7 +66,7 @@ function extendMedianWindow(existing: SampleStatistics, value: number): number[]
 
 function createStatistics(
   value: number,
-  source: 'REAL_OBD' | 'CARSCANNER_BASELINE',
+  source: 'REAL_OBD',
   realSamples: number,
   seedSamples: number,
   thresholds: Record<string, number>,
@@ -97,12 +97,17 @@ function updateStatisticsWithRealSample(
   const previousSamples = existing.samples;
   const previousM2 = existing.stddev * existing.stddev * Math.max(0, previousSamples - 1);
 
-  if (existing.seedSamples > 0 && existing.realSamples === 0 && profile.seedWeight > 0) {
-    const seedWeight = Math.min(1, Math.max(0, profile.seedWeight));
-    existing.mean = previousMean * seedWeight + value * (1 - seedWeight);
-    existing.samples = existing.seedSamples + 1;
+  if (existing.seedSamples > 0 || !existing.source.includes('REAL_OBD')) {
+    // Não reaproveitar estatística antiga contaminada: reiniciar com a primeira amostra real.
+    existing.mean = value;
+    existing.median = value;
+    existing.min = value;
+    existing.max = value;
+    existing.stddev = 0;
+    existing.samples = 1;
     existing.realSamples = 1;
-    existing.stddev = Math.abs(value - previousMean) * Math.sqrt(seedWeight * (1 - seedWeight));
+    existing.seedSamples = 0;
+    existing.medianWindow = [value];
   } else {
     existing.samples = previousSamples + 1;
     existing.realSamples += 1;
@@ -121,6 +126,82 @@ function updateStatisticsWithRealSample(
   existing.source = Array.from(new Set([...existing.source, 'REAL_OBD']));
 }
 
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isFiniteNonNegative(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
+}
+
+function isValidLearningStatistics(value: unknown): value is SampleStatistics {
+  if (!isObjectRecord(value)) return false;
+  const finiteKeys = ['mean', 'median', 'min', 'max', 'stddev', 'samples', 'realSamples', 'seedSamples'];
+  if (!finiteKeys.every((key) => typeof value[key] === 'number' && Number.isFinite(value[key]))) return false;
+  if (!isFiniteNonNegative(value.samples) || !isFiniteNonNegative(value.realSamples) ||
+      !isFiniteNonNegative(value.seedSamples) || !isFiniteNonNegative(value.stddev)) return false;
+  if ((value.min as number) > (value.max as number)) return false;
+  if (!['LOW', 'MEDIUM', 'GOOD', 'HIGH'].includes(String(value.confidence))) return false;
+  if (typeof value.lastUpdate !== 'string' || !Number.isFinite(Date.parse(value.lastUpdate))) return false;
+  if (!Array.isArray(value.source) || !value.source.every((source) => typeof source === 'string')) return false;
+  if (value.medianWindow !== undefined &&
+      (!Array.isArray(value.medianWindow) || !value.medianWindow.every((item) => typeof item === 'number' && Number.isFinite(item)))) return false;
+  return true;
+}
+
+function isValidStatisticsMap(value: unknown): value is Record<string, SampleStatistics> {
+  return isObjectRecord(value) && Object.values(value).every(isValidLearningStatistics);
+}
+
+function isValidLearningProfile(value: unknown): value is MerivaLearningProfile {
+  if (!isObjectRecord(value)) return false;
+
+  const thresholds = isObjectRecord(value.confidenceThresholds) ? value.confidenceThresholds : null;
+  const counts = isObjectRecord(value.globalSampleCounts) ? value.globalSampleCounts : null;
+  const contamination = isObjectRecord(value.dataContamination) ? value.dataContamination : null;
+  const contextualData = value.contextualData;
+
+  if (!thresholds || !counts || !contamination || !Array.isArray(contextualData)) return false;
+  if (
+    !isFiniteNonNegative(thresholds.low) ||
+    !isFiniteNonNegative(thresholds.medium) ||
+    !isFiniteNonNegative(thresholds.good) ||
+    !isFiniteNonNegative(thresholds.high) ||
+    thresholds.low > thresholds.medium ||
+    thresholds.medium > thresholds.good ||
+    thresholds.good > thresholds.high
+  ) return false;
+  if (
+    !isFiniteNonNegative(counts.seedSamples) ||
+    !isFiniteNonNegative(counts.realSamples) ||
+    !isFiniteNonNegative(counts.totalSamples) ||
+    !isFiniteNonNegative(contamination.simulationDetected) ||
+    !isFiniteNonNegative(contamination.simulationFiltered)
+  ) return false;
+  if (
+    typeof value.vehicleId !== 'string' ||
+    typeof value.profileCreated !== 'string' || !Number.isFinite(Date.parse(value.profileCreated)) ||
+    typeof value.lastUpdated !== 'string' || !Number.isFinite(Date.parse(value.lastUpdated)) ||
+    typeof value.seedVersion !== 'string' ||
+    typeof value.seedImportDate !== 'string' ||
+    !['COLD_START', 'SEED_INITIALIZED', 'LEARNING_ACTIVE', 'CONFIDENT'].includes(String(value.learningStatus)) ||
+    !['HYBRID', 'REAL_ONLY'].includes(String(value.source)) ||
+    typeof value.seedWeight !== 'number' || !Number.isFinite(value.seedWeight) || value.seedWeight < 0 ||
+    !contextualData.every((context) => {
+      if (!isObjectRecord(context)) return false;
+      return (
+        ['IDLE_COLD', 'IDLE_WARM', 'ACCELERATION', 'CRUISE', 'DECELERATION', 'UNKNOWN'].includes(String(context.condition)) &&
+        typeof context.lastUpdate === 'string' && Number.isFinite(Date.parse(context.lastUpdate)) &&
+        isFiniteNonNegative(context.sampleCount) &&
+        isValidStatisticsMap(context.statistics)
+      );
+    }) ||
+    !isValidStatisticsMap(value.overallStatistics)
+  ) return false;
+
+  return true;
+}
+
 async function readLearningProfileUnsafe(
   basePath: string,
 ): Promise<MerivaLearningProfile | null> {
@@ -129,8 +210,9 @@ async function readLearningProfileUnsafe(
   if (!info.exists || info.isDirectory) return null;
 
   try {
-    const content = await FileSystem.readAsStringAsync(target);
-    return JSON.parse(content) as MerivaLearningProfile;
+    const content = await FileSystem.readAsStringAsync(target, { encoding: FileSystem.EncodingType.UTF8 });
+    const parsed = JSON.parse(content) as unknown;
+    return isValidLearningProfile(parsed) ? parsed : null;
   } catch {
     return null;
   }
@@ -141,10 +223,47 @@ async function writeLearningProfileUnsafe(
   profile: MerivaLearningProfile,
 ): Promise<void> {
   const target = profilePath(basePath);
+  const temp = target + '.tmp';
+  const backup = target + '.previous';
+  const quarantine = target + '.invalid';
   await FileSystem.makeDirectoryAsync(`${basePath}/APRENDIZADO`, { intermediates: true });
-  await FileSystem.writeAsStringAsync(target, JSON.stringify(profile, null, 2), {
-    encoding: FileSystem.EncodingType.UTF8,
-  });
+
+  const content = JSON.stringify(profile, null, 2);
+  await FileSystem.writeAsStringAsync(temp, content, { encoding: FileSystem.EncodingType.UTF8 });
+  const staged = JSON.parse(await FileSystem.readAsStringAsync(temp, { encoding: FileSystem.EncodingType.UTF8 })) as unknown;
+  if (!isValidLearningProfile(staged)) throw new Error('LEARNING_PROFILE_STAGING_VALIDATION_FAILED');
+
+  const info = await FileSystem.getInfoAsync(target);
+  if (info.exists && !info.isDirectory) {
+    const current = await FileSystem.readAsStringAsync(target, { encoding: FileSystem.EncodingType.UTF8 }).catch(() => '');
+    let parsedCurrent: unknown = null;
+    try { parsedCurrent = JSON.parse(current) as unknown; } catch { /* preserve below */ }
+    if (isValidLearningProfile(parsedCurrent)) {
+      await FileSystem.copyAsync({ from: target, to: backup });
+    } else {
+      // Preserve malformed legacy content separately before replacing it with a
+      // clean profile, without allowing invalid shape to reach learning logic.
+      await FileSystem.copyAsync({ from: target, to: quarantine }).catch(() => undefined);
+    }
+  }
+
+  let committed = false;
+  try {
+    await FileSystem.copyAsync({ from: temp, to: target });
+    const readBack = JSON.parse(await FileSystem.readAsStringAsync(target, { encoding: FileSystem.EncodingType.UTF8 })) as unknown;
+    if (!isValidLearningProfile(readBack)) throw new Error('LEARNING_PROFILE_COMMIT_VALIDATION_FAILED');
+    committed = true;
+  } catch (cause) {
+    const backupInfo = await FileSystem.getInfoAsync(backup).catch(() => ({ exists: false, isDirectory: false }));
+    if (backupInfo.exists && !backupInfo.isDirectory) {
+      try { await FileSystem.copyAsync({ from: backup, to: target }); } catch { /* recovery backup remains */ }
+    }
+    throw cause;
+  } finally {
+    if (committed) {
+      try { await FileSystem.deleteAsync(temp, { idempotent: true }); } catch { /* clean on next write */ }
+    }
+  }
 }
 
 async function enqueueProfileTransaction<T>(
@@ -209,98 +328,67 @@ export async function createLearningProfile(
     },
   };
 
+  const existingInfo = await FileSystem.getInfoAsync(profilePath(basePath));
+  if (existingInfo.exists && !existingInfo.isDirectory) {
+    const existing = await readLearningProfileUnsafe(basePath);
+    if (!existing) {
+      // New blank profile must not destroy an unreadable legacy DNA file.
+      const invalidCopy = profilePath(basePath) + '.invalid';
+      await FileSystem.copyAsync({ from: profilePath(basePath), to: invalidCopy }).catch(() => undefined);
+    }
+  }
   await saveLearningProfile(basePath, profile);
   return profile;
 }
 
-export interface CarScannerSeedSample {
-  pidName: string;
-  value: number;
-  condition: VehicleCondition;
-  timestamp: string;
-}
-
-export const CARSCANNER_SEED_VERSION = 'CARSCANNER_2026-09-24';
-
-export const CARSCANNER_SEED_SAMPLES: CarScannerSeedSample[] = [
-  { pidName: 'Coolant Temperature', value: 81, condition: 'IDLE_WARM', timestamp: '2026-09-24T14:48:00.000Z' },
-  { pidName: 'STFT Bank 1', value: -8.59, condition: 'IDLE_WARM', timestamp: '2026-09-24T14:48:00.000Z' },
-  { pidName: 'LTFT Bank 1', value: 10.94, condition: 'IDLE_WARM', timestamp: '2026-09-24T14:48:00.000Z' },
-  { pidName: 'MAP', value: 39.02, condition: 'IDLE_WARM', timestamp: '2026-09-24T14:48:00.000Z' },
-  { pidName: 'Engine RPM', value: 778, condition: 'IDLE_WARM', timestamp: '2026-09-24T14:48:00.000Z' },
-  { pidName: 'Timing Advance', value: 8, condition: 'IDLE_WARM', timestamp: '2026-09-24T14:48:00.000Z' },
-  { pidName: 'Intake Air Temperature', value: 33, condition: 'IDLE_WARM', timestamp: '2026-09-24T14:48:00.000Z' },
-  { pidName: 'MAF', value: 2.48, condition: 'IDLE_WARM', timestamp: '2026-09-24T14:48:00.000Z' },
-  { pidName: 'Throttle Position', value: 3.53, condition: 'IDLE_WARM', timestamp: '2026-09-24T14:48:00.000Z' },
-  { pidName: 'O2 Sensor 1 Voltage', value: 0.53, condition: 'IDLE_WARM', timestamp: '2026-09-24T14:48:00.000Z' },
-];
-
-export async function initializeCarScannerSeed(
-  basePath: string,
-  seedImportDate = '2026-09-24T14:48:00.000Z',
-): Promise<MerivaLearningProfile | null> {
+/**
+ * Remove definitivamente a influência histórica do CarScanner do perfil local.
+ * Estatísticas mistas não podem ser separadas com exatidão porque a média antiga
+ * combinava seed e amostras reais; por segurança, essas estatísticas são descartadas.
+ * Estatísticas comprovadamente REAL_OBD sem amostras seed são preservadas.
+ */
+export async function purgeCarScannerHistory(basePath: string): Promise<MerivaLearningProfile | null> {
   return enqueueProfileTransaction(basePath, async () => {
     const profile = await readLearningProfileUnsafe(basePath);
     if (!profile) return null;
-    if (profile.seedVersion === CARSCANNER_SEED_VERSION && profile.globalSampleCounts.seedSamples > 0) {
-      return profile;
-    }
 
-    const now = new Date().toISOString();
-    profile.seedVersion = CARSCANNER_SEED_VERSION;
-    profile.seedImportDate = seedImportDate;
-    if (profile.globalSampleCounts.realSamples >= profile.confidenceThresholds.high) {
-      profile.learningStatus = 'CONFIDENT';
-    } else if (profile.globalSampleCounts.realSamples >= profile.confidenceThresholds.low) {
-      profile.learningStatus = 'LEARNING_ACTIVE';
-    } else if (profile.globalSampleCounts.realSamples > 0) {
-      profile.learningStatus = 'COLD_START';
-    } else {
-      profile.learningStatus = 'SEED_INITIALIZED';
-    }
-    profile.source = 'HYBRID';
-    profile.seedWeight = 0.25;
-    profile.globalSampleCounts.seedSamples = CARSCANNER_SEED_SAMPLES.length;
-    profile.globalSampleCounts.totalSamples = profile.globalSampleCounts.realSamples + profile.globalSampleCounts.seedSamples;
-    profile.lastUpdated = now;
-
-    for (const sample of CARSCANNER_SEED_SAMPLES) {
-      const context = profile.contextualData.find((item) => item.condition === sample.condition) ?? {
-        condition: sample.condition,
-        statistics: {},
-        lastUpdate: now,
-        sampleCount: 0,
-      };
-      if (!profile.contextualData.includes(context)) profile.contextualData.push(context);
-
-      const existing = context.statistics[sample.pidName];
-      if (existing && existing.realSamples > 0) continue;
-
-      context.sampleCount = Math.max(context.sampleCount, 1);
-      context.lastUpdate = now;
-      context.statistics[sample.pidName] = {
-        mean: sample.value,
-        median: sample.value,
-        min: sample.value,
-        max: sample.value,
-        stddev: 0,
-        samples: 1,
-        realSamples: 0,
-        seedSamples: 1,
-        confidence: 'LOW',
-        lastUpdate: sample.timestamp,
-        source: ['CARSCANNER_BASELINE'],
-        medianWindow: [sample.value],
-      };
-
-      const overallExisting = profile.overallStatistics[sample.pidName];
-      if (!overallExisting || overallExisting.realSamples === 0) {
-        profile.overallStatistics[sample.pidName] = {
-          ...context.statistics[sample.pidName],
-          medianWindow: [sample.value],
+    const cleanStats = (stats: Record<string, SampleStatistics>): Record<string, SampleStatistics> => {
+      const clean: Record<string, SampleStatistics> = {};
+      for (const [pidName, value] of Object.entries(stats)) {
+        const sources = Array.isArray(value.source) ? value.source : [];
+        if (value.seedSamples > 0 || sources.includes('CARSCANNER_BASELINE')) continue;
+        if (value.realSamples <= 0 || !sources.includes('REAL_OBD')) continue;
+        clean[pidName] = {
+          ...value,
+          samples: value.realSamples,
+          seedSamples: 0,
+          source: ['REAL_OBD'],
+          medianWindow: (value.medianWindow ?? []).slice(-MEDIAN_WINDOW_LIMIT),
         };
       }
-    }
+      return clean;
+    };
+
+    profile.contextualData = profile.contextualData
+      .map((context) => {
+        const statistics = cleanStats(context.statistics);
+        return { ...context, statistics, sampleCount: Object.values(statistics).reduce((sum, item) => sum + item.realSamples, 0) };
+      })
+      .filter((context) => Object.keys(context.statistics).length > 0);
+
+    profile.overallStatistics = cleanStats(profile.overallStatistics);
+    profile.globalSampleCounts.seedSamples = 0;
+    profile.globalSampleCounts.totalSamples = profile.globalSampleCounts.realSamples;
+    profile.seedVersion = 'NONE';
+    profile.seedImportDate = '';
+    profile.seedWeight = 0;
+    profile.source = 'REAL_ONLY';
+    profile.learningStatus = profile.globalSampleCounts.realSamples >= profile.confidenceThresholds.high
+      ? 'CONFIDENT'
+      : profile.globalSampleCounts.realSamples >= profile.confidenceThresholds.low
+        ? 'LEARNING_ACTIVE'
+        : 'COLD_START';
+    profile.lastUpdated = new Date().toISOString();
 
     await writeLearningProfileUnsafe(basePath, profile);
     return profile;

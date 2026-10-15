@@ -2,7 +2,7 @@
 // Arquivo para copiar em: <repo>/src/meriva/autosaveTxtFormatter.ts
 //
 // Valores ausentes aparecem como N/D. Nunca são preenchidos com ficção.
-// Seeds aparecem sempre com o rótulo da sua fonte (CARSCANNER_SEED etc.).
+// Apenas viagens REAL_OBD entram no relatório operacional; baseline importado não é histórico.
 
 import type { MerivaPersistedState } from './autosaveState';
 import { AUTOSAVE_SCHEMA_VERSION } from './autosaveTypes';
@@ -88,7 +88,7 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
 
   L.push('[HISTORY]');
   const displayedCycles = options.historyLimit == null
-    ? state.driveCycles.filter((cycle) => cycle.source !== 'CARSCANNER_SEED')
+    ? state.driveCycles.filter((cycle) => cycle.source === 'REAL_OBD')
     : options.historyLimit <= 0
       ? []
       : state.driveCycles

@@ -18,12 +18,23 @@ function linkedSensorRecommendations(ruleId: string): string[] {
 }
 const ACTIVE_DTC_STATUSES = new Set(['CONFIRMED', 'PENDING', 'PERMANENT', 'CURRENT']);
 
-function isSimulation(item: PidObservation): boolean { return String(item.source ?? '').trim().toUpperCase() === 'SIMULACAO'; }
+function isSimulation(item: PidObservation): boolean { return Boolean(item) && String(item.source ?? '').trim().toUpperCase() === 'SIMULACAO'; }
 function isLiveObd(item: PidObservation): boolean { return String(item.source ?? '').trim().toUpperCase() === 'REAL_OBD'; }
 
-function pidValue(observations: PidObservation[], pid: string): PidObservation | undefined {
+/** PID evidence must be numerical, responded and recent. A cached reading
+ * cannot keep generating a live fault after the ECU stopped communicating. */
+export const MAX_DIAGNOSTIC_PID_AGE_MS = 30_000;
+
+function pidValue(observations: PidObservation[], pid: string, nowMs = Date.now()): PidObservation | undefined {
   return observations
-    .filter((item) => item.pid.toUpperCase() === pid.toUpperCase() && item.value !== null && isLiveObd(item))
+    .filter((item) => {
+      if (!item || typeof item.pid !== 'string' || item.pid.toUpperCase() !== pid.toUpperCase() || !isLiveObd(item)) return false;
+      if (typeof item.value !== 'number' || !Number.isFinite(item.value)) return false;
+      if (item.status !== undefined && item.status !== 'RESPONDEU') return false;
+      const timestampMs = Date.parse(item.timestamp);
+      const ageMs = nowMs - timestampMs;
+      return Number.isFinite(timestampMs) && ageMs >= 0 && ageMs <= MAX_DIAGNOSTIC_PID_AGE_MS;
+    })
     .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))[0];
 }
 
@@ -42,8 +53,11 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
   const observations = rawObservations.filter((item) => !isSimulation(item));
   const rawDtcs = input.dtcs ?? [];
   const liveDtcs = rawDtcs.filter((item) =>
-    String(item.source ?? '').trim().toUpperCase() === 'REAL_OBD'
-    && ACTIVE_DTC_STATUSES.has(String(item.status ?? '').trim().toUpperCase()),
+    Boolean(item) &&
+    typeof item.code === 'string' &&
+    /^[PCBU][0-9A-F]{4}$/i.test(item.code) &&
+    String(item.source ?? '').trim().toUpperCase() === 'REAL_OBD' &&
+    ACTIVE_DTC_STATUSES.has(String(item.status ?? '').trim().toUpperCase()),
   );
   const blockedSimulationSamples = rawObservations.filter(isSimulation).length;
   const blockedNonLiveDtcs = rawDtcs.length - liveDtcs.length;

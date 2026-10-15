@@ -34,6 +34,7 @@ const files = new Map();
 const dirs = new Set(['/doc']);
 let writeDelayMs = 0;
 let failReadPath = null;
+let failCopyToPath = null;
 let bluetoothListener = null;
 let bluetoothDisconnectListener = null;
 let fakeDeviceConnected = true;
@@ -64,6 +65,7 @@ function resetFS() {
   dirs.add('/doc');
   writeDelayMs = 0;
   failReadPath = null;
+  failCopyToPath = null;
 }
 
 const fakeFS = {
@@ -104,6 +106,10 @@ const fakeFS = {
   },
 
   async copyAsync({ from, to }) {
+    if (failCopyToPath === to) {
+      failCopyToPath = null;
+      throw new Error('COPY IO FAILURE: ' + to);
+    }
     if (files.has(from)) {
       ensureDirTree(parentDir(to));
       files.set(to, files.get(from));
@@ -203,10 +209,34 @@ const fakeBluetooth = {
   },
 };
 
+// expo-sqlite is a native module; these Node-only tests exercise autosave
+// contracts, not SQLite itself. Return a no-op database so importing the module
+// never loads Expo's native/ESM implementation in Node.
+const fakeSQLiteDb = {
+  async execAsync() {},
+  async runAsync() { return { changes: 1, lastInsertRowId: 1 }; },
+  async getFirstAsync(sql) {
+    if (/PRAGMA user_version/i.test(sql)) return { user_version: 0 };
+    if (/PRAGMA page_count/i.test(sql)) return { page_count: 1 };
+    if (/PRAGMA page_size/i.test(sql)) return { page_size: 4096 };
+    if (/metadata_json/i.test(sql)) return { metadata_json: '{}' };
+    if (/COUNT\s*\(/i.test(sql)) {
+      const aliases = Array.from(sql.matchAll(/(?:COUNT|SUM|MAX)\s*\([^)]*\)\s+AS\s+([a-zA-Z_][a-zA-Z0-9_]*)/gi), (m) => m[1]);
+      return Object.fromEntries(aliases.map((alias) => [alias, 0]));
+    }
+    return null;
+  },
+  async getAllAsync() { return []; },
+  async withTransactionAsync(operation) { return operation(); },
+  async closeAsync() {},
+};
+const fakeSQLite = { async openDatabaseAsync() { return fakeSQLiteDb; } };
+
 const originalLoad = Module._load;
 Module._load = function (request, parent, isMain) {
   if (request === 'expo-file-system') return fakeFS;
   if (request === 'react-native') return fakeRN;
+  if (request === 'expo-sqlite') return fakeSQLite;
   if (request === 'react-native-bluetooth-classic') return fakeBluetooth;
   if (request === 'expo-location') return { PermissionStatus: { GRANTED: 'granted' }, requestForegroundPermissionsAsync: async () => ({ status: 'granted' }), getBackgroundPermissionsAsync: async () => ({ status: 'granted' }), requestBackgroundPermissionsAsync: async () => ({ status: 'granted' }), hasStartedLocationUpdatesAsync: async () => false, startLocationUpdatesAsync: async () => {}, stopLocationUpdatesAsync: async () => {}, Accuracy: { BestForNavigation: 6 } };
   if (parent && parent.filename && (request.startsWith('./') || request.startsWith('../'))) {
@@ -265,6 +295,27 @@ async function testParser() {
   assert.strictEqual(parser.parsePidResponse('010C', 'NO DATA').status, 'NÃO RESPONDEU');
   assert.deepStrictEqual(parser.parseDtcResponse('43 01 33 00 00 00'), ['P0133']);
   assert.deepStrictEqual(parser.parseDtcResponse('48 6B 10 43 01 33 00 00 82'), ['P0133']);
+
+  const sparkReadiness = parser.parsePidResponse('0101', '41 01 00 70 01 01');
+  assert.ok(sparkReadiness.interpretation.includes('CICLO OTTO/SI'));
+  assert.ok(sparkReadiness.interpretation.includes('CATALISADOR=NÃO PRONTO'));
+  assert.ok(sparkReadiness.interpretation.includes('CATALISADOR'));
+  assert.ok(!sparkReadiness.interpretation.includes('MISFIRE'), 'monitor comum não suportado não deve ser indicado como incompleto');
+  assert.ok(!sparkReadiness.interpretation.includes('FUEL_SYSTEM'), 'monitor de combustível não suportado não deve ser indicado como incompleto');
+  assert.ok(!sparkReadiness.interpretation.includes('COMPONENTES'), 'monitor de componentes não suportado não deve ser indicado como incompleto');
+
+  // On compression-ignition engines C/D encode NMHC, NOx/SCR, boost,
+  // exhaust-sensor and particulate-filter monitors—not gasoline EVAP/O2 bits.
+  const dieselReadiness = parser.parsePidResponse('0101', '41 01 00 78 AB AB');
+  assert.ok(dieselReadiness.interpretation.includes('DIESEL/CI'));
+  assert.ok(dieselReadiness.interpretation.includes('CATALISADOR_NMHC=NÃO PRONTO'));
+  assert.ok(dieselReadiness.interpretation.includes('NOX_SCR'));
+  assert.ok(dieselReadiness.interpretation.includes('PRESSAO_TURBO'));
+  assert.ok(!dieselReadiness.interpretation.includes('EVAP'));
+  assert.ok(!dieselReadiness.interpretation.includes('AQUECEDOR_O2'));
+  assert.ok(!dieselReadiness.interpretation.includes('MISFIRE'), 'monitor misfire não suportado não deve ser indicado como incompleto');
+  assert.ok(!dieselReadiness.interpretation.includes('FUEL_SYSTEM'), 'monitor combustível não suportado não deve ser indicado como incompleto');
+  assert.ok(!dieselReadiness.interpretation.includes('COMPONENTES'), 'monitor de componentes não suportado não deve ser indicado como incompleto');
 }
 
 async function testElmAndProtocol() {
@@ -525,7 +576,7 @@ async function testIntelligentPidDiscovery() {
   assert.ok(result.supportedPids.includes('0105'), 'PID com resposta real válida deve continuar disponível');
 }
 
-async function testCarScannerBaselineAndFuel012F() {
+async function testRealOnlyLearningAndFuel012F() {
   resetFS();
   const parser = loadTs(path.join(ROOT, 'src/obd/parser.ts'));
   const fuel = loadTs(path.join(ROOT, 'src/trip/fuelLevel.ts'));
@@ -544,41 +595,41 @@ async function testCarScannerBaselineAndFuel012F() {
   assert.strictEqual(fuel.isFuelReserve(8), true);
   assert.strictEqual(fuel.estimateRangeFromFuelLevel(50, 10), 280);
 
-  await learning.createLearningProfile(BASE, '2026-09-24T14:48:00.000Z');
-  const seeded = await learning.initializeCarScannerSeed(BASE);
-  assert.strictEqual(seeded.globalSampleCounts.seedSamples, 10);
-  assert.strictEqual(seeded.globalSampleCounts.realSamples, 0);
-  assert.strictEqual(seeded.globalSampleCounts.totalSamples, 10);
-  assert.strictEqual(seeded.source, 'HYBRID');
-  assert.strictEqual(seeded.learningStatus, 'SEED_INITIALIZED');
-  const rpm = seeded.contextualData.find((item) => item.condition === 'IDLE_WARM').statistics['Engine RPM'];
-  assert.strictEqual(rpm.mean, 778);
-  assert.strictEqual(rpm.realSamples, 0);
-  assert.strictEqual(rpm.seedSamples, 1);
-  assert.deepStrictEqual(rpm.source, ['CARSCANNER_BASELINE']);
+  await learning.createLearningProfile(BASE, new Date().toISOString());
+  let profile = await learning.readLearningProfile(BASE);
+  assert.strictEqual(profile.globalSampleCounts.seedSamples, 0);
+  assert.strictEqual(profile.globalSampleCounts.totalSamples, 0);
+  assert.strictEqual(profile.source, 'REAL_ONLY');
   await learning.updateLearningProfileRealSample(BASE, 'Engine RPM', 800, 'IDLE_WARM');
-  const learned = await learning.readLearningProfile(BASE);
-  const learnedRpm = learned.contextualData.find((item) => item.condition === 'IDLE_WARM').statistics['Engine RPM'];
-  assert.strictEqual(learned.globalSampleCounts.realSamples, 1);
-  assert.ok(learnedRpm.mean > 778 && learnedRpm.mean < 800);
-  assert.deepStrictEqual(learnedRpm.source, ['CARSCANNER_BASELINE', 'REAL_OBD']);
-  assert.ok(Array.isArray(learnedRpm.medianWindow), 'mediana deve manter janela limitada de amostras');
-  assert.strictEqual(learnedRpm.median, 789, 'mediana do seed + primeira amostra real deve ser calculada de forma determinística');
+  profile = await learning.readLearningProfile(BASE);
+  assert.strictEqual(profile.globalSampleCounts.realSamples, 1);
+  assert.strictEqual(profile.globalSampleCounts.seedSamples, 0);
+  assert.strictEqual(profile.overallStatistics['Engine RPM'].mean, 800);
+  assert.deepStrictEqual(profile.overallStatistics['Engine RPM'].source, ['REAL_OBD']);
 
-  const overallRpm = learned.overallStatistics['Engine RPM'];
-  assert.ok(overallRpm, 'estatística global do PID deve ser atualizada');
-  assert.strictEqual(overallRpm.realSamples, 1);
-  assert.strictEqual(overallRpm.seedSamples, 1);
-  assert.strictEqual(overallRpm.confidence, 'LOW', 'seed não pode aumentar confiança baseada em amostras reais');
+  // Simula um perfil legado contaminado e verifica a purga sem perder estatística real limpa.
+  const profilePath = `${BASE}/APRENDIZADO/dna_meriva.json`;
+  const legacy = JSON.parse(files.get(profilePath));
+  legacy.source = 'HYBRID';
+  legacy.seedVersion = 'CARSCANNER_2026-09-24';
+  legacy.seedImportDate = '2026-09-24T14:48:00.000Z';
+  legacy.seedWeight = 0.25;
+  legacy.globalSampleCounts.seedSamples = 10;
+  legacy.globalSampleCounts.totalSamples = legacy.globalSampleCounts.realSamples + 10;
+  legacy.overallStatistics['Legacy contaminated PID'] = {
+    mean: 778, median: 778, min: 778, max: 800, stddev: 10,
+    samples: 2, realSamples: 1, seedSamples: 1, confidence: 'LOW',
+    lastUpdate: new Date().toISOString(), source: ['CARSCANNER_BASELINE', 'REAL_OBD'],
+    medianWindow: [778, 800],
+  };
+  files.set(profilePath, JSON.stringify(legacy));
+  const purged = await learning.purgeCarScannerHistory(BASE);
+  assert.strictEqual(purged.globalSampleCounts.seedSamples, 0);
+  assert.strictEqual(purged.globalSampleCounts.totalSamples, purged.globalSampleCounts.realSamples);
+  assert.strictEqual(purged.source, 'REAL_ONLY');
+  assert.ok(!purged.overallStatistics['Legacy contaminated PID'], 'estatística misturada deve ser descartada');
+  assert.strictEqual(purged.overallStatistics['Engine RPM'].mean, 800, 'estatística real limpa deve ser preservada');
 
-  const lateSeedBase = BASE + '/late-seed';
-  await learning.createLearningProfile(lateSeedBase, '');
-  await learning.updateLearningProfileRealSample(lateSeedBase, 'Engine RPM', 1000, 'IDLE_COLD');
-  await learning.initializeCarScannerSeed(lateSeedBase);
-  const lateSeed = await learning.readLearningProfile(lateSeedBase);
-  assert.strictEqual(lateSeed.learningStatus, 'COLD_START', 'seed tardio não pode rebaixar um aprendizado real em andamento');
-  assert.strictEqual(lateSeed.overallStatistics['Engine RPM'].realSamples, 1, 'seed tardio não pode apagar estatística real global');
-  assert.strictEqual(lateSeed.overallStatistics['Engine RPM'].mean, 1000, 'estatística real global deve sobreviver ao seed tardio');
 }
 
 async function testBluetoothConnectionCallbacks() {
@@ -810,6 +861,7 @@ async function testDriveCycleValidation() {
     version: '1.0',
     cycles: [
       { ...cycle, id: 'legacy-seed', source: 'CARSCANNER_SEED' },
+      { ...cycle, id: 'legacy-simulation', source: 'SIMULACAO' },
       cycle,
     ],
     totalCount: 2,
@@ -819,10 +871,57 @@ async function testDriveCycleValidation() {
 
   await storage.addDriveCycle(BASE, { ...cycle, id: 'test-2' });
   const migratedIndex = JSON.parse(files.get(indexFile));
-  assert.ok(migratedIndex.cycles.every((item) => item.source !== 'CARSCANNER_SEED'), 'adding a real trip must remove legacy seeds from active index');
+  assert.ok(migratedIndex.cycles.every((item) => item.source === 'REAL_OBD'), 'adding a real trip must remove seed and simulated cycles from the operational index');
 
+  // If the live index becomes malformed, restore the last-known-good backup
+  // instead of silently presenting an empty history.
   files.set(indexFile, JSON.stringify({ cycles: 'corrompido' }));
-  assert.deepStrictEqual(await storage.readDriveCycles(BASE), []);
+  const recovered = await storage.readDriveCycles(BASE);
+  assert.deepStrictEqual(recovered.map((item) => item.id).sort(), ['test-1', 'test-2']);
+  assert.deepStrictEqual(JSON.parse(files.get(indexFile)).cycles.map((item) => item.id).sort(), ['test-1', 'test-2']);
+
+  // Concurrent trip completions must serialize their read-modify-write cycle.
+  resetFS();
+  await Promise.all([
+    storage.addDriveCycle(BASE, { ...cycle, id: 'parallel-a' }),
+    storage.addDriveCycle(BASE, { ...cycle, id: 'parallel-b' }),
+  ]);
+  const concurrent = await storage.readDriveCycles(BASE);
+  assert.deepStrictEqual(concurrent.map((item) => item.id).sort(), ['parallel-a', 'parallel-b']);
+  await storage.addDriveCycle(BASE, { ...cycle, id: 'parallel-a' });
+  assert.strictEqual((await storage.readDriveCycles(BASE)).filter((item) => item.id === 'parallel-a').length, 1,
+    'retries with the same trip ID must be idempotent');
+  await assert.rejects(
+    storage.addDriveCycle(BASE, { ...cycle, id: 'forbidden-seed', source: 'CARSCANNER_SEED' }),
+    /NON_REAL_TRIP_NOT_ALLOWED/,
+  );
+  assert.ok(!(await storage.readDriveCycles(BASE)).some((item) => item.id === 'forbidden-seed'),
+    'CarScanner reference trips must be rejected at the persistence boundary');
+  await assert.rejects(
+    storage.addDriveCycle(BASE, { ...cycle, id: 'forbidden-simulation', source: 'SIMULACAO' }),
+    /NON_REAL_TRIP_NOT_ALLOWED/,
+  );
+  assert.ok(!(await storage.readDriveCycles(BASE)).some((item) => item.id === 'forbidden-simulation'),
+    'simulation trips must never enter the operational history');
+
+  // Recovery snapshot from JSON may contain a finalized trip absent from the
+  // index when Android interrupted finalization; reconcile it without duplicates.
+  resetFS();
+  await storage.initializeDriveCycles(BASE);
+  const recoveredTrip = { ...cycle, id: 'recovered-json-trip' };
+  const afterReconcile = await storage.reconcileDriveCycles(BASE, [recoveredTrip]);
+  assert.deepStrictEqual(afterReconcile.map((item) => item.id), ['recovered-json-trip']);
+  assert.deepStrictEqual((await storage.readDriveCycles(BASE)).map((item) => item.id), ['recovered-json-trip']);
+  await storage.reconcileDriveCycles(BASE, [recoveredTrip]);
+  assert.strictEqual((await storage.readDriveCycles(BASE)).filter((item) => item.id === 'recovered-json-trip').length, 1,
+    'reconciliation must be idempotent');
+
+  // A corrupt primary with no backup must never be replaced by an empty index.
+  resetFS();
+  const corruptContent = JSON.stringify({ cycles: 'corrompido' });
+  files.set(indexFile, corruptContent);
+  await assert.rejects(storage.addDriveCycle(BASE, cycle), /DRIVE_CYCLE_INDEX_UNREADABLE/);
+  assert.strictEqual(files.get(indexFile), corruptContent, 'unreadable history must remain preserved for manual recovery');
 
   resetFS();
   await storage.initializeDriveCycles(BASE);
@@ -881,11 +980,18 @@ async function testDriveCycleSummaryUsesWeightedRealSpeed() {
     avgFuelConsumptionKml: 0,
     fuelDataValid: false,
   };
-  const summary = driveCycles.getDriveCycleSummary([slowLongTrip, shortFastTrip, latestSeed, noFuelTrip]);
-  assert.strictEqual(summary.avgSpeedKmh, 20, 'aggregate speed must use all real distance / real moving time, even when fuel data is unavailable');
-  assert.strictEqual(summary.totalDistanceKm, 15, 'seed distance must not enter real totals, while fuel-incomplete real trips still count for distance');
+  const noMovingTimeTrip = {
+    ...slowLongTrip,
+    id: 'real-no-moving-time',
+    startedAt: '2026-10-03T10:00:00.000Z',
+    distanceTotalKm: 8,
+    drivingTimeHms: '00:00:00',
+  };
+  const summary = driveCycles.getDriveCycleSummary([slowLongTrip, shortFastTrip, latestSeed, noFuelTrip, noMovingTimeTrip]);
+  assert.strictEqual(summary.avgSpeedKmh, 20, 'trips without moving time must not inflate aggregate speed');
+  assert.strictEqual(summary.totalDistanceKm, 23, 'seed distance is excluded, but all real trip distance remains included');
   assert.strictEqual(summary.avgConsumptionKml, 12.5, 'trips without valid fuel data must not distort the consumption average');
-  assert.strictEqual(summary.realCycleCount, 3, 'fuel-incomplete real trips still count as real trips');
+  assert.strictEqual(summary.realCycleCount, 4, 'fuel-incomplete and movement-incomplete real trips remain in trip count');
   assert.strictEqual(summary.referenceCycleCount, 1);
   assert.strictEqual(summary.lastCycle.id, 'real-no-fuel', 'the latest operational cycle cannot be a seed');
   assert.strictEqual(summary.lastRealCycle.id, 'real-no-fuel');
@@ -906,6 +1012,25 @@ async function testDtcStorage() {
   });
   const dtcs = await dtcManager.readDtcs(BASE);
   assert.strictEqual(dtcs[0].code, 'P0133');
+
+  await assert.rejects(
+    dtcManager.recordDtc(BASE, {
+      code: 'P0420', status: 'CURRENT',
+      firstSeen: '2026-10-02T20:00:00.000Z', lastSeen: '2026-10-02T20:00:00.000Z',
+      occurrences: 1, source: 'CARSCANNER_BASELINE', historical: false,
+    }),
+    /NON_REAL_DTC_NOT_ALLOWED/,
+    'DTC importado não pode ser escrito no histórico operacional',
+  );
+  await assert.rejects(
+    dtcManager.recordDtc(BASE, {
+      code: 'BROKEN', status: 'CURRENT',
+      firstSeen: '2026-10-02T20:00:00.000Z', lastSeen: '2026-10-02T20:00:00.000Z',
+      occurrences: 1, source: 'REAL_OBD', historical: false,
+    }),
+    /INVALID_DTC_CODE/,
+    'código malformado não pode ser persistido',
+  );
 
   writeDelayMs = 25;
   await Promise.all([
@@ -933,6 +1058,47 @@ async function testDtcStorage() {
   writeDelayMs = 0;
   const concurrentDtcs = await dtcManager.readDtcs(BASE);
   assert.strictEqual(concurrentDtcs.length, 3, 'gravações concorrentes de DTC não podem perder registros');
+
+  const dtcPath = `${BASE}/DTC/dtc_records.txt`;
+  files.set(dtcPath, files.get(dtcPath) + [
+    'P0420|legado CarScanner|CURRENT|2026-10-01T00:00:00.000Z|2026-10-01T00:00:00.000Z|4|CARSCANNER_BASELINE|false|true',
+    'P0300|simulado|CURRENT|2026-10-01T00:00:00.000Z|2026-10-01T00:00:00.000Z|2|SIMULACAO|false|true',
+    'BADCODE|malformado|CURRENT|2026-10-01T00:00:00.000Z|2026-10-01T00:00:00.000Z|1|REAL_OBD|false|true',
+  ].join('\n') + '\n');
+  assert.strictEqual((await dtcManager.readDtcs(BASE)).length, 3,
+    'DTC importado, simulado e malformado não podem entrar na lista operacional');
+  await dtcManager.purgeLegacyNonRealDtcs(BASE);
+  const cleanedDtcText = files.get(dtcPath);
+  assert.ok(cleanedDtcText.includes('P0133|'), 'purga deve preservar DTC real');
+  assert.ok(!cleanedDtcText.includes('CARSCANNER_BASELINE'), 'purga deve remover proveniência seed');
+  assert.ok(!cleanedDtcText.includes('SIMULACAO'), 'purga deve remover DTC simulado');
+  assert.ok(!cleanedDtcText.includes('BADCODE'), 'purga deve remover DTC malformado');
+  assert.ok(files.get(dtcPath + '.previous').includes('P0133|'), 'backup de recuperação deve continuar válido após a purga');
+  assert.ok(!files.get(dtcPath + '.previous').includes('CARSCANNER_BASELINE'), 'backup operacional validado não deve reintroduzir seed após conclusão');
+}
+
+async function testMalformedLearningProfileRecovery() {
+  resetFS();
+  const learning = loadTs(path.join(ROOT, 'src/database/learningProfile.ts'));
+  const target = `${BASE}/APRENDIZADO/dna_meriva.json`;
+  const malformed = JSON.stringify({
+    vehicleId: 'MERIVA_MAXX',
+    globalSampleCounts: null,
+    confidenceThresholds: null,
+    contextualData: [null],
+    overallStatistics: { RPM: null },
+    source: 'HYBRID',
+  });
+  files.set(target, malformed);
+
+  assert.strictEqual(await learning.readLearningProfile(BASE), null,
+    'perfil de aprendizado parcial não deve passar pela validação como perfil operacional');
+  const recovered = await learning.createLearningProfile(BASE, '');
+  assert.strictEqual(recovered.source, 'REAL_ONLY');
+  assert.deepStrictEqual(recovered.globalSampleCounts, { seedSamples: 0, realSamples: 0, totalSamples: 0 });
+  assert.strictEqual(files.get(target + '.invalid'), malformed,
+    'o perfil inválido original deve ser preservado antes de criar um perfil frio seguro');
+  assert.strictEqual((await learning.readLearningProfile(BASE)).learningStatus, 'COLD_START');
 }
 
 async function testBackupCompleteness() {
@@ -977,6 +1143,89 @@ async function testCsvWriteSerialization() {
   assert.ok(content.includes('A,t1'));
   assert.ok(content.includes('B,t2'));
   assert.strictEqual(content.split('\n').filter(Boolean).length, 3);
+}
+
+async function testPidBankRealOnlyPurge() {
+  resetFS();
+  const pidBank = loadTs(path.join(ROOT, 'src/database/pidBank.ts'));
+  const target = `${BASE}/BANCO/pids_meriva_confirmados.txt`;
+  const realRow = '010C|RPM|PADRAO_OBD|CONFIRMADO|2026-10-01T10:00:00.000Z|2026-10-01T10:00:00.000Z|2|KWP|10|REAL_OBD|1';
+  const oldRows = [
+    realRow,
+    '0105|ECT baseline|PADRAO_OBD|CONFIRMADO|2026-10-01T10:00:00.000Z|2026-10-01T10:00:00.000Z|5|N/D|0|CARSCANNER_BASELINE|0.9',
+    '010D|simulated speed|PADRAO_OBD|CONFIRMADO|2026-10-01T10:00:00.000Z|2026-10-01T10:00:00.000Z|5|SIMULACAO|0|SIMULACAO|0.9',
+    '010B|imported MAP|PADRAO_OBD|DESCOBERTO|2026-10-01T10:00:00.000Z|2026-10-01T10:00:00.000Z|1|N/D|0|IMPORTADO|0',
+    'BADPID|invalid|PADRAO_OBD|RESPONDEU|2026-10-01T10:00:00.000Z|2026-10-01T10:00:00.000Z|1|KWP|10|REAL_OBD|1',
+  ];
+  files.set(target, oldRows.join('\n') + '\n');
+
+  const visibleBeforePurge = await pidBank.readPidConfirmations(BASE);
+  assert.deepStrictEqual(visibleBeforePurge.map((entry) => entry.pid), ['010C'],
+    'leitura operacional nunca deve expor PID seed, simulado, importado ou malformado');
+  await assert.rejects(
+    pidBank.recordPidConfirmation(BASE, {
+      pid: '0105', name: 'ECT', classification: 'PADRAO_OBD', status: 'CONFIRMADO',
+      firstSeen: '2026-10-01T10:00:00.000Z', lastSeen: '2026-10-01T10:00:00.000Z',
+      occurrences: 1, protocol: 'KWP', responseTime: 10, source: 'CARSCANNER_BASELINE', confidence: 1,
+    }),
+    /NON_REAL_PID_NOT_ALLOWED/,
+    'PID de baseline não pode ser gravado como confirmação operacional',
+  );
+
+  await pidBank.purgeLegacyNonRealPidConfirmations(BASE);
+  const cleaned = files.get(target);
+  assert.ok(cleaned.includes(realRow), 'purga deve preservar PID confirmado por ECU');
+  assert.ok(!/CARSCANNER_BASELINE|SIMULACAO|IMPORTADO|BADPID/.test(cleaned), 'purga deve remover todas as linhas não reais');
+  assert.ok(files.get(target + '.previous').includes(realRow), 'backup final deve refletir o banco já sanitizado');
+  assert.ok(!/CARSCANNER_BASELINE|SIMULACAO|IMPORTADO|BADPID/.test(files.get(target + '.previous')),
+    'backup não deve manter as entradas importadas após a purga confirmada');
+
+  await pidBank.recordDiscoveredPids(BASE, ['010D', 'BADPID', '01 05'], 'ISO 14230-4 KWP FAST');
+  const discovered = await pidBank.readPidConfirmations(BASE);
+  assert.deepStrictEqual(discovered.map((entry) => entry.pid), ['0105', '010C', '010D'],
+    'bitmap atual pode adicionar somente PIDs de formato válido com origem REAL_OBD');
+}
+
+async function testPidBankWriteRollback() {
+  resetFS();
+  const pidBank = loadTs(path.join(ROOT, 'src/database/pidBank.ts'));
+  const target = `${BASE}/BANCO/pids_meriva_confirmados.txt`;
+  const original = '010C|RPM|PADRAO_OBD|CONFIRMADO|2026-10-01T10:00:00.000Z|2026-10-01T10:00:00.000Z|2|KWP|10|REAL_OBD|1\n';
+  files.set(target, original);
+  failCopyToPath = target;
+
+  await assert.rejects(
+    pidBank.recordPidConfirmation(BASE, {
+      pid: '0105', name: 'ECT', classification: 'PADRAO_OBD', status: 'RESPONDEU',
+      firstSeen: '2026-10-15T10:00:00.000Z', lastSeen: '2026-10-15T10:00:00.000Z',
+      occurrences: 1, protocol: 'KWP', responseTime: 12, source: 'REAL_OBD', confidence: 1,
+    }),
+    /COPY IO FAILURE/,
+    'falha ao substituir o banco deve ser propagada depois de tentar rollback',
+  );
+  assert.strictEqual(files.get(target), original,
+    'falha na escrita final deve restaurar exatamente o banco anterior');
+  assert.strictEqual(files.get(target + '.previous'), original,
+    'backup deve conter a última versão válida durante rollback');
+  assert.ok(!files.has(target + '.tmp'),
+    'temporário deve ser removido após rollback confirmado');
+}
+
+async function testPersistablePidTimestampGuard() {
+  const database = loadTs(path.join(ROOT, 'src/storage/merivaDatabase.ts'));
+  const now = Date.parse('2026-10-15T12:00:00.000Z');
+  assert.strictEqual(database.isPersistablePidTimestamp('2026-10-15T11:59:30.000Z', now), true,
+    'amostra no limite de 30 s deve ser aceita');
+  assert.strictEqual(database.isPersistablePidTimestamp('2026-10-15T11:59:29.999Z', now), false,
+    'amostra com mais de 30 s deve ser descartada');
+  assert.strictEqual(database.isPersistablePidTimestamp('2026-10-15T12:00:05.000Z', now), true,
+    'pequena diferença de relógio futuro dentro de 5 s é tolerada');
+  assert.strictEqual(database.isPersistablePidTimestamp('2026-10-15T12:00:05.001Z', now), false,
+    'timestamp futuro além da tolerância não pode poluir a série temporal');
+  assert.strictEqual(database.isPersistablePidTimestamp('DATA-INVALIDA', now), false,
+    'timestamp inválido não deve virar uma amostra atual');
+  assert.strictEqual(database.isPersistablePidTimestamp('', now), false,
+    'timestamp vazio deve ser rejeitado');
 }
 
 async function testPidAndLearningWriteSerialization() {
@@ -1089,6 +1338,75 @@ function testPidResponseIsNotVehicleValidation() {
   assert.ok(integration.includes("status: prior?.status === 'CONFIRMADO' && prior.source === 'USER_REAL_OBSERVATION' ? 'CONFIRMADO' : 'RESPONDEU'"), 'resposta válida não deve promover automaticamente PID para confirmado');
   assert.ok(integration.includes('não valida a exatidão física do sensor'), 'o código deve documentar que resposta OBD não comprova exatidão elétrica do sensor');
 
+  const validation = loadTs(path.join(ROOT, 'src/meriva/autosaveValidation.ts'));
+  assert.strictEqual(validation.shouldFeedLearning('REAL', 'RESPONDEU', 123), true);
+  assert.strictEqual(validation.shouldFeedLearning('REAL', 'RESPONDEU', NaN), false, 'NaN não pode alimentar aprendizado');
+  assert.strictEqual(validation.shouldFeedLearning('REAL', 'RESPONDEU', Infinity), false, 'Infinity não pode alimentar aprendizado');
+  assert.strictEqual(validation.shouldFeedLearning('REAL', 'RESPONDEU', null), false);
+  assert.strictEqual(validation.shouldFeedLearning('SIMULACAO', 'RESPONDEU', 123), false);
+
+  const stateFactory = loadTs(path.join(ROOT, 'src/meriva/autosaveState.ts'));
+  const legacyState = stateFactory.createEmptyMerivaState();
+  legacyState.lastReadings = [
+    { pid: '010C', name: 'RPM', value: 1726, unit: 'rpm', status: 'RESPONDEU', timestamp: new Date().toISOString(), source: 'REAL' },
+    { pid: '0105', name: 'ECT imported', value: 90, unit: 'celsius', status: 'RESPONDEU', timestamp: new Date().toISOString(), source: 'IMPORTADO' },
+    { pid: '010B', name: 'MAP invalid', value: Infinity, unit: 'kpa', status: 'RESPONDEU', timestamp: new Date().toISOString(), source: 'REAL' },
+    { pid: '010C', name: 'RPM simulado', value: 1000, unit: 'rpm', status: 'RESPONDEU', timestamp: new Date().toISOString(), source: 'SIMULACAO' },
+  ];
+  legacyState.dtcs = [
+    { code: 'P0135', status: 'CURRENT', firstSeen: '', lastSeen: '', occurrences: 1, source: 'REAL_OBD', historical: false },
+    { code: 'BROKEN', status: 'CURRENT', firstSeen: '', lastSeen: '', occurrences: 1, source: 'REAL_OBD', historical: false },
+    null,
+  ];
+  legacyState.obd = null;
+  legacyState.settings = null;
+  legacyState.autonomy = {
+    tankCapacityL: Infinity, fuelLevelPercent: 150, fuelRemainingL: -1,
+    readings: [null, { id: 'imported', timestamp: new Date().toISOString(), distanceKm: 5, fuelUsedL: 1, consumptionKml: 5, estimatedRangeKm: 280, source: 'IMPORTADO' }],
+  };
+  legacyState.driveCycles = [{ id: 'malformed-real', source: 'REAL_OBD', distanceTotalKm: Infinity }];
+  legacyState.pidDiscovery = { supportedPids: ['010C', 'BOGUS', '01 05'], protocol: 'KWP', discoveredAt: new Date().toISOString() };
+  const hydrated = validation.hydrateState(legacyState);
+  assert.deepStrictEqual(hydrated.lastReadings.map((reading) => reading.source), ['REAL', 'SIMULACAO'],
+    'hidratação deve rejeitar origens desconhecidas e valores não finitos sem apagar dados reais/simulados válidos');
+  assert.deepStrictEqual(hydrated.dtcs.map((dtc) => dtc.code), ['P0135'],
+    'hidratação deve descartar DTC malformado sem remover registro real válido');
+  assert.deepStrictEqual(hydrated.obd, { connected: false }, 'snapshot com OBD nulo deve voltar a um estado desconectado seguro');
+  assert.deepStrictEqual(hydrated.settings, {}, 'configurações malformadas não devem quebrar a inicialização');
+  assert.strictEqual(hydrated.autonomy.tankCapacityL, 56, 'autonomia não pode aceitar capacidade não finita');
+  assert.strictEqual(hydrated.autonomy.fuelLevelPercent, null, 'nível fora da faixa 0–100 deve virar N/D');
+  assert.deepStrictEqual(hydrated.autonomy.readings, [], 'leituras de autonomia importadas não devem virar leituras reais');
+  assert.deepStrictEqual(hydrated.driveCycles, [], 'viagens malformadas não devem chegar à interface como viagens reais');
+  assert.deepStrictEqual(hydrated.pidDiscovery.supportedPids, ['010C', '0105'], 'cache de PIDs deve normalizar espaços e remover entradas inválidas');
+
+  const partialLearningState = stateFactory.createEmptyMerivaState();
+  partialLearningState.learning = {
+    vehicleId: 'MERIVA_MAXX',
+    source: 'HYBRID',
+    globalSampleCounts: null,
+    confidenceThresholds: null,
+    contextualData: [null, { condition: 'INVALID', statistics: null }],
+    overallStatistics: { BROKEN: null },
+  };
+  const partialLearningHydrated = validation.hydrateState(partialLearningState);
+  assert.strictEqual(partialLearningHydrated.learning.source, 'REAL_ONLY');
+  assert.strictEqual(partialLearningHydrated.learning.learningStatus, 'COLD_START');
+  assert.deepStrictEqual(partialLearningHydrated.learning.contextualData, []);
+  assert.deepStrictEqual(partialLearningHydrated.learning.overallStatistics, {});
+  assert.deepStrictEqual(partialLearningHydrated.learning.globalSampleCounts, { seedSamples: 0, realSamples: 0, totalSamples: 0 },
+    'perfil parcial não deve lançar erro nem restaurar contagens seed');
+  const invalidThresholdState = stateFactory.createEmptyMerivaState();
+  invalidThresholdState.learning = {
+    vehicleId: 'MERIVA_MAXX', source: 'HYBRID',
+    globalSampleCounts: { seedSamples: 500, realSamples: 12, totalSamples: 512 },
+    confidenceThresholds: { low: 20, medium: 1, good: 1, high: 1 },
+    contextualData: [], overallStatistics: {},
+  };
+  const safeThresholdHydrated = validation.hydrateState(invalidThresholdState);
+  assert.strictEqual(safeThresholdHydrated.learning.learningStatus, 'COLD_START',
+    'limiares corrompidos não podem promover um perfil com 12 leituras para CONFIDENT');
+  assert.deepStrictEqual(safeThresholdHydrated.learning.confidenceThresholds, { low: 20, medium: 20, good: 20, high: 20 });
+
   const runtime = loadTs(path.join(ROOT, 'src/meriva/autosaveIntegration.ts'));
   const basePath = '/doc/learning-throttle-regression';
   assert.strictEqual(runtime.shouldPersistRealPidSample(basePath, '010C', 1000), true);
@@ -1102,11 +1420,16 @@ function testPidResponseIsNotVehicleValidation() {
 }
 
 function testStorageScreenDoesNotPromoteSeedOrInvalidFuel() {
-  const storageScreen = fs.readFileSync(path.join(ROOT, 'app/armazenamento.tsx'), 'utf8');
-  assert.ok(storageScreen.includes("filter((cycle) => cycle.source === 'REAL_OBD')"), 'tela de histórico não deve apresentar viagens seed do Car Scanner como viagens do app');
-  assert.ok(storageScreen.includes("cycle.fuelDataValid !== false"), 'consumo precisa respeitar o indicador de confiabilidade');
-  assert.ok(storageScreen.includes("cycle.fuelUsedL >= 0.05"), 'consumo deve exigir volume de combustível válido');
-  assert.ok(storageScreen.includes("'Consumo: N/D'"), 'consumo inválido deve ser apresentado como N/D, nunca 0,00 km/L');
+  // A lista de viagens vive em app/viagens.tsx; app/armazenamento.tsx é a central de relatórios.
+  const tripsScreen = fs.readFileSync(path.join(ROOT, 'app/viagens.tsx'), 'utf8');
+  assert.ok(tripsScreen.includes("items.filter(cycle => cycle.source === 'REAL_OBD')"), 'tela de viagens não deve apresentar viagens seed do CarScanner como viagens do app');
+  assert.ok(tripsScreen.includes("cycle.fuelDataValid === false || cycle.fuelUsedL < 0.05 || cycle.avgFuelConsumptionKml <= 0 ? 'CONSUMO N/D'"), 'tela de viagens deve exibir N/D quando os dados de consumo não forem confiáveis');
+
+  // A exportação TXT também deve excluir viagens não reais e não inventar consumo.
+  const exports = fs.readFileSync(path.join(ROOT, 'src/storage/exportDiagnostics.ts'), 'utf8');
+  assert.ok(exports.includes(".filter((cycle) => cycle.source === 'REAL_OBD')"), 'relatórios TXT não devem promover viagens importadas como reais');
+  assert.ok(exports.includes("cycle.fuelDataValid === false || !Number.isFinite(cycle.fuelUsedL) || cycle.fuelUsedL < 0.05"), 'consumo no TXT deve respeitar a validação mínima de combustível');
+  assert.ok(exports.includes("return 'N/D'"), 'consumo inválido deve ser apresentado como N/D, nunca como zero presumido');
 }
 
 
@@ -1157,7 +1480,7 @@ async function main() {
     ['gate de validação ECU/010C', testEcuValidationGate],
     ['descoberta de PIDs', testPidScanner],
     ['IA burrinha de PIDs', testIntelligentPidDiscovery],
-    ['CarScanner baseline + PID 012F', testCarScannerBaselineAndFuel012F],
+    ['CarScanner baseline + PID 012F', testRealOnlyLearningAndFuel012F],
     ['Bluetooth callbacks', testBluetoothConnectionCallbacks],
     ['Bluetooth por eventos', testBluetoothEventTransport],
     ['quota configurável', testQuota],
@@ -1166,8 +1489,12 @@ async function main() {
     ['drive cycles', testDriveCycleValidation],
     ['resumo de velocidade real ponderado', testDriveCycleSummaryUsesWeightedRealSpeed],
     ['DTC persistência', testDtcStorage],
+    ['recuperação de perfil de aprendizado malformado', testMalformedLearningProfileRecovery],
     ['backup completo', testBackupCompleteness],
     ['CSV serializado', testCsvWriteSerialization],
+    ['PID bank real-only purge', testPidBankRealOnlyPurge],
+    ['PID bank rollback em falha de gravação', testPidBankWriteRollback],
+    ['frescor temporal de PID SQLite', testPersistablePidTimestampGuard],
     ['PID + DNA serializados', testPidAndLearningWriteSerialization],
     ['contratos de aquisição e persistência', testAcquisitionPolicyConsistency],
     ['PID respondeu não significa sensor validado', testPidResponseIsNotVehicleValidation],

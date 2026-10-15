@@ -30,68 +30,7 @@ export interface DriveCycle {
   importedAt: string;
 }
 
-export const INITIAL_DRIVE_CYCLES: DriveCycle[] = [
-  {
-    id: 'seed_cycle_2026_07_25_01',
-    startedAt: '2026-07-25 13:36:08',
-    finishedAt: '2026-07-25 14:06:49',
-    distanceTotalKm: 20.32,
-    distanceIceKm: 20.32,
-    fuelUsedL: 1.678,
-    totalTimeHms: '00:30:40',
-    drivingTimeHms: '00:28:22',
-    standingTimeHms: '00:02:18',
-    avgDrivingSpeedKmh: 42.977,
-    avgFuelConsumptionKml: 12.109,
-    source: 'CARSCANNER_SEED',
-    importedAt: '2026-09-29T00:00:00.000Z',
-  },
-  {
-    id: 'seed_cycle_2026_07_23_02',
-    startedAt: '2026-07-23 10:34:53',
-    finishedAt: '2026-07-23 10:39:25',
-    distanceTotalKm: 1.503,
-    distanceIceKm: 1.503,
-    fuelUsedL: 0.176,
-    totalTimeHms: '00:04:31',
-    drivingTimeHms: '00:03:55',
-    standingTimeHms: '00:00:36',
-    avgDrivingSpeedKmh: 23.004,
-    avgFuelConsumptionKml: 8.546,
-    source: 'CARSCANNER_SEED',
-    importedAt: '2026-09-29T00:00:00.000Z',
-  },
-  {
-    id: 'seed_cycle_2026_07_23_03',
-    startedAt: '2026-07-23 10:19:03',
-    finishedAt: '2026-07-23 10:27:15',
-    distanceTotalKm: 3.582,
-    distanceIceKm: 3.582,
-    fuelUsedL: 0.341,
-    totalTimeHms: '00:08:12',
-    drivingTimeHms: '00:07:29',
-    standingTimeHms: '00:00:43',
-    avgDrivingSpeedKmh: 28.716,
-    avgFuelConsumptionKml: 10.498,
-    source: 'CARSCANNER_SEED',
-    importedAt: '2026-09-29T00:00:00.000Z',
-  },
-  {
-    id: 'seed_cycle_2026_07_23_04',
-    startedAt: '2026-07-23 09:16:19',
-    finishedAt: '2026-07-23 09:27:02',
-    distanceTotalKm: 3.697,
-    distanceIceKm: 3.697,
-    fuelUsedL: 0.434,
-    totalTimeHms: '00:10:42',
-    drivingTimeHms: '00:08:08',
-    standingTimeHms: '00:02:33',
-    avgDrivingSpeedKmh: 27.226,
-    avgFuelConsumptionKml: 8.525,
-    source: 'CARSCANNER_SEED',
-    importedAt: '2026-09-29T00:00:00.000Z',
-  },
-];
+export const INITIAL_DRIVE_CYCLES: DriveCycle[] = [];
 
 export interface DriveCycleSummary {
   totalDistanceKm: number;
@@ -113,22 +52,36 @@ function durationHmsToMs(value: string): number {
 export function getDriveCycleSummary(cycles: DriveCycle[]): DriveCycleSummary {
   const realCycles = cycles.filter((cycle) => cycle.source === 'REAL_OBD');
   const referenceCycles = cycles.filter((cycle) => cycle.source === 'CARSCANNER_SEED');
-  const realDistanceKm = realCycles.reduce((sum, cycle) => sum + cycle.distanceTotalKm, 0);
+  // Keep total distance even when fuel telemetry or movement timing is
+  // invalid, but do not calculate economy from a trip with no positive moving
+  // time, no positive distance, non-finite values, or explicitly invalid fuel.
+  const realDistanceKm = realCycles.reduce((sum, cycle) =>
+    sum + (Number.isFinite(cycle.distanceTotalKm) && cycle.distanceTotalKm > 0 ? cycle.distanceTotalKm : 0),
+  0);
   const consumptionCycles = realCycles.filter((cycle) =>
-    cycle.fuelDataValid === false
-      ? false
-      : cycle.fuelUsedL >= 0.05 && cycle.avgFuelConsumptionKml > 0,
+    cycle.fuelDataValid !== false &&
+    Number.isFinite(cycle.distanceTotalKm) && cycle.distanceTotalKm > 0 &&
+    Number.isFinite(cycle.fuelUsedL) && cycle.fuelUsedL >= 0.05 &&
+    Number.isFinite(cycle.avgFuelConsumptionKml) && cycle.avgFuelConsumptionKml > 0 &&
+    durationHmsToMs(cycle.drivingTimeHms) > 0,
   );
   const realFuelL = consumptionCycles.reduce((sum, cycle) => sum + cycle.fuelUsedL, 0);
   const consumptionDistanceKm = consumptionCycles.reduce((sum, cycle) => sum + cycle.distanceTotalKm, 0);
-  const realMovingTimeMs = realCycles.reduce(
-    (sum, cycle) => sum + durationHmsToMs(cycle.drivingTimeHms),
+  // Only trips with a valid positive moving duration can contribute to an
+  // aggregate speed. A trip with distance but 00:00:00 movement must remain
+  // in the distance total, but cannot inflate km/h by adding distance to a
+  // denominator that does not include its elapsed time.
+  const tripsWithMovingTime = realCycles
+    .map((cycle) => ({ cycle, movingTimeMs: durationHmsToMs(cycle.drivingTimeHms) }))
+    .filter((item) => Number.isFinite(item.movingTimeMs) && item.movingTimeMs > 0);
+  const realMovingTimeMs = tripsWithMovingTime.reduce((sum, item) => sum + item.movingTimeMs, 0);
+  const realMovingDistanceKm = tripsWithMovingTime.reduce(
+    (sum, item) => sum + (Number.isFinite(item.cycle.distanceTotalKm) && item.cycle.distanceTotalKm > 0 ? item.cycle.distanceTotalKm : 0),
     0,
   );
-  // Aggregate velocity is total real distance / total real moving time.
-  // An unweighted mean gives a 1 km trip the same weight as a 20 km trip.
+  // Aggregate speed is a distance/time ratio, not an unweighted mean of trip averages.
   const realAvgSpeedKmh = realMovingTimeMs > 0
-    ? realDistanceKm / (realMovingTimeMs / 3_600_000)
+    ? realMovingDistanceKm / (realMovingTimeMs / 3_600_000)
     : 0;
 
   const visibleCycles = cycles.filter((cycle) => cycle.source !== 'CARSCANNER_SEED');

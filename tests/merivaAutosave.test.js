@@ -166,11 +166,35 @@ const fakeRN = {
   NativeModules: {},
 };
 
+// expo-sqlite is a native module; these Node-only tests exercise autosave
+// contracts, not SQLite itself. Return a no-op database so importing the module
+// never loads Expo's native/ESM implementation in Node.
+const fakeSQLiteDb = {
+  async execAsync() {},
+  async runAsync() { return { changes: 1, lastInsertRowId: 1 }; },
+  async getFirstAsync(sql) {
+    if (/PRAGMA user_version/i.test(sql)) return { user_version: 0 };
+    if (/PRAGMA page_count/i.test(sql)) return { page_count: 1 };
+    if (/PRAGMA page_size/i.test(sql)) return { page_size: 4096 };
+    if (/metadata_json/i.test(sql)) return { metadata_json: '{}' };
+    if (/COUNT\s*\(/i.test(sql)) {
+      const aliases = Array.from(sql.matchAll(/(?:COUNT|SUM|MAX)\s*\([^)]*\)\s+AS\s+([a-zA-Z_][a-zA-Z0-9_]*)/gi), (m) => m[1]);
+      return Object.fromEntries(aliases.map((alias) => [alias, 0]));
+    }
+    return null;
+  },
+  async getAllAsync() { return []; },
+  async withTransactionAsync(operation) { return operation(); },
+  async closeAsync() {},
+};
+const fakeSQLite = { async openDatabaseAsync() { return fakeSQLiteDb; } };
+
 // ---------- stub de resolução de módulos ----------
 const originalLoad = Module._load;
 Module._load = function (request, parent, isMain) {
   if (request === 'expo-file-system') return currentFS;
   if (request === 'react-native') return fakeRN;
+  if (request === 'expo-sqlite') return fakeSQLite;
   if (parent && parent.filename && (request.startsWith('./') || request.startsWith('../'))) {
     const resolved = path.resolve(path.dirname(parent.filename), request);
     if (fs.existsSync(resolved + '.ts')) return loadTs(resolved + '.ts');
@@ -434,7 +458,10 @@ test('7a. TXT antigo remove linhas CarScanner sem apagar os demais dados', async
   const cleaned = await history.readAutoSaveHistory(BASE);
   assert.ok(!cleaned.includes('CARSCANNER_SEED'), 'export must remove legacy seed trip lines');
   assert.ok(cleaned.includes('[HISTORY]\nN/D'), 'empty operational history must show N/D');
-  assert.ok(cleaned.includes('Amostras reais: 0 / seed: 10'), 'learning provenance must be preserved');
+  assert.ok(cleaned.includes('Histórico legado removido: estatísticas importadas não são evidência real.'),
+    'estatística de aprendizado misturada deve ser substituída por uma nota explícita');
+  assert.ok(!cleaned.includes('Amostras reais: 0 / seed: 10'),
+    'contadores de aprendizado contaminados não devem ser apresentados como estado operacional atual');
 });
 
 test('7b. histórico autosave elimina duplicatas legadas e serializa gravações concorrentes', async () => {

@@ -10,6 +10,7 @@ import BottomNavigation from '../src/ui/BottomNavigation';
 import { exportDiagnosticsTxt, exportDriveCyclesTxt } from '../src/storage/exportDiagnostics';
 import { DAILY_OBD_HISTORY_FILE } from '../src/meriva/dailyObdHistory';
 import { AUTOSAVE_HISTORY_FILE } from '../src/meriva/autosaveHistoryTxt';
+import { getSqliteStorageOverview, type SqliteStorageOverview } from '../src/storage/merivaDatabase';
 
 const DEFAULT_QUOTA: StorageQuotaConfig = { limitMb: 2048, warningThreshold: 0.9, cleanupTargetMb: 1536, autoCleanupEnabled: true };
 const MAX_PREVIEW_CHARS = 18000;
@@ -69,6 +70,8 @@ export default function ArmazenamentoScreen() {
   const [basePath, setBasePath] = useState<string | null>(null);
   const [quota, setQuota] = useState<{ warning: boolean; critical: boolean; message: string } | null>(null);
   const [usageBreakdown, setUsageBreakdown] = useState<Record<string, number>>({});
+  const [sqliteOverview, setSqliteOverview] = useState<SqliteStorageOverview | null>(null);
+  const [sqliteError, setSqliteError] = useState('');
   const [reports, setReports] = useState<TxtReport[]>([]);
   const [previewPath, setPreviewPath] = useState('');
   const [previewContent, setPreviewContent] = useState('');
@@ -79,6 +82,13 @@ export default function ArmazenamentoScreen() {
   const refresh = useCallback(async (path: string) => {
     const results = await Promise.all([checkStorageQuota(path, DEFAULT_QUOTA), getStorageBreakdown(path), listTxtReports(path)]);
     setQuota(results[0]); setUsageBreakdown(results[1]); setReports(results[2]);
+    try {
+      setSqliteOverview(await getSqliteStorageOverview());
+      setSqliteError('');
+    } catch (cause) {
+      setSqliteOverview(null);
+      setSqliteError(cause instanceof Error ? cause.message : 'Banco SQLite ainda indisponível.');
+    }
     return results[2];
   }, []);
   useEffect(() => {
@@ -177,6 +187,23 @@ export default function ArmazenamentoScreen() {
               <Text selectable style={styles.previewText}>{previewContent}</Text>
             </View>
           )}
+          <Text style={styles.sectionTitle}>BANCO OPERACIONAL SQLITE</Text>
+          <View style={styles.storageCard}>
+            {sqliteOverview ? (
+              <>
+                <View style={styles.storageRow}><Text style={styles.storageLabel}>Esquema do banco</Text><Text style={styles.storageValue}>v{sqliteOverview.schemaVersion}</Text></View>
+                <View style={styles.storageRow}><Text style={styles.storageLabel}>Tamanho do banco (SQLite)</Text><Text style={styles.storageValue}>{formatBytes(sqliteOverview.databaseSizeBytes)}</Text></View>
+                <View style={styles.storageRow}><Text style={styles.storageLabel}>Sessões ECU abertas</Text><Text style={styles.storageValue}>{sqliteOverview.openSessions}</Text></View>
+                <View style={styles.storageRow}><Text style={styles.storageLabel}>Amostras reais de PID</Text><Text style={styles.storageValue}>{sqliteOverview.recordedPidSamples}</Text></View>
+                <View style={styles.storageRow}><Text style={styles.storageLabel}>Eventos DTC registrados</Text><Text style={styles.storageValue}>{sqliteOverview.recordedDtcEvents}</Text></View>
+                <View style={styles.storageRow}><Text style={styles.storageLabel}>Testes de sensores</Text><Text style={styles.storageValue}>{sqliteOverview.recordedSensorTests}</Text></View>
+                <View style={styles.storageRow}><Text style={styles.storageLabel}>Viagens reais</Text><Text style={styles.storageValue}>{sqliteOverview.recordedRealTrips}</Text></View>
+                <View style={styles.storageRow}><Text style={styles.storageLabel}>Achados diagnósticos</Text><Text style={styles.storageValue}>{sqliteOverview.recordedDiagnosticFindings}</Text></View>
+                <View style={styles.storageRow}><Text style={styles.storageLabel}>PIDs aprendidos (reais)</Text><Text style={styles.storageValue}>{sqliteOverview.learnedPids}</Text></View>
+              </>
+            ) : <Text style={styles.note}>{sqliteError || 'Consultando o banco local…'}</Text>}
+            <Text style={styles.note}>Contadores internos; simulação e histórico CarScanner não entram nas evidências reais.</Text>
+          </View>
           <Text style={styles.sectionTitle}>USO DO ARMAZENAMENTO</Text>
           <View style={styles.storageCard}>
             {Object.entries(usageBreakdown).map(([directory, sizeMb]) => (

@@ -58,6 +58,12 @@ function main() {
 
   result = engine.runLocalDiagnostic({
     ...base,
+    dtcs: [null, { code: 'NOT_A_DTC', status: 'CURRENT', firstSeen: '', lastSeen: '', occurrences: 1, source: 'REAL_OBD', historical: false }],
+  });
+  assert.strictEqual(result.hypotheses.length, 0, 'DTC malformado ou entrada nula não pode derrubar a Central de Saúde');
+
+  result = engine.runLocalDiagnostic({
+    ...base,
     observations: [obs('0106', 10), obs('0107', 4)],
   });
   assert.strictEqual(result.hypotheses.length, 0);
@@ -92,6 +98,24 @@ function main() {
     observations: [obs('010B', 80, 'CARSCANNER_BASELINE')],
   });
   assert.strictEqual(result.hypotheses.length, 0, 'baseline CarScanner não pode virar diagnóstico de ECU atual');
+
+  result = engine.runLocalDiagnostic({
+    ...base,
+    observations: [{ ...obs('010B', 80), timestamp: new Date(Date.now() - engine.MAX_DIAGNOSTIC_PID_AGE_MS - 1000).toISOString() }],
+  });
+  assert.strictEqual(result.hypotheses.length, 0, 'leitura antiga não pode continuar gerando hipótese após perder frescor');
+
+  result = engine.runLocalDiagnostic({
+    ...base,
+    observations: [obs('010B', NaN)],
+  });
+  assert.strictEqual(result.hypotheses.length, 0, 'valor não finito não pode gerar hipótese diagnóstica');
+
+  result = engine.runLocalDiagnostic({
+    ...base,
+    observations: [{ ...obs('010B', 80), status: 'NÃO RESPONDEU' }],
+  });
+  assert.strictEqual(result.hypotheses.length, 0, 'status sem resposta não pode usar um valor numérico antigo como evidência');
 
 
 

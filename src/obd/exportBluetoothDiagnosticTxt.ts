@@ -64,9 +64,10 @@ function buildLocalDiagnostic(): DiagnosticResult {
     name: reading.name,
     value: reading.value,
     unit: reading.unit,
-    source: reading.source === 'SIMULACAO' ? 'SIMULACAO' : 'REAL_OBD',
+    source: reading.source === 'REAL' ? 'REAL_OBD' : reading.source === 'SIMULACAO' ? 'SIMULACAO' : 'IMPORTADO',
+      status: reading.status,
     timestamp: reading.timestamp,
-    confidence: reading.source === 'SIMULACAO' ? 'LOW' : 'GOOD',
+    confidence: reading.source === 'REAL' ? 'GOOD' : 'LOW',
   }));
   return runLocalDiagnostic({ observations, dtcs: state.dtcs, condition: 'UNKNOWN' });
 }
