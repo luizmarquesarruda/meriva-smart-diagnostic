@@ -825,6 +825,7 @@ async function testDriveCycleValidation() {
     version: '1.0',
     cycles: [
       { ...cycle, id: 'legacy-seed', source: 'CARSCANNER_SEED' },
+      { ...cycle, id: 'legacy-simulation', source: 'SIMULACAO' },
       cycle,
     ],
     totalCount: 2,
@@ -834,7 +835,7 @@ async function testDriveCycleValidation() {
 
   await storage.addDriveCycle(BASE, { ...cycle, id: 'test-2' });
   const migratedIndex = JSON.parse(files.get(indexFile));
-  assert.ok(migratedIndex.cycles.every((item) => item.source !== 'CARSCANNER_SEED'), 'adding a real trip must remove legacy seeds from active index');
+  assert.ok(migratedIndex.cycles.every((item) => item.source === 'REAL_OBD'), 'adding a real trip must remove seed and simulated cycles from the operational index');
 
   // If the live index becomes malformed, restore the last-known-good backup
   // instead of silently presenting an empty history.
@@ -856,10 +857,16 @@ async function testDriveCycleValidation() {
     'retries with the same trip ID must be idempotent');
   await assert.rejects(
     storage.addDriveCycle(BASE, { ...cycle, id: 'forbidden-seed', source: 'CARSCANNER_SEED' }),
-    /CARSCANNER_SEED_NOT_ALLOWED/,
+    /NON_REAL_TRIP_NOT_ALLOWED/,
   );
   assert.ok(!(await storage.readDriveCycles(BASE)).some((item) => item.id === 'forbidden-seed'),
     'CarScanner reference trips must be rejected at the persistence boundary');
+  await assert.rejects(
+    storage.addDriveCycle(BASE, { ...cycle, id: 'forbidden-simulation', source: 'SIMULACAO' }),
+    /NON_REAL_TRIP_NOT_ALLOWED/,
+  );
+  assert.ok(!(await storage.readDriveCycles(BASE)).some((item) => item.id === 'forbidden-simulation'),
+    'simulation trips must never enter the operational history');
 
   // A corrupt primary with no backup must never be replaced by an empty index.
   resetFS();
