@@ -49,14 +49,21 @@ function deduplicateEntries(entries: string[]): string[] {
 
 /** Remove imported seed trips from old snapshots before displaying/exporting them. */
 function removeCarScannerTripsFromSnapshot(entry: string): string {
-  const match = entry.match(/(\[HISTORY\]\r?\n)([\s\S]*?)(?=\r?\n\[[^\]\r\n]+\]|$)/);
-  if (!match) return entry;
+  // Remove também a proveniência e as amostras seed em snapshots antigos,
+  // não apenas as linhas de viagens importadas.
+  const withoutSeedLines = entry
+    .split(/\r?\n/)
+    .filter((line) => !/CARSCANNER|seed_cycle_|seedSamples|seedVersion|seedWeight|fonte=HYBRID/i.test(line))
+    .join('\n');
+
+  const match = withoutSeedLines.match(/(\[HISTORY\]\r?\n)([\s\S]*?)(?=\r?\n\[[^\]\r\n]+\]|$)/);
+  if (!match) return withoutSeedLines;
 
   const rows = match[2]
     .split(/\r?\n/)
-    .filter((line) => line.trim() && !/fonte=CARSCANNER_SEED|seed_cycle_/i.test(line));
+    .filter((line) => line.trim() && !/seed/i.test(line));
   const historyBody = rows.length ? rows.join('\n') : 'N/D';
-  return entry.replace(match[0], match[1] + historyBody);
+  return withoutSeedLines.replace(match[0], match[1] + historyBody);
 }
 
 async function readAutoSaveHistoryUnsafe(basePath: string): Promise<string> {
