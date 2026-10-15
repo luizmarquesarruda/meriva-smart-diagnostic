@@ -57,7 +57,7 @@ const INITIAL_STATE: AutoTripServiceState = {
   instantaneousConsumptionTimestampMs: null,
   instantaneousSpeedKmh: null,
   activeFuelType: null,
-  error: null;
+  error: null,
   averageConsumptionKml: 0,
   estimatedRangeKm: 0,
 };
