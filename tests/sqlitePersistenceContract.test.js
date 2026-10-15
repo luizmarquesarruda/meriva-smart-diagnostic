@@ -69,7 +69,7 @@ assert.match(database, /activeSessionId = null;[\s\S]*lastPidSampleAt\.clear\(\)
 assert.match(tripStorage, /serializeIndexOperation/, 'gravações simultâneas de viagens devem ser serializadas');
 assert.match(tripStorage, /DRIVE_CYCLE_INDEX_UNREADABLE/, 'histórico corrompido sem backup não pode ser substituído silenciosamente');
 assert.match(tripStorage, /writeIndexSafely/, 'índice de viagens deve usar staging, validação e recuperação');
-assert.match(tripStorage, /CARSCANNER_SEED_NOT_ALLOWED_IN_OPERATIONAL_TRIP_HISTORY/, 'seed CarScanner não pode ser escrito no histórico operacional');
+assert.match(tripStorage, /NON_REAL_TRIP_NOT_ALLOWED_IN_OPERATIONAL_HISTORY/, 'histórico operacional só aceita viagens reais');
 assert.match(autoTripService, /pendingFinalizedTrips/, 'viagem pendente de persistência deve ficar retida para nova tentativa');
 assert.match(autoTripService, /AUTOSAVE_DA_VIAGEM_NAO_CONFIRMADO/, 'viagem não pode sair da fila antes de confirmar autosave');
 assert.match(database, /persistDiagnosticFindings\(/, 'achados da IA local devem ser persistidos');
