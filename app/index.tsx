@@ -13,6 +13,7 @@ import type { ObdConnectionState } from '../src/meriva/autosaveState';
 import { gpsTracker, type GpsTripState } from '../src/gps';
 import { ensureMerivaVehicleProfile } from '../src/database/vehicleConfig';
 import { purgeLegacyNonRealDtcs } from '../src/database/dtcManager';
+import { purgeLegacyNonRealPidConfirmations } from '../src/database/pidBank';
 import { createLearningProfile, purgeCarScannerHistory, readLearningProfile } from '../src/database/learningProfile';
 import { readAppSettings, type AppSettings } from '../src/database/appSettings';
 import { connectPreferredElm, getSharedObdConnection, getSharedObdLastError, getSharedObdStatus, subscribeSharedObd, subscribeSharedObdStatus } from '../src/obd/sharedConnection';
@@ -70,6 +71,11 @@ export default function IndexScreen() {
         await purgeLegacyNonRealDtcs(basePath);
       } catch (cause) {
         console.warn('[dtc] purga do histórico legado adiada; arquivo preservado:', cause instanceof Error ? cause.message : cause);
+      }
+      try {
+        await purgeLegacyNonRealPidConfirmations(basePath);
+      } catch (cause) {
+        console.warn('[pid-bank] purga de entradas não reais adiada; arquivo preservado:', cause instanceof Error ? cause.message : cause);
       }
 
       // Trip-index damage must not block settings/vehicle hydration. The JSON
