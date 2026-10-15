@@ -2762,7 +2762,7 @@ Em `app/dados.tsx`, “ÚLTIMAS LEITURAS REAIS” agora só lista itens com `sou
 
 
 ### Aperfeiçoamento após revisão conceitual da referência
-A comparação de um trecho instantâneo com a média de uma viagem inteira pode confundir trânsito/cidade/estrada com eficiência. A referência pessoal agora exige também velocidade média histórica aproximadamente compatível com a velocidade do trecho atual (faixa relativa inicial máxima de 50%), além de mesma fonte de taxa e tipo de combustível. O parâmetro está em `fuel_coach_policy.json`. Se não houver viagens comparáveis suficientes, o coach permanece em “Calibrando”. A referência é uma comparação informativa, não uma medição controlada do estilo de condução nem um diagnóstico mecânico.
+A comparação de um trecho instantâneo com a média de uma viagem inteira pode confundir trânsito/cidade/estrada com eficiência. A referência pessoal agora exige também velocidade média histórica aproximadamente compatível com a velocidade do trecho atual (faixa relativa inicial máxima de 35%), além de mesma fonte de taxa e tipo de combustível. O parâmetro está em `fuel_coach_policy.json`. Se não houver viagens comparáveis suficientes, o coach permanece em “Calibrando”. A referência é uma comparação informativa, não uma medição controlada do estilo de condução nem um diagnóstico mecânico.
 
 
 ### Desconexão/ECU sem resposta
@@ -2771,3 +2771,7 @@ O loop do serviço agora zera instantaneamente valor de consumo, fonte, timestam
 
 ### Barreira de sessão para a janela do coach
 A janela em memória agora registra o instante em que a ECU passou a responder na sessão corrente. Uma leitura só pode entrar se o timestamp original da taxa for igual ou posterior a esse instante. Assim, uma reconexão rápida não reutiliza um timestamp da sessão anterior mesmo se o reset assíncrono do loop chegar depois do evento de reconexão. O teste de contrato foi ampliado; não foi executada CI.
+
+
+### Ajuste conservador de velocidade
+Os limites configurados foram estreitados para dispersão absoluta máxima de 10 km/h, dispersão relativa máxima de 25% e diferença máxima de 35% entre a velocidade do trecho e a média das viagens usadas na referência. O objetivo é recusar comparações potencialmente incompatíveis, ainda que isso mantenha mais sessões em “Trecho instável” ou “Calibrando”. Os valores são parâmetros iniciais e precisam ser avaliados em viagens reais.
