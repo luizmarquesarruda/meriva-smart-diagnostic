@@ -508,8 +508,9 @@ class AutoTripService {
         if (moving) {
           this.stoppedSinceMs = null;
           if (!this.recorder) {
-            this.recorderFuelType = this.fuelType;
-            this.recorder = new RealTripRecorder(Date.now(), gps.distanceKm, this.recorderFuelType);
+            const tripFuelType = this.fuelType;
+            this.recorderFuelType = tripFuelType;
+            this.recorder = new RealTripRecorder(Date.now(), gps.distanceKm, tripFuelType);
           }
         } else if (this.recorder) {
           this.stoppedSinceMs ??= Date.now();
