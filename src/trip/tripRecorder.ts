@@ -60,6 +60,7 @@ function toFiniteNonNegative(value: number): number {
 
 export class RealTripRecorder {
   private readonly startedAtMs: number;
+  private readonly fuelType: DriveCycle['fuelType'];
   private lastAbsoluteDistanceKm: number;
   private readonly fuelIntegrator = new FuelRateIntegrator();
   private lastTimestampMs: number | null = null;
@@ -71,8 +72,9 @@ export class RealTripRecorder {
   private telemetrySamples: TripTelemetrySample[] = [];
   private lastTelemetrySampleAtMs: number | null = null;
 
-  constructor(startedAtMs = Date.now(), initialDistanceKm = 0) {
+  constructor(startedAtMs = Date.now(), initialDistanceKm = 0, fuelType?: DriveCycle['fuelType']) {
     this.startedAtMs = startedAtMs;
+    this.fuelType = fuelType;
     this.lastAbsoluteDistanceKm = toFiniteNonNegative(initialDistanceKm);
   }
 
@@ -183,6 +185,7 @@ export class RealTripRecorder {
       avgFuelConsumptionKml: Number(avgFuelConsumptionKml.toFixed(3)),
       maxSpeedKmh: Number(state.maxSpeedKmh.toFixed(1)),
       telemetrySamples: state.telemetrySamples,
+      fuelType: this.fuelType,
       fuelDataValid,
       source: 'REAL_OBD',
       fuelRateSource: this.fuelRateSources.size === 1
