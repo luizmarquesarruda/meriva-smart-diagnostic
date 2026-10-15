@@ -58,6 +58,12 @@ function main() {
 
   result = engine.runLocalDiagnostic({
     ...base,
+    dtcs: [null, { code: 'NOT_A_DTC', status: 'CURRENT', firstSeen: '', lastSeen: '', occurrences: 1, source: 'REAL_OBD', historical: false }],
+  });
+  assert.strictEqual(result.hypotheses.length, 0, 'DTC malformado ou entrada nula não pode derrubar a Central de Saúde');
+
+  result = engine.runLocalDiagnostic({
+    ...base,
     observations: [obs('0106', 10), obs('0107', 4)],
   });
   assert.strictEqual(result.hypotheses.length, 0);
