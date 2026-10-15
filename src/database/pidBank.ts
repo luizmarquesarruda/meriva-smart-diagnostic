@@ -94,14 +94,124 @@ async function readPidConfirmationsUnlocked(basePath: string): Promise<PidConfir
 }
 
 async function writeCompactFile(target: string, entries: PidConfirmationEntry[]): Promise<void> {
-  const compact = entries
-    .filter((entry) => entry.pid)
+  const normalized = entries.map((entry) => ({
+    ...entry,
+    pid: entry.pid.replace(/\\s/g, '').toUpperCase(),
+  }));
+  if (normalized.some((entry) => entry.source !== 'REAL_OBD')) {
+    throw new Error('NON_REAL_PID_NOT_ALLOWED_IN_OPERATIONAL_BANK');
+  }
+  if (normalized.some((entry) => !/^[0-9A-F]{4}$/.test(entry.pid))) {
+    throw new Error('INVALID_PID_CONFIRMATION_ID');
+  }
+
+  const compact = normalized
     .sort((a, b) => a.pid.localeCompare(b.pid))
     .map(compactLine)
-    .join('\n');
-  await FileSystem.writeAsStringAsync(target, compact ? compact + '\n' : '', {
-    encoding: FileSystem.EncodingType.UTF8,
-  });
+    .join('\\n');
+  const output = compact ? compact + '\\n' : '';
+  const tempPath = target + '.tmp';
+  const backupPath = target + '.previous';
+  const targetInfo = await FileSystem.getInfoAsync(target);
+  if (targetInfo.exists && targetInfo.isDirectory) throw new Error('PID_BANK_IS_DIRECTORY');
+
+  let previousContent: string | null = null;
+  let committed = false;
+  try {
+    // A escrita só toca no alvo depois de o staging ser lido de volta e validado.
+    await FileSystem.writeAsStringAsync(tempPath, output, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
+    const staged = await FileSystem.readAsStringAsync(tempPath, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
+    const stagedEntries = staged.split(/\\r?\\n/).filter((line) => line.trim()).map(parsePidConfirmationLine);
+    if (
+      staged !== output ||
+      stagedEntries.length !== normalized.length ||
+      stagedEntries.some((entry) => !entry || entry.source !== 'REAL_OBD')
+    ) {
+      throw new Error('PID_BANK_WRITE_STAGING_FAILED');
+    }
+
+    if (targetInfo.exists) {
+      previousContent = await FileSystem.readAsStringAsync(target, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+      // Backup validado antes de iniciar a substituição do arquivo operacional.
+      await FileSystem.writeAsStringAsync(backupPath, previousContent, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+      const backupReadBack = await FileSystem.readAsStringAsync(backupPath, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+      if (backupReadBack !== previousContent) throw new Error('PID_BANK_BACKUP_VALIDATION_FAILED');
+    }
+
+    try {
+      await FileSystem.copyAsync({ from: tempPath, to: target });
+      const readBack = await FileSystem.readAsStringAsync(target, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+      const committedEntries = readBack.split(/\\r?\\n/).filter((line) => line.trim()).map(parsePidConfirmationLine);
+      if (
+        readBack !== output ||
+        committedEntries.length !== normalized.length ||
+        committedEntries.some((entry) => !entry || entry.source !== 'REAL_OBD')
+      ) {
+        throw new Error('PID_BANK_WRITE_COMMIT_FAILED');
+      }
+      committed = true;
+
+      // Atualiza a cópia de recuperação somente depois de o alvo estar confirmado.
+      // Uma falha nessa cópia não invalida o arquivo operacional recém-validado;
+      // a próxima escrita voltará a proteger o alvo antes de substituí-lo.
+      try {
+        await FileSystem.writeAsStringAsync(backupPath, output, {
+          encoding: FileSystem.EncodingType.UTF8,
+        });
+        const backupReadBack = await FileSystem.readAsStringAsync(backupPath, {
+          encoding: FileSystem.EncodingType.UTF8,
+        });
+        if (backupReadBack !== output) throw new Error('PID_BANK_BACKUP_REFRESH_FAILED');
+      } catch {
+        // O alvo principal já passou na leitura de confirmação.
+      }
+    } catch (cause) {
+      if (previousContent !== null) {
+        try {
+          await FileSystem.copyAsync({ from: backupPath, to: target });
+          const restored = await FileSystem.readAsStringAsync(target, {
+            encoding: FileSystem.EncodingType.UTF8,
+          });
+          if (restored !== previousContent) throw new Error('PID_BANK_ROLLBACK_CONTENT_MISMATCH');
+        } catch (rollbackCause) {
+          const originalMessage = cause instanceof Error ? cause.message : String(cause);
+          const rollbackMessage = rollbackCause instanceof Error ? rollbackCause.message : String(rollbackCause);
+          throw new Error(
+            'PID_BANK_WRITE_ROLLBACK_FAILED: ' + rollbackMessage +
+            '; causa original: ' + originalMessage +
+            '; cópia recuperável: ' + backupPath,
+          );
+        }
+      } else {
+        try {
+          await FileSystem.deleteAsync(target, { idempotent: true });
+        } catch {
+          // Sem alvo anterior; o staging continua sendo a cópia validada disponível.
+        }
+      }
+      throw cause;
+    }
+  } finally {
+    try {
+      await FileSystem.deleteAsync(tempPath, { idempotent: true });
+    } catch {
+      // Temp residual é sobrescrito na próxima tentativa; não substituir o alvo por conteúdo incerto.
+    }
+  }
+
+  if (!committed) throw new Error('PID_BANK_WRITE_NOT_CONFIRMED');
 }
 
 export async function recordPidConfirmation(
