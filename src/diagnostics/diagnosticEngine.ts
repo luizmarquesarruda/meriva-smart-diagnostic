@@ -21,9 +21,20 @@ const ACTIVE_DTC_STATUSES = new Set(['CONFIRMED', 'PENDING', 'PERMANENT', 'CURRE
 function isSimulation(item: PidObservation): boolean { return String(item.source ?? '').trim().toUpperCase() === 'SIMULACAO'; }
 function isLiveObd(item: PidObservation): boolean { return String(item.source ?? '').trim().toUpperCase() === 'REAL_OBD'; }
 
-function pidValue(observations: PidObservation[], pid: string): PidObservation | undefined {
+/** PID evidence must be numerical, responded and recent. A cached reading
+ * cannot keep generating a live fault after the ECU stopped communicating. */
+export const MAX_DIAGNOSTIC_PID_AGE_MS = 30_000;
+
+function pidValue(observations: PidObservation[], pid: string, nowMs = Date.now()): PidObservation | undefined {
   return observations
-    .filter((item) => item.pid.toUpperCase() === pid.toUpperCase() && item.value !== null && isLiveObd(item))
+    .filter((item) => {
+      if (item.pid.toUpperCase() !== pid.toUpperCase() || !isLiveObd(item)) return false;
+      if (typeof item.value !== 'number' || !Number.isFinite(item.value)) return false;
+      if (item.status !== undefined && item.status !== 'RESPONDEU') return false;
+      const timestampMs = Date.parse(item.timestamp);
+      const ageMs = nowMs - timestampMs;
+      return Number.isFinite(timestampMs) && ageMs >= 0 && ageMs <= MAX_DIAGNOSTIC_PID_AGE_MS;
+    })
     .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))[0];
 }
 
