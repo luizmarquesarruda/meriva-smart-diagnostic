@@ -1157,7 +1157,7 @@ async function main() {
     ['gate de validação ECU/010C', testEcuValidationGate],
     ['descoberta de PIDs', testPidScanner],
     ['IA burrinha de PIDs', testIntelligentPidDiscovery],
-    ['CarScanner baseline + PID 012F', testCarScannerBaselineAndFuel012F],
+    ['CarScanner baseline + PID 012F', testRealOnlyLearningAndFuel012F],
     ['Bluetooth callbacks', testBluetoothConnectionCallbacks],
     ['Bluetooth por eventos', testBluetoothEventTransport],
     ['quota configurável', testQuota],
