@@ -271,8 +271,9 @@ export function hydrateState(payload: MerivaPersistedState): MerivaPersistedStat
         const seedSamples = finiteNonNegative(stat.seedSamples);
         const statRealSamples = Math.floor(finiteNonNegative(stat.realSamples));
         const sources = Array.isArray(stat.source) ? stat.source : [];
-        // Mixed statistics cannot be separated safely; keep only proven REAL_OBD.
-        if (seedSamples > 0 || sources.includes('CARSCANNER_BASELINE')) continue;
+        // Mixed/unknown statistics cannot be separated safely. Keep a statistic
+        // only when every listed source is explicitly REAL_OBD and no seed count exists.
+        if (seedSamples > 0 || sources.some((source) => source !== 'REAL_OBD')) continue;
         if (statRealSamples <= 0 || !sources.includes('REAL_OBD')) continue;
 
         const mean = stat.mean;
