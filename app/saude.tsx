@@ -20,6 +20,12 @@ export default function SaudeScreen() {
   const diagnostic: DiagnosticResult = useMemo(()=>runLocalDiagnostic({observations:state.lastReadings.map(r=>({pid:r.pid,name:r.name,value:r.value,unit:r.unit,source:r.source==='SIMULACAO'?'SIMULACAO':'REAL_OBD',timestamp:r.timestamp,confidence:r.source==='SIMULACAO'?'LOW':'GOOD'} as PidObservation)),dtcs:state.dtcs,condition:context.condition}),[state,context.condition]);
   const sessionId = getActiveSqliteSessionId();
   const lastPersistedFindingSignature = useRef('');
+  const lastPersistedFindingAt = useRef(0);
+  const inFlightFindingSignature = useRef('');
+  const retryFindingsAfter = useRef(0);
+  // Valores numéricos oscilam continuamente. A assinatura considera a estrutura
+  // da evidência; valores são atualizados no banco no máximo a cada 30 segundos,
+  // exceto quando muda a hipótese, a confiança ou a composição da evidência.
   const findingSignature = JSON.stringify({
     sessionId,
     hypotheses: diagnostic.hypotheses.map((hypothesis) => ({
@@ -27,15 +33,28 @@ export default function SaudeScreen() {
       label: hypothesis.label,
       score: hypothesis.score,
       confidence: hypothesis.confidence,
-      evidence: hypothesis.evidence,
       nextTests: hypothesis.nextTests,
+      evidence: hypothesis.evidence.map((item) => ({
+        ruleId: item.ruleId,
+        source: item.source,
+        pid: item.pid,
+        dtc: item.dtc,
+      })),
     })),
   });
   useEffect(() => {
-    if (lastPersistedFindingSignature.current === findingSignature) return;
-    lastPersistedFindingSignature.current = findingSignature;
-    if (!diagnostic.hypotheses.length) return;
+    const now = Date.now();
+    const signatureChanged = lastPersistedFindingSignature.current !== findingSignature;
+    const refreshDue = now - lastPersistedFindingAt.current >= 30_000;
+    if (!signatureChanged && !refreshDue) return;
+    if (!diagnostic.hypotheses.length) {
+      lastPersistedFindingSignature.current = findingSignature;
+      lastPersistedFindingAt.current = now;
+      return;
+    }
+    if (now < retryFindingsAfter.current || inFlightFindingSignature.current === findingSignature) return;
 
+    inFlightFindingSignature.current = findingSignature;
     void persistDiagnosticFindings(
       diagnostic.hypotheses.map((hypothesis) => ({
         id: hypothesis.id,
@@ -46,10 +65,16 @@ export default function SaudeScreen() {
         nextTests: hypothesis.nextTests,
       })),
       sessionId,
-    ).catch((cause) => {
-      // Permite nova tentativa no próximo render se a falha for transitória.
-      if (lastPersistedFindingSignature.current === findingSignature) {
-        lastPersistedFindingSignature.current = '';
+    ).then(() => {
+      if (inFlightFindingSignature.current !== findingSignature) return;
+      lastPersistedFindingSignature.current = findingSignature;
+      lastPersistedFindingAt.current = Date.now();
+      inFlightFindingSignature.current = '';
+      retryFindingsAfter.current = 0;
+    }).catch((cause) => {
+      if (inFlightFindingSignature.current === findingSignature) {
+        inFlightFindingSignature.current = '';
+        retryFindingsAfter.current = Date.now() + 5_000;
       }
       console.warn('[sqlite] não foi possível salvar achados da Central de Saúde:', cause instanceof Error ? cause.message : cause);
     });
