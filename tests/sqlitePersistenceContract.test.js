@@ -79,6 +79,10 @@ assert.match(autoTripService, /AUTOSAVE_DA_VIAGEM_NAO_CONFIRMADO/, 'viagem não 
 assert.match(autoTripService, /SNAPSHOT_JSON_DA_VIAGEM_NAO_CONFIRMADO/, 'viagem finalizada deve ser journaled no snapshot antes do índice');
 assert.match(autoTripService, /pendingRetryDue/, 'falhas de gravação em ECU desconectada devem ter retry limitado por intervalo');
 assert.match(dtcManager, /NON_REAL_DTC_NOT_ALLOWED_IN_OPERATIONAL_HISTORY/, 'camada de DTC deve rejeitar importação e simulação no histórico operacional');
+assert.ok(pidBank.includes("NON_REAL_PID_NOT_ALLOWED_IN_OPERATIONAL_BANK"), 'banco de PIDs deve rejeitar origem não real');
+assert.ok(pidBank.includes('purgeLegacyNonRealPidConfirmations'), 'banco legado de PIDs deve ser expurgado na inicialização');
+assert.ok(pidBank.includes("entry.source === 'REAL_OBD'"), 'consulta operacional deve retornar apenas PIDs reais');
+assert.ok(homeScreen.includes('purgeLegacyNonRealPidConfirmations(basePath)'), 'startup deve executar a purga do banco PID legado');
 assert.match(dtcManager, /DTC_HISTORY_PURGE_STAGING_FAILED/, 'purga de DTC precisa validar a escrita temporária');
 assert.match(learningManager, /isValidLearningProfile/, 'perfil de aprendizado parcial deve ser validado antes de consumo');
 assert.match(learningManager, /LEARNING_PROFILE_STAGING_VALIDATION_FAILED/, 'perfil de aprendizado precisa ser validado antes da substituição');
