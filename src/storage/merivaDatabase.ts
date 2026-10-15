@@ -263,40 +263,55 @@ export function getActiveSqliteSessionId(): string | null {
 export async function openSqliteObdSession(connection: ObdConnectionState): Promise<string | null> {
   if (!connection.connected) return null;
   return serializeWrite(async () => {
-    const db = await openDatabase();
     const startedAt = new Date().toISOString();
-
     const previousSessionId = activeSessionId;
-    // Clear in-memory attribution before any awaited SQLite operation. If the
-    // update/insert fails, new PID reads must not be attached to the old session.
+    // Clear in-memory attribution before awaiting SQLite. If the database is
+    // unavailable, subsequent PID samples must not be attached to the old trip.
     activeSessionId = null;
     lastPidSampleAt.clear();
-    if (previousSessionId) {
-      await db.runAsync(
-        `UPDATE obd_sessions SET status = 'CLOSED', ended_at = ?, close_reason = 'REPLACED_BY_NEW_SESSION'
-         WHERE id = ? AND status = 'OPEN'`,
-        startedAt,
-        previousSessionId,
-      );
-    }
 
+    const db = await openDatabase();
     const id = makeId('ecu');
-    await db.runAsync(
-      `INSERT INTO obd_sessions
-        (id, started_at, adapter_name, protocol, ecu_address, ecu_identification, status, metadata_json)
-       VALUES (?, ?, ?, ?, ?, ?, 'OPEN', ?)`,
-      id,
-      startedAt,
-      connection.adapterName ?? null,
-      connection.protocol ?? connection.lastKnownProtocol ?? null,
-      connection.ecuAddress ?? null,
-      connection.ecuIdentification ?? null,
-      asJson({
-        ecuName: connection.ecuName ?? null,
-        ecuValidatedAt: connection.ecuValidatedAt ?? null,
-        ecuValidationSource: connection.ecuValidationSource ?? null,
-      }),
-    );
+    await db.withTransactionAsync(async () => {
+      if (previousSessionId) {
+        await db.runAsync(
+          `UPDATE obd_sessions
+           SET status = 'CLOSED', ended_at = ?, close_reason = 'REPLACED_BY_NEW_SESSION'
+           WHERE id = ? AND status = 'OPEN'`,
+          startedAt,
+          previousSessionId,
+        );
+      }
+
+      // There can be an OPEN row without a live in-memory ID when a previous
+      // close/open failed after a process-level or database error. Close those
+      // orphan rows before creating the next active session.
+      await db.runAsync(
+        `UPDATE obd_sessions
+         SET status = 'RECOVERED', ended_at = COALESCE(ended_at, ?),
+             close_reason = COALESCE(close_reason, 'STALE_SESSION_BEFORE_NEW_SESSION'),
+             recovered = 1
+         WHERE status = 'OPEN'`,
+        startedAt,
+      );
+
+      await db.runAsync(
+        `INSERT INTO obd_sessions
+          (id, started_at, adapter_name, protocol, ecu_address, ecu_identification, status, metadata_json)
+         VALUES (?, ?, ?, ?, ?, ?, 'OPEN', ?)`,
+        id,
+        startedAt,
+        connection.adapterName ?? null,
+        connection.protocol ?? connection.lastKnownProtocol ?? null,
+        connection.ecuAddress ?? null,
+        connection.ecuIdentification ?? null,
+        asJson({
+          ecuName: connection.ecuName ?? null,
+          ecuValidatedAt: connection.ecuValidatedAt ?? null,
+          ecuValidationSource: connection.ecuValidationSource ?? null,
+        }),
+      );
+    });
     activeSessionId = id;
     lastPidSampleAt.clear();
     return id;
