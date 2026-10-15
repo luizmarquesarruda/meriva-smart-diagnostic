@@ -20,6 +20,8 @@ let databasePromise: Promise<SQLiteDatabase> | null = null;
 let activeSessionId: string | null = null;
 let serializedWrites: Promise<void> = Promise.resolve();
 const lastPidSampleAt = new Map<string, number>();
+const lastPersistedDtcFingerprints = new Map<string, string>();
+const lastPersistedTripFingerprints = new Map<string, string>();
 
 function makeId(prefix: string): string {
   return prefix + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
@@ -382,9 +384,27 @@ export async function recordRealPidReading(reading: LastPidReading): Promise<voi
 async function persistDtcSnapshot(
   dtcs: DtcRecord[],
   db: SQLiteDatabase,
+  skipUnchanged = false,
 ): Promise<void> {
   const realDtcs = dtcs.filter((dtc) => dtc.source === 'REAL_OBD' && /^[PCBU][0-9A-F]{4}$/i.test(dtc.code));
   for (const dtc of realDtcs) {
+    const eventKey = dtc.code.toUpperCase() + '|' + dtc.status + '|' + dtc.lastSeen;
+    const details = asJson({
+      description: dtc.description ?? null,
+      historical: dtc.historical,
+      confirmed: dtc.confirmed ?? null,
+    });
+    const fingerprint = asJson({
+      code: dtc.code.toUpperCase(),
+      status: dtc.status,
+      occurrences: dtc.occurrences,
+      firstSeen: dtc.firstSeen,
+      lastSeen: dtc.lastSeen,
+      details,
+      sessionId: activeSessionId,
+    });
+    if (skipUnchanged && lastPersistedDtcFingerprints.get(eventKey) === fingerprint) continue;
+
     await db.runAsync(
       `INSERT INTO dtc_events
         (session_id, code, status, occurrences, first_seen, last_seen, source, details_json)
@@ -399,14 +419,21 @@ async function persistDtcSnapshot(
       Math.max(1, Number.isFinite(dtc.occurrences) ? dtc.occurrences : 1),
       dtc.firstSeen,
       dtc.lastSeen,
-      asJson({ description: dtc.description ?? null, historical: dtc.historical, confirmed: dtc.confirmed ?? null }),
+      details,
     );
+    lastPersistedDtcFingerprints.set(eventKey, fingerprint);
   }
 }
 
-async function persistRealTrips(cycles: DriveCycle[], db: SQLiteDatabase): Promise<void> {
+async function persistRealTrips(
+  cycles: DriveCycle[],
+  db: SQLiteDatabase,
+  skipUnchanged = false,
+): Promise<void> {
   const trips = cycles.filter((cycle) => cycle.source === 'REAL_OBD');
   for (const trip of trips) {
+    const fingerprint = asJson(trip);
+    if (skipUnchanged && lastPersistedTripFingerprints.get(trip.id) === fingerprint) continue;
     await db.runAsync(
       `INSERT INTO trip_records
         (id, started_at, finished_at, distance_km, fuel_used_l, average_consumption_km_l,
@@ -428,33 +455,47 @@ async function persistRealTrips(cycles: DriveCycle[], db: SQLiteDatabase): Promi
       trip.avgFuelConsumptionKml,
       trip.avgDrivingSpeedKmh,
       trip.maxSpeedKmh ?? null,
-      asJson(trip),
+      fingerprint,
     );
+    lastPersistedTripFingerprints.set(trip.id, fingerprint);
   }
 }
 
 /** Reimportação idempotente do snapshot JSON antigo; nunca importa seed/simulação. */
 export async function migrateLegacyStateToSqlite(state: MerivaPersistedState): Promise<void> {
-  await serializeWrite(async () => {
-    const db = await openDatabase();
-    await db.withTransactionAsync(async () => {
-      await persistDtcSnapshot(state.dtcs, db);
-      await persistRealTrips(state.driveCycles, db);
+  try {
+    await serializeWrite(async () => {
+      const db = await openDatabase();
+      await db.withTransactionAsync(async () => {
+        await persistDtcSnapshot(state.dtcs, db);
+        await persistRealTrips(state.driveCycles, db);
+      });
     });
-  });
+  } catch (cause) {
+    // Uma transação revertida invalida os fingerprints provisórios.
+    lastPersistedDtcFingerprints.clear();
+    lastPersistedTripFingerprints.clear();
+    throw cause;
+  }
 }
 
 export async function persistOperationalStateToSqlite(
   dtcs: DtcRecord[],
   cycles: DriveCycle[],
 ): Promise<void> {
-  await serializeWrite(async () => {
-    const db = await openDatabase();
-    await db.withTransactionAsync(async () => {
-      await persistDtcSnapshot(dtcs, db);
-      await persistRealTrips(cycles, db);
+  try {
+    await serializeWrite(async () => {
+      const db = await openDatabase();
+      await db.withTransactionAsync(async () => {
+        await persistDtcSnapshot(dtcs, db, true);
+        await persistRealTrips(cycles, db, true);
+      });
     });
-  });
+  } catch (cause) {
+    lastPersistedDtcFingerprints.clear();
+    lastPersistedTripFingerprints.clear();
+    throw cause;
+  }
 }
 
 export interface SensorTestReportInput {
