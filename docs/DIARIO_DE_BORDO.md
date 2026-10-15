@@ -2775,3 +2775,7 @@ A janela em memória agora registra o instante em que a ECU passou a responder n
 
 ### Ajuste conservador de velocidade
 Os limites configurados foram estreitados para dispersão absoluta máxima de 10 km/h, dispersão relativa máxima de 25% e diferença máxima de 35% entre a velocidade do trecho e a média das viagens usadas na referência. O objetivo é recusar comparações potencialmente incompatíveis, ainda que isso mantenha mais sessões em “Trecho instável” ou “Calibrando”. Os valores são parâmetros iniciais e precisam ser avaliados em viagens reais.
+
+
+### Análise estática de tipos
+A captura do combustível de início de viagem usa agora uma variável local não anulável ao construir `RealTripRecorder`; o campo de classe continua anulável para representar “nenhuma viagem ativa”, mas o construtor recebe somente `FuelType` válido. Esta correção reduz ambiguidade de tipos sem executar TypeScript/CI.
