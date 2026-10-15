@@ -10,6 +10,13 @@ assert.ok(index.includes('/saude'), 'cockpit deve preservar o atalho para saúde
 assert.ok(index.includes('href="/mais"'), 'Mais recursos deve continuar acessível pelo cabeçalho');
 const bottomNav = read('src/ui/BottomNavigation.tsx');
 for (const route of ['/', '/laboratorio', '/testes-sensores', '/armazenamento']) assert.ok(bottomNav.includes(route), 'navegação inferior deve expor ' + route);
+const dataScreen = read('app/dados.tsx');
+assert.match(dataScreen, /item\.source === 'REAL'/, 'lista de últimas leituras deve excluir simulações');
+assert.match(dataScreen, /item\.status === 'RESPONDEU'/, 'leituras sem resposta não devem aparecer como reais');
+assert.match(dataScreen, /Number\.isFinite\(item\.value\)/, 'leituras exibidas devem ser finitas');
+assert.match(index, /ASSISTENTE DE ECONOMIA/, 'cockpit deve conter o assistente de economia');
+assert.doesNotMatch(index, />SAÚDE DO VEÍCULO<\/Text>/, 'painel grande de saúde não deve estar duplicado no cockpit');
+assert.match(read('src/obd/fuelCoach.ts'), /referenceMinimumTrips/, 'assistente deve exigir referência pessoal');
 
 // Contrato ergonômico: os quatro destinos mantêm largura uniforme,
 // área de toque ampliada e rótulos que não empurram o layout em portrait/landscape.
