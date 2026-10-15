@@ -125,7 +125,7 @@ async function readIndexWithRecovery(indexFile: string): Promise<DriveCycleIndex
   return null;
 }
 
-async function writeIndexSafely(indexFile: string, data: DriveCycleIndex): Promise<void> {
+async function writeIndexSafely(indexFile: string, data: DriveCycleIndex, requireRecoveryCopy = true): Promise<void> {
   const tempPath = temporaryIndexPath(indexFile);
   const backupPath = previousIndexPath(indexFile);
   const encoded = JSON.stringify(data, null, 2);
@@ -155,9 +155,15 @@ async function writeIndexSafely(indexFile: string, data: DriveCycleIndex): Promi
     try { await FileSystem.deleteAsync(tempPath, { idempotent: true }); } catch { /* temp pode ser removido na próxima escrita */ }
   }
 
-  // Refresh the recovery point as part of the successful operation. If this
-  // fails, bubble it up so the caller retains its pending write for retry.
-  await FileSystem.copyAsync({ from: indexFile, to: backupPath });
+  // Refresh the recovery point as part of the successful operation. Existing
+  // history writes require this copy, so callers retain the trip for retry.
+  // A brand-new empty index has no prior history to protect and must not block
+  // startup solely because this optional first backup copy is unavailable.
+  try {
+    await FileSystem.copyAsync({ from: indexFile, to: backupPath });
+  } catch (cause) {
+    if (requireRecoveryCopy) throw cause;
+  }
 }
 
 function localDayKey(date = new Date()): string {
@@ -233,7 +239,7 @@ export async function initializeDriveCycles(basePath: string): Promise<void> {
       cycles: [],
       totalCount: 0,
     };
-    await writeIndexSafely(indexFile, emptyData);
+    await writeIndexSafely(indexFile, emptyData, false);
   });
 }
 
