@@ -17,6 +17,14 @@ assert.match(dataScreen, /Number\.isFinite\(item\.value\)/, 'leituras exibidas d
 assert.match(index, /ASSISTENTE DE ECONOMIA/, 'cockpit deve conter o assistente de economia');
 assert.doesNotMatch(index, />SAÚDE DO VEÍCULO<\/Text>/, 'painel grande de saúde não deve estar duplicado no cockpit');
 assert.match(read('src/obd/fuelCoach.ts'), /referenceMinimumTrips/, 'assistente deve exigir referência pessoal');
+const tripService = read('src/trip/autoTripService.ts');
+assert.match(tripService, /instantaneousConsumptionTimestampMs/, 'consumo deve preservar timestamp original da taxa');
+assert.match(tripService, /instantaneousSpeedKmh: tripVehicleSpeedKmh/, 'coach deve usar a velocidade que gerou o km/L');
+assert.match(tripService, /instantaneousFuelType: instantaneousConsumptionKml != null \? estimateFuelType : null/,
+  'o tipo associado ao cálculo não pode mudar por alteração posterior da configuração');
+assert.match(tripService, /const estimateFuelType = this\.recorderFuelType \?\? this\.fuelType/,
+  'fórmula de combustível deve permanecer fixa dentro da viagem');
+assert.match(read('src/trip/tripRecorder.ts'), /fuelType: this\.fuelType/, 'viagem deve guardar o combustível usado');
 
 // Contrato ergonômico: os quatro destinos mantêm largura uniforme,
 // área de toque ampliada e rótulos que não empurram o layout em portrait/landscape.
