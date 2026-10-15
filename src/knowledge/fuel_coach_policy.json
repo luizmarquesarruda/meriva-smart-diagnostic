@@ -10,6 +10,7 @@
   "maximumSpeedSpreadRatio": 0.35,
   "referenceMinimumTrips": 3,
   "referenceMinimumDistanceKm": 20,
+  "referenceSpeedDifferenceRatio": 0.50,
   "goodRatio": 1.10,
   "elevatedRatio": 0.85
 }
