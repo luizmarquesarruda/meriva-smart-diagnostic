@@ -100,11 +100,14 @@ export function hydrateState(payload: MerivaPersistedState): MerivaPersistedStat
     const raw = asRecord(rawLearning);
     const now = new Date().toISOString();
     const rawThresholds = asRecord(raw.confidenceThresholds);
+    const lowThreshold = finiteNonNegative(rawThresholds.low, 10) || 10;
+    const mediumThreshold = Math.max(lowThreshold, finiteNonNegative(rawThresholds.medium, 50) || 50);
+    const goodThreshold = Math.max(mediumThreshold, finiteNonNegative(rawThresholds.good, 200) || 200);
     const thresholds = {
-      low: finiteNonNegative(rawThresholds.low, 10) || 10,
-      medium: finiteNonNegative(rawThresholds.medium, 50) || 50,
-      good: finiteNonNegative(rawThresholds.good, 200) || 200,
-      high: finiteNonNegative(rawThresholds.high, 500) || 500,
+      low: lowThreshold,
+      medium: mediumThreshold,
+      good: goodThreshold,
+      high: Math.max(goodThreshold, finiteNonNegative(rawThresholds.high, 500) || 500),
     };
     const rawCounts = asRecord(raw.globalSampleCounts);
     const realSamples = Math.floor(finiteNonNegative(rawCounts.realSamples));
@@ -173,8 +176,10 @@ export function hydrateState(payload: MerivaPersistedState): MerivaPersistedStat
       .filter((context) => Object.keys(context.statistics).length > 0);
 
     const overallStatistics = cleanStats(raw.overallStatistics);
-    const countsFromStats = Object.values(overallStatistics).reduce((sum, stat) => sum + stat.realSamples, 0);
-    const realCount = realSamples || countsFromStats;
+    // Global count is a distinct sample counter, not the sum of per-PID counters.
+    // Inferring it from that sum can overstate confidence by counting the same
+    // scan multiple times; missing/corrupt count data therefore falls back to 0.
+    const realCount = realSamples;
     const rawContamination = asRecord(raw.dataContamination);
     hydrated.learning = {
       vehicleId: typeof raw.vehicleId === 'string' && raw.vehicleId.trim() ? raw.vehicleId : 'MERIVA_MAXX',
