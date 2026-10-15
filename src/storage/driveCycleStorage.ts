@@ -168,7 +168,13 @@ function localDayKey(date = new Date()): string {
 }
 
 async function appendTripCsvOnce(viagensDir: string, cycle: DriveCycle): Promise<void> {
-  const csvFile = `${viagensDir}/viagens_${localDayKey(new Date())}.csv`;
+  const normalizedStartedAt = cycle.startedAt.trim().replace(
+    /^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?)/,
+    '$1T$2',
+  );
+  const startedAtDate = new Date(normalizedStartedAt);
+  const dayKey = Number.isFinite(startedAtDate.getTime()) ? localDayKey(startedAtDate) : localDayKey();
+  const csvFile = `${viagensDir}/viagens_${dayKey}.csv`;
   const info = await FileSystem.getInfoAsync(csvFile);
   if (info.exists && !info.isDirectory) {
     const content = await FileSystem.readAsStringAsync(csvFile, { encoding: FileSystem.EncodingType.UTF8 });
