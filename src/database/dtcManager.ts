@@ -28,18 +28,33 @@ export function nextDtcOccurrences(previous?: DtcRecord): number {
 }
 
 export async function recordDtc(basePath: string, dtc: DtcRecord): Promise<void> {
+  // This file is the operational history, not a staging area for imported or
+  // simulated events. Reject them at the write boundary, not just at read time.
+  if (dtc.source !== 'REAL_OBD') {
+    throw new Error('NON_REAL_DTC_NOT_ALLOWED_IN_OPERATIONAL_HISTORY');
+  }
+  if (!/^[PCBU][0-9A-F]{4}$/i.test(dtc.code)) {
+    throw new Error('INVALID_DTC_CODE');
+  }
+  if (!VALID_DTC_STATUSES.has(dtc.status)) {
+    throw new Error('INVALID_DTC_STATUS');
+  }
+  if (!Number.isFinite(dtc.occurrences) || dtc.occurrences < 0) {
+    throw new Error('INVALID_DTC_OCCURRENCE_COUNT');
+  }
+
   const target = `${basePath}/DTC/dtc_records.txt`;
   await queueDtcWrite(target, async () => {
     await FileSystem.makeDirectoryAsync(`${basePath}/DTC`, { intermediates: true });
 
     const line = [
-      dtc.code,
-      dtc.description ?? '',
+      dtc.code.toUpperCase(),
+      (dtc.description ?? '').replace(/[|\r\n]/g, ' '),
       dtc.status,
-      dtc.firstSeen,
-      dtc.lastSeen,
-      dtc.occurrences,
-      dtc.source,
+      dtc.firstSeen ?? '',
+      dtc.lastSeen ?? '',
+      Math.max(1, Math.floor(dtc.occurrences)),
+      'REAL_OBD',
       dtc.historical ? 'true' : 'false',
       dtc.confirmed ? 'true' : 'false',
     ].join('|');
