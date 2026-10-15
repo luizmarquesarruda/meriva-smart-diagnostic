@@ -53,7 +53,7 @@ function windowSamples(nowMs, consumptionKmL = 4.5, overrides = {}) {
 }
 
 const compatibleTrips = [trip('1'), trip('2'), trip('3')];
-const reference = buildFuelCoachReference(compatibleTrips, 'ETANOL', 'MEASURED_015E');
+const reference = buildFuelCoachReference(compatibleTrips, 'ETANOL', 'MEASURED_015E', 40);
 assert.strictEqual(reference.ready, true);
 assert.strictEqual(reference.sampleCount, 3);
 assert.strictEqual(reference.totalDistanceKm, 24);
@@ -67,11 +67,13 @@ const mixedTrips = [
   trip('seed', { source: 'CARSCANNER_SEED' }),
   trip('legacy', { fuelType: undefined }),
 ];
-assert.strictEqual(buildFuelCoachReference(mixedTrips, 'ETANOL', 'MEASURED_015E').sampleCount, 3,
+assert.strictEqual(buildFuelCoachReference(mixedTrips, 'ETANOL', 'MEASURED_015E', 40).sampleCount, 3,
   'referência utiliza somente viagens reais compatíveis');
-assert.strictEqual(buildFuelCoachReference(compatibleTrips.slice(0, 2), 'ETANOL', 'MEASURED_015E').ready, false);
-assert.strictEqual(buildFuelCoachReference(compatibleTrips, 'GASOLINA', 'MEASURED_015E').ready, false);
-assert.strictEqual(buildFuelCoachReference(compatibleTrips, 'ETANOL', 'ESTIMATED_MAF').ready, false);
+assert.strictEqual(buildFuelCoachReference(compatibleTrips.slice(0, 2), 'ETANOL', 'MEASURED_015E', 40).ready, false);
+assert.strictEqual(buildFuelCoachReference(compatibleTrips, 'GASOLINA', 'MEASURED_015E', 40).ready, false);
+assert.strictEqual(buildFuelCoachReference(compatibleTrips, 'ETANOL', 'ESTIMATED_MAF', 40).ready, false);
+assert.strictEqual(buildFuelCoachReference([trip('slow', { avgDrivingSpeedKmh: 10 })], 'ETANOL', 'MEASURED_015E', 40).sampleCount, 0,
+  'viagens com velocidade média muito diferente não entram na referência');
 
 const nowMs = 1_800_000_000_000;
 function evaluate(kmL, sampleSet = windowSamples(nowMs, kmL), overrides = {}) {
@@ -97,10 +99,11 @@ assert.strictEqual(evaluate(4.5, windowSamples(nowMs, 4.5), { currentTimestampMs
 assert.strictEqual(evaluate(4.5, windowSamples(nowMs, 4.5).slice(0, 2)).status, 'COLLECTING');
 assert.strictEqual(evaluate(4.5, windowSamples(nowMs, 4.5, { speedKmh: 10 })).status, 'CONTEXT_UNSTABLE');
 assert.strictEqual(evaluate(4.5, windowSamples(nowMs, 4.5), {
-  reference: buildFuelCoachReference([], 'ETANOL', 'MEASURED_015E'),
+  reference: buildFuelCoachReference([], 'ETANOL', 'MEASURED_015E', 40),
 }).status, 'CALIBRATING');
 assert.strictEqual(evaluate(4.5, windowSamples(nowMs, 4.5, { source: 'ESTIMATED_MAF' }), {
   source: 'ESTIMATED_MAF',
+  reference: buildFuelCoachReference(compatibleTrips, 'ETANOL', 'MEASURED_015E', 40),
 }).status, 'CALIBRATING', 'fontes diferentes exigem referências diferentes');
 
 console.log('PASS fuel coach: referência, fonte, frescor, estabilidade e faixas');
