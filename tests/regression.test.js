@@ -270,6 +270,9 @@ async function testParser() {
   assert.ok(sparkReadiness.interpretation.includes('CICLO OTTO/SI'));
   assert.ok(sparkReadiness.interpretation.includes('CATALISADOR=NÃO PRONTO'));
   assert.ok(sparkReadiness.interpretation.includes('CATALISADOR'));
+  assert.ok(!sparkReadiness.interpretation.includes('MISFIRE'), 'monitor comum não suportado não deve ser indicado como incompleto');
+  assert.ok(!sparkReadiness.interpretation.includes('FUEL_SYSTEM'), 'monitor de combustível não suportado não deve ser indicado como incompleto');
+  assert.ok(!sparkReadiness.interpretation.includes('COMPONENTES'), 'monitor de componentes não suportado não deve ser indicado como incompleto');
 
   // On compression-ignition engines C/D encode NMHC, NOx/SCR, boost,
   // exhaust-sensor and particulate-filter monitors—not gasoline EVAP/O2 bits.
@@ -280,6 +283,9 @@ async function testParser() {
   assert.ok(dieselReadiness.interpretation.includes('PRESSAO_TURBO'));
   assert.ok(!dieselReadiness.interpretation.includes('EVAP'));
   assert.ok(!dieselReadiness.interpretation.includes('AQUECEDOR_O2'));
+  assert.ok(!dieselReadiness.interpretation.includes('MISFIRE'), 'monitor misfire não suportado não deve ser indicado como incompleto');
+  assert.ok(!dieselReadiness.interpretation.includes('FUEL_SYSTEM'), 'monitor combustível não suportado não deve ser indicado como incompleto');
+  assert.ok(!dieselReadiness.interpretation.includes('COMPONENTES'), 'monitor de componentes não suportado não deve ser indicado como incompleto');
 }
 
 async function testElmAndProtocol() {
