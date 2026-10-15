@@ -1147,6 +1147,18 @@ function testPidResponseIsNotVehicleValidation() {
   assert.strictEqual(validation.shouldFeedLearning('REAL', 'RESPONDEU', null), false);
   assert.strictEqual(validation.shouldFeedLearning('SIMULACAO', 'RESPONDEU', 123), false);
 
+  const stateFactory = loadTs(path.join(ROOT, 'src/meriva/autosaveState.ts'));
+  const legacyState = stateFactory.createEmptyMerivaState();
+  legacyState.lastReadings = [
+    { pid: '010C', name: 'RPM', value: 1726, unit: 'rpm', status: 'RESPONDEU', timestamp: new Date().toISOString(), source: 'REAL' },
+    { pid: '0105', name: 'ECT imported', value: 90, unit: 'celsius', status: 'RESPONDEU', timestamp: new Date().toISOString(), source: 'IMPORTADO' },
+    { pid: '010B', name: 'MAP invalid', value: Infinity, unit: 'kpa', status: 'RESPONDEU', timestamp: new Date().toISOString(), source: 'REAL' },
+    { pid: '010C', name: 'RPM simulado', value: 1000, unit: 'rpm', status: 'RESPONDEU', timestamp: new Date().toISOString(), source: 'SIMULACAO' },
+  ];
+  const hydrated = validation.hydrateState(legacyState);
+  assert.deepStrictEqual(hydrated.lastReadings.map((reading) => reading.source), ['REAL', 'SIMULACAO'],
+    'hidratação deve rejeitar origens desconhecidas e valores não finitos sem apagar dados reais/simulados válidos');
+
   const runtime = loadTs(path.join(ROOT, 'src/meriva/autosaveIntegration.ts'));
   const basePath = '/doc/learning-throttle-regression';
   assert.strictEqual(runtime.shouldPersistRealPidSample(basePath, '010C', 1000), true);
