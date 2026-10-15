@@ -265,6 +265,21 @@ async function testParser() {
   assert.strictEqual(parser.parsePidResponse('010C', 'NO DATA').status, 'NÃO RESPONDEU');
   assert.deepStrictEqual(parser.parseDtcResponse('43 01 33 00 00 00'), ['P0133']);
   assert.deepStrictEqual(parser.parseDtcResponse('48 6B 10 43 01 33 00 00 82'), ['P0133']);
+
+  const sparkReadiness = parser.parsePidResponse('0101', '41 01 00 70 01 01');
+  assert.ok(sparkReadiness.interpretation.includes('CICLO OTTO/SI'));
+  assert.ok(sparkReadiness.interpretation.includes('CATALISADOR=NÃO PRONTO'));
+  assert.ok(sparkReadiness.interpretation.includes('CATALISADOR'));
+
+  // On compression-ignition engines C/D encode NMHC, NOx/SCR, boost,
+  // exhaust-sensor and particulate-filter monitors—not gasoline EVAP/O2 bits.
+  const dieselReadiness = parser.parsePidResponse('0101', '41 01 00 78 A9 A9');
+  assert.ok(dieselReadiness.interpretation.includes('DIESEL/CI'));
+  assert.ok(dieselReadiness.interpretation.includes('CATALISADOR_NMHC=NÃO PRONTO'));
+  assert.ok(dieselReadiness.interpretation.includes('NOX_SCR'));
+  assert.ok(dieselReadiness.interpretation.includes('PRESSAO_TURBO'));
+  assert.ok(!dieselReadiness.interpretation.includes('EVAP'));
+  assert.ok(!dieselReadiness.interpretation.includes('AQUECEDOR_O2'));
 }
 
 async function testElmAndProtocol() {
