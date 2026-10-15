@@ -2753,3 +2753,9 @@ Em `app/dados.tsx`, “ÚLTIMAS LEITURAS REAIS” agora só lista itens com `sou
 1. Consolidar a fonte de leitura das viagens entre índice/snapshot JSON e SQLite, mantendo a recuperação idempotente atual.
 2. Conferir o coach no aparelho em retrato e paisagem, em especial a altura da navegação inferior e a área do cockpit.
 3. Validar com a Meriva quais PIDs de consumo realmente respondem e comparar a classificação com o consumo integrado observado.
+
+
+### Revisão estática pós-gravação
+- A revisão manual do estado inicial de `AutoTripService` encontrou e corrigiu um separador sintático no objeto `INITIAL_STATE` antes de encerrar esta rodada. O typecheck não foi executado, conforme a ordem de não disparar CI.
+- O estado expõe agora, de forma explícita, o timestamp original da taxa, a velocidade usada no cálculo e o tipo de combustível associado à amostra. O cockpit utiliza esses três dados de proveniência em vez de inferir o combustível pelo valor mais recente da configuração.
+- A regressão estática do cockpit verifica a presença desses contratos. Esta checagem de código não substitui a suíte executada; validação automatizada permanece pendente.
