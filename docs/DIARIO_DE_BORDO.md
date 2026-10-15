@@ -2490,3 +2490,10 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - O leitor público captura a falha e retorna fallback vazio somente quando não consegue consultar nem o SQLite nem o JSON; o arquivo existente não é sobrescrito.
 - Adicionado contrato estático para impedir que um índice legado ilegível seja silenciosamente marcado como migrado.
 - Não executados testes nem CI após esta correção; commit com `[skip ci]`.
+
+
+### Consistência dos espelhos de recuperação
+
+- Cada viagem confirmada no SQLite também atualiza o JSON de compatibilidade em baixa frequência (encerramento da viagem, não cada amostra OBD). A escrita substitui por ID para evitar duplicações em tentativas repetidas; se o espelho JSON falhar, o registro já comprometido em SQLite permanece.
+- Se a escrita de evento ECU no SQLite falhar depois que o TXT foi salvo, o marcador de migração é redefinido para `pending` quando o banco ainda estiver acessível, permitindo reimportar idempotentemente o TXT na próxima sessão.
+- Teste de contrato atualizado para proteger a sincronização do JSON de recuperação. Nenhum teste automatizado ou build foi executado após esta mudança; commit marcado com `[skip ci]`.

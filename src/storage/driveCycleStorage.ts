@@ -65,6 +65,8 @@ async function writeLegacyCycle(basePath: string, cycle: DriveCycle): Promise<vo
       throw new Error('Índice legado de viagens ilegível; arquivo preservado para recuperação.');
     }
   }
+  // Mirror by ID so retries do not duplicate a cycle in the compatibility JSON.
+  existing = existing.filter((item) => item.id !== cycle.id);
   existing.push(cycle);
   await FileSystem.writeAsStringAsync(indexFile, JSON.stringify({
     version: '1.0',
@@ -145,6 +147,13 @@ export async function addDriveCycle(basePath: string, cycle: DriveCycle): Promis
       const localDb = loadLocalDatabase();
       await localDb.upsertDriveCycle(cycle);
       storedInSqlite = true;
+      // Keep the recovery/fallback JSON current. Trips are committed per drive cycle,
+      // not per telemetry sample, so this low-frequency mirror is acceptable.
+      try {
+        await writeLegacyCycle(basePath, cycle);
+      } catch (mirrorError) {
+        console.warn('[sqlite] viagem gravada, mas o espelho JSON não foi atualizado:', mirrorError instanceof Error ? mirrorError.message : mirrorError);
+      }
     } catch (error) {
       console.warn('[sqlite] ciclo não gravado no banco; usando compatibilidade JSON:', error instanceof Error ? error.message : error);
     }

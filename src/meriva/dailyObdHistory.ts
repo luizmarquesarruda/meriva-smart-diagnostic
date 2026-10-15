@@ -186,6 +186,13 @@ async function appendDailyObdSessionEventUnsafe(
   try {
     await mirrorSessionEventToSqlite(date, event, timestamp, renderEvent(state, event, timestamp), state);
   } catch (error) {
+    // Force an idempotent TXT rescan on the next event if SQLite is still reachable.
+    try {
+      const localDb = loadLocalDatabase();
+      await localDb.setLocalMetadata('migration.daily_obd_history.v1', 'pending');
+    } catch {
+      // Database unavailable: TXT remains durable and retains the missing event.
+    }
     // O TXT já foi persistido; SQLite é índice estruturado, não cópia única.
     console.warn('[sqlite] evento salvo em TXT, mas não indexado em SQLite:', error instanceof Error ? error.message : error);
   }
