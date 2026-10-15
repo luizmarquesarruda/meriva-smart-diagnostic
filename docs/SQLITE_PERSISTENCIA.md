@@ -30,7 +30,6 @@ A versão é controlada por PRAGMA user_version e também registrada em schema_m
 
 - sensor_tests e sensor_test_readings: cabeçalho, modo de teste, situação completa/parcial, protocolo, caminho do TXT, avaliação resumida e cada tentativa, incluindo ausência de resposta e RX bruto.
 - trip_records: viagens de origem REAL_OBD, com distância, combustível, consumo, velocidades e evidência original serializada.
-- diagnostic_findings: estrutura preparada para achados determinísticos ligados à evidência e à sessão.
 - `diagnostic_findings`: achados determinísticos gerados pela Central de Saúde, com score/confiança, evidências e próximos testes. IDs derivados de sessão + evidência evitam duplicar o mesmo achado em cada render; uma evidência diferente pode gerar novo registro histórico.
 - A Central de Relatórios exibe versão do esquema, sessões abertas, amostras PID, DTCs, testes, viagens, achados diagnósticos e PIDs aprendidos, sem precisar abrir um relatório TXT.
 - Uma versão de app que encontre banco com `user_version` maior do que sua versão conhecida recusa alterações no esquema, em vez de tentar operar silenciosamente em estrutura desconhecida.
@@ -43,11 +42,11 @@ O banco usa WAL e chaves estrangeiras. Operações relacionadas a um relatório 
 1. **Telemetria persistida**: somente fonte REAL, estado RESPONDEU, valor numérico finito e uma sessão ECU ativa. A tabela normaliza a fonte para REAL_OBD.
 2. **Amostragem limitada**: no máximo uma amostra detalhada de cada PID a cada 2 segundos. O painel pode atualizar mais rápido em memória; nem todo ciclo de 500 ms vira gravação em disco.
 3. **UPSERTs de snapshot limitados**: fingerprints em memória evitam regravar DTCs/viagens inalterados a cada autosave; em falha de transação, os fingerprints são descartados para forçar ressincronização na próxima tentativa.
-3. **Testes de sensores**: guardam todas as tentativas da varredura (inclusive resposta ausente), porque elas são evidência diagnóstica; o relatório TXT é gravado primeiro e continua utilizável se o registro SQLite falhar.
-4. **DTCs e viagens**: apenas origem REAL_OBD; seed CarScanner, simulação e importações não alimentam o banco de evidência real. A gravação de viagens é idempotente pela ID.
-5. **Retomada**: na abertura do banco, sessões que ficaram OPEN no processo anterior são marcadas RECOVERED; não são tratadas como uma conexão ECU viva.
-6. **Migração sem perda**: os DTCs reais e viagens reais do snapshot JSON são importados com operações idempotentes. O arquivo JSON não é apagado nem reescrito pela migração do banco. Leituras antigas isoladas não são inventadas como série temporal retroativa.
-7. **Falha degradada**: se o SQLite falhar, o autosave JSON e a exportação TXT continuam como caminhos independentes; o erro é registrado no log de desenvolvimento.
+4. **Testes de sensores**: guardam todas as tentativas da varredura (inclusive resposta ausente), porque elas são evidência diagnóstica; o relatório TXT é gravado primeiro e continua utilizável se o registro SQLite falhar.
+5. **DTCs e viagens**: apenas origem REAL_OBD; seed CarScanner, simulação e importações não alimentam o banco de evidência real. A gravação de viagens é idempotente pela ID.
+6. **Retomada**: na abertura do banco, sessões que ficaram OPEN no processo anterior são marcadas RECOVERED; não são tratadas como uma conexão ECU viva.
+7. **Migração sem perda**: os DTCs reais e viagens reais do snapshot JSON são importados com operações idempotentes. O arquivo JSON não é apagado nem reescrito pela migração do banco. Leituras antigas isoladas não são inventadas como série temporal retroativa.
+8. **Falha degradada**: se o SQLite falhar, o autosave JSON e a exportação TXT continuam como caminhos independentes; o erro é registrado no log de desenvolvimento.
 
 ## Testes e limites desta etapa
 
