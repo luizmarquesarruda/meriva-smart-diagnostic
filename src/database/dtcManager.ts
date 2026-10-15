@@ -3,15 +3,16 @@ import type { DataSource, DtcStatus, DtcRecord } from '../types/sourceTypes';
 
 export type { DtcRecord } from '../types/sourceTypes';
 
-const dtcQueues = new Map<string, Promise<void>>();
+const dtcQueues = new Map<string, Promise<unknown>>();
 
-function queueDtcWrite(target: string, operation: () => Promise<void>): Promise<void> {
+function queueDtcWrite<T>(target: string, operation: () => Promise<T>): Promise<T> {
   const previous = dtcQueues.get(target) ?? Promise.resolve();
   const current = previous.catch(() => undefined).then(operation);
-  dtcQueues.set(target, current.catch(() => undefined));
-  return current.finally(() => {
+  dtcQueues.set(target, current);
+  void current.finally(() => {
     if (dtcQueues.get(target) === current) dtcQueues.delete(target);
-  });
+  }).catch(() => undefined);
+  return current;
 }
 
 
@@ -57,41 +58,85 @@ export async function recordDtc(basePath: string, dtc: DtcRecord): Promise<void>
   });
 }
 
+const VALID_DTC_STATUSES = new Set<DtcStatus>([
+  'CONFIRMED', 'PENDING', 'PERMANENT', 'INACTIVE', 'HISTORICAL', 'CURRENT', 'UNKNOWN',
+]);
+
+function parseStoredDtcLine(line: string): DtcRecord | null {
+  const [rawCode, description, rawStatus, firstSeen, lastSeen, rawOccurrences, rawSource, historical, confirmed] = line.split('|');
+  const code = typeof rawCode === 'string' ? rawCode.trim().toUpperCase() : '';
+  const status = typeof rawStatus === 'string' ? rawStatus.trim().toUpperCase() as DtcStatus : 'UNKNOWN';
+  const source = typeof rawSource === 'string' ? rawSource.trim() as DataSource : 'IMPORTADO';
+  const occurrences = Number(rawOccurrences);
+  if (!/^[PCBU][0-9A-F]{4}$/.test(code) || !VALID_DTC_STATUSES.has(status) ||
+      source !== 'REAL_OBD' || !Number.isFinite(occurrences) || occurrences < 0) return null;
+  return {
+    code,
+    description: description || undefined,
+    status,
+    firstSeen: firstSeen || '',
+    lastSeen: lastSeen || '',
+    occurrences: Math.max(1, Math.floor(occurrences)),
+    source: 'REAL_OBD',
+    historical: historical === 'true' || status === 'HISTORICAL' || status === 'INACTIVE',
+    confirmed: confirmed === 'true',
+  };
+}
+
+/**
+ * Remove imported/seed/simulation and malformed rows from the legacy DTC text
+ * file. A backup is kept and a staged read-back is validated before replacing
+ * the original, so a failed purge never turns the existing file into empty data.
+ */
+export async function purgeLegacyNonRealDtcs(basePath: string): Promise<void> {
+  const target = `${basePath}/DTC/dtc_records.txt`;
+  await queueDtcWrite(target, async () => {
+    const info = await FileSystem.getInfoAsync(target);
+    if (!info.exists) return;
+    if (info.isDirectory) throw new Error('DTC_HISTORY_IS_DIRECTORY');
+    const content = await FileSystem.readAsStringAsync(target, { encoding: FileSystem.EncodingType.UTF8 });
+    const lines = content.split(/\r?\n/).filter((line) => line.trim());
+    const cleanLines = lines.filter((line) => parseStoredDtcLine(line) !== null);
+    if (cleanLines.length === lines.length) return;
+
+    const temp = target + '.tmp';
+    const backup = target + '.previous';
+    const output = cleanLines.length ? cleanLines.join('\n') + '\n' : '';
+    await FileSystem.writeAsStringAsync(temp, output, { encoding: FileSystem.EncodingType.UTF8 });
+    const staged = await FileSystem.readAsStringAsync(temp, { encoding: FileSystem.EncodingType.UTF8 });
+    if (staged !== output || staged.split(/\r?\n/).filter(Boolean).some((line) => parseStoredDtcLine(line) === null)) {
+      throw new Error('DTC_HISTORY_PURGE_STAGING_FAILED');
+    }
+    await FileSystem.copyAsync({ from: target, to: backup });
+    let committed = false;
+    try {
+      await FileSystem.copyAsync({ from: temp, to: target });
+      const readBack = await FileSystem.readAsStringAsync(target, { encoding: FileSystem.EncodingType.UTF8 });
+      if (readBack !== output) throw new Error('DTC_HISTORY_PURGE_COMMIT_FAILED');
+      committed = true;
+    } catch (cause) {
+      try { await FileSystem.copyAsync({ from: backup, to: target }); } catch { /* preserve backup */ }
+      throw cause;
+    } finally {
+      if (committed) {
+        try { await FileSystem.deleteAsync(temp, { idempotent: true }); } catch { /* clean next time */ }
+      }
+    }
+    try { await FileSystem.copyAsync({ from: target, to: backup }); } catch {
+      // Main DTC file has been verified; previous backup remains recoverable.
+    }
+  });
+}
+
 export async function readDtcs(basePath: string): Promise<DtcRecord[]> {
   const target = `${basePath}/DTC/dtc_records.txt`;
   await (dtcQueues.get(target) ?? Promise.resolve()).catch(() => undefined);
   const info = await FileSystem.getInfoAsync(target);
   if (!info.exists) return [];
-
-  const content = await FileSystem.readAsStringAsync(target);
-  return content
-    .split('\n')
-    .filter((line) => line.trim())
-    .map((line) => {
-      const [
-        code,
-        description,
-        status,
-        firstSeen,
-        lastSeen,
-        occurrences,
-        source,
-        historical,
-        confirmed,
-      ] = line.split('|');
-
-      return {
-        code,
-        description: description || undefined,
-        status: (status as DtcStatus) || 'UNKNOWN',
-        firstSeen,
-        lastSeen,
-        occurrences: Number(occurrences || 0),
-        source: (source as DataSource) || 'IMPORTADO',
-        historical: historical === 'true',
-        confirmed: confirmed === 'true',
-      };
-    });
+  if (info.isDirectory) throw new Error('DTC_HISTORY_IS_DIRECTORY');
+  const content = await FileSystem.readAsStringAsync(target, { encoding: FileSystem.EncodingType.UTF8 });
+  return content.split(/\r?\n/).filter((line) => line.trim())
+    .map(parseStoredDtcLine).filter((dtc): dtc is DtcRecord => dtc !== null);
 }
 
 export async function getCurrentDtcs(basePath: string): Promise<DtcRecord[]> {
