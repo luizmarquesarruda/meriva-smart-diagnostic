@@ -18,7 +18,7 @@ function linkedSensorRecommendations(ruleId: string): string[] {
 }
 const ACTIVE_DTC_STATUSES = new Set(['CONFIRMED', 'PENDING', 'PERMANENT', 'CURRENT']);
 
-function isSimulation(item: PidObservation): boolean { return String(item.source ?? '').trim().toUpperCase() === 'SIMULACAO'; }
+function isSimulation(item: PidObservation): boolean { return Boolean(item) && String(item.source ?? '').trim().toUpperCase() === 'SIMULACAO'; }
 function isLiveObd(item: PidObservation): boolean { return String(item.source ?? '').trim().toUpperCase() === 'REAL_OBD'; }
 
 /** PID evidence must be numerical, responded and recent. A cached reading
