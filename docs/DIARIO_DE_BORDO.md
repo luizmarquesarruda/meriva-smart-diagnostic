@@ -2446,3 +2446,28 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Commit da correção de navegação: `f258796d2da04071173293e023c5697d3366de01`.
 - A alteração permanece numa branch de revisão; **CI e testes automatizados continuam sem execução**, conforme solicitado.
 
+## 2026-10-15 — Evolução de persistência SQLite
+
+### Objetivo e arquitetura
+- Adicionada a camada operacional SQLite em `src/storage/merivaDatabase.ts`, com `expo-sqlite ~14.0.6` para Expo SDK 51. O SQLite complementa o autosave; não substitui a recuperação JSON.
+- Mantido `CONFIG/autosave.json` como snapshot interno com validação e cópia anterior. TXT continua sendo o único formato de relatório entregue ao usuário: histórico ECU diário e relatório individual da Central de Testes.
+- Criadas migrações versionadas 1 e 2 (`PRAGMA user_version` + `schema_migrations`), WAL, chaves estrangeiras e índices por data/sessão/PID.
+
+### Dados operacionais e integridade
+- Migração 1: `obd_sessions`, `pid_readings`, `dtc_events` e `learned_pids`.
+- Migração 2: `sensor_tests`, `sensor_test_readings`, `trip_records` e `diagnostic_findings`.
+- Sessões ECU registram abertura/fechamento; sessões que ficaram abertas após encerramento do processo são marcadas como recuperadas, nunca como conexão viva.
+- A telemetria detalhada é limitada a uma amostra por PID a cada 2 segundos, só para fonte `REAL`, status `RESPONDEU`, valor finito e sessão ativa. A tela continua livre para atualizar valores mais rapidamente em memória.
+- DTCs e viagens são sincronizados apenas quando sua origem é `REAL_OBD`; dados seed/CarScanner e simulações não são importados para a evidência operacional. A migração do snapshot JSON é idempotente e não remove o arquivo legado.
+- A Central de Testes continua salvando TXT primeiro e também registra cabeçalho, avaliações e tentativas no SQLite. A falha de SQLite não invalida o TXT.
+
+### Dependências, teste de contrato e documentação
+- Atualizados `package.json` e `package-lock.json` com `expo-sqlite ~14.0.6` e dependências transitivas necessárias.
+- Criado `tests/sqlitePersistenceContract.test.js` para proteger esquema, migrações, lockfile, filtros de origem, throttling, integração do autosave e continuidade dos relatórios TXT.
+- Criado `docs/SQLITE_PERSISTENCIA.md` com divisão de responsabilidades, tabelas, regras de qualidade e limites da migração.
+- Arquivos funcionais: `src/storage/merivaDatabase.ts`, `src/meriva/autosaveManager.ts`, `app/testes-sensores.tsx`, `package.json`, `package-lock.json`, `tests/sqlitePersistenceContract.test.js` e `docs/SQLITE_PERSISTENCIA.md`.
+
+### Validação, limites e próximo passo
+- Não foram executados `npm run validate`, Expo Doctor, prebuild/build Android nem testes com o ELM327/ECU físico. **Não afirmar que a integração nativa está validada** até esses passos terminarem.
+- A CI não foi disparada por solicitação. A branch `feat/sqlite-persistencia-20261015` está temporariamente excluída do gatilho de push em `.github/workflows/ci.yml` para evitar execução automática durante esta fase; a exceção deve ser removida ao autorizar a validação/integração.
+- Próximo passo: executar typecheck, suíte de testes, Expo Doctor e build standalone Android; corrigir qualquer divergência observada e depois testar com o veículo parado, primeiro com motor desligado e depois aquecido em marcha lenta.
