@@ -84,7 +84,7 @@ export default function TestesSensoresScreen(){
     for(const row of item.rows)lines.push('Leitura '+row.readingNumber+': '+valueText(row.value,row.unit)+' | Parser: '+row.status+' | Latência: '+row.elapsedMs+' ms | '+row.timestamp,'RX bruto: '+(row.rawResponse||'VAZIO'));
    }
    lines.push('','POLÍTICA: resposta positiva confirma resposta do PID, não exatidão física/elétrica do sensor. PIDs fora da bitmap não foram consultados.','REFERÊNCIAS: SAE J1979 supported-PID bitmap; Dashlogic PID listing; OBD2 PID Knowledge; auditoria da Bíblia da Meriva.','Limiares são heurísticos, não especificações OEM. Algumas verificações exigem multímetro, osciloscópio ou condições controladas.');
-   await FileSystem.writeAsStringAsync(path,lines.join('\\n'),{encoding:FileSystem.EncodingType.UTF8});
+   await FileSystem.writeAsStringAsync(path,lines.join('\n'),{encoding:FileSystem.EncodingType.UTF8});
    let indexedInSqlite=true;
    try{
     const localDb=await import('../src/database/localDatabase');
