@@ -235,7 +235,12 @@ async function openDatabase(): Promise<SQLiteDatabase> {
         ? documentDirectory + MERIVA_DATABASE_DIRECTORY
         : undefined;
       if (databaseDirectory) {
-        await FileSystem.makeDirectoryAsync(databaseDirectory, { intermediates: true });
+        const directoryInfo = await FileSystem.getInfoAsync(databaseDirectory);
+        if (!directoryInfo.exists) {
+          await FileSystem.makeDirectoryAsync(databaseDirectory, { intermediates: true });
+        } else if (!directoryInfo.isDirectory) {
+          throw new Error('SQLITE_DIRECTORY_CONFLICT:' + databaseDirectory);
+        }
       }
       // Mantém o .db dentro de MERIVA_SMART/BANCO para que a central de
       // armazenamento contabilize o banco junto dos demais dados locais.
