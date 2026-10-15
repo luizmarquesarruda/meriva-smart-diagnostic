@@ -100,6 +100,53 @@ function splitPages(content: string): Map<string, string> {
   return pages;
 }
 
+
+/** Importa os blocos TXT preexistentes uma única vez; o TXT continua sendo o histórico visível. */
+async function migrateLegacyHistoryToSqlite(content: string): Promise<void> {
+  const localDb = await import('../database/localDatabase');
+  const migrationKey = 'migration.daily_obd_history.v1';
+  if (await localDb.getLocalMetadata(migrationKey) === 'complete') return;
+  const events: import('../database/localDatabase').LocalSessionEvent[] = [];
+  for (const [date, body] of splitPages(content)) {
+    const marker = /--- EVENTO: (SESSION_START|SESSION_END|SESSION_RECOVERED) \| ([^\r\n]+) ---/g;
+    let match: RegExpExecArray | null;
+    while ((match = marker.exec(body)) !== null) {
+      const endMarker = body.indexOf('--- FIM DO EVENTO ---', marker.lastIndex);
+      const end = endMarker >= 0 ? endMarker + '--- FIM DO EVENTO ---'.length : marker.lastIndex;
+      events.push({
+        date,
+        eventType: match[1] as import('../database/localDatabase').LocalSessionEvent['eventType'],
+        timestamp: match[2].trim(),
+        renderedTxt: body.slice(match.index, end).trim(),
+        payload: { importedFromDailyTxt: true },
+      });
+      marker.lastIndex = end;
+    }
+  }
+  await localDb.importLegacyObdSessionEvents(events, migrationKey);
+}
+
+async function mirrorSessionEventToSqlite(
+  date: string,
+  event: 'SESSION_START' | 'SESSION_END' | 'SESSION_RECOVERED',
+  timestamp: string,
+  renderedTxt: string,
+  state: MerivaPersistedState,
+): Promise<void> {
+  const localDb = await import('../database/localDatabase');
+  await localDb.recordObdSessionEvent({
+    date, eventType: event, timestamp, renderedTxt,
+    payload: {
+      adapterName: state.obd.adapterName ?? null,
+      protocol: state.obd.protocol ?? null,
+      connected: state.obd.connected,
+      realReadingCount: state.lastReadings.filter((reading) => reading.source === 'REAL').length,
+      dtcCount: state.dtcs.length,
+      realTripCount: state.driveCycles.filter((cycle) => cycle.source === 'REAL_OBD').length,
+    },
+  });
+}
+
 async function appendDailyObdSessionEventUnsafe(
   basePath: string,
   state: MerivaPersistedState,
@@ -120,6 +167,8 @@ async function appendDailyObdSessionEventUnsafe(
     content = await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 });
   }
 
+  try { await migrateLegacyHistoryToSqlite(content); } catch (error) { console.warn('[sqlite] migração do histórico diário pendente; TXT preservado:', error instanceof Error ? error.message : error); }
+
   const pages = splitPages(content);
   const previousEvents = pages.get(date) ?? '';
   const updatedEvents = [previousEvents, renderEvent(state, event, timestamp)].filter(Boolean).join('\n\n');
@@ -132,6 +181,12 @@ async function appendDailyObdSessionEventUnsafe(
     output.push('', `========== DIA: ${day} ==========`, pages.get(day) ?? '', `========== FIM DO DIA ==========`);
   }
   await FileSystem.writeAsStringAsync(path, `${output.join('\n')}\n`, { encoding: FileSystem.EncodingType.UTF8 });
+  try {
+    await mirrorSessionEventToSqlite(date, event, timestamp, renderEvent(state, event, timestamp), state);
+  } catch (error) {
+    // O TXT já foi persistido; SQLite é índice estruturado, não cópia única.
+    console.warn('[sqlite] evento salvo em TXT, mas não indexado em SQLite:', error instanceof Error ? error.message : error);
+  }
   return { date, eventCount };
 }
 

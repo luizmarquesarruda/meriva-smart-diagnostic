@@ -68,7 +68,7 @@ A recepção Bluetooth usa o listener de dados como fonte única. A `Elm327Sessi
 
 ### Dados
 
-`src/database/` contém persistência, DTC, banco de PIDs, aprendizado e configuração do veículo.
+`src/database/` contém persistência, DTC, banco de PIDs, aprendizado, configuração do veículo e a camada SQLite em `localDatabase.ts`. SQLite guarda viagens, eventos de sessão ECU e execuções/amostras dos testes de sensores, com índices por data/PID.
 
 ### Meriva
 
@@ -95,6 +95,12 @@ Somente dados reais podem alimentar o aprendizado real do veículo.
 ## Estado Bluetooth
 
 O estado não deve ser resumido a "conectado". O diagnóstico precisa separar Bluetooth, ELM327 e ECU.
+
+## Persistência SQLite
+
+O banco privado `meriva-smart-diagnostic.db` usa a API assíncrona de `expo-sqlite` compatível com Expo SDK 51. A conexão é compartilhada, usa WAL, timeout de bloqueio e transações exclusivas para gravações de várias tabelas. Migrações são idempotentes e versionadas em `app_metadata`. As tabelas armazenam viagens, eventos ECU e execução/amostras dos testes de sensores; os arquivos JSON e TXT legados não são removidos na migração.
+
+O autosave principal permanece em JSON; configurações e catálogos continuam em JSON e os relatórios voltados ao usuário permanecem TXT. Se SQLite estiver indisponível, as viagens podem ser lidas/gravar pelo JSON legado e o histórico ECU continua sendo salvo em TXT. Backups incluem snapshot estruturado do banco SQLite; a quota contabiliza o banco e os arquivos WAL/SHM.
 
 ## Autosave
 
