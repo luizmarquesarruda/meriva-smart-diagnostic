@@ -232,6 +232,9 @@ async function initAutoSaveUnsafe(basePath: string): Promise<MerivaPersistedStat
 
   const envelope = await loadLastValidEnvelope(basePath);
   runtime.state = envelope ? hydrateState(envelope.payload) : createEmptyMerivaState();
+  const legacySnapshotNeedsCleanup = Boolean(
+    envelope && JSON.stringify(envelope.payload) !== JSON.stringify(runtime.state),
+  );
   try {
     await migrateLegacyStateToSqlite(runtime.state);
   } catch (databaseCause) {
@@ -240,9 +243,11 @@ async function initAutoSaveUnsafe(basePath: string): Promise<MerivaPersistedStat
   runtime.lastSavedAt = envelope?.savedAt ?? null;
   runtime.lastSaveReason = null;
   runtime.lastError = null;
-  runtime.lastSavedFingerprint = envelope ? snapshotFingerprint(runtime.state) : null;
-  runtime.dirty = false;
-  runtime.mutationVersion = 0;
+  // Se a hidratação removeu dados CarScanner, forçar a gravação do snapshot
+  // sanitizado para que a remoção seja persistente, não apenas visual.
+  runtime.lastSavedFingerprint = envelope && !legacySnapshotNeedsCleanup ? snapshotFingerprint(runtime.state) : null;
+  runtime.dirty = legacySnapshotNeedsCleanup;
+  runtime.mutationVersion = legacySnapshotNeedsCleanup ? 1 : 0;
 
   // Android pode encerrar o processo sem executar o fechamento da sessão.
   // Nunca reutilizar uma conexão persistida como se ainda estivesse viva.
