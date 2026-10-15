@@ -2763,3 +2763,7 @@ Em `app/dados.tsx`, “ÚLTIMAS LEITURAS REAIS” agora só lista itens com `sou
 
 ### Aperfeiçoamento após revisão conceitual da referência
 A comparação de um trecho instantâneo com a média de uma viagem inteira pode confundir trânsito/cidade/estrada com eficiência. A referência pessoal agora exige também velocidade média histórica aproximadamente compatível com a velocidade do trecho atual (faixa relativa inicial máxima de 50%), além de mesma fonte de taxa e tipo de combustível. O parâmetro está em `fuel_coach_policy.json`. Se não houver viagens comparáveis suficientes, o coach permanece em “Calibrando”. A referência é uma comparação informativa, não uma medição controlada do estilo de condução nem um diagnóstico mecânico.
+
+
+### Desconexão/ECU sem resposta
+O loop do serviço agora zera instantaneamente valor de consumo, fonte, timestamp original, tipo de combustível e velocidade usados pelo coach quando a ECU deixa de responder. Isso evita que uma amostra da sessão anterior seja reutilizada quando uma conexão volta. O contrato estático do cockpit foi ampliado para proteger essa invalidação. A execução automatizada continua pendente por decisão explícita de não disparar CI.
