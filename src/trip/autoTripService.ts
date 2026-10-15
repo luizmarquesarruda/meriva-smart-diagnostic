@@ -28,6 +28,7 @@ export interface AutoTripServiceState {
   instantaneousConsumptionKml: number | null;
   instantaneousConsumptionSource: FuelRateSource | null;
   instantaneousConsumptionTimestampMs: number | null;
+  instantaneousFuelType: FuelType | null;
   instantaneousSpeedKmh: number | null;
   activeFuelType: FuelType | null;
   error: string | null;
@@ -55,6 +56,7 @@ const INITIAL_STATE: AutoTripServiceState = {
   instantaneousConsumptionKml: null,
   instantaneousConsumptionSource: null,
   instantaneousConsumptionTimestampMs: null,
+  instantaneousFuelType: null,
   instantaneousSpeedKmh: null,
   activeFuelType: null,
   error: null,
@@ -553,6 +555,7 @@ class AutoTripService {
           instantaneousConsumptionKml,
           instantaneousConsumptionSource: instantaneousConsumptionKml != null ? fuelRateForDisplaySource : null,
           instantaneousConsumptionTimestampMs: instantaneousConsumptionKml != null ? fuelRateForDisplayTimestampMs : null,
+          instantaneousFuelType: instantaneousConsumptionKml != null ? estimateFuelType : null,
           instantaneousSpeedKmh: tripVehicleSpeedKmh,
           activeFuelType: recorder ? (this.recorderFuelType ?? this.fuelType) : null,
           fuelLevelPercent,
