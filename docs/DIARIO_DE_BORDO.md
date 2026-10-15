@@ -2446,3 +2446,31 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Commit da correção de navegação: `f258796d2da04071173293e023c5697d3366de01`.
 - A alteração permanece numa branch de revisão; **CI e testes automatizados continuam sem execução**, conforme solicitado.
 
+
+
+## 2026-10-15 — Evolução da persistência com SQLite
+
+### Arquitetura aplicada
+- Adicionada a dependência `expo-sqlite ~14.0.6`, alinhada à geração do Expo SDK 51 / React Native 0.74.5. O lockfile foi atualizado com a árvore direta e transitiva do pacote.
+- Criada `src/database/localDatabase.ts`, com esquema versão 1, WAL, timeout de bloqueio, uma conexão compartilhada e fila serializada de transações exclusivas.
+- Criadas as tabelas `app_metadata`, `drive_cycles`, `obd_session_events`, `sensor_test_runs` e `sensor_test_readings`, com índices por data, origem e PID e consultas limitadas para histórico.
+- Adicionada migração idempotente do índice legado `VIAGENS/index.json` para SQLite. Viagens passam a ser lidas e gravadas prioritariamente no banco; o JSON existente continua disponível como compatibilidade/recuperação e é usado em fallback.
+- Adicionada migração idempotente de eventos já registrados no TXT diário. Novos eventos continuam a ser registrados no histórico TXT e também são indexados em SQLite.
+- Ao salvar um relatório de teste de sensores, o TXT continua sendo criado primeiro e o resultado (execução completa/parcial, leituras, valor, unidade, resposta bruta, latência e avaliação) também é indexado em SQLite. Se a indexação falhar, o TXT permanece salvo e a tela avisa que o banco não foi atualizado.
+- A área de armazenamento contabiliza o banco SQLite e os arquivos auxiliares WAL/SHM. Backups incluem um snapshot JSON interno das linhas SQLite, pois o arquivo de banco vive fora da pasta `MERIVA_SMART`.
+- Atualizada `docs/ARCHITECTURE.md` e criado `tests/sqlitePersistence.test.js`, registrado em `npm test`, para checar dependência/lockfile, tabelas, transações, migrações, fallback e manutenção dos relatórios TXT.
+
+### Formatos e preservação
+- JSON permanece para autosave, configuração, catálogos e compatibilidade legada; TXT permanece o único formato de relatório entregue ao motorista.
+- O CSV de viagens existente ainda é mantido como log interno de compatibilidade; não é oferecido como formato de relatório.
+- Os arquivos TXT e JSON legados não são apagados como parte da migração SQL. A política já existente de retirar registros de referência `CARSCANNER_SEED` do histórico visível de viagens foi mantida.
+- Limite remanescente: o TXT agregado de sessões ECU ainda é reconstituído quando um evento é anexado. SQLite evita depender desse texto como índice consultável, mas uma futura geração do TXT consolidado sob demanda poderia reduzir ainda mais as gravações em históricos muito grandes.
+
+### Verificação e CI
+- Revisados estaticamente os arquivos alterados, a resolução/versão declarada no lockfile e a presença dos contratos de persistência; isto **não substitui** instalação real ou execução dos testes.
+- **TypeScript, suíte de testes, Expo Doctor, build Android e teste físico com ELM327 não foram executados.**
+- **Incidente de CI automática:** apesar de não ter solicitado uma execução manual, os commits individuais via API do GitHub fizeram o repositório iniciar Actions automaticamente; várias execuções foram canceladas/substituídas e a verificação final encontrou a execução `38679192817` em andamento. A conexão disponível não expõe uma ação de cancelamento, então não consegui interrompê-la diretamente. Esta situação foi causada pelo fluxo de commits e não deve ser interpretada como autorização para futuras execuções. Este registro usa a marca `[skip ci]` para evitar iniciar outra execução.
+
+### Referência
+- Branch de evolução: `feat/sqlite-local-persistence-20261015`.
+- Commit de código verificado antes deste registro: `aadfe413379518595f1e5a783858648ba0c3be0b`.
