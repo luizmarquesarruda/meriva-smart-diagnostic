@@ -10,6 +10,13 @@ O app passa a usar três camadas distintas, cada uma com uma função explícita
 
 Não criar relatórios JSON ou CSV visíveis ao usuário. Catálogos e configuração JSON internos permanecem válidos.
 
+## Limpeza do legado CarScanner
+
+- Viagens importadas são removidas do índice legado e não fazem parte das viagens iniciais.
+- Na inicialização, o perfil de aprendizado é purgado: estatísticas limpas de origem `REAL_OBD` são preservadas; estatísticas que misturavam baseline importado e amostras reais são descartadas porque a média histórica não pode ser separada com segurança.
+- Snapshots JSON antigos são sanitizados durante a hidratação. TXT históricos removem linhas de origem importada e substituem o bloco de aprendizado contaminado por uma nota explícita.
+- Os PIDs antes usados como candidatos de baseline permanecem apenas como alvos não validados, sem valores de referência importados. Somente resposta RAW_ECU real pode confirmá-los.
+
 ## Compatibilidade
 
 O projeto permanece em Expo SDK 51 / React Native 0.74.5. A dependência expo-sqlite ~14.0.6 usa a linha do módulo compatível com esse SDK e a API assíncrona openDatabaseAsync. Referência: [documentação SQLite do Expo SDK 51](https://docs.expo.dev/versions/v51.0.0/sdk/sqlite/).
