@@ -126,6 +126,73 @@ function updateStatisticsWithRealSample(
   existing.source = Array.from(new Set([...existing.source, 'REAL_OBD']));
 }
 
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isFiniteNonNegative(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
+}
+
+function isValidLearningStatistics(value: unknown): value is SampleStatistics {
+  if (!isObjectRecord(value)) return false;
+  const finiteKeys = ['mean', 'median', 'min', 'max', 'stddev', 'samples', 'realSamples', 'seedSamples'];
+  if (!finiteKeys.every((key) => typeof value[key] === 'number' && Number.isFinite(value[key]))) return false;
+  if (!isFiniteNonNegative(value.samples) || !isFiniteNonNegative(value.realSamples) ||
+      !isFiniteNonNegative(value.seedSamples) || !isFiniteNonNegative(value.stddev)) return false;
+  if ((value.min as number) > (value.max as number)) return false;
+  if (!['LOW', 'MEDIUM', 'GOOD', 'HIGH'].includes(String(value.confidence))) return false;
+  if (typeof value.lastUpdate !== 'string' || !Number.isFinite(Date.parse(value.lastUpdate))) return false;
+  if (!Array.isArray(value.source) || !value.source.every((source) => typeof source === 'string')) return false;
+  if (value.medianWindow !== undefined &&
+      (!Array.isArray(value.medianWindow) || !value.medianWindow.every((item) => typeof item === 'number' && Number.isFinite(item)))) return false;
+  return true;
+}
+
+function isValidStatisticsMap(value: unknown): value is Record<string, SampleStatistics> {
+  return isObjectRecord(value) && Object.values(value).every(isValidLearningStatistics);
+}
+
+function isValidLearningProfile(value: unknown): value is MerivaLearningProfile {
+  if (!isObjectRecord(value)) return false;
+  if (
+    typeof value.vehicleId !== 'string' ||
+    typeof value.profileCreated !== 'string' || !Number.isFinite(Date.parse(value.profileCreated)) ||
+    typeof value.lastUpdated !== 'string' || !Number.isFinite(Date.parse(value.lastUpdated)) ||
+    typeof value.seedVersion !== 'string' ||
+    typeof value.seedImportDate !== 'string' ||
+    !['COLD_START', 'SEED_INITIALIZED', 'LEARNING_ACTIVE', 'CONFIDENT'].includes(String(value.learningStatus)) ||
+    !['HYBRID', 'REAL_ONLY'].includes(String(value.source)) ||
+    typeof value.seedWeight !== 'number' || !Number.isFinite(value.seedWeight) || value.seedWeight < 0 ||
+    !isObjectRecord(value.confidenceThresholds) ||
+    !['low', 'medium', 'good', 'high'].every((key) => isFiniteNonNegative(value.confidenceThresholds[key])) ||
+    typeof value.confidenceThresholds.low !== 'number' || typeof value.confidenceThresholds.medium !== 'number' ||
+    typeof value.confidenceThresholds.good !== 'number' || typeof value.confidenceThresholds.high !== 'number' ||
+    value.confidenceThresholds.low > value.confidenceThresholds.medium ||
+    value.confidenceThresholds.medium > value.confidenceThresholds.good ||
+    value.confidenceThresholds.good > value.confidenceThresholds.high ||
+    !isObjectRecord(value.globalSampleCounts) ||
+    !isFiniteNonNegative(value.globalSampleCounts.seedSamples) ||
+    !isFiniteNonNegative(value.globalSampleCounts.realSamples) ||
+    !isFiniteNonNegative(value.globalSampleCounts.totalSamples) ||
+    !Array.isArray(value.contextualData) ||
+    !value.contextualData.every((context) => {
+      if (!isObjectRecord(context)) return false;
+      return (
+        ['IDLE_COLD', 'IDLE_WARM', 'ACCELERATION', 'CRUISE', 'DECELERATION', 'UNKNOWN'].includes(String(context.condition)) &&
+        typeof context.lastUpdate === 'string' && Number.isFinite(Date.parse(context.lastUpdate)) &&
+        isFiniteNonNegative(context.sampleCount) &&
+        isValidStatisticsMap(context.statistics)
+      );
+    }) ||
+    !isValidStatisticsMap(value.overallStatistics) ||
+    !isObjectRecord(value.dataContamination) ||
+    !isFiniteNonNegative(value.dataContamination.simulationDetected) ||
+    !isFiniteNonNegative(value.dataContamination.simulationFiltered)
+  ) return false;
+  return true;
+}
+
 async function readLearningProfileUnsafe(
   basePath: string,
 ): Promise<MerivaLearningProfile | null> {
@@ -134,8 +201,9 @@ async function readLearningProfileUnsafe(
   if (!info.exists || info.isDirectory) return null;
 
   try {
-    const content = await FileSystem.readAsStringAsync(target);
-    return JSON.parse(content) as MerivaLearningProfile;
+    const content = await FileSystem.readAsStringAsync(target, { encoding: FileSystem.EncodingType.UTF8 });
+    const parsed = JSON.parse(content) as unknown;
+    return isValidLearningProfile(parsed) ? parsed : null;
   } catch {
     return null;
   }
@@ -146,10 +214,47 @@ async function writeLearningProfileUnsafe(
   profile: MerivaLearningProfile,
 ): Promise<void> {
   const target = profilePath(basePath);
+  const temp = target + '.tmp';
+  const backup = target + '.previous';
+  const quarantine = target + '.invalid';
   await FileSystem.makeDirectoryAsync(`${basePath}/APRENDIZADO`, { intermediates: true });
-  await FileSystem.writeAsStringAsync(target, JSON.stringify(profile, null, 2), {
-    encoding: FileSystem.EncodingType.UTF8,
-  });
+
+  const content = JSON.stringify(profile, null, 2);
+  await FileSystem.writeAsStringAsync(temp, content, { encoding: FileSystem.EncodingType.UTF8 });
+  const staged = JSON.parse(await FileSystem.readAsStringAsync(temp, { encoding: FileSystem.EncodingType.UTF8 })) as unknown;
+  if (!isValidLearningProfile(staged)) throw new Error('LEARNING_PROFILE_STAGING_VALIDATION_FAILED');
+
+  const info = await FileSystem.getInfoAsync(target);
+  if (info.exists && !info.isDirectory) {
+    const current = await FileSystem.readAsStringAsync(target, { encoding: FileSystem.EncodingType.UTF8 }).catch(() => '');
+    let parsedCurrent: unknown = null;
+    try { parsedCurrent = JSON.parse(current) as unknown; } catch { /* preserve below */ }
+    if (isValidLearningProfile(parsedCurrent)) {
+      await FileSystem.copyAsync({ from: target, to: backup });
+    } else {
+      // Preserve malformed legacy content separately before replacing it with a
+      // clean profile, without allowing invalid shape to reach learning logic.
+      await FileSystem.copyAsync({ from: target, to: quarantine }).catch(() => undefined);
+    }
+  }
+
+  let committed = false;
+  try {
+    await FileSystem.copyAsync({ from: temp, to: target });
+    const readBack = JSON.parse(await FileSystem.readAsStringAsync(target, { encoding: FileSystem.EncodingType.UTF8 })) as unknown;
+    if (!isValidLearningProfile(readBack)) throw new Error('LEARNING_PROFILE_COMMIT_VALIDATION_FAILED');
+    committed = true;
+  } catch (cause) {
+    const backupInfo = await FileSystem.getInfoAsync(backup).catch(() => ({ exists: false, isDirectory: false }));
+    if (backupInfo.exists && !backupInfo.isDirectory) {
+      try { await FileSystem.copyAsync({ from: backup, to: target }); } catch { /* recovery backup remains */ }
+    }
+    throw cause;
+  } finally {
+    if (committed) {
+      try { await FileSystem.deleteAsync(temp, { idempotent: true }); } catch { /* clean on next write */ }
+    }
+  }
 }
 
 async function enqueueProfileTransaction<T>(
@@ -214,6 +319,15 @@ export async function createLearningProfile(
     },
   };
 
+  const existingInfo = await FileSystem.getInfoAsync(profilePath(basePath));
+  if (existingInfo.exists && !existingInfo.isDirectory) {
+    const existing = await readLearningProfileUnsafe(basePath);
+    if (!existing) {
+      // New blank profile must not destroy an unreadable legacy DNA file.
+      const invalidCopy = profilePath(basePath) + '.invalid';
+      await FileSystem.copyAsync({ from: profilePath(basePath), to: invalidCopy }).catch(() => undefined);
+    }
+  }
   await saveLearningProfile(basePath, profile);
   return profile;
 }
