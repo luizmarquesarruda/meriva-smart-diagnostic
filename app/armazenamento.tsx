@@ -192,6 +192,7 @@ export default function ArmazenamentoScreen() {
             {sqliteOverview ? (
               <>
                 <View style={styles.storageRow}><Text style={styles.storageLabel}>Esquema do banco</Text><Text style={styles.storageValue}>v{sqliteOverview.schemaVersion}</Text></View>
+                <View style={styles.storageRow}><Text style={styles.storageLabel}>Tamanho do banco (SQLite)</Text><Text style={styles.storageValue}>{formatBytes(sqliteOverview.databaseSizeBytes)}</Text></View>
                 <View style={styles.storageRow}><Text style={styles.storageLabel}>Sessões ECU abertas</Text><Text style={styles.storageValue}>{sqliteOverview.openSessions}</Text></View>
                 <View style={styles.storageRow}><Text style={styles.storageLabel}>Amostras reais de PID</Text><Text style={styles.storageValue}>{sqliteOverview.recordedPidSamples}</Text></View>
                 <View style={styles.storageRow}><Text style={styles.storageLabel}>Eventos DTC registrados</Text><Text style={styles.storageValue}>{sqliteOverview.recordedDtcEvents}</Text></View>
