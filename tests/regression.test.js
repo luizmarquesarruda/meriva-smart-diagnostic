@@ -1140,6 +1140,13 @@ function testPidResponseIsNotVehicleValidation() {
   assert.ok(integration.includes("status: prior?.status === 'CONFIRMADO' && prior.source === 'USER_REAL_OBSERVATION' ? 'CONFIRMADO' : 'RESPONDEU'"), 'resposta válida não deve promover automaticamente PID para confirmado');
   assert.ok(integration.includes('não valida a exatidão física do sensor'), 'o código deve documentar que resposta OBD não comprova exatidão elétrica do sensor');
 
+  const validation = loadTs(path.join(ROOT, 'src/meriva/autosaveValidation.ts'));
+  assert.strictEqual(validation.shouldFeedLearning('REAL', 'RESPONDEU', 123), true);
+  assert.strictEqual(validation.shouldFeedLearning('REAL', 'RESPONDEU', NaN), false, 'NaN não pode alimentar aprendizado');
+  assert.strictEqual(validation.shouldFeedLearning('REAL', 'RESPONDEU', Infinity), false, 'Infinity não pode alimentar aprendizado');
+  assert.strictEqual(validation.shouldFeedLearning('REAL', 'RESPONDEU', null), false);
+  assert.strictEqual(validation.shouldFeedLearning('SIMULACAO', 'RESPONDEU', 123), false);
+
   const runtime = loadTs(path.join(ROOT, 'src/meriva/autosaveIntegration.ts'));
   const basePath = '/doc/learning-throttle-regression';
   assert.strictEqual(runtime.shouldPersistRealPidSample(basePath, '010C', 1000), true);
