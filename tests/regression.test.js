@@ -1047,6 +1047,30 @@ async function testDtcStorage() {
   assert.ok(!files.get(dtcPath + '.previous').includes('CARSCANNER_BASELINE'), 'backup operacional validado não deve reintroduzir seed após conclusão');
 }
 
+async function testMalformedLearningProfileRecovery() {
+  resetFS();
+  const learning = loadTs(path.join(ROOT, 'src/database/learningProfile.ts'));
+  const target = `${BASE}/APRENDIZADO/dna_meriva.json`;
+  const malformed = JSON.stringify({
+    vehicleId: 'MERIVA_MAXX',
+    globalSampleCounts: null,
+    confidenceThresholds: null,
+    contextualData: [null],
+    overallStatistics: { RPM: null },
+    source: 'HYBRID',
+  });
+  files.set(target, malformed);
+
+  assert.strictEqual(await learning.readLearningProfile(BASE), null,
+    'perfil de aprendizado parcial não deve passar pela validação como perfil operacional');
+  const recovered = await learning.createLearningProfile(BASE, '');
+  assert.strictEqual(recovered.source, 'REAL_ONLY');
+  assert.deepStrictEqual(recovered.globalSampleCounts, { seedSamples: 0, realSamples: 0, totalSamples: 0 });
+  assert.strictEqual(files.get(target + '.invalid'), malformed,
+    'o perfil inválido original deve ser preservado antes de criar um perfil frio seguro');
+  assert.strictEqual((await learning.readLearningProfile(BASE)).learningStatus, 'COLD_START');
+}
+
 async function testBackupCompleteness() {
   resetFS();
   const m = loadTs(path.join(ROOT, 'src/meriva/autosaveManager.ts'));
@@ -1352,6 +1376,7 @@ async function main() {
     ['drive cycles', testDriveCycleValidation],
     ['resumo de velocidade real ponderado', testDriveCycleSummaryUsesWeightedRealSpeed],
     ['DTC persistência', testDtcStorage],
+    ['recuperação de perfil de aprendizado malformado', testMalformedLearningProfileRecovery],
     ['backup completo', testBackupCompleteness],
     ['CSV serializado', testCsvWriteSerialization],
     ['PID + DNA serializados', testPidAndLearningWriteSerialization],
