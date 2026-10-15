@@ -81,6 +81,10 @@ assert.match(autoTripService, /pendingRetryDue/, 'falhas de gravação em ECU de
 assert.match(dtcManager, /NON_REAL_DTC_NOT_ALLOWED_IN_OPERATIONAL_HISTORY/, 'camada de DTC deve rejeitar importação e simulação no histórico operacional');
 assert.ok(pidBank.includes("NON_REAL_PID_NOT_ALLOWED_IN_OPERATIONAL_BANK"), 'banco de PIDs deve rejeitar origem não real');
 assert.ok(pidBank.includes('purgeLegacyNonRealPidConfirmations'), 'banco legado de PIDs deve ser expurgado na inicialização');
+assert.ok(pidBank.includes('PID_BANK_WRITE_STAGING_FAILED'), 'banco de PIDs deve validar staging antes de substituir');
+assert.ok(pidBank.includes('PID_BANK_BACKUP_VALIDATION_FAILED'), 'backup de PIDs deve ser confirmado antes do commit');
+assert.ok(pidBank.includes('PID_BANK_WRITE_ROLLBACK_FAILED'), 'falha de rollback deve ser explícita e manter caminho de recuperação');
+assert.ok(read('tests/regression.test.js').includes('testPidBankWriteRollback'), 'regressão deve simular falha de cópia no banco TXT de PIDs');
 assert.ok(pidBank.includes("entry.source === 'REAL_OBD'"), 'consulta operacional deve retornar apenas PIDs reais');
 assert.ok(homeScreen.includes('purgeLegacyNonRealPidConfirmations(basePath)'), 'startup deve executar a purga do banco PID legado');
 assert.match(dtcManager, /DTC_HISTORY_PURGE_STAGING_FAILED/, 'purga de DTC precisa validar a escrita temporária');
