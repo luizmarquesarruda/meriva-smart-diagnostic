@@ -12,6 +12,7 @@ import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
 import type { ObdConnectionState } from '../src/meriva/autosaveState';
 import { gpsTracker, type GpsTripState } from '../src/gps';
 import { ensureMerivaVehicleProfile } from '../src/database/vehicleConfig';
+import { purgeLegacyNonRealDtcs } from '../src/database/dtcManager';
 import { createLearningProfile, purgeCarScannerHistory, readLearningProfile } from '../src/database/learningProfile';
 import { readAppSettings, type AppSettings } from '../src/database/appSettings';
 import { connectPreferredElm, getSharedObdConnection, getSharedObdLastError, getSharedObdStatus, subscribeSharedObd, subscribeSharedObdStatus } from '../src/obd/sharedConnection';
@@ -44,7 +45,7 @@ export default function IndexScreen() {
     const state = getAutoSaveState();
     const live = getSharedObdConnection();
     const liveConnected = getSharedObdStatus().ecuConnected;
-    setDtcCount(state.dtcs.filter((item) => ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(item.status)).length);
+    setDtcCount(state.dtcs.filter((item) => item.source === 'REAL_OBD' && ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(item.status)).length);
     setConnectionStatus(getSharedObdStatus());
     setObd({
       ...state.obd,
@@ -65,6 +66,11 @@ export default function IndexScreen() {
     try {
       const nextSettings = await readAppSettings(basePath);
       const restored = await initAutoSave(basePath);
+      try {
+        await purgeLegacyNonRealDtcs(basePath);
+      } catch (cause) {
+        console.warn('[dtc] purga do histórico legado adiada; arquivo preservado:', cause instanceof Error ? cause.message : cause);
+      }
 
       // Trip-index damage must not block settings/vehicle hydration. The JSON
       // snapshot is the recovery source for trips if the operational index is unavailable.
@@ -101,7 +107,7 @@ export default function IndexScreen() {
       setConnectionStatus(getSharedObdStatus());
       setObd({ ...restored.obd, connected: getSharedObdStatus().ecuConnected });
       setSaveStatus(getAutoSaveStatus());
-      setDtcCount(restored.dtcs.filter((item) => ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(item.status)).length);
+      setDtcCount(restored.dtcs.filter((item) => item.source === 'REAL_OBD' && ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(item.status)).length);
       setIsHydrated(true);
     } catch {
       setSaveStatus(getAutoSaveStatus());
