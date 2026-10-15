@@ -51,3 +51,10 @@ Execução: [GitHub Actions #38765550919](https://github.com/luizmarquesarruda/m
 ## Resultado desta consolidação
 
 O código e os contratos foram ajustados e consolidados na branch de trabalho. A validação conclusiva depende da nova execução da CI; até os dois jobs terminarem, o build não deve ser declarado aprovado.
+
+
+## Atualização da auditoria — mock GPS
+
+O log de testes continha warnings não fatais porque `tests/gps.test.js` não fornecia as APIs de ciclo de vida de segundo plano usadas por `GpsTracker.stopBackgroundLocation()`. A implementação real dessas APIs foi confirmada no código fonte `expo-location` da linha SDK 51.
+
+Foi corrigido o mock e ampliada a cobertura para testar `startBackgroundLocation()` e `stopBackgroundLocation()`, incluindo verificação da configuração da notificação de foreground service. Nenhuma mudança foi necessária no Java nativo ou em `app.json` para esse aviso. O novo run deve confirmar a suíte limpa e o build standalone.

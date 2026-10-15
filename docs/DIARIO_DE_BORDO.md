@@ -2611,3 +2611,11 @@ Ajustar este registro ao resultado da nova CI após a atualização do diário. 
 ### Limites da validação
 - A nova CI deve confirmar TypeScript, toda a suíte, Expo Doctor e montagem do APK standalone.
 - O contrato SQLite verifica esquema e integrações estruturais, mas não substitui um lançamento real no Android, teste de migração de dados do usuário nem validação física com ELM327/ECU. Esses testes seguem necessários antes de declarar validação de campo.
+
+
+## 2026-10-15 — Correção do mock de ciclo de vida GPS
+
+- O log de validação integrada revelou warnings ao encerrar a localização: `Location.hasStartedLocationUpdatesAsync is not a function`.
+- Conferido o código da API `expo-location` da linha SDK 51: `hasStartedLocationUpdatesAsync`, `startLocationUpdatesAsync` e `stopLocationUpdatesAsync` existem. A lacuna estava no mock de `tests/gps.test.js`, que só imitava permissões e o watcher em primeiro plano.
+- Atualizado o mock para simular o estado do serviço e suas três APIs; adicionadas asserções explícitas de início, opção de foreground service e parada. A alteração é somente de teste, sem alterar o ciclo de vida GPS de produção.
+- A CI já havia passado por TypeScript, Expo Doctor e suíte completa no commit anterior, mas a montagem de APK ainda estava em andamento quando esta melhoria de teste foi preparada. A nova CI deste commit deve ser o resultado final; não declarar o build validado até ambos os jobs concluírem.

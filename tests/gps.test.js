@@ -17,12 +17,22 @@ const output = ts.transpileModule(fs.readFileSync(sourcePath, 'utf8'), {
 }).outputText;
 
 let watcher = null;
+let backgroundTaskStarted = false;
+let backgroundTaskOptions = null;
 const fakeLocation = {
   Accuracy: { BestForNavigation: 6 },
   PermissionStatus: { GRANTED: 'granted' },
   hasServicesEnabledAsync: async () => true,
   getForegroundPermissionsAsync: async () => ({ status: 'granted' }),
   requestForegroundPermissionsAsync: async () => ({ status: 'granted' }),
+  hasStartedLocationUpdatesAsync: async () => backgroundTaskStarted,
+  startLocationUpdatesAsync: async (_taskName, options) => {
+    backgroundTaskOptions = options;
+    backgroundTaskStarted = true;
+  },
+  stopLocationUpdatesAsync: async () => {
+    backgroundTaskStarted = false;
+  },
   watchPositionAsync: async (_options, callback) => {
     watcher = callback;
     return {
@@ -146,8 +156,18 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
 
   await tracker.stop();
   assert.strictEqual(tracker.getState().running, false);
+  assert.strictEqual(backgroundTaskStarted, false, 'parada de foreground não deve deixar o serviço de fundo ativo');
   unsubscribe();
-  console.log('PASS GPS: automático, velocidade, distância e consumo');
+
+  // Simular também o ciclo de vida do Foreground Service/TaskManager. O mock
+  // deve refletir as APIs reais de expo-location do SDK 51, sem warnings falsos.
+  const backgroundTracker = new GpsTracker();
+  assert.strictEqual(await backgroundTracker.startBackgroundLocation(), true);
+  assert.strictEqual(backgroundTaskStarted, true, 'start deve registrar o serviço de localização');
+  assert.strictEqual(backgroundTaskOptions?.foregroundService?.notificationTitle, 'MERIVA SMART — Diagnóstico OBD');
+  await backgroundTracker.stopBackgroundLocation();
+  assert.strictEqual(backgroundTaskStarted, false, 'stop deve encerrar o serviço se estiver ativo');
+  console.log('PASS GPS: foreground, segundo plano, velocidade, distância e consumo');
 })().catch((error) => {
   console.error(error);
   process.exitCode = 1;
