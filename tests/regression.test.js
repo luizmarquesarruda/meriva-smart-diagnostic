@@ -34,6 +34,7 @@ const files = new Map();
 const dirs = new Set(['/doc']);
 let writeDelayMs = 0;
 let failReadPath = null;
+let failCopyToPath = null;
 let bluetoothListener = null;
 let bluetoothDisconnectListener = null;
 let fakeDeviceConnected = true;
@@ -64,6 +65,7 @@ function resetFS() {
   dirs.add('/doc');
   writeDelayMs = 0;
   failReadPath = null;
+  failCopyToPath = null;
 }
 
 const fakeFS = {
@@ -104,6 +106,10 @@ const fakeFS = {
   },
 
   async copyAsync({ from, to }) {
+    if (failCopyToPath === to) {
+      failCopyToPath = null;
+      throw new Error('COPY IO FAILURE: ' + to);
+    }
     if (files.has(from)) {
       ensureDirTree(parentDir(to));
       files.set(to, files.get(from));
@@ -1180,6 +1186,31 @@ async function testPidBankRealOnlyPurge() {
     'bitmap atual pode adicionar somente PIDs de formato válido com origem REAL_OBD');
 }
 
+async function testPidBankWriteRollback() {
+  resetFS();
+  const pidBank = loadTs(path.join(ROOT, 'src/database/pidBank.ts'));
+  const target = `${BASE}/BANCO/pids_meriva_confirmados.txt`;
+  const original = '010C|RPM|PADRAO_OBD|CONFIRMADO|2026-10-01T10:00:00.000Z|2026-10-01T10:00:00.000Z|2|KWP|10|REAL_OBD|1\\n';
+  files.set(target, original);
+  failCopyToPath = target;
+
+  await assert.rejects(
+    pidBank.recordPidConfirmation(BASE, {
+      pid: '0105', name: 'ECT', classification: 'PADRAO_OBD', status: 'RESPONDEU',
+      firstSeen: '2026-10-15T10:00:00.000Z', lastSeen: '2026-10-15T10:00:00.000Z',
+      occurrences: 1, protocol: 'KWP', responseTime: 12, source: 'REAL_OBD', confidence: 1,
+    }),
+    /COPY IO FAILURE/,
+    'falha ao substituir o banco deve ser propagada depois de tentar rollback',
+  );
+  assert.strictEqual(files.get(target), original,
+    'falha na escrita final deve restaurar exatamente o banco anterior');
+  assert.strictEqual(files.get(target + '.previous'), original,
+    'backup deve conter a última versão válida durante rollback');
+  assert.ok(!files.has(target + '.tmp'),
+    'temporário deve ser removido após rollback confirmado');
+}
+
 async function testPidAndLearningWriteSerialization() {
   resetFS();
   const pidBank = loadTs(path.join(ROOT, 'src/database/pidBank.ts'));
@@ -1445,6 +1476,7 @@ async function main() {
     ['backup completo', testBackupCompleteness],
     ['CSV serializado', testCsvWriteSerialization],
     ['PID bank real-only purge', testPidBankRealOnlyPurge],
+    ['PID bank rollback em falha de gravação', testPidBankWriteRollback],
     ['PID + DNA serializados', testPidAndLearningWriteSerialization],
     ['contratos de aquisição e persistência', testAcquisitionPolicyConsistency],
     ['PID respondeu não significa sensor validado', testPidResponseIsNotVehicleValidation],
