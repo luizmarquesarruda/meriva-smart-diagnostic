@@ -1,4 +1,5 @@
 import * as FileSystem from 'expo-file-system';
+import { exportLocalDatabaseSnapshot } from '../database/localDatabase';
 
 export interface BackupInfo {
   timestamp: string;
@@ -34,11 +35,18 @@ export async function createBackup(basePath: string): Promise<BackupInfo> {
     const dest = `${backupDir}/${dir}`;
     const info = await FileSystem.getInfoAsync(source);
     if (!info.exists || !info.isDirectory) continue;
-
     await FileSystem.copyAsync({ from: source, to: dest });
     totalSize += await getDirectorySize(source);
     included.push(dir);
   }
 
+  // SQLite fica fora de MERIVA_SMART; exportar as linhas comprometidas torna o backup portátil.
+  const snapshot = await exportLocalDatabaseSnapshot();
+  const snapshotPath = `${backupDir}/BANCO_SQLITE_snapshot.json`;
+  await FileSystem.writeAsStringAsync(snapshotPath, JSON.stringify(snapshot, null, 2), {
+    encoding: FileSystem.EncodingType.UTF8,
+  });
+  totalSize += await getDirectorySize(snapshotPath);
+  included.push('BANCO_SQLITE_snapshot.json');
   return { timestamp, sizeBytes: totalSize, includes: included };
 }

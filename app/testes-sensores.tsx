@@ -84,7 +84,26 @@ export default function TestesSensoresScreen(){
     for(const row of item.rows)lines.push('Leitura '+row.readingNumber+': '+valueText(row.value,row.unit)+' | Parser: '+row.status+' | Latência: '+row.elapsedMs+' ms | '+row.timestamp,'RX bruto: '+(row.rawResponse||'VAZIO'));
    }
    lines.push('','POLÍTICA: resposta positiva confirma resposta do PID, não exatidão física/elétrica do sensor. PIDs fora da bitmap não foram consultados.','REFERÊNCIAS: SAE J1979 supported-PID bitmap; Dashlogic PID listing; OBD2 PID Knowledge; auditoria da Bíblia da Meriva.','Limiares são heurísticos, não especificações OEM. Algumas verificações exigem multímetro, osciloscópio ou condições controladas.');
-   await FileSystem.writeAsStringAsync(path,lines.join('\n'),{encoding:FileSystem.EncodingType.UTF8});setSavedPath(path);setError('');setMessage('Relatório TXT salvo no armazenamento privado do aplicativo.');
+   await FileSystem.writeAsStringAsync(path,lines.join('\\n'),{encoding:FileSystem.EncodingType.UTF8});
+   let indexedInSqlite=true;
+   try{
+    const localDb=await import('../src/database/localDatabase');
+    await localDb.saveSensorTestRun({
+     id:'sensor-test-'+String(runStartedAt.current||Date.now()),
+     startedAt:new Date(runStartedAt.current||Date.now()).toISOString(),
+     savedAt:new Date().toISOString(),
+     mode,completed,catalogId:catalog.catalogId,
+     protocol:getSharedObdConnection()?.protocol??'N/D',
+     plannedPids:testPlan.length,plannedReadings:plannedReads,
+     elapsedMs:Math.max(0,Date.now()-(runStartedAt.current||Date.now())),
+     readings:samples.map((sample,readingIndex)=>{
+      const assessment=grouped.find(item=>item.test.pid===sample.pid)?.assessment;
+      return {readingIndex,sample,assessmentState:assessment?.state??'NAO_CONCLUSIVO',assessmentTitle:assessment?.title??'N/D'};
+     })
+    });
+   }catch(cause){indexedInSqlite=false;console.warn('[sqlite] TXT do teste salvo; indexação indisponível:',cause instanceof Error?cause.message:cause);}
+   setSavedPath(path);setError('');
+   setMessage(indexedInSqlite?'Relatório TXT salvo e resultado indexado no banco SQLite.':'Relatório TXT salvo; o índice SQLite falhou. O TXT foi preservado e não será perdido.');
   }catch(cause){setError(cause instanceof Error?cause.message:'Falha ao salvar relatório TXT.');}
  }
  return <SafeAreaView style={st.container} edges={['top','bottom','left','right']}><ScrollView contentContainerStyle={[st.content,{paddingHorizontal:layout.horizontalPadding}]}><View style={[st.frame,{maxWidth:layout.maxContentWidth}]}>

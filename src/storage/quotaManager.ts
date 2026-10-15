@@ -29,12 +29,24 @@ function toMb(bytes: number): number {
   return Math.round((bytes / MB) * 10) / 10;
 }
 
+async function sqliteStorageBytes(): Promise<number> {
+  const root = FileSystem.documentDirectory;
+  if (!root) return 0;
+  const sizes = await Promise.all([
+    getEntrySizeBytes(`${root}SQLite/meriva-smart-diagnostic.db`),
+    getEntrySizeBytes(`${root}SQLite/meriva-smart-diagnostic.db-wal`),
+    getEntrySizeBytes(`${root}SQLite/meriva-smart-diagnostic.db-shm`),
+  ]);
+  return sizes.reduce((sum, size) => sum + size, 0);
+}
+
 export async function getStorageBreakdown(basePath: string): Promise<Record<string, number>> {
   const dirs = ['CONFIG', 'BANCO', 'LEITURAS', 'APRENDIZADO', 'DTC', 'LOGS', 'VIAGENS', 'RELATORIOS', 'BACKUP'];
   const breakdown: Record<string, number> = {};
   for (const dir of dirs) {
     breakdown[dir] = toMb(await getEntrySizeBytes(`${basePath}/${dir}`));
   }
+  breakdown.BANCO_SQLITE = toMb(await sqliteStorageBytes());
   return breakdown;
 }
 
@@ -43,7 +55,7 @@ export async function getStorageUsage(
   limitMb: number = DEFAULT_LIMIT_MB,
 ): Promise<{ usedMb: number; limitMb: number }> {
   const safeLimitMb = Number.isFinite(limitMb) && limitMb > 0 ? limitMb : DEFAULT_LIMIT_MB;
-  const bytes = await getEntrySizeBytes(basePath);
+  const bytes = (await getEntrySizeBytes(basePath)) + await sqliteStorageBytes();
   return { usedMb: toMb(bytes), limitMb: safeLimitMb };
 }
 
