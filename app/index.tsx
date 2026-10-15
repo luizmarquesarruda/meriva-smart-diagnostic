@@ -35,6 +35,8 @@ export default function IndexScreen() {
   const [activeHeroMetric, setActiveHeroMetric] = useState(0);
   const [fuelCoachSamples, setFuelCoachSamples] = useState<FuelCoachSample[]>([]);
   const lastFuelCoachSampleAt = useRef<number | null>(null);
+  const fuelCoachConnectionStartedAt = useRef<number | null>(null);
+  const lastFuelCoachEcuConnected = useRef(false);
   const layout = useMidLayout();
 
   useEffect(() => gpsTracker.subscribe(setGpsState), []);
@@ -44,15 +46,24 @@ export default function IndexScreen() {
   // The short rolling window stays in memory and does not write every OBD poll to storage.
   useEffect(() => {
     if (!connectionStatus.ecuConnected) {
+      lastFuelCoachEcuConnected.current = false;
+      fuelCoachConnectionStartedAt.current = null;
       lastFuelCoachSampleAt.current = null;
       setFuelCoachSamples([]);
       return;
+    }
+    if (!lastFuelCoachEcuConnected.current) {
+      lastFuelCoachEcuConnected.current = true;
+      fuelCoachConnectionStartedAt.current = Date.now();
+      lastFuelCoachSampleAt.current = null;
+      setFuelCoachSamples([]);
     }
     const timestampMs = tripState.instantaneousConsumptionTimestampMs;
     const consumptionKmL = tripState.instantaneousConsumptionKml;
     const source = tripState.instantaneousConsumptionSource;
     if (
       timestampMs == null || timestampMs === lastFuelCoachSampleAt.current ||
+      fuelCoachConnectionStartedAt.current == null || timestampMs < fuelCoachConnectionStartedAt.current ||
       consumptionKmL == null || source == null ||
       !Number.isFinite(consumptionKmL) || consumptionKmL <= 0
     ) return;
