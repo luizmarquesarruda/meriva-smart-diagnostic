@@ -600,6 +600,19 @@ class AutoTripService {
 
     while (this.pendingFinalizedTrips.length > 0) {
       const cycle = this.pendingFinalizedTrips[0];
+
+      // Write the finalized trip into the JSON recovery snapshot first. If
+      // index/CSV storage then fails or Android kills the process, startup can
+      // reconcile this same stable trip ID into the operational trip index.
+      updateAutoSaveState((state) => {
+        const existingIndex = state.driveCycles.findIndex((item) => item.id === cycle.id);
+        if (existingIndex >= 0) state.driveCycles[existingIndex] = cycle;
+        else state.driveCycles.push(cycle);
+        state.driveCycles = state.driveCycles.filter((item) => item.source === 'REAL_OBD');
+      });
+      const stagedSnapshotSaved = await saveNow('critical');
+      if (!stagedSnapshotSaved) throw new Error('SNAPSHOT_JSON_DA_VIAGEM_NAO_CONFIRMADO');
+
       await addDriveCycle(this.basePath, cycle);
       const storedCycles = await readDriveCycles(this.basePath);
 
