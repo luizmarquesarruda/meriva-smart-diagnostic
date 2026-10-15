@@ -6,6 +6,26 @@
 import type { AutoSaveEnvelope } from './autosaveTypes';
 import type { MerivaPersistedState } from './autosaveState';
 import { createEmptyMerivaState } from './autosaveState';
+import type { ContextualStatistics, MerivaLearningProfile } from '../database/learningProfile';
+import type { SampleStatistics, VehicleCondition } from '../types/sourceTypes';
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function finiteNonNegative(value: unknown, fallback = 0): number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : fallback;
+}
+
+function timestampOrNow(value: unknown, fallback: string): string {
+  return typeof value === 'string' && Number.isFinite(Date.parse(value)) ? value : fallback;
+}
+
+const VALID_VEHICLE_CONDITIONS = new Set<VehicleCondition>([
+  'IDLE_COLD', 'IDLE_WARM', 'ACCELERATION', 'CRUISE', 'DECELERATION', 'UNKNOWN',
+]);
 
 export function isValidEnvelope(value: unknown): value is AutoSaveEnvelope<MerivaPersistedState> {
   if (typeof value !== 'object' || value === null) return false;
@@ -75,39 +95,115 @@ export function hydrateState(payload: MerivaPersistedState): MerivaPersistedStat
   // Nunca reintroduzir viagens importadas ou aprendizado contaminado de snapshots antigos.
   hydrated.driveCycles = (Array.isArray(payload.driveCycles) ? payload.driveCycles : [])
     .filter((cycle) => cycle && cycle.source === 'REAL_OBD');
-  if (hydrated.learning) {
-    const cleanStats = (stats: Record<string, import('../types/sourceTypes').SampleStatistics>) => {
-      const clean: Record<string, import('../types/sourceTypes').SampleStatistics> = {};
-      for (const [name, stat] of Object.entries(stats ?? {})) {
-        if (stat.seedSamples > 0 || (stat.source ?? []).includes('CARSCANNER_BASELINE')) continue;
-        if (stat.realSamples <= 0 || !(stat.source ?? []).includes('REAL_OBD')) continue;
-        clean[name] = { ...stat, samples: stat.realSamples, seedSamples: 0, source: ['REAL_OBD'] };
+  const rawLearning = payload.learning as unknown;
+  if (rawLearning && typeof rawLearning === 'object' && !Array.isArray(rawLearning)) {
+    const raw = asRecord(rawLearning);
+    const now = new Date().toISOString();
+    const rawThresholds = asRecord(raw.confidenceThresholds);
+    const thresholds = {
+      low: finiteNonNegative(rawThresholds.low, 10) || 10,
+      medium: finiteNonNegative(rawThresholds.medium, 50) || 50,
+      good: finiteNonNegative(rawThresholds.good, 200) || 200,
+      high: finiteNonNegative(rawThresholds.high, 500) || 500,
+    };
+    const rawCounts = asRecord(raw.globalSampleCounts);
+    const realSamples = Math.floor(finiteNonNegative(rawCounts.realSamples));
+
+    const cleanStats = (input: unknown): Record<string, SampleStatistics> => {
+      const clean: Record<string, SampleStatistics> = {};
+      for (const [name, rawStat] of Object.entries(asRecord(input))) {
+        if (!rawStat || typeof rawStat !== 'object' || Array.isArray(rawStat)) continue;
+        const stat = rawStat as Record<string, unknown>;
+        const seedSamples = finiteNonNegative(stat.seedSamples);
+        const statRealSamples = Math.floor(finiteNonNegative(stat.realSamples));
+        const sources = Array.isArray(stat.source) ? stat.source : [];
+        // Mixed statistics cannot be separated safely; keep only proven REAL_OBD.
+        if (seedSamples > 0 || sources.includes('CARSCANNER_BASELINE')) continue;
+        if (statRealSamples <= 0 || !sources.includes('REAL_OBD')) continue;
+
+        const mean = stat.mean;
+        const median = stat.median;
+        const min = stat.min;
+        const max = stat.max;
+        const stddev = stat.stddev;
+        if (
+          ![mean, median, min, max, stddev].every((value) => typeof value === 'number' && Number.isFinite(value)) ||
+          (min as number) > (max as number) ||
+          (stddev as number) < 0
+        ) continue;
+        const confidenceValue = ['LOW', 'MEDIUM', 'GOOD', 'HIGH'].includes(String(stat.confidence))
+          ? stat.confidence as SampleStatistics['confidence']
+          : 'LOW';
+        const medianWindow = Array.isArray(stat.medianWindow)
+          ? stat.medianWindow.filter((value): value is number => typeof value === 'number' && Number.isFinite(value)).slice(-101)
+          : undefined;
+        clean[name] = {
+          mean: mean as number,
+          median: median as number,
+          min: min as number,
+          max: max as number,
+          stddev: stddev as number,
+          samples: statRealSamples,
+          realSamples: statRealSamples,
+          seedSamples: 0,
+          confidence: confidenceValue,
+          lastUpdate: timestampOrNow(stat.lastUpdate, now),
+          source: ['REAL_OBD'],
+          ...(medianWindow ? { medianWindow } : {}),
+        };
       }
       return clean;
     };
+
+    const contextualData: ContextualStatistics[] = (Array.isArray(raw.contextualData) ? raw.contextualData : [])
+      .filter((value): value is Record<string, unknown> =>
+        typeof value === 'object' && value !== null && !Array.isArray(value))
+      .map((context) => {
+        const condition = context.condition;
+        const statistics = cleanStats(context.statistics);
+        return {
+          condition: VALID_VEHICLE_CONDITIONS.has(condition as VehicleCondition)
+            ? condition as VehicleCondition
+            : 'UNKNOWN',
+          statistics,
+          lastUpdate: timestampOrNow(context.lastUpdate, now),
+          sampleCount: Object.values(statistics).reduce((sum, stat) => sum + stat.realSamples, 0),
+        };
+      })
+      .filter((context) => Object.keys(context.statistics).length > 0);
+
+    const overallStatistics = cleanStats(raw.overallStatistics);
+    const countsFromStats = Object.values(overallStatistics).reduce((sum, stat) => sum + stat.realSamples, 0);
+    const realCount = realSamples || countsFromStats;
+    const rawContamination = asRecord(raw.dataContamination);
     hydrated.learning = {
-      ...hydrated.learning,
+      vehicleId: typeof raw.vehicleId === 'string' && raw.vehicleId.trim() ? raw.vehicleId : 'MERIVA_MAXX',
+      profileCreated: timestampOrNow(raw.profileCreated, now),
+      lastUpdated: timestampOrNow(raw.lastUpdated, now),
       seedVersion: 'NONE',
       seedImportDate: '',
-      learningStatus: hydrated.learning.globalSampleCounts.realSamples >= hydrated.learning.confidenceThresholds.high
+      learningStatus: realCount >= thresholds.high
         ? 'CONFIDENT'
-        : hydrated.learning.globalSampleCounts.realSamples >= hydrated.learning.confidenceThresholds.low
-          ? 'LEARNING_ACTIVE' : 'COLD_START',
+        : realCount >= thresholds.low
+          ? 'LEARNING_ACTIVE'
+          : 'COLD_START',
+      confidenceThresholds: thresholds,
+      contextualData,
+      overallStatistics,
+      globalSampleCounts: {
+        seedSamples: 0,
+        realSamples: realCount,
+        totalSamples: realCount,
+      },
       source: 'REAL_ONLY',
       seedWeight: 0,
-      contextualData: hydrated.learning.contextualData
-        .map((context) => {
-          const statistics = cleanStats(context.statistics);
-          return { ...context, statistics, sampleCount: Object.values(statistics).reduce((sum, stat) => sum + stat.realSamples, 0) };
-        })
-        .filter((context) => Object.keys(context.statistics).length > 0),
-      overallStatistics: cleanStats(hydrated.learning.overallStatistics),
-      globalSampleCounts: {
-        ...hydrated.learning.globalSampleCounts,
-        seedSamples: 0,
-        totalSamples: hydrated.learning.globalSampleCounts.realSamples,
+      dataContamination: {
+        simulationDetected: Math.floor(finiteNonNegative(rawContamination.simulationDetected)),
+        simulationFiltered: Math.floor(finiteNonNegative(rawContamination.simulationFiltered)),
       },
-    };
+    } as MerivaLearningProfile;
+  } else {
+    hydrated.learning = null;
   }
   return hydrated;
 }
