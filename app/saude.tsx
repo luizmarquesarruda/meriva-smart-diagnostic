@@ -17,7 +17,18 @@ export default function SaudeScreen() {
   useEffect(()=>{const t=setInterval(()=>setState({...getAutoSaveState()}),1000);return()=>clearInterval(t)},[]);
   const context = getVehicleConditionSnapshot();
   const activeDtcs = state.dtcs.filter((item) => ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(item.status));
-  const diagnostic: DiagnosticResult = useMemo(()=>runLocalDiagnostic({observations:state.lastReadings.map(r=>({pid:r.pid,name:r.name,value:r.value,unit:r.unit,source:r.source==='SIMULACAO'?'SIMULACAO':'REAL_OBD',timestamp:r.timestamp,confidence:r.source==='SIMULACAO'?'LOW':'GOOD'} as PidObservation)),dtcs:state.dtcs,condition:context.condition}),[state,context.condition]);
+  const diagnostic: DiagnosticResult = useMemo(()=>runLocalDiagnostic({observations:state.lastReadings.map(r=>({
+    pid:r.pid,
+    name:r.name,
+    value:r.value,
+    unit:r.unit,
+    // Only the explicit REAL marker may become live ECU evidence. Unknown or
+    // imported provenance is deliberately mapped to IMPORTADO, never REAL_OBD.
+    source:r.source==='REAL'?'REAL_OBD':r.source==='SIMULACAO'?'SIMULACAO':'IMPORTADO',
+    timestamp:r.timestamp,
+    confidence:r.source==='REAL'?'GOOD':'LOW',
+    status:r.status,
+  } as PidObservation)),dtcs:state.dtcs,condition:context.condition}),[state,context.condition]);
   const sessionId = getActiveSqliteSessionId();
   const lastPersistedFindingSignature = useRef('');
   const lastPersistedFindingAt = useRef(0);
