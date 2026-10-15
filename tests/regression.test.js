@@ -1211,6 +1211,23 @@ async function testPidBankWriteRollback() {
     'temporário deve ser removido após rollback confirmado');
 }
 
+async function testPersistablePidTimestampGuard() {
+  const database = loadTs(path.join(ROOT, 'src/storage/merivaDatabase.ts'));
+  const now = Date.parse('2026-10-15T12:00:00.000Z');
+  assert.strictEqual(database.isPersistablePidTimestamp('2026-10-15T11:59:30.000Z', now), true,
+    'amostra no limite de 30 s deve ser aceita');
+  assert.strictEqual(database.isPersistablePidTimestamp('2026-10-15T11:59:29.999Z', now), false,
+    'amostra com mais de 30 s deve ser descartada');
+  assert.strictEqual(database.isPersistablePidTimestamp('2026-10-15T12:00:05.000Z', now), true,
+    'pequena diferença de relógio futuro dentro de 5 s é tolerada');
+  assert.strictEqual(database.isPersistablePidTimestamp('2026-10-15T12:00:05.001Z', now), false,
+    'timestamp futuro além da tolerância não pode poluir a série temporal');
+  assert.strictEqual(database.isPersistablePidTimestamp('DATA-INVALIDA', now), false,
+    'timestamp inválido não deve virar uma amostra atual');
+  assert.strictEqual(database.isPersistablePidTimestamp('', now), false,
+    'timestamp vazio deve ser rejeitado');
+}
+
 async function testPidAndLearningWriteSerialization() {
   resetFS();
   const pidBank = loadTs(path.join(ROOT, 'src/database/pidBank.ts'));
@@ -1477,6 +1494,7 @@ async function main() {
     ['CSV serializado', testCsvWriteSerialization],
     ['PID bank real-only purge', testPidBankRealOnlyPurge],
     ['PID bank rollback em falha de gravação', testPidBankWriteRollback],
+    ['frescor temporal de PID SQLite', testPersistablePidTimestampGuard],
     ['PID + DNA serializados', testPidAndLearningWriteSerialization],
     ['contratos de aquisição e persistência', testAcquisitionPolicyConsistency],
     ['PID respondeu não significa sensor validado', testPidResponseIsNotVehicleValidation],
