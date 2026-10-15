@@ -42,6 +42,7 @@ O banco usa WAL e chaves estrangeiras. Operações relacionadas a um relatório 
 
 1. **Telemetria persistida**: somente fonte REAL, estado RESPONDEU, valor numérico finito e uma sessão ECU ativa. A tabela normaliza a fonte para REAL_OBD.
 2. **Amostragem limitada**: no máximo uma amostra detalhada de cada PID a cada 2 segundos. O painel pode atualizar mais rápido em memória; nem todo ciclo de 500 ms vira gravação em disco.
+3. **UPSERTs de snapshot limitados**: fingerprints em memória evitam regravar DTCs/viagens inalterados a cada autosave; em falha de transação, os fingerprints são descartados para forçar ressincronização na próxima tentativa.
 3. **Testes de sensores**: guardam todas as tentativas da varredura (inclusive resposta ausente), porque elas são evidência diagnóstica; o relatório TXT é gravado primeiro e continua utilizável se o registro SQLite falhar.
 4. **DTCs e viagens**: apenas origem REAL_OBD; seed CarScanner, simulação e importações não alimentam o banco de evidência real. A gravação de viagens é idempotente pela ID.
 5. **Retomada**: na abertura do banco, sessões que ficaram OPEN no processo anterior são marcadas RECOVERED; não são tratadas como uma conexão ECU viva.
