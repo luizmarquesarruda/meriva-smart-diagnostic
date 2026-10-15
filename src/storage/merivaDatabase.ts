@@ -266,16 +266,18 @@ export async function openSqliteObdSession(connection: ObdConnectionState): Prom
     const db = await openDatabase();
     const startedAt = new Date().toISOString();
 
-    if (activeSessionId) {
+    const previousSessionId = activeSessionId;
+    // Clear in-memory attribution before any awaited SQLite operation. If the
+    // update/insert fails, new PID reads must not be attached to the old session.
+    activeSessionId = null;
+    lastPidSampleAt.clear();
+    if (previousSessionId) {
       await db.runAsync(
         `UPDATE obd_sessions SET status = 'CLOSED', ended_at = ?, close_reason = 'REPLACED_BY_NEW_SESSION'
          WHERE id = ? AND status = 'OPEN'`,
         startedAt,
-        activeSessionId,
+        previousSessionId,
       );
-      // Never keep a stale in-memory session ID if creation of its replacement fails.
-      activeSessionId = null;
-      lastPidSampleAt.clear();
     }
 
     const id = makeId('ecu');
@@ -306,11 +308,15 @@ export async function closeSqliteObdSession(
   connection?: ObdConnectionState,
 ): Promise<void> {
   await serializeWrite(async () => {
-    const db = await openDatabase();
     const id = activeSessionId;
     if (!id) return;
+    // Stop attributing incoming readings immediately, including when opening
+    // SQLite itself fails. A restarted process will recover any still-OPEN row.
+    activeSessionId = null;
+    lastPidSampleAt.clear();
 
     try {
+      const db = await openDatabase();
       const endedAt = new Date().toISOString();
       let metadataJson: string | null = null;
       if (connection) {
