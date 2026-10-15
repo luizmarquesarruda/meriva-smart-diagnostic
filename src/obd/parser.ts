@@ -120,24 +120,45 @@ export function parsePidResponse(pidRequested: string, rawResponse: string, posi
         const mil = (a & 0x80) !== 0;
         const dtcCount = a & 0x7f;
         const compressionIgnition = (b & 0x08) !== 0;
-        const catalystSupported = (readinessSupported & 0x01) !== 0;
-        const catalystIncomplete = (readiness & 0x01) !== 0;
-        const incomplete = [
+        // Bytes C/D use different monitor bit assignments for spark-ignition
+        // and compression-ignition engines. Decoding both as gasoline creates
+        // fictitious EVAP/O2 readiness results on diesel ECUs.
+        const monitorBits: Array<[string, number]> = compressionIgnition
+          ? [
+              ['CATALISADOR_NMHC', 0],
+              ['NOX_SCR', 1],
+              ['PRESSAO_TURBO', 3],
+              ['SENSOR_GASES_ESCAPE', 5],
+              ['FILTRO_PARTICULAS', 6],
+              ['EGR/VVT', 7],
+            ]
+          : [
+              ['CATALISADOR', 0],
+              ['CATALISADOR_AQUECIDO', 1],
+              ['EVAP', 2],
+              ['AR_SECUNDARIO', 3],
+              ['FILTRO_PARTICULAS_GASOLINA', 4],
+              ['O2', 5],
+              ['AQUECEDOR_O2', 6],
+              ['EGR/VVT', 7],
+            ];
+        const incompleteEntries: Array<[string, boolean]> = [
           ['MISFIRE', (b & 0x10) !== 0],
           ['FUEL_SYSTEM', (b & 0x20) !== 0],
           ['COMPONENTES', (b & 0x40) !== 0],
-          ['CATALISADOR', catalystSupported && catalystIncomplete],
-          ['CATALISADOR_AQUECIDO', (readinessSupported & 0x02) !== 0 && (readiness & 0x02) !== 0],
-          ['EVAP', (readinessSupported & 0x04) !== 0 && (readiness & 0x04) !== 0],
-          ['AR_SECUNDARIO', (readinessSupported & 0x08) !== 0 && (readiness & 0x08) !== 0],
-          ['O2', (readinessSupported & 0x20) !== 0 && (readiness & 0x20) !== 0],
-          ['AQUECEDOR_O2', (readinessSupported & 0x40) !== 0 && (readiness & 0x40) !== 0],
-          ['EGR/VVT', (readinessSupported & 0x80) !== 0 && (readiness & 0x80) !== 0],
-        ].filter(([, notReady]) => notReady).map(([name]) => name);
+          ...monitorBits.map(([name, bit]): [string, boolean] => {
+            const mask = 1 << bit;
+            return [name, (readinessSupported & mask) !== 0 && (readiness & mask) !== 0];
+          }),
+        ];
+        const incomplete = incompleteEntries.filter(([, notReady]) => notReady).map(([name]) => name);
+        const primaryMonitorName = compressionIgnition ? 'CATALISADOR_NMHC' : 'CATALISADOR';
+        const catalystSupported = (readinessSupported & 0x01) !== 0;
+        const catalystIncomplete = (readiness & 0x01) !== 0;
         return 'MIL=' + (mil ? 'ON' : 'OFF')
           + ' | DTCs=' + dtcCount
           + ' | MOTOR=' + (compressionIgnition ? 'DIESEL/CI' : 'CICLO OTTO/SI')
-          + ' | CATALISADOR=' + (catalystSupported ? (catalystIncomplete ? 'NÃO PRONTO' : 'PRONTO') : 'NÃO SUPORTADO')
+          + ' | ' + primaryMonitorName + '=' + (catalystSupported ? (catalystIncomplete ? 'NÃO PRONTO' : 'PRONTO') : 'NÃO SUPORTADO')
           + ' | INCOMPLETOS=' + (incomplete.length ? incomplete.join(', ') : 'NENHUM');
       })()
     : undefined;
