@@ -142,10 +142,18 @@ export function parsePidResponse(pidRequested: string, rawResponse: string, posi
               ['AQUECEDOR_O2', 6],
               ['EGR/VVT', 7],
             ];
+        const commonMonitorBits: Array<[string, number]> = [
+          ['MISFIRE', 0],
+          ['FUEL_SYSTEM', 1],
+          ['COMPONENTES', 2],
+        ];
         const incompleteEntries: Array<[string, boolean]> = [
-          ['MISFIRE', (b & 0x10) !== 0],
-          ['FUEL_SYSTEM', (b & 0x20) !== 0],
-          ['COMPONENTES', (b & 0x40) !== 0],
+          ...commonMonitorBits.map(([name, bit]): [string, boolean] => {
+            const mask = 1 << bit;
+            const isSupported = (b & mask) !== 0;
+            const isIncomplete = (b & (1 << (bit + 4))) !== 0;
+            return [name, isSupported && isIncomplete];
+          }),
           ...monitorBits.map(([name, bit]): [string, boolean] => {
             const mask = 1 << bit;
             return [name, (readinessSupported & mask) !== 0 && (readiness & mask) !== 0];
