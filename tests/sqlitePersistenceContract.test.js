@@ -9,6 +9,8 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'u
 const parse = (relativePath) => JSON.parse(read(relativePath));
 
 const database = read('src/storage/merivaDatabase.ts');
+const tripStorage = read('src/storage/driveCycleStorage.ts');
+const autoTripService = read('src/trip/autoTripService.ts');
 const autosave = read('src/meriva/autosaveManager.ts');
 const testScreen = read('app/testes-sensores.tsx');
 const healthScreen = read('app/saude.tsx');
@@ -59,6 +61,14 @@ assert.match(database, /cycle\.source === 'REAL_OBD'/, 'viagens importadas/semen
 assert.match(database, /ON CONFLICT\(pid\) DO UPDATE/, 'aprendizado PID deve atualizar a chave existente');
 assert.match(database, /ON CONFLICT\(id\) DO UPDATE/, 'relatórios repetidos do mesmo teste devem ser idempotentes');
 assert.match(database, /status = 'RECOVERED'/, 'sessões abandonadas precisam ser recuperadas como encerradas');
+assert.match(database, /SELECT metadata_json FROM obd_sessions/, 'fechamento de sessão deve preservar metadados anteriores');
+assert.match(database, /activeSessionId = null;[\s\S]*lastPidSampleAt\.clear\(\)/, 'fechar/trocar sessão deve cortar atribuição a sessão antiga antes do I/O seguinte');
+assert.match(tripStorage, /serializeIndexOperation/, 'gravações simultâneas de viagens devem ser serializadas');
+assert.match(tripStorage, /DRIVE_CYCLE_INDEX_UNREADABLE/, 'histórico corrompido sem backup não pode ser substituído silenciosamente');
+assert.match(tripStorage, /writeIndexSafely/, 'índice de viagens deve usar staging, validação e recuperação');
+assert.match(tripStorage, /CARSCANNER_SEED_NOT_ALLOWED_IN_OPERATIONAL_TRIP_HISTORY/, 'seed CarScanner não pode ser escrito no histórico operacional');
+assert.match(autoTripService, /pendingFinalizedTrips/, 'viagem pendente de persistência deve ficar retida para nova tentativa');
+assert.match(autoTripService, /AUTOSAVE_DA_VIAGEM_NAO_CONFIRMADO/, 'viagem não pode sair da fila antes de confirmar autosave');
 assert.match(database, /persistDiagnosticFindings\(/, 'achados da IA local devem ser persistidos');
 assert.match(database, /INSERT INTO diagnostic_findings/, 'achados devem ir para a tabela operacional');
 assert.match(database, /stableHash\(/, 'IDs dos achados devem ser determinísticos e idempotentes');
