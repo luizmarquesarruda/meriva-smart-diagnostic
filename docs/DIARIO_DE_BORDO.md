@@ -2702,3 +2702,54 @@ O cockpit e as telas secundárias compartilhavam o componente `src/ui/BottomNavi
 ### Validação
 - A CI executada após esta alteração deverá confirmar `npm run validate`, Expo Doctor e `android-build`.
 - A mudança ainda precisa ser conferida visualmente no aparelho, tanto em retrato como em paisagem, em especial a largura do rótulo “DIAGNÓSTICO” e a área útil do cockpit.
+
+
+## 2026-10-15 — Assistente de Economia e integridade das leituras
+
+### Escopo implementado
+Primeira versão do Assistente de Economia no cockpit, substituindo a caixa alta redundante de saúde. A Central de Saúde mantém os DTCs, evidências e hipóteses detalhadas; o contador compacto de DTC continua no cockpit.
+
+### Classificador isolado: `src/obd/fuelCoach.ts`
+- Separado da interface para permitir testes determinísticos e ajuste de parâmetros independente do layout.
+- Estados: `AGUARDANDO ECU`, `AGUARDANDO LEITURA`, `ANALISANDO CONSUMO`, `TRECHO INSTÁVEL`, `CALIBRANDO REFERÊNCIA`, `BOM CONSUMO`, `DENTRO DO PADRÃO` e `CONSUMO ELEVADO`.
+- Reutiliza o consumo instantâneo produzido por `autoTripService`; não reimplementa o integrador nem usa uma média histórica como se fosse leitura atual.
+- A amostragem volátil aceita um timestamp de fonte apenas uma vez. Reexibir estimativa cacheada não fabrica uma amostra nova nem grava cada ciclo em SQLite/JSON.
+- Guardas: timestamp com idade máxima de 15 s; pelo menos quatro amostras ao longo de ao menos 15 s; velocidade média >= 20 km/h; e dispersão de velocidade dentro do limite configurado.
+- Usa mediana da janela móvel para limitar a influência de valores espúrios. Faixas configuráveis iniciais: bom >= 110% e elevado <= 85% da referência. Não são limites universais nem diagnóstico mecânico.
+- Sem amostra válida, trecho estável ou referência comparável, a UI exibe estado sem classificação e orientação explícita em vez de inferir bom/elevado.
+
+### Referência pessoal compatível
+A referência agrega distância / combustível de viagens concluídas e válidas, filtradas por `REAL_OBD`, combustível configurado e fonte da taxa (`MEASURED_015E`, `ESTIMATED_MAF` ou `ESTIMATED_MAP`) idênticos. Exige pelo menos três viagens e 20 km agregados. Exclui CarScanner, simuladas/importadas, taxas mistas, combustível inválido e viagens antigas sem snapshot do tipo de combustível. O denominador e numerador são agregados antes da divisão; não se calcula uma média simples das médias de cada trajeto.
+
+### Snapshot de combustível por viagem e integridade temporal
+- `DriveCycle.fuelType` foi adicionado como opcional para manter compatibilidade com os históricos legados.
+- `RealTripRecorder` captura a configuração ao abrir o registro real de viagem e persiste o valor no ciclo finalizado.
+- `AutoTripService` fornece timestamp original da taxa de combustível e a velocidade usada no cálculo de km/L (OBD quando disponível, senão GPS), evitando avaliar estabilidade com uma velocidade diferente da que gerou o consumo.
+- Trocar a preferência no meio de uma viagem não muda a fórmula usada pelo integrador ativo. Se a configuração muda durante o trajeto, o cache estimado que pertença à configuração antiga é invalidado na fronteira da viagem.
+- O SQLite já armazena o objeto completo da viagem em `details_json`; esse campo adicional participa do objeto serializado sem mudança de esquema. Viagens antigas sem o campo não recebem um tipo presumido e não entram na referência pessoal.
+
+### Correção de proveniência na tela Dados
+Em `app/dados.tsx`, “ÚLTIMAS LEITURAS REAIS” agora só lista itens com `source = REAL`, `status = RESPONDEU`, valor não nulo e finito. A lista mantém a ordem de atualização da cache em vez de inverter a ordem, impedindo que uma leitura simulada ou sem resposta apareça como valor real.
+
+### UI do cockpit
+- Retrato: a antiga caixa grande “SAÚDE DO VEÍCULO” foi substituída pelo Assistente de Economia, com estado, valor, origem (medido/estimado), referência/progresso, orientação curta e atalhos para Histórico de Viagens e Saúde.
+- Paisagem: o coach aparece em uma linha mais compacta e clicável, preservando a área útil sem exigir rolagem na tela inicial.
+- Os indicadores de consumo, autonomia e falhas já existentes permanecem; o diagnóstico detalhado continua em `/saude`.
+
+### Testes adicionados/ajustados
+- `tests/fuelCoach.test.js`: referência pessoal, compatibilidade de combustível/fonte, exclusão de dados mistos/legados, ECU desconectada, timestamp antigo, amostras insuficientes, trecho instável e faixas bom/normal/elevado.
+- `tests/tripRecorder.test.js`: snapshot de combustível da viagem.
+- `tests/cockpitNavigation.test.js`: coach no cockpit, ausência do painel duplicado e filtro de leituras reais.
+- `tests/knowledgeJson.test.js`: política e limites configuráveis.
+- `package.json`: nova suíte incluída em `npm test`.
+
+### CI e limites
+- Conforme solicitado, cada commit desta rodada inclui `[skip ci]`; **não foi disparada uma nova CI**.
+- Typecheck, testes completos, Expo Doctor e build Android não foram executados nesta rodada e permanecem pendentes.
+- O catálogo confirma atualmente apenas o PID `010C` por evidência RAW_ECU; as fontes de consumo continuam dependentes da bitmap atual e da resposta individual real da ECU. O coach não promove um PID candidato para confirmado.
+- No aparelho real, deve-se confirmar a origem da taxa, os timestamps, as mudanças de combustível e o comportamento do coach após novas viagens. A referência só será útil depois que existirem viagens reais elegíveis.
+
+### Próximas verificações da auditoria geral
+1. Consolidar a fonte de leitura das viagens entre índice/snapshot JSON e SQLite, mantendo a recuperação idempotente atual.
+2. Conferir o coach no aparelho em retrato e paisagem, em especial a altura da navegação inferior e a área do cockpit.
+3. Validar com a Meriva quais PIDs de consumo realmente respondem e comparar a classificação com o consumo integrado observado.
