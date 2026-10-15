@@ -21,7 +21,7 @@ function historyPath(basePath: string): string {
 function isValidHistoryContent(content: string): boolean {
   // Accept the two-line header used by older app builds, then normalize it to
   // the current header on the next safe write.
-  const legacyHeader = 'MERIVA SMART DIAGNOSTIC\\nHISTÓRICO DE SALVAMENTOS AUTOMÁTICOS';
+  const legacyHeader = 'MERIVA SMART DIAGNOSTIC\nHISTÓRICO DE SALVAMENTOS AUTOMÁTICOS';
   if (!content.startsWith(HISTORY_HEADER.trimEnd()) && !content.startsWith(legacyHeader)) return false;
   const begins = content.split(ENTRY_BEGIN).length - 1;
   const ends = content.split(ENTRY_END).length - 1;
