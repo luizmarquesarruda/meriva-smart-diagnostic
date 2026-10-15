@@ -100,6 +100,47 @@ function splitPages(content: string): Map<string, string> {
   return pages;
 }
 
+async function writeDailyHistorySafely(path: string, output: string, expectedDate: string): Promise<void> {
+  const tempPath = path + '.tmp';
+  const backupPath = path + '.previous';
+  await FileSystem.writeAsStringAsync(tempPath, output, { encoding: FileSystem.EncodingType.UTF8 });
+  const staged = await FileSystem.readAsStringAsync(tempPath, { encoding: FileSystem.EncodingType.UTF8 });
+  if (staged !== output || !splitPages(staged).has(expectedDate)) {
+    throw new Error('DAILY_OBD_HISTORY_STAGING_VALIDATION_FAILED');
+  }
+
+  const targetInfo = await FileSystem.getInfoAsync(path);
+  if (targetInfo.exists && !targetInfo.isDirectory) {
+    await FileSystem.copyAsync({ from: path, to: backupPath });
+  }
+
+  let committed = false;
+  try {
+    await FileSystem.copyAsync({ from: tempPath, to: path });
+    const readBack = await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 });
+    if (readBack !== output || !splitPages(readBack).has(expectedDate)) {
+      throw new Error('DAILY_OBD_HISTORY_COMMIT_VALIDATION_FAILED');
+    }
+    committed = true;
+  } catch (cause) {
+    const backupInfo = await FileSystem.getInfoAsync(backupPath).catch(() => ({ exists: false, isDirectory: false }));
+    if (backupInfo.exists && !backupInfo.isDirectory) {
+      try { await FileSystem.copyAsync({ from: backupPath, to: path }); } catch { /* backup continua disponível */ }
+    }
+    throw cause;
+  } finally {
+    // On failure without a backup, retain the validated .tmp file for a later
+    // recovery attempt rather than deleting the only complete copy of the page.
+    if (committed) {
+      try { await FileSystem.deleteAsync(tempPath, { idempotent: true }); } catch { /* limpar na próxima gravação */ }
+    }
+  }
+
+  try { await FileSystem.copyAsync({ from: path, to: backupPath }); } catch {
+    // O histórico principal já foi validado; a cópia anterior continua como recuperação.
+  }
+}
+
 async function appendDailyObdSessionEventUnsafe(
   basePath: string,
   state: MerivaPersistedState,
@@ -118,6 +159,12 @@ async function appendDailyObdSessionEventUnsafe(
     // A failure to read an existing file is not equivalent to an empty history.
     // Abort the append instead of overwriting unreadable data with a new file.
     content = await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 });
+    const normalizedContent = content.replace(/\r\n/g, '\n');
+    const hasDateMarker = /^========== DIA: \d{4}-\d{2}-\d{2} ==========$/m.test(normalizedContent);
+    const unexpectedBody = normalizedContent.replace(HEADER.trim(), '').trim();
+    if (content.trim() && !hasDateMarker && unexpectedBody) {
+      throw new Error('DAILY_OBD_HISTORY_UNRECOGNIZED_FORMAT: arquivo preservado sem sobrescrita.');
+    }
   }
 
   const pages = splitPages(content);
@@ -131,7 +178,7 @@ async function appendDailyObdSessionEventUnsafe(
   for (const day of sortedDates) {
     output.push('', `========== DIA: ${day} ==========`, pages.get(day) ?? '', `========== FIM DO DIA ==========`);
   }
-  await FileSystem.writeAsStringAsync(path, `${output.join('\n')}\n`, { encoding: FileSystem.EncodingType.UTF8 });
+  await writeDailyHistorySafely(path, `${output.join('\n')}\n`, date);
   return { date, eventCount };
 }
 
