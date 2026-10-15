@@ -2416,3 +2416,26 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Corrigido o normalizador e acrescentado teste de regressão: normalizeSensorPid('01 0C') deve resultar em '010C'. A página já removia whitespace corretamente.
 - Nenhuma regra de suporte ou conclusão de sensor foi alterada.
 - CI desta correção: TypeScript, testes, Expo Doctor e build Android.
+
+## 2026-10-15 — Navegação principal inferior e central de relatórios TXT
+
+### Alterações
+- Criado `src/ui/BottomNavigation.tsx` com quatro destinos: Painel, Diagnóstico, Testes e Relatórios. A barra fica na parte inferior e foi adicionada também às telas secundárias, para evitar voltar ao cockpit apenas para trocar de área.
+- Removidos da tela inicial os botões centrais redundantes para Diagnóstico, Dados e Viagens; Dados e Viagens continuam disponíveis por suas próprias telas e pelo menu de recursos.
+- Reorganizada `app/armazenamento.tsx` como central TXT: lista relatórios e históricos TXT conhecidos, permite ler prévia e compartilhar o conteúdo, exibe uso de armazenamento e mantém limpeza separada dos relatórios.
+- Criadas as exportações `exportDiagnosticsTxt` e `exportDriveCyclesTxt`, salvas como TXT UTF-8 em `MERIVA_SMART/RELATORIOS`.
+- Relatórios da Central de Testes são salvos em `MERIVA_SMART/RELATORIOS/TESTES`; a tela de relatórios também procura TXT legados no diretório antigo para não esconder históricos preexistentes.
+- Adicionado `RELATORIOS` ao resumo de espaço ocupado e adicionada documentação em `docs/RELATORIOS_TXT.md`.
+- Removido o corte fixo de 365 datas do histórico diário ECU. O texto diário preserva as páginas existentes e continua serializando gravações.
+- JSON permanece como formato interno para estado/configuração/catálogos. Logs estruturados internos existentes não foram convertidos nesta etapa; os relatórios exportados pela interface passam a ser somente TXT.
+- Adicionados testes de contrato para navegação, formatos dos relatórios e retenção das datas.
+
+### Arquivos e commits
+- Commit funcional: `b4ff7faefd1b083aa72ee840ad53543ac7bd63ef`.
+- Commit atual deste registro: acrescentado em commit separado para que o hash funcional conste no diário.
+
+### Verificação e CI
+- Foi feita uma verificação estática de coerência dos arquivos durante a preparação e foi adicionada cobertura automatizada; **TypeScript, testes locais, Expo Doctor e build Android não foram executados**.
+- **CI não foi disparada por solicitação.** A validação pelo GitHub Actions permanece pendente.
+- Próxima etapa: revisar o comportamento visual em retrato e paisagem e, quando autorizado, executar a suíte, Expo Doctor e build Android; só então disparar a CI e acompanhar os resultados.
+
