@@ -16,7 +16,8 @@ assert.equal(pkg.dependencies['expo-sqlite'],'~14.0.6','SQLite deve ficar na ver
 assert.equal(lock.packages[''].dependencies['expo-sqlite'],'~14.0.6','lockfile e package.json devem concordar');
 assert.equal(lock.packages['node_modules/expo-sqlite'].version,'14.0.6','lockfile deve fixar a versão instalada');
 for(const table of ['app_metadata','drive_cycles','obd_session_events','sensor_test_runs','sensor_test_readings']) assert.ok(db.includes('CREATE TABLE IF NOT EXISTS '+table),'tabela ausente: '+table);
-assert.ok(db.includes('withExclusiveTransactionAsync'),'gravações multi-tabela devem usar transação exclusiva');
+assert.ok(db.includes('withExclusiveTransactionAsync')&&db.includes('transactionQueue'),'gravações multi-tabela devem usar transação exclusiva e fila serializada');
+assert.ok(db.includes('readLocalSessionEvents')&&db.includes('readSensorTestRuns')&&db.includes('readSensorTestReadings'),'históricos estruturados precisam ter APIs de consulta');
 assert.ok(db.includes('migration.drive_cycles.v1')&&db.includes('migration.daily_obd_history.v1'),'migrações devem ser idempotentes');
 assert.ok(trips.includes('readDriveCyclesFromDatabase')&&trips.includes('readLegacyCycles'),'viagens devem usar SQLite com fallback JSON');
 assert.ok(daily.includes('mirrorSessionEventToSqlite')&&daily.includes('FileSystem.writeAsStringAsync'),'histórico TXT deve continuar sendo gravado');
