@@ -66,6 +66,8 @@ assert.match(healthScreen, /persistDiagnosticFindings\(/, 'Central de Saúde dev
 assert.match(healthScreen, /lastPersistedFindingSignature/, 'achados idênticos não devem ser gravados a cada render');
 assert.match(storageScreen, /getSqliteStorageOverview\(/, 'Central de Relatórios deve consultar estatísticas SQLite');
 assert.match(storageScreen, /Amostras reais de PID/, 'contadores SQLite devem ser visíveis ao usuário');
+assert.match(storageScreen, /Achados diagnósticos/, 'contagem de achados da Central de Saúde deve ser visível');
+assert.match(database, /SQLITE_SCHEMA_NEWER_THAN_APP/, 'app não deve abrir silenciosamente banco de esquema futuro');
 
 assert.match(reportDocs, /TXT/i);
 assert.match(reportDocs, /JSON/i);
