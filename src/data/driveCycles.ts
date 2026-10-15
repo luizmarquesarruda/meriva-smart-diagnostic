@@ -19,6 +19,8 @@ export interface DriveCycle {
   standingTimeHms: string;
   avgDrivingSpeedKmh: number;
   avgFuelConsumptionKml: number;
+  /** Fuel configuration used for estimates during this trip; absent on legacy records. */
+  fuelType?: 'FLEX' | 'ETANOL' | 'GASOLINA';
   /** False when a real trip is retained but fuel data cannot support km/L. */
   fuelDataValid?: boolean;
   /** Maximum valid speed observed during this trip; absent in legacy records. */
