@@ -52,11 +52,18 @@ function durationHmsToMs(value: string): number {
 export function getDriveCycleSummary(cycles: DriveCycle[]): DriveCycleSummary {
   const realCycles = cycles.filter((cycle) => cycle.source === 'REAL_OBD');
   const referenceCycles = cycles.filter((cycle) => cycle.source === 'CARSCANNER_SEED');
-  const realDistanceKm = realCycles.reduce((sum, cycle) => sum + cycle.distanceTotalKm, 0);
+  // Keep total distance even when fuel telemetry or movement timing is
+  // invalid, but do not calculate economy from a trip with no positive moving
+  // time, no positive distance, non-finite values, or explicitly invalid fuel.
+  const realDistanceKm = realCycles.reduce((sum, cycle) =>
+    sum + (Number.isFinite(cycle.distanceTotalKm) && cycle.distanceTotalKm > 0 ? cycle.distanceTotalKm : 0),
+  0);
   const consumptionCycles = realCycles.filter((cycle) =>
-    cycle.fuelDataValid === false
-      ? false
-      : cycle.fuelUsedL >= 0.05 && cycle.avgFuelConsumptionKml > 0,
+    cycle.fuelDataValid !== false &&
+    Number.isFinite(cycle.distanceTotalKm) && cycle.distanceTotalKm > 0 &&
+    Number.isFinite(cycle.fuelUsedL) && cycle.fuelUsedL >= 0.05 &&
+    Number.isFinite(cycle.avgFuelConsumptionKml) && cycle.avgFuelConsumptionKml > 0 &&
+    durationHmsToMs(cycle.drivingTimeHms) > 0,
   );
   const realFuelL = consumptionCycles.reduce((sum, cycle) => sum + cycle.fuelUsedL, 0);
   const consumptionDistanceKm = consumptionCycles.reduce((sum, cycle) => sum + cycle.distanceTotalKm, 0);
