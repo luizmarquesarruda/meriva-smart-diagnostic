@@ -2584,3 +2584,11 @@ Ajustar este registro ao resultado da nova CI após a atualização do diário. 
 - A regressão `testPidBankWriteRollback` simula falha na cópia para o arquivo operacional e exige restauração byte a byte do conteúdo anterior, preservação do `.previous` e remoção do temporário.
 - O contrato SQLite também verifica a presença das barreiras de staging, backup e rollback; isso complementa, mas não substitui, o teste real com Expo SQLite/Android.
 - **Estado atual: CI pendente no head consolidado.** Não há evidência suficiente para declarar a alteração validada até `npm run validate`, Expo Doctor e build Android terminarem na execução disparada por este registro. O teste físico com ELM327/ECU continua pendente.
+
+
+## 2026-10-15 — Validação de frescor temporal no SQLite
+
+- `recordRealPidReading` antes usava `Date.now()` como fallback apenas para o limitador de amostras, mas ainda gravava a string original de timestamp. Um timestamp inválido poderia entrar na base; um timestamp muito futuro também podia deslocar o relógio de amostragem e bloquear leituras seguintes.
+- Adicionada a regra explícita de elegibilidade temporal: leitura até 30 segundos de idade e tolerância futura máxima de 5 segundos. Amostras fora da janela ou com data inválida são descartadas; o SQLite recebe ISO normalizado.
+- Adicionado teste determinístico de limites temporais e contrato estrutural da regra. Isso é validação do comportamento puro do guard, não teste do módulo nativo Expo SQLite.
+- Validar no CI do head final: `npm run validate`, Expo Doctor e APK Android; hardware real continua pendente.
