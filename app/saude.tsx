@@ -47,6 +47,10 @@ export default function SaudeScreen() {
       })),
       sessionId,
     ).catch((cause) => {
+      // Permite nova tentativa no próximo render se a falha for transitória.
+      if (lastPersistedFindingSignature.current === findingSignature) {
+        lastPersistedFindingSignature.current = '';
+      }
       console.warn('[sqlite] não foi possível salvar achados da Central de Saúde:', cause instanceof Error ? cause.message : cause);
     });
   }, [diagnostic.hypotheses, findingSignature, sessionId]);
