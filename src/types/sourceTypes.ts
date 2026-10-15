@@ -39,6 +39,8 @@ export interface PidObservation {
   source: DataSource;
   timestamp: string;
   confidence: ConfidenceLevel;
+  /** Present for live autosave rows; only RESPONDEU may be used as ECU evidence. */
+  status?: 'RESPONDEU' | 'NÃO RESPONDEU' | 'VALOR NÃO INTERPRETADO' | string;
   derived?: boolean;
   derivedFrom?: string;
   errorMessage?: string;
