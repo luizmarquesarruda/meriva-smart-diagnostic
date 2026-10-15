@@ -62,6 +62,7 @@ assert.match(database, /ON CONFLICT\(pid\) DO UPDATE/, 'aprendizado PID deve atu
 assert.match(database, /ON CONFLICT\(id\) DO UPDATE/, 'relatórios repetidos do mesmo teste devem ser idempotentes');
 assert.match(database, /status = 'RECOVERED'/, 'sessões abandonadas precisam ser recuperadas como encerradas');
 assert.match(database, /SELECT metadata_json FROM obd_sessions/, 'fechamento de sessão deve preservar metadados anteriores');
+assert.match(database, /withTransactionAsync\(async \(\) => \{[\s\S]*STALE_SESSION_BEFORE_NEW_SESSION[\s\S]*INSERT INTO obd_sessions/, 'abertura ECU deve fechar sessões órfãs e criar a nova sessão numa transação');
 assert.match(database, /activeSessionId = null;[\s\S]*lastPidSampleAt\.clear\(\)/, 'fechar/trocar sessão deve cortar atribuição a sessão antiga antes do I/O seguinte');
 assert.match(tripStorage, /serializeIndexOperation/, 'gravações simultâneas de viagens devem ser serializadas');
 assert.match(tripStorage, /DRIVE_CYCLE_INDEX_UNREADABLE/, 'histórico corrompido sem backup não pode ser substituído silenciosamente');
