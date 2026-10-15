@@ -234,8 +234,8 @@ export default function IndexScreen() {
   const summary = useMemo(() => getDriveCycleSummary(cycles), [cycles]);
   const coachFuelType = tripState.instantaneousFuelType ?? tripState.activeFuelType ?? settings?.fuelType ?? 'FLEX';
   const fuelCoachReference = useMemo(
-    () => buildFuelCoachReference(cycles, coachFuelType, tripState.instantaneousConsumptionSource),
-    [cycles, coachFuelType, tripState.instantaneousConsumptionSource],
+    () => buildFuelCoachReference(cycles, coachFuelType, tripState.instantaneousConsumptionSource, tripState.instantaneousSpeedKmh),
+    [cycles, coachFuelType, tripState.instantaneousConsumptionSource, tripState.instantaneousSpeedKmh],
   );
   const fuelCoach = useMemo(
     () => evaluateFuelCoach({
