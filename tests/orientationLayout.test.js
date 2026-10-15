@@ -5,11 +5,12 @@ const appJson = JSON.parse(fs.readFileSync('app.json', 'utf8'));
 const index = fs.readFileSync('app/index.tsx', 'utf8');
 const layout = fs.readFileSync('app/_layout.tsx', 'utf8');
 const midLayout = fs.readFileSync('src/ui/midLayout.ts', 'utf8');
+const bottomNav = fs.readFileSync('src/ui/BottomNavigation.tsx', 'utf8');
 const tripService = fs.readFileSync('src/trip/autoTripService.ts', 'utf8');
 const screenFiles = [
   'app/mais.tsx', 'app/dados.tsx', 'app/saude.tsx', 'app/veiculo.tsx',
   'app/viagens.tsx', 'app/aprendizado.tsx', 'app/bluetooth.tsx',
-  'app/armazenamento.tsx', 'app/configuracoes.tsx', 'app/laboratorio.tsx',
+  'app/armazenamento.tsx', 'app/configuracoes.tsx', 'app/laboratorio.tsx', 'app/testes-sensores.tsx',
 ];
 
 // Expo's default orientation means no orientation lock; do not introduce a native portrait/landscape lock.
@@ -34,10 +35,8 @@ assert.match(index, /item\.pid === '0111'/);
 assert.match(index, /item\.pid === '010C'/);
 assert.match(index, /setActiveHeroMetric\(\(current\) => \(current \+ 1\) % Math\.max\(1, heroMetrics\.length\)\)/);
 assert.match(index, /activeHeroMetric \+ 1\}\/\{heroMetrics\.length\}/, 'contador visual deve usar o mesmo total dinâmico');
-assert.match(index, /href="[^"]*viagens"/);
-assert.match(index, /href="[^"]*dados"/);
-assert.match(index, /dashboardAction/);
-assert.match(index, /actionGridLandscape/);
+assert.ok(index.includes('<BottomNavigation active="painel" />'));
+for (const route of ['/', '/laboratorio', '/testes-sensores', '/armazenamento']) assert.ok(bottomNav.includes(route), 'tab inferior ausente: ' + route);
 assert.match(index, /react-native-safe-area-context/);
 assert.match(layout, /SafeAreaProvider/);
 assert.match(midLayout, /size\.width > size\.height/);

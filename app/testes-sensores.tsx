@@ -1,5 +1,5 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
-import {Link} from 'expo-router';
+import BottomNavigation from '../src/ui/BottomNavigation';
 import {ActivityIndicator,ScrollView,StyleSheet,Text,TouchableOpacity,View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
@@ -76,7 +76,7 @@ export default function TestesSensoresScreen(){
  async function saveReport(){
   if(!samples.length){setError('Ainda não há amostras para salvar.');return;}
   try{
-   const dir=(FileSystem.documentDirectory??'')+'MERIVA_SMART/testes-sensores';await FileSystem.makeDirectoryAsync(dir,{intermediates:true});
+   const dir=(FileSystem.documentDirectory??'')+'MERIVA_SMART/RELATORIOS/TESTES';await FileSystem.makeDirectoryAsync(dir,{intermediates:true});
    const path=dir+'/teste-sensores-'+new Date().toISOString().replace(/[:.]/g,'-')+'.txt';
    const lines=['MERIVA SMART DIAGNOSTIC — CENTRAL DE TESTES DE SENSORES','Catálogo: '+catalog.catalogId+' v'+catalog.schemaVersion,'Data: '+new Date().toLocaleString(),'Veículo de referência: Chevrolet Meriva Maxx 1.4 8V ECONO.FLEX 2011/2012','Condição: '+(mode==='ENGINE_OFF'?'IGNIÇÃO LIGADA / MOTOR DESLIGADO':'MOTOR LIGADO, VEÍCULO PARADO'),'ECU validada no início: '+(connectedAtStart.current?'SIM':'NÃO'),'Protocolo observado: '+(getSharedObdConnection()?.protocol??'N/D'),'Leituras mínimas por PID: '+MIN_SENSOR_TEST_READINGS,'PIDs selecionados pela bitmap: '+testPlan.length,'Tentativas previstas: '+plannedReads,'Tentativas registradas: '+samples.length,'Execução completa: '+(completed?'SIM':'NÃO — RELATÓRIO PARCIAL'),'Tempo decorrido: '+Math.round((Date.now()-runStartedAt.current)/1000)+' s','','AVALIAÇÃO POR PID'];
    for(const item of grouped){
@@ -84,11 +84,11 @@ export default function TestesSensoresScreen(){
     for(const row of item.rows)lines.push('Leitura '+row.readingNumber+': '+valueText(row.value,row.unit)+' | Parser: '+row.status+' | Latência: '+row.elapsedMs+' ms | '+row.timestamp,'RX bruto: '+(row.rawResponse||'VAZIO'));
    }
    lines.push('','POLÍTICA: resposta positiva confirma resposta do PID, não exatidão física/elétrica do sensor. PIDs fora da bitmap não foram consultados.','REFERÊNCIAS: SAE J1979 supported-PID bitmap; Dashlogic PID listing; OBD2 PID Knowledge; auditoria da Bíblia da Meriva.','Limiares são heurísticos, não especificações OEM. Algumas verificações exigem multímetro, osciloscópio ou condições controladas.');
-   await FileSystem.writeAsStringAsync(path,lines.join('\n'));setSavedPath(path);setError('');setMessage('Relatório TXT salvo no armazenamento privado do aplicativo.');
+   await FileSystem.writeAsStringAsync(path,lines.join('\n'),{encoding:FileSystem.EncodingType.UTF8});setSavedPath(path);setError('');setMessage('Relatório TXT salvo no armazenamento privado do aplicativo.');
   }catch(cause){setError(cause instanceof Error?cause.message:'Falha ao salvar relatório TXT.');}
  }
  return <SafeAreaView style={st.container} edges={['top','bottom','left','right']}><ScrollView contentContainerStyle={[st.content,{paddingHorizontal:layout.horizontalPadding}]}><View style={[st.frame,{maxWidth:layout.maxContentWidth}]}>
-  <Text style={st.title}>CENTRAL DE TESTES</Text><Text style={st.subtitle}>CATÁLOGO JSON • DADOS REAIS • 3 LEITURAS MÍNIMAS POR PID</Text>
+  <Text style={st.title}>CENTRAL DE TESTES</Text><Text style={st.subtitle}>CATÁLOGO INTERNO JSON • RELATÓRIO TXT • 3 LEITURAS MÍNIMAS POR PID</Text>
   <View style={[st.connection,connected?st.good:st.warn]}><Text style={connected?st.goodTitle:st.warnTitle}>{connected?'● ECU VALIDADA':'● ECU NÃO VALIDADA'}</Text><Text style={st.muted}>{connection?.device.name??'Nenhum adaptador ativo'} · {connection?.protocol??'Protocolo N/D'}</Text><Text style={st.muted}>Só PIDs anunciados pela ECU e cadastrados no catálogo entram na varredura.</Text></View>
   <Text style={st.section}>CONDIÇÃO DO MOTOR</Text><View style={[st.modes,layout.landscape&&st.modesWide]}>
    <TouchableOpacity disabled={running} onPress={()=>setMode('ENGINE_OFF')} style={[st.mode,mode==='ENGINE_OFF'&&st.selected]}><Text style={st.icon}>⏻</Text><Text style={st.modeTitle}>Motor desligado</Text><Text style={st.muted}>Ignição ligada, motor parado</Text></TouchableOpacity>
@@ -108,8 +108,7 @@ export default function TestesSensoresScreen(){
   </View>)}
   <TouchableOpacity onPress={()=>void saveReport()} style={st.save}><Text style={st.saveText}>SALVAR RELATÓRIO TXT</Text></TouchableOpacity>{savedPath?<Text selectable style={st.saved}>{savedPath}</Text>:null}</>}
   <View style={st.disclaimer}><Text style={st.resultTitle}>Critério da IA local</Text><Text style={st.explanation}>O JSON orienta PIDs, pré-requisitos, faixas heurísticas e recomendações. “Coerente” não certifica o sensor; “investigar” não ordena troca de peça. Três tentativas registram repetibilidade, mas O2, aquecedor, chicote e vácuo podem exigir testes próprios.</Text></View>
-  <Link href="/mais" asChild><TouchableOpacity style={st.back}><Text style={st.backText}>← MAIS RECURSOS</Text></TouchableOpacity></Link><Link href="/" asChild><TouchableOpacity style={st.back}><Text style={st.backText}>← COCKPIT</Text></TouchableOpacity></Link>
- </View></ScrollView></SafeAreaView>;
+ </View></ScrollView><BottomNavigation active="testes" /></SafeAreaView>;
 }
 const st=StyleSheet.create({
  container:{flex:1,backgroundColor:'#07111f'},content:{flexGrow:1,width:'100%',paddingVertical:14,paddingBottom:30},frame:{width:'100%',alignSelf:'center'},

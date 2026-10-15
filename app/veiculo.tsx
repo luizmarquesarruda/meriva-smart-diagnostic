@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import BottomNavigation from '../src/ui/BottomNavigation';
 import { Link } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -29,7 +30,7 @@ export default function VeiculoScreen() {
     </View>
     <Link href="/bluetooth" asChild><TouchableOpacity style={styles.primary}><Text style={styles.primaryText}>📡 GERENCIAR CONEXÃO</Text></TouchableOpacity></Link>
     <Link href="/" asChild><TouchableOpacity style={styles.back}><Text style={styles.backText}>← VOLTAR</Text></TouchableOpacity></Link>
-  </View></ScrollView></SafeAreaView>;
+  </View></ScrollView><BottomNavigation active={null} /></SafeAreaView>;
 }
 function Row({ l, v }: { l: string; v: string }) { return <View style={styles.row}><Text style={styles.label}>{l}</Text><Text style={styles.value}>{v}</Text></View>; }
 const styles = StyleSheet.create({

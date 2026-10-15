@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import BottomNavigation from '../src/ui/BottomNavigation';
 import { Link } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -98,7 +99,7 @@ export default function ViagensScreen() {
         </>}
       </View>
     </ScrollView>
-  </SafeAreaView>;
+  <BottomNavigation active={null} /></SafeAreaView>;
 }
 
 function TripDetails({cycle,onBack}:{cycle:DriveCycle;onBack:()=>void}) {

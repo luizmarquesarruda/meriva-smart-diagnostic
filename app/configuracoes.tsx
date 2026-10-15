@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import BottomNavigation from '../src/ui/BottomNavigation';
 import Constants from 'expo-constants';
 import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -278,7 +279,7 @@ export default function ConfiguracaoScreen() {
       ) : <Text style={styles.info}>Veículo: N/D</Text>}
       </View>
     </ScrollView>
-    </SafeAreaView>
+    <BottomNavigation active={null} /></SafeAreaView>
   );
 }
 

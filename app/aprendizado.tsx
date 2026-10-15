@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import BottomNavigation from '../src/ui/BottomNavigation';
 import { Link } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,7 +27,7 @@ export default function AprendizadoScreen() {
     <Text style={styles.note}>Somente amostras REAL_OBD alimentam o raciocínio diagnóstico. Dados de simulação permanecem bloqueados para aprendizado.</Text>
     <Link href="/saude" asChild><TouchableOpacity style={styles.primary}><Text style={styles.primaryText}>🚨 VER EVIDÊNCIAS E HIPÓTESES</Text></TouchableOpacity></Link>
     <Link href="/" asChild><TouchableOpacity style={styles.back}><Text style={styles.backText}>← VOLTAR</Text></TouchableOpacity></Link>
-  </View></ScrollView></SafeAreaView>;
+  </View></ScrollView><BottomNavigation active={null} /></SafeAreaView>;
 }
 function Metric({ l, v, landscape=false }: { l: string; v: string; landscape?: boolean }) { return <View style={[styles.metric,landscape&&styles.metricLandscape]}><Text style={styles.label}>{l}</Text><Text style={styles.value}>{v}</Text></View>; }
 function Row({ l, v }: { l: string; v: string }) { return <View style={styles.row}><Text style={styles.label}>{l}</Text><Text style={styles.value}>{v}</Text></View>; }

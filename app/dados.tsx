@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import BottomNavigation from '../src/ui/BottomNavigation';
 import { Link } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -55,7 +56,7 @@ export default function DadosScreen() {
     <View style={styles.note}><Text style={styles.noteText}>A tela não inventa telemetria: somente leituras marcadas como REAL entram como evidência do veículo.</Text></View>
     <Link href="/laboratorio" asChild><TouchableOpacity style={styles.primary}><Text style={styles.primaryText}>🔧 CONSULTAR / DESCOBRIR PIDs</Text></TouchableOpacity></Link>
     <Back />
-  </View></ScrollView></SafeAreaView>;
+  </View></ScrollView><BottomNavigation active={null} /></SafeAreaView>;
 }
 function Header({title,subtitle}:{title:string;subtitle:string}){return <View style={styles.header}><Text style={styles.title}>{title}</Text><Text style={styles.subtitle}>{subtitle}</Text></View>}
 function Metric({label,value,landscape=false}:{label:string;value:string;landscape?:boolean}){return <View style={[styles.metric,landscape&&styles.metricLandscape]}><Text style={styles.label}>{label}</Text><Text style={styles.metricValue}>{value}</Text></View>}

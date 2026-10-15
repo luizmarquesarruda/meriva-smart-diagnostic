@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import BottomNavigation from '../src/ui/BottomNavigation';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMidLayout } from '../src/ui/midLayout';
@@ -235,7 +236,7 @@ export default function BluetoothScreen() {
         </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    <BottomNavigation active={null} /></SafeAreaView>
   );
 }
 

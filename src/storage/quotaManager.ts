@@ -30,7 +30,7 @@ function toMb(bytes: number): number {
 }
 
 export async function getStorageBreakdown(basePath: string): Promise<Record<string, number>> {
-  const dirs = ['CONFIG', 'BANCO', 'LEITURAS', 'APRENDIZADO', 'DTC', 'LOGS', 'VIAGENS', 'BACKUP'];
+  const dirs = ['CONFIG', 'BANCO', 'LEITURAS', 'APRENDIZADO', 'DTC', 'LOGS', 'VIAGENS', 'RELATORIOS', 'BACKUP'];
   const breakdown: Record<string, number> = {};
   for (const dir of dirs) {
     breakdown[dir] = toMb(await getEntrySizeBytes(`${basePath}/${dir}`));

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import BottomNavigation from '../src/ui/BottomNavigation';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
@@ -664,6 +665,7 @@ export default function LaboratorioScreen() {
       {!!error && <Text style={styles.error}>{error}</Text>}
       </View>
     </ScrollView>
+    <BottomNavigation active="diagnostico" />
     </SafeAreaView>
   );
 }

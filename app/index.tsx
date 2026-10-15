@@ -1,4 +1,5 @@
 import { Link, useFocusEffect } from 'expo-router';
+import BottomNavigation from '../src/ui/BottomNavigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -255,20 +256,8 @@ export default function IndexScreen() {
               <Link href="/saude" asChild><TouchableOpacity style={styles.outlineButton}><Text style={styles.outlineText}>ABRIR CENTRAL DE SAÚDE →</Text></TouchableOpacity></Link>
             </View>
           )}
-          <View style={[styles.actionGrid, layout.landscape && styles.actionGridLandscape]}>
-            <Link href="/laboratorio" asChild><TouchableOpacity style={[styles.primaryButton, styles.dashboardAction]}><Text style={styles.buttonText} numberOfLines={1}>🔧 DIAGNÓSTICO</Text></TouchableOpacity></Link>
-            <Link href="/dados" asChild><TouchableOpacity style={[styles.secondaryButton, styles.dashboardAction]}><Text style={styles.secondaryButtonText} numberOfLines={1}>📊 DADOS</Text></TouchableOpacity></Link>
-            <Link href="/viagens" asChild><TouchableOpacity style={[styles.secondaryButton, styles.dashboardAction]}><Text style={styles.secondaryButtonText} numberOfLines={1}>🛣️ VIAGENS</Text></TouchableOpacity></Link>
-          </View>
-          {!layout.landscape && (
-            <>
-              <View style={styles.bottomNav}>
-                <Link href="/bluetooth" asChild><TouchableOpacity style={styles.bottomNavItem}><Text style={styles.bottomNavIcon}>🔵</Text><Text style={styles.bottomNavText}>BLUETOOTH</Text></TouchableOpacity></Link>
-                <Link href="/mais" asChild><TouchableOpacity style={styles.bottomNavItem}><Text style={styles.bottomNavIcon}>⋯</Text><Text style={styles.bottomNavText}>MAIS RECURSOS</Text></TouchableOpacity></Link>
-              </View>
-              <Text style={styles.footerStatus}>{!isHydrated ? 'CARREGANDO...' : saveStatus.obdSessionActive ? 'DIÁRIO DE BORDO • GRAVANDO' : 'DIÁRIO DE BORDO • AGUARDANDO ECU'}</Text>
-            </>
-          )}
+          <Text style={styles.footerStatus}>{!isHydrated ? 'CARREGANDO...' : saveStatus.obdSessionActive ? 'DIÁRIO DE BORDO • GRAVANDO' : 'DIÁRIO DE BORDO • AGUARDANDO ECU'}</Text>
+          <BottomNavigation active="painel" />
         </View>
       </View>
     </SafeAreaView>
