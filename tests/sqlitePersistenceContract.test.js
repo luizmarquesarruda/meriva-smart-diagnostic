@@ -11,6 +11,8 @@ const parse = (relativePath) => JSON.parse(read(relativePath));
 const database = read('src/storage/merivaDatabase.ts');
 const autosave = read('src/meriva/autosaveManager.ts');
 const testScreen = read('app/testes-sensores.tsx');
+const healthScreen = read('app/saude.tsx');
+const storageScreen = read('app/armazenamento.tsx');
 const packageJson = parse('package.json');
 const packageLock = parse('package-lock.json');
 const diary = read('docs/DIARIO_DE_BORDO.md');
@@ -46,6 +48,9 @@ assert.match(database, /cycle\.source === 'REAL_OBD'/, 'viagens importadas/semen
 assert.match(database, /ON CONFLICT\(pid\) DO UPDATE/, 'aprendizado PID deve atualizar a chave existente');
 assert.match(database, /ON CONFLICT\(id\) DO UPDATE/, 'relatórios repetidos do mesmo teste devem ser idempotentes');
 assert.match(database, /status = 'RECOVERED'/, 'sessões abandonadas precisam ser recuperadas como encerradas');
+assert.match(database, /persistDiagnosticFindings\(/, 'achados da IA local devem ser persistidos');
+assert.match(database, /INSERT INTO diagnostic_findings/, 'achados devem ir para a tabela operacional');
+assert.match(database, /stableHash\(/, 'IDs dos achados devem ser determinísticos e idempotentes');
 
 assert.match(autosave, /initializeMerivaDatabase\(\)/, 'autosave deve inicializar SQLite');
 assert.match(autosave, /migrateLegacyStateToSqlite\(runtime\.state\)/, 'snapshot antigo deve ser migrado sem ser removido');
@@ -57,6 +62,10 @@ assert.match(autosave, /autosave\.json/, 'JSON interno continua como recuperaç�
 assert.match(testScreen, /persistSensorTestReport\(/, 'relatório da central de testes deve persistir no SQLite');
 assert.match(testScreen, /writeAsStringAsync\(path,lines\.join/, 'a exportação visível do teste continua em TXT');
 assert.match(testScreen, /TXT salvo\. O registro interno SQLite falhou/, 'falha no banco não deve apagar/invalidar o TXT');
+assert.match(healthScreen, /persistDiagnosticFindings\(/, 'Central de Saúde deve registrar achados com evidência real');
+assert.match(healthScreen, /lastPersistedFindingSignature/, 'achados idênticos não devem ser gravados a cada render');
+assert.match(storageScreen, /getSqliteStorageOverview\(/, 'Central de Relatórios deve consultar estatísticas SQLite');
+assert.match(storageScreen, /Amostras reais de PID/, 'contadores SQLite devem ser visíveis ao usuário');
 
 assert.match(reportDocs, /TXT/i);
 assert.match(reportDocs, /JSON/i);
