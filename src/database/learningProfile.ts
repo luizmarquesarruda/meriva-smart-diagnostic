@@ -155,6 +155,29 @@ function isValidStatisticsMap(value: unknown): value is Record<string, SampleSta
 
 function isValidLearningProfile(value: unknown): value is MerivaLearningProfile {
   if (!isObjectRecord(value)) return false;
+
+  const thresholds = isObjectRecord(value.confidenceThresholds) ? value.confidenceThresholds : null;
+  const counts = isObjectRecord(value.globalSampleCounts) ? value.globalSampleCounts : null;
+  const contamination = isObjectRecord(value.dataContamination) ? value.dataContamination : null;
+  const contextualData = value.contextualData;
+
+  if (!thresholds || !counts || !contamination || !Array.isArray(contextualData)) return false;
+  if (
+    !isFiniteNonNegative(thresholds.low) ||
+    !isFiniteNonNegative(thresholds.medium) ||
+    !isFiniteNonNegative(thresholds.good) ||
+    !isFiniteNonNegative(thresholds.high) ||
+    thresholds.low > thresholds.medium ||
+    thresholds.medium > thresholds.good ||
+    thresholds.good > thresholds.high
+  ) return false;
+  if (
+    !isFiniteNonNegative(counts.seedSamples) ||
+    !isFiniteNonNegative(counts.realSamples) ||
+    !isFiniteNonNegative(counts.totalSamples) ||
+    !isFiniteNonNegative(contamination.simulationDetected) ||
+    !isFiniteNonNegative(contamination.simulationFiltered)
+  ) return false;
   if (
     typeof value.vehicleId !== 'string' ||
     typeof value.profileCreated !== 'string' || !Number.isFinite(Date.parse(value.profileCreated)) ||
@@ -164,19 +187,7 @@ function isValidLearningProfile(value: unknown): value is MerivaLearningProfile 
     !['COLD_START', 'SEED_INITIALIZED', 'LEARNING_ACTIVE', 'CONFIDENT'].includes(String(value.learningStatus)) ||
     !['HYBRID', 'REAL_ONLY'].includes(String(value.source)) ||
     typeof value.seedWeight !== 'number' || !Number.isFinite(value.seedWeight) || value.seedWeight < 0 ||
-    !isObjectRecord(value.confidenceThresholds) ||
-    !['low', 'medium', 'good', 'high'].every((key) => isFiniteNonNegative(value.confidenceThresholds[key])) ||
-    typeof value.confidenceThresholds.low !== 'number' || typeof value.confidenceThresholds.medium !== 'number' ||
-    typeof value.confidenceThresholds.good !== 'number' || typeof value.confidenceThresholds.high !== 'number' ||
-    value.confidenceThresholds.low > value.confidenceThresholds.medium ||
-    value.confidenceThresholds.medium > value.confidenceThresholds.good ||
-    value.confidenceThresholds.good > value.confidenceThresholds.high ||
-    !isObjectRecord(value.globalSampleCounts) ||
-    !isFiniteNonNegative(value.globalSampleCounts.seedSamples) ||
-    !isFiniteNonNegative(value.globalSampleCounts.realSamples) ||
-    !isFiniteNonNegative(value.globalSampleCounts.totalSamples) ||
-    !Array.isArray(value.contextualData) ||
-    !value.contextualData.every((context) => {
+    !contextualData.every((context) => {
       if (!isObjectRecord(context)) return false;
       return (
         ['IDLE_COLD', 'IDLE_WARM', 'ACCELERATION', 'CRUISE', 'DECELERATION', 'UNKNOWN'].includes(String(context.condition)) &&
@@ -185,11 +196,9 @@ function isValidLearningProfile(value: unknown): value is MerivaLearningProfile 
         isValidStatisticsMap(context.statistics)
       );
     }) ||
-    !isValidStatisticsMap(value.overallStatistics) ||
-    !isObjectRecord(value.dataContamination) ||
-    !isFiniteNonNegative(value.dataContamination.simulationDetected) ||
-    !isFiniteNonNegative(value.dataContamination.simulationFiltered)
+    !isValidStatisticsMap(value.overallStatistics)
   ) return false;
+
   return true;
 }
 
