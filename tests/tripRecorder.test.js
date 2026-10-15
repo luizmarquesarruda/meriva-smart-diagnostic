@@ -59,6 +59,12 @@ const noFuel = new RealTripRecorder(0, 0);
 noFuel.addSample({ timestampMs: 0, distanceKm: 0, speedKmh: 0, fuelRateLph: null });
 noFuel.addSample({ timestampMs: 1000, distanceKm: 0.2, speedKmh: 20, fuelRateLph: null });
 const noFuelCycle = noFuel.buildDriveCycle(2000);
+const fuelTypedTrip = new RealTripRecorder(0, 0, 'ETANOL');
+fuelTypedTrip.addSample({ timestampMs: 0, distanceKm: 0, speedKmh: 0, fuelRateLph: 2, fuelRateSource: 'ESTIMATED_MAF' });
+fuelTypedTrip.addSample({ timestampMs: 10000, distanceKm: 0.2, speedKmh: 36, fuelRateLph: 2, fuelRateSource: 'ESTIMATED_MAF' });
+const fuelTypedCycle = fuelTypedTrip.buildDriveCycle(11000);
+assert.strictEqual(fuelTypedCycle.fuelType, 'ETANOL', 'a viagem deve registrar o combustível associado à estimativa');
+
 assert.ok(noFuelCycle, 'a real trip with distance must be retained even without fuel telemetry');
 assert.strictEqual(noFuelCycle.fuelDataValid, false);
 assert.strictEqual(noFuelCycle.avgFuelConsumptionKml, 0, 'unavailable consumption must not be fabricated');
