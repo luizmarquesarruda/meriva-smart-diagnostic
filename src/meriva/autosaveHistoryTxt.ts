@@ -90,6 +90,9 @@ async function readAutoSaveHistoryUnsafe(basePath: string): Promise<string> {
 /** Reescreve o histórico legado já sanitizado; se a leitura falhar, não toca no arquivo original. */
 export async function purgeLegacyCarScannerHistoryTxt(basePath: string): Promise<void> {
   const path = historyPath(basePath);
+  const info = await FileSystem.getInfoAsync(path);
+  if (!info.exists) return;
+  if (info.isDirectory) throw new Error('O caminho do histórico TXT aponta para um diretório.');
   const sanitized = await readAutoSaveHistoryUnsafe(basePath);
   await FileSystem.writeAsStringAsync(path, sanitized, {
     encoding: FileSystem.EncodingType.UTF8,
