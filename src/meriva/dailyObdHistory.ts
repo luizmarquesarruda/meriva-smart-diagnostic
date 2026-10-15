@@ -100,6 +100,38 @@ function splitPages(content: string): Map<string, string> {
   return pages;
 }
 
+async function recoverPendingDailyHistoryWrite(path: string): Promise<void> {
+  const tempPath = path + '.tmp';
+  const backupPath = path + '.previous';
+  const tempInfo = await FileSystem.getInfoAsync(tempPath);
+  if (!tempInfo.exists || tempInfo.isDirectory) return;
+
+  // A complete validated temp file represents an append that was interrupted
+  // during replacement; promote it before building the next event.
+  const staged = await FileSystem.readAsStringAsync(tempPath, { encoding: FileSystem.EncodingType.UTF8 });
+  const validStaged = staged.startsWith(HEADER.trimEnd()) &&
+    staged.trimEnd().endsWith('========== FIM DO DIA ==========') &&
+    splitPages(staged).size > 0;
+  if (!validStaged) return;
+
+  const primaryInfo = await FileSystem.getInfoAsync(path);
+  if (primaryInfo.exists && !primaryInfo.isDirectory) {
+    await FileSystem.copyAsync({ from: path, to: backupPath });
+  }
+  try {
+    await FileSystem.copyAsync({ from: tempPath, to: path });
+    const readBack = await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 });
+    if (readBack !== staged) throw new Error('DAILY_OBD_HISTORY_RECOVERY_VALIDATION_FAILED');
+    await FileSystem.deleteAsync(tempPath, { idempotent: true });
+  } catch (cause) {
+    const backupInfo = await FileSystem.getInfoAsync(backupPath).catch(() => ({ exists: false, isDirectory: false }));
+    if (backupInfo.exists && !backupInfo.isDirectory) {
+      try { await FileSystem.copyAsync({ from: backupPath, to: path }); } catch { /* keep the backup */ }
+    }
+    throw cause;
+  }
+}
+
 async function writeDailyHistorySafely(path: string, output: string, expectedDate: string): Promise<void> {
   const tempPath = path + '.tmp';
   const backupPath = path + '.previous';
@@ -150,6 +182,7 @@ async function appendDailyObdSessionEventUnsafe(
   const path = historyPath(basePath);
   const date = localDayKey(new Date(timestamp));
   await FileSystem.makeDirectoryAsync(`${basePath}/VIAGENS`, { intermediates: true });
+  await recoverPendingDailyHistoryWrite(path);
   let content = '';
   const info = await FileSystem.getInfoAsync(path);
   if (info.exists && info.isDirectory) {
