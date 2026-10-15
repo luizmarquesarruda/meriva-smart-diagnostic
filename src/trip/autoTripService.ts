@@ -665,10 +665,11 @@ class AutoTripService {
 
       this.pendingFinalizedTrips.shift();
       const autonomy = getAutoSaveState().autonomy;
+      const hadPendingWriteError = this.state.error?.startsWith('VIAGEM PENDENTE DE SALVAMENTO:') ?? false;
       this.setState({
         averageConsumptionKml: autonomy.averageConsumptionKml,
         estimatedRangeKm: autonomy.estimatedRangeKm,
-        error: this.pendingFinalizedTrips.length ? this.state.error : null,
+        error: this.pendingFinalizedTrips.length === 0 && hadPendingWriteError ? null : this.state.error,
       });
     }
   }
