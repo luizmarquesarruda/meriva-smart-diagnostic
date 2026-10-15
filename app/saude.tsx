@@ -14,7 +14,7 @@ import { getActiveSqliteSessionId, persistDiagnosticFindings } from '../src/stor
 export default function SaudeScreen() {
   const layout = useMidLayout();
   const [state,setState]=useState(getAutoSaveState());
-  useEffect(()=>{const t=setInterval(()=>setState(getAutoSaveState()),1000);return()=>clearInterval(t)},[]);
+  useEffect(()=>{const t=setInterval(()=>setState({...getAutoSaveState()}),1000);return()=>clearInterval(t)},[]);
   const context = getVehicleConditionSnapshot();
   const activeDtcs = state.dtcs.filter((item) => ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(item.status));
   const diagnostic: DiagnosticResult = useMemo(()=>runLocalDiagnostic({observations:state.lastReadings.map(r=>({pid:r.pid,name:r.name,value:r.value,unit:r.unit,source:r.source==='SIMULACAO'?'SIMULACAO':'REAL_OBD',timestamp:r.timestamp,confidence:r.source==='SIMULACAO'?'LOW':'GOOD'} as PidObservation)),dtcs:state.dtcs,condition:context.condition}),[state,context.condition]);
