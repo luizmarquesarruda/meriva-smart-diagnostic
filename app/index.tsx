@@ -63,7 +63,7 @@ export default function IndexScreen() {
       consumptionKmL,
       speedKmh: tripState.instantaneousSpeedKmh ?? 0,
       source,
-      fuelType: tripState.activeFuelType ?? settings?.fuelType ?? 'FLEX',
+      fuelType: tripState.instantaneousFuelType ?? tripState.activeFuelType ?? settings?.fuelType ?? 'FLEX',
     };
     setFuelCoachSamples((current) => [
       ...current.filter((item) => item.timestampMs >= timestampMs - 30_000),
@@ -72,6 +72,7 @@ export default function IndexScreen() {
   }, [
     connectionStatus.ecuConnected,
     tripState.instantaneousConsumptionTimestampMs,
+    tripState.instantaneousFuelType,
     tripState.instantaneousConsumptionKml,
     tripState.instantaneousConsumptionSource,
     tripState.instantaneousSpeedKmh,
@@ -231,7 +232,7 @@ export default function IndexScreen() {
   );
 
   const summary = useMemo(() => getDriveCycleSummary(cycles), [cycles]);
-  const coachFuelType = tripState.activeFuelType ?? settings?.fuelType ?? 'FLEX';
+  const coachFuelType = tripState.instantaneousFuelType ?? tripState.activeFuelType ?? settings?.fuelType ?? 'FLEX';
   const fuelCoachReference = useMemo(
     () => buildFuelCoachReference(cycles, coachFuelType, tripState.instantaneousConsumptionSource),
     [cycles, coachFuelType, tripState.instantaneousConsumptionSource],
@@ -251,6 +252,7 @@ export default function IndexScreen() {
       connectionStatus.ecuConnected,
       tripState.instantaneousConsumptionKml,
       tripState.instantaneousConsumptionTimestampMs,
+      tripState.instantaneousFuelType,
       tripState.instantaneousSpeedKmh,
       tripState.instantaneousConsumptionSource,
       coachFuelType,
