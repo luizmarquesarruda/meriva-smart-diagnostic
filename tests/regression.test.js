@@ -821,8 +821,37 @@ async function testDriveCycleValidation() {
   const migratedIndex = JSON.parse(files.get(indexFile));
   assert.ok(migratedIndex.cycles.every((item) => item.source !== 'CARSCANNER_SEED'), 'adding a real trip must remove legacy seeds from active index');
 
+  // If the live index becomes malformed, restore the last-known-good backup
+  // instead of silently presenting an empty history.
   files.set(indexFile, JSON.stringify({ cycles: 'corrompido' }));
-  assert.deepStrictEqual(await storage.readDriveCycles(BASE), []);
+  const recovered = await storage.readDriveCycles(BASE);
+  assert.deepStrictEqual(recovered.map((item) => item.id).sort(), ['test-1', 'test-2']);
+  assert.deepStrictEqual(JSON.parse(files.get(indexFile)).cycles.map((item) => item.id).sort(), ['test-1', 'test-2']);
+
+  // Concurrent trip completions must serialize their read-modify-write cycle.
+  resetFS();
+  await Promise.all([
+    storage.addDriveCycle(BASE, { ...cycle, id: 'parallel-a' }),
+    storage.addDriveCycle(BASE, { ...cycle, id: 'parallel-b' }),
+  ]);
+  const concurrent = await storage.readDriveCycles(BASE);
+  assert.deepStrictEqual(concurrent.map((item) => item.id).sort(), ['parallel-a', 'parallel-b']);
+  await storage.addDriveCycle(BASE, { ...cycle, id: 'parallel-a' });
+  assert.strictEqual((await storage.readDriveCycles(BASE)).filter((item) => item.id === 'parallel-a').length, 1,
+    'retries with the same trip ID must be idempotent');
+  await assert.rejects(
+    storage.addDriveCycle(BASE, { ...cycle, id: 'forbidden-seed', source: 'CARSCANNER_SEED' }),
+    /CARSCANNER_SEED_NOT_ALLOWED/,
+  );
+  assert.ok(!(await storage.readDriveCycles(BASE)).some((item) => item.id === 'forbidden-seed'),
+    'CarScanner reference trips must be rejected at the persistence boundary');
+
+  // A corrupt primary with no backup must never be replaced by an empty index.
+  resetFS();
+  const corruptContent = JSON.stringify({ cycles: 'corrompido' });
+  files.set(indexFile, corruptContent);
+  await assert.rejects(storage.addDriveCycle(BASE, cycle), /DRIVE_CYCLE_INDEX_UNREADABLE/);
+  assert.strictEqual(files.get(indexFile), corruptContent, 'unreadable history must remain preserved for manual recovery');
 
   resetFS();
   await storage.initializeDriveCycles(BASE);
@@ -881,9 +910,16 @@ async function testDriveCycleSummaryUsesWeightedRealSpeed() {
     avgFuelConsumptionKml: 0,
     fuelDataValid: false,
   };
-  const summary = driveCycles.getDriveCycleSummary([slowLongTrip, shortFastTrip, latestSeed, noFuelTrip]);
-  assert.strictEqual(summary.avgSpeedKmh, 20, 'aggregate speed must use all real distance / real moving time, even when fuel data is unavailable');
-  assert.strictEqual(summary.totalDistanceKm, 15, 'seed distance must not enter real totals, while fuel-incomplete real trips still count for distance');
+  const noMovingTimeTrip = {
+    ...slowLongTrip,
+    id: 'real-no-moving-time',
+    startedAt: '2026-10-05T10:00:00.000Z',
+    distanceTotalKm: 8,
+    drivingTimeHms: '00:00:00',
+  };
+  const summary = driveCycles.getDriveCycleSummary([slowLongTrip, shortFastTrip, latestSeed, noFuelTrip, noMovingTimeTrip]);
+  assert.strictEqual(summary.avgSpeedKmh, 20, 'trips without moving time must not inflate aggregate speed');
+  assert.strictEqual(summary.totalDistanceKm, 23, 'seed distance is excluded, but all real trip distance remains included');
   assert.strictEqual(summary.avgConsumptionKml, 12.5, 'trips without valid fuel data must not distort the consumption average');
   assert.strictEqual(summary.realCycleCount, 3, 'fuel-incomplete real trips still count as real trips');
   assert.strictEqual(summary.referenceCycleCount, 1);
