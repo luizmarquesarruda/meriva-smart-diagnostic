@@ -4,7 +4,7 @@
 
 O app passa a usar três camadas distintas, cada uma com uma função explícita:
 
-- **SQLite privado (MERIVA_SMART/BANCO/meriva-smart-diagnostic.db)**: histórico operacional consultável e relacional — sessões ECU, amostras reais de PID, eventos DTC, resultados da Central de Testes, viagens reais e PIDs aprendidos. O arquivo fica dentro da árvore examinada pela Central de Armazenamento.
+- **SQLite privado (`meriva-smart-diagnostic.db`)**: histórico operacional consultável e relacional — sessões ECU, amostras reais de PID, eventos DTC, resultados da Central de Testes, viagens reais e PIDs aprendidos. O SQLite v14 (linha do Expo SDK 51) usa o diretório privado padrão gerenciado pelo Expo; a Central de Relatórios exibe o tamanho lógico calculado por `PRAGMA page_count × page_size` separadamente do inventário de diretórios TXT/JSON.
 - **JSON interno (CONFIG/autosave.json)**: snapshot completo para reabrir o aplicativo, com arquivo temporário, leitura de validação e cópia anterior. Continua sendo a recuperação principal; SQLite não substitui o envelope de autosave.
 - **TXT**: único formato de relatório apresentado/exportado ao usuário. O histórico diário ECU continua em páginas lógicas por data e os testes continuam gerando arquivos separados em MERIVA_SMART/RELATORIOS/TESTES.
 
