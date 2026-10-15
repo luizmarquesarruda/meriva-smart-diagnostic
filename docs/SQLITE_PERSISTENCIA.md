@@ -32,7 +32,8 @@ A versão é controlada por PRAGMA user_version e também registrada em schema_m
 - trip_records: viagens de origem REAL_OBD, com distância, combustível, consumo, velocidades e evidência original serializada.
 - diagnostic_findings: estrutura preparada para achados determinísticos ligados à evidência e à sessão.
 - `diagnostic_findings`: achados determinísticos gerados pela Central de Saúde, com score/confiança, evidências e próximos testes. IDs derivados de sessão + evidência evitam duplicar o mesmo achado em cada render; uma evidência diferente pode gerar novo registro histórico.
-- A Central de Relatórios exibe versão do esquema, sessões abertas, amostras PID, DTCs, testes, viagens e PIDs aprendidos, sem precisar abrir um relatório TXT.
+- A Central de Relatórios exibe versão do esquema, sessões abertas, amostras PID, DTCs, testes, viagens, achados diagnósticos e PIDs aprendidos, sem precisar abrir um relatório TXT.
+- Uma versão de app que encontre banco com `user_version` maior do que sua versão conhecida recusa alterações no esquema, em vez de tentar operar silenciosamente em estrutura desconhecida.
 - Índices de data/horário para consultas rápidas.
 
 O banco usa WAL e chaves estrangeiras. Operações relacionadas a um relatório de teste são executadas em transação; o identificador estável do teste evita duplicar amostras quando o mesmo resultado é salvo novamente.
