@@ -13,7 +13,7 @@ export type { AutoSaveStatus } from './autosaveTypes';
 import { MerivaPersistedState, createEmptyMerivaState } from './autosaveState';
 import { hydrateState, isValidEnvelope, validatePayload } from './autosaveValidation';
 import { migrateEnvelope } from './autosaveMigrations';
-import { appendAutoSaveHistory } from './autosaveHistoryTxt';
+import { appendAutoSaveHistory, purgeLegacyCarScannerHistoryTxt } from './autosaveHistoryTxt';
 import { appendDailyObdSessionEvent } from './dailyObdHistory';
 import {
   closeSqliteObdSession,
@@ -220,6 +220,12 @@ async function initAutoSaveUnsafe(basePath: string): Promise<MerivaPersistedStat
   }
 
   await ensureStorageDirs(basePath);
+  try {
+    await purgeLegacyCarScannerHistoryTxt(basePath);
+  } catch (historyCleanupCause) {
+    // A limpeza do TXT é complementar; nunca truncar um arquivo que não pôde ser lido.
+    console.warn('[autosave] não foi possível migrar o TXT legado:', historyCleanupCause instanceof Error ? historyCleanupCause.message : historyCleanupCause);
+  }
   runtime.basePath = basePath;
 
   try {
