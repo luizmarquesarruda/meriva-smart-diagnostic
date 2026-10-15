@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "description": "Parâmetros conservadores do Assistente de Economia. Classifica apenas após amostras recentes, velocidade relativamente estável e referência pessoal formada com viagens reais comparáveis.",
+  "sampleWindowMs": 30000,
+  "maximumSampleAgeMs": 15000,
+  "minimumSamples": 4,
+  "minimumSampleSpanMs": 15000,
+  "minimumStableSpeedKmh": 20,
+  "maximumSpeedSpreadKmh": 15,
+  "maximumSpeedSpreadRatio": 0.35,
+  "referenceMinimumTrips": 3,
+  "referenceMinimumDistanceKm": 20,
+  "goodRatio": 1.10,
+  "elevatedRatio": 0.85
+}
