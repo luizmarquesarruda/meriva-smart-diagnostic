@@ -383,9 +383,13 @@ async function persistDtcSnapshot(
   const realDtcs = dtcs.filter((dtc) => dtc.source === 'REAL_OBD' && /^[PCBU][0-9A-F]{4}$/i.test(dtc.code));
   for (const dtc of realDtcs) {
     await db.runAsync(
-      `INSERT OR IGNORE INTO dtc_events
+      `INSERT INTO dtc_events
         (session_id, code, status, occurrences, first_seen, last_seen, source, details_json)
-       VALUES (?, ?, ?, ?, ?, ?, 'REAL_OBD', ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, 'REAL_OBD', ?)
+       ON CONFLICT(code, status, last_seen) DO UPDATE SET
+         session_id = COALESCE(dtc_events.session_id, excluded.session_id),
+         occurrences = excluded.occurrences,
+         details_json = excluded.details_json`,
       activeSessionId,
       dtc.code.toUpperCase(),
       dtc.status,
