@@ -205,12 +205,12 @@ export async function initializeDriveCycles(basePath: string): Promise<void> {
     const parsed = await readIndexWithRecovery(indexFile);
     if (parsed) {
       const originalCycles = Array.isArray(parsed.cycles) ? parsed.cycles : [];
-      const hasSeed = originalCycles.some(
-        (cycle) => typeof cycle === 'object' && cycle !== null &&
-          (cycle as { source?: unknown }).source === 'CARSCANNER_SEED',
+      const hasNonOperationalCycle = originalCycles.some(
+        (cycle) => typeof cycle !== 'object' || cycle === null ||
+          (cycle as { source?: unknown }).source !== 'REAL_OBD',
       );
-      if (hasSeed) {
-        const cycles = cyclesFromUnknown(originalCycles).filter((cycle) => cycle.source !== 'CARSCANNER_SEED');
+      if (hasNonOperationalCycle) {
+        const cycles = cyclesFromUnknown(originalCycles).filter((cycle) => cycle.source === 'REAL_OBD');
         await writeIndexSafely(indexFile, {
           ...parsed,
           cycles,
@@ -237,7 +237,7 @@ export async function readDriveCycles(basePath: string): Promise<DriveCycle[]> {
     try {
       const data = await readIndexWithRecovery(indexFile);
       if (!data) return [];
-      return cyclesFromUnknown(data.cycles).filter((cycle) => cycle.source !== 'CARSCANNER_SEED');
+      return cyclesFromUnknown(data.cycles).filter((cycle) => cycle.source === 'REAL_OBD');
     } catch {
       // Keep read-only UI resilient. Mutating operations fail closed on an unreadable index.
       return [];
@@ -249,8 +249,8 @@ export async function addDriveCycle(basePath: string, cycle: DriveCycle): Promis
   const viagensDir = `${basePath}/VIAGENS`;
   const indexFile = `${viagensDir}/index.json`;
 
-  if (cycle?.source === 'CARSCANNER_SEED') {
-    throw new Error('CARSCANNER_SEED_NOT_ALLOWED_IN_OPERATIONAL_TRIP_HISTORY');
+  if (cycle?.source !== 'REAL_OBD') {
+    throw new Error('NON_REAL_TRIP_NOT_ALLOWED_IN_OPERATIONAL_HISTORY');
   }
   if (!isDriveCycle(cycle)) {
     throw new Error('DRIVE_CYCLE_INVALID: ciclo de viagem não atende ao contrato de persistência.');
@@ -266,7 +266,7 @@ export async function addDriveCycle(basePath: string, cycle: DriveCycle): Promis
       totalCount: 0,
     };
     const sourceCycles = Array.isArray(original.cycles) ? cyclesFromUnknown(original.cycles) : [];
-    const cycles = sourceCycles.filter((item) => item.source !== 'CARSCANNER_SEED');
+    const cycles = sourceCycles.filter((item) => item.source === 'REAL_OBD');
     const existingIndex = cycles.findIndex((item) => item.id === cycle.id);
     if (existingIndex >= 0) cycles[existingIndex] = cycle;
     else cycles.push(cycle);
