@@ -58,6 +58,20 @@ export function hydrateState(payload: MerivaPersistedState): MerivaPersistedStat
       );
     });
 
+  // Discard malformed DTC rows before UI/diagnostic code accesses .code or .status.
+  const validDtcStatuses = new Set(['CONFIRMED', 'PENDING', 'PERMANENT', 'INACTIVE', 'HISTORICAL', 'CURRENT', 'UNKNOWN']);
+  const validDtcSources = new Set(['REAL_OBD', 'CARSCANNER_BASELINE', 'USER_REAL_OBSERVATION', 'SIMULACAO', 'IMPORTADO']);
+  hydrated.dtcs = (Array.isArray(payload.dtcs) ? payload.dtcs : [])
+    .filter((dtc) => {
+      if (!dtc || typeof dtc !== 'object') return false;
+      const item = dtc as unknown as Record<string, unknown>;
+      return (
+        typeof item.code === 'string' && /^[PCBU][0-9A-F]{4}$/i.test(item.code) &&
+        typeof item.status === 'string' && validDtcStatuses.has(item.status.toUpperCase()) &&
+        typeof item.source === 'string' && validDtcSources.has(item.source)
+      );
+    });
+
   // Nunca reintroduzir viagens importadas ou aprendizado contaminado de snapshots antigos.
   hydrated.driveCycles = (Array.isArray(payload.driveCycles) ? payload.driveCycles : [])
     .filter((cycle) => cycle && cycle.source === 'REAL_OBD');
