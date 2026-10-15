@@ -67,6 +67,7 @@ assert.match(testScreen, /writeAsStringAsync\(path,lines\.join/, 'a exportação
 assert.match(testScreen, /TXT salvo\. O registro interno SQLite falhou/, 'falha no banco não deve apagar/invalidar o TXT');
 assert.match(healthScreen, /persistDiagnosticFindings\(/, 'Central de Saúde deve registrar achados com evidência real');
 assert.match(healthScreen, /lastPersistedFindingSignature/, 'achados idênticos não devem ser gravados a cada render');
+assert.match(healthScreen, /setState\(\{\.\.\.getAutoSaveState\(\)\}\)/, 'poll de saúde deve publicar novo snapshot para atualizar UI e persistência');
 assert.match(storageScreen, /getSqliteStorageOverview\(/, 'Central de Relatórios deve consultar estatísticas SQLite');
 assert.match(storageScreen, /Amostras reais de PID/, 'contadores SQLite devem ser visíveis ao usuário');
 assert.match(storageScreen, /Achados diagnósticos/, 'contagem de achados da Central de Saúde deve ser visível');
