@@ -231,6 +231,58 @@ export async function initializeDriveCycles(basePath: string): Promise<void> {
   });
 }
 
+/**
+ * Reconcile real trips recovered from the JSON snapshot with the operational
+ * index after an interrupted finalization. One serialized read/modify/write
+ * prevents startup recovery from overwriting concurrently recorded trips.
+ */
+export async function reconcileDriveCycles(basePath: string, recoveredCycles: DriveCycle[]): Promise<DriveCycle[]> {
+  const viagensDir = `${basePath}/VIAGENS`;
+  const indexFile = `${viagensDir}/index.json`;
+
+  return serializeIndexOperation(indexFile, async () => {
+    await FileSystem.makeDirectoryAsync(viagensDir, { intermediates: true });
+    const parsed = await readIndexWithRecovery(indexFile);
+    const originalCycles = Array.isArray(parsed?.cycles) ? parsed.cycles : [];
+    const hadNonOperationalCycles = originalCycles.some(
+      (cycle) => !isDriveCycle(cycle) || cycle.source !== 'REAL_OBD',
+    );
+    const cycles = cyclesFromUnknown(originalCycles).filter((cycle) => cycle.source === 'REAL_OBD');
+    const byId = new Map(cycles.map((cycle) => [cycle.id, cycle]));
+    let changed = !parsed || hadNonOperationalCycles;
+
+    for (const candidate of Array.isArray(recoveredCycles) ? recoveredCycles : []) {
+      if (!isDriveCycle(candidate) || candidate.source !== 'REAL_OBD') continue;
+      if (!byId.has(candidate.id)) {
+        byId.set(candidate.id, candidate);
+        changed = true;
+      }
+    }
+
+    const reconciled = Array.from(byId.values());
+    if (changed) {
+      await writeIndexSafely(indexFile, {
+        ...(parsed ?? {
+          version: '1.0',
+          initializedAt: new Date().toISOString(),
+        }),
+        cycles: reconciled,
+        totalCount: reconciled.length,
+        lastModified: new Date().toISOString(),
+      });
+    }
+
+    // If a previous attempt wrote the index but failed before the CSV append,
+    // verify every recovered ID against its day file and repair the CSV too.
+    for (const candidate of Array.isArray(recoveredCycles) ? recoveredCycles : []) {
+      if (isDriveCycle(candidate) && candidate.source === 'REAL_OBD' && byId.has(candidate.id)) {
+        await appendTripCsvOnce(viagensDir, candidate);
+      }
+    }
+    return reconciled;
+  });
+}
+
 export async function readDriveCycles(basePath: string): Promise<DriveCycle[]> {
   const indexFile = `${basePath}/VIAGENS/index.json`;
   return serializeIndexOperation(indexFile, async () => {
