@@ -246,6 +246,37 @@ export async function importLegacyObdSessionEvents(
 export async function recordObdSessionEvent(event: LocalSessionEvent): Promise<void> {
   await withLocalTransaction(async (transaction) => writeSessionEvent(transaction, event));
 }
+export interface LocalSessionEventRecord extends LocalSessionEvent {
+  eventId: string;
+}
+
+export async function readLocalSessionEvents(options: {
+  fromDate?: string;
+  toDate?: string;
+  limit?: number;
+} = {}): Promise<LocalSessionEventRecord[]> {
+  const db = await getLocalDatabase();
+  const clauses: string[] = [];
+  const values: Array<string | number> = [];
+  if (options.fromDate) { clauses.push('event_date >= ?'); values.push(options.fromDate); }
+  if (options.toDate) { clauses.push('event_date <= ?'); values.push(options.toDate); }
+  const limit = Number.isFinite(options.limit) ? Math.min(5000, Math.max(1, Math.floor(options.limit as number))) : 500;
+  values.push(limit);
+  const where = clauses.length ? ' WHERE ' + clauses.join(' AND ') : '';
+  const rows = await db.getAllAsync<{
+    event_id: string; event_date: string; event_type: LocalSessionEvent['eventType'];
+    event_at: string; rendered_txt: string; payload_json: string;
+  }>(`SELECT event_id, event_date, event_type, event_at, rendered_txt, payload_json
+      FROM obd_session_events${where} ORDER BY event_at DESC LIMIT ?`, ...values);
+  return rows.map((row) => {
+    let payload: unknown = {};
+    try { payload = JSON.parse(row.payload_json); } catch { /* retain event with empty payload */ }
+    return {
+      eventId: row.event_id, date: row.event_date, eventType: row.event_type,
+      timestamp: row.event_at, renderedTxt: row.rendered_txt, payload,
+    };
+  });
+}
 
 export async function saveSensorTestRun(run: StoredSensorTestRun): Promise<void> {
   await withLocalTransaction(async (transaction) => {
@@ -289,6 +320,55 @@ export async function saveSensorTestRun(run: StoredSensorTestRun): Promise<void>
       );
     }
   });
+}
+
+export interface StoredSensorTestRunSummary {
+  id: string;
+  startedAt: string;
+  savedAt: string;
+  mode: string;
+  status: 'COMPLETE' | 'PARTIAL';
+  catalogId: string;
+  protocol: string;
+  metadata: Record<string, unknown>;
+}
+
+export async function readSensorTestRuns(limit = 100): Promise<StoredSensorTestRunSummary[]> {
+  const db = await getLocalDatabase();
+  const safeLimit = Number.isFinite(limit) ? Math.min(1000, Math.max(1, Math.floor(limit))) : 100;
+  const rows = await db.getAllAsync<{
+    id: string; started_at: string; saved_at: string; mode: string; status: 'COMPLETE' | 'PARTIAL';
+    catalog_id: string; protocol: string; payload_json: string;
+  }>('SELECT id, started_at, saved_at, mode, status, catalog_id, protocol, payload_json FROM sensor_test_runs ORDER BY started_at DESC LIMIT ?', safeLimit);
+  return rows.map((row) => {
+    let metadata: Record<string, unknown> = {};
+    try { metadata = JSON.parse(row.payload_json) as Record<string, unknown>; } catch { /* retain summary */ }
+    return {
+      id: row.id, startedAt: row.started_at, savedAt: row.saved_at, mode: row.mode,
+      status: row.status, catalogId: row.catalog_id, protocol: row.protocol, metadata,
+    };
+  });
+}
+
+export async function readSensorTestReadings(runId: string): Promise<StoredSensorReading[]> {
+  const db = await getLocalDatabase();
+  const rows = await db.getAllAsync<{
+    reading_index: number; payload_json: string; assessment_state: string; assessment_title: string;
+  }>('SELECT reading_index, payload_json, assessment_state, assessment_title FROM sensor_test_readings WHERE run_id = ? ORDER BY reading_index ASC', runId);
+  const readings: StoredSensorReading[] = [];
+  for (const row of rows) {
+    try {
+      readings.push({
+        readingIndex: row.reading_index,
+        sample: JSON.parse(row.payload_json) as StoredSensorReading['sample'],
+        assessmentState: row.assessment_state,
+        assessmentTitle: row.assessment_title,
+      });
+    } catch {
+      // Ignore a single corrupt sample without hiding the rest of the run.
+    }
+  }
+  return readings;
 }
 
 export async function getLocalDatabaseStats(): Promise<Record<string, number>> {
