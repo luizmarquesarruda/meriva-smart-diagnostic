@@ -61,3 +61,17 @@ O banco usa WAL e chaves estrangeiras. Operações relacionadas a um relatório 
 O teste tests/sqlitePersistenceContract.test.js valida os contratos do esquema, as versões, a dependência/lockfile, os filtros de fonte, a amostragem, a integração com autosave e a continuidade TXT.
 
 **Não declarar validação de runtime ainda**: a suíte npm run validate, Expo Doctor, prebuild/build Android e teste físico com ELM327/ECU não foram executados nesta etapa, para respeitar a solicitação de não disparar a CI. A execução desses testes deve anteceder a integração em main.
+
+## Auditoria de integridade adicional — 15/10/2026
+
+A revisão do fluxo de persistência ampliou os contratos além do esquema SQLite inicial:
+
+- **Sessões ECU**: abrir sessão é uma transação SQLite; sessões órfãs são recuperadas antes de inserir outra sessão. O ID em memória é removido antes de aguardar operações de fechamento/abertura, evitando atribuir uma nova leitura à sessão anterior caso o banco falhe.
+- **Viagens**: ao finalizar, a viagem com ID/timestamps estáveis entra primeiro no snapshot JSON; em seguida é conciliada com o índice operacional. No início do app, o índice é reconciliado com as viagens recuperadas do JSON. Repetir uma gravação com o mesmo ID é idempotente. Falhas mantêm a viagem pendente para nova tentativa; sem resposta da ECU, as tentativas são limitadas por intervalo.
+- **Índice de viagens e TXT**: a escrita usa staging e leitura de confirmação, preserva cópia anterior e tenta recuperar o temporário validado após interrupção. Uma falha de leitura ou arquivo em formato desconhecido não é tratada como histórico vazio. O CSV interno de viagens é separado pela data local de início; não é um formato de relatório apresentado pela interface.
+- **Proveniência operacional**: o índice de viagens só aceita REAL_OBD, e o arquivo operacional de DTC rejeita gravações não reais/malformadas. A inicialização remove DTCs legados importados, simulados ou inválidos com validação antes da substituição; os registros reais válidos são mantidos.
+- **Diagnóstico**: a conversão para evidência REAL_OBD exige origem explícita REAL; PID desconhecido/importado não é promovido. O motor local rejeita valores não finitos, status que não sejam RESPONDEU e leituras de PID com mais de 30 segundos.
+- **Aprendizado**: o perfil JSON independente é validado antes do uso; objetos parciais não são tratados como perfil válido. A gravação usa arquivo temporário validado e preserva conteúdo anterior inválido para recuperação. Estatísticas com origem mista/desconhecida não entram no perfil purgado, e a contagem global não é inferida pela soma de amostras por PID.
+- **Central de Testes**: finishedAt passa a registrar quando a varredura terminou, e não quando o usuário pediu a exportação posterior.
+
+Essas mudanças estão protegidas por regressões para histórico corrompido, gravações concorrentes, reconciliação JSON/índice, não promoção de leituras importadas, DTC legado, perfil de aprendizado parcial e bitmap de prontidão OBD. A aprovação do código depende da nova execução de npm run validate, Expo Doctor e build Android; teste físico ELM327/ECU continua sendo uma validação separada.
