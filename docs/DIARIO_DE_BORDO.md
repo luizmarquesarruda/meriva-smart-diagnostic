@@ -2759,3 +2759,7 @@ Em `app/dados.tsx`, “ÚLTIMAS LEITURAS REAIS” agora só lista itens com `sou
 - A revisão manual do estado inicial de `AutoTripService` encontrou e corrigiu um separador sintático no objeto `INITIAL_STATE` antes de encerrar esta rodada. O typecheck não foi executado, conforme a ordem de não disparar CI.
 - O estado expõe agora, de forma explícita, o timestamp original da taxa, a velocidade usada no cálculo e o tipo de combustível associado à amostra. O cockpit utiliza esses três dados de proveniência em vez de inferir o combustível pelo valor mais recente da configuração.
 - A regressão estática do cockpit verifica a presença desses contratos. Esta checagem de código não substitui a suíte executada; validação automatizada permanece pendente.
+
+
+### Aperfeiçoamento após revisão conceitual da referência
+A comparação de um trecho instantâneo com a média de uma viagem inteira pode confundir trânsito/cidade/estrada com eficiência. A referência pessoal agora exige também velocidade média histórica aproximadamente compatível com a velocidade do trecho atual (faixa relativa inicial máxima de 50%), além de mesma fonte de taxa e tipo de combustível. O parâmetro está em `fuel_coach_policy.json`. Se não houver viagens comparáveis suficientes, o coach permanece em “Calibrando”. A referência é uma comparação informativa, não uma medição controlada do estilo de condução nem um diagnóstico mecânico.
