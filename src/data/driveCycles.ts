@@ -60,14 +60,21 @@ export function getDriveCycleSummary(cycles: DriveCycle[]): DriveCycleSummary {
   );
   const realFuelL = consumptionCycles.reduce((sum, cycle) => sum + cycle.fuelUsedL, 0);
   const consumptionDistanceKm = consumptionCycles.reduce((sum, cycle) => sum + cycle.distanceTotalKm, 0);
-  const realMovingTimeMs = realCycles.reduce(
-    (sum, cycle) => sum + durationHmsToMs(cycle.drivingTimeHms),
+  // Only trips with a valid positive moving duration can contribute to an
+  // aggregate speed. A trip with distance but 00:00:00 movement must remain
+  // in the distance total, but cannot inflate km/h by adding distance to a
+  // denominator that does not include its elapsed time.
+  const tripsWithMovingTime = realCycles
+    .map((cycle) => ({ cycle, movingTimeMs: durationHmsToMs(cycle.drivingTimeHms) }))
+    .filter((item) => Number.isFinite(item.movingTimeMs) && item.movingTimeMs > 0);
+  const realMovingTimeMs = tripsWithMovingTime.reduce((sum, item) => sum + item.movingTimeMs, 0);
+  const realMovingDistanceKm = tripsWithMovingTime.reduce(
+    (sum, item) => sum + (Number.isFinite(item.cycle.distanceTotalKm) && item.cycle.distanceTotalKm > 0 ? item.cycle.distanceTotalKm : 0),
     0,
   );
-  // Aggregate velocity is total real distance / total real moving time.
-  // An unweighted mean gives a 1 km trip the same weight as a 20 km trip.
+  // Aggregate speed is a distance/time ratio, not an unweighted mean of trip averages.
   const realAvgSpeedKmh = realMovingTimeMs > 0
-    ? realDistanceKm / (realMovingTimeMs / 3_600_000)
+    ? realMovingDistanceKm / (realMovingTimeMs / 3_600_000)
     : 0;
 
   const visibleCycles = cycles.filter((cycle) => cycle.source !== 'CARSCANNER_SEED');
