@@ -2460,12 +2460,14 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - A telemetria detalhada é limitada a uma amostra por PID a cada 2 segundos, só para fonte `REAL`, status `RESPONDEU`, valor finito e sessão ativa. A tela continua livre para atualizar valores mais rapidamente em memória.
 - DTCs e viagens são sincronizados apenas quando sua origem é `REAL_OBD`; dados seed/CarScanner e simulações não são importados para a evidência operacional. A migração do snapshot JSON é idempotente e não remove o arquivo legado.
 - A Central de Testes continua salvando TXT primeiro e também registra cabeçalho, avaliações e tentativas no SQLite. A falha de SQLite não invalida o TXT.
+- A Central de Saúde salva achados com evidência, score/confiança e próximos testes na tabela `diagnostic_findings`; IDs determinísticos por sessão/evidência evitam gravar a mesma hipótese em cada render, e falhas transitórias permitem nova tentativa.
+- A Central de Relatórios exibe métricas do SQLite (versão do esquema, sessões abertas, amostras reais, DTCs, testes, viagens e PIDs aprendidos). Leituras dessas métricas entram na fila serial para não concorrer com transações de escrita.
 
 ### Dependências, teste de contrato e documentação
 - Atualizados `package.json` e `package-lock.json` com `expo-sqlite ~14.0.6` e dependências transitivas necessárias.
 - Criado `tests/sqlitePersistenceContract.test.js` para proteger esquema, migrações, lockfile, filtros de origem, throttling, integração do autosave e continuidade dos relatórios TXT.
 - Criado `docs/SQLITE_PERSISTENCIA.md` com divisão de responsabilidades, tabelas, regras de qualidade e limites da migração.
-- Arquivos funcionais: `src/storage/merivaDatabase.ts`, `src/meriva/autosaveManager.ts`, `app/testes-sensores.tsx`, `package.json`, `package-lock.json`, `tests/sqlitePersistenceContract.test.js` e `docs/SQLITE_PERSISTENCIA.md`.
+- Arquivos funcionais: `src/storage/merivaDatabase.ts`, `src/meriva/autosaveManager.ts`, `app/testes-sensores.tsx`, `app/saude.tsx`, `app/armazenamento.tsx`, `package.json`, `package-lock.json`, `tests/sqlitePersistenceContract.test.js` e `docs/SQLITE_PERSISTENCIA.md`.
 
 ### Validação, limites e próximo passo
 - Não foram executados `npm run validate`, Expo Doctor, prebuild/build Android nem testes com o ELM327/ECU físico. **Não afirmar que a integração nativa está validada** até esses passos terminarem.
