@@ -2,8 +2,9 @@ import { gpsTracker } from '../gps';
 import type { SharedObdConnection } from '../obd/sharedConnection';
 import { getSharedObdConnection, getSharedObdStatus, subscribeSharedObd } from '../obd/sharedConnection';
 import { addDriveCycle, readDriveCycles } from '../storage/driveCycleStorage';
-import { forceSaveOnObdEvent, registerObdQuery } from '../meriva/autosaveIntegration';
-import { getAutoSaveState, updateAutoSaveState, initAutoSave } from '../meriva/autosaveManager';
+import { registerObdQuery } from '../meriva/autosaveIntegration';
+import { getAutoSaveState, updateAutoSaveState, initAutoSave, saveNow } from '../meriva/autosaveManager';
+import type { DriveCycle } from '../data/driveCycles';
 import { RealTripRecorder, shouldFinalizeStoppedTrip } from './tripRecorder';
 import { estimateRangeFromFuelLevel, fuelLevelPercentToLiters, isFuelReserve } from './fuelLevel';
 import { getLivePidTrend, resetLiveTelemetry } from '../obd/liveTelemetry';
@@ -59,6 +60,8 @@ class AutoTripService {
   private basePath = '';
   private running = false;
   private recorder: RealTripRecorder | null = null;
+  private pendingFinalizedTrips: DriveCycle[] = [];
+  private lastPendingTripRetryAt = 0;
   private loopPromise: Promise<void> | null = null;
   private generation = 0;
   private pollingPauseCount = 0;
@@ -237,6 +240,17 @@ class AutoTripService {
       if (this.pollingPauseCount > 0) {
         await new Promise((resolve) => setTimeout(resolve, 100));
         continue;
+      }
+
+      // Retry durable trip writes without stopping live OBD polling. The queued
+      // DriveCycle keeps its original ID/timestamps across retries.
+      if (this.pendingFinalizedTrips.length > 0 && Date.now() - this.lastPendingTripRetryAt >= 10_000) {
+        this.lastPendingTripRetryAt = Date.now();
+        try {
+          await this.flushPendingFinalizedTrips();
+        } catch (cause) {
+          this.setState({ error: 'VIAGEM PENDENTE DE SALVAMENTO: ' + (cause instanceof Error ? cause.message : String(cause)) });
+        }
       }
 
       if (!this.gpsStartedForEcu) await this.ensureGpsForEcu();
@@ -567,79 +581,96 @@ class AutoTripService {
   }
 
   private async finalizeRecorder(): Promise<void> {
-    const recorder = this.recorder;
-    if (!recorder || !this.basePath) return;
+    if (!this.basePath) return;
 
-    const cycle = recorder.buildDriveCycle();
-    if (!cycle) {
+    const recorder = this.recorder;
+    if (recorder) {
+      const cycle = recorder.buildDriveCycle();
+      // Freeze the previous session once. Rebuilding later would generate a
+      // different finishedAt/id and could duplicate a trip after partial I/O.
       this.recorder = null;
-      return;
+      if (cycle) this.pendingFinalizedTrips.push(cycle);
     }
 
-    // Do not clear the only in-memory trip copy until the index, CSV, snapshot
-    // and critical autosave all completed. addDriveCycle is idempotent by ID,
-    // so retries after a partial failure do not duplicate the trip.
-    await addDriveCycle(this.basePath, cycle);
-    const storedCycles = await readDriveCycles(this.basePath);
-    updateAutoSaveState((state) => {
-      state.driveCycles = storedCycles;
+    await this.flushPendingFinalizedTrips();
+  }
 
-      // O PID 012F é a fonte absoluta de nível de combustível para autonomia.
-      // A capacidade nominal de 56 L converte o percentual da ECU em litros.
-      // O histórico de consumo continua vindo de viagens reais.
-      // Trips remain in history even when fuel telemetry is insufficient, but
-      // they must not contaminate cumulative consumption/autonomy calculations.
-      const consumptionIsValid = cycle.fuelDataValid !== false && cycle.fuelUsedL >= 0.05 && cycle.avgFuelConsumptionKml > 0;
-      const existingReading = state.autonomy.readings.find((item) => item.id === cycle.id);
-      if (consumptionIsValid && !existingReading) {
-        const previousDistance = Number(state.autonomy.cumulativeDistanceKm) || 0;
-        const previousFuel = Number(state.autonomy.cumulativeFuelUsedL) || 0;
-        const distanceKm = Math.max(0, Number(cycle.distanceTotalKm) || 0);
-        const fuelUsedL = Math.max(0, Number(cycle.fuelUsedL) || 0);
-        const cumulativeDistanceKm = previousDistance + distanceKm;
-        const cumulativeFuelUsedL = previousFuel + fuelUsedL;
-        const averageConsumptionKml = cumulativeFuelUsedL > 0
-          ? cumulativeDistanceKm / cumulativeFuelUsedL
-          : 0;
-        const estimatedRangeKm = averageConsumptionKml > 0
-          ? averageConsumptionKml * state.autonomy.tankCapacityL
-          : 0;
+  private async flushPendingFinalizedTrips(): Promise<void> {
+    if (!this.basePath) return;
 
-        state.autonomy = {
-          ...state.autonomy,
-          tankCapacityL: 56,
-          cumulativeDistanceKm: Number(cumulativeDistanceKm.toFixed(3)),
-          cumulativeFuelUsedL: Number(cumulativeFuelUsedL.toFixed(3)),
-          averageConsumptionKml: Number(averageConsumptionKml.toFixed(3)),
-          estimatedRangeKm: Number(estimatedRangeKm.toFixed(1)),
-          fuelLevelPercent: this.state.fuelLevelPercent,
-          fuelRemainingL: this.state.fuelRemainingL,
-          fuelReserve: this.state.fuelReserve,
-          realReadingCount: (Number(state.autonomy.realReadingCount) || 0) + 1,
-          lastReadingAt: cycle.finishedAt,
-          readings: [
-            ...state.autonomy.readings,
-            {
-              id: cycle.id,
-              timestamp: cycle.finishedAt,
-              distanceKm,
-              fuelUsedL,
-              consumptionKml: Number((fuelUsedL > 0 ? distanceKm / fuelUsedL : 0).toFixed(3)),
-              estimatedRangeKm: Number(estimatedRangeKm.toFixed(1)),
-              source: 'REAL_OBD' as const,
-            },
-          ].slice(-200),
-        };
-      }
-    });
+    while (this.pendingFinalizedTrips.length > 0) {
+      const cycle = this.pendingFinalizedTrips[0];
+      await addDriveCycle(this.basePath, cycle);
+      const storedCycles = await readDriveCycles(this.basePath);
 
-    const autonomy = (await initAutoSave(this.basePath)).autonomy;
-    this.setState({
-      averageConsumptionKml: autonomy.averageConsumptionKml,
-      estimatedRangeKm: autonomy.estimatedRangeKm,
-    });
-    await forceSaveOnObdEvent();
-    if (this.recorder === recorder) this.recorder = null;
+      updateAutoSaveState((state) => {
+        state.driveCycles = storedCycles;
+
+        // Only trustworthy integrated fuel contributes to cumulative economy.
+        // Incomplete trips remain saved but never inject a fictitious km/L.
+        const consumptionIsValid =
+          cycle.fuelDataValid !== false &&
+          cycle.fuelUsedL >= 0.05 &&
+          cycle.avgFuelConsumptionKml > 0;
+        const existingReading = state.autonomy.readings.find((item) => item.id === cycle.id);
+        if (consumptionIsValid && !existingReading) {
+          const previousDistance = Number(state.autonomy.cumulativeDistanceKm) || 0;
+          const previousFuel = Number(state.autonomy.cumulativeFuelUsedL) || 0;
+          const distanceKm = Math.max(0, Number(cycle.distanceTotalKm) || 0);
+          const fuelUsedL = Math.max(0, Number(cycle.fuelUsedL) || 0);
+          const cumulativeDistanceKm = previousDistance + distanceKm;
+          const cumulativeFuelUsedL = previousFuel + fuelUsedL;
+          const averageConsumptionKml = cumulativeFuelUsedL > 0
+            ? cumulativeDistanceKm / cumulativeFuelUsedL
+            : 0;
+          const tankCapacityL = Number.isFinite(state.autonomy.tankCapacityL) && state.autonomy.tankCapacityL > 0
+            ? state.autonomy.tankCapacityL
+            : 56;
+          const estimatedRangeKm = averageConsumptionKml > 0
+            ? averageConsumptionKml * tankCapacityL
+            : 0;
+
+          state.autonomy = {
+            ...state.autonomy,
+            tankCapacityL,
+            cumulativeDistanceKm: Number(cumulativeDistanceKm.toFixed(3)),
+            cumulativeFuelUsedL: Number(cumulativeFuelUsedL.toFixed(3)),
+            averageConsumptionKml: Number(averageConsumptionKml.toFixed(3)),
+            estimatedRangeKm: Number(estimatedRangeKm.toFixed(1)),
+            fuelLevelPercent: this.state.fuelLevelPercent,
+            fuelRemainingL: this.state.fuelRemainingL,
+            fuelReserve: this.state.fuelReserve,
+            realReadingCount: (Number(state.autonomy.realReadingCount) || 0) + 1,
+            lastReadingAt: cycle.finishedAt,
+            readings: [
+              ...state.autonomy.readings,
+              {
+                id: cycle.id,
+                timestamp: cycle.finishedAt,
+                distanceKm,
+                fuelUsedL,
+                consumptionKml: Number((distanceKm / fuelUsedL).toFixed(3)),
+                estimatedRangeKm: Number(estimatedRangeKm.toFixed(1)),
+                source: 'REAL_OBD' as const,
+              },
+            ].slice(-200),
+          };
+        }
+      });
+
+      // Resolve only after the JSON recovery snapshot is confirmed. The
+      // persistent index upsert is idempotent if this save has to be retried.
+      const saved = await saveNow('critical');
+      if (!saved) throw new Error('AUTOSAVE_DA_VIAGEM_NAO_CONFIRMADO');
+
+      this.pendingFinalizedTrips.shift();
+      const autonomy = getAutoSaveState().autonomy;
+      this.setState({
+        averageConsumptionKml: autonomy.averageConsumptionKml,
+        estimatedRangeKm: autonomy.estimatedRangeKm,
+        error: this.pendingFinalizedTrips.length ? this.state.error : null,
+      });
+    }
   }
 
   private setState(patch: Partial<AutoTripServiceState>): void {
