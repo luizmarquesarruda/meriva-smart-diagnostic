@@ -25,6 +25,7 @@ const driveCycles = read('src/data/driveCycles.ts');
 const learningProfile = read('src/database/learningProfile.ts');
 const learningManager = read('src/database/learningProfile.ts');
 const dtcManager = read('src/database/dtcManager.ts');
+const pidBank = read('src/database/pidBank.ts');
 const obdParser = read('src/obd/parser.ts');
 const hydration = read('src/meriva/autosaveValidation.ts');
 const historyTxt = read('src/meriva/autosaveHistoryTxt.ts');
