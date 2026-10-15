@@ -54,6 +54,7 @@ function main() {
   assert.strictEqual(typeof fuelCoachPolicy.version, 'number');
   assert.ok(fuelCoachPolicy.minimumSamples >= 3 && fuelCoachPolicy.minimumSampleSpanMs > 0);
   assert.ok(fuelCoachPolicy.referenceMinimumTrips >= 3 && fuelCoachPolicy.referenceMinimumDistanceKm > 0);
+  assert.ok(fuelCoachPolicy.referenceSpeedDifferenceRatio > 0 && fuelCoachPolicy.referenceSpeedDifferenceRatio <= 1);
   assert.ok(fuelCoachPolicy.goodRatio > 1 && fuelCoachPolicy.elevatedRatio > 0 && fuelCoachPolicy.elevatedRatio < 1);
   assert.ok(fuelCoachPolicy.maximumSampleAgeMs <= fuelCoachPolicy.sampleWindowMs);
   assert.ok(Array.isArray(dtcCatalog.codes) && dtcCatalog.codes.length > 0, 'catálogo DTC vazio');
