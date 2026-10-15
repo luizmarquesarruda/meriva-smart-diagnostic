@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import type { SQLiteDatabase } from 'expo-sqlite';
+import * as FileSystem from 'expo-file-system';
 import type { DriveCycle } from '../data/driveCycles';
 import type { DtcRecord } from '../types/sourceTypes';
 import type { LastPidReading, MerivaPersistedState, ObdConnectionState } from '../meriva/autosaveState';
@@ -13,6 +14,7 @@ import type { SensorTestMode, SensorTestSample } from '../diagnostics/sensorTest
  * continuam sendo o formato exportado ao usuário.
  */
 export const MERIVA_DATABASE_NAME = 'meriva-smart-diagnostic.db';
+export const MERIVA_DATABASE_DIRECTORY = 'MERIVA_SMART/BANCO';
 export const MERIVA_DATABASE_SCHEMA_VERSION = 2;
 const MIN_PID_SAMPLE_INTERVAL_MS = 2_000;
 
@@ -228,7 +230,16 @@ async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
 async function openDatabase(): Promise<SQLiteDatabase> {
   if (!databasePromise) {
     databasePromise = (async () => {
-      const db = await SQLite.openDatabaseAsync(MERIVA_DATABASE_NAME);
+      const documentDirectory = FileSystem.documentDirectory;
+      const databaseDirectory = documentDirectory
+        ? documentDirectory + MERIVA_DATABASE_DIRECTORY
+        : undefined;
+      if (databaseDirectory) {
+        await FileSystem.makeDirectoryAsync(databaseDirectory, { intermediates: true });
+      }
+      // Mantém o .db dentro de MERIVA_SMART/BANCO para que a central de
+      // armazenamento contabilize o banco junto dos demais dados locais.
+      const db = await SQLite.openDatabaseAsync(MERIVA_DATABASE_NAME, {}, databaseDirectory);
       await migrateDatabase(db);
 
       // Uma sessão deixada como OPEN só pode pertencer a um processo anterior.
