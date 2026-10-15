@@ -5,7 +5,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMidLayout } from '../src/ui/midLayout';
 import * as FileSystem from 'expo-file-system';
-import { readDriveCycles, initializeDriveCycles } from '../src/storage/driveCycleStorage';
+import { readDriveCycles, initializeDriveCycles, reconcileDriveCycles } from '../src/storage/driveCycleStorage';
 import { getDriveCycleSummary, type DriveCycle } from '../src/data/driveCycles';
 import { getAutoSaveState, getAutoSaveStatus, initAutoSave, updateAutoSaveState } from '../src/meriva/autosaveManager';
 import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
@@ -65,17 +65,34 @@ export default function IndexScreen() {
     try {
       const nextSettings = await readAppSettings(basePath);
       const restored = await initAutoSave(basePath);
-      await initializeDriveCycles(basePath);
+
+      // Trip-index damage must not block settings/vehicle hydration. The JSON
+      // snapshot is the recovery source for trips if the operational index is unavailable.
+      try {
+        await initializeDriveCycles(basePath);
+      } catch (cause) {
+        console.warn('[history] inicialização do índice de viagens falhou; preservando o snapshot JSON:', cause instanceof Error ? cause.message : cause);
+      }
+
       await ensureMerivaVehicleProfile(basePath);
       const learningProfile = await readLearningProfile(basePath);
       if (!learningProfile) await createLearningProfile(basePath, new Date().toISOString());
       else await purgeCarScannerHistory(basePath);
-      const storedCycles = await readDriveCycles(basePath);
-      const loaded = restored.driveCycles.length ? restored.driveCycles : storedCycles;
 
-      if (!restored.driveCycles.length && loaded.length) {
+      let reconciledCycles: DriveCycle[] | null = null;
+      try {
+        reconciledCycles = await reconcileDriveCycles(basePath, restored.driveCycles);
+      } catch (cause) {
+        console.warn('[history] reconciliação do índice falhou; usando dados recuperáveis:', cause instanceof Error ? cause.message : cause);
+      }
+      const storedCycles = await readDriveCycles(basePath);
+      const loaded = reconciledCycles ?? (restored.driveCycles.length ? restored.driveCycles : storedCycles);
+
+      const restoredIds = restored.driveCycles.map((cycle) => cycle.id).join('|');
+      const loadedIds = loaded.map((cycle) => cycle.id).join('|');
+      if (restoredIds !== loadedIds) {
         updateAutoSaveState((state) => {
-          state.driveCycles = loaded;
+          state.driveCycles = loaded.filter((cycle) => cycle.source === 'REAL_OBD');
         });
       }
 
