@@ -273,6 +273,9 @@ export async function openSqliteObdSession(connection: ObdConnectionState): Prom
         startedAt,
         activeSessionId,
       );
+      // Never keep a stale in-memory session ID if creation of its replacement fails.
+      activeSessionId = null;
+      lastPidSampleAt.clear();
     }
 
     const id = makeId('ecu');
@@ -306,20 +309,47 @@ export async function closeSqliteObdSession(
     const db = await openDatabase();
     const id = activeSessionId;
     if (!id) return;
-    const endedAt = new Date().toISOString();
-    await db.runAsync(
-      `UPDATE obd_sessions
-       SET status = 'CLOSED', ended_at = ?, close_reason = ?,
-           metadata_json = CASE WHEN ? IS NULL THEN metadata_json ELSE ? END
-       WHERE id = ? AND status = 'OPEN'`,
-      endedAt,
-      reason,
-      connection ? asJson({ connected: connection.connected, lastKnownProtocol: connection.lastKnownProtocol ?? null }) : null,
-      connection ? asJson({ connected: connection.connected, lastKnownProtocol: connection.lastKnownProtocol ?? null }) : null,
-      id,
-    );
-    activeSessionId = null;
-    lastPidSampleAt.clear();
+
+    try {
+      const endedAt = new Date().toISOString();
+      let metadataJson: string | null = null;
+      if (connection) {
+        const row = await db.getFirstAsync<{ metadata_json: string }>(
+          'SELECT metadata_json FROM obd_sessions WHERE id = ?',
+          id,
+        );
+        let existingMetadata: Record<string, unknown> = {};
+        try {
+          const parsed = JSON.parse(row?.metadata_json ?? '{}') as unknown;
+          if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+            existingMetadata = parsed as Record<string, unknown>;
+          }
+        } catch {
+          // Repair malformed metadata with the minimum close context without changing session facts.
+        }
+        metadataJson = asJson({
+          ...existingMetadata,
+          connected: connection.connected,
+          lastKnownProtocol: connection.lastKnownProtocol ?? existingMetadata.lastKnownProtocol ?? null,
+        });
+      }
+
+      await db.runAsync(
+        `UPDATE obd_sessions
+         SET status = 'CLOSED', ended_at = ?, close_reason = ?,
+             metadata_json = COALESCE(?, metadata_json)
+         WHERE id = ? AND status = 'OPEN'`,
+        endedAt,
+        reason,
+        metadataJson,
+        id,
+      );
+    } finally {
+      // A close request is a terminal boundary for the live session even if
+      // SQLite reports an I/O error. Process restart recovery remains the fallback.
+      activeSessionId = null;
+      lastPidSampleAt.clear();
+    }
   });
 }
 
