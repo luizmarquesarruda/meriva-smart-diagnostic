@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import BottomNavigation from '../src/ui/BottomNavigation';
 import { Link } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -9,6 +9,7 @@ import { runLocalDiagnostic, type DiagnosticResult } from '../src/diagnostics/di
 import type { PidObservation } from '../src/types/sourceTypes';
 import { getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
 import { getDtcDefinition } from '../src/obd/dtcDefinition';
+import { getActiveSqliteSessionId, persistDiagnosticFindings } from '../src/storage/merivaDatabase';
 
 export default function SaudeScreen() {
   const layout = useMidLayout();
@@ -17,6 +18,38 @@ export default function SaudeScreen() {
   const context = getVehicleConditionSnapshot();
   const activeDtcs = state.dtcs.filter((item) => ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(item.status));
   const diagnostic: DiagnosticResult = useMemo(()=>runLocalDiagnostic({observations:state.lastReadings.map(r=>({pid:r.pid,name:r.name,value:r.value,unit:r.unit,source:r.source==='SIMULACAO'?'SIMULACAO':'REAL_OBD',timestamp:r.timestamp,confidence:r.source==='SIMULACAO'?'LOW':'GOOD'} as PidObservation)),dtcs:state.dtcs,condition:context.condition}),[state,context.condition]);
+  const sessionId = getActiveSqliteSessionId();
+  const lastPersistedFindingSignature = useRef('');
+  const findingSignature = JSON.stringify({
+    sessionId,
+    hypotheses: diagnostic.hypotheses.map((hypothesis) => ({
+      id: hypothesis.id,
+      label: hypothesis.label,
+      score: hypothesis.score,
+      confidence: hypothesis.confidence,
+      evidence: hypothesis.evidence,
+      nextTests: hypothesis.nextTests,
+    })),
+  });
+  useEffect(() => {
+    if (lastPersistedFindingSignature.current === findingSignature) return;
+    lastPersistedFindingSignature.current = findingSignature;
+    if (!diagnostic.hypotheses.length) return;
+
+    void persistDiagnosticFindings(
+      diagnostic.hypotheses.map((hypothesis) => ({
+        id: hypothesis.id,
+        label: hypothesis.label,
+        score: hypothesis.score,
+        confidence: hypothesis.confidence,
+        evidence: hypothesis.evidence,
+        nextTests: hypothesis.nextTests,
+      })),
+      sessionId,
+    ).catch((cause) => {
+      console.warn('[sqlite] não foi possível salvar achados da Central de Saúde:', cause instanceof Error ? cause.message : cause);
+    });
+  }, [diagnostic.hypotheses, findingSignature, sessionId]);
   const normal=diagnostic.hypotheses.length===0 && activeDtcs.length===0;
   return <SafeAreaView style={styles.container} edges={["top","bottom","left","right"]}><ScrollView contentContainerStyle={[styles.content,{paddingHorizontal:layout.horizontalPadding}]} showsHorizontalScrollIndicator={false}><View style={[styles.screenFrame,{maxWidth:layout.maxContentWidth}]}>
     <View style={styles.header}><Text style={styles.title}>CENTRAL DE SAÚDE</Text><Text style={styles.subtitle}>EVIDÊNCIAS • DTC • HIPÓTESES</Text></View>
