@@ -87,6 +87,15 @@ async function readAutoSaveHistoryUnsafe(basePath: string): Promise<string> {
   return entries.length ? `${HISTORY_HEADER}${entries.join('\n\n')}\n` : HISTORY_HEADER;
 }
 
+/** Reescreve o histórico legado já sanitizado; se a leitura falhar, não toca no arquivo original. */
+export async function purgeLegacyCarScannerHistoryTxt(basePath: string): Promise<void> {
+  const path = historyPath(basePath);
+  const sanitized = await readAutoSaveHistoryUnsafe(basePath);
+  await FileSystem.writeAsStringAsync(path, sanitized, {
+    encoding: FileSystem.EncodingType.UTF8,
+  });
+}
+
 export async function readAutoSaveHistory(basePath: string): Promise<string> {
   try {
     return await readAutoSaveHistoryUnsafe(basePath);
