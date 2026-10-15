@@ -2458,6 +2458,7 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Migração 2: `sensor_tests`, `sensor_test_readings`, `trip_records` e `diagnostic_findings`.
 - Sessões ECU registram abertura/fechamento; sessões que ficaram abertas após encerramento do processo são marcadas como recuperadas, nunca como conexão viva.
 - A telemetria detalhada é limitada a uma amostra por PID a cada 2 segundos, só para fonte `REAL`, status `RESPONDEU`, valor finito e sessão ativa. A tela continua livre para atualizar valores mais rapidamente em memória.
+- O arquivo `meriva-smart-diagnostic.db` fica em `MERIVA_SMART/BANCO`; fingerprints evitam UPSERTs repetidos de DTCs/viagens inalterados. Em falha de transação os fingerprints são limpos para repetir a sincronização.
 - DTCs e viagens são sincronizados apenas quando sua origem é `REAL_OBD`; dados seed/CarScanner e simulações não são importados para a evidência operacional. A migração do snapshot JSON é idempotente e não remove o arquivo legado.
 - A Central de Testes continua salvando TXT primeiro e também registra cabeçalho, avaliações e tentativas no SQLite. A falha de SQLite não invalida o TXT.
 - A Central de Saúde salva achados com evidência, score/confiança e próximos testes na tabela `diagnostic_findings`; IDs determinísticos por sessão/evidência evitam gravar a mesma hipótese em cada render, e falhas transitórias permitem nova tentativa.
