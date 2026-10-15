@@ -17,6 +17,13 @@ const packageJson = parse('package.json');
 const packageLock = parse('package-lock.json');
 const diary = read('docs/DIARIO_DE_BORDO.md');
 const reportDocs = read('docs/SQLITE_PERSISTENCIA.md');
+const driveCycles = read('src/data/driveCycles.ts');
+const learningProfile = read('src/database/learningProfile.ts');
+const hydration = read('src/meriva/autosaveValidation.ts');
+const historyTxt = read('src/meriva/autosaveHistoryTxt.ts');
+const txtFormatter = read('src/meriva/autosaveTxtFormatter.ts');
+const homeScreen = read('app/index.tsx');
+const pidCatalog = parse('src/knowledge/meriva_confirmed_pids.json');
 
 assert.equal(packageJson.dependencies['expo-sqlite'], '~14.0.6');
 assert.equal(packageLock.packages[''].dependencies['expo-sqlite'], '~14.0.6');
