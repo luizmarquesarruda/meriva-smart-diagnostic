@@ -41,6 +41,23 @@ export function hydrateState(payload: MerivaPersistedState): MerivaPersistedStat
     metadata: { ...defaults.metadata, ...(payload.metadata ?? {}) },
   };
 
+  // Validate provenance at hydration time. Old/corrupt snapshots must not
+  // promote imported readings to live evidence simply because they are present.
+  hydrated.lastReadings = (Array.isArray(payload.lastReadings) ? payload.lastReadings : [])
+    .filter((reading) => {
+      if (!reading || typeof reading !== 'object') return false;
+      const item = reading as unknown as Record<string, unknown>;
+      return (
+        typeof item.pid === 'string' && item.pid.trim().length > 0 &&
+        typeof item.name === 'string' &&
+        typeof item.unit === 'string' &&
+        typeof item.status === 'string' &&
+        typeof item.timestamp === 'string' && Number.isFinite(Date.parse(item.timestamp)) &&
+        (item.value === null || (typeof item.value === 'number' && Number.isFinite(item.value))) &&
+        (item.source === 'REAL' || item.source === 'SIMULACAO')
+      );
+    });
+
   // Nunca reintroduzir viagens importadas ou aprendizado contaminado de snapshots antigos.
   hydrated.driveCycles = (Array.isArray(payload.driveCycles) ? payload.driveCycles : [])
     .filter((cycle) => cycle && cycle.source === 'REAL_OBD');
