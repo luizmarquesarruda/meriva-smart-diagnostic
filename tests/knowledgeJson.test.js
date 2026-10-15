@@ -32,6 +32,7 @@ function main() {
   const sensorTests = readJson('src/knowledge/sensor_tests.json');
   const dtcCatalog = readJson('src/knowledge/dtc_catalog.json');
   const pollingPolicy = readJson('src/knowledge/polling_policy.json');
+  const fuelCoachPolicy = readJson('src/knowledge/fuel_coach_policy.json');
 
   assert.strictEqual(typeof pids.version, 'number');
   assert.strictEqual(typeof formulas.version, 'number');
@@ -50,6 +51,11 @@ function main() {
   assert.strictEqual(typeof dtcCatalog.version, 'number');
   assert.strictEqual(typeof pollingPolicy.version, 'number');
   assert.strictEqual(pollingPolicy.version, 2, 'cadência flex-fuel exige versão de contrato atualizada');
+  assert.strictEqual(typeof fuelCoachPolicy.version, 'number');
+  assert.ok(fuelCoachPolicy.minimumSamples >= 3 && fuelCoachPolicy.minimumSampleSpanMs > 0);
+  assert.ok(fuelCoachPolicy.referenceMinimumTrips >= 3 && fuelCoachPolicy.referenceMinimumDistanceKm > 0);
+  assert.ok(fuelCoachPolicy.goodRatio > 1 && fuelCoachPolicy.elevatedRatio > 0 && fuelCoachPolicy.elevatedRatio < 1);
+  assert.ok(fuelCoachPolicy.maximumSampleAgeMs <= fuelCoachPolicy.sampleWindowMs);
   assert.ok(Array.isArray(dtcCatalog.codes) && dtcCatalog.codes.length > 0, 'catálogo DTC vazio');
   assert.strictEqual(dtcCatalog.standard, 'SAE J2012');
   assertUnique(dtcCatalog.codes.map((item) => String(item.code).toUpperCase()), 'DTC catalogado');
