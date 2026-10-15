@@ -7,6 +7,7 @@ const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
 
 const index = read('app/index.tsx');
 assert.ok(index.includes('/saude'), 'cockpit deve preservar o atalho para saúde');
+assert.ok(index.includes('href="/mais"'), 'Mais recursos deve continuar acessível pelo cabeçalho');
 const bottomNav = read('src/ui/BottomNavigation.tsx');
 for (const route of ['/', '/laboratorio', '/testes-sensores', '/armazenamento']) assert.ok(bottomNav.includes(route), 'navegação inferior deve expor ' + route);
 for (const file of ['app/dados.tsx', 'app/saude.tsx', 'app/mais.tsx', 'app/veiculo.tsx', 'app/viagens.tsx', 'app/aprendizado.tsx', 'app/testes-sensores.tsx']) {
