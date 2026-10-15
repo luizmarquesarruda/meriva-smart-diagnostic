@@ -583,20 +583,24 @@ export interface SqliteStorageOverview {
 }
 
 export async function getSqliteStorageOverview(): Promise<SqliteStorageOverview> {
-  const db = await openDatabase();
-  const version = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
-  const count = async (table: string, where = '') => {
-    // Names are fixed internal constants; user input is never interpolated.
-    const row = await db.getFirstAsync<{ count: number }>(`SELECT COUNT(*) AS count FROM ${table} ${where}`);
-    return Number(row?.count ?? 0);
-  };
-  return {
-    schemaVersion: Number(version?.user_version ?? 0),
-    openSessions: await count('obd_sessions', "WHERE status = 'OPEN'"),
-    recordedPidSamples: await count('pid_readings'),
-    recordedDtcEvents: await count('dtc_events'),
-    recordedSensorTests: await count('sensor_tests'),
-    recordedRealTrips: await count('trip_records'),
-    learnedPids: await count('learned_pids'),
-  };
+  // Também serializa leituras de estatística para que não cruzem transações
+  // iniciadas por withTransactionAsync no mesmo handle SQLite.
+  return serializeWrite(async () => {
+    const db = await openDatabase();
+    const version = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
+    const count = async (table: string, where = '') => {
+      // Nomes são constantes internas; não há interpolação de entrada do usuário.
+      const row = await db.getFirstAsync<{ count: number }>(`SELECT COUNT(*) AS count FROM ${table} ${where}`);
+      return Number(row?.count ?? 0);
+    };
+    return {
+      schemaVersion: Number(version?.user_version ?? 0),
+      openSessions: await count('obd_sessions', "WHERE status = 'OPEN'"),
+      recordedPidSamples: await count('pid_readings'),
+      recordedDtcEvents: await count('dtc_events'),
+      recordedSensorTests: await count('sensor_tests'),
+      recordedRealTrips: await count('trip_records'),
+      learnedPids: await count('learned_pids'),
+    };
+  });
 }
