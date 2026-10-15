@@ -6,11 +6,11 @@
   "minimumSamples": 4,
   "minimumSampleSpanMs": 15000,
   "minimumStableSpeedKmh": 20,
-  "maximumSpeedSpreadKmh": 15,
-  "maximumSpeedSpreadRatio": 0.35,
+  "maximumSpeedSpreadKmh": 10,
+  "maximumSpeedSpreadRatio": 0.25,
   "referenceMinimumTrips": 3,
   "referenceMinimumDistanceKm": 20,
-  "referenceSpeedDifferenceRatio": 0.50,
+  "referenceSpeedDifferenceRatio": 0.35,
   "goodRatio": 1.10,
   "elevatedRatio": 0.85
 }
