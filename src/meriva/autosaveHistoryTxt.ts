@@ -49,21 +49,26 @@ function deduplicateEntries(entries: string[]): string[] {
 
 /** Remove imported seed trips from old snapshots before displaying/exporting them. */
 function removeCarScannerTripsFromSnapshot(entry: string): string {
-  // Remove também a proveniência e as amostras seed em snapshots antigos,
-  // não apenas as linhas de viagens importadas.
-  const withoutSeedLines = entry
+  const hadImportedLearning = /CARSCANNER|seed_cycle_|seedSamples|seedVersion|seedWeight|fonte=HYBRID/i.test(entry);
+  // Remove proveniência e amostras seed em snapshots antigos.
+  let cleaned = entry
     .split(/\r?\n/)
     .filter((line) => !/CARSCANNER|seed_cycle_|seedSamples|seedVersion|seedWeight|fonte=HYBRID/i.test(line))
     .join('\n');
 
-  const match = withoutSeedLines.match(/(\[HISTORY\]\r?\n)([\s\S]*?)(?=\r?\n\[[^\]\r\n]+\]|$)/);
-  if (!match) return withoutSeedLines;
+  if (hadImportedLearning) {
+    // Médias antigas podem misturar seed + leituras reais e não são separáveis
+    // com segurança. Remover o bloco inteiro evita apresentar números contaminados.
+    cleaned = cleaned.replace(
+      /\[LEARNING\]\r?\n[\s\S]*?(?=\r?\n\[[^\]\r\n]+\]|$)/,
+      '[LEARNING]\nHistórico legado removido: estatísticas importadas não são evidência real.',
+    );
+  }
 
-  const rows = match[2]
-    .split(/\r?\n/)
-    .filter((line) => line.trim() && !/seed/i.test(line));
-  const historyBody = rows.length ? rows.join('\n') : 'N/D';
-  return withoutSeedLines.replace(match[0], match[1] + historyBody);
+  const match = cleaned.match(/(\[HISTORY\]\r?\n)([\s\S]*?)(?=\r?\n\[[^\]\r\n]+\]|$)/);
+  if (!match) return cleaned;
+  const rows = match[2].split(/\r?\n/).filter((line) => line.trim() && !/seed|CARSCANNER/i.test(line));
+  return cleaned.replace(match[0], match[1] + (rows.length ? rows.join('\n') : 'N/D'));
 }
 
 async function readAutoSaveHistoryUnsafe(basePath: string): Promise<string> {
