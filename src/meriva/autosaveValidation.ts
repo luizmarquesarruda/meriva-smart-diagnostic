@@ -218,7 +218,7 @@ export function hydrateState(payload: MerivaPersistedState): MerivaPersistedStat
 
   // Discard malformed DTC rows before UI/diagnostic code accesses .code or .status.
   const validDtcStatuses = new Set(['CONFIRMED', 'PENDING', 'PERMANENT', 'INACTIVE', 'HISTORICAL', 'CURRENT', 'UNKNOWN']);
-  const validDtcSources = new Set(['REAL_OBD', 'CARSCANNER_BASELINE', 'USER_REAL_OBSERVATION', 'SIMULACAO', 'IMPORTADO']);
+  const validDtcSources = new Set(['REAL_OBD', 'USER_REAL_OBSERVATION']);
   hydrated.dtcs = (Array.isArray(payload.dtcs) ? payload.dtcs : [])
     .filter((dtc) => {
       if (!dtc || typeof dtc !== 'object' || Array.isArray(dtc)) return false;
