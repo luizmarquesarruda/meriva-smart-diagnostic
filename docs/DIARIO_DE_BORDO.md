@@ -2455,7 +2455,8 @@ O histórico operacional do aplicativo deve refletir dados próprios da Meriva, 
 - `src/data/driveCycles.ts`: novas instalações começam sem viagens predefinidas.
 - `app/index.tsx`: startup não inicializa mais o seed; chama a purga do perfil legado.
 - `src/database/learningProfile.ts`: remove estatísticas seed/mistas, preservando somente estatísticas comprovadamente `REAL_OBD`; amostras reais limpas permanecem.
-- `src/meriva/autosaveValidation.ts`: sanitiza snapshots JSON antigos durante a recuperação, filtrando viagens não reais e aprendizado contaminado.
+- `src/meriva/autosaveValidation.ts`: sanitiza snapshots JSON antigos durante a recuperação, filtrando viagens não reais e aprendizado contaminado; `autosaveManager.ts` detecta a diferença e força a regravação do JSON limpo.
+- `purgeLegacyCarScannerHistoryTxt` reescreve o TXT legado já sanitizado durante a inicialização. Se a leitura falhar, o arquivo original não é sobrescrito.
 - `src/meriva/autosaveHistoryTxt.ts` e `autosaveTxtFormatter.ts`: limpam linhas e blocos contaminados e exportam somente viagens reais.
 - `src/knowledge/meriva_confirmed_pids.json`: valores CarScanner são removidos dos candidatos; PIDs ficam não validados até resposta RAW_ECU.
 - `tests/regression.test.js` e `tests/sqlitePersistenceContract.test.js`: cobertura para purga e filtros de legado.
