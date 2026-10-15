@@ -168,8 +168,9 @@ class AutoTripService {
     try {
       await this.finalizeRecorder();
     } catch (cause) {
-      // Keep the recorder in memory and retry on the next loop/connection rather
-      // than dropping the only copy when storage is temporarily unavailable.
+      // Keep the finalized trip and delay the next write attempt to avoid a hot
+      // retry loop while storage is unavailable.
+      this.lastPendingTripRetryAt = Date.now();
       pendingTripWriteError = cause instanceof Error ? cause.message : String(cause);
     }
 
@@ -205,7 +206,9 @@ class AutoTripService {
       fuelLevelPercent: null,
       fuelRemainingL: null,
       fuelReserve: null,
-      error: null,
+      error: pendingTripWriteError
+        ? 'VIAGEM PENDENTE DE SALVAMENTO: ' + pendingTripWriteError
+        : null,
       averageConsumptionKml: persistedAutonomy.averageConsumptionKml > 0
         ? persistedAutonomy.averageConsumptionKml
         : 0,
