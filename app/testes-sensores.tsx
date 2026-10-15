@@ -7,6 +7,7 @@ import {useMidLayout} from '../src/ui/midLayout';
 import {getSharedObdConnection,getSharedObdStatus,subscribeSharedObd,subscribeSharedObdStatus} from '../src/obd/sharedConnection';
 import {getPidDefinition} from '../src/obd/pidDefinition';
 import {assessSensorSample,createSensorTestPlan,getSensorTestCatalog,MIN_SENSOR_TEST_READINGS,type SensorTestDefinition,type SensorTestMode,type SensorTestSample,type SensorAssessment} from '../src/diagnostics/sensorTestEngine';
+import {getActiveSqliteSessionId,persistSensorTestReport} from '../src/storage/merivaDatabase';
 const catalog=getSensorTestCatalog();
 const labels:Record<SensorAssessment['state'],string>={CONSISTENTE:'COERENTE',INVESTIGAR:'INVESTIGAR',SEM_RESPOSTA:'SEM RESPOSTA',NAO_CONCLUSIVO:'NÃO CONCLUSIVO'};
 const colors:Record<SensorAssessment['state'],string>={CONSISTENTE:'#4ade80',INVESTIGAR:'#fbbf24',SEM_RESPOSTA:'#fb7185',NAO_CONCLUSIVO:'#93c5fd'};
@@ -19,7 +20,7 @@ export default function TestesSensoresScreen(){
  const [plannedReads,setPlannedReads]=useState(0),[commandProgress,setCommandProgress]=useState(0),[commandPlan,setCommandPlan]=useState(0),[countdownMs,setCountdownMs]=useState(0);
  const [round,setRound]=useState(0),[currentPid,setCurrentPid]=useState(''),[message,setMessage]=useState('Conecte o ELM327 e valide a ECU.');
  const [error,setError]=useState(''),[savedPath,setSavedPath]=useState(''),[revision,setRevision]=useState(0);
- const cancelled=useRef(false),deadline=useRef(0),runStartedAt=useRef(0),commandsDone=useRef(0),commandElapsedTotal=useRef(0),connectedAtStart=useRef(false);
+ const cancelled=useRef(false),deadline=useRef(0),runStartedAt=useRef(0),runSessionId=useRef<string|null>(null),commandsDone=useRef(0),commandElapsedTotal=useRef(0),connectedAtStart=useRef(false);
  useEffect(()=>{const refresh=()=>setRevision(n=>n+1);const a=subscribeSharedObd(refresh),b=subscribeSharedObdStatus(refresh);return()=>{cancelled.current=true;a();b();};},[]);
  useEffect(()=>{if(!running)return;const timer=setInterval(()=>{const remain=deadline.current-Date.now();setCountdownMs(remain>0?remain:1000);},1000);return()=>clearInterval(timer);},[running]);
  const connection=getSharedObdConnection(),status=getSharedObdStatus(),connected=Boolean(connection?.ecuValidated&&status.ecuConnected);
@@ -45,6 +46,7 @@ export default function TestesSensoresScreen(){
   if(!active?.ecuValidated||!activeStatus.ecuConnected){setError('ECU não validada. Conecte pelo módulo Bluetooth/ELM327 antes de testar.');setMessage('Teste não iniciado: ECU sem resposta válida.');setRunning(false);setAborted(true);setCountdownMs(0);return;}
   if(!supported.has('010C')){setError('A ECU não anunciou o PID 010C (RPM), obrigatório para verificar a condição do motor. Nenhum teste iniciado.');setMessage('Teste não iniciado: condição do motor não validada.');setRunning(false);setAborted(true);setCountdownMs(0);return;}
   if(!plan.some(test=>test.pid==='010C')||plan.length===0){setError('Nenhum PID do catálogo foi anunciado como suportado. Nenhum comando será enviado por tentativa.');setMessage('Teste não iniciado: bitmap sem PIDs catalogados.');setRunning(false);setAborted(true);setCountdownMs(0);return;}
+  runSessionId.current=getActiveSqliteSessionId();
   const readings:SensorTestSample[]=[];let finished=false;
   try{
    setMessage('Confirmando a condição do motor com uma leitura inicial de RPM…');
@@ -84,7 +86,27 @@ export default function TestesSensoresScreen(){
     for(const row of item.rows)lines.push('Leitura '+row.readingNumber+': '+valueText(row.value,row.unit)+' | Parser: '+row.status+' | Latência: '+row.elapsedMs+' ms | '+row.timestamp,'RX bruto: '+(row.rawResponse||'VAZIO'));
    }
    lines.push('','POLÍTICA: resposta positiva confirma resposta do PID, não exatidão física/elétrica do sensor. PIDs fora da bitmap não foram consultados.','REFERÊNCIAS: SAE J1979 supported-PID bitmap; Dashlogic PID listing; OBD2 PID Knowledge; auditoria da Bíblia da Meriva.','Limiares são heurísticos, não especificações OEM. Algumas verificações exigem multímetro, osciloscópio ou condições controladas.');
-   await FileSystem.writeAsStringAsync(path,lines.join('\n'),{encoding:FileSystem.EncodingType.UTF8});setSavedPath(path);setError('');setMessage('Relatório TXT salvo no armazenamento privado do aplicativo.');
+   await FileSystem.writeAsStringAsync(path,lines.join('\n'),{encoding:FileSystem.EncodingType.UTF8});
+   setSavedPath(path);setError('');
+   try {
+    await persistSensorTestReport({
+     id:'sensor-test-'+String(runStartedAt.current||Date.now()),
+     sessionId:runSessionId.current,
+     startedAt:new Date(runStartedAt.current||Date.now()).toISOString(),
+     finishedAt:new Date().toISOString(),
+     mode,
+     status:completed?'COMPLETED':'PARTIAL',
+     protocol:getSharedObdConnection()?.protocol??null,
+     supportedPidCount:testPlan.length,
+     reportPath:path,
+     summary:grouped.map(item=>({pid:item.test.pid,label:item.test.label,state:item.assessment.state,title:item.assessment.title,validReadings:item.values.length,requiredReadings:MIN_SENSOR_TEST_READINGS})),
+     readings:samples,
+    });
+    setMessage('Relatório TXT salvo e execução registrada no banco SQLite.');
+   } catch(databaseCause) {
+    console.warn('[sqlite] TXT salvo, mas o registro estruturado falhou:',databaseCause instanceof Error?databaseCause.message:databaseCause);
+    setMessage('Relatório TXT salvo. O registro interno SQLite falhou; o arquivo TXT continua válido.');
+   }
   }catch(cause){setError(cause instanceof Error?cause.message:'Falha ao salvar relatório TXT.');}
  }
  return <SafeAreaView style={st.container} edges={['top','bottom','left','right']}><ScrollView contentContainerStyle={[st.content,{paddingHorizontal:layout.horizontalPadding}]}><View style={[st.frame,{maxWidth:layout.maxContentWidth}]}>
