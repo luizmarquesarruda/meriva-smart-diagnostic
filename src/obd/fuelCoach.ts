@@ -71,7 +71,7 @@ function median(values: number[]): number | null {
     : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
-/** Baseline from valid, completed REAL_OBD trips with matching fuel and rate source. */
+/** Baseline from valid REAL_OBD trips matching fuel, rate source, and approximate mean speed. */
 export function buildFuelCoachReference(
   cycles: DriveCycle[],
   fuelType: FuelType,
