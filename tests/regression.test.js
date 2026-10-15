@@ -1139,6 +1139,47 @@ async function testCsvWriteSerialization() {
   assert.strictEqual(content.split('\n').filter(Boolean).length, 3);
 }
 
+async function testPidBankRealOnlyPurge() {
+  resetFS();
+  const pidBank = loadTs(path.join(ROOT, 'src/database/pidBank.ts'));
+  const target = `${BASE}/BANCO/pids_meriva_confirmados.txt`;
+  const realRow = '010C|RPM|PADRAO_OBD|CONFIRMADO|2026-10-01T10:00:00.000Z|2026-10-01T10:00:00.000Z|2|KWP|10|REAL_OBD|1';
+  const oldRows = [
+    realRow,
+    '0105|ECT baseline|PADRAO_OBD|CONFIRMADO|2026-10-01T10:00:00.000Z|2026-10-01T10:00:00.000Z|5|N/D|0|CARSCANNER_BASELINE|0.9',
+    '010D|simulated speed|PADRAO_OBD|CONFIRMADO|2026-10-01T10:00:00.000Z|2026-10-01T10:00:00.000Z|5|SIMULACAO|0|SIMULACAO|0.9',
+    '010B|imported MAP|PADRAO_OBD|DESCOBERTO|2026-10-01T10:00:00.000Z|2026-10-01T10:00:00.000Z|1|N/D|0|IMPORTADO|0',
+    'BADPID|invalid|PADRAO_OBD|RESPONDEU|2026-10-01T10:00:00.000Z|2026-10-01T10:00:00.000Z|1|KWP|10|REAL_OBD|1',
+  ];
+  files.set(target, oldRows.join('\n') + '\n');
+
+  const visibleBeforePurge = await pidBank.readPidConfirmations(BASE);
+  assert.deepStrictEqual(visibleBeforePurge.map((entry) => entry.pid), ['010C'],
+    'leitura operacional nunca deve expor PID seed, simulado, importado ou malformado');
+  await assert.rejects(
+    pidBank.recordPidConfirmation(BASE, {
+      pid: '0105', name: 'ECT', classification: 'PADRAO_OBD', status: 'CONFIRMADO',
+      firstSeen: '2026-10-01T10:00:00.000Z', lastSeen: '2026-10-01T10:00:00.000Z',
+      occurrences: 1, protocol: 'KWP', responseTime: 10, source: 'CARSCANNER_BASELINE', confidence: 1,
+    }),
+    /NON_REAL_PID_NOT_ALLOWED/,
+    'PID de baseline não pode ser gravado como confirmação operacional',
+  );
+
+  await pidBank.purgeLegacyNonRealPidConfirmations(BASE);
+  const cleaned = files.get(target);
+  assert.ok(cleaned.includes(realRow), 'purga deve preservar PID confirmado por ECU');
+  assert.ok(!/CARSCANNER_BASELINE|SIMULACAO|IMPORTADO|BADPID/.test(cleaned), 'purga deve remover todas as linhas não reais');
+  assert.ok(files.get(target + '.previous').includes(realRow), 'backup final deve refletir o banco já sanitizado');
+  assert.ok(!/CARSCANNER_BASELINE|SIMULACAO|IMPORTADO|BADPID/.test(files.get(target + '.previous')),
+    'backup não deve manter as entradas importadas após a purga confirmada');
+
+  await pidBank.recordDiscoveredPids(BASE, ['010D', 'BADPID', '01 05'], 'ISO 14230-4 KWP FAST');
+  const discovered = await pidBank.readPidConfirmations(BASE);
+  assert.deepStrictEqual(discovered.map((entry) => entry.pid), ['0105', '010C', '010D'],
+    'bitmap atual pode adicionar somente PIDs de formato válido com origem REAL_OBD');
+}
+
 async function testPidAndLearningWriteSerialization() {
   resetFS();
   const pidBank = loadTs(path.join(ROOT, 'src/database/pidBank.ts'));
@@ -1403,6 +1444,7 @@ async function main() {
     ['recuperação de perfil de aprendizado malformado', testMalformedLearningProfileRecovery],
     ['backup completo', testBackupCompleteness],
     ['CSV serializado', testCsvWriteSerialization],
+    ['PID bank real-only purge', testPidBankRealOnlyPurge],
     ['PID + DNA serializados', testPidAndLearningWriteSerialization],
     ['contratos de aquisição e persistência', testAcquisitionPolicyConsistency],
     ['PID respondeu não significa sensor validado', testPidResponseIsNotVehicleValidation],
