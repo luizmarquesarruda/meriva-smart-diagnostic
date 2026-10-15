@@ -14,7 +14,7 @@ Não criar relatórios JSON ou CSV visíveis ao usuário. Catálogos e configura
 
 - Viagens importadas são removidas do índice legado e não fazem parte das viagens iniciais.
 - Na inicialização, o perfil de aprendizado é purgado: estatísticas limpas de origem `REAL_OBD` são preservadas; estatísticas que misturavam baseline importado e amostras reais são descartadas porque a média histórica não pode ser separada com segurança.
-- Snapshots JSON antigos são sanitizados durante a hidratação. TXT históricos removem linhas de origem importada e substituem o bloco de aprendizado contaminado por uma nota explícita.
+- Snapshots JSON antigos são sanitizados durante a hidratação e regravados pelo autosave. TXT históricos são sanitizados e reescritos na inicialização: removem linhas de origem importada e substituem o bloco de aprendizado contaminado por uma nota explícita. Se um arquivo não puder ser lido com segurança, a migração não o sobrescreve.
 - Os PIDs antes usados como candidatos de baseline permanecem apenas como alvos não validados, sem valores de referência importados. Somente resposta RAW_ECU real pode confirmá-los.
 
 ## Compatibilidade
