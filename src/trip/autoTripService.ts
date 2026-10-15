@@ -261,6 +261,11 @@ class AutoTripService {
         this.setState({
           connected: true,
           active: false,
+          instantaneousConsumptionKml: null,
+          instantaneousConsumptionSource: null,
+          instantaneousConsumptionTimestampMs: null,
+          instantaneousFuelType: null,
+          instantaneousSpeedKmh: null,
           error: finalizationError
             ? 'VIAGEM PENDENTE DE SALVAMENTO: ' + finalizationError
             : this.pendingFinalizedTrips.length > 0
