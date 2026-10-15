@@ -2767,3 +2767,7 @@ A comparação de um trecho instantâneo com a média de uma viagem inteira pode
 
 ### Desconexão/ECU sem resposta
 O loop do serviço agora zera instantaneamente valor de consumo, fonte, timestamp original, tipo de combustível e velocidade usados pelo coach quando a ECU deixa de responder. Isso evita que uma amostra da sessão anterior seja reutilizada quando uma conexão volta. O contrato estático do cockpit foi ampliado para proteger essa invalidação. A execução automatizada continua pendente por decisão explícita de não disparar CI.
+
+
+### Barreira de sessão para a janela do coach
+A janela em memória agora registra o instante em que a ECU passou a responder na sessão corrente. Uma leitura só pode entrar se o timestamp original da taxa for igual ou posterior a esse instante. Assim, uma reconexão rápida não reutiliza um timestamp da sessão anterior mesmo se o reset assíncrono do loop chegar depois do evento de reconexão. O teste de contrato foi ampliado; não foi executada CI.
