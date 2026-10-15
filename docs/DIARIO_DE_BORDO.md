@@ -2498,3 +2498,30 @@ A CI não foi disparada. A suíte de testes e o build Android ainda precisam ser
 - Não foram executados `npm run validate`, Expo Doctor, prebuild/build Android nem testes com o ELM327/ECU físico. **Não afirmar que a integração nativa está validada** até esses passos terminarem.
 - A CI não foi disparada por solicitação. A branch `feat/sqlite-persistencia-20261015` está temporariamente excluída do gatilho de push em `.github/workflows/ci.yml` para evitar execução automática durante esta fase; a exceção deve ser removida ao autorizar a validação/integração.
 - Próximo passo: executar typecheck, suíte de testes, Expo Doctor e build standalone Android; corrigir qualquer divergência observada e depois testar com o veículo parado, primeiro com motor desligado e depois aquecido em marcha lenta.
+
+
+## 2026-10-15 — Correção da regressão estática do histórico CarScanner
+
+### Falha confirmada na CI #2154, tentativa 2
+- Run: `38680512586`
+- Commit testado: `bef78989c1eb0c5e39572f3f3cec9654681808b3`
+- `npm ci`: sucesso.
+- `npm run doctor`: **17/17** verificações aprovadas.
+- `tsc --noEmit`: sucesso.
+- A suíte de testes falhou em `tests/regression.test.js`, caso `histórico sem seed e consumo N/D`, linha 1106. O job Android foi ignorado em consequência da falha de validação.
+
+### Causa raiz
+O teste procurava as regras de filtro de viagens dentro de `app/armazenamento.tsx`, que é a central de relatórios TXT e armazenamento SQLite, e exigia trechos textuais antigos. A tela de viagens é `app/viagens.tsx`; nela, a lista já filtra `source === 'REAL_OBD'` e mostra `CONSUMO N/D` quando os dados não atendem aos critérios mínimos. A exportação em `src/storage/exportDiagnostics.ts` também filtra viagens reais e valida o consumo antes de exportar.
+
+Portanto, a falha observada é uma regressão do próprio teste estático por apontar para o arquivo errado/contratos de texto desatualizados; não é evidência de que a tela atual esteja mostrando viagens seed.
+
+### Correção
+- Atualizado `tests/regression.test.js` para verificar a tela real de viagens (`app/viagens.tsx`) e a lógica de exportação TXT (`src/storage/exportDiagnostics.ts`).
+- Mantidas verificações para impedir viagens não reais no histórico/exportação e consumo inválido apresentado como valor numérico.
+- Nenhuma regra de produção foi enfraquecida para fazer o teste passar.
+
+### Commit da correção
+- `a384fdc859f71d85f17acfb4d26a810d9e9e17cc` — `test: align CarScanner regression with trips screen`
+
+### Próxima etapa
+Ajustar este registro ao resultado da nova CI após a atualização do diário. A correção só estará validada quando a nova execução concluir `validate` e o `android-build` sem falhas. Não tratar o resultado anterior como CI verde.
