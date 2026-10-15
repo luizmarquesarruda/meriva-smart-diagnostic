@@ -12,7 +12,7 @@ import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
 import type { ObdConnectionState } from '../src/meriva/autosaveState';
 import { gpsTracker, type GpsTripState } from '../src/gps';
 import { ensureMerivaVehicleProfile } from '../src/database/vehicleConfig';
-import { createLearningProfile, initializeCarScannerSeed, readLearningProfile } from '../src/database/learningProfile';
+import { createLearningProfile, purgeCarScannerHistory, readLearningProfile } from '../src/database/learningProfile';
 import { readAppSettings, type AppSettings } from '../src/database/appSettings';
 import { connectPreferredElm, getSharedObdConnection, getSharedObdLastError, getSharedObdStatus, subscribeSharedObd, subscribeSharedObdStatus } from '../src/obd/sharedConnection';
 import { autoTripService, type AutoTripServiceState } from '../src/trip/autoTripService';
@@ -68,8 +68,8 @@ export default function IndexScreen() {
       await initializeDriveCycles(basePath);
       await ensureMerivaVehicleProfile(basePath);
       const learningProfile = await readLearningProfile(basePath);
-      if (!learningProfile) await createLearningProfile(basePath, '2026-09-24T14:48:00.000Z');
-      await initializeCarScannerSeed(basePath);
+      if (!learningProfile) await createLearningProfile(basePath, new Date().toISOString());
+      else await purgeCarScannerHistory(basePath);
       const storedCycles = await readDriveCycles(basePath);
       const loaded = restored.driveCycles.length ? restored.driveCycles : storedCycles;
 
