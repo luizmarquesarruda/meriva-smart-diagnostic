@@ -20,7 +20,7 @@ export default function TestesSensoresScreen(){
  const [plannedReads,setPlannedReads]=useState(0),[commandProgress,setCommandProgress]=useState(0),[commandPlan,setCommandPlan]=useState(0),[countdownMs,setCountdownMs]=useState(0);
  const [round,setRound]=useState(0),[currentPid,setCurrentPid]=useState(''),[message,setMessage]=useState('Conecte o ELM327 e valide a ECU.');
  const [error,setError]=useState(''),[savedPath,setSavedPath]=useState(''),[revision,setRevision]=useState(0);
- const cancelled=useRef(false),deadline=useRef(0),runStartedAt=useRef(0),runSessionId=useRef<string|null>(null),commandsDone=useRef(0),commandElapsedTotal=useRef(0),connectedAtStart=useRef(false);
+ const cancelled=useRef(false),deadline=useRef(0),runStartedAt=useRef(0),runFinishedAt=useRef(0),runSessionId=useRef<string|null>(null),commandsDone=useRef(0),commandElapsedTotal=useRef(0),connectedAtStart=useRef(false);
  useEffect(()=>{const refresh=()=>setRevision(n=>n+1);const a=subscribeSharedObd(refresh),b=subscribeSharedObdStatus(refresh);return()=>{cancelled.current=true;a();b();};},[]);
  useEffect(()=>{if(!running)return;const timer=setInterval(()=>{const remain=deadline.current-Date.now();setCountdownMs(remain>0?remain:1000);},1000);return()=>clearInterval(timer);},[running]);
  const connection=getSharedObdConnection(),status=getSharedObdStatus(),connected=Boolean(connection?.ecuValidated&&status.ecuConnected);
@@ -39,7 +39,7 @@ export default function TestesSensoresScreen(){
  function recordCommand(elapsedMs:number,totalCommands:number){commandsDone.current+=1;commandElapsedTotal.current+=Math.max(0,elapsedMs);setCommandProgress(commandsDone.current);updateCountdown(totalCommands-commandsDone.current);}
  async function runTests(){
   cancelled.current=false;setRunning(true);setCompleted(false);setAborted(false);setCommandProgress(0);setPlannedReads(0);setTestPlan([]);setSamples([]);setError('');setSavedPath('');setRound(0);setCurrentPid('');setMessage('Preparando a varredura e estimando o tempo…');
-  runStartedAt.current=Date.now();commandsDone.current=0;commandElapsedTotal.current=0;
+  runStartedAt.current=Date.now();runFinishedAt.current=0;commandsDone.current=0;commandElapsedTotal.current=0;
   const active=getSharedObdConnection(),activeStatus=getSharedObdStatus();connectedAtStart.current=Boolean(active?.ecuValidated&&activeStatus.ecuConnected);
   const plan=createSensorTestPlan(active?.supportedPids??[],pid=>Boolean(getPidDefinition(pid))),expectedReads=plan.length*MIN_SENSOR_TEST_READINGS,expectedCommands=expectedReads+1;
   setTestPlan(plan);setPlannedReads(expectedReads);setCommandPlan(expectedCommands);setCommandProgress(0);updateCountdown(expectedCommands);
@@ -72,7 +72,7 @@ export default function TestesSensoresScreen(){
    setMessage(finished?'Varredura concluída: cada PID suportado teve três tentativas. Revise as evidências antes de reparar.':'Teste interrompido; as leituras concluídas foram mantidas para relatório parcial.');
    setRound(finished?MIN_SENSOR_TEST_READINGS:0);
   }catch(cause){setError(cause instanceof Error?cause.message:'Falha desconhecida durante a consulta.');setMessage('Varredura não concluída normalmente; leituras finalizadas permanecem disponíveis.');setAborted(true);}
-  finally{setRunning(false);setCountdownMs(0);setCurrentPid('');}
+  finally{runFinishedAt.current=Date.now();setRunning(false);setCountdownMs(0);setCurrentPid('');}
  }
  const stop=()=>{cancelled.current=true;setMessage('Parada solicitada; a consulta OBD atual será concluída antes de interromper.');};
  async function saveReport(){
@@ -80,7 +80,7 @@ export default function TestesSensoresScreen(){
   try{
    const dir=(FileSystem.documentDirectory??'')+'MERIVA_SMART/RELATORIOS/TESTES';await FileSystem.makeDirectoryAsync(dir,{intermediates:true});
    const path=dir+'/teste-sensores-'+new Date().toISOString().replace(/[:.]/g,'-')+'.txt';
-   const lines=['MERIVA SMART DIAGNOSTIC — CENTRAL DE TESTES DE SENSORES','Catálogo: '+catalog.catalogId+' v'+catalog.schemaVersion,'Data: '+new Date().toLocaleString(),'Veículo de referência: Chevrolet Meriva Maxx 1.4 8V ECONO.FLEX 2011/2012','Condição: '+(mode==='ENGINE_OFF'?'IGNIÇÃO LIGADA / MOTOR DESLIGADO':'MOTOR LIGADO, VEÍCULO PARADO'),'ECU validada no início: '+(connectedAtStart.current?'SIM':'NÃO'),'Protocolo observado: '+(getSharedObdConnection()?.protocol??'N/D'),'Leituras mínimas por PID: '+MIN_SENSOR_TEST_READINGS,'PIDs selecionados pela bitmap: '+testPlan.length,'Tentativas previstas: '+plannedReads,'Tentativas registradas: '+samples.length,'Execução completa: '+(completed?'SIM':'NÃO — RELATÓRIO PARCIAL'),'Tempo decorrido: '+Math.round((Date.now()-runStartedAt.current)/1000)+' s','','AVALIAÇÃO POR PID'];
+   const lines=['MERIVA SMART DIAGNOSTIC — CENTRAL DE TESTES DE SENSORES','Catálogo: '+catalog.catalogId+' v'+catalog.schemaVersion,'Data: '+new Date().toLocaleString(),'Veículo de referência: Chevrolet Meriva Maxx 1.4 8V ECONO.FLEX 2011/2012','Condição: '+(mode==='ENGINE_OFF'?'IGNIÇÃO LIGADA / MOTOR DESLIGADO':'MOTOR LIGADO, VEÍCULO PARADO'),'ECU validada no início: '+(connectedAtStart.current?'SIM':'NÃO'),'Protocolo observado: '+(getSharedObdConnection()?.protocol??'N/D'),'Leituras mínimas por PID: '+MIN_SENSOR_TEST_READINGS,'PIDs selecionados pela bitmap: '+testPlan.length,'Tentativas previstas: '+plannedReads,'Tentativas registradas: '+samples.length,'Execução completa: '+(completed?'SIM':'NÃO — RELATÓRIO PARCIAL'),'Tempo decorrido: '+Math.round(((runFinishedAt.current||Date.now())-runStartedAt.current)/1000)+' s','','AVALIAÇÃO POR PID'];
    for(const item of grouped){
     lines.push('',item.test.pid+' — '+item.test.label,'Resultado: '+item.assessment.state+' — '+item.assessment.title,'Explicação: '+item.assessment.explanation,'Guia da IA local: '+item.test.aiGuidance,'Leituras válidas: '+item.values.length+'/'+MIN_SENSOR_TEST_READINGS);
     for(const row of item.rows)lines.push('Leitura '+row.readingNumber+': '+valueText(row.value,row.unit)+' | Parser: '+row.status+' | Latência: '+row.elapsedMs+' ms | '+row.timestamp,'RX bruto: '+(row.rawResponse||'VAZIO'));
@@ -93,7 +93,7 @@ export default function TestesSensoresScreen(){
      id:'sensor-test-'+String(runStartedAt.current||Date.now()),
      sessionId:runSessionId.current,
      startedAt:new Date(runStartedAt.current||Date.now()).toISOString(),
-     finishedAt:new Date().toISOString(),
+     finishedAt:new Date(runFinishedAt.current||Date.now()).toISOString(),
      mode,
      status:completed?'COMPLETED':'PARTIAL',
      protocol:getSharedObdConnection()?.protocol??null,
