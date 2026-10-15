@@ -1155,9 +1155,16 @@ function testPidResponseIsNotVehicleValidation() {
     { pid: '010B', name: 'MAP invalid', value: Infinity, unit: 'kpa', status: 'RESPONDEU', timestamp: new Date().toISOString(), source: 'REAL' },
     { pid: '010C', name: 'RPM simulado', value: 1000, unit: 'rpm', status: 'RESPONDEU', timestamp: new Date().toISOString(), source: 'SIMULACAO' },
   ];
+  legacyState.dtcs = [
+    { code: 'P0135', status: 'CURRENT', firstSeen: '', lastSeen: '', occurrences: 1, source: 'REAL_OBD', historical: false },
+    { code: 'BROKEN', status: 'CURRENT', firstSeen: '', lastSeen: '', occurrences: 1, source: 'REAL_OBD', historical: false },
+    null,
+  ];
   const hydrated = validation.hydrateState(legacyState);
   assert.deepStrictEqual(hydrated.lastReadings.map((reading) => reading.source), ['REAL', 'SIMULACAO'],
     'hidratação deve rejeitar origens desconhecidas e valores não finitos sem apagar dados reais/simulados válidos');
+  assert.deepStrictEqual(hydrated.dtcs.map((dtc) => dtc.code), ['P0135'],
+    'hidratação deve descartar DTC malformado sem remover registro real válido');
 
   const runtime = loadTs(path.join(ROOT, 'src/meriva/autosaveIntegration.ts'));
   const basePath = '/doc/learning-throttle-regression';
