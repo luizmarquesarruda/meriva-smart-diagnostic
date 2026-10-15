@@ -1024,8 +1024,8 @@ async function testDtcStorage() {
   assert.ok(!cleanedDtcText.includes('CARSCANNER_BASELINE'), 'purga deve remover proveniência seed');
   assert.ok(!cleanedDtcText.includes('SIMULACAO'), 'purga deve remover DTC simulado');
   assert.ok(!cleanedDtcText.includes('BADCODE'), 'purga deve remover DTC malformado');
-  assert.ok(files.get(dtcPath + '.previous').includes('CARSCANNER_BASELINE'),
-    'purga deve guardar o arquivo anterior como backup');
+  assert.ok(files.get(dtcPath + '.previous').includes('P0133|'), 'backup de recuperação deve continuar válido após a purga');
+  assert.ok(!files.get(dtcPath + '.previous').includes('CARSCANNER_BASELINE'), 'backup operacional validado não deve reintroduzir seed após conclusão');
 }
 
 async function testBackupCompleteness() {
