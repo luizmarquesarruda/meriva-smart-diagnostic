@@ -2439,3 +2439,10 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - **CI não foi disparada por solicitação.** A validação pelo GitHub Actions permanece pendente.
 - Próxima etapa: revisar o comportamento visual em retrato e paisagem e, quando autorizado, executar a suíte, Expo Doctor e build Android; só então disparar a CI e acompanhar os resultados.
 
+## 2026-10-15 — Acesso contínuo a Mais recursos
+
+- A revisão de navegação identificou que remover os dois atalhos antigos também ocultava o acesso ao menu secundário. Foi acrescentado um botão discreto de reticências no cabeçalho do cockpit, mantendo os quatro destinos principais na barra inferior.
+- Atualizado o teste de navegação para proteger a acessibilidade de `Mais recursos`.
+- Commit da correção de navegação: `f258796d2da04071173293e023c5697d3366de01`.
+- A alteração permanece numa branch de revisão; **CI e testes automatizados continuam sem execução**, conforme solicitado.
+
