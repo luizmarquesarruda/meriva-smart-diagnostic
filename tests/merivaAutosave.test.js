@@ -458,7 +458,10 @@ test('7a. TXT antigo remove linhas CarScanner sem apagar os demais dados', async
   const cleaned = await history.readAutoSaveHistory(BASE);
   assert.ok(!cleaned.includes('CARSCANNER_SEED'), 'export must remove legacy seed trip lines');
   assert.ok(cleaned.includes('[HISTORY]\nN/D'), 'empty operational history must show N/D');
-  assert.ok(cleaned.includes('Amostras reais: 0 / seed: 10'), 'learning provenance must be preserved');
+  assert.ok(cleaned.includes('Histórico legado removido: estatísticas importadas não são evidência real.'),
+    'estatística de aprendizado misturada deve ser substituída por uma nota explícita');
+  assert.ok(!cleaned.includes('Amostras reais: 0 / seed: 10'),
+    'contadores de aprendizado contaminados não devem ser apresentados como estado operacional atual');
 });
 
 test('7b. histórico autosave elimina duplicatas legadas e serializa gravações concorrentes', async () => {
