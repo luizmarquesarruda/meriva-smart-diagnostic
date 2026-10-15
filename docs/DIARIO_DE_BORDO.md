@@ -2680,3 +2680,25 @@ A CI passou por validação automatizada e compilação Android, mas não substi
 5. Verificar que as sessões SQLite órfãs, relatórios de teste TXT e o histórico diário permanecem consistentes após encerramento forçado e nova inicialização.
 
 **Conclusão técnica:** a última execução disponível comprova TypeScript, suíte automatizada, contrato de persistência, Expo Doctor e APK Release aprovados. A integridade de gravação do banco de PIDs e o filtro de frescor temporal estão cobertos por regressões. A validação elétrica/OBD com veículo e adaptador reais ainda precisa ser feita e registrada à parte.
+
+
+## 2026-10-15 — Ergonomia da navegação inferior
+
+### Problema observado
+O cockpit e as telas secundárias compartilhavam o componente `src/ui/BottomNavigation.tsx`, cuja barra tinha altura mínima de 48 px, ícones de 16 px, rótulos de 8 px e apenas 3 px de padding externo. Os quatro destinos usavam larguras iguais, mas a falta de separação interna e a baixa altura visual faziam os controles parecerem pequenos e agrupados. Rótulos longos precisavam caber em uma área estreita sem expandir o layout.
+
+### Alteração implementada
+- A altura mínima do destino passou de 48 px para **88 px** (aproximadamente 1,8×), ampliando a área de toque sem alterar rotas ou ações.
+- Ícones passaram de 16 px para **22 px**; rótulos de 8 px para **10 px**, com line-height explícito.
+- A barra agora usa padding externo de 5 px, espaçamento de 4 px entre destinos e cantos mais amplos; cada destino tem padding interno e espaçamento próprios.
+- Mantido `flex: 1` com `minWidth: 0`: os quatro destinos continuam com distribuição uniforme, sem permitir que o rótulo “DIAGNÓSTICO” alargue um item e comprima os outros.
+- Mantidos links, labels de acessibilidade, papel de botão e estado `selected`. Não houve alteração no fluxo OBD, no autosave JSON, no SQLite ou na exportação TXT.
+
+### Proteção contra regressão
+- Atualizado `tests/cockpitNavigation.test.js` para verificar as quatro rotas, distribuição igual, altura mínima de 88 px, ícone de 22 px, rótulo de 10 px e preservação dos atributos de acessibilidade.
+- O teste é um contrato estático do componente; a validação final precisa incluir typecheck, suíte completa e build Android.
+- A mudança é confinada ao componente compartilhado e ao teste do cockpit, sem adicionar dependências.
+
+### Validação
+- A CI executada após esta alteração deverá confirmar `npm run validate`, Expo Doctor e `android-build`.
+- A mudança ainda precisa ser conferida visualmente no aparelho, tanto em retrato como em paisagem, em especial a largura do rótulo “DIAGNÓSTICO” e a área útil do cockpit.

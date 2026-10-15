@@ -31,10 +31,12 @@ export default function BottomNavigation({ active = null }: Props) {
 }
 
 const styles = StyleSheet.create({
-  bar: { flexDirection: 'row', width: '100%', backgroundColor: '#0e1b2d', borderRadius: 14, borderWidth: 1, borderColor: '#28415f', padding: 3, marginTop: 8 },
-  item: { flex: 1, minWidth: 0, minHeight: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2, paddingVertical: 6, borderRadius: 10, gap: 3 },
+  // Four equal-width destinations, with visible separation and a larger touch zone.
+  // minWidth: 0 and single-line labels keep the bar stable on narrow/landscape screens.
+  bar: { flexDirection: 'row', width: '100%', backgroundColor: '#0e1b2d', borderRadius: 16, borderWidth: 1, borderColor: '#28415f', padding: 5, marginTop: 8, gap: 4 },
+  item: { flex: 1, minWidth: 0, minHeight: 88, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, paddingVertical: 10, borderRadius: 12, gap: 4 },
   selected: { backgroundColor: '#152a45' },
-  icon: { color: '#9fb4cf', fontSize: 16, fontWeight: '900' },
-  label: { color: '#9fb4cf', fontSize: 8, fontWeight: '900', letterSpacing: 0.2 },
+  icon: { color: '#9fb4cf', fontSize: 22, lineHeight: 26, fontWeight: '900' },
+  label: { color: '#9fb4cf', fontSize: 10, lineHeight: 12, fontWeight: '900', letterSpacing: 0.25, textAlign: 'center' },
   selectedText: { color: '#7db3ff' },
 });
