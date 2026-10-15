@@ -150,7 +150,14 @@ class AutoTripService {
     // A conexão inicial pode já ter iniciado o GPS pelo serviço nativo em
     // sharedConnection; não o desligar e ligar novamente sem necessidade.
     if (!connection || hadTrackingSession) await this.stopGpsForEcu();
-    await this.finalizeRecorder();
+    let pendingTripWriteError: string | null = null;
+    try {
+      await this.finalizeRecorder();
+    } catch (cause) {
+      // Keep the recorder in memory and retry on the next loop/connection rather
+      // than dropping the only copy when storage is temporarily unavailable.
+      pendingTripWriteError = cause instanceof Error ? cause.message : String(cause);
+    }
 
     resetLiveTelemetry();
     this.telemetryCursor = 0;
@@ -159,7 +166,10 @@ class AutoTripService {
     this.lastFuelEthanolPercent = null;
 
     if (!connection || !this.running) {
-      this.state = { ...INITIAL_STATE };
+      this.state = {
+        ...INITIAL_STATE,
+        error: pendingTripWriteError ? 'VIAGEM PENDENTE DE SALVAMENTO: ' + pendingTripWriteError : null,
+      };
       this.emit();
       return;
     }
@@ -206,9 +216,20 @@ class AutoTripService {
         // A ECU perdeu a resposta: encerrar a captura de localização e fechar a
         // viagem com a última evidência válida, sem acumular GPS offline.
         await this.stopGpsForEcu();
-        await this.finalizeRecorder();
-        this.stoppedSinceMs = null;
-        this.setState({ connected: true, active: false, error: 'ADAPTADOR OK / ECU SEM RESPOSTA' });
+        let finalizationError: string | null = null;
+        try {
+          await this.finalizeRecorder();
+          this.stoppedSinceMs = null;
+        } catch (cause) {
+          finalizationError = cause instanceof Error ? cause.message : String(cause);
+        }
+        this.setState({
+          connected: true,
+          active: false,
+          error: finalizationError
+            ? 'VIAGEM PENDENTE DE SALVAMENTO: ' + finalizationError
+            : 'ADAPTADOR OK / ECU SEM RESPOSTA',
+        });
         await new Promise((resolve) => setTimeout(resolve, 1000));
         continue;
       }
@@ -547,12 +568,17 @@ class AutoTripService {
 
   private async finalizeRecorder(): Promise<void> {
     const recorder = this.recorder;
-    this.recorder = null;
     if (!recorder || !this.basePath) return;
 
     const cycle = recorder.buildDriveCycle();
-    if (!cycle) return;
+    if (!cycle) {
+      this.recorder = null;
+      return;
+    }
 
+    // Do not clear the only in-memory trip copy until the index, CSV, snapshot
+    // and critical autosave all completed. addDriveCycle is idempotent by ID,
+    // so retries after a partial failure do not duplicate the trip.
     await addDriveCycle(this.basePath, cycle);
     const storedCycles = await readDriveCycles(this.basePath);
     updateAutoSaveState((state) => {
@@ -613,6 +639,7 @@ class AutoTripService {
       estimatedRangeKm: autonomy.estimatedRangeKm,
     });
     await forceSaveOnObdEvent();
+    if (this.recorder === recorder) this.recorder = null;
   }
 
   private setState(patch: Partial<AutoTripServiceState>): void {
