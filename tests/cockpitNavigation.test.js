@@ -20,6 +20,8 @@ assert.match(read('src/obd/fuelCoach.ts'), /referenceMinimumTrips/, 'assistente 
 assert.match(read('src/obd/fuelCoach.ts'), /referenceSpeedDifferenceRatio/, 'referência deve limitar diferenças de velocidade');
 const tripService = read('src/trip/autoTripService.ts');
 assert.match(tripService, /instantaneousConsumptionTimestampMs/, 'consumo deve preservar timestamp original da taxa');
+assert.match(tripService, /connected: true,\s*active: false,\s*instantaneousConsumptionKml: null,\s*instantaneousConsumptionSource: null,\s*instantaneousConsumptionTimestampMs: null,\s*instantaneousFuelType: null,\s*instantaneousSpeedKmh: null,\s*error: finalizationError/,
+  'perda de resposta da ECU deve invalidar imediatamente amostras do coach');
 assert.match(tripService, /instantaneousSpeedKmh: tripVehicleSpeedKmh/, 'coach deve usar a velocidade que gerou o km/L');
 assert.match(tripService, /instantaneousFuelType: instantaneousConsumptionKml != null \? estimateFuelType : null/,
   'o tipo associado ao cálculo não pode mudar por alteração posterior da configuração');
