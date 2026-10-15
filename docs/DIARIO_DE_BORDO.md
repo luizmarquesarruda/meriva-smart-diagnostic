@@ -2471,6 +2471,7 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Arquivos funcionais: `src/storage/merivaDatabase.ts`, `src/meriva/autosaveManager.ts`, `app/testes-sensores.tsx`, `app/saude.tsx`, `app/armazenamento.tsx`, `package.json`, `package-lock.json`, `tests/sqlitePersistenceContract.test.js` e `docs/SQLITE_PERSISTENCIA.md`.
 
 ### Validação, limites e próximo passo
+- Revisão estática final em 15/10/2026: **20/20 verificações de contrato passaram**, incluindo sincronização de dependências/lockfile, tabelas e migrações, filtros de fonte real, limitação de gravação, continuidade JSON/TXT, telas consumidoras e exclusão do gatilho de push nesta branch. É uma verificação de código/estrutura, não execução de testes.
 - Não foram executados `npm run validate`, Expo Doctor, prebuild/build Android nem testes com o ELM327/ECU físico. **Não afirmar que a integração nativa está validada** até esses passos terminarem.
 - A CI não foi disparada por solicitação. A branch `feat/sqlite-persistencia-20261015` está temporariamente excluída do gatilho de push em `.github/workflows/ci.yml` para evitar execução automática durante esta fase; a exceção deve ser removida ao autorizar a validação/integração.
 - Próximo passo: executar typecheck, suíte de testes, Expo Doctor e build standalone Android; corrigir qualquer divergência observada e depois testar com o veículo parado, primeiro com motor desligado e depois aquecido em marcha lenta.
