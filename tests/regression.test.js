@@ -544,41 +544,41 @@ async function testCarScannerBaselineAndFuel012F() {
   assert.strictEqual(fuel.isFuelReserve(8), true);
   assert.strictEqual(fuel.estimateRangeFromFuelLevel(50, 10), 280);
 
-  await learning.createLearningProfile(BASE, '2026-09-24T14:48:00.000Z');
-  const seeded = await learning.initializeCarScannerSeed(BASE);
-  assert.strictEqual(seeded.globalSampleCounts.seedSamples, 10);
-  assert.strictEqual(seeded.globalSampleCounts.realSamples, 0);
-  assert.strictEqual(seeded.globalSampleCounts.totalSamples, 10);
-  assert.strictEqual(seeded.source, 'HYBRID');
-  assert.strictEqual(seeded.learningStatus, 'SEED_INITIALIZED');
-  const rpm = seeded.contextualData.find((item) => item.condition === 'IDLE_WARM').statistics['Engine RPM'];
-  assert.strictEqual(rpm.mean, 778);
-  assert.strictEqual(rpm.realSamples, 0);
-  assert.strictEqual(rpm.seedSamples, 1);
-  assert.deepStrictEqual(rpm.source, ['CARSCANNER_BASELINE']);
+  await learning.createLearningProfile(BASE, new Date().toISOString());
+  let profile = await learning.readLearningProfile(BASE);
+  assert.strictEqual(profile.globalSampleCounts.seedSamples, 0);
+  assert.strictEqual(profile.globalSampleCounts.totalSamples, 0);
+  assert.strictEqual(profile.source, 'REAL_ONLY');
   await learning.updateLearningProfileRealSample(BASE, 'Engine RPM', 800, 'IDLE_WARM');
-  const learned = await learning.readLearningProfile(BASE);
-  const learnedRpm = learned.contextualData.find((item) => item.condition === 'IDLE_WARM').statistics['Engine RPM'];
-  assert.strictEqual(learned.globalSampleCounts.realSamples, 1);
-  assert.ok(learnedRpm.mean > 778 && learnedRpm.mean < 800);
-  assert.deepStrictEqual(learnedRpm.source, ['CARSCANNER_BASELINE', 'REAL_OBD']);
-  assert.ok(Array.isArray(learnedRpm.medianWindow), 'mediana deve manter janela limitada de amostras');
-  assert.strictEqual(learnedRpm.median, 789, 'mediana do seed + primeira amostra real deve ser calculada de forma determinística');
+  profile = await learning.readLearningProfile(BASE);
+  assert.strictEqual(profile.globalSampleCounts.realSamples, 1);
+  assert.strictEqual(profile.globalSampleCounts.seedSamples, 0);
+  assert.strictEqual(profile.overallStatistics['Engine RPM'].mean, 800);
+  assert.deepStrictEqual(profile.overallStatistics['Engine RPM'].source, ['REAL_OBD']);
 
-  const overallRpm = learned.overallStatistics['Engine RPM'];
-  assert.ok(overallRpm, 'estatística global do PID deve ser atualizada');
-  assert.strictEqual(overallRpm.realSamples, 1);
-  assert.strictEqual(overallRpm.seedSamples, 1);
-  assert.strictEqual(overallRpm.confidence, 'LOW', 'seed não pode aumentar confiança baseada em amostras reais');
+  // Simula um perfil legado contaminado e verifica a purga sem perder estatística real limpa.
+  const profilePath = `${BASE}/APRENDIZADO/dna_meriva.json`;
+  const legacy = JSON.parse(files.get(profilePath));
+  legacy.source = 'HYBRID';
+  legacy.seedVersion = 'CARSCANNER_2026-09-24';
+  legacy.seedImportDate = '2026-09-24T14:48:00.000Z';
+  legacy.seedWeight = 0.25;
+  legacy.globalSampleCounts.seedSamples = 10;
+  legacy.globalSampleCounts.totalSamples = legacy.globalSampleCounts.realSamples + 10;
+  legacy.overallStatistics['Legacy contaminated PID'] = {
+    mean: 778, median: 778, min: 778, max: 800, stddev: 10,
+    samples: 2, realSamples: 1, seedSamples: 1, confidence: 'LOW',
+    lastUpdate: new Date().toISOString(), source: ['CARSCANNER_BASELINE', 'REAL_OBD'],
+    medianWindow: [778, 800],
+  };
+  files.set(profilePath, JSON.stringify(legacy));
+  const purged = await learning.purgeCarScannerHistory(BASE);
+  assert.strictEqual(purged.globalSampleCounts.seedSamples, 0);
+  assert.strictEqual(purged.globalSampleCounts.totalSamples, purged.globalSampleCounts.realSamples);
+  assert.strictEqual(purged.source, 'REAL_ONLY');
+  assert.ok(!purged.overallStatistics['Legacy contaminated PID'], 'estatística misturada deve ser descartada');
+  assert.strictEqual(purged.overallStatistics['Engine RPM'].mean, 800, 'estatística real limpa deve ser preservada');
 
-  const lateSeedBase = BASE + '/late-seed';
-  await learning.createLearningProfile(lateSeedBase, '');
-  await learning.updateLearningProfileRealSample(lateSeedBase, 'Engine RPM', 1000, 'IDLE_COLD');
-  await learning.initializeCarScannerSeed(lateSeedBase);
-  const lateSeed = await learning.readLearningProfile(lateSeedBase);
-  assert.strictEqual(lateSeed.learningStatus, 'COLD_START', 'seed tardio não pode rebaixar um aprendizado real em andamento');
-  assert.strictEqual(lateSeed.overallStatistics['Engine RPM'].realSamples, 1, 'seed tardio não pode apagar estatística real global');
-  assert.strictEqual(lateSeed.overallStatistics['Engine RPM'].mean, 1000, 'estatística real global deve sobreviver ao seed tardio');
 }
 
 async function testBluetoothConnectionCallbacks() {
