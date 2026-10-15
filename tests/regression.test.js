@@ -1185,11 +1185,26 @@ function testPidResponseIsNotVehicleValidation() {
     { code: 'BROKEN', status: 'CURRENT', firstSeen: '', lastSeen: '', occurrences: 1, source: 'REAL_OBD', historical: false },
     null,
   ];
+  legacyState.obd = null;
+  legacyState.settings = null;
+  legacyState.autonomy = {
+    tankCapacityL: Infinity, fuelLevelPercent: 150, fuelRemainingL: -1,
+    readings: [null, { id: 'imported', timestamp: new Date().toISOString(), distanceKm: 5, fuelUsedL: 1, consumptionKml: 5, estimatedRangeKm: 280, source: 'IMPORTADO' }],
+  };
+  legacyState.driveCycles = [{ id: 'malformed-real', source: 'REAL_OBD', distanceTotalKm: Infinity }];
+  legacyState.pidDiscovery = { supportedPids: ['010C', 'BOGUS', '01 05'], protocol: 'KWP', discoveredAt: new Date().toISOString() };
   const hydrated = validation.hydrateState(legacyState);
   assert.deepStrictEqual(hydrated.lastReadings.map((reading) => reading.source), ['REAL', 'SIMULACAO'],
     'hidratação deve rejeitar origens desconhecidas e valores não finitos sem apagar dados reais/simulados válidos');
   assert.deepStrictEqual(hydrated.dtcs.map((dtc) => dtc.code), ['P0135'],
     'hidratação deve descartar DTC malformado sem remover registro real válido');
+  assert.deepStrictEqual(hydrated.obd, { connected: false }, 'snapshot com OBD nulo deve voltar a um estado desconectado seguro');
+  assert.deepStrictEqual(hydrated.settings, {}, 'configurações malformadas não devem quebrar a inicialização');
+  assert.strictEqual(hydrated.autonomy.tankCapacityL, 56, 'autonomia não pode aceitar capacidade não finita');
+  assert.strictEqual(hydrated.autonomy.fuelLevelPercent, null, 'nível fora da faixa 0–100 deve virar N/D');
+  assert.deepStrictEqual(hydrated.autonomy.readings, [], 'leituras de autonomia importadas não devem virar leituras reais');
+  assert.deepStrictEqual(hydrated.driveCycles, [], 'viagens malformadas não devem chegar à interface como viagens reais');
+  assert.deepStrictEqual(hydrated.pidDiscovery.supportedPids, ['010C', '0105'], 'cache de PIDs deve normalizar espaços e remover entradas inválidas');
 
   const partialLearningState = stateFactory.createEmptyMerivaState();
   partialLearningState.learning = {
@@ -1207,6 +1222,17 @@ function testPidResponseIsNotVehicleValidation() {
   assert.deepStrictEqual(partialLearningHydrated.learning.overallStatistics, {});
   assert.deepStrictEqual(partialLearningHydrated.learning.globalSampleCounts, { seedSamples: 0, realSamples: 0, totalSamples: 0 },
     'perfil parcial não deve lançar erro nem restaurar contagens seed');
+  const invalidThresholdState = stateFactory.createEmptyMerivaState();
+  invalidThresholdState.learning = {
+    vehicleId: 'MERIVA_MAXX', source: 'HYBRID',
+    globalSampleCounts: { seedSamples: 500, realSamples: 12, totalSamples: 512 },
+    confidenceThresholds: { low: 20, medium: 1, good: 1, high: 1 },
+    contextualData: [], overallStatistics: {},
+  };
+  const safeThresholdHydrated = validation.hydrateState(invalidThresholdState);
+  assert.strictEqual(safeThresholdHydrated.learning.learningStatus, 'COLD_START',
+    'limiares corrompidos não podem promover um perfil com 12 leituras para CONFIDENT');
+  assert.deepStrictEqual(safeThresholdHydrated.learning.confidenceThresholds, { low: 20, medium: 20, good: 20, high: 20 });
 
   const runtime = loadTs(path.join(ROOT, 'src/meriva/autosaveIntegration.ts'));
   const basePath = '/doc/learning-throttle-regression';
