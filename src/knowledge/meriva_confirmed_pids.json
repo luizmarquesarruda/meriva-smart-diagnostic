@@ -8,7 +8,7 @@
     "displacement_cm3": 1389,
     "cylinders": 4
   },
-  "purpose": "Separar PIDs confirmados pela ECU da Meriva de sementes e candidatos. Este arquivo não substitui o catálogo padrão OBD.",
+  "purpose": "Separar PIDs comprovados por resposta real da ECU de PIDs candidatos ainda não validados. Não contém baseline nem histórico importado.",
   "protocol_observed": {
     "protocol": "ISO 14230-4 KWP Fast Init",
     "baud": 10400,
@@ -37,10 +37,9 @@
       "unit": "celsius",
       "formulaId": "TEMP_C",
       "bytes": 1,
-      "evidence": "CARSCANNER_SEED",
-      "confidence": 0.85,
-      "observed_value": 81,
-      "source_note": "Valor observado no baseline CarScanner de 2026-09-24.",
+      "evidence": "NOT_VALIDATED",
+      "confidence": 0,
+      "source_note": "PID candidato; aguarda resposta RAW_ECU real e validação de fórmula e plausibilidade.",
       "status": "CANDIDATO"
     },
     {
@@ -49,10 +48,9 @@
       "unit": "percent",
       "formulaId": "FUEL_TRIM",
       "bytes": 1,
-      "evidence": "CARSCANNER_SEED",
-      "confidence": 0.85,
-      "observed_value": -8.59,
-      "source_note": "Valor observado no baseline CarScanner de 2026-09-24.",
+      "evidence": "NOT_VALIDATED",
+      "confidence": 0,
+      "source_note": "PID candidato; aguarda resposta RAW_ECU real e validação de fórmula e plausibilidade.",
       "status": "CANDIDATO"
     },
     {
@@ -61,10 +59,9 @@
       "unit": "percent",
       "formulaId": "FUEL_TRIM",
       "bytes": 1,
-      "evidence": "CARSCANNER_SEED",
-      "confidence": 0.85,
-      "observed_value": 10.94,
-      "source_note": "Valor observado no baseline CarScanner de 2026-09-24.",
+      "evidence": "NOT_VALIDATED",
+      "confidence": 0,
+      "source_note": "PID candidato; aguarda resposta RAW_ECU real e validação de fórmula e plausibilidade.",
       "status": "CANDIDATO"
     },
     {
@@ -73,12 +70,10 @@
       "unit": "kpa",
       "formulaId": "U8",
       "bytes": 1,
-      "evidence": "CARSCANNER_SEED",
-      "confidence": 0.85,
-      "observed_value": 39.02,
-      "source_note": "CarScanner exibiu 5.66 psi no baseline de 2026-09-24, equivalente a aproximadamente 39.02 kPa. O valor RAW da ECU ainda deve confirmar o PID.",
-      "status": "CANDIDATO",
-      "observed_unit": "kPa"
+      "evidence": "NOT_VALIDATED",
+      "confidence": 0,
+      "source_note": "PID candidato; aguarda resposta RAW_ECU real e validação de fórmula e plausibilidade.",
+      "status": "CANDIDATO"
     },
     {
       "pid": "010E",
@@ -86,10 +81,9 @@
       "unit": "degrees",
       "formulaId": "TIMING_DEG",
       "bytes": 1,
-      "evidence": "CARSCANNER_SEED",
-      "confidence": 0.85,
-      "observed_value": 8,
-      "source_note": "Valor observado no baseline CarScanner de 2026-09-24.",
+      "evidence": "NOT_VALIDATED",
+      "confidence": 0,
+      "source_note": "PID candidato; aguarda resposta RAW_ECU real e validação de fórmula e plausibilidade.",
       "status": "CANDIDATO"
     },
     {
@@ -98,10 +92,9 @@
       "unit": "celsius",
       "formulaId": "TEMP_C",
       "bytes": 1,
-      "evidence": "CARSCANNER_SEED",
-      "confidence": 0.85,
-      "observed_value": 33,
-      "source_note": "Valor observado no baseline CarScanner de 2026-09-24.",
+      "evidence": "NOT_VALIDATED",
+      "confidence": 0,
+      "source_note": "PID candidato; aguarda resposta RAW_ECU real e validação de fórmula e plausibilidade.",
       "status": "CANDIDATO"
     },
     {
@@ -110,12 +103,10 @@
       "unit": "grams_per_second",
       "formulaId": "MAF_GS",
       "bytes": 2,
-      "evidence": "CARSCANNER_SEED",
-      "confidence": 0.85,
-      "observed_value": 2.48,
-      "source_note": "CarScanner exibiu 8.93 kg/h no baseline de 2026-09-24, equivalente a aproximadamente 2.48 g/s. O valor RAW da ECU ainda deve confirmar o PID.",
-      "status": "CANDIDATO",
-      "observed_unit": "g/s"
+      "evidence": "NOT_VALIDATED",
+      "confidence": 0,
+      "source_note": "PID candidato; aguarda resposta RAW_ECU real e validação de fórmula e plausibilidade.",
+      "status": "CANDIDATO"
     },
     {
       "pid": "0111",
@@ -123,10 +114,9 @@
       "unit": "percent",
       "formulaId": "PERCENT_255",
       "bytes": 1,
-      "evidence": "CARSCANNER_SEED",
-      "confidence": 0.85,
-      "observed_value": 3.53,
-      "source_note": "Valor observado no baseline CarScanner de 2026-09-24.",
+      "evidence": "NOT_VALIDATED",
+      "confidence": 0,
+      "source_note": "PID candidato; aguarda resposta RAW_ECU real e validação de fórmula e plausibilidade.",
       "status": "CANDIDATO"
     },
     {
@@ -135,10 +125,9 @@
       "unit": "volts",
       "formulaId": "O2_VOLTS",
       "bytes": 2,
-      "evidence": "CARSCANNER_SEED",
-      "confidence": 0.85,
-      "observed_value": 0.53,
-      "source_note": "Valor observado no baseline CarScanner de 2026-09-24.",
+      "evidence": "NOT_VALIDATED",
+      "confidence": 0,
+      "source_note": "PID candidato; aguarda resposta RAW_ECU real e validação de fórmula e plausibilidade.",
       "status": "CANDIDATO"
     },
     {
@@ -155,7 +144,6 @@
   ],
   "rules": [
     "Somente resposta RAW_ECU válida pode colocar um PID em confirmed_pids.",
-    "CARSCANNER_SEED é referência de descoberta e comparação, não leitura atual da ECU.",
     "Resposta válida deve passar pelo parser, fórmula conhecida e plausibilidade.",
     "Referências de Corsa/Montana/GM semelhantes continuam como candidatos.",
     "Preservar resposta bruta, protocolo e tempo de resposta.",
