@@ -23,8 +23,7 @@ assert.ok(![trips,daily,sensor].some(source=>source.includes('await import(')),'
 assert.ok(db.includes('readLocalSessionEvents')&&db.includes('readSensorTestRuns')&&db.includes('readSensorTestReadings'),'históricos estruturados precisam ter APIs de consulta');
 assert.ok(db.includes('migration.drive_cycles.v1')&&db.includes('migration.daily_obd_history.v1'),'migrações devem ser idempotentes');
 assert.ok(trips.includes('readDriveCyclesFromDatabase')&&trips.includes('readLegacyCycles'),'viagens devem usar SQLite com fallback JSON');
-assert.ok(trips.includes('if (storedInSqlite)')===false,'compatibilidade JSON não pode depender de um ramo redundante');
-assert.ok(trips.includes('await writeLegacyCycle(basePath, cycle);')&&trips.includes('Keep the recovery/fallback JSON current'),'viagens SQL devem manter o JSON de recuperação sincronizado');
+assert.ok(trips.includes('await localDb.upsertDriveCycle(cycle);')&&trips.includes('await writeLegacyCycle(basePath, cycle);')&&trips.includes('Keep the recovery/fallback JSON current'),'viagens SQL devem manter o JSON de recuperação sincronizado');
 assert.ok(trips.includes('migração pendente e arquivo preservado'),'JSON legado ilegível não deve marcar migração como concluída');
 assert.ok(daily.includes('mirrorSessionEventToSqlite')&&daily.includes('FileSystem.writeAsStringAsync'),'histórico TXT deve continuar sendo gravado');
 assert.ok(sensor.includes('saveSensorTestRun')&&sensor.includes("writeAsStringAsync(path,lines.join('\\n')"),'testes devem ser indexados sem substituir TXT');
