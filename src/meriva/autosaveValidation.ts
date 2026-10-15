@@ -213,7 +213,7 @@ export function hydrateState(payload: MerivaPersistedState): MerivaPersistedStat
   const validDtcSources = new Set(['REAL_OBD', 'CARSCANNER_BASELINE', 'USER_REAL_OBSERVATION', 'SIMULACAO', 'IMPORTADO']);
   hydrated.dtcs = (Array.isArray(payload.dtcs) ? payload.dtcs : [])
     .filter((dtc) => {
-      if (!dtc || typeof dtc !== 'object') return false;
+      if (!dtc || typeof dtc !== 'object' || Array.isArray(dtc)) return false;
       const item = dtc as unknown as Record<string, unknown>;
       return (
         typeof item.code === 'string' && /^[PCBU][0-9A-F]{4}$/i.test(item.code) &&
@@ -221,6 +221,18 @@ export function hydrateState(payload: MerivaPersistedState): MerivaPersistedStat
         typeof item.source === 'string' && validDtcSources.has(item.source) &&
         (item.occurrences === undefined || (typeof item.occurrences === 'number' && Number.isFinite(item.occurrences) && item.occurrences >= 0))
       );
+    })
+    .map((dtc) => {
+      const item = dtc as unknown as Record<string, unknown>;
+      return {
+        ...dtc,
+        code: String(item.code).toUpperCase(),
+        firstSeen: timestampOrNow(item.firstSeen, new Date().toISOString()),
+        lastSeen: timestampOrNow(item.lastSeen, new Date().toISOString()),
+        occurrences: Math.max(1, Math.floor(finiteNonNegative(item.occurrences, 1))),
+        historical: item.historical === true || item.status === 'HISTORICAL' || item.status === 'INACTIVE',
+        ...(typeof item.confirmed === 'boolean' ? { confirmed: item.confirmed } : {}),
+      } as DtcRecord;
     });
 
   // Nunca reintroduzir viagens importadas ou aprendizado contaminado de snapshots antigos.
