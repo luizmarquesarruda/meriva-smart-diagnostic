@@ -17,6 +17,7 @@ assert.match(dataScreen, /Number\.isFinite\(item\.value\)/, 'leituras exibidas d
 assert.match(index, /ASSISTENTE DE ECONOMIA/, 'cockpit deve conter o assistente de economia');
 assert.doesNotMatch(index, />SAÚDE DO VEÍCULO<\/Text>/, 'painel grande de saúde não deve estar duplicado no cockpit');
 assert.match(read('src/obd/fuelCoach.ts'), /referenceMinimumTrips/, 'assistente deve exigir referência pessoal');
+assert.match(read('src/obd/fuelCoach.ts'), /referenceSpeedDifferenceRatio/, 'referência deve limitar diferenças de velocidade');
 const tripService = read('src/trip/autoTripService.ts');
 assert.match(tripService, /instantaneousConsumptionTimestampMs/, 'consumo deve preservar timestamp original da taxa');
 assert.match(tripService, /instantaneousSpeedKmh: tripVehicleSpeedKmh/, 'coach deve usar a velocidade que gerou o km/L');
