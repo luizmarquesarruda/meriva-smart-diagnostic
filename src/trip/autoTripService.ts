@@ -142,8 +142,19 @@ class AutoTripService {
     await this.stopCurrentLoop();
     await this.stopGpsForEcu();
     this.lastEstimatedFuelRate = null;
-    await this.finalizeRecorder();
-    this.state = { ...INITIAL_STATE };
+    let finalizationError: string | null = null;
+    try {
+      await this.finalizeRecorder();
+    } catch (cause) {
+      this.lastPendingTripRetryAt = Date.now();
+      finalizationError = cause instanceof Error ? cause.message : String(cause);
+    }
+    this.state = {
+      ...INITIAL_STATE,
+      error: finalizationError || this.pendingFinalizedTrips.length > 0
+        ? 'VIAGEM PENDENTE DE SALVAMENTO: ' + (finalizationError ?? 'aguardando a próxima conexão para nova tentativa')
+        : null,
+    };
     this.emit();
   }
 
@@ -220,18 +231,27 @@ class AutoTripService {
         // viagem com a última evidência válida, sem acumular GPS offline.
         await this.stopGpsForEcu();
         let finalizationError: string | null = null;
-        try {
-          await this.finalizeRecorder();
-          this.stoppedSinceMs = null;
-        } catch (cause) {
-          finalizationError = cause instanceof Error ? cause.message : String(cause);
+        const hasLiveRecorder = this.recorder !== null;
+        const pendingRetryDue = this.pendingFinalizedTrips.length > 0 &&
+          Date.now() - this.lastPendingTripRetryAt >= 10_000;
+        if (hasLiveRecorder || pendingRetryDue) {
+          try {
+            if (pendingRetryDue) this.lastPendingTripRetryAt = Date.now();
+            await this.finalizeRecorder();
+            this.stoppedSinceMs = null;
+          } catch (cause) {
+            this.lastPendingTripRetryAt = Date.now();
+            finalizationError = cause instanceof Error ? cause.message : String(cause);
+          }
         }
         this.setState({
           connected: true,
           active: false,
           error: finalizationError
             ? 'VIAGEM PENDENTE DE SALVAMENTO: ' + finalizationError
-            : 'ADAPTADOR OK / ECU SEM RESPOSTA',
+            : this.pendingFinalizedTrips.length > 0
+              ? 'VIAGEM PENDENTE DE SALVAMENTO: nova tentativa em até 10 s'
+              : 'ADAPTADOR OK / ECU SEM RESPOSTA',
         });
         await new Promise((resolve) => setTimeout(resolve, 1000));
         continue;
