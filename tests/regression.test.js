@@ -525,7 +525,7 @@ async function testIntelligentPidDiscovery() {
   assert.ok(result.supportedPids.includes('0105'), 'PID com resposta real válida deve continuar disponível');
 }
 
-async function testCarScannerBaselineAndFuel012F() {
+async function testRealOnlyLearningAndFuel012F() {
   resetFS();
   const parser = loadTs(path.join(ROOT, 'src/obd/parser.ts'));
   const fuel = loadTs(path.join(ROOT, 'src/trip/fuelLevel.ts'));
