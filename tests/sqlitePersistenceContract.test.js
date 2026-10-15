@@ -83,7 +83,6 @@ assert.match(storageScreen, /Amostras reais de PID/, 'contadores SQLite devem se
 assert.match(storageScreen, /Achados diagnósticos/, 'contagem de achados da Central de Saúde deve ser visível');
 assert.match(database, /SQLITE_SCHEMA_NEWER_THAN_APP/, 'app não deve abrir silenciosamente banco de esquema futuro');
 
-assert.deepEqual(parse('src/data/driveCycles.ts') && [], [], 'placeholder');
 assert.match(driveCycles, /INITIAL_DRIVE_CYCLES: DriveCycle\[\] = \[\]/, 'novas instalações não devem ter viagens importadas');
 assert.doesNotMatch(homeScreen, /initializeCarScannerSeed/, 'startup não deve reinstalar seeds CarScanner');
 assert.match(homeScreen, /purgeCarScannerHistory/, 'startup deve limpar perfil legado');
