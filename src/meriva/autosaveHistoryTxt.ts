@@ -18,6 +18,78 @@ function historyPath(basePath: string): string {
   return `${basePath}/CONFIG/${AUTOSAVE_HISTORY_FILE}`;
 }
 
+function isValidHistoryContent(content: string): boolean {
+  if (!content.startsWith(HISTORY_HEADER.trimEnd())) return false;
+  const begins = content.split(ENTRY_BEGIN).length - 1;
+  const ends = content.split(ENTRY_END).length - 1;
+  const entries = splitEntries(content);
+  return begins === ends && entries.length === begins;
+}
+
+async function recoverPendingAutoSaveHistoryWrite(path: string): Promise<void> {
+  const tempPath = path + '.tmp';
+  const backupPath = path + '.previous';
+  const tempInfo = await FileSystem.getInfoAsync(tempPath);
+  if (!tempInfo.exists || tempInfo.isDirectory) return;
+
+  const staged = await FileSystem.readAsStringAsync(tempPath, { encoding: FileSystem.EncodingType.UTF8 });
+  if (!isValidHistoryContent(staged)) return;
+
+  const primaryInfo = await FileSystem.getInfoAsync(path);
+  if (primaryInfo.exists && !primaryInfo.isDirectory) {
+    await FileSystem.copyAsync({ from: path, to: backupPath });
+  }
+  try {
+    await FileSystem.copyAsync({ from: tempPath, to: path });
+    const readBack = await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 });
+    if (readBack !== staged) throw new Error('AUTOSAVE_HISTORY_RECOVERY_VALIDATION_FAILED');
+    await FileSystem.deleteAsync(tempPath, { idempotent: true });
+  } catch (cause) {
+    const backupInfo = await FileSystem.getInfoAsync(backupPath).catch(() => ({ exists: false, isDirectory: false }));
+    if (backupInfo.exists && !backupInfo.isDirectory) {
+      try { await FileSystem.copyAsync({ from: backupPath, to: path }); } catch { /* backup remains recoverable */ }
+    }
+    throw cause;
+  }
+}
+
+async function writeAutoSaveHistorySafely(path: string, content: string): Promise<void> {
+  const tempPath = path + '.tmp';
+  const backupPath = path + '.previous';
+  await FileSystem.writeAsStringAsync(tempPath, content, { encoding: FileSystem.EncodingType.UTF8 });
+  const staged = await FileSystem.readAsStringAsync(tempPath, { encoding: FileSystem.EncodingType.UTF8 });
+  if (staged !== content || !isValidHistoryContent(staged)) {
+    throw new Error('AUTOSAVE_HISTORY_STAGING_VALIDATION_FAILED');
+  }
+
+  const targetInfo = await FileSystem.getInfoAsync(path);
+  if (targetInfo.exists && !targetInfo.isDirectory) {
+    await FileSystem.copyAsync({ from: path, to: backupPath });
+  }
+  let committed = false;
+  try {
+    await FileSystem.copyAsync({ from: tempPath, to: path });
+    const readBack = await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 });
+    if (readBack !== content || !isValidHistoryContent(readBack)) {
+      throw new Error('AUTOSAVE_HISTORY_COMMIT_VALIDATION_FAILED');
+    }
+    committed = true;
+  } catch (cause) {
+    const backupInfo = await FileSystem.getInfoAsync(backupPath).catch(() => ({ exists: false, isDirectory: false }));
+    if (backupInfo.exists && !backupInfo.isDirectory) {
+      try { await FileSystem.copyAsync({ from: backupPath, to: path }); } catch { /* backup remains recoverable */ }
+    }
+    throw cause;
+  } finally {
+    if (committed) {
+      try { await FileSystem.deleteAsync(tempPath, { idempotent: true }); } catch { /* cleaned on next write */ }
+    }
+  }
+  try { await FileSystem.copyAsync({ from: path, to: backupPath }); } catch {
+    // The primary history was verified; any earlier backup is still recoverable.
+  }
+}
+
 function splitEntries(content: string): string[] {
   return content
     .split(ENTRY_BEGIN)
@@ -73,14 +145,29 @@ function removeCarScannerTripsFromSnapshot(entry: string): string {
 
 async function readAutoSaveHistoryUnsafe(basePath: string): Promise<string> {
   const path = historyPath(basePath);
+  await recoverPendingAutoSaveHistoryWrite(path);
   const info = await FileSystem.getInfoAsync(path);
   if (!info.exists) return HISTORY_HEADER;
   if (info.isDirectory) {
     throw new Error('O caminho do histórico de autosave aponta para um diretório; arquivo existente preservado.');
   }
-  const content = await FileSystem.readAsStringAsync(path, {
-    encoding: FileSystem.EncodingType.UTF8,
-  });
+  let content: string;
+  try {
+    content = await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 });
+    if (!isValidHistoryContent(content)) throw new Error('AUTOSAVE_HISTORY_INVALID_CONTENT');
+  } catch (primaryCause) {
+    const backupPath = path + '.previous';
+    const backupInfo = await FileSystem.getInfoAsync(backupPath).catch(() => ({ exists: false, isDirectory: false }));
+    if (!backupInfo.exists || backupInfo.isDirectory) {
+      throw new Error('AUTOSAVE_HISTORY_UNREADABLE: histórico preservado. ' + (primaryCause instanceof Error ? primaryCause.message : String(primaryCause)));
+    }
+    const backup = await FileSystem.readAsStringAsync(backupPath, { encoding: FileSystem.EncodingType.UTF8 });
+    if (!isValidHistoryContent(backup)) {
+      throw new Error('AUTOSAVE_HISTORY_AND_BACKUP_INVALID: histórico original preservado.');
+    }
+    await FileSystem.copyAsync({ from: backupPath, to: path });
+    content = backup;
+  }
   const entries = deduplicateEntries(splitEntries(content))
     .slice(-AUTOSAVE_HISTORY_MAX_ENTRIES)
     .map(removeCarScannerTripsFromSnapshot);
@@ -94,9 +181,7 @@ export async function purgeLegacyCarScannerHistoryTxt(basePath: string): Promise
   if (!info.exists) return;
   if (info.isDirectory) throw new Error('O caminho do histórico TXT aponta para um diretório.');
   const sanitized = await readAutoSaveHistoryUnsafe(basePath);
-  await FileSystem.writeAsStringAsync(path, sanitized, {
-    encoding: FileSystem.EncodingType.UTF8,
-  });
+  await writeAutoSaveHistorySafely(path, sanitized);
 }
 
 export async function readAutoSaveHistory(basePath: string): Promise<string> {
@@ -136,9 +221,7 @@ async function appendAutoSaveHistoryUnsafe(
     ENTRY_END,
   ].join('\n');
   const kept = [...entries, entry].slice(-AUTOSAVE_HISTORY_MAX_ENTRIES);
-  await FileSystem.writeAsStringAsync(path, `${HISTORY_HEADER}${kept.join('\n\n')}\n`, {
-    encoding: FileSystem.EncodingType.UTF8,
-  });
+  await writeAutoSaveHistorySafely(path, `${HISTORY_HEADER}${kept.join('\n\n')}\n`);
   return { count: kept.length };
 }
 
