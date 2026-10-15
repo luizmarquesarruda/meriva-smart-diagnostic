@@ -2446,6 +2446,28 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Commit da correção de navegação: `f258796d2da04071173293e023c5697d3366de01`.
 - A alteração permanece numa branch de revisão; **CI e testes automatizados continuam sem execução**, conforme solicitado.
 
+## 2026-10-15 — Remoção do histórico CarScanner
+
+### Decisão
+O histórico operacional do aplicativo deve refletir dados próprios da Meriva, não viagens ou estatísticas importadas de outra ferramenta.
+
+### Alterações
+- `src/data/driveCycles.ts`: novas instalações começam sem viagens predefinidas.
+- `app/index.tsx`: startup não inicializa mais o seed; chama a purga do perfil legado.
+- `src/database/learningProfile.ts`: remove estatísticas seed/mistas, preservando somente estatísticas comprovadamente `REAL_OBD`; amostras reais limpas permanecem.
+- `src/meriva/autosaveValidation.ts`: sanitiza snapshots JSON antigos durante a recuperação, filtrando viagens não reais e aprendizado contaminado.
+- `src/meriva/autosaveHistoryTxt.ts` e `autosaveTxtFormatter.ts`: limpam linhas e blocos contaminados e exportam somente viagens reais.
+- `src/knowledge/meriva_confirmed_pids.json`: valores CarScanner são removidos dos candidatos; PIDs ficam não validados até resposta RAW_ECU.
+- `tests/regression.test.js` e `tests/sqlitePersistenceContract.test.js`: cobertura para purga e filtros de legado.
+
+### Proteção dos dados
+Estatísticas que misturavam seed e dados reais são descartadas, pois não há como reconstruir a média real com exatidão a partir de uma média já misturada. Leituras reais limpas e o autosave JSON como mecanismo de recuperação são preservados.
+
+### Validação
+A CI não foi disparada. A suíte de testes e o build Android ainda precisam ser executados antes de considerar a limpeza validada no dispositivo.
+
+---
+
 ## 2026-10-15 — Evolução de persistência SQLite
 
 ### Objetivo e arquitetura
