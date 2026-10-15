@@ -1,6 +1,6 @@
 import { Link, useFocusEffect } from 'expo-router';
 import BottomNavigation from '../src/ui/BottomNavigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMidLayout } from '../src/ui/midLayout';
@@ -18,6 +18,7 @@ import { createLearningProfile, purgeCarScannerHistory, readLearningProfile } fr
 import { readAppSettings, type AppSettings } from '../src/database/appSettings';
 import { connectPreferredElm, getSharedObdConnection, getSharedObdLastError, getSharedObdStatus, subscribeSharedObd, subscribeSharedObdStatus } from '../src/obd/sharedConnection';
 import { autoTripService, type AutoTripServiceState } from '../src/trip/autoTripService';
+import { buildFuelCoachReference, evaluateFuelCoach, getFuelRateSourceLabel, type FuelCoachSample } from '../src/obd/fuelCoach';
 
 export default function IndexScreen() {
   const [cycles, setCycles] = useState<DriveCycle[]>([]);
@@ -32,10 +33,51 @@ export default function IndexScreen() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [dtcCount, setDtcCount] = useState(0);
   const [activeHeroMetric, setActiveHeroMetric] = useState(0);
+  const [fuelCoachSamples, setFuelCoachSamples] = useState<FuelCoachSample[]>([]);
+  const lastFuelCoachSampleAt = useRef<number | null>(null);
   const layout = useMidLayout();
 
   useEffect(() => gpsTracker.subscribe(setGpsState), []);
   useEffect(() => autoTripService.subscribe(setTripState), []);
+
+  // Count a real fuel-rate timestamp once. Cached estimates do not become artificial samples.
+  // The short rolling window stays in memory and does not write every OBD poll to storage.
+  useEffect(() => {
+    if (!connectionStatus.ecuConnected) {
+      lastFuelCoachSampleAt.current = null;
+      setFuelCoachSamples([]);
+      return;
+    }
+    const timestampMs = tripState.instantaneousConsumptionTimestampMs;
+    const consumptionKmL = tripState.instantaneousConsumptionKml;
+    const source = tripState.instantaneousConsumptionSource;
+    if (
+      timestampMs == null || timestampMs === lastFuelCoachSampleAt.current ||
+      consumptionKmL == null || source == null ||
+      !Number.isFinite(consumptionKmL) || consumptionKmL <= 0
+    ) return;
+
+    lastFuelCoachSampleAt.current = timestampMs;
+    const sample: FuelCoachSample = {
+      timestampMs,
+      consumptionKmL,
+      speedKmh: tripState.instantaneousSpeedKmh ?? 0,
+      source,
+      fuelType: tripState.activeFuelType ?? settings?.fuelType ?? 'FLEX',
+    };
+    setFuelCoachSamples((current) => [
+      ...current.filter((item) => item.timestampMs >= timestampMs - 30_000),
+      sample,
+    ].slice(-40));
+  }, [
+    connectionStatus.ecuConnected,
+    tripState.instantaneousConsumptionTimestampMs,
+    tripState.instantaneousConsumptionKml,
+    tripState.instantaneousConsumptionSource,
+    tripState.instantaneousSpeedKmh,
+    tripState.activeFuelType,
+    settings?.fuelType,
+  ]);
   useEffect(() => {
     const unsubscribeConnection = subscribeSharedObd(() => setConnectionStatus(getSharedObdStatus()));
     const unsubscribeHealth = subscribeSharedObdStatus((status) => setConnectionStatus(status));
@@ -189,6 +231,44 @@ export default function IndexScreen() {
   );
 
   const summary = useMemo(() => getDriveCycleSummary(cycles), [cycles]);
+  const coachFuelType = tripState.activeFuelType ?? settings?.fuelType ?? 'FLEX';
+  const fuelCoachReference = useMemo(
+    () => buildFuelCoachReference(cycles, coachFuelType, tripState.instantaneousConsumptionSource),
+    [cycles, coachFuelType, tripState.instantaneousConsumptionSource],
+  );
+  const fuelCoach = useMemo(
+    () => evaluateFuelCoach({
+      ecuConnected: connectionStatus.ecuConnected,
+      currentKmL: tripState.instantaneousConsumptionKml,
+      currentTimestampMs: tripState.instantaneousConsumptionTimestampMs,
+      currentSpeedKmh: tripState.instantaneousSpeedKmh,
+      source: tripState.instantaneousConsumptionSource,
+      fuelType: coachFuelType,
+      samples: fuelCoachSamples,
+      reference: fuelCoachReference,
+    }),
+    [
+      connectionStatus.ecuConnected,
+      tripState.instantaneousConsumptionKml,
+      tripState.instantaneousConsumptionTimestampMs,
+      tripState.instantaneousSpeedKmh,
+      tripState.instantaneousConsumptionSource,
+      coachFuelType,
+      fuelCoachSamples,
+      fuelCoachReference,
+    ],
+  );
+  const coachUsesMedian = fuelCoach.status !== 'COLLECTING' && fuelCoach.rollingMedianKmL != null;
+  const coachDisplayedConsumption = coachUsesMedian
+    ? fuelCoach.rollingMedianKmL
+    : tripState.instantaneousConsumptionKml;
+  const coachDisplayedConsumptionLabel = coachUsesMedian
+    ? 'MEDIANA MÓVEL • 30 S'
+    : 'CONSUMO INSTANTÂNEO';
+  const coachBadgeLabel = fuelCoach.status === 'GOOD'
+    ? 'EFICIENTE'
+    : fuelCoach.status === 'ELEVATED' ? 'ELEVADO' : 'SEM CLASSIF.';
+
   const realConsumptionKml = summary.avgConsumptionKml > 0 ? summary.avgConsumptionKml : null;
   const availableConsumptionKml = tripState.instantaneousConsumptionKml
     ?? (tripState.consumptionKml != null && tripState.consumptionKml > 0
@@ -280,11 +360,65 @@ export default function IndexScreen() {
               </Text>
             </View>
           </View>
-          {!layout.landscape && (
-            <View style={styles.healthCard}>
-              <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>SAÚDE DO VEÍCULO</Text><Text style={styles.sectionHint}>{dtcCount > 0 ? 'Falhas requerem atenção' : 'Nenhuma falha ativa registrada'}</Text></View><Text style={dtcCount > 0 ? styles.danger : styles.ok}>{dtcCount > 0 ? (dtcCount + ' DTC') : 'NORMAL'}</Text></View>
-              <Link href="/saude" asChild><TouchableOpacity style={styles.outlineButton}><Text style={styles.outlineText}>ABRIR CENTRAL DE SAÚDE →</Text></TouchableOpacity></Link>
+          {!layout.landscape ? (
+            <View style={styles.coachCard} accessibilityLabel="Assistente de economia e dirigibilidade">
+              <View style={styles.coachHeader}>
+                <View style={styles.coachHeading}>
+                  <Text style={styles.coachTitle}>ASSISTENTE DE ECONOMIA</Text>
+                  <Text style={[
+                    styles.coachLabel,
+                    fuelCoach.status === 'GOOD' && styles.coachGoodText,
+                    fuelCoach.status === 'ELEVATED' && styles.coachElevatedText,
+                  ]}>{fuelCoach.label}</Text>
+                </View>
+                <View style={[
+                  styles.coachBadge,
+                  fuelCoach.status === 'GOOD' ? styles.coachBadgeGood
+                    : fuelCoach.status === 'ELEVATED' ? styles.coachBadgeElevated
+                      : styles.coachBadgeNeutral,
+                ]}>
+                  <Text style={styles.coachBadgeText}>{coachBadgeLabel}</Text>
+                </View>
+              </View>
+              <View style={styles.coachMetricRow}>
+                <View style={styles.coachMetricBlock}>
+                  <Text style={styles.coachMetricCaption}>{coachDisplayedConsumptionLabel}</Text>
+                  <Text style={styles.coachValue}>
+                    {coachDisplayedConsumption != null ? coachDisplayedConsumption.toFixed(1) + ' km/L' : 'N/D'}
+                  </Text>
+                </View>
+                <View style={styles.coachSourceBlock}>
+                  <Text style={styles.coachSource}>{getFuelRateSourceLabel(tripState.instantaneousConsumptionSource)}</Text>
+                  <Text style={styles.coachReference}>
+                    {fuelCoach.referenceKmL != null
+                      ? 'REF. ' + fuelCoach.referenceKmL.toFixed(1) + ' km/L'
+                        + (fuelCoach.differencePercent == null ? '' : ' • ' + (fuelCoach.differencePercent >= 0 ? '+' : '') + fuelCoach.differencePercent.toFixed(0) + '%')
+                      : fuelCoach.referenceProgressLabel}
+                  </Text>
+                </View>
+              </View>
+              <Text style={styles.coachAdvice}>{fuelCoach.advice}</Text>
+              <View style={styles.coachActions}>
+                <Link href="/viagens" asChild><TouchableOpacity accessibilityRole="button" style={styles.coachAction}><Text style={styles.coachActionText}>HISTÓRICO ↗</Text></TouchableOpacity></Link>
+                <Link href="/saude" asChild><TouchableOpacity accessibilityRole="button" style={styles.coachAction}><Text style={styles.coachActionText}>{dtcCount > 0 ? 'VER DTCs ↗' : 'SAÚDE ↗'}</Text></TouchableOpacity></Link>
+              </View>
             </View>
+          ) : (
+            <Link href="/viagens" asChild>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Abrir assistente de economia e histórico de viagens" style={styles.landscapeCoachCard}>
+                <View style={styles.landscapeCoachText}>
+                  <Text style={styles.coachTitle}>ECONOMIA</Text>
+                  <Text style={[
+                    styles.coachLabel,
+                    fuelCoach.status === 'GOOD' && styles.coachGoodText,
+                    fuelCoach.status === 'ELEVATED' && styles.coachElevatedText,
+                  ]}>{fuelCoach.label}</Text>
+                </View>
+                <Text style={styles.landscapeCoachValue}>
+                  {coachDisplayedConsumption != null ? coachDisplayedConsumption.toFixed(1) + ' km/L' : 'N/D'}
+                </Text>
+              </TouchableOpacity>
+            </Link>
           )}
           <Text style={styles.footerStatus}>{!isHydrated ? 'CARREGANDO...' : saveStatus.obdSessionActive ? 'DIÁRIO DE BORDO • GRAVANDO' : 'DIÁRIO DE BORDO • AGUARDANDO ECU'}</Text>
           <BottomNavigation active="painel" />
@@ -308,5 +442,31 @@ const styles = StyleSheet.create({
   connectionCard:{backgroundColor:'#0e1b2d',borderRadius:15,borderWidth:1,borderColor:'#28415f',padding:14,marginBottom:10},chain:{flexDirection:'row',alignItems:'center',marginTop:10},chainStep:{flex:1,alignItems:'center'},chainCircle:{width:30,height:30,borderRadius:15,alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:'#3b516b',backgroundColor:'#0a1727'},chainCircleOk:{borderColor:'#3b8c5a',backgroundColor:'#10261b'},chainCircleText:{color:'#7185a1',fontSize:11,fontWeight:'900'},chainCircleTextOk:{color:'#4ade80'},chainLabel:{color:'#9fb4cf',fontSize:8,fontWeight:'900',marginTop:4},chainArrow:{color:'#526a86',fontSize:24,paddingHorizontal:4},
   actionGrid:{flexDirection:'row',gap:7,marginBottom:8},actionGridLandscape:{flexDirection:'row'},actionButtonLandscape:{flex:1,minWidth:0},dashboardAction:{flex:1,minWidth:0,paddingVertical:15,paddingHorizontal:4},primaryButton:{backgroundColor:'#2563eb',borderRadius:13,padding:14,alignItems:'center'},buttonText:{color:'#fff',fontWeight:'900',fontSize:10,textAlign:'center'},buttonSubtext:{color:'#bfdbfe',fontWeight:'800',fontSize:8,marginTop:3},secondaryButton:{backgroundColor:'#0e1b2d',borderRadius:13,padding:13,alignItems:'center',borderWidth:1,borderColor:'#34506f'},secondaryButtonText:{color:'#dbeafe',fontWeight:'900',fontSize:10,textAlign:'center'},buttonSubtextDark:{color:'#7185a1',fontWeight:'800',fontSize:8,marginTop:3},
   statusGrid:{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',marginBottom:2},statusGridLandscape:{flexWrap:'nowrap',gap:8},statusCardLandscape:{width:'auto',flex:1},statusCard:{width:'48%',minWidth:0,backgroundColor:'#0e1b2d',borderRadius:12,borderWidth:1,borderColor:'#233a56',padding:11,marginBottom:8},moreButton:{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:'#0e1b2d',borderRadius:14,borderWidth:1,borderColor:'#28415f',padding:13,marginTop:2},moreIcon:{color:'#7db3ff',fontSize:24,fontWeight:'900'},moreBody:{flex:1,minWidth:0},moreTitle:{color:'#e5edf7',fontSize:11,fontWeight:'900'},moreHint:{color:'#7185a1',fontSize:8,marginTop:3,flexShrink:1},moreArrow:{color:'#7db3ff',fontSize:24},
-  error:{color:'#fb7185',fontWeight:'800',fontSize:10,marginTop:8},bottomNav:{flexDirection:'row',backgroundColor:'#0e1b2d',borderRadius:14,borderWidth:1,borderColor:'#28415f',marginTop:0,padding:3},bottomNavItem:{flex:1,alignItems:'center',paddingVertical:8,borderRadius:10},bottomNavActive:{backgroundColor:'#152a45'},bottomNavIcon:{fontSize:17,marginBottom:2},bottomNavActiveText:{color:'#7db3ff',fontSize:9,fontWeight:'900'},bottomNavText:{color:'#9fb4cf',fontSize:9,fontWeight:'900'},footerStatus:{color:'#60748f',textAlign:'center',fontSize:9,marginTop:9},
+  error:{color:'#fb7185',fontWeight:'800',fontSize:10,marginTop:8},coachCard:{backgroundColor:'#0e1b2d',borderRadius:15,borderWidth:1,borderColor:'#28415f',padding:10,marginBottom:8,gap:7},
+  coachHeader:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8},
+  coachHeading:{flex:1,minWidth:0},
+  coachTitle:{color:'#f1f5f9',fontWeight:'900',fontSize:11,letterSpacing:.5},
+  coachLabel:{color:'#9fb4cf',fontSize:9,fontWeight:'900',marginTop:3},
+  coachGoodText:{color:'#4ade80'},
+  coachElevatedText:{color:'#fbbf24'},
+  coachBadge:{borderRadius:8,paddingHorizontal:8,paddingVertical:5,borderWidth:1},
+  coachBadgeGood:{backgroundColor:'#10261b',borderColor:'#28613e'},
+  coachBadgeElevated:{backgroundColor:'#281c12',borderColor:'#8a5a24'},
+  coachBadgeNeutral:{backgroundColor:'#152a45',borderColor:'#315579'},
+  coachBadgeText:{color:'#dbeafe',fontSize:8,fontWeight:'900',letterSpacing:.3},
+  coachMetricRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8},
+  coachMetricBlock:{flex:1,minWidth:0},
+  coachMetricCaption:{color:'#7185a1',fontSize:7,fontWeight:'900',letterSpacing:.3},
+  coachValue:{color:'#f8fafc',fontSize:21,lineHeight:25,fontWeight:'900',fontVariant:['tabular-nums'],marginTop:2},
+  coachSourceBlock:{flex:1,minWidth:0,alignItems:'flex-end'},
+  coachSource:{color:'#9fb4cf',fontSize:7,fontWeight:'900',textAlign:'right'},
+  coachReference:{color:'#7db3ff',fontSize:7,fontWeight:'800',textAlign:'right',marginTop:3},
+  coachAdvice:{color:'#c2d0df',fontSize:8,lineHeight:12},
+  coachActions:{flexDirection:'row',justifyContent:'space-between',gap:8},
+  coachAction:{borderWidth:1,borderColor:'#315579',borderRadius:8,paddingHorizontal:9,paddingVertical:6,flex:1,alignItems:'center'},
+  coachActionText:{color:'#9fc5f7',fontSize:8,fontWeight:'900'},
+  landscapeCoachCard:{backgroundColor:'#0e1b2d',borderRadius:11,borderWidth:1,borderColor:'#28415f',paddingHorizontal:12,paddingVertical:7,marginBottom:4,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8},
+  landscapeCoachText:{flex:1,minWidth:0},
+  landscapeCoachValue:{color:'#f8fafc',fontSize:16,fontWeight:'900',fontVariant:['tabular-nums']},
+  bottomNav:{flexDirection:'row',backgroundColor:'#0e1b2d',borderRadius:14,borderWidth:1,borderColor:'#28415f',marginTop:0,padding:3},bottomNavItem:{flex:1,alignItems:'center',paddingVertical:8,borderRadius:10},bottomNavActive:{backgroundColor:'#152a45'},bottomNavIcon:{fontSize:17,marginBottom:2},bottomNavActiveText:{color:'#7db3ff',fontSize:9,fontWeight:'900'},bottomNavText:{color:'#9fb4cf',fontSize:9,fontWeight:'900'},footerStatus:{color:'#60748f',textAlign:'center',fontSize:9,marginTop:9},
 });
