@@ -7,7 +7,9 @@ import type { AutoSaveEnvelope } from './autosaveTypes';
 import type { MerivaPersistedState } from './autosaveState';
 import { createEmptyMerivaState } from './autosaveState';
 import type { ContextualStatistics, MerivaLearningProfile } from '../database/learningProfile';
-import type { SampleStatistics, VehicleCondition } from '../types/sourceTypes';
+import type { SampleStatistics, VehicleCondition, DtcRecord } from '../types/sourceTypes';
+import type { DriveCycle } from '../data/driveCycles';
+import type { VehicleProfile } from '../database/vehicleConfig';
 
 function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -19,8 +21,67 @@ function finiteNonNegative(value: unknown, fallback = 0): number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : fallback;
 }
 
+function normalizeTimestamp(value: unknown): string | null {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const normalized = value.trim().replace(
+    /^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?)/,
+    '$1T$2',
+  );
+  return Number.isFinite(Date.parse(normalized)) ? normalized : null;
+}
+
 function timestampOrNow(value: unknown, fallback: string): string {
-  return typeof value === 'string' && Number.isFinite(Date.parse(value)) ? value : fallback;
+  return normalizeTimestamp(value) ?? fallback;
+}
+
+function isValidHydratedTrip(value: unknown): value is DriveCycle {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const cycle = value as Record<string, unknown>;
+  const finiteNonNegativeField = (field: unknown) =>
+    typeof field === 'number' && Number.isFinite(field) && field >= 0;
+  return (
+    typeof cycle.id === 'string' && cycle.id.trim().length > 0 &&
+    normalizeTimestamp(cycle.startedAt) !== null &&
+    normalizeTimestamp(cycle.finishedAt) !== null &&
+    typeof cycle.totalTimeHms === 'string' &&
+    typeof cycle.drivingTimeHms === 'string' &&
+    typeof cycle.standingTimeHms === 'string' &&
+    finiteNonNegativeField(cycle.distanceTotalKm) &&
+    finiteNonNegativeField(cycle.distanceIceKm) &&
+    finiteNonNegativeField(cycle.fuelUsedL) &&
+    finiteNonNegativeField(cycle.avgDrivingSpeedKmh) &&
+    finiteNonNegativeField(cycle.avgFuelConsumptionKml) &&
+    ['REAL_OBD'].includes(String(cycle.source)) &&
+    normalizeTimestamp(cycle.importedAt) !== null &&
+    (cycle.fuelDataValid === undefined || typeof cycle.fuelDataValid === 'boolean') &&
+    (cycle.maxSpeedKmh === undefined || finiteNonNegativeField(cycle.maxSpeedKmh)) &&
+    (cycle.telemetrySamples === undefined || (
+      Array.isArray(cycle.telemetrySamples) && cycle.telemetrySamples.every((sample) => {
+        if (!sample || typeof sample !== 'object' || Array.isArray(sample)) return false;
+        const item = sample as Record<string, unknown>;
+        return normalizeTimestamp(item.timestamp) !== null &&
+          (item.speedKmh === null || finiteNonNegativeField(item.speedKmh)) &&
+          (item.rpm === null || finiteNonNegativeField(item.rpm)) &&
+          (item.coolantTempC === null || (typeof item.coolantTempC === 'number' && Number.isFinite(item.coolantTempC)));
+      })
+    ))
+  );
+}
+
+function normalizeVehicle(value: unknown): VehicleProfile | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const item = value as Record<string, unknown>;
+  if (
+    typeof item.vehicleName !== 'string' ||
+    typeof item.year !== 'number' || !Number.isFinite(item.year) ||
+    typeof item.make !== 'string' ||
+    typeof item.model !== 'string' ||
+    typeof item.engine !== 'string' ||
+    typeof item.createdAt !== 'string' ||
+    typeof item.lastModified !== 'string' ||
+    typeof item.protocolBaseline !== 'string'
+  ) return null;
+  return value as VehicleProfile;
 }
 
 const VALID_VEHICLE_CONDITIONS = new Set<VehicleCondition>([
@@ -58,8 +119,77 @@ export function hydrateState(payload: MerivaPersistedState): MerivaPersistedStat
   const hydrated = {
     ...defaults,
     ...payload,
-    metadata: { ...defaults.metadata, ...(payload.metadata ?? {}) },
+    metadata: {
+      savedAt: typeof payload.metadata?.savedAt === 'string' ? payload.metadata.savedAt : defaults.metadata.savedAt,
+      appVersion: typeof payload.metadata?.appVersion === 'string' ? payload.metadata.appVersion : defaults.metadata.appVersion,
+    },
   };
+
+  // Normalize nested fields too: valid outer JSON can still contain null or
+  // partial objects from older app versions or interrupted writes.
+  hydrated.vehicle = normalizeVehicle(payload.vehicle);
+  const rawObd = asRecord(payload.obd);
+  hydrated.obd = {
+    connected: rawObd.connected === true,
+    ...(typeof rawObd.adapterName === 'string' ? { adapterName: rawObd.adapterName } : {}),
+    ...(typeof rawObd.protocol === 'string' ? { protocol: rawObd.protocol } : {}),
+    ...(typeof rawObd.lastKnownProtocol === 'string' ? { lastKnownProtocol: rawObd.lastKnownProtocol } : {}),
+    ...(typeof rawObd.ecuAddress === 'string' ? { ecuAddress: rawObd.ecuAddress } : {}),
+    ...(typeof rawObd.ecuIdentification === 'string' ? { ecuIdentification: rawObd.ecuIdentification } : {}),
+    ...(typeof rawObd.ecuName === 'string' ? { ecuName: rawObd.ecuName } : {}),
+    ...(typeof rawObd.ecuValidatedAt === 'string' ? { ecuValidatedAt: rawObd.ecuValidatedAt } : {}),
+    ...(rawObd.ecuValidationSource === 'OBD_RESPONSE' || rawObd.ecuValidationSource === 'VEHICLE_PROFILE'
+      ? { ecuValidationSource: rawObd.ecuValidationSource } : {}),
+    ...(Array.isArray(rawObd.ecuValidationChecks)
+      ? { ecuValidationChecks: rawObd.ecuValidationChecks.filter((item): item is string => typeof item === 'string') }
+      : {}),
+    ...(typeof rawObd.lastConnectedAt === 'string' ? { lastConnectedAt: rawObd.lastConnectedAt } : {}),
+  };
+  const rawSettings = asRecord(payload.settings);
+  hydrated.settings = Object.fromEntries(
+    Object.entries(rawSettings).filter(([, value]) =>
+      typeof value === 'string' || typeof value === 'boolean' ||
+      (typeof value === 'number' && Number.isFinite(value))),
+  ) as Record<string, string | number | boolean>;
+
+  const rawAutonomy = asRecord(payload.autonomy);
+  const rawFuelLevel = rawAutonomy.fuelLevelPercent;
+  const rawFuelRemaining = rawAutonomy.fuelRemainingL;
+  hydrated.autonomy = {
+    tankCapacityL: finiteNonNegative(rawAutonomy.tankCapacityL, 56) || 56,
+    cumulativeDistanceKm: finiteNonNegative(rawAutonomy.cumulativeDistanceKm),
+    cumulativeFuelUsedL: finiteNonNegative(rawAutonomy.cumulativeFuelUsedL),
+    averageConsumptionKml: finiteNonNegative(rawAutonomy.averageConsumptionKml),
+    estimatedRangeKm: finiteNonNegative(rawAutonomy.estimatedRangeKm),
+    fuelLevelPercent: typeof rawFuelLevel === 'number' && Number.isFinite(rawFuelLevel) && rawFuelLevel >= 0 && rawFuelLevel <= 100
+      ? rawFuelLevel : null,
+    fuelRemainingL: typeof rawFuelRemaining === 'number' && Number.isFinite(rawFuelRemaining) && rawFuelRemaining >= 0
+      ? rawFuelRemaining : null,
+    fuelReserve: typeof rawAutonomy.fuelReserve === 'boolean' ? rawAutonomy.fuelReserve : null,
+    realReadingCount: Math.floor(finiteNonNegative(rawAutonomy.realReadingCount)),
+    lastReadingAt: normalizeTimestamp(rawAutonomy.lastReadingAt),
+    readings: (Array.isArray(rawAutonomy.readings) ? rawAutonomy.readings : [])
+      .filter((entry) => {
+        if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false;
+        const item = entry as Record<string, unknown>;
+        return typeof item.id === 'string' && normalizeTimestamp(item.timestamp) !== null &&
+          finiteNonNegative(item.distanceKm, -1) >= 0 &&
+          finiteNonNegative(item.fuelUsedL, -1) >= 0.05 &&
+          finiteNonNegative(item.consumptionKml, -1) > 0 &&
+          finiteNonNegative(item.estimatedRangeKm, -1) >= 0 &&
+          item.source === 'REAL_OBD';
+      })
+      .map((entry) => entry as MerivaPersistedState['autonomy']['readings'][number]),
+  };
+  const rawDiscovery = asRecord(payload.pidDiscovery);
+  const discoveredPids = Array.isArray(rawDiscovery.supportedPids)
+    ? rawDiscovery.supportedPids.map((pid) => typeof pid === 'string' ? pid.replace(/\s/g, '').toUpperCase() : '')
+        .filter((pid) => /^[0-9A-F]{4}$/.test(pid))
+    : [];
+  hydrated.pidDiscovery = typeof rawDiscovery.protocol === 'string' &&
+    normalizeTimestamp(rawDiscovery.discoveredAt) !== null
+      ? { supportedPids: Array.from(new Set(discoveredPids)), protocol: rawDiscovery.protocol, discoveredAt: normalizeTimestamp(rawDiscovery.discoveredAt)! }
+      : null;
 
   // Validate provenance at hydration time. Old/corrupt snapshots must not
   // promote imported readings to live evidence simply because they are present.
@@ -88,13 +218,14 @@ export function hydrateState(payload: MerivaPersistedState): MerivaPersistedStat
       return (
         typeof item.code === 'string' && /^[PCBU][0-9A-F]{4}$/i.test(item.code) &&
         typeof item.status === 'string' && validDtcStatuses.has(item.status.toUpperCase()) &&
-        typeof item.source === 'string' && validDtcSources.has(item.source)
+        typeof item.source === 'string' && validDtcSources.has(item.source) &&
+        (item.occurrences === undefined || (typeof item.occurrences === 'number' && Number.isFinite(item.occurrences) && item.occurrences >= 0))
       );
     });
 
   // Nunca reintroduzir viagens importadas ou aprendizado contaminado de snapshots antigos.
   hydrated.driveCycles = (Array.isArray(payload.driveCycles) ? payload.driveCycles : [])
-    .filter((cycle) => cycle && cycle.source === 'REAL_OBD');
+    .filter(isValidHydratedTrip);
   const rawLearning = payload.learning as unknown;
   if (rawLearning && typeof rawLearning === 'object' && !Array.isArray(rawLearning)) {
     const raw = asRecord(rawLearning);
