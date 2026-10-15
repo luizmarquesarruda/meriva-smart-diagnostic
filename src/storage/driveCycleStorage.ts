@@ -147,6 +147,13 @@ export async function addDriveCycle(basePath: string, cycle: DriveCycle): Promis
 
   if (!storedInSqlite && cycle.source !== 'CARSCANNER_SEED') {
     await writeLegacyCycle(basePath, cycle);
+    // Quando SQLite voltar a funcionar, a próxima tentativa reimporta também este ciclo de fallback.
+    try {
+      const localDb = await import('./localDatabase');
+      await localDb.setLocalMetadata('migration.drive_cycles.v1', 'pending');
+    } catch {
+      // SQLite está indisponível; o JSON legado contém a nova viagem e permanece preservado.
+    }
   }
 
   // CSV é mantido como log interno legado; relatórios exportados ao motorista são TXT.
