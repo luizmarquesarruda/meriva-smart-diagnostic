@@ -24,13 +24,13 @@ function trip(id, overrides = {}) {
     id,
     startedAt: '2026-10-01T10:00:00.000Z',
     finishedAt: '2026-10-01T10:30:00.000Z',
-    distanceTotalKm: 8,
-    distanceIceKm: 8,
-    fuelUsedL: 2,
+    distanceTotalKm: 10,
+    distanceIceKm: 10,
+    fuelUsedL: 2.5,
     totalTimeHms: '00:30:00',
     drivingTimeHms: '00:20:00',
     standingTimeHms: '00:10:00',
-    avgDrivingSpeedKmh: 24,
+    avgDrivingSpeedKmh: 30,
     avgFuelConsumptionKml: 4,
     fuelDataValid: true,
     fuelType: 'ETANOL',
@@ -56,7 +56,7 @@ const compatibleTrips = [trip('1'), trip('2'), trip('3')];
 const reference = buildFuelCoachReference(compatibleTrips, 'ETANOL', 'MEASURED_015E', 40);
 assert.strictEqual(reference.ready, true);
 assert.strictEqual(reference.sampleCount, 3);
-assert.strictEqual(reference.totalDistanceKm, 24);
+assert.strictEqual(reference.totalDistanceKm, 30);
 assert.strictEqual(reference.averageKmL, 4);
 
 const mixedTrips = [
