@@ -87,7 +87,7 @@ assert.match(testScreen, /persistSensorTestReport\(/, 'relatório da central de 
 assert.match(testScreen, /writeAsStringAsync\(path,lines\.join/, 'a exportação visível do teste continua em TXT');
 assert.match(testScreen, /TXT salvo\. O registro interno SQLite falhou/, 'falha no banco não deve apagar/invalidar o TXT');
 assert.match(healthScreen, /persistDiagnosticFindings\(/, 'Central de Saúde deve registrar achados com evidência real');
-assert.match(healthScreen, /reading\.source==='REAL'\?'REAL_OBD'/, 'Central de Saúde só deve promover a fonte explicitamente REAL');
+assert.match(healthScreen, /source:r\.source==='REAL'\?'REAL_OBD'/, 'Central de Saúde só deve promover a fonte explicitamente REAL');
 assert.match(healthScreen, /'IMPORTADO'/, 'origem desconhecida deve permanecer não operacional');
 assert.match(labScreen, /reading\.source === 'REAL' \? 'REAL_OBD'/, 'Laboratório deve preservar proveniência sem promover desconhecidos');
 assert.match(bluetoothReport, /reading\.source === 'REAL' \? 'REAL_OBD'/, 'relatório Bluetooth deve preservar proveniência sem promover desconhecidos');
