@@ -197,6 +197,7 @@ export default function ArmazenamentoScreen() {
                 <View style={styles.storageRow}><Text style={styles.storageLabel}>Eventos DTC registrados</Text><Text style={styles.storageValue}>{sqliteOverview.recordedDtcEvents}</Text></View>
                 <View style={styles.storageRow}><Text style={styles.storageLabel}>Testes de sensores</Text><Text style={styles.storageValue}>{sqliteOverview.recordedSensorTests}</Text></View>
                 <View style={styles.storageRow}><Text style={styles.storageLabel}>Viagens reais</Text><Text style={styles.storageValue}>{sqliteOverview.recordedRealTrips}</Text></View>
+                <View style={styles.storageRow}><Text style={styles.storageLabel}>Achados diagnósticos</Text><Text style={styles.storageValue}>{sqliteOverview.recordedDiagnosticFindings}</Text></View>
                 <View style={styles.storageRow}><Text style={styles.storageLabel}>PIDs aprendidos (reais)</Text><Text style={styles.storageValue}>{sqliteOverview.learnedPids}</Text></View>
               </>
             ) : <Text style={styles.note}>{sqliteError || 'Consultando o banco local…'}</Text>}
