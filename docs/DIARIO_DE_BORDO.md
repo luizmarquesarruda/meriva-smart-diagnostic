@@ -2557,3 +2557,22 @@ Ajustar este registro ao resultado da nova CI após a atualização do diário. 
 - A revisão de código e a adição de testes/contratos foram enviadas à branch `feat/sqlite-persistencia-20261015`; o `main` não foi alterado por esta rodada.
 - O workflow excluía esta branch de pushes, o que impedia validar o head alterado. A próxima alteração de workflow remove essa exceção e deve disparar a CI completa para este ramo.
 - **Estado desta entrada: validação integral pendente.** Ainda não há prova de que TypeScript, toda a suíte, Expo Doctor e build standalone Android passaram no commit final desta auditoria. Testes em veículo, ELM327 e ECU física permanecem separados e pendentes.
+
+
+## 2026-10-15 — Escrita recuperável no banco operacional de PIDs
+
+### Defeito confirmado
+- `recordPidConfirmation` e `recordDiscoveredPids` chamavam a escrita direta do TXT operacional. Diferentemente da purga legada, esse caminho não validava o conteúdo antes de substituir o arquivo nem preservava o banco atual para rollback.
+- Uma interrupção ou falha de I/O durante a substituição podia deixar `BANCO/pids_meriva_confirmados.txt` incompleto. Isso poderia remover confirmações reais já registradas.
+
+### Correção aplicada
+- O gravador normaliza e valida PID/origem antes da escrita.
+- A nova versão é preparada em `.tmp`, lida de volta e validada quanto à estrutura e proveniência `REAL_OBD`.
+- O arquivo anterior é preservado em `.previous` e conferido antes de tocar no alvo.
+- A versão nova só é aceita após leitura de confirmação; em falha, o gravador restaura e confere exatamente o conteúdo anterior. Falha também no rollback gera erro explícito e indica o caminho recuperável.
+- Adicionada regressão de I/O que força a cópia final a falhar e verifica preservação exata do arquivo anterior. O contrato de persistência também protege staging, backup e rollback.
+
+### Validação
+- A correção foi preparada na branch `feat/sqlite-persistencia-20261015`.
+- `npm run validate`, Expo Doctor e build Android ainda precisam confirmar o código no head final; teste físico OBD/ECU continua separado.
+- A CI automática será observada após o push final desta correção. Não declarar a rodada verde antes dos dois jobs `validate` e `android-build` terminarem com sucesso.
