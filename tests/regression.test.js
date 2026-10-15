@@ -874,6 +874,18 @@ async function testDriveCycleValidation() {
   assert.ok(!(await storage.readDriveCycles(BASE)).some((item) => item.id === 'forbidden-simulation'),
     'simulation trips must never enter the operational history');
 
+  // Recovery snapshot from JSON may contain a finalized trip absent from the
+  // index when Android interrupted finalization; reconcile it without duplicates.
+  resetFS();
+  await storage.initializeDriveCycles(BASE);
+  const recoveredTrip = { ...cycle, id: 'recovered-json-trip' };
+  const afterReconcile = await storage.reconcileDriveCycles(BASE, [recoveredTrip]);
+  assert.deepStrictEqual(afterReconcile.map((item) => item.id), ['recovered-json-trip']);
+  assert.deepStrictEqual((await storage.readDriveCycles(BASE)).map((item) => item.id), ['recovered-json-trip']);
+  await storage.reconcileDriveCycles(BASE, [recoveredTrip]);
+  assert.strictEqual((await storage.readDriveCycles(BASE)).filter((item) => item.id === 'recovered-json-trip').length, 1,
+    'reconciliation must be idempotent');
+
   // A corrupt primary with no backup must never be replaced by an empty index.
   resetFS();
   const corruptContent = JSON.stringify({ cycles: 'corrompido' });
