@@ -15,6 +15,8 @@ import type { SensorTestMode, SensorTestSample } from '../diagnostics/sensorTest
 export const MERIVA_DATABASE_NAME = 'meriva-smart-diagnostic.db';
 export const MERIVA_DATABASE_SCHEMA_VERSION = 2;
 const MIN_PID_SAMPLE_INTERVAL_MS = 2_000;
+const MAX_PID_SAMPLE_AGE_MS = 30_000;
+const MAX_PID_SAMPLE_FUTURE_SKEW_MS = 5_000;
 
 let databasePromise: Promise<SQLiteDatabase> | null = null;
 let activeSessionId: string | null = null;
@@ -22,6 +24,19 @@ let serializedWrites: Promise<void> = Promise.resolve();
 const lastPidSampleAt = new Map<string, number>();
 const lastPersistedDtcFingerprints = new Map<string, string>();
 const lastPersistedTripFingerprints = new Map<string, string>();
+
+/**
+ * Só aceita amostras de telemetria recém-recebidas. Evita gravar timestamps
+ * inválidos, futuros ou antigos como se fossem observações atuais da ECU.
+ */
+export function isPersistablePidTimestamp(timestamp: string, nowMs = Date.now()): boolean {
+  if (typeof timestamp !== 'string' || !timestamp.trim() || !Number.isFinite(nowMs)) return false;
+  const parsedTime = Date.parse(timestamp);
+  return Number.isFinite(parsedTime)
+    && parsedTime >= nowMs - MAX_PID_SAMPLE_AGE_MS
+    && parsedTime <= nowMs + MAX_PID_SAMPLE_FUTURE_SKEW_MS;
+}
+
 
 function makeId(prefix: string): string {
   return prefix + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
@@ -391,8 +406,10 @@ export async function recordRealPidReading(reading: LastPidReading): Promise<voi
 
   const pid = reading.pid.replace(/\s/g, '').toUpperCase();
   if (!pid) return;
-  const parsedTime = Date.parse(reading.timestamp);
-  const timestampMs = Number.isFinite(parsedTime) ? parsedTime : Date.now();
+  const timestampMs = Date.parse(reading.timestamp);
+  const nowMs = Date.now();
+  if (!isPersistablePidTimestamp(reading.timestamp, nowMs)) return;
+  const timestamp = new Date(timestampMs).toISOString();
   const previous = lastPidSampleAt.get(pid);
   if (previous !== undefined && (timestampMs < previous || timestampMs - previous < MIN_PID_SAMPLE_INTERVAL_MS)) return;
   lastPidSampleAt.set(pid, timestampMs);
@@ -410,7 +427,7 @@ export async function recordRealPidReading(reading: LastPidReading): Promise<voi
       reading.name,
       reading.value,
       reading.unit,
-      reading.timestamp,
+      timestamp,
     );
     await db.runAsync(
       `INSERT INTO learned_pids
@@ -426,8 +443,8 @@ export async function recordRealPidReading(reading: LastPidReading): Promise<voi
       pid,
       reading.name,
       reading.unit,
-      reading.timestamp,
-      reading.timestamp,
+      timestamp,
+      timestamp,
       reading.value,
       asJson({ source: 'REAL_OBD', lastStatus: reading.status }),
     );
