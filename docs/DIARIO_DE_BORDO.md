@@ -2555,7 +2555,7 @@ Ajustar este registro ao resultado da nova CI após a atualização do diário. 
 
 ### Status e próximo passo
 - A revisão de código e a adição de testes/contratos foram enviadas à branch `feat/sqlite-persistencia-20261015`; o `main` não foi alterado por esta rodada.
-- O workflow excluía esta branch de pushes, o que impedia validar o head alterado. A próxima alteração de workflow remove essa exceção e deve disparar a CI completa para este ramo.
+- O workflow observado no head atual inclui gatilho de push para todas as branches (`push: branches: ['**']`). Os commits intermediários da correção foram marcados para não disparar CI; o registro final abaixo dispara a validação do head consolidado. A execução precisa ser acompanhada até `validate` e `android-build` concluírem.
 - **Estado desta entrada: validação integral pendente.** Ainda não há prova de que TypeScript, toda a suíte, Expo Doctor e build standalone Android passaram no commit final desta auditoria. Testes em veículo, ELM327 e ECU física permanecem separados e pendentes.
 
 
@@ -2576,3 +2576,11 @@ Ajustar este registro ao resultado da nova CI após a atualização do diário. 
 - A correção foi preparada na branch `feat/sqlite-persistencia-20261015`.
 - `npm run validate`, Expo Doctor e build Android ainda precisam confirmar o código no head final; teste físico OBD/ECU continua separado.
 - A CI automática será observada após o push final desta correção. Não declarar a rodada verde antes dos dois jobs `validate` e `android-build` terminarem com sucesso.
+
+
+### Revisão final do patch do banco de PIDs — 15/10/2026
+
+- Na revisão do diff antes da CI, foram corrigidos escapes de whitespace e separadores de linha no novo gravador e no fixture da regressão; o código final usa regex de whitespace real e TXT delimitado por novas linhas.
+- A regressão `testPidBankWriteRollback` simula falha na cópia para o arquivo operacional e exige restauração byte a byte do conteúdo anterior, preservação do `.previous` e remoção do temporário.
+- O contrato SQLite também verifica a presença das barreiras de staging, backup e rollback; isso complementa, mas não substitui, o teste real com Expo SQLite/Android.
+- **Estado atual: CI pendente no head consolidado.** Não há evidência suficiente para declarar a alteração validada até `npm run validate`, Expo Doctor e build Android terminarem na execução disparada por este registro. O teste físico com ELM327/ECU continua pendente.
