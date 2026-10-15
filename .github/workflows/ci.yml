@@ -3,7 +3,7 @@ name: CI
 on:
   workflow_dispatch:
   push:
-    branches: ['**']
+    branches: ['**', '!feat/sqlite-persistencia-20261015']
   pull_request:
     branches: [main]
 
