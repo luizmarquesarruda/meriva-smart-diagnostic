@@ -96,7 +96,7 @@ async function readPidConfirmationsUnlocked(basePath: string): Promise<PidConfir
 async function writeCompactFile(target: string, entries: PidConfirmationEntry[]): Promise<void> {
   const normalized = entries.map((entry) => ({
     ...entry,
-    pid: entry.pid.replace(/\\s/g, '').toUpperCase(),
+    pid: entry.pid.replace(/\s/g, '').toUpperCase(),
   }));
   if (normalized.some((entry) => entry.source !== 'REAL_OBD')) {
     throw new Error('NON_REAL_PID_NOT_ALLOWED_IN_OPERATIONAL_BANK');
@@ -108,8 +108,8 @@ async function writeCompactFile(target: string, entries: PidConfirmationEntry[])
   const compact = normalized
     .sort((a, b) => a.pid.localeCompare(b.pid))
     .map(compactLine)
-    .join('\\n');
-  const output = compact ? compact + '\\n' : '';
+    .join('\n');
+  const output = compact ? compact + '\n' : '';
   const tempPath = target + '.tmp';
   const backupPath = target + '.previous';
   const targetInfo = await FileSystem.getInfoAsync(target);
@@ -125,7 +125,7 @@ async function writeCompactFile(target: string, entries: PidConfirmationEntry[])
     const staged = await FileSystem.readAsStringAsync(tempPath, {
       encoding: FileSystem.EncodingType.UTF8,
     });
-    const stagedEntries = staged.split(/\\r?\\n/).filter((line) => line.trim()).map(parsePidConfirmationLine);
+    const stagedEntries = staged.split(/\r?\n/).filter((line) => line.trim()).map(parsePidConfirmationLine);
     if (
       staged !== output ||
       stagedEntries.length !== normalized.length ||
@@ -153,7 +153,7 @@ async function writeCompactFile(target: string, entries: PidConfirmationEntry[])
       const readBack = await FileSystem.readAsStringAsync(target, {
         encoding: FileSystem.EncodingType.UTF8,
       });
-      const committedEntries = readBack.split(/\\r?\\n/).filter((line) => line.trim()).map(parsePidConfirmationLine);
+      const committedEntries = readBack.split(/\r?\n/).filter((line) => line.trim()).map(parsePidConfirmationLine);
       if (
         readBack !== output ||
         committedEntries.length !== normalized.length ||
