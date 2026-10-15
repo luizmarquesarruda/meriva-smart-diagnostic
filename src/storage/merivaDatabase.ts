@@ -33,6 +33,16 @@ function asJson(value: unknown): string {
   }
 }
 
+function stableHash(value: string): string {
+  // Identificador determinístico local; não é usado para autenticação/segurança.
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
 function serializeWrite<T>(operation: () => Promise<T>): Promise<T> {
   const result = serializedWrites.then(operation, operation);
   serializedWrites = result.then(() => undefined, () => undefined);
@@ -330,6 +340,8 @@ export async function recordRealPidReading(reading: LastPidReading): Promise<voi
   lastPidSampleAt.set(pid, timestampMs);
 
   await serializeWrite(async () => {
+    // A sessão pode ter sido encerrada enquanto a escrita aguardava a fila.
+    if (activeSessionId !== sessionId) return;
     const db = await openDatabase();
     await db.runAsync(
       `INSERT INTO pid_readings
@@ -495,6 +507,65 @@ export async function persistSensorTestReport(report: SensorTestReportInput): Pr
           Math.max(0, Math.round(sample.elapsedMs || 0)),
           sample.timestamp,
           Math.max(0, Math.round(sample.readingNumber || 0)),
+        );
+      }
+    });
+  });
+}
+
+export interface PersistableDiagnosticFinding {
+  id: string;
+  label: string;
+  score: number;
+  confidence: string;
+  evidence: unknown[];
+  nextTests: string[];
+}
+
+export async function persistDiagnosticFindings(
+  findings: PersistableDiagnosticFinding[],
+  sessionId: string | null = activeSessionId,
+): Promise<void> {
+  const valid = findings.filter((finding) =>
+    Boolean(finding.id)
+    && Boolean(finding.label)
+    && Array.isArray(finding.evidence)
+    && finding.evidence.length > 0
+    && Number.isFinite(finding.score),
+  );
+  if (!valid.length) return;
+
+  await serializeWrite(async () => {
+    const db = await openDatabase();
+    await db.withTransactionAsync(async () => {
+      for (const finding of valid) {
+        const evidenceJson = asJson({
+          score: finding.score,
+          confidence: finding.confidence,
+          evidence: finding.evidence,
+          nextTests: finding.nextTests,
+          source: 'REAL_OBD',
+        });
+        const id = 'finding_' + stableHash(asJson({
+          sessionId,
+          rule: finding.id,
+          evidenceJson,
+        }));
+        await db.runAsync(
+          `INSERT INTO diagnostic_findings
+            (id, session_id, code, severity, summary, evidence_json, created_at, source)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 'REAL_OBD')
+           ON CONFLICT(id) DO UPDATE SET
+             severity = excluded.severity,
+             summary = excluded.summary,
+             evidence_json = excluded.evidence_json`,
+          id,
+          sessionId,
+          finding.id,
+          finding.confidence,
+          finding.label,
+          evidenceJson,
+          new Date().toISOString(),
         );
       }
     });
