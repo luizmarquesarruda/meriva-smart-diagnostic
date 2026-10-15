@@ -239,6 +239,9 @@ export async function addDriveCycle(basePath: string, cycle: DriveCycle): Promis
   const viagensDir = `${basePath}/VIAGENS`;
   const indexFile = `${viagensDir}/index.json`;
 
+  if (cycle?.source === 'CARSCANNER_SEED') {
+    throw new Error('CARSCANNER_SEED_NOT_ALLOWED_IN_OPERATIONAL_TRIP_HISTORY');
+  }
   if (!isDriveCycle(cycle)) {
     throw new Error('DRIVE_CYCLE_INVALID: ciclo de viagem não atende ao contrato de persistência.');
   }
