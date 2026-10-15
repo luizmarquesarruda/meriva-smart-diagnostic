@@ -2525,3 +2525,35 @@ Portanto, a falha observada é uma regressão do próprio teste estático por ap
 
 ### Próxima etapa
 Ajustar este registro ao resultado da nova CI após a atualização do diário. A correção só estará validada quando a nova execução concluir `validate` e o `android-build` sem falhas. Não tratar o resultado anterior como CI verde.
+
+## 2026-10-15 — Mega auditoria de integridade, recuperação e proveniência
+
+### Estado de partida e evidência
+- A tentativa anterior da CI #2154 (run `38680512586`, tentativa 2) testou o commit `bef78989c1eb0c5e39572f3f3cec9654681808b3`, não os ajustes mais recentes. Nesse commit, `npm ci`, Expo Doctor (17/17) e `tsc --noEmit` passaram; a suíte falhou num contrato antigo de histórico/CarScanner em `tests/regression.test.js`, e `android-build` ficou ignorado porque `validate` falhou.
+- Não considerar aquela execução como validação das correções desta auditoria. O teste de viagens atual verifica `app/viagens.tsx` e a exportação TXT, mas a CI completa precisa ser executada no novo head.
+
+### Defeitos confirmados e correções aplicadas
+1. **Proveniência diagnóstica promovida indevidamente** — Central de Saúde, Laboratório e exportação Bluetooth tratavam qualquer origem diferente de SIMULACAO como REAL_OBD. Corrigido: só `source === 'REAL'` pode ser convertido para `REAL_OBD`; origem desconhecida/importada permanece não operacional. O motor de hipóteses exige valor finito, status RESPONDEU quando disponível e leitura do PID com no máximo 30 s de idade; DTCs malformados são ignorados.
+2. **Histórico de viagens podia perder dados ou aceitar simulação** — o índice podia ser reconstruído como vazio depois de erro de leitura, e as gravações concorrentes não eram serializadas. Corrigido: fila por índice, staging, leitura de confirmação, cópia recuperável, ID idempotente e erro explícito quando o arquivo está ilegível sem backup. O armazenamento e a reconciliação operacional aceitam apenas viagens REAL_OBD; sementes e simulações não entram.
+3. **Janela de perda ao finalizar viagem** — a viagem podia ficar somente em memória se o processo fosse interrompido ou a gravação falhasse. Corrigido: a viagem finalizada, com ID/timestamps estáveis, é journaled no autosave JSON antes de atualizar o índice e é reconciliada na inicialização. Falhas mantêm a viagem pendente; as novas tentativas desconectadas são limitadas por intervalo e o serviço informa que existe salvamento pendente.
+4. **CSV de viagem no dia errado** — o arquivo diário era escolhido pela data da gravação, não pela data local de início da viagem. Corrigido: caminho derivado da data inicial da viagem, com detecção de ID para evitar repetição durante retries.
+5. **Resumo de velocidade podia inflar** — uma viagem com distância positiva e zero tempo em movimento podia aumentar a velocidade agregada. Corrigido: o numerador e denominador da média de velocidade usam apenas viagens que têm tempo de deslocamento positivo; a distância total histórica continua preservada.
+6. **DTC legado podia contaminar o histórico** — a leitura filtrava fonte não real, mas a camada de gravação ainda aceitava DTC importado/malformado. Corrigido: limite de escrita rejeita fonte diferente de REAL_OBD, código inválido, status inválido e contagem de ocorrências não finita; a purga antiga usa arquivo temporário, validação e cópia de recuperação, preservando DTCs reais válidos.
+7. **JSON parcial podia quebrar o app ou inflar confiança do aprendizado** — hidratação agora valida subobjetos de OBD, veículo, autonomia, descoberta de PIDs, DTCs, viagens e estatísticas de aprendizado. Estatísticas mistas/desconhecidas não são tratadas como puramente reais; o contador global real não é estimado somando amostras de PIDs diferentes. O perfil independente `dna_meriva.json` também é validado e escrito com staging/read-back; conteúdo inválido é preservado em `.invalid` antes da criação de um perfil frio seguro.
+8. **Sessão SQLite podia ficar atribuída ao ID anterior** — abertura/fechamento agora remove o identificador em memória antes do I/O aguardado; a abertura é transacional e fecha sessões órfãs antes de inserir a nova. O fechamento preserva os metadados existentes e acrescenta apenas o contexto de fechamento.
+9. **Falha de escrita TXT ou encerramento do processo** — histórico diário e histórico de autosave usam temporário validado, cópia anterior e leitura de confirmação; arquivos existentes ilegíveis ou de formato desconhecido não viram histórico vazio. O temporário válido pode ser recuperado na próxima tentativa.
+10. **Hora de fim incorreta em teste de sensores** — `finishedAt` era calculado na hora do salvamento/exportação; agora registra o término real da varredura.
+11. **Contratos adicionados** — regressões cobrem concorrência/recuperação do índice, reconciliação JSON/índice, recusa de viagens simuladas, DTC importado, leitura antiga/NaN, hidratação parcial do perfil de aprendizado, tempo de conclusão dos testes e fontes diagnósticas.
+
+### Commits representativos desta rodada
+- `e218d87210f607e3dfc15f2df15cd05f957868a5` — histórico operacional só aceita viagens reais.
+- `91c92163fde1e3da136ed081b1b9c4fe098ef589` — frescor e validade da evidência PID.
+- `c66f34781b81d7d504338bdd71f8aa3b49750a7b` — validação de fonte na gravação DTC.
+- `cdb8762b895314ac151124f906cc8673652c6f75` e `f538d5fbd09973c0aceffc3b53a9916c257c0750` — perfil de aprendizado validado e escrita recuperável.
+- `0348276a85c73fc5e6603eec152b71dd0325a4e6` — reconciliação no startup sem bloquear a hidratação principal.
+- `4076d69600d804d8a09d36791153d9ec083c0fef` — retries da finalização de viagem limitados e estado pendente visível.
+
+### Status e próximo passo
+- A revisão de código e a adição de testes/contratos foram enviadas à branch `feat/sqlite-persistencia-20261015`; o `main` não foi alterado por esta rodada.
+- O workflow excluía esta branch de pushes, o que impedia validar o head alterado. A próxima alteração de workflow remove essa exceção e deve disparar a CI completa para este ramo.
+- **Estado desta entrada: validação integral pendente.** Ainda não há prova de que TypeScript, toda a suíte, Expo Doctor e build standalone Android passaram no commit final desta auditoria. Testes em veículo, ELM327 e ECU física permanecem separados e pendentes.
