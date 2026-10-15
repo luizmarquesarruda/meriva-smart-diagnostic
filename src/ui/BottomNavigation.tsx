@@ -31,10 +31,12 @@ export default function BottomNavigation({ active = null }: Props) {
 }
 
 const styles = StyleSheet.create({
-  bar: { flexDirection: 'row', width: '100%', backgroundColor: '#0e1b2d', borderRadius: 14, borderWidth: 1, borderColor: '#28415f', padding: 3, marginTop: 8 },
-  item: { flex: 1, minWidth: 0, minHeight: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2, paddingVertical: 6, borderRadius: 10, gap: 3 },
-  selected: { backgroundColor: '#152a45' },
-  icon: { color: '#9fb4cf', fontSize: 16, fontWeight: '900' },
-  label: { color: '#9fb4cf', fontSize: 8, fontWeight: '900', letterSpacing: 0.2 },
+  // Cada destino agora é um botão separado; o espaço entre eles reduz a sensação de
+  // barra apertada e facilita acertar o alvo de toque sem alterar as rotas.
+  bar: { flexDirection: 'row', alignItems: 'stretch', justifyContent: 'space-between', gap: 8, width: '100%', marginTop: 12 },
+  item: { flex: 1, minWidth: 0, minHeight: 78, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, paddingVertical: 10, borderRadius: 14, borderWidth: 1, borderColor: '#28415f', backgroundColor: '#0e1b2d', gap: 6 },
+  selected: { backgroundColor: '#152a45', borderColor: '#3b82f6' },
+  icon: { color: '#9fb4cf', fontSize: 24, lineHeight: 27, fontWeight: '900' },
+  label: { color: '#9fb4cf', fontSize: 10, lineHeight: 12, fontWeight: '900', letterSpacing: 0.15, textAlign: 'center' },
   selectedText: { color: '#7db3ff' },
 });

@@ -2446,3 +2446,16 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Commit da correção de navegação: `f258796d2da04071173293e023c5697d3366de01`.
 - A alteração permanece numa branch de revisão; **CI e testes automatizados continuam sem execução**, conforme solicitado.
 
+
+
+## 2026-10-15 — Aumento e redistribuição dos botões inferiores
+
+### Alterações
+- Atualizado `src/ui/BottomNavigation.tsx`: cada um dos quatro destinos principais agora tem superfície própria, borda individual e espaçamento de 8 dp em vez de parecer parte de uma única barra compacta.
+- Aumentada a altura mínima dos alvos de toque de 48 para 78 dp; ícones ampliados de 16 para 24 e rótulos de 8 para 10, mantendo os quatro destinos com largura equivalente.
+- O estado selecionado recebe realce azul também na borda; rotas, rótulos de acessibilidade e comportamento de navegação foram preservados.
+- Atualizado `tests/cockpitNavigation.test.js` para proteger os tamanhos e o espaçamento da navegação inferior.
+
+### Validação
+- Alteração estática e cobertura de contrato foram preparadas; a suíte de testes, TypeScript, Expo Doctor e build Android **não foram executados nesta etapa**.
+- A CI permanece sem disparo. O visual precisa ser conferido no dispositivo em retrato e paisagem, especialmente em telas estreitas, antes de considerar a mudança visualmente validada.
