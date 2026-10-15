@@ -124,26 +124,65 @@ function deduplicateEntries(entries: string[]): string[] {
 
 /** Remove imported seed trips from old snapshots before displaying/exporting them. */
 function removeCarScannerTripsFromSnapshot(entry: string): string {
+  const lines = entry.split(/\r?\n/);
   const hadImportedLearning = /CARSCANNER|seed_cycle_|seedSamples|seedVersion|seedWeight|fonte=HYBRID/i.test(entry);
-  // Remove proveniência e amostras seed em snapshots antigos.
-  let cleaned = entry
-    .split(/\r?\n/)
-    .filter((line) => !/CARSCANNER|seed_cycle_|seedSamples|seedVersion|seedWeight|fonte=HYBRID/i.test(line))
-    .join('\n');
 
+  // First remove rows whose provenance is unambiguously imported/seed. Keep
+  // the envelope markers and section headers as structural boundaries.
+  let cleanedLines = lines.filter((line) =>
+    !/CARSCANNER|seed_cycle_|seedSamples|seedVersion|seedWeight|fonte=HYBRID/i.test(line),
+  );
+
+  const replaceSection = (
+    input: string[],
+    sectionName: string,
+    replacementLines: string[],
+  ): string[] => {
+    const sectionHeader = '[' + sectionName + ']';
+    const sectionStart = input.findIndex((line) => line.trim() === sectionHeader);
+    if (sectionStart < 0) return input;
+    let sectionEnd = sectionStart + 1;
+    while (sectionEnd < input.length) {
+      const line = input[sectionEnd].trim();
+      if (/^\[[^\]\r\n]+\]$/.test(line) || line === ENTRY_END || line === ENTRY_BEGIN) break;
+      sectionEnd += 1;
+    }
+    return [
+      ...input.slice(0, sectionStart),
+      sectionHeader,
+      ...replacementLines,
+      ...input.slice(sectionEnd),
+    ];
+  };
+
+  // An old mean may have combined seed + real values and cannot be repaired
+  // exactly. Replace only the learning section body, never its entry footer.
   if (hadImportedLearning) {
-    // Médias antigas podem misturar seed + leituras reais e não são separáveis
-    // com segurança. Remover o bloco inteiro evita apresentar números contaminados.
-    cleaned = cleaned.replace(
-      /\[LEARNING\]\r?\n[\s\S]*?(?=\r?\n\[[^\]\r\n]+\]|$)/,
-      '[LEARNING]\nHistórico legado removido: estatísticas importadas não são evidência real.',
-    );
+    cleanedLines = replaceSection(cleanedLines, 'LEARNING', [
+      'Histórico legado removido: estatísticas importadas não são evidência real.',
+    ]);
   }
 
-  const match = cleaned.match(/(\[HISTORY\]\r?\n)([\s\S]*?)(?=\r?\n\[[^\]\r\n]+\]|$)/);
-  if (!match) return cleaned;
-  const rows = match[2].split(/\r?\n/).filter((line) => line.trim() && !/seed|CARSCANNER/i.test(line));
-  return cleaned.replace(match[0], match[1] + (rows.length ? rows.join('\n') : 'N/D'));
+  // Always render an explicit empty state if no valid trip rows remain. The
+  // next section and SALVAMENTO_END are structural boundaries, not trip rows.
+  const historyStart = cleanedLines.findIndex((line) => line.trim() === '[HISTORY]');
+  if (historyStart >= 0) {
+    let historyEnd = historyStart + 1;
+    while (historyEnd < cleanedLines.length) {
+      const line = cleanedLines[historyEnd].trim();
+      if (/^\[[^\]\r\n]+\]$/.test(line) || line === ENTRY_END || line === ENTRY_BEGIN) break;
+      historyEnd += 1;
+    }
+    const rows = cleanedLines.slice(historyStart + 1, historyEnd)
+      .filter((line) => line.trim() && !/seed|CARSCANNER/i.test(line));
+    cleanedLines = [
+      ...cleanedLines.slice(0, historyStart + 1),
+      ...(rows.length ? rows : ['N/D']),
+      ...cleanedLines.slice(historyEnd),
+    ];
+  }
+
+  return cleanedLines.join('\n');
 }
 
 async function readAutoSaveHistoryUnsafe(basePath: string): Promise<string> {
