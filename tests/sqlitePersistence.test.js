@@ -23,6 +23,7 @@ assert.ok(![trips,daily,sensor].some(source=>source.includes('await import(')),'
 assert.ok(db.includes('readLocalSessionEvents')&&db.includes('readSensorTestRuns')&&db.includes('readSensorTestReadings'),'históricos estruturados precisam ter APIs de consulta');
 assert.ok(db.includes('migration.drive_cycles.v1')&&db.includes('migration.daily_obd_history.v1'),'migrações devem ser idempotentes');
 assert.ok(trips.includes('readDriveCyclesFromDatabase')&&trips.includes('readLegacyCycles'),'viagens devem usar SQLite com fallback JSON');
+assert.ok(trips.includes('migração pendente e arquivo preservado'),'JSON legado ilegível não deve marcar migração como concluída');
 assert.ok(daily.includes('mirrorSessionEventToSqlite')&&daily.includes('FileSystem.writeAsStringAsync'),'histórico TXT deve continuar sendo gravado');
 assert.ok(sensor.includes('saveSensorTestRun')&&sensor.includes("writeAsStringAsync(path,lines.join('\\n')"),'testes devem ser indexados sem substituir TXT');
 assert.ok(quota.includes('meriva-smart-diagnostic.db-wal')&&quota.includes('BANCO_SQLITE'),'quota deve contar DB e arquivos WAL/SHM');

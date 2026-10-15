@@ -38,13 +38,17 @@ function cyclesFromUnknown(value: unknown): DriveCycle[] {
 }
 
 async function readLegacyCycles(indexFile: string): Promise<DriveCycle[]> {
+  const info = await FileSystem.getInfoAsync(indexFile);
+  if (!info.exists) return [];
+  if (info.isDirectory) {
+    throw new Error('O índice legado de viagens é um diretório; arquivo preservado.');
+  }
   try {
-    const info = await FileSystem.getInfoAsync(indexFile);
-    if (!info.exists || info.isDirectory) return [];
     const data = JSON.parse(await FileSystem.readAsStringAsync(indexFile)) as { cycles?: unknown };
     return cyclesFromUnknown(data.cycles).filter((cycle) => cycle.source !== 'CARSCANNER_SEED');
   } catch {
-    return [];
+    // Never mark a failed legacy import as complete: the file may be recoverable.
+    throw new Error('Índice legado de viagens ilegível; migração pendente e arquivo preservado.');
   }
 }
 
@@ -125,7 +129,7 @@ export async function readDriveCycles(basePath: string): Promise<DriveCycle[]> {
     return (await localDb.readDriveCyclesFromDatabase()).filter((cycle) => cycle.source !== 'CARSCANNER_SEED');
   } catch {
     // Compatibilidade: se SQLite estiver indisponível, ler o índice JSON legado.
-    return readLegacyCycles(indexFile);
+    try { return await readLegacyCycles(indexFile); } catch { return []; }
   }
 }
 

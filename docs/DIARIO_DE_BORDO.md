@@ -2482,3 +2482,11 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - **Correção preparada:** criado `src/database/localDatabaseLoader.ts`, que usa importação de tipo apagada na compilação e um `require('./localDatabase')` com caminho literal no momento em que SQLite for usado. Foram alterados `dailyObdHistory.ts`, `driveCycleStorage.ts` e `app/testes-sensores.tsx` para usar o loader, mantendo lazy loading e fallback legado.
 - **Regressão adicionada:** o teste de contrato verifica que a camada nova usa o loader e impede o retorno dos `await import(...)` incompatíveis nesses fluxos.
 - **Validação:** a correção ainda não teve `tsc`, testes ou build Android executados após a mudança. Nenhuma nova CI foi solicitada; o commit de correção também usa `[skip ci]`.
+
+
+### Proteção adicional da migração de viagens
+
+- A leitura do JSON legado agora diferencia ausência do arquivo de arquivo ilegível. Em caso de erro de leitura/parsing, a migração falha sem gravar a marca `complete`, mantendo o caminho aberto para recuperação e nova tentativa.
+- O leitor público captura a falha e retorna fallback vazio somente quando não consegue consultar nem o SQLite nem o JSON; o arquivo existente não é sobrescrito.
+- Adicionado contrato estático para impedir que um índice legado ilegível seja silenciosamente marcado como migrado.
+- Não executados testes nem CI após esta correção; commit com `[skip ci]`.
