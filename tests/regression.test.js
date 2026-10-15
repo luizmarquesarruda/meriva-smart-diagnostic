@@ -1166,6 +1166,23 @@ function testPidResponseIsNotVehicleValidation() {
   assert.deepStrictEqual(hydrated.dtcs.map((dtc) => dtc.code), ['P0135'],
     'hidratação deve descartar DTC malformado sem remover registro real válido');
 
+  const partialLearningState = stateFactory.createEmptyMerivaState();
+  partialLearningState.learning = {
+    vehicleId: 'MERIVA_MAXX',
+    source: 'HYBRID',
+    globalSampleCounts: null,
+    confidenceThresholds: null,
+    contextualData: [null, { condition: 'INVALID', statistics: null }],
+    overallStatistics: { BROKEN: null },
+  };
+  const partialLearningHydrated = validation.hydrateState(partialLearningState);
+  assert.strictEqual(partialLearningHydrated.learning.source, 'REAL_ONLY');
+  assert.strictEqual(partialLearningHydrated.learning.learningStatus, 'COLD_START');
+  assert.deepStrictEqual(partialLearningHydrated.learning.contextualData, []);
+  assert.deepStrictEqual(partialLearningHydrated.learning.overallStatistics, {});
+  assert.deepStrictEqual(partialLearningHydrated.learning.globalSampleCounts, { seedSamples: 0, realSamples: 0, totalSamples: 0 },
+    'perfil parcial não deve lançar erro nem restaurar contagens seed');
+
   const runtime = loadTs(path.join(ROOT, 'src/meriva/autosaveIntegration.ts'));
   const basePath = '/doc/learning-throttle-regression';
   assert.strictEqual(runtime.shouldPersistRealPidSample(basePath, '010C', 1000), true);
