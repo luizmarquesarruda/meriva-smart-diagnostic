@@ -983,6 +983,25 @@ async function testDtcStorage() {
   const dtcs = await dtcManager.readDtcs(BASE);
   assert.strictEqual(dtcs[0].code, 'P0133');
 
+  await assert.rejects(
+    dtcManager.recordDtc(BASE, {
+      code: 'P0420', status: 'CURRENT',
+      firstSeen: '2026-10-02T20:00:00.000Z', lastSeen: '2026-10-02T20:00:00.000Z',
+      occurrences: 1, source: 'CARSCANNER_BASELINE', historical: false,
+    }),
+    /NON_REAL_DTC_NOT_ALLOWED/,
+    'DTC importado não pode ser escrito no histórico operacional',
+  );
+  await assert.rejects(
+    dtcManager.recordDtc(BASE, {
+      code: 'BROKEN', status: 'CURRENT',
+      firstSeen: '2026-10-02T20:00:00.000Z', lastSeen: '2026-10-02T20:00:00.000Z',
+      occurrences: 1, source: 'REAL_OBD', historical: false,
+    }),
+    /INVALID_DTC_CODE/,
+    'código malformado não pode ser persistido',
+  );
+
   writeDelayMs = 25;
   await Promise.all([
     dtcManager.recordDtc(BASE, {
