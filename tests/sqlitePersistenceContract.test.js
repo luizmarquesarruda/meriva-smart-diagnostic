@@ -107,8 +107,14 @@ assert.doesNotMatch(homeScreen, /initializeCarScannerSeed/, 'startup não deve r
 assert.match(homeScreen, /purgeCarScannerHistory/, 'startup deve limpar perfil legado');
 assert.match(learningProfile, /globalSampleCounts\.seedSamples = 0/, 'purga deve zerar contador seed');
 assert.match(learningProfile, /source = 'REAL_ONLY'/, 'aprendizado deve ficar real-only');
-assert.match(hydration, /cycle\.source === 'REAL_OBD'/, 'autosave legado deve recuperar apenas viagens reais');
+assert.match(hydration, /isValidHydratedTrip/, 'autosave legado deve validar cada viagem antes de recuperar apenas viagens reais');
+assert.match(hydration, /cycle\.source === 'REAL_OBD'/, 'contrato de viagem persistida exige fonte REAL_OBD');
 assert.match(hydration, /CARSCANNER_BASELINE/, 'estatísticas misturadas devem ser removidas na hidratação');
+assert.match(tripStorage, /reconcileDriveCycles/, 'viagens finalizadas no JSON devem ser reconciliadas com o índice');
+assert.match(autoTripService, /SNAPSHOT_JSON_DA_VIAGEM_NAO_CONFIRMADO/, 'viagem deve ser journaled em JSON antes de alterar o índice operacional');
+assert.match(homeScreen, /reconcileDriveCycles\(basePath, restored\.driveCycles\)/, 'startup deve reconciliar viagens após encerramento abrupto');
+assert.match(hydration, /normalizeVehicle/, 'perfil de veículo parcial deve ser validado antes de hidratar a interface');
+assert.match(hydration, /rawAutonomy = asRecord\(payload\.autonomy\)/, 'snapshot com autonomia nula/malformada deve usar defaults seguros');
 assert.match(historyTxt, /Histórico legado removido/, 'TXT legado não deve exibir aprendizado contaminado');
 assert.match(txtFormatter, /state\.driveCycles\.filter\(\(cycle\) => cycle\.source === 'REAL_OBD'\)/, 'relatórios TXT devem incluir apenas viagens reais');
 assert.ok(pidCatalog.candidates.every((pid) => pid.evidence !== 'CARSCANNER_SEED' && pid.observed_value === undefined), 'catálogo não deve conter valores importados como baseline');
