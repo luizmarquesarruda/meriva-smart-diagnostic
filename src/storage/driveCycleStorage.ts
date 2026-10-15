@@ -35,13 +35,24 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
+function isValidTimestamp(value: unknown): value is string {
+  if (typeof value !== 'string' || !value.trim()) return false;
+  // Older app records used "YYYY-MM-DD HH:mm:ss"; normalize that legacy form
+  // before validation because Hermes/date parsers are stricter across versions.
+  const normalized = value.trim().replace(
+    /^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?)/,
+    '$1T$2',
+  );
+  return Number.isFinite(Date.parse(normalized));
+}
+
 function isDriveCycle(value: unknown): value is DriveCycle {
   if (typeof value !== 'object' || value === null) return false;
   const cycle = value as Partial<DriveCycle>;
   return (
     typeof cycle.id === 'string' && cycle.id.trim().length > 0 &&
-    typeof cycle.startedAt === 'string' && Number.isFinite(Date.parse(cycle.startedAt)) &&
-    typeof cycle.finishedAt === 'string' && Number.isFinite(Date.parse(cycle.finishedAt)) &&
+    isValidTimestamp(cycle.startedAt) &&
+    isValidTimestamp(cycle.finishedAt) &&
     isFiniteNumber(cycle.distanceTotalKm) && cycle.distanceTotalKm >= 0 &&
     isFiniteNumber(cycle.distanceIceKm) && cycle.distanceIceKm >= 0 &&
     isFiniteNumber(cycle.fuelUsedL) && cycle.fuelUsedL >= 0 &&
@@ -54,13 +65,13 @@ function isDriveCycle(value: unknown): value is DriveCycle {
     (cycle.maxSpeedKmh === undefined || (isFiniteNumber(cycle.maxSpeedKmh) && cycle.maxSpeedKmh >= 0)) &&
     (cycle.telemetrySamples === undefined || (Array.isArray(cycle.telemetrySamples) && cycle.telemetrySamples.every((sample) =>
       typeof sample === 'object' && sample !== null &&
-      typeof sample.timestamp === 'string' && Number.isFinite(Date.parse(sample.timestamp)) &&
+      isValidTimestamp(sample.timestamp) &&
       (sample.speedKmh === null || (isFiniteNumber(sample.speedKmh) && sample.speedKmh >= 0)) &&
       (sample.rpm === null || (isFiniteNumber(sample.rpm) && sample.rpm >= 0)) &&
       (sample.coolantTempC === null || isFiniteNumber(sample.coolantTempC))
     ))) &&
     ['CARSCANNER_SEED', 'REAL_OBD', 'SIMULACAO'].includes(cycle.source as string) &&
-    typeof cycle.importedAt === 'string' && Number.isFinite(Date.parse(cycle.importedAt))
+    isValidTimestamp(cycle.importedAt)
   );
 }
 
@@ -144,10 +155,9 @@ async function writeIndexSafely(indexFile: string, data: DriveCycleIndex): Promi
     try { await FileSystem.deleteAsync(tempPath, { idempotent: true }); } catch { /* temp pode ser removido na próxima escrita */ }
   }
 
-  // Refresh only after the committed index has been read and validated.
-  try { await FileSystem.copyAsync({ from: indexFile, to: backupPath }); } catch {
-    // A validated primary remains authoritative; the older backup is still safer than an empty index.
-  }
+  // Refresh the recovery point as part of the successful operation. If this
+  // fails, bubble it up so the caller retains its pending write for retry.
+  await FileSystem.copyAsync({ from: indexFile, to: backupPath });
 }
 
 function localDayKey(date = new Date()): string {
