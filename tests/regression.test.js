@@ -1009,6 +1009,23 @@ async function testDtcStorage() {
   writeDelayMs = 0;
   const concurrentDtcs = await dtcManager.readDtcs(BASE);
   assert.strictEqual(concurrentDtcs.length, 3, 'gravações concorrentes de DTC não podem perder registros');
+
+  const dtcPath = `${BASE}/DTC/dtc_records.txt`;
+  files.set(dtcPath, files.get(dtcPath) + [
+    'P0420|legado CarScanner|CURRENT|2026-10-01T00:00:00.000Z|2026-10-01T00:00:00.000Z|4|CARSCANNER_BASELINE|false|true',
+    'P0300|simulado|CURRENT|2026-10-01T00:00:00.000Z|2026-10-01T00:00:00.000Z|2|SIMULACAO|false|true',
+    'BADCODE|malformado|CURRENT|2026-10-01T00:00:00.000Z|2026-10-01T00:00:00.000Z|1|REAL_OBD|false|true',
+  ].join('\n') + '\n');
+  assert.strictEqual((await dtcManager.readDtcs(BASE)).length, 3,
+    'DTC importado, simulado e malformado não podem entrar na lista operacional');
+  await dtcManager.purgeLegacyNonRealDtcs(BASE);
+  const cleanedDtcText = files.get(dtcPath);
+  assert.ok(cleanedDtcText.includes('P0133|'), 'purga deve preservar DTC real');
+  assert.ok(!cleanedDtcText.includes('CARSCANNER_BASELINE'), 'purga deve remover proveniência seed');
+  assert.ok(!cleanedDtcText.includes('SIMULACAO'), 'purga deve remover DTC simulado');
+  assert.ok(!cleanedDtcText.includes('BADCODE'), 'purga deve remover DTC malformado');
+  assert.ok(files.get(dtcPath + '.previous').includes('CARSCANNER_BASELINE'),
+    'purga deve guardar o arquivo anterior como backup');
 }
 
 async function testBackupCompleteness() {
