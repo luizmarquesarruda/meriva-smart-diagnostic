@@ -93,6 +93,24 @@ function main() {
   });
   assert.strictEqual(result.hypotheses.length, 0, 'baseline CarScanner não pode virar diagnóstico de ECU atual');
 
+  result = engine.runLocalDiagnostic({
+    ...base,
+    observations: [{ ...obs('010B', 80), timestamp: new Date(Date.now() - engine.MAX_DIAGNOSTIC_PID_AGE_MS - 1000).toISOString() }],
+  });
+  assert.strictEqual(result.hypotheses.length, 0, 'leitura antiga não pode continuar gerando hipótese após perder frescor');
+
+  result = engine.runLocalDiagnostic({
+    ...base,
+    observations: [obs('010B', NaN)],
+  });
+  assert.strictEqual(result.hypotheses.length, 0, 'valor não finito não pode gerar hipótese diagnóstica');
+
+  result = engine.runLocalDiagnostic({
+    ...base,
+    observations: [{ ...obs('010B', 80), status: 'NÃO RESPONDEU' }],
+  });
+  assert.strictEqual(result.hypotheses.length, 0, 'status sem resposta não pode usar um valor numérico antigo como evidência');
+
 
 
   result = engine.runLocalDiagnostic({
