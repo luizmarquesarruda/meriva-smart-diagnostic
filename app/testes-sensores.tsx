@@ -1,5 +1,6 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import BottomNavigation from '../src/ui/BottomNavigation';
+import {loadLocalDatabase} from '../src/database/localDatabaseLoader';
 import {ActivityIndicator,ScrollView,StyleSheet,Text,TouchableOpacity,View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
@@ -87,7 +88,7 @@ export default function TestesSensoresScreen(){
    await FileSystem.writeAsStringAsync(path,lines.join('\n'),{encoding:FileSystem.EncodingType.UTF8});
    let indexedInSqlite=true;
    try{
-    const localDb=await import('../src/database/localDatabase');
+    const localDb=loadLocalDatabase();
     await localDb.saveSensorTestRun({
      id:'sensor-test-'+String(runStartedAt.current||Date.now()),
      startedAt:new Date(runStartedAt.current||Date.now()).toISOString(),

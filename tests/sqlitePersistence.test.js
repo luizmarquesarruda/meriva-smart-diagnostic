@@ -7,6 +7,7 @@ const read=p=>fs.readFileSync(path.join(root,p),'utf8');
 const pkg=JSON.parse(read('package.json'));
 const lock=JSON.parse(read('package-lock.json'));
 const db=read('src/database/localDatabase.ts');
+const loader=read('src/database/localDatabaseLoader.ts');
 const trips=read('src/storage/driveCycleStorage.ts');
 const daily=read('src/meriva/dailyObdHistory.ts');
 const sensor=read('app/testes-sensores.tsx');
@@ -17,6 +18,8 @@ assert.equal(lock.packages[''].dependencies['expo-sqlite'],'~14.0.6','lockfile e
 assert.equal(lock.packages['node_modules/expo-sqlite'].version,'14.0.6','lockfile deve fixar a versão instalada');
 for(const table of ['app_metadata','drive_cycles','obd_session_events','sensor_test_runs','sensor_test_readings']) assert.ok(db.includes('CREATE TABLE IF NOT EXISTS '+table),'tabela ausente: '+table);
 assert.ok(db.includes('withExclusiveTransactionAsync')&&db.includes('transactionQueue'),'gravações multi-tabela devem usar transação exclusiva e fila serializada');
+assert.ok(loader.includes("require('./localDatabase')"),'loader comum evita import dinâmico incompatível com o tsconfig atual');
+assert.ok(![trips,daily,sensor].some(source=>source.includes('await import(')),'persistência não deve gerar TS1323 por import dinâmico');
 assert.ok(db.includes('readLocalSessionEvents')&&db.includes('readSensorTestRuns')&&db.includes('readSensorTestReadings'),'históricos estruturados precisam ter APIs de consulta');
 assert.ok(db.includes('migration.drive_cycles.v1')&&db.includes('migration.daily_obd_history.v1'),'migrações devem ser idempotentes');
 assert.ok(trips.includes('readDriveCyclesFromDatabase')&&trips.includes('readLegacyCycles'),'viagens devem usar SQLite com fallback JSON');

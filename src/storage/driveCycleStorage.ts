@@ -1,6 +1,7 @@
 import * as FileSystem from 'expo-file-system';
 import { appendCsvRow, CsvRow } from '../database/csvLogger';
 import { DriveCycle } from '../data/driveCycles';
+import { loadLocalDatabase } from '../database/localDatabaseLoader';
 
 function isDriveCycle(value: unknown): value is DriveCycle {
   if (typeof value !== 'object' || value === null) return false;
@@ -71,7 +72,7 @@ async function writeLegacyCycle(basePath: string, cycle: DriveCycle): Promise<vo
 
 /** Importa o índice JSON antigo uma vez; a migração SQL é idempotente. */
 async function migrateLegacyCycles(indexFile: string): Promise<void> {
-  const localDb = await import('./localDatabase');
+  const localDb = loadLocalDatabase();
   if (await localDb.getLocalMetadata('migration.drive_cycles.v1') === 'complete') return;
   const cycles = await readLegacyCycles(indexFile);
   await localDb.importLegacyDriveCycles(cycles);
@@ -120,7 +121,7 @@ export async function readDriveCycles(basePath: string): Promise<DriveCycle[]> {
   const indexFile = `${basePath}/VIAGENS/index.json`;
   try {
     await migrateLegacyCycles(indexFile);
-    const localDb = await import('./localDatabase');
+    const localDb = loadLocalDatabase();
     return (await localDb.readDriveCyclesFromDatabase()).filter((cycle) => cycle.source !== 'CARSCANNER_SEED');
   } catch {
     // Compatibilidade: se SQLite estiver indisponível, ler o índice JSON legado.
@@ -137,7 +138,7 @@ export async function addDriveCycle(basePath: string, cycle: DriveCycle): Promis
   if (cycle.source !== 'CARSCANNER_SEED') {
     try {
       await migrateLegacyCycles(indexFile);
-      const localDb = await import('./localDatabase');
+      const localDb = loadLocalDatabase();
       await localDb.upsertDriveCycle(cycle);
       storedInSqlite = true;
     } catch (error) {
@@ -149,7 +150,7 @@ export async function addDriveCycle(basePath: string, cycle: DriveCycle): Promis
     await writeLegacyCycle(basePath, cycle);
     // Quando SQLite voltar a funcionar, a próxima tentativa reimporta também este ciclo de fallback.
     try {
-      const localDb = await import('./localDatabase');
+      const localDb = loadLocalDatabase();
       await localDb.setLocalMetadata('migration.drive_cycles.v1', 'pending');
     } catch {
       // SQLite está indisponível; o JSON legado contém a nova viagem e permanece preservado.

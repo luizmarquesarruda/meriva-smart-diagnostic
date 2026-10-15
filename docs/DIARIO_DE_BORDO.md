@@ -2469,8 +2469,16 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 ### Verificação e CI
 - Revisados estaticamente os arquivos alterados, a resolução/versão declarada no lockfile e a presença dos contratos de persistência; isto **não substitui** instalação real ou execução dos testes.
 - **TypeScript, suíte de testes, Expo Doctor, build Android e teste físico com ELM327 não foram executados.**
-- **Incidente de CI automática:** apesar de não ter solicitado uma execução manual, os commits individuais via API do GitHub fizeram o repositório iniciar Actions automaticamente; várias execuções foram canceladas/substituídas e a verificação final encontrou a execução `38679192817` em andamento. A conexão disponível não expõe uma ação de cancelamento, então não consegui interrompê-la diretamente. Esta situação foi causada pelo fluxo de commits e não deve ser interpretada como autorização para futuras execuções. Este registro usa a marca `[skip ci]` para evitar iniciar outra execução.
+- **Incidente de CI automática:** apesar de não ter solicitado uma execução manual, commits individuais via API do GitHub iniciaram Actions automaticamente; várias execuções anteriores foram canceladas/substituídas. A execução `38679192817` terminou em **falha no TypeScript** depois de `npm ci` passar e Expo Doctor passar em 17/17. A conexão disponível não expõe uma ação de cancelamento. O erro de compilação está detalhado na seção de correção seguinte. Esta situação foi causada pelo fluxo de commits, não por autorização para executar CI. Os commits seguintes usam `[skip ci]`.
 
 ### Referência
 - Branch de evolução: `feat/sqlite-local-persistence-20261015`.
 - Commit de código verificado antes deste registro: `aadfe413379518595f1e5a783858648ba0c3be0b`.
+
+
+### Correção de compatibilidade TypeScript — diagnóstico da execução automática #38679192817
+
+- **Evidência do log:** `npm ci` concluiu com sucesso, Expo Doctor passou em 17/17, e `npm run validate` falhou no `tsc --noEmit` antes de iniciar a suíte de testes. Os erros TS1323 eram causados por `await import(...)` em arquivos compilados com o módulo CommonJS do tsconfig; o TypeScript também não conseguiu resolver alguns desses imports dinâmicos.
+- **Correção preparada:** criado `src/database/localDatabaseLoader.ts`, que usa importação de tipo apagada na compilação e um `require('./localDatabase')` com caminho literal no momento em que SQLite for usado. Foram alterados `dailyObdHistory.ts`, `driveCycleStorage.ts` e `app/testes-sensores.tsx` para usar o loader, mantendo lazy loading e fallback legado.
+- **Regressão adicionada:** o teste de contrato verifica que a camada nova usa o loader e impede o retorno dos `await import(...)` incompatíveis nesses fluxos.
+- **Validação:** a correção ainda não teve `tsc`, testes ou build Android executados após a mudança. Nenhuma nova CI foi solicitada; o commit de correção também usa `[skip ci]`.

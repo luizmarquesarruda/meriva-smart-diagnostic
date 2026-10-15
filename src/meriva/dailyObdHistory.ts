@@ -1,5 +1,7 @@
 import * as FileSystem from 'expo-file-system';
 import type { MerivaPersistedState } from './autosaveState';
+import type { LocalSessionEvent } from '../database/localDatabase';
+import { loadLocalDatabase } from '../database/localDatabaseLoader';
 
 /**
  * Histórico compacto de sessões ECU, separado do snapshot mutável do autosave.
@@ -103,10 +105,10 @@ function splitPages(content: string): Map<string, string> {
 
 /** Importa os blocos TXT preexistentes uma única vez; o TXT continua sendo o histórico visível. */
 async function migrateLegacyHistoryToSqlite(content: string): Promise<void> {
-  const localDb = await import('../database/localDatabase');
+  const localDb = loadLocalDatabase();
   const migrationKey = 'migration.daily_obd_history.v1';
   if (await localDb.getLocalMetadata(migrationKey) === 'complete') return;
-  const events: import('../database/localDatabase').LocalSessionEvent[] = [];
+  const events: LocalSessionEvent[] = [];
   for (const [date, body] of splitPages(content)) {
     const marker = /--- EVENTO: (SESSION_START|SESSION_END|SESSION_RECOVERED) \| ([^\r\n]+) ---/g;
     let match: RegExpExecArray | null;
@@ -115,7 +117,7 @@ async function migrateLegacyHistoryToSqlite(content: string): Promise<void> {
       const end = endMarker >= 0 ? endMarker + '--- FIM DO EVENTO ---'.length : marker.lastIndex;
       events.push({
         date,
-        eventType: match[1] as import('../database/localDatabase').LocalSessionEvent['eventType'],
+        eventType: match[1] as LocalSessionEvent['eventType'],
         timestamp: match[2].trim(),
         renderedTxt: body.slice(match.index, end).trim(),
         payload: { importedFromDailyTxt: true },
@@ -133,7 +135,7 @@ async function mirrorSessionEventToSqlite(
   renderedTxt: string,
   state: MerivaPersistedState,
 ): Promise<void> {
-  const localDb = await import('../database/localDatabase');
+  const localDb = loadLocalDatabase();
   await localDb.recordObdSessionEvent({
     date, eventType: event, timestamp, renderedTxt,
     payload: {
