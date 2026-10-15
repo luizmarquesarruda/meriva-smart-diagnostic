@@ -191,6 +191,9 @@ async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
 
   const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
   let version = Number(row?.user_version ?? 0);
+  if (version > MERIVA_DATABASE_SCHEMA_VERSION) {
+    throw new Error('SQLITE_SCHEMA_NEWER_THAN_APP:' + version);
+  }
 
   if (version < 1) {
     await db.withTransactionAsync(async () => {
@@ -583,6 +586,7 @@ export interface SqliteStorageOverview {
   recordedDtcEvents: number;
   recordedSensorTests: number;
   recordedRealTrips: number;
+  recordedDiagnosticFindings: number;
   learnedPids: number;
 }
 
@@ -604,6 +608,7 @@ export async function getSqliteStorageOverview(): Promise<SqliteStorageOverview>
       recordedDtcEvents: await count('dtc_events'),
       recordedSensorTests: await count('sensor_tests'),
       recordedRealTrips: await count('trip_records'),
+      recordedDiagnosticFindings: await count('diagnostic_findings'),
       learnedPids: await count('learned_pids'),
     };
   });
