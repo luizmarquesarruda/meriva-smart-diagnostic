@@ -605,10 +605,22 @@ export async function persistDiagnosticFindings(
           nextTests: finding.nextTests,
           source: 'REAL_OBD',
         });
+        const evidenceIdentity = finding.evidence.map((item) => {
+          if (!item || typeof item !== 'object') return item;
+          const evidence = item as { ruleId?: unknown; source?: unknown; pid?: unknown; dtc?: unknown };
+          return {
+            ruleId: evidence.ruleId ?? null,
+            source: evidence.source ?? null,
+            pid: evidence.pid ?? null,
+            dtc: evidence.dtc ?? null,
+          };
+        });
+        // Mesmo tipo de evidência na mesma sessão atualiza a linha existente.
+        // Valores flutuantes ficam no JSON de evidência, não no ID da linha.
         const id = 'finding_' + stableHash(asJson({
           sessionId,
           rule: finding.id,
-          evidenceJson,
+          evidenceIdentity,
         }));
         await db.runAsync(
           `INSERT INTO diagnostic_findings
