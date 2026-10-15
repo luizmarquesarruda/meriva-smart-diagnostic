@@ -2592,3 +2592,91 @@ Ajustar este registro ao resultado da nova CI após a atualização do diário. 
 - Adicionada a regra explícita de elegibilidade temporal: leitura até 30 segundos de idade e tolerância futura máxima de 5 segundos. Amostras fora da janela ou com data inválida são descartadas; o SQLite recebe ISO normalizado.
 - Adicionado teste determinístico de limites temporais e contrato estrutural da regra. Isso é validação do comportamento puro do guard, não teste do módulo nativo Expo SQLite.
 - Validar no CI do head final: `npm run validate`, Expo Doctor e APK Android; hardware real continua pendente.
+
+## 2026-10-15 — Fechamento técnico da auditoria de persistência e CI #2182
+
+> **Atualização de estado:** esta seção substitui o estado “validação pendente” das entradas imediatamente anteriores sobre a escrita recuperável do banco de PIDs e a validação temporal SQLite. Aquelas entradas registravam corretamente o estado antes de a CI final terminar; os resultados abaixo são a evidência posterior.
+
+### Escopo consolidado da rodada
+
+A auditoria concentrou-se em duas fronteiras de integridade: (1) impedir corrupção/perda do banco TXT que contém confirmações operacionais de PIDs reais; (2) impedir que timestamps inválidos, obsoletos ou muito futuros contaminem as séries operacionais de telemetria SQLite. As regras são protegidas por testes de regressão e por um contrato estrutural de persistência.
+
+### 1. Banco de PIDs: escrita transacional por staging e recuperação
+
+**Arquivo principal:** `src/database/pidBank.ts`
+
+**Falha de projeto identificada:** o caminho normal de gravação do banco TXT operacional podia substituir o arquivo diretamente. Não havia uma confirmação completa do conteúdo gravado nem um caminho de rollback verificado se ocorresse falha de I/O durante a substituição.
+
+**Comportamento implementado:**
+1. Normalizar a entrada e validar o PID e a proveniência permitida antes de gravar.
+2. Gerar a nova representação no arquivo temporário `.tmp`, sem alterar imediatamente o arquivo operacional.
+3. Ler novamente o staging e validar estrutura e proveniência `REAL_OBD`; staging inválido aborta a operação.
+4. Copiar a versão atual para `.previous` e validar o backup antes de substituir o destino.
+5. Promover o staging ao destino e ler de volta o destino, confirmando o conteúdo e as invariantes de proveniência.
+6. Se a promoção ou a validação falhar, restaurar o conteúdo anterior a partir do backup e conferir a restauração exata.
+7. Se também falhar o rollback, emitir `PID_BANK_WRITE_ROLLBACK_FAILED` com o caminho de recuperação, em vez de ocultar a possibilidade de perda.
+8. Remover o staging transitório nos caminhos de sucesso/falha em que a remoção é segura.
+
+**Correção encontrada durante a própria validação:** a primeira versão do patch continha escapes incorretos em expressões de whitespace e delimitadores de linha. A CI #2180 expôs o defeito: o conteúdo gerado não passava pela validação de staging, e regressões ligadas à purga/gravação do banco de PIDs falhavam. O patch foi corrigido para usar a regex real de whitespace, divisão por `/\r?\n/` e serialização com `join('\n')`. O fixture da regressão também foi corrigido para produzir quebras de linha reais. A lógica de produção não foi enfraquecida para contornar o teste.
+
+**Testes associados:**
+- `tests/regression.test.js`: `testPidBankWriteRollback` injeta falha de cópia para o arquivo de destino e comprova que o conteúdo operacional anterior permanece idêntico, que o backup contém o conteúdo anterior e que o temporário é removido.
+- `tests/sqlitePersistenceContract.test.js`: protege os contratos de staging, validação do backup, rollback explícito e purga de registros que não têm origem real.
+- Contrato operacional preservado: o banco consultável não promove amostras importadas/simuladas para confirmações reais; a fonte operacional válida continua sendo `REAL_OBD`.
+
+### 2. SQLite: validade temporal das amostras de PID
+
+**Arquivo principal:** `src/storage/merivaDatabase.ts`
+
+**Falha de projeto identificada:** usar o relógio atual apenas como fallback do limitador de amostragem não garantia que o timestamp persistido estivesse correto. Uma string inválida podia atingir a persistência e um timestamp muito futuro podia deslocar o controle de cadência, bloqueando amostras subsequentes.
+
+**Regra implementada:**
+- `MIN_PID_SAMPLE_INTERVAL_MS = 2_000`: no máximo uma amostra persistida do mesmo PID dentro de uma janela de 2 segundos.
+- `MAX_PID_SAMPLE_AGE_MS = 30_000`: rejeitar amostra com mais de 30 segundos de idade.
+- `MAX_PID_SAMPLE_FUTURE_SKEW_MS = 5_000`: tolerar no máximo 5 segundos de avanço em relação ao relógio local.
+- `isPersistablePidTimestamp(timestamp, nowMs)`: rejeitar timestamps ausentes/vazios, inválidos, antigos além do limite ou futuros além da tolerância.
+- Após aprovação, serializar o instante em ISO normalizado antes da gravação.
+
+As leituras excluídas por esse filtro não entram no histórico relacional nem alteram o limitador de amostragem. A regra não altera a atualização em memória da telemetria da interface; ela limita a persistência operacional de evidência temporalmente confiável.
+
+**Testes associados:**
+- `tests/regression.test.js`: verifica entradas inválidas/vazias, o limite de idade de 30 s e o limite de avanço futuro de 5 s, incluindo os valores-limite aceitos.
+- `tests/sqlitePersistenceContract.test.js`: protege constantes, chamada do guard antes da gravação e normalização ISO.
+
+### 3. Histórico das execuções de validação
+
+- **CI #2180 — falhou.** O teste real revelou o defeito de escape no patch inicial do banco de PIDs. Essa tentativa não é considerada validação bem-sucedida.
+- **CI #2181 — cancelada.** Uma nova atualização chegou enquanto a execução anterior estava em andamento; portanto, esta tentativa não é usada como evidência de aprovação.
+- **CI #2182 — sucesso final**, run `38760853718`, no commit de código `83f414bbdc329792914bc8292d4c77cafc048ba8`.
+  - Execução: [GitHub Actions — CI #2182](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/38760853718).
+  - Job `validate`: **success**.
+  - Job `android-build`: **success**.
+  - Logs da suíte: **30 regressões passaram**, incluindo `PID bank real-only purge`, `PID bank rollback em falha de gravação`, `frescor temporal de PID SQLite` e `PID + DNA serializados`.
+  - `sqlitePersistenceContract.test.js`: **OK**, com verificações de esquema, lockfile, filtros de dados reais, amostragem, migração JSON e exportação TXT.
+  - `npm run doctor`: **17/17 verificações** aprovadas.
+  - TypeScript: aprovado.
+  - Build Android: `expo prebuild --clean --platform android --non-interactive` seguido de `./gradlew :app:assembleRelease`: sucesso; APK verificado e enviado como artefato da execução.
+
+### 4. Artefato Android e rastreabilidade
+
+- Artefato: `meriva-smart-diagnostic-standalone-apk`.
+- ID do artefato: `11986387409`.
+- Tamanho registrado: `31.857.895 bytes` (aproximadamente 31,9 MB).
+- Acesso pelo run de CI acima, na seção **Artifacts**. A compilação comprova que o workflow gerou e verificou um APK Release; não comprova compatibilidade de todos os comportamentos com o ELM327/ECU físico.
+
+### 5. Workflow e escopo de comprovação
+
+- O workflow `.github/workflows/ci.yml` usa gatilho de push para todas as branches (`push: branches: ['**']`). A exclusão temporária de branch descrita no registro original da fase SQLite foi removida posteriormente; o histórico acima registra o estado atual observado no workflow.
+- A aprovação da CI #2182 valida o código no commit `83f414b`. A atualização documental desta seção cria um novo commit e, com o gatilho atual, pode iniciar outra execução automática.
+- As alterações desta rodada permanecem na branch `feat/sqlite-persistencia-20261015`; este registro **não significa merge em `main`**.
+
+### 6. Limites e próximos testes necessários
+
+A CI passou por validação automatizada e compilação Android, mas não substitui o teste em hardware. Permanecem pendentes:
+1. Instalar o APK no aparelho-alvo e confirmar que o aplicativo abre e conserva os dados após reinício.
+2. Com a Meriva parada, confirmar conexão Bluetooth Classic, comunicação real com o ELM327 e resposta de ECU; registrar separadamente adaptador conectado e ECU respondendo.
+3. Confirmar leituras reais de PID, cadência de persistência de 2 s, rejeição de timestamp inválido/obsoleto e recuperação após desconexão.
+4. Forçar, em ambiente de teste controlado, a falha de escrita do TXT e verificar a recuperação pelo arquivo anterior sem perder confirmações reais.
+5. Verificar que as sessões SQLite órfãs, relatórios de teste TXT e o histórico diário permanecem consistentes após encerramento forçado e nova inicialização.
+
+**Conclusão técnica:** a última execução disponível comprova TypeScript, suíte automatizada, contrato de persistência, Expo Doctor e APK Release aprovados. A integridade de gravação do banco de PIDs e o filtro de frescor temporal estão cobertos por regressões. A validação elétrica/OBD com veículo e adaptador reais ainda precisa ser feita e registrada à parte.
