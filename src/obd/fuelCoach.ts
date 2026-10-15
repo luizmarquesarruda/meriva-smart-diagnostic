@@ -76,8 +76,16 @@ export function buildFuelCoachReference(
   cycles: DriveCycle[],
   fuelType: FuelType,
   source: FuelRateSource | null,
+  targetSpeedKmh: number | null,
 ): FuelCoachReference {
-  const eligible = source
+  // A city/highway mismatch can masquerade as a driving-efficiency change.
+  // Only trips with a reasonably similar whole-trip average speed are baseline candidates.
+  const referenceSpeedKmh = typeof targetSpeedKmh === 'number'
+    && Number.isFinite(targetSpeedKmh)
+    && targetSpeedKmh >= policy.minimumStableSpeedKmh
+    ? targetSpeedKmh
+    : null;
+  const eligible = source && referenceSpeedKmh != null
     ? cycles.filter((cycle) =>
         cycle.source === 'REAL_OBD' &&
         cycle.fuelType === fuelType &&
@@ -86,6 +94,8 @@ export function buildFuelCoachReference(
         Number.isFinite(cycle.distanceTotalKm) && cycle.distanceTotalKm > 0 &&
         Number.isFinite(cycle.fuelUsedL) && cycle.fuelUsedL >= 0.05 &&
         Number.isFinite(cycle.avgFuelConsumptionKml) && cycle.avgFuelConsumptionKml > 0 &&
+        Number.isFinite(cycle.avgDrivingSpeedKmh) && cycle.avgDrivingSpeedKmh > 0 &&
+        Math.abs(cycle.avgDrivingSpeedKmh - referenceSpeedKmh) / referenceSpeedKmh <= policy.referenceSpeedDifferenceRatio &&
         durationHmsToMs(cycle.drivingTimeHms) > 0,
       )
     : [];
@@ -104,9 +114,9 @@ export function buildFuelCoachReference(
     totalDistanceKm: Number(totalDistanceKm.toFixed(1)),
     ready,
     progressLabel: ready
-      ? 'REFERÊNCIA PESSOAL • ' + eligible.length + ' VIAGENS'
+      ? 'REFERÊNCIA PESSOAL • ' + eligible.length + ' VIAGENS • VEL. COMPATÍVEL'
       : 'REFERÊNCIA EM FORMAÇÃO • ' + eligible.length + '/' + policy.referenceMinimumTrips
-        + ' VIAGENS • ' + totalDistanceKm.toFixed(1) + '/' + policy.referenceMinimumDistanceKm + ' KM',
+        + ' VIAGENS • ' + totalDistanceKm.toFixed(1) + '/' + policy.referenceMinimumDistanceKm + ' KM • VEL. COMPATÍVEL',
   };
 }
 
@@ -126,7 +136,7 @@ const ADVICE: Record<FuelCoachStatus, string> = {
   WAITING_FOR_DATA: 'Aguardando taxa de combustível e velocidade válidas e recentes; sem esses dados, não há classificação confiável.',
   COLLECTING: 'Coletando amostras recentes antes de classificar. Uma leitura isolada não define a qualidade da condução.',
   CONTEXT_UNSTABLE: 'A velocidade está baixa ou varia bastante. Trânsito, relevo e carga afetam o consumo; compare em trecho mais constante, sempre com segurança.',
-  CALIBRATING: 'Sua referência pessoal está em formação. São necessárias viagens reais suficientes com o mesmo combustível e método de cálculo.',
+  CALIBRATING: 'Sua referência pessoal está em formação. São necessárias viagens reais com o mesmo combustível, método de cálculo e velocidade média semelhante.',
   GOOD: 'Rendimento móvel acima da sua referência pessoal. Mantenha aceleração suave e condução segura.',
   NORMAL: 'Rendimento próximo da sua referência. Priorize aceleração progressiva e velocidade constante quando as condições permitirem.',
   ELEVATED: 'Rendimento móvel abaixo da sua referência pessoal. Se for seguro, suavize acelerações e antecipe desacelerações; isso não indica, por si só, defeito mecânico.',
