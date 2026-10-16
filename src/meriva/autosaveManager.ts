@@ -15,7 +15,14 @@ import { hydrateState, isValidEnvelope, validatePayload } from './autosaveValida
 import { migrateEnvelope } from './autosaveMigrations';
 import { appendAutoSaveHistory } from './autosaveHistoryTxt';
 import { appendDailyObdSessionEvent } from './dailyObdHistory';
+import { flushBufferedCsvRows } from '../database/csvLogger';
 import autosavePolicy from '../knowledge/autosave_policy.json';
+
+let backgroundPersistenceFlushHandler: (() => Promise<void>) | null = null;
+
+export function registerBackgroundPersistenceFlushHandler(handler: (() => Promise<void>) | null): void {
+  backgroundPersistenceFlushHandler = handler;
+}
 
 const DEBOUNCE_MS = autosavePolicy.persistence.debounceMs;
 const CHECKPOINT_MS = autosavePolicy.persistence.checkpointMs;
@@ -256,11 +263,15 @@ async function initAutoSaveUnsafe(basePath: string): Promise<MerivaPersistedStat
         // response but persists ordinary value churn at a bounded cadence.
         // Compare fingerprints on lifecycle exit so the final in-memory values
         // are still saved even when the throttle window has not elapsed.
-        if (
-          status !== 'active' &&
-          (runtime.dirty || snapshotFingerprint(runtime.state) !== runtime.lastSavedFingerprint)
-        ) {
-          void saveNow('background');
+        if (status !== 'active') {
+          if (runtime.dirty || snapshotFingerprint(runtime.state) !== runtime.lastSavedFingerprint) {
+            void saveNow('background');
+          }
+          // Drain queued PID-bank/learning writes, then CSV buffers before Android suspends JS.
+          const flush = backgroundPersistenceFlushHandler ? backgroundPersistenceFlushHandler() : flushBufferedCsvRows();
+          void flush.catch((cause) => {
+            console.warn('[autosave] falha ao descarregar evidências OBD em segundo plano:', cause instanceof Error ? cause.message : cause);
+          });
         }
       },
     );

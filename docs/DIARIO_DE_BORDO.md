@@ -2450,3 +2450,13 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Nova CI solicitada pela atualização da branch; confirmar resultado integral, inclusive testes restantes e build Android.
 - Teste físico do ELM327 no veículo continua pendente.
 
+
+
+## 2026-10-16 — Consolidação de desempenho OBD e recuperação de viagens
+
+- A primeira CI da branch de consolidação concluiu Expo Doctor e TypeScript; falhou na suíte por uma asserção antiga de `tests/cockpitNavigation.test.js` que exigia o link direto `/saude` no cockpit. A tela Saúde permanece disponível em `app/mais.tsx`; o teste agora verifica esse destino na navegação secundária.
+- Buffer CSV de até 8 linhas / 3 s com descarga explícita e reencaminhamento em caso de erro; telemetria em memória é publicada antes do I/O e o aprendizado persistente é limitado por PID em cadência de 10 s na trilha de alta frequência.
+- O serviço de viagens passa a enfileirar gravações OBD sem bloquear cada ciclo, descarregar fila no encerramento/troca de conexão, aplicar backoff exponencial aos PIDs secundários que falham e manter viagens finalizadas pendentes para nova tentativa de persistência.
+- O índice de viagens usa cópia de recuperação (sidecar), validação e backup; a leitura também consulta sidecars válidos e evita tratar falha de leitura como histórico vazio.
+- Testes adicionados: desempenho do logger CSV, segurança do armazenamento de viagens e caminho rápido da telemetria. A página web para notebook continua explicitamente fora do escopo.
+- CI do commit seguinte: pendente. Não promover para main até validate e android-build passarem.

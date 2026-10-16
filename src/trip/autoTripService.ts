@@ -1,9 +1,10 @@
 import { gpsTracker } from '../gps';
+import type { DriveCycle } from '../data/driveCycles';
 import { gpsHistoryStore } from '../gps/gpsHistory';
 import type { SharedObdConnection } from '../obd/sharedConnection';
 import { getSharedObdConnection, getSharedObdStatus, subscribeSharedObd, subscribeSharedObdStatus } from '../obd/sharedConnection';
 import { addDriveCycle, readDriveCycles } from '../storage/driveCycleStorage';
-import { forceSaveOnObdEvent, registerObdQuery } from '../meriva/autosaveIntegration';
+import { flushObdPersistence, forceSaveOnObdEvent, registerObdQuery } from '../meriva/autosaveIntegration';
 import { getAutoSaveState, updateAutoSaveState, initAutoSave } from '../meriva/autosaveManager';
 import { RealTripRecorder, shouldFinalizeStoppedTrip } from './tripRecorder';
 import { estimateRangeFromFuelLevel, fuelLevelPercentToLiters, isFuelReserve } from './fuelLevel';
@@ -73,11 +74,40 @@ class AutoTripService {
   private pollCycleNumber = 0;
   private stoppedSinceMs: number | null = null;
   private gpsStartedForEcu = false;
+  private readonly pidFailureCount = new Map<string, number>();
+  private readonly pidNextEligibleAt = new Map<string, number>();
+  private readonly pendingFinalizedCycles: DriveCycle[] = [];
+  private pendingCycleFlushPromise: Promise<void> | null = null;
+  private pendingCycleRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  private nextPendingCycleRetryAtMs = 0;
   private lastEstimatedFuelRate: { rateLph: number; source: FuelRateSource; timestampMs: number } | null = null;
   private fuelType: FuelType = 'FLEX';
   private lastFuelEthanolPercent: number | null = null;
   private unsubscribeAppSettings: (() => void) | null = null;
   private state: AutoTripServiceState = { ...INITIAL_STATE };
+
+  private canQueryPid(pid: string): boolean {
+    return Date.now() >= (this.pidNextEligibleAt.get(pid) ?? 0);
+  }
+
+  private notePidResult(pid: string, valid: boolean): void {
+    if (valid) {
+      this.pidFailureCount.delete(pid);
+      this.pidNextEligibleAt.delete(pid);
+      return;
+    }
+    const failures = (this.pidFailureCount.get(pid) ?? 0) + 1;
+    this.pidFailureCount.set(pid, failures);
+    const delayMs = Math.min(30_000, 1_000 * (2 ** Math.min(failures - 1, 5)));
+    this.pidNextEligibleAt.set(pid, Date.now() + delayMs);
+  }
+
+  private resetPollingCaches(): void {
+    this.pidFailureCount.clear();
+    this.pidNextEligibleAt.clear();
+    this.lastEstimatedFuelRate = null;
+    this.lastFuelEthanolPercent = null;
+  }
 
   subscribe(listener: Listener): () => void {
     this.listeners.add(listener);
@@ -121,6 +151,7 @@ class AutoTripService {
     };
     this.emit();
     this.running = true;
+    if (this.pendingFinalizedCycles.length > 0) void this.flushPendingFinalizedCycles();
     this.unsubscribeConnection = subscribeSharedObd((connection) => {
       this.transition = this.transition
         .then(() => this.applyConnection(connection))
@@ -156,6 +187,7 @@ class AutoTripService {
     this.unsubscribeAppSettings = null;
     await this.transition;
     await this.stopCurrentLoop();
+    await flushObdPersistence(this.basePath);
     await this.stopGpsForEcu();
     this.lastEstimatedFuelRate = null;
     await this.finalizeRecorder();
@@ -166,6 +198,8 @@ class AutoTripService {
   private async applyConnection(connection: SharedObdConnection | null): Promise<void> {
     const hadTrackingSession = Boolean(this.loopPromise || this.recorder || this.gpsStartedForEcu);
     await this.stopCurrentLoop();
+    await flushObdPersistence(this.basePath);
+    this.resetPollingCaches();
     // A conexão inicial pode já ter iniciado o GPS pelo serviço nativo em
     // sharedConnection; não o desligar e ligar novamente sem necessidade.
     if (!connection || hadTrackingSession) await this.stopGpsForEcu();
@@ -252,13 +286,14 @@ class AutoTripService {
         let fuelLevelPercent: number | null = this.state.fuelLevelPercent;
         let obdSpeedKmh: number | null = null;
         let rpm: number | null = null;
+        const queriedPidsThisCycle = new Set<string>();
         if (obdSpeedSupported) gpsTracker.setVehicleSpeedHintKmh(null);
 
         // Caminho crítico primeiro: velocidade e RPM alimentam o cockpit e
         // a detecção de movimento antes das consultas secundárias.
         if (obdSpeedSupported) {
           const speedResult = await connection.session.queryPid('010D');
-          await registerObdQuery(this.basePath, speedResult, 'REAL');
+          await registerObdQuery(this.basePath, speedResult, 'REAL', undefined, { deferPersistence: true });
           if (
             speedResult.parsed.status === 'RESPONDEU' &&
             speedResult.parsed.unit === 'km/h' &&
@@ -275,7 +310,7 @@ class AutoTripService {
         // da detecção de motor ligado/desligado.
         if (connection.supportedPids.includes('010C')) {
           const rpmResult = await connection.session.queryPid('010C');
-          await registerObdQuery(this.basePath, rpmResult, 'REAL');
+          await registerObdQuery(this.basePath, rpmResult, 'REAL', undefined, { deferPersistence: true });
           if (
             rpmResult.parsed.status === 'RESPONDEU' &&
             rpmResult.parsed.value != null &&
@@ -287,15 +322,14 @@ class AutoTripService {
 
         // O consumo medido (015E) continua sendo consultado em cada ciclo
         // para manter o indicador responsivo sempre que a ECU o suporta.
-        if (this.state.fuelSupported) {
+        if (this.state.fuelSupported && this.canQueryPid('015E')) {
           const fuelResult = await connection.session.queryPid('015E');
-          await registerObdQuery(this.basePath, fuelResult, 'REAL');
+          queriedPidsThisCycle.add('015E');
+          await registerObdQuery(this.basePath, fuelResult, 'REAL', undefined, { deferPersistence: true });
+          const measuredFuelValid = fuelResult.commandStatus === 'OK' && fuelResult.parsed.status === 'RESPONDEU' && fuelResult.parsed.unit === 'L/h' && fuelResult.parsed.value != null && Number.isFinite(fuelResult.parsed.value) && fuelResult.parsed.value >= 0;
+          this.notePidResult('015E', measuredFuelValid);
           if (
-            fuelResult.parsed.status === 'RESPONDEU' &&
-            fuelResult.parsed.unit === 'L/h' &&
-            fuelResult.parsed.value != null &&
-            Number.isFinite(fuelResult.parsed.value) &&
-            fuelResult.parsed.value >= 0
+            measuredFuelValid
           ) {
             fuelRateLph = fuelResult.parsed.value;
             fuelRateSource = 'MEASURED_015E';
@@ -307,16 +341,14 @@ class AutoTripService {
 
         // O nível do tanque muda lentamente: consultar a cada quatro ciclos
         // reduz tráfego serial sem limpar o último valor válido da interface.
-        if (this.state.fuelLevelSupported && this.pollCycleNumber % FUEL_LEVEL_EVERY_N_CYCLES === pollingPolicy.polling.fuelLevel.phase) {
+        if (this.state.fuelLevelSupported && this.pollCycleNumber % FUEL_LEVEL_EVERY_N_CYCLES === pollingPolicy.polling.fuelLevel.phase && this.canQueryPid('012F')) {
           const fuelLevelResult = await connection.session.queryPid('012F');
-          await registerObdQuery(this.basePath, fuelLevelResult, 'REAL');
+          queriedPidsThisCycle.add('012F');
+          await registerObdQuery(this.basePath, fuelLevelResult, 'REAL', undefined, { deferPersistence: true });
+          const fuelLevelValid = fuelLevelResult.commandStatus === 'OK' && fuelLevelResult.parsed.status === 'RESPONDEU' && fuelLevelResult.parsed.unit === 'percent' && fuelLevelResult.parsed.value != null && Number.isFinite(fuelLevelResult.parsed.value) && fuelLevelResult.parsed.value >= 0 && fuelLevelResult.parsed.value <= 100;
+          this.notePidResult('012F', fuelLevelValid);
           if (
-            fuelLevelResult.parsed.status === 'RESPONDEU' &&
-            fuelLevelResult.parsed.unit === 'percent' &&
-            fuelLevelResult.parsed.value != null &&
-            Number.isFinite(fuelLevelResult.parsed.value) &&
-            fuelLevelResult.parsed.value >= 0 &&
-            fuelLevelResult.parsed.value <= 100
+            fuelLevelValid
           ) {
             fuelLevelPercent = fuelLevelResult.parsed.value;
           }
@@ -332,29 +364,31 @@ class AutoTripService {
           (!this.state.fuelSupported || fuelRateLph == null) &&
           this.fuelType === 'FLEX' &&
           connection.supportedPids.includes(fuelCompositionPolicy.pid) &&
+          this.canQueryPid(fuelCompositionPolicy.pid) &&
           this.pollCycleNumber % fuelCompositionPolicy.everyCycles === fuelCompositionPolicy.phase
         ) {
           const compositionResult = await connection.session.queryPid(fuelCompositionPolicy.pid);
-          await registerObdQuery(this.basePath, compositionResult, 'REAL');
+          queriedPidsThisCycle.add(fuelCompositionPolicy.pid);
+          await registerObdQuery(this.basePath, compositionResult, 'REAL', undefined, { deferPersistence: true });
+          const compositionValid = compositionResult.commandStatus === 'OK' && compositionResult.parsed.status === 'RESPONDEU' && compositionResult.parsed.unit === 'percent' && compositionResult.parsed.value != null && Number.isFinite(compositionResult.parsed.value) && compositionResult.parsed.value >= 0 && compositionResult.parsed.value <= 100;
+          this.notePidResult(fuelCompositionPolicy.pid, compositionValid);
           if (
-            compositionResult.parsed.status === 'RESPONDEU' &&
-            compositionResult.parsed.unit === 'percent' &&
-            compositionResult.parsed.value != null &&
-            Number.isFinite(compositionResult.parsed.value) &&
-            compositionResult.parsed.value >= 0 &&
-            compositionResult.parsed.value <= 100
+            compositionValid
           ) {
             this.lastFuelEthanolPercent = compositionResult.parsed.value;
           }
         }
 
-        if (fuelRateLph == null && fuelEstimateDue && connection.supportedPids.includes('0110')) {
+        if (fuelRateLph == null && fuelEstimateDue && connection.supportedPids.includes('0110') && this.canQueryPid('0110')) {
           // MAF é estimativa secundária: amostrar a cada quatro ciclos reduz tráfego
           // K-Line. Só valores positivos produzem estimativa de taxa de combustível.
           const mafResult = await connection.session.queryPid('0110');
-          await registerObdQuery(this.basePath, mafResult, 'REAL');
+          queriedPidsThisCycle.add('0110');
+          await registerObdQuery(this.basePath, mafResult, 'REAL', undefined, { deferPersistence: true });
           const mafGs = mafResult.parsed.status === 'RESPONDEU' ? mafResult.parsed.value : null;
-          const estimate = mafGs != null && Number.isFinite(mafGs)
+          const mafValid = mafResult.commandStatus === 'OK' && mafGs != null && Number.isFinite(mafGs) && mafGs > 0;
+          this.notePidResult('0110', mafValid);
+          const estimate = mafValid
             ? estimateFuelRateLph({ mafGs, fuelType: this.fuelType, ethanolPercent: this.lastFuelEthanolPercent })
             : null;
           if (estimate) {
@@ -375,21 +409,28 @@ class AutoTripService {
           fuelEstimateDue &&
           connection.supportedPids.includes('010B') &&
           connection.supportedPids.includes('010F') &&
-          connection.supportedPids.includes('010C')
+          connection.supportedPids.includes('010C') &&
+          this.canQueryPid('010B') && this.canQueryPid('010F')
         ) {
           // MAP e IAT são consultados juntos e só na cadência de estimativa.
           // Marcar MAP evita repetir o mesmo PID na telemetria rotativa deste ciclo.
           mapFallbackQueriedThisCycle = true;
           const mapResult = await connection.session.queryPid('010B');
+          queriedPidsThisCycle.add('010B');
           const iatResult = await connection.session.queryPid('010F');
-          await registerObdQuery(this.basePath, mapResult, 'REAL');
-          await registerObdQuery(this.basePath, iatResult, 'REAL');
+          queriedPidsThisCycle.add('010F');
+          await registerObdQuery(this.basePath, mapResult, 'REAL', undefined, { deferPersistence: true });
+          await registerObdQuery(this.basePath, iatResult, 'REAL', undefined, { deferPersistence: true });
           const mapKpa = mapResult.parsed.status === 'RESPONDEU' ? mapResult.parsed.value : null;
           const intakeAirTempC = iatResult.parsed.status === 'RESPONDEU' ? iatResult.parsed.value : null;
+          const mapValid = mapResult.commandStatus === 'OK' && mapKpa != null && Number.isFinite(mapKpa) && mapKpa > 0;
+          const iatValid = iatResult.commandStatus === 'OK' && intakeAirTempC != null && Number.isFinite(intakeAirTempC);
+          this.notePidResult('010B', mapValid);
+          this.notePidResult('010F', iatValid);
           const estimate = estimateFuelRateLph({
-            mapKpa: mapKpa != null && Number.isFinite(mapKpa) ? mapKpa : null,
+            mapKpa: mapValid ? mapKpa : null,
             rpm,
-            intakeAirTempC: intakeAirTempC != null && Number.isFinite(intakeAirTempC) ? intakeAirTempC : null,
+            intakeAirTempC: iatValid ? intakeAirTempC : null,
             displacementCm3: getAutoSaveState().vehicle?.displacementCm3 ?? 1389,
             fuelType: this.fuelType,
             ethanolPercent: this.lastFuelEthanolPercent,
@@ -427,13 +468,17 @@ class AutoTripService {
         const telemetryCandidates = pollingPolicy.polling.rotatingTelemetryPids;
         const supportedTelemetry = telemetryCandidates.filter((item) =>
           connection.supportedPids.includes(item) &&
+          !queriedPidsThisCycle.has(item) &&
+          this.canQueryPid(item) &&
           !(mapFallbackQueriedThisCycle && item === pollingPolicy.polling.estimatedFuelRate.mapPid)
         );
         if (supportedTelemetry.length > 0) {
           const telemetryPid = supportedTelemetry[this.telemetryCursor % supportedTelemetry.length];
           this.telemetryCursor += 1;
           const telemetryResult = await connection.session.queryPid(telemetryPid);
-          await registerObdQuery(this.basePath, telemetryResult, 'REAL');
+          queriedPidsThisCycle.add(telemetryPid);
+          await registerObdQuery(this.basePath, telemetryResult, 'REAL', undefined, { deferPersistence: true });
+          this.notePidResult(telemetryPid, telemetryResult.commandStatus === 'OK' && telemetryResult.parsed.status === 'RESPONDEU' && telemetryResult.parsed.value != null && Number.isFinite(telemetryResult.parsed.value));
         }
 
         const gps = gpsTracker.getState();
@@ -564,24 +609,63 @@ class AutoTripService {
     }
   }
 
-  private async finalizeRecorder(): Promise<void> {
-    const recorder = this.recorder;
-    this.recorder = null;
-    if (!recorder || !this.basePath) return;
+  private schedulePendingCycleRetry(): void {
+    if (this.pendingCycleRetryTimer || this.pendingFinalizedCycles.length === 0) return;
+    const delayMs = Math.max(250, this.nextPendingCycleRetryAtMs - Date.now());
+    this.pendingCycleRetryTimer = setTimeout(() => {
+      this.pendingCycleRetryTimer = null;
+      void this.flushPendingFinalizedCycles();
+    }, delayMs);
+  }
 
-    const cycle = recorder.buildDriveCycle();
-    if (!cycle) return;
+  private async flushPendingFinalizedCycles(): Promise<void> {
+    if (this.pendingCycleFlushPromise) return this.pendingCycleFlushPromise;
+    const operation = this.flushPendingFinalizedCyclesUnsafe();
+    this.pendingCycleFlushPromise = operation;
+    try {
+      await operation;
+    } finally {
+      if (this.pendingCycleFlushPromise === operation) this.pendingCycleFlushPromise = null;
+    }
+  }
 
-    await addDriveCycle(this.basePath, cycle);
+  private async flushPendingFinalizedCyclesUnsafe(): Promise<void> {
+    if (!this.basePath || this.pendingFinalizedCycles.length === 0) return;
+    if (Date.now() < this.nextPendingCycleRetryAtMs) {
+      this.schedulePendingCycleRetry();
+      return;
+    }
+
+    while (this.pendingFinalizedCycles.length > 0) {
+      const cycle = this.pendingFinalizedCycles[0];
+      try {
+        await addDriveCycle(this.basePath, cycle);
+      } catch (cause) {
+        this.nextPendingCycleRetryAtMs = Date.now() + 5_000;
+        this.setState({ error: 'VIAGEM PENDENTE DE SALVAMENTO: ' + (cause instanceof Error ? cause.message : 'FALHA DE ARMAZENAMENTO') });
+        this.schedulePendingCycleRetry();
+        return;
+      }
+
+      this.pendingFinalizedCycles.shift();
+      this.nextPendingCycleRetryAtMs = 0;
+      if (this.pendingCycleRetryTimer) {
+        clearTimeout(this.pendingCycleRetryTimer);
+        this.pendingCycleRetryTimer = null;
+      }
+      try {
+        await this.persistFinalizedCycleState(cycle);
+      } catch (cause) {
+        this.setState({ error: 'VIAGEM SALVA, MAS FALHOU A ATUALIZAÇÃO DO SNAPSHOT: ' + (cause instanceof Error ? cause.message : 'FALHA DE AUTOSAVE') });
+        return;
+      }
+    }
+  }
+
+  private async persistFinalizedCycleState(cycle: DriveCycle): Promise<void> {
     const storedCycles = await readDriveCycles(this.basePath);
     updateAutoSaveState((state) => {
       state.driveCycles = storedCycles;
-
-      // O PID 012F é a fonte absoluta de nível de combustível para autonomia.
-      // A capacidade nominal de 56 L converte o percentual da ECU em litros.
-      // O histórico de consumo continua vindo de viagens reais.
-      // Trips remain in history even when fuel telemetry is insufficient, but
-      // they must not contaminate cumulative consumption/autonomy calculations.
       const consumptionIsValid = cycle.fuelDataValid !== false && cycle.fuelUsedL >= 0.05 && cycle.avgFuelConsumptionKml > 0;
       const existingReading = state.autonomy.readings.find((item) => item.id === cycle.id);
       if (consumptionIsValid && !existingReading) {
@@ -591,13 +675,8 @@ class AutoTripService {
         const fuelUsedL = Math.max(0, Number(cycle.fuelUsedL) || 0);
         const cumulativeDistanceKm = previousDistance + distanceKm;
         const cumulativeFuelUsedL = previousFuel + fuelUsedL;
-        const averageConsumptionKml = cumulativeFuelUsedL > 0
-          ? cumulativeDistanceKm / cumulativeFuelUsedL
-          : 0;
-        const estimatedRangeKm = averageConsumptionKml > 0
-          ? averageConsumptionKml * state.autonomy.tankCapacityL
-          : 0;
-
+        const averageConsumptionKml = cumulativeFuelUsedL > 0 ? cumulativeDistanceKm / cumulativeFuelUsedL : 0;
+        const estimatedRangeKm = averageConsumptionKml > 0 ? averageConsumptionKml * state.autonomy.tankCapacityL : 0;
         state.autonomy = {
           ...state.autonomy,
           tankCapacityL: 56,
@@ -610,28 +689,39 @@ class AutoTripService {
           fuelReserve: this.state.fuelReserve,
           realReadingCount: (Number(state.autonomy.realReadingCount) || 0) + 1,
           lastReadingAt: cycle.finishedAt,
-          readings: [
-            ...state.autonomy.readings,
-            {
-              id: cycle.id,
-              timestamp: cycle.finishedAt,
-              distanceKm,
-              fuelUsedL,
-              consumptionKml: Number((fuelUsedL > 0 ? distanceKm / fuelUsedL : 0).toFixed(3)),
-              estimatedRangeKm: Number(estimatedRangeKm.toFixed(1)),
-              source: 'REAL_OBD' as const,
-            },
-          ].slice(-200),
+          readings: [...state.autonomy.readings, {
+            id: cycle.id,
+            timestamp: cycle.finishedAt,
+            distanceKm,
+            fuelUsedL,
+            consumptionKml: Number((fuelUsedL > 0 ? distanceKm / fuelUsedL : 0).toFixed(3)),
+            estimatedRangeKm: Number(estimatedRangeKm.toFixed(1)),
+            source: 'REAL_OBD' as const,
+          }].slice(-200),
         };
       }
     });
 
     const autonomy = (await initAutoSave(this.basePath)).autonomy;
+    const retryResolved = this.state.error?.startsWith('VIAGEM PENDENTE DE SALVAMENTO') ? null : this.state.error;
     this.setState({
       averageConsumptionKml: autonomy.averageConsumptionKml,
       estimatedRangeKm: autonomy.estimatedRangeKm,
+      error: retryResolved,
     });
     await forceSaveOnObdEvent();
+  }
+
+  private async finalizeRecorder(): Promise<void> {
+    const recorder = this.recorder;
+    this.recorder = null;
+    if (recorder && this.basePath) {
+      const cycle = recorder.buildDriveCycle();
+      if (cycle && !this.pendingFinalizedCycles.some((pending) => pending.id === cycle.id)) {
+        this.pendingFinalizedCycles.push(cycle);
+      }
+    }
+    await this.flushPendingFinalizedCycles();
   }
 
   private setState(patch: Partial<AutoTripServiceState>): void {

@@ -65,18 +65,31 @@ export default function IndexScreen() {
     try {
       const nextSettings = await readAppSettings(basePath);
       const restored = await initAutoSave(basePath);
-      await initializeDriveCycles(basePath);
+      try {
+        await initializeDriveCycles(basePath);
+      } catch (cause) {
+        // A damaged trip index must not prevent the dashboard from hydrating;
+        // the storage layer will expose any valid backup or pending sidecar.
+        console.warn('[trips] índice não pôde ser reconciliado; preservando arquivos para recuperação:', cause instanceof Error ? cause.message : cause);
+      }
       await ensureMerivaVehicleProfile(basePath);
       const learningProfile = await readLearningProfile(basePath);
       if (!learningProfile) await createLearningProfile(basePath, '2026-09-24T14:48:00.000Z');
       await initializeCarScannerSeed(basePath);
       const storedCycles = await readDriveCycles(basePath);
-      const loaded = restored.driveCycles.length ? restored.driveCycles : storedCycles;
-
-      if (!restored.driveCycles.length && loaded.length) {
-        updateAutoSaveState((state) => {
-          state.driveCycles = loaded;
-        });
+      const mergedCycles = new Map<string, DriveCycle>();
+      for (const cycle of restored.driveCycles) {
+        if (cycle.source !== 'CARSCANNER_SEED') mergedCycles.set(cycle.id, cycle);
+      }
+      // The storage index/backup and pending sidecars are authoritative for duplicate IDs.
+      for (const cycle of storedCycles) {
+        if (cycle.source !== 'CARSCANNER_SEED') mergedCycles.set(cycle.id, cycle);
+      }
+      const loaded = Array.from(mergedCycles.values());
+      const cyclesChanged = loaded.length !== restored.driveCycles.length ||
+        loaded.some((cycle, index) => JSON.stringify(cycle) !== JSON.stringify(restored.driveCycles[index]));
+      if (cyclesChanged) {
+        updateAutoSaveState((state) => { state.driveCycles = loaded; });
       }
 
       setSettings(nextSettings);

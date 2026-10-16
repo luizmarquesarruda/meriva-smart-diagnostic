@@ -1,6 +1,5 @@
-import * as FileSystem from 'expo-file-system';
-import { queueCsvRow, CsvRow } from './csvLogger';
-import { PidQueryResult } from '../obd/elm327';
+import { appendCsvRow, appendCsvRowBuffered, type CsvRow } from './csvLogger';
+import type { PidQueryResult } from '../obd/elm327';
 
 export interface RawObdLogEntry {
   timestamp: string;
@@ -13,24 +12,16 @@ export interface RawObdLogEntry {
   source: 'REAL' | 'SIMULACAO';
 }
 
-/** Uses device-local date for daily file partitioning; timestamps stay ISO UTC. */
-export function getObdLogLocalDateKey(date = new Date()): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
 export async function logRawObdData(
   basePath: string,
   query: PidQueryResult,
   pid: string,
   source: 'REAL' | 'SIMULACAO',
+  options: { buffered?: boolean } = {},
 ): Promise<void> {
-  const today = getObdLogLocalDateKey();
+  const today = new Date().toISOString().split('T')[0];
   const fileName = `obd_raw_${today}.csv`;
   const filePath = `${basePath}/LOGS/${fileName}`;
-
   const row: CsvRow = {
     timestamp: new Date().toISOString(),
     tx: query.tx,
@@ -42,7 +33,11 @@ export async function logRawObdData(
     source,
   };
 
-  queueCsvRow(filePath, row);
+  if (options.buffered) {
+    appendCsvRowBuffered(filePath, row);
+    return;
+  }
+  await appendCsvRow(filePath, row);
 }
 
 export async function logInterpretedData(
@@ -50,11 +45,11 @@ export async function logInterpretedData(
   query: PidQueryResult,
   pid: string,
   source: 'REAL' | 'SIMULACAO',
+  options: { buffered?: boolean } = {},
 ): Promise<void> {
-  const today = getObdLogLocalDateKey();
+  const today = new Date().toISOString().split('T')[0];
   const fileName = `obd_interpreted_${today}.csv`;
   const filePath = `${basePath}/LOGS/${fileName}`;
-
   const row: CsvRow = {
     timestamp: new Date().toISOString(),
     tx: query.tx,
@@ -70,5 +65,9 @@ export async function logInterpretedData(
     condicao: query.parsed.status,
   };
 
-  queueCsvRow(filePath, row);
+  if (options.buffered) {
+    appendCsvRowBuffered(filePath, row);
+    return;
+  }
+  await appendCsvRow(filePath, row);
 }
