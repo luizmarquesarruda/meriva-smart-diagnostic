@@ -2517,3 +2517,9 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - A CI #2210 passou nas 26 regressões, nos testes CSV, recuperação de viagens, caminho rápido OBD e GPS básico. Falhou em `gpsHistory.test.js` porque Node não resolve automaticamente o sufixo `.ts` em `require('../trip/tripRecorder')` durante a compilação isolada do módulo de teste.
 - O teste foi corrigido com um mock explícito do contrato constante `MAX_VALID_TRIP_CONSUMPTION_KML=30`, mantendo a lógica real da store de histórico sob teste. Nenhum comportamento da aplicação foi relaxado.
 - A nova execução deve validar o restante da suíte e o build Android.
+
+
+### Ajuste do carregador TypeScript no teste do histórico GPS — 2026-10-16
+- A CI #2211 passou por todas as 26 regressões, logger CSV, recuperação de viagens, telemetria rápida, gate GPS e teste de GPS básico.
+- A suíte parou em `gpsHistory.test.js` porque `loadTs()` já retorna o objeto `exports`, mas o teste tentava acessar `compiledModule.exports`; corrigida a extração para usar o retorno real do carregador.
+- O mock da constante do gravador de viagem permanece apenas no teste Node para simular a resolução de módulos TypeScript.

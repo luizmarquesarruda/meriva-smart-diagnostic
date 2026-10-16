@@ -122,7 +122,7 @@ const {
   GPS_HISTORY_RETENTION_DAYS,
   GPS_HISTORY_MAX_SAMPLES_PER_DAY,
   GPS_HISTORY_SEGMENT_RECORDS,
-} = compiledModule.exports;
+} = compiledModule;
 const { appendDailyGpsHistoryIndex } = dailyHistoryModule;
 
 function localKey(timestamp) {
