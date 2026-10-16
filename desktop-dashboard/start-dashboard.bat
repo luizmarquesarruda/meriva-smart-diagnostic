@@ -11,10 +11,21 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
-for /f "tokens=1 delims=." %%a in ('node -p "process.versions.node"') do set NODE_MAJOR=%%a
+for /f "tokens=1,2 delims=." %%a in ('node -p "process.versions.node"') do (
+  set NODE_MAJOR=%%a
+  set NODE_MINOR=%%b
+)
 if not "%NODE_MAJOR%"=="22" (
-  echo AVISO: o painel foi preparado para Node.js 22.x. Versao detectada:
+  echo ERRO: Node.js 22.x e obrigatorio para o modulo SQLite do painel.
   node --version
+  pause
+  exit /b 1
+)
+if %NODE_MINOR% LSS 5 (
+  echo ERRO: Node.js 22.5 ou superior e necessario.
+  node --version
+  pause
+  exit /b 1
 )
 where adb >nul 2>nul
 if errorlevel 1 (
