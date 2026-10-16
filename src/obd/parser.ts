@@ -140,7 +140,16 @@ export function parsePidResponse(pidRequested: string, rawResponse: string, posi
           + ' | CATALISADOR=' + (catalystSupported ? (catalystIncomplete ? 'NÃO PRONTO' : 'PRONTO') : 'NÃO SUPORTADO')
           + ' | INCOMPLETOS=' + (incomplete.length ? incomplete.join(', ') : 'NENHUM');
       })()
-    : undefined;
+    : pid === '0114'
+      ? (() => {
+          const [voltageByte, trimByte] = data;
+          const voltage = voltageByte / 200;
+          // Pela fórmula SAE, o byte B usa todo o intervalo 0x00–0xFF.
+          // 0xFF representa +99,21875%; não é um sentinela universal de ausência.
+          const trim = `${((trimByte * 100) / 128 - 100).toFixed(2)}%`;
+          return `TENSÃO O2 B1S1=${voltage.toFixed(3)} V | STFT B1S1=${trim}`;
+        })()
+      : undefined;
   const validation = validatePidValue(pid, value);
   if (!validation.valid) {
     return {

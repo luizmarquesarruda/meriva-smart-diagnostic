@@ -21,7 +21,7 @@ export default function TestesSensoresScreen(){
  const [error,setError]=useState(''),[savedPath,setSavedPath]=useState(''),[revision,setRevision]=useState(0);
  const cancelled=useRef(false),deadline=useRef(0),runStartedAt=useRef(0),commandsDone=useRef(0),commandElapsedTotal=useRef(0),connectedAtStart=useRef(false);
  useEffect(()=>{const refresh=()=>setRevision(n=>n+1);const a=subscribeSharedObd(refresh),b=subscribeSharedObdStatus(refresh);return()=>{cancelled.current=true;a();b();};},[]);
- useEffect(()=>{if(!running)return;const timer=setInterval(()=>{const remain=deadline.current-Date.now();setCountdownMs(remain>0?remain:1000);},1000);return()=>clearInterval(timer);},[running]);
+ useEffect(()=>{if(!running)return;const timer=setInterval(()=>{const remain=deadline.current-Date.now();setCountdownMs(Math.max(0,remain));},1000);return()=>clearInterval(timer);},[running]);
  const connection=getSharedObdConnection(),status=getSharedObdStatus(),connected=Boolean(connection?.ecuValidated&&status.ecuConnected);
  const supported=new Set((connection?.supportedPids??[]).map(p=>p.replace(/\s/g,'').toUpperCase()));
  const grouped=useMemo(()=>testPlan.map(test=>{

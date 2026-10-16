@@ -209,6 +209,7 @@ test('1. estado vazio -> salvar -> restaurar', async () => {
   const envelope = JSON.parse(files.get(`${CONFIG_DIR}/autosave.json`));
   assert.strictEqual(envelope.schemaVersion, 1);
   assert.strictEqual(envelope.dataType, 'APP_STATE');
+  assert.ok(!files.get(`${CONFIG_DIR}/autosave.json`).includes('\n  "schemaVersion"'), 'autosave JSON deve ser compacto para reduzir bytes serializados/escritos');
   m.disposeAutoSave();
   state = await m.initAutoSave(BASE);
   assert.strictEqual(state.settings.teste, 42, 'estado deve ser restaurado');
@@ -256,6 +257,34 @@ test('1b. leituras rápidas atualizam memória sem regravar TXT a cada mudança;
       'a cadência mínima deve persistir a leitura mais recente quando vencer');
   } finally {
     Date.now = realNow;
+    m.disposeAutoSave();
+  }
+});
+
+test('1c. JSON compacto salva sempre o estado atual sem reescrever TXT em cada atualização numérica', async () => {
+  const m = manager();
+  m.disposeAutoSave();
+  resetFS();
+  await m.initAutoSave(BASE);
+  const historyPath = `${CONFIG_DIR}/meriva_smart_autosave_history.txt`;
+  try {
+    m.updateAutoSaveState((state) => { state.settings.performanceProbe = 1; });
+    assert.strictEqual(await m.saveNow('debounce'), true);
+    const firstText = files.get(historyPath);
+    assert.ok(firstText, 'primeiro snapshot TXT deve existir');
+    const countEntries = (value) => value.split('=== SALVAMENTO_BEGIN ===').length - 1;
+    const firstCount = countEntries(firstText);
+
+    m.updateAutoSaveState((state) => { state.settings.performanceProbe = 2; });
+    assert.strictEqual(await m.saveNow('debounce'), true);
+    const envelope = JSON.parse(files.get(`${CONFIG_DIR}/autosave.json`));
+    assert.strictEqual(envelope.payload.settings.performanceProbe, 2, 'o JSON principal precisa receber a atualização mesmo quando o TXT é limitado por cadência');
+    assert.strictEqual(countEntries(files.get(historyPath)), firstCount, 'atualização numérica dentro do intervalo não deve reescrever/acrescentar ao TXT');
+
+    m.updateAutoSaveState((state) => { state.settings.performanceProbe = 3; });
+    assert.strictEqual(await m.saveNow('manual'), true);
+    assert.strictEqual(countEntries(files.get(historyPath)), firstCount + 1, 'salvamento manual deve sempre gerar snapshot TXT');
+  } finally {
     m.disposeAutoSave();
   }
 });
@@ -479,6 +508,43 @@ test('7b. histórico autosave elimina duplicatas legadas e serializa gravações
   assert.deepStrictEqual(finalNumbers, [...finalNumbers].sort((a, b) => a - b), 'snapshots devem permanecer em ordem crescente');
 });
 
+
+test('7d. snapshots legados agrupam Exported At pela data local do aparelho', async () => {
+  resetFS();
+  const previousTimezone = process.env.TZ;
+  process.env.TZ = 'America/Sao_Paulo';
+  const history = loadTs(path.join(ROOT, 'src/meriva/autosaveHistoryTxt.ts'));
+  const target = CONFIG_DIR + '/meriva_smart_autosave_history.txt';
+  try {
+    files.set(target, [
+      'MERIVA SMART DIAGNOSTIC',
+      'HISTÓRICO DE SALVAMENTOS AUTOMÁTICOS',
+      '=== SALVAMENTO_BEGIN ===',
+      'NÚMERO: 1',
+      'MOTIVO: legado',
+      'MERIVA SMART DIAGNOSTIC',
+      'SAVE EXPORT',
+      'Exported At: 2026-10-11T01:00:00.000Z',
+      '[HISTORY]',
+      'N/D',
+      '=== SALVAMENTO_END ===',
+    ].join('\n'));
+
+    const rendered = await history.readAutoSaveHistory(BASE);
+    assert.ok(
+      rendered.includes('========== DIA: 2026-10-10 =========='),
+      '01:00 UTC deve ser agrupado no dia anterior no fuso America/Sao_Paulo',
+    );
+    assert.ok(
+      !rendered.includes('========== DIA: 2026-10-11 =========='),
+      'não agrupar snapshots legados pela data UTC quando diverge do dia local',
+    );
+  } finally {
+    if (previousTimezone === undefined) delete process.env.TZ;
+    else process.env.TZ = previousTimezone;
+  }
+});
+
 test('7c. mudança de combustível é publicada sem reler configurações a cada PID', async () => {
   resetFS();
   const settingsModule = loadTs(path.join(ROOT, 'src/database/appSettings.ts'));
@@ -619,13 +685,13 @@ test('12. debounce agrupa gravações', async () => {
   m.disposeAutoSave();
 });
 
-test('13. autosave mantém um único TXT histórico e limita a 200 snapshots', async () => {
+test('13. autosave agrupa snapshots por data e limita a 1000 entradas', async () => {
   const m = manager();
   m.disposeAutoSave();
   resetFS();
   await m.initAutoSave(BASE);
 
-  for (let i = 1; i <= 205; i += 1) {
+  for (let i = 1; i <= 1005; i += 1) {
     m.updateAutoSaveState((s) => {
       s.settings.sequence = i;
     });
@@ -636,10 +702,17 @@ test('13. autosave mantém um único TXT histórico e limita a 200 snapshots', a
   assert.ok(files.has(historyPath), 'histórico TXT deve ser criado automaticamente');
   const history = files.get(historyPath);
   const entries = history.split('=== SALVAMENTO_BEGIN ===').slice(1);
-  assert.strictEqual(entries.length, 200, 'histórico deve manter exatamente os 200 mais recentes');
-  assert.ok(history.includes('NÚMERO: 205'), 'último salvamento deve permanecer');
+  assert.strictEqual(entries.length, 1000, 'histórico deve manter exatamente os 1000 mais recentes');
+  assert.ok(history.includes('NÚMERO: 1005'), 'último salvamento deve permanecer');
   assert.ok(!/NÚMERO: 5\n/.test(history), 'salvamentos antigos devem ser removidos');
-  assert.strictEqual((history.match(/meriva smart diagnostic/gi) || []).length, 201, 'um cabeçalho + 200 snapshots');
+  assert.ok(history.includes('========== DIA: '), 'histórico deve ser agrupado por data');
+  assert.ok(history.includes('DATA LOCAL: '), 'cada snapshot deve registrar sua data local');
+  const localDateMatch = history.match(/DATA LOCAL: (\d{4}-\d{2}-\d{2})/);
+  assert.ok(localDateMatch, 'data local deve estar em formato ISO');
+  assert.ok(history.includes(`========== DIA: ${localDateMatch[1]} ==========`), 'o agrupamento deve usar a mesma data do snapshot');
+  assert.match(history, /\n========== DIA: \d{4}-\d{2}-\d{2} ==========\n/, 'blocos diários devem usar quebras de linha reais');
+  assert.match(history, /\n========== FIM DO DIA ==========\n/, 'fim de cada dia deve ocupar uma linha própria');
+  assert.strictEqual((history.match(/meriva smart diagnostic/gi) || []).length, 1001, 'um cabeçalho + 1000 snapshots');
   m.disposeAutoSave();
 });
 
@@ -880,6 +953,174 @@ test('recuperação após encerramento abrupto limpa conexão fantasma e registr
   const envelope = JSON.parse(files.get(`${CONFIG_DIR}/autosave.json`));
   assert.strictEqual(envelope.payload.obd.connected, false, 'estado desconectado deve persistir');
   m.disposeAutoSave();
+});
+
+
+
+test('diário correlaciona viagens e DTCs com a sessão ECU correta', async () => {
+  resetFS();
+  const history = loadTs(path.join(ROOT, 'src/meriva/dailyObdHistory.ts'));
+  const state = loadTs(path.join(ROOT, 'src/meriva/autosaveState.ts')).createEmptyMerivaState();
+  state.obd = {
+    connected: false,
+    adapterName: 'OBDII',
+    lastConnectedAt: '2026-10-10T12:00:00.000Z',
+  };
+  state.driveCycles = [
+    {
+      id: 'previous-session-trip', source: 'REAL_OBD',
+      startedAt: '2026-10-09T12:00:00.000Z', finishedAt: '2026-10-09T12:01:00.000Z',
+      distanceTotalKm: 1, fuelUsedL: 0.1, avgFuelConsumptionKml: 10, fuelDataValid: true,
+      maxSpeedKmh: 40, telemetrySamples: [],
+    },
+    {
+      id: 'current-session-trip', source: 'REAL_OBD',
+      startedAt: '2026-10-10T12:00:02.000Z', finishedAt: '2026-10-10T12:00:09.000Z',
+      distanceTotalKm: 0.2, fuelUsedL: 0.02, avgFuelConsumptionKml: 10, fuelDataValid: true,
+      maxSpeedKmh: 25, telemetrySamples: [],
+    },
+    {
+      id: 'future-trip', source: 'REAL_OBD',
+      startedAt: '2026-10-10T12:00:25.000Z', finishedAt: '2026-10-10T12:01:00.000Z',
+      distanceTotalKm: 0.5, fuelUsedL: 0.05, avgFuelConsumptionKml: 10, fuelDataValid: true,
+      maxSpeedKmh: 30, telemetrySamples: [],
+    },
+  ];
+  state.dtcs = [{
+    code: 'P0135', status: 'CURRENT', occurrences: 1,
+    firstSeen: '2026-10-09T10:00:00.000Z', lastSeen: '2026-10-09T10:00:00.000Z', source: 'REAL_OBD',
+  }];
+  await history.appendDailyObdSessionEvent(BASE, state, 'SESSION_END', '2026-10-10T12:00:20.000Z');
+  const rendered = files.get(BASE + '/VIAGENS/meriva_smart_daily_obd_history.txt');
+  assert.ok(rendered.includes('current-session-trip') === false, 'trip IDs are not exported; assert using the unique start time');
+  assert.ok(rendered.includes('2026-10-10T12:00:02.000Z -> 2026-10-10T12:00:09.000Z'), 'trip from the active session should be retained');
+  assert.ok(!rendered.includes('2026-10-09T12:00:00.000Z -> 2026-10-09T12:01:00.000Z'), 'trip from a prior session must not be repeated');
+  assert.ok(!rendered.includes('2026-10-10T12:00:25.000Z -> 2026-10-10T12:01:00.000Z'), 'trip ending after the event must not appear in the snapshot');
+  assert.ok(rendered.includes('evidência=REGISTRO_ANTERIOR_À_SESSÃO'), 'DTCs last seen before the current session must be labelled as prior evidence');
+});
+
+test('diário mostra leituras recentes por PID e rotula DTC antigo sem revalidar', async () => {
+  resetFS();
+  const history = loadTs(path.join(ROOT, 'src/meriva/dailyObdHistory.ts'));
+  const stateModule = loadTs(path.join(ROOT, 'src/meriva/autosaveState.ts'));
+  const state = stateModule.createEmptyMerivaState();
+  state.obd = {
+    connected: false,
+    adapterName: 'OBDII',
+    lastConnectedAt: '2026-10-14T11:00:00.000Z',
+  };
+  state.lastReadings = [
+    { pid: '010C', name: 'Engine RPM', value: 700, unit: 'rpm', status: 'RESPONDEU', timestamp: '2026-10-14T11:00:10.000Z', source: 'REAL' },
+    { pid: '010C', name: 'Engine RPM', value: 900, unit: 'rpm', status: 'RESPONDEU', timestamp: '2026-10-14T12:00:10.000Z', source: 'REAL' },
+    { pid: '01 0C', name: 'Engine RPM', value: 800, unit: 'rpm', status: 'RESPONDEU', timestamp: '2026-10-14T12:00:19.000Z', source: 'REAL' },
+    { pid: '010D', name: 'Vehicle Speed', value: 35, unit: 'km/h', status: 'RESPONDEU', timestamp: '2026-10-14T12:02:00.000Z', source: 'REAL' },
+  ];
+  state.dtcs = [{
+    code: 'P0135',
+    status: 'CURRENT',
+    firstSeen: '2026-10-10T10:00:00.000Z',
+    lastSeen: '2026-10-10T10:00:00.000Z',
+    occurrences: 5,
+    source: 'REAL_OBD',
+    historical: false,
+    confirmed: true,
+  }];
+
+  const target = BASE + '/VIAGENS/meriva_smart_daily_obd_history.txt';
+  await history.appendDailyObdSessionEvent(BASE, state, 'SESSION_END', '2026-10-14T12:00:20.000Z');
+  const rendered = files.get(target);
+  assert.ok(rendered.includes('010C Engine RPM: 800 rpm'), 'resumo deve exibir a leitura mais recente do PID');
+  assert.ok(!rendered.includes('010C Engine RPM: 700 rpm'), 'leitura de uma hora atrás deve ser excluída');
+  assert.ok(!rendered.includes('010C Engine RPM: 900 rpm'), 'leitura mais antiga do mesmo PID não deve duplicar a linha');
+  assert.ok(!rendered.includes('010D Vehicle Speed'), 'timestamp muito posterior ao evento deve ser excluído');
+  assert.ok(rendered.includes('status=HISTÓRICO/SEM_REVALIDAÇÃO | status original=CURRENT'),
+    'DTC antigo não deve ser apresentado como atual só porque o status persistido era CURRENT');
+});
+
+test('formatador TXT distingue DTC recente de registro sem revalidação', async () => {
+  resetFS();
+  const formatter = loadTs(path.join(ROOT, 'src/meriva/autosaveTxtFormatter.ts'));
+  const state = loadTs(path.join(ROOT, 'src/meriva/autosaveState.ts')).createEmptyMerivaState();
+  state.dtcs = [{
+    code: 'P0420',
+    status: 'CURRENT',
+    firstSeen: '2026-10-10T10:00:00.000Z',
+    lastSeen: '2026-10-10T10:00:00.000Z',
+    occurrences: 5,
+    source: 'REAL_OBD',
+    historical: false,
+    confirmed: true,
+  }];
+  const rendered = formatter.formatAutoSaveTxt(state, {
+    appVersion: '1.0.1',
+    exportedAt: '2026-10-14T12:00:00.000Z',
+  });
+  assert.ok(rendered.includes('status=CURRENT validade=HISTÓRICO_SEM_REVALIDAÇÃO'),
+    'o status original deve ser preservado, mas marcado como não revalidado recentemente');
+});
+
+test('diário marca litros e consumo N/D quando a integração teve lacunas', async () => {
+  resetFS();
+  const history = loadTs(path.join(ROOT, 'src/meriva/dailyObdHistory.ts'));
+  const stateModule = loadTs(path.join(ROOT, 'src/meriva/autosaveState.ts'));
+  const state = stateModule.createEmptyMerivaState();
+  state.obd = {
+    connected: false,
+    adapterName: 'OBDII',
+    lastConnectedAt: '2026-10-14T12:00:00.000Z',
+  };
+  state.driveCycles = [{
+    id: 'gap-trip',
+    source: 'REAL_OBD',
+    startedAt: '2026-10-14T12:00:00.000Z',
+    finishedAt: '2026-10-14T12:00:40.000Z',
+    distanceTotalKm: 1.2,
+    distanceIceKm: 1.2,
+    fuelUsedL: 0.12,
+    avgFuelConsumptionKml: 10,
+    fuelDataValid: false,
+    fuelCoverageComplete: false,
+    totalTimeHms: '00:00:40',
+    drivingTimeHms: '00:00:40',
+    standingTimeHms: '00:00:00',
+    avgDrivingSpeedKmh: 108,
+    maxSpeedKmh: 110,
+    telemetrySamples: [],
+    importedAt: '2026-10-14T12:00:40.000Z',
+  }];
+  const target = BASE + '/VIAGENS/meriva_smart_daily_obd_history.txt';
+  await history.appendDailyObdSessionEvent(BASE, state, 'SESSION_END', '2026-10-14T12:00:45.000Z');
+  const rendered = files.get(target);
+  assert.ok(rendered.includes('1.2 km | N/D (cobertura insuficiente) | N/D'),
+    'não apresentar combustível parcial como total válido depois de uma lacuna superior a 30 s');
+});
+
+test('diário sanitiza médias legadas acima de 30 km/L ao acrescentar evento', async () => {
+  resetFS();
+  const history = loadTs(path.join(ROOT, 'src/meriva/dailyObdHistory.ts'));
+  const stateModule = loadTs(path.join(ROOT, 'src/meriva/autosaveState.ts'));
+  const state = stateModule.createEmptyMerivaState();
+  state.obd = { connected: true, adapterName: 'OBDII' };
+  const target = BASE + '/VIAGENS/meriva_smart_daily_obd_history.txt';
+  files.set(target, [
+    'MERIVA SMART DIAGNOSTIC',
+    '========== DIA: 2026-10-10 ==========',
+    '--- EVENTO: SESSION_END | 2026-10-10T17:15:18.994Z ---',
+    '[VIAGENS REAIS RECENTES]',
+    '2026-10-09T12:28:24.188Z -> 2026-10-09T12:32:15.418Z | 1.025 km | 122.819 km/L | REAL_OBD',
+    '2026-10-10T17:10:20.279Z -> 2026-10-10T17:10:33.716Z | 0.223 km | 31.784 km/L | REAL_OBD',
+    '2026-10-10T17:10:36.631Z -> 2026-10-10T17:10:47.538Z | 0.156 km | 25.318 km/L | REAL_OBD',
+    '--- FIM DO EVENTO ---',
+    '========== FIM DO DIA ==========',
+  ].join('\n'));
+
+  await history.appendDailyObdSessionEvent(BASE, state, 'SESSION_START', '2026-10-14T13:00:00.000Z');
+  const rendered = files.get(target);
+  assert.ok(rendered, 'diário atualizado deve continuar existindo');
+  assert.ok(!rendered.includes('122.819 km/L'), 'média legada extrema não deve continuar sendo apresentada como válida');
+  assert.ok(!rendered.includes('31.784 km/L'), 'média acima do teto deve ser substituída por N/D');
+  assert.ok(rendered.includes('| N/D | REAL_OBD'), 'a viagem deve ser preservada com consumo indisponível');
+  assert.ok(rendered.includes('25.318 km/L'), 'valores abaixo do teto não devem ser alterados por este filtro');
 });
 
 test('diário diário não sobrescreve arquivo existente quando a leitura falha', async () => {

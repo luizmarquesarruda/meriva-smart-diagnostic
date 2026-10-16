@@ -51,7 +51,7 @@ function main() {
 
   let result = engine.runLocalDiagnostic({
     ...base,
-    dtcs: [{ code: 'P0301', status: 'CONFIRMED', firstSeen: '', lastSeen: '', occurrences: 1, source: 'REAL_OBD', historical: false, confirmed: true }],
+    dtcs: [{ code: 'P0301', status: 'CONFIRMED', firstSeen: '', lastSeen: new Date().toISOString(), occurrences: 1, source: 'REAL_OBD', historical: false, confirmed: true }],
   });
   assert.strictEqual(result.hypotheses[0].id, 'FALHA_DE_COMBUSTAO_CILINDRO_1');
   assert.strictEqual(result.hypotheses[0].confidence, 'MEDIUM');
@@ -67,6 +67,17 @@ function main() {
     observations: [obs('0106', 12), obs('0107', 5)],
   });
   assert.strictEqual(result.hypotheses[0].id, 'MISTURA_POBRE');
+
+  const olderTrim = obs('0106', 25);
+  olderTrim.timestamp = new Date(Date.now() - 5000).toISOString();
+  const latestTrim = obs('0106', 2);
+  latestTrim.timestamp = new Date().toISOString();
+  result = engine.runLocalDiagnostic({
+    ...base,
+    // A amostra antiga fica por último no array; a evidência mais recente deve vencer.
+    observations: [latestTrim, obs('0107', 2), olderTrim],
+  });
+  assert.strictEqual(result.hypotheses.length, 0, 'índice deve selecionar a amostra atual, não a última posição do array');
 
   result = engine.runLocalDiagnostic({
     ...base,
@@ -104,7 +115,7 @@ function main() {
 
   result = engine.runLocalDiagnostic({
     ...base,
-    dtcs: [{ code: 'P0135', status: 'CONFIRMED', firstSeen: '', lastSeen: '', occurrences: 1, source: 'REAL_OBD', historical: false, confirmed: true }],
+    dtcs: [{ code: 'P0135', status: 'CONFIRMED', firstSeen: '', lastSeen: new Date().toISOString(), occurrences: 1, source: 'REAL_OBD', historical: false, confirmed: true }],
   });
   assert.strictEqual(result.hypotheses[0].id, 'FALHA_CIRCUITO_AQUECEDOR_O2_B1S1');
   assert.ok(result.hypotheses[0].nextTests.some((item) => item.includes('0114')), 'IA usa sensor_tests.json para recomendar avaliação O2 no P0135');
@@ -120,6 +131,24 @@ function main() {
   assert.strictEqual(result.hypotheses.length, 1);
   assert.strictEqual(result.hypotheses[0].id, 'MISTURA_POBRE');
   assert.strictEqual(result.blockedSimulationSamples, 1);
+
+  assert.strictEqual(engine.isFreshDiagnosticTimestamp(new Date().toISOString()), true, 'timestamp atual deve ser aceito');
+  assert.strictEqual(engine.isFreshDiagnosticTimestamp(new Date(Date.now() + 10_000).toISOString()), false, 'timestamp futuro inválido deve ser bloqueado');
+
+  const staleObservation = obs('010B', 80);
+  staleObservation.timestamp = new Date(Date.now() - engine.MAX_DIAGNOSTIC_EVIDENCE_AGE_MS - 1000).toISOString();
+  result = engine.runLocalDiagnostic({ ...base, observations: [staleObservation] });
+  assert.strictEqual(result.hypotheses.length, 0, 'PID antigo não pode gerar hipótese atual');
+  assert.strictEqual(result.blockedStaleObservations, 1, 'PID antigo deve ser contabilizado como bloqueado');
+
+  const staleDtc = { code: 'P0135', status: 'CURRENT', firstSeen: '', lastSeen: new Date(Date.now() - engine.MAX_DIAGNOSTIC_EVIDENCE_AGE_MS - 1000).toISOString(), occurrences: 1, source: 'REAL_OBD', historical: false, confirmed: true };
+  result = engine.runLocalDiagnostic({ ...base, dtcs: [staleDtc] });
+  assert.strictEqual(result.hypotheses.length, 0, 'DTC sem atualização recente não pode ser tratado como ativo agora');
+  assert.strictEqual(result.blockedStaleDtcs, 1, 'DTC antigo deve ser contabilizado como bloqueado');
+
+  result = engine.runLocalDiagnostic({ ...base, ecuConnected: false, observations: [obs('010B', 80)], dtcs: [{ ...staleDtc, lastSeen: new Date().toISOString() }] });
+  assert.strictEqual(result.hypotheses.length, 0, 'sem resposta atual da ECU, evidências armazenadas não geram hipótese atual');
+  assert.strictEqual(result.disconnectedEvidenceIgnored, true);
 
   console.log('Diagnostic engine: OK');
 }

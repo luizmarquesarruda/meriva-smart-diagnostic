@@ -21,6 +21,8 @@ export interface DriveCycle {
   avgFuelConsumptionKml: number;
   /** False when a real trip is retained but fuel data cannot support km/L. */
   fuelDataValid?: boolean;
+  /** False when more than 30 s elapsed between valid fuel-rate samples; old records may omit it. */
+  fuelCoverageComplete?: boolean;
   /** Maximum valid speed observed during this trip; absent in legacy records. */
   maxSpeedKmh?: number;
   /** Sparse timestamped telemetry captured for this trip. */
@@ -115,7 +117,7 @@ export function getDriveCycleSummary(cycles: DriveCycle[]): DriveCycleSummary {
   const referenceCycles = cycles.filter((cycle) => cycle.source === 'CARSCANNER_SEED');
   const realDistanceKm = realCycles.reduce((sum, cycle) => sum + cycle.distanceTotalKm, 0);
   const consumptionCycles = realCycles.filter((cycle) =>
-    cycle.fuelDataValid === false
+    cycle.fuelDataValid === false || cycle.fuelCoverageComplete === false
       ? false
       : cycle.fuelUsedL >= 0.05 && cycle.avgFuelConsumptionKml > 0,
   );

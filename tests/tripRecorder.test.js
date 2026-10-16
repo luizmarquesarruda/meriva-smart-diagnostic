@@ -61,6 +61,7 @@ noFuel.addSample({ timestampMs: 1000, distanceKm: 0.2, speedKmh: 20, fuelRateLph
 const noFuelCycle = noFuel.buildDriveCycle(2000);
 assert.ok(noFuelCycle, 'a real trip with distance must be retained even without fuel telemetry');
 assert.strictEqual(noFuelCycle.fuelDataValid, false);
+assert.strictEqual(noFuelCycle.fuelCoverageComplete, false, 'without at least two fuel-rate samples, fuel coverage is incomplete');
 assert.strictEqual(noFuelCycle.avgFuelConsumptionKml, 0, 'unavailable consumption must not be fabricated');
 
 const tinyFuel = new RealTripRecorder(1000, 0);
@@ -85,6 +86,7 @@ assert.strictEqual(saved.distanceTotalKm, 2);
 assertApprox(saved.fuelUsedL, 12 * 20_000 / 3_600_000, 1e-6);
 assert.strictEqual(saved.avgFuelConsumptionKml, Number((2 / saved.fuelUsedL).toFixed(3)));
 assert.strictEqual(saved.fuelDataValid, true, 'sufficient fuel samples must be marked valid');
+assert.strictEqual(saved.fuelCoverageComplete, true, 'consecutive valid fuel samples provide complete integration coverage');
 assert.strictEqual(saved.maxSpeedKmh, 36, 'maximum speed must be persisted for the trip report');
 assert.ok(Array.isArray(saved.telemetrySamples), 'trip must persist a bounded telemetry series');
 assert.strictEqual(saved.telemetrySamples.length, 3, 'chart samples are stored no more often than every ten seconds');
@@ -134,6 +136,11 @@ gap.addSample({ timestampMs: 0, distanceKm: 0, speedKmh: 0, fuelRateLph: 10 });
 gap.addSample({ timestampMs: 40_001, distanceKm: 1, speedKmh: 30, fuelRateLph: 10 });
 assert.strictEqual(gap.getState().durationMs, 0);
 assert.strictEqual(gap.getState().fuelUsedL, 0);
+assert.strictEqual(gap.getState().fuelCoverageComplete, false, 'a dropped integration interval must mark fuel coverage incomplete');
+const gapCycle = gap.buildDriveCycle(50_000);
+assert.ok(gapCycle, 'distance must be retained when fuel readings have a gap');
+assert.strictEqual(gapCycle.fuelDataValid, false, 'partial fuel intervals cannot publish an average');
+assert.strictEqual(gapCycle.fuelCoverageComplete, false);
 
 // Short stationary periods must not fragment a real drive into tiny trips.
 assert.strictEqual(shouldFinalizeStoppedTrip(15_000, 850), false, 'idle at a traffic light must not close a trip after 15 seconds');
@@ -145,3 +152,12 @@ assert.strictEqual(shouldFinalizeStoppedTrip(300_000, null), true, 'missing RPM 
 assert.strictEqual(shouldFinalizeStoppedTrip(Number.NaN, 0), false, 'invalid elapsed time must not close a trip');
 
 console.log('PASS trip recorder: GPS monotônico, timestamps, limiar de combustível e persistência REAL_OBD');
+// A mathematically calculable but implausible average must be invalidated.
+const implausible = new RealTripRecorder(1000, 0);
+implausible.addSample({ timestampMs: 1000, distanceKm: 0, speedKmh: 0, fuelRateLph: 10 });
+implausible.addSample({ timestampMs: 11000, distanceKm: 1, speedKmh: 36, fuelRateLph: 10 });
+implausible.addSample({ timestampMs: 21000, distanceKm: 2, speedKmh: 36, fuelRateLph: 10 });
+const implausibleCycle = implausible.buildDriveCycle(22000);
+assert.ok(implausibleCycle);
+assert.strictEqual(implausibleCycle.fuelDataValid, false, 'consumption above 30 km/L must be marked invalid');
+assert.strictEqual(implausibleCycle.avgFuelConsumptionKml, 0, 'invalid consumption must not be stored as a real average');

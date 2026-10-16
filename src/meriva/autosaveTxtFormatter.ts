@@ -7,6 +7,11 @@
 import type { MerivaPersistedState } from './autosaveState';
 import { AUTOSAVE_SCHEMA_VERSION } from './autosaveTypes';
 import { getDtcDefinition } from '../obd/dtcDefinition';
+import { MAX_VALID_TRIP_CONSUMPTION_KML } from '../trip/tripRecorder';
+import autosavePolicy from '../knowledge/autosave_policy.json';
+import diagnosticPolicy from '../knowledge/diagnostic_policy.json';
+
+const ACTIVE_DTC_STATUSES = new Set<string>(diagnosticPolicy.activeDtcStatuses);
 
 export const ND = 'N/D';
 
@@ -15,11 +20,18 @@ function or(value: string | number | boolean | null | undefined): string {
   return String(value);
 }
 
+function formatNumber(value: number, maxDecimals = 2): string {
+  if (!Number.isFinite(value)) return ND;
+  return Number(value.toFixed(maxDecimals)).toString();
+}
+
 export interface ExportTxtOptions {
   appVersion: string;
   exportedAt: string;
-  /** When set, include only the newest N REAL_OBD trips in a compact snapshot. */
+  /** When set, include only the newest N REAL_OBD trips. */
   historyLimit?: number;
+  /** Reduce repeated autosave snapshots; the full state remains in autosave.json. */
+  compact?: boolean;
 }
 
 export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTxtOptions): string {
@@ -56,12 +68,16 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
   L.push('');
 
   L.push('[LAST READINGS]');
-  if (state.lastReadings.length) {
-    for (const reading of state.lastReadings) {
+  const readings = options.compact ? state.lastReadings.slice(0, autosavePolicy.history.compactLatestReadings) : state.lastReadings;
+  if (options.compact && state.lastReadings.length > readings.length) {
+    L.push(`Exibindo as ${readings.length} leituras mais recentes; todas permanecem no autosave JSON.`);
+  }
+  if (readings.length) {
+    for (const reading of readings) {
       const value =
         reading.value === null || reading.value === undefined
           ? ND
-          : `${reading.value} ${reading.unit}`;
+          : `${formatNumber(reading.value, 2)} ${reading.unit}`;
       L.push(`${reading.pid} ${reading.name}: ${value} [${reading.status}] fonte=${reading.source} ${reading.timestamp}`);
     }
   } else {
@@ -70,11 +86,25 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
   L.push('');
 
   L.push('[DTC]');
-  if (state.dtcs.length) {
-    for (const dtc of state.dtcs) {
+  const dtcs = options.compact ? state.dtcs.slice(-autosavePolicy.history.compactLatestDtcs) : state.dtcs;
+  if (options.compact && state.dtcs.length > dtcs.length) {
+    L.push(`Exibindo os ${dtcs.length} DTCs mais recentes; histórico completo permanece no autosave JSON.`);
+  }
+  if (dtcs.length) {
+    for (const dtc of dtcs) {
       const dtcDefinition = getDtcDefinition(dtc.code);
+      const exportTimestampMs = Date.parse(options.exportedAt);
+      const dtcLastSeenMs = Date.parse(dtc.lastSeen);
+      const normalizedStatus = String(dtc.status ?? '').toUpperCase();
+      const hasRecentDtcEvidence = dtc.source === 'REAL_OBD'
+        && ACTIVE_DTC_STATUSES.has(normalizedStatus)
+        && Number.isFinite(exportTimestampMs)
+        && Number.isFinite(dtcLastSeenMs)
+        && dtcLastSeenMs <= exportTimestampMs + diagnosticPolicy.freshness.maxFutureClockSkewMs
+        && exportTimestampMs - dtcLastSeenMs <= diagnosticPolicy.freshness.maxEvidenceAgeMs;
+      const validity = hasRecentDtcEvidence ? 'EVIDÊNCIA_RECENTE' : 'HISTÓRICO_SEM_REVALIDAÇÃO';
       L.push(
-        `${dtc.code} status=${dtc.status} ocorrencias=${dtc.occurrences} fonte=${dtc.source} primeira=${dtc.firstSeen} ultima=${dtc.lastSeen} descricao=${or(dtcDefinition?.description)}`,
+        `${dtc.code} status=${dtc.status} validade=${validity} ocorrencias=${dtc.occurrences} fonte=${dtc.source} primeira=${dtc.firstSeen} ultima=${dtc.lastSeen} descricao=${or(dtcDefinition?.description)}`,
       );
       if (dtcDefinition?.likelyCauses?.length) L.push(`  Causas provaveis: ${dtcDefinition.likelyCauses.join('; ')}`);
       if (dtc.freezeFrame) {
@@ -99,8 +129,19 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
   }
   if (displayedCycles.length) {
     for (const cycle of displayedCycles) {
+      const fuelUsedLabel = cycle.fuelCoverageComplete === false
+        ? 'N/D (cobertura insuficiente)'
+        : cycle.avgFuelConsumptionKml > MAX_VALID_TRIP_CONSUMPTION_KML
+          ? 'N/D (consumo implausível)'
+          : `${formatNumber(cycle.fuelUsedL, 3)} L`;
+      const consumptionLabel = cycle.fuelDataValid === false
+        || cycle.fuelUsedL < 0.05
+        || cycle.avgFuelConsumptionKml <= 0
+        || cycle.avgFuelConsumptionKml > MAX_VALID_TRIP_CONSUMPTION_KML
+        ? ND
+        : `${formatNumber(cycle.avgFuelConsumptionKml, 2)} km/L`;
       L.push(
-        `${cycle.startedAt} -> ${cycle.finishedAt} | ${cycle.distanceTotalKm} km | ${cycle.fuelUsedL} L | ${(cycle.fuelDataValid === false || cycle.fuelUsedL < 0.05 || cycle.avgFuelConsumptionKml <= 0) ? ND : `${cycle.avgFuelConsumptionKml} km/L`} | fonte=${cycle.source} | combustivel=${or(cycle.fuelRateSource)}`,
+        `${cycle.startedAt} -> ${cycle.finishedAt} | ${formatNumber(cycle.distanceTotalKm, 3)} km | ${fuelUsedLabel} | ${consumptionLabel} | fonte=${cycle.source} | combustivel=${or(cycle.fuelRateSource)}`,
       );
     }
   } else {
@@ -115,7 +156,9 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
     L.push(
       `Amostras reais: ${or(state.learning.globalSampleCounts?.realSamples)} / seed: ${or(state.learning.globalSampleCounts?.seedSamples)}`,
     );
-    if (state.learning.contextualData?.length) {
+    if (options.compact) {
+      L.push('Detalhes de estatísticas por contexto preservados no autosave JSON.');
+    } else if (state.learning.contextualData?.length) {
       for (const context of state.learning.contextualData) {
         L.push(`Contexto ${context.condition} (amostras: ${context.sampleCount}):`);
         for (const [pidName, stat] of Object.entries(context.statistics)) {
@@ -133,10 +176,14 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
   L.push('');
 
   L.push('[SETTINGS]');
-  const settings = Object.entries(state.settings ?? {});
+  const allSettings = Object.entries(state.settings ?? {});
+  const settings = options.compact ? allSettings.slice(0, autosavePolicy.history.compactSettings) : allSettings;
   if (settings.length) {
     for (const [key, value] of settings) {
       L.push(`${key}: ${or(value)}`);
+    }
+    if (options.compact && allSettings.length > settings.length) {
+      L.push(`Mais ${allSettings.length - settings.length} configurações preservadas no autosave JSON.`);
     }
   } else {
     L.push(ND);

@@ -487,6 +487,7 @@ export default function LaboratorioScreen() {
     })),
     dtcs: getAutoSaveState().dtcs,
     condition: getVehicleConditionSnapshot().condition,
+    ecuConnected: getSharedObdStatus().ecuConnected,
   });
 
   return (

@@ -253,6 +253,21 @@ async function testParser() {
   assert.strictEqual(o2.status, 'RESPONDEU');
   assert.strictEqual(o2.value, 0.53);
   assert.strictEqual(o2.rawBytes.length, 4);
+  assert.ok(o2.interpretation.includes('STFT B1S1=0.00%'), 'PID 0114 byte B should decode STFT independently of voltage');
+  const o2MaxTrim = parser.parsePidResponse('0114', '41 14 6A FF');
+  assert.strictEqual(o2MaxTrim.value, 0.53, 'byte B must not change the independent O2 voltage value');
+  assert.ok(o2MaxTrim.interpretation.includes('STFT B1S1=99.22%'), 'PID 0114 byte B 0xFF is +99.21875% by the SAE formula, not an undocumented missing-value sentinel');
+  for (const pid of ['0106', '0107', '012D']) {
+    const maxTrim = parser.parsePidResponse(pid, `41 ${pid.slice(-2)} FF`);
+    assert.strictEqual(maxTrim.status, 'RESPONDEU', pid + ' must accept the exact standard maximum fuel-trim value');
+    assert.strictEqual(maxTrim.value, 99.21875, pid + ' full-range maximum formula');
+  }
+  const fuelRate = parser.parsePidResponse('015E', '41 5E 01 2C');
+  assert.strictEqual(fuelRate.status, 'RESPONDEU');
+  assert.strictEqual(fuelRate.value, 15, 'PID 015E must decode ((A × 256) + B) / 20 L/h');
+  const ethanol = parser.parsePidResponse('0152', '41 52 80');
+  assert.strictEqual(ethanol.status, 'RESPONDEU');
+  assert.ok(Math.abs(ethanol.value - (128 * 100 / 255)) < 1e-9, 'PID 0152 must decode ethanol percentage from the full byte range');
   assert.strictEqual(parser.parsePidResponse('01 0C', '41 0C 1A F8').value, 1726);
   assert.strictEqual(parser.validateOBDResponse('410C1AF8'), true);
   assert.strictEqual(parser.parsePidResponse('010C', '410C1AF8').value, 1726);
@@ -445,6 +460,50 @@ async function testEcuValidationGate() {
   assert.strictEqual(manager.isValidEcuProbe({ status: 'OK', response: '41 0B 25', command: '010C', elapsedMs: 10, attempt: 1 }), false);
   assert.strictEqual(manager.MAX_BLUETOOTH_ATTEMPTS, 20);
   assert.strictEqual(manager.BLUETOOTH_RETRY_INTERVAL_MS, 8000);
+
+  const now = Date.now();
+  const cache = {
+    supportedPids: ['0105', '010C', '010D'],
+    protocol: 'ISO 14230-4 KWP FAST',
+    discoveredAt: new Date(now - 60_000).toISOString(),
+    adapterAddress: 'AA:BB:CC:DD:EE:01',
+    vehicleVin: '1HGCM82633A004352',
+  };
+  assert.strictEqual(
+    manager.isPidDiscoveryCacheReusable(cache, 'aa:bb:cc:dd:ee:01', cache.protocol, cache.vehicleVin, now),
+    true,
+    'fresh cache should reuse the same adapter, protocol, and VIN',
+  );
+  assert.strictEqual(
+    manager.isPidDiscoveryCacheReusable(cache, 'AA:BB:CC:DD:EE:02', cache.protocol, cache.vehicleVin, now),
+    false,
+    'cache must not cross Bluetooth adapters',
+  );
+  assert.strictEqual(
+    manager.isPidDiscoveryCacheReusable(cache, 'AA:BB:CC:DD:EE:01', 'ISO 9141-2', cache.vehicleVin, now),
+    false,
+    'cache must not cross negotiated protocols',
+  );
+  assert.strictEqual(
+    manager.isPidDiscoveryCacheReusable(cache, 'AA:BB:CC:DD:EE:01', cache.protocol, '2HGFA16584H000001', now),
+    false,
+    'cache must not cross known vehicle VINs',
+  );
+  assert.strictEqual(
+    manager.isPidDiscoveryCacheReusable(cache, 'AA:BB:CC:DD:EE:01', cache.protocol, undefined, now),
+    false,
+    'VIN-specific cache cannot be reused when the current vehicle VIN is unknown',
+  );
+  assert.strictEqual(
+    manager.isPidDiscoveryCacheReusable(cache, 'AA:BB:CC:DD:EE:01', cache.protocol, cache.vehicleVin, now + manager.PID_DISCOVERY_CACHE_TTL_MS + 1),
+    false,
+    'cache older than 24 hours must be rediscovered',
+  );
+  assert.strictEqual(
+    manager.isPidDiscoveryCacheReusable({ ...cache, adapterAddress: undefined }, 'AA:BB:CC:DD:EE:01', cache.protocol, cache.vehicleVin, now),
+    false,
+    'legacy caches without adapter identity must be rebuilt safely',
+  );
 }
 
 async function testPidScanner() {
@@ -889,6 +948,19 @@ async function testDriveCycleSummaryUsesWeightedRealSpeed() {
   assert.strictEqual(summary.referenceCycleCount, 1);
   assert.strictEqual(summary.lastCycle.id, 'real-no-fuel', 'the latest operational cycle cannot be a seed');
   assert.strictEqual(summary.lastRealCycle.id, 'real-no-fuel');
+
+  const incompleteCoverage = {
+    ...slowLongTrip,
+    id: 'real-incomplete-fuel-coverage',
+    distanceTotalKm: 1,
+    fuelUsedL: 0.05,
+    avgFuelConsumptionKml: 20,
+    fuelDataValid: true,
+    fuelCoverageComplete: false,
+  };
+  const coverageSummary = driveCycles.getDriveCycleSummary([slowLongTrip, incompleteCoverage]);
+  assert.strictEqual(coverageSummary.avgConsumptionKml, 10,
+    'trip with incomplete fuel integration must not influence the aggregate even if a legacy record says fuelDataValid=true');
 }
 
 async function testDtcStorage() {

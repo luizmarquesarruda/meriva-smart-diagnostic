@@ -32,6 +32,8 @@ function main() {
   const sensorTests = readJson('src/knowledge/sensor_tests.json');
   const dtcCatalog = readJson('src/knowledge/dtc_catalog.json');
   const pollingPolicy = readJson('src/knowledge/polling_policy.json');
+  const autosavePolicy = readJson('src/knowledge/autosave_policy.json');
+  const diagnosticPolicy = readJson('src/knowledge/diagnostic_policy.json');
 
   assert.strictEqual(typeof pids.version, 'number');
   assert.strictEqual(typeof formulas.version, 'number');
@@ -49,6 +51,24 @@ function main() {
   assert.ok(Array.isArray(sensorTests.sources) && sensorTests.sources.length >= 5, 'fontes pesquisadas ausentes');
   assert.strictEqual(typeof dtcCatalog.version, 'number');
   assert.strictEqual(typeof pollingPolicy.version, 'number');
+  assert.strictEqual(autosavePolicy.schemaVersion, 1, 'autosave policy schema');
+  assert.strictEqual(diagnosticPolicy.schemaVersion, 1, 'diagnostic policy schema');
+  assert.strictEqual(diagnosticPolicy.freshness.maxEvidenceAgeMs, 120000);
+  assert.strictEqual(diagnosticPolicy.freshness.maxFutureClockSkewMs, 5000);
+  assert.strictEqual(diagnosticPolicy.freshness.dailyReadingWindowMs, diagnosticPolicy.freshness.maxEvidenceAgeMs);
+  assertUnique(diagnosticPolicy.activeDtcStatuses, 'status DTC ativo');
+  assert.ok(diagnosticPolicy.activeDtcStatuses.includes('CURRENT') && diagnosticPolicy.activeDtcStatuses.includes('PENDING'));
+  assert.strictEqual(autosavePolicy.persistence.compactJson, true, 'JSON principal deve ser gravado sem indentação');
+  assert.ok(Number.isInteger(autosavePolicy.persistence.debounceMs) && autosavePolicy.persistence.debounceMs >= 250);
+  assert.ok(Number.isInteger(autosavePolicy.persistence.checkpointMs) && autosavePolicy.persistence.checkpointMs >= autosavePolicy.persistence.debounceMs);
+  assert.ok(Number.isInteger(autosavePolicy.persistence.maxLastReadings) && autosavePolicy.persistence.maxLastReadings >= 10);
+  assert.ok(Number.isInteger(autosavePolicy.history.maxSnapshots) && autosavePolicy.history.maxSnapshots === 1000);
+  assert.ok(Number.isInteger(autosavePolicy.history.snapshotIntervalMs) && autosavePolicy.history.snapshotIntervalMs >= 10000);
+  assert.ok(Array.isArray(autosavePolicy.history.forceRecordReasons) && autosavePolicy.history.forceRecordReasons.includes('session_start') && autosavePolicy.history.forceRecordReasons.includes('session_end'));
+  assert.ok(Number.isInteger(autosavePolicy.history.compactLatestTrips) && autosavePolicy.history.compactLatestTrips >= 0);
+  assert.ok(Number.isInteger(autosavePolicy.history.compactLatestReadings) && autosavePolicy.history.compactLatestReadings >= 1);
+  assert.ok(Number.isInteger(autosavePolicy.history.compactLatestDtcs) && autosavePolicy.history.compactLatestDtcs >= 1);
+  assert.ok(Number.isInteger(autosavePolicy.history.compactSettings) && autosavePolicy.history.compactSettings >= 1);
   assert.strictEqual(pollingPolicy.version, 2, 'cadência flex-fuel exige versão de contrato atualizada');
   assert.ok(Array.isArray(dtcCatalog.codes) && dtcCatalog.codes.length > 0, 'catálogo DTC vazio');
   assert.strictEqual(dtcCatalog.standard, 'SAE J2012');

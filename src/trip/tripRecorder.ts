@@ -1,4 +1,4 @@
-import { FuelRateIntegrator } from '../obd/fuelConsumption';
+import { FuelRateIntegrator, MAX_FUEL_INTEGRATION_INTERVAL_MS } from '../obd/fuelConsumption';
 import type { DriveCycle, TripTelemetrySample } from '../data/driveCycles';
 import type { FuelRateSource } from '../obd/fuelConsumption';
 
@@ -14,6 +14,8 @@ export interface RealTripSample {
 
 /** Minimum integrated fuel required before persisting a consumption average. */
 export const MIN_TRIP_FUEL_L = 0.05;
+/** Consumption above this ceiling is treated as invalid telemetry, not displayed. */
+export const MAX_VALID_TRIP_CONSUMPTION_KML = 30;
 
 /**
  * Do not split a drive every time the vehicle stops briefly at a traffic light.
@@ -42,6 +44,8 @@ export interface RealTripRecorderState {
   movingTimeMs: number;
   maxSpeedKmh: number;
   validFuelSamples: number;
+  /** False if fuel readings were absent or had gaps too long to integrate safely. */
+  fuelCoverageComplete: boolean;
   lastTimestampMs: number | null;
   telemetrySamples: TripTelemetrySample[];
 }
@@ -68,6 +72,8 @@ export class RealTripRecorder {
   private movingTimeMs = 0;
   private maxSpeedKmh = 0;
   private fuelRateSources = new Set<FuelRateSource>();
+  private lastFuelSampleAtMs: number | null = null;
+  private fuelCoverageGapObserved = false;
   private telemetrySamples: TripTelemetrySample[] = [];
   private lastTelemetrySampleAtMs: number | null = null;
 
@@ -134,7 +140,17 @@ export class RealTripRecorder {
       Number.isFinite(sample.fuelRateLph) &&
       sample.fuelRateLph >= 0
     ) {
+      // The integrator intentionally drops intervals >30 s. Make that loss
+      // explicit for the trip: otherwise a partial fuel total could look like
+      // a trustworthy average merely because the missing interval was skipped.
+      if (
+        this.lastFuelSampleAtMs !== null
+        && timestampMs - this.lastFuelSampleAtMs > MAX_FUEL_INTEGRATION_INTERVAL_MS
+      ) {
+        this.fuelCoverageGapObserved = true;
+      }
       this.fuelIntegrator.addSample(sample.fuelRateLph, timestampMs);
+      this.lastFuelSampleAtMs = timestampMs;
       if (sample.fuelRateSource) this.fuelRateSources.add(sample.fuelRateSource);
     }
 
@@ -151,6 +167,7 @@ export class RealTripRecorder {
       movingTimeMs: this.movingTimeMs,
       maxSpeedKmh: this.maxSpeedKmh,
       validFuelSamples: fuelState.validSamples,
+      fuelCoverageComplete: fuelState.validSamples >= 2 && !this.fuelCoverageGapObserved,
       lastTimestampMs: this.lastTimestampMs,
       telemetrySamples: this.telemetrySamples.map((sample) => ({ ...sample })),
     };
@@ -163,8 +180,15 @@ export class RealTripRecorder {
     // never discard the trip or publish an unstable km/L value.
     if (state.distanceKm < 0.1) return null;
 
-    const fuelDataValid = state.fuelUsedL >= MIN_TRIP_FUEL_L && state.validFuelSamples >= 2;
-    const avgFuelConsumptionKml = fuelDataValid ? state.distanceKm / state.fuelUsedL : 0;
+    const hasMinimumFuelEvidence = state.fuelUsedL >= MIN_TRIP_FUEL_L
+      && state.validFuelSamples >= 2
+      && state.fuelCoverageComplete;
+    const calculatedConsumptionKml = hasMinimumFuelEvidence ? state.distanceKm / state.fuelUsedL : 0;
+    const fuelDataValid = hasMinimumFuelEvidence
+      && Number.isFinite(calculatedConsumptionKml)
+      && calculatedConsumptionKml > 0
+      && calculatedConsumptionKml <= MAX_VALID_TRIP_CONSUMPTION_KML;
+    const avgFuelConsumptionKml = fuelDataValid ? calculatedConsumptionKml : 0;
     const avgDrivingSpeedKmh = state.movingTimeMs > 0
       ? state.distanceKm / (state.movingTimeMs / 3_600_000)
       : 0;
@@ -184,6 +208,7 @@ export class RealTripRecorder {
       maxSpeedKmh: Number(state.maxSpeedKmh.toFixed(1)),
       telemetrySamples: state.telemetrySamples,
       fuelDataValid,
+      fuelCoverageComplete: state.fuelCoverageComplete,
       source: 'REAL_OBD',
       fuelRateSource: this.fuelRateSources.size === 1
         ? [...this.fuelRateSources][0]

@@ -33,6 +33,10 @@ export interface PidDiscoveryCache {
   supportedPids: string[];
   protocol: string;
   discoveredAt: string;
+  /** Cache validity is tied to the physical adapter, not just the protocol. */
+  adapterAddress?: string;
+  /** When a VIN is known, do not reuse a cache for a different vehicle. */
+  vehicleVin?: string;
 }
 
 export interface AutonomyReading {

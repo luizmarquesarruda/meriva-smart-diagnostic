@@ -362,6 +362,7 @@ async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm3
           void handleUnexpectedDisconnect(reason);
         },
       },
+      getAutoSaveState().vehicle?.vin,
     );
 
     if (attemptGeneration !== connectionGeneration || disconnectedDuringAttempt || intentionalDisconnect) {
@@ -402,6 +403,20 @@ async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm3
       }
     } catch {
       // Identificação é opcional e não invalida uma ECU já validada.
+    }
+
+    // Cache only a useful ECU PID discovery; weak discoveries are retried next session.
+    if (connection.pidDiscoverySource === 'ECU' && connection.supportedPids.includes('010C') && connection.supportedPids.length >= 3) {
+      updateAutoSaveState((state) => {
+        const vehicleVin = state.vehicle?.vin?.trim().toUpperCase();
+        state.pidDiscovery = {
+          supportedPids: Array.from(new Set(connection.supportedPids)).sort(),
+          protocol: connection.protocol ?? 'AUTO',
+          discoveredAt: new Date().toISOString(),
+          adapterAddress: device.address.toUpperCase(),
+          ...(vehicleVin ? { vehicleVin } : {}),
+        };
+      });
     }
 
     active = {

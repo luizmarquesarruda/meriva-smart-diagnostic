@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "description": "Política central de persistência. O autosave JSON mantém o estado atual; o histórico TXT é um resumo legível e não precisa ser reescrito em toda atualização numérica.",
+  "persistence": {
+    "debounceMs": 1500,
+    "checkpointMs": 45000,
+    "maxLastReadings": 50,
+    "minReadingSaveIntervalMs": 10000,
+    "compactJson": true
+  },
+  "history": {
+    "maxSnapshots": 1000,
+    "snapshotIntervalMs": 30000,
+    "forceRecordReasons": [
+      "critical",
+      "manual",
+      "background",
+      "session_start",
+      "session_end",
+      "session_recovery"
+    ],
+    "compactLatestReadings": 10,
+    "compactLatestDtcs": 8,
+    "compactLatestTrips": 3,
+    "compactSettings": 8
+  }
+}

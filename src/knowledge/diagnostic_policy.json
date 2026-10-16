@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "description": "Contrato comum de atualidade das evidências de diagnóstico e dos relatórios. Evita apresentar dados antigos como estado atual.",
+  "freshness": {
+    "maxEvidenceAgeMs": 120000,
+    "maxFutureClockSkewMs": 5000,
+    "dailyReadingWindowMs": 120000
+  },
+  "activeDtcStatuses": [
+    "CURRENT",
+    "CONFIRMED",
+    "PENDING",
+    "PERMANENT"
+  ]
+}
