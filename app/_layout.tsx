@@ -11,6 +11,7 @@ import { initAutoSave } from '../src/meriva/autosaveManager';
 import { autoTripService } from '../src/trip/autoTripService';
 import { requestAllRequiredPermissions } from '../src/permissions/permissionManager';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { syncDesktopDashboardIfAvailable } from '../src/storage/desktopSync';
 
 export default function RootLayout() {
   // Ativa o bloqueio de tela de forma explícita e o restaura quando o app volta ao primeiro plano.
@@ -35,6 +36,28 @@ export default function RootLayout() {
       disposed = true;
       subscription.remove();
       void deactivateKeepAwake(tag);
+    };
+  }, []);
+
+  // Sincronização opcional com o painel Windows: só transfere dados quando
+  // o serviço local responde pelo ADB reverse autorizado. Não afeta a ECU se
+  // o notebook estiver desconectado.
+  useEffect(() => {
+    let disposed = false;
+    const sync = () => {
+      if (!disposed && AppState.currentState === 'active') {
+        void syncDesktopDashboardIfAvailable();
+      }
+    };
+    sync();
+    const timer = setInterval(sync, 30_000);
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') sync();
+    });
+    return () => {
+      disposed = true;
+      clearInterval(timer);
+      subscription.remove();
     };
   }, []);
 
