@@ -2416,3 +2416,21 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Corrigido o normalizador e acrescentado teste de regressão: normalizeSensorPid('01 0C') deve resultar em '010C'. A página já removia whitespace corretamente.
 - Nenhuma regra de suporte ou conclusão de sensor foi alterada.
 - CI desta correção: TypeScript, testes, Expo Doctor e build Android.
+
+
+## 2026-10-16 — Incidente: ciclo repetitivo de conexão OBD
+
+### Sintoma relatado
+- Ao conectar o ELM327, a tela pisca, desconecta, tenta conectar novamente e repete o ciclo.
+- O sintoma foi relatado pelo usuário; não há log de execução do aparelho que comprove a causa inicial da queda.
+
+### Correções preparadas
+- Removida a tentativa de conexão OBD do `app/_layout.tsx`; o layout permanece responsável por permissões e ciclo de vida, enquanto a tela inicial é a única proprietária da conexão automática inicial.
+- A reconexão em `sharedConnection.ts` preserva a configuração de compatibilidade da sessão original, em vez de voltar aos padrões ao passar configuração indefinida.
+- A recuperação reserva o estado `reconnecting` antes de persistir/fechar a sessão, ignorando callbacks repetidos da mesma queda durante a limpeza assíncrona.
+- Atualizado `tests/bluetoothLifecycle.test.js` para proteger a propriedade única do fluxo e a preservação da configuração.
+
+### Validação e limites
+- Alterações preparadas na branch `fix/obd-reconnect-loop-20261016`.
+- Testes automatizados, CI e validação física ainda pendentes; não declarar a correção validada até a execução dos testes e a verificação no veículo.
+- Próximo teste físico: com o veículo parado, verificar uma conexão normal, desligar/religar o adaptador e confirmar que a interface não entra em ciclo de pisca/desconexão.
