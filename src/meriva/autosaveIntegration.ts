@@ -116,18 +116,18 @@ export async function registerObdQuery(
   const parsedValue = result.parsed.value;
   const persistLearning = shouldFeedLearning(source, result.parsed.status, parsedValue) && parsedValue !== null;
   const learningCondition = condition ?? (source === 'REAL' ? getVehicleConditionSnapshot().condition : 'UNKNOWN');
+  // Aggregation applies to both the fast-path queue and legacy synchronous callers.
+  // Only one sample per PID per 10 s updates persistent learning/occurrence counts;
+  // every actual response still updates live telemetry, last readings, and CSV evidence.
+  const learningKey = `${basePath}|${result.parsed.pid}`;
+  const now = Date.now();
+  const lastLearningAt = lastBackgroundLearningAt.get(learningKey) ?? 0;
+  const persistThisLearningSample = persistLearning && (
+    lastLearningAt === 0 || now - lastLearningAt >= BACKGROUND_LEARNING_MIN_INTERVAL_MS
+  );
+  if (persistThisLearningSample) lastBackgroundLearningAt.set(learningKey, now);
 
   if (options.deferPersistence) {
-    // Learning only needs a representative sample per PID every 10 seconds.
-    // live telemetry and raw CSV evidence still capture every OBD response.
-    const learningKey = `${basePath}|${result.parsed.pid}`;
-    const now = Date.now();
-    const lastLearningAt = lastBackgroundLearningAt.get(learningKey) ?? 0;
-    const persistThisLearningSample = persistLearning && (
-      lastLearningAt === 0 || now - lastLearningAt >= BACKGROUND_LEARNING_MIN_INTERVAL_MS
-    );
-    if (persistThisLearningSample) lastBackgroundLearningAt.set(learningKey, now);
-
     enqueueBackgroundPersistence(basePath, () => persistObdQuery(
       basePath,
       result,
@@ -143,7 +143,7 @@ export async function registerObdQuery(
     result,
     source,
     learningCondition,
-    { bufferedLogs: false, persistLearning },
+    { bufferedLogs: false, persistLearning: persistThisLearningSample },
   );
 }
 

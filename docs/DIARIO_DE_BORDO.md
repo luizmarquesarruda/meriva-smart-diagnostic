@@ -2479,3 +2479,9 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - A CI #2204 passou TypeScript e Expo Doctor, e executou a suíte. O teste de autosave encontrou o nome público legado `flushLearningPersistenceQueue()`, removido ao unificar filas no `flushObdPersistence()`.
 - A função antiga foi preservada como alias funcional que aguarda as tarefas da fila serial de aprendizado; a nova função continua descarregando também CSV e persistência geral.
 - A nova execução da CI precisa confirmar todos os testes e a geração do APK.
+
+
+### Cadência de aprendizado também no caminho síncrono — 2026-10-16
+- A CI #2205 avançou no contrato público e encontrou que a agregação de aprendizado de 10 s só valia para chamadas com `deferPersistence: true`.
+- A mesma regra foi aplicada a chamadas síncronas antigas: a primeira amostra do PID alimenta aprendizado/banco; amostras repetidas dentro de 10 s ainda atualizam telemetria/log, mas não inflam contagens persistidas.
+- A próxima CI deve validar a suíte completa, incluindo o teste de autosave que detectou o problema.
