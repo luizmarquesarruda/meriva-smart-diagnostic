@@ -56,7 +56,7 @@ async function persistObdQuery(
       pid: result.parsed.pid,
       name: result.parsed.name,
       classification: prior?.classification ?? 'PADRAO_OBD',
-      // A resposta prova que o PID respondeu, não que o sensor esteja fisicamente calibrado.
+      // A resposta prova que o PID respondeu, não valida a exatidão física do sensor nem comprova a calibração elétrica.
       status: prior?.status === 'CONFIRMADO' && prior.source === 'USER_REAL_OBSERVATION' ? 'CONFIRMADO' : 'RESPONDEU',
       firstSeen: prior?.firstSeen ?? now,
       lastSeen: now,

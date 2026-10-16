@@ -881,7 +881,8 @@ async function testDriveCycleValidation() {
   assert.ok(migratedIndex.cycles.every((item) => item.source !== 'CARSCANNER_SEED'), 'adding a real trip must remove legacy seeds from active index');
 
   files.set(indexFile, JSON.stringify({ cycles: 'corrompido' }));
-  assert.deepStrictEqual(await storage.readDriveCycles(BASE), []);
+  assert.deepStrictEqual((await storage.readDriveCycles(BASE)).map((item) => item.id), ['test-1', 'test-2'],
+    'índice corrompido deve recuperar ciclos reais do backup válido em vez de apagar o histórico');
 
   resetFS();
   await storage.initializeDriveCycles(BASE);
@@ -1098,10 +1099,10 @@ async function testPidAndLearningWriteSerialization() {
   assert.ok(cockpitSource.includes('ageMs >= 0 && ageMs <= 30_000'), 'cockpit deve descartar temperatura OBD futura ou obsoleta após 30 segundos');
   assert.ok(cockpitSource.includes('LÍQUIDO DE ARREFECIMENTO'), 'página inicial deve apresentar métrica de temperatura do arrefecimento');
   assert.ok(cockpitSource.includes("'TEMPERATURA ALTA'"), 'cockpit deve destacar temperatura alta sem esconder o valor numérico');
-  assert.ok(autoTripServiceSource.includes('registerObdQuery(this.basePath, fuelLevelResult, \'REAL\')'), 'PID 012F automático deve alimentar o pipeline de persistência');
-  assert.ok(autoTripServiceSource.includes('registerObdQuery(this.basePath, fuelResult, \'REAL\')'), 'PID 015E automático deve alimentar o pipeline de persistência');
-  assert.ok(autoTripServiceSource.includes('registerObdQuery(this.basePath, speedResult, \'REAL\')'), 'PID 010D automático deve alimentar o pipeline de persistência');
-  assert.ok(autoTripServiceSource.includes('registerObdQuery(this.basePath, telemetryResult, \'REAL\')'), 'telemetria automática deve alimentar o pipeline de persistência');
+  assert.ok(autoTripServiceSource.includes("registerObdQuery(this.basePath, fuelLevelResult, 'REAL', undefined, { deferPersistence: true })"), 'PID 012F automático deve alimentar o pipeline de persistência');
+  assert.ok(autoTripServiceSource.includes("registerObdQuery(this.basePath, fuelResult, 'REAL', undefined, { deferPersistence: true })"), 'PID 015E automático deve alimentar o pipeline de persistência');
+  assert.ok(autoTripServiceSource.includes("registerObdQuery(this.basePath, speedResult, 'REAL', undefined, { deferPersistence: true })"), 'PID 010D automático deve alimentar o pipeline de persistência');
+  assert.ok(autoTripServiceSource.includes("registerObdQuery(this.basePath, telemetryResult, 'REAL', undefined, { deferPersistence: true })"), 'telemetria automática deve alimentar o pipeline de persistência');
   assert.ok(autoTripServiceSource.includes('instantaneousConsumptionSource'), 'origem do consumo instantâneo deve ser preservada para a interface');
   assert.ok(autoTripServiceSource.includes('A leitura instantânea deve ser publicada a cada ciclo OBD válido'), 'consumo instantâneo deve atualizar mesmo sem viagem ativa');
   const speedQueryIndex = autoTripServiceSource.indexOf("queryPid('010D')");
@@ -1146,8 +1147,11 @@ function testAcquisitionPolicyConsistency() {
   assert.ok(autoTrip.includes('queryPid(fuelCompositionPolicy.pid)'), 'composição do combustível deve ser consultada apenas pela política centralizada');
   assert.ok(settings.includes('subscribeAppSettings') && settings.includes('publishSettings(settings)'),
     'configurações devem notificar serviços ativos após leitura/escrita');
-  assert.ok(learning.includes('enqueueLearningPersistence(async () => {'),
+  const integrationSource = fs.readFileSync(path.join(ROOT, 'src/meriva/autosaveIntegration.ts'), 'utf8');
+  assert.ok(autoTrip.includes('deferPersistence: true') && integrationSource.includes('enqueueBackgroundPersistence(basePath, () => persistObdQuery('),
     'I/O de aprendizado deve ficar fora do caminho crítico de polling serial');
+  assert.ok(learning.includes('enqueueProfileTransaction(basePath, async () => {'),
+    'atualizações do perfil devem manter a fila serial de read-modify-write');
   assert.ok(history.includes('deduplicateEntries') && history.includes('historyQueues'),
     'histórico deve deduplicar registros legados e serializar read-modify-write');
   assert.ok((logger.match(/const today = getObdLogLocalDateKey\(\);/g) || []).length >= 2,

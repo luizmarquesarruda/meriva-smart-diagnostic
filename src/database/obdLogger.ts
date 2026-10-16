@@ -1,6 +1,14 @@
 import { appendCsvRow, appendCsvRowBuffered, type CsvRow } from './csvLogger';
 import type { PidQueryResult } from '../obd/elm327';
 
+/** Device-local day partition; timestamps themselves remain ISO UTC. */
+export function getObdLogLocalDateKey(date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export interface RawObdLogEntry {
   timestamp: string;
   tx: string;
@@ -19,7 +27,7 @@ export async function logRawObdData(
   source: 'REAL' | 'SIMULACAO',
   options: { buffered?: boolean } = {},
 ): Promise<void> {
-  const today = new Date().toISOString().split('T')[0];
+  const today = getObdLogLocalDateKey();
   const fileName = `obd_raw_${today}.csv`;
   const filePath = `${basePath}/LOGS/${fileName}`;
   const row: CsvRow = {
@@ -33,11 +41,11 @@ export async function logRawObdData(
     source,
   };
 
-  if (options.buffered) {
-    appendCsvRowBuffered(filePath, row);
+  if (options.buffered === false) {
+    await appendCsvRow(filePath, row);
     return;
   }
-  await appendCsvRow(filePath, row);
+  appendCsvRowBuffered(filePath, row);
 }
 
 export async function logInterpretedData(
@@ -47,7 +55,7 @@ export async function logInterpretedData(
   source: 'REAL' | 'SIMULACAO',
   options: { buffered?: boolean } = {},
 ): Promise<void> {
-  const today = new Date().toISOString().split('T')[0];
+  const today = getObdLogLocalDateKey();
   const fileName = `obd_interpreted_${today}.csv`;
   const filePath = `${basePath}/LOGS/${fileName}`;
   const row: CsvRow = {
@@ -65,9 +73,9 @@ export async function logInterpretedData(
     condicao: query.parsed.status,
   };
 
-  if (options.buffered) {
-    appendCsvRowBuffered(filePath, row);
+  if (options.buffered === false) {
+    await appendCsvRow(filePath, row);
     return;
   }
-  await appendCsvRow(filePath, row);
+  appendCsvRowBuffered(filePath, row);
 }

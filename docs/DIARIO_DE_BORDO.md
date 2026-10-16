@@ -2485,3 +2485,11 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - A CI #2205 avançou no contrato público e encontrou que a agregação de aprendizado de 10 s só valia para chamadas com `deferPersistence: true`.
 - A mesma regra foi aplicada a chamadas síncronas antigas: a primeira amostra do PID alimenta aprendizado/banco; amostras repetidas dentro de 10 s ainda atualizam telemetria/log, mas não inflam contagens persistidas.
 - A próxima CI deve validar a suíte completa, incluindo o teste de autosave que detectou o problema.
+
+
+### Preservação de contrato e correção dos testes de regressão — 2026-10-16
+- O logger OBD mantém a partição por data local do aparelho, enquanto os timestamps continuam ISO UTC; o caminho normal usa buffer, e `buffered: false` fica disponível para gravação explícita.
+- O armazenamento agora recupera `test-1` e `test-2` do backup válido após corrupção do índice primário; o teste foi atualizado para validar recuperação real em vez de exigir histórico vazio.
+- Os testes de aquisição verificam a API de caminho rápido atual (`deferPersistence: true` + fila `enqueueBackgroundPersistence`) e confirmam separadamente que a fila de perfil serializa as transações.
+- O código explicita que resposta válida do PID não valida a exatidão física/elétrica do sensor.
+- CI da revisão seguinte continua pendente.
