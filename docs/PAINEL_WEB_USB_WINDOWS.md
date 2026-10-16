@@ -71,3 +71,11 @@ A branch agora contém uma primeira versão executável do serviço e da interfa
 ### Segurança e integridade
 
 O serviço escuta somente em loopback e o banco do notebook é separado da base Android. A política de rede Android foi limitada ao loopback. A depuração USB continua exigindo autorização explícita no próprio telefone. A importação filtra leituras, DTCs, testes, viagens e achados por origem `REAL_OBD`; linhas com outra origem não podem alimentar o painel diagnóstico. A base local do notebook deve ser tratada como dado pessoal do veículo e não compartilhada sem intenção.
+
+
+### Revisão estática complementar
+
+- As IDs importadas agora recebem namespace persistente do app Android, evitando colisão com IDs de uma nova instalação/banco recriado. O cursor de amostras permanece separado do identificador da origem.
+- As colunas JSON são preservadas como JSON válido em vez de serem serializadas novamente como strings.
+- A tabela de lotes do serviço é limitada aos 1.000 recebimentos mais recentes; a base de histórico não é apagada por essa limpeza.
+- **Autenticação de aplicação ainda pendente:** a API não usa token por lote. A mitigação atual é escutar exclusivamente em `127.0.0.1`, não abrir porta na LAN e exigir depuração USB autorizada. Não mudar o bind para `0.0.0.0` nem expor a porta por firewall/roteador. Antes de distribuir para terceiros, adicionar autenticação pareada e teste de segurança.
