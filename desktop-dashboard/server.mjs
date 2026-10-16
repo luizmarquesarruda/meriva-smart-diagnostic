@@ -126,8 +126,8 @@ function importBatch(batch) {
     }
     for (const x of batch.dtcEvents ?? []) {
       if (!validText(x.id,128) || !/^[PCBU][0-9A-F]{4}$/i.test(x.code??'') || x.source !== 'REAL_OBD' || !validDate(x.last_seen)) continue;
-      db.prepare('INSERT INTO dtc_events VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET status=excluded.status,occurrences=excluded.occurrences,last_seen=excluded.last_seen,details_json=excluded.details_json')
-        .run(x.id,x.session_id??null,x.code,x.status??'UNKNOWN',Number.isFinite(x.occurrences)?x.occurrences:1,x.first_seen??x.last_seen,x.last_seen,x.source,safeJson(x.details_json),null);
+      db.prepare('INSERT INTO dtc_events VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET status=excluded.status,occurrences=excluded.occurrences,last_seen=excluded.last_seen,details_json=excluded.details_json')
+        .run(x.id,x.session_id??null,x.code,x.status??'UNKNOWN',Number.isFinite(x.occurrences)?x.occurrences:1,x.first_seen??x.last_seen,x.last_seen,x.source,safeJson(x.details_json));
       imported++;
     }
     for (const x of batch.learnedPids ?? []) {
@@ -144,8 +144,8 @@ function importBatch(batch) {
     }
     for (const x of batch.tripRecords ?? []) {
       if (!validText(x.id,128) || !validDate(x.started_at) || x.source !== 'REAL_OBD') continue;
-      db.prepare('INSERT INTO trip_records VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET finished_at=excluded.finished_at,distance_km=excluded.distance_km,fuel_used_l=excluded.fuel_used_l,average_consumption_km_l=excluded.average_consumption_km_l,details_json=excluded.details_json')
-        .run(x.id,x.started_at,x.finished_at??x.started_at,Number(x.distance_km)||0,Number(x.fuel_used_l)||0,Number(x.average_consumption_km_l)||0,Number(x.average_speed_kmh)||0,Number.isFinite(x.maximum_speed_kmh)?x.maximum_speed_kmh:null,x.source,safeJson(x.details_json),null);
+      db.prepare('INSERT INTO trip_records VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET finished_at=excluded.finished_at,distance_km=excluded.distance_km,fuel_used_l=excluded.fuel_used_l,average_consumption_km_l=excluded.average_consumption_km_l,details_json=excluded.details_json')
+        .run(x.id,x.started_at,x.finished_at??x.started_at,Number(x.distance_km)||0,Number(x.fuel_used_l)||0,Number(x.average_consumption_km_l)||0,Number(x.average_speed_kmh)||0,Number.isFinite(x.maximum_speed_kmh)?x.maximum_speed_kmh:null,x.source,safeJson(x.details_json));
       imported++;
     }
     for (const x of batch.diagnosticFindings ?? []) {
