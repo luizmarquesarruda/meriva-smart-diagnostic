@@ -8,7 +8,7 @@ Disponibilizar no notebook Windows 10 um painel local para análise histórica d
 ## Arquitetura proposta
 - Android: SQLite operacional atual continua sendo a origem dos dados. Criar uma camada explícita de exportação/sincronização; não permitir acesso arbitrário ao sandbox privado do app.
 - USB/ADB: conexão autorizada pelo usuário. O serviço Windows detecta o aparelho via adb devices e configura o transporte local. ADB é uma dependência de instalação e deve ser explicado ao usuário.
-- Transporte: preferir uma conexão encaminhada pelo ADB para não depender de Wi-Fi nem abrir portas no roteador. O desenho final deve escolher e testar um único sentido de conexão.
+- Transporte implementado: `adb reverse tcp:8765 tcp:8765`; o app Android acessa `http://localhost:8765` e envia lotes para o serviço Windows. Isso evita depender de Wi-Fi ou abrir portas no roteador. A transferência ainda precisa ser validada em aparelho físico.
 - Serviço Windows: processo local autenticado que recebe lotes versionados, valida o schema, aplica UPSERT/idempotência e grava uma base SQLite própria do painel.
 - Web UI: navegador acessa apenas loopback, por exemplo http://127.0.0.1:8765; gráficos e filtros leem a base local através de API HTTP.
 - Exportações: manter TXT diário e JSON do aplicativo. O painel não apaga nem modifica os originais.
