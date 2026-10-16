@@ -44,8 +44,12 @@ test('API local importa lotes reais idempotentemente e rejeita origem simulada',
     },
     stdio: 'ignore',
   });
-  t.after(() => {
-    if (child && child.exitCode === null) child.kill('SIGTERM');
+  t.after(async () => {
+    if (child && child.exitCode === null) {
+      const exited = new Promise(resolve => child.once('exit', resolve));
+      child.kill('SIGTERM');
+      await Promise.race([exited, new Promise(resolve => setTimeout(resolve, 3000))]);
+    }
     if (dataDir) rmSync(dataDir, { recursive: true, force: true });
   });
 
