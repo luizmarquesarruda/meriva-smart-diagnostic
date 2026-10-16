@@ -97,6 +97,10 @@ async function handleUnexpectedDisconnect(reason: string): Promise<void> {
   connectionGeneration += 1;
   lastConnectionError = reason;
   const connection = active;
+  const compatibility = connection?.session.getCompatibilityConfig();
+  // Reserve recovery before async cleanup; native disconnect callbacks may repeat
+  // for the same physical drop while persistence/session close is still pending.
+  if (connection) reconnecting = true;
   active = null;
 
   if (monitorTimer) {
@@ -118,8 +122,7 @@ async function handleUnexpectedDisconnect(reason: string): Promise<void> {
     }
 
     if (!reason.includes('BLUETOOTH DESLIGADO')) {
-      const delays = connection.session.getCompatibilityConfig().recoveryBackoffMs;
-      reconnecting = true;
+      const delays = compatibility?.recoveryBackoffMs ?? DEFAULT_ELM327_COMPATIBILITY.recoveryBackoffMs;
       void (async () => {
         try {
           for (const delay of delays) {
@@ -127,7 +130,7 @@ async function handleUnexpectedDisconnect(reason: string): Promise<void> {
             await new Promise((resolve) => setTimeout(resolve, delay));
             if (intentionalDisconnect || active) return;
             try {
-              await connectPreferredElm(connection.device.address, undefined, 'EXPLICIT');
+              await connectPreferredElm(connection.device.address, compatibility, 'EXPLICIT');
               return;
             } catch (cause) {
               lastConnectionError = cause instanceof Error ? cause.message : String(cause);
@@ -137,6 +140,8 @@ async function handleUnexpectedDisconnect(reason: string): Promise<void> {
           reconnecting = false;
         }
       })();
+    } else {
+      reconnecting = false;
     }
   }
 }
