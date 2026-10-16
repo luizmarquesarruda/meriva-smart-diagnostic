@@ -702,6 +702,88 @@ export async function persistDiagnosticFindings(
   });
 }
 
+export interface DesktopSyncBatch {
+  schemaVersion: 1;
+  batchId: string;
+  exportedAt: string;
+  sessions: Record<string, unknown>[];
+  pidReadings: Record<string, unknown>[];
+  dtcEvents: Record<string, unknown>[];
+  learnedPids: Record<string, unknown>[];
+  sensorTests: Record<string, unknown>[];
+  tripRecords: Record<string, unknown>[];
+  diagnosticFindings: Record<string, unknown>[];
+  nextPidCursor: number;
+  hasMorePidReadings: boolean;
+}
+
+/**
+ * Lê uma página de dados SQLite para sincronização local por USB/ADB.
+ * O cursor só avança quando o notebook confirma o lote; IDs de exportação são
+ * estáveis para que uma repetição não duplique registros na réplica.
+ */
+export async function getDesktopSyncBatch(afterPidReadingId = 0, pageSize = 500): Promise<DesktopSyncBatch> {
+  const safeCursor = Number.isFinite(afterPidReadingId) ? Math.max(0, Math.floor(afterPidReadingId)) : 0;
+  const safePageSize = Number.isFinite(pageSize) ? Math.min(1000, Math.max(1, Math.floor(pageSize))) : 500;
+  return serializeWrite(async () => {
+    const db = await openDatabase();
+    const sessions = await db.getAllAsync<Record<string, unknown>>(
+      `SELECT id, started_at, ended_at, adapter_name, protocol, ecu_address, ecu_identification,
+              status, close_reason, metadata_json
+       FROM obd_sessions ORDER BY started_at DESC LIMIT 5000`,
+    );
+    const pidRows = await db.getAllAsync<{
+      id: number; session_id: string | null; pid: string; name: string; value: number;
+      unit: string; status: string; source: string; timestamp: string;
+    }>(
+      `SELECT id, session_id, pid, name, value, unit, status, source, timestamp
+       FROM pid_readings WHERE id > ? AND source = 'REAL_OBD'
+       ORDER BY id ASC LIMIT ?`,
+      safeCursor,
+      safePageSize + 1,
+    );
+    const hasMorePidReadings = pidRows.length > safePageSize;
+    const page = hasMorePidReadings ? pidRows.slice(0, safePageSize) : pidRows;
+    const nextPidCursor = page.length ? page[page.length - 1].id : safeCursor;
+    const dtcs = await db.getAllAsync<Record<string, unknown>>(
+      `SELECT id, session_id, code, status, occurrences, first_seen, last_seen, source, details_json
+       FROM dtc_events WHERE source = 'REAL_OBD' ORDER BY id ASC LIMIT 5000`,
+    );
+    const learned = await db.getAllAsync<Record<string, unknown>>(
+      `SELECT pid, name, unit, first_seen, last_seen, successful_reads, last_value, evidence_json
+       FROM learned_pids ORDER BY pid LIMIT 5000`,
+    );
+    const tests = await db.getAllAsync<Record<string, unknown>>(
+      `SELECT id, session_id, started_at, finished_at, mode, status, protocol,
+              supported_pid_count, attempted_read_count, summary_json, source
+       FROM sensor_tests WHERE source = 'REAL_OBD' ORDER BY started_at DESC LIMIT 2000`,
+    );
+    const trips = await db.getAllAsync<Record<string, unknown>>(
+      `SELECT id, started_at, finished_at, distance_km, fuel_used_l, average_consumption_km_l,
+              average_speed_kmh, maximum_speed_kmh, source, details_json
+       FROM trip_records WHERE source = 'REAL_OBD' ORDER BY started_at DESC LIMIT 5000`,
+    );
+    const findings = await db.getAllAsync<Record<string, unknown>>(
+      `SELECT id, session_id, code, severity, summary, evidence_json, created_at, source
+       FROM diagnostic_findings WHERE source = 'REAL_OBD' ORDER BY created_at DESC LIMIT 5000`,
+    );
+    return {
+      schemaVersion: 1,
+      batchId: 'android-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10),
+      exportedAt: new Date().toISOString(),
+      sessions,
+      pidReadings: page.map((row) => ({ ...row, id: 'pid-' + row.id })),
+      dtcEvents: dtcs.map((row) => ({ ...row, id: 'dtc-' + row.id })),
+      learnedPids: learned,
+      sensorTests: tests,
+      tripRecords: trips,
+      diagnosticFindings: findings,
+      nextPidCursor,
+      hasMorePidReadings,
+    };
+  });
+}
+
 export interface SqliteStorageOverview {
   schemaVersion: number;
   databaseSizeBytes: number;
