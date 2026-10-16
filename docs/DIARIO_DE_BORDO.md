@@ -2473,3 +2473,9 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - A primeira tentativa da CI após a inclusão do buffer encontrou dois imports legados de `flushCsvLogs` (exportação/armazenamento e ciclo de vida Bluetooth).
 - Mantida a API pública `flushCsvLogs()` como alias para descarregar todos os buffers novos; as chamadas existentes continuam válidas e não exigem alterações espalhadas.
 - A CI dessa correção de compatibilidade ainda precisa confirmar TypeScript, testes e build Android.
+
+
+### Compatibilidade da fila de aprendizado — 2026-10-16
+- A CI #2204 passou TypeScript e Expo Doctor, e executou a suíte. O teste de autosave encontrou o nome público legado `flushLearningPersistenceQueue()`, removido ao unificar filas no `flushObdPersistence()`.
+- A função antiga foi preservada como alias funcional que aguarda as tarefas da fila serial de aprendizado; a nova função continua descarregando também CSV e persistência geral.
+- A nova execução da CI precisa confirmar todos os testes e a geração do APK.

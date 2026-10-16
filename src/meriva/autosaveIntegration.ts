@@ -147,6 +147,11 @@ export async function registerObdQuery(
   );
 }
 
+/** Backward-compatible name retained for callers that drain only the learning/persistence queue. */
+export async function flushLearningPersistenceQueue(): Promise<void> {
+  await Promise.all(Array.from(backgroundPersistenceQueues.values(), (queue) => queue.catch(() => undefined)));
+}
+
 export async function flushObdPersistence(basePath?: string): Promise<void> {
   const queues = basePath
     ? [backgroundPersistenceQueues.get(basePath)].filter((queue): queue is Promise<void> => Boolean(queue))
