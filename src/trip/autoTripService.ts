@@ -82,6 +82,7 @@ class AutoTripService {
   private pendingCycleRetryTimer: ReturnType<typeof setTimeout> | null = null;
   private nextPendingCycleRetryAtMs = 0;
   private lastEstimatedFuelRate: { rateLph: number; source: FuelRateSource; timestampMs: number } | null = null;
+  private lastFuelFallbackAttemptAtMs = 0;
   private fuelType: FuelType = 'FLEX';
   private lastFuelEthanolPercent: number | null = null;
   private unsubscribeAppSettings: (() => void) | null = null;
@@ -107,6 +108,7 @@ class AutoTripService {
     this.pidFailureCount.clear();
     this.pidNextEligibleAt.clear();
     this.lastEstimatedFuelRate = null;
+    this.lastFuelFallbackAttemptAtMs = 0;
     this.lastFuelEthanolPercent = null;
   }
 
@@ -219,6 +221,7 @@ class AutoTripService {
     this.telemetryCursor = 0;
     this.pollCycleNumber = 0;
     this.lastEstimatedFuelRate = null;
+    this.lastFuelFallbackAttemptAtMs = 0;
     this.lastFuelEthanolPercent = null;
 
     if (!connection || !this.running) {
@@ -389,7 +392,10 @@ class AutoTripService {
           }
         }
 
-        if (fuelRateLph == null && fuelEstimateDue && connection.supportedPids.includes('0110') && this.canQueryPid('0110')) {
+        const fuelFallbackDue = fuelRateLph == null && Date.now() - this.lastFuelFallbackAttemptAtMs >= 5_000;
+        if (fuelFallbackDue) this.lastFuelFallbackAttemptAtMs = Date.now();
+
+        if (fuelRateLph == null && fuelEstimateDue && connection.supportedPids.includes('0110') && fuelFallbackDue && this.canQueryPid('0110')) {
           // MAF é estimativa secundária: amostrar a cada quatro ciclos reduz tráfego
           // K-Line. Só valores positivos produzem estimativa de taxa de combustível.
           const mafResult = await connection.session.queryPid('0110');
@@ -417,6 +423,7 @@ class AutoTripService {
         if (
           fuelRateLph == null &&
           fuelEstimateDue &&
+          fuelFallbackDue &&
           connection.supportedPids.includes('010B') &&
           connection.supportedPids.includes('010F') &&
           connection.supportedPids.includes('010C') &&

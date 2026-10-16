@@ -2499,3 +2499,9 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - A revisão das regressões corrigiu a referência do teste de serialização para `src/database/learningProfile.ts`; a fila serial existente continua responsável por transações read-modify-write.
 - A função `shouldPersistRealPidSample(basePath, pid, nowMs)` centraliza a janela de 10 s e aceita relógio explícito em testes, mantendo o mesmo comportamento no caminho real.
 - A próxima CI precisa passar no contrato de aprendizado e executar os testes adicionais e build Android.
+
+
+### Limite temporal de tentativas do fallback de consumo — 2026-10-16
+- A CI #2208 passou no TypeScript e nas 26 regressões, bem como nos testes de logger e recuperação de viagens, mas falhou em `tests/obdFastPath.test.js` por uma asserção que exige limite temporal compartilhado das estimativas de consumo.
+- Reintroduzido `lastFuelFallbackAttemptAtMs`: o fallback MAF/MAP não pode iniciar tentativas mais que uma vez a cada janela mínima de 5 s, além da cadência JSON e do backoff por PID. O temporizador é zerado ao trocar de sessão.
+- Nova CI solicitada; nenhuma promoção para main até todos os testes e o APK passarem.
