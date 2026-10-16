@@ -2779,3 +2779,28 @@ Os limites configurados foram estreitados para dispersão absoluta máxima de 10
 
 ### Análise estática de tipos
 A captura do combustível de início de viagem usa agora uma variável local não anulável ao construir `RealTripRecorder`; o campo de classe continua anulável para representar “nenhuma viagem ativa”, mas o construtor recebe somente `FuelType` válido. Esta correção reduz ambiguidade de tipos sem executar TypeScript/CI.
+
+
+## 2026-10-16 — Painel Windows local e sincronização USB (branch separada)
+
+### Objetivo
+Implementar a estação de análise no Windows 10 para consultar histórico real do Meriva Smart Diagnostic, sem copiar pastas manualmente e sem modificar a base operacional do Android.
+
+### Mudanças realizadas nesta etapa
+- Criada a pasta `desktop-dashboard/` com serviço HTTP local, banco SQLite independente, interface web e gráficos SVG para PIDs importados.
+- Criada API para resumo, sessões, leituras por PID, DTCs, PIDs aprendidos, viagens, testes de sensores e achados diagnósticos.
+- Criado contrato de lote versão 1. O importador valida campos, limita o tamanho do corpo, filtra origem `REAL_OBD` nas entidades diagnósticas e usa transação SQLite.
+- IDs estáveis das leituras e das entidades evitam duplicação em reimportações. O cursor de amostras é salvo no Android somente após resposta HTTP bem-sucedida e é associado ao ID persistente da base local do notebook.
+- Adicionada exportação paginada em `src/storage/merivaDatabase.ts` e cliente oportunista em `src/storage/desktopSync.ts`. A sincronização tenta ocorrer enquanto o app está em primeiro plano e o serviço do notebook responde por `localhost:8765`.
+- Adicionado plugin de configuração Android para permitir HTTP somente em loopback, mantendo tráfego claro desabilitado para outros domínios.
+- Adicionados lançador Windows e monitor PowerShell que reaplica `adb reverse` após conexão/reconexão USB.
+- Adicionado teste `desktop-dashboard/server.test.mjs` para verificar importação, idempotência e rejeição de leitura simulada.
+- Base SQLite local e arquivos WAL/SHM foram adicionados ao `.gitignore` para evitar incluir histórico de veículo no repositório.
+- Documentação ampliada em `docs/PAINEL_WEB_USB_WINDOWS.md`.
+
+### Decisões e limites
+- Branch: `feat/desktop-dashboard-usb-20261016`, derivada da branch de persistência SQLite; `main` não foi alterada.
+- O serviço usa `node:sqlite`, portanto requer Node.js 22.5+ da linha 22.x e Android Platform Tools/ADB no PATH.
+- A sincronização depende de depuração USB habilitada e autorização do computador no telefone. O app Android precisa estar em primeiro plano para executar as tentativas automáticas nesta versão.
+- Não foi executado teste de runtime, `npm test`, `npm run validate`, Expo prebuild/build ou teste físico USB/Android. Os arquivos foram adicionados e revisados estaticamente; isso **não equivale a validação funcional**.
+- Nenhuma CI foi iniciada intencionalmente. Antes de integrar em `main`, executar os testes do painel e do app, validar o plugin no prebuild, conferir reconexão, volumes grandes e paridade de contagens com SQLite/TXT de origem.
