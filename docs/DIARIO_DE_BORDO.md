@@ -2804,3 +2804,10 @@ Implementar a estação de análise no Windows 10 para consultar histórico real
 - A sincronização depende de depuração USB habilitada e autorização do computador no telefone. O app Android precisa estar em primeiro plano para executar as tentativas automáticas nesta versão.
 - Não foi executado teste de runtime, `npm test`, `npm run validate`, Expo prebuild/build ou teste físico USB/Android. Os arquivos foram adicionados e revisados estaticamente; isso **não equivale a validação funcional**.
 - Nenhuma CI foi iniciada intencionalmente. Antes de integrar em `main`, executar os testes do painel e do app, validar o plugin no prebuild, conferir reconexão, volumes grandes e paridade de contagens com SQLite/TXT de origem.
+
+
+### 2026-10-16 — conferência complementar do painel USB
+- IDs exportados são prefixados pela origem Android para evitar colisões entre instalações.
+- JSON de origem é preservado sem dupla serialização e a tabela de lotes do serviço mantém apenas os 1.000 registros mais recentes.
+- O teste de API foi criado, mas continua pendente de execução; a CI permanece sem execução nesta etapa.
+- A API permanece restrita a loopback e não deve ser exposta na rede local; pareamento autenticado segue como trabalho pendente antes de distribuição.
