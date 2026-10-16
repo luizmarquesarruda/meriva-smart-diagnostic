@@ -68,6 +68,7 @@ class AutoTripService {
   private transition: Promise<void> = Promise.resolve();
   private unsubscribeConnection: (() => void) | null = null;
   private unsubscribeEcuStatus: (() => void) | null = null;
+  private unsubscribeGpsHistory: (() => void) | null = null;
   private gpsRecordingTransition: Promise<void> = Promise.resolve();
   private readonly listeners = new Set<Listener>();
   private telemetryCursor = 0;
@@ -131,6 +132,7 @@ class AutoTripService {
   async start(basePath: string): Promise<void> {
     if (this.running) return;
     this.basePath = basePath;
+    gpsHistoryStore.configure(basePath);
     const settings = await readAppSettings(basePath);
     this.fuelType = settings.fuelType;
     this.unsubscribeAppSettings?.();
@@ -152,6 +154,12 @@ class AutoTripService {
     this.emit();
     this.running = true;
     if (this.pendingFinalizedCycles.length > 0) void this.flushPendingFinalizedCycles();
+    // Foreground watcher and Expo background-location task both feed gpsTracker.handleLocation.
+    // Recording here keeps JSONL history passive until a validated ECU session opens.
+    this.unsubscribeGpsHistory = gpsTracker.subscribe((gpsState) => {
+      if (!gpsState.lastSample) return;
+      void gpsHistoryStore.record(gpsState.lastSample, gpsState.currentSpeedKmh);
+    });
     this.unsubscribeConnection = subscribeSharedObd((connection) => {
       this.transition = this.transition
         .then(() => this.applyConnection(connection))
@@ -181,6 +189,8 @@ class AutoTripService {
     this.unsubscribeConnection = null;
     this.unsubscribeEcuStatus?.();
     this.unsubscribeEcuStatus = null;
+    this.unsubscribeGpsHistory?.();
+    this.unsubscribeGpsHistory = null;
     await this.gpsRecordingTransition;
     await gpsHistoryStore.stopSession();
     this.unsubscribeAppSettings?.();

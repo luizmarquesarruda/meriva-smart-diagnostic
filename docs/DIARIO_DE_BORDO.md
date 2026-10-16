@@ -2460,3 +2460,10 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - O índice de viagens usa cópia de recuperação (sidecar), validação e backup; a leitura também consulta sidecars válidos e evita tratar falha de leitura como histórico vazio.
 - Testes adicionados: desempenho do logger CSV, segurança do armazenamento de viagens e caminho rápido da telemetria. A página web para notebook continua explicitamente fora do escopo.
 - CI do commit seguinte: pendente. Não promover para main até validate e android-build passarem.
+
+
+### Ajuste de integração GPS após revisão de código — 2026-10-16
+- A revisão detectou que a store JSONL tinha retenção, segmentação e fila, mas ainda faltava conectar as amostras emitidas pelo singleton `gpsTracker` à store.
+- O serviço agora assina o estado do rastreador e envia cada última amostra válida à store; o mesmo caminho recebe posições do watcher em primeiro plano e da tarefa Expo de localização em segundo plano.
+- A store é configurada com o diretório ativo do autosave antes de iniciar, e o listener é removido no encerramento do serviço; amostras pendentes ainda são drenadas pelo encerramento da sessão.
+- Essa correção entra na próxima execução de CI. O comportamento com tela apagada depende das permissões e do ciclo de vida Android; force-stop e teste físico permanecem pendentes.
