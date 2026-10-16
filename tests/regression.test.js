@@ -1125,7 +1125,7 @@ function testAcquisitionPolicyConsistency() {
   const root = path.join(ROOT, 'src');
   const autoTrip = fs.readFileSync(path.join(root, 'trip/autoTripService.ts'), 'utf8');
   const settings = fs.readFileSync(path.join(root, 'database/appSettings.ts'), 'utf8');
-  const learning = fs.readFileSync(path.join(root, 'meriva/autosaveIntegration.ts'), 'utf8');
+  const learning = fs.readFileSync(path.join(root, 'database/learningProfile.ts'), 'utf8');
   const history = fs.readFileSync(path.join(root, 'meriva/autosaveHistoryTxt.ts'), 'utf8');
   const logger = fs.readFileSync(path.join(root, 'database/obdLogger.ts'), 'utf8');
   const policy = JSON.parse(fs.readFileSync(path.join(root, 'knowledge/polling_policy.json'), 'utf8'));
@@ -1170,8 +1170,8 @@ function testPidResponseIsNotVehicleValidation() {
   assert.strictEqual(runtime.shouldPersistRealPidSample(basePath, '010C', 1000), true);
   assert.strictEqual(runtime.shouldPersistRealPidSample(basePath, '010C', 2000), false,
     'mesmo PID não deve regravar aprendizado antes da janela mínima');
-  assert.strictEqual(runtime.shouldPersistRealPidSample(basePath, '010C', 5999), false);
-  assert.strictEqual(runtime.shouldPersistRealPidSample(basePath, '010C', 6000), true,
+  assert.strictEqual(runtime.shouldPersistRealPidSample(basePath, '010C', 10999), false);
+  assert.strictEqual(runtime.shouldPersistRealPidSample(basePath, '010C', 11000), true,
     'o PID volta a alimentar o aprendizado quando termina a janela mínima');
   assert.strictEqual(runtime.shouldPersistRealPidSample(basePath, '0105', 2000), true,
     'a cadência deve ser independente por PID');

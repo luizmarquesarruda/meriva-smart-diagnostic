@@ -77,6 +77,14 @@ async function persistObdQuery(
   }
 }
 
+export function shouldPersistRealPidSample(basePath: string, pid: string, nowMs = Date.now()): boolean {
+  const key = `${basePath}|${pid}`;
+  const last = lastBackgroundLearningAt.get(key);
+  if (last != null && nowMs - last < BACKGROUND_LEARNING_MIN_INTERVAL_MS) return false;
+  lastBackgroundLearningAt.set(key, nowMs);
+  return true;
+}
+
 function enqueueBackgroundPersistence(basePath: string, task: () => Promise<void>): void {
   const previous = backgroundPersistenceQueues.get(basePath) ?? Promise.resolve();
   const current = previous.catch(() => undefined).then(task);
@@ -119,13 +127,8 @@ export async function registerObdQuery(
   // Aggregation applies to both the fast-path queue and legacy synchronous callers.
   // Only one sample per PID per 10 s updates persistent learning/occurrence counts;
   // every actual response still updates live telemetry, last readings, and CSV evidence.
-  const learningKey = `${basePath}|${result.parsed.pid}`;
-  const now = Date.now();
-  const lastLearningAt = lastBackgroundLearningAt.get(learningKey) ?? 0;
-  const persistThisLearningSample = persistLearning && (
-    lastLearningAt === 0 || now - lastLearningAt >= BACKGROUND_LEARNING_MIN_INTERVAL_MS
-  );
-  if (persistThisLearningSample) lastBackgroundLearningAt.set(learningKey, now);
+  const persistThisLearningSample = persistLearning &&
+    shouldPersistRealPidSample(basePath, result.parsed.pid, Date.now());
 
   if (options.deferPersistence) {
     enqueueBackgroundPersistence(basePath, () => persistObdQuery(

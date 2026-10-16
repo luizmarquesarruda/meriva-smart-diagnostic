@@ -2493,3 +2493,9 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Os testes de aquisição verificam a API de caminho rápido atual (`deferPersistence: true` + fila `enqueueBackgroundPersistence`) e confirmam separadamente que a fila de perfil serializa as transações.
 - O código explicita que resposta válida do PID não valida a exatidão física/elétrica do sensor.
 - CI da revisão seguinte continua pendente.
+
+
+### Janela de aprendizado testável — 2026-10-16
+- A revisão das regressões corrigiu a referência do teste de serialização para `src/database/learningProfile.ts`; a fila serial existente continua responsável por transações read-modify-write.
+- A função `shouldPersistRealPidSample(basePath, pid, nowMs)` centraliza a janela de 10 s e aceita relógio explícito em testes, mantendo o mesmo comportamento no caminho real.
+- A próxima CI precisa passar no contrato de aprendizado e executar os testes adicionais e build Android.
