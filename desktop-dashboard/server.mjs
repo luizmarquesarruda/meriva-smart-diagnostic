@@ -99,7 +99,7 @@ function readBody(req) {
 function validText(v, max=500) { return typeof v === 'string' && v.length > 0 && v.length <= max; }
 function validDate(v) { return validText(v, 50) && Number.isFinite(Date.parse(v)); }
 function rows(v, max=10000) { return Array.isArray(v) && v.length <= max; }
-function safeJson(v) { try { return JSON.stringify(v ?? {}); } catch { return '{}'; } }
+function safeJson(v) { try { return JSON.stringify(v ?? {}); } catch { return '{}'; } }\nfunction jsonColumn(v) { if (typeof v === 'string') { try { JSON.parse(v); return v; } catch { return safeJson(v); } } return safeJson(v); }
 
 function importBatch(batch) {
   if (!batch || batch.schemaVersion !== SCHEMA_VERSION || !validText(batch.batchId, 128) || !validDate(batch.exportedAt)) {
@@ -119,7 +119,7 @@ function importBatch(batch) {
       db.prepare(`INSERT INTO obd_sessions VALUES(?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT(id) DO UPDATE SET ended_at=excluded.ended_at,status=excluded.status,
         close_reason=excluded.close_reason,metadata_json=excluded.metadata_json`)
-        .run(x.id,x.started_at,x.ended_at??null,x.adapter_name??null,x.protocol??null,x.ecu_address??null,x.ecu_identification??null,x.status??null,x.close_reason??null,safeJson(x.metadata_json));
+        .run(x.id,x.started_at,x.ended_at??null,x.adapter_name??null,x.protocol??null,x.ecu_address??null,x.ecu_identification??null,x.status??null,x.close_reason??null,jsonColumn(x.metadata_json));
       imported++;
     }
     for (const x of batch.pidReadings ?? []) {
@@ -131,19 +131,19 @@ function importBatch(batch) {
     for (const x of batch.dtcEvents ?? []) {
       if (!validText(x.id,128) || !/^[PCBU][0-9A-F]{4}$/i.test(x.code??'') || x.source !== 'REAL_OBD' || !validDate(x.last_seen)) continue;
       db.prepare('INSERT INTO dtc_events VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET status=excluded.status,occurrences=excluded.occurrences,last_seen=excluded.last_seen,details_json=excluded.details_json')
-        .run(x.id,x.session_id??null,x.code,x.status??'UNKNOWN',Number.isFinite(x.occurrences)?x.occurrences:1,x.first_seen??x.last_seen,x.last_seen,x.source,safeJson(x.details_json));
+        .run(x.id,x.session_id??null,x.code,x.status??'UNKNOWN',Number.isFinite(x.occurrences)?x.occurrences:1,x.first_seen??x.last_seen,x.last_seen,x.source,jsonColumn(x.details_json));
       imported++;
     }
     for (const x of batch.learnedPids ?? []) {
       if (!validText(x.pid,24) || !validText(x.name,200) || !validDate(x.last_seen)) continue;
       db.prepare('INSERT INTO learned_pids VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(pid) DO UPDATE SET name=excluded.name,unit=excluded.unit,last_seen=excluded.last_seen,successful_reads=MAX(learned_pids.successful_reads,excluded.successful_reads),last_value=excluded.last_value,evidence_json=excluded.evidence_json')
-        .run(x.pid,x.name,String(x.unit??''),x.first_seen??x.last_seen,x.last_seen,Math.max(0,Number(x.successful_reads)||0),Number.isFinite(x.last_value)?x.last_value:null,safeJson(x.evidence_json));
+        .run(x.pid,x.name,String(x.unit??''),x.first_seen??x.last_seen,x.last_seen,Math.max(0,Number(x.successful_reads)||0),Number.isFinite(x.last_value)?x.last_value:null,jsonColumn(x.evidence_json));
       imported++;
     }
     for (const x of batch.sensorTests ?? []) {
       if (!validText(x.id,128) || !validDate(x.started_at) || x.source !== 'REAL_OBD') continue;
       db.prepare('INSERT INTO sensor_tests VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET finished_at=excluded.finished_at,status=excluded.status,summary_json=excluded.summary_json')
-        .run(x.id,x.session_id??null,x.started_at,x.finished_at??x.started_at,x.mode??'UNKNOWN',x.status??'UNKNOWN',x.protocol??null,Number(x.supported_pid_count)||0,Number(x.attempted_read_count)||0,safeJson(x.summary_json),x.source);
+        .run(x.id,x.session_id??null,x.started_at,x.finished_at??x.started_at,x.mode??'UNKNOWN',x.status??'UNKNOWN',x.protocol??null,Number(x.supported_pid_count)||0,Number(x.attempted_read_count)||0,jsonColumn(x.summary_json),x.source);
       imported++;
     }
     for (const x of batch.tripRecords ?? []) {
