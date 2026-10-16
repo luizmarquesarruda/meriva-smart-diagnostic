@@ -2467,3 +2467,9 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - O serviço agora assina o estado do rastreador e envia cada última amostra válida à store; o mesmo caminho recebe posições do watcher em primeiro plano e da tarefa Expo de localização em segundo plano.
 - A store é configurada com o diretório ativo do autosave antes de iniciar, e o listener é removido no encerramento do serviço; amostras pendentes ainda são drenadas pelo encerramento da sessão.
 - Essa correção entra na próxima execução de CI. O comportamento com tela apagada depende das permissões e do ciclo de vida Android; force-stop e teste físico permanecem pendentes.
+
+
+### Compatibilidade da fila CSV — 2026-10-16
+- A primeira tentativa da CI após a inclusão do buffer encontrou dois imports legados de `flushCsvLogs` (exportação/armazenamento e ciclo de vida Bluetooth).
+- Mantida a API pública `flushCsvLogs()` como alias para descarregar todos os buffers novos; as chamadas existentes continuam válidas e não exigem alterações espalhadas.
+- A CI dessa correção de compatibilidade ainda precisa confirmar TypeScript, testes e build Android.

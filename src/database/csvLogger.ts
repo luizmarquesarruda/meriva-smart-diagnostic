@@ -155,3 +155,8 @@ export function getBufferedCsvRowCount(filePath?: string): number {
   if (filePath) return bufferedRows.get(filePath)?.length ?? 0;
   return Array.from(bufferedRows.values()).reduce((total, rows) => total + rows.length, 0);
 }
+
+/** Compatibility API used by exports and the Bluetooth lifecycle. */
+export async function flushCsvLogs(): Promise<void> {
+  await flushBufferedCsvRows();
+}
