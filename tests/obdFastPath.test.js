@@ -34,6 +34,7 @@ const fakeAutosave = {
   pushLastReading(reading) { savedReadings.push(reading); },
   updateAutoSaveState() {},
   scheduleCriticalSave: async () => true,
+  registerBackgroundPersistenceFlushHandler() {},
 };
 const mocks = {
   '../database/obdLogger': {

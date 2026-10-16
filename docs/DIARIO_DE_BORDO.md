@@ -2505,3 +2505,9 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - A CI #2208 passou no TypeScript e nas 26 regressões, bem como nos testes de logger e recuperação de viagens, mas falhou em `tests/obdFastPath.test.js` por uma asserção que exige limite temporal compartilhado das estimativas de consumo.
 - Reintroduzido `lastFuelFallbackAttemptAtMs`: o fallback MAF/MAP não pode iniciar tentativas mais que uma vez a cada janela mínima de 5 s, além da cadência JSON e do backoff por PID. O temporizador é zerado ao trocar de sessão.
 - Nova CI solicitada; nenhuma promoção para main até todos os testes e o APK passarem.
+
+
+### Atualização do mock para o callback de background — 2026-10-16
+- A CI #2209 confirmou que as 26 regressões passam, o logger CSV e a recuperação de viagens também passam, e a execução parou no teste `obdFastPath.test.js` porque seu mock do gerenciador de autosave não implementava `registerBackgroundPersistenceFlushHandler`.
+- O mock foi atualizado para implementar a nova API de ciclo de vida; o teste continua verificando a fila e o caminho rápido da telemetria.
+- A próxima execução precisa confirmar os testes GPS/driveability restantes e a geração Android.
