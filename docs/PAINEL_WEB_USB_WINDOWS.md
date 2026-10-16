@@ -37,3 +37,37 @@ Conectar o telefone por USB, autorizar uma vez, iniciar o serviço local e sincr
 
 ## Validação
 Nenhum teste de runtime, instalação Windows ou teste físico USB foi executado ainda. A CI foi intencionalmente evitada nesta etapa.
+
+## Implementação inicial — 16/10/2026
+
+A branch agora contém uma primeira versão executável do serviço e da interface:
+
+- `desktop-dashboard/server.mjs`: API local em `127.0.0.1:8765`, base SQLite independente e rotas de resumo, sessões, leituras por PID, DTCs, PIDs aprendidos, viagens, testes e achados.
+- `desktop-dashboard/index.html`: painel que consulta a API e desenha um gráfico SVG a partir de amostras realmente importadas.
+- `desktop-dashboard/start-dashboard.bat` e `watch-usb.ps1`: inicializam o serviço/navegador e reaplicam `adb reverse` quando o Android autorizado é conectado ou reconectado.
+- `src/storage/merivaDatabase.ts`: leitura paginada das amostras SQLite reais e exportação estável das entidades para sincronização.
+- `src/storage/desktopSync.ts`: cliente que verifica o serviço, envia lotes, salva o cursor localmente após confirmação e retoma por ID da amostra.
+- `plugins/withLoopbackDashboardNetwork.js` + `app.json`: política de rede Android que permite HTTP em loopback e mantém tráfego claro desabilitado para outros domínios.
+- `desktop-dashboard/server.test.mjs`: teste de API para importação idempotente e filtro de origem simulada.
+- `.gitignore`: impede versionar a base local de histórico do notebook.
+
+### Pré-requisitos e execução
+
+1. Instalar Node.js 22.x (mínimo 22.5, por usar `node:sqlite`) e Android Platform Tools/ADB no Windows.
+2. No Android, habilitar opções do desenvolvedor e depuração USB; conectar por cabo de dados e aceitar a autorização do computador.
+3. Executar `desktop-dashboard/start-dashboard.bat`. Manter aberta a janela de monitoramento USB.
+4. O navegador abre em `http://127.0.0.1:8765`. A base do notebook é criada em `desktop-dashboard/data/meriva-dashboard.db` e fica fora do Git.
+5. Para executar o teste local da API, abrir um terminal na pasta `desktop-dashboard` e executar `npm test` com Node 22.5+.
+
+### Limites atuais — não confundir código criado com validação concluída
+
+- A API e o cliente Android foram adicionados, mas **não foram executados neste ambiente**. Não foi possível confirmar build Android, runtime Node/SQLite, autorização ADB nem transferência com telefone físico.
+- A exportação envia sessões e entidades de apoio junto com páginas de até 500 amostras PID. O cursor só avança após uma resposta HTTP de sucesso; os IDs das amostras tornam reimportações idempotentes.
+- O cliente sincroniza enquanto o aplicativo Android está em primeiro plano. Não há promessa de transferência com o app encerrado ou em background.
+- O serviço requer Node 22.x e ADB configurado no PATH; ainda não é um instalador autossuficiente.
+- O teste automatizado foi criado, mas não executado. A CI não foi disparada nesta etapa, conforme a restrição do projeto.
+- Antes de considerar pronto: executar `npm test` na pasta do painel, `npm run validate`, Expo prebuild/build, testar USB real, desconexão/reconexão, lotes grandes e comparar contagens com a base SQLite/TXT do celular.
+
+### Segurança e integridade
+
+O serviço escuta somente em loopback e o banco do notebook é separado da base Android. A política de rede Android foi limitada ao loopback. A depuração USB continua exigindo autorização explícita no próprio telefone. A importação filtra leituras, DTCs, testes, viagens e achados por origem `REAL_OBD`; linhas com outra origem não podem alimentar o painel diagnóstico. A base local do notebook deve ser tratada como dado pessoal do veículo e não compartilhada sem intenção.
