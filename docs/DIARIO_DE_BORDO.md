@@ -2434,3 +2434,19 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Alterações preparadas na branch `fix/obd-reconnect-loop-20261016`.
 - Testes automatizados, CI e validação física ainda pendentes; não declarar a correção validada até a execução dos testes e a verificação no veículo.
 - Próximo teste físico: com o veículo parado, verificar uma conexão normal, desligar/religar o adaptador e confirmar que a interface não entra em ciclo de pisca/desconexão.
+
+## 2026-10-16 — Ajuste da validação CI da correção Bluetooth
+
+### Evidência
+- A execução CI #2193 passou por `npm ci`, Expo Doctor (17/17) e TypeScript.
+- A suíte parou em `tests/bluetoothLifecycle.test.js:47` porque o teste ainda exigia uma mensagem de fallback que deixou de existir após o `RootLayout` passar a preparar permissões sem iniciar a conexão OBD.
+- A falha encontrada foi uma asserção de teste desatualizada; isso, isoladamente, não comprova a correção física do problema de reconexão.
+
+### Correção
+- Substituída a asserção da mensagem antiga por verificações explícitas de que o layout exige as permissões Bluetooth e localização.
+- Mantidas as asserções que impedem conexão OBD concorrente no layout e verificam preservação da configuração da sessão durante a recuperação.
+
+### Validação pendente
+- Nova CI solicitada pela atualização da branch; confirmar resultado integral, inclusive testes restantes e build Android.
+- Teste físico do ELM327 no veículo continua pendente.
+
