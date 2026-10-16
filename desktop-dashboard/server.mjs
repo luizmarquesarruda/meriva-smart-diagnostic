@@ -99,7 +99,8 @@ function readBody(req) {
 function validText(v, max=500) { return typeof v === 'string' && v.length > 0 && v.length <= max; }
 function validDate(v) { return validText(v, 50) && Number.isFinite(Date.parse(v)); }
 function rows(v, max=10000) { return Array.isArray(v) && v.length <= max; }
-function safeJson(v) { try { return JSON.stringify(v ?? {}); } catch { return '{}'; } }\nfunction jsonColumn(v) { if (typeof v === 'string') { try { JSON.parse(v); return v; } catch { return safeJson(v); } } return safeJson(v); }
+function safeJson(v) { try { return JSON.stringify(v ?? {}); } catch { return '{}'; } }
+function jsonColumn(v) { if (typeof v === 'string') { try { JSON.parse(v); return v; } catch { return safeJson(v); } } return safeJson(v); }
 
 function importBatch(batch) {
   if (!batch || batch.schemaVersion !== SCHEMA_VERSION || !validText(batch.batchId, 128) || !validDate(batch.exportedAt)) {
