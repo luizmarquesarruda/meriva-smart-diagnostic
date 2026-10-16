@@ -2,26 +2,66 @@
 <html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Meriva Smart Diagnostic — Painel local</title>
 <style>
-:root{color-scheme:dark;--bg:#0b0e13;--panel:#131923;--line:#283241;--muted:#9aa8b8;--text:#edf3fa;--blue:#59a7ff;--green:#53d6a1;--amber:#f3c66b}
+:root{color-scheme:dark;--bg:#0b0e13;--panel:#131923;--line:#283241;--muted:#9aa8b8;--text:#edf3fa;--blue:#59a7ff;--green:#53d6a1;--amber:#f3c66b;--red:#ff8585}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
-header{padding:24px clamp(18px,4vw,48px);border-bottom:1px solid var(--line);background:#0f141c}.wrap{max-width:1400px;margin:auto}
+header{padding:24px clamp(18px,4vw,48px);border-bottom:1px solid var(--line);background:#0f141c}.wrap,main{max-width:1400px;margin:auto}
 header .eyebrow{color:var(--green);font-size:.76rem;font-weight:800;letter-spacing:.13em;text-transform:uppercase}h1{margin:5px 0;font-size:clamp(1.5rem,3vw,2.2rem)}p{margin:5px 0;color:var(--muted)}
-main{max-width:1400px;margin:auto;padding:24px clamp(18px,4vw,48px)}.status{display:flex;gap:12px;align-items:center;padding:16px;border:1px solid #69572e;background:#211c12;border-radius:12px;margin-bottom:20px}
-.dot{width:10px;height:10px;border-radius:50%;background:var(--amber);flex:none}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
-.card{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:18px;min-width:0}.label{font-size:.82rem;color:var(--muted)}.value{font-size:1.7rem;font-weight:750;margin-top:8px}
-.wide{grid-column:span 2}.empty{padding:24px;border:1px dashed var(--line);border-radius:10px;color:var(--muted)}.section-title{font-size:1.05rem;font-weight:750;margin:0 0 12px}
-.small{font-size:.8rem;color:var(--muted)}footer{padding:24px;text-align:center;color:var(--muted);font-size:.8rem}@media(max-width:900px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.wide{grid-column:span 2}}@media(max-width:520px){.grid{grid-template-columns:1fr}.wide{grid-column:auto}}
+main{padding:24px clamp(18px,4vw,48px)}.status{display:flex;gap:12px;align-items:center;padding:16px;border:1px solid var(--line);background:var(--panel);border-radius:12px;margin-bottom:20px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--amber);flex:none}.status[data-state="ok"]{border-color:#24684f}.status[data-state="ok"] .dot{background:var(--green)}.status[data-state="error"]{border-color:#703d3d}.status[data-state="error"] .dot{background:var(--red)}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.card{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:18px;min-width:0}.label{font-size:.82rem;color:var(--muted)}.value{font-size:1.7rem;font-weight:750;margin-top:8px}
+.wide{grid-column:span 2}.full{grid-column:1/-1}.section-title{font-size:1.05rem;font-weight:750;margin:0 0 12px}.small{font-size:.8rem;color:var(--muted)}
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:12px}select,button{background:#0b1119;border:1px solid var(--line);color:var(--text);padding:9px 12px;border-radius:8px;font:inherit}button{cursor:pointer}button:hover{border-color:var(--blue)}
+.chart{width:100%;height:260px;display:block}.empty{padding:24px;border:1px dashed var(--line);border-radius:10px;color:var(--muted)}.table-wrap{overflow:auto;max-height:380px}table{width:100%;border-collapse:collapse;font-size:.87rem}th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);white-space:nowrap}th{color:var(--muted);font-weight:600;position:sticky;top:0;background:var(--panel)}.tag{display:inline-block;padding:2px 7px;border-radius:6px;background:#202a36;font-size:.76rem}
+footer{padding:24px;text-align:center;color:var(--muted);font-size:.8rem}
+@media(max-width:900px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.wide{grid-column:span 2}}@media(max-width:520px){.grid{grid-template-columns:1fr}.wide,.full{grid-column:auto}.value{font-size:1.5rem}}
 </style></head><body>
 <header><div class="wrap"><div class="eyebrow">Estação de análise local</div><h1>Meriva Smart Diagnostic</h1><p>Históricos, telemetria e relatórios no notebook Windows</p></div></header>
-<main><div class="status" role="status"><span class="dot"></span><div><strong>Serviço USB ainda não conectado</strong><p>Esta interface é o esqueleto inicial. A sincronização automática por USB/ADB e as consultas ao banco serão implementadas nas próximas etapas.</p></div></div>
+<main>
+<div class="status" id="status" data-state="wait" role="status" aria-live="polite"><span class="dot"></span><div><strong id="statusTitle">Verificando serviço local…</strong><p id="statusText">Este painel lê apenas a base local. A sincronização Android ainda precisa ser habilitada no aplicativo.</p></div></div>
 <div class="grid">
-<div class="card"><div class="label">Sessões importadas</div><div class="value">—</div><p>Disponível após sincronização</p></div>
-<div class="card"><div class="label">Amostras de PIDs</div><div class="value">—</div><p>Somente leituras reais</p></div>
-<div class="card"><div class="label">Eventos DTC</div><div class="value">—</div><p>Com origem e data</p></div>
-<div class="card"><div class="label">Última sincronização</div><div class="value">—</div><p>USB / ADB autorizado</p></div>
-<div class="card wide"><h2 class="section-title">Telemetria histórica</h2><div class="empty">Os gráficos de temperatura, RPM, tensão e velocidade aparecerão aqui após a conexão do serviço e a sincronização dos dados.</div></div>
-<div class="card wide"><h2 class="section-title">Histórico de sessões</h2><div class="empty">As sessões serão agrupadas por dia, preservando múltiplas conexões na mesma data.</div></div>
-<div class="card wide"><h2 class="section-title">Códigos de falha</h2><div class="empty">Os eventos DTC serão apresentados com status, ocorrências e evidência real da ECU.</div></div>
-<div class="card wide"><h2 class="section-title">PIDs aprendidos</h2><div class="empty">Somente PIDs com resposta válida da ECU serão considerados confirmados.</div></div>
-</div><section class="card" style="margin-top:18px"><h2 class="section-title">Como será aberto no notebook</h2><ol><li>Instalar o pacote local do painel e os componentes USB necessários.</li><li>Conectar o celular por cabo USB de dados e autorizar o computador no Android.</li><li>Iniciar o serviço local do painel.</li><li>O serviço abrirá esta página no navegador padrão e acompanhará a sincronização.</li></ol><p class="small">O endereço final será local, por exemplo http://127.0.0.1:8765. Não é um endereço ativo nesta versão estática.</p></section></main>
-<footer>Meriva Smart Diagnostic · painel local · sem hospedagem externa</footer></body></html>
+<div class="card"><div class="label">Sessões importadas</div><div class="value" id="sessionsCount">—</div><p>Conexões ECU preservadas</p></div>
+<div class="card"><div class="label">Amostras de PIDs</div><div class="value" id="readingsCount">—</div><p>Somente origem REAL_OBD</p></div>
+<div class="card"><div class="label">Eventos DTC</div><div class="value" id="dtcsCount">—</div><p>Com status e data</p></div>
+<div class="card"><div class="label">Última sincronização</div><div class="value" id="lastSync" style="font-size:1rem">—</div><p id="syncBatches">Sem lotes recebidos</p></div>
+<div class="card full"><h2 class="section-title">Telemetria histórica</h2><div class="toolbar"><label for="pidSelect">PID:</label><select id="pidSelect" aria-label="Selecionar PID"><option value="">Aguardando dados</option></select><button id="refreshChart" type="button">Atualizar gráfico</button><span class="small" id="chartInfo">O gráfico só aparece após a importação de amostras reais.</span></div><svg id="chart" class="chart" viewBox="0 0 1000 260" role="img" aria-label="Gráfico de telemetria histórica"><text x="500" y="130" fill="#9aa8b8" text-anchor="middle">Sem amostras importadas</text></svg></div>
+<div class="card full"><h2 class="section-title">Sessões ECU</h2><div class="table-wrap"><table><thead><tr><th>Início</th><th>Fim</th><th>Adaptador</th><th>Protocolo</th><th>Estado</th></tr></thead><tbody id="sessionsTable"><tr><td colspan="5">Nenhuma sessão importada.</td></tr></tbody></table></div></div>
+<div class="card wide"><h2 class="section-title">Códigos de falha</h2><div class="table-wrap"><table><thead><tr><th>Código</th><th>Status</th><th>Ocorrências</th><th>Última observação</th></tr></thead><tbody id="dtcsTable"><tr><td colspan="4">Nenhum DTC importado.</td></tr></tbody></table></div></div>
+<div class="card wide"><h2 class="section-title">PIDs aprendidos</h2><div class="table-wrap"><table><thead><tr><th>PID</th><th>Nome</th><th>Unidade</th><th>Leituras válidas</th><th>Último valor</th></tr></thead><tbody id="learnedTable"><tr><td colspan="5">Nenhum PID importado.</td></tr></tbody></table></div></div>
+<div class="card wide"><h2 class="section-title">Viagens reais</h2><div class="table-wrap"><table><thead><tr><th>Início</th><th>Distância</th><th>Consumo médio</th><th>Velocidade média</th></tr></thead><tbody id="tripsTable"><tr><td colspan="4">Nenhuma viagem importada.</td></tr></tbody></table></div></div>
+<div class="card wide"><h2 class="section-title">Testes de sensores</h2><div class="table-wrap"><table><thead><tr><th>Início</th><th>Modo</th><th>Estado</th><th>PIDs suportados</th></tr></thead><tbody id="testsTable"><tr><td colspan="4">Nenhum teste importado.</td></tr></tbody></table></div></div>
+</div>
+<section class="card" style="margin-top:18px"><h2 class="section-title">Estado da integração USB</h2><p id="usbInfo">O serviço local prepara o canal ADB, mas ainda não há um exportador dentro do app Android para enviar os registros. Não interprete a ausência de dados como ausência de atividade no veículo.</p><p class="small">Serviço local: <code>http://127.0.0.1:8765</code>. A base deste notebook é uma réplica de análise e não altera nem apaga o histórico do celular.</p></section>
+</main><footer>Meriva Smart Diagnostic · painel local · sem hospedagem externa</footer>
+<script>
+const $=id=>document.getElementById(id);
+const fmtDate=v=>{if(!v)return '—';const d=new Date(v);return Number.isNaN(d.getTime())?String(v):d.toLocaleString('pt-BR')};
+const esc=v=>String(v??'—').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function api(path){const r=await fetch(path,{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
+function rowsHtml(target,items,empty,render){$(target).innerHTML=items.length?items.map(render).join(''):'<tr><td colspan="8">'+esc(empty)+'</td></tr>'}
+function drawChart(data,unit){
+ const svg=$('chart');if(!data.length){svg.innerHTML='<text x="500" y="130" fill="#9aa8b8" text-anchor="middle">Sem amostras para este PID</text>';return}
+ const vals=data.map(x=>Number(x.value)).filter(Number.isFinite);if(!vals.length){svg.innerHTML='<text x="500" y="130" fill="#9aa8b8" text-anchor="middle">Valores indisponíveis</text>';return}
+ const min=Math.min(...vals),max=Math.max(...vals),span=max-min||1,W=1000,H=260,L=62,R=20,T=20,B=40;
+ const pts=data.map((x,i)=>{const px=L+(data.length===1?0:i/(data.length-1))*(W-L-R);const py=T+(max-Number(x.value))/span*(H-T-B);return px.toFixed(1)+','+py.toFixed(1)}).join(' ');
+ const grid=[0,.25,.5,.75,1].map(t=>{const y=T+t*(H-T-B),v=max-t*span;return '<line x1="'+L+'" y1="'+y+'" x2="'+(W-R)+'" y2="'+y+'" stroke="#283241"/><text x="'+(L-9)+'" y="'+(y+4)+'" fill="#9aa8b8" text-anchor="end" font-size="12">'+v.toFixed(1)+'</text>'}).join('');
+ svg.innerHTML=grid+'<polyline points="'+pts+'" fill="none" stroke="#59a7ff" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/><text x="'+L+'" y="'+(H-10)+'" fill="#9aa8b8" font-size="12">'+esc(fmtDate(data[0].timestamp))+'</text><text x="'+(W-R)+'" y="'+(H-10)+'" fill="#9aa8b8" text-anchor="end" font-size="12">'+esc(fmtDate(data[data.length-1].timestamp))+'</text><text x="'+L+'" y="14" fill="#edf3fa" font-size="12">'+esc(unit||'valor')+'</text>';
+}
+async function loadChart(){const pid=$('pidSelect').value;if(!pid)return;try{const data=await api('/api/readings?pid='+encodeURIComponent(pid)+'&limit=1000');drawChart(data,'');$('chartInfo').textContent=data.length+' amostras exibidas · '+pid;}catch(e){$('chartInfo').textContent='Falha ao carregar gráfico: '+e.message}}
+async function refresh(){
+ try{
+  const health=await api('/api/health');const s=await api('/api/summary');
+  $('status').dataset.state='ok';$('statusTitle').textContent='Serviço local ativo';$('statusText').textContent='API disponível · esquema '+health.schemaVersion+' · '+fmtDate(health.now);
+  $('sessionsCount').textContent=s.sessions??0;$('readingsCount').textContent=s.readings??0;$('dtcsCount').textContent=s.dtcs??0;$('lastSync').textContent=fmtDate(s.lastSync);$('syncBatches').textContent=s.lastSync?'Último lote recebido':'Nenhum lote recebido ainda';
+  const [sessions,dtcs,learned,trips,tests]=await Promise.all([api('/api/sessions'),api('/api/dtcs'),api('/api/learned-pids'),api('/api/trips'),api('/api/tests')]);
+  rowsHtml('sessionsTable',sessions,'Nenhuma sessão importada.',x=>'<tr><td>'+esc(fmtDate(x.started_at))+'</td><td>'+esc(fmtDate(x.ended_at))+'</td><td>'+esc(x.adapter_name)+'</td><td>'+esc(x.protocol)+'</td><td><span class="tag">'+esc(x.status)+'</span></td></tr>');
+  rowsHtml('dtcsTable',dtcs,'Nenhum DTC importado.',x=>'<tr><td><strong>'+esc(x.code)+'</strong></td><td>'+esc(x.status)+'</td><td>'+esc(x.occurrences)+'</td><td>'+esc(fmtDate(x.last_seen))+'</td></tr>');
+  rowsHtml('learnedTable',learned,'Nenhum PID importado.',x=>'<tr><td>'+esc(x.pid)+'</td><td>'+esc(x.name)+'</td><td>'+esc(x.unit)+'</td><td>'+esc(x.successful_reads)+'</td><td>'+esc(x.last_value)+'</td></tr>');
+  rowsHtml('tripsTable',trips,'Nenhuma viagem importada.',x=>'<tr><td>'+esc(fmtDate(x.started_at))+'</td><td>'+esc(Number(x.distance_km).toFixed(2))+' km</td><td>'+esc(Number(x.average_consumption_km_l).toFixed(2))+' km/L</td><td>'+esc(Number(x.average_speed_kmh).toFixed(1))+' km/h</td></tr>');
+  rowsHtml('testsTable',tests,'Nenhum teste importado.',x=>'<tr><td>'+esc(fmtDate(x.started_at))+'</td><td>'+esc(x.mode)+'</td><td>'+esc(x.status)+'</td><td>'+esc(x.supported_pid_count)+'</td></tr>');
+  const previous=$('pidSelect').value;$('pidSelect').innerHTML=learned.length?learned.map(x=>'<option value="'+esc(x.pid)+'">'+esc(x.pid+' — '+x.name)+'</option>').join(''):'<option value="">Nenhum PID importado</option>';
+  if(learned.some(x=>x.pid===previous))$('pidSelect').value=previous;
+  if($('pidSelect').value)await loadChart();else drawChart([],'');
+ }catch(e){$('status').dataset.state='error';$('statusTitle').textContent='Serviço local indisponível';$('statusText').textContent='Inicie start-dashboard.bat. Detalhe: '+e.message;}
+}
+$('refreshChart').addEventListener('click',loadChart);$('pidSelect').addEventListener('change',loadChart);refresh();setInterval(refresh,15000);
+</script></body></html>
