@@ -150,18 +150,19 @@ function importBatch(batch) {
     for (const x of batch.tripRecords ?? []) {
       if (!validText(x.id,128) || !validDate(x.started_at) || x.source !== 'REAL_OBD') continue;
       db.prepare('INSERT INTO trip_records VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET finished_at=excluded.finished_at,distance_km=excluded.distance_km,fuel_used_l=excluded.fuel_used_l,average_consumption_km_l=excluded.average_consumption_km_l,details_json=excluded.details_json')
-        .run(x.id,x.started_at,x.finished_at??x.started_at,Number(x.distance_km)||0,Number(x.fuel_used_l)||0,Number(x.average_consumption_km_l)||0,Number(x.average_speed_kmh)||0,Number.isFinite(x.maximum_speed_kmh)?x.maximum_speed_kmh:null,x.source,safeJson(x.details_json));
+        .run(x.id,x.started_at,x.finished_at??x.started_at,Number(x.distance_km)||0,Number(x.fuel_used_l)||0,Number(x.average_consumption_km_l)||0,Number(x.average_speed_kmh)||0,Number.isFinite(x.maximum_speed_kmh)?x.maximum_speed_kmh:null,x.source,jsonColumn(x.details_json));
       imported++;
     }
     for (const x of batch.diagnosticFindings ?? []) {
       if (!validText(x.id,128) || !validDate(x.created_at) || x.source !== 'REAL_OBD') continue;
       db.prepare('INSERT INTO diagnostic_findings VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET severity=excluded.severity,summary=excluded.summary,evidence_json=excluded.evidence_json')
-        .run(x.id,x.session_id??null,x.code??'UNKNOWN',x.severity??'INFO',x.summary??'',safeJson(x.evidence_json),x.created_at,x.source);
+        .run(x.id,x.session_id??null,x.code??'UNKNOWN',x.severity??'INFO',x.summary??'',jsonColumn(x.evidence_json),x.created_at,x.source);
       imported++;
     }
     const total = collections.reduce((n,k)=>n+(batch[k]??[]).length,0);
     tx.run(batch.batchId,new Date().toISOString(),batch.exportedAt,SCHEMA_VERSION,total);
     db.exec('COMMIT');
+    db.prepare('DELETE FROM sync_batches WHERE batch_id NOT IN (SELECT batch_id FROM sync_batches ORDER BY received_at DESC LIMIT 1000)').run();
     return { duplicate: false, imported, batchId: batch.batchId, instanceId };
   } catch (error) {
     db.exec('ROLLBACK');
