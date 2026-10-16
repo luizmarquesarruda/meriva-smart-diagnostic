@@ -18,7 +18,7 @@ const db = new DatabaseSync(DB_PATH);
 db.exec(`
   PRAGMA journal_mode = WAL;
   PRAGMA foreign_keys = ON;
-  CREATE TABLE IF NOT EXISTS sync_batches (
+  CREATE TABLE IF NOT EXISTS service_meta (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);\n  CREATE TABLE IF NOT EXISTS sync_batches (
     batch_id TEXT PRIMARY KEY NOT NULL,
     received_at TEXT NOT NULL,
     exported_at TEXT NOT NULL,
@@ -63,7 +63,7 @@ db.exec(`
   );
 `);
 
-const q = {
+let instanceId = db.prepare('SELECT value FROM service_meta WHERE key=?').get('instanceId')?.value;\nif (!instanceId) { instanceId = randomUUID(); db.prepare('INSERT OR REPLACE INTO service_meta(key,value) VALUES(?,?)').run('instanceId', instanceId); }\n\nconst q = {
   summary: db.prepare(`SELECT
     (SELECT COUNT(*) FROM obd_sessions) AS sessions,
     (SELECT COUNT(*) FROM pid_readings WHERE source='REAL_OBD') AS readings,
@@ -104,7 +104,7 @@ function importBatch(batch) {
   const collections = ['sessions','pidReadings','dtcEvents','learnedPids','sensorTests','tripRecords','diagnosticFindings'];
   if (collections.some(k => !rows(batch[k] ?? [], 20000))) throw Object.assign(new Error('INVALID_BATCH_COLLECTION'), { status: 400 });
   const existing = db.prepare('SELECT batch_id FROM sync_batches WHERE batch_id=?').get(batch.batchId);
-  if (existing) return { duplicate: true, imported: 0 };
+  if (existing) return { duplicate: true, imported: 0, instanceId };
 
   let imported = 0;
   const tx = db.prepare('INSERT INTO sync_batches(batch_id,received_at,exported_at,schema_version,record_count) VALUES(?,?,?,?,?)');
@@ -157,7 +157,7 @@ function importBatch(batch) {
     const total = collections.reduce((n,k)=>n+(batch[k]??[]).length,0);
     tx.run(batch.batchId,new Date().toISOString(),batch.exportedAt,SCHEMA_VERSION,total);
     db.exec('COMMIT');
-    return { duplicate: false, imported, batchId: batch.batchId };
+    return { duplicate: false, imported, batchId: batch.batchId, instanceId };
   } catch (error) {
     db.exec('ROLLBACK');
     throw error;
@@ -167,7 +167,7 @@ function importBatch(batch) {
 const server = http.createServer(async (req,res) => {
   try {
     const url = new URL(req.url ?? '/', 'http://127.0.0.1');
-    if (req.method === 'GET' && url.pathname === '/api/health') return json(res,200,{ok:true,service:'meriva-desktop-dashboard',schemaVersion:SCHEMA_VERSION,now:new Date().toISOString()});
+    if (req.method === 'GET' && url.pathname === '/api/health') return json(res,200,{ok:true,service:'meriva-desktop-dashboard',schemaVersion:SCHEMA_VERSION,instanceId,now:new Date().toISOString()});
     if (req.method === 'GET' && url.pathname === '/api/summary') return json(res,200,q.summary.get());
     if (req.method === 'GET' && url.pathname === '/api/sessions') return json(res,200,q.sessions.all());
     if (req.method === 'GET' && url.pathname === '/api/dtcs') return json(res,200,q.dtcs.all('REAL_OBD'));
