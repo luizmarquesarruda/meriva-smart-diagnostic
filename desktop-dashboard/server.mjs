@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = join(ROOT, 'data');
+const DATA_DIR = process.env.MERIVA_DASHBOARD_DATA_DIR || join(ROOT, 'data');
 const DB_PATH = join(DATA_DIR, 'meriva-dashboard.db');
 const HOST = '127.0.0.1';
 const PORT = Number(process.env.MERIVA_DASHBOARD_PORT || 8765);
