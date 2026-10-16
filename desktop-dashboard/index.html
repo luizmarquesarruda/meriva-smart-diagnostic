@@ -17,7 +17,7 @@ footer{padding:24px;text-align:center;color:var(--muted);font-size:.8rem}
 </style></head><body>
 <header><div class="wrap"><div class="eyebrow">Estação de análise local</div><h1>Meriva Smart Diagnostic</h1><p>Históricos, telemetria e relatórios no notebook Windows</p></div></header>
 <main>
-<div class="status" id="status" data-state="wait" role="status" aria-live="polite"><span class="dot"></span><div><strong id="statusTitle">Verificando serviço local…</strong><p id="statusText">Este painel lê apenas a base local. A sincronização Android ainda precisa ser habilitada no aplicativo.</p></div></div>
+<div class="status" id="status" data-state="wait" role="status" aria-live="polite"><span class="dot"></span><div><strong id="statusTitle">Verificando serviço local…</strong><p id="statusText">Serviço local ativo. O app Android tenta sincronizar em primeiro plano; este status não comprova que o telefone já enviou dados.</p></div></div>
 <div class="grid">
 <div class="card"><div class="label">Sessões importadas</div><div class="value" id="sessionsCount">—</div><p>Conexões ECU preservadas</p></div>
 <div class="card"><div class="label">Amostras de PIDs</div><div class="value" id="readingsCount">—</div><p>Somente origem REAL_OBD</p></div>
@@ -30,7 +30,7 @@ footer{padding:24px;text-align:center;color:var(--muted);font-size:.8rem}
 <div class="card wide"><h2 class="section-title">Viagens reais</h2><div class="table-wrap"><table><thead><tr><th>Início</th><th>Distância</th><th>Consumo médio</th><th>Velocidade média</th></tr></thead><tbody id="tripsTable"><tr><td colspan="4">Nenhuma viagem importada.</td></tr></tbody></table></div></div>
 <div class="card wide"><h2 class="section-title">Testes de sensores</h2><div class="table-wrap"><table><thead><tr><th>Início</th><th>Modo</th><th>Estado</th><th>PIDs suportados</th></tr></thead><tbody id="testsTable"><tr><td colspan="4">Nenhum teste importado.</td></tr></tbody></table></div></div>
 </div>
-<section class="card" style="margin-top:18px"><h2 class="section-title">Estado da integração USB</h2><p id="usbInfo">O serviço local prepara o canal ADB, mas ainda não há um exportador dentro do app Android para enviar os registros. Não interprete a ausência de dados como ausência de atividade no veículo.</p><p class="small">Serviço local: <code>http://127.0.0.1:8765</code>. A base deste notebook é uma réplica de análise e não altera nem apaga o histórico do celular.</p></section>
+<section class="card" style="margin-top:18px"><h2 class="section-title">Estado da integração USB</h2><p id="usbInfo">O app Android tenta enviar os lotes quando está em primeiro plano e o ADB reverse está autorizado. A transferência física ainda precisa ser validada; se os números ficarem zerados, confira depuração USB, autorização do computador e se o app está aberto. Dados ausentes no painel não significam ausência de atividade no veículo.</p><p class="small">Serviço local: <code>http://127.0.0.1:8765</code>. A base deste notebook é uma réplica de análise e não altera nem apaga o histórico do celular.</p></section>
 </main><footer>Meriva Smart Diagnostic · painel local · sem hospedagem externa</footer>
 <script>
 const $=id=>document.getElementById(id);
