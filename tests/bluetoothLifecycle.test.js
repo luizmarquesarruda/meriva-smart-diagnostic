@@ -42,12 +42,16 @@ assert(shared.includes('ecuValidatedAt: validatedAt'));
 assert(shared.includes("ecuValidationSource: 'OBD_RESPONSE'"));
 assert(shared.includes("probe.parsed.status === 'RESPONDEU'"));
 assert(shared.includes("probe.commandStatus === 'OK'"));
-assert(rootLayout.includes('connectPreferredElm(settings.selectedAdapterAddress)'));
+assert(!rootLayout.includes('connectPreferredElm'), 'RootLayout must not start a competing OBD connection');
+assert(!rootLayout.includes('ensureBluetoothReady'), 'Bluetooth connection readiness belongs to the dashboard connection owner');
 assert(rootLayout.includes('Bluetooth necessário para diagnóstico do veículo.'));
 assert(bluetoothScreen.includes('ATIVAR BLUETOOTH'));
 assert(bluetoothScreen.includes('CONECTAR E VALIDAR ELM327'));
 assert(bluetoothScreen.includes('bluetoothConnected ? styles.online'));
 assert(dashboard.includes('connectPreferredElm(settings.selectedAdapterAddress'));
+assert(shared.includes('const compatibility = connection?.session.getCompatibilityConfig()'), 'recovery must preserve the active session compatibility settings');
+assert(shared.includes("connectPreferredElm(connection.device.address, compatibility, 'EXPLICIT')"), 'recovery must pass the original compatibility settings');
+assert(shared.includes('if (connection) reconnecting = true'), 'reserve recovery before awaiting async cleanup to ignore duplicate disconnect callbacks');
 
 console.log('bluetoothLifecycle.test.js: OK');
 
