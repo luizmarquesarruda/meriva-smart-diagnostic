@@ -18,7 +18,8 @@ const db = new DatabaseSync(DB_PATH);
 db.exec(`
   PRAGMA journal_mode = WAL;
   PRAGMA foreign_keys = ON;
-  CREATE TABLE IF NOT EXISTS service_meta (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);\n  CREATE TABLE IF NOT EXISTS sync_batches (
+  CREATE TABLE IF NOT EXISTS service_meta (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);
+  CREATE TABLE IF NOT EXISTS sync_batches (
     batch_id TEXT PRIMARY KEY NOT NULL,
     received_at TEXT NOT NULL,
     exported_at TEXT NOT NULL,
@@ -63,7 +64,10 @@ db.exec(`
   );
 `);
 
-let instanceId = db.prepare('SELECT value FROM service_meta WHERE key=?').get('instanceId')?.value;\nif (!instanceId) { instanceId = randomUUID(); db.prepare('INSERT OR REPLACE INTO service_meta(key,value) VALUES(?,?)').run('instanceId', instanceId); }\n\nconst q = {
+let instanceId = db.prepare('SELECT value FROM service_meta WHERE key=?').get('instanceId')?.value;
+if (!instanceId) { instanceId = randomUUID(); db.prepare('INSERT OR REPLACE INTO service_meta(key,value) VALUES(?,?)').run('instanceId', instanceId); }
+
+const q = {
   summary: db.prepare(`SELECT
     (SELECT COUNT(*) FROM obd_sessions) AS sessions,
     (SELECT COUNT(*) FROM pid_readings WHERE source='REAL_OBD') AS readings,
