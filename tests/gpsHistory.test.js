@@ -105,6 +105,7 @@ function loadTs(tsPath) {
 const originalLoad = Module._load;
 Module._load = function(request) {
   if (request === 'expo-file-system') return fakeFS;
+  if (request === '../trip/tripRecorder') return { MAX_VALID_TRIP_CONSUMPTION_KML: 30 };
   if (request === '../meriva/dailyObdHistory') {
     return loadTs(path.join(ROOT, 'src/meriva/dailyObdHistory.ts'));
   }

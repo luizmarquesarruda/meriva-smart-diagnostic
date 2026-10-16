@@ -2511,3 +2511,9 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - A CI #2209 confirmou que as 26 regressões passam, o logger CSV e a recuperação de viagens também passam, e a execução parou no teste `obdFastPath.test.js` porque seu mock do gerenciador de autosave não implementava `registerBackgroundPersistenceFlushHandler`.
 - O mock foi atualizado para implementar a nova API de ciclo de vida; o teste continua verificando a fila e o caminho rápido da telemetria.
 - A próxima execução precisa confirmar os testes GPS/driveability restantes e a geração Android.
+
+
+### Mock de dependência TypeScript em teste GPS — 2026-10-16
+- A CI #2210 passou nas 26 regressões, nos testes CSV, recuperação de viagens, caminho rápido OBD e GPS básico. Falhou em `gpsHistory.test.js` porque Node não resolve automaticamente o sufixo `.ts` em `require('../trip/tripRecorder')` durante a compilação isolada do módulo de teste.
+- O teste foi corrigido com um mock explícito do contrato constante `MAX_VALID_TRIP_CONSUMPTION_KML=30`, mantendo a lógica real da store de histórico sob teste. Nenhum comportamento da aplicação foi relaxado.
+- A nova execução deve validar o restante da suíte e o build Android.
