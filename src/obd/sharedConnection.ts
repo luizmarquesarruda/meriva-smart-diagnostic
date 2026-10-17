@@ -430,7 +430,7 @@ async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm3
       throw new Error('ECU NÃO VALIDADA. OBRIGATÓRIO RECEBER 41 0C PARA MARCAR OBD COMO CONECTADO.');
     }
 
-    ecuResponseState = 'RESPONDING';
+    setEcuResponseState('RESPONDING');
     consecutiveEcuFailures = 0;
     lastEcuResponseAt = new Date().toISOString();
     lastEcuError = null;
@@ -495,8 +495,7 @@ async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm3
     return active;
   } catch (cause) {
     if (!active) {
-      lifecycle = 'DISCONNECTED';
-      emit();
+      setLifecycle('DISCONNECTED');
     }
     throw cause;
   }
@@ -586,7 +585,7 @@ export async function setSharedObdConnection(connection: SharedObdConnection | n
 
   if (connection) {
     lastConnectionError = null;
-    ecuResponseState = connection.ecuValidated ? 'RESPONDING' : 'NOT_VALIDATED';
+    setEcuResponseState(connection.ecuValidated ? 'RESPONDING' : 'NOT_VALIDATED');
     consecutiveEcuFailures = 0;
     lastEcuResponseAt = connection.ecuValidated ? new Date().toISOString() : null;
     lastEcuError = null;
