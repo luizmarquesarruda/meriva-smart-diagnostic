@@ -245,6 +245,17 @@ export class Elm327Session {
     return true;
   }
 
+  /** Tensão reportada pelo próprio adaptador ELM327 via ATRV. */
+  async queryAdapterVoltage(): Promise<{ voltage: number | null; response: string }> {
+    const result = await this.executeCommand('ATRV');
+    const match = result.response.match(/(?:^|\\s)(\\d{1,2}(?:\\.\\d{1,2})?)\\s*V?\\b/i);
+    const parsed = match ? Number(match[1]) : NaN;
+    return {
+      voltage: result.status === 'OK' && Number.isFinite(parsed) && parsed >= 5 && parsed <= 20 ? parsed : null,
+      response: result.response,
+    };
+  }
+
   /** KWP2000 TesterPresent (3E 00) para manter a sessão diagnóstica viva. */
   async keepAlive(): Promise<ElmCommandResult> {
     if (!this.opened) throw new Error('ELM NÃO INICIALIZADO');
