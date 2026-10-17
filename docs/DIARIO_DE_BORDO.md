@@ -2450,3 +2450,17 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Nova CI solicitada pela atualização da branch; confirmar resultado integral, inclusive testes restantes e build Android.
 - Teste físico do ELM327 no veículo continua pendente.
 
+
+
+## 2026-10-16 — PR de integridade do autosave e eventos de enlace
+
+- Build: branch `fix/autosave-integrity-observability-20261016`; versionCode do APK: N/D.
+- Hipótese: cópia direta do temporário para o autosave podia deixar escrita ambígua; histórico TXT não tinha rodapé verificável e podia carregar blocos malformados/numeração duplicada; causas de queda e latência por PID não eram persistidas em inventário próprio.
+- Mudanças: autosave JSON agora valida o temporário lido de volta, guarda backup anterior, substitui o destino via move e restaura o backup se a troca falhar. Saved At usa o maior entre relógio atual e último Saved At + 1 ms para impedir retrocesso.
+- Histórico TXT: leitor tolera resíduo fora de BEGIN/END, trunca bloco no primeiro END, deduplica/normaliza numeração consecutiva e grava em temporário com leitura de verificação, backup anterior, move e rodapé BLOCKS/BYTES/SHA256. O SHA-256 é calculado sobre o corpo anterior ao rodapé; BYTES mede o mesmo corpo.
+- Observabilidade: novo linkEventStore mantém logs JSON limitados e serializados em LOGS/link_events.json e app_events.json até a migração SQLite. sharedConnection registra transições de quatro níveis e causa; autosaveIntegration registra latência por PID, causa e sequência de falhas; autosaveManager registra eventos de sessão.
+- Testes adicionados para SHA-256, rodapé, numeração consecutiva e concorrência dos eventos. **NÃO EXECUTADOS**.
+- CI, typecheck, testes completos e build: NÃO EXECUTADOS. CI/workflows NÃO DISPARADOS.
+- Limitações: Expo FileSystem não expõe fsync portátil; o fluxo usa leitura de verificação, backup e move com restauração, mas isso não é uma garantia formal de atomicidade de hardware. SQLite/WAL e schema_migrations continuam pendentes.
+- Bloqueio de fixture: o arquivo original scripts/verify_autosave.py e o autosave real 11–16/10 não foram encontrados nos arquivos acessíveis nesta etapa. Não foi criada uma implementação presumida que pudesse divergir do verificador que o usuário já usa.
+- Status: PENDENTE; sem teste físico com Meriva/ELM327.
