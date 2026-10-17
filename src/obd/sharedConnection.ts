@@ -171,13 +171,37 @@ function startBluetoothMonitor(): void {
         const isKwp = /KWP|14230/i.test(connection.protocol ?? '');
         if (isKwp) {
           const keepAlive = await connection.session.keepAlive();
-          if (keepAlive.status !== 'OK') lastEcuError = keepAlive.errorMessage ?? 'KEEP-ALIVE KWP SEM RESPOSTA';
+          if (keepAlive.status !== 'OK') {
+            consecutiveEcuFailures += 1;
+            lastEcuError = keepAlive.errorMessage ?? keepAlive.response ?? 'KEEP-ALIVE KWP SEM RESPOSTA';
+            setEcuResponseState('NO_RESPONSE', lastEcuError);
+            if (consecutiveEcuFailures >= connection.session.getCompatibilityConfig().noDataReconnectThreshold) {
+              setEcuResponseState('RECOVERING', lastEcuError);
+              const recovered = await connection.session.recoverProtocol();
+              if (recovered) {
+                consecutiveEcuFailures = 0;
+                lastEcuResponseAt = new Date().toISOString();
+                lastEcuError = null;
+                setEcuResponseState('RESPONDING');
+              } else {
+                await handleUnexpectedDisconnect('KEEP-ALIVE KWP FALHOU 3 VEZES; RECUPERAÇÃO FALHOU');
+              }
+              return;
+            }
+          } else {
+            // TesterPresent positivo é evidência de resposta da ECU, não apenas
+            // de socket Bluetooth aberto.
+            consecutiveEcuFailures = 0;
+            lastEcuResponseAt = new Date().toISOString();
+            lastEcuError = null;
+            setEcuResponseState('RESPONDING');
+          }
         }
 
-        // A cada 3 ciclos (~15 s), valida a ECU com um PID real. O Bluetooth
-        // pode permanecer conectado enquanto a ECU deixa de responder.
-        if (healthTick % 3 !== 0) return;
-        const probe = await connection.session.queryPid('010C');
+        // A cada 4 ciclos (~10 s), valida a telemetria com um PID funcional.
+        // O monitor é serializado e usa timeout curto para não bloquear o polling.
+        if (healthTick % 4 !== 0) return;
+        const probe = await connection.session.queryPid('010C', 2500);
         const valid = probe.commandStatus === 'OK'
           && probe.parsed.status === 'RESPONDEU'
           && Number.isFinite(probe.parsed.value);
@@ -228,7 +252,7 @@ function startBluetoothMonitor(): void {
         monitorBusy = false;
       }
     })();
-  }, 5000);
+  }, 2500);
 }
 
 function setConnectionError(cause: unknown): void {
