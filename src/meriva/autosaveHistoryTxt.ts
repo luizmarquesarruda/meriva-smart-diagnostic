@@ -1,6 +1,7 @@
 import * as FileSystem from 'expo-file-system';
 import type { MerivaPersistedState } from './autosaveState';
 import { formatAutoSaveTxt } from './autosaveTxtFormatter';
+import { sha256Hex, utf8ByteLength } from './sha256';
 
 export const AUTOSAVE_HISTORY_MAX_ENTRIES = 200;
 export const AUTOSAVE_HISTORY_FILE = 'meriva_smart_autosave_history.txt';
@@ -19,13 +20,41 @@ function historyPath(basePath: string): string {
 }
 
 function splitEntries(content: string): string[] {
-  return content
+  const withoutFooter = content.replace(/\nBLOCKS:\s*\d+\nBYTES:\s*\d+\nSHA256:\s*[a-f0-9]{64}\s*$/i, '\n');
+  return withoutFooter
     .split(ENTRY_BEGIN)
     .slice(1)
-    .map((part) => `${ENTRY_BEGIN}${part}`.trim())
-    .filter((entry) => entry.includes(ENTRY_END));
+    .map((part) => {
+      const raw = ENTRY_BEGIN + part;
+      const endAt = raw.indexOf(ENTRY_END);
+      return endAt < 0 ? '' : raw.slice(0, endAt + ENTRY_END.length).trim();
+    })
+    .filter((entry) => entry.length > 0);
 }
 
+function normalizeEntryNumbers(entries: string[]): string[] {
+  const lastNumber = entries.reduce((max, entry) => {
+    const match = entry.match(/NÚMERO:\s*(\d+)/);
+    return match ? Math.max(max, Number(match[1])) : max;
+  }, 0);
+  const firstNumber = Math.max(1, lastNumber - entries.length + 1);
+  return entries.map((entry, index) =>
+    /NÚMERO:\s*\d+/.test(entry)
+      ? entry.replace(/NÚMERO:\s*\d+/, 'NÚMERO: ' + (firstNumber + index))
+      : entry.replace(ENTRY_BEGIN, ENTRY_BEGIN + '\nNÚMERO: ' + (firstNumber + index)),
+  );
+}
+
+function buildIntegrityFooter(body: string, blockCount: number): string {
+  return 'BLOCKS: ' + blockCount + '\nBYTES: ' + utf8ByteLength(body) + '\nSHA256: ' + sha256Hex(body) + '\n';
+}
+
+function verifyIntegrityFooter(content: string): boolean {
+  const match = content.match(/\nBLOCKS:\s*(\d+)\nBYTES:\s*(\d+)\nSHA256:\s*([a-f0-9]{64})\n?$/i);
+  if (!match) return false;
+  const body = content.slice(0, match.index);
+  return Number(match[2]) === utf8ByteLength(body) && match[3].toLowerCase() === sha256Hex(body);
+}
 /**
  * A manual export and an automatic autosave can overlap on older app versions.
  * Keep the last snapshot for each sequence number and restore numeric order.
@@ -93,7 +122,7 @@ async function appendAutoSaveHistoryUnsafe(
 ): Promise<{ count: number }> {
   const path = historyPath(basePath);
   const current = await readAutoSaveHistoryUnsafe(basePath);
-  const entries = deduplicateEntries(splitEntries(current));
+  const entries = normalizeEntryNumbers(deduplicateEntries(splitEntries(current)));
   const lastNumber = entries.reduce((max, entry) => {
     const match = entry.match(/NÚMERO:\s*(\d+)/);
     return match ? Math.max(max, Number(match[1])) : max;
@@ -111,10 +140,25 @@ async function appendAutoSaveHistoryUnsafe(
     snapshot.trim(),
     ENTRY_END,
   ].join('\n');
-  const kept = [...entries, entry].slice(-AUTOSAVE_HISTORY_MAX_ENTRIES);
-  await FileSystem.writeAsStringAsync(path, `${HISTORY_HEADER}${kept.join('\n\n')}\n`, {
-    encoding: FileSystem.EncodingType.UTF8,
-  });
+  const kept = normalizeEntryNumbers([...entries, entry].slice(-AUTOSAVE_HISTORY_MAX_ENTRIES));
+  const body = HISTORY_HEADER + kept.join('\n\n') + '\n';
+  const output = body + buildIntegrityFooter(body, kept.length);
+  const tmpPath = path + '.tmp';
+  const previousPath = path + '.previous';
+  await FileSystem.writeAsStringAsync(tmpPath, output, { encoding: FileSystem.EncodingType.UTF8 });
+  const readBack = await FileSystem.readAsStringAsync(tmpPath, { encoding: FileSystem.EncodingType.UTF8 });
+  if (readBack !== output || !verifyIntegrityFooter(readBack)) throw new Error('AUTOSAVE_HISTORY_INTEGRITY_FAILED');
+  const currentInfo = await FileSystem.getInfoAsync(path);
+  if (currentInfo.exists) await FileSystem.copyAsync({ from: path, to: previousPath });
+  try {
+    if (currentInfo.exists) await FileSystem.deleteAsync(path, { idempotent: true });
+    await FileSystem.moveAsync({ from: tmpPath, to: path });
+  } catch (error) {
+    const targetInfo = await FileSystem.getInfoAsync(path);
+    const backupInfo = await FileSystem.getInfoAsync(previousPath);
+    if (!targetInfo.exists && backupInfo.exists) await FileSystem.copyAsync({ from: previousPath, to: path });
+    throw error;
+  }
   return { count: kept.length };
 }
 
