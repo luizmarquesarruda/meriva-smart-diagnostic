@@ -51,6 +51,8 @@ Referências oficiais:
 4. Simulação fica em uma origem separada.
 5. O insert é enfileirado e não é aguardado pela solicitação serial do ELM327. Se SQLite falhar, TXT/JSON/CSV continuam independentes.
 6. Nesta versão não há limpeza por retenção, importação de CarScanner ou migração destrutiva.
+7. A fila da cópia SQLite tem limite configurável em `src/knowledge/sqlite_policy.json` (500 gravações pendentes). Ao saturar, o app omite apenas a nova linha do índice SQLite, incrementa `droppedSamples` e limita o aviso no log a um por minuto. O CSV/TXT canônico não é descartado por essa proteção; a tela de armazenamento mostra fila pendente e amostras não indexadas.
+8. O índice tem papel secundário; a perda de linhas somente no SQLite é explícita e observável. Não usar a contagem SQLite como prova de que todos os pacotes de telemetria foram armazenados.
 
 ## Código
 
