@@ -100,6 +100,18 @@ O estado não deve ser resumido a "conectado". O diagnóstico precisa separar Bl
 
 O autosave escreve primeiro em arquivo temporário, valida o conteúdo e só então atualiza o arquivo principal. O arquivo anterior é mantido como recuperação.
 
+## SQLite histórico
+
+`src/database/diagnosticDatabase.ts` implementa o repositório SQLite local versionado. A migração inicial cria tabelas indexadas para amostras PID, DTCs, viagens reais, telemetria esparsa e relatórios dos testes de sensores.
+
+A integração é complementar: o JSON de autosave, CSV bruto/interpretado e TXT exportável continuam mantidos. O SQLite é inicializado sem bloquear a UI e falhas são registradas sem interromper a sessão OBD. Escritas de amostras são enfileiradas fora da consulta serial do ELM327 e limitadas a 1 por PID/origem a cada 5 s. DTCs e viagens reais são indexados após a persistência primária.
+
+A proveniência permanece obrigatória. Dados seed/simulação não são inseridos no histórico de viagens reais; valores ausentes ficam NULL e são exibidos como N/D. A migração atual não importa nem apaga os arquivos históricos anteriores.
+
+A tela de viagens apresenta distância das últimas sete viagens reais e consumo somente em trajetos com cobertura de combustível válida; valores acima de 30 km/L e registros sem combustível válido são omitidos. A filtragem está isolada e coberta por testes Node.
+
+Veja `docs/SQLITE_MIGRATION_AND_CHARTS_2026-10-17.md` para o esquema, compatibilidade de dependências, limitações e próximos passos.
+
 ## Limite atual
 
 A aplicação exige build nativo Android por usar Bluetooth Classic. Expo Go não é suficiente para validar o transporte.
