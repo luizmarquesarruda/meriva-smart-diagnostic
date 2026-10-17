@@ -51,5 +51,11 @@
     "CARSCANNER_BASELINE",
     "IMPORTADO",
     "USER_REAL_OBSERVATION"
-  ]
+  ],
+  "writeQueue": {
+    "maxPendingWrites": 500,
+    "warningThrottleMs": 60000,
+    "fullBehavior": "drop_secondary_sqlite_index_sample_only",
+    "canonicalLogsRemainIndependent": true
+  }
 }
