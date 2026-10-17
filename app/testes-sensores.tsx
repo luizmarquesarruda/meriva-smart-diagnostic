@@ -4,7 +4,7 @@ import {ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from
 import { AdaptiveText as Text } from '../src/ui/AdaptiveText';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
-import { saveSensorTestRun } from '../src/database/diagnosticDatabase';
+import { saveSensorTestRunLazy } from '../src/database/diagnosticDatabaseAccess';
 import {useMidLayout} from '../src/ui/midLayout';
 import {getSharedObdConnection,getSharedObdStatus,subscribeSharedObd,subscribeSharedObdStatus} from '../src/obd/sharedConnection';
 import {getPidDefinition} from '../src/obd/pidDefinition';
@@ -89,7 +89,7 @@ export default function TestesSensoresScreen(){
    await FileSystem.writeAsStringAsync(path,lines.join('\\n'));setSavedPath(path);setError('');
     if(connectedAtStart.current&&runStartedAt.current>0){
      try{
-      await saveSensorTestRun({
+      await saveSensorTestRunLazy({
        id:path.split('/').pop()?.replace(/\.txt$/,'')??('sensor-test-'+Date.now()),
        mode,
        startedAt:new Date(runStartedAt.current).toISOString(),
