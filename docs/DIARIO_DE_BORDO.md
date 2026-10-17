@@ -2562,3 +2562,10 @@ A política `src/knowledge/sqlite_policy.json` explicita que a tabela `telemetry
 - A escrita passa por arquivo temporário e leitura de volta byte a byte, guarda o arquivo anterior em `.previous` e tenta restaurá-lo se o `moveAsync` falhar. Diretório inesperado no caminho de backup é tratado como erro; não se apaga automaticamente.
 - Testes adicionados: diário com 366 páginas; conteúdo legada não parseável preservado; recuperação da cópia anterior após falha simulada de `moveAsync`.
 - **Testes não executados nesta etapa.** Os testes são regressões adicionadas, não evidência de aprovação de CI ou validação no telefone.
+
+
+### Pressão de fila e SQLite secundário
+- Adicionado limite de 500 gravações pendentes configurado em `src/knowledge/sqlite_policy.json`, com aviso limitado a um por minuto.
+- Quando a fila enche, a nova amostra não é adicionada ao índice SQLite, mas os fluxos canônicos TXT/JSON/CSV continuam independentes; contador `droppedSamples` torna a perda do índice visível.
+- A tela de armazenamento mostra a profundidade da fila, o limite e a quantidade de amostras não indexadas, para evitar que a base secundária pareça completa quando houver pressão.
+- Um teste com SQLite artificialmente bloqueado enfileira 501 amostras, verifica o teto de 500, a amostra descartada e a recuperação da fila. **Teste criado, não executado**; CI não foi disparada.
