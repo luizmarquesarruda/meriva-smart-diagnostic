@@ -1007,7 +1007,7 @@ test('diário TXT com estrutura inválida não é reescrito', async () => {
   assert.strictEqual(files.get(target), original, 'conteúdo que não pode ser parseado deve permanecer intacto');
 });
 
-test('diário TXT restaura a cópia anterior se a substituição atômica falhar', async () => {
+test('diário TXT restaura a cópia anterior se a substituição recuperável falhar', async () => {
   resetFS();
   const history = loadTs(path.join(ROOT, 'src/meriva/dailyObdHistory.ts'));
   const state = loadTs(path.join(ROOT, 'src/meriva/autosaveState.ts')).createEmptyMerivaState();
@@ -1036,6 +1036,33 @@ test('diário TXT restaura a cópia anterior se a substituição atômica falhar
     currentFS.moveAsync = originalMove;
   }
   assert.strictEqual(files.get(target), original, 'o backup deve restaurar o TXT anterior após falha de move');
+});
+
+test('diário TXT recupera backup se processo parou com arquivo principal ausente', async () => {
+  resetFS();
+  const history = loadTs(path.join(ROOT, 'src/meriva/dailyObdHistory.ts'));
+  const state = loadTs(path.join(ROOT, 'src/meriva/autosaveState.ts')).createEmptyMerivaState();
+  const target = BASE + '/VIAGENS/meriva_smart_daily_obd_history.txt';
+  const backupPath = target + '.previous';
+  const original = [
+    'MERIVA SMART DIAGNOSTIC',
+    'HISTÓRICO TXT POR DIA — CADA DATA É UMA PÁGINA LÓGICA.',
+    'REGRA: cada sessão ECU validada gera eventos de início e encerramento; sessão interrompida é marcada na próxima abertura.',
+    'FONTE: estado local do aplicativo; valores mantêm fonte e horário quando disponíveis.',
+    '',
+    '========== DIA: 2026-10-16 ==========',
+    'EVENTO_LEGADO_PRESERVAR',
+    '========== FIM DO DIA ==========',
+    '',
+  ].join('\n');
+  files.set(backupPath, original);
+  assert.strictEqual(files.has(target), false);
+
+  await history.appendDailyObdSessionEvent(BASE, state, 'SESSION_START', '2026-10-16T12:00:00.000Z');
+  const restoredAndUpdated = files.get(target);
+  assert.ok(restoredAndUpdated.includes('EVENTO_LEGADO_PRESERVAR'), 'backup antigo precisa ser restaurado antes de acrescentar');
+  assert.ok(restoredAndUpdated.includes('--- EVENTO: SESSION_START | 2026-10-16T12:00:00.000Z ---'));
+  assert.strictEqual(files.get(backupPath), original, 'a cópia anterior deve continuar recuperável');
 });
 
 test('histórico de autosave não sobrescreve arquivo existente quando a leitura falha', async () => {
