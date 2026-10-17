@@ -187,7 +187,7 @@ export async function sanitizeLearningProfileToRealOnly(basePath: string): Promi
     const profile = await readLearningProfileUnsafe(basePath);
     if (!profile) return null;
     sanitizeProfileToRealOnly(profile);
-    profile.lastUpdated = new Date().toISOString();
+    // A limpeza de proveniência não é uma nova amostra nem deve falsificar o horário do aprendizado.
     await writeLearningProfileUnsafe(basePath, profile);
     return profile;
   });
