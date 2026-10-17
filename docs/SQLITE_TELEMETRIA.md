@@ -77,3 +77,8 @@ npx expo prebuild --platform android
 ```
 
 O prebuild e o build Android precisam ser validados em uma branch de trabalho, mantendo `android/` gerado fora da versionagem conforme a política CNG do repositório. O teste de store mockado valida o contrato JavaScript/SQL, não prova que o SQLite nativo funciona no aparelho. O teste físico precisa confirmar que a base persiste após reinício, armazena TX/RX real e não degrada o polling KWP.
+
+
+## Visibilidade operacional
+
+A tela `app/armazenamento.tsx` consulta `getSqliteDiagnosticsHealth()` e exibe disponibilidade, nome do banco, schema, versão nativa do SQLite, quantidade de amostras indexadas e um código de erro sanitizado quando a base não pode ser aberta. O botão “VERIFICAR SQLITE” repete a verificação. A tela não modifica nem apaga o histórico por consultar o estado do banco.
