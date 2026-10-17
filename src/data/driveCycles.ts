@@ -36,6 +36,7 @@ export interface DriveCycle {
   distGpsKm?: number;
   distFinalKm?: number;
   distSource?: 'OBD' | 'GPS' | 'MIXED' | 'UNAVAILABLE';
+  tripQuality?: 'OK' | 'SUSPEITA' | 'DADOS_INSUFICIENTES' | 'LEGADO_NAO_VERIFICADO';
   importedAt: string;
 }
 
@@ -124,12 +125,16 @@ export function getDriveCycleSummary(cycles: DriveCycle[]): DriveCycleSummary {
   const referenceCycles = cycles.filter((cycle) => cycle.source === 'CARSCANNER_SEED');
   const realDistanceKm = realCycles.reduce((sum, cycle) => sum + cycle.distanceTotalKm, 0);
   const consumptionCycles = realCycles.filter((cycle) =>
-    cycle.fuelDataValid === false
-      ? false
-      : cycle.fuelUsedL >= 0.05 && cycle.avgFuelConsumptionKml > 0,
+    cycle.fuelDataValid !== false &&
+    cycle.fuelLiters != null &&
+    (cycle.fuelCoveragePct ?? 0) >= 70 &&
+    cycle.tripQuality !== 'SUSPEITA' &&
+    cycle.fuelUsedL >= 0.05 &&
+    cycle.avgFuelConsumptionKml >= 2 &&
+    cycle.avgFuelConsumptionKml <= 40,
   );
-  const realFuelL = consumptionCycles.reduce((sum, cycle) => sum + cycle.fuelUsedL, 0);
-  const consumptionDistanceKm = consumptionCycles.reduce((sum, cycle) => sum + cycle.distanceTotalKm, 0);
+  const realFuelL = consumptionCycles.reduce((sum, cycle) => sum + (cycle.fuelLiters ?? 0), 0);
+  const consumptionDistanceKm = consumptionCycles.reduce((sum, cycle) => sum + (cycle.distFinalKm ?? cycle.distanceTotalKm), 0);
   const realMovingTimeMs = realCycles.reduce(
     (sum, cycle) => sum + durationHmsToMs(cycle.drivingTimeHms),
     0,
