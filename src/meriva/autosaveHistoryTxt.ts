@@ -114,20 +114,47 @@ function removeCarScannerTripsFromSnapshot(entry: string): string {
 async function readAutoSaveHistoryUnsafe(basePath: string): Promise<string> {
   const path = historyPath(basePath);
   const info = await FileSystem.getInfoAsync(path);
-  if (!info.exists) return HISTORY_HEADER;
-  if (info.isDirectory) {
-    throw new Error('O caminho do histórico de autosave aponta para um diretório; arquivo existente preservado.');
+  let content: string;
+
+  if (!info.exists) {
+    const backupPath = path + '.previous';
+    const backupInfo = await FileSystem.getInfoAsync(backupPath);
+    if (!backupInfo.exists) return HISTORY_HEADER;
+    if (backupInfo.isDirectory) {
+      throw new Error('O backup do histórico de autosave aponta para um diretório; arquivo existente preservado.');
+    }
+
+    // Recover a prior valid snapshot if the Android process stopped after the
+    // current history was moved/deleted but before the temporary file became
+    // the new primary file.
+    const backupContent = await FileSystem.readAsStringAsync(backupPath, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
+    validateHistoryIntegrity(backupContent);
+    await FileSystem.copyAsync({ from: backupPath, to: path });
+    content = await FileSystem.readAsStringAsync(path, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
+    if (content !== backupContent) {
+      await FileSystem.deleteAsync(path, { idempotent: true }).catch(() => undefined);
+      throw new Error('AUTOSAVE_HISTORY_BACKUP_RESTORE_MISMATCH');
+    }
+    validateHistoryIntegrity(content);
+  } else {
+    if (info.isDirectory) {
+      throw new Error('O caminho do histórico de autosave aponta para um diretório; arquivo existente preservado.');
+    }
+    content = await FileSystem.readAsStringAsync(path, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
+    validateHistoryIntegrity(content);
   }
-  const content = await FileSystem.readAsStringAsync(path, {
-    encoding: FileSystem.EncodingType.UTF8,
-  });
-  validateHistoryIntegrity(content);
+
   const entries = deduplicateEntries(splitEntries(content))
     .slice(-AUTOSAVE_HISTORY_MAX_ENTRIES)
     .map(removeCarScannerTripsFromSnapshot);
   return entries.length ? `${HISTORY_HEADER}${entries.join('\n\n')}\n` : HISTORY_HEADER;
 }
-
 export async function readAutoSaveHistory(basePath: string): Promise<string> {
   try {
     return await readAutoSaveHistoryUnsafe(basePath);
