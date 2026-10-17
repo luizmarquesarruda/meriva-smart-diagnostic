@@ -2497,3 +2497,12 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - `tests/cockpitNavigation.test.js` agora verifica a presença desses retornos.
 - Commits desta correção: `949b6cf832e557f4beacfeabd47038cf14b104b0`, `7e3845de6147fb1da4f4b015ef4731f8194ef8bb`, `d9b2fe95949da01b5d47ca1c4e9ff9512473ed94`, `b59768a92e8e039ed6f709bd3f71895f655f3dbb`, `e07630118cf7955c432182b03d14eeb86e52dc3f`, `818df8e26b59fb030b60d0c1f39cea3836cd5086`.
 - **NÃO EXECUTADOS:** testes Node, TypeScript, Expo Doctor, prebuild, APK, inspeção visual e teste físico. CI não disparada; PR #68 continua em rascunho.
+
+
+### Ajuste de densidade em paisagem — sem validação visual
+
+- `app/index.tsx`: o cabeçalho usa padding vertical 8 em paisagem, o atalho de recursos reduz o padding para 6, o espaçamento do grupo de ações diminui e os três cards secundários usam padding vertical compacto 4.
+- `tests/orientationLayout.test.js`: adicionadas asserções de contrato para o modo compacto e para os três cards.
+- Commit de implementação: `81762d87243d38fb35367ec731c8f7bc4aaa275f`; commit do teste: `42e014aa19db89a5d5613216ab7689a37a51ab57`; documentação atualizada em `55bc949c3799bd4fc7a9712e1b570231504f475d`.
+- A verificação estática confirmou três usos do modo compacto e a existência das regras de estilo. A altura real do conteúdo não foi medida via screenshot/emulador.
+- **NÃO EXECUTADOS:** teste Node, TypeScript, Expo Doctor, prebuild, Gradle/APK e dispositivo físico. CI permanece **NÃO DISPARADA**.
