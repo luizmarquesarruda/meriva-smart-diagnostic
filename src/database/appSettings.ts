@@ -2,7 +2,7 @@ import * as FileSystem from 'expo-file-system';
 
 export type FuelType = 'FLEX' | 'ETANOL' | 'GASOLINA';
 export type DistanceUnit = 'KM' | 'MI';
-export type HomePrimaryMetric = 'TEMPERATURE' | 'RPM' | 'VOLTAGE' | 'THROTTLE' | 'SPEED';
+export type HomePrimaryMetric = 'TEMPERATURE' | 'RPM' | 'VOLTAGE' | 'THROTTLE' | 'SPEED' | 'CONSUMPTION' | 'FAULTS';
 export interface AppSettings {
   fuelType: FuelType;
   distanceUnit: DistanceUnit;
@@ -91,7 +91,7 @@ export async function readAppSettings(basePath: string): Promise<AppSettings> {
     const settings: AppSettings = {
       fuelType: parsed.fuelType === 'GASOLINA' ? 'GASOLINA' : parsed.fuelType === 'ETANOL' ? 'ETANOL' : 'FLEX',
       distanceUnit: parsed.distanceUnit === 'MI' ? 'MI' : 'KM',
-      homePrimaryMetric: ['TEMPERATURE', 'RPM', 'VOLTAGE', 'THROTTLE', 'SPEED'].includes(String(parsed.homePrimaryMetric)) ? parsed.homePrimaryMetric as HomePrimaryMetric : 'TEMPERATURE',
+      homePrimaryMetric: ['TEMPERATURE', 'RPM', 'VOLTAGE', 'THROTTLE', 'SPEED', 'CONSUMPTION', 'FAULTS'].includes(String(parsed.homePrimaryMetric)) ? parsed.homePrimaryMetric as HomePrimaryMetric : 'TEMPERATURE',
       homeAutoRotate: parsed.homeAutoRotate === true,
       showSpeedMetric: parsed.showSpeedMetric === true || parsed.homePrimaryMetric === 'SPEED',
       largeText: parsed.largeText !== false,
