@@ -22,6 +22,13 @@ export const MIN_TRIP_FUEL_L = 0.05;
 export const STOPPED_ENGINE_OFF_CLOSE_DELAY_MS = 60_000;
 export const STOPPED_OTHER_CLOSE_DELAY_MS = 300_000;
 
+/** Keep a real trip open through brief ECU/Bluetooth drops; GPS itself stops immediately. */
+export const LINK_LOSS_TRIP_GRACE_MS = 120_000;
+
+export function shouldFinalizeAfterLinkLoss(linkLossDurationMs: number): boolean {
+  return Number.isFinite(linkLossDurationMs) && linkLossDurationMs >= LINK_LOSS_TRIP_GRACE_MS;
+}
+
 export function shouldFinalizeStoppedTrip(
   stoppedDurationMs: number,
   rpm: number | null | undefined,
