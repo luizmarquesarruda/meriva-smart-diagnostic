@@ -11,7 +11,8 @@ import { getMidLayout } from '../src/ui/midLayout';
 import { readDriveCycles } from '../src/storage/driveCycleStorage';
 import type { DriveCycle } from '../src/data/driveCycles';
 import { exportDiagnosticsJson, exportDriveCyclesCsv } from '../src/storage/exportDiagnostics';
-import { getDiagnosticDatabaseHealth, type DiagnosticDatabaseHealth } from '../src/database/diagnosticDatabase';
+import type { DiagnosticDatabaseHealth } from '../src/database/diagnosticDatabase';
+import { getDiagnosticDatabaseHealthLazy } from '../src/database/diagnosticDatabaseAccess';
 
 const DEFAULT_QUOTA: StorageQuotaConfig = {
   limitMb: 2048,
@@ -38,7 +39,7 @@ export default function ArmazenamentoScreen() {
     setUsageBreakdown(breakdown);
     setCycles((await readDriveCycles(path)).filter((cycle) => cycle.source === 'REAL_OBD').sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()));
     try {
-      setDatabaseHealth(await getDiagnosticDatabaseHealth());
+      setDatabaseHealth(await getDiagnosticDatabaseHealthLazy());
     } catch {
       setDatabaseHealth(null);
     }
