@@ -2450,3 +2450,14 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Nova CI solicitada pela atualização da branch; confirmar resultado integral, inclusive testes restantes e build Android.
 - Teste físico do ELM327 no veículo continua pendente.
 
+
+
+## 2026-10-16 — PR de observabilidade: verificador de autosave e Fase 0
+
+- Build: SHA do branch registrado no GitHub por commit; branch `fix/autosave-verifier-observability-20261016`; versionCode: N/D (app.json não declara android.versionCode).
+- Hipótese: falhas de integridade do autosave precisam ser mensuráveis antes de alterar persistência.
+- Evidência: `src/meriva/autosaveManager.ts:148-166` grava JSON temporário, valida leitura de retorno e copia para o destino; `src/meriva/autosaveHistoryTxt.ts:115` reescreve o TXT de snapshots; `src/meriva/dailyObdHistory.ts:135` mantém o histórico diário em outro caminho. O método atual não usa rename atômico/fsync.
+- Mudança: adicionado `scripts/verify_autosave.py` com JSON/relatório textual, filtro temporal, contagem de duplicatas, quebras de numeração, END duplicado, regressão de Saved At, leitura posterior ao snapshot e frescor das leituras. Adicionado teste Python de contrato, amostra sanitizada de um bloco real de 11/10 e passo de teste na configuração da CI.
+- Testes: execução do verificador local sobre a cópia disponível de 2.725.564 bytes → 401 blocos parseáveis, 205 únicos, 3 quebras de numeração, 3 retrocessos de Saved At, 63 leituras posteriores ao Saved At. Este é o arquivo disponível de 11–12/10, não o log solicitado de 11–16/10. O comando com janela 16/10 retorna zero blocos; não é válido como baseline. O teste Python commitado e os testes do app: NÃO EXECUTADOS no checkout do repositório.
+- Validação física: NÃO; ELM327 e protocolo não verificados nesta etapa.
+- Status: PENDENTE. Necessário fornecer o log real de 16/10 para criar a fixture de replay exigida. CI/workflows NÃO DISPARADOS; commits usam `[skip ci]`.
