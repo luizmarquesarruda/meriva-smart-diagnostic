@@ -992,6 +992,52 @@ test('diário diário não sobrescreve arquivo existente quando a leitura falha'
   assert.strictEqual(files.get(target), originalContent, 'o histórico anterior deve permanecer intacto');
 });
 
+test('diário TXT com estrutura inválida não é reescrito', async () => {
+  resetFS();
+  const history = loadTs(path.join(ROOT, 'src/meriva/dailyObdHistory.ts'));
+  const state = loadTs(path.join(ROOT, 'src/meriva/autosaveState.ts')).createEmptyMerivaState();
+  const target = BASE + '/VIAGENS/meriva_smart_daily_obd_history.txt';
+  const original = 'MERIVA SMART DIAGNOSTIC\nCONTEÚDO LEGADO NÃO PARSEÁVEL — NÃO APAGAR\n';
+  files.set(target, original);
+
+  await assert.rejects(
+    history.appendDailyObdSessionEvent(BASE, state, 'SESSION_START', '2026-10-12T12:00:00.000Z'),
+    /DAILY_HISTORY_PAGE_MARKERS_MISSING/,
+  );
+  assert.strictEqual(files.get(target), original, 'conteúdo que não pode ser parseado deve permanecer intacto');
+});
+
+test('diário TXT restaura a cópia anterior se a substituição atômica falhar', async () => {
+  resetFS();
+  const history = loadTs(path.join(ROOT, 'src/meriva/dailyObdHistory.ts'));
+  const state = loadTs(path.join(ROOT, 'src/meriva/autosaveState.ts')).createEmptyMerivaState();
+  const target = BASE + '/VIAGENS/meriva_smart_daily_obd_history.txt';
+  const original = [
+    'MERIVA SMART DIAGNOSTIC',
+    'HISTÓRICO TXT POR DIA — CADA DATA É UMA PÁGINA LÓGICA.',
+    'REGRA: cada sessão ECU validada gera eventos de início e encerramento; sessão interrompida é marcada na próxima abertura.',
+    'FONTE: estado local do aplicativo; valores mantêm fonte e horário quando disponíveis.',
+    '',
+    '========== DIA: 2026-10-16 ==========',
+    'EVENTO_LEGADO_PRESERVAR',
+    '========== FIM DO DIA ==========',
+    '',
+  ].join('\n');
+  files.set(target, original);
+  const originalMove = currentFS.moveAsync;
+  currentFS.moveAsync = async () => { throw new Error('falha simulada de move'); };
+
+  try {
+    await assert.rejects(
+      history.appendDailyObdSessionEvent(BASE, state, 'SESSION_START', '2026-10-16T12:00:00.000Z'),
+      /falha simulada de move/,
+    );
+  } finally {
+    currentFS.moveAsync = originalMove;
+  }
+  assert.strictEqual(files.get(target), original, 'o backup deve restaurar o TXT anterior após falha de move');
+});
+
 test('histórico de autosave não sobrescreve arquivo existente quando a leitura falha', async () => {
   resetFS();
   const history = loadTs(path.join(ROOT, 'src/meriva/autosaveHistoryTxt.ts'));
