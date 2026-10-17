@@ -123,9 +123,21 @@ export default function ArmazenamentoScreen() {
           <Text style={styles.label}>Amostras indexadas</Text>
           <Text style={styles.value}>{sqliteHealth?.sampleCount == null ? 'N/D' : String(sqliteHealth.sampleCount)}</Text>
         </View>
-        {!sqliteHealth?.available && sqliteHealth?.lastError
-          ? <Text style={styles.note}>Diagnóstico: {sqliteHealth.lastError}</Text>
-          : <Text style={styles.note}>Índice secundário; não altera o autosave JSON nem os históricos TXT. A limpeza de CSV segue as regras existentes da tela.</Text>}
+        <View style={styles.row}>
+          <Text style={styles.label}>Fila de escrita</Text>
+          <Text style={styles.value}>{sqliteHealth ? `${sqliteHealth.pendingWrites}/${sqliteHealth.maxPendingWrites}` : 'N/D'}</Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.label}>Amostras não indexadas</Text>
+          <Text style={sqliteHealth?.droppedSamples ? styles.warning : styles.value}>
+            {sqliteHealth ? String(sqliteHealth.droppedSamples) : 'N/D'}
+          </Text>
+        </View>
+        {sqliteHealth?.droppedSamples
+          ? <Text style={styles.warning}>FILA SECUNDÁRIA SATURADA: algumas amostras não entraram no SQLite. Os arquivos canônicos TXT/CSV continuam independentes.</Text>
+          : !sqliteHealth?.available && sqliteHealth?.lastError
+            ? <Text style={styles.note}>Diagnóstico: {sqliteHealth.lastError}</Text>
+            : <Text style={styles.note}>Índice secundário; não altera o autosave JSON nem os históricos TXT. A limpeza de CSV segue as regras existentes da tela.</Text>}
         <TouchableOpacity style={[styles.button, { flex: 0 }]} onPress={() => void refreshSqlite()} disabled={busy}>
           <Text style={styles.buttonText}>VERIFICAR SQLITE</Text>
         </TouchableOpacity>
