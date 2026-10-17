@@ -9,6 +9,7 @@
 - Textos maiores ficam ativados por padrão. Botões de opções e ações importantes têm altura mínima de 48 px; navegação inferior tem alvo mínimo de 44 px em retrato e 40 px em paisagem para preservar espaço de tela.
 - Configurações são persistidas em MERIVA_SMART/CONFIG/app-settings.json; valores antigos recebem defaults compatíveis quando o arquivo é lido.
 - A opção `keepScreenAwake` controla o bloqueio de suspensão da tela e permanece ligada por padrão; a tela reage à mudança de preferência sem reiniciar.
+- O controle de textos maiores agora é compartilhado: aumenta em 12% o texto auxiliar/rotulagem com tamanho-base até 32 px em todas as telas do Expo Router, sem redimensionar novamente os números hero.
 
 ## Configurações de painel adicionadas
 - Indicador principal: temperatura, RPM, tensão, posição da borboleta, velocidade GPS, consumo km/L ou falhas ativas.
@@ -45,3 +46,7 @@ Implementação registrada em branch de trabalho. Estado de testes e compilaçã
 - A tela continua ligada por padrão, atendendo ao requisito anterior do projeto.
 - O usuário agora pode desativar o comportamento nas configurações. A preferência é publicada para o layout raiz em tempo real.
 - A CI confirma compilação e testes; a reação de suspensão/retorno ainda deve ser verificada fisicamente em aparelho Android.
+
+
+## Aplicação real da preferência de texto
+`largeText` é aplicada via `AdaptiveText` nas telas Painel, Diagnóstico/Saúde, Viagens, Veículo, Bluetooth, Dados, Aprendizado, Histórico/Armazenamento, Laboratório, Testes de Sensores, Mais e Configurações. Os botões/touch targets continuam sujeitos a avaliação em dispositivo físico; a ampliação tipográfica não substitui inspeção de acessibilidade.

@@ -21,6 +21,10 @@ assert.match(settings, /keepScreenAwake: true/, 'tela ligada deve continuar habi
 assert.match(config, /settings\\.keepScreenAwake/);
 assert.match(config, /Manter tela ligada enquanto o aplicativo estiver aberto/);
 assert.match(fs.readFileSync('app/_layout.tsx', 'utf8'), /subscribeAppSettings/);
+for (const file of fs.readdirSync('app').filter((name) => name.endsWith('.tsx') && name !== '_layout.tsx')) {
+  const screen = fs.readFileSync('app/' + file, 'utf8');
+  assert.match(screen, /AdaptiveText as Text/, file + ' deve aplicar a preferência global de texto maior');
+}
 assert.match(config, /minHeight: 48/, 'opções de configuração devem ter alvo de toque grande');
 assert.match(cockpit, /metric\.id !== 'SPEED' \|\| settings\?\.showSpeedMetric/);
 assert.match(cockpit, /settings\?\.homeAutoRotate/);

@@ -32,6 +32,7 @@ A inteligência diagnóstica é local, determinística e explicável. Ela não e
 - `src/knowledge/diagnostic_responses.json` agora fornece os textos por ID de hipótese, sem manter cópias em mapas TypeScript.
 - Os catálogos têm schemas JSON Schema Draft 2020-12 e um teste de contrato, que verifica a ligação entre regra, resposta e proveniência do PID.
 - `keepScreenAwake` é uma preferência persistida (padrão ligado), atualizada em tempo real pelo layout raiz.
+- `largeText` é consumido por `src/ui/AdaptiveText.tsx` e foi aplicado às telas Expo Router; a preferência ajusta textos auxiliares e rótulos sem ampliar novamente os valores hero.
 
 ## Próximas etapas da reengenharia
 - Criar dataQuality.ts independente com regras de validade, frescor, faixa e proveniência compartilhadas entre painel, viagens e diagnóstico.
@@ -59,3 +60,7 @@ A CI pode validar tipos, testes automatizados e compilação, mas não prova a q
 - `ai_policy.schema.json` e `diagnostic_responses.schema.json`: contratos JSON Schema Draft 2020-12 para validadores compatíveis.
 - `tests/aiKnowledgeJson.test.js`: contrato entre regras, política, respostas e evidência. Confirma que somente PID com `RAW_ECU` pode estar confirmado.
 - Limite: JSON melhora governança e explicabilidade, mas não cria por si só um modelo generativo nem comprova precisão no carro. O motor continua determinístico; não houve introdução de dado fictício ou escrita na ECU.
+
+
+## Acessibilidade global — implementação de 2026-10-17
+O componente `AdaptiveText` assina a preferência uma única vez por módulo e reutiliza o valor publicado por `subscribeAppSettings`. Com `largeText=true`, escala 12% os textos com `fontSize` base até 32 px; os valores hero acima desse limite mantêm o tamanho original para evitar escala dupla. A suíte verifica que todas as telas com conteúdo textual, exceto o layout-raiz, usam o componente. Deve ser verificada visualmente em aparelho real para identificar possíveis truncamentos.

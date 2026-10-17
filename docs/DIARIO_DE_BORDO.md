@@ -2585,3 +2585,15 @@ Criar arquivos JSON úteis para o raciocínio local do app e transformar o bloqu
 ### Verificação
 - CI #2301 no commit anterior: `validate` passou; o APK Android ainda estava em montagem no último estado observado.
 - Este commit dispara uma nova CI. O resultado completo de typecheck, suíte e APK precisa ser lido no run associado a ele; não há teste em dispositivo nem conexão física ELM327 comprovados por esta alteração.
+
+
+## 2026-10-17 — Aplicação global de texto maior
+
+### Alterações
+- Criado `src/ui/AdaptiveText.tsx`, com assinatura compartilhada da configuração `largeText`; há uma única leitura inicial de configurações para o módulo em vez de uma leitura por cada componente de texto.
+- Aplicado o componente nas 12 telas de conteúdo do diretório `app/` (Painel, Configurações, Mais, Saúde, Dados, Bluetooth, Aprendizado, Armazenamento, Laboratório, Testes de Sensores, Veículo e Viagens).
+- Quando ativada, a preferência aumenta 12% os textos cujo tamanho-base é de até 32 px; valores hero são mantidos para evitar escala dupla.
+- Adicionada uma regressão estática para exigir `AdaptiveText` em todas as telas de conteúdo.
+
+### Limite
+A CI pode provar TypeScript e testes de contrato, mas não mede a legibilidade real nem detecta toda quebra visual em cada densidade de tela. Continua necessária revisão em aparelho Android, em retrato e paisagem.

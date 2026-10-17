@@ -32,8 +32,9 @@ function policyNumber(value: unknown, fallback: number, min: number, max: number
 const LIVE_OBD_SOURCE = aiPolicy.sources?.liveObd === 'REAL_OBD' ? 'REAL_OBD' : '__INVALID_AI_POLICY_SOURCE__';
 const MAX_DIAGNOSTIC_READING_AGE_MS = policyNumber(aiPolicy.observations?.maxAgeMs, 60_000, 1_000, 60_000);
 const SAFE_ACTIVE_DTC_STATUSES = new Set(['CONFIRMED', 'PENDING', 'PERMANENT', 'CURRENT']);
+const configuredActiveStatuses = aiPolicy.dtcs?.activeStatuses;
 const ACTIVE_DTC_STATUSES = new Set(
-  (Array.isArray(aiPolicy.dtcs?.activeStatuses) ? aiPolicy.dtcs.activeStatuses : [])
+  (Array.isArray(configuredActiveStatuses) ? configuredActiveStatuses : [])
     .filter((status): status is string => typeof status === 'string')
     .map((status) => status.toUpperCase())
     .filter((status) => SAFE_ACTIVE_DTC_STATUSES.has(status)),
