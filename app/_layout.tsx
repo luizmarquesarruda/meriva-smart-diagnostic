@@ -102,7 +102,7 @@ export default function RootLayout() {
     <SafeAreaProvider>
     <Stack
       screenOptions={{
-        // Todas as telas de app/ já desenham o próprio cabeçalho; o header nativo duplicava o título e consumia altura útil no celular.
+        // As telas desenham seus títulos e oferecem retorno explícito; ocultar o header nativo evita títulos duplicados sem retirar a navegação de volta.
         headerShown: false,
         headerStyle: { backgroundColor: '#d9d9d9' },
         headerTintColor: '#1557a6',
