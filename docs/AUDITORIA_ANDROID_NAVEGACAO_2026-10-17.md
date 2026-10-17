@@ -17,8 +17,8 @@ Correção mínima para reduzir duplicação visual no Android sem alterar as ro
 
 ## Correção aplicada nesta branch
 
-- `app/_layout.tsx`: define `headerShown: false` no Stack raiz. As telas mantêm seus cabeçalhos internos e o espaço útil vertical aumenta; nenhuma rota é removida.
-- `tests/cockpitNavigation.test.js`: verifica o cabeçalho global, os quatro destinos principais, a entrada única de Bluetooth e a ausência de Viagens/Veículo em Mais recursos.
+- `app/_layout.tsx`: define `headerShown: false` no Stack raiz para evitar títulos duplicados. Como o header nativo também continha a seta de retorno, foram adicionados retornos internos acessíveis ao Laboratório (`/`), Armazenamento (`/mais`) e Configurações (`/mais`); nenhuma rota é removida.
+- `tests/cockpitNavigation.test.js`: verifica o cabeçalho global, os quatro destinos principais, a entrada única de Bluetooth, a ausência de Viagens/Veículo em Mais recursos e a existência de retorno visível nas três rotas que antes dependiam da seta nativa.
 - `app/index.tsx`: substitui os atalhos independentes de Diagnóstico/Dados/Viagens por um único acesso a Mais recursos; adiciona navegação principal de quatro destinos, acessível nas duas orientações; transforma o chip de conexão em link acessível para Bluetooth.
 - `app/mais.tsx`: remove entradas duplicadas de Viagens e Veículo, remove Bluetooth (centralizado no chip) e adiciona Dados ao Vivo para preservar o acesso à rota `/dados`.
 
