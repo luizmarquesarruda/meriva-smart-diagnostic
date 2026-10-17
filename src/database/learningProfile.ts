@@ -178,7 +178,7 @@ async function enqueueProfileTransaction<T>(
 
 export async function createLearningProfile(
   basePath: string,
-  seedImportDate: string,
+  seedImportDate = new Date().toISOString(),
 ): Promise<MerivaLearningProfile> {
   const now = new Date().toISOString();
   const profile: MerivaLearningProfile = {
