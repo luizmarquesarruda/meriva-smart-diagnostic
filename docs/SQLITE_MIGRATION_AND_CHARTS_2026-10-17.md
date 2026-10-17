@@ -37,6 +37,14 @@ A adoção é aditiva, não uma substituição abrupta:
 5. Depois de gerar o TXT dos testes de sensores, o app grava o conjunto estruturado quando a ECU real foi validada no início. Se SQLite falhar, o TXT continua salvo e a interface informa o problema.
 6. A base existente ainda precisa de uma etapa posterior de importação idempotente de históricos JSON/CSV antigos. Nenhuma migração destrutiva é executada nesta fase.
 
+## Observabilidade na interface
+
+A tela Histórico e Dados mostra disponibilidade do SQLite, versão real da migração, contagens por tabela, fila de escritas pendentes, total de amostras descartadas da fila secundária e última condição de erro. Se o banco não abrir, o painel não mostra a versão-alvo como se fosse uma migração ativa. Esse estado não substitui uma leitura real da ECU.
+
+## Integração com a branch de telemetria SQLite
+
+Foi encontrada uma implementação anterior/alternativa na PR #66 que grava a telemetria crua em outro módulo. Esta branch utiliza o mesmo nome de banco e formato de tabela para fazer a consolidação aditiva, inclusive com compatibilidade do ledger de migração. **Não mesclar as duas stores como implementações independentes**: antes de um merge conjunto, reconciliar o módulo de gravação, a versão do schema e o ponto de integração para manter somente uma origem de verdade. A versão alternativa isolada ainda presume schema v1, então não pode coexistir em execução com o schema v2 sem ajuste.
+
 ## Proveniência e segurança diagnóstica
 
 As fontes permanecem separadas: `REAL_OBD`, `SIMULACAO`, `CARSCANNER_BASELINE`, `USER_REAL_OBSERVATION` e `IMPORTADO`. Uma resposta válida de PID comprova resposta do protocolo, não a precisão física do sensor. Nenhum PID candidato é promovido a confirmado. Nenhum comando de atuação/escrita na ECU foi introduzido.
