@@ -56,21 +56,7 @@ Module._load = originalLoad;
 
   // A malformed existing log must be preserved, not silently replaced by a
   // new one-event file after read/parse failure.
-  const corruptPath = '/doc/MERIVA/LOGS/corrupt_events.json';
   const corruptContent = '{broken-json';
-  files.set(corruptPath, corruptContent);
-  await assert.rejects(
-    mod.exports.appendLinkEvent('/doc/MERIVA', {
-      timestamp: new Date().toISOString(),
-      state: 'ECU_RESPONDING',
-      cause: 'PID_RESPONSE',
-      consecutiveFailures: 0,
-    }).then(() => {
-      // The store uses the fixed link_events.json name, so test corruption on
-      // that actual target and preserve the original bytes.
-    }),
-  ).catch(() => undefined);
-
   const actualLinkPath = '/doc/MERIVA/LOGS/link_events.json';
   const originalLinkContent = files.get(actualLinkPath);
   files.set(actualLinkPath, corruptContent);
