@@ -2,6 +2,8 @@ name: Temporary SQLite dependency installation
 
 on:
   workflow_dispatch:
+  push:
+    branches: ['feat/accessibility-settings-ai-rework-20261017']
 
 permissions:
   contents: write
