@@ -593,7 +593,7 @@ export async function getDiagnosticDatabaseHealth(): Promise<DiagnosticDatabaseH
     enabled: Boolean(sqlitePolicy.enabled),
     available: false,
     databaseName: DIAGNOSTIC_DATABASE_NAME,
-    schemaVersion: DIAGNOSTIC_DATABASE_SCHEMA_VERSION,
+    schemaVersion: 0,
     sqliteVersion: null as string | null,
     pidSampleCount: null as number | null,
     telemetrySampleCount: null as number | null,
@@ -635,7 +635,7 @@ export async function getDiagnosticDatabaseHealth(): Promise<DiagnosticDatabaseH
       dtcRecordCount,
       tripCount,
       sensorTestRunCount,
-      lastError: droppedTelemetrySamples > 0 ? 'SQLITE_WRITE_QUEUE_FULL' : null,
+      lastError: droppedTelemetrySamples > 0 ? 'SQLITE_WRITE_QUEUE_FULL' : lastDatabaseError,
     };
   } catch {
     return { ...base, lastError: lastDatabaseError ?? 'SQLITE_UNAVAILABLE' };
