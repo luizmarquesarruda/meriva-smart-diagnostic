@@ -37,8 +37,8 @@ function loadTs(tsPath) {
   return mod.exports;
 }
 
-function obs(pid, value, source = 'REAL_OBD') {
-  return { pid, name: pid, value, unit: 'N/D', source, timestamp: new Date().toISOString(), confidence: 'HIGH' };
+function obs(pid, value, source = 'REAL_OBD', timestamp = new Date().toISOString()) {
+  return { pid, name: pid, value, unit: 'N/D', source, timestamp, confidence: 'HIGH' };
 }
 
 function main() {
@@ -51,7 +51,7 @@ function main() {
 
   let result = engine.runLocalDiagnostic({
     ...base,
-    dtcs: [{ code: 'P0301', status: 'CONFIRMED', firstSeen: '', lastSeen: '', occurrences: 1, source: 'REAL_OBD', historical: false, confirmed: true }],
+    dtcs: [{ code: 'P0301', status: 'CONFIRMED', firstSeen: '', lastSeen: new Date().toISOString(), occurrences: 1, source: 'REAL_OBD', historical: false, confirmed: true }],
   });
   assert.strictEqual(result.hypotheses[0].id, 'FALHA_DE_COMBUSTAO_CILINDRO_1');
   assert.strictEqual(result.hypotheses[0].confidence, 'MEDIUM');
@@ -97,14 +97,14 @@ function main() {
 
   result = engine.runLocalDiagnostic({
     ...base,
-    dtcs: [{ code: 'P0420', status: 'HISTORICAL', firstSeen: '', lastSeen: '', occurrences: 1, source: 'REAL_OBD', historical: true, confirmed: false }],
+    dtcs: [{ code: 'P0420', status: 'HISTORICAL', firstSeen: '', lastSeen: new Date().toISOString(), occurrences: 1, source: 'REAL_OBD', historical: true, confirmed: false }],
   });
   assert.strictEqual(result.hypotheses.length, 0, 'DTC histórico não pode gerar falha atual');
   assert.strictEqual(result.blockedNonLiveDtcs, 1);
 
   result = engine.runLocalDiagnostic({
     ...base,
-    dtcs: [{ code: 'P0135', status: 'CONFIRMED', firstSeen: '', lastSeen: '', occurrences: 1, source: 'REAL_OBD', historical: false, confirmed: true }],
+    dtcs: [{ code: 'P0135', status: 'CONFIRMED', firstSeen: '', lastSeen: new Date().toISOString(), occurrences: 1, source: 'REAL_OBD', historical: false, confirmed: true }],
   });
   assert.strictEqual(result.hypotheses[0].id, 'FALHA_CIRCUITO_AQUECEDOR_O2_B1S1');
   assert.ok(result.hypotheses[0].nextTests.some((item) => item.includes('0114')), 'IA usa sensor_tests.json para recomendar avaliação O2 no P0135');
@@ -120,6 +120,38 @@ function main() {
   assert.strictEqual(result.hypotheses.length, 1);
   assert.strictEqual(result.hypotheses[0].id, 'MISTURA_POBRE');
   assert.strictEqual(result.blockedSimulationSamples, 1);
+
+  assert.strictEqual(engine.normalizeDiagnosticSource('REAL', 'RESPONDEU'), 'REAL_OBD');
+  assert.strictEqual(engine.normalizeDiagnosticSource('REAL', 'NÃO RESPONDEU'), 'IMPORTADO');
+  assert.strictEqual(engine.normalizeDiagnosticSource('SIMULACAO', 'RESPONDEU'), 'SIMULACAO');
+  assert.strictEqual(engine.normalizeDiagnosticSource('CARSCANNER_BASELINE', 'RESPONDEU'), 'CARSCANNER_BASELINE');
+  assert.strictEqual(engine.normalizeDiagnosticSource('origem-desconhecida', 'RESPONDEU'), 'IMPORTADO');
+
+  const staleAt = new Date(Date.now() - engine.MAX_DIAGNOSTIC_EVIDENCE_AGE_MS - 1000).toISOString();
+  result = engine.runLocalDiagnostic({ ...base, observations: [obs('010B', 50, 'REAL_OBD', staleAt)] });
+  assert.strictEqual(result.hypotheses.length, 0, 'leitura antiga não pode gerar hipótese atual');
+  assert.strictEqual(result.blockedStaleObservations, 1);
+
+  result = engine.runLocalDiagnostic({ ...base, observations: [obs('010B', 50, 'IMPORTADO')] });
+  assert.strictEqual(result.hypotheses.length, 0, 'dados importados nunca podem ser tratados como leitura live');
+  assert.strictEqual(result.blockedNonLiveSamples, 1);
+
+  result = engine.runLocalDiagnostic({
+    ...base,
+    ecuConnected: false,
+    observations: [obs('010B', 50)],
+    dtcs: [{ code: 'P0135', status: 'CURRENT', firstSeen: new Date().toISOString(), lastSeen: new Date().toISOString(), occurrences: 1, source: 'REAL_OBD', historical: false, confirmed: true }],
+  });
+  assert.strictEqual(result.hypotheses.length, 0, 'ECU desconectada não pode produzir diagnóstico atual com evidência salva');
+  assert.strictEqual(result.disconnectedEvidenceIgnored, true);
+
+  const staleDtcAt = new Date(Date.now() - engine.MAX_DIAGNOSTIC_EVIDENCE_AGE_MS - 1000).toISOString();
+  result = engine.runLocalDiagnostic({
+    ...base,
+    dtcs: [{ code: 'P0135', status: 'CURRENT', firstSeen: staleDtcAt, lastSeen: staleDtcAt, occurrences: 1, source: 'REAL_OBD', historical: false, confirmed: true }],
+  });
+  assert.strictEqual(result.hypotheses.length, 0, 'DTC sem atualização recente não pode ser apresentado como atual');
+  assert.strictEqual(result.blockedStaleDtcs, 1);
 
   console.log('Diagnostic engine: OK');
 }
