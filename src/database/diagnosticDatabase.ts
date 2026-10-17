@@ -264,26 +264,28 @@ async function openAndMigrate(): Promise<SQLiteDatabase> {
     ? 'applied_at'
     : 'applied_at_utc';
 
-  // Re-run all CREATE TABLE IF NOT EXISTS statements during open. That safely fills in
-  // missing tables if a v1 telemetry-only DB already exists; it never deletes prior records.
-  await db.withExclusiveTransactionAsync(async (transaction) => {
-    await transaction.execAsync(SCHEMA_V1);
-    if (version < 1) {
-      await transaction.runAsync(
-        `INSERT OR IGNORE INTO schema_migrations(version, ${timestampColumn}) VALUES (?, ?)`,
-        1,
-        new Date().toISOString(),
-      );
-    }
-    await transaction.execAsync(SCHEMA_V2);
-    if (version < 2) {
-      await transaction.runAsync(
-        `INSERT OR IGNORE INTO schema_migrations(version, ${timestampColumn}) VALUES (?, ?)`,
-        2,
-        new Date().toISOString(),
-      );
-    }
-  });
+  // Only run DDL when creating/upgrading. For a v1 telemetry-only DB, these
+  // idempotent CREATE statements fill missing tables without deleting old records.
+  if (version < DIAGNOSTIC_DATABASE_SCHEMA_VERSION) {
+    await db.withExclusiveTransactionAsync(async (transaction) => {
+      await transaction.execAsync(SCHEMA_V1);
+      if (version < 1) {
+        await transaction.runAsync(
+          `INSERT OR IGNORE INTO schema_migrations(version, ${timestampColumn}) VALUES (?, ?)`,
+          1,
+          new Date().toISOString(),
+        );
+      }
+      await transaction.execAsync(SCHEMA_V2);
+      if (version < 2) {
+        await transaction.runAsync(
+          `INSERT OR IGNORE INTO schema_migrations(version, ${timestampColumn}) VALUES (?, ?)`,
+          2,
+          new Date().toISOString(),
+        );
+      }
+    });
+  }
   databaseRetryAfterMs = 0;
   lastDatabaseError = null;
   return db;
