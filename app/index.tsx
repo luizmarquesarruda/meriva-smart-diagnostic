@@ -189,6 +189,8 @@ export default function IndexScreen() {
     { id: 'VOLTAGE', label: 'VOLTAGEM DO SISTEMA', value: voltageValue != null ? voltageValue.toFixed(1) : 'N/D', unit: voltageValue != null ? 'V' : '', hint: voltageValue != null ? 'LEITURA REAL • PID 0142' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0142' : 'ECU DESCONECTADA', tone: 'normal' },
     { id: 'THROTTLE', label: 'POSIÇÃO DA BORBOLETA', value: throttleValue != null ? throttleValue.toFixed(1) : 'N/D', unit: throttleValue != null ? '%' : '', hint: throttleValue != null ? 'LEITURA REAL • PID 0111' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0111' : 'ECU DESCONECTADA', tone: 'normal' },
     { id: 'RPM', label: 'ROTAÇÃO DO MOTOR', value: rpmValue != null ? String(Math.round(rpmValue)) : 'N/D', unit: rpmValue != null ? 'RPM' : '', hint: rpmValue != null ? 'LEITURA REAL • PID 010C' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 010C' : 'ECU DESCONECTADA', tone: 'normal' },
+    { id: 'CONSUMPTION', label: 'CONSUMO DE COMBUSTÍVEL', value: availableConsumptionKml != null ? availableConsumptionKml.toFixed(1) : 'N/D', unit: availableConsumptionKml != null ? 'km/L' : '', hint: consumptionLabel + ' • DADO DA VIAGEM', tone: 'normal' },
+    { id: 'FAULTS', label: 'FALHAS ATIVAS', value: dtcCount > 0 ? String(dtcCount) : 'NORMAL', unit: dtcCount > 0 ? 'DTC' : '', hint: dtcCount > 0 ? 'CÓDIGOS ATIVOS REGISTRADOS' : 'SEM DTC ATIVO REGISTRADO', tone: dtcCount > 0 ? 'danger' : 'normal' },
   ];
   const heroMetrics = allHeroMetrics.filter((metric) => metric.id !== 'SPEED' || settings?.showSpeedMetric === true || settings?.homePrimaryMetric === 'SPEED');
   const configuredMetricIndex = Math.max(0, heroMetrics.findIndex((metric) => metric.id === (settings?.homePrimaryMetric ?? 'TEMPERATURE')));
@@ -244,7 +246,7 @@ export default function IndexScreen() {
             >
               <Text style={styles.heroEyebrow}>{selectedHeroMetric.label}</Text>
               <View style={styles.heroNumberRow}>
-                <Text style={[styles.heroValue, settings?.largeText && styles.heroValueLarge, layout.landscape && styles.heroValueLandscape, selectedHeroMetric.tone === 'danger' && styles.danger, selectedHeroMetric.tone === 'warning' && styles.heroWarning]}>{selectedHeroMetric.value}</Text>
+                <Text style={[styles.heroValue, layout.landscape && styles.heroValueLandscape, settings?.largeText && styles.heroValueLarge, selectedHeroMetric.tone === 'danger' && styles.danger, selectedHeroMetric.tone === 'warning' && styles.heroWarning]}>{selectedHeroMetric.value}</Text>
                 {!!selectedHeroMetric.unit && <Text style={styles.heroUnit}>{selectedHeroMetric.unit}</Text>}
               </View>
               <Text style={styles.heroState}>{selectedHeroMetric.hint}</Text>
