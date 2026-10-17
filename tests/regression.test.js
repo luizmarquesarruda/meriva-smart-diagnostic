@@ -844,6 +844,10 @@ async function testDriveCycleSummaryUsesWeightedRealSpeed() {
     distanceTotalKm: 2,
     distanceIceKm: 2,
     fuelUsedL: 0.2,
+    fuelLiters: 0.2,
+    fuelCoveragePct: 100,
+    fuelUncertaintyPct: 30,
+    tripQuality: 'OK',
     totalTimeHms: '00:20:00',
     drivingTimeHms: '00:20:00',
     standingTimeHms: '00:00:00',
@@ -880,6 +884,9 @@ async function testDriveCycleSummaryUsesWeightedRealSpeed() {
     fuelUsedL: 0.01,
     avgFuelConsumptionKml: 0,
     fuelDataValid: false,
+    fuelLiters: null,
+    fuelCoveragePct: 0,
+    tripQuality: 'DADOS_INSUFICIENTES',
   };
   const summary = driveCycles.getDriveCycleSummary([slowLongTrip, shortFastTrip, latestSeed, noFuelTrip]);
   assert.strictEqual(summary.avgSpeedKmh, 20, 'aggregate speed must use all real distance / real moving time, even when fuel data is unavailable');
