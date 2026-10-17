@@ -35,11 +35,17 @@ export function validatePayload(payload: MerivaPersistedState): boolean {
 /** Preenche campos ausentes com valores padrão — tolera schema parcial. */
 export function hydrateState(payload: MerivaPersistedState): MerivaPersistedState {
   const defaults = createEmptyMerivaState();
-  return {
+  const hydrated: MerivaPersistedState = {
     ...defaults,
     ...payload,
-    metadata: { ...defaults.metadata, ...(payload.metadata ?? {}) },
+    metadata: { ...defaults.metadata, ...(payload.metadata ?? {}), buildInfo: payload.metadata?.buildInfo ?? defaults.metadata.buildInfo },
   };
+  // Migração transparente do nome legado; não manter duas fontes de contagem.
+  if (hydrated.settings.simulatedQueries == null && hydrated.settings.simulationQueries != null) {
+    hydrated.settings.simulatedQueries = Number(hydrated.settings.simulationQueries) || 0;
+  }
+  delete hydrated.settings.simulationQueries;
+  return hydrated;
 }
 
 /**
