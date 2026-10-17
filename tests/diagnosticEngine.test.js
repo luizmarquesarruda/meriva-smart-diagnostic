@@ -121,6 +121,13 @@ function main() {
   assert.strictEqual(result.hypotheses[0].id, 'MISTURA_POBRE');
   assert.strictEqual(result.blockedSimulationSamples, 1);
 
+  result = engine.runLocalDiagnostic({
+    ...base,
+    observations: [{ ...obs('010B', 80), timestamp: new Date(Date.now() - 120_000).toISOString() }],
+  });
+  assert.strictEqual(result.hypotheses.length, 0, 'leituras OBD antigas não podem gerar hipóteses atuais');
+  assert.strictEqual(result.blockedStaleSamples, 1, 'leituras reais antigas devem ser contabilizadas como bloqueadas');
+
   console.log('Diagnostic engine: OK');
 }
 
