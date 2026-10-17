@@ -2506,3 +2506,17 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Commit de implementação: `81762d87243d38fb35367ec731c8f7bc4aaa275f`; commit do teste: `42e014aa19db89a5d5613216ab7689a37a51ab57`; documentação atualizada em `55bc949c3799bd4fc7a9712e1b570231504f475d`.
 - A verificação estática confirmou três usos do modo compacto e a existência das regras de estilo. A altura real do conteúdo não foi medida via screenshot/emulador.
 - **NÃO EXECUTADOS:** teste Node, TypeScript, Expo Doctor, prebuild, Gradle/APK e dispositivo físico. CI permanece **NÃO DISPARADA**.
+
+
+### CI da navegação Android — execução #2277
+
+- Data reportada pelo GitHub Actions: 2026-10-17.
+- PR: https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/68
+- Workflow run ID: `39028085170`; execução: [CI #2277](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/39028085170).
+- Commit validado: `36af6d44b200fa955a9e095864d4e70f1748c25f` (o mesmo SHA indicado como head da PR no momento da consulta).
+- Evento: `pull_request`; estado final: `completed`; conclusão: **success**.
+- Job `validate`: sucesso. Passos concluídos: Node 20, Java 17, `npm ci --no-audit --no-fund`, `npm run doctor` e `npm run validate` (typecheck + testes).
+- Job `android-build`: sucesso. Passos concluídos: `npm ci`, Expo prebuild para Android, Gradle `:app:assembleRelease`, verificação de APK não vazio e upload do artefato `meriva-smart-diagnostic-standalone-apk` (retenção configurada em 14 dias).
+- Evidência dos jobs: `validate` ID `117382942876`; `android-build` ID `117383071884`; ambos com conclusão `success`.
+- Limitação: CI bem-sucedida não substitui validação visual em emulador/aparelho nem teste físico Meriva + ELM327.
+- Esta entrada é uma atualização documental após a execução #2277. A gravação do diário gera um commit novo e pode iniciar outra CI pelo gatilho `push`; esse novo resultado será registrado separadamente.
