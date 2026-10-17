@@ -82,7 +82,7 @@ export default function ViagensScreen() {
             <View style={s.tripFooter}>
               <Text style={s.tripFooterText}>Máxima: {mv(n(cycle.maxSpeedKmh),'km/h')}</Text>
               <Text style={[s.consumption,cycle.fuelDataValid === false && s.muted]}>
-                {cycle.fuelDataValid === false || cycle.fuelUsedL < 0.05 || cycle.avgFuelConsumptionKml <= 0 ? 'CONSUMO N/D' : mv(cycle.avgFuelConsumptionKml,'km/L')}
+                {cycle.tripQuality === 'SUSPEITA' ? 'SUSPEITA' : cycle.fuelDataValid === false || cycle.fuelLiters == null || (cycle.fuelCoveragePct ?? 0) < 70 || cycle.fuelUsedL < 0.05 || cycle.avgFuelConsumptionKml <= 0 ? 'CONSUMO N/D' : mv(cycle.avgFuelConsumptionKml,'km/L')}
               </Text>
             </View>
           </TouchableOpacity>) : <View style={s.empty}>
@@ -109,7 +109,7 @@ function TripDetails({cycle,onBack}:{cycle:DriveCycle;onBack:()=>void}) {
   const min = coolant.length ? Math.min(...coolant) : null;
   const max = coolant.length ? Math.max(...coolant) : null;
   const avg = coolant.length ? coolant.reduce((sum,value)=>sum+value,0)/coolant.length : null;
-  const fuelValid = cycle.fuelDataValid !== false && cycle.fuelLiters != null && (cycle.fuelCoveragePct ?? 0) >= 70 && cycle.fuelUsedL >= 0.05 && cycle.avgFuelConsumptionKml > 0;
+  const fuelValid = cycle.tripQuality !== 'SUSPEITA' && cycle.fuelDataValid !== false && cycle.fuelLiters != null && (cycle.fuelCoveragePct ?? 0) >= 70 && cycle.fuelUsedL >= 0.05 && cycle.avgFuelConsumptionKml >= 2 && cycle.avgFuelConsumptionKml <= 40;
   const totalSeconds = durationSeconds(cycle.totalTimeHms);
   return <>
     <TouchableOpacity style={s.backInline} onPress={onBack}><Text style={s.backText}>← VOLTAR AO HISTÓRICO</Text></TouchableOpacity>
