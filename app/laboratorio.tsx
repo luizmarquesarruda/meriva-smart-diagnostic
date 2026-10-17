@@ -644,6 +644,7 @@ export default function LaboratorioScreen() {
         {diagnostic.blockedStaleObservations > 0 ? <Text style={styles.aiMuted}>LEITURAS ANTIGAS IGNORADAS: {diagnostic.blockedStaleObservations}.</Text> : null}
         {diagnostic.blockedStaleDtcs > 0 ? <Text style={styles.aiMuted}>DTCs SEM ATUALIZAÇÃO RECENTE: {diagnostic.blockedStaleDtcs}.</Text> : null}
         {diagnostic.disconnectedEvidenceIgnored ? <Text style={styles.aiWarning}>ECU SEM RESPOSTA: evidência OBD salva não foi usada como estado atual.</Text> : null}
+        {diagnostic.recommendedActions.map(action => <Text key={action.id} style={styles.aiMuted}>{action.priority}: {action.title} — {action.detail}</Text>)}
         <Text style={styles.aiDisclaimer}>{diagnostic.disclaimer}</Text>
       </View>
 
