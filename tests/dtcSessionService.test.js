@@ -71,7 +71,8 @@ try { mod._compile(output, sourcePath); } finally { Module._load = originalLoad;
   assert.strictEqual(second.freezeFrame.available, false);
   assert.strictEqual(second.freezeFrame.frame, null);
   assert.strictEqual(db.get('P0135').status, 'INACTIVE');
-  assert.strictEqual(db.get('P0135').freezeFrame, undefined);
+  assert.strictEqual(db.get('P0135').freezeFrame.dtc, 'P0135', 'historical frame stays attached only to its owner');
+  assert.strictEqual(db.get('P0135').freezeFrame.rpm, null, 'empty new frame must not fabricate zero RPM');
   console.log('dtcSessionService: revalidation, occurrence count and frame ownership passed');
 })().catch((error) => {
   console.error(error);
