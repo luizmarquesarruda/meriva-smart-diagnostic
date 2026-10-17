@@ -2619,3 +2619,5 @@ A política `src/knowledge/sqlite_policy.json` explicita que a tabela `telemetry
 - Teste criado com SQLite artificialmente bloqueado para verificar o teto, a amostra omitida e a recuperação da fila. **Não executado**; sem disparo de CI.
 
 - `droppedSamples` é contador em memória da execução atual e reinicia com o processo; não é um contador histórico. Para reconciliação completa, usar os TXT/CSV canônicos que permanecem independentes.
+
+- Cooldown nativo SQLite de 15 s após falha de abertura/migração foi adicionado à política JSON, evitando repetição por PID. Teste mockado criado, não executado.
