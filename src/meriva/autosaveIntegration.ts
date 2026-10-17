@@ -14,6 +14,8 @@ import { shouldFeedLearning } from './autosaveValidation';
 import { getVehicleConditionSnapshot, recordLivePidQuery } from '../obd/liveTelemetry';
 import pollingPolicy from '../knowledge/polling_policy.json';
 import { appendLinkEvent } from '../obd/linkEventStore';
+import { recordSqliteTelemetrySample } from '../database/sqliteTelemetryStore';
+import { getAutoSaveState } from './autosaveManager';
 
 const lastLearningPersistedAt = new Map<string, number>();
 const LEARNING_SAMPLE_MIN_INTERVAL_MS = pollingPolicy.learningSampleMinIntervalMs;
@@ -63,6 +65,17 @@ export async function registerObdQuery(
 
   recordLivePidQuery(result, source);
 
+  const queryTimestamp = new Date().toISOString();
+  const currentObdState = getAutoSaveState().obd;
+  // SQLite is an additive offline index. Never await it in the ECU serial
+  // request path; raw daily CSV and canonical autosave remain independent.
+  void recordSqliteTelemetrySample(
+    result,
+    source,
+    queryTimestamp,
+    currentObdState.ecuValidatedAt ?? currentObdState.lastConnectedAt ?? null,
+  );
+
   if (source === 'REAL') {
     const responseText = String(result.rx ?? '').toUpperCase();
     const succeeded = result.commandStatus === 'OK' && result.parsed.status === 'RESPONDEU';
@@ -104,7 +117,7 @@ export async function registerObdQuery(
     value: result.parsed.value,
     unit: result.parsed.unit,
     status: result.parsed.status,
-    timestamp: new Date().toISOString(),
+    timestamp: queryTimestamp,
     source,
   });
 
