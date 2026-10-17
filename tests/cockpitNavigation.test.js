@@ -40,3 +40,9 @@ console.log('Navegação principal sem rotas duplicadas: OK');
 const rootLayout = read('app/_layout.tsx');
 assert.match(rootLayout, /screenOptions=\{\{[\s\S]*?headerShown:\s*false/, 'o Stack global não deve duplicar cabeçalhos desenhados pelas telas');
 console.log('Cabeçalho global duplicado desativado: OK');
+for (const [file, route] of [['app/laboratorio.tsx', '/'], ['app/armazenamento.tsx', '/mais'], ['app/configuracoes.tsx', '/mais']]) {
+  const source = read(file);
+  assert.ok(source.includes('href="' + route + '"'), file + ' deve fornecer retorno visível com o cabeçalho nativo oculto');
+  assert.match(source, /accessibilityRole="button"/, file + ' deve rotular o controle de retorno para acessibilidade');
+}
+console.log('Rotas sem cabeçalho nativo preservam retorno visível: OK');
