@@ -603,12 +603,12 @@ export async function setSharedObdConnection(connection: SharedObdConnection | n
     }
     startBluetoothMonitor();
   } else {
-    ecuResponseState = 'NOT_VALIDATED';
+    setEcuResponseState('NOT_VALIDATED');
     consecutiveEcuFailures = 0;
     lastEcuResponseAt = null;
     lastEcuError = null;
-    lifecycle = 'DISCONNECTED';
-    emit();
+    setLifecycle('DISCONNECTED');
+    currentSessionId = undefined;
     await closeObdAutosaveSession();
   }
 }
@@ -625,12 +625,12 @@ export async function disconnectSharedObd(): Promise<void> {
 
   const connection = active;
   active = null;
-  ecuResponseState = 'NOT_VALIDATED';
+  setEcuResponseState('NOT_VALIDATED');
   consecutiveEcuFailures = 0;
   lastEcuResponseAt = null;
   lastEcuError = null;
-  lifecycle = 'DISCONNECTED';
-  emit();
+  setLifecycle('DISCONNECTED');
+  currentSessionId = undefined;
 
   try {
     if (connection) await connection.session.close();
