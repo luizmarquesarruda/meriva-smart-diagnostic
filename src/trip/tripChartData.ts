@@ -36,7 +36,7 @@ export function buildTripChartData(cycles: readonly DriveCycle[], limit = 7): Tr
 
   const consumption = realCycles
     .filter((cycle) =>
-      cycle.fuelDataValid !== false
+      cycle.fuelDataValid === true
       && Number.isFinite(cycle.fuelUsedL)
       && cycle.fuelUsedL >= 0.05
       && Number.isFinite(cycle.avgFuelConsumptionKml)
