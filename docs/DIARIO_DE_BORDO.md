@@ -2478,3 +2478,13 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - A PR #68 continua em rascunho para revisão; não houve merge.
 - A barra inferior agora fica visível em paisagem, com espaçamento/tipografia reduzidos. Sem screenshot real, não declarar o layout visual aprovado.
 - Nenhuma rota foi excluída; apenas as entradas redundantes foram movidas/consolidadas.
+
+
+### Complemento da revisão estática — navegação do cockpit
+
+- Em revisão estática posterior, atualizados os contratos de `tests/orientationLayout.test.js` para que Dados ao Vivo seja verificado no menu Mais recursos, e não como um segundo atalho no cockpit.
+- Removidos 30 estilos de navegação obsoletos de `app/index.tsx`, sem alterar a lógica de telemetria/OBD.
+- Verificações estáticas do conteúdo remoto retornaram verdadeiro para: destinos primários, acesso aos recursos secundários, entrada única de Bluetooth, ausência de Viagens/Veículo em Mais recursos e barra de navegação ativa em paisagem.
+- Commits adicionais: `94659b1a151dcae24c4596f8ab641c9656fd72dd` (limpeza de estilos) e `f924a8d709c10e9031e92533f798192974b97eb9` (contrato de orientação).
+- Esses checks são inspeções de conteúdo e não substituem executar Node/Jest. Testes locais, typecheck, Expo Doctor, prebuild, build APK, screenshots e validação física continuam **NÃO EXECUTADOS**. CI permanece **NÃO DISPARADA**.
+- PR #68 atualizada, continua aberta em rascunho e não foi mesclada.
