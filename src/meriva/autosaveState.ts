@@ -2,6 +2,7 @@ import type { VehicleProfile } from '../database/vehicleConfig';
 import type { DriveCycle } from '../data/driveCycles';
 import type { DtcRecord } from '../types/sourceTypes';
 import type { MerivaLearningProfile } from '../database/learningProfile';
+import { getAppBuildInfo, type AppBuildInfo } from './buildInfo';
 
 export interface LastPidReading {
   pid: string;
@@ -11,6 +12,10 @@ export interface LastPidReading {
   status: string;
   timestamp: string;
   source: 'REAL' | 'SIMULACAO';
+  dataSource?: 'REAL' | 'SIMULADO' | 'REPLAY';
+  monotonicMs?: number;
+  ageMs?: number;
+  quality?: 'FRESH' | 'STALE' | 'ERROR';
 }
 
 export interface ObdConnectionState {
@@ -69,7 +74,7 @@ export interface MerivaPersistedState {
   pidDiscovery: PidDiscoveryCache | null;
   autonomy: AutonomyState;
   settings: Record<string, string | number | boolean>;
-  metadata: { savedAt: string; appVersion: string };
+  metadata: { savedAt: string; appVersion: string; buildInfo?: AppBuildInfo };
 }
 
 export function createEmptyMerivaState(): MerivaPersistedState {
@@ -95,6 +100,6 @@ export function createEmptyMerivaState(): MerivaPersistedState {
       readings: [],
     },
     settings: {},
-    metadata: { savedAt: '', appVersion: '1.0.1' },
+    metadata: { savedAt: '', appVersion: getAppBuildInfo().appVersion, buildInfo: getAppBuildInfo() },
   };
 }

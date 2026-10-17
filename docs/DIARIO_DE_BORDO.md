@@ -2450,3 +2450,19 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Nova CI solicitada pela atualização da branch; confirmar resultado integral, inclusive testes restantes e build Android.
 - Teste físico do ELM327 no veículo continua pendente.
 
+
+
+## 2026-10-16 — PR de build, perfil e exportação rastreável
+
+- Build: branch `feat/build-profile-export-metadata-20261016`; versionCode configurado pelo app.config.js (padrão 1; pode ser sobrescrito por ANDROID_VERSION_CODE). SHA/branch vêm do ambiente Git; se não disponíveis, aparecem UNKNOWN.
+- Hipótese: o perfil técnico do veículo não era sincronizado ao autosave; ano padrão podia parecer confirmado; exportações não tinham identidade de build nem qualidade/frescor por leitura.
+- Mudanças: novo src/meriva/buildInfo.ts e app.config.js para SHA, branch, versionCode, data do build, modelo do aparelho e versão Android. O perfil Meriva é sincronizado ao autosave, inclui tipo de injeção explicitamente não confirmado e preserva ano informado pelo usuário; o padrão 2012 fica marcado como não confirmado.
+- Telemetria: leituras novas recebem dataSource REAL/SIMULADO, monotonicMs, ageMs e quality inicial; exports recalculam age_ms e qualidade FRESH/STALE/ERROR. simulationQueries é migrado para simulatedQueries.
+- Exportações: TXT, histórico diário, relatório Bluetooth, JSON e CSV recebem metadados de build; JSON tem schemaVersion/exportVersion e modo compartilhável por padrão na tela de armazenamento; VIN, identificadores ECU, nome do adaptador e MAC são redigidos no modo compartilhável. O relatório Bluetooth redige identificadores por padrão.
+- Removido o array operacional de viagens de referência CarScanner e a inicialização do seed do perfil. As linhas de migração/limpeza de legado permanecem para limpar instalações antigas.
+- UX: a tela inicial já mantinha temperatura persistente, velocidade destacada, alternância de métricas e layout sem rolagem principal; essas partes não foram refeitas nesta etapa.
+- Documentação adicionada: docs/MODELO_DE_DADOS.md e docs/PROTOCOLO_ELM327_KWP.md. O documento de dados declara explicitamente que SQLite/WAL/migrações ainda NÃO estão implementados.
+- Testes adicionados/atualizados para perfil, metadados de build, qualidade de leitura, redaction e ausência de viagens seed. **NÃO EXECUTADOS**.
+- CI/build físico: NÃO EXECUTADOS. CI/workflows NÃO DISPARADOS.
+- Pendências bloqueadas: scripts/verify_autosave.py e fixture real de 11–16/10 não estão disponíveis nesta sessão/repositório recuperado; não criar uma cópia presumida do verificador. SQLite não pode ser declarado fonte de verdade sem instalar e travar expo-sqlite, atualizar lockfile e executar testes de migração.
+- Status: PENDENTE, sem aprovação de build, CI ou validação física.

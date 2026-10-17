@@ -11,6 +11,10 @@ export interface VehicleProfile {
   cylinders: number;
   fuel: string;
   modelYearReference: string;
+  /** Ano do carro não é confirmado pelo perfil padrão do modelo. */
+  yearConfirmed?: boolean;
+  yearSource?: 'USER' | 'DOCUMENT' | 'DEFAULT';
+  injectionType?: string;
   tankCapacityL: number;
   reserveCapacityL: number;
   manualSource: string;
@@ -61,14 +65,17 @@ export async function ensureMerivaVehicleProfile(basePath: string): Promise<Vehi
     const normalized: VehicleProfile = {
       ...existing,
       vehicleName: 'Meriva Maxx',
-      year: MERIVA_MANUAL.modelYear,
+      year: existing.year >= 2010 && existing.year <= 2012 ? existing.year : MERIVA_MANUAL.modelYear,
+      yearConfirmed: existing.yearConfirmed ?? false,
+      yearSource: existing.yearSource ?? 'DEFAULT',
       make: 'Chevrolet',
       model: 'Meriva Maxx',
       engine: MERIVA_MANUAL.engine.designation,
       displacementCm3: MERIVA_MANUAL.engine.displacementCm3,
       cylinders: MERIVA_MANUAL.engine.cylinders,
       fuel: 'Gasolina / Álcool',
-      modelYearReference: MERIVA_MANUAL.modelYearReference,
+      modelYearReference: existing.modelYearReference || '2010–2012 (ano exato a confirmar)',
+      injectionType: existing.injectionType || 'Injeção eletrônica (tipo exato não confirmado pela ECU)',
       tankCapacityL: MERIVA_MANUAL.capacities.fuelTankL,
       reserveCapacityL: MERIVA_MANUAL.capacities.fuelReserveApproxL,
       manualSource: MERIVA_MANUAL.source,
@@ -83,13 +90,16 @@ export async function ensureMerivaVehicleProfile(basePath: string): Promise<Vehi
   const profile: VehicleProfile = {
     vehicleName: 'Meriva Maxx',
     year: 2012,
+    yearConfirmed: false,
+    yearSource: 'DEFAULT',
     make: 'Chevrolet',
     model: 'Meriva Maxx',
     engine: MERIVA_MANUAL.engine.designation,
     displacementCm3: MERIVA_MANUAL.engine.displacementCm3,
     cylinders: MERIVA_MANUAL.engine.cylinders,
     fuel: 'Gasolina / Álcool',
-    modelYearReference: MERIVA_MANUAL.modelYearReference,
+    modelYearReference: '2010–2012 (ano exato a confirmar; referência técnica MY12)',
+    injectionType: 'Injeção eletrônica (tipo exato não confirmado pela ECU)',
     tankCapacityL: MERIVA_MANUAL.capacities.fuelTankL,
     reserveCapacityL: MERIVA_MANUAL.capacities.fuelReserveApproxL,
     manualSource: MERIVA_MANUAL.source,

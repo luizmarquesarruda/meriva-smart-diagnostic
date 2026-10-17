@@ -207,6 +207,7 @@ const originalLoad = Module._load;
 Module._load = function (request, parent, isMain) {
   if (request === 'expo-file-system') return fakeFS;
   if (request === 'react-native') return fakeRN;
+  if (request === 'expo-constants') return { expoConfig: { version: '1.0.1', android: { versionCode: 1 }, extra: { buildInfo: { gitSha: 'test-sha', branch: 'test-branch', versionCode: 1, buildDate: '2026-10-16T00:00:00.000Z' } } }, nativeAppVersion: '1.0.1', deviceName: 'Test Device' };
   if (request === 'react-native-bluetooth-classic') return fakeBluetooth;
   if (request === 'expo-location') return { PermissionStatus: { GRANTED: 'granted' }, requestForegroundPermissionsAsync: async () => ({ status: 'granted' }), getBackgroundPermissionsAsync: async () => ({ status: 'granted' }), requestBackgroundPermissionsAsync: async () => ({ status: 'granted' }), hasStartedLocationUpdatesAsync: async () => false, startLocationUpdatesAsync: async () => {}, stopLocationUpdatesAsync: async () => {}, Accuracy: { BestForNavigation: 6 } };
   if (parent && parent.filename && (request.startsWith('./') || request.startsWith('../'))) {
@@ -777,6 +778,16 @@ async function testVehicleProfile() {
 
   await vehicle.createVehicleProfile(BASE, profile);
   assert.strictEqual((await vehicle.readVehicleProfile(BASE)).vehicleName, 'Meriva Maxx');
+  const defaulted = await vehicle.ensureMerivaVehicleProfile(BASE);
+  assert.strictEqual(defaulted.tankCapacityL, 56);
+  assert.strictEqual(defaulted.yearConfirmed, false, 'modelo padrão não pode declarar ano real confirmado');
+  assert.ok(defaulted.injectionType.includes('não confirmado'));
+  const userYear = { ...defaulted, year: 2010, yearConfirmed: true, yearSource: 'USER' };
+  await vehicle.createVehicleProfile(BASE, userYear);
+  const preserved = await vehicle.ensureMerivaVehicleProfile(BASE);
+  assert.strictEqual(preserved.year, 2010, 'ano informado pelo usuário não pode ser sobrescrito pelo ano do manual de referência');
+  assert.strictEqual(preserved.yearConfirmed, true);
+
   files.set(`${BASE}/CONFIG/veiculo.json`, '{invalido');
   assert.strictEqual(await vehicle.readVehicleProfile(BASE), null);
 }

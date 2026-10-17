@@ -1,5 +1,6 @@
 import * as FileSystem from 'expo-file-system';
 import type { MerivaPersistedState } from './autosaveState';
+import { getAppBuildInfo } from './buildInfo';
 
 /**
  * Histórico compacto de sessões ECU, separado do snapshot mutável do autosave.
@@ -8,11 +9,22 @@ import type { MerivaPersistedState } from './autosaveState';
  */
 export const DAILY_OBD_HISTORY_FILE = 'meriva_smart_daily_obd_history.txt';
 const MAX_DAYS = 365;
+const BUILD = getAppBuildInfo();
 const HEADER = [
   'MERIVA SMART DIAGNOSTIC',
   'HISTÓRICO TXT POR DIA — CADA DATA É UMA PÁGINA LÓGICA.',
   'REGRA: cada sessão ECU validada gera eventos de início e encerramento; sessão interrompida é marcada na próxima abertura.',
   'FONTE: estado local do aplicativo; valores mantêm fonte e horário quando disponíveis.',
+  '[BUILD]',
+  'SCHEMA VERSION: 1',
+  'EXPORT VERSION: 1',
+  `SHA: ${BUILD.gitSha}`,
+  `BRANCH: ${BUILD.branch}`,
+  `VERSION: ${BUILD.appVersion}`,
+  `VERSION CODE: ${BUILD.versionCode ?? 'N/D'}`,
+  `BUILD DATE: ${BUILD.buildDate}`,
+  `DEVICE MODEL: ${BUILD.deviceModel}`,
+  `ANDROID VERSION: ${BUILD.androidVersion}`,
   '',
 ].join('\n');
 
@@ -30,6 +42,17 @@ function historyPath(basePath: string): string {
 function renderEvent(state: MerivaPersistedState, event: 'SESSION_START' | 'SESSION_END' | 'SESSION_RECOVERED', timestamp: string): string {
   const lines = [
     `--- EVENTO: ${event} | ${timestamp} ---`,
+    '[BUILD]',
+    `SHA: ${state.metadata?.buildInfo?.gitSha ?? BUILD.gitSha}`,
+    `BRANCH: ${state.metadata?.buildInfo?.branch ?? BUILD.branch}`,
+    `VERSION CODE: ${state.metadata?.buildInfo?.versionCode ?? BUILD.versionCode ?? 'N/D'}`,
+    `BUILD DATE: ${state.metadata?.buildInfo?.buildDate ?? BUILD.buildDate}`,
+    '[VEHICLE]',
+    `MARCA: ${state.vehicle?.make ?? 'N/D'}`,
+    `MODELO: ${state.vehicle?.model ?? 'N/D'}`,
+    `MOTOR: ${state.vehicle?.engine ?? 'N/D'}`,
+    `ANO: ${state.vehicle?.year ?? 'N/D'} | CONFIRMADO: ${state.vehicle?.yearConfirmed ? 'SIM' : 'NÃO'}`,
+    `TANQUE: ${state.vehicle?.tankCapacityL ?? 'N/D'} L | RESERVA: ${state.vehicle?.reserveCapacityL ?? 'N/D'} L`,
     `ADAPTADOR: ${state.obd.adapterName ?? 'N/D'}`,
     `BLUETOOTH/OBD: ${state.obd.connected ? 'CONECTADO' : 'DESCONECTADO'} | ECU VALIDADA EM: ${state.obd.ecuValidatedAt ?? 'N/D'}`,
     `PROTOCOLO ATUAL: ${state.obd.protocol ?? 'N/D'} | ÚLTIMO CONHECIDO: ${state.obd.lastKnownProtocol ?? 'N/D'}`,
@@ -47,7 +70,10 @@ function renderEvent(state: MerivaPersistedState, event: 'SESSION_START' | 'SESS
   });
   if (realReadings.length) {
     for (const reading of realReadings) {
-      lines.push(`${reading.pid} ${reading.name}: ${reading.value ?? 'N/D'} ${reading.unit} | ${reading.status} | ${reading.timestamp}`);
+      const readingTimestampMs = Date.parse(reading.timestamp);
+      const ageMs = eventTimestampMs - readingTimestampMs;
+      const quality = reading.status !== 'RESPONDEU' || reading.value == null ? 'ERROR' : ageMs <= 10_000 ? 'FRESH' : 'STALE';
+      lines.push(`${reading.pid} ${reading.name}: ${reading.value ?? 'N/D'} ${reading.unit} | ${reading.status} | data_source=${reading.dataSource ?? 'REAL'} | timestamp=${reading.timestamp} | monotonic_ms=${reading.monotonicMs ?? 'N/D'} | age_ms=${Math.max(0, ageMs)} | quality=${quality}`);
     }
   } else {
     lines.push('N/D');

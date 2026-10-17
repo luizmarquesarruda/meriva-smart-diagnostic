@@ -7,6 +7,8 @@
 import type { MerivaPersistedState } from './autosaveState';
 import { AUTOSAVE_SCHEMA_VERSION } from './autosaveTypes';
 import { getDtcDefinition } from '../obd/dtcDefinition';
+import { getAppBuildInfo } from './buildInfo';
+import { redactSensitiveText } from './redaction';
 
 export const ND = 'N/D';
 
@@ -20,26 +22,43 @@ export interface ExportTxtOptions {
   exportedAt: string;
   /** When set, include only the newest N REAL_OBD trips in a compact snapshot. */
   historyLimit?: number;
+  /** Remove VIN, ECU ID, adapter name and MAC before sharing. */
+  shared?: boolean;
 }
 
 export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTxtOptions): string {
   const L: string[] = [];
 
+  const build = state.metadata?.buildInfo ?? getAppBuildInfo();
   L.push('MERIVA SMART DIAGNOSTIC');
   L.push('SAVE EXPORT');
   L.push('========================');
   L.push(`Schema: ${AUTOSAVE_SCHEMA_VERSION}`);
-  L.push(`App Version: ${or(options.appVersion)}`);
+  L.push('Export Version: 1');
+  L.push(`App Version: ${or(options.appVersion || build.appVersion)}`);
   L.push(`Exported At: ${options.exportedAt}`);
   L.push(`Saved At: ${or(state.metadata?.savedAt)}`);
+  L.push('[BUILD]');
+  L.push(`SHA: ${or(build.gitSha)}`);
+  L.push(`Branch: ${or(build.branch)}`);
+  L.push(`Version Code: ${or(build.versionCode)}`);
+  L.push(`Build Date: ${or(build.buildDate)}`);
+  L.push(`Device Model: ${or(build.deviceModel)}`);
+  L.push(`Android Version: ${or(build.androidVersion)}`);
   L.push('');
 
   L.push('[VEHICLE]');
   L.push(`Marca: ${or(state.vehicle?.make)}`);
   L.push(`Modelo: ${or(state.vehicle?.model)}`);
   L.push(`Motor: ${or(state.vehicle?.engine)}`);
-  L.push(`Ano: ${or(state.vehicle?.year)}`);
-  L.push(`VIN: ${or(state.vehicle?.vin)}`);
+  L.push(`Ano: ${or(state.vehicle?.year)}${state.vehicle?.yearConfirmed ? ' (CONFIRMADO)' : ' (PADRÃO NÃO CONFIRMADO)'}`);
+  L.push(`Referência de ano: ${or(state.vehicle?.modelYearReference)}`);
+  L.push(`Ano confirmado: ${state.vehicle?.yearConfirmed ? 'SIM' : 'NÃO'}`);
+  L.push(`Combustível compatível: ${or(state.vehicle?.fuel)}`);
+  L.push(`Tipo de injeção: ${or(state.vehicle?.injectionType)}`);
+  L.push(`Capacidade do tanque: ${or(state.vehicle?.tankCapacityL)} L`);
+  L.push(`Reserva aproximada: ${or(state.vehicle?.reserveCapacityL)} L`);
+  L.push(`VIN: ${options.shared ? '[REDACTED]' : or(state.vehicle?.vin)}`);
   L.push('');
 
   L.push('[OBD]');
@@ -62,7 +81,12 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
         reading.value === null || reading.value === undefined
           ? ND
           : `${reading.value} ${reading.unit}`;
-      L.push(`${reading.pid} ${reading.name}: ${value} [${reading.status}] fonte=${reading.source} ${reading.timestamp}`);
+      const timestampMs = Date.parse(reading.timestamp);
+      const ageMs = Number.isFinite(timestampMs) ? Math.max(0, Date.now() - timestampMs) : null;
+      const quality = reading.status !== 'RESPONDEU' || reading.value == null
+        ? 'ERROR' : ageMs != null && ageMs <= 10_000 ? 'FRESH' : 'STALE';
+      const dataSource = reading.dataSource ?? (reading.source === 'REAL' ? 'REAL' : 'SIMULADO');
+      L.push(`${reading.pid} ${reading.name}: ${value} status=${reading.status} data_source=${dataSource} timestamp=${reading.timestamp} monotonic_ms=${or(reading.monotonicMs)} age_ms=${or(ageMs)} quality=${quality}`);
     }
   } else {
     L.push(ND);
@@ -142,5 +166,6 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
     L.push(ND);
   }
 
-  return `${L.join('\n')}\n`;
+  const output = `${L.join('\n')}\n`;
+  return options.shared ? redactSensitiveText(output) : output;
 }
