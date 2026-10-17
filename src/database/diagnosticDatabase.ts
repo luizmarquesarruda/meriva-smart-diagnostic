@@ -3,9 +3,12 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import type { DtcRecord, DataSource } from '../types/sourceTypes';
 import type { DriveCycle } from '../data/driveCycles';
 import type { SensorTestSample, SensorTestMode, SensorAssessmentState } from '../diagnostics/sensorTestEngine';
+import type { PidQueryResult } from '../obd/elm327';
+import sqlitePolicy from '../knowledge/sqlite_policy.json';
 
-export const DIAGNOSTIC_DATABASE_NAME = 'meriva-smart-diagnostic.db';
-export const DIAGNOSTIC_DATABASE_SCHEMA_VERSION = 1;
+export const DIAGNOSTIC_DATABASE_NAME = sqlitePolicy.databaseName;
+export const DIAGNOSTIC_DATABASE_SCHEMA_VERSION = 2;
+export const MAX_PENDING_SQLITE_WRITES = sqlitePolicy.writeQueue.maxPendingWrites;
 export const SQLITE_LIVE_SAMPLE_MIN_INTERVAL_MS = 5_000;
 
 const DATA_SOURCES: readonly DataSource[] = [
@@ -51,11 +54,20 @@ export interface SensorTestRunInput {
 }
 
 export interface DiagnosticDatabaseHealth {
+  enabled: boolean;
+  available: boolean;
+  databaseName: string;
   schemaVersion: number;
-  pidSampleCount: number;
-  dtcRecordCount: number;
-  tripCount: number;
-  sensorTestRunCount: number;
+  sqliteVersion: string | null;
+  pidSampleCount: number | null;
+  telemetrySampleCount: number | null;
+  dtcRecordCount: number | null;
+  tripCount: number | null;
+  sensorTestRunCount: number | null;
+  pendingWrites: number;
+  droppedSamples: number;
+  maxPendingWrites: number;
+  lastError: string | null;
 }
 
 const SCHEMA_V1 = `
@@ -167,8 +179,35 @@ CREATE TABLE IF NOT EXISTS diagnostic_runs (
 CREATE INDEX IF NOT EXISTS idx_diagnostic_runs_generated ON diagnostic_runs(generated_at_utc DESC);
 `;
 
+const SCHEMA_V2 = `
+CREATE TABLE IF NOT EXISTS telemetry_samples (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  timestamp TEXT NOT NULL,
+  pid TEXT NOT NULL,
+  name TEXT NOT NULL,
+  value REAL,
+  unit TEXT NOT NULL,
+  status TEXT NOT NULL,
+  source TEXT NOT NULL CHECK (source IN ('REAL_OBD', 'SIMULACAO')),
+  command_status TEXT NOT NULL,
+  protocol TEXT NOT NULL,
+  elapsed_ms INTEGER NOT NULL CHECK (elapsed_ms >= 0),
+  tx TEXT NOT NULL,
+  rx TEXT NOT NULL,
+  session_id TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_telemetry_timestamp ON telemetry_samples(timestamp);
+CREATE INDEX IF NOT EXISTS idx_telemetry_pid_timestamp ON telemetry_samples(pid, timestamp);
+`;
+
 let databasePromise: Promise<SQLiteDatabase> | null = null;
 let writeQueue: Promise<void> = Promise.resolve();
+let databaseRetryAfterMs = 0;
+let pendingTelemetryWrites = 0;
+let droppedTelemetrySamples = 0;
+let lastQueueFullWarningAt = 0;
+let lastDatabaseError: string | null = null;
+let lastDatabaseErrorLogAt = 0;
 const lastLiveSampleAt = new Map<string, number>();
 
 function isDataSource(value: unknown): value is DataSource {
@@ -201,8 +240,11 @@ function enqueueWrite<T>(operation: () => Promise<T>): Promise<T> {
 }
 
 async function openAndMigrate(): Promise<SQLiteDatabase> {
+  if (!sqlitePolicy.enabled) throw new Error('SQLITE_DISABLED_BY_POLICY');
+  if (Date.now() < databaseRetryAfterMs) throw new Error('SQLITE_OPEN_RETRY_COOLDOWN_ACTIVE');
+
   const db = await SQLite.openDatabaseAsync(DIAGNOSTIC_DATABASE_NAME);
-  await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
+  await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       version INTEGER PRIMARY KEY NOT NULL,
@@ -210,9 +252,10 @@ async function openAndMigrate(): Promise<SQLiteDatabase> {
     );
   `);
   const row = await db.getFirstAsync<{ version: number }>(
-    'SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1',
+    'SELECT COALESCE(MAX(version), 0) AS version FROM schema_migrations',
   );
-  const version = Number(row?.version ?? 0);
+  let version = Number(row?.version ?? 0);
+  if (version > DIAGNOSTIC_DATABASE_SCHEMA_VERSION) throw new Error('SQLITE_SCHEMA_NEWER_THAN_APP');
   if (version < 1) {
     await db.withTransactionAsync(async () => {
       await db.execAsync(SCHEMA_V1);
@@ -222,19 +265,96 @@ async function openAndMigrate(): Promise<SQLiteDatabase> {
         new Date().toISOString(),
       );
     });
+    version = 1;
   }
+  if (version < 2) {
+    await db.withTransactionAsync(async () => {
+      await db.execAsync(SCHEMA_V2);
+      await db.runAsync(
+        'INSERT OR IGNORE INTO schema_migrations(version, applied_at_utc) VALUES (?, ?)',
+        2,
+        new Date().toISOString(),
+      );
+    });
+  }
+  databaseRetryAfterMs = 0;
+  lastDatabaseError = null;
   return db;
 }
 
-/** One shared connection; failed initialization can be retried on the next call. */
+/** One shared connection; failed initialization backs off and can be retried later. */
 export function initializeDiagnosticDatabase(): Promise<SQLiteDatabase> {
   if (!databasePromise) {
     databasePromise = openAndMigrate().catch((error) => {
       databasePromise = null;
+      databaseRetryAfterMs = Date.now() + sqlitePolicy.database.openRetryCooldownMs;
+      lastDatabaseError = error instanceof Error ? error.message.replace(/[^A-Za-z0-9_.:-]/g, '_').slice(0, 100) : 'SQLITE_OPEN_FAILED';
       throw error;
     });
   }
   return databasePromise;
+}
+
+/**
+ * Append the exact OBD query to the secondary local index, including failures.
+ * Bounded queue drops only secondary SQLite records if storage is blocked; CSV/TXT remain authoritative.
+ */
+export async function recordTelemetryQuery(
+  query: PidQueryResult,
+  source: 'REAL' | 'SIMULACAO',
+  timestamp = new Date().toISOString(),
+  sessionId: string | null = null,
+): Promise<boolean> {
+  if (!sqlitePolicy.enabled) return false;
+  if (pendingTelemetryWrites >= MAX_PENDING_SQLITE_WRITES) {
+    droppedTelemetrySamples += 1;
+    const now = Date.now();
+    if (now - lastQueueFullWarningAt >= sqlitePolicy.writeQueue.warningThrottleMs) {
+      lastQueueFullWarningAt = now;
+      console.warn('[sqlite] fila secundária cheia; amostras omitidas:', droppedTelemetrySamples);
+    }
+    return false;
+  }
+  pendingTelemetryWrites += 1;
+  try {
+    const db = await initializeDiagnosticDatabase();
+    const numericValue = query.parsed.value;
+    const safeValue = numericValue != null && Number.isFinite(numericValue) ? numericValue : null;
+    await enqueueWrite(async () => {
+      await db.runAsync(
+        `INSERT INTO telemetry_samples
+          (timestamp, pid, name, value, unit, status, source, command_status, protocol, elapsed_ms, tx, rx, session_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        toUtc(timestamp) ?? new Date().toISOString(),
+        normalizePid(String(query.parsed.pid ?? 'N/D')),
+        String(query.parsed.name ?? 'N/D'),
+        safeValue,
+        String(query.parsed.unit ?? 'N/D'),
+        String(query.parsed.status ?? 'NÃO RESPONDEU'),
+        source === 'REAL' ? 'REAL_OBD' : 'SIMULACAO',
+        String(query.commandStatus ?? 'NO_RESPONSE'),
+        String(query.protocol ?? 'N/D'),
+        Number.isFinite(query.elapsedMs) ? Math.max(0, Math.trunc(query.elapsedMs)) : 0,
+        String(query.tx ?? ''),
+        String(query.rx ?? ''),
+        sessionId,
+      );
+    });
+    lastDatabaseError = null;
+    return true;
+  } catch (cause) {
+    lastDatabaseError = cause instanceof Error
+      ? cause.message.replace(/[^A-Za-z0-9_.:-]/g, '_').slice(0, 100)
+      : 'SQLITE_WRITE_FAILED';
+    const now = Date.now();
+    if (now - lastDatabaseErrorLogAt >= 60_000) {
+      lastDatabaseErrorLogAt = now;
+      console.warn('[sqlite] telemetria secundária falhou; CSV/TXT mantidos:', lastDatabaseError);
+    }
+    return false;
+  } finally {
+    pendingTelemetryWrites = Math.max(0, pendingTelemetryWrites - 1);
+  }
 }
 
 export async function recordPidSample(sample: PidSampleInput): Promise<number | null> {
@@ -465,29 +585,57 @@ export async function saveSensorTestRun(run: SensorTestRunInput): Promise<void> 
 }
 
 export async function getDiagnosticDatabaseHealth(): Promise<DiagnosticDatabaseHealth> {
-  const db = await initializeDiagnosticDatabase();
-  const migration = await db.getFirstAsync<{ version: number }>(
-    'SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1',
-  );
-  const count = async (table: string): Promise<number> => {
-    const allowed = ['pid_samples', 'dtc_records', 'trips', 'sensor_test_runs'];
-    if (!allowed.includes(table)) return 0;
-    const row = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) AS count FROM ' + table);
-    return Number(row?.count ?? 0);
+  const base = {
+    enabled: Boolean(sqlitePolicy.enabled),
+    available: false,
+    databaseName: DIAGNOSTIC_DATABASE_NAME,
+    schemaVersion: DIAGNOSTIC_DATABASE_SCHEMA_VERSION,
+    sqliteVersion: null as string | null,
+    pidSampleCount: null as number | null,
+    telemetrySampleCount: null as number | null,
+    dtcRecordCount: null as number | null,
+    tripCount: null as number | null,
+    sensorTestRunCount: null as number | null,
+    pendingWrites: pendingTelemetryWrites,
+    droppedSamples: droppedTelemetrySamples,
+    maxPendingWrites: MAX_PENDING_SQLITE_WRITES,
+    lastError: lastDatabaseError,
   };
-  const [pidSampleCount, dtcRecordCount, tripCount, sensorTestRunCount] = await Promise.all([
-    count('pid_samples'),
-    count('dtc_records'),
-    count('trips'),
-    count('sensor_test_runs'),
-  ]);
-  return {
-    schemaVersion: Number(migration?.version ?? 0),
-    pidSampleCount,
-    dtcRecordCount,
-    tripCount,
-    sensorTestRunCount,
-  };
+  if (!sqlitePolicy.enabled) return { ...base, lastError: 'SQLITE_DISABLED_BY_POLICY' };
+  try {
+    const db = await initializeDiagnosticDatabase();
+    const migration = await db.getFirstAsync<{ version: number }>(
+      'SELECT COALESCE(MAX(version), 0) AS version FROM schema_migrations',
+    );
+    const count = async (table: string): Promise<number> => {
+      const allowed = ['pid_samples', 'telemetry_samples', 'dtc_records', 'trips', 'sensor_test_runs'];
+      if (!allowed.includes(table)) return 0;
+      const row = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) AS count FROM ' + table);
+      return Number(row?.count ?? 0);
+    };
+    const [sqliteVersion, pidSampleCount, telemetrySampleCount, dtcRecordCount, tripCount, sensorTestRunCount] = await Promise.all([
+      db.getFirstAsync<{ version: string }>('SELECT sqlite_version() AS version'),
+      count('pid_samples'),
+      count('telemetry_samples'),
+      count('dtc_records'),
+      count('trips'),
+      count('sensor_test_runs'),
+    ]);
+    return {
+      ...base,
+      available: true,
+      schemaVersion: Number(migration?.version ?? 0),
+      sqliteVersion: sqliteVersion?.version ?? null,
+      pidSampleCount,
+      telemetrySampleCount,
+      dtcRecordCount,
+      tripCount,
+      sensorTestRunCount,
+      lastError: droppedTelemetrySamples > 0 ? 'SQLITE_WRITE_QUEUE_FULL' : null,
+    };
+  } catch {
+    return { ...base, lastError: lastDatabaseError ?? 'SQLITE_UNAVAILABLE' };
+  }
 }
 
 /** Test/lifecycle hook. It closes no native handles; the shared connection lives for process lifetime. */
@@ -495,4 +643,10 @@ export function resetDiagnosticDatabaseForTests(): void {
   databasePromise = null;
   writeQueue = Promise.resolve();
   lastLiveSampleAt.clear();
+  databaseRetryAfterMs = 0;
+  pendingTelemetryWrites = 0;
+  droppedTelemetrySamples = 0;
+  lastQueueFullWarningAt = 0;
+  lastDatabaseError = null;
+  lastDatabaseErrorLogAt = 0;
 }
