@@ -171,6 +171,7 @@ const originalLoad = Module._load;
 Module._load = function (request, parent, isMain) {
   if (request === 'expo-file-system') return currentFS;
   if (request === 'react-native') return fakeRN;
+  if (request === 'expo-constants') return { expoConfig: { version: '1.0.1', android: { versionCode: 1 }, extra: { buildInfo: { gitSha: 'test-sha', branch: 'test-branch', versionCode: 1, buildDate: '2026-10-16T00:00:00.000Z' } } }, nativeAppVersion: '1.0.1', deviceName: 'Test Device' };
   if (parent && parent.filename && (request.startsWith('./') || request.startsWith('../'))) {
     const resolved = path.resolve(path.dirname(parent.filename), request);
     if (fs.existsSync(resolved + '.ts')) return loadTs(resolved + '.ts');
