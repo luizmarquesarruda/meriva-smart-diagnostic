@@ -41,7 +41,10 @@ async function main() {
         modResults: {
           manifest: {
             manifest: {
-              'uses-permission': [{ $: { 'android:name': 'android.permission.BLUETOOTH_CONNECT' } }],
+              'uses-permission': [
+                { $: { 'android:name': 'android.permission.BLUETOOTH_CONNECT' } },
+                { $: { 'android:name': 'android.permission.POST_NOTIFICATIONS' } },
+              ],
               application: [{ $: { 'android:label': 'Meriva' } }],
             },
           },
@@ -108,6 +111,11 @@ async function main() {
   assert.ok(permissions.includes('android.permission.FOREGROUND_SERVICE'));
   assert.ok(permissions.includes('android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE'));
   assert.ok(permissions.includes('android.permission.POST_NOTIFICATIONS'));
+  assert.strictEqual(
+    permissions.filter((item) => item === 'android.permission.POST_NOTIFICATIONS').length,
+    1,
+    'plugin must not duplicate POST_NOTIFICATIONS from app.json',
+  );
 
   const service = transformState.manifest.manifest.application[0].service;
   assert.strictEqual(service.length, 1);
