@@ -35,11 +35,13 @@ export default function SaudeScreen() {
     || activeDtcs.length > 0
   );
   const diagnostic: DiagnosticResult = useMemo(()=>runLocalDiagnostic({observations:state.lastReadings.map(r=>({pid:r.pid,name:r.name,value:r.value,unit:r.unit,source:normalizeDiagnosticSource(r.source,r.status),timestamp:r.timestamp,confidence:normalizeDiagnosticSource(r.source,r.status)==='REAL_OBD'?'GOOD':'LOW'} as PidObservation)),dtcs:state.dtcs,condition:context.condition,ecuConnected:obdStatus.ecuConnected}),[state,context.condition,obdStatus.ecuConnected]);
-  const normal=hasFreshEvidence && diagnostic.hypotheses.length===0 && activeDtcs.length===0;
-  const headline = !obdStatus.ecuConnected ? '● ECU SEM RESPOSTA' : !hasFreshEvidence ? '● SEM EVIDÊNCIA ATUAL' : normal ? '● SEM ALERTAS IDENTIFICADOS' : '● ATENÇÃO NECESSÁRIA';
+  const inconclusive = diagnostic.recommendedActions.some((action) => action.id === 'COLLECT_CONTEXTUAL_EVIDENCE');
+  const normal=hasFreshEvidence && diagnostic.hypotheses.length===0 && activeDtcs.length===0 && !inconclusive;
+  const headline = !obdStatus.ecuConnected ? '● ECU SEM RESPOSTA' : !hasFreshEvidence ? '● SEM EVIDÊNCIA ATUAL' : inconclusive ? '● DIAGNÓSTICO INCONCLUSIVO' : normal ? '● SEM ALERTAS IDENTIFICADOS' : '● ATENÇÃO NECESSÁRIA';
   const healthHint = !obdStatus.ecuConnected
     ? (state.dtcs.length ? 'ECU sem resposta; registros anteriores foram preservados, mas não são tratados como atuais.' : 'ECU sem resposta atual; não é possível confirmar o estado dos DTCs.')
     : !hasFreshEvidence ? 'Aguardando leituras reais recentes da ECU.'
+    : inconclusive ? 'Nenhuma regra local encontrou evidência suficiente. Isso não comprova normalidade; colete dados complementares.'
     : activeDtcs.length ? activeDtcs.length + ' DTC(s) atualizado(s) recentemente pela ECU.'
     : state.dtcs.length ? 'Nenhum DTC atual revalidado; registros anteriores permanecem no histórico.'
     : 'Nenhum DTC registrado.';
