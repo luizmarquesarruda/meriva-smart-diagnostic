@@ -16,6 +16,9 @@ const screenFiles = [
 assert.equal(appJson.expo.orientation, 'default');
 assert.match(index, /useMidLayout\(\)/);
 assert.match(index, /layout\.landscape/);
+assert.match(index, /resourceButtonLandscape/, 'o atalho de recursos deve reduzir altura em paisagem');
+assert.match(index, /cockpitMetricCompact/, 'cards secundários devem ser compactados em paisagem');
+assert.equal((index.match(/compact=\{layout\.landscape\}/g) || []).length, 3, 'os três indicadores secundários devem usar o modo compacto em paisagem');
 assert.doesNotMatch(index, /ScrollView/);
 assert.match(index, /content:\{flex:1,width:'100%'/);
 assert.match(index, /maxContentWidth/);
