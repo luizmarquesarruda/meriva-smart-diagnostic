@@ -230,7 +230,10 @@ export class Elm327Session {
   async recoverProtocol(): Promise<boolean> {
     if (!this.opened) return false;
     // Recuperação também entra na fila única; nunca intercalar ATZ/ATSP com polling.
-    return this.enqueueCommand(() => this.recoverProtocolUnsafe());
+    const recovered = await this.enqueueCommand(() => this.recoverProtocolUnsafe());
+    // Identificação usa executeCommand e precisa ocorrer depois de liberar a fila.
+    if (recovered) await this.identifyProtocol();
+    return recovered;
   }
 
   private async recoverProtocolUnsafe(): Promise<boolean> {
@@ -262,7 +265,6 @@ export class Elm327Session {
     this.noDataCount = 0;
     this.consecutiveFailures = 0;
     this.lastSuccessfulResponseAt = new Date().toISOString();
-    await this.identifyProtocol();
     return true;
   }
 
