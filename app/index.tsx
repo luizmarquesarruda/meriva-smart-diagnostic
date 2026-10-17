@@ -1,6 +1,6 @@
 import { Link, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMidLayout } from '../src/ui/midLayout';
 import * as FileSystem from 'expo-file-system';
@@ -29,6 +29,7 @@ export default function IndexScreen() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [dtcCount, setDtcCount] = useState(0);
   const [activeHeroMetric, setActiveHeroMetric] = useState(0);
+  const heroOpacity = useState(() => new Animated.Value(1))[0];
   const layout = useMidLayout();
 
   useEffect(() => gpsTracker.subscribe(setGpsState), []);
@@ -182,25 +183,40 @@ export default function IndexScreen() {
   const voltageValue = voltageReading?.value ?? null;
   const throttleReading = freshRealReading((item) => item.pid === '0111' || /throttle|borboleta/i.test(item.name));
   const throttleValue = throttleReading?.value ?? null;
-  const heroMetrics = [
-    { label: 'VELOCIDADE GPS', value: gpsState.running ? String(Math.round(gpsState.currentSpeedKmh)) : 'N/D', unit: gpsState.running ? 'km/h' : '', hint: gpsState.running ? 'SINAL GPS ATIVO' : 'AGUARDANDO GPS', tone: 'normal' },
-    { label: 'TEMPERATURA DO MOTOR', value: coolantValue != null ? String(Math.round(coolantValue)) : 'N/D', unit: coolantValue != null ? '°C' : '', hint: coolantValue != null ? 'LEITURA REAL • PID 0105' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0105' : 'ECU DESCONECTADA', tone: coolantValue != null && coolantValue >= 115 ? 'danger' : coolantValue != null && coolantValue >= 110 ? 'warning' : 'normal' },
-    { label: 'VOLTAGEM DO SISTEMA', value: voltageValue != null ? voltageValue.toFixed(1) : 'N/D', unit: voltageValue != null ? 'V' : '', hint: voltageValue != null ? 'LEITURA REAL • PID 0142' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0142' : 'ECU DESCONECTADA', tone: 'normal' },
-    { label: 'POSIÇÃO DA BORBOLETA', value: throttleValue != null ? throttleValue.toFixed(1) : 'N/D', unit: throttleValue != null ? '%' : '', hint: throttleValue != null ? 'LEITURA REAL • PID 0111' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0111' : 'ECU DESCONECTADA', tone: 'normal' },
-    { label: 'ROTAÇÃO DO MOTOR', value: rpmValue != null ? String(Math.round(rpmValue)) : 'N/D', unit: rpmValue != null ? 'RPM' : '', hint: rpmValue != null ? 'LEITURA REAL • PID 010C' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 010C' : 'ECU DESCONECTADA', tone: 'normal' },
+  const allHeroMetrics = [
+    { id: 'SPEED', label: 'VELOCIDADE GPS', value: gpsState.running ? String(Math.round(gpsState.currentSpeedKmh)) : 'N/D', unit: gpsState.running ? 'km/h' : '', hint: gpsState.running ? 'SINAL GPS ATIVO' : 'AGUARDANDO GPS', tone: 'normal' },
+    { id: 'TEMPERATURE', label: 'TEMPERATURA DO MOTOR', value: coolantValue != null ? String(Math.round(coolantValue)) : 'N/D', unit: coolantValue != null ? '°C' : '', hint: coolantValue != null ? 'LEITURA REAL • PID 0105' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0105' : 'ECU DESCONECTADA', tone: coolantValue != null && coolantValue >= 115 ? 'danger' : coolantValue != null && coolantValue >= 110 ? 'warning' : 'normal' },
+    { id: 'VOLTAGE', label: 'VOLTAGEM DO SISTEMA', value: voltageValue != null ? voltageValue.toFixed(1) : 'N/D', unit: voltageValue != null ? 'V' : '', hint: voltageValue != null ? 'LEITURA REAL • PID 0142' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0142' : 'ECU DESCONECTADA', tone: 'normal' },
+    { id: 'THROTTLE', label: 'POSIÇÃO DA BORBOLETA', value: throttleValue != null ? throttleValue.toFixed(1) : 'N/D', unit: throttleValue != null ? '%' : '', hint: throttleValue != null ? 'LEITURA REAL • PID 0111' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0111' : 'ECU DESCONECTADA', tone: 'normal' },
+    { id: 'RPM', label: 'ROTAÇÃO DO MOTOR', value: rpmValue != null ? String(Math.round(rpmValue)) : 'N/D', unit: rpmValue != null ? 'RPM' : '', hint: rpmValue != null ? 'LEITURA REAL • PID 010C' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 010C' : 'ECU DESCONECTADA', tone: 'normal' },
   ];
+  const heroMetrics = allHeroMetrics.filter((metric) => metric.id !== 'SPEED' || settings?.showSpeedMetric === true || settings?.homePrimaryMetric === 'SPEED');
+  const configuredMetricIndex = Math.max(0, heroMetrics.findIndex((metric) => metric.id === (settings?.homePrimaryMetric ?? 'TEMPERATURE')));
+  const safeActiveHeroMetric = Math.min(activeHeroMetric, Math.max(0, heroMetrics.length - 1));
 
-  // The displayed metric count is the single source of truth for both timed
-  // and touch-driven rotation; adding/removing metrics cannot desynchronize it.
   useEffect(() => {
+    setActiveHeroMetric(configuredMetricIndex);
+  }, [configuredMetricIndex]);
+
+  useEffect(() => {
+    if (!settings?.homeAutoRotate || heroMetrics.length < 2) return;
     const timer = setInterval(
-      () => setActiveHeroMetric((current) => (current + 1) % Math.max(1, heroMetrics.length)),
+      () => setActiveHeroMetric((current) => (current + 1) % heroMetrics.length),
       10_000,
     );
     return () => clearInterval(timer);
-  }, [heroMetrics.length]);
+  }, [settings?.homeAutoRotate, heroMetrics.length]);
 
-  const selectedHeroMetric = heroMetrics[activeHeroMetric] ?? heroMetrics[0];
+  useEffect(() => {
+    if (!settings?.animationsEnabled) {
+      heroOpacity.setValue(1);
+      return;
+    }
+    heroOpacity.setValue(0.72);
+    Animated.timing(heroOpacity, { toValue: 1, duration: 180, useNativeDriver: true }).start();
+  }, [activeHeroMetric, settings?.animationsEnabled, heroOpacity]);
+
+  const selectedHeroMetric = heroMetrics[safeActiveHeroMetric] ?? heroMetrics[0];
   const coolantStatus = coolantValue != null && coolantValue >= 115
     ? 'TEMPERATURA ALTA'
     : coolantValue != null && coolantValue >= 110
@@ -224,15 +240,15 @@ export default function IndexScreen() {
               accessibilityLabel={selectedHeroMetric.label + '. Toque para trocar o indicador'}
               onPress={() => setActiveHeroMetric((current) => (current + 1) % Math.max(1, heroMetrics.length))}
               activeOpacity={0.82}
-              style={styles.heroReadout}
+              style={[styles.heroReadout, { opacity: heroOpacity }]}
             >
               <Text style={styles.heroEyebrow}>{selectedHeroMetric.label}</Text>
               <View style={styles.heroNumberRow}>
-                <Text style={[styles.heroValue, layout.landscape && styles.heroValueLandscape, selectedHeroMetric.tone === 'danger' && styles.danger, selectedHeroMetric.tone === 'warning' && styles.heroWarning]}>{selectedHeroMetric.value}</Text>
+                <Text style={[styles.heroValue, settings?.largeText && styles.heroValueLarge, layout.landscape && styles.heroValueLandscape, selectedHeroMetric.tone === 'danger' && styles.danger, selectedHeroMetric.tone === 'warning' && styles.heroWarning]}>{selectedHeroMetric.value}</Text>
                 {!!selectedHeroMetric.unit && <Text style={styles.heroUnit}>{selectedHeroMetric.unit}</Text>}
               </View>
               <Text style={styles.heroState}>{selectedHeroMetric.hint}</Text>
-              <Text style={styles.heroSwitchHint}>◉ {activeHeroMetric + 1}/{heroMetrics.length}  •  TOQUE PARA TROCAR  •  10 S</Text>
+              <Text style={[styles.heroSwitchHint, settings?.largeText && styles.heroSwitchHintLarge]}>{safeActiveHeroMetric + 1}/{heroMetrics.length}  •  TOQUE PARA TROCAR{settings?.homeAutoRotate ? ' • 10 S' : ''}</Text>
             </TouchableOpacity>
             <View style={[styles.metricRow, layout.landscape && styles.metricRowLandscape]}>
               <CockpitMetric compact={layout.landscape} label={consumptionLabel} value={availableConsumptionKml != null ? availableConsumptionKml.toFixed(1) + ' km/L' : 'N/D'} />
@@ -276,9 +292,9 @@ const styles = StyleSheet.create({
   container:{flex:1,backgroundColor:'#07111f'},content:{flex:1,width:'100%',paddingVertical:6,paddingBottom:6},screenFrame:{width:'100%',flex:1,alignSelf:'center',justifyContent:'space-between'},
   header:{backgroundColor:'#0e1b2d',borderRadius:16,borderWidth:1,borderColor:'#28415f',padding:14,marginBottom:10,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:10},headerLandscape:{paddingVertical:8},headerTitle:{flex:1,minWidth:0},brand:{color:'#f8fafc',fontSize:18,fontWeight:'900',letterSpacing:1.2},subtitle:{color:'#7db3ff',fontSize:9,fontWeight:'900',letterSpacing:1,marginTop:3},
   connectionPill:{flexDirection:'row',alignItems:'center',gap:6,flexShrink:0,backgroundColor:'#091526',borderRadius:20,borderWidth:1,borderColor:'#29415f',paddingHorizontal:10,paddingVertical:7},dot:{width:8,height:8,borderRadius:4},dotOk:{backgroundColor:'#4ade80'},dotWarn:{backgroundColor:'#fbbf24'},dotDanger:{backgroundColor:'#fb7185'},connectionText:{color:'#dbeafe',fontSize:9,fontWeight:'900'},
-  heroCard:{backgroundColor:'#0f2035',borderRadius:18,borderWidth:1,borderColor:'#2d5278',padding:12,alignItems:'center',marginBottom:8},heroCardLandscape:{padding:7,marginBottom:4},heroReadout:{width:'100%',alignItems:'center',paddingVertical:1},heroEyebrow:{color:'#7db3ff',fontSize:10,fontWeight:'900',letterSpacing:1.4,textAlign:'center'},heroNumberRow:{flexDirection:'row',alignItems:'baseline',justifyContent:'center',gap:6},heroUnit:{color:'#a9c8ef',fontSize:18,fontWeight:'900'},heroSwitchHint:{color:'#6884a6',fontSize:8,fontWeight:'900',letterSpacing:.6,marginTop:4},heroWarning:{color:'#fbbf24'},heroValue:{color:'#f8fafc',fontSize:50,lineHeight:56,fontWeight:'900',marginTop:2,fontVariant:['tabular-nums']},heroValueLandscape:{fontSize:36,lineHeight:40,marginTop:0},heroState:{color:'#8fa6c1',fontSize:9,fontWeight:'800',letterSpacing:.5,textAlign:'center'},
+  heroCard:{backgroundColor:'#0f2035',borderRadius:18,borderWidth:1,borderColor:'#2d5278',padding:12,alignItems:'center',marginBottom:8},heroCardLandscape:{padding:7,marginBottom:4},heroReadout:{width:'100%',alignItems:'center',paddingVertical:1},heroEyebrow:{color:'#7db3ff',fontSize:10,fontWeight:'900',letterSpacing:1.4,textAlign:'center'},heroNumberRow:{flexDirection:'row',alignItems:'baseline',justifyContent:'center',gap:6},heroUnit:{color:'#a9c8ef',fontSize:18,fontWeight:'900'},heroSwitchHint:{color:'#8ea8c8',fontSize:10,fontWeight:'900',letterSpacing:.4,marginTop:6},heroSwitchHintLarge:{fontSize:12,lineHeight:18},heroWarning:{color:'#fbbf24'},heroValue:{color:'#f8fafc',fontSize:50,lineHeight:56,fontWeight:'900',marginTop:2,fontVariant:['tabular-nums']},heroValueLarge:{fontSize:56,lineHeight:62},heroValueLandscape:{fontSize:36,lineHeight:40,marginTop:0},heroState:{color:'#8fa6c1',fontSize:9,fontWeight:'800',letterSpacing:.5,textAlign:'center'},
   metricRow:{width:'100%',flexDirection:'row',gap:6,marginTop:10},metricRowLandscape:{marginTop:4},cockpitMetric:{flex:1,minWidth:0,backgroundColor:'#091626',borderRadius:11,borderWidth:1,borderColor:'#233d5b',paddingVertical:9,paddingHorizontal:5,alignItems:'center'},cockpitMetricCompact:{paddingVertical:4,paddingHorizontal:3},metricLabel:{color:'#9aacc4',fontSize:8,fontWeight:'900',letterSpacing:.3,textAlign:'center'},metricValue:{color:'#e5edf7',fontSize:12,fontWeight:'900',marginTop:3,textAlign:'center'},
   coolantCard:{width:'100%',flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:12,marginTop:9,paddingHorizontal:13,paddingVertical:11,backgroundColor:'#091626',borderRadius:12,borderWidth:1,borderColor:'#315579'},coolantCardLandscape:{marginTop:4,paddingVertical:5,paddingHorizontal:9},coolantCopy:{flex:1,minWidth:0},coolantLabel:{color:'#c5d8f2',fontSize:9,fontWeight:'900',letterSpacing:.4},coolantStatus:{color:'#7185a1',fontSize:8,fontWeight:'800',marginTop:4},coolantValue:{fontSize:23,fontWeight:'900',fontVariant:['tabular-nums']},coolantOk:{color:'#4ade80'},coolantWarning:{color:'#fbbf24'},
   healthCard:{backgroundColor:'#0e1b2d',borderRadius:15,borderWidth:1,borderColor:'#28415f',padding:11,marginBottom:8},sectionHeader:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},sectionTitle:{color:'#f1f5f9',fontWeight:'900',fontSize:12,letterSpacing:.6},sectionHint:{color:'#7185a1',fontSize:9,marginTop:3},ok:{color:'#4ade80',fontSize:11,fontWeight:'900'},danger:{color:'#fb7185',fontSize:11,fontWeight:'900'},
-  actionGrid:{flexDirection:'row',gap:7,marginBottom:8},actionGridLandscape:{flexDirection:'row',marginBottom:4},resourceButton:{flex:1,paddingVertical:10,paddingHorizontal:8},resourceButtonLandscape:{paddingVertical:6},secondaryButton:{backgroundColor:'#0e1b2d',borderRadius:13,padding:13,alignItems:'center',borderWidth:1,borderColor:'#34506f'},secondaryButtonText:{color:'#dbeafe',fontWeight:'900',fontSize:10,textAlign:'center'},bottomNav:{flexDirection:'row',backgroundColor:'#0e1b2d',borderRadius:14,borderWidth:1,borderColor:'#28415f',marginTop:0,padding:3},bottomNavLandscape:{padding:2},bottomNavItem:{flex:1,minWidth:0,alignItems:'center',paddingVertical:8,borderRadius:10},bottomNavItemLandscape:{paddingVertical:3},bottomNavIconLandscape:{fontSize:12,marginBottom:0},bottomNavTextLandscape:{fontSize:7},bottomNavIcon:{fontSize:17,marginBottom:2},bottomNavText:{color:'#9fb4cf',fontSize:9,fontWeight:'900'},footerStatus:{color:'#60748f',textAlign:'center',fontSize:9,marginTop:9},
+  actionGrid:{flexDirection:'row',gap:7,marginBottom:8},actionGridLandscape:{flexDirection:'row',marginBottom:4},resourceButton:{flex:1,paddingVertical:10,paddingHorizontal:8},resourceButtonLandscape:{paddingVertical:6},secondaryButton:{backgroundColor:'#0e1b2d',borderRadius:13,padding:13,alignItems:'center',borderWidth:1,borderColor:'#34506f'},secondaryButtonText:{color:'#dbeafe',fontWeight:'900',fontSize:10,textAlign:'center'},bottomNav:{flexDirection:'row',backgroundColor:'#0e1b2d',borderRadius:14,borderWidth:1,borderColor:'#28415f',marginTop:0,padding:3},bottomNavLandscape:{padding:2},bottomNavItem:{flex:1,minWidth:0,minHeight:44,alignItems:'center',justifyContent:'center',paddingVertical:8,borderRadius:10},bottomNavItemLandscape:{minHeight:40,paddingVertical:3},bottomNavIconLandscape:{fontSize:12,marginBottom:0},bottomNavTextLandscape:{fontSize:7},bottomNavIcon:{fontSize:17,marginBottom:2},bottomNavText:{color:'#c0d1e6',fontSize:10,fontWeight:'900'},footerStatus:{color:'#60748f',textAlign:'center',fontSize:9,marginTop:9},
 });
