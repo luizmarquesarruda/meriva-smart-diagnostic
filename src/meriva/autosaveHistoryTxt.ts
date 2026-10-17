@@ -132,9 +132,10 @@ export async function readAutoSaveHistory(basePath: string): Promise<string> {
   try {
     return await readAutoSaveHistoryUnsafe(basePath);
   } catch {
-    // The read-only UI may show an empty-state header, but append operations
-    // use the strict reader below and never replace an unreadable existing file.
-    return HISTORY_HEADER;
+    // A read-only UI must not imply that a rejected, still-existing history is empty.
+    // The append path also throws and never overwrites the original file.
+    return HISTORY_HEADER
+      + 'AVISO: HISTÓRICO NÃO VALIDADO. O ARQUIVO ORIGINAL FOI PRESERVADO; NÃO HOUVE REESCRITA.\n';
   }
 }
 
