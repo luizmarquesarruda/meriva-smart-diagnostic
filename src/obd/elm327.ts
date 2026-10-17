@@ -248,7 +248,7 @@ export class Elm327Session {
   /** Tensão reportada pelo próprio adaptador ELM327 via ATRV. */
   async queryAdapterVoltage(): Promise<{ voltage: number | null; response: string }> {
     const result = await this.executeCommand('ATRV', 2500);
-    const match = result.response.match(/(?:^|\\s)(\\d{1,2}(?:\\.\\d{1,2})?)\\s*V?\\b/i);
+    const match = result.response.match(/(?:^|\s)(\d{1,2}(?:\.\d{1,2})?)\s*V?\b/i);
     const parsed = match ? Number(match[1]) : NaN;
     return {
       voltage: result.status === 'OK' && Number.isFinite(parsed) && parsed >= 5 && parsed <= 20 ? parsed : null,
