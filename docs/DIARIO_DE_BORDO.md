@@ -2567,5 +2567,5 @@ A política `src/knowledge/sqlite_policy.json` explicita que a tabela `telemetry
 ### Pressão de fila e SQLite secundário
 - Adicionado limite de 500 gravações pendentes configurado em `src/knowledge/sqlite_policy.json`, com aviso limitado a um por minuto.
 - Quando a fila enche, a nova amostra não é adicionada ao índice SQLite, mas os fluxos canônicos TXT/JSON/CSV continuam independentes; contador `droppedSamples` torna a perda do índice visível.
-- A tela de armazenamento mostra a profundidade da fila, o limite e a quantidade de amostras não indexadas, para evitar que a base secundária pareça completa quando houver pressão.
+- A tela de armazenamento mostra a profundidade da fila, o limite e a quantidade de amostras não indexadas nesta execução, para evitar que a base secundária pareça completa quando houver pressão.
 - Um teste com SQLite artificialmente bloqueado enfileira 501 amostras, verifica o teto de 500, a amostra descartada e a recuperação da fila. **Teste criado, não executado**; CI não foi disparada.
