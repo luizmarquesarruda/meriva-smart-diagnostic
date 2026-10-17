@@ -56,6 +56,7 @@ function renderEvent(state: MerivaPersistedState, event: 'SESSION_START' | 'SESS
   if (state.dtcs.length) {
     for (const dtc of state.dtcs) {
       lines.push(`${dtc.code} | status=${dtc.status} | validade=${dtc.validation ?? 'HISTORY_WITHOUT_REVALIDATION'} | validado=${dtc.validatedAt ?? 'N/D'} | sessão=${dtc.sessionId ?? 'N/D'} | ocorrências=${dtc.occurrences} | última=${dtc.lastSeen} | fonte=${dtc.source}`);
+      if (dtc.freezeFrame) lines.push(`  FreezeFrame dono=${dtc.freezeFrame.dtc ?? dtc.code} | frame=${dtc.freezeFrame.frame ?? 'N/D'} | capturado=${dtc.freezeFrame.capturedAt ?? 'N/D'} | rpm=${dtc.freezeFrame.rpm ?? 'N/D'} | coolantC=${dtc.freezeFrame.coolantC ?? 'N/D'}`);
     }
   } else {
     lines.push('N/D');
