@@ -27,6 +27,15 @@ export interface DriveCycle {
   telemetrySamples?: TripTelemetrySample[];
   source: DriveCycleSource;
   fuelRateSource?: 'MEASURED_015E' | 'ESTIMATED_MAF' | 'ESTIMATED_MAP' | 'MIXED';
+  /** Canonical nullable liters; null means unavailable, never zero-by-default. */
+  fuelLiters?: number | null;
+  fuelMethod?: 'MEASURED_015E' | 'ESTIMATED_MAF' | 'ESTIMATED_MAP' | 'MIXED' | 'UNAVAILABLE';
+  fuelCoveragePct?: number;
+  fuelUncertaintyPct?: number | null;
+  distObdKm?: number;
+  distGpsKm?: number;
+  distFinalKm?: number;
+  distSource?: 'OBD' | 'GPS' | 'MIXED' | 'UNAVAILABLE';
   importedAt: string;
 }
 
