@@ -1,6 +1,7 @@
-import {useEffect,useMemo,useRef,useState} from 'react';
+import { useEffect, useMemo, useRef, useState} from 'react';
 import {Link} from 'expo-router';
-import {ActivityIndicator,ScrollView,StyleSheet,Text,TouchableOpacity,View} from 'react-native';
+import {ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { AdaptiveText as Text } from '../src/ui/AdaptiveText';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
 import {useMidLayout} from '../src/ui/midLayout';

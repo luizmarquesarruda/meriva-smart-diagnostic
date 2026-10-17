@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'expo-router';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { AdaptiveText as Text } from '../src/ui/AdaptiveText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
 import { flushCsvLogs } from '../src/database/csvLogger';
