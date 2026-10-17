@@ -259,7 +259,12 @@ export class Elm327Session {
     for (const command of ['ATE0', 'ATL0', 'ATS0', 'ATH0', protocolCommand, '0100', '010C']) {
       const timeout = command.startsWith('AT') ? 2500 : 5000;
       const result = await this.command(command, 1, timeout);
-      if (result.status !== 'OK') return false;
+      if (result.status !== 'OK') {
+        // Alguns clones não implementam todos os comandos AT opcionais.
+        // Falha de configuração opcional não deve impedir a validação real da ECU.
+        if (command.startsWith('AT') && command !== protocolCommand && result.status === 'UNSUPPORTED') continue;
+        return false;
+      }
       if (command === '010C' && !/41\\s*0C/i.test(result.response.replace(/\\s/g, ''))) return false;
     }
     this.noDataCount = 0;
