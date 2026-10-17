@@ -139,6 +139,7 @@ async function writeDailyHistoryAtomically(path: string, content: string): Promi
 
   const currentInfo = await FileSystem.getInfoAsync(path);
   const previousInfo = await FileSystem.getInfoAsync(previousPath);
+  if (previousInfo.exists && previousInfo.isDirectory) throw new Error('DAILY_HISTORY_BACKUP_PATH_IS_DIRECTORY');
   if (previousInfo.exists) await FileSystem.deleteAsync(previousPath, { idempotent: true });
   if (currentInfo.exists) await FileSystem.copyAsync({ from: path, to: previousPath });
 
@@ -155,7 +156,7 @@ async function writeDailyHistoryAtomically(path: string, content: string): Promi
         targetIsComplete = false;
       }
     }
-    if (targetInfo.exists && !targetIsComplete) {
+    if (targetInfo.exists && !targetInfo.isDirectory && !targetIsComplete) {
       await FileSystem.deleteAsync(path, { idempotent: true });
     }
     const backupInfo = await FileSystem.getInfoAsync(previousPath);
