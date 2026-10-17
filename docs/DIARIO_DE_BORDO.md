@@ -2603,3 +2603,11 @@ A política `src/knowledge/sqlite_policy.json` explicita que a tabela `telemetry
 - A escrita passa por arquivo temporário e leitura de volta byte a byte, guarda o arquivo anterior em `.previous` e tenta restaurá-lo se o `moveAsync` falhar. Diretório inesperado no caminho de backup é tratado como erro; não se apaga automaticamente.
 - Testes adicionados: diário com 366 páginas; conteúdo legada não parseável preservado; recuperação da cópia anterior após falha simulada de `moveAsync`.
 - **Testes não executados nesta etapa.** Os testes são regressões adicionadas, não evidência de aprovação de CI ou validação no telefone.
+
+
+### Partial wake lock da sessão OBD
+- Serviço Java agora solicita um `PARTIAL_WAKE_LOCK` depois de entrar em foreground e o libera em start inválido, stop solicitado e destruição do serviço.
+- `WAKE_LOCK` está declarado no app config e no Manifest gerado pelo plugin.
+- Finalidade: manter CPU disponível com a tela apagada durante a sessão OBD visível. Limite: não transfere consultas ELM327 para Java nem garante sozinho a sobrevivência dos timers JS em todos os firmwares Android.
+- Risco conhecido: consumo adicional de bateria durante a sessão; o serviço está ligado ao ciclo de vida da conexão validada e não deve ficar ativo depois da desconexão.
+- Teste de contrato atualizado para aquisição/liberação; não executado. Prebuild, Gradle/APK e teste físico ainda não foram executados.
