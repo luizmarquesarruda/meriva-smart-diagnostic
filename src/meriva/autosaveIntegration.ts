@@ -6,6 +6,7 @@
 
 import type { PidQueryResult } from '../obd/elm327';
 import { logRawObdData, logInterpretedData } from '../database/obdLogger';
+import { recordPidSample, recordTelemetryQuery } from '../database/diagnosticDatabase';
 import { PidConfirmationEntry, readPidConfirmations, recordPidConfirmation } from '../database/pidBank';
 import { updateLearningProfileRealSample } from '../database/learningProfile';
 import type { VehicleCondition } from '../types/sourceTypes';
@@ -31,10 +32,7 @@ function queueSqlitePidSample(sample: {
   // Fila independente: nenhuma escrita SQLite aguarda o próximo comando ELM327.
   sqliteSamplePersistenceQueue = sqliteSamplePersistenceQueue
     .catch(() => undefined)
-    .then(async () => {
-      const { recordPidSample } = await import('../database/diagnosticDatabase');
-      await recordPidSample(sample);
-    })
+    .then(() => recordPidSample(sample).then(() => undefined))
     .catch((cause) => {
       console.warn('[sqlite] amostra OBD não foi indexada; logs JSON/CSV continuam disponíveis:',
         cause instanceof Error ? cause.message : cause);
@@ -89,14 +87,12 @@ export async function registerObdQuery(
   const obdSessionState = getAutoSaveState().obd;
   // Registra TX/RX inclusive nas tentativas sem resposta. A escrita é secundária,
   // limitada e assíncrona; não entra na fila de comandos serial do ELM327.
-  void import('../database/diagnosticDatabase')
-    .then(({ recordTelemetryQuery }) => recordTelemetryQuery(
-      result,
-      source,
-      observationTimestamp,
-      obdSessionState.ecuValidatedAt ?? obdSessionState.lastConnectedAt ?? null,
-    ))
-    .catch((cause) => console.warn(
+  void recordTelemetryQuery(
+    result,
+    source,
+    observationTimestamp,
+    obdSessionState.ecuValidatedAt ?? obdSessionState.lastConnectedAt ?? null,
+  ).catch((cause) => console.warn(
       '[sqlite] consulta OBD não indexada; CSV/TXT continuam disponíveis:',
       cause instanceof Error ? cause.message : cause,
     ));
