@@ -2580,3 +2580,15 @@ A correção e os testes foram gravados nesta branch e propagados para as branch
 - `requestNotificationsPermissionOnly()` é chamada durante a preparação inicial de permissões, antes da conexão com ECU, para evitar pedir esse acesso enquanto o usuário conecta o carro.
 - Negar a permissão não falsifica o estado da ECU nem bloqueia a solicitação do serviço; no Android 13+ a notificação pode não ficar na gaveta, embora o controle de serviço ativo do sistema permaneça disponível.
 - Teste de contrato atualizado; não executado.
+
+
+## 2026-10-17 — Preservar o histórico diário sem corte artificial
+
+### Achado
+`src/meriva/dailyObdHistory.ts` mantinha `MAX_DAYS = 365` e `.slice(-MAX_DAYS)`, descartando a página diária mais antiga ao passar de um ano. Isso contradiz o requisito do projeto de uma página lógica por data sem limite fixo de páginas.
+
+### Correção
+Removido o limite artificial: as páginas são ordenadas por data e todas são gravadas novamente. Não foi habilitada limpeza automática do banco SQLite nem importação destrutiva.
+
+### Regressão adicionada
+Um teste gera 366 datas distintas e verifica que a primeira e a última continuam no TXT após acrescentar um evento. O teste **não foi executado**; commit inclui `[skip ci]` e não houve novo workflow.
