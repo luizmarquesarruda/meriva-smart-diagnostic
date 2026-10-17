@@ -2571,3 +2571,5 @@ A política `src/knowledge/sqlite_policy.json` explicita que a tabela `telemetry
 - Um teste com SQLite artificialmente bloqueado enfileira 501 amostras, verifica o teto de 500, a amostra descartada e a recuperação da fila. **Teste criado, não executado**; CI não foi disparada.
 
 - `droppedSamples` é contador em memória da execução atual e reinicia com o processo; não é um contador histórico. Para reconciliação completa, usar os TXT/CSV canônicos que permanecem independentes.
+
+- O carregamento/migração nativa agora aplica cooldown de 15 s após falha de abertura. Um teste mockado verifica que consultas seguintes não tentem reabrir o banco em cada PID; o teste não foi executado.
