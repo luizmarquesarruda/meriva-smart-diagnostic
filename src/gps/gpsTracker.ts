@@ -381,7 +381,7 @@ export class GpsTracker {
       derivedSpeedKmh <= MAX_SPEED_KMH &&
       (vehicleSpeedHintKmh != null
         ? vehicleSpeedHintKmh >= MIN_MOVEMENT_SPEED_KMH &&
-          Math.abs(derivedSpeedKmh ?? 0 - vehicleSpeedHintKmh) <= Math.max(20, vehicleSpeedHintKmh * 0.5)
+          Math.abs((derivedSpeedKmh ?? 0) - vehicleSpeedHintKmh) <= Math.max(20, vehicleSpeedHintKmh * 0.5)
         : sample.speedKmh != null &&
           sample.speedKmh >= MIN_MOVEMENT_SPEED_KMH &&
           sample.speedKmh <= MAX_SPEED_KMH) &&
