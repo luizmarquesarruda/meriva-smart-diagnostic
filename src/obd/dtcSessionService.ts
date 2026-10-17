@@ -2,7 +2,7 @@ import type { Elm327Session } from './elm327';
 import { readFreezeFrame, scanDtcServices, type DtcServiceScan, type FreezeFrameSnapshot } from './dtcScanner';
 import { getDtcDefinition } from './dtcDefinition';
 import { nextDtcOccurrences, readDtcs, recordDtc } from '../database/dtcManager';
-import { getAutoSaveState, updateAutoSaveState } from '../meriva/autosaveManager';
+import { updateAutoSaveState } from '../meriva/autosaveManager';
 import { forceSaveOnObdEvent } from '../meriva/autosaveIntegration';
 import type { DtcRecord } from '../types/sourceTypes';
 
