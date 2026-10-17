@@ -1141,8 +1141,8 @@ async function testAutosaveRace() {
 (function testDtcOccurrenceSemantics() {
   const dtcManager = loadTs(path.join(ROOT, 'src/database/dtcManager.ts'));
   assert.strictEqual(dtcManager.nextDtcOccurrences(undefined), 1, 'novo DTC deve iniciar em 1');
-  assert.strictEqual(dtcManager.nextDtcOccurrences({ status: 'CURRENT', occurrences: 4 }), 4, 'leitura repetida não deve inflar ocorrências');
-  assert.strictEqual(dtcManager.nextDtcOccurrences({ status: 'INACTIVE', occurrences: 4 }), 5, 'novo ciclo após inatividade deve incrementar ocorrência');
+  assert.strictEqual(dtcManager.nextDtcOccurrences({ status: 'CURRENT', occurrences: 4 }), 5, 'cada leitura em que o código aparece incrementa ocorrências');
+  assert.strictEqual(dtcManager.nextDtcOccurrences({ status: 'INACTIVE', occurrences: 4 }), 5, 'leitura após inatividade também conta como nova observação');
 })();
 
 async function main() {
