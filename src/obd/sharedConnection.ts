@@ -11,6 +11,7 @@ import { flushCsvLogs } from '../database/csvLogger';
 import { readAppSettings, writeAppSettings } from '../database/appSettings';
 import { startBackgroundMonitoring, stopBackgroundMonitoring } from '../gps/backgroundMonitoring';
 import { readVehicleIdentity } from './vehicleIdentity';
+import { refreshDtcSession } from './dtcSessionService';
 
 export interface SharedObdConnection {
   session: Elm327Session;
@@ -434,6 +435,10 @@ async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm3
     lastConnectionError = null;
     setLifecycle('READY');
     startBluetoothMonitor();
+    // Cada sessão validada relê modos 03/07/0A. O scan é assíncrono e usa a
+    // mesma fila ELM; falha de DTC não derruba uma conexão ECU já validada.
+    void refreshDtcSession(`${FileSystem.documentDirectory}MERIVA_SMART`, active.session)
+      .catch((error) => console.warn('[dtc] releitura de sessão falhou:', error instanceof Error ? error.message : error));
     return active;
   } catch (cause) {
     if (!active) {
