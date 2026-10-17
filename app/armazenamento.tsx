@@ -9,6 +9,7 @@ import { getMidLayout } from '../src/ui/midLayout';
 import { readDriveCycles } from '../src/storage/driveCycleStorage';
 import type { DriveCycle } from '../src/data/driveCycles';
 import { exportDiagnosticsJson, exportDriveCyclesCsv } from '../src/storage/exportDiagnostics';
+import { getSqliteDiagnosticsHealth, type SqliteDiagnosticsHealth } from '../src/database/sqliteTelemetryStore';
 
 const DEFAULT_QUOTA: StorageQuotaConfig = {
   limitMb: 2048,
@@ -26,6 +27,7 @@ export default function ArmazenamentoScreen() {
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [cycles, setCycles] = useState<DriveCycle[]>([]);
+  const [sqliteHealth, setSqliteHealth] = useState<SqliteDiagnosticsHealth | null>(null);
 
   async function refresh(path: string) {
     const status = await checkStorageQuota(path, DEFAULT_QUOTA);
@@ -33,6 +35,7 @@ export default function ArmazenamentoScreen() {
     const breakdown = await getStorageBreakdown(path);
     setUsageBreakdown(breakdown);
     setCycles((await readDriveCycles(path)).filter((cycle) => cycle.source === 'REAL_OBD').sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()));
+    setSqliteHealth(await getSqliteDiagnosticsHealth());
   }
 
   useEffect(() => {
@@ -44,6 +47,10 @@ export default function ArmazenamentoScreen() {
 
     void checkQuota();
   }, []);
+
+  async function refreshSqlite() {
+    setSqliteHealth(await getSqliteDiagnosticsHealth());
+  }
 
   async function handleClean() {
     if (!basePath || busy) return;
@@ -91,6 +98,39 @@ export default function ArmazenamentoScreen() {
         {quota?.message || 'VERIFICANDO'}
       </Text>
       {!!message && <Text style={styles.cleanMessage}>{message}</Text>}
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>BASE LOCAL SQLITE</Text>
+        <View style={styles.row}>
+          <Text style={styles.label}>Estado</Text>
+          <Text style={sqliteHealth?.available ? styles.ok : styles.warning}>
+            {sqliteHealth ? (sqliteHealth.available ? 'DISPONÍVEL' : 'INDISPONÍVEL') : 'VERIFICANDO'}
+          </Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.label}>Banco</Text>
+          <Text style={styles.value}>{sqliteHealth?.databaseName ?? 'meriva_diagnostics.db'}</Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.label}>Schema</Text>
+          <Text style={styles.value}>{sqliteHealth ? String(sqliteHealth.schemaVersion) : 'N/D'}</Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.label}>SQLite nativo</Text>
+          <Text style={styles.value}>{sqliteHealth?.sqliteVersion ?? 'N/D'}</Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.label}>Amostras indexadas</Text>
+          <Text style={styles.value}>{sqliteHealth?.sampleCount == null ? 'N/D' : String(sqliteHealth.sampleCount)}</Text>
+        </View>
+        {!sqliteHealth?.available && sqliteHealth?.lastError
+          ? <Text style={styles.note}>Diagnóstico: {sqliteHealth.lastError}</Text>
+          : <Text style={styles.note}>Índice secundário de telemetria. TXT diário, CSV bruto/interpretado e autosave JSON continuam preservados.</Text>}
+        <TouchableOpacity style={styles.button} onPress={() => void refreshSqlite()} disabled={busy}>
+          <Text style={styles.buttonText}>VERIFICAR SQLITE</Text>
+        </TouchableOpacity>
+      </View>
+
       <View style={[styles.dataColumns, layout.landscape && styles.dataColumnsLandscape]}>
       <View style={[styles.card, layout.landscape && styles.dataColumnCard]}>
         <Text style={styles.cardTitle}>ESPAÇO UTILIZADO</Text>
