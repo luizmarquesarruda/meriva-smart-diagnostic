@@ -2,11 +2,12 @@ import type { DtcRecord, PidObservation, VehicleCondition } from '../types/sourc
 import ruleCatalog from '../knowledge/diagnostic_rules.json';
 import sensorTestCatalogJson from '../knowledge/sensor_tests.json';
 import * as aiPolicyJson from '../knowledge/ai_policy.json';
+import { validateAiKnowledgeCatalogs } from '../knowledge/aiKnowledgeValidator';
 
 export interface DiagnosticInput { observations: PidObservation[]; dtcs?: DtcRecord[]; condition?: VehicleCondition; }
 export interface DiagnosticEvidence { ruleId: string; text: string; source: 'DTC' | 'PID'; pid?: string; dtc?: string; value?: number; }
 export interface DiagnosticHypothesis { id: string; label: string; score: number; confidence: 'LOW' | 'MEDIUM' | 'HIGH'; evidence: DiagnosticEvidence[]; nextTests: string[]; }
-export interface DiagnosticResult { engine: 'LOCAL_EVIDENCE_ENGINE'; version: 1; generatedAt: string; hypotheses: DiagnosticHypothesis[]; blockedSimulationSamples: number; blockedNonLiveDtcs: number; blockedStaleSamples: number; disclaimer: string; }
+export interface DiagnosticResult { engine: 'LOCAL_EVIDENCE_ENGINE'; version: 1; generatedAt: string; hypotheses: DiagnosticHypothesis[]; blockedSimulationSamples: number; blockedNonLiveDtcs: number; blockedStaleSamples: number; disclaimer: string; knowledgeValidationErrors?: string[]; }
 
 interface Rule { id: string; trigger: { dtc?: string; combinedTrimMin?: number; combinedTrimMax?: number; condition?: VehicleCondition; mapMinKpa?: number; }; hypothesis: string; baseScore: number; tests: string[]; }
 
@@ -80,6 +81,20 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
   const blockedSimulationSamples = rawObservations.filter(isSimulation).length;
   const blockedStaleSamples = rawObservations.filter((item) => isLiveObd(item) && !isFreshReading(item)).length;
   const blockedNonLiveDtcs = rawDtcs.length - liveDtcs.length;
+  const knowledgeValidation = validateAiKnowledgeCatalogs();
+  if (!knowledgeValidation.valid) {
+    return {
+      engine: 'LOCAL_EVIDENCE_ENGINE',
+      version: 1,
+      generatedAt: new Date().toISOString(),
+      hypotheses: [],
+      blockedSimulationSamples,
+      blockedNonLiveDtcs,
+      blockedStaleSamples,
+      knowledgeValidationErrors: knowledgeValidation.errors,
+      disclaimer: 'Diagnóstico local bloqueado porque os catálogos JSON não passaram na validação. Nenhuma hipótese foi gerada.',
+    };
+  }
   const hypotheses = new Map<string, DiagnosticHypothesis>();
 
   const add = (rule: Rule, evidence: DiagnosticEvidence): void => {

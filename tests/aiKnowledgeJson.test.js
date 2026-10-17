@@ -2,6 +2,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const ts = require('typescript');
 const ROOT = path.resolve(__dirname, '..');
 
 function readJson(relativePath) {
@@ -68,4 +69,37 @@ const composer = fs.readFileSync(path.join(ROOT, 'src/diagnostics/diagnosticResp
 assert.match(engine, /ai_policy\.json/, 'motor precisa consumir a política JSON');
 assert.match(composer, /diagnostic_responses\.json/, 'compositor precisa consumir textos JSON');
 assert.match(composer, /catalog\.responses\[hypothesis\.id\]/);
-console.log('AI knowledge/policy JSON contracts: OK');
+assert.match(engine, /validateAiKnowledgeCatalogs/);
+assert.match(engine, /knowledgeValidationErrors/, 'motor deve bloquear hipóteses quando os catálogos falharem');
+
+const validatorPath = path.resolve(ROOT, 'src/knowledge/aiKnowledgeValidator.ts');
+const validatorSource = fs.readFileSync(validatorPath, 'utf8');
+const validatorJs = ts.transpileModule(validatorSource, {
+  compilerOptions: {
+    module: ts.ModuleKind.CommonJS,
+    target: ts.ScriptTarget.ES2019,
+    esModuleInterop: true,
+    resolveJsonModule: true,
+  },
+}).outputText;
+const validatorModule = { exports: {}, filename: validatorPath, paths: require('module')._nodeModulePaths(path.dirname(validatorPath)) };
+const localRequire = (request) => request.endsWith('.json')
+  ? require(path.resolve(path.dirname(validatorPath), request))
+  : require(require.resolve(request, { paths: [path.dirname(validatorPath)] }));
+new Function('exports', 'require', 'module', '__filename', '__dirname', validatorJs)(
+  validatorModule.exports, localRequire, validatorModule, validatorPath, path.dirname(validatorPath)
+);
+const validatorApi = validatorModule.exports;
+const liveValidation = validatorApi.validateAiKnowledgeCatalogs();
+assert.strictEqual(liveValidation.valid, true, liveValidation.errors.join(' | '));
+assert.ok(liveValidation.checkedCatalogs.includes('ai_policy.json'));
+assert.ok(liveValidation.checkedCatalogs.includes('diagnostic_responses.json'));
+
+const invalidPolicy = {
+  ...policy,
+  observations: { ...policy.observations, maxAgeMs: 60001 },
+};
+const invalidResult = validatorApi.validateJsonSchemaDocument(policySchema, invalidPolicy, 'fixture inválido');
+assert.strictEqual(invalidResult.valid, false, 'biblioteca deve rejeitar idade de leitura acima do teto do schema');
+assert.match(invalidResult.errors.join(' '), /maxAgeMs/i);
+console.log('AI JSON Schema library runtime validation: OK');
