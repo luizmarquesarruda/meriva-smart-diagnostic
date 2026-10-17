@@ -40,7 +40,7 @@ function assertApprox(actual, expected, epsilon = 1e-9) {
   assert.ok(Math.abs(actual - expected) <= epsilon, `expected ${actual} ≈ ${expected}`);
 }
 
-const { RealTripRecorder, shouldFinalizeStoppedTrip } = loadTs('src/trip/tripRecorder.ts');
+const { RealTripRecorder, shouldFinalizeStoppedTrip, shouldFinalizeAfterLinkLoss, LINK_LOSS_TRIP_GRACE_MS } = loadTs('src/trip/tripRecorder.ts');
 Module._load = originalLoad;
 
 const recorder = new RealTripRecorder(1000, 5.000);
@@ -137,6 +137,9 @@ assert.strictEqual(gap.getState().fuelUsedL, 0);
 
 // Short stationary periods must not fragment a real drive into tiny trips.
 assert.strictEqual(shouldFinalizeStoppedTrip(15_000, 850), false, 'idle at a traffic light must not close a trip after 15 seconds');
+assert.strictEqual(LINK_LOSS_TRIP_GRACE_MS, 120_000);
+assert.strictEqual(shouldFinalizeAfterLinkLoss(119_999), false, 'short ECU/Bluetooth gaps must not close a trip');
+assert.strictEqual(shouldFinalizeAfterLinkLoss(120_000), true, 'a link loss at or beyond the grace window may close the trip');
 assert.strictEqual(shouldFinalizeStoppedTrip(299_999, 850), false, 'engine-running stop remains open until the longer threshold');
 assert.strictEqual(shouldFinalizeStoppedTrip(300_000, 850), true, 'long stationary engine-running period can close the trip');
 assert.strictEqual(shouldFinalizeStoppedTrip(59_999, 0), false, 'explicit engine-off needs a sustained zero-RPM period');
