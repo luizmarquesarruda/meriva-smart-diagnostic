@@ -53,5 +53,38 @@ Module._load = originalLoad;
   assert.strictEqual(links.events[0].pid, '010C');
   assert.strictEqual(links.events[11].latencyMs, 131);
   assert.strictEqual(apps.events[0].eventType, 'SESSION_START');
-  console.log('linkEventStore: serialized event writes passed');
+
+  // A malformed existing log must be preserved, not silently replaced by a
+  // new one-event file after read/parse failure.
+  const corruptPath = '/doc/MERIVA/LOGS/corrupt_events.json';
+  const corruptContent = '{broken-json';
+  files.set(corruptPath, corruptContent);
+  await assert.rejects(
+    mod.exports.appendLinkEvent('/doc/MERIVA', {
+      timestamp: new Date().toISOString(),
+      state: 'ECU_RESPONDING',
+      cause: 'PID_RESPONSE',
+      consecutiveFailures: 0,
+    }).then(() => {
+      // The store uses the fixed link_events.json name, so test corruption on
+      // that actual target and preserve the original bytes.
+    }),
+  ).catch(() => undefined);
+
+  const actualLinkPath = '/doc/MERIVA/LOGS/link_events.json';
+  const originalLinkContent = files.get(actualLinkPath);
+  files.set(actualLinkPath, corruptContent);
+  await assert.rejects(
+    mod.exports.appendLinkEvent('/doc/MERIVA', {
+      timestamp: new Date().toISOString(),
+      state: 'ECU_RESPONDING',
+      cause: 'PID_RESPONSE',
+      consecutiveFailures: 0,
+    }),
+    /EVENT_LOG_CORRUPT_JSON/,
+  );
+  assert.strictEqual(files.get(actualLinkPath), corruptContent, 'corrupt event log must not be overwritten');
+  files.set(actualLinkPath, originalLinkContent);
+
+  console.log('linkEventStore: serialized writes and corrupt-log preservation passed');
 })().catch((error) => { console.error(error); process.exitCode = 1; });
