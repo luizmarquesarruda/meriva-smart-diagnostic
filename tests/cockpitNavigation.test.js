@@ -12,7 +12,9 @@ for (const route of ['/mais', '/laboratorio', '/viagens', '/veiculo']) {
 }
 assert.doesNotMatch(index, /href="\/dados"/, 'dados ao vivo devem ficar no menu Mais recursos, sem atalho duplicado no cockpit');
 assert.doesNotMatch(index, /href="\/saude"/, 'Saúde deve ter entrada única em Mais recursos; o card do painel é informativo');
-for (const route of ['/dados', '/aprendizado', '/saude', '/bluetooth', '/armazenamento', '/configuracoes', '/testes-sensores']) {
+assert.ok(index.includes('href="/bluetooth"'), 'status da conexão no cabeçalho deve abrir o gerenciamento Bluetooth');
+assert.doesNotMatch(more, /'\/bluetooth'/, 'Bluetooth deve ter um único ponto de entrada no chip de conexão');
+for (const route of ['/dados', '/aprendizado', '/saude', '/armazenamento', '/configuracoes', '/testes-sensores']) {
   assert.ok(more.includes("'" + route + "'"), 'Mais recursos deve preservar acesso a ' + route);
 }
 assert.doesNotMatch(more, /'\/(viagens|veiculo)'/, 'Viagens e Veículo pertencem à navegação principal, sem duplicação em Mais recursos');
