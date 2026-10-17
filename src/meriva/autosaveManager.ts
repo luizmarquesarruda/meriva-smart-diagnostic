@@ -133,7 +133,12 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
   let saved = false;
 
   try {
-    const savedAt = new Date().toISOString();
+    const wallClockMs = Date.now();
+    const previousSavedAtMs = Date.parse(runtime.lastSavedAt ?? runtime.state.metadata?.savedAt ?? '');
+    const savedAtMs = Number.isFinite(previousSavedAtMs)
+      ? Math.max(wallClockMs, previousSavedAtMs + 1)
+      : wallClockMs;
+    const savedAt = new Date(savedAtMs).toISOString();
     runtime.state.metadata = { ...runtime.state.metadata, savedAt };
     const envelope: AutoSaveEnvelope<MerivaPersistedState> = {
       schemaVersion: AUTOSAVE_SCHEMA_VERSION,
