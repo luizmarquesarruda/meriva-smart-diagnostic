@@ -74,11 +74,11 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
     for (const dtc of state.dtcs) {
       const dtcDefinition = getDtcDefinition(dtc.code);
       L.push(
-        `${dtc.code} status=${dtc.status} ocorrencias=${dtc.occurrences} fonte=${dtc.source} primeira=${dtc.firstSeen} ultima=${dtc.lastSeen} descricao=${or(dtcDefinition?.description)}`,
+        `${dtc.code} status=${dtc.status} validade=${dtc.validation ?? 'HISTORY_WITHOUT_REVALIDATION'} validado_em=${or(dtc.validatedAt)} sessao=${or(dtc.sessionId)} ocorrencias=${dtc.occurrences} fonte=${dtc.source} primeira=${dtc.firstSeen} ultima=${dtc.lastSeen} descricao=${or(dtcDefinition?.description)}`,
       );
       if (dtcDefinition?.likelyCauses?.length) L.push(`  Causas provaveis: ${dtcDefinition.likelyCauses.join('; ')}`);
       if (dtc.freezeFrame) {
-        L.push(`  FreezeFrame frame=${dtc.freezeFrame.frame} rpm=${or(dtc.freezeFrame.rpm)} coolantC=${or(dtc.freezeFrame.coolantC)}`);
+        L.push(`  FreezeFrame dono=${or(dtc.freezeFrame.dtc)} frame=${or(dtc.freezeFrame.frame)} capturado=${or(dtc.freezeFrame.capturedAt)} rpm=${or(dtc.freezeFrame.rpm)} coolantC=${or(dtc.freezeFrame.coolantC)}`);
       }
     }
   } else {
