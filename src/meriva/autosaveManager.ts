@@ -164,12 +164,21 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
     }
 
     const mainInfo = await FileSystem.getInfoAsync(mainPath(base));
-    if (mainInfo.exists) {
-      await FileSystem.copyAsync({ from: mainPath(base), to: previousPath(base) });
-    }
+    const previousInfo = await FileSystem.getInfoAsync(previousPath(base));
+    if (previousInfo.exists) await FileSystem.deleteAsync(previousPath(base), { idempotent: true });
+    if (mainInfo.exists) await FileSystem.copyAsync({ from: mainPath(base), to: previousPath(base) });
 
-    await FileSystem.copyAsync({ from: tmpPath(base), to: mainPath(base) });
-    await FileSystem.deleteAsync(tmpPath(base), { idempotent: true });
+    try {
+      if (mainInfo.exists) await FileSystem.deleteAsync(mainPath(base), { idempotent: true });
+      await FileSystem.moveAsync({ from: tmpPath(base), to: mainPath(base) });
+    } catch (writeCause) {
+      const targetInfo = await FileSystem.getInfoAsync(mainPath(base));
+      const backupInfo = await FileSystem.getInfoAsync(previousPath(base));
+      if (!targetInfo.exists && backupInfo.exists) {
+        await FileSystem.copyAsync({ from: previousPath(base), to: mainPath(base) });
+      }
+      throw writeCause;
+    }
 
     runtime.lastSavedAt = savedAt;
     runtime.lastSaveReason = reason;
