@@ -168,6 +168,29 @@ async function writeDailyHistoryAtomically(path: string, content: string): Promi
   }
 }
 
+async function restoreDailyHistoryBackupIfMainMissing(path: string): Promise<void> {
+  const currentInfo = await FileSystem.getInfoAsync(path);
+  if (currentInfo.exists) return;
+
+  const backupPath = path + '.previous';
+  const backupInfo = await FileSystem.getInfoAsync(backupPath);
+  if (!backupInfo.exists) return;
+  if (backupInfo.isDirectory) throw new Error('DAILY_HISTORY_BACKUP_PATH_IS_DIRECTORY');
+
+  // A process may be killed after deleting the previous file but before moving
+  // the temporary replacement. In that narrow gap, recover the last saved page
+  // before interpreting a missing main file as an empty history.
+  const backupContent = await FileSystem.readAsStringAsync(backupPath, { encoding: FileSystem.EncodingType.UTF8 });
+  validateExistingDailyHistory(backupContent);
+  await FileSystem.copyAsync({ from: backupPath, to: path });
+  const restored = await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 });
+  if (restored !== backupContent) {
+    await FileSystem.deleteAsync(path, { idempotent: true }).catch(() => undefined);
+    throw new Error('DAILY_HISTORY_BACKUP_RESTORE_MISMATCH');
+  }
+  validateExistingDailyHistory(restored);
+}
+
 async function appendDailyObdSessionEventUnsafe(
   basePath: string,
   state: MerivaPersistedState,
@@ -177,6 +200,7 @@ async function appendDailyObdSessionEventUnsafe(
   const path = historyPath(basePath);
   const date = localDayKey(new Date(timestamp));
   await FileSystem.makeDirectoryAsync(`${basePath}/VIAGENS`, { intermediates: true });
+  await restoreDailyHistoryBackupIfMainMissing(path);
   let content = '';
   const info = await FileSystem.getInfoAsync(path);
   if (info.exists && info.isDirectory) {
