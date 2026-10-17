@@ -73,6 +73,16 @@ assert.deepStrictEqual(parseDtcResponseForService('0A', '4A 01 23 00 00'), ['P01
   assert.strictEqual(freeze.frame, 0, 'frame number must be read from the response header');
   assert.strictEqual(freeze.available, true);
 
+  const emptyFreeze = await scanner.readFreezeFrame({}, async () => ({
+    response: '', status: 'NO_RESPONSE', elapsedMs: 2500,
+  }));
+  assert.strictEqual(emptyFreeze.available, false);
+  assert.strictEqual(emptyFreeze.dtc, null);
+  assert.strictEqual(emptyFreeze.frame, null);
+  assert.strictEqual(emptyFreeze.rpm, null);
+  assert.strictEqual(emptyFreeze.coolantC, null, 'empty frame must not fabricate 0 rpm or -40 C');
+
+
   const summary = scanner.summarizeDtcScan(results);
   assert.deepStrictEqual(summary.stored, ['P0130']);
   assert.deepStrictEqual(summary.pending, []);
