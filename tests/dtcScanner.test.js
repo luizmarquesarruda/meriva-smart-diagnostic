@@ -41,10 +41,16 @@ function loadTs(file) {
 
 const { parseDtcResponseForService } = loadTs('src/obd/dtcParser.ts');
 const scanner = loadTs('src/obd/dtcScanner.ts');
+const { parsePidResponse } = loadTs('src/obd/parser.ts');
 
 assert.deepStrictEqual(parseDtcResponseForService('03', '43 01 30 00 00'), ['P0130']);
 assert.deepStrictEqual(parseDtcResponseForService('07', '47 01 23 00 00'), ['P0123']);
 assert.deepStrictEqual(parseDtcResponseForService('0A', '4A 01 23 00 00'), ['P0123']);
+const monitorStatus = parsePidResponse('0101', '41 01 80 07 A1 00');
+assert.strictEqual(monitorStatus.status, 'RESPONDEU');
+assert.ok(monitorStatus.interpretation.includes('MIL=ON'));
+assert.ok(monitorStatus.interpretation.includes('DTCs=0'));
+
 
 (async () => {
   const replies = {
@@ -72,6 +78,16 @@ assert.deepStrictEqual(parseDtcResponseForService('0A', '4A 01 23 00 00'), ['P01
   assert.strictEqual(freeze.dtc, 'P0130', 'freeze-frame DTC starts after the frame-number byte');
   assert.strictEqual(freeze.frame, 0, 'frame number must be read from the response header');
   assert.strictEqual(freeze.available, true);
+
+  const emptyFreeze = await scanner.readFreezeFrame({}, async () => ({
+    response: '', status: 'NO_RESPONSE', elapsedMs: 2500,
+  }));
+  assert.strictEqual(emptyFreeze.available, false);
+  assert.strictEqual(emptyFreeze.dtc, null);
+  assert.strictEqual(emptyFreeze.frame, null);
+  assert.strictEqual(emptyFreeze.rpm, null);
+  assert.strictEqual(emptyFreeze.coolantC, null, 'empty frame must not fabricate 0 rpm or -40 C');
+
 
   const summary = scanner.summarizeDtcScan(results);
   assert.deepStrictEqual(summary.stored, ['P0130']);

@@ -906,6 +906,24 @@ async function testDtcStorage() {
   });
   const dtcs = await dtcManager.readDtcs(BASE);
   assert.strictEqual(dtcs[0].code, 'P0133');
+  assert.strictEqual(dtcs[0].status, 'HISTORICAL', 'legacy CURRENT without session validation must not be presented as current');
+  assert.strictEqual(dtcs[0].validation, 'HISTORY_WITHOUT_REVALIDATION');
+  await dtcManager.recordDtc(BASE, {
+    ...dtcs[0],
+    status: 'CURRENT',
+    historical: false,
+    confirmed: true,
+    validation: 'REVALIDATED_IN_SESSION',
+    validatedAt: '2026-10-16T20:00:00.000Z',
+    sessionId: 'session-test',
+    freezeFrame: { frame: 0, dtc: 'P0133', rpm: null, coolantC: null, capturedAt: '2026-10-16T20:00:00.000Z' },
+  });
+  const revalidated = await dtcManager.readDtcs(BASE);
+  assert.strictEqual(revalidated[0].status, 'CURRENT');
+  assert.strictEqual(revalidated[0].validation, 'REVALIDATED_IN_SESSION');
+  assert.strictEqual(revalidated[0].freezeFrame.dtc, 'P0133');
+  assert.strictEqual(revalidated[0].freezeFrame.rpm, null);
+
 
   writeDelayMs = 25;
   await Promise.all([
@@ -1141,8 +1159,8 @@ async function testAutosaveRace() {
 (function testDtcOccurrenceSemantics() {
   const dtcManager = loadTs(path.join(ROOT, 'src/database/dtcManager.ts'));
   assert.strictEqual(dtcManager.nextDtcOccurrences(undefined), 1, 'novo DTC deve iniciar em 1');
-  assert.strictEqual(dtcManager.nextDtcOccurrences({ status: 'CURRENT', occurrences: 4 }), 4, 'leitura repetida não deve inflar ocorrências');
-  assert.strictEqual(dtcManager.nextDtcOccurrences({ status: 'INACTIVE', occurrences: 4 }), 5, 'novo ciclo após inatividade deve incrementar ocorrência');
+  assert.strictEqual(dtcManager.nextDtcOccurrences({ status: 'CURRENT', occurrences: 4 }), 5, 'cada leitura em que o código aparece incrementa ocorrências');
+  assert.strictEqual(dtcManager.nextDtcOccurrences({ status: 'INACTIVE', occurrences: 4 }), 5, 'leitura após inatividade também conta como nova observação');
 })();
 
 async function main() {

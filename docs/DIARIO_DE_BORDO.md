@@ -2450,3 +2450,17 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Nova CI solicitada pela atualização da branch; confirmar resultado integral, inclusive testes restantes e build Android.
 - Teste físico do ELM327 no veículo continua pendente.
 
+
+
+## 2026-10-16 — PR de DTC/PIDs: revalidação por sessão, freeze frame e tensão
+
+- Build: branch `fix/dtc-session-validation-20261016`; versionCode: N/D.
+- Hipótese: DTCs históricos permaneciam CURRENT sem releitura; respostas de freeze frame vazias podiam ser confundidas com dados válidos; Mode 09 vazava bytes de cabeçalho/ordenação para identificação; tensão do adaptador não era lida por ATRV.
+- Evidência: `src/database/dtcManager.ts` persistia DTCs sem campo de validade de sessão; `src/obd/dtcScanner.ts` usava frame=0 como fallback, embora RPM/temperatura já fossem nullable; `src/obd/vehicleIdentity.ts` decodificava payload a partir do primeiro cabeçalho 49 PID, sem remover cabeçalhos repetidos em quadros subsequentes; não havia chamada ATRV no código pesquisado.
+- Mudança: novo `src/obd/dtcSessionService.ts` relê modos 03/07/0A no início de cada sessão e em leitura manual, registra `REVALIDATED_IN_SESSION` ou `HISTORY_WITHOUT_REVALIDATION`, atualiza status ausente quando o modo correspondente foi validado, incrementa ocorrências a cada observação e associa freeze frame somente ao DTC proprietário. Registros legados CURRENT sem validação são rebaixados para HISTORICAL na leitura.
+- Freeze frame: frame é null quando não há resposta; disponibilidade exige DTC proprietário; valores RPM/coolant continuam null quando não foram retornados. O TXT diário e o autosave incluem dono, frame, captura e valores.
+- Mode 09: parser remove `49 PID NN` de cada quadro; teste cobre ECU ID multiquadro esperado `24578336`.
+- Tensão: adicionado parser ATRV limitado a 5–20 V, leitura única após validação da sessão, persistência como observação REAL e fallback de UI; PID 0142 continua preferencial quando fresco.
+- Testes: adicionados testes de sessão DTC, freeze frame vazio, PID 0101, Mode 09 e ATRV. **NÃO EXECUTADOS**.
+- Validação física: NÃO; veículo/adaptador/protocolo não verificados.
+- Status: PENDENTE. CI/workflows NÃO DISPARADOS; commits marcados `[skip ci]`. O estado SQLite/schemaVersion e as tabelas de observações continuam pendentes.

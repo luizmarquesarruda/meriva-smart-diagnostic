@@ -1,4 +1,5 @@
 import { parsePidResponse } from './parser';
+import { parseAdapterVoltageResponse } from './adapterVoltage';
 import {
   DEFAULT_ELM327_COMPATIBILITY,
   Elm327CompatibilityConfig,
@@ -245,16 +246,25 @@ export class Elm327Session {
     return true;
   }
 
+  /** Tensão reportada pelo próprio adaptador ELM327 via ATRV. */
+  async queryAdapterVoltage(): Promise<{ voltage: number | null; response: string }> {
+    const result = await this.executeCommand('ATRV', 2500);
+    return {
+      voltage: result.status === 'OK' ? parseAdapterVoltageResponse(result.response) : null,
+      response: result.response,
+    };
+  }
+
   /** KWP2000 TesterPresent (3E 00) para manter a sessão diagnóstica viva. */
   async keepAlive(): Promise<ElmCommandResult> {
     if (!this.opened) throw new Error('ELM NÃO INICIALIZADO');
     return this.executeCommand('3E00');
   }
 
-  async queryPid(pid: string): Promise<PidQueryResult> {
+  async queryPid(pid: string, timeoutOverrideMs?: number): Promise<PidQueryResult> {
     await this.initialize();
     const normalized = normalizeCommand(pid);
-    const result = await this.executeCommand(normalized);
+    const result = await this.executeCommand(normalized, timeoutOverrideMs);
     const parsed = parsePidResponse(normalized, result.response);
 
     return {
@@ -267,10 +277,10 @@ export class Elm327Session {
     };
   }
 
-  async executeCommand(command: string): Promise<ElmCommandResult> {
+  async executeCommand(command: string, timeoutOverrideMs?: number): Promise<ElmCommandResult> {
     await this.initialize();
     const normalized = normalizeCommand(command);
-    return this.enqueueCommand(() => this.command(normalized));
+    return this.enqueueCommand(() => this.command(normalized, 1, timeoutOverrideMs));
   }
 
   async close(): Promise<void> {
