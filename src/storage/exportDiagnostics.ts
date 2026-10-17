@@ -64,10 +64,12 @@ export async function exportDriveCyclesCsv(basePath: string): Promise<string> {
   const dir = await ensureExportDir(basePath);
   const path = `${dir}/drive_cycles_${Date.now()}.csv`;
   const build = getAppBuildInfo();
-  const header = ['startedAt','finishedAt','distanceKm','fuelUsedL','consumptionKml','source','fuelRateSource','buildSha','branch','versionCode','buildDate','deviceModel','androidVersion'];
+  const header = ['schemaVersion','exportVersion','startedAt','finishedAt','distanceKm','fuelUsedL','consumptionKml','source','fuelRateSource','buildSha','branch','versionCode','buildDate','deviceModel','androidVersion'];
   const lines = [
     header.join(','),
     ...cycles.map((cycle) => [
+      csv(1),
+      csv(1),
       csv(cycle.startedAt),
       csv(cycle.finishedAt),
       csv(cycle.distanceTotalKm),
