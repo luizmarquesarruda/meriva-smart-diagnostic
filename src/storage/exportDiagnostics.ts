@@ -40,16 +40,24 @@ export async function exportDriveCyclesCsv(basePath: string): Promise<string> {
   const cycles = await readDriveCycles(basePath);
   const dir = await ensureExportDir(basePath);
   const path = `${dir}/drive_cycles_${Date.now()}.csv`;
-  const header = ['startedAt','finishedAt','distanceKm','fuelUsedL','consumptionKml','source','fuelRateSource'];
+  const header = ['startedAt','finishedAt','distanceKm','distObdKm','distGpsKm','distFinalKm','distSource','fuelLiters','fuelUsedL_legacy','fuelCoveragePct','fuelUncertaintyPct','consumptionKml','source','fuelMethod','fuelRateSource'];
   const lines = [
     header.join(','),
     ...cycles.map((cycle) => [
       csv(cycle.startedAt),
       csv(cycle.finishedAt),
-      csv(cycle.distanceTotalKm),
+      csv(cycle.distFinalKm ?? cycle.distanceTotalKm),
+      csv(cycle.distObdKm),
+      csv(cycle.distGpsKm),
+      csv(cycle.distFinalKm ?? cycle.distanceTotalKm),
+      csv(cycle.distSource),
+      csv(cycle.fuelLiters),
       csv(cycle.fuelUsedL),
+      csv(cycle.fuelCoveragePct),
+      csv(cycle.fuelUncertaintyPct),
       csv(cycle.avgFuelConsumptionKml),
       csv(cycle.source),
+      csv(cycle.fuelMethod ?? cycle.fuelRateSource),
       csv(cycle.fuelRateSource),
     ].join(',')),
   ];
