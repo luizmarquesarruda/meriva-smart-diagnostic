@@ -492,6 +492,12 @@ export async function upsertDriveCycle(cycle: DriveCycle): Promise<boolean> {
   const startedUtc = toUtc(cycle.startedAt);
   const finishedUtc = toUtc(cycle.finishedAt);
   if (!startedUtc || !finishedUtc) return false;
+  const fuelConsumptionValid = cycle.fuelDataValid === true
+    && Number.isFinite(cycle.fuelUsedL)
+    && cycle.fuelUsedL >= 0.05
+    && Number.isFinite(cycle.avgFuelConsumptionKml)
+    && cycle.avgFuelConsumptionKml > 0
+    && cycle.avgFuelConsumptionKml <= 30;
   const db = await initializeDiagnosticDatabase();
   await enqueueWrite(() => db.withTransactionAsync(async () => {
     await db.runAsync(
@@ -516,12 +522,10 @@ export async function upsertDriveCycle(cycle: DriveCycle): Promise<boolean> {
       toLocal(finishedUtc) ?? finishedUtc,
       Math.max(0, Number(cycle.distanceTotalKm) || 0),
       Math.max(0, Number(cycle.fuelUsedL) || 0),
-      cycle.fuelDataValid === false || !(cycle.fuelUsedL >= 0.05 && cycle.avgFuelConsumptionKml > 0)
-        ? null
-        : cycle.avgFuelConsumptionKml,
+      fuelConsumptionValid ? cycle.avgFuelConsumptionKml : null,
       Number.isFinite(cycle.avgDrivingSpeedKmh) && cycle.avgDrivingSpeedKmh >= 0 ? cycle.avgDrivingSpeedKmh : null,
       Number.isFinite(cycle.maxSpeedKmh) && (cycle.maxSpeedKmh ?? -1) >= 0 ? cycle.maxSpeedKmh as number : null,
-      cycle.fuelDataValid === false || !(cycle.fuelUsedL >= 0.05 && cycle.avgFuelConsumptionKml > 0) ? 0 : 1,
+      fuelConsumptionValid ? 1 : 0,
       cycle.fuelRateSource ?? null,
       new Date().toISOString(),
     );
