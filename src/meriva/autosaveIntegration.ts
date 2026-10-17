@@ -9,13 +9,12 @@ import { logRawObdData, logInterpretedData } from '../database/obdLogger';
 import { PidConfirmationEntry, readPidConfirmations, recordPidConfirmation } from '../database/pidBank';
 import { updateLearningProfileRealSample } from '../database/learningProfile';
 import type { VehicleCondition } from '../types/sourceTypes';
-import { pushLastReading, updateAutoSaveState, scheduleCriticalSave } from './autosaveManager';
+import { pushLastReading, updateAutoSaveState, scheduleCriticalSave, getAutoSaveState } from './autosaveManager';
 import { shouldFeedLearning } from './autosaveValidation';
 import { getVehicleConditionSnapshot, recordLivePidQuery } from '../obd/liveTelemetry';
 import pollingPolicy from '../knowledge/polling_policy.json';
 import { appendLinkEvent } from '../obd/linkEventStore';
 import { recordSqliteTelemetrySample } from '../database/sqliteTelemetryStore';
-import { getAutoSaveState } from './autosaveManager';
 
 const lastLearningPersistedAt = new Map<string, number>();
 const LEARNING_SAMPLE_MIN_INTERVAL_MS = pollingPolicy.learningSampleMinIntervalMs;
