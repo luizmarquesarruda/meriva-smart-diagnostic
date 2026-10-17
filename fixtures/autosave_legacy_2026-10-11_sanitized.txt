@@ -1,0 +1,45 @@
+# Amostra sanitizada derivada do autosave recebido; não é o log completo de 16/10.
+=== SALVAMENTO_BEGIN ===
+NÚMERO: 242
+MOTIVO: session_start
+MERIVA SMART DIAGNOSTIC
+SAVE EXPORT
+========================
+Schema: 1
+App Version: 1.0.1
+Exported At: 2026-10-11T16:32:45.393Z
+Saved At: 2026-10-11T16:32:44.959Z
+
+[VEHICLE]
+Marca: N/D
+Modelo: N/D
+Motor: N/D
+Ano: N/D
+VIN: [REDACTED]
+
+[OBD]
+Status: CONECTADO
+Adaptador: [REDACTED]
+Protocolo: AUTO,ISO 14230-4 (KWP FAST)
+Último protocolo conhecido: AUTO,ISO 14230-4 (KWP FAST)
+ECU: N/D
+Identificação ECU: [REDACTED]
+Nome ECU: [REDACTED]
+ECU validada em: 2026-10-11T16:32:44.953Z
+Fonte da validação ECU: OBD_RESPONSE
+Validações: 010C/41 0C, PROTOCOLO AUTO,ISO 14230-4 (KWP FAST), PIDS 20
+
+[LAST READINGS]
+0105 Coolant Temperature: N/D [NÃO RESPONDEU] fonte=REAL 2026-10-11T16:31:55.961Z
+0110 MAF: N/D [NÃO RESPONDEU] fonte=REAL 2026-10-11T16:31:54.603Z
+010C Engine RPM: N/D [NÃO RESPONDEU] fonte=REAL 2026-10-11T16:31:52.037Z
+010D Vehicle Speed: N/D [NÃO RESPONDEU] fonte=REAL 2026-10-11T16:31:49.770Z
+0111 Throttle Position: N/D [NÃO RESPONDEU] fonte=REAL 2026-10-11T16:31:46.193Z
+010B MAP: 72 kpa [RESPONDEU] fonte=REAL 2026-10-11T16:29:19.546Z
+010F Intake Air Temperature: N/D [NÃO RESPONDEU] fonte=REAL 2026-10-10T17:13:23.655Z
+0101 PID DESCONHECIDO: N/D [VALOR NÃO INTERPRETADO] fonte=REAL 2026-10-08T18:51:06.236Z
+
+[DTC]
+P0135 status=CURRENT ocorrencias=5 fonte=REAL_OBD primeira=2026-10-08T10:11:32.238Z ultima=2026-10-11T16:27:53.680Z
+P0420 status=CURRENT ocorrencias=5 fonte=REAL_OBD primeira=2026-10-08T10:11:32.238Z ultima=2026-10-11T16:27:53.680Z
+=== SALVAMENTO_END ===
