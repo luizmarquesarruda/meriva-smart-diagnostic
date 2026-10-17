@@ -20,6 +20,7 @@ const DEBOUNCE_MS = 1500;
 const CHECKPOINT_MS = 45000;
 const MAX_LAST_READINGS = 50;
 const MIN_READING_SAVE_INTERVAL_MS = 10_000;
+let lastSqliteDtcFingerprint: string | null = null;
 
 interface AutosaveRuntime {
   basePath: string;
@@ -67,6 +68,25 @@ function tmpPath(basePath: string): string {
 }
 function previousPath(basePath: string): string {
   return `${basePath}/CONFIG/autosave.previous.json`;
+}
+
+function mirrorDtcHistoryToSqlite(records: MerivaPersistedState['dtcs']): void {
+  const fingerprint = JSON.stringify(records);
+  if (fingerprint === lastSqliteDtcFingerprint) return;
+  lastSqliteDtcFingerprint = fingerprint;
+  if (!records.length) return;
+
+  // O armazenamento SQLite é complementar. Falhas aqui nunca invalidam o autosave principal.
+  const snapshot = records.map((record) => ({
+    ...record,
+    freezeFrame: record.freezeFrame ? { ...record.freezeFrame } : undefined,
+  }));
+  void import('../database/diagnosticDatabase')
+    .then(({ persistDtcHistory }) => persistDtcHistory(snapshot))
+    .catch((cause) => {
+      lastSqliteDtcFingerprint = null; // permitir nova tentativa após falha transitória
+      console.warn('[sqlite] histórico DTC não sincronizado:', cause instanceof Error ? cause.message : cause);
+    });
 }
 
 function snapshotFingerprint(state: MerivaPersistedState): string {
@@ -180,6 +200,7 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
     } catch (historyCause) {
       console.warn('[autosave] falha ao atualizar histórico TXT:', historyCause instanceof Error ? historyCause.message : historyCause);
     }
+    mirrorDtcHistoryToSqlite(runtime.state.dtcs);
     runtime.dirty = runtime.mutationVersion !== mutationVersionAtStart;
     saved = true;
     return true;
@@ -478,5 +499,6 @@ export function disposeAutoSave(): void {
   runtime.lastSaveReason = null;
   runtime.lastError = null;
   runtime.lastSavedFingerprint = null;
+  lastSqliteDtcFingerprint = null;
   runtime.lastReadingMutationAt.clear();
 }
