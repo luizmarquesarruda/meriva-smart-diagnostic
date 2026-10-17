@@ -14,12 +14,14 @@ export default function SaudeScreen() {
   const [state,setState]=useState(getAutoSaveState());
   useEffect(()=>{const t=setInterval(()=>setState(getAutoSaveState()),1000);return()=>clearInterval(t)},[]);
   const context = getVehicleConditionSnapshot();
-  const activeDtcs = state.dtcs.filter((item) => item.validation === 'REVALIDATED_IN_SESSION' && ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(item.status));
+  const activeStatuses = ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'];
+  const activeDtcs = state.dtcs.filter((item) => item.validation === 'REVALIDATED_IN_SESSION' && activeStatuses.includes(item.status));
+  const unvalidatedDtcs = state.dtcs.filter((item) => activeStatuses.includes(item.status) && item.validation !== 'REVALIDATED_IN_SESSION');
   const diagnostic: DiagnosticResult = useMemo(()=>runLocalDiagnostic({observations:state.lastReadings.map(r=>({pid:r.pid,name:r.name,value:r.value,unit:r.unit,source:r.source==='SIMULACAO'?'SIMULACAO':'REAL_OBD',timestamp:r.timestamp,confidence:r.source==='SIMULACAO'?'LOW':'GOOD'} as PidObservation)),dtcs:state.dtcs,condition:context.condition}),[state,context.condition]);
-  const normal=diagnostic.hypotheses.length===0 && activeDtcs.length===0;
+  const normal=diagnostic.hypotheses.length===0 && activeDtcs.length===0 && unvalidatedDtcs.length===0;
   return <SafeAreaView style={styles.container} edges={["top","bottom","left","right"]}><ScrollView contentContainerStyle={[styles.content,{paddingHorizontal:layout.horizontalPadding}]} showsHorizontalScrollIndicator={false}><View style={[styles.screenFrame,{maxWidth:layout.maxContentWidth}]}>
     <View style={styles.header}><Text style={styles.title}>CENTRAL DE SAÚDE</Text><Text style={styles.subtitle}>EVIDÊNCIAS • DTC • HIPÓTESES</Text></View>
-    <View style={[styles.health, normal ? styles.healthOk : styles.healthWarn]}><Text style={normal ? styles.bigOk : styles.bigWarn}>{normal ? '● SISTEMA NORMAL' : '● ATENÇÃO NECESSÁRIA'}</Text><Text style={styles.hint}>{activeDtcs.length ? activeDtcs.length + ' DTC ativo(s).' : (state.dtcs.length ? state.dtcs.length + ' registro(s) histórico(s), sem DTC ativo.' : 'Nenhum DTC registrado.')}</Text></View>
+    <View style={[styles.health, normal ? styles.healthOk : styles.healthWarn]}><Text style={normal ? styles.bigOk : styles.bigWarn}>{normal ? '● SISTEMA NORMAL' : '● ATENÇÃO NECESSÁRIA'}</Text><Text style={styles.hint}>{activeDtcs.length ? activeDtcs.length + ' DTC ativo(s).' : (unvalidatedDtcs.length ? unvalidatedDtcs.length + ' DTC(s) sem releitura nesta sessão; ausência de falha não confirmada.' : state.dtcs.length ? state.dtcs.length + ' registro(s) histórico(s), sem DTC ativo.' : 'Nenhum DTC registrado.')}</Text></View>
     <Text style={styles.section}>CONEXÃO</Text>
     <View style={[styles.infoGrid, layout.landscape && styles.infoGridLandscape]}>
       <View style={[styles.row, layout.landscape && styles.gridRow]}><Text style={styles.name}>Bluetooth</Text><Text style={state.obd.connected?styles.ok:styles.muted}>{state.obd.connected?'CONECTADO':'AGUARDANDO'}</Text></View>
