@@ -57,5 +57,8 @@
     "warningThrottleMs": 60000,
     "fullBehavior": "drop_secondary_sqlite_index_sample_only",
     "canonicalLogsRemainIndependent": true
+  },
+  "database": {
+    "openRetryCooldownMs": 15000
   }
 }
