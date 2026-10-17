@@ -2520,3 +2520,44 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Evidência dos jobs: `validate` ID `117382942876`; `android-build` ID `117383071884`; ambos com conclusão `success`.
 - Limitação: CI bem-sucedida não substitui validação visual em emulador/aparelho nem teste físico Meriva + ELM327.
 - Esta entrada é uma atualização documental após a execução #2277. A gravação do diário gera um commit novo e pode iniciar outra CI pelo gatilho `push`; esse novo resultado será registrado separadamente.
+
+
+## 2026-10-17 — Reengenharia inicial de configurações, acessibilidade e respostas de IA
+
+### Objetivo
+Atender à necessidade de personalizar o painel sem obrigar o usuário a exibir velocidade, melhorar legibilidade e tornar as respostas diagnósticas mais claras sem misturar dados históricos com leituras atuais.
+
+### Alterações
+- Adicionados a AppSettings e ao arquivo de configuração persistente: indicador principal, alternância automática, exibição de velocidade GPS, texto maior e animações.
+- Temperatura do motor passa a ser o indicador principal padrão; velocidade GPS fica oculta da rotação automática por padrão.
+- A rotação automática a cada 10 segundos agora é opcional; o usuário pode alternar indicadores manualmente.
+- A tela de configurações ganhou controles para painel, legibilidade e movimento. Alvos de toque principais foram ampliados.
+- O painel usa uma animação de opacidade leve, controlável pelo usuário.
+- A tela Saúde preserva a origem da leitura: apenas fontes explicitamente REAL/REAL_OBD entram como REAL_OBD; baseline, simulação e fontes desconhecidas não são promovidas.
+- O motor diagnóstico passa a ignorar leituras reais com mais de 60 segundos para gerar hipóteses atuais e contabiliza essas leituras bloqueadas.
+- Criada camada src/diagnostics/diagnosticResponse.ts para respostas em português com resumo, próxima ação e ressalva de que score heurístico não é probabilidade calibrada.
+- Criados testes para configurações do painel, proveniência, frescor dos dados e composição da resposta.
+- Criada documentação de arquitetura da IA local e auditoria de UX/configurações/rotas, com referências oficiais Expo, Android e React Native.
+
+### Arquivos principais
+- src/database/appSettings.ts
+- app/configuracoes.tsx
+- app/index.tsx
+- app/saude.tsx
+- src/diagnostics/diagnosticEngine.ts
+- src/diagnostics/diagnosticResponse.ts
+- tests/diagnosticEngine.test.js
+- tests/diagnosticResponse.test.js
+- tests/dashboardSettings.test.js
+- tests/orientationLayout.test.js
+- docs/REENGENHARIA_IA_LOCAL_2026-10-17.md
+- docs/AUDITORIA_UX_CONFIGURACOES_2026-10-17.md
+
+### Limitações e validação
+- CI desta branch: NÃO EXECUTADA ainda no momento da gravação desta entrada.
+- Testes em emulador, aparelho físico e Meriva/ELM327: NÃO EXECUTADOS.
+- O limite de 60 segundos é um filtro de segurança local para hipóteses atuais, não uma especificação OEM.
+- A reengenharia foi iniciada com uma camada de proveniência/frescor e respostas explicáveis; divisão completa dos detectores por domínio e aprendizado versionado ficam para etapas subsequentes, depois da CI.
+
+### Próximo passo
+Abrir PR de rascunho baseada na PR #68, rodar CI, corrigir qualquer falha antes de ampliar a reengenharia ou declarar a implementação pronta.
