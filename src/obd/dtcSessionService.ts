@@ -2,7 +2,7 @@ import type { Elm327Session } from './elm327';
 import { readFreezeFrame, scanDtcServices, type DtcServiceScan, type FreezeFrameSnapshot } from './dtcScanner';
 import { getDtcDefinition } from './dtcDefinition';
 import { nextDtcOccurrences, readDtcs, recordDtc } from '../database/dtcManager';
-import { updateAutoSaveState } from '../meriva/autosaveManager';
+import { getAutoSaveState, updateAutoSaveState } from '../meriva/autosaveManager';
 import { forceSaveOnObdEvent } from '../meriva/autosaveIntegration';
 import type { DtcRecord } from '../types/sourceTypes';
 
@@ -32,7 +32,10 @@ export async function refreshDtcSession(
   const freezeFrame = stored?.available && stored.codes.length > 0
     ? await readFreezeFrame(session, execute)
     : UNAVAILABLE_FRAME;
-  const existing = await readDtcs(basePath);
+  const fileRecords = await readDtcs(basePath);
+  const mergedExisting = new Map(getAutoSaveState().dtcs.map((item) => [item.code, item]));
+  for (const item of fileRecords) mergedExisting.set(item.code, item);
+  const existing = [...mergedExisting.values()];
   const existingByCode = new Map(existing.map((item) => [item.code, item]));
   const now = new Date().toISOString();
   const priorities: Record<DtcServiceScan['kind'], number> = { PENDING: 1, PERMANENT: 2, STORED: 3 };
