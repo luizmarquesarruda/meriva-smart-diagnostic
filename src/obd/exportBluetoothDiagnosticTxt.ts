@@ -140,6 +140,15 @@ async function buildReport(): Promise<string> {
     `INJEÇÃO: ${state.vehicle?.injectionType ?? 'N/D'}`,
     `TANQUE: ${state.vehicle?.tankCapacityL ?? 'N/D'} L`,
     `PROTOCOL BASELINE: ${state.vehicle?.protocolBaseline ?? 'N/D'}`,
+    '[RECENT PID OBSERVATIONS]',
+    ...state.lastReadings.slice(0, 50).map((reading) => {
+      const timestampMs = Date.parse(reading.timestamp);
+      const ageMs = Number.isFinite(timestampMs) ? Math.max(0, Date.now() - timestampMs) : null;
+      const quality = reading.status !== 'RESPONDEU' || reading.value == null
+        ? 'ERROR' : ageMs != null && ageMs <= 10_000 ? 'FRESH' : 'STALE';
+      const dataSource = reading.dataSource ?? (reading.source === 'REAL' ? 'REAL' : 'SIMULADO');
+      return `${reading.pid} ${reading.name}=${reading.value ?? 'N/D'} ${reading.unit} status=${reading.status} data_source=${dataSource} timestamp=${reading.timestamp} monotonic_ms=${reading.monotonicMs ?? 'N/D'} age_ms=${ageMs ?? 'N/D'} quality=${quality}`;
+    }),
     '[LINK]',
     `ECU STATUS: ${getSharedObdStatus().ecuResponseState}`,
     `ECU VALIDADA EM: ${state.obd.ecuValidatedAt ?? 'N/D'}`,
