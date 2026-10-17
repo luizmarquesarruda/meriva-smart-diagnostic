@@ -9,6 +9,7 @@ import android.content.Intent;
 import android.content.pm.ServiceInfo;
 import android.os.Build;
 import android.os.IBinder;
+import android.os.PowerManager;
 import android.util.Log;
 
 /**
@@ -27,6 +28,7 @@ public final class ObdForegroundService extends Service {
   private static volatile boolean running = false;
 
   private String adapterName = "ELM327";
+  private PowerManager.WakeLock cpuWakeLock;
 
   public static boolean isRunning() {
     return running;
@@ -41,8 +43,8 @@ public final class ObdForegroundService extends Service {
   @Override
   public int onStartCommand(Intent intent, int flags, int startId) {
     if (intent == null) {
-      // Do not resurrect a stale "connected" notification without the JS
-      // owner/session state that was lost with the app process.
+      // Do not resurrect a stale session without the JS owner/session state.
+      releaseCpuWakeLock();
       stopSelf(startId);
       return START_NOT_STICKY;
     }
@@ -50,12 +52,14 @@ public final class ObdForegroundService extends Service {
     String action = intent.getAction();
     if (ACTION_STOP.equals(action)) {
       running = false;
+      releaseCpuWakeLock();
       stopForeground(true);
       stopSelf(startId);
       return START_NOT_STICKY;
     }
 
     if (!ACTION_START.equals(action)) {
+      releaseCpuWakeLock();
       stopSelf(startId);
       return START_NOT_STICKY;
     }
@@ -76,10 +80,16 @@ public final class ObdForegroundService extends Service {
       } else {
         startForeground(NOTIFICATION_ID, notification);
       }
+      // The OBD session exists only while the user-visible foreground service
+      // is active. A partial wake lock keeps CPU available with the display off;
+      // it is explicitly released on every stop/destruction path.
+      acquireCpuWakeLock();
       running = true;
-    } catch (SecurityException | IllegalArgumentException error) {
+    } catch (RuntimeException error) {
       running = false;
-      Log.e(TAG, "Unable to promote OBD service to foreground", error);
+      releaseCpuWakeLock();
+      Log.e(TAG, "Unable to start OBD foreground session", error);
+      stopForeground(true);
       stopSelf(startId);
       return START_NOT_STICKY;
     }
@@ -87,6 +97,34 @@ public final class ObdForegroundService extends Service {
     // START_STICKY keeps the running process prioritized while the ECU session
     // is active; a null restart intent is explicitly stopped above.
     return START_STICKY;
+  }
+
+  private void acquireCpuWakeLock() {
+    PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
+    if (powerManager == null) {
+      throw new IllegalStateException("PowerManager unavailable");
+    }
+    if (cpuWakeLock == null) {
+      cpuWakeLock = powerManager.newWakeLock(
+        PowerManager.PARTIAL_WAKE_LOCK,
+        getPackageName() + ":OBDSession"
+      );
+      cpuWakeLock.setReferenceCounted(false);
+    }
+    if (!cpuWakeLock.isHeld()) {
+      cpuWakeLock.acquire();
+    }
+  }
+
+  private void releaseCpuWakeLock() {
+    if (cpuWakeLock != null && cpuWakeLock.isHeld()) {
+      try {
+        cpuWakeLock.release();
+      } catch (RuntimeException error) {
+        Log.w(TAG, "Unable to release OBD CPU wake lock cleanly", error);
+      }
+    }
+    cpuWakeLock = null;
   }
 
   private Notification buildNotification() {
@@ -143,6 +181,7 @@ public final class ObdForegroundService extends Service {
   @Override
   public void onDestroy() {
     running = false;
+    releaseCpuWakeLock();
     stopForeground(true);
     super.onDestroy();
   }
