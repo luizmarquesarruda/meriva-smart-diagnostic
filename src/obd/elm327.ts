@@ -229,32 +229,60 @@ export class Elm327Session {
   /** Reinicializa o ELM e renegocia o protocolo sem destruir o transporte Bluetooth. */
   async recoverProtocol(): Promise<boolean> {
     if (!this.opened) return false;
+    // Recuperação também entra na fila única; nunca intercalar ATZ/ATSP com polling.
+    const recovered = await this.enqueueCommand(() => this.recoverProtocolUnsafe());
+    // Identificação usa executeCommand e precisa ocorrer depois de liberar a fila.
+    if (recovered) await this.identifyProtocol();
+    return recovered;
+  }
+
+  private async recoverProtocolUnsafe(): Promise<boolean> {
+    if (!this.opened) return false;
     const protocol = (this.protocol ?? '').toUpperCase();
     const preferred = /KWP|14230/.test(protocol) ? 'ATSP5' : 'ATSP0';
-    const reset = await this.command('ATZ');
+
+    // Primeiro tenta warm-start rápido. Clones que não implementam ATWS seguem
+    // para a sequência de re-inicialização completa.
+    const warm = await this.command('ATWS', 1, 2500);
+    if (warm.status === 'OK') {
+      const warmed = await this.configureAndProbe(preferred);
+      if (warmed) return true;
+    }
+
+    const reset = await this.command('ATZ', 1, 5000);
     if (reset.status !== 'OK') return false;
     await new Promise((resolve) => setTimeout(resolve, 1200));
-    const selected = await this.command(preferred);
-    if (selected.status !== 'OK') return false;
-    const probe = await this.command('010C');
-    if (probe.status !== 'OK' || !/41\\s*0C/i.test(probe.response.replace(/\\s/g, ''))) return false;
+    return this.configureAndProbe(preferred);
+  }
+
+  private async configureAndProbe(protocolCommand: string): Promise<boolean> {
+    for (const command of ['ATE0', 'ATL0', 'ATS0', 'ATH0', protocolCommand, '0100', '010C']) {
+      const timeout = command.startsWith('AT') ? 2500 : 5000;
+      const result = await this.command(command, 1, timeout);
+      if (result.status !== 'OK') {
+        // Alguns clones não implementam todos os comandos AT opcionais.
+        // Falha de configuração opcional não deve impedir a validação real da ECU.
+        if (command.startsWith('AT') && command !== protocolCommand && result.status === 'UNSUPPORTED') continue;
+        return false;
+      }
+      if (command === '010C' && !/41\\s*0C/i.test(result.response.replace(/\\s/g, ''))) return false;
+    }
     this.noDataCount = 0;
     this.consecutiveFailures = 0;
     this.lastSuccessfulResponseAt = new Date().toISOString();
-    await this.identifyProtocol();
     return true;
   }
 
-  /** KWP2000 TesterPresent (3E 00) para manter a sessão diagnóstica viva. */
+  /** KWP2000 TesterPresent (3E 00) com timeout curto para monitoramento. */
   async keepAlive(): Promise<ElmCommandResult> {
     if (!this.opened) throw new Error('ELM NÃO INICIALIZADO');
-    return this.executeCommand('3E00');
+    return this.executeCommand('3E00', 2500);
   }
 
-  async queryPid(pid: string): Promise<PidQueryResult> {
+  async queryPid(pid: string, timeoutOverrideMs?: number): Promise<PidQueryResult> {
     await this.initialize();
     const normalized = normalizeCommand(pid);
-    const result = await this.executeCommand(normalized);
+    const result = await this.executeCommand(normalized, timeoutOverrideMs);
     const parsed = parsePidResponse(normalized, result.response);
 
     return {
@@ -267,10 +295,10 @@ export class Elm327Session {
     };
   }
 
-  async executeCommand(command: string): Promise<ElmCommandResult> {
+  async executeCommand(command: string, timeoutOverrideMs?: number): Promise<ElmCommandResult> {
     await this.initialize();
     const normalized = normalizeCommand(command);
-    return this.enqueueCommand(() => this.command(normalized));
+    return this.enqueueCommand(() => this.command(normalized, 1, timeoutOverrideMs));
   }
 
   async close(): Promise<void> {

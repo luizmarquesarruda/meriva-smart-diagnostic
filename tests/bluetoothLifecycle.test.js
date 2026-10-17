@@ -8,6 +8,7 @@ const ROOT = path.resolve(__dirname, '..');
 const transport = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'bluetoothClassicTransport.ts'), 'utf8');
 const manager = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'bluetoothManager.ts'), 'utf8');
 const shared = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'sharedConnection.ts'), 'utf8');
+const elm = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'elm327.ts'), 'utf8');
 const rootLayout = fs.readFileSync(path.join(ROOT, 'app', '_layout.tsx'), 'utf8');
 const bluetoothScreen = fs.readFileSync(path.join(ROOT, 'app', 'bluetooth.tsx'), 'utf8');
 const dashboard = fs.readFileSync(path.join(ROOT, 'app', 'index.tsx'), 'utf8');
@@ -74,3 +75,12 @@ assert(orderedStates.every((value, index) => value >= 0 && (index === 0 || value
 const ecuGate = shared.indexOf("if (!connection.ecuValidated)");
 const activeAssignment = shared.indexOf('    active = {', ecuGate);
 assert(ecuGate >= 0 && activeAssignment > ecuGate, 'active não pode existir antes da validação da ECU');
+
+assert(shared.includes("queryPid('010C', 2500)"), 'sonda de saúde deve usar timeout curto');
+assert(shared.includes('healthTick % 4 !== 0'), 'a sonda de telemetria deve ocorrer a cada ~10 s');
+assert(shared.includes('}, 2500);'), 'monitor deve executar em intervalo de 2,5 s');
+assert(shared.includes("consecutiveEcuFailures >= connection.session.getCompatibilityConfig().noDataReconnectThreshold"));
+assert(elm.includes("return this.enqueueCommand(() => this.recoverProtocolUnsafe())"), 'recuperação deve usar a mesma fila serial do polling');
+assert(elm.includes("this.command('ATWS', 1, 2500)"), 'recuperação deve tentar warm start antes do reset completo');
+assert(elm.includes("['ATE0', 'ATL0', 'ATS0', 'ATH0', protocolCommand, '0100', '010C']"), 'reinit deve configurar o adaptador e validar a ECU');
+
