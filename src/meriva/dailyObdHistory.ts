@@ -55,7 +55,7 @@ function renderEvent(state: MerivaPersistedState, event: 'SESSION_START' | 'SESS
   lines.push('', '[CÓDIGOS DE FALHA REGISTRADOS]');
   if (state.dtcs.length) {
     for (const dtc of state.dtcs) {
-      lines.push(`${dtc.code} | status=${dtc.status} | ocorrências=${dtc.occurrences} | última=${dtc.lastSeen} | fonte=${dtc.source}`);
+      lines.push(`${dtc.code} | status=${dtc.status} | validade=${dtc.validation ?? 'HISTORY_WITHOUT_REVALIDATION'} | validado=${dtc.validatedAt ?? 'N/D'} | sessão=${dtc.sessionId ?? 'N/D'} | ocorrências=${dtc.occurrences} | última=${dtc.lastSeen} | fonte=${dtc.source}`);
     }
   } else {
     lines.push('N/D');
