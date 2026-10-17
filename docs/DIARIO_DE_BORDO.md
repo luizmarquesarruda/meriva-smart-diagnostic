@@ -2501,3 +2501,37 @@ Adicionar consultas e persistência local estruturada sem trocar o histórico TX
 1. Revisar e testar o store SQLite, em especial o carregamento nativo no APK SDK 51 e a pressão de gravações no polling.
 2. Adicionar serviço Android nativo via config plugin separado; testar a integração com o ciclo real de conexão/desconexão e garantir que não abra um segundo socket Bluetooth concorrente.
 3. Só migrar qualquer fonte existente após relatório de reconciliação e backup confirmado.
+
+
+## 2026-10-17 — Serviço nativo Android em primeiro plano (PR empilhada sobre SQLite)
+
+### Objetivo
+Deixar o ciclo de vida da sessão OBD visível para o Android por meio de um serviço Java e notificação contínua, sem criar outro socket Bluetooth em paralelo ao transporte já existente.
+
+### Implementação
+- Plugin Expo CNG: `plugins/withObdForegroundService.js` injeta permissões e serviço no Manifesto gerado, registra módulo em `MainApplication.kt` e copia fontes Java no prebuild.
+- Serviço Java: notificação de sessão, tipo `connectedDevice`, comandos start/stop e proteção contra reinício sem contexto de sessão válido.
+- Ponte nativa: `src/obd/nativeObdForegroundService.ts`, chamada após a ECU ser validada e encerrada em desconexão/fechamento.
+- Teste estático de contrato: `tests/obdForegroundServicePlugin.test.js`, incluído em `npm test`.
+- Documento de referência: `docs/ANDROID_OBD_FOREGROUND_SERVICE.md`.
+- `app.json` registra o plugin local.
+
+### Limite técnico explícito
+O serviço nativo mantém a sessão e sua notificação, mas **não** transfere o polling OBD para Java. O socket e a fila serial continuam pertencendo ao fluxo ELM327 existente. Migrar o polling para Java exige outro trabalho, testes de paridade e remoção coordenada do proprietário JS, não a abertura de um segundo socket concorrente. Notificação em primeiro plano não prova que a ECU responde nem garante sozinha a sobrevivência de todos os timers JS.
+
+### Segurança
+- Serviço não exportado.
+- Tipo Android `connectedDevice`; declara `FOREGROUND_SERVICE` e `FOREGROUND_SERVICE_CONNECTED_DEVICE`.
+- Sem comandos de atuação/write, sem limpeza DTC e sem transporte Bluetooth adicional.
+- Arquivos Android permanecem gerados via CNG; não commitados como árvore nativa duplicada.
+
+### Testes e CI
+- Teste de contrato: criado, **não executado**.
+- Typecheck/testes, `expo prebuild --platform android --clean`, Gradle/APK e validação física no Samsung/ELM327: **não executados**.
+- Commits com `[skip ci]`; nenhum merge foi realizado.
+- PR empilhada depois da PR SQLite #66 para preservar a ordem de dependências.
+
+### Referências
+- Expo Config Plugins: https://docs.expo.dev/config-plugins/introduction/
+- Expo SQLite SDK 51: https://docs.expo.dev/versions/v51.0.0/sdk/sqlite/
+- Android foreground service types: https://developer.android.com/about/versions/14/changes/fgs-types-required
