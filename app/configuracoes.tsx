@@ -45,7 +45,7 @@ export default function ConfiguracaoScreen() {
 
   async function updateSetting<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
     if (!storageBase || !settings) return;
-    const next = { ...settings, [key]: value };
+    const next = { ...settings, [key]: value, ...(key === 'showSpeedMetric' && value === false && settings.homePrimaryMetric === 'SPEED' ? { homePrimaryMetric: 'TEMPERATURE' as const } : {}) };
     setSettings(next);
     try {
       await writeAppSettings(storageBase, next);
