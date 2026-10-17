@@ -2551,3 +2551,7 @@ Removido o limite artificial: as páginas são ordenadas por data e todas são g
 
 ### Regressão adicionada
 Um teste gera 366 datas distintas e verifica que a primeira e a última continuam no TXT após acrescentar um evento. O teste **não foi executado**; commit inclui `[skip ci]` e não houve novo workflow.
+
+
+### Fonte permitida por linha SQLite
+A política `src/knowledge/sqlite_policy.json` explicita que a tabela `telemetry_samples` só aceita `REAL_OBD` e `SIMULACAO`. `CARSCANNER_BASELINE`, `IMPORTADO` e `USER_REAL_OBSERVATION` ficam fora dessa tabela; importação de legado e migração destrutiva seguem desabilitadas.
