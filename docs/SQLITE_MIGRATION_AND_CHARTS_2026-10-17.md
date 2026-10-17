@@ -14,7 +14,7 @@ A seleção usa versões compatíveis com a linha SDK 51, não os últimos major
 
 ## Banco e versionamento
 
-Arquivo privado do aplicativo: `meriva-smart-diagnostic.db`. O módulo `src/database/diagnosticDatabase.ts` mantém uma única promessa de inicialização e uma migração versionada (`schema_migrations`, versão 1).
+Arquivo privado do aplicativo: `meriva_diagnostics.db`, definido em `src/knowledge/sqlite_policy.json`. O módulo `src/database/diagnosticDatabase.ts` mantém uma conexão compartilhada, fila limitada e migrações versionadas (`schema_migrations`, versão atual 2).
 
 Tabelas criadas nas migrações v1/v2:
 - `pid_samples`: amostras numéricas válidas e amostradas, com unidade, status de parser, origem explícita, RX bruto, hora UTC e hora local; índices por PID/data e origem/data;
@@ -32,7 +32,7 @@ Consultas usam parâmetros SQL; campos de origem têm restrições CHECK; valore
 A adoção é aditiva, não uma substituição abrupta:
 1. Autosave JSON, arquivos CSV e relatórios TXT existentes continuam preservados como fonte de restauração/exportação.
 2. O app tenta inicializar o SQLite em paralelo no layout raiz. Erro é registrado no log e não bloqueia Bluetooth/ECU nem o autosave antigo.
-3. Cada consulta OBD (inclusive timeout/NO DATA) é enfileirada de forma assíncrona em `telemetry_samples`, mantendo status, protocolo, latência e TX/RX. A fila secundária tem limite de 500 gravações pendentes e só descarta amostras do índice SQLite quando saturada; CSV/TXT permanecem independentes. Uma amostra numérica RESPONDEU por PID/origem a cada 5 s é adicionalmente registrada em `pid_samples`. A fila SQL não segura o próximo comando serial do ELM327.
+3. Cada consulta OBD (inclusive timeout/NO DATA) é enfileirada de forma assíncrona em `telemetry_samples`, mantendo status, protocolo, latência e TX/RX. A fila secundária tem limite de 500 gravações pendentes e só descarta amostras do índice SQLite quando saturada; CSV/TXT permanecem independentes. Uma amostra numérica RESPONDEU por PID/origem a cada 5 s é adicionalmente registrada em `pid_samples`. A fila SQL não segura o próximo comando serial do ELM327. A tentativa de abertura que falha ativa uma janela de retentativa de 15 s sem prolongar o cooldown a cada consulta.
 4. O autosave espelha DTCs após gravação JSON; viagens só são indexadas quando `source === REAL_OBD`.
 5. Depois de gerar o TXT dos testes de sensores, o app grava o conjunto estruturado quando a ECU real foi validada no início. Se SQLite falhar, o TXT continua salvo e a interface informa o problema.
 6. A base existente ainda precisa de uma etapa posterior de importação idempotente de históricos JSON/CSV antigos. Nenhuma migração destrutiva é executada nesta fase.
