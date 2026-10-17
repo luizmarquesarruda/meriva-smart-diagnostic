@@ -9,7 +9,7 @@ import { logRawObdData, logInterpretedData } from '../database/obdLogger';
 import { PidConfirmationEntry, readPidConfirmations, recordPidConfirmation } from '../database/pidBank';
 import { updateLearningProfileRealSample } from '../database/learningProfile';
 import type { VehicleCondition } from '../types/sourceTypes';
-import { pushLastReading, updateAutoSaveState, scheduleCriticalSave } from './autosaveManager';
+import { pushLastReading, updateAutoSaveState, scheduleCriticalSave, getAutoSaveState } from './autosaveManager';
 import { shouldFeedLearning } from './autosaveValidation';
 import { getVehicleConditionSnapshot, recordLivePidQuery } from '../obd/liveTelemetry';
 import pollingPolicy from '../knowledge/polling_policy.json';
@@ -86,6 +86,20 @@ export async function registerObdQuery(
   recordLivePidQuery(result, source);
 
   const observationTimestamp = new Date().toISOString();
+  const obdSessionState = getAutoSaveState().obd;
+  // Registra TX/RX inclusive nas tentativas sem resposta. A escrita é secundária,
+  // limitada e assíncrona; não entra na fila de comandos serial do ELM327.
+  void import('../database/diagnosticDatabase')
+    .then(({ recordTelemetryQuery }) => recordTelemetryQuery(
+      result,
+      source,
+      observationTimestamp,
+      obdSessionState.ecuValidatedAt ?? obdSessionState.lastConnectedAt ?? null,
+    ))
+    .catch((cause) => console.warn(
+      '[sqlite] consulta OBD não indexada; CSV/TXT continuam disponíveis:',
+      cause instanceof Error ? cause.message : cause,
+    ));
   pushLastReading({
     pid: result.parsed.pid,
     name: result.parsed.name,
