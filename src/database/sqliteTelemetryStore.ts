@@ -44,6 +44,7 @@ let pendingWriteCount = 0;
 let droppedSampleCount = 0;
 let lastQueueFullWarningAt = 0;
 let databasePromise: Promise<SQLiteDatabase> | null = null;
+let databaseRetryAfterMs = 0;
 let writeQueue: Promise<void> = Promise.resolve();
 let lastError: string | null = null;
 let lastErrorLogAt = 0;
@@ -116,15 +117,20 @@ async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
 
 async function getDatabase(): Promise<SQLiteDatabase> {
   if (!storagePolicy.enabled) throw new Error('SQLITE_DISABLED_BY_POLICY');
+  if (Date.now() < databaseRetryAfterMs) {
+    throw new Error('SQLITE_OPEN_RETRY_COOLDOWN_ACTIVE');
+  }
   if (!databasePromise) {
     databasePromise = SQLite.openDatabaseAsync(DATABASE_NAME)
       .then(async (db) => {
         await migrateDatabase(db);
+        databaseRetryAfterMs = 0;
         lastError = null;
         return db;
       })
       .catch((cause) => {
         databasePromise = null;
+        databaseRetryAfterMs = Date.now() + storagePolicy.database.openRetryCooldownMs;
         throw cause;
       });
   }
