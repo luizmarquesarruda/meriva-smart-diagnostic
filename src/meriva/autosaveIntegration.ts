@@ -14,6 +14,11 @@ import { shouldFeedLearning } from './autosaveValidation';
 import { getVehicleConditionSnapshot, recordLivePidQuery } from '../obd/liveTelemetry';
 import pollingPolicy from '../knowledge/polling_policy.json';
 
+function monotonicNowMs(): number {
+  const perf = (globalThis as unknown as { performance?: { now?: () => number } }).performance;
+  return typeof perf?.now === 'function' ? perf.now() : Date.now();
+}
+
 const lastLearningPersistedAt = new Map<string, number>();
 const LEARNING_SAMPLE_MIN_INTERVAL_MS = pollingPolicy.learningSampleMinIntervalMs;
 
@@ -68,6 +73,10 @@ export async function registerObdQuery(
     status: result.parsed.status,
     timestamp: new Date().toISOString(),
     source,
+    dataSource: source === 'REAL' ? 'REAL' : 'SIMULADO',
+    monotonicMs: monotonicNowMs(),
+    ageMs: 0,
+    quality: result.parsed.status === 'RESPONDEU' && result.parsed.value !== null ? 'FRESH' : 'ERROR',
   });
 
   const parsedValue = result.parsed.value;
@@ -127,7 +136,7 @@ export async function registerObdQuery(
 
   if (source === 'SIMULACAO') {
     updateAutoSaveState((state) => {
-      state.settings.simulationQueries = (Number(state.settings.simulationQueries) || 0) + 1;
+      state.settings.simulatedQueries = (Number(state.settings.simulatedQueries) || 0) + 1;
     });
   }
 }
