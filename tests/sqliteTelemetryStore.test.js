@@ -10,11 +10,15 @@ const statements = [];
 const samples = [];
 const migrations = new Set();
 let openCalls = 0;
+let holdTelemetryWrites = false;
+let telemetryWriteGate = null;
 const sqlitePolicy = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'src', 'knowledge', 'sqlite_policy.json'), 'utf8'));
 assert.deepStrictEqual(sqlitePolicy.allowedTelemetryRowSources, ['REAL_OBD', 'SIMULACAO']);
 assert.strictEqual(sqlitePolicy.migration.legacyImportEnabled, false);
 assert.strictEqual(sqlitePolicy.migration.destructiveMigrationAllowed, false);
 assert.ok(sqlitePolicy.nonTelemetrySourcesRemainOutsideSamples.includes('CARSCANNER_BASELINE'));
+assert.strictEqual(sqlitePolicy.writeQueue.maxPendingWrites, 500);
+assert.strictEqual(sqlitePolicy.writeQueue.canonicalLogsRemainIndependent, true);
 
 const fakeDatabase = {
   async execAsync(sql) { statements.push(String(sql)); },
@@ -26,6 +30,7 @@ const fakeDatabase = {
       return { lastInsertRowId: 1, changes: 1 };
     }
     if (/INSERT\s+INTO\s+telemetry_samples/i.test(sql)) {
+      if (holdTelemetryWrites && telemetryWriteGate) await telemetryWriteGate;
       samples.push({
         id: samples.length + 1,
         timestamp: params[0],
@@ -159,8 +164,40 @@ async function main() {
   assert.strictEqual(health.schemaVersion, 1);
   assert.strictEqual(health.sqliteVersion, '3.45.3');
   assert.strictEqual(health.sampleCount, 3);
+  assert.strictEqual(health.pendingWrites, 0);
+  assert.strictEqual(health.droppedSamples, 0);
 
-  console.log('sqliteTelemetryStore: migrations, source separation, raw TX/RX, and health checks passed');
+  // A blocked database must not grow an unbounded in-memory queue. Overflow
+  // drops only the secondary SQLite index sample; canonical logs are unaffected.
+  let releaseGate;
+  telemetryWriteGate = new Promise((resolve) => { releaseGate = resolve; });
+  holdTelemetryWrites = true;
+  const maximum = mod.exports.MAX_PENDING_SQLITE_WRITES;
+  const overload = Array.from({ length: maximum + 1 }, (_, index) =>
+    mod.exports.recordSqliteTelemetrySample(
+      query('010C', 1000 + index, '010C\\r', '410C 1000\\r\\n>'),
+      'REAL',
+      '2026-10-17T12:01:' + String(index % 60).padStart(2, '0') + '.000Z',
+      'overload-session',
+    ),
+  );
+  const overflowResult = await Promise.all(overload.slice(maximum));
+  assert.deepStrictEqual(overflowResult, [false], 'queue overflow must drop the new secondary-index row');
+  const overloadedHealth = await mod.exports.getSqliteDiagnosticsHealth();
+  assert.strictEqual(overloadedHealth.pendingWrites, maximum, 'pending writes must remain bounded');
+  assert.strictEqual(overloadedHealth.droppedSamples, 1);
+  assert.strictEqual(overloadedHealth.lastError, 'SQLITE_WRITE_QUEUE_FULL');
+
+  holdTelemetryWrites = false;
+  releaseGate();
+  const queuedResults = await Promise.all(overload);
+  await mod.exports.flushSqliteTelemetryWrites();
+  assert.strictEqual(queuedResults.filter(Boolean).length, maximum);
+  const recoveredHealth = await mod.exports.getSqliteDiagnosticsHealth();
+  assert.strictEqual(recoveredHealth.pendingWrites, 0);
+  assert.strictEqual(recoveredHealth.droppedSamples, 1, 'dropped secondary samples must remain observable');
+
+  console.log('sqliteTelemetryStore: migrations, source separation, raw TX/RX, health checks and bounded queue passed');
 }
 
 main().catch((error) => {
