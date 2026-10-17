@@ -225,6 +225,8 @@ export class RealTripRecorder {
 
     const fuelDataValid = state.fuelUsedL >= MIN_TRIP_FUEL_L && state.validFuelSamples >= 2 && state.fuelCoveragePct >= 70;
     const avgFuelConsumptionKml = fuelDataValid ? state.distanceKm / state.fuelUsedL : 0;
+    const tripQuality = !fuelDataValid ? 'DADOS_INSUFICIENTES'
+      : avgFuelConsumptionKml < 2 || avgFuelConsumptionKml > 40 ? 'SUSPEITA' : 'OK';
     const avgDrivingSpeedKmh = state.movingTimeMs > 0
       ? state.distanceKm / (state.movingTimeMs / 3_600_000)
       : 0;
@@ -257,6 +259,7 @@ export class RealTripRecorder {
       maxSpeedKmh: Number(state.maxSpeedKmh.toFixed(1)),
       telemetrySamples: state.telemetrySamples,
       fuelDataValid,
+      tripQuality,
       source: 'REAL_OBD',
       fuelRateSource: this.fuelRateSources.size === 1
         ? [...this.fuelRateSources][0]
