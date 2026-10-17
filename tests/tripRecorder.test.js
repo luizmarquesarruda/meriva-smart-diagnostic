@@ -81,13 +81,13 @@ assert.strictEqual(tinyFuelCycle.fuelDataValid, false, 'trip under 0.05 L must n
 assert.strictEqual(tinyFuelCycle.avgFuelConsumptionKml, 0);
 
 const cycle = new RealTripRecorder(1000, 0);
-cycle.addSample({ timestampMs: 1000, distanceKm: 0, speedKmh: 0, fuelRateLph: 12, rpm: 800, coolantTempC: 25 });
-cycle.addSample({ timestampMs: 11000, distanceKm: 1, speedKmh: 36, fuelRateLph: 12, rpm: 1800, coolantTempC: 40 });
-cycle.addSample({ timestampMs: 21000, distanceKm: 2, speedKmh: 36, fuelRateLph: 12, rpm: 2200, coolantTempC: 78 });
-cycle.addSample({ timestampMs: 31000, distanceKm: 2, speedKmh: 36, fuelRateLph: 12, rpm: 2200, coolantTempC: 78 });
-cycle.addSample({ timestampMs: 41000, distanceKm: 2, speedKmh: 36, fuelRateLph: 12, rpm: 2200, coolantTempC: 78 });
-cycle.addSample({ timestampMs: 51000, distanceKm: 2, speedKmh: 36, fuelRateLph: 12, rpm: 2200, coolantTempC: 78 });
-cycle.addSample({ timestampMs: 61000, distanceKm: 2, speedKmh: 36, fuelRateLph: 12, rpm: 2200, coolantTempC: 78 });
+cycle.addSample({ timestampMs: 1000, distanceKm: 0, speedKmh: 0, fuelRateLph: 12, fuelRateSource: 'MEASURED_015E', rpm: 800, coolantTempC: 25 });
+cycle.addSample({ timestampMs: 11000, distanceKm: 1, speedKmh: 36, fuelRateLph: 12, fuelRateSource: 'MEASURED_015E', rpm: 1800, coolantTempC: 40 });
+cycle.addSample({ timestampMs: 21000, distanceKm: 2, speedKmh: 36, fuelRateLph: 12, fuelRateSource: 'MEASURED_015E', rpm: 2200, coolantTempC: 78 });
+cycle.addSample({ timestampMs: 31000, distanceKm: 2, speedKmh: 36, fuelRateLph: 12, fuelRateSource: 'MEASURED_015E', rpm: 2200, coolantTempC: 78 });
+cycle.addSample({ timestampMs: 41000, distanceKm: 2, speedKmh: 36, fuelRateLph: 12, fuelRateSource: 'MEASURED_015E', rpm: 2200, coolantTempC: 78 });
+cycle.addSample({ timestampMs: 51000, distanceKm: 2, speedKmh: 36, fuelRateLph: 12, fuelRateSource: 'MEASURED_015E', rpm: 2200, coolantTempC: 78 });
+cycle.addSample({ timestampMs: 61000, distanceKm: 2, speedKmh: 36, fuelRateLph: 12, fuelRateSource: 'MEASURED_015E', rpm: 2200, coolantTempC: 78 });
 const saved = cycle.buildDriveCycle(62000);
 
 assert.ok(saved);
@@ -96,7 +96,8 @@ assert.strictEqual(saved.distanceTotalKm, 2);
 assertApprox(saved.fuelUsedL, 12 * 60_000 / 3_600_000, 1e-6);
 assert.strictEqual(saved.fuelLiters, Number(saved.fuelUsedL.toFixed(4)));
 assert.strictEqual(saved.fuelCoveragePct, 100);
-assert.strictEqual(saved.fuelMethod, 'UNAVAILABLE', false);
+assert.strictEqual(saved.fuelMethod, 'MEASURED_015E');
+assert.strictEqual(saved.fuelUncertaintyPct, 5);
 assert.strictEqual(saved.avgFuelConsumptionKml, Number((2 / saved.fuelUsedL).toFixed(3)));
 assert.strictEqual(saved.distFinalKm, 2);
 assert.strictEqual(saved.distSource, 'GPS');
