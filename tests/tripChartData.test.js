@@ -40,12 +40,11 @@ function trip(id, day, overrides = {}) {
 
 const real = [
   trip('day-1', 1),
-  trip('bad-fuel', 2, { fuelDataValid: false, avgFuelConsumptionKml: 12 }),
-  trip('absurd-consumption', 3, { avgFuelConsumptionKml: 75 }),
-  trip('zero-fuel', 4, { fuelUsedL: 0, avgFuelConsumptionKml: 0 }),
-  trip('upper-limit', 5, { avgFuelConsumptionKml: 30 }),
-  trip('day-6', 6, { distanceTotalKm: 0 }),
-  trip('day-7', 7),
+  trip('unknown-fuel', 3, { fuelDataValid: undefined }),
+  trip('bad-fuel', 4, { fuelDataValid: false, avgFuelConsumptionKml: 12 }),
+  trip('absurd-consumption', 5, { avgFuelConsumptionKml: 75 }),
+  trip('zero-fuel', 6, { fuelUsedL: 0, avgFuelConsumptionKml: 0 }),
+  trip('upper-limit', 7, { avgFuelConsumptionKml: 30 }),
   trip('day-8', 8),
   trip('day-9', 9),
 ];
