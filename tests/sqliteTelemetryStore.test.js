@@ -10,6 +10,11 @@ const statements = [];
 const samples = [];
 const migrations = new Set();
 let openCalls = 0;
+const sqlitePolicy = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'src', 'knowledge', 'sqlite_policy.json'), 'utf8'));
+assert.deepStrictEqual(sqlitePolicy.allowedTelemetryRowSources, ['REAL_OBD', 'SIMULACAO']);
+assert.strictEqual(sqlitePolicy.migration.legacyImportEnabled, false);
+assert.strictEqual(sqlitePolicy.migration.destructiveMigrationAllowed, false);
+assert.ok(sqlitePolicy.nonTelemetrySourcesRemainOutsideSamples.includes('CARSCANNER_BASELINE'));
 
 const fakeDatabase = {
   async execAsync(sql) { statements.push(String(sql)); },
