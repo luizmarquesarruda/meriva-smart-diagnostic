@@ -38,7 +38,7 @@ assert.match(index, /href="[^"]*viagens"/);
 const more = fs.readFileSync('app/mais.tsx', 'utf8');
 assert.match(more, /'\/dados'/, 'Dados ao Vivo deve continuar acessível pelo menu Mais recursos');
 assert.doesNotMatch(index, /href="\/dados"/, 'Dados não deve reaparecer como segundo atalho de primeiro nível');
-assert.match(index, /dashboardAction/);
+assert.match(index, /resourceButton/, 'o cockpit deve ter um único acesso a Mais recursos');
 assert.match(index, /actionGridLandscape/);
 assert.match(index, /react-native-safe-area-context/);
 assert.match(layout, /SafeAreaProvider/);
