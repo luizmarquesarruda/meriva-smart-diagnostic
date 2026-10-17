@@ -29,9 +29,14 @@ function decodeVin(response: string): string | null {
 
 function decodeText(response: string, service: string, pid: string): string | null {
   const normalized = response.replace(/[^0-9A-F]/gi, '').toUpperCase();
-  const marker = normalized.indexOf(service + pid);
-  if (marker < 0) return null;
-  const text = hexToAscii(normalized.slice(marker + 4));
+  const header = service + pid;
+  if (!normalized.includes(header)) return null;
+
+  // Mode 09 pode retornar vários quadros; cada quadro repete 49 PID NN.
+  // Remover o cabeçalho e o byte de sequência de TODOS os quadros evita que
+  // os bytes 01/02/03 vazem para o identificador ASCII (ex.: 2457I8336IYIZ).
+  const payload = normalized.replace(new RegExp(header + '[0-9A-F]{2}', 'g'), '');
+  const text = hexToAscii(payload);
   return text || null;
 }
 
