@@ -2450,3 +2450,16 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Nova CI solicitada pela atualização da branch; confirmar resultado integral, inclusive testes restantes e build Android.
 - Teste físico do ELM327 no veículo continua pendente.
 
+
+
+## 2026-10-16 — PR de viagens: distância OBD/GPS, lacunas e combustível confiável
+
+- Build: branch `fix/trip-link-gap-gps-fuel-20261016`; versionCode: N/D.
+- Hipótese: viagens eram encerradas imediatamente na perda da ECU; distância usava só o acumulador GPS; GPS aceitava precisão desconhecida e saltos incompatíveis com velocidade OBD; consumo sem cobertura suficiente podia contaminar médias.
+- Evidência: `src/trip/autoTripService.ts` finalizava o recorder dentro do ramo `!ecuConnected` e em `applyConnection(null)`; `src/trip/tripRecorder.ts` integrava apenas a distância absoluta GPS e aceitava qualquer duração desde que a distância fosse ≥0,1 km; `src/gps/gpsTracker.ts:29,78-80,326-375` aceitava accuracy nula e usava a velocidade OBD só como confirmação de movimento, sem comparação de magnitude.
+- Mudança: GPS exige accuracy conhecida ≤20 m e descarta movimento quando a velocidade derivada é incompatível com a velocidade OBD recente. Viagem só se confirma após velocidade >3 km/h por 5 s; viagem não confirmada é descartada. Queda de enlace para a captura GPS imediatamente, mas mantém viagem por até 120 s; ao reconectar dentro da janela, a viagem é retomada. Viagem nova só é persistida com ≥60 s e ≥100 m.
+- Distância: `RealTripRecorder` integra velocidade OBD por trapézio com dt real quando existem duas amostras OBD válidas separadas por ≤5 s; nos intervalos sem par OBD fresco, usa incremento GPS filtrado. Exporta `distObdKm`, `distGpsKm`, `distFinalKm` e `distSource`.
+- Combustível: adiciona `fuelLiters` nulo quando indisponível, método, cobertura e incerteza; quebra a integração em lacunas; exige cobertura ≥70%, pelo menos duas amostras e ≥0,05 L para publicar km/L. Consumo fora de 2–40 km/L é marcado `SUSPEITA` e excluído das médias. TXT diário, TXT de autosave, CSV e tela de viagem exibem a proveniência.
+- Testes: adicionados testes para distância OBD primária, cobertura de combustível, nulo quando indisponível, suspeita fora de faixa, limiar de 120 s, GPS sem accuracy e salto incompatível. **NÃO EXECUTADOS**.
+- Validação física: NÃO; veículo/adaptador/protocolo não verificados.
+- Status: PENDENTE. CI/workflows NÃO DISPARADOS; commits marcados `[skip ci]`. O SQLite ainda não é fonte única da verdade e o histórico antigo não é recalculado automaticamente.
