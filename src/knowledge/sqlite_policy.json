@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "enabled": true,
+  "databaseName": "meriva_diagnostics.db",
+  "journalMode": "WAL",
+  "foreignKeys": true,
+  "rawProtocolCapture": {
+    "enabled": true,
+    "preserveTxExactly": true,
+    "preserveRxExactly": true,
+    "storeFailedResponses": true
+  },
+  "sourceTaxonomy": [
+    "REAL_OBD",
+    "SIMULACAO",
+    "CARSCANNER_BASELINE",
+    "IMPORTADO",
+    "USER_REAL_OBSERVATION"
+  ],
+  "migration": {
+    "strategy": "append_only_additive",
+    "legacyImportEnabled": false,
+    "destructiveMigrationAllowed": false,
+    "authoritativeHistoryRemains": [
+      "CONFIG/autosave.json",
+      "CONFIG/meriva_smart_autosave_history.txt",
+      "VIAGENS/meriva_smart_daily_obd_history.txt",
+      "LOGS/obd_raw_YYYY-MM-DD.csv",
+      "LOGS/obd_interpreted_YYYY-MM-DD.csv"
+    ]
+  },
+  "retention": {
+    "mode": "unbounded",
+    "automaticDeletion": false,
+    "defaultQueryLimit": 200
+  },
+  "qualityRules": {
+    "liveMeasurementRequires": [
+      "source=REAL_OBD",
+      "commandStatus=OK",
+      "status=RESPONDEU",
+      "finiteNumericValue"
+    ],
+    "sourceDoesNotProveSensorAccuracy": true
+  }
+}
