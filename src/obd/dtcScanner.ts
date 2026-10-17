@@ -85,7 +85,7 @@ export const DTC_SERVICE_REQUESTS = REQUESTS;
 
 
 export interface FreezeFrameSnapshot {
-  frame: number;
+  frame: number | null;
   dtc: string | null;
   rpm: number | null;
   coolantC: number | null;
@@ -135,13 +135,14 @@ export async function readFreezeFrame(
   }
 
   const frameMatch = Object.values(responses).join(' ').match(/42\s*(?:02|0C|05)\s*([0-9A-F]{2})/i);
-  const frame = frameMatch ? Number.parseInt(frameMatch[1], 16) : 0;
+  const frame = frameMatch ? Number.parseInt(frameMatch[1], 16) : null;
   return {
     frame,
     dtc,
     rpm,
     coolantC,
-    available: Boolean(dtc || rpm != null || coolantC != null),
+    // A frame without its owning DTC is not safe to attach to any code.
+    available: dtc !== null,
     responses,
   };
 }
