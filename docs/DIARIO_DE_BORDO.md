@@ -2465,6 +2465,11 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Interface de aprendizado e exports mostram apenas estatísticas com proveniência exclusiva REAL_OBD.
 - Adiciona testes de origem, frescor, ECU desconectada e migração de perfis legados.
 
+### Tarefas de acompanhamento adicionadas à IA
+- O motor agora emite ações estruturadas com prioridade e motivo: restabelecer enlace ECU, atualizar PIDs confirmados, reler DTCs da sessão e coletar evidência complementar quando nenhuma regra conclui.
+- Central de Saúde, Laboratório e exportação TXT mostram essas ações.
+- A Central não declara estado sem alertas quando a conclusão local é inconclusiva.
+
 ### Build e testes
 - Build APK, typecheck, testes e Expo Doctor: NÃO EXECUTADOS.
 - CI/workflows: NÃO DISPARADOS; commits da branch marcados [skip ci].
