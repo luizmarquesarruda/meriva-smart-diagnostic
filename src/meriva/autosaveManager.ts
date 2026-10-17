@@ -1,5 +1,5 @@
 import * as FileSystem from 'expo-file-system';
-import { persistDtcHistory } from '../database/diagnosticDatabase';
+import { persistDtcHistoryLazy } from '../database/diagnosticDatabaseAccess';
 import { AppState } from 'react-native';
 import type { AppStateStatus } from 'react-native';
 import {
@@ -82,7 +82,7 @@ function mirrorDtcHistoryToSqlite(records: MerivaPersistedState['dtcs']): void {
     ...record,
     freezeFrame: record.freezeFrame ? { ...record.freezeFrame } : undefined,
   }));
-  void persistDtcHistory(snapshot).catch((cause) => {
+  void persistDtcHistoryLazy(snapshot).catch((cause) => {
       lastSqliteDtcFingerprint = null; // permitir nova tentativa após falha transitória
       console.warn('[sqlite] histórico DTC não sincronizado:', cause instanceof Error ? cause.message : cause);
     });
