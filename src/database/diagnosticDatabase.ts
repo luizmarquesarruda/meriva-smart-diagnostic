@@ -245,38 +245,45 @@ async function openAndMigrate(): Promise<SQLiteDatabase> {
 
   const db = await SQLite.openDatabaseAsync(DIAGNOSTIC_DATABASE_NAME);
   await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
+  // Keep the migration ledger compatible with the earlier telemetry-only SQLite prototype:
+  // it used "applied_at", while an intermediate branch used "applied_at_utc".
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       version INTEGER PRIMARY KEY NOT NULL,
-      applied_at_utc TEXT NOT NULL
+      applied_at TEXT,
+      applied_at_utc TEXT
     );
   `);
   const row = await db.getFirstAsync<{ version: number }>(
     'SELECT COALESCE(MAX(version), 0) AS version FROM schema_migrations',
   );
-  let version = Number(row?.version ?? 0);
+  const version = Number(row?.version ?? 0);
   if (version > DIAGNOSTIC_DATABASE_SCHEMA_VERSION) throw new Error('SQLITE_SCHEMA_NEWER_THAN_APP');
-  if (version < 1) {
-    await db.withTransactionAsync(async () => {
-      await db.execAsync(SCHEMA_V1);
-      await db.runAsync(
-        'INSERT OR IGNORE INTO schema_migrations(version, applied_at_utc) VALUES (?, ?)',
+  const migrationColumns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(schema_migrations)');
+  const timestampColumn = migrationColumns.some((column) => column.name === 'applied_at')
+    ? 'applied_at'
+    : 'applied_at_utc';
+
+  // Re-run all CREATE TABLE IF NOT EXISTS statements during open. That safely fills in
+  // missing tables if a v1 telemetry-only DB already exists; it never deletes prior records.
+  await db.withExclusiveTransactionAsync(async (transaction) => {
+    await transaction.execAsync(SCHEMA_V1);
+    if (version < 1) {
+      await transaction.runAsync(
+        `INSERT OR IGNORE INTO schema_migrations(version, ${timestampColumn}) VALUES (?, ?)`,
         1,
         new Date().toISOString(),
       );
-    });
-    version = 1;
-  }
-  if (version < 2) {
-    await db.withTransactionAsync(async () => {
-      await db.execAsync(SCHEMA_V2);
-      await db.runAsync(
-        'INSERT OR IGNORE INTO schema_migrations(version, applied_at_utc) VALUES (?, ?)',
+    }
+    await transaction.execAsync(SCHEMA_V2);
+    if (version < 2) {
+      await transaction.runAsync(
+        `INSERT OR IGNORE INTO schema_migrations(version, ${timestampColumn}) VALUES (?, ?)`,
         2,
         new Date().toISOString(),
       );
-    });
-  }
+    }
+  });
   databaseRetryAfterMs = 0;
   lastDatabaseError = null;
   return db;
