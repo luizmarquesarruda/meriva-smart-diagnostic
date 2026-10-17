@@ -19,6 +19,7 @@ assert.strictEqual(sqlitePolicy.migration.destructiveMigrationAllowed, false);
 assert.ok(sqlitePolicy.nonTelemetrySourcesRemainOutsideSamples.includes('CARSCANNER_BASELINE'));
 assert.strictEqual(sqlitePolicy.writeQueue.maxPendingWrites, 500);
 assert.strictEqual(sqlitePolicy.writeQueue.canonicalLogsRemainIndependent, true);
+assert.strictEqual(sqlitePolicy.database.openRetryCooldownMs, 15000);
 
 const fakeDatabase = {
   async execAsync(sql) { statements.push(String(sql)); },
@@ -118,6 +119,39 @@ function query(pid, value, tx, rx, status = 'RESPONDEU') {
   };
 }
 
+async function testDatabaseOpenCooldown() {
+  let openAttempts = 0;
+  const failingSQLite = {
+    async openDatabaseAsync(name) {
+      openAttempts += 1;
+      assert.strictEqual(name, 'meriva_diagnostics.db');
+      throw new Error('SIMULATED_OPEN_FAILURE');
+    },
+  };
+
+  const originalLoadForFailure = Module._load;
+  let failureMod;
+  try {
+    Module._load = function(request, parentModule, isMain) {
+      if (request === 'expo-sqlite') return failingSQLite;
+      return originalLoadForFailure.call(this, request, parentModule, isMain);
+    };
+    failureMod = new Module(sourcePath + '.failure-test', null);
+    failureMod.filename = sourcePath;
+    failureMod.paths = Module._nodeModulePaths(path.dirname(sourcePath));
+    failureMod._compile(output, sourcePath);
+  } finally {
+    Module._load = originalLoadForFailure;
+  }
+
+  const first = await failureMod.exports.getSqliteDiagnosticsHealth();
+  const second = await failureMod.exports.getSqliteDiagnosticsHealth();
+  assert.strictEqual(first.available, false);
+  assert.strictEqual(first.lastError, 'SIMULATED_OPEN_FAILURE');
+  assert.strictEqual(second.lastError, 'SQLITE_OPEN_RETRY_COOLDOWN_ACTIVE');
+  assert.strictEqual(openAttempts, 1, 'failed database opening must not retry on every PID during cooldown');
+}
+
 async function main() {
   const realTx = '010C\r';
   const realRx = '410C 0C80\r\n>';
@@ -197,7 +231,9 @@ async function main() {
   assert.strictEqual(recoveredHealth.pendingWrites, 0);
   assert.strictEqual(recoveredHealth.droppedSamples, 1, 'dropped secondary samples must remain observable');
 
-  console.log('sqliteTelemetryStore: migrations, source separation, raw TX/RX, health checks and bounded queue passed');
+  await testDatabaseOpenCooldown();
+
+  console.log('sqliteTelemetryStore: migration, source separation, raw TX/RX, queue backpressure and open cooldown contracts passed');
 }
 
 main().catch((error) => {
