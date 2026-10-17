@@ -12,6 +12,7 @@ import { readAppSettings, writeAppSettings } from '../database/appSettings';
 import { startBackgroundMonitoring, stopBackgroundMonitoring } from '../gps/backgroundMonitoring';
 import { readVehicleIdentity } from './vehicleIdentity';
 import { appendAppEvent, appendLinkEvent, type LinkCause, type LinkState } from './linkEventStore';
+import { startNativeObdForegroundService, stopNativeObdForegroundService } from './nativeObdForegroundService';
 
 export interface SharedObdConnection {
   session: Elm327Session;
@@ -140,6 +141,8 @@ async function persistDisconnectedState(): Promise<void> {
   } catch {
     // a perda de conectividade não deve derrubar a interface
   } finally {
+    // The native notification must track the same single-owner ECU session.
+    await stopNativeObdForegroundService();
     // Não perder amostras pendentes quando o link ECU/Bluetooth cair.
     try { await flushCsvLogs(); } catch { /* a fila retenta sem bloquear a reconexão */ }
   }
@@ -336,6 +339,10 @@ async function persistValidatedConnection(
   });
 
   const sessionSaved = await startObdAutosaveSession();
+  const nativeService = await startNativeObdForegroundService(connection.device.name);
+  if (!nativeService.requested) {
+    console.warn('[obd] serviço nativo em primeiro plano não solicitado:', nativeService.reason ?? 'N/D');
+  }
   const backgroundStarted = await startBackgroundMonitoring();
   if (!backgroundStarted) {
     console.warn('[obd] ECU validada, mas o monitoramento em segundo plano não foi iniciado.');
@@ -609,6 +616,7 @@ export async function setSharedObdConnection(connection: SharedObdConnection | n
     setLifecycle('DISCONNECTED');
     currentSessionId = undefined;
     await closeObdAutosaveSession();
+    await stopNativeObdForegroundService();
   }
 }
 
@@ -635,6 +643,7 @@ export async function disconnectSharedObd(): Promise<void> {
     if (connection) await connection.session.close();
   } finally {
     try { await stopBackgroundMonitoring(); } catch { /* continuar o fechamento da sessão */ }
+    await stopNativeObdForegroundService();
     try { await closeObdAutosaveSession(); } catch { /* continuar o flush dos logs */ }
     try { await flushCsvLogs(); } catch { /* fila retém o lote e agenda nova tentativa */ }
     intentionalDisconnect = false;
