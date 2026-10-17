@@ -28,7 +28,10 @@ A inteligência diagnóstica é local, determinística e explicável. Ela não e
 - runLocalDiagnostic não usa leituras REAL_OBD com mais de 60 segundos para criar hipóteses atuais e contabiliza leituras antigas bloqueadas.
 - app/saude.tsx preserva a origem de cada leitura; origens desconhecidas viram IMPORTADO, não REAL_OBD. Isso corrige uma promoção silenciosa de qualquer fonte não simulada a leitura real.
 - A camada de resposta oferece título, resumo, nível de confiança textual, próxima ação e cautela em português.
-- Testes cobrem leitura antiga e a linguagem da resposta.
+- `src/knowledge/ai_policy.json` agora é consumido pelo motor para frescor, allowlist de status DTC e limites do score; guardas de runtime mantêm limites conservadores.
+- `src/knowledge/diagnostic_responses.json` agora fornece os textos por ID de hipótese, sem manter cópias em mapas TypeScript.
+- Os catálogos têm schemas JSON Schema Draft 2020-12 e um teste de contrato, que verifica a ligação entre regra, resposta e proveniência do PID.
+- `keepScreenAwake` é uma preferência persistida (padrão ligado), atualizada em tempo real pelo layout raiz.
 
 ## Próximas etapas da reengenharia
 - Criar dataQuality.ts independente com regras de validade, frescor, faixa e proveniência compartilhadas entre painel, viagens e diagnóstico.
@@ -48,3 +51,11 @@ A inteligência diagnóstica é local, determinística e explicável. Ela não e
 
 ## Limitações
 A CI pode validar tipos, testes automatizados e compilação, mas não prova a qualidade de todas as hipóteses em um veículo real. É necessário comparar as regras com documentação OEM, dados reais preservados e testes de bancada/veículo. Nenhuma medição nova foi inventada nesta implementação.
+
+
+## JSON operacional da IA — extensão de 2026-10-17
+- `ai_policy.json`: limites de frescor, fontes aceitas, status DTC, score heurístico e obrigações de resposta. O TypeScript consome a política, mas limita valores em runtime e mantém `REAL_OBD` como única fonte de evidência atual.
+- `diagnostic_responses.json`: catálogo de textos em português por ID de hipótese.
+- `ai_policy.schema.json` e `diagnostic_responses.schema.json`: contratos JSON Schema Draft 2020-12 para validadores compatíveis.
+- `tests/aiKnowledgeJson.test.js`: contrato entre regras, política, respostas e evidência. Confirma que somente PID com `RAW_ECU` pode estar confirmado.
+- Limite: JSON melhora governança e explicabilidade, mas não cria por si só um modelo generativo nem comprova precisão no carro. O motor continua determinístico; não houve introdução de dado fictício ou escrita na ECU.

@@ -8,9 +8,10 @@
 - Animação suave de transição pode ser desativada nas configurações.
 - Textos maiores ficam ativados por padrão. Botões de opções e ações importantes têm altura mínima de 48 px; navegação inferior tem alvo mínimo de 44 px em retrato e 40 px em paisagem para preservar espaço de tela.
 - Configurações são persistidas em MERIVA_SMART/CONFIG/app-settings.json; valores antigos recebem defaults compatíveis quando o arquivo é lido.
+- A opção `keepScreenAwake` controla o bloqueio de suspensão da tela e permanece ligada por padrão; a tela reage à mudança de preferência sem reiniciar.
 
 ## Configurações de painel adicionadas
-- Indicador principal: temperatura, RPM, tensão, posição da borboleta ou velocidade GPS.
+- Indicador principal: temperatura, RPM, tensão, posição da borboleta, velocidade GPS, consumo km/L ou falhas ativas.
 - Alternância automática a cada 10 segundos.
 - Mostrar/ocultar velocidade GPS como indicador secundário.
 - Texto maior.
@@ -38,3 +39,9 @@ A tela Saúde agora apresenta títulos e explicações em português, distingue 
 
 ## Resultado antes da CI
 Implementação registrada em branch de trabalho. Estado de testes e compilação: NÃO EXECUTADO nesta branch até o workflow terminar. Não há validação física nesta entrada.
+
+
+## Keep Awake configurável — extensão de 2026-10-17
+- A tela continua ligada por padrão, atendendo ao requisito anterior do projeto.
+- O usuário agora pode desativar o comportamento nas configurações. A preferência é publicada para o layout raiz em tempo real.
+- A CI confirma compilação e testes; a reação de suspensão/retorno ainda deve ser verificada fisicamente em aparelho Android.

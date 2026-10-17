@@ -185,6 +185,7 @@ export default function ConfiguracaoScreen() {
           <SettingSwitch label="Alternar indicadores automaticamente a cada 10 segundos" value={settings.homeAutoRotate} onChange={(v) => void updateSetting('homeAutoRotate', v)} />
           <SettingSwitch label="Mostrar velocidade GPS entre os indicadores" value={settings.showSpeedMetric} onChange={(v) => void updateSetting('showSpeedMetric', v)} />
           <SettingSwitch label="Textos e botões maiores" value={settings.largeText} onChange={(v) => void updateSetting('largeText', v)} />
+          <SettingSwitch label="Manter tela ligada enquanto o aplicativo estiver aberto" value={settings.keepScreenAwake} onChange={(v) => void updateSetting('keepScreenAwake', v)} />
           <SettingSwitch label="Animações suaves da interface" value={settings.animationsEnabled} onChange={(v) => void updateSetting('animationsEnabled', v)} />
 
           <Text style={styles.section}>COMPATIBILIDADE ELM327</Text>

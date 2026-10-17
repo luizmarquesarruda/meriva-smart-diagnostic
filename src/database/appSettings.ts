@@ -10,6 +10,7 @@ export interface AppSettings {
   homeAutoRotate: boolean;
   showSpeedMetric: boolean;
   largeText: boolean;
+  keepScreenAwake: boolean;
   animationsEnabled: boolean;
   autoConnectObd: boolean;
   diagnosticAlerts: boolean;
@@ -50,6 +51,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   homeAutoRotate: false,
   showSpeedMetric: false,
   largeText: true,
+  keepScreenAwake: true,
   animationsEnabled: true,
   autoConnectObd: true,
   diagnosticAlerts: true,
@@ -95,6 +97,7 @@ export async function readAppSettings(basePath: string): Promise<AppSettings> {
       homeAutoRotate: parsed.homeAutoRotate === true,
       showSpeedMetric: parsed.showSpeedMetric === true || parsed.homePrimaryMetric === 'SPEED',
       largeText: parsed.largeText !== false,
+      keepScreenAwake: parsed.keepScreenAwake !== false,
       animationsEnabled: parsed.animationsEnabled !== false,
       autoConnectObd: parsed.autoConnectObd !== false,
       diagnosticAlerts: parsed.diagnosticAlerts !== false,

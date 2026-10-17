@@ -255,6 +255,9 @@ function main() {
   assert.ok(diagnosticRules.principles?.length >= 1, 'princípios diagnósticos ausentes');
   for (const principle of diagnosticRules.principles) assert.ok(typeof principle === 'string' && principle.trim(), 'princípio diagnóstico vazio');
 
+  assert.ok(fs.existsSync(path.join(ROOT, 'src/knowledge/ai_policy.json')), 'política IA JSON ausente');
+  assert.ok(fs.existsSync(path.join(ROOT, 'src/knowledge/diagnostic_responses.json')), 'respostas IA JSON ausentes');
+
   console.log('JSON knowledge audit: OK');
 }
 

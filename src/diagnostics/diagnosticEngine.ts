@@ -1,6 +1,7 @@
 import type { DtcRecord, PidObservation, VehicleCondition } from '../types/sourceTypes';
 import ruleCatalog from '../knowledge/diagnostic_rules.json';
 import sensorTestCatalogJson from '../knowledge/sensor_tests.json';
+import * as aiPolicyJson from '../knowledge/ai_policy.json';
 
 export interface DiagnosticInput { observations: PidObservation[]; dtcs?: DtcRecord[]; condition?: VehicleCondition; }
 export interface DiagnosticEvidence { ruleId: string; text: string; source: 'DTC' | 'PID'; pid?: string; dtc?: string; value?: number; }
@@ -16,12 +17,35 @@ function linkedSensorRecommendations(ruleId: string): string[] {
  return sensorTestLinks.filter((test)=>test.diagnosticRuleIds.includes(ruleId)).slice(0,3)
   .map((test)=>test.label+' (PID '+test.pid+'): '+test.aiGuidance);
 }
-const ACTIVE_DTC_STATUSES = new Set(['CONFIRMED', 'PENDING', 'PERMANENT', 'CURRENT']);
+interface AiPolicyConfig {
+  sources?: { liveObd?: unknown };
+  observations?: { maxAgeMs?: unknown };
+  dtcs?: { activeStatuses?: unknown };
+  scoring?: { mediumAt?: unknown; highAt?: unknown; additionalEvidenceIncrement?: unknown; maxScore?: unknown };
+}
+const aiPolicy = aiPolicyJson as unknown as AiPolicyConfig;
+function policyNumber(value: unknown, fallback: number, min: number, max: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
+  return Math.max(min, Math.min(max, value));
+}
+// Falhar fechado: uma fonte configurada diferente de REAL_OBD nunca vira evidência real.
+const LIVE_OBD_SOURCE = aiPolicy.sources?.liveObd === 'REAL_OBD' ? 'REAL_OBD' : '__INVALID_AI_POLICY_SOURCE__';
+const MAX_DIAGNOSTIC_READING_AGE_MS = policyNumber(aiPolicy.observations?.maxAgeMs, 60_000, 1_000, 60_000);
+const SAFE_ACTIVE_DTC_STATUSES = new Set(['CONFIRMED', 'PENDING', 'PERMANENT', 'CURRENT']);
+const ACTIVE_DTC_STATUSES = new Set(
+  (Array.isArray(aiPolicy.dtcs?.activeStatuses) ? aiPolicy.dtcs.activeStatuses : [])
+    .filter((status): status is string => typeof status === 'string')
+    .map((status) => status.toUpperCase())
+    .filter((status) => SAFE_ACTIVE_DTC_STATUSES.has(status)),
+);
+const MEDIUM_CONFIDENCE_AT = policyNumber(aiPolicy.scoring?.mediumAt, 0.5, 0.01, 0.98);
+const HIGH_CONFIDENCE_AT_RAW = policyNumber(aiPolicy.scoring?.highAt, 0.75, 0.51, 0.99);
+const HIGH_CONFIDENCE_AT = HIGH_CONFIDENCE_AT_RAW > MEDIUM_CONFIDENCE_AT ? HIGH_CONFIDENCE_AT_RAW : Math.min(0.99, MEDIUM_CONFIDENCE_AT + 0.01);
+const ADDITIONAL_EVIDENCE_INCREMENT = policyNumber(aiPolicy.scoring?.additionalEvidenceIncrement, 0.15, 0, 0.49);
+const MAX_HYPOTHESIS_SCORE = policyNumber(aiPolicy.scoring?.maxScore, 0.99, 0.5, 0.99);
 
 function isSimulation(item: PidObservation): boolean { return String(item.source ?? '').trim().toUpperCase() === 'SIMULACAO'; }
-function isLiveObd(item: PidObservation): boolean { return String(item.source ?? '').trim().toUpperCase() === 'REAL_OBD'; }
-
-const MAX_DIAGNOSTIC_READING_AGE_MS = 60_000;
+function isLiveObd(item: PidObservation): boolean { return String(item.source ?? '').trim().toUpperCase() === LIVE_OBD_SOURCE; }
 function isFreshReading(item: PidObservation, now = Date.now()): boolean {
   const timestamp = Date.parse(item.timestamp);
   const age = now - timestamp;
@@ -30,13 +54,13 @@ function isFreshReading(item: PidObservation, now = Date.now()): boolean {
 
 function pidValue(observations: PidObservation[], pid: string): PidObservation | undefined {
   return observations
-    .filter((item) => item.pid.toUpperCase() === pid.toUpperCase() && item.value !== null && isLiveObd(item) && isFreshReading(item))
+    .filter((item) => item.pid.toUpperCase() === pid.toUpperCase() && typeof item.value === 'number' && Number.isFinite(item.value) && isLiveObd(item) && isFreshReading(item))
     .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))[0];
 }
 
 function confidence(score: number): DiagnosticHypothesis['confidence'] {
-  if (score >= 0.75) return 'HIGH';
-  if (score >= 0.5) return 'MEDIUM';
+  if (score >= HIGH_CONFIDENCE_AT) return 'HIGH';
+  if (score >= MEDIUM_CONFIDENCE_AT) return 'MEDIUM';
   return 'LOW';
 }
 
@@ -49,7 +73,7 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
   const observations = rawObservations.filter((item) => !isSimulation(item));
   const rawDtcs = input.dtcs ?? [];
   const liveDtcs = rawDtcs.filter((item) =>
-    String(item.source ?? '').trim().toUpperCase() === 'REAL_OBD'
+    String(item.source ?? '').trim().toUpperCase() === LIVE_OBD_SOURCE
     && ACTIVE_DTC_STATUSES.has(String(item.status ?? '').trim().toUpperCase()),
   );
   const blockedSimulationSamples = rawObservations.filter(isSimulation).length;
@@ -60,7 +84,7 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
   const add = (rule: Rule, evidence: DiagnosticEvidence): void => {
     const current = hypotheses.get(rule.hypothesis);
     if (current) {
-      current.score = Math.min(0.99, current.score + 0.15);
+      current.score = Math.min(MAX_HYPOTHESIS_SCORE, current.score + ADDITIONAL_EVIDENCE_INCREMENT);
       current.evidence.push(evidence);
       current.confidence = confidence(current.score);
       return;

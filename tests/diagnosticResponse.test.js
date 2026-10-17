@@ -7,7 +7,11 @@ const file = path.resolve(__dirname, '../src/diagnostics/diagnosticResponse.ts')
 const source = fs.readFileSync(file, 'utf8');
 const js = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2019 } }).outputText;
 const mod = { exports: {} };
-new Function('exports', 'require', 'module', js)(mod.exports, require, mod);
+const localRequire = (request) => {
+  if (request.endsWith('diagnostic_responses.json')) return require('../src/knowledge/diagnostic_responses.json');
+  return require(request);
+};
+new Function('exports', 'require', 'module', js)(mod.exports, localRequire, mod);
 const compose = mod.exports.composeDiagnosticResponse;
 
 const response = compose({

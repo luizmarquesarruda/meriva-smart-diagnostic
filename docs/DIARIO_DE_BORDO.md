@@ -2561,3 +2561,27 @@ Atender à necessidade de personalizar o painel sem obrigar o usuário a exibir 
 
 ### Próximo passo
 Abrir PR de rascunho baseada na PR #68, rodar CI, corrigir qualquer falha antes de ampliar a reengenharia ou declarar a implementação pronta.
+
+
+## 2026-10-17 — Política operacional da IA em JSON e Keep Awake configurável
+
+### Objetivo
+Criar arquivos JSON úteis para o raciocínio local do app e transformar o bloqueio de suspensão da tela em preferência persistida.
+
+### Alterações
+- Criados `src/knowledge/ai_policy.json` e `src/knowledge/diagnostic_responses.json`, consumidos em runtime por `diagnosticEngine.ts` e `diagnosticResponse.ts`.
+- Criados schemas JSON Schema Draft 2020-12 para os dois catálogos.
+- Criado `tests/aiKnowledgeJson.test.js` e incluído na suíte via `npm test`; o teste verifica política, fontes, limites, mapeamento entre hipóteses/respostas e a regra de que apenas evidência `RAW_ECU` pode declarar PID confirmado.
+- Frescor e scores vêm do JSON, com limites defensivos. Status DTC são lidos do catálogo e intersectados com allowlist de status ativos; fonte diferente de `REAL_OBD` não vira evidência de ECU.
+- Adicionada configuração `keepScreenAwake`, padrão ligada, em `appSettings.ts` e `app/configuracoes.tsx`. `app/_layout.tsx` observa mudanças e ativa/desativa Keep Awake sem reiniciar o aplicativo.
+- Atualizados os documentos da IA e da auditoria UX.
+
+### Proteções preservadas
+- Nenhum PID candidato foi promovido; só registros com `RAW_ECU` continuam declarados confirmados.
+- Score não é apresentado como probabilidade calibrada.
+- JSON é política/configuração do motor determinístico, não um modelo generativo.
+- Nenhum comando de escrita/atuação na ECU foi introduzido.
+
+### Verificação
+- CI #2301 no commit anterior: `validate` passou; o APK Android ainda estava em montagem no último estado observado.
+- Este commit dispara uma nova CI. O resultado completo de typecheck, suíte e APK precisa ser lido no run associado a ele; não há teste em dispositivo nem conexão física ELM327 comprovados por esta alteração.
