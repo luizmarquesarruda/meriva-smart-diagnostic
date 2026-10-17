@@ -13,6 +13,7 @@ const PERMISSIONS = [
   'android.permission.FOREGROUND_SERVICE',
   'android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE',
   'android.permission.POST_NOTIFICATIONS',
+  'android.permission.WAKE_LOCK',
 ];
 
 function requireAndroidPackage(config) {
