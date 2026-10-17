@@ -49,6 +49,8 @@ assert.equal(defaults.ioTimeoutMs, 15000);
 assert.equal(defaults.adaptiveTimeoutMaxMs, 15000);
 assert.equal(defaults.optionalAtTimeoutMs, 2500);
 assert.equal(defaults.protocolSelectionTimeoutMs, 15000);
+assert.equal(defaults.noDataReconnectThreshold, 3, 'three consecutive ECU failures must trigger recovery');
+assert.deepEqual(defaults.recoveryBackoffMs, [2000, 5000, 15000]);
 const customTimeouts = mergeCompatibilityConfig({ optionalAtTimeoutMs: 1800, protocolSelectionTimeoutMs: 9000 });
 assert.equal(customTimeouts.optionalAtTimeoutMs, 1800);
 assert.equal(customTimeouts.protocolSelectionTimeoutMs, 9000);
