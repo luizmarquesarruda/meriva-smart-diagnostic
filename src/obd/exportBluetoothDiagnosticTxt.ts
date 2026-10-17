@@ -2,10 +2,10 @@ import * as FileSystem from 'expo-file-system';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { getLastBluetoothDiagnosticText } from '../obd/bluetoothManager';
-import { getSharedObdConnection, getSharedObdLastError, getSharedObdDiagnosticContext } from '../obd/sharedConnection';
+import { getSharedObdConnection, getSharedObdLastError, getSharedObdDiagnosticContext, getSharedObdStatus } from '../obd/sharedConnection';
 import { readLearningProfile, type MerivaLearningProfile } from '../database/learningProfile';
 import { getAutoSaveState } from '../meriva/autosaveManager';
-import { runLocalDiagnostic, type DiagnosticResult } from '../diagnostics/diagnosticEngine';
+import { normalizeDiagnosticSource, runLocalDiagnostic, type DiagnosticResult } from '../diagnostics/diagnosticEngine';
 import type { PidObservation } from '../types/sourceTypes';
 
 async function readCurrentLearningProfile(): Promise<MerivaLearningProfile | null> {
@@ -39,6 +39,10 @@ function diagnosticReportLines(result: DiagnosticResult): string[] {
     `MOTOR: ${result.engine}`,
     `VERSÃO: ${result.version}`,
     `AMOSTRAS DE SIMULAÇÃO BLOQUEADAS: ${result.blockedSimulationSamples}`,
+    `AMOSTRAS DE ORIGEM NÃO ECU IGNORADAS: ${result.blockedNonLiveSamples}`,
+    `LEITURAS OBD ANTIGAS BLOQUEADAS: ${result.blockedStaleObservations}`,
+    `DTCs SEM ATUALIZAÇÃO RECENTE BLOQUEADOS: ${result.blockedStaleDtcs}`,
+    `EVIDÊNCIAS IGNORADAS POR ECU DESCONECTADA: ${result.disconnectedEvidenceIgnored ? 'SIM' : 'NÃO'}`,
   ];
   if (result.hypotheses.length === 0) {
     lines.push('NENHUMA HIPÓTESE DIAGNÓSTICA GERADA COM AS EVIDÊNCIAS DISPONÍVEIS.');
@@ -53,6 +57,10 @@ function diagnosticReportLines(result: DiagnosticResult): string[] {
       lines.push(`  PRÓXIMO TESTE: ${nextTest}`);
     }
   }
+  if (result.recommendedActions.length) {
+    lines.push('--- TAREFAS RECOMENDADAS PELO MOTOR LOCAL ---');
+    for (const action of result.recommendedActions) lines.push(`AÇÃO [${action.priority}]: ${action.title} — ${action.detail}`);
+  }
   lines.push(`NOTA: ${result.disclaimer}`);
   return lines;
 }
@@ -64,40 +72,55 @@ function buildLocalDiagnostic(): DiagnosticResult {
     name: reading.name,
     value: reading.value,
     unit: reading.unit,
-    source: reading.source === 'SIMULACAO' ? 'SIMULACAO' : 'REAL_OBD',
+    source: normalizeDiagnosticSource(reading.source, reading.status),
     timestamp: reading.timestamp,
-    confidence: reading.source === 'SIMULACAO' ? 'LOW' : 'GOOD',
+    confidence: normalizeDiagnosticSource(reading.source, reading.status) === 'REAL_OBD' ? 'GOOD' : 'LOW',
   }));
-  return runLocalDiagnostic({ observations, dtcs: state.dtcs, condition: 'UNKNOWN' });
+  const connection = getSharedObdConnection();
+  return runLocalDiagnostic({
+    observations,
+    dtcs: state.dtcs,
+    condition: 'UNKNOWN',
+    ecuConnected: Boolean(connection?.ecuValidated && getSharedObdStatus().ecuConnected),
+  });
 }
 
 function learningReportLines(profile: MerivaLearningProfile | null): string[] {
   if (!profile) return ['APRENDIZADO: PERFIL NÃO DISPONÍVEL.'];
+  const realContexts = profile.contextualData
+    .map((context) => ({
+      ...context,
+      statistics: Object.fromEntries(Object.entries(context.statistics).filter(([, stats]) =>
+        stats.realSamples > 0 && stats.seedSamples === 0 && stats.source.includes('REAL_OBD'),
+      )),
+    }))
+    .filter((context) => Object.keys(context.statistics).length > 0);
+  const learnedPidCount = Object.keys(profile.overallStatistics).filter((pid) => {
+    const stats = profile.overallStatistics[pid];
+    return stats.realSamples > 0 && stats.seedSamples === 0 && stats.source.includes('REAL_OBD');
+  }).length;
   const lines = [
     '--- O QUE O APLICATIVO APRENDEU ---',
     `STATUS: ${profile.learningStatus}`,
-    `FONTE: ${profile.source}`,
-    `SEED CARSCANNER: ${profile.seedVersion}`,
-    `AMOSTRAS SEED: ${profile.globalSampleCounts.seedSamples}`,
+    'FONTE OPERACIONAL: SOMENTE RESPOSTAS REAIS DA ECU',
     `AMOSTRAS REAIS: ${profile.globalSampleCounts.realSamples}`,
-    `AMOSTRAS TOTAIS: ${profile.globalSampleCounts.totalSamples}`,
+    `PIDs COM ESTATÍSTICA REAL RASTREÁVEL: ${learnedPidCount}`,
     `ÚLTIMA ATUALIZAÇÃO: ${profile.lastUpdated}`,
-    `PESO DO SEED: ${profile.seedWeight}`,
     `SIMULAÇÕES DETECTADAS: ${profile.dataContamination.simulationDetected}`,
     `SIMULAÇÕES FILTRADAS: ${profile.dataContamination.simulationFiltered}`,
+    'ESTATÍSTICAS SEM PROVENIÊNCIA EXCLUSIVAMENTE REAL NÃO SÃO EXIBIDAS.',
   ];
 
-  for (const context of profile.contextualData) {
-    lines.push(`CONDIÇÃO: ${context.condition} | AMOSTRAS: ${context.sampleCount} | ATUALIZAÇÃO: ${context.lastUpdate}`);
+  for (const context of realContexts) {
+    lines.push(`CONDIÇÃO: ${context.condition} | ATUALIZAÇÃO: ${context.lastUpdate}`);
     for (const [pid, stats] of Object.entries(context.statistics)) {
       lines.push(
         `  PID ${pid} | MÉDIA: ${stats.mean} | MIN: ${stats.min} | MAX: ${stats.max} | ` +
-        `DESVIO: ${stats.stddev} | AMOSTRAS: ${stats.samples} | REAIS: ${stats.realSamples} | ` +
-        `SEED: ${stats.seedSamples} | CONFIANÇA: ${stats.confidence} | FONTE: ${stats.source.join(',')}`,
+        `DESVIO: ${stats.stddev} | AMOSTRAS REAIS: ${stats.realSamples} | CONFIANÇA: ${stats.confidence}`,
       );
     }
   }
-  if (profile.contextualData.length === 0) lines.push('NENHUM DADO APRENDIDO AINDA.');
+  if (realContexts.length === 0) lines.push('NENHUMA ESTATÍSTICA COM PROVENIÊNCIA REAL SUFICIENTE.');
   return lines;
 }
 
