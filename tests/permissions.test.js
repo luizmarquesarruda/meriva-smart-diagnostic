@@ -6,6 +6,9 @@ const layout = fs.readFileSync('app/_layout.tsx', 'utf8');
 const appJson = JSON.parse(fs.readFileSync('app.json', 'utf8'));
 
 assert(source.includes('BLUETOOTH_CONNECT'));
+assert(source.includes('POST_NOTIFICATIONS'));
+assert(source.includes('requestNotificationsPermissionOnly'));
+assert(source.includes('PermissionsAndroid.request('));
 assert(source.includes('BLUETOOTH_SCAN'));
 assert(source.includes('requestForegroundPermissionsAsync'));
 assert(source.includes('APP_PRIVATE'));
