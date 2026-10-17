@@ -7,6 +7,7 @@ import { useMidLayout } from '../src/ui/midLayout';
 import * as FileSystem from 'expo-file-system';
 import { readDriveCycles } from '../src/storage/driveCycleStorage';
 import { getDriveCycleSummary, type DriveCycle } from '../src/data/driveCycles';
+import { BarChart, LineChart } from 'react-native-gifted-charts';
 
 const BASE_PATH = FileSystem.documentDirectory + 'MERIVA_SMART';
 const DAY_MS = 86_400_000;
@@ -45,6 +46,21 @@ export default function ViagensScreen() {
   }, [cycles, periodDays]);
   const summary = getDriveCycleSummary(visible);
   const selected = selectedId ? cycles.find(cycle => cycle.id === selectedId) ?? null : null;
+  const chartCycles = visible.slice(0, 7).reverse();
+  const chartLabel = (value: string) => {
+    const date = new Date(value.replace(' ', 'T'));
+    return Number.isFinite(date.getTime())
+      ? date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+      : value.slice(0, 5);
+  };
+  const distanceChartData = chartCycles
+    .filter(cycle => Number.isFinite(cycle.distanceTotalKm) && cycle.distanceTotalKm >= 0)
+    .map(cycle => ({ value: cycle.distanceTotalKm, label: chartLabel(cycle.startedAt) }));
+  const consumptionChartData = chartCycles
+    .filter(cycle => cycle.fuelDataValid !== false && cycle.fuelUsedL >= 0.05
+      && Number.isFinite(cycle.avgFuelConsumptionKml) && cycle.avgFuelConsumptionKml > 0
+      && cycle.avgFuelConsumptionKml <= 30)
+    .map(cycle => ({ value: cycle.avgFuelConsumptionKml, label: chartLabel(cycle.startedAt) }));
 
   return <SafeAreaView style={s.container} edges={['top','bottom','left','right']}>
     <ScrollView contentContainerStyle={[s.content,{paddingHorizontal:layout.horizontalPadding}]} showsVerticalScrollIndicator={false}>
@@ -58,6 +74,41 @@ export default function ViagensScreen() {
             <Metric l="DISTÂNCIA TOTAL" v={mv(summary.totalDistanceKm,'km')} />
             <Metric l="CONSUMO MÉDIO" v={summary.avgConsumptionKml > 0 ? mv(summary.avgConsumptionKml,'km/L') : 'N/D'} />
           </View>
+          {distanceChartData.length > 0 && <View style={s.chartCard}>
+            <Text style={s.section}>DISTÂNCIA POR VIAGEM — ÚLTIMAS 7</Text>
+            <BarChart
+              data={distanceChartData}
+              barWidth={18}
+              spacing={14}
+              height={135}
+              hideRules
+              yAxisThickness={0}
+              xAxisThickness={1}
+              noOfSections={3}
+              barBorderRadius={4}
+              isAnimated={false}
+              yAxisTextStyle={s.chartAxis}
+              xAxisLabelTextStyle={s.chartAxis}
+            />
+          </View>}
+          {consumptionChartData.length > 0 && <View style={s.chartCard}>
+            <Text style={s.section}>CONSUMO VÁLIDO POR VIAGEM — km/L</Text>
+            <LineChart
+              data={consumptionChartData}
+              height={135}
+              spacing={30}
+              thickness={2}
+              dataPointsRadius={3}
+              hideRules
+              yAxisThickness={0}
+              xAxisThickness={1}
+              noOfSections={3}
+              isAnimated={false}
+              yAxisTextStyle={s.chartAxis}
+              xAxisLabelTextStyle={s.chartAxis}
+            />
+            <Text style={s.chartNote}>Viagens sem cobertura válida de combustível e valores acima de 30 km/L são excluídos deste gráfico, não convertidos em zero.</Text>
+          </View>}
           <Text style={s.section}>PERÍODO</Text>
           <View style={s.filters}>
             {([{label:'TODAS',value:0},{label:'7 DIAS',value:7},{label:'30 DIAS',value:30}] as const).map(item =>
@@ -161,7 +212,7 @@ function Metric({l,v}:{l:string;v:string}) { return <View style={s.metric}><Text
 function Stat({label,value}:{label:string;value:string}) { return <View style={s.stat}><Text style={s.label}>{label}</Text><Text style={s.statValue}>{value}</Text></View>; }
 function Detail({label,value}:{label:string;value:string}) { return <View style={s.detail}><Text style={s.detailLabel}>{label}</Text><Text style={s.detailValue}>{value}</Text></View>; }
 
-const s=StyleSheet.create({
+const s=StyleSheet.create({chartCard:{backgroundColor:'#0e1b2d',borderColor:'#233a56',borderWidth:1,borderRadius:13,padding:12,marginTop:12},chartAxis:{color:'#9fb0c5',fontSize:10},chartNote:{color:'#9fb0c5',fontSize:11,lineHeight:16,marginTop:4},
   container:{flex:1,backgroundColor:'#07111f'},content:{flexGrow:1,width:'100%',paddingVertical:16,paddingBottom:34},frame:{width:'100%',alignSelf:'center'},
   eyebrow:{color:'#55d6be',fontSize:9,fontWeight:'900',letterSpacing:1.5,marginBottom:5},title:{color:'#f8fafc',fontSize:25,fontWeight:'900'},subtitle:{color:'#91a9c9',fontSize:10,fontWeight:'700',marginTop:5,marginBottom:16,lineHeight:15},
   grid:{flexDirection:'row',gap:9,marginBottom:9},metric:{flex:1,minWidth:0,backgroundColor:'#0e1b2d',borderRadius:14,borderWidth:1,borderColor:'#233a56',padding:12},label:{color:'#8196b4',fontSize:8,fontWeight:'900',letterSpacing:0.5},metricValue:{color:'#e5edf7',fontSize:15,fontWeight:'900',marginTop:6},
