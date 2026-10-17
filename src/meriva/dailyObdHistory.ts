@@ -72,6 +72,36 @@ function renderEvent(state: MerivaPersistedState, event: 'SESSION_START' | 'SESS
   return lines.join('\n');
 }
 
+/**
+ * Refuse to rewrite an existing daily history when its structure is unreadable.
+ * A malformed file is kept for recovery rather than silently replaced by the
+ * subset of pages the parser happened to recognize.
+ */
+function validateExistingDailyHistory(content: string): void {
+  if (!content.trim()) return;
+  if (!content.startsWith('MERIVA SMART DIAGNOSTIC')) {
+    throw new Error('DAILY_HISTORY_HEADER_INVALID');
+  }
+
+  const markers = Array.from(
+    content.matchAll(/^========== DIA: (\d{4}-\d{2}-\d{2}) ==========\r?$/gm),
+  );
+  if (!markers.length) {
+    if (content.trim() === HEADER.trim()) return;
+    throw new Error('DAILY_HISTORY_PAGE_MARKERS_MISSING');
+  }
+
+  for (let index = 0; index < markers.length; index += 1) {
+    const marker = markers[index];
+    const bodyStart = (marker.index ?? 0) + marker[0].length;
+    const bodyEnd = markers[index + 1]?.index ?? content.length;
+    const pageBody = content.slice(bodyStart, bodyEnd);
+    if (!/(?:^|\r?\n)========== FIM DO DIA ==========\s*$/.test(pageBody)) {
+      throw new Error('DAILY_HISTORY_PAGE_INCOMPLETE:' + marker[1]);
+    }
+  }
+}
+
 function splitPages(content: string): Map<string, string> {
   const pages = new Map<string, string>();
   // Capture apenas os marcadores de página. Não usar "$" como fim do conteúdo
@@ -100,6 +130,43 @@ function splitPages(content: string): Map<string, string> {
   return pages;
 }
 
+async function writeDailyHistoryAtomically(path: string, content: string): Promise<void> {
+  const tempPath = path + '.tmp';
+  const previousPath = path + '.previous';
+  await FileSystem.writeAsStringAsync(tempPath, content, { encoding: FileSystem.EncodingType.UTF8 });
+  const readBack = await FileSystem.readAsStringAsync(tempPath, { encoding: FileSystem.EncodingType.UTF8 });
+  if (readBack !== content) throw new Error('DAILY_HISTORY_READBACK_MISMATCH');
+
+  const currentInfo = await FileSystem.getInfoAsync(path);
+  const previousInfo = await FileSystem.getInfoAsync(previousPath);
+  if (previousInfo.exists) await FileSystem.deleteAsync(previousPath, { idempotent: true });
+  if (currentInfo.exists) await FileSystem.copyAsync({ from: path, to: previousPath });
+
+  try {
+    if (currentInfo.exists) await FileSystem.deleteAsync(path, { idempotent: true });
+    await FileSystem.moveAsync({ from: tempPath, to: path });
+  } catch (error) {
+    const targetInfo = await FileSystem.getInfoAsync(path);
+    let targetIsComplete = false;
+    if (targetInfo.exists && !targetInfo.isDirectory) {
+      try {
+        targetIsComplete = (await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 })) === content;
+      } catch {
+        targetIsComplete = false;
+      }
+    }
+    if (targetInfo.exists && !targetIsComplete) {
+      await FileSystem.deleteAsync(path, { idempotent: true });
+    }
+    const backupInfo = await FileSystem.getInfoAsync(previousPath);
+    const targetAfterCleanup = await FileSystem.getInfoAsync(path);
+    if (!targetIsComplete && !targetAfterCleanup.exists && backupInfo.exists) {
+      await FileSystem.copyAsync({ from: previousPath, to: path });
+    }
+    throw error;
+  }
+}
+
 async function appendDailyObdSessionEventUnsafe(
   basePath: string,
   state: MerivaPersistedState,
@@ -120,6 +187,7 @@ async function appendDailyObdSessionEventUnsafe(
     content = await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 });
   }
 
+  validateExistingDailyHistory(content);
   const pages = splitPages(content);
   const previousEvents = pages.get(date) ?? '';
   const updatedEvents = [previousEvents, renderEvent(state, event, timestamp)].filter(Boolean).join('\n\n');
@@ -132,7 +200,8 @@ async function appendDailyObdSessionEventUnsafe(
   for (const day of sortedDates) {
     output.push('', `========== DIA: ${day} ==========`, pages.get(day) ?? '', `========== FIM DO DIA ==========`);
   }
-  await FileSystem.writeAsStringAsync(path, `${output.join('\n')}\n`, { encoding: FileSystem.EncodingType.UTF8 });
+  const serialized = `${output.join('\n')}\n`;
+  await writeDailyHistoryAtomically(path, serialized);
   return { date, eventCount };
 }
 
