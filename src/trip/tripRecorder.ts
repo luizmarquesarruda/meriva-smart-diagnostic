@@ -243,7 +243,7 @@ export class RealTripRecorder {
       fuelMethod: this.fuelRateSources.size === 1
         ? [...this.fuelRateSources][0]
         : this.fuelRateSources.size > 1 ? 'MIXED' : 'UNAVAILABLE',
-      fuelUncertaintyPct: this.fuelRateSources.size === 0 ? null
+      fuelUncertaintyPct: !fuelDataValid || this.fuelRateSources.size === 0 ? null
         : this.fuelRateSources.size > 1 ? 40
         : this.fuelRateSources.has('MEASURED_015E') ? 5
         : this.fuelRateSources.has('ESTIMATED_MAF') ? 30 : 50,
