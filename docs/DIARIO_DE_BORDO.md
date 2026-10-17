@@ -2619,3 +2619,35 @@ Incluir no aplicativo uma biblioteca de validação JSON Schema e usá-la nos ca
 
 ### Verificação
 A CI que será disparada após esta consolidação deve confirmar typecheck, testes, Expo prebuild e build de APK Android. A existência do pacote no lockfile foi confirmada após a execução de instalação; a integração final ainda depende do resultado da CI. Sem teste em dispositivo Android e sem sessão física ELM327 nesta etapa.
+
+
+## 2026-10-17 — Bibliotecas prioritárias: SQLite histórico e gráficos de viagens
+
+### Problema e prioridade
+A persistência estruturada ainda não existia no aplicativo; JSON/TXT funcionavam para recuperação e leitura humana, mas não forneciam consultas indexadas para séries por PID, DTCs, viagens e resultados de teste. Foram adicionadas dependências alinhadas ao Expo SDK 51, em vez de atualizar o framework em conjunto.
+
+### Implementação
+- Declaradas `expo-sqlite@~14.0.6`, `expo-linear-gradient@~13.0.2`, `react-native-svg@15.2.0` e `react-native-gifted-charts@1.4.47`.
+- Criado `src/database/diagnosticDatabase.ts` com migração versionada v1, conexão compartilhada, WAL, chaves/índices por data e PID, restrições de origem e consultas parametrizadas.
+- Criadas tabelas para amostras PID, DTCs, viagens, telemetria de viagem, sessões/resultados de teste de sensores e execuções de diagnóstico.
+- Inicialização SQLite no layout raiz é não bloqueante. O autosave JSON, logs CSV e TXT permanecem preservados; uma falha SQLite não deve interromper a aquisição serial OBD.
+- Leituras finitas com status RESPONDEU entram em uma fila assíncrona a cada 5 s por PID/origem. DTCs são espelhados depois do autosave principal; apenas viagens com origem REAL_OBD são indexadas. Relatórios de sensores continuam exportando TXT, com cópia estruturada quando a ECU real foi validada.
+- Adicionados gráficos de distância (últimas sete viagens reais) e consumo (apenas cobertura válida; exclui valores acima de 30 km/L), com política separada em `src/trip/tripChartData.ts`.
+- Adicionados testes Node de contrato para SQLite e política dos gráficos e incluídos no comando `npm test`.
+
+### Proveniência e recuperação
+- `REAL_OBD`, `SIMULACAO`, `CARSCANNER_BASELINE`, `USER_REAL_OBSERVATION` e `IMPORTADO` permanecem fontes distintas.
+- Nenhum PID candidato foi promovido a confirmado e nenhum comando de escrita/atuação na ECU foi acrescentado.
+- Nenhum JSON/CSV/TXT histórico foi apagado ou migrado de forma destrutiva. Importação histórica idempotente fica para uma etapa separada.
+- SQLite é complementar até conclusão da validação nativa e teste em aparelho; não é declarada migração total do armazenamento.
+
+### Validação
+- Criado `tests/diagnosticDatabase.test.js` usando mock da API Expo SQLite; ele verifica contrato da camada JavaScript, não um banco nativo real.
+- Criado `tests/tripChartData.test.js` para verificar fontes, limite das sete viagens, cobertura de combustível e valores implausíveis.
+- **CI, TypeScript, suíte completa e build Android: A CONFIRMAR após os commits desta mudança.**
+- **NÃO EXECUTADOS nesta etapa:** instalação do APK em aparelho, persistência após reiniciar o app, conexão física Meriva + ELM327 e validação de uso prolongado.
+
+### Próximos passos
+1. Executar e acompanhar a CI canônica; corrigir erros reais de typecheck/testes/Gradle.
+2. Remover o workflow temporário de sincronização de lockfile após confirmar que `package-lock.json` contém todas as dependências.
+3. Validar banco nativo e charts no APK standalone. Depois disso, planejar importação idempotente dos históricos existentes, sem trocar o JSON como fonte de recuperação antes da validação.
