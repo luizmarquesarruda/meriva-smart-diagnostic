@@ -2464,3 +2464,24 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Limitações: Expo FileSystem não expõe fsync portátil; o fluxo usa leitura de verificação, backup e move com restauração, mas isso não é uma garantia formal de atomicidade de hardware. SQLite/WAL e schema_migrations continuam pendentes.
 - Bloqueio de fixture: o arquivo original scripts/verify_autosave.py e o autosave real 11–16/10 não foram encontrados nos arquivos acessíveis nesta etapa. Não foi criada uma implementação presumida que pudesse divergir do verificador que o usuário já usa.
 - Status: PENDENTE; sem teste físico com Meriva/ELM327.
+
+
+## 2026-10-17 — Reconciliar falha observada na CI #2227
+
+### Evidência
+A execução GitHub Actions #2227 da PR #65 terminou com:
+- `npm ci`: sucesso;
+- `npm run doctor`: 17/17 verificações;
+- `npm run typecheck`: passou (a suíte continuou para `npm test`);
+- `npm test`: falhou em `tests/bluetoothConfig.test.js:62`;
+- `android-build`: ignorado após falha de validação.
+
+Mensagem: o teste exigia o texto `lifecycle = 'DISCONNECTED'`, enquanto o código centraliza a mudança em `setLifecycle('DISCONNECTED')`. O comportamento tinha a chamada do setter; o contrato textual do teste ficou preso à forma antiga de implementação.
+
+### Correção mínima
+O teste agora aceita a transição por `setLifecycle('DISCONNECTED')` ou a atribuição direta legada e mantém a checagem semântica do estado. Nenhum código de conexão foi alterado para satisfazer um teste estático.
+
+### Estado
+- Commit de correção no branch desta PR: `a43050b7`.
+- A mesma revisão de teste foi propagada às branches empilhadas de SQLite e serviço Android para que os diffs não reintroduzam o teste obsoleto.
+- O commit usa `[skip ci]`; **não foi solicitada nova CI**. Portanto, a correção é plausível a partir da evidência, mas ainda não foi verificada por uma execução nova.
