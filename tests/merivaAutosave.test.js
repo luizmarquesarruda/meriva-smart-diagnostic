@@ -592,7 +592,7 @@ test('10. exportação TXT legível, sem inventar valores', async () => {
   const shared = formatter.formatAutoSaveTxt(m.getAutoSaveState(), { ...opts, shared: true });
   assert.ok(!shared.includes('2457I8336IYIZ'));
   assert.ok(!shared.includes('OBDII'));
-  assert.ok(!shared.includes('VIN:'));
+  assert.ok(shared.includes('VIN: [REDACTED]'));
   m.disposeAutoSave();
 });
 
