@@ -2629,9 +2629,9 @@ A persistência estruturada ainda não existia no aplicativo; JSON/TXT funcionav
 ### Implementação
 - Declaradas `expo-sqlite@~14.0.6`, `expo-linear-gradient@~13.0.2`, `react-native-svg@15.2.0` e `react-native-gifted-charts@1.4.47`.
 - Criado `src/database/diagnosticDatabase.ts` com migrações v1/v2, conexão compartilhada, WAL, chaves/índices por data e PID, restrições de origem e consultas parametrizadas. O arquivo usado é `meriva_diagnostics.db`, definido em `src/knowledge/sqlite_policy.json`.
-- Criadas tabelas para amostras PID, DTCs, viagens, telemetria de viagem, sessões/resultados de teste de sensores e execuções de diagnóstico.
-- Inicialização SQLite no layout raiz é não bloqueante. O autosave JSON, logs CSV e TXT permanecem preservados; uma falha SQLite não deve interromper a aquisição serial OBD.
-- Leituras finitas com status RESPONDEU entram em uma fila assíncrona a cada 5 s por PID/origem. DTCs são espelhados depois do autosave principal; apenas viagens com origem REAL_OBD são indexadas. Relatórios de sensores continuam exportando TXT, com cópia estruturada quando a ECU real foi validada.
+- Criadas tabelas para amostras PID, consultas OBD completas (inclusive falhas), DTCs, viagens, telemetria de viagem, sessões/resultados de teste de sensores e execuções de diagnóstico.
+- Inicialização SQLite no layout raiz é não bloqueante. O autosave JSON, logs CSV e TXT permanecem preservados; uma falha SQLite não deve interromper a aquisição serial OBD. A política `sqlite_policy.json` define limite de 500 gravações pendentes e cooldown de retentativa de abertura de 15 s.
+- Cada consulta OBD é armazenada na tabela `telemetry_samples` de forma assíncrona, mantendo status, protocolo, latência e TX/RX brutos inclusive quando há timeout/NO DATA. O índice `pid_samples` adicional salva respostas numéricas finitas uma vez a cada 5 s por PID/origem. DTCs são espelhados depois do autosave principal; apenas viagens com origem REAL_OBD são indexadas. Relatórios de sensores continuam exportando TXT, com cópia estruturada quando a ECU real foi validada.
 - Adicionados gráficos de distância (últimas sete viagens reais) e consumo (apenas cobertura válida; exclui valores acima de 30 km/L), com política separada em `src/trip/tripChartData.ts`.
 - Adicionados testes Node de contrato para SQLite e política dos gráficos e incluídos no comando `npm test`.
 
@@ -2644,6 +2644,7 @@ A persistência estruturada ainda não existia no aplicativo; JSON/TXT funcionav
 ### Validação
 - Criado `tests/diagnosticDatabase.test.js` usando mock da API Expo SQLite; ele verifica contrato da camada JavaScript, não um banco nativo real.
 - Criado `tests/tripChartData.test.js` para verificar fontes, limite das sete viagens, cobertura de combustível e valores implausíveis.
+- Adicionado painel na tela Histórico e Dados para visualizar estado, versão do schema, contagens, fila pendente e amostras descartadas do índice secundário.
 - **CI, TypeScript, suíte completa e build Android: A CONFIRMAR após os commits desta mudança.**
 - **NÃO EXECUTADOS nesta etapa:** instalação do APK em aparelho, persistência após reiniciar o app, conexão física Meriva + ELM327 e validação de uso prolongado.
 
