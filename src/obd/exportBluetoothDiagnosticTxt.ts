@@ -1,8 +1,7 @@
 import * as FileSystem from 'expo-file-system';
-import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { getLastBluetoothDiagnosticText } from '../obd/bluetoothManager';
-import { getSharedObdConnection, getSharedObdLastError, getSharedObdDiagnosticContext } from '../obd/sharedConnection';
+import { getSharedObdConnection, getSharedObdLastError, getSharedObdDiagnosticContext, getSharedObdStatus } from '../obd/sharedConnection';
 import { readLearningProfile, type MerivaLearningProfile } from '../database/learningProfile';
 import { getAutoSaveState } from '../meriva/autosaveManager';
 import { getAppBuildInfo } from '../meriva/buildInfo';
