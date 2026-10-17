@@ -435,6 +435,21 @@ async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm3
     lastConnectionError = null;
     setLifecycle('READY');
     startBluetoothMonitor();
+    // ATRV é tensão do adaptador; PID 0142 (quando suportado) permanece como
+    // fonte preferencial da tensão informada pela ECU.
+    updateAutoSaveState((state) => {
+      state.lastReadings = state.lastReadings.filter((reading) => reading.pid !== 'ATRV');
+    });
+    void active.session.queryAdapterVoltage().then(({ voltage }) => {
+      if (voltage == null || getSharedObdConnection()?.session !== active.session) return;
+      const timestamp = new Date().toISOString();
+      updateAutoSaveState((state) => {
+        state.lastReadings = [
+          { pid: 'ATRV', name: 'Tensão do adaptador', value: voltage, unit: 'V', status: 'RESPONDEU', timestamp, source: 'REAL' },
+          ...state.lastReadings.filter((reading) => reading.pid !== 'ATRV'),
+        ].slice(0, 200);
+      });
+    }).catch((error) => console.warn('[obd] leitura ATRV falhou:', error instanceof Error ? error.message : error));
     // Cada sessão validada relê modos 03/07/0A. O scan é assíncrono e usa a
     // mesma fila ELM; falha de DTC não derruba uma conexão ECU já validada.
     void refreshDtcSession(`${FileSystem.documentDirectory}MERIVA_SMART`, active.session)
