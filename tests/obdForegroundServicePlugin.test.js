@@ -111,6 +111,7 @@ async function main() {
   assert.ok(permissions.includes('android.permission.FOREGROUND_SERVICE'));
   assert.ok(permissions.includes('android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE'));
   assert.ok(permissions.includes('android.permission.POST_NOTIFICATIONS'));
+  assert.ok(permissions.includes('android.permission.WAKE_LOCK'));
   assert.strictEqual(
     permissions.filter((item) => item === 'android.permission.POST_NOTIFICATIONS').length,
     1,
@@ -138,6 +139,11 @@ async function main() {
   assert.match(serviceSource, /startForeground/);
   assert.match(serviceSource, /FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE/);
   assert.match(serviceSource, /NotificationChannel/);
+  assert.match(serviceSource, /PARTIAL_WAKE_LOCK/);
+  assert.match(serviceSource, /acquireCpuWakeLock\(\)/);
+  assert.match(serviceSource, /releaseCpuWakeLock\(\)/);
+  assert.match(serviceSource, /cpuWakeLock\.acquire\(\)/);
+  assert.match(serviceSource, /cpuWakeLock\.release\(\)/);
   assert.match(bridgeSource, /getName\(\)[\s\S]*ObdForegroundService/);
   assert.match(bridgeSource, /startForegroundService/);
   assert.match(packageSource, /new ObdForegroundServiceModule/);
