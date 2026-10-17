@@ -90,7 +90,7 @@ export default function TestesSensoresScreen(){
      try{
       const {saveSensorTestRun}=await import('../src/database/diagnosticDatabase');
       await saveSensorTestRun({
-       id:path.split('/').pop()?.replace(/\\.txt$/,'')??('sensor-test-'+Date.now()),
+       id:path.split('/').pop()?.replace(/\.txt$/,'')??('sensor-test-'+Date.now()),
        mode,
        startedAt:new Date(runStartedAt.current).toISOString(),
        finishedAt:new Date().toISOString(),
