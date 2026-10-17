@@ -130,7 +130,7 @@ function splitPages(content: string): Map<string, string> {
   return pages;
 }
 
-async function writeDailyHistoryAtomically(path: string, content: string): Promise<void> {
+async function writeDailyHistoryRecoverably(path: string, content: string): Promise<void> {
   const tempPath = path + '.tmp';
   const previousPath = path + '.previous';
   await FileSystem.writeAsStringAsync(tempPath, content, { encoding: FileSystem.EncodingType.UTF8 });
@@ -226,7 +226,7 @@ async function appendDailyObdSessionEventUnsafe(
     output.push('', `========== DIA: ${day} ==========`, pages.get(day) ?? '', `========== FIM DO DIA ==========`);
   }
   const serialized = `${output.join('\n')}\n`;
-  await writeDailyHistoryAtomically(path, serialized);
+  await writeDailyHistoryRecoverably(path, serialized);
   return { date, eventCount };
 }
 
