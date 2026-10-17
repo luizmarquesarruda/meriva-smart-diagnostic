@@ -2501,3 +2501,24 @@ Adicionar consultas e persistência local estruturada sem trocar o histórico TX
 1. Revisar e testar o store SQLite, em especial o carregamento nativo no APK SDK 51 e a pressão de gravações no polling.
 2. Adicionar serviço Android nativo via config plugin separado; testar a integração com o ciclo real de conexão/desconexão e garantir que não abra um segundo socket Bluetooth concorrente.
 3. Só migrar qualquer fonte existente após relatório de reconciliação e backup confirmado.
+
+
+## 2026-10-17 — Reconciliar falha observada na CI #2227
+
+### Evidência
+A execução GitHub Actions #2227 da PR #65 terminou com:
+- `npm ci`: sucesso;
+- `npm run doctor`: 17/17 verificações;
+- `npm run typecheck`: passou (a suíte continuou para `npm test`);
+- `npm test`: falhou em `tests/bluetoothConfig.test.js:62`;
+- `android-build`: ignorado após falha de validação.
+
+Mensagem: o teste exigia o texto `lifecycle = 'DISCONNECTED'`, enquanto o código centraliza a mudança em `setLifecycle('DISCONNECTED')`. O comportamento tinha a chamada do setter; o contrato textual do teste ficou preso à forma antiga de implementação.
+
+### Correção mínima
+O teste agora aceita a transição por `setLifecycle('DISCONNECTED')` ou a atribuição direta legada e mantém a checagem semântica do estado. Nenhum código de conexão foi alterado para satisfazer um teste estático.
+
+### Estado
+- Commit de correção no branch desta PR: `a43050b7`.
+- A mesma revisão de teste foi propagada às branches empilhadas de SQLite e serviço Android para que os diffs não reintroduzam o teste obsoleto.
+- O commit usa `[skip ci]`; **não foi solicitada nova CI**. Portanto, a correção é plausível a partir da evidência, mas ainda não foi verificada por uma execução nova.
