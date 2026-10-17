@@ -389,6 +389,7 @@ export default function LaboratorioScreen() {
       if (mode === 'REAL') {
         const existing = await readDtcs(getBasePath());
         const now = new Date().toISOString();
+        const sessionId = `manual-mode03-${Date.now()}`;
         const records: DtcRecord[] = codes.map((code) => {
           const previous = existing.find((item) => item.code === code);
           return {
@@ -401,12 +402,19 @@ export default function LaboratorioScreen() {
             source: 'REAL_OBD',
             historical: false,
             confirmed: true,
+            validation: 'REVALIDATED_IN_SESSION',
+            validatedAt: now,
+            sessionId,
           };
         });
 
         for (const record of records) await recordDtc(getBasePath(), record);
+        const observedCodes = new Set(records.map((item) => item.code));
         updateAutoSaveState((state) => {
-          state.dtcs = records.length ? records : existing;
+          state.dtcs = [
+            ...records,
+            ...state.dtcs.filter((item) => !observedCodes.has(item.code)),
+          ];
         });
         await forceSaveOnObdEvent();
       }
