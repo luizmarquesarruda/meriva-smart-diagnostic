@@ -2617,3 +2617,5 @@ A política `src/knowledge/sqlite_policy.json` explicita que a tabela `telemetry
 - Adicionado limite de 500 gravações pendentes configurado em `src/knowledge/sqlite_policy.json`, com aviso limitado a um por minuto.
 - Quando a fila enche, a nova amostra não é adicionada ao índice SQLite; CSV/TXT canônicos continuam independentes. A tela de armazenamento mostra profundidade da fila e contagem de amostras não indexadas durante a execução atual.
 - Teste criado com SQLite artificialmente bloqueado para verificar o teto, a amostra omitida e a recuperação da fila. **Não executado**; sem disparo de CI.
+
+- `droppedSamples` é contador em memória da execução atual e reinicia com o processo; não é um contador histórico. Para reconciliação completa, usar os TXT/CSV canônicos que permanecem independentes.
