@@ -9,8 +9,17 @@ import * as FileSystem from 'expo-file-system';
 import { autoTripService } from '../src/trip/autoTripService';
 import { requestAllRequiredPermissions } from '../src/permissions/permissionManager';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { initializeDiagnosticDatabase } from '../src/database/diagnosticDatabase';
 
 export default function RootLayout() {
+  // SQLite começa em paralelo; falha no índice estruturado não bloqueia Bluetooth,
+  // telemetria ou o autosave JSON/TXT existente.
+  useEffect(() => {
+    void initializeDiagnosticDatabase().catch((error) => {
+      console.warn('[SQLite] Banco estruturado indisponível; JSON/TXT continuam ativos:', error instanceof Error ? error.message : error);
+    });
+  }, []);
+
   // O keep-awake respeita a preferência persistida e reage às mudanças sem reiniciar o app.
   useEffect(() => {
     const tag = 'meriva-smart-diagnostic-active';
