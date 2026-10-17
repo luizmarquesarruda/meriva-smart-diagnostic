@@ -2481,6 +2481,7 @@ Adicionar consultas e persistência local estruturada sem trocar o histórico TX
 - `src/knowledge/sqlite_policy.json`: política aditiva, taxonomia de origem e retenção sem exclusão automática.
 - `src/database/sqliteTelemetryStore.ts`: schema versionado, telemetria estruturada, TX/RX brutos e health snapshot.
 - `src/meriva/autosaveIntegration.ts`: índice SQLite é escrito de forma assíncrona; o store não é aguardado pelo polling do ELM327.
+- `app/armazenamento.tsx`: status SQLite visível, schema/versão/count e botão para verificar novamente.
 - `tests/sqliteTelemetryStore.test.js`: contrato de migrações, separação REAL_OBD/SIMULACAO, TX/RX, falhas e health.
 - `docs/SQLITE_TELEMETRIA.md`: esquema, regras de integridade e validação pendente.
 
