@@ -61,6 +61,7 @@ export default function SaudeScreen() {
     <Text style={styles.section}>HIPÓTESES LOCAIS</Text>
     {!diagnostic.hypotheses.length?<View style={styles.empty}><Text style={styles.emptyText}>Ainda não há evidência suficiente para gerar hipótese.</Text></View>:diagnostic.hypotheses.map(h=><View key={h.id} style={styles.hyp}><View style={styles.rowHead}><Text style={styles.name}>{h.label}</Text><Text style={styles.score}>{Math.round(h.score*100)}%</Text></View><Text style={styles.detail}>CONFIANÇA: {h.confidence}</Text>{h.evidence.map((e,i)=><Text key={i} style={styles.evidence}>• {e.text}</Text>)}<Text style={styles.next}>PRÓXIMOS TESTES: {h.nextTests.join(' • ')}</Text></View>)}
     {diagnostic.blockedNonLiveSamples>0?<Text style={styles.detail}>LEITURAS DE ORIGEM NÃO ECU IGNORADAS: {diagnostic.blockedNonLiveSamples}.</Text>:null}
+    {diagnostic.recommendedActions.map(action=><Text key={action.id} style={styles.next}>{action.priority}: {action.title} — {action.detail}</Text>)}
     {diagnostic.blockedStaleObservations>0?<Text style={styles.detail}>LEITURAS ANTIGAS IGNORADAS: {diagnostic.blockedStaleObservations}.</Text>:null}
     {diagnostic.blockedStaleDtcs>0?<Text style={styles.detail}>DTCs SEM ATUALIZAÇÃO RECENTE IGNORADOS: {diagnostic.blockedStaleDtcs}.</Text>:null}
     {diagnostic.disconnectedEvidenceIgnored?<Text style={styles.detail}>SEM RESPOSTA DA ECU: evidências OBD armazenadas não foram usadas como diagnóstico atual.</Text>:null}
