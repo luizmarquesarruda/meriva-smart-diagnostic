@@ -13,9 +13,11 @@ import { pushLastReading, updateAutoSaveState, scheduleCriticalSave } from './au
 import { shouldFeedLearning } from './autosaveValidation';
 import { getVehicleConditionSnapshot, recordLivePidQuery } from '../obd/liveTelemetry';
 import pollingPolicy from '../knowledge/polling_policy.json';
+import { appendLinkEvent } from '../obd/linkEventStore';
 
 const lastLearningPersistedAt = new Map<string, number>();
 const LEARNING_SAMPLE_MIN_INTERVAL_MS = pollingPolicy.learningSampleMinIntervalMs;
+let consecutiveRealQueryFailures = 0;
 
 // Learning/profile file I/O must not hold the serial OBD polling loop. Mutations
 // are serialized so simultaneous PIDs cannot overwrite each other's profile updates.
@@ -59,6 +61,28 @@ export async function registerObdQuery(
   }
 
   recordLivePidQuery(result, source);
+
+  if (source === 'REAL') {
+    const responseText = String(result.rx ?? '').toUpperCase();
+    const succeeded = result.commandStatus === 'OK' && result.parsed.status === 'RESPONDEU';
+    consecutiveRealQueryFailures = succeeded ? 0 : consecutiveRealQueryFailures + 1;
+    const cause = succeeded ? 'PID_RESPONSE'
+      : responseText.includes('TIMEOUT') || result.commandStatus === 'TIMEOUT' ? 'TIMEOUT'
+      : responseText.includes('NO DATA') ? 'NO_DATA'
+      : responseText.includes('BUS INIT') || responseText.includes('BUS ERROR') ? 'BUS_INIT_ERROR'
+      : responseText.includes('UNABLE TO CONNECT') ? 'UNABLE_TO_CONNECT'
+      : responseText.includes('SOCKET') || responseText.includes('CLOSED') ? 'SOCKET'
+      : 'STATE_CHANGE';
+    void appendLinkEvent(basePath, {
+      timestamp: new Date().toISOString(),
+      state: succeeded ? 'ECU_RESPONDING' : 'ADAPTER_NO_ECU_RESPONSE',
+      cause,
+      consecutiveFailures: consecutiveRealQueryFailures,
+      latencyMs: result.elapsedMs,
+      pid: result.parsed.pid,
+      ...(result.parsed.pid === '0142' && result.parsed.value != null ? { adapterVoltageV: result.parsed.value } : {}),
+    }).catch((error) => console.warn('[link-event] PID event failed:', error instanceof Error ? error.message : error));
+  }
 
   pushLastReading({
     pid: result.parsed.pid,
