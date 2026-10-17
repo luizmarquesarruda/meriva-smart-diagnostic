@@ -52,7 +52,7 @@ function buildIntegrityFooter(body: string, blockCount: number): string {
 function verifyIntegrityFooter(content: string): boolean {
   const match = content.match(/\nBLOCKS:\s*(\d+)\nBYTES:\s*(\d+)\nSHA256:\s*([a-f0-9]{64})\n?$/i);
   if (!match) return false;
-  const body = content.slice(0, match.index);
+  const body = content.slice(0, match.index ?? 0);
   return Number(match[2]) === utf8ByteLength(body) && match[3].toLowerCase() === sha256Hex(body);
 }
 /**
@@ -149,6 +149,8 @@ async function appendAutoSaveHistoryUnsafe(
   const readBack = await FileSystem.readAsStringAsync(tmpPath, { encoding: FileSystem.EncodingType.UTF8 });
   if (readBack !== output || !verifyIntegrityFooter(readBack)) throw new Error('AUTOSAVE_HISTORY_INTEGRITY_FAILED');
   const currentInfo = await FileSystem.getInfoAsync(path);
+  const previousInfo = await FileSystem.getInfoAsync(previousPath);
+  if (previousInfo.exists) await FileSystem.deleteAsync(previousPath, { idempotent: true });
   if (currentInfo.exists) await FileSystem.copyAsync({ from: path, to: previousPath });
   try {
     if (currentInfo.exists) await FileSystem.deleteAsync(path, { idempotent: true });
