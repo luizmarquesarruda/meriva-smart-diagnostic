@@ -479,7 +479,7 @@ test('7b. histórico autosave elimina duplicatas legadas e serializa gravações
   assert.deepStrictEqual(finalNumbers, [...finalNumbers].sort((a, b) => a - b), 'snapshots devem permanecer em ordem crescente');
   assert.ok(finalNumbers.every((number, index) => index === 0 || number === finalNumbers[index - 1] + 1), 'numeração deve ser consecutiva sem lacunas');
   const persisted = files.get(target);
-  const footer = persisted.match(/\nBLOCKS:\s*(\d+)\nBYTES:\s*(\d+)\nSHA256:\s*([a-f0-9]{64})\n?$/i);
+  const footer = persisted.match(/BLOCKS:\s*(\d+)\nBYTES:\s*(\d+)\nSHA256:\s*([a-f0-9]{64})\n?$/i);
   assert.ok(footer, 'arquivo deve terminar com rodapé de integridade');
   const body = persisted.slice(0, footer.index);
   const sha = loadTs(path.join(ROOT, 'src/meriva/sha256.ts'));
@@ -487,6 +487,47 @@ test('7b. histórico autosave elimina duplicatas legadas e serializa gravações
   assert.strictEqual(Number(footer[2]), Buffer.byteLength(body, 'utf8'));
   assert.strictEqual(footer[3], sha.sha256Hex(body));
 
+});
+
+test('7b2. histórico corrompido ou bloco incompleto é preservado sem reescrita', async () => {
+  resetFS();
+  const history = loadTs(path.join(ROOT, 'src/meriva/autosaveHistoryTxt.ts'));
+  const state = loadTs(path.join(ROOT, 'src/meriva/autosaveState.ts')).createEmptyMerivaState();
+  const target = CONFIG_DIR + '/meriva_smart_autosave_history.txt';
+  const body = [
+    'MERIVA SMART DIAGNOSTIC',
+    'HISTÓRICO DE SALVAMENTOS AUTOMÁTICOS',
+    '=== SALVAMENTO_BEGIN ===',
+    'NÚMERO: 1',
+    'MOTIVO: manual',
+    '[HISTORY]',
+    'N/D',
+    '=== SALVAMENTO_END ===',
+    '',
+  ].join('\n');
+  const corruptFooter = body + 'BLOCKS: 1\nBYTES: 999\nSHA256: ' + '0'.repeat(64) + '\n';
+  files.set(target, corruptFooter);
+  await assert.rejects(
+    history.appendAutoSaveHistory(BASE, state, '1.0.1', 'corrupt-footer'),
+    /AUTOSAVE_HISTORY_INTEGRITY_FAILED/,
+  );
+  assert.strictEqual(files.get(target), corruptFooter, 'hash inválido não pode substituir/apagar o histórico anterior');
+
+  const incomplete = [
+    'MERIVA SMART DIAGNOSTIC',
+    'HISTÓRICO DE SALVAMENTOS AUTOMÁTICOS',
+    '=== SALVAMENTO_BEGIN ===',
+    'NÚMERO: 2',
+    'MOTIVO: interrupted-write',
+    '[HISTORY]',
+    'N/D',
+  ].join('\n');
+  files.set(target, incomplete);
+  await assert.rejects(
+    history.appendAutoSaveHistory(BASE, state, '1.0.1', 'incomplete-legacy'),
+    /AUTOSAVE_HISTORY_BLOCK_STRUCTURE_FAILED/,
+  );
+  assert.strictEqual(files.get(target), incomplete, 'bloco incompleto legado deve ser preservado para recuperação');
 });
 
 test('7c. mudança de combustível é publicada sem reler configurações a cada PID', async () => {
