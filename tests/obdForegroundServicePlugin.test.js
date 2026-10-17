@@ -107,6 +107,7 @@ async function main() {
   );
   assert.ok(permissions.includes('android.permission.FOREGROUND_SERVICE'));
   assert.ok(permissions.includes('android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE'));
+  assert.ok(permissions.includes('android.permission.POST_NOTIFICATIONS'));
 
   const service = transformState.manifest.manifest.application[0].service;
   assert.strictEqual(service.length, 1);
