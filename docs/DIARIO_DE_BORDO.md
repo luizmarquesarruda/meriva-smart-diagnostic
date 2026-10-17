@@ -2501,3 +2501,15 @@ O gerador calculava BYTES/SHA-256 sobre o corpo completo terminando em newline; 
 
 ### Estado de validação
 A correção e os testes foram gravados nesta branch e propagados para as branches empilhadas de SQLite e serviço Android. **Os testes não foram executados e não houve nova CI**; a causa foi identificada estaticamente a partir do código e do teste da suíte. Não declarar a correção como validada até executar a suíte numa janela autorizada.
+
+
+## 2026-10-17 — Preservar o histórico diário sem corte artificial
+
+### Achado
+`src/meriva/dailyObdHistory.ts` mantinha `MAX_DAYS = 365` e `.slice(-MAX_DAYS)`, descartando a página diária mais antiga ao passar de um ano. Isso contradiz o requisito do projeto de uma página lógica por data sem limite fixo de páginas.
+
+### Correção
+Removido o limite artificial: as páginas são ordenadas por data e todas são gravadas novamente. Não foi habilitada limpeza automática do banco SQLite nem importação destrutiva.
+
+### Regressão adicionada
+Um teste gera 366 datas distintas e verifica que a primeira e a última continuam no TXT após acrescentar um evento. O teste **não foi executado**; commit inclui `[skip ci]` e não houve novo workflow.
