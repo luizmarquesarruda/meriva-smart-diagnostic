@@ -18,7 +18,7 @@ assert.match(config, /Alternar indicadores automaticamente/);
 assert.match(config, /Textos e botões maiores/);
 assert.match(config, /Animações suaves da interface/);
 assert.match(settings, /keepScreenAwake: true/, 'tela ligada deve continuar habilitada por padrão');
-assert.match(config, /settings\\.keepScreenAwake/);
+assert.match(config, /settings\.keepScreenAwake/);
 assert.match(config, /Manter tela ligada enquanto o aplicativo estiver aberto/);
 assert.match(fs.readFileSync('app/_layout.tsx', 'utf8'), /subscribeAppSettings/);
 for (const file of fs.readdirSync('app').filter((name) => name.endsWith('.tsx') && name !== '_layout.tsx')) {
