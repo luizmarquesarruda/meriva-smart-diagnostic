@@ -14,7 +14,8 @@ import { getDtcDefinition } from '../src/obd/dtcDefinition';
 import { getSharedObdConnection, getSharedObdStatus, setSharedObdConnection, subscribeSharedObd, disconnectSharedObd } from '../src/obd/sharedConnection';
 import { autoTripService } from '../src/trip/autoTripService';
 import { getMidLayout } from '../src/ui/midLayout';
-import { scanDtcServices, readFreezeFrame, type DtcServiceScan } from '../src/obd/dtcScanner';
+import { scanDtcServices, type DtcServiceScan } from '../src/obd/dtcScanner';
+import { refreshDtcSession } from '../src/obd/dtcSessionService';
 import { getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
 
 import { DtcRecord, nextDtcOccurrences, readDtcs, recordDtc } from '../src/database/dtcManager';
@@ -340,69 +341,14 @@ export default function LaboratorioScreen() {
       }
       if (!activeSession) throw new Error('CONECTE AO ELM327 ANTES DA VARREDURA DTC');
 
-      const results = mode === 'REAL'
-        ? await autoTripService.withPollingPaused(() => scanDtcServices(activeSession))
-        : await scanDtcServices(activeSession);
+      const refreshed = mode === 'REAL'
+        ? await autoTripService.withPollingPaused(() => refreshDtcSession(getBasePath(), activeSession))
+        : null;
+      const results = refreshed?.scans ?? await scanDtcServices(activeSession);
       setDtcScan(results);
       const stored = results.find((item) => item.kind === 'STORED');
-      const freezeFrame = mode === 'REAL'
-        ? await autoTripService.withPollingPaused(() => readFreezeFrame(activeSession))
-        : null;
+      const freezeFrame = refreshed?.freezeFrame ?? null;
       setDtcCodes(stored?.codes ?? []);
-
-      if (mode === 'REAL') {
-        const existing = await readDtcs(getBasePath());
-        const now = new Date().toISOString();
-        const priorities: Record<DtcServiceScan['kind'], number> = { PENDING: 1, PERMANENT: 2, STORED: 3 };
-        const bestByCode = new Map<string, DtcServiceScan['kind']>();
-        for (const scan of results) {
-          if (!scan.available) continue;
-          for (const code of scan.codes) {
-            const priorKind = bestByCode.get(code);
-            if (!priorKind || priorities[scan.kind] > priorities[priorKind]) bestByCode.set(code, scan.kind);
-          }
-        }
-
-        const records: DtcRecord[] = [...bestByCode.entries()].map(([code, kind]) => {
-          const previous = existing.find((item) => item.code === code);
-          return {
-            code,
-            description: getDtcDefinition(code)?.description,
-            status: kind === 'PENDING' ? 'PENDING' : kind === 'PERMANENT' ? 'PERMANENT' : 'CURRENT',
-            firstSeen: previous?.firstSeen ?? now,
-            lastSeen: now,
-            occurrences: nextDtcOccurrences(previous),
-            source: 'REAL_OBD',
-            historical: false,
-            confirmed: kind !== 'PENDING',
-            ...(freezeFrame?.available ? {
-              freezeFrame: {
-                frame: freezeFrame.frame,
-                dtc: freezeFrame.dtc,
-                rpm: freezeFrame.rpm,
-                coolantC: freezeFrame.coolantC,
-              },
-            } : {}),
-          };
-        });
-
-        for (const record of records) await recordDtc(getBasePath(), record);
-        const detectedCodes = new Set(records.map((item) => item.code));
-        const storedCodes = new Set(stored?.codes ?? []);
-        const storedAvailable = stored?.available === true;
-        const becameInactive: DtcRecord[] = storedAvailable
-          ? existing
-            .filter((item) => ['CURRENT', 'CONFIRMED'].includes(item.status) && !storedCodes.has(item.code) && !detectedCodes.has(item.code))
-            .map((item) => ({ ...item, status: 'INACTIVE', historical: true, lastSeen: now }))
-          : [];
-        for (const record of becameInactive) await recordDtc(getBasePath(), record);
-        const allDetectedOrInactive = new Set([...detectedCodes, ...becameInactive.map((item) => item.code)]);
-        updateAutoSaveState((state) => {
-          const preserved = state.dtcs.filter((item) => !allDetectedOrInactive.has(item.code));
-          state.dtcs = [...records, ...becameInactive, ...preserved];
-        });
-        await forceSaveOnObdEvent();
-      }
 
       const available = results.filter((item) => item.available);
       const unavailable = results.filter((item) => !item.available).map((item) => item.service);
