@@ -49,11 +49,34 @@ function buildIntegrityFooter(body: string, blockCount: number): string {
   return 'BLOCKS: ' + blockCount + '\nBYTES: ' + utf8ByteLength(body) + '\nSHA256: ' + sha256Hex(body) + '\n';
 }
 
+function matchIntegrityFooter(content: string): RegExpMatchArray | null {
+  // Match from the first footer character, not the separating newline. The
+  // body written by buildIntegrityFooter already includes that final newline.
+  return content.match(/BLOCKS:\s*(\d+)\nBYTES:\s*(\d+)\nSHA256:\s*([a-f0-9]{64})\n?$/i);
+}
+
 function verifyIntegrityFooter(content: string): boolean {
-  const match = content.match(/\nBLOCKS:\s*(\d+)\nBYTES:\s*(\d+)\nSHA256:\s*([a-f0-9]{64})\n?$/i);
+  const match = matchIntegrityFooter(content);
   if (!match) return false;
   const body = content.slice(0, match.index ?? 0);
   return Number(match[2]) === utf8ByteLength(body) && match[3].toLowerCase() === sha256Hex(body);
+}
+
+/** Never rewrite a footer-bearing history unless its bytes and block structure verify. */
+function validateHistoryIntegrity(content: string): void {
+  const footer = matchIntegrityFooter(content);
+  const footerMarkerPresent = /(?:^|\n)(?:BLOCKS|BYTES|SHA256):/i.test(content);
+  if (footerMarkerPresent && !footer) throw new Error('AUTOSAVE_HISTORY_FOOTER_MALFORMED');
+  if (footer && !verifyIntegrityFooter(content)) throw new Error('AUTOSAVE_HISTORY_INTEGRITY_FAILED');
+
+  const beginCount = content.split(ENTRY_BEGIN).length - 1;
+  const endCount = content.split(ENTRY_END).length - 1;
+  // Legacy files may contain stray END markers from older app versions. Keep
+  // tolerating those, but never discard an unfinished BEGIN block on append.
+  if (beginCount > endCount) throw new Error('AUTOSAVE_HISTORY_BLOCK_STRUCTURE_FAILED');
+  if (footer && (beginCount !== endCount || Number(footer[1]) !== beginCount || splitEntries(content).length !== beginCount)) {
+    throw new Error('AUTOSAVE_HISTORY_BLOCK_COUNT_MISMATCH');
+  }
 }
 /**
  * A manual export and an automatic autosave can overlap on older app versions.
@@ -98,6 +121,7 @@ async function readAutoSaveHistoryUnsafe(basePath: string): Promise<string> {
   const content = await FileSystem.readAsStringAsync(path, {
     encoding: FileSystem.EncodingType.UTF8,
   });
+  validateHistoryIntegrity(content);
   const entries = deduplicateEntries(splitEntries(content))
     .slice(-AUTOSAVE_HISTORY_MAX_ENTRIES)
     .map(removeCarScannerTripsFromSnapshot);
@@ -108,9 +132,10 @@ export async function readAutoSaveHistory(basePath: string): Promise<string> {
   try {
     return await readAutoSaveHistoryUnsafe(basePath);
   } catch {
-    // The read-only UI may show an empty-state header, but append operations
-    // use the strict reader below and never replace an unreadable existing file.
-    return HISTORY_HEADER;
+    // A read-only UI must not imply that a rejected, still-existing history is empty.
+    // The append path also throws and never overwrites the original file.
+    return HISTORY_HEADER
+      + 'AVISO: HISTÓRICO NÃO VALIDADO. O ARQUIVO ORIGINAL FOI PRESERVADO; NÃO HOUVE REESCRITA.\n';
   }
 }
 
