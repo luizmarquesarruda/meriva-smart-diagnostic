@@ -113,7 +113,7 @@ function removeCarScannerTripsFromSnapshot(entry: string): string {
 
 async function readAutoSaveHistoryUnsafe(basePath: string): Promise<string> {
   const path = historyPath(basePath);
-  let info = await FileSystem.getInfoAsync(path);
+  const info = await FileSystem.getInfoAsync(path);
   let content: string;
 
   if (!info.exists) {
@@ -140,7 +140,6 @@ async function readAutoSaveHistoryUnsafe(basePath: string): Promise<string> {
       throw new Error('AUTOSAVE_HISTORY_BACKUP_RESTORE_MISMATCH');
     }
     validateHistoryIntegrity(content);
-    info = await FileSystem.getInfoAsync(path);
   } else {
     if (info.isDirectory) {
       throw new Error('O caminho do histórico de autosave aponta para um diretório; arquivo existente preservado.');
