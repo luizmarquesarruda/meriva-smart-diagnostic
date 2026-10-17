@@ -38,6 +38,7 @@ const stubs = {
     nextDtcOccurrences: (previous) => (Number(previous?.occurrences) || 0) + 1,
   },
   '../meriva/autosaveManager': {
+    getAutoSaveState: () => persistedState,
     updateAutoSaveState: (callback) => callback(persistedState),
   },
   '../meriva/autosaveIntegration': { forceSaveOnObdEvent: async () => undefined },
