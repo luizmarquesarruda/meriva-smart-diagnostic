@@ -2573,3 +2573,10 @@ O gerador calculava BYTES/SHA-256 sobre o corpo completo terminando em newline; 
 
 ### Estado de validação
 A correção e os testes foram gravados nesta branch e propagados para as branches empilhadas de SQLite e serviço Android. **Os testes não foram executados e não houve nova CI**; a causa foi identificada estaticamente a partir do código e do teste da suíte. Não declarar a correção como validada até executar a suíte numa janela autorizada.
+
+
+### Permissão de notificação Android 13+
+- O Manifest gerado passa a declarar `POST_NOTIFICATIONS`.
+- `requestNotificationsPermissionOnly()` é chamada durante a preparação inicial de permissões, antes da conexão com ECU, para evitar pedir esse acesso enquanto o usuário conecta o carro.
+- Negar a permissão não falsifica o estado da ECU nem bloqueia a solicitação do serviço; no Android 13+ a notificação pode não ficar na gaveta, embora o controle de serviço ativo do sistema permaneça disponível.
+- Teste de contrato atualizado; não executado.
