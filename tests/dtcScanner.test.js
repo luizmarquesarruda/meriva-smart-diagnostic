@@ -41,10 +41,16 @@ function loadTs(file) {
 
 const { parseDtcResponseForService } = loadTs('src/obd/dtcParser.ts');
 const scanner = loadTs('src/obd/dtcScanner.ts');
+const { parsePidResponse } = loadTs('src/obd/parser.ts');
 
 assert.deepStrictEqual(parseDtcResponseForService('03', '43 01 30 00 00'), ['P0130']);
 assert.deepStrictEqual(parseDtcResponseForService('07', '47 01 23 00 00'), ['P0123']);
 assert.deepStrictEqual(parseDtcResponseForService('0A', '4A 01 23 00 00'), ['P0123']);
+const monitorStatus = parsePidResponse('0101', '41 01 80 07 A1 00');
+assert.strictEqual(monitorStatus.status, 'RESPONDEU');
+assert.ok(monitorStatus.interpretation.includes('MIL=ON'));
+assert.ok(monitorStatus.interpretation.includes('DTCs=0'));
+
 
 (async () => {
   const replies = {
