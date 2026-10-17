@@ -42,5 +42,14 @@
       "finiteNumericValue"
     ],
     "sourceDoesNotProveSensorAccuracy": true
-  }
+  },
+  "allowedTelemetryRowSources": [
+    "REAL_OBD",
+    "SIMULACAO"
+  ],
+  "nonTelemetrySourcesRemainOutsideSamples": [
+    "CARSCANNER_BASELINE",
+    "IMPORTADO",
+    "USER_REAL_OBSERVATION"
+  ]
 }
