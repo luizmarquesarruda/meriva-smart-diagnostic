@@ -2523,3 +2523,21 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - A CI #2211 passou por todas as 26 regressões, logger CSV, recuperação de viagens, telemetria rápida, gate GPS e teste de GPS básico.
 - A suíte parou em `gpsHistory.test.js` porque `loadTs()` já retorna o objeto `exports`, mas o teste tentava acessar `compiledModule.exports`; corrigida a extração para usar o retorno real do carregador.
 - O mock da constante do gravador de viagem permanece apenas no teste Node para simular a resolução de módulos TypeScript.
+
+
+## 2026-10-16 — Adaptador do verificador de TXT de autosave (CI não executada)
+
+### Análise do formato real do aplicativo
+- O exportador src/meriva/autosaveTxtFormatter.ts emite SAVE EXPORT, Schema, App Version, Exported At, Saved At e as seções [VEHICLE], [OBD], [LAST READINGS], [DTC], [HISTORY], [LEARNING] e [SETTINGS].
+- O diário de sessões src/meriva/dailyObdHistory.ts usa páginas DIA, eventos SESSION_START, SESSION_END e SESSION_RECOVERED, além de blocos de leituras, DTCs e viagens.
+- O verificador aceita N/D e ECU desconectada como estados possíveis, sem confundi-los com corrupção; separa erros estruturais de avisos diagnósticos; e sinaliza viagens seed do CarScanner e consumo acima de 30 km/L.
+
+### Alteração
+- Adicionado tools/verify_autosave.py, com detecção automática ou seleção explícita do tipo de TXT, saída humana/JSON e lista opcional de PIDs conhecidos.
+- Adicionados testes unitários Python com fixtures sintéticas baseadas no formato atual do exportador e do diário de sessões.
+- Os fixtures verificam o contrato do parser, não substituem a validação com um TXT real exportado do aparelho.
+
+### Validação e limites
+- CI não executada, conforme solicitado.
+- Ainda não foi validado contra um TXT real produzido no aparelho; por isso, os resultados dos fixtures não devem ser interpretados como prova de funcionamento do autosave, Bluetooth, ECU ou GPS.
+- O workflow de CI não foi alterado nesta etapa.
