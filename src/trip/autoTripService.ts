@@ -68,6 +68,7 @@ class AutoTripService {
   private telemetryCursor = 0;
   private pollCycleNumber = 0;
   private stoppedSinceMs: number | null = null;
+  private movingCandidateSinceMs: number | null = null;
   private linkLostAtMs: number | null = null;
   private linkLossTimer: ReturnType<typeof setTimeout> | null = null;
   private gpsStartedForEcu = false;
@@ -190,6 +191,7 @@ class AutoTripService {
     const fuelLevelSupported = connection.supportedPids.includes('012F');
     const obdSpeedSupported = connection.supportedPids.includes('010D');
     this.stoppedSinceMs = null;
+    if (!this.recorder) this.movingCandidateSinceMs = null;
     const generation = ++this.generation;
 
     const persistedAutonomy = (await initAutoSave(this.basePath)).autonomy;
@@ -442,19 +444,31 @@ class AutoTripService {
         const gps = gpsTracker.getState();
         const vehicleSpeedKmh = obdSpeedKmh ?? gps.currentSpeedKmh;
         // If RPM is temporarily unavailable, valid vehicle speed is still movement evidence.
-        const moving = vehicleSpeedKmh > 0 && (rpm == null || rpm > 0);
+        const moving = vehicleSpeedKmh > 3 && (rpm == null || rpm > 0);
 
         if (moving) {
           this.stoppedSinceMs = null;
           if (!this.recorder) {
-            this.recorder = new RealTripRecorder(Date.now(), gps.distanceKm);
+            this.movingCandidateSinceMs ??= Date.now();
+            this.recorder = new RealTripRecorder(this.movingCandidateSinceMs, gps.distanceKm);
           }
+          // O início só é confirmado depois de movimento >3 km/h sustentado por 5 s.
+          if (this.movingCandidateSinceMs != null && Date.now() - this.movingCandidateSinceMs >= 5000) {
+            this.movingCandidateSinceMs = null;
+          }
+        } else if (this.recorder && this.movingCandidateSinceMs != null) {
+          // Movimento curto que não atingiu o limiar de 5 s não vira uma viagem.
+          this.recorder = null;
+          this.movingCandidateSinceMs = null;
+          this.stoppedSinceMs = null;
         } else if (this.recorder) {
           this.stoppedSinceMs ??= Date.now();
           if (shouldFinalizeStoppedTrip(Date.now() - this.stoppedSinceMs, rpm)) {
             await this.finalizeRecorder();
             this.stoppedSinceMs = null;
           }
+        } else {
+          this.movingCandidateSinceMs = null;
         }
 
         const recorder = this.recorder;
@@ -471,6 +485,7 @@ class AutoTripService {
             timestampMs: Date.now(),
             distanceKm: tripGps.distanceKm,
             speedKmh: tripVehicleSpeedKmh,
+            obdSpeedKmh,
             fuelRateLph,
             fuelRateSource,
             rpm: (() => { const trend = getLivePidTrend('010C'); return trend && trend.ageSeconds <= 10 ? trend.current : null; })(),
