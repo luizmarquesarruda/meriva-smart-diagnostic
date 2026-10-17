@@ -45,6 +45,7 @@ const fakeDb = {
     return { lastInsertRowId: ++rowId, changes: 1 };
   },
   async withTransactionAsync(task) { await task(); },
+  async withExclusiveTransactionAsync(task) { await task(this); },
 };
 const fakeSqlite = {
   async openDatabaseAsync(name) {
