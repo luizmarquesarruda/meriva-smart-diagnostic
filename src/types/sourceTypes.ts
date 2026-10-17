@@ -76,7 +76,7 @@ export interface DtcRecord {
   validation?: 'REVALIDATED_IN_SESSION' | 'HISTORY_WITHOUT_REVALIDATION';
   validatedAt?: string;
   sessionId?: string;
-  freezeFrame?: { frame: number | null; dtc: string; rpm: number | null; coolantC: number | null; capturedAt?: string };
+  freezeFrame?: { frame: number | null; dtc: string | null; rpm: number | null; coolantC: number | null; capturedAt?: string };
 }
 
 export interface ConsumptionReference {
