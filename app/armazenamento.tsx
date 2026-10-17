@@ -135,7 +135,7 @@ export default function ArmazenamentoScreen() {
           </Text>
         </View>
         <View style={styles.row}><Text style={styles.label}>Arquivo</Text><Text style={styles.value}>{databaseHealth?.databaseName ?? 'meriva_diagnostics.db'}</Text></View>
-        <View style={styles.row}><Text style={styles.label}>Schema</Text><Text style={styles.value}>{databaseHealth?.schemaVersion ?? 'N/D'} / v{2}</Text></View>
+        <View style={styles.row}><Text style={styles.label}>Schema</Text><Text style={styles.value}>{databaseHealth?.available ? databaseHealth.schemaVersion : 'N/D'} / v{2}</Text></View>
         <View style={styles.row}><Text style={styles.label}>Consultas OBD indexadas</Text><Text style={styles.value}>{databaseHealth?.telemetrySampleCount ?? 'N/D'}</Text></View>
         <View style={styles.row}><Text style={styles.label}>Amostras PID indexadas</Text><Text style={styles.value}>{databaseHealth?.pidSampleCount ?? 'N/D'}</Text></View>
         <View style={styles.row}><Text style={styles.label}>DTC / viagens / testes</Text><Text style={styles.value}>{databaseHealth ? `${databaseHealth.dtcRecordCount ?? 'N/D'} / ${databaseHealth.tripCount ?? 'N/D'} / ${databaseHealth.sensorTestRunCount ?? 'N/D'}` : 'N/D'}</Text></View>
