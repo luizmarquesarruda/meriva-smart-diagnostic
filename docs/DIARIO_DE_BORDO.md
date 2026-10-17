@@ -2596,3 +2596,10 @@ Um teste gera 366 datas distintas e verifica que a primeira e a última continua
 
 ### Fonte permitida por linha SQLite
 A política `src/knowledge/sqlite_policy.json` explicita que a tabela `telemetry_samples` só aceita `REAL_OBD` e `SIMULACAO`. `CARSCANNER_BASELINE`, `IMPORTADO` e `USER_REAL_OBSERVATION` ficam fora dessa tabela; importação de legado e migração destrutiva seguem desabilitadas.
+
+
+### Reforço do histórico diário: estrutura e escrita recuperável
+- Além de remover o corte de 365 dias, a leitura anterior é validada antes de ser reserializada. Um TXT sem cabeçalho/páginas reconhecíveis ou com uma página sem marcador de fim é recusado em vez de ser substituído silenciosamente por um subconjunto de páginas.
+- A escrita passa por arquivo temporário e leitura de volta byte a byte, guarda o arquivo anterior em `.previous` e tenta restaurá-lo se o `moveAsync` falhar. Diretório inesperado no caminho de backup é tratado como erro; não se apaga automaticamente.
+- Testes adicionados: diário com 366 páginas; conteúdo legada não parseável preservado; recuperação da cópia anterior após falha simulada de `moveAsync`.
+- **Testes não executados nesta etapa.** Os testes são regressões adicionadas, não evidência de aprovação de CI ou validação no telefone.
