@@ -12,6 +12,7 @@ const SERVICE_SIMPLE_NAME = 'ObdForegroundService';
 const PERMISSIONS = [
   'android.permission.FOREGROUND_SERVICE',
   'android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE',
+  'android.permission.POST_NOTIFICATIONS',
 ];
 
 function requireAndroidPackage(config) {
