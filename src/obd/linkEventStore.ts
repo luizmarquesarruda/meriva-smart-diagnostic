@@ -42,13 +42,28 @@ function filePath(basePath: string, name: 'link_events.json' | 'app_events.json'
 }
 
 async function readEvents<T>(path: string): Promise<T[]> {
+  const info = await FileSystem.getInfoAsync(path);
+  if (!info.exists) return [];
+  if (info.isDirectory) throw new Error('EVENT_LOG_PATH_IS_DIRECTORY');
+
+  // Do not interpret a corrupt/unreadable existing log as an empty log: doing
+  // so would overwrite the only copy of previously collected diagnostic events.
+  const raw = await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 });
+  let parsed: unknown;
   try {
-    const raw = await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 });
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed?.events) ? parsed.events as T[] : [];
+    parsed = JSON.parse(raw);
   } catch {
-    return [];
+    throw new Error('EVENT_LOG_CORRUPT_JSON');
   }
+  if (
+    typeof parsed !== 'object'
+    || parsed === null
+    || !Array.isArray((parsed as { events?: unknown }).events)
+    || (parsed as { schemaVersion?: unknown }).schemaVersion !== 1
+  ) {
+    throw new Error('EVENT_LOG_INVALID_SCHEMA');
+  }
+  return (parsed as { events: T[] }).events;
 }
 
 async function writeJsonWithBackup(path: string, payload: { schemaVersion: number; events: unknown[] }): Promise<void> {
@@ -57,6 +72,7 @@ async function writeJsonWithBackup(path: string, payload: { schemaVersion: numbe
   const content = JSON.stringify(payload);
   await FileSystem.writeAsStringAsync(tmp, content, { encoding: FileSystem.EncodingType.UTF8 });
   const check = await FileSystem.readAsStringAsync(tmp, { encoding: FileSystem.EncodingType.UTF8 });
+  if (check !== content) throw new Error('EVENT_LOG_READBACK_MISMATCH');
   const parsed = JSON.parse(check);
   if (!Array.isArray(parsed.events) || parsed.schemaVersion !== payload.schemaVersion) {
     throw new Error('EVENT_LOG_VALIDATION_FAILED');
