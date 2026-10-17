@@ -18,3 +18,7 @@ assert.match(read('app/aprendizado.tsx'), /realSamples/);
 assert.match(read('app/laboratorio.tsx'), /03 \/ 07 \/ 0A/);
 assert.match(read('app/bluetooth.tsx'), /SAÚDE DO ELM327/);
 console.log('Cockpit e telas secundárias: OK');
+
+const rootLayout = read('app/_layout.tsx');
+assert.match(rootLayout, /screenOptions=\{\{[\s\S]*?headerShown:\s*false/, 'o Stack global não deve duplicar cabeçalhos desenhados pelas telas');
+console.log('Cabeçalho global duplicado desativado: OK');
