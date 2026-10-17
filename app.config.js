@@ -2,7 +2,8 @@ const { execSync } = require('child_process');
 
 function gitValue(command) {
   try {
-    return execSync(command, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    const value = execSync(command, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    return value || 'UNKNOWN';
   } catch {
     return 'UNKNOWN';
   }
