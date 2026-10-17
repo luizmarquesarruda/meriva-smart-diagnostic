@@ -112,21 +112,24 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
   if (state.learning) {
     L.push(`Status: ${or(state.learning.learningStatus)}`);
     L.push(`Atualizado: ${or(state.learning.lastUpdated)}`);
-    L.push(
-      `Amostras reais: ${or(state.learning.globalSampleCounts?.realSamples)} / seed: ${or(state.learning.globalSampleCounts?.seedSamples)}`,
-    );
+    L.push(`Amostras reais rastreáveis: ${or(state.learning.globalSampleCounts?.realSamples)}`);
+    let contextsWithRealStatistics = 0;
     if (state.learning.contextualData?.length) {
       for (const context of state.learning.contextualData) {
-        L.push(`Contexto ${context.condition} (amostras: ${context.sampleCount}):`);
-        for (const [pidName, stat] of Object.entries(context.statistics)) {
+        const realStatistics = Object.entries(context.statistics).filter(([, stat]) =>
+          stat.realSamples > 0 && stat.seedSamples === 0 && stat.source.includes('REAL_OBD'),
+        );
+        if (!realStatistics.length) continue;
+        contextsWithRealStatistics += 1;
+        L.push(`Contexto ${context.condition}:`);
+        for (const [pidName, stat] of realStatistics) {
           L.push(
-            `  ${pidName}: media=${Number(stat.mean.toFixed(2))} min=${Number(stat.min.toFixed(2))} max=${Number(stat.max.toFixed(2))} confianca=${stat.confidence}`,
+            `  ${pidName}: media=${Number(stat.mean.toFixed(2))} min=${Number(stat.min.toFixed(2))} max=${Number(stat.max.toFixed(2))} amostras_reais=${stat.realSamples} confianca=${stat.confidence}`,
           );
         }
       }
-    } else {
-      L.push('Padroes por contexto: N/D');
     }
+    if (contextsWithRealStatistics === 0) L.push('Padroes reais por contexto: N/D');
   } else {
     L.push(ND);
   }
