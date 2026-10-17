@@ -2628,7 +2628,7 @@ A persistência estruturada ainda não existia no aplicativo; JSON/TXT funcionav
 
 ### Implementação
 - Declaradas `expo-sqlite@~14.0.6`, `expo-linear-gradient@~13.0.2`, `react-native-svg@15.2.0` e `react-native-gifted-charts@1.4.47`.
-- Criado `src/database/diagnosticDatabase.ts` com migração versionada v1, conexão compartilhada, WAL, chaves/índices por data e PID, restrições de origem e consultas parametrizadas.
+- Criado `src/database/diagnosticDatabase.ts` com migrações v1/v2, conexão compartilhada, WAL, chaves/índices por data e PID, restrições de origem e consultas parametrizadas. O arquivo usado é `meriva_diagnostics.db`, definido em `src/knowledge/sqlite_policy.json`.
 - Criadas tabelas para amostras PID, DTCs, viagens, telemetria de viagem, sessões/resultados de teste de sensores e execuções de diagnóstico.
 - Inicialização SQLite no layout raiz é não bloqueante. O autosave JSON, logs CSV e TXT permanecem preservados; uma falha SQLite não deve interromper a aquisição serial OBD.
 - Leituras finitas com status RESPONDEU entram em uma fila assíncrona a cada 5 s por PID/origem. DTCs são espelhados depois do autosave principal; apenas viagens com origem REAL_OBD são indexadas. Relatórios de sensores continuam exportando TXT, com cópia estruturada quando a ECU real foi validada.
