@@ -63,6 +63,12 @@ const fakeSQLite = {
   },
 };
 
+const storageScreenSource = fs.readFileSync(path.join(__dirname, '..', 'app', 'armazenamento.tsx'), 'utf8');
+assert.ok(storageScreenSource.includes('getSqliteDiagnosticsHealth'), 'storage screen must expose SQLite availability');
+assert.ok(storageScreenSource.includes('BASE LOCAL SQLITE'), 'storage screen must label the local database');
+assert.ok(storageScreenSource.includes('sampleCount'), 'storage screen must show indexed sample count');
+assert.ok(storageScreenSource.includes('VERIFICAR SQLITE'), 'storage screen must allow health refresh');
+
 const sourcePath = path.join(__dirname, '..', 'src', 'database', 'sqliteTelemetryStore.ts');
 const source = fs.readFileSync(sourcePath, 'utf8');
 const output = ts.transpileModule(source, {
