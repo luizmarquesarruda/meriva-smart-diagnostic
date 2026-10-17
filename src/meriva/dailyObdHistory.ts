@@ -16,6 +16,8 @@ const HEADER = [
   'REGRA: cada sessão ECU validada gera eventos de início e encerramento; sessão interrompida é marcada na próxima abertura.',
   'FONTE: estado local do aplicativo; valores mantêm fonte e horário quando disponíveis.',
   '[BUILD]',
+  'SCHEMA VERSION: 1',
+  'EXPORT VERSION: 1',
   `SHA: ${BUILD.gitSha}`,
   `BRANCH: ${BUILD.branch}`,
   `VERSION: ${BUILD.appVersion}`,
