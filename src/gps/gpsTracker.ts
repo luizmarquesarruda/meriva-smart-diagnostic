@@ -26,7 +26,7 @@ export interface GpsTripState {
 
 export type GpsListener = (state: GpsTripState) => void;
 
-const MAX_ACCURACY_M = 30;
+const MAX_ACCURACY_M = 20;
 const MAX_SPEED_KMH = 220;
 const MIN_MOVEMENT_SPEED_KMH = 5;
 const MIN_MOVEMENT_DISTANCE_M = 8;
@@ -76,7 +76,7 @@ export function normalizeGpsSpeedKmh(speedMs: number | null | undefined): number
 }
 
 function isAccurate(sample: GpsSample): boolean {
-  return sample.accuracyM == null || sample.accuracyM <= MAX_ACCURACY_M;
+  return sample.accuracyM != null && Number.isFinite(sample.accuracyM) && sample.accuracyM <= MAX_ACCURACY_M;
 }
 
 export class GpsTracker {
@@ -87,6 +87,7 @@ export class GpsTracker {
   private consecutiveMovingSamples = 0;
   private pendingMovingDistanceKm = 0;
   private vehicleSpeedHintKmh: number | null = null;
+  private vehicleSpeedHintAtMs: number | null = null;
 
   private state: GpsTripState = {
     running: false,
@@ -196,11 +197,20 @@ export class GpsTracker {
     return this.backgroundTaskRunning;
   }
 
-  setVehicleSpeedHintKmh(speedKmh: number | null): void {
+  setVehicleSpeedHintKmh(speedKmh: number | null, timestampMs = Date.now()): void {
     this.vehicleSpeedHintKmh =
       speedKmh != null && Number.isFinite(speedKmh) && speedKmh >= 0 && speedKmh <= MAX_SPEED_KMH
         ? speedKmh
         : null;
+    this.vehicleSpeedHintAtMs = this.vehicleSpeedHintKmh == null && speedKmh == null
+      ? null
+      : Number.isFinite(timestampMs) ? timestampMs : Date.now();
+  }
+
+  private freshVehicleSpeedHint(sampleTimestampMs: number): number | null {
+    if (this.vehicleSpeedHintKmh == null || this.vehicleSpeedHintAtMs == null) return null;
+    const ageMs = sampleTimestampMs - this.vehicleSpeedHintAtMs;
+    return ageMs >= 0 && ageMs <= 5000 ? this.vehicleSpeedHintKmh : null;
   }
 
   private getSignalQuality(accuracyM: number | null): GpsTripState['signalQuality'] {
@@ -321,6 +331,7 @@ export class GpsTracker {
     };
 
     const accurate = isAccurate(sample);
+    const vehicleSpeedHintKmh = this.freshVehicleSpeedHint(sample.timestamp);
     let derivedSpeedKmh: number | null = null;
 
     if (this.previous && accurate && isAccurate(this.previous)) {
@@ -334,8 +345,9 @@ export class GpsTracker {
           segmentDistanceM >= movementThresholdM(sample, this.previous) &&
           derivedSpeedKmh >= MIN_MOVEMENT_SPEED_KMH &&
           derivedSpeedKmh <= MAX_SPEED_KMH &&
-          (this.vehicleSpeedHintKmh != null
-            ? this.vehicleSpeedHintKmh >= MIN_MOVEMENT_SPEED_KMH
+          (vehicleSpeedHintKmh != null
+            ? vehicleSpeedHintKmh >= MIN_MOVEMENT_SPEED_KMH &&
+              Math.abs(derivedSpeedKmh - vehicleSpeedHintKmh) <= Math.max(20, vehicleSpeedHintKmh * 0.5)
             : sample.speedKmh != null &&
               sample.speedKmh >= MIN_MOVEMENT_SPEED_KMH &&
               sample.speedKmh <= MAX_SPEED_KMH);
@@ -367,21 +379,22 @@ export class GpsTracker {
       derivedSpeedKmh != null &&
       derivedSpeedKmh >= MIN_MOVEMENT_SPEED_KMH &&
       derivedSpeedKmh <= MAX_SPEED_KMH &&
-      (this.vehicleSpeedHintKmh != null
-        ? this.vehicleSpeedHintKmh >= MIN_MOVEMENT_SPEED_KMH
+      (vehicleSpeedHintKmh != null
+        ? vehicleSpeedHintKmh >= MIN_MOVEMENT_SPEED_KMH &&
+          Math.abs((derivedSpeedKmh ?? 0) - vehicleSpeedHintKmh) <= Math.max(20, vehicleSpeedHintKmh * 0.5)
         : sample.speedKmh != null &&
           sample.speedKmh >= MIN_MOVEMENT_SPEED_KMH &&
           sample.speedKmh <= MAX_SPEED_KMH) &&
       this.consecutiveMovingSamples >= MIN_MOVING_SAMPLES;
     let speedKmh = movementConfirmed
-      ? (sample.speedKmh != null && sample.speedKmh <= MAX_SPEED_KMH
-        ? sample.speedKmh
-        : (derivedSpeedKmh ?? 0))
+      ? (vehicleSpeedHintKmh != null
+        ? vehicleSpeedHintKmh
+        : (sample.speedKmh != null && sample.speedKmh <= MAX_SPEED_KMH ? sample.speedKmh : (derivedSpeedKmh ?? 0)))
       : 0;
     if (!Number.isFinite(speedKmh) || speedKmh < STOP_SPEED_KMH || speedKmh > MAX_SPEED_KMH) speedKmh = 0;
     const speedSource: GpsTripState['speedSource'] = speedKmh <= 0
       ? 'PARADO'
-      : this.vehicleSpeedHintKmh != null && this.vehicleSpeedHintKmh >= MIN_MOVEMENT_SPEED_KMH
+      : vehicleSpeedHintKmh != null && vehicleSpeedHintKmh >= MIN_MOVEMENT_SPEED_KMH
         ? 'OBD'
         : 'GPS';
 
@@ -408,6 +421,7 @@ export class GpsTracker {
     this.consecutiveMovingSamples = 0;
     this.pendingMovingDistanceKm = 0;
     this.vehicleSpeedHintKmh = null;
+    this.vehicleSpeedHintAtMs = null;
 
     if (options.resetTrip) {
       this.state = {

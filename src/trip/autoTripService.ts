@@ -4,7 +4,7 @@ import { getSharedObdConnection, getSharedObdStatus, subscribeSharedObd } from '
 import { addDriveCycle, readDriveCycles } from '../storage/driveCycleStorage';
 import { forceSaveOnObdEvent, registerObdQuery } from '../meriva/autosaveIntegration';
 import { getAutoSaveState, updateAutoSaveState, initAutoSave } from '../meriva/autosaveManager';
-import { RealTripRecorder, shouldFinalizeStoppedTrip } from './tripRecorder';
+import { RealTripRecorder, shouldFinalizeStoppedTrip, shouldFinalizeAfterLinkLoss, LINK_LOSS_TRIP_GRACE_MS } from './tripRecorder';
 import { estimateRangeFromFuelLevel, fuelLevelPercentToLiters, isFuelReserve } from './fuelLevel';
 import { getLivePidTrend, resetLiveTelemetry } from '../obd/liveTelemetry';
 import { estimateFuelRateLph, type FuelRateSource } from '../obd/fuelConsumption';
@@ -68,6 +68,9 @@ class AutoTripService {
   private telemetryCursor = 0;
   private pollCycleNumber = 0;
   private stoppedSinceMs: number | null = null;
+  private movingCandidateSinceMs: number | null = null;
+  private linkLostAtMs: number | null = null;
+  private linkLossTimer: ReturnType<typeof setTimeout> | null = null;
   private gpsStartedForEcu = false;
   private lastEstimatedFuelRate: { rateLph: number; source: FuelRateSource; timestampMs: number } | null = null;
   private fuelType: FuelType = 'FLEX';
@@ -129,6 +132,7 @@ class AutoTripService {
   async stop(): Promise<void> {
     if (!this.running) return;
     this.running = false;
+    this.clearLinkLossGrace();
     gpsTracker.setVehicleSpeedHintKmh(null);
     this.generation += 1;
     this.unsubscribeConnection?.();
@@ -147,10 +151,28 @@ class AutoTripService {
   private async applyConnection(connection: SharedObdConnection | null): Promise<void> {
     const hadTrackingSession = Boolean(this.loopPromise || this.recorder || this.gpsStartedForEcu);
     await this.stopCurrentLoop();
-    // A conexão inicial pode já ter iniciado o GPS pelo serviço nativo em
-    // sharedConnection; não o desligar e ligar novamente sem necessidade.
+    // GPS para imediatamente sem ECU validada. A viagem, porém, permanece aberta
+    // durante uma queda transitória de até 120 s para não fragmentar o histórico.
     if (!connection || hadTrackingSession) await this.stopGpsForEcu();
-    await this.finalizeRecorder();
+
+    if (!connection) {
+      if (this.recorder) this.startLinkLossGrace();
+      else await this.finalizeRecorder();
+      resetLiveTelemetry();
+      this.telemetryCursor = 0;
+      this.pollCycleNumber = 0;
+      this.lastEstimatedFuelRate = null;
+      this.lastFuelEthanolPercent = null;
+      this.state = { ...INITIAL_STATE };
+      this.emit();
+      return;
+    }
+
+    if (this.linkLostAtMs !== null) {
+      await this.resumeAfterLinkLoss();
+    } else if (hadTrackingSession) {
+      await this.finalizeRecorder();
+    }
 
     resetLiveTelemetry();
     this.telemetryCursor = 0;
@@ -158,7 +180,8 @@ class AutoTripService {
     this.lastEstimatedFuelRate = null;
     this.lastFuelEthanolPercent = null;
 
-    if (!connection || !this.running) {
+    if (!this.running) {
+      await this.finalizeRecorder();
       this.state = { ...INITIAL_STATE };
       this.emit();
       return;
@@ -167,8 +190,8 @@ class AutoTripService {
     const fuelSupported = connection.supportedPids.includes('015E');
     const fuelLevelSupported = connection.supportedPids.includes('012F');
     const obdSpeedSupported = connection.supportedPids.includes('010D');
-    this.recorder = null;
     this.stoppedSinceMs = null;
+    if (!this.recorder) this.movingCandidateSinceMs = null;
     const generation = ++this.generation;
 
     const persistedAutonomy = (await initAutoSave(this.basePath)).autonomy;
@@ -203,15 +226,16 @@ class AutoTripService {
       getSharedObdConnection()?.session === connection.session
     ) {
       if (!getSharedObdStatus().ecuConnected) {
-        // A ECU perdeu a resposta: encerrar a captura de localização e fechar a
-        // viagem com a última evidência válida, sem acumular GPS offline.
+        // A captura GPS para durante a ausência de resposta, mas não adiciona
+        // distância/combustível. A viagem só fecha após a janela de 120 s.
         await this.stopGpsForEcu();
-        await this.finalizeRecorder();
-        this.stoppedSinceMs = null;
+        this.startLinkLossGrace();
         this.setState({ connected: true, active: false, error: 'ADAPTADOR OK / ECU SEM RESPOSTA' });
         await new Promise((resolve) => setTimeout(resolve, 1000));
         continue;
       }
+
+      await this.resumeAfterLinkLoss();
 
       if (this.pollingPauseCount > 0) {
         await new Promise((resolve) => setTimeout(resolve, 100));
@@ -420,19 +444,31 @@ class AutoTripService {
         const gps = gpsTracker.getState();
         const vehicleSpeedKmh = obdSpeedKmh ?? gps.currentSpeedKmh;
         // If RPM is temporarily unavailable, valid vehicle speed is still movement evidence.
-        const moving = vehicleSpeedKmh > 0 && (rpm == null || rpm > 0);
+        const moving = vehicleSpeedKmh > 3 && (rpm == null || rpm > 0);
 
         if (moving) {
           this.stoppedSinceMs = null;
           if (!this.recorder) {
-            this.recorder = new RealTripRecorder(Date.now(), gps.distanceKm);
+            this.movingCandidateSinceMs ??= Date.now();
+            this.recorder = new RealTripRecorder(this.movingCandidateSinceMs, gps.distanceKm);
           }
+          // O início só é confirmado depois de movimento >3 km/h sustentado por 5 s.
+          if (this.movingCandidateSinceMs != null && Date.now() - this.movingCandidateSinceMs >= 5000) {
+            this.movingCandidateSinceMs = null;
+          }
+        } else if (this.recorder && this.movingCandidateSinceMs != null) {
+          // Movimento curto que não atingiu o limiar de 5 s não vira uma viagem.
+          this.recorder = null;
+          this.movingCandidateSinceMs = null;
+          this.stoppedSinceMs = null;
         } else if (this.recorder) {
           this.stoppedSinceMs ??= Date.now();
           if (shouldFinalizeStoppedTrip(Date.now() - this.stoppedSinceMs, rpm)) {
             await this.finalizeRecorder();
             this.stoppedSinceMs = null;
           }
+        } else {
+          this.movingCandidateSinceMs = null;
         }
 
         const recorder = this.recorder;
@@ -449,6 +485,7 @@ class AutoTripService {
             timestampMs: Date.now(),
             distanceKm: tripGps.distanceKm,
             speedKmh: tripVehicleSpeedKmh,
+            obdSpeedKmh,
             fuelRateLph,
             fuelRateSource,
             rpm: (() => { const trend = getLivePidTrend('010C'); return trend && trend.ageSeconds <= 10 ? trend.current : null; })(),
@@ -500,6 +537,42 @@ class AutoTripService {
       const elapsedMs = Date.now() - loopStartedAt;
       const waitMs = Math.max(150, intervalMs - elapsedMs);
       await new Promise((resolve) => setTimeout(resolve, waitMs));
+    }
+  }
+
+  private startLinkLossGrace(): void {
+    if (this.linkLostAtMs !== null) return;
+    if (this.movingCandidateSinceMs !== null) {
+      // Uma partida curta ainda não confirmada não pode sobreviver como viagem.
+      this.recorder = null;
+      this.movingCandidateSinceMs = null;
+    }
+    this.linkLostAtMs = Date.now();
+    this.linkLossTimer = setTimeout(() => {
+      this.linkLossTimer = null;
+      const elapsed = this.linkLostAtMs == null ? 0 : Date.now() - this.linkLostAtMs;
+      if (shouldFinalizeAfterLinkLoss(elapsed) && !getSharedObdStatus().ecuConnected) {
+        this.linkLostAtMs = null;
+        void this.finalizeRecorder();
+      }
+    }, LINK_LOSS_TRIP_GRACE_MS);
+  }
+
+  private clearLinkLossGrace(): number {
+    const elapsed = this.linkLostAtMs == null ? 0 : Date.now() - this.linkLostAtMs;
+    if (this.linkLossTimer) clearTimeout(this.linkLossTimer);
+    this.linkLossTimer = null;
+    this.linkLostAtMs = null;
+    return elapsed;
+  }
+
+  private async resumeAfterLinkLoss(): Promise<void> {
+    if (this.linkLostAtMs === null) return;
+    const elapsed = this.clearLinkLossGrace();
+    if (shouldFinalizeAfterLinkLoss(elapsed)) {
+      // Se o processo JS ficou suspenso e o timer atrasou, ainda respeitar a
+      // janela por relógio real antes de iniciar uma nova viagem.
+      await this.finalizeRecorder();
     }
   }
 

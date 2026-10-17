@@ -100,7 +100,7 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
   if (displayedCycles.length) {
     for (const cycle of displayedCycles) {
       L.push(
-        `${cycle.startedAt} -> ${cycle.finishedAt} | ${cycle.distanceTotalKm} km | ${cycle.fuelUsedL} L | ${(cycle.fuelDataValid === false || cycle.fuelUsedL < 0.05 || cycle.avgFuelConsumptionKml <= 0) ? ND : `${cycle.avgFuelConsumptionKml} km/L`} | fonte=${cycle.source} | combustivel=${or(cycle.fuelRateSource)}`,
+        `${cycle.startedAt} -> ${cycle.finishedAt} | dist_final=${cycle.distFinalKm ?? cycle.distanceTotalKm} km | dist_obd=${or(cycle.distObdKm)} km | dist_gps=${or(cycle.distGpsKm)} km | dist_source=${or(cycle.distSource)} | fuel_l=${cycle.fuelLiters == null ? ND : cycle.fuelLiters} L | ${(cycle.fuelDataValid === false || cycle.fuelLiters == null || cycle.avgFuelConsumptionKml <= 0) ? ND : `${cycle.avgFuelConsumptionKml} km/L`} | fuel_method=${or(cycle.fuelMethod ?? cycle.fuelRateSource)} | fuel_coverage_pct=${or(cycle.fuelCoveragePct)} | fuel_uncertainty_pct=${or(cycle.fuelUncertaintyPct)} | fonte=${cycle.source}`,
       );
     }
   } else {

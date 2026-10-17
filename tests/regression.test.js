@@ -844,6 +844,10 @@ async function testDriveCycleSummaryUsesWeightedRealSpeed() {
     distanceTotalKm: 2,
     distanceIceKm: 2,
     fuelUsedL: 0.2,
+    fuelLiters: 0.2,
+    fuelCoveragePct: 100,
+    fuelUncertaintyPct: 30,
+    tripQuality: 'OK',
     totalTimeHms: '00:20:00',
     drivingTimeHms: '00:20:00',
     standingTimeHms: '00:00:00',
@@ -880,6 +884,9 @@ async function testDriveCycleSummaryUsesWeightedRealSpeed() {
     fuelUsedL: 0.01,
     avgFuelConsumptionKml: 0,
     fuelDataValid: false,
+    fuelLiters: null,
+    fuelCoveragePct: 0,
+    tripQuality: 'DADOS_INSUFICIENTES',
   };
   const summary = driveCycles.getDriveCycleSummary([slowLongTrip, shortFastTrip, latestSeed, noFuelTrip]);
   assert.strictEqual(summary.avgSpeedKmh, 20, 'aggregate speed must use all real distance / real moving time, even when fuel data is unavailable');
@@ -1044,6 +1051,11 @@ async function testPidAndLearningWriteSerialization() {
   assert.ok(autoTripServiceSource.includes("connection.supportedPids.includes('010B') &&\n          connection.supportedPids.includes('010F')"), 'fallback MAP exige suporte confirmado aos PIDs MAP e IAT');
   assert.ok(autoTripServiceSource.includes('!(mapFallbackQueriedThisCycle && item === pollingPolicy.polling.estimatedFuelRate.mapPid)'), 'MAP usado no fallback não deve ser consultado novamente na telemetria rotativa');
   assert.ok(autoTripServiceSource.includes('FUEL_RATE_DISPLAY_STALE_AFTER_MS'), 'valor em cache deve ter prazo explícito de expiração para exibição');
+  assert.ok(autoTripServiceSource.includes('LINK_LOSS_TRIP_GRACE_MS'), 'queda do enlace deve usar janela explícita de 120 s');
+  assert.ok(autoTripServiceSource.includes('this.startLinkLossGrace()'), 'perda de ECU deve adiar o fechamento da viagem');
+  assert.ok(autoTripServiceSource.includes('await this.resumeAfterLinkLoss()'), 'reconexão dentro da janela deve preservar a viagem');
+  assert.ok(autoTripServiceSource.includes('await this.stopGpsForEcu()'), 'GPS deve parar enquanto a ECU não responde');
+
   assert.ok(!autoTripServiceSource.includes('recordLivePidQuery('), 'telemetria automática deve registrar cada resposta uma única vez via registerObdQuery');
   writeDelayMs = 0;
 }

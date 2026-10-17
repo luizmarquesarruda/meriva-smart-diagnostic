@@ -74,6 +74,12 @@ export class FuelRateIntegrator {
     return { ...this.state };
   }
 
+  /** Break interpolation across a telemetry gap without clearing accumulated liters. */
+  breakContinuity(): void {
+    this.state.lastRateLph = null;
+    this.state.lastTimestampMs = null;
+  }
+
   getState(): FuelIntegrationState {
     return { ...this.state };
   }

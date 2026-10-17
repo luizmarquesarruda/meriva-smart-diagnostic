@@ -64,7 +64,7 @@ function renderEvent(state: MerivaPersistedState, event: 'SESSION_START' | 'SESS
   const realTrips = state.driveCycles.filter((cycle) => cycle.source === 'REAL_OBD').slice(-10);
   if (realTrips.length) {
     for (const trip of realTrips) {
-      lines.push(`${trip.startedAt} -> ${trip.finishedAt} | ${trip.distanceTotalKm} km | ${(trip.fuelDataValid === false || trip.fuelUsedL < 0.05 || trip.avgFuelConsumptionKml <= 0) ? 'N/D' : `${trip.avgFuelConsumptionKml} km/L`} | máxima=${trip.maxSpeedKmh ?? 'N/D'} km/h | amostras=${trip.telemetrySamples?.length ?? 0} | REAL_OBD`);
+      lines.push(`${trip.startedAt} -> ${trip.finishedAt} | dist_final=${trip.distFinalKm ?? trip.distanceTotalKm} km | dist_obd=${trip.distObdKm ?? 'N/D'} km | dist_gps=${trip.distGpsKm ?? 'N/D'} km | dist_source=${trip.distSource ?? 'N/D'} | fuel_l=${trip.fuelLiters == null ? 'N/D' : trip.fuelLiters} L | ${(trip.fuelDataValid === false || trip.fuelLiters == null || trip.avgFuelConsumptionKml <= 0) ? 'N/D' : `${trip.avgFuelConsumptionKml} km/L`} | fuel_method=${trip.fuelMethod ?? trip.fuelRateSource ?? 'UNAVAILABLE'} | cobertura=${trip.fuelCoveragePct ?? 'N/D'}% | incerteza=${trip.fuelUncertaintyPct ?? 'N/D'}% | máxima=${trip.maxSpeedKmh ?? 'N/D'} km/h | amostras=${trip.telemetrySamples?.length ?? 0} | REAL_OBD`);
     }
   } else {
     lines.push('N/D');
