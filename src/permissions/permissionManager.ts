@@ -4,6 +4,7 @@ import * as Location from 'expo-location';
 export interface PermissionAudit {
   bluetooth: 'GRANTED' | 'DENIED' | 'BLOCKED' | 'UNAVAILABLE';
   location: 'GRANTED' | 'DENIED' | 'BLOCKED' | 'UNAVAILABLE';
+  notifications: 'GRANTED' | 'DENIED' | 'BLOCKED' | 'UNAVAILABLE';
   storage: 'APP_PRIVATE' | 'GRANTED' | 'DENIED' | 'UNAVAILABLE';
 }
 
@@ -39,6 +40,28 @@ export async function requestBluetoothPermissionsOnly(): Promise<PermissionAudit
   return 'DENIED';
 }
 
+/**
+ * Android 13+ asks separately for notification permission. The foreground
+ * service can still be started when denied, but its notification may not be
+ * shown in the notification drawer; request this during app preparation, not
+ * at the moment the driver connects to the ECU.
+ */
+export async function requestNotificationsPermissionOnly(): Promise<PermissionAudit['notifications']> {
+  if (Platform.OS !== 'android') return 'UNAVAILABLE';
+  if (Platform.Version < 33) return 'GRANTED';
+
+  const result = await PermissionsAndroid.request(
+    PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+    {
+      title: 'Notificação da sessão OBD',
+      message: 'O app usa uma notificação persistente para indicar quando a sessão de diagnóstico está ativa.',
+      buttonPositive: 'Permitir',
+      buttonNegative: 'Agora não',
+    },
+  );
+  return mapAndroid(result);
+}
+
 export async function requestBackgroundLocationPermissionsOnly(): Promise<PermissionAudit['location']> {
   if (Platform.OS !== 'android') return 'UNAVAILABLE';
   if (Platform.Version < 29) return 'GRANTED';
@@ -71,10 +94,12 @@ export async function requestLocationPermissionsOnly(): Promise<PermissionAudit[
 export async function requestAllRequiredPermissions(): Promise<PermissionAudit> {
   const bluetooth = await requestBluetoothPermissionsOnly();
   const location = await requestLocationPermissionsOnly();
+  const notifications = await requestNotificationsPermissionOnly();
 
   return {
     bluetooth,
     location,
+    notifications,
     storage: 'APP_PRIVATE',
   };
 }
