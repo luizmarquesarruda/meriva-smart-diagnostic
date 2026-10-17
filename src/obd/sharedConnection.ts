@@ -11,6 +11,7 @@ import { flushCsvLogs } from '../database/csvLogger';
 import { readAppSettings, writeAppSettings } from '../database/appSettings';
 import { startBackgroundMonitoring, stopBackgroundMonitoring } from '../gps/backgroundMonitoring';
 import { readVehicleIdentity } from './vehicleIdentity';
+import { appendAppEvent, appendLinkEvent, type LinkCause, type LinkState } from './linkEventStore';
 
 export interface SharedObdConnection {
   session: Elm327Session;
@@ -67,14 +68,67 @@ function emit(): void {
   for (const listener of statusListeners) listener(status);
 }
 
+const EVENT_BASE_PATH = `${FileSystem.documentDirectory}MERIVA_SMART`;
+let currentSessionId: string | undefined;
+let lastLoggedLinkState: LinkState | null = null;
+
+function classifyLinkCause(value?: string | null): LinkCause {
+  const text = String(value ?? '').toUpperCase();
+  if (text.includes('TIMEOUT')) return 'TIMEOUT';
+  if (text.includes('NO DATA')) return 'NO_DATA';
+  if (text.includes('BUS INIT') || text.includes('BUS ERROR')) return 'BUS_INIT_ERROR';
+  if (text.includes('UNABLE TO CONNECT')) return 'UNABLE_TO_CONNECT';
+  if (text.includes('SOCKET') || text.includes('READ FAILED') || text.includes('CLOSED')) return 'SOCKET';
+  if (text.includes('STOPPED')) return 'STOPPED';
+  return 'STATE_CHANGE';
+}
+
+function stateForLifecycle(next: BluetoothLifecycleState): LinkState {
+  if (next === 'BLUETOOTH_OFF' || next === 'UNSUPPORTED' || next === 'DISCONNECTED') return 'BLUETOOTH_OFF';
+  if (next === 'READY' || next === 'ECU_RESPONDING') return 'ECU_RESPONDING';
+  if (next === 'ERROR') return 'ADAPTER_NO_ECU_RESPONSE';
+  return 'ADAPTER_CONNECTED';
+}
+
+function logLinkState(state: LinkState, cause: LinkCause, detail?: string): void {
+  if (state === lastLoggedLinkState && cause === 'STATE_CHANGE') return;
+  lastLoggedLinkState = state;
+  void appendLinkEvent(EVENT_BASE_PATH, {
+    timestamp: new Date().toISOString(),
+    sessionId: currentSessionId,
+    state,
+    cause,
+    consecutiveFailures: consecutiveEcuFailures,
+  }).catch((error) => console.warn('[link-event] persist failed:', error instanceof Error ? error.message : error));
+  void appendAppEvent(EVENT_BASE_PATH, {
+    timestamp: new Date().toISOString(),
+    sessionId: currentSessionId,
+    eventType: 'LINK_STATE',
+    detail: { state, cause, detail: detail ?? null },
+  }).catch(() => undefined);
+}
+
 function setLifecycle(next: BluetoothLifecycleState): void {
+  const previous = lifecycle;
   lifecycle = next;
+  if (next !== previous) {
+    logLinkState(stateForLifecycle(next), classifyLinkCause(lastEcuError ?? lastConnectionError), previous + ' -> ' + next);
+  }
   emit();
 }
 
 function setEcuResponseState(next: EcuResponseState, error?: string): void {
+  const previous = ecuResponseState;
   ecuResponseState = next;
   if (error) lastEcuError = error;
+  const state: LinkState = next === 'RESPONDING'
+    ? 'ECU_RESPONDING'
+    : next === 'NO_RESPONSE' || next === 'RECOVERING'
+      ? 'ADAPTER_NO_ECU_RESPONSE'
+      : isBluetoothLinkUp(lifecycle) ? 'ADAPTER_CONNECTED' : 'BLUETOOTH_OFF';
+  if (state !== lastLoggedLinkState || next !== previous) {
+    logLinkState(state, next === 'RESPONDING' ? 'PID_RESPONSE' : classifyLinkCause(error ?? lastEcuError), previous + ' -> ' + next);
+  }
   emit();
 }
 
@@ -110,7 +164,9 @@ async function handleUnexpectedDisconnect(reason: string): Promise<void> {
 
   lifecycle = reason.includes('DESLIGADO') ? 'BLUETOOTH_OFF' : 'DISCONNECTED';
   ecuResponseState = 'NO_RESPONSE';
+  logLinkState(reason.includes('DESLIGADO') ? 'BLUETOOTH_OFF' : 'ADAPTER_NO_ECU_RESPONSE', classifyLinkCause(reason), reason);
   emit();
+  currentSessionId = undefined;
 
   if (connection) {
     intentionalDisconnect = true;
@@ -374,7 +430,7 @@ async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm3
       throw new Error('ECU NÃO VALIDADA. OBRIGATÓRIO RECEBER 41 0C PARA MARCAR OBD COMO CONECTADO.');
     }
 
-    ecuResponseState = 'RESPONDING';
+    setEcuResponseState('RESPONDING');
     consecutiveEcuFailures = 0;
     lastEcuResponseAt = new Date().toISOString();
     lastEcuError = null;
@@ -412,6 +468,8 @@ async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm3
       ecuValidated: connection.ecuValidated,
       getDiagnosticsText: () => connection.session.getTransportDiagnosticsText(),
     };
+    currentSessionId = 'ecu-' + Date.now().toString(36);
+    lastLoggedLinkState = null;
 
     // Persistência local: o próximo diagnóstico reutiliza automaticamente o
     // adaptador validado. A ECU só é marcada como validada após o gate 41 0C.
@@ -437,8 +495,7 @@ async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm3
     return active;
   } catch (cause) {
     if (!active) {
-      lifecycle = 'DISCONNECTED';
-      emit();
+      setLifecycle('DISCONNECTED');
     }
     throw cause;
   }
@@ -519,12 +576,16 @@ export async function connectPreferredElm(
 
 export async function setSharedObdConnection(connection: SharedObdConnection | null): Promise<void> {
   active = connection;
+  if (connection) {
+    currentSessionId = 'ecu-' + Date.now().toString(36);
+    lastLoggedLinkState = null;
+  }
   intentionalDisconnect = !connection;
   if (!connection) connectionGeneration += 1;
 
   if (connection) {
     lastConnectionError = null;
-    ecuResponseState = connection.ecuValidated ? 'RESPONDING' : 'NOT_VALIDATED';
+    setEcuResponseState(connection.ecuValidated ? 'RESPONDING' : 'NOT_VALIDATED');
     consecutiveEcuFailures = 0;
     lastEcuResponseAt = connection.ecuValidated ? new Date().toISOString() : null;
     lastEcuError = null;
@@ -541,12 +602,12 @@ export async function setSharedObdConnection(connection: SharedObdConnection | n
     }
     startBluetoothMonitor();
   } else {
-    ecuResponseState = 'NOT_VALIDATED';
+    setEcuResponseState('NOT_VALIDATED');
     consecutiveEcuFailures = 0;
     lastEcuResponseAt = null;
     lastEcuError = null;
-    lifecycle = 'DISCONNECTED';
-    emit();
+    setLifecycle('DISCONNECTED');
+    currentSessionId = undefined;
     await closeObdAutosaveSession();
   }
 }
@@ -563,12 +624,12 @@ export async function disconnectSharedObd(): Promise<void> {
 
   const connection = active;
   active = null;
-  ecuResponseState = 'NOT_VALIDATED';
+  setEcuResponseState('NOT_VALIDATED');
   consecutiveEcuFailures = 0;
   lastEcuResponseAt = null;
   lastEcuError = null;
-  lifecycle = 'DISCONNECTED';
-  emit();
+  setLifecycle('DISCONNECTED');
+  currentSessionId = undefined;
 
   try {
     if (connection) await connection.session.close();

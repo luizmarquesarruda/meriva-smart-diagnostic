@@ -2450,3 +2450,76 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Nova CI solicitada pela atualização da branch; confirmar resultado integral, inclusive testes restantes e build Android.
 - Teste físico do ELM327 no veículo continua pendente.
 
+
+
+## 2026-10-16 — PR de integridade do autosave e eventos de enlace
+
+- Build: branch `fix/autosave-integrity-observability-20261016`; versionCode do APK: N/D.
+- Hipótese: cópia direta do temporário para o autosave podia deixar escrita ambígua; histórico TXT não tinha rodapé verificável e podia carregar blocos malformados/numeração duplicada; causas de queda e latência por PID não eram persistidas em inventário próprio.
+- Mudanças: autosave JSON agora valida o temporário lido de volta, guarda backup anterior, substitui o destino via move e restaura o backup se a troca falhar. Saved At usa o maior entre relógio atual e último Saved At + 1 ms para impedir retrocesso.
+- Histórico TXT: leitor tolera resíduo fora de BEGIN/END, trunca bloco no primeiro END, deduplica/normaliza numeração consecutiva e grava em temporário com leitura de verificação, backup anterior, move e rodapé BLOCKS/BYTES/SHA256. O SHA-256 é calculado sobre o corpo anterior ao rodapé; BYTES mede o mesmo corpo.
+- Observabilidade: novo linkEventStore mantém logs JSON limitados e serializados em LOGS/link_events.json e app_events.json até a migração SQLite. sharedConnection registra transições de quatro níveis e causa; autosaveIntegration registra latência por PID, causa e sequência de falhas; autosaveManager registra eventos de sessão.
+- Testes adicionados para SHA-256, rodapé, numeração consecutiva e concorrência dos eventos. **NÃO EXECUTADOS**.
+- CI, typecheck, testes completos e build: NÃO EXECUTADOS. CI/workflows NÃO DISPARADOS.
+- Limitações: Expo FileSystem não expõe fsync portátil; o fluxo usa leitura de verificação, backup e move com restauração, mas isso não é uma garantia formal de atomicidade de hardware. SQLite/WAL e schema_migrations continuam pendentes.
+- Bloqueio de fixture: o arquivo original scripts/verify_autosave.py e o autosave real 11–16/10 não foram encontrados nos arquivos acessíveis nesta etapa. Não foi criada uma implementação presumida que pudesse divergir do verificador que o usuário já usa.
+- Status: PENDENTE; sem teste físico com Meriva/ELM327.
+
+
+## 2026-10-17 — Reconciliar falha observada na CI #2227
+
+### Evidência
+A execução GitHub Actions #2227 da PR #65 terminou com:
+- `npm ci`: sucesso;
+- `npm run doctor`: 17/17 verificações;
+- `npm run typecheck`: passou (a suíte continuou para `npm test`);
+- `npm test`: falhou em `tests/bluetoothConfig.test.js:62`;
+- `android-build`: ignorado após falha de validação.
+
+Mensagem: o teste exigia o texto `lifecycle = 'DISCONNECTED'`, enquanto o código centraliza a mudança em `setLifecycle('DISCONNECTED')`. O comportamento tinha a chamada do setter; o contrato textual do teste ficou preso à forma antiga de implementação.
+
+### Correção mínima
+O teste agora aceita a transição por `setLifecycle('DISCONNECTED')` ou a atribuição direta legada e mantém a checagem semântica do estado. Nenhum código de conexão foi alterado para satisfazer um teste estático.
+
+### Estado
+- Commit de correção no branch desta PR: `a43050b7`.
+- A mesma revisão de teste foi propagada às branches empilhadas de SQLite e serviço Android para que os diffs não reintroduzam o teste obsoleto.
+- O commit usa `[skip ci]`; **não foi solicitada nova CI**. Portanto, a correção é plausível a partir da evidência, mas ainda não foi verificada por uma execução nova.
+
+
+## 2026-10-17 — Correção do contrato SHA-256 do histórico TXT
+
+### Causa encontrada por inspeção
+O gerador calculava BYTES/SHA-256 sobre o corpo completo terminando em newline; o verificador e o teste iniciavam o corpo na posição anterior a esse newline. Assim, a verificação podia rejeitar um arquivo recém-gravado, apesar de a leitura de volta corresponder ao texto escrito.
+
+### Correção mínima
+- A leitura do rodapé passa a iniciar em `BLOCKS:` e calcular o corpo incluindo o newline que antecede o rodapé.
+- Antes de qualquer append/rewrite, um rodapé existente é validado por bytes, hash e contagem de blocos.
+- Arquivo com rodapé parcial/inválido ou bloco BEGIN sem END não é regravado. Legados sem rodapé que possuam ENDs extras isolados continuam legíveis para migração sem apagar os blocos completos.
+- A tela de leitura informa que o arquivo original foi preservado quando a integridade falha, em vez de aparentar silenciosamente que o histórico está vazio.
+- Teste de regressão adicionado para hash inválido e bloco legado incompleto; teste existente ajustado para medir o corpo corretamente.
+
+### Estado de validação
+A correção e os testes foram gravados nesta branch e propagados para as branches empilhadas de SQLite e serviço Android. **Os testes não foram executados e não houve nova CI**; a causa foi identificada estaticamente a partir do código e do teste da suíte. Não declarar a correção como validada até executar a suíte numa janela autorizada.
+
+
+## 2026-10-17 — Preservar o histórico diário sem corte artificial
+
+### Achado
+`src/meriva/dailyObdHistory.ts` mantinha `MAX_DAYS = 365` e `.slice(-MAX_DAYS)`, descartando a página diária mais antiga ao passar de um ano. Isso contradiz o requisito do projeto de uma página lógica por data sem limite fixo de páginas.
+
+### Correção
+Removido o limite artificial: as páginas são ordenadas por data e todas são gravadas novamente. Não foi habilitada limpeza automática do banco SQLite nem importação destrutiva.
+
+### Regressão adicionada
+Um teste gera 366 datas distintas e verifica que a primeira e a última continuam no TXT após acrescentar um evento. O teste **não foi executado**; commit inclui `[skip ci]` e não houve novo workflow.
+
+
+### Reforço do histórico diário: estrutura e escrita recuperável
+- Além de remover o corte de 365 dias, a leitura anterior é validada antes de ser reserializada. Um TXT sem cabeçalho/páginas reconhecíveis ou com uma página sem marcador de fim é recusado em vez de ser substituído silenciosamente por um subconjunto de páginas.
+- A escrita passa por arquivo temporário e leitura de volta byte a byte, guarda o arquivo anterior em `.previous` e tenta restaurá-lo se o `moveAsync` falhar. Diretório inesperado no caminho de backup é tratado como erro; não se apaga automaticamente.
+- Testes adicionados: diário com 366 páginas; conteúdo legada não parseável preservado; recuperação da cópia anterior após falha simulada de `moveAsync`.
+- **Testes não executados nesta etapa.** Os testes são regressões adicionadas, não evidência de aprovação de CI ou validação no telefone.
+
+- Recuperação após encerramento abrupto: na próxima leitura/gravação, se o TXT principal estiver ausente e existir `.previous`, o histórico diário e o histórico de autosave validam o backup, restauram o arquivo e conferem o conteúdo lido de volta antes de acrescentar novos dados. O backup permanece disponível.
+- Novos testes adicionados: diário restaura página anterior quando a principal está ausente; histórico de autosave restaura o bloco anterior e continua a numeração. Testes ainda não executados.

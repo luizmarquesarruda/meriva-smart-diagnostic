@@ -477,6 +477,57 @@ test('7b. histórico autosave elimina duplicatas legadas e serializa gravações
   assert.strictEqual(finalNumbers.length, 9, 'cada escrita concorrente deve gerar um snapshot sem perder os demais');
   assert.strictEqual(new Set(finalNumbers).size, finalNumbers.length, 'números de salvamento devem ser únicos');
   assert.deepStrictEqual(finalNumbers, [...finalNumbers].sort((a, b) => a - b), 'snapshots devem permanecer em ordem crescente');
+  assert.ok(finalNumbers.every((number, index) => index === 0 || number === finalNumbers[index - 1] + 1), 'numeração deve ser consecutiva sem lacunas');
+  const persisted = files.get(target);
+  const footer = persisted.match(/BLOCKS:\s*(\d+)\nBYTES:\s*(\d+)\nSHA256:\s*([a-f0-9]{64})\n?$/i);
+  assert.ok(footer, 'arquivo deve terminar com rodapé de integridade');
+  const body = persisted.slice(0, footer.index);
+  const sha = loadTs(path.join(ROOT, 'src/meriva/sha256.ts'));
+  assert.strictEqual(Number(footer[1]), 9);
+  assert.strictEqual(Number(footer[2]), Buffer.byteLength(body, 'utf8'));
+  assert.strictEqual(footer[3], sha.sha256Hex(body));
+
+});
+
+test('7b2. histórico corrompido ou bloco incompleto é preservado sem reescrita', async () => {
+  resetFS();
+  const history = loadTs(path.join(ROOT, 'src/meriva/autosaveHistoryTxt.ts'));
+  const state = loadTs(path.join(ROOT, 'src/meriva/autosaveState.ts')).createEmptyMerivaState();
+  const target = CONFIG_DIR + '/meriva_smart_autosave_history.txt';
+  const body = [
+    'MERIVA SMART DIAGNOSTIC',
+    'HISTÓRICO DE SALVAMENTOS AUTOMÁTICOS',
+    '=== SALVAMENTO_BEGIN ===',
+    'NÚMERO: 1',
+    'MOTIVO: manual',
+    '[HISTORY]',
+    'N/D',
+    '=== SALVAMENTO_END ===',
+    '',
+  ].join('\n');
+  const corruptFooter = body + 'BLOCKS: 1\nBYTES: 999\nSHA256: ' + '0'.repeat(64) + '\n';
+  files.set(target, corruptFooter);
+  await assert.rejects(
+    history.appendAutoSaveHistory(BASE, state, '1.0.1', 'corrupt-footer'),
+    /AUTOSAVE_HISTORY_INTEGRITY_FAILED/,
+  );
+  assert.strictEqual(files.get(target), corruptFooter, 'hash inválido não pode substituir/apagar o histórico anterior');
+
+  const incomplete = [
+    'MERIVA SMART DIAGNOSTIC',
+    'HISTÓRICO DE SALVAMENTOS AUTOMÁTICOS',
+    '=== SALVAMENTO_BEGIN ===',
+    'NÚMERO: 2',
+    'MOTIVO: interrupted-write',
+    '[HISTORY]',
+    'N/D',
+  ].join('\n');
+  files.set(target, incomplete);
+  await assert.rejects(
+    history.appendAutoSaveHistory(BASE, state, '1.0.1', 'incomplete-legacy'),
+    /AUTOSAVE_HISTORY_BLOCK_STRUCTURE_FAILED/,
+  );
+  assert.strictEqual(files.get(target), incomplete, 'bloco incompleto legado deve ser preservado para recuperação');
 });
 
 test('7c. mudança de combustível é publicada sem reler configurações a cada PID', async () => {
@@ -856,6 +907,38 @@ test('15. diário de sessões preserva eventos concorrentes no mesmo arquivo', a
   assert.ok(saved.includes('2026-10-10T12:00:03.000Z'));
 });
 
+test('15b. diário diário mantém todas as páginas acima de 365 datas', async () => {
+  resetFS();
+  const history = loadTs(path.join(ROOT, 'src/meriva/dailyObdHistory.ts'));
+  const state = loadTs(path.join(ROOT, 'src/meriva/autosaveState.ts')).createEmptyMerivaState();
+  const target = BASE + '/VIAGENS/meriva_smart_daily_obd_history.txt';
+  const start = Date.UTC(2025, 9, 17);
+  const dates = Array.from({ length: 366 }, (_, index) =>
+    new Date(start + index * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+  );
+  const legacy = [
+    'MERIVA SMART DIAGNOSTIC',
+    ...dates.flatMap((date) => [
+      '',
+      '========== DIA: ' + date + ' ==========',
+      'KEEP:' + date,
+      '========== FIM DO DIA ==========',
+    ]),
+    '',
+  ].join('\n');
+  files.set(target, legacy);
+
+  await history.appendDailyObdSessionEvent(BASE, state, 'SESSION_START', '2025-10-17T12:00:00.000Z');
+  const saved = files.get(target);
+  assert.strictEqual(
+    (saved.match(/^========== DIA: \d{4}-\d{2}-\d{2} ==========$/gm) || []).length,
+    366,
+    'o diário deve preservar as 366 datas, sem truncar a mais antiga',
+  );
+  assert.ok(saved.includes('KEEP:2025-10-17'), 'a primeira página não deve ser removida');
+  assert.ok(saved.includes('KEEP:2026-10-17'), 'a última página deve permanecer');
+});
+
 test('recuperação após encerramento abrupto limpa conexão fantasma e registra evento', async () => {
   const m = manager();
   m.disposeAutoSave();
@@ -909,6 +992,79 @@ test('diário diário não sobrescreve arquivo existente quando a leitura falha'
   assert.strictEqual(files.get(target), originalContent, 'o histórico anterior deve permanecer intacto');
 });
 
+test('diário TXT com estrutura inválida não é reescrito', async () => {
+  resetFS();
+  const history = loadTs(path.join(ROOT, 'src/meriva/dailyObdHistory.ts'));
+  const state = loadTs(path.join(ROOT, 'src/meriva/autosaveState.ts')).createEmptyMerivaState();
+  const target = BASE + '/VIAGENS/meriva_smart_daily_obd_history.txt';
+  const original = 'MERIVA SMART DIAGNOSTIC\nCONTEÚDO LEGADO NÃO PARSEÁVEL — NÃO APAGAR\n';
+  files.set(target, original);
+
+  await assert.rejects(
+    history.appendDailyObdSessionEvent(BASE, state, 'SESSION_START', '2026-10-12T12:00:00.000Z'),
+    /DAILY_HISTORY_PAGE_MARKERS_MISSING/,
+  );
+  assert.strictEqual(files.get(target), original, 'conteúdo que não pode ser parseado deve permanecer intacto');
+});
+
+test('diário TXT restaura a cópia anterior se a substituição recuperável falhar', async () => {
+  resetFS();
+  const history = loadTs(path.join(ROOT, 'src/meriva/dailyObdHistory.ts'));
+  const state = loadTs(path.join(ROOT, 'src/meriva/autosaveState.ts')).createEmptyMerivaState();
+  const target = BASE + '/VIAGENS/meriva_smart_daily_obd_history.txt';
+  const original = [
+    'MERIVA SMART DIAGNOSTIC',
+    'HISTÓRICO TXT POR DIA — CADA DATA É UMA PÁGINA LÓGICA.',
+    'REGRA: cada sessão ECU validada gera eventos de início e encerramento; sessão interrompida é marcada na próxima abertura.',
+    'FONTE: estado local do aplicativo; valores mantêm fonte e horário quando disponíveis.',
+    '',
+    '========== DIA: 2026-10-16 ==========',
+    'EVENTO_LEGADO_PRESERVAR',
+    '========== FIM DO DIA ==========',
+    '',
+  ].join('\n');
+  files.set(target, original);
+  const originalMove = currentFS.moveAsync;
+  currentFS.moveAsync = async () => { throw new Error('falha simulada de move'); };
+
+  try {
+    await assert.rejects(
+      history.appendDailyObdSessionEvent(BASE, state, 'SESSION_START', '2026-10-16T12:00:00.000Z'),
+      /falha simulada de move/,
+    );
+  } finally {
+    currentFS.moveAsync = originalMove;
+  }
+  assert.strictEqual(files.get(target), original, 'o backup deve restaurar o TXT anterior após falha de move');
+});
+
+test('diário TXT recupera backup se processo parou com arquivo principal ausente', async () => {
+  resetFS();
+  const history = loadTs(path.join(ROOT, 'src/meriva/dailyObdHistory.ts'));
+  const state = loadTs(path.join(ROOT, 'src/meriva/autosaveState.ts')).createEmptyMerivaState();
+  const target = BASE + '/VIAGENS/meriva_smart_daily_obd_history.txt';
+  const backupPath = target + '.previous';
+  const original = [
+    'MERIVA SMART DIAGNOSTIC',
+    'HISTÓRICO TXT POR DIA — CADA DATA É UMA PÁGINA LÓGICA.',
+    'REGRA: cada sessão ECU validada gera eventos de início e encerramento; sessão interrompida é marcada na próxima abertura.',
+    'FONTE: estado local do aplicativo; valores mantêm fonte e horário quando disponíveis.',
+    '',
+    '========== DIA: 2026-10-16 ==========',
+    'EVENTO_LEGADO_PRESERVAR',
+    '========== FIM DO DIA ==========',
+    '',
+  ].join('\n');
+  files.set(backupPath, original);
+  assert.strictEqual(files.has(target), false);
+
+  await history.appendDailyObdSessionEvent(BASE, state, 'SESSION_START', '2026-10-16T12:00:00.000Z');
+  const restoredAndUpdated = files.get(target);
+  assert.ok(restoredAndUpdated.includes('EVENTO_LEGADO_PRESERVAR'), 'backup antigo precisa ser restaurado antes de acrescentar');
+  assert.ok(restoredAndUpdated.includes('--- EVENTO: SESSION_START | 2026-10-16T12:00:00.000Z ---'));
+  assert.strictEqual(files.get(backupPath), original, 'a cópia anterior deve continuar recuperável');
+});
+
 test('histórico de autosave não sobrescreve arquivo existente quando a leitura falha', async () => {
   resetFS();
   const history = loadTs(path.join(ROOT, 'src/meriva/autosaveHistoryTxt.ts'));
@@ -932,6 +1088,36 @@ test('histórico de autosave não sobrescreve arquivo existente quando a leitura
   }
 
   assert.strictEqual(files.get(target), originalContent, 'o histórico autosave anterior deve permanecer intacto');
+});
+
+test('histórico de autosave recupera backup quando arquivo principal está ausente', async () => {
+  resetFS();
+  const history = loadTs(path.join(ROOT, 'src/meriva/autosaveHistoryTxt.ts'));
+  const state = loadTs(path.join(ROOT, 'src/meriva/autosaveState.ts')).createEmptyMerivaState();
+  const target = CONFIG_DIR + '/meriva_smart_autosave_history.txt';
+  const backupPath = target + '.previous';
+  const backup = [
+    'MERIVA SMART DIAGNOSTIC',
+    'HISTÓRICO DE SALVAMENTOS AUTOMÁTICOS',
+    'LIMITE: 200 SALVAMENTOS',
+    'REGRA: quando ultrapassar o limite, o salvamento mais antigo é removido.',
+    '',
+    '=== SALVAMENTO_BEGIN ===',
+    'NÚMERO: 1',
+    'MOTIVO: backup-recovery',
+    'PRESERVAR_AUTOSAVE_ANTERIOR',
+    '=== SALVAMENTO_END ===',
+    '',
+  ].join('\n');
+  files.set(backupPath, backup);
+  assert.strictEqual(files.has(target), false);
+
+  await history.appendAutoSaveHistory(BASE, state, '1.0.1', 'recovery-test');
+  const recovered = files.get(target);
+  assert.ok(recovered.includes('PRESERVAR_AUTOSAVE_ANTERIOR'), 'o autosave anterior deve ser recuperado antes de acrescentar');
+  assert.ok(recovered.includes('NÚMERO: 2'), 'a nova entrada deve continuar a numeração após a recuperação');
+  assert.ok(recovered.includes('=== SALVAMENTO_END ==='));
+  assert.strictEqual(files.has(backupPath), true, 'a cópia anterior deve permanecer disponível após a nova gravação');
 });
 
 // ---------- executor ----------

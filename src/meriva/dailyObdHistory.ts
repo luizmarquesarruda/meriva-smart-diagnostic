@@ -7,7 +7,6 @@ import type { MerivaPersistedState } from './autosaveState';
  * eventos de início/fim sem substituir os eventos anteriores daquele dia.
  */
 export const DAILY_OBD_HISTORY_FILE = 'meriva_smart_daily_obd_history.txt';
-const MAX_DAYS = 365;
 const HEADER = [
   'MERIVA SMART DIAGNOSTIC',
   'HISTÓRICO TXT POR DIA — CADA DATA É UMA PÁGINA LÓGICA.',
@@ -73,6 +72,36 @@ function renderEvent(state: MerivaPersistedState, event: 'SESSION_START' | 'SESS
   return lines.join('\n');
 }
 
+/**
+ * Refuse to rewrite an existing daily history when its structure is unreadable.
+ * A malformed file is kept for recovery rather than silently replaced by the
+ * subset of pages the parser happened to recognize.
+ */
+function validateExistingDailyHistory(content: string): void {
+  if (!content.trim()) return;
+  if (!content.startsWith('MERIVA SMART DIAGNOSTIC')) {
+    throw new Error('DAILY_HISTORY_HEADER_INVALID');
+  }
+
+  const markers = Array.from(
+    content.matchAll(/^========== DIA: (\d{4}-\d{2}-\d{2}) ==========\r?$/gm),
+  );
+  if (!markers.length) {
+    if (content.trim() === HEADER.trim()) return;
+    throw new Error('DAILY_HISTORY_PAGE_MARKERS_MISSING');
+  }
+
+  for (let index = 0; index < markers.length; index += 1) {
+    const marker = markers[index];
+    const bodyStart = (marker.index ?? 0) + marker[0].length;
+    const bodyEnd = markers[index + 1]?.index ?? content.length;
+    const pageBody = content.slice(bodyStart, bodyEnd);
+    if (!/(?:^|\r?\n)========== FIM DO DIA ==========\s*$/.test(pageBody)) {
+      throw new Error('DAILY_HISTORY_PAGE_INCOMPLETE:' + marker[1]);
+    }
+  }
+}
+
 function splitPages(content: string): Map<string, string> {
   const pages = new Map<string, string>();
   // Capture apenas os marcadores de página. Não usar "$" como fim do conteúdo
@@ -101,6 +130,67 @@ function splitPages(content: string): Map<string, string> {
   return pages;
 }
 
+async function writeDailyHistoryRecoverably(path: string, content: string): Promise<void> {
+  const tempPath = path + '.tmp';
+  const previousPath = path + '.previous';
+  await FileSystem.writeAsStringAsync(tempPath, content, { encoding: FileSystem.EncodingType.UTF8 });
+  const readBack = await FileSystem.readAsStringAsync(tempPath, { encoding: FileSystem.EncodingType.UTF8 });
+  if (readBack !== content) throw new Error('DAILY_HISTORY_READBACK_MISMATCH');
+
+  const currentInfo = await FileSystem.getInfoAsync(path);
+  const previousInfo = await FileSystem.getInfoAsync(previousPath);
+  if (previousInfo.exists && previousInfo.isDirectory) throw new Error('DAILY_HISTORY_BACKUP_PATH_IS_DIRECTORY');
+  if (previousInfo.exists) await FileSystem.deleteAsync(previousPath, { idempotent: true });
+  if (currentInfo.exists) await FileSystem.copyAsync({ from: path, to: previousPath });
+
+  try {
+    if (currentInfo.exists) await FileSystem.deleteAsync(path, { idempotent: true });
+    await FileSystem.moveAsync({ from: tempPath, to: path });
+  } catch (error) {
+    const targetInfo = await FileSystem.getInfoAsync(path);
+    let targetIsComplete = false;
+    if (targetInfo.exists && !targetInfo.isDirectory) {
+      try {
+        targetIsComplete = (await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 })) === content;
+      } catch {
+        targetIsComplete = false;
+      }
+    }
+    if (targetInfo.exists && !targetInfo.isDirectory && !targetIsComplete) {
+      await FileSystem.deleteAsync(path, { idempotent: true });
+    }
+    const backupInfo = await FileSystem.getInfoAsync(previousPath);
+    const targetAfterCleanup = await FileSystem.getInfoAsync(path);
+    if (!targetIsComplete && !targetAfterCleanup.exists && backupInfo.exists) {
+      await FileSystem.copyAsync({ from: previousPath, to: path });
+    }
+    throw error;
+  }
+}
+
+async function restoreDailyHistoryBackupIfMainMissing(path: string): Promise<void> {
+  const currentInfo = await FileSystem.getInfoAsync(path);
+  if (currentInfo.exists) return;
+
+  const backupPath = path + '.previous';
+  const backupInfo = await FileSystem.getInfoAsync(backupPath);
+  if (!backupInfo.exists) return;
+  if (backupInfo.isDirectory) throw new Error('DAILY_HISTORY_BACKUP_PATH_IS_DIRECTORY');
+
+  // A process may be killed after deleting the previous file but before moving
+  // the temporary replacement. In that narrow gap, recover the last saved page
+  // before interpreting a missing main file as an empty history.
+  const backupContent = await FileSystem.readAsStringAsync(backupPath, { encoding: FileSystem.EncodingType.UTF8 });
+  validateExistingDailyHistory(backupContent);
+  await FileSystem.copyAsync({ from: backupPath, to: path });
+  const restored = await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 });
+  if (restored !== backupContent) {
+    await FileSystem.deleteAsync(path, { idempotent: true }).catch(() => undefined);
+    throw new Error('DAILY_HISTORY_BACKUP_RESTORE_MISMATCH');
+  }
+  validateExistingDailyHistory(restored);
+}
+
 async function appendDailyObdSessionEventUnsafe(
   basePath: string,
   state: MerivaPersistedState,
@@ -110,6 +200,7 @@ async function appendDailyObdSessionEventUnsafe(
   const path = historyPath(basePath);
   const date = localDayKey(new Date(timestamp));
   await FileSystem.makeDirectoryAsync(`${basePath}/VIAGENS`, { intermediates: true });
+  await restoreDailyHistoryBackupIfMainMissing(path);
   let content = '';
   const info = await FileSystem.getInfoAsync(path);
   if (info.exists && info.isDirectory) {
@@ -121,18 +212,21 @@ async function appendDailyObdSessionEventUnsafe(
     content = await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 });
   }
 
+  validateExistingDailyHistory(content);
   const pages = splitPages(content);
   const previousEvents = pages.get(date) ?? '';
   const updatedEvents = [previousEvents, renderEvent(state, event, timestamp)].filter(Boolean).join('\n\n');
   pages.set(date, updatedEvents);
   const eventCount = (updatedEvents.match(/--- EVENTO: SESSION_(?:START|END|RECOVERED) \|/g) ?? []).length;
 
-  const sortedDates = Array.from(pages.keys()).sort().slice(-MAX_DAYS);
+  // Preserve every logical date page. The explicit storage-cleanup workflow must not impose a silent one-year truncation.
+  const sortedDates = Array.from(pages.keys()).sort();
   const output = [HEADER.trimEnd()];
   for (const day of sortedDates) {
     output.push('', `========== DIA: ${day} ==========`, pages.get(day) ?? '', `========== FIM DO DIA ==========`);
   }
-  await FileSystem.writeAsStringAsync(path, `${output.join('\n')}\n`, { encoding: FileSystem.EncodingType.UTF8 });
+  const serialized = `${output.join('\n')}\n`;
+  await writeDailyHistoryRecoverably(path, serialized);
   return { date, eventCount };
 }
 

@@ -15,6 +15,7 @@ import { hydrateState, isValidEnvelope, validatePayload } from './autosaveValida
 import { migrateEnvelope } from './autosaveMigrations';
 import { appendAutoSaveHistory } from './autosaveHistoryTxt';
 import { appendDailyObdSessionEvent } from './dailyObdHistory';
+import { appendAppEvent } from '../obd/linkEventStore';
 
 const DEBOUNCE_MS = 1500;
 const CHECKPOINT_MS = 45000;
@@ -133,7 +134,12 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
   let saved = false;
 
   try {
-    const savedAt = new Date().toISOString();
+    const wallClockMs = Date.now();
+    const previousSavedAtMs = Date.parse(runtime.lastSavedAt ?? runtime.state.metadata?.savedAt ?? '');
+    const savedAtMs = Number.isFinite(previousSavedAtMs)
+      ? Math.max(wallClockMs, previousSavedAtMs + 1)
+      : wallClockMs;
+    const savedAt = new Date(savedAtMs).toISOString();
     runtime.state.metadata = { ...runtime.state.metadata, savedAt };
     const envelope: AutoSaveEnvelope<MerivaPersistedState> = {
       schemaVersion: AUTOSAVE_SCHEMA_VERSION,
@@ -158,12 +164,21 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
     }
 
     const mainInfo = await FileSystem.getInfoAsync(mainPath(base));
-    if (mainInfo.exists) {
-      await FileSystem.copyAsync({ from: mainPath(base), to: previousPath(base) });
-    }
+    const previousInfo = await FileSystem.getInfoAsync(previousPath(base));
+    if (previousInfo.exists) await FileSystem.deleteAsync(previousPath(base), { idempotent: true });
+    if (mainInfo.exists) await FileSystem.copyAsync({ from: mainPath(base), to: previousPath(base) });
 
-    await FileSystem.copyAsync({ from: tmpPath(base), to: mainPath(base) });
-    await FileSystem.deleteAsync(tmpPath(base), { idempotent: true });
+    try {
+      if (mainInfo.exists) await FileSystem.deleteAsync(mainPath(base), { idempotent: true });
+      await FileSystem.moveAsync({ from: tmpPath(base), to: mainPath(base) });
+    } catch (writeCause) {
+      const targetInfo = await FileSystem.getInfoAsync(mainPath(base));
+      const backupInfo = await FileSystem.getInfoAsync(previousPath(base));
+      if (!targetInfo.exists && backupInfo.exists) {
+        await FileSystem.copyAsync({ from: previousPath(base), to: mainPath(base) });
+      }
+      throw writeCause;
+    }
 
     runtime.lastSavedAt = savedAt;
     runtime.lastSaveReason = reason;
@@ -386,12 +401,19 @@ export function startObdSessionCheckpoint(): void {
 async function appendDailySessionBoundary(event: 'SESSION_START' | 'SESSION_END' | 'SESSION_RECOVERED'): Promise<void> {
   if (!runtime.basePath) return;
   try {
-    await appendDailyObdSessionEvent(
-      runtime.basePath,
-      runtime.state,
-      event,
-      new Date().toISOString(),
-    );
+    const timestamp = new Date().toISOString();
+    await appendDailyObdSessionEvent(runtime.basePath, runtime.state, event, timestamp);
+    void appendAppEvent(runtime.basePath, {
+      timestamp,
+      sessionId: runtime.state.obd.ecuValidatedAt ?? undefined,
+      eventType: event,
+      detail: {
+        protocol: runtime.state.obd.protocol ?? null,
+        connected: runtime.state.obd.connected,
+        ecuValidatedAt: runtime.state.obd.ecuValidatedAt ?? null,
+        reason: runtime.lastSaveReason,
+      },
+    }).catch((error) => console.warn('[app-event] session event failed:', error instanceof Error ? error.message : error));
   } catch (cause) {
     // O histórico diário é complementar: falha no TXT não invalida o autosave JSON.
     console.warn('[autosave] falha ao registrar fronteira da sessão ECU:', cause instanceof Error ? cause.message : cause);
