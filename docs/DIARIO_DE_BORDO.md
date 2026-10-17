@@ -2464,3 +2464,40 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Limitações: Expo FileSystem não expõe fsync portátil; o fluxo usa leitura de verificação, backup e move com restauração, mas isso não é uma garantia formal de atomicidade de hardware. SQLite/WAL e schema_migrations continuam pendentes.
 - Bloqueio de fixture: o arquivo original scripts/verify_autosave.py e o autosave real 11–16/10 não foram encontrados nos arquivos acessíveis nesta etapa. Não foi criada uma implementação presumida que pudesse divergir do verificador que o usuário já usa.
 - Status: PENDENTE; sem teste físico com Meriva/ELM327.
+
+
+## 2026-10-17 — SQLite de telemetria (PR empilhada sobre PR #65)
+
+### Objetivo
+Adicionar consultas e persistência local estruturada sem trocar o histórico TXT diário, o CSV bruto/interpretado ou o autosave JSON como fontes existentes do aplicativo.
+
+### Pesquisa técnica
+- Expo SDK 51 documenta `expo-sqlite ~14.0.6`; não usar a versão atual do pacote, pois o app continua em SDK 51.
+- O projeto usa Continuous Native Generation: código Android manual fora de config plugins seria perdido durante `prebuild`.
+- A base usa APIs assíncronas, WAL, migrações versionadas e consultas parametrizadas.
+
+### Arquivos
+- `package.json`, `package-lock.json`: dependência `expo-sqlite ~14.0.6` e grafo de dependências bloqueado.
+- `src/knowledge/sqlite_policy.json`: política aditiva, taxonomia de origem e retenção sem exclusão automática.
+- `src/database/sqliteTelemetryStore.ts`: schema versionado, telemetria estruturada, TX/RX brutos e health snapshot.
+- `src/meriva/autosaveIntegration.ts`: índice SQLite é escrito de forma assíncrona; o store não é aguardado pelo polling do ELM327.
+- `tests/sqliteTelemetryStore.test.js`: contrato de migrações, separação REAL_OBD/SIMULACAO, TX/RX, falhas e health.
+- `docs/SQLITE_TELEMETRIA.md`: esquema, regras de integridade e validação pendente.
+
+### Proteções de dados
+- O SQLite é uma cópia/índice secundário; nenhuma leitura, viagem ou sessão TXT/JSON/CSV existente é migrada ou apagada.
+- Respostas falhas preservam TX/RX, mas valor não finito é armazenado como NULL.
+- `REAL_OBD` representa o canal de aquisição e não prova exatidão física de sensor.
+- O schema não contém comandos de atuação nem limpeza de DTC.
+- Nenhuma limpeza por retenção está ativa.
+
+### Testes/CI/build
+- Teste `tests/sqliteTelemetryStore.test.js`: **adicionado, não executado**.
+- Typecheck, `npm test`, prebuild, build Android e teste físico: **não executados**.
+- CI/workflows: commits feitos com marcador `[skip ci]`; verificar status remoto, não presumir sucesso.
+- Sem merge para `main`.
+
+### Próximos passos
+1. Revisar e testar o store SQLite, em especial o carregamento nativo no APK SDK 51 e a pressão de gravações no polling.
+2. Adicionar serviço Android nativo via config plugin separado; testar a integração com o ciclo real de conexão/desconexão e garantir que não abra um segundo socket Bluetooth concorrente.
+3. Só migrar qualquer fonte existente após relatório de reconciliação e backup confirmado.
