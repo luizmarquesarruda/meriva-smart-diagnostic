@@ -123,6 +123,8 @@ async function buildReport(): Promise<string> {
     '',
     `DATA: ${new Date().toISOString()}`,
     '[BUILD]',
+    'SCHEMA VERSION: 1',
+    'EXPORT VERSION: 1',
     `SHA: ${build.gitSha}`,
     `BRANCH: ${build.branch}`,
     `VERSION: ${build.appVersion}`,
