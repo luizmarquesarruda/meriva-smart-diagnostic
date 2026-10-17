@@ -50,3 +50,9 @@ Implementação registrada em branch de trabalho. Estado de testes e compilaçã
 
 ## Aplicação real da preferência de texto
 `largeText` é aplicada via `AdaptiveText` nas telas Painel, Diagnóstico/Saúde, Viagens, Veículo, Bluetooth, Dados, Aprendizado, Histórico/Armazenamento, Laboratório, Testes de Sensores, Mais e Configurações. Os botões/touch targets continuam sujeitos a avaliação em dispositivo físico; a ampliação tipográfica não substitui inspeção de acessibilidade.
+
+
+## Proteção de configuração da IA
+- O app usa `json-schema-library@11.6.2` para validar localmente os catálogos de política e de respostas contra JSON Schema Draft 2020-12.
+- Se a validação falhar, o motor de hipóteses fica bloqueado e a tela Saúde apresenta `IA LOCAL INDISPONÍVEL` com até duas mensagens de validação. A ausência de hipóteses não é tratada como estado normal nesse cenário.
+- O validador é cacheado por ciclo JS; a validação não é executada a cada atualização de telemetria.

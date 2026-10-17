@@ -64,3 +64,12 @@ A CI pode validar tipos, testes automatizados e compilação, mas não prova a q
 
 ## Acessibilidade global — implementação de 2026-10-17
 O componente `AdaptiveText` assina a preferência uma única vez por módulo e reutiliza o valor publicado por `subscribeAppSettings`. Com `largeText=true`, escala 12% os textos com `fontSize` base até 32 px; os valores hero acima desse limite mantêm o tamanho original para evitar escala dupla. A suíte verifica que todas as telas com conteúdo textual, exceto o layout-raiz, usam o componente. Deve ser verificada visualmente em aparelho real para identificar possíveis truncamentos.
+
+
+## Validação JSON Schema em runtime — 2026-10-17
+- Incluída `json-schema-library@11.6.2` como dependência de produção. A biblioteca oferece suporte a JSON Schema Draft 2020-12 e executa em Node e navegadores; a compatibilidade do bundle final com Expo/Hermes será confirmada pela CI de typecheck/build Android.
+- `src/knowledge/aiKnowledgeValidator.ts` valida `ai_policy.json` e `diagnostic_responses.json` contra os respectivos schemas. Também verifica referências cruzadas de regra→resposta e teste de sensor→regra.
+- O resultado é cacheado durante o ciclo JS; não é necessário recompilar/validar catálogos a cada leitura de PID.
+- `runLocalDiagnostic` falha fechado em caso de validação inválida: retorna zero hipóteses e inclui erros de validação. A Central de Saúde avisa que a IA local está indisponível, em vez de interpretar um resultado vazio como “sistema normal”.
+- `tests/aiKnowledgeJson.test.js` invoca a biblioteca instalada, valida os arquivos reais e confirma a rejeição de uma política com `maxAgeMs` acima do limite declarado.
+- Limitação: as duas famílias de catálogo que possuem schema passam pela validação formal; `diagnostic_rules.json` e `sensor_tests.json` têm validação semântica dos vínculos nesta etapa, mas ainda não possuem schemas próprios.

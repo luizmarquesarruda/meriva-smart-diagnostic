@@ -2597,3 +2597,25 @@ Criar arquivos JSON úteis para o raciocínio local do app e transformar o bloqu
 
 ### Limite
 A CI pode provar TypeScript e testes de contrato, mas não mede a legibilidade real nem detecta toda quebra visual em cada densidade de tela. Continua necessária revisão em aparelho Android, em retrato e paisagem.
+
+
+## 2026-10-17 — Biblioteca JSON Schema integrada ao fluxo diagnóstico
+
+### Solicitação
+Incluir no aplicativo uma biblioteca de validação JSON Schema e usá-la nos catálogos criados para a IA local.
+
+### Implementação
+- Adicionada `json-schema-library@11.6.2` como dependência de produção, com lockfile npm atualizado pelo workflow de instalação e lockfile temporário removido ao final desta alteração.
+- Criado `src/knowledge/aiKnowledgeValidator.ts` com validação efetiva contra `ai_policy.schema.json` e `diagnostic_responses.schema.json`.
+- O validador também verifica integridade semântica entre hipóteses definidas em `diagnostic_rules.json`, respostas disponíveis e referências dos testes de sensores.
+- A validação ocorre uma vez por ciclo JS e seu resultado é cacheado.
+- O motor `runLocalDiagnostic` bloqueia a geração de hipóteses se a validação falhar; a tela Saúde comunica `IA LOCAL INDISPONÍVEL`, para não confundir falha de configuração com ausência de defeito.
+- Os testes usam a biblioteca real instalada: validam os dois documentos locais e confirmam que ela rejeita uma política contendo `maxAgeMs=60001`, acima do limite do schema.
+
+### Proteções preservadas
+- Não foram alterados dados de leitura da ECU nem promovidos PIDs candidatos a confirmados.
+- Falha de schema produz diagnóstico bloqueado, nunca “sistema normal” nem hipótese de defeito inventada.
+- Validação é local/offline e não envia comandos à ECU.
+
+### Verificação
+A CI que será disparada após esta consolidação deve confirmar typecheck, testes, Expo prebuild e build de APK Android. A existência do pacote no lockfile foi confirmada após a execução de instalação; a integração final ainda depende do resultado da CI. Sem teste em dispositivo Android e sem sessão física ELM327 nesta etapa.
