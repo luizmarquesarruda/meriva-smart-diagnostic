@@ -72,7 +72,11 @@ export interface DtcRecord {
   source: DataSource;
   historical: boolean;
   confirmed?: boolean;
-  freezeFrame?: { frame: number; dtc: string | null; rpm: number | null; coolantC: number | null };
+  /** CURRENT só é confiável após releitura real nesta sessão ECU. */
+  validation?: 'REVALIDATED_IN_SESSION' | 'HISTORY_WITHOUT_REVALIDATION';
+  validatedAt?: string;
+  sessionId?: string;
+  freezeFrame?: { frame: number | null; dtc: string; rpm: number | null; coolantC: number | null; capturedAt?: string };
 }
 
 export interface ConsumptionReference {
