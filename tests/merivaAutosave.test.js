@@ -907,6 +907,38 @@ test('15. diário de sessões preserva eventos concorrentes no mesmo arquivo', a
   assert.ok(saved.includes('2026-10-10T12:00:03.000Z'));
 });
 
+test('15b. diário diário mantém todas as páginas acima de 365 datas', async () => {
+  resetFS();
+  const history = loadTs(path.join(ROOT, 'src/meriva/dailyObdHistory.ts'));
+  const state = loadTs(path.join(ROOT, 'src/meriva/autosaveState.ts')).createEmptyMerivaState();
+  const target = BASE + '/VIAGENS/meriva_smart_daily_obd_history.txt';
+  const start = Date.UTC(2025, 9, 17);
+  const dates = Array.from({ length: 366 }, (_, index) =>
+    new Date(start + index * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+  );
+  const legacy = [
+    'MERIVA SMART DIAGNOSTIC',
+    ...dates.flatMap((date) => [
+      '',
+      '========== DIA: ' + date + ' ==========',
+      'KEEP:' + date,
+      '========== FIM DO DIA ==========',
+    ]),
+    '',
+  ].join('\n');
+  files.set(target, legacy);
+
+  await history.appendDailyObdSessionEvent(BASE, state, 'SESSION_START', '2025-10-17T12:00:00.000Z');
+  const saved = files.get(target);
+  assert.strictEqual(
+    (saved.match(/^========== DIA: \d{4}-\d{2}-\d{2} ==========$/gm) || []).length,
+    366,
+    'o diário deve preservar as 366 datas, sem truncar a mais antiga',
+  );
+  assert.ok(saved.includes('KEEP:2025-10-17'), 'a primeira página não deve ser removida');
+  assert.ok(saved.includes('KEEP:2026-10-17'), 'a última página deve permanecer');
+});
+
 test('recuperação após encerramento abrupto limpa conexão fantasma e registra evento', async () => {
   const m = manager();
   m.disposeAutoSave();
