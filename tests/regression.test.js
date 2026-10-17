@@ -1044,6 +1044,11 @@ async function testPidAndLearningWriteSerialization() {
   assert.ok(autoTripServiceSource.includes("connection.supportedPids.includes('010B') &&\n          connection.supportedPids.includes('010F')"), 'fallback MAP exige suporte confirmado aos PIDs MAP e IAT');
   assert.ok(autoTripServiceSource.includes('!(mapFallbackQueriedThisCycle && item === pollingPolicy.polling.estimatedFuelRate.mapPid)'), 'MAP usado no fallback não deve ser consultado novamente na telemetria rotativa');
   assert.ok(autoTripServiceSource.includes('FUEL_RATE_DISPLAY_STALE_AFTER_MS'), 'valor em cache deve ter prazo explícito de expiração para exibição');
+  assert.ok(autoTripServiceSource.includes('LINK_LOSS_TRIP_GRACE_MS'), 'queda do enlace deve usar janela explícita de 120 s');
+  assert.ok(autoTripServiceSource.includes('this.startLinkLossGrace()'), 'perda de ECU deve adiar o fechamento da viagem');
+  assert.ok(autoTripServiceSource.includes('await this.resumeAfterLinkLoss()'), 'reconexão dentro da janela deve preservar a viagem');
+  assert.ok(autoTripServiceSource.includes('await this.stopGpsForEcu()'), 'GPS deve parar enquanto a ECU não responde');
+
   assert.ok(!autoTripServiceSource.includes('recordLivePidQuery('), 'telemetria automática deve registrar cada resposta uma única vez via registerObdQuery');
   writeDelayMs = 0;
 }
