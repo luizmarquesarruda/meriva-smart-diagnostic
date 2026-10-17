@@ -80,7 +80,6 @@ export async function registerObdQuery(
       consecutiveFailures: consecutiveRealQueryFailures,
       latencyMs: result.elapsedMs,
       pid: result.parsed.pid,
-      ...(result.parsed.pid === '0142' && result.parsed.value != null ? { adapterVoltageV: result.parsed.value } : {}),
     }).catch((error) => console.warn('[link-event] PID event failed:', error instanceof Error ? error.message : error));
   }
 
