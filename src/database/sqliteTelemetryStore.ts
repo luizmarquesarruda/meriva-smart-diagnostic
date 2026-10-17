@@ -39,7 +39,7 @@ const DATABASE_NAME = storagePolicy.databaseName;
 const SCHEMA_VERSION = 1;
 // Bound memory use if the device is slow or SQLite is temporarily blocked.
 // CSV/raw TXT remain the primary diagnostic record when this secondary index is saturated.
-export const MAX_PENDING_SQLITE_WRITES = 500;
+export const MAX_PENDING_SQLITE_WRITES: number = storagePolicy.writeQueue.maxPendingWrites;
 let pendingWriteCount = 0;
 let droppedSampleCount = 0;
 let lastQueueFullWarningAt = 0;
@@ -135,7 +135,7 @@ function enqueueWrite(operation: () => Promise<void>): Promise<boolean> | null {
   if (pendingWriteCount >= MAX_PENDING_SQLITE_WRITES) {
     droppedSampleCount += 1;
     const now = Date.now();
-    if (now - lastQueueFullWarningAt >= 60_000) {
+    if (now - lastQueueFullWarningAt >= storagePolicy.writeQueue.warningThrottleMs) {
       lastQueueFullWarningAt = now;
       console.warn(
         '[sqlite] fila secundária cheia; amostras SQLite omitidas:',
