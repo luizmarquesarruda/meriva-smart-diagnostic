@@ -397,7 +397,7 @@ test('7. CARSCANNER_SEED nunca vira histórico real', async () => {
   const formatter = loadTs(path.join(ROOT, 'src/meriva/autosaveTxtFormatter.ts'));
   await learning.createLearningProfile(BASE, new Date().toISOString());
   m.updateAutoSaveState((s) => {
-    s.driveCycles = driveCycles.INITIAL_DRIVE_CYCLES.slice();
+    s.driveCycles = [];
   });
   await m.saveNow('critical');
   const profile = await learning.readLearningProfile(BASE);
