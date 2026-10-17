@@ -572,12 +572,27 @@ test('10. exportação TXT legível, sem inventar valores', async () => {
   assert.ok(empty.includes('Modelo: N/D'), 'dados ausentes devem ser N/D');
   assert.ok(empty.includes('Protocolo: N/D'), 'protocolo ausente deve ser N/D');
   assert.ok(empty.includes('Schema: 1'));
+  assert.ok(empty.includes('[BUILD]'));
+  assert.ok(empty.includes('SHA:'));
+  assert.ok(empty.includes('Version Code:'));
+  assert.ok(empty.includes('Tipo de injeção:'));
+
   m.updateAutoSaveState((s) => {
-    s.obd = { connected: true, protocol: 'ISO 14230-4 KWP', ecuAddress: '11', adapterName: 'OBDII' };
+    s.vehicle = { vehicleName: 'Meriva Maxx', year: 2012, yearConfirmed: false, yearSource: 'DEFAULT', make: 'Chevrolet', model: 'Meriva Maxx', engine: '1.4L 8V ECONO.FLEX', displacementCm3: 1389, cylinders: 4, fuel: 'Gasolina / Álcool', modelYearReference: '2010–2012', injectionType: 'Injeção eletrônica (não confirmada)', tankCapacityL: 56, reserveCapacityL: 5, manualSource: 'Manual MY12', createdAt: '', lastModified: '', protocolBaseline: 'KWP FAST' };
+    s.obd = { connected: true, protocol: 'ISO 14230-4 KWP', ecuAddress: '11', adapterName: 'OBDII', ecuIdentification: '2457I8336IYIZ' };
+    s.lastReadings = [{ pid: '010C', name: 'Engine RPM', value: 800, unit: 'rpm', status: 'RESPONDEU', timestamp: '2026-10-16T18:41:00.000Z', source: 'REAL', dataSource: 'REAL', monotonicMs: 123.4 }];
   });
   const filled = formatter.formatAutoSaveTxt(m.getAutoSaveState(), opts);
   assert.ok(filled.includes('ISO 14230-4 KWP'));
   assert.ok(filled.includes('ECU: 11'));
+  assert.ok(filled.includes('Ano confirmado: NÃO'));
+  assert.ok(filled.includes('data_source=REAL'));
+  assert.ok(filled.includes('age_ms='));
+  assert.ok(filled.includes('quality=STALE') || filled.includes('quality=FRESH'));
+  const shared = formatter.formatAutoSaveTxt(m.getAutoSaveState(), { ...opts, shared: true });
+  assert.ok(!shared.includes('2457I8336IYIZ'));
+  assert.ok(!shared.includes('OBDII'));
+  assert.ok(!shared.includes('VIN:'));
   m.disposeAutoSave();
 });
 
