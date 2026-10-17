@@ -125,8 +125,8 @@ export default function ArmazenamentoScreen() {
         </View>
         {!sqliteHealth?.available && sqliteHealth?.lastError
           ? <Text style={styles.note}>Diagnóstico: {sqliteHealth.lastError}</Text>
-          : <Text style={styles.note}>Índice secundário de telemetria. TXT diário, CSV bruto/interpretado e autosave JSON continuam preservados.</Text>}
-        <TouchableOpacity style={styles.button} onPress={() => void refreshSqlite()} disabled={busy}>
+          : <Text style={styles.note}>Índice secundário; não altera o autosave JSON nem os históricos TXT. A limpeza de CSV segue as regras existentes da tela.</Text>}
+        <TouchableOpacity style={[styles.button, { flex: 0 }]} onPress={() => void refreshSqlite()} disabled={busy}>
           <Text style={styles.buttonText}>VERIFICAR SQLITE</Text>
         </TouchableOpacity>
       </View>
