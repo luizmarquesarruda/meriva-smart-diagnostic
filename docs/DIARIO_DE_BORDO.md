@@ -2488,3 +2488,12 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Commits adicionais: `94659b1a151dcae24c4596f8ab641c9656fd72dd` (limpeza de estilos) e `f924a8d709c10e9031e92533f798192974b97eb9` (contrato de orientação).
 - Esses checks são inspeções de conteúdo e não substituem executar Node/Jest. Testes locais, typecheck, Expo Doctor, prebuild, build APK, screenshots e validação física continuam **NÃO EXECUTADOS**. CI permanece **NÃO DISPARADA**.
 - PR #68 atualizada, continua aberta em rascunho e não foi mesclada.
+
+
+### Retorno explícito nas telas com cabeçalho nativo oculto
+
+- A revisão identificou risco introduzido por `headerShown: false`: `app/laboratorio.tsx`, `app/armazenamento.tsx` e `app/configuracoes.tsx` não tinham link interno de retorno e dependiam da seta nativa.
+- Corrigido adicionando controle acessível de retorno ao Painel no Laboratório e a Mais recursos em Armazenamento/Configurações. As telas continuam com títulos internos, sem depender do cabeçalho nativo para voltar.
+- `tests/cockpitNavigation.test.js` agora verifica a presença desses retornos.
+- Commits desta correção: `949b6cf832e557f4beacfeabd47038cf14b104b0`, `7e3845de6147fb1da4f4b015ef4731f8194ef8bb`, `d9b2fe95949da01b5d47ca1c4e9ff9512473ed94`, `b59768a92e8e039ed6f709bd3f71895f655f3dbb`, `e07630118cf7955c432182b03d14eeb86e52dc3f`, `818df8e26b59fb030b60d0c1f39cea3836cd5086`.
+- **NÃO EXECUTADOS:** testes Node, TypeScript, Expo Doctor, prebuild, APK, inspeção visual e teste físico. CI não disparada; PR #68 continua em rascunho.
