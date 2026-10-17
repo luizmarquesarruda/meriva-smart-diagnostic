@@ -169,6 +169,8 @@ export default function ConfiguracaoScreen() {
                 ['VOLTAGE', 'TENSÃO'],
                 ['THROTTLE', 'BORBOLETA'],
                 ['SPEED', 'VELOCIDADE GPS'],
+                ['CONSUMPTION', 'CONSUMO km/L'],
+                ['FAULTS', 'FALHAS ATIVAS'],
               ] as const).map(([value, label]) => (
                 <TouchableOpacity key={value} accessibilityRole="button" accessibilityState={{ selected: settings.homePrimaryMetric === value }} style={[styles.choice, settings.homePrimaryMetric === value && styles.choiceActive]} onPress={() => {
                   const next = { ...settings, homePrimaryMetric: value, ...(value === 'SPEED' ? { showSpeedMetric: true } : {}) };
