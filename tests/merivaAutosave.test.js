@@ -477,6 +477,7 @@ test('7b. histórico autosave elimina duplicatas legadas e serializa gravações
   assert.strictEqual(finalNumbers.length, 9, 'cada escrita concorrente deve gerar um snapshot sem perder os demais');
   assert.strictEqual(new Set(finalNumbers).size, finalNumbers.length, 'números de salvamento devem ser únicos');
   assert.deepStrictEqual(finalNumbers, [...finalNumbers].sort((a, b) => a - b), 'snapshots devem permanecer em ordem crescente');
+  assert.ok(finalNumbers.every((number, index) => index === 0 || number === finalNumbers[index - 1] + 1), 'numeração deve ser consecutiva sem lacunas');
   const persisted = files.get(target);
   const footer = persisted.match(/\nBLOCKS:\s*(\d+)\nBYTES:\s*(\d+)\nSHA256:\s*([a-f0-9]{64})\n?$/i);
   assert.ok(footer, 'arquivo deve terminar com rodapé de integridade');
