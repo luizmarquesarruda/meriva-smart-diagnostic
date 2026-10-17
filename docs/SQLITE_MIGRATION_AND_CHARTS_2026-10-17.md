@@ -16,8 +16,9 @@ A seleção usa versões compatíveis com a linha SDK 51, não os últimos major
 
 Arquivo privado do aplicativo: `meriva-smart-diagnostic.db`. O módulo `src/database/diagnosticDatabase.ts` mantém uma única promessa de inicialização e uma migração versionada (`schema_migrations`, versão 1).
 
-Tabelas criadas na migração inicial:
-- `pid_samples`: valor opcional, unidade, status de parser, origem explícita, RX bruto, hora UTC e hora local; índices por PID/data e origem/data;
+Tabelas criadas nas migrações v1/v2:
+- `pid_samples`: amostras numéricas válidas e amostradas, com unidade, status de parser, origem explícita, RX bruto, hora UTC e hora local; índices por PID/data e origem/data;
+- `telemetry_samples`: consultas completas de protocolo, inclusive falhas, com valor NULL quando ausente, status do comando, protocolo, latência e TX/RX; índices por PID/data e data;
 - `dtc_records`: estado, origem, primeiras/últimas ocorrências e metadados;
 - `trips` e `trip_telemetry`: viagens e amostras esparsas;
 - `sensor_test_runs` e `sensor_test_results`: sessões de teste, tentativas por PID e avaliação;
@@ -31,7 +32,7 @@ Consultas usam parâmetros SQL; campos de origem têm restrições CHECK; valore
 A adoção é aditiva, não uma substituição abrupta:
 1. Autosave JSON, arquivos CSV e relatórios TXT existentes continuam preservados como fonte de restauração/exportação.
 2. O app tenta inicializar o SQLite em paralelo no layout raiz. Erro é registrado no log e não bloqueia Bluetooth/ECU nem o autosave antigo.
-3. Leituras numéricas finitas com status RESPONDEU são enfileiradas de forma assíncrona, limitadas a uma amostra por PID/origem a cada 5 s. A fila SQL não segura o próximo comando serial do ELM327.
+3. Cada consulta OBD (inclusive timeout/NO DATA) é enfileirada de forma assíncrona em `telemetry_samples`, mantendo status, protocolo, latência e TX/RX. A fila secundária tem limite de 500 gravações pendentes e só descarta amostras do índice SQLite quando saturada; CSV/TXT permanecem independentes. Uma amostra numérica RESPONDEU por PID/origem a cada 5 s é adicionalmente registrada em `pid_samples`. A fila SQL não segura o próximo comando serial do ELM327.
 4. O autosave espelha DTCs após gravação JSON; viagens só são indexadas quando `source === REAL_OBD`.
 5. Depois de gerar o TXT dos testes de sensores, o app grava o conjunto estruturado quando a ECU real foi validada no início. Se SQLite falhar, o TXT continua salvo e a interface informa o problema.
 6. A base existente ainda precisa de uma etapa posterior de importação idempotente de históricos JSON/CSV antigos. Nenhuma migração destrutiva é executada nesta fase.
@@ -51,6 +52,6 @@ A filtragem foi isolada em `src/trip/tripChartData.ts` com testes de proveniênc
 
 ## Validação e limitações
 
-A suíte adiciona testes de contrato para schema/versionamento SQLite, origem dos dados, consultas parametrizadas, exclusão de viagens seed, armazenamento de relatório e política de gráficos. O teste da API Expo SQLite usa mock Node: demonstra contratos da camada JS, não é teste de um arquivo SQLite nativo real. O build Android da CI verifica a integração nativa; somente o APK instalado e uma sessão física podem comprovar comportamento no dispositivo e com a Meriva/ELM327.
+A suíte adiciona testes de contrato para schema/migração SQLite v1→v2, captura de resposta OBD sem sucesso, origem dos dados, consultas parametrizadas, exclusão de viagens seed, armazenamento de relatório e política de gráficos. O teste da API Expo SQLite usa mock Node: demonstra contratos da camada JS, não é teste de um arquivo SQLite nativo real. O build Android da CI verifica a integração nativa; somente o APK instalado e uma sessão física podem comprovar comportamento no dispositivo e com a Meriva/ELM327.
 
 Próximos passos após CI: corrigir os erros observados; confirmar o APK standalone; instalar no Samsung Android de teste; verificar criação/reabertura do banco, persistência após encerrar o app, espaço de armazenamento e sessão real. A migração histórica deve ser separada e idempotente antes de mudar qualquer caminho de leitura principal.
