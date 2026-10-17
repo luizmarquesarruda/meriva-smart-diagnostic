@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
 import { flushCsvLogs } from '../src/database/csvLogger';
@@ -25,6 +25,7 @@ export default function ArmazenamentoScreen() {
   const [usageBreakdown, setUsageBreakdown] = useState<Record<string, number>>({});
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const [sharedExport, setSharedExport] = useState(true);
   const [cycles, setCycles] = useState<DriveCycle[]>([]);
 
   async function refresh(path: string) {
@@ -71,7 +72,7 @@ export default function ArmazenamentoScreen() {
     try {
       await flushCsvLogs();
       const path = format === 'JSON'
-        ? await exportDiagnosticsJson(basePath)
+        ? await exportDiagnosticsJson(basePath, { shared: sharedExport })
         : await exportDriveCyclesCsv(basePath);
       setMessage(`EXPORTADO ${format}: ${path}`);
     } catch {
@@ -114,6 +115,14 @@ export default function ArmazenamentoScreen() {
           </View>
         )) : <Text style={styles.empty}>Nenhuma viagem salva ainda.</Text>}
       </View>
+      </View>
+
+      <View style={styles.shareRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.label}>MODO COMPARTILHÁVEL</Text>
+          <Text style={styles.note}>Redige VIN, identificadores da ECU e nome/endereço do adaptador no JSON.</Text>
+        </View>
+        <Switch value={sharedExport} onValueChange={setSharedExport} trackColor={{ false: '#475569', true: '#2563eb' }} thumbColor={sharedExport ? '#dbeafe' : '#cbd5e1'} />
       </View>
 
       <View style={styles.exportRow}>
