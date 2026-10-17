@@ -178,7 +178,9 @@ export default function IndexScreen() {
   const rpmValue = rpmReading?.value ?? null;
   const coolantReading = freshRealReading((item) => item.pid === '0105' || /coolant|arrefecimento|temperatura.*motor/i.test(item.name));
   const coolantValue = coolantReading?.value ?? null;
-  const voltageReading = freshRealReading((item) => item.pid === '0142' || item.pid === 'ATRV' || /module.*voltage|voltagem|tensão.*módulo|tensão.*adaptador/i.test(item.name));
+  const ecuVoltageReading = freshRealReading((item) => item.pid === '0142' || /module.*voltage|voltagem|tensão.*módulo/i.test(item.name));
+  const adapterVoltageReading = freshRealReading((item) => item.pid === 'ATRV' || /tensão.*adaptador/i.test(item.name));
+  const voltageReading = ecuVoltageReading ?? adapterVoltageReading;
   const voltageValue = voltageReading?.value ?? null;
   const throttleReading = freshRealReading((item) => item.pid === '0111' || /throttle|borboleta/i.test(item.name));
   const throttleValue = throttleReading?.value ?? null;
