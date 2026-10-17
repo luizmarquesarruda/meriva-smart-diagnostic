@@ -142,7 +142,7 @@ export class RealTripRecorder {
     const chosenDeltaKm = obdDeltaKm !== null ? obdDeltaKm : gpsDeltaKm;
     if (chosenDeltaKm !== null && Number.isFinite(chosenDeltaKm) && chosenDeltaKm >= 0) {
       this.distanceKm = Number((this.distanceKm + chosenDeltaKm).toFixed(3));
-      this.distanceSources.add(obdDeltaKm !== null ? 'OBD' : 'GPS');
+      if (chosenDeltaKm > 0) this.distanceSources.add(obdDeltaKm !== null ? 'OBD' : 'GPS');
     }
     this.maxSpeedKmh = Number(Math.max(this.maxSpeedKmh, speedKmh).toFixed(1));
 
