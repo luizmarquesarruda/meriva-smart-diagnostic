@@ -5,8 +5,9 @@ import diagnosticPolicy from '../knowledge/diagnostic_policy.json';
 
 export interface DiagnosticInput { observations: PidObservation[]; dtcs?: DtcRecord[]; condition?: VehicleCondition; ecuConnected?: boolean; }
 export interface DiagnosticEvidence { ruleId: string; text: string; source: 'DTC' | 'PID'; pid?: string; dtc?: string; value?: number; }
+export interface DiagnosticAction { id: string; priority: 'HIGH' | 'MEDIUM' | 'INFO'; title: string; detail: string; }
 export interface DiagnosticHypothesis { id: string; label: string; score: number; confidence: 'LOW' | 'MEDIUM' | 'HIGH'; evidence: DiagnosticEvidence[]; nextTests: string[]; }
-export interface DiagnosticResult { engine: 'LOCAL_EVIDENCE_ENGINE'; version: 1; generatedAt: string; hypotheses: DiagnosticHypothesis[]; blockedSimulationSamples: number; blockedNonLiveSamples: number; blockedNonLiveDtcs: number; blockedStaleObservations: number; blockedStaleDtcs: number; disconnectedEvidenceIgnored: boolean; disclaimer: string; }
+export interface DiagnosticResult { engine: 'LOCAL_EVIDENCE_ENGINE'; version: 1; generatedAt: string; hypotheses: DiagnosticHypothesis[]; blockedSimulationSamples: number; blockedNonLiveSamples: number; blockedNonLiveDtcs: number; blockedStaleObservations: number; blockedStaleDtcs: number; disconnectedEvidenceIgnored: boolean; recommendedActions: DiagnosticAction[]; disclaimer: string; }
 
 interface Rule { id: string; trigger: { dtc?: string; combinedTrimMin?: number; combinedTrimMax?: number; condition?: VehicleCondition; mapMinKpa?: number; }; hypothesis: string; baseScore: number; tests: string[]; }
 
@@ -162,11 +163,51 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
     add(mapRule, { ruleId: mapRule.id, text: 'MAP em marcha lenta aquecida = ' + map.value!.toFixed(2) + ' kPa.', source: 'PID', pid: '010B', value: map.value! });
   }
 
+  const hypothesisResults = [...hypotheses.values()].sort((a, b) => b.score - a.score);
+  const recommendedActions: DiagnosticAction[] = [];
+
+  if (input.ecuConnected === false) {
+    recommendedActions.push({
+      id: 'RESTORE_ECU_LINK',
+      priority: 'HIGH',
+      title: 'Restabelecer comunicação com a ECU',
+      detail: 'Sem resposta atual, dados guardados são histórico e não confirmam o estado presente do motor.',
+    });
+  } else {
+    if (blockedStaleObservations > 0 || (input.ecuConnected === true && latestPidById.size === 0)) {
+      recommendedActions.push({
+        id: 'REFRESH_CONFIRMED_PIDS',
+        priority: 'HIGH',
+        title: 'Atualizar PIDs confirmados',
+        detail: blockedStaleObservations > 0
+          ? blockedStaleObservations + ' leitura(s) passaram de 120 s; repetir somente consultas anunciadas e funcionais na ECU.'
+          : 'Ainda não há leitura atual válida; coletar respostas reais para PIDs confirmados antes de inferir falhas.',
+      });
+    }
+    if (input.ecuConnected === true && (liveDtcs.length === 0 || blockedStaleDtcs > 0)) {
+      recommendedActions.push({
+        id: 'READ_SESSION_DTCS',
+        priority: 'MEDIUM',
+        title: 'Reler os DTCs da sessão',
+        detail: 'Consultar modos 03 e 07 e o modo 0A quando suportado; só classificar o código como atual depois de resposta válida da ECU.',
+      });
+    }
+    if (input.ecuConnected === true && hypothesisResults.length === 0 && latestPidById.size > 0) {
+      recommendedActions.push({
+        id: 'COLLECT_CONTEXTUAL_EVIDENCE',
+        priority: 'INFO',
+        title: 'Coletar evidência complementar',
+        detail: 'Nenhuma regra atual disparou. Isso não comprova normalidade; registrar leituras adicionais válidas nas condições em que o sintoma ocorre.',
+      });
+    }
+  }
+
   return {
     engine: 'LOCAL_EVIDENCE_ENGINE',
     version: 1,
     generatedAt: new Date().toISOString(),
-    hypotheses: [...hypotheses.values()].sort((a, b) => b.score - a.score),
+    hypotheses: hypothesisResults,
+    recommendedActions,
     blockedSimulationSamples,
     blockedNonLiveSamples,
     blockedNonLiveDtcs,
