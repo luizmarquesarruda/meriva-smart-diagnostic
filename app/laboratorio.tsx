@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'expo-router';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
@@ -493,6 +494,7 @@ export default function LaboratorioScreen() {
     <SafeAreaView style={{flex:1,backgroundColor:'#eef3fb'}} edges={["top","bottom","left","right"]}>
     <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
       <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
+      <Link href="/" asChild><TouchableOpacity accessibilityRole="button" accessibilityLabel="Voltar ao Painel" style={styles.navigationBack}><Text style={styles.navigationBackText}>← VOLTAR AO PAINEL</Text></TouchableOpacity></Link>
       <Text style={styles.title}>DIAGNÓSTICO OBD</Text>
       <Text style={styles.status}>{status}</Text>
       <View style={styles.connectionSummary}>
@@ -743,5 +745,7 @@ const styles = StyleSheet.create({
   panel: { backgroundColor: '#1f2937', borderRadius: 14, padding: 16, marginTop: 8 },
   label: { color: '#93c5fd', marginTop: 8 },
   value: { color: '#f8fafc', fontSize: 16, marginTop: 3 },
+  navigationBack: { alignSelf: 'flex-start', paddingVertical: 8, paddingHorizontal: 10, marginBottom: 8, backgroundColor: '#dbeafe', borderRadius: 8 },
+  navigationBackText: { color: '#1557a6', fontSize: 10, fontWeight: '900' },
   error: { color: '#c2410c', marginTop: 16 },
 });

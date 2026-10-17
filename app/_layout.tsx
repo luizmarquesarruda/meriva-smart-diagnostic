@@ -102,6 +102,8 @@ export default function RootLayout() {
     <SafeAreaProvider>
     <Stack
       screenOptions={{
+        // As telas desenham seus títulos e oferecem retorno explícito; ocultar o header nativo evita títulos duplicados sem retirar a navegação de volta.
+        headerShown: false,
         headerStyle: { backgroundColor: '#d9d9d9' },
         headerTintColor: '#1557a6',
         headerTitleStyle: { fontWeight: '900' },

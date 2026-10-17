@@ -2450,3 +2450,73 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Nova CI solicitada pela atualização da branch; confirmar resultado integral, inclusive testes restantes e build Android.
 - Teste físico do ELM327 no veículo continua pendente.
 
+
+
+## 2026-10-17 — Consolidação de navegação e acessibilidade do cockpit
+
+### Evidência
+- `app/index.tsx` continha três atalhos horizontais (Diagnóstico, Dados e Viagens), outro atalho para Saúde, uma barra inferior com Bluetooth/Mais que desaparecia em paisagem, e o estado da conexão sem ação de navegação.
+- `app/mais.tsx` repetia os destinos Viagens e Veículo em relação ao Painel/barra principal; Bluetooth tinha entrada no menu Mais embora o estado do enlace já estivesse visível no cabeçalho.
+- `src/ui/midLayout.ts` já calcula orientação, margens e largura máxima. O encaixe visual real nos tamanhos-alvo continua pendente, pois esta etapa não executou emulador nem aparelho.
+
+### Alterações nesta branch
+- `app/index.tsx`: criado menu principal persistente com quatro destinos (Painel, Diagnóstico, Viagens e Veículo), também em paisagem; o cabeçalho/chip de estado abre a tela Bluetooth; os atalhos redundantes foram substituídos por um único acesso a Mais recursos; o cartão de Saúde permanece informativo.
+- `app/mais.tsx`: removidos os destinos redundantes Viagens e Veículo e a entrada Bluetooth; adicionada a entrada Dados ao Vivo para preservar acesso à rota `/dados`.
+- `tests/cockpitNavigation.test.js`: os contratos agora verificam destinos principais, entrada única de Bluetooth e ausência de destinos duplicados em Mais recursos.
+- `docs/AUDITORIA_ANDROID_NAVEGACAO_2026-10-17.md`: matriz e decisão atualizadas.
+
+### Commits da etapa
+- `38270d168c0fc95af1dd2aad97363e3738e67bb2` — navegação principal e layout em retrato/paisagem.
+- `88e354546dfbc9b1ddfa5c648e3c5cae8c844452` — chip de conexão como entrada única para Bluetooth.
+- `b2f00cb775ee4e2c4c3aed505f9a68e8df069900` e `0ffe47e2f548f1ae491a2c16643c9708fe261018` — consolidação de Mais recursos.
+- `09d1ac479e7a87bc231d49ac9c4a48196dc1935a` e `a13bb3c74bf74f293e5b70e7977ff6c3f68f072f` — contrato de navegação atualizado.
+- `7b1a4be4569780f148e40f32a1022f43696dc09b` — auditoria atualizada.
+
+### Validação e limites
+- **NÃO EXECUTADOS:** Jest/Node, typecheck, Expo Doctor, prebuild, Gradle/APK, screenshots, aparelho Android, teste físico da Meriva/ELM327.
+- **CI/workflows: NÃO DISPARADOS.**
+- A PR #68 continua em rascunho para revisão; não houve merge.
+- A barra inferior agora fica visível em paisagem, com espaçamento/tipografia reduzidos. Sem screenshot real, não declarar o layout visual aprovado.
+- Nenhuma rota foi excluída; apenas as entradas redundantes foram movidas/consolidadas.
+
+
+### Complemento da revisão estática — navegação do cockpit
+
+- Em revisão estática posterior, atualizados os contratos de `tests/orientationLayout.test.js` para que Dados ao Vivo seja verificado no menu Mais recursos, e não como um segundo atalho no cockpit.
+- Removidos 30 estilos de navegação obsoletos de `app/index.tsx`, sem alterar a lógica de telemetria/OBD.
+- Verificações estáticas do conteúdo remoto retornaram verdadeiro para: destinos primários, acesso aos recursos secundários, entrada única de Bluetooth, ausência de Viagens/Veículo em Mais recursos e barra de navegação ativa em paisagem.
+- Commits adicionais: `94659b1a151dcae24c4596f8ab641c9656fd72dd` (limpeza de estilos) e `f924a8d709c10e9031e92533f798192974b97eb9` (contrato de orientação).
+- Esses checks são inspeções de conteúdo e não substituem executar Node/Jest. Testes locais, typecheck, Expo Doctor, prebuild, build APK, screenshots e validação física continuam **NÃO EXECUTADOS**. CI permanece **NÃO DISPARADA**.
+- PR #68 atualizada, continua aberta em rascunho e não foi mesclada.
+
+
+### Retorno explícito nas telas com cabeçalho nativo oculto
+
+- A revisão identificou risco introduzido por `headerShown: false`: `app/laboratorio.tsx`, `app/armazenamento.tsx` e `app/configuracoes.tsx` não tinham link interno de retorno e dependiam da seta nativa.
+- Corrigido adicionando controle acessível de retorno ao Painel no Laboratório e a Mais recursos em Armazenamento/Configurações. As telas continuam com títulos internos, sem depender do cabeçalho nativo para voltar.
+- `tests/cockpitNavigation.test.js` agora verifica a presença desses retornos.
+- Commits desta correção: `949b6cf832e557f4beacfeabd47038cf14b104b0`, `7e3845de6147fb1da4f4b015ef4731f8194ef8bb`, `d9b2fe95949da01b5d47ca1c4e9ff9512473ed94`, `b59768a92e8e039ed6f709bd3f71895f655f3dbb`, `e07630118cf7955c432182b03d14eeb86e52dc3f`, `818df8e26b59fb030b60d0c1f39cea3836cd5086`.
+- **NÃO EXECUTADOS:** testes Node, TypeScript, Expo Doctor, prebuild, APK, inspeção visual e teste físico. CI não disparada; PR #68 continua em rascunho.
+
+
+### Ajuste de densidade em paisagem — sem validação visual
+
+- `app/index.tsx`: o cabeçalho usa padding vertical 8 em paisagem, o atalho de recursos reduz o padding para 6, o espaçamento do grupo de ações diminui e os três cards secundários usam padding vertical compacto 4.
+- `tests/orientationLayout.test.js`: adicionadas asserções de contrato para o modo compacto e para os três cards.
+- Commit de implementação: `81762d87243d38fb35367ec731c8f7bc4aaa275f`; commit do teste: `42e014aa19db89a5d5613216ab7689a37a51ab57`; documentação atualizada em `55bc949c3799bd4fc7a9712e1b570231504f475d`.
+- A verificação estática confirmou três usos do modo compacto e a existência das regras de estilo. A altura real do conteúdo não foi medida via screenshot/emulador.
+- **NÃO EXECUTADOS:** teste Node, TypeScript, Expo Doctor, prebuild, Gradle/APK e dispositivo físico. CI permanece **NÃO DISPARADA**.
+
+
+### CI da navegação Android — execução #2277
+
+- Data reportada pelo GitHub Actions: 2026-10-17.
+- PR: https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/68
+- Workflow run ID: `39028085170`; execução: [CI #2277](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/39028085170).
+- Commit validado: `36af6d44b200fa955a9e095864d4e70f1748c25f` (o mesmo SHA indicado como head da PR no momento da consulta).
+- Evento: `pull_request`; estado final: `completed`; conclusão: **success**.
+- Job `validate`: sucesso. Passos concluídos: Node 20, Java 17, `npm ci --no-audit --no-fund`, `npm run doctor` e `npm run validate` (typecheck + testes).
+- Job `android-build`: sucesso. Passos concluídos: `npm ci`, Expo prebuild para Android, Gradle `:app:assembleRelease`, verificação de APK não vazio e upload do artefato `meriva-smart-diagnostic-standalone-apk` (retenção configurada em 14 dias).
+- Evidência dos jobs: `validate` ID `117382942876`; `android-build` ID `117383071884`; ambos com conclusão `success`.
+- Limitação: CI bem-sucedida não substitui validação visual em emulador/aparelho nem teste físico Meriva + ELM327.
+- Esta entrada é uma atualização documental após a execução #2277. A gravação do diário gera um commit novo e pode iniciar outra CI pelo gatilho `push`; esse novo resultado será registrado separadamente.

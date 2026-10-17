@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'expo-router';
 import Constants from 'expo-constants';
 import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -111,6 +112,7 @@ export default function ConfiguracaoScreen() {
     <SafeAreaView style={{flex:1,backgroundColor:'#0b1220'}} edges={["top","bottom","left","right"]}>
     <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
       <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
+      <Link href="/mais" asChild><TouchableOpacity accessibilityRole="button" accessibilityLabel="Voltar ao menu Mais recursos" style={styles.navigationBack}><Text style={styles.navigationBackText}>← VOLTAR AOS RECURSOS</Text></TouchableOpacity></Link>
       <Text style={styles.title}>CONFIGURAÇÕES</Text>
       <Text style={styles.status}>{status}</Text>
 
@@ -308,4 +310,6 @@ const styles = StyleSheet.create({
   error: { color: '#dc2626', fontWeight: '600', marginBottom: 12 },
   button: { backgroundColor: '#2563eb', borderRadius: 10, padding: 14, alignItems: 'center', marginBottom: 10, marginTop: 6 },
   buttonText: { color: '#fff', fontWeight: '700' },
+  navigationBack: { alignSelf: 'flex-start', paddingVertical: 8, paddingHorizontal: 10, marginBottom: 8, backgroundColor: '#111c2e', borderRadius: 8 },
+  navigationBackText: { color: '#7db3ff', fontSize: 10, fontWeight: '900' },
 });
