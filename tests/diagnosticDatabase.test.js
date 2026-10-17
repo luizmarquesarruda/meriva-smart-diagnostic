@@ -196,6 +196,13 @@ async function main() {
   assert.ok(health.pidSampleCount >= 0);
   assert.ok(health.telemetrySampleCount >= 0);
   assert.strictEqual(health.maxPendingWrites, 500);
+
+  // An existing telemetry-only schema v1 must be upgraded without deleting its tables.
+  dbModule.resetDiagnosticDatabaseForTests();
+  schemaVersion = 1;
+  await dbModule.initializeDiagnosticDatabase();
+  assert.strictEqual(schemaVersion, 2, 'an existing v1 database should migrate to v2');
+  assert.ok(execCalls.some(sql => sql.includes('CREATE TABLE IF NOT EXISTS telemetry_samples')));
   console.log('SQLite database repository contract: OK (mocked Expo SQLite API; native device database not exercised)');
 }
 
