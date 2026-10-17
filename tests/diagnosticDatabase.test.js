@@ -185,7 +185,7 @@ async function main() {
     }],
     assessments: [{ pid: '010C', state: 'CONSISTENTE' }],
   });
-  const sensorInsert = sqlCalls.findLast(call => /INSERT INTO sensor_test_results/i.test(call.sql));
+  const sensorInsert = sqlCalls.findLast(call => /INSERT (?:OR IGNORE )?INTO sensor_test_results/i.test(call.sql));
   assert.ok(sensorInsert);
   assert.strictEqual(sensorInsert.params[1], '010C');
   assert.strictEqual(sensorInsert.params[10], 'CONSISTENTE');
