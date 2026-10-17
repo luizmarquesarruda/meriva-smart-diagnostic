@@ -51,7 +51,7 @@ function main() {
 
   let result = engine.runLocalDiagnostic({
     ...base,
-    dtcs: [{ code: 'P0301', status: 'CONFIRMED', firstSeen: '', lastSeen: '', occurrences: 1, source: 'REAL_OBD', historical: false, confirmed: true }],
+    dtcs: [{ code: 'P0301', status: 'CONFIRMED', firstSeen: '', lastSeen: '', occurrences: 1, source: 'REAL_OBD', historical: false, confirmed: true, validation: 'REVALIDATED_IN_SESSION' }],
   });
   assert.strictEqual(result.hypotheses[0].id, 'FALHA_DE_COMBUSTAO_CILINDRO_1');
   assert.strictEqual(result.hypotheses[0].confidence, 'MEDIUM');
@@ -101,6 +101,13 @@ function main() {
   });
   assert.strictEqual(result.hypotheses.length, 0, 'DTC histórico não pode gerar falha atual');
   assert.strictEqual(result.blockedNonLiveDtcs, 1);
+  result = engine.runLocalDiagnostic({
+    ...base,
+    dtcs: [{ code: 'P0135', status: 'CURRENT', firstSeen: '', lastSeen: '', occurrences: 2, source: 'REAL_OBD', historical: false, confirmed: true }],
+  });
+  assert.strictEqual(result.hypotheses.length, 0, 'CURRENT sem validação de sessão não pode alimentar hipótese atual');
+  assert.strictEqual(result.blockedNonLiveDtcs, 1);
+
 
   result = engine.runLocalDiagnostic({
     ...base,
