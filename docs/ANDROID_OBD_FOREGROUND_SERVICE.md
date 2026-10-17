@@ -40,8 +40,9 @@ O retorno positivo de `startNativeObdForegroundService` significa que o pedido a
 O plugin adiciona:
 - `android.permission.FOREGROUND_SERVICE`
 - `android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE`
+- `android.permission.POST_NOTIFICATIONS`
 
-O app existente já declara permissões Bluetooth no `app.json`. O Android exige o tipo e as permissões compatíveis para serviços em primeiro plano de dispositivos conectados nas versões modernas do sistema. A autorização de Bluetooth em runtime ainda é controlada pelo fluxo de conexão existente; a autorização de localização continua sob o módulo de permissões/Expo Location.
+O app existente já declara permissões Bluetooth no `app.json`. O Android exige o tipo e as permissões compatíveis para serviços em primeiro plano de dispositivos conectados nas versões modernas do sistema. A autorização de Bluetooth em runtime ainda é controlada pelo fluxo de conexão existente; a autorização de localização continua sob o módulo de permissões/Expo Location. No Android 13+, a permissão de notificação é solicitada durante a preparação inicial do app, antes de conectar ao veículo, para evitar um prompt no momento da conexão. Se o usuário negar, o serviço ainda pode ser iniciado, mas a notificação pode não aparecer na gaveta; o Android mantém os controles de serviço ativo do sistema.
 
 ## Validação antes de distribuir APK
 
