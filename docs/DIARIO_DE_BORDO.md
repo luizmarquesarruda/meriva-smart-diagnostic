@@ -2520,3 +2520,6 @@ Um teste gera 366 datas distintas e verifica que a primeira e a última continua
 - A escrita passa por arquivo temporário e leitura de volta byte a byte, guarda o arquivo anterior em `.previous` e tenta restaurá-lo se o `moveAsync` falhar. Diretório inesperado no caminho de backup é tratado como erro; não se apaga automaticamente.
 - Testes adicionados: diário com 366 páginas; conteúdo legada não parseável preservado; recuperação da cópia anterior após falha simulada de `moveAsync`.
 - **Testes não executados nesta etapa.** Os testes são regressões adicionadas, não evidência de aprovação de CI ou validação no telefone.
+
+- Recuperação após encerramento abrupto: na próxima leitura/gravação, se o TXT principal estiver ausente e existir `.previous`, o histórico diário e o histórico de autosave validam o backup, restauram o arquivo e conferem o conteúdo lido de volta antes de acrescentar novos dados. O backup permanece disponível.
+- Novos testes adicionados: diário restaura página anterior quando a principal está ausente; histórico de autosave restaura o bloco anterior e continua a numeração. Testes ainda não executados.
