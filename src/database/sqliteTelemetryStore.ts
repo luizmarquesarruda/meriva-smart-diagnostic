@@ -29,11 +29,20 @@ export interface SqliteDiagnosticsHealth {
   schemaVersion: number;
   sqliteVersion: string | null;
   sampleCount: number | null;
+  pendingWrites: number;
+  droppedSamples: number;
+  maxPendingWrites: number;
   lastError: string | null;
 }
 
 const DATABASE_NAME = storagePolicy.databaseName;
 const SCHEMA_VERSION = 1;
+// Bound memory use if the device is slow or SQLite is temporarily blocked.
+// CSV/raw TXT remain the primary diagnostic record when this secondary index is saturated.
+export const MAX_PENDING_SQLITE_WRITES = 500;
+let pendingWriteCount = 0;
+let droppedSampleCount = 0;
+let lastQueueFullWarningAt = 0;
 let databasePromise: Promise<SQLiteDatabase> | null = null;
 let writeQueue: Promise<void> = Promise.resolve();
 let lastError: string | null = null;
@@ -122,10 +131,27 @@ async function getDatabase(): Promise<SQLiteDatabase> {
   return databasePromise;
 }
 
-function enqueueWrite(operation: () => Promise<void>): Promise<void> {
+function enqueueWrite(operation: () => Promise<void>): Promise<boolean> | null {
+  if (pendingWriteCount >= MAX_PENDING_SQLITE_WRITES) {
+    droppedSampleCount += 1;
+    const now = Date.now();
+    if (now - lastQueueFullWarningAt >= 60_000) {
+      lastQueueFullWarningAt = now;
+      console.warn(
+        '[sqlite] fila secundária cheia; amostras SQLite omitidas:',
+        droppedSampleCount,
+        '(CSV/TXT canônicos continuam independentes)',
+      );
+    }
+    return null;
+  }
+
+  pendingWriteCount += 1;
   const current = writeQueue.catch(() => undefined).then(operation);
   writeQueue = current.catch(() => undefined);
-  return current;
+  return current.then(() => true).finally(() => {
+    pendingWriteCount = Math.max(0, pendingWriteCount - 1);
+  });
 }
 
 /**
@@ -142,7 +168,7 @@ export function recordSqliteTelemetrySample(
 ): Promise<boolean> {
   if (!storagePolicy.enabled) return Promise.resolve(false);
 
-  return enqueueWrite(async () => {
+  const queued = enqueueWrite(async () => {
     const db = await getDatabase();
     const rowSource: SqliteTelemetrySource = source === 'REAL' ? 'REAL_OBD' : 'SIMULACAO';
     const numericValue = query.parsed.value;
@@ -165,7 +191,9 @@ export function recordSqliteTelemetrySample(
       String(query.rx ?? ''),
       sessionId,
     );
-  }).then(() => {
+  });
+  if (!queued) return Promise.resolve(false);
+  return queued.then(() => {
     lastError = null;
     return true;
   }).catch((cause) => {
@@ -193,6 +221,9 @@ export async function getSqliteDiagnosticsHealth(): Promise<SqliteDiagnosticsHea
       schemaVersion: SCHEMA_VERSION,
       sqliteVersion: null,
       sampleCount: null,
+      pendingWrites: pendingWriteCount,
+      droppedSamples: droppedSampleCount,
+      maxPendingWrites: MAX_PENDING_SQLITE_WRITES,
       lastError: 'SQLITE_DISABLED_BY_POLICY',
     };
   }
@@ -208,7 +239,10 @@ export async function getSqliteDiagnosticsHealth(): Promise<SqliteDiagnosticsHea
       schemaVersion: SCHEMA_VERSION,
       sqliteVersion: version?.version ?? null,
       sampleCount: Number(count?.count ?? 0),
-      lastError: null,
+      pendingWrites: pendingWriteCount,
+      droppedSamples: droppedSampleCount,
+      maxPendingWrites: MAX_PENDING_SQLITE_WRITES,
+      lastError: droppedSampleCount > 0 ? 'SQLITE_WRITE_QUEUE_FULL' : null,
     };
   } catch (cause) {
     logStoreError(cause);
@@ -219,6 +253,9 @@ export async function getSqliteDiagnosticsHealth(): Promise<SqliteDiagnosticsHea
       schemaVersion: SCHEMA_VERSION,
       sqliteVersion: null,
       sampleCount: null,
+      pendingWrites: pendingWriteCount,
+      droppedSamples: droppedSampleCount,
+      maxPendingWrites: MAX_PENDING_SQLITE_WRITES,
       lastError,
     };
   }
