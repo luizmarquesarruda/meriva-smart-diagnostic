@@ -2633,7 +2633,8 @@ A persistência estruturada ainda não existia no aplicativo; JSON/TXT funcionav
 - Inicialização SQLite no layout raiz é não bloqueante. O autosave JSON, logs CSV e TXT permanecem preservados; uma falha SQLite não deve interromper a aquisição serial OBD. A política `sqlite_policy.json` define limite de 500 gravações pendentes e cooldown de retentativa de abertura de 15 s.
 - Cada consulta OBD é armazenada na tabela `telemetry_samples` de forma assíncrona, mantendo status, protocolo, latência e TX/RX brutos inclusive quando há timeout/NO DATA. O índice `pid_samples` adicional salva respostas numéricas finitas uma vez a cada 5 s por PID/origem. DTCs são espelhados depois do autosave principal; apenas viagens com origem REAL_OBD são indexadas. Relatórios de sensores continuam exportando TXT, com cópia estruturada quando a ECU real foi validada.
 - Adicionados gráficos de distância (últimas sete viagens reais) e consumo (apenas cobertura válida; exclui valores acima de 30 km/L), com política separada em `src/trip/tripChartData.ts`.
-- Adicionados testes Node de contrato para SQLite e política dos gráficos e incluídos no comando `npm test`.
+- Adicionados testes Node de contrato para migração SQLite v1→v2, captura de falhas/TX/RX e política dos gráficos, registrados no comando `npm test`.
+- Tela Histórico e Dados agora exibe estado, versão efetivamente aplicada, contagens por tabela, fila pendente, descartes do índice secundário e última condição de erro.
 
 ### Proveniência e recuperação
 - `REAL_OBD`, `SIMULACAO`, `CARSCANNER_BASELINE`, `USER_REAL_OBSERVATION` e `IMPORTADO` permanecem fontes distintas.
@@ -2645,7 +2646,8 @@ A persistência estruturada ainda não existia no aplicativo; JSON/TXT funcionav
 - Criado `tests/diagnosticDatabase.test.js` usando mock da API Expo SQLite; ele verifica contrato da camada JavaScript, não um banco nativo real.
 - Criado `tests/tripChartData.test.js` para verificar fontes, limite das sete viagens, cobertura de combustível e valores implausíveis.
 - Adicionado painel na tela Histórico e Dados para visualizar estado, versão do schema, contagens, fila pendente e amostras descartadas do índice secundário.
-- **CI, TypeScript, suíte completa e build Android: A CONFIRMAR após os commits desta mudança.**
+- A branch foi atualizada; a consulta disponível de status não forneceu checks verificáveis para esta cabeça. **CI, TypeScript, suíte completa e build Android seguem A CONFIRMAR; nenhum resultado verde foi presumido.**
+- Foi identificada a store SQLite paralela da PR #66. **Não mesclar os dois stores como módulos independentes**; consolidar o schema e o caminho de gravação antes de um merge conjunto.
 - **NÃO EXECUTADOS nesta etapa:** instalação do APK em aparelho, persistência após reiniciar o app, conexão física Meriva + ELM327 e validação de uso prolongado.
 
 ### Próximos passos
