@@ -8,6 +8,7 @@ import * as FileSystem from 'expo-file-system';
 import { readDriveCycles } from '../src/storage/driveCycleStorage';
 import { getDriveCycleSummary, type DriveCycle } from '../src/data/driveCycles';
 import { BarChart, LineChart } from 'react-native-gifted-charts';
+import { buildTripChartData } from '../src/trip/tripChartData';
 
 const BASE_PATH = FileSystem.documentDirectory + 'MERIVA_SMART';
 const DAY_MS = 86_400_000;
@@ -46,21 +47,7 @@ export default function ViagensScreen() {
   }, [cycles, periodDays]);
   const summary = getDriveCycleSummary(visible);
   const selected = selectedId ? cycles.find(cycle => cycle.id === selectedId) ?? null : null;
-  const chartCycles = visible.slice(0, 7).reverse();
-  const chartLabel = (value: string) => {
-    const date = new Date(value.replace(' ', 'T'));
-    return Number.isFinite(date.getTime())
-      ? date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
-      : value.slice(0, 5);
-  };
-  const distanceChartData = chartCycles
-    .filter(cycle => Number.isFinite(cycle.distanceTotalKm) && cycle.distanceTotalKm >= 0)
-    .map(cycle => ({ value: cycle.distanceTotalKm, label: chartLabel(cycle.startedAt) }));
-  const consumptionChartData = chartCycles
-    .filter(cycle => cycle.fuelDataValid !== false && cycle.fuelUsedL >= 0.05
-      && Number.isFinite(cycle.avgFuelConsumptionKml) && cycle.avgFuelConsumptionKml > 0
-      && cycle.avgFuelConsumptionKml <= 30)
-    .map(cycle => ({ value: cycle.avgFuelConsumptionKml, label: chartLabel(cycle.startedAt) }));
+  const { distance: distanceChartData, consumption: consumptionChartData } = buildTripChartData(visible, 7);
 
   return <SafeAreaView style={s.container} edges={['top','bottom','left','right']}>
     <ScrollView contentContainerStyle={[s.content,{paddingHorizontal:layout.horizontalPadding}]} showsVerticalScrollIndicator={false}>
