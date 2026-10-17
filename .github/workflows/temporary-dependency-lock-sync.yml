@@ -41,8 +41,7 @@ jobs:
           git commit -m "chore(deps): sync dependency lockfile"
           git push origin "HEAD:${GITHUB_REF_NAME}"
           echo "changed=true" >> "$GITHUB_OUTPUT"
-      - name: Dispatch canonical CI for synchronized branch
-        if: steps.commit-lock.outputs.changed == 'true'
+      - name: Dispatch canonical CI after dependency synchronization
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPOSITORY: ${{ github.repository }}
