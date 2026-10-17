@@ -15,6 +15,7 @@ import { hydrateState, isValidEnvelope, validatePayload } from './autosaveValida
 import { migrateEnvelope } from './autosaveMigrations';
 import { appendAutoSaveHistory } from './autosaveHistoryTxt';
 import { appendDailyObdSessionEvent } from './dailyObdHistory';
+import { appendAppEvent } from '../obd/linkEventStore';
 
 const DEBOUNCE_MS = 1500;
 const CHECKPOINT_MS = 45000;
@@ -391,12 +392,19 @@ export function startObdSessionCheckpoint(): void {
 async function appendDailySessionBoundary(event: 'SESSION_START' | 'SESSION_END' | 'SESSION_RECOVERED'): Promise<void> {
   if (!runtime.basePath) return;
   try {
-    await appendDailyObdSessionEvent(
-      runtime.basePath,
-      runtime.state,
-      event,
-      new Date().toISOString(),
-    );
+    const timestamp = new Date().toISOString();
+    await appendDailyObdSessionEvent(runtime.basePath, runtime.state, event, timestamp);
+    void appendAppEvent(runtime.basePath, {
+      timestamp,
+      sessionId: runtime.state.obd.ecuValidatedAt ?? undefined,
+      eventType: event,
+      detail: {
+        protocol: runtime.state.obd.protocol ?? null,
+        connected: runtime.state.obd.connected,
+        ecuValidatedAt: runtime.state.obd.ecuValidatedAt ?? null,
+        reason: runtime.lastSaveReason,
+      },
+    }).catch((error) => console.warn('[app-event] session event failed:', error instanceof Error ? error.message : error));
   } catch (cause) {
     // O histórico diário é complementar: falha no TXT não invalida o autosave JSON.
     console.warn('[autosave] falha ao registrar fronteira da sessão ECU:', cause instanceof Error ? cause.message : cause);
