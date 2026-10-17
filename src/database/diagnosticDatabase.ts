@@ -176,7 +176,7 @@ function isDataSource(value: unknown): value is DataSource {
 }
 
 function normalizePid(pid: string): string {
-  return pid.replace(/\\s/g, '').toUpperCase();
+  return pid.replace(/\s/g, '').toUpperCase();
 }
 
 function parseTimestamp(value: string): Date | null {
