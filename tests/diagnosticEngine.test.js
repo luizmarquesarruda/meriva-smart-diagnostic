@@ -131,6 +131,7 @@ function main() {
   result = engine.runLocalDiagnostic({ ...base, observations: [obs('010B', 50, 'REAL_OBD', staleAt)] });
   assert.strictEqual(result.hypotheses.length, 0, 'leitura antiga não pode gerar hipótese atual');
   assert.strictEqual(result.blockedStaleObservations, 1);
+  assert.ok(result.recommendedActions.some((item) => item.id === 'REFRESH_CONFIRMED_PIDS'));
 
   result = engine.runLocalDiagnostic({ ...base, observations: [obs('010B', 50, 'IMPORTADO')] });
   assert.strictEqual(result.hypotheses.length, 0, 'dados importados nunca podem ser tratados como leitura live');
@@ -144,6 +145,7 @@ function main() {
   });
   assert.strictEqual(result.hypotheses.length, 0, 'ECU desconectada não pode produzir diagnóstico atual com evidência salva');
   assert.strictEqual(result.disconnectedEvidenceIgnored, true);
+  assert.ok(result.recommendedActions.some((item) => item.id === 'RESTORE_ECU_LINK'));
 
   const staleDtcAt = new Date(Date.now() - engine.MAX_DIAGNOSTIC_EVIDENCE_AGE_MS - 1000).toISOString();
   result = engine.runLocalDiagnostic({
@@ -152,6 +154,12 @@ function main() {
   });
   assert.strictEqual(result.hypotheses.length, 0, 'DTC sem atualização recente não pode ser apresentado como atual');
   assert.strictEqual(result.blockedStaleDtcs, 1);
+  assert.ok(result.recommendedActions.some((item) => item.id === 'READ_SESSION_DTCS'));
+
+  result = engine.runLocalDiagnostic({ ...base, ecuConnected: true, observations: [obs('010C', 800)] });
+  assert.strictEqual(result.hypotheses.length, 0);
+  assert.ok(result.recommendedActions.some((item) => item.id === 'COLLECT_CONTEXTUAL_EVIDENCE'),
+    'ausência de hipótese deve gerar tarefa complementar, não declarar motor normal');
 
   console.log('Diagnostic engine: OK');
 }
