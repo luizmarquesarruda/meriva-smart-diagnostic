@@ -26,9 +26,9 @@ function loadTs(tsPath) {
   };
 
   const localRequire = (request) => {
-    if (request.endsWith('diagnostic_rules.json')) {
-      return require(DIAGNOSTIC_RULES_PATH);
-    }
+    if (request.endsWith('diagnostic_rules.json')) return require(DIAGNOSTIC_RULES_PATH);
+    if (request.endsWith('aiKnowledgeValidator')) return loadTs(path.join(ROOT, 'src/knowledge/aiKnowledgeValidator.ts'));
+    if (request.endsWith('.json')) return require(path.resolve(path.dirname(tsPath), request));
     return require(require.resolve(request, { paths: [path.dirname(tsPath)] }));
   };
 
@@ -55,6 +55,7 @@ function main() {
   });
   assert.strictEqual(result.hypotheses[0].id, 'FALHA_DE_COMBUSTAO_CILINDRO_1');
   assert.strictEqual(result.hypotheses[0].confidence, 'MEDIUM');
+  assert.strictEqual(result.knowledgeValidationErrors, undefined, 'catálogos válidos devem permitir executar hipóteses');
 
   result = engine.runLocalDiagnostic({
     ...base,
@@ -120,6 +121,13 @@ function main() {
   assert.strictEqual(result.hypotheses.length, 1);
   assert.strictEqual(result.hypotheses[0].id, 'MISTURA_POBRE');
   assert.strictEqual(result.blockedSimulationSamples, 1);
+
+  result = engine.runLocalDiagnostic({
+    ...base,
+    observations: [{ ...obs('010B', 80), timestamp: new Date(Date.now() - 120_000).toISOString() }],
+  });
+  assert.strictEqual(result.hypotheses.length, 0, 'leituras OBD antigas não podem gerar hipóteses atuais');
+  assert.strictEqual(result.blockedStaleSamples, 1, 'leituras reais antigas devem ser contabilizadas como bloqueadas');
 
   console.log('Diagnostic engine: OK');
 }

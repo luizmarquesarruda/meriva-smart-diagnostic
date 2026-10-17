@@ -1,11 +1,13 @@
 import type { DtcRecord, PidObservation, VehicleCondition } from '../types/sourceTypes';
 import ruleCatalog from '../knowledge/diagnostic_rules.json';
 import sensorTestCatalogJson from '../knowledge/sensor_tests.json';
+import * as aiPolicyJson from '../knowledge/ai_policy.json';
+import { validateAiKnowledgeCatalogs } from '../knowledge/aiKnowledgeValidator';
 
 export interface DiagnosticInput { observations: PidObservation[]; dtcs?: DtcRecord[]; condition?: VehicleCondition; }
 export interface DiagnosticEvidence { ruleId: string; text: string; source: 'DTC' | 'PID'; pid?: string; dtc?: string; value?: number; }
 export interface DiagnosticHypothesis { id: string; label: string; score: number; confidence: 'LOW' | 'MEDIUM' | 'HIGH'; evidence: DiagnosticEvidence[]; nextTests: string[]; }
-export interface DiagnosticResult { engine: 'LOCAL_EVIDENCE_ENGINE'; version: 1; generatedAt: string; hypotheses: DiagnosticHypothesis[]; blockedSimulationSamples: number; blockedNonLiveDtcs: number; disclaimer: string; }
+export interface DiagnosticResult { engine: 'LOCAL_EVIDENCE_ENGINE'; version: 1; generatedAt: string; hypotheses: DiagnosticHypothesis[]; blockedSimulationSamples: number; blockedNonLiveDtcs: number; blockedStaleSamples: number; disclaimer: string; knowledgeValidationErrors?: string[]; }
 
 interface Rule { id: string; trigger: { dtc?: string; combinedTrimMin?: number; combinedTrimMax?: number; condition?: VehicleCondition; mapMinKpa?: number; }; hypothesis: string; baseScore: number; tests: string[]; }
 
@@ -16,20 +18,51 @@ function linkedSensorRecommendations(ruleId: string): string[] {
  return sensorTestLinks.filter((test)=>test.diagnosticRuleIds.includes(ruleId)).slice(0,3)
   .map((test)=>test.label+' (PID '+test.pid+'): '+test.aiGuidance);
 }
-const ACTIVE_DTC_STATUSES = new Set(['CONFIRMED', 'PENDING', 'PERMANENT', 'CURRENT']);
+interface AiPolicyConfig {
+  sources?: { liveObd?: unknown };
+  observations?: { maxAgeMs?: unknown };
+  dtcs?: { activeStatuses?: unknown };
+  scoring?: { mediumAt?: unknown; highAt?: unknown; additionalEvidenceIncrement?: unknown; maxScore?: unknown };
+}
+const aiPolicy = aiPolicyJson as unknown as AiPolicyConfig;
+function policyNumber(value: unknown, fallback: number, min: number, max: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
+  return Math.max(min, Math.min(max, value));
+}
+// Falhar fechado: uma fonte configurada diferente de REAL_OBD nunca vira evidência real.
+const LIVE_OBD_SOURCE = aiPolicy.sources?.liveObd === 'REAL_OBD' ? 'REAL_OBD' : '__INVALID_AI_POLICY_SOURCE__';
+const MAX_DIAGNOSTIC_READING_AGE_MS = policyNumber(aiPolicy.observations?.maxAgeMs, 60_000, 1_000, 60_000);
+const SAFE_ACTIVE_DTC_STATUSES = new Set(['CONFIRMED', 'PENDING', 'PERMANENT', 'CURRENT']);
+const configuredActiveStatuses = aiPolicy.dtcs?.activeStatuses;
+const ACTIVE_DTC_STATUSES = new Set(
+  (Array.isArray(configuredActiveStatuses) ? configuredActiveStatuses : [])
+    .filter((status): status is string => typeof status === 'string')
+    .map((status) => status.toUpperCase())
+    .filter((status) => SAFE_ACTIVE_DTC_STATUSES.has(status)),
+);
+const MEDIUM_CONFIDENCE_AT = policyNumber(aiPolicy.scoring?.mediumAt, 0.5, 0.01, 0.98);
+const HIGH_CONFIDENCE_AT_RAW = policyNumber(aiPolicy.scoring?.highAt, 0.75, 0.51, 0.99);
+const HIGH_CONFIDENCE_AT = HIGH_CONFIDENCE_AT_RAW > MEDIUM_CONFIDENCE_AT ? HIGH_CONFIDENCE_AT_RAW : Math.min(0.99, MEDIUM_CONFIDENCE_AT + 0.01);
+const ADDITIONAL_EVIDENCE_INCREMENT = policyNumber(aiPolicy.scoring?.additionalEvidenceIncrement, 0.15, 0, 0.49);
+const MAX_HYPOTHESIS_SCORE = policyNumber(aiPolicy.scoring?.maxScore, 0.99, 0.5, 0.99);
 
 function isSimulation(item: PidObservation): boolean { return String(item.source ?? '').trim().toUpperCase() === 'SIMULACAO'; }
-function isLiveObd(item: PidObservation): boolean { return String(item.source ?? '').trim().toUpperCase() === 'REAL_OBD'; }
+function isLiveObd(item: PidObservation): boolean { return String(item.source ?? '').trim().toUpperCase() === LIVE_OBD_SOURCE; }
+function isFreshReading(item: PidObservation, now = Date.now()): boolean {
+  const timestamp = Date.parse(item.timestamp);
+  const age = now - timestamp;
+  return Number.isFinite(timestamp) && age >= 0 && age <= MAX_DIAGNOSTIC_READING_AGE_MS;
+}
 
 function pidValue(observations: PidObservation[], pid: string): PidObservation | undefined {
   return observations
-    .filter((item) => item.pid.toUpperCase() === pid.toUpperCase() && item.value !== null && isLiveObd(item))
+    .filter((item) => item.pid.toUpperCase() === pid.toUpperCase() && typeof item.value === 'number' && Number.isFinite(item.value) && isLiveObd(item) && isFreshReading(item))
     .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))[0];
 }
 
 function confidence(score: number): DiagnosticHypothesis['confidence'] {
-  if (score >= 0.75) return 'HIGH';
-  if (score >= 0.5) return 'MEDIUM';
+  if (score >= HIGH_CONFIDENCE_AT) return 'HIGH';
+  if (score >= MEDIUM_CONFIDENCE_AT) return 'MEDIUM';
   return 'LOW';
 }
 
@@ -42,17 +75,32 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
   const observations = rawObservations.filter((item) => !isSimulation(item));
   const rawDtcs = input.dtcs ?? [];
   const liveDtcs = rawDtcs.filter((item) =>
-    String(item.source ?? '').trim().toUpperCase() === 'REAL_OBD'
+    String(item.source ?? '').trim().toUpperCase() === LIVE_OBD_SOURCE
     && ACTIVE_DTC_STATUSES.has(String(item.status ?? '').trim().toUpperCase()),
   );
   const blockedSimulationSamples = rawObservations.filter(isSimulation).length;
+  const blockedStaleSamples = rawObservations.filter((item) => isLiveObd(item) && !isFreshReading(item)).length;
   const blockedNonLiveDtcs = rawDtcs.length - liveDtcs.length;
+  const knowledgeValidation = validateAiKnowledgeCatalogs();
+  if (!knowledgeValidation.valid) {
+    return {
+      engine: 'LOCAL_EVIDENCE_ENGINE',
+      version: 1,
+      generatedAt: new Date().toISOString(),
+      hypotheses: [],
+      blockedSimulationSamples,
+      blockedNonLiveDtcs,
+      blockedStaleSamples,
+      knowledgeValidationErrors: knowledgeValidation.errors,
+      disclaimer: 'Diagnóstico local bloqueado porque os catálogos JSON não passaram na validação. Nenhuma hipótese foi gerada.',
+    };
+  }
   const hypotheses = new Map<string, DiagnosticHypothesis>();
 
   const add = (rule: Rule, evidence: DiagnosticEvidence): void => {
     const current = hypotheses.get(rule.hypothesis);
     if (current) {
-      current.score = Math.min(0.99, current.score + 0.15);
+      current.score = Math.min(MAX_HYPOTHESIS_SCORE, current.score + ADDITIONAL_EVIDENCE_INCREMENT);
       current.evidence.push(evidence);
       current.confidence = confidence(current.score);
       return;
@@ -105,6 +153,7 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
     hypotheses: [...hypotheses.values()].sort((a, b) => b.score - a.score),
     blockedSimulationSamples,
     blockedNonLiveDtcs,
+    blockedStaleSamples,
     disclaimer: 'Hipóteses baseadas em evidências locais. Não condenar peça apenas por um DTC ou um PID isolado; status histórico/inativo e dados não-REAL_OBD não geram falha atual.',
   };
 }

@@ -6,15 +6,38 @@
 
 import type { PidQueryResult } from '../obd/elm327';
 import { logRawObdData, logInterpretedData } from '../database/obdLogger';
+import { recordPidSampleLazy, recordTelemetryQueryLazy } from '../database/diagnosticDatabaseAccess';
 import { PidConfirmationEntry, readPidConfirmations, recordPidConfirmation } from '../database/pidBank';
 import { updateLearningProfileRealSample } from '../database/learningProfile';
 import type { VehicleCondition } from '../types/sourceTypes';
-import { pushLastReading, updateAutoSaveState, scheduleCriticalSave } from './autosaveManager';
+import { pushLastReading, updateAutoSaveState, scheduleCriticalSave, getAutoSaveState } from './autosaveManager';
 import { shouldFeedLearning } from './autosaveValidation';
 import { getVehicleConditionSnapshot, recordLivePidQuery } from '../obd/liveTelemetry';
 import pollingPolicy from '../knowledge/polling_policy.json';
 
 const lastLearningPersistedAt = new Map<string, number>();
+const lastSqliteSampleQueuedAt = new Map<string, number>();
+const SQLITE_SAMPLE_INTERVAL_MS = 5_000;
+let sqliteSamplePersistenceQueue: Promise<void> = Promise.resolve();
+
+function queueSqlitePidSample(sample: {
+  pid: string; name: string; value: number; unit: string; status: string;
+  source: 'REAL_OBD' | 'SIMULACAO'; timestamp: string; rawResponse: string;
+}): void {
+  const key = sample.source + ':' + sample.pid.replace(/\s/g, '').toUpperCase();
+  const now = Date.now();
+  const previous = lastSqliteSampleQueuedAt.get(key);
+  if (previous !== undefined && now - previous < SQLITE_SAMPLE_INTERVAL_MS) return;
+  lastSqliteSampleQueuedAt.set(key, now);
+  // Fila independente: nenhuma escrita SQLite aguarda o próximo comando ELM327.
+  sqliteSamplePersistenceQueue = sqliteSamplePersistenceQueue
+    .catch(() => undefined)
+    .then(() => recordPidSampleLazy(sample).then(() => undefined))
+    .catch((cause) => {
+      console.warn('[sqlite] amostra OBD não foi indexada; logs JSON/CSV continuam disponíveis:',
+        cause instanceof Error ? cause.message : cause);
+    });
+}
 const LEARNING_SAMPLE_MIN_INTERVAL_MS = pollingPolicy.learningSampleMinIntervalMs;
 
 // Learning/profile file I/O must not hold the serial OBD polling loop. Mutations
@@ -60,17 +83,46 @@ export async function registerObdQuery(
 
   recordLivePidQuery(result, source);
 
+  const observationTimestamp = new Date().toISOString();
+  const obdSessionState = getAutoSaveState().obd;
+  // Registra TX/RX inclusive nas tentativas sem resposta. A escrita é secundária,
+  // limitada e assíncrona; não entra na fila de comandos serial do ELM327.
+  void recordTelemetryQueryLazy(
+    result,
+    source,
+    observationTimestamp,
+    obdSessionState.ecuValidatedAt ?? obdSessionState.lastConnectedAt ?? null,
+  ).catch((cause) => console.warn(
+      '[sqlite] consulta OBD não indexada; CSV/TXT continuam disponíveis:',
+      cause instanceof Error ? cause.message : cause,
+    ));
   pushLastReading({
     pid: result.parsed.pid,
     name: result.parsed.name,
     value: result.parsed.value,
     unit: result.parsed.unit,
     status: result.parsed.status,
-    timestamp: new Date().toISOString(),
+    timestamp: observationTimestamp,
     source,
   });
 
   const parsedValue = result.parsed.value;
+  if (
+    result.parsed.status === 'RESPONDEU'
+    && typeof parsedValue === 'number'
+    && Number.isFinite(parsedValue)
+  ) {
+    queueSqlitePidSample({
+      pid: result.parsed.pid,
+      name: result.parsed.name,
+      value: parsedValue,
+      unit: result.parsed.unit || 'N/D',
+      status: result.parsed.status,
+      source: source === 'REAL' ? 'REAL_OBD' : 'SIMULACAO',
+      timestamp: observationTimestamp,
+      rawResponse: result.rx ?? '',
+    });
+  }
   const learningCondition = condition ?? (source === 'REAL' ? getVehicleConditionSnapshot().condition : 'UNKNOWN');
   if (
     shouldFeedLearning(source, result.parsed.status, parsedValue) &&

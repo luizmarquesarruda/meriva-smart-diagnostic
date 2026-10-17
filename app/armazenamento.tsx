@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'expo-router';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { AdaptiveText as Text } from '../src/ui/AdaptiveText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
 import { flushCsvLogs } from '../src/database/csvLogger';
@@ -10,6 +11,8 @@ import { getMidLayout } from '../src/ui/midLayout';
 import { readDriveCycles } from '../src/storage/driveCycleStorage';
 import type { DriveCycle } from '../src/data/driveCycles';
 import { exportDiagnosticsJson, exportDriveCyclesCsv } from '../src/storage/exportDiagnostics';
+import type { DiagnosticDatabaseHealth } from '../src/database/diagnosticDatabase';
+import { getDiagnosticDatabaseHealthLazy } from '../src/database/diagnosticDatabaseAccess';
 
 const DEFAULT_QUOTA: StorageQuotaConfig = {
   limitMb: 2048,
@@ -27,6 +30,7 @@ export default function ArmazenamentoScreen() {
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [cycles, setCycles] = useState<DriveCycle[]>([]);
+  const [databaseHealth, setDatabaseHealth] = useState<DiagnosticDatabaseHealth | null>(null);
 
   async function refresh(path: string) {
     const status = await checkStorageQuota(path, DEFAULT_QUOTA);
@@ -34,6 +38,11 @@ export default function ArmazenamentoScreen() {
     const breakdown = await getStorageBreakdown(path);
     setUsageBreakdown(breakdown);
     setCycles((await readDriveCycles(path)).filter((cycle) => cycle.source === 'REAL_OBD').sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()));
+    try {
+      setDatabaseHealth(await getDiagnosticDatabaseHealthLazy());
+    } catch {
+      setDatabaseHealth(null);
+    }
   }
 
   useEffect(() => {
@@ -118,6 +127,28 @@ export default function ArmazenamentoScreen() {
       </View>
       </View>
 
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>BANCO ESTRUTURADO SQLITE</Text>
+        <View style={styles.dbStatusRow}>
+          <Text style={styles.label}>Estado</Text>
+          <Text style={databaseHealth?.available ? styles.real : styles.dbUnavailable}>
+            {databaseHealth?.available ? 'ATIVO' : databaseHealth?.enabled === false ? 'DESATIVADO POR POLÍTICA' : 'INDISPONÍVEL / INICIALIZANDO'}
+          </Text>
+        </View>
+        <View style={styles.row}><Text style={styles.label}>Arquivo</Text><Text style={styles.value}>{databaseHealth?.databaseName ?? 'meriva_diagnostics.db'}</Text></View>
+        <View style={styles.row}><Text style={styles.label}>Schema</Text><Text style={styles.value}>{databaseHealth?.available ? databaseHealth.schemaVersion : 'N/D'} / v{2}</Text></View>
+        <View style={styles.row}><Text style={styles.label}>Consultas OBD indexadas</Text><Text style={styles.value}>{databaseHealth?.telemetrySampleCount ?? 'N/D'}</Text></View>
+        <View style={styles.row}><Text style={styles.label}>Amostras PID indexadas</Text><Text style={styles.value}>{databaseHealth?.pidSampleCount ?? 'N/D'}</Text></View>
+        <View style={styles.row}><Text style={styles.label}>DTC / viagens / testes</Text><Text style={styles.value}>{databaseHealth ? `${databaseHealth.dtcRecordCount ?? 'N/D'} / ${databaseHealth.tripCount ?? 'N/D'} / ${databaseHealth.sensorTestRunCount ?? 'N/D'}` : 'N/D'}</Text></View>
+        <View style={styles.row}><Text style={styles.label}>Fila secundária</Text><Text style={styles.value}>{databaseHealth ? `${databaseHealth.pendingWrites}/${databaseHealth.maxPendingWrites}` : 'N/D'}</Text></View>
+        <View style={styles.row}><Text style={styles.label}>Amostras descartadas da fila</Text><Text style={databaseHealth?.droppedSamples ? styles.dbUnavailable : styles.value}>{databaseHealth?.droppedSamples ?? 'N/D'}</Text></View>
+        {databaseHealth?.lastError ? <Text style={styles.dbError}>Última condição: {databaseHealth.lastError}</Text> : null}
+        <Text style={styles.note}>SQLite é um índice complementar. Autosave JSON, CSV e relatórios TXT continuam preservados; este painel não confirma comunicação física com a ECU.</Text>
+        <TouchableOpacity style={styles.dbRefresh} onPress={() => { if (basePath) void refresh(basePath); }} disabled={!basePath || busy}>
+          <Text style={styles.dbRefreshText}>ATUALIZAR ESTADO DO SQLITE</Text>
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.exportRow}>
         <TouchableOpacity style={styles.button} onPress={() => void handleExport('JSON')} disabled={!basePath || busy}><Text style={styles.buttonText}>EXPORTAR JSON</Text></TouchableOpacity>
         <TouchableOpacity style={styles.button} onPress={() => void handleExport('CSV')} disabled={!basePath || busy}><Text style={styles.buttonText}>EXPORTAR CSV</Text></TouchableOpacity>
@@ -144,6 +175,11 @@ const styles = StyleSheet.create({
   warning: { color: '#d97706' },
   critical: { color: '#dc2626' },
   cleanMessage: { color: '#e5edf7', marginBottom: 12 },
+  dbStatusRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6 },
+  dbUnavailable: { color: '#f59e0b', fontWeight: '900', fontSize: 10 },
+  dbError: { color: '#fbbf24', fontSize: 10, lineHeight: 15, marginTop: 5 },
+  dbRefresh: { alignSelf: 'flex-start', borderColor: '#355780', borderWidth: 1, borderRadius: 7, paddingHorizontal: 11, paddingVertical: 9, marginTop: 10 },
+  dbRefreshText: { color: '#93c5fd', fontSize: 10, fontWeight: '900' },
   historyCard: { backgroundColor: '#111c2e', borderRadius: 8, padding: 11, borderWidth: 1, borderColor: '#243652', marginBottom: 10 },
   historyRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#243652' },
   historyMain: { flex: 1, minWidth: 0 },

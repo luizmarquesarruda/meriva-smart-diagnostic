@@ -2520,3 +2520,137 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Evidência dos jobs: `validate` ID `117382942876`; `android-build` ID `117383071884`; ambos com conclusão `success`.
 - Limitação: CI bem-sucedida não substitui validação visual em emulador/aparelho nem teste físico Meriva + ELM327.
 - Esta entrada é uma atualização documental após a execução #2277. A gravação do diário gera um commit novo e pode iniciar outra CI pelo gatilho `push`; esse novo resultado será registrado separadamente.
+
+
+## 2026-10-17 — Reengenharia inicial de configurações, acessibilidade e respostas de IA
+
+### Objetivo
+Atender à necessidade de personalizar o painel sem obrigar o usuário a exibir velocidade, melhorar legibilidade e tornar as respostas diagnósticas mais claras sem misturar dados históricos com leituras atuais.
+
+### Alterações
+- Adicionados a AppSettings e ao arquivo de configuração persistente: indicador principal, alternância automática, exibição de velocidade GPS, texto maior e animações.
+- Temperatura do motor passa a ser o indicador principal padrão; velocidade GPS fica oculta da rotação automática por padrão.
+- A rotação automática a cada 10 segundos agora é opcional; o usuário pode alternar indicadores manualmente.
+- A tela de configurações ganhou controles para painel, legibilidade e movimento. Alvos de toque principais foram ampliados.
+- O painel usa uma animação de opacidade leve, controlável pelo usuário.
+- A tela Saúde preserva a origem da leitura: apenas fontes explicitamente REAL/REAL_OBD entram como REAL_OBD; baseline, simulação e fontes desconhecidas não são promovidas.
+- O motor diagnóstico passa a ignorar leituras reais com mais de 60 segundos para gerar hipóteses atuais e contabiliza essas leituras bloqueadas.
+- Criada camada src/diagnostics/diagnosticResponse.ts para respostas em português com resumo, próxima ação e ressalva de que score heurístico não é probabilidade calibrada.
+- Criados testes para configurações do painel, proveniência, frescor dos dados e composição da resposta.
+- Criada documentação de arquitetura da IA local e auditoria de UX/configurações/rotas, com referências oficiais Expo, Android e React Native.
+
+### Arquivos principais
+- src/database/appSettings.ts
+- app/configuracoes.tsx
+- app/index.tsx
+- app/saude.tsx
+- src/diagnostics/diagnosticEngine.ts
+- src/diagnostics/diagnosticResponse.ts
+- tests/diagnosticEngine.test.js
+- tests/diagnosticResponse.test.js
+- tests/dashboardSettings.test.js
+- tests/orientationLayout.test.js
+- docs/REENGENHARIA_IA_LOCAL_2026-10-17.md
+- docs/AUDITORIA_UX_CONFIGURACOES_2026-10-17.md
+
+### Limitações e validação
+- CI desta branch: NÃO EXECUTADA ainda no momento da gravação desta entrada.
+- Testes em emulador, aparelho físico e Meriva/ELM327: NÃO EXECUTADOS.
+- O limite de 60 segundos é um filtro de segurança local para hipóteses atuais, não uma especificação OEM.
+- A reengenharia foi iniciada com uma camada de proveniência/frescor e respostas explicáveis; divisão completa dos detectores por domínio e aprendizado versionado ficam para etapas subsequentes, depois da CI.
+
+### Próximo passo
+Abrir PR de rascunho baseada na PR #68, rodar CI, corrigir qualquer falha antes de ampliar a reengenharia ou declarar a implementação pronta.
+
+
+## 2026-10-17 — Política operacional da IA em JSON e Keep Awake configurável
+
+### Objetivo
+Criar arquivos JSON úteis para o raciocínio local do app e transformar o bloqueio de suspensão da tela em preferência persistida.
+
+### Alterações
+- Criados `src/knowledge/ai_policy.json` e `src/knowledge/diagnostic_responses.json`, consumidos em runtime por `diagnosticEngine.ts` e `diagnosticResponse.ts`.
+- Criados schemas JSON Schema Draft 2020-12 para os dois catálogos.
+- Criado `tests/aiKnowledgeJson.test.js` e incluído na suíte via `npm test`; o teste verifica política, fontes, limites, mapeamento entre hipóteses/respostas e a regra de que apenas evidência `RAW_ECU` pode declarar PID confirmado.
+- Frescor e scores vêm do JSON, com limites defensivos. Status DTC são lidos do catálogo e intersectados com allowlist de status ativos; fonte diferente de `REAL_OBD` não vira evidência de ECU.
+- Adicionada configuração `keepScreenAwake`, padrão ligada, em `appSettings.ts` e `app/configuracoes.tsx`. `app/_layout.tsx` observa mudanças e ativa/desativa Keep Awake sem reiniciar o aplicativo.
+- Atualizados os documentos da IA e da auditoria UX.
+
+### Proteções preservadas
+- Nenhum PID candidato foi promovido; só registros com `RAW_ECU` continuam declarados confirmados.
+- Score não é apresentado como probabilidade calibrada.
+- JSON é política/configuração do motor determinístico, não um modelo generativo.
+- Nenhum comando de escrita/atuação na ECU foi introduzido.
+
+### Verificação
+- CI #2301 no commit anterior: `validate` passou; o APK Android ainda estava em montagem no último estado observado.
+- Este commit dispara uma nova CI. O resultado completo de typecheck, suíte e APK precisa ser lido no run associado a ele; não há teste em dispositivo nem conexão física ELM327 comprovados por esta alteração.
+
+
+## 2026-10-17 — Aplicação global de texto maior
+
+### Alterações
+- Criado `src/ui/AdaptiveText.tsx`, com assinatura compartilhada da configuração `largeText`; há uma única leitura inicial de configurações para o módulo em vez de uma leitura por cada componente de texto.
+- Aplicado o componente nas 12 telas de conteúdo do diretório `app/` (Painel, Configurações, Mais, Saúde, Dados, Bluetooth, Aprendizado, Armazenamento, Laboratório, Testes de Sensores, Veículo e Viagens).
+- Quando ativada, a preferência aumenta 12% os textos cujo tamanho-base é de até 32 px; valores hero são mantidos para evitar escala dupla.
+- Adicionada uma regressão estática para exigir `AdaptiveText` em todas as telas de conteúdo.
+
+### Limite
+A CI pode provar TypeScript e testes de contrato, mas não mede a legibilidade real nem detecta toda quebra visual em cada densidade de tela. Continua necessária revisão em aparelho Android, em retrato e paisagem.
+
+
+## 2026-10-17 — Biblioteca JSON Schema integrada ao fluxo diagnóstico
+
+### Solicitação
+Incluir no aplicativo uma biblioteca de validação JSON Schema e usá-la nos catálogos criados para a IA local.
+
+### Implementação
+- Adicionada `json-schema-library@11.6.2` como dependência de produção, com lockfile npm atualizado pelo workflow de instalação e lockfile temporário removido ao final desta alteração.
+- Criado `src/knowledge/aiKnowledgeValidator.ts` com validação efetiva contra `ai_policy.schema.json` e `diagnostic_responses.schema.json`.
+- O validador também verifica integridade semântica entre hipóteses definidas em `diagnostic_rules.json`, respostas disponíveis e referências dos testes de sensores.
+- A validação ocorre uma vez por ciclo JS e seu resultado é cacheado.
+- O motor `runLocalDiagnostic` bloqueia a geração de hipóteses se a validação falhar; a tela Saúde comunica `IA LOCAL INDISPONÍVEL`, para não confundir falha de configuração com ausência de defeito.
+- Os testes usam a biblioteca real instalada: validam os dois documentos locais e confirmam que ela rejeita uma política contendo `maxAgeMs=60001`, acima do limite do schema.
+
+### Proteções preservadas
+- Não foram alterados dados de leitura da ECU nem promovidos PIDs candidatos a confirmados.
+- Falha de schema produz diagnóstico bloqueado, nunca “sistema normal” nem hipótese de defeito inventada.
+- Validação é local/offline e não envia comandos à ECU.
+
+### Verificação
+A CI que será disparada após esta consolidação deve confirmar typecheck, testes, Expo prebuild e build de APK Android. A existência do pacote no lockfile foi confirmada após a execução de instalação; a integração final ainda depende do resultado da CI. Sem teste em dispositivo Android e sem sessão física ELM327 nesta etapa.
+
+
+## 2026-10-17 — Bibliotecas prioritárias: SQLite histórico e gráficos de viagens
+
+### Problema e prioridade
+A persistência estruturada ainda não existia no aplicativo; JSON/TXT funcionavam para recuperação e leitura humana, mas não forneciam consultas indexadas para séries por PID, DTCs, viagens e resultados de teste. Foram adicionadas dependências alinhadas ao Expo SDK 51, em vez de atualizar o framework em conjunto.
+
+### Implementação
+- Declaradas `expo-sqlite@~14.0.6`, `expo-linear-gradient@~13.0.2`, `react-native-svg@15.2.0` e `react-native-gifted-charts@1.4.47`.
+- Criado `src/database/diagnosticDatabase.ts` com migrações v1/v2, conexão compartilhada, WAL, chaves/índices por data e PID, restrições de origem e consultas parametrizadas. O arquivo usado é `meriva_diagnostics.db`, definido em `src/knowledge/sqlite_policy.json`.
+- Criadas tabelas para amostras PID, consultas OBD completas (inclusive falhas), DTCs, viagens, telemetria de viagem, sessões/resultados de teste de sensores e execuções de diagnóstico.
+- Inicialização SQLite no layout raiz é não bloqueante. O autosave JSON, logs CSV e TXT permanecem preservados; uma falha SQLite não deve interromper a aquisição serial OBD. A política `sqlite_policy.json` define limite de 500 gravações pendentes e cooldown de retentativa de abertura de 15 s.
+- Cada consulta OBD é armazenada na tabela `telemetry_samples` de forma assíncrona, mantendo status, protocolo, latência e TX/RX brutos inclusive quando há timeout/NO DATA. O índice `pid_samples` adicional salva respostas numéricas finitas uma vez a cada 5 s por PID/origem. DTCs são espelhados depois do autosave principal; apenas viagens com origem REAL_OBD são indexadas. Relatórios de sensores continuam exportando TXT, com cópia estruturada quando a ECU real foi validada.
+- Adicionados gráficos de distância (últimas sete viagens reais) e consumo (apenas cobertura válida; exclui valores acima de 30 km/L), com política separada em `src/trip/tripChartData.ts`.
+- Adicionados testes Node de contrato para migração SQLite v1→v2, captura de falhas/TX/RX e política dos gráficos, registrados no comando `npm test`.
+- Tela Histórico e Dados agora exibe estado, versão efetivamente aplicada, contagens por tabela, fila pendente, descartes do índice secundário e última condição de erro.
+
+### Proveniência e recuperação
+- `REAL_OBD`, `SIMULACAO`, `CARSCANNER_BASELINE`, `USER_REAL_OBSERVATION` e `IMPORTADO` permanecem fontes distintas.
+- Nenhum PID candidato foi promovido a confirmado e nenhum comando de escrita/atuação na ECU foi acrescentado.
+- Nenhum JSON/CSV/TXT histórico foi apagado ou migrado de forma destrutiva. Importação histórica idempotente fica para uma etapa separada.
+- SQLite é complementar até conclusão da validação nativa e teste em aparelho; não é declarada migração total do armazenamento.
+
+### Validação
+- Criado `tests/diagnosticDatabase.test.js` usando mock da API Expo SQLite; ele verifica contrato da camada JavaScript, não um banco nativo real.
+- Criado `tests/tripChartData.test.js` para verificar fontes, limite das sete viagens, cobertura de combustível e valores implausíveis.
+- Adicionado painel na tela Histórico e Dados para visualizar estado, versão do schema, contagens, fila pendente e amostras descartadas do índice secundário.
+- A branch foi atualizada; a consulta disponível de status não forneceu checks verificáveis para esta cabeça. **CI, TypeScript, suíte completa e build Android seguem A CONFIRMAR; nenhum resultado verde foi presumido.**
+- Foi identificada a store SQLite paralela da PR #66. **Não mesclar os dois stores como módulos independentes**; consolidar o schema e o caminho de gravação antes de um merge conjunto.
+- **NÃO EXECUTADOS nesta etapa:** instalação do APK em aparelho, persistência após reiniciar o app, conexão física Meriva + ELM327 e validação de uso prolongado.
+
+### Próximos passos
+1. Executar e acompanhar a CI canônica; corrigir erros reais de typecheck/testes/Gradle.
+2. Remover o workflow temporário de sincronização de lockfile após confirmar que `package-lock.json` contém todas as dependências.
+3. Validar banco nativo e charts no APK standalone. Depois disso, planejar importação idempotente dos históricos existentes, sem trocar o JSON como fonte de recuperação antes da validação.

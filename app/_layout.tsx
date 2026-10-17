@@ -3,35 +3,59 @@ import { useEffect, useRef } from 'react';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { Alert, AppState, Platform } from 'react-native';
 import { Stack } from 'expo-router';
-import { readAppSettings } from '../src/database/appSettings';
+import { readAppSettings, subscribeAppSettings } from '../src/database/appSettings';
 import { disconnectSharedObd } from '../src/obd/sharedConnection';
 import * as FileSystem from 'expo-file-system';
 import { autoTripService } from '../src/trip/autoTripService';
 import { requestAllRequiredPermissions } from '../src/permissions/permissionManager';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import * as diagnosticDatabase from '../src/database/diagnosticDatabase';
+import { configureDiagnosticDatabaseAccess } from '../src/database/diagnosticDatabaseAccess';
+
+configureDiagnosticDatabaseAccess(diagnosticDatabase);
 
 export default function RootLayout() {
-  // Ativa o bloqueio de tela de forma explícita e o restaura quando o app volta ao primeiro plano.
+  // SQLite começa em paralelo; falha no índice estruturado não bloqueia Bluetooth,
+  // telemetria ou o autosave JSON/TXT existente.
+  useEffect(() => {
+    void diagnosticDatabase.initializeDiagnosticDatabase().catch((error) => {
+      console.warn('[SQLite] Banco estruturado indisponível; JSON/TXT continuam ativos:', error instanceof Error ? error.message : error);
+    });
+  }, []);
+
+  // O keep-awake respeita a preferência persistida e reage às mudanças sem reiniciar o app.
   useEffect(() => {
     const tag = 'meriva-smart-diagnostic-active';
+    const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
     let disposed = false;
+    let keepAwakeEnabled = true;
 
-    const activate = () => {
-      if (disposed || AppState.currentState === 'background' || AppState.currentState === 'inactive') return;
-      void activateKeepAwakeAsync(tag).catch((error) => {
-        console.warn('[KeepAwake] Falha ao manter a tela ligada:', error);
-      });
+    const applyPreference = (enabled: boolean) => {
+      keepAwakeEnabled = enabled;
+      if (disposed) return;
+      if (enabled && AppState.currentState !== 'background' && AppState.currentState !== 'inactive') {
+        void activateKeepAwakeAsync(tag).catch((error) => {
+          console.warn('[KeepAwake] Falha ao manter a tela ligada:', error);
+        });
+      } else {
+        void deactivateKeepAwake(tag);
+      }
     };
 
-    activate();
-    const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') activate();
+    const unsubscribeSettings = subscribeAppSettings((settings) => applyPreference(settings.keepScreenAwake));
+    const appStateSubscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && keepAwakeEnabled) applyPreference(true);
       else void deactivateKeepAwake(tag);
     });
 
+    void readAppSettings(basePath)
+      .then((settings) => applyPreference(settings.keepScreenAwake))
+      .catch((error) => console.warn('[KeepAwake] Não foi possível ler a configuração; padrão seguro mantido:', error));
+
     return () => {
       disposed = true;
-      subscription.remove();
+      unsubscribeSettings();
+      appStateSubscription.remove();
       void deactivateKeepAwake(tag);
     };
   }, []);

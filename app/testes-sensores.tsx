@@ -1,8 +1,10 @@
-import {useEffect,useMemo,useRef,useState} from 'react';
+import { useEffect, useMemo, useRef, useState} from 'react';
 import {Link} from 'expo-router';
-import {ActivityIndicator,ScrollView,StyleSheet,Text,TouchableOpacity,View} from 'react-native';
+import {ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { AdaptiveText as Text } from '../src/ui/AdaptiveText';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
+import { saveSensorTestRunLazy } from '../src/database/diagnosticDatabaseAccess';
 import {useMidLayout} from '../src/ui/midLayout';
 import {getSharedObdConnection,getSharedObdStatus,subscribeSharedObd,subscribeSharedObdStatus} from '../src/obd/sharedConnection';
 import {getPidDefinition} from '../src/obd/pidDefinition';
@@ -84,7 +86,27 @@ export default function TestesSensoresScreen(){
     for(const row of item.rows)lines.push('Leitura '+row.readingNumber+': '+valueText(row.value,row.unit)+' | Parser: '+row.status+' | Latência: '+row.elapsedMs+' ms | '+row.timestamp,'RX bruto: '+(row.rawResponse||'VAZIO'));
    }
    lines.push('','POLÍTICA: resposta positiva confirma resposta do PID, não exatidão física/elétrica do sensor. PIDs fora da bitmap não foram consultados.','REFERÊNCIAS: SAE J1979 supported-PID bitmap; Dashlogic PID listing; OBD2 PID Knowledge; auditoria da Bíblia da Meriva.','Limiares são heurísticos, não especificações OEM. Algumas verificações exigem multímetro, osciloscópio ou condições controladas.');
-   await FileSystem.writeAsStringAsync(path,lines.join('\n'));setSavedPath(path);setError('');setMessage('Relatório TXT salvo no armazenamento privado do aplicativo.');
+   await FileSystem.writeAsStringAsync(path,lines.join('\\n'));setSavedPath(path);setError('');
+    if(connectedAtStart.current&&runStartedAt.current>0){
+     try{
+      await saveSensorTestRunLazy({
+       id:path.split('/').pop()?.replace(/\.txt$/,'')??('sensor-test-'+Date.now()),
+       mode,
+       startedAt:new Date(runStartedAt.current).toISOString(),
+       finishedAt:new Date().toISOString(),
+       completed,
+       source:'REAL_OBD',
+       samples,
+       assessments:grouped.map(item=>({pid:item.test.pid,state:item.assessment.state})),
+      });
+      setMessage('Relatório TXT salvo; as amostras também foram indexadas no SQLite interno.');
+     }catch(databaseCause){
+      setMessage('Relatório TXT salvo. O histórico SQLite não foi atualizado; o arquivo TXT foi preservado.');
+      setError(databaseCause instanceof Error?('SQLite: '+databaseCause.message):'Falha ao atualizar o banco SQLite.');
+     }
+    }else{
+     setMessage('Relatório TXT salvo. Apenas testes iniciados com ECU real validada entram no histórico SQLite.');
+    }
   }catch(cause){setError(cause instanceof Error?cause.message:'Falha ao salvar relatório TXT.');}
  }
  return <SafeAreaView style={st.container} edges={['top','bottom','left','right']}><ScrollView contentContainerStyle={[st.content,{paddingHorizontal:layout.horizontalPadding}]}><View style={[st.frame,{maxWidth:layout.maxContentWidth}]}>

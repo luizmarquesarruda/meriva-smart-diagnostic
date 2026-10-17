@@ -36,7 +36,7 @@ assert.match(tripService, /telemetryCandidates = pollingPolicy\.polling\.rotatin
 assert.match(index, /item\.pid === '0111'/);
 assert.match(index, /item\.pid === '010C'/);
 assert.match(index, /setActiveHeroMetric\(\(current\) => \(current \+ 1\) % Math\.max\(1, heroMetrics\.length\)\)/);
-assert.match(index, /activeHeroMetric \+ 1\}\/\{heroMetrics\.length\}/, 'contador visual deve usar o mesmo total dinâmico');
+assert.match(index, /safeActiveHeroMetric \+ 1\}\/\{heroMetrics\.length\}/, 'contador visual deve usar o mesmo total dinâmico');
 assert.match(index, /href="[^"]*viagens"/);
 const more = fs.readFileSync('app/mais.tsx', 'utf8');
 assert.match(more, /'\/dados'/, 'Dados ao Vivo deve continuar acessível pelo menu Mais recursos');

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'expo-router';
 import Constants from 'expo-constants';
-import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { ScrollView, StyleSheet, Switch, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { AdaptiveText as Text } from '../src/ui/AdaptiveText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
 import { createBackup } from '../src/storage/backup';
@@ -45,7 +46,7 @@ export default function ConfiguracaoScreen() {
 
   async function updateSetting<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
     if (!storageBase || !settings) return;
-    const next = { ...settings, [key]: value };
+    const next = { ...settings, [key]: value, ...(key === 'showSpeedMetric' && value === false && settings.homePrimaryMetric === 'SPEED' ? { homePrimaryMetric: 'TEMPERATURE' as const } : {}) };
     setSettings(next);
     try {
       await writeAppSettings(storageBase, next);
@@ -157,6 +158,36 @@ export default function ConfiguracaoScreen() {
           <SettingSwitch label="Conectar ao ELM327 automaticamente" value={settings.autoConnectObd} onChange={(v) => void updateSetting('autoConnectObd', v)} />
           <SettingSwitch label="Inicialização forçada do ELM (ATZ + ATE0)" value={settings.elmForceInitialization} onChange={(v) => void updateSetting('elmForceInitialization', v)} />
           <SettingSwitch label="Alertas de diagnóstico" value={settings.diagnosticAlerts} onChange={(v) => void updateSetting('diagnosticAlerts', v)} />
+
+          <Text style={styles.section}>PAINEL E ACESSIBILIDADE</Text>
+          <View style={styles.card}>
+            <Text style={styles.label}>Indicador principal do painel</Text>
+            <Text style={styles.note}>Escolha o dado que aparece em destaque. Velocidade não é obrigatória e fica oculta por padrão.</Text>
+            <View style={styles.row}>
+              {([
+                ['TEMPERATURE', 'TEMPERATURA'],
+                ['RPM', 'ROTAÇÃO'],
+                ['VOLTAGE', 'TENSÃO'],
+                ['THROTTLE', 'BORBOLETA'],
+                ['SPEED', 'VELOCIDADE GPS'],
+                ['CONSUMPTION', 'CONSUMO km/L'],
+                ['FAULTS', 'FALHAS ATIVAS'],
+              ] as const).map(([value, label]) => (
+                <TouchableOpacity key={value} accessibilityRole="button" accessibilityState={{ selected: settings.homePrimaryMetric === value }} style={[styles.choice, settings.homePrimaryMetric === value && styles.choiceActive]} onPress={() => {
+                  const next = { ...settings, homePrimaryMetric: value, ...(value === 'SPEED' ? { showSpeedMetric: true } : {}) };
+                  setSettings(next);
+                  void writeAppSettings(storageBase!, next).then(() => setStatus('PAINEL ATUALIZADO')).catch(() => setStatus('FALHA AO SALVAR PAINEL'));
+                }}>
+                  <Text style={styles.choiceText}>{label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+          <SettingSwitch label="Alternar indicadores automaticamente a cada 10 segundos" value={settings.homeAutoRotate} onChange={(v) => void updateSetting('homeAutoRotate', v)} />
+          <SettingSwitch label="Mostrar velocidade GPS entre os indicadores" value={settings.showSpeedMetric} onChange={(v) => void updateSetting('showSpeedMetric', v)} />
+          <SettingSwitch label="Textos e botões maiores" value={settings.largeText} onChange={(v) => void updateSetting('largeText', v)} />
+          <SettingSwitch label="Manter tela ligada enquanto o aplicativo estiver aberto" value={settings.keepScreenAwake} onChange={(v) => void updateSetting('keepScreenAwake', v)} />
+          <SettingSwitch label="Animações suaves da interface" value={settings.animationsEnabled} onChange={(v) => void updateSetting('animationsEnabled', v)} />
 
           <Text style={styles.section}>COMPATIBILIDADE ELM327</Text>
           <View style={styles.card}>
@@ -299,17 +330,17 @@ const styles = StyleSheet.create({
   section: { fontSize: 12, fontWeight: '900', color: '#7db3ff', letterSpacing: 0.8, marginTop: 16, marginBottom: 8 },
   status: { color: '#2563eb', fontWeight: '700', marginBottom: 12 },
   card: { backgroundColor: '#111c2e', borderRadius: 8, padding: 11, marginBottom: 9, borderWidth: 1, borderColor: '#243652' },
-  label: { flex: 1, color: '#e5edf7', fontWeight: '600' },
+  label: { flex: 1, color: '#e5edf7', fontWeight: '700', fontSize: 15, lineHeight: 21 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
-  choice: { flexGrow: 1, flexBasis: 86, minWidth: 86, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, padding: 11, alignItems: 'center' },
+  choice: { flexGrow: 1, flexBasis: 100, minWidth: 100, minHeight: 48, justifyContent: 'center', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, padding: 12, alignItems: 'center' },
   choiceActive: { backgroundColor: '#172f52', borderColor: '#3b82f6' },
-  choiceText: { color: '#e5edf7', fontWeight: '700', flexShrink: 1, textAlign: 'center', lineHeight: 16 },
-  switchRow: { backgroundColor: '#111c2e', borderRadius: 8, padding: 11, marginBottom: 9, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#243652' },
+  choiceText: { color: '#e5edf7', fontWeight: '800', fontSize: 13, flexShrink: 1, textAlign: 'center', lineHeight: 19 },
+  switchRow: { backgroundColor: '#111c2e', borderRadius: 10, padding: 14, minHeight: 58, marginBottom: 9, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#243652', gap: 12 },
   info: { color: '#e5edf7', marginBottom: 6, fontSize: 12 },
-  note: { color: '#8da2bd', fontSize: 10, lineHeight: 15, marginTop: -2, marginBottom: 8 },
+  note: { color: '#a8bad2', fontSize: 12, lineHeight: 18, marginTop: 2, marginBottom: 10 },
   error: { color: '#dc2626', fontWeight: '600', marginBottom: 12 },
-  button: { backgroundColor: '#2563eb', borderRadius: 10, padding: 14, alignItems: 'center', marginBottom: 10, marginTop: 6 },
-  buttonText: { color: '#fff', fontWeight: '700' },
-  navigationBack: { alignSelf: 'flex-start', paddingVertical: 8, paddingHorizontal: 10, marginBottom: 8, backgroundColor: '#111c2e', borderRadius: 8 },
-  navigationBackText: { color: '#7db3ff', fontSize: 10, fontWeight: '900' },
+  button: { backgroundColor: '#2563eb', borderRadius: 12, padding: 16, minHeight: 54, justifyContent: 'center', alignItems: 'center', marginBottom: 10, marginTop: 6 },
+  buttonText: { color: '#fff', fontWeight: '800', fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  navigationBack: { alignSelf: 'flex-start', paddingVertical: 12, paddingHorizontal: 14, minHeight: 48, justifyContent: 'center', marginBottom: 8, backgroundColor: '#111c2e', borderRadius: 10 },
+  navigationBackText: { color: '#7db3ff', fontSize: 13, fontWeight: '900' },
 });

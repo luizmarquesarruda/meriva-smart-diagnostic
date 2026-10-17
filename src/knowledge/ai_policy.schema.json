@@ -1,0 +1,212 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://meriva-smart-diagnostic.local/schemas/ai_policy.schema.json",
+  "title": "Política da IA diagnóstica local do Meriva Smart Diagnostic",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "policyId",
+    "mode",
+    "sources",
+    "observations",
+    "dtcs",
+    "scoring",
+    "responseContract",
+    "prohibitions"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "policyId": {
+      "const": "MERIVA_LOCAL_DIAGNOSTIC_POLICY"
+    },
+    "mode": {
+      "const": "DETERMINISTIC_RULE_ENGINE"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sources": {
+      "type": "object",
+      "required": [
+        "liveObd",
+        "simulation",
+        "historicalBaseline",
+        "neverPromoteToLive"
+      ],
+      "properties": {
+        "liveObd": {
+          "const": "REAL_OBD"
+        },
+        "simulation": {
+          "const": "SIMULACAO"
+        },
+        "historicalBaseline": {
+          "const": "CARSCANNER_BASELINE"
+        },
+        "neverPromoteToLive": {
+          "type": "array",
+          "minItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "observations": {
+      "type": "object",
+      "required": [
+        "maxAgeMs",
+        "rejectFutureTimestamps",
+        "requireFiniteValue",
+        "allowedLiveSource"
+      ],
+      "properties": {
+        "maxAgeMs": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 60000
+        },
+        "rejectFutureTimestamps": {
+          "const": true
+        },
+        "requireFiniteValue": {
+          "const": true
+        },
+        "allowedLiveSource": {
+          "const": "REAL_OBD"
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "dtcs": {
+      "type": "object",
+      "required": [
+        "requiredSource",
+        "activeStatuses",
+        "inactiveOrHistoricalStatuses"
+      ],
+      "properties": {
+        "requiredSource": {
+          "const": "REAL_OBD"
+        },
+        "activeStatuses": {
+          "type": "array",
+          "minItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "CONFIRMED",
+              "PENDING",
+              "PERMANENT",
+              "CURRENT"
+            ]
+          }
+        },
+        "inactiveOrHistoricalStatuses": {
+          "type": "array",
+          "minItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "INACTIVE",
+              "HISTORICAL",
+              "UNKNOWN"
+            ]
+          }
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "scoring": {
+      "type": "object",
+      "required": [
+        "mediumAt",
+        "highAt",
+        "additionalEvidenceIncrement",
+        "maxScore",
+        "isCalibratedProbability"
+      ],
+      "properties": {
+        "mediumAt": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 0.98
+        },
+        "highAt": {
+          "type": "number",
+          "minimum": 0.51,
+          "maximum": 0.99
+        },
+        "additionalEvidenceIncrement": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.49
+        },
+        "maxScore": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 0.99
+        },
+        "isCalibratedProbability": {
+          "const": false
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "responseContract": {
+      "type": "object",
+      "required": [
+        "requiredFields",
+        "requireTraceableEvidence",
+        "requireNextTest",
+        "language"
+      ],
+      "properties": {
+        "requiredFields": {
+          "type": "array",
+          "minItems": 5,
+          "items": {
+            "type": "string"
+          }
+        },
+        "requireTraceableEvidence": {
+          "const": true
+        },
+        "requireNextTest": {
+          "const": true
+        },
+        "language": {
+          "const": "pt-BR"
+        }
+      },
+      "additionalProperties": false
+    },
+    "prohibitions": {
+      "type": "array",
+      "minItems": 7,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "additionalProperties": false
+}

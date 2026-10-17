@@ -2,9 +2,16 @@ import * as FileSystem from 'expo-file-system';
 
 export type FuelType = 'FLEX' | 'ETANOL' | 'GASOLINA';
 export type DistanceUnit = 'KM' | 'MI';
+export type HomePrimaryMetric = 'TEMPERATURE' | 'RPM' | 'VOLTAGE' | 'THROTTLE' | 'SPEED' | 'CONSUMPTION' | 'FAULTS';
 export interface AppSettings {
   fuelType: FuelType;
   distanceUnit: DistanceUnit;
+  homePrimaryMetric: HomePrimaryMetric;
+  homeAutoRotate: boolean;
+  showSpeedMetric: boolean;
+  largeText: boolean;
+  keepScreenAwake: boolean;
+  animationsEnabled: boolean;
   autoConnectObd: boolean;
   diagnosticAlerts: boolean;
   selectedAdapterAddress: string | null;
@@ -40,6 +47,12 @@ export function subscribeAppSettings(listener: (settings: AppSettings) => void):
 const DEFAULT_SETTINGS: AppSettings = {
   fuelType: 'FLEX',
   distanceUnit: 'KM',
+  homePrimaryMetric: 'TEMPERATURE',
+  homeAutoRotate: false,
+  showSpeedMetric: false,
+  largeText: true,
+  keepScreenAwake: true,
+  animationsEnabled: true,
   autoConnectObd: true,
   diagnosticAlerts: true,
   selectedAdapterAddress: null,
@@ -80,6 +93,12 @@ export async function readAppSettings(basePath: string): Promise<AppSettings> {
     const settings: AppSettings = {
       fuelType: parsed.fuelType === 'GASOLINA' ? 'GASOLINA' : parsed.fuelType === 'ETANOL' ? 'ETANOL' : 'FLEX',
       distanceUnit: parsed.distanceUnit === 'MI' ? 'MI' : 'KM',
+      homePrimaryMetric: ['TEMPERATURE', 'RPM', 'VOLTAGE', 'THROTTLE', 'SPEED', 'CONSUMPTION', 'FAULTS'].includes(String(parsed.homePrimaryMetric)) ? parsed.homePrimaryMetric as HomePrimaryMetric : 'TEMPERATURE',
+      homeAutoRotate: parsed.homeAutoRotate === true,
+      showSpeedMetric: parsed.showSpeedMetric === true || parsed.homePrimaryMetric === 'SPEED',
+      largeText: parsed.largeText !== false,
+      keepScreenAwake: parsed.keepScreenAwake !== false,
+      animationsEnabled: parsed.animationsEnabled !== false,
       autoConnectObd: parsed.autoConnectObd !== false,
       diagnosticAlerts: parsed.diagnosticAlerts !== false,
       selectedAdapterAddress: typeof parsed.selectedAdapterAddress === 'string' && parsed.selectedAdapterAddress.trim()

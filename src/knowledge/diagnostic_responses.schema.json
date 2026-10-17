@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://meriva-smart-diagnostic.local/schemas/diagnostic_responses.schema.json",
+  "title": "Respostas legíveis da IA diagnóstica local",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "catalogId",
+    "language",
+    "confidenceLabels",
+    "defaults",
+    "responses"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "catalogId": {
+      "const": "MERIVA_SMART_DIAGNOSTIC_RESPONSES"
+    },
+    "language": {
+      "const": "pt-BR"
+    },
+    "confidenceLabels": {
+      "type": "object",
+      "required": [
+        "LOW",
+        "MEDIUM",
+        "HIGH"
+      ],
+      "properties": {
+        "LOW": {
+          "type": "string",
+          "minLength": 1
+        },
+        "MEDIUM": {
+          "type": "string",
+          "minLength": 1
+        },
+        "HIGH": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "defaults": {
+      "type": "object",
+      "required": [
+        "summary",
+        "nextAction",
+        "cautionWithEvidencePrefix",
+        "cautionWithEvidenceSuffix",
+        "cautionWithoutEvidence"
+      ],
+      "properties": {
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nextAction": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cautionWithEvidencePrefix": {
+          "type": "string"
+        },
+        "cautionWithEvidenceSuffix": {
+          "type": "string"
+        },
+        "cautionWithoutEvidence": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "responses": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "title",
+          "summary"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "summary": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

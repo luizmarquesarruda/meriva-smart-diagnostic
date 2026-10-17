@@ -1,0 +1,69 @@
+{
+  "$schema": "./ai_policy.schema.json",
+  "schemaVersion": 1,
+  "policyId": "MERIVA_LOCAL_DIAGNOSTIC_POLICY",
+  "mode": "DETERMINISTIC_RULE_ENGINE",
+  "description": "Contrato operacional do motor local. Este arquivo configura limites conservadores; não é um modelo generativo e não substitui evidência da ECU.",
+  "sources": {
+    "liveObd": "REAL_OBD",
+    "simulation": "SIMULACAO",
+    "historicalBaseline": "CARSCANNER_BASELINE",
+    "neverPromoteToLive": [
+      "SIMULACAO",
+      "CARSCANNER_BASELINE",
+      "USER_REAL_OBSERVATION",
+      "IMPORTADO"
+    ]
+  },
+  "observations": {
+    "maxAgeMs": 60000,
+    "rejectFutureTimestamps": true,
+    "requireFiniteValue": true,
+    "allowedLiveSource": "REAL_OBD",
+    "description": "Somente observação REAL_OBD com timestamp válido, não futuro e até 60 segundos pode gerar hipótese atual."
+  },
+  "dtcs": {
+    "requiredSource": "REAL_OBD",
+    "activeStatuses": [
+      "CONFIRMED",
+      "PENDING",
+      "PERMANENT",
+      "CURRENT"
+    ],
+    "inactiveOrHistoricalStatuses": [
+      "INACTIVE",
+      "HISTORICAL",
+      "UNKNOWN"
+    ],
+    "description": "DTC histórico/inativo, simulado, importado ou de origem diferente de REAL_OBD não gera hipótese de falha atual."
+  },
+  "scoring": {
+    "mediumAt": 0.5,
+    "highAt": 0.75,
+    "additionalEvidenceIncrement": 0.15,
+    "maxScore": 0.99,
+    "isCalibratedProbability": false,
+    "description": "Score ordinal heurístico. Não deve ser apresentado como probabilidade estatística nem como certeza de componente defeituoso."
+  },
+  "responseContract": {
+    "requiredFields": [
+      "title",
+      "summary",
+      "confidenceLabel",
+      "nextAction",
+      "caution"
+    ],
+    "requireTraceableEvidence": true,
+    "requireNextTest": true,
+    "language": "pt-BR"
+  },
+  "prohibitions": [
+    "NAO_CONDENAR_COMPONENTE_POR_UM_DTC_ISOLADO",
+    "NAO_PROMOVER_BASELINE_PARA_REAL_OBD",
+    "NAO_USAR_SIMULACAO_COMO_EVIDENCIA_ATUAL",
+    "NAO_TRATAR_SCORE_COMO_PROBABILIDADE_CALIBRADA",
+    "NAO_ENVIAR_COMANDOS_DE_ESCRITA_OU_ATUACAO_A_ECU",
+    "NAO_INFERIR_ZERO_QUANDO_DADO_ESTA_AUSENTE",
+    "NAO_EXIBIR_LEITURA_EXPIRADA_COMO_ATUAL"
+  ]
+}
