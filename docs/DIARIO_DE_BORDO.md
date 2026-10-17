@@ -2450,3 +2450,28 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Nova CI solicitada pela atualização da branch; confirmar resultado integral, inclusive testes restantes e build Android.
 - Teste físico do ELM327 no veículo continua pendente.
 
+
+
+## 2026-10-16 — PR #59: integridade da IA local
+
+### Auditoria
+- O motor atual é uma IA local determinística, baseada em regras e catálogos JSON; não é um LLM generativo remoto. Está integrado à Central de Saúde, ao Laboratório e ao relatório TXT.
+- Confirmada a promoção incorreta de qualquer fonte diferente de SIMULACAO para REAL_OBD em telas/exportação.
+- Confirmado que estatísticas legadas podiam misturar dados importados e da ECU, contaminando médias e dispersões.
+
+### Mudanças
+- PR #59 adiciona política de frescor de 120 s, bloqueio de evidência antiga ou usada com ECU desconectada e contadores de dados bloqueados.
+- Remove a inclusão automática do seed e o importador de seed operacional; o saneamento descarta estatísticas seed-only ou misturadas e reinicia aprendizado por novas respostas reais.
+- Interface de aprendizado e exports mostram apenas estatísticas com proveniência exclusiva REAL_OBD.
+- Adiciona testes de origem, frescor, ECU desconectada e migração de perfis legados.
+
+### Build e testes
+- Build APK, typecheck, testes e Expo Doctor: NÃO EXECUTADOS.
+- CI/workflows: NÃO DISPARADOS; commits da branch marcados [skip ci].
+- Validação física Meriva/ELM327: NÃO EXECUTADA.
+- app.json não declara android.versionCode; versionCode do APK: N/D (APK não gerado).
+
+### Riscos e estado
+- Estatísticas antigas sem proveniência exclusiva da ECU são descartadas, não reconstruídas. Novas observações reais precisam reaprender os PIDs.
+- A validade temporal não substitui a releitura dos DTCs ao iniciar cada sessão; isso permanece pendente.
+- PR #59 está em rascunho. Status: PENDENTE; nenhuma aprovação de build, CI ou validação física.
