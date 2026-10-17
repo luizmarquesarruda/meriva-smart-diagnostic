@@ -154,7 +154,7 @@ async function readAutoSaveHistoryUnsafe(basePath: string): Promise<string> {
   const entries = deduplicateEntries(splitEntries(content))
     .slice(-AUTOSAVE_HISTORY_MAX_ENTRIES)
     .map(removeCarScannerTripsFromSnapshot);
-  return entries.length ? `${HISTORY_HEADER}${entries.join('\\n\\n')}\\n` : HISTORY_HEADER;
+  return entries.length ? `${HISTORY_HEADER}${entries.join('\n\n')}\n` : HISTORY_HEADER;
 }
 export async function readAutoSaveHistory(basePath: string): Promise<string> {
   try {
