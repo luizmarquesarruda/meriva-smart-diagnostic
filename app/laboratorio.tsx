@@ -25,7 +25,7 @@ import {
   getAutoSaveState,
 } from '../src/meriva/autosaveManager';
 import { forceSaveOnObdEvent, registerObdQuery } from '../src/meriva/autosaveIntegration';
-import { runLocalDiagnostic, type DiagnosticResult } from '../src/diagnostics/diagnosticEngine';
+import { normalizeDiagnosticSource, runLocalDiagnostic, type DiagnosticResult } from '../src/diagnostics/diagnosticEngine';
 import type { PidObservation } from '../src/types/sourceTypes';
 
 type Mode = 'REAL' | 'SIMULACAO';
@@ -481,12 +481,13 @@ export default function LaboratorioScreen() {
       name: reading.name,
       value: reading.value,
       unit: reading.unit,
-      source: reading.source === 'SIMULACAO' ? 'SIMULACAO' : 'REAL_OBD',
+      source: normalizeDiagnosticSource(reading.source, reading.status),
       timestamp: reading.timestamp,
-      confidence: reading.source === 'SIMULACAO' ? 'LOW' : 'GOOD',
+      confidence: normalizeDiagnosticSource(reading.source, reading.status) === 'REAL_OBD' ? 'GOOD' : 'LOW',
     })),
     dtcs: getAutoSaveState().dtcs,
     condition: getVehicleConditionSnapshot().condition,
+    ecuConnected: getSharedObdStatus().ecuConnected,
   });
 
   return (
@@ -639,6 +640,10 @@ export default function LaboratorioScreen() {
         {diagnostic.blockedSimulationSamples > 0 ? (
           <Text style={styles.aiWarning}>SIMULAÇÃO BLOQUEADA: {diagnostic.blockedSimulationSamples} amostra(s) não aumentaram a confiança.</Text>
         ) : null}
+        {diagnostic.blockedNonLiveSamples > 0 ? <Text style={styles.aiMuted}>ORIGEM NÃO ECU IGNORADA: {diagnostic.blockedNonLiveSamples} leitura(s).</Text> : null}
+        {diagnostic.blockedStaleObservations > 0 ? <Text style={styles.aiMuted}>LEITURAS ANTIGAS IGNORADAS: {diagnostic.blockedStaleObservations}.</Text> : null}
+        {diagnostic.blockedStaleDtcs > 0 ? <Text style={styles.aiMuted}>DTCs SEM ATUALIZAÇÃO RECENTE: {diagnostic.blockedStaleDtcs}.</Text> : null}
+        {diagnostic.disconnectedEvidenceIgnored ? <Text style={styles.aiWarning}>ECU SEM RESPOSTA: evidência OBD salva não foi usada como estado atual.</Text> : null}
         <Text style={styles.aiDisclaimer}>{diagnostic.disclaimer}</Text>
       </View>
 
