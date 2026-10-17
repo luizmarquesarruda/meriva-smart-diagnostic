@@ -9,13 +9,16 @@ import * as FileSystem from 'expo-file-system';
 import { autoTripService } from '../src/trip/autoTripService';
 import { requestAllRequiredPermissions } from '../src/permissions/permissionManager';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { initializeDiagnosticDatabase } from '../src/database/diagnosticDatabase';
+import * as diagnosticDatabase from '../src/database/diagnosticDatabase';
+import { configureDiagnosticDatabaseAccess } from '../src/database/diagnosticDatabaseAccess';
+
+configureDiagnosticDatabaseAccess(diagnosticDatabase);
 
 export default function RootLayout() {
   // SQLite começa em paralelo; falha no índice estruturado não bloqueia Bluetooth,
   // telemetria ou o autosave JSON/TXT existente.
   useEffect(() => {
-    void initializeDiagnosticDatabase().catch((error) => {
+    void diagnosticDatabase.initializeDiagnosticDatabase().catch((error) => {
       console.warn('[SQLite] Banco estruturado indisponível; JSON/TXT continuam ativos:', error instanceof Error ? error.message : error);
     });
   }, []);
