@@ -2605,6 +2605,9 @@ A política `src/knowledge/sqlite_policy.json` explicita que a tabela `telemetry
 - **Testes não executados nesta etapa.** Os testes são regressões adicionadas, não evidência de aprovação de CI ou validação no telefone.
 
 
+- Recuperação após encerramento abrupto: na próxima leitura/gravação, se o TXT principal estiver ausente e existir `.previous`, o histórico diário e o histórico de autosave validam o backup, restauram o arquivo e conferem o conteúdo lido de volta antes de acrescentar novos dados. O backup permanece disponível.
+- Novos testes adicionados: diário restaura página anterior quando a principal está ausente; histórico de autosave restaura o bloco anterior e continua a numeração. Testes ainda não executados.
+
 ### Partial wake lock da sessão OBD
 - Serviço Java agora solicita um `PARTIAL_WAKE_LOCK` depois de entrar em foreground e o libera em start inválido, stop solicitado e destruição do serviço.
 - `WAKE_LOCK` está declarado no app config e no Manifest gerado pelo plugin.
