@@ -287,8 +287,12 @@ export function initializeDiagnosticDatabase(): Promise<SQLiteDatabase> {
   if (!databasePromise) {
     databasePromise = openAndMigrate().catch((error) => {
       databasePromise = null;
-      databaseRetryAfterMs = Date.now() + sqlitePolicy.database.openRetryCooldownMs;
-      lastDatabaseError = error instanceof Error ? error.message.replace(/[^A-Za-z0-9_.:-]/g, '_').slice(0, 100) : 'SQLITE_OPEN_FAILED';
+      const message = error instanceof Error ? error.message : String(error);
+      // Não prolongar o cooldown a cada consulta que chega durante a janela de espera.
+      if (message !== 'SQLITE_OPEN_RETRY_COOLDOWN_ACTIVE') {
+        databaseRetryAfterMs = Date.now() + sqlitePolicy.database.openRetryCooldownMs;
+      }
+      lastDatabaseError = message.replace(/[^A-Za-z0-9_.:-]/g, '_').slice(0, 100) || 'SQLITE_OPEN_FAILED';
       throw error;
     });
   }
