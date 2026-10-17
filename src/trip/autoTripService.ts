@@ -554,6 +554,15 @@ class AutoTripService {
     if (!cycle) return;
 
     await addDriveCycle(this.basePath, cycle);
+    if (cycle.source === 'REAL_OBD') {
+      // O JSON de viagens continua sendo restaurável; SQLite adiciona índices e histórico consultável.
+      void import('../database/diagnosticDatabase')
+        .then(({ upsertDriveCycle }) => upsertDriveCycle(cycle))
+        .catch((cause) => console.warn(
+          '[sqlite] viagem não indexada; arquivo histórico mantido:',
+          cause instanceof Error ? cause.message : cause,
+        ));
+    }
     const storedCycles = await readDriveCycles(this.basePath);
     updateAutoSaveState((state) => {
       state.driveCycles = storedCycles;
