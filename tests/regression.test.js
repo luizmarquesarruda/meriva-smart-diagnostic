@@ -777,6 +777,16 @@ async function testVehicleProfile() {
 
   await vehicle.createVehicleProfile(BASE, profile);
   assert.strictEqual((await vehicle.readVehicleProfile(BASE)).vehicleName, 'Meriva Maxx');
+  const defaulted = await vehicle.ensureMerivaVehicleProfile(BASE);
+  assert.strictEqual(defaulted.tankCapacityL, 56);
+  assert.strictEqual(defaulted.yearConfirmed, false, 'modelo padrão não pode declarar ano real confirmado');
+  assert.ok(defaulted.injectionType.includes('não confirmado'));
+  const userYear = { ...defaulted, year: 2010, yearConfirmed: true, yearSource: 'USER' };
+  await vehicle.createVehicleProfile(BASE, userYear);
+  const preserved = await vehicle.ensureMerivaVehicleProfile(BASE);
+  assert.strictEqual(preserved.year, 2010, 'ano informado pelo usuário não pode ser sobrescrito pelo ano do manual de referência');
+  assert.strictEqual(preserved.yearConfirmed, true);
+
   files.set(`${BASE}/CONFIG/veiculo.json`, '{invalido');
   assert.strictEqual(await vehicle.readVehicleProfile(BASE), null);
 }
