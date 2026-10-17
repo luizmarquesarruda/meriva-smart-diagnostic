@@ -5,7 +5,7 @@ import sensorTestCatalogJson from '../knowledge/sensor_tests.json';
 export interface DiagnosticInput { observations: PidObservation[]; dtcs?: DtcRecord[]; condition?: VehicleCondition; }
 export interface DiagnosticEvidence { ruleId: string; text: string; source: 'DTC' | 'PID'; pid?: string; dtc?: string; value?: number; }
 export interface DiagnosticHypothesis { id: string; label: string; score: number; confidence: 'LOW' | 'MEDIUM' | 'HIGH'; evidence: DiagnosticEvidence[]; nextTests: string[]; }
-export interface DiagnosticResult { engine: 'LOCAL_EVIDENCE_ENGINE'; version: 1; generatedAt: string; hypotheses: DiagnosticHypothesis[]; blockedSimulationSamples: number; blockedNonLiveDtcs: number; disclaimer: string; }
+export interface DiagnosticResult { engine: 'LOCAL_EVIDENCE_ENGINE'; version: 1; generatedAt: string; hypotheses: DiagnosticHypothesis[]; blockedSimulationSamples: number; blockedNonLiveDtcs: number; blockedStaleSamples: number; disclaimer: string; }
 
 interface Rule { id: string; trigger: { dtc?: string; combinedTrimMin?: number; combinedTrimMax?: number; condition?: VehicleCondition; mapMinKpa?: number; }; hypothesis: string; baseScore: number; tests: string[]; }
 
@@ -21,9 +21,16 @@ const ACTIVE_DTC_STATUSES = new Set(['CONFIRMED', 'PENDING', 'PERMANENT', 'CURRE
 function isSimulation(item: PidObservation): boolean { return String(item.source ?? '').trim().toUpperCase() === 'SIMULACAO'; }
 function isLiveObd(item: PidObservation): boolean { return String(item.source ?? '').trim().toUpperCase() === 'REAL_OBD'; }
 
+const MAX_DIAGNOSTIC_READING_AGE_MS = 60_000;
+function isFreshReading(item: PidObservation, now = Date.now()): boolean {
+  const timestamp = Date.parse(item.timestamp);
+  const age = now - timestamp;
+  return Number.isFinite(timestamp) && age >= 0 && age <= MAX_DIAGNOSTIC_READING_AGE_MS;
+}
+
 function pidValue(observations: PidObservation[], pid: string): PidObservation | undefined {
   return observations
-    .filter((item) => item.pid.toUpperCase() === pid.toUpperCase() && item.value !== null && isLiveObd(item))
+    .filter((item) => item.pid.toUpperCase() === pid.toUpperCase() && item.value !== null && isLiveObd(item) && isFreshReading(item))
     .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))[0];
 }
 
@@ -46,6 +53,7 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
     && ACTIVE_DTC_STATUSES.has(String(item.status ?? '').trim().toUpperCase()),
   );
   const blockedSimulationSamples = rawObservations.filter(isSimulation).length;
+  const blockedStaleSamples = rawObservations.filter((item) => isLiveObd(item) && !isFreshReading(item)).length;
   const blockedNonLiveDtcs = rawDtcs.length - liveDtcs.length;
   const hypotheses = new Map<string, DiagnosticHypothesis>();
 
@@ -105,6 +113,7 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
     hypotheses: [...hypotheses.values()].sort((a, b) => b.score - a.score),
     blockedSimulationSamples,
     blockedNonLiveDtcs,
+    blockedStaleSamples,
     disclaimer: 'Hipóteses baseadas em evidências locais. Não condenar peça apenas por um DTC ou um PID isolado; status histórico/inativo e dados não-REAL_OBD não geram falha atual.',
   };
 }
