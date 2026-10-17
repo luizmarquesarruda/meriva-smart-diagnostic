@@ -542,6 +542,11 @@ class AutoTripService {
 
   private startLinkLossGrace(): void {
     if (this.linkLostAtMs !== null) return;
+    if (this.movingCandidateSinceMs !== null) {
+      // Uma partida curta ainda não confirmada não pode sobreviver como viagem.
+      this.recorder = null;
+      this.movingCandidateSinceMs = null;
+    }
     this.linkLostAtMs = Date.now();
     this.linkLossTimer = setTimeout(() => {
       this.linkLossTimer = null;
