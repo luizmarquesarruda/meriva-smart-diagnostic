@@ -21,9 +21,9 @@ function queueDtcWrite(target: string, operation: () => Promise<void>): Promise<
  * previously absent/inactive and is detected again.
  */
 export function nextDtcOccurrences(previous?: DtcRecord): number {
-  if (!previous) return 1;
-  const active = ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(previous.status);
-  return active ? Math.max(1, previous.occurrences || 1) : Math.max(1, previous.occurrences || 0) + 1;
+  // occurrences significa número de leituras em que o código apareceu,
+  // não número estimado de episódios físicos de falha.
+  return Math.max(0, Number(previous?.occurrences) || 0) + 1;
 }
 
 export async function recordDtc(basePath: string, dtc: DtcRecord): Promise<void> {
@@ -41,6 +41,10 @@ export async function recordDtc(basePath: string, dtc: DtcRecord): Promise<void>
       dtc.source,
       dtc.historical ? 'true' : 'false',
       dtc.confirmed ? 'true' : 'false',
+      dtc.validation ?? 'HISTORY_WITHOUT_REVALIDATION',
+      dtc.validatedAt ?? '',
+      dtc.sessionId ?? '',
+      dtc.freezeFrame ? JSON.stringify(dtc.freezeFrame) : '',
     ].join('|');
 
     const info = await FileSystem.getInfoAsync(target);
@@ -78,25 +82,50 @@ export async function readDtcs(basePath: string): Promise<DtcRecord[]> {
         source,
         historical,
         confirmed,
+        validation,
+        validatedAt,
+        sessionId,
+        freezeFrameRaw,
       ] = line.split('|');
+      let freezeFrame: DtcRecord['freezeFrame'];
+      try {
+        const parsed = freezeFrameRaw ? JSON.parse(freezeFrameRaw) : null;
+        if (parsed && typeof parsed === 'object' && (parsed.dtc == null || typeof parsed.dtc === 'string')
+          && (parsed.frame == null || (typeof parsed.frame === 'number' && Number.isFinite(parsed.frame)))
+          && (parsed.rpm == null || (typeof parsed.rpm === 'number' && Number.isFinite(parsed.rpm)))
+          && (parsed.coolantC == null || (typeof parsed.coolantC === 'number' && Number.isFinite(parsed.coolantC)))) {
+          freezeFrame = parsed;
+        }
+      } catch {
+        freezeFrame = undefined;
+      }
+      const validationValue = validation === 'REVALIDATED_IN_SESSION'
+        ? 'REVALIDATED_IN_SESSION' : 'HISTORY_WITHOUT_REVALIDATION';
+      const rawStatus = (status as DtcStatus) || 'UNKNOWN';
+      const safeStatus = validationValue === 'HISTORY_WITHOUT_REVALIDATION' && rawStatus === 'CURRENT'
+        ? 'HISTORICAL' : rawStatus;
 
       return {
         code,
         description: description || undefined,
-        status: (status as DtcStatus) || 'UNKNOWN',
+        status: safeStatus,
         firstSeen,
         lastSeen,
         occurrences: Number(occurrences || 0),
         source: (source as DataSource) || 'IMPORTADO',
-        historical: historical === 'true',
-        confirmed: confirmed === 'true',
+        historical: historical === 'true' || safeStatus === 'HISTORICAL',
+        confirmed: confirmed === 'true' && validationValue === 'REVALIDATED_IN_SESSION',
+        validation: validationValue,
+        validatedAt: validatedAt || undefined,
+        sessionId: sessionId || undefined,
+        freezeFrame,
       };
     });
 }
 
 export async function getCurrentDtcs(basePath: string): Promise<DtcRecord[]> {
   const all = await readDtcs(basePath);
-  return all.filter((dtc) => ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(dtc.status));
+  return all.filter((dtc) => dtc.validation === 'REVALIDATED_IN_SESSION' && ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(dtc.status));
 }
 
 export async function getHistoricalDtcs(basePath: string): Promise<DtcRecord[]> {
