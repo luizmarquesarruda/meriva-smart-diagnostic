@@ -477,6 +477,15 @@ test('7b. histórico autosave elimina duplicatas legadas e serializa gravações
   assert.strictEqual(finalNumbers.length, 9, 'cada escrita concorrente deve gerar um snapshot sem perder os demais');
   assert.strictEqual(new Set(finalNumbers).size, finalNumbers.length, 'números de salvamento devem ser únicos');
   assert.deepStrictEqual(finalNumbers, [...finalNumbers].sort((a, b) => a - b), 'snapshots devem permanecer em ordem crescente');
+  const persisted = files.get(target);
+  const footer = persisted.match(/\nBLOCKS:\s*(\d+)\nBYTES:\s*(\d+)\nSHA256:\s*([a-f0-9]{64})\n?$/i);
+  assert.ok(footer, 'arquivo deve terminar com rodapé de integridade');
+  const body = persisted.slice(0, footer.index);
+  const sha = loadTs(path.join(ROOT, 'src/meriva/sha256.ts'));
+  assert.strictEqual(Number(footer[1]), 9);
+  assert.strictEqual(Number(footer[2]), Buffer.byteLength(body, 'utf8'));
+  assert.strictEqual(footer[3], sha.sha256Hex(body));
+
 });
 
 test('7c. mudança de combustível é publicada sem reler configurações a cada PID', async () => {
