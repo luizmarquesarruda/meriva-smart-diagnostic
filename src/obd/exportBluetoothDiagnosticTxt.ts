@@ -57,6 +57,10 @@ function diagnosticReportLines(result: DiagnosticResult): string[] {
       lines.push(`  PRÓXIMO TESTE: ${nextTest}`);
     }
   }
+  if (result.recommendedActions.length) {
+    lines.push('--- TAREFAS RECOMENDADAS PELO MOTOR LOCAL ---');
+    for (const action of result.recommendedActions) lines.push(`AÇÃO [${action.priority}]: ${action.title} — ${action.detail}`);
+  }
   lines.push(`NOTA: ${result.disclaimer}`);
   return lines;
 }
