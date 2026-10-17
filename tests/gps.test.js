@@ -112,7 +112,7 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
   assert.strictEqual(tracker.getState().distanceKm, distanceBeforeStop);
 
   // Quando a ECU confirma velocidade, a origem exibida passa a ser OBD.
-  tracker.setVehicleSpeedHintKmh(36);
+  tracker.setVehicleSpeedHintKmh(36, 14000);
   watcher({ coords: { latitude: 0, longitude: 0.0010, speed: 10, accuracy: 5 }, timestamp: 14000 });
   watcher({ coords: { latitude: 0, longitude: 0.0012, speed: 10, accuracy: 5 }, timestamp: 15000 });
   watcher({ coords: { latitude: 0, longitude: 0.0014, speed: 10, accuracy: 5 }, timestamp: 16000 });
@@ -121,15 +121,27 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
   const distanceAfterObdMovement = tracker.getState().distanceKm;
   assert.ok(distanceAfterObdMovement > distanceBeforeStop);
 
-  tracker.setVehicleSpeedHintKmh(0);
-  watcher({ coords: { latitude: 0, longitude: 0.0016, speed: 10, accuracy: 5 }, timestamp: 18000 });
+  // Salto GPS incompatível com a velocidade OBD deve ser descartado.
+  tracker.setVehicleSpeedHintKmh(25, 18000);
+  const distanceBeforeJump = tracker.getState().distanceKm;
+  watcher({ coords: { latitude: 0, longitude: 0.00195, speed: 40, accuracy: 5 }, timestamp: 18000 });
+  assert.strictEqual(tracker.getState().distanceKm, distanceBeforeJump);
+  assert.strictEqual(tracker.getState().currentSpeedKmh, 0);
+
+  tracker.setVehicleSpeedHintKmh(0, 19000);
+  watcher({ coords: { latitude: 0, longitude: 0.00195, speed: 10, accuracy: 5 }, timestamp: 19000 });
   assert.strictEqual(tracker.getState().currentSpeedKmh, 0);
 
   // Jitter parado de poucos metros não pode virar distância, mesmo com speed stale positivo.
   const distanceBeforeJitter = tracker.getState().distanceKm;
-  watcher({ coords: { latitude: 0, longitude: 0.00161, speed: 10, accuracy: 5 }, timestamp: 19000 });
-  watcher({ coords: { latitude: 0, longitude: 0.00162, speed: 10, accuracy: 5 }, timestamp: 20000 });
+  watcher({ coords: { latitude: 0, longitude: 0.00196, speed: 10, accuracy: 5 }, timestamp: 20000 });
+  watcher({ coords: { latitude: 0, longitude: 0.00197, speed: 10, accuracy: 5 }, timestamp: 21000 });
   assert.strictEqual(tracker.getState().distanceKm, distanceBeforeJitter);
+
+  // Sem accuracy reportada, o fix não pode contribuir para distância.
+  const previousDistance = tracker.getState().distanceKm;
+  watcher({ coords: { latitude: 0, longitude: 0.0024, speed: 50, accuracy: null }, timestamp: 22000 });
+  assert.strictEqual(tracker.getState().distanceKm, previousDistance);
 
   // Fixes com speed ausente também não podem transformar deriva do GPS em movimento.
   watcher({ coords: { latitude: 0, longitude: 0.00163, speed: null, accuracy: 5 }, timestamp: 21000 });
