@@ -5,6 +5,8 @@ import { getLastBluetoothDiagnosticText } from '../obd/bluetoothManager';
 import { getSharedObdConnection, getSharedObdLastError, getSharedObdDiagnosticContext } from '../obd/sharedConnection';
 import { readLearningProfile, type MerivaLearningProfile } from '../database/learningProfile';
 import { getAutoSaveState } from '../meriva/autosaveManager';
+import { getAppBuildInfo } from '../meriva/buildInfo';
+import { redactSensitiveText } from '../meriva/redaction';
 import { runLocalDiagnostic, type DiagnosticResult } from '../diagnostics/diagnosticEngine';
 import type { PidObservation } from '../types/sourceTypes';
 
@@ -114,17 +116,37 @@ async function buildReport(): Promise<string> {
   const trace = connection?.getDiagnosticsText() || context.trace || getLastBluetoothDiagnosticText();
   const learningProfile = await readCurrentLearningProfile();
   const localDiagnostic = buildLocalDiagnostic();
+  const state = getAutoSaveState();
+  const build = state.metadata?.buildInfo ?? getAppBuildInfo();
   const lines = [
     'MERIVA SMART',
     'BLUETOOTH CLASSIC / ELM327 DIAGNOSTIC REPORT',
     '',
     `DATA: ${new Date().toISOString()}`,
-    `APP VERSION: ${Constants.expoConfig?.version ?? 'N/D'}`,
+    '[BUILD]',
+    `SHA: ${build.gitSha}`,
+    `BRANCH: ${build.branch}`,
+    `VERSION: ${build.appVersion}`,
+    `VERSION CODE: ${build.versionCode ?? 'N/D'}`,
+    `BUILD DATE: ${build.buildDate}`,
+    `DEVICE MODEL: ${build.deviceModel}`,
+    `ANDROID VERSION: ${build.androidVersion}`,
     `PLATFORM: ${Platform.OS} ${Platform.Version}`,
-    `DEVICE: ${Constants.deviceName ?? 'N/D'}`,
-    `ELM DEVICE: ${connection ? `${connection.device.name} | ${connection.device.address}` : 'NÃO CONECTADO'}`,
+    '[VEHICLE]',
+    `MARCA: ${state.vehicle?.make ?? 'N/D'}`,
+    `MODELO: ${state.vehicle?.model ?? 'N/D'}`,
+    `MOTOR: ${state.vehicle?.engine ?? 'N/D'}`,
+    `ANO: ${state.vehicle?.year ?? 'N/D'} | CONFIRMADO: ${state.vehicle?.yearConfirmed ? 'SIM' : 'NÃO'}`,
+    `COMBUSTÍVEL COMPATÍVEL: ${state.vehicle?.fuel ?? 'N/D'}`,
+    `INJEÇÃO: ${state.vehicle?.injectionType ?? 'N/D'}`,
+    `TANQUE: ${state.vehicle?.tankCapacityL ?? 'N/D'} L`,
+    `PROTOCOL BASELINE: ${state.vehicle?.protocolBaseline ?? 'N/D'}`,
+    '[LINK]',
+    `ECU STATUS: ${getSharedObdStatus().ecuResponseState}`,
+    `ECU VALIDADA EM: ${state.obd.ecuValidatedAt ?? 'N/D'}`,
     `PROTOCOL: ${connection?.protocol ?? 'N/D'}`,
     `LAST ERROR: ${getSharedObdLastError() ?? extractLastTraceError(trace) ?? 'NENHUM'}`,
+    `DATA SOURCE COUNTS: REAL=${state.lastReadings.filter((r) => (r.dataSource ?? (r.source === 'REAL' ? 'REAL' : 'SIMULADO')) === 'REAL').length}, SIMULADO=${state.lastReadings.filter((r) => (r.dataSource ?? (r.source === 'REAL' ? 'REAL' : 'SIMULADO')) === 'SIMULADO').length}, REPLAY=${state.lastReadings.filter((r) => r.dataSource === 'REPLAY').length}`,
     `PAIRED DEVICES: ${context.devices.length}`,
     ...context.devices.map((device, index) => `PAIRED ${index + 1}: ${device.name} | ${device.address}`),
     '',
@@ -137,7 +159,8 @@ async function buildReport(): Promise<string> {
     '',
     '--- FIM DO RELATÓRIO ---',
   ];
-  return lines.join('\n');
+  // Este relatório é pensado para compartilhamento; identificadores pessoais são redigidos.
+  return redactSensitiveText(lines.join('\n'));
 }
 
 export async function exportBluetoothDiagnosticTxt(): Promise<BluetoothReportResult> {
