@@ -102,9 +102,9 @@ O autosave escreve primeiro em arquivo temporário, valida o conteúdo e só ent
 
 ## SQLite histórico
 
-`src/database/diagnosticDatabase.ts` implementa o repositório SQLite local versionado. A migração inicial cria tabelas indexadas para amostras PID, DTCs, viagens reais, telemetria esparsa e relatórios dos testes de sensores.
+`src/database/diagnosticDatabase.ts` implementa o repositório SQLite local versionado (`meriva_diagnostics.db`, política em `src/knowledge/sqlite_policy.json`). As migrações v1/v2 criam tabelas indexadas para amostras PID, consultas OBD completas com TX/RX e falhas, DTCs, viagens reais, telemetria esparsa e relatórios dos testes de sensores.
 
-A integração é complementar: o JSON de autosave, CSV bruto/interpretado e TXT exportável continuam mantidos. O SQLite é inicializado sem bloquear a UI e falhas são registradas sem interromper a sessão OBD. Escritas de amostras são enfileiradas fora da consulta serial do ELM327 e limitadas a 1 por PID/origem a cada 5 s. DTCs e viagens reais são indexados após a persistência primária.
+A integração é complementar: o JSON de autosave, CSV bruto/interpretado e TXT exportável continuam mantidos. O SQLite é inicializado sem bloquear a UI e falhas são registradas sem interromper a sessão OBD. Consultas OBD completas são enfileiradas fora da consulta serial do ELM327, preservando também tentativas com timeout/NO DATA; a fila secundária admite até 500 gravações pendentes. Se saturar, somente o índice SQLite pode descartar amostras, com aviso limitado por intervalo. O índice numérico de respostas válidas é limitado a 1 por PID/origem a cada 5 s. A abertura do banco tem janela de retentativa de 15 s. DTCs e viagens reais são indexados após a persistência primária.
 
 A proveniência permanece obrigatória. Dados seed/simulação não são inseridos no histórico de viagens reais; valores ausentes ficam NULL e são exibidos como N/D. A migração atual não importa nem apaga os arquivos históricos anteriores.
 
