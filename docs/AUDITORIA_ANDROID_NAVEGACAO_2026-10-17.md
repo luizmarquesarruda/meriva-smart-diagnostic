@@ -21,6 +21,7 @@ Correção mínima para reduzir duplicação visual no Android sem alterar as ro
 - `tests/cockpitNavigation.test.js`: verifica o cabeçalho global, os quatro destinos principais, a entrada única de Bluetooth, a ausência de Viagens/Veículo em Mais recursos e a existência de retorno visível nas três rotas que antes dependiam da seta nativa.
 - `app/index.tsx`: substitui os atalhos independentes de Diagnóstico/Dados/Viagens por um único acesso a Mais recursos; adiciona navegação principal de quatro destinos, acessível nas duas orientações; transforma o chip de conexão em link acessível para Bluetooth.
 - `app/mais.tsx`: remove entradas duplicadas de Viagens e Veículo, remove Bluetooth (centralizado no chip) e adiciona Dados ao Vivo para preservar o acesso à rota `/dados`.
+- Layout em paisagem: cabeçalho com menor padding vertical, três cards de métricas com espaçamento compacto e atalho de recursos mais baixo; a navegação principal também reduz espaçamento/tamanho. Isso é uma correção baseada nas dimensões relativas, não uma medição visual real.
 
 ## Android nativo
 
