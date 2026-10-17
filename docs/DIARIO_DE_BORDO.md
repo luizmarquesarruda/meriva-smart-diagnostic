@@ -2564,6 +2564,9 @@ A política `src/knowledge/sqlite_policy.json` explicita que a tabela `telemetry
 - **Testes não executados nesta etapa.** Os testes são regressões adicionadas, não evidência de aprovação de CI ou validação no telefone.
 
 
+- Recuperação após encerramento abrupto: na próxima leitura/gravação, se o TXT principal estiver ausente e existir `.previous`, o histórico diário e o histórico de autosave validam o backup, restauram o arquivo e conferem o conteúdo lido de volta antes de acrescentar novos dados. O backup permanece disponível.
+- Novos testes adicionados: diário restaura página anterior quando a principal está ausente; histórico de autosave restaura o bloco anterior e continua a numeração. Testes ainda não executados.
+
 ### Pressão de fila e SQLite secundário
 - Adicionado limite de 500 gravações pendentes configurado em `src/knowledge/sqlite_policy.json`, com aviso limitado a um por minuto.
 - Quando a fila enche, a nova amostra não é adicionada ao índice SQLite, mas os fluxos canônicos TXT/JSON/CSV continuam independentes; contador `droppedSamples` torna a perda do índice visível.
