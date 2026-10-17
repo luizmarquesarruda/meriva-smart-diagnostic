@@ -16,11 +16,11 @@ const fakeDatabase = {
   async withExclusiveTransactionAsync(task) { await task(this); },
   async runAsync(sql, ...params) {
     statements.push(String(sql));
-    if (/INSERT\\s+OR\\s+IGNORE\\s+INTO\\s+schema_migrations/i.test(sql)) {
+    if (/INSERT\s+OR\s+IGNORE\s+INTO\s+schema_migrations/i.test(sql)) {
       migrations.add(Number(params[0]));
       return { lastInsertRowId: 1, changes: 1 };
     }
-    if (/INSERT\\s+INTO\\s+telemetry_samples/i.test(sql)) {
+    if (/INSERT\s+INTO\s+telemetry_samples/i.test(sql)) {
       samples.push({
         id: samples.length + 1,
         timestamp: params[0],
@@ -43,14 +43,14 @@ const fakeDatabase = {
   },
   async getFirstAsync(sql) {
     statements.push(String(sql));
-    if (/MAX\\(version\\)/i.test(sql)) return { version: migrations.size ? Math.max(...migrations) : 0 };
-    if (/sqlite_version\\(\\)/i.test(sql)) return { version: '3.45.3' };
-    if (/COUNT\\(\\*\\).*telemetry_samples/i.test(sql)) return { count: samples.length };
+    if (/MAX\(version\)/i.test(sql)) return { version: migrations.size ? Math.max(...migrations) : 0 };
+    if (/sqlite_version\(\)/i.test(sql)) return { version: '3.45.3' };
+    if (/COUNT\(\*\).*telemetry_samples/i.test(sql)) return { count: samples.length };
     return null;
   },
   async getAllAsync(sql, ...params) {
     statements.push(String(sql));
-    if (/FROM\\s+telemetry_samples/i.test(sql)) return samples.slice().reverse().slice(0, Number(params[0]) || 200);
+    if (/FROM\s+telemetry_samples/i.test(sql)) return samples.slice().reverse().slice(0, Number(params[0]) || 200);
     return [];
   },
 };
@@ -103,20 +103,20 @@ function query(pid, value, tx, rx, status = 'RESPONDEU') {
 }
 
 async function main() {
-  const realTx = '010C\\r';
-  const realRx = '410C 0C80\\r\\n>';
-  const failedRx = 'NO DATA\\r\\n>';
+  const realTx = '010C\r';
+  const realRx = '410C 0C80\r\n>';
+  const failedRx = 'NO DATA\r\n>';
 
   const results = await Promise.all([
     mod.exports.recordSqliteTelemetrySample(
       query('010C', 800, realTx, realRx), 'REAL', '2026-10-17T12:00:00.000Z', 'ecu-session-1',
     ),
     mod.exports.recordSqliteTelemetrySample(
-      query('0105', Number.NaN, '0105\\r', failedRx, 'NÃO RESPONDEU'),
+      query('0105', Number.NaN, '0105\r', failedRx, 'NÃO RESPONDEU'),
       'REAL', '2026-10-17T12:00:01.000Z', 'ecu-session-1',
     ),
     mod.exports.recordSqliteTelemetrySample(
-      query('010C', 900, '010C\\r', '410C 0E10\\r\\n>'),
+      query('010C', 900, '010C\r', '410C 0E10\r\n>'),
       'SIMULACAO', '2026-10-17T12:00:02.000Z', null,
     ),
   ]);
@@ -126,20 +126,20 @@ async function main() {
   assert.strictEqual(openCalls, 1, 'database must be opened once');
   assert.strictEqual(samples.length, 3, 'all samples should be appended');
   assert.strictEqual(samples[0].source, 'REAL_OBD');
-  assert.strictEqual(samples[0].tx, realTx, 'raw TX must be preserved byte-for-byte at string level');
-  assert.strictEqual(samples[0].rx, realRx, 'raw RX must be preserved byte-for-byte at string level');
+  assert.strictEqual(samples[0].tx, realTx, 'raw TX must be preserved exactly');
+  assert.strictEqual(samples[0].rx, realRx, 'raw RX must be preserved exactly');
   assert.strictEqual(samples[0].session_id, 'ecu-session-1');
   assert.strictEqual(samples[1].value, null, 'non-finite values must not enter SQLite as real measurements');
   assert.strictEqual(samples[1].rx, failedRx, 'failed raw responses must still be recorded');
   assert.strictEqual(samples[2].source, 'SIMULACAO', 'simulation data must keep its own source label');
 
-  const sql = statements.join('\\n');
+  const sql = statements.join('\n');
   assert.match(sql, /PRAGMA journal_mode = WAL/i);
   assert.match(sql, /CREATE TABLE IF NOT EXISTS telemetry_samples/i);
   assert.match(sql, /tx TEXT NOT NULL/i);
   assert.match(sql, /rx TEXT NOT NULL/i);
   assert.match(sql, /CREATE INDEX IF NOT EXISTS idx_telemetry_pid_timestamp/i);
-  assert.doesNotMatch(sql, /\\bDROP\\s+TABLE\\b|\\bDELETE\\s+FROM\\s+telemetry_samples\\b/i);
+  assert.doesNotMatch(sql, /\bDROP\s+TABLE\b|\bDELETE\s+FROM\s+telemetry_samples\b/i);
 
   const recent = await mod.exports.getRecentSqliteTelemetrySamples(2);
   assert.strictEqual(recent.length, 2, 'recent reads must be bounded');
