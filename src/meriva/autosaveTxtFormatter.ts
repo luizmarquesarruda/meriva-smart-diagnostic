@@ -34,6 +34,7 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
   L.push('SAVE EXPORT');
   L.push('========================');
   L.push(`Schema: ${AUTOSAVE_SCHEMA_VERSION}`);
+  L.push('Export Version: 1');
   L.push(`App Version: ${or(options.appVersion || build.appVersion)}`);
   L.push(`Exported At: ${options.exportedAt}`);
   L.push(`Saved At: ${or(state.metadata?.savedAt)}`);
