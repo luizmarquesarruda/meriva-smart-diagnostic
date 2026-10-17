@@ -2513,3 +2513,10 @@ Removido o limite artificial: as páginas são ordenadas por data e todas são g
 
 ### Regressão adicionada
 Um teste gera 366 datas distintas e verifica que a primeira e a última continuam no TXT após acrescentar um evento. O teste **não foi executado**; commit inclui `[skip ci]` e não houve novo workflow.
+
+
+### Reforço do histórico diário: estrutura e escrita recuperável
+- Além de remover o corte de 365 dias, a leitura anterior é validada antes de ser reserializada. Um TXT sem cabeçalho/páginas reconhecíveis ou com uma página sem marcador de fim é recusado em vez de ser substituído silenciosamente por um subconjunto de páginas.
+- A escrita passa por arquivo temporário e leitura de volta byte a byte, guarda o arquivo anterior em `.previous` e tenta restaurá-lo se o `moveAsync` falhar. Diretório inesperado no caminho de backup é tratado como erro; não se apaga automaticamente.
+- Testes adicionados: diário com 366 páginas; conteúdo legada não parseável preservado; recuperação da cópia anterior após falha simulada de `moveAsync`.
+- **Testes não executados nesta etapa.** Os testes são regressões adicionadas, não evidência de aprovação de CI ou validação no telefone.
