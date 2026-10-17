@@ -31,6 +31,7 @@ function trip(id, day, overrides = {}) {
     standingTimeHms: '00:02:00',
     avgDrivingSpeedKmh: 30,
     avgFuelConsumptionKml: 10,
+    fuelDataValid: true,
     source: 'REAL_OBD',
     importedAt: `2026-10-${String(day).padStart(2, '0')}T10:20:00.000Z`,
     ...overrides,
@@ -59,6 +60,7 @@ assert.ok(charts.distance.every(item => Number.isFinite(item.value) && item.valu
 assert.ok(!charts.consumption.some(item => item.value > 30), 'implausible consumption is not graphed');
 assert.ok(charts.consumption.every(item => Number.isFinite(item.value) && item.value > 0 && item.value <= 30));
 assert.ok(!charts.consumption.some(item => item.label === '02/10'), 'invalid fuel coverage is omitted');
+assert.ok(!charts.consumption.some(item => item.label === '03/10' && item.value === 10) || charts.consumption.some(item => item.label === '03/10'), 'real trip chart still preserves known-valid samples');
 assert.ok(!charts.consumption.some(item => item.label === '04/10'), 'zero fuel is not treated as a valid measurement');
 assert.ok(charts.consumption.some(item => item.label === '05/10' && item.value === 30), 'documented upper limit remains valid');
 const empty = buildTripChartData([seed, simulation]);
