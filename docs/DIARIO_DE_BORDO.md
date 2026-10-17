@@ -2535,3 +2535,24 @@ O serviço nativo mantém a sessão e sua notificação, mas **não** transfere 
 - Expo Config Plugins: https://docs.expo.dev/config-plugins/introduction/
 - Expo SQLite SDK 51: https://docs.expo.dev/versions/v51.0.0/sdk/sqlite/
 - Android foreground service types: https://developer.android.com/about/versions/14/changes/fgs-types-required
+
+
+## 2026-10-17 — Reconciliar falha observada na CI #2227
+
+### Evidência
+A execução GitHub Actions #2227 da PR #65 terminou com:
+- `npm ci`: sucesso;
+- `npm run doctor`: 17/17 verificações;
+- `npm run typecheck`: passou (a suíte continuou para `npm test`);
+- `npm test`: falhou em `tests/bluetoothConfig.test.js:62`;
+- `android-build`: ignorado após falha de validação.
+
+Mensagem: o teste exigia o texto `lifecycle = 'DISCONNECTED'`, enquanto o código centraliza a mudança em `setLifecycle('DISCONNECTED')`. O comportamento tinha a chamada do setter; o contrato textual do teste ficou preso à forma antiga de implementação.
+
+### Correção mínima
+O teste agora aceita a transição por `setLifecycle('DISCONNECTED')` ou a atribuição direta legada e mantém a checagem semântica do estado. Nenhum código de conexão foi alterado para satisfazer um teste estático.
+
+### Estado
+- Commit de correção no branch desta PR: `a43050b7`.
+- A mesma revisão de teste foi propagada às branches empilhadas de SQLite e serviço Android para que os diffs não reintroduzam o teste obsoleto.
+- O commit usa `[skip ci]`; **não foi solicitada nova CI**. Portanto, a correção é plausível a partir da evidência, mas ainda não foi verificada por uma execução nova.
