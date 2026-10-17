@@ -1090,6 +1090,36 @@ test('histórico de autosave não sobrescreve arquivo existente quando a leitura
   assert.strictEqual(files.get(target), originalContent, 'o histórico autosave anterior deve permanecer intacto');
 });
 
+test('histórico de autosave recupera backup quando arquivo principal está ausente', async () => {
+  resetFS();
+  const history = loadTs(path.join(ROOT, 'src/meriva/autosaveHistoryTxt.ts'));
+  const state = loadTs(path.join(ROOT, 'src/meriva/autosaveState.ts')).createEmptyMerivaState();
+  const target = CONFIG_DIR + '/meriva_smart_autosave_history.txt';
+  const backupPath = target + '.previous';
+  const backup = [
+    'MERIVA SMART DIAGNOSTIC',
+    'HISTÓRICO DE SALVAMENTOS AUTOMÁTICOS',
+    'LIMITE: 200 SALVAMENTOS',
+    'REGRA: quando ultrapassar o limite, o salvamento mais antigo é removido.',
+    '',
+    '=== SALVAMENTO_BEGIN ===',
+    'NÚMERO: 1',
+    'MOTIVO: backup-recovery',
+    'PRESERVAR_AUTOSAVE_ANTERIOR',
+    '=== SALVAMENTO_END ===',
+    '',
+  ].join('\n');
+  files.set(backupPath, backup);
+  assert.strictEqual(files.has(target), false);
+
+  await history.appendAutoSaveHistory(BASE, state, '1.0.1', 'recovery-test');
+  const recovered = files.get(target);
+  assert.ok(recovered.includes('PRESERVAR_AUTOSAVE_ANTERIOR'), 'o autosave anterior deve ser recuperado antes de acrescentar');
+  assert.ok(recovered.includes('NÚMERO: 2'), 'a nova entrada deve continuar a numeração após a recuperação');
+  assert.ok(recovered.includes('=== SALVAMENTO_END ==='));
+  assert.strictEqual(files.has(backupPath), true, 'a cópia anterior deve permanecer disponível após a nova gravação');
+});
+
 // ---------- executor ----------
 async function main() {
   let failed = 0;
