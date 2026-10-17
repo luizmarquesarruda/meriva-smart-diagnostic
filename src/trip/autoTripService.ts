@@ -2,6 +2,7 @@ import { gpsTracker } from '../gps';
 import type { SharedObdConnection } from '../obd/sharedConnection';
 import { getSharedObdConnection, getSharedObdStatus, subscribeSharedObd } from '../obd/sharedConnection';
 import { addDriveCycle, readDriveCycles } from '../storage/driveCycleStorage';
+import { upsertDriveCycle } from '../database/diagnosticDatabase';
 import { forceSaveOnObdEvent, registerObdQuery } from '../meriva/autosaveIntegration';
 import { getAutoSaveState, updateAutoSaveState, initAutoSave } from '../meriva/autosaveManager';
 import { RealTripRecorder, shouldFinalizeStoppedTrip } from './tripRecorder';
@@ -556,9 +557,7 @@ class AutoTripService {
     await addDriveCycle(this.basePath, cycle);
     if (cycle.source === 'REAL_OBD') {
       // O JSON de viagens continua sendo restaurável; SQLite adiciona índices e histórico consultável.
-      void import('../database/diagnosticDatabase')
-        .then(({ upsertDriveCycle }) => upsertDriveCycle(cycle))
-        .catch((cause) => console.warn(
+      void upsertDriveCycle(cycle).catch((cause) => console.warn(
           '[sqlite] viagem não indexada; arquivo histórico mantido:',
           cause instanceof Error ? cause.message : cause,
         ));
