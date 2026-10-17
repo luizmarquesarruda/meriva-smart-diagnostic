@@ -18,7 +18,7 @@ const fakeDb = {
   async execAsync(sql) { execCalls.push(sql); },
   async getFirstAsync(sql) {
     sqlCalls.push({ sql, params: [] });
-    if (/SELECT version FROM schema_migrations/i.test(sql)) {
+    if (/FROM schema_migrations/i.test(sql) && /version/i.test(sql)) {
       return schemaVersion ? { version: schemaVersion } : null;
     }
     if (/SELECT COUNT\(\*\) AS count FROM ([a-z_]+)/i.test(sql)) {
@@ -49,7 +49,7 @@ const fakeDb = {
 const fakeSqlite = {
   async openDatabaseAsync(name) {
     openCount += 1;
-    assert.strictEqual(name, 'meriva-smart-diagnostic.db');
+    assert.strictEqual(name, 'meriva_diagnostics.db');
     return fakeDb;
   },
 };
@@ -97,7 +97,26 @@ async function main() {
   assert.ok(execCalls.some(sql => sql.includes('CREATE TABLE IF NOT EXISTS pid_samples')));
   assert.ok(execCalls.some(sql => sql.includes('CREATE INDEX IF NOT EXISTS idx_pid_samples_pid_time')));
   assert.ok(execCalls.some(sql => sql.includes('CREATE TABLE IF NOT EXISTS sensor_test_runs')));
-  assert.strictEqual(schemaVersion, 1, 'schema migration v1 must be recorded');
+  assert.ok(execCalls.some(sql => sql.includes('CREATE TABLE IF NOT EXISTS telemetry_samples')));
+  assert.strictEqual(schemaVersion, 2, 'schema migration v2 must be recorded');
+
+  const rawQueryStored = await dbModule.recordTelemetryQuery({
+    commandStatus: 'TIMEOUT',
+    protocol: 'AUTO, ISO 14230-4 (KWP FAST)',
+    elapsedMs: 2200,
+    tx: '010C',
+    rx: 'NO DATA',
+    parsed: { pid: '01 0C', name: 'Engine RPM', value: null, unit: 'rpm', status: 'SEM_DADOS' },
+  }, 'REAL', '2026-10-17T12:00:00.000Z', 'session-1');
+  assert.strictEqual(rawQueryStored, true, 'failed raw queries are still kept for protocol audit');
+  const rawInsert = sqlCalls.findLast(call => /INSERT INTO telemetry_samples/i.test(call.sql));
+  assert.ok(rawInsert);
+  assert.strictEqual(rawInsert.params[1], '010C');
+  assert.strictEqual(rawInsert.params[3], null, 'unavailable values remain SQL NULL, not zero');
+  assert.strictEqual(rawInsert.params[6], 'REAL_OBD');
+  assert.strictEqual(rawInsert.params[7], 'TIMEOUT');
+  assert.strictEqual(rawInsert.params[10], '010C');
+  assert.strictEqual(rawInsert.params[11], 'NO DATA');
 
   const insertedId = await dbModule.recordPidSample({
     pid: '01 0c', name: 'Engine RPM', value: 812, unit: 'rpm', status: 'RESPONDEU',
@@ -172,8 +191,10 @@ async function main() {
   assert.strictEqual(sensorInsert.params[11], 'REAL_OBD');
 
   const health = await dbModule.getDiagnosticDatabaseHealth();
-  assert.strictEqual(health.schemaVersion, 1);
+  assert.strictEqual(health.schemaVersion, 2);
   assert.ok(health.pidSampleCount >= 0);
+  assert.ok(health.telemetrySampleCount >= 0);
+  assert.strictEqual(health.maxPendingWrites, 500);
   console.log('SQLite database repository contract: OK (mocked Expo SQLite API; native device database not exercised)');
 }
 
