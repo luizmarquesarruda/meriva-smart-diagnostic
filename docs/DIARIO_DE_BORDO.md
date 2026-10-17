@@ -2450,3 +2450,14 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Nova CI solicitada pela atualização da branch; confirmar resultado integral, inclusive testes restantes e build Android.
 - Teste físico do ELM327 no veículo continua pendente.
 
+
+
+## 2026-10-16 — PR de enlace: keep-alive KWP e recuperação serializada
+
+- Build: branch `fix/obd-recovery-keepalive-20261016`; versionCode: N/D.
+- Hipótese: o monitor de enlace consulta a ECU em intervalos longos e a recuperação pode intercalar comandos com polling.
+- Evidência: `src/obd/sharedConnection.ts` usava timer de 5 s e sonda 010C a cada três ciclos (~15 s); `src/obd/elm327.ts` fazia recuperação fora da fila de comandos; `src/obd/elm327Compatibility.ts` usava limite de quatro falhas.
+- Mudança: timer de saúde passa para 2,5 s; sonda 010C usa timeout de 2,5 s a cada quatro ciclos (~10 s); limite padrão cai para três falhas; keep-alive KWP usa timeout curto; recuperação tenta ATWS e, se necessário, ATZ + ATE0/ATL0/ATS0/ATH0 + seleção de protocolo + 0100/010C. A recuperação é serializada pela mesma fila e a identificação de protocolo só ocorre depois de liberar a fila.
+- Testes: adicionadas asserções estáticas em `tests/bluetoothLifecycle.test.js` e `tests/elm327Compatibility.test.js`; **NÃO EXECUTADOS**.
+- Validação física: NÃO; Meriva/ELM327 e protocolo não testados.
+- Status: PENDENTE. O serviço foreground nativo de Bluetooth não foi implementado porque o diretório Android Java não está versionado na árvore consultada; a execução em segundo plano continua dependente do caminho JS/Expo. Fallback persistente ATSP5→ATSP0 após duas recuperações falhas também requer estado de sessão compartilhado e permanece pendente. CI/workflows NÃO DISPARADOS.
