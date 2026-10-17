@@ -12,6 +12,8 @@ assert.match(settings, /homeAutoRotate: false/, 'rotação automática deve ser 
 assert.match(settings, /showSpeedMetric: false/, 'velocidade deve ficar oculta por padrão');
 assert.match(settings, /largeText: true/, 'texto maior deve vir ativado por padrão');
 assert.match(config, /Indicador principal do painel/);
+assert.match(config, /CONSUMO km\/L/);
+assert.match(config, /FALHAS ATIVAS/);
 assert.match(config, /Alternar indicadores automaticamente/);
 assert.match(config, /Textos e botões maiores/);
 assert.match(config, /Animações suaves da interface/);
