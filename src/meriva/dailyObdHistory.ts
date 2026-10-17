@@ -68,6 +68,7 @@ function renderEvent(state: MerivaPersistedState, event: 'SESSION_START' | 'SESS
   });
   if (realReadings.length) {
     for (const reading of realReadings) {
+      const readingTimestampMs = Date.parse(reading.timestamp);
       const ageMs = eventTimestampMs - readingTimestampMs;
       const quality = reading.status !== 'RESPONDEU' || reading.value == null ? 'ERROR' : ageMs <= 10_000 ? 'FRESH' : 'STALE';
       lines.push(`${reading.pid} ${reading.name}: ${reading.value ?? 'N/D'} ${reading.unit} | ${reading.status} | data_source=${reading.dataSource ?? 'REAL'} | timestamp=${reading.timestamp} | monotonic_ms=${reading.monotonicMs ?? 'N/D'} | age_ms=${Math.max(0, ageMs)} | quality=${quality}`);
