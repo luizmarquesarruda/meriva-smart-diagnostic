@@ -9,12 +9,18 @@ Correção mínima para reduzir duplicação visual no Android sem alterar as ro
 - `app/_layout.tsx` renderizava um `Stack` sem `headerShown: false` global. Apenas as rotas `index` e `bluetooth` ocultavam o cabeçalho nativo.
 - As telas usam cabeçalhos próprios (por exemplo, `app/veiculo.tsx` renderiza o título “VEÍCULO”; `app/mais.tsx` renderiza “MAIS RECURSOS”). Para as demais rotas, o cabeçalho padrão do Stack podia aparecer junto ao título interno.
 - `src/ui/midLayout.ts` centraliza padding, largura máxima e detecção de paisagem. `app/index.tsx` usa layout sem ScrollView para manter os dados principais visíveis.
-- O painel oferece atalhos para Diagnóstico, Dados, Viagens, Saúde, Bluetooth e Mais recursos; a tela Mais também lista alguns desses destinos. Isso é duplicação de acesso/atalhos, não duplicação de rota. A consolidação completa do menu fica para uma etapa própria, com matriz de navegação e teste de acessibilidade, para não ocultar recursos sem verificar o fluxo de cada tela.
+- A barra principal agora concentra quatro destinos: Painel, Diagnóstico OBD, Viagens e Veículo, visível em retrato e paisagem.
+- O chip de estado da ECU/Bluetooth abre o gerenciamento de conexão; Bluetooth foi retirado da lista Mais recursos para evitar dois pontos de entrada.
+- O Painel usa um único atalho para Mais recursos. A tela Mais inclui Dados ao Vivo, Testes de Sensores, Aprendizado, Saúde, Histórico/Arquivos e Configurações; Viagens e Veículo saíram dessa lista porque já são destinos principais.
+- O cartão Saúde do Painel ficou informativo, sem um segundo botão para a mesma tela. A rota `/saude` continua disponível em Mais recursos.
+- Os caminhos de rota não foram apagados nem renomeados, preservando deep links e chamadas existentes.
 
 ## Correção aplicada nesta branch
 
 - `app/_layout.tsx`: define `headerShown: false` no Stack raiz. As telas mantêm seus cabeçalhos internos e o espaço útil vertical aumenta; nenhuma rota é removida.
-- `tests/cockpitNavigation.test.js`: adiciona uma asserção de contrato para evitar que o cabeçalho global volte a duplicar os cabeçalhos das telas.
+- `tests/cockpitNavigation.test.js`: verifica o cabeçalho global, os quatro destinos principais, a entrada única de Bluetooth e a ausência de Viagens/Veículo em Mais recursos.
+- `app/index.tsx`: substitui os atalhos independentes de Diagnóstico/Dados/Viagens por um único acesso a Mais recursos; adiciona navegação principal de quatro destinos, acessível nas duas orientações; transforma o chip de conexão em link acessível para Bluetooth.
+- `app/mais.tsx`: remove entradas duplicadas de Viagens e Veículo, remove Bluetooth (centralizado no chip) e adiciona Dados ao Vivo para preservar o acesso à rota `/dados`.
 
 ## Android nativo
 
@@ -39,7 +45,7 @@ A proposta do serviço de primeiro plano mantém a conexão/socket e a fila ELM3
 
 ## Próxima etapa
 
-1. Revisar a árvore de navegação completa e construir a matriz de duplicações por função.
-2. Consolidar os destinos de primeiro nível sem quebrar deep links/rotas antigas.
-3. Medir o encaixe do painel em 360×640 e 411×891, paisagem e fonte ampliada.
-4. Rever PRs #65 → #66 → #67 na ordem de dependência e só então validar o serviço nativo em build Android.
+1. Executar `node tests/cockpitNavigation.test.js` e `node tests/orientationLayout.test.js` no checkout.
+2. Revisar o encaixe do Painel em 360×640, 411×891, paisagem e fonte ampliada com screenshots/emulador; esse teste visual ainda está pendente.
+3. Executar TypeScript, suíte completa e Expo Doctor somente após autorização para validação; CI segue não disparada.
+4. Rever PRs #65 → #66 → #67 na ordem de dependência e validar serviço Android em APK e hardware antes de merge.
