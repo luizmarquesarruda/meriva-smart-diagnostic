@@ -64,6 +64,7 @@ noFuel.addSample({ timestampMs: 60_000, distanceKm: 0.5, speedKmh: 20, fuelRateL
 const noFuelCycle = noFuel.buildDriveCycle(61_000);
 assert.ok(noFuelCycle, 'a real trip with distance must be retained even without fuel telemetry');
 assert.strictEqual(noFuelCycle.fuelDataValid, false);
+assert.strictEqual(noFuelCycle.fuelLiters, null, 'unavailable fuel must be null, never zero');
 assert.strictEqual(noFuelCycle.avgFuelConsumptionKml, 0, 'unavailable consumption must not be fabricated');
 
 const tinyFuel = new RealTripRecorder(1000, 0);
@@ -79,6 +80,7 @@ const tinyFuelCycle = tinyFuel.buildDriveCycle(62000);
 assert.ok(tinyFuelCycle, 'trip below 0.05 L must remain in the real-trip history');
 assert.strictEqual(tinyFuelCycle.fuelDataValid, false, 'trip under 0.05 L must not publish an unstable km/L average');
 assert.strictEqual(tinyFuelCycle.avgFuelConsumptionKml, 0);
+assert.strictEqual(tinyFuelCycle.fuelLiters, null);
 
 const cycle = new RealTripRecorder(1000, 0);
 cycle.addSample({ timestampMs: 1000, distanceKm: 0, speedKmh: 0, fuelRateLph: 12, fuelRateSource: 'MEASURED_015E', rpm: 800, coolantTempC: 25 });
@@ -102,11 +104,27 @@ assert.strictEqual(saved.avgFuelConsumptionKml, Number((2 / saved.fuelUsedL).toF
 assert.strictEqual(saved.distFinalKm, 2);
 assert.strictEqual(saved.distSource, 'GPS');
 assert.strictEqual(saved.fuelDataValid, true, 'sufficient fuel samples must be marked valid');
+assert.strictEqual(saved.tripQuality, 'OK');
 assert.strictEqual(saved.maxSpeedKmh, 36, 'maximum speed must be persisted for the trip report');
 assert.ok(Array.isArray(saved.telemetrySamples), 'trip must persist a bounded telemetry series');
 assert.strictEqual(saved.telemetrySamples.length, 7, 'chart samples are stored no more often than every ten seconds');
 
 // Older/duplicate timestamps cannot corrupt distance, speed, duration, or fuel.
+const suspect = new RealTripRecorder(0, 0);
+for (let second = 0; second <= 60; second += 10) {
+  suspect.addSample({
+    timestampMs: second * 1000,
+    distanceKm: second / 20,
+    speedKmh: 36,
+    fuelRateLph: 4,
+    fuelRateSource: 'MEASURED_015E',
+  });
+}
+const suspectCycle = suspect.buildDriveCycle(61_000);
+assert.ok(suspectCycle);
+assert.ok(suspectCycle.avgFuelConsumptionKml > 40);
+assert.strictEqual(suspectCycle.tripQuality, 'SUSPEITA', 'consumption outside 2–40 km/L must be marked suspect');
+
 const ordered = new RealTripRecorder(0, 10);
 const orderedFirst = ordered.addSample({ timestampMs: 1000, distanceKm: 10, speedKmh: 10, fuelRateLph: 12 });
 assert.deepStrictEqual(
