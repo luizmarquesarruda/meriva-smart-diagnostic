@@ -18,6 +18,13 @@ function isDriveCycle(value: unknown): value is DriveCycle {
     typeof cycle.avgDrivingSpeedKmh === 'number' &&
     typeof cycle.avgFuelConsumptionKml === 'number' &&
     (cycle.fuelDataValid === undefined || typeof cycle.fuelDataValid === 'boolean') &&
+    (cycle.fuelLiters === undefined || cycle.fuelLiters === null || (typeof cycle.fuelLiters === 'number' && Number.isFinite(cycle.fuelLiters) && cycle.fuelLiters >= 0)) &&
+    (cycle.fuelCoveragePct === undefined || (typeof cycle.fuelCoveragePct === 'number' && Number.isFinite(cycle.fuelCoveragePct) && cycle.fuelCoveragePct >= 0 && cycle.fuelCoveragePct <= 100)) &&
+    (cycle.fuelUncertaintyPct === undefined || cycle.fuelUncertaintyPct === null || (typeof cycle.fuelUncertaintyPct === 'number' && Number.isFinite(cycle.fuelUncertaintyPct) && cycle.fuelUncertaintyPct >= 0)) &&
+    (cycle.distObdKm === undefined || (typeof cycle.distObdKm === 'number' && Number.isFinite(cycle.distObdKm) && cycle.distObdKm >= 0)) &&
+    (cycle.distGpsKm === undefined || (typeof cycle.distGpsKm === 'number' && Number.isFinite(cycle.distGpsKm) && cycle.distGpsKm >= 0)) &&
+    (cycle.distFinalKm === undefined || (typeof cycle.distFinalKm === 'number' && Number.isFinite(cycle.distFinalKm) && cycle.distFinalKm >= 0)) &&
+    (cycle.tripQuality === undefined || ['OK', 'SUSPEITA', 'DADOS_INSUFICIENTES', 'LEGADO_NAO_VERIFICADO'].includes(cycle.tripQuality)) &&
     (cycle.maxSpeedKmh === undefined || (typeof cycle.maxSpeedKmh === 'number' && Number.isFinite(cycle.maxSpeedKmh) && cycle.maxSpeedKmh >= 0)) &&
     (cycle.telemetrySamples === undefined || (Array.isArray(cycle.telemetrySamples) && cycle.telemetrySamples.every((sample) =>
       typeof sample === 'object' && sample !== null &&
