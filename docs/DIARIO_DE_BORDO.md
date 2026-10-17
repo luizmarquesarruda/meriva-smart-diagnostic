@@ -2611,3 +2611,9 @@ A política `src/knowledge/sqlite_policy.json` explicita que a tabela `telemetry
 - Finalidade: manter CPU disponível com a tela apagada durante a sessão OBD visível. Limite: não transfere consultas ELM327 para Java nem garante sozinho a sobrevivência dos timers JS em todos os firmwares Android.
 - Risco conhecido: consumo adicional de bateria durante a sessão; o serviço está ligado ao ciclo de vida da conexão validada e não deve ficar ativo depois da desconexão.
 - Teste de contrato atualizado para aquisição/liberação; não executado. Prebuild, Gradle/APK e teste físico ainda não foram executados.
+
+
+### Pressão de fila e SQLite secundário
+- Adicionado limite de 500 gravações pendentes configurado em `src/knowledge/sqlite_policy.json`, com aviso limitado a um por minuto.
+- Quando a fila enche, a nova amostra não é adicionada ao índice SQLite; CSV/TXT canônicos continuam independentes. A tela de armazenamento mostra profundidade da fila e contagem de amostras não indexadas durante a execução atual.
+- Teste criado com SQLite artificialmente bloqueado para verificar o teto, a amostra omitida e a recuperação da fila. **Não executado**; sem disparo de CI.
