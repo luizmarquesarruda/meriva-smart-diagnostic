@@ -109,7 +109,7 @@ function TripDetails({cycle,onBack}:{cycle:DriveCycle;onBack:()=>void}) {
   const min = coolant.length ? Math.min(...coolant) : null;
   const max = coolant.length ? Math.max(...coolant) : null;
   const avg = coolant.length ? coolant.reduce((sum,value)=>sum+value,0)/coolant.length : null;
-  const fuelValid = cycle.fuelDataValid !== false && cycle.fuelUsedL >= 0.05 && cycle.avgFuelConsumptionKml > 0;
+  const fuelValid = cycle.fuelDataValid !== false && cycle.fuelLiters != null && (cycle.fuelCoveragePct ?? 0) >= 70 && cycle.fuelUsedL >= 0.05 && cycle.avgFuelConsumptionKml > 0;
   const totalSeconds = durationSeconds(cycle.totalTimeHms);
   return <>
     <TouchableOpacity style={s.backInline} onPress={onBack}><Text style={s.backText}>← VOLTAR AO HISTÓRICO</Text></TouchableOpacity>
@@ -127,10 +127,19 @@ function TripDetails({cycle,onBack}:{cycle:DriveCycle;onBack:()=>void}) {
     <View style={s.grid}><Metric l="VEL. MÁXIMA" v={mv(n(cycle.maxSpeedKmh),'km/h')} /><Metric l="MÁXIMO RPM" v={mv(rpm.length?Math.max(...rpm):null,'rpm',0)} /></View>
     <Text style={s.section}>COMBUSTÍVEL</Text>
     <View style={s.card}>
-      <Detail label="Combustível integrado" value={fuelValid?mv(n(cycle.fuelUsedL),'L',3):'N/D'} />
+      <Detail label="Combustível integrado" value={fuelValid?mv(n(cycle.fuelLiters),'L',3):'N/D'} />
       <Detail label="Consumo médio" value={fuelValid?mv(n(cycle.avgFuelConsumptionKml),'km/L',2):'N/D'} />
-      <Detail label="Origem da taxa" value={cycle.fuelRateSource ?? 'N/D'} />
-      <Text style={s.smallNote}>{fuelValid?'Integração calculada conforme a fonte indicada; não equivale a uma medição física do tanque.':'Dados insuficientes para estimar consumo com segurança neste trajeto.'}</Text>
+      <Detail label="Método" value={cycle.fuelMethod ?? cycle.fuelRateSource ?? 'UNAVAILABLE'} />
+      <Detail label="Cobertura das amostras" value={cycle.fuelCoveragePct == null ? 'N/D' : mv(cycle.fuelCoveragePct,'%',1)} />
+      <Detail label="Incerteza estimada" value={cycle.fuelUncertaintyPct == null ? 'N/D' : mv(cycle.fuelUncertaintyPct,'%',0)} />
+      <Text style={s.smallNote}>{fuelValid?'Estimativa baseada em telemetria com cobertura suficiente; não equivale a uma medição física do tanque.':'Dados insuficientes ou cobertura inferior a 70%; combustível e consumo são exibidos como N/D.'}</Text>
+    </View>
+    <Text style={s.section}>DISTÂNCIA E FONTES</Text>
+    <View style={s.card}>
+      <Detail label="Distância final" value={mv(n(cycle.distFinalKm ?? cycle.distanceTotalKm),'km',3)} />
+      <Detail label="Distância integrada OBD" value={cycle.distObdKm == null ? 'N/D' : mv(cycle.distObdKm,'km',3)} />
+      <Detail label="Distância GPS" value={cycle.distGpsKm == null ? 'N/D' : mv(cycle.distGpsKm,'km',3)} />
+      <Detail label="Fonte da distância" value={cycle.distSource ?? 'LEGADO_NÃO_VERIFICADO'} />
     </View>
     <Text style={s.section}>TEMPERATURA DO ARREFECIMENTO</Text>
     <View style={s.card}>
