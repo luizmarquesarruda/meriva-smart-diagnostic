@@ -2557,3 +2557,19 @@ O teste agora aceita a transição por `setLifecycle('DISCONNECTED')` ou a atrib
 - Commit de correção no branch desta PR: `a43050b7`.
 - A mesma revisão de teste foi propagada às branches empilhadas de SQLite e serviço Android para que os diffs não reintroduzam o teste obsoleto.
 - O commit usa `[skip ci]`; **não foi solicitada nova CI**. Portanto, a correção é plausível a partir da evidência, mas ainda não foi verificada por uma execução nova.
+
+
+## 2026-10-17 — Correção do contrato SHA-256 do histórico TXT
+
+### Causa encontrada por inspeção
+O gerador calculava BYTES/SHA-256 sobre o corpo completo terminando em newline; o verificador e o teste iniciavam o corpo na posição anterior a esse newline. Assim, a verificação podia rejeitar um arquivo recém-gravado, apesar de a leitura de volta corresponder ao texto escrito.
+
+### Correção mínima
+- A leitura do rodapé passa a iniciar em `BLOCKS:` e calcular o corpo incluindo o newline que antecede o rodapé.
+- Antes de qualquer append/rewrite, um rodapé existente é validado por bytes, hash e contagem de blocos.
+- Arquivo com rodapé parcial/inválido ou bloco BEGIN sem END não é regravado. Legados sem rodapé que possuam ENDs extras isolados continuam legíveis para migração sem apagar os blocos completos.
+- A tela de leitura informa que o arquivo original foi preservado quando a integridade falha, em vez de aparentar silenciosamente que o histórico está vazio.
+- Teste de regressão adicionado para hash inválido e bloco legado incompleto; teste existente ajustado para medir o corpo corretamente.
+
+### Estado de validação
+A correção e os testes foram gravados nesta branch e propagados para as branches empilhadas de SQLite e serviço Android. **Os testes não foram executados e não houve nova CI**; a causa foi identificada estaticamente a partir do código e do teste da suíte. Não declarar a correção como validada até executar a suíte numa janela autorizada.
