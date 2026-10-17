@@ -23,7 +23,7 @@ function queueSqlitePidSample(sample: {
   pid: string; name: string; value: number; unit: string; status: string;
   source: 'REAL_OBD' | 'SIMULACAO'; timestamp: string; rawResponse: string;
 }): void {
-  const key = sample.source + ':' + sample.pid.replace(/\\s/g, '').toUpperCase();
+  const key = sample.source + ':' + sample.pid.replace(/\s/g, '').toUpperCase();
   const now = Date.now();
   const previous = lastSqliteSampleQueuedAt.get(key);
   if (previous !== undefined && now - previous < SQLITE_SAMPLE_INTERVAL_MS) return;
