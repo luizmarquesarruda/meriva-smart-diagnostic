@@ -1,4 +1,5 @@
 import sensorTestCatalogJson from '../knowledge/sensor_tests.json';
+import { getPidDefinition } from '../obd/pidDefinition';
 export type SensorTestMode='ENGINE_OFF'|'ENGINE_ON';
 export type SensorAssessmentState='CONSISTENTE'|'INVESTIGAR'|'SEM_RESPOSTA'|'NAO_CONCLUSIVO';
 export interface SensorTestSample{pid:string;name:string;value:number|null;unit:string;status:string;rawResponse:string;elapsedMs:number;timestamp:string;readingNumber?:number;}
@@ -11,11 +12,20 @@ export function getSensorTestCatalog():SensorTestCatalog{return catalog;}
 export function normalizeSensorPid(pid:string):string{return pid.replace(/\s/g,'').toUpperCase();}
 export function createSensorTestPlan(supportedPids:string[],hasDefinition:(pid:string)=>boolean=()=>true):SensorTestDefinition[]{
  const supported=new Set(supportedPids.map(normalizeSensorPid));
- return catalog.tests.filter(test=>supported.has(normalizeSensorPid(test.pid))&&test.modes.length>0&&hasDefinition(test.pid));
+ const curated=catalog.tests.filter(test=>supported.has(normalizeSensorPid(test.pid))&&test.modes.length>0&&hasDefinition(test.pid));
+ const included=new Set(curated.map(test=>normalizeSensorPid(test.pid)));
+ const discovered:SensorTestDefinition[]=[];
+ for(const pid of supported){
+  if(included.has(pid)||!hasDefinition(pid))continue;
+  const definition=getPidDefinition(pid);
+  if(!definition)continue;
+  discovered.push({id:'DISCOVERED_'+pid,pid,label:definition.name,catalogName:definition.name,unit:definition.unit,formulaId:definition.formulaId,category:'descoberto',evaluator:'DISCOVERED_STABILITY',modes:['ENGINE_OFF','ENGINE_ON'],requiredPids:[],minimumReadings:MIN_SENSOR_TEST_READINGS,thresholds:{maxRelativeSpreadPercent:20},evidenceClass:'STANDARD_OBD_OPTIONAL_ECU_SUPPORT',vehicleEvidenceStatus:'UNCONFIRMED_FOR_THIS_ECU',diagnosticRuleIds:[],aiGuidance:'PID anunciado pela bitmap e com definição local. Avalie média e dispersão das cinco amostras; estabilidade não comprova exatidão nem integridade física do sensor.'});
+ }
+ return [...curated,...discovered];
 }
 function validRows(samples:SensorTestSample[],pid:string):SensorTestSample[]{return samples.filter(item=>normalizeSensorPid(item.pid)===normalizeSensorPid(pid)&&item.status==='RESPONDEU'&&item.value!==null&&Number.isFinite(item.value));}
-function median(values:number[]):number|null{if(!values.length)return null;const sorted=[...values].sort((a,b)=>a-b),i=Math.floor(sorted.length/2);return sorted.length%2?sorted[i]:(sorted[i-1]+sorted[i])/2;}
-function valueOf(samples:SensorTestSample[],pid:string):number|null{const rows=validRows(samples,pid);if(rows.length<MIN_SENSOR_TEST_READINGS)return null;return median(rows.map(item=>item.value as number));}
+function mean(values:number[]):number|null{if(!values.length)return null;return values.reduce((sum,value)=>sum+value,0)/values.length;}
+function valueOf(samples:SensorTestSample[],pid:string):number|null{const rows=validRows(samples,pid);if(rows.length<MIN_SENSOR_TEST_READINGS)return null;return mean(rows.map(item=>item.value as number));}
 function result(state:SensorAssessmentState,title:string,explanation:string):SensorAssessment{return{state,title,explanation};}
 function rangeAssessment(value:number,test:SensorTestDefinition):SensorAssessment{
  const min=test.thresholds.min,max=test.thresholds.max;
@@ -27,11 +37,18 @@ export function assessSensorSample(sample:SensorTestSample,mode:SensorTestMode,a
  const pid=normalizeSensorPid(sample.pid),test=catalog.tests.find(item=>normalizeSensorPid(item.pid)===pid);
  if(!test)return result('NAO_CONCLUSIVO','PID fora do catálogo','Nenhuma regra inferida porque o PID não está cadastrado em sensor_tests.json.');
  const attempts=all.filter(item=>normalizeSensorPid(item.pid)===pid),valid=validRows(all,pid);
- if(attempts.length<test.minimumReadings)return result('NAO_CONCLUSIVO','Aguardando três leituras','Leituras válidas/total: '+valid.length+'/'+attempts.length+'. O resultado requer '+test.minimumReadings+' tentativas.');
- if(valid.length===0)return result('SEM_RESPOSTA','Sem resposta interpretável nas três tentativas','O PID não forneceu valor interpretável. Pode ser suporte, comunicação ou parser; não prova falha física.');
- if(valid.length<test.minimumReadings)return result('NAO_CONCLUSIVO','Menos de três leituras válidas','Foram obtidas '+valid.length+' leituras válidas em '+attempts.length+' tentativas; não há amostragem suficiente.');
- const value=median(valid.map(item=>item.value as number));if(value===null||!Number.isFinite(value))return result('NAO_CONCLUSIVO','Sem mediana válida','As amostras não geraram valor numérico confiável.');
+ if(attempts.length<test.minimumReadings)return result('NAO_CONCLUSIVO','Aguardando cinco leituras','Leituras válidas/total: '+valid.length+'/'+attempts.length+'. O resultado requer '+test.minimumReadings+' tentativas.');
+ if(valid.length===0)return result('SEM_RESPOSTA','Sem resposta interpretável nas cinco tentativas','O PID não forneceu valor interpretável. Pode ser suporte, comunicação ou parser; não prova falha física.');
+ if(valid.length<test.minimumReadings)return result('NAO_CONCLUSIVO','Menos de cinco leituras válidas','Foram obtidas '+valid.length+' leituras válidas em '+attempts.length+' tentativas; não há amostragem suficiente.');
+ const value=mean(valid.map(item=>item.value as number));if(value===null||!Number.isFinite(value))return result('NAO_CONCLUSIVO','Sem mediana válida','As amostras não geraram valor numérico confiável.');
  const t=test.thresholds,read=(otherPid:string)=>valueOf(all,otherPid);
+ if(test.evaluator==='DISCOVERED_STABILITY'){
+  const values=valid.map(item=>item.value as number),average=mean(values),min=Math.min(...values),max=Math.max(...values);
+  if(average===null||!Number.isFinite(average))return result('NAO_CONCLUSIVO','Média indisponível','Não foi possível calcular média numérica confiável.');
+  const relativeSpread=Math.abs(average)>1e-9?((max-min)/Math.abs(average))*100:(max===min?0:Infinity);
+  if(relativeSpread>t.maxRelativeSpreadPercent)return result('INVESTIGAR','Leituras instáveis','Dispersão entre mínimo e máximo de '+relativeSpread.toFixed(1)+'% da média nas cinco amostras. Repita em condição estável e confira RX bruto; isso não condena o sensor.');
+  return result('NAO_CONCLUSIVO','Cinco leituras coletadas; estabilidade preliminar','Média: '+average.toFixed(3)+' '+test.unit+'; amplitude: '+min.toFixed(3)+'–'+max.toFixed(3)+' '+test.unit+'. Estabilidade não comprova exatidão nem confirma suporte OEM.');
+ }
  if(test.evaluator==='RPM_BY_MODE'){
   if(mode==='ENGINE_OFF')return value<=t.engineOffMaxRpm?result('CONSISTENTE','RPM compatível com motor parado','A mediana está próxima de zero; isso confirma a condição selecionada, não o estado elétrico completo do sensor CKP.'):result('INVESTIGAR','RPM incompatível com motor parado','RPM acima do limite heurístico. Confirme a condição e o RX bruto.');
   return value>=t.engineOnMinRpm?result('CONSISTENTE','Rotação detectada','A ECU reportou rotação compatível com motor funcionando; os demais sensores ainda exigem avaliação.'):result('INVESTIGAR','RPM não confirma motor ligado','A RPM está abaixo do gatilho configurado. Confirme partida, condição do motor e comunicação.');
