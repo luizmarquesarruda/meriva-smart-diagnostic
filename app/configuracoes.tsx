@@ -12,6 +12,7 @@ import { getAutoSaveState, getAutoSaveStatus, initAutoSave } from '../src/meriva
 import { exportAutoSaveTxt, exportDailyObdHistoryTxt } from '../src/meriva/exportAutoSaveTxt';
 import { exportBluetoothDiagnosticTxt } from '../src/obd/exportBluetoothDiagnosticTxt';
 import { AppSettings, readAppSettings, writeAppSettings } from '../src/database/appSettings';
+import { AppIconBadge } from '../src/ui/AppIcon';
 import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
 import { getMidLayout } from '../src/ui/midLayout';
 
@@ -114,7 +115,7 @@ export default function ConfiguracaoScreen() {
     <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
       <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
       <Link href="/mais" asChild><TouchableOpacity accessibilityRole="button" accessibilityLabel="Voltar ao menu Mais recursos" style={styles.navigationBack}><Text style={styles.navigationBackText}>← VOLTAR AOS RECURSOS</Text></TouchableOpacity></Link>
-      <Text style={styles.title}>CONFIGURAÇÕES</Text>
+      <View style={styles.pageHeader}><AppIconBadge name="settings" size={44} color="#e8b54b" /><View style={styles.pageHeaderCopy}><Text style={styles.title}>CONFIGURAÇÕES</Text><Text style={styles.pageSubtitle}>PAINEL • CONEXÃO • ARMAZENAMENTO</Text></View></View>
       <Text style={styles.status}>{status}</Text>
 
       {settings && (
@@ -326,7 +327,10 @@ function SettingSwitch({ label, value, onChange }: { label: string; value: boole
 
 const styles = StyleSheet.create({
   container: { flexGrow: 1, paddingVertical: 16, backgroundColor: '#0b1220' },
-  title: { fontSize: 23, fontWeight: '900', color: '#7db3ff', letterSpacing: 0.5, marginBottom: 6 },
+  pageHeader: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 10 },
+  pageHeaderCopy: { flex: 1, minWidth: 0 },
+  pageSubtitle: { color: '#8da2bd', fontSize: 10, fontWeight: '800', marginTop: 3, letterSpacing: 0.6 },
+  title: { fontSize: 23, fontWeight: '900', color: '#7db3ff', letterSpacing: 0.5, marginBottom: 2 },
   section: { fontSize: 12, fontWeight: '900', color: '#7db3ff', letterSpacing: 0.8, marginTop: 16, marginBottom: 8 },
   status: { color: '#2563eb', fontWeight: '700', marginBottom: 12 },
   card: { backgroundColor: '#111c2e', borderRadius: 8, padding: 11, marginBottom: 9, borderWidth: 1, borderColor: '#243652' },
