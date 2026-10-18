@@ -19,7 +19,7 @@ mod.filename = sourcePath;
 mod.paths = Module._nodeModulePaths(path.dirname(sourcePath));
 mod._compile(output, sourcePath);
 
-const { integrateFuelRateLph, FuelRateIntegrator, estimateFuelRateLph } = mod.exports;
+const { integrateFuelRateLph, FuelRateIntegrator, estimateFuelRateLph, calculateInstantaneousConsumptionKml } = mod.exports;
 
 function assertApprox(actual, expected, epsilon = 1e-12) {
   assert.ok(Math.abs(actual - expected) <= epsilon, `expected ${actual} ≈ ${expected}`);
@@ -123,6 +123,12 @@ const flexMapReference = estimateFuelRateLph({
 });
 assert.ok(flexMapReference && flexMapReference.source === 'ESTIMATED_FLEX',
   'o fallback MAP deve estimar em FLEX sem PID 0152 usando a mistura de referência identificada');
+assert.strictEqual(calculateInstantaneousConsumptionKml(60, 3), null,
+  'consumo instantâneo acima de 30 km/L deve ser suprimido, não exibido como leitura plausível');
+assert.strictEqual(calculateInstantaneousConsumptionKml(60, 0), null,
+  'taxa zero não pode produzir divisão infinita ou consumo inventado');
+assert.strictEqual(calculateInstantaneousConsumptionKml(60, 6), 10,
+  'taxa e velocidade válidas devem produzir o consumo instantâneo calculado');
 assert.strictEqual(estimateFuelRateLph({ mafGs: NaN, fuelType: 'ETANOL' }), null);
 assert.strictEqual(estimateFuelRateLph({ mafGs: 655.35, fuelType: 'ETANOL' }), null,
   'MAF com formato de sentinela serial não pode virar estimativa');

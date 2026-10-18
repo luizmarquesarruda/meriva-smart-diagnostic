@@ -14,10 +14,26 @@ const MAX_INTERVAL_MS = 30_000;
 
 /** Generous guardrail to reject OBD sentinels/extreme values, not vehicle calibration. */
 export const MAX_PLAUSIBLE_FUEL_RATE_LPH = 80;
+export const MAX_PLAUSIBLE_CONSUMPTION_KML = 30;
 const MAX_PLAUSIBLE_MAF_GS = 200;
 
 function isPlausibleFuelRateLph(value: number): boolean {
   return Number.isFinite(value) && value >= 0 && value <= MAX_PLAUSIBLE_FUEL_RATE_LPH;
+}
+
+/** A zero rate or >30 km/L result is unavailable, not a valid instantaneous average. */
+export function calculateInstantaneousConsumptionKml(
+  speedKmh: number | null | undefined,
+  fuelRateLph: number | null | undefined,
+): number | null {
+  if (
+    !Number.isFinite(speedKmh) || (speedKmh ?? 0) <= 0 ||
+    !Number.isFinite(fuelRateLph) || (fuelRateLph ?? 0) <= 0
+  ) return null;
+  const value = (speedKmh as number) / (fuelRateLph as number);
+  return Number.isFinite(value) && value > 0 && value <= MAX_PLAUSIBLE_CONSUMPTION_KML
+    ? value
+    : null;
 }
 
 export function integrateFuelRateLph(

@@ -1,4 +1,4 @@
-import { FuelRateIntegrator } from '../obd/fuelConsumption';
+import { FuelRateIntegrator, MAX_PLAUSIBLE_CONSUMPTION_KML } from '../obd/fuelConsumption';
 import type { DriveCycle, TripTelemetrySample } from '../data/driveCycles';
 import type { FuelRateSource } from '../obd/fuelConsumption';
 
@@ -168,7 +168,7 @@ export class RealTripRecorder {
       && state.validFuelSamples >= 2
       && Number.isFinite(rawAverageConsumptionKml)
       && rawAverageConsumptionKml > 0
-      && rawAverageConsumptionKml <= 30;
+      && rawAverageConsumptionKml <= MAX_PLAUSIBLE_CONSUMPTION_KML;
     const avgFuelConsumptionKml = fuelDataValid ? rawAverageConsumptionKml : 0;
     const avgDrivingSpeedKmh = state.movingTimeMs > 0
       ? state.distanceKm / (state.movingTimeMs / 3_600_000)

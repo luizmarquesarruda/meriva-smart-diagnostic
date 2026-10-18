@@ -10,8 +10,10 @@ export interface TripFuelValidityInput {
   fuelDataValid?: boolean;
 }
 
+import { MAX_PLAUSIBLE_CONSUMPTION_KML } from '../obd/fuelConsumption';
+
 export const MIN_RELIABLE_TRIP_FUEL_L = 0.05;
-export const MAX_RELIABLE_CONSUMPTION_KML = 30;
+export const MAX_RELIABLE_CONSUMPTION_KML = MAX_PLAUSIBLE_CONSUMPTION_KML;
 
 export function isReliableTripFuelConsumption(cycle: TripFuelValidityInput): boolean {
   return cycle.source === 'REAL_OBD'

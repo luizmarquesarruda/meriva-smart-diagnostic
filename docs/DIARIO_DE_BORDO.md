@@ -2792,6 +2792,7 @@ A estimativa MAF/MAP já existia, mas `resolveFuelEstimateProperties` devolvia n
 
 ### Correção
 - FLEX sem composição medida passa a usar mistura de referência 50% etanol / 50% gasolina para estimativa por MAF/MAP.
+- Consumo instantâneo acima de 30 km/L ou calculado com taxa zero fica indisponível; o limite de plausibilidade é compartilhado com o resumo e o relatório.
 - A fonte aparece como `ESTIMATED_FLEX`; a tela inicial e o relatório deixam claro que é estimativa, não leitura medida, e que a mistura real pode ser diferente.
 - Selecionar ETANOL ou GASOLINA segundo o que está no tanque substitui essa referência por parâmetros específicos e tende a melhorar a aproximação.
 - Mantida a precedência de PID 015E quando há leitura medida. Sem taxa medida nem MAF/MAP válidos anunciados pela ECU, o aplicativo continua em N/D: não se inventa resposta de sensor.
@@ -2800,6 +2801,7 @@ A estimativa MAF/MAP já existia, mas `resolveFuelEstimateProperties` devolvia n
 ### Testes adicionados
 - MAF em FLEX sem PID 0152 deve produzir fonte `ESTIMATED_FLEX`.
 - MAP + IAT + RPM em FLEX sem composição deve produzir estimativa identificada.
+- Consumo instantâneo com taxa zero ou resultado acima de 30 km/L deve ser suprimido; dados plausíveis permanecem calculáveis.
 - Quando PID 0152 entrega composição válida, a origem volta a ser estimativa MAF/MAP específica, sem rótulo de mistura presumida.
 
 ### Limites / CI

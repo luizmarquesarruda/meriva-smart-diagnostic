@@ -8,7 +8,7 @@ import { getAutoSaveState, updateAutoSaveState, initAutoSave } from '../meriva/a
 import { RealTripRecorder, shouldFinalizeStoppedTrip } from './tripRecorder';
 import { estimateRangeFromFuelLevel, fuelLevelPercentToLiters, isFuelReserve } from './fuelLevel';
 import { getLivePidTrend, resetLiveTelemetry } from '../obd/liveTelemetry';
-import { estimateFuelRateLph, MAX_PLAUSIBLE_FUEL_RATE_LPH, type FuelRateSource } from '../obd/fuelConsumption';
+import { calculateInstantaneousConsumptionKml, estimateFuelRateLph, MAX_PLAUSIBLE_FUEL_RATE_LPH, type FuelRateSource } from '../obd/fuelConsumption';
 import { isReliableTripFuelConsumption } from './fuelValidity';
 import { startBackgroundMonitoring } from '../gps/backgroundMonitoring';
 import { readAppSettings, subscribeAppSettings } from '../database/appSettings';
@@ -465,10 +465,10 @@ class AutoTripService {
               : null;
         }
 
-        const instantaneousConsumptionKml =
-          fuelRateForDisplayLph != null && fuelRateForDisplayLph > 0 && tripVehicleSpeedKmh > 0
-            ? tripVehicleSpeedKmh / fuelRateForDisplayLph
-            : null;
+        const instantaneousConsumptionKml = calculateInstantaneousConsumptionKml(
+          tripVehicleSpeedKmh,
+          fuelRateForDisplayLph,
+        );
 
         this.setState({
           connected: true,
