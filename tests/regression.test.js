@@ -461,9 +461,10 @@ async function testPidScanner() {
   assert.ok(supported40.includes('015F'));
   // No bloco 0160, o bit mais significativo do 4º byte representa o PID 0179.
   // 01 seria o PID 0180. Mantemos a relação OBD-II MSB-first explícita no teste.
-  const supported60 = scanner.decodeSupportedPids('0160', '41 60 00 00 00 80');
-  assert.ok(supported60.includes('0179'));
-  assert.ok(!supported60.includes('0180'));
+  const supported60 = scanner.decodeSupportedPids('0160', '41 60 00 00 00 01');
+  assert.ok(supported60.includes('0180'), 'o bit de continuação do bloco 61-80 deve permitir o bloco 81-A0');
+  assert.ok(scanner.decodeSupportedPids('01E0', '41 E0 00 00 00 00').length === 0);
+  assert.deepStrictEqual(scanner.DISCOVERY_PIDS, ['0100','0120','0140','0160','0180','01A0','01C0','01E0']);
 
   const fakeSession = {
     async executeCommand(pid) {
@@ -471,13 +472,17 @@ async function testPidScanner() {
         '0100': { response: '41 00 80 00 00 01', status: 'OK', elapsedMs: 10 },
         '0120': { response: '41 20 80 00 00 01', status: 'OK', elapsedMs: 10 },
         '0140': { response: '41 40 80 00 00 01', status: 'OK', elapsedMs: 10 },
-        '0160': { response: '41 60 00 00 00 80', status: 'OK', elapsedMs: 10 },
+        '0160': { response: '41 60 80 00 00 01', status: 'OK', elapsedMs: 10 },
+        '0180': { response: '41 80 80 00 00 01', status: 'OK', elapsedMs: 10 },
+        '01A0': { response: '41 A0 80 00 00 01', status: 'OK', elapsedMs: 10 },
+        '01C0': { response: '41 C0 80 00 00 01', status: 'OK', elapsedMs: 10 },
+        '01E0': { response: '41 E0 00 00 00 00', status: 'OK', elapsedMs: 10 },
       };
       return responses[pid];
     },
   };
   const discovered = await scanner.discoverSupportedPids(fakeSession);
-  assert.deepStrictEqual(discovered.map((item) => item.pid), ['0100', '0120', '0140', '0160']);
+  assert.deepStrictEqual(discovered.map((item) => item.pid), ['0100', '0120', '0140', '0160', '0180', '01A0', '01C0', '01E0']);
 }
 
 
