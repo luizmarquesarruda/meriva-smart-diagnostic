@@ -8,14 +8,27 @@ const ts = require('typescript');
 
 const sourcePath = path.resolve(__dirname, '../src/trip/tripChartData.ts');
 const originalLoad = Module._load;
+const fuelConsumptionPath = path.resolve(__dirname, '../src/obd/fuelConsumption.ts');
 const validityPath = path.resolve(__dirname, '../src/trip/fuelValidity.ts');
-const validityCompiled = ts.transpileModule(fs.readFileSync(validityPath, 'utf8'), {
-  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2019 },
-}).outputText;
+
+function loadTypeScriptModule(filename) {
+  const compiled = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2019, esModuleInterop: true },
+  }).outputText;
+  const loaded = new Module(filename, null);
+  loaded.filename = filename;
+  loaded.paths = Module._nodeModulePaths(path.dirname(filename));
+  loaded._compile(compiled, filename);
+  return loaded;
+}
+
+// The repository's Node tests transpile TypeScript manually. Compile the real
+// fuel model dependency too, so fuelValidity does not fall through to Node's
+// default resolver (which does not load .ts files).
+const fuelConsumptionMod = loadTypeScriptModule(fuelConsumptionPath);
 const validityMod = new Module(validityPath, null);
 validityMod.filename = validityPath;
 validityMod.paths = Module._nodeModulePaths(path.dirname(validityPath));
-validityMod._compile(validityCompiled, validityPath);
 const source = fs.readFileSync(sourcePath, 'utf8');
 const compiled = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2019, esModuleInterop: true },
@@ -23,14 +36,21 @@ const compiled = ts.transpileModule(source, {
 const mod = new Module(sourcePath, null);
 mod.filename = sourcePath;
 mod.paths = Module._nodeModulePaths(path.dirname(sourcePath));
+
 Module._load = function(request) {
+  if (request === '../obd/fuelConsumption') return fuelConsumptionMod.exports;
   if (request === './fuelValidity') return validityMod.exports;
   return originalLoad.apply(this, arguments);
 };
-mod._compile(compiled, sourcePath);
-Module._load = originalLoad;
+try {
+  validityMod._compile(ts.transpileModule(fs.readFileSync(validityPath, 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2019, esModuleInterop: true },
+  }).outputText, validityPath);
+  mod._compile(compiled, sourcePath);
+} finally {
+  Module._load = originalLoad;
+}
 const { buildTripChartData } = mod.exports;
-
 function trip(id, day, overrides = {}) {
   return {
     id,
