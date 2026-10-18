@@ -79,7 +79,7 @@ export default function TestesSensoresScreen(){
    if(pre.parsed.status!=='RESPONDEU'||rpm==null)throw new Error('Não foi possível confirmar a condição do motor pela RPM.');
    if(mode==='ENGINE_OFF'&&rpm>50)throw new Error('RPM '+rpm.toFixed(0)+': o motor parece ligado. Desligue-o ou selecione Motor ligado.');
    if(mode==='ENGINE_ON'&&rpm<400)throw new Error('RPM '+rpm.toFixed(0)+': não foi possível confirmar motor funcionando em marcha lenta.');
-   setMessage('Executando três rodadas sequenciais. Respostas ausentes também serão registradas como tentativas; nenhum PID será consultado em paralelo.');
+   setMessage('Executando rodadas sequenciais para obter cinco respostas válidas por PID. Respostas ausentes também serão registradas como tentativas; nenhum PID será consultado em paralelo.');
    outer:for(let sampleRound=1;sampleRound<=MIN_SENSOR_TEST_READINGS;sampleRound++){
     setRound(sampleRound);
     for(const test of plan){
