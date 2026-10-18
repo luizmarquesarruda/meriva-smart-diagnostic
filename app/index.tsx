@@ -186,13 +186,13 @@ export default function IndexScreen() {
   const throttleReading = freshRealReading((item) => item.pid === '0111' || /throttle|borboleta/i.test(item.name));
   const throttleValue = throttleReading?.value ?? null;
   const allHeroMetrics = [
-    { id: 'SPEED', label: 'VELOCIDADE GPS', value: gpsState.running ? String(Math.round(gpsState.currentSpeedKmh)) : 'N/D', unit: gpsState.running ? 'km/h' : '', hint: gpsState.running ? 'SINAL GPS ATIVO' : 'AGUARDANDO GPS', tone: 'normal' },
-    { id: 'TEMPERATURE', label: 'TEMPERATURA DO MOTOR', value: coolantValue != null ? String(Math.round(coolantValue)) : 'N/D', unit: coolantValue != null ? '°C' : '', hint: coolantValue != null ? 'LEITURA REAL • PID 0105' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0105' : 'ECU DESCONECTADA', tone: coolantValue != null && coolantValue >= 115 ? 'danger' : coolantValue != null && coolantValue >= 110 ? 'warning' : 'normal' },
-    { id: 'VOLTAGE', label: 'VOLTAGEM DO SISTEMA', value: voltageValue != null ? voltageValue.toFixed(1) : 'N/D', unit: voltageValue != null ? 'V' : '', hint: voltageValue != null ? 'LEITURA REAL • PID 0142' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0142' : 'ECU DESCONECTADA', tone: 'normal' },
-    { id: 'THROTTLE', label: 'POSIÇÃO DA BORBOLETA', value: throttleValue != null ? throttleValue.toFixed(1) : 'N/D', unit: throttleValue != null ? '%' : '', hint: throttleValue != null ? 'LEITURA REAL • PID 0111' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0111' : 'ECU DESCONECTADA', tone: 'normal' },
-    { id: 'RPM', label: 'ROTAÇÃO DO MOTOR', value: rpmValue != null ? String(Math.round(rpmValue)) : 'N/D', unit: rpmValue != null ? 'RPM' : '', hint: rpmValue != null ? 'LEITURA REAL • PID 010C' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 010C' : 'ECU DESCONECTADA', tone: 'normal' },
-    { id: 'CONSUMPTION', label: 'CONSUMO DE COMBUSTÍVEL', value: availableConsumptionKml != null ? availableConsumptionKml.toFixed(1) : 'N/D', unit: availableConsumptionKml != null ? 'km/L' : '', hint: consumptionLabel + ' • DADO DA VIAGEM', tone: 'normal' },
-    { id: 'FAULTS', label: 'FALHAS ATIVAS', value: dtcCount > 0 ? String(dtcCount) : 'NORMAL', unit: dtcCount > 0 ? 'DTC' : '', hint: dtcCount > 0 ? 'CÓDIGOS ATIVOS REGISTRADOS' : 'SEM DTC ATIVO REGISTRADO', tone: dtcCount > 0 ? 'danger' : 'normal' },
+    { id: 'SPEED', icon: 'dashboard' as const, label: 'VELOCIDADE GPS', value: gpsState.running ? String(Math.round(gpsState.currentSpeedKmh)) : 'N/D', unit: gpsState.running ? 'km/h' : '', hint: gpsState.running ? 'SINAL GPS ATIVO' : 'AGUARDANDO GPS', tone: 'normal' },
+    { id: 'TEMPERATURE', icon: 'temperature' as const, label: 'TEMPERATURA DO MOTOR', value: coolantValue != null ? String(Math.round(coolantValue)) : 'N/D', unit: coolantValue != null ? '°C' : '', hint: coolantValue != null ? 'LEITURA REAL • PID 0105' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0105' : 'ECU DESCONECTADA', tone: coolantValue != null && coolantValue >= 115 ? 'danger' : coolantValue != null && coolantValue >= 110 ? 'warning' : 'normal' },
+    { id: 'VOLTAGE', icon: 'battery' as const, label: 'VOLTAGEM DO SISTEMA', value: voltageValue != null ? voltageValue.toFixed(1) : 'N/D', unit: voltageValue != null ? 'V' : '', hint: voltageValue != null ? 'LEITURA REAL • PID 0142' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0142' : 'ECU DESCONECTADA', tone: 'normal' },
+    { id: 'THROTTLE', icon: 'activity' as const, label: 'POSIÇÃO DA BORBOLETA', value: throttleValue != null ? throttleValue.toFixed(1) : 'N/D', unit: throttleValue != null ? '%' : '', hint: throttleValue != null ? 'LEITURA REAL • PID 0111' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0111' : 'ECU DESCONECTADA', tone: 'normal' },
+    { id: 'RPM', icon: 'activity' as const, label: 'ROTAÇÃO DO MOTOR', value: rpmValue != null ? String(Math.round(rpmValue)) : 'N/D', unit: rpmValue != null ? 'RPM' : '', hint: rpmValue != null ? 'LEITURA REAL • PID 010C' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 010C' : 'ECU DESCONECTADA', tone: 'normal' },
+    { id: 'CONSUMPTION', icon: 'fuel' as const, label: 'CONSUMO DE COMBUSTÍVEL', value: availableConsumptionKml != null ? availableConsumptionKml.toFixed(1) : 'N/D', unit: availableConsumptionKml != null ? 'km/L' : '', hint: consumptionLabel + ' • DADO DA VIAGEM', tone: 'normal' },
+    { id: 'FAULTS', icon: 'alert' as const, label: 'FALHAS ATIVAS', value: dtcCount > 0 ? String(dtcCount) : 'NORMAL', unit: dtcCount > 0 ? 'DTC' : '', hint: dtcCount > 0 ? 'CÓDIGOS ATIVOS REGISTRADOS' : 'SEM DTC ATIVO REGISTRADO', tone: dtcCount > 0 ? 'danger' : 'normal' },
   ];
   const heroMetrics = allHeroMetrics.filter((metric) => metric.id !== 'SPEED' || settings?.showSpeedMetric === true || settings?.homePrimaryMetric === 'SPEED');
   const configuredMetricIndex = Math.max(0, heroMetrics.findIndex((metric) => metric.id === (settings?.homePrimaryMetric ?? 'TEMPERATURE')));
@@ -249,7 +249,10 @@ export default function IndexScreen() {
               activeOpacity={0.82}
               style={[styles.heroReadout, { opacity: heroOpacity }]}
             >
-              <Text style={styles.heroEyebrow}>{selectedHeroMetric.label}</Text>
+              <View style={styles.heroLabelRow}>
+                <AppIcon name={selectedHeroMetric.icon} size={18} color={selectedHeroMetric.tone === 'danger' ? '#fb7185' : selectedHeroMetric.tone === 'warning' ? '#fbbf24' : '#e8b54b'} />
+                <Text style={styles.heroEyebrow}>{selectedHeroMetric.label}</Text>
+              </View>
               <View style={styles.heroNumberRow}>
                 <Text style={[styles.heroValue, layout.landscape && styles.heroValueLandscape, settings?.largeText && styles.heroValueLarge, selectedHeroMetric.tone === 'danger' && styles.danger, selectedHeroMetric.tone === 'warning' && styles.heroWarning]}>{selectedHeroMetric.value}</Text>
                 {!!selectedHeroMetric.unit && <Text style={styles.heroUnit}>{selectedHeroMetric.unit}</Text>}
@@ -276,15 +279,54 @@ export default function IndexScreen() {
             </View>
           </View>
           {!layout.landscape && (
-            <View style={styles.healthCard}>
-              <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>SAÚDE DO VEÍCULO</Text><Text style={styles.sectionHint}>{dtcCount > 0 ? 'Falhas requerem atenção' : 'Nenhuma falha ativa registrada'}</Text></View><Text style={dtcCount > 0 ? styles.danger : styles.ok}>{dtcCount > 0 ? (dtcCount + ' DTC') : 'NORMAL'}</Text></View>
-            </View>
+            <Link href="/saude" asChild>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Abrir saúde do veículo e revisar evidências" activeOpacity={0.82} style={styles.healthCard}>
+                <View style={styles.healthIdentity}>
+                  <AppIconBadge name="health" size={38} color={dtcCount > 0 ? '#fb7185' : '#4ade80'} />
+                  <View style={styles.healthCopy}>
+                    <Text style={styles.sectionTitle}>SAÚDE DO VEÍCULO</Text>
+                    <Text style={styles.sectionHint}>{dtcCount > 0 ? 'Falhas registradas • toque para revisar' : 'Sem DTC ativo registrado • ver evidências'}</Text>
+                  </View>
+                </View>
+                <View style={styles.healthStatus}>
+                  <Text style={dtcCount > 0 ? styles.danger : styles.ok}>{dtcCount > 0 ? (dtcCount + ' DTC') : 'NORMAL'}</Text>
+                  <AppIcon name="forward" size={18} color="#7db3ff" />
+                </View>
+              </TouchableOpacity>
+            </Link>
           )}
           <View style={[styles.actionGrid, layout.landscape && styles.actionGridLandscape]}>
-            <Link href="/mais" asChild><TouchableOpacity accessibilityRole="button" accessibilityLabel="Abrir todos os recursos" style={[styles.secondaryButton, styles.resourceButton, layout.landscape && styles.resourceButtonLandscape]}><View style={styles.buttonContentRow}>
-              <AppIcon name="resources" size={17} color="#e8b54b" />
-              <Text style={styles.secondaryButtonText} numberOfLines={1}>TODOS OS RECURSOS</Text>
-            </View></TouchableOpacity></Link>
+            <Link href="/dados" asChild>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Abrir dados ao vivo e tendências de PIDs" activeOpacity={0.82} style={[styles.quickAction, layout.landscape && styles.quickActionLandscape]}>
+                <AppIconBadge name="charts" size={36} />
+                <View style={styles.quickActionCopy}>
+                  <Text style={styles.quickActionTitle} numberOfLines={1}>DADOS AO VIVO</Text>
+                  <Text style={styles.quickActionHint} numberOfLines={2}>PIDs e tendências</Text>
+                </View>
+                <AppIcon name="forward" size={16} color="#7db3ff" />
+              </TouchableOpacity>
+            </Link>
+            <Link href="/testes-sensores" asChild>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Abrir testes guiados de sensores" activeOpacity={0.82} style={[styles.quickAction, layout.landscape && styles.quickActionLandscape]}>
+                <AppIconBadge name="sensors" size={36} color="#e8b54b" />
+                <View style={styles.quickActionCopy}>
+                  <Text style={styles.quickActionTitle} numberOfLines={1}>TESTES DE SENSORES</Text>
+                  <Text style={styles.quickActionHint} numberOfLines={2}>Verificações guiadas</Text>
+                </View>
+                <AppIcon name="forward" size={16} color="#7db3ff" />
+              </TouchableOpacity>
+            </Link>
+          </View>
+          <View style={[styles.resourceRow, layout.landscape && styles.resourceRowLandscape]}>
+            <Link href="/mais" asChild>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Abrir todos os recursos do aplicativo" activeOpacity={0.82} style={[styles.secondaryButton, styles.resourceButton, layout.landscape && styles.resourceButtonLandscape]}>
+                <View style={styles.buttonContentRow}>
+                  <AppIcon name="resources" size={17} color="#e8b54b" />
+                  <Text style={styles.secondaryButtonText} numberOfLines={1}>TODOS OS RECURSOS</Text>
+                  <AppIcon name="forward" size={15} color="#7db3ff" />
+                </View>
+              </TouchableOpacity>
+            </Link>
           </View>
           <View style={[styles.bottomNav, layout.landscape && styles.bottomNavLandscape]}>
             <Link href="/" asChild><TouchableOpacity accessibilityRole="button" accessibilityLabel="Painel principal" style={[styles.bottomNavItem, layout.landscape && styles.bottomNavItemLandscape]}><AppIcon name="home" size={layout.landscape ? 15 : 20} color="#7db3ff" /><Text style={[styles.bottomNavText, layout.landscape && styles.bottomNavTextLandscape]}>PAINEL</Text></TouchableOpacity></Link>
@@ -305,9 +347,9 @@ const styles = StyleSheet.create({
   container:{flex:1,backgroundColor:'#07111f'},content:{flex:1,width:'100%',paddingVertical:6,paddingBottom:6},screenFrame:{width:'100%',flex:1,alignSelf:'center',justifyContent:'space-between'},
   header:{backgroundColor:'#0e1b2d',borderRadius:16,borderWidth:1,borderColor:'#28415f',padding:14,marginBottom:10,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:10},headerLandscape:{paddingVertical:8},headerIdentity:{flexDirection:'row',alignItems:'center',gap:10,flex:1,minWidth:0},headerTitle:{flex:1,minWidth:0},brand:{color:'#f8fafc',fontSize:18,fontWeight:'900',letterSpacing:1.2},subtitle:{color:'#7db3ff',fontSize:9,fontWeight:'900',letterSpacing:1,marginTop:3},
   connectionPill:{flexDirection:'row',alignItems:'center',gap:6,flexShrink:0,backgroundColor:'#091526',borderRadius:20,borderWidth:1,borderColor:'#29415f',paddingHorizontal:10,paddingVertical:7},dot:{width:8,height:8,borderRadius:4},dotOk:{backgroundColor:'#4ade80'},dotWarn:{backgroundColor:'#fbbf24'},dotDanger:{backgroundColor:'#fb7185'},connectionText:{color:'#dbeafe',fontSize:9,fontWeight:'900'},
-  heroCard:{backgroundColor:'#0f2035',borderRadius:18,borderWidth:1,borderColor:'#2d5278',padding:12,alignItems:'center',marginBottom:8},heroCardLandscape:{padding:7,marginBottom:4},heroReadout:{width:'100%',alignItems:'center',paddingVertical:1},heroEyebrow:{color:'#7db3ff',fontSize:10,fontWeight:'900',letterSpacing:1.4,textAlign:'center'},heroNumberRow:{flexDirection:'row',alignItems:'baseline',justifyContent:'center',gap:6},heroUnit:{color:'#a9c8ef',fontSize:18,fontWeight:'900'},heroSwitchHint:{color:'#8ea8c8',fontSize:10,fontWeight:'900',letterSpacing:.4,marginTop:6},heroSwitchHintLarge:{fontSize:12,lineHeight:18},heroWarning:{color:'#fbbf24'},heroValue:{color:'#f8fafc',fontSize:50,lineHeight:56,fontWeight:'900',marginTop:2,fontVariant:['tabular-nums']},heroValueLarge:{fontSize:56,lineHeight:62},heroValueLandscape:{fontSize:36,lineHeight:40,marginTop:0},heroState:{color:'#8fa6c1',fontSize:9,fontWeight:'800',letterSpacing:.5,textAlign:'center'},
+  heroCard:{backgroundColor:'#0f2035',borderRadius:18,borderWidth:1,borderColor:'#2d5278',padding:12,alignItems:'center',marginBottom:8},heroCardLandscape:{padding:7,marginBottom:4},heroReadout:{width:'100%',alignItems:'center',paddingVertical:1},heroLabelRow:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7,marginBottom:2},heroEyebrow:{color:'#7db3ff',fontSize:10,fontWeight:'900',letterSpacing:1.4,textAlign:'center'},heroNumberRow:{flexDirection:'row',alignItems:'baseline',justifyContent:'center',gap:6},heroUnit:{color:'#a9c8ef',fontSize:18,fontWeight:'900'},heroSwitchHint:{color:'#8ea8c8',fontSize:10,fontWeight:'900',letterSpacing:.4,marginTop:6},heroSwitchHintLarge:{fontSize:12,lineHeight:18},heroWarning:{color:'#fbbf24'},heroValue:{color:'#f8fafc',fontSize:50,lineHeight:56,fontWeight:'900',marginTop:2,fontVariant:['tabular-nums']},heroValueLarge:{fontSize:56,lineHeight:62},heroValueLandscape:{fontSize:36,lineHeight:40,marginTop:0},heroState:{color:'#8fa6c1',fontSize:9,fontWeight:'800',letterSpacing:.5,textAlign:'center'},
   metricRow:{width:'100%',flexDirection:'row',gap:6,marginTop:10},metricRowLandscape:{marginTop:4},cockpitMetric:{flex:1,minWidth:0,backgroundColor:'#091626',borderRadius:11,borderWidth:1,borderColor:'#233d5b',paddingVertical:9,paddingHorizontal:5,alignItems:'center'},cockpitMetricCompact:{paddingVertical:4,paddingHorizontal:3},metricLabel:{color:'#9aacc4',fontSize:8,fontWeight:'900',letterSpacing:.3,textAlign:'center'},metricValue:{color:'#e5edf7',fontSize:12,fontWeight:'900',marginTop:3,textAlign:'center'},
   coolantCard:{width:'100%',flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:12,marginTop:9,paddingHorizontal:13,paddingVertical:11,backgroundColor:'#091626',borderRadius:12,borderWidth:1,borderColor:'#315579'},coolantCardLandscape:{marginTop:4,paddingVertical:5,paddingHorizontal:9},coolantCopy:{flex:1,minWidth:0},coolantLabelRow:{flexDirection:'row',alignItems:'center',gap:6},coolantLabel:{color:'#c5d8f2',fontSize:9,fontWeight:'900',letterSpacing:.4},coolantStatus:{color:'#7185a1',fontSize:8,fontWeight:'800',marginTop:4},coolantValue:{fontSize:23,fontWeight:'900',fontVariant:['tabular-nums']},coolantOk:{color:'#4ade80'},coolantWarning:{color:'#fbbf24'},
-  healthCard:{backgroundColor:'#0e1b2d',borderRadius:15,borderWidth:1,borderColor:'#28415f',padding:11,marginBottom:8},sectionHeader:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},sectionTitle:{color:'#f1f5f9',fontWeight:'900',fontSize:12,letterSpacing:.6},sectionHint:{color:'#7185a1',fontSize:9,marginTop:3},ok:{color:'#4ade80',fontSize:11,fontWeight:'900'},danger:{color:'#fb7185',fontSize:11,fontWeight:'900'},
-  actionGrid:{flexDirection:'row',gap:7,marginBottom:8},actionGridLandscape:{flexDirection:'row',marginBottom:4},resourceButton:{flex:1,paddingVertical:10,paddingHorizontal:8},resourceButtonLandscape:{paddingVertical:6},buttonContentRow:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7},secondaryButton:{backgroundColor:'#0e1b2d',borderRadius:13,padding:13,alignItems:'center',borderWidth:1,borderColor:'#34506f'},secondaryButtonText:{color:'#dbeafe',fontWeight:'900',fontSize:10,textAlign:'center'},bottomNav:{flexDirection:'row',backgroundColor:'#0e1b2d',borderRadius:14,borderWidth:1,borderColor:'#28415f',marginTop:0,padding:3},bottomNavLandscape:{padding:2},bottomNavItem:{flex:1,minWidth:0,minHeight:44,alignItems:'center',justifyContent:'center',paddingVertical:8,borderRadius:10},bottomNavItemLandscape:{minHeight:40,paddingVertical:3},bottomNavIconLandscape:{fontSize:12,marginBottom:0},bottomNavTextLandscape:{fontSize:7},bottomNavIcon:{fontSize:17,marginBottom:2},bottomNavText:{color:'#c0d1e6',fontSize:10,fontWeight:'900'},footerStatus:{color:'#60748f',textAlign:'center',fontSize:9,marginTop:9},
+  healthCard:{backgroundColor:'#0e1b2d',borderRadius:15,borderWidth:1,borderColor:'#28415f',padding:10,marginBottom:8,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8},healthIdentity:{flex:1,minWidth:0,flexDirection:'row',alignItems:'center',gap:9},healthCopy:{flex:1,minWidth:0},healthStatus:{alignItems:'flex-end',gap:3},sectionHeader:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},sectionTitle:{color:'#f1f5f9',fontWeight:'900',fontSize:12,letterSpacing:.6},sectionHint:{color:'#7185a1',fontSize:9,marginTop:3},ok:{color:'#4ade80',fontSize:11,fontWeight:'900'},danger:{color:'#fb7185',fontSize:11,fontWeight:'900'},
+  actionGrid:{flexDirection:'row',gap:8,marginBottom:7},actionGridLandscape:{flexDirection:'row',gap:6,marginBottom:4},quickAction:{flex:1,minWidth:0,minHeight:68,backgroundColor:'#0e1b2d',borderRadius:13,borderWidth:1,borderColor:'#28415f',paddingVertical:9,paddingHorizontal:8,flexDirection:'row',alignItems:'center',gap:7},quickActionLandscape:{minHeight:48,paddingVertical:5,paddingHorizontal:6},quickActionCopy:{flex:1,minWidth:0},quickActionTitle:{color:'#e5edf7',fontSize:9,fontWeight:'900',letterSpacing:.2},quickActionHint:{color:'#8194ad',fontSize:8,lineHeight:12,marginTop:3},resourceRow:{marginBottom:7},resourceRowLandscape:{marginBottom:3},resourceButton:{flex:1,paddingVertical:7,paddingHorizontal:8},resourceButtonLandscape:{paddingVertical:5},buttonContentRow:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7},secondaryButton:{backgroundColor:'#0e1b2d',borderRadius:13,padding:13,alignItems:'center',borderWidth:1,borderColor:'#34506f'},secondaryButtonText:{color:'#dbeafe',fontWeight:'900',fontSize:10,textAlign:'center'},bottomNav:{flexDirection:'row',backgroundColor:'#0e1b2d',borderRadius:14,borderWidth:1,borderColor:'#28415f',marginTop:0,padding:3},bottomNavLandscape:{padding:2},bottomNavItem:{flex:1,minWidth:0,minHeight:44,alignItems:'center',justifyContent:'center',paddingVertical:8,borderRadius:10},bottomNavItemLandscape:{minHeight:40,paddingVertical:3},bottomNavIconLandscape:{fontSize:12,marginBottom:0},bottomNavTextLandscape:{fontSize:7},bottomNavIcon:{fontSize:17,marginBottom:2},bottomNavText:{color:'#c0d1e6',fontSize:10,fontWeight:'900'},footerStatus:{color:'#60748f',textAlign:'center',fontSize:9,marginTop:9},
 });
