@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "policyId": "MERIVA_REAL_PID_SAMPLE_LEARNING",
+  "catalogPath": "src/knowledge/pids.json",
+  "sensorTestCatalogPath": "src/knowledge/sensor_tests.json",
+  "requiredCatalogPidCount": 34,
+  "minimumValidSamplesPerPid": 5,
+  "maximumAttemptsPerPid": 8,
+  "acquisition": {
+    "strategy": "ROUND_ROBIN_SEQUENTIAL",
+    "maxQueriesPerPidPerRound": 1,
+    "noParallelPidQueries": true,
+    "retryInvalidOnLaterRound": true,
+    "onlyTestPidsAnnouncedByCurrentEcuBitmap": true
+  },
+  "buffer": {
+    "type": "IN_MEMORY_MAP_BY_PID",
+    "preserveRawAttempts": true,
+    "validStatus": "RESPONDEU",
+    "requireFiniteValue": true,
+    "continuousAggregation": "ARITHMETIC_MEAN",
+    "discreteAggregation": "MODE",
+    "requireFiveValidSamplesBeforeAssessment": true,
+    "invalidResponseConsumesAttemptButNeverEntersAggregate": true
+  },
+  "learning": {
+    "allowedSource": "REAL_OBD",
+    "denySimulationAndImportedSamples": true,
+    "updateOnlyAfterFiveValidSamplesForThatPid": true,
+    "persistOneAggregatePerPidPerRun": true,
+    "learningValue": "MEAN_FOR_CONTINUOUS_PID_MODE_FOR_DISCRETE_PID",
+    "neverPromoteResponseToPhysicalSensorAccuracy": true,
+    "discoveredStatus": "RESPONDEU"
+  },
+  "discretePids": ["0101", "0130", "0131", "0151"],
+  "note": "0101 é um campo de bits; 0130 e 0131 são contadores; 0151 é um código. Não usar média aritmética em valores categóricos."
+}
