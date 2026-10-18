@@ -2,7 +2,7 @@ import { Elm327Session } from './elm327';
 import { validateOBDResponse } from './parser';
 import pidCatalog from '../knowledge/pids.json';
 
-export const DISCOVERY_PIDS = ['0100', '0120', '0140', '0160'];
+export const DISCOVERY_PIDS = ['0100', '0120', '0140', '0160', '0180', '01A0', '01C0', '01E0'];
 export const KNOWN_PIDS = (pidCatalog.pids as Array<{ pid: string }>).map((item) => item.pid.toUpperCase());
 
 export interface DiscoveryItem {
@@ -15,7 +15,7 @@ export interface DiscoveryItem {
 
 export function decodeSupportedPids(requestedPid: string, response: string): string[] {
   const normalized = requestedPid.replace(/\s/g, '').toUpperCase();
-  if (!/^01(?:00|20|40|60)$/.test(normalized) || !validateOBDResponse(response)) return [];
+  if (!/^01(?:00|20|40|60|80|A0|C0|E0)$/.test(normalized) || !validateOBDResponse(response)) return [];
 
   const stream = response.replace(/[^0-9A-F]/gi, '').toUpperCase();
   const marker = `41${normalized.slice(-2)}`;
