@@ -74,10 +74,15 @@ assert.strictEqual(tinyFuelCycle.fuelDataValid, false, 'trip under 0.05 L must n
 assert.strictEqual(tinyFuelCycle.avgFuelConsumptionKml, 0);
 
 const absurdConsumption = new RealTripRecorder(0, 0);
-absurdConsumption.addSample({ timestampMs: 1000, distanceKm: 0, speedKmh: 0, fuelRateLph: 18 });
-absurdConsumption.addSample({ timestampMs: 11000, distanceKm: 2, speedKmh: 60, fuelRateLph: 18 });
-absurdConsumption.addSample({ timestampMs: 21000, distanceKm: 4, speedKmh: 60, fuelRateLph: 18 });
-const absurdCycle = absurdConsumption.buildDriveCycle(22000);
+for (let i = 0; i <= 7; i += 1) {
+  absurdConsumption.addSample({
+    timestampMs: 1000 + i * 30_000,
+    distanceKm: Number((i * 0.3).toFixed(3)),
+    speedKmh: 36,
+    fuelRateLph: 1,
+  });
+}
+const absurdCycle = absurdConsumption.buildDriveCycle(212_000);
 assert.ok(absurdCycle, 'trajeto continua no histórico mesmo com consumo implausível');
 assert.strictEqual(absurdCycle.fuelDataValid, false, 'consumo acima de 30 km/L não deve ser validado');
 assert.strictEqual(absurdCycle.avgFuelConsumptionKml, 0, 'média implausível deve ficar indisponível');
