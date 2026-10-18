@@ -47,12 +47,12 @@ const screens = [
   ['app/index.tsx', ['AppIconBadge name="vehicle"', 'AppIcon name="diagnostics"', 'AppIcon name="trips"', 'AppIcon name="temperature"']],
   ['app/mais.tsx', ['AppIconBadge', "['sensors', 'TESTES DE SENSORES'", "['charts', 'DADOS AO VIVO'", "['health', 'SAÚDE'"]],
   ['app/bluetooth.tsx', ['AppIcon name="vehicle"', 'AppIcon name="bluetooth"', 'AppIcon name="connection"', 'AppIcon name="cpu"', 'AppIcon name="activity"', 'styles.labelRow']],
-  ['app/saude.tsx', ['AppIcon name="diagnostics"']],
+  ['app/saude.tsx', ['AppIcon name="diagnostics"', 'name="bluetooth"', 'name="activity"', 'name="alert"', 'name="learning"', 'sectionHeader']],
   ['app/veiculo.tsx', ['AppIcon name="bluetooth"']],
-  ['app/dados.tsx', ['AppIcon name="sensors"', 'Metric icon="dashboard"', 'Metric icon="trips"', 'Metric icon="fuel"', 'Metric icon="battery"', 'metricHeader']],
+  ['app/dados.tsx', ['AppIcon name="sensors"', 'name="charts"', 'name="radio"', 'Metric icon="dashboard"', 'Metric icon="trips"', 'Metric icon="fuel"', 'Metric icon="battery"', 'metricHeader', 'sectionHeader']],
   ['app/aprendizado.tsx', ['AppIcon name="health"', 'AppIconBadge name="learning"']],
   ['app/laboratorio.tsx', ['AppIconBadge name="diagnostics"', 'name="bluetooth"', 'name="radio"', "backgroundColor: '#07111f'"]],
-  ['app/configuracoes.tsx', ['AppIconBadge name="settings"', 'PAINEL • CONEXÃO • ARMAZENAMENTO']],
+  ['app/configuracoes.tsx', ['AppIconBadge name="settings"', 'PAINEL • CONEXÃO • ARMAZENAMENTO', 'name="fuel"', 'name="dashboard"', 'name="bluetooth"', 'name="database"', 'sectionHeader']],
   ['app/armazenamento.tsx', ['AppIconBadge name="history"', 'HISTÓRICO E DADOS']],
   ['app/viagens.tsx', ['AppIconBadge name="trips"', 'RELATÓRIO DE VIAGENS', 'Metric icon="trips"', 'Metric icon="dashboard"', 'Metric icon="fuel"', "AppIcon name=\"forward\""]],
 ];
@@ -64,6 +64,9 @@ assert.ok(cockpit.includes('accessibilityLabel="Abrir saúde do veículo e revis
 
 const resources = read('app/mais.tsx');
 assert.ok(resources.includes("width: '48%'") && resources.includes('tileTopRow'), 'resource page should use responsive icon tiles');
+
+const tripReports = read('app/viagens.tsx');
+assert.ok(!tripReports.includes('#55d6be') && !tripReports.includes('#176e70'), 'trip reports should use the shared blue/amber visual palette');
 
 for (const [file, requiredSnippets] of screens) {
   const source = read(file);
