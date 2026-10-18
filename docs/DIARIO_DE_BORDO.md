@@ -2723,7 +2723,7 @@ Modernizar os ícones do cockpit e dos menus, adotando uma linguagem visual auto
 - Nenhuma alteração foi feita à conexão OBD, aos PIDs, às regras da IA, à base de dados ou aos serviços de GPS/viagens.
 - A alteração está isolada na branch `feat/modern-meriva-icon-system-20261018`.
 - Conforme solicitado, a CI não foi disparada. As alterações remotas usam `[skip ci]`; TypeScript, testes, Expo Doctor, build Android e verificação visual em aparelho permanecem pendentes.
-- O lockfile foi atualizado estruturalmente para fixar a versão do pacote, mas não foi possível executar `npm ci` para verificar o download/resolução no ambiente atual. A validação final deverá confirmar também a integridade do pacote instalado.
+- O lockfile fixa a versão `0.468.0`, URL do tarball, integridade SHA-512 e peer dependencies de React/React Native SVG. O hash e os intervalos peer foram conferidos contra metadata pública de lockfile: https://github.com/gitdeepaks/100x-React-Native-Dev/blob/f7569ad0e6ce94082126e6554cb36aa1dd4395da/Habit-Tracker/bun.lock. `npm ci` não foi executado; a resolução de instalação permanece pendente.
 
 ### Próximo passo
 Revisar o resultado visual no Android em retrato/paisagem e executar `npm ci --no-audit --no-fund`, `npm run doctor` e `npm run validate` somente quando o usuário autorizar fechar a rodada de alterações.
