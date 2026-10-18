@@ -22,8 +22,12 @@ const allPidDefinitions=require('../src/knowledge/pids.json').pids.map(item=>ite
 const allDefinedPlan=e.createSensorTestPlan(allPidDefinitions,pid=>Boolean(require('../src/knowledge/pids.json').pids.find(item=>item.pid===pid)));
 assert.equal(allPidDefinitions.length,34,'o catálogo local contém os 34 PIDs definidos');
 assert.equal(allDefinedPlan.length,34,'os 34 PIDs definidos devem entrar no plano quando anunciados pela ECU');
-assert.equal(allDefinedPlan.filter(item=>item.evaluator==='DISCOVERED_STABILITY').length,4,'PIDs sem teste especializado recebem avaliação conservadora');
+assert.equal(allDefinedPlan.filter(item=>item.evaluator==='OBSERVATION_ONLY').length,4,'PIDs de estado/contador/código recebem avaliação sem média');
 assert.equal(e.assessSensorSample(sample('0104',50),'ENGINE_ON',five('0104',50)).state,'NAO_CONCLUSIVO','PID dinâmico estável não deve ser declarado saudável');
+assert.equal(e.assessSensorSample(sample('0101',7),'ENGINE_ON',five('0101',7)).state,'NAO_CONCLUSIVO','PID de status não deve ser tratado como sensor analógico');
+assert.equal(e.assessSensorSample(sample('0130',3),'ENGINE_OFF',five('0130',3)).state,'NAO_CONCLUSIVO','contador de aquecimento não deve ser diagnosticado por média');
+assert.equal(e.assessSensorSample(sample('0131',120),'ENGINE_OFF',five('0131',120)).state,'NAO_CONCLUSIVO','distância desde DTC é contador, não sensor');
+assert.equal(e.assessSensorSample(sample('0151',1),'ENGINE_OFF',five('0151',1)).state,'NAO_CONCLUSIVO','tipo de combustível é código enumerado, não média analógica');
 assert.equal(e.assessSensorSample(sample('0104',50),'ENGINE_ON',[sample('0104',20),sample('0104',30),sample('0104',40),sample('0104',60),sample('0104',90)]).state,'INVESTIGAR','dispersão alta em PID dinâmico deve ser sinalizada');
 assert.equal(e.assessSensorSample(sample('010B',36),'ENGINE_OFF',[sample('010B',36)]).state,'NAO_CONCLUSIVO');
 assert.equal(e.assessSensorSample(sample('010B',36),'ENGINE_OFF',[...five('010B',36),...five('0133',38)]).state,'CONSISTENTE');
