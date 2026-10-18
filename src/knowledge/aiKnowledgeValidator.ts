@@ -63,7 +63,7 @@ export function validateAiKnowledgeCatalogs(): AiKnowledgeValidationResult {
   const policyResult = validateJsonSchemaDocument(aiPolicySchema, aiPolicy, 'ai_policy.json');
   const responsesResult = validateJsonSchemaDocument(responseCatalogSchema, responseCatalog, 'diagnostic_responses.json');
   const errors = [...policyResult.errors, ...responsesResult.errors];
-  const checkedCatalogs = ['ai_policy.json', 'diagnostic_responses.json'];
+  const checkedCatalogs = ['ai_policy.json', 'diagnostic_responses.json', 'pids.json', 'sensor_tests.json'];
 
   const ruleItems = (diagnosticRules as unknown as { rules?: Array<{ id?: string; hypothesis?: string }> }).rules;
   const responseMap = (responseCatalog as unknown as { responses?: Record<string, unknown> }).responses;
