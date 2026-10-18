@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'expo-router';
 import { ActivityIndicator, ScrollView, StyleSheet, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { AdaptiveText as Text } from '../src/ui/AdaptiveText';
+import { AppIcon, AppIconBadge } from '../src/ui/AppIcon';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
 import { Elm327Session } from '../src/obd/elm327';
@@ -496,7 +497,7 @@ export default function LaboratorioScreen() {
     <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
       <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
       <Link href="/" asChild><TouchableOpacity accessibilityRole="button" accessibilityLabel="Voltar ao Painel" style={styles.navigationBack}><Text style={styles.navigationBackText}>← VOLTAR AO PAINEL</Text></TouchableOpacity></Link>
-      <Text style={styles.title}>DIAGNÓSTICO OBD</Text>
+      <View style={styles.pageHeader}><AppIconBadge name="diagnostics" size={44} color="#e8b54b" /><View style={styles.pageHeaderCopy}><Text style={styles.title}>DIAGNÓSTICO OBD</Text><Text style={styles.pageSubtitle}>ELM327 • LEITURAS REAIS • FERRAMENTAS DE OFICINA</Text></View></View>
       <Text style={styles.status}>{status}</Text>
       <View style={styles.connectionSummary}>
         <View style={styles.connectionItem}><Text style={styles.connectionLabel}>ELM327</Text><Text style={styles.connectionValue}>{sessionRef.current ? 'CONECTADO' : 'AGUARDANDO'}</Text></View>
@@ -530,7 +531,7 @@ export default function LaboratorioScreen() {
       {mode === 'REAL' ? (
         <>
           <TouchableOpacity style={[styles.button, layout.landscape && styles.flexButton]} onPress={loadDevices} disabled={loadingDevices || !storageReady}>
-            {loadingDevices ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>LISTAR PAREADOS</Text>}
+            {loadingDevices ? <ActivityIndicator color="#fff" /> : <View style={styles.buttonContentRow}><AppIcon name="bluetooth" size={17} color="#ffffff" /><Text style={styles.buttonText}>LISTAR PAREADOS</Text></View>}
           </TouchableOpacity>
 
           {devices.map((device) => (
@@ -544,10 +545,10 @@ export default function LaboratorioScreen() {
           ))}
 
           <TouchableOpacity style={[styles.button, layout.landscape && styles.flexButton]} onPress={connectReal} disabled={!devices.length || !storageReady}>
-            <Text style={styles.buttonText}>CONECTAR AUTOMATICAMENTE AO ELM327</Text>
+            <View style={styles.buttonContentRow}><AppIcon name="connection" size={17} color="#ffffff" /><Text style={styles.buttonText}>CONECTAR AUTOMATICAMENTE AO ELM327</Text></View>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.button, styles.disconnect, layout.landscape && styles.flexButton]} onPress={() => void disconnectReal()} disabled={!sessionRef.current}>
-            <Text style={styles.buttonText}>DESCONECTAR ELM327</Text>
+            <View style={styles.buttonContentRow}><AppIcon name="bluetooth" size={17} color="#ffffff" /><Text style={styles.buttonText}>DESCONECTAR ELM327</Text></View>
           </TouchableOpacity>
         </>
       ) : (
@@ -565,11 +566,11 @@ export default function LaboratorioScreen() {
           placeholderTextColor="#64748b"
         />
         <TouchableOpacity style={styles.button} onPress={testPid} disabled={!storageReady || (mode === 'REAL' && !sessionRef.current)}>
-          <Text style={styles.buttonText}>CONSULTAR PID</Text>
+          <View style={styles.buttonContentRow}><AppIcon name="radio" size={17} color="#ffffff" /><Text style={styles.buttonText}>CONSULTAR PID</Text></View>
         </TouchableOpacity>
       </View>
       <TouchableOpacity style={styles.secondaryButton} onPress={discoverPids} disabled={!storageReady || (mode === 'REAL' && !sessionRef.current)}>
-        <Text style={styles.secondaryButtonText}>DESCOBRIR PIDs SUPORTADOS</Text>
+        <View style={styles.buttonContentRow}><AppIcon name="sensors" size={17} color="#7db3ff" /><Text style={styles.secondaryButtonText}>DESCOBRIR PIDs SUPORTADOS</Text></View>
       </TouchableOpacity>
       {!!supportedPids.length ? (
         <View style={styles.pidPanel}>
@@ -587,7 +588,7 @@ export default function LaboratorioScreen() {
         </View>
       ) : null}
       <TouchableOpacity style={styles.secondaryButton} onPress={readAllDtcs} disabled={!storageReady || dtcScanning || (mode === 'REAL' && !sessionRef.current)}>
-        <Text style={styles.secondaryButtonText}>{dtcScanning ? 'VARRENDO DTC 03/07/0A...' : 'VARREDURA COMPLETA DE DTC • 03 / 07 / 0A'}</Text>
+        <View style={styles.buttonContentRow}><AppIcon name="alert" size={17} color="#e8b54b" /><Text style={styles.secondaryButtonText}>{dtcScanning ? 'VARRENDO DTC 03/07/0A...' : 'VARREDURA COMPLETA DE DTC • 03 / 07 / 0A'}</Text></View>
       </TouchableOpacity>
       {!!dtcScan.length ? (
         <View style={styles.dtcPanel}>
@@ -672,81 +673,85 @@ export default function LaboratorioScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, paddingVertical: 16, backgroundColor: '#eef3fb' },
-  title: { fontSize: 22, fontWeight: '900', color: '#1557a6', letterSpacing: 0.5, marginBottom: 6 },
+  container: { flexGrow: 1, paddingVertical: 16, backgroundColor: '#07111f' },
+  pageHeader: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 8 },
+  pageHeaderCopy: { flex: 1, minWidth: 0 },
+  pageSubtitle: { color: '#8da8ca', fontSize: 10, fontWeight: '800', marginTop: 3, letterSpacing: 0.3 },
+  title: { fontSize: 22, fontWeight: '900', color: '#f8fafc', letterSpacing: 0.5, marginBottom: 6 },
   status: { color: '#2563eb', fontWeight: '700', marginBottom: 6 },
-  protocol: { color: '#475569', fontWeight: '600', marginBottom: 8 },
+  protocol: { color: '#94a3b8', fontWeight: '600', marginBottom: 8 },
   connectionSummary: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
-  connectionItem: { flexGrow: 1, flexBasis: 110, minWidth: 110, backgroundColor: '#fff', borderRadius: 7, borderWidth: 1, borderColor: '#d1d9e2', padding: 9 },
-  connectionLabel: { color: '#64748b', fontSize: 9, fontWeight: '900' },
-  connectionValue: { color: '#1f2937', fontSize: 12, fontWeight: '900', marginTop: 3 },
+  connectionItem: { flexGrow: 1, flexBasis: 110, minWidth: 110, backgroundColor: '#0e1b2d', borderRadius: 7, borderWidth: 1, borderColor: '#28415f', padding: 9 },
+  connectionLabel: { color: '#8194ad', fontSize: 9, fontWeight: '900' },
+  connectionValue: { color: '#e5edf7', fontSize: 12, fontWeight: '900', marginTop: 3 },
   modeRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
   rowLandscape: { alignItems: 'stretch' },
   flexButton: { flex: 1 },
   tripPanelLandscape: { padding: 14 },
   tripGridLandscape: { flexWrap: 'nowrap', gap: 12 },
   commandCardLandscape: { maxWidth: 620 },
-  modeButton: { flex: 1, padding: 10, borderRadius: 7, borderWidth: 1, borderColor: '#94a3b8', alignItems: 'center' },
-  modeText: { color: '#1f2937', fontWeight: '900', fontSize: 11 },
-  active: { backgroundColor: '#dbeafe', borderColor: '#2563eb' },
-  simActive: { backgroundColor: '#fef3c7', borderColor: '#d97706' },
-  commandCard: { backgroundColor: '#fff', borderRadius: 8, padding: 11, marginBottom: 10, borderWidth: 1, borderColor: '#d1d9e2' },
-  commandTitle: { color: '#1f2937', fontSize: 12, fontWeight: '900', marginBottom: 7 },
-  button: { backgroundColor: '#1557a6', borderRadius: 7, padding: 13, alignItems: 'center', marginBottom: 9 },
-  secondaryButton: { backgroundColor: '#fff', borderColor: '#94a3b8', borderWidth: 1, borderRadius: 7, padding: 12, alignItems: 'center', marginBottom: 9 },
-  secondaryButtonText: { color: '#1f2937', fontWeight: '700' },
+  modeButton: { flex: 1, padding: 10, borderRadius: 7, borderWidth: 1, borderColor: '#34506f', alignItems: 'center' },
+  modeText: { color: '#e5edf7', fontWeight: '900', fontSize: 11 },
+  active: { backgroundColor: '#102743', borderColor: '#7db3ff' },
+  simActive: { backgroundColor: '#2b271b', borderColor: '#8e7132' },
+  commandCard: { backgroundColor: '#0e1b2d', borderRadius: 8, padding: 11, marginBottom: 10, borderWidth: 1, borderColor: '#28415f' },
+  commandTitle: { color: '#e5edf7', fontSize: 12, fontWeight: '900', marginBottom: 7 },
+  button: { backgroundColor: '#2563eb', borderRadius: 7, padding: 13, alignItems: 'center', marginBottom: 9 },
+  secondaryButton: { backgroundColor: '#0e1b2d', borderColor: '#34506f', borderWidth: 1, borderRadius: 7, padding: 12, alignItems: 'center', marginBottom: 9 },
+  secondaryButtonText: { color: '#dbeafe', fontWeight: '800' },
   disconnect: { backgroundColor: '#64748b' },
-  buttonText: { color: '#fff', fontWeight: '700' },
-  device: { backgroundColor: '#fff', borderRadius: 10, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: '#cbd5e1' },
+  buttonText: { color: '#fff', fontWeight: '800' },
+  device: { backgroundColor: '#0e1b2d', borderRadius: 10, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: '#28415f' },
   selected: { borderColor: '#2563eb', borderWidth: 2 },
-  deviceName: { fontWeight: '700', color: '#1f2937' },
-  warning: { color: '#b45309', marginBottom: 12 },
-  input: { backgroundColor: '#fff', borderColor: '#cbd5e1', borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 12, color: '#0f172a' },
-  tripPanel: { backgroundColor: '#fff', borderRadius: 10, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#cbd5e1' },
+  deviceName: { fontWeight: '700', color: '#e5edf7' },
+  warning: { color: '#fbbf24', marginBottom: 12 },
+  input: { backgroundColor: '#0e1b2d', borderColor: '#28415f', borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 12, color: '#e5edf7' },
+  tripPanel: { backgroundColor: '#0e1b2d', borderRadius: 10, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#28415f' },
   tripHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  tripTitle: { color: '#1f2937', fontWeight: '900', fontSize: 14 },
+  tripTitle: { color: '#e5edf7', fontWeight: '900', fontSize: 14 },
   tripGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   tripMetric: { width: '48%', marginBottom: 8 },
   tripMetricLandscape: { width: '23%', marginBottom: 0 },
-  tripLabel: { color: '#64748b', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
-  tripValue: { color: '#1f2937', fontWeight: '800', fontSize: 16, marginTop: 2 },
-  live: { color: '#15803d', fontWeight: '900', fontSize: 10 },
-  muted: { color: '#64748b', fontWeight: '900', fontSize: 10 },
-  tripHelp: { color: '#64748b', fontSize: 11, marginTop: 2 },
-  aiPanel: { backgroundColor: '#fff', borderRadius: 10, padding: 13, marginBottom: 10, borderWidth: 1, borderColor: '#93c5fd' },
+  tripLabel: { color: '#8194ad', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+  tripValue: { color: '#e5edf7', fontWeight: '800', fontSize: 16, marginTop: 2 },
+  live: { color: '#4ade80', fontWeight: '900', fontSize: 10 },
+  muted: { color: '#8194ad', fontWeight: '900', fontSize: 10 },
+  tripHelp: { color: '#8194ad', fontSize: 11, marginTop: 2 },
+  aiPanel: { backgroundColor: '#0e1b2d', borderRadius: 10, padding: 13, marginBottom: 10, borderWidth: 1, borderColor: '#93c5fd' },
   aiHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  aiTitle: { color: '#1557a6', fontWeight: '900', fontSize: 14 },
-  aiEngine: { color: '#64748b', fontSize: 9, fontWeight: '800' },
-  hypothesis: { borderTopWidth: 1, borderTopColor: '#dbeafe', paddingTop: 9, marginTop: 8 },
-  hypothesisTitle: { color: '#1f2937', fontWeight: '900', fontSize: 14 },
+  aiTitle: { color: '#7db3ff', fontWeight: '900', fontSize: 14 },
+  aiEngine: { color: '#8194ad', fontSize: 9, fontWeight: '800' },
+  hypothesis: { borderTopWidth: 1, borderTopColor: '#233a56', paddingTop: 9, marginTop: 8 },
+  hypothesisTitle: { color: '#e5edf7', fontWeight: '900', fontSize: 14 },
   hypothesisConfidence: { color: '#2563eb', fontWeight: '800', fontSize: 11, marginTop: 3 },
-  aiLine: { color: '#334155', fontSize: 11, marginTop: 4 },
-  aiMuted: { color: '#64748b', fontSize: 11 },
-  aiWarning: { color: '#b45309', fontWeight: '800', fontSize: 11, marginTop: 9 },
-  aiDisclaimer: { color: '#64748b', fontSize: 10, marginTop: 9 },
-  dtcPanel: { backgroundColor: '#fff', borderRadius: 10, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#cbd5e1' },
-  dtcTitle: { color: '#1557a6', fontSize: 13, fontWeight: '900', marginBottom: 6 },
-  dtcRow: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingVertical: 8 },
-  dtcKind: { color: '#334155', flexShrink: 1, fontSize: 10, fontWeight: '900' },
-  dtcCodes: { color: '#64748b', fontSize: 10, marginTop: 3 },
-  dtcAvailable: { color: '#15803d', fontSize: 8, fontWeight: '900' },
-  dtcUnavailable: { color: '#b45309', fontSize: 8, fontWeight: '900' },
-  dtcHint: { color: '#64748b', fontSize: 9, lineHeight: 14, marginTop: 7 },
-  dtcDetails: { marginTop: 10, borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingTop: 8 },
-  dtcDetailRow: { flexDirection: 'row', gap: 8, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#eef2f7' },
-  dtcDetailCode: { color: '#1557a6', fontWeight: '900', fontSize: 12, width: 52 },
-  dtcDetailName: { color: '#1f2937', fontWeight: '900', fontSize: 11 },
-  dtcDetailText: { color: '#64748b', fontSize: 9, lineHeight: 14, marginTop: 2 },
-  pidPanel: { backgroundColor: '#fff', borderRadius: 10, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#93c5fd' },
-  pidRow: { flexDirection: 'row', gap: 9, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#e2e8f0' },
-  pidCode: { color: '#1557a6', fontWeight: '900', fontSize: 11, width: 42 },
-  pidName: { color: '#1f2937', fontWeight: '900', fontSize: 11 },
-  pidDescription: { color: '#64748b', fontSize: 9, lineHeight: 14, marginTop: 2 },
+  aiLine: { color: '#c0d1e6', fontSize: 11, marginTop: 4 },
+  aiMuted: { color: '#8194ad', fontSize: 11 },
+  aiWarning: { color: '#fbbf24', fontWeight: '800', fontSize: 11, marginTop: 9 },
+  aiDisclaimer: { color: '#8194ad', fontSize: 10, marginTop: 9 },
+  dtcPanel: { backgroundColor: '#0e1b2d', borderRadius: 10, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#28415f' },
+  dtcTitle: { color: '#7db3ff', fontSize: 13, fontWeight: '900', marginBottom: 6 },
+  dtcRow: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#233a56', paddingVertical: 8 },
+  dtcKind: { color: '#c0d1e6', flexShrink: 1, fontSize: 10, fontWeight: '900' },
+  dtcCodes: { color: '#8194ad', fontSize: 10, marginTop: 3 },
+  dtcAvailable: { color: '#4ade80', fontSize: 8, fontWeight: '900' },
+  dtcUnavailable: { color: '#fbbf24', fontSize: 8, fontWeight: '900' },
+  dtcHint: { color: '#8194ad', fontSize: 9, lineHeight: 14, marginTop: 7 },
+  dtcDetails: { marginTop: 10, borderTopWidth: 1, borderTopColor: '#233a56', paddingTop: 8 },
+  dtcDetailRow: { flexDirection: 'row', gap: 8, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#233a56' },
+  dtcDetailCode: { color: '#7db3ff', fontWeight: '900', fontSize: 12, width: 52 },
+  dtcDetailName: { color: '#e5edf7', fontWeight: '900', fontSize: 11 },
+  dtcDetailText: { color: '#8194ad', fontSize: 9, lineHeight: 14, marginTop: 2 },
+  pidPanel: { backgroundColor: '#0e1b2d', borderRadius: 10, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#93c5fd' },
+  pidRow: { flexDirection: 'row', gap: 9, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#233a56' },
+  pidCode: { color: '#7db3ff', fontWeight: '900', fontSize: 11, width: 42 },
+  pidName: { color: '#e5edf7', fontWeight: '900', fontSize: 11 },
+  pidDescription: { color: '#8194ad', fontSize: 9, lineHeight: 14, marginTop: 2 },
   pidMeta: { color: '#2563eb', fontSize: 8, fontWeight: '800', marginTop: 3 },
-  panel: { backgroundColor: '#1f2937', borderRadius: 14, padding: 16, marginTop: 8 },
-  label: { color: '#93c5fd', marginTop: 8 },
+  panel: { backgroundColor: '#091626', borderRadius: 14, padding: 16, marginTop: 8 },
+  label: { color: '#7db3ff', marginTop: 8 },
   value: { color: '#f8fafc', fontSize: 16, marginTop: 3 },
-  navigationBack: { alignSelf: 'flex-start', paddingVertical: 8, paddingHorizontal: 10, marginBottom: 8, backgroundColor: '#dbeafe', borderRadius: 8 },
-  navigationBackText: { color: '#1557a6', fontSize: 10, fontWeight: '900' },
-  error: { color: '#c2410c', marginTop: 16 },
+  navigationBack: { alignSelf: 'flex-start', paddingVertical: 8, paddingHorizontal: 10, marginBottom: 8, backgroundColor: '#102743', borderRadius: 8 },
+  navigationBackText: { color: '#7db3ff', fontSize: 10, fontWeight: '900' },
+  buttonContentRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  error: { color: '#fb7185', marginTop: 16 },
 });
