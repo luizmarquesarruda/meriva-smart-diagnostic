@@ -221,9 +221,9 @@ async function main() {
     })
   ));
   const accepted = burst.filter(value => value !== null).length;
-  const rejected = burst.filter(value => value === null).length;
+  const rejectedOverflowSamples = burst.filter(value => value === null).length;
   assert.strictEqual(accepted, maxPendingWrites, 'only the configured maximum may be pending in a burst');
-  assert.strictEqual(rejected, 25, 'overflow samples should be dropped from the secondary SQLite index');
+  assert.strictEqual(rejectedOverflowSamples, 25, 'overflow samples should be dropped from the secondary SQLite index');
   const pidInsertCountAfterBurst = sqlCalls.filter(call => /INSERT INTO pid_samples/i.test(call.sql)).length;
   assert.strictEqual(pidInsertCountAfterBurst - priorPidInsertCount, maxPendingWrites, 'only accepted samples should be written');
   const healthAfterBurst = await dbModule.getDiagnosticDatabaseHealth();

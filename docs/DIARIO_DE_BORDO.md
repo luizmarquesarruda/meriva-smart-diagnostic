@@ -2680,3 +2680,23 @@ Os arquivos de teste foram alterados, mas os comandos `npm ci`, `npm run validat
 
 ### Próximo passo
 Executar a CI para a nova cabeça da PR #69 e inspecionar os logs de `validate` e `android-build`. Se algum job falhar, registrar a causa observada antes de outra correção.
+
+
+## 2026-10-18 — CI #2375: correção de compilação do teste SQLite
+
+### Resultado observado
+- Run #2375 / `39091662438`, commit `7cd0ca5acc0f7b91f1301187fec18a5d89cd078f`.
+- `npm ci --no-audit --no-fund`: sucesso.
+- Expo Doctor: job concluído com sucesso.
+- `npm run validate`: falhou durante `tsc --noEmit`, antes de iniciar a suíte de testes.
+- Erro exato: `tests/diagnosticDatabase.test.js(144,9)` e `tests/diagnosticDatabase.test.js(224,9)`: `TS2451 Cannot redeclare block-scoped variable 'rejected'`.
+- `android-build`: pulado porque o job `validate` falhou.
+
+### Diagnóstico
+A nova regressão da rajada concorrente usou o nome local `rejected`, já declarado anteriormente no mesmo escopo por outro cenário do teste. A falha observada é uma colisão no nome de variável do teste, não evidência de falha no repositório SQLite.
+
+### Correção
+Renomeada a variável da regressão nova para `rejectedOverflowSamples` e atualizada a asserção correspondente. A lógica de produção não foi alterada nesta correção.
+
+### Próximo passo
+Executar a CI novamente no novo commit. Só depois de `validate` e `android-build` verdes será possível considerar esta rodada validada por CI.
