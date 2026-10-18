@@ -34,8 +34,13 @@ function rangeAssessment(value:number,test:SensorTestDefinition):SensorAssessmen
 }
 /** Motor determinístico de triagem local, configurado pelo JSON. Nenhum estado certifica integridade física/elétrica. */
 export function assessSensorSample(sample:SensorTestSample,mode:SensorTestMode,all:SensorTestSample[]):SensorAssessment{
- const pid=normalizeSensorPid(sample.pid),test=catalog.tests.find(item=>normalizeSensorPid(item.pid)===pid);
- if(!test)return result('NAO_CONCLUSIVO','PID fora do catálogo','Nenhuma regra inferida porque o PID não está cadastrado em sensor_tests.json.');
+ const pid=normalizeSensorPid(sample.pid);
+ const catalogTest=catalog.tests.find(item=>normalizeSensorPid(item.pid)===pid);
+ const definition=getPidDefinition(pid);
+ const test:SensorTestDefinition|undefined=catalogTest??(definition?{
+  id:'DISCOVERED_'+pid,pid,label:definition.name,catalogName:definition.name,unit:definition.unit,formulaId:definition.formulaId,category:'descoberto',evaluator:'DISCOVERED_STABILITY',modes:['ENGINE_OFF','ENGINE_ON'],requiredPids:[],minimumReadings:MIN_SENSOR_TEST_READINGS,thresholds:{maxRelativeSpreadPercent:20},evidenceClass:'STANDARD_OBD_OPTIONAL_ECU_SUPPORT',vehicleEvidenceStatus:'UNCONFIRMED_FOR_THIS_ECU',diagnosticRuleIds:[],aiGuidance:'PID anunciado pela ECU e definido no catálogo local. Estabilidade não comprova exatidão nem integridade física do sensor.'
+ }:undefined);
+ if(!test)return result('NAO_CONCLUSIVO','PID fora do catálogo','Nenhuma regra inferida porque o PID não tem definição local.');
  const attempts=all.filter(item=>normalizeSensorPid(item.pid)===pid),valid=validRows(all,pid);
  if(attempts.length<test.minimumReadings)return result('NAO_CONCLUSIVO','Aguardando cinco leituras','Leituras válidas/total: '+valid.length+'/'+attempts.length+'. O resultado requer '+test.minimumReadings+' tentativas.');
  if(valid.length===0)return result('SEM_RESPOSTA','Sem resposta interpretável nas cinco tentativas','O PID não forneceu valor interpretável. Pode ser suporte, comunicação ou parser; não prova falha física.');
