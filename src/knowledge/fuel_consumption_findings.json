@@ -88,7 +88,7 @@
     }
   ],
   "knownLimitations": [
-    "The actual Meriva has not yet had a complete physical session validating the candidate fuel PIDs.",
+    "No complete RAW_ECU evidence set (raw responses plus support bitmap) has been recorded for the candidate fuel PIDs on the actual Meriva; physical support and compatibility remain unconfirmed.",
     "PID 0152 interpretation and availability are not confirmed for this KWP/K-Line ECU, especially with Brazilian retail gasoline blend rules.",
     "The MAF formula currently assumes stoichiometric operation unless the model is extended with a valid lambda/equivalence-ratio correction.",
     "The MAP path uses provisional volumetric efficiency 0.80; this is not a calibrated Chevrolet Meriva constant.",
