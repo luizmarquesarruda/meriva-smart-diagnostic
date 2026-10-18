@@ -282,7 +282,7 @@ export default function IndexScreen() {
             <Link href="/saude" asChild>
               <TouchableOpacity accessibilityRole="button" accessibilityLabel="Abrir saúde do veículo e revisar evidências" activeOpacity={0.82} style={styles.healthCard}>
                 <View style={styles.healthIdentity}>
-                  <AppIconBadge name="health" size={38} color={dtcCount > 0 ? '#fb7185' : '#4ade80'} />
+                  <AppIconBadge name="health" size={38} color={dtcCount > 0 ? '#fb7185' : '#4ade80'} tone={dtcCount > 0 ? 'danger' : 'success'} />
                   <View style={styles.healthCopy}>
                     <Text style={styles.sectionTitle}>SAÚDE DO VEÍCULO</Text>
                     <Text style={styles.sectionHint}>{dtcCount > 0 ? 'Falhas registradas • toque para revisar' : 'Sem DTC ativo registrado • ver evidências'}</Text>
