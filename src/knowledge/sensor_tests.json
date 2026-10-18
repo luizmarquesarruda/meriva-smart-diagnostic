@@ -315,7 +315,7 @@
         "DTC_P0301_MISFIRE",
         "FUEL_TRIM_LEAN"
       ],
-      "aiGuidance": "Motor parado: compare medianas MAP/BARO. Motor aquecido: avalie com RPM. MAP alto cria hipótese de vácuo/entrada de ar/sincronismo, não prova sensor ruim.",
+      "aiGuidance": "Motor parado: compare médias MAP/BARO calculadas com cinco respostas válidas. Motor aquecido: avalie com RPM. MAP alto cria hipótese de vácuo/entrada de ar/sincronismo, não prova sensor ruim.",
       "aggregation": "MEAN"
     },
     {
@@ -342,7 +342,7 @@
       "diagnosticRuleIds": [
         "DTC_P0301_MISFIRE"
       ],
-      "aiGuidance": "Confirme RPM em três leituras e compare com a condição selecionada. Resposta do PID não comprova integridade elétrica do CKP.",
+      "aiGuidance": "Confirme RPM com cinco respostas válidas e compare com a condição selecionada. Resposta do PID não comprova integridade elétrica do CKP.",
       "aggregation": "MEAN"
     },
     {
@@ -900,7 +900,7 @@
       "diagnosticRuleIds": [
         "DTC_P0123_THROTTLE"
       ],
-      "aiGuidance": "Não pressione o pedal durante o teste parado; três leituras estáticas só verificam resposta e plausibilidade.",
+      "aiGuidance": "Não pressione o pedal durante o teste parado; cinco leituras estáticas só verificam resposta e plausibilidade.",
       "aggregation": "MEAN"
     },
     {
