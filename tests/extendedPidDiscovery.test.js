@@ -1,0 +1,16 @@
+'use strict';
+const assert = require('assert');
+const path = require('path');
+const ts = require('typescript');
+const source = require('fs').readFileSync(path.resolve(__dirname, '../src/obd/extendedPidDiscovery.ts'), 'utf8');
+const js = ts.transpileModule(source, {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2019}}).outputText;
+const Module = require('module');
+const mod = new Module(path.resolve(__dirname, '../src/obd/extendedPidDiscovery.ts'), module);
+mod.filename = path.resolve(__dirname, '../src/obd/extendedPidDiscovery.ts');
+mod.paths = Module._nodeModulePaths(path.dirname(mod.filename));
+mod._compile(js, mod.filename);
+const api = mod.exports;
+assert.deepStrictEqual(api.decodeExtendedSupportBitmap('0900','49 00 90 00 00 00','09'),['01','04']);
+assert.deepStrictEqual(api.decodeExtendedSupportBitmap('0600','46 00 80 00 00 00','06'),['01']);
+assert.deepStrictEqual(api.decodeExtendedSupportBitmap('0100','41 00 80 00 00 00','09'),[]);
+console.log('Extended PID bitmap tests passed');
