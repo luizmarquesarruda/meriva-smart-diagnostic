@@ -44,7 +44,8 @@ export function assessSensorSample(sample:SensorTestSample,mode:SensorTestMode,a
  if(attempts.length<test.minimumReadings)return result('NAO_CONCLUSIVO','Aguardando cinco leituras','Leituras válidas/total: '+valid.length+'/'+attempts.length+'. O resultado requer '+test.minimumReadings+' respostas válidas.');
  if(valid.length===0)return result('SEM_RESPOSTA','Sem resposta interpretável nas cinco tentativas','O PID não forneceu valor interpretável. Pode ser suporte, comunicação ou parser; não prova falha física.');
  if(valid.length<test.minimumReadings)return result('NAO_CONCLUSIVO','Menos de cinco leituras válidas','Foram obtidas '+valid.length+' leituras válidas em '+attempts.length+' tentativas; não há amostragem suficiente.');
- const value=median(valid.map(item=>item.value as number));if(value===null||!Number.isFinite(value))return result('NAO_CONCLUSIVO','Sem mediana válida','As amostras não geraram valor numérico confiável.');
+ const summary=summarizeSensorPidSamples(all,pid,test.aggregation),value=summary.value;if(value===null||!Number.isFinite(value))return result('NAO_CONCLUSIVO','Sem média/moda válida','As amostras não geraram um agregado numérico confiável.');
+ if(test.aggregation==='MODE'&&summary.distinctValues>1)return result('NAO_CONCLUSIVO','Código/contador variou durante a coleta','Foram observados '+summary.distinctValues+' valores distintos. A moda foi '+value+'; variação de código/contador não condena componente.');
  const t=test.thresholds,read=(otherPid:string)=>valueOf(all,otherPid);
  if(test.evaluator==='RPM_BY_MODE'){
   if(mode==='ENGINE_OFF')return value<=t.engineOffMaxRpm?result('CONSISTENTE','RPM compatível com motor parado','A mediana está próxima de zero; isso confirma a condição selecionada, não o estado elétrico completo do sensor CKP.'):result('INVESTIGAR','RPM incompatível com motor parado','RPM acima do limite heurístico. Confirme a condição e o RX bruto.');
