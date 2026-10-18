@@ -2700,3 +2700,30 @@ Renomeada a variável da regressão nova para `rejectedOverflowSamples` e atuali
 
 ### Próximo passo
 Executar a CI novamente no novo commit. Só depois de `validate` e `android-build` verdes será possível considerar esta rodada validada por CI.
+
+
+## 2026-10-18 — Sistema de ícones vetoriais com identidade Meriva
+
+### Objetivo
+Modernizar os ícones do cockpit e dos menus, adotando uma linguagem visual automotiva consistente com o Meriva Smart Diagnostic, sem alterar a lógica de diagnóstico, o fluxo serial ELM327 ou o ciclo de vida dos serviços.
+
+### Pesquisa e decisão técnica
+- Consultada a documentação do Lucide React Native: https://github.com/lucide-icons/lucide/blob/main/docs/guide/installation.md
+- Escolhido `lucide-react-native@0.468.0`, versão fixa e compatível com a geração React Native do projeto. O pacote utiliza `react-native-svg`, que já está declarado no projeto para gráficos.
+- A documentação mais recente do Expo descreve uma mudança para pacotes de ícones modulares em SDKs recentes; o projeto continua em Expo SDK 51, portanto esta alteração não atualiza o Expo nem as dependências-base.
+- Paleta preservada: azul técnico, fundo azul-marinho e realces âmbar/dourados inspirados em instrumentos automotivos. Não foi incorporado o logótipo oficial Chevrolet; o emblema é uma composição genérica com ícone de veículo.
+
+### Implementação
+- Criado `src/ui/AppIcon.tsx` como catálogo central de ícones vetoriais, com tamanhos/cores configuráveis e badges consistentes para módulos.
+- Atualizados cockpit, navegação inferior, menu Mais Recursos, estado Bluetooth/ELM327, ações das telas Saúde, Veículo, Dados e Aprendizado.
+- Removidos os emojis usados como ícones nessas áreas; estados de conexão mantêm as cores e os rótulos textuais para não depender somente de cor ou símbolo.
+- Adicionado `tests/appIconCatalog.test.js` ao script de testes para conferir catálogo, usos principais e sincronização estrutural entre `package.json` e `package-lock.json`.
+
+### Escopo e validação
+- Nenhuma alteração foi feita à conexão OBD, aos PIDs, às regras da IA, à base de dados ou aos serviços de GPS/viagens.
+- A alteração está isolada na branch `feat/modern-meriva-icon-system-20261018`.
+- Conforme solicitado, a CI não foi disparada. As alterações remotas usam `[skip ci]`; TypeScript, testes, Expo Doctor, build Android e verificação visual em aparelho permanecem pendentes.
+- O lockfile foi atualizado estruturalmente para fixar a versão do pacote, mas não foi possível executar `npm ci` para verificar o download/resolução no ambiente atual. A validação final deverá confirmar também a integridade do pacote instalado.
+
+### Próximo passo
+Revisar o resultado visual no Android em retrato/paisagem e executar `npm ci --no-audit --no-fund`, `npm run doctor` e `npm run validate` somente quando o usuário autorizar fechar a rodada de alterações.
