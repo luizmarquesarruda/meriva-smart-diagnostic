@@ -9,6 +9,9 @@ import { readDriveCycles } from '../src/storage/driveCycleStorage';
 import { getDriveCycleSummary, type DriveCycle } from '../src/data/driveCycles';
 import { BarChart, LineChart } from 'react-native-gifted-charts';
 import { buildTripChartData } from '../src/trip/tripChartData';
+import { isReliableTripFuelConsumption } from '../src/trip/fuelValidity';
+import { readAppSettings, type FuelType } from '../src/database/appSettings';
+import { AppIcon } from '../src/ui/AppIcon';
 
 const BASE_PATH = FileSystem.documentDirectory + 'MERIVA_SMART';
 const DAY_MS = 86_400_000;
@@ -32,11 +35,15 @@ export default function ViagensScreen() {
   const [cycles, setCycles] = useState<DriveCycle[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [periodDays, setPeriodDays] = useState<7 | 30 | 0>(0);
+  const [fuelType, setFuelType] = useState<FuelType | null>(null);
   useEffect(() => {
     let mounted = true;
     void readDriveCycles(BASE_PATH)
       .then(items => { if (mounted) setCycles(items.filter(cycle => cycle.source === 'REAL_OBD')); })
       .catch(() => { if (mounted) setCycles([]); });
+    void readAppSettings(BASE_PATH)
+      .then(settings => { if (mounted) setFuelType(settings.fuelType); })
+      .catch(() => { if (mounted) setFuelType(null); });
     return () => { mounted = false; };
   }, []);
 
@@ -46,10 +53,25 @@ export default function ViagensScreen() {
       .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
   }, [cycles, periodDays]);
   const summary = getDriveCycleSummary(visible);
+  const reliableFuelCycles = useMemo(() => visible.filter(isReliableTripFuelConsumption), [visible]);
+  const reliableFuelDistanceKm = reliableFuelCycles.reduce((sum, cycle) => sum + cycle.distanceTotalKm, 0);
+  const reliableFuelLiters = reliableFuelCycles.reduce((sum, cycle) => sum + cycle.fuelUsedL, 0);
+  const reliableConsumptionKml = reliableFuelLiters > 0 && Number.isFinite(reliableFuelDistanceKm / reliableFuelLiters)
+    ? reliableFuelDistanceKm / reliableFuelLiters
+    : null;
   const selected = selectedId ? cycles.find(cycle => cycle.id === selectedId) ?? null : null;
   const { distance: distanceChartData, consumption: consumptionChartData } = buildTripChartData(visible, 7);
 
   return <SafeAreaView style={s.container} edges={['top','bottom','left','right']}>
+    <View style={[s.stickyTopBar,{paddingHorizontal:layout.horizontalPadding}]}>
+      <Link href="/" asChild>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Voltar à página inicial" activeOpacity={0.82} style={s.stickyHomeButton}>
+          <AppIcon name="home" size={20} color="#e8b54b" />
+          <Text style={s.stickyHomeText}>PÁGINA INICIAL</Text>
+        </TouchableOpacity>
+      </Link>
+      <Text style={s.stickyTopLabel}>RELATÓRIOS</Text>
+    </View>
     <ScrollView contentContainerStyle={[s.content,{paddingHorizontal:layout.horizontalPadding}]} showsVerticalScrollIndicator={false}>
       <View style={[s.frame,{maxWidth:layout.maxContentWidth}]}>
         {selected ? <TripDetails cycle={selected} onBack={() => setSelectedId(null)} /> : <>
@@ -59,7 +81,7 @@ export default function ViagensScreen() {
           <View style={s.grid}>
             <Metric l="VIAGENS" v={String(visible.length)} />
             <Metric l="DISTÂNCIA TOTAL" v={mv(summary.totalDistanceKm,'km')} />
-            <Metric l="CONSUMO MÉDIO" v={summary.avgConsumptionKml > 0 ? mv(summary.avgConsumptionKml,'km/L') : 'N/D'} />
+            <Metric l="CONSUMO MÉDIO" v={reliableConsumptionKml != null ? mv(reliableConsumptionKml,'km/L') : 'N/D'} />
           </View>
           {distanceChartData.length > 0 && <View style={s.chartCard}>
             <Text style={s.section}>DISTÂNCIA POR VIAGEM — ÚLTIMAS 7</Text>
@@ -120,20 +142,38 @@ export default function ViagensScreen() {
             </View>
             <View style={s.tripFooter}>
               <Text style={s.tripFooterText}>Máxima: {mv(n(cycle.maxSpeedKmh),'km/h')}</Text>
-              <Text style={[s.consumption,cycle.fuelDataValid === false && s.muted]}>
-                {cycle.fuelDataValid === false || cycle.fuelUsedL < 0.05 || cycle.avgFuelConsumptionKml <= 0 ? 'CONSUMO N/D' : mv(cycle.avgFuelConsumptionKml,'km/L')}
+              <Text style={[s.consumption, !isReliableTripFuelConsumption(cycle) && s.muted]}>
+                {isReliableTripFuelConsumption(cycle) ? mv(cycle.avgFuelConsumptionKml,'km/L') : 'CONSUMO N/D'}
               </Text>
             </View>
           </TouchableOpacity>) : <View style={s.empty}>
             <Text style={s.emptyTitle}>Nenhuma viagem neste período</Text>
             <Text style={s.emptyText}>A lista contém apenas viagens registradas com fonte REAL_OBD. Dados importados ou simulados não são apresentados como trajetos da Meriva.</Text>
           </View>}
-          <View style={s.note}>
-            <Text style={s.noteTitle}>QUALIDADE DOS DADOS</Text>
-            <Text style={s.noteText}>Consumo só aparece quando atende aos critérios mínimos de integração. Sensores sem amostras armazenadas são apresentados como N/D, não como valores presumidos.</Text>
-          </View>
+          {visible.length > 0 && reliableFuelCycles.length === 0 ? (
+            <View style={s.note}>
+              <Text style={s.noteTitle}>POR QUE O CONSUMO ESTÁ N/D?</Text>
+              <Text style={s.noteText}>
+                {fuelType === 'FLEX'
+                  ? 'No modo FLEX, o app não presume a mistura: a estimativa MAF/MAP exige composição válida pelo PID 0152. Se a ECU não fornecer essa composição nem a taxa medida pelo PID 015E, o consumo fica indisponível. Confira o combustível realmente abastecido e faça um novo trajeto com amostras válidas; viagens antigas sem dados suficientes não podem ser reconstruídas.'
+                  : fuelType === 'ETANOL' || fuelType === 'GASOLINA'
+                    ? 'Nenhuma viagem deste período atingiu os critérios de cobertura. A ECU precisa fornecer PID 015E ou PIDs compatíveis para estimar a taxa (MAF 0110 ou MAP 010B + IAT 010F e RPM 010C), além de distância e amostras suficientes. A configuração ajuda, mas não substitui dados da ECU; viagens incompletas antigas não podem ser reconstruídas.'
+                    : 'Não foi possível ler a configuração de combustível. Confira a opção em Configurações e valide a disponibilidade dos PIDs de combustível no Diagnóstico OBD.'}
+              </Text>
+              <Link href="/configuracoes" asChild><TouchableOpacity style={s.noteAction}><Text style={s.noteActionText}>CONFERIR COMBUSTÍVEL</Text></TouchableOpacity></Link>
+              <Link href="/laboratorio" asChild><TouchableOpacity style={s.noteAction}><Text style={s.noteActionText}>VERIFICAR PIDs NO DIAGNÓSTICO</Text></TouchableOpacity></Link>
+            </View>
+          ) : (
+            <View style={s.note}>
+              <Text style={s.noteTitle}>QUALIDADE DOS DADOS</Text>
+              <Text style={s.noteText}>
+                {reliableFuelCycles.length > 0
+                  ? String(reliableFuelCycles.length) + ' de ' + String(visible.length) + ' viagens possuem consumo válido. Trajetos sem cobertura ou acima de 30 km/L ficam fora da média e dos gráficos.'
+                  : 'Consumo só aparece quando atende aos critérios mínimos de integração. Dados ausentes são N/D, não valores presumidos.'}
+              </Text>
+            </View>
+          )}
           <Link href="/armazenamento" asChild><TouchableOpacity style={s.primary}><Text style={s.primaryText}>ABRIR HISTÓRICO E EXPORTAÇÃO</Text></TouchableOpacity></Link>
-          <Link href="/" asChild><TouchableOpacity style={s.back}><Text style={s.backText}>← VOLTAR AO PAINEL</Text></TouchableOpacity></Link>
         </>}
       </View>
     </ScrollView>
@@ -148,7 +188,7 @@ function TripDetails({cycle,onBack}:{cycle:DriveCycle;onBack:()=>void}) {
   const min = coolant.length ? Math.min(...coolant) : null;
   const max = coolant.length ? Math.max(...coolant) : null;
   const avg = coolant.length ? coolant.reduce((sum,value)=>sum+value,0)/coolant.length : null;
-  const fuelValid = cycle.fuelDataValid !== false && cycle.fuelUsedL >= 0.05 && cycle.avgFuelConsumptionKml > 0;
+  const fuelValid = isReliableTripFuelConsumption(cycle);
   const totalSeconds = durationSeconds(cycle.totalTimeHms);
   return <>
     <TouchableOpacity style={s.backInline} onPress={onBack}><Text style={s.backText}>← VOLTAR AO HISTÓRICO</Text></TouchableOpacity>
@@ -200,14 +240,14 @@ function Stat({label,value}:{label:string;value:string}) { return <View style={s
 function Detail({label,value}:{label:string;value:string}) { return <View style={s.detail}><Text style={s.detailLabel}>{label}</Text><Text style={s.detailValue}>{value}</Text></View>; }
 
 const s=StyleSheet.create({chartCard:{backgroundColor:'#0e1b2d',borderColor:'#233a56',borderWidth:1,borderRadius:13,padding:12,marginTop:12},chartAxis:{color:'#9fb0c5',fontSize:10},chartNote:{color:'#9fb0c5',fontSize:11,lineHeight:16,marginTop:4},
-  container:{flex:1,backgroundColor:'#07111f'},content:{flexGrow:1,width:'100%',paddingVertical:16,paddingBottom:34},frame:{width:'100%',alignSelf:'center'},
+  container:{flex:1,backgroundColor:'#07111f'},stickyTopBar:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:10,paddingTop:7,paddingBottom:7,backgroundColor:'#0e1b2d',borderBottomWidth:1,borderBottomColor:'#28415f'},stickyHomeButton:{flexDirection:'row',alignItems:'center',gap:8,paddingHorizontal:11,paddingVertical:9,borderRadius:10,backgroundColor:'#091626',borderWidth:1,borderColor:'#315579'},stickyHomeText:{color:'#e5edf7',fontSize:10,fontWeight:'900'},stickyTopLabel:{color:'#7db3ff',fontSize:9,fontWeight:'900',letterSpacing:1},content:{flexGrow:1,width:'100%',paddingVertical:16,paddingBottom:34},frame:{width:'100%',alignSelf:'center'},
   eyebrow:{color:'#55d6be',fontSize:9,fontWeight:'900',letterSpacing:1.5,marginBottom:5},title:{color:'#f8fafc',fontSize:25,fontWeight:'900'},subtitle:{color:'#91a9c9',fontSize:10,fontWeight:'700',marginTop:5,marginBottom:16,lineHeight:15},
   grid:{flexDirection:'row',gap:9,marginBottom:9},metric:{flex:1,minWidth:0,backgroundColor:'#0e1b2d',borderRadius:14,borderWidth:1,borderColor:'#233a56',padding:12},label:{color:'#8196b4',fontSize:8,fontWeight:'900',letterSpacing:0.5},metricValue:{color:'#e5edf7',fontSize:15,fontWeight:'900',marginTop:6},
   section:{color:'#55d6be',fontSize:10,fontWeight:'900',letterSpacing:1,marginTop:18,marginBottom:8},filters:{flexDirection:'row',gap:8,marginBottom:3},filter:{flex:1,padding:11,borderRadius:10,borderWidth:1,borderColor:'#29415f',backgroundColor:'#0e1b2d',alignItems:'center'},filterActive:{backgroundColor:'#123a42',borderColor:'#55d6be'},filterText:{color:'#9fb3cd',fontSize:9,fontWeight:'900'},filterTextActive:{color:'#a8fff0'},
   card:{backgroundColor:'#0e1b2d',borderRadius:14,borderWidth:1,borderColor:'#233a56',padding:13,marginBottom:9},cardHeader:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginBottom:13},tripDate:{color:'#e5edf7',fontSize:12,fontWeight:'900'},tripRange:{color:'#8196b4',fontSize:9,marginTop:4},chevron:{color:'#55d6be',fontSize:26,fontWeight:'300',marginLeft:10},
   stats:{flexDirection:'row',gap:8,marginBottom:10},stat:{flex:1,minWidth:0},statValue:{color:'#e5edf7',fontSize:12,fontWeight:'900',marginTop:5},tripFooter:{borderTopWidth:1,borderTopColor:'#233a56',paddingTop:10,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8},tripFooterText:{color:'#9fb3cd',fontSize:9},consumption:{color:'#55d6be',fontSize:10,fontWeight:'900'},muted:{color:'#8196b4'},
   empty:{backgroundColor:'#0e1b2d',borderRadius:14,padding:18,borderWidth:1,borderColor:'#233a56'},emptyTitle:{color:'#e5edf7',fontSize:13,fontWeight:'900',marginBottom:7},emptyText:{color:'#9fb3cd',fontSize:10,lineHeight:16},
-  note:{backgroundColor:'#0b252e',borderRadius:12,padding:13,marginTop:8,borderWidth:1,borderColor:'#1b5b61'},noteTitle:{color:'#7debd7',fontSize:9,fontWeight:'900',marginBottom:6},noteText:{color:'#bad8dd',fontSize:10,lineHeight:16},
+  note:{backgroundColor:'#0b252e',borderRadius:12,padding:13,marginTop:8,borderWidth:1,borderColor:'#1b5b61'},noteTitle:{color:'#7debd7',fontSize:9,fontWeight:'900',marginBottom:6},noteText:{color:'#bad8dd',fontSize:10,lineHeight:16},noteAction:{alignSelf:'stretch',alignItems:'center',paddingVertical:10,paddingHorizontal:8,marginTop:8,borderRadius:9,borderWidth:1,borderColor:'#247b7d',backgroundColor:'#10363c'},noteActionText:{color:'#a8fff0',fontSize:9,fontWeight:'900',textAlign:'center'},
   primary:{backgroundColor:'#176e70',borderRadius:12,padding:15,alignItems:'center',marginTop:13},primaryText:{color:'#f0fdfa',fontSize:10,fontWeight:'900',textAlign:'center'},back:{padding:15,alignItems:'center'},backInline:{alignSelf:'flex-start',paddingVertical:10,marginBottom:8},backText:{color:'#8de8db',fontSize:10,fontWeight:'900'},
   hero:{backgroundColor:'#10363c',borderColor:'#247b7d',borderWidth:1,borderRadius:16,padding:18,marginBottom:4},heroLabel:{color:'#8de8db',fontSize:9,fontWeight:'900',letterSpacing:1},heroValue:{color:'#f0fdfa',fontSize:30,fontWeight:'900',marginTop:6},heroSub:{color:'#b7d9d9',fontSize:9,marginTop:8,lineHeight:15},
   detail:{flexDirection:'row',justifyContent:'space-between',alignItems:'flex-start',gap:12,paddingVertical:8,borderBottomWidth:1,borderBottomColor:'#20334b'},detailLabel:{color:'#9fb3cd',fontSize:10,flex:1},detailValue:{color:'#e5edf7',fontSize:10,fontWeight:'800',flex:1,textAlign:'right'},smallNote:{color:'#8196b4',fontSize:9,lineHeight:15,marginTop:10},

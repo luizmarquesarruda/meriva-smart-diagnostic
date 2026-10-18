@@ -11,7 +11,8 @@ for (const route of ['/mais', '/laboratorio', '/viagens', '/veiculo']) {
   assert.ok(index.includes('href="' + route + '"'), 'navegação principal deve expor ' + route);
 }
 assert.doesNotMatch(index, /href="\/dados"/, 'dados ao vivo devem ficar no menu Mais recursos, sem atalho duplicado no cockpit');
-assert.doesNotMatch(index, /href="\/saude"/, 'Saúde deve ter entrada única em Mais recursos; o card do painel é informativo');
+assert.doesNotMatch(index, /href="\/saude"/, 'Saúde continua como página secundária; o cockpit não duplica a página');
+assert.doesNotMatch(index, /SAÚDE DO VEÍCULO/, 'o cockpit deve usar o espaço para informar a coleta em tempo real');
 assert.ok(index.includes('href="/bluetooth"'), 'status da conexão no cabeçalho deve abrir o gerenciamento Bluetooth');
 assert.doesNotMatch(more, /'\/bluetooth'/, 'Bluetooth deve ter um único ponto de entrada no chip de conexão');
 for (const route of ['/dados', '/aprendizado', '/saude', '/armazenamento', '/configuracoes', '/testes-sensores']) {
@@ -29,12 +30,14 @@ assert.match(read('app/aprendizado.tsx'), /realSamples/);
 assert.match(read('app/laboratorio.tsx'), /03 \/ 07 \/ 0A/);
 assert.match(read('app/bluetooth.tsx'), /SAÚDE DO ELM327/);
 console.log('Cockpit e telas secundárias: OK');
-assert.match(index, /TODOS OS RECURSOS/, 'cockpit deve manter o acesso secundário ao menu de recursos');
+assert.match(index, /TODOS OS RECURSOS/, 'a barra inferior deve ter o acesso Todos os Recursos');
 assert.match(index, /bottomNavLandscape/, 'navegação principal não deve desaparecer em paisagem');
-for (const label of ['PAINEL', 'DIAGNÓSTICO', 'VIAGENS', 'VEÍCULO']) {
+for (const label of ['PAINEL', 'DIAGNÓSTICO', 'VIAGENS', 'VEÍCULO', 'TODOS OS RECURSOS']) {
   assert.ok(index.includes('>' + label + '</Text>') || index.includes('>' + label + '<'), 'barra principal deve expor ' + label);
 }
-console.log('Navegação principal sem rotas duplicadas: OK');
+assert.ok(index.includes('size={layout.landscape ? 30 : 40}'), 'ícones da barra inferior devem ter o dobro do tamanho-base');
+assert.match(index, /sessionCard/, 'o cockpit deve exibir coleta em tempo real no lugar do cartão de saúde duplicado');
+console.log('Navegação principal distribuída em cinco acessos: OK');
 
 
 const rootLayout = read('app/_layout.tsx');

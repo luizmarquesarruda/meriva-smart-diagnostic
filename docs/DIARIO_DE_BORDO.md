@@ -2751,3 +2751,35 @@ Revisar o resultado visual no Android em retrato/paisagem e executar `npm ci --n
 
 ### Próximo passo
 Consultar a execução da CI vinculada ao commit deste registro. Se falhar, ler o log do job e corrigir a causa observada antes de nova tentativa. Após CI verde, verificar no aparelho os tamanhos, cortes, contraste e alinhamento dos novos ícones, incluindo a tela inicial e Mais Recursos.
+
+
+## 2026-10-18 — Cockpit em cinco acessos, diagnóstico padronizado e política de consumo
+
+### Problemas observados
+- O cartão Saúde do Veículo duplicava a tela secundária e consumia espaço do cockpit.
+- Todos os Recursos ficava numa linha separada; os quatro acessos não ocupavam toda a barra e os ícones pareciam pequenos.
+- A tela Diagnóstico usava uma paleta clara diferente do cockpit escuro.
+- Em Relatório de Viagens, o retorno à página inicial ficava no fim do conteúdo rolável; o consumo N/D não explicava qual evidência faltava.
+- Os critérios de validade não eram uniformes entre resumo, gráfico, relatório e autonomia; valores extremos podiam afetar integrações.
+
+### Correções
+- Substituído o cartão duplicado por Coleta em Tempo Real, mostrando o estado ECU/viagem, distância registrada e GPS.
+- Barra inferior com cinco destinos flexíveis: Painel, Diagnóstico, Viagens, Veículo e Todos os Recursos. Ícones em 40 px no retrato e 30 px na paisagem, o dobro dos tamanhos anteriores.
+- Diagnóstico recebe ícone no cabeçalho e paleta azul-marinho/azul/âmbar, preservando o fluxo OBD e o modo REAL/SIMULAÇÃO.
+- Relatório de Viagens recebe botão persistente da página inicial acima do ScrollView, também durante a visualização de uma viagem; removido o botão de retorno repetido ao final do histórico.
+- Criada política comum em src/trip/fuelValidity.ts: somente viagem REAL_OBD com flag de combustível confirmada, distância/combustível/média finitos, pelo menos 0,05 L e consumo entre 0 e 30 km/L entra na média, nos gráficos, no relatório e na autonomia.
+- O integrador e o PID 015E rejeitam taxas acima de 80 L/h; estimativas MAF/MAP rejeitam fluxo de ar implausível acima de 200 g/s, taxas fora do limite e temperatura absoluta inválida. São limites defensivos genéricos, não calibração definitiva da Meriva.
+- Quando não há consumo válido no período, o relatório explica as condições necessárias. No modo FLEX, não presume gasolina nem etanol e oferece atalhos para Configurações e Diagnóstico. Histórico sem amostras adequadas não é recalculado por adivinhação.
+
+### Testes preparados
+- Atualizadas regressões de navegação para cinco destinos, ausência de cartão de saúde duplicado e ícones em dobro.
+- Adicionadas regressões contra taxas de combustível extremas, sentinelas MAF e médias acima de 30 km/L.
+- Resumo, gráfico, detalhe do relatório e atualização de autonomia passam a usar critérios de validade alinhados.
+
+### CI e limites
+- Base: feat/modern-meriva-icon-system-20261018, commit fc9050f457f200eca23b4d29b08404485fc6c2c8. CI #2378 (run 39128148789) foi concluída com sucesso no commit-base.
+- Os commits desta rodada usam [skip ci], conforme solicitado; nenhuma nova CI foi disparada.
+- npm ci, TypeScript, suíte completa, Expo Doctor, Gradle/APK e teste físico Meriva + ELM327 não foram executados nesta sessão. Revisão estática não comprova renderização visual nem suporte dos PIDs da ECU.
+
+### Próximo passo
+Autorizar a validação completa depois de revisar as alterações. Em aparelho Android, revisar retrato e paisagem. No carro, conferir combustível selecionado e registrar um trajeto novo; verificar suporte/leituras de 015E, 0152, 0110, 010B, 010F, 010C e velocidade real. Viagens antigas sem telemetria suficiente continuarão N/D.
