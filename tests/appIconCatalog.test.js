@@ -59,6 +59,8 @@ const screens = [
 
 const cockpit = read('app/index.tsx');
 assert.ok(cockpit.includes('selectedHeroMetric.icon'), 'primary indicator should show its contextual icon');
+assert.ok(cockpit.includes('CockpitMetric icon="fuel"') && cockpit.includes('CockpitMetric icon="trips"') && cockpit.includes('CockpitMetric icon="alert"'), 'cockpit summary metrics should each show a contextual icon');
+assert.ok(cockpit.includes('metricLabelRow'), 'cockpit metric labels should pair icon and text without replacing the label');
 assert.ok(cockpit.includes('DADOS AO VIVO') && cockpit.includes('TESTES DE SENSORES'), 'cockpit should expose high-frequency shortcuts');
 assert.ok(cockpit.includes('accessibilityLabel="Abrir saúde do veículo e revisar evidências"'), 'health summary should be a clear, accessible action');
 
