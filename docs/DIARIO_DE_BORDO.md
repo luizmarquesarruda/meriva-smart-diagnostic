@@ -2807,3 +2807,30 @@ A estimativa MAF/MAP já existia, mas `resolveFuelEstimateProperties` devolvia n
 ### Limites / CI
 - A estimativa de 50% é um ponto de referência provisório; não é inferência da mistura real nem calibração específica da Meriva. Valores históricos antigos sem taxa integrada não são recalculados.
 - Nenhuma CI disparada; apenas teste estático de código foi feito nesta sessão. É necessário executar os testes e confirmar leituras MAF/MAP/0152/015E no veículo antes de tratar a estimativa como confiável.
+
+
+## 2026-10-18 — Pesquisa e arquitetura parametrizada do consumo
+
+### Pesquisa e descobertas
+- Comparados os métodos documentados em `obd2-dash` e `obdgpslogger`: priorizar a taxa de combustível reportada pela ECU (015E), usar MAF (0110) como fallback e MAP + IAT + RPM (010B + 010F + 010C) como segunda alternativa. A documentação do obdgpslogger também aponta abastecimentos reais como base para calibrar VE.
+- A pesquisa localiza apenas PID 010C como confirmado por RAW_ECU na base específica da Meriva; os demais PIDs de combustível/fluxo continuam candidatos até teste físico.
+- Foi identificada a diferença entre parâmetros genéricos e combustível vendido no Brasil. Na data da pesquisa, a ANP descrevia E32 temporário para gasolina C comum desde 01/08/2026, por 180 dias. O E32 modelado é referência calculada, não ensaio de combustível real. O etanol usa proxy para etanol hidratado (mistura com água), não parâmetros de etanol anidro puro.
+- AFR de mistura passou a ser calculado ponderando massa de combustível por fração volumétrica e densidade, em vez de fazer uma interpolação linear simplista de AFR por volume.
+
+### Implementação
+- Criado `src/knowledge/fuel_consumption_model.json` com limites defensivos, PIDs usados, propriedades de referência, VE inicial, constantes físicas, estratégia E50 explícita para FLEX sem composição e parâmetros planejados de calibração.
+- Criado `src/knowledge/fuel_consumption_findings.json` com referências, grau de confiança, decisões, limitações e próximos testes.
+- Criado `docs/METODO_CONSUMO_COMBUSTIVEL.md` com fórmulas, ordem de preferência e procedimento de calibração cheio-a-cheio.
+- `src/obd/fuelConsumption.ts` lê limites, propriedades físicas, VE e correção por JSON; fator de calibração explícito somente é aceito entre 0,70 e 1,30.
+- `polling_policy.json` passou à versão 3 e esclarece a referência E50 sem misturar estimativa e medição.
+- Configurações, painel e relatório agora dizem referência E50, não “50% etanol / 50% gasolina” como se essa composição fosse conhecida.
+
+### Calibração e limitações
+- Calibração por abastecimento cheio-a-cheio ficou especificada com no mínimo três intervalos válidos, fator observado = litros abastecidos / litros integrados, envelope 0,70–1,30 e suavização de 0,25. A interface para registrar abastecimentos e a persistência de um fator aprendido ainda não estão implementadas; o fator atual permanece 1,0.
+- A referência brasileira E32 deverá ser revisada até 27/01/2027 ou antes, conforme alteração oficial. A referência de etanol hidratado também é aproximação.
+- O método não foi validado fisicamente na Meriva. A fórmula MAF ainda assume lambda próximo de 1 e a VE=0,80 do MAP continua provisória.
+
+### Testes e CI
+- Atualizados testes de parâmetros de combustível, fatores de correção, JSON de conhecimento e versão da política. Os testes foram preparados, mas não executados nesta sessão.
+- Nenhuma CI foi disparada. Os commits desta rodada continuam marcados `[skip ci]`, conforme orientação vigente.
+- Próximo passo: executar validação autorizada e depois obter respostas RAW_ECU dos PIDs 015E, 0110, 010B, 010F e 0152; em seguida, implementar a entrada/persistência de abastecimentos reais para calibrar o modelo.
