@@ -106,6 +106,7 @@ export function validateAiKnowledgeCatalogs(): AiKnowledgeValidationResult {
     if (sensorPidIds.size !== pidDefinitions.length) errors.push('sensor_tests.json: a cobertura do catálogo não coincide com os PIDs padronizados');
   }
   const sensorCatalogPolicy = sensorTestsCatalog as unknown as { minimumReadingsPerPid?: number; maximumAttemptsPerPid?: number; tests?: Array<{ minimumReadings?: number }> };
+  const sampleLearningPolicy = pidLearningPolicy as unknown as { minimumValidSamplesPerPid?: number; maximumAttemptsPerPid?: number; acquisition?: { strategy?: string; maxQueriesPerPidPerRound?: number; noParallelPidQueries?: boolean }; buffer?: { continuousAggregation?: string; discreteAggregation?: string; requireFiveValidSamplesBeforeAssessment?: boolean }; learning?: { allowedSource?: string; updateOnlyAfterFiveValidSamplesForThatPid?: boolean; denySimulationAndImportedSamples?: boolean } };
   if (sensorCatalogPolicy.minimumReadingsPerPid !== 5) errors.push('sensor_tests.json: política de coleta exige cinco respostas válidas por PID');
   if (sensorCatalogPolicy.maximumAttemptsPerPid !== 8) errors.push('sensor_tests.json: limite de tentativas deve permitir recuperar amostras sem resposta');
   if (Array.isArray(sensorCatalogPolicy.tests) && sensorCatalogPolicy.tests.some((test) => test.minimumReadings !== 5)) {
