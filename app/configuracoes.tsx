@@ -135,10 +135,10 @@ export default function ConfiguracaoScreen() {
             </View>
             <Text style={styles.note}>
               {settings.fuelType === 'FLEX'
-                ? 'Se o PID 0152 não informar a mistura, MAF/MAP ainda podem gerar uma estimativa com mistura de referência 50% etanol / 50% gasolina. Ela será identificada como estimativa, não como leitura medida. Para melhorar a aproximação, selecione o combustível que realmente abasteceu o tanque.'
+                ? 'Sem composição válida no PID 0152, MAF/MAP podem gerar uma estimativa com referência E50 (50% de etanol por volume no modelo), não uma medição da mistura do tanque. Selecione etanol ou gasolina conforme o combustível abastecido para melhorar a aproximação.'
                 : settings.fuelType === 'ETANOL'
-                  ? 'Estimativa MAF/MAP usa parâmetros aproximados de etanol; selecione esta opção quando o tanque estiver abastecido com etanol.'
-                  : 'Estimativa MAF/MAP usa parâmetros aproximados de gasolina; selecione esta opção quando o tanque estiver abastecido com gasolina.'}
+                  ? 'Estimativa MAF/MAP usa uma referência aproximada de etanol hidratado brasileiro (não é análise do combustível do posto). Selecione esta opção quando o tanque estiver abastecido com etanol.'
+                  : 'Estimativa MAF/MAP usa a referência temporária da gasolina C comum E32 vigente na pesquisa de 18/10/2026; o parâmetro precisa ser revisto em 27/01/2027 ou antes se a ANP mudar a mistura.'}
               {' '}A leitura medida PID 015E sempre tem precedência. Sem MAF 0110 nem MAP 010B + IAT 010F + RPM 010C válidos, o app não inventa uma taxa de combustível.
             </Text>
           </View>
