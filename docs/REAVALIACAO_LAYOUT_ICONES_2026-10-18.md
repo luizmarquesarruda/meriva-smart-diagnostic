@@ -14,6 +14,9 @@ A linguagem de ícones já existia, mas a aplicação ainda apresentava três la
 - **Mais recursos em grade:** cartões responsivos em duas colunas, com ícone, nome, explicação curta e seta de navegação. A lista continua acessível por rolagem, sem reduzir as áreas de toque.
 - **Cabeçalhos coerentes:** adicionados emblemas vetoriais a Saúde, Dados, Veículo, Aprendizado, Bluetooth, Configurações, Histórico, Viagens e Diagnóstico OBD.
 - **Diagnóstico OBD com tema consistente:** o laboratório passa para fundo azul-marinho, cartões de contraste alto e acentos azul/âmbar; os botões de ações principais recebem ícones vetoriais.
+- **Dados e viagem com ícones contextuais:** cartões de telemetria usam ícones próprios para velocidade, distância, consumo e autonomia; o resumo de viagens usa ícones de rota, distância e combustível.
+- **Estados de conexão legíveis:** cartões Bluetooth/ELM327/ECU/saúde da comunicação têm ícones próprios, mantendo o rótulo textual e o estado explícito.
+- **Seções com hierarquia clara:** Configurações, Saúde e Dados usam ícones em títulos de seção; a tela de Viagens adota a mesma paleta azul/âmbar do cockpit, substituindo o acento turquesa isolado.
 - **Tons semânticos nos emblemas:** azul para navegação/técnica, dourado para realce, verde para estado saudável, âmbar para aviso e vermelho-rosado para falha. O estado segue expresso em texto, não só em cor.
 
 ## Paleta de referência
