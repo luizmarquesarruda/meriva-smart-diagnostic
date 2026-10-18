@@ -2746,7 +2746,7 @@ Revisar o resultado visual no Android em retrato/paisagem e executar `npm ci --n
 
 ### Acionamento e validação
 - Foi criado este commit documental sem `[skip ci]` na branch de ícones para acionar o workflow canônico por push.
-- Estado verificado em 18/10/2026: a CI #2378 (run 39128148789) terminou com sucesso no commit-base fc9050f457f200eca23b4d29b08404485fc6c2c8. Essa execução não cobre os ajustes posteriores da branch de trabalho.
+- Estado verificado em 18/10/2026: CI #2378 (run 39128148789) e CI #2379 (run 39132520244) terminaram com sucesso no commit-base fc9050f457f200eca23b4d29b08404485fc6c2c8; a #2379 foi a execução mais recente antes das mudanças de código desta branch.
 - A CI de base reportou sucesso; npm ci, npm run doctor, npm run validate e Gradle não foram executados manualmente nesta sessão. O build automatizado não substitui a verificação visual em aparelho Android, especialmente em retrato e paisagem.
 
 ### Próximo passo
@@ -2777,7 +2777,7 @@ Revisar os ajustes posteriores em uma branch separada. Como esta rodada foi marc
 - Resumo, gráfico, detalhe do relatório e atualização de autonomia passam a usar critérios de validade alinhados.
 
 ### CI e limites
-- Base: feat/modern-meriva-icon-system-20261018, commit fc9050f457f200eca23b4d29b08404485fc6c2c8. CI #2378 (run 39128148789) foi concluída com sucesso no commit-base.
+- Base: feat/modern-meriva-icon-system-20261018, commit fc9050f457f200eca23b4d29b08404485fc6c2c8. CI #2378 (run 39128148789) e CI #2379 (run 39132520244) foram concluídas com sucesso no commit-base; a #2379 foi a execução mais recente antes dos commits de correção.
 - Os commits desta rodada usam [skip ci], conforme solicitado; nenhuma nova CI foi disparada.
 - npm ci, TypeScript, suíte completa, Expo Doctor, Gradle/APK e teste físico Meriva + ELM327 não foram executados nesta sessão. Revisão estática não comprova renderização visual nem suporte dos PIDs da ECU.
 
