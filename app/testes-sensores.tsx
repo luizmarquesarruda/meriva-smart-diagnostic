@@ -110,7 +110,7 @@ export default function TestesSensoresScreen(){
   }catch(cause){setError(cause instanceof Error?cause.message:'Falha ao salvar relatório TXT.');}
  }
  return <SafeAreaView style={st.container} edges={['top','bottom','left','right']}><ScrollView contentContainerStyle={[st.content,{paddingHorizontal:layout.horizontalPadding}]}><View style={[st.frame,{maxWidth:layout.maxContentWidth}]}>
-  <Text style={st.title}>CENTRAL DE TESTES</Text><Text style={st.subtitle}>CATÁLOGO JSON • DADOS REAIS • 3 LEITURAS MÍNIMAS POR PID</Text>
+  <Text style={st.title}>CENTRAL DE TESTES</Text><Text style={st.subtitle}>CATÁLOGO JSON • DADOS REAIS • 5 LEITURAS VÁLIDAS POR PID</Text>
   <View style={[st.connection,connected?st.good:st.warn]}><Text style={connected?st.goodTitle:st.warnTitle}>{connected?'● ECU VALIDADA':'● ECU NÃO VALIDADA'}</Text><Text style={st.muted}>{connection?.device.name??'Nenhum adaptador ativo'} · {connection?.protocol??'Protocolo N/D'}</Text><Text style={st.muted}>Só PIDs anunciados pela ECU e cadastrados no catálogo entram na varredura.</Text></View>
   <Text style={st.section}>CONDIÇÃO DO MOTOR</Text><View style={[st.modes,layout.landscape&&st.modesWide]}>
    <TouchableOpacity disabled={running} onPress={()=>setMode('ENGINE_OFF')} style={[st.mode,mode==='ENGINE_OFF'&&st.selected]}><Text style={st.icon}>⏻</Text><Text style={st.modeTitle}>Motor desligado</Text><Text style={st.muted}>Ignição ligada, motor parado</Text></TouchableOpacity>
