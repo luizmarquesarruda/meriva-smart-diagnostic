@@ -7,6 +7,7 @@ import * as FileSystem from 'expo-file-system';
 import { saveSensorTestRunLazy } from '../src/database/diagnosticDatabaseAccess';
 import { createLearningProfile, readLearningProfile, updateLearningProfileRealSample } from '../src/database/learningProfile';
 import { readPidConfirmations, recordPidConfirmation } from '../src/database/pidBank';
+import { getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
 import {useMidLayout} from '../src/ui/midLayout';
 import {getSharedObdConnection,getSharedObdStatus,subscribeSharedObd,subscribeSharedObdStatus} from '../src/obd/sharedConnection';
 import {getPidDefinition} from '../src/obd/pidDefinition';
