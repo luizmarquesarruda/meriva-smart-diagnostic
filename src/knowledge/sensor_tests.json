@@ -29,13 +29,13 @@
       "note": "Observado em sessão do projeto; validar no veículo antes de generalizar."
     }
   },
-  "minimumReadingsPerPid": 3,
+  "minimumReadingsPerPid": 5,
   "timing": {
     "defaultCommandLatencyMs": 2500,
     "minimumEstimatedCommandLatencyMs": 500,
     "perCommandSafetyMarginMs": 500,
     "finalizationMarginMs": 1200,
-    "note": "ETA é recalculada com latência observada; conclusão depende de três tentativas por PID suportado."
+    "note": "ETA recalculada pela latência observada; cinco leituras sequenciais por PID, com apenas um comando OBD ativo por vez."
   },
   "resultStates": [
     "CONSISTENTE",
@@ -115,7 +115,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "engineOffMaxRpm": 50,
         "engineOnMinRpm": 400
@@ -141,7 +141,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "maxStationarySpeedKmh": 3
       },
@@ -164,7 +164,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": 0,
         "max": 100
@@ -190,7 +190,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": -40,
         "max": 215
@@ -219,7 +219,7 @@
         "010C",
         "0105"
       ],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": -100,
         "max": 99.2,
@@ -254,7 +254,7 @@
         "010C",
         "0105"
       ],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": -100,
         "max": 99.2,
@@ -286,7 +286,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": 0,
         "max": 765
@@ -317,7 +317,7 @@
         "010C",
         "0105"
       ],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": 0,
         "max": 255,
@@ -350,7 +350,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": -64,
         "max": 63.5
@@ -376,7 +376,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": -40,
         "max": 215
@@ -403,7 +403,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": 0,
         "max": 655.35
@@ -431,7 +431,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": 0,
         "max": 100
@@ -459,7 +459,7 @@
       "requiredPids": [
         "0105"
       ],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": 0,
         "max": 1.275,
@@ -489,7 +489,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": 0,
         "max": 100
@@ -513,7 +513,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": -100,
         "max": 99.2
@@ -537,7 +537,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": 0,
         "max": 100
@@ -561,7 +561,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": 0,
         "max": 100
@@ -585,7 +585,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": 10,
         "max": 110
@@ -611,7 +611,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "engineOffMinV": 11.5,
         "engineOnMinV": 12.5,
@@ -636,7 +636,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": 0,
         "max": 25700
@@ -662,7 +662,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": 0,
         "max": 100
@@ -688,7 +688,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": -40,
         "max": 215
@@ -712,7 +712,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": 0,
         "max": 100
@@ -739,7 +739,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": 0,
         "max": 655350
@@ -766,7 +766,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": 0,
         "max": 100
@@ -792,7 +792,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": -40,
         "max": 210
@@ -816,7 +816,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": -210,
         "max": 301.99
@@ -844,7 +844,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": 0,
         "max": 3276.75
@@ -871,7 +871,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": -125,
         "max": 130
@@ -895,7 +895,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": -125,
         "max": 130
