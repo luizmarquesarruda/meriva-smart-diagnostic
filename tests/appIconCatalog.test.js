@@ -46,7 +46,7 @@ for (const mapping of requiredIconMappings) {
 const screens = [
   ['app/index.tsx', ['AppIconBadge name="vehicle"', 'AppIcon name="diagnostics"', 'AppIcon name="trips"', 'AppIcon name="temperature"']],
   ['app/mais.tsx', ['AppIconBadge', "['sensors', 'TESTES DE SENSORES'", "['charts', 'DADOS AO VIVO'", "['health', 'SAÚDE'"]],
-  ['app/bluetooth.tsx', ['AppIcon name="vehicle"', 'AppIcon name="bluetooth"']],
+  ['app/bluetooth.tsx', ['AppIcon name="vehicle"', 'AppIcon name="bluetooth"', 'AppIcon name="connection"', 'AppIcon name="cpu"', 'AppIcon name="activity"', 'styles.labelRow']],
   ['app/saude.tsx', ['AppIcon name="diagnostics"']],
   ['app/veiculo.tsx', ['AppIcon name="bluetooth"']],
   ['app/dados.tsx', ['AppIcon name="sensors"', 'Metric icon="dashboard"', 'Metric icon="trips"', 'Metric icon="fuel"', 'Metric icon="battery"', 'metricHeader']],
