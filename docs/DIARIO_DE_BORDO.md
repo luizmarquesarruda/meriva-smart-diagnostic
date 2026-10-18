@@ -2871,3 +2871,23 @@ Executar `npm run validate` após autorização. Depois conectar a ECU real, sal
 - A persistência da coleta preserva o estado e a proveniência de uma confirmação manual anterior; a repetibilidade de cinco respostas não promove novos PIDs a confirmados.
 - Verificação estática final: cobertura única 34/34; mínimo 5, máximo 8; coleta em rodízio; agregação média/moda; perfil local atualizado apenas para PIDs com cinco respostas válidas; testes e mensagens antigas de três leituras atualizados.
 - Nenhuma suíte automatizada foi executada e nenhuma CI foi disparada.
+
+
+## 2026-10-18 — Ampliação da descoberta de PIDs OBD-II Mode 01
+
+### Problema
+A descoberta do aplicativo estava limitada a quatro mapas de suporte (`0100`, `0120`, `0140`, `0160`), cobrindo somente PIDs até `017F` e podendo deixar de descobrir parâmetros padronizados de blocos superiores.
+
+### Solução
+- `src/obd/pidScanner.ts` agora define a cadeia completa de mapas de suporte Mode 01: `0100`, `0120`, `0140`, `0160`, `0180`, `01A0`, `01C0`, `01E0`.
+- A cadeia continua condicionada ao bit de continuação anunciado pela bitmap anterior. Cada mapa é consultado sequencialmente, sem paralelismo; não são sondados todos os PIDs possíveis às cegas.
+- O decodificador aceita todos os oito mapas, preservando a validação do formato da resposta e a separação entre PID anunciado e PID individual que respondeu com payload válido.
+- `tests/regression.test.js` foi atualizado para cobrir os oito mapas, a decodificação do PID de continuação e a parada da cadeia no último bloco.
+
+### Limites
+- A mudança amplia o intervalo que pode ser descoberto, não a capacidade física da ECU. Se a bitmap da Meriva não anunciar um bloco ou um PID, o aplicativo não deve presumir suporte.
+- Este passo não inclui PIDs proprietários GM nem modos de serviço 02/06/09; esses exigem descoberta e parsers próprios e devem ser implementados em uma etapa separada, evitando interpretar respostas com o decodificador Mode 01.
+- Testes automatizados e CI não foram executados nem disparados. A verificação desta rodada foi estática.
+
+### Próximo passo
+Executar `npm run validate` com autorização e testar uma conexão real em KWP 10400 baud. Guardar as respostas brutas das bitmaps e comparar o conjunto anunciado com os PIDs individuais que a ECU realmente responde.
