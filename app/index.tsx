@@ -175,7 +175,11 @@ export default function IndexScreen() {
         : 'INSTANTÂNEO ESTIMADO'
     : tripState.consumptionKml != null && tripState.consumptionKml > 0
       ? 'MÉDIA DA VIAGEM'
-      : tripState.averageConsumptionKml > 0 ? 'MÉDIA HISTÓRICA' : 'CONSUMO ESTIMADO';
+      : tripState.averageConsumptionKml > 0 || realConsumptionKml != null
+        ? 'MÉDIA HISTÓRICA'
+        : availableConsumptionKml != null
+          ? 'CONSUMO ESTIMADO'
+          : 'CONSUMO • AGUARDANDO DADOS';
   const liveReadings = getAutoSaveState().lastReadings;
   const freshRealReading = (matches: (item: (typeof liveReadings)[number]) => boolean) => liveReadings.find((item) => {
     if (!matches(item) || item.source !== 'REAL' || item.value == null || !Number.isFinite(item.value)) return false;
