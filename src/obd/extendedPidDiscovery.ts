@@ -14,3 +14,45 @@ export function decodeExtendedSupportBitmap(command: string, response: string, s
  return result;
 }
 export function nextExtendedSupportBlock(block:string,ids:string[]):string|null{const i=BLOCKS.indexOf(block);if(i<0||i>=BLOCKS.length-1)return null;return ids.includes(BLOCKS[i+1])?BLOCKS[i+1]:null;}
+
+export interface ExtendedDiscoveryReport {
+ schemaVersion: 1;
+ source: 'REAL_OBD';
+ createdAt: string;
+ protocol: string | null;
+ policyId: 'MERIVA_EXTENDED_OBD_DISCOVERY_V1';
+ commands: ExtendedCommandRecord[];
+ supportedMode09InfoTypes: string[];
+ supportedMode06MonitorIds: string[];
+ skippedCommands: string[];
+ notes: string[];
+}
+const SAFE_MODE09_TYPES=['01','03','04','05','06','07','0A'];
+function hasPositive(raw:string,service:string,id:string):boolean{return hex(raw).includes(service+id);}
+async function queryBitmaps(session:{executeCommand(command:string):Promise<{response:string;status:string;elapsedMs:number}>},service:ExtendedService,records:ExtendedCommandRecord[]):Promise<string[]>{
+ const all=new Set<string>();let block:string|null='00';
+ while(block){
+  const command=service+block,started=Date.now();
+  try{
+   const r=await session.executeCommand(command),ids=decodeExtendedSupportBitmap(command,r.response,service);
+   const ok=r.status==='OK'&&hasPositive(r.response,service==='06'?'46':'49',block);
+   records.push({service,command,response:r.response,status:ok?'RESPONDEU':'SEM_RESPOSTA',elapsedMs:r.elapsedMs||Date.now()-started,supportedIds:ids});
+   ids.forEach(id=>all.add(id));block=ok?nextExtendedSupportBlock(block,ids):null;
+  }catch{records.push({service,command,response:'',status:'ERRO',elapsedMs:Date.now()-started,supportedIds:[]});block=null;}
+ }
+ return Array.from(all).sort((a,b)=>parseInt(a,16)-parseInt(b,16));
+}
+/** Sequencial: Mode 06 fica na descoberta de OBDMID; Mode 09 omite o InfoType 02. */
+export async function discoverExtendedObdData(session:{executeCommand(command:string):Promise<{response:string;status:string;elapsedMs:number}>},protocol:string|null=null):Promise<ExtendedDiscoveryReport>{
+ const commands:ExtendedCommandRecord[]=[];
+ const supportedMode09InfoTypes=await queryBitmaps(session,'09',commands);
+ const supportedMode06MonitorIds=await queryBitmaps(session,'06',commands);
+ for(const id of SAFE_MODE09_TYPES){
+  if(!supportedMode09InfoTypes.includes(id))continue;
+  const command='09'+id,started=Date.now();
+  try{const r=await session.executeCommand(command),ok=r.status==='OK'&&hasPositive(r.response,'49',id);
+   commands.push({service:'09',command,response:r.response,status:ok?'RESPONDEU':'SEM_RESPOSTA',elapsedMs:r.elapsedMs||Date.now()-started,supportedIds:[]});
+  }catch{commands.push({service:'09',command,response:'',status:'ERRO',elapsedMs:Date.now()-started,supportedIds:[]});}
+ }
+ return {schemaVersion:1,source:'REAL_OBD',createdAt:new Date().toISOString(),protocol,policyId:'MERIVA_EXTENDED_OBD_DISCOVERY_V1',commands,supportedMode09InfoTypes,supportedMode06MonitorIds,skippedCommands:['0902'],notes:['Consultas sequenciais pela fila do ELM327.','Mode 06 registra bitmaps; resultados individuais aguardam parser validado.','Comando 0902 omitido por política de privacidade.','Ausência de resposta não comprova defeito físico.']};
+}
