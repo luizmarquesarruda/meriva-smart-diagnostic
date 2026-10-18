@@ -486,6 +486,33 @@ async function testPidScanner() {
 }
 
 
+async function testExtendedPidDiscovery() {
+  const discovery = loadTs(path.join(ROOT, 'src/obd/extendedPidDiscovery.ts'));
+  assert.deepStrictEqual(discovery.decodeExtendedSupportBitmap('0900', '49 00 90 00 00 00', '09'), ['01', '04']);
+  assert.deepStrictEqual(discovery.decodeExtendedSupportBitmap('0600', '46 00 80 00 00 00', '06'), ['01']);
+  assert.deepStrictEqual(discovery.decodeExtendedSupportBitmap('0100', '41 00 80 00 00 00', '09'), []);
+
+  const commands = [];
+  const responses = {
+    '0900': { response: '49 00 90 00 00 00', status: 'OK', elapsedMs: 10 },
+    '0600': { response: '46 00 80 00 00 00', status: 'OK', elapsedMs: 11 },
+    '0901': { response: '49 01 01', status: 'OK', elapsedMs: 12 },
+    '0904': { response: '49 04 01 41 42 43', status: 'OK', elapsedMs: 13 },
+  };
+  const report = await discovery.discoverExtendedObdData({
+    async executeCommand(command) {
+      commands.push(command);
+      return responses[command] || { response: 'NO DATA', status: 'ERROR', elapsedMs: 5 };
+    },
+  }, 'ISO 14230-4 (KWP FAST)');
+  assert.deepStrictEqual(commands, ['0900', '0600', '0901', '0904']);
+  assert.ok(!commands.includes('0902'), 'não deve consultar o tipo excluído');
+  assert.deepStrictEqual(report.supportedMode09InfoTypes, ['01', '04']);
+  assert.deepStrictEqual(report.supportedMode06MonitorIds, ['01']);
+  assert.strictEqual(report.source, 'REAL_OBD');
+}
+
+
 async function testIntelligentPidDiscovery() {
   const ai = loadTs(path.join(ROOT, 'src/obd/intelligentPidDiscovery.ts'));
   const commands = [];
@@ -1161,6 +1188,7 @@ async function main() {
     ['seleção estrita + gate ECU', testConnectionSelectionAndStrictEcuGate],
     ['gate de validação ECU/010C', testEcuValidationGate],
     ['descoberta de PIDs', testPidScanner],
+    ['descoberta estendida Mode 06/09', testExtendedPidDiscovery],
     ['IA burrinha de PIDs', testIntelligentPidDiscovery],
     ['CarScanner baseline + PID 012F', testCarScannerBaselineAndFuel012F],
     ['Bluetooth callbacks', testBluetoothConnectionCallbacks],
