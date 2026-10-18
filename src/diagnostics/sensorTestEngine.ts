@@ -20,8 +20,16 @@ export function createSensorTestPlan(supportedPids:string[],hasDefinition:(pid:s
  return catalog.tests.filter(test=>supported.has(normalizeSensorPid(test.pid))&&test.modes.length>0&&hasDefinition(test.pid));
 }
 function validRows(samples:SensorTestSample[],pid:string):SensorTestSample[]{return samples.filter(item=>normalizeSensorPid(item.pid)===normalizeSensorPid(pid)&&item.status==='RESPONDEU'&&item.value!==null&&Number.isFinite(item.value));}
-function median(values:number[]):number|null{if(!values.length)return null;const sorted=[...values].sort((a,b)=>a-b),i=Math.floor(sorted.length/2);return sorted.length%2?sorted[i]:(sorted[i-1]+sorted[i])/2;}
-function valueOf(samples:SensorTestSample[],pid:string):number|null{const rows=validRows(samples,pid);if(rows.length<MIN_SENSOR_TEST_READINGS)return null;return median(rows.map(item=>item.value as number));}
+export function summarizeSensorPidSamples(samples:SensorTestSample[],pid:string,aggregation?:SensorSampleAggregation):SensorSampleSummary{
+ const normalized=normalizeSensorPid(pid),attempts=samples.filter(item=>normalizeSensorPid(item.pid)===normalized),rows=validRows(samples,normalized),values=rows.map(item=>item.value as number);
+ const definition=catalog.tests.find(item=>normalizeSensorPid(item.pid)===normalized),strategy=aggregation??definition?.aggregation??'MEAN';
+ const mean=values.length?values.reduce((sum,value)=>sum+value,0)/values.length:null,min=values.length?Math.min(...values):null,max=values.length?Math.max(...values):null;
+ const squares=mean===null?0:values.reduce((sum,value)=>sum+Math.pow(value-mean,2),0),standardDeviation=values.length>1?Math.sqrt(squares/(values.length-1)):values.length===1?0:null;
+ const counts=new Map<number,number>();for(const value of values)counts.set(value,(counts.get(value)??0)+1);
+ let mode:number|null=null,bestCount=0;for(const value of values){const count=counts.get(value)??0;if(count>bestCount){mode=value;bestCount=count;}}
+ return {pid:normalized,attempts:attempts.length,validSamples:values.length,requiredSamples:MIN_SENSOR_TEST_READINGS,aggregation:strategy,value:strategy==='MODE'?mode:mean,mean,min,max,standardDeviation,distinctValues:counts.size};
+}
+function valueOf(samples:SensorTestSample[],pid:string):number|null{const summary=summarizeSensorPidSamples(samples,pid);return summary.validSamples<MIN_SENSOR_TEST_READINGS?null:summary.value;}
 function result(state:SensorAssessmentState,title:string,explanation:string):SensorAssessment{return{state,title,explanation};}
 function rangeAssessment(value:number,test:SensorTestDefinition):SensorAssessment{
  const min=test.thresholds.min,max=test.thresholds.max;
