@@ -31,8 +31,9 @@ export default function TestesSensoresScreen(){
  const supported=new Set((connection?.supportedPids??[]).map(p=>p.replace(/\s/g,'').toUpperCase()));
  const grouped=useMemo(()=>testPlan.map(test=>{
   const rows=samples.filter(sample=>sample.pid===test.pid),values=rows.filter(sample=>sample.status==='RESPONDEU'&&sample.value!==null&&Number.isFinite(sample.value)).map(sample=>sample.value as number),last=rows[rows.length-1];
-  const representative:SensorTestSample={pid:test.pid,name:test.label,value:median(values),unit:last?.unit??getPidDefinition(test.pid)?.unit??'N/D',status:last?.status??'AINDA_NAO_TESTADO',rawResponse:last?.rawResponse??'',elapsedMs:last?.elapsedMs??0,timestamp:last?.timestamp??new Date().toISOString(),readingNumber:last?.readingNumber};
-  return {test,rows,values,representative,assessment:assessSensorSample(representative,mode,samples)};
+  const summary=summarizeSensorPidSamples(samples,test.pid,test.aggregation);
+  const representative:SensorTestSample={pid:test.pid,name:test.label,value:summary.value,unit:last?.unit??getPidDefinition(test.pid)?.unit??'N/D',status:last?.status??'AINDA_NAO_TESTADO',rawResponse:last?.rawResponse??'',elapsedMs:last?.elapsedMs??0,timestamp:last?.timestamp??new Date().toISOString(),readingNumber:last?.readingNumber};
+  return {test,rows,values,summary,representative,assessment:assessSensorSample(representative,mode,samples)};
  }),[testPlan,samples,mode]);
  const attention=grouped.filter(x=>x.assessment.state==='INVESTIGAR').length;
  function updateCountdown(remainingCommands:number){
