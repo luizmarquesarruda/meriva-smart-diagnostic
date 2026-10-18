@@ -2777,3 +2777,24 @@ O catálogo de ícones já existia, mas sua adoção não estabelecia uma hierar
 
 ### Resultado e próximo passo
 As alterações de interface foram registradas na branch `feat/cockpit-layout-refresh-20261018`, sem merge para `main` e sem execução de CI. Antes de considerar o layout aprovado, conferir compilação TypeScript, suíte de testes, build Android e comportamento visual em retrato/paisagem; dar atenção especial à altura disponível do cockpit em telas menores, à leitura dos cartões e ao comportamento sem rolagem.
+
+
+## 2026-10-18 — Continuação da uniformização do cockpit e histórico
+
+### Ajustes adicionais
+- Os três cartões-resumo do cockpit agora exibem ícones contextuais para consumo, autonomia e falhas ativas, mantendo rótulo e valor textual.
+- A tela Histórico e Dados recebeu ícones nos títulos de Espaço Utilizado, Viagens Salvas e Banco Estruturado SQLite.
+- Ações de atualização do SQLite, exportação JSON/CSV e limpeza de dados antigos receberam ícones e rótulos de acessibilidade; a ação de limpeza continua limitada à rotina existente e não foi ampliada.
+- A tela de armazenamento foi alinhada à paleta azul-marinho/azul técnico/âmbar e aos tons semânticos de sucesso, aviso e falha.
+- O teste estrutural exige os ícones do cockpit e os controles do histórico.
+
+### Commits adicionais
+- Métricas contextuais do cockpit: `18b6f469f8e52c052870fee4790b1702666f64a0`.
+- Contratos para métricas do cockpit: `7459131c8a4b190bd3ec961103cc248cfc8fb71d`.
+- Tela Histórico e Dados: `13400f400ecbd2a46349272b1780e2b6f4a986ce`.
+- Contratos para controles do histórico: `af2661fda71a606ff16c3e1202d61c68f726d444`.
+
+### Validação
+- A verificação por leitura de fonte ainda precisa ser repetida após estes commits para garantir que os ícones adicionados estão no catálogo.
+- Nenhum teste foi executado, nenhuma compilação foi feita e a CI não foi acionada.
+- Próximo passo: terminar a inspeção estática da branch, atualizar a documentação de revisão e consolidar os riscos antes de autorizar testes.
