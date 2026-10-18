@@ -34,7 +34,7 @@ async function queryBitmaps(executeCommand:(command:string)=>Promise<ExtendedCom
   const command=service+block,started=Date.now();
   try{
    const r=await executeCommand(command),ids=decodeExtendedSupportBitmap(command,r.response,service);
-   const ok=r.status==='OK'&&hasPositive(r.response,service==='06'?'46':'49',block);
+   const ok: boolean = r.status === 'OK' && hasPositive(r.response, service === '06' ? '46' : '49', block);
    records.push({service,command,response:r.response,status:ok?'RESPONDEU':'SEM_RESPOSTA',elapsedMs:r.elapsedMs||Date.now()-started,supportedIds:ids});
    ids.forEach(id=>all.add(id));block=ok?nextExtendedSupportBlock(block,ids):null;
   }catch{records.push({service,command,response:'',status:'ERRO',elapsedMs:Date.now()-started,supportedIds:[]});block=null;}
