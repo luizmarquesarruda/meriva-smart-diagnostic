@@ -49,7 +49,7 @@ const screens = [
   ['app/bluetooth.tsx', ['AppIcon name="vehicle"', 'AppIcon name="bluetooth"']],
   ['app/saude.tsx', ['AppIcon name="diagnostics"']],
   ['app/veiculo.tsx', ['AppIcon name="bluetooth"']],
-  ['app/dados.tsx', ['AppIcon name="sensors"']],
+  ['app/dados.tsx', ['AppIcon name="sensors"', 'Metric icon="dashboard"', 'Metric icon="trips"', 'Metric icon="fuel"', 'Metric icon="battery"', 'metricHeader']],
   ['app/aprendizado.tsx', ['AppIcon name="health"', 'AppIconBadge name="learning"']],
   ['app/laboratorio.tsx', ['AppIconBadge name="diagnostics"', 'name="bluetooth"', 'name="radio"', "backgroundColor: '#07111f'"]],
   ['app/configuracoes.tsx', ['AppIconBadge name="settings"', 'PAINEL • CONEXÃO • ARMAZENAMENTO']],
