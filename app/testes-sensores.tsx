@@ -8,6 +8,8 @@ import { saveSensorTestRunLazy } from '../src/database/diagnosticDatabaseAccess'
 import { createLearningProfile, readLearningProfile, updateLearningProfileRealSample } from '../src/database/learningProfile';
 import { readPidConfirmations, recordPidConfirmation } from '../src/database/pidBank';
 import { getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
+import { discoverExtendedObdData } from '../src/obd/extendedPidDiscovery';
+import { saveExtendedDiscoveryReport } from '../src/database/extendedDiscoveryStore';
 import {useMidLayout} from '../src/ui/midLayout';
 import {getSharedObdConnection,getSharedObdStatus,subscribeSharedObd,subscribeSharedObdStatus} from '../src/obd/sharedConnection';
 import {getPidDefinition} from '../src/obd/pidDefinition';
@@ -24,6 +26,7 @@ export default function TestesSensoresScreen(){
  const [plannedReads,setPlannedReads]=useState(0),[commandProgress,setCommandProgress]=useState(0),[commandPlan,setCommandPlan]=useState(0),[countdownMs,setCountdownMs]=useState(0);
  const [round,setRound]=useState(0),[currentPid,setCurrentPid]=useState(''),[message,setMessage]=useState('Conecte o ELM327 e valide a ECU.');
  const [error,setError]=useState(''),[savedPath,setSavedPath]=useState(''),[revision,setRevision]=useState(0);
+ const [extendedBusy,setExtendedBusy]=useState(false),[extendedPath,setExtendedPath]=useState(''),[extendedMessage,setExtendedMessage]=useState('');
  const cancelled=useRef(false),deadline=useRef(0),runStartedAt=useRef(0),commandsDone=useRef(0),commandElapsedTotal=useRef(0),connectedAtStart=useRef(false);
  useEffect(()=>{const refresh=()=>setRevision(n=>n+1);const a=subscribeSharedObd(refresh),b=subscribeSharedObdStatus(refresh);return()=>{cancelled.current=true;a();b();};},[]);
  useEffect(()=>{if(!running)return;const timer=setInterval(()=>{const remain=deadline.current-Date.now();setCountdownMs(remain>0?remain:1000);},1000);return()=>clearInterval(timer);},[running]);
@@ -109,6 +112,22 @@ export default function TestesSensoresScreen(){
   finally{setRunning(false);setCountdownMs(0);setCurrentPid('');}
  }
  const stop=()=>{cancelled.current=true;setMessage('Parada solicitada; a consulta OBD atual será concluída antes de interromper.');};
+ async function runExtendedDiscovery(){
+  const active=getSharedObdConnection(),activeStatus=getSharedObdStatus();
+  if(!active?.ecuValidated||!activeStatus.ecuConnected){setError('ECU não validada. Conecte o ELM327 antes da descoberta estendida.');return;}
+  if(running||extendedBusy)return;
+  setExtendedBusy(true);setExtendedPath('');setExtendedMessage('Consultando bitmaps Mode 09 e Mode 06 em sequência…');setError('');
+  try{
+   const report=await discoverExtendedObdData(active.session,active.protocol);
+   const basePath=(FileSystem.documentDirectory??'')+'MERIVA_SMART';
+   const saved=await saveExtendedDiscoveryReport(basePath,report);
+   setExtendedPath(saved);
+   setExtendedMessage('Descoberta concluída: '+report.supportedMode09InfoTypes.length+' tipos Mode 09 e '+report.supportedMode06MonitorIds.length+' OBDMIDs anunciados. RX bruto salvo em JSON.');
+  }catch(cause){
+   setError(cause instanceof Error?cause.message:'Falha na descoberta OBD estendida.');
+   setExtendedMessage('Descoberta interrompida. Confira a conexão e o relatório de diagnóstico.');
+  }finally{setExtendedBusy(false);}
+ }
  async function saveReport(){
   if(!samples.length){setError('Ainda não há amostras para salvar.');return;}
   try{
@@ -151,6 +170,8 @@ export default function TestesSensoresScreen(){
    <TouchableOpacity disabled={running} onPress={()=>setMode('ENGINE_ON')} style={[st.mode,mode==='ENGINE_ON'&&st.selected]}><Text style={st.icon}>◉</Text><Text style={st.modeTitle}>Motor ligado</Text><Text style={st.muted}>Motor funcionando, carro parado</Text></TouchableOpacity>
   </View>
   <View style={st.notice}><Text style={st.noticeTitle}>Antes de iniciar</Text><Text style={st.noticeText}>Estacione em local seguro, aplique o freio de estacionamento e não use esta tela durante a condução. A duração depende da latência K-Line/ELM327 e da quantidade de PIDs suportados.</Text></View>
+  <TouchableOpacity disabled={!connected||running||extendedBusy} onPress={()=>void runExtendedDiscovery()} style={[st.secondary,(!connected||running||extendedBusy)&&st.disabled]}>{extendedBusy?<ActivityIndicator color="#93c5fd"/>:<Text style={st.secondaryText}>⌕ DESCOBRIR MODOS OBD 06/09</Text>}</TouchableOpacity>
+  {extendedMessage?<Text style={st.message}>{extendedMessage}</Text>:null}{extendedPath?<Text selectable style={st.saved}>{extendedPath}</Text>:null}
   <TouchableOpacity disabled={!connected||running} onPress={()=>void runTests()} style={[st.primary,(!connected||running)&&st.disabled]}>{running?<ActivityIndicator color="#06111f"/>:<Text style={st.primaryText}>▶ INICIAR TESTE COMPLETO</Text>}</TouchableOpacity>
   {running&&<TouchableOpacity onPress={stop} style={st.stop}><Text style={st.stopText}>PARAR APÓS A CONSULTA ATUAL</Text></TouchableOpacity>}
   <View style={st.timerCard}><Text style={st.timerLabel}>{running?'TEMPO ESTIMADO RESTANTE':completed?'TESTE CONCLUÍDO':aborted?'TESTE INTERROMPIDO':'CONTAGEM REGRESSIVA'}</Text><Text style={[st.timer,{color:running?'#60a5fa':completed?'#4ade80':aborted?'#fb7185':'#a3b4ca'}]}>{clock(countdownMs)}</Text><Text style={st.muted}>{running?'Estimativa adaptativa; só encerra após todas as tentativas terminarem.':completed?'Todos os PIDs planejados tiveram cinco respostas válidas.':aborted?'Contagem parada por erro/interrupção, não por conclusão completa.':'O contador começa quando você inicia a varredura.'}</Text></View>
@@ -173,7 +194,7 @@ const st=StyleSheet.create({
  connection:{borderRadius:13,borderWidth:1,padding:13,marginBottom:12},good:{backgroundColor:'#10261b',borderColor:'#28613e'},warn:{backgroundColor:'#28151c',borderColor:'#713043'},goodTitle:{color:'#4ade80',fontSize:12,fontWeight:'900',marginBottom:4},warnTitle:{color:'#fb7185',fontSize:12,fontWeight:'900',marginBottom:4},muted:{color:'#a3b4ca',fontSize:10,marginTop:3},
  section:{color:'#7db3ff',fontSize:10,fontWeight:'900',letterSpacing:1,marginTop:13,marginBottom:8},modes:{gap:9},modesWide:{flexDirection:'row'},mode:{flex:1,backgroundColor:'#0e1b2d',borderRadius:13,borderWidth:1,borderColor:'#233a56',padding:14,minHeight:112},selected:{borderColor:'#3b82f6',backgroundColor:'#122a43'},icon:{color:'#60a5fa',fontSize:23,fontWeight:'900'},modeTitle:{color:'#f8fafc',fontSize:13,fontWeight:'900',marginTop:6},
  notice:{backgroundColor:'#152238',borderRadius:11,borderWidth:1,borderColor:'#304767',padding:12,marginTop:12,marginBottom:12},noticeTitle:{color:'#fbbf24',fontSize:11,fontWeight:'900'},noticeText:{color:'#c4d2e4',fontSize:10,lineHeight:16,marginTop:4},
- primary:{backgroundColor:'#60a5fa',padding:15,borderRadius:12,alignItems:'center',justifyContent:'center',minHeight:48},primaryText:{color:'#06111f',fontSize:11,fontWeight:'900'},disabled:{opacity:.4},stop:{borderColor:'#fb7185',borderWidth:1,padding:13,borderRadius:12,alignItems:'center',marginTop:8},stopText:{color:'#fb7185',fontSize:10,fontWeight:'900'},
+ secondary:{backgroundColor:'#102238',borderColor:'#3b82f6',borderWidth:1,padding:13,borderRadius:12,alignItems:'center',justifyContent:'center',minHeight:44,marginBottom:8},secondaryText:{color:'#93c5fd',fontSize:10,fontWeight:'900'},primary:{backgroundColor:'#60a5fa',padding:15,borderRadius:12,alignItems:'center',justifyContent:'center',minHeight:48},primaryText:{color:'#06111f',fontSize:11,fontWeight:'900'},disabled:{opacity:.4},stop:{borderColor:'#fb7185',borderWidth:1,padding:13,borderRadius:12,alignItems:'center',marginTop:8},stopText:{color:'#fb7185',fontSize:10,fontWeight:'900'},
  timerCard:{backgroundColor:'#0e1b2d',borderColor:'#233a56',borderWidth:1,borderRadius:14,padding:15,alignItems:'center',marginTop:12},timerLabel:{color:'#7db3ff',fontSize:9,fontWeight:'900',letterSpacing:1},timer:{color:'#a3b4ca',fontSize:31,fontWeight:'900',fontVariant:['tabular-nums'],marginTop:4},progress:{color:'#93c5fd',fontSize:10,marginTop:8},
  message:{color:'#a3b4ca',fontSize:10,lineHeight:15,marginTop:10},error:{color:'#fb7185',backgroundColor:'#28151c',borderRadius:9,padding:10,fontSize:10,marginTop:8},
  summary:{flexDirection:'row',gap:7,marginTop:13},summaryCell:{flex:1,backgroundColor:'#0e1b2d',borderRadius:10,padding:10,alignItems:'center'},count:{color:'#f8fafc',fontSize:17,fontWeight:'900'},card:{backgroundColor:'#0e1b2d',borderColor:'#233a56',borderWidth:1,borderRadius:12,padding:12,marginBottom:8},resultHead:{flexDirection:'row',alignItems:'flex-start',gap:8},sensor:{color:'#e5edf7',fontSize:12,fontWeight:'900'},pid:{color:'#7185a1',fontSize:9,marginTop:3},value:{color:'#f8fafc',fontSize:14,fontWeight:'900',textAlign:'right'},state:{fontSize:9,fontWeight:'900',marginTop:3,textAlign:'right'},resultTitle:{color:'#dbeafe',fontSize:10,fontWeight:'900',marginTop:9},explanation:{color:'#9fb0c6',fontSize:10,lineHeight:15,marginTop:4},readings:{color:'#93c5fd',fontSize:9,lineHeight:14,marginTop:8},raw:{color:'#647b98',fontSize:9,marginTop:8},
