@@ -171,7 +171,7 @@ export default function IndexScreen() {
     ? tripState.instantaneousConsumptionSource === 'MEASURED_015E'
       ? 'CONSUMO INSTANTÂNEO OBD'
       : tripState.instantaneousConsumptionSource === 'ESTIMATED_FLEX'
-        ? 'INSTANTÂNEO FLEX • ESTIMATIVA 50%'
+        ? 'INSTANTÂNEO FLEX • REFERÊNCIA E50'
         : 'INSTANTÂNEO ESTIMADO'
     : tripState.consumptionKml != null && tripState.consumptionKml > 0
       ? 'MÉDIA DA VIAGEM'
