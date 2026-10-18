@@ -242,7 +242,7 @@ function main() {
   const sensorTestItems = sensorTests.tests;
   assertUnique(sensorTestItems.map((item) => item.id), 'ID de teste de sensor');
   assertUnique(sensorTestItems.map((item) => item.pid), 'PID do catálogo de testes');
-  const allowedSensorEvaluators = new Set(['RPM_BY_MODE','STATIONARY_SPEED','PLAUSIBILITY_RANGE','TEMPERATURE_PLAUSIBILITY','FUEL_TRIM_CONTEXT','MAP_BY_MODE','O2_NARROWBAND_LIMITATION','PERCENT_PLAUSIBILITY','BARO_PLAUSIBILITY','ECU_VOLTAGE_BY_MODE','FLEX_COMPOSITION','FUEL_RATE_BY_MODE']);
+  const allowedSensorEvaluators = new Set(['RPM_BY_MODE','STATIONARY_SPEED','PLAUSIBILITY_RANGE','TEMPERATURE_PLAUSIBILITY','FUEL_TRIM_CONTEXT','MAP_BY_MODE','O2_NARROWBAND_LIMITATION','PERCENT_PLAUSIBILITY','BARO_PLAUSIBILITY','ECU_VOLTAGE_BY_MODE','FLEX_COMPOSITION','FUEL_RATE_BY_MODE','DISCRETE_CODE']);
   const validSensorModes = new Set(['ENGINE_OFF','ENGINE_ON']);
   for (const test of sensorTestItems) {
     const id = String(test.pid).toUpperCase();
