@@ -1,6 +1,6 @@
 {
-  "version": 2,
-  "description": "Política de aquisição priorizada para ELM327 em K-Line/KWP. PIDs críticos têm prioridade; estimativas e nível do tanque usam menor cadência; composição do combustível é consultada raramente e somente quando a ECU a anuncia; logs CSV são agrupados.",
+  "version": 3,
+  "description": "Política de aquisição priorizada para ELM327 em K-Line/KWP. Taxa medida, quando suportada, tem prioridade; MAF/MAP são estimativas etiquetadas e usam parâmetros versionados em fuel_consumption_model.json.",
   "polling": {
     "corePids": [
       "010D",
@@ -20,7 +20,8 @@
       "intakeAirTempPid": "010F",
       "everyCycles": 4,
       "displayStaleAfterMs": 10000,
-      "phase": 1
+      "phase": 1,
+      "modelConfig": "src/knowledge/fuel_consumption_model.json"
     },
     "fuelLevel": {
       "pid": "012F",
@@ -44,10 +45,13 @@
     "Somente uma estimativa recém-calculada pode alimentar a integração de combustível da viagem.",
     "Uma estimativa em cache pode ser exibida por até displayStaleAfterMs, mas não pode ser integrada novamente.",
     "PIDs usados no cálculo de consumo não devem ser consultados novamente no mesmo ciclo para telemetria rotativa.",
-    "No modo FLEX, a estimativa MAF/MAP exige composição de etanol válida via PID 0152; nunca assumir gasolina como fallback silencioso.",
+    "No modo FLEX, sem composição válida via 0152, usar somente a referência E50 definida em fuel_consumption_model.json e identificá-la como ESTIMATED_FLEX; não chamar de leitura medida.",
     "PID 015E medido tem precedência sobre estimativas derivadas de MAF/MAP.",
     "Não aplicar temporizações específicas de CAN a uma sessão K-Line sem medições no adaptador e veículo reais.",
-    "A confirmação e a estatística de aprendizado do mesmo PID não são persistidas mais de uma vez em learningSampleMinIntervalMs, mas cada resposta real continua na fila CSV."
+    "A confirmação e a estatística de aprendizado do mesmo PID não são persistidas mais de uma vez em learningSampleMinIntervalMs, mas cada resposta real continua na fila CSV.",
+    "GASOLINA usa referência brasileira Gasolina C E32 datada em fuel_consumption_model.json; rever o parâmetro conforme a política ANP vigente.",
+    "ETANOL usa propriedades de referência para etanol hidratado, explicitamente aproximadas; não tratar como composição laboratorial.",
+    "Consumo e combustível derivados são estimativas até comparação com abastecimentos reais; parâmetros e fontes precisam permanecer versionados."
   ],
   "learningSampleMinIntervalMs": 5000
 }
