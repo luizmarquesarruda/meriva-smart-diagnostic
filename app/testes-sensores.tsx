@@ -92,8 +92,10 @@ export default function TestesSensoresScreen(){
      readings.push(sample);setSamples([...readings]);recordCommand(response.elapsedMs,expectedCommands);
     }
    }
-   finished=!cancelled.current&&readings.length===expectedReads;setCompleted(finished);setAborted(!finished);
-   setMessage(finished?'Varredura concluída: cada PID suportado teve três tentativas. Revise as evidências antes de reparar.':'Teste interrompido; as leituras concluídas foram mantidas para relatório parcial.');
+   const pidsLearned=await learnCompletedPidSamples(readings,plan,mode);
+   finished=!cancelled.current&&plan.every(test=>summarizeSensorPidSamples(readings,test.pid,test.aggregation).validSamples>=MIN_SENSOR_TEST_READINGS);
+   setCompleted(finished);setAborted(!finished);
+   setMessage(finished?'Coleta concluída: cinco respostas válidas por PID. IA local atualizada com médias/modas reais de '+pidsLearned+' PIDs.':'Coleta parcial: apenas PIDs com cinco respostas válidas entraram no aprendizado ('+pidsLearned+'). Revise o relatório antes de concluir.');
    setRound(finished?MIN_SENSOR_TEST_READINGS:0);
   }catch(cause){setError(cause instanceof Error?cause.message:'Falha desconhecida durante a consulta.');setMessage('Varredura não concluída normalmente; leituras finalizadas permanecem disponíveis.');setAborted(true);}
   finally{setRunning(false);setCountdownMs(0);setCurrentPid('');}
