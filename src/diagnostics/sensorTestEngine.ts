@@ -47,6 +47,11 @@ export function assessSensorSample(sample:SensorTestSample,mode:SensorTestMode,a
  if(valid.length<test.minimumReadings)return result('NAO_CONCLUSIVO','Menos de cinco leituras válidas','Foram obtidas '+valid.length+' leituras válidas em '+attempts.length+' tentativas; não há amostragem suficiente.');
  const value=mean(valid.map(item=>item.value as number));if(value===null||!Number.isFinite(value))return result('NAO_CONCLUSIVO','Sem média válida','As amostras não geraram valor numérico confiável.');
  const t=test.thresholds,read=(otherPid:string)=>valueOf(all,otherPid);
+ if(test.evaluator==='OBSERVATION_ONLY'){
+  const values=valid.map(item=>item.value as number);
+  const allSame=values.every(item=>item===values[0]);
+  return result('NAO_CONCLUSIVO','PID informativo coletado; sem diagnóstico analógico','Cinco respostas registradas. '+(allSame?'O valor/código permaneceu igual nas amostras.':'O valor/código variou entre amostras.')+' Este PID representa estado, contador ou código enumerado; não usar média nem alimentar perfil de valores típicos.');
+ }
  if(test.evaluator==='DISCOVERED_STABILITY'){
   const values=valid.map(item=>item.value as number),average=mean(values),min=Math.min(...values),max=Math.max(...values);
   if(average===null||!Number.isFinite(average))return result('NAO_CONCLUSIVO','Média indisponível','Não foi possível calcular média numérica confiável.');
