@@ -1,12 +1,18 @@
 import sensorTestCatalogJson from '../knowledge/sensor_tests.json';
+import pidLearningPolicyJson from '../knowledge/pid_learning_policy.json';
 export type SensorTestMode='ENGINE_OFF'|'ENGINE_ON';
 export type SensorAssessmentState='CONSISTENTE'|'INVESTIGAR'|'SEM_RESPOSTA'|'NAO_CONCLUSIVO';
 export interface SensorTestSample{pid:string;name:string;value:number|null;unit:string;status:string;rawResponse:string;elapsedMs:number;timestamp:string;readingNumber?:number;}
 export interface SensorAssessment{state:SensorAssessmentState;title:string;explanation:string;}
-export interface SensorTestDefinition{id:string;pid:string;label:string;catalogName:string;unit:string;formulaId:string;category:string;evaluator:string;modes:SensorTestMode[];requiredPids:string[];minimumReadings:number;thresholds:Record<string,number>;evidenceClass:string;vehicleEvidenceStatus:string;diagnosticRuleIds:string[];aiGuidance:string;}
-interface SensorTestCatalog{schemaVersion:number;catalogId:string;minimumReadingsPerPid:number;timing:{defaultCommandLatencyMs:number;minimumEstimatedCommandLatencyMs:number;perCommandSafetyMarginMs:number;finalizationMarginMs:number};tests:SensorTestDefinition[];}
+export type SensorSampleAggregation='MEAN'|'MODE';
+export interface SensorTestDefinition{id:string;pid:string;label:string;catalogName:string;unit:string;formulaId:string;category:string;evaluator:string;modes:SensorTestMode[];requiredPids:string[];minimumReadings:number;aggregation?:SensorSampleAggregation;thresholds:Record<string,number>;evidenceClass:string;vehicleEvidenceStatus:string;diagnosticRuleIds:string[];aiGuidance:string;}
+export interface SensorSampleSummary{pid:string;attempts:number;validSamples:number;requiredSamples:number;aggregation:SensorSampleAggregation;value:number|null;mean:number|null;min:number|null;max:number|null;standardDeviation:number|null;distinctValues:number;}
+interface SensorTestCatalog{schemaVersion:number;catalogId:string;minimumReadingsPerPid:number;maximumAttemptsPerPid:number;timing:{defaultCommandLatencyMs:number;minimumEstimatedCommandLatencyMs:number;perCommandSafetyMarginMs:number;finalizationMarginMs:number};tests:SensorTestDefinition[];}
+interface PidLearningPolicy{minimumValidSamplesPerPid:number;maximumAttemptsPerPid:number;discretePids:string[];}
 const catalog=sensorTestCatalogJson as unknown as SensorTestCatalog;
-export const MIN_SENSOR_TEST_READINGS=catalog.minimumReadingsPerPid;
+const learningPolicy=pidLearningPolicyJson as unknown as PidLearningPolicy;
+export const MIN_SENSOR_TEST_READINGS=learningPolicy.minimumValidSamplesPerPid;
+export const MAX_SENSOR_TEST_ATTEMPTS=learningPolicy.maximumAttemptsPerPid;
 export function getSensorTestCatalog():SensorTestCatalog{return catalog;}
 export function normalizeSensorPid(pid:string):string{return pid.replace(/\s/g,'').toUpperCase();}
 export function createSensorTestPlan(supportedPids:string[],hasDefinition:(pid:string)=>boolean=()=>true):SensorTestDefinition[]{
