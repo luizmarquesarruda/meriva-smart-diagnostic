@@ -510,7 +510,7 @@
         "DTC_P0133_O2_SLOW",
         "DTC_P0301_MISFIRE"
       ],
-      "aiGuidance": "Três leituras servem como triagem; alternância, resposta dinâmica e aquecedor exigem amostragem temporal/teste elétrico.",
+      "aiGuidance": "Cinco respostas válidas servem como triagem; alternância, resposta dinâmica e aquecedor exigem amostragem temporal/teste elétrico.",
       "aggregation": "MEAN"
     },
     {
