@@ -310,7 +310,8 @@ class AutoTripService {
 
         // FLEX composition is stable and expensive enough to keep off the hot
         // path; sample it rarely, only when the ECU bitmap announces PID 0152.
-        // Without a valid composition reading, do not silently estimate as gasoline.
+        // Without a valid composition reading the model uses a visible E50 reference,
+        // never a silent assumption that the tank is gasoline.
         const fuelCompositionPolicy = pollingPolicy.polling.fuelComposition;
         if (
           (!this.state.fuelSupported || fuelRateLph == null) &&
@@ -490,7 +491,7 @@ class AutoTripService {
           error: rpm === 0 && obdSpeedKmh === 0 && fuelRateForDisplayLph == null
             ? 'MOTOR DESLIGADO? / ECU SEM TELEMETRIA VÁLIDA'
             : fuelRateForDisplaySource === 'ESTIMATED_FLEX'
-              ? 'CONSUMO FLEX ESTIMADO (MISTURA DE REFERÊNCIA 50%; NÃO MEDIDA)'
+              ? 'CONSUMO FLEX ESTIMADO (REFERÊNCIA E50; NÃO MEDIDA)'
               : fuelRateForDisplaySource && fuelRateForDisplaySource !== 'MEASURED_015E'
                 ? 'CONSUMO ESTIMADO POR ' + fuelRateForDisplaySource.replace('ESTIMATED_', '')
                 : null,
