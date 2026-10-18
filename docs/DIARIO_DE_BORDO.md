@@ -2745,6 +2745,7 @@ O catálogo de ícones já existia, mas sua adoção não estabelecia uma hierar
 - Cockpit: ícone contextual no indicador rotativo; atalho de Saúde navegável; cartões rápidos para Dados ao Vivo e Testes de Sensores; acesso explícito a Todos os Recursos.
 - Mais Recursos: grade responsiva de cartões em duas colunas com ícone, título, descrição curta e seta.
 - Cabeçalhos com emblema vetorial adicionados ou alinhados em Saúde, Dados ao Vivo, Veículo, Aprendizado, Bluetooth, Configurações, Histórico, Viagens e Diagnóstico OBD.
+- Cartões de telemetria em Dados ao Vivo também recebem ícones específicos para velocidade, distância, consumo e autonomia, associados aos respectivos valores em vez de usar um símbolo genérico.
 - Laboratório OBD: paleta alinhada ao cockpit e ícones nas ações de conexão, consulta PID, descoberta de PIDs e varredura de DTC.
 - AppIconBadge: tons semânticos azul, dourado, sucesso, aviso e falha; a saúde do veículo usa o tom correspondente ao estado.
 - Criado `docs/REAVALIACAO_LAYOUT_ICONES_2026-10-18.md` com as decisões de UX, paleta e limitações de validação.
@@ -2763,6 +2764,8 @@ O catálogo de ícones já existia, mas sua adoção não estabelecia uma hierar
 - Laboratório OBD: `aa3324dd6ae06f48f5e4948de07537bb86e0e593`.
 - Biblioteca de ícones: `a3d2f6d6ef68087293f12c67d35939d3d961fdcf`.
 - Contratos de teste atualizados: `4ad130c08c04e958665b3286aebe92b7d5cbe1a2`.
+- Teste ampliado para exigir os quatro ícones dos cartões de telemetria: `a50dfae1ba4dc182f5b20b2ee96f06b492eb9c55`.
+- Componente de métricas de Dados ao Vivo atualizado para exibir os ícones contextuais: `97623ac5bf03874e66c7cfc0f84fa901c8315e47`.
 - Documento de revisão: `f56aef51da8b8a76265ba03b60b047dd8c6e2033`.
 
 ### Resultado e próximo passo
