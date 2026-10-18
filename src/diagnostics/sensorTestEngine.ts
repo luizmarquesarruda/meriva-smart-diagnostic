@@ -69,7 +69,7 @@ export function assessSensorSample(sample:SensorTestSample,mode:SensorTestMode,a
   const range=rangeAssessment(value,test);if(range.state==='INVESTIGAR')return range;
   if(mode!=='ENGINE_ON')return result('NAO_CONCLUSIVO','Sonda O2 exige motor funcionando','Motor parado não valida aquecedor, resposta nem alternância. '+test.aiGuidance);
   const ect=read('0105');if(ect===null||ect<t.warmCoolantMinC)return result('NAO_CONCLUSIVO','Motor não confirmado como aquecido','Requer cinco leituras válidas de temperatura e motor aquecido. '+test.aiGuidance);
-  return result('NAO_CONCLUSIVO','Tensão plausível; alternância não validada','Três leituras não medem frequência de comutação nem testam o circuito aquecedor. '+test.aiGuidance);
+  return result('NAO_CONCLUSIVO','Tensão plausível; alternância não validada','Cinco leituras agregadas não medem frequência de comutação nem testam o circuito aquecedor. '+test.aiGuidance);
  }
  if(test.evaluator==='ECU_VOLTAGE_BY_MODE'){
   const min=mode==='ENGINE_OFF'?t.engineOffMinV:t.engineOnMinV;if(value<min||value>t.maxV)return result('INVESTIGAR','Tensão fora do gatilho heurístico','Mediana '+value.toFixed(2)+' V fora da faixa de triagem. Confirme com multímetro nos polos da bateria antes de concluir.');
