@@ -896,6 +896,7 @@ async function testDriveCycleSummaryUsesWeightedRealSpeed() {
     standingTimeHms: '00:00:00',
     avgDrivingSpeedKmh: 6,
     avgFuelConsumptionKml: 10,
+    fuelDataValid: true,
     source: 'REAL_OBD',
     importedAt: '2026-10-01T10:20:00.000Z',
   };
@@ -1106,7 +1107,7 @@ function testAcquisitionPolicyConsistency() {
   const bluetooth = JSON.parse(fs.readFileSync(path.join(root, 'knowledge/bluetooth_config.json'), 'utf8'));
   const settingsUi = fs.readFileSync(path.join(ROOT, 'app/configuracoes.tsx'), 'utf8');
 
-  assert.strictEqual(policy.version, 2);
+  assert.strictEqual(policy.version, 3, 'a política de aquisição deve corresponder ao esquema atual versionado');
   assert.strictEqual(policy.polling.fuelComposition.pid, '0152');
   assert.strictEqual(policy.polling.fuelComposition.everyCycles, 30);
   assert.strictEqual(bluetooth.schemaVersion, 2);
