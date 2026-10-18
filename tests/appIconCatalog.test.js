@@ -54,7 +54,7 @@ const screens = [
   ['app/laboratorio.tsx', ['AppIconBadge name="diagnostics"', 'name="bluetooth"', 'name="radio"', "backgroundColor: '#07111f'"]],
   ['app/configuracoes.tsx', ['AppIconBadge name="settings"', 'PAINEL • CONEXÃO • ARMAZENAMENTO']],
   ['app/armazenamento.tsx', ['AppIconBadge name="history"', 'HISTÓRICO E DADOS']],
-  ['app/viagens.tsx', ['AppIconBadge name="trips"', 'RELATÓRIO DE VIAGENS']],
+  ['app/viagens.tsx', ['AppIconBadge name="trips"', 'RELATÓRIO DE VIAGENS', 'Metric icon="trips"', 'Metric icon="dashboard"', 'Metric icon="fuel"', "AppIcon name=\"forward\""]],
 ];
 
 const cockpit = read('app/index.tsx');
