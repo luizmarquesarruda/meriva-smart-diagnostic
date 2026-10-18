@@ -2834,3 +2834,32 @@ A estimativa MAF/MAP já existia, mas `resolveFuelEstimateProperties` devolvia n
 - Atualizados testes de parâmetros de combustível, fatores de correção, JSON de conhecimento e versão da política. Os testes foram preparados, mas não executados nesta sessão.
 - Nenhuma CI foi disparada. Os commits desta rodada continuam marcados `[skip ci]`, conforme orientação vigente.
 - Próximo passo: executar validação autorizada e depois obter respostas RAW_ECU dos PIDs 015E, 0110, 010B, 010F e 0152; em seguida, implementar a entrada/persistência de abastecimentos reais para calibrar o modelo.
+
+
+## 2026-10-18 — Catálogo completo de 34 PIDs, aquisição em rodízio e aprendizado por cinco amostras
+
+### Problema
+A página de testes utilizava apenas 30 regras, apesar de `src/knowledge/pids.json` conter 34 PIDs padronizados. A coleta parava após três rodadas fixas, de modo que uma resposta perdida podia deixar menos de cinco leituras válidas. A média usada no painel era uma mediana, e não existia persistência explícita do agregado de cada PID da sessão de testes no perfil de aprendizado.
+
+### Correções
+- `src/knowledge/sensor_tests.json` passou para schema v2, cobrindo exatamente os 34 PIDs catalogados e exigindo cinco respostas válidas por PID. Os quatro PIDs anteriormente ausentes são `0101`, `0130`, `0131` e `0151`.
+- Criado `src/knowledge/pid_learning_policy.json`: cinco respostas válidas, orçamento de até oito tentativas, uma consulta por PID por rodada, sem consultas em paralelo, média aritmética para medidas contínuas e moda para campos discretos/códigos/contadores.
+- `src/diagnostics/sensorTestEngine.ts` agora calcula, por PID, número de tentativas, quantidade válida, média, mínimo, máximo, desvio-padrão amostral e modo quando a variável é discreta. Respostas sem valor finito ou sem status `RESPONDEU` não entram no agregado.
+- `app/testes-sensores.tsx` lista os PIDs descobertos na sessão; percorre o plano em rodízio, consultando um único PID por vez. Após cada consulta, passa para o próximo PID. Repete rodadas até cada PID reunir cinco respostas válidas ou esgotar oito tentativas.
+- Quando um PID tem cinco respostas válidas de sessão `REAL_OBD`, o agregado é registrado no perfil de aprendizado local e as respostas são contabilizadas no banco de PIDs como `RESPONDEU`. Nenhum desses passos promove automaticamente o PID a `CONFIRMADO` nem certifica a condição física do sensor.
+- A validação do conhecimento local agora falha se algum PID do catálogo não tiver regra de teste, se o catálogo deixar de cobrir os 34 IDs, se a exigência deixar de ser cinco respostas válidas ou se o contrato da coleta/aprendizado mudar.
+- Os relatórios TXT incluem o agregado usado, mínimo/máximo, desvio-padrão e RX bruto de cada tentativa. Foram atualizados os testes de unidade para buffer de média, modo, exclusão de amostra inválida e contrato de cinco leituras.
+
+### Evidência e limites
+- As 34 entradas são PIDs padronizados disponíveis no catálogo do aplicativo; isso não quer dizer que os 34 sejam suportados pela ECU desta Meriva.
+- O registro de evidência da Meriva continua a marcar somente `010C` como confirmado por resposta RAW_ECU. O plano de testes é filtrado pela bitmap/anúncio descoberto na conexão real e por definições cadastradas.
+- Cinco respostas OBD válidas dão uma amostra repetida do valor reportado; não medem exatidão física/elétrica nem substituem multímetro/osciloscópio para testes específicos.
+- A persistência de aprendizado usa um agregado por PID por execução completa desse PID, não as cinco observações como se fossem cinco ensaios independentes. As cinco leituras brutas permanecem registradas no relatório da sessão. Para códigos e contadores, o agregado é a moda, não uma média decimal sem significado.
+
+### Testes e CI
+- Adicionadas/ajustadas regressões para média de cinco valores, mínimo/máximo/desvio-padrão, exclusão de resposta inválida, moda de código discreto, cobertura dos 34 PIDs e validação do contrato de aprendizado.
+- Foi realizada verificação estática das estruturas JSON, do código e dos critérios de cobertura. **A suíte automatizada, TypeScript, Expo/Android e teste físico ainda não foram executados.**
+- Nenhuma CI foi disparada, conforme orientação vigente; commits desta rodada usam `[skip ci]`.
+
+### Próximo passo
+Executar `npm run validate` após autorização. Depois conectar a ECU real, salvar o relatório TXT e verificar quais PIDs são anunciados/respondem. Comparar os agregados com o perfil de aprendizado persistido e investigar respostas intermitentes antes de considerar um PID apto para outras regras de diagnóstico.
