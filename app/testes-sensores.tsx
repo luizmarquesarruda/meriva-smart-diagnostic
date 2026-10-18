@@ -6,7 +6,7 @@ import * as FileSystem from 'expo-file-system';
 import {useMidLayout} from '../src/ui/midLayout';
 import {getSharedObdConnection,getSharedObdStatus,subscribeSharedObd,subscribeSharedObdStatus} from '../src/obd/sharedConnection';
 import {getPidDefinition} from '../src/obd/pidDefinition';
-import {updateLearningProfileRealSample} from '../src/database/learningProfile';
+import {createLearningProfile,readLearningProfile,updateLearningProfileRealSample} from '../src/database/learningProfile';
 import {assessSensorSample,createSensorTestPlan,getSensorTestCatalog,MIN_SENSOR_TEST_READINGS,type SensorTestDefinition,type SensorTestMode,type SensorTestSample,type SensorAssessment} from '../src/diagnostics/sensorTestEngine';
 const catalog=getSensorTestCatalog();
 const labels:Record<SensorAssessment['state'],string>={CONSISTENTE:'COERENTE',INVESTIGAR:'INVESTIGAR',SEM_RESPOSTA:'SEM RESPOSTA',NAO_CONCLUSIVO:'NÃO CONCLUSIVO'};
@@ -68,17 +68,24 @@ export default function TestesSensoresScreen(){
     }
    }
    finished=!cancelled.current&&readings.length===expectedReads;
+   let learnedPids=0,learningWarning='';
    if(finished){
     const basePath=(FileSystem.documentDirectory??'')+'MERIVA_SMART';
-    for(const test of plan){
-     const valid=readings.filter(row=>row.pid===test.pid&&row.status==='RESPONDEU'&&row.value!==null&&Number.isFinite(row.value));
-     if(valid.length!==MIN_SENSOR_TEST_READINGS)continue;
-     const learnedMean=average(valid.map(row=>row.value as number));
-     if(learnedMean===null||!Number.isFinite(learnedMean))continue;
-     // Uma média por PID e por execução evita contar as cinco amostras correlacionadas como cinco experiências independentes.
-     await updateLearningProfileRealSample(basePath,getPidDefinition(test.pid)?.name??test.label,learnedMean,'UNKNOWN');
+    try{
+     if(!(await readLearningProfile(basePath)))await createLearningProfile(basePath,new Date().toISOString());
+     for(const test of plan){
+      const valid=readings.filter(row=>row.pid===test.pid&&row.status==='RESPONDEU'&&row.value!==null&&Number.isFinite(row.value));
+      if(valid.length!==MIN_SENSOR_TEST_READINGS)continue;
+      const learnedMean=average(valid.map(row=>row.value as number));
+      if(learnedMean===null||!Number.isFinite(learnedMean))continue;
+      // Uma média por PID e por execução evita contar as cinco amostras correlacionadas como cinco experiências independentes.
+      await updateLearningProfileRealSample(basePath,getPidDefinition(test.pid)?.name??test.label,learnedMean,'UNKNOWN');
+      learnedPids+=1;
+     }
+    }catch(learningError){
+     learningWarning=' A varredura terminou, mas houve falha ao gravar o perfil de aprendizado: '+(learningError instanceof Error?learningError.message:'erro desconhecido')+'.';
     }
-    setMessage('Cinco leituras por PID concluídas. Médias reais incorporadas ao perfil local de aprendizado; revise as avaliações antes de qualquer reparo.');
+    setMessage('Cinco rodadas concluídas. Médias incorporadas ao perfil local para '+learnedPids+' PIDs.'+(learningWarning||' PIDs sem cinco respostas válidas não foram aprendidos.'));if(learningWarning)setError(learningWarning.trim());
    }
    setCompleted(finished);setAborted(!finished);
    if(!finished)setMessage('Teste interrompido; as leituras concluídas foram mantidas para relatório parcial.');
@@ -111,7 +118,7 @@ export default function TestesSensoresScreen(){
   <View style={st.notice}><Text style={st.noticeTitle}>Antes de iniciar</Text><Text style={st.noticeText}>Estacione em local seguro, aplique o freio de estacionamento e não use esta tela durante a condução. A duração depende da latência K-Line/ELM327 e da quantidade de PIDs suportados.</Text></View>
   <TouchableOpacity disabled={!connected||running} onPress={()=>void runTests()} style={[st.primary,(!connected||running)&&st.disabled]}>{running?<ActivityIndicator color="#06111f"/>:<Text style={st.primaryText}>▶ INICIAR TESTE COMPLETO</Text>}</TouchableOpacity>
   {running&&<TouchableOpacity onPress={stop} style={st.stop}><Text style={st.stopText}>PARAR APÓS A CONSULTA ATUAL</Text></TouchableOpacity>}
-  <View style={st.timerCard}><Text style={st.timerLabel}>{running?'TEMPO ESTIMADO RESTANTE':completed?'TESTE CONCLUÍDO':aborted?'TESTE INTERROMPIDO':'CONTAGEM REGRESSIVA'}</Text><Text style={[st.timer,{color:running?'#60a5fa':completed?'#4ade80':aborted?'#fb7185':'#a3b4ca'}]}>{clock(countdownMs)}</Text><Text style={st.muted}>{running?'Estimativa adaptativa; só encerra após todas as tentativas terminarem.':completed?'Todos os PIDs planejados tiveram três tentativas.':aborted?'Contagem parada por erro/interrupção, não por conclusão completa.':'O contador começa quando você inicia a varredura.'}</Text></View>
+  <View style={st.timerCard}><Text style={st.timerLabel}>{running?'TEMPO ESTIMADO RESTANTE':completed?'TESTE CONCLUÍDO':aborted?'TESTE INTERROMPIDO':'CONTAGEM REGRESSIVA'}</Text><Text style={[st.timer,{color:running?'#60a5fa':completed?'#4ade80':aborted?'#fb7185':'#a3b4ca'}]}>{clock(countdownMs)}</Text><Text style={st.muted}>{running?'Estimativa adaptativa; só encerra após todas as tentativas terminarem.':completed?'Todos os PIDs planejados tiveram cinco tentativas.':aborted?'Contagem parada por erro/interrupção, não por conclusão completa.':'O contador começa quando você inicia a varredura.'}</Text></View>
   <Text style={st.message}>{message}</Text>{error?<Text style={st.error}>{error}</Text>:null}
   {testPlan.length>0&&<><View style={st.summary}><View style={st.summaryCell}><Text style={st.count}>{testPlan.length}</Text><Text style={st.muted}>PIDs suportados</Text></View><View style={st.summaryCell}><Text style={st.count}>{samples.length}/{plannedReads}</Text><Text style={st.muted}>Tentativas</Text></View><View style={st.summaryCell}><Text style={[st.count,{color:'#fbbf24'}]}>{attention}</Text><Text style={st.muted}>Investigar</Text></View></View>
   {running&&<Text style={st.progress}>Comandos: {commandProgress}/{commandPlan} · rodada {round}/{MIN_SENSOR_TEST_READINGS}{currentPid?' · PID '+currentPid:''}</Text>}
@@ -121,7 +128,7 @@ export default function TestesSensoresScreen(){
    <Text style={st.resultTitle}>{assessment.title}</Text><Text style={st.explanation}>{assessment.explanation}</Text><Text style={st.readings}>Valores: {rows.length?rows.map(row=>row.value==null?'N/D':row.value.toFixed(2)).join(' · '):'aguardando'} {representative.unit} | válidas {values.length}/{MIN_SENSOR_TEST_READINGS}</Text><Text style={st.raw}>RX mais recente: {representative.rawResponse||'AINDA SEM RESPOSTA'}</Text>
   </View>)}
   <TouchableOpacity onPress={()=>void saveReport()} style={st.save}><Text style={st.saveText}>SALVAR RELATÓRIO TXT</Text></TouchableOpacity>{savedPath?<Text selectable style={st.saved}>{savedPath}</Text>:null}</>}
-  <View style={st.disclaimer}><Text style={st.resultTitle}>Critério da IA local</Text><Text style={st.explanation}>O JSON orienta PIDs, pré-requisitos, faixas heurísticas e recomendações. “Coerente” não certifica o sensor; “investigar” não ordena troca de peça. Três tentativas registram repetibilidade, mas O2, aquecedor, chicote e vácuo podem exigir testes próprios.</Text></View>
+  <View style={st.disclaimer}><Text style={st.resultTitle}>Critério da IA local</Text><Text style={st.explanation}>O JSON orienta PIDs, pré-requisitos, faixas heurísticas e recomendações. “Coerente” não certifica o sensor; “investigar” não ordena troca de peça. Cinco amostras registram estabilidade pontual, mas O2, aquecedor, chicote e vácuo podem exigir testes próprios.</Text></View>
   <Link href="/mais" asChild><TouchableOpacity style={st.back}><Text style={st.backText}>← MAIS RECURSOS</Text></TouchableOpacity></Link><Link href="/" asChild><TouchableOpacity style={st.back}><Text style={st.backText}>← COCKPIT</Text></TouchableOpacity></Link>
  </View></ScrollView></SafeAreaView>;
 }
