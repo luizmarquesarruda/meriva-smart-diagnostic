@@ -38,6 +38,9 @@ const requiredIconMappings = [
   'trips: Route',
   'temperature: Thermometer',
   'resources: LayoutGrid',
+  'file: File',
+  'refresh: RefreshCw',
+  'trash: Trash2',
 ];
 for (const mapping of requiredIconMappings) {
   assert.ok(iconModule.includes(mapping), `icon catalogue is missing ${mapping}`);
