@@ -9,7 +9,7 @@ import { readDriveCycles } from '../src/storage/driveCycleStorage';
 import { getDriveCycleSummary, type DriveCycle } from '../src/data/driveCycles';
 import { BarChart, LineChart } from 'react-native-gifted-charts';
 import { buildTripChartData } from '../src/trip/tripChartData';
-import { AppIconBadge } from '../src/ui/AppIcon';
+import { AppIcon, AppIconBadge, type AppIconName } from '../src/ui/AppIcon';
 
 const BASE_PATH = FileSystem.documentDirectory + 'MERIVA_SMART';
 const DAY_MS = 86_400_000;
@@ -63,9 +63,9 @@ export default function ViagensScreen() {
             </View>
           </View>
           <View style={s.grid}>
-            <Metric l="VIAGENS" v={String(visible.length)} />
-            <Metric l="DISTÂNCIA TOTAL" v={mv(summary.totalDistanceKm,'km')} />
-            <Metric l="CONSUMO MÉDIO" v={summary.avgConsumptionKml > 0 ? mv(summary.avgConsumptionKml,'km/L') : 'N/D'} />
+            <Metric icon="trips" l="VIAGENS" v={String(visible.length)} />
+            <Metric icon="dashboard" l="DISTÂNCIA TOTAL" v={mv(summary.totalDistanceKm,'km')} />
+            <Metric icon="fuel" l="CONSUMO MÉDIO" v={summary.avgConsumptionKml > 0 ? mv(summary.avgConsumptionKml,'km/L') : 'N/D'} />
           </View>
           {distanceChartData.length > 0 && <View style={s.chartCard}>
             <Text style={s.section}>DISTÂNCIA POR VIAGEM — ÚLTIMAS 7</Text>
@@ -117,7 +117,7 @@ export default function ViagensScreen() {
                 <Text style={s.tripDate}>{dateLabel(cycle.startedAt)}</Text>
                 <Text style={s.tripRange}>Até {dateLabel(cycle.finishedAt)}</Text>
               </View>
-              <Text style={s.chevron}>›</Text>
+              <AppIcon name="forward" size={20} color="#7db3ff" />
             </View>
             <View style={s.stats}>
               <Stat label="DISTÂNCIA" value={mv(n(cycle.distanceTotalKm),'km',2)} />
@@ -201,21 +201,21 @@ function TripDetails({cycle,onBack}:{cycle:DriveCycle;onBack:()=>void}) {
     <Link href="/armazenamento" asChild><TouchableOpacity style={s.primary}><Text style={s.primaryText}>ABRIR EXPORTAÇÃO E DIÁRIO DE BORDO</Text></TouchableOpacity></Link>
   </>;
 }
-function Metric({l,v}:{l:string;v:string}) { return <View style={s.metric}><Text style={s.label}>{l}</Text><Text style={s.metricValue}>{v}</Text></View>; }
+function Metric({l,v,icon}:{l:string;v:string;icon?:AppIconName}) { return <View style={s.metric}><View style={s.metricHeader}>{icon ? <AppIcon name={icon} size={15} color="#e8b54b" /> : null}<Text style={s.label}>{l}</Text></View><Text style={s.metricValue}>{v}</Text></View>; }
 function Stat({label,value}:{label:string;value:string}) { return <View style={s.stat}><Text style={s.label}>{label}</Text><Text style={s.statValue}>{value}</Text></View>; }
 function Detail({label,value}:{label:string;value:string}) { return <View style={s.detail}><Text style={s.detailLabel}>{label}</Text><Text style={s.detailValue}>{value}</Text></View>; }
 
 const s=StyleSheet.create({chartCard:{backgroundColor:'#0e1b2d',borderColor:'#233a56',borderWidth:1,borderRadius:13,padding:12,marginTop:12},chartAxis:{color:'#9fb0c5',fontSize:10},chartNote:{color:'#9fb0c5',fontSize:11,lineHeight:16,marginTop:4},
   container:{flex:1,backgroundColor:'#07111f'},content:{flexGrow:1,width:'100%',paddingVertical:16,paddingBottom:34},frame:{width:'100%',alignSelf:'center'},pageHeader:{flexDirection:'row',alignItems:'center',gap:11,marginBottom:4},pageHeaderCopy:{flex:1,minWidth:0},
-  eyebrow:{color:'#55d6be',fontSize:9,fontWeight:'900',letterSpacing:1.5,marginBottom:5},title:{color:'#f8fafc',fontSize:25,fontWeight:'900'},subtitle:{color:'#91a9c9',fontSize:10,fontWeight:'700',marginTop:5,marginBottom:16,lineHeight:15},
-  grid:{flexDirection:'row',gap:9,marginBottom:9},metric:{flex:1,minWidth:0,backgroundColor:'#0e1b2d',borderRadius:14,borderWidth:1,borderColor:'#233a56',padding:12},label:{color:'#8196b4',fontSize:8,fontWeight:'900',letterSpacing:0.5},metricValue:{color:'#e5edf7',fontSize:15,fontWeight:'900',marginTop:6},
-  section:{color:'#55d6be',fontSize:10,fontWeight:'900',letterSpacing:1,marginTop:18,marginBottom:8},filters:{flexDirection:'row',gap:8,marginBottom:3},filter:{flex:1,padding:11,borderRadius:10,borderWidth:1,borderColor:'#29415f',backgroundColor:'#0e1b2d',alignItems:'center'},filterActive:{backgroundColor:'#123a42',borderColor:'#55d6be'},filterText:{color:'#9fb3cd',fontSize:9,fontWeight:'900'},filterTextActive:{color:'#a8fff0'},
-  card:{backgroundColor:'#0e1b2d',borderRadius:14,borderWidth:1,borderColor:'#233a56',padding:13,marginBottom:9},cardHeader:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginBottom:13},tripDate:{color:'#e5edf7',fontSize:12,fontWeight:'900'},tripRange:{color:'#8196b4',fontSize:9,marginTop:4},chevron:{color:'#55d6be',fontSize:26,fontWeight:'300',marginLeft:10},
-  stats:{flexDirection:'row',gap:8,marginBottom:10},stat:{flex:1,minWidth:0},statValue:{color:'#e5edf7',fontSize:12,fontWeight:'900',marginTop:5},tripFooter:{borderTopWidth:1,borderTopColor:'#233a56',paddingTop:10,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8},tripFooterText:{color:'#9fb3cd',fontSize:9},consumption:{color:'#55d6be',fontSize:10,fontWeight:'900'},muted:{color:'#8196b4'},
+  eyebrow:{color:'#7db3ff',fontSize:9,fontWeight:'900',letterSpacing:1.5,marginBottom:5},title:{color:'#f8fafc',fontSize:25,fontWeight:'900'},subtitle:{color:'#91a9c9',fontSize:10,fontWeight:'700',marginTop:5,marginBottom:16,lineHeight:15},
+  grid:{flexDirection:'row',gap:9,marginBottom:9},metric:{flex:1,minWidth:0,backgroundColor:'#0e1b2d',borderRadius:14,borderWidth:1,borderColor:'#233a56',padding:12},metricHeader:{flexDirection:'row',alignItems:'center',gap:6},label:{color:'#8194ad',fontSize:9,fontWeight:'900',letterSpacing:0.3},metricValue:{color:'#e5edf7',fontSize:15,fontWeight:'900',marginTop:6},
+  section:{color:'#7db3ff',fontSize:10,fontWeight:'900',letterSpacing:1,marginTop:18,marginBottom:8},filters:{flexDirection:'row',gap:8,marginBottom:3},filter:{flex:1,padding:11,borderRadius:10,borderWidth:1,borderColor:'#29415f',backgroundColor:'#0e1b2d',alignItems:'center'},filterActive:{backgroundColor:'#102743',borderColor:'#7db3ff'},filterText:{color:'#9fb3cd',fontSize:9,fontWeight:'900'},filterTextActive:{color:'#dbeafe'},
+  card:{backgroundColor:'#0e1b2d',borderRadius:14,borderWidth:1,borderColor:'#233a56',padding:13,marginBottom:9},cardHeader:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginBottom:13},tripDate:{color:'#e5edf7',fontSize:12,fontWeight:'900'},tripRange:{color:'#8196b4',fontSize:9,marginTop:4},chevron:{color:'#7db3ff',fontSize:26,fontWeight:'300',marginLeft:10},
+  stats:{flexDirection:'row',gap:8,marginBottom:10},stat:{flex:1,minWidth:0},statValue:{color:'#e5edf7',fontSize:12,fontWeight:'900',marginTop:5},tripFooter:{borderTopWidth:1,borderTopColor:'#233a56',paddingTop:10,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8},tripFooterText:{color:'#9fb3cd',fontSize:9},consumption:{color:'#e8b54b',fontSize:10,fontWeight:'900'},muted:{color:'#8196b4'},
   empty:{backgroundColor:'#0e1b2d',borderRadius:14,padding:18,borderWidth:1,borderColor:'#233a56'},emptyTitle:{color:'#e5edf7',fontSize:13,fontWeight:'900',marginBottom:7},emptyText:{color:'#9fb3cd',fontSize:10,lineHeight:16},
-  note:{backgroundColor:'#0b252e',borderRadius:12,padding:13,marginTop:8,borderWidth:1,borderColor:'#1b5b61'},noteTitle:{color:'#7debd7',fontSize:9,fontWeight:'900',marginBottom:6},noteText:{color:'#bad8dd',fontSize:10,lineHeight:16},
-  primary:{backgroundColor:'#176e70',borderRadius:12,padding:15,alignItems:'center',marginTop:13},primaryText:{color:'#f0fdfa',fontSize:10,fontWeight:'900',textAlign:'center'},back:{padding:15,alignItems:'center'},backInline:{alignSelf:'flex-start',paddingVertical:10,marginBottom:8},backText:{color:'#8de8db',fontSize:10,fontWeight:'900'},
-  hero:{backgroundColor:'#10363c',borderColor:'#247b7d',borderWidth:1,borderRadius:16,padding:18,marginBottom:4},heroLabel:{color:'#8de8db',fontSize:9,fontWeight:'900',letterSpacing:1},heroValue:{color:'#f0fdfa',fontSize:30,fontWeight:'900',marginTop:6},heroSub:{color:'#b7d9d9',fontSize:9,marginTop:8,lineHeight:15},
+  note:{backgroundColor:'#0b1829',borderRadius:12,padding:13,marginTop:8,borderWidth:1,borderColor:'#28415f'},noteTitle:{color:'#e8b54b',fontSize:9,fontWeight:'900',marginBottom:6},noteText:{color:'#b0c2d9',fontSize:10,lineHeight:16},
+  primary:{backgroundColor:'#2563eb',borderRadius:12,padding:15,alignItems:'center',marginTop:13},primaryText:{color:'#ffffff',fontSize:10,fontWeight:'900',textAlign:'center'},back:{padding:15,alignItems:'center'},backInline:{alignSelf:'flex-start',paddingVertical:10,marginBottom:8},backText:{color:'#7db3ff',fontSize:10,fontWeight:'900'},
+  hero:{backgroundColor:'#0f2035',borderColor:'#2d5278',borderWidth:1,borderRadius:16,padding:18,marginBottom:4},heroLabel:{color:'#7db3ff',fontSize:9,fontWeight:'900',letterSpacing:1},heroValue:{color:'#ffffff',fontSize:30,fontWeight:'900',marginTop:6},heroSub:{color:'#b0c2d9',fontSize:9,marginTop:8,lineHeight:15},
   detail:{flexDirection:'row',justifyContent:'space-between',alignItems:'flex-start',gap:12,paddingVertical:8,borderBottomWidth:1,borderBottomColor:'#20334b'},detailLabel:{color:'#9fb3cd',fontSize:10,flex:1},detailValue:{color:'#e5edf7',fontSize:10,fontWeight:'800',flex:1,textAlign:'right'},smallNote:{color:'#8196b4',fontSize:9,lineHeight:15,marginTop:10},
-  chart:{height:92,flexDirection:'row',alignItems:'flex-end',gap:3,paddingTop:8,paddingBottom:3},chartColumn:{flex:1,height:82,justifyContent:'flex-end',alignItems:'center'},chartBar:{width:'75%',minHeight:5,backgroundColor:'#55d6be',borderRadius:3},
+  chart:{height:92,flexDirection:'row',alignItems:'flex-end',gap:3,paddingTop:8,paddingBottom:3},chartColumn:{flex:1,height:82,justifyContent:'flex-end',alignItems:'center'},chartBar:{width:'75%',minHeight:5,backgroundColor:'#7db3ff',borderRadius:3},
 });
