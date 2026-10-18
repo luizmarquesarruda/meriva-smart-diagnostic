@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { AdaptiveText as Text } from '../src/ui/AdaptiveText';
+import { AppIcon } from '../src/ui/AppIcon';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMidLayout } from '../src/ui/midLayout';
 import * as FileSystem from 'expo-file-system';
@@ -149,19 +150,19 @@ export default function BluetoothScreen() {
         <View style={[styles.connectionGrid, layout.landscape && styles.connectionGridLandscape]}>
           <View style={[styles.connectionCard, layout.landscape && styles.connectionCardLandscape]}>
             <Text style={styles.label}>BLUETOOTH</Text>
-            <Text style={bluetoothConnected ? styles.online : styles.waiting}>{bluetoothConnected ? '🟢 CONECTADO' : '🟡 AGUARDANDO'}</Text>
+            <Text style={bluetoothConnected ? styles.online : styles.waiting}>{bluetoothConnected ? 'CONECTADO' : 'AGUARDANDO'}</Text>
             <Text style={styles.detail}>{bluetoothConnected ? (connectedName ?? 'ELM327') : status}</Text>
             <Text style={styles.detail}>ESTADO: {lifecycleLabel(lifecycle)}</Text>
           </View>
           <View style={[styles.connectionCard, layout.landscape && styles.connectionCardLandscape]}>
             <Text style={styles.label}>ELM327</Text>
             <Text style={lifecycle === 'READY' ? styles.online : styles.waiting}>
-              {lifecycle === 'READY' ? '🟢 PRONTO' : lifecycle === 'ELM_INITIALIZED' ? '🟢 INICIALIZADO' : lifecycle === 'ELM_RESPONDING' ? '🟢 RESPONDENDO' : lifecycle === 'BLUETOOTH_CONNECTED' ? '🟡 AGUARDANDO RESPOSTA' : '⚪ AGUARDANDO'}
+              {lifecycle === 'READY' ? 'PRONTO' : lifecycle === 'ELM_INITIALIZED' ? 'INICIALIZADO' : lifecycle === 'ELM_RESPONDING' ? 'RESPONDENDO' : lifecycle === 'BLUETOOTH_CONNECTED' ? 'AGUARDANDO RESPOSTA' : 'AGUARDANDO'}
             </Text>
           </View>
           <View style={[styles.connectionCard, layout.landscape && styles.connectionCardLandscape]}>
             <Text style={styles.label}>ECU</Text>
-            <Text style={ecuConnected ? styles.online : styles.waiting}>{ecuConnected ? '🟢 CONECTADA' : ecuResponseState === 'NO_RESPONSE' ? '🟠 SEM RESPOSTA' : ecuResponseState === 'RECOVERING' ? '🟡 RECUPERANDO' : connectedName ? '🟡 CONECTANDO' : '⚪ AGUARDANDO'}</Text>
+            <Text style={ecuConnected ? styles.online : styles.waiting}>{ecuConnected ? 'CONECTADA' : ecuResponseState === 'NO_RESPONSE' ? 'SEM RESPOSTA' : ecuResponseState === 'RECOVERING' ? 'RECUPERANDO' : connectedName ? 'CONECTANDO' : 'AGUARDANDO'}</Text>
           </View>
           <View style={[styles.connectionCard, layout.landscape && styles.connectionCardLandscape]}>
             <Text style={styles.label}>SAÚDE DO ELM327</Text>
@@ -225,12 +226,12 @@ export default function BluetoothScreen() {
         <View style={styles.bottomNav}>
           <Link href="/" asChild>
             <TouchableOpacity style={styles.bottomItem}>
-              <Text style={styles.bottomIcon}>🚗</Text>
+              <AppIcon name="vehicle" size={20} color="#e8b54b" />
               <Text style={styles.bottomText}>CARRO</Text>
             </TouchableOpacity>
           </Link>
           <TouchableOpacity style={[styles.bottomItem, styles.bottomActive]}>
-            <Text style={styles.bottomIcon}>🔵</Text>
+            <AppIcon name="bluetooth" size={20} color="#7db3ff" />
             <Text style={styles.bottomActiveText}>BLUETOOTH</Text>
           </TouchableOpacity>
         </View>
