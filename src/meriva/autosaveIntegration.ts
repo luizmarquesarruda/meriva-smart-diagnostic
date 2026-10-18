@@ -18,7 +18,6 @@ import pollingPolicy from '../knowledge/polling_policy.json';
 const lastLearningPersistedAt = new Map<string, number>();
 const lastSqliteSampleQueuedAt = new Map<string, number>();
 const SQLITE_SAMPLE_INTERVAL_MS = 5_000;
-let sqliteSamplePersistenceQueue: Promise<void> = Promise.resolve();
 
 function queueSqlitePidSample(sample: {
   pid: string; name: string; value: number; unit: string; status: string;
@@ -29,14 +28,12 @@ function queueSqlitePidSample(sample: {
   const previous = lastSqliteSampleQueuedAt.get(key);
   if (previous !== undefined && now - previous < SQLITE_SAMPLE_INTERVAL_MS) return;
   lastSqliteSampleQueuedAt.set(key, now);
-  // Fila independente: nenhuma escrita SQLite aguarda o próximo comando ELM327.
-  sqliteSamplePersistenceQueue = sqliteSamplePersistenceQueue
-    .catch(() => undefined)
-    .then(() => recordPidSampleLazy(sample).then(() => undefined))
-    .catch((cause) => {
-      console.warn('[sqlite] amostra OBD não foi indexada; logs JSON/CSV continuam disponíveis:',
-        cause instanceof Error ? cause.message : cause);
-    });
+  // A camada SQLite aplica o limite comum de gravações pendentes e serializa
+  // o acesso ao banco; esta chamada não aguarda nem bloqueia o próximo comando ELM327.
+  void recordPidSampleLazy(sample).catch((cause) => {
+    console.warn('[sqlite] amostra OBD não foi indexada; logs JSON/CSV continuam disponíveis:',
+      cause instanceof Error ? cause.message : cause);
+  });
 }
 const LEARNING_SAMPLE_MIN_INTERVAL_MS = pollingPolicy.learningSampleMinIntervalMs;
 

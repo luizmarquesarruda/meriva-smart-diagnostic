@@ -2654,3 +2654,29 @@ A persistência estruturada ainda não existia no aplicativo; JSON/TXT funcionav
 1. Executar e acompanhar a CI canônica; corrigir erros reais de typecheck/testes/Gradle.
 2. Remover o workflow temporário de sincronização de lockfile após confirmar que `package-lock.json` contém todas as dependências.
 3. Validar banco nativo e charts no APK standalone. Depois disso, planejar importação idempotente dos históricos existentes, sem trocar o JSON como fonte de recuperação antes da validação.
+
+
+## 2026-10-17 — Correção preventiva: fila SQLite de amostras limitada
+
+### Problema
+A integração OBD encadeava as amostras numéricas em uma Promise queue local sem limite explícito. O throttle por PID reduzia o ritmo, mas não impedia acúmulo se a escrita no armazenamento ficasse mais lenta que a produção de amostras. Essa fila também ficava fora da métrica de pendências da tela de armazenamento.
+
+### Diagnóstico
+A tabela `telemetry_samples` já aplicava o limite de `maxPendingWrites`, porém `pid_samples` tinha outro caminho de entrada. Como ambos escrevem no mesmo `writeQueue` serial interno do SQLite, a fila anterior de `autosaveIntegration` era redundante e podia acumular Promises antes de o limite do repositório ter efeito.
+
+### Correção
+- Removida a Promise queue sem limite de `autosaveIntegration.ts`; a chamada de persistência continua assíncrona e não bloqueia a próxima consulta serial do ELM327.
+- O repositório SQLite agora contabiliza as consultas OBD e as amostras PID pendentes sob o mesmo limite configurado.
+- Quando a fila alcança o limite, a amostra adicional é descartada apenas do índice SQLite secundário; JSON/TXT/CSV permanecem independentes.
+- A saúde do banco mostra pendências e descartes combinados.
+- `sqlite_policy.json` foi alinhado ao schema implementado (versão 2).
+
+### Testes adicionados
+- Verificação da correspondência entre a versão declarada na política e a versão do schema.
+- Rajada concorrente que aceita até o limite configurado, rejeita excedentes e verifica que pendências/descartes retornam valores coerentes.
+
+### Estado antes da CI
+Os arquivos de teste foram alterados, mas os comandos `npm ci`, `npm run validate`, Expo Doctor, prebuild e Gradle **ainda não foram executados neste ambiente**. A CI da PR deverá confirmar o resultado; o mock SQLite não substitui validação nativa em aparelho.
+
+### Próximo passo
+Executar a CI para a nova cabeça da PR #69 e inspecionar os logs de `validate` e `android-build`. Se algum job falhar, registrar a causa observada antes de outra correção.

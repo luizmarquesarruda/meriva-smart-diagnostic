@@ -204,7 +204,9 @@ let databasePromise: Promise<SQLiteDatabase> | null = null;
 let writeQueue: Promise<void> = Promise.resolve();
 let databaseRetryAfterMs = 0;
 let pendingTelemetryWrites = 0;
+let pendingPidSampleWrites = 0;
 let droppedTelemetrySamples = 0;
+let droppedPidSamples = 0;
 let lastQueueFullWarningAt = 0;
 let lastDatabaseError: string | null = null;
 let lastDatabaseErrorLogAt = 0;
@@ -319,12 +321,12 @@ export async function recordTelemetryQuery(
   sessionId: string | null = null,
 ): Promise<boolean> {
   if (!sqlitePolicy.enabled) return false;
-  if (pendingTelemetryWrites >= MAX_PENDING_SQLITE_WRITES) {
+  if (pendingTelemetryWrites + pendingPidSampleWrites >= MAX_PENDING_SQLITE_WRITES) {
     droppedTelemetrySamples += 1;
     const now = Date.now();
     if (now - lastQueueFullWarningAt >= sqlitePolicy.writeQueue.warningThrottleMs) {
       lastQueueFullWarningAt = now;
-      console.warn('[sqlite] fila secundária cheia; amostras omitidas:', droppedTelemetrySamples);
+      console.warn('[sqlite] fila secundária cheia; amostras omitidas:', droppedTelemetrySamples + droppedPidSamples);
     }
     return false;
   }
@@ -375,26 +377,44 @@ export async function recordPidSample(sample: PidSampleInput): Promise<number | 
   const timestampUtc = toUtc(sample.timestamp);
   if (!pid || !timestampUtc || !isDataSource(sample.source)) return null;
   if (sample.value !== null && !Number.isFinite(sample.value)) return null;
-  const db = await initializeDiagnosticDatabase();
-  return enqueueWrite(async () => {
-    const result = await db.runAsync(
-      `INSERT INTO pid_samples
-        (pid, name, value, unit, status, source, observed_at_utc, observed_at_local, session_id, raw_response, created_at_utc)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      pid,
-      sample.name || pid,
-      sample.value,
-      sample.unit || 'N/D',
-      sample.status || 'N/D',
-      sample.source,
-      timestampUtc,
-      toLocal(timestampUtc) ?? timestampUtc,
-      sample.sessionId ?? null,
-      sample.rawResponse ?? null,
-      new Date().toISOString(),
-    );
-    return result.lastInsertRowId;
-  });
+
+  // Count before the first await so bursts of concurrent callers cannot exceed
+  // the shared high-frequency queue capacity. JSON/TXT/CSV remain authoritative.
+  if (pendingTelemetryWrites + pendingPidSampleWrites >= MAX_PENDING_SQLITE_WRITES) {
+    droppedPidSamples += 1;
+    const now = Date.now();
+    if (now - lastQueueFullWarningAt >= sqlitePolicy.writeQueue.warningThrottleMs) {
+      lastQueueFullWarningAt = now;
+      console.warn('[sqlite] fila secundária cheia; amostras omitidas:', droppedTelemetrySamples + droppedPidSamples);
+    }
+    return null;
+  }
+
+  pendingPidSampleWrites += 1;
+  try {
+    const db = await initializeDiagnosticDatabase();
+    return await enqueueWrite(async () => {
+      const result = await db.runAsync(
+        `INSERT INTO pid_samples
+          (pid, name, value, unit, status, source, observed_at_utc, observed_at_local, session_id, raw_response, created_at_utc)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        pid,
+        sample.name || pid,
+        sample.value,
+        sample.unit || 'N/D',
+        sample.status || 'N/D',
+        sample.source,
+        timestampUtc,
+        toLocal(timestampUtc) ?? timestampUtc,
+        sample.sessionId ?? null,
+        sample.rawResponse ?? null,
+        new Date().toISOString(),
+      );
+      return result.lastInsertRowId;
+    });
+  } finally {
+    pendingPidSampleWrites = Math.max(0, pendingPidSampleWrites - 1);
+  }
 }
 
 /** Throttle only history sampling; live values remain updated in the existing in-memory telemetry cache. */
@@ -405,8 +425,8 @@ export async function recordLivePidSample(sample: PidSampleInput, nowMs = Date.n
   const timestamp = parseTimestamp(sample.timestamp);
   if (!timestamp || !Number.isFinite(sample.value) || !isDataSource(sample.source)) return false;
   lastLiveSampleAt.set(key, nowMs);
-  await recordPidSample(sample);
-  return true;
+  const savedId = await recordPidSample(sample);
+  return savedId !== null;
 }
 
 export async function readPidHistory(
@@ -613,8 +633,8 @@ export async function getDiagnosticDatabaseHealth(): Promise<DiagnosticDatabaseH
     dtcRecordCount: null as number | null,
     tripCount: null as number | null,
     sensorTestRunCount: null as number | null,
-    pendingWrites: pendingTelemetryWrites,
-    droppedSamples: droppedTelemetrySamples,
+    pendingWrites: pendingTelemetryWrites + pendingPidSampleWrites,
+    droppedSamples: droppedTelemetrySamples + droppedPidSamples,
     maxPendingWrites: MAX_PENDING_SQLITE_WRITES,
     lastError: lastDatabaseError,
   };
@@ -648,7 +668,7 @@ export async function getDiagnosticDatabaseHealth(): Promise<DiagnosticDatabaseH
       dtcRecordCount,
       tripCount,
       sensorTestRunCount,
-      lastError: droppedTelemetrySamples > 0 ? 'SQLITE_WRITE_QUEUE_FULL' : lastDatabaseError,
+      lastError: droppedTelemetrySamples + droppedPidSamples > 0 ? 'SQLITE_WRITE_QUEUE_FULL' : lastDatabaseError,
     };
   } catch {
     return { ...base, lastError: lastDatabaseError ?? 'SQLITE_UNAVAILABLE' };
@@ -662,7 +682,9 @@ export function resetDiagnosticDatabaseForTests(): void {
   lastLiveSampleAt.clear();
   databaseRetryAfterMs = 0;
   pendingTelemetryWrites = 0;
+  pendingPidSampleWrites = 0;
   droppedTelemetrySamples = 0;
+  droppedPidSamples = 0;
   lastQueueFullWarningAt = 0;
   lastDatabaseError = null;
   lastDatabaseErrorLogAt = 0;

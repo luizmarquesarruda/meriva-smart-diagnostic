@@ -7,6 +7,7 @@ const Module = require('module');
 const ts = require('typescript');
 
 const ROOT = path.resolve(__dirname, '..');
+const sqlitePolicy = JSON.parse(fs.readFileSync(path.join(ROOT, 'src/knowledge/sqlite_policy.json'), 'utf8'));
 const compiled = new Map();
 const sqlCalls = [];
 const execCalls = [];
@@ -100,6 +101,7 @@ async function main() {
   assert.ok(execCalls.some(sql => sql.includes('CREATE TABLE IF NOT EXISTS sensor_test_runs')));
   assert.ok(execCalls.some(sql => sql.includes('CREATE TABLE IF NOT EXISTS telemetry_samples')));
   assert.strictEqual(schemaVersion, 2, 'schema migration v2 must be recorded');
+  assert.strictEqual(sqlitePolicy.schemaVersion, dbModule.DIAGNOSTIC_DATABASE_SCHEMA_VERSION, 'policy and implementation schema versions must agree');
 
   const rawQueryStored = await dbModule.recordTelemetryQuery({
     commandStatus: 'TIMEOUT',
@@ -203,6 +205,31 @@ async function main() {
   await dbModule.initializeDiagnosticDatabase();
   assert.strictEqual(schemaVersion, 2, 'an existing v1 database should migrate to v2');
   assert.ok(execCalls.some(sql => sql.includes('CREATE TABLE IF NOT EXISTS telemetry_samples')));
+
+  // Concurrent bursts must not create an unbounded second queue for PID samples.
+  const maxPendingWrites = sqlitePolicy.writeQueue.maxPendingWrites;
+  const priorPidInsertCount = sqlCalls.filter(call => /INSERT INTO pid_samples/i.test(call.sql)).length;
+  const burst = await Promise.all(Array.from({ length: maxPendingWrites + 25 }, (_, index) =>
+    dbModule.recordPidSample({
+      pid: index % 2 ? '010C' : '0105',
+      name: 'Burst sample',
+      value: index,
+      unit: 'test',
+      status: 'RESPONDEU',
+      source: 'REAL_OBD',
+      timestamp: '2026-10-17T12:02:00.000Z',
+    })
+  ));
+  const accepted = burst.filter(value => value !== null).length;
+  const rejected = burst.filter(value => value === null).length;
+  assert.strictEqual(accepted, maxPendingWrites, 'only the configured maximum may be pending in a burst');
+  assert.strictEqual(rejected, 25, 'overflow samples should be dropped from the secondary SQLite index');
+  const pidInsertCountAfterBurst = sqlCalls.filter(call => /INSERT INTO pid_samples/i.test(call.sql)).length;
+  assert.strictEqual(pidInsertCountAfterBurst - priorPidInsertCount, maxPendingWrites, 'only accepted samples should be written');
+  const healthAfterBurst = await dbModule.getDiagnosticDatabaseHealth();
+  assert.strictEqual(healthAfterBurst.pendingWrites, 0, 'all queued writes should be settled after Promise.all');
+  assert.strictEqual(healthAfterBurst.droppedSamples, 25, 'dropped secondary samples should be observable in health metrics');
+  assert.strictEqual(healthAfterBurst.maxPendingWrites, maxPendingWrites);
   console.log('SQLite database repository contract: OK (mocked Expo SQLite API; native device database not exercised)');
 }
 
