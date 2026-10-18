@@ -2863,3 +2863,11 @@ A página de testes utilizava apenas 30 regras, apesar de `src/knowledge/pids.js
 
 ### Próximo passo
 Executar `npm run validate` após autorização. Depois conectar a ECU real, salvar o relatório TXT e verificar quais PIDs são anunciados/respondem. Comparar os agregados com o perfil de aprendizado persistido e investigar respostas intermitentes antes de considerar um PID apto para outras regras de diagnóstico.
+
+
+### Complemento de auditoria — contrato de aprendizado e conclusão por PID
+- A validação local da IA passou também a inspecionar `pid_learning_policy.json`, incluindo coleta sequencial, limite de oito tentativas, agregação contínua/discreta e origem exclusivamente `REAL_OBD`.
+- As rodadas terminam assim que cada PID atinge cinco respostas válidas ou esgota as oito tentativas; não há consultas extras em rodadas vazias. PIDs incompletos não entram no aprendizado, enquanto PIDs concluídos podem ser agregados mesmo em relatório parcial.
+- A persistência da coleta preserva o estado e a proveniência de uma confirmação manual anterior; a repetibilidade de cinco respostas não promove novos PIDs a confirmados.
+- Verificação estática final: cobertura única 34/34; mínimo 5, máximo 8; coleta em rodízio; agregação média/moda; perfil local atualizado apenas para PIDs com cinco respostas válidas; testes e mensagens antigas de três leituras atualizados.
+- Nenhuma suíte automatizada foi executada e nenhuma CI foi disparada.
