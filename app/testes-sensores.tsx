@@ -66,7 +66,7 @@ export default function TestesSensoresScreen(){
   cancelled.current=false;setRunning(true);setCompleted(false);setAborted(false);setCommandProgress(0);setPlannedReads(0);setTestPlan([]);setSamples([]);setError('');setSavedPath('');setRound(0);setCurrentPid('');setMessage('Preparando a varredura e estimando o tempo…');
   runStartedAt.current=Date.now();commandsDone.current=0;commandElapsedTotal.current=0;
   const active=getSharedObdConnection(),activeStatus=getSharedObdStatus();connectedAtStart.current=Boolean(active?.ecuValidated&&activeStatus.ecuConnected);
-  const plan=createSensorTestPlan(active?.supportedPids??[],pid=>Boolean(getPidDefinition(pid))),expectedReads=plan.length*MIN_SENSOR_TEST_READINGS,expectedCommands=expectedReads+1;
+  const plan=createSensorTestPlan(active?.supportedPids??[],pid=>Boolean(getPidDefinition(pid))),expectedReads=plan.length*MAX_SENSOR_TEST_ATTEMPTS,expectedCommands=expectedReads+1;
   setTestPlan(plan);setPlannedReads(expectedReads);setCommandPlan(expectedCommands);setCommandProgress(0);updateCountdown(expectedCommands);
   if(!active?.ecuValidated||!activeStatus.ecuConnected){setError('ECU não validada. Conecte pelo módulo Bluetooth/ELM327 antes de testar.');setMessage('Teste não iniciado: ECU sem resposta válida.');setRunning(false);setAborted(true);setCountdownMs(0);return;}
   if(!supported.has('010C')){setError('A ECU não anunciou o PID 010C (RPM), obrigatório para verificar a condição do motor. Nenhum teste iniciado.');setMessage('Teste não iniciado: condição do motor não validada.');setRunning(false);setAborted(true);setCountdownMs(0);return;}
