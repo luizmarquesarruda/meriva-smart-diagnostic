@@ -46,7 +46,7 @@ function main() {
   assert.strictEqual(typeof diagnosticRules.version, 'number');
   assert.strictEqual(typeof sensorTests.schemaVersion, 'number');
   assert.strictEqual(sensorTests.catalogId, 'MERIVA_SMART_SENSOR_TESTS');
-  assert.strictEqual(sensorTests.minimumReadingsPerPid, 3, 'cada PID suportado exige três tentativas');
+  assert.strictEqual(sensorTests.minimumReadingsPerPid, 5, 'cada PID suportado exige cinco respostas válidas');
   assert.ok(Array.isArray(sensorTests.tests) && sensorTests.tests.length > 0, 'catálogo de testes vazio');
   assert.ok(Array.isArray(sensorTests.sources) && sensorTests.sources.length >= 5, 'fontes pesquisadas ausentes');
   assert.strictEqual(typeof dtcCatalog.version, 'number');
