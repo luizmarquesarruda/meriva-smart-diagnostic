@@ -12,7 +12,7 @@ import { getAutoSaveState, getAutoSaveStatus, initAutoSave } from '../src/meriva
 import { exportAutoSaveTxt, exportDailyObdHistoryTxt } from '../src/meriva/exportAutoSaveTxt';
 import { exportBluetoothDiagnosticTxt } from '../src/obd/exportBluetoothDiagnosticTxt';
 import { AppSettings, readAppSettings, writeAppSettings } from '../src/database/appSettings';
-import { AppIconBadge } from '../src/ui/AppIcon';
+import { AppIcon, AppIconBadge } from '../src/ui/AppIcon';
 import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
 import { getMidLayout } from '../src/ui/midLayout';
 
@@ -120,7 +120,7 @@ export default function ConfiguracaoScreen() {
 
       {settings && (
         <>
-          <Text style={styles.section}>PREFERÊNCIAS BÁSICAS</Text>
+          <View style={styles.sectionHeader}><AppIcon name="fuel" size={16} color="#e8b54b" /><Text style={[styles.section, styles.sectionText]}>PREFERÊNCIAS BÁSICAS</Text></View>
           <View style={styles.card}>
             <Text style={styles.label}>Combustível</Text>
             <View style={styles.row}>
@@ -160,7 +160,7 @@ export default function ConfiguracaoScreen() {
           <SettingSwitch label="Inicialização forçada do ELM (ATZ + ATE0)" value={settings.elmForceInitialization} onChange={(v) => void updateSetting('elmForceInitialization', v)} />
           <SettingSwitch label="Alertas de diagnóstico" value={settings.diagnosticAlerts} onChange={(v) => void updateSetting('diagnosticAlerts', v)} />
 
-          <Text style={styles.section}>PAINEL E ACESSIBILIDADE</Text>
+          <View style={styles.sectionHeader}><AppIcon name="dashboard" size={16} color="#e8b54b" /><Text style={[styles.section, styles.sectionText]}>PAINEL E ACESSIBILIDADE</Text></View>
           <View style={styles.card}>
             <Text style={styles.label}>Indicador principal do painel</Text>
             <Text style={styles.note}>Escolha o dado que aparece em destaque. Velocidade não é obrigatória e fica oculta por padrão.</Text>
@@ -190,7 +190,7 @@ export default function ConfiguracaoScreen() {
           <SettingSwitch label="Manter tela ligada enquanto o aplicativo estiver aberto" value={settings.keepScreenAwake} onChange={(v) => void updateSetting('keepScreenAwake', v)} />
           <SettingSwitch label="Animações suaves da interface" value={settings.animationsEnabled} onChange={(v) => void updateSetting('animationsEnabled', v)} />
 
-          <Text style={styles.section}>COMPATIBILIDADE ELM327</Text>
+          <View style={styles.sectionHeader}><AppIcon name="bluetooth" size={16} color="#e8b54b" /><Text style={[styles.section, styles.sectionText]}>COMPATIBILIDADE ELM327</Text></View>
           <View style={styles.card}>
             <Text style={styles.label}>Tempo de espera de entrada/saída</Text>
             <View style={styles.row}>
@@ -280,7 +280,7 @@ export default function ConfiguracaoScreen() {
         </>
       )}
 
-      <Text style={styles.section}>DADOS E MANUTENÇÃO</Text>
+      <View style={styles.sectionHeader}><AppIcon name="database" size={16} color="#e8b54b" /><Text style={[styles.section, styles.sectionText]}>DADOS E MANUTENÇÃO</Text></View>
       <Text style={styles.info}>VERSÃO: {appVersion}</Text>
       
       <Text style={styles.info}>SALVAMENTO AUTOMÁTICO: ATIVO</Text>
@@ -331,6 +331,8 @@ const styles = StyleSheet.create({
   pageHeaderCopy: { flex: 1, minWidth: 0 },
   pageSubtitle: { color: '#8da2bd', fontSize: 10, fontWeight: '800', marginTop: 3, letterSpacing: 0.6 },
   title: { fontSize: 23, fontWeight: '900', color: '#7db3ff', letterSpacing: 0.5, marginBottom: 2 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16, marginBottom: 8 },
+  sectionText: { marginTop: 0, marginBottom: 0, flexShrink: 1 },
   section: { fontSize: 12, fontWeight: '900', color: '#7db3ff', letterSpacing: 0.8, marginTop: 16, marginBottom: 8 },
   status: { color: '#2563eb', fontWeight: '700', marginBottom: 12 },
   card: { backgroundColor: '#111c2e', borderRadius: 8, padding: 11, marginBottom: 9, borderWidth: 1, borderColor: '#243652' },
