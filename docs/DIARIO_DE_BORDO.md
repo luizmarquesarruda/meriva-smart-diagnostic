@@ -2727,3 +2727,43 @@ Modernizar os ícones do cockpit e dos menus, adotando uma linguagem visual auto
 
 ### Próximo passo
 Revisar o resultado visual no Android em retrato/paisagem e executar `npm ci --no-audit --no-fund`, `npm run doctor` e `npm run validate` somente quando o usuário autorizar fechar a rodada de alterações.
+
+
+## 2026-10-18 — Reavaliação do layout e aplicação dos ícones modernos
+
+### Problema
+O catálogo de ícones já existia, mas sua adoção não estabelecia uma hierarquia consistente em todas as áreas. O cockpit mantinha poucos atalhos operacionais, a página Mais Recursos era uma lista vertical e o Laboratório OBD destoava da paleta escura aplicada no restante do aplicativo.
+
+### Diagnóstico
+- O indicador principal precisava comunicar o tipo de dado por ícone sem perder valor, unidade, fonte e estado da leitura.
+- Saúde do Veículo precisava ser um atalho funcional, e não apenas mais uma caixa de status.
+- Os principais módulos não compartilhavam um padrão de cabeçalho e emblema.
+- O Laboratório OBD mantinha cartões brancos/cores de texto da paleta antiga, criando quebra de identidade visual.
+- A seleção de cores do AppIconBadge estava condicionada a comparar diretamente um único código hexadecimal, inadequado para estados além de azul e dourado.
+
+### Correção implementada
+- Cockpit: ícone contextual no indicador rotativo; atalho de Saúde navegável; cartões rápidos para Dados ao Vivo e Testes de Sensores; acesso explícito a Todos os Recursos.
+- Mais Recursos: grade responsiva de cartões em duas colunas com ícone, título, descrição curta e seta.
+- Cabeçalhos com emblema vetorial adicionados ou alinhados em Saúde, Dados ao Vivo, Veículo, Aprendizado, Bluetooth, Configurações, Histórico, Viagens e Diagnóstico OBD.
+- Laboratório OBD: paleta alinhada ao cockpit e ícones nas ações de conexão, consulta PID, descoberta de PIDs e varredura de DTC.
+- AppIconBadge: tons semânticos azul, dourado, sucesso, aviso e falha; a saúde do veículo usa o tom correspondente ao estado.
+- Criado `docs/REAVALIACAO_LAYOUT_ICONES_2026-10-18.md` com as decisões de UX, paleta e limitações de validação.
+- Atualizado `tests/appIconCatalog.test.js` para cobrir estados de emblema e requisitos centrais do layout.
+
+### Testes e verificações
+- Verificação estrutural via conector: os ícones literais encontrados nos arquivos alterados correspondem ao catálogo; nenhuma referência literal de estilo sem definição foi encontrada nos arquivos verificados.
+- Foram conferidos os marcadores de layout, ícones e cabeçalhos esperados. Esta verificação não equivale a compilar TypeScript nem executar a suíte Node.
+- **NÃO EXECUTADOS:** `npm ci`, `npm test`, TypeScript, Expo Doctor, prebuild/Gradle/APK e inspeção em dispositivo Android.
+- **CI: NÃO DISPARADA**, conforme orientação de consolidar as mudanças antes de iniciar validação.
+
+### Commits da rodada
+- Cockpit: `5bbab2c13de5ac027b7a57faa6304261ad6cace1` e correção de tom semântico `a9bf7dc5db55d0aff0581015c845a60f11e304fc`.
+- Recursos: `71b6319b89e36d0e16ed7ea999896fa892fd1b4e`.
+- Cabeçalhos: Saúde `65ee70a212e7b332f11f4c2a16ec82b6c5dc0b6d`; Dados `043a1abd2a9b63f872d04cc0763f13072e45b80f`; Veículo `c302fc0d1a2865912017a09f4ceb16131d219916`; Aprendizado `1112851ae838d62936fa5e3e980a066430b9a3fb`; Bluetooth `dfe664ce337662c13214ce9c060b67f20fc34618`; Configurações `c4d1a0bbcfcbd4e3f598cda0a9f9a1379b297175`; Histórico `36980058735220dd40a4073f1fa08893384df4e4`; Viagens `237bdc3c2980fd1126a400b3fe00a9d000c3875b`.
+- Laboratório OBD: `aa3324dd6ae06f48f5e4948de07537bb86e0e593`.
+- Biblioteca de ícones: `a3d2f6d6ef68087293f12c67d35939d3d961fdcf`.
+- Contratos de teste atualizados: `4ad130c08c04e958665b3286aebe92b7d5cbe1a2`.
+- Documento de revisão: `f56aef51da8b8a76265ba03b60b047dd8c6e2033`.
+
+### Resultado e próximo passo
+As alterações de interface foram registradas na branch `feat/cockpit-layout-refresh-20261018`, sem merge para `main` e sem execução de CI. Antes de considerar o layout aprovado, conferir compilação TypeScript, suíte de testes, build Android e comportamento visual em retrato/paisagem; dar atenção especial à altura disponível do cockpit em telas menores, à leitura dos cartões e ao comportamento sem rolagem.
