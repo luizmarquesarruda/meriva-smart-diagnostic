@@ -77,8 +77,9 @@ export function validateAiKnowledgeCatalogs(): AiKnowledgeValidationResult {
     }
   }
 
+  const pidDefinitions = (pidCatalog as unknown as { pids?: Array<{ pid?: string; name?: string }> }).pids;
   const ruleIds = new Set(Array.isArray(ruleItems) ? ruleItems.map((rule) => rule.id).filter((id): id is string => typeof id === 'string') : []);
-  const sensorTests = (sensorTestsCatalog as unknown as { tests?: Array<{ id?: string; diagnosticRuleIds?: string[] }> }).tests;
+  const sensorTests = (sensorTestsCatalog as unknown as { schemaVersion?: number; minimumReadingsPerPid?: number; tests?: Array<{ id?: string; pid?: string; diagnosticRuleIds?: string[]; minimumReadings?: number }> }).tests;
   if (!Array.isArray(sensorTests)) {
     errors.push('sensor_tests.json: propriedade tests ausente ou inválida');
   } else {
