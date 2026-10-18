@@ -273,6 +273,20 @@ export class Elm327Session {
     return this.enqueueCommand(() => this.command(normalized));
   }
 
+  /**
+   * Reserva a fila serial durante uma sequência diagnóstica inteira.
+   * O callback deve usar somente o executor recebido, nunca chamar executeCommand
+   * no mesmo session por dentro do lock (isso criaria deadlock).
+   */
+  async withExclusiveCommandSession<T>(
+    operation: (executeCommand: (command: string) => Promise<ElmCommandResult>) => Promise<T>,
+  ): Promise<T> {
+    await this.initialize();
+    return this.enqueueCommand(() => operation(async (command: string) => {
+      return this.command(normalizeCommand(command));
+    }));
+  }
+
   async close(): Promise<void> {
     const initialization = this.initializationPromise;
     if (initialization) {
