@@ -24,7 +24,9 @@ assert.equal(
   'package-lock must contain the pinned icon package',
 );
 assert.ok(iconModule.includes("from 'lucide-react-native'"));
-assert.ok(iconModule.includes("color === '#e8b54b'"), 'gold accent should remain available for Meriva-themed highlights');
+assert.ok(iconModule.includes("type AppIconBadgeTone"), 'badge colors should use named semantic tones');
+assert.ok(iconModule.includes("success: { borderColor: '#28613e'"), 'healthy status should use a dedicated success palette');
+assert.ok(iconModule.includes("danger: { borderColor: '#713043'"), 'fault status should use a dedicated danger palette');
 
 const requiredIconMappings = [
   'vehicle: Car',
@@ -48,8 +50,20 @@ const screens = [
   ['app/saude.tsx', ['AppIcon name="diagnostics"']],
   ['app/veiculo.tsx', ['AppIcon name="bluetooth"']],
   ['app/dados.tsx', ['AppIcon name="sensors"']],
-  ['app/aprendizado.tsx', ['AppIcon name="health"']],
+  ['app/aprendizado.tsx', ['AppIcon name="health"', 'AppIconBadge name="learning"']],
+  ['app/laboratorio.tsx', ['AppIconBadge name="diagnostics"', 'name="bluetooth"', 'name="radio"', "backgroundColor: '#07111f'"]],
+  ['app/configuracoes.tsx', ['AppIconBadge name="settings"', 'PAINEL • CONEXÃO • ARMAZENAMENTO']],
+  ['app/armazenamento.tsx', ['AppIconBadge name="history"', 'HISTÓRICO E DADOS']],
+  ['app/viagens.tsx', ['AppIconBadge name="trips"', 'RELATÓRIO DE VIAGENS']],
 ];
+
+const cockpit = read('app/index.tsx');
+assert.ok(cockpit.includes('selectedHeroMetric.icon'), 'primary indicator should show its contextual icon');
+assert.ok(cockpit.includes('DADOS AO VIVO') && cockpit.includes('TESTES DE SENSORES'), 'cockpit should expose high-frequency shortcuts');
+assert.ok(cockpit.includes('accessibilityLabel="Abrir saúde do veículo e revisar evidências"'), 'health summary should be a clear, accessible action');
+
+const resources = read('app/mais.tsx');
+assert.ok(resources.includes("width: '48%'") && resources.includes('tileTopRow'), 'resource page should use responsive icon tiles');
 
 for (const [file, requiredSnippets] of screens) {
   const source = read(file);
