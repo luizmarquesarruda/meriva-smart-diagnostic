@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "policyId": "MERIVA_EXTENDED_OBD_DISCOVERY_V1",
+  "services": {
+    "mode06": {
+      "purpose": "Discover supported OBDMIDs and preserve raw bitmap responses",
+      "probeCommands": ["0600", "0620", "0640", "0660", "0680", "06A0", "06C0", "06E0"],
+      "decodeIndividualMonitorResults": false
+    },
+    "mode09": {
+      "purpose": "Discover supported vehicle information types and preserve raw responses",
+      "safeInfoTypes": ["01", "03", "04", "05", "06", "07", "0A"],
+      "excludedInfoTypes": ["02"],
+      "probeCommands": ["0900", "0920", "0940", "0960", "0980", "09A0", "09C0", "09E0"]
+    }
+  },
+  "acquisition": {
+    "sequentialOnly": true,
+    "followContinuationBitmapOnly": true,
+    "parallelRequests": false,
+    "sourceRequired": "REAL_OBD"
+  },
+  "persistence": {
+    "format": "JSON",
+    "preserveRawCommandAndResponse": true,
+    "preserveElapsedMs": true,
+    "preserveProtocol": true,
+    "storeOnlyCurrentSessionReport": true
+  },
+  "safety": {
+    "neverClearDtc": true,
+    "neverRequestExcludedInfoTypes": true,
+    "mode06IndividualParserRequiredBeforeDecoding": true,
+    "noResponseDoesNotMeanSensorFailure": true
+  }
+}
