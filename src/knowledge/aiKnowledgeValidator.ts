@@ -90,6 +90,27 @@ export function validateAiKnowledgeCatalogs(): AiKnowledgeValidationResult {
     }
   }
 
+  if (!Array.isArray(pidDefinitions)) {
+    errors.push('pids.json: propriedade pids ausente ou inválida');
+  } else {
+    if (pidDefinitions.length !== 34) errors.push('pids.json: o catálogo local precisa conter os 34 PIDs previstos');
+    const sensorPidIds = new Set((Array.isArray(sensorTests) ? sensorTests : [])
+      .map((test) => test.pid)
+      .filter((pid): pid is string => typeof pid === 'string'));
+    for (const pid of pidDefinitions) {
+      if (typeof pid.pid !== 'string' || !sensorPidIds.has(pid.pid)) {
+        errors.push('sensor_tests.json: falta avaliação/buffer para o PID ' + String(pid.pid ?? 'sem ID'));
+      }
+    }
+    if (sensorPidIds.size !== pidDefinitions.length) errors.push('sensor_tests.json: a cobertura do catálogo não coincide com os PIDs padronizados');
+  }
+  const sensorCatalogPolicy = sensorTestsCatalog as unknown as { minimumReadingsPerPid?: number; maximumAttemptsPerPid?: number; tests?: Array<{ minimumReadings?: number }> };
+  if (sensorCatalogPolicy.minimumReadingsPerPid !== 5) errors.push('sensor_tests.json: política de coleta exige cinco respostas válidas por PID');
+  if (sensorCatalogPolicy.maximumAttemptsPerPid !== 8) errors.push('sensor_tests.json: limite de tentativas deve permitir recuperar amostras sem resposta');
+  if (Array.isArray(sensorCatalogPolicy.tests) && sensorCatalogPolicy.tests.some((test) => test.minimumReadings !== 5)) {
+    errors.push('sensor_tests.json: cada PID deve exigir cinco respostas válidas');
+  }
+
   cachedResult = { valid: errors.length === 0, errors, checkedCatalogs };
   return { ...cachedResult, errors: [...cachedResult.errors], checkedCatalogs: [...cachedResult.checkedCatalogs] };
 }
