@@ -5,6 +5,7 @@ import responseCatalogSchema from './diagnostic_responses.schema.json';
 import responseCatalog from './diagnostic_responses.json';
 import diagnosticRules from './diagnostic_rules.json';
 import sensorTestsCatalog from './sensor_tests.json';
+import pidCatalog from './pids.json';
 
 export interface JsonSchemaValidationResult {
   valid: boolean;
