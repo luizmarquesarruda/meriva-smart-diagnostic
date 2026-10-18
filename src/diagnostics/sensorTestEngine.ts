@@ -41,9 +41,9 @@ export function assessSensorSample(sample:SensorTestSample,mode:SensorTestMode,a
  const pid=normalizeSensorPid(sample.pid),test=catalog.tests.find(item=>normalizeSensorPid(item.pid)===pid);
  if(!test)return result('NAO_CONCLUSIVO','PID fora do catálogo','Nenhuma regra inferida porque o PID não está cadastrado em sensor_tests.json.');
  const attempts=all.filter(item=>normalizeSensorPid(item.pid)===pid),valid=validRows(all,pid);
- if(attempts.length<test.minimumReadings)return result('NAO_CONCLUSIVO','Aguardando cinco leituras','Leituras válidas/total: '+valid.length+'/'+attempts.length+'. O resultado requer '+test.minimumReadings+' tentativas.');
- if(valid.length===0)return result('SEM_RESPOSTA','Sem resposta interpretável nas três tentativas','O PID não forneceu valor interpretável. Pode ser suporte, comunicação ou parser; não prova falha física.');
- if(valid.length<test.minimumReadings)return result('NAO_CONCLUSIVO','Menos de três leituras válidas','Foram obtidas '+valid.length+' leituras válidas em '+attempts.length+' tentativas; não há amostragem suficiente.');
+ if(attempts.length<test.minimumReadings)return result('NAO_CONCLUSIVO','Aguardando cinco leituras','Leituras válidas/total: '+valid.length+'/'+attempts.length+'. O resultado requer '+test.minimumReadings+' respostas válidas.');
+ if(valid.length===0)return result('SEM_RESPOSTA','Sem resposta interpretável nas cinco tentativas','O PID não forneceu valor interpretável. Pode ser suporte, comunicação ou parser; não prova falha física.');
+ if(valid.length<test.minimumReadings)return result('NAO_CONCLUSIVO','Menos de cinco leituras válidas','Foram obtidas '+valid.length+' leituras válidas em '+attempts.length+' tentativas; não há amostragem suficiente.');
  const value=median(valid.map(item=>item.value as number));if(value===null||!Number.isFinite(value))return result('NAO_CONCLUSIVO','Sem mediana válida','As amostras não geraram valor numérico confiável.');
  const t=test.thresholds,read=(otherPid:string)=>valueOf(all,otherPid);
  if(test.evaluator==='RPM_BY_MODE'){
