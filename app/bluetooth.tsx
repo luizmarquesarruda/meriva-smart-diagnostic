@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { AdaptiveText as Text } from '../src/ui/AdaptiveText';
-import { AppIcon } from '../src/ui/AppIcon';
+import { AppIcon, AppIconBadge } from '../src/ui/AppIcon';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMidLayout } from '../src/ui/midLayout';
 import * as FileSystem from 'expo-file-system';
@@ -143,8 +143,11 @@ export default function BluetoothScreen() {
       <ScrollView contentContainerStyle={[styles.content,{paddingHorizontal:layout.horizontalPadding}]} showsHorizontalScrollIndicator={false}>
         <View style={[styles.screenFrame,{maxWidth:layout.maxContentWidth}]}>
         <View style={styles.header}>
-          <Text style={styles.title}>BLUETOOTH</Text>
-          <Text style={styles.subtitle}>ELM327 • BLUETOOTH CLASSIC</Text>
+          <AppIconBadge name="bluetooth" size={44} color="#e8b54b" />
+          <View style={styles.headerCopy}>
+            <Text style={styles.title}>BLUETOOTH</Text>
+            <Text style={styles.subtitle}>ELM327 • BLUETOOTH CLASSIC</Text>
+          </View>
         </View>
 
         <View style={[styles.connectionGrid, layout.landscape && styles.connectionGridLandscape]}>
@@ -245,7 +248,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0b1220' },
   content: { flexGrow: 1, width: '100%', paddingVertical: 14, paddingBottom: 28 },
   screenFrame: { width: '100%', alignSelf: 'center' },
-  header: { paddingVertical: 8, marginBottom: 10 },
+  header: { paddingVertical: 8, marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 11 },
+  headerCopy: { flex: 1, minWidth: 0 },
   title: { color: '#f8fafc', fontSize: 25, fontWeight: '900', letterSpacing: 1 },
   subtitle: { color: '#7db3ff', fontSize: 10, fontWeight: '900', marginTop: 3, letterSpacing: 0.8 },
   connectionGrid: { width: '100%' },
