@@ -84,6 +84,9 @@ export default function TestesSensoresScreen(){
     setRound(sampleRound);
     for(const test of plan){
      if(cancelled.current)break outer;
+     const pidAttempts=readings.filter(item=>item.pid===test.pid);
+     const pidValid=pidAttempts.filter(item=>item.status==='RESPONDEU'&&item.value!==null&&Number.isFinite(item.value)).length;
+     if(pidValid>=MIN_SENSOR_TEST_READINGS||pidAttempts.length>=MAX_SENSOR_TEST_ATTEMPTS)continue;
      const current=getSharedObdConnection(),currentStatus=getSharedObdStatus();
      if(!current?.ecuValidated||!currentStatus.ecuConnected)throw new Error('Conexão ECU perdida. As amostras concluídas permanecem disponíveis para relatório.');
      setCurrentPid(test.pid);
