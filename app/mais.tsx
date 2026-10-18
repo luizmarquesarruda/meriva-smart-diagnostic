@@ -41,16 +41,18 @@ export default function MaisScreen() {
                   activeOpacity={0.82}
                   style={[styles.item, layout.landscape && styles.itemLandscape]}
                 >
-                  <AppIconBadge
-                    name={icon}
-                    size={46}
-                    color={icon === 'learning' || icon === 'health' ? '#e8b54b' : '#7db3ff'}
-                  />
+                  <View style={styles.tileTopRow}>
+                    <AppIconBadge
+                      name={icon}
+                      size={42}
+                      color={icon === 'learning' || icon === 'health' ? '#e8b54b' : '#7db3ff'}
+                    />
+                    <View style={styles.tileArrow}><AppIcon name="forward" size={18} color="#7db3ff" /></View>
+                  </View>
                   <View style={styles.itemCopy}>
                     <Text style={styles.itemTitle} numberOfLines={2}>{title}</Text>
-                    <Text style={styles.hint} numberOfLines={2}>{hint}</Text>
+                    <Text style={styles.hint} numberOfLines={3}>{hint}</Text>
                   </View>
-                  <AppIcon name="forward" size={19} color="#7db3ff" />
                 </TouchableOpacity>
               </Link>
             ))}
@@ -78,23 +80,28 @@ const styles = StyleSheet.create({
   screenFrame: { width: '100%', alignSelf: 'center' },
   headingRow: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 16 },
   headingCopy: { flex: 1, minWidth: 0 },
-  itemsGrid: { width: '100%' },
-  itemsGridLandscape: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  itemsGrid: { width: '100%', flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  itemsGridLandscape: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   title: { color: '#f8fafc', fontSize: 24, fontWeight: '900', letterSpacing: 1 },
   subtitle: { color: '#7db3ff', fontSize: 12, fontWeight: '900', letterSpacing: 1, marginTop: 4 },
   item: {
+    width: '48%',
+    flexGrow: 1,
     backgroundColor: '#0e1b2d',
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#28415f',
-    padding: 13,
-    minHeight: 78,
-    marginBottom: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+    padding: 12,
+    minHeight: 142,
+    marginBottom: 0,
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    justifyContent: 'flex-start',
+    gap: 10,
   },
-  itemLandscape: { width: '48.5%', marginBottom: 0 },
+  itemLandscape: { width: '48%', flexGrow: 1, minHeight: 134 },
+  tileTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  tileArrow: { width: 30, height: 30, borderRadius: 9, backgroundColor: '#102743', alignItems: 'center', justifyContent: 'center' },
   itemCopy: { flex: 1, minWidth: 0 },
   itemTitle: { color: '#f1f5f9', fontSize: 14, lineHeight: 19, fontWeight: '900' },
   hint: { color: '#a7bad3', fontSize: 12, lineHeight: 17, marginTop: 4 },
