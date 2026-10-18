@@ -5,6 +5,7 @@ const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.Common
 const mod={exports:{},filename:p,paths:require('module')._nodeModulePaths(path.dirname(p))};
 new Function('exports','require','module','__filename','__dirname',js)(mod.exports,request=>{
  if(request.endsWith('sensor_tests.json'))return require(path.resolve(__dirname,'../src/knowledge/sensor_tests.json'));
+ if(request.endsWith('pid_learning_policy.json'))return require(path.resolve(__dirname,'../src/knowledge/pid_learning_policy.json'));
  return require(require.resolve(request,{paths:[path.dirname(p)]}));
 },mod,p,path.dirname(p));
 const c=require('../src/knowledge/sensor_tests.json'),e=mod.exports;
