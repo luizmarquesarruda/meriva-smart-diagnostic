@@ -2746,11 +2746,11 @@ Revisar o resultado visual no Android em retrato/paisagem e executar `npm ci --n
 
 ### Acionamento e validação
 - Foi criado este commit documental sem `[skip ci]` na branch de ícones para acionar o workflow canônico por push.
-- Resultado da CI para a nova cabeça: **PENDENTE DE CONSULTA** neste registro. Não se presume sucesso de `npm ci`, `npm run doctor`, `npm run validate`, prebuild ou Gradle.
-- A CI deve confirmar `validate` e `android-build` verdes; o mock e o build automatizado não substituem a verificação visual em aparelho Android, especialmente em retrato e paisagem.
+- Estado verificado em 18/10/2026: a CI #2378 (run 39128148789) terminou com sucesso no commit-base fc9050f457f200eca23b4d29b08404485fc6c2c8. Essa execução não cobre os ajustes posteriores da branch de trabalho.
+- A CI de base reportou sucesso; npm ci, npm run doctor, npm run validate e Gradle não foram executados manualmente nesta sessão. O build automatizado não substitui a verificação visual em aparelho Android, especialmente em retrato e paisagem.
 
 ### Próximo passo
-Consultar a execução da CI vinculada ao commit deste registro. Se falhar, ler o log do job e corrigir a causa observada antes de nova tentativa. Após CI verde, verificar no aparelho os tamanhos, cortes, contraste e alinhamento dos novos ícones, incluindo a tela inicial e Mais Recursos.
+Revisar os ajustes posteriores em uma branch separada. Como esta rodada foi marcada [skip ci], executar a validação completa somente após autorização; depois, verificar no aparelho os tamanhos, cortes, contraste e alinhamento dos ícones, incluindo tela inicial e Todos os Recursos.
 
 
 ## 2026-10-18 — Cockpit em cinco acessos, diagnóstico padronizado e política de consumo
