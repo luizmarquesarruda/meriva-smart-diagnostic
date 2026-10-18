@@ -96,6 +96,7 @@ assert.ok(liveValidation.checkedCatalogs.includes('ai_policy.json'));
 assert.ok(liveValidation.checkedCatalogs.includes('diagnostic_responses.json'));
 assert.ok(liveValidation.checkedCatalogs.includes('pids.json'));
 assert.ok(liveValidation.checkedCatalogs.includes('sensor_tests.json'));
+assert.ok(liveValidation.checkedCatalogs.includes('pid_learning_policy.json'));
 
 const invalidPolicy = {
   ...policy,
