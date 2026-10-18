@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "modelId": "MERIVA_OBD_HYBRID_FUEL_FLOW",
+  "updatedAt": "2026-10-18",
+  "reviewDue": "2027-01-27",
+  "vehicleDefaults": {
+    "displacementCm3": 1389,
+    "engineCycle": "FOUR_STROKE",
+    "volumetricEfficiency": 0.8,
+    "volumetricEfficiencyStatus": "PROVISIONAL_NOT_CALIBRATED"
+  },
+  "pids": {
+    "measuredFuelRate": "015E",
+    "massAirFlow": "0110",
+    "manifoldAbsolutePressure": "010B",
+    "intakeAirTemperature": "010F",
+    "engineRpm": "010C",
+    "fuelEthanolPercent": "0152",
+    "vehicleSpeed": "010D"
+  },
+  "limits": {
+    "maxFuelRateLph": 80,
+    "maxMafGs": 200,
+    "maxInstantConsumptionKml": 30,
+    "maxIntegrationGapMs": 30000,
+    "displayStaleAfterMs": 10000
+  },
+  "physicalConstants": {
+    "airGasConstantJPerKgK": 287.05,
+    "celsiusToKelvin": 273.15,
+    "fourStrokeRpmDivisor": 120
+  },
+  "fuelProperties": {
+    "gasolineAReference": {
+      "airFuelRatio": 14.7,
+      "densityKgPerL": 0.742,
+      "meaning": "Endpoint reference for estimating an ethanol-content blend; not retail Brazilian gasoline C."
+    },
+    "gasolineCRetailReference": {
+      "blend": "E32",
+      "airFuelRatio": 12.8,
+      "densityKgPerL": 0.757,
+      "evidence": "APPROXIMATED_FROM_VOLUME_BLEND",
+      "effectiveAsOf": "2026-10-18",
+      "reviewDue": "2027-01-27",
+      "note": "Reference calculated by volumetric interpolation of gasoline A (AFR 14.7; 0.742 kg/L) and anhydrous ethanol (AFR 9.0; 0.789 kg/L). Not a lab analysis of fuel from a specific station."
+    },
+    "hydrousEthanolReference": {
+      "airFuelRatio": 8.51,
+      "densityKgPerL": 0.812,
+      "evidence": "LITERATURE_PROXY_95VOL_PERCENT_ETHANOL",
+      "note": "Proxy based on literature properties for 95 vol% ethanol plus 5 vol% water; Brazilian pump hydrous ethanol can vary within specification and requires fill-up calibration."
+    },
+    "unknownFlexReferenceEthanolPercent": 50,
+    "unknownFlexReferenceMeaning": "Reference E50 estimate by volume, not a measurement of the tank composition.",
+    "blendCalculation": "Density is volume-weighted. Stoichiometric AFR is mass-weighted: sum(volumeFraction * density * AFR) / blendDensity."
+  },
+  "calibration": {
+    "method": "FULL_TO_FULL",
+    "runtimeCalibrationEnabled": false,
+    "defaultFlowCorrectionFactor": 1,
+    "minFlowCorrectionFactor": 0.7,
+    "maxFlowCorrectionFactor": 1.3,
+    "minimumValidFullToFullIntervals": 3,
+    "smoothingAlpha": 0.25,
+    "acceptanceFormula": "observedFactor = measuredRefillLiters / estimatedIntegratedLiters",
+    "applicationFormula": "calibratedFuelRateLph = estimatedFuelRateLph * flowCorrectionFactor",
+    "status": "DESIGN_RECORDED_NOT_YET_CONNECTED_TO_REFUEL_UI",
+    "requirements": [
+      "Three or more full-to-full intervals using the same fill endpoint and fuel selection.",
+      "Estimated liters must be integrated from fresh, valid fuel-rate samples, not cached display values.",
+      "Reject outliers outside the configured factor envelope rather than learning from them.",
+      "Keep separate calibration profiles when the selected fuel changes.",
+      "Do not modify historical trips retrospectively without replayable source samples."
+    ]
+  },
+  "qualityGates": {
+    "directFuelRateFirst": true,
+    "onlyQueryAdvertisedPids": true,
+    "requireValidRawEcuResponse": true,
+    "doNotIntegrateStaleEstimates": true,
+    "instantaneousConsumptionRequiresPositiveSpeedAndRate": true,
+    "maximumInstantaneousKmPerL": 30,
+    "noTankLevelBasedFuelRateInference": true,
+    "discloseAllReferenceAssumptions": true
+  },
+  "researchSources": [
+    {
+      "id": "obd2_dash",
+      "url": "https://github.com/trepidity/obd2-dash/blob/master/MANUAL.md",
+      "finding": "Prioritizes ECU fuel rate PID 015E, then derives flow from MAF; also documents speed-density MAP/IAT/RPM estimation."
+    },
+    {
+      "id": "obdgpslogger",
+      "url": "https://github.com/oesmith/obdgpslogger/blob/master/doc/mpg-calculation",
+      "finding": "Documents MAF-derived fuel economy and MAP/IAT/RPM speed-density estimation; recommends fill-up data to calibrate volumetric efficiency."
+    },
+    {
+      "id": "anp_e32_2026",
+      "url": "https://www.gov.br/anp/pt-br/canais_atendimento/imprensa/noticias-comunicados/e32-gasolina-com-32-de-etanol-passa-a-valer-temporariamente-a-partir-de-amanha-1-8",
+      "finding": "As of the research date, gasoline C common is temporarily E32 from 2026-08-01 for 180 days; model parameters have an explicit review date."
+    },
+    {
+      "id": "hydrous_ethanol_properties",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8495882/",
+      "finding": "Reports density and stoichiometric AFR varying with ethanol/water ratio; 95 vol% ethanol with 5% water is used only as a proxy."
+    }
+  ]
+}
