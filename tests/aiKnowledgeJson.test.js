@@ -94,6 +94,8 @@ const liveValidation = validatorApi.validateAiKnowledgeCatalogs();
 assert.strictEqual(liveValidation.valid, true, liveValidation.errors.join(' | '));
 assert.ok(liveValidation.checkedCatalogs.includes('ai_policy.json'));
 assert.ok(liveValidation.checkedCatalogs.includes('diagnostic_responses.json'));
+assert.ok(liveValidation.checkedCatalogs.includes('pids.json'));
+assert.ok(liveValidation.checkedCatalogs.includes('sensor_tests.json'));
 
 const invalidPolicy = {
   ...policy,
