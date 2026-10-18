@@ -3,7 +3,7 @@ import { Link } from 'expo-router';
 import { ScrollView, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { AdaptiveText as Text } from '../src/ui/AdaptiveText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AppIconBadge } from '../src/ui/AppIcon';
+import { AppIcon, AppIconBadge } from '../src/ui/AppIcon';
 import * as FileSystem from 'expo-file-system';
 import { flushCsvLogs } from '../src/database/csvLogger';
 import { checkStorageQuota, getStorageBreakdown, StorageQuotaConfig } from '../src/storage/quotaManager';
@@ -93,7 +93,7 @@ export default function ArmazenamentoScreen() {
   }
 
   return (
-    <SafeAreaView style={{flex:1,backgroundColor:'#0b1220'}} edges={["top","bottom","left","right"]}>
+    <SafeAreaView style={{flex:1,backgroundColor:'#07111f'}} edges={["top","bottom","left","right"]}>
     <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
       <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
       <Link href="/mais" asChild><TouchableOpacity accessibilityRole="button" accessibilityLabel="Voltar ao menu Mais recursos" style={styles.navigationBack}><Text style={styles.navigationBackText}>← VOLTAR AOS RECURSOS</Text></TouchableOpacity></Link>
@@ -110,7 +110,7 @@ export default function ArmazenamentoScreen() {
       {!!message && <Text style={styles.cleanMessage}>{message}</Text>}
       <View style={[styles.dataColumns, layout.landscape && styles.dataColumnsLandscape]}>
       <View style={[styles.card, layout.landscape && styles.dataColumnCard]}>
-        <Text style={styles.cardTitle}>ESPAÇO UTILIZADO</Text>
+        <View style={styles.cardHeading}><AppIcon name="database" size={16} color="#e8b54b" /><Text style={styles.cardTitle}>ESPAÇO UTILIZADO</Text></View>
         {Object.entries(usageBreakdown).map(([dir, sizesMb]) => (
           <View key={dir} style={styles.row}>
             <Text style={styles.label}>{dir}</Text>
@@ -120,7 +120,7 @@ export default function ArmazenamentoScreen() {
         <Text style={styles.note}>Limite configurado: 2 GB. A limpeza remove somente dados antigos permitidos pelo sistema.</Text>
       </View>
       <View style={[styles.historyCard, layout.landscape && styles.dataColumnCard]}>
-        <Text style={styles.cardTitle}>VIAGENS SALVAS</Text>
+        <View style={styles.cardHeading}><AppIcon name="trips" size={16} color="#e8b54b" /><Text style={styles.cardTitle}>VIAGENS SALVAS</Text></View>
         {cycles.length ? cycles.slice(0, 6).map((cycle) => (
           <View key={cycle.id} style={styles.historyRow}>
             <View style={styles.historyMain}>
@@ -134,7 +134,7 @@ export default function ArmazenamentoScreen() {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>BANCO ESTRUTURADO SQLITE</Text>
+        <View style={styles.cardHeading}><AppIcon name="database" size={16} color="#e8b54b" /><Text style={styles.cardTitle}>BANCO ESTRUTURADO SQLITE</Text></View>
         <View style={styles.dbStatusRow}>
           <Text style={styles.label}>Estado</Text>
           <Text style={databaseHealth?.available ? styles.real : styles.dbUnavailable}>
@@ -150,18 +150,18 @@ export default function ArmazenamentoScreen() {
         <View style={styles.row}><Text style={styles.label}>Amostras descartadas da fila</Text><Text style={databaseHealth?.droppedSamples ? styles.dbUnavailable : styles.value}>{databaseHealth?.droppedSamples ?? 'N/D'}</Text></View>
         {databaseHealth?.lastError ? <Text style={styles.dbError}>Última condição: {databaseHealth.lastError}</Text> : null}
         <Text style={styles.note}>SQLite é um índice complementar. Autosave JSON, CSV e relatórios TXT continuam preservados; este painel não confirma comunicação física com a ECU.</Text>
-        <TouchableOpacity style={styles.dbRefresh} onPress={() => { if (basePath) void refresh(basePath); }} disabled={!basePath || busy}>
-          <Text style={styles.dbRefreshText}>ATUALIZAR ESTADO DO SQLITE</Text>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Atualizar estado do banco SQLite" style={styles.dbRefresh} onPress={() => { if (basePath) void refresh(basePath); }} disabled={!basePath || busy}>
+          <View style={styles.buttonContentRow}><AppIcon name="refresh" size={15} color="#7db3ff" /><Text style={styles.dbRefreshText}>ATUALIZAR ESTADO DO SQLITE</Text></View>
         </TouchableOpacity>
       </View>
 
       <View style={styles.exportRow}>
-        <TouchableOpacity style={styles.button} onPress={() => void handleExport('JSON')} disabled={!basePath || busy}><Text style={styles.buttonText}>EXPORTAR JSON</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.button} onPress={() => void handleExport('CSV')} disabled={!basePath || busy}><Text style={styles.buttonText}>EXPORTAR CSV</Text></TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Exportar dados em JSON" style={styles.button} onPress={() => void handleExport('JSON')} disabled={!basePath || busy}><View style={styles.buttonContentRow}><AppIcon name="file" size={16} color="#ffffff" /><Text style={styles.buttonText}>EXPORTAR JSON</Text></View></TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Exportar dados em CSV" style={styles.button} onPress={() => void handleExport('CSV')} disabled={!basePath || busy}><View style={styles.buttonContentRow}><AppIcon name="file" size={16} color="#ffffff" /><Text style={styles.buttonText}>EXPORTAR CSV</Text></View></TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={styles.button} onPress={handleClean} disabled={!basePath || busy}>
-        <Text style={styles.buttonText}>{busy ? 'LIMPANDO...' : 'LIMPAR DADOS ANTIGOS'}</Text>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Limpar dados antigos permitidos pelo sistema" style={styles.button} onPress={handleClean} disabled={!basePath || busy}>
+        <View style={styles.buttonContentRow}><AppIcon name="trash" size={16} color="#ffffff" /><Text style={styles.buttonText}>{busy ? 'LIMPANDO...' : 'LIMPAR DADOS ANTIGOS'}</Text></View>
       </TouchableOpacity>
       </View>
     </ScrollView>
@@ -170,7 +170,7 @@ export default function ArmazenamentoScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, paddingVertical: 16, backgroundColor: '#0b1220' },
+  container: { flexGrow: 1, paddingVertical: 16, backgroundColor: '#07111f' },
   dataColumns: { width: '100%' },
   dataColumnsLandscape: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
   dataColumnCard: { flex: 1, minWidth: 0 },
@@ -179,31 +179,33 @@ const styles = StyleSheet.create({
   title: { fontSize: 23, fontWeight: '900', color: '#7db3ff', letterSpacing: 0.5, marginBottom: 5 },
   subtitle: { color: '#8da2bd', fontSize: 11, lineHeight: 16, marginBottom: 12 },
   status: { fontWeight: '700', marginBottom: 16 },
-  ok: { color: '#16a34a' },
-  warning: { color: '#d97706' },
-  critical: { color: '#dc2626' },
+  ok: { color: '#4ade80' },
+  warning: { color: '#fbbf24' },
+  critical: { color: '#fb7185' },
   cleanMessage: { color: '#e5edf7', marginBottom: 12 },
   dbStatusRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6 },
   dbUnavailable: { color: '#f59e0b', fontWeight: '900', fontSize: 10 },
   dbError: { color: '#fbbf24', fontSize: 10, lineHeight: 15, marginTop: 5 },
   dbRefresh: { alignSelf: 'flex-start', borderColor: '#355780', borderWidth: 1, borderRadius: 7, paddingHorizontal: 11, paddingVertical: 9, marginTop: 10 },
   dbRefreshText: { color: '#93c5fd', fontSize: 10, fontWeight: '900' },
-  historyCard: { backgroundColor: '#111c2e', borderRadius: 8, padding: 11, borderWidth: 1, borderColor: '#243652', marginBottom: 10 },
-  historyRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#243652' },
+  historyCard: { backgroundColor: '#0e1b2d', borderRadius: 8, padding: 11, borderWidth: 1, borderColor: '#28415f', marginBottom: 10 },
+  historyRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#233a56' },
   historyMain: { flex: 1, minWidth: 0 },
   historyDate: { color: '#e5edf7', fontWeight: '800', fontSize: 11 },
   historyMeta: { color: '#8da2bd', fontSize: 10, marginTop: 2 },
-  real: { color: '#15803d', fontWeight: '900', fontSize: 9 },
-  reference: { color: '#b45309', fontWeight: '900', fontSize: 9 },
+  real: { color: '#4ade80', fontWeight: '900', fontSize: 9 },
+  reference: { color: '#fbbf24', fontWeight: '900', fontSize: 9 },
   empty: { color: '#8da2bd', fontSize: 11 },
   card: { backgroundColor: '#111c2e', borderRadius: 8, padding: 11, borderWidth: 1, borderColor: '#243652', marginBottom: 10 },
-  cardTitle: { color: '#e5edf7', fontSize: 12, fontWeight: '900', marginBottom: 7 },
+  cardHeading: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 7 },
+  cardTitle: { flexShrink: 1, color: '#e5edf7', fontSize: 12, fontWeight: '900' },
+  buttonContentRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
   row: { paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: '#243652', flexDirection: 'row', justifyContent: 'space-between' },
   note: { color: '#8da2bd', fontSize: 10, lineHeight: 15, marginTop: 8 },
   label: { color: '#e5edf7', fontWeight: '600' },
-  value: { color: '#2563eb', fontWeight: '700' },
+  value: { color: '#c0d1e6', fontWeight: '700' },
   exportRow: { width: '100%', flexDirection: 'row', gap: 8, marginTop: 4 },
-  button: { flex: 1, backgroundColor: '#1557a6', borderRadius: 7, padding: 13, alignItems: 'center', marginTop: 4 },
+  button: { flex: 1, backgroundColor: '#2563eb', borderRadius: 7, padding: 13, alignItems: 'center', marginTop: 4 },
   buttonText: { color: '#fff', fontWeight: '700' },
   navigationBack: { alignSelf: 'flex-start', paddingVertical: 8, paddingHorizontal: 10, marginBottom: 8, backgroundColor: '#111c2e', borderRadius: 8 },
   navigationBackText: { color: '#7db3ff', fontSize: 10, fontWeight: '900' },
