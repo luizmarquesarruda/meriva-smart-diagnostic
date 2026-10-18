@@ -1,3 +1,5 @@
+import * as fuelModel from '../knowledge/fuel_consumption_model.json';
+
 export interface FuelRateSample {
   fuelRateLph: number;
   timestampMs: number;
@@ -10,12 +12,12 @@ export interface FuelIntegrationState {
   lastTimestampMs: number | null;
 }
 
-const MAX_INTERVAL_MS = 30_000;
+const MAX_INTERVAL_MS = fuelModel.limits.maxIntegrationGapMs;
 
-/** Generous guardrail to reject OBD sentinels/extreme values, not vehicle calibration. */
-export const MAX_PLAUSIBLE_FUEL_RATE_LPH = 80;
-export const MAX_PLAUSIBLE_CONSUMPTION_KML = 30;
-const MAX_PLAUSIBLE_MAF_GS = 200;
+/** Defensive limits are model parameters, not Meriva-specific measured calibration. */
+export const MAX_PLAUSIBLE_FUEL_RATE_LPH = fuelModel.limits.maxFuelRateLph;
+export const MAX_PLAUSIBLE_CONSUMPTION_KML = fuelModel.limits.maxInstantConsumptionKml;
+const MAX_PLAUSIBLE_MAF_GS = fuelModel.limits.maxMafGs;
 
 function isPlausibleFuelRateLph(value: number): boolean {
   return Number.isFinite(value) && value >= 0 && value <= MAX_PLAUSIBLE_FUEL_RATE_LPH;
@@ -119,6 +121,8 @@ export interface FuelRateEstimateInput {
   /** Advanced overrides are retained for calibration/tests. */
   airFuelRatio?: number;
   fuelDensityKgPerL?: number;
+  /** Full-to-full correction, if a future persisted calibration provides one. */
+  calibrationFactor?: number;
 }
 
 /**
@@ -132,18 +136,56 @@ export function resolveFuelEstimateProperties(
   fuelType: FuelTypeForEstimate | undefined,
   ethanolPercent?: number | null,
 ): { airFuelRatio: number; fuelDensityKgPerL: number } | null {
-  if (fuelType === 'GASOLINA') return { airFuelRatio: 14.7, fuelDensityKgPerL: 0.745 };
-  if (fuelType === 'ETANOL') return { airFuelRatio: 9.0, fuelDensityKgPerL: 0.789 };
+  const properties = fuelModel.fuelProperties;
+  if (fuelType === 'GASOLINA') {
+    return {
+      airFuelRatio: properties.gasolineCRetailReference.airFuelRatio,
+      fuelDensityKgPerL: properties.gasolineCRetailReference.densityKgPerL,
+    };
+  }
+  if (fuelType === 'ETANOL') {
+    return {
+      airFuelRatio: properties.hydrousEthanolReference.airFuelRatio,
+      fuelDensityKgPerL: properties.hydrousEthanolReference.densityKgPerL,
+    };
+  }
   if (fuelType !== 'FLEX') return null;
 
-  // First-order volumetric blend interpolation. With no ECU blend reading, use
-  // a disclosed 50% reference blend rather than silently treating FLEX as gas.
-  const hasMeasuredBlend = Number.isFinite(ethanolPercent) && ethanolPercent! >= 0 && ethanolPercent! <= 100;
-  const ethanolFraction = hasMeasuredBlend ? ethanolPercent! / 100 : 0.5;
-  return {
-    airFuelRatio: 14.7 * (1 - ethanolFraction) + 9.0 * ethanolFraction,
-    fuelDensityKgPerL: 0.745 * (1 - ethanolFraction) + 0.789 * ethanolFraction,
-  };
+  // When PID 0152 is absent, E50 is only a visible reference assumption.
+  // With a reported percentage, treat it as the blend-volume percentage,
+  // subject to future confirmation of the PID semantics on the Meriva ECU.
+  const hasMeasuredBlend = Number.isFinite(ethanolPercent) &&
+    ethanolPercent! >= 0 && ethanolPercent! <= 100;
+  const ethanolFraction = (hasMeasuredBlend
+    ? ethanolPercent!
+    : properties.unknownFlexReferenceEthanolPercent) / 100;
+  const gasoline = properties.gasolineAReference;
+  const ethanol = properties.hydrousEthanolReference;
+  const fuelDensityKgPerL =
+    gasoline.densityKgPerL * (1 - ethanolFraction) +
+    ethanol.densityKgPerL * ethanolFraction;
+  if (!Number.isFinite(fuelDensityKgPerL) || fuelDensityKgPerL <= 0) return null;
+
+  // AFR for a volumetric blend is mass-weighted; linear interpolation of AFR
+  // by volume alone would introduce avoidable bias.
+  const stoichiometricAirPerLiter =
+    gasoline.airFuelRatio * gasoline.densityKgPerL * (1 - ethanolFraction) +
+    ethanol.airFuelRatio * ethanol.densityKgPerL * ethanolFraction;
+  const airFuelRatio = stoichiometricAirPerLiter / fuelDensityKgPerL;
+  return Number.isFinite(airFuelRatio) && airFuelRatio > 0
+    ? { airFuelRatio, fuelDensityKgPerL }
+    : null;
+}
+
+function applyFuelFlowCorrection(rateLph: number, requestedFactor?: number): number {
+  const calibration = fuelModel.calibration;
+  const configuredDefault = calibration.defaultFlowCorrectionFactor;
+  const validRequestedFactor =
+    Number.isFinite(requestedFactor) &&
+    (requestedFactor ?? 0) >= calibration.minFlowCorrectionFactor &&
+    (requestedFactor ?? 0) <= calibration.maxFlowCorrectionFactor;
+  const factor = validRequestedFactor ? requestedFactor as number : configuredDefault;
+  return rateLph * factor;
 }
 
 export function estimateFuelRateLph(input: FuelRateEstimateInput): { rateLph: number; source: FuelRateSource } | null {
@@ -164,8 +206,8 @@ export function estimateFuelRateLph(input: FuelRateEstimateInput): { rateLph: nu
     && (input.mafGs ?? Number.POSITIVE_INFINITY) <= MAX_PLAUSIBLE_MAF_GS
     && afr > 0 && density > 0
   ) {
-    const fuelKgPerSecond = (input.mafGs as number) / 1000 / afr;
-    const rateLph = fuelKgPerSecond * 3600 / density;
+    const uncorrectedRateLph = ((input.mafGs as number) * 3.6) / (afr * density);
+    const rateLph = applyFuelFlowCorrection(uncorrectedRateLph, input.calibrationFactor);
     return isPlausibleFuelRateLph(rateLph) && rateLph > 0
       ? { rateLph, source: assumedFlexBlend ? 'ESTIMATED_FLEX' : 'ESTIMATED_MAF' }
       : null;
@@ -174,8 +216,8 @@ export function estimateFuelRateLph(input: FuelRateEstimateInput): { rateLph: nu
   const map = input.mapKpa;
   const rpm = input.rpm;
   const iat = input.intakeAirTempC;
-  const displacementL = (input.displacementCm3 ?? 0) / 1000;
-  const ve = input.volumetricEfficiency ?? 0.80;
+  const displacementL = (input.displacementCm3 ?? fuelModel.vehicleDefaults.displacementCm3) / 1000;
+  const ve = input.volumetricEfficiency ?? fuelModel.vehicleDefaults.volumetricEfficiency;
   if (
     Number.isFinite(map) && (map ?? 0) > 0
     && Number.isFinite(rpm) && (rpm ?? 0) > 0
@@ -184,14 +226,15 @@ export function estimateFuelRateLph(input: FuelRateEstimateInput): { rateLph: nu
     && afr > 0 && density > 0 && ve > 0
   ) {
     const absolutePressurePa = (map as number) * 1000;
-    const temperatureK = (iat as number) + 273.15;
-    const airDensityGPerL = absolutePressurePa / (287.05 * temperatureK);
-    const volumetricFlowLPerSecond = displacementL * (rpm as number) / 120 * ve;
+    const temperatureK = (iat as number) + fuelModel.physicalConstants.celsiusToKelvin;
+    const airDensityGPerL = absolutePressurePa / (fuelModel.physicalConstants.airGasConstantJPerKgK * temperatureK);
+    const volumetricFlowLPerSecond =
+      displacementL * (rpm as number) / fuelModel.physicalConstants.fourStrokeRpmDivisor * ve;
     const mafGs = airDensityGPerL * volumetricFlowLPerSecond;
     if (!Number.isFinite(temperatureK) || temperatureK <= 0 ||
         !Number.isFinite(mafGs) || mafGs <= 0 || mafGs > MAX_PLAUSIBLE_MAF_GS) return null;
-    const fuelKgPerSecond = mafGs / 1000 / afr;
-    const rateLph = fuelKgPerSecond * 3600 / density;
+    const uncorrectedRateLph = (mafGs * 3.6) / (afr * density);
+    const rateLph = applyFuelFlowCorrection(uncorrectedRateLph, input.calibrationFactor);
     return isPlausibleFuelRateLph(rateLph) && rateLph > 0
       ? { rateLph, source: assumedFlexBlend ? 'ESTIMATED_FLEX' : 'ESTIMATED_MAP' }
       : null;
