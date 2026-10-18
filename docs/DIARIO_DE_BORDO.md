@@ -2477,3 +2477,29 @@ Incluir no plano de testes os PIDs anunciados pela ECU que tenham definição no
 
 ### Próximo passo
 Revisar o diff completo, verificar se os PIDs descobertos da sessão real aparecem na central, validar a integração com o perfil de aprendizado e só então autorizar a CI.
+
+
+## 2026-10-18 — Segunda revisão: 34 PIDs no catálogo e proteção de aprendizado
+
+### Problemas encontrados na revisão estática
+- Quatro PIDs do catálogo geral não estavam declarados em `sensor_tests.json`: 0101 (estado dos monitores), 0130 (contador de aquecimentos), 0131 (distância desde limpeza de DTC) e 0151 (código do tipo de combustível).
+- A avaliação genérica dos PIDs dinâmicos precisava construir a regra a partir de `getPidDefinition`; sem isso, o caminho de avaliação de estabilidade não era alcançado.
+- O perfil de aprendizado podia não existir ainda. A função de atualização retorna sem gravar se o perfil não estiver inicializado.
+- Status, contadores e códigos enumerados não devem receber média analógica nem contaminar as estatísticas de valores típicos.
+
+### Correções aplicadas
+- `sensor_tests.json` agora contém 34 entradas únicas, alinhadas aos 34 PIDs de `pids.json`.
+- Os quatro PIDs informativos usam `OBSERVATION_ONLY`: as cinco respostas são registradas, a tela mostra o valor mais recente e não calcula média nem ensina esses códigos/contadores como sensores analógicos.
+- PIDs adicionais definidos localmente recebem avaliação conservadora de estabilidade. Dispersão alta gera INVESTIGAR; estabilidade gera NÃO CONCLUSIVO, nunca aprovação automática.
+- A tela inicializa o perfil local se ausente e grava uma média por PID apenas para cinco respostas numéricas válidas e para PIDs não categóricos.
+- A mensagem final informa quantos PIDs realmente contribuíram para o aprendizado e não afirma que todos foram aprendidos.
+- Textos de ajuda foram alinhados ao requisito de cinco amostras.
+- Testes ampliados para cobrir 34 PIDs, quatro PIDs informativos e comportamento de avaliação conservadora.
+
+### Verificação até aqui
+- Revisão estática dos arquivos no branch; confirmados 34 PIDs únicos no JSON.
+- Confirmada a lógica de consulta em cinco rodadas seriais, uma consulta por PID por rodada.
+- **Ainda não executado:** `npm run validate`, TypeScript real do projeto e build Android. Não marcar a alteração como validada até esses comandos/CI terminarem com sucesso.
+
+### Próximo passo
+Executar a validação automatizada completa e analisar qualquer falha antes de integrar ao branch principal. Não realizar merge sem `validate` e `android-build` verdes.
