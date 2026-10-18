@@ -9,6 +9,7 @@ import { readDriveCycles } from '../src/storage/driveCycleStorage';
 import { getDriveCycleSummary, type DriveCycle } from '../src/data/driveCycles';
 import { BarChart, LineChart } from 'react-native-gifted-charts';
 import { buildTripChartData } from '../src/trip/tripChartData';
+import { AppIconBadge } from '../src/ui/AppIcon';
 
 const BASE_PATH = FileSystem.documentDirectory + 'MERIVA_SMART';
 const DAY_MS = 86_400_000;
@@ -53,9 +54,14 @@ export default function ViagensScreen() {
     <ScrollView contentContainerStyle={[s.content,{paddingHorizontal:layout.horizontalPadding}]} showsVerticalScrollIndicator={false}>
       <View style={[s.frame,{maxWidth:layout.maxContentWidth}]}>
         {selected ? <TripDetails cycle={selected} onBack={() => setSelectedId(null)} /> : <>
-          <Text style={s.eyebrow}>MERIVA SMART DIAGNOSTIC</Text>
-          <Text style={s.title}>RELATÓRIO DE VIAGENS</Text>
-          <Text style={s.subtitle}>HISTÓRICO REAL • SESSÕES INDEPENDENTES • DADOS AUDITÁVEIS</Text>
+          <View style={s.pageHeader}>
+            <AppIconBadge name="trips" size={46} color="#e8b54b" />
+            <View style={s.pageHeaderCopy}>
+              <Text style={s.eyebrow}>MERIVA SMART DIAGNOSTIC</Text>
+              <Text style={s.title}>RELATÓRIO DE VIAGENS</Text>
+              <Text style={s.subtitle}>HISTÓRICO REAL • SESSÕES INDEPENDENTES • DADOS AUDITÁVEIS</Text>
+            </View>
+          </View>
           <View style={s.grid}>
             <Metric l="VIAGENS" v={String(visible.length)} />
             <Metric l="DISTÂNCIA TOTAL" v={mv(summary.totalDistanceKm,'km')} />
@@ -200,7 +206,7 @@ function Stat({label,value}:{label:string;value:string}) { return <View style={s
 function Detail({label,value}:{label:string;value:string}) { return <View style={s.detail}><Text style={s.detailLabel}>{label}</Text><Text style={s.detailValue}>{value}</Text></View>; }
 
 const s=StyleSheet.create({chartCard:{backgroundColor:'#0e1b2d',borderColor:'#233a56',borderWidth:1,borderRadius:13,padding:12,marginTop:12},chartAxis:{color:'#9fb0c5',fontSize:10},chartNote:{color:'#9fb0c5',fontSize:11,lineHeight:16,marginTop:4},
-  container:{flex:1,backgroundColor:'#07111f'},content:{flexGrow:1,width:'100%',paddingVertical:16,paddingBottom:34},frame:{width:'100%',alignSelf:'center'},
+  container:{flex:1,backgroundColor:'#07111f'},content:{flexGrow:1,width:'100%',paddingVertical:16,paddingBottom:34},frame:{width:'100%',alignSelf:'center'},pageHeader:{flexDirection:'row',alignItems:'center',gap:11,marginBottom:4},pageHeaderCopy:{flex:1,minWidth:0},
   eyebrow:{color:'#55d6be',fontSize:9,fontWeight:'900',letterSpacing:1.5,marginBottom:5},title:{color:'#f8fafc',fontSize:25,fontWeight:'900'},subtitle:{color:'#91a9c9',fontSize:10,fontWeight:'700',marginTop:5,marginBottom:16,lineHeight:15},
   grid:{flexDirection:'row',gap:9,marginBottom:9},metric:{flex:1,minWidth:0,backgroundColor:'#0e1b2d',borderRadius:14,borderWidth:1,borderColor:'#233a56',padding:12},label:{color:'#8196b4',fontSize:8,fontWeight:'900',letterSpacing:0.5},metricValue:{color:'#e5edf7',fontSize:15,fontWeight:'900',marginTop:6},
   section:{color:'#55d6be',fontSize:10,fontWeight:'900',letterSpacing:1,marginTop:18,marginBottom:8},filters:{flexDirection:'row',gap:8,marginBottom:3},filter:{flex:1,padding:11,borderRadius:10,borderWidth:1,borderColor:'#29415f',backgroundColor:'#0e1b2d',alignItems:'center'},filterActive:{backgroundColor:'#123a42',borderColor:'#55d6be'},filterText:{color:'#9fb3cd',fontSize:9,fontWeight:'900'},filterTextActive:{color:'#a8fff0'},
