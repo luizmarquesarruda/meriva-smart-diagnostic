@@ -2727,3 +2727,27 @@ Modernizar os ícones do cockpit e dos menus, adotando uma linguagem visual auto
 
 ### Próximo passo
 Revisar o resultado visual no Android em retrato/paisagem e executar `npm ci --no-audit --no-fund`, `npm run doctor` e `npm run validate` somente quando o usuário autorizar fechar a rodada de alterações.
+
+## 2026-10-18 — Auditoria dos ícones Meriva e acionamento da CI
+
+### Estado de referência
+- Branch: `feat/modern-meriva-icon-system-20261018`.
+- Cabeça antes deste registro: `7d73fa77cd5d1709bd8d000609664ae33bcb15e6`.
+- A CI #2377 (run `39094503715`) terminou verde no SHA `2cec34ee2f79a3474283c394f33d2ba8d949123c`, anterior aos commits finais do sistema de ícones. Ela não valida sozinha a cabeça atual.
+- A série de commits de ícones foi marcada com `[skip ci]`, então a cabeça atual ainda precisa de validação completa.
+
+### Auditoria estática
+- `src/ui/AppIcon.tsx` centraliza os ícones Lucide usados no cockpit, navegação e menus. A composição usa formas vetoriais e mantém o texto dos estados, de modo que cor/ícone não sejam a única indicação de conectividade.
+- `lucide-react-native@0.468.0` está fixado no `package.json` e no `package-lock.json`; o lockfile contém a integridade SHA-512 e seus peer dependencies permitem React 18, React Native e `react-native-svg` 15.2.0.
+- A tela inicial recebeu identidade visual Meriva, ícone de temperatura do arrefecimento, ação de recursos e ícones vetoriais na navegação inferior. A tela Mais Recursos recebeu cartões com ícones e rótulos acessíveis; telas de Bluetooth, Saúde, Veículo, Dados e Aprendizado receberam substituições pontuais de ícones.
+- `tests/appIconCatalog.test.js` verifica contratos de estrutura, mapeamentos e alinhamento do lockfile. Por usar inspeção textual, não comprova que todos os ícones renderizam corretamente nem substitui o TypeScript, os testes de regressão, Expo Doctor e o build Android.
+- `app/_layout.tsx` não foi alterado nesta série. Portanto, esta entrega é uma modernização visual das telas citadas, não uma refatoração do layout raiz ou do ciclo de vida de navegação.
+- Nenhum arquivo de protocolo OBD, PID, IA diagnóstica, SQLite, GPS ou viagem foi alterado por esta série de ícones.
+
+### Acionamento e validação
+- Foi criado este commit documental sem `[skip ci]` na branch de ícones para acionar o workflow canônico por push.
+- Resultado da CI para a nova cabeça: **PENDENTE DE CONSULTA** neste registro. Não se presume sucesso de `npm ci`, `npm run doctor`, `npm run validate`, prebuild ou Gradle.
+- A CI deve confirmar `validate` e `android-build` verdes; o mock e o build automatizado não substituem a verificação visual em aparelho Android, especialmente em retrato e paisagem.
+
+### Próximo passo
+Consultar a execução da CI vinculada ao commit deste registro. Se falhar, ler o log do job e corrigir a causa observada antes de nova tentativa. Após CI verde, verificar no aparelho os tamanhos, cortes, contraste e alinhamento dos novos ícones, incluindo a tela inicial e Mais Recursos.
