@@ -42,6 +42,26 @@ export default function TestesSensoresScreen(){
   deadline.current=Date.now()+ms;setCountdownMs(ms);
  }
  function recordCommand(elapsedMs:number,totalCommands:number){commandsDone.current+=1;commandElapsedTotal.current+=Math.max(0,elapsedMs);setCommandProgress(commandsDone.current);updateCountdown(totalCommands-commandsDone.current);}
+ async function learnCompletedPidSamples(readings:SensorTestSample[],plan:SensorTestDefinition[],selectedMode:SensorTestMode):Promise<number>{
+  if(!connectedAtStart.current)return 0;
+  const basePath=(FileSystem.documentDirectory??'')+'MERIVA_SMART';
+  const eligible=plan.filter(test=>summarizeSensorPidSamples(readings,test.pid,test.aggregation).validSamples>=MIN_SENSOR_TEST_READINGS);
+  if(!eligible.length)return 0;
+  if(!await readLearningProfile(basePath))await createLearningProfile(basePath,new Date().toISOString());
+  const condition=selectedMode==='ENGINE_ON'?getVehicleConditionSnapshot().condition:'UNKNOWN';
+  const priorEntries=await readPidConfirmations(basePath);
+  let learned=0;
+  for(const test of eligible){
+   const summary=summarizeSensorPidSamples(readings,test.pid,test.aggregation),valid=readings.filter(item=>item.pid===test.pid&&item.status==='RESPONDEU'&&item.value!==null&&Number.isFinite(item.value));
+   if(summary.value===null||valid.length<MIN_SENSOR_TEST_READINGS)continue;
+   const definition=getPidDefinition(test.pid),prior=priorEntries.find(item=>item.pid===test.pid),now=new Date().toISOString();
+   try{
+    await recordPidConfirmation(basePath,{pid:test.pid,name:definition?.name??test.catalogName,classification:prior?.classification??'PADRAO_OBD',status:'RESPONDEU',firstSeen:prior?.firstSeen??valid[0].timestamp,lastSeen:valid[valid.length-1].timestamp,occurrences:(prior?.occurrences??0)+valid.length,protocol:getSharedObdConnection()?.protocol??prior?.protocol??'N/D',responseTime:Math.round(valid.reduce((sum,item)=>sum+item.elapsedMs,0)/valid.length),source:'REAL_OBD',confidence:(prior?.confidence??0)+valid.length,unit:definition?.unit??test.unit,formulaId:definition?.formulaId??test.formulaId,bytes:definition?.bytes,description:definition?.description});
+    await updateLearningProfileRealSample(basePath,definition?.name??test.catalogName,summary.value,condition);learned+=1;
+   }catch(cause){console.warn('[IA local] não foi possível persistir aprendizado do PID '+test.pid,cause instanceof Error?cause.message:cause);}
+  }
+  return learned;
+ }
  async function runTests(){
   cancelled.current=false;setRunning(true);setCompleted(false);setAborted(false);setCommandProgress(0);setPlannedReads(0);setTestPlan([]);setSamples([]);setError('');setSavedPath('');setRound(0);setCurrentPid('');setMessage('Preparando a varredura e estimando o tempo…');
   runStartedAt.current=Date.now();commandsDone.current=0;commandElapsedTotal.current=0;
