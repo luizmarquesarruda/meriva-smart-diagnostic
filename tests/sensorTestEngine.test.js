@@ -14,7 +14,7 @@ const five=(pid,value,status='RESPONDEU')=>[sample(pid,value,status,1),sample(pi
 assert.equal(e.normalizeSensorPid('01 0C'),'010C','normaliza PID com espaços');
 assert.equal(e.MIN_SENSOR_TEST_READINGS,5);assert.equal(e.MAX_SENSOR_TEST_ATTEMPTS,8);assert.equal(c.minimumReadingsPerPid,5);assert.equal(c.maximumAttemptsPerPid,8);
 const plan=e.createSensorTestPlan(['010C','010B','0133','015E'],pid=>pid!=='015E');
-assert.deepEqual(plan.map(x=>x.pid),['010C','010B','0133']);
+assert.deepEqual(plan.map(x=>x.pid),['010B','010C','0133'],'plano deve respeitar a ordem canônica definida no catálogo de sensores');
 assert.equal(e.createSensorTestPlan(['010C','010C'],()=>true).length,1);
 assert.equal(e.assessSensorSample(sample('010B',36),'ENGINE_OFF',[sample('010B',36)]).state,'NAO_CONCLUSIVO');
 assert.equal(e.assessSensorSample(sample('010B',36),'ENGINE_OFF',[...five('010B',36),...five('0133',38)]).state,'CONSISTENTE');
