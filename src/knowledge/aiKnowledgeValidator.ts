@@ -113,6 +113,12 @@ export function validateAiKnowledgeCatalogs(): AiKnowledgeValidationResult {
     errors.push('sensor_tests.json: cada PID deve exigir cinco respostas válidas');
   }
 
+  if (sampleLearningPolicy.minimumValidSamplesPerPid !== 5) errors.push('pid_learning_policy.json: aprendizado exige cinco amostras válidas');
+  if (sampleLearningPolicy.maximumAttemptsPerPid !== 8) errors.push('pid_learning_policy.json: máximo de tentativas deve ser oito');
+  if (sampleLearningPolicy.acquisition?.strategy !== 'ROUND_ROBIN_SEQUENTIAL' || sampleLearningPolicy.acquisition.maxQueriesPerPidPerRound !== 1 || sampleLearningPolicy.acquisition.noParallelPidQueries !== true) errors.push('pid_learning_policy.json: coleta precisa ser sequencial, uma consulta por PID/rodada');
+  if (sampleLearningPolicy.buffer?.continuousAggregation !== 'ARITHMETIC_MEAN' || sampleLearningPolicy.buffer.discreteAggregation !== 'MODE' || sampleLearningPolicy.buffer.requireFiveValidSamplesBeforeAssessment !== true) errors.push('pid_learning_policy.json: agregação do buffer não corresponde ao contrato');
+  if (sampleLearningPolicy.learning?.allowedSource !== 'REAL_OBD' || sampleLearningPolicy.learning.updateOnlyAfterFiveValidSamplesForThatPid !== true || sampleLearningPolicy.learning.denySimulationAndImportedSamples !== true) errors.push('pid_learning_policy.json: aprendizado precisa exigir amostras reais completas');
+
   cachedResult = { valid: errors.length === 0, errors, checkedCatalogs };
   return { ...cachedResult, errors: [...cachedResult.errors], checkedCatalogs: [...cachedResult.checkedCatalogs] };
 }
