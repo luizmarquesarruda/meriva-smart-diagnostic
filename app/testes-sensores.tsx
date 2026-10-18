@@ -10,7 +10,7 @@ import {assessSensorSample,createSensorTestPlan,getSensorTestCatalog,MIN_SENSOR_
 const catalog=getSensorTestCatalog();
 const labels:Record<SensorAssessment['state'],string>={CONSISTENTE:'COERENTE',INVESTIGAR:'INVESTIGAR',SEM_RESPOSTA:'SEM RESPOSTA',NAO_CONCLUSIVO:'NÃO CONCLUSIVO'};
 const colors:Record<SensorAssessment['state'],string>={CONSISTENTE:'#4ade80',INVESTIGAR:'#fbbf24',SEM_RESPOSTA:'#fb7185',NAO_CONCLUSIVO:'#93c5fd'};
-const median=(values:number[])=>{if(!values.length)return null;const a=[...values].sort((x,y)=>x-y),i=Math.floor(a.length/2);return a.length%2?a[i]:(a[i-1]+a[i])/2;};
+const average=(values:number[])=>values.length?values.reduce((sum,value)=>sum+value,0)/values.length:null;
 const valueText=(value:number|null,unit:string)=>value==null?'N/D':value.toFixed(2)+' '+unit;
 const clock=(milliseconds:number)=>{const seconds=Math.max(0,Math.ceil(milliseconds/1000));return String(Math.floor(seconds/60)).padStart(2,'0')+':'+String(seconds%60).padStart(2,'0');};
 export default function TestesSensoresScreen(){
@@ -26,7 +26,7 @@ export default function TestesSensoresScreen(){
  const supported=new Set((connection?.supportedPids??[]).map(p=>p.replace(/\s/g,'').toUpperCase()));
  const grouped=useMemo(()=>testPlan.map(test=>{
   const rows=samples.filter(sample=>sample.pid===test.pid),values=rows.filter(sample=>sample.status==='RESPONDEU'&&sample.value!==null&&Number.isFinite(sample.value)).map(sample=>sample.value as number),last=rows[rows.length-1];
-  const representative:SensorTestSample={pid:test.pid,name:test.label,value:median(values),unit:last?.unit??getPidDefinition(test.pid)?.unit??'N/D',status:last?.status??'AINDA_NAO_TESTADO',rawResponse:last?.rawResponse??'',elapsedMs:last?.elapsedMs??0,timestamp:last?.timestamp??new Date().toISOString(),readingNumber:last?.readingNumber};
+  const representative:SensorTestSample={pid:test.pid,name:test.label,value:average(values),unit:last?.unit??getPidDefinition(test.pid)?.unit??'N/D',status:last?.status??'AINDA_NAO_TESTADO',rawResponse:last?.rawResponse??'',elapsedMs:last?.elapsedMs??0,timestamp:last?.timestamp??new Date().toISOString(),readingNumber:last?.readingNumber};
   return {test,rows,values,representative,assessment:assessSensorSample(representative,mode,samples)};
  }),[testPlan,samples,mode]);
  const attention=grouped.filter(x=>x.assessment.state==='INVESTIGAR').length;
@@ -53,7 +53,7 @@ export default function TestesSensoresScreen(){
    if(pre.parsed.status!=='RESPONDEU'||rpm==null)throw new Error('Não foi possível confirmar a condição do motor pela RPM.');
    if(mode==='ENGINE_OFF'&&rpm>50)throw new Error('RPM '+rpm.toFixed(0)+': o motor parece ligado. Desligue-o ou selecione Motor ligado.');
    if(mode==='ENGINE_ON'&&rpm<400)throw new Error('RPM '+rpm.toFixed(0)+': não foi possível confirmar motor funcionando em marcha lenta.');
-   setMessage('Executando três rodadas sequenciais. Respostas ausentes também serão registradas como tentativas; nenhum PID será consultado em paralelo.');
+   setMessage('Executando cinco rodadas sequenciais. Respostas ausentes também serão registradas como tentativas; nenhum PID será consultado em paralelo.');
    outer:for(let sampleRound=1;sampleRound<=MIN_SENSOR_TEST_READINGS;sampleRound++){
     setRound(sampleRound);
     for(const test of plan){
@@ -67,7 +67,7 @@ export default function TestesSensoresScreen(){
     }
    }
    finished=!cancelled.current&&readings.length===expectedReads;setCompleted(finished);setAborted(!finished);
-   setMessage(finished?'Varredura concluída: cada PID suportado teve três tentativas. Revise as evidências antes de reparar.':'Teste interrompido; as leituras concluídas foram mantidas para relatório parcial.');
+   setMessage(finished?'Varredura concluída: cada PID anunciado e catalogado teve cinco tentativas. Revise as evidências antes de reparar.':'Teste interrompido; as leituras concluídas foram mantidas para relatório parcial.');
    setRound(finished?MIN_SENSOR_TEST_READINGS:0);
   }catch(cause){setError(cause instanceof Error?cause.message:'Falha desconhecida durante a consulta.');setMessage('Varredura não concluída normalmente; leituras finalizadas permanecem disponíveis.');setAborted(true);}
   finally{setRunning(false);setCountdownMs(0);setCurrentPid('');}
@@ -80,7 +80,7 @@ export default function TestesSensoresScreen(){
    const path=dir+'/teste-sensores-'+new Date().toISOString().replace(/[:.]/g,'-')+'.txt';
    const lines=['MERIVA SMART DIAGNOSTIC — CENTRAL DE TESTES DE SENSORES','Catálogo: '+catalog.catalogId+' v'+catalog.schemaVersion,'Data: '+new Date().toLocaleString(),'Veículo de referência: Chevrolet Meriva Maxx 1.4 8V ECONO.FLEX 2011/2012','Condição: '+(mode==='ENGINE_OFF'?'IGNIÇÃO LIGADA / MOTOR DESLIGADO':'MOTOR LIGADO, VEÍCULO PARADO'),'ECU validada no início: '+(connectedAtStart.current?'SIM':'NÃO'),'Protocolo observado: '+(getSharedObdConnection()?.protocol??'N/D'),'Leituras mínimas por PID: '+MIN_SENSOR_TEST_READINGS,'PIDs selecionados pela bitmap: '+testPlan.length,'Tentativas previstas: '+plannedReads,'Tentativas registradas: '+samples.length,'Execução completa: '+(completed?'SIM':'NÃO — RELATÓRIO PARCIAL'),'Tempo decorrido: '+Math.round((Date.now()-runStartedAt.current)/1000)+' s','','AVALIAÇÃO POR PID'];
    for(const item of grouped){
-    lines.push('',item.test.pid+' — '+item.test.label,'Resultado: '+item.assessment.state+' — '+item.assessment.title,'Explicação: '+item.assessment.explanation,'Guia da IA local: '+item.test.aiGuidance,'Leituras válidas: '+item.values.length+'/'+MIN_SENSOR_TEST_READINGS);
+    lines.push('',item.test.pid+' — '+item.test.label,'Resultado: '+item.assessment.state+' — '+item.assessment.title,'Explicação: '+item.assessment.explanation,'Guia da IA local: '+item.test.aiGuidance,'Leituras válidas: '+item.values.length+'/'+MIN_SENSOR_TEST_READINGS+' | Média aritmética: '+(average(item.values)===null?'N/D':average(item.values).toFixed(3)));
     for(const row of item.rows)lines.push('Leitura '+row.readingNumber+': '+valueText(row.value,row.unit)+' | Parser: '+row.status+' | Latência: '+row.elapsedMs+' ms | '+row.timestamp,'RX bruto: '+(row.rawResponse||'VAZIO'));
    }
    lines.push('','POLÍTICA: resposta positiva confirma resposta do PID, não exatidão física/elétrica do sensor. PIDs fora da bitmap não foram consultados.','REFERÊNCIAS: SAE J1979 supported-PID bitmap; Dashlogic PID listing; OBD2 PID Knowledge; auditoria da Bíblia da Meriva.','Limiares são heurísticos, não especificações OEM. Algumas verificações exigem multímetro, osciloscópio ou condições controladas.');
@@ -88,7 +88,7 @@ export default function TestesSensoresScreen(){
   }catch(cause){setError(cause instanceof Error?cause.message:'Falha ao salvar relatório TXT.');}
  }
  return <SafeAreaView style={st.container} edges={['top','bottom','left','right']}><ScrollView contentContainerStyle={[st.content,{paddingHorizontal:layout.horizontalPadding}]}><View style={[st.frame,{maxWidth:layout.maxContentWidth}]}>
-  <Text style={st.title}>CENTRAL DE TESTES</Text><Text style={st.subtitle}>CATÁLOGO JSON • DADOS REAIS • 3 LEITURAS MÍNIMAS POR PID</Text>
+  <Text style={st.title}>CENTRAL DE TESTES</Text><Text style={st.subtitle}>CATÁLOGO JSON • DADOS REAIS • 5 LEITURAS SEQUENCIAIS POR PID</Text>
   <View style={[st.connection,connected?st.good:st.warn]}><Text style={connected?st.goodTitle:st.warnTitle}>{connected?'● ECU VALIDADA':'● ECU NÃO VALIDADA'}</Text><Text style={st.muted}>{connection?.device.name??'Nenhum adaptador ativo'} · {connection?.protocol??'Protocolo N/D'}</Text><Text style={st.muted}>Só PIDs anunciados pela ECU e cadastrados no catálogo entram na varredura.</Text></View>
   <Text style={st.section}>CONDIÇÃO DO MOTOR</Text><View style={[st.modes,layout.landscape&&st.modesWide]}>
    <TouchableOpacity disabled={running} onPress={()=>setMode('ENGINE_OFF')} style={[st.mode,mode==='ENGINE_OFF'&&st.selected]}><Text style={st.icon}>⏻</Text><Text style={st.modeTitle}>Motor desligado</Text><Text style={st.muted}>Ignição ligada, motor parado</Text></TouchableOpacity>
