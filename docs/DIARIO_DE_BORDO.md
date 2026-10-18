@@ -2891,3 +2891,32 @@ A descoberta do aplicativo estava limitada a quatro mapas de suporte (`0100`, `0
 
 ### Próximo passo
 Executar `npm run validate` com autorização e testar uma conexão real em KWP 10400 baud. Guardar as respostas brutas das bitmaps e comparar o conjunto anunciado com os PIDs individuais que a ECU realmente responde.
+
+
+## 2026-10-18 — Descoberta estendida OBD Mode 06/09 e persistência JSON
+
+### Objetivo
+Ampliar a coleta além dos PIDs de dados correntes Mode 01, sem sondagem indiscriminada, sem comandos que alterem a ECU e sem concorrência na K-Line/KWP.
+
+### Implementação
+- Criado `src/obd/extendedPidDiscovery.ts` com decodificação de bitmaps de suporte Mode 09 (`49 xx`) e Mode 06 (`46 xx`).
+- A descoberta consulta cada bitmap de forma serial e só avança para o próximo bloco quando o bit de continuação é anunciado pela ECU.
+- Mode 09 consulta somente os tipos anunciados e permitidos pela política: `0901`, `0903`, `0904`, `0905`, `0906`, `0907` e `090A`. O tipo `0902` é explicitamente excluído.
+- Mode 06, nesta etapa, registra bitmaps e respostas brutas dos OBDMIDs suportados; não interpreta resultados individuais sem um parser específico validado.
+- Criado `src/database/extendedDiscoveryStore.ts` para gravar relatório JSON da sessão com comando TX, resposta RX, status, latência, protocolo e timestamp.
+- Criado `src/knowledge/extended_obd_discovery_policy.json` com serviços, comandos de descoberta, política sequencial, persistência e limites de segurança.
+- Adicionado botão manual “DESCOBRIR MODOS OBD 06/09” à Central de Testes. A rotina exige ECU conectada e validada; não roda automaticamente em segundo plano.
+- Adicionada regressão `testExtendedPidDiscovery` à suíte existente em `tests/regression.test.js`, cobrindo bitmaps, ordem serial e exclusão do comando `0902`.
+
+### Limites e riscos remanescentes
+- Suporte ao serviço/modo não garante que cada teste individual seja suportado nem que o resultado tenha significado clínico/mecânico sem decodificação específica.
+- Os resultados Mode 06 ainda são brutos; não são convertidos em diagnóstico ou aprovação/reprovação de componente.
+- A descoberta Mode 09 pode produzir metadados de calibração da ECU; os arquivos JSON ficam no armazenamento local do aplicativo.
+- A execução real na Meriva com adaptador KWP 10400 baud ainda é necessária para verificar compatibilidade do ELM327 e respostas efetivas.
+
+### Validação
+- Verificação estática pós-commit: arquivos novos, imports da tela, botão manual, persistência JSON e teste de regressão confirmados no branch.
+- **Não foi executado `npm run validate`, não foi executado Android build, não houve teste físico e nenhuma CI foi disparada**, conforme a instrução de não disparar CI enquanto os pontos são consolidados.
+
+### Próximo passo
+Quando autorizado, executar `npm run validate` localmente/ambiente de validação sem disparar CI; corrigir qualquer falha observada. Depois realizar coleta real estacionária e inspecionar os relatórios JSON antes de habilitar decodificação de testes Mode 06 individuais.
