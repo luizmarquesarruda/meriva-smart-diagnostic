@@ -76,17 +76,32 @@ export function AppIcon({
   return <Icon size={size} color={color} strokeWidth={strokeWidth} />;
 }
 
+type AppIconBadgeTone = 'blue' | 'gold' | 'success' | 'warning' | 'danger';
+
 type AppIconBadgeProps = {
   name: AppIconName;
   size?: number;
   color?: string;
+  tone?: AppIconBadgeTone;
+};
+
+const BADGE_TONES: Record<AppIconBadgeTone, { borderColor: string; backgroundColor: string }> = {
+  blue: { borderColor: '#315579', backgroundColor: '#102743' },
+  gold: { borderColor: '#8e7132', backgroundColor: '#2b271b' },
+  success: { borderColor: '#28613e', backgroundColor: '#10261b' },
+  warning: { borderColor: '#8e7132', backgroundColor: '#2b271b' },
+  danger: { borderColor: '#713043', backgroundColor: '#28151c' },
 };
 
 export function AppIconBadge({
   name,
   size = 44,
   color = '#7db3ff',
+  tone,
 }: AppIconBadgeProps) {
+  const effectiveTone = tone ?? (color === '#e8b54b' ? 'gold' : 'blue');
+  const badgeTone = BADGE_TONES[effectiveTone];
+
   return (
     <View
       accessible={false}
@@ -95,11 +110,11 @@ export function AppIconBadge({
         {
           width: size,
           height: size,
-          borderColor: color === '#e8b54b' ? '#8e7132' : '#315579',
+          borderColor: badgeTone.borderColor,
         },
       ]}
     >
-      <View style={[styles.inner, { backgroundColor: color === '#e8b54b' ? '#2b271b' : '#102743' }]}>
+      <View style={[styles.inner, { backgroundColor: badgeTone.backgroundColor }]}>
         <AppIcon name={name} size={Math.round(size * 0.52)} color={color} strokeWidth={1.9} />
       </View>
     </View>
