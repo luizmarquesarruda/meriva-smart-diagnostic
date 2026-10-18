@@ -6,6 +6,7 @@ import * as FileSystem from 'expo-file-system';
 import {useMidLayout} from '../src/ui/midLayout';
 import {getSharedObdConnection,getSharedObdStatus,subscribeSharedObd,subscribeSharedObdStatus} from '../src/obd/sharedConnection';
 import {getPidDefinition} from '../src/obd/pidDefinition';
+import {updateLearningProfileRealSample} from '../src/database/learningProfile';
 import {assessSensorSample,createSensorTestPlan,getSensorTestCatalog,MIN_SENSOR_TEST_READINGS,type SensorTestDefinition,type SensorTestMode,type SensorTestSample,type SensorAssessment} from '../src/diagnostics/sensorTestEngine';
 const catalog=getSensorTestCatalog();
 const labels:Record<SensorAssessment['state'],string>={CONSISTENTE:'COERENTE',INVESTIGAR:'INVESTIGAR',SEM_RESPOSTA:'SEM RESPOSTA',NAO_CONCLUSIVO:'NÃO CONCLUSIVO'};
@@ -66,8 +67,21 @@ export default function TestesSensoresScreen(){
      readings.push(sample);setSamples([...readings]);recordCommand(response.elapsedMs,expectedCommands);
     }
    }
-   finished=!cancelled.current&&readings.length===expectedReads;setCompleted(finished);setAborted(!finished);
-   setMessage(finished?'Varredura concluída: cada PID anunciado e catalogado teve cinco tentativas. Revise as evidências antes de reparar.':'Teste interrompido; as leituras concluídas foram mantidas para relatório parcial.');
+   finished=!cancelled.current&&readings.length===expectedReads;
+   if(finished){
+    const basePath=(FileSystem.documentDirectory??'')+'MERIVA_SMART';
+    for(const test of plan){
+     const valid=readings.filter(row=>row.pid===test.pid&&row.status==='RESPONDEU'&&row.value!==null&&Number.isFinite(row.value));
+     if(valid.length!==MIN_SENSOR_TEST_READINGS)continue;
+     const learnedMean=average(valid.map(row=>row.value as number));
+     if(learnedMean===null||!Number.isFinite(learnedMean))continue;
+     // Uma média por PID e por execução evita contar as cinco amostras correlacionadas como cinco experiências independentes.
+     await updateLearningProfileRealSample(basePath,getPidDefinition(test.pid)?.name??test.label,learnedMean,'UNKNOWN');
+    }
+    setMessage('Cinco leituras por PID concluídas. Médias reais incorporadas ao perfil local de aprendizado; revise as avaliações antes de qualquer reparo.');
+   }
+   setCompleted(finished);setAborted(!finished);
+   if(!finished)setMessage('Teste interrompido; as leituras concluídas foram mantidas para relatório parcial.');
    setRound(finished?MIN_SENSOR_TEST_READINGS:0);
   }catch(cause){setError(cause instanceof Error?cause.message:'Falha desconhecida durante a consulta.');setMessage('Varredura não concluída normalmente; leituras finalizadas permanecem disponíveis.');setAborted(true);}
   finally{setRunning(false);setCountdownMs(0);setCurrentPid('');}
