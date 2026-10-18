@@ -94,6 +94,11 @@ export default function TestesSensoresScreen(){
      const sample:SensorTestSample={pid:test.pid,name:test.label,value:response.parsed.status==='RESPONDEU'?response.parsed.value:null,unit:response.parsed.unit||getPidDefinition(test.pid)?.unit||'N/D',status:response.parsed.status,rawResponse:response.rx,elapsedMs:response.elapsedMs,timestamp:new Date().toISOString(),readingNumber:sampleRound};
      readings.push(sample);setSamples([...readings]);recordCommand(response.elapsedMs,expectedCommands);
     }
+    if(plan.every(test=>{
+     const attempts=readings.filter(item=>item.pid===test.pid);
+     const valid=attempts.filter(item=>item.status==='RESPONDEU'&&item.value!==null&&Number.isFinite(item.value)).length;
+     return valid>=MIN_SENSOR_TEST_READINGS||attempts.length>=MAX_SENSOR_TEST_ATTEMPTS;
+    }))break outer;
    }
    const pidsLearned=await learnCompletedPidSamples(readings,plan,mode);
    finished=!cancelled.current&&plan.every(test=>summarizeSensorPidSamples(readings,test.pid,test.aggregation).validSamples>=MIN_SENSOR_TEST_READINGS);
