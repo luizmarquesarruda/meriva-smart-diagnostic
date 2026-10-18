@@ -3,6 +3,7 @@ import { Link } from 'expo-router';
 import { ScrollView, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { AdaptiveText as Text } from '../src/ui/AdaptiveText';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { AppIconBadge } from '../src/ui/AppIcon';
 import * as FileSystem from 'expo-file-system';
 import { flushCsvLogs } from '../src/database/csvLogger';
 import { checkStorageQuota, getStorageBreakdown, StorageQuotaConfig } from '../src/storage/quotaManager';
@@ -96,8 +97,13 @@ export default function ArmazenamentoScreen() {
     <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
       <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
       <Link href="/mais" asChild><TouchableOpacity accessibilityRole="button" accessibilityLabel="Voltar ao menu Mais recursos" style={styles.navigationBack}><Text style={styles.navigationBackText}>← VOLTAR AOS RECURSOS</Text></TouchableOpacity></Link>
-      <Text style={styles.title}>HISTÓRICO E DADOS</Text>
-      <Text style={styles.subtitle}>O app salva as viagens e leituras automaticamente. Esta tela serve para acompanhar o espaço usado e fazer limpeza quando necessário.</Text>
+      <View style={styles.pageHeader}>
+        <AppIconBadge name="history" size={44} color="#e8b54b" />
+        <View style={styles.pageHeaderCopy}>
+          <Text style={styles.title}>HISTÓRICO E DADOS</Text>
+          <Text style={styles.subtitle}>Viagens e leituras salvas automaticamente; acompanhe o espaço e exporte quando necessário.</Text>
+        </View>
+      </View>
       <Text style={[styles.status, quota?.critical ? styles.critical : quota?.warning ? styles.warning : styles.ok]}>
         {quota?.message || 'VERIFICANDO'}
       </Text>
@@ -168,6 +174,8 @@ const styles = StyleSheet.create({
   dataColumns: { width: '100%' },
   dataColumnsLandscape: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
   dataColumnCard: { flex: 1, minWidth: 0 },
+  pageHeader: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 8 },
+  pageHeaderCopy: { flex: 1, minWidth: 0 },
   title: { fontSize: 23, fontWeight: '900', color: '#7db3ff', letterSpacing: 0.5, marginBottom: 5 },
   subtitle: { color: '#8da2bd', fontSize: 11, lineHeight: 16, marginBottom: 12 },
   status: { fontWeight: '700', marginBottom: 16 },
