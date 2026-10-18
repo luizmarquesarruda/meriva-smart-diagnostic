@@ -2920,3 +2920,21 @@ Ampliar a coleta além dos PIDs de dados correntes Mode 01, sem sondagem indiscr
 
 ### Próximo passo
 Quando autorizado, executar `npm run validate` localmente/ambiente de validação sem disparar CI; corrigir qualquer falha observada. Depois realizar coleta real estacionária e inspecionar os relatórios JSON antes de habilitar decodificação de testes Mode 06 individuais.
+
+
+## 2026-10-18 — Reserva atômica da fila OBD para descoberta estendida
+
+### Problema identificado na revisão
+A primeira integração chamava `executeCommand` separadamente para cada consulta. Embora cada comando individual fosse serializado, telemetria ou outra tela poderia inserir comandos entre consultas da mesma descoberta. Isso prolongaria a varredura e misturaria as amostras da tarefa com tráfego de monitoramento.
+
+### Correções
+- Adicionado `Elm327Session.withExclusiveCommandSession`, que reserva a fila de comandos durante toda a operação diagnóstica.
+- A descoberta Mode 06/09 prefere esse mecanismo e utiliza o executor exclusivo recebido no callback; não chama `executeCommand` recursivamente dentro do bloqueio, evitando deadlock.
+- Mantida compatibilidade com sessões simuladas/alternativas que oferecem apenas `executeCommand`.
+- A Central de Testes agora desabilita o botão de teste completo enquanto a descoberta estendida está em andamento, evitando que as duas tarefas concorram.
+- Expandida a regressão para verificar que a descoberta utiliza a sessão exclusiva quando disponível.
+
+### Validação e limites
+- Conferência estática do contrato entre `Elm327Session`, rotina Mode 06/09, tela e teste.
+- Nenhum teste automatizado, typecheck, build Android ou teste físico foi executado nesta etapa.
+- Nenhuma CI foi disparada.
