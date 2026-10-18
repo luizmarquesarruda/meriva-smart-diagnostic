@@ -2746,6 +2746,8 @@ O catálogo de ícones já existia, mas sua adoção não estabelecia uma hierar
 - Mais Recursos: grade responsiva de cartões em duas colunas com ícone, título, descrição curta e seta.
 - Cabeçalhos com emblema vetorial adicionados ou alinhados em Saúde, Dados ao Vivo, Veículo, Aprendizado, Bluetooth, Configurações, Histórico, Viagens e Diagnóstico OBD.
 - Cartões de telemetria em Dados ao Vivo também recebem ícones específicos para velocidade, distância, consumo e autonomia, associados aos respectivos valores em vez de usar um símbolo genérico.
+- Estados do Bluetooth/ELM327/ECU e saúde da comunicação foram diferenciados por ícones; Configurações e Saúde também ganharam ícones nos títulos de seção.
+- Relatório de Viagens padronizado para a paleta azul/âmbar do cockpit, com ícones nas três métricas do resumo e seta vetorial nos cartões de viagem.
 - Laboratório OBD: paleta alinhada ao cockpit e ícones nas ações de conexão, consulta PID, descoberta de PIDs e varredura de DTC.
 - AppIconBadge: tons semânticos azul, dourado, sucesso, aviso e falha; a saúde do veículo usa o tom correspondente ao estado.
 - Criado `docs/REAVALIACAO_LAYOUT_ICONES_2026-10-18.md` com as decisões de UX, paleta e limitações de validação.
@@ -2766,6 +2768,11 @@ O catálogo de ícones já existia, mas sua adoção não estabelecia uma hierar
 - Contratos de teste atualizados: `4ad130c08c04e958665b3286aebe92b7d5cbe1a2`.
 - Teste ampliado para exigir os quatro ícones dos cartões de telemetria: `a50dfae1ba4dc182f5b20b2ee96f06b492eb9c55`.
 - Componente de métricas de Dados ao Vivo atualizado para exibir os ícones contextuais: `97623ac5bf03874e66c7cfc0f84fa901c8315e47`.
+- Relatório de Viagens harmonizado com a paleta e ícones nas métricas: `d3a31e77be867e866b2eac13b7a25192a920ef18`.
+- Cartões de conexão ELM327 receberam ícones contextuais: `f9470b52531405acbe5268d0271c6a076dc77352`.
+- Ícones nas seções de Configurações, Saúde e Dados ao Vivo: `4a89c0b3d888bee94335d2f35ecef97e7d8e9a6b`, `1a6142bdcb7789762cc2e581612bb643b402b668`, `3902c3482d0f4c3ecfb98a4a5948cc66022b4850`.
+- Contratos adicionais de teste para layout, Bluetooth e paleta de Viagens: `267cfabbb6d4e4abe385272b637515c55a60155f`.
+- Os testes relativos às métricas de Dados e Viagens também foram ampliados nos commits `a50dfae1ba4dc182f5b20b2ee96f06b492eb9c55` e `a127d2bd2548847ee2fa8c2800ed5b6e03d0ce2b`.
 - Documento de revisão: `f56aef51da8b8a76265ba03b60b047dd8c6e2033`.
 
 ### Resultado e próximo passo
