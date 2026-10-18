@@ -53,7 +53,7 @@ const screens = [
   ['app/aprendizado.tsx', ['AppIcon name="health"', 'AppIconBadge name="learning"']],
   ['app/laboratorio.tsx', ['AppIconBadge name="diagnostics"', 'name="bluetooth"', 'name="radio"', "backgroundColor: '#07111f'"]],
   ['app/configuracoes.tsx', ['AppIconBadge name="settings"', 'PAINEL • CONEXÃO • ARMAZENAMENTO', 'name="fuel"', 'name="dashboard"', 'name="bluetooth"', 'name="database"', 'sectionHeader']],
-  ['app/armazenamento.tsx', ['AppIconBadge name="history"', 'HISTÓRICO E DADOS']],
+  ['app/armazenamento.tsx', ['AppIconBadge name="history"', 'HISTÓRICO E DADOS', 'name="database"', 'name="trips"', 'name="refresh"', 'name="file"', 'name="trash"', 'cardHeading', 'Exportar dados em JSON']],
   ['app/viagens.tsx', ['AppIconBadge name="trips"', 'RELATÓRIO DE VIAGENS', 'Metric icon="trips"', 'Metric icon="dashboard"', 'Metric icon="fuel"', "AppIcon name=\"forward\""]],
 ];
 
@@ -61,6 +61,7 @@ const cockpit = read('app/index.tsx');
 assert.ok(cockpit.includes('selectedHeroMetric.icon'), 'primary indicator should show its contextual icon');
 assert.ok(cockpit.includes('CockpitMetric icon="fuel"') && cockpit.includes('CockpitMetric icon="trips"') && cockpit.includes('CockpitMetric icon="alert"'), 'cockpit summary metrics should each show a contextual icon');
 assert.ok(cockpit.includes('metricLabelRow'), 'cockpit metric labels should pair icon and text without replacing the label');
+assert.ok(cockpit.includes('CockpitMetric icon="fuel"') && cockpit.includes('CockpitMetric icon="trips"') && cockpit.includes('CockpitMetric icon="alert"'), 'cockpit summary metrics should each show a contextual icon');
 assert.ok(cockpit.includes('DADOS AO VIVO') && cockpit.includes('TESTES DE SENSORES'), 'cockpit should expose high-frequency shortcuts');
 assert.ok(cockpit.includes('accessibilityLabel="Abrir saúde do veículo e revisar evidências"'), 'health summary should be a clear, accessible action');
 
