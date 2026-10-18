@@ -29,7 +29,13 @@ assert.match(config, /minHeight: 48/, 'opções de configuração devem ter alvo
 assert.match(cockpit, /metric\.id !== 'SPEED' \|\| settings\?\.showSpeedMetric/);
 assert.match(cockpit, /settings\?\.homeAutoRotate/);
 assert.match(cockpit, /Animated\.timing/);
-assert.match(cockpit, /bottomNavItem:\{[^}]*minHeight:44/);
+const bottomNavItemStyle = cockpit.match(/bottomNavItem\\s*:\\s*\\{([^}]*)\\}/);
+assert.ok(bottomNavItemStyle, 'o item da navegação principal deve declarar seu estilo');
+const bottomNavMinHeight = bottomNavItemStyle[1].match(/minHeight\\s*:\\s*(\\d+)/);
+assert.ok(
+  bottomNavMinHeight && Number(bottomNavMinHeight[1]) >= 44,
+  'atalhos da navegação principal devem manter alvo de toque com pelo menos 44 px',
+);
 assert.match(health, /CARSCANNER_BASELINE/);
 assert.match(health, /composeDiagnosticResponse/);
 console.log('Dashboard settings, readability and AI provenance: OK');
