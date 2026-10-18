@@ -152,23 +152,23 @@ export default function BluetoothScreen() {
 
         <View style={[styles.connectionGrid, layout.landscape && styles.connectionGridLandscape]}>
           <View style={[styles.connectionCard, layout.landscape && styles.connectionCardLandscape]}>
-            <Text style={styles.label}>BLUETOOTH</Text>
+            <View style={styles.labelRow}><AppIcon name="bluetooth" size={15} color="#7db3ff" /><Text style={styles.label}>BLUETOOTH</Text></View>
             <Text style={bluetoothConnected ? styles.online : styles.waiting}>{bluetoothConnected ? 'CONECTADO' : 'AGUARDANDO'}</Text>
             <Text style={styles.detail}>{bluetoothConnected ? (connectedName ?? 'ELM327') : status}</Text>
             <Text style={styles.detail}>ESTADO: {lifecycleLabel(lifecycle)}</Text>
           </View>
           <View style={[styles.connectionCard, layout.landscape && styles.connectionCardLandscape]}>
-            <Text style={styles.label}>ELM327</Text>
+            <View style={styles.labelRow}><AppIcon name="connection" size={15} color="#e8b54b" /><Text style={styles.label}>ELM327</Text></View>
             <Text style={lifecycle === 'READY' ? styles.online : styles.waiting}>
               {lifecycle === 'READY' ? 'PRONTO' : lifecycle === 'ELM_INITIALIZED' ? 'INICIALIZADO' : lifecycle === 'ELM_RESPONDING' ? 'RESPONDENDO' : lifecycle === 'BLUETOOTH_CONNECTED' ? 'AGUARDANDO RESPOSTA' : 'AGUARDANDO'}
             </Text>
           </View>
           <View style={[styles.connectionCard, layout.landscape && styles.connectionCardLandscape]}>
-            <Text style={styles.label}>ECU</Text>
+            <View style={styles.labelRow}><AppIcon name="cpu" size={15} color="#7db3ff" /><Text style={styles.label}>ECU</Text></View>
             <Text style={ecuConnected ? styles.online : styles.waiting}>{ecuConnected ? 'CONECTADA' : ecuResponseState === 'NO_RESPONSE' ? 'SEM RESPOSTA' : ecuResponseState === 'RECOVERING' ? 'RECUPERANDO' : connectedName ? 'CONECTANDO' : 'AGUARDANDO'}</Text>
           </View>
           <View style={[styles.connectionCard, layout.landscape && styles.connectionCardLandscape]}>
-            <Text style={styles.label}>SAÚDE DO ELM327</Text>
+            <View style={styles.labelRow}><AppIcon name="activity" size={15} color="#e8b54b" /><Text style={styles.label}>SAÚDE DO ELM327</Text></View>
             {(() => {
               const health = getSharedObdConnection()?.session.getHealthSnapshot();
               return health ? (
@@ -256,6 +256,7 @@ const styles = StyleSheet.create({
   connectionGridLandscape: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   connectionCardLandscape: { width: '48.5%', marginBottom: 0 },
   connectionCard: { width: '100%', backgroundColor: '#111c2e', borderRadius: 14, borderWidth: 1, borderColor: '#29415f', padding: 15, marginBottom: 10 },
+  labelRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 2 },
   label: { color: '#7185a1', fontSize: 9, fontWeight: '900', letterSpacing: 1 },
   online: { color: '#4ade80', fontSize: 24, fontWeight: '900', marginTop: 3 },
   waiting: { color: '#fbbf24', fontSize: 24, fontWeight: '900', marginTop: 3 },
