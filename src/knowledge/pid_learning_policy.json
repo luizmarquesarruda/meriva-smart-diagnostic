@@ -14,7 +14,7 @@
     "onlyTestPidsAnnouncedByCurrentEcuBitmap": true
   },
   "buffer": {
-    "type": "IN_MEMORY_MAP_BY_PID",
+    "type": "IN_MEMORY_RAW_SAMPLE_BUFFER_FILTERED_BY_PID",
     "preserveRawAttempts": true,
     "validStatus": "RESPONDEU",
     "requireFiniteValue": true,
