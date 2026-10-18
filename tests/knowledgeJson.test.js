@@ -32,6 +32,8 @@ function main() {
   const sensorTests = readJson('src/knowledge/sensor_tests.json');
   const dtcCatalog = readJson('src/knowledge/dtc_catalog.json');
   const pollingPolicy = readJson('src/knowledge/polling_policy.json');
+  const fuelModel = readJson('src/knowledge/fuel_consumption_model.json');
+  const fuelFindings = readJson('src/knowledge/fuel_consumption_findings.json');
 
   assert.strictEqual(typeof pids.version, 'number');
   assert.strictEqual(typeof formulas.version, 'number');
@@ -49,7 +51,20 @@ function main() {
   assert.ok(Array.isArray(sensorTests.sources) && sensorTests.sources.length >= 5, 'fontes pesquisadas ausentes');
   assert.strictEqual(typeof dtcCatalog.version, 'number');
   assert.strictEqual(typeof pollingPolicy.version, 'number');
-  assert.strictEqual(pollingPolicy.version, 2, 'cadência flex-fuel exige versão de contrato atualizada');
+  assert.strictEqual(pollingPolicy.version, 3, 'política deve acompanhar o modelo parametrizado por JSON');
+  assert.strictEqual(fuelModel.schemaVersion, 1);
+  assert.strictEqual(fuelModel.modelId, 'MERIVA_OBD_HYBRID_FUEL_FLOW');
+  assert.strictEqual(fuelModel.pids.measuredFuelRate, '015E');
+  assert.strictEqual(fuelModel.pids.massAirFlow, '0110');
+  assert.strictEqual(fuelModel.pids.manifoldAbsolutePressure, '010B');
+  assert.strictEqual(fuelModel.fuelProperties.gasolineCRetailReference.blend, 'E32');
+  assert.strictEqual(fuelModel.calibration.runtimeCalibrationEnabled, false);
+  assert.ok(fuelModel.calibration.minimumValidFullToFullIntervals >= 3);
+  assert.ok(Array.isArray(fuelModel.researchSources) && fuelModel.researchSources.length >= 4);
+  assert.strictEqual(fuelFindings.schemaVersion, 1);
+  assert.strictEqual(fuelFindings.researchDate, '2026-10-18');
+  assert.ok(fuelFindings.findings.length >= 6);
+  assert.ok(fuelFindings.knownLimitations.some((item) => item.includes('RAW_ECU')));
   assert.ok(Array.isArray(dtcCatalog.codes) && dtcCatalog.codes.length > 0, 'catálogo DTC vazio');
   assert.strictEqual(dtcCatalog.standard, 'SAE J2012');
   assertUnique(dtcCatalog.codes.map((item) => String(item.code).toUpperCase()), 'DTC catalogado');
