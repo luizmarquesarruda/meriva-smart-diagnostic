@@ -489,9 +489,11 @@ class AutoTripService {
             : this.state.estimatedRangeKm,
           error: rpm === 0 && obdSpeedKmh === 0 && fuelRateForDisplayLph == null
             ? 'MOTOR DESLIGADO? / ECU SEM TELEMETRIA VÁLIDA'
-            : fuelRateForDisplaySource && fuelRateForDisplaySource !== 'MEASURED_015E'
-              ? 'CONSUMO ESTIMADO POR ' + fuelRateForDisplaySource.replace('ESTIMATED_', '')
-              : null,
+            : fuelRateForDisplaySource === 'ESTIMATED_FLEX'
+              ? 'CONSUMO FLEX ESTIMADO (MISTURA DE REFERÊNCIA 50%; NÃO MEDIDA)'
+              : fuelRateForDisplaySource && fuelRateForDisplaySource !== 'MEASURED_015E'
+                ? 'CONSUMO ESTIMADO POR ' + fuelRateForDisplaySource.replace('ESTIMATED_', '')
+                : null,
         });
       } catch (cause) {
         this.setState({

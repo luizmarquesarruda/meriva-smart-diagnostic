@@ -135,11 +135,11 @@ export default function ConfiguracaoScreen() {
             </View>
             <Text style={styles.note}>
               {settings.fuelType === 'FLEX'
-                ? 'No modo FLEX, a estimativa MAF/MAP exige composição de etanol válida via PID 0152; sem ela, o consumo estimado fica indisponível em vez de assumir gasolina.'
+                ? 'Se o PID 0152 não informar a mistura, MAF/MAP ainda podem gerar uma estimativa com mistura de referência 50% etanol / 50% gasolina. Ela será identificada como estimativa, não como leitura medida. Para melhorar a aproximação, selecione o combustível que realmente abasteceu o tanque.'
                 : settings.fuelType === 'ETANOL'
-                  ? 'Estimativa MAF/MAP usa parâmetros aproximados de etanol.'
-                  : 'Estimativa MAF/MAP usa parâmetros aproximados de gasolina.'}
-              {' '}A leitura medida PID 015E sempre tem precedência.
+                  ? 'Estimativa MAF/MAP usa parâmetros aproximados de etanol; selecione esta opção quando o tanque estiver abastecido com etanol.'
+                  : 'Estimativa MAF/MAP usa parâmetros aproximados de gasolina; selecione esta opção quando o tanque estiver abastecido com gasolina.'}
+              {' '}A leitura medida PID 015E sempre tem precedência. Sem MAF 0110 nem MAP 010B + IAT 010F + RPM 010C válidos, o app não inventa uma taxa de combustível.
             </Text>
           </View>
 

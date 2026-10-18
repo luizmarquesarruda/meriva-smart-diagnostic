@@ -86,7 +86,7 @@ export class FuelRateIntegrator {
 }
 
 
-export type FuelRateSource = 'MEASURED_015E' | 'ESTIMATED_MAF' | 'ESTIMATED_MAP';
+export type FuelRateSource = 'MEASURED_015E' | 'ESTIMATED_MAF' | 'ESTIMATED_MAP' | 'ESTIMATED_FLEX';
 
 export type FuelTypeForEstimate = 'FLEX' | 'ETANOL' | 'GASOLINA';
 
@@ -107,8 +107,10 @@ export interface FuelRateEstimateInput {
 
 /**
  * Approximate stoichiometric values for MAF/MAP-derived fuel flow.
- * Flex fuel requires measured ethanol percentage; never silently assume gasoline.
- * These are estimates, not a substitute for directly measured PID 015E.
+ * FLEX without PID 0152 uses an explicit 50% blend reference solely to keep an
+ * estimate available. The caller must surface ESTIMATED_FLEX because this is
+ * not a measured mixture. Selecting the actually used fuel or obtaining PID
+ * 0152 gives a more relevant estimate. None of these replaces measured PID 015E.
  */
 export function resolveFuelEstimateProperties(
   fuelType: FuelTypeForEstimate | undefined,
@@ -116,12 +118,12 @@ export function resolveFuelEstimateProperties(
 ): { airFuelRatio: number; fuelDensityKgPerL: number } | null {
   if (fuelType === 'GASOLINA') return { airFuelRatio: 14.7, fuelDensityKgPerL: 0.745 };
   if (fuelType === 'ETANOL') return { airFuelRatio: 9.0, fuelDensityKgPerL: 0.789 };
-  if (fuelType !== 'FLEX' || !Number.isFinite(ethanolPercent) || ethanolPercent! < 0 || ethanolPercent! > 100) {
-    return null;
-  }
+  if (fuelType !== 'FLEX') return null;
 
-  // First-order volumetric blend interpolation, documented as an estimate.
-  const ethanolFraction = ethanolPercent! / 100;
+  // First-order volumetric blend interpolation. With no ECU blend reading, use
+  // a disclosed 50% reference blend rather than silently treating FLEX as gas.
+  const hasMeasuredBlend = Number.isFinite(ethanolPercent) && ethanolPercent! >= 0 && ethanolPercent! <= 100;
+  const ethanolFraction = hasMeasuredBlend ? ethanolPercent! / 100 : 0.5;
   return {
     airFuelRatio: 14.7 * (1 - ethanolFraction) + 9.0 * ethanolFraction,
     fuelDensityKgPerL: 0.745 * (1 - ethanolFraction) + 0.789 * ethanolFraction,
@@ -130,6 +132,8 @@ export function resolveFuelEstimateProperties(
 
 export function estimateFuelRateLph(input: FuelRateEstimateInput): { rateLph: number; source: FuelRateSource } | null {
   const fuelProperties = resolveFuelEstimateProperties(input.fuelType, input.ethanolPercent);
+  const hasMeasuredBlend = Number.isFinite(input.ethanolPercent) && input.ethanolPercent! >= 0 && input.ethanolPercent! <= 100;
+  const assumedFlexBlend = input.fuelType === 'FLEX' && !hasMeasuredBlend;
   const afr = input.airFuelRatio ?? fuelProperties?.airFuelRatio;
   const density = input.fuelDensityKgPerL ?? fuelProperties?.fuelDensityKgPerL;
   if (
@@ -147,7 +151,7 @@ export function estimateFuelRateLph(input: FuelRateEstimateInput): { rateLph: nu
     const fuelKgPerSecond = (input.mafGs as number) / 1000 / afr;
     const rateLph = fuelKgPerSecond * 3600 / density;
     return isPlausibleFuelRateLph(rateLph) && rateLph > 0
-      ? { rateLph, source: 'ESTIMATED_MAF' }
+      ? { rateLph, source: assumedFlexBlend ? 'ESTIMATED_FLEX' : 'ESTIMATED_MAF' }
       : null;
   }
 
@@ -173,7 +177,7 @@ export function estimateFuelRateLph(input: FuelRateEstimateInput): { rateLph: nu
     const fuelKgPerSecond = mafGs / 1000 / afr;
     const rateLph = fuelKgPerSecond * 3600 / density;
     return isPlausibleFuelRateLph(rateLph) && rateLph > 0
-      ? { rateLph, source: 'ESTIMATED_MAP' }
+      ? { rateLph, source: assumedFlexBlend ? 'ESTIMATED_FLEX' : 'ESTIMATED_MAP' }
       : null;
   }
 

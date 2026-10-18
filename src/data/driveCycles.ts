@@ -28,7 +28,7 @@ export interface DriveCycle {
   /** Sparse timestamped telemetry captured for this trip. */
   telemetrySamples?: TripTelemetrySample[];
   source: DriveCycleSource;
-  fuelRateSource?: 'MEASURED_015E' | 'ESTIMATED_MAF' | 'ESTIMATED_MAP' | 'MIXED';
+  fuelRateSource?: 'MEASURED_015E' | 'ESTIMATED_MAF' | 'ESTIMATED_MAP' | 'ESTIMATED_FLEX' | 'MIXED';
   importedAt: string;
 }
 

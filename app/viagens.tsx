@@ -29,6 +29,14 @@ function durationSeconds(value: string): number {
 function mv(value: number | null, unit: string, digits = 1): string {
   return value == null ? 'N/D' : `${value.toFixed(digits)} ${unit}`;
 }
+function fuelSourceLabel(source: DriveCycle['fuelRateSource']): string {
+  if (source === 'MEASURED_015E') return 'OBD medido • PID 015E';
+  if (source === 'ESTIMATED_MAF') return 'Estimativa por MAF 0110';
+  if (source === 'ESTIMATED_MAP') return 'Estimativa por MAP 010B + IAT 010F';
+  if (source === 'ESTIMATED_FLEX') return 'Estimativa FLEX • mistura de referência 50% (não medida)';
+  if (source === 'MIXED') return 'Fontes medidas/estimadas combinadas';
+  return 'N/D';
+}
 
 export default function ViagensScreen() {
   const layout = useMidLayout();
@@ -155,9 +163,9 @@ export default function ViagensScreen() {
               <Text style={s.noteTitle}>POR QUE O CONSUMO ESTÁ N/D?</Text>
               <Text style={s.noteText}>
                 {fuelType === 'FLEX'
-                  ? 'No modo FLEX, o app não presume a mistura: a estimativa MAF/MAP exige composição válida pelo PID 0152. Se a ECU não fornecer essa composição nem a taxa medida pelo PID 015E, o consumo fica indisponível. Confira o combustível realmente abastecido e faça um novo trajeto com amostras válidas; viagens antigas sem dados suficientes não podem ser reconstruídas.'
+                  ? 'Nenhum consumo válido foi calculado. Em FLEX sem composição no PID 0152, o app tenta usar mistura de referência 50% se MAF 0110 ou MAP 010B + IAT 010F + RPM 010C responderem. Se continuar N/D, a ECU pode não anunciar esses PIDs ou as leituras não passaram nos filtros. Confira a taxa medida 015E e os PIDs no Diagnóstico; escolha etanol/gasolina conforme o combustível do tanque. Viagens antigas não podem ser reconstruídas sem amostras.'
                   : fuelType === 'ETANOL' || fuelType === 'GASOLINA'
-                    ? 'Nenhuma viagem deste período atingiu os critérios de cobertura. A ECU precisa fornecer PID 015E ou PIDs compatíveis para estimar a taxa (MAF 0110 ou MAP 010B + IAT 010F e RPM 010C), além de distância e amostras suficientes. A configuração ajuda, mas não substitui dados da ECU; viagens incompletas antigas não podem ser reconstruídas.'
+                    ? 'Nenhuma viagem deste período atingiu os critérios de cobertura. A ECU precisa fornecer PID 015E ou PIDs compatíveis para estimar a taxa (MAF 0110 ou MAP 010B + IAT 010F e RPM 010C), além de distância e amostras suficientes. Se continuar N/D, confira se esses PIDs são anunciados e respondem no Diagnóstico; viagens incompletas antigas não podem ser reconstruídas.'
                     : 'Não foi possível ler a configuração de combustível. Confira a opção em Configurações e valide a disponibilidade dos PIDs de combustível no Diagnóstico OBD.'}
               </Text>
               <Link href="/configuracoes" asChild><TouchableOpacity style={s.noteAction}><Text style={s.noteActionText}>CONFERIR COMBUSTÍVEL</Text></TouchableOpacity></Link>
@@ -208,8 +216,12 @@ function TripDetails({cycle,onBack}:{cycle:DriveCycle;onBack:()=>void}) {
     <View style={s.card}>
       <Detail label="Combustível integrado" value={fuelValid?mv(n(cycle.fuelUsedL),'L',3):'N/D'} />
       <Detail label="Consumo médio" value={fuelValid?mv(n(cycle.avgFuelConsumptionKml),'km/L',2):'N/D'} />
-      <Detail label="Origem da taxa" value={cycle.fuelRateSource ?? 'N/D'} />
-      <Text style={s.smallNote}>{fuelValid?'Integração calculada conforme a fonte indicada; não equivale a uma medição física do tanque.':'Dados insuficientes para estimar consumo com segurança neste trajeto.'}</Text>
+      <Detail label="Origem da taxa" value={fuelSourceLabel(cycle.fuelRateSource)} />
+      <Text style={s.smallNote}>{fuelValid
+        ? cycle.fuelRateSource === 'ESTIMATED_FLEX'
+          ? 'Valor estimado por MAF/MAP usando mistura de referência 50% etanol / 50% gasolina porque a ECU não informou a composição. A mistura real pode diferir; configure o combustível efetivamente usado para melhorar a estimativa.'
+          : 'Integração calculada conforme a fonte indicada; não equivale a uma medição física do tanque.'
+        : 'Dados insuficientes ou implausíveis para estimar consumo com segurança neste trajeto.'}</Text>
     </View>
     <Text style={s.section}>TEMPERATURA DO ARREFECIMENTO</Text>
     <View style={s.card}>

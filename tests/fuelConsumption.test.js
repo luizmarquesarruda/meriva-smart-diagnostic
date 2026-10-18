@@ -109,10 +109,20 @@ const ethanolMafEstimate = estimateFuelRateLph({ mafGs: 2.5, fuelType: 'ETANOL' 
 assert.ok(ethanolMafEstimate, 'Etanol deve usar AFR e densidade próprios');
 assert.ok(ethanolMafEstimate.rateLph > gasolineMafEstimate.rateLph,
   'para a mesma massa de ar, estimativa volumétrica com etanol deve superar a estimativa com gasolina');
-assert.strictEqual(estimateFuelRateLph({ mafGs: 2.5, fuelType: 'FLEX' }), null,
-  'FLEX sem composição medida não pode assumir gasolina silenciosamente');
-assert.ok(estimateFuelRateLph({ mafGs: 2.5, fuelType: 'FLEX', ethanolPercent: 100 }));
-assert.ok(estimateFuelRateLph({ mafGs: 2.5, fuelType: 'FLEX', ethanolPercent: 0 }));
+const flexReferenceEstimate = estimateFuelRateLph({ mafGs: 2.5, fuelType: 'FLEX' });
+assert.ok(flexReferenceEstimate, 'FLEX sem PID 0152 deve continuar mostrando uma estimativa identificada');
+assert.strictEqual(flexReferenceEstimate.source, 'ESTIMATED_FLEX',
+  'mistura de referência precisa ser identificada como estimativa, não taxa medida');
+assert.ok(flexReferenceEstimate.rateLph > 0 && flexReferenceEstimate.rateLph < 80);
+assert.strictEqual(estimateFuelRateLph({ mafGs: 2.5, fuelType: 'FLEX', ethanolPercent: 100 }).source, 'ESTIMATED_MAF',
+  'composição de etanol medida deve usar a fonte MAF');
+assert.strictEqual(estimateFuelRateLph({ mafGs: 2.5, fuelType: 'FLEX', ethanolPercent: 0 }).source, 'ESTIMATED_MAF',
+  'composição de gasolina medida deve usar a fonte MAF');
+const flexMapReference = estimateFuelRateLph({
+  mapKpa: 39, rpm: 800, intakeAirTempC: 33, displacementCm3: 1389, fuelType: 'FLEX',
+});
+assert.ok(flexMapReference && flexMapReference.source === 'ESTIMATED_FLEX',
+  'o fallback MAP deve estimar em FLEX sem PID 0152 usando a mistura de referência identificada');
 assert.strictEqual(estimateFuelRateLph({ mafGs: NaN, fuelType: 'ETANOL' }), null);
 assert.strictEqual(estimateFuelRateLph({ mafGs: 655.35, fuelType: 'ETANOL' }), null,
   'MAF com formato de sentinela serial não pode virar estimativa');

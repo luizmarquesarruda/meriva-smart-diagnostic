@@ -168,8 +168,14 @@ export default function IndexScreen() {
       ? tripState.consumptionKml
       : tripState.averageConsumptionKml > 0 ? tripState.averageConsumptionKml : realConsumptionKml);
   const consumptionLabel = tripState.instantaneousConsumptionKml != null
-    ? tripState.instantaneousConsumptionSource === 'MEASURED_015E' ? 'CONSUMO INSTANTÂNEO OBD' : 'INSTANTÂNEO ESTIMADO'
-    : tripState.consumptionKml != null && tripState.consumptionKml > 0 ? 'MÉDIA DA VIAGEM' : 'MÉDIA HISTÓRICA';
+    ? tripState.instantaneousConsumptionSource === 'MEASURED_015E'
+      ? 'CONSUMO INSTANTÂNEO OBD'
+      : tripState.instantaneousConsumptionSource === 'ESTIMATED_FLEX'
+        ? 'INSTANTÂNEO FLEX • ESTIMATIVA 50%'
+        : 'INSTANTÂNEO ESTIMADO'
+    : tripState.consumptionKml != null && tripState.consumptionKml > 0
+      ? 'MÉDIA DA VIAGEM'
+      : tripState.averageConsumptionKml > 0 ? 'MÉDIA HISTÓRICA' : 'CONSUMO ESTIMADO';
   const liveReadings = getAutoSaveState().lastReadings;
   const freshRealReading = (matches: (item: (typeof liveReadings)[number]) => boolean) => liveReadings.find((item) => {
     if (!matches(item) || item.source !== 'REAL' || item.value == null || !Number.isFinite(item.value)) return false;

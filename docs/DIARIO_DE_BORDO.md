@@ -2783,3 +2783,25 @@ Revisar os ajustes posteriores em uma branch separada. Como esta rodada foi marc
 
 ### Próximo passo
 Autorizar a validação completa depois de revisar as alterações. Em aparelho Android, revisar retrato e paisagem. No carro, conferir combustível selecionado e registrar um trajeto novo; verificar suporte/leituras de 015E, 0152, 0110, 010B, 010F, 010C e velocidade real. Viagens antigas sem telemetria suficiente continuarão N/D.
+
+
+## 2026-10-18 — Desbloqueio de estimativa de consumo em modo FLEX
+
+### Causa identificada
+A estimativa MAF/MAP já existia, mas `resolveFuelEstimateProperties` devolvia null quando a configuração estava em FLEX e a ECU não fornecia PID 0152 (percentual de etanol). Em Meriva/KWP que não anunciam esse PID, o fallback era interrompido antes de calcular uma taxa; resultado recorrente: N/D mesmo com MAF 0110 ou MAP 010B + IAT 010F + RPM 010C disponíveis. No catálogo local, somente PID 010C está confirmado por resposta RAW_ECU; MAP, MAF e IAT ainda são candidatos e precisam ser confirmados no adaptador real.
+
+### Correção
+- FLEX sem composição medida passa a usar mistura de referência 50% etanol / 50% gasolina para estimativa por MAF/MAP.
+- A fonte aparece como `ESTIMATED_FLEX`; a tela inicial e o relatório deixam claro que é estimativa, não leitura medida, e que a mistura real pode ser diferente.
+- Selecionar ETANOL ou GASOLINA segundo o que está no tanque substitui essa referência por parâmetros específicos e tende a melhorar a aproximação.
+- Mantida a precedência de PID 015E quando há leitura medida. Sem taxa medida nem MAF/MAP válidos anunciados pela ECU, o aplicativo continua em N/D: não se inventa resposta de sensor.
+- Relatório agora descreve as fontes de cálculo e aponta os PIDs relevantes para depuração.
+
+### Testes adicionados
+- MAF em FLEX sem PID 0152 deve produzir fonte `ESTIMATED_FLEX`.
+- MAP + IAT + RPM em FLEX sem composição deve produzir estimativa identificada.
+- Quando PID 0152 entrega composição válida, a origem volta a ser estimativa MAF/MAP específica, sem rótulo de mistura presumida.
+
+### Limites / CI
+- A estimativa de 50% é um ponto de referência provisório; não é inferência da mistura real nem calibração específica da Meriva. Valores históricos antigos sem taxa integrada não são recalculados.
+- Nenhuma CI disparada; apenas teste estático de código foi feito nesta sessão. É necessário executar os testes e confirmar leituras MAF/MAP/0152/015E no veículo antes de tratar a estimativa como confiável.
