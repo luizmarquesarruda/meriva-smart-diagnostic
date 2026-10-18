@@ -510,6 +510,21 @@ async function testExtendedPidDiscovery() {
   assert.deepStrictEqual(report.supportedMode09InfoTypes, ['01', '04']);
   assert.deepStrictEqual(report.supportedMode06MonitorIds, ['01']);
   assert.strictEqual(report.source, 'REAL_OBD');
+
+  let exclusiveLockUsed = false;
+  const exclusiveReport = await discovery.discoverExtendedObdData({
+    async executeCommand() { throw new Error('deveria usar executor exclusivo'); },
+    async withExclusiveCommandSession(operation) {
+      exclusiveLockUsed = true;
+      return operation(async (command) => ({
+        response: command === '0900' ? '49 00 00 00 00 00' : 'NO DATA',
+        status: command === '0900' ? 'OK' : 'ERROR',
+        elapsedMs: 4,
+      }));
+    },
+  }, 'KWP FAST');
+  assert.strictEqual(exclusiveLockUsed, true, 'deve reservar a fila do ELM durante a descoberta');
+  assert.strictEqual(exclusiveReport.source, 'REAL_OBD');
 }
 
 
