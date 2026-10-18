@@ -123,8 +123,8 @@ const flexMapReference = estimateFuelRateLph({
 });
 assert.ok(flexMapReference && flexMapReference.source === 'ESTIMATED_FLEX',
   'o fallback MAP deve estimar em FLEX sem PID 0152 usando a mistura de referência identificada');
-assert.strictEqual(calculateInstantaneousConsumptionKml(60, 3), null,
-  'consumo instantâneo acima de 30 km/L deve ser suprimido, não exibido como leitura plausível');
+assert.strictEqual(calculateInstantaneousConsumptionKml(60, 1), null,
+  'consumo instantâneo de 60 km/L deve ser suprimido, não exibido como leitura plausível');
 assert.strictEqual(calculateInstantaneousConsumptionKml(60, 0), null,
   'taxa zero não pode produzir divisão infinita ou consumo inventado');
 assert.strictEqual(calculateInstantaneousConsumptionKml(60, 6), 10,
