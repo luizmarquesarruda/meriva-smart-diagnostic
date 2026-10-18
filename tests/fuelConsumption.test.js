@@ -19,7 +19,8 @@ mod.filename = sourcePath;
 mod.paths = Module._nodeModulePaths(path.dirname(sourcePath));
 mod._compile(output, sourcePath);
 
-const { integrateFuelRateLph, FuelRateIntegrator, estimateFuelRateLph, calculateInstantaneousConsumptionKml } = mod.exports;
+const { integrateFuelRateLph, FuelRateIntegrator, estimateFuelRateLph, calculateInstantaneousConsumptionKml, resolveFuelEstimateProperties } = mod.exports;
+const fuelModel = require('../src/knowledge/fuel_consumption_model.json');
 
 function assertApprox(actual, expected, epsilon = 1e-12) {
   assert.ok(Math.abs(actual - expected) <= epsilon, `expected ${actual} ≈ ${expected}`);
@@ -101,10 +102,34 @@ if (!fsSource.includes('ESTIMATED_MAF') || !fsSource.includes('ESTIMATED_MAP')) 
   throw new Error('fuel fallback MAF/MAP não está implementado');
 }
 assert.strictEqual(estimateFuelRateLph({ mafGs: 0 }), null, 'MAF zero não pode ser convertido em uma estimativa de consumo válida');
+
+const gasolineReference = resolveFuelEstimateProperties('GASOLINA');
+assert.strictEqual(gasolineReference.airFuelRatio, 12.8,
+  'gasolina C brasileira deve usar a referência E32 datada do modelo, não AFR de gasolina pura');
+assert.strictEqual(gasolineReference.fuelDensityKgPerL, 0.757);
+const hydrousEthanolReference = resolveFuelEstimateProperties('ETANOL');
+assert.strictEqual(hydrousEthanolReference.airFuelRatio, 8.51,
+  'etanol selecionado usa proxy para etanol hidratado, não etanol puro');
+assert.strictEqual(hydrousEthanolReference.fuelDensityKgPerL, 0.812);
+assert.strictEqual(fuelModel.schemaVersion, 1);
+assert.strictEqual(fuelModel.calibration.runtimeCalibrationEnabled, false,
+  'não declarar calibração de abastecimento ativa antes de persistir abastecimentos reais');
+const referenceBlend = resolveFuelEstimateProperties('FLEX');
+assert.ok(referenceBlend.airFuelRatio > 10 && referenceBlend.airFuelRatio < 13);
 const gasolineMafEstimate = estimateFuelRateLph({ mafGs: 2.5, fuelType: 'GASOLINA' });
 assert.ok(gasolineMafEstimate, 'MAF positivo com combustível selecionado deve gerar estimativa');
 assert.strictEqual(gasolineMafEstimate.source, 'ESTIMATED_MAF');
 assert.ok(gasolineMafEstimate.rateLph > 0);
+const correctedMafEstimate = estimateFuelRateLph({
+  mafGs: 2.5, fuelType: 'GASOLINA', calibrationFactor: 1.1,
+});
+assertApprox(correctedMafEstimate.rateLph, gasolineMafEstimate.rateLph * 1.1,
+  1e-12);
+const unsafeCalibrationFactor = estimateFuelRateLph({
+  mafGs: 2.5, fuelType: 'GASOLINA', calibrationFactor: 2.0,
+});
+assert.strictEqual(unsafeCalibrationFactor.rateLph, gasolineMafEstimate.rateLph,
+  'fator fora do envelope 0.70–1.30 deve ser ignorado');
 const ethanolMafEstimate = estimateFuelRateLph({ mafGs: 2.5, fuelType: 'ETANOL' });
 assert.ok(ethanolMafEstimate, 'Etanol deve usar AFR e densidade próprios');
 assert.ok(ethanolMafEstimate.rateLph > gasolineMafEstimate.rateLph,
