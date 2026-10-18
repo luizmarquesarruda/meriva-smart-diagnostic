@@ -33,7 +33,7 @@ function fuelSourceLabel(source: DriveCycle['fuelRateSource']): string {
   if (source === 'MEASURED_015E') return 'OBD medido • PID 015E';
   if (source === 'ESTIMATED_MAF') return 'Estimativa por MAF 0110';
   if (source === 'ESTIMATED_MAP') return 'Estimativa por MAP 010B + IAT 010F';
-  if (source === 'ESTIMATED_FLEX') return 'Estimativa FLEX • mistura de referência 50% (não medida)';
+  if (source === 'ESTIMATED_FLEX') return 'Estimativa FLEX • referência E50 (não medida)';
   if (source === 'MIXED') return 'Fontes medidas/estimadas combinadas';
   return 'N/D';
 }
@@ -163,7 +163,7 @@ export default function ViagensScreen() {
               <Text style={s.noteTitle}>POR QUE O CONSUMO ESTÁ N/D?</Text>
               <Text style={s.noteText}>
                 {fuelType === 'FLEX'
-                  ? 'Nenhum consumo válido foi calculado. Em FLEX sem composição no PID 0152, o app tenta usar mistura de referência 50% se MAF 0110 ou MAP 010B + IAT 010F + RPM 010C responderem. Se continuar N/D, a ECU pode não anunciar esses PIDs ou as leituras não passaram nos filtros. Confira a taxa medida 015E e os PIDs no Diagnóstico; escolha etanol/gasolina conforme o combustível do tanque. Viagens antigas não podem ser reconstruídas sem amostras.'
+                  ? 'Nenhum consumo válido foi calculado. Em FLEX sem composição no PID 0152, o app tenta usar referência E50 (hipótese de 50% etanol por volume) se MAF 0110 ou MAP 010B + IAT 010F + RPM 010C responderem. Isso não mede a mistura real. Se continuar N/D, a ECU pode não anunciar esses PIDs ou as leituras não passaram nos filtros. Confira a taxa 015E e os PIDs no Diagnóstico; escolha etanol/gasolina conforme o combustível do tanque. Viagens antigas não podem ser reconstruídas sem amostras.'
                   : fuelType === 'ETANOL' || fuelType === 'GASOLINA'
                     ? 'Nenhuma viagem deste período atingiu os critérios de cobertura. A ECU precisa fornecer PID 015E ou PIDs compatíveis para estimar a taxa (MAF 0110 ou MAP 010B + IAT 010F e RPM 010C), além de distância e amostras suficientes. Se continuar N/D, confira se esses PIDs são anunciados e respondem no Diagnóstico; viagens incompletas antigas não podem ser reconstruídas.'
                     : 'Não foi possível ler a configuração de combustível. Confira a opção em Configurações e valide a disponibilidade dos PIDs de combustível no Diagnóstico OBD.'}
@@ -219,7 +219,7 @@ function TripDetails({cycle,onBack}:{cycle:DriveCycle;onBack:()=>void}) {
       <Detail label="Origem da taxa" value={fuelSourceLabel(cycle.fuelRateSource)} />
       <Text style={s.smallNote}>{fuelValid
         ? cycle.fuelRateSource === 'ESTIMATED_FLEX'
-          ? 'Valor estimado por MAF/MAP usando mistura de referência 50% etanol / 50% gasolina porque a ECU não informou a composição. A mistura real pode diferir; configure o combustível efetivamente usado para melhorar a estimativa.'
+          ? 'Valor estimado por MAF/MAP usando referência E50 porque a ECU não informou a composição. E50 é uma hipótese do modelo, não leitura do tanque; configure o combustível efetivamente usado para melhorar a estimativa.'
           : 'Integração calculada conforme a fonte indicada; não equivale a uma medição física do tanque.'
         : 'Dados insuficientes ou implausíveis para estimar consumo com segurança neste trajeto.'}</Text>
     </View>
