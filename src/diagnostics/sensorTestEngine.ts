@@ -33,7 +33,7 @@ function valueOf(samples:SensorTestSample[],pid:string):number|null{const summar
 function result(state:SensorAssessmentState,title:string,explanation:string):SensorAssessment{return{state,title,explanation};}
 function rangeAssessment(value:number,test:SensorTestDefinition):SensorAssessment{
  const min=test.thresholds.min,max=test.thresholds.max;
- if((Number.isFinite(min)&&value<min)||(Number.isFinite(max)&&value>max))return result('INVESTIGAR','Valor fora da faixa de plausibilidade','A mediana ficou fora da faixa ampla cadastrada. Confirme fórmula, unidade, RX bruto e especificação aplicável; isso não condena o sensor.');
+ if((Number.isFinite(min)&&value<min)||(Number.isFinite(max)&&value>max))return result('INVESTIGAR','Valor fora da faixa de plausibilidade','A média/moda calculada ficou fora da faixa ampla cadastrada. Confirme fórmula, unidade, RX bruto e especificação aplicável; isso não condena o sensor.');
  return result('NAO_CONCLUSIVO','Resposta plausível; diagnóstico não encerrado',test.aiGuidance+' A faixa cadastrada é heurística, não limite OEM de aprovação.');
 }
 /** Motor determinístico de triagem local, configurado pelo JSON. Nenhum estado certifica integridade física/elétrica. */
