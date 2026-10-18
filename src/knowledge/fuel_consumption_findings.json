@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "researchDate": "2026-10-18",
+  "targetVehicle": {
+    "make": "Chevrolet",
+    "model": "Meriva 1.4 Flex",
+    "yearRange": "2011/2012",
+    "displacementCm3": 1389
+  },
+  "findings": [
+    {
+      "id": "DIRECT_ECU_RATE_PRIORITY",
+      "status": "SUPPORTED_BY_OPEN_SOURCE_IMPLEMENTATION_AND_OBD_PID_REFERENCE",
+      "discovery": "Fuel-rate PID 015E is the preferred path when announced and returning a valid parsed value. It is ECU-reported, not an independent fuel-flow-meter measurement.",
+      "decision": "Keep 015E first; never downgrade a valid 015E reading to MAF/MAP in the same sample.",
+      "confidence": "HIGH_FOR_ALGORITHM_ORDER",
+      "sources": [
+        "https://github.com/trepidity/obd2-dash/blob/master/MANUAL.md",
+        "https://github.com/evrenonur/obd2-elm327-pid-reference/blob/master/OBD2_Complete_PID_Reference_EN.md"
+      ]
+    },
+    {
+      "id": "MAF_FALLBACK",
+      "status": "IMPLEMENTED_BUT_VEHICLE_PID_UNCONFIRMED",
+      "discovery": "Fuel volume can be estimated from air mass flow, stoichiometric air/fuel ratio and fuel density; the result changes materially with fuel type and mixture.",
+      "decision": "Use MAF only after the 0110 PID is advertised and its individual response passes parsing and plausibility gates. Mark the result as estimated.",
+      "confidence": "HIGH_FOR_FORMULA_MEDIUM_FOR_MERIVA_ACCURACY",
+      "sources": [
+        "https://github.com/trepidity/obd2-dash/blob/master/MANUAL.md",
+        "https://doi.org/10.1177/09544070231185609"
+      ]
+    },
+    {
+      "id": "MAP_SPEED_DENSITY",
+      "status": "IMPLEMENTED_WITH_PROVISIONAL_VE",
+      "discovery": "MAP + IAT + RPM + engine displacement can derive an approximate air mass flow through the ideal gas law; volumetric efficiency is an uncertain engine-specific parameter.",
+      "decision": "Keep MAP as the second fallback, label as estimated and preserve VE as a JSON parameter until real Meriva logs and refuelling data can calibrate it.",
+      "confidence": "MEDIUM",
+      "sources": [
+        "https://github.com/oesmith/obdgpslogger/blob/master/doc/mpg-calculation",
+        "https://github.com/trepidity/obd2-dash/blob/master/MANUAL.md"
+      ]
+    },
+    {
+      "id": "BRAZILIAN_GASOLINE_CURRENT_BLEND",
+      "status": "RESEARCH_DATE_DEPENDENT",
+      "discovery": "The ANP reported a temporary E32 blend for regular gasoline C, effective from 2026-08-01 for 180 days; the common E30 baseline is not current on the research date.",
+      "decision": "Use E32 as the explicitly dated default when the user selects GASOLINA, mark values as model estimates, and schedule a parameter review by 2027-01-27.",
+      "confidence": "HIGH_FOR_POLICY_DATE_APPROXIMATE_FOR_PHYSICAL_PROPERTIES",
+      "sources": [
+        "https://www.gov.br/anp/pt-br/canais_atendimento/imprensa/noticias-comunicados/e32-gasolina-com-32-de-etanol-passa-a-valer-temporariamente-a-partir-de-amanha-1-8"
+      ]
+    },
+    {
+      "id": "BRAZILIAN_HYDROUS_ETHANOL",
+      "status": "LITERATURE_PROXY",
+      "discovery": "Hydrous ethanol is not identical to anhydrous/pure ethanol; water fraction changes density and stoichiometric AFR.",
+      "decision": "Use 95 vol% ethanol plus 5 vol% water literature properties as a provisional proxy, not an exact specification for the user's fuel batch.",
+      "confidence": "MEDIUM",
+      "sources": [
+        "https://pmc.ncbi.nlm.nih.gov/articles/PMC8495882/",
+        "https://pubs.acs.org/doi/10.1021/acsomega.1c04065"
+      ]
+    },
+    {
+      "id": "UNKNOWN_FLEX_BLEND",
+      "status": "ESTIMATE_ONLY",
+      "discovery": "Without PID 0152, the ECU does not reveal the fuel ethanol share; an automatic midpoint is not a measurement and may be wrong for a tank filled with only ethanol or gasoline.",
+      "decision": "Keep reference E50 only as a visible fallback, encode the percentage in JSON, and advise selecting the actual tank fuel. Never call the result measured.",
+      "confidence": "HIGH_FOR_LIMITATION"
+    },
+    {
+      "id": "MERIVA_PID_EVIDENCE",
+      "status": "LOCAL_REPOSITORY_EVIDENCE",
+      "discovery": "The repository's vehicle-specific evidence list marks only 010C as confirmed from a RAW_ECU response; 015E, 0110, 010B, 010F and 0152 remain candidates until verified on the actual adapter/ECU.",
+      "decision": "Do not claim the new hierarchy is physically validated on the Meriva until RAW_ECU responses and their support bitmap are recorded.",
+      "confidence": "HIGH_FOR_CURRENT_REPOSITORY_RECORD"
+    },
+    {
+      "id": "FULL_TO_FULL_CALIBRATION",
+      "status": "DESIGNED_NOT_CONNECTED_TO_UI",
+      "discovery": "Open-source OBD guidance describes using tank refill data to calibrate MAP-derived volumetric efficiency; a full-to-full comparison also provides a practical flow correction factor.",
+      "decision": "Require at least three valid full-to-full intervals before accepting a correction factor; reject factors outside 0.70–1.30 and smooth accepted updates.",
+      "confidence": "MEDIUM",
+      "sources": [
+        "https://github.com/oesmith/obdgpslogger/blob/master/doc/mpg-calculation"
+      ]
+    }
+  ],
+  "knownLimitations": [
+    "The actual Meriva has not yet had a complete physical session validating the candidate fuel PIDs.",
+    "PID 0152 interpretation and availability are not confirmed for this KWP/K-Line ECU, especially with Brazilian retail gasoline blend rules.",
+    "The MAF formula currently assumes stoichiometric operation unless the model is extended with a valid lambda/equivalence-ratio correction.",
+    "The MAP path uses provisional volumetric efficiency 0.80; this is not a calibrated Chevrolet Meriva constant.",
+    "Runtime entry and persistence of full-to-full refuelling calibration still require a settings flow and are not implemented by this change."
+  ],
+  "nextActions": [
+    "Record RAW_ECU + bitmap evidence for 015E, 0110, 010B, 010F and 0152.",
+    "Run the same route while logging speed, MAF or MAP/IAT/RPM and calculated fuel rate.",
+    "Compare at least three full-to-full fuel-up intervals against integrated estimated litres.",
+    "Before 2027-01-27, review the temporary E32 parameter against current ANP policy.",
+    "Only add lambda/fuel-trim corrections after confirming supported PID semantics and actual response quality."
+  ]
+}
