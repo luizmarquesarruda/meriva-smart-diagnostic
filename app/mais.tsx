@@ -5,14 +5,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMidLayout } from '../src/ui/midLayout';
 import { AppIcon, AppIconBadge, type AppIconName } from '../src/ui/AppIcon';
 
-const items: ReadonlyArray<readonly [AppIconName, string, string, string]> = [
+const items = [
   ['sensors', 'TESTES DE SENSORES', 'Varredura guiada com motor desligado ou ligado', '/testes-sensores'],
   ['charts', 'DADOS AO VIVO', 'Telemetria, tendências e indicadores', '/dados'],
   ['learning', 'APRENDIZADO', 'Amostras reais, confiança e contaminação', '/aprendizado'],
   ['health', 'SAÚDE', 'DTCs, evidências e hipóteses locais', '/saude'],
   ['history', 'HISTÓRICO E ARQUIVOS', 'Autosave, TXT e exportações', '/armazenamento'],
   ['settings', 'CONFIGURAÇÕES', 'Preferências e parâmetros do aplicativo', '/configuracoes'],
-];
+] as const;
 
 export default function MaisScreen() {
   const layout = useMidLayout();
@@ -34,7 +34,7 @@ export default function MaisScreen() {
 
           <View style={[styles.itemsGrid, layout.landscape && styles.itemsGridLandscape]}>
             {items.map(([icon, title, hint, href]) => (
-              <Link key={href} href={href as never} asChild>
+              <Link key={href} href={href} asChild>
                 <TouchableOpacity
                   accessibilityRole="button"
                   accessibilityLabel={title + '. ' + hint}
