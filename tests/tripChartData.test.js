@@ -8,6 +8,14 @@ const ts = require('typescript');
 
 const sourcePath = path.resolve(__dirname, '../src/trip/tripChartData.ts');
 const originalLoad = Module._load;
+const validityPath = path.resolve(__dirname, '../src/trip/fuelValidity.ts');
+const validityCompiled = ts.transpileModule(fs.readFileSync(validityPath, 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2019 },
+}).outputText;
+const validityMod = new Module(validityPath, null);
+validityMod.filename = validityPath;
+validityMod.paths = Module._nodeModulePaths(path.dirname(validityPath));
+validityMod._compile(validityCompiled, validityPath);
 const source = fs.readFileSync(sourcePath, 'utf8');
 const compiled = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2019, esModuleInterop: true },
@@ -15,7 +23,12 @@ const compiled = ts.transpileModule(source, {
 const mod = new Module(sourcePath, null);
 mod.filename = sourcePath;
 mod.paths = Module._nodeModulePaths(path.dirname(sourcePath));
+Module._load = function(request) {
+  if (request === './fuelValidity') return validityMod.exports;
+  return originalLoad.apply(this, arguments);
+};
 mod._compile(compiled, sourcePath);
+Module._load = originalLoad;
 const { buildTripChartData } = mod.exports;
 
 function trip(id, day, overrides = {}) {

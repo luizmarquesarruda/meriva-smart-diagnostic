@@ -47,6 +47,9 @@ assert.strictEqual(
   ),
   0,
 );
+assert.strictEqual(integrateFuelRateLph(
+  { fuelRateLph: 10, timestampMs: 1000 }, { fuelRateLph: 90, timestampMs: 2000 },
+), 0, 'taxa L/h acima do limite não deve ser integrada');
 assertApprox(
   integrateFuelRateLph(
     { fuelRateLph: 0, timestampMs: 1000 },
@@ -82,6 +85,9 @@ assert.deepStrictEqual(integrator.addSample(100, 1500), beforeOutOfOrder,
   'sample com timestamp antigo deve ser ignorada sem rebobinar o integrador');
 assert.strictEqual(integrator.getState().lastTimestampMs, 2000,
   'timestamp de referência deve continuar monotônico');
+const beforeExtremeRate = integrator.getState();
+assert.deepStrictEqual(integrator.addSample(81, 2500), beforeExtremeRate,
+  'taxa extrema/sentinela deve ser ignorada');
 assertApprox(integrator.addSample(10, 3000).fuelUsedL, 10 / 3600, 1e-12,
   'amostra válida após timestamp antigo deve integrar apenas o intervalo correto');
 integrator.reset();
@@ -108,6 +114,10 @@ assert.strictEqual(estimateFuelRateLph({ mafGs: 2.5, fuelType: 'FLEX' }), null,
 assert.ok(estimateFuelRateLph({ mafGs: 2.5, fuelType: 'FLEX', ethanolPercent: 100 }));
 assert.ok(estimateFuelRateLph({ mafGs: 2.5, fuelType: 'FLEX', ethanolPercent: 0 }));
 assert.strictEqual(estimateFuelRateLph({ mafGs: NaN, fuelType: 'ETANOL' }), null);
+assert.strictEqual(estimateFuelRateLph({ mafGs: 655.35, fuelType: 'ETANOL' }), null,
+  'MAF com formato de sentinela serial não pode virar estimativa');
+assert.strictEqual(estimateFuelRateLph({ mafGs: 250, fuelType: 'ETANOL' }), null,
+  'MAF fora do envelope plausível deve ser rejeitado');
 assert.strictEqual(estimateFuelRateLph({ mafGs: 2.5, airFuelRatio: 14.7, fuelDensityKgPerL: 0.745 }).source,
   'ESTIMATED_MAF', 'calibração explícita deve continuar disponível');
 
