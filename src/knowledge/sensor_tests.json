@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "catalogId": "MERIVA_SMART_SENSOR_TESTS",
-  "updatedAt": "2026-10-14",
+  "updatedAt": "2026-10-18",
   "vehicleProfile": {
     "make": "Chevrolet",
     "model": "Meriva Maxx",
@@ -102,53 +102,25 @@
   ],
   "tests": [
     {
-      "id": "PID_010C",
-      "pid": "010C",
-      "label": "Rotação do motor",
-      "catalogName": "Engine RPM",
-      "unit": "rpm",
-      "formulaId": "RPM",
-      "category": "motor",
-      "evaluator": "RPM_BY_MODE",
+      "id": "PID_0101",
+      "pid": "0101",
+      "label": "Estado dos monitores OBD",
+      "catalogName": "Monitor Status Since DTCs Cleared",
+      "unit": "status",
+      "formulaId": "U32",
+      "category": "estado/monitor",
+      "evaluator": "OBSERVATION_ONLY",
       "modes": [
         "ENGINE_OFF",
         "ENGINE_ON"
       ],
       "requiredPids": [],
       "minimumReadings": 5,
-      "thresholds": {
-        "engineOffMaxRpm": 50,
-        "engineOnMinRpm": 400
-      },
-      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
-      "vehicleEvidenceStatus": "CONFIRMED_REAL_ECU",
-      "diagnosticRuleIds": [
-        "DTC_P0301_MISFIRE"
-      ],
-      "aiGuidance": "Confirme RPM em três leituras e compare com a condição selecionada. Resposta do PID não comprova integridade elétrica do CKP."
-    },
-    {
-      "id": "PID_010D",
-      "pid": "010D",
-      "label": "Velocidade informada pela ECU",
-      "catalogName": "Vehicle Speed",
-      "unit": "km/h",
-      "formulaId": "U8",
-      "category": "movimento",
-      "evaluator": "STATIONARY_SPEED",
-      "modes": [
-        "ENGINE_OFF",
-        "ENGINE_ON"
-      ],
-      "requiredPids": [],
-      "minimumReadings": 5,
-      "thresholds": {
-        "maxStationarySpeedKmh": 3
-      },
+      "thresholds": {},
       "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
       "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
       "diagnosticRuleIds": [],
-      "aiGuidance": "Com o carro parado, velocidade reportada deve ficar próxima de zero. Não conduza durante o teste."
+      "aiGuidance": "PID de bits/estado. Registre as cinco respostas brutas; não calcule média nem use como valor analógico ou prova de prontidão sem decodificar os bits conforme SAE J1979."
     },
     {
       "id": "PID_0104",
@@ -335,6 +307,55 @@
         "FUEL_TRIM_LEAN"
       ],
       "aiGuidance": "Motor parado: compare medianas MAP/BARO. Motor aquecido: avalie com RPM. MAP alto cria hipótese de vácuo/entrada de ar/sincronismo, não prova sensor ruim."
+    },
+    {
+      "id": "PID_010C",
+      "pid": "010C",
+      "label": "Rotação do motor",
+      "catalogName": "Engine RPM",
+      "unit": "rpm",
+      "formulaId": "RPM",
+      "category": "motor",
+      "evaluator": "RPM_BY_MODE",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [],
+      "minimumReadings": 5,
+      "thresholds": {
+        "engineOffMaxRpm": 50,
+        "engineOnMinRpm": 400
+      },
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "CONFIRMED_REAL_ECU",
+      "diagnosticRuleIds": [
+        "DTC_P0301_MISFIRE"
+      ],
+      "aiGuidance": "Confirme RPM em três leituras e compare com a condição selecionada. Resposta do PID não comprova integridade elétrica do CKP."
+    },
+    {
+      "id": "PID_010D",
+      "pid": "010D",
+      "label": "Velocidade informada pela ECU",
+      "catalogName": "Vehicle Speed",
+      "unit": "km/h",
+      "formulaId": "U8",
+      "category": "movimento",
+      "evaluator": "STATIONARY_SPEED",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [],
+      "minimumReadings": 5,
+      "thresholds": {
+        "maxStationarySpeedKmh": 3
+      },
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
+      "diagnosticRuleIds": [],
+      "aiGuidance": "Com o carro parado, velocidade reportada deve ficar próxima de zero. Não conduza durante o teste."
     },
     {
       "id": "PID_010E",
@@ -572,6 +593,48 @@
       "aiGuidance": "Boia/filtro da ECU podem produzir leitura lenta; sem nível físico conhecido não confirme exatidão."
     },
     {
+      "id": "PID_0130",
+      "pid": "0130",
+      "label": "Ciclos de aquecimento desde limpeza de DTC",
+      "catalogName": "Warmups Since DTC Clear",
+      "unit": "code",
+      "formulaId": "U8",
+      "category": "contador",
+      "evaluator": "OBSERVATION_ONLY",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [],
+      "minimumReadings": 5,
+      "thresholds": {},
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
+      "diagnosticRuleIds": [],
+      "aiGuidance": "Contador cumulativo. Preserve as cinco leituras e a última resposta; não trate a média como estado de sensor nem como diagnóstico de defeito."
+    },
+    {
+      "id": "PID_0131",
+      "pid": "0131",
+      "label": "Distância desde limpeza de DTC",
+      "catalogName": "Distance Since DTC Clear",
+      "unit": "km",
+      "formulaId": "DISTANCE_KM",
+      "category": "contador",
+      "evaluator": "OBSERVATION_ONLY",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [],
+      "minimumReadings": 5,
+      "thresholds": {},
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
+      "diagnosticRuleIds": [],
+      "aiGuidance": "Contador cumulativo. Guarde as cinco respostas e a última leitura; a média não é representativa de sensor nem deve alimentar o perfil de valores típicos."
+    },
+    {
       "id": "PID_0133",
       "pid": "0133",
       "label": "Pressão barométrica (BARO)",
@@ -697,6 +760,27 @@
       "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
       "diagnosticRuleIds": [],
       "aiGuidance": "Considere estabilização e calor do cofre; plausibilidade não comprova calibração."
+    },
+    {
+      "id": "PID_0151",
+      "pid": "0151",
+      "label": "Tipo de combustível informado pela ECU",
+      "catalogName": "Fuel Type",
+      "unit": "code",
+      "formulaId": "U8",
+      "category": "identificação",
+      "evaluator": "OBSERVATION_ONLY",
+      "modes": [
+        "ENGINE_OFF",
+        "ENGINE_ON"
+      ],
+      "requiredPids": [],
+      "minimumReadings": 5,
+      "thresholds": {},
+      "evidenceClass": "STANDARD_OBD_OPTIONAL_ECU_SUPPORT",
+      "vehicleEvidenceStatus": "UNCONFIRMED_FOR_THIS_ECU",
+      "diagnosticRuleIds": [],
+      "aiGuidance": "Código enumerado, não valor analógico. Registre as cinco respostas e compare igualdade; não calcule média nem conclua compatibilidade Flex sem decodificar o código padronizado."
     },
     {
       "id": "PID_0152",
