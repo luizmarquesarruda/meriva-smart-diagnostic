@@ -47,6 +47,10 @@ function main() {
   assert.strictEqual(typeof sensorTests.schemaVersion, 'number');
   assert.strictEqual(sensorTests.catalogId, 'MERIVA_SMART_SENSOR_TESTS');
   assert.strictEqual(sensorTests.minimumReadingsPerPid, 5, 'cada PID suportado exige cinco respostas válidas');
+  assert.strictEqual(sensorTests.maximumAttemptsPerPid, 8, 'leituras inválidas recebem novas oportunidades limitadas');
+  assert.strictEqual(sensorTests.tests.length, 34, 'IA de testes precisa cobrir os 34 PIDs catalogados');
+  assert.ok(sensorTests.tests.every((test) => test.minimumReadings === 5), 'cada regra precisa exigir cinco respostas válidas');
+  assert.deepStrictEqual(new Set(sensorTests.tests.map((test) => test.pid)), new Set(pids.pids.map((pid) => pid.pid)), 'todos os PIDs de conhecimento precisam ter teste/buffer');
   assert.ok(Array.isArray(sensorTests.tests) && sensorTests.tests.length > 0, 'catálogo de testes vazio');
   assert.ok(Array.isArray(sensorTests.sources) && sensorTests.sources.length >= 5, 'fontes pesquisadas ausentes');
   assert.strictEqual(typeof dtcCatalog.version, 'number');
