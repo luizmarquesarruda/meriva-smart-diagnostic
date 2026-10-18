@@ -27,7 +27,7 @@ export default function TestesSensoresScreen(){
  const supported=new Set((connection?.supportedPids??[]).map(p=>p.replace(/\s/g,'').toUpperCase()));
  const grouped=useMemo(()=>testPlan.map(test=>{
   const rows=samples.filter(sample=>sample.pid===test.pid),values=rows.filter(sample=>sample.status==='RESPONDEU'&&sample.value!==null&&Number.isFinite(sample.value)).map(sample=>sample.value as number),last=rows[rows.length-1];
-  const representative:SensorTestSample={pid:test.pid,name:test.label,value:average(values),unit:last?.unit??getPidDefinition(test.pid)?.unit??'N/D',status:last?.status??'AINDA_NAO_TESTADO',rawResponse:last?.rawResponse??'',elapsedMs:last?.elapsedMs??0,timestamp:last?.timestamp??new Date().toISOString(),readingNumber:last?.readingNumber};
+  const representative:SensorTestSample={pid:test.pid,name:test.label,value:test.evaluator==='OBSERVATION_ONLY'?(last?.value??null):average(values),unit:last?.unit??getPidDefinition(test.pid)?.unit??'N/D',status:last?.status??'AINDA_NAO_TESTADO',rawResponse:last?.rawResponse??'',elapsedMs:last?.elapsedMs??0,timestamp:last?.timestamp??new Date().toISOString(),readingNumber:last?.readingNumber};
   return {test,rows,values,representative,assessment:assessSensorSample(representative,mode,samples)};
  }),[testPlan,samples,mode]);
  const attention=grouped.filter(x=>x.assessment.state==='INVESTIGAR').length;
@@ -75,7 +75,7 @@ export default function TestesSensoresScreen(){
      if(!(await readLearningProfile(basePath)))await createLearningProfile(basePath,new Date().toISOString());
      for(const test of plan){
       const valid=readings.filter(row=>row.pid===test.pid&&row.status==='RESPONDEU'&&row.value!==null&&Number.isFinite(row.value));
-      if(valid.length!==MIN_SENSOR_TEST_READINGS)continue;
+      if(valid.length!==MIN_SENSOR_TEST_READINGS||test.evaluator==='OBSERVATION_ONLY')continue;
       const learnedMean=average(valid.map(row=>row.value as number));
       if(learnedMean===null||!Number.isFinite(learnedMean))continue;
       // Uma média por PID e por execução evita contar as cinco amostras correlacionadas como cinco experiências independentes.
@@ -101,7 +101,7 @@ export default function TestesSensoresScreen(){
    const path=dir+'/teste-sensores-'+new Date().toISOString().replace(/[:.]/g,'-')+'.txt';
    const lines=['MERIVA SMART DIAGNOSTIC — CENTRAL DE TESTES DE SENSORES','Catálogo: '+catalog.catalogId+' v'+catalog.schemaVersion,'Data: '+new Date().toLocaleString(),'Veículo de referência: Chevrolet Meriva Maxx 1.4 8V ECONO.FLEX 2011/2012','Condição: '+(mode==='ENGINE_OFF'?'IGNIÇÃO LIGADA / MOTOR DESLIGADO':'MOTOR LIGADO, VEÍCULO PARADO'),'ECU validada no início: '+(connectedAtStart.current?'SIM':'NÃO'),'Protocolo observado: '+(getSharedObdConnection()?.protocol??'N/D'),'Leituras mínimas por PID: '+MIN_SENSOR_TEST_READINGS,'PIDs selecionados pela bitmap: '+testPlan.length,'Tentativas previstas: '+plannedReads,'Tentativas registradas: '+samples.length,'Execução completa: '+(completed?'SIM':'NÃO — RELATÓRIO PARCIAL'),'Tempo decorrido: '+Math.round((Date.now()-runStartedAt.current)/1000)+' s','','AVALIAÇÃO POR PID'];
    for(const item of grouped){
-    lines.push('',item.test.pid+' — '+item.test.label,'Resultado: '+item.assessment.state+' — '+item.assessment.title,'Explicação: '+item.assessment.explanation,'Guia da IA local: '+item.test.aiGuidance,'Leituras válidas: '+item.values.length+'/'+MIN_SENSOR_TEST_READINGS+' | Média aritmética: '+(average(item.values)===null?'N/D':average(item.values).toFixed(3)));
+    lines.push('',item.test.pid+' — '+item.test.label,'Resultado: '+item.assessment.state+' — '+item.assessment.title,'Explicação: '+item.assessment.explanation,'Guia da IA local: '+item.test.aiGuidance,'Leituras válidas: '+item.values.length+'/'+MIN_SENSOR_TEST_READINGS+(item.test.evaluator==='OBSERVATION_ONLY'?' | Média: não aplicável (estado/contador/código)':' | Média aritmética: '+(average(item.values)===null?'N/D':average(item.values).toFixed(3))));
     for(const row of item.rows)lines.push('Leitura '+row.readingNumber+': '+valueText(row.value,row.unit)+' | Parser: '+row.status+' | Latência: '+row.elapsedMs+' ms | '+row.timestamp,'RX bruto: '+(row.rawResponse||'VAZIO'));
    }
    lines.push('','POLÍTICA: resposta positiva confirma resposta do PID, não exatidão física/elétrica do sensor. PIDs fora da bitmap não foram consultados.','REFERÊNCIAS: SAE J1979 supported-PID bitmap; Dashlogic PID listing; OBD2 PID Knowledge; auditoria da Bíblia da Meriva.','Limiares são heurísticos, não especificações OEM. Algumas verificações exigem multímetro, osciloscópio ou condições controladas.');
@@ -125,7 +125,7 @@ export default function TestesSensoresScreen(){
   <Text style={st.section}>RESULTADOS POR PID</Text>
   {grouped.map(({test,rows,values,representative,assessment})=><View key={test.pid} style={st.card}>
    <View style={st.resultHead}><View style={{flex:1}}><Text style={st.sensor}>{test.label}</Text><Text style={st.pid}>{test.pid} · {test.category} · {rows.length}/{MIN_SENSOR_TEST_READINGS} leituras</Text></View><View style={{alignItems:'flex-end',maxWidth:'55%'}}><Text style={st.value}>{valueText(representative.value,representative.unit)}</Text><Text style={[st.state,{color:colors[assessment.state]}]}>{labels[assessment.state]}</Text></View></View>
-   <Text style={st.resultTitle}>{assessment.title}</Text><Text style={st.explanation}>{assessment.explanation}</Text><Text style={st.readings}>Valores: {rows.length?rows.map(row=>row.value==null?'N/D':row.value.toFixed(2)).join(' · '):'aguardando'} {representative.unit} | válidas {values.length}/{MIN_SENSOR_TEST_READINGS}</Text><Text style={st.raw}>RX mais recente: {representative.rawResponse||'AINDA SEM RESPOSTA'}</Text>
+   <Text style={st.resultTitle}>{assessment.title}</Text><Text style={st.explanation}>{assessment.explanation}</Text><Text style={st.readings}>Valores: {rows.length?rows.map(row=>row.value==null?'N/D':row.value.toFixed(2)).join(' · '):'aguardando'} {representative.unit} | válidas {values.length}/{MIN_SENSOR_TEST_READINGS}{test.evaluator==='OBSERVATION_ONLY'?' · valor informativo, sem média':''}</Text><Text style={st.raw}>RX mais recente: {representative.rawResponse||'AINDA SEM RESPOSTA'}</Text>
   </View>)}
   <TouchableOpacity onPress={()=>void saveReport()} style={st.save}><Text style={st.saveText}>SALVAR RELATÓRIO TXT</Text></TouchableOpacity>{savedPath?<Text selectable style={st.saved}>{savedPath}</Text>:null}</>}
   <View style={st.disclaimer}><Text style={st.resultTitle}>Critério da IA local</Text><Text style={st.explanation}>O JSON orienta PIDs, pré-requisitos, faixas heurísticas e recomendações. “Coerente” não certifica o sensor; “investigar” não ordena troca de peça. Cinco amostras registram estabilidade pontual, mas O2, aquecedor, chicote e vácuo podem exigir testes próprios.</Text></View>
