@@ -2450,3 +2450,30 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Nova CI solicitada pela atualização da branch; confirmar resultado integral, inclusive testes restantes e build Android.
 - Teste físico do ELM327 no veículo continua pendente.
 
+
+
+## 2026-10-18 — Catálogo dinâmico de PIDs, cinco amostras e aprendizado local
+
+### Objetivo
+Incluir no plano de testes os PIDs anunciados pela ECU que tenham definição no catálogo local, elevar a amostragem mínima de três para cinco leituras por PID e alimentar o perfil de aprendizado somente com evidência OBD real.
+
+### Alterações nesta rodada
+- `src/knowledge/sensor_tests.json`: mínimo global e por teste alterado para cinco leituras.
+- `src/diagnostics/sensorTestEngine.ts`: o plano combina testes especializados existentes com PIDs adicionais anunciados em runtime e presentes no catálogo de definições. Os PIDs adicionais usam avaliação conservadora de estabilidade, sem classificá-los como sensores saudáveis ou como suporte OEM confirmado.
+- `app/testes-sensores.tsx`: preservada a varredura serial por rodadas — uma consulta por PID em cada rodada, avançando ao próximo PID antes da rodada seguinte. As cinco amostras ficam em buffer; a média aritmética é usada como valor representativo.
+- Ao concluir uma execução completa, o perfil local recebe uma média por PID com cinco respostas numéricas reais. Não são gravadas cinco experiências independentes para cinco leituras correlacionadas da mesma execução; a condição é registrada como `UNKNOWN` para não inventar motor frio/aquecido.
+- Relatórios TXT exibem a média e a contagem de leituras. Execuções parciais não alimentam o perfil de aprendizado.
+- Testes de catálogo e motor atualizados para o requisito de cinco leituras e inclusão de PIDs descobertos.
+
+### Limites e segurança diagnóstica
+- PID anunciado pela bitmap significa descoberto, não confirmado por resposta individual.
+- Resposta positiva significa que a ECU respondeu, não prova exatidão nem integridade física/elétrica do sensor.
+- A média é calculada somente com valores numéricos finitos de respostas válidas. Amostras sem resposta não viram zero.
+- O teste permanece serial; não são emitidos comandos OBD em paralelo.
+
+### Testes e CI
+- Não foi disparada CI nesta rodada, conforme a orientação vigente de fechar os pontos antes da execução.
+- Os testes foram atualizados no código, mas ainda precisam ser executados localmente/na CI. Não declarar validação concluída antes de confirmar `npm run validate` e `android-build`.
+
+### Próximo passo
+Revisar o diff completo, verificar se os PIDs descobertos da sessão real aparecem na central, validar a integração com o perfil de aprendizado e só então autorizar a CI.
