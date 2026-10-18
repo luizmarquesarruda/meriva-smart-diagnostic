@@ -1,3 +1,5 @@
+import { isReliableTripFuelConsumption } from '../trip/fuelValidity';
+
 export type DriveCycleSource = 'CARSCANNER_SEED' | 'REAL_OBD' | 'SIMULACAO';
 
 export interface TripTelemetrySample {
@@ -114,11 +116,7 @@ export function getDriveCycleSummary(cycles: DriveCycle[]): DriveCycleSummary {
   const realCycles = cycles.filter((cycle) => cycle.source === 'REAL_OBD');
   const referenceCycles = cycles.filter((cycle) => cycle.source === 'CARSCANNER_SEED');
   const realDistanceKm = realCycles.reduce((sum, cycle) => sum + cycle.distanceTotalKm, 0);
-  const consumptionCycles = realCycles.filter((cycle) =>
-    cycle.fuelDataValid === false
-      ? false
-      : cycle.fuelUsedL >= 0.05 && cycle.avgFuelConsumptionKml > 0,
-  );
+  const consumptionCycles = realCycles.filter(isReliableTripFuelConsumption);
   const realFuelL = consumptionCycles.reduce((sum, cycle) => sum + cycle.fuelUsedL, 0);
   const consumptionDistanceKm = consumptionCycles.reduce((sum, cycle) => sum + cycle.distanceTotalKm, 0);
   const realMovingTimeMs = realCycles.reduce(

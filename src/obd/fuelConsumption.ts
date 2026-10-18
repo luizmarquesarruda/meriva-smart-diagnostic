@@ -12,16 +12,22 @@ export interface FuelIntegrationState {
 
 const MAX_INTERVAL_MS = 30_000;
 
+/** Generous guardrail to reject OBD sentinels/extreme values, not vehicle calibration. */
+export const MAX_PLAUSIBLE_FUEL_RATE_LPH = 80;
+const MAX_PLAUSIBLE_MAF_GS = 200;
+
+function isPlausibleFuelRateLph(value: number): boolean {
+  return Number.isFinite(value) && value >= 0 && value <= MAX_PLAUSIBLE_FUEL_RATE_LPH;
+}
+
 export function integrateFuelRateLph(
   previous: FuelRateSample | null,
   current: FuelRateSample,
 ): number {
   if (!previous) return 0;
   if (
-    !Number.isFinite(previous.fuelRateLph) ||
-    previous.fuelRateLph < 0 ||
-    !Number.isFinite(current.fuelRateLph) ||
-    current.fuelRateLph < 0
+    !isPlausibleFuelRateLph(previous.fuelRateLph) ||
+    !isPlausibleFuelRateLph(current.fuelRateLph)
   ) return 0;
 
   const elapsedMs = current.timestampMs - previous.timestampMs;
@@ -55,7 +61,7 @@ export class FuelRateIntegrator {
         ? { fuelRateLph: this.state.lastRateLph, timestampMs: this.state.lastTimestampMs }
         : null;
 
-    const valid = Number.isFinite(fuelRateLph) && fuelRateLph >= 0 && Number.isFinite(timestampMs);
+    const valid = isPlausibleFuelRateLph(fuelRateLph) && Number.isFinite(timestampMs);
     const timestampIsMonotonic = previous === null || timestampMs > previous.timestampMs;
 
     // Ignore stale/out-of-order samples entirely. Integrating zero for an
@@ -132,9 +138,17 @@ export function estimateFuelRateLph(input: FuelRateEstimateInput): { rateLph: nu
     afr <= 0 || density <= 0
   ) return null;
 
-  if (Number.isFinite(input.mafGs) && (input.mafGs ?? 0) > 0 && afr > 0 && density > 0) {
+  if (
+    Number.isFinite(input.mafGs)
+    && (input.mafGs ?? 0) > 0
+    && (input.mafGs ?? Number.POSITIVE_INFINITY) <= MAX_PLAUSIBLE_MAF_GS
+    && afr > 0 && density > 0
+  ) {
     const fuelKgPerSecond = (input.mafGs as number) / 1000 / afr;
-    return { rateLph: fuelKgPerSecond * 3600 / density, source: 'ESTIMATED_MAF' };
+    const rateLph = fuelKgPerSecond * 3600 / density;
+    return isPlausibleFuelRateLph(rateLph) && rateLph > 0
+      ? { rateLph, source: 'ESTIMATED_MAF' }
+      : null;
   }
 
   const map = input.mapKpa;
@@ -154,8 +168,13 @@ export function estimateFuelRateLph(input: FuelRateEstimateInput): { rateLph: nu
     const airDensityGPerL = absolutePressurePa / (287.05 * temperatureK);
     const volumetricFlowLPerSecond = displacementL * (rpm as number) / 120 * ve;
     const mafGs = airDensityGPerL * volumetricFlowLPerSecond;
+    if (!Number.isFinite(temperatureK) || temperatureK <= 0 ||
+        !Number.isFinite(mafGs) || mafGs <= 0 || mafGs > MAX_PLAUSIBLE_MAF_GS) return null;
     const fuelKgPerSecond = mafGs / 1000 / afr;
-    return { rateLph: fuelKgPerSecond * 3600 / density, source: 'ESTIMATED_MAP' };
+    const rateLph = fuelKgPerSecond * 3600 / density;
+    return isPlausibleFuelRateLph(rateLph) && rateLph > 0
+      ? { rateLph, source: 'ESTIMATED_MAP' }
+      : null;
   }
 
   return null;

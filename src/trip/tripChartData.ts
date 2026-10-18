@@ -1,4 +1,5 @@
 import type { DriveCycle } from '../data/driveCycles';
+import { isReliableTripFuelConsumption } from './fuelValidity';
 
 export interface TripChartPoint {
   value: number;
@@ -35,14 +36,7 @@ export function buildTripChartData(cycles: readonly DriveCycle[], limit = 7): Tr
     .map((cycle) => ({ value: cycle.distanceTotalKm, label: labelDate(cycle.startedAt) }));
 
   const consumption = realCycles
-    .filter((cycle) =>
-      cycle.fuelDataValid === true
-      && Number.isFinite(cycle.fuelUsedL)
-      && cycle.fuelUsedL >= 0.05
-      && Number.isFinite(cycle.avgFuelConsumptionKml)
-      && cycle.avgFuelConsumptionKml > 0
-      && cycle.avgFuelConsumptionKml <= 30,
-    )
+    .filter(isReliableTripFuelConsumption)
     .map((cycle) => ({ value: cycle.avgFuelConsumptionKml, label: labelDate(cycle.startedAt) }));
 
   return { distance, consumption };

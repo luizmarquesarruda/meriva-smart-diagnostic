@@ -163,8 +163,13 @@ export class RealTripRecorder {
     // never discard the trip or publish an unstable km/L value.
     if (state.distanceKm < 0.1) return null;
 
-    const fuelDataValid = state.fuelUsedL >= MIN_TRIP_FUEL_L && state.validFuelSamples >= 2;
-    const avgFuelConsumptionKml = fuelDataValid ? state.distanceKm / state.fuelUsedL : 0;
+    const rawAverageConsumptionKml = state.fuelUsedL > 0 ? state.distanceKm / state.fuelUsedL : 0;
+    const fuelDataValid = state.fuelUsedL >= MIN_TRIP_FUEL_L
+      && state.validFuelSamples >= 2
+      && Number.isFinite(rawAverageConsumptionKml)
+      && rawAverageConsumptionKml > 0
+      && rawAverageConsumptionKml <= 30;
+    const avgFuelConsumptionKml = fuelDataValid ? rawAverageConsumptionKml : 0;
     const avgDrivingSpeedKmh = state.movingTimeMs > 0
       ? state.distanceKm / (state.movingTimeMs / 3_600_000)
       : 0;

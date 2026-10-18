@@ -8,7 +8,8 @@ import { getAutoSaveState, updateAutoSaveState, initAutoSave } from '../meriva/a
 import { RealTripRecorder, shouldFinalizeStoppedTrip } from './tripRecorder';
 import { estimateRangeFromFuelLevel, fuelLevelPercentToLiters, isFuelReserve } from './fuelLevel';
 import { getLivePidTrend, resetLiveTelemetry } from '../obd/liveTelemetry';
-import { estimateFuelRateLph, type FuelRateSource } from '../obd/fuelConsumption';
+import { estimateFuelRateLph, MAX_PLAUSIBLE_FUEL_RATE_LPH, type FuelRateSource } from '../obd/fuelConsumption';
+import { isReliableTripFuelConsumption } from './fuelValidity';
 import { startBackgroundMonitoring } from '../gps/backgroundMonitoring';
 import { readAppSettings, subscribeAppSettings } from '../database/appSettings';
 import type { FuelType } from '../database/appSettings';
@@ -277,7 +278,8 @@ class AutoTripService {
             fuelResult.parsed.unit === 'L/h' &&
             fuelResult.parsed.value != null &&
             Number.isFinite(fuelResult.parsed.value) &&
-            fuelResult.parsed.value >= 0
+            fuelResult.parsed.value >= 0 &&
+            fuelResult.parsed.value <= MAX_PLAUSIBLE_FUEL_RATE_LPH
           ) {
             fuelRateLph = fuelResult.parsed.value;
             fuelRateSource = 'MEASURED_015E';
@@ -571,7 +573,7 @@ class AutoTripService {
       // O histórico de consumo continua vindo de viagens reais.
       // Trips remain in history even when fuel telemetry is insufficient, but
       // they must not contaminate cumulative consumption/autonomy calculations.
-      const consumptionIsValid = cycle.fuelDataValid !== false && cycle.fuelUsedL >= 0.05 && cycle.avgFuelConsumptionKml > 0;
+      const consumptionIsValid = isReliableTripFuelConsumption(cycle);
       const existingReading = state.autonomy.readings.find((item) => item.id === cycle.id);
       if (consumptionIsValid && !existingReading) {
         const previousDistance = Number(state.autonomy.cumulativeDistanceKm) || 0;
