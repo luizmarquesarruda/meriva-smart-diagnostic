@@ -2450,3 +2450,23 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Nova CI solicitada pela atualização da branch; confirmar resultado integral, inclusive testes restantes e build Android.
 - Teste físico do ELM327 no veículo continua pendente.
 
+
+
+## 2026-10-19 — Regressão visual: Saúde do Veículo voltou à página inicial
+
+### Problema
+- O bloco “SAÚDE DO VEÍCULO” reapareceu no cockpit inicial, contrariando a decisão de manter a página inicial compacta e deixar a central de saúde na rota dedicada.
+
+### Diagnóstico
+- A auditoria de `app/index.tsx` confirmou um cartão `healthCard` renderizado no modo retrato, com resumo de DTCs e botão para `/saude`. A rota dedicada continua acessível por Mais Recursos; portanto, o cartão duplicava uma função de navegação e consumia espaço do cockpit.
+
+### Correção
+- Removido exclusivamente o cartão “SAÚDE DO VEÍCULO” da tela inicial. Mantidos o indicador compacto “FALHAS ATIVAS”, a temperatura do arrefecimento e o acesso à central de saúde em Mais Recursos. Não alterada a lógica OBD/DTC nem a tela `/saude`.
+
+### Testes e CI
+- Revisão estática do bloco e do fluxo de navegação realizada no repositório.
+- TypeScript, testes automatizados, build Android e CI: pendentes da execução na branch desta correção; não considerar validado até os jobs obrigatórios concluírem com sucesso.
+- Validação visual em aparelho real: pendente.
+
+### Próximo passo
+- Executar a CI da PR, confirmar `validate` e `android-build` verdes e verificar que o cartão não reaparece em retrato nem em paisagem.
