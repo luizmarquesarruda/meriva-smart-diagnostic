@@ -38,7 +38,7 @@ function diagnosticReportLines(result: DiagnosticResult): string[] {
     '--- DIAGNÓSTICO LOCAL / MOTOR DE EVIDÊNCIAS ---',
     `MOTOR: ${result.engine}`,
     `VERSÃO: ${result.version}`,
-    `AMOSTRAS DE SIMULAÇÃO BLOQUEADAS: ${result.blockedSimulationSamples}`,\n    `LEITURAS REAL_OBD OBSOLETAS BLOQUEADAS: ${result.blockedStaleObservations}`,
+    `AMOSTRAS DE SIMULAÇÃO BLOQUEADAS: ${result.blockedSimulationSamples}`,\n    `LEITURAS REAL_OBD OBSOLETAS BLOQUEADAS: ${result.blockedStaleObservations}`,\n    `GRUPOS DE EVIDÊNCIA PID RECENTES: ${result.freshDiagnosticEvidenceGroups}`,
   ];
   if (result.hypotheses.length === 0) {
     lines.push('NENHUMA HIPÓTESE DIAGNÓSTICA GERADA COM AS EVIDÊNCIAS DISPONÍVEIS.');
