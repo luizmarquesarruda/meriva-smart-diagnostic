@@ -4,6 +4,11 @@ on:
   workflow_dispatch:
   push:
     branches: ['**']
+    # Keep code changes automatically validated; skip documentation-only pushes.
+    # A push containing both code and documentation still runs the full CI.
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
   pull_request:
     branches: [main]
 
@@ -54,7 +59,6 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
           java-package: 'jdk'
-          architecture: 'x64'
       - run: npm ci --no-audit --no-fund
       - run: npx expo prebuild --clean --platform android --non-interactive
       - name: Assemble Android release APK (standalone)
