@@ -67,7 +67,7 @@ function main() {
     observations: [obs('0106', 12), obs('0107', 5)],
   });
   assert.strictEqual(result.hypotheses[0].id, 'MISTURA_POBRE');
-  assert.strictEqual(result.blockedStaleObservations, 0, 'leituras recentes não podem ser classificadas como obsoletas');
+  assert.strictEqual(result.blockedStaleObservations, 0, 'leituras recentes não podem ser classificadas como obsoletas');\n  assert.strictEqual(result.freshDiagnosticEvidenceGroups, 1, 'STFT e LTFT recentes formam um grupo válido de evidências');
 
   const staleTimestamp = new Date(Date.now() - 60000).toISOString();
   result = engine.runLocalDiagnostic({
@@ -75,7 +75,7 @@ function main() {
     observations: [obs('0106', 20, 'REAL_OBD', staleTimestamp), obs('0107', 0, 'REAL_OBD', staleTimestamp)],
   });
   assert.strictEqual(result.hypotheses.length, 0, 'leituras antigas não podem gerar hipótese atual');
-  assert.strictEqual(result.blockedStaleObservations, 2, 'ambas as leituras antigas devem ser contabilizadas');
+  assert.strictEqual(result.blockedStaleObservations, 2, 'ambas as leituras antigas devem ser contabilizadas');\n  assert.strictEqual(result.freshDiagnosticEvidenceGroups, 0, 'leituras antigas não contam como evidência atual');
   assert.strictEqual(result.version, 2, 'o contrato do motor deve refletir o bloqueio de evidências obsoletas');
 
   result = engine.runLocalDiagnostic({
@@ -88,7 +88,7 @@ function main() {
     ...base,
     observations: [obs('010B', 50)],
   });
-  assert.strictEqual(result.hypotheses[0].id, 'VACUO_DO_MOTOR_POSSIVELMENTE_ANORMAL');
+  assert.strictEqual(result.hypotheses[0].id, 'VACUO_DO_MOTOR_POSSIVELMENTE_ANORMAL');\n  assert.strictEqual(result.freshDiagnosticEvidenceGroups, 1, 'MAP recente forma um grupo de evidência diagnóstica');
 
   result = engine.runLocalDiagnostic({
     ...base,
