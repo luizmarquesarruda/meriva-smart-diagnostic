@@ -2450,3 +2450,32 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Nova CI solicitada pela atualização da branch; confirmar resultado integral, inclusive testes restantes e build Android.
 - Teste físico do ELM327 no veículo continua pendente.
 
+
+
+## 2026-10-19 — Internet móvel e clima atual no cockpit
+
+### Solicitação e objetivo
+- Usar a conectividade de internet já disponível no telefone (incluindo dados móveis 4G/5G) sem interferir na sessão Bluetooth Classic → ELM327 → ECU.
+- Exibir cidade/localidade e temperatura externa atual na tela inicial.
+- Corrigir a regressão visual relatada em que o cartão “SAÚDE DO VEÍCULO” reapareceu na tela inicial; esse cartão foi removido do cockpit e substituído pelo resumo de clima/localização.
+
+### Implementação
+- `app.json`: declarar explicitamente a permissão normal Android `INTERNET`; nenhuma permissão de telefone/operadora foi adicionada.
+- `src/weather/dashboardWeather.ts`: consultar permissão de localização em primeiro plano, usar localização recente do aparelho ou solicitar uma posição balanceada, resolver o nome da cidade quando o geocodificador do sistema responder e consultar temperatura, sensação térmica e código meteorológico por HTTPS na API Open-Meteo.
+- A requisição tem timeout de 8 segundos. Falha de rede não lança erro para a tela nem toca na conexão OBD.
+- `app/index.tsx`: o cockpit mostra localidade, temperatura em °C, condição meteorológica, sensação térmica e horário da última atualização. Atualiza ao abrir, ao retornar ao primeiro plano e a cada 30 minutos enquanto a tela estiver montada.
+- Sem rede, preserva em memória a última temperatura válida e exibe o horário do dado; sem permissão/posição, informa o estado em vez de inventar cidade ou temperatura.
+- `tests/dashboardWeather.test.js`: valida resposta de clima, temperaturas fora de faixa, fallback do nome da cidade e mapeamento de códigos meteorológicos.
+- `tests/cockpitNavigation.test.js` e `tests/permissions.test.js`: protegem o cartão de clima e a permissão de internet; o teste de clima foi incorporado ao script `npm test`.
+
+### Roteamento de rede, privacidade e limites
+- A requisição usa a rede padrão do Android. Se o Wi-Fi estiver desligado e os dados móveis estiverem ativos, o sistema encaminha o tráfego pela rede celular disponível (4G/5G). Se o Wi-Fi for a rede padrão, o Android poderá usá-lo; o aplicativo não força a troca de rede nem liga dados móveis desativados pelo usuário.
+- Para calcular o tempo local, a latitude/longitude aproximadas do aparelho são enviadas à API Open-Meteo. A consulta ocorre no primeiro plano, na abertura/retorno e no intervalo definido acima; não é iniciada uma tarefa de clima em segundo plano.
+- A temperatura é a estimativa meteorológica para a coordenada, não uma leitura de sensor físico do telefone. Sem permissão de localização ou resposta válida da API, o valor permanece indisponível.
+- A funcionalidade não altera polling, filas, timeouts ou reconexão do ELM327; os pedidos OBD continuam seriais e independentes da internet.
+
+### Testes e estado de validação
+- Revisão estática: importações, permissões Android, script `npm test`, tratamento offline e substituição do cartão da tela inicial conferidos no repositório.
+- **CI TypeScript/testes/Expo Doctor e build Android: pendentes** até a execução automática no GitHub Actions terminar. Não declarar sucesso antes de conferir os checks.
+- **Validação física pendente:** no Samsung, desativar Wi-Fi, manter dados móveis ligados, abrir a tela inicial e confirmar cidade/temperatura/horário; depois cortar a internet e verificar que o app permanece responsivo e que a sessão ELM327 não é interrompida.
+- Próximo passo: revisar o resultado completo da CI; corrigir qualquer falha com base no log real e repetir a execução antes de considerar a implementação validada.
