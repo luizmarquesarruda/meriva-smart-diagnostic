@@ -2,9 +2,11 @@ import * as FileSystem from 'expo-file-system';
 
 export type FuelType = 'FLEX' | 'ETANOL' | 'GASOLINA';
 export type DistanceUnit = 'KM' | 'MI';
+export type AcquisitionProfile = 'STANDARD' | 'COCKPIT_PRIORITY';
 export interface AppSettings {
   fuelType: FuelType;
   distanceUnit: DistanceUnit;
+  acquisitionProfile: AcquisitionProfile;
   autoConnectObd: boolean;
   diagnosticAlerts: boolean;
   selectedAdapterAddress: string | null;
@@ -40,6 +42,7 @@ export function subscribeAppSettings(listener: (settings: AppSettings) => void):
 const DEFAULT_SETTINGS: AppSettings = {
   fuelType: 'FLEX',
   distanceUnit: 'KM',
+  acquisitionProfile: 'STANDARD',
   autoConnectObd: true,
   diagnosticAlerts: true,
   selectedAdapterAddress: null,
@@ -80,6 +83,7 @@ export async function readAppSettings(basePath: string): Promise<AppSettings> {
     const settings: AppSettings = {
       fuelType: parsed.fuelType === 'GASOLINA' ? 'GASOLINA' : parsed.fuelType === 'ETANOL' ? 'ETANOL' : 'FLEX',
       distanceUnit: parsed.distanceUnit === 'MI' ? 'MI' : 'KM',
+      acquisitionProfile: parsed.acquisitionProfile === 'COCKPIT_PRIORITY' ? 'COCKPIT_PRIORITY' : 'STANDARD',
       autoConnectObd: parsed.autoConnectObd !== false,
       diagnosticAlerts: parsed.diagnosticAlerts !== false,
       selectedAdapterAddress: typeof parsed.selectedAdapterAddress === 'string' && parsed.selectedAdapterAddress.trim()
@@ -96,7 +100,10 @@ export async function readAppSettings(basePath: string): Promise<AppSettings> {
       elmForceInitialization: parsed.elmForceInitialization !== false,
       elmAdaptiveTiming: parsed.elmAdaptiveTiming !== false,
       elmAdaptiveTimeoutMinMs: numberSetting(parsed.elmAdaptiveTimeoutMinMs, 3000, 1000, 15000),
-      elmAdaptiveTimeoutMaxMs: numberSetting(parsed.elmAdaptiveTimeoutMaxMs, 15000, 3000, 30000),
+      elmAdaptiveTimeoutMaxMs: Math.max(
+        numberSetting(parsed.elmAdaptiveTimeoutMinMs, 3000, 1000, 15000),
+        numberSetting(parsed.elmAdaptiveTimeoutMaxMs, 15000, 3000, 30000),
+      ),
     };
     publishSettings(settings);
     return settings;
