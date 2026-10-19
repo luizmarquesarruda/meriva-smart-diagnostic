@@ -60,18 +60,28 @@ assert.deepStrictEqual(parseDtcResponseForService('0A', '4A 01 23 00 00'), ['P01
   assert.strictEqual(results[1].available, true);
   assert.strictEqual(results[2].available, false);
 
-  const freeze = await scanner.readFreezeFrame({}, async (command) => ({
-    response: command === '020200'
-      ? '42 02 00 01 30'
-      : command === '020C00'
-        ? '42 0C 00 1F 40'
-        : '42 05 00 50',
-    status: 'OK',
-    elapsedMs: 15,
-  }));
+  const freezeCommands = [];
+  const freeze = await scanner.readFreezeFrame({}, async (command) => {
+    freezeCommands.push(command);
+    return {
+      response: command === '020200'
+        ? '42 02 00 01 30'
+        : command === '020C00'
+          ? '42 0C 00 1F 40'
+          : '42 05 00 50',
+      status: 'OK',
+      elapsedMs: 15,
+    };
+  });
   assert.strictEqual(freeze.dtc, 'P0130', 'freeze-frame DTC starts after the frame-number byte');
   assert.strictEqual(freeze.frame, 0, 'frame number must be read from the response header');
   assert.strictEqual(freeze.available, true);
+  assert.strictEqual(freeze.rpm, 2000, 'Mode 02 response must decode RPM after the frame byte');
+  assert.strictEqual(freeze.coolantC, 40, 'Mode 02 response must decode coolant temperature');
+  assert.strictEqual(freeze.parameters.length, 9, 'the extended snapshot should try the supported standard parameters');
+  assert.ok(freeze.parameters.some((item) => item.pid === '010C' && item.available), 'RPM result should be included in parameters');
+  assert.ok(freezeCommands.includes('020C00'), 'the scanner should request RPM using the active frame number');
+  assert.ok(freezeCommands.includes('021100'), 'the extended snapshot should include throttle position');
 
   const summary = scanner.summarizeDtcScan(results);
   assert.deepStrictEqual(summary.stored, ['P0130']);
