@@ -2470,6 +2470,7 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 
 ### Roteamento de rede, privacidade e limites
 - A requisição usa a rede padrão do Android. Se o Wi-Fi estiver desligado e os dados móveis estiverem ativos, o sistema encaminha o tráfego pela rede celular disponível (4G/5G). Se o Wi-Fi for a rede padrão, o Android poderá usá-lo; o aplicativo não força a troca de rede nem liga dados móveis desativados pelo usuário.
+- Crédito obrigatório exibido no cartão: Open-Meteo, dados sob CC BY 4.0. A API gratuita é apenas para uso não comercial e tem limites publicados; se o aplicativo for distribuído/operado comercialmente, substituir pelo endpoint/licença comercial ou por outra fonte autorizada. Referências: https://open-meteo.com/en/terms e https://open-meteo.com/en/pricing.
 - Para calcular o tempo local, a latitude/longitude aproximadas do aparelho são enviadas à API Open-Meteo. A consulta ocorre no primeiro plano, na abertura/retorno e no intervalo definido acima; não é iniciada uma tarefa de clima em segundo plano.
 - A temperatura é a estimativa meteorológica para a coordenada, não uma leitura de sensor físico do telefone. Sem permissão de localização ou resposta válida da API, o valor permanece indisponível.
 - A funcionalidade não altera polling, filas, timeouts ou reconexão do ELM327; os pedidos OBD continuam seriais e independentes da internet.
