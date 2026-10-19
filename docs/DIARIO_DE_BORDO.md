@@ -2522,3 +2522,50 @@ Os dois destinos da barra inferior são navegação para Bluetooth/ECU e Mais Re
 
 ### Resultado e próximo passo
 A barra inferior fica mais limpa, com apenas os botões de ícone, mantendo acessibilidade e navegação. Antes de integrar, executar a suíte de testes e validar visualmente em Android, incluindo tamanhos de fonte e orientação da tela.
+
+## 2026-10-18 — Pesquisa externa e novos perfis de aquisição nas configurações
+
+### Problema
+- As configurações do aplicativo já expunham vários parâmetros ELM327, mas o tempo máximo do Adaptive Timing existia no modelo de dados e não tinha controle visível.
+- A tela permitia selecionar 20 tentativas de conexão, enquanto `readAppSettings()` limitava o valor persistido a 10; a escolha podia mudar após reabrir as configurações.
+- Faltava um modo simples para reduzir a carga dos sensores auxiliares e dar mais espaço de barramento às métricas principais sem paralelizar comandos.
+
+### Pesquisa e evidências externas
+- `https://github.com/ETSoftwareStudio/obd-scanner-android`: referência de intervalos de polling configuráveis, reconexão automática, preferências persistentes e telemetria de depuração.
+- `https://github.com/tkaracan/python-OBD/blob/master/docs/Async%20Connections.md` e `https://python-obd.readthedocs.io/en/latest/Connections/`: atualização sem bloquear a interface, comandos monitorados, timeout configurável e estados distintos de adaptador/veículo.
+- `https://github.com/3badguys/Free_OBD`: opções avançadas de protocolo/endereço da ECU e debug logging; esses controles são inspiração de arquitetura, não autorização para expor comandos AT irrestritos.
+- `https://www.obdautodoctor.com/features/`: mostra valores de sensores e estatísticas mínimas/médias/máximas e esclarece que a velocidade depende do veículo, do adaptador e da conexão.
+- `https://github.com/Joost-vanAndel/OBDvis`: diagnósticos explicáveis baseados em janelas temporais, valores recentes, confiança explícita e tratamento de leituras ausentes como limitação.
+
+### Diagnóstico técnico
+- `src/knowledge/polling_policy.json` mantém a fila serial e já define velocidade/RPM no caminho prioritário, taxa medida `015E` em cada ciclo quando suportada, estimativas e nível do tanque em intervalos menores e telemetria auxiliar rotativa.
+- Como a sessão da Meriva usa KWP/K-Line, não é seguro importar taxas rápidas anunciadas para CAN nem consultar PIDs em paralelo. O perfil novo só reduz chamadas opcionais; não promete ganho de latência medido.
+- `elmAdaptiveTimeoutMaxMs` já era lido e passado para a sessão, então expor esse campo na tela não exigiu novo protocolo nem mudança de defaults físicos.
+
+### Correções implementadas na branch `ux/secondary-pages-home-button-20261018`
+- `src/database/appSettings.ts`: adicionado `acquisitionProfile` persistente, padrão `STANDARD`; leitura de settings legados seleciona o padrão se o novo campo não existir. O limite máximo Adaptive Timing é normalizado para nunca ficar abaixo do mínimo.
+- `src/knowledge/polling_policy.json`: contrato atualizado para versão 3 com dois perfis. `STANDARD` mantém a cadência atual. `COCKPIT_PRIORITY` dobra o intervalo de estimativas MAF/MAP, nível do tanque e composição FLEX, além de consultar a telemetria auxiliar rotativa a cada dois ciclos.
+- `src/trip/autoTripService.ts`: aplicação em tempo de execução do perfil selecionado via `subscribeAppSettings`. Velocidade `010D`, RPM `010C`, taxa medida `015E` e fila serial permanecem inalteradas; não foi introduzido paralelismo.
+- `app/configuracoes.tsx`: adicionadas escolhas visíveis para `PADRÃO` e `PRIORIZAR COCKPIT`; exposto o limite máximo do Adaptive Timing em 10, 15, 20 ou 30 segundos; mínimo e máximo são mantidos coerentes. Tentativas de conexão agora oferecem 3, 5 e 10 opções, alinhadas ao limite validado de 10.
+- `tests/knowledgeJson.test.js`: valida a versão 3 e o contrato dos perfis.
+- Criado `tests/acquisitionProfiles.test.js` com regressões estáticas para os perfis, as invariantes de timeout e a compatibilidade entre UI e limites persistidos; incluído no script `npm test` em `package.json`.
+- Atualizados `README.md` e `docs/RELATORIO_PIDS_E_FORMULAS.md` com o contrato e os limites do novo perfil.
+
+### Validação e limites
+- Revisão estática remota confirma a presença do perfil nos settings, no JSON, no serviço de viagem e na tela de configurações. Os valores de versão/perfil foram comparados entre código e testes.
+- A nova suíte de regressão foi adicionada, mas **não foi executada** nesta etapa. TypeScript, `npm test`, Expo Doctor e build Android continuam pendentes.
+- A CI **não foi disparada**: os commits desta etapa usam `[skip ci]`, conforme a restrição operacional.
+- Não houve teste físico com a Meriva/ELM327 nem benchmark comparativo. `COCKPIT_PRIORITY` reduz sondagens opcionais por política; não existe prova neste registro de um número específico de milissegundos ganhos.
+- A configuração de timeout do ELM é enviada no início da conexão; não se deve assumir que editar timeout reconfigure instantaneamente uma sessão ELM já aberta. O perfil de aquisição, por outro lado, é observado pelo serviço de viagem em execução.
+
+### Commits principais
+- `ebccf3f2` — modelo de settings, perfil de aquisição e invariant do Adaptive Timing.
+- `fc2385de` — contrato JSON versão 3 e perfis de aquisição.
+- `0e99c70f` — aplicação dos perfis à cadência de PIDs opcionais.
+- `6d6cab85` — controles novos na tela Configurações e alinhamento das tentativas.
+- `4675259a`, `604e0e26`, `3665caef` — testes de contrato, novo teste de configurações e inclusão no pipeline local.
+- `08f82fd0`, `0d9edb1d` — documentação técnica.
+
+### Resultado e próximo passo
+- As configurações agora permitem escolher entre a cadência atual e uma alternativa conservadora que favorece a responsividade das métricas principais reduzindo consultas auxiliares. Os limites do Adaptive Timing ficam explícitos e coerentes; a escolha de tentativas não excede o limite persistido.
+- Próximo passo: executar `npm run validate`, Expo Doctor e build Android somente após autorização de CI, revisar qualquer falha pelo log, e comparar no veículo parado a frequência/latência das métricas nos dois perfis. Reverter para `STANDARD` se a captura de amostras auxiliares for insuficiente.
