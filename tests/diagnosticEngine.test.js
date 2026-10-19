@@ -37,8 +37,8 @@ function loadTs(tsPath) {
   return mod.exports;
 }
 
-function obs(pid, value, source = 'REAL_OBD') {
-  return { pid, name: pid, value, unit: 'N/D', source, timestamp: new Date().toISOString(), confidence: 'HIGH' };
+function obs(pid, value, source = 'REAL_OBD', timestamp = new Date().toISOString()) {
+  return { pid, name: pid, value, unit: 'N/D', source, timestamp, confidence: 'HIGH' };
 }
 
 function main() {
@@ -67,6 +67,16 @@ function main() {
     observations: [obs('0106', 12), obs('0107', 5)],
   });
   assert.strictEqual(result.hypotheses[0].id, 'MISTURA_POBRE');
+  assert.strictEqual(result.blockedStaleObservations, 0, 'leituras recentes não podem ser classificadas como obsoletas');
+
+  const staleTimestamp = new Date(Date.now() - 60000).toISOString();
+  result = engine.runLocalDiagnostic({
+    ...base,
+    observations: [obs('0106', 20, 'REAL_OBD', staleTimestamp), obs('0107', 0, 'REAL_OBD', staleTimestamp)],
+  });
+  assert.strictEqual(result.hypotheses.length, 0, 'leituras antigas não podem gerar hipótese atual');
+  assert.strictEqual(result.blockedStaleObservations, 2, 'ambas as leituras antigas devem ser contabilizadas');
+  assert.strictEqual(result.version, 2, 'o contrato do motor deve refletir o bloqueio de evidências obsoletas');
 
   result = engine.runLocalDiagnostic({
     ...base,
