@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { cockpitTheme } from '../src/ui/cockpitTheme';
 import Constants from 'expo-constants';
 import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -108,7 +109,7 @@ export default function ConfiguracaoScreen() {
   }
 
   return (
-    <SafeAreaView style={{flex:1,backgroundColor:'#0b1220'}} edges={["top","bottom","left","right"]}>
+    <SafeAreaView style={{flex:1,backgroundColor: cockpitTheme.background}} edges={["bottom","left","right"]}>
     <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
       <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
       <Text style={styles.title}>CONFIGURAÇÕES</Text>
@@ -292,9 +293,9 @@ function SettingSwitch({ label, value, onChange }: { label: string; value: boole
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, paddingVertical: 16, backgroundColor: '#0b1220' },
-  title: { fontSize: 23, fontWeight: '900', color: '#7db3ff', letterSpacing: 0.5, marginBottom: 6 },
-  section: { fontSize: 12, fontWeight: '900', color: '#7db3ff', letterSpacing: 0.8, marginTop: 16, marginBottom: 8 },
+  container: { flexGrow: 1, paddingVertical: 14, backgroundColor: cockpitTheme.background },
+  title: { fontSize: 23, fontWeight: '900', color: cockpitTheme.text, letterSpacing: 0.5, marginBottom: 6 },
+  section: { fontSize: 12, fontWeight: '900', color: cockpitTheme.accent, letterSpacing: 0.8, marginTop: 16, marginBottom: 8 },
   status: { color: '#2563eb', fontWeight: '700', marginBottom: 12 },
   card: { backgroundColor: '#111c2e', borderRadius: 8, padding: 11, marginBottom: 9, borderWidth: 1, borderColor: '#243652' },
   label: { flex: 1, color: '#e5edf7', fontWeight: '600' },
