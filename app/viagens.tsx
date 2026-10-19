@@ -8,6 +8,7 @@ import { useMidLayout } from '../src/ui/midLayout';
 import * as FileSystem from 'expo-file-system';
 import { readDriveCycles } from '../src/storage/driveCycleStorage';
 import { getDriveCycleSummary, type DriveCycle } from '../src/data/driveCycles';
+import { summarizeTripTelemetry } from '../src/trip/tripSummary';
 
 const BASE_PATH = FileSystem.documentDirectory + 'MERIVA_SMART';
 const DAY_MS = 86_400_000;
@@ -103,12 +104,19 @@ export default function ViagensScreen() {
 
 function TripDetails({cycle,onBack}:{cycle:DriveCycle;onBack:()=>void}) {
   const samples = cycle.telemetrySamples ?? [];
+  const telemetry = summarizeTripTelemetry(samples);
   const coolant = samples.filter(x => n(x.coolantTempC) != null).map(x => x.coolantTempC as number);
   const rpm = samples.filter(x => n(x.rpm) != null).map(x => x.rpm as number);
   const speed = samples.filter(x => n(x.speedKmh) != null).map(x => x.speedKmh as number);
-  const min = coolant.length ? Math.min(...coolant) : null;
-  const max = coolant.length ? Math.max(...coolant) : null;
-  const avg = coolant.length ? coolant.reduce((sum,value)=>sum+value,0)/coolant.length : null;
+  const min = telemetry.coolant?.min ?? null;
+  const max = telemetry.coolant?.max ?? null;
+  const avg = telemetry.coolant?.average ?? null;
+  const rpmMin = telemetry.rpm?.min ?? null;
+  const rpmAvg = telemetry.rpm?.average ?? null;
+  const rpmMax = telemetry.rpm?.max ?? null;
+  const sampledSpeedMin = telemetry.speed?.min ?? null;
+  const sampledSpeedAvg = telemetry.speed?.average ?? null;
+  const sampledSpeedMax = telemetry.speed?.max ?? null;
   const fuelValid = cycle.fuelDataValid !== false && cycle.fuelUsedL >= 0.05 && cycle.avgFuelConsumptionKml > 0;
   const totalSeconds = durationSeconds(cycle.totalTimeHms);
   return <>
@@ -130,6 +138,24 @@ function TripDetails({cycle,onBack}:{cycle:DriveCycle;onBack:()=>void}) {
       <Detail label="Origem da taxa" value={cycle.fuelRateSource ?? 'N/D'} />
       <Text style={s.smallNote}>{fuelValid?'Integração calculada conforme a fonte indicada; não equivale a uma medição física do tanque.':'Dados insuficientes para estimar consumo com segurança neste trajeto.'}</Text>
     </View>
+    <Text style={s.section}>VELOCIDADE NAS AMOSTRAS</Text>
+    <View style={s.card}>
+      <View style={s.stats}>
+        <Stat label="MÍNIMA" value={mv(sampledSpeedMin,'km/h')} />
+        <Stat label="MÉDIA AMOSTRADA" value={mv(sampledSpeedAvg,'km/h')} />
+        <Stat label="MÁXIMA AMOSTRADA" value={mv(sampledSpeedMax,'km/h')} />
+      </View>
+      <Text style={s.smallNote}>Resumo calculado apenas dos pontos temporais salvos ({telemetry.speed?.count ?? 0} valores). A velocidade máxima absoluta da viagem, registrada em cada ciclo, permanece no resumo principal.</Text>
+    </View>
+    <Text style={s.section}>ROTAÇÃO DO MOTOR</Text>
+    <View style={s.card}>
+      <View style={s.stats}>
+        <Stat label="MÍNIMA" value={mv(rpmMin,'rpm',0)} />
+        <Stat label="MÉDIA AMOSTRADA" value={mv(rpmAvg,'rpm',0)} />
+        <Stat label="MÁXIMA AMOSTRADA" value={mv(rpmMax,'rpm',0)} />
+      </View>
+      <Text style={s.smallNote}>{telemetry.rpm?.count ?? 0} amostras de RPM válidas. Leituras ausentes são ignoradas, não contadas como zero.</Text>
+    </View>
     <Text style={s.section}>TEMPERATURA DO ARREFECIMENTO</Text>
     <View style={s.card}>
       <View style={s.stats}><Stat label="MÍNIMA" value={mv(min,'°C')} /><Stat label="MÉDIA" value={mv(avg,'°C')} /><Stat label="MÁXIMA" value={mv(max,'°C')} /></View>
@@ -147,7 +173,8 @@ function TripDetails({cycle,onBack}:{cycle:DriveCycle;onBack:()=>void}) {
       <Detail label="Origem do registro" value={cycle.source} />
       <Detail label="Início" value={dateLabel(cycle.startedAt)} />
       <Detail label="Fim" value={dateLabel(cycle.finishedAt)} />
-      <Detail label="Amostras temporais" value={String(samples.length)} />
+      <Detail label="Amostras temporais" value={String(telemetry.sampleCount)} />
+      <Detail label="Cobertura Speed / RPM / ECT" value={speed.length + " / " + rpm.length + " / " + coolant.length} />
       <Detail label="Duração contabilizada" value={totalSeconds>0?`${Math.round(totalSeconds/60)} min`:'N/D'} />
       <Text style={s.smallNote}>Ausência de amostras significa falta de evidência armazenada, não prova de falha do sensor.</Text>
     </View>
