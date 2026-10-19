@@ -449,9 +449,8 @@ export default function LaboratorioScreen() {
         : await scanDtcServices(activeSession);
       setDtcScan(results);
       const stored = results.find((item) => item.kind === 'STORED');
-      // Freeze frame is user-triggered separately to avoid nine extra Mode 02
-      // requests on every ordinary DTC scan over the Meriva's K-Line session.
-      const freezeFrame: FreezeFrameSnapshot | null = null;
+      // Extended freeze-frame acquisition is a separate user action to avoid
+      // extra Mode 02 requests during every ordinary DTC scan.
       setDtcCodes(stored?.codes ?? []);
 
       if (mode === 'REAL') {
