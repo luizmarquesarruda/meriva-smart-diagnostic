@@ -130,7 +130,7 @@ function TripDetails({cycle,onBack}:{cycle:DriveCycle;onBack:()=>void}) {
     <Text style={s.section}>RESUMO</Text>
     <View style={s.grid}><Metric l="DURAÇÃO" v={cycle.totalTimeHms || 'N/D'} /><Metric l="EM MOVIMENTO" v={cycle.drivingTimeHms || 'N/D'} /></View>
     <View style={s.grid}><Metric l="TEMPO PARADO" v={cycle.standingTimeHms || 'N/D'} /><Metric l="VEL. MÉDIA" v={mv(n(cycle.avgDrivingSpeedKmh),'km/h')} /></View>
-    <View style={s.grid}><Metric l="VEL. MÁXIMA" v={mv(n(cycle.maxSpeedKmh),'km/h')} /><Metric l="MÁXIMO RPM" v={mv(rpm.length?Math.max(...rpm):null,'rpm',0)} /></View>
+    <View style={s.grid}><Metric l="VEL. MÁXIMA" v={mv(n(cycle.maxSpeedKmh),'km/h')} /><Metric l="RPM MÁXIMO AMOSTRADO" v={mv(rpm.length?Math.max(...rpm):null,'rpm',0)} /></View>
     <Text style={s.section}>COMBUSTÍVEL</Text>
     <View style={s.card}>
       <Detail label="Combustível integrado" value={fuelValid?mv(n(cycle.fuelUsedL),'L',3):'N/D'} />
