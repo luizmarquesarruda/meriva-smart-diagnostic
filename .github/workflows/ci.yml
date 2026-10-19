@@ -63,6 +63,7 @@ jobs:
       - name: Apply known safe repairs
         run: python .github/scripts/repair_known_ci.py
       - name: Commit and push if a safe repair was applied
+        id: repair_commit
         run: |
           if git diff --quiet; then
             echo "No known safe repair matched. Manual diagnosis is still required."
@@ -73,8 +74,9 @@ jobs:
           git add app/saude.tsx src/obd/exportBluetoothDiagnosticTxt.ts
           git commit -m "ci: apply deterministic repair after failed validation"
           git push origin "HEAD:${{ github.ref_name }}"
+          echo "repaired=true" >> "$GITHUB_OUTPUT"
       - name: Re-run CI after automatic repair
-        if: success()
+        if: steps.repair_commit.outputs.repaired == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run CI --ref "${{ github.ref_name }}"
