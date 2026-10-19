@@ -42,6 +42,9 @@ function main() {
   assert.strictEqual(typeof confirmed.version, 'number');
   assert.strictEqual(typeof bluetooth.schemaVersion, 'number');
   assert.strictEqual(typeof diagnosticRules.version, 'number');
+  assert.strictEqual(diagnosticRules.version, 3, 'regras de diagnóstico versão 3 incluem política de atualidade');
+  assert.ok(Number.isInteger(diagnosticRules.dataQuality.pidMaxAgeMs) && diagnosticRules.dataQuality.pidMaxAgeMs >= 1000, 'idade máxima de PID precisa ser válida');
+  assert.ok(Number.isInteger(diagnosticRules.dataQuality.futureTimestampToleranceMs) && diagnosticRules.dataQuality.futureTimestampToleranceMs >= 0, 'tolerância de relógio precisa ser válida');
   assert.strictEqual(typeof sensorTests.schemaVersion, 'number');
   assert.strictEqual(sensorTests.catalogId, 'MERIVA_SMART_SENSOR_TESTS');
   assert.strictEqual(sensorTests.minimumReadingsPerPid, 3, 'cada PID suportado exige três tentativas');
