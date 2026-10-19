@@ -1,19 +1,18 @@
 #!/usr/bin/env python3
-"""Apply only narrowly-scoped, deterministic repairs for known CI syntax artifacts.
-
-This deliberately does not attempt speculative source-code rewrites. Unknown failures
-remain failed and must be diagnosed from the CI logs.
-"""
+"""Apply only narrowly-scoped, deterministic repairs for known CI syntax artifacts."""
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+tick = chr(96)
 REPAIRS = {
     "app/saude.tsx": [
         (r";\n  const normal", ";\n  const normal"),
     ],
     "src/obd/exportBluetoothDiagnosticTxt.ts": [
-        (r"\`,\n    \`LEITURAS REAL_OBD", "\`,\n    \`LEITURAS REAL_OBD"),
-        (r"\`,\n    \`GRUPOS DE EVIDÊNCIA PID", "\`,\n    \`GRUPOS DE EVIDÊNCIA PID"),
+        (tick + r",\n    " + tick + "LEITURAS REAL_OBD",
+         tick + ",\n    " + tick + "LEITURAS REAL_OBD"),
+        (tick + r",\n    " + tick + "GRUPOS DE EVIDÊNCIA PID",
+         tick + ",\n    " + tick + "GRUPOS DE EVIDÊNCIA PID"),
     ],
 }
 
