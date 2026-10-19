@@ -98,7 +98,7 @@ export function parseReadinessMonitorResponse(rawResponse: string): ReadinessMon
       ];
 
   for (const [id, label, mask] of engineSpecific as [string, string, number][]) {
-    monitors.push(monitor(id, label, c, d, mask));
+    monitors.push(monitor(id, label, (c & mask) !== 0, (d & mask) !== 0));
   }
 
   const supportedCount = monitors.filter((item) => item.supported).length;

@@ -2687,3 +2687,25 @@ P1–P4 e o seletor de PID foram integrados ao branch de trabalho, com cobertura
 ## 2026-10-19 — Solicitação de execução da CI para P1–P4
 
 A pedido do usuário, foi solicitada a execução da CI para validar as alterações de prontidão Mode 01, freeze frame Mode 02, resumo técnico por viagem, histórico temporal de evidências e seletor manual de PID. Este commit intencionalmente **não** usa `[skip ci]`, para que o gatilho `push` definido em `.github/workflows/ci.yml` execute os jobs `validate` e `android-build`. Resultado e conclusão dos jobs devem ser registrados após a consulta ao GitHub Actions; não presumir sucesso antes do término.
+
+
+## 2026-10-19 — Auditoria do resultado da CI #2420 e correções de integração
+
+### Falhas confirmadas
+- `src/diagnostics/diagnosticEngine.ts`: o tipo público `DiagnosticResult` exige `freshDiagnosticEvidenceGroups`; a função já calculava o valor, mas não o incluía no objeto de retorno. Isso causava TS2741 e ocultaria um dado que os testes já esperavam.
+- `src/obd/readinessMonitor.ts`: a chamada ao helper `monitor` fornecia cinco argumentos para uma função de quatro argumentos. Além de impedir a compilação (TS2554), não convertia os bytes C/D e a máscara em estados de suporte e conclusão.
+
+### Correções aplicadas
+- Incluído `freshDiagnosticEvidenceGroups` no retorno de `runLocalDiagnostic`, preservando o cálculo existente e alinhando implementação, interface e testes.
+- Alterada a descodificação de monitores não contínuos para calcular suporte por `(c & mask) !== 0` e incompletude por `(d & mask) !== 0`; o helper continua convertendo incompletude em `complete`.
+- Ampliado `.github/scripts/repair_known_ci.py` com correções determinísticas e estreitas para esses dois padrões.
+- Corrigido o job `auto-repair`: agora inclui os arquivos dessas correções no `git add` e recebe permissão `actions: write` para poder disparar `workflow_dispatch` depois de um reparo aplicado. A automação permanece limitada a padrões conhecidos; erros desconhecidos não são adivinhados nem alterados automaticamente.
+
+### Auditoria e validação
+- Estado inicial: CI #2420 falhou em `npm run typecheck`; `npm ci` e Expo Doctor (17/17) passaram. `npm test` não foi executado e `android-build` foi ignorado pela dependência da validação.
+- Os dois erros foram correlacionados diretamente com os tipos e as funções envolvidos. Os testes de motor diagnóstico já verificam os grupos de evidência; os testes de prontidão verificam suporte/incompletude dos bits.
+- A suíte local não foi executada neste ambiente remoto de edição. O push deste commit dispara uma nova CI para executar typecheck, testes, Expo Doctor e build Android; o resultado só será declarado após consultar os jobs.
+- Nenhum merge para `main`; teste físico na Meriva continua pendente.
+
+### Próximo passo
+Acompanhar a nova CI do commit desta auditoria. Se houver falha, analisar o log concreto e aplicar uma correção direcionada antes de qualquer nova tentativa.

@@ -130,6 +130,7 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
     hypotheses: [...hypotheses.values()].sort((a, b) => b.score - a.score),
     blockedSimulationSamples,
     blockedStaleObservations,
+    freshDiagnosticEvidenceGroups,
     blockedNonLiveDtcs,
     disclaimer: 'Hipóteses baseadas em evidências locais. Não condenar peça por um DTC ou PID isolado. PIDs REAL_OBD com timestamp ausente, inconsistente ou mais antigo que a janela configurada são ignorados; status histórico/inativo e dados não-REAL_OBD não geram falha atual.',
   };

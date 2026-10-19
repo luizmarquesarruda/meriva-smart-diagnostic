@@ -8,6 +8,14 @@ REPAIRS = {
     "app/saude.tsx": [
         (r";\n  const normal", ";\n  const normal"),
     ],
+    "src/diagnostics/diagnosticEngine.ts": [
+        ("    blockedStaleObservations,\\n    blockedNonLiveDtcs,",
+         "    blockedStaleObservations,\\n    freshDiagnosticEvidenceGroups,\\n    blockedNonLiveDtcs,"),
+    ],
+    "src/obd/readinessMonitor.ts": [
+        ("    monitors.push(monitor(id, label, c, d, mask));",
+         "    monitors.push(monitor(id, label, (c & mask) !== 0, (d & mask) !== 0));"),
+    ],
     "src/obd/exportBluetoothDiagnosticTxt.ts": [
         (tick + r",\n    " + tick + "LEITURAS REAL_OBD",
          tick + ",\n    " + tick + "LEITURAS REAL_OBD"),
