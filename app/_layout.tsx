@@ -1,8 +1,8 @@
 import '../src/gps/backgroundLocationTask';
 import { useEffect, useRef } from 'react';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
-import { Alert, AppState, Platform } from 'react-native';
-import { Stack } from 'expo-router';
+import { Alert, AppState, Platform, Pressable, Text } from 'react-native';
+import { Stack, useRouter } from 'expo-router';
 import { readAppSettings } from '../src/database/appSettings';
 import { disconnectSharedObd } from '../src/obd/sharedConnection';
 import * as FileSystem from 'expo-file-system';
@@ -11,6 +11,7 @@ import { requestAllRequiredPermissions } from '../src/permissions/permissionMana
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 export default function RootLayout() {
+  const router = useRouter();
   // Ativa o bloqueio de tela de forma explícita e o restaura quando o app volta ao primeiro plano.
   useEffect(() => {
     const tag = 'meriva-smart-diagnostic-active';
@@ -105,10 +106,22 @@ export default function RootLayout() {
         headerStyle: { backgroundColor: '#d9d9d9' },
         headerTintColor: '#1557a6',
         headerTitleStyle: { fontWeight: '900' },
+        headerBackVisible: false,
+        headerLeft: () => (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Página inicial"
+            accessibilityHint="Volta para a tela inicial do Meriva Smart Diagnostic."
+            onPress={() => router.replace('/')}
+            style={{ marginLeft: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: '#1557a6' }}
+          >
+            <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '800' }}>⌂ Página inicial</Text>
+          </Pressable>
+        ),
       }}
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="bluetooth" options={{ headerShown: false }} />
+      <Stack.Screen name="bluetooth" options={{ title: 'BLUETOOTH / ECU' }} />
       <Stack.Screen name="laboratorio" options={{ title: 'DIAGNÓSTICO OBD' }} />
       <Stack.Screen name="armazenamento" options={{ title: 'HISTÓRICO E DADOS' }} />
       <Stack.Screen name="configuracoes" options={{ title: 'CONFIGURAÇÕES' }} />
