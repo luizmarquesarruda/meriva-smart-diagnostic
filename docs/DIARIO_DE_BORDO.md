@@ -2709,3 +2709,24 @@ A pedido do usuário, foi solicitada a execução da CI para validar as alteraç
 
 ### Próximo passo
 Acompanhar a nova CI do commit desta auditoria. Se houver falha, analisar o log concreto e aplicar uma correção direcionada antes de qualquer nova tentativa.
+
+
+## 2026-10-19 — Correção das duas regressões de contrato após CI #2421
+
+### Resultado observado
+- O TypeScript passou depois da correção de `freshDiagnosticEvidenceGroups` e da decodificação dos bits C/D do PID 0101.
+- Expo Doctor passou (17/17).
+- Os testes de resumo de viagem, histórico de evidências, persistência DTC/freeze frame, integração P1–P4, prontidão e scanner de freeze frame passaram.
+- `tests/regression.test.js` encontrou duas asserções de contrato desatualizadas, não dois defeitos na política executada:
+  1. A asserção textual procurava a expressão antiga com `FUEL_LEVEL_EVERY_N_CYCLES`, mas o código usa `fuelLevelEveryNCycles`, calculado com o multiplicador do perfil ativo.
+  2. A regressão esperava versão 2 de `polling_policy.json`, enquanto o JSON e `tests/knowledgeJson.test.js` já declaram versão 3, necessária para o contrato de perfis e a política de composição Flex.
+
+### Correções
+- Atualizada a asserção de cadência para refletir a variável derivada que incorpora o perfil `STANDARD` ou `COCKPIT_PRIORITY`; não foi removida a verificação.
+- Atualizada a versão esperada para 3, alinhando o teste de regressão ao catálogo JSON e ao teste dedicado de consistência de conhecimento.
+- Corrigido `.github/scripts/repair_known_ci.py`: as duas novas regras de reparo agora contêm escapes de newline reais do Python, de modo que comparem quebras de linha do arquivo em vez dos caracteres literais barra+n.
+
+### Validação pendente
+- CI #2421 falhou exclusivamente em duas asserções do teste de regressão após typecheck, Doctor e os testes anteriores passarem. Como `npm test` para na falha desse script, os scripts de teste posteriores ainda não foram executados nesta rodada.
+- Este commit dispara a CI novamente. Não declarar validação concluída até `validate` e `android-build` terminarem com sucesso.
+- Nenhum merge para `main`; teste físico no veículo continua pendente.

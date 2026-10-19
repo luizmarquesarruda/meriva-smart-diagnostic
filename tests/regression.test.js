@@ -1037,7 +1037,7 @@ async function testPidAndLearningWriteSerialization() {
   const measuredFuelQueryIndex = autoTripServiceSource.indexOf("queryPid('015E')");
   const fuelLevelQueryIndex = autoTripServiceSource.indexOf("queryPid('012F')");
   assert.ok(speedQueryIndex >= 0 && rpmQueryIndex > speedQueryIndex && measuredFuelQueryIndex > rpmQueryIndex && fuelLevelQueryIndex > measuredFuelQueryIndex, 'velocidade, RPM e taxa de combustível devem preceder o nível lento do tanque');
-  assert.ok(autoTripServiceSource.includes("this.pollCycleNumber % FUEL_LEVEL_EVERY_N_CYCLES === pollingPolicy.polling.fuelLevel.phase"), 'nível do tanque deve seguir a cadência centralizada no JSON');
+  assert.ok(autoTripServiceSource.includes("this.pollCycleNumber % fuelLevelEveryNCycles === pollingPolicy.polling.fuelLevel.phase"), 'nível do tanque deve seguir a cadência centralizada no JSON e o perfil de aquisição');
   assert.ok(autoTripServiceSource.includes("fuelLevelResult.parsed.unit === 'percent'"), 'o nível do tanque deve aceitar a unidade real do parser (percent)');
   assert.ok(!autoTripServiceSource.includes("fuelLevelResult.parsed.unit === '%'"), 'a unidade incompatível não deve invalidar o PID 012F');
   assert.ok(autoTripServiceSource.includes("fuelRateLph == null && fuelEstimateDue && connection.supportedPids.includes('0110')"), 'MAF só deve ser consultado como fallback quando suportado e na cadência reduzida');
@@ -1059,7 +1059,7 @@ function testAcquisitionPolicyConsistency() {
   const bluetooth = JSON.parse(fs.readFileSync(path.join(root, 'knowledge/bluetooth_config.json'), 'utf8'));
   const settingsUi = fs.readFileSync(path.join(ROOT, 'app/configuracoes.tsx'), 'utf8');
 
-  assert.strictEqual(policy.version, 2);
+  assert.strictEqual(policy.version, 3);
   assert.strictEqual(policy.polling.fuelComposition.pid, '0152');
   assert.strictEqual(policy.polling.fuelComposition.everyCycles, 30);
   assert.strictEqual(bluetooth.schemaVersion, 2);

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply only narrowly-scoped, deterministic repairs for known CI syntax artifacts."""
+"""Apply only narrowly-scoped, deterministic repairs for known CI failures."""
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -9,8 +9,8 @@ REPAIRS = {
         (r";\n  const normal", ";\n  const normal"),
     ],
     "src/diagnostics/diagnosticEngine.ts": [
-        ("    blockedStaleObservations,\\n    blockedNonLiveDtcs,",
-         "    blockedStaleObservations,\\n    freshDiagnosticEvidenceGroups,\\n    blockedNonLiveDtcs,"),
+        ("    blockedStaleObservations,\n    blockedNonLiveDtcs,",
+         "    blockedStaleObservations,\n    freshDiagnosticEvidenceGroups,\n    blockedNonLiveDtcs,"),
     ],
     "src/obd/readinessMonitor.ts": [
         ("    monitors.push(monitor(id, label, c, d, mask));",
