@@ -28,7 +28,7 @@ export default function VeiculoScreen() {
       </View>
     </View>
     <Link href="/bluetooth" asChild><TouchableOpacity style={styles.primary}><Text style={styles.primaryText}>📡 GERENCIAR CONEXÃO</Text></TouchableOpacity></Link>
-    <Link href="/" asChild><TouchableOpacity style={styles.back}><Text style={styles.backText}>← VOLTAR</Text></TouchableOpacity></Link>
+    
   </View></ScrollView></SafeAreaView>;
 }
 function Row({ l, v }: { l: string; v: string }) { return <View style={styles.row}><Text style={styles.label}>{l}</Text><Text style={styles.value}>{v}</Text></View>; }
@@ -36,5 +36,5 @@ const styles = StyleSheet.create({
   container:{flex:1,backgroundColor:'#07111f'},content:{flexGrow:1,width:'100%',paddingVertical:14,paddingBottom:30},screenFrame:{width:'100%',alignSelf:'center'},title:{color:'#f8fafc',fontSize:24,fontWeight:'900'},subtitle:{color:'#7db3ff',fontSize:9,fontWeight:'900',marginTop:3,marginBottom:12},
   vehicleColumns:{width:'100%',gap:10},vehicleColumnsLandscape:{flexDirection:'row',alignItems:'flex-start'},hero:{backgroundColor:'#0f2035',borderRadius:16,borderWidth:1,borderColor:'#2d5278',padding:16,marginBottom:10},name:{color:'#f8fafc',fontSize:23,fontWeight:'900'},engine:{color:'#9fc5f7',fontSize:10,marginTop:5},fuel:{color:'#7185a1',fontSize:10,marginTop:3},
   heroLandscape:{flex:0.72,minWidth:0,marginBottom:0},cardLandscape:{flex:1,minWidth:0},card:{backgroundColor:'#0e1b2d',borderRadius:14,borderWidth:1,borderColor:'#28415f',padding:5},row:{padding:11,borderBottomWidth:1,borderBottomColor:'#1c3048'},label:{flex:1,minWidth:0,color:'#7185a1',fontSize:8,fontWeight:'900'},value:{color:'#dbeafe',fontSize:11,fontWeight:'800',marginTop:3,flexShrink:1,textAlign:'right'},
-  primary:{backgroundColor:'#2563eb',borderRadius:11,padding:14,alignItems:'center',marginTop:10},primaryText:{color:'#fff',fontSize:10,fontWeight:'900'},back:{padding:14,alignItems:'center'},backText:{color:'#7db3ff',fontSize:10,fontWeight:'900'}
+  primary:{backgroundColor:'#2563eb',borderRadius:11,padding:14,alignItems:'center',marginTop:10},primaryText:{color:'#fff',fontSize:10,fontWeight:'900'}
 });
