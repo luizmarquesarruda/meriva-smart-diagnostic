@@ -159,7 +159,8 @@ export async function recordDiagnosticFindings(
 
       if (existing && Number.isFinite(existingLastSeen) && ageSinceLastSeen >= 0 && ageSinceLastSeen <= ACTIVE_EPISODE_WINDOW_MS) {
         existing.lastSeenAt = observedAt.toISOString();
-        if (observedAt.getTime() - Date.parse(existing.lastCountedAt) >= MIN_OBSERVATION_INTERVAL_MS) {
+        const countTrendPoint = observedAt.getTime() - Date.parse(existing.lastCountedAt) >= MIN_OBSERVATION_INTERVAL_MS;
+        if (countTrendPoint) {
           existing.observations += 1;
           existing.lastCountedAt = observedAt.toISOString();
         }
@@ -167,9 +168,7 @@ export async function recordDiagnosticFindings(
         existing.confidence = hypothesis.confidence;
         existing.sources = [...new Set(hypothesis.evidence.map((item) => item.source))];
         if (!Array.isArray(existing.timeline)) existing.timeline = [];
-        if (observedAt.getTime() - Date.parse(existing.lastCountedAt) < MIN_OBSERVATION_INTERVAL_MS) {
-          // No duplicate trend point for sub-minute UI/service refreshes.
-        } else {
+        if (countTrendPoint) {
           existing.timeline.push({
             at: observedAt.toISOString(),
             score: hypothesis.score,
