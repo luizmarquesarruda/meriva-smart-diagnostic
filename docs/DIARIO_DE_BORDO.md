@@ -2584,10 +2584,10 @@ O motor local selecionava a última observação REAL_OBD por PID, mas não exig
 
 ### Correção aplicada na branch ux/secondary-pages-home-button-20261018
 - src/knowledge/diagnostic_rules.json: versão 3; janela de atualidade padrão de 10.000 ms e tolerância de timestamp futuro de 1.000 ms.
-- src/diagnostics/diagnosticEngine.ts: ignora PIDs sem valor numérico finito, de fonte diferente de REAL_OBD, timestamp inválido, antigos além da janela ou com timestamp muito à frente do relógio; mantém a filtragem de DTC ativo separada. O contrato do motor passa para versão 2 e inclui blockedStaleObservations.
-- app/saude.tsx e app/laboratorio.tsx: mostram alerta quando as leituras reais antigas foram descartadas.
-- src/obd/exportBluetoothDiagnosticTxt.ts: registra a quantidade de leituras obsoletas bloqueadas no relatório exportado.
-- tests/diagnosticEngine.test.js: adicionados casos para leituras recentes e duas leituras de mistura com 60 segundos de idade.
+- src/diagnostics/diagnosticEngine.ts: ignora PIDs sem valor numérico finito, de fonte diferente de REAL_OBD, timestamp inválido, antigos além da janela ou com timestamp muito à frente do relógio; mantém a filtragem de DTC ativo separada. O contrato do motor passa para versão 2 e inclui blockedStaleObservations e freshDiagnosticEvidenceGroups; os PIDs também são normalizados removendo espaços.
+- app/saude.tsx: mostra DADOS INSUFICIENTES em vez de SISTEMA NORMAL quando não há grupo atual de 0106+0107 ou 010B nem DTC ativo; também avisa quando leituras antigas foram descartadas. app/laboratorio.tsx: mostra as leituras obsoletas ignoradas e informa quando falta evidência PID atual.
+- src/obd/exportBluetoothDiagnosticTxt.ts: registra a quantidade de leituras obsoletas bloqueadas e quantos grupos de evidência PID recentes existem no relatório exportado.
+- tests/diagnosticEngine.test.js: adicionados casos para leituras recentes, duas leituras de mistura com 60 segundos de idade, timestamp no futuro e preservação de um DTC atual quando um PID está obsoleto.
 - tests/knowledgeJson.test.js: verifica a versão e os limites da política.
 
 ### Validação e limites
