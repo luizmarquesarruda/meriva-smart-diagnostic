@@ -2487,3 +2487,7 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Correção: o teste agora exige `/dados` e `/mais` no cockpit e verifica que o atalho para `/saude` não reapareça. Commit de teste: `11fdb41c`.
 - A compilação Android foi corretamente pulada porque `validate` falhou. CI da revisão atualizada ainda pendente; não tratar o erro como resolvido até a nova execução ficar verde.
 - Não houve falha relatada de TypeScript no trecho disponível; o erro observado foi a asserção desatualizada. Aguardando confirmação pela próxima CI.
+
+### Ajuste preventivo do teste de regressão
+- Na revisão da correção da asserção de `/saude`, a expressão regular foi simplificada para `/href="[^"]*saude/`, evitando escapar a barra no literal regex e protegendo o contrato de não exibir o atalho na tela inicial.
+- Commit de teste: `66ec246e`. O conjunto exato atualizado deverá ser validado pela execução CI disparada por este registro; nenhuma validação é considerada concluída antecipadamente.
