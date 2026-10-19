@@ -204,4 +204,24 @@ O motor de diagnóstico local usa somente observações numéricas com fonte REA
 
 Esse bloqueio é uma proteção de qualidade dos dados — não uma falha do veículo. Um PID antigo não prova que a condição continua presente. A ausência de hipótese também não certifica que o motor está saudável: a Central de Saúde mostra DADOS INSUFICIENTES quando não há grupo recente de STFT+LTFT (0106+0107) nem MAP (010B). DTCs atuais lidos da ECU seguem o fluxo próprio de status, enquanto registros históricos/inativos continuam sem gerar falha atual.
 
-A janela está configurada em src/knowledge/diagnostic_rules.json. A decisão segue a abordagem explicável por evidências e leituras recentes documentada no [OBDvis](https://github.com/Joost-vanAndel/OBDvis); funcionalidades de readiness e Mode 06 de outras aplicações permanecem itens futuros e só devem ser habilitadas depois de validar a resposta real da ECU.
+A janela está configurada em src/knowledge/diagnostic_rules.json. A decisão segue a abordagem explicável por evidências e leituras recentes documentada no [OBDvis](https://github.com/Joost-vanAndel/OBDvis). O aplicativo agora inclui monitores de prontidão pelo Mode 01 PID 01 e leitura ampliada de freeze frame pelo Mode 02, com validação do bitmap de PIDs suportados e do número do quadro. Mode 06 continua como evolução futura: só deve ser implementado com tabelas de testes e suporte da ECU comprovados.
+
+
+## Prontidão, freeze frame, relatórios e consulta manual de PIDs
+
+### Monitores de prontidão de emissões (P1)
+A tela Laboratório permite ler o **Mode 01 PID 01** sob demanda. O relatório separa MIL acesa/apagada, contagem de DTCs informada pela ECU e estado dos monitores suportados: pronto, incompleto ou não suportado. Bytes C/D são interpretados considerando o tipo de ignição informado pela ECU; bits cuja interpretação varia por revisão da norma são exibidos com descrição neutra. Uma resposta ausente ou inválida é N/D, nunca “sem falhas”.
+
+### Freeze frame ampliado (P2)
+A leitura **Mode 02** é explicitamente iniciada pelo usuário, não adicionada à varredura normal de DTCs, para evitar nove consultas extras em cada varredura na K-Line. Primeiro é lido o DTC/quadro; em seguida o aplicativo solicita o bitmap de PIDs de freeze frame e só consulta parâmetros marcados como suportados. Cada resposta precisa corresponder ao mesmo número de quadro. Os parâmetros tentados incluem carga, ECT, STFT/LTFT, MAP, RPM, velocidade, IAT e posição da borboleta. Valores ausentes permanecem N/D com razão; não são transformados em zero. O snapshot completo é associado ao DTC correspondente no histórico TXT já existente, mantendo a leitura de registros legados sem o campo JSON.
+
+### Resumo técnico por viagem (P3)
+O relatório de viagens apresenta mínimo, média amostrada e máximo de velocidade/RPM, além das estatísticas de temperatura já existentes. Os valores são calculados apenas a partir de pontos temporais válidos armazenados (cadência esparsa), com contagem de amostras e indicação de cobertura. A máxima de velocidade registrada pelo recorder continua separada da máxima vista na amostragem; não se promete que uma média de pontos a cada dez segundos seja a média instantânea de todo o trajeto. Campos sem leituras ficam N/D.
+
+### Histórico de evidências (P4)
+Quando a aquisição automática tem hipóteses diagnósticas com evidências atuais, o serviço registra um histórico diário JSON e TXT em MERIVA_SMART/DIAGNOSTIC_HISTORY. A tela Central de Saúde mostra hipótese, contexto operacional, score/confiança, fontes, evidências, próximos testes e primeira/última observação em horário local e UTC. Repetições no mesmo contexto são agrupadas por até cinco minutos e a contagem é limitada a uma observação por minuto, para evitar que o ciclo rápido de interface infle artificialmente a persistência. O histórico registra evidências e hipóteses, não comprova falhas independentes.
+
+### Consulta manual (catálogo de PIDs)
+O campo de PID do Laboratório abre uma lista pesquisável do catálogo local. PIDs descobertos como suportados pela ECU aparecem primeiro; cada item mostra código, nome, descrição, unidade e situação de suporte conhecida. Ao escolher um item, o campo é preenchido e o botão **CONSULTAR PID** executa somente esse PID. A seleção do catálogo não garante que a ECU realmente responda: a resposta individual continua sendo validada.
+
+**Limites:** novos PIDs, monitores e freeze frames dependem do suporte real da ECU/adaptador. As operações continuam serializadas; nenhum paralelismo foi adicionado à sessão ELM327/KWP-K-Line.
