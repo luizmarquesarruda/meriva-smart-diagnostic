@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { cockpitTheme } from '../src/ui/cockpitTheme';
+import { CockpitScreenHeader } from '../src/ui/CockpitScreenHeader';
 import { Link } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,7 +19,7 @@ export default function AprendizadoScreen() {
     return () => clearInterval(timer);
   }, []);
   return <SafeAreaView style={styles.container} edges={["bottom","left","right"]}><ScrollView contentContainerStyle={[styles.content,{paddingHorizontal:layout.horizontalPadding}]} showsHorizontalScrollIndicator={false}><View style={[styles.screenFrame,{maxWidth:layout.maxContentWidth}]}>
-    <Text style={styles.title}>APRENDIZADO</Text><Text style={styles.subtitle}>DNA DO MERIVA • EVIDÊNCIA REAL</Text>
+    <CockpitScreenHeader title="APRENDIZADO" subtitle="DNA DO MERIVA • EVIDÊNCIA REAL" />
     {profile ? <>
       <View style={styles.hero}><Text style={styles.status}>{profile.learningStatus}</Text><Text style={styles.source}>FONTE: {profile.source}</Text></View>
       <View style={styles.grid}><Metric landscape={layout.landscape} l="AMOSTRAS REAIS" v={String(profile.globalSampleCounts.realSamples)} /><Metric landscape={layout.landscape} l="BASE SEED" v={String(profile.globalSampleCounts.seedSamples)} /><Metric landscape={layout.landscape} l="TOTAL" v={String(profile.globalSampleCounts.totalSamples)} /><Metric landscape={layout.landscape} l="PIDs APRENDIDOS" v={String(Object.keys(profile.overallStatistics).length)} /></View>
