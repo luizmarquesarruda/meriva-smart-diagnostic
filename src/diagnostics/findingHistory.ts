@@ -2,6 +2,14 @@ import * as FileSystem from 'expo-file-system';
 import type { DiagnosticResult, DiagnosticHypothesis, DiagnosticEvidence } from './diagnosticEngine';
 import type { VehicleCondition } from '../types/sourceTypes';
 
+export interface DiagnosticFindingTimelinePoint {
+  at: string;
+  score: number;
+  confidence: DiagnosticHypothesis['confidence'];
+  sources: Array<DiagnosticEvidence['source']>;
+  evidence: DiagnosticEvidence[];
+}
+
 export interface DiagnosticFindingHistoryEntry {
   id: string;
   hypothesisId: string;
@@ -15,6 +23,7 @@ export interface DiagnosticFindingHistoryEntry {
   confidence: DiagnosticHypothesis['confidence'];
   sources: Array<DiagnosticEvidence['source']>;
   evidence: DiagnosticEvidence[];
+  timeline: DiagnosticFindingTimelinePoint[];
   nextTests: string[];
 }
 
@@ -63,7 +72,16 @@ async function loadDailyHistory(file: string, date: string, now: Date): Promise<
       updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : now.toISOString(),
       entries: parsed.entries.filter((entry): entry is DiagnosticFindingHistoryEntry =>
         Boolean(entry && typeof entry.hypothesisId === 'string' && typeof entry.lastSeenAt === 'string'),
-      ),
+      ).map((entry) => ({
+        ...entry,
+        timeline: Array.isArray(entry.timeline) ? entry.timeline : [{
+          at: entry.lastSeenAt,
+          score: Number.isFinite(entry.score) ? entry.score : 0,
+          confidence: entry.confidence ?? 'LOW',
+          sources: Array.isArray(entry.sources) ? entry.sources : [],
+          evidence: Array.isArray(entry.evidence) ? entry.evidence : [],
+        }],
+      })),
     };
   } catch {
     return emptyHistory(date, now);
@@ -90,6 +108,7 @@ function renderDailyTxt(date: string, entries: DiagnosticFindingHistoryEntry[]):
       'OBSERVAÇÕES REGISTRADAS: ' + entry.observations,
       'CONFIANÇA: ' + entry.confidence + ' | SCORE: ' + entry.score.toFixed(2),
       'FONTES DE EVIDÊNCIA: ' + sources,
+      ...entry.timeline.map((point) => 'TENDÊNCIA ' + point.at + ' | SCORE ' + point.score.toFixed(2) + ' | CONFIANÇA ' + point.confidence + ' | FONTES ' + point.sources.join(', ')),
       ...entry.evidence.map((item) => 'EVIDÊNCIA [' + item.source + ']: ' + item.text),
       ...entry.nextTests.map((item) => 'PRÓXIMO TESTE: ' + item),
       '',
@@ -147,6 +166,18 @@ export async function recordDiagnosticFindings(
         existing.score = hypothesis.score;
         existing.confidence = hypothesis.confidence;
         existing.sources = [...new Set(hypothesis.evidence.map((item) => item.source))];
+        if (!Array.isArray(existing.timeline)) existing.timeline = [];
+        if (observedAt.getTime() - Date.parse(existing.lastCountedAt) < MIN_OBSERVATION_INTERVAL_MS) {
+          // No duplicate trend point for sub-minute UI/service refreshes.
+        } else {
+          existing.timeline.push({
+            at: observedAt.toISOString(),
+            score: hypothesis.score,
+            confidence: hypothesis.confidence,
+            sources: [...new Set(hypothesis.evidence.map((item) => item.source))],
+            evidence: snapshotEvidence(hypothesis.evidence),
+          });
+        }
         existing.evidence = snapshotEvidence(hypothesis.evidence);
         existing.nextTests = [...hypothesis.nextTests];
       } else {
@@ -163,6 +194,13 @@ export async function recordDiagnosticFindings(
           confidence: hypothesis.confidence,
           sources: [...new Set(hypothesis.evidence.map((item) => item.source))],
           evidence: snapshotEvidence(hypothesis.evidence),
+          timeline: [{
+            at: observedAt.toISOString(),
+            score: hypothesis.score,
+            confidence: hypothesis.confidence,
+            sources: [...new Set(hypothesis.evidence.map((item) => item.source))],
+            evidence: snapshotEvidence(hypothesis.evidence),
+          }],
           nextTests: [...hypothesis.nextTests],
         });
       }
@@ -176,7 +214,7 @@ export async function recordDiagnosticFindings(
     await FileSystem.writeAsStringAsync(target.txt, renderDailyTxt(date, history.entries), {
       encoding: FileSystem.EncodingType.UTF8,
     });
-    return history.entries.map((entry) => ({ ...entry, evidence: snapshotEvidence(entry.evidence), nextTests: [...entry.nextTests], sources: [...entry.sources] }));
+    return history.entries.map((entry) => ({ ...entry, evidence: snapshotEvidence(entry.evidence), timeline: entry.timeline.map((point) => ({ ...point, sources: [...point.sources], evidence: snapshotEvidence(point.evidence) })), nextTests: [...entry.nextTests], sources: [...entry.sources] }));
   });
 }
 
@@ -197,7 +235,7 @@ export async function readRecentDiagnosticFindings(
   return entries
     .sort((a, b) => Date.parse(b.lastSeenAt) - Date.parse(a.lastSeenAt))
     .slice(0, Math.max(0, Math.floor(limit)))
-    .map((entry) => ({ ...entry, evidence: snapshotEvidence(entry.evidence), nextTests: [...entry.nextTests], sources: [...entry.sources] }));
+    .map((entry) => ({ ...entry, evidence: snapshotEvidence(entry.evidence), timeline: entry.timeline.map((point) => ({ ...point, sources: [...point.sources], evidence: snapshotEvidence(point.evidence) })), nextTests: [...entry.nextTests], sources: [...entry.sources] }));
 }
 
 export const DIAGNOSTIC_HISTORY_ACTIVE_WINDOW_MS = ACTIVE_EPISODE_WINDOW_MS;
