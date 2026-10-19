@@ -16,7 +16,7 @@ assert.match(read('app/saude.tsx'), /runLocalDiagnostic/);
 assert.match(read('app/saude.tsx'), /activeDtcs/);
 assert.match(read('app/aprendizado.tsx'), /realSamples/);
 assert.match(index, /loadDashboardWeather/);
-assert.match(index, /LOCALIZAÇÃO ATUAL/);
+assert.match(index, /CLIMA EXTERNO/);
 assert.doesNotMatch(index, /SAÚDE DO VEÍCULO/);
 assert.match(read('app/laboratorio.tsx'), /03 \/ 07 \/ 0A/);
 assert.match(read('app/bluetooth.tsx'), /SAÚDE DO ELM327/);
