@@ -2450,3 +2450,48 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Nova CI solicitada pela atualização da branch; confirmar resultado integral, inclusive testes restantes e build Android.
 - Teste físico do ELM327 no veículo continua pendente.
 
+## 2026-10-18 — Navegação padrão: botão “Página inicial” no topo das telas secundárias
+
+### Problema
+- As páginas secundárias não tinham um controle superior comum para voltar ao cockpit.
+- A tela Bluetooth ocultava o cabeçalho nativo e usava uma navegação inferior própria.
+- Algumas telas também exibiam um link de retorno ao cockpit no final do conteúdo, duplicando a mesma ação.
+
+### Diagnóstico
+O Stack global do Expo Router já centraliza os cabeçalhos das rotas, mas o botão de retorno à página inicial não estava definido como padrão. A tela inicial deve continuar sem esse cabeçalho, enquanto as páginas secundárias precisam compartilhar o mesmo controle.
+
+### Correção aplicada na branch `ux/secondary-pages-home-button-20261018`
+- `app/_layout.tsx`: adicionado botão global superior “⌂ Página inicial”, com rótulo e dica de acessibilidade. A ação usa `router.replace('/')` para retornar ao cockpit sem acumular a rota secundária no histórico de navegação.
+- O botão nativo de voltar é ocultado para evitar dois controles concorrentes com a mesma finalidade.
+- A rota inicial continua com `headerShown: false`; Bluetooth passa a usar o cabeçalho global com título “BLUETOOTH / ECU”.
+- Removidos retornos redundantes ao cockpit do conteúdo das telas Mais Recursos, Dados, Saúde, Veículo, Viagens, Aprendizado, Bluetooth e Testes de Sensores. A navegação entre módulos, como o link de Testes de Sensores para Mais Recursos, foi preservada.
+- `tests/cockpitNavigation.test.js`: adicionadas regressões estáticas para o botão global, a rota inicial, a acessibilidade, a visibilidade do cabeçalho e a ausência de links de retorno duplicados nas telas secundárias.
+- Bluetooth deixou de manter uma barra de navegação inferior que duplicava a ação da página inicial; as bordas de Safe Area foram ajustadas ao novo cabeçalho.
+
+### Arquivos alterados
+- `app/_layout.tsx`
+- `app/mais.tsx`
+- `app/dados.tsx`
+- `app/saude.tsx`
+- `app/veiculo.tsx`
+- `app/viagens.tsx`
+- `app/aprendizado.tsx`
+- `app/bluetooth.tsx`
+- `app/testes-sensores.tsx`
+- `tests/cockpitNavigation.test.js`
+
+### Commits
+- `85dba2a0` — cabeçalho global com botão Página inicial.
+- `b74ca16c`, `f24d0db1`, `23e394fd`, `8b74be7a`, `4c3bb66e`, `94006a0a`, `f8f5c1e2` — remoção dos links redundantes de retorno.
+- `756e1219`, `6efa5525` — regressões de navegação e ajuste do matcher.
+- `eb032e33` — remoção da navegação inferior duplicada no Bluetooth.
+- Esta entrada documental é feita em commit separado, com `[skip ci]`.
+
+### Validação e limites
+- A inspeção estática remota confirmou o botão superior no layout, a navegação para `/`, o cockpit sem cabeçalho, o cabeçalho visível no Bluetooth e a ausência de links diretos duplicados nas telas secundárias verificadas.
+- O teste de navegação foi atualizado, mas não foi executado localmente nesta etapa. TypeScript, suíte completa e build Android permanecem **pendentes**.
+- **CI não foi disparada**, conforme a restrição operacional desta rodada; os commits usam `[skip ci]`.
+- Não houve merge para `main` e não foi realizada validação visual em aparelho Android.
+
+### Próximo passo
+Após autorização explícita para CI, executar `npm run validate` e confirmar também o job `android-build`. Depois verificar visualmente em aparelho que o botão superior não sobrepõe o título em retrato/paisagem e que todas as rotas secundárias retornam ao cockpit.
