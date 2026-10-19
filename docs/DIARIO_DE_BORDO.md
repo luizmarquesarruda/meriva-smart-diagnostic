@@ -2474,3 +2474,12 @@ A home tinha três atalhos textuais no meio da tela e dois atalhos no rodapé. A
 
 ### Próximo passo
 Após a CI, revisar o encaixe em telas Android pequenas, retrato e paisagem. Em seguida harmonizar os títulos no topo das telas secundárias sem alterar o conteúdo diagnóstico.
+
+
+### Registro adicional — CI #2436: regressão do contrato de layout
+
+- Execução CI #2436, run 39273053683: `npm ci` e Expo Doctor concluíram com sucesso.
+- `npm run validate` falhou em `tests/orientationLayout.test.js`, que ainda exigia os estilos `dashboardAction` e `actionGridLandscape` da antiga grade de atalhos removida nesta alteração.
+- Diagnóstico: as asserções não acompanhavam a nova navegação; não apontavam erro de execução da barra de ícones.
+- Correção: substituídas pelas verificações da barra inferior responsiva (`bottomNav`, `bottomNavLandscape`), papel de acessibilidade `tablist` e alvo mínimo de toque de 54 px.
+- Resultado da CI #2436: `android-build` foi ignorado porque `validate` falhou. A nova CI deverá validar as asserções corrigidas; a alteração continua não validada até os dois jobs passarem.
