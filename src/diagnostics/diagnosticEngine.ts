@@ -5,11 +5,20 @@ import sensorTestCatalogJson from '../knowledge/sensor_tests.json';
 export interface DiagnosticInput { observations: PidObservation[]; dtcs?: DtcRecord[]; condition?: VehicleCondition; }
 export interface DiagnosticEvidence { ruleId: string; text: string; source: 'DTC' | 'PID'; pid?: string; dtc?: string; value?: number; }
 export interface DiagnosticHypothesis { id: string; label: string; score: number; confidence: 'LOW' | 'MEDIUM' | 'HIGH'; evidence: DiagnosticEvidence[]; nextTests: string[]; }
-export interface DiagnosticResult { engine: 'LOCAL_EVIDENCE_ENGINE'; version: 1; generatedAt: string; hypotheses: DiagnosticHypothesis[]; blockedSimulationSamples: number; blockedNonLiveDtcs: number; disclaimer: string; }
+export interface DiagnosticResult { engine: 'LOCAL_EVIDENCE_ENGINE'; version: 2; generatedAt: string; hypotheses: DiagnosticHypothesis[]; blockedSimulationSamples: number; blockedStaleObservations: number; blockedNonLiveDtcs: number; disclaimer: string; }
 
 interface Rule { id: string; trigger: { dtc?: string; combinedTrimMin?: number; combinedTrimMax?: number; condition?: VehicleCondition; mapMinKpa?: number; }; hypothesis: string; baseScore: number; tests: string[]; }
 
 const rules = ruleCatalog.rules as Rule[];
+const dataQualityPolicy = (ruleCatalog as unknown as {
+  dataQuality?: { pidMaxAgeMs?: number; futureTimestampToleranceMs?: number };
+}).dataQuality;
+const PID_MAX_AGE_MS = Number.isFinite(dataQualityPolicy?.pidMaxAgeMs)
+  ? Math.max(0, dataQualityPolicy!.pidMaxAgeMs!)
+  : 10_000;
+const FUTURE_TIMESTAMP_TOLERANCE_MS = Number.isFinite(dataQualityPolicy?.futureTimestampToleranceMs)
+  ? Math.max(0, dataQualityPolicy!.futureTimestampToleranceMs!)
+  : 1_000;
 interface SensorTestLink { pid: string; label: string; aiGuidance: string; diagnosticRuleIds: string[]; }
 const sensorTestLinks = (sensorTestCatalogJson as unknown as { tests: SensorTestLink[] }).tests;
 function linkedSensorRecommendations(ruleId: string): string[] {
@@ -21,9 +30,17 @@ const ACTIVE_DTC_STATUSES = new Set(['CONFIRMED', 'PENDING', 'PERMANENT', 'CURRE
 function isSimulation(item: PidObservation): boolean { return String(item.source ?? '').trim().toUpperCase() === 'SIMULACAO'; }
 function isLiveObd(item: PidObservation): boolean { return String(item.source ?? '').trim().toUpperCase() === 'REAL_OBD'; }
 
+function isFreshLiveObservation(item: PidObservation, nowMs: number): boolean {
+  if (!isLiveObd(item) || item.value == null || !Number.isFinite(item.value)) return false;
+  const timestampMs = Date.parse(item.timestamp);
+  if (!Number.isFinite(timestampMs)) return false;
+  const ageMs = nowMs - timestampMs;
+  return ageMs <= PID_MAX_AGE_MS && ageMs >= -FUTURE_TIMESTAMP_TOLERANCE_MS;
+}
+
 function pidValue(observations: PidObservation[], pid: string): PidObservation | undefined {
   return observations
-    .filter((item) => item.pid.toUpperCase() === pid.toUpperCase() && item.value !== null && isLiveObd(item))
+    .filter((item) => item.pid.toUpperCase() === pid.toUpperCase() && item.value !== null && Number.isFinite(item.value) && isLiveObd(item))
     .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))[0];
 }
 
@@ -39,7 +56,11 @@ function isTrimContext(condition?: VehicleCondition): boolean {
 
 export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
   const rawObservations = input.observations ?? [];
-  const observations = rawObservations.filter((item) => !isSimulation(item));
+  const nowMs = Date.now();
+  const observations = rawObservations.filter((item) => isFreshLiveObservation(item, nowMs));
+  const blockedStaleObservations = rawObservations.filter((item) =>
+    isLiveObd(item) && item.value != null && Number.isFinite(item.value) && !isFreshLiveObservation(item, nowMs),
+  ).length;
   const rawDtcs = input.dtcs ?? [];
   const liveDtcs = rawDtcs.filter((item) =>
     String(item.source ?? '').trim().toUpperCase() === 'REAL_OBD'
@@ -100,11 +121,12 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
 
   return {
     engine: 'LOCAL_EVIDENCE_ENGINE',
-    version: 1,
+    version: 2,
     generatedAt: new Date().toISOString(),
     hypotheses: [...hypotheses.values()].sort((a, b) => b.score - a.score),
     blockedSimulationSamples,
+    blockedStaleObservations,
     blockedNonLiveDtcs,
-    disclaimer: 'Hipóteses baseadas em evidências locais. Não condenar peça apenas por um DTC ou um PID isolado; status histórico/inativo e dados não-REAL_OBD não geram falha atual.',
+    disclaimer: 'Hipóteses baseadas em evidências locais. Não condenar peça por um DTC ou PID isolado. PIDs REAL_OBD com timestamp ausente, inconsistente ou mais antigo que a janela configurada são ignorados; status histórico/inativo e dados não-REAL_OBD não geram falha atual.',
   };
 }
