@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { cockpitTheme } from '../src/ui/cockpitTheme';
+import { CockpitScreenHeader } from '../src/ui/CockpitScreenHeader';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
@@ -86,8 +87,7 @@ export default function ArmazenamentoScreen() {
     <SafeAreaView style={{flex:1,backgroundColor: cockpitTheme.background}} edges={["bottom","left","right"]}>
     <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
       <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
-      <Text style={styles.title}>HISTÓRICO E DADOS</Text>
-      <Text style={styles.subtitle}>O app salva as viagens e leituras automaticamente. Esta tela serve para acompanhar o espaço usado e fazer limpeza quando necessário.</Text>
+      <CockpitScreenHeader title="HISTÓRICO E DADOS" subtitle="VIAGENS, LEITURAS, ESPAÇO E EXPORTAÇÕES" />
       <Text style={[styles.status, quota?.critical ? styles.critical : quota?.warning ? styles.warning : styles.ok]}>
         {quota?.message || 'VERIFICANDO'}
       </Text>
