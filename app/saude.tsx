@@ -10,11 +10,27 @@ import { runLocalDiagnostic, type DiagnosticResult } from '../src/diagnostics/di
 import type { PidObservation } from '../src/types/sourceTypes';
 import { getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
 import { getDtcDefinition } from '../src/obd/dtcDefinition';
+import * as FileSystem from 'expo-file-system';
+import { readRecentDiagnosticFindings, type DiagnosticFindingHistoryEntry } from '../src/diagnostics/findingHistory';
+
+const HISTORY_BASE_PATH = `${FileSystem.documentDirectory}MERIVA_SMART`;
 
 export default function SaudeScreen() {
   const layout = useMidLayout();
   const [state,setState]=useState(getAutoSaveState());
+  const [findingHistory,setFindingHistory]=useState<DiagnosticFindingHistoryEntry[]>([]);
   useEffect(()=>{const t=setInterval(()=>setState(getAutoSaveState()),1000);return()=>clearInterval(t)},[]);
+  useEffect(() => {
+    let active = true;
+    const loadHistory = () => {
+      void readRecentDiagnosticFindings(HISTORY_BASE_PATH, 10)
+        .then((entries) => { if (active) setFindingHistory(entries); })
+        .catch(() => { if (active) setFindingHistory([]); });
+    };
+    loadHistory();
+    const timer = setInterval(loadHistory, 30_000);
+    return () => { active = false; clearInterval(timer); };
+  }, []);
   const context = getVehicleConditionSnapshot();
   const activeDtcs = state.dtcs.filter((item) => ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(item.status));
   const diagnostic: DiagnosticResult = useMemo(()=>runLocalDiagnostic({observations:state.lastReadings.map(r=>({pid:r.pid,name:r.name,value:r.value,unit:r.unit,source:r.source==='SIMULACAO'?'SIMULACAO':'REAL_OBD',timestamp:r.timestamp,confidence:r.source==='SIMULACAO'?'LOW':'GOOD'} as PidObservation)),dtcs:state.dtcs,condition:context.condition}),[state,context.condition]);
@@ -33,11 +49,27 @@ export default function SaudeScreen() {
       <View style={styles.context}><Text style={styles.contextText}>{context.reason}</Text></View>
     </View>
     <Text style={styles.section}>FALHAS</Text>
-    {!activeDtcs.length?<View style={styles.empty}><Text style={styles.emptyText}>{state.dtcs.length ? 'Nenhum DTC ativo. Há apenas histórico registrado.' : 'Nenhum DTC armazenado.'}</Text></View>:activeDtcs.map(d=>{const definition=getDtcDefinition(d.code);return <View key={d.code} style={styles.row}><View style={{flex:1}}><Text style={styles.name}>{d.code} • {definition?.name ?? 'Descrição não catalogada localmente'}</Text><Text style={styles.detail}>{definition?.description ?? 'Código recebido da ECU sem descrição local detalhada.'}</Text><Text style={styles.detail}>{d.status} • {d.occurrences} ocorrência(s) • fonte {d.source}</Text></View><Text style={styles.warn}>ATENÇÃO</Text></View>})}
+    {!activeDtcs.length?<View style={styles.empty}><Text style={styles.emptyText}>{state.dtcs.length ? 'Nenhum DTC ativo. Há apenas histórico registrado.' : 'Nenhum DTC armazenado.'}</Text></View>:activeDtcs.map(d=>{const definition=getDtcDefinition(d.code);return <View key={d.code} style={styles.row}><View style={{flex:1}}><Text style={styles.name}>{d.code} • {definition?.name ?? 'Descrição não catalogada localmente'}</Text><Text style={styles.detail}>{definition?.description ?? 'Código recebido da ECU sem descrição local detalhada.'}</Text><Text style={styles.detail}>{d.status} • {d.occurrences} ocorrência(s) • fonte {d.source}</Text>{d.freezeFrame ? <Text style={styles.detail}>FREEZE FRAME: quadro {d.freezeFrame.frame} • DTC {d.freezeFrame.dtc ?? d.code} • RPM {d.freezeFrame.rpm ?? 'N/D'} • ECT {d.freezeFrame.coolantC == null ? 'N/D' : d.freezeFrame.coolantC + ' °C'} • PIDs adicionais: {d.freezeFrame.parameters?.filter((item) => item.available).length ?? 0}</Text> : null}</View><Text style={styles.warn}>ATENÇÃO</Text></View>})}
     <Text style={styles.section}>HIPÓTESES LOCAIS</Text>
     {!diagnostic.hypotheses.length?<View style={styles.empty}><Text style={styles.emptyText}>Ainda não há evidência suficiente para gerar hipótese.</Text></View>:diagnostic.hypotheses.map(h=><View key={h.id} style={styles.hyp}><View style={styles.rowHead}><Text style={styles.name}>{h.label}</Text><Text style={styles.score}>{Math.round(h.score*100)}%</Text></View><Text style={styles.detail}>CONFIANÇA: {h.confidence}</Text>{h.evidence.map((e,i)=><Text key={i} style={styles.evidence}>• {e.text}</Text>)}<Text style={styles.next}>PRÓXIMOS TESTES: {h.nextTests.join(' • ')}</Text></View>)}
     {diagnostic.blockedStaleObservations > 0 ? <Text style={styles.warn}>DADOS ANTIGOS IGNORADOS: {diagnostic.blockedStaleObservations} leitura(s) REAL_OBD fora da janela de atualidade. Atualize os PIDs antes de concluir que o sistema está normal ou de avaliar uma hipótese.</Text> : null}
     <Text style={styles.disclaimer}>{diagnostic.disclaimer}</Text>
+    <Text style={styles.section}>HISTÓRICO TEMPORAL DE EVIDÊNCIAS</Text>
+    <Text style={styles.disclaimer}>As observações mostram persistência de hipóteses ao longo do tempo; não equivalem a falhas independentes confirmadas. O histórico registra fonte, contexto, horário local e horário UTC.</Text>
+    {findingHistory.length ? findingHistory.map((entry) => (
+      <View key={entry.id} style={styles.hyp}>
+        <View style={styles.rowHead}>
+          <Text style={styles.name}>{entry.label}</Text>
+          <Text style={styles.score}>{Math.round(entry.score * 100)}%</Text>
+        </View>
+        <Text style={styles.detail}>CONFIANÇA: {entry.confidence} • OBSERVAÇÕES: {entry.observations} • CONTEXTO: {entry.condition}</Text>
+        <Text style={styles.detail}>PRIMEIRA: {new Date(entry.firstSeenAt).toLocaleString()} (UTC {entry.firstSeenAt})</Text>
+        <Text style={styles.detail}>ÚLTIMA: {new Date(entry.lastSeenAt).toLocaleString()} (UTC {entry.lastSeenAt})</Text>
+        <Text style={styles.detail}>FONTES: {entry.sources.join(', ') || 'N/D'}</Text>
+        {entry.evidence.slice(0, 4).map((e, i) => <Text key={entry.id + '-e-' + i} style={styles.evidence}>• {e.text}</Text>)}
+        {entry.nextTests.slice(0, 3).map((item, i) => <Text key={entry.id + '-t-' + i} style={styles.next}>→ {item}</Text>)}
+      </View>
+    )) : <View style={styles.empty}><Text style={styles.emptyText}>Nenhuma hipótese foi registrada no histórico recente. Ele é preenchido durante a aquisição OBD quando há evidências diagnósticas atuais.</Text></View>}
     <Link href="/laboratorio" asChild><TouchableOpacity style={styles.primary}><Text style={styles.primaryText}>🔧 EXECUTAR NOVO DIAGNÓSTICO</Text></TouchableOpacity></Link>
     
   </View></ScrollView></SafeAreaView>;
