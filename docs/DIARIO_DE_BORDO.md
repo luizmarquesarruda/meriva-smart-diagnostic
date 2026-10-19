@@ -2598,3 +2598,66 @@ O motor local selecionava a última observação REAL_OBD por PID, mas não exig
 
 ### Resultado e próximo passo
 O motor deixa de usar PIDs numéricos antigos para gerar hipóteses atuais e passa a expor a quantidade de leituras bloqueadas. Próximas opções pesquisadas: readiness monitors (Mode 01 PID 01), detalhamento de freeze frame e resumo pós-viagem com picos e ocorrências. Antes de implementar consultas adicionais, confirmar o suporte da ECU e manter a fila ELM327 serial.
+
+
+## 2026-10-19 — P1–P4: prontidão, freeze frame, resumo de viagens e histórico de evidências; seletor manual de PID
+
+### Solicitação e escopo
+Implementar os quatro itens priorizados na pesquisa de aplicações OBD-II e substituir o campo livre de PID manual por um seletor pesquisável que permita escolher um PID no catálogo local. A CI permanece desativada até a consolidação de todos os pontos.
+
+### Referências consultadas
+- [OBD2 PID Knowledge — Mode 01 PID 01](https://obd2pid.com/pids/01-01): estrutura dos quatro bytes, MIL, contagem de DTCs, bits de suporte/completude e diferença entre motores de ignição por centelha e compressão. A página foi revisada em 31/08/2026.
+- [SAE J1979 — tabela de PID 01](https://law.resource.org/pub/us/cfr/ibr/005/sae.j1979.2002.pdf): referência pública para status dos monitores e bits de conclusão; revisões da norma podem variar em alguns monitores específicos.
+- [x-engineer — OBD Mode 02 Freeze Frame](https://x-engineer.org/obd-diagnostic-service-mode-02-request-powertrain-freeze-frame-data/): formato de consulta com PID e número do quadro e obrigação de associar a resposta ao quadro solicitado.
+- [ISO 15031-5 / SAE J1979 (cópia pública)](https://studylib.net/doc/25827573/iso-15031-5-2006): estrutura de requisição/resposta de Mode 02 e requisito de consultar PIDs declarados suportados.
+- [Free_OBD](https://github.com/3badguys/Free_OBD): descoberta/consulta de PIDs, dados em tempo real e leitura detalhada de freeze frame.
+- [OBDvis](https://github.com/Joost-vanAndel/OBDvis): diagnóstico explicável por janelas recentes, registro de ocorrências, tendências e resumos pós-viagem.
+
+### Implementações
+
+#### P1 — Monitores de prontidão de emissões
+- Criado src/obd/readinessMonitor.ts para consultar Mode 01 PID 01 sob demanda e separar MIL, contagem de DTCs, tipo de ignição, suporte e conclusão de cada monitor.
+- A UI diferencia READY/PRONTO, INCOMPLETE/INCOMPLETO e NOT_SUPPORTED/NÃO SUPORTADO. Resposta ausente, truncada ou inválida é tratada como indisponível, não como aprovação do sistema.
+- src/obd/parser.ts reutiliza o mesmo decodificador para a interpretação técnica do PID 0101.
+- O byte C4 em motores por centelha é descrito de forma neutra como monitor específico: fontes de revisões distintas identificam diferentes sistemas nesse bit. Não inferir um componente/peça com base nesse bit sem confirmar a norma e a ECU reais.
+
+#### P2 — Freeze frame expandido
+- src/obd/dtcScanner.ts agora começa por Mode 02 PID 02 para identificar o DTC e quadro; depois lê o bitmap de suporte de Mode 02 e só consulta PIDs declarados disponíveis.
+- O conjunto tentado inclui 0104, 0105, 0106, 0107, 010B, 010C, 010D, 010F e 0111. Cada resposta é validada pelo PID e pelo mesmo número de quadro; resposta ausente, truncada ou de outro quadro fica N/D e não entra nos valores.
+- A aquisição completa tem botão próprio no Laboratório, em vez de acrescentar até nove consultas à varredura normal 03/07/0A. Essa decisão minimiza latência e risco de perturbar a sessão KWP/K-Line.
+- O DTC correspondente recebe os valores disponíveis em src/database/dtcManager.ts; o TXT legado permanece legível e o snapshot expandido é armazenado como JSON no campo adicional. Se o bitmap não puder ser validado, o scanner para sem disparar sondagens de PIDs não confirmados.
+
+#### P3 — Resumo técnico por viagem
+- Criado src/trip/tripSummary.ts para obter min/média/máx e contagem de amostras válidas de velocidade, RPM e ECT das amostras temporais persistidas.
+- app/viagens.tsx mostra estatísticas de velocidade e RPM no detalhe individual, mantém estatística ECT existente e expõe contagem/cobertura.
+- As médias são identificadas como médias amostradas dos pontos temporais disponíveis. A máxima de velocidade registrada pelo recorder continua sendo mostrada separadamente; ausência de amostras é N/D, nunca zero.
+
+#### P4 — Histórico temporal de evidências
+- Criado src/diagnostics/findingHistory.ts com arquivos diários JSON e TXT em MERIVA_SMART/DIAGNOSTIC_HISTORY, contendo hipótese, contexto, primeira/última observação, score/confiança, fonte, texto das evidências e próximos testes, com horário local/UTC no TXT.
+- Repetições da mesma hipótese no mesmo contexto são unidas quando a distância temporal é de até cinco minutos; a contagem de observações aumenta no máximo uma vez por minuto. Isso reduz inflação por polling rápido e preserva episódios separados após intervalos maiores.
+- src/trip/autoTripService.ts registra os achados de modo best-effort em tarefa assíncrona, com limite de uma avaliação/minuto; falha de armazenamento não interrompe a aquisição OBD.
+- app/saude.tsx mostra o histórico temporal, diferenciando persistência de evidências de confirmação de uma falha física.
+
+#### Consulta manual de PID
+- No Laboratório, o espaço do PID virou um botão acessível que abre um Modal pesquisável, contendo o catálogo PID_DATABASE. Os itens descobertos pela ECU aparecem primeiro e exibem código, nome, descrição, unidade e estado SUPORTADO/NÃO LISTADO/NÃO VERIFICADO.
+- Escolher um item preenche o PID selecionado; o botão CONSULTAR PID executa a consulta individual já existente. A seleção do catálogo não é usada como prova de suporte: a resposta real continua validada pelo parser.
+- A consulta continua no caminho serial da sessão ELM327. Não houve chamada em paralelo nem comandos AT irrestritos.
+
+### Testes e arquivos de regressão adicionados
+- tests/readinessMonitor.test.js: bytes, tipo de ignição, monitores, resposta incompleta e ECU sem suporte.
+- tests/dtcScanner.test.js: DTC/quadro, dados estendidos, bitmap, validação de quadro e interrupção de consultas quando o bitmap não corresponde.
+- tests/dtcManager.test.js: round-trip do freeze frame no TXT e compatibilidade com registros antigos sem campo JSON.
+- tests/tripSummary.test.js: agregação min/média/máx, contagem válida e falta de amostras.
+- tests/findingHistory.test.js: agrupamento temporal, deduplicação por minuto e TXT diário com hora local/UTC.
+- tests/fieldFeatures.test.js: contratos de integração dos quatro itens e do seletor pesquisável.
+- package.json registra os novos testes no comando npm test.
+
+### Validação e limites
+- Revisão estática: os arquivos JSON relevantes foram parseados; a sintaxe JavaScript dos testes adicionados e dos testes de diagnóstico existentes foi verificada. A inspeção estática confirmou integração da UI, dos serviços, do armazenamento e do script de testes.
+- **A suíte de testes não foi executada.** Não há resultado de npm run validate, TypeScript, Expo Doctor ou build Android nesta rodada. A análise estática não substitui essas execuções.
+- **CI não disparada**, conforme solicitado; commits desta etapa usam [skip ci]. Não houve merge para main.
+- **Teste físico pendente:** confirmar no Meriva/ELM327 a resposta de PID 0101, bitmap de Mode 02 e parâmetros do quadro. Adaptadores/ECUs que não exponham o bitmap de freeze frame serão marcados como indisponíveis; não se consultam PIDs às cegas.
+- Readiness incompleto não confirma componente defeituoso, MIL apagada não garante motor saudável e médias de telemetria esparsa não equivalem a médias instantâneas contínuas.
+
+### Resultado e próximo passo
+P1–P4 e o seletor de PID foram integrados ao branch de trabalho, com cobertura de regressão adicionada e sem alterar main nem disparar CI. Próxima etapa: executar npm run validate, revisar qualquer falha por logs concretos e então validar o build Android. Após isso, testar no carro parado cada leitura Mode 01/02 e a consulta manual antes de considerar a função concluída no veículo real.
