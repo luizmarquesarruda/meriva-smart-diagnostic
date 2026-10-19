@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { cockpitTheme } from '../src/ui/cockpitTheme';
 import { CockpitScreenHeader } from '../src/ui/CockpitScreenHeader';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
 import { Elm327Session } from '../src/obd/elm327';
@@ -11,12 +11,13 @@ import { BluetoothDeviceInfo } from '../src/obd/bluetoothClassicTransport';
 import { createRealElmSession, discoverPairedDevices } from '../src/obd/bluetoothManager';
 import { canPollObd } from '../src/obd/bluetoothState';
 import { discoverSupportedPids, KNOWN_PIDS } from '../src/obd/pidScanner';
-import { getPidDefinition } from '../src/obd/pidDefinition';
+import { getPidDefinition, PID_DATABASE } from '../src/obd/pidDefinition';
+import { readReadinessMonitor, type ReadinessScanResult } from '../src/obd/readinessMonitor';
 import { getDtcDefinition } from '../src/obd/dtcDefinition';
 import { getSharedObdConnection, getSharedObdStatus, setSharedObdConnection, subscribeSharedObd, disconnectSharedObd } from '../src/obd/sharedConnection';
 import { autoTripService } from '../src/trip/autoTripService';
 import { getMidLayout } from '../src/ui/midLayout';
-import { scanDtcServices, readFreezeFrame, type DtcServiceScan } from '../src/obd/dtcScanner';
+import { scanDtcServices, readFreezeFrame, type DtcServiceScan, type FreezeFrameSnapshot } from '../src/obd/dtcScanner';
 import { getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
 
 import { DtcRecord, nextDtcOccurrences, readDtcs, recordDtc } from '../src/database/dtcManager';
@@ -42,6 +43,8 @@ export default function LaboratorioScreen() {
   const [mode, setMode] = useState<Mode>('REAL');
   const [devices, setDevices] = useState<BluetoothDeviceInfo[]>([]);
   const [pid, setPid] = useState('010C');
+  const [pidPickerOpen, setPidPickerOpen] = useState(false);
+  const [pidPickerSearch, setPidPickerSearch] = useState('');
   const [tx, setTx] = useState('');
   const [rx, setRx] = useState('');
   const [elapsedMs, setElapsedMs] = useState<number | null>(null);
@@ -61,6 +64,9 @@ export default function LaboratorioScreen() {
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const [dtcScan, setDtcScan] = useState<DtcServiceScan[]>([]);
   const [dtcScanning, setDtcScanning] = useState(false);
+  const [readinessScan, setReadinessScan] = useState<ReadinessScanResult | null>(null);
+  const [readinessScanning, setReadinessScanning] = useState(false);
+  const [freezeFrameSnapshot, setFreezeFrameSnapshot] = useState<FreezeFrameSnapshot | null>(null);
   const sessionRef = useRef<Elm327Session | null>(null);
   const autoSaveReadyRef = useRef(false);
 
@@ -298,6 +304,38 @@ export default function LaboratorioScreen() {
     }
   }
 
+  async function scanReadiness() {
+    setError('');
+    setReadinessScanning(true);
+    setStatus(mode === 'SIMULACAO' ? 'SIMULAÇÃO LOCAL: LENDO PRONTIDÃO 0101' : 'ECU: LENDO PRONTIDÃO 0101');
+    try {
+      const activeSession = mode === 'SIMULACAO' ? simulationSession : sessionRef.current;
+      if (mode === 'REAL' && !canPollObd(getSharedObdStatus().lifecycle)) {
+        throw new Error('DIAGNÓSTICO AINDA NÃO ESTÁ PRONTO. AGUARDE BLUETOOTH, ELM327 E ECU.');
+      }
+      if (!activeSession) throw new Error('CONECTE AO ELM327 ANTES DE LER A PRONTIDÃO');
+      const result = mode === 'REAL'
+        ? await autoTripService.withPollingPaused(() => readReadinessMonitor(activeSession))
+        : await readReadinessMonitor(activeSession);
+      setReadinessScan(result);
+      if (!result.available || !result.report) {
+        setStatus('PRONTIDÃO NÃO DISPONÍVEL');
+        setError(result.reason ?? 'A ECU não forneceu uma resposta de prontidão válida.');
+      } else {
+        setTx('0101');
+        setRx(result.response);
+        setElapsedMs(result.elapsedMs);
+        setProtocol(activeSession.getProtocol() ?? 'N/D');
+        setStatus('PRONTIDÃO DE EMISSÕES LIDA • PID 0101');
+      }
+    } catch (cause) {
+      setStatus('FALHA NA LEITURA DE PRONTIDÃO');
+      setError(cause instanceof Error ? cause.message : 'ERRO AO LER PID 0101');
+    } finally {
+      setReadinessScanning(false);
+    }
+  }
+
   async function discoverPids() {
     setError('');
     setStatus(mode === 'SIMULACAO' ? 'SIMULAÇÃO LOCAL: DESCOBRINDO PIDs' : 'ECU: DESCOBRINDO PIDs');
@@ -350,6 +388,7 @@ export default function LaboratorioScreen() {
       const freezeFrame = mode === 'REAL'
         ? await autoTripService.withPollingPaused(() => readFreezeFrame(activeSession))
         : null;
+      setFreezeFrameSnapshot(freezeFrame);
       setDtcCodes(stored?.codes ?? []);
 
       if (mode === 'REAL') {
@@ -377,12 +416,14 @@ export default function LaboratorioScreen() {
             source: 'REAL_OBD',
             historical: false,
             confirmed: kind !== 'PENDING',
-            ...(freezeFrame?.available ? {
+            ...(freezeFrame?.available && freezeFrame.dtc === code ? {
               freezeFrame: {
                 frame: freezeFrame.frame,
                 dtc: freezeFrame.dtc,
                 rpm: freezeFrame.rpm,
                 coolantC: freezeFrame.coolantC,
+                capturedAt: freezeFrame.capturedAt,
+                parameters: freezeFrame.parameters.map((item) => ({ pid: item.pid, label: item.label, value: item.value, unit: item.unit, available: item.available, ...(item.reason ? { reason: item.reason } : {}) })),
               },
             } : {}),
           };
@@ -477,6 +518,18 @@ export default function LaboratorioScreen() {
   const parsed = rx ? parsePidResponse(pid, rx) : null;
   const knownSupported = supportedPids.filter((value) => KNOWN_PIDS.includes(value));
   const identifiedSupportedPids = supportedPids.map((value) => ({ pid: value, definition: getPidDefinition(value) }));
+  const selectedPidDefinition = getPidDefinition(pid);
+  const pidOptions = Object.values(PID_DATABASE).sort((a, b) => {
+    const aSupported = supportedPids.includes(a.pid);
+    const bSupported = supportedPids.includes(b.pid);
+    if (aSupported !== bSupported) return aSupported ? -1 : 1;
+    return a.pid.localeCompare(b.pid);
+  });
+  const filteredPidOptions = pidOptions.filter((definition) => {
+    const query = pidPickerSearch.trim().toLocaleLowerCase();
+    return !query || [definition.pid, definition.name, definition.description, definition.unit]
+      .some((field) => String(field).toLocaleLowerCase().includes(query));
+  });
   const diagnostic: DiagnosticResult = runLocalDiagnostic({
     observations: getAutoSaveState().lastReadings.map((reading): PidObservation => ({
       pid: reading.pid,
@@ -555,18 +608,67 @@ export default function LaboratorioScreen() {
 
       <View style={[styles.commandCard, layout.landscape && styles.commandCardLandscape]}>
         <Text style={styles.commandTitle}>CONSULTA MANUAL</Text>
-        <TextInput
-          value={pid}
-          onChangeText={setPid}
-          autoCapitalize="characters"
-          style={styles.input}
-          placeholder="PID, ex.: 010C"
-          placeholderTextColor="#64748b"
-        />
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Selecionar PID para consulta manual"
+          accessibilityHint="Abre o catálogo local de PIDs. Os mais recentemente descobertos e suportados pela ECU aparecem primeiro."
+          style={[styles.input, styles.pidSelectInput]}
+          onPress={() => { setPidPickerSearch(''); setPidPickerOpen(true); }}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={styles.pidSelectCode}>{pid}</Text>
+            <Text style={styles.pidSelectName}>{selectedPidDefinition?.name ?? 'Selecione um PID do catálogo'}</Text>
+          </View>
+          <Text style={styles.pidSelectChevron}>⌄</Text>
+        </TouchableOpacity>
+        <Text style={styles.pidPickerHelp}>Toque no campo para pesquisar e selecionar um PID. A seleção não garante suporte da ECU.</Text>
         <TouchableOpacity style={styles.button} onPress={testPid} disabled={!storageReady || (mode === 'REAL' && !sessionRef.current)}>
           <Text style={styles.buttonText}>CONSULTAR PID</Text>
         </TouchableOpacity>
       </View>
+      <TouchableOpacity style={styles.secondaryButton} onPress={scanReadiness} disabled={!storageReady || readinessScanning || (mode === 'REAL' && !sessionRef.current)}>
+        <Text style={styles.secondaryButtonText}>{readinessScanning ? 'LENDO PRONTIDÃO...' : 'LER MONITORES DE EMISSÕES • PID 0101'}</Text>
+      </TouchableOpacity>
+      {!!readinessScan ? (
+        <View style={styles.dtcPanel}>
+          <Text style={styles.dtcTitle}>PRONTIDÃO DE EMISSÕES • DESDE A LIMPEZA DOS DTCs</Text>
+          {!readinessScan.available || !readinessScan.report ? (
+            <Text style={styles.dtcHint}>NÃO DISPONÍVEL: {readinessScan.reason ?? 'a ECU não retornou os quatro bytes válidos do PID 0101.'}</Text>
+          ) : (
+            <>
+              <View style={styles.dtcRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.dtcKind}>LUZ DE INJEÇÃO (MIL)</Text>
+                  <Text style={styles.dtcCodes}>{readinessScan.report.milOn ? 'LIGADA' : 'APAGADA'}</Text>
+                </View>
+                <Text style={readinessScan.report.milOn ? styles.dtcUnavailable : styles.dtcAvailable}>{readinessScan.report.milOn ? 'ATENÇÃO' : 'OFF'}</Text>
+              </View>
+              <View style={styles.dtcRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.dtcKind}>DTCs CONFIRMADOS INFORMADOS PELA ECU</Text>
+                  <Text style={styles.dtcCodes}>{readinessScan.report.confirmedDtcCount}</Text>
+                </View>
+                <Text style={styles.dtcCodes}>{readinessScan.report.ignition === 'SPARK' ? 'CICLO OTTO' : 'COMPRESSÃO'}</Text>
+              </View>
+              <Text style={styles.dtcHint}>Monitores prontos: {readinessScan.report.completeCount}/{readinessScan.report.supportedCount}
+                {readinessScan.report.readinessPercent == null ? ' • percentual N/D' : ' • ' + readinessScan.report.readinessPercent + '%'}
+              </Text>
+              {readinessScan.report.monitors.map((monitor) => (
+                <View key={monitor.id} style={styles.dtcRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.dtcKind}>{monitor.label}</Text>
+                    <Text style={styles.dtcCodes}>{!monitor.supported ? 'A ECU não informou este monitor como suportado.' : monitor.complete ? 'Monitor concluído desde a última limpeza de DTCs.' : 'Monitor suportado, mas ainda incompleto.'}</Text>
+                  </View>
+                  <Text style={!monitor.supported ? styles.dtcNotSupported : monitor.complete ? styles.dtcAvailable : styles.dtcUnavailable}>
+                    {!monitor.supported ? 'N/S' : monitor.complete ? 'PRONTO' : 'INCOMPLETO'}
+                  </Text>
+                </View>
+              ))}
+              <Text style={styles.dtcHint}>A prontidão não prova que todos os componentes estão bons. “Incompleto” pode ocorrer após apagar códigos ou desligar a bateria; a disponibilidade depende da ECU. Resposta: {readinessScan.response}</Text>
+            </>
+          )}
+        </View>
+      ) : null}
       <TouchableOpacity style={styles.secondaryButton} onPress={discoverPids} disabled={!storageReady || (mode === 'REAL' && !sessionRef.current)}>
         <Text style={styles.secondaryButtonText}>DESCOBRIR PIDs SUPORTADOS</Text>
       </TouchableOpacity>
@@ -588,6 +690,27 @@ export default function LaboratorioScreen() {
       <TouchableOpacity style={styles.secondaryButton} onPress={readAllDtcs} disabled={!storageReady || dtcScanning || (mode === 'REAL' && !sessionRef.current)}>
         <Text style={styles.secondaryButtonText}>{dtcScanning ? 'VARRENDO DTC 03/07/0A...' : 'VARREDURA COMPLETA DE DTC • 03 / 07 / 0A'}</Text>
       </TouchableOpacity>
+      {!!freezeFrameSnapshot ? (
+        <View style={styles.dtcPanel}>
+          <Text style={styles.dtcTitle}>FREEZE FRAME • MODE 02 • QUADRO {freezeFrameSnapshot.frame}</Text>
+          {!freezeFrameSnapshot.available || !freezeFrameSnapshot.parameters.some((item) => item.available) ? (
+            <Text style={styles.dtcHint}>A ECU não forneceu um snapshot interpretável. Isso não significa ausência de falhas; alguns módulos não expõem todos os parâmetros de freeze frame.</Text>
+          ) : (
+            <>
+              <Text style={styles.dtcHint}>DTC associado: {freezeFrameSnapshot.dtc ?? 'N/D'} • Captura: {new Date(freezeFrameSnapshot.capturedAt).toLocaleString()} • Os valores abaixo representam o instante registrado pela ECU, não a telemetria atual.</Text>
+              {freezeFrameSnapshot.parameters.map((item) => (
+                <View key={item.pid} style={styles.dtcRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.dtcKind}>{item.pid} • {item.label}</Text>
+                    <Text style={styles.dtcCodes}>{item.available && item.value != null ? item.value.toFixed(2) + (item.unit && item.unit !== 'N/D' ? ' ' + item.unit : '') : item.reason ?? 'NÃO DISPONÍVEL'}</Text>
+                  </View>
+                  <Text style={item.available ? styles.dtcAvailable : styles.dtcNotSupported}>{item.available ? 'LIDO' : 'N/D'}</Text>
+                </View>
+              ))}
+            </>
+          )}
+        </View>
+      ) : null}
       {!!dtcScan.length ? (
         <View style={styles.dtcPanel}>
           <Text style={styles.dtcTitle}>ESTADOS DE DTC</Text>
@@ -672,6 +795,50 @@ export default function LaboratorioScreen() {
       {!!error && <Text style={styles.error}>{error}</Text>}
       </View>
     </ScrollView>
+    <Modal visible={pidPickerOpen} transparent animationType="slide" onRequestClose={() => setPidPickerOpen(false)}>
+      <View style={styles.pidPickerOverlay}>
+        <View style={styles.pidPickerCard}>
+          <Text style={styles.pidPickerTitle}>SELECIONAR PID</Text>
+          <Text style={styles.pidPickerSubtitle}>Catálogo local • PIDs descobertos na ECU aparecem primeiro</Text>
+          <TextInput
+            value={pidPickerSearch}
+            onChangeText={setPidPickerSearch}
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={styles.pidPickerSearch}
+            placeholder="Buscar por PID, nome ou unidade"
+            placeholderTextColor={cockpitTheme.mutedLight}
+          />
+          <ScrollView style={styles.pidPickerList} keyboardShouldPersistTaps="handled">
+            {filteredPidOptions.map((definition) => {
+              const isSupported = supportedPids.includes(definition.pid);
+              const supportKnown = supportedPids.length > 0;
+              return (
+                <TouchableOpacity
+                  key={definition.pid}
+                  accessibilityRole="button"
+                  onPress={() => { setPid(definition.pid); setPidPickerOpen(false); }}
+                  style={styles.pidPickerItem}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.pidPickerItemTitle}>{definition.pid} • {definition.name}</Text>
+                    <Text style={styles.pidPickerItemDescription}>{definition.description}</Text>
+                    <Text style={styles.pidPickerItemUnit}>{definition.unit} • {definition.classification}</Text>
+                  </View>
+                  <Text style={isSupported ? styles.dtcAvailable : supportKnown ? styles.dtcNotSupported : styles.muted}>
+                    {isSupported ? 'SUPORTADO' : supportKnown ? 'NÃO LISTADO' : 'NÃO VERIFICADO'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+            {!filteredPidOptions.length ? <Text style={styles.dtcHint}>Nenhum PID do catálogo corresponde à busca.</Text> : null}
+          </ScrollView>
+          <TouchableOpacity style={styles.secondaryButton} onPress={() => setPidPickerOpen(false)}>
+            <Text style={styles.secondaryButtonText}>FECHAR LISTA</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
     </SafeAreaView>
   );
 }
@@ -707,6 +874,22 @@ const styles = StyleSheet.create({
   deviceName: { fontWeight: '700', color: cockpitTheme.textStrong },
   warning: { color: cockpitTheme.warning, marginBottom: 12 },
   input: { backgroundColor: cockpitTheme.surface, borderColor: cockpitTheme.border, borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 12, color: cockpitTheme.textStrong },
+  pidSelectInput: { flexDirection: 'row', alignItems: 'center', minHeight: 58 },
+  pidSelectCode: { color: cockpitTheme.accent, fontSize: 13, fontWeight: '900' },
+  pidSelectName: { color: cockpitTheme.textSecondary, fontSize: 10, marginTop: 2 },
+  pidSelectChevron: { color: cockpitTheme.accent, fontSize: 24, fontWeight: '900', paddingHorizontal: 5 },
+  pidPickerHelp: { color: cockpitTheme.mutedLight, fontSize: 9, marginTop: -7, marginBottom: 10 },
+  pidPickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', justifyContent: 'flex-end', padding: 12 },
+  pidPickerCard: { maxHeight: '88%', backgroundColor: cockpitTheme.surface, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: cockpitTheme.border },
+  pidPickerTitle: { color: cockpitTheme.accent, fontSize: 16, fontWeight: '900' },
+  pidPickerSubtitle: { color: cockpitTheme.mutedLight, fontSize: 10, marginTop: 4, marginBottom: 10 },
+  pidPickerSearch: { backgroundColor: cockpitTheme.surfaceAlt, color: cockpitTheme.textStrong, borderRadius: 10, borderWidth: 1, borderColor: cockpitTheme.border, padding: 12, marginBottom: 8 },
+  pidPickerList: { maxHeight: 430 },
+  pidPickerItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderTopWidth: 1, borderTopColor: cockpitTheme.borderSubtle },
+  pidPickerItemTitle: { color: cockpitTheme.textStrong, fontSize: 11, fontWeight: '900' },
+  pidPickerItemDescription: { color: cockpitTheme.textSecondary, fontSize: 9, lineHeight: 13, marginTop: 3 },
+  pidPickerItemUnit: { color: cockpitTheme.accent, fontSize: 8, marginTop: 3 },
+  dtcNotSupported: { color: cockpitTheme.mutedLight, fontSize: 8, fontWeight: '800' },
   tripPanel: { backgroundColor: cockpitTheme.surface, borderRadius: 14, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: cockpitTheme.border },
   tripHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   tripTitle: { color: cockpitTheme.textStrong, fontWeight: '900', fontSize: 14 },
