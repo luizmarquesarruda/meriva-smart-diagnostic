@@ -95,6 +95,7 @@ async function handleUnexpectedDisconnect(reason: string): Promise<void> {
   if (intentionalDisconnect || reconnecting) return;
 
   connectionGeneration += 1;
+  const recoveryGeneration = connectionGeneration;
   lastConnectionError = reason;
   const connection = active;
   const compatibility = connection?.session.getCompatibilityConfig();
@@ -126,13 +127,14 @@ async function handleUnexpectedDisconnect(reason: string): Promise<void> {
       void (async () => {
         try {
           for (const delay of delays) {
-            if (intentionalDisconnect) return;
+            if (intentionalDisconnect || connectionGeneration !== recoveryGeneration) return;
             await new Promise((resolve) => setTimeout(resolve, delay));
-            if (intentionalDisconnect || active) return;
+            if (intentionalDisconnect || connectionGeneration !== recoveryGeneration || active) return;
             try {
               await connectPreferredElm(connection.device.address, compatibility, 'EXPLICIT');
               return;
             } catch (cause) {
+              if (intentionalDisconnect || connectionGeneration !== recoveryGeneration) return;
               lastConnectionError = cause instanceof Error ? cause.message : String(cause);
             }
           }
@@ -154,23 +156,28 @@ function startBluetoothMonitor(): void {
     if (monitorBusy || !active) return;
     monitorBusy = true;
     healthTick += 1;
+    const monitorGeneration = connectionGeneration;
+    let monitoredConnection: SharedObdConnection | null = null;
 
     void (async () => {
       try {
         const enabled = await RNBluetoothClassic.isBluetoothEnabled();
+        if (monitorGeneration !== connectionGeneration) return;
         if (!enabled) {
           await handleUnexpectedDisconnect('BLUETOOTH DESLIGADO');
           return;
         }
 
         const connection = active;
-        if (!connection) return;
+        if (!connection || monitorGeneration !== connectionGeneration) return;
+        monitoredConnection = connection;
 
         // KWP FAST precisa de TesterPresent durante uma sessão diagnóstica.
         // O ELM continua sendo o responsável pelo framing/protocolo físico.
         const isKwp = /KWP|14230/i.test(connection.protocol ?? '');
         if (isKwp) {
           const keepAlive = await connection.session.keepAlive();
+          if (monitorGeneration !== connectionGeneration || active !== connection) return;
           if (keepAlive.status !== 'OK') lastEcuError = keepAlive.errorMessage ?? 'KEEP-ALIVE KWP SEM RESPOSTA';
         }
 
@@ -178,6 +185,7 @@ function startBluetoothMonitor(): void {
         // pode permanecer conectado enquanto a ECU deixa de responder.
         if (healthTick % 3 !== 0) return;
         const probe = await connection.session.queryPid('010C');
+        if (monitorGeneration !== connectionGeneration || active !== connection) return;
         const valid = probe.commandStatus === 'OK'
           && probe.parsed.status === 'RESPONDEU'
           && Number.isFinite(probe.parsed.value);
@@ -199,6 +207,7 @@ function startBluetoothMonitor(): void {
 
         setEcuResponseState('RECOVERING', lastEcuError);
         const recovered = await connection.session.recoverProtocol();
+        if (monitorGeneration !== connectionGeneration || active !== connection) return;
         if (recovered) {
           consecutiveEcuFailures = 0;
           lastEcuResponseAt = new Date().toISOString();
@@ -208,11 +217,15 @@ function startBluetoothMonitor(): void {
           await handleUnexpectedDisconnect('ECU SEM RESPOSTA APÓS RECUPERAÇÃO DE PROTOCOLO');
         }
       } catch (cause) {
+        if (monitorGeneration !== connectionGeneration || (monitoredConnection && active !== monitoredConnection)) return;
         consecutiveEcuFailures += 1;
         lastEcuError = cause instanceof Error ? cause.message : String(cause);
-        if (consecutiveEcuFailures >= (active?.session.getCompatibilityConfig().noDataReconnectThreshold ?? 4)) {
+        const connectionForRecovery = monitoredConnection ?? active;
+        if (consecutiveEcuFailures >= (connectionForRecovery?.session.getCompatibilityConfig().noDataReconnectThreshold ?? 4)) {
+          if (!connectionForRecovery || active !== connectionForRecovery) return;
           setEcuResponseState('RECOVERING', lastEcuError);
-          const recovered = await active?.session.recoverProtocol();
+          const recovered = await connectionForRecovery.session.recoverProtocol();
+          if (monitorGeneration !== connectionGeneration || active !== connectionForRecovery) return;
           if (recovered) {
             consecutiveEcuFailures = 0;
             lastEcuResponseAt = new Date().toISOString();
@@ -230,7 +243,6 @@ function startBluetoothMonitor(): void {
     })();
   }, 5000);
 }
-
 function setConnectionError(cause: unknown): void {
   lastConnectionError = cause instanceof Error ? cause.message : String(cause ?? 'ERRO DESCONHECIDO');
 }
@@ -340,13 +352,13 @@ export function subscribeSharedObdStatus(listener: (status: SharedObdStatus) => 
   return () => statusListeners.delete(listener);
 }
 
-async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm327CompatibilityConfig): Promise<SharedObdConnection> {
+async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm327CompatibilityConfig, requestGeneration: number): Promise<SharedObdConnection> {
+  assertConnectionAttemptCurrent(requestGeneration);
   setLifecycle('DEVICE_SELECTED');
   setLifecycle('BLUETOOTH_CONNECTING');
-  intentionalDisconnect = false;
 
   try {
-      const attemptGeneration = connectionGeneration;
+      const attemptGeneration = requestGeneration;
     let disconnectedDuringAttempt = false;
     const connection = await createRealElmSession(
       device,
@@ -444,17 +456,27 @@ async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm3
   }
 }
 
+function assertConnectionAttemptCurrent(requestGeneration: number): void {
+  if (intentionalDisconnect || requestGeneration !== connectionGeneration) {
+    throw new Error('TENTATIVA DE CONEXÃO CANCELADA POR MUDANÇA DE ESTADO.');
+  }
+}
+
 async function connectPreferredElmOnce(
   compatibility: Elm327CompatibilityConfig,
   preferredAddress: string | null,
-  selectionMode: ConnectionSelectionMode = 'PREFERRED',
+  selectionMode: ConnectionSelectionMode,
+  requestGeneration: number,
 ): Promise<SharedObdConnection> {
+  assertConnectionAttemptCurrent(requestGeneration);
   clearBluetoothDiagnostic();
   lastDiscoveryDevices = [];
   await ensureBluetoothReady();
+  assertConnectionAttemptCurrent(requestGeneration);
   setLifecycle('BLUETOOTH_ON');
 
   const devices = await discoverPairedDevices();
+  assertConnectionAttemptCurrent(requestGeneration);
   lastDiscoveryDevices = devices;
   const candidates = buildCandidateList(devices, preferredAddress, selectionMode);
   if (selectionMode === 'EXPLICIT' && candidates.length === 0) {
@@ -463,9 +485,11 @@ async function connectPreferredElmOnce(
 
   let lastError: unknown = null;
   for (const device of candidates) {
+    assertConnectionAttemptCurrent(requestGeneration);
     try {
-      return await connectCandidate(device, compatibility);
+      return await connectCandidate(device, compatibility, requestGeneration);
     } catch (cause) {
+      if (intentionalDisconnect || requestGeneration !== connectionGeneration) throw cause;
       lastError = cause;
       setConnectionError(cause);
     }
@@ -480,6 +504,9 @@ export async function connectPreferredElm(
   compatibility?: Partial<Elm327CompatibilityConfig>,
   selectionMode: ConnectionSelectionMode = 'PREFERRED',
 ): Promise<SharedObdConnection> {
+  if (intentionalDisconnect) {
+    throw new Error('DESCONEXÃO EM ANDAMENTO. AGUARDE A LIBERAÇÃO DA SESSÃO ANTES DE CONECTAR.');
+  }
   if (active) {
     if (selectionMode === 'EXPLICIT' && preferredAddress && !sameAddress(active.device.address, preferredAddress)) {
       throw new Error('OUTRO ADAPTADOR JÁ ESTÁ CONECTADO. DESCONECTE O ATUAL ANTES DE TROCAR DE DISPOSITIVO.');
@@ -489,34 +516,33 @@ export async function connectPreferredElm(
   if (connecting) return connecting;
 
   const config = mergeCompatibilityConfig(compatibility ?? DEFAULT_ELM327_COMPATIBILITY);
-
-  connecting = (async () => {
-    // O fluxo de tentativa já é controlado por bluetooth_config.json:
-    // cada candidato usa o limite efetivo configurado (20 por padrão), com 8 s
-    // entre falhas, e para imediatamente no primeiro sucesso. Não repetir uma nova rodada inteira
-    // após esgotar os candidatos evita um ciclo de conexão potencialmente
-    // infinito quando nenhum adaptador responde.
+  const requestGeneration = connectionGeneration;
+  const attempt = (async () => {
     try {
-      return await connectPreferredElmOnce(config, preferredAddress, selectionMode);
+      return await connectPreferredElmOnce(config, preferredAddress, selectionMode, requestGeneration);
     } catch (cause) {
-      setConnectionError(cause);
-      const message = cause instanceof Error ? cause.message : String(cause);
-      if (/BLUETOOTH.*DESLIGADO|BLUETOOTH CONTINUA DESLIGADO|BLUETOOTH NÃO FOI ATIVADO/i.test(message)) {
-        setLifecycle('BLUETOOTH_OFF');
-      } else {
-        setLifecycle('ERROR');
+      const cancelled = requestGeneration !== connectionGeneration || intentionalDisconnect
+        || /TENTATIVA DE CONEXÃO CANCELADA|DESCONEXÃO EM ANDAMENTO/i.test(cause instanceof Error ? cause.message : String(cause));
+      if (!cancelled) {
+        setConnectionError(cause);
+        const message = cause instanceof Error ? cause.message : String(cause);
+        if (/BLUETOOTH.*DESLIGADO|BLUETOOTH CONTINUA DESLIGADO|BLUETOOTH NÃO FOI ATIVADO/i.test(message)) {
+          setLifecycle('BLUETOOTH_OFF');
+        } else {
+          setLifecycle('ERROR');
+        }
       }
       throw cause;
     }
   })();
 
+  connecting = attempt;
   try {
-    return await connecting;
+    return await attempt;
   } finally {
-    connecting = null;
+    if (connecting === attempt) connecting = null;
   }
 }
-
 export async function setSharedObdConnection(connection: SharedObdConnection | null): Promise<void> {
   active = connection;
   intentionalDisconnect = !connection;
@@ -547,7 +573,11 @@ export async function setSharedObdConnection(connection: SharedObdConnection | n
     lastEcuError = null;
     lifecycle = 'DISCONNECTED';
     emit();
-    await closeObdAutosaveSession();
+    try {
+      await closeObdAutosaveSession();
+    } finally {
+      intentionalDisconnect = false;
+    }
   }
 }
 

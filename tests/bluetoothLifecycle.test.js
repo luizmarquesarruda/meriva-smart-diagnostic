@@ -53,6 +53,13 @@ assert(dashboard.includes('connectPreferredElm(settings.selectedAdapterAddress')
 assert(shared.includes('const compatibility = connection?.session.getCompatibilityConfig()'), 'recovery must preserve the active session compatibility settings');
 assert(shared.includes("connectPreferredElm(connection.device.address, compatibility, 'EXPLICIT')"), 'recovery must pass the original compatibility settings');
 assert(shared.includes('if (connection) reconnecting = true'), 'reserve recovery before awaiting async cleanup to ignore duplicate disconnect callbacks');
+assert(shared.includes('const recoveryGeneration = connectionGeneration'), 'recovery must capture its initiating connection generation');
+assert(shared.includes('connectionGeneration !== recoveryGeneration'), 'recovery retry must stop when a newer disconnect/request changes generation');
+assert(shared.includes('function assertConnectionAttemptCurrent'), 'connection setup must check explicit cancellation after awaits');
+assert(shared.includes('requestGeneration !== connectionGeneration'), 'stale connect attempt must not proceed to another candidate');
+assert(shared.includes('if (connecting === attempt) connecting = null;'), 'finishing an old promise cannot erase the current connection attempt');
+assert(shared.includes('const monitorGeneration = connectionGeneration;'), 'monitor must pin its health probe to one connection generation');
+assert(shared.includes('active !== connection'), 'late keepalive/probe responses must not overwrite a disconnected/replaced session');
 
 console.log('bluetoothLifecycle.test.js: OK');
 

@@ -2757,3 +2757,22 @@ Acompanhar a nova CI do commit desta auditoria. Se houver falha, analisar o log 
 
 ### Próximo passo
 Consultar resultado de validação e build Android desta revisão. No carro, confirmar individualmente os PIDs realmente suportados, especialmente 0101, 0151 e 0152, sem elevar candidaturas de catálogo a confirmação de ECU.
+
+
+## 2026-10-19 — Proteção de cancelamento na reconexão ELM327
+
+### Risco identificado
+A rotina de recuperação aguardava o backoff, mas só consultava `intentionalDisconnect` e `active`. Uma desconexão manual podia terminar a limpeza e voltar a flag para `false` durante a espera; a recuperação antiga podia então tentar reconectar. Além disso, o `finally` de uma promessa antiga limpava `connecting` sem verificar sua identidade, podendo apagar a referência a uma tentativa mais nova. No monitor, respostas atrasadas de `keepAlive`, PID 010C ou recuperação de protocolo podiam atualizar o estado depois de a sessão mudar.
+
+### Correções aplicadas em `src/obd/sharedConnection.ts`
+- A recuperação captura a geração da conexão e valida a mesma geração antes/depois de cada espera e de cada falha; uma desconexão nova cancela a sequência antiga.
+- A tentativa de conexão recebe uma geração imutável e verifica cancelamento após preparar o Bluetooth e descobrir dispositivos. O loop não continua para o próximo candidato quando a tentativa foi cancelada.
+- O início de cada candidato não redefine mais a flag de desconexão deliberada.
+- A promessa só limpa `connecting` quando ainda é a promessa ativa.
+- O monitor descarta resultados de keep-alive, PID 010C e `recoverProtocol` se a geração ou a conexão ativa mudou.
+- `setSharedObdConnection(null)` libera a flag de desconexão após concluir o fechamento do autosave.
+
+### Testes e limites
+- `tests/bluetoothLifecycle.test.js` verifica os contratos de geração, cancelamento, identidade da promessa e descarte de sondagens tardias.
+- CI #2424 no commit `f14c0a1`: `npm run validate` passou; o build Android ainda estava executando. O presente commit dispara uma nova CI abrangendo também as proteções de corrida.
+- A proteção é uma correção de concorrência apoiada por inspeção estática e testes. A causa exata da oscilação visual no telefone precisa de confirmação com log físico da sessão Meriva/ELM327. O teste físico continua pendente.
