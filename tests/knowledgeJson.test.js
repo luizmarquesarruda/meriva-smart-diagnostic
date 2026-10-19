@@ -49,7 +49,18 @@ function main() {
   assert.ok(Array.isArray(sensorTests.sources) && sensorTests.sources.length >= 5, 'fontes pesquisadas ausentes');
   assert.strictEqual(typeof dtcCatalog.version, 'number');
   assert.strictEqual(typeof pollingPolicy.version, 'number');
-  assert.strictEqual(pollingPolicy.version, 2, 'cadência flex-fuel exige versão de contrato atualizada');
+  assert.strictEqual(pollingPolicy.version, 3, 'perfis de aquisição exigem versão de contrato atualizada');
+  assert.deepStrictEqual(Object.keys(pollingPolicy.acquisitionProfiles).sort(), ['COCKPIT_PRIORITY', 'STANDARD']);
+  assert.strictEqual(pollingPolicy.acquisitionProfiles.STANDARD.optionalSamplingMultiplier, 1);
+  assert.strictEqual(pollingPolicy.acquisitionProfiles.STANDARD.rotatingTelemetryEveryCycles, 1);
+  assert.strictEqual(pollingPolicy.acquisitionProfiles.COCKPIT_PRIORITY.optionalSamplingMultiplier, 2);
+  assert.strictEqual(pollingPolicy.acquisitionProfiles.COCKPIT_PRIORITY.rotatingTelemetryEveryCycles, 2);
+  for (const [id, profile] of Object.entries(pollingPolicy.acquisitionProfiles)) {
+    assert.ok(typeof profile.label === 'string' && profile.label.trim(), 'perfil sem nome: ' + id);
+    assert.ok(typeof profile.description === 'string' && profile.description.trim(), 'perfil sem explicação: ' + id);
+    assert.ok([1, 2].includes(profile.optionalSamplingMultiplier), 'multiplicador de amostragem inválido: ' + id);
+    assert.ok([1, 2].includes(profile.rotatingTelemetryEveryCycles), 'cadência de telemetria inválida: ' + id);
+  }
   assert.ok(Array.isArray(dtcCatalog.codes) && dtcCatalog.codes.length > 0, 'catálogo DTC vazio');
   assert.strictEqual(dtcCatalog.standard, 'SAE J2012');
   assertUnique(dtcCatalog.codes.map((item) => String(item.code).toUpperCase()), 'DTC catalogado');
