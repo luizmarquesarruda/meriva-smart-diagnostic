@@ -94,7 +94,7 @@ export default function ViagensScreen() {
             <Text style={s.noteText}>Consumo só aparece quando atende aos critérios mínimos de integração. Sensores sem amostras armazenadas são apresentados como N/D, não como valores presumidos.</Text>
           </View>
           <Link href="/armazenamento" asChild><TouchableOpacity style={s.primary}><Text style={s.primaryText}>ABRIR HISTÓRICO E EXPORTAÇÃO</Text></TouchableOpacity></Link>
-          <Link href="/" asChild><TouchableOpacity style={s.back}><Text style={s.backText}>← VOLTAR AO PAINEL</Text></TouchableOpacity></Link>
+          
         </>}
       </View>
     </ScrollView>
