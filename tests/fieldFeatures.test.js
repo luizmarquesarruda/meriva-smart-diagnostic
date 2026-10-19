@@ -21,7 +21,7 @@ assert.ok(readiness.includes('parseReadinessMonitorResponse'));
 assert.ok(readiness.includes("execute('0101')"));
 assert.ok(lab.includes('scanReadiness'));
 assert.ok(lab.includes('LER MONITORES DE EMISSÕES • PID 0101'));
-assert.ok(lab.includes('NOT_SUPPORTED'));
+assert.ok(lab.includes('!monitor.supported'));
 assert.ok(lab.includes('INCOMPLETO'));
 
 // P2 — Mode 02 is frame-aware and refuses unsupported/unverified PIDs.
