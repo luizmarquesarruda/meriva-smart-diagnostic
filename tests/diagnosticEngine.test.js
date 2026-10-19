@@ -80,6 +80,22 @@ function main() {
   assert.strictEqual(result.freshDiagnosticEvidenceGroups, 0, 'leituras antigas não contam como evidência atual');
   assert.strictEqual(result.version, 2, 'o contrato do motor deve refletir o bloqueio de evidências obsoletas');
 
+  const futureTimestamp = new Date(Date.now() + 5000).toISOString();
+  result = engine.runLocalDiagnostic({
+    ...base,
+    observations: [obs('010B', 50, 'REAL_OBD', futureTimestamp)],
+  });
+  assert.strictEqual(result.hypotheses.length, 0, 'timestamp muito à frente do relógio deve ser bloqueado');
+  assert.strictEqual(result.blockedStaleObservations, 1);
+
+  result = engine.runLocalDiagnostic({
+    ...base,
+    observations: [obs('0106', 20, 'REAL_OBD', staleTimestamp)],
+    dtcs: [{ code: 'P0135', status: 'CONFIRMED', firstSeen: '', lastSeen: '', occurrences: 1, source: 'REAL_OBD', historical: false, confirmed: true }],
+  });
+  assert.strictEqual(result.hypotheses[0].id, 'FALHA_CIRCUITO_AQUECEDOR_O2_B1S1', 'DTC atual continua válido mesmo quando um PID numérico está obsoleto');
+  assert.strictEqual(result.freshDiagnosticEvidenceGroups, 0);
+
   result = engine.runLocalDiagnostic({
     ...base,
     observations: [obs('0106', -20), obs('0107', -5)],
