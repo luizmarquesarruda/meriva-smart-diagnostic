@@ -22,14 +22,14 @@ assert.ok(spark, 'valid PID 01 reply should parse');
 assert.strictEqual(spark.milOn, true);
 assert.strictEqual(spark.confirmedDtcCount, 3);
 assert.strictEqual(spark.ignition, 'SPARK');
-assert.strictEqual(spark.supportedCount, 7);
-assert.strictEqual(spark.incompleteCount, 2);
+assert.strictEqual(spark.supportedCount, 8);
+assert.strictEqual(spark.incompleteCount, 3);
 assert.strictEqual(spark.monitors.find((item) => item.id === 'CATALYST').state, 'INCOMPLETE');
 assert.strictEqual(spark.monitors.find((item) => item.id === 'O2_HEATER').state, 'INCOMPLETE');
 assert.strictEqual(spark.monitors.find((item) => item.id === 'HEATED_CATALYST').state, 'NOT_SUPPORTED');
 assert.strictEqual(spark.monitors.find((item) => item.id === 'FUEL_SYSTEM').state, 'INCOMPLETE');
 
-const diesel = parseReadinessMonitorResponse('41 01 00 0F 49 00');
+const diesel = parseReadinessMonitorResponse('41 01 00 0F 4B 00');
 assert.ok(diesel);
 assert.strictEqual(diesel.ignition, 'COMPRESSION');
 assert.strictEqual(diesel.monitors.find((item) => item.id === 'NOX_SCR').supported, true);
