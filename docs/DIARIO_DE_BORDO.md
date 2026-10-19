@@ -2633,10 +2633,10 @@ Implementar os quatro itens priorizados na pesquisa de aplicações OBD-II e sub
 - As médias são identificadas como médias amostradas dos pontos temporais disponíveis. A máxima de velocidade registrada pelo recorder continua sendo mostrada separadamente; ausência de amostras é N/D, nunca zero.
 
 #### P4 — Histórico temporal de evidências
-- Criado src/diagnostics/findingHistory.ts com arquivos diários JSON e TXT em MERIVA_SMART/DIAGNOSTIC_HISTORY, contendo hipótese, contexto, primeira/última observação, score/confiança, fonte, texto das evidências e próximos testes, com horário local/UTC no TXT.
+- Criado src/diagnostics/findingHistory.ts com arquivos diários JSON e TXT em MERIVA_SMART/DIAGNOSTIC_HISTORY, contendo hipótese, contexto, primeira/última observação, score/confiança, série temporal de score/confiança, fonte, texto das evidências e próximos testes, com horário local/UTC no TXT.
 - Repetições da mesma hipótese no mesmo contexto são unidas quando a distância temporal é de até cinco minutos; a contagem de observações aumenta no máximo uma vez por minuto. Isso reduz inflação por polling rápido e preserva episódios separados após intervalos maiores.
 - src/trip/autoTripService.ts registra os achados de modo best-effort em tarefa assíncrona, com limite de uma avaliação/minuto; falha de armazenamento não interrompe a aquisição OBD.
-- app/saude.tsx mostra o histórico temporal, diferenciando persistência de evidências de confirmação de uma falha física.
+- app/saude.tsx mostra o histórico temporal e um sparkline do score por hipótese, diferenciando persistência de evidências de confirmação de uma falha física.
 
 #### Consulta manual de PID
 - No Laboratório, o espaço do PID virou um botão acessível que abre um Modal pesquisável, contendo o catálogo PID_DATABASE. Os itens descobertos pela ECU aparecem primeiro e exibem código, nome, descrição, unidade e estado SUPORTADO/NÃO LISTADO/NÃO VERIFICADO.
@@ -2648,7 +2648,7 @@ Implementar os quatro itens priorizados na pesquisa de aplicações OBD-II e sub
 - tests/dtcScanner.test.js: DTC/quadro, dados estendidos, bitmap, validação de quadro e interrupção de consultas quando o bitmap não corresponde.
 - tests/dtcManager.test.js: round-trip do freeze frame no TXT e compatibilidade com registros antigos sem campo JSON.
 - tests/tripSummary.test.js: agregação min/média/máx, contagem válida e falta de amostras.
-- tests/findingHistory.test.js: agrupamento temporal, deduplicação por minuto e TXT diário com hora local/UTC.
+- tests/findingHistory.test.js: agrupamento temporal, deduplicação por minuto, sequência de score e TXT diário com hora local/UTC.
 - tests/fieldFeatures.test.js: contratos de integração dos quatro itens e do seletor pesquisável.
 - package.json registra os novos testes no comando npm test.
 
