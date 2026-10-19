@@ -2730,3 +2730,30 @@ Acompanhar a nova CI do commit desta auditoria. Se houver falha, analisar o log 
 - CI #2421 falhou exclusivamente em duas asserções do teste de regressão após typecheck, Doctor e os testes anteriores passarem. Como `npm test` para na falha desse script, os scripts de teste posteriores ainda não foram executados nesta rodada.
 - Este commit dispara a CI novamente. Não declarar validação concluída até `validate` e `android-build` terminarem com sucesso.
 - Nenhum merge para `main`; teste físico no veículo continua pendente.
+
+
+## 2026-10-19 — Concordância da rotação do cockpit e cinco leituras para os 34 PIDs
+
+### Inconsistências encontradas
+- O carrossel principal ainda incluía velocidade GPS como primeiro item, embora a especificação pedisse rotação de temperatura, tensão do sistema, posição da borboleta e RPM a cada dez segundos. A temperatura do líquido já tinha um cartão persistente separado.
+- O catálogo principal `src/knowledge/pids.json` continha 34 PIDs; `src/knowledge/sensor_tests.json` só tinha 30. Faltavam 0101, 0130, 0131 e 0151.
+- A página e o motor dos testes ainda exigiam três tentativas por PID, apesar da decisão posterior de cinco leituras distribuídas em rodadas sequenciais.
+- O README dizia que a integração de litros dependia exclusivamente de PID 015E e que o GPS era apenas de primeiro plano, descrições que não refletiam a política MAF/MAP aprovada nem o caminho atual de monitoramento nativo pós-validação da ECU.
+
+### Correções
+- Retirada a velocidade GPS do carrossel de indicadores principais. A primeira métrica agora é temperatura do motor; o ciclo de rotação fica com temperatura, tensão, borboleta e RPM, sem remover GPS da aquisição/viagens e mantendo ECT sempre visível no cartão permanente.
+- Elevado `minimumReadingsPerPid` e todos os `minimumReadings` do JSON de 3 para 5. A rotina já era round-robin e serializada: uma leitura de cada PID do plano em cada rodada; mantido esse comportamento, sem requisições em paralelo.
+- A avaliação e apresentação passam a usar a média aritmética das cinco leituras válidas. Se qualquer PID tiver menos de cinco valores válidos, a avaliação permanece não conclusiva. As respostas ausentes continuam registradas como tentativas, sem serem convertidas em zero.
+- Incluídas as quatro entradas ausentes do catálogo de testes, usando definições existentes de nomes, fórmulas e unidades. PID 0101 recebe interpretação explícita de MIL/DTC/prontidão sem fingir ser teste de sensor; 0151 converte o código de combustível via `fuel_types.json`, sem inferir composição do tanque; 0130/0131 ficam classificados como parâmetros históricos de contexto.
+- O plano permanece bloqueado por suporte em tempo real: ter 34 entradas no catálogo não significa que a ECU suporte todos. A bitmap e a resposta individual continuam sendo as condições de consulta.
+- Atualizado README para reconciliar os comportamentos reais de GPS, combustível medido/estimado e amostragem de sensores.
+
+### Testes de regressão
+- Atualizados os testes de contrato JSON para exigir cinco leituras, aceitar os dois novos avaliadores e garantir correspondência completa e sem duplicação entre os 34 PIDs definidos e o catálogo de testes.
+- Atualizado o teste do motor para usar cinco amostras por PID e cobrir média do buffer, semântica de prontidão do 0101 e interpretação do 0151.
+- Atualizado o teste de layout para garantir que velocidade GPS não retorne ao carrossel principal.
+- CI #2422: `npm run validate` passou após as correções anteriores; o build Android ainda estava em execução durante a auditoria. A CI acionada por este commit fará a validação integral deste novo lote, inclusive build nativo; não presumir resultado antes do término.
+- Nenhum merge para `main`. Teste físico na Meriva ainda pendente.
+
+### Próximo passo
+Consultar resultado de validação e build Android desta revisão. No carro, confirmar individualmente os PIDs realmente suportados, especialmente 0101, 0151 e 0152, sem elevar candidaturas de catálogo a confirmação de ECU.

@@ -10,7 +10,6 @@ import { getDriveCycleSummary, type DriveCycle } from '../src/data/driveCycles';
 import { getAutoSaveState, getAutoSaveStatus, initAutoSave, updateAutoSaveState } from '../src/meriva/autosaveManager';
 import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
 import type { ObdConnectionState } from '../src/meriva/autosaveState';
-import { gpsTracker, type GpsTripState } from '../src/gps';
 import { ensureMerivaVehicleProfile } from '../src/database/vehicleConfig';
 import { createLearningProfile, initializeCarScannerSeed, readLearningProfile } from '../src/database/learningProfile';
 import { readAppSettings, type AppSettings } from '../src/database/appSettings';
@@ -25,14 +24,12 @@ export default function IndexScreen() {
   const [bluetoothError, setBluetoothError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<AutoSaveStatus>({ lastSavedAt: null, lastSaveReason: null, lastError: null, obdSessionActive: false });
   const [isHydrated, setIsHydrated] = useState(false);
-  const [gpsState, setGpsState] = useState<GpsTripState>(gpsTracker.getState());
   const [tripState, setTripState] = useState<AutoTripServiceState>(autoTripService.getState());
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [dtcCount, setDtcCount] = useState(0);
   const [activeHeroMetric, setActiveHeroMetric] = useState(0);
   const layout = useMidLayout();
 
-  useEffect(() => gpsTracker.subscribe(setGpsState), []);
   useEffect(() => autoTripService.subscribe(setTripState), []);
   useEffect(() => {
     const unsubscribeConnection = subscribeSharedObd(() => setConnectionStatus(getSharedObdStatus()));
@@ -184,7 +181,6 @@ export default function IndexScreen() {
   const throttleReading = freshRealReading((item) => item.pid === '0111' || /throttle|borboleta/i.test(item.name));
   const throttleValue = throttleReading?.value ?? null;
   const heroMetrics = [
-    { label: 'VELOCIDADE GPS', value: gpsState.running ? String(Math.round(gpsState.currentSpeedKmh)) : 'N/D', unit: gpsState.running ? 'km/h' : '', hint: gpsState.running ? 'SINAL GPS ATIVO' : 'AGUARDANDO GPS', tone: 'normal' },
     { label: 'TEMPERATURA DO MOTOR', value: coolantValue != null ? String(Math.round(coolantValue)) : 'N/D', unit: coolantValue != null ? '°C' : '', hint: coolantValue != null ? 'LEITURA REAL • PID 0105' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0105' : 'ECU DESCONECTADA', tone: coolantValue != null && coolantValue >= 115 ? 'danger' : coolantValue != null && coolantValue >= 110 ? 'warning' : 'normal' },
     { label: 'VOLTAGEM DO SISTEMA', value: voltageValue != null ? voltageValue.toFixed(1) : 'N/D', unit: voltageValue != null ? 'V' : '', hint: voltageValue != null ? 'LEITURA REAL • PID 0142' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0142' : 'ECU DESCONECTADA', tone: 'normal' },
     { label: 'POSIÇÃO DA BORBOLETA', value: throttleValue != null ? throttleValue.toFixed(1) : 'N/D', unit: throttleValue != null ? '%' : '', hint: throttleValue != null ? 'LEITURA REAL • PID 0111' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0111' : 'ECU DESCONECTADA', tone: 'normal' },

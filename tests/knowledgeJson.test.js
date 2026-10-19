@@ -47,7 +47,7 @@ function main() {
   assert.ok(Number.isInteger(diagnosticRules.dataQuality.futureTimestampToleranceMs) && diagnosticRules.dataQuality.futureTimestampToleranceMs >= 0, 'tolerância de relógio precisa ser válida');
   assert.strictEqual(typeof sensorTests.schemaVersion, 'number');
   assert.strictEqual(sensorTests.catalogId, 'MERIVA_SMART_SENSOR_TESTS');
-  assert.strictEqual(sensorTests.minimumReadingsPerPid, 3, 'cada PID suportado exige três tentativas');
+  assert.strictEqual(sensorTests.minimumReadingsPerPid, 5, 'cada PID suportado exige cinco tentativas');
   assert.ok(Array.isArray(sensorTests.tests) && sensorTests.tests.length > 0, 'catálogo de testes vazio');
   assert.ok(Array.isArray(sensorTests.sources) && sensorTests.sources.length >= 5, 'fontes pesquisadas ausentes');
   assert.strictEqual(typeof dtcCatalog.version, 'number');
@@ -237,12 +237,13 @@ function main() {
   const sensorTestItems = sensorTests.tests;
   assertUnique(sensorTestItems.map((item) => item.id), 'ID de teste de sensor');
   assertUnique(sensorTestItems.map((item) => item.pid), 'PID do catálogo de testes');
-  const allowedSensorEvaluators = new Set(['RPM_BY_MODE','STATIONARY_SPEED','PLAUSIBILITY_RANGE','TEMPERATURE_PLAUSIBILITY','FUEL_TRIM_CONTEXT','MAP_BY_MODE','O2_NARROWBAND_LIMITATION','PERCENT_PLAUSIBILITY','BARO_PLAUSIBILITY','ECU_VOLTAGE_BY_MODE','FLEX_COMPOSITION','FUEL_RATE_BY_MODE']);
+  assert.deepStrictEqual(new Set(sensorTestItems.map((item) => String(item.pid).toUpperCase())), pidIds, 'cada PID definido deve ter teste catalogado');
+  const allowedSensorEvaluators = new Set(['RPM_BY_MODE','STATIONARY_SPEED','PLAUSIBILITY_RANGE','TEMPERATURE_PLAUSIBILITY','FUEL_TRIM_CONTEXT','MAP_BY_MODE','O2_NARROWBAND_LIMITATION','PERCENT_PLAUSIBILITY','BARO_PLAUSIBILITY','ECU_VOLTAGE_BY_MODE','FLEX_COMPOSITION','FUEL_RATE_BY_MODE','READINESS_STATUS','FUEL_TYPE_CODE']);
   const validSensorModes = new Set(['ENGINE_OFF','ENGINE_ON']);
   for (const test of sensorTestItems) {
     const id = String(test.pid).toUpperCase();
     assert.ok(pidIds.has(id), 'sensor_tests.json referencia PID ausente: ' + id);
-    assert.strictEqual(test.minimumReadings, 3, 'teste exige três tentativas: ' + id);
+    assert.strictEqual(test.minimumReadings, 5, 'teste exige cinco tentativas: ' + id);
     assert.ok(typeof test.label === 'string' && test.label.trim(), 'teste sem rótulo: ' + id);
     assert.ok(allowedSensorEvaluators.has(test.evaluator), 'avaliador não implementado: ' + test.evaluator);
     assert.ok(Array.isArray(test.modes) && test.modes.length > 0 && test.modes.every((mode) => validSensorModes.has(mode)), 'modo inválido: ' + id);

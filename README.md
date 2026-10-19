@@ -10,7 +10,7 @@ Versão: 1.0.1 | Plataforma: Android | Transporte: Bluetooth Classic | ECU: OBD-
 
 O projeto prioriza dados reais, rastreabilidade e diagnóstico explicável. Uma resposta ausente não vira um valor inventado.
 
-O GPS do celular inicia automaticamente ao abrir o aplicativo. Ele fornece velocidade e distância em primeiro plano, mesmo quando a ECU não oferece o PID 015E. A gravação de litros e consumo depende de taxa de combustível OBD válida. Litros consumidos só entram no cálculo quando a ECU fornece uma taxa de combustível válida pelo PID OBD 015E. O GPS sozinho não mede litros. O aplicativo não aceita litros digitados manualmente na tela principal.
+Após a validação da ECU pela resposta OBD real, o serviço inicia o rastreamento GPS para registrar movimento e distância; o modo em segundo plano depende das permissões e do serviço nativo Android. O GPS não mede litros. O consumo pode ser integrado a partir de uma taxa válida diretamente medida pelo PID 015E ou de uma estimativa MAF/MAP quando a política versionada autoriza e há os dados necessários. A interface identifica quando o valor é estimado, e amostras inválidas ou antigas não entram na integração. O aplicativo não aceita litros digitados manualmente na tela principal.
 
 Bluetooth Classic exige build nativo Android. Expo Go não é o ambiente de validação do transporte.
 
@@ -68,7 +68,7 @@ velocidade / distância
 cálculo km/L somente com litros válidos
 ```
 
-O rastreador é criado uma vez por sessão do aplicativo para continuar ativo enquanto o usuário navega entre as telas. A coleta é de primeiro plano e requer permissão de localização.
+O rastreador é compartilhado entre telas e pode usar o serviço nativo em segundo plano depois que a ECU é validada. A execução exige permissões de localização; fabricantes Android podem restringir a atividade em segundo plano.
 
 ## Regras de dados
 
@@ -83,6 +83,10 @@ O rastreador é criado uma vez por sessão do aplicativo para continuar ativo en
 ## PIDs e combustível
 
 A base cobre PIDs padrão úteis para telemetria e diagnóstico, incluindo velocidade, RPM, temperatura, MAF, posição da borboleta, nível de combustível (PID 012F) e taxa de combustível do motor (PID 015E). O PID 012F é a fonte absoluta de nível de combustível usada para litros, reserva e autonomia quando a resposta for válida. O PID 015E representa taxa de combustível em L/h quando suportado pela ECU; o aplicativo integra essa taxa ao longo do tempo usando os intervalos entre amostras, ignorando amostras inválidas e intervalos excessivamente longos.
+
+## Central de testes de sensores
+
+O catálogo `src/knowledge/sensor_tests.json` cobre os 34 PIDs definidos em `src/knowledge/pids.json`. A página executa apenas os PIDs que a bitmap da ECU anunciou como suportados. A coleta é sequencial e round-robin: uma consulta por PID em cada rodada até cinco tentativas por PID, preservando RX/latência/status. A média aritmética do buffer é usada na triagem; menos de cinco respostas válidas gera resultado não conclusivo. O catálogo não afirma que os 34 PIDs sejam suportados pela ECU real da Meriva.
 
 ## Identificação de combustível
 
