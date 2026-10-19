@@ -644,6 +644,9 @@ export default function LaboratorioScreen() {
         {diagnostic.blockedStaleObservations > 0 ? (
           <Text style={styles.aiWarning}>DADOS ANTIGOS IGNORADOS: {diagnostic.blockedStaleObservations} leitura(s) REAL_OBD com mais de 10 segundos ou timestamp inválido. Atualize as leituras antes de interpretar o resultado.</Text>
         ) : null}
+        {diagnostic.freshDiagnosticEvidenceGroups === 0 ? (
+          <Text style={styles.aiWarning}>SEM EVIDÊNCIA PID ATUAL: não há grupo recente de STFT+LTFT (0106+0107) nem MAP (010B). Isso limita o diagnóstico por sensores; DTCs válidos são avaliados separadamente.</Text>
+        ) : null}
         <Text style={styles.aiDisclaimer}>{diagnostic.disclaimer}</Text>
       </View>
 
