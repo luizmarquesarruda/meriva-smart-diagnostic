@@ -21,6 +21,7 @@ export interface ReadinessMonitorReport {
   incompleteCount: number;
   readinessPercent: number | null;
   rawResponse: string;
+  summary: string;
 }
 
 export interface ReadinessScanResult {
@@ -114,6 +115,7 @@ export function parseReadinessMonitorResponse(rawResponse: string): ReadinessMon
     incompleteCount,
     readinessPercent: supportedCount > 0 ? Math.round((completeCount / supportedCount) * 100) : null,
     rawResponse,
+    summary: `MIL=${(a & 0x80) !== 0 ? 'ON' : 'OFF'} | DTCs=${a & 0x7f} | MOTOR=${ignition} | PRONTOS=${completeCount}/${supportedCount} | INCOMPLETOS=${incompleteCount}`,
   };
 }
 
