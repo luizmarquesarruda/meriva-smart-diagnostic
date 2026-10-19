@@ -72,7 +72,21 @@ export interface DtcRecord {
   source: DataSource;
   historical: boolean;
   confirmed?: boolean;
-  freezeFrame?: { frame: number; dtc: string | null; rpm: number | null; coolantC: number | null };
+  freezeFrame?: {
+    frame: number;
+    dtc: string | null;
+    rpm: number | null;
+    coolantC: number | null;
+    speedKmh?: number | null;
+    engineLoadPercent?: number | null;
+    stftPercent?: number | null;
+    ltftPercent?: number | null;
+    mapKpa?: number | null;
+    intakeAirTempC?: number | null;
+    throttlePercent?: number | null;
+    capturedAt?: string;
+    parameters?: Array<{ pid: string; label: string; value: number | null; unit: string; available: boolean; reason?: string }>;
+  };
 }
 
 export interface ConsumptionReference {
