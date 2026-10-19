@@ -41,6 +41,7 @@ export async function recordDtc(basePath: string, dtc: DtcRecord): Promise<void>
       dtc.source,
       dtc.historical ? 'true' : 'false',
       dtc.confirmed ? 'true' : 'false',
+      JSON.stringify(dtc.freezeFrame ?? null),
     ].join('|');
 
     const info = await FileSystem.getInfoAsync(target);
@@ -78,7 +79,18 @@ export async function readDtcs(basePath: string): Promise<DtcRecord[]> {
         source,
         historical,
         confirmed,
+        freezeFrameJson,
       ] = line.split('|');
+
+      let freezeFrame: DtcRecord['freezeFrame'];
+      if (freezeFrameJson) {
+        try {
+          const parsedFreezeFrame = JSON.parse(freezeFrameJson) as DtcRecord['freezeFrame'] | null;
+          if (parsedFreezeFrame && typeof parsedFreezeFrame.frame === 'number') freezeFrame = parsedFreezeFrame;
+        } catch {
+          // Linhas antigas ou campos de snapshot inválidos não anulam o DTC.
+        }
+      }
 
       return {
         code,
@@ -90,6 +102,7 @@ export async function readDtcs(basePath: string): Promise<DtcRecord[]> {
         source: (source as DataSource) || 'IMPORTADO',
         historical: historical === 'true',
         confirmed: confirmed === 'true',
+        ...(freezeFrame ? { freezeFrame } : {}),
       };
     });
 }
