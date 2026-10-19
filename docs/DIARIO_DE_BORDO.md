@@ -2816,3 +2816,22 @@ A home ainda repetia a Central de Saúde em um cartão próprio, apesar de os DT
 
 ### Próximo passo
 Acompanhar a CI desta alteração; se falhar, ler os logs, corrigir a causa comprovada e validar novamente antes de considerar a rodada concluída.
+
+
+## 2026-10-19 — Correção do contrato de navegação revelada pela CI #2430
+
+### Falha observada
+A CI #2430 passou pela instalação de dependências e pelo Expo Doctor, mas `tests/cockpitNavigation.test.js` falhou na asserção antiga que exigia um link direto para `/saude` na home.
+
+### Diagnóstico
+A remoção do cartão duplicado da Central de Saúde é intencional. A tela `app/saude.tsx` continua existindo e a central permanece acessível pelo módulo Mais Recursos; portanto, exigir o link `/saude` diretamente no cockpit contradizia a nova arquitetura de navegação. O teste de contrato estava desatualizado, não a rota da tela de saúde.
+
+### Correção
+- Atualizada a lista de destinos que devem aparecer diretamente no cockpit para refletir a nova barra inferior: Dados, Mais Recursos, Diagnóstico, Viagens e Bluetooth.
+- Preservada a verificação de existência de `app/saude.tsx` e os novos testes que proíbem o cartão duplicado.
+- Mantidos os rótulos de acessibilidade e a exigência de seis botões inferiores.
+
+### Validação e CI
+- CI #2430, commit `e3bd6a8`: `npm ci` passou; Expo Doctor passou; `npm run validate` falhou somente no contrato de rota direta para `/saude`.
+- A correção deste teste dispara uma nova CI. Não declarar `validate` nem `android-build` aprovados até o novo run terminar.
+- A CI #2429 foi cancelada pela atualização subsequente da branch; não representa falha de código.

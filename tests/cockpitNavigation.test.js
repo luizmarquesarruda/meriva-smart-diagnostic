@@ -7,7 +7,7 @@ const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
 
 const index = read('app/index.tsx');
 const layout = read('app/_layout.tsx');
-for (const route of ['/dados', '/saude', '/mais']) assert.match(index, new RegExp(route.replace('/', '\\/')), 'cockpit deve expor a rota ' + route);
+for (const route of ['/dados', '/mais', '/laboratorio', '/viagens', '/bluetooth']) assert.match(index, new RegExp(route.replace('/', '\\/')), 'cockpit deve expor a rota ' + route);
 for (const file of ['app/dados.tsx', 'app/saude.tsx', 'app/mais.tsx', 'app/veiculo.tsx', 'app/viagens.tsx', 'app/aprendizado.tsx']) {
   assert.equal(fs.existsSync(path.join(ROOT, file)), true, file + ' deve existir');
 }
