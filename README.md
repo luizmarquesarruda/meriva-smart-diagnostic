@@ -196,3 +196,12 @@ A revisão cruzou código, catálogos JSON, testes e o TXT de autosaves fornecid
 ### Throttle do autosave de telemetria
 
 As últimas leituras em memória são atualizadas a cada resposta; mudanças contínuas de RPM/velocidade não regravam todo o autosave e o histórico TXT a cada ciclo. A persistência ordinária por PID fica limitada a uma vez por 10 segundos; PID novo e mudanças de status/unidade/origem são persistidos imediatamente. Ao sair para background, o app compara o fingerprint do estado para descarregar também valores em memória que ainda não venceram a janela. A fila CSV continua preservando cada amostra real.
+
+  
+## Qualidade temporal das evidências diagnósticas
+
+O motor de diagnóstico local usa somente observações numéricas com fonte REAL_OBD e timestamp recente. Por padrão, leituras PID com mais de **10 segundos**, timestamp inválido ou timestamp mais de **1 segundo no futuro** são excluídas das hipóteses baseadas em sensores. O contador blockedStaleObservations registra quantas leituras reais foram rejeitadas e é apresentado na Central de Saúde, no Laboratório e no relatório TXT do diagnóstico Bluetooth.
+
+Esse bloqueio é uma proteção de qualidade dos dados — não uma falha do veículo. Um PID antigo não prova que a condição continua presente. A ausência de hipótese também não certifica que o motor está saudável; a tela deve informar quando as evidências atuais são insuficientes. DTCs atuais lidos da ECU seguem o fluxo próprio de status, enquanto registros históricos/inativos continuam sem gerar falha atual.
+
+A janela está configurada em src/knowledge/diagnostic_rules.json. A decisão segue a abordagem explicável por evidências e leituras recentes documentada no [OBDvis](https://github.com/Joost-vanAndel/OBDvis); funcionalidades de readiness e Mode 06 de outras aplicações permanecem itens futuros e só devem ser habilitadas depois de validar a resposta real da ECU.
