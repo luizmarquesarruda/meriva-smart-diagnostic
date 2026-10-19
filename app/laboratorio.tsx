@@ -362,35 +362,48 @@ export default function LaboratorioScreen() {
       setRx(result.responses['020200'] ?? '');
       if (mode === 'REAL') {
         const existing = await readDtcs(getBasePath());
-        const matchingDtc = existing.find((item) => item.code === result.dtc);
-        if (matchingDtc) {
-          const updatedRecord: DtcRecord = {
-            ...matchingDtc,
-            freezeFrame: {
-              frame: result.frame,
-              dtc: result.dtc,
-              rpm: result.rpm,
-              coolantC: result.coolantC,
-              speedKmh: result.speedKmh,
-              engineLoadPercent: result.engineLoadPercent,
-              stftPercent: result.stftPercent,
-              ltftPercent: result.ltftPercent,
-              mapKpa: result.mapKpa,
-              intakeAirTempC: result.intakeAirTempC,
-              throttlePercent: result.throttlePercent,
-              capturedAt: result.capturedAt,
-              parameters: result.parameters.map((item) => ({
-                pid: item.pid, label: item.label, value: item.value, unit: item.unit,
-                available: item.available, ...(item.reason ? { reason: item.reason } : {}),
-              })),
-            },
-          };
-          await recordDtc(getBasePath(), updatedRecord);
-          updateAutoSaveState((state) => {
-            state.dtcs = state.dtcs.map((item) => item.code === result.dtc ? updatedRecord : item);
-          });
-          await forceSaveOnObdEvent();
-        }
+        const persistedMatch = existing.find((item) => item.code === result.dtc);
+        const stateMatch = getAutoSaveState().dtcs.find((item) => item.code === result.dtc);
+        const matchingDtc = persistedMatch ?? stateMatch;
+        const freezeFrame = {
+          frame: result.frame,
+          dtc: result.dtc,
+          rpm: result.rpm,
+          coolantC: result.coolantC,
+          speedKmh: result.speedKmh,
+          engineLoadPercent: result.engineLoadPercent,
+          stftPercent: result.stftPercent,
+          ltftPercent: result.ltftPercent,
+          mapKpa: result.mapKpa,
+          intakeAirTempC: result.intakeAirTempC,
+          throttlePercent: result.throttlePercent,
+          capturedAt: result.capturedAt,
+          parameters: result.parameters.map((item) => ({
+            pid: item.pid, label: item.label, value: item.value, unit: item.unit,
+            available: item.available, ...(item.reason ? { reason: item.reason } : {}),
+          })),
+        };
+        // The DTC associated with a freeze frame is not automatically assumed
+        // to be current. If there is no existing record, add it as historical.
+        const updatedRecord: DtcRecord = matchingDtc
+          ? { ...matchingDtc, freezeFrame }
+          : {
+              code: result.dtc,
+              description: getDtcDefinition(result.dtc)?.description,
+              status: 'HISTORICAL',
+              firstSeen: result.capturedAt,
+              lastSeen: result.capturedAt,
+              occurrences: 1,
+              source: 'REAL_OBD',
+              historical: true,
+              confirmed: false,
+              freezeFrame,
+            };
+        await recordDtc(getBasePath(), updatedRecord);
+        updateAutoSaveState((state) => {
+          state.dtcs = [...state.dtcs.filter((item) => item.code !== result.dtc), updatedRecord];
+        });
+        await forceSaveOnObdEvent();
       }
     } catch (cause) {
       setStatus('FALHA NA LEITURA DO FREEZE FRAME');
