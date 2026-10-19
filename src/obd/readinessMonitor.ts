@@ -43,12 +43,10 @@ type ExecuteCommand = (command: string) => Promise<CommandReply>;
 function monitor(
   id: string,
   label: string,
-  supportByte: number,
-  readinessByte: number,
-  mask: number,
+  supported: boolean,
+  incomplete: boolean,
 ): ReadinessMonitorItem {
-  const supported = (supportByte & mask) !== 0;
-  const complete = supported ? (readinessByte & mask) === 0 : null;
+  const complete = supported ? !incomplete : null;
   return {
     id,
     label,
@@ -73,14 +71,10 @@ export function parseReadinessMonitorResponse(rawResponse: string): ReadinessMon
   const [a, b, c, d] = [0, 2, 4, 6].map((offset) => Number.parseInt(payload.slice(offset, offset + 2), 16));
   const ignition: ReadinessIgnition = (b & 0x08) !== 0 ? 'COMPRESSION' : 'SPARK';
   const monitors: ReadinessMonitorItem[] = [
-    monitor('MISFIRE', 'Falha de combustão', b, b, 0x01),
-    monitor('FUEL_SYSTEM', 'Sistema de combustível', b, b, 0x02),
-    monitor('COMPONENTS', 'Componentes abrangentes', b, b, 0x04),
+    monitor('MISFIRE', 'Falha de combustão', (b & 0x01) !== 0, (b & 0x10) !== 0),
+    monitor('FUEL_SYSTEM', 'Sistema de combustível', (b & 0x02) !== 0, (b & 0x20) !== 0),
+    monitor('COMPONENTS', 'Componentes abrangentes', (b & 0x04) !== 0, (b & 0x40) !== 0),
   ];
-  // B bits 4-6 indicate incomplete status, while bits 0-2 indicate support.
-  monitors[0] = monitor('MISFIRE', 'Falha de combustão', b & 0x01 ? 0x01 : 0, (b & 0x10) ? 0x01 : 0, 0x01);
-  monitors[1] = monitor('FUEL_SYSTEM', 'Sistema de combustível', b & 0x02 ? 0x02 : 0, (b & 0x20) ? 0x02 : 0, 0x02);
-  monitors[2] = monitor('COMPONENTS', 'Componentes abrangentes', b & 0x04 ? 0x04 : 0, (b & 0x40) ? 0x04 : 0, 0x04);
 
   const engineSpecific = ignition === 'SPARK'
     ? [
