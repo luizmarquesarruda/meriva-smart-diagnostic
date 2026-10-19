@@ -66,9 +66,11 @@ assert.deepStrictEqual(parseDtcResponseForService('0A', '4A 01 23 00 00'), ['P01
     return {
       response: command === '020200'
         ? '42 02 00 01 30'
-        : command === '020C00'
-          ? '42 0C 00 1F 40'
-          : '42 05 00 50',
+        : command === '020000'
+          ? '42 00 00 1E 3A 80 00'
+          : command === '020C00'
+            ? '42 0C 00 1F 40'
+            : '42 05 00 50',
       status: 'OK',
       elapsedMs: 15,
     };
@@ -82,6 +84,24 @@ assert.deepStrictEqual(parseDtcResponseForService('0A', '4A 01 23 00 00'), ['P01
   assert.ok(freeze.parameters.some((item) => item.pid === '010C' && item.available), 'RPM result should be included in parameters');
   assert.ok(freezeCommands.includes('020C00'), 'the scanner should request RPM using the active frame number');
   assert.ok(freezeCommands.includes('021100'), 'the extended snapshot should include throttle position');
+
+  assert.ok(freezeCommands.includes('020000'), 'Mode 02 PID support bitmap must be read before requesting parameters');
+  const incompatibleCommands = [];
+  const noBitmap = await scanner.readFreezeFrame({}, async (command) => {
+    incompatibleCommands.push(command);
+    return {
+      response: command === '020200'
+        ? '42 02 00 01 30'
+        : command === '020000'
+          ? '42 00 01 1E 3A 80 00'
+          : 'NO DATA',
+      status: 'OK',
+      elapsedMs: 10,
+    };
+  });
+  assert.strictEqual(noBitmap.available, false, 'a support bitmap for a different frame must be rejected');
+  assert.ok(noBitmap.reason);
+  assert.strictEqual(incompatibleCommands.length, 2, 'must stop before querying PIDs when bitmap/frame validation fails');
 
   const summary = scanner.summarizeDtcScan(results);
   assert.deepStrictEqual(summary.stored, ['P0130']);
