@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { cockpitTheme } from '../src/ui/cockpitTheme';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMidLayout } from '../src/ui/midLayout';
@@ -227,12 +228,12 @@ export default function BluetoothScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b1220' },
+  container: { flex: 1, backgroundColor: cockpitTheme.background },
   content: { flexGrow: 1, width: '100%', paddingVertical: 14, paddingBottom: 28 },
   screenFrame: { width: '100%', alignSelf: 'center' },
   header: { paddingVertical: 8, marginBottom: 10 },
-  title: { color: '#f8fafc', fontSize: 25, fontWeight: '900', letterSpacing: 1 },
-  subtitle: { color: '#7db3ff', fontSize: 10, fontWeight: '900', marginTop: 3, letterSpacing: 0.8 },
+  title: { color: cockpitTheme.text, fontSize: 25, fontWeight: '900', letterSpacing: 1 },
+  subtitle: { color: cockpitTheme.accent, fontSize: 10, fontWeight: '900', marginTop: 3, letterSpacing: 0.8 },
   connectionGrid: { width: '100%' },
   connectionGridLandscape: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   connectionCardLandscape: { width: '48.5%', marginBottom: 0 },
@@ -242,9 +243,9 @@ const styles = StyleSheet.create({
   waiting: { color: '#fbbf24', fontSize: 24, fontWeight: '900', marginTop: 3 },
   detail: { color: '#cbd5e1', fontSize: 11, marginTop: 4 },
   warning: { color: '#fbbf24', fontSize: 10, fontWeight: '900', marginTop: 5 },
-  section: { color: '#7db3ff', fontSize: 10, fontWeight: '900', letterSpacing: 1, marginTop: 7, marginBottom: 7 },
-  primary: { backgroundColor: '#2563eb', borderRadius: 11, padding: 14, alignItems: 'center', marginBottom: 9 },
-  primaryText: { color: '#fff', fontSize: 11, fontWeight: '900' },
+  section: { color: cockpitTheme.accent, fontSize: 10, fontWeight: '900', letterSpacing: 1, marginTop: 7, marginBottom: 7 },
+  primary: { backgroundColor: cockpitTheme.primary, borderRadius: 11, padding: 14, alignItems: 'center', marginBottom: 9 },
+  primaryText: { color: cockpitTheme.text, fontSize: 11, fontWeight: '900' },
   disabled: { opacity: 0.45 },
   device: { backgroundColor: '#111c2e', borderRadius: 11, borderWidth: 1, borderColor: '#243652', padding: 13, marginBottom: 8 },
   selected: { borderColor: '#60a5fa', borderWidth: 2 },
