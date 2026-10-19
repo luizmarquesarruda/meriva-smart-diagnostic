@@ -17,4 +17,21 @@ assert.match(read('app/saude.tsx'), /activeDtcs/);
 assert.match(read('app/aprendizado.tsx'), /realSamples/);
 assert.match(read('app/laboratorio.tsx'), /03 \/ 07 \/ 0A/);
 assert.match(read('app/bluetooth.tsx'), /SAÚDE DO ELM327/);
+
+const navMatch = index.match(/<View\s+style={\[styles\.bottomNav,[\s\S]*?<\/View>/);
+assert.ok(navMatch, 'a navegação principal deve existir no rodapé');
+const nav = navMatch[0];
+assert.match(nav, /accessibilityRole="tablist"/);
+for (const [href, label] of [
+  ['/', 'Início'],
+  ['/laboratorio', 'Diagnóstico'],
+  ['/dados', 'Dados em tempo real'],
+  ['/viagens', 'Viagens'],
+  ['/mais', 'Mais recursos'],
+]) {
+  assert.ok(nav.includes('href="' + href + '"') && nav.includes('accessibilityLabel="' + label + '"'),
+    'atalho inferior deve existir e manter nome acessível: ' + label);
+}
+assert.doesNotMatch(nav, /bottomNavText/);
+assert.match(index, /bottomNavItem:\{[^}]*minHeight:54/);
 console.log('Cockpit e telas secundárias: OK');
