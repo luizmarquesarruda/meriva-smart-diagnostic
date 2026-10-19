@@ -371,7 +371,10 @@ async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm3
         onEcuResponding: () => setLifecycle('ECU_RESPONDING'),
         onDisconnected: (reason) => {
           disconnectedDuringAttempt = true;
-          void handleUnexpectedDisconnect(reason);
+          // A candidate is not active until ECU validation succeeds. A failed
+          // handshake must not invalidate this search generation or poison
+          // later candidates; active-session drops still use shared recovery.
+          if (active) void handleUnexpectedDisconnect(reason);
         },
       },
     );

@@ -2780,3 +2780,7 @@ A rotina de recuperação aguardava o backoff, mas só consultava `intentionalDi
 
 ### Correção da suíte de configuração Bluetooth após CI #2425
 O primeiro teste após a auditoria de concorrência falhou porque `tests/bluetoothConfig.test.js` validava três frases de comentário da implementação anterior (`cada candidato usa o limite efetivo configurado`, `20 por padrão` e `Não repetir uma nova rodada inteira`). O código de retry e geração foi refatorado, então a verificação era frágil e não demonstrava comportamento. Removidas as asserções de prosa e substituídas por verificações do fluxo finito de candidatos, do gate da geração e do erro terminal. As asserções diretas que ligam `bluetooth_config.json` a `MAX_BLUETOOTH_ATTEMPTS` e `BLUETOOTH_RETRY_INTERVAL_MS` continuam no teste.
+
+
+### Ajuste de isolamento de falha durante handshake
+A revisão do callback `onDisconnected` revelou que, antes de a ECU ser validada e `active` ser atribuída, uma queda do candidato chamava `handleUnexpectedDisconnect`, incrementando a geração global e cancelando a descoberta sequencial de outros adaptadores. Agora o callback sempre marca `disconnectedDuringAttempt`, mas só inicia recuperação global se houver uma sessão compartilhada ativa. Um candidato que cai durante o handshake é fechado/rejeitado pelo fluxo dele próprio; a pesquisa pode continuar aos demais candidatos com a mesma geração. Adicionado contrato de regressão para essa separação.

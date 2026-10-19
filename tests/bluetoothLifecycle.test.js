@@ -57,6 +57,7 @@ assert(shared.includes('const recoveryGeneration = connectionGeneration'), 'reco
 assert(shared.includes('connectionGeneration !== recoveryGeneration'), 'recovery retry must stop when a newer disconnect/request changes generation');
 assert(shared.includes('function assertConnectionAttemptCurrent'), 'connection setup must check explicit cancellation after awaits');
 assert(shared.includes('requestGeneration !== connectionGeneration'), 'stale connect attempt must not proceed to another candidate');
+assert(shared.includes('if (active) void handleUnexpectedDisconnect(reason);'), 'a disconnect during handshake must not invalidate the candidate search before any session becomes active');
 assert(shared.includes('if (connecting === attempt) connecting = null;'), 'finishing an old promise cannot erase the current connection attempt');
 assert(shared.includes('const monitorGeneration = connectionGeneration;'), 'monitor must pin its health probe to one connection generation');
 assert(shared.includes('active !== connection'), 'late keepalive/probe responses must not overwrite a disconnected/replaced session');
