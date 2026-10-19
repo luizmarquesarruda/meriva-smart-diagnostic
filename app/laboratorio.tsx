@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { cockpitTheme } from '../src/ui/cockpitTheme';
+import { CockpitScreenHeader } from '../src/ui/CockpitScreenHeader';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
@@ -494,7 +495,7 @@ export default function LaboratorioScreen() {
     <SafeAreaView style={{flex:1,backgroundColor: cockpitTheme.background}} edges={["bottom","left","right"]}>
     <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
       <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
-      <Text style={styles.title}>DIAGNÓSTICO OBD</Text>
+      <CockpitScreenHeader title="DIAGNÓSTICO OBD" subtitle="ECU • PIDs • DTC • EVIDÊNCIAS REAIS" />
       <Text style={styles.status}>{status}</Text>
       <View style={styles.connectionSummary}>
         <View style={styles.connectionItem}><Text style={styles.connectionLabel}>ELM327</Text><Text style={styles.connectionValue}>{sessionRef.current ? 'CONECTADO' : 'AGUARDANDO'}</Text></View>
