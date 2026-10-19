@@ -264,8 +264,26 @@ export default function IndexScreen() {
           {!layout.landscape && (
             <>
               <View style={styles.bottomNav}>
-                <Link href="/bluetooth" asChild><TouchableOpacity style={styles.bottomNavItem}><Text style={styles.bottomNavIcon}>🔵</Text><Text style={styles.bottomNavText}>BLUETOOTH</Text></TouchableOpacity></Link>
-                <Link href="/mais" asChild><TouchableOpacity style={styles.bottomNavItem}><Text style={styles.bottomNavIcon}>⋯</Text><Text style={styles.bottomNavText}>MAIS RECURSOS</Text></TouchableOpacity></Link>
+                <Link href="/bluetooth" asChild>
+                  <TouchableOpacity
+                    style={styles.bottomNavItem}
+                    accessibilityRole="button"
+                    accessibilityLabel="Bluetooth e conexão OBD"
+                    accessibilityHint="Abre o gerenciamento do adaptador ELM327."
+                  >
+                    <Text style={styles.bottomNavIcon}>🔵</Text>
+                  </TouchableOpacity>
+                </Link>
+                <Link href="/mais" asChild>
+                  <TouchableOpacity
+                    style={styles.bottomNavItem}
+                    accessibilityRole="button"
+                    accessibilityLabel="Mais recursos"
+                    accessibilityHint="Abre os módulos adicionais do aplicativo."
+                  >
+                    <Text style={styles.bottomNavIcon}>⋯</Text>
+                  </TouchableOpacity>
+                </Link>
               </View>
               <Text style={styles.footerStatus}>{!isHydrated ? 'CARREGANDO...' : saveStatus.obdSessionActive ? 'DIÁRIO DE BORDO • GRAVANDO' : 'DIÁRIO DE BORDO • AGUARDANDO ECU'}</Text>
             </>
@@ -289,5 +307,5 @@ const styles = StyleSheet.create({
   connectionCard:{backgroundColor:cockpitTheme.surface,borderRadius:15,borderWidth:1,borderColor:cockpitTheme.border,padding:14,marginBottom:10},chain:{flexDirection:'row',alignItems:'center',marginTop:10},chainStep:{flex:1,alignItems:'center'},chainCircle:{width:30,height:30,borderRadius:15,alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:cockpitTheme.border,backgroundColor:'#0a1727'},chainCircleOk:{borderColor:'#3b8c5a',backgroundColor:cockpitTheme.successSurface},chainCircleText:{color:cockpitTheme.muted,fontSize:11,fontWeight:'900'},chainCircleTextOk:{color:cockpitTheme.success},chainLabel:{color:'#9fb4cf',fontSize:8,fontWeight:'900',marginTop:4},chainArrow:{color:'#526a86',fontSize:24,paddingHorizontal:4},
   actionGrid:{flexDirection:'row',gap:7,marginBottom:8},actionGridLandscape:{flexDirection:'row'},actionButtonLandscape:{flex:1,minWidth:0},dashboardAction:{flex:1,minWidth:0,paddingVertical:15,paddingHorizontal:4},primaryButton:{backgroundColor:cockpitTheme.primary,borderRadius:13,padding:14,alignItems:'center'},buttonText:{color:cockpitTheme.text,fontWeight:'900',fontSize:10,textAlign:'center'},buttonSubtext:{color:'#bfdbfe',fontWeight:'800',fontSize:8,marginTop:3},secondaryButton:{backgroundColor:cockpitTheme.surface,borderRadius:13,padding:13,alignItems:'center',borderWidth:1,borderColor:cockpitTheme.border},secondaryButtonText:{color:cockpitTheme.textStrong,fontWeight:'900',fontSize:10,textAlign:'center'},buttonSubtextDark:{color:cockpitTheme.muted,fontWeight:'800',fontSize:8,marginTop:3},
   statusGrid:{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',marginBottom:2},statusGridLandscape:{flexWrap:'nowrap',gap:8},statusCardLandscape:{width:'auto',flex:1},statusCard:{width:'48%',minWidth:0,backgroundColor:cockpitTheme.surface,borderRadius:12,borderWidth:1,borderColor:cockpitTheme.border,padding:11,marginBottom:8},moreButton:{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:cockpitTheme.surface,borderRadius:14,borderWidth:1,borderColor:cockpitTheme.border,padding:13,marginTop:2},moreIcon:{color:cockpitTheme.accent,fontSize:24,fontWeight:'900'},moreBody:{flex:1,minWidth:0},moreTitle:{color:cockpitTheme.textStrong,fontSize:11,fontWeight:'900'},moreHint:{color:cockpitTheme.muted,fontSize:8,marginTop:3,flexShrink:1},moreArrow:{color:cockpitTheme.accent,fontSize:24},
-  error:{color:cockpitTheme.danger,fontWeight:'800',fontSize:10,marginTop:8},bottomNav:{flexDirection:'row',backgroundColor:cockpitTheme.surface,borderRadius:14,borderWidth:1,borderColor:cockpitTheme.border,marginTop:0,padding:3},bottomNavItem:{flex:1,alignItems:'center',paddingVertical:8,borderRadius:10},bottomNavActive:{backgroundColor:'#152a45'},bottomNavIcon:{fontSize:17,marginBottom:2},bottomNavActiveText:{color:cockpitTheme.accent,fontSize:9,fontWeight:'900'},bottomNavText:{color:'#9fb4cf',fontSize:9,fontWeight:'900'},footerStatus:{color:'#60748f',textAlign:'center',fontSize:9,marginTop:9},
+  error:{color:cockpitTheme.danger,fontWeight:'800',fontSize:10,marginTop:8},bottomNav:{flexDirection:'row',backgroundColor:cockpitTheme.surface,borderRadius:14,borderWidth:1,borderColor:cockpitTheme.border,marginTop:0,padding:3},bottomNavItem:{flex:1,minHeight:44,alignItems:'center',justifyContent:'center',paddingVertical:8,borderRadius:10},bottomNavActive:{backgroundColor:'#152a45'},bottomNavIcon:{fontSize:22},footerStatus:{color:'#60748f',textAlign:'center',fontSize:9,marginTop:9},
 });
