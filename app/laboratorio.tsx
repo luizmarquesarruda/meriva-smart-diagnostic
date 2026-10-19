@@ -641,6 +641,9 @@ export default function LaboratorioScreen() {
         {diagnostic.blockedSimulationSamples > 0 ? (
           <Text style={styles.aiWarning}>SIMULAÇÃO BLOQUEADA: {diagnostic.blockedSimulationSamples} amostra(s) não aumentaram a confiança.</Text>
         ) : null}
+        {diagnostic.blockedStaleObservations > 0 ? (
+          <Text style={styles.aiWarning}>DADOS ANTIGOS IGNORADOS: {diagnostic.blockedStaleObservations} leitura(s) REAL_OBD com mais de 10 segundos ou timestamp inválido. Atualize as leituras antes de interpretar o resultado.</Text>
+        ) : null}
         <Text style={styles.aiDisclaimer}>{diagnostic.disclaimer}</Text>
       </View>
 
