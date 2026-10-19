@@ -6,7 +6,10 @@ import { forceSaveOnObdEvent, registerObdQuery } from '../meriva/autosaveIntegra
 import { getAutoSaveState, updateAutoSaveState, initAutoSave } from '../meriva/autosaveManager';
 import { RealTripRecorder, shouldFinalizeStoppedTrip } from './tripRecorder';
 import { estimateRangeFromFuelLevel, fuelLevelPercentToLiters, isFuelReserve } from './fuelLevel';
-import { getLivePidTrend, resetLiveTelemetry } from '../obd/liveTelemetry';
+import { getLivePidTrend, resetLiveTelemetry, getVehicleConditionSnapshot } from '../obd/liveTelemetry';
+import { runLocalDiagnostic } from '../diagnostics/diagnosticEngine';
+import { recordDiagnosticFindings } from '../diagnostics/findingHistory';
+import type { PidObservation } from '../types/sourceTypes';
 import { estimateFuelRateLph, type FuelRateSource } from '../obd/fuelConsumption';
 import { startBackgroundMonitoring } from '../gps/backgroundMonitoring';
 import { readAppSettings, subscribeAppSettings } from '../database/appSettings';
@@ -73,6 +76,8 @@ class AutoTripService {
   private fuelType: FuelType = 'FLEX';
   private acquisitionProfile: AcquisitionProfile = 'STANDARD';
   private lastFuelEthanolPercent: number | null = null;
+  private lastDiagnosticHistoryQueuedAtMs = 0;
+  private diagnosticHistoryWritePending = false;
   private unsubscribeAppSettings: (() => void) | null = null;
   private state: AutoTripServiceState = { ...INITIAL_STATE };
 
@@ -122,6 +127,7 @@ class AutoTripService {
     };
     this.emit();
     this.running = true;
+    this.lastDiagnosticHistoryQueuedAtMs = 0;
     this.unsubscribeConnection = subscribeSharedObd((connection) => {
       this.transition = this.transition
         .then(() => this.applyConnection(connection))
@@ -502,6 +508,7 @@ class AutoTripService {
               ? 'CONSUMO ESTIMADO POR ' + fuelRateForDisplaySource.replace('ESTIMATED_', '')
               : null,
         });
+        this.captureDiagnosticHistoryIfDue();
       } catch (cause) {
         this.setState({
           error: cause instanceof Error ? cause.message : 'FALHA NA LEITURA AUTOMÁTICA OBD',
@@ -513,6 +520,50 @@ class AutoTripService {
       const waitMs = Math.max(150, intervalMs - elapsedMs);
       await new Promise((resolve) => setTimeout(resolve, waitMs));
     }
+  }
+
+  /**
+   * Saves diagnostic findings once per minute without awaiting disk I/O in the
+   * polling loop. Missing/old PIDs remain excluded by the local diagnostic
+   * engine; a history write failure must never interrupt OBD acquisition.
+   */
+  private captureDiagnosticHistoryIfDue(): void {
+    const now = Date.now();
+    if (
+      !this.running ||
+      this.diagnosticHistoryWritePending ||
+      now - this.lastDiagnosticHistoryQueuedAtMs < 60_000
+    ) return;
+
+    this.lastDiagnosticHistoryQueuedAtMs = now;
+    this.diagnosticHistoryWritePending = true;
+    void (async () => {
+      try {
+        const snapshot = getAutoSaveState();
+        const context = getVehicleConditionSnapshot();
+        const observations: PidObservation[] = snapshot.lastReadings.map((reading): PidObservation => ({
+          pid: reading.pid,
+          name: reading.name,
+          value: reading.value,
+          unit: reading.unit,
+          source: reading.source === 'SIMULACAO' ? 'SIMULACAO' : 'REAL_OBD',
+          timestamp: reading.timestamp,
+          confidence: reading.source === 'SIMULACAO' ? 'LOW' : 'GOOD',
+        }));
+        const result = runLocalDiagnostic({
+          observations,
+          dtcs: snapshot.dtcs,
+          condition: context.condition,
+        });
+        if (result.hypotheses.length > 0) {
+          await recordDiagnosticFindings(this.basePath, result, context.condition, new Date(now));
+        }
+      } catch {
+        // Best effort only: history cannot gate or stall ECU polling.
+      } finally {
+        this.diagnosticHistoryWritePending = false;
+      }
+    })();
   }
 
   private async ensureGpsForEcu(): Promise<void> {
