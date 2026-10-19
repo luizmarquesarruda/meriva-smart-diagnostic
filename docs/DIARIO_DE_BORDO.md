@@ -2483,3 +2483,41 @@ Após a CI, revisar o encaixe em telas Android pequenas, retrato e paisagem. Em 
 - Diagnóstico: as asserções não acompanhavam a nova navegação; não apontavam erro de execução da barra de ícones.
 - Correção: substituídas pelas verificações da barra inferior responsiva (`bottomNav`, `bottomNavLandscape`), papel de acessibilidade `tablist` e alvo mínimo de toque de 54 px.
 - Resultado da CI #2436: `android-build` foi ignorado porque `validate` falhou. A nova CI deverá validar as asserções corrigidas; a alteração continua não validada até os dois jobs passarem.
+
+
+## 2026-10-19 — Tela de abertura com progresso orientado pelo estado OBD
+
+### Problema
+O aplicativo entrava diretamente na home sem uma etapa visual de preparação, conexão e validação OBD. Uma barra apenas animada poderia sugerir progresso ou conexão confirmada sem evidência real.
+
+### Diagnóstico
+A tela inicial já é a única proprietária da conexão automática por `connectPreferredElm`. O estado de `sharedConnection` expõe as etapas Bluetooth, ELM327 e ECU; iniciar outra sessão a partir do splash poderia reintroduzir corrida e instabilidade de conexão.
+
+### Correção implementada
+- Criado `src/ui/StartupScreen.tsx` com identidade visual Meriva Smart/OBD-II, mensagem de estado, barra inferior de progresso e acessibilidade para leitores de tela.
+- Criado `src/ui/startupProgress.ts` para mapear estados reais em etapas visuais: carregamento local, Bluetooth, adaptador, ELM327, resposta da ECU e validação final.
+- `app/index.tsx` exibe a tela de abertura enquanto a mesma conexão da home é iniciada; o componente visual não abre sessão OBD.
+- A conclusão “APLICATIVO PRONTO” com ECU conectada exige o estado real `ecuConnected`, baseado na validação OBD existente. Se a conexão falhar, a home abre em modo offline sem declarar sucesso.
+- Limite de 30 segundos impede que a abertura bloqueie indefinidamente; ao expirar, a tela fecha e a tentativa já iniciada pode continuar sob o dono original da conexão.
+- Quando conexão automática está desativada, a tela conclui a preparação sem afirmar que a ECU foi validada.
+- Adicionado `tests/startupProgress.test.js` com casos de preparação, conexão em andamento, ECU validada, modo manual, falha e timeout; incluído no script `npm test`.
+- Mantidos o nome de exibição atual e o identificador Android; a alternativa “Smart OBD Diagnostic” segue sem decisão final, portanto não foi renomeado.
+
+### Arquivos
+- `app/index.tsx`
+- `src/ui/StartupScreen.tsx`
+- `src/ui/startupProgress.ts`
+- `tests/startupProgress.test.js`
+- `package.json`
+
+### Commit
+- Implementação: `97c18f2accb91fd72e63c9304217842d61e465b8`
+- Mensagem: `feat(startup): add OBD-aware launch screen and progress`
+
+### Validação
+- A alteração foi enviada à branch `feat/personal-home-navigation-20261019`, associada à PR #70.
+- A atualização do branch dispara a CI configurada para push/PR: Expo Doctor, `npm run validate` e build Android standalone.
+- Validação local não executada neste ambiente. Resultado automatizado e teste físico no aparelho Android ainda precisam ser conferidos; não declarar a implementação validada antes do término dos jobs.
+
+### Próximo passo
+Conferir o resultado integral da CI, corrigir qualquer falha antes de novo disparo e validar a abertura com o adaptador desligado, pareado sem ECU respondendo e conectado com resposta ECU real. Verificar também retrato/paisagem e que a tela não provoca reconexões repetidas.
