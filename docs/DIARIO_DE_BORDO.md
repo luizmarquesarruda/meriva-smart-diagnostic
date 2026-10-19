@@ -2479,3 +2479,11 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - **CI TypeScript/testes/Expo Doctor e build Android: pendentes** até a execução automática no GitHub Actions terminar. Não declarar sucesso antes de conferir os checks.
 - **Validação física pendente:** no Samsung, desativar Wi-Fi, manter dados móveis ligados, abrir a tela inicial e confirmar cidade/temperatura/horário; depois cortar a internet e verificar que o app permanece responsivo e que a sessão ELM327 não é interrompida.
 - Próximo passo: revisar o resultado completo da CI; corrigir qualquer falha com base no log real e repetir a execução antes de considerar a implementação validada.
+
+
+### Ajuste pós-CI — teste de navegação desatualizado
+- CI de push #2453, execução `39341868128`: `npm ci` e Expo Doctor passaram; `npm run validate` falhou em `tests/cockpitNavigation.test.js`, porque o teste antigo exigia o atalho `/saude` na tela inicial.
+- O requisito era contraditório: o mesmo teste protegia a ausência do cartão “SAÚDE DO VEÍCULO”, enquanto exigia que a rota ficasse visível no cockpit. A tela de saúde continua existindo como `app/saude.tsx`; somente o atalho redundante da tela inicial foi removido para ceder espaço ao clima.
+- Correção: o teste agora exige `/dados` e `/mais` no cockpit e verifica que o atalho para `/saude` não reapareça. Commit de teste: `11fdb41c`.
+- A compilação Android foi corretamente pulada porque `validate` falhou. CI da revisão atualizada ainda pendente; não tratar o erro como resolvido até a nova execução ficar verde.
+- Não houve falha relatada de TypeScript no trecho disponível; o erro observado foi a asserção desatualizada. Aguardando confirmação pela próxima CI.
