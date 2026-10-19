@@ -31,6 +31,6 @@ const secondaryNavigationFiles = [
   'app/testes-sensores.tsx',
 ];
 for (const file of secondaryNavigationFiles) {
-  assert.doesNotMatch(read(file), /<Link\\s+href=["']\\/["']/, file + ' não deve duplicar o botão global de página inicial');
+  assert.doesNotMatch(read(file), /<Link\s+href=["']\/["']/, file + ' não deve duplicar o botão global de página inicial');
 }
 console.log('Cockpit e telas secundárias: OK');
