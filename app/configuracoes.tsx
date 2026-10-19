@@ -254,7 +254,7 @@ export default function ConfiguracaoScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-            <Text style={styles.note}>O app aumenta o tempo quando há timeout/erro e reduz gradualmente quando as respostas ficam rápidas. O mínimo nunca pode superar o máximo.</Text>
+            <Text style={styles.note}>O app aumenta o tempo quando há timeout/erro e reduz gradualmente quando as respostas ficam rápidas. O mínimo nunca pode superar o máximo. Os novos limites entram em vigor na próxima conexão com o ELM327.</Text>
           </View>
 
           <View style={styles.card}>
