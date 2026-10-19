@@ -31,9 +31,10 @@ assert(manager.includes('bluetoothConfig.initialization.optionalCommandTimeoutMs
 assert(manager.includes('bluetoothConfig.initialization.protocolSelectionTimeoutMs'));
 
 const sharedConnection = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'sharedConnection.ts'), 'utf8');
-assert(sharedConnection.includes('cada candidato usa o limite efetivo configurado'));
-assert(sharedConnection.includes('20 por padrão'));
-assert(sharedConnection.includes('Não repetir uma nova rodada inteira'));
+// Test behavior/configuration wiring rather than prose in source comments.
+assert(sharedConnection.includes('for (const device of candidates)'), 'candidate discovery must use a finite device list');
+assert(sharedConnection.includes('assertConnectionAttemptCurrent(requestGeneration)'), 'cancelled connection generations must stop before a candidate is started');
+assert(sharedConnection.includes("throw new Error('ELM327 NÃO CONECTOU. DISPOSITIVOS TESTADOS: ' + candidates.length"), 'exhausting candidates must return a finite connection error');
 assert(!sharedConnection.includes('while (!active)'), 'sharedConnection não deve repetir rodadas infinitamente após esgotar os candidatos');
 const exporter = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'exportBluetoothDiagnosticTxt.ts'), 'utf8');
 assert(exporter.includes('readLearningProfile'));

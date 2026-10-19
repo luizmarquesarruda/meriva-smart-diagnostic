@@ -2776,3 +2776,7 @@ A rotina de recuperação aguardava o backoff, mas só consultava `intentionalDi
 - `tests/bluetoothLifecycle.test.js` verifica os contratos de geração, cancelamento, identidade da promessa e descarte de sondagens tardias.
 - CI #2424 no commit `f14c0a1`: `npm run validate` passou; o build Android ainda estava executando. O presente commit dispara uma nova CI abrangendo também as proteções de corrida.
 - A proteção é uma correção de concorrência apoiada por inspeção estática e testes. A causa exata da oscilação visual no telefone precisa de confirmação com log físico da sessão Meriva/ELM327. O teste físico continua pendente.
+
+
+### Correção da suíte de configuração Bluetooth após CI #2425
+O primeiro teste após a auditoria de concorrência falhou porque `tests/bluetoothConfig.test.js` validava três frases de comentário da implementação anterior (`cada candidato usa o limite efetivo configurado`, `20 por padrão` e `Não repetir uma nova rodada inteira`). O código de retry e geração foi refatorado, então a verificação era frágil e não demonstrava comportamento. Removidas as asserções de prosa e substituídas por verificações do fluxo finito de candidatos, do gate da geração e do erro terminal. As asserções diretas que ligam `bluetooth_config.json` a `MAX_BLUETOOTH_ATTEMPTS` e `BLUETOOTH_RETRY_INTERVAL_MS` continuam no teste.
