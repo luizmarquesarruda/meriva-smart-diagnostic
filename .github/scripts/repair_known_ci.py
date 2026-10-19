@@ -9,11 +9,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 REPAIRS = {
     "app/saude.tsx": [
-        (r";\\n  const normal", ";\n  const normal"),
+        (r";\n  const normal", ";\n  const normal"),
     ],
     "src/obd/exportBluetoothDiagnosticTxt.ts": [
-        (r"`,\\n    `LEITURAS REAL_OBD", "`,\n    `LEITURAS REAL_OBD"),
-        (r"`,\\n    `GRUPOS DE EVIDÊNCIA PID", "`,\n    `GRUPOS DE EVIDÊNCIA PID"),
+        (r"\`,\n    \`LEITURAS REAL_OBD", "\`,\n    \`LEITURAS REAL_OBD"),
+        (r"\`,\n    \`GRUPOS DE EVIDÊNCIA PID", "\`,\n    \`GRUPOS DE EVIDÊNCIA PID"),
     ],
 }
 
@@ -34,4 +34,4 @@ if changed:
     print("Applied deterministic CI repairs:")
     print("\n".join(f" - {path}" for path in changed))
 else:
-    print("No known safe automatic repair matched. No files changed.")
+    print("No known safe repair matched. No files changed.")
