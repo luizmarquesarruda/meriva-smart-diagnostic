@@ -9,6 +9,7 @@ import * as FileSystem from 'expo-file-system';
 import { autoTripService } from '../src/trip/autoTripService';
 import { requestAllRequiredPermissions } from '../src/permissions/permissionManager';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { cockpitTheme } from '../src/ui/cockpitTheme';
 
 export default function RootLayout() {
   const router = useRouter();
@@ -103,9 +104,11 @@ export default function RootLayout() {
     <SafeAreaProvider>
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: '#d9d9d9' },
-        headerTintColor: '#1557a6',
-        headerTitleStyle: { fontWeight: '900' },
+        headerStyle: { backgroundColor: cockpitTheme.background },
+        headerShadowVisible: false,
+        headerTitle: '',
+        headerTintColor: cockpitTheme.accent,
+        headerTitleStyle: { color: cockpitTheme.text, fontWeight: '900' },
         headerBackVisible: false,
         headerLeft: () => (
           <Pressable
@@ -113,18 +116,18 @@ export default function RootLayout() {
             accessibilityLabel="Página inicial"
             accessibilityHint="Volta para a tela inicial do Meriva Smart Diagnostic."
             onPress={() => router.replace('/')}
-            style={{ marginLeft: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: '#1557a6' }}
+            style={{ marginLeft: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: cockpitTheme.primary }}
           >
-            <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '800' }}>⌂ Página inicial</Text>
+            <Text style={{ color: cockpitTheme.text, fontSize: 12, fontWeight: '800' }}>⌂ Página inicial</Text>
           </Pressable>
         ),
       }}
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="bluetooth" options={{ title: 'BLUETOOTH / ECU' }} />
-      <Stack.Screen name="laboratorio" options={{ title: 'DIAGNÓSTICO OBD' }} />
-      <Stack.Screen name="armazenamento" options={{ title: 'HISTÓRICO E DADOS' }} />
-      <Stack.Screen name="configuracoes" options={{ title: 'CONFIGURAÇÕES' }} />
+      <Stack.Screen name="bluetooth" />
+      <Stack.Screen name="laboratorio" />
+      <Stack.Screen name="armazenamento" />
+      <Stack.Screen name="configuracoes" />
     </Stack>
     </SafeAreaProvider>
   );
