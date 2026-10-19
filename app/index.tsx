@@ -1,4 +1,6 @@
 import { Link, useFocusEffect } from 'expo-router';
+import { StartupScreen } from '../src/ui/StartupScreen';
+import { getStartupProgress } from '../src/ui/startupProgress';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,6 +18,8 @@ import { readAppSettings, type AppSettings } from '../src/database/appSettings';
 import { connectPreferredElm, getSharedObdConnection, getSharedObdLastError, getSharedObdStatus, subscribeSharedObd, subscribeSharedObdStatus } from '../src/obd/sharedConnection';
 import { autoTripService, type AutoTripServiceState } from '../src/trip/autoTripService';
 
+const STARTUP_TIMEOUT_MS = 30_000;
+
 export default function IndexScreen() {
   const [cycles, setCycles] = useState<DriveCycle[]>([]);
   const [, setObd] = useState<ObdConnectionState>({ connected: false });
@@ -24,6 +28,9 @@ export default function IndexScreen() {
   const [bluetoothError, setBluetoothError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<AutoSaveStatus>({ lastSavedAt: null, lastSaveReason: null, lastError: null, obdSessionActive: false });
   const [isHydrated, setIsHydrated] = useState(false);
+  const [showStartupScreen, setShowStartupScreen] = useState(true);
+  const [startupTimedOut, setStartupTimedOut] = useState(false);
+  const [startupConnectionAttempted, setStartupConnectionAttempted] = useState(false);
   const [gpsState, setGpsState] = useState<GpsTripState>(gpsTracker.getState());
   const [tripState, setTripState] = useState<AutoTripServiceState>(autoTripService.getState());
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -112,6 +119,7 @@ export default function IndexScreen() {
       }));
     });
 
+    setStartupConnectionAttempted(true);
     setBluetoothSearching(true);
     setBluetoothError(null);
     if (settings?.autoConnectObd === false) {
@@ -151,6 +159,41 @@ export default function IndexScreen() {
       unsubscribe();
     };
   }, [isHydrated, settings]);
+
+  // A tela de abertura acompanha o mesmo estado da conexão que usa a home.
+  // Ela nunca abre uma segunda sessão OBD e sempre cede ao painel em caso de demora.
+  useEffect(() => {
+    if (!showStartupScreen || startupTimedOut) return;
+    const timer = setTimeout(() => setStartupTimedOut(true), STARTUP_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [showStartupScreen, startupTimedOut]);
+
+  useEffect(() => {
+    if (!showStartupScreen || !startupTimedOut) return;
+    const timer = setTimeout(() => setShowStartupScreen(false), 1200);
+    return () => clearTimeout(timer);
+  }, [showStartupScreen, startupTimedOut]);
+
+  useEffect(() => {
+    if (!showStartupScreen || !isHydrated) return;
+
+    let closeDelayMs: number | null = null;
+    if (!settings) closeDelayMs = 1600;
+    else if (settings.autoConnectObd === false) closeDelayMs = 850;
+    else if (connectionStatus.ecuConnected) closeDelayMs = 900;
+    else if (startupConnectionAttempted && !bluetoothSearching) closeDelayMs = 1300;
+
+    if (closeDelayMs === null) return;
+    const timer = setTimeout(() => setShowStartupScreen(false), closeDelayMs);
+    return () => clearTimeout(timer);
+  }, [
+    showStartupScreen,
+    isHydrated,
+    settings?.autoConnectObd,
+    connectionStatus.ecuConnected,
+    startupConnectionAttempted,
+    bluetoothSearching,
+  ]);
 
   useFocusEffect(
     useCallback(() => {
@@ -206,6 +249,19 @@ export default function IndexScreen() {
     : coolantValue != null && coolantValue >= 110
       ? 'ATENÇÃO'
       : coolantValue != null ? 'LEITURA REAL • PID 0105' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0105' : 'ECU DESCONECTADA';
+
+  const startupProgress = getStartupProgress({
+    hydrated: isHydrated,
+    settingsLoaded: settings !== null,
+    autoConnect: settings?.autoConnectObd !== false,
+    searching: bluetoothSearching,
+    ecuConnected: connectionStatus.ecuConnected,
+    lifecycle: connectionStatus.lifecycle,
+    error: bluetoothError,
+    timedOut: startupTimedOut,
+  });
+
+  if (showStartupScreen) return <StartupScreen progress={startupProgress} />;
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
