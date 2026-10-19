@@ -47,7 +47,7 @@ jobs:
   auto-repair:
     # Apply only narrowly-scoped deterministic repairs after a failed CI on a
     # working branch. Unknown failures are reported in the job log, not guessed at.
-    if: ${{ always() && github.event_name == 'push' && github.ref != 'refs/heads/main' && (needs.validate.result == 'failure' || needs.android-build.result == 'failure') }}
+    if: ${{ always() && contains(fromJSON('["push","workflow_dispatch"]'), github.event_name) && github.ref != 'refs/heads/main' && (needs.validate.result == 'failure' || needs.android-build.result == 'failure') }}
     needs: [validate, android-build]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -73,6 +73,11 @@ jobs:
           git add app/saude.tsx src/obd/exportBluetoothDiagnosticTxt.ts
           git commit -m "ci: apply deterministic repair after failed validation"
           git push origin "HEAD:${{ github.ref_name }}"
+      - name: Re-run CI after automatic repair
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run CI --ref "${{ github.ref_name }}"
 
   android-build:
     runs-on: ubuntu-24.04
