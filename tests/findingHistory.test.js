@@ -57,14 +57,18 @@ function result(id = 'MISTURA_POBRE', score = 0.45) {
   let entries = await recordDiagnosticFindings(basePath, result(), 'IDLE_WARM', start);
   assert.strictEqual(entries.length, 1);
   assert.strictEqual(entries[0].observations, 1);
+  assert.strictEqual(entries[0].timeline.length, 1, 'each finding episode begins with one trend point');
 
   entries = await recordDiagnosticFindings(basePath, result('MISTURA_POBRE', 0.5), 'IDLE_WARM', new Date(start.getTime() + 30000));
   assert.strictEqual(entries.length, 1, 'same finding in same context within five minutes is merged');
   assert.strictEqual(entries[0].observations, 1, 'sub-minute polling must not inflate observation counts');
+  assert.strictEqual(entries[0].timeline.length, 1, 'sub-minute samples must not add duplicate trend points');
 
   entries = await recordDiagnosticFindings(basePath, result('MISTURA_POBRE', 0.55), 'IDLE_WARM', new Date(start.getTime() + 90000));
   assert.strictEqual(entries[0].observations, 2, 'a sustained finding may be counted once per minute');
   assert.strictEqual(entries[0].score, 0.55);
+  assert.strictEqual(entries[0].timeline.length, 2, 'a one-minute observation appends a trend point');
+  assert.strictEqual(entries[0].timeline[1].score, 0.55);
 
   entries = await recordDiagnosticFindings(basePath, result(), 'IDLE_WARM', new Date(start.getTime() + 7 * 60000));
   assert.strictEqual(entries.length, 2, 'a finding after the active episode window starts a new episode');
@@ -76,6 +80,7 @@ function result(id = 'MISTURA_POBRE', score = 0.45) {
   assert.ok(txtPath, 'a daily text history file should be created');
   assert.ok(memory.get(txtPath).includes('OBSERVAÇÕES REGISTRADAS'));
   assert.ok(memory.get(txtPath).includes('PRIMEIRA OBSERVAÇÃO UTC'));
+  assert.ok(memory.get(txtPath).includes('TENDÊNCIA '), 'daily TXT should include sampled score trend points');
   console.log('Diagnostic finding history: PASS');
 })().catch((error) => {
   console.error(error);
