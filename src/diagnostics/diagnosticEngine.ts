@@ -5,7 +5,7 @@ import sensorTestCatalogJson from '../knowledge/sensor_tests.json';
 export interface DiagnosticInput { observations: PidObservation[]; dtcs?: DtcRecord[]; condition?: VehicleCondition; }
 export interface DiagnosticEvidence { ruleId: string; text: string; source: 'DTC' | 'PID'; pid?: string; dtc?: string; value?: number; }
 export interface DiagnosticHypothesis { id: string; label: string; score: number; confidence: 'LOW' | 'MEDIUM' | 'HIGH'; evidence: DiagnosticEvidence[]; nextTests: string[]; }
-export interface DiagnosticResult { engine: 'LOCAL_EVIDENCE_ENGINE'; version: 2; generatedAt: string; hypotheses: DiagnosticHypothesis[]; blockedSimulationSamples: number; blockedStaleObservations: number; blockedNonLiveDtcs: number; disclaimer: string; }
+export interface DiagnosticResult { engine: 'LOCAL_EVIDENCE_ENGINE'; version: 2; generatedAt: string; hypotheses: DiagnosticHypothesis[]; blockedSimulationSamples: number; blockedStaleObservations: number; freshDiagnosticEvidenceGroups: number; blockedNonLiveDtcs: number; disclaimer: string; }
 
 interface Rule { id: string; trigger: { dtc?: string; combinedTrimMin?: number; combinedTrimMax?: number; condition?: VehicleCondition; mapMinKpa?: number; }; hypothesis: string; baseScore: number; tests: string[]; }
 
@@ -61,6 +61,9 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
   const blockedStaleObservations = rawObservations.filter((item) =>
     isLiveObd(item) && item.value != null && Number.isFinite(item.value) && !isFreshLiveObservation(item, nowMs),
   ).length;
+  const freshPids = new Set(observations.map((item) => item.pid.replace(/\\s/g, '').toUpperCase()));
+  const freshDiagnosticEvidenceGroups = Number(freshPids.has('0106') && freshPids.has('0107'))
+    + Number(freshPids.has('010B'));
   const rawDtcs = input.dtcs ?? [];
   const liveDtcs = rawDtcs.filter((item) =>
     String(item.source ?? '').trim().toUpperCase() === 'REAL_OBD'
