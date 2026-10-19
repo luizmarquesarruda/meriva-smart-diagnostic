@@ -2659,5 +2659,18 @@ Implementar os quatro itens priorizados na pesquisa de aplicações OBD-II e sub
 - **Teste físico pendente:** confirmar no Meriva/ELM327 a resposta de PID 0101, bitmap de Mode 02 e parâmetros do quadro. Adaptadores/ECUs que não exponham o bitmap de freeze frame serão marcados como indisponíveis; não se consultam PIDs às cegas.
 - Readiness incompleto não confirma componente defeituoso, MIL apagada não garante motor saudável e médias de telemetria esparsa não equivalem a médias instantâneas contínuas.
 
+### Commits principais desta implementação
+- `ca38bd3d` — decodificação de prontidão com bit C4 de interpretação neutra.
+- `665af271` — interpretação compartilhada do PID 0101 pelo parser.
+- `8312b1e0` — freeze frame Mode 02 com bitmap de suporte, verificação do quadro e valores expandidos.
+- `7e3c6527`, `181fda2b` — persistência do freeze frame e extensão do tipo DTC.
+- `794e4592`, `f13a5074`, `a0d3841d` — interface do Laboratório: prontidão, freeze frame sob demanda e seletor de PIDs.
+- `285400ce`, `31b7dce3` — estatísticas de viagem e rótulo de RPM máximo amostrado.
+- `52b868ee`, `14724b52`, `f88ecf24` — série temporal do score, agrupamento por minuto e sparkline na Central de Saúde.
+- `0e4bbedb`, `85c1e8a0` — captura de evidências pela aquisição automática e tela de histórico.
+- `24e897f1`, `3eac2309`, `8e330248`, `b6f02959`, `f908c2d3`, `4fd08a96` — regressões de prontidão, freeze frame, persistência DTC, resumo, histórico e integração.
+- `e3a03676` — inclusão dos novos testes no script `npm test`.
+- `ba0d26e2`, `2b564474`, `e39d413d` — documentação de README e Diário de Bordo.
+
 ### Resultado e próximo passo
 P1–P4 e o seletor de PID foram integrados ao branch de trabalho, com cobertura de regressão adicionada e sem alterar main nem disparar CI. Próxima etapa: executar npm run validate, revisar qualquer falha por logs concretos e então validar o build Android. Após isso, testar no carro parado cada leitura Mode 01/02 e a consulta manual antes de considerar a função concluída no veículo real.
