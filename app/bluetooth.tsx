@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { cockpitTheme } from '../src/ui/cockpitTheme';
+import { CockpitScreenHeader } from '../src/ui/CockpitScreenHeader';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMidLayout } from '../src/ui/midLayout';
@@ -140,10 +141,7 @@ export default function BluetoothScreen() {
     <SafeAreaView style={styles.container} edges={["bottom","left","right"]}>
       <ScrollView contentContainerStyle={[styles.content,{paddingHorizontal:layout.horizontalPadding}]} showsHorizontalScrollIndicator={false}>
         <View style={[styles.screenFrame,{maxWidth:layout.maxContentWidth}]}>
-        <View style={styles.header}>
-          <Text style={styles.title}>BLUETOOTH</Text>
-          <Text style={styles.subtitle}>ELM327 • BLUETOOTH CLASSIC</Text>
-        </View>
+        <CockpitScreenHeader title="BLUETOOTH" subtitle="ELM327 • BLUETOOTH CLASSIC" />
 
         <View style={[styles.connectionGrid, layout.landscape && styles.connectionGridLandscape]}>
           <View style={[styles.connectionCard, layout.landscape && styles.connectionCardLandscape]}>
@@ -229,7 +227,7 @@ export default function BluetoothScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: cockpitTheme.background },
-  content: { flexGrow: 1, width: '100%', paddingVertical: 14, paddingBottom: 28 },
+  content: { flexGrow: 1, width: '100%', paddingVertical: 14, paddingBottom: 30 },
   screenFrame: { width: '100%', alignSelf: 'center' },
   header: { paddingVertical: 8, marginBottom: 10 },
   title: { color: cockpitTheme.text, fontSize: 25, fontWeight: '900', letterSpacing: 1 },
