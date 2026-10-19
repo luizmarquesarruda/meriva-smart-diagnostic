@@ -2495,3 +2495,30 @@ O Stack global do Expo Router já centraliza os cabeçalhos das rotas, mas o bot
 
 ### Próximo passo
 Após autorização explícita para CI, executar `npm run validate` e confirmar também o job `android-build`. Depois verificar visualmente em aparelho que o botão superior não sobrepõe o título em retrato/paisagem e que todas as rotas secundárias retornam ao cockpit.
+
+
+## 2026-10-18 — Cockpit: barra inferior somente com ícones
+
+### Problema
+A barra inferior do cockpit exibia legendas de texto que ocupavam espaço e deixavam os controles visualmente carregados.
+
+### Diagnóstico
+Os dois destinos da barra inferior são navegação para Bluetooth/ECU e Mais Recursos. As legendas visuais não são necessárias se os controles mantiverem nomes acessíveis para leitores de tela.
+
+### Correção
+- Removidas as legendas visuais “BLUETOOTH” e “MAIS RECURSOS”; os botões mostram apenas os ícones.
+- Aumentado o ícone para 22 pontos e garantida área mínima de toque de 44 pontos.
+- Preservados os destinos, os estilos da barra e os rótulos/dicas de acessibilidade.
+- Acrescentadas asserções estáticas em `tests/cockpitNavigation.test.js` para impedir o retorno das legendas e verificar a acessibilidade.
+
+### Testes
+- Revisão estática do JSX e dos estilos: confirma que a barra contém apenas ícones e que os rótulos continuam em `accessibilityLabel`.
+- Teste automatizado, typecheck e build Android: **não executados nesta etapa**; não afirmar sucesso sem execução.
+
+### Commit e CI
+- Implementação: commit na branch `ux/secondary-pages-home-button-20261018` (mensagem `style(cockpit): make bottom navigation icon-only [skip ci]`).
+- Teste de regressão: `fd9138a0bf9f3a7d3ce7baa4cbf128088a840fb8`.
+- CI: **não disparada**, conforme orientação.
+
+### Resultado e próximo passo
+A barra inferior fica mais limpa, com apenas os botões de ícone, mantendo acessibilidade e navegação. Antes de integrar, executar a suíte de testes e validar visualmente em Android, incluindo tamanhos de fonte e orientação da tela.
