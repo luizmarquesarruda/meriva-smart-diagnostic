@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { cockpitTheme } from '../src/ui/cockpitTheme';
+import { CockpitScreenHeader } from '../src/ui/CockpitScreenHeader';
 import { Link } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -50,9 +51,7 @@ export default function ViagensScreen() {
     <ScrollView contentContainerStyle={[s.content,{paddingHorizontal:layout.horizontalPadding}]} showsVerticalScrollIndicator={false}>
       <View style={[s.frame,{maxWidth:layout.maxContentWidth}]}>
         {selected ? <TripDetails cycle={selected} onBack={() => setSelectedId(null)} /> : <>
-          <Text style={s.eyebrow}>MERIVA SMART DIAGNOSTIC</Text>
-          <Text style={s.title}>RELATÓRIO DE VIAGENS</Text>
-          <Text style={s.subtitle}>HISTÓRICO REAL • SESSÕES INDEPENDENTES • DADOS AUDITÁVEIS</Text>
+          <CockpitScreenHeader eyebrow="MERIVA SMART DIAGNOSTIC" title="RELATÓRIO DE VIAGENS" subtitle="HISTÓRICO REAL • SESSÕES INDEPENDENTES • DADOS AUDITÁVEIS" />
           <View style={s.grid}>
             <Metric l="VIAGENS" v={String(visible.length)} />
             <Metric l="DISTÂNCIA TOTAL" v={mv(summary.totalDistanceKm,'km')} />
@@ -114,9 +113,7 @@ function TripDetails({cycle,onBack}:{cycle:DriveCycle;onBack:()=>void}) {
   const totalSeconds = durationSeconds(cycle.totalTimeHms);
   return <>
     <TouchableOpacity style={s.backInline} onPress={onBack}><Text style={s.backText}>← VOLTAR AO HISTÓRICO</Text></TouchableOpacity>
-    <Text style={s.eyebrow}>RELATÓRIO INDIVIDUAL</Text>
-    <Text style={s.title}>DETALHES DA VIAGEM</Text>
-    <Text style={s.subtitle}>{dateLabel(cycle.startedAt)}</Text>
+    <CockpitScreenHeader eyebrow="RELATÓRIO INDIVIDUAL" title="DETALHES DA VIAGEM" subtitle={dateLabel(cycle.startedAt)} />
     <View style={s.hero}>
       <Text style={s.heroLabel}>DISTÂNCIA REGISTRADA</Text>
       <Text style={s.heroValue}>{mv(n(cycle.distanceTotalKm),'km',2)}</Text>
