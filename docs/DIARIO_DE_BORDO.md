@@ -2569,3 +2569,32 @@ A barra inferior fica mais limpa, com apenas os botões de ícone, mantendo aces
 ### Resultado e próximo passo
 - As configurações agora permitem escolher entre a cadência atual e uma alternativa conservadora que favorece a responsividade das métricas principais reduzindo consultas auxiliares. Os limites do Adaptive Timing ficam explícitos e coerentes; a escolha de tentativas não excede o limite persistido.
 - Próximo passo: executar `npm run validate`, Expo Doctor e build Android somente após autorização de CI, revisar qualquer falha pelo log, e comparar no veículo parado a frequência/latência das métricas nos dois perfis. Reverter para `STANDARD` se a captura de amostras auxiliares for insuficiente.
+
+
+## 2026-10-18 — Motor diagnóstico: bloqueio de leituras PID obsoletas
+
+### Problema
+O motor local selecionava a última observação REAL_OBD por PID, mas não exigia que o timestamp ainda estivesse dentro de uma janela recente. Como as leituras do autosave persistem entre sessões, um valor antigo poderia alimentar uma hipótese como se ainda representasse o estado atual do motor.
+
+### Referências e diagnóstico
+- O [OBDvis](https://github.com/Joost-vanAndel/OBDvis) descreve diagnósticos por janelas temporais, amostras recentes, confiança explícita e exclusão de leituras obsoletas; dados ausentes devem aparecer como limitação, não como estado saudável presumido.
+- O [OBD Auto Doctor](https://www.obdautodoctor.com/features/) demonstra dados de sensores, estatísticas e readiness monitors, com disponibilidade dependente do veículo.
+- O [Torque Pro](https://play.google.com/store/apps/details?id=org.prowl.torque) oferece telemetria em tempo real e registro com contexto GPS. Esses recursos inspiram a organização do produto; não provam suporte a qualquer PID específico na Meriva.
+- O código anterior filtrava SIMULAÇÃO, mas pidValue() não aplicava limite de idade. A telemetria contextual já usava 10 segundos como limite de atualidade, então adotar o mesmo padrão reduz divergência entre contexto e diagnóstico.
+
+### Correção aplicada na branch ux/secondary-pages-home-button-20261018
+- src/knowledge/diagnostic_rules.json: versão 3; janela de atualidade padrão de 10.000 ms e tolerância de timestamp futuro de 1.000 ms.
+- src/diagnostics/diagnosticEngine.ts: ignora PIDs sem valor numérico finito, de fonte diferente de REAL_OBD, timestamp inválido, antigos além da janela ou com timestamp muito à frente do relógio; mantém a filtragem de DTC ativo separada. O contrato do motor passa para versão 2 e inclui blockedStaleObservations.
+- app/saude.tsx e app/laboratorio.tsx: mostram alerta quando as leituras reais antigas foram descartadas.
+- src/obd/exportBluetoothDiagnosticTxt.ts: registra a quantidade de leituras obsoletas bloqueadas no relatório exportado.
+- tests/diagnosticEngine.test.js: adicionados casos para leituras recentes e duas leituras de mistura com 60 segundos de idade.
+- tests/knowledgeJson.test.js: verifica a versão e os limites da política.
+
+### Validação e limites
+- Revisão estática confirmou as alterações propostas nos arquivos e o JSON de política é parseável.
+- Os testes foram atualizados, mas **não foram executados** nesta rodada. TypeScript, npm run validate, Expo Doctor, build Android e teste físico seguem pendentes.
+- A CI **não foi disparada**; todos os commits desta rodada usam [skip ci]. Não houve merge para main.
+- A janela de 10 segundos é uma política conservadora local, não uma especificação Chevrolet. Ela poderá ser ajustada depois de medir a cadência real dos PIDs na Meriva; não deve ser usada para apagar ou reclassificar DTCs armazenados.
+
+### Resultado e próximo passo
+O motor deixa de usar PIDs numéricos antigos para gerar hipóteses atuais e passa a expor a quantidade de leituras bloqueadas. Próximas opções pesquisadas: readiness monitors (Mode 01 PID 01), detalhamento de freeze frame e resumo pós-viagem com picos e ocorrências. Antes de implementar consultas adicionais, confirmar o suporte da ECU e manter a fila ELM327 serial.
