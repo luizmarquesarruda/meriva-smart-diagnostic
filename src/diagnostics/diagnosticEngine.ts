@@ -39,8 +39,9 @@ function isFreshLiveObservation(item: PidObservation, nowMs: number): boolean {
 }
 
 function pidValue(observations: PidObservation[], pid: string): PidObservation | undefined {
+  const targetPid = pid.replace(/\s/g, '').toUpperCase();
   return observations
-    .filter((item) => item.pid.toUpperCase() === pid.toUpperCase() && item.value !== null && Number.isFinite(item.value) && isLiveObd(item))
+    .filter((item) => item.pid.replace(/\s/g, '').toUpperCase() === targetPid && item.value !== null && Number.isFinite(item.value) && isLiveObd(item))
     .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))[0];
 }
 
