@@ -2450,3 +2450,27 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Nova CI solicitada pela atualização da branch; confirmar resultado integral, inclusive testes restantes e build Android.
 - Teste físico do ELM327 no veículo continua pendente.
 
+
+
+## 2026-10-19 — Primeira etapa de simplificação da tela inicial para uso pessoal
+
+### Objetivo
+Aplicar recomendações de usabilidade à home do Meriva Smart Diagnostic, ferramenta de uso pessoal e não comercial.
+
+### Diagnóstico
+A home tinha três atalhos textuais no meio da tela e dois atalhos no rodapé. A navegação ficava dividida entre duas áreas. Os indicadores úteis já existentes — status da ECU, telemetria rotativa, consumo, autonomia, temperatura e falhas — devem ser preservados.
+
+### Correção
+- app/index.tsx: removida a grade intermediária de atalhos duplicados.
+- A barra inferior passou a apresentar cinco destinos: Início, Diagnóstico, Dados em tempo real, Viagens e Mais Recursos.
+- O rodapé exibe somente ícones, sem legendas visíveis. Cada destino mantém nome de acessibilidade, papel de aba e estado selecionado.
+- Área mínima de toque de 54 px, distribuição igualitária e suporte a retrato e paisagem.
+- Mantido o acesso à central de saúde. Não foram adicionados cadastro, publicidade, analytics ou funções comerciais.
+
+### Testes e validação
+- tests/cockpitNavigation.test.js: ampliado para verificar os cinco destinos, acessibilidade e ausência de legenda visível na barra.
+- O push da branch dispara a CI. A etapa só será considerada validada quando validate e android-build terminarem com sucesso.
+- A conferência visual em aparelho Android ainda está pendente.
+
+### Próximo passo
+Após a CI, revisar o encaixe em telas Android pequenas, retrato e paisagem. Em seguida harmonizar os títulos no topo das telas secundárias sem alterar o conteúdo diagnóstico.
