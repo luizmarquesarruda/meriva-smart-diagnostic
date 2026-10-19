@@ -2682,3 +2682,8 @@ Implementar os quatro itens priorizados na pesquisa de aplicações OBD-II e sub
 
 ### Resultado e próximo passo
 P1–P4 e o seletor de PID foram integrados ao branch de trabalho, com cobertura de regressão adicionada e sem alterar main nem disparar CI. Próxima etapa: executar npm run validate, revisar qualquer falha por logs concretos e então validar o build Android. Após isso, testar no carro parado cada leitura Mode 01/02 e a consulta manual antes de considerar a função concluída no veículo real.
+
+
+## 2026-10-19 — Solicitação de execução da CI para P1–P4
+
+A pedido do usuário, foi solicitada a execução da CI para validar as alterações de prontidão Mode 01, freeze frame Mode 02, resumo técnico por viagem, histórico temporal de evidências e seletor manual de PID. Este commit intencionalmente **não** usa `[skip ci]`, para que o gatilho `push` definido em `.github/workflows/ci.yml` execute os jobs `validate` e `android-build`. Resultado e conclusão dos jobs devem ser registrados após a consulta ao GitHub Actions; não presumir sucesso antes do término.
