@@ -14,9 +14,9 @@ export interface TripTelemetrySummary {
   coolant: TelemetryMetricSummary | null;
 }
 
-function summarize(values: Array<number | null | undefined>): TelemetryMetricSummary | null {
+function summarize(values: Array<number | null | undefined>, allowNegative = false): TelemetryMetricSummary | null {
   const valid = values.filter((value): value is number =>
-    value != null && Number.isFinite(value) && value >= 0,
+    value != null && Number.isFinite(value) && (allowNegative || value >= 0),
   );
   if (!valid.length) return null;
   return {
@@ -37,6 +37,6 @@ export function summarizeTripTelemetry(samples: TripTelemetrySample[] | null | u
     sampleCount: data.length,
     speed: summarize(data.map((item) => item.speedKmh)),
     rpm: summarize(data.map((item) => item.rpm)),
-    coolant: summarize(data.map((item) => item.coolantTempC)),
+    coolant: summarize(data.map((item) => item.coolantTempC), true),
   };
 }
