@@ -61,7 +61,7 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
   const blockedStaleObservations = rawObservations.filter((item) =>
     isLiveObd(item) && item.value != null && Number.isFinite(item.value) && !isFreshLiveObservation(item, nowMs),
   ).length;
-  const freshPids = new Set(observations.map((item) => item.pid.replace(/\\s/g, '').toUpperCase()));
+  const freshPids = new Set(observations.map((item) => item.pid.replace(/\s/g, '').toUpperCase()));
   const freshDiagnosticEvidenceGroups = Number(freshPids.has('0106') && freshPids.has('0107'))
     + Number(freshPids.has('010B'));
   const rawDtcs = input.dtcs ?? [];
