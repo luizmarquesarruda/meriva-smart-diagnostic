@@ -41,4 +41,9 @@ for (const file of secondaryNavigationFiles) {
 }
 assert.match(read('src/ui/CockpitScreenHeader.tsx'), /accessibilityRole="header"/);
 assert.match(read('src/ui/cockpitTheme.ts'), /background: '#07111f'/);
+const dashboard = read('app/index.tsx');
+assert.match(dashboard, /accessibilityLabel="Bluetooth e conexão OBD"/, 'botão Bluetooth deve continuar acessível sem legenda visual');
+assert.match(dashboard, /accessibilityLabel="Mais recursos"/, 'botão Mais Recursos deve continuar acessível sem legenda visual');
+assert.match(dashboard, /bottomNavIcon:\s*\{fontSize:\s*22\}/, 'botões inferiores devem usar ícones maiores');
+assert.doesNotMatch(dashboard, /bottomNavText|bottomNavActiveText/, 'a barra inferior não deve renderizar legendas visíveis');
 console.log('Cockpit e telas secundárias: OK');
