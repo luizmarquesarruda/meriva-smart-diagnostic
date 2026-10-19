@@ -8,7 +8,7 @@ import { useMidLayout } from '../src/ui/midLayout';
 import { getAutoSaveState } from '../src/meriva/autosaveManager';
 import { runLocalDiagnostic, type DiagnosticResult } from '../src/diagnostics/diagnosticEngine';
 import type { PidObservation } from '../src/types/sourceTypes';
-import { getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
+import { getVehicleConditionSnapshot, formatSparkline } from '../src/obd/liveTelemetry';
 import { getDtcDefinition } from '../src/obd/dtcDefinition';
 import * as FileSystem from 'expo-file-system';
 import { readRecentDiagnosticFindings, type DiagnosticFindingHistoryEntry } from '../src/diagnostics/findingHistory';
@@ -66,6 +66,7 @@ export default function SaudeScreen() {
         <Text style={styles.detail}>PRIMEIRA: {new Date(entry.firstSeenAt).toLocaleString()} (UTC {entry.firstSeenAt})</Text>
         <Text style={styles.detail}>ÚLTIMA: {new Date(entry.lastSeenAt).toLocaleString()} (UTC {entry.lastSeenAt})</Text>
         <Text style={styles.detail}>FONTES: {entry.sources.join(', ') || 'N/D'}</Text>
+        <Text style={styles.detail}>TENDÊNCIA DO SCORE: {entry.timeline.length ? formatSparkline(entry.timeline.map((point) => point.score)) : 'N/D'} • {entry.timeline.length} ponto(s) temporal(is)</Text>
         {entry.evidence.slice(0, 4).map((e, i) => <Text key={entry.id + '-e-' + i} style={styles.evidence}>• {e.text}</Text>)}
         {entry.nextTests.slice(0, 3).map((item, i) => <Text key={entry.id + '-t-' + i} style={styles.next}>→ {item}</Text>)}
       </View>
