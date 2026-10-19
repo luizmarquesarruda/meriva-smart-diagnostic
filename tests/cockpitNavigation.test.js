@@ -46,4 +46,19 @@ assert.match(dashboard, /accessibilityLabel="Bluetooth e conexão OBD"/, 'botão
 assert.match(dashboard, /accessibilityLabel="Mais recursos"/, 'botão Mais Recursos deve continuar acessível sem legenda visual');
 assert.match(dashboard, /bottomNavIcon:\s*\{fontSize:\s*22\}/, 'botões inferiores devem usar ícones maiores');
 assert.doesNotMatch(dashboard, /bottomNavText|bottomNavActiveText/, 'a barra inferior não deve renderizar legendas visíveis');
+
+const homeDashboard = read('app/index.tsx');
+assert.doesNotMatch(homeDashboard, /SAÚDE DO VEÍCULO|ABRIR CENTRAL DE SAÚDE|styles\.healthCard/, 'a home não deve duplicar a Central de Saúde');
+assert.doesNotMatch(homeDashboard, /styles\.actionGrid/, 'as ações principais devem ficar na navegação inferior');
+const bottomNavStart = homeDashboard.indexOf('<View style={styles.bottomNav}>');
+const footerStart = homeDashboard.indexOf('<Text style={styles.footerStatus}', bottomNavStart);
+assert.ok(bottomNavStart >= 0 && footerStart > bottomNavStart, 'a barra inferior deve existir antes do status');
+const bottomNav = homeDashboard.slice(bottomNavStart, footerStart);
+assert.equal((bottomNav.match(/<Link href=/g) || []).length, 6, 'a barra inferior deve conter seis destinos');
+assert.ok(!homeDashboard.slice(Math.max(0, bottomNavStart - 80), bottomNavStart).includes('!layout.landscape'), 'a navegação inferior deve continuar disponível em paisagem');
+for (const label of ['Resumo inicial', 'Bluetooth e conexão OBD', 'Diagnóstico OBD', 'Viagens', 'Dados e telemetria', 'Mais recursos']) {
+  assert.ok(bottomNav.includes('accessibilityLabel="' + label + '"'), 'botão deve ter rótulo acessível: ' + label);
+}
+assert.doesNotMatch(bottomNav, /bottomNavText|>\s*(RESUMO|BLUETOOTH|DIAGNÓSTICO|VIAGENS|DADOS|MAIS RECURSOS)\s*</, 'a barra inferior deve mostrar somente ícones');
+
 console.log('Cockpit e telas secundárias: OK');

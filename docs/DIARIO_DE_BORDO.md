@@ -2790,3 +2790,29 @@ A revisão do callback `onDisconnected` revelou que, antes de a ECU ser validada
 - `npm ci` advertia que `@xmldom/xmldom@0.7.13` está descontinuado e contém problemas críticos. A árvore mostrou que a cópia vinha de `@expo/plist@0.1.3`, dependência do Expo SDK 51; outra dependência `plist@3.1.1` já usava a versão corrigida `0.9.12`.
 - Aplicado override restrito a `@expo/plist -> @xmldom/xmldom@0.9.12`; Expo SDK e demais dependências não foram atualizados. O lockfile reaproveita a URL e integridade da versão `0.9.12` já presente e testada pela árvore.
 - A compatibilidade só será considerada confirmada se `npm ci`, Expo Doctor, prebuild limpo e APK Android terminarem com sucesso na CI #2428. Se falhar, o erro será investigado e não se manterá o override só para ocultar o aviso.
+
+
+## 2026-10-19 — Simplificação da home e navegação inferior acessível
+
+### Problema e diagnóstico
+A home ainda repetia a Central de Saúde em um cartão próprio, apesar de os DTCs já serem resumidos no cockpit e existir a rota dedicada `/saude`. Também dividia as ações entre três botões grandes no meio da tela e dois ícones na barra inferior, sem uma navegação global consistente.
+
+### Correções nesta branch
+- Removido da home o cartão “SAÚDE DO VEÍCULO”; a tela dedicada `/saude` permanece disponível por Mais Recursos, e o resumo de falhas ativas continua no cockpit.
+- Consolidada a navegação em seis alvos inferiores: Resumo, Bluetooth/OBD, Diagnóstico, Viagens, Dados e Mais Recursos.
+- Removidas as legendas visuais da barra inferior; cada botão mantém `accessibilityRole`, `accessibilityLabel` e `accessibilityHint`.
+- A navegação fica disponível em retrato e paisagem; cada botão tem área mínima de 48 pontos e ocupa uma das seis colunas flexíveis.
+- Adicionadas regressões para impedir o retorno do cartão de saúde, dos botões duplicados e das legendas visíveis, e para exigir os seis destinos acessíveis.
+
+### Arquivos afetados
+- `app/index.tsx`
+- `tests/cockpitNavigation.test.js`
+- `docs/DIARIO_DE_BORDO.md`
+
+### Validação
+- CI de referência antes desta alteração: run #2428, commit `b7aa841`, conclusão `success`.
+- Esta alteração ainda precisa da CI automática da branch. Typecheck, suíte completa e build Android não são declarados como aprovados até o novo run terminar.
+- A verificação física/visual em Android e o teste de conexão com o ELM327 permanecem pendentes.
+
+### Próximo passo
+Acompanhar a CI desta alteração; se falhar, ler os logs, corrigir a causa comprovada e validar novamente antes de considerar a rodada concluída.
