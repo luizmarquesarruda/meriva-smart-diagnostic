@@ -46,7 +46,14 @@ export default function ConfiguracaoScreen() {
 
   async function updateSetting<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
     if (!storageBase || !settings) return;
-    const next = { ...settings, [key]: value };
+    const next: AppSettings = { ...settings, [key]: value };
+    // Keep the adaptive timeout bounds valid when either limit is changed.
+    if (key === 'elmAdaptiveTimeoutMinMs' && typeof value === 'number') {
+      next.elmAdaptiveTimeoutMaxMs = Math.max(next.elmAdaptiveTimeoutMaxMs, value);
+    }
+    if (key === 'elmAdaptiveTimeoutMaxMs' && typeof value === 'number') {
+      next.elmAdaptiveTimeoutMinMs = Math.min(next.elmAdaptiveTimeoutMinMs, value);
+    }
     setSettings(next);
     try {
       await writeAppSettings(storageBase, next);
@@ -158,6 +165,30 @@ export default function ConfiguracaoScreen() {
           <SettingSwitch label="Inicialização forçada do ELM (ATZ + ATE0)" value={settings.elmForceInitialization} onChange={(v) => void updateSetting('elmForceInitialization', v)} />
           <SettingSwitch label="Alertas de diagnóstico" value={settings.diagnosticAlerts} onChange={(v) => void updateSetting('diagnosticAlerts', v)} />
 
+          <Text style={styles.section}>AQUISIÇÃO E DESEMPENHO</Text>
+          <View style={styles.card}>
+            <Text style={styles.label}>Perfil de aquisição de sensores</Text>
+            <View style={styles.row}>
+              <TouchableOpacity
+                style={[styles.choice, settings.acquisitionProfile === 'STANDARD' && styles.choiceActive]}
+                onPress={() => void updateSetting('acquisitionProfile', 'STANDARD')}
+              >
+                <Text style={styles.choiceText}>PADRÃO</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.choice, settings.acquisitionProfile === 'COCKPIT_PRIORITY' && styles.choiceActive]}
+                onPress={() => void updateSetting('acquisitionProfile', 'COCKPIT_PRIORITY')}
+              >
+                <Text style={styles.choiceText}>PRIORIZAR COCKPIT</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.note}>
+              {settings.acquisitionProfile === 'COCKPIT_PRIORITY'
+                ? 'Velocidade, RPM e taxa medida de combustível mantêm a prioridade. Sondagens auxiliares, nível do tanque e estimativas MAF/MAP ficam duas vezes menos frequentes. Valores auxiliares podem demorar mais para atualizar.'
+                : 'Mantém a cadência atual dos sensores auxiliares. As consultas continuam sequenciais, sem paralelismo no ELM327.'}
+            </Text>
+          </View>
+
           <Text style={styles.section}>COMPATIBILIDADE ELM327</Text>
           <View style={styles.card}>
             <Text style={styles.label}>Tempo de espera de entrada/saída</Text>
@@ -195,26 +226,35 @@ export default function ConfiguracaoScreen() {
           <View style={styles.card}>
             <Text style={styles.label}>Tentativas de conexão</Text>
             <View style={styles.row}>
-              {[3, 10, 20].map((value) => (
+              {[3, 5, 10].map((value) => (
                 <TouchableOpacity key={value} style={[styles.choice, settings.elmMaxConnectionAttempts === value && styles.choiceActive]} onPress={() => void updateSetting('elmMaxConnectionAttempts', value)}>
                   <Text style={styles.choiceText}>{String(value)}</Text>
                 </TouchableOpacity>
               ))}
             </View>
-            <Text style={styles.note}>O limite é finito para evitar ciclos de conexão indefinidos. A opção 20 corresponde ao limite operacional padrão.</Text>
+            <Text style={styles.note}>O limite é finito para evitar ciclos de conexão indefinidos. Valores maiores podem alongar bastante a tentativa de conexão, especialmente com adaptador sem resposta.</Text>
           </View>
 
           <View style={styles.card}>
             <Text style={styles.label}>Adaptive Timing do ELM</Text>
             <SettingSwitch label="Ajustar timeout conforme a resposta" value={settings.elmAdaptiveTiming} onChange={(v) => void updateSetting('elmAdaptiveTiming', v)} />
+            <Text style={styles.note}>Tempo mínimo</Text>
             <View style={styles.row}>
               {[3000, 5000, 10000].map((value) => (
                 <TouchableOpacity key={value} style={[styles.choice, settings.elmAdaptiveTimeoutMinMs === value && styles.choiceActive]} onPress={() => void updateSetting('elmAdaptiveTimeoutMinMs', value)}>
-                  <Text style={styles.choiceText}>mín. {value / 1000}s</Text>
+                  <Text style={styles.choiceText}>{value / 1000}s</Text>
                 </TouchableOpacity>
               ))}
             </View>
-            <Text style={styles.note}>O app aumenta o tempo quando há timeout/erro e reduz gradualmente quando as respostas ficam rápidas.</Text>
+            <Text style={styles.note}>Tempo máximo</Text>
+            <View style={styles.row}>
+              {[10000, 15000, 20000, 30000].map((value) => (
+                <TouchableOpacity key={value} style={[styles.choice, settings.elmAdaptiveTimeoutMaxMs === value && styles.choiceActive]} onPress={() => void updateSetting('elmAdaptiveTimeoutMaxMs', value)}>
+                  <Text style={styles.choiceText}>{value / 1000}s</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={styles.note}>O app aumenta o tempo quando há timeout/erro e reduz gradualmente quando as respostas ficam rápidas. O mínimo nunca pode superar o máximo.</Text>
           </View>
 
           <View style={styles.card}>
