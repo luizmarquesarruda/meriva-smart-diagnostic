@@ -44,6 +44,36 @@ jobs:
       - run: npm run doctor
       - run: npm run validate
 
+  auto-repair:
+    # Apply only narrowly-scoped deterministic repairs after a failed CI on a
+    # working branch. Unknown failures are reported in the job log, not guessed at.
+    if: ${{ always() && github.event_name == 'push' && github.ref != 'refs/heads/main' && (needs.validate.result == 'failure' || needs.android-build.result == 'failure') }}
+    needs: [validate, android-build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref_name }}
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+      - name: Apply known safe repairs
+        run: python .github/scripts/repair_known_ci.py
+      - name: Commit and push if a safe repair was applied
+        run: |
+          if git diff --quiet; then
+            echo "No known safe repair matched. Manual diagnosis is still required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/saude.tsx src/obd/exportBluetoothDiagnosticTxt.ts
+          git commit -m "ci: apply deterministic repair after failed validation"
+          git push origin "HEAD:${{ github.ref_name }}"
+
   android-build:
     runs-on: ubuntu-24.04
     needs: validate
