@@ -22,10 +22,11 @@ const summary = summarizeTripTelemetry([
   { timestamp: '2026-10-01T10:00:10.000Z', speedKmh: 20, rpm: 1800, coolantTempC: 40 },
   { timestamp: '2026-10-01T10:00:20.000Z', speedKmh: 40, rpm: 2200, coolantTempC: null },
   { timestamp: '2026-10-01T10:00:30.000Z', speedKmh: null, rpm: null, coolantTempC: 80 },
+  { timestamp: '2026-10-01T10:00:40.000Z', speedKmh: null, rpm: null, coolantTempC: -10 },
 ]);
-assert.strictEqual(summary.sampleCount, 4);
+assert.strictEqual(summary.sampleCount, 5);
 assert.deepStrictEqual(summary.speed, { count: 3, min: 0, max: 40, average: 20 });
 assert.deepStrictEqual(summary.rpm, { count: 3, min: 800, max: 2200, average: 1600 });
-assert.deepStrictEqual(summary.coolant, { count: 3, min: 25, max: 80, average: (25 + 40 + 80) / 3 });
+assert.deepStrictEqual(summary.coolant, { count: 4, min: -10, max: 80, average: (25 + 40 + 80 - 10) / 4 });
 assert.strictEqual(summarizeTripTelemetry([]).speed, null, 'absence of samples must remain N/D, not zero');
 console.log('Trip telemetry summary: PASS');
