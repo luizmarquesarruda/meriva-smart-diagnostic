@@ -67,6 +67,7 @@ export default function LaboratorioScreen() {
   const [readinessScan, setReadinessScan] = useState<ReadinessScanResult | null>(null);
   const [readinessScanning, setReadinessScanning] = useState(false);
   const [freezeFrameSnapshot, setFreezeFrameSnapshot] = useState<FreezeFrameSnapshot | null>(null);
+  const [freezeFrameScanning, setFreezeFrameScanning] = useState(false);
   const sessionRef = useRef<Elm327Session | null>(null);
   const autoSaveReadyRef = useRef(false);
 
@@ -336,6 +337,69 @@ export default function LaboratorioScreen() {
     }
   }
 
+  async function scanFreezeFrameReport() {
+    setError('');
+    setFreezeFrameScanning(true);
+    setStatus(mode === 'SIMULACAO' ? 'SIMULAÇÃO LOCAL: LENDO FREEZE FRAME MODE 02' : 'ECU: LENDO FREEZE FRAME MODE 02');
+    try {
+      const activeSession = mode === 'SIMULACAO' ? simulationSession : sessionRef.current;
+      if (mode === 'REAL' && !canPollObd(getSharedObdStatus().lifecycle)) {
+        throw new Error('DIAGNÓSTICO AINDA NÃO ESTÁ PRONTO. AGUARDE BLUETOOTH, ELM327 E ECU.');
+      }
+      if (!activeSession) throw new Error('CONECTE AO ELM327 ANTES DE LER O FREEZE FRAME');
+      const result = mode === 'REAL'
+        ? await autoTripService.withPollingPaused(() => readFreezeFrame(activeSession))
+        : await readFreezeFrame(activeSession);
+      setFreezeFrameSnapshot(result);
+      if (!result.available || !result.dtc) {
+        setStatus('FREEZE FRAME NÃO DISPONÍVEL');
+        setError(result.reason ?? 'A ECU não forneceu um DTC/quadro com parâmetros interpretáveis.');
+        return;
+      }
+
+      setStatus('FREEZE FRAME LIDO • ' + result.dtc + ' • ' + result.parameters.filter((item) => item.available).length + ' PIDs válidos');
+      setTx('020200');
+      setRx(result.responses['020200'] ?? '');
+      if (mode === 'REAL') {
+        const existing = await readDtcs(getBasePath());
+        const matchingDtc = existing.find((item) => item.code === result.dtc);
+        if (matchingDtc) {
+          const updatedRecord: DtcRecord = {
+            ...matchingDtc,
+            freezeFrame: {
+              frame: result.frame,
+              dtc: result.dtc,
+              rpm: result.rpm,
+              coolantC: result.coolantC,
+              speedKmh: result.speedKmh,
+              engineLoadPercent: result.engineLoadPercent,
+              stftPercent: result.stftPercent,
+              ltftPercent: result.ltftPercent,
+              mapKpa: result.mapKpa,
+              intakeAirTempC: result.intakeAirTempC,
+              throttlePercent: result.throttlePercent,
+              capturedAt: result.capturedAt,
+              parameters: result.parameters.map((item) => ({
+                pid: item.pid, label: item.label, value: item.value, unit: item.unit,
+                available: item.available, ...(item.reason ? { reason: item.reason } : {}),
+              })),
+            },
+          };
+          await recordDtc(getBasePath(), updatedRecord);
+          updateAutoSaveState((state) => {
+            state.dtcs = state.dtcs.map((item) => item.code === result.dtc ? updatedRecord : item);
+          });
+          await forceSaveOnObdEvent();
+        }
+      }
+    } catch (cause) {
+      setStatus('FALHA NA LEITURA DO FREEZE FRAME');
+      setError(cause instanceof Error ? cause.message : 'ERRO AO LER MODE 02');
+    } finally {
+      setFreezeFrameScanning(false);
+    }
+  }
+
   async function discoverPids() {
     setError('');
     setStatus(mode === 'SIMULACAO' ? 'SIMULAÇÃO LOCAL: DESCOBRINDO PIDs' : 'ECU: DESCOBRINDO PIDs');
@@ -385,10 +449,9 @@ export default function LaboratorioScreen() {
         : await scanDtcServices(activeSession);
       setDtcScan(results);
       const stored = results.find((item) => item.kind === 'STORED');
-      const freezeFrame = mode === 'REAL'
-        ? await autoTripService.withPollingPaused(() => readFreezeFrame(activeSession))
-        : null;
-      setFreezeFrameSnapshot(freezeFrame);
+      // Freeze frame is user-triggered separately to avoid nine extra Mode 02
+      // requests on every ordinary DTC scan over the Meriva's K-Line session.
+      const freezeFrame: FreezeFrameSnapshot | null = null;
       setDtcCodes(stored?.codes ?? []);
 
       if (mode === 'REAL') {
@@ -416,16 +479,7 @@ export default function LaboratorioScreen() {
             source: 'REAL_OBD',
             historical: false,
             confirmed: kind !== 'PENDING',
-            ...(freezeFrame?.available && freezeFrame.dtc === code ? {
-              freezeFrame: {
-                frame: freezeFrame.frame,
-                dtc: freezeFrame.dtc,
-                rpm: freezeFrame.rpm,
-                coolantC: freezeFrame.coolantC,
-                capturedAt: freezeFrame.capturedAt,
-                parameters: freezeFrame.parameters.map((item) => ({ pid: item.pid, label: item.label, value: item.value, unit: item.unit, available: item.available, ...(item.reason ? { reason: item.reason } : {}) })),
-              },
-            } : {}),
+            ...(previous?.freezeFrame ? { freezeFrame: previous.freezeFrame } : {}),
           };
         });
 
@@ -687,6 +741,9 @@ export default function LaboratorioScreen() {
           ))}
         </View>
       ) : null}
+      <TouchableOpacity style={styles.secondaryButton} onPress={scanFreezeFrameReport} disabled={!storageReady || freezeFrameScanning || (mode === 'REAL' && !sessionRef.current)}>
+        <Text style={styles.secondaryButtonText}>{freezeFrameScanning ? 'LENDO FREEZE FRAME...' : 'LER FREEZE FRAME COMPLETO • MODE 02'}</Text>
+      </TouchableOpacity>
       <TouchableOpacity style={styles.secondaryButton} onPress={readAllDtcs} disabled={!storageReady || dtcScanning || (mode === 'REAL' && !sessionRef.current)}>
         <Text style={styles.secondaryButtonText}>{dtcScanning ? 'VARRENDO DTC 03/07/0A...' : 'VARREDURA COMPLETA DE DTC • 03 / 07 / 0A'}</Text>
       </TouchableOpacity>
@@ -694,7 +751,7 @@ export default function LaboratorioScreen() {
         <View style={styles.dtcPanel}>
           <Text style={styles.dtcTitle}>FREEZE FRAME • MODE 02 • QUADRO {freezeFrameSnapshot.frame}</Text>
           {!freezeFrameSnapshot.available || !freezeFrameSnapshot.parameters.some((item) => item.available) ? (
-            <Text style={styles.dtcHint}>A ECU não forneceu um snapshot interpretável. Isso não significa ausência de falhas; alguns módulos não expõem todos os parâmetros de freeze frame.</Text>
+            <Text style={styles.dtcHint}>{freezeFrameSnapshot.reason ?? 'A ECU não forneceu um snapshot interpretável.'} Isso não significa ausência de falhas; alguns módulos não expõem todos os parâmetros de freeze frame.</Text>
           ) : (
             <>
               <Text style={styles.dtcHint}>DTC associado: {freezeFrameSnapshot.dtc ?? 'N/D'} • Captura: {new Date(freezeFrameSnapshot.capturedAt).toLocaleString()} • Os valores abaixo representam o instante registrado pela ECU, não a telemetria atual.</Text>
@@ -784,6 +841,7 @@ export default function LaboratorioScreen() {
           <Text style={styles.label}>TEMPO</Text><Text style={styles.value}>{elapsedMs === null ? 'SEM DADOS' : elapsedMs + ' ms'}</Text>
           <Text style={styles.label}>STATUS</Text><Text style={styles.value}>{parsed?.status || 'COMANDO'}</Text>
           <Text style={styles.label}>VALOR</Text><Text style={styles.value}>{parsed?.value === null || !parsed ? 'SEM DADOS' : parsed.value + ' ' + parsed.unit}</Text>
+          <Text style={styles.label}>INTERPRETAÇÃO</Text><Text style={styles.value}>{parsed?.interpretation ?? 'N/D'}</Text>
           <Text style={styles.label}>COMBUSTÍVEL INTEGRADO (PID 015E)</Text><Text style={styles.value}>{fuelUsedL.toFixed(6)} L</Text>
           <Text style={styles.label}>CONTEXTO OPERACIONAL</Text><Text style={styles.value}>{getVehicleConditionSnapshot().condition}</Text>
           <Text style={styles.label}>DTC ARMAZENADOS</Text><Text style={styles.value}>{dtcCodes.length ? dtcCodes.join(', ') : 'NENHUM'}</Text>
