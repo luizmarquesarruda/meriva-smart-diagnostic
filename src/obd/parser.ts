@@ -1,6 +1,7 @@
 import { parseDtcResponseForService } from './dtcParser';
 import { getPidDefinition } from './pidDefinition';
 import { validatePidValue } from './formulaEngine';
+import { parseReadinessMonitorResponse } from './readinessMonitor';
 import type { PidDefinition } from './pidDefinition';
 
 export type ParseStatus = 'RESPONDEU' | 'NÃO RESPONDEU' | 'VALOR NÃO INTERPRETADO';
@@ -115,31 +116,7 @@ export function parsePidResponse(pidRequested: string, rawResponse: string, posi
 
   const value = definition.formula(data);
   const interpretation = pid === '0101'
-    ? (() => {
-        const [a, b, readinessSupported, readiness] = data;
-        const mil = (a & 0x80) !== 0;
-        const dtcCount = a & 0x7f;
-        const compressionIgnition = (b & 0x08) !== 0;
-        const catalystSupported = (readinessSupported & 0x01) !== 0;
-        const catalystIncomplete = (readiness & 0x01) !== 0;
-        const incomplete = [
-          ['MISFIRE', (b & 0x10) !== 0],
-          ['FUEL_SYSTEM', (b & 0x20) !== 0],
-          ['COMPONENTES', (b & 0x40) !== 0],
-          ['CATALISADOR', catalystSupported && catalystIncomplete],
-          ['CATALISADOR_AQUECIDO', (readinessSupported & 0x02) !== 0 && (readiness & 0x02) !== 0],
-          ['EVAP', (readinessSupported & 0x04) !== 0 && (readiness & 0x04) !== 0],
-          ['AR_SECUNDARIO', (readinessSupported & 0x08) !== 0 && (readiness & 0x08) !== 0],
-          ['O2', (readinessSupported & 0x20) !== 0 && (readiness & 0x20) !== 0],
-          ['AQUECEDOR_O2', (readinessSupported & 0x40) !== 0 && (readiness & 0x40) !== 0],
-          ['EGR/VVT', (readinessSupported & 0x80) !== 0 && (readiness & 0x80) !== 0],
-        ].filter(([, notReady]) => notReady).map(([name]) => name);
-        return 'MIL=' + (mil ? 'ON' : 'OFF')
-          + ' | DTCs=' + dtcCount
-          + ' | MOTOR=' + (compressionIgnition ? 'DIESEL/CI' : 'CICLO OTTO/SI')
-          + ' | CATALISADOR=' + (catalystSupported ? (catalystIncomplete ? 'NÃO PRONTO' : 'PRONTO') : 'NÃO SUPORTADO')
-          + ' | INCOMPLETOS=' + (incomplete.length ? incomplete.join(', ') : 'NENHUM');
-      })()
+    ? parseReadinessMonitorResponse(rawResponse)?.summary ?? 'STATUS DE PRONTIDÃO NÃO INTERPRETADO'
     : undefined;
   const validation = validatePidValue(pid, value);
   if (!validation.valid) {
