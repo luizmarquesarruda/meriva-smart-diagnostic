@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { cockpitTheme } from '../src/ui/cockpitTheme';
+import { CockpitScreenHeader } from '../src/ui/CockpitScreenHeader';
 import { Link } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,7 +20,7 @@ export default function VeiculoScreen() {
     return () => clearInterval(t);
   }, []);
   return <SafeAreaView style={styles.container} edges={["bottom","left","right"]}><ScrollView contentContainerStyle={[styles.content,{paddingHorizontal:layout.horizontalPadding}]} showsHorizontalScrollIndicator={false}><View style={[styles.screenFrame,{maxWidth:layout.maxContentWidth}]}>
-    <Text style={styles.title}>VEÍCULO</Text><Text style={styles.subtitle}>PERFIL DO MERIVA + ECU</Text>
+    <CockpitScreenHeader title="VEÍCULO" subtitle="PERFIL DO MERIVA + ECU" />
     <View style={[styles.vehicleColumns, layout.landscape && styles.vehicleColumnsLandscape]}>
       {profile ? <View style={[styles.hero, layout.landscape && styles.heroLandscape]}><Text style={styles.name}>{profile.vehicleName}</Text><Text style={styles.engine}>{profile.engine} • {profile.displacementCm3} cm³ • {profile.cylinders} cilindros</Text><Text style={styles.fuel}>{profile.fuel}</Text></View> : null}
       <View style={[styles.card, layout.landscape && styles.cardLandscape]}>
