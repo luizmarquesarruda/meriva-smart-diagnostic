@@ -39,5 +39,10 @@
     "@babel/core": "^7.0.0",
     "@types/react": "~18.2.0",
     "typescript": "~5.3.3"
+  },
+  "overrides": {
+    "@expo/plist": {
+      "@xmldom/xmldom": "0.9.12"
+    }
   }
 }

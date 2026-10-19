@@ -2784,3 +2784,9 @@ O primeiro teste após a auditoria de concorrência falhou porque `tests/bluetoo
 
 ### Ajuste de isolamento de falha durante handshake
 A revisão do callback `onDisconnected` revelou que, antes de a ECU ser validada e `active` ser atribuída, uma queda do candidato chamava `handleUnexpectedDisconnect`, incrementando a geração global e cancelando a descoberta sequencial de outros adaptadores. Agora o callback sempre marca `disconnectedDuringAttempt`, mas só inicia recuperação global se houver uma sessão compartilhada ativa. Um candidato que cai durante o handshake é fechado/rejeitado pelo fluxo dele próprio; a pesquisa pode continuar aos demais candidatos com a mesma geração. Adicionado contrato de regressão para essa separação.
+
+
+### Auditoria de dependência transitiva — 2026-10-19
+- `npm ci` advertia que `@xmldom/xmldom@0.7.13` está descontinuado e contém problemas críticos. A árvore mostrou que a cópia vinha de `@expo/plist@0.1.3`, dependência do Expo SDK 51; outra dependência `plist@3.1.1` já usava a versão corrigida `0.9.12`.
+- Aplicado override restrito a `@expo/plist -> @xmldom/xmldom@0.9.12`; Expo SDK e demais dependências não foram atualizados. O lockfile reaproveita a URL e integridade da versão `0.9.12` já presente e testada pela árvore.
+- A compatibilidade só será considerada confirmada se `npm ci`, Expo Doctor, prebuild limpo e APK Android terminarem com sucesso na CI #2428. Se falhar, o erro será investigado e não se manterá o override só para ocultar o aviso.
