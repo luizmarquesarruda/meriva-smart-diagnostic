@@ -22,7 +22,9 @@ assert.match(layout, /headerLeft:\s*\(\)\s*=>/, 'telas secundárias devem usar u
 assert.match(layout, /accessibilityLabel="Página inicial"/, 'o botão superior deve ter um rótulo acessível');
 assert.match(layout, /router\.replace\(['"]\/['"]\)/, 'o botão superior deve substituir a rota pela inicial');
 assert.match(layout, /headerBackVisible:\s*false/, 'o retorno padrão deve ser à página inicial, sem duplicar a seta voltar');
-assert.match(layout, /name="bluetooth" options=\{\{ title: 'BLUETOOTH \/ ECU' \}\}/, 'Bluetooth também deve exibir o cabeçalho padrão');
+assert.match(layout, /name="bluetooth"/, 'Bluetooth deve usar o Stack comum e cabeçalho padrão');
+assert.match(layout, /headerStyle:\s*\{\s*backgroundColor:\s*cockpitTheme\.background\s*\}/, 'a barra superior deve usar o fundo do cockpit');
+assert.match(layout, /headerTitle:\s*''/, 'o título da rota não deve duplicar o título do conteúdo');
 assert.match(layout, /name="index" options=\{\{ headerShown: false \}\}/, 'o cockpit inicial deve continuar sem cabeçalho secundário');
 const secondaryNavigationFiles = [
   'app/mais.tsx', 'app/dados.tsx', 'app/saude.tsx', 'app/veiculo.tsx',
@@ -31,6 +33,12 @@ const secondaryNavigationFiles = [
   'app/testes-sensores.tsx',
 ];
 for (const file of secondaryNavigationFiles) {
-  assert.doesNotMatch(read(file), /<Link\s+href=["']\/["']/, file + ' não deve duplicar o botão global de página inicial');
+  const source = read(file);
+  assert.doesNotMatch(source, /<Link\s+href=["']\/["']/, file + ' não deve duplicar o botão global de página inicial');
+  assert.match(source, /CockpitScreenHeader/, file + ' deve usar o cabeçalho compartilhado do cockpit');
+  assert.match(source, /cockpitTheme/, file + ' deve usar os tokens visuais compartilhados');
+  assert.match(source, /edges=\{\[["']bottom["'],["']left["'],["']right["']\]\}/, file + ' deve deixar a Safe Area superior para o Stack');
 }
+assert.match(read('src/ui/CockpitScreenHeader.tsx'), /accessibilityRole="header"/);
+assert.match(read('src/ui/cockpitTheme.ts'), /background: '#07111f'/);
 console.log('Cockpit e telas secundárias: OK');
