@@ -1,6 +1,6 @@
 {
-  "version": 2,
-  "description": "Política de aquisição priorizada para ELM327 em K-Line/KWP. PIDs críticos têm prioridade; estimativas e nível do tanque usam menor cadência; composição do combustível é consultada raramente e somente quando a ECU a anuncia; logs CSV são agrupados.",
+  "version": 3,
+  "description": "Política de aquisição priorizada para ELM327 em K-Line/KWP. Os perfis alteram apenas a frequência dos PIDs auxiliares; velocidade, RPM, taxa de combustível medida e a fila serial permanecem inalteradas.",
   "polling": {
     "corePids": [
       "010D",
@@ -49,5 +49,19 @@
     "Não aplicar temporizações específicas de CAN a uma sessão K-Line sem medições no adaptador e veículo reais.",
     "A confirmação e a estatística de aprendizado do mesmo PID não são persistidas mais de uma vez em learningSampleMinIntervalMs, mas cada resposta real continua na fila CSV."
   ],
-  "learningSampleMinIntervalMs": 5000
+  "learningSampleMinIntervalMs": 5000,
+  "acquisitionProfiles": {
+    "STANDARD": {
+      "label": "PADRÃO",
+      "description": "Usa as cadências atuais do aplicativo.",
+      "optionalSamplingMultiplier": 1,
+      "rotatingTelemetryEveryCycles": 1
+    },
+    "COCKPIT_PRIORITY": {
+      "label": "PRIORIZAR COCKPIT",
+      "description": "Reduz pela metade a frequência dos PIDs auxiliares, do nível do tanque e das estimativas de combustível para deixar mais tempo de barramento para velocidade, RPM e taxa medida.",
+      "optionalSamplingMultiplier": 2,
+      "rotatingTelemetryEveryCycles": 2
+    }
+  }
 }
