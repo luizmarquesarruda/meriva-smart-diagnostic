@@ -44,6 +44,8 @@ assert.ok(tripsPage.includes('MÉDIA AMOSTRADA'));
 assert.ok(history.includes("findings_' + date + '.json"));
 assert.ok(history.includes("findings_' + date + '.txt"));
 assert.ok(history.includes('MIN_OBSERVATION_INTERVAL_MS'));
+assert.ok(history.includes('existing.timeline.push'));
+assert.ok(health.includes('TENDÊNCIA DO SCORE'));
 assert.ok(autoTrip.includes('recordDiagnosticFindings'));
 assert.ok(autoTrip.includes('captureDiagnosticHistoryIfDue'));
 assert.ok(health.includes('HISTÓRICO TEMPORAL DE EVIDÊNCIAS'));
