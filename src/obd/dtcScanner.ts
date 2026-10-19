@@ -112,18 +112,18 @@ export interface FreezeFrameSnapshot {
   responses: Record<string, string>;
 }
 
-type FreezeFramePidSpec = { pid: string; label: string };
+type FreezeFramePidSpec = { pid: string; label: string; unit: string };
 
 const FREEZE_FRAME_PIDS: FreezeFramePidSpec[] = [
-  { pid: '0104', label: 'Carga calculada do motor' },
-  { pid: '0105', label: 'Temperatura do arrefecimento' },
-  { pid: '0106', label: 'Ajuste de combustível curto prazo (STFT)' },
-  { pid: '0107', label: 'Ajuste de combustível longo prazo (LTFT)' },
-  { pid: '010B', label: 'Pressão absoluta do coletor (MAP)' },
-  { pid: '010C', label: 'Rotação do motor' },
-  { pid: '010D', label: 'Velocidade do veículo' },
-  { pid: '010F', label: 'Temperatura do ar de admissão' },
-  { pid: '0111', label: 'Posição da borboleta' },
+  { pid: '0104', label: 'Carga calculada do motor', unit: '%' },
+  { pid: '0105', label: 'Temperatura do arrefecimento', unit: '°C' },
+  { pid: '0106', label: 'Ajuste de combustível curto prazo (STFT)', unit: '%' },
+  { pid: '0107', label: 'Ajuste de combustível longo prazo (LTFT)', unit: '%' },
+  { pid: '010B', label: 'Pressão absoluta do coletor (MAP)', unit: 'kPa' },
+  { pid: '010C', label: 'Rotação do motor', unit: 'rpm' },
+  { pid: '010D', label: 'Velocidade do veículo', unit: 'km/h' },
+  { pid: '010F', label: 'Temperatura do ar de admissão', unit: '°C' },
+  { pid: '0111', label: 'Posição da borboleta', unit: '%' },
 ];
 
 function normalizedResponse(response: string): string {
@@ -136,6 +136,25 @@ function parseFreezeFrameFrameNumber(response: string, pid: string): number | nu
   if (marker < 0) return null;
   const frameHex = stream.slice(marker + 4, marker + 6);
   return /^[0-9A-F]{2}$/.test(frameHex) ? Number.parseInt(frameHex, 16) : null;
+}
+
+function parseFreezeFrameSupportBitmap(response: string, frame: number): number[] | null {
+  const stream = normalizedResponse(response);
+  const marker = stream.indexOf('4200');
+  if (marker < 0) return null;
+  const frameHex = stream.slice(marker + 4, marker + 6);
+  if (!/^[0-9A-F]{2}$/.test(frameHex) || Number.parseInt(frameHex, 16) !== frame) return null;
+  const data = stream.slice(marker + 6, marker + 14);
+  if (!/^[0-9A-F]{8}$/.test(data)) return null;
+  return [0, 2, 4, 6].map((offset) => Number.parseInt(data.slice(offset, offset + 2), 16));
+}
+
+function isFreezeFramePidSupported(bitmap: number[], pid: string): boolean {
+  const value = Number.parseInt(pid.slice(-2), 16);
+  if (!Number.isFinite(value) || value < 1 || value > 0x20) return false;
+  const byteIndex = Math.floor((value - 1) / 8);
+  const bitIndex = 7 - ((value - 1) % 8);
+  return ((bitmap[byteIndex] ?? 0) & (1 << bitIndex)) !== 0;
 }
 
 function parseFreezeFrameDtc(response: string): string | null {
@@ -193,9 +212,43 @@ export async function readFreezeFrame(
     );
   }
 
-  const parameters: FreezeFrameParameter[] = [];
   const frameHex = frame.toString(16).padStart(2, '0').toUpperCase();
+  let supportReply: Awaited<ReturnType<Elm327Session['executeCommand']>>;
+  try {
+    supportReply = await execute('0200' + frameHex);
+    responses['0200' + frameHex] = supportReply.response ?? '';
+  } catch (cause) {
+    return emptyFreezeFrame(
+      capturedAt,
+      responses,
+      cause instanceof Error ? cause.message : 'FALHA AO LER O BITMAP DE PIDs DO FREEZE FRAME',
+      frame,
+      dtc,
+    );
+  }
+  const supportBitmap = supportReply.status === 'OK'
+    ? parseFreezeFrameSupportBitmap(supportReply.response ?? '', frame)
+    : null;
+  if (!supportBitmap) {
+    return emptyFreezeFrame(
+      capturedAt,
+      responses,
+      supportReply.errorMessage || 'A ECU não informou o bitmap de PIDs suportados do freeze frame; leituras adicionais foram interrompidas para evitar consultas incompatíveis.',
+      frame,
+      dtc,
+    );
+  }
+
+  const parameters: FreezeFrameParameter[] = [];
   for (const spec of FREEZE_FRAME_PIDS) {
+    if (!isFreezeFramePidSupported(supportBitmap, spec.pid.slice(-2))) {
+      parameters.push({
+        pid: spec.pid, label: spec.label, value: null,
+        unit: spec.unit, available: false,
+        reason: 'A ECU não declarou este PID como suportado no bitmap do freeze frame.',
+      });
+      continue;
+    }
     const command = '02' + spec.pid.slice(-2) + frameHex;
     let response = '';
     try {
@@ -205,7 +258,7 @@ export async function readFreezeFrame(
       if (reply.status !== 'OK') {
         parameters.push({
           pid: spec.pid, label: spec.label, value: null,
-          unit: 'N/D', available: false,
+          unit: spec.unit, available: false,
           reason: reply.errorMessage || 'SERVIÇO SEM RESPOSTA VÁLIDA',
         });
         continue;
@@ -224,14 +277,14 @@ export async function readFreezeFrame(
         pid: spec.pid,
         label: spec.label,
         value: parsed.status === 'RESPONDEU' ? parsed.value : null,
-        unit: parsed.unit,
+        unit: spec.unit || parsed.unit,
         available: parsed.status === 'RESPONDEU' && parsed.value !== null && Number.isFinite(parsed.value),
         ...(parsed.status !== 'RESPONDEU' ? { reason: parsed.errorMessage || parsed.status } : {}),
       });
     } catch (cause) {
       parameters.push({
         pid: spec.pid, label: spec.label, value: null,
-        unit: 'N/D', available: false,
+        unit: spec.unit, available: false,
         reason: cause instanceof Error ? cause.message : 'FALHA AO LER PID DE FREEZE FRAME',
       });
     }
