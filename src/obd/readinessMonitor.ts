@@ -83,7 +83,7 @@ export function parseReadinessMonitorResponse(rawResponse: string): ReadinessMon
         ['HEATED_CATALYST', 'Catalisador aquecido', 0x02],
         ['EVAP', 'Sistema evaporativo (EVAP)', 0x04],
         ['SECONDARY_AIR', 'Injeção de ar secundário', 0x08],
-        ['PARTICULATE_FILTER', 'Filtro de partículas / bit C4', 0x10],
+        ['MONITOR_C4', 'Monitor não contínuo específico (bit C4)', 0x10],
         ['O2_SENSOR', 'Sensor de oxigênio (O2)', 0x20],
         ['O2_HEATER', 'Aquecedor do sensor O2', 0x40],
         ['EGR_VVT', 'EGR / sincronismo variável', 0x80],
