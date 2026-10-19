@@ -3,7 +3,6 @@ import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacit
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMidLayout } from '../src/ui/midLayout';
 import * as FileSystem from 'expo-file-system';
-import { Link } from 'expo-router';
 import { BluetoothDeviceInfo } from '../src/obd/bluetoothClassicTransport';
 import { discoverPairedDevices, ensureBluetoothReady } from '../src/obd/bluetoothManager';
 import { connectPreferredElm, getSharedObdConnection, getSharedObdStatus, subscribeSharedObd, subscribeSharedObdStatus, disconnectSharedObd } from '../src/obd/sharedConnection';
@@ -137,7 +136,7 @@ export default function BluetoothScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top","bottom","left","right"]}>
+    <SafeAreaView style={styles.container} edges={["bottom","left","right"]}>
       <ScrollView contentContainerStyle={[styles.content,{paddingHorizontal:layout.horizontalPadding}]} showsHorizontalScrollIndicator={false}>
         <View style={[styles.screenFrame,{maxWidth:layout.maxContentWidth}]}>
         <View style={styles.header}>
@@ -221,18 +220,6 @@ export default function BluetoothScreen() {
           <Text style={styles.rule}>Pareado não significa conectado. ECU só fica verde após resposta OBD real.</Text>
         </View>
 
-        <View style={styles.bottomNav}>
-          <Link href="/" asChild>
-            <TouchableOpacity style={styles.bottomItem}>
-              <Text style={styles.bottomIcon}>🚗</Text>
-              <Text style={styles.bottomText}>CARRO</Text>
-            </TouchableOpacity>
-          </Link>
-          <TouchableOpacity style={[styles.bottomItem, styles.bottomActive]}>
-            <Text style={styles.bottomIcon}>🔵</Text>
-            <Text style={styles.bottomActiveText}>BLUETOOTH</Text>
-          </TouchableOpacity>
-        </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -271,10 +258,4 @@ const styles = StyleSheet.create({
   ruleCard: { backgroundColor: '#111c2e', borderRadius: 12, borderWidth: 1, borderColor: '#243652', padding: 13, marginTop: 4 },
   ruleTitle: { color: '#7db3ff', fontSize: 10, fontWeight: '900', marginBottom: 6 },
   rule: { color: '#a9b9cc', fontSize: 10, lineHeight: 17 },
-  bottomNav: { flexDirection: 'row', backgroundColor: '#111c2e', borderRadius: 14, borderWidth: 1, borderColor: '#29415f', marginTop: 12, padding: 5 },
-  bottomItem: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 10 },
-  bottomActive: { backgroundColor: '#1a3150' },
-  bottomIcon: { fontSize: 17, marginBottom: 2 },
-  bottomText: { color: '#9fb4cf', fontSize: 9, fontWeight: '900' },
-  bottomActiveText: { color: '#7db3ff', fontSize: 9, fontWeight: '900' },
 });
