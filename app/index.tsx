@@ -267,7 +267,7 @@ export default function IndexScreen() {
       ? 'LOCALIZAÇÃO DESATIVADA'
       : dashboardWeather.status === 'LOCATION_UNAVAILABLE'
         ? 'CIDADE INDISPONÍVEL'
-        : 'DETECTANDO CIDADE';
+        : dashboardWeather.status === 'LOADING' ? 'DETECTANDO CIDADE' : 'CIDADE INDISPONÍVEL';
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
