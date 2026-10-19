@@ -2470,3 +2470,11 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 
 ### Próximo passo
 - Executar a CI da PR, confirmar `validate` e `android-build` verdes e verificar que o cartão não reaparece em retrato nem em paisagem.
+
+
+### Correção da validação CI #2447 — teste de navegação desatualizado
+- **Resultado observado:** CI #2447 falhou no job `validate`; `npm ci` e `npm run doctor` passaram. `android-build` foi ignorado porque a validação falhou.
+- **Causa confirmada no log:** `tests/cockpitNavigation.test.js` ainda exigia que a rota `/saude` estivesse exposta diretamente em `app/index.tsx`, embora a decisão de UX remova o cartão e mantenha a central de saúde em Mais Recursos.
+- **Correção:** atualizar o teste para verificar as rotas principais do cockpit, confirmar que `/saude` permanece em `app/mais.tsx` e impedir regressão do texto “SAÚDE DO VEÍCULO” na tela inicial.
+- **Escopo:** apenas teste e diário; lógica do app não alterada.
+- **Validação:** nova CI acionada pela atualização da branch; ainda pendente. Não declarar sucesso até `validate` e `android-build` ficarem verdes.
