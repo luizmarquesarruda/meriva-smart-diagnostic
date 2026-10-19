@@ -2672,5 +2672,13 @@ Implementar os quatro itens priorizados na pesquisa de aplicações OBD-II e sub
 - `e3a03676` — inclusão dos novos testes no script `npm test`.
 - `ba0d26e2`, `2b564474`, `e39d413d` — documentação de README e Diário de Bordo.
 
+### Ajustes finais da auditoria estática
+- `src/diagnostics/findingHistory.ts` guarda pontos de tendência do score/confiança a cada observação contada; subminuto não gera ponto duplicado e a Central de Saúde exibe um sparkline.
+- `src/trip/tripSummary.ts` permite temperaturas ECT negativas válidas (ex.: ambiente abaixo de 0 °C), mantendo speed/RPM limitados a valores não negativos.
+- `app/viagens.tsx` rotula a maior rotação derivada da amostragem como “RPM MÁXIMO AMOSTRADO”, para não apresentar uma amostra esparsa como máxima absoluta contínua.
+- `app/laboratorio.tsx` salva como `HISTORICAL`/não confirmado o DTC associado ao freeze frame quando não existia registro local anterior; não inventa status atual. Registros existentes preservam seu status.
+- Commits adicionais: `52b868ee`, `14724b52`, `f88ecf24`, `f908c2d3`, `285400ce`, `b6f02959`, `31b7dce3`, `794e4592`.
+- Na conferência final, os oito arquivos JS de teste passaram somente pela verificação de sintaxe; os três JSONs (`package.json`, `diagnostic_rules.json`, `pids.json`) foram parseados e as verificações estáticas de integração passaram. Isso não equivale à execução dos testes.
+
 ### Resultado e próximo passo
 P1–P4 e o seletor de PID foram integrados ao branch de trabalho, com cobertura de regressão adicionada e sem alterar main nem disparar CI. Próxima etapa: executar npm run validate, revisar qualquer falha por logs concretos e então validar o build Android. Após isso, testar no carro parado cada leitura Mode 01/02 e a consulta manual antes de considerar a função concluída no veículo real.
