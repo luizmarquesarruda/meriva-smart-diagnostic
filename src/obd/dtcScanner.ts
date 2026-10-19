@@ -84,17 +84,62 @@ export function summarizeDtcScan(results: DtcServiceScan[]): {
 export const DTC_SERVICE_REQUESTS = REQUESTS;
 
 
+export interface FreezeFrameParameter {
+  pid: string;
+  label: string;
+  value: number | null;
+  unit: string;
+  available: boolean;
+  reason?: string;
+}
+
 export interface FreezeFrameSnapshot {
   frame: number;
   dtc: string | null;
   rpm: number | null;
   coolantC: number | null;
+  speedKmh: number | null;
+  engineLoadPercent: number | null;
+  stftPercent: number | null;
+  ltftPercent: number | null;
+  mapKpa: number | null;
+  intakeAirTempC: number | null;
+  throttlePercent: number | null;
+  capturedAt: string;
   available: boolean;
+  reason?: string;
+  parameters: FreezeFrameParameter[];
   responses: Record<string, string>;
 }
 
+type FreezeFramePidSpec = { pid: string; label: string };
+
+const FREEZE_FRAME_PIDS: FreezeFramePidSpec[] = [
+  { pid: '0104', label: 'Carga calculada do motor' },
+  { pid: '0105', label: 'Temperatura do arrefecimento' },
+  { pid: '0106', label: 'Ajuste de combustível curto prazo (STFT)' },
+  { pid: '0107', label: 'Ajuste de combustível longo prazo (LTFT)' },
+  { pid: '010B', label: 'Pressão absoluta do coletor (MAP)' },
+  { pid: '010C', label: 'Rotação do motor' },
+  { pid: '010D', label: 'Velocidade do veículo' },
+  { pid: '010F', label: 'Temperatura do ar de admissão' },
+  { pid: '0111', label: 'Posição da borboleta' },
+];
+
+function normalizedResponse(response: string): string {
+  return String(response ?? '').replace(/[^0-9A-F]/gi, '').toUpperCase();
+}
+
+function parseFreezeFrameFrameNumber(response: string, pid: string): number | null {
+  const stream = normalizedResponse(response);
+  const marker = stream.indexOf('42' + pid);
+  if (marker < 0) return null;
+  const frameHex = stream.slice(marker + 4, marker + 6);
+  return /^[0-9A-F]{2}$/.test(frameHex) ? Number.parseInt(frameHex, 16) : null;
+}
+
 function parseFreezeFrameDtc(response: string): string | null {
-  const stream = response.replace(/[^0-9A-F]/gi, '').toUpperCase();
+  const stream = normalizedResponse(response);
   const marker = stream.indexOf('4202');
   if (marker < 0) return null;
   // Mode 02 PID 02 payload: 42 02, frame number (1 byte), then DTC (2 bytes).
@@ -106,42 +151,111 @@ function parseFreezeFrameDtc(response: string): string | null {
   return `${type}${((high >> 4) & 0x03).toString(16).toUpperCase()}${(high & 0x0f).toString(16).toUpperCase()}${(low >> 4).toString(16).toUpperCase()}${(low & 0x0f).toString(16).toUpperCase()}`;
 }
 
+function emptyFreezeFrame(
+  capturedAt: string,
+  responses: Record<string, string>,
+  reason: string,
+  frame = 0,
+  dtc: string | null = null,
+): FreezeFrameSnapshot {
+  return {
+    frame, dtc, rpm: null, coolantC: null, speedKmh: null,
+    engineLoadPercent: null, stftPercent: null, ltftPercent: null,
+    mapKpa: null, intakeAirTempC: null, throttlePercent: null,
+    capturedAt, available: false, reason, parameters: [], responses,
+  };
+}
+
 export async function readFreezeFrame(
   session: Elm327Session,
-  execute: (command: string) => Promise<Awaited<ReturnType<Elm327Session['executeCommand']>>> = (command) => session.executeCommand(command),
+  execute: (command: string) => Promise<Awaited<ReturnType<Elm327Session['executeCommand']>>> = (command) =>
+    session.executeCommand(command),
 ): Promise<FreezeFrameSnapshot> {
   const responses: Record<string, string> = {};
-  let dtc: string | null = null;
-  let rpm: number | null = null;
-  let coolantC: number | null = null;
+  const capturedAt = new Date().toISOString();
+  let firstReply: Awaited<ReturnType<Elm327Session['executeCommand']>>;
+  try {
+    firstReply = await execute('020200');
+    responses['020200'] = firstReply.response ?? '';
+  } catch (cause) {
+    return emptyFreezeFrame(capturedAt, responses, cause instanceof Error ? cause.message : 'FALHA NA LEITURA DO FREEZE FRAME');
+  }
 
-  for (const command of ['020200', '020C00', '020500']) {
+  const frame = parseFreezeFrameFrameNumber(firstReply.response ?? '', '02');
+  const dtc = firstReply.status === 'OK' ? parseFreezeFrameDtc(firstReply.response ?? '') : null;
+  if (firstReply.status !== 'OK' || frame === null || dtc === null) {
+    return emptyFreezeFrame(
+      capturedAt,
+      responses,
+      firstReply.errorMessage || 'A ECU não informou um DTC/quadro válido em Mode 02 PID 02.',
+      frame ?? 0,
+      dtc,
+    );
+  }
+
+  const parameters: FreezeFrameParameter[] = [];
+  const frameHex = frame.toString(16).padStart(2, '0').toUpperCase();
+  for (const spec of FREEZE_FRAME_PIDS) {
+    const command = '02' + spec.pid.slice(-2) + frameHex;
+    let response = '';
     try {
       const reply = await execute(command);
-      responses[command] = reply.response;
-      if (reply.status !== 'OK') continue;
-      if (command === '020200') dtc = parseFreezeFrameDtc(reply.response);
-      if (command === '020C00') {
-        const parsed = parsePidResponse('010C', reply.response, '42');
-        rpm = parsed.status === 'RESPONDEU' ? parsed.value : null;
+      response = reply.response ?? '';
+      responses[command] = response;
+      if (reply.status !== 'OK') {
+        parameters.push({
+          pid: spec.pid, label: spec.label, value: null,
+          unit: 'N/D', available: false,
+          reason: reply.errorMessage || 'SERVIÇO SEM RESPOSTA VÁLIDA',
+        });
+        continue;
       }
-      if (command === '020500') {
-        const parsed = parsePidResponse('0105', reply.response, '42');
-        coolantC = parsed.status === 'RESPONDEU' ? parsed.value : null;
+      const responseFrame = parseFreezeFrameFrameNumber(response, spec.pid.slice(-2));
+      if (responseFrame !== frame) {
+        parameters.push({
+          pid: spec.pid, label: spec.label, value: null,
+          unit: 'N/D', available: false,
+          reason: responseFrame === null ? 'PID NÃO DISPONÍVEL NO FREEZE FRAME' : 'RESPOSTA DE OUTRO QUADRO IGNORADA',
+        });
+        continue;
       }
-    } catch {
-      // Freeze frame is optional and must not invalidate the DTC scan.
+      const parsed = parsePidResponse(spec.pid, response, '42');
+      parameters.push({
+        pid: spec.pid,
+        label: spec.label,
+        value: parsed.status === 'RESPONDEU' ? parsed.value : null,
+        unit: parsed.unit,
+        available: parsed.status === 'RESPONDEU' && parsed.value !== null && Number.isFinite(parsed.value),
+        ...(parsed.status !== 'RESPONDEU' ? { reason: parsed.errorMessage || parsed.status } : {}),
+      });
+    } catch (cause) {
+      parameters.push({
+        pid: spec.pid, label: spec.label, value: null,
+        unit: 'N/D', available: false,
+        reason: cause instanceof Error ? cause.message : 'FALHA AO LER PID DE FREEZE FRAME',
+      });
     }
   }
 
-  const frameMatch = Object.values(responses).join(' ').match(/42\s*(?:02|0C|05)\s*([0-9A-F]{2})/i);
-  const frame = frameMatch ? Number.parseInt(frameMatch[1], 16) : 0;
+  const value = (pid: string): number | null =>
+    parameters.find((item) => item.pid === pid && item.available && item.value !== null)?.value ?? null;
+  const anyParameter = parameters.some((item) => item.available);
   return {
     frame,
     dtc,
-    rpm,
-    coolantC,
-    available: Boolean(dtc || rpm != null || coolantC != null),
+    rpm: value('010C'),
+    coolantC: value('0105'),
+    speedKmh: value('010D'),
+    engineLoadPercent: value('0104'),
+    stftPercent: value('0106'),
+    ltftPercent: value('0107'),
+    mapKpa: value('010B'),
+    intakeAirTempC: value('010F'),
+    throttlePercent: value('0111'),
+    capturedAt,
+    available: anyParameter,
+    ...(!anyParameter ? { reason: 'O DTC foi identificado, mas nenhum PID de freeze frame foi decodificado.' } : {}),
+    parameters,
     responses,
   };
 }
