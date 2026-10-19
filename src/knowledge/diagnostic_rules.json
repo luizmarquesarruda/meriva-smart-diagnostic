@@ -1,5 +1,9 @@
 {
-  "version": 2,
+  "version": 3,
+  "dataQuality": {
+    "pidMaxAgeMs": 10000,
+    "futureTimestampToleranceMs": 1000
+  },
   "description": "Regras locais e rastreáveis do motor de raciocínio diagnóstico. Uma regra gera evidência ou hipótese; nunca prova isoladamente uma falha. Limiares heurísticos não substituem limites de fábrica.",
   "principles": [
     "DTC sozinho não condena componente.",
