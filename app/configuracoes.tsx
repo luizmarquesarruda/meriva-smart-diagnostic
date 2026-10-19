@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { cockpitTheme } from '../src/ui/cockpitTheme';
+import { CockpitScreenHeader } from '../src/ui/CockpitScreenHeader';
 import Constants from 'expo-constants';
 import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -112,7 +113,7 @@ export default function ConfiguracaoScreen() {
     <SafeAreaView style={{flex:1,backgroundColor: cockpitTheme.background}} edges={["bottom","left","right"]}>
     <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
       <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
-      <Text style={styles.title}>CONFIGURAÇÕES</Text>
+      <CockpitScreenHeader title="CONFIGURAÇÕES" subtitle="PREFERÊNCIAS • CONEXÃO • ARMAZENAMENTO" />
       <Text style={styles.status}>{status}</Text>
 
       {settings && (
