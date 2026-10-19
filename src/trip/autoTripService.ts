@@ -10,7 +10,7 @@ import { getLivePidTrend, resetLiveTelemetry } from '../obd/liveTelemetry';
 import { estimateFuelRateLph, type FuelRateSource } from '../obd/fuelConsumption';
 import { startBackgroundMonitoring } from '../gps/backgroundMonitoring';
 import { readAppSettings, subscribeAppSettings } from '../database/appSettings';
-import type { FuelType } from '../database/appSettings';
+import type { AcquisitionProfile, FuelType } from '../database/appSettings';
 import pollingPolicy from '../knowledge/polling_policy.json';
 
 export interface AutoTripServiceState {
@@ -71,6 +71,7 @@ class AutoTripService {
   private gpsStartedForEcu = false;
   private lastEstimatedFuelRate: { rateLph: number; source: FuelRateSource; timestampMs: number } | null = null;
   private fuelType: FuelType = 'FLEX';
+  private acquisitionProfile: AcquisitionProfile = 'STANDARD';
   private lastFuelEthanolPercent: number | null = null;
   private unsubscribeAppSettings: (() => void) | null = null;
   private state: AutoTripServiceState = { ...INITIAL_STATE };
@@ -99,12 +100,16 @@ class AutoTripService {
     this.basePath = basePath;
     const settings = await readAppSettings(basePath);
     this.fuelType = settings.fuelType;
+    this.acquisitionProfile = settings.acquisitionProfile;
     this.unsubscribeAppSettings?.();
     this.unsubscribeAppSettings = subscribeAppSettings((nextSettings) => {
       if (nextSettings.fuelType !== this.fuelType) {
         this.fuelType = nextSettings.fuelType;
         this.lastFuelEthanolPercent = null;
         this.lastEstimatedFuelRate = null;
+      }
+      if (nextSettings.acquisitionProfile !== this.acquisitionProfile) {
+        this.acquisitionProfile = nextSettings.acquisitionProfile;
       }
     });
     const persisted = await initAutoSave(basePath);
@@ -229,7 +234,11 @@ class AutoTripService {
         let fuelRateForDisplayLph: number | null = null;
         let fuelRateForDisplaySource: FuelRateSource | null = null;
         let mapFallbackQueriedThisCycle = false;
-        const fuelEstimateDue = this.pollCycleNumber % FUEL_ESTIMATE_EVERY_N_CYCLES === pollingPolicy.polling.estimatedFuelRate.phase;
+        const acquisitionPolicy = pollingPolicy.acquisitionProfiles[this.acquisitionProfile];
+        const optionalSamplingMultiplier = acquisitionPolicy.optionalSamplingMultiplier;
+        const fuelEstimateEveryNCycles = FUEL_ESTIMATE_EVERY_N_CYCLES * optionalSamplingMultiplier;
+        const fuelLevelEveryNCycles = FUEL_LEVEL_EVERY_N_CYCLES * optionalSamplingMultiplier;
+        const fuelEstimateDue = this.pollCycleNumber % fuelEstimateEveryNCycles === pollingPolicy.polling.estimatedFuelRate.phase;
         let fuelLevelPercent: number | null = this.state.fuelLevelPercent;
         let obdSpeedKmh: number | null = null;
         let rpm: number | null = null;
@@ -288,7 +297,7 @@ class AutoTripService {
 
         // O nível do tanque muda lentamente: consultar a cada quatro ciclos
         // reduz tráfego serial sem limpar o último valor válido da interface.
-        if (this.state.fuelLevelSupported && this.pollCycleNumber % FUEL_LEVEL_EVERY_N_CYCLES === pollingPolicy.polling.fuelLevel.phase) {
+        if (this.state.fuelLevelSupported && this.pollCycleNumber % fuelLevelEveryNCycles === pollingPolicy.polling.fuelLevel.phase) {
           const fuelLevelResult = await connection.session.queryPid('012F');
           await registerObdQuery(this.basePath, fuelLevelResult, 'REAL');
           if (
@@ -313,7 +322,7 @@ class AutoTripService {
           (!this.state.fuelSupported || fuelRateLph == null) &&
           this.fuelType === 'FLEX' &&
           connection.supportedPids.includes(fuelCompositionPolicy.pid) &&
-          this.pollCycleNumber % fuelCompositionPolicy.everyCycles === fuelCompositionPolicy.phase
+          this.pollCycleNumber % (fuelCompositionPolicy.everyCycles * optionalSamplingMultiplier) === fuelCompositionPolicy.phase
         ) {
           const compositionResult = await connection.session.queryPid(fuelCompositionPolicy.pid);
           await registerObdQuery(this.basePath, compositionResult, 'REAL');
@@ -410,7 +419,10 @@ class AutoTripService {
           connection.supportedPids.includes(item) &&
           !(mapFallbackQueriedThisCycle && item === pollingPolicy.polling.estimatedFuelRate.mapPid)
         );
-        if (supportedTelemetry.length > 0) {
+        if (
+          supportedTelemetry.length > 0 &&
+          this.pollCycleNumber % acquisitionPolicy.rotatingTelemetryEveryCycles === 0
+        ) {
           const telemetryPid = supportedTelemetry[this.telemetryCursor % supportedTelemetry.length];
           this.telemetryCursor += 1;
           const telemetryResult = await connection.session.queryPid(telemetryPid);
