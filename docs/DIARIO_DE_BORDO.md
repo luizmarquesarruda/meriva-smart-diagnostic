@@ -2521,3 +2521,27 @@ A tela inicial já é a única proprietária da conexão automática por `connec
 
 ### Próximo passo
 Conferir o resultado integral da CI, corrigir qualquer falha antes de novo disparo e validar a abertura com o adaptador desligado, pareado sem ECU respondendo e conectado com resposta ECU real. Verificar também retrato/paisagem e que a tela não provoca reconexões repetidas.
+
+
+## 2026-10-19 — Consolidação da navegação inferior e clima na home
+
+### Problema
+- A navegação por cinco ícones estava na branch da PR #70, fechada sem merge; a versão principal mantinha atalhos textuais e inconsistentes.
+- A implementação de clima/cidade da PR #72 e a remoção do cartão de saúde estavam em outra branch, com alterações sobrepostas em app/index.tsx.
+
+### Diagnóstico
+- A correção precisa preservar a tela de abertura OBD, cinco destinos inferiores sem legendas visíveis, clima/cidade e ausência do cartão duplicado de saúde.
+
+### Correção
+- Criada a branch fix/restore-bottom-navigation-20261019 a partir da implementação da PR #70.
+- Integrado o cartão de clima/cidade e a permissão INTERNET da PR #72, preservando a navegação de cinco ícones e os estados de inicialização OBD.
+- Atualizado o teste de navegação para conferir cinco destinos, nomes acessíveis, ausência de legendas visíveis e ausência do cartão “SAÚDE DO VEÍCULO”.
+- Incluídos os testes de clima e mantidos os testes de progresso da tela de abertura no script npm test.
+
+### Testes e CI
+- Revisão estática de composição concluída: cinco destinos encontrados, sem legendas visíveis, clima presente, cartão de saúde removido e tela de abertura preservada.
+- npm run validate e android-build: pendentes da CI desta branch; não declarar sucesso antes da conclusão.
+- Validação visual no aparelho Android: pendente.
+
+### Próximo passo
+- Abrir PR, acompanhar CI completa e corrigir qualquer falha antes de considerar a regressão encerrada.
