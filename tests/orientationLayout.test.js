@@ -34,6 +34,7 @@ assert.ok(heroStart >= 0 && heroEnd > heroStart, 'lista de indicadores rotativos
 const heroBlock = index.slice(heroStart, heroEnd);
 assert.equal((heroBlock.match(/\{ label:/g) || []).length, 4, 'cockpit deve manter quatro indicadores rotativos');
 assert.doesNotMatch(index, /SAÚDE DO VEÍCULO|ABRIR CENTRAL DE SAÚDE/, 'não duplicar a central de saúde na página inicial');
+assert.match(index, /danger:\{color:'#fb7185'\}/, 'alerta térmico deve mudar a cor sem encolher o valor principal');
 assert.match(index, /!connectionStatus\.ecuConnected \? 'N\/D'/, 'não declarar ausência de DTC como normal sem ECU conectada');
 assert.match(index, /POSIÇÃO DA BORBOLETA/);
 assert.match(index, /VOLTAGEM DO SISTEMA/);
