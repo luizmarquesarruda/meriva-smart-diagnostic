@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Constants from 'expo-constants';
+import * as Network from 'expo-network';
 import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
@@ -12,6 +13,7 @@ import { exportBluetoothDiagnosticTxt } from '../src/obd/exportBluetoothDiagnost
 import { AppSettings, readAppSettings, writeAppSettings } from '../src/database/appSettings';
 import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
 import { getMidLayout } from '../src/ui/midLayout';
+import { describeNetworkState } from '../src/network/networkPolicy';
 
 function formatTime(iso: string | null): string {
   if (!iso) return 'N/D';
@@ -25,9 +27,24 @@ export default function ConfiguracaoScreen() {
   const [profile, setProfile] = useState<VehicleProfile | null>(null);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [status, setStatus] = useState('INICIALIZANDO...');
+  const [networkStatus, setNetworkStatus] = useState('VERIFICANDO REDE...');
   const [busy, setBusy] = useState(false);
   const [saveStatus, setSaveStatus] = useState<AutoSaveStatus>({ lastSavedAt: null, lastSaveReason: null, lastError: null, obdSessionActive: false });
   const appVersion = Constants.expoConfig?.version ?? '1.0.1';
+
+  useEffect(() => {
+    let disposed = false;
+    const refreshNetworkStatus = async () => {
+      try {
+        const state = await Network.getNetworkStateAsync();
+        if (!disposed) setNetworkStatus(describeNetworkState(state));
+      } catch {
+        if (!disposed) setNetworkStatus('STATUS DE REDE INDISPONÍVEL');
+      }
+    };
+    void refreshNetworkStatus();
+    return () => { disposed = true; };
+  }, []);
 
   useEffect(() => {
     async function initStorage() {
@@ -155,6 +172,25 @@ export default function ConfiguracaoScreen() {
           <SettingSwitch label="Conectar ao ELM327 automaticamente" value={settings.autoConnectObd} onChange={(v) => void updateSetting('autoConnectObd', v)} />
           <SettingSwitch label="Inicialização forçada do ELM (ATZ + ATE0)" value={settings.elmForceInitialization} onChange={(v) => void updateSetting('elmForceInitialization', v)} />
           <SettingSwitch label="Alertas de diagnóstico" value={settings.diagnosticAlerts} onChange={(v) => void updateSetting('diagnosticAlerts', v)} />
+
+          <Text style={styles.section}>INTERNET E FUNCIONAMENTO OFFLINE</Text>
+          <View style={styles.card}>
+            <Text style={styles.label}>Conectividade detectada: {networkStatus}</Text>
+            <Text style={styles.note}>O diagnóstico OBD, a leitura de PIDs, os testes do veículo e as regras locais da IA devem funcionar sem internet. A rede é usada apenas por recursos opcionais, como clima e futuras atualizações.</Text>
+            <Text style={styles.label}>Permitir recursos on-line por</Text>
+            <View style={styles.row}>
+              <TouchableOpacity accessibilityRole="radio" accessibilityState={{ checked: settings.networkMode === 'WIFI_ONLY' }} style={[styles.choice, settings.networkMode === 'WIFI_ONLY' && styles.choiceActive]} onPress={() => void updateSetting('networkMode', 'WIFI_ONLY')}>
+                <Text style={styles.choiceText}>SOMENTE WI-FI</Text>
+              </TouchableOpacity>
+              <TouchableOpacity accessibilityRole="radio" accessibilityState={{ checked: settings.networkMode === 'WIFI_AND_MOBILE' }} style={[styles.choice, settings.networkMode === 'WIFI_AND_MOBILE' && styles.choiceActive]} onPress={() => void updateSetting('networkMode', 'WIFI_AND_MOBILE')}>
+                <Text style={styles.choiceText}>WI-FI + DADOS MÓVEIS</Text>
+              </TouchableOpacity>
+              <TouchableOpacity accessibilityRole="radio" accessibilityState={{ checked: settings.networkMode === 'OFFLINE' }} style={[styles.choice, settings.networkMode === 'OFFLINE' && styles.choiceActive]} onPress={() => void updateSetting('networkMode', 'OFFLINE')}>
+                <Text style={styles.choiceText}>TOTALMENTE OFFLINE</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.note}>O modo offline bloqueia as consultas opcionais de rede. Nenhum relatório é enviado automaticamente; o envio on-line, quando implementado, deverá exigir autorização explícita no momento do envio.</Text>
+          </View>
 
           <Text style={styles.section}>COMPATIBILIDADE ELM327</Text>
           <View style={styles.card}>
