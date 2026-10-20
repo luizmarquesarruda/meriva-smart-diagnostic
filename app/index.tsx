@@ -2,7 +2,7 @@ import { Link, useFocusEffect } from 'expo-router';
 import { StartupScreen } from '../src/ui/StartupScreen';
 import { getStartupProgress } from '../src/ui/startupProgress';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { AppState, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMidLayout } from '../src/ui/midLayout';
 import * as FileSystem from 'expo-file-system';
@@ -17,6 +17,7 @@ import { createLearningProfile, initializeCarScannerSeed, readLearningProfile } 
 import { readAppSettings, type AppSettings } from '../src/database/appSettings';
 import { connectPreferredElm, getSharedObdConnection, getSharedObdLastError, getSharedObdStatus, subscribeSharedObd, subscribeSharedObdStatus } from '../src/obd/sharedConnection';
 import { autoTripService, type AutoTripServiceState } from '../src/trip/autoTripService';
+import { describeWeatherCode, loadDashboardWeather, type DashboardWeather } from '../src/weather/dashboardWeather';
 
 const STARTUP_TIMEOUT_MS = 30_000;
 
@@ -36,7 +37,50 @@ export default function IndexScreen() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [dtcCount, setDtcCount] = useState(0);
   const [activeHeroMetric, setActiveHeroMetric] = useState(0);
+  const [dashboardWeather, setDashboardWeather] = useState<DashboardWeather>({ status: 'LOADING', city: null, region: null, temperatureC: null, apparentTemperatureC: null, weatherCode: null, updatedAt: null });
   const layout = useMidLayout();
+
+  useEffect(() => {
+    let disposed = false;
+    let inFlight = false;
+
+    const refreshWeather = async () => {
+      if (disposed || inFlight) return;
+      inFlight = true;
+      try {
+        const next = await loadDashboardWeather();
+        if (disposed) return;
+        setDashboardWeather((current) => {
+          if (next.status === 'READY' || next.status === 'LOCATION_PERMISSION' || next.status === 'LOCATION_UNAVAILABLE') {
+            return next;
+          }
+          // Preserve the last valid temperature while offline, with its original timestamp.
+          return {
+            ...current,
+            city: next.city ?? current.city,
+            region: next.region ?? current.region,
+            status: 'OFFLINE',
+          };
+        });
+      } catch {
+        if (!disposed) setDashboardWeather((current) => ({ ...current, status: 'OFFLINE' }));
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    void refreshWeather();
+    const interval = setInterval(() => void refreshWeather(), 30 * 60 * 1000);
+    const appStateSubscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void refreshWeather();
+    });
+
+    return () => {
+      disposed = true;
+      clearInterval(interval);
+      appStateSubscription.remove();
+    };
+  }, []);
 
   useEffect(() => gpsTracker.subscribe(setGpsState), []);
   useEffect(() => autoTripService.subscribe(setTripState), []);
@@ -263,6 +307,25 @@ export default function IndexScreen() {
 
   if (showStartupScreen) return <StartupScreen progress={startupProgress} />;
 
+  const weatherStatusLabel = dashboardWeather.status === 'READY'
+    ? 'ONLINE • ' + formatWeatherTime(dashboardWeather.updatedAt)
+    : dashboardWeather.status === 'OFFLINE'
+      ? dashboardWeather.updatedAt
+        ? 'SEM INTERNET • ÚLTIMO DADO ' + formatWeatherTime(dashboardWeather.updatedAt)
+        : 'SEM INTERNET • AGUARDANDO 4G/5G'
+      : dashboardWeather.status === 'LOCATION_PERMISSION'
+        ? 'ATIVE A LOCALIZAÇÃO DO CELULAR'
+        : dashboardWeather.status === 'LOCATION_UNAVAILABLE'
+          ? 'LOCALIZAÇÃO INDISPONÍVEL'
+          : 'BUSCANDO CLIMA PELA INTERNET';
+  const weatherLocationLabel = dashboardWeather.city
+    ? dashboardWeather.city + (dashboardWeather.region && dashboardWeather.region !== dashboardWeather.city ? ' • ' + dashboardWeather.region : '')
+    : dashboardWeather.status === 'LOCATION_PERMISSION'
+      ? 'LOCALIZAÇÃO DESATIVADA'
+      : dashboardWeather.status === 'LOCATION_UNAVAILABLE'
+        ? 'CIDADE INDISPONÍVEL'
+        : dashboardWeather.status === 'LOADING' ? 'DETECTANDO CIDADE' : 'CIDADE INDISPONÍVEL';
+
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
       <View style={[styles.content, { paddingHorizontal: layout.horizontalPadding }]}>
@@ -305,12 +368,21 @@ export default function IndexScreen() {
               </Text>
             </View>
           </View>
-          {!layout.landscape && (
-            <View style={styles.healthCard}>
-              <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>SAÚDE DO VEÍCULO</Text><Text style={styles.sectionHint}>{dtcCount > 0 ? 'Falhas requerem atenção' : 'Nenhuma falha ativa registrada'}</Text></View><Text style={dtcCount > 0 ? styles.danger : styles.ok}>{dtcCount > 0 ? (dtcCount + ' DTC') : 'NORMAL'}</Text></View>
-              <Link href="/saude" asChild><TouchableOpacity style={styles.outlineButton}><Text style={styles.outlineText}>ABRIR CENTRAL DE SAÚDE →</Text></TouchableOpacity></Link>
+          <View style={[styles.weatherCard, layout.landscape && styles.weatherCardLandscape]}>
+            <View style={styles.weatherLocation}>
+              <Text style={styles.weatherEyebrow}>📍 CLIMA EXTERNO</Text>
+              <Text style={styles.weatherCity} numberOfLines={1}>{weatherLocationLabel}</Text>
+              <Text style={styles.weatherStatus} numberOfLines={1}>{weatherStatusLabel}</Text>
+              <Text style={styles.weatherSource}>DADOS METEOROLÓGICOS: OPEN-METEO (CC BY 4.0)</Text>
             </View>
-          )}
+            <View style={styles.weatherTemperature}>
+              <Text style={styles.weatherTemp}>{dashboardWeather.temperatureC != null ? Math.round(dashboardWeather.temperatureC) + '°' : '--°'}</Text>
+              <Text style={styles.weatherCondition}>{dashboardWeather.temperatureC != null ? describeWeatherCode(dashboardWeather.weatherCode) : 'TEMPERATURA EXTERNA'}</Text>
+              {dashboardWeather.apparentTemperatureC != null && (
+                <Text style={styles.weatherFeels}>SENSAÇÃO {Math.round(dashboardWeather.apparentTemperatureC)}°</Text>
+              )}
+            </View>
+          </View>
           <View
             style={[styles.bottomNav, layout.landscape && styles.bottomNavLandscape]}
             accessibilityRole="tablist"
@@ -333,6 +405,12 @@ export default function IndexScreen() {
 
 function CockpitMetric({ label, value }: { label: string; value: string }) { return <View style={styles.cockpitMetric}><Text style={styles.metricLabel}>{label}</Text><Text style={styles.metricValue}>{value}</Text></View>; }
 
+function formatWeatherTime(value: string | null): string {
+  if (!value) return '--:--';
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? new Date(timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+}
+
 const styles = StyleSheet.create({
   container:{flex:1,backgroundColor:'#07111f'},content:{flex:1,width:'100%',paddingVertical:6,paddingBottom:6},screenFrame:{width:'100%',flex:1,alignSelf:'center',justifyContent:'space-between'},
   header:{backgroundColor:'#0e1b2d',borderRadius:16,borderWidth:1,borderColor:'#28415f',padding:14,marginBottom:10,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:10},headerLandscape:{paddingVertical:12},headerTitle:{flex:1,minWidth:0},brand:{color:'#f8fafc',fontSize:18,fontWeight:'900',letterSpacing:1.2},subtitle:{color:'#7db3ff',fontSize:9,fontWeight:'900',letterSpacing:1,marginTop:3},
@@ -341,6 +419,7 @@ const styles = StyleSheet.create({
   metricRow:{width:'100%',flexDirection:'row',gap:6,marginTop:10},metricRowLandscape:{marginTop:4},cockpitMetric:{flex:1,minWidth:0,backgroundColor:'#091626',borderRadius:11,borderWidth:1,borderColor:'#233d5b',paddingVertical:9,paddingHorizontal:5,alignItems:'center'},metricLabel:{color:'#9aacc4',fontSize:8,fontWeight:'900',letterSpacing:.3,textAlign:'center'},metricValue:{color:'#e5edf7',fontSize:12,fontWeight:'900',marginTop:3,textAlign:'center'},
   coolantCard:{width:'100%',flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:12,marginTop:9,paddingHorizontal:13,paddingVertical:11,backgroundColor:'#091626',borderRadius:12,borderWidth:1,borderColor:'#315579'},coolantCardLandscape:{marginTop:4,paddingVertical:5,paddingHorizontal:9},coolantCopy:{flex:1,minWidth:0},coolantLabel:{color:'#c5d8f2',fontSize:9,fontWeight:'900',letterSpacing:.4},coolantStatus:{color:'#7185a1',fontSize:8,fontWeight:'800',marginTop:4},coolantValue:{fontSize:23,fontWeight:'900',fontVariant:['tabular-nums']},coolantOk:{color:'#4ade80'},coolantWarning:{color:'#fbbf24'},
   healthCard:{backgroundColor:'#0e1b2d',borderRadius:15,borderWidth:1,borderColor:'#28415f',padding:11,marginBottom:8},sectionHeader:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},sectionTitle:{color:'#f1f5f9',fontWeight:'900',fontSize:12,letterSpacing:.6},sectionHint:{color:'#7185a1',fontSize:9,marginTop:3},ok:{color:'#4ade80',fontSize:11,fontWeight:'900'},danger:{color:'#fb7185',fontSize:11,fontWeight:'900'},outlineButton:{borderWidth:1,borderColor:'#315579',borderRadius:9,padding:10,alignItems:'center',marginTop:10},outlineText:{color:'#9fc5f7',fontSize:9,fontWeight:'900'},
+  weatherCard:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:10,backgroundColor:'#0e1b2d',borderRadius:13,borderWidth:1,borderColor:'#28415f',paddingHorizontal:13,paddingVertical:9,marginBottom:8,minHeight:60},weatherCardLandscape:{paddingVertical:5,marginBottom:4},weatherLocation:{flex:1,minWidth:0},weatherEyebrow:{color:'#7db3ff',fontSize:8,fontWeight:'900',letterSpacing:.8},weatherCity:{color:'#f1f5f9',fontSize:12,fontWeight:'900',marginTop:4},weatherStatus:{color:'#7185a1',fontSize:8,fontWeight:'800',marginTop:3},weatherSource:{color:'#506985',fontSize:7,fontWeight:'800',marginTop:2},weatherTemperature:{alignItems:'flex-end',justifyContent:'center',minWidth:72},weatherTemp:{color:'#f8fafc',fontSize:27,lineHeight:31,fontWeight:'900',fontVariant:['tabular-nums']},weatherCondition:{color:'#9fc5f7',fontSize:8,fontWeight:'900',letterSpacing:.3},weatherFeels:{color:'#7185a1',fontSize:8,fontWeight:'800',marginTop:2},danger:{color:'#fb7185',fontSize:11,fontWeight:'900'},
   connectionCard:{backgroundColor:'#0e1b2d',borderRadius:15,borderWidth:1,borderColor:'#28415f',padding:14,marginBottom:10},chain:{flexDirection:'row',alignItems:'center',marginTop:10},chainStep:{flex:1,alignItems:'center'},chainCircle:{width:30,height:30,borderRadius:15,alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:'#3b516b',backgroundColor:'#0a1727'},chainCircleOk:{borderColor:'#3b8c5a',backgroundColor:'#10261b'},chainCircleText:{color:'#7185a1',fontSize:11,fontWeight:'900'},chainCircleTextOk:{color:'#4ade80'},chainLabel:{color:'#9fb4cf',fontSize:8,fontWeight:'900',marginTop:4},chainArrow:{color:'#526a86',fontSize:24,paddingHorizontal:4},
   
   statusGrid:{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',marginBottom:2},statusGridLandscape:{flexWrap:'nowrap',gap:8},statusCardLandscape:{width:'auto',flex:1},statusCard:{width:'48%',minWidth:0,backgroundColor:'#0e1b2d',borderRadius:12,borderWidth:1,borderColor:'#233a56',padding:11,marginBottom:8},moreButton:{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:'#0e1b2d',borderRadius:14,borderWidth:1,borderColor:'#28415f',padding:13,marginTop:2},moreIcon:{color:'#7db3ff',fontSize:24,fontWeight:'900'},moreBody:{flex:1,minWidth:0},moreTitle:{color:'#e5edf7',fontSize:11,fontWeight:'900'},moreHint:{color:'#7185a1',fontSize:8,marginTop:3,flexShrink:1},moreArrow:{color:'#7db3ff',fontSize:24},
