@@ -47,7 +47,8 @@ const settingsUi = fs.readFileSync(path.resolve(__dirname, '../app/configuracoes
 assert(settingsUi.includes("settings.networkMode === 'WIFI_ONLY'"));
 assert(settingsUi.includes("settings.networkMode === 'WIFI_AND_MOBILE'"));
 assert(settingsUi.includes("settings.networkMode === 'OFFLINE'"));
-assert(settingsUi.includes('Network.addNetworkStateListener'), 'configurações devem acompanhar mudanças de rede automaticamente');
+assert(settingsUi.includes('setInterval(() => { void refreshNetworkStatus(); }, 10_000)'), 'configurações devem acompanhar mudanças de rede automaticamente');
+assert(settingsUi.includes("AppState.addEventListener('change'"), 'configurações devem atualizar ao retornar ao primeiro plano');
 
 const settingsSource = fs.readFileSync(path.resolve(__dirname, '../src/database/appSettings.ts'), 'utf8');
 const weatherSource = fs.readFileSync(path.resolve(__dirname, '../src/weather/dashboardWeather.ts'), 'utf8');
