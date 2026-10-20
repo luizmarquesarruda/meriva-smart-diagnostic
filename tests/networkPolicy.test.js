@@ -50,6 +50,12 @@ assert(settingsUi.includes("settings.networkMode === 'OFFLINE'"));
 assert(settingsUi.includes('setInterval(() => { void refreshNetworkStatus(); }, 10_000)'), 'configurações devem acompanhar mudanças de rede automaticamente');
 assert(settingsUi.includes("AppState.addEventListener('change'"), 'configurações devem atualizar ao retornar ao primeiro plano');
 
+const homeSource = fs.readFileSync(path.resolve(__dirname, '../app/index.tsx'), 'utf8');
+assert(homeSource.includes('Network.getNetworkStateAsync'), 'home deve mostrar o tipo de rede detectado');
+assert(homeSource.includes('setInterval(() => { void refreshNetworkStatus(); }, 10_000)'), 'home deve atualizar o estado da rede periodicamente');
+assert(homeSource.includes("settings?.networkMode === 'OFFLINE'"), 'home deve mostrar preferência offline');
+assert(homeSource.includes("dashboardWeather.status === 'NETWORK_RESTRICTED'"), 'home deve distinguir bloqueio por preferência de falha de internet');
+
 const settingsSource = fs.readFileSync(path.resolve(__dirname, '../src/database/appSettings.ts'), 'utf8');
 const weatherSource = fs.readFileSync(path.resolve(__dirname, '../src/weather/dashboardWeather.ts'), 'utf8');
 const bluetoothSource = fs.readFileSync(path.resolve(__dirname, '../src/obd/sharedConnection.ts'), 'utf8');
