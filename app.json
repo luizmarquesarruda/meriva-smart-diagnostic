@@ -12,6 +12,7 @@
     "android": {
       "package": "com.meriva.smartdiagnostic",
       "permissions": [
+        "INTERNET",
         "BLUETOOTH",
         "BLUETOOTH_ADMIN",
         "BLUETOOTH_CONNECT",
