@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Constants from 'expo-constants';
 import * as Network from 'expo-network';
-import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { AppState, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
 import { createBackup } from '../src/storage/backup';
@@ -43,12 +43,16 @@ export default function ConfiguracaoScreen() {
       }
     };
     void refreshNetworkStatus();
-    const subscription = Network.addNetworkStateListener((state) => {
-      if (!disposed) setNetworkStatus(describeNetworkState(state));
+    // Expo Network 6.x (SDK 51) exposes a snapshot API, not a change listener.
+    // Recheck periodically and whenever the app returns to the foreground.
+    const timer = setInterval(() => { void refreshNetworkStatus(); }, 10_000);
+    const appStateSubscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void refreshNetworkStatus();
     });
     return () => {
       disposed = true;
-      subscription.remove();
+      clearInterval(timer);
+      appStateSubscription.remove();
     };
   }, []);
 
