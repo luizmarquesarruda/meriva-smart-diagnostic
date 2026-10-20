@@ -1,7 +1,7 @@
 import * as Location from 'expo-location';
 import * as Network from 'expo-network';
 import * as FileSystem from 'expo-file-system';
-import { readAppSettings } from '../database/appSettings';
+import { readAppSettings, type AppSettings } from '../database/appSettings';
 import { isOptionalNetworkAllowed } from '../network/networkPolicy';
 
 export type DashboardWeatherStatus =
@@ -164,8 +164,8 @@ async function cachedWeather(
  * Coordenadas são enviadas à API pública Open-Meteo para obter a previsão local.
  */
 export async function loadDashboardWeather(fetchImpl: typeof fetch = fetch): Promise<DashboardWeather> {
-  let settings;
-  let networkState: Network.NetworkState;
+  let settings: AppSettings;
+  let networkState: Awaited<ReturnType<typeof Network.getNetworkStateAsync>>;
   try {
     const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
     settings = await readAppSettings(basePath);
