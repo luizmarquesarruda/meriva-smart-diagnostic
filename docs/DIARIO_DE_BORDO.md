@@ -2583,3 +2583,10 @@ Conferir o resultado integral da CI, corrigir qualquer falha antes de novo dispa
 
 ### Próximo passo
 Acompanhar a CI da branch feat/offline-first-network-policy-20261019. Se falhar, corrigir com base nos logs antes de novo disparo. Depois, testar no Android com Wi-Fi desligado, dados móveis desligados, rede sem acesso à internet e troca de Wi-Fi para dados móveis, confirmando que a sessão OBD não reinicia.
+
+
+### Correção da CI #2502 — versão inexistente do Expo Network
+- A CI #2502 falhou em `npm ci` antes de Expo Doctor e testes porque o lockfile apontava para `expo-network@6.0.2`, versão estável que não existe no registry; o log retornou HTTP 404.
+- Conferência do registro npm: para Expo SDK 51, a versão estável publicada é `6.0.1` (tag `sdk-51`).
+- Correção: alinhados `package.json` e `package-lock.json` para `expo-network ~6.0.1` e o tarball `expo-network-6.0.1.tgz`.
+- `validate` e `android-build` ainda não foram validados nesta correção. A nova CI deve executar instalação, Expo Doctor, suíte de testes e APK Android; se houver nova falha, seguir o log antes de outra alteração.
