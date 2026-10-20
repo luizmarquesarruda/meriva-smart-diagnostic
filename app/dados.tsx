@@ -310,6 +310,7 @@ const styles = StyleSheet.create({
   chartCard: { backgroundColor: '#0e1b2d', borderRadius: 14, borderWidth: 1, borderColor: '#28415f', padding: 12, marginBottom: 12 },
   chartTitle: { color: '#e5edf7', fontSize: 11, fontWeight: '900', letterSpacing: 0.6 },
   chartHint: { color: '#7185a1', fontSize: 9, lineHeight: 14, marginTop: 4 },
+  chartFootnote: { color: '#7185a1', fontSize: 8, lineHeight: 13, marginTop: 7, textAlign: 'center' },
   chartStatus: { color: '#fbbf24', fontSize: 9, lineHeight: 14, marginTop: 5 },
   chartShell: { alignSelf: 'center', marginTop: 5 },
   chartPlot: { position: 'relative', overflow: 'hidden', backgroundColor: '#091626', borderRadius: 10, borderWidth: 1, borderColor: '#203854' },

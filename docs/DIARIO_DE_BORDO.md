@@ -2553,3 +2553,10 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 ### Próximo passo
 - Aguardar CI completa (`validate` e `android-build`), corrigir falhas pela evidência do log e registrar o resultado final.
 - Após instalar o APK, conferir amostras reais na Meriva/ELM327; não tratar a validação automatizada como prova de precisão dos sensores nem de suporte a todos os PIDs.
+
+
+### Ajuste revelado pela primeira CI da etapa de gráficos
+- CI #2546 — run [39445022697](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/39445022697): `npm ci`, Expo Doctor e o início de `npm run validate` foram executados; o typecheck falhou em `app/dados.tsx` nas linhas 131 e 167 porque `styles.chartFootnote` era usado pela tela, mas não estava declarado no `StyleSheet`.
+- Diagnóstico: erro de tipagem da apresentação, não falha do parser, da aquisição OBD ou da geometria do gráfico. O job `android-build` foi corretamente ignorado por depender de `validate`.
+- Correção: declarado `chartFootnote` com tipografia compacta e alinhada ao restante dos metadados do gráfico.
+- A nova CI deve confirmar a correção e executar o APK Android. Até ambos os jobs ficarem verdes, a etapa continua **não validada**.
