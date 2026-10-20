@@ -40,6 +40,7 @@ export default function LaboratorioScreen() {
   const [mode, setMode] = useState<Mode>('REAL');
   const [devices, setDevices] = useState<BluetoothDeviceInfo[]>([]);
   const [pid, setPid] = useState('010C');
+  const [queriedPid, setQueriedPid] = useState('010C');
   const [tx, setTx] = useState('');
   const [rx, setRx] = useState('');
   const [elapsedMs, setElapsedMs] = useState<number | null>(null);
@@ -85,12 +86,14 @@ export default function LaboratorioScreen() {
       }
       sessionRef.current = connection.session;
       setProtocol(connection.protocol ?? 'N/D');
+      if (connection.supportedPids?.length) setSupportedPids(connection.supportedPids);
       setStatus('ELM RESPONDENDO / CONEXÃO AUTOMÁTICA');
     });
     const existing = getSharedObdConnection();
     if (existing) {
       sessionRef.current = existing.session;
       setProtocol(existing.protocol ?? 'N/D');
+      if (existing.supportedPids?.length) setSupportedPids(existing.supportedPids);
     }
 
     let mounted = true;
@@ -101,6 +104,8 @@ export default function LaboratorioScreen() {
         if (mounted) {
           setStorageReady(true);
           setProtocol(state.obd.protocol ?? 'N/D');
+          const persistedPids = state.pidDiscovery?.supportedPids ?? [];
+          if (persistedPids.length) setSupportedPids((current) => current.length ? current : persistedPids);
           setStatus('BLUETOOTH PRONTO PARA TESTE');
         }
       })
@@ -268,19 +273,25 @@ export default function LaboratorioScreen() {
     setError('');
     setStatus(mode === 'SIMULACAO' ? 'SIMULAÇÃO LOCAL: CONSULTANDO' : 'ECU CONSULTANDO');
     try {
+      const normalizedPid = pid.replace(/\s/g, '').toUpperCase();
+      if (!/^01[0-9A-F]{2}$/.test(normalizedPid)) {
+        throw new Error('PID inválido. Use um código Mode 01 com quatro dígitos hexadecimais, por exemplo 010C.');
+      }
+      setPid(normalizedPid);
       const activeSession = mode === 'SIMULACAO' ? simulationSession : sessionRef.current;
       if (mode === 'REAL' && !canPollObd(getSharedObdStatus().lifecycle)) {
         throw new Error('DIAGNÓSTICO AINDA NÃO ESTÁ PRONTO. AGUARDE BLUETOOTH, ELM327 E ECU.');
       }
       if (!activeSession) throw new Error('CONECTE AO ELM327 ANTES DE TESTAR O PID');
       const result = mode === 'REAL'
-        ? await autoTripService.withPollingPaused(() => activeSession.queryPid(pid))
-        : await activeSession.queryPid(pid);
+        ? await autoTripService.withPollingPaused(() => activeSession.queryPid(normalizedPid))
+        : await activeSession.queryPid(normalizedPid);
 
       await registerObdQuery(getBasePath(), result, mode);
 
       setTx(result.tx);
       setRx(result.rx);
+      setQueriedPid(normalizedPid);
       setElapsedMs(result.elapsedMs);
       setProtocol(result.protocol ?? 'N/D');
       setStatus(
@@ -472,7 +483,7 @@ export default function LaboratorioScreen() {
     }
   }
 
-  const parsed = rx ? parsePidResponse(pid, rx) : null;
+  const parsed = rx ? parsePidResponse(queriedPid, rx) : null;
   const knownSupported = supportedPids.filter((value) => KNOWN_PIDS.includes(value));
   const identifiedSupportedPids = supportedPids.map((value) => ({ pid: value, definition: getPidDefinition(value) }));
   const diagnostic: DiagnosticResult = runLocalDiagnostic({
@@ -570,16 +581,17 @@ export default function LaboratorioScreen() {
       </TouchableOpacity>
       {!!supportedPids.length ? (
         <View style={styles.pidPanel}>
-          <Text style={styles.dtcTitle}>PIDs ENCONTRADOS NA ECU</Text>
+          <Text style={styles.dtcTitle}>PIDs REGISTRADOS / DESCOBERTOS</Text>
+          <Text style={styles.pidDescription}>Toque em um código para preencher a consulta manual. A lista pode vir da descoberta atual ou do cache salvo; confirme a resposta real antes de tratar o PID como suportado na sessão atual.</Text>
           {identifiedSupportedPids.map(({ pid: value, definition }) => (
-            <View key={value} style={styles.pidRow}>
+            <TouchableOpacity key={value} style={styles.pidRow} onPress={() => setPid(value)} accessibilityRole="button" accessibilityLabel={'Usar PID '+value+' na consulta manual'}>
               <Text style={styles.pidCode}>{value}</Text>
               <View style={{ flex: 1 }}>
                 <Text style={styles.pidName}>{definition?.name ?? 'PID sem definição local'}</Text>
                 <Text style={styles.pidDescription}>{definition?.description ?? 'A ECU informou este PID como suportado, mas o catálogo local ainda não possui decodificação deste identificador.'}</Text>
                 <Text style={styles.pidMeta}>{definition ? definition.unit + ' • ' + definition.classification : 'DESCONHECIDO'}</Text>
               </View>
-            </View>
+            </TouchableOpacity>
           ))}
         </View>
       ) : null}
