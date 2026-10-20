@@ -2571,3 +2571,40 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - A falha inicial de tipagem do estilo `chartFootnote` foi corrigida antes desta execução verde.
 - Limite da evidência: CI confirma validação automatizada e compilação, não confirma conexão física com ELM327, exatidão dos sensores, qualidade das curvas em condução nem persistência após reinstalação.
 - PR #74 permanece aberta e não foi mesclada.
+
+
+## 2026-10-20 — Auditoria P1–P5 e enriquecimento opcional de clima
+
+### Escopo e auditoria
+- Revisado o estado do branch da PR #74 antes de alterar código; a PR permanece aberta e não foi mesclada.
+- **P1 — OBD/ELM327:** reutilizados o transporte Bluetooth Classic, o estado explícito de resposta da ECU, a telemetria real e a suíte de regressão existente. Não foi adicionada segunda fila de polling nem biblioteca OBD paralela.
+- **P2 — GPS/viagens:** confirmada a existência de `expo-location`, `expo-task-manager`, serviço de viagens automáticas, tarefas em segundo plano e testes de GPS/permissões. Nenhuma dependência duplicada foi adicionada.
+- **P3 — Internet opcional:** implementado enriquecimento de cidade/condição climática na página inicial. Usa a permissão de localização em primeiro plano somente se já concedida; não solicita permissão automaticamente. Falha de GPS, permissão ou rede degrada para N/D e não interfere com aquisição OBD.
+- **P4 — Histórico/exportação:** reutilizadas as funções de persistência local e exportação TXT existentes, incluindo histórico diário separado e registros de viagens. Não foi criado um segundo armazenamento.
+- **P5 — Interface/alertas:** mantidos o cockpit, indicadores reais, estados N/D, gráfico ao vivo e histórico já existentes. Alertas térmicos continuam informativos; não foi introduzida notificação de fundo sem necessidade validada. Auditoria visual de acessibilidade em aparelho real continua pendente.
+
+### Implementação P3
+- Novo `src/weather/currentConditions.ts`: consulta Open-Meteo para temperatura/código meteorológico; geocodificação reversa tenta obter o nome da cidade. O recurso é somente de apresentação, não alimenta o motor diagnóstico.
+- `app/index.tsx`: exibe faixa compacta com cidade, temperatura e condição do tempo; estado indisponível é explícito.
+- Sem nova dependência: aproveita `expo-location` já instalado no Expo SDK 51 e a API `fetch` do React Native.
+- Privacidade e operação offline: nenhuma solicitação nova de permissão; não envia coordenadas se a permissão existente não estiver concedida. Falha de rede não bloqueia nem altera leituras OBD.
+- Novo `tests/onlineConditions.test.js`: cobre códigos de tempo, ausência de permissão sem leitura GPS, fallback offline e resposta online.
+- `package.json`: adiciona o teste à suíte `npm test`; não houve alteração de versão do Expo nem instalação de pacote.
+
+### Commits
+- `39e7aa0bcad1ed1e506d7b1fe3e921c6201518cb` — módulo de clima opcional.
+- `e219118773ed366306368b74cac1f93a53a096b5` — faixa de clima na página inicial.
+- `4f1c2b1dbbab99035ccd6fafb28440e850c447cc` — testes de fallback online/offline.
+- `b980bdf6ed16c3c07d90af650b5c60edbf434768` — suíte de teste atualizada.
+
+### Testes e CI
+- Testes automatizados e build Android para os commits desta etapa devem ser considerados **pendentes até a CI da cabeça final da branch terminar**. Não declarar a mudança validada antes de `validate` e `android-build` ficarem verdes.
+- A execução anterior da PR, run [39448090512](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/39448090512), validou a versão anterior do branch, mas **não cobre** os commits de clima listados acima.
+- Não foi possível executar `npm run validate` localmente por não haver checkout local conectado nesta sessão; a CI do GitHub é a fonte de validação de código.
+
+### Limites e próximos passos
+1. Aguardar CI da cabeça final e corrigir qualquer falha com base nos logs.
+2. Verificar o APK instalado: página inicial online, modo avião, permissão de localização negada e retorno de internet.
+3. Testar no carro a estabilidade Bluetooth/ECU, cinco leituras sequenciais, consulta manual PID e gravação/encerramento GPS; CI não substitui o teste físico.
+4. Capturar telas atuais em retrato e paisagem para a auditoria visual de Product Design e acessibilidade.
+5. Manter a PR #74 aberta até revisão final e autorização explícita de merge.
