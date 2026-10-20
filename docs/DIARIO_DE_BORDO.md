@@ -2560,3 +2560,14 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Diagnóstico: erro de tipagem da apresentação, não falha do parser, da aquisição OBD ou da geometria do gráfico. O job `android-build` foi corretamente ignorado por depender de `validate`.
 - Correção: declarado `chartFootnote` com tipografia compacta e alinhada ao restante dos metadados do gráfico.
 - A nova CI deve confirmar a correção e executar o APK Android. Até ambos os jobs ficarem verdes, a etapa continua **não validada**.
+
+
+### Resultado final da CI — etapa de gráficos de telemetria
+- CI #2548 — [execução 39445257264](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/39445257264), commit `b3d71e912a4b77d00e6f927f553a0a3b85754526`: **concluída com sucesso**.
+- `validate`: PASS — `npm ci`, Expo Doctor (17/17 verificações) e `npm run validate` passaram, incluindo typecheck e os testes de regressão adicionados.
+- `android-build`: PASS — Expo prebuild, montagem do APK standalone, verificação do APK e upload do artefato passaram.
+- Artefato: [meriva-smart-diagnostic-standalone-apk](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/39445257264/artifacts/12277461327), aproximadamente 27,45 MB; expira em 03/11/2026.
+- Hash SHA-256 do artefato publicado: `82b5c835945b92a485277e35fac4df82c721d7f2c134c26514cb7081b7877b24`.
+- A falha inicial de tipagem do estilo `chartFootnote` foi corrigida antes desta execução verde.
+- Limite da evidência: CI confirma validação automatizada e compilação, não confirma conexão física com ELM327, exatidão dos sensores, qualidade das curvas em condução nem persistência após reinstalação.
+- PR #74 permanece aberta e não foi mesclada.
