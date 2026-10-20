@@ -2450,3 +2450,38 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Nova CI solicitada pela atualização da branch; confirmar resultado integral, inclusive testes restantes e build Android.
 - Teste físico do ELM327 no veículo continua pendente.
 
+
+## 2026-10-20 — Restaurar cinco leituras do Laboratório e consulta manual de PID
+
+### Problema
+- O Laboratório de Sensores havia regredido de cinco para três tentativas por PID.
+- A consulta manual de PID e o acesso rápido à lista de PIDs descobertos ficaram difíceis de localizar; a lista não era consistentemente reidratada da sessão/cache.
+- A suíte de contrato ainda esperava três leituras, o que provocou a primeira falha de validação após a correção.
+
+### Diagnóstico
+- O catálogo JSON, o motor de avaliação, o texto/progresso da tela e o teste de contrato precisavam concordar na exigência de cinco tentativas.
+- A avaliação numérica deve exigir cinco tentativas e cinco respostas válidas para o PID avaliado; ausência de resposta não pode virar zero nem ser aprovada como leitura válida.
+- A lista pode vir da descoberta da ECU ou do cache persistido; cache antigo não prova suporte atual da ECU e deve ser confirmado por resposta real.
+
+### Correção
+- Restaurado o mínimo de cinco leituras por PID no catálogo e na tela do Laboratório.
+- O motor passou a calcular a média aritmética das cinco amostras válidas; resultados com amostragem incompleta ficam não conclusivos/sem resposta, conforme o caso.
+- Reintroduzida a navegação direta “Consulta manual de PID” em Mais Recursos, normalização/validação de PID Mode 01 e alinhamento do PID consultado com o parser.
+- A lista de PIDs recupera a descoberta da sessão/cache e permite tocar em um item para preencher a consulta manual.
+- Atualizados testes de regressão do motor, do contrato do catálogo e da navegação para impedir retorno silencioso a três leituras ou remoção do acesso manual.
+
+### Testes e CI
+- Primeira execução: `npm run validate` falhou porque `tests/knowledgeJson.test.js` ainda exigia três leituras. Corrigida a expectativa para cinco sem remover a verificação.
+- Execução final: [CI #39424459644](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/39424459644) — `validate` **success**; `android-build` **success**; Expo prebuild, montagem do APK standalone, verificação e upload do artefato concluídos.
+- Commit validado: `0dbaab941bc4e7a3da07a9f91486cd149e1d9c2c`.
+- Artefato de CI: [meriva-smart-diagnostic-standalone-apk](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/39424459644) (disponibilidade indicada pelo GitHub até 2026-11-03; exige acesso ao repositório).
+- PR: [#74 — restaurar cinco leituras e consulta manual de PID](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/74).
+
+### Resultado
+- Validação automatizada e build Android verdes. Isso confirma compilação e verificações automatizadas, mas não substitui teste de campo com ELM327/ECU reais.
+- Não declarar sensor fisicamente aprovado apenas por resposta OBD: os estados são heurísticos e dependem do suporte do PID, do parser e das condições do teste.
+
+### Próximo passo
+- Revisar o diff final da PR #74 e executar teste no veículo: cinco amostras por PID, falha de resposta, PID inválido, seleção de PID descoberto/cacheado e consulta manual real.
+- Confirmar que a lista mostra claramente a diferença entre PID descoberto na sessão atual e PID recuperado do cache antes de tratar a informação como suporte confirmado.
+- Não integrar a PR até concluir a revisão do diff e o teste de regressão funcional, caso permaneça alguma divergência de UX.
