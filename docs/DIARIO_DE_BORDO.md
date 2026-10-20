@@ -8,9 +8,8 @@
 - Repositório: `luizmarquesarruda/meriva-smart-diagnostic`.
 - Branch de trabalho: `fix/restore-five-readings-manual-pids-20261020`.
 - PR #74: aberta e **não mesclada**. Nenhum merge pode ser feito sem autorização explícita do usuário.
-- Último commit de código não documental confirmado nesta sequência: `2b853e9830213b23f520a7e7eb12e7cbb7e8a237`. Para saber o HEAD real, consultar a PR #74 no GitHub: o SHA do próprio diário muda quando este arquivo recebe novo commit.
-- Último estado de CI observado antes desta atualização: run [39450738426 / CI #2562](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/39450738426) estava `in_progress`; a API ainda não expunha jobs nesse momento. Isso é apenas um registro temporal, **não** prova o resultado da cabeça atual. Em toda retomada, consultar o run mais recente do SHA atual da PR.
-- Esta entrada altera documentação e índice; não altera lógica de produção, dependências nem configuração nativa.
+- O SHA e o estado da CI no diário são apenas registros históricos. A autoridade vigente é a cabeça real da PR #74 e a última execução de CI associada a esse SHA, consultadas no GitHub a cada retomada.
+- Esta camada adiciona um teste executável e um passo visível no workflow; não modifica a lógica de leitura OBD, o transporte Bluetooth nem as regras diagnósticas.
 
 ### Contratos que não podem regredir
 1. **Testes de sensores:** cinco tentativas sequenciais por PID e cinco respostas válidas para uma avaliação numérica. Calcular a média aritmética das cinco amostras válidas. Resposta ausente, inválida ou timeout não vira zero e não conta como leitura válida; amostragem incompleta = inconclusiva/sem resposta, nunca aprovada.
@@ -28,7 +27,7 @@
 
 ## ÍNDICE SEQUENCIAL — TODAS AS ATUALIZAÇÕES
 
-**Regra:** o maior ID identifica a atualização documental mais recente. O índice é cronológico pela ordem de registro no diário (IDs crescentes), não necessariamente uma ordenação estrita pela data escrita: registros podem ser adicionados no mesmo dia ou documentar eventos anteriores. Ao retomar, comece pela maior entrada e confira o HEAD e a CI atuais no GitHub.
+**Regra:** o maior ID identifica a atualização documental mais recente. O índice é sequencial pela ordem de registro (não necessariamente ordenado estritamente pela data do evento). Na retomada, comece pelo maior ID e confira o HEAD e a CI atuais diretamente no GitHub.
 
 - **DB-001** · 2026-10-06 — Correção do carregamento do catálogo de combustível
 - **DB-002** · 2026-10-07 — Continuidade do fluxo Bluetooth
@@ -108,6 +107,7 @@
 - **DB-076** · 2026-10-20 — Auditoria P1–P5 e enriquecimento opcional de clima
 - **DB-077** · 2026-10-20 — Consolidação do diário e salvaguardas contra regressões
 - **DB-078** · 2026-10-20 — Índice enumerado de todas as atualizações e regra de leitura
+- **DB-079** · 2026-10-20 — Camada executável anti-regressão
 
 ---
 
@@ -2778,3 +2778,38 @@ Enumerar todas as atualizações do diário para que trabalhos futuros encontrem
 
 ### Resultado
 O diário contém 78 atualizações enumeradas no índice e no próprio cabeçalho das entradas. O número de referência cresce monotonamente: a próxima entrada será `DB-079`.
+
+
+## DB-079 · 2026-10-20 — Camada executável anti-regressão
+
+### Problema
+O índice numerado melhora a retomada documental, mas não impede sozinho que uma alteração futura remova uma funcionalidade, reduza o número de leituras ou deixe de executar uma suíte crítica na CI.
+
+### Diagnóstico
+Já existiam testes de comportamento para PIDs, consulta manual, cockpit, Bluetooth/ELM327, GPS, histórico e clima offline. A falha processual era não haver um gate único que verificasse os contratos centrais e confirmasse que as principais suítes continuavam conectadas ao comando de validação.
+
+### Correção
+- Criado `docs/CONTRATO_ANTI_REGRESSAO.md`, com RG-01 a RG-10, seus testes responsáveis, regras para mudanças autorizadas e procedimento de retomada.
+- Criado `tests/projectBaseline.test.js`, que valida: cinco leituras por PID; presença das suítes essenciais em `npm test`; unicidade da fila serial ELM327; fluxo único de conexão; diagnóstico local separado do clima; Expo SDK 51; coerência de `package.json` e `package-lock.json`; e os quatro indicadores atuais do cockpit.
+- Adicionado o comando `npm run gate:baseline`.
+- Adicionado ao workflow de CI o passo visível **Run anti-regression baseline gate**, antes de `npm run validate`. Uma regressão nos contratos cobertos falha a validação, em vez de depender apenas de revisão manual do diário.
+- Mantidas as suítes comportamentais individuais; o gate não as substitui e também verifica se permanecem conectadas à suíte principal.
+- Nenhuma regra diagnóstica, fórmula, PID, configuração Bluetooth ou dependência de produção foi modificada.
+
+### Arquivos
+- `docs/CONTRATO_ANTI_REGRESSAO.md` (novo)
+- `tests/projectBaseline.test.js` (novo)
+- `package.json`
+- `.github/workflows/ci.yml`
+- `docs/DIARIO_DE_BORDO.md`
+
+### Testes e CI
+- O gate foi integrado ao workflow em um passo independente e à execução de validação por script. A CI iniciada pelo novo commit deve ser consultada para confirmar a execução real.
+- Não declarar sucesso antecipado: é necessário que o novo HEAD conclua `gate:baseline`, `validate` e `android-build` com sucesso.
+- Nenhuma validação física ELM327/ECU foi realizada por esta alteração documental/estrutural.
+
+### Resultado e limites
+A partir deste commit, as regressões cobertas no contrato são verificadas automaticamente na CI, além de ficarem documentadas. O mecanismo reduz regressões acidentais, mas não substitui revisão de diff, teste no aparelho e teste com ECU real.
+
+### Próximo passo
+Consultar a CI do SHA resultante; corrigir falhas a partir dos logs. Em toda alteração futura, atualizar código + testes + contrato + diário de modo consistente, e manter a PR #74 aberta até autorização explícita para merge.

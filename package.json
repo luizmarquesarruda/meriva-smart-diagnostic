@@ -17,7 +17,8 @@
     "build:apk": "eas build --platform android --profile preview",
     "build:production": "eas build --platform android --profile production",
     "doctor": "npx expo-doctor",
-    "validate": "npm run typecheck && npm test"
+    "validate": "npm run typecheck && npm test",
+    "gate:baseline": "node tests/projectBaseline.test.js"
   },
   "dependencies": {
     "expo": "~51.0.39",

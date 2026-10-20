@@ -37,6 +37,8 @@ jobs:
           test -n "$JAVA_HOME"
       - run: npm ci --no-audit --no-fund
       - run: npm run doctor
+      - name: Run anti-regression baseline gate
+        run: npm run gate:baseline
       - run: npm run validate
 
   android-build:
