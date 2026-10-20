@@ -64,7 +64,7 @@ assert.match(sensorEngine, /MIN_SENSOR_TEST_READINGS\s*=\s*catalog\.minimumReadi
 assert.match(sensorEngine, /validRows/);
 assert.match(sensorEngine, /average\(/);
 assert.match(projectContract, /cinco tentativas sequenciais/i);
-assert.match(projectContract, /uma única fila serial/i);
+assert.match(projectContract, /fila serial única/i);
 
 // The ELM protocol must serialize all commands through the shared session queue.
 assert.match(elm, /private commandQueue:\s*Promise<void>\s*=\s*Promise\.resolve\(\)/);

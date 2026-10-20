@@ -108,6 +108,7 @@
 - **DB-077** · 2026-10-20 — Consolidação do diário e salvaguardas contra regressões
 - **DB-078** · 2026-10-20 — Índice enumerado de todas as atualizações e regra de leitura
 - **DB-079** · 2026-10-20 — Camada executável anti-regressão
+- **DB-080** · 2026-10-20 — Revisão preventiva do próprio gate anti-regressão
 
 ---
 
@@ -2813,3 +2814,20 @@ A partir deste commit, as regressões cobertas no contrato são verificadas auto
 
 ### Próximo passo
 Consultar a CI do SHA resultante; corrigir falhas a partir dos logs. Em toda alteração futura, atualizar código + testes + contrato + diário de modo consistente, e manter a PR #74 aberta até autorização explícita para merge.
+
+
+## DB-080 · 2026-10-20 — Revisão preventiva do próprio gate anti-regressão
+
+### Problema
+Durante a revisão estática da nova barreira RG, uma asserção comparava a ordem exata de palavras de um invariante com a redação do contrato, embora o significado estivesse correto.
+
+### Diagnóstico
+A validação da camada de proteção não deve depender de uma formulação editorial idêntica quando o contrato preserva o mesmo significado. Isso criaria falha artificial da CI por redação e reduziria a confiança no gate.
+
+### Correção
+- Ajustada a asserção de tests/projectBaseline.test.js para procurar a formulação que consta no contrato (“fila serial única”).
+- Nenhum código de produção, regra funcional ou teste de comportamento foi alterado.
+- A correção ocorreu antes de considerar verde a nova CI; o resultado deve vir do run da cabeça atual, não desta revisão estática.
+
+### Próximo passo
+Conferir a execução de CI da cabeça mais recente. Se o gate apontar outra divergência, corrigir pelo código/contrato real e registrar nova entrada com o próximo ID.
