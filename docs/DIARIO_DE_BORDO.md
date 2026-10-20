@@ -2617,7 +2617,7 @@ Acompanhar a CI da branch feat/offline-first-network-policy-20261019. Se falhar,
 - A solicitação de localização em primeiro plano é iniciada pelo usuário por um botão específico quando a permissão não está concedida.
 - As leituras meteorológicas válidas são persistidas em `MERIVA_SMART/CACHE/dashboard-weather.json`. Ao perder a internet ou bloquear a rede por preferência, o último valor válido pode ser restaurado após reiniciar o aplicativo; o timestamp original é preservado para diferenciar dado antigo de leitura atual.
 - O estado `NETWORK_RESTRICTED` distingue uma preferência que bloqueia a consulta de uma indisponibilidade real de internet.
-- A geocodificação reversa fica no dispositivo; somente coordenadas arredondadas a duas casas decimais (precisão aproximada de escala quilométrica) são enviadas à API meteorológica.
+- A geocodificação reversa usa o serviço nativo de localização do sistema; somente coordenadas arredondadas a duas casas decimais (precisão aproximada de escala quilométrica) são explicitamente enviadas à API Open-Meteo. O processamento de localização pelo provedor nativo depende da implementação/configuração do Android.
 - A atribuição da Open-Meteo passou a ser clicável e leva ao site da fonte. A API gratuita continua restrita a uso não comercial; para distribuição comercial, deve ser adotado plano/licença apropriado ou fonte alternativa autorizada: https://open-meteo.com/en/terms.
 
 ### Testes e validação
