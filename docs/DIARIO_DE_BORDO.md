@@ -2590,3 +2590,10 @@ Acompanhar a CI da branch feat/offline-first-network-policy-20261019. Se falhar,
 - Conferência do registro npm: para Expo SDK 51, a versão estável publicada é `6.0.1` (tag `sdk-51`).
 - Correção: alinhados `package.json` e `package-lock.json` para `expo-network ~6.0.1` e o tarball `expo-network-6.0.1.tgz`.
 - `validate` e `android-build` ainda não foram validados nesta correção. A nova CI deve executar instalação, Expo Doctor, suíte de testes e APK Android; se houver nova falha, seguir o log antes de outra alteração.
+
+
+### Correção da CI #2508 — API de listener incompatível com Expo Network 6.0.1
+- `npm ci` e Expo Doctor passaram; `npm run validate` falhou no TypeScript porque `expo-network@6.0.1` não expõe `addNetworkStateListener`.
+- Correção: a tela Configurações agora consulta `getNetworkStateAsync` a cada 10 segundos e ao voltar ao primeiro plano via `AppState`, usando APIs compatíveis com SDK 51. O teste foi ajustado para proteger esse comportamento.
+- A sessão Bluetooth/OBD não é envolvida no monitoramento. O intervalo consulta apenas o estado da rede e não faz requisições de internet.
+- A próxima CI deve confirmar TypeScript, todos os testes e APK Android; ainda não declarar a etapa validada.
