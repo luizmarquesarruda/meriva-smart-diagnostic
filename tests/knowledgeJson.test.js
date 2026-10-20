@@ -44,7 +44,7 @@ function main() {
   assert.strictEqual(typeof diagnosticRules.version, 'number');
   assert.strictEqual(typeof sensorTests.schemaVersion, 'number');
   assert.strictEqual(sensorTests.catalogId, 'MERIVA_SMART_SENSOR_TESTS');
-  assert.strictEqual(sensorTests.minimumReadingsPerPid, 3, 'cada PID suportado exige três tentativas');
+  assert.strictEqual(sensorTests.minimumReadingsPerPid, 5, 'cada PID suportado exige cinco tentativas');
   assert.ok(Array.isArray(sensorTests.tests) && sensorTests.tests.length > 0, 'catálogo de testes vazio');
   assert.ok(Array.isArray(sensorTests.sources) && sensorTests.sources.length >= 5, 'fontes pesquisadas ausentes');
   assert.strictEqual(typeof dtcCatalog.version, 'number');
@@ -228,7 +228,7 @@ function main() {
   for (const test of sensorTestItems) {
     const id = String(test.pid).toUpperCase();
     assert.ok(pidIds.has(id), 'sensor_tests.json referencia PID ausente: ' + id);
-    assert.strictEqual(test.minimumReadings, 3, 'teste exige três tentativas: ' + id);
+    assert.strictEqual(test.minimumReadings, 5, 'teste exige cinco tentativas: ' + id);
     assert.ok(typeof test.label === 'string' && test.label.trim(), 'teste sem rótulo: ' + id);
     assert.ok(allowedSensorEvaluators.has(test.evaluator), 'avaliador não implementado: ' + test.evaluator);
     assert.ok(Array.isArray(test.modes) && test.modes.length > 0 && test.modes.every((mode) => validSensorModes.has(mode)), 'modo inválido: ' + id);
