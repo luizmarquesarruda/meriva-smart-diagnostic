@@ -14,6 +14,7 @@ import { createLearningProfile, initializeCarScannerSeed, readLearningProfile } 
 import { readAppSettings, type AppSettings } from '../src/database/appSettings';
 import { connectPreferredElm, getSharedObdConnection, getSharedObdLastError, getSharedObdStatus, subscribeSharedObd, subscribeSharedObdStatus } from '../src/obd/sharedConnection';
 import { autoTripService, type AutoTripServiceState } from '../src/trip/autoTripService';
+import { loadCurrentConditions, type CurrentConditions } from '../src/weather/currentConditions';
 
 export default function IndexScreen() {
   const [cycles, setCycles] = useState<DriveCycle[]>([]);
@@ -27,7 +28,16 @@ export default function IndexScreen() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [dtcCount, setDtcCount] = useState(0);
   const [activeHeroMetric, setActiveHeroMetric] = useState(0);
+  const [conditions, setConditions] = useState<CurrentConditions>({ city: null, temperatureC: null, description: 'CLIMA OPCIONAL', available: false });
   const layout = useMidLayout();
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadCurrentConditions().then((result) => {
+      if (!cancelled) setConditions(result);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => autoTripService.subscribe(setTripState), []);
   useEffect(() => {
@@ -214,6 +224,15 @@ export default function IndexScreen() {
             </View>
             <View style={styles.connectionPill}><View style={[styles.dot, connectionStatus.ecuConnected ? styles.dotOk : bluetoothError ? styles.dotDanger : styles.dotWarn]} /><Text style={styles.connectionText}>{connectionStatus.ecuResponseState === 'NO_RESPONSE' ? 'ECU SEM RESPOSTA' : connectionStatus.ecuResponseState === 'RECOVERING' ? 'RECUPERANDO' : connectionStatus.ecuConnected ? 'ECU' : connectionStatus.bluetoothConnected ? 'BLUETOOTH' : bluetoothSearching ? 'CONECTANDO' : 'OFFLINE'}</Text></View>
           </View>
+          <View style={styles.weatherStrip}>
+            <Text style={styles.weatherText} numberOfLines={1}>
+              {conditions.city ? conditions.city.toLocaleUpperCase('pt-BR') : 'CLIMA LOCAL'}
+              {'  •  '}
+              {conditions.temperatureC != null ? `${Math.round(conditions.temperatureC)} °C` : 'N/D'}
+              {'  •  '}
+              {conditions.description}
+            </Text>
+          </View>
           <View style={[styles.heroCard, layout.landscape && styles.heroCardLandscape]}>
             <TouchableOpacity
               accessibilityRole="button"
@@ -269,6 +288,7 @@ function CockpitMetric({ label, value }: { label: string; value: string }) { ret
 
 const styles = StyleSheet.create({
   container:{flex:1,backgroundColor:'#07111f'},content:{flex:1,width:'100%',paddingVertical:6,paddingBottom:6},screenFrame:{width:'100%',flex:1,alignSelf:'center',justifyContent:'space-between'},
+  weatherStrip:{minHeight:22,justifyContent:'center',paddingHorizontal:10,marginTop:-5,marginBottom:5},weatherText:{color:'#8fa6c1',fontSize:8,fontWeight:'800',letterSpacing:.3,textAlign:'center'},
   header:{backgroundColor:'#0e1b2d',borderRadius:16,borderWidth:1,borderColor:'#28415f',padding:14,marginBottom:10,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:10},headerLandscape:{paddingVertical:12},headerTitle:{flex:1,minWidth:0},brand:{color:'#f8fafc',fontSize:18,fontWeight:'900',letterSpacing:1.2},subtitle:{color:'#7db3ff',fontSize:9,fontWeight:'900',letterSpacing:1,marginTop:3},
   connectionPill:{flexDirection:'row',alignItems:'center',gap:6,flexShrink:0,backgroundColor:'#091526',borderRadius:20,borderWidth:1,borderColor:'#29415f',paddingHorizontal:10,paddingVertical:7},dot:{width:8,height:8,borderRadius:4},dotOk:{backgroundColor:'#4ade80'},dotWarn:{backgroundColor:'#fbbf24'},dotDanger:{backgroundColor:'#fb7185'},connectionText:{color:'#dbeafe',fontSize:9,fontWeight:'900'},
   heroCard:{backgroundColor:'#0f2035',borderRadius:18,borderWidth:1,borderColor:'#2d5278',padding:12,alignItems:'center',marginBottom:8},heroCardLandscape:{padding:7,marginBottom:4},heroReadout:{width:'100%',alignItems:'center',paddingVertical:1},heroEyebrow:{color:'#7db3ff',fontSize:10,fontWeight:'900',letterSpacing:1.4,textAlign:'center'},heroNumberRow:{flexDirection:'row',alignItems:'baseline',justifyContent:'center',gap:6},heroUnit:{color:'#a9c8ef',fontSize:18,fontWeight:'900'},heroSwitchHint:{color:'#6884a6',fontSize:8,fontWeight:'900',letterSpacing:.6,marginTop:4},heroWarning:{color:'#fbbf24'},heroValue:{color:'#f8fafc',fontSize:50,lineHeight:56,fontWeight:'900',marginTop:2,fontVariant:['tabular-nums']},heroValueLandscape:{fontSize:36,lineHeight:40,marginTop:0},heroState:{color:'#8fa6c1',fontSize:9,fontWeight:'800',letterSpacing:.5,textAlign:'center'},
