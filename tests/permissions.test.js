@@ -13,6 +13,7 @@ const storageSource = fs.readFileSync('src/meriva/exportAutoSaveTxt.ts', 'utf8')
 assert(storageSource.includes('StorageAccessFramework') || storageSource.includes('Storage Access Framework'));
 assert(layout.includes('requestAllRequiredPermissions'));
 assert(!layout.includes('requestBluetoothPermissions'));
+assert(appJson.expo.android.permissions.includes('INTERNET'));
 assert(appJson.expo.android.permissions.includes('BLUETOOTH_CONNECT'));
 assert(appJson.expo.android.permissions.includes('BLUETOOTH_SCAN'));
 assert(appJson.expo.android.permissions.includes('ACCESS_FINE_LOCATION'));
