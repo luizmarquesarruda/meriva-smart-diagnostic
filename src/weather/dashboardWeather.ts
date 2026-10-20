@@ -211,7 +211,7 @@ export async function loadDashboardWeather(fetchImpl: typeof fetch = fetch): Pro
   let city: string | null = null;
   let region: string | null = null;
   try {
-    // Reverse geocoding remains on-device; only rounded coordinates are sent to the weather API.
+    // Reverse geocoding uses the platform geocoder; only rounded coordinates are explicitly sent to Open-Meteo.
     const addresses = await Location.reverseGeocodeAsync({
       latitude: position.coords.latitude,
       longitude: position.coords.longitude,
