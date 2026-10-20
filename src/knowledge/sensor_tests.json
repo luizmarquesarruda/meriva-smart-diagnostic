@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "catalogId": "MERIVA_SMART_SENSOR_TESTS",
-  "updatedAt": "2026-10-14",
+  "updatedAt": "2026-10-20",
   "vehicleProfile": {
     "make": "Chevrolet",
     "model": "Meriva Maxx",
@@ -29,13 +29,13 @@
       "note": "Observado em sessão do projeto; validar no veículo antes de generalizar."
     }
   },
-  "minimumReadingsPerPid": 3,
+  "minimumReadingsPerPid": 5,
   "timing": {
     "defaultCommandLatencyMs": 2500,
     "minimumEstimatedCommandLatencyMs": 500,
     "perCommandSafetyMarginMs": 500,
     "finalizationMarginMs": 1200,
-    "note": "ETA é recalculada com latência observada; conclusão depende de três tentativas por PID suportado."
+    "note": "A ETA é recalculada com a latência observada; a conclusão exige cinco tentativas e cinco respostas válidas por PID."
   },
   "resultStates": [
     "CONSISTENTE",
@@ -47,7 +47,8 @@
     "CONSISTENTE significa compatibilidade com a heurística da condição, não saúde certificada do sensor.",
     "INVESTIGAR é gatilho de acompanhamento, não ordem para trocar peça.",
     "SEM_RESPOSTA é resultado de comunicação/parser, não prova de dano físico.",
-    "NAO_CONCLUSIVO cobre PID opcional, leituras insuficientes ou necessidade de teste dinâmico/elétrico."
+    "NAO_CONCLUSIVO cobre PID opcional, leituras insuficientes ou necessidade de teste dinâmico/elétrico.",
+    "Cada avaliação numérica exige cinco tentativas e cinco respostas válidas por PID; tentativas sem resposta não são substituídas por zero."
   ],
   "sources": [
     {
@@ -115,7 +116,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "engineOffMaxRpm": 50,
         "engineOnMinRpm": 400
@@ -125,7 +126,7 @@
       "diagnosticRuleIds": [
         "DTC_P0301_MISFIRE"
       ],
-      "aiGuidance": "Confirme RPM em três leituras e compare com a condição selecionada. Resposta do PID não comprova integridade elétrica do CKP."
+      "aiGuidance": "Confirme RPM em cinco leituras e compare com a condição selecionada. Resposta do PID não comprova integridade elétrica do CKP."
     },
     {
       "id": "PID_010D",
@@ -141,7 +142,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "maxStationarySpeedKmh": 3
       },
@@ -164,7 +165,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": 0,
         "max": 100
@@ -190,7 +191,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": -40,
         "max": 215
@@ -219,7 +220,7 @@
         "010C",
         "0105"
       ],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": -100,
         "max": 99.2,
@@ -254,7 +255,7 @@
         "010C",
         "0105"
       ],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": -100,
         "max": 99.2,
@@ -286,7 +287,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": 0,
         "max": 765
@@ -317,7 +318,7 @@
         "010C",
         "0105"
       ],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": 0,
         "max": 255,
@@ -350,7 +351,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": -64,
         "max": 63.5
@@ -376,7 +377,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": -40,
         "max": 215
@@ -403,7 +404,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": 0,
         "max": 655.35
@@ -431,7 +432,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": 0,
         "max": 100
@@ -459,7 +460,7 @@
       "requiredPids": [
         "0105"
       ],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": 0,
         "max": 1.275,
@@ -473,7 +474,7 @@
         "DTC_P0133_O2_SLOW",
         "DTC_P0301_MISFIRE"
       ],
-      "aiGuidance": "Três leituras servem como triagem; alternância, resposta dinâmica e aquecedor exigem amostragem temporal/teste elétrico."
+      "aiGuidance": "cinco leituras servem como triagem; alternância, resposta dinâmica e aquecedor exigem amostragem temporal/teste elétrico."
     },
     {
       "id": "PID_012C",
@@ -489,7 +490,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": 0,
         "max": 100
@@ -513,7 +514,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": -100,
         "max": 99.2
@@ -537,7 +538,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": 0,
         "max": 100
@@ -561,7 +562,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": 0,
         "max": 100
@@ -585,7 +586,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": 10,
         "max": 110
@@ -611,7 +612,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "engineOffMinV": 11.5,
         "engineOnMinV": 12.5,
@@ -636,7 +637,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": 0,
         "max": 25700
@@ -662,7 +663,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": 0,
         "max": 100
@@ -688,7 +689,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": -40,
         "max": 215
@@ -712,7 +713,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": 0,
         "max": 100
@@ -739,7 +740,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": 0,
         "max": 655350
@@ -766,7 +767,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": 0,
         "max": 100
@@ -776,7 +777,7 @@
       "diagnosticRuleIds": [
         "DTC_P0123_THROTTLE"
       ],
-      "aiGuidance": "Não pressione o pedal durante o teste parado; três leituras estáticas só verificam resposta e plausibilidade."
+      "aiGuidance": "Não pressione o pedal durante o teste parado; cinco leituras estáticas só verificam resposta e plausibilidade."
     },
     {
       "id": "PID_015C",
@@ -792,7 +793,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": -40,
         "max": 210
@@ -816,7 +817,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": -210,
         "max": 301.99
@@ -844,7 +845,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": 0,
         "max": 3276.75
@@ -871,7 +872,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": -125,
         "max": 130
@@ -895,7 +896,7 @@
         "ENGINE_ON"
       ],
       "requiredPids": [],
-      "minimumReadings": 3,
+      "minimumReadings": 5,
       "thresholds": {
         "min": -125,
         "max": 130
