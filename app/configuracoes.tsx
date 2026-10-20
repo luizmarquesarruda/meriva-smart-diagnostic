@@ -43,7 +43,13 @@ export default function ConfiguracaoScreen() {
       }
     };
     void refreshNetworkStatus();
-    return () => { disposed = true; };
+    const subscription = Network.addNetworkStateListener((state) => {
+      if (!disposed) setNetworkStatus(describeNetworkState(state));
+    });
+    return () => {
+      disposed = true;
+      subscription.remove();
+    };
   }, []);
 
   useEffect(() => {
