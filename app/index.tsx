@@ -2,8 +2,9 @@ import { Link, useFocusEffect } from 'expo-router';
 import { StartupScreen } from '../src/ui/StartupScreen';
 import { getStartupProgress } from '../src/ui/startupProgress';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AppState, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { AppState, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as Network from 'expo-network';
+import * as Location from 'expo-location';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMidLayout } from '../src/ui/midLayout';
 import * as FileSystem from 'expo-file-system';
@@ -345,6 +346,35 @@ export default function IndexScreen() {
 
   if (showStartupScreen) return <StartupScreen progress={startupProgress} />;
 
+  async function requestWeatherLocation() {
+    try {
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (permission.status !== 'granted') {
+        setDashboardWeather((current) => ({ ...current, status: 'LOCATION_PERMISSION' }));
+        return;
+      }
+      const next = await loadDashboardWeather();
+      setDashboardWeather((current) => {
+        if (next.status === 'READY') return next;
+        if (next.status === 'OFFLINE' || next.status === 'NETWORK_RESTRICTED') {
+          return {
+            ...current,
+            city: current.city ?? next.city,
+            region: current.region ?? next.region,
+            temperatureC: current.temperatureC ?? next.temperatureC,
+            apparentTemperatureC: current.apparentTemperatureC ?? next.apparentTemperatureC,
+            weatherCode: current.weatherCode ?? next.weatherCode,
+            updatedAt: current.updatedAt ?? next.updatedAt,
+            status: next.status,
+          };
+        }
+        return next;
+      });
+    } catch {
+      setDashboardWeather((current) => ({ ...current, status: 'LOCATION_UNAVAILABLE' }));
+    }
+  }
+
   const weatherStatusLabel = dashboardWeather.status === 'READY'
     ? 'CLIMA ATUALIZADO • ' + formatWeatherTime(dashboardWeather.updatedAt)
     : dashboardWeather.status === 'OFFLINE'
@@ -356,9 +386,13 @@ export default function IndexScreen() {
           ? 'REDE RESTRITA • ÚLTIMO DADO ' + formatWeatherTime(dashboardWeather.updatedAt)
           : 'CONSULTA BLOQUEADA PELA PREFERÊNCIA DE REDE'
         : dashboardWeather.status === 'LOCATION_PERMISSION'
-          ? 'ATIVE A LOCALIZAÇÃO DO CELULAR'
+          ? dashboardWeather.updatedAt
+            ? 'LOCALIZAÇÃO DESATIVADA • ÚLTIMO DADO ' + formatWeatherTime(dashboardWeather.updatedAt)
+            : 'TOQUE PARA AUTORIZAR LOCALIZAÇÃO'
           : dashboardWeather.status === 'LOCATION_UNAVAILABLE'
-            ? 'LOCALIZAÇÃO INDISPONÍVEL'
+            ? dashboardWeather.updatedAt
+              ? 'LOCALIZAÇÃO INDISPONÍVEL • ÚLTIMO DADO ' + formatWeatherTime(dashboardWeather.updatedAt)
+              : 'LOCALIZAÇÃO INDISPONÍVEL'
             : 'BUSCANDO CLIMA PELA INTERNET';
   const weatherLocationLabel = dashboardWeather.city
     ? dashboardWeather.city + (dashboardWeather.region && dashboardWeather.region !== dashboardWeather.city ? ' • ' + dashboardWeather.region : '')
@@ -415,7 +449,22 @@ export default function IndexScreen() {
               <Text style={styles.weatherEyebrow} numberOfLines={1}>📍 CLIMA EXTERNO • {networkStatus}</Text>
               <Text style={styles.weatherCity} numberOfLines={1}>{weatherLocationLabel}</Text>
               <Text style={styles.weatherStatus} numberOfLines={1}>{weatherStatusLabel}</Text>
-              <Text style={styles.weatherSource}>DADOS METEOROLÓGICOS: OPEN-METEO (CC BY 4.0)</Text>
+              {dashboardWeather.status === 'LOCATION_PERMISSION' && (
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Autorizar localização para mostrar a cidade e o clima"
+                  onPress={() => void requestWeatherLocation()}
+                >
+                  <Text style={[styles.weatherSource, { color: '#7db3ff', textDecorationLine: 'underline' }]}>AUTORIZAR LOCALIZAÇÃO</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                accessibilityRole="link"
+                accessibilityLabel="Créditos dos dados climáticos: Open-Meteo, licença CC BY 4.0"
+                onPress={() => { void Linking.openURL('https://open-meteo.com/').catch(() => {}); }}
+              >
+                <Text style={[styles.weatherSource, { textDecorationLine: 'underline' }]}>DADOS METEOROLÓGICOS: OPEN-METEO (CC BY 4.0) ↗</Text>
+              </TouchableOpacity>
             </View>
             <View style={styles.weatherTemperature}>
               <Text style={styles.weatherTemp}>{dashboardWeather.temperatureC != null ? Math.round(dashboardWeather.temperatureC) + '°' : '--°'}</Text>
