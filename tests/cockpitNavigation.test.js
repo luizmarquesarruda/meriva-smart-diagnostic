@@ -14,6 +14,14 @@ assert.match(more, /'\/saude'/, 'a central de saúde deve continuar acessível e
 for (const file of ['app/dados.tsx', 'app/saude.tsx', 'app/mais.tsx', 'app/veiculo.tsx', 'app/viagens.tsx', 'app/aprendizado.tsx']) {
   assert.equal(fs.existsSync(path.join(ROOT, file)), true, file + ' deve existir');
 }
+// A settings reload on screen focus must not restart the OBD effect merely
+// because readAppSettings returned a fresh object; navigation remains visible
+// in both orientations.
+assert.doesNotMatch(index, /\}, \[isHydrated, settings\]\);/, 'objeto settings inteiro não pode reiniciar o efeito de conexão');
+assert.match(index, /settings\?\.elmMaxConnectionAttempts/, 'efeito deve reagir às opções OBD efetivamente alteradas');
+assert.match(index, /bottomNavLandscape/, 'navegação inferior deve continuar disponível em paisagem');
+assert.doesNotMatch(index, /!layout\.landscape\s*&&\s*\(/, 'navegação não deve desaparecer ao girar o aparelho');
+
 const dataScreen = read('app/dados.tsx');
 assert.match(dataScreen, /buildTelemetryChart/, 'tela Dados deve usar o modelo de gráfico testável');
 assert.match(dataScreen, /getLiveSeries/, 'gráfico ao vivo deve reutilizar a janela de telemetria existente');
