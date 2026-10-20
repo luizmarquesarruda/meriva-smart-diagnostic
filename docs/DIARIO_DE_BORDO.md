@@ -1,5 +1,35 @@
 # Diário de Bordo - Meriva Smart Diagnostic
 
+## ESTADO VIGENTE E REGRAS ANTI-REGRESSÃO — 2026-10-20
+
+> **Esta seção é a referência operacional atual.** O restante deste arquivo contém registros históricos: falhas, decisões e “próximos passos” antigos descrevem o estado da época e não devem ser tratados como tarefas ainda abertas sem nova verificação. Quando dois registros divergirem, prevalecem este contrato e a entrada cronologicamente mais recente que tenha evidência verificável.
+
+### Estado atual do trabalho
+- Repositório: `luizmarquesarruda/meriva-smart-diagnostic`.
+- Branch de trabalho: `fix/restore-five-readings-manual-pids-20261020`.
+- PR #74: aberta e **não mesclada**. Nenhum merge pode ser feito sem autorização explícita do usuário.
+- Último commit de código conhecido antes desta atualização documental: `2b853e9830213b23f520a7e7eb12e7cbb7e8a237`.
+- CI #2560, run [39449909465](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/39449909465): `validate` **PASS** (inclui `npm ci`, Expo Doctor e `npm run validate`); `android-build` estava **em execução** durante a consulta. Não declarar a CI inteira verde até o resultado final de `android-build`. O registro final deve ser atualizado após consultar a execução.
+- Esta alteração atualiza somente a documentação e as salvaguardas de processo; não altera lógica de produção, dependências ou configuração nativa.
+
+### Contratos que não podem regredir
+1. **Testes de sensores:** cinco tentativas sequenciais por PID e cinco respostas válidas para uma avaliação numérica. Calcular a média aritmética das cinco amostras válidas. Resposta ausente, inválida ou timeout não vira zero e não conta como leitura válida; amostragem incompleta = inconclusiva/sem resposta, nunca aprovada.
+2. **Consulta manual de PID:** manter a rota/atalho de consulta manual, validação e normalização Mode 01, parser usando o mesmo PID solicitado e lista de PIDs selecionável. Distinguir descoberta na sessão atual de itens vindos do cache. Cache não comprova suporte atual; somente resposta ECU real apropriada é evidência atual.
+3. **Bluetooth/ELM327:** manter Bluetooth Classic e uma única fila serial compartilhada; não iniciar polling/conexão em paralelo a partir do layout ou de uma segunda tela. A tela inicial é a proprietária do fluxo automático de conexão inicial. Conexão Bluetooth não equivale a ECU respondendo; validar ECU com resposta OBD real, não apenas nome do adaptador ou estado do socket. Tentativas/reconexões têm limite e nunca podem entrar em laço infinito.
+4. **Offline por padrão:** regras locais, diagnóstico básico, leitura de PIDs, execução dos testes e acesso ao histórico salvo precisam funcionar sem internet. Clima/cidade são enriquecimento visual opcional, jamais pré-requisito nem entrada do motor diagnóstico. Falha online deve degradar para N/D sem bloquear nem reiniciar a conexão OBD.
+5. **Localização e privacidade:** não solicitar localização automaticamente para mostrar clima. Só usar GPS para esse enriquecimento quando a permissão de primeiro plano já existir. Erro de permissão, localização ou rede não pode interromper o diagnóstico.
+6. **Origem dos dados:** manter `REAL`, `REAL_OBD`, `SIMULACAO` e `CARSCANNER_SEED` semanticamente separados. Seeds/simulações nunca podem se tornar evidência real, contaminar consumo real, gráfico operacional ou decisão diagnóstica. Amostras ausentes não são interpoladas nem inventadas; dados antigos/desconectados aparecem como N/D, não como leitura atual.
+7. **GPS/viagens:** reutilizar o rastreador e o serviço de viagem existentes; evitar watchers/tarefas nativas duplicadas, amostras com timestamp repetido/fora de ordem e redução indevida da distância. Não salvar consumo como válido quando as amostras de combustível/distância não são suficientes. Parar monitoramento nativo consultando seu estado real, sem depender somente de flag JavaScript.
+8. **Expo e dependências:** manter Expo SDK 51 e o lockfile coerente. Antes de adicionar pacote, procurar e reutilizar o módulo já instalado; não trocar bibliotecas de Bluetooth, gráficos ou armazenamento sem necessidade comprovada e teste de compatibilidade.
+9. **Testes sem fragilidade textual:** preferir testes de funções puras, saída observável, contratos JSON, fila/estados e comportamento. Não criar teste que dependa apenas de palavras em comentários, mensagens explicativas ou formatação incidental.
+10. **CI obrigatória:** a validação de referência é a CI da cabeça mais recente, com `validate` e `android-build` concluídos com sucesso. `validate` inclui TypeScript e a suíte completa; o Android build deve completar prebuild, APK, verificação e artefato. Falha em qualquer etapa não é conclusão. Uma CI verde não substitui teste físico de ELM327/ECU ou inspeção visual em aparelho.
+11. **Diário em primeiro lugar:** antes de editar código, ler esta seção e a entrada final mais recente; conferir branch, SHA e CI no GitHub; escrever problema → causa comprovada → alteração → testes → commit → CI → resultado → próximos passos. Atualizar este arquivo com evidências, nunca com resultados presumidos.
+12. **Histórico não é fila de tarefas:** entradas anteriores preservam o contexto da época. Não repetir seus “próximos passos” automaticamente nem desfazer correções posteriores; confirmar primeiro se ainda estão pendentes no código e na CI.
+
+---
+
+Este arquivo é o registro operacional das correções, auditorias e decisões técnicas do projeto.
+
 Este arquivo é o registro operacional das correções, auditorias e decisões técnicas do projeto.
 
 ## Regra de trabalho
@@ -2388,7 +2418,9 @@ Revisão estática feita contra os contratos de `sharedConnection`, `Elm327Sessi
 Revisar o diff completo, executar validação TypeScript/testes e build Android, depois testar fisicamente no veículo: primeiro motor desligado, depois motor aquecido em marcha lenta. Não testar durante a condução.
 
 
-## 2026-10-14 — Catálogo JSON, IA de triagem e três leituras por PID
+## 2026-10-14 — [HISTÓRICO SUPERSEDIDO EM 2026-10-20] Catálogo JSON, IA de triagem e três leituras por PID
+
+> **Nota histórica:** esta entrada descreve a versão então implementada. A exigência atual é de cinco leituras sequenciais e cinco valores válidos, conforme a entrada de 2026-10-20 “Restaurar cinco leituras do Laboratório e consulta manual de PID”. Não reduzir para três nem usar este registro histórico como especificação atual.
 
 ### Pesquisa técnica e limites de evidência
 - Consultadas referências públicas SAE J1979/OBD-II e tabelas abertas de PIDs para conferir definição/fórmula, além do Manual do Proprietário Meriva 2012, auditoria da Bíblia e material técnico secundário Econoflex.
@@ -2597,14 +2629,41 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - `4f1c2b1dbbab99035ccd6fafb28440e850c447cc` — testes de fallback online/offline.
 - `b980bdf6ed16c3c07d90af650b5c60edbf434768` — suíte de teste atualizada.
 
-### Testes e CI
-- Testes automatizados e build Android para os commits desta etapa devem ser considerados **pendentes até a CI da cabeça final da branch terminar**. Não declarar a mudança validada antes de `validate` e `android-build` ficarem verdes.
-- A execução anterior da PR, run [39448090512](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/39448090512), validou a versão anterior do branch, mas **não cobre** os commits de clima listados acima.
-- Não foi possível executar `npm run validate` localmente por não haver checkout local conectado nesta sessão; a CI do GitHub é a fonte de validação de código.
+### Testes e CI — status registrado em 2026-10-20
+- Run [39449909465 / CI #2560](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/39449909465), commit de código `2b853e9830213b23f520a7e7eb12e7cbb7e8a237`: `npm ci` **PASS**, Expo Doctor **PASS**, `npm run validate` **PASS**.
+- No momento da atualização deste trecho, `android-build` ainda estava montando o APK release standalone. Portanto, **a CI completa continua pendente** até aparecer conclusão `success` nesse job e terminar verificação/upload do APK.
+- A execução anterior [39448090512](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/39448090512) passou em ambos os jobs para um commit anterior, mas não substitui a confirmação da cabeça atual.
+- Este status é um retrato do run consultado; ao atualizar a CI, registrar o resultado real sem inferir PASS com base em uma etapa intermediária.
 
 ### Limites e próximos passos
-1. Aguardar CI da cabeça final e corrigir qualquer falha com base nos logs.
+1. Confirmar o resultado final de `android-build` para o código de clima opcional e atualizar este diário com evidência.
 2. Verificar o APK instalado: página inicial online, modo avião, permissão de localização negada e retorno de internet.
 3. Testar no carro a estabilidade Bluetooth/ECU, cinco leituras sequenciais, consulta manual PID e gravação/encerramento GPS; CI não substitui o teste físico.
-4. Capturar telas atuais em retrato e paisagem para a auditoria visual de Product Design e acessibilidade.
+4. Capturar telas atuais em retrato e paisagem para verificar legibilidade, overflow e acessibilidade.
 5. Manter a PR #74 aberta até revisão final e autorização explícita de merge.
+
+
+## 2026-10-20 — Consolidação do diário e salvaguardas contra regressões
+
+### Problema
+O diário cresceu e passou a reunir muitos “próximos passos” históricos. A implementação de três leituras em 14/10 aparecia perto de registros mais recentes que exigem cinco, criando risco de um agente futuro seguir uma descrição antiga em vez da regra atual. Havia também vários estados de CI pendentes que pertenciam a commits anteriores.
+
+### Correção documental
+- Adicionada no início uma seção de estado vigente e contratos anti-regressão, com a ordem de precedência explícita: estado atual + entrada mais recente verificada > registros históricos.
+- Destacadas como invariantes as cinco leituras válidas, consulta manual e seleção de PIDs, fila serial única ELM327, modo offline, fronteiras entre dados reais/seeds/simulação, regras de GPS/viagens, compatibilidade Expo SDK 51 e CI completa.
+- Marcada a seção de 14/10 sobre três leituras como histórica e supersedida pela correção de 20/10.
+- Atualizado o bloco de CI da entrada P1–P5 com o status realmente observado do run 39449909465: `validate` passou; `android-build` ainda estava em execução na última consulta. Não foi presumida aprovação final.
+- Preservados os diagnósticos de falhas antigas e as correções que servem como evidência de regressões já ocorridas. Não foram apagados históricos técnicos só para encurtar o arquivo.
+- Nenhum arquivo de produção, dependência, catálogo de PIDs ou configuração Android foi alterado nesta consolidação.
+
+### Verificação e CI
+- Base documental lida integralmente: 2.611 linhas na versão anterior.
+- Branch: `fix/restore-five-readings-manual-pids-20261020`.
+- PR #74 continua aberta e não mesclada.
+- A alteração é documental. A nova CI associada ao commit deste diário deve ser observada separadamente; o run anterior não deve ser descrito como validação de um SHA posterior.
+
+### Resultado
+O diário agora oferece primeiro o contrato que deve ser obedecido antes de apresentar o histórico. O registro de três leituras permanece apenas para explicar a regressão passada; não é mais uma instrução operacional.
+
+### Próximo passo
+Confirmar a nova execução de CI após este commit e atualizar o registro final de `validate` e `android-build`. Depois da CI, executar validação física no Android/ELM327 e verificação visual retrato/paisagem; não fazer merge sem autorização.
