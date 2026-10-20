@@ -8,7 +8,9 @@ const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
 const index = read('app/index.tsx');
 const more = read('app/mais.tsx');
 const laboratory = read('app/laboratorio.tsx');
-for (const route of ['/dados', '/saude', '/mais']) assert.match(index, new RegExp(route.replace('/', '\\/')), 'cockpit deve expor a rota ' + route);
+for (const route of ['/dados', '/mais']) assert.match(index, new RegExp(route.replace('/', '\\/')), 'cockpit deve expor a rota ' + route);
+assert.doesNotMatch(index, /href="\/saude"/, 'saúde detalhada não deve duplicar o cartão na página inicial');
+assert.match(more, /'\/saude'/, 'a central de saúde deve continuar acessível em Mais Recursos');
 for (const file of ['app/dados.tsx', 'app/saude.tsx', 'app/mais.tsx', 'app/veiculo.tsx', 'app/viagens.tsx', 'app/aprendizado.tsx']) {
   assert.equal(fs.existsSync(path.join(ROOT, file)), true, file + ' deve existir');
 }
