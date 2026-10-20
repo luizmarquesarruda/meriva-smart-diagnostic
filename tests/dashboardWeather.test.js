@@ -34,7 +34,7 @@ mod.paths = Module._nodeModulePaths(path.dirname(sourcePath));
 mod._compile(output, sourcePath);
 Module._load = originalLoad;
 
-const { parseCurrentWeather, resolveCityName, describeWeatherCode } = mod.exports;
+const { parseCurrentWeather, parseCachedWeather, resolveCityName, describeWeatherCode } = mod.exports;
 
 assert.deepEqual(
   parseCurrentWeather({
@@ -49,6 +49,30 @@ assert.deepEqual(
 assert.equal(parseCurrentWeather(null), null);
 assert.equal(parseCurrentWeather({ current: { temperature_2m: 'N/D' } }), null);
 assert.equal(parseCurrentWeather({ current: { temperature_2m: 150 } }), null);
+const cachedAt = '2026-10-20T08:00:00.000Z';
+assert.deepEqual(
+  parseCachedWeather({
+    status: 'READY',
+    city: 'Sorocaba',
+    region: 'São Paulo',
+    temperatureC: 24.4,
+    apparentTemperatureC: 27.1,
+    weatherCode: 2,
+    updatedAt: cachedAt,
+  }),
+  {
+    status: 'OFFLINE',
+    city: 'Sorocaba',
+    region: 'São Paulo',
+    temperatureC: 24.4,
+    apparentTemperatureC: 27.1,
+    weatherCode: 2,
+    updatedAt: cachedAt,
+  },
+);
+assert.equal(parseCachedWeather({ temperatureC: 150, updatedAt: cachedAt }), null);
+assert.equal(parseCachedWeather({ temperatureC: 24, updatedAt: 'data inválida' }), null);
+assert.equal(parseCachedWeather(null), null);
 assert.equal(resolveCityName({ city: 'Sorocaba', subregion: 'Região Metropolitana', district: 'Centro', region: 'São Paulo' }), 'Sorocaba');
 assert.equal(resolveCityName({ city: null, subregion: 'Sorocaba', district: null, region: 'São Paulo' }), 'Sorocaba');
 assert.equal(resolveCityName({ city: null, subregion: null, district: null, region: 'São Paulo' }), 'São Paulo');
