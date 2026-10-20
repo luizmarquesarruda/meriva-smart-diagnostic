@@ -2,9 +2,11 @@ import * as FileSystem from 'expo-file-system';
 
 export type FuelType = 'FLEX' | 'ETANOL' | 'GASOLINA';
 export type DistanceUnit = 'KM' | 'MI';
+export type NetworkMode = 'WIFI_ONLY' | 'WIFI_AND_MOBILE' | 'OFFLINE';
 export interface AppSettings {
   fuelType: FuelType;
   distanceUnit: DistanceUnit;
+  networkMode: NetworkMode;
   autoConnectObd: boolean;
   diagnosticAlerts: boolean;
   selectedAdapterAddress: string | null;
@@ -40,6 +42,7 @@ export function subscribeAppSettings(listener: (settings: AppSettings) => void):
 const DEFAULT_SETTINGS: AppSettings = {
   fuelType: 'FLEX',
   distanceUnit: 'KM',
+  networkMode: 'WIFI_AND_MOBILE',
   autoConnectObd: true,
   diagnosticAlerts: true,
   selectedAdapterAddress: null,
@@ -80,6 +83,7 @@ export async function readAppSettings(basePath: string): Promise<AppSettings> {
     const settings: AppSettings = {
       fuelType: parsed.fuelType === 'GASOLINA' ? 'GASOLINA' : parsed.fuelType === 'ETANOL' ? 'ETANOL' : 'FLEX',
       distanceUnit: parsed.distanceUnit === 'MI' ? 'MI' : 'KM',
+      networkMode: parsed.networkMode === 'WIFI_ONLY' || parsed.networkMode === 'OFFLINE' ? parsed.networkMode : 'WIFI_AND_MOBILE',
       autoConnectObd: parsed.autoConnectObd !== false,
       diagnosticAlerts: parsed.diagnosticAlerts !== false,
       selectedAdapterAddress: typeof parsed.selectedAdapterAddress === 'string' && parsed.selectedAdapterAddress.trim()
