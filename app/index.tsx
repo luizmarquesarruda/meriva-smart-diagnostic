@@ -3,6 +3,7 @@ import { StartupScreen } from '../src/ui/StartupScreen';
 import { getStartupProgress } from '../src/ui/startupProgress';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppState, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import * as Network from 'expo-network';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMidLayout } from '../src/ui/midLayout';
 import * as FileSystem from 'expo-file-system';
@@ -18,6 +19,7 @@ import { readAppSettings, type AppSettings } from '../src/database/appSettings';
 import { connectPreferredElm, getSharedObdConnection, getSharedObdLastError, getSharedObdStatus, subscribeSharedObd, subscribeSharedObdStatus } from '../src/obd/sharedConnection';
 import { autoTripService, type AutoTripServiceState } from '../src/trip/autoTripService';
 import { describeWeatherCode, loadDashboardWeather, type DashboardWeather } from '../src/weather/dashboardWeather';
+import { describeNetworkState } from '../src/network/networkPolicy';
 
 const STARTUP_TIMEOUT_MS = 30_000;
 
@@ -38,9 +40,11 @@ export default function IndexScreen() {
   const [dtcCount, setDtcCount] = useState(0);
   const [activeHeroMetric, setActiveHeroMetric] = useState(0);
   const [dashboardWeather, setDashboardWeather] = useState<DashboardWeather>({ status: 'LOADING', city: null, region: null, temperatureC: null, apparentTemperatureC: null, weatherCode: null, updatedAt: null });
+  const [networkStatus, setNetworkStatus] = useState('VERIFICANDO REDE...');
   const layout = useMidLayout();
 
   useEffect(() => {
+    if (!settings) return;
     let disposed = false;
     let inFlight = false;
 
@@ -54,12 +58,16 @@ export default function IndexScreen() {
           if (next.status === 'READY' || next.status === 'LOCATION_PERMISSION' || next.status === 'LOCATION_UNAVAILABLE') {
             return next;
           }
-          // Preserve the last valid temperature while offline, with its original timestamp.
+          // Use the in-memory observation first, or the validated disk cache after an app restart.
           return {
             ...current,
-            city: next.city ?? current.city,
-            region: next.region ?? current.region,
-            status: 'OFFLINE',
+            city: current.city ?? next.city,
+            region: current.region ?? next.region,
+            temperatureC: current.temperatureC ?? next.temperatureC,
+            apparentTemperatureC: current.apparentTemperatureC ?? next.apparentTemperatureC,
+            weatherCode: current.weatherCode ?? next.weatherCode,
+            updatedAt: current.updatedAt ?? next.updatedAt,
+            status: next.status,
           };
         });
       } catch {
@@ -80,7 +88,37 @@ export default function IndexScreen() {
       clearInterval(interval);
       appStateSubscription.remove();
     };
-  }, []);
+  }, [settings?.networkMode]);
+
+  useEffect(() => {
+    let disposed = false;
+    const refreshNetworkStatus = async () => {
+      try {
+        const state = await Network.getNetworkStateAsync();
+        if (disposed) return;
+        const detected = describeNetworkState(state);
+        if (settings?.networkMode === 'OFFLINE') {
+          setNetworkStatus('MODO OFFLINE');
+        } else if (settings?.networkMode === 'WIFI_ONLY' && detected === 'DADOS MÓVEIS') {
+          setNetworkStatus('DADOS MÓVEIS BLOQUEADOS');
+        } else {
+          setNetworkStatus(detected);
+        }
+      } catch {
+        if (!disposed) setNetworkStatus('REDE INDISPONÍVEL');
+      }
+    };
+    void refreshNetworkStatus();
+    const timer = setInterval(() => { void refreshNetworkStatus(); }, 10_000);
+    const appStateSubscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void refreshNetworkStatus();
+    });
+    return () => {
+      disposed = true;
+      clearInterval(timer);
+      appStateSubscription.remove();
+    };
+  }, [settings?.networkMode]);
 
   useEffect(() => gpsTracker.subscribe(setGpsState), []);
   useEffect(() => autoTripService.subscribe(setTripState), []);
@@ -308,16 +346,20 @@ export default function IndexScreen() {
   if (showStartupScreen) return <StartupScreen progress={startupProgress} />;
 
   const weatherStatusLabel = dashboardWeather.status === 'READY'
-    ? 'ONLINE • ' + formatWeatherTime(dashboardWeather.updatedAt)
+    ? 'CLIMA ATUALIZADO • ' + formatWeatherTime(dashboardWeather.updatedAt)
     : dashboardWeather.status === 'OFFLINE'
       ? dashboardWeather.updatedAt
         ? 'SEM INTERNET • ÚLTIMO DADO ' + formatWeatherTime(dashboardWeather.updatedAt)
-        : 'SEM INTERNET • AGUARDANDO 4G/5G'
-      : dashboardWeather.status === 'LOCATION_PERMISSION'
-        ? 'ATIVE A LOCALIZAÇÃO DO CELULAR'
-        : dashboardWeather.status === 'LOCATION_UNAVAILABLE'
-          ? 'LOCALIZAÇÃO INDISPONÍVEL'
-          : 'BUSCANDO CLIMA PELA INTERNET';
+        : 'SEM INTERNET • AGUARDANDO WI-FI/4G/5G'
+      : dashboardWeather.status === 'NETWORK_RESTRICTED'
+        ? dashboardWeather.updatedAt
+          ? 'REDE RESTRITA • ÚLTIMO DADO ' + formatWeatherTime(dashboardWeather.updatedAt)
+          : 'CONSULTA BLOQUEADA PELA PREFERÊNCIA DE REDE'
+        : dashboardWeather.status === 'LOCATION_PERMISSION'
+          ? 'ATIVE A LOCALIZAÇÃO DO CELULAR'
+          : dashboardWeather.status === 'LOCATION_UNAVAILABLE'
+            ? 'LOCALIZAÇÃO INDISPONÍVEL'
+            : 'BUSCANDO CLIMA PELA INTERNET';
   const weatherLocationLabel = dashboardWeather.city
     ? dashboardWeather.city + (dashboardWeather.region && dashboardWeather.region !== dashboardWeather.city ? ' • ' + dashboardWeather.region : '')
     : dashboardWeather.status === 'LOCATION_PERMISSION'
@@ -370,7 +412,7 @@ export default function IndexScreen() {
           </View>
           <View style={[styles.weatherCard, layout.landscape && styles.weatherCardLandscape]}>
             <View style={styles.weatherLocation}>
-              <Text style={styles.weatherEyebrow}>📍 CLIMA EXTERNO</Text>
+              <Text style={styles.weatherEyebrow} numberOfLines={1}>📍 CLIMA EXTERNO • {networkStatus}</Text>
               <Text style={styles.weatherCity} numberOfLines={1}>{weatherLocationLabel}</Text>
               <Text style={styles.weatherStatus} numberOfLines={1}>{weatherStatusLabel}</Text>
               <Text style={styles.weatherSource}>DADOS METEOROLÓGICOS: OPEN-METEO (CC BY 4.0)</Text>
