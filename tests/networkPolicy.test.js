@@ -43,6 +43,12 @@ assert.equal(describeNetworkState(mobile), 'DADOS MÓVEIS');
 assert.equal(describeNetworkState(noInternet), 'REDE SEM INTERNET');
 assert.equal(describeNetworkState(disconnected), 'SEM REDE');
 
+const settingsUi = fs.readFileSync(path.resolve(__dirname, '../app/configuracoes.tsx'), 'utf8');
+assert(settingsUi.includes("settings.networkMode === 'WIFI_ONLY'"));
+assert(settingsUi.includes("settings.networkMode === 'WIFI_AND_MOBILE'"));
+assert(settingsUi.includes("settings.networkMode === 'OFFLINE'"));
+assert(settingsUi.includes('Network.addNetworkStateListener'), 'configurações devem acompanhar mudanças de rede automaticamente');
+
 const settingsSource = fs.readFileSync(path.resolve(__dirname, '../src/database/appSettings.ts'), 'utf8');
 const weatherSource = fs.readFileSync(path.resolve(__dirname, '../src/weather/dashboardWeather.ts'), 'utf8');
 const bluetoothSource = fs.readFileSync(path.resolve(__dirname, '../src/obd/sharedConnection.ts'), 'utf8');
