@@ -14,8 +14,13 @@ assert.match(more, /'\/saude'/, 'a central de saúde deve continuar acessível e
 for (const file of ['app/dados.tsx', 'app/saude.tsx', 'app/mais.tsx', 'app/veiculo.tsx', 'app/viagens.tsx', 'app/aprendizado.tsx']) {
   assert.equal(fs.existsSync(path.join(ROOT, file)), true, file + ' deve existir');
 }
-assert.match(read('app/dados.tsx'), /getLivePidTrend/);
-assert.match(read('app/dados.tsx'), /formatSparkline/);
+const dataScreen = read('app/dados.tsx');
+assert.match(dataScreen, /buildTelemetryChart/, 'tela Dados deve usar o modelo de gráfico testável');
+assert.match(dataScreen, /getLiveSeries/, 'gráfico ao vivo deve reutilizar a janela de telemetria existente');
+assert.match(dataScreen, /source === 'REAL_OBD'/, 'histórico deve excluir viagens simuladas e seeds');
+assert.match(dataScreen, /item\.source === 'REAL'/, 'últimas leituras devem excluir origem de simulação');
+assert.match(dataScreen, /telemetrySamples/, 'histórico deve reutilizar amostras persistidas por viagem');
+assert.match(dataScreen, /VIAGENS SALVAS/, 'tela deve oferecer modo interativo de histórico');
 assert.match(read('app/saude.tsx'), /runLocalDiagnostic/);
 assert.match(read('app/saude.tsx'), /activeDtcs/);
 assert.match(read('app/aprendizado.tsx'), /realSamples/);

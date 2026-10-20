@@ -2524,3 +2524,32 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Instalar o APK da CI e conferir os quatro indicadores em retrato/paisagem, a alternância de 10 segundos e o comportamento N/D com ECU desconectada.
 - No carro parado, confirmar leituras reais de 0105/0142/0111/010C e validar os fluxos do Laboratório: cinco leituras sequenciais, respostas ausentes, PID manual inválido e PID selecionado da lista. Distinguir sempre PID guardado em cache de suporte confirmado pela ECU atual.
 - Rever o diff completo da PR e só então decidir o merge.
+
+
+## 2026-10-20 — Gráficos de telemetria ao vivo e histórico por viagem
+
+### Problema e diagnóstico
+- A tela Dados já mostrava sparklines textuais de quatro parâmetros, mas não permitia examinar curvas nem comparar telemetria de uma viagem real finalizada.
+- O projeto já tinha fontes apropriadas: janela móvel em memória por PID, com limite de 120 pontos por PID, e pontos temporais esparsos persistidos em viagens reais (no máximo 720 pontos por viagem, com intervalo mínimo de 10 s). Criar um segundo logger/histórico seria redundante e aumentaria I/O no Android.
+- A lista de “últimas leituras reais” usava a ordem do array cacheado e não filtrava explicitamente origem SIMULAÇÃO, portanto precisava ser ordenada pelo timestamp e filtrada por fonte.
+
+### Correção implementada
+- Criado `src/obd/telemetryChart.ts`, helper puro para calcular coordenadas, segmentos e estatísticas de gráfico sem dependências externas.
+- O helper descarta timestamps inválidos/futuros e valores numéricos inválidos, limita a janela desenhada e **não liga os dois lados de uma amostra ausente**; séries vazias/dimensões inválidas retornam sem gráfico.
+- `app/dados.tsx`: adicionado seletor de parâmetros reais para a série da sessão ECU atual e alternância para telemetria persistida em viagens `REAL_OBD` finalizadas.
+- Histórico de viagem usa somente `DriveCycle.telemetrySamples` já gravado. Viagens `SIMULACAO`, `CARSCANNER_SEED` e viagens antigas sem amostras não recebem valores artificiais.
+- A sessão ao vivo usa `getLiveSeries()` existente; quando a ECU está desconectada, o gráfico não reapresenta amostras antigas como se fossem atuais.
+- As últimas leituras agora filtram `source === 'REAL'` e são ordenadas pelo timestamp mais recente.
+- Não foram adicionados pacotes, servidores nem novas consultas OBD; o polling ELM327 permanece serial.
+
+### Testes adicionados
+- `tests/liveTelemetry.test.js`: cobre cálculo de mínimos/máximos/média/variação, coordenadas dentro dos limites, amostra faltante sem segmento cruzado, timestamps inválidos/futuros, série vazia, dimensões inválidas e séries planas.
+- `tests/cockpitNavigation.test.js`: protege a reutilização da janela de telemetria, o histórico `REAL_OBD`, o filtro das últimas leituras reais e o modo de viagens salvas.
+
+### Validação e CI
+- Esta implementação foi publicada no branch `fix/restore-five-readings-manual-pids-20261020`; **TypeScript, suíte completa e APK Android estão pendentes da CI deste commit**. Registrar o run e o resultado após a execução, sem assumir PASS antecipado.
+- Teste físico ainda pendente: confirmar no aparelho as curvas ao vivo, o comportamento sem ECU, a navegação retrato/paisagem e que uma viagem recém-finalizada aparece no histórico local com as amostras efetivamente gravadas.
+
+### Próximo passo
+- Aguardar CI completa (`validate` e `android-build`), corrigir falhas pela evidência do log e registrar o resultado final.
+- Após instalar o APK, conferir amostras reais na Meriva/ELM327; não tratar a validação automatizada como prova de precisão dos sensores nem de suporte a todos os PIDs.
