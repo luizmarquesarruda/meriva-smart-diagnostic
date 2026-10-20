@@ -2552,3 +2552,34 @@ Conferir o resultado integral da CI, corrigir qualquer falha antes de novo dispa
 - **Correção:** removida a segunda declaração de `danger` adicionada junto aos estilos do cartão de clima; preservada a declaração já existente compartilhada pelos indicadores.
 - **Build Android:** ignorado pela dependência do job `validate`; aguardando nova execução após esta correção.
 - **Próximo passo:** confirmar `validate` e `android-build` verdes na nova CI.
+
+
+## 2026-10-19 — Política de rede offline-first (primeira etapa)
+
+### Requisitos
+- Diagnóstico básico, regras locais da IA, leitura de PIDs e testes do veículo não podem depender de internet.
+- Detectar mudanças de conectividade e permitir Wi-Fi apenas, Wi-Fi + dados móveis ou modo totalmente offline.
+- Consultas e atualizações on-line são opcionais; falhas de rede não podem comandar o ciclo de vida do Bluetooth/ELM327.
+- Relatórios não devem ser enviados automaticamente; eventual envio remoto exige autorização explícita.
+
+### Implementação nesta branch
+- Adicionada a dependência Expo Network compatível com Expo SDK 51 e atualizados package.json e package-lock.json.
+- Criado src/network/networkPolicy.ts para avaliar tipo de rede, conectividade e disponibilidade de internet.
+- AppSettings agora persiste networkMode; instalações existentes recebem WIFI_AND_MOBILE como padrão sem perder as demais preferências.
+- A tela Configurações mostra o tipo/estado da rede em tempo real e oferece os três modos solicitados.
+- A consulta opcional de clima/cidade respeita o modo salvo e falha fechada se não for possível ler a preferência ou o estado da rede.
+- O módulo src/obd/sharedConnection.ts não importa nem observa Expo Network; a política de rede não abre, fecha nem reinicia conexões OBD.
+- Adicionado tests/networkPolicy.test.js para os modos, perda de internet, migração da preferência, monitoramento de rede e separação estática do módulo Bluetooth.
+
+### Privacidade e escopo
+- Não foi criado endpoint nem mecanismo de envio remoto de relatórios. O aplicativo não envia relatórios automaticamente; um fluxo de envio futuro deverá mostrar o conteúdo/destinatário e exigir confirmação explícita.
+- Esta etapa não implementa ainda sincronização remota da base de conhecimento ou atualizações de IA; mantém a IA local e estabelece a política que esses recursos deverão respeitar.
+- A permissão Android INTERNET já existia nesta branch. A presença da permissão, isoladamente, não prova conectividade nem funcionamento offline.
+
+### Validação
+- CI-base #2473 (commit pai d0ce02c7807e971612ffae7aad83baec4f18918c): validate e android-build concluíram com sucesso.
+- A CI da nova branch precisa validar a dependência/lockfile, Expo Doctor, TypeScript, testes e APK Android. A etapa offline-first permanece não validada por CI até ambos os jobs da nova execução terminarem verdes.
+- Teste físico de desconexão da internet com ELM327 conectado ainda pendente.
+
+### Próximo passo
+Acompanhar a CI da branch feat/offline-first-network-policy-20261019. Se falhar, corrigir com base nos logs antes de novo disparo. Depois, testar no Android com Wi-Fi desligado, dados móveis desligados, rede sem acesso à internet e troca de Wi-Fi para dados móveis, confirmando que a sessão OBD não reinicia.
