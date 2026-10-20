@@ -2485,3 +2485,42 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Revisar o diff final da PR #74 e executar teste no veículo: cinco amostras por PID, falha de resposta, PID inválido, seleção de PID descoberto/cacheado e consulta manual real.
 - Confirmar que a lista mostra claramente a diferença entre PID descoberto na sessão atual e PID recuperado do cache antes de tratar a informação como suporte confirmado.
 - Não integrar a PR até concluir a revisão do diff e o teste de regressão funcional, caso permaneça alguma divergência de UX.
+
+
+## 2026-10-20 — Cockpit inicial: indicadores OBD e estado de falhas
+
+### Problema
+- O indicador rotativo principal ainda incluía velocidade GPS, embora o cockpit devesse priorizar os quatro parâmetros OBD definidos.
+- O cartão grande “Saúde do veículo” repetia conteúdo/navegação da central detalhada.
+- O contador de falhas podia mostrar “NORMAL” com a ECU desconectada, confundindo ausência de leitura atual com ausência de DTC.
+- O estilo visual de alerta térmico podia sobrescrever a tipografia do valor principal.
+
+### Diagnóstico
+- As correções pertencem à apresentação do cockpit. Não foi necessário alterar a fila serial ELM327, o parser de PIDs, a descoberta OBD ou os serviços de conexão.
+- Os quatro indicadores usam leituras reais finitas e recentes (até 30 segundos), somente com ECU conectada; caso contrário, mostram N/D.
+- A central detalhada de saúde continua acessível em Mais Recursos, pela rota /saude.
+
+### Correção
+- O ciclo de 10 segundos agora percorre temperatura do motor (0105), tensão do módulo (0142), posição da borboleta (0111) e RPM (010C). O toque no indicador continua permitindo avançar manualmente.
+- Removido da página inicial o cartão duplicado de saúde, sem excluir a tela /saude.
+- O contador de falhas mostra N/D quando a ECU não está conectada; com conexão atual, mostra quantidade de DTCs ou SEM DTC.
+- Estilo de alerta térmico limitado à cor, preservando o tamanho do valor principal.
+- Criados testes de regressão em tests/orientationLayout.test.js e tests/cockpitNavigation.test.js para proteger o conjunto de quatro métricas, o estado N/D e a navegação para a central de saúde.
+
+### Testes e CI
+- [CI #2542](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/39437018218): job validate **success**; job android-build **success**.
+- Expo Doctor: **17/17** verificações aprovadas.
+- npm run validate: **success**.
+- Prebuild Android, montagem do APK standalone, verificação do APK e upload do artefato: **success**.
+- Commit de código validado: b2d90079a5d12e3468f40289ebe5b0b776ecc231.
+- Artefato meriva-smart-diagnostic-standalone-apk: 27.443.656 bytes, SHA-256 126605b500ea50b7858cc5d6d0a9c7445bc16a87074e829ad2997d7ca34e93d6; disponível até 2026-11-03 no GitHub Actions (requer acesso ao repositório).
+
+### Resultado e limites
+- Cockpit e validação automatizada/build Android verdes no commit registrado acima.
+- A validação automatizada não substitui a verificação física no aparelho. Ainda não foi realizado teste desta revisão com ELM327/ECU reais, nem verificação visual final em retrato e paisagem.
+- PR #74 continua aberta e não foi integrada ao main.
+
+### Próximo passo
+- Instalar o APK da CI e conferir os quatro indicadores em retrato/paisagem, a alternância de 10 segundos e o comportamento N/D com ECU desconectada.
+- No carro parado, confirmar leituras reais de 0105/0142/0111/010C e validar os fluxos do Laboratório: cinco leituras sequenciais, respostas ausentes, PID manual inválido e PID selecionado da lista. Distinguir sempre PID guardado em cache de suporte confirmado pela ECU atual.
+- Rever o diff completo da PR e só então decidir o merge.
