@@ -2597,3 +2597,31 @@ Acompanhar a CI da branch feat/offline-first-network-policy-20261019. Se falhar,
 - Correção: a tela Configurações agora consulta `getNetworkStateAsync` a cada 10 segundos e ao voltar ao primeiro plano via `AppState`, usando APIs compatíveis com SDK 51. O teste foi ajustado para proteger esse comportamento.
 - A sessão Bluetooth/OBD não é envolvida no monitoramento. O intervalo consulta apenas o estado da rede e não faz requisições de internet.
 - A próxima CI deve confirmar TypeScript, todos os testes e APK Android; ainda não declarar a etapa validada.
+
+
+
+## 2026-10-19 — P1/P2: política de rede, conectividade da home e clima com cache
+
+### Auditoria de integração e PRs
+- As PRs #71 (remoção do cartão duplicado), #72 (clima/dados móveis) e #73 (consolidação da home, navegação, startup e política offline-first) estavam fechadas com `merged: false`; nenhuma alteração dessas PRs foi integrada pela operação de merge.
+- A comparação `main...fix/restore-bottom-navigation-20261019` indicou a branch consolidada 32 commits à frente, sem commits exclusivos no lado-base no momento da revisão. As branches das PRs #71 e #72 são linhas divergentes e não devem ser mescladas separadamente sobre a consolidação.
+- Nenhum merge na `main` foi realizado nesta etapa. O trabalho continua na branch consolidada e será submetido a uma nova execução de CI em PR.
+
+### P1 — conectividade e política offline-first
+- A home apresenta o tipo de conexão detectado: Wi-Fi, dados móveis, sem rede, rede sem internet, modo offline ou dados móveis bloqueados pela preferência “somente Wi-Fi”.
+- O estado é atualizado a cada 10 s e ao retornar o app ao primeiro plano. O SDK Expo Network usado nesta versão não expõe listener de mudança compatível; o acompanhamento usa snapshots periódicos.
+- As preferências persistidas continuam sendo “somente Wi-Fi”, “Wi-Fi + dados móveis” e “totalmente offline”. A tela inicial reavalia o clima quando o modo de rede muda nas configurações.
+- A política limita somente consultas opcionais de internet. O módulo compartilhado OBD/Bluetooth não importa Expo Network e não é controlado pela conectividade externa.
+
+### P2 — clima e cidade
+- A solicitação de localização em primeiro plano é iniciada pelo usuário por um botão específico quando a permissão não está concedida.
+- As leituras meteorológicas válidas são persistidas em `MERIVA_SMART/CACHE/dashboard-weather.json`. Ao perder a internet ou bloquear a rede por preferência, o último valor válido pode ser restaurado após reiniciar o aplicativo; o timestamp original é preservado para diferenciar dado antigo de leitura atual.
+- O estado `NETWORK_RESTRICTED` distingue uma preferência que bloqueia a consulta de uma indisponibilidade real de internet.
+- A geocodificação reversa fica no dispositivo; somente coordenadas arredondadas a duas casas decimais (precisão aproximada de escala quilométrica) são enviadas à API meteorológica.
+- A atribuição da Open-Meteo passou a ser clicável e leva ao site da fonte. A API gratuita continua restrita a uso não comercial; para distribuição comercial, deve ser adotado plano/licença apropriado ou fonte alternativa autorizada: https://open-meteo.com/en/terms.
+
+### Testes e validação
+- `tests/dashboardWeather.test.js`: valida cache serializado, rejeição de dados/timestamp inválidos, persistência após resposta válida, fallback offline, bloqueio de rede móvel em modo Wi-Fi e arredondamento de coordenadas.
+- `tests/networkPolicy.test.js`: valida indicador da home, atualização periódica, modos de rede e isolamento da sessão Bluetooth.
+- As alterações foram aplicadas à branch `fix/restore-bottom-navigation-20261019`. **A CI do novo head ainda precisa terminar verde** com Expo Doctor, `npm run validate` e `android-build`; não declarar validado antes do resultado real.
+- Pendências fora da CI: testar no aparelho Android alternando Wi-Fi, dados móveis e modo offline; confirmar que o ELM327 mantém a sessão; observar permissão de localização e o uso do cache após reiniciar o app.
