@@ -2545,3 +2545,10 @@ Conferir o resultado integral da CI, corrigir qualquer falha antes de novo dispa
 
 ### Próximo passo
 - Abrir PR, acompanhar CI completa e corrigir qualquer falha antes de considerar a regressão encerrada.
+
+
+### Correção da CI #2470 — propriedade de estilo duplicada
+- **Falha observada:** `npm run doctor` passou (17/17 checks); `npm run validate` parou no TypeScript com `TS1117` em `app/index.tsx` por duplicação da propriedade `danger` no objeto de estilos.
+- **Correção:** removida a segunda declaração de `danger` adicionada junto aos estilos do cartão de clima; preservada a declaração já existente compartilhada pelos indicadores.
+- **Build Android:** ignorado pela dependência do job `validate`; aguardando nova execução após esta correção.
+- **Próximo passo:** confirmar `validate` e `android-build` verdes na nova CI.
