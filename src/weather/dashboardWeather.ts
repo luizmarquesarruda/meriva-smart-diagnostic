@@ -1,4 +1,8 @@
 import * as Location from 'expo-location';
+import * as Network from 'expo-network';
+import * as FileSystem from 'expo-file-system';
+import { readAppSettings } from '../database/appSettings';
+import { isOptionalNetworkAllowed } from '../network/networkPolicy';
 
 export type DashboardWeatherStatus =
   | 'LOADING'
@@ -87,6 +91,19 @@ function emptyWeather(status: DashboardWeatherStatus, city: string | null = null
  * Coordenadas são enviadas à API pública Open-Meteo para obter a previsão local.
  */
 export async function loadDashboardWeather(fetchImpl: typeof fetch = fetch): Promise<DashboardWeather> {
+  // Weather is optional: fail closed if settings/network state cannot be read.
+  // This gate runs before location access and never touches the OBD/Bluetooth session.
+  try {
+    const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
+    const settings = await readAppSettings(basePath);
+    const networkState = await Network.getNetworkStateAsync();
+    if (!isOptionalNetworkAllowed(settings.networkMode, networkState)) {
+      return emptyWeather('OFFLINE');
+    }
+  } catch {
+    return emptyWeather('OFFLINE');
+  }
+
   let permission: Location.LocationPermissionResponse | null = null;
   try {
     permission = await Location.getForegroundPermissionsAsync();
