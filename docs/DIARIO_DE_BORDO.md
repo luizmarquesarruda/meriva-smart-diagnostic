@@ -109,6 +109,7 @@
 - **DB-078** · 2026-10-20 — Índice enumerado de todas as atualizações e regra de leitura
 - **DB-079** · 2026-10-20 — Camada executável anti-regressão
 - **DB-080** · 2026-10-20 — Revisão preventiva do próprio gate anti-regressão
+- **DB-081** · 2026-10-20 — Correção do pisca-pisca do cockpit e restauração da navegação inferior
 
 ---
 
@@ -2831,3 +2832,31 @@ A validação da camada de proteção não deve depender de uma formulação edi
 
 ### Próximo passo
 Conferir a execução de CI da cabeça mais recente. Se o gate apontar outra divergência, corrigir pelo código/contrato real e registrar nova entrada com o próximo ID.
+
+
+## DB-081 · 2026-10-20 — Correção do pisca-pisca do cockpit e restauração da navegação inferior
+
+### Problema observado
+A tela inicial passou a apresentar piscadas e os botões inferiores deixaram de aparecer após as alterações recentes.
+
+### Diagnóstico estático
+- O efeito de conexão automática dependia do objeto completo `settings`. A tela recarrega as configurações ao ganhar foco; cada leitura pode produzir um novo objeto mesmo que todas as opções sejam iguais. Isso reiniciava o efeito de conexão e reinscrevia listeners sem necessidade, podendo repetir tentativas de conexão quando o usuário navegava e voltava ao cockpit.
+- A navegação inferior estava explicitamente condicionada a `!layout.landscape`, portanto desaparecia por definição ao girar o aparelho para paisagem.
+- Estes são defeitos identificáveis no código. Ainda não constituem prova de que explicam toda piscada observada no aparelho; a validação física continua necessária.
+
+### Correção implementada
+- O efeito de conexão agora depende dos valores primitivos das opções OBD relevantes, e não da identidade do objeto `settings`. Uma recarga sem alteração de configuração não reinicia o fluxo de conexão; alterações reais das opções continuam atualizando o efeito.
+- Os botões inferiores Bluetooth e Mais Recursos, junto do estado do diário, permanecem renderizados em retrato e paisagem; a paisagem recebe um ajuste compacto de espaçamento.
+- Não foram alterados o transporte Bluetooth Classic, a fila serial ELM327, o protocolo KWP, a validação de resposta ECU, as regras diagnósticas, o número de leituras dos testes nem o catálogo de PIDs.
+
+### Testes adicionados
+- `tests/cockpitNavigation.test.js` protege contra a dependência do objeto de configurações inteiro e contra o desaparecimento da navegação ao mudar para paisagem.
+- A suíte completa e o build Android ainda precisam confirmar que a alteração compila e passa pelos testes automatizados.
+
+### Commit e CI
+- Branch de correção: `fix/cockpit-flicker-restore-buttons-20261020`, criada a partir da cabeça `a9668cf7d3759dfcaf1ef95ccf9f7684fb13ac03) da PR #74.
+- Alterações publicadas em commits separados de `app/index.tsx`, `tests/cockpitNavigation.test.js` e deste diário. Os SHAs resultantes e a CI serão consultados no GitHub; não presumir CI verde antes da conclusão dos jobs `validate` e `android-build`.
+- A PR #74 não foi mesclada.
+
+### Próximo passo
+Executar `npm run validate` e `android-build` pela CI da branch de correção. Se ambos passarem, instalar o APK e reproduzir a navegação em retrato e paisagem; verificar também conexão, desconexão e retorno do app do segundo plano. Se continuar piscando com a conexão estável, recolher logcat e rastrear mudanças de estado/renderização no aparelho antes de alterar o transporte OBD.
