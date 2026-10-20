@@ -21,6 +21,10 @@ const fakeLocation = {};
 const originalLoad = Module._load;
 Module._load = function(request) {
   if (request === 'expo-location') return fakeLocation;
+  if (request === 'expo-network') return { NetworkStateType: { WIFI: 'WIFI', CELLULAR: 'CELLULAR', ETHERNET: 'ETHERNET', NONE: 'NONE' }, getNetworkStateAsync: async () => ({ type: 'WIFI', isConnected: true, isInternetReachable: true }) };
+  if (request === 'expo-file-system') return { documentDirectory: '/doc/' };
+  if (request === '../database/appSettings') return { readAppSettings: async () => ({ networkMode: 'WIFI_AND_MOBILE' }) };
+  if (request === '../network/networkPolicy') return { isOptionalNetworkAllowed: () => true };
   return originalLoad.apply(this, arguments);
 };
 
