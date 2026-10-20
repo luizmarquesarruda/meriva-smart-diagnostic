@@ -176,7 +176,7 @@ export async function loadDashboardWeather(fetchImpl: typeof fetch = fetch): Pro
 
   // Respect the user's network policy without ever touching the OBD/Bluetooth session.
   if (!isOptionalNetworkAllowed(settings.networkMode, networkState)) {
-    const cellular = networkState.type === Network.NetworkStateType.CELLULAR || networkState.type === 'CELLULAR';
+    const cellular = networkState.type === Network.NetworkStateType.CELLULAR;
     const internetUnavailable = networkState.isConnected !== true || networkState.isInternetReachable === false;
     const preferenceBlocks = settings.networkMode === 'OFFLINE' ||
       (settings.networkMode === 'WIFI_ONLY' && cellular && !internetUnavailable);
