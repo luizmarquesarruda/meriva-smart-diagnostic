@@ -9,7 +9,8 @@ export type DashboardWeatherStatus =
   | 'READY'
   | 'OFFLINE'
   | 'LOCATION_PERMISSION'
-  | 'LOCATION_UNAVAILABLE';
+  | 'LOCATION_UNAVAILABLE'
+  | 'NETWORK_RESTRICTED';
 
 export interface CurrentWeatherObservation {
   temperatureC: number;
@@ -85,23 +86,101 @@ function emptyWeather(status: DashboardWeatherStatus, city: string | null = null
   return { ...EMPTY_WEATHER, status, city, region };
 }
 
+function weatherCachePath(): string | null {
+  const root = FileSystem.documentDirectory;
+  return root ? `${root}MERIVA_SMART/CACHE/dashboard-weather.json` : null;
+}
+
+/** Parse and validate a previously saved observation before using it offline. */
+export function parseCachedWeather(payload: unknown): DashboardWeather | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const raw = payload as Record<string, unknown>;
+  const observation = parseCurrentWeather({
+    current: {
+      temperature_2m: raw.temperatureC,
+      apparent_temperature: raw.apparentTemperatureC,
+      weather_code: raw.weatherCode,
+    },
+  });
+  if (!observation || typeof raw.updatedAt !== 'string' || !Number.isFinite(Date.parse(raw.updatedAt))) {
+    return null;
+  }
+
+  const cleanText = (value: unknown): string | null =>
+    typeof value === 'string' && value.trim() ? value.trim() : null;
+
+  return {
+    status: 'OFFLINE',
+    city: cleanText(raw.city),
+    region: cleanText(raw.region),
+    ...observation,
+    updatedAt: raw.updatedAt,
+  };
+}
+
+async function readCachedWeather(): Promise<DashboardWeather | null> {
+  const path = weatherCachePath();
+  if (!path) return null;
+  try {
+    const info = await FileSystem.getInfoAsync(path);
+    if (!info.exists || info.isDirectory) return null;
+    return parseCachedWeather(JSON.parse(await FileSystem.readAsStringAsync(path)));
+  } catch {
+    return null;
+  }
+}
+
+async function persistCachedWeather(weather: DashboardWeather): Promise<void> {
+  const path = weatherCachePath();
+  if (!path || weather.status !== 'READY' || !weather.updatedAt) return;
+  try {
+    await FileSystem.makeDirectoryAsync(`${FileSystem.documentDirectory}MERIVA_SMART/CACHE`, { intermediates: true });
+    await FileSystem.writeAsStringAsync(path, JSON.stringify(weather), {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
+  } catch {
+    // Cache failures must never make a successful live weather result unavailable.
+  }
+}
+
+async function cachedWeather(
+  status: DashboardWeatherStatus,
+  city: string | null = null,
+  region: string | null = null,
+): Promise<DashboardWeather> {
+  const cached = await readCachedWeather();
+  if (!cached) return emptyWeather(status, city, region);
+  return {
+    ...cached,
+    status,
+    city: city ?? cached.city,
+    region: region ?? cached.region,
+  };
+}
+
 /**
  * Busca localização apenas em primeiro plano e consulta o clima atual.
  * A requisição HTTPS usa a rede padrão do Android (Wi-Fi ou dados móveis).
  * Coordenadas são enviadas à API pública Open-Meteo para obter a previsão local.
  */
 export async function loadDashboardWeather(fetchImpl: typeof fetch = fetch): Promise<DashboardWeather> {
-  // Weather is optional: fail closed if settings/network state cannot be read.
-  // This gate runs before location access and never touches the OBD/Bluetooth session.
+  let settings;
+  let networkState: Network.NetworkState;
   try {
     const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
-    const settings = await readAppSettings(basePath);
-    const networkState = await Network.getNetworkStateAsync();
-    if (!isOptionalNetworkAllowed(settings.networkMode, networkState)) {
-      return emptyWeather('OFFLINE');
-    }
+    settings = await readAppSettings(basePath);
+    networkState = await Network.getNetworkStateAsync();
   } catch {
-    return emptyWeather('OFFLINE');
+    return cachedWeather('OFFLINE');
+  }
+
+  // Respect the user's network policy without ever touching the OBD/Bluetooth session.
+  if (!isOptionalNetworkAllowed(settings.networkMode, networkState)) {
+    const cellular = networkState.type === Network.NetworkStateType.CELLULAR || networkState.type === 'CELLULAR';
+    const internetUnavailable = networkState.isConnected !== true || networkState.isInternetReachable === false;
+    const preferenceBlocks = settings.networkMode === 'OFFLINE' ||
+      (settings.networkMode === 'WIFI_ONLY' && cellular && !internetUnavailable);
+    return cachedWeather(preferenceBlocks ? 'NETWORK_RESTRICTED' : 'OFFLINE');
   }
 
   let permission: Location.LocationPermissionResponse | null = null;
@@ -112,7 +191,7 @@ export async function loadDashboardWeather(fetchImpl: typeof fetch = fetch): Pro
   }
 
   if (permission?.status !== 'granted') {
-    return emptyWeather('LOCATION_PERMISSION');
+    return cachedWeather('LOCATION_PERMISSION');
   }
 
   let position: Location.LocationObject;
@@ -126,12 +205,13 @@ export async function loadDashboardWeather(fetchImpl: typeof fetch = fetch): Pro
       mayShowUserSettingsDialog: false,
     });
   } catch {
-    return emptyWeather('LOCATION_UNAVAILABLE');
+    return cachedWeather('LOCATION_UNAVAILABLE');
   }
 
   let city: string | null = null;
   let region: string | null = null;
   try {
+    // Reverse geocoding remains on-device; only rounded coordinates are sent to the weather API.
     const addresses = await Location.reverseGeocodeAsync({
       latitude: position.coords.latitude,
       longitude: position.coords.longitude,
@@ -146,12 +226,15 @@ export async function loadDashboardWeather(fetchImpl: typeof fetch = fetch): Pro
   const lat = position.coords.latitude;
   const lon = position.coords.longitude;
   if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
-    return emptyWeather('LOCATION_UNAVAILABLE', city, region);
+    return cachedWeather('LOCATION_UNAVAILABLE', city, region);
   }
 
+  // Two decimal places are roughly kilometre-scale and avoid sending precise location to Open-Meteo.
+  const approximateLatitude = Number(lat.toFixed(2));
+  const approximateLongitude = Number(lon.toFixed(2));
   const url =
     'https://api.open-meteo.com/v1/forecast' +
-    `?latitude=${lat}&longitude=${lon}` +
+    `?latitude=${approximateLatitude}&longitude=${approximateLongitude}` +
     '&current=temperature_2m%2Capparent_temperature%2Cweather_code&timezone=auto';
 
   const controller = new AbortController();
@@ -162,15 +245,17 @@ export async function loadDashboardWeather(fetchImpl: typeof fetch = fetch): Pro
     const observation = parseCurrentWeather(await response.json());
     if (!observation) throw new Error('Weather response is invalid');
 
-    return {
+    const result: DashboardWeather = {
       status: 'READY',
       city,
       region,
       ...observation,
       updatedAt: new Date().toISOString(),
     };
+    await persistCachedWeather(result);
+    return result;
   } catch {
-    return emptyWeather('OFFLINE', city, region);
+    return cachedWeather('OFFLINE', city, region);
   } finally {
     clearTimeout(timeout);
   }
