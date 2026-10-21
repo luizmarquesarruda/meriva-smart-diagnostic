@@ -9,7 +9,7 @@
 - HEAD do `main` confirmado em `57da653ea6f671fba131e9dfbe54ebaa32e62bd4`, após o merge da PR #76 em 2026-10-21.
 - PR #76 (`audit: restore anti-regression protections and cockpit fixes`) consta como mesclada no GitHub. A execução CI #2637 para esse SHA terminou com sucesso: `validate` passou (incluindo o gate `gate:baseline`) e `android-build` passou, com APK standalone verificado e enviado como artefato. Isto não comprova teste físico no telefone ou no ELM327.
 - PRs #74 e #75 permanecem fechadas sem merge próprio; as correções que agora estão em `main` são as efetivamente integradas pela PR #76, não uma aprovação implícita dos heads isolados.
-- Trabalho em andamento: branch `fix/bt-reconnect-guard`, baseada no HEAD acima. A primeira CI desta alteração detectou uma regressão no caso de duas instâncias do transporte abertas em paralelo; o código foi ajustado para esperar a tentativa anterior com limite configurado e falhar apenas se ela não terminar. A execução da CI para a revisão corrigida deve ser conferida no GitHub; a branch ainda não foi mesclada e o teste físico continua pendente.
+- Trabalho em andamento: branch `fix/bt-reconnect-guard`, baseada no HEAD acima. A primeira CI encontrou uma regressão no caso de duas instâncias do transporte abertas em paralelo e essa foi corrigida com espera limitada. A revisão adicional também garante que uma conexão nativa resolvida tardiamente termine seu fechamento antes de outra tentativa RFCOMM. A CI do SHA mais recente deve ser consultada; a branch não foi mesclada e o teste físico continua pendente.
 - Não mesclar alterações novas sem autorização explícita. Para esta branch, exigir `gate:baseline`, `validate` e `android-build` verdes no SHA final; teste visual e físico com ELM327/ECU são etapas separadas.
 
 ### Contratos que não podem regredir
@@ -121,6 +121,7 @@
 - **DB-089** · 2026-10-21 — Rotação automática da tela
 - **DB-090** · 2026-10-21 — Timeout Bluetooth pendente e resiliência da recuperação
 - **DB-091** · 2026-10-21 — CI detecta regressão de concorrência e corrige espera Bluetooth limitada
+- **DB-092** · 2026-10-21 — Serialização do fechamento tardio de socket após timeout
 
 ---
 
@@ -3104,4 +3105,22 @@ Executar/revisar `gate:baseline`, `validate` e `android-build` no SHA final dest
 
 ### Próximo passo
 Consultar logs da última execução na cabeça atual. Se `validate` passar, confirmar também `android-build` e a verificação do APK standalone. Manter PR #77 em rascunho até os gates ficarem verdes e revisar o diff completo antes de solicitar aprovação.
+
+## DB-092 · 2026-10-21 — Serialização do fechamento tardio de socket após timeout
+
+### Problema / reavaliação
+A correção DB-091 aguardava a promessa nativa original com limite. A análise do caminho de sucesso tardio mostrou uma janela adicional: a promessa nativa pode resolver antes de terminar o `safeDisconnect()` chamado depois do timeout. Esperar apenas a promessa original não comprova que o socket tardio foi fechado antes da próxima tentativa.
+
+### Correção preparada
+- `src/obd/bluetoothClassicTransport.ts`: adiciona `pendingNativeConnectionSettlements`, que representa a conclusão da promessa nativa junto com a limpeza associada a um sucesso tardio.
+- Uma nova instância aguarda a promessa de assentamento/limpeza até o mesmo limite configurado; apenas após essa conclusão o endereço pode iniciar nova tentativa. Se a limpeza ficar presa, o transporte falha de forma controlada sem abrir um segundo socket concorrente.
+- `tests/bluetoothLifecycle.test.js` verifica que a espera se baseia no assentamento da limpeza e que o fechamento tardio ocorre antes de completar a promessa de assentamento.
+
+### Validação e limite
+- A revisão anterior, no SHA `702cbb692fb6125b1706885c273287ca76ed35bd`, passou em `gate:baseline` e `validate`; o build Android dessa execução estava em andamento no momento da revisão. Esses resultados não validam o SHA atual após a alteração DB-092.
+- A nova versão precisa executar novamente os três gates no SHA final da PR #77.
+- A operação nativa ainda não é cancelada pelo aplicativo. O controle evita espera ilimitada no chamador e concorrência de sockets; o teste em hardware físico continua necessário.
+
+### Próximo passo
+Conferir a CI mais recente da PR #77, revisar o diff final e manter a PR sem merge até `gate:baseline`, `validate` e `android-build` passarem.
 
