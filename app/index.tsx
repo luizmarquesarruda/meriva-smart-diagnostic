@@ -1,5 +1,5 @@
 import { Link, useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMidLayout } from '../src/ui/midLayout';
@@ -18,6 +18,10 @@ import { readAppSettings, type AppSettings } from '../src/database/appSettings';
 import { connectPreferredElm, getSharedObdConnection, getSharedObdLastError, getSharedObdStatus, subscribeSharedObd, subscribeSharedObdStatus } from '../src/obd/sharedConnection';
 import { autoTripService, type AutoTripServiceState } from '../src/trip/autoTripService';
 import { loadCurrentConditions, type CurrentConditions } from '../src/weather/currentConditions';
+import { StartupScreen } from '../src/ui/StartupScreen';
+import { getStartupHideDelayMs, getStartupProgress, STARTUP_TIMEOUT_MS, type StartupTerminalState } from '../src/ui/startupProgress';
+
+let startupScreenConsumed = false;
 
 export default function IndexScreen() {
   const [cycles, setCycles] = useState<DriveCycle[]>([]);
@@ -27,6 +31,10 @@ export default function IndexScreen() {
   const [bluetoothError, setBluetoothError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<AutoSaveStatus>({ lastSavedAt: null, lastSaveReason: null, lastError: null, obdSessionActive: false });
   const [isHydrated, setIsHydrated] = useState(false);
+  const [showStartupScreen, setShowStartupScreen] = useState(() => !startupScreenConsumed);
+  const [startupTimedOut, setStartupTimedOut] = useState(false);
+  const startupStartedAt = useRef(Date.now());
+  const startupTerminalRef = useRef<StartupTerminalState>('progress');
   const [tripState, setTripState] = useState<AutoTripServiceState>(autoTripService.getState());
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [dtcCount, setDtcCount] = useState(0);
@@ -229,6 +237,45 @@ export default function IndexScreen() {
     : coolantValue != null && coolantValue >= 110
       ? 'ATENÇÃO'
       : coolantValue != null ? 'LEITURA REAL • PID 0105' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0105' : 'ECU DESCONECTADA';
+
+  const startupProgress = getStartupProgress({
+    hydrated: isHydrated,
+    settingsLoaded: settings !== null,
+    autoConnect: settings?.autoConnectObd !== false,
+    searching: bluetoothSearching,
+    ecuConnected: connectionStatus.ecuConnected,
+    lifecycle: connectionStatus.lifecycle,
+    error: bluetoothError,
+    timedOut: startupTimedOut,
+  });
+  startupTerminalRef.current = startupProgress.terminal;
+
+  // A tela acompanha a conexão já iniciada pelo fluxo proprietário da home.
+  // O timeout libera a interface em modo offline sem alegar que a ECU respondeu.
+  useEffect(() => {
+    if (!showStartupScreen) return;
+    const timer = setTimeout(() => {
+      if (startupTerminalRef.current === 'progress') setStartupTimedOut(true);
+    }, STARTUP_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [showStartupScreen]);
+
+  useEffect(() => {
+    if (!showStartupScreen) return;
+    const delayMs = getStartupHideDelayMs({
+      elapsedMs: Date.now() - startupStartedAt.current,
+      terminal: startupProgress.terminal,
+      timedOut: startupTimedOut,
+    });
+    if (delayMs === null) return;
+    const timer = setTimeout(() => {
+      startupScreenConsumed = true;
+      setShowStartupScreen(false);
+    }, delayMs);
+    return () => clearTimeout(timer);
+  }, [showStartupScreen, startupProgress.terminal, startupTimedOut]);
+
+  if (showStartupScreen) return <StartupScreen progress={startupProgress} />;
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
