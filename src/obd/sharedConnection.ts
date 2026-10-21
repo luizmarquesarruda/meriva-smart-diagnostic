@@ -11,6 +11,7 @@ import { flushCsvLogs } from '../database/csvLogger';
 import { readAppSettings, writeAppSettings } from '../database/appSettings';
 import { startBackgroundMonitoring, stopBackgroundMonitoring } from '../gps/backgroundMonitoring';
 import { readVehicleIdentity } from './vehicleIdentity';
+import { cleanupDisconnectedSession } from './connectionRecovery';
 
 export interface SharedObdConnection {
   session: Elm327Session;
@@ -115,8 +116,22 @@ async function handleUnexpectedDisconnect(reason: string): Promise<void> {
   if (connection) {
     intentionalDisconnect = true;
     try {
-      await persistDisconnectedState();
-      try { await connection.session.close(); } catch { /* sessão já perdida */ }
+      const cleanup = await cleanupDisconnectedSession(
+        () => persistDisconnectedState(),
+        () => connection.session.close(),
+      );
+      if (cleanup.persistenceError) {
+        const detail = cleanup.persistenceError instanceof Error
+          ? cleanup.persistenceError.message
+          : String(cleanup.persistenceError);
+        lastConnectionError = `${reason}; FALHA AO PERSISTIR ESTADO DA DESCONEXÃO: ${detail}`;
+      }
+      if (cleanup.closeError) {
+        const detail = cleanup.closeError instanceof Error
+          ? cleanup.closeError.message
+          : String(cleanup.closeError);
+        lastConnectionError = `${lastConnectionError ?? reason}; FALHA AO FECHAR SESSÃO ELM327: ${detail}`;
+      }
     } finally {
       intentionalDisconnect = false;
     }
