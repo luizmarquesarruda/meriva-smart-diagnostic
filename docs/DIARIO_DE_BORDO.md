@@ -3086,7 +3086,7 @@ A grade de informação pode ser reorganizada sem tocar na conexão OBD nem no i
 - Adicionado `tests/drivingMode.test.js` ao `npm test` e ao gate anti-regressão; ampliados testes do cockpit; RG-17 documenta os contratos. Sem dependências novas, alterações de protocolo, polling OBD paralelo, mudanças na splash ou redução dos cinco testes de PID do Laboratório.
 
 ### Validação e limites
-- SHA desta alteração e resultado de CI devem ser registrados após a publicação e a consulta dos jobs reais. Não reutilizar a CI-base como se validasse DB-090.
+- Primeira CI da implementação: run [39608545524](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/39608545524) falhou no teste de navegação porque a asserção antiga ainda exigia 56 dp para os botões, enquanto a nova especificação aumenta corretamente o alvo para 64 dp. A expectativa do teste foi alinhada ao novo contrato; nenhum teste foi removido ou enfraquecido. A CI da correção precisa passar.
 - CI-base: `1b5d33bbabe3719c385912db5693d7b6f71061a7`, run 39606176769, `validate` e `android-build` verdes; esse é apenas o ponto de partida.
 - Continua pendente conferir o APK em aparelho real, retrato/paisagem, alvos de toque/TalkBack e estabilidade com ELM327/ECU.
 

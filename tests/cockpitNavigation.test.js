@@ -27,7 +27,7 @@ assert.doesNotMatch(index, /<Text style=\{styles\.bottomNavText\}>/, 'navegaçã
 assert.match(index, /bottomNavItem:\{[^}]*minHeight:56/, 'atalhos inferiores devem ter área de toque de 56 dp');
 assert.match(index, /accessibilityLabel="Mais recursos"/, 'botão sem legenda visual precisa de nome acessível');
 assert.match(index, /accessibilityHint="Abre os módulos adicionais do aplicativo"/, 'atalho Mais precisa explicar a ação ao leitor de tela');
-assert.match(index, /dashboardAction:\{[^}]*minHeight:56/, 'ações principais devem ter altura tátil mínima de 56 dp');
+assert.match(index, /dashboardAction:\{[^}]*minHeight:64/, 'ações principais devem ter altura tátil mínima de 64 dp');
 assert.match(index, /accessibilityLabel="Abrir laboratório de diagnóstico OBD"/, 'ação de diagnóstico deve ter nome acessível explícito');
 assert.match(index, /accessibilityLabel="Abrir dados em tempo real"/, 'ação de dados deve ter nome acessível explícito');
 assert.match(index, /weatherCity:\{[^}]*fontSize:15/, 'cidade/clima deve estar em tamanho legível no retrato');
