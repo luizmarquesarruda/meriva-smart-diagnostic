@@ -2,7 +2,7 @@ import RNBluetoothClassic, { BluetoothDevice } from 'react-native-bluetooth-clas
 import { Platform } from 'react-native';
 import { ObdTransport } from './elm327';
 import { DEFAULT_ELM327_COMPATIBILITY, Elm327CompatibilityConfig, mergeCompatibilityConfig } from './elm327Compatibility';
-import { timedOutNativeAttemptStillPending } from './connectionRecovery';
+import { timedOutNativeAttemptStillPending, waitForNativeConnectAttempt } from './connectionRecovery';
 
 export interface BluetoothDeviceInfo {
   address: string;
@@ -137,13 +137,26 @@ export class BluetoothClassicTransport implements ObdTransport {
         // GLOBAL por endereço para impedir chamadas concorrentes ao mesmo MAC.
         const pending = pendingNativeConnections.get(addressKey);
         if (pending) {
-          this.logDiagnostic('CONNECT_ABORT_PREVIOUS_NATIVE_ATTEMPT_PENDING', {
+          this.logDiagnostic('CONNECT_WAITING_PREVIOUS_NATIVE_ATTEMPT', {
             address: this.deviceAddress,
+            timeoutMs: this.config.bluetoothConnectTimeoutMs,
           });
-          lastCause = new Error(
-            'TENTATIVA NATIVA ANTERIOR AINDA PENDENTE. EVITE UMA SEGUNDA CONEXÃO SIMULTÂNEA; TENTE NOVAMENTE APÓS A LIBERAÇÃO DO ADAPTADOR.',
+          const previousSettled = await waitForNativeConnectAttempt(
+            pending,
+            this.config.bluetoothConnectTimeoutMs,
           );
-          break;
+          if (!previousSettled) {
+            this.logDiagnostic('CONNECT_ABORT_PREVIOUS_NATIVE_ATTEMPT_PENDING', {
+              address: this.deviceAddress,
+              timeoutMs: this.config.bluetoothConnectTimeoutMs,
+            });
+            lastCause = new Error(
+              'TENTATIVA NATIVA ANTERIOR AINDA PENDENTE APÓS O TIMEOUT. EVITE UMA SEGUNDA CONEXÃO SIMULTÂNEA; TENTE NOVAMENTE APÓS A LIBERAÇÃO DO ADAPTADOR.',
+            );
+            break;
+          }
+          // A tentativa terminou (com sucesso ou erro); the next attempt can be serialized safely.
+          try { await pending; } catch { /* retry after failed native attempt */ }
         }
 
         this.logDiagnostic('CONNECT_ATTEMPT', {
