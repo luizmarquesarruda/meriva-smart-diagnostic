@@ -21,6 +21,9 @@ const diagnostics = read('src/diagnostics/diagnosticEngine.ts');
 const sensorEngine = read('src/diagnostics/sensorTestEngine.ts');
 const projectContract = read('docs/CONTRATO_ANTI_REGRESSAO.md');
 const theme = read('src/ui/theme.ts');
+const startupPidPreflight = read('src/diagnostics/startupPidPreflight.ts');
+const startupProgress = read('src/ui/startupProgress.ts');
+const startupScreen = read('src/ui/StartupScreen.tsx');
 
 // Gate itself must be a first-class CI step, not a note in the diary.
 assert.equal(packageJson.scripts['gate:baseline'], 'node tests/projectBaseline.test.js');
@@ -113,13 +116,16 @@ assert.match(home, /10_000/);
 assert.ok(read('app/mais.tsx').includes('CONSULTA MANUAL DE PID'), 'atalho de consulta manual precisa existir');
 assert.ok(read('app/laboratorio.tsx').includes('PIDs REGISTRADOS / DESCOBERTOS'), 'lista de PIDs precisa continuar acessível');
 
-const startupProgress = read('src/ui/startupProgress.ts');
-const startupScreen = read('src/ui/StartupScreen.tsx');
 assert.match(startupProgress, /STARTUP_MIN_DURATION_MS = 6_000/);
-assert.match(startupProgress, /STARTUP_TIMEOUT_MS = 30_000/);
+assert.match(startupProgress, /STARTUP_TIMEOUT_MS = 60_000/);
 assert.match(home, /<StartupScreen progress=\{startupProgress\} \/>/);
+assert.match(home, /runStartupPidPreflight\(connection/);
 assert.match(home, /useState\(\(\) => !startupScreenConsumed\)/);
 assert.match(startupScreen, /accessibilityRole="progressbar"/);
+assert.match(startupScreen, /progress.pidDetail/);
+assert.match(startupPidPreflight, /STARTUP_PID_PREFLIGHT_PIDS = \['010C', '0105', '0142', '0111'\]/);
+assert.match(startupPidPreflight, /MIN_SENSOR_TEST_READINGS/);
+assert.match(startupProgress, /VALIDANDO PIDs ESSENCIAIS/);
 assert.doesNotMatch(startupScreen, /connectPreferredElm/, 'tela de abertura não pode iniciar uma segunda sessão OBD');
 
 assert.match(theme, /SCREEN_TITLE_STYLE/);
