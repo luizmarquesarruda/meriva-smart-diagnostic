@@ -10,7 +10,7 @@
 - PRs #73, #74 e #75 foram fechadas em 2026-10-21 sem merge, conforme solicitação do usuário; não há PR aberta no início desta nova tarefa.
 - Esta branch deriva do commit `bd2e725a45fb2dce633377c1527bb0b389f86d5b` da antiga PR #75, fechada sem merge. Ela preserva alterações ainda não incorporadas à `main`; a criação da branch não equivale a merge.
 - A autoridade vigente é o HEAD real desta branch e a CI correspondente; não reutilizar estado de CI de commits antigos. Não reabrir PRs antigas nem mesclar sem solicitação explícita.
-- Esta camada adiciona um teste executável e um passo visível no workflow; não modifica a lógica de leitura OBD, o transporte Bluetooth nem as regras diagnósticas.
+- A barreira anti-regressão permanece executável e visível na CI. A nova pré-verificação de abertura reutiliza a sessão OBD única já validada; não cria transporte, fila serial ou motor diagnóstico paralelo.
 
 ### Contratos que não podem regredir
 1. **Testes de sensores:** cinco tentativas sequenciais por PID e cinco respostas válidas para uma avaliação numérica. Calcular a média aritmética das cinco amostras válidas. Resposta ausente, inválida ou timeout não vira zero e não conta como leitura válida; amostragem incompleta = inconclusiva/sem resposta, nunca aprovada.
@@ -3017,7 +3017,7 @@ A revisão do histórico identificou que a PR #70 (UX: navegação e inicializa�
 - Após validação real da ECU, executar uma pré-verificação sequencial dos quatro PIDs centrais do cockpit: `010C` RPM, `0105` temperatura do arrefecimento, `0142` tensão do módulo e `0111` posição da borboleta. Um PID só é consultado se a ECU o anunciar na bitmap de suporte e houver definição local.
 - Para cada PID selecionado, realizar cinco tentativas sequenciais; apenas cinco respostas numéricas válidas contam como PID verificado. Timeout, erro, valor ausente ou PID não anunciado não são convertidos em zero nem contados como aprovação.
 - A pré-verificação confirma resposta repetível e parsing; não certifica a integridade física/elétrica do sensor e não substitui os testes completos do Laboratório, que podem depender de motor parado, motor aquecido ou outros PIDs.
-- A barra mostra o PID/etapa e a rodada atual. O estado final diferencia verificação completa, parcial e offline; só declara ECU conectada após evidência OBD real.
+- A barra mostra o PID/etapa e a rodada atual. O indicador visual do protocolo muda de neutro durante a inicialização para sucesso/alerta conforme o resultado real; não anuncia Bluetooth pronto antecipadamente. O estado final diferencia verificação completa, parcial e offline; só declara ECU conectada após evidência OBD real.
 
 ### Tempo de abertura e recuperação
 - A splash fica visível por no mínimo `6.000 ms`, mesmo se a conexão ocorrer mais rápido.
