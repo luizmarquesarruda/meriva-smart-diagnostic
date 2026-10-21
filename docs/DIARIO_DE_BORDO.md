@@ -9,7 +9,7 @@
 - HEAD do `main` confirmado em `57da653ea6f671fba131e9dfbe54ebaa32e62bd4`, após o merge da PR #76 em 2026-10-21.
 - PR #76 (`audit: restore anti-regression protections and cockpit fixes`) consta como mesclada no GitHub. A execução CI #2637 para esse SHA terminou com sucesso: `validate` passou (incluindo o gate `gate:baseline`) e `android-build` passou, com APK standalone verificado e enviado como artefato. Isto não comprova teste físico no telefone ou no ELM327.
 - PRs #74 e #75 permanecem fechadas sem merge próprio; as correções que agora estão em `main` são as efetivamente integradas pela PR #76, não uma aprovação implícita dos heads isolados.
-- Trabalho em andamento: branch `fix/bt-reconnect-guard`, baseada no HEAD acima, para impedir espera ilimitada após timeout Bluetooth nativo e garantir que falha de persistência não bloqueie a recuperação. Esta branch ainda não foi mesclada; a CI correspondente e o teste físico continuam pendentes.
+- Trabalho em andamento: branch `fix/bt-reconnect-guard`, baseada no HEAD acima. A primeira CI desta alteração detectou uma regressão no caso de duas instâncias do transporte abertas em paralelo; o código foi ajustado para esperar a tentativa anterior com limite configurado e falhar apenas se ela não terminar. A execução da CI para a revisão corrigida deve ser conferida no GitHub; a branch ainda não foi mesclada e o teste físico continua pendente.
 - Não mesclar alterações novas sem autorização explícita. Para esta branch, exigir `gate:baseline`, `validate` e `android-build` verdes no SHA final; teste visual e físico com ELM327/ECU são etapas separadas.
 
 ### Contratos que não podem regredir
@@ -120,6 +120,7 @@
 - **DB-088** · 2026-10-21 — Auditoria contra regressões, reconciliação das PRs fechadas e CI do conjunto combinado
 - **DB-089** · 2026-10-21 — Rotação automática da tela
 - **DB-090** · 2026-10-21 — Timeout Bluetooth pendente e resiliência da recuperação
+- **DB-091** · 2026-10-21 — CI detecta regressão de concorrência e corrige espera Bluetooth limitada
 
 ---
 
@@ -3069,7 +3070,7 @@ A revisão do código no HEAD integrado da PR #76 identificou dois caminhos capa
 
 ### Correção preparada
 - Criado `src/obd/connectionRecovery.ts` com política testável para reconhecer uma tentativa nativa ainda pendente e executar persistência/fechamento como operações de melhor esforço independentes.
-- `src/obd/bluetoothClassicTransport.ts`: uma tentativa nativa anterior ainda registrada agora falha rápido, em vez de ser aguardada indefinidamente. Quando a tentativa atual excede o timeout e continua pendente, o fallback para o outro modo de socket é cancelado para evitar chamadas RFCOMM concorrentes contra o mesmo endereço. O evento é registrado no diagnóstico Bluetooth.
+- `src/obd/bluetoothClassicTransport.ts`: uma tentativa nativa anterior é aguardada apenas até `bluetoothConnectTimeoutMs`; se continuar pendente, o transporte falha de forma controlada em vez de esperar indefinidamente. Quando a tentativa atual excede o timeout e continua pendente, o fallback para o outro modo de socket é cancelado para evitar chamadas RFCOMM concorrentes contra o mesmo endereço. O evento é registrado no diagnóstico Bluetooth.
 - `src/obd/sharedConnection.ts`: a persistência e o fechamento da sessão agora são tratados separadamente. A falha de persistência é preservada em `lastConnectionError`, mas não impede fechar a sessão nem iniciar o backoff de recuperação.
 - Criado `tests/connectionRecovery.test.js` com cenários executáveis para falha de persistência, falha de fechamento e identidade da promessa nativa ainda pendente.
 - A nova suíte foi incluída em `npm test` e no gate `projectBaseline.test.js`; o contrato anti-regressão recebe RG-16.
@@ -3083,4 +3084,24 @@ A revisão do código no HEAD integrado da PR #76 identificou dois caminhos capa
 
 ### Próximo passo
 Executar/revisar `gate:baseline`, `validate` e `android-build` no SHA final desta branch; corrigir falhas reveladas pela CI e manter a PR aberta para revisão, sem merge automático.
+
+## DB-091 · 2026-10-21 — CI detecta regressão de concorrência e corrige espera Bluetooth limitada
+
+### Problema / evidência
+- A CI #2647 executou `gate:baseline` com sucesso, mas `npm run validate` falhou em `tests/regression.test.js`, cenário `testBluetoothEventTransport`.
+- O cenário cria duas instâncias de transporte em paralelo e espera que a segunda aguarde a primeira tentativa nativa, preservando `bluetoothMaxNativeConnections === 1`. A primeira versão da proteção abortava cedo demais e quebrava esse contrato.
+
+### Correção da correção
+- Adicionada `waitForNativeConnectAttempt()` em `src/obd/connectionRecovery.ts`: aguarda conclusão/erro da promessa nativa até `bluetoothConnectTimeoutMs` e sempre limpa o temporizador.
+- `src/obd/bluetoothClassicTransport.ts` agora serializa chamadas concorrentes que terminam dentro do limite e só aborta quando a tentativa anterior realmente continua pendente após o prazo. O bloqueio de fallback após timeout da tentativa atual continua ativo.
+- `tests/connectionRecovery.test.js` cobre a promessa resolvida e uma promessa que nunca termina; `tests/bluetoothLifecycle.test.js` protege a integração da espera limitada.
+- A política não cancela a chamada nativa — limita a espera e evita iniciar outra conexão sobre a mesma tentativa ainda ativa.
+
+### Validação
+- CI #2647: **falhou**, com motivo identificado em `testBluetoothEventTransport`; os testes anteriores do gate, TypeScript e demais suites executadas antes do cenário também haviam passado.
+- A correção foi publicada na branch `fix/bt-reconnect-guard`; novas execuções push/PR foram iniciadas. O resultado final precisa ser consultado no GitHub após conclusão da CI mais recente.
+- Nenhum merge foi feito. O teste físico com adaptador ELM327 continua pendente.
+
+### Próximo passo
+Consultar logs da última execução na cabeça atual. Se `validate` passar, confirmar também `android-build` e a verificação do APK standalone. Manter PR #77 em rascunho até os gates ficarem verdes e revisar o diff completo antes de solicitar aprovação.
 
