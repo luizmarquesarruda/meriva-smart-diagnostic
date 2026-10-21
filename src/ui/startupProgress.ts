@@ -50,10 +50,20 @@ export function getStartupProgress(input: StartupProgressInput): StartupProgress
     return stage(100, 'APLICATIVO PRONTO', 'Conexão automática desativada. O painel abrirá sem iniciar uma sessão OBD.', 'ready');
   }
   if (input.timedOut) {
-    const detail = input.ecuConnected
-      ? 'ECU validada. O tempo para verificar os PIDs terminou; o painel abrirá com a verificação parcial.'
-      : 'Abrindo o painel em modo offline. A tentativa de conexão não foi validada dentro do limite de tempo.';
-    return stage(100, 'TEMPO DE INICIALIZAÇÃO ESGOTADO', detail, 'offline');
+    if (input.ecuConnected) {
+      return stage(
+        100,
+        'VERIFICAÇÃO INICIAL PARCIAL',
+        'ECU validada. O limite de 60 s encerrou a verificação dos PIDs; o painel abrirá conectado e as leituras não concluídas permanecerão como N/D.',
+        'partial',
+      );
+    }
+    return stage(
+      100,
+      'TEMPO DE INICIALIZAÇÃO ESGOTADO',
+      'Abrindo o painel em modo offline. A tentativa de conexão não foi validada dentro do limite de tempo.',
+      'offline',
+    );
   }
   if (!input.hydrated) {
     return stage(8, 'PREPARANDO O APLICATIVO', 'Carregando configurações locais e histórico de diagnóstico.');
