@@ -9,7 +9,9 @@
 - HEAD do `main` confirmado em `57da653ea6f671fba131e9dfbe54ebaa32e62bd4`, após o merge da PR #76 em 2026-10-21.
 - PR #76 (`audit: restore anti-regression protections and cockpit fixes`) consta como mesclada no GitHub. A execução CI #2637 para esse SHA terminou com sucesso: `validate` passou (incluindo o gate `gate:baseline`) e `android-build` passou, com APK standalone verificado e enviado como artefato. Isto não comprova teste físico no telefone ou no ELM327.
 - PRs #74 e #75 permanecem fechadas sem merge próprio; as correções que agora estão em `main` são as efetivamente integradas pela PR #76, não uma aprovação implícita dos heads isolados.
-- Trabalho em andamento: branch `fix/bt-reconnect-guard`, baseada no HEAD da `main` `57da653ea6f671fba131e9dfbe54ebaa32e62bd4`. A PR #77 trata concorrência RFCOMM, fechamento tardio e recuperação após desconexão. CI #2671 aprovou `gate:baseline` e `validate`, mas não valida as correções posteriores. Após a auditoria adicional DB-095, a CI #2678 está pendente para o SHA `4cd5bee6a259f1336fa3fec7ee5a8c2882d6171b`. A branch segue sem merge e o teste físico está pendente.
+- Trabalho em andamento: branch `fix/bt-reconnect-guard`, PR #77 contra `main`, aberta em rascunho e não mesclada. A PR trata concorrência RFCOMM, fechamento tardio e recuperação após desconexão.
+- CI #2680, no SHA anterior `e95a4e2fb5bcddc96abc9ebfec535c6a804ed310`, falhou em `validate` com `TS2304: Cannot find name 'cleanup'` em `src/obd/sharedConnection.ts`; `gate:baseline` passou e `android-build` foi ignorado após a falha. A correção de escopo foi publicada em `c564ec465e27f6e86f15b2d583a8cba2981a93c6`; a nova CI desse SHA precisa ser consultada.
+- O teste físico está pendente. Não mesclar alterações novas sem autorização explícita. Exigir `gate:baseline`, `validate` e `android-build` verdes no SHA final; teste visual e físico com ELM327/ECU são etapas separadas.
 - Não mesclar alterações novas sem autorização explícita. Para esta branch, exigir `gate:baseline`, `validate` e `android-build` verdes no SHA final; teste visual e físico com ELM327/ECU são etapas separadas.
 
 ### Contratos que não podem regredir
@@ -118,6 +120,14 @@
 - **DB-086** · 2026-10-21 — Cockpit: informações de rede/clima legíveis e botões com áreas de toque ampliadas
 - **DB-087** · 2026-10-21 — Ajuste adicional de legibilidade da rede e tamanho dos botões principais
 - **DB-088** · 2026-10-21 — Auditoria contra regressões, reconciliação das PRs fechadas e CI do conjunto combinado
+- **DB-089** · 2026-10-21 — Rotação automática da tela
+- **DB-090** · 2026-10-21 — Auditoria do timeout da conexão nativa Bluetooth
+- **DB-091** · 2026-10-21 — Limite de espera pela tentativa nativa de conexão
+- **DB-092** · 2026-10-21 — Serialização do fechamento tardio de socket após timeout
+- **DB-093** · 2026-10-21 — Limite para persistência travada durante a desconexão
+- **DB-094** · 2026-10-21 — Auditoria da CI #2669 e validação parcial da correção de recuperação
+- **DB-095** · 2026-10-21 — Impedir nova conexão quando o fechamento do socket falha
+- **DB-096** · 2026-10-21 — Corrigir escopo do resultado de limpeza revelado pela CI #2680
 - **DB-089** · 2026-10-21 — Rotação automática da tela
 - **DB-090** · 2026-10-21 — Timeout Bluetooth pendente e resiliência da recuperação
 - **DB-091** · 2026-10-21 — CI detecta regressão de concorrência e corrige espera Bluetooth limitada
@@ -3188,3 +3198,22 @@ A auditoria profunda encontrou uma lacuna na recuperação: embora `cleanupDisco
 
 ### Próximo passo / limites
 Consultar CI #2678 no SHA final depois desta atualização do diário. Exigir `gate:baseline`, `validate` e `android-build` verdes. O teste com ELM327 real e a inspeção visual no Android permanecem pendentes; não mesclar sem autorização explícita.
+
+## DB-096 · 2026-10-21 — Corrigir escopo do resultado de limpeza revelado pela CI #2680
+
+### Problema / evidência
+- CI #2680 falhou em `validate`, com TypeScript `TS2304: Cannot find name 'cleanup'` em `src/obd/sharedConnection.ts`.
+- A variável havia sido declarada com `const` dentro do bloco `try`, mas era consultada após o bloco. `gate:baseline` passou; o Android build foi ignorado após a falha.
+
+### Correção
+- Declarado `cleanup` no escopo externo ao `try`, mantendo a atribuição por `await cleanupDisconnectedSession(...)`. Preserva a decisão de não abrir novo socket se o fechamento falhar, eliminando o erro de escopo TypeScript.
+- Não foram relaxadas regras de retry, limite de persistência nem contratos OBD para mascarar a falha.
+
+### Commit / CI
+- Correção de código: `c564ec465e27f6e86f15b2d583a8cba2981a93c6`.
+- CI #2680: `gate:baseline` aprovado; `validate` falhou pelo erro acima; `android-build` ignorado.
+- A CI do SHA corrigido deve ser consultada antes de declarar validação concluída.
+
+### Regressões e pendências
+- A suíte completa precisa passar no SHA corrigido; confirmar os três gates e revisar a PR #77.
+- Teste físico com ELM327, desconexão real, reconexão e inspeção visual continuam pendentes. Não mesclar sem autorização explícita.
