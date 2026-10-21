@@ -10,7 +10,8 @@ interface StartupScreenProps {
 
 export function StartupScreen({ progress }: StartupScreenProps) {
   const isWorking = progress.terminal === 'progress';
-  const protocolDotColor = progress.terminal === 'ready'
+  const ecuVerified = progress.terminal === 'ready' && progress.detail.includes('ECU validada');
+  const protocolDotColor = ecuVerified
     ? COLORS.success
     : progress.terminal === 'offline' || progress.terminal === 'partial'
       ? COLORS.warning
