@@ -2,6 +2,7 @@ import RNBluetoothClassic, { BluetoothDevice } from 'react-native-bluetooth-clas
 import { Platform } from 'react-native';
 import { ObdTransport } from './elm327';
 import { DEFAULT_ELM327_COMPATIBILITY, Elm327CompatibilityConfig, mergeCompatibilityConfig } from './elm327Compatibility';
+import { timedOutNativeAttemptStillPending } from './connectionRecovery';
 
 export interface BluetoothDeviceInfo {
   address: string;
@@ -136,10 +137,13 @@ export class BluetoothClassicTransport implements ObdTransport {
         // GLOBAL por endereço para impedir chamadas concorrentes ao mesmo MAC.
         const pending = pendingNativeConnections.get(addressKey);
         if (pending) {
-          this.logDiagnostic('CONNECT_WAITING_PREVIOUS_NATIVE_ATTEMPT', {
+          this.logDiagnostic('CONNECT_ABORT_PREVIOUS_NATIVE_ATTEMPT_PENDING', {
             address: this.deviceAddress,
           });
-          try { await pending; } catch { /* próxima tentativa após término */ }
+          lastCause = new Error(
+            'TENTATIVA NATIVA ANTERIOR AINDA PENDENTE. EVITE UMA SEGUNDA CONEXÃO SIMULTÂNEA; TENTE NOVAMENTE APÓS A LIBERAÇÃO DO ADAPTADOR.',
+          );
+          break;
         }
 
         this.logDiagnostic('CONNECT_ATTEMPT', {
@@ -195,6 +199,19 @@ export class BluetoothClassicTransport implements ObdTransport {
           error: cause instanceof Error ? cause.message : String(cause),
         });
         lastCause = cause;
+        if (timedOutNativeAttemptStillPending(
+          connectionRaceTimedOut,
+          connectPromise,
+          pendingNativeConnections.get(addressKey),
+        )) {
+          this.logDiagnostic('CONNECT_ABORT_NATIVE_ATTEMPT_STILL_PENDING', {
+            secureSocket,
+            timeoutMs: this.config.bluetoothConnectTimeoutMs,
+          });
+          // The JS timeout cannot cancel the native request. Do not wait forever
+          // or race a second RFCOMM socket against the same adapter.
+          break;
+        }
         if (device) await this.safeDisconnect(device);
         device = null;
       }
