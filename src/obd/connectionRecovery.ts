@@ -90,3 +90,11 @@ export function timedOutNativeAttemptStillPending(
 ): boolean {
   return timedOut && currentAttempt !== null && registeredAttempt === currentAttempt;
 }
+
+/**
+ * A rejected close leaves the native socket state uncertain; retrying could create
+ * concurrent RFCOMM sessions for the same adapter.
+ */
+export function shouldRetryAfterDisconnectCleanup(closeError: unknown | null): boolean {
+  return closeError === null;
+}
