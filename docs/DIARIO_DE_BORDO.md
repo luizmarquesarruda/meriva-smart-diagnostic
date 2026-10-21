@@ -3012,7 +3012,7 @@ Conferir o SHA final e a CI da PR #75; corrigir qualquer falha indicada pelos lo
 A revisão do histórico identificou que a PR #70 (UX: navegação e inicialização OBD com progresso), fechada sem merge, já continha `src/ui/StartupScreen.tsx`, o modelo `src/ui/startupProgress.ts` e um teste para a progressão Bluetooth → ELM327 → ECU. A versão anterior permitia que a abertura terminasse em cerca de 850–1.300 ms, portanto não assegurava seis segundos e não validava os PIDs essenciais antes de exibir o cockpit.
 
 ### Decisão de arquitetura
-- Restaurar a identidade Smart OBD, a barra de progresso e mensagens baseadas nos estados reais de Bluetooth Classic, ELM327 e resposta da ECU.
+- Restaurar a tela de abertura com a identidade atual `MERIVA SMART`, consistente com o nome exibido no cockpit e em `app.json`, mais barra de progresso e mensagens baseadas nos estados reais de Bluetooth Classic, ELM327 e resposta da ECU. A renomeação geral do produto fica fora deste escopo.
 - A conexão automática continua sendo iniciada exclusivamente pelo fluxo proprietário já existente em `app/index.tsx`; a splash não abre outro socket, sessão ou fila ELM327.
 - Após validação real da ECU, executar uma pré-verificação sequencial dos quatro PIDs centrais do cockpit: `010C` RPM, `0105` temperatura do arrefecimento, `0142` tensão do módulo e `0111` posição da borboleta. Um PID só é consultado se a ECU o anunciar na bitmap de suporte e houver definição local.
 - Para cada PID selecionado, realizar cinco tentativas sequenciais; apenas cinco respostas numéricas válidas contam como PID verificado. Timeout, erro, valor ausente ou PID não anunciado não são convertidos em zero nem contados como aprovação.
@@ -3026,7 +3026,7 @@ A revisão do histórico identificou que a PR #70 (UX: navegação e inicializa�
 - A conexão já estabelecida permanece em `sharedConnection`; ao abrir o cockpit não se chama uma segunda conexão. A monitorização OBD existente mantém a fila serial única.
 
 ### Alterações e testes adicionados
-- `src/ui/StartupScreen.tsx`: identidade Smart OBD com barra acessível e detalhe da leitura em andamento.
+- `src/ui/StartupScreen.tsx`: identidade `MERIVA SMART` com barra acessível, indicador de estado e detalhe da leitura em andamento.
 - `src/ui/startupProgress.ts`: duração mínima, timeout de 60 s e apresentação de estados Bluetooth/ELM/ECU e pré-verificação.
 - `src/diagnostics/startupPidPreflight.ts`: pré-verificação dos quatro PIDs principais, respeitando bitmap, cinco tentativas e cinco respostas válidas.
 - `app/index.tsx`: executa a pré-verificação no fluxo da conexão existente antes de liberar a splash.
