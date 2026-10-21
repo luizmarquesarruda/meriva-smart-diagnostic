@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 
 const appJson = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 const index = fs.readFileSync('app/index.tsx', 'utf8');
 const layout = fs.readFileSync('app/_layout.tsx', 'utf8');
 const midLayout = fs.readFileSync('src/ui/midLayout.ts', 'utf8');
@@ -14,6 +15,11 @@ const screenFiles = [
 
 // Expo's default orientation means no orientation lock; do not introduce a native portrait/landscape lock.
 assert.equal(appJson.expo.orientation, 'default');
+assert.equal(packageJson.dependencies['expo-screen-orientation'], '~7.0.5');
+assert.match(layout, /import \* as ScreenOrientation from 'expo-screen-orientation'/);
+assert.match(layout, /ScreenOrientation\.unlockAsync\(\)/, 'a inicialização deve remover travas de orientação e permitir retrato/paisagem');
+assert.match(layout, /addOrientationChangeListener/);
+assert.match(layout, /subscription\.remove\(\)/, 'listener de orientação deve ser removido no cleanup');
 assert.match(index, /useMidLayout\(\)/);
 assert.match(index, /layout\.landscape/);
 assert.doesNotMatch(index, /ScrollView/);
