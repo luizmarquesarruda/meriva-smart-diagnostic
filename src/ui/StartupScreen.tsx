@@ -32,7 +32,7 @@ export function StartupScreen({ progress }: StartupScreenProps) {
               <Text style={styles.obdBadgeText}>OBD-II</Text>
             </View>
           </View>
-          <Text style={styles.brand}>SMART OBD</Text>
+          <Text style={styles.brand}>MERIVA SMART</Text>
           <Text style={styles.subtitle}>DIAGNÓSTICO INTELIGENTE</Text>
           <View style={styles.protocolPill}>
             <Text style={styles.protocolText}>OBD-II</Text>
