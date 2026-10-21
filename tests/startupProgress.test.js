@@ -260,6 +260,7 @@ async function main() {
   assert.match(screen, /MERIVA SMART/);
   assert.match(screen, /OBD-II/);
   assert.match(screen, /protocolDotColor/);
+  assert.match(screen, /progress\.terminal === 'ready' && progress\.detail\.includes\('ECU validada'\)/);
   assert.match(screen, /backgroundColor: protocolDotColor/);
   assert.doesNotMatch(screen, /connectPreferredElm/, 'tela de abertura não pode iniciar uma segunda sessão OBD');
   console.log('startupProgress.test.js: PASS');
