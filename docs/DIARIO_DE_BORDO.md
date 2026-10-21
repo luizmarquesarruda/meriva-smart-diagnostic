@@ -1,6 +1,6 @@
 # Diário de Bordo - Meriva Smart Diagnostic
 
-## ESTADO VIGENTE E REGRAS ANTI-REGRESSÃO — 2026-10-20
+## ESTADO VIGENTE E REGRAS ANTI-REGRESSÃO — 2026-10-21
 
 > **Esta seção é a referência operacional atual.** O restante deste arquivo contém registros históricos: falhas, decisões e “próximos passos” antigos descrevem o estado da época e não devem ser tratados como tarefas ainda abertas sem nova verificação. Quando dois registros divergirem, prevalecem este contrato e a entrada cronologicamente mais recente que tenha evidência verificável.
 
@@ -113,6 +113,8 @@
 - **DB-082** · 2026-10-21 — Auditoria visual, tema comum e proteção de consistência entre telas
 - **DB-083** · 2026-10-21 — Navegação inferior somente com ícones e alvos acessíveis
 - **DB-084** · 2026-10-21 — Biblioteca visual compartilhada, monitoramento de rede 4G/5G e página de conectividade
+- **DB-085** · 2026-10-21 — Atualização manual da rede e validação do sinal informado pelo Android
+- **DB-086** · 2026-10-21 — Cockpit: informações de rede/clima legíveis e botões com áreas de toque ampliadas
 
 ---
 
@@ -2951,3 +2953,30 @@ A página de conectividade apresentava o estado recebido por eventos do sistema,
 
 ### Próximo passo
 Conferir os jobs da CI do novo SHA; depois, testar a ação de atualização e confirmar que a conexão OBD permanece estável ao alternar entre a página de conectividade e o cockpit.
+
+
+## DB-086 · 2026-10-21 — Cockpit: informações de rede/clima legíveis e botões com áreas de toque ampliadas
+
+### Problema e evidência visual
+- Nas capturas Android recebidas, cidade, temperatura e condição meteorológica eram renderizadas em uma linha com fonte de 8 dp; o atalho de rede usava ícone de 13 dp e texto de 8 dp. Isso reduzia a legibilidade das informações ambientais e da rede.
+- O cockpit usava `justifyContent: 'space-between'` em um contêiner flexível com vários blocos. O espaço livre era distribuído entre cada bloco, criando uma lacuna desproporcional entre cabeçalho/rede e o painel OBD.
+- Os atalhos inferiores já tinham rótulos de acessibilidade e altura mínima de 48 dp, mas ícones de 22 dp e ausência de dicas de ação. As três ações principais também não declaravam explicitamente papel/rótulo acessível.
+
+### Correções preparadas no código
+- `app/index.tsx`: agrupado cabeçalho + informações ambientais/rede; criada apresentação em duas linhas para cidade, temperatura e condição, com tamanhos maiores e versão compacta para paisagem; o cartão ambiental mantém valores `N/D`/opcional quando não houver observação válida.
+- O selo de rede reserva espaço maior e direciona para a página de conectividade existente. Um segundo nível de texto diferencia INTERNET OK, SEM INTERNET, OFFLINE e VERIFICANDO a partir do estado já informado pelo Android; a página detalhada continua exibindo os estados completos.
+- O contêiner do cockpit deixou de distribuir todas as secções com `space-between`; o espaço flexível foi concentrado abaixo das ações principais, mantendo a navegação no fim sem abrir grandes lacunas entre cabeçalho, rede e painel OBD.
+- As três ações principais receberam papel, nome e dica de acessibilidade explícitos, altura mínima de 54 dp e área de toque preservada. Os atalhos inferiores permanecem **somente com ícones**, conforme o contrato anterior, com ícones de 25 dp, alvo mínimo de 56 dp, feedback de toque e dicas para leitores de tela.
+- `src/ui/NetworkStatusIndicator.tsx`: aumentada a geração/rede para 12 dp e acrescentada segunda linha compacta que informa a disponibilidade da internet.
+- `tests/cockpitNavigation.test.js`: adicionadas regressões para hierarquia tipográfica da cidade/temperatura/condição, estado de internet, dimensões dos botões, dicas de acessibilidade e prevenção da distribuição vertical que criava lacunas.
+- `docs/CONTRATO_ANTI_REGRESSAO.md`: novo RG-15 protege legibilidade da rede/clima e áreas de toque sem acoplar a conectividade à ECU.
+- Nenhuma dependência nova, permissão, consulta OBD ou mecanismo de polling foi adicionado. O fluxo de rede continua informativo e não comanda a conexão Bluetooth/ELM327.
+
+### Commit, CI e limites
+- Esta atualização foi preparada no branch `fix/cockpit-flicker-restore-buttons-20261020`, dentro da PR #75, que continua aberta e não mesclada.
+- O hash do commit e a execução da CI serão registrados após a publicação e a consulta real do GitHub Actions; neste momento, TypeScript, testes, `gate:baseline` e `android-build` ainda não foram declarados aprovados para estas mudanças.
+- A CI anterior verde valida apenas seu próprio SHA; não substitui a execução desta alteração.
+- A inspeção das capturas fundamenta os problemas de legibilidade/espaçamento, mas a aparência final ainda exige instalação do APK e conferência no Android em retrato e paisagem, incluindo os toques reais dos três ícones inferiores.
+
+### Próximo passo
+Publicar uma alteração atômica de código + regressões + contrato + diário; consultar a CI do SHA exato. Corrigir qualquer falha pelo log e não fazer merge sem autorização explícita.

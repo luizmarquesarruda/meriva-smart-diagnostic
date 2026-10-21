@@ -13,15 +13,28 @@ export function NetworkStatusIndicator() {
       : presentation.tone === 'danger'
         ? COLORS.danger
         : COLORS.textMuted;
+  const internetSummary = presentation.tone === 'success'
+    ? 'INTERNET OK'
+    : presentation.tone === 'warning'
+      ? 'SEM INTERNET'
+      : presentation.tone === 'danger'
+        ? 'OFFLINE'
+        : 'VERIFICANDO';
+
   return (
     <View style={styles.container}>
-      <AppIcon name={presentation.icon} size={13} color={toneColor} />
-      <Text style={[styles.label, { color: toneColor }]} numberOfLines={1}>{presentation.shortLabel}</Text>
+      <View style={styles.statusRow}>
+        <AppIcon name={presentation.icon} size={18} color={toneColor} />
+        <Text style={[styles.label, { color: toneColor }]} numberOfLines={1}>{presentation.shortLabel}</Text>
+      </View>
+      <Text style={[styles.internetStatus, { color: toneColor }]} numberOfLines={1}>{internetSummary}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
-  label: { fontSize: 8, fontWeight: '900', letterSpacing: 0.35 },
+  container: { width: '100%', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3 },
+  statusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
+  label: { fontSize: 12, fontWeight: '900', letterSpacing: 0.3 },
+  internetStatus: { fontSize: 8, fontWeight: '900', letterSpacing: 0.1, textAlign: 'center' },
 });
