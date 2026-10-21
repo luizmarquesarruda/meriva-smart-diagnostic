@@ -12,6 +12,7 @@ export interface BluetoothDeviceInfo {
 
 type NativeConnectPromise = Promise<BluetoothDevice>;
 const pendingNativeConnections = new Map<string, NativeConnectPromise>();
+const pendingNativeConnectionSettlements = new Map<string, Promise<void>>();
 
 function normalizeBluetoothAddress(address: string): string {
   return address.replace(/:/g, '').toUpperCase();
@@ -141,8 +142,11 @@ export class BluetoothClassicTransport implements ObdTransport {
             address: this.deviceAddress,
             timeoutMs: this.config.bluetoothConnectTimeoutMs,
           });
+          // Wait for the native call AND any late-success cleanup to finish before
+          // opening another RFCOMM socket for the same adapter.
+          const pendingSettlement = pendingNativeConnectionSettlements.get(addressKey) ?? pending;
           const previousSettled = await waitForNativeConnectAttempt(
-            pending,
+            pendingSettlement,
             this.config.bluetoothConnectTimeoutMs,
           );
           if (!previousSettled) {
@@ -155,8 +159,7 @@ export class BluetoothClassicTransport implements ObdTransport {
             );
             break;
           }
-          // A tentativa terminou (com sucesso ou erro); the next attempt can be serialized safely.
-          try { await pending; } catch { /* retry after failed native attempt */ }
+          try { await pendingSettlement; } catch { /* retry after failed native attempt */ }
         }
 
         this.logDiagnostic('CONNECT_ATTEMPT', {
@@ -175,18 +178,22 @@ export class BluetoothClassicTransport implements ObdTransport {
         pendingNativeConnections.set(addressKey, connectPromise);
 
         const currentPromise = connectPromise;
-        void currentPromise.then(async (lateDevice) => {
+        const settlement = currentPromise.then(async (lateDevice) => {
           if (!connectionRaceTimedOut || !lateDevice) return;
           this.logDiagnostic('LATE_CONNECT_SUCCESS_AFTER_TIMEOUT', { secureSocket });
           await this.safeDisconnect(lateDevice);
           this.logDiagnostic('LATE_CONNECT_DISCONNECTED', { secureSocket });
         }).catch(() => {
           // A tentativa nativa atrasada também pode terminar com erro.
-        }).finally(() => {
+        }).then(() => {
           if (pendingNativeConnections.get(addressKey) === currentPromise) {
             pendingNativeConnections.delete(addressKey);
           }
+          if (pendingNativeConnectionSettlements.get(addressKey) === settlement) {
+            pendingNativeConnectionSettlements.delete(addressKey);
+          }
         });
+        pendingNativeConnectionSettlements.set(addressKey, settlement);
 
         device = await Promise.race([
           connectPromise,
