@@ -37,6 +37,7 @@ export function StartupScreen({ progress }: StartupScreenProps) {
           <View style={styles.statusBlock} accessibilityLiveRegion="polite">
             <Text style={styles.statusTitle}>{progress.title}</Text>
             <Text style={styles.statusDetail}>{progress.detail}</Text>
+            {progress.pidDetail ? <Text style={styles.pidProgressDetail}>{progress.pidDetail}</Text> : null}
           </View>
         </View>
 
@@ -85,6 +86,7 @@ const styles = StyleSheet.create({
   statusBlock: { marginTop: 34, width: '100%', maxWidth: 420, minHeight: 82, alignItems: 'center', justifyContent: 'center' },
   statusTitle: { color: COLORS.textStrong, fontSize: 13, fontWeight: '900', letterSpacing: 1.1, textAlign: 'center' },
   statusDetail: { color: COLORS.textMuted, fontSize: 11, lineHeight: 17, textAlign: 'center', marginTop: 8, maxWidth: 340 },
+  pidProgressDetail: { color: COLORS.accent, fontSize: 10, fontWeight: '800', lineHeight: 15, textAlign: 'center', marginTop: 8, maxWidth: 340 },
   bottomDock: { width: '100%', paddingHorizontal: 20, paddingBottom: 12, paddingTop: 14 },
   progressTrack: { height: 5, width: '100%', overflow: 'hidden', backgroundColor: COLORS.surfaceInset, borderRadius: 3, borderWidth: 1, borderColor: COLORS.border },
   progressFill: { height: '100%', minWidth: 3, backgroundColor: COLORS.accent, borderRadius: 3 },
