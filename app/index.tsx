@@ -20,6 +20,7 @@ import { autoTripService, type AutoTripServiceState } from '../src/trip/autoTrip
 import { loadCurrentConditions, type CurrentConditions } from '../src/weather/currentConditions';
 import { StartupScreen } from '../src/ui/StartupScreen';
 import { getStartupHideDelayMs, getStartupProgress, STARTUP_TIMEOUT_MS, type StartupTerminalState } from '../src/ui/startupProgress';
+import { INITIAL_STARTUP_PID_PREFLIGHT, runStartupPidPreflight, type StartupPidPreflightSnapshot } from '../src/diagnostics/startupPidPreflight';
 
 let startupScreenConsumed = false;
 
@@ -33,8 +34,13 @@ export default function IndexScreen() {
   const [isHydrated, setIsHydrated] = useState(false);
   const [showStartupScreen, setShowStartupScreen] = useState(() => !startupScreenConsumed);
   const [startupTimedOut, setStartupTimedOut] = useState(false);
+  const [startupPidPreflight, setStartupPidPreflight] = useState<StartupPidPreflightSnapshot>(INITIAL_STARTUP_PID_PREFLIGHT);
   const startupStartedAt = useRef(Date.now());
   const startupTerminalRef = useRef<StartupTerminalState>('progress');
+  const startupScreenShownRef = useRef(showStartupScreen);
+  const startupPreflightCancelled = useRef(false);
+  const startupPidCheckStarted = useRef(false);
+  startupScreenShownRef.current = showStartupScreen;
   const [tripState, setTripState] = useState<AutoTripServiceState>(autoTripService.getState());
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [dtcCount, setDtcCount] = useState(0);
@@ -51,6 +57,13 @@ export default function IndexScreen() {
   }, []);
 
   useEffect(() => autoTripService.subscribe(setTripState), []);
+  useEffect(() => {
+    if (!showStartupScreen) startupPreflightCancelled.current = true;
+  }, [showStartupScreen]);
+  useEffect(() => () => {
+    startupScreenShownRef.current = false;
+    startupPreflightCancelled.current = true;
+  }, []);
   useEffect(() => {
     const unsubscribeConnection = subscribeSharedObd(() => setConnectionStatus(getSharedObdStatus()));
     const unsubscribeHealth = subscribeSharedObdStatus((status) => setConnectionStatus(status));
@@ -150,9 +163,31 @@ export default function IndexScreen() {
       adaptiveTimeoutMinMs: elmSettings.elmAdaptiveTimeoutMinMs,
       adaptiveTimeoutMaxMs: elmSettings.elmAdaptiveTimeoutMaxMs,
     })
-      .then(() => {
+      .then(async (connection) => {
         setBluetoothSearching(false);
         setBluetoothError(null);
+        if (!startupScreenShownRef.current || startupPidCheckStarted.current) return;
+        startupPidCheckStarted.current = true;
+        setStartupPidPreflight({ ...INITIAL_STARTUP_PID_PREFLIGHT, status: 'running' });
+        try {
+          const summary = await runStartupPidPreflight(connection, {
+            onProgress: (snapshot) => {
+              if (startupScreenShownRef.current && !startupPreflightCancelled.current) setStartupPidPreflight(snapshot);
+            },
+            shouldCancel: () => startupPreflightCancelled.current
+              || !startupScreenShownRef.current
+              || getSharedObdConnection() !== connection,
+          });
+          if (startupScreenShownRef.current && !startupPreflightCancelled.current) setStartupPidPreflight(summary);
+        } catch (cause) {
+          if (startupScreenShownRef.current && !startupPreflightCancelled.current) {
+            setStartupPidPreflight({
+              ...INITIAL_STARTUP_PID_PREFLIGHT,
+              status: 'partial',
+              message: cause instanceof Error ? cause.message : 'Falha inesperada na verificação inicial dos PIDs.',
+            });
+          }
+        }
       })
       .catch((cause) => {
         setBluetoothSearching(false);
@@ -247,6 +282,7 @@ export default function IndexScreen() {
     lifecycle: connectionStatus.lifecycle,
     error: bluetoothError,
     timedOut: startupTimedOut,
+    pidPreflight: startupPidPreflight,
   });
   startupTerminalRef.current = startupProgress.terminal;
 
@@ -255,7 +291,10 @@ export default function IndexScreen() {
   useEffect(() => {
     if (!showStartupScreen) return;
     const timer = setTimeout(() => {
-      if (startupTerminalRef.current === 'progress') setStartupTimedOut(true);
+      if (startupTerminalRef.current === 'progress') {
+        startupPreflightCancelled.current = true;
+        setStartupTimedOut(true);
+      }
     }, STARTUP_TIMEOUT_MS);
     return () => clearTimeout(timer);
   }, [showStartupScreen]);
