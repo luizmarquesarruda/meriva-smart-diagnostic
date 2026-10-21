@@ -1025,7 +1025,7 @@ async function testPidAndLearningWriteSerialization() {
   assert.ok(cockpitSource.includes("item.source !== 'REAL'"), 'cockpit não deve exibir temperatura simulada como dado real');
   assert.ok(cockpitSource.includes('ageMs >= 0 && ageMs <= 30_000'), 'cockpit deve descartar temperatura OBD futura ou obsoleta após 30 segundos');
   assert.ok(cockpitSource.includes('TEMPERATURA DO MOTOR'), 'painel de cartões deve apresentar a temperatura do motor');
-  assert.ok(cockpitSource.includes("'TEMPERATURA ALTA'"), 'cockpit deve destacar temperatura alta sem esconder o valor numérico');
+  assert.ok(cockpitSource.includes('TEMPERATURA ALTA'), 'cockpit deve destacar temperatura alta sem esconder o valor numérico');
   assert.ok(autoTripServiceSource.includes('registerObdQuery(this.basePath, fuelLevelResult, \'REAL\')'), 'PID 012F automático deve alimentar o pipeline de persistência');
   assert.ok(autoTripServiceSource.includes('registerObdQuery(this.basePath, fuelResult, \'REAL\')'), 'PID 015E automático deve alimentar o pipeline de persistência');
   assert.ok(autoTripServiceSource.includes('registerObdQuery(this.basePath, speedResult, \'REAL\')'), 'PID 010D automático deve alimentar o pipeline de persistência');
