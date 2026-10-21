@@ -10,6 +10,11 @@ interface StartupScreenProps {
 
 export function StartupScreen({ progress }: StartupScreenProps) {
   const isWorking = progress.terminal === 'progress';
+  const protocolDotColor = progress.terminal === 'ready'
+    ? COLORS.success
+    : progress.terminal === 'offline' || progress.terminal === 'partial'
+      ? COLORS.warning
+      : COLORS.accent;
   const fillWidth = `${progress.percent}%` as `${number}%`;
 
   return (
@@ -31,7 +36,7 @@ export function StartupScreen({ progress }: StartupScreenProps) {
           <Text style={styles.subtitle}>DIAGNÓSTICO INTELIGENTE</Text>
           <View style={styles.protocolPill}>
             <Text style={styles.protocolText}>OBD-II</Text>
-            <View style={styles.protocolDot} />
+            <View style={[styles.protocolDot, { backgroundColor: protocolDotColor }]} />
             <Text style={styles.protocolText}>BLUETOOTH CLASSIC</Text>
           </View>
           <View style={styles.statusBlock} accessibilityLiveRegion="polite">
