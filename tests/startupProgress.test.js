@@ -66,7 +66,7 @@ const base = {
 };
 
 assert.equal(STARTUP_MIN_DURATION_MS, 6000);
-assert.equal(STARTUP_TIMEOUT_MS, 30000);
+assert.equal(STARTUP_TIMEOUT_MS, 60000);
 assert.deepEqual(STARTUP_PID_PREFLIGHT_PIDS, ['010C', '0105', '0142', '0111']);
 
 const loading = getStartupProgress({ ...base, hydrated: false });
