@@ -111,6 +111,7 @@
 - **DB-080** · 2026-10-20 — Revisão preventiva do próprio gate anti-regressão
 - **DB-081** · 2026-10-20 — Correção do pisca-pisca do cockpit e restauração da navegação inferior
 - **DB-082** · 2026-10-21 — Auditoria visual, tema comum e proteção de consistência entre telas
+- **DB-083** · 2026-10-21 — Navegação inferior somente com ícones e alvos acessíveis
 
 ---
 
@@ -2883,3 +2884,23 @@ Executar `npm run validate` e `android-build` pela CI da branch de correção. S
 
 ### Próximo passo
 Consultar a CI associada ao SHA atual; corrigir qualquer falha pelo log. Após CI verde, instalar o APK e verificar contraste, títulos, barras nativas, botões inferiores, orientação, ciclo de conexão e tela do Laboratório.
+
+
+## DB-083 · 2026-10-21 — Navegação inferior somente com ícones e alvos acessíveis
+
+### Problema e evidência
+- O requisito visual anterior pedia botões inferiores sem legendas visíveis, mas o cockpit e a tela Bluetooth ainda renderizavam rótulos textuais.
+- A altura visual/tátil dos itens podia ficar abaixo da recomendação Android de 48 dp para alvos de toque.
+
+### Correção
+- Removidas as legendas visuais da navegação inferior no cockpit e na tela Bluetooth; ícones preservados.
+- Adicionados `accessibilityLabel`/estado selecionado para que a navegação sem texto continue identificável por leitores de tela.
+- Definidos alvos de navegação com `minHeight: 48` e ícones de 22 dp.
+- Adicionadas asserções de regressão para navegação icon-only, altura mínima e rótulos de acessibilidade.
+
+### Validação
+- A CI do commit de padronização visual está sendo acompanhada separadamente. A alteração icon-only será validada pela próxima execução de `gate:baseline`, `validate` e `android-build`.
+- A inspeção tátil/visual em telefone Android continua necessária.
+
+### Próximo passo
+Confirmar a CI da cabeça atual e testar os botões em retrato e paisagem, inclusive com TalkBack.

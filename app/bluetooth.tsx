@@ -224,14 +224,12 @@ export default function BluetoothScreen() {
 
         <View style={styles.bottomNav}>
           <Link href="/" asChild>
-            <TouchableOpacity style={styles.bottomItem}>
+            <TouchableOpacity style={styles.bottomItem} accessibilityRole="button" accessibilityLabel="Voltar ao cockpit">
               <Text style={styles.bottomIcon}>🚗</Text>
-              <Text style={styles.bottomText}>CARRO</Text>
             </TouchableOpacity>
           </Link>
-          <TouchableOpacity style={[styles.bottomItem, styles.bottomActive]}>
+          <TouchableOpacity style={[styles.bottomItem, styles.bottomActive]} accessibilityRole="button" accessibilityLabel="Bluetooth, tela atual" accessibilityState={{ selected: true }}>
             <Text style={styles.bottomIcon}>🔵</Text>
-            <Text style={styles.bottomActiveText}>BLUETOOTH</Text>
           </TouchableOpacity>
         </View>
         </View>
@@ -273,9 +271,7 @@ const styles = StyleSheet.create({
   ruleTitle: { color: '#7db3ff', fontSize: 10, fontWeight: '900', marginBottom: 6 },
   rule: { color: '#a9b9cc', fontSize: 10, lineHeight: 17 },
   bottomNav: { flexDirection: 'row', backgroundColor: '#111c2e', borderRadius: 14, borderWidth: 1, borderColor: '#29415f', marginTop: 12, padding: 5 },
-  bottomItem: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 10 },
+  bottomItem: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 48, borderRadius: 10 },
   bottomActive: { backgroundColor: '#1a3150' },
-  bottomIcon: { fontSize: 17, marginBottom: 2 },
-  bottomText: { color: '#9fb4cf', fontSize: 9, fontWeight: '900' },
-  bottomActiveText: { color: '#7db3ff', fontSize: 9, fontWeight: '900' },
+  bottomIcon: { fontSize: 22, marginBottom: 0 },
 });

@@ -21,6 +21,13 @@ assert.doesNotMatch(index, /\}, \[isHydrated, settings\]\);/, 'objeto settings i
 assert.match(index, /settings\?\.elmMaxConnectionAttempts/, 'efeito deve reagir às opções OBD efetivamente alteradas');
 assert.match(index, /bottomNavLandscape/, 'navegação inferior deve continuar disponível em paisagem');
 assert.doesNotMatch(index, /!layout\.landscape\s*&&\s*\(/, 'navegação não deve desaparecer ao girar o aparelho');
+assert.doesNotMatch(index, /<Text style=\{styles\.bottomNavText\}>/, 'navegação inferior do cockpit deve ser icon-only');
+assert.match(index, /bottomNavItem:\{[^}]*minHeight:48/, 'alvo inferior deve ter ao menos 48 dp');
+assert.match(index, /accessibilityLabel="Mais recursos"/, 'botão sem legenda visual precisa de nome acessível');
+const bluetooth = read('app/bluetooth.tsx');
+assert.doesNotMatch(bluetooth, /<Text style=\{styles\.bottomText\}>|<Text style=\{styles\.bottomActiveText\}>/, 'navegação Bluetooth deve ser icon-only');
+assert.match(bluetooth, /minHeight:\s*48/, 'botões inferiores Bluetooth devem ter alvo de 48 dp');
+assert.match(bluetooth, /accessibilityLabel="Bluetooth, tela atual"/, 'estado atual precisa de rótulo acessível');
 
 const dataScreen = read('app/dados.tsx');
 assert.match(dataScreen, /buildTelemetryChart/, 'tela Dados deve usar o modelo de gráfico testável');
