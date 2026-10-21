@@ -30,6 +30,27 @@ export async function cleanupDisconnectedSession(
 }
 
 /**
+ * Wait for an earlier native request to settle, but never inherit an unbounded wait.
+ * The native API itself cannot be cancelled from this layer.
+ */
+export async function waitForNativeConnectAttempt(
+  pending: Promise<unknown>,
+  timeoutMs: number,
+): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      pending.then(() => true, () => true),
+      new Promise<boolean>((resolve) => {
+        timer = setTimeout(() => resolve(false), Math.max(1, timeoutMs));
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/**
  * A JS timeout does not cancel the native RFCOMM request.
  * If that exact request is still registered, do not start a second socket mode concurrently.
  */
