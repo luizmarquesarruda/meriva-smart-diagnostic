@@ -36,6 +36,7 @@ const requiredSuites = [
   'orientationLayout.test.js',
   'liveTelemetry.test.js',
   'bluetoothLifecycle.test.js',
+  'connectionRecovery.test.js',
   'elm327Compatibility.test.js',
   'regression.test.js',
   'diagnosticEngine.test.js',
