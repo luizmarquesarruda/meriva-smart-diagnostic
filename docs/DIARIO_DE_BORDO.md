@@ -9,7 +9,7 @@
 - HEAD do `main` confirmado em `57da653ea6f671fba131e9dfbe54ebaa32e62bd4`, após o merge da PR #76 em 2026-10-21.
 - PR #76 (`audit: restore anti-regression protections and cockpit fixes`) consta como mesclada no GitHub. A execução CI #2637 para esse SHA terminou com sucesso: `validate` passou (incluindo o gate `gate:baseline`) e `android-build` passou, com APK standalone verificado e enviado como artefato. Isto não comprova teste físico no telefone ou no ELM327.
 - PRs #74 e #75 permanecem fechadas sem merge próprio; as correções que agora estão em `main` são as efetivamente integradas pela PR #76, não uma aprovação implícita dos heads isolados.
-- Trabalho em andamento: branch `fix/bt-reconnect-guard`, baseada no HEAD acima. A PR #77 corrige a concorrência RFCOMM e o fechamento tardio de sockets. A CI #2664 passou em `gate:baseline` e `validate`; o `android-build` ainda estava em execução na última consulta. Revisão adicional identificou que uma persistência sem resposta também poderia atrasar o fechamento; DB-093 limita essa espera sem permitir nova conexão antes de o fechamento da sessão terminar. A nova CI do SHA final deve ser consultada; a branch não foi mesclada e o teste físico continua pendente.
+- Trabalho em andamento: branch `fix/bt-reconnect-guard`, baseada no HEAD acima. A PR #77 corrige a concorrência RFCOMM e o fechamento tardio de sockets. Na CI #2671, `gate:baseline` e `validate` passaram no SHA `9ef897f784e645b941e8b9dabdd0c62cf2f535e0`; `android-build` estava em compilação na última consulta. A entrada DB-094 registra a falha anterior #2669 e a correção; esta atualização do diário cria novo SHA, cuja CI precisa ser consultada. A branch não foi mesclada e o teste físico continua pendente.
 - Não mesclar alterações novas sem autorização explícita. Para esta branch, exigir `gate:baseline`, `validate` e `android-build` verdes no SHA final; teste visual e físico com ELM327/ECU são etapas separadas.
 
 ### Contratos que não podem regredir
@@ -122,6 +122,8 @@
 - **DB-090** · 2026-10-21 — Timeout Bluetooth pendente e resiliência da recuperação
 - **DB-091** · 2026-10-21 — CI detecta regressão de concorrência e corrige espera Bluetooth limitada
 - **DB-092** · 2026-10-21 — Serialização do fechamento tardio de socket após timeout
+- **DB-093** · 2026-10-21 — Limite para persistência travada durante a desconexão
+- **DB-094** · 2026-10-21 — Auditoria da CI #2669 e validação parcial da correção de recuperação
 
 ---
 
@@ -3145,3 +3147,24 @@ A revisão de concorrência identificou que `cleanupDisconnectedSession()` trata
 
 ### Próximo passo
 Consultar a nova CI da PR #77 no SHA final. Confirmar `gate:baseline`, `validate` e `android-build` verdes e revisar o diff final; manter a PR em rascunho e não mesclar automaticamente.
+
+
+## DB-094 · 2026-10-21 — Auditoria da CI #2669 e validação parcial da correção de recuperação
+
+### Problema / evidência
+- A CI #2669 falhou em `validate`: o teste `connectionRecovery.test.js` esperava que a persistência fosse invocada antes do fechamento da sessão. A versão anterior adiava a invocação para uma microtask, alterando a ordem observável.
+- A revisão do diário também encontrou uma inconsistência documental: a entrada DB-093 já existia no corpo, mas faltava no índice sequencial.
+
+### Correção
+- `src/obd/connectionRecovery.ts`: a persistência volta a ser invocada sincronamente, com captura de erro síncrono e normalização da Promise; o fechamento da sessão continua independente do tempo de armazenamento e a espera da persistência é limitada a 1.000 ms.
+- O índice do Diário de Bordo passa a incluir DB-093 e esta entrada DB-094, mantendo o histórico e sem remover evidências anteriores.
+
+### Commit / CI
+- Correção de código: `9ef897f784e645b941e8b9dabdd0c62cf2f535e0`.
+- CI #2669: `validate` falhou com a ordem `close,persist`; causa identificada e corrigida.
+- CI #2671, SHA `9ef897f784e645b941e8b9dabdd0c62cf2f535e0`: `gate:baseline` e `validate` concluíram com sucesso. Na última consulta, `android-build` estava compilando o APK; verificação e upload do artefato ainda pendentes.
+- PR #77 permanece aberta, em rascunho, sem merge. O registro deste diário cria um novo commit e exige consultar novamente a CI do SHA resultante.
+
+### Limites / próximo passo
+- Não há teste físico declarado. A correção de timeout nativo não cancela a chamada RFCOMM subjacente; ela impede que a camada JS inicie outra conexão concorrente enquanto a tentativa/limpeza anterior continua pendente.
+- Confirmar os três gates no SHA final após esta atualização documental. Depois, fazer teste controlado com ELM327 real e inspecionar a tela durante conexão, perda de link e recuperação. Não mesclar sem autorização explícita.
