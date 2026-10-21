@@ -3031,3 +3031,28 @@ Os botões principais ainda foram reportados visualmente como texto sem aparênc
 
 ### Limitações atuais
 A inspeção estática confirma os contratos e a diferença entre branches, mas não comprova por si só o comportamento visual em um aparelho nem a estabilidade física da conexão Bluetooth/ECU. A rodada permanece pendente até a CI da nova PR terminar.
+
+
+## DB-089 · 2026-10-21 — Rotação automática da tela
+
+### Problema
+O usuário pediu que a interface acompanhe a rotação física do aparelho, mantendo o layout adaptável sem regressões na conexão Bluetooth/ECU.
+
+### Diagnóstico
+- `app.json` já declara `expo.orientation: "default"`, e o layout responsivo usa `useWindowDimensions()` via `useMidLayout()`.
+- A biblioteca oficial `expo-screen-orientation` tem versão compatível com Expo SDK 51: `~7.0.5`. O uso de `unlockAsync()` restaura a política `DEFAULT`, evitando que uma trava de orientação deixada pela navegação impeça retrato/paisagem.
+- A documentação do Expo informa que `OrientationLock.DEFAULT` deixa o Android decidir a orientação; portanto, o bloqueio global de rotação do próprio Android ainda pode impedir a mudança física.
+
+### Correção
+- Adicionada `expo-screen-orientation@~7.0.5` ao `package.json` e ao `package-lock.json`.
+- O layout raiz chama `ScreenOrientation.unlockAsync()` na inicialização e registra listener de orientação com cleanup.
+- Mantida a lógica responsiva centralizada existente (`useWindowDimensions()` / `useMidLayout()`); não foram adicionados bloqueios de retrato ou paisagem nem alterada a lógica OBD/Bluetooth.
+- O teste `tests/orientationLayout.test.js` agora protege a dependência, a liberação da orientação padrão e a limpeza do listener.
+
+### Testes / CI
+- Alteração preparada na branch `audit/anti-regression-ci-20261021`, dentro da PR #76.
+- A CI deve validar `gate:baseline`, `validate` e `android-build`. Nenhum resultado é declarado antes de os jobs terminarem.
+- O comportamento físico deve ser confirmado no aparelho com **Rotação automática** ativada nas configurações rápidas do Android.
+
+### Próximo passo
+Aguardar a CI da PR #76 após as últimas alterações; corrigir qualquer falha real de instalação, TypeScript, testes ou build antes de considerar a alteração pronta.
