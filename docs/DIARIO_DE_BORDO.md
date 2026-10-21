@@ -6,9 +6,10 @@
 
 ### Estado atual do trabalho
 - Repositório: `luizmarquesarruda/meriva-smart-diagnostic`.
-- Branch de trabalho: `fix/cockpit-flicker-restore-buttons-20261020`.
-- PR #75: aberta e **não mesclada**; PR #74 é a base funcional e também permanece aberta. Não fazer merge sem autorização explícita. Nenhum merge pode ser feito sem autorização explícita do usuário.
-- O SHA e o estado da CI no diário são apenas registros históricos. Para este trabalho, a autoridade vigente é a cabeça real da PR #75 (correção do cockpit), consultada junto à última CI desse SHA. A PR #74 é a base funcional empilhada e permanece aberta; não mesclar nenhuma delas sem autorização explícita.
+- Branch de trabalho atual: `feat/startup-screen-minimum-six-seconds-20261021`, criada a partir da cabeça que continha os últimos ajustes de cockpit.
+- PRs #73, #74 e #75 foram fechadas em 2026-10-21 sem merge, conforme solicitação do usuário; não há PR aberta no início desta nova tarefa.
+- Esta branch deriva do commit `bd2e725a45fb2dce633377c1527bb0b389f86d5b` da antiga PR #75, fechada sem merge. Ela preserva alterações ainda não incorporadas à `main`; a criação da branch não equivale a merge.
+- A autoridade vigente é o HEAD real desta branch e a CI correspondente; não reutilizar estado de CI de commits antigos. Não reabrir PRs antigas nem mesclar sem solicitação explícita.
 - Esta camada adiciona um teste executável e um passo visível no workflow; não modifica a lógica de leitura OBD, o transporte Bluetooth nem as regras diagnósticas.
 
 ### Contratos que não podem regredir
@@ -116,6 +117,7 @@
 - **DB-085** · 2026-10-21 — Atualização manual da rede e validação do sinal informado pelo Android
 - **DB-086** · 2026-10-21 — Cockpit: informações de rede/clima legíveis e botões com áreas de toque ampliadas
 - **DB-087** · 2026-10-21 — Ajuste adicional de legibilidade da rede e tamanho dos botões principais
+- **DB-088** · 2026-10-21 — Splash com conexão OBD e pré-verificação de cinco leituras dos PIDs essenciais
 
 ---
 
@@ -3003,3 +3005,40 @@ A revisão da implementação DB-086 confirmou que o tipo de rede e o ícone for
 
 ### Próximo passo
 Conferir o SHA final e a CI da PR #75; corrigir qualquer falha indicada pelos logs. Não mesclar sem autorização explícita.
+
+## DB-088 · 2026-10-21 — Splash com conexão OBD e pré-verificação de cinco leituras dos PIDs essenciais
+
+### Retomada do histórico
+A revisão do histórico identificou que a PR #70 (UX: navegação e inicialização OBD com progresso), fechada sem merge, já continha `src/ui/StartupScreen.tsx`, o modelo `src/ui/startupProgress.ts` e um teste para a progressão Bluetooth → ELM327 → ECU. A versão anterior permitia que a abertura terminasse em cerca de 850–1.300 ms, portanto não assegurava seis segundos e não validava os PIDs essenciais antes de exibir o cockpit.
+
+### Decisão de arquitetura
+- Restaurar a identidade Smart OBD, a barra de progresso e mensagens baseadas nos estados reais de Bluetooth Classic, ELM327 e resposta da ECU.
+- A conexão automática continua sendo iniciada exclusivamente pelo fluxo proprietário já existente em `app/index.tsx`; a splash não abre outro socket, sessão ou fila ELM327.
+- Após validação real da ECU, executar uma pré-verificação sequencial dos quatro PIDs centrais do cockpit: `010C` RPM, `0105` temperatura do arrefecimento, `0142` tensão do módulo e `0111` posição da borboleta. Um PID só é consultado se a ECU o anunciar na bitmap de suporte e houver definição local.
+- Para cada PID selecionado, realizar cinco tentativas sequenciais; apenas cinco respostas numéricas válidas contam como PID verificado. Timeout, erro, valor ausente ou PID não anunciado não são convertidos em zero nem contados como aprovação.
+- A pré-verificação confirma resposta repetível e parsing; não certifica a integridade física/elétrica do sensor e não substitui os testes completos do Laboratório, que podem depender de motor parado, motor aquecido ou outros PIDs.
+- A barra mostra o PID/etapa e a rodada atual. O estado final diferencia verificação completa, parcial e offline; só declara ECU conectada após evidência OBD real.
+
+### Tempo de abertura e recuperação
+- A splash fica visível por no mínimo `6.000 ms`, mesmo se a conexão ocorrer mais rápido.
+- O limite total da inicialização é `60.000 ms`, para dar tempo razoável à conexão e às vinte consultas possíveis dos quatro PIDs essenciais. Se excedido, interrompe novas consultas e libera o cockpit com estado parcial/offline; não prende o usuário indefinidamente.
+- A splash é exibida apenas na primeira entrada da sessão JavaScript. Voltar ao cockpit durante a mesma sessão não inicia outra pré-verificação.
+- A conexão já estabelecida permanece em `sharedConnection`; ao abrir o cockpit não se chama uma segunda conexão. A monitorização OBD existente mantém a fila serial única.
+
+### Alterações e testes adicionados
+- `src/ui/StartupScreen.tsx`: identidade Smart OBD com barra acessível e detalhe da leitura em andamento.
+- `src/ui/startupProgress.ts`: duração mínima, timeout de 60 s e apresentação de estados Bluetooth/ELM/ECU e pré-verificação.
+- `src/diagnostics/startupPidPreflight.ts`: pré-verificação dos quatro PIDs principais, respeitando bitmap, cinco tentativas e cinco respostas válidas.
+- `app/index.tsx`: executa a pré-verificação no fluxo da conexão existente antes de liberar a splash.
+- `tests/startupProgress.test.js`: cobre cronologia, cinco leituras por PID, PIDs não anunciados, respostas inválidas, cancelamento e ausência de conexão duplicada.
+- `package.json` e `tests/projectBaseline.test.js`: conectam o novo teste à validação principal e ao gate anti-regressão.
+- `docs/CONTRATO_ANTI_REGRESSAO.md`: RG-16 registra o mínimo de seis segundos, os quatro PIDs e a saída parcial/offline.
+
+### Validação e limites
+- As PRs #73, #74 e #75 permanecem fechadas e não mescladas. Esta alteração está na branch `feat/startup-screen-minimum-six-seconds-20261021`.
+- Não foram adicionadas dependências. O script de teste mudou; não há mudança de dependências para exigir edição do lockfile.
+- A validação local de TypeScript e dos testes não foi executada nesta sessão, pois o repositório não está clonado no ambiente. Conferir `npm ci`, Expo Doctor, `gate:baseline`, `npm run validate` e `android-build` na CI do HEAD final.
+- A CI não substitui teste no Android real: observar duração, conexão já pronta ao abrir o cockpit, compatibilidade da bitmap de PIDs e estabilidade do ELM327 durante as consultas sequenciais.
+
+### Próximo passo
+Confirmar a CI do HEAD exato e corrigir falhas a partir dos logs. Não reabrir PR antiga nem fazer merge sem solicitação explícita.
