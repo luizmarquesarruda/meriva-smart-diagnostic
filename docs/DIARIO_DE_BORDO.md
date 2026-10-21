@@ -6,10 +6,11 @@
 
 ### Estado atual do trabalho
 - Repositório: `luizmarquesarruda/meriva-smart-diagnostic`.
-- Branch de auditoria: `audit/anti-regression-ci-20261021`, criada sobre o head da antiga branch de cockpit `bd2e725a45fb2dce633377c1527bb0b389f86d5b`.
-- Situação verificada em 2026-10-21: PR #74 e PR #75 estão **fechadas sem merge**; portanto, as correções dessas branches não devem ser presumidas como presentes no `main`.
-- Head consultado do `main`: `78b9ca71344ce3d100ad949c09f290b328f01eaa`. O código do `main` ainda tinha o efeito de conexão da tela inicial dependente do objeto `settings` inteiro; a branch auditada restringe as dependências às opções OBD relevantes, reduzindo reinícios causados por recarga de configurações.
-- Nenhum merge está autorizado. A CI da nova PR deve validar o conjunto combinado contra `main`; só aceitar se `gate:baseline`, `validate` e `android-build` concluírem com sucesso.
+- HEAD do `main` confirmado em `57da653ea6f671fba131e9dfbe54ebaa32e62bd4`, após o merge da PR #76 em 2026-10-21.
+- PR #76 (`audit: restore anti-regression protections and cockpit fixes`) consta como mesclada no GitHub. A execução CI #2637 para esse SHA terminou com sucesso: `validate` passou (incluindo o gate `gate:baseline`) e `android-build` passou, com APK standalone verificado e enviado como artefato. Isto não comprova teste físico no telefone ou no ELM327.
+- PRs #74 e #75 permanecem fechadas sem merge próprio; as correções que agora estão em `main` são as efetivamente integradas pela PR #76, não uma aprovação implícita dos heads isolados.
+- Trabalho em andamento: branch `fix/bt-reconnect-guard`, baseada no HEAD acima, para impedir espera ilimitada após timeout Bluetooth nativo e garantir que falha de persistência não bloqueie a recuperação. Esta branch ainda não foi mesclada; a CI correspondente e o teste físico continuam pendentes.
+- Não mesclar alterações novas sem autorização explícita. Para esta branch, exigir `gate:baseline`, `validate` e `android-build` verdes no SHA final; teste visual e físico com ELM327/ECU são etapas separadas.
 
 ### Contratos que não podem regredir
 1. **Testes de sensores:** cinco tentativas sequenciais por PID e cinco respostas válidas para uma avaliação numérica. Calcular a média aritmética das cinco amostras válidas. Resposta ausente, inválida ou timeout não vira zero e não conta como leitura válida; amostragem incompleta = inconclusiva/sem resposta, nunca aprovada.
@@ -117,6 +118,8 @@
 - **DB-086** · 2026-10-21 — Cockpit: informações de rede/clima legíveis e botões com áreas de toque ampliadas
 - **DB-087** · 2026-10-21 — Ajuste adicional de legibilidade da rede e tamanho dos botões principais
 - **DB-088** · 2026-10-21 — Auditoria contra regressões, reconciliação das PRs fechadas e CI do conjunto combinado
+- **DB-089** · 2026-10-21 — Rotação automática da tela
+- **DB-090** · 2026-10-21 — Timeout Bluetooth pendente e resiliência da recuperação
 
 ---
 
@@ -3056,3 +3059,28 @@ O usuário pediu que a interface acompanhe a rotação física do aparelho, mant
 
 ### Próximo passo
 Aguardar a CI da PR #76 após as últimas alterações; corrigir qualquer falha real de instalação, TypeScript, testes ou build antes de considerar a alteração pronta.
+
+## DB-090 · 2026-10-21 — Timeout Bluetooth pendente e resiliência da recuperação
+
+### Problema observado
+A revisão do código no HEAD integrado da PR #76 identificou dois caminhos capazes de travar a recuperação após uma desconexão:
+1. O timeout de `Promise.race` interrompia apenas a espera JavaScript, não cancelava a operação nativa RFCOMM. No próximo modo de socket, o código aguardava a promessa anterior sem limite e podia nunca terminar nem exibir erro recuperável.
+2. `handleUnexpectedDisconnect()` aguardava `persistDisconnectedState()` antes de fechar a sessão e agendar reconexão. Se o armazenamento falhasse, a função saía antes do bloco de backoff e `reconnecting` podia continuar verdadeiro permanentemente.
+
+### Correção preparada
+- Criado `src/obd/connectionRecovery.ts` com política testável para reconhecer uma tentativa nativa ainda pendente e executar persistência/fechamento como operações de melhor esforço independentes.
+- `src/obd/bluetoothClassicTransport.ts`: uma tentativa nativa anterior ainda registrada agora falha rápido, em vez de ser aguardada indefinidamente. Quando a tentativa atual excede o timeout e continua pendente, o fallback para o outro modo de socket é cancelado para evitar chamadas RFCOMM concorrentes contra o mesmo endereço. O evento é registrado no diagnóstico Bluetooth.
+- `src/obd/sharedConnection.ts`: a persistência e o fechamento da sessão agora são tratados separadamente. A falha de persistência é preservada em `lastConnectionError`, mas não impede fechar a sessão nem iniciar o backoff de recuperação.
+- Criado `tests/connectionRecovery.test.js` com cenários executáveis para falha de persistência, falha de fechamento e identidade da promessa nativa ainda pendente.
+- A nova suíte foi incluída em `npm test` e no gate `projectBaseline.test.js`; o contrato anti-regressão recebe RG-16.
+- Nenhuma troca de biblioteca, alteração de protocolo OBD ou mudança de layout foi feita.
+
+### Validação e limites
+- Branch: `fix/bt-reconnect-guard`, derivada do HEAD da `main` que passou na CI #2637.
+- As alterações foram publicadas sequencialmente na branch via API do GitHub. A aprovação da CI desta branch precisa ser verificada separadamente e não deve ser inferida da CI #2637.
+- `timedOutNativeAttemptStillPending` evita concorrência perigosa, mas não cancela a operação nativa (a biblioteca não expõe cancelamento comprovado nesta camada). Se a promessa nativa nunca resolver, a conexão falha de modo explícito e será necessário aguardar a liberação ou reiniciar o processo do app antes de uma nova tentativa; isto é preferível a abrir um segundo socket simultâneo.
+- Ainda falta validar no aparelho o cenário de timeout, desconexão e reconexão com ELM327 real. Nenhum teste físico foi declarado.
+
+### Próximo passo
+Executar/revisar `gate:baseline`, `validate` e `android-build` no SHA final desta branch; corrigir falhas reveladas pela CI e manter a PR aberta para revisão, sem merge automático.
+
