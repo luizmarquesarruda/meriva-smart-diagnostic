@@ -92,7 +92,9 @@ assert.deepEqual(lock.packages[''].dependencies, packageJson.dependencies, 'pack
 assert.deepEqual(lock.packages[''].devDependencies, packageJson.devDependencies, 'devDependencies e lockfile divergiram');
 assert.equal(packageJson.dependencies['@expo/vector-icons'], '14.1.0');
 assert.equal(lock.packages['node_modules/@expo/vector-icons'].version, packageJson.dependencies['@expo/vector-icons']);
-assert.equal(packageJson.dependencies['@react-native-community/netinfo'], '12.0.1');
+assert.equal(packageJson.dependencies['@react-native-community/netinfo'], '11.3.1');
+assert.equal(packageJson.dependencies['expo-font'], '~12.0.10');
+assert.equal(lock.packages['node_modules/expo-font'].version, '12.0.10');
 assert.equal(lock.packages['node_modules/@react-native-community/netinfo'].version, packageJson.dependencies['@react-native-community/netinfo']);
 assert.equal(app.expo.orientation, 'default', 'a orientação livre não deve ser bloqueada');
 assert.ok(app.expo.plugins.some((plugin) => Array.isArray(plugin) && plugin[0] === 'expo-location'));
