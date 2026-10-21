@@ -259,6 +259,8 @@ async function main() {
   assert.match(screen, /progress.pidDetail/);
   assert.match(screen, /SMART OBD/);
   assert.match(screen, /OBD-II/);
+  assert.match(screen, /protocolDotColor/);
+  assert.match(screen, /backgroundColor: protocolDotColor/);
   assert.doesNotMatch(screen, /connectPreferredElm/, 'tela de abertura não pode iniciar uma segunda sessão OBD');
   console.log('startupProgress.test.js: PASS');
 }
