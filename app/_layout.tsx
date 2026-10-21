@@ -9,6 +9,7 @@ import * as FileSystem from 'expo-file-system';
 import { autoTripService } from '../src/trip/autoTripService';
 import { requestAllRequiredPermissions } from '../src/permissions/permissionManager';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { COLORS } from '../src/ui/theme';
 
 export default function RootLayout() {
   // Ativa o bloqueio de tela de forma explícita e o restaura quando o app volta ao primeiro plano.
@@ -102,8 +103,8 @@ export default function RootLayout() {
     <SafeAreaProvider>
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: '#d9d9d9' },
-        headerTintColor: '#1557a6',
+        headerStyle: { backgroundColor: COLORS.screen },
+        headerTintColor: COLORS.accent,
         headerTitleStyle: { fontWeight: '900' },
       }}
     >

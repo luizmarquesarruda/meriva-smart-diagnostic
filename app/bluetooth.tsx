@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMidLayout } from '../src/ui/midLayout';
+import { COLORS, SCREEN_TITLE_STYLE } from '../src/ui/theme';
 import * as FileSystem from 'expo-file-system';
 import { Link } from 'expo-router';
 import { BluetoothDeviceInfo } from '../src/obd/bluetoothClassicTransport';
@@ -240,11 +241,11 @@ export default function BluetoothScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b1220' },
+  container: { flex: 1, backgroundColor: COLORS.screen },
   content: { flexGrow: 1, width: '100%', paddingVertical: 14, paddingBottom: 28 },
   screenFrame: { width: '100%', alignSelf: 'center' },
   header: { paddingVertical: 8, marginBottom: 10 },
-  title: { color: '#f8fafc', fontSize: 25, fontWeight: '900', letterSpacing: 1 },
+  title: { ...SCREEN_TITLE_STYLE, marginBottom: 6 },
   subtitle: { color: '#7db3ff', fontSize: 10, fontWeight: '900', marginTop: 3, letterSpacing: 0.8 },
   connectionGrid: { width: '100%' },
   connectionGridLandscape: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

@@ -5,7 +5,7 @@
     "scheme": "meriva-smart-diagnostic",
     "version": "1.0.1",
     "orientation": "default",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "platforms": [
       "android"
     ],

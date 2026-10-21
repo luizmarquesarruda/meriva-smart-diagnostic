@@ -3,6 +3,7 @@ import { Link } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMidLayout } from '../src/ui/midLayout';
+import { COLORS, SCREEN_TITLE_STYLE } from '../src/ui/theme';
 import { getAutoSaveState } from '../src/meriva/autosaveManager';
 import { autoTripService } from '../src/trip/autoTripService';
 import { gpsTracker } from '../src/gps';
@@ -281,11 +282,11 @@ function Back() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#07111f' },
+  container: { flex: 1, backgroundColor: COLORS.screen },
   content: { flexGrow: 1, width: '100%', paddingVertical: 14, paddingBottom: 30 },
   screenFrame: { width: '100%', alignSelf: 'center' },
   header: { marginBottom: 12 },
-  title: { color: '#f8fafc', fontSize: 22, fontWeight: '900', letterSpacing: 1 },
+  title: { ...SCREEN_TITLE_STYLE, marginBottom: 6 },
   subtitle: { color: '#7db3ff', fontSize: 9, fontWeight: '900', marginTop: 3, letterSpacing: 1 },
   liveCard: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 10 },
   connectedCard: { backgroundColor: '#10261b', borderColor: '#28613e' },

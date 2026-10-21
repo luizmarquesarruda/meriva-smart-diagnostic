@@ -20,6 +20,7 @@ const home = read('app/index.tsx');
 const diagnostics = read('src/diagnostics/diagnosticEngine.ts');
 const sensorEngine = read('src/diagnostics/sensorTestEngine.ts');
 const projectContract = read('docs/CONTRATO_ANTI_REGRESSAO.md');
+const theme = read('src/ui/theme.ts');
 
 // Gate itself must be a first-class CI step, not a note in the diary.
 assert.equal(packageJson.scripts['gate:baseline'], 'node tests/projectBaseline.test.js');
@@ -44,6 +45,7 @@ const requiredSuites = [
   'autosaveTxtFormatter.test.js',
   'merivaAutosave.test.js',
   'onlineConditions.test.js',
+  'screenTheme.test.js',
 ];
 const scriptedTests = new Set(testCommand.map((command) => {
   const match = command.match(/^node tests\/([A-Za-z0-9._-]+)$/);
@@ -102,6 +104,9 @@ for (const label of [
 assert.match(home, /10_000/);
 assert.ok(read('app/mais.tsx').includes('CONSULTA MANUAL DE PID'), 'atalho de consulta manual precisa existir');
 assert.ok(read('app/laboratorio.tsx').includes('PIDs REGISTRADOS / DESCOBERTOS'), 'lista de PIDs precisa continuar acessível');
+
+assert.match(theme, /SCREEN_TITLE_STYLE/);
+assert.match(read('tests/screenTheme.test.js'), /Shared screen theme and title contract/);
 
 console.log('Anti-regression baseline gate: PASS');
 console.log('Protected contracts: five-read sensor tests, manual PID flow, single ELM327 queue, offline diagnosis, Expo SDK 51, GPS/Trip, TXT/history and cockpit/graphs.');

@@ -6,6 +6,7 @@ import { flushCsvLogs } from '../src/database/csvLogger';
 import { checkStorageQuota, getStorageBreakdown, StorageQuotaConfig } from '../src/storage/quotaManager';
 import { cleanupOldLogs, cleanupOldReadings } from '../src/storage/cleanup';
 import { getMidLayout } from '../src/ui/midLayout';
+import { COLORS, SCREEN_TITLE_STYLE } from '../src/ui/theme';
 import { readDriveCycles } from '../src/storage/driveCycleStorage';
 import type { DriveCycle } from '../src/data/driveCycles';
 import { exportDiagnosticsJson, exportDriveCyclesCsv } from '../src/storage/exportDiagnostics';
@@ -82,7 +83,7 @@ export default function ArmazenamentoScreen() {
   }
 
   return (
-    <SafeAreaView style={{flex:1,backgroundColor:'#0b1220'}} edges={["top","bottom","left","right"]}>
+    <SafeAreaView style={{flex:1,backgroundColor:COLORS.screen}} edges={["top","bottom","left","right"]}>
     <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
       <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
       <Text style={styles.title}>HISTÓRICO E DADOS</Text>
@@ -131,11 +132,11 @@ export default function ArmazenamentoScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, paddingVertical: 16, backgroundColor: '#0b1220' },
+  container: { flexGrow: 1, paddingVertical: 16, backgroundColor: COLORS.screen },
   dataColumns: { width: '100%' },
   dataColumnsLandscape: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
   dataColumnCard: { flex: 1, minWidth: 0 },
-  title: { fontSize: 23, fontWeight: '900', color: '#7db3ff', letterSpacing: 0.5, marginBottom: 5 },
+  title: { ...SCREEN_TITLE_STYLE, marginBottom: 6 },
   subtitle: { color: '#8da2bd', fontSize: 11, lineHeight: 16, marginBottom: 12 },
   status: { fontWeight: '700', marginBottom: 16 },
   ok: { color: '#16a34a' },

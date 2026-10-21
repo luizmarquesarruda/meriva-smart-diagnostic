@@ -6,8 +6,8 @@
 
 ### Estado atual do trabalho
 - Repositório: `luizmarquesarruda/meriva-smart-diagnostic`.
-- Branch de trabalho: `fix/restore-five-readings-manual-pids-20261020`.
-- PR #74: aberta e **não mesclada**. Nenhum merge pode ser feito sem autorização explícita do usuário.
+- Branch de trabalho: `fix/cockpit-flicker-restore-buttons-20261020`.
+- PR #75: aberta e **não mesclada**; PR #74 é a base funcional e também permanece aberta. Não fazer merge sem autorização explícita. Nenhum merge pode ser feito sem autorização explícita do usuário.
 - O SHA e o estado da CI no diário são apenas registros históricos. A autoridade vigente é a cabeça real da PR #74 e a última execução de CI associada a esse SHA, consultadas no GitHub a cada retomada.
 - Esta camada adiciona um teste executável e um passo visível no workflow; não modifica a lógica de leitura OBD, o transporte Bluetooth nem as regras diagnósticas.
 
@@ -110,6 +110,7 @@
 - **DB-079** · 2026-10-20 — Camada executável anti-regressão
 - **DB-080** · 2026-10-20 — Revisão preventiva do próprio gate anti-regressão
 - **DB-081** · 2026-10-20 — Correção do pisca-pisca do cockpit e restauração da navegação inferior
+- **DB-082** · 2026-10-21 — Auditoria visual, tema comum e proteção de consistência entre telas
 
 ---
 
@@ -2860,3 +2861,25 @@ A tela inicial passou a apresentar piscadas e os botões inferiores deixaram de 
 
 ### Próximo passo
 Executar `npm run validate` e `android-build` pela CI da branch de correção. Se ambos passarem, instalar o APK e reproduzir a navegação em retrato e paisagem; verificar também conexão, desconexão e retorno do app do segundo plano. Se continuar piscando com a conexão estável, recolher logcat e rastrear mudanças de estado/renderização no aparelho antes de alterar o transporte OBD.
+
+
+## DB-082 · 2026-10-21 — Auditoria visual, tema comum e proteção de consistência entre telas
+
+### Problema e evidência
+- A inspeção do código confirmou uma inconsistência visível: o Laboratório OBD usava fundo claro (#eef3fb), cartões brancos e textos escuros, enquanto o cockpit e as demais telas usavam tema escuro.
+- As telas secundárias tinham tamanhos/estilos de título divergentes, e o cabeçalho nativo do Expo usava cinza claro/azul apesar do conteúdo escuro.
+- A PR #75 tinha `validate` e `android-build` verdes no run #2573 antes desta mudança. Esse resultado é histórico e não valida este novo commit.
+
+### Correções
+- Criado `src/ui/theme.ts` com tokens compartilhados de cor e estilo de título.
+- Padronizados o fundo das telas, os títulos secundários, o cabeçalho nativo e a paleta do Laboratório; definido `userInterfaceStyle: dark` no Expo.
+- Criado `tests/screenTheme.test.js` e conectado a `npm test` e ao gate anti-regressão. O contrato RG-11 protege a consistência visual básica.
+- Preservados os fluxos de OBD, a fila serial ELM327, os cinco valores válidos por PID, a consulta manual, os dados offline e as regras diagnósticas.
+
+### Validação e limites
+- O commit desta alteração precisa de CI nova com `gate:baseline`, `validate` e `android-build`; nenhum resultado está sendo presumido.
+- A validação automatizada verifica os contratos de tema, não substitui inspeção visual no Android em retrato/paisagem. A correção da piscada também requer teste físico com ELM327 para confirmar o comportamento real.
+- Não foram adicionadas dependências.
+
+### Próximo passo
+Consultar a CI associada ao SHA atual; corrigir qualquer falha pelo log. Após CI verde, instalar o APK e verificar contraste, títulos, barras nativas, botões inferiores, orientação, ciclo de conexão e tela do Laboratório.

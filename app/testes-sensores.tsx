@@ -4,6 +4,7 @@ import {ActivityIndicator,ScrollView,StyleSheet,Text,TouchableOpacity,View} from
 import {SafeAreaView} from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
 import {useMidLayout} from '../src/ui/midLayout';
+import { COLORS, SCREEN_TITLE_STYLE } from '../src/ui/theme';
 import {getSharedObdConnection,getSharedObdStatus,subscribeSharedObd,subscribeSharedObdStatus} from '../src/obd/sharedConnection';
 import {getPidDefinition} from '../src/obd/pidDefinition';
 import {assessSensorSample,createSensorTestPlan,getSensorTestCatalog,MIN_SENSOR_TEST_READINGS,type SensorTestDefinition,type SensorTestMode,type SensorTestSample,type SensorAssessment} from '../src/diagnostics/sensorTestEngine';
@@ -112,8 +113,8 @@ export default function TestesSensoresScreen(){
  </View></ScrollView></SafeAreaView>;
 }
 const st=StyleSheet.create({
- container:{flex:1,backgroundColor:'#07111f'},content:{flexGrow:1,width:'100%',paddingVertical:14,paddingBottom:30},frame:{width:'100%',alignSelf:'center'},
- title:{color:'#f8fafc',fontSize:23,fontWeight:'900',letterSpacing:1},subtitle:{color:'#7db3ff',fontSize:9,fontWeight:'900',letterSpacing:1,marginTop:3,marginBottom:14},
+ container:{flex:1,backgroundColor:COLORS.screen},content:{flexGrow:1,width:'100%',paddingVertical:14,paddingBottom:30},frame:{width:'100%',alignSelf:'center'},
+ title: { ...SCREEN_TITLE_STYLE, marginBottom: 6 },subtitle:{color:'#7db3ff',fontSize:9,fontWeight:'900',letterSpacing:1,marginTop:3,marginBottom:14},
  connection:{borderRadius:13,borderWidth:1,padding:13,marginBottom:12},good:{backgroundColor:'#10261b',borderColor:'#28613e'},warn:{backgroundColor:'#28151c',borderColor:'#713043'},goodTitle:{color:'#4ade80',fontSize:12,fontWeight:'900',marginBottom:4},warnTitle:{color:'#fb7185',fontSize:12,fontWeight:'900',marginBottom:4},muted:{color:'#a3b4ca',fontSize:10,marginTop:3},
  section:{color:'#7db3ff',fontSize:10,fontWeight:'900',letterSpacing:1,marginTop:13,marginBottom:8},modes:{gap:9},modesWide:{flexDirection:'row'},mode:{flex:1,backgroundColor:'#0e1b2d',borderRadius:13,borderWidth:1,borderColor:'#233a56',padding:14,minHeight:112},selected:{borderColor:'#3b82f6',backgroundColor:'#122a43'},icon:{color:'#60a5fa',fontSize:23,fontWeight:'900'},modeTitle:{color:'#f8fafc',fontSize:13,fontWeight:'900',marginTop:6},
  notice:{backgroundColor:'#152238',borderRadius:11,borderWidth:1,borderColor:'#304767',padding:12,marginTop:12,marginBottom:12},noticeTitle:{color:'#fbbf24',fontSize:11,fontWeight:'900'},noticeText:{color:'#c4d2e4',fontSize:10,lineHeight:16,marginTop:4},

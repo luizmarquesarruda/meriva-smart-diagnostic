@@ -47,3 +47,6 @@ Este documento é o contrato de aceitação entre mudanças, testes, diário e C
 ## Limitações
 
 O gate é uma barreira contra regressões acidentais, não uma prova formal nem uma proteção contra alteração deliberada simultânea do código e de seus testes. Por isso, revisão de diff, CI do HEAD real e testes físicos continuam obrigatórios.
+
+
+| RG-11 | Todas as telas usam fundo, títulos e barras nativas consistentes; o laboratório não pode reintroduzir uma paleta clara isolada. | `screenTheme.test.js`, `projectBaseline.test.js` |
