@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMidLayout } from '../src/ui/midLayout';
+import { COLORS, SCREEN_TITLE_STYLE } from '../src/ui/theme';
+import { AppIcon } from '../src/ui/AppIcon';
 import * as FileSystem from 'expo-file-system';
 import { Link } from 'expo-router';
 import { BluetoothDeviceInfo } from '../src/obd/bluetoothClassicTransport';
@@ -223,14 +225,12 @@ export default function BluetoothScreen() {
 
         <View style={styles.bottomNav}>
           <Link href="/" asChild>
-            <TouchableOpacity style={styles.bottomItem}>
-              <Text style={styles.bottomIcon}>🚗</Text>
-              <Text style={styles.bottomText}>CARRO</Text>
+            <TouchableOpacity style={styles.bottomItem} accessibilityRole="button" accessibilityLabel="Voltar ao cockpit">
+              <AppIcon name="cockpit" size={22} color={COLORS.accent} />
             </TouchableOpacity>
           </Link>
-          <TouchableOpacity style={[styles.bottomItem, styles.bottomActive]}>
-            <Text style={styles.bottomIcon}>🔵</Text>
-            <Text style={styles.bottomActiveText}>BLUETOOTH</Text>
+          <TouchableOpacity style={[styles.bottomItem, styles.bottomActive]} accessibilityRole="button" accessibilityLabel="Bluetooth, tela atual" accessibilityState={{ selected: true }}>
+            <AppIcon name="bluetooth" size={22} color={COLORS.accent} />
           </TouchableOpacity>
         </View>
         </View>
@@ -240,11 +240,11 @@ export default function BluetoothScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b1220' },
+  container: { flex: 1, backgroundColor: COLORS.screen },
   content: { flexGrow: 1, width: '100%', paddingVertical: 14, paddingBottom: 28 },
   screenFrame: { width: '100%', alignSelf: 'center' },
   header: { paddingVertical: 8, marginBottom: 10 },
-  title: { color: '#f8fafc', fontSize: 25, fontWeight: '900', letterSpacing: 1 },
+  title: { ...SCREEN_TITLE_STYLE, marginBottom: 6 },
   subtitle: { color: '#7db3ff', fontSize: 10, fontWeight: '900', marginTop: 3, letterSpacing: 0.8 },
   connectionGrid: { width: '100%' },
   connectionGridLandscape: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -272,9 +272,7 @@ const styles = StyleSheet.create({
   ruleTitle: { color: '#7db3ff', fontSize: 10, fontWeight: '900', marginBottom: 6 },
   rule: { color: '#a9b9cc', fontSize: 10, lineHeight: 17 },
   bottomNav: { flexDirection: 'row', backgroundColor: '#111c2e', borderRadius: 14, borderWidth: 1, borderColor: '#29415f', marginTop: 12, padding: 5 },
-  bottomItem: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 10 },
+  bottomItem: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 48, borderRadius: 10 },
   bottomActive: { backgroundColor: '#1a3150' },
-  bottomIcon: { fontSize: 17, marginBottom: 2 },
-  bottomText: { color: '#9fb4cf', fontSize: 9, fontWeight: '900' },
-  bottomActiveText: { color: '#7db3ff', fontSize: 9, fontWeight: '900' },
+  bottomIcon: { fontSize: 22, marginBottom: 0 },
 });

@@ -19,6 +19,7 @@ function loadTs(file) {
 }
 
 const telemetry = loadTs('src/obd/liveTelemetry.ts');
+const telemetryChart = loadTs('src/obd/telemetryChart.ts');
 telemetry.resetLiveTelemetry();
 
 telemetry.recordLivePidReading({
@@ -71,4 +72,40 @@ telemetry.recordLivePidReading({ pid: '010C', name: 'RPM', value: 800, unit: 'rp
 telemetry.recordLivePidReading({ pid: '0105', name: 'Coolant', value: 85, unit: 'celsius', timestamp: stale, source: 'REAL' });
 assert.strictEqual(telemetry.getVehicleConditionSnapshot().condition, 'UNKNOWN');
 
-console.log('Live telemetry: rolling window + context + simulation isolation: PASS');
+
+
+// Chart geometry: real finite timestamps only, fixed window, and gaps are not connected.
+const now = Date.now();
+const chart = telemetryChart.buildTelemetryChart([
+  { timestamp: new Date(now - 5000).toISOString(), value: 10 },
+  { timestamp: new Date(now - 4000).toISOString(), value: 20 },
+  { timestamp: new Date(now - 3000).toISOString(), value: null },
+  { timestamp: 'not-a-timestamp', value: 90 },
+  { timestamp: new Date(now + 1000).toISOString(), value: 999 },
+  { timestamp: new Date(now - 1000).toISOString(), value: 30 },
+], 320, 160, now, 4, 8);
+
+assert.ok(chart, 'real numeric points should produce a chart model');
+assert.strictEqual(chart.samples, 3);
+assert.strictEqual(chart.min, 10);
+assert.strictEqual(chart.max, 30);
+assert.strictEqual(chart.current, 30);
+assert.strictEqual(chart.average, 20);
+assert.strictEqual(chart.delta, 20);
+assert.strictEqual(chart.points.length, 3);
+assert.strictEqual(chart.segments.length, 1, 'chart must not draw a line across a missing sample');
+assert.ok(chart.points.every((point) => point.x >= 8 && point.x <= 312 && point.y >= 8 && point.y <= 152));
+assert.ok(chart.segments.every((segment) => Number.isFinite(segment.length) && Number.isFinite(segment.angleDeg)));
+assert.strictEqual(telemetryChart.buildTelemetryChart([], 320, 160, now), null);
+assert.strictEqual(telemetryChart.buildTelemetryChart([{ timestamp: 'bad', value: 1 }], 320, 160, now), null);
+assert.strictEqual(telemetryChart.buildTelemetryChart([{ timestamp: new Date(now).toISOString(), value: 1 }], 0, 160, now), null);
+
+const flatChart = telemetryChart.buildTelemetryChart([
+  { timestamp: new Date(now - 1000).toISOString(), value: 7 },
+  { timestamp: new Date(now).toISOString(), value: 7 },
+], 300, 120, now);
+assert.ok(flatChart);
+assert.strictEqual(flatChart.points[0].y, 60);
+assert.strictEqual(flatChart.points[1].y, 60);
+
+console.log('Live telemetry + chart geometry: rolling window, gap handling, invalid timestamps and simulation isolation: PASS');

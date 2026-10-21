@@ -1,5 +1,125 @@
 # Diário de Bordo - Meriva Smart Diagnostic
 
+## ESTADO VIGENTE E REGRAS ANTI-REGRESSÃO — 2026-10-21
+
+> **Esta seção é a referência operacional atual.** O restante deste arquivo contém registros históricos: falhas, decisões e “próximos passos” antigos descrevem o estado da época e não devem ser tratados como tarefas ainda abertas sem nova verificação. Quando dois registros divergirem, prevalecem este contrato e a entrada cronologicamente mais recente que tenha evidência verificável.
+
+### Estado atual do trabalho
+- Repositório: `luizmarquesarruda/meriva-smart-diagnostic`.
+- Branch de auditoria: `audit/anti-regression-ci-20261021`, criada sobre o head da antiga branch de cockpit `bd2e725a45fb2dce633377c1527bb0b389f86d5b`.
+- Situação verificada em 2026-10-21: PR #74 e PR #75 estão **fechadas sem merge**; portanto, as correções dessas branches não devem ser presumidas como presentes no `main`.
+- Head consultado do `main`: `78b9ca71344ce3d100ad949c09f290b328f01eaa`. O código do `main` ainda tinha o efeito de conexão da tela inicial dependente do objeto `settings` inteiro; a branch auditada restringe as dependências às opções OBD relevantes, reduzindo reinícios causados por recarga de configurações.
+- Nenhum merge está autorizado. A CI da nova PR deve validar o conjunto combinado contra `main`; só aceitar se `gate:baseline`, `validate` e `android-build` concluírem com sucesso.
+
+### Contratos que não podem regredir
+1. **Testes de sensores:** cinco tentativas sequenciais por PID e cinco respostas válidas para uma avaliação numérica. Calcular a média aritmética das cinco amostras válidas. Resposta ausente, inválida ou timeout não vira zero e não conta como leitura válida; amostragem incompleta = inconclusiva/sem resposta, nunca aprovada.
+2. **Consulta manual de PID:** manter a rota/atalho de consulta manual, validação e normalização Mode 01, parser usando o mesmo PID solicitado e lista de PIDs selecionável. Distinguir descoberta na sessão atual de itens vindos do cache. Cache não comprova suporte atual; somente resposta ECU real apropriada é evidência atual.
+3. **Bluetooth/ELM327:** manter Bluetooth Classic e uma única fila serial compartilhada; não iniciar polling/conexão em paralelo a partir do layout ou de uma segunda tela. A tela inicial é a proprietária do fluxo automático de conexão inicial. Conexão Bluetooth não equivale a ECU respondendo; validar ECU com resposta OBD real, não apenas nome do adaptador ou estado do socket. Tentativas/reconexões têm limite e nunca podem entrar em laço infinito.
+4. **Offline por padrão:** regras locais, diagnóstico básico, leitura de PIDs, execução dos testes e acesso ao histórico salvo precisam funcionar sem internet. Clima/cidade são enriquecimento visual opcional, jamais pré-requisito nem entrada do motor diagnóstico. Falha online deve degradar para N/D sem bloquear nem reiniciar a conexão OBD.
+5. **Localização e privacidade:** não solicitar localização automaticamente para mostrar clima. Só usar GPS para esse enriquecimento quando a permissão de primeiro plano já existir. Erro de permissão, localização ou rede não pode interromper o diagnóstico.
+6. **Origem dos dados:** manter `REAL`, `REAL_OBD`, `SIMULACAO` e `CARSCANNER_SEED` semanticamente separados. Seeds/simulações nunca podem se tornar evidência real, contaminar consumo real, gráfico operacional ou decisão diagnóstica. Amostras ausentes não são interpoladas nem inventadas; dados antigos/desconectados aparecem como N/D, não como leitura atual.
+7. **GPS/viagens:** reutilizar o rastreador e o serviço de viagem existentes; evitar watchers/tarefas nativas duplicadas, amostras com timestamp repetido/fora de ordem e redução indevida da distância. Não salvar consumo como válido quando as amostras de combustível/distância não são suficientes. Parar monitoramento nativo consultando seu estado real, sem depender somente de flag JavaScript.
+8. **Expo e dependências:** manter Expo SDK 51 e o lockfile coerente. Antes de adicionar pacote, procurar e reutilizar o módulo já instalado; não trocar bibliotecas de Bluetooth, gráficos ou armazenamento sem necessidade comprovada e teste de compatibilidade.
+9. **Testes sem fragilidade textual:** preferir testes de funções puras, saída observável, contratos JSON, fila/estados e comportamento. Não criar teste que dependa apenas de palavras em comentários, mensagens explicativas ou formatação incidental.
+10. **CI obrigatória:** a validação de referência é a CI da cabeça mais recente, com `validate` e `android-build` concluídos com sucesso. `validate` inclui TypeScript e a suíte completa; o Android build deve completar prebuild, APK, verificação e artefato. Falha em qualquer etapa não é conclusão. Uma CI verde não substitui teste físico de ELM327/ECU ou inspeção visual em aparelho.
+11. **Diário em primeiro lugar:** antes de editar código, ler esta seção e a entrada final mais recente; conferir branch, SHA e CI no GitHub; escrever problema → causa comprovada → alteração → testes → commit → CI → resultado → próximos passos. Atualizar este arquivo com evidências, nunca com resultados presumidos.
+12. **Histórico não é fila de tarefas:** entradas anteriores preservam o contexto da época. Não repetir seus “próximos passos” automaticamente nem desfazer correções posteriores; confirmar primeiro se ainda estão pendentes no código e na CI.
+
+## ÍNDICE SEQUENCIAL — TODAS AS ATUALIZAÇÕES
+
+**Regra:** o maior ID identifica a atualização documental mais recente. O índice é sequencial pela ordem de registro (não necessariamente ordenado estritamente pela data do evento). Na retomada, comece pelo maior ID e confira o HEAD e a CI atuais diretamente no GitHub.
+
+- **DB-001** · 2026-10-06 — Correção do carregamento do catálogo de combustível
+- **DB-002** · 2026-10-07 — Continuidade do fluxo Bluetooth
+- **DB-003** · 2026-10-07 — Primeira camada do motor de raciocínio diagnóstico local
+- **DB-004** · 2026-10-07 — Integração e apresentação do diagnóstico local
+- **DB-005** · 2026-10-07 — Auditoria da CI #731: falha real no teste, não no motor
+- **DB-006** · 2026-10-07 — Reconciliação do lockfile e reprodutibilidade da CI
+- **DB-007** · 2026-10-07 — Correção revelada pela validação com `npm ci`
+- **DB-008** · 2026-10-07 — Consolidação final no main e CI verde
+- **DB-009** · 2026-10-07 — Verificação do package-lock.json
+- **DB-010** · 2026-10-07 — Persistência automática de Bluetooth/ECU e histórico TXT rotativo
+- **DB-011** · 2026-10-07 — Auditoria e centralização das permissões Android
+- **DB-012** · 2026-10-07 — Implementação das fases 1, 2 e 3 da nova experiência de telas
+- **DB-013** · 2026-10-07 — Consolidação do Diário após as fases 1, 2 e 3
+- **DB-014** · 2026-10-07 — Auditoria da CI #901/#902 + pesquisa de referências OBD
+- **DB-015** · 2026-10-07 — Incorporação de funções de referência OBD + auditoria pré-CI
+- **DB-016** · 2026-10-07 — Correção revelada pela CI #926 antes do fechamento
+- **DB-017** · 2026-10-07 — Correção do harness DTC revelada pela CI #929
+- **DB-018** · 2026-10-07 — Correção final do parser DTC revelada pela CI #930
+- **DB-019** · 2026-10-07 — Correção final do loader de testes DTC revelada pela CI #931
+- **DB-020** · 2026-10-08 — Rotação livre do Android + proteção responsiva do cockpit
+- **DB-021** · 2026-10-08 — Auditoria de integridade: Safe Area, JSON e retry Bluetooth
+- **DB-022** · 2026-10-08 — Adaptação completa das telas à rotação do celular
+- **DB-023** · 2026-10-08 — Auditoria e correção do autosave/persistência
+- **DB-024** · 2026-10-08 — Auditoria sênior: identificação de PIDs e DTCs na interface
+- **DB-025** · 2026-10-08 — Auditoria sênior documental de PIDs, DTCs e motor diagnóstico
+- **DB-026** · 2026-10-08 — Resultado da auditoria documental de PIDs, DTCs e motor diagnóstico
+- **DB-027** · 2026-10-08 — Auditoria profunda pré-CI: correção crítica do retry Bluetooth/ELM327
+- **DB-028** · 2026-10-08 — CI #1038: falha de TypeScript na camada de permissões
+- **DB-029** · 2026-10-08 — CI #1045: regressão de teste de permissões
+- **DB-030** · 2026-10-08 — CI #1051: teste apontando arquivo SAF incorreto
+- **DB-031** · 2026-10-08 — CI #1057: teste de rotação desatualizado
+- **DB-032** · 2026-10-08 — CI #1063 verde e consolidação da auditoria
+- **DB-033** · 2026-10-08 — Registro complementar: status confirmado da CI #1063
+- **DB-034** · 2026-10-08 — Autosave vinculado à sessão real da ECU
+- **DB-035** · 2026-10-08 — Correção: histórico e dados não eram alimentados pela telemetria automática
+- **DB-036** · 2026-10-08 — Auditoria: duplicação na telemetria automática
+- **DB-037** · 2026-10-08 — CI #1235: regressão estática no teste de ciclo Bluetooth
+- **DB-038** · 2026-10-08 — CI #1236: validação verde da correção de telemetria automática
+- **DB-039** · 2026-10-08 — Execução em segundo plano com tela apagada
+- **DB-040** · 2026-10-08 — Varredura de conhecimento OBD e enriquecimento do banco local
+- **DB-041** · 2026-10-08 — TXT de PIDs compactado e descoberta persistente
+- **DB-042** · 2026-10-08 — Pacote prioritário: saúde da ECU, DTC, identificação, consumo e persistência
+- **DB-043** · 2026-10-08 — Auditoria pós-implementação: correções de integração
+- **DB-044** · 2026-10-09 — Trip formula integrity
+- **DB-045** · 2026-10-09 — Histórico diário de sessões ECU e tela ativa
+- **DB-046** · 2026-10-09 — Plano de auditoria cruzada TXT/viagens (registrado antes do código)
+- **DB-047** · 2026-10-10 — Consolidação das correções de viagens e registro de auditoria
+- **DB-048** · 2026-10-10 — Auditoria e correção da atualização do consumo em tempo real
+- **DB-049** · 2026-10-10 — Otimização do polling do consumo e correção de escopo TypeScript
+- **DB-050** · 2026-10-10 — Temperatura do líquido de arrefecimento no cockpit inicial
+- **DB-051** · 2026-10-10 — Auditoria consolidada de histórico, consumo e telemetria
+- **DB-052** · 2026-10-11 — Recuperação de sessão OBD interrompida
+- **DB-053** · 2026-10-10 — Fase 1: relatório detalhado de viagem e telemetria por trajeto
+- **DB-054** · 2026-10-11 — Fase 2: correção de tipagem da recuperação do histórico diário
+- **DB-055** · 2026-10-11 — Fase 3: correção do DTC no freeze frame
+- **DB-056** · 2026-10-11 — Fase 4: integridade da distância em amostras GPS inválidas
+- **DB-057** · 2026-10-11 — Fase 5: preservar o TXT diário quando a leitura falha
+- **DB-058** · 2026-10-11 — Fase 6: reduzir fragmentação de viagens e crescimento do TXT
+- **DB-059** · 2026-10-11 — Regressão no início do histórico diário por concorrência de inicialização
+- **DB-060** · 2026-10-11 — Correção da CI #1911: teste de tela ligada desatualizado
+- **DB-061** · 2026-10-12 — Auditoria de consumo estimado e disparo de CI
+- **DB-062** · 2026-10-12 — Auditoria de desempenho OBD, integridade de PIDs e persistência em lote
+- **DB-063** · 2026-10-12 — Ajuste da regressão de rotação do cockpit identificada na CI
+- **DB-064** · 2026-10-12 — Correção de asserções antigas da CI #1920
+- **DB-065** · 2026-10-12 — CI #1921 verde na validação e redução dos retries AT opcionais
+- **DB-066** · 2026-10-12 — Fixture ELM327 do teste de fast-fail corrigida
+- **DB-067** · 2026-10-13 — Auditoria de performance, política JSON e fast-fail de inicialização
+- **DB-068** · 2026-10-13 — Auditoria cruzada do TXT real, performance OBD, cálculo de combustível e integridade do autosave
+- **DB-069** · 2026-10-14 — Central de Testes de Sensores (primeira versão)
+- **DB-070** · 2026-10-14 — [HISTÓRICO SUPERSEDIDO EM 2026-10-20] Catálogo JSON, IA de triagem e três leituras por PID
+- **DB-071** · 2026-10-16 — Incidente: ciclo repetitivo de conexão OBD
+- **DB-072** · 2026-10-16 — Ajuste da validação CI da correção Bluetooth
+- **DB-073** · 2026-10-20 — Restaurar cinco leituras do Laboratório e consulta manual de PID
+- **DB-074** · 2026-10-20 — Cockpit inicial: indicadores OBD e estado de falhas
+- **DB-075** · 2026-10-20 — Gráficos de telemetria ao vivo e histórico por viagem
+- **DB-076** · 2026-10-20 — Auditoria P1–P5 e enriquecimento opcional de clima
+- **DB-077** · 2026-10-20 — Consolidação do diário e salvaguardas contra regressões
+- **DB-078** · 2026-10-20 — Índice enumerado de todas as atualizações e regra de leitura
+- **DB-079** · 2026-10-20 — Camada executável anti-regressão
+- **DB-080** · 2026-10-20 — Revisão preventiva do próprio gate anti-regressão
+- **DB-081** · 2026-10-20 — Correção do pisca-pisca do cockpit e restauração da navegação inferior
+- **DB-082** · 2026-10-21 — Auditoria visual, tema comum e proteção de consistência entre telas
+- **DB-083** · 2026-10-21 — Navegação inferior somente com ícones e alvos acessíveis
+- **DB-084** · 2026-10-21 — Biblioteca visual compartilhada, monitoramento de rede 4G/5G e página de conectividade
+- **DB-085** · 2026-10-21 — Atualização manual da rede e validação do sinal informado pelo Android
+- **DB-086** · 2026-10-21 — Cockpit: informações de rede/clima legíveis e botões com áreas de toque ampliadas
+- **DB-087** · 2026-10-21 — Ajuste adicional de legibilidade da rede e tamanho dos botões principais
+- **DB-088** · 2026-10-21 — Auditoria contra regressões, reconciliação das PRs fechadas e CI do conjunto combinado
+
+---
+
 Este arquivo é o registro operacional das correções, auditorias e decisões técnicas do projeto.
 
 ## Regra de trabalho
@@ -14,7 +134,7 @@ Antes de qualquer correção de código:
 7. Se a CI falhar, registrar a falha e somente então iniciar a próxima correção.
 8. Manter documentação e repositório sincronizados.
 
-## 2026-10-06 - Correção do carregamento do catálogo de combustível
+## DB-001 · 2026-10-06 - Correção do carregamento do catálogo de combustível
 
 ### Problema
 A CI #661 falhou no teste `tests/fuelIdentification.test.js`. O teste transpila `src/obd/fuelIdentification.ts` diretamente para CommonJS e o import default de `src/knowledge/fuel_types.json` não foi resolvido como esperado. O catálogo chegou como indefinido e a leitura de `codes` falhou.
@@ -54,7 +174,7 @@ Toda nova correção deverá deixar uma trilha mínima no diário:
 
 Nenhuma falha de CI será tratada como correção concluída.
 
-## 2026-10-07 — Continuidade do fluxo Bluetooth
+## DB-002 · 2026-10-07 — Continuidade do fluxo Bluetooth
 
 - **Diagnóstico:** o fluxo `sharedConnection` podia iniciar uma nova rodada completa de descoberta após esgotar todos os candidatos. Como `maxConnectionAttempts` tinha valor padrão 0, isso podia resultar em reconexão indefinida.
 - **Correção:** removida a repetição externa. O controle de tentativas permanece concentrado no fluxo do ELM327: até **20 tentativas por candidato**, intervalo de **8 segundos** e parada imediata no primeiro sucesso.
@@ -62,7 +182,7 @@ Nenhuma falha de CI será tratada como correção concluída.
 - **Teste:** adicionada regressão estática para impedir o retorno do laço infinito em `sharedConnection`.
 - **Regra preservada:** ELM327 Mini é tratado como adaptador genérico; a conexão só vira OBD válido após resposta real `010C` com `41 0C`.
 
-## 2026-10-07 - Primeira camada do motor de raciocínio diagnóstico local
+## DB-003 · 2026-10-07 - Primeira camada do motor de raciocínio diagnóstico local
 
 ### Objetivo
 Transformar a base de PIDs, DTCs e aprendizado em um motor local de hipóteses rastreáveis, sem depender de ChatGPT/OpenAI para funcionar.
@@ -82,7 +202,7 @@ Regras iniciais:
 - STFT + LTFT <= -15% -> mistura rica;
 - MAP >= 45 kPa em IDLE_WARM -> vácuo possivelmente anormal.
 
-## 2026-10-07 — Integração e apresentação do diagnóstico local
+## DB-004 · 2026-10-07 — Integração e apresentação do diagnóstico local
 
 - LastPidReading preserva REAL/SIMULACAO.
 - A tela de laboratório mostra hipóteses, score, confiança, evidências e próximos testes.
@@ -90,7 +210,7 @@ Regras iniciais:
 - Evidências estruturadas são renderizadas por `evidence.text`.
 - Figma foi criado para as telas secundárias, mas a edição MCP ficou indisponível; a melhoria visual foi aplicada diretamente em `app/configuracoes.tsx` e `app/armazenamento.tsx`.
 
-## 2026-10-07 — Auditoria da CI #731: falha real no teste, não no motor
+## DB-005 · 2026-10-07 — Auditoria da CI #731: falha real no teste, não no motor
 
 ### Falha encontrada
 A CI #731 (run `37641181931`) passou por:
@@ -137,7 +257,7 @@ Assim o teste fica realmente abaixo do limiar de 15%, sem alterar a regra diagn�
 O próximo push dispara automaticamente a CI. **Não considerar a correção concluída até a nova CI terminar.** Se houver nova falha, analisar o log antes de alterar novamente o código.
 
 
-## 2026-10-07 — Reconciliação do lockfile e reprodutibilidade da CI
+## DB-006 · 2026-10-07 — Reconciliação do lockfile e reprodutibilidade da CI
 
 ### Problema
 O repositório não continha `package-lock.json`, apesar de a engenharia do projeto já depender de um conjunto declarado de versões no `package.json`. A CI usava `npm install`, deixando a árvore transitiva dependente do estado do registry em cada execução.
@@ -177,7 +297,7 @@ O lockfile não autoriza atualizar versões declaradas do projeto por conta pró
 Executar a nova CI completa com `npm ci`. A correção só será considerada concluída quando `validate` e `android-build` terminarem sem falha. Caso `npm ci` revele divergência de lockfile, corrigir o lockfile a partir do erro observado antes de qualquer outra alteração.
 
 
-## 2026-10-07 — Correção revelada pela validação com `npm ci`
+## DB-007 · 2026-10-07 — Correção revelada pela validação com `npm ci`
 
 ### Falha encontrada
 A validação no ambiente Node 20/npm 10 executou `npm ci` com sucesso e `expo-doctor` com **17/17**. O `npm run validate` encontrou uma regressão em `tests/regression.test.js` relacionada ao seed tardio do perfil de aprendizado.
@@ -208,7 +328,7 @@ O run intermediário que revelou a falha foi cancelado após a criação de novo
 ### Próximo passo
 Aguardar a nova CI no commit da correção. Validar novamente `npm ci`, typecheck, todos os testes e Android build antes de considerar o conjunto concluído.
 
-## 2026-10-07 — Consolidação final no main e CI verde
+## DB-008 · 2026-10-07 — Consolidação final no main e CI verde
 
 ### Consolidação
 O PR #24 foi integrado ao `main` por squash no commit `1e0c8372b33454cc9675f48f18d5cf39b74cd239`.
@@ -234,7 +354,7 @@ A consolidação foi concluída com os dois jobs obrigatórios verdes. O reposit
 ### Próximo passo
 Qualquer nova alteração deve iniciar por nova leitura deste diário e deve preservar a regra: problema → diagnóstico → correção → testes → commit → CI → resultado.
 
-## 2026-10-07 — Verificação do package-lock.json
+## DB-009 · 2026-10-07 — Verificação do package-lock.json
 
 ### Solicitação
 Foi solicitada a inclusão do `package-lock.json` no repositório do aplicativo e a atualização deste Diário de Bordo.
@@ -260,7 +380,7 @@ O repositório mantém um único `package-lock.json` versionado. A partir deste 
 
 
 
-## 2026-10-07 — Persistência automática de Bluetooth/ECU e histórico TXT rotativo
+## DB-010 · 2026-10-07 — Persistência automática de Bluetooth/ECU e histórico TXT rotativo
 
 ### Solicitação
 Após teste longe do ELM327, foi solicitado:
@@ -335,7 +455,7 @@ A implementação está integrada ao `main` e validada por CI. O próximo teste 
 4. crescimento do TXT único até 200 snapshots e rotação do mais antigo.
 
 
-## 2026-10-07 — Auditoria e centralização das permissões Android
+## DB-011 · 2026-10-07 — Auditoria e centralização das permissões Android
 
 ### Análise
 O aplicativo já declarava Bluetooth Classic e localização no `app.json`, e o módulo Bluetooth solicitava `BLUETOOTH_CONNECT/SCAN` no Android 12+. O GPS já solicitava localização em primeiro plano por `expo-location`. Porém, a inicialização fazia essas verificações em fluxos separados, e não havia um único ponto de auditoria das permissões necessárias.
@@ -359,7 +479,7 @@ Não foi implementado um pedido indiscriminado de “todas as permissões”. O 
 ### Próximo passo
 Executar CI e gerar novo APK Android. No primeiro lançamento, o usuário deverá conceder Bluetooth e localização quando solicitados. Se uma permissão estiver bloqueada com “não perguntar novamente”, o app deve direcionar o usuário para as configurações do aplicativo.
 
-## 2026-10-07 — Implementação das fases 1, 2 e 3 da nova experiência de telas
+## DB-012 · 2026-10-07 — Implementação das fases 1, 2 e 3 da nova experiência de telas
 
 ### Objetivo
 Transformar a tela inicial em um cockpit de diagnóstico e distribuir a profundidade técnica em telas secundárias, sem alterar o transporte Bluetooth/ELM327 existente.
@@ -393,7 +513,7 @@ Nenhuma alteração foi feita no protocolo Bluetooth/ELM327 ou no motor de evid�
 ### Estado
 Código implementado no main. A conclusão técnica depende da nova CI: typecheck, suíte completa e Android build precisam terminar verdes antes de considerar as três fases encerradas.
 
-## 2026-10-07 — Consolidação do Diário após as fases 1, 2 e 3
+## DB-013 · 2026-10-07 — Consolidação do Diário após as fases 1, 2 e 3
 
 ### Registro consolidado
 A nova arquitetura de experiência do aplicativo foi registrada neste diário após a implementação do cockpit e das telas secundárias. O foco da mudança foi melhorar a hierarquia de informação sem acoplar a UI ao transporte Bluetooth/ELM327.
@@ -439,7 +559,7 @@ Foi adicionada uma regressão estática para as novas rotas e integrações prin
 3. Após CI verde, validar a experiência no aparelho Android físico com ELM327 real.
 4. Na validação física, verificar principalmente os estados: offline, conectando, Bluetooth conectado sem ECU validada, ECU conectada, DTC presente e ausência de dados reais.
 
-## 2026-10-07 — Auditoria da CI #901/#902 + pesquisa de referências OBD
+## DB-014 · 2026-10-07 — Auditoria da CI #901/#902 + pesquisa de referências OBD
 
 ### Falha confirmada antes da nova implementação
 As CI #901 (run 37705647976) e #902 (run 37705797381) falharam no mesmo ponto:
@@ -485,7 +605,7 @@ Foi coberta a documentação oficial e as referências técnicas relevantes para
 ### Estado
 A falha da CI foi diagnosticada antes de qualquer nova alteração. A próxima sequência é: correção sintática → novas funções diagnósticas → testes/regressões → auditoria → CI.
 
-## 2026-10-07 — Incorporação de funções de referência OBD + auditoria pré-CI
+## DB-015 · 2026-10-07 — Incorporação de funções de referência OBD + auditoria pré-CI
 
 ### Correção da CI
 A falha das CI #901/#902 foi corrigida em `app/index.tsx`: faltava o fechamento do componente principal `IndexScreen` antes das funções auxiliares. A causa era sintática e impedia o TypeScript; o Android-build era corretamente bloqueado pelo `needs: validate`.
@@ -538,7 +658,7 @@ A etapa revisou a documentação oficial relevante de Android Bluetooth, Expo Pe
 ### Estado antes da nova CI
 As correções e auditorias de código estão registradas. A nova CI deve ser o árbitro final de TypeScript, suíte completa e Android Release. Não considerar a etapa concluída até os dois jobs obrigatórios terminarem verdes.
 
-## 2026-10-07 — Correção revelada pela CI #926 antes do fechamento
+## DB-016 · 2026-10-07 — Correção revelada pela CI #926 antes do fechamento
 
 ### Falha observada
 A CI #926 (run 37707128150), executada sobre o commit `e9f3b92c719ebbb579f5770a2c95a683749200bc`, confirmou `npm ci` e Expo Doctor **17/17**. O `npm run validate` falhou no TypeScript com quatro erros:
@@ -558,7 +678,7 @@ Nenhuma dependência foi adicionada nem o contrato Bluetooth/ELM327 foi alterado
 ### Estado
 Os quatro erros do #926 foram corrigidos antes do fechamento da nova execução. A próxima CI é obrigatória para confirmar TypeScript, suíte completa e Android Release.
 
-## 2026-10-07 — Correção do harness DTC revelada pela CI #929
+## DB-017 · 2026-10-07 — Correção do harness DTC revelada pela CI #929
 
 ### Falha
 A CI #929 (run 37707396660), no commit `38911b8e79b43dcdfcdc18b18cca39c1a138151c`, passou por `npm ci`, Expo Doctor e **typecheck**. A nova suíte `liveTelemetry.test.js` também passou. O primeiro teste DTC falhou por infraestrutura do próprio teste: o loader CommonJS transpila `parser.ts` isoladamente, mas o parser depende em runtime de `pidDefinition.ts` e `formulaEngine.ts`, que continuam como TypeScript e não podem ser resolvidos pelo `require` padrão do harness.
@@ -569,7 +689,7 @@ A lógica de parsing DTC foi extraída para `src/obd/dtcParser.ts`, que não pos
 ### Estado
 A falha não alterava a lógica de produção do parser OBD; o problema era a estratégia de carregamento do teste. A nova CI deve confirmar a suíte completa e liberar o Android build.
 
-## 2026-10-07 — Correção final do parser DTC revelada pela CI #930
+## DB-018 · 2026-10-07 — Correção final do parser DTC revelada pela CI #930
 
 ### Falha
 A CI #930 (run 37707510064), no commit `87571e97d68ea993222dbb03b229fdffba17ba20`, confirmou `npm ci` e Expo Doctor **17/17**. O `liveTelemetry.test.js` havia passado e a suíte chegou ao `typecheck`, mas `parser.ts(155,10)` falhou com `TS2304: Cannot find name 'parseDtcResponseForService'`.
@@ -583,7 +703,7 @@ Restaurado o import local de `parseDtcResponseForService` em `src/obd/parser.ts`
 ### Estado
 A próxima CI deve confirmar TypeScript + testes completos e, em caso de sucesso, liberar o job Android Release.
 
-## 2026-10-07 — Correção final do loader de testes DTC revelada pela CI #931
+## DB-019 · 2026-10-07 — Correção final do loader de testes DTC revelada pela CI #931
 
 ### Falha
 A CI #931 (run 37707607771), no commit `dbada2ded42be53a67a89644c2073bcd6385bbd0`, passou por `npm ci`, Expo Doctor e **typecheck**. A falha ocorreu no primeiro teste DTC, com `MODULE_NOT_FOUND: ./dtcParser`.
@@ -598,7 +718,7 @@ O loader de `tests/dtcScanner.test.js` agora intercepta apenas o import relativo
 A próxima CI deve repetir a suíte a partir do mesmo ponto, agora com o harness capaz de carregar a dependência TypeScript isolada.
 
 
-## 2026-10-08 — Rotação livre do Android + proteção responsiva do cockpit
+## DB-020 · 2026-10-08 — Rotação livre do Android + proteção responsiva do cockpit
 
 ### Objetivo
 Permitir rotação livre da aplicação Android, sem alterar o protocolo Bluetooth/ELM327, a persistência ou o fluxo diagnóstico, e impedir que a mudança de orientação cause overflow, compressão indevida ou perda de acessibilidade visual na tela principal.
@@ -637,7 +757,7 @@ A implementação foi alinhada à documentação oficial do Expo para `orientati
 A configuração de rotação está implementada no repositório. A conclusão da etapa depende da CI completa: typecheck, suíte de testes e Android Release devem terminar verdes. Após isso, o APK deve ser validado fisicamente em retrato e paisagem, incluindo rotação durante a tela principal e nas telas de diagnóstico.
 
 
-## 2026-10-08 — Auditoria de integridade: Safe Area, JSON e retry Bluetooth
+## DB-021 · 2026-10-08 — Auditoria de integridade: Safe Area, JSON e retry Bluetooth
 
 ### Objetivo
 Continuar a auditoria de integridade solicitada após a etapa de rotação livre, sem executar a CI nesta rodada.
@@ -757,7 +877,7 @@ As alterações foram gravadas no `main`. Foi feita somente verificação estrut
 ### Próximo passo
 Executar a CI completa somente na próxima etapa. Se houver falha, registrar primeiro a causa e depois corrigir.
 
-## 2026-10-08 — Adaptação completa das telas à rotação do celular
+## DB-022 · 2026-10-08 — Adaptação completa das telas à rotação do celular
 
 ### Objetivo
 Garantir que todas as telas do MERIVA SMART acompanhem a mudança entre portrait e landscape, recalculando dimensões e reorganizando blocos sem travar a orientação nem criar overflow horizontal.
@@ -798,7 +918,7 @@ A CI intermediária detectou erro de compilação JSX em app/bluetooth.tsx: o Vi
 Correção aplicada: fechamento do componente restaurado e tela Bluetooth mantida com grade responsiva de conexão.
 A execução final de CI correspondente ao commit de correção foi disparada automaticamente e ainda está pendente no momento deste registro.
 
-## 2026-10-08 — Auditoria e correção do autosave/persistência
+## DB-023 · 2026-10-08 — Auditoria e correção do autosave/persistência
 
 ### Objetivo
 Corrigir os problemas evidenciados pelo histórico de salvamentos automáticos: tempestade de snapshots críticos, estados redundantes, `Saved At: N/D`, perda da validação ECU ao desconectar, ambiguidade entre conexão atual e último protocolo, semântica incorreta de ocorrências DTC e mistura de estado REAL_OBD/SIMULACAO.
@@ -875,7 +995,7 @@ Foi feita apenas auditoria por leitura do código e alterações controladas no 
 Todas as alterações desta auditoria estão gravadas no main e o Diário de Bordo foi atualizado com os hashes. Não foi executada CI.
 
 
-## 2026-10-08 — Auditoria sênior: identificação de PIDs e DTCs na interface
+## DB-024 · 2026-10-08 — Auditoria sênior: identificação de PIDs e DTCs na interface
 
 ### Problema reportado
 O aplicativo consegue consultar PIDs e detectar DTCs da ECU, porém a interface expõe principalmente o identificador bruto (PID/código) e não apresenta de forma suficiente **o que aquele identificador representa**, dificultando a leitura técnica do diagnóstico.
@@ -942,7 +1062,7 @@ Plano registrado antes das alterações. Próximo passo: implementar a identific
 Foi feita leitura estática e auditoria cruzada do diff. CI não foi executada, conforme solicitado. A próxima CI deve confirmar TypeScript, testes e Android Release.
 
 
-## 2026-10-08 — Auditoria sênior documental de PIDs, DTCs e motor diagnóstico
+## DB-025 · 2026-10-08 — Auditoria sênior documental de PIDs, DTCs e motor diagnóstico
 
 ### Solicitação
 Pesquisar documentação técnica da Chevrolet Meriva, referências de PIDs OBD-II e DTCs, auditar os catálogos e as fórmulas do aplicativo e corrigir o que estiver tecnicamente inconsistente. O foco é o veículo Meriva 1.4 8V Econo.Flex 2011/2012 já documentado no projeto, sem transformar dados de outras motorizações Meriva em compatibilidade confirmada.
@@ -970,7 +1090,7 @@ Pesquisar documentação técnica da Chevrolet Meriva, referências de PIDs OBD-
 Bluetooth Classic/ELM327, gate ECU 010C → 41 0C, separação REAL_OBD/SIMULACAO, autosave e package-lock não devem ser alterados nesta auditoria.
 
 
-## 2026-10-08 — Resultado da auditoria documental de PIDs, DTCs e motor diagnóstico
+## DB-026 · 2026-10-08 — Resultado da auditoria documental de PIDs, DTCs e motor diagnóstico
 
 ### Pesquisa concluída
 Foram consultadas referências oficiais e técnicas antes da correção:
@@ -1045,7 +1165,7 @@ O compare do plano c67dc850e979f935cc80b64dc1432d61601cd749 até o estado 7a6db8
 A próxima etapa deve executar a validação completa do repositório e, separadamente, teste físico na Meriva para confirmar quais PIDs a ECU realmente anuncia/responde. A confirmação de compatibilidade Meriva não deve ser inferida apenas da documentação OBD genérica.
 
 
-## 2026-10-08 — Auditoria profunda pré-CI: correção crítica do retry Bluetooth/ELM327
+## DB-027 · 2026-10-08 — Auditoria profunda pré-CI: correção crítica do retry Bluetooth/ELM327
 
 ### Achado crítico
 A auditoria estática do estado atual encontrou uma regressão em `src/obd/bluetoothManager.ts`: `createRealElmSessionAttempt()` recebia `maxAttempts` como parâmetro e redeclarava uma constante com o mesmo nome. Além de ser um erro de compilação TypeScript, a intenção funcional era ambígua: o limite configurável de `maxConnectionAttempts` deveria ser calculado uma única vez e propagado de forma explícita.
@@ -1083,7 +1203,7 @@ A correção foi inspecionada diretamente no código e a suíte de regressão fo
 Aguardando resultado da CI. Se houver falha, a causa será registrada e corrigida antes de considerar a auditoria concluída.
 
 
-## 2026-10-08 — CI #1038: falha de TypeScript na camada de permissões
+## DB-028 · 2026-10-08 — CI #1038: falha de TypeScript na camada de permissões
 
 ### CI
 PR #27 — run #1038 / `37766512053`.
@@ -1116,7 +1236,7 @@ A correção preserva `APP_PRIVATE` para armazenamento e não adiciona permissõ
 Criar nova execução verificável da CI sobre o estado corrigido. Exigir `npm ci`, Expo Doctor, typecheck/testes e Android Release antes do merge.
 
 
-## 2026-10-08 — CI #1045: regressão de teste de permissões
+## DB-029 · 2026-10-08 — CI #1045: regressão de teste de permissões
 
 ### CI
 PR #28 — run #1045 / `37766789224`.
@@ -1145,7 +1265,7 @@ Ajustar somente a asserção do teste para refletir o limite de responsabilidade
 Nova execução de CI obrigatória. O código de produção de permissões não foi alterado nesta correção.
 
 
-## 2026-10-08 — CI #1051: teste apontando arquivo SAF incorreto
+## DB-030 · 2026-10-08 — CI #1051: teste apontando arquivo SAF incorreto
 
 ### CI
 PR #29 — run #1051 / `37766933271`.
@@ -1171,7 +1291,7 @@ Alterar o teste para inspecionar explicitamente os módulos de exportação que 
 Nova execução da CI completa. O código de produção permanece sem alteração nesta etapa.
 
 
-## 2026-10-08 — CI #1057: teste de rotação desatualizado
+## DB-031 · 2026-10-08 — CI #1057: teste de rotação desatualizado
 
 ### CI
 PR #30 — run #1057 / `37767133384`.
@@ -1202,7 +1322,7 @@ Nova CI completa obrigatória, incluindo Android Release.
 Branch `audit-deep-ci-2026-10-08-r5` criada a partir do `main` após a correção do teste responsivo. Validar novamente toda a suíte e Android Release.
 
 
-## 2026-10-08 — CI #1063 verde e consolidação da auditoria
+## DB-032 · 2026-10-08 — CI #1063 verde e consolidação da auditoria
 
 ### Resultado final da CI
 PR #31 — run #1063 / `37767314687`:
@@ -1229,7 +1349,7 @@ PR #31 foi integrado ao `main` por squash no commit `2a0189cb51b831c18cf962936ac
 A auditoria de código desta rodada está **concluída e validada pela CI #1063**. A validação física do ELM327/Meriva continua sendo uma etapa de hardware/veículo, não substituída pela CI.
 
 
-## 2026-10-08 — Registro complementar: status confirmado da CI #1063
+## DB-033 · 2026-10-08 — Registro complementar: status confirmado da CI #1063
 
 ### Verificação pós-consolidação
 Foi feita uma nova leitura do estado do repositório para confirmar a situação da última CI e do merge do PR #31.
@@ -1261,7 +1381,7 @@ O commit posterior `5ee79fa3d8648201671914399773f8b6deeeadbe` apenas consolida e
 **AUDITORIA DE CÓDIGO: CONCLUÍDA E VALIDADA.**
 
 A próxima etapa de validação que permanece fora do alcance da CI é o teste físico na Meriva com o ELM327, especialmente conexão Bluetooth, resposta real `010C → 41 0C`, leitura de PIDs anunciados pela ECU e persistência dos dados validados.
-## 2026-10-08 — Autosave vinculado à sessão real da ECU
+## DB-034 · 2026-10-08 — Autosave vinculado à sessão real da ECU
 
 ### Problema observado
 A análise do histórico `meriva_smart_autosave_history.txt` mostrou que o autosave estava funcionando, porém o ciclo de diagnóstico não tinha uma fronteira explícita: havia múltiplos pontos iniciando/parando checkpoint e a persistência de `obd.connected` era duplicada entre `sharedConnection`, cockpit, layout raiz e laboratório.
@@ -1327,7 +1447,7 @@ A regra de salvamento agora é:
 `ECU validada → INICIA AUTOSAVE → checkpoints durante a sessão → ECU desconectada → SALVAMENTO FINAL → FECHA AUTOSAVE`
 
 O estado histórico continua separado do estado atual: a desconexão não apaga `lastKnownProtocol` nem os dados históricos já registrados.
-## 2026-10-08 — Correção: histórico e dados não eram alimentados pela telemetria automática
+## DB-035 · 2026-10-08 — Correção: histórico e dados não eram alimentados pela telemetria automática
 
 ### Problema
 Após a centralização do autosave na sessão ECU, o aplicativo passou a conectar/validar a ECU, mas o fluxo automático de PIDs não alimentava o mesmo pipeline usado pelas consultas manuais.
@@ -1376,7 +1496,7 @@ O teste de persistência REAL foi ampliado para verificar também `lastReadings`
 
 Commit adicional: `ae1672fd00342891a7272bbd435aedac2e5b73f3`.
 
-## 2026-10-08 — Auditoria: duplicação na telemetria automática
+## DB-036 · 2026-10-08 — Auditoria: duplicação na telemetria automática
 
 ### Problema identificado antes da nova CI
 Na revisão da correção que religou a alimentação automática do histórico, foi confirmado um efeito colateral: `src/trip/autoTripService.ts` chamava `recordLivePidQuery()` diretamente e, logo depois, `registerObdQuery()`, que também chama `recordLivePidQuery()`. Assim, uma única resposta real da ECU podia entrar duas vezes na janela de telemetria em memória.
@@ -1404,7 +1524,7 @@ Plano registrado antes da alteração de código. A CI anterior continua sendo a
 ### Preparação da CI de validação
 As correções desta auditoria já estão no `main`. Esta branch de verificação preserva exatamente o código corrigido e adiciona somente este registro documental para forçar uma execução verificável do GitHub Actions sobre o estado atual.
 
-## 2026-10-08 — CI #1235: regressão estática no teste de ciclo Bluetooth
+## DB-037 · 2026-10-08 — CI #1235: regressão estática no teste de ciclo Bluetooth
 ### Falha observada
 A CI #1235 / run `37795969222` executou `npm ci`, Expo Doctor `17/17` e TypeScript com sucesso. A suíte falhou em `tests/bluetoothLifecycle.test.js:32` porque o teste procurava literalmente `selectedAdapterAddress: device.address.toUpperCase()`.
 
@@ -1419,7 +1539,7 @@ A implementação atual e correta usa o objeto `connection` já validado: `selec
 ### Estado
 A correção será limitada ao teste; o fluxo de produção permanece inalterado.
 
-## 2026-10-08 — CI #1236: validação verde da correção de telemetria automática
+## DB-038 · 2026-10-08 — CI #1236: validação verde da correção de telemetria automática
 
 ### Resultado
 PR #35 / run #1236 — `37796216776`, executado sobre `e68c0a4fb2a3fc4a126c08327d08581f9f345ff6`:
@@ -1449,7 +1569,7 @@ O run #1235 permaneceu como histórico de falha de teste; a causa foi a asserç�
 ### Estado
 A correção desta etapa está consolidada no `main` e validada por CI. A validação física do ELM327/Meriva continua necessária para confirmar comportamento de hardware e compatibilidade real de PIDs.
 
-## 2026-10-08 — Execução em segundo plano com tela apagada
+## DB-039 · 2026-10-08 — Execução em segundo plano com tela apagada
 
 ### Problema
 O monitoramento automático usava setTimeout/setInterval no JavaScript e watchPositionAsync. Esses mecanismos não constituem um serviço persistente de Android: com a aplicação em segundo plano ou a tela apagada, a execução poderia ser suspensa e o histórico deixaria de receber telemetria.
@@ -1484,7 +1604,7 @@ A correção aguarda validação pela CI nesta branch antes de ser considerada c
 - O autosave continua registrando as leituras reais durante a sessão.
 - Limitação mantida: sem uma taxa OBD `015E` válida, o aplicativo não deve fabricar consumo.
 
-## 2026-10-08 — Varredura de conhecimento OBD e enriquecimento do banco local
+## DB-040 · 2026-10-08 — Varredura de conhecimento OBD e enriquecimento do banco local
 
 ### Problema
 A descoberta de PIDs identificava códigos suportados pela ECU, mas o catálogo local continha poucos PIDs. Quando um PID estava fora de `src/knowledge/pids.json`, o parser retornava `PID DESCONHECIDO` e o aplicativo não conseguia apresentar significado, unidade ou fórmula. Isso também limitava o aprendizado e o banco local de PIDs confirmados.
@@ -1507,7 +1627,7 @@ As fórmulas foram cruzadas com referências públicas de OBD-II/J1979. PID 015E
 ### Estado
 Conhecimento estático ampliado e banco local preparado para guardar o significado dos PIDs. A confirmação física dos novos PIDs depende da próxima sessão real com a ECU da Meriva.
 
-## 2026-10-08 — TXT de PIDs compactado e descoberta persistente
+## DB-041 · 2026-10-08 — TXT de PIDs compactado e descoberta persistente
 
 ### Problema
 O arquivo `BANCO/pids_meriva_confirmados.txt` havia crescido com metadados extensos por linha e, apesar de o banco evitar duplicação por PID, o formato ficou pesado para leitura/exportação.
@@ -1525,7 +1645,7 @@ O arquivo `BANCO/pids_meriva_confirmados.txt` havia crescido com metadados exten
 O TXT deixa de repetir descrição, unidade, fórmula e bytes em cada linha. Essas informações permanecem na base JSON, enquanto o TXT funciona como **índice histórico compacto dos PIDs observados**.
 
 
-## 2026-10-08 — Pacote prioritário: saúde da ECU, DTC, identificação, consumo e persistência
+## DB-042 · 2026-10-08 — Pacote prioritário: saúde da ECU, DTC, identificação, consumo e persistência
 
 ### Objetivo
 Implementar os problemas observados no histórico real do aplicativo sem tratar perda de resposta da ECU como simples desconexão Bluetooth.
@@ -1625,7 +1745,7 @@ A confirmação definitiva exige uma sessão real na Meriva com ELM327, principa
 - comportamento com tela apagada/segundo plano.
 
 
-## 2026-10-08 — Auditoria pós-implementação: correções de integração
+## DB-043 · 2026-10-08 — Auditoria pós-implementação: correções de integração
 
 - Corrigida a validação de respostas de Mode 02 para aceitar o cabeçalho positivo 42; antes, o parser ainda exigia 41 e poderia rejeitar freeze frame válido.
 - O cockpit e a tela Bluetooth passaram a usar o estado de resposta da ECU, evitando exibir ECU como conectada quando somente o enlace Bluetooth permanece ativo.
@@ -1638,7 +1758,7 @@ A confirmação definitiva exige uma sessão real na Meriva com ELM327, principa
 
 
 
-## 2026-10-09 — Trip formula integrity
+## DB-044 · 2026-10-09 — Trip formula integrity
 
 - Ignore duplicate/out-of-order samples before they can rewind trip state.
 - Persist a real trip when distance is valid even if integrated fuel is below 0.05 L or fuel samples are unavailable; mark its consumption as unavailable (N/D) and exclude it from consumption averages/autonomy totals. Never fabricate a km/L value.
@@ -1648,7 +1768,7 @@ A confirmação definitiva exige uma sessão real na Meriva com ELM327, principa
 - The exact cause of 122.819 km/L remains unconfirmed until raw fuel-rate samples, timestamps and distance deltas from that session are available.
 
 
-## 2026-10-09 — Histórico diário de sessões ECU e tela ativa
+## DB-045 · 2026-10-09 — Histórico diário de sessões ECU e tela ativa
 
 ### Problema observado
 O relatório diário exibia o último estado mutável, o que não preserva por si só todas as partidas/reconexões ocorridas no mesmo dia. O TXT geral de autosave é rotativo (200 snapshots) e não é um diário por data.
@@ -1672,7 +1792,7 @@ A sessão é definida por conexão/desconexão validada da ECU, não pela posiç
 
 - A exportação do diário diário foi adicionada em Configurações como ação separada `EXPORTAR HISTÓRICO DIÁRIO ECU (.TXT)`, preservando a exportação antiga de snapshots de autosave.
 
-## 2026-10-09 — Plano de auditoria cruzada TXT/viagens (registrado antes do código)
+## DB-046 · 2026-10-09 — Plano de auditoria cruzada TXT/viagens (registrado antes do código)
 
 ### Evidências do histórico TXT recebido
 - O arquivo contém 116 blocos completos, numerados de 1 e 4–118; os identificadores 2 e 3 não aparecem no arquivo fornecido. Não renumerar automaticamente dados históricos sem evidência da origem da lacuna.
@@ -1695,7 +1815,7 @@ Plano registrado antes das alterações de produção. A correção só será co
 
 
 
-## 2026-10-10 — Consolidação das correções de viagens e registro de auditoria
+## DB-047 · 2026-10-10 — Consolidação das correções de viagens e registro de auditoria
 
 ### Regra aplicada
 O diário foi lido antes de alterar o código. Esta entrada segue o fluxo obrigatório: problema → diagnóstico → correção → testes → commit → CI → resultado → próximo passo. Não foi feito merge na `main`.
@@ -1737,7 +1857,7 @@ A regra anterior de rejeitar ciclos com combustível integrado inferior a `0,05 
 5. Não fazer merge nem declarar versão pronta para uso real antes da validação completa e, para comunicação OBD, do teste físico.
 
 
-## 2026-10-10 — Auditoria e correção da atualização do consumo em tempo real
+## DB-048 · 2026-10-10 — Auditoria e correção da atualização do consumo em tempo real
 
 ### Sintoma
 O consumo exibido no cockpit podia parecer congelado ou atualizar tarde, mesmo com a conexão OBD ativa.
@@ -1766,7 +1886,7 @@ O consumo exibido no cockpit podia parecer congelado ou atualizar tarde, mesmo c
 
 
 
-## 2026-10-10 — Otimização do polling do consumo e correção de escopo TypeScript
+## DB-049 · 2026-10-10 — Otimização do polling do consumo e correção de escopo TypeScript
 
 ### Evidência encontrada
 Na revisão da atualização anterior, a publicação de estado adicionada ao `runLoop` declarava novamente `gps` e `vehicleSpeedKmh` no mesmo bloco `try`. Isso é uma colisão de identificadores e poderia impedir o typecheck/build. Também havia consultas lentas antes de velocidade/RPM e consultas de fallback a PIDs sem verificar suporte confirmado da ECU.
@@ -1790,7 +1910,7 @@ As alterações foram gravadas na branch `fix/daily-obd-history-keep-screen-awak
 - Se `015E` não for suportado, a estimativa depende de MAF ou MAP/RPM/IAT e continua menos confiável; a interface deve identificá-la como estimativa.
 - A atualização em tempo real precisa ser medida com ELM327 e ECU reais na Meriva. Testes de código e CI não substituem validação física.
 
-## 2026-10-10 — Temperatura do líquido de arrefecimento no cockpit inicial
+## DB-050 · 2026-10-10 — Temperatura do líquido de arrefecimento no cockpit inicial
 
 ### Auditoria
 - A página inicial já tinha polling secundário do PID OBD `0105` no serviço de viagens, mas não apresentava a temperatura em um cartão visível no cockpit. Portanto, a telemetria existia no fluxo de consulta, mas faltava a métrica na tela inicial.
@@ -1812,7 +1932,7 @@ As alterações foram gravadas na branch `fix/daily-obd-history-keep-screen-awak
 - Nenhum merge foi realizado.
 
 
-## 2026-10-10 — Auditoria consolidada de histórico, consumo e telemetria
+## DB-051 · 2026-10-10 — Auditoria consolidada de histórico, consumo e telemetria
 
 ### Evidências verificadas no repositório
 - A exportação do diário diário já está integrada em **Configurações** por `handleDailyHistoryExport()` e `exportDailyObdHistoryTxt()`. A hipótese anterior de que faltava o botão na interface estava incorreta; não duplicar o fluxo.
@@ -1857,7 +1977,7 @@ As alterações foram gravadas na branch `fix/daily-obd-history-keep-screen-awak
 - Não foi feito merge na `main`.
 
 
-## 2026-10-11 — Recuperação de sessão OBD interrompida
+## DB-052 · 2026-10-11 — Recuperação de sessão OBD interrompida
 
 ### Problema
 O Android pode encerrar o processo sem executar o fechamento normal. O último snapshot poderia manter `obd.connected = true`, levando a uma conexão antiga ser restaurada como se estivesse ativa.
@@ -1872,7 +1992,7 @@ O Android pode encerrar o processo sem executar o fechamento normal. O último s
 A recuperação detecta a interrupção na próxima inicialização. Os CSVs continuam sendo a trilha temporal de consultas individuais. Esta alteração dispara nova CI; confirmar `validate` e `android-build` no commit resultante. Teste físico com ELM327/ECU permanece pendente. Não foi feito merge na `main`.
 
 
-## 2026-10-10 — Fase 1: relatório detalhado de viagem e telemetria por trajeto
+## DB-053 · 2026-10-10 — Fase 1: relatório detalhado de viagem e telemetria por trajeto
 
 ### Objetivo
 Começar a implementação das melhorias de produto com uma entrega que reaproveita o registro de viagens existente, sem importar dados do Car Scanner e sem aumentar a frequência de consultas OBD.
@@ -1903,7 +2023,7 @@ Começar a implementação das melhorias de produto com uma entrega que reaprove
 4. Diário de manutenção/abastecimento, comparação de viagens, backup/restauração e auditoria de qualidade do adaptador.
 5. Revisão visual de todas as telas e navegação integrada, sem duplicar lógica OBD.
 
-## 2026-10-11 — Fase 2: correção de tipagem da recuperação do histórico diário
+## DB-054 · 2026-10-11 — Fase 2: correção de tipagem da recuperação do histórico diário
 
 ### Auditoria
 - `src/meriva/autosaveManager.ts` registra `SESSION_RECOVERED` quando detecta, na inicialização, que o snapshot anterior deixou a sessão OBD marcada como conectada.
@@ -1926,7 +2046,7 @@ Começar a implementação das melhorias de produto com uma entrega que reaprove
 3. Revisar limites e histerese dos alertas de temperatura com documentação técnica específica da Meriva; não inferir defeito de sensor apenas por uma leitura.
 4. Auditar leitura de DTC e freeze frame para distinguir serviço indisponível, resposta vazia e ausência confirmada de códigos.
 
-## 2026-10-11 — Fase 3: correção do DTC no freeze frame
+## DB-055 · 2026-10-11 — Fase 3: correção do DTC no freeze frame
 
 ### Evidência e causa
 - `src/obd/dtcScanner.ts` buscava o DTC do serviço Mode 02/PID 02 a partir de `marker + 8`. A resposta positiva contém o cabeçalho `42 02`, um byte de número do frame e só então os dois bytes do DTC. O deslocamento anterior pulava bytes do código e podia fazer um freeze frame válido aparecer sem DTC.
@@ -1941,7 +2061,7 @@ Começar a implementação das melhorias de produto com uma entrega que reaprove
 - O teste foi adicionado, mas não executado neste ambiente; não declarar PASS até executar `npm test`/`npm run validate` com autorização para CI.
 - O formato de resposta pode variar entre adaptadores ELM327; confirmar no log bruto da ECU antes de concluir que o frame está disponível. Não limpar DTCs automaticamente.
 
-## 2026-10-11 — Fase 4: integridade da distância em amostras GPS inválidas
+## DB-056 · 2026-10-11 — Fase 4: integridade da distância em amostras GPS inválidas
 
 ### Evidência e risco
 - Na auditoria de `src/trip/tripRecorder.ts`, a distância acumulada do GPS era normalizada por uma função que convertia qualquer valor não finito ou negativo em zero.
@@ -1960,7 +2080,7 @@ Começar a implementação das melhorias de produto com uma entrega que reaprove
 ### Próxima etapa
 - Continuar a auditoria da persistência de viagens e do histórico diário, priorizando falhas de leitura/escrita, concorrência e recuperação segura sem apagar silenciosamente registros existentes.
 
-## 2026-10-11 — Fase 5: preservar o TXT diário quando a leitura falha
+## DB-057 · 2026-10-11 — Fase 5: preservar o TXT diário quando a leitura falha
 
 ### Evidência e risco
 - `src/meriva/dailyObdHistory.ts` capturava qualquer erro ao consultar/ler o arquivo e continuava como se o histórico estivesse vazio.
@@ -1983,7 +2103,7 @@ Começar a implementação das melhorias de produto com uma entrega que reaprove
 - Testar exportação no Android: cancelar o seletor deve deixar o arquivo local intacto; falha de permissão/escrita deve retornar erro explícito sem alegar exportação concluída.
 
 
-## 2026-10-11 — Fase 6: reduzir fragmentação de viagens e crescimento do TXT
+## DB-058 · 2026-10-11 — Fase 6: reduzir fragmentação de viagens e crescimento do TXT
 
 ### Evidência
 - O TXT de autosave continha até 200 snapshots completos, cada um repetindo quase todo o histórico de viagens. Isso ampliava o arquivo sem acrescentar eventos de viagem únicos.
@@ -2004,7 +2124,7 @@ Começar a implementação das melhorias de produto com uma entrega que reaprove
 - A CI #1879 executou um commit anterior ao conjunto final de correções. A versão final desta branch ainda não foi validada por TypeScript, suíte completa ou build Android.
 - Nenhum merge foi realizado. Validação física com a Meriva/ELM327 continua pendente.
 
-## 2026-10-11 — Regressão no início do histórico diário por concorrência de inicialização
+## DB-059 · 2026-10-11 — Regressão no início do histórico diário por concorrência de inicialização
 
 ### Sintoma
 O diário por data podia deixar de registrar a abertura de uma sessão ECU validada, especialmente na primeira conexão após iniciar o aplicativo.
@@ -2024,7 +2144,7 @@ O diário por data podia deixar de registrar a abertura de uma sessão ECU valid
 - Testes automatizados e validação física no Android ainda pendentes; não declarar a correção validada até esses resultados.
 - PR #49 permanece sem merge; `main` não foi alterada.
 
-## 2026-10-11 — Correção da CI #1911: teste de tela ligada desatualizado
+## DB-060 · 2026-10-11 — Correção da CI #1911: teste de tela ligada desatualizado
 
 ### Falha observada
 A CI #1911 executou `npm run doctor` com sucesso e passou pelo TypeScript e por diversos testes, mas falhou em `tests/backgroundExecution.test.js:21`. O teste exigia o import antigo `useKeepAwake` e a chamada do hook, embora `app/_layout.tsx` já tivesse sido alterado para ativação explícita via `activateKeepAwakeAsync`, reativação no retorno ao primeiro plano e limpeza com `deactivateKeepAwake`.
@@ -2037,7 +2157,7 @@ A correção do teste foi gravada na branch `fix/daily-obd-history-keep-screen-a
 
 
 
-## 2026-10-12 — Auditoria de consumo estimado e disparo de CI
+## DB-061 · 2026-10-12 — Auditoria de consumo estimado e disparo de CI
 
 ### Evidência e correção
 - Na leitura de `src/trip/autoTripService.ts`, o fallback MAF aceitava `0 g/s` como entrada válida para estimar combustível. Fluxo de ar zero não sustenta uma estimativa positiva de consumo e podia produzir telemetria enganosa.
@@ -2056,7 +2176,7 @@ A correção do teste foi gravada na branch `fix/daily-obd-history-keep-screen-a
 4. Encerrar PRs abertas somente após preservar as alterações úteis e verificar que não há trabalho exclusivo perdido.
 
 
-## 2026-10-12 — Auditoria de desempenho OBD, integridade de PIDs e persistência em lote
+## DB-062 · 2026-10-12 — Auditoria de desempenho OBD, integridade de PIDs e persistência em lote
 
 ### Pesquisa comparativa
 Foram comparados os caminhos de atualização documentados pelo `python-OBD`, OBD Auto Doctor e OBDLink com a implementação deste aplicativo:
@@ -2121,7 +2241,7 @@ Arquivos de testes: `tests/regression.test.js`, `tests/merivaAutosave.test.js`, 
 - Pesquisa de PRs abertas do repositório em 2026-10-12 não retornou PR aberta; não há PR pendente para fechar nesta fase.
 
 
-## 2026-10-12 — Ajuste da regressão de rotação do cockpit identificada na CI
+## DB-063 · 2026-10-12 — Ajuste da regressão de rotação do cockpit identificada na CI
 
 ### Evidência
 - A execução CI #1918 (run `38251558555`) passou por instalação de dependências e Expo Doctor, mas falhou em `npm run validate` no teste `tests/orientationLayout.test.js`.
@@ -2137,7 +2257,7 @@ Arquivos de testes: `tests/regression.test.js`, `tests/merivaAutosave.test.js`, 
 A nova CI foi disparada ao registrar esta correção. Não declarar TypeScript, testes e build Android como aprovados até a execução mais recente chegar a `completed/success`. Se outra asserção de contrato antigo surgir, corrigir o teste para o comportamento real apenas quando a implementação já estiver coerente; não relaxar testes funcionais.
 
 
-## 2026-10-12 — Correção de asserções antigas da CI #1920
+## DB-064 · 2026-10-12 — Correção de asserções antigas da CI #1920
 
 ### Evidência do run
 - CI #1920, run `38257980970`, iniciou com commit `7c07a5cb`. `npm ci`, Expo Doctor e TypeScript terminaram com sucesso.
@@ -2152,7 +2272,7 @@ A nova CI foi disparada ao registrar esta correção. Não declarar TypeScript, 
 A gravação deste registro dispara a CI seguinte. A CI #1920 não terminou verde e não deve ser usada como validação final. É preciso confirmar novamente o script completo, inclusive GPS, persistência e build Android.
 
 
-## 2026-10-12 — CI #1921 verde na validação e redução dos retries AT opcionais
+## DB-065 · 2026-10-12 — CI #1921 verde na validação e redução dos retries AT opcionais
 
 ### Resultado confirmado
 - CI #1921, run `38258162611`, commit `5d8eca2a`: `npm ci`, Expo Doctor, TypeScript e `npm test` concluíram com sucesso.
@@ -2168,7 +2288,7 @@ A gravação deste registro dispara a CI seguinte. A CI #1920 não terminou verd
 Este registro dispara a CI #1922 no head atualizado para cobrir a otimização AT e gerar/validar o APK standalone desse conjunto exato de código. A CI #1921 comprova a validação automatizada do head anterior, não a nova mudança AT; o APK ainda precisa de uma conclusão bem-sucedida na execução mais recente.
 
 
-## 2026-10-12 — Fixture ELM327 do teste de fast-fail corrigida
+## DB-066 · 2026-10-12 — Fixture ELM327 do teste de fast-fail corrigida
 
 - O teste de regressão de comando AT opcional foi ajustado para emitir uma resposta serial realista: payload + CR/LF + prompt `>` do ELM327. A fixture anterior usava barras invertidas literais e não reproduzia o enquadramento real; por isso não classificava `ATI` como `UNSUPPORTED`.
 - O teste agora verifica que `ATI` explícito `?` é executado uma única vez durante a inicialização. Timeout e erro transitório continuam elegíveis aos retries limitados do produto.
@@ -2176,7 +2296,7 @@ Este registro dispara a CI #1922 no head atualizado para cobrir a otimização A
 - CI #1922 foi iniciada no head imediatamente anterior a este ajuste. O registro atual dispara a CI seguinte para validar exatamente esta fixture e a mudança de `Elm327Session`. Não usar o resultado de #1922 como prova do estado final.
 
 
-## 2026-10-13 — Auditoria de performance, política JSON e fast-fail de inicialização
+## DB-067 · 2026-10-13 — Auditoria de performance, política JSON e fast-fail de inicialização
 
 ### Escopo e restrição operacional
 - Revisão do estado atual de `main`, dos arquivos de transporte/parser/descoberta/polling, catálogos JSON, testes e documentação.
@@ -2238,7 +2358,7 @@ A inicialização podia repetir comandos AT opcionais com erro/timeout até trê
 - O registro não altera a regra de validação da ECU por resposta OBD real `010C` e não inicia CI.
 
 
-## 2026-10-13 — Auditoria cruzada do TXT real, performance OBD, cálculo de combustível e integridade do autosave
+## DB-068 · 2026-10-13 — Auditoria cruzada do TXT real, performance OBD, cálculo de combustível e integridade do autosave
 
 ### Escopo
 - Lido o histórico `meriva_smart_autosave_history.txt` fornecido nesta etapa e cruzado com os serviços de telemetria, polling, combustível, logger CSV, autosave, catálogo de PIDs/JSON, suíte de regressão e documentação.
@@ -2355,7 +2475,7 @@ Conclusão: interfaces assíncronas melhoram a disponibilidade do último valor,
 
 
 
-## 2026-10-14 — Central de Testes de Sensores (primeira versão)
+## DB-069 · 2026-10-14 — Central de Testes de Sensores (primeira versão)
 
 ### Implementação nesta branch
 - Criada a rota `app/testes-sensores.tsx`, acessível em Mais Recursos.
@@ -2388,7 +2508,9 @@ Revisão estática feita contra os contratos de `sharedConnection`, `Elm327Sessi
 Revisar o diff completo, executar validação TypeScript/testes e build Android, depois testar fisicamente no veículo: primeiro motor desligado, depois motor aquecido em marcha lenta. Não testar durante a condução.
 
 
-## 2026-10-14 — Catálogo JSON, IA de triagem e três leituras por PID
+## DB-070 · 2026-10-14 — [HISTÓRICO SUPERSEDIDO EM 2026-10-20] Catálogo JSON, IA de triagem e três leituras por PID
+
+> **Nota histórica:** esta entrada descreve a versão então implementada. A exigência atual é de cinco leituras sequenciais e cinco valores válidos, conforme a entrada de 2026-10-20 “Restaurar cinco leituras do Laboratório e consulta manual de PID”. Não reduzir para três nem usar este registro histórico como especificação atual.
 
 ### Pesquisa técnica e limites de evidência
 - Consultadas referências públicas SAE J1979/OBD-II e tabelas abertas de PIDs para conferir definição/fórmula, além do Manual do Proprietário Meriva 2012, auditoria da Bíblia e material técnico secundário Econoflex.
@@ -2418,7 +2540,7 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - CI desta correção: TypeScript, testes, Expo Doctor e build Android.
 
 
-## 2026-10-16 — Incidente: ciclo repetitivo de conexão OBD
+## DB-071 · 2026-10-16 — Incidente: ciclo repetitivo de conexão OBD
 
 ### Sintoma relatado
 - Ao conectar o ELM327, a tela pisca, desconecta, tenta conectar novamente e repete o ciclo.
@@ -2435,7 +2557,7 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Testes automatizados, CI e validação física ainda pendentes; não declarar a correção validada até a execução dos testes e a verificação no veículo.
 - Próximo teste físico: com o veículo parado, verificar uma conexão normal, desligar/religar o adaptador e confirmar que a interface não entra em ciclo de pisca/desconexão.
 
-## 2026-10-16 — Ajuste da validação CI da correção Bluetooth
+## DB-072 · 2026-10-16 — Ajuste da validação CI da correção Bluetooth
 
 ### Evidência
 - A execução CI #2193 passou por `npm ci`, Expo Doctor (17/17) e TypeScript.
@@ -2450,3 +2572,487 @@ Revisar o diff completo, executar validação TypeScript/testes e build Android,
 - Nova CI solicitada pela atualização da branch; confirmar resultado integral, inclusive testes restantes e build Android.
 - Teste físico do ELM327 no veículo continua pendente.
 
+
+## DB-073 · 2026-10-20 — Restaurar cinco leituras do Laboratório e consulta manual de PID
+
+### Problema
+- O Laboratório de Sensores havia regredido de cinco para três tentativas por PID.
+- A consulta manual de PID e o acesso rápido à lista de PIDs descobertos ficaram difíceis de localizar; a lista não era consistentemente reidratada da sessão/cache.
+- A suíte de contrato ainda esperava três leituras, o que provocou a primeira falha de validação após a correção.
+
+### Diagnóstico
+- O catálogo JSON, o motor de avaliação, o texto/progresso da tela e o teste de contrato precisavam concordar na exigência de cinco tentativas.
+- A avaliação numérica deve exigir cinco tentativas e cinco respostas válidas para o PID avaliado; ausência de resposta não pode virar zero nem ser aprovada como leitura válida.
+- A lista pode vir da descoberta da ECU ou do cache persistido; cache antigo não prova suporte atual da ECU e deve ser confirmado por resposta real.
+
+### Correção
+- Restaurado o mínimo de cinco leituras por PID no catálogo e na tela do Laboratório.
+- O motor passou a calcular a média aritmética das cinco amostras válidas; resultados com amostragem incompleta ficam não conclusivos/sem resposta, conforme o caso.
+- Reintroduzida a navegação direta “Consulta manual de PID” em Mais Recursos, normalização/validação de PID Mode 01 e alinhamento do PID consultado com o parser.
+- A lista de PIDs recupera a descoberta da sessão/cache e permite tocar em um item para preencher a consulta manual.
+- Atualizados testes de regressão do motor, do contrato do catálogo e da navegação para impedir retorno silencioso a três leituras ou remoção do acesso manual.
+
+### Testes e CI
+- Primeira execução: `npm run validate` falhou porque `tests/knowledgeJson.test.js` ainda exigia três leituras. Corrigida a expectativa para cinco sem remover a verificação.
+- Execução final: [CI #39424459644](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/39424459644) — `validate` **success**; `android-build` **success**; Expo prebuild, montagem do APK standalone, verificação e upload do artefato concluídos.
+- Commit validado: `0dbaab941bc4e7a3da07a9f91486cd149e1d9c2c`.
+- Artefato de CI: [meriva-smart-diagnostic-standalone-apk](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/39424459644) (disponibilidade indicada pelo GitHub até 2026-11-03; exige acesso ao repositório).
+- PR: [#74 — restaurar cinco leituras e consulta manual de PID](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/74).
+
+### Resultado
+- Validação automatizada e build Android verdes. Isso confirma compilação e verificações automatizadas, mas não substitui teste de campo com ELM327/ECU reais.
+- Não declarar sensor fisicamente aprovado apenas por resposta OBD: os estados são heurísticos e dependem do suporte do PID, do parser e das condições do teste.
+
+### Próximo passo
+- Revisar o diff final da PR #74 e executar teste no veículo: cinco amostras por PID, falha de resposta, PID inválido, seleção de PID descoberto/cacheado e consulta manual real.
+- Confirmar que a lista mostra claramente a diferença entre PID descoberto na sessão atual e PID recuperado do cache antes de tratar a informação como suporte confirmado.
+- Não integrar a PR até concluir a revisão do diff e o teste de regressão funcional, caso permaneça alguma divergência de UX.
+
+
+## DB-074 · 2026-10-20 — Cockpit inicial: indicadores OBD e estado de falhas
+
+### Problema
+- O indicador rotativo principal ainda incluía velocidade GPS, embora o cockpit devesse priorizar os quatro parâmetros OBD definidos.
+- O cartão grande “Saúde do veículo” repetia conteúdo/navegação da central detalhada.
+- O contador de falhas podia mostrar “NORMAL” com a ECU desconectada, confundindo ausência de leitura atual com ausência de DTC.
+- O estilo visual de alerta térmico podia sobrescrever a tipografia do valor principal.
+
+### Diagnóstico
+- As correções pertencem à apresentação do cockpit. Não foi necessário alterar a fila serial ELM327, o parser de PIDs, a descoberta OBD ou os serviços de conexão.
+- Os quatro indicadores usam leituras reais finitas e recentes (até 30 segundos), somente com ECU conectada; caso contrário, mostram N/D.
+- A central detalhada de saúde continua acessível em Mais Recursos, pela rota /saude.
+
+### Correção
+- O ciclo de 10 segundos agora percorre temperatura do motor (0105), tensão do módulo (0142), posição da borboleta (0111) e RPM (010C). O toque no indicador continua permitindo avançar manualmente.
+- Removido da página inicial o cartão duplicado de saúde, sem excluir a tela /saude.
+- O contador de falhas mostra N/D quando a ECU não está conectada; com conexão atual, mostra quantidade de DTCs ou SEM DTC.
+- Estilo de alerta térmico limitado à cor, preservando o tamanho do valor principal.
+- Criados testes de regressão em tests/orientationLayout.test.js e tests/cockpitNavigation.test.js para proteger o conjunto de quatro métricas, o estado N/D e a navegação para a central de saúde.
+
+### Testes e CI
+- [CI #2542](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/39437018218): job validate **success**; job android-build **success**.
+- Expo Doctor: **17/17** verificações aprovadas.
+- npm run validate: **success**.
+- Prebuild Android, montagem do APK standalone, verificação do APK e upload do artefato: **success**.
+- Commit de código validado: b2d90079a5d12e3468f40289ebe5b0b776ecc231.
+- Artefato meriva-smart-diagnostic-standalone-apk: 27.443.656 bytes, SHA-256 126605b500ea50b7858cc5d6d0a9c7445bc16a87074e829ad2997d7ca34e93d6; disponível até 2026-11-03 no GitHub Actions (requer acesso ao repositório).
+
+### Resultado e limites
+- Cockpit e validação automatizada/build Android verdes no commit registrado acima.
+- A validação automatizada não substitui a verificação física no aparelho. Ainda não foi realizado teste desta revisão com ELM327/ECU reais, nem verificação visual final em retrato e paisagem.
+- PR #74 continua aberta e não foi integrada ao main.
+
+### Próximo passo
+- Instalar o APK da CI e conferir os quatro indicadores em retrato/paisagem, a alternância de 10 segundos e o comportamento N/D com ECU desconectada.
+- No carro parado, confirmar leituras reais de 0105/0142/0111/010C e validar os fluxos do Laboratório: cinco leituras sequenciais, respostas ausentes, PID manual inválido e PID selecionado da lista. Distinguir sempre PID guardado em cache de suporte confirmado pela ECU atual.
+- Rever o diff completo da PR e só então decidir o merge.
+
+
+## DB-075 · 2026-10-20 — Gráficos de telemetria ao vivo e histórico por viagem
+
+### Problema e diagnóstico
+- A tela Dados já mostrava sparklines textuais de quatro parâmetros, mas não permitia examinar curvas nem comparar telemetria de uma viagem real finalizada.
+- O projeto já tinha fontes apropriadas: janela móvel em memória por PID, com limite de 120 pontos por PID, e pontos temporais esparsos persistidos em viagens reais (no máximo 720 pontos por viagem, com intervalo mínimo de 10 s). Criar um segundo logger/histórico seria redundante e aumentaria I/O no Android.
+- A lista de “últimas leituras reais” usava a ordem do array cacheado e não filtrava explicitamente origem SIMULAÇÃO, portanto precisava ser ordenada pelo timestamp e filtrada por fonte.
+
+### Correção implementada
+- Criado `src/obd/telemetryChart.ts`, helper puro para calcular coordenadas, segmentos e estatísticas de gráfico sem dependências externas.
+- O helper descarta timestamps inválidos/futuros e valores numéricos inválidos, limita a janela desenhada e **não liga os dois lados de uma amostra ausente**; séries vazias/dimensões inválidas retornam sem gráfico.
+- `app/dados.tsx`: adicionado seletor de parâmetros reais para a série da sessão ECU atual e alternância para telemetria persistida em viagens `REAL_OBD` finalizadas.
+- Histórico de viagem usa somente `DriveCycle.telemetrySamples` já gravado. Viagens `SIMULACAO`, `CARSCANNER_SEED` e viagens antigas sem amostras não recebem valores artificiais.
+- A sessão ao vivo usa `getLiveSeries()` existente; quando a ECU está desconectada, o gráfico não reapresenta amostras antigas como se fossem atuais.
+- As últimas leituras agora filtram `source === 'REAL'` e são ordenadas pelo timestamp mais recente.
+- Não foram adicionados pacotes, servidores nem novas consultas OBD; o polling ELM327 permanece serial.
+
+### Testes adicionados
+- `tests/liveTelemetry.test.js`: cobre cálculo de mínimos/máximos/média/variação, coordenadas dentro dos limites, amostra faltante sem segmento cruzado, timestamps inválidos/futuros, série vazia, dimensões inválidas e séries planas.
+- `tests/cockpitNavigation.test.js`: protege a reutilização da janela de telemetria, o histórico `REAL_OBD`, o filtro das últimas leituras reais e o modo de viagens salvas.
+
+### Validação e CI
+- Esta implementação foi publicada no branch `fix/restore-five-readings-manual-pids-20261020`; **TypeScript, suíte completa e APK Android estão pendentes da CI deste commit**. Registrar o run e o resultado após a execução, sem assumir PASS antecipado.
+- Teste físico ainda pendente: confirmar no aparelho as curvas ao vivo, o comportamento sem ECU, a navegação retrato/paisagem e que uma viagem recém-finalizada aparece no histórico local com as amostras efetivamente gravadas.
+
+### Próximo passo
+- Aguardar CI completa (`validate` e `android-build`), corrigir falhas pela evidência do log e registrar o resultado final.
+- Após instalar o APK, conferir amostras reais na Meriva/ELM327; não tratar a validação automatizada como prova de precisão dos sensores nem de suporte a todos os PIDs.
+
+
+### Ajuste revelado pela primeira CI da etapa de gráficos
+- CI #2546 — run [39445022697](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/39445022697): `npm ci`, Expo Doctor e o início de `npm run validate` foram executados; o typecheck falhou em `app/dados.tsx` nas linhas 131 e 167 porque `styles.chartFootnote` era usado pela tela, mas não estava declarado no `StyleSheet`.
+- Diagnóstico: erro de tipagem da apresentação, não falha do parser, da aquisição OBD ou da geometria do gráfico. O job `android-build` foi corretamente ignorado por depender de `validate`.
+- Correção: declarado `chartFootnote` com tipografia compacta e alinhada ao restante dos metadados do gráfico.
+- A nova CI deve confirmar a correção e executar o APK Android. Até ambos os jobs ficarem verdes, a etapa continua **não validada**.
+
+
+### Resultado final da CI — etapa de gráficos de telemetria
+- CI #2548 — [execução 39445257264](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/39445257264), commit `b3d71e912a4b77d00e6f927f553a0a3b85754526`: **concluída com sucesso**.
+- `validate`: PASS — `npm ci`, Expo Doctor (17/17 verificações) e `npm run validate` passaram, incluindo typecheck e os testes de regressão adicionados.
+- `android-build`: PASS — Expo prebuild, montagem do APK standalone, verificação do APK e upload do artefato passaram.
+- Artefato: [meriva-smart-diagnostic-standalone-apk](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/39445257264/artifacts/12277461327), aproximadamente 27,45 MB; expira em 03/11/2026.
+- Hash SHA-256 do artefato publicado: `82b5c835945b92a485277e35fac4df82c721d7f2c134c26514cb7081b7877b24`.
+- A falha inicial de tipagem do estilo `chartFootnote` foi corrigida antes desta execução verde.
+- Limite da evidência: CI confirma validação automatizada e compilação, não confirma conexão física com ELM327, exatidão dos sensores, qualidade das curvas em condução nem persistência após reinstalação.
+- PR #74 permanece aberta e não foi mesclada.
+
+
+## DB-076 · 2026-10-20 — Auditoria P1–P5 e enriquecimento opcional de clima
+
+### Escopo e auditoria
+- Revisado o estado do branch da PR #74 antes de alterar código; a PR permanece aberta e não foi mesclada.
+- **P1 — OBD/ELM327:** reutilizados o transporte Bluetooth Classic, o estado explícito de resposta da ECU, a telemetria real e a suíte de regressão existente. Não foi adicionada segunda fila de polling nem biblioteca OBD paralela.
+- **P2 — GPS/viagens:** confirmada a existência de `expo-location`, `expo-task-manager`, serviço de viagens automáticas, tarefas em segundo plano e testes de GPS/permissões. Nenhuma dependência duplicada foi adicionada.
+- **P3 — Internet opcional:** implementado enriquecimento de cidade/condição climática na página inicial. Usa a permissão de localização em primeiro plano somente se já concedida; não solicita permissão automaticamente. Falha de GPS, permissão ou rede degrada para N/D e não interfere com aquisição OBD.
+- **P4 — Histórico/exportação:** reutilizadas as funções de persistência local e exportação TXT existentes, incluindo histórico diário separado e registros de viagens. Não foi criado um segundo armazenamento.
+- **P5 — Interface/alertas:** mantidos o cockpit, indicadores reais, estados N/D, gráfico ao vivo e histórico já existentes. Alertas térmicos continuam informativos; não foi introduzida notificação de fundo sem necessidade validada. Auditoria visual de acessibilidade em aparelho real continua pendente.
+
+### Implementação P3
+- Novo `src/weather/currentConditions.ts`: consulta Open-Meteo para temperatura/código meteorológico; geocodificação reversa tenta obter o nome da cidade. O recurso é somente de apresentação, não alimenta o motor diagnóstico.
+- `app/index.tsx`: exibe faixa compacta com cidade, temperatura e condição do tempo; estado indisponível é explícito.
+- Sem nova dependência: aproveita `expo-location` já instalado no Expo SDK 51 e a API `fetch` do React Native.
+- Privacidade e operação offline: nenhuma solicitação nova de permissão; não envia coordenadas se a permissão existente não estiver concedida. Falha de rede não bloqueia nem altera leituras OBD.
+- Novo `tests/onlineConditions.test.js`: cobre códigos de tempo, ausência de permissão sem leitura GPS, fallback offline e resposta online.
+- `package.json`: adiciona o teste à suíte `npm test`; não houve alteração de versão do Expo nem instalação de pacote.
+
+### Commits
+- `39e7aa0bcad1ed1e506d7b1fe3e921c6201518cb` — módulo de clima opcional.
+- `e219118773ed366306368b74cac1f93a53a096b5` — faixa de clima na página inicial.
+- `4f1c2b1dbbab99035ccd6fafb28440e850c447cc` — testes de fallback online/offline.
+- `b980bdf6ed16c3c07d90af650b5c60edbf434768` — suíte de teste atualizada.
+
+### Testes e CI — status registrado em 2026-10-20
+- Run [39449909465 / CI #2560](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/39449909465), commit de código `2b853e9830213b23f520a7e7eb12e7cbb7e8a237`: `npm ci` **PASS**, Expo Doctor **PASS**, `npm run validate` **PASS**.
+- No momento da atualização deste trecho, `android-build` ainda estava montando o APK release standalone. Portanto, **a CI completa continua pendente** até aparecer conclusão `success` nesse job e terminar verificação/upload do APK.
+- A execução anterior [39448090512](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/39448090512) passou em ambos os jobs para um commit anterior, mas não substitui a confirmação da cabeça atual.
+- Este status é um retrato do run consultado; ao atualizar a CI, registrar o resultado real sem inferir PASS com base em uma etapa intermediária.
+
+### Limites e próximos passos
+1. Confirmar o resultado final de `android-build` para o código de clima opcional e atualizar este diário com evidência.
+2. Verificar o APK instalado: página inicial online, modo avião, permissão de localização negada e retorno de internet.
+3. Testar no carro a estabilidade Bluetooth/ECU, cinco leituras sequenciais, consulta manual PID e gravação/encerramento GPS; CI não substitui o teste físico.
+4. Capturar telas atuais em retrato e paisagem para verificar legibilidade, overflow e acessibilidade.
+5. Manter a PR #74 aberta até revisão final e autorização explícita de merge.
+
+
+## DB-077 · 2026-10-20 — Consolidação do diário e salvaguardas contra regressões
+
+### Problema
+O diário cresceu e passou a reunir muitos “próximos passos” históricos. A implementação de três leituras em 14/10 aparecia perto de registros mais recentes que exigem cinco, criando risco de um agente futuro seguir uma descrição antiga em vez da regra atual. Havia também vários estados de CI pendentes que pertenciam a commits anteriores.
+
+### Correção documental
+- Adicionada no início uma seção de estado vigente e contratos anti-regressão, com a ordem de precedência explícita: estado atual + entrada mais recente verificada > registros históricos.
+- Destacadas como invariantes as cinco leituras válidas, consulta manual e seleção de PIDs, fila serial única ELM327, modo offline, fronteiras entre dados reais/seeds/simulação, regras de GPS/viagens, compatibilidade Expo SDK 51 e CI completa.
+- Marcada a seção de 14/10 sobre três leituras como histórica e supersedida pela correção de 20/10.
+- Atualizado o bloco de CI da entrada P1–P5 com o status realmente observado do run 39449909465: `validate` passou; `android-build` ainda estava em execução na última consulta. Não foi presumida aprovação final.
+- Preservados os diagnósticos de falhas antigas e as correções que servem como evidência de regressões já ocorridas. Não foram apagados históricos técnicos só para encurtar o arquivo.
+- Nenhum arquivo de produção, dependência, catálogo de PIDs ou configuração Android foi alterado nesta consolidação.
+
+### Verificação e CI
+- Base documental lida integralmente: 2.611 linhas na versão anterior.
+- Branch: `fix/restore-five-readings-manual-pids-20261020`.
+- PR #74 continua aberta e não mesclada.
+- A alteração é documental. A nova CI associada ao commit deste diário deve ser observada separadamente; o run anterior não deve ser descrito como validação de um SHA posterior.
+
+### Resultado
+O diário agora oferece primeiro o contrato que deve ser obedecido antes de apresentar o histórico. O registro de três leituras permanece apenas para explicar a regressão passada; não é mais uma instrução operacional.
+
+### Próximo passo
+Confirmar a nova execução de CI após este commit e atualizar o registro final de `validate` e `android-build`. Depois da CI, executar validação física no Android/ELM327 e verificação visual retrato/paisagem; não fazer merge sem autorização.
+
+
+## DB-078 · 2026-10-20 — Índice enumerado de todas as atualizações e regra de leitura
+
+### Solicitação
+Enumerar todas as atualizações do diário para que trabalhos futuros encontrem primeiro as decisões mais recentes e não recuperem instruções antigas como se fossem atuais.
+
+### Alterações
+- Atribuído ID sequencial `DB-001` a `DB-077` a cada seção de atualização datada já existente, preservando a ordem do documento e os detalhes técnicos históricos.
+- O índice integral dessas entradas foi inserido no início do arquivo.
+- Esta atualização passa a ser `DB-078`; novas atualizações devem receber o próximo número sequencial, sem reutilizar IDs.
+- A seção antiga de três leituras permanece identificada como supersedida; o contrato atual continua exigindo cinco tentativas sequenciais e cinco respostas válidas para avaliação numérica.
+- Corrigida a duplicação do parágrafo introdutório.
+- Reforçada a regra de que o SHA da cabeça da PR e a CI devem ser verificados ao vivo no GitHub. Não usar um SHA ou estado de CI estático do diário como fonte mais atual quando já houver commits posteriores.
+
+### Regra obrigatória para toda retomada
+1. Ler “ESTADO VIGENTE E REGRAS ANTI-REGRESSÃO”.
+2. Consultar o índice e abrir a maior entrada `DB-NNN`; ela é o ponto de retomada documental.
+3. Verificar na PR #74 o HEAD/SHA real e a última CI associada a esse SHA; olhar os dois jobs `validate` e `android-build`.
+4. Ler as entradas relevantes anteriores para causas/regressões, mas confirmar no código se uma tarefa continua pendente antes de executá-la.
+5. Ao concluir qualquer ação, acrescentar nova entrada com o próximo ID, atualizar o índice no início, registrar commit/CI com evidência e manter a PR aberta até autorização explícita de merge.
+
+### Estado ao registrar
+- Branch: `fix/restore-five-readings-manual-pids-20261020`.
+- PR #74 permanece aberta e não mesclada.
+- Nenhuma alteração de código funcional foi feita nesta atualização.
+- A CI precisa ser consultada novamente após este commit; um run anterior não valida automaticamente o novo SHA.
+
+### Resultado
+O diário contém 78 atualizações enumeradas no índice e no próprio cabeçalho das entradas. O número de referência cresce monotonamente: a próxima entrada será `DB-079`.
+
+
+## DB-079 · 2026-10-20 — Camada executável anti-regressão
+
+### Problema
+O índice numerado melhora a retomada documental, mas não impede sozinho que uma alteração futura remova uma funcionalidade, reduza o número de leituras ou deixe de executar uma suíte crítica na CI.
+
+### Diagnóstico
+Já existiam testes de comportamento para PIDs, consulta manual, cockpit, Bluetooth/ELM327, GPS, histórico e clima offline. A falha processual era não haver um gate único que verificasse os contratos centrais e confirmasse que as principais suítes continuavam conectadas ao comando de validação.
+
+### Correção
+- Criado `docs/CONTRATO_ANTI_REGRESSAO.md`, com RG-01 a RG-10, seus testes responsáveis, regras para mudanças autorizadas e procedimento de retomada.
+- Criado `tests/projectBaseline.test.js`, que valida: cinco leituras por PID; presença das suítes essenciais em `npm test`; unicidade da fila serial ELM327; fluxo único de conexão; diagnóstico local separado do clima; Expo SDK 51; coerência de `package.json` e `package-lock.json`; e os quatro indicadores atuais do cockpit.
+- Adicionado o comando `npm run gate:baseline`.
+- Adicionado ao workflow de CI o passo visível **Run anti-regression baseline gate**, antes de `npm run validate`. Uma regressão nos contratos cobertos falha a validação, em vez de depender apenas de revisão manual do diário.
+- Mantidas as suítes comportamentais individuais; o gate não as substitui e também verifica se permanecem conectadas à suíte principal.
+- Nenhuma regra diagnóstica, fórmula, PID, configuração Bluetooth ou dependência de produção foi modificada.
+
+### Arquivos
+- `docs/CONTRATO_ANTI_REGRESSAO.md` (novo)
+- `tests/projectBaseline.test.js` (novo)
+- `package.json`
+- `.github/workflows/ci.yml`
+- `docs/DIARIO_DE_BORDO.md`
+
+### Testes e CI
+- O gate foi integrado ao workflow em um passo independente e à execução de validação por script. A CI iniciada pelo novo commit deve ser consultada para confirmar a execução real.
+- Não declarar sucesso antecipado: é necessário que o novo HEAD conclua `gate:baseline`, `validate` e `android-build` com sucesso.
+- Nenhuma validação física ELM327/ECU foi realizada por esta alteração documental/estrutural.
+
+### Resultado e limites
+A partir deste commit, as regressões cobertas no contrato são verificadas automaticamente na CI, além de ficarem documentadas. O mecanismo reduz regressões acidentais, mas não substitui revisão de diff, teste no aparelho e teste com ECU real.
+
+### Próximo passo
+Consultar a CI do SHA resultante; corrigir falhas a partir dos logs. Em toda alteração futura, atualizar código + testes + contrato + diário de modo consistente, e manter a PR #74 aberta até autorização explícita para merge.
+
+
+## DB-080 · 2026-10-20 — Revisão preventiva do próprio gate anti-regressão
+
+### Problema
+Durante a revisão estática da nova barreira RG, uma asserção comparava a ordem exata de palavras de um invariante com a redação do contrato, embora o significado estivesse correto.
+
+### Diagnóstico
+A validação da camada de proteção não deve depender de uma formulação editorial idêntica quando o contrato preserva o mesmo significado. Isso criaria falha artificial da CI por redação e reduziria a confiança no gate.
+
+### Correção
+- Ajustada a asserção de tests/projectBaseline.test.js para procurar a formulação que consta no contrato (“fila serial única”).
+- Nenhum código de produção, regra funcional ou teste de comportamento foi alterado.
+- A correção ocorreu antes de considerar verde a nova CI; o resultado deve vir do run da cabeça atual, não desta revisão estática.
+
+### Próximo passo
+Conferir a execução de CI da cabeça mais recente. Se o gate apontar outra divergência, corrigir pelo código/contrato real e registrar nova entrada com o próximo ID.
+
+
+## DB-081 · 2026-10-20 — Correção do pisca-pisca do cockpit e restauração da navegação inferior
+
+### Problema observado
+A tela inicial passou a apresentar piscadas e os botões inferiores deixaram de aparecer após as alterações recentes.
+
+### Diagnóstico estático
+- O efeito de conexão automática dependia do objeto completo `settings`. A tela recarrega as configurações ao ganhar foco; cada leitura pode produzir um novo objeto mesmo que todas as opções sejam iguais. Isso reiniciava o efeito de conexão e reinscrevia listeners sem necessidade, podendo repetir tentativas de conexão quando o usuário navegava e voltava ao cockpit.
+- A navegação inferior estava explicitamente condicionada a `!layout.landscape`, portanto desaparecia por definição ao girar o aparelho para paisagem.
+- Estes são defeitos identificáveis no código. Ainda não constituem prova de que explicam toda piscada observada no aparelho; a validação física continua necessária.
+
+### Correção implementada
+- O efeito de conexão agora depende dos valores primitivos das opções OBD relevantes, e não da identidade do objeto `settings`. Uma recarga sem alteração de configuração não reinicia o fluxo de conexão; alterações reais das opções continuam atualizando o efeito.
+- Os botões inferiores Bluetooth e Mais Recursos, junto do estado do diário, permanecem renderizados em retrato e paisagem; a paisagem recebe um ajuste compacto de espaçamento.
+- Não foram alterados o transporte Bluetooth Classic, a fila serial ELM327, o protocolo KWP, a validação de resposta ECU, as regras diagnósticas, o número de leituras dos testes nem o catálogo de PIDs.
+
+### Testes adicionados
+- `tests/cockpitNavigation.test.js` protege contra a dependência do objeto de configurações inteiro e contra o desaparecimento da navegação ao mudar para paisagem.
+- A suíte completa e o build Android ainda precisam confirmar que a alteração compila e passa pelos testes automatizados.
+
+### Commit e CI
+- Branch de correção: `fix/cockpit-flicker-restore-buttons-20261020`, criada a partir da cabeça `a9668cf7d3759dfcaf1ef95ccf9f7684fb13ac03) da PR #74.
+- Alterações publicadas em commits separados de `app/index.tsx`, `tests/cockpitNavigation.test.js` e deste diário. Os SHAs resultantes e a CI serão consultados no GitHub; não presumir CI verde antes da conclusão dos jobs `validate` e `android-build`.
+- A PR #74 não foi mesclada.
+
+### Próximo passo
+Executar `npm run validate` e `android-build` pela CI da branch de correção. Se ambos passarem, instalar o APK e reproduzir a navegação em retrato e paisagem; verificar também conexão, desconexão e retorno do app do segundo plano. Se continuar piscando com a conexão estável, recolher logcat e rastrear mudanças de estado/renderização no aparelho antes de alterar o transporte OBD.
+
+
+## DB-082 · 2026-10-21 — Auditoria visual, tema comum e proteção de consistência entre telas
+
+### Problema e evidência
+- A inspeção do código confirmou uma inconsistência visível: o Laboratório OBD usava fundo claro (#eef3fb), cartões brancos e textos escuros, enquanto o cockpit e as demais telas usavam tema escuro.
+- As telas secundárias tinham tamanhos/estilos de título divergentes, e o cabeçalho nativo do Expo usava cinza claro/azul apesar do conteúdo escuro.
+- A PR #75 tinha `validate` e `android-build` verdes no run #2573 antes desta mudança. Esse resultado é histórico e não valida este novo commit.
+
+### Correções
+- Criado `src/ui/theme.ts` com tokens compartilhados de cor e estilo de título.
+- Padronizados o fundo das telas, os títulos secundários, o cabeçalho nativo e a paleta do Laboratório; definido `userInterfaceStyle: dark` no Expo.
+- Criado `tests/screenTheme.test.js` e conectado a `npm test` e ao gate anti-regressão. O contrato RG-11 protege a consistência visual básica.
+- Preservados os fluxos de OBD, a fila serial ELM327, os cinco valores válidos por PID, a consulta manual, os dados offline e as regras diagnósticas.
+
+### Validação e limites
+- O commit desta alteração precisa de CI nova com `gate:baseline`, `validate` e `android-build`; nenhum resultado está sendo presumido.
+- A validação automatizada verifica os contratos de tema, não substitui inspeção visual no Android em retrato/paisagem. A correção da piscada também requer teste físico com ELM327 para confirmar o comportamento real.
+- Não foram adicionadas dependências.
+
+### Próximo passo
+Consultar a CI associada ao SHA atual; corrigir qualquer falha pelo log. Após CI verde, instalar o APK e verificar contraste, títulos, barras nativas, botões inferiores, orientação, ciclo de conexão e tela do Laboratório.
+
+
+## DB-083 · 2026-10-21 — Navegação inferior somente com ícones e alvos acessíveis
+
+### Problema e evidência
+- O requisito visual anterior pedia botões inferiores sem legendas visíveis, mas o cockpit e a tela Bluetooth ainda renderizavam rótulos textuais.
+- A altura visual/tátil dos itens podia ficar abaixo da recomendação Android de 48 dp para alvos de toque.
+
+### Correção
+- Removidas as legendas visuais da navegação inferior no cockpit e na tela Bluetooth; ícones preservados.
+- Adicionados `accessibilityLabel`/estado selecionado para que a navegação sem texto continue identificável por leitores de tela.
+- Definidos alvos de navegação com `minHeight: 48` e ícones de 22 dp.
+- Adicionadas asserções de regressão para navegação icon-only, altura mínima e rótulos de acessibilidade.
+
+### Validação
+- A CI do commit de padronização visual está sendo acompanhada separadamente. A alteração icon-only será validada pela próxima execução de `gate:baseline`, `validate` e `android-build`.
+- A inspeção tátil/visual em telefone Android continua necessária.
+
+### Próximo passo
+Confirmar a CI da cabeça atual e testar os botões em retrato e paisagem, inclusive com TalkBack.
+
+
+## DB-084 · 2026-10-21 — Biblioteca visual compartilhada, monitoramento de rede 4G/5G e página de conectividade
+
+### Problema e pesquisa técnica
+- Navegação e atalhos usavam emojis/glifos misturados, sem vocabulário visual compartilhado.
+- O projeto está fixado em Expo SDK 51. A biblioteca `@expo/vector-icons@14.1.0` já constava no lockfile, então foi escolhida para esta atualização compatível com o runtime atual; a migração para os pacotes modulares recomendados pelo Expo fica como atualização de plataforma separada, com matriz própria de compatibilidade e CI.
+- O NetInfo fornece estado do transporte, alcance da internet e geração celular. A UI diferencia rede ativa de acesso à internet confirmado e não inventa geração móvel ausente nos dados do Android.
+
+### Correções implementadas
+- Criado `src/ui/AppIcon.tsx`, com ícones Ionicons e nomes semânticos centralizados.
+- Substituídos emojis/glifos nos atalhos do cockpit, navegação inferior, Bluetooth e botões principais de Dados, Veículo e Saúde.
+- Adicionado `@react-native-community/netinfo@11.3.1` e o hook orientado a eventos `src/network/useNetworkStatus.ts`; sem timer de polling e sem alteração do ciclo OBD.
+- Criado `src/network/networkStatus.ts` com apresentação testável para Wi-Fi, dados móveis 2G/3G/4G/5G, internet não confirmada, falta de internet, sinal Wi-Fi e informação de tarifação quando fornecidos pelo sistema.
+- Adicionada a tela `app/conectividade.tsx` e atalhos no cockpit e em Mais Recursos. A tela explica que leituras OBD, testes, histórico e IA local não dependem da internet; recursos ainda não implementados são identificados como próximos passos.
+- Preservados Bluetooth Classic/ELM327, fila serial única, cinco leituras válidas nos testes, consulta manual de PIDs, histórico local e regras offline.
+
+### Testes e contrato
+- Adicionado `tests/connectivity.test.js` para 5G, 4G sem internet, Wi-Fi, offline e estado desconhecido.
+- Conectada a suíte ao `npm test` e ao gate de anti-regressão; incluída a tela de conectividade no teste de tema e registrados RG-12/RG-13.
+- Atualizado o lockfile para corresponder ao `package.json`, mantendo o Expo SDK 51. A primeira CI detectou ausência de `expo-font` como dependência direta e recomendou NetInfo `11.3.1` para SDK 51; ambos foram corrigidos conforme o resultado do `expo-doctor` antes da nova CI.
+
+### Commit, CI e limites
+- Atualizações preparadas na branch `fix/cockpit-flicker-restore-buttons-20261020`; após a publicação, conferir o SHA e a CI real da nova cabeça.
+- Não considerar a entrega concluída até `gate:baseline`, `validate` e `android-build` passarem.
+- A geração 4G/5G depende dos dados que o Android fornece; caso ausentes, o app mostra “MÓVEL”/“Geração não informada”.
+- Instalar e conferir o APK em retrato/paisagem, Wi-Fi, dados móveis e modo avião; validar fisicamente ELM327/ECU separadamente.
+
+
+## DB-085 · 2026-10-21 — Atualização manual da rede e validação do sinal informado pelo Android
+
+### Problema
+A página de conectividade apresentava o estado recebido por eventos do sistema, mas não oferecia uma ação explícita para reconsultá-lo quando a geração móvel ou o acesso à internet apareciam como não confirmados. Além disso, o normalizador aceitava qualquer número finito como força de sinal Wi-Fi.
+
+### Correção
+- Adicionada a ação acessível “VERIFICAR REDE NOVAMENTE”, usando `NetInfo.refresh()`; o botão indica a verificação em andamento e informa falha sem bloquear a tela.
+- O monitoramento continua orientado a eventos. A atualização não inicia polling periódico e não chama nem reinicia Bluetooth, ELM327, GPS ou motor diagnóstico.
+- O sinal Wi-Fi só é aceito como válido quando o Android informa número finito entre 0 e 100; valores negativos ou acima de 100 viram desconhecidos, não percentuais falsos.
+- Atualizados os testes de conectividade e o contrato RG-14.
+
+### Validação e limites
+- A CI verde do SHA anterior `047ec91a29be943e9fce40d2a9f4b6e0644bdc30` é somente a linha de base; esta alteração precisa de nova CI.
+- Verificar `gate:baseline`, `validate` e `android-build` na cabeça nova. A CI não substitui o teste do APK em Wi-Fi, 4G/5G e modo avião.
+
+### Próximo passo
+Conferir os jobs da CI do novo SHA; depois, testar a ação de atualização e confirmar que a conexão OBD permanece estável ao alternar entre a página de conectividade e o cockpit.
+
+
+## DB-086 · 2026-10-21 — Cockpit: informações de rede/clima legíveis e botões com áreas de toque ampliadas
+
+### Problema e evidência visual
+- Nas capturas Android recebidas, cidade, temperatura e condição meteorológica eram renderizadas em uma linha com fonte de 8 dp; o atalho de rede usava ícone de 13 dp e texto de 8 dp. Isso reduzia a legibilidade das informações ambientais e da rede.
+- O cockpit usava `justifyContent: 'space-between'` em um contêiner flexível com vários blocos. O espaço livre era distribuído entre cada bloco, criando uma lacuna desproporcional entre cabeçalho/rede e o painel OBD.
+- Os atalhos inferiores já tinham rótulos de acessibilidade e altura mínima de 48 dp, mas ícones de 22 dp e ausência de dicas de ação. As três ações principais também não declaravam explicitamente papel/rótulo acessível.
+
+### Correções preparadas no código
+- `app/index.tsx`: agrupado cabeçalho + informações ambientais/rede; cidade, temperatura e condição têm tamanhos maiores, com o nome da cidade podendo ocupar até duas linhas no retrato e uma linha na paisagem; o cartão ambiental mantém valores `N/D`/opcional quando não houver observação válida.
+- O selo de rede reserva espaço maior e direciona para a página de conectividade existente. Um segundo nível de texto diferencia INTERNET OK, SEM INTERNET, OFFLINE e VERIFICANDO a partir do estado já informado pelo Android; a página detalhada continua exibindo os estados completos.
+- O contêiner do cockpit deixou de distribuir todas as secções com `space-between`; o espaço flexível foi concentrado abaixo das ações principais, mantendo a navegação no fim sem abrir grandes lacunas entre cabeçalho, rede e painel OBD.
+- As três ações principais receberam papel, nome e dica de acessibilidade explícitos, altura mínima de 54 dp e área de toque preservada. Os atalhos inferiores permanecem **somente com ícones**, conforme o contrato anterior, com ícones de 25 dp, alvo mínimo de 56 dp, feedback de toque e dicas para leitores de tela.
+- `src/ui/NetworkStatusIndicator.tsx`: aumentada a geração/rede para 12 dp e acrescentada segunda linha compacta que informa a disponibilidade da internet.
+- `tests/cockpitNavigation.test.js`: adicionadas regressões para hierarquia tipográfica da cidade/temperatura/condição, estado de internet, dimensões dos botões, dicas de acessibilidade e prevenção da distribuição vertical que criava lacunas.
+- `docs/CONTRATO_ANTI_REGRESSAO.md`: novo RG-15 protege legibilidade da rede/clima e áreas de toque sem acoplar a conectividade à ECU.
+- Nenhuma dependência nova, permissão, consulta OBD ou mecanismo de polling foi adicionado. O fluxo de rede continua informativo e não comanda a conexão Bluetooth/ELM327.
+
+### Commit, CI e limites
+- Esta atualização foi preparada no branch `fix/cockpit-flicker-restore-buttons-20261020`, dentro da PR #75, que continua aberta e não mesclada.
+- O hash do commit e a execução da CI serão registrados após a publicação e a consulta real do GitHub Actions; neste momento, TypeScript, testes, `gate:baseline` e `android-build` ainda não foram declarados aprovados para estas mudanças.
+- A CI anterior verde valida apenas seu próprio SHA; não substitui a execução desta alteração.
+- A inspeção das capturas fundamenta os problemas de legibilidade/espaçamento, mas a aparência final ainda exige instalação do APK e conferência no Android em retrato e paisagem, incluindo os toques reais dos três ícones inferiores.
+
+### Próximo passo
+Publicar uma alteração atômica de código + regressões + contrato + diário; consultar a CI do SHA exato. Corrigir qualquer falha pelo log e não fazer merge sem autorização explícita.
+
+
+## DB-087 · 2026-10-21 — Ajuste adicional de legibilidade da rede e tamanho dos botões principais
+
+### Problema observado
+A revisão da implementação DB-086 confirmou que o tipo de rede e o ícone foram ampliados, mas a linha secundária de disponibilidade da internet ainda usava fonte de 8 dp. Os botões principais tinham altura mínima de 54 dp e rótulo de 10 dp, deixando margem para melhorar leitura e toque sem recriar o espaçamento irregular.
+
+### Correção implementada
+- `src/ui/NetworkStatusIndicator.tsx`: ícone de rede ampliado de 18 para 20 dp, rótulo Wi-Fi/geração móvel de 12 para 13 dp e estado resumido da internet de 8 para 10 dp.
+- `app/index.tsx`: cartão de rede ampliado (64 dp de altura mínima) com dimensões compactas específicas para paisagem; botões principais agora têm altura mínima de 56 dp e texto de 11 dp.
+- `tests/cockpitNavigation.test.js`: protege os novos limites de tipografia, ícone e área dos botões nos dois modos de orientação.
+- `docs/CONTRATO_ANTI_REGRESSAO.md`: RG-15 passa a registrar os tamanhos mínimos e sua cobertura automatizada.
+- Sem novas dependências ou mudanças nas funções OBD, conexão Bluetooth, regras diagnósticas, consultas manuais, número de leituras dos testes ou fluxo offline.
+
+### Verificação e limites
+- Alterações escritas sequencialmente na branch `fix/cockpit-flicker-restore-buttons-20261020`; o SHA final e a execução de CI devem ser consultados no GitHub.
+- Não declarar validação local: este ambiente não tem acesso de rede para executar clone/instalação do repositório.
+- A CI precisa concluir `gate:baseline`, `validate` e `android-build` no SHA final antes de declarar a etapa automatizada aprovada.
+- Teste no aparelho Android segue separado: legibilidade real em 360 dp, orientação paisagem, TalkBack e funcionamento dos botões; a conectividade não pode interferir na sessão ELM327.
+
+### Próximo passo
+Conferir o SHA final e a CI da PR #75; corrigir qualquer falha indicada pelos logs. Não mesclar sem autorização explícita.
+
+
+## DB-088 · 2026-10-21 — Auditoria contra regressões, reconciliação das PRs fechadas e CI do conjunto combinado
+
+### Problema
+Os botões principais ainda foram reportados visualmente como texto sem aparência de botão e havia histórico recente de oscilação da conexão Bluetooth/ECU. O estado de PRs/CI precisava ser reconciliado antes de afirmar que as correções estavam no aplicativo principal.
+
+### Diagnóstico baseado no GitHub
+- O `main` consultado estava no commit `78b9ca71344ce3d100ad949c09f290b328f01eaa`, com correção de lifecycle Bluetooth já incorporada.
+- PR #74 (`a9668cf7d3759dfcaf1ef95ccf9f7684fb13ac03`) e PR #75 (`bd2e725a45fb2dce633377c1527bb0b389f86d5b`) estavam fechadas sem merge. A CI #2568 do head da PR #74 terminou com sucesso, mas isso não valida automaticamente o conjunto da PR #75 nem o seu merge em `main`.
+- Na branch de cockpit, a tela inicial usa dependências individuais das opções OBD no efeito de conexão, em vez do objeto `settings` inteiro; isso protege contra reinício da conexão quando o estado de configurações é recarregado como novo objeto.
+- O contrato anti-regressão e o gate executável protegem cinco leituras por PID, consulta manual/lista de PIDs, fila ELM327 serial, dono único da conexão inicial, funcionamento offline, GPS/viagens, histórico, tema, navegação em ambas as orientações e legibilidade/acessibilidade dos botões.
+
+### Ação desta rodada
+- Criada a branch `audit/anti-regression-ci-20261021` sobre a cabeça da branch de cockpit, incluindo o conjunto funcional de cinco leituras/consulta manual e as correções de cockpit, navegação e conectividade.
+- Atualizado este diário para registrar o estado real das PRs e o resultado da auditoria, sem declarar uma CI ainda não executada.
+- Será aberta uma PR de auditoria contra `main` para disparar a CI automática sobre o conjunto combinado. Não será feito merge sem autorização explícita.
+
+### Critérios de aceitação
+1. `gate:baseline` aprovado.
+2. `validate` aprovado, incluindo TypeScript e a suíte completa.
+3. `android-build` aprovado e APK standalone verificado.
+4. Revisar os logs de cada job se algum falhar; não reduzir testes nem alterar regras funcionais para mascarar falha.
+5. Depois da CI, validar no aparelho a renderização real dos três botões em retrato/paisagem e testar o ELM327 com o veículo parado. CI verde não comprova o teste físico.
+
+### Limitações atuais
+A inspeção estática confirma os contratos e a diferença entre branches, mas não comprova por si só o comportamento visual em um aparelho nem a estabilidade física da conexão Bluetooth/ECU. A rodada permanece pendente até a CI da nova PR terminar.
+
+
+## DB-089 · 2026-10-21 — Rotação automática da tela
+
+### Problema
+O usuário pediu que a interface acompanhe a rotação física do aparelho, mantendo o layout adaptável sem regressões na conexão Bluetooth/ECU.
+
+### Diagnóstico
+- `app.json` já declara `expo.orientation: "default"`, e o layout responsivo usa `useWindowDimensions()` via `useMidLayout()`.
+- A biblioteca oficial `expo-screen-orientation` tem versão compatível com Expo SDK 51: `~7.0.5`. O uso de `unlockAsync()` restaura a política `DEFAULT`, evitando que uma trava de orientação deixada pela navegação impeça retrato/paisagem.
+- A documentação do Expo informa que `OrientationLock.DEFAULT` deixa o Android decidir a orientação; portanto, o bloqueio global de rotação do próprio Android ainda pode impedir a mudança física.
+
+### Correção
+- Adicionada `expo-screen-orientation@~7.0.5` ao `package.json` e ao `package-lock.json`.
+- O layout raiz chama `ScreenOrientation.unlockAsync()` na inicialização e registra listener de orientação com cleanup.
+- Mantida a lógica responsiva centralizada existente (`useWindowDimensions()` / `useMidLayout()`); não foram adicionados bloqueios de retrato ou paisagem nem alterada a lógica OBD/Bluetooth.
+- O teste `tests/orientationLayout.test.js` agora protege a dependência, a liberação da orientação padrão e a limpeza do listener.
+
+### Testes / CI
+- Alteração preparada na branch `audit/anti-regression-ci-20261021`, dentro da PR #76.
+- A CI deve validar `gate:baseline`, `validate` e `android-build`. Nenhum resultado é declarado antes de os jobs terminarem.
+- O comportamento físico deve ser confirmado no aparelho com **Rotação automática** ativada nas configurações rápidas do Android.
+
+### Próximo passo
+Aguardar a CI da PR #76 após as últimas alterações; corrigir qualquer falha real de instalação, TypeScript, testes ou build antes de considerar a alteração pronta.

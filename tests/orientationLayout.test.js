@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 
 const appJson = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 const index = fs.readFileSync('app/index.tsx', 'utf8');
 const layout = fs.readFileSync('app/_layout.tsx', 'utf8');
 const midLayout = fs.readFileSync('src/ui/midLayout.ts', 'utf8');
@@ -14,6 +15,11 @@ const screenFiles = [
 
 // Expo's default orientation means no orientation lock; do not introduce a native portrait/landscape lock.
 assert.equal(appJson.expo.orientation, 'default');
+assert.equal(packageJson.dependencies['expo-screen-orientation'], '~7.0.5');
+assert.match(layout, /import \* as ScreenOrientation from 'expo-screen-orientation'/);
+assert.match(layout, /ScreenOrientation\.unlockAsync\(\)/, 'a inicialização deve remover travas de orientação e permitir retrato/paisagem');
+assert.match(layout, /addOrientationChangeListener/);
+assert.match(layout, /subscription\.remove\(\)/, 'listener de orientação deve ser removido no cleanup');
 assert.match(index, /useMidLayout\(\)/);
 assert.match(index, /layout\.landscape/);
 assert.doesNotMatch(index, /ScrollView/);
@@ -23,7 +29,19 @@ assert.match(index, /const rpmReading/);
 assert.match(index, /coolantValue/);
 assert.match(index, /setInterval\(\s*\(\) => setActiveHeroMetric/, 'a rotação automática deve usar um timer de ciclo de vida');
 assert.match(index, /10_000/);
-assert.match(index, /VELOCIDADE GPS/);
+assert.doesNotMatch(index, /VELOCIDADE GPS/, 'GPS não deve ocupar um dos quatro indicadores rotativos principais');
+assert.match(index, /label: 'TEMPERATURA DO MOTOR'/);
+assert.match(index, /label: 'VOLTAGEM DO SISTEMA'/);
+assert.match(index, /label: 'POSIÇÃO DA BORBOLETA'/);
+assert.match(index, /label: 'ROTAÇÃO DO MOTOR'/);
+const heroStart = index.indexOf('const heroMetrics = [');
+const heroEnd = index.indexOf('];', heroStart);
+assert.ok(heroStart >= 0 && heroEnd > heroStart, 'lista de indicadores rotativos deve existir');
+const heroBlock = index.slice(heroStart, heroEnd);
+assert.equal((heroBlock.match(/\{ label:/g) || []).length, 4, 'cockpit deve manter quatro indicadores rotativos');
+assert.doesNotMatch(index, /SAÚDE DO VEÍCULO|ABRIR CENTRAL DE SAÚDE/, 'não duplicar a central de saúde na página inicial');
+assert.match(index, /danger:\{color:'#fb7185'\}/, 'alerta térmico deve mudar a cor sem encolher o valor principal');
+assert.match(index, /!connectionStatus\.ecuConnected \? 'N\/D'/, 'não declarar ausência de DTC como normal sem ECU conectada');
 assert.match(index, /POSIÇÃO DA BORBOLETA/);
 assert.match(index, /VOLTAGEM DO SISTEMA/);
 assert.match(index, /heroSwitchHint/);

@@ -12,6 +12,7 @@ import { exportBluetoothDiagnosticTxt } from '../src/obd/exportBluetoothDiagnost
 import { AppSettings, readAppSettings, writeAppSettings } from '../src/database/appSettings';
 import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
 import { getMidLayout } from '../src/ui/midLayout';
+import { COLORS, SCREEN_TITLE_STYLE } from '../src/ui/theme';
 
 function formatTime(iso: string | null): string {
   if (!iso) return 'N/D';
@@ -108,7 +109,7 @@ export default function ConfiguracaoScreen() {
   }
 
   return (
-    <SafeAreaView style={{flex:1,backgroundColor:'#0b1220'}} edges={["top","bottom","left","right"]}>
+    <SafeAreaView style={{flex:1,backgroundColor:COLORS.screen}} edges={["top","bottom","left","right"]}>
     <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
       <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
       <Text style={styles.title}>CONFIGURAÇÕES</Text>
@@ -292,8 +293,8 @@ function SettingSwitch({ label, value, onChange }: { label: string; value: boole
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, paddingVertical: 16, backgroundColor: '#0b1220' },
-  title: { fontSize: 23, fontWeight: '900', color: '#7db3ff', letterSpacing: 0.5, marginBottom: 6 },
+  container: { flexGrow: 1, paddingVertical: 16, backgroundColor: COLORS.screen },
+  title: { ...SCREEN_TITLE_STYLE, marginBottom: 6 },
   section: { fontSize: 12, fontWeight: '900', color: '#7db3ff', letterSpacing: 0.8, marginTop: 16, marginBottom: 8 },
   status: { color: '#2563eb', fontWeight: '700', marginBottom: 12 },
   card: { backgroundColor: '#111c2e', borderRadius: 8, padding: 11, marginBottom: 9, borderWidth: 1, borderColor: '#243652' },

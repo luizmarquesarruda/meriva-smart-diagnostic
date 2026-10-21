@@ -13,13 +13,16 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "prebuild": "expo prebuild --clean",
-    "test": "node tests/liveTelemetry.test.js && node tests/dtcScanner.test.js && node tests/permissions.test.js && node tests/cockpitNavigation.test.js && node tests/orientationLayout.test.js && node tests/knowledgeJson.test.js && node tests/bluetoothConfig.test.js && node tests/bluetoothState.test.js && node tests/ecuHealth.test.js && node tests/bluetoothLifecycle.test.js && node tests/merivaAutosave.test.js && node tests/regression.test.js && node tests/gps.test.js && node tests/backgroundExecution.test.js && node tests/fuelConsumption.test.js && node tests/fuelIdentification.test.js && node tests/autosaveTxtFormatter.test.js && node tests/tripRecorder.test.js && node tests/elm327Compatibility.test.js && node tests/diagnosticEngine.test.js && node tests/sensorTestEngine.test.js",
+    "test": "node tests/screenTheme.test.js && node tests/onlineConditions.test.js && node tests/connectivity.test.js && node tests/liveTelemetry.test.js && node tests/dtcScanner.test.js && node tests/permissions.test.js && node tests/cockpitNavigation.test.js && node tests/orientationLayout.test.js && node tests/knowledgeJson.test.js && node tests/bluetoothConfig.test.js && node tests/bluetoothState.test.js && node tests/ecuHealth.test.js && node tests/bluetoothLifecycle.test.js && node tests/merivaAutosave.test.js && node tests/regression.test.js && node tests/gps.test.js && node tests/backgroundExecution.test.js && node tests/fuelConsumption.test.js && node tests/fuelIdentification.test.js && node tests/autosaveTxtFormatter.test.js && node tests/tripRecorder.test.js && node tests/elm327Compatibility.test.js && node tests/diagnosticEngine.test.js && node tests/sensorTestEngine.test.js",
     "build:apk": "eas build --platform android --profile preview",
     "build:production": "eas build --platform android --profile production",
     "doctor": "npx expo-doctor",
-    "validate": "npm run typecheck && npm test"
+    "validate": "npm run typecheck && npm test",
+    "gate:baseline": "node tests/projectBaseline.test.js"
   },
   "dependencies": {
+    "@expo/vector-icons": "14.1.0",
+    "@react-native-community/netinfo": "11.3.1",
     "expo": "~51.0.39",
     "expo-file-system": "~17.0.1",
     "expo-keep-awake": "~13.0.2",
@@ -33,7 +36,9 @@
     "expo-location": "~17.0.1",
     "expo-linking": "~6.3.1",
     "expo-status-bar": "~1.12.1",
-    "expo-task-manager": "~11.8.2"
+    "expo-task-manager": "~11.8.2",
+    "expo-font": "~12.0.10",
+    "expo-screen-orientation": "~7.0.5"
   },
   "devDependencies": {
     "@babel/core": "^7.0.0",

@@ -14,6 +14,7 @@ import { getDtcDefinition } from '../src/obd/dtcDefinition';
 import { getSharedObdConnection, getSharedObdStatus, setSharedObdConnection, subscribeSharedObd, disconnectSharedObd } from '../src/obd/sharedConnection';
 import { autoTripService } from '../src/trip/autoTripService';
 import { getMidLayout } from '../src/ui/midLayout';
+import { COLORS, SCREEN_TITLE_STYLE } from '../src/ui/theme';
 import { scanDtcServices, readFreezeFrame, type DtcServiceScan } from '../src/obd/dtcScanner';
 import { getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
 
@@ -40,6 +41,7 @@ export default function LaboratorioScreen() {
   const [mode, setMode] = useState<Mode>('REAL');
   const [devices, setDevices] = useState<BluetoothDeviceInfo[]>([]);
   const [pid, setPid] = useState('010C');
+  const [queriedPid, setQueriedPid] = useState('010C');
   const [tx, setTx] = useState('');
   const [rx, setRx] = useState('');
   const [elapsedMs, setElapsedMs] = useState<number | null>(null);
@@ -85,12 +87,14 @@ export default function LaboratorioScreen() {
       }
       sessionRef.current = connection.session;
       setProtocol(connection.protocol ?? 'N/D');
+      if (connection.supportedPids?.length) setSupportedPids(connection.supportedPids);
       setStatus('ELM RESPONDENDO / CONEXÃO AUTOMÁTICA');
     });
     const existing = getSharedObdConnection();
     if (existing) {
       sessionRef.current = existing.session;
       setProtocol(existing.protocol ?? 'N/D');
+      if (existing.supportedPids?.length) setSupportedPids(existing.supportedPids);
     }
 
     let mounted = true;
@@ -101,6 +105,8 @@ export default function LaboratorioScreen() {
         if (mounted) {
           setStorageReady(true);
           setProtocol(state.obd.protocol ?? 'N/D');
+          const persistedPids = state.pidDiscovery?.supportedPids ?? [];
+          if (persistedPids.length) setSupportedPids((current) => current.length ? current : persistedPids);
           setStatus('BLUETOOTH PRONTO PARA TESTE');
         }
       })
@@ -268,19 +274,25 @@ export default function LaboratorioScreen() {
     setError('');
     setStatus(mode === 'SIMULACAO' ? 'SIMULAÇÃO LOCAL: CONSULTANDO' : 'ECU CONSULTANDO');
     try {
+      const normalizedPid = pid.replace(/\s/g, '').toUpperCase();
+      if (!/^01[0-9A-F]{2}$/.test(normalizedPid)) {
+        throw new Error('PID inválido. Use um código Mode 01 com quatro dígitos hexadecimais, por exemplo 010C.');
+      }
+      setPid(normalizedPid);
       const activeSession = mode === 'SIMULACAO' ? simulationSession : sessionRef.current;
       if (mode === 'REAL' && !canPollObd(getSharedObdStatus().lifecycle)) {
         throw new Error('DIAGNÓSTICO AINDA NÃO ESTÁ PRONTO. AGUARDE BLUETOOTH, ELM327 E ECU.');
       }
       if (!activeSession) throw new Error('CONECTE AO ELM327 ANTES DE TESTAR O PID');
       const result = mode === 'REAL'
-        ? await autoTripService.withPollingPaused(() => activeSession.queryPid(pid))
-        : await activeSession.queryPid(pid);
+        ? await autoTripService.withPollingPaused(() => activeSession.queryPid(normalizedPid))
+        : await activeSession.queryPid(normalizedPid);
 
       await registerObdQuery(getBasePath(), result, mode);
 
       setTx(result.tx);
       setRx(result.rx);
+      setQueriedPid(normalizedPid);
       setElapsedMs(result.elapsedMs);
       setProtocol(result.protocol ?? 'N/D');
       setStatus(
@@ -472,7 +484,7 @@ export default function LaboratorioScreen() {
     }
   }
 
-  const parsed = rx ? parsePidResponse(pid, rx) : null;
+  const parsed = rx ? parsePidResponse(queriedPid, rx) : null;
   const knownSupported = supportedPids.filter((value) => KNOWN_PIDS.includes(value));
   const identifiedSupportedPids = supportedPids.map((value) => ({ pid: value, definition: getPidDefinition(value) }));
   const diagnostic: DiagnosticResult = runLocalDiagnostic({
@@ -490,7 +502,7 @@ export default function LaboratorioScreen() {
   });
 
   return (
-    <SafeAreaView style={{flex:1,backgroundColor:'#eef3fb'}} edges={["top","bottom","left","right"]}>
+    <SafeAreaView style={{flex:1,backgroundColor:COLORS.screen}} edges={["top","bottom","left","right"]}>
     <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
       <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
       <Text style={styles.title}>DIAGNÓSTICO OBD</Text>
@@ -570,16 +582,17 @@ export default function LaboratorioScreen() {
       </TouchableOpacity>
       {!!supportedPids.length ? (
         <View style={styles.pidPanel}>
-          <Text style={styles.dtcTitle}>PIDs ENCONTRADOS NA ECU</Text>
+          <Text style={styles.dtcTitle}>PIDs REGISTRADOS / DESCOBERTOS</Text>
+          <Text style={styles.pidDescription}>Toque em um código para preencher a consulta manual. A lista pode vir da descoberta atual ou do cache salvo; confirme a resposta real antes de tratar o PID como suportado na sessão atual.</Text>
           {identifiedSupportedPids.map(({ pid: value, definition }) => (
-            <View key={value} style={styles.pidRow}>
+            <TouchableOpacity key={value} style={styles.pidRow} onPress={() => setPid(value)} accessibilityRole="button" accessibilityLabel={'Usar PID '+value+' na consulta manual'}>
               <Text style={styles.pidCode}>{value}</Text>
               <View style={{ flex: 1 }}>
                 <Text style={styles.pidName}>{definition?.name ?? 'PID sem definição local'}</Text>
                 <Text style={styles.pidDescription}>{definition?.description ?? 'A ECU informou este PID como suportado, mas o catálogo local ainda não possui decodificação deste identificador.'}</Text>
                 <Text style={styles.pidMeta}>{definition ? definition.unit + ' • ' + definition.classification : 'DESCONHECIDO'}</Text>
               </View>
-            </View>
+            </TouchableOpacity>
           ))}
         </View>
       ) : null}
@@ -669,79 +682,79 @@ export default function LaboratorioScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, paddingVertical: 16, backgroundColor: '#eef3fb' },
-  title: { fontSize: 22, fontWeight: '900', color: '#1557a6', letterSpacing: 0.5, marginBottom: 6 },
-  status: { color: '#2563eb', fontWeight: '700', marginBottom: 6 },
-  protocol: { color: '#475569', fontWeight: '600', marginBottom: 8 },
+  container: { flexGrow: 1, paddingVertical: 16, backgroundColor: COLORS.screen },
+  title: { ...SCREEN_TITLE_STYLE, marginBottom: 6 },
+  status: { color: COLORS.primary, fontWeight: '700', marginBottom: 6 },
+  protocol: { color: COLORS.textMuted, fontWeight: '600', marginBottom: 8 },
   connectionSummary: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
-  connectionItem: { flexGrow: 1, flexBasis: 110, minWidth: 110, backgroundColor: '#fff', borderRadius: 7, borderWidth: 1, borderColor: '#d1d9e2', padding: 9 },
-  connectionLabel: { color: '#64748b', fontSize: 9, fontWeight: '900' },
-  connectionValue: { color: '#1f2937', fontSize: 12, fontWeight: '900', marginTop: 3 },
+  connectionItem: { flexGrow: 1, flexBasis: 110, minWidth: 110, backgroundColor: COLORS.surface, borderRadius: 7, borderWidth: 1, borderColor: COLORS.border, padding: 9 },
+  connectionLabel: { color: COLORS.textSubtle, fontSize: 9, fontWeight: '900' },
+  connectionValue: { color: COLORS.text, fontSize: 12, fontWeight: '900', marginTop: 3 },
   modeRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
   rowLandscape: { alignItems: 'stretch' },
   flexButton: { flex: 1 },
   tripPanelLandscape: { padding: 14 },
   tripGridLandscape: { flexWrap: 'nowrap', gap: 12 },
   commandCardLandscape: { maxWidth: 620 },
-  modeButton: { flex: 1, padding: 10, borderRadius: 7, borderWidth: 1, borderColor: '#94a3b8', alignItems: 'center' },
-  modeText: { color: '#1f2937', fontWeight: '900', fontSize: 11 },
-  active: { backgroundColor: '#dbeafe', borderColor: '#2563eb' },
-  simActive: { backgroundColor: '#fef3c7', borderColor: '#d97706' },
-  commandCard: { backgroundColor: '#fff', borderRadius: 8, padding: 11, marginBottom: 10, borderWidth: 1, borderColor: '#d1d9e2' },
-  commandTitle: { color: '#1f2937', fontSize: 12, fontWeight: '900', marginBottom: 7 },
+  modeButton: { flex: 1, padding: 10, borderRadius: 7, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center' },
+  modeText: { color: COLORS.text, fontWeight: '900', fontSize: 11 },
+  active: { backgroundColor: '#152a45', borderColor: '#2563eb' },
+  simActive: { backgroundColor: '#352b16', borderColor: COLORS.warning },
+  commandCard: { backgroundColor: COLORS.surface, borderRadius: 8, padding: 11, marginBottom: 10, borderWidth: 1, borderColor: COLORS.border },
+  commandTitle: { color: COLORS.text, fontSize: 12, fontWeight: '900', marginBottom: 7 },
   button: { backgroundColor: '#1557a6', borderRadius: 7, padding: 13, alignItems: 'center', marginBottom: 9 },
-  secondaryButton: { backgroundColor: '#fff', borderColor: '#94a3b8', borderWidth: 1, borderRadius: 7, padding: 12, alignItems: 'center', marginBottom: 9 },
-  secondaryButtonText: { color: '#1f2937', fontWeight: '700' },
+  secondaryButton: { backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1, borderRadius: 7, padding: 12, alignItems: 'center', marginBottom: 9 },
+  secondaryButtonText: { color: COLORS.text, fontWeight: '700' },
   disconnect: { backgroundColor: '#64748b' },
-  buttonText: { color: '#fff', fontWeight: '700' },
-  device: { backgroundColor: '#fff', borderRadius: 10, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: '#cbd5e1' },
+  buttonText: { color: COLORS.textStrong, fontWeight: '700' },
+  device: { backgroundColor: COLORS.surface, borderRadius: 10, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: COLORS.border },
   selected: { borderColor: '#2563eb', borderWidth: 2 },
-  deviceName: { fontWeight: '700', color: '#1f2937' },
-  warning: { color: '#b45309', marginBottom: 12 },
-  input: { backgroundColor: '#fff', borderColor: '#cbd5e1', borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 12, color: '#0f172a' },
-  tripPanel: { backgroundColor: '#fff', borderRadius: 10, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#cbd5e1' },
+  deviceName: { fontWeight: '700', color: COLORS.text },
+  warning: { color: COLORS.warning, marginBottom: 12 },
+  input: { backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 12, color: COLORS.text },
+  tripPanel: { backgroundColor: COLORS.surface, borderRadius: 10, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: COLORS.border },
   tripHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  tripTitle: { color: '#1f2937', fontWeight: '900', fontSize: 14 },
+  tripTitle: { color: COLORS.text, fontWeight: '900', fontSize: 14 },
   tripGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   tripMetric: { width: '48%', marginBottom: 8 },
   tripMetricLandscape: { width: '23%', marginBottom: 0 },
-  tripLabel: { color: '#64748b', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
-  tripValue: { color: '#1f2937', fontWeight: '800', fontSize: 16, marginTop: 2 },
-  live: { color: '#15803d', fontWeight: '900', fontSize: 10 },
-  muted: { color: '#64748b', fontWeight: '900', fontSize: 10 },
-  tripHelp: { color: '#64748b', fontSize: 11, marginTop: 2 },
-  aiPanel: { backgroundColor: '#fff', borderRadius: 10, padding: 13, marginBottom: 10, borderWidth: 1, borderColor: '#93c5fd' },
+  tripLabel: { color: COLORS.textSubtle, fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+  tripValue: { color: COLORS.text, fontWeight: '800', fontSize: 16, marginTop: 2 },
+  live: { color: COLORS.success, fontWeight: '900', fontSize: 10 },
+  muted: { color: COLORS.textSubtle, fontWeight: '900', fontSize: 10 },
+  tripHelp: { color: COLORS.textSubtle, fontSize: 11, marginTop: 2 },
+  aiPanel: { backgroundColor: COLORS.surface, borderRadius: 10, padding: 13, marginBottom: 10, borderWidth: 1, borderColor: '#315579' },
   aiHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  aiTitle: { color: '#1557a6', fontWeight: '900', fontSize: 14 },
-  aiEngine: { color: '#64748b', fontSize: 9, fontWeight: '800' },
-  hypothesis: { borderTopWidth: 1, borderTopColor: '#dbeafe', paddingTop: 9, marginTop: 8 },
-  hypothesisTitle: { color: '#1f2937', fontWeight: '900', fontSize: 14 },
-  hypothesisConfidence: { color: '#2563eb', fontWeight: '800', fontSize: 11, marginTop: 3 },
-  aiLine: { color: '#334155', fontSize: 11, marginTop: 4 },
-  aiMuted: { color: '#64748b', fontSize: 11 },
-  aiWarning: { color: '#b45309', fontWeight: '800', fontSize: 11, marginTop: 9 },
-  aiDisclaimer: { color: '#64748b', fontSize: 10, marginTop: 9 },
-  dtcPanel: { backgroundColor: '#fff', borderRadius: 10, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#cbd5e1' },
-  dtcTitle: { color: '#1557a6', fontSize: 13, fontWeight: '900', marginBottom: 6 },
-  dtcRow: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingVertical: 8 },
-  dtcKind: { color: '#334155', flexShrink: 1, fontSize: 10, fontWeight: '900' },
-  dtcCodes: { color: '#64748b', fontSize: 10, marginTop: 3 },
-  dtcAvailable: { color: '#15803d', fontSize: 8, fontWeight: '900' },
-  dtcUnavailable: { color: '#b45309', fontSize: 8, fontWeight: '900' },
-  dtcHint: { color: '#64748b', fontSize: 9, lineHeight: 14, marginTop: 7 },
-  dtcDetails: { marginTop: 10, borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingTop: 8 },
-  dtcDetailRow: { flexDirection: 'row', gap: 8, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#eef2f7' },
-  dtcDetailCode: { color: '#1557a6', fontWeight: '900', fontSize: 12, width: 52 },
-  dtcDetailName: { color: '#1f2937', fontWeight: '900', fontSize: 11 },
-  dtcDetailText: { color: '#64748b', fontSize: 9, lineHeight: 14, marginTop: 2 },
-  pidPanel: { backgroundColor: '#fff', borderRadius: 10, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#93c5fd' },
-  pidRow: { flexDirection: 'row', gap: 9, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#e2e8f0' },
-  pidCode: { color: '#1557a6', fontWeight: '900', fontSize: 11, width: 42 },
-  pidName: { color: '#1f2937', fontWeight: '900', fontSize: 11 },
-  pidDescription: { color: '#64748b', fontSize: 9, lineHeight: 14, marginTop: 2 },
-  pidMeta: { color: '#2563eb', fontSize: 8, fontWeight: '800', marginTop: 3 },
-  panel: { backgroundColor: '#1f2937', borderRadius: 14, padding: 16, marginTop: 8 },
-  label: { color: '#93c5fd', marginTop: 8 },
+  aiTitle: { color: COLORS.accent, fontWeight: '900', fontSize: 14 },
+  aiEngine: { color: COLORS.textSubtle, fontSize: 9, fontWeight: '800' },
+  hypothesis: { borderTopWidth: 1, borderTopColor: COLORS.border, paddingTop: 9, marginTop: 8 },
+  hypothesisTitle: { color: COLORS.text, fontWeight: '900', fontSize: 14 },
+  hypothesisConfidence: { color: COLORS.primary, fontWeight: '800', fontSize: 11, marginTop: 3 },
+  aiLine: { color: '#c2d0df', fontSize: 11, marginTop: 4 },
+  aiMuted: { color: COLORS.textSubtle, fontSize: 11 },
+  aiWarning: { color: COLORS.warning, fontWeight: '800', fontSize: 11, marginTop: 9 },
+  aiDisclaimer: { color: COLORS.textSubtle, fontSize: 10, marginTop: 9 },
+  dtcPanel: { backgroundColor: COLORS.surface, borderRadius: 10, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: COLORS.border },
+  dtcTitle: { color: COLORS.accent, fontSize: 13, fontWeight: '900', marginBottom: 6 },
+  dtcRow: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: COLORS.border, paddingVertical: 8 },
+  dtcKind: { color: '#c2d0df', flexShrink: 1, fontSize: 10, fontWeight: '900' },
+  dtcCodes: { color: COLORS.textSubtle, fontSize: 10, marginTop: 3 },
+  dtcAvailable: { color: COLORS.success, fontSize: 8, fontWeight: '900' },
+  dtcUnavailable: { color: COLORS.warning, fontSize: 8, fontWeight: '900' },
+  dtcHint: { color: COLORS.textSubtle, fontSize: 9, lineHeight: 14, marginTop: 7 },
+  dtcDetails: { marginTop: 10, borderTopWidth: 1, borderTopColor: COLORS.border, paddingTop: 8 },
+  dtcDetailRow: { flexDirection: 'row', gap: 8, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#203854' },
+  dtcDetailCode: { color: COLORS.accent, fontWeight: '900', fontSize: 12, width: 52 },
+  dtcDetailName: { color: COLORS.text, fontWeight: '900', fontSize: 11 },
+  dtcDetailText: { color: COLORS.textSubtle, fontSize: 9, lineHeight: 14, marginTop: 2 },
+  pidPanel: { backgroundColor: COLORS.surface, borderRadius: 10, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#315579' },
+  pidRow: { flexDirection: 'row', gap: 9, paddingVertical: 8, borderTopWidth: 1, borderTopColor: COLORS.border },
+  pidCode: { color: COLORS.accent, fontWeight: '900', fontSize: 11, width: 42 },
+  pidName: { color: COLORS.text, fontWeight: '900', fontSize: 11 },
+  pidDescription: { color: COLORS.textSubtle, fontSize: 9, lineHeight: 14, marginTop: 2 },
+  pidMeta: { color: COLORS.primary, fontSize: 8, fontWeight: '800', marginTop: 3 },
+  panel: { backgroundColor: COLORS.surface, borderRadius: 14, padding: 16, marginTop: 8 },
+  label: { color: COLORS.accent, marginTop: 8 },
   value: { color: '#f8fafc', fontSize: 16, marginTop: 3 },
-  error: { color: '#c2410c', marginTop: 16 },
+  error: { color: COLORS.danger, marginTop: 16 },
 });

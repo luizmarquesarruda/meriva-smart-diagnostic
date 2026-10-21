@@ -9,8 +9,23 @@ import * as FileSystem from 'expo-file-system';
 import { autoTripService } from '../src/trip/autoTripService';
 import { requestAllRequiredPermissions } from '../src/permissions/permissionManager';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import * as ScreenOrientation from 'expo-screen-orientation';
+import { COLORS } from '../src/ui/theme';
 
 export default function RootLayout() {
+  // Libera retrato/paisagem conforme a orientação suportada pelo sistema.
+  // useWindowDimensions/useMidLayout recalculam os componentes quando a janela muda.
+  useEffect(() => {
+    void ScreenOrientation.unlockAsync().catch((error) => {
+      console.warn('[ScreenOrientation] Não foi possível restaurar orientação padrão:', error);
+    });
+
+    const subscription = ScreenOrientation.addOrientationChangeListener(({ orientationInfo }) => {
+      console.info('[ScreenOrientation] Orientação alterada:', orientationInfo.orientation);
+    });
+
+    return () => subscription.remove();
+  }, []);
   // Ativa o bloqueio de tela de forma explícita e o restaura quando o app volta ao primeiro plano.
   useEffect(() => {
     const tag = 'meriva-smart-diagnostic-active';
@@ -102,13 +117,14 @@ export default function RootLayout() {
     <SafeAreaProvider>
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: '#d9d9d9' },
-        headerTintColor: '#1557a6',
+        headerStyle: { backgroundColor: COLORS.screen },
+        headerTintColor: COLORS.accent,
         headerTitleStyle: { fontWeight: '900' },
       }}
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="bluetooth" options={{ headerShown: false }} />
+      <Stack.Screen name="conectividade" options={{ headerShown: false }} />
       <Stack.Screen name="laboratorio" options={{ title: 'DIAGNÓSTICO OBD' }} />
       <Stack.Screen name="armazenamento" options={{ title: 'HISTÓRICO E DADOS' }} />
       <Stack.Screen name="configuracoes" options={{ title: 'CONFIGURAÇÕES' }} />
