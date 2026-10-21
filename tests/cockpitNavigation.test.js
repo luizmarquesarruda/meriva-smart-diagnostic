@@ -25,7 +25,7 @@ assert.doesNotMatch(index, /<Text style=\{styles\.bottomNavText\}>/, 'navegaçã
 assert.match(index, /bottomNavItem:\{[^}]*minHeight:56/, 'atalhos inferiores devem ter área de toque de 56 dp');
 assert.match(index, /accessibilityLabel="Mais recursos"/, 'botão sem legenda visual precisa de nome acessível');
 assert.match(index, /accessibilityHint="Abre os módulos adicionais do aplicativo"/, 'atalho Mais precisa explicar a ação ao leitor de tela');
-assert.match(index, /dashboardAction:\{[^}]*minHeight:54/, 'ações principais devem ter altura tátil mínima explícita');
+assert.match(index, /dashboardAction:\{[^}]*minHeight:56/, 'ações principais devem ter altura tátil mínima de 56 dp');
 assert.match(index, /accessibilityLabel="Abrir laboratório de diagnóstico OBD"/, 'ação de diagnóstico deve ter nome acessível explícito');
 assert.match(index, /accessibilityLabel="Abrir dados em tempo real"/, 'ação de dados deve ter nome acessível explícito');
 assert.match(index, /weatherCity:\{[^}]*fontSize:15/, 'cidade/clima deve estar em tamanho legível no retrato');
@@ -34,12 +34,15 @@ assert.match(index, /weatherCity:\{[^}]*lineHeight:18/, 'quebra de linha da cida
 assert.match(index, /weatherTemperature:\{[^}]*fontSize:24/, 'temperatura do clima deve ter destaque visual');
 assert.match(index, /weatherDescription:\{[^}]*fontSize:12/, 'condição meteorológica deve ser legível');
 assert.match(index, /infoStrip:\{[^}]*minHeight:88/, 'cartão de informações online deve reservar área para os dados');
-assert.match(index, /networkChip:\{[^}]*minHeight:60/, 'atalho da rede deve ser maior que o chip anterior');
+assert.match(index, /networkChip:\{[^}]*minHeight:64/, 'atalho da rede deve ter altura ampliada para melhorar a leitura');
 assert.doesNotMatch(index, /screenFrame:\{[^}]*justifyContent:'space-between'/, 'layout não deve espalhar a rede e o cockpit com grandes lacunas');
 assert.match(index, /layoutSpacer:\{flexGrow:1,minHeight:8/, 'a navegação deve permanecer abaixo do conteúdo sem espaçamentos artificiais entre cartões');
 const networkIndicator = read('src/ui/NetworkStatusIndicator.tsx');
-assert.match(networkIndicator, /label: \{ fontSize: 12/, 'geração Wi-Fi/4G/5G deve ser legível no cockpit');
-assert.match(networkIndicator, /internetStatus: \{ fontSize: 8/, 'selo deve mostrar o estado da internet em uma segunda linha');
+assert.match(networkIndicator, /label: \{ fontSize: 13/, 'geração Wi-Fi/4G/5G deve ter maior legibilidade no cockpit');
+assert.match(networkIndicator, /AppIcon name=\{presentation\.icon\} size=\{20\}/, 'ícone da rede deve ficar visível sem dominar o cartão');
+assert.match(index, /buttonText:\{[^}]*fontSize:11/, 'texto dos botões principais deve ficar legível');
+assert.match(index, /networkChipLandscape:\{[^}]*minHeight:50,[^}]*maxWidth:92/, 'cartão de rede permanece compacto em paisagem');
+assert.match(networkIndicator, /internetStatus: \{ fontSize: 10/, 'estado da internet deve usar tipografia legível em uma segunda linha');
 assert.match(networkIndicator, /INTERNET OK/);
 assert.match(networkIndicator, /SEM INTERNET/);
 assert.ok(index.includes('href="/conectividade"'), 'cockpit deve expor conectividade 4G/5G');
