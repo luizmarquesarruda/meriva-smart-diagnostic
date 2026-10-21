@@ -33,6 +33,7 @@ const requiredSuites = [
   'sensorTestEngine.test.js',
   'knowledgeJson.test.js',
   'cockpitNavigation.test.js',
+  'startupProgress.test.js',
   'orientationLayout.test.js',
   'liveTelemetry.test.js',
   'bluetoothLifecycle.test.js',
@@ -111,6 +112,15 @@ for (const label of [
 assert.match(home, /10_000/);
 assert.ok(read('app/mais.tsx').includes('CONSULTA MANUAL DE PID'), 'atalho de consulta manual precisa existir');
 assert.ok(read('app/laboratorio.tsx').includes('PIDs REGISTRADOS / DESCOBERTOS'), 'lista de PIDs precisa continuar acessível');
+
+const startupProgress = read('src/ui/startupProgress.ts');
+const startupScreen = read('src/ui/StartupScreen.tsx');
+assert.match(startupProgress, /STARTUP_MIN_DURATION_MS = 6_000/);
+assert.match(startupProgress, /STARTUP_TIMEOUT_MS = 30_000/);
+assert.match(home, /<StartupScreen progress=\{startupProgress\} \/>/);
+assert.match(home, /useState\(\(\) => !startupScreenConsumed\)/);
+assert.match(startupScreen, /accessibilityRole="progressbar"/);
+assert.doesNotMatch(startupScreen, /connectPreferredElm/, 'tela de abertura não pode iniciar uma segunda sessão OBD');
 
 assert.match(theme, /SCREEN_TITLE_STYLE/);
 assert.match(read('tests/screenTheme.test.js'), /Shared screen theme and title contract/);
