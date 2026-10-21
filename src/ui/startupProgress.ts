@@ -85,7 +85,7 @@ export function getStartupProgress(input: StartupProgressInput): StartupProgress
   if (input.ecuConnected) {
     if (preflight.status === 'complete') {
       const unsupported = preflight.unsupportedPids.length;
-      const detail = preflight.verifiedPids.length + ' PIDs essenciais verificados com cinco respostas válidas cada.'
+      const detail = 'ECU validada. ' + preflight.verifiedPids.length + ' PIDs essenciais verificados com cinco respostas válidas cada.'
         + (unsupported ? ' ' + unsupported + ' PID(s) não anunciado(s) pela ECU foram ignorados.' : '')
         + ' A conexão ECU será mantida ao abrir o painel.';
       return stage(100, 'APLICATIVO PRONTO', detail, 'ready');
