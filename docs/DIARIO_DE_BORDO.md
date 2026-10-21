@@ -6,10 +6,10 @@
 
 ### Estado atual do trabalho
 - Repositório: `luizmarquesarruda/meriva-smart-diagnostic`.
-- Branch de trabalho: `fix/cockpit-flicker-restore-buttons-20261020`.
-- PR #75: aberta e **não mesclada**; PR #74 é a base funcional e também permanece aberta. Não fazer merge sem autorização explícita. Nenhum merge pode ser feito sem autorização explícita do usuário.
-- O SHA e o estado da CI no diário são apenas registros históricos. Para este trabalho, a autoridade vigente é a cabeça real da PR #75 (correção do cockpit), consultada junto à última CI desse SHA. A PR #74 é a base funcional empilhada e permanece aberta; não mesclar nenhuma delas sem autorização explícita.
-- Esta camada adiciona um teste executável e um passo visível no workflow; não modifica a lógica de leitura OBD, o transporte Bluetooth nem as regras diagnósticas.
+- Branch de auditoria: `audit/anti-regression-ci-20261021`, criada sobre o head da antiga branch de cockpit `bd2e725a45fb2dce633377c1527bb0b389f86d5b`.
+- Situação verificada em 2026-10-21: PR #74 e PR #75 estão **fechadas sem merge**; portanto, as correções dessas branches não devem ser presumidas como presentes no `main`.
+- Head consultado do `main`: `78b9ca71344ce3d100ad949c09f290b328f01eaa`. O código do `main` ainda tinha o efeito de conexão da tela inicial dependente do objeto `settings` inteiro; a branch auditada restringe as dependências às opções OBD relevantes, reduzindo reinícios causados por recarga de configurações.
+- Nenhum merge está autorizado. A CI da nova PR deve validar o conjunto combinado contra `main`; só aceitar se `gate:baseline`, `validate` e `android-build` concluírem com sucesso.
 
 ### Contratos que não podem regredir
 1. **Testes de sensores:** cinco tentativas sequenciais por PID e cinco respostas válidas para uma avaliação numérica. Calcular a média aritmética das cinco amostras válidas. Resposta ausente, inválida ou timeout não vira zero e não conta como leitura válida; amostragem incompleta = inconclusiva/sem resposta, nunca aprovada.
@@ -116,6 +116,7 @@
 - **DB-085** · 2026-10-21 — Atualização manual da rede e validação do sinal informado pelo Android
 - **DB-086** · 2026-10-21 — Cockpit: informações de rede/clima legíveis e botões com áreas de toque ampliadas
 - **DB-087** · 2026-10-21 — Ajuste adicional de legibilidade da rede e tamanho dos botões principais
+- **DB-088** · 2026-10-21 — Auditoria contra regressões, reconciliação das PRs fechadas e CI do conjunto combinado
 
 ---
 
@@ -3003,3 +3004,30 @@ A revisão da implementação DB-086 confirmou que o tipo de rede e o ícone for
 
 ### Próximo passo
 Conferir o SHA final e a CI da PR #75; corrigir qualquer falha indicada pelos logs. Não mesclar sem autorização explícita.
+
+
+## DB-088 · 2026-10-21 — Auditoria contra regressões, reconciliação das PRs fechadas e CI do conjunto combinado
+
+### Problema
+Os botões principais ainda foram reportados visualmente como texto sem aparência de botão e havia histórico recente de oscilação da conexão Bluetooth/ECU. O estado de PRs/CI precisava ser reconciliado antes de afirmar que as correções estavam no aplicativo principal.
+
+### Diagnóstico baseado no GitHub
+- O `main` consultado estava no commit `78b9ca71344ce3d100ad949c09f290b328f01eaa`, com correção de lifecycle Bluetooth já incorporada.
+- PR #74 (`a9668cf7d3759dfcaf1ef95ccf9f7684fb13ac03`) e PR #75 (`bd2e725a45fb2dce633377c1527bb0b389f86d5b`) estavam fechadas sem merge. A CI #2568 do head da PR #74 terminou com sucesso, mas isso não valida automaticamente o conjunto da PR #75 nem o seu merge em `main`.
+- Na branch de cockpit, a tela inicial usa dependências individuais das opções OBD no efeito de conexão, em vez do objeto `settings` inteiro; isso protege contra reinício da conexão quando o estado de configurações é recarregado como novo objeto.
+- O contrato anti-regressão e o gate executável protegem cinco leituras por PID, consulta manual/lista de PIDs, fila ELM327 serial, dono único da conexão inicial, funcionamento offline, GPS/viagens, histórico, tema, navegação em ambas as orientações e legibilidade/acessibilidade dos botões.
+
+### Ação desta rodada
+- Criada a branch `audit/anti-regression-ci-20261021` sobre a cabeça da branch de cockpit, incluindo o conjunto funcional de cinco leituras/consulta manual e as correções de cockpit, navegação e conectividade.
+- Atualizado este diário para registrar o estado real das PRs e o resultado da auditoria, sem declarar uma CI ainda não executada.
+- Será aberta uma PR de auditoria contra `main` para disparar a CI automática sobre o conjunto combinado. Não será feito merge sem autorização explícita.
+
+### Critérios de aceitação
+1. `gate:baseline` aprovado.
+2. `validate` aprovado, incluindo TypeScript e a suíte completa.
+3. `android-build` aprovado e APK standalone verificado.
+4. Revisar os logs de cada job se algum falhar; não reduzir testes nem alterar regras funcionais para mascarar falha.
+5. Depois da CI, validar no aparelho a renderização real dos três botões em retrato/paisagem e testar o ELM327 com o veículo parado. CI verde não comprova o teste físico.
+
+### Limitações atuais
+A inspeção estática confirma os contratos e a diferença entre branches, mas não comprova por si só o comportamento visual em um aparelho nem a estabilidade física da conexão Bluetooth/ECU. A rodada permanece pendente até a CI da nova PR terminar.
