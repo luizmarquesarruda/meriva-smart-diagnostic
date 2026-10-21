@@ -29,9 +29,11 @@ assert.match(index, /dashboardAction:\{[^}]*minHeight:54/, 'ações principais d
 assert.match(index, /accessibilityLabel="Abrir laboratório de diagnóstico OBD"/, 'ação de diagnóstico deve ter nome acessível explícito');
 assert.match(index, /accessibilityLabel="Abrir dados em tempo real"/, 'ação de dados deve ter nome acessível explícito');
 assert.match(index, /weatherCity:\{[^}]*fontSize:15/, 'cidade/clima deve estar em tamanho legível no retrato');
+assert.match(index, /numberOfLines=\{layout\.landscape \? 1 : 2\}/, 'nome de cidade longo deve caber em duas linhas no retrato e uma na paisagem');
+assert.match(index, /weatherCity:\{[^}]*lineHeight:18/, 'quebra de linha da cidade deve preservar a hierarquia vertical');
 assert.match(index, /weatherTemperature:\{[^}]*fontSize:24/, 'temperatura do clima deve ter destaque visual');
 assert.match(index, /weatherDescription:\{[^}]*fontSize:12/, 'condição meteorológica deve ser legível');
-assert.match(index, /infoStrip:\{[^}]*minHeight:76/, 'cartão de informações online deve reservar área para os dados');
+assert.match(index, /infoStrip:\{[^}]*minHeight:88/, 'cartão de informações online deve reservar área para os dados');
 assert.match(index, /networkChip:\{[^}]*minHeight:60/, 'atalho da rede deve ser maior que o chip anterior');
 assert.doesNotMatch(index, /screenFrame:\{[^}]*justifyContent:'space-between'/, 'layout não deve espalhar a rede e o cockpit com grandes lacunas');
 assert.match(index, /layoutSpacer:\{flexGrow:1,minHeight:8/, 'a navegação deve permanecer abaixo do conteúdo sem espaçamentos artificiais entre cartões');

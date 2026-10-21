@@ -8,7 +8,7 @@
 - Repositório: `luizmarquesarruda/meriva-smart-diagnostic`.
 - Branch de trabalho: `fix/cockpit-flicker-restore-buttons-20261020`.
 - PR #75: aberta e **não mesclada**; PR #74 é a base funcional e também permanece aberta. Não fazer merge sem autorização explícita. Nenhum merge pode ser feito sem autorização explícita do usuário.
-- O SHA e o estado da CI no diário são apenas registros históricos. A autoridade vigente é a cabeça real da PR #74 e a última execução de CI associada a esse SHA, consultadas no GitHub a cada retomada.
+- O SHA e o estado da CI no diário são apenas registros históricos. Para este trabalho, a autoridade vigente é a cabeça real da PR #75 (correção do cockpit), consultada junto à última CI desse SHA. A PR #74 é a base funcional empilhada e permanece aberta; não mesclar nenhuma delas sem autorização explícita.
 - Esta camada adiciona um teste executável e um passo visível no workflow; não modifica a lógica de leitura OBD, o transporte Bluetooth nem as regras diagnósticas.
 
 ### Contratos que não podem regredir
@@ -2963,7 +2963,7 @@ Conferir os jobs da CI do novo SHA; depois, testar a ação de atualização e c
 - Os atalhos inferiores já tinham rótulos de acessibilidade e altura mínima de 48 dp, mas ícones de 22 dp e ausência de dicas de ação. As três ações principais também não declaravam explicitamente papel/rótulo acessível.
 
 ### Correções preparadas no código
-- `app/index.tsx`: agrupado cabeçalho + informações ambientais/rede; criada apresentação em duas linhas para cidade, temperatura e condição, com tamanhos maiores e versão compacta para paisagem; o cartão ambiental mantém valores `N/D`/opcional quando não houver observação válida.
+- `app/index.tsx`: agrupado cabeçalho + informações ambientais/rede; cidade, temperatura e condição têm tamanhos maiores, com o nome da cidade podendo ocupar até duas linhas no retrato e uma linha na paisagem; o cartão ambiental mantém valores `N/D`/opcional quando não houver observação válida.
 - O selo de rede reserva espaço maior e direciona para a página de conectividade existente. Um segundo nível de texto diferencia INTERNET OK, SEM INTERNET, OFFLINE e VERIFICANDO a partir do estado já informado pelo Android; a página detalhada continua exibindo os estados completos.
 - O contêiner do cockpit deixou de distribuir todas as secções com `space-between`; o espaço flexível foi concentrado abaixo das ações principais, mantendo a navegação no fim sem abrir grandes lacunas entre cabeçalho, rede e painel OBD.
 - As três ações principais receberam papel, nome e dica de acessibilidade explícitos, altura mínima de 54 dp e área de toque preservada. Os atalhos inferiores permanecem **somente com ícones**, conforme o contrato anterior, com ícones de 25 dp, alvo mínimo de 56 dp, feedback de toque e dicas para leitores de tela.
