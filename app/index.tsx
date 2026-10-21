@@ -408,7 +408,7 @@ export default function IndexScreen() {
               icon="coolant"
               label="TEMPERATURA DO MOTOR"
               value={coolantValue != null ? `${Math.round(coolantValue)} °C` : 'N/D'}
-              detail={coolantValue != null ? 'LEITURA REAL • PID 0105' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0105' : 'ECU DESCONECTADA'}
+              detail={coolantValue != null ? coolantValue >= 115 ? 'TEMPERATURA ALTA • PID 0105' : coolantValue >= 110 ? 'ATENÇÃO • PID 0105' : 'LEITURA REAL • PID 0105' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0105' : 'ECU DESCONECTADA'}
               tone={coolantValue != null && coolantValue >= 115 ? 'danger' : coolantValue != null && coolantValue >= 110 ? 'warning' : coolantValue != null ? 'good' : 'muted'}
               landscape={layout.landscape}
             />

@@ -1024,13 +1024,14 @@ async function testPidAndLearningWriteSerialization() {
   assert.ok(cockpitSource.includes("item.pid === '0105'"), 'cockpit deve identificar temperatura do líquido pelo PID 0105');
   assert.ok(cockpitSource.includes("item.source !== 'REAL'"), 'cockpit não deve exibir temperatura simulada como dado real');
   assert.ok(cockpitSource.includes('ageMs >= 0 && ageMs <= 30_000'), 'cockpit deve descartar temperatura OBD futura ou obsoleta após 30 segundos');
-  assert.ok(cockpitSource.includes('LÍQUIDO DE ARREFECIMENTO'), 'página inicial deve apresentar métrica de temperatura do arrefecimento');
+  assert.ok(cockpitSource.includes('TEMPERATURA DO MOTOR'), 'painel de cartões deve apresentar a temperatura do motor');
   assert.ok(cockpitSource.includes("'TEMPERATURA ALTA'"), 'cockpit deve destacar temperatura alta sem esconder o valor numérico');
   assert.ok(autoTripServiceSource.includes('registerObdQuery(this.basePath, fuelLevelResult, \'REAL\')'), 'PID 012F automático deve alimentar o pipeline de persistência');
   assert.ok(autoTripServiceSource.includes('registerObdQuery(this.basePath, fuelResult, \'REAL\')'), 'PID 015E automático deve alimentar o pipeline de persistência');
   assert.ok(autoTripServiceSource.includes('registerObdQuery(this.basePath, speedResult, \'REAL\')'), 'PID 010D automático deve alimentar o pipeline de persistência');
   assert.ok(autoTripServiceSource.includes('registerObdQuery(this.basePath, telemetryResult, \'REAL\')'), 'telemetria automática deve alimentar o pipeline de persistência');
   assert.ok(autoTripServiceSource.includes('instantaneousConsumptionSource'), 'origem do consumo instantâneo deve ser preservada para a interface');
+  assert.ok(autoTripServiceSource.includes('instantaneousConsumptionTimestampMs'), 'tendência só pode contar amostras frescas de consumo');
   assert.ok(autoTripServiceSource.includes('A leitura instantânea deve ser publicada a cada ciclo OBD válido'), 'consumo instantâneo deve atualizar mesmo sem viagem ativa');
   const speedQueryIndex = autoTripServiceSource.indexOf("queryPid('010D')");
   const rpmQueryIndex = autoTripServiceSource.indexOf("queryPid('010C')");
