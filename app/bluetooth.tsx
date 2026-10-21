@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacit
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMidLayout } from '../src/ui/midLayout';
 import { COLORS, SCREEN_TITLE_STYLE } from '../src/ui/theme';
+import { AppIcon } from '../src/ui/AppIcon';
 import * as FileSystem from 'expo-file-system';
 import { Link } from 'expo-router';
 import { BluetoothDeviceInfo } from '../src/obd/bluetoothClassicTransport';
@@ -225,11 +226,11 @@ export default function BluetoothScreen() {
         <View style={styles.bottomNav}>
           <Link href="/" asChild>
             <TouchableOpacity style={styles.bottomItem} accessibilityRole="button" accessibilityLabel="Voltar ao cockpit">
-              <Text style={styles.bottomIcon}>🚗</Text>
+              <AppIcon name="cockpit" size={22} color={COLORS.accent} />
             </TouchableOpacity>
           </Link>
           <TouchableOpacity style={[styles.bottomItem, styles.bottomActive]} accessibilityRole="button" accessibilityLabel="Bluetooth, tela atual" accessibilityState={{ selected: true }}>
-            <Text style={styles.bottomIcon}>🔵</Text>
+            <AppIcon name="bluetooth" size={22} color={COLORS.accent} />
           </TouchableOpacity>
         </View>
         </View>

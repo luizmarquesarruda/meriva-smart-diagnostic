@@ -112,6 +112,7 @@
 - **DB-081** · 2026-10-20 — Correção do pisca-pisca do cockpit e restauração da navegação inferior
 - **DB-082** · 2026-10-21 — Auditoria visual, tema comum e proteção de consistência entre telas
 - **DB-083** · 2026-10-21 — Navegação inferior somente com ícones e alvos acessíveis
+- **DB-084** · 2026-10-21 — Biblioteca visual compartilhada, monitoramento de rede 4G/5G e página de conectividade
 
 ---
 
@@ -2904,3 +2905,30 @@ Consultar a CI associada ao SHA atual; corrigir qualquer falha pelo log. Após C
 
 ### Próximo passo
 Confirmar a CI da cabeça atual e testar os botões em retrato e paisagem, inclusive com TalkBack.
+
+
+## DB-084 · 2026-10-21 — Biblioteca visual compartilhada, monitoramento de rede 4G/5G e página de conectividade
+
+### Problema e pesquisa técnica
+- Navegação e atalhos usavam emojis/glifos misturados, sem vocabulário visual compartilhado.
+- O projeto está fixado em Expo SDK 51. A biblioteca `@expo/vector-icons@14.1.0` já constava no lockfile, então foi escolhida para esta atualização compatível com o runtime atual; a migração para os pacotes modulares recomendados pelo Expo fica como atualização de plataforma separada, com matriz própria de compatibilidade e CI.
+- O NetInfo fornece estado do transporte, alcance da internet e geração celular. A UI diferencia rede ativa de acesso à internet confirmado e não inventa geração móvel ausente nos dados do Android.
+
+### Correções implementadas
+- Criado `src/ui/AppIcon.tsx`, com ícones Ionicons e nomes semânticos centralizados.
+- Substituídos emojis/glifos nos atalhos do cockpit, navegação inferior, Bluetooth e botões principais de Dados, Veículo e Saúde.
+- Adicionado `@react-native-community/netinfo@12.0.1` e o hook orientado a eventos `src/network/useNetworkStatus.ts`; sem timer de polling e sem alteração do ciclo OBD.
+- Criado `src/network/networkStatus.ts` com apresentação testável para Wi-Fi, dados móveis 2G/3G/4G/5G, internet não confirmada, falta de internet, sinal Wi-Fi e informação de tarifação quando fornecidos pelo sistema.
+- Adicionada a tela `app/conectividade.tsx` e atalhos no cockpit e em Mais Recursos. A tela explica que leituras OBD, testes, histórico e IA local não dependem da internet; recursos ainda não implementados são identificados como próximos passos.
+- Preservados Bluetooth Classic/ELM327, fila serial única, cinco leituras válidas nos testes, consulta manual de PIDs, histórico local e regras offline.
+
+### Testes e contrato
+- Adicionado `tests/connectivity.test.js` para 5G, 4G sem internet, Wi-Fi, offline e estado desconhecido.
+- Conectada a suíte ao `npm test` e ao gate de anti-regressão; incluída a tela de conectividade no teste de tema e registrados RG-12/RG-13.
+- Atualizado o lockfile para corresponder ao `package.json`, mantendo o Expo SDK 51.
+
+### Commit, CI e limites
+- Atualizações preparadas na branch `fix/cockpit-flicker-restore-buttons-20261020`; após a publicação, conferir o SHA e a CI real da nova cabeça.
+- Não considerar a entrega concluída até `gate:baseline`, `validate` e `android-build` passarem.
+- A geração 4G/5G depende dos dados que o Android fornece; caso ausentes, o app mostra “MÓVEL”/“Geração não informada”.
+- Instalar e conferir o APK em retrato/paisagem, Wi-Fi, dados móveis e modo avião; validar fisicamente ELM327/ECU separadamente.

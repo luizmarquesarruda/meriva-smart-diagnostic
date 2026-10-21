@@ -24,6 +24,11 @@ assert.doesNotMatch(index, /!layout\.landscape\s*&&\s*\(/, 'navegação não dev
 assert.doesNotMatch(index, /<Text style=\{styles\.bottomNavText\}>/, 'navegação inferior do cockpit deve ser icon-only');
 assert.match(index, /bottomNavItem:\{[^}]*minHeight:48/, 'alvo inferior deve ter ao menos 48 dp');
 assert.match(index, /accessibilityLabel="Mais recursos"/, 'botão sem legenda visual precisa de nome acessível');
+assert.ok(index.includes('href="/conectividade"'), 'cockpit deve expor conectividade 4G/5G');
+assert.match(index, /NetworkStatusIndicator/, 'cockpit deve exibir o estado da rede por eventos');
+assert.match(index, /AppIcon name="connectivity"/, 'atalho de conectividade deve usar a biblioteca compartilhada');
+assert.match(more, /CONECTIVIDADE 4G\/5G/, 'Mais Recursos deve expor a página de conectividade');
+assert.match(more, /AppIcon name=\{icon as AppIconName\}/, 'recursos devem usar a biblioteca de ícones compartilhada');
 const bluetooth = read('app/bluetooth.tsx');
 assert.doesNotMatch(bluetooth, /<Text style=\{styles\.bottomText\}>|<Text style=\{styles\.bottomActiveText\}>/, 'navegação Bluetooth deve ser icon-only');
 assert.match(bluetooth, /minHeight:\s*48/, 'botões inferiores Bluetooth devem ter alvo de 48 dp');

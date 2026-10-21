@@ -337,7 +337,7 @@ const styles = StyleSheet.create({
   note: { backgroundColor: '#0b1829', borderRadius: 10, padding: 11, marginVertical: 5 },
   noteText: { color: '#8194ad', fontSize: 9, lineHeight: 15 },
   primary: { backgroundColor: '#2563eb', borderRadius: 11, padding: 14, alignItems: 'center', marginTop: 8 },
-  primaryText: { color: '#fff', fontSize: 10, fontWeight: '900' },
+  actionContent:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5},primaryText: { color: '#fff', fontSize: 10, fontWeight: '900' },
   empty: { backgroundColor: '#091626', borderRadius: 11, borderWidth: 1, borderColor: '#203854', padding: 16, marginTop: 8 },
   emptyText: { color: '#94a3b8', fontSize: 10, textAlign: 'center', lineHeight: 16 },
   back: { padding: 14, alignItems: 'center' },

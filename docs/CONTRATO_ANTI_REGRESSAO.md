@@ -26,6 +26,9 @@ Este documento é o contrato de aceitação entre mudanças, testes, diário e C
 | RG-08 | Cockpit mantém temperatura, tensão, borboleta e RPM com rotação automática de dez segundos; saúde detalhada não é duplicada na página inicial. | `orientationLayout.test.js`, `cockpitNavigation.test.js` |
 | RG-09 | Gráficos reaproveitam telemetria ao vivo e amostras de viagens reais existentes; sem novo logger paralelo nem linha interpolada sobre lacunas. | `liveTelemetry.test.js`, `cockpitNavigation.test.js` |
 | RG-10 | Histórico TXT/autosave continua local e separado de simulação; o diagnóstico não depende de exportação ou serviço externo. | `autosaveTxtFormatter.test.js`, `merivaAutosave.test.js` |
+| RG-11 | Todas as telas usam fundo, títulos e barras nativas consistentes; o laboratório não pode reintroduzir uma paleta clara isolada. | `screenTheme.test.js`, `projectBaseline.test.js` |
+| RG-12 | Estado de Wi-Fi/4G/5G é informativo e orientado a eventos; nunca controla reconexão OBD, polling de PIDs ou decisão diagnóstica. Sem internet, o motor local permanece funcional. | `connectivity.test.js`, `onlineConditions.test.js` |
+| RG-13 | Ícones usam vocabulário compartilhado e botões sem rótulo visual mantêm nomes acessíveis e alvos de pelo menos 48 dp. | `cockpitNavigation.test.js`, `screenTheme.test.js` |
 
 ## Regras para uma alteração legítima
 
@@ -47,6 +50,3 @@ Este documento é o contrato de aceitação entre mudanças, testes, diário e C
 ## Limitações
 
 O gate é uma barreira contra regressões acidentais, não uma prova formal nem uma proteção contra alteração deliberada simultânea do código e de seus testes. Por isso, revisão de diff, CI do HEAD real e testes físicos continuam obrigatórios.
-
-
-| RG-11 | Todas as telas usam fundo, títulos e barras nativas consistentes; o laboratório não pode reintroduzir uma paleta clara isolada. | `screenTheme.test.js`, `projectBaseline.test.js` |

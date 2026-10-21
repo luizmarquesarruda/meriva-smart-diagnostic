@@ -45,6 +45,7 @@ const requiredSuites = [
   'autosaveTxtFormatter.test.js',
   'merivaAutosave.test.js',
   'onlineConditions.test.js',
+  'connectivity.test.js',
   'screenTheme.test.js',
 ];
 const scriptedTests = new Set(testCommand.map((command) => {
@@ -89,6 +90,10 @@ assert.equal(lock.packages[''].dependencies.expo, packageJson.dependencies.expo)
 assert.equal(lock.packages[''].dependencies['react-native'], packageJson.dependencies['react-native']);
 assert.deepEqual(lock.packages[''].dependencies, packageJson.dependencies, 'package.json e lockfile divergiram');
 assert.deepEqual(lock.packages[''].devDependencies, packageJson.devDependencies, 'devDependencies e lockfile divergiram');
+assert.equal(packageJson.dependencies['@expo/vector-icons'], '14.1.0');
+assert.equal(lock.packages['node_modules/@expo/vector-icons'].version, packageJson.dependencies['@expo/vector-icons']);
+assert.equal(packageJson.dependencies['@react-native-community/netinfo'], '12.0.1');
+assert.equal(lock.packages['node_modules/@react-native-community/netinfo'].version, packageJson.dependencies['@react-native-community/netinfo']);
 assert.equal(app.expo.orientation, 'default', 'a orientação livre não deve ser bloqueada');
 assert.ok(app.expo.plugins.some((plugin) => Array.isArray(plugin) && plugin[0] === 'expo-location'));
 
