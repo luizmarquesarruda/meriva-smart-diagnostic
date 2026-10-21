@@ -31,6 +31,7 @@ Este documento é o contrato de aceitação entre mudanças, testes, diário e C
 | RG-13 | Ícones usam vocabulário compartilhado e botões sem rótulo visual mantêm nomes acessíveis e alvos de pelo menos 48 dp. | `cockpitNavigation.test.js`, `screenTheme.test.js` |
 | RG-14 | Estado de rede pode ser reconsultado sob comando; valores de sinal fora de 0–100 são descartados e falha da consulta não afeta diagnóstico offline/OBD. | `connectivity.test.js`, `cockpitNavigation.test.js` |
 | RG-15 | Cockpit apresenta cidade, temperatura/condição e tipo de rede em hierarquia legível; o estado resumido da internet usa pelo menos 10 dp, a geração móvel usa 13 dp, os botões principais têm ao menos 56 dp de altura e os atalhos inferiores mantêm alvos ampliados e rótulos acessíveis, sem espalhar o conteúdo com espaços vazios. Rede permanece independente da sessão OBD. | `cockpitNavigation.test.js`, `connectivity.test.js`, `onlineConditions.test.js` |
+| RG-16 | A tela de abertura aparece na primeira entrada do app por no mínimo 6.000 ms; o progresso representa estados Bluetooth/ELM/ECU, só declara prontidão após resposta OBD real, e libera o painel em modo offline após timeout de 30 s. Não pode criar conexão OBD paralela nem reaparecer ao voltar ao cockpit durante a mesma sessão do app. | `startupProgress.test.js`, `projectBaseline.test.js`, `bluetoothLifecycle.test.js` |
 
 ## Regras para uma alteração legítima
 
