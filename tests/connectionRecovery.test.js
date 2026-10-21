@@ -14,7 +14,7 @@ const loaded = { exports: {} };
 new Function('exports', 'module', js)(loaded.exports, loaded);
 
 async function run() {
-  const { cleanupDisconnectedSession, timedOutNativeAttemptStillPending, waitForNativeConnectAttempt } = loaded.exports;
+  const { cleanupDisconnectedSession, shouldRetryAfterDisconnectCleanup, timedOutNativeAttemptStillPending, waitForNativeConnectAttempt } = loaded.exports;
   const order = [];
   const diskError = new Error('disk unavailable');
   const cleanup = await cleanupDisconnectedSession(
@@ -45,6 +45,11 @@ async function run() {
   );
   assert.equal(bothFailed.persistenceError, diskError);
   assert.equal(bothFailed.closeError, closeError, 'cleanup errors must be reported without escaping');
+
+  assert.equal(shouldRetryAfterDisconnectCleanup(null), true,
+    'recovery may retry after the old session closes successfully');
+  assert.equal(shouldRetryAfterDisconnectCleanup(closeError), false,
+    'recovery must not open another socket when old-session closure failed');
 
   const attempt = new Promise(() => {});
   assert.equal(timedOutNativeAttemptStillPending(true, attempt, attempt), true,
