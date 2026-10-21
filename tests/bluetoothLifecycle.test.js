@@ -54,6 +54,7 @@ assert(shared.includes('const compatibility = connection?.session.getCompatibili
 assert(shared.includes("connectPreferredElm(connection.device.address, compatibility, 'EXPLICIT')"), 'recovery must pass the original compatibility settings');
 assert(shared.includes('if (connection) reconnecting = true'), 'reserve recovery before awaiting async cleanup to ignore duplicate disconnect callbacks');
 assert(transport.includes('timedOutNativeAttemptStillPending('), 'timed-out native connect must not race a second socket mode');
+assert(transport.includes('waitForNativeConnectAttempt('), 'waiting for a concurrent native attempt must have an explicit timeout');
 assert(transport.includes("CONNECT_ABORT_PREVIOUS_NATIVE_ATTEMPT_PENDING"), 'a stale native connection must fail fast instead of being awaited forever');
 assert(shared.includes('cleanupDisconnectedSession('), 'disconnect recovery must isolate persistence failure from session close');
 
