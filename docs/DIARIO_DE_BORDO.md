@@ -115,6 +115,7 @@
 - **DB-084** · 2026-10-21 — Biblioteca visual compartilhada, monitoramento de rede 4G/5G e página de conectividade
 - **DB-085** · 2026-10-21 — Atualização manual da rede e validação do sinal informado pelo Android
 - **DB-086** · 2026-10-21 — Cockpit: informações de rede/clima legíveis e botões com áreas de toque ampliadas
+- **DB-087** · 2026-10-21 — Ajuste adicional de legibilidade da rede e tamanho dos botões principais
 
 ---
 
@@ -2980,3 +2981,25 @@ Conferir os jobs da CI do novo SHA; depois, testar a ação de atualização e c
 
 ### Próximo passo
 Publicar uma alteração atômica de código + regressões + contrato + diário; consultar a CI do SHA exato. Corrigir qualquer falha pelo log e não fazer merge sem autorização explícita.
+
+
+## DB-087 · 2026-10-21 — Ajuste adicional de legibilidade da rede e tamanho dos botões principais
+
+### Problema observado
+A revisão da implementação DB-086 confirmou que o tipo de rede e o ícone foram ampliados, mas a linha secundária de disponibilidade da internet ainda usava fonte de 8 dp. Os botões principais tinham altura mínima de 54 dp e rótulo de 10 dp, deixando margem para melhorar leitura e toque sem recriar o espaçamento irregular.
+
+### Correção implementada
+- `src/ui/NetworkStatusIndicator.tsx`: ícone de rede ampliado de 18 para 20 dp, rótulo Wi-Fi/geração móvel de 12 para 13 dp e estado resumido da internet de 8 para 10 dp.
+- `app/index.tsx`: cartão de rede ampliado (64 dp de altura mínima) com dimensões compactas específicas para paisagem; botões principais agora têm altura mínima de 56 dp e texto de 11 dp.
+- `tests/cockpitNavigation.test.js`: protege os novos limites de tipografia, ícone e área dos botões nos dois modos de orientação.
+- `docs/CONTRATO_ANTI_REGRESSAO.md`: RG-15 passa a registrar os tamanhos mínimos e sua cobertura automatizada.
+- Sem novas dependências ou mudanças nas funções OBD, conexão Bluetooth, regras diagnósticas, consultas manuais, número de leituras dos testes ou fluxo offline.
+
+### Verificação e limites
+- Alterações escritas sequencialmente na branch `fix/cockpit-flicker-restore-buttons-20261020`; o SHA final e a execução de CI devem ser consultados no GitHub.
+- Não declarar validação local: este ambiente não tem acesso de rede para executar clone/instalação do repositório.
+- A CI precisa concluir `gate:baseline`, `validate` e `android-build` no SHA final antes de declarar a etapa automatizada aprovada.
+- Teste no aparelho Android segue separado: legibilidade real em 360 dp, orientação paisagem, TalkBack e funcionamento dos botões; a conectividade não pode interferir na sessão ELM327.
+
+### Próximo passo
+Conferir o SHA final e a CI da PR #75; corrigir qualquer falha indicada pelos logs. Não mesclar sem autorização explícita.
