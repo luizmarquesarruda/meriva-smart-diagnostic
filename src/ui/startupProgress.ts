@@ -2,7 +2,7 @@ import type { BluetoothLifecycleState } from '../obd/bluetoothState';
 import type { StartupPidPreflightSnapshot } from '../diagnostics/startupPidPreflight';
 
 export const STARTUP_MIN_DURATION_MS = 6_000;
-export const STARTUP_TIMEOUT_MS = 30_000;
+export const STARTUP_TIMEOUT_MS = 60_000;
 export const STARTUP_TERMINAL_HOLD_MS = 700;
 export const STARTUP_TIMEOUT_HOLD_MS = 1_200;
 
