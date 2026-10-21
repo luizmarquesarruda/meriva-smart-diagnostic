@@ -9,7 +9,7 @@
 - HEAD do `main` confirmado em `57da653ea6f671fba131e9dfbe54ebaa32e62bd4`, após o merge da PR #76 em 2026-10-21.
 - PR #76 (`audit: restore anti-regression protections and cockpit fixes`) consta como mesclada no GitHub. A execução CI #2637 para esse SHA terminou com sucesso: `validate` passou (incluindo o gate `gate:baseline`) e `android-build` passou, com APK standalone verificado e enviado como artefato. Isto não comprova teste físico no telefone ou no ELM327.
 - PRs #74 e #75 permanecem fechadas sem merge próprio; as correções que agora estão em `main` são as efetivamente integradas pela PR #76, não uma aprovação implícita dos heads isolados.
-- Trabalho em andamento: branch `fix/bt-reconnect-guard`, baseada no HEAD acima. A primeira CI encontrou uma regressão no caso de duas instâncias do transporte abertas em paralelo e essa foi corrigida com espera limitada. A revisão adicional também garante que uma conexão nativa resolvida tardiamente termine seu fechamento antes de outra tentativa RFCOMM. A CI do SHA mais recente deve ser consultada; a branch não foi mesclada e o teste físico continua pendente.
+- Trabalho em andamento: branch `fix/bt-reconnect-guard`, baseada no HEAD acima. A PR #77 corrige a concorrência RFCOMM e o fechamento tardio de sockets. A CI #2664 passou em `gate:baseline` e `validate`; o `android-build` ainda estava em execução na última consulta. Revisão adicional identificou que uma persistência sem resposta também poderia atrasar o fechamento; DB-093 limita essa espera sem permitir nova conexão antes de o fechamento da sessão terminar. A nova CI do SHA final deve ser consultada; a branch não foi mesclada e o teste físico continua pendente.
 - Não mesclar alterações novas sem autorização explícita. Para esta branch, exigir `gate:baseline`, `validate` e `android-build` verdes no SHA final; teste visual e físico com ELM327/ECU são etapas separadas.
 
 ### Contratos que não podem regredir
@@ -3124,3 +3124,24 @@ A correção DB-091 aguardava a promessa nativa original com limite. A análise 
 ### Próximo passo
 Conferir a CI mais recente da PR #77, revisar o diff final e manter a PR sem merge até `gate:baseline`, `validate` e `android-build` passarem.
 
+
+
+## DB-093 · 2026-10-21 — Limite para persistência travada durante a desconexão
+
+### Problema / evidência
+A revisão de concorrência identificou que `cleanupDisconnectedSession()` tratava corretamente uma falha de persistência que rejeitava, mas aguardava a operação sem limite. Se o armazenamento nunca resolvesse nem rejeitasse, o fechamento da sessão e o backoff de reconexão ficariam bloqueados, mantendo `reconnecting` ativo.
+
+### Correção
+- Inicia a persistência sem fazer o fechamento do socket depender dela.
+- Aguarda o fechamento da sessão antes de permitir que o fluxo de recuperação tente abrir outro socket.
+- Limita a espera da persistência a 1.000 ms; se o armazenamento continuar pendente, registra erro de timeout e permite que a recuperação prossiga após a tentativa de fechamento.
+- Mantém o tratamento da rejeição tardia da persistência para evitar rejeição não observada.
+- Acrescenta teste comportamental com persistência que nunca resolve, verificando que o fechamento ocorre e o timeout é relatado.
+
+### Validação e limites
+- A CI #2664 passou em `gate:baseline` e `validate`, mas o `android-build` ainda estava em execução na última consulta. A alteração DB-093 cria um novo SHA e exige nova CI completa; os resultados anteriores não validam esta alteração.
+- O fechamento do socket continua sem timeout deliberado: não iniciar outro socket enquanto o fechamento anterior não tiver terminado é mais seguro do que permitir duas conexões RFCOMM concorrentes.
+- Teste físico com ELM327 e inspeção visual no Android continuam pendentes.
+
+### Próximo passo
+Consultar a nova CI da PR #77 no SHA final. Confirmar `gate:baseline`, `validate` e `android-build` verdes e revisar o diff final; manter a PR em rascunho e não mesclar automaticamente.
