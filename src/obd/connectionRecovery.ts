@@ -17,12 +17,18 @@ export async function cleanupDisconnectedSession(
 
   // Start persistence without making socket closure wait for storage I/O.
   // Normalize the promise so a late rejection is always handled.
-  const persistence = Promise.resolve()
-    .then(persist)
-    .then(
-      () => ({ timedOut: false as const, error: null as unknown | null }),
-      (cause) => ({ timedOut: false as const, error: cause as unknown }),
-    );
+  let persistenceOperation: Promise<void>;
+  try {
+    // Invoke synchronously to preserve deterministic start ordering, while
+    // converting both synchronous throws and async rejections into a handled promise.
+    persistenceOperation = Promise.resolve(persist());
+  } catch (cause) {
+    persistenceOperation = Promise.reject(cause);
+  }
+  const persistence = persistenceOperation.then(
+    () => ({ timedOut: false as const, error: null as unknown | null }),
+    (cause) => ({ timedOut: false as const, error: cause as unknown }),
+  );
 
   try {
     // Do not start recovery until close settles: opening a second RFCOMM socket
