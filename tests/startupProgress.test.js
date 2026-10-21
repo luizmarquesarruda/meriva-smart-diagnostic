@@ -257,7 +257,7 @@ async function main() {
   assert.match(model, /STARTUP_MIN_DURATION_MS = 6_000/);
   assert.match(screen, /accessibilityRole="progressbar"/);
   assert.match(screen, /progress.pidDetail/);
-  assert.match(screen, /SMART OBD/);
+  assert.match(screen, /MERIVA SMART/);
   assert.match(screen, /OBD-II/);
   assert.match(screen, /protocolDotColor/);
   assert.match(screen, /backgroundColor: protocolDotColor/);
