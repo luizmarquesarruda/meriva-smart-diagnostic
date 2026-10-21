@@ -26,6 +26,18 @@ async function run() {
   assert.equal(cleanup.persistenceError, diskError);
   assert.equal(cleanup.closeError, null);
 
+  const neverPersists = new Promise(() => {});
+  let closeCalledBeforePersistenceTimeout = false;
+  const timeoutCleanup = await cleanupDisconnectedSession(
+    () => neverPersists,
+    async () => { closeCalledBeforePersistenceTimeout = true; },
+    5,
+  );
+  assert.equal(closeCalledBeforePersistenceTimeout, true,
+    'socket close must run even if persistence never settles');
+  assert.match(String(timeoutCleanup.persistenceError), /EXCEDEU 5 MS/,
+    'a stalled persistence operation must be reported after the bounded wait');
+
   const closeError = new Error('session already closed');
   const bothFailed = await cleanupDisconnectedSession(
     async () => { throw diskError; },
