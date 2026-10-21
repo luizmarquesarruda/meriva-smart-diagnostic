@@ -2932,3 +2932,22 @@ Confirmar a CI da cabeça atual e testar os botões em retrato e paisagem, inclu
 - Não considerar a entrega concluída até `gate:baseline`, `validate` e `android-build` passarem.
 - A geração 4G/5G depende dos dados que o Android fornece; caso ausentes, o app mostra “MÓVEL”/“Geração não informada”.
 - Instalar e conferir o APK em retrato/paisagem, Wi-Fi, dados móveis e modo avião; validar fisicamente ELM327/ECU separadamente.
+
+
+## DB-085 · 2026-10-21 — Atualização manual da rede e validação do sinal informado pelo Android
+
+### Problema
+A página de conectividade apresentava o estado recebido por eventos do sistema, mas não oferecia uma ação explícita para reconsultá-lo quando a geração móvel ou o acesso à internet apareciam como não confirmados. Além disso, o normalizador aceitava qualquer número finito como força de sinal Wi-Fi.
+
+### Correção
+- Adicionada a ação acessível “VERIFICAR REDE NOVAMENTE”, usando `NetInfo.refresh()`; o botão indica a verificação em andamento e informa falha sem bloquear a tela.
+- O monitoramento continua orientado a eventos. A atualização não inicia polling periódico e não chama nem reinicia Bluetooth, ELM327, GPS ou motor diagnóstico.
+- O sinal Wi-Fi só é aceito como válido quando o Android informa número finito entre 0 e 100; valores negativos ou acima de 100 viram desconhecidos, não percentuais falsos.
+- Atualizados os testes de conectividade e o contrato RG-14.
+
+### Validação e limites
+- A CI verde do SHA anterior `047ec91a29be943e9fce40d2a9f4b6e0644bdc30` é somente a linha de base; esta alteração precisa de nova CI.
+- Verificar `gate:baseline`, `validate` e `android-build` na cabeça nova. A CI não substitui o teste do APK em Wi-Fi, 4G/5G e modo avião.
+
+### Próximo passo
+Conferir os jobs da CI do novo SHA; depois, testar a ação de atualização e confirmar que a conexão OBD permanece estável ao alternar entre a página de conectividade e o cockpit.

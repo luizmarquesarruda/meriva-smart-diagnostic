@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import NetInfo from '@react-native-community/netinfo';
 import { Link } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,6 +12,20 @@ import { useNetworkStatus } from '../src/network/useNetworkStatus';
 export default function ConectividadeScreen() {
   const layout = useMidLayout();
   const snapshot = useNetworkStatus();
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshFailed, setRefreshFailed] = useState(false);
+
+  const refreshNetwork = async () => {
+    setRefreshing(true);
+    try {
+      await NetInfo.refresh();
+      setRefreshFailed(false);
+    } catch {
+      setRefreshFailed(true);
+    } finally {
+      setRefreshing(false);
+    }
+  };
   const presentation = getNetworkPresentation(snapshot);
   const toneColor = presentation.tone === 'success'
     ? COLORS.success
@@ -37,6 +53,17 @@ export default function ConectividadeScreen() {
             </View>
             <Text style={styles.heroDetail}>{presentation.detail}</Text>
           </View>
+          <TouchableOpacity
+            style={[styles.refreshButton, refreshing && styles.refreshButtonDisabled]}
+            onPress={() => { void refreshNetwork(); }}
+            disabled={refreshing}
+            accessibilityRole="button"
+            accessibilityLabel="Atualizar estado da rede"
+          >
+            <AppIcon name="refresh" size={16} color={COLORS.accent} />
+            <Text style={styles.refreshButtonText}>{refreshing ? 'VERIFICANDO REDE…' : 'VERIFICAR REDE NOVAMENTE'}</Text>
+          </TouchableOpacity>
+          {refreshFailed ? <Text style={styles.refreshError}>Não foi possível atualizar agora. O diagnóstico local continua disponível.</Text> : null}
           <Text style={styles.section}>ESTADO DA REDE</Text>
           <View style={[styles.infoGrid,layout.landscape && styles.infoGridLandscape]}>
             <InfoCard title="TRANSPORTE ATIVO" value={presentation.transportLabel} />
@@ -97,6 +124,10 @@ const styles = StyleSheet.create({
   heroTitle:{color:COLORS.textStrong,fontSize:17,fontWeight:'900'},
   internetLabel:{fontSize:10,fontWeight:'900',letterSpacing:.6,marginTop:5},
   heroDetail:{color:COLORS.textMuted,fontSize:11,lineHeight:17,marginTop:12},
+  refreshButton:{minHeight:48,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,borderRadius:12,borderWidth:1,borderColor:COLORS.border,backgroundColor:COLORS.surface,paddingHorizontal:12,marginBottom:12},
+  refreshButtonDisabled:{opacity:0.6},
+  refreshButtonText:{color:COLORS.accent,fontSize:10,fontWeight:'900',letterSpacing:.5},
+  refreshError:{color:COLORS.warning,fontSize:10,lineHeight:15,marginBottom:10},
   section:{color:COLORS.accent,fontSize:10,fontWeight:'900',letterSpacing:1,marginTop:5,marginBottom:8},
   infoGrid:{gap:8},
   infoGridLandscape:{flexDirection:'row',flexWrap:'wrap'},

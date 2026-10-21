@@ -28,6 +28,10 @@ assert.ok(index.includes('href="/conectividade"'), 'cockpit deve expor conectivi
 assert.match(index, /NetworkStatusIndicator/, 'cockpit deve exibir o estado da rede por eventos');
 assert.match(index, /AppIcon name="connectivity"/, 'atalho de conectividade deve usar a biblioteca compartilhada');
 assert.match(more, /CONECTIVIDADE 4G\/5G/, 'Mais Recursos deve expor a página de conectividade');
+const connectivity = read('app/conectividade.tsx');
+assert.match(connectivity, /NetInfo\.refresh\(\)/, 'a tela de conectividade deve permitir atualizar o estado sob comando');
+assert.match(connectivity, /accessibilityLabel="Atualizar estado da rede"/, 'a ação de atualização deve ter nome acessível');
+assert.match(connectivity, /minHeight:48/, 'o botão de atualização deve respeitar alvo mínimo de 48 dp');
 assert.match(more, /AppIcon name=\{icon as AppIconName\}/, 'recursos devem usar a biblioteca de ícones compartilhada');
 const bluetooth = read('app/bluetooth.tsx');
 assert.doesNotMatch(bluetooth, /<Text style=\{styles\.bottomText\}>|<Text style=\{styles\.bottomActiveText\}>/, 'navegação Bluetooth deve ser icon-only');

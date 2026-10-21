@@ -41,6 +41,17 @@ const wifi = getNetworkPresentation(normalizeNetworkSnapshot({
 }));
 assert.equal(wifi.shortLabel, 'WI-FI');
 assert.equal(wifi.signalLabel, '78% (sinal Wi-Fi informado pelo sistema)');
+
+const invalidSignal = normalizeNetworkSnapshot({
+  type: 'wifi', isConnected: true, isInternetReachable: true,
+  details: { strength: 150 },
+});
+assert.equal(invalidSignal.strength, null, 'sinal fora de 0–100 não pode ser apresentado como real');
+const negativeSignal = normalizeNetworkSnapshot({
+  type: 'wifi', isConnected: true, isInternetReachable: true,
+  details: { strength: -1 },
+});
+assert.equal(negativeSignal.strength, null, 'sinal negativo deve ser tratado como desconhecido');
 assert.equal(wifi.generationLabel, 'Fora da rede móvel');
 
 const offline = getNetworkPresentation(normalizeNetworkSnapshot({

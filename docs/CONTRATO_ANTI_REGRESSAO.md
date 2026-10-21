@@ -29,6 +29,7 @@ Este documento é o contrato de aceitação entre mudanças, testes, diário e C
 | RG-11 | Todas as telas usam fundo, títulos e barras nativas consistentes; o laboratório não pode reintroduzir uma paleta clara isolada. | `screenTheme.test.js`, `projectBaseline.test.js` |
 | RG-12 | Estado de Wi-Fi/4G/5G é informativo e orientado a eventos; nunca controla reconexão OBD, polling de PIDs ou decisão diagnóstica. Sem internet, o motor local permanece funcional. | `connectivity.test.js`, `onlineConditions.test.js` |
 | RG-13 | Ícones usam vocabulário compartilhado e botões sem rótulo visual mantêm nomes acessíveis e alvos de pelo menos 48 dp. | `cockpitNavigation.test.js`, `screenTheme.test.js` |
+| RG-14 | Estado de rede pode ser reconsultado sob comando; valores de sinal fora de 0–100 são descartados e falha da consulta não afeta diagnóstico offline/OBD. | `connectivity.test.js`, `cockpitNavigation.test.js` |
 
 ## Regras para uma alteração legítima
 

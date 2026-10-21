@@ -47,7 +47,10 @@ export function normalizeNetworkSnapshot(state: unknown): NetworkSnapshot {
   const isConnectionExpensive = typeof details.isConnectionExpensive === 'boolean'
     ? details.isConnectionExpensive
     : null;
-  const strength = typeof details.strength === 'number' && Number.isFinite(details.strength)
+  const strength = typeof details.strength === 'number'
+    && Number.isFinite(details.strength)
+    && details.strength >= 0
+    && details.strength <= 100
     ? details.strength
     : null;
 
