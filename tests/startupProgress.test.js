@@ -160,6 +160,19 @@ assert.equal(timedOut.percent, 100);
 assert.equal(timedOut.terminal, 'offline');
 assert.match(timedOut.detail, /modo offline/);
 
+const timedOutWithValidatedEcu = getStartupProgress({
+  ...base,
+  ecuConnected: true,
+  timedOut: true,
+  pidPreflight: pidRunning,
+});
+assert.equal(timedOutWithValidatedEcu.percent, 100);
+assert.equal(timedOutWithValidatedEcu.terminal, 'partial');
+assert.match(timedOutWithValidatedEcu.title, /VERIFICAÇÃO INICIAL PARCIAL/);
+assert.match(timedOutWithValidatedEcu.detail, /ECU validada/);
+assert.match(timedOutWithValidatedEcu.detail, /painel abrirá conectado/);
+assert.doesNotMatch(timedOutWithValidatedEcu.detail, /modo offline/i);
+
 assert.equal(getStartupHideDelayMs({ elapsedMs: 1000, terminal: 'ready', timedOut: false }), 5000);
 assert.equal(getStartupHideDelayMs({ elapsedMs: 5900, terminal: 'ready', timedOut: false }), 700);
 assert.equal(getStartupHideDelayMs({ elapsedMs: 1000, terminal: 'progress', timedOut: false }), null);
