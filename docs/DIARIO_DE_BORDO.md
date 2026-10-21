@@ -9,7 +9,7 @@
 - HEAD do `main` confirmado em `57da653ea6f671fba131e9dfbe54ebaa32e62bd4`, após o merge da PR #76 em 2026-10-21.
 - PR #76 (`audit: restore anti-regression protections and cockpit fixes`) consta como mesclada no GitHub. A execução CI #2637 para esse SHA terminou com sucesso: `validate` passou (incluindo o gate `gate:baseline`) e `android-build` passou, com APK standalone verificado e enviado como artefato. Isto não comprova teste físico no telefone ou no ELM327.
 - PRs #74 e #75 permanecem fechadas sem merge próprio; as correções que agora estão em `main` são as efetivamente integradas pela PR #76, não uma aprovação implícita dos heads isolados.
-- Trabalho em andamento: branch `fix/bt-reconnect-guard`, baseada no HEAD acima. A PR #77 corrige a concorrência RFCOMM e o fechamento tardio de sockets. Na CI #2671, `gate:baseline` e `validate` passaram no SHA `9ef897f784e645b941e8b9dabdd0c62cf2f535e0`; `android-build` estava em compilação na última consulta. A entrada DB-094 registra a falha anterior #2669 e a correção; esta atualização do diário cria novo SHA, cuja CI precisa ser consultada. A branch não foi mesclada e o teste físico continua pendente.
+- Trabalho em andamento: branch `fix/bt-reconnect-guard`, baseada no HEAD da `main` `57da653ea6f671fba131e9dfbe54ebaa32e62bd4`. A PR #77 trata concorrência RFCOMM, fechamento tardio e recuperação após desconexão. CI #2671 aprovou `gate:baseline` e `validate`, mas não valida as correções posteriores. Após a auditoria adicional DB-095, a CI #2678 está pendente para o SHA `4cd5bee6a259f1336fa3fec7ee5a8c2882d6171b`. A branch segue sem merge e o teste físico está pendente.
 - Não mesclar alterações novas sem autorização explícita. Para esta branch, exigir `gate:baseline`, `validate` e `android-build` verdes no SHA final; teste visual e físico com ELM327/ECU são etapas separadas.
 
 ### Contratos que não podem regredir
@@ -124,6 +124,7 @@
 - **DB-092** · 2026-10-21 — Serialização do fechamento tardio de socket após timeout
 - **DB-093** · 2026-10-21 — Limite para persistência travada durante a desconexão
 - **DB-094** · 2026-10-21 — Auditoria da CI #2669 e validação parcial da correção de recuperação
+- **DB-095** · 2026-10-21 — Impedir nova conexão quando o fechamento do socket falha
 
 ---
 
@@ -3168,3 +3169,22 @@ Consultar a nova CI da PR #77 no SHA final. Confirmar `gate:baseline`, `validate
 ### Limites / próximo passo
 - Não há teste físico declarado. A correção de timeout nativo não cancela a chamada RFCOMM subjacente; ela impede que a camada JS inicie outra conexão concorrente enquanto a tentativa/limpeza anterior continua pendente.
 - Confirmar os três gates no SHA final após esta atualização documental. Depois, fazer teste controlado com ELM327 real e inspecionar a tela durante conexão, perda de link e recuperação. Não mesclar sem autorização explícita.
+
+
+## DB-095 · 2026-10-21 — Impedir nova conexão quando o fechamento do socket falha
+
+### Problema / diagnóstico
+A auditoria profunda encontrou uma lacuna na recuperação: embora `cleanupDisconnectedSession()` devolvesse `closeError`, `handleUnexpectedDisconnect()` ainda iniciava o backoff e podia tentar abrir um novo RFCOMM. Quando o fechamento rejeita, o estado físico do socket é incerto; iniciar outra conexão pode recriar a concorrência que a PR #77 pretende impedir.
+
+### Correção
+- `src/obd/connectionRecovery.ts`: adicionada a política pura `shouldRetryAfterDisconnectCleanup()`, que só autoriza nova tentativa quando o fechamento foi concluído sem erro.
+- `src/obd/sharedConnection.ts`: se o fechamento falhar, encerra o fluxo automático de recuperação, limpa a reserva `reconnecting`, publica o estado `ERROR` e não abre outro socket automaticamente.
+- `tests/connectionRecovery.test.js`: adicionados casos positivos/negativos para a política de retry, mantendo os testes de timeout e persistência.
+
+### Commit / CI
+- Commits publicados sequencialmente na branch `fix/bt-reconnect-guard`; SHA de teste mais recente conhecido: `4cd5bee6a259f1336fa3fec7ee5a8c2882d6171b`.
+- CI #2678 foi criada para esse SHA e estava pendente na última consulta. A CI #2676 foi cancelada quando uma atualização posterior da mesma branch disparou uma nova execução; não deve ser interpretada como falha do código.
+- O resultado anterior #2671 aprovou `gate:baseline` e `validate`, mas seu `android-build` ainda estava em execução; ele não valida esta correção adicional.
+
+### Próximo passo / limites
+Consultar CI #2678 no SHA final depois desta atualização do diário. Exigir `gate:baseline`, `validate` e `android-build` verdes. O teste com ELM327 real e a inspeção visual no Android permanecem pendentes; não mesclar sem autorização explícita.
