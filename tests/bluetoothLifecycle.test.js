@@ -55,6 +55,9 @@ assert(shared.includes("connectPreferredElm(connection.device.address, compatibi
 assert(shared.includes('if (connection) reconnecting = true'), 'reserve recovery before awaiting async cleanup to ignore duplicate disconnect callbacks');
 assert(transport.includes('timedOutNativeAttemptStillPending('), 'timed-out native connect must not race a second socket mode');
 assert(transport.includes('waitForNativeConnectAttempt('), 'waiting for a concurrent native attempt must have an explicit timeout');
+assert(transport.includes('pendingNativeConnectionSettlements'), 'a late native connection must be serialized through its cleanup completion');
+assert.match(transport, /pendingNativeConnectionSettlements\.get\(addressKey\) \?\? pending/, 'concurrent opens must wait for native cleanup, not only the raw socket promise');
+assert.match(transport, /await this\.safeDisconnect\(lateDevice\)[\s\S]*?LATE_CONNECT_DISCONNECTED/, 'a timed-out late success must be disconnected before the settlement completes');
 assert(transport.includes("CONNECT_ABORT_PREVIOUS_NATIVE_ATTEMPT_PENDING"), 'a stale native connection must fail fast instead of being awaited forever');
 assert(shared.includes('cleanupDisconnectedSession('), 'disconnect recovery must isolate persistence failure from session close');
 
