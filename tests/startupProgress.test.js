@@ -40,7 +40,7 @@ const corePidSet = new Set(['010C', '0105', '0142', '0111']);
 const preflight = loadTypeScriptModule(preflightSource, (request) => {
   if (request === './sensorTestEngine') return sensorEngine;
   if (request === '../obd/pidDefinition') {
-    return { getPidDefinition: (pid) => corePidSet.has(String(pid).replace(/\\s/g, '').toUpperCase()) ? { unit: 'N/D' } : null };
+    return { getPidDefinition: (pid) => corePidSet.has(String(pid).replace(/\s/g, '').toUpperCase()) ? { unit: 'N/D' } : null };
   }
   return require(require.resolve(request, { paths: [path.dirname(preflightSource)] }));
 });
@@ -107,7 +107,7 @@ const pidRunning = {
 const validatingPid = getStartupProgress({ ...base, ecuConnected: true, pidPreflight: pidRunning });
 assert.equal(validatingPid.terminal, 'progress');
 assert.match(validatingPid.title, /VALIDANDO PIDs ESSENCIAIS/);
-assert.match(validatingPid.pidDetail, /0105.*leitura 3\\/5/);
+assert.match(validatingPid.pidDetail, /0105.*leitura 3\/5/);
 
 const pidReady = getStartupProgress({
   ...base,
@@ -144,7 +144,7 @@ const pidPartial = getStartupProgress({
 });
 assert.equal(pidPartial.terminal, 'partial');
 assert.match(pidPartial.title, /VERIFICAÇÃO PARCIAL/);
-assert.match(pidPartial.detail, /N\\/D/);
+assert.match(pidPartial.detail, /N\/D/);
 
 const manualMode = getStartupProgress({ ...base, autoConnect: false, searching: false });
 assert.equal(manualMode.terminal, 'ready');
@@ -249,11 +249,11 @@ async function main() {
   const dashboard = fs.readFileSync(path.join(ROOT, 'app', 'index.tsx'), 'utf8');
   const screen = fs.readFileSync(path.join(ROOT, 'src', 'ui', 'StartupScreen.tsx'), 'utf8');
   const model = fs.readFileSync(path.join(ROOT, 'src', 'ui', 'startupProgress.ts'), 'utf8');
-  assert.match(dashboard, /getStartupProgress\\(/);
-  assert.match(dashboard, /<StartupScreen progress=\\{startupProgress\\} \\/>/);
-  assert.match(dashboard, /runStartupPidPreflight\\(connection/);
+  assert.match(dashboard, /getStartupProgress\(/);
+  assert.match(dashboard, /<StartupScreen progress=\{startupProgress\} \/>/);
+  assert.match(dashboard, /runStartupPidPreflight\(connection/);
   assert.match(dashboard, /STARTUP_TIMEOUT_MS/);
-  assert.match(dashboard, /useState\\(\\(\\) => !startupScreenConsumed\\)/);
+  assert.match(dashboard, /useState\(\(\) => !startupScreenConsumed\)/);
   assert.match(model, /STARTUP_MIN_DURATION_MS = 6_000/);
   assert.match(screen, /accessibilityRole="progressbar"/);
   assert.match(screen, /progress.pidDetail/);
