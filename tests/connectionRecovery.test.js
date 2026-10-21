@@ -14,7 +14,7 @@ const loaded = { exports: {} };
 new Function('exports', 'module', js)(loaded.exports, loaded);
 
 async function run() {
-  const { cleanupDisconnectedSession, timedOutNativeAttemptStillPending } = loaded.exports;
+  const { cleanupDisconnectedSession, timedOutNativeAttemptStillPending, waitForNativeConnectAttempt } = loaded.exports;
   const order = [];
   const diskError = new Error('disk unavailable');
   const cleanup = await cleanupDisconnectedSession(
@@ -41,6 +41,12 @@ async function run() {
     'a non-timed-out attempt must not trigger timeout abort logic');
   assert.equal(timedOutNativeAttemptStillPending(true, attempt, Promise.resolve()), false,
     'an unrelated pending promise must not be mistaken for the current native call');
+
+  assert.equal(await waitForNativeConnectAttempt(Promise.resolve('connected'), 20), true,
+    'concurrent opens must continue after the prior native request settles');
+  const neverSettles = new Promise(() => {});
+  assert.equal(await waitForNativeConnectAttempt(neverSettles, 5), false,
+    'a native request that never settles must not block a future open indefinitely');
 
   console.log('connectionRecovery.test.js: OK');
 }
