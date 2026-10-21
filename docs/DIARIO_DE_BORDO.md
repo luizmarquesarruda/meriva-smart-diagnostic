@@ -118,6 +118,7 @@
 - **DB-086** · 2026-10-21 — Cockpit: informações de rede/clima legíveis e botões com áreas de toque ampliadas
 - **DB-087** · 2026-10-21 — Ajuste adicional de legibilidade da rede e tamanho dos botões principais
 - **DB-088** · 2026-10-21 — Splash com conexão OBD e pré-verificação de cinco leituras dos PIDs essenciais
+- **DB-089** · 2026-10-21 — Corrigir estado do timeout após validação da ECU
 
 ---
 
@@ -3042,3 +3043,25 @@ A revisão do histórico identificou que a PR #70 (UX: navegação e inicializa�
 
 ### Próximo passo
 Confirmar a CI do HEAD exato e corrigir falhas a partir dos logs. Não reabrir PR antiga nem fazer merge sem solicitação explícita.
+
+
+## DB-089 · 2026-10-21 — Estado correto ao expirar o timeout com ECU já validada
+
+### Problema identificado na auditoria
+O estado terminal de timeout sempre era `offline`, mesmo quando `connectionStatus.ecuConnected` já confirmava resposta real da ECU. A mensagem tentava explicar a verificação parcial, mas o estado de UI contradizia a conexão real e podia levar o indicador/consumidor do estado a tratar como offline uma sessão ainda conectada.
+
+### Causa
+Em `getStartupProgress()`, o ramo `timedOut` calculava uma mensagem diferente conforme `ecuConnected`, porém retornava o mesmo terminal `offline` em ambos os casos. O comportamento não estava coberto por um teste para o caso timeout + ECU validada.
+
+### Correção
+- Timeout sem resposta ECU validada continua resultando em `offline`.
+- Timeout após validação real da ECU resulta em `partial`, com título explícito de verificação inicial parcial. O painel abre conectado; PIDs não concluídos permanecem N/D.
+- Adicionado teste comportamental para garantir os dois resultados distintos. RG-16 atualizado para tornar a distinção contratual.
+
+### Testes e validação
+- `tests/startupProgress.test.js`: mantém o caso timeout offline e adiciona o caso timeout com ECU validada; verifica terminal, título e mensagem.
+- A alteração foi publicada na branch `feat/startup-screen-minimum-six-seconds-20261021`. O workflow `CI` está configurado para executar no evento `push`; nesta sessão, não houve resultado de execução do SHA final disponível para confirmação. Não declarar `validate` nem `android-build` verdes sem consultar a execução exata.
+- A validação local completa continua pendente porque o repositório não está clonado neste ambiente. A CI não substitui a inspeção visual no Android e o teste físico do ELM327/ECU.
+
+### Próximo passo
+Consultar os jobs `validate` e `android-build` do HEAD final e corrigir qualquer falha pelo log. Manter todas as PRs fechadas e não fazer merge sem solicitação explícita.
