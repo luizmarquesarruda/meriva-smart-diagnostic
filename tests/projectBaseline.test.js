@@ -17,6 +17,8 @@ const workflow = read('.github/workflows/ci.yml');
 const elm = read('src/obd/elm327.ts');
 const sharedObd = read('src/obd/sharedConnection.ts');
 const home = read('app/index.tsx');
+const drivingMode = read('src/ui/drivingMode.ts');
+const tripService = read('src/trip/autoTripService.ts');
 const diagnostics = read('src/diagnostics/diagnosticEngine.ts');
 const sensorEngine = read('src/diagnostics/sensorTestEngine.ts');
 const projectContract = read('docs/CONTRATO_ANTI_REGRESSAO.md');
@@ -36,6 +38,7 @@ const requiredSuites = [
   'sensorTestEngine.test.js',
   'knowledgeJson.test.js',
   'cockpitNavigation.test.js',
+  'drivingMode.test.js',
   'startupProgress.test.js',
   'orientationLayout.test.js',
   'liveTelemetry.test.js',
@@ -113,6 +116,13 @@ for (const label of [
   assert.ok(home.includes("label: '" + label + "'"), 'indicador principal ausente: ' + label);
 }
 assert.match(home, /10_000/);
+assert.match(home, /getDrivingModePresentation/);
+assert.match(home, /vehicleTileGrid/);
+assert.match(home, /instantaneousConsumptionTimestampMs/);
+assert.match(drivingMode, /MIN_VALID_SAMPLES = 5/);
+assert.match(drivingMode, /MAX_VALID_CONSUMPTION_KML = 30/);
+assert.match(tripService, /instantaneousConsumptionTimestampMs/);
+assert.match(projectContract, /RG-17/);
 assert.ok(read('app/mais.tsx').includes('CONSULTA MANUAL DE PID'), 'atalho de consulta manual precisa existir');
 assert.ok(read('app/laboratorio.tsx').includes('PIDs REGISTRADOS / DESCOBERTOS'), 'lista de PIDs precisa continuar acessível');
 

@@ -6,11 +6,12 @@
 
 ### Estado atual do trabalho
 - Repositório: `luizmarquesarruda/meriva-smart-diagnostic`.
-- Branch de trabalho atual: `feat/startup-screen-minimum-six-seconds-20261021`, criada a partir da cabeça que continha os últimos ajustes de cockpit.
-- PRs #73, #74 e #75 foram fechadas em 2026-10-21 sem merge, conforme solicitação do usuário; não há PR aberta no início desta nova tarefa.
-- Esta branch deriva do commit `bd2e725a45fb2dce633377c1527bb0b389f86d5b` da antiga PR #75, fechada sem merge. Ela preserva alterações ainda não incorporadas à `main`; a criação da branch não equivale a merge.
-- A autoridade vigente é o HEAD real desta branch e a CI correspondente; não reutilizar estado de CI de commits antigos. Não reabrir PRs antigas nem mesclar sem solicitação explícita.
-- A barreira anti-regressão permanece executável e visível na CI. A nova pré-verificação de abertura reutiliza a sessão OBD única já validada; não cria transporte, fila serial ou motor diagnóstico paralelo.
+- Branch de base funcional: `feat/startup-screen-minimum-six-seconds-20261021`; último commit antes desta alteração: `1b5d33bbabe3719c385912db5693d7b6f71061a7`, incluindo a correção DB-089 para timeout com ECU já validada.
+- Nova alteração isolada na branch `feat/cockpit-info-tiles-driving-mode-20261021`, baseada na cabeça real mais recente, e não na antiga PR #75. PRs #73, #74 e #75 continuam fechadas sem merge; não havia PR aberta no momento desta edição.
+- CI do HEAD-base `1b5d33bbabe3719c385912db5693d7b6f71061a7`: run [39606176769](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/39606176769), jobs `validate` e `android-build` concluídos com sucesso. Esse resultado não cobre a nova mudança visual.
+- A atualização altera a apresentação do cockpit e acrescenta um timestamp para distinguir novas amostras de consumo das estimativas mantidas em cache. Mantém uma conexão Bluetooth/ELM327 única, splash, cinco leituras do Laboratório, consulta manual, offline-first e regras diagnósticas.
+- A classificação compara apenas dados atuais válidos com viagens `REAL_OBD`; seed/simulação não serve de referência e valores acima de 30 km/L não formam uma classe.
+- Não fazer merge de nenhuma PR sem autorização explícita.
 
 ### Contratos que não podem regredir
 1. **Testes de sensores:** cinco tentativas sequenciais por PID e cinco respostas válidas para uma avaliação numérica. Calcular a média aritmética das cinco amostras válidas. Resposta ausente, inválida ou timeout não vira zero e não conta como leitura válida; amostragem incompleta = inconclusiva/sem resposta, nunca aprovada.
@@ -120,6 +121,7 @@
 - **DB-088** · 2026-10-21 — Splash com conexão OBD e pré-verificação de cinco leituras dos PIDs essenciais
 - **DB-089** · 2026-10-21 — Corrigir estado do timeout após validação da ECU
 
+- **DB-090** · 2026-10-21 — Cartões do cockpit, botões agrupados e tendência de consumo com amostras novas
 ---
 
 Este arquivo é o registro operacional das correções, auditorias e decisões técnicas do projeto.
@@ -3065,3 +3067,28 @@ Em `getStartupProgress()`, o ramo `timedOut` calculava uma mensagem diferente co
 
 ### Próximo passo
 Consultar os jobs `validate` e `android-build` do HEAD final e corrigir qualquer falha pelo log. Manter todas as PRs fechadas e não fazer merge sem solicitação explícita.
+
+
+## DB-090 · 2026-10-21 — Cartões do cockpit, botões agrupados e tendência de consumo com amostras novas
+
+### Problema
+Na captura Android, Diagnóstico/Dados/Viagens tinham apresentação discreta e os indicadores de temperatura, consumo, autonomia e falhas ocupavam cartões pequenos, com a temperatura em uma faixa separada.
+
+### Diagnóstico
+A grade de informação pode ser reorganizada sem tocar na conexão OBD nem no indicador rotativo. Já o modo econômico não pode ser inferido por uma única leitura, por amostras de cache repetidas ou pelo histórico CarScanner de exemplo.
+
+### Correções
+- Substituída a faixa de métricas pequenas e o cartão separado de temperatura por uma grade 2×2: temperatura do motor, tendência de consumo, autonomia estimada e falhas ativas. Em paisagem, os quatro cartões ficam compactos em uma linha.
+- Os destinos principais mantêm as rotas existentes e passam a exibir ícones maiores sobre rótulos, em botões de pelo menos 64 dp: Diagnóstico, Dados e Viagens. A navegação inferior Bluetooth, Conectividade e Mais fica preservada.
+- Criado `src/ui/drivingMode.ts`: classifica a tendência depois de cinco amostras válidas (0–30 km/L) e compara a média curta com as viagens concluídas `REAL_OBD`. Margens de 15% evitam trocar o estado por pequenas diferenças; sem dados suficientes aparece N/D, COLETANDO ou CALIBRANDO.
+- `src/trip/autoTripService.ts` publica `instantaneousConsumptionTimestampMs` apenas quando nova taxa de combustível válida e velocidade produzem uma leitura. Estimativas mantidas em cache podem seguir visíveis, mas não entram como amostra independente.
+- `getDriveCycleSummary` já exclui `CARSCANNER_SEED` e `SIMULACAO`; essas fontes não são usadas como histórico real. Temperatura requer PID 0105 real e recente; falhas ficam N/D sem ECU; autonomia é identificada como estimativa.
+- Adicionado `tests/drivingMode.test.js` ao `npm test` e ao gate anti-regressão; ampliados testes do cockpit; RG-17 documenta os contratos. Sem dependências novas, alterações de protocolo, polling OBD paralelo, mudanças na splash ou redução dos cinco testes de PID do Laboratório.
+
+### Validação e limites
+- SHA desta alteração e resultado de CI devem ser registrados após a publicação e a consulta dos jobs reais. Não reutilizar a CI-base como se validasse DB-090.
+- CI-base: `1b5d33bbabe3719c385912db5693d7b6f71061a7`, run 39606176769, `validate` e `android-build` verdes; esse é apenas o ponto de partida.
+- Continua pendente conferir o APK em aparelho real, retrato/paisagem, alvos de toque/TalkBack e estabilidade com ELM327/ECU.
+
+### Próximo passo
+Abrir PR para revisão; conferir `npm run doctor`, `npm run gate:baseline`, `npm run validate` e `android-build` no SHA exato. Corrigir falhas a partir dos logs e não mesclar sem autorização explícita.

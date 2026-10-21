@@ -26,6 +26,8 @@ export interface AutoTripServiceState {
   consumptionKml: number | null;
   instantaneousConsumptionKml: number | null;
   instantaneousConsumptionSource: FuelRateSource | null;
+  /** Timestamp changes only when a fresh fuel-rate sample and valid speed are combined. */
+  instantaneousConsumptionTimestampMs: number | null;
   error: string | null;
   averageConsumptionKml: number;
   estimatedRangeKm: number;
@@ -50,6 +52,7 @@ const INITIAL_STATE: AutoTripServiceState = {
   consumptionKml: null,
   instantaneousConsumptionKml: null,
   instantaneousConsumptionSource: null,
+  instantaneousConsumptionTimestampMs: null,
   error: null,
   averageConsumptionKml: 0,
   estimatedRangeKm: 0,
@@ -466,6 +469,10 @@ class AutoTripService {
           fuelRateForDisplayLph != null && fuelRateForDisplayLph > 0 && tripVehicleSpeedKmh > 0
             ? tripVehicleSpeedKmh / fuelRateForDisplayLph
             : null;
+        // Cached display estimates are not independent measurements and must not
+        // increment the five-sample driving trend window.
+        const instantaneousConsumptionTimestampMs =
+          fuelRateLph != null && instantaneousConsumptionKml != null ? Date.now() : null;
 
         this.setState({
           connected: true,
@@ -475,6 +482,7 @@ class AutoTripService {
           consumptionKml: tripConsumptionKml,
           instantaneousConsumptionKml,
           instantaneousConsumptionSource: instantaneousConsumptionKml != null ? fuelRateForDisplaySource : null,
+          instantaneousConsumptionTimestampMs,
           fuelLevelPercent,
           fuelRemainingL: fuelLevelPercentToLiters(fuelLevelPercent),
           fuelReserve: isFuelReserve(fuelLevelPercent),
