@@ -11,7 +11,7 @@ import { flushCsvLogs } from '../database/csvLogger';
 import { readAppSettings, writeAppSettings } from '../database/appSettings';
 import { startBackgroundMonitoring, stopBackgroundMonitoring } from '../gps/backgroundMonitoring';
 import { readVehicleIdentity } from './vehicleIdentity';
-import { cleanupDisconnectedSession } from './connectionRecovery';
+import { cleanupDisconnectedSession, shouldRetryAfterDisconnectCleanup } from './connectionRecovery';
 
 export interface SharedObdConnection {
   session: Elm327Session;
@@ -134,6 +134,15 @@ async function handleUnexpectedDisconnect(reason: string): Promise<void> {
       }
     } finally {
       intentionalDisconnect = false;
+    }
+
+    // If close() rejects, the native socket state is unknown. Do not open a
+    // replacement RFCOMM socket until the old session is known to be released.
+    if (!shouldRetryAfterDisconnectCleanup(cleanup.closeError)) {
+      reconnecting = false;
+      lifecycle = 'ERROR';
+      emit();
+      return;
     }
 
     if (!reason.includes('BLUETOOTH DESLIGADO')) {
