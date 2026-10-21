@@ -115,8 +115,11 @@ async function handleUnexpectedDisconnect(reason: string): Promise<void> {
 
   if (connection) {
     intentionalDisconnect = true;
+    // Keep the cleanup result in the enclosing scope so retry policy can use it
+    // after the finally block without a block-scoped TypeScript error.
+    let cleanup: Awaited<ReturnType<typeof cleanupDisconnectedSession>>;
     try {
-      const cleanup = await cleanupDisconnectedSession(
+      cleanup = await cleanupDisconnectedSession(
         () => persistDisconnectedState(),
         () => connection.session.close(),
       );
