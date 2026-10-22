@@ -43,6 +43,11 @@ function finiteValue(value: number | null | undefined): value is number {
   return value != null && Number.isFinite(value);
 }
 
+function hasUsableTimestamp(timestamp: string, nowMs = Date.now()): boolean {
+  const parsedTimestamp = Date.parse(timestamp);
+  return Number.isFinite(parsedTimestamp) && parsedTimestamp <= nowMs;
+}
+
 function store(point: LiveTelemetryPoint): void {
   const pid = normalizePid(point.pid);
   const current = series.get(pid) ?? [];
@@ -59,7 +64,7 @@ export function resetLiveTelemetry(): void {
 export function recordLivePidReading(
   reading: Pick<LastPidReading, 'pid' | 'name' | 'value' | 'unit' | 'timestamp' | 'source'>,
 ): void {
-  if (reading.source !== 'REAL' || !finiteValue(reading.value)) return;
+  if (reading.source !== 'REAL' || !finiteValue(reading.value) || !hasUsableTimestamp(reading.timestamp)) return;
   store({
     pid: normalizePid(reading.pid),
     name: reading.name,
@@ -87,7 +92,8 @@ export function getLiveSeries(pid: string): LiveTelemetryPoint[] {
 }
 
 export function getLivePidTrend(pid: string): PidTrend | null {
-  const values = getLiveSeries(pid);
+  const nowMs = Date.now();
+  const values = getLiveSeries(pid).filter((item) => hasUsableTimestamp(item.timestamp, nowMs));
   if (!values.length) return null;
 
   const numeric = values.map((item) => item.value);
@@ -98,9 +104,7 @@ export function getLivePidTrend(pid: string): PidTrend | null {
   const average = numeric.reduce((sum, value) => sum + value, 0) / numeric.length;
   const lastTimestamp = values[values.length - 1].timestamp;
   const parsedTimestamp = Date.parse(lastTimestamp);
-  const ageSeconds = Number.isFinite(parsedTimestamp)
-    ? Math.max(0, (Date.now() - parsedTimestamp) / 1000)
-    : 0;
+  const ageSeconds = (nowMs - parsedTimestamp) / 1000;
 
   return {
     pid: normalizePid(pid),
@@ -157,14 +161,16 @@ export function getVehicleConditionSnapshot(): VehicleConditionSnapshot {
   const values = new Map<string, number>();
   for (const [pid, point] of latest.entries()) {
     const timestamp = Date.parse(point.timestamp);
-    if (Number.isFinite(timestamp) && now - timestamp <= STALE_AFTER_MS) {
+    const ageMs = now - timestamp;
+    if (Number.isFinite(timestamp) && ageMs >= 0 && ageMs <= STALE_AFTER_MS) {
       values.set(pid, point.value);
     }
   }
 
   const speedSeries = (series.get('010D') ?? []).filter((point) => {
     const timestamp = Date.parse(point.timestamp);
-    return Number.isFinite(timestamp) && now - timestamp <= STALE_AFTER_MS;
+    const ageMs = now - timestamp;
+    return Number.isFinite(timestamp) && ageMs >= 0 && ageMs <= STALE_AFTER_MS;
   });
   const previousSpeed = speedSeries.length > 1
     ? speedSeries[speedSeries.length - 2].value

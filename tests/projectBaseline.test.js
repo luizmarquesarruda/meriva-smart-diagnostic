@@ -19,6 +19,7 @@ const sharedObd = read('src/obd/sharedConnection.ts');
 const home = read('app/index.tsx');
 const dataScreen = read('app/dados.tsx');
 const tripService = read('src/trip/autoTripService.ts');
+const liveTelemetry = read('src/obd/liveTelemetry.ts');
 const diagnostics = read('src/diagnostics/diagnosticEngine.ts');
 const sensorEngine = read('src/diagnostics/sensorTestEngine.ts');
 const projectContract = read('docs/CONTRATO_ANTI_REGRESSAO.md');
@@ -134,6 +135,8 @@ assert.ok(!tripService.includes('averageConsumptionKml * state.autonomy.tankCapa
 assert.ok(tripService.includes('estimateRangeFromFuelLevel(currentFuelLevelPercent, averageConsumptionKml)'),
   'autonomia persistida deve usar apenas nível de combustível atual');
 assert.match(tripService, /isCurrentFuelLevelSample\(this\.state\.fuelLevelReadAtMs\)/);
+assert.match(liveTelemetry, /!hasUsableTimestamp\(reading\.timestamp\)/, 'live samples must reject invalid or future timestamps at ingestion');
+assert.match(liveTelemetry, /ageMs >= 0 && ageMs <= STALE_AFTER_MS/, 'operational context must reject timestamps from the future');
 assert.match(tripService, /listener\(this\.getState\(\)\)/, 'new service subscribers must receive freshness-filtered state');
 assert.match(tripService, /const snapshot = this\.getState\(\)/, 'service updates must emit freshness-filtered state');
 assert.ok(!tripService.includes('estimatedRangeKm: persisted.autonomy.estimatedRangeKm'), 'current state cannot be seeded with saved range');

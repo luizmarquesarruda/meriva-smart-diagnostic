@@ -3219,3 +3219,19 @@ Transformar as prioridades do relatório analítico em critérios verificáveis 
 - Alteração adicional de revisão funcional; nenhuma dependência ou protocolo alterado.
 - A CI #2841 está associada ao commit anterior de frescor DB-095, não valida esta alteração complementar. A atualização desta branch poderá iniciar automaticamente uma nova execução; conferir o resultado correspondente ao SHA mais recente.
 - Teste físico ELM327/ECU e inspeção visual da splash continuam pendentes. Sem merge; modo oficina avançado e sincronização em nuvem/perfis permanecem fora do escopo.
+
+
+## DB-097 · 2026-10-22 — Rejeitar timestamps inválidos/futuros na telemetria ao vivo
+
+### Achado funcional
+- `getVehicleConditionSnapshot()` tratava qualquer timestamp que fosse no máximo 10 s no passado como atual, sem exigir idade não negativa. Uma amostra marcada no futuro poderia entrar no contexto de motor/veículo.
+- `getLivePidTrend()` também convertia idade negativa em zero, permitindo que timestamp futuro fosse mostrado como leitura recém-recebida, e `recordLivePidReading()` aceitava timestamps inválidos.
+
+### Correção aplicada
+- `src/obd/liveTelemetry.ts`: timestamps ISO inválidos/futuros são rejeitados na entrada; tendência e contexto operacional calculam idade usando o mesmo instante de referência e exigem idade entre 0 e 10 s para classificar o estado atual.
+- `tests/liveTelemetry.test.js`: adiciona regressão para timestamps futuros e inválidos, assegurando ausência de tendência/contexto fabricado.
+- `tests/projectBaseline.test.js`, `docs/TEST_PLAN.md`, `docs/CONTRATO_ANTI_REGRESSAO.md` e `CHANGELOG.md` foram atualizados para registrar a regra.
+
+### Validação
+- Mudança sem nova dependência e sem alterar consulta OBD, fila Bluetooth ou origem das amostras.
+- Testes automatizados e build Android da cabeça mais recente devem ser confirmados na CI automática; sem merge e sem declaração de teste físico ELM327/ECU.
