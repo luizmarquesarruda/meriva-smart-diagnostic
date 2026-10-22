@@ -11,7 +11,7 @@ import { flushCsvLogs } from '../database/csvLogger';
 import { readAppSettings, writeAppSettings } from '../database/appSettings';
 import { startBackgroundMonitoring, stopBackgroundMonitoring } from '../gps/backgroundMonitoring';
 import { readVehicleIdentity } from './vehicleIdentity';
-import { cleanupDisconnectedSession, shouldRetryAfterDisconnectCleanup } from './connectionRecovery';
+import { cleanupDisconnectedSession, runDisconnectPersistenceTasks, shouldRetryAfterDisconnectCleanup } from './connectionRecovery';
 
 export interface SharedObdConnection {
   session: Elm327Session;
@@ -81,15 +81,13 @@ function setEcuResponseState(next: EcuResponseState, error?: string): void {
 
 
 async function persistDisconnectedState(): Promise<void> {
-  try {
-    await stopBackgroundMonitoring();
-    await closeObdAutosaveSession();
-  } catch {
-    // a perda de conectividade não deve derrubar a interface
-  } finally {
-    // Não perder amostras pendentes quando o link ECU/Bluetooth cair.
-    try { await flushCsvLogs(); } catch { /* a fila retenta sem bloquear a reconexão */ }
-  }
+  // Cada ação é tentada mesmo quando outra falha. A camada de recuperação
+  // registra o erro agregado sem impedir o fechamento da sessão ELM327.
+  await runDisconnectPersistenceTasks([
+    { label: 'parar monitoramento em segundo plano', run: () => stopBackgroundMonitoring() },
+    { label: 'fechar sessão de autosave', run: () => closeObdAutosaveSession() },
+    { label: 'descarregar logs CSV', run: () => flushCsvLogs() },
+  ]);
 }
 
 async function handleUnexpectedDisconnect(reason: string): Promise<void> {
