@@ -21,14 +21,14 @@ assert.doesNotMatch(index, /\}, \[isHydrated, settings\]\);/, 'objeto settings i
 assert.match(index, /settings\?\.elmMaxConnectionAttempts/, 'efeito deve reagir às opções OBD efetivamente alteradas');
 const primaryTabs = read('src/ui/PrimaryTabBar.tsx');
 assert.doesNotMatch(index, /!layout\.landscape\s*&&\s*\(/, 'navegação não deve desaparecer ao girar o aparelho');
-assert.ok(read(file).includes('<PrimaryTabBar active="' + active + '" />'), file + ' deve mostrar a navegação principal');
+assert.ok(index.includes('<PrimaryTabBar active="cockpit" />'), 'cockpit deve mostrar a navegação principal compartilhada');
 for (const [file, active] of [
   ['app/laboratorio.tsx', 'diagnostic'],
   ['app/dados.tsx', 'data'],
   ['app/viagens.tsx', 'trips'],
   ['app/mais.tsx', 'more'],
 ]) {
-  assert.match(read(file), new RegExp('<PrimaryTabBar active="' + active + '" \\/>'), file + ' deve mostrar a navegação principal');
+  assert.ok(read(file).includes('<PrimaryTabBar active="' + active + '" />'), file + ' deve mostrar a navegação principal');
 }
 for (const route of ['href="/"', 'href="/laboratorio"', 'href="/dados"', 'href="/viagens"', 'href="/mais"']) {
   assert.ok(primaryTabs.includes(route), 'barra principal deve expor ' + route);
