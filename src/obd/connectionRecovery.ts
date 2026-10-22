@@ -38,7 +38,7 @@ export async function cleanupDisconnectedSession(
   persist: () => Promise<void>,
   close: () => Promise<void>,
   persistenceTimeoutMs = 1_000,
-  closeTimeoutMs = 1_000,
+  closeTimeoutMs = 5_000,
 ): Promise<DisconnectCleanupResult> {
   let persistenceError: unknown | null = null;
   let closeError: unknown | null = null;
