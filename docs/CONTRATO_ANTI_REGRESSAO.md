@@ -36,6 +36,7 @@ Este documento é o contrato de aceitação entre mudanças, testes, diário e C
 | RG-18 | No Manifest Android gerado, `BLUETOOTH` e `BLUETOOTH_ADMIN` legados devem declarar `maxSdkVersion=30`; `BLUETOOTH_CONNECT` e `BLUETOOTH_SCAN` modernos permanecem sem esse limite. | `permissions.test.js`, validação do `android-build` |
 | RG-19 | Renegociação de protocolo ELM (ATZ, seleção ATSP, prova ECU e leitura ATDP) deve ser atômica na fila serial, sem intercalar consultas de PID até a recuperação concluir. | `regression.test.js` — recuperação de protocolo serializada |
 | RG-20 | Escrita RFCOMM nativa sem conclusão deve atingir o deadline I/O, marcar o link como perdido e iniciar limpeza; nenhuma reconexão pode avançar antes de a limpeza nativa concluir. | `regression.test.js` — escrita travada; `bluetoothLifecycle.test.js`; `android-build` |
+| RG-21 | Falha de `disconnect()` só pode ser tratada como já desconectado se `isConnected()` confirmar estado desligado; erro ou estado desconhecido deve ser propagado para bloquear nova sessão. | `regression.test.js` — falha de limpeza nativa; `connectionRecovery.test.js` |
 
 ## Regras para uma alteração legítima
 
