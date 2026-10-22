@@ -111,6 +111,18 @@ export async function cleanupDisconnectedSession(
  * Wait for an earlier native request to settle, but never inherit an unbounded wait.
  * The native API itself cannot be cancelled from this layer.
  */
+/** Wait for native cleanup to settle before permitting another RFCOMM open. */
+export async function awaitNativeCleanupRetry(
+  retryPromise: Promise<void>,
+  timeoutMs: number,
+): Promise<void> {
+  const settled = await waitForNativeConnectAttempt(retryPromise, timeoutMs);
+  if (!settled) {
+    throw new Error('RETRY DE LIMPEZA NATIVA AINDA PENDENTE; NOVA CONEXÃO RFCOMM BLOQUEADA');
+  }
+  await retryPromise;
+}
+
 export async function waitForNativeConnectAttempt(
   pending: Promise<unknown>,
   timeoutMs: number,
