@@ -35,6 +35,13 @@
           "isAndroidBackgroundLocationEnabled": true,
           "isAndroidForegroundServiceEnabled": true
         }
+      ],
+      [
+        "expo-navigation-bar",
+        {
+          "backgroundColor": "#07111f",
+          "barStyle": "light"
+        }
       ]
     ]
   }
