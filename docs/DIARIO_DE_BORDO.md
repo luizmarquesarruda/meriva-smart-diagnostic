@@ -1,6 +1,6 @@
 # Diário de Bordo - Meriva Smart Diagnostic
 
-## ESTADO VIGENTE E REGRAS ANTI-REGRESSÃO — 2026-10-21
+## ESTADO VIGENTE E REGRAS ANTI-REGRESSÃO — 2026-10-22
 
 > **Esta seção é a referência operacional atual.** O restante deste arquivo contém registros históricos: falhas, decisões e “próximos passos” antigos descrevem o estado da época e não devem ser tratados como tarefas ainda abertas sem nova verificação. Quando dois registros divergirem, prevalecem este contrato e a entrada cronologicamente mais recente que tenha evidência verificável.
 
@@ -10,7 +10,8 @@
 - PR #76 (`audit: restore anti-regression protections and cockpit fixes`) consta como mesclada no GitHub. A execução CI #2637 para esse SHA terminou com sucesso: `validate` passou (incluindo o gate `gate:baseline`) e `android-build` passou, com APK standalone verificado e enviado como artefato. Isto não comprova teste físico no telefone ou no ELM327.
 - PRs #74 e #75 permanecem fechadas sem merge próprio; as correções que agora estão em `main` são as efetivamente integradas pela PR #76, não uma aprovação implícita dos heads isolados.
 - Trabalho em andamento: branch `fix/bt-reconnect-guard`, PR #77 contra `main`, aberta em rascunho e não mesclada. A PR trata concorrência RFCOMM, fechamento tardio e recuperação após desconexão.
-- CI #2680, no SHA anterior `e95a4e2fb5bcddc96abc9ebfec535c6a804ed310`, falhou em `validate` com `TS2304: Cannot find name 'cleanup'` em `src/obd/sharedConnection.ts`; `gate:baseline` passou e `android-build` foi ignorado após a falha. A correção de escopo foi publicada em `c564ec465e27f6e86f15b2d583a8cba2981a93c6`; a nova CI desse SHA precisa ser consultada.
+- Auditoria adicional de persistência na desconexão: commits `d50b15a238a028f6c14c0d92923bfd13b54809cb`, `708288c38ee1f84f702e34a6e25bd94f8f2a1ebd` e `3027de27756027794e34566682b5a5342ef5ca6` fazem as operações de GPS/autosave/CSV serem tentadas independentemente e devolvem os erros à recuperação; a validação dessa alteração aguarda a nova CI do SHA final.
+- CI #2680, no SHA `e95a4e2fb5bcddc96abc9ebfec535c6a804ed310`, falhou em `validate` com `TS2304: Cannot find name 'cleanup'`; a correção de escopo saiu em `c564ec465e27f6e86f15b2d583a8cba2981a93c6`. A CI #2684 no SHA `ac5d173b1299abfa7cd87c445bc9c5df8b5e5768` aprovou `gate:baseline`, `validate` e `android-build`, mas antecede a auditoria atual de propagação de erros de persistência.
 - O teste físico está pendente. Não mesclar alterações novas sem autorização explícita; para esta branch, exigir `gate:baseline`, `validate` e `android-build` verdes no SHA final. Teste visual e físico com ELM327/ECU são etapas separadas.
 
 ### Contratos que não podem regredir
@@ -128,6 +129,7 @@
 - **DB-095** · 2026-10-21 — Impedir nova conexão quando o fechamento do socket falha
 - **DB-096** · 2026-10-21 — Corrigir escopo do resultado de limpeza revelado pela CI #2680
 - **DB-097** · 2026-10-22 — Auditoria de integridade do índice do Diário de Bordo
+- **DB-098** · 2026-10-22 — Erros de persistência expostos na recuperação Bluetooth
 
 ---
 
@@ -3230,3 +3232,26 @@ Consultar CI #2678 no SHA final depois desta atualização do diário. Exigir `g
 ### Próximo passo
 - Acompanhar a CI do novo SHA e manter a PR #77 em rascunho. Não mesclar sem autorização explícita.
 - Após a CI, testar conexão, timeout, desconexão e reconexão com o ELM327 real; CI verde não substitui o teste no veículo.
+
+
+## DB-098 · 2026-10-22 — Erros de persistência expostos na recuperação Bluetooth
+
+### Problema / evidência
+- Na revisão da PR #77, `handleUnexpectedDisconnect()` já tratava `cleanup.persistenceError`, mas `persistDisconnectedState()` capturava silenciosamente as falhas de `stopBackgroundMonitoring()`/`closeObdAutosaveSession()` e de `flushCsvLogs()`.
+- Por isso, a camada nova não conseguiria relatar essas falhas reais: o callback de persistência normalmente resolvia com sucesso mesmo quando uma ou mais operações tinham falhado.
+- A CI #2684 havia passado para o SHA anterior `ac5d173b1299abfa7cd87c445bc9c5df8b5e5768`; ela não cobre estes commits.
+
+### Correção
+- `src/obd/connectionRecovery.ts`: criado `runDisconnectPersistenceTasks()`, que tenta todas as ações fornecidas, agrega as falhas e rejeita só depois de os resultados disponíveis serem tratados.
+- `src/obd/sharedConnection.ts`: GPS em segundo plano, encerramento do autosave e flush dos CSVs são tentados independentemente; a falha agregada é recebida por `cleanupDisconnectedSession()`, sem impedir o fechamento da sessão ELM327.
+- `tests/connectionRecovery.test.js`: teste comportamental confirma que todas as ações são tentadas e que falhas de GPS/CSV chegam ao erro agregado.
+- Commits de código/teste: `d50b15a238a028f6c14c0d92923bfd13b54809cb`, `708288c38ee1f84f702e34a6e25bd94f8f2a1ebd` e `3027de27756027794e34566682b5a5342ef5ca6`.
+- Nenhuma dependência, fórmula de PID, comando OBD ou regra de abertura paralela de socket foi alterada.
+
+### Validação e limite
+- Os commits intermediários não iniciaram CI para evitar validar uma revisão parcial. Este commit documental deve disparar a validação do conjunto completo.
+- Não declarar a correção concluída até a CI no SHA final aprovar `gate:baseline`, `validate` e `android-build`.
+- Teste físico de desconexão, falha de GPS/armazenamento e reconexão com ELM327 continua pendente.
+
+### Próximo passo
+Acompanhar a CI do SHA deste registro, revisar os logs se houver falha e manter a PR #77 em rascunho. Não mesclar sem autorização explícita.
