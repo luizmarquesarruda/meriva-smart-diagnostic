@@ -2,7 +2,7 @@ import RNBluetoothClassic, { BluetoothDevice } from 'react-native-bluetooth-clas
 import { Platform } from 'react-native';
 import { ObdTransport } from './elm327';
 import { DEFAULT_ELM327_COMPATIBILITY, Elm327CompatibilityConfig, mergeCompatibilityConfig } from './elm327Compatibility';
-import { timedOutNativeAttemptStillPending, waitForNativeConnectAttempt } from './connectionRecovery';
+import { awaitNativeCleanupRetry, timedOutNativeAttemptStillPending, waitForNativeConnectAttempt } from './connectionRecovery';
 
 export interface BluetoothDeviceInfo {
   address: string;
@@ -49,7 +49,7 @@ async function waitForPendingNativeSocketCleanup(addressKey: string, timeoutMs: 
         () => { if (pending.retryPromise === retryPromise) pending.retryPromise = null; },
       );
     }
-    await retryPromise;
+    await awaitNativeCleanupRetry(retryPromise, timeoutMs);
   }
 
   if (pendingNativeSocketCleanups.get(addressKey) === pending) {
