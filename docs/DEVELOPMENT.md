@@ -72,3 +72,14 @@ Se um PID não estiver na resposta de descoberta, não assuma que ele é suporta
 O GitHub Actions executa instalação, Expo Doctor, TypeScript, testes e montagem de um APK release standalone com Java 17.
 
 A validação física do Bluetooth e do GPS continua exigindo um Android real.
+
+
+## Verificação da splash screen
+
+1. Confira `expo.splash.backgroundColor` e `resizeMode` em `app.json`.
+2. Confirme que `expo-splash-screen` está declarado em `package.json` e que a versão instalada no lockfile é compatível com Expo SDK 51.
+3. Execute `npm ci --no-audit --no-fund`, `npm run doctor`, `npm run gate:baseline`, `npm run validate` e o build Android release conforme o workflow.
+4. Instale o APK gerado em um dispositivo Android e confira inicialização fria, retorno após fechar/reabrir, proporção do logotipo e transição para a primeira tela.
+5. Registre o SHA e o resultado de cada job em `docs/DIARIO_DE_BORDO.md`.
+
+**Limite atual conhecido:** a configuração de fundo escuro está registrada, mas a existência/identidade do asset de logotipo não deve ser declarada como confirmada até inspeção do arquivo e do APK.
