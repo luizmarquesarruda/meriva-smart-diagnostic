@@ -3253,3 +3253,38 @@ Transformar as prioridades do relatório analítico em critérios verificáveis 
 ### Limites e validação
 - Nenhuma dependência ou comando de limpeza de DTC foi adicionado. O lote só altera classificação da leitura.
 - A CI do SHA final precisa concluir `validate` e `android-build`. O teste físico de ECU/ELM327 continua pendente; sem merge.
+
+
+## DB-099 · 2026-10-22 — Pendências de splash screen e rodada de estabilização
+
+### Objetivo
+Consolidar as pendências da auditoria e iniciar a validação com critérios verificáveis, sem presumir que a CI de um commit anterior valide mudanças posteriores.
+
+### Estado verificado antes desta entrada
+- Branch consultada: `fix/cockpit-live-autonomy-20261022`.
+- `app.json` contém a configuração de splash com fundo `#07111f` e `resizeMode: contain`, mas essa configuração, sozinha, não comprova a presença do logotipo no APK.
+- O workflow `.github/workflows/ci.yml` é acionado em push para branches e executa `npm ci`, Expo Doctor, `gate:baseline`, `npm run validate` e build APK Android.
+- O SHA atual da branch e a presença de asset visual de splash ainda precisam ser confirmados nesta rodada; não declarar a CI anterior como validação do estado atual.
+
+### Pendências prioritárias
+1. Inspecionar assets existentes e confirmar se a splash visual está referenciada e empacotada no Android; validar cold start em aparelho.
+2. Confirmar HEAD da branch e vincular todos os resultados de teste ao mesmo SHA candidato.
+3. Executar CI completa: baseline antirregressão, TypeScript/suíte de testes, Expo Doctor, prebuild e APK standalone.
+4. Preservar Bluetooth Classic, fila serial compartilhada, distinção entre adaptador conectado e ECU respondendo, consulta manual de PID, cinco leituras válidas, separação entre dados reais e simulados, GPS, viagens, telemetria e histórico.
+5. Revisar navegação Diagnóstico/Dados/Viagem, legibilidade e orientação sem remover funcionalidades.
+6. Testar ELM327/ECU fisicamente e registrar esse resultado separadamente da CI.
+7. Atualizar changelog, plano de testes e contrato antirregressão conforme as alterações efetivamente verificadas.
+
+### Sequência de execução
+- Confirmar branch e SHA.
+- Inspecionar assets antes de criar, substituir ou renomear arquivos.
+- Corrigir a integração da splash sem alterar o fluxo de inicialização além do necessário.
+- Implementar alterações pequenas e rastreáveis; rodar validações no mesmo commit final.
+- Registrar falhas, evidências, artefatos e testes físicos pendentes.
+
+### Restrições e critério de conclusão
+- Não remover funcionalidades existentes para contornar falhas.
+- Não marcar testes como aprovados sem evidências.
+- Não fazer merge sem validação final e autorização explícita.
+- Modo oficina avançado e sincronização em nuvem/perfis permanecem fora do escopo.
+- Esta entrada permanece em andamento até a CI da cabeça final estar concluída e os testes físicos serem identificados como aprovados ou pendentes.
