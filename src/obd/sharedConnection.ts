@@ -85,7 +85,7 @@ async function persistDisconnectedState(): Promise<void> {
   // registra o erro agregado sem impedir o fechamento da sessão ELM327.
   await runDisconnectPersistenceTasks([
     { label: 'parar monitoramento em segundo plano', run: async () => { await stopBackgroundMonitoring(); } },
-    { label: 'fechar sessão de autosave', run: () => closeObdAutosaveSession() },
+    { label: 'fechar sessão de autosave', run: async () => { await closeObdAutosaveSession(); } },
     { label: 'descarregar logs CSV', run: async () => { await flushCsvLogs(); } },
   ]);
 }
