@@ -155,6 +155,7 @@
 - **DB-109** · 2026-10-22 — Bloqueio global de reconexão enquanto a limpeza do socket está incerta
 - **DB-110** · 2026-10-22 — Incluir falhas no fechamento normal no bloqueio global RFCOMM
 - **DB-111** · 2026-10-22 — Deadline para fechamento nativo de sessão que não conclui
+- **DB-112** · 2026-10-22 — Deadline para retry de limpeza nativa pendente
 
 ---
 
@@ -3527,3 +3528,21 @@ A função `cleanupDisconnectedSession()` limitava a espera da persistência, ma
 - Alterações publicadas na branch `fix/bt-reconnect-guard`, vinculada à PR #77.
 - O teste foi adicionado à suíte `npm test`; a execução real da suíte, `gate:baseline`, `validate` e `android-build` para o SHA resultante deve ser confirmada na CI.
 - Não há confirmação de teste físico com ELM327/ECU nesta etapa.
+
+
+## DB-112 · 2026-10-22 — Deadline para retry de limpeza nativa pendente
+
+### Problema observado
+A limpeza global de socket bloqueava uma nova conexão enquanto a desconexão anterior estivesse pendente. Porém, quando a primeira limpeza rejeitava, o caminho de retry aguardava a nova promessa sem deadline. Um `disconnect()` nativo que nunca concluísse podia suspender a tentativa de reconexão indefinidamente.
+
+### Correção aplicada
+- Extraída a política `awaitNativeCleanupRetry()`, que aguarda o retry apenas até o timeout configurado.
+- Integrada a política à limpeza global de socket em `BluetoothClassicTransport`.
+- Uma limpeza que permanece pendente conserva o bloqueio RFCOMM e produz erro recuperável em vez de iniciar outro socket.
+- Adicionado teste adversarial para uma promessa de retry que nunca resolve.
+- Contrato anti-regressão atualizado com RG-24.
+
+### Validação
+- Commits: `934da33a4161ee87cab9f1682f6879a15495d206` (política), `ea2a0320b7cc22aabeb76cf56ef3a643e1a988be` (integração no transporte), `47341ee86e5f6e01315003faaa28229b980fb54d` (teste).
+- CI do SHA final, incluindo `gate:baseline`, `validate` e `android-build`, ainda deve ser confirmada.
+- Teste físico com ELM327/ECU não realizado nesta etapa.
