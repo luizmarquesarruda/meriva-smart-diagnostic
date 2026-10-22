@@ -43,6 +43,7 @@ let bluetoothConnectCalls = 0;
 let bluetoothActiveNativeConnections = 0;
 let bluetoothMaxNativeConnections = 0;
 let bluetoothConnectDelayMs = 0;
+let bluetoothWriteNeverSettles = false;
 
 function parentDir(p) {
   const i = p.lastIndexOf('/');
@@ -184,6 +185,7 @@ const fakeBluetooth = {
       return { remove() { bluetoothListener = null; } };
     },
     write: async () => {
+      if (bluetoothWriteNeverSettles) return new Promise(() => {});
       bluetoothListener?.({ data: '41 0C ' });
       bluetoothListener?.({ data: '0C 18\r\n>' });
     },
@@ -690,6 +692,22 @@ async function testBluetoothEventTransport() {
   bluetoothDisconnectListener?.({ address: 'AA:BB:CC:DD:EE:FF' });
   await assert.rejects(pendingRead, /BLUETOOTH DESCONECTADO|BLUETOOTH NÃO CONECTADO/);
   await transport.close();
+
+  // A never-settling native write must hit the I/O deadline and initiate socket cleanup.
+  bluetoothWriteNeverSettles = true;
+  const timeoutEvents = [];
+  const stalledTransport = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF', { ioTimeoutMs: 1000 }, {
+    onDisconnected: (reason) => timeoutEvents.push(reason),
+  });
+  await stalledTransport.open();
+  await assert.rejects(
+    stalledTransport.write('010C\r'),
+    /TIMEOUT: ESCRITA BLUETOOTH SEM CONCLUSÃO/,
+  );
+  assert.deepStrictEqual(timeoutEvents, ['BLUETOOTH DESCONECTADO']);
+  assert.match(stalledTransport.getDiagnosticsText(), /WRITE_TIMEOUT/);
+  await stalledTransport.close();
+  bluetoothWriteNeverSettles = false;
 }
 
 async function testQuota() {
