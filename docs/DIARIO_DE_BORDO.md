@@ -3123,3 +3123,36 @@ Concluir a revisão final do conjunto e restaurar os gatilhos da CI para executa
 
 ### Lição de processo
 Uma anotação de auditoria que remove uma funcionalidade visível precisa de evidência de que ela é realmente redundante e de uma atualização explícita do contrato de regressão. A ausência de teste não é prova de ausência de uso.
+
+## DB-093 · 2026-10-22 — Reconciliação da documentação após regressão da splash
+
+### Objetivo
+Sincronizar a documentação de entrada, arquitetura, desenvolvimento, contribuição, changelog, auditorias históricas e contrato antirregressão com a correção preparada em DB-092, sem apagar decisões antigas nem declarar validação não comprovada.
+
+### Arquivos atualizados neste lote
+- `README.md`: documenta a configuração atual de splash, a dependência necessária e a distinção entre configuração nativa e asset visual confirmado.
+- `CHANGELOG.md`: adiciona a seção Unreleased com as mudanças da splash e o estado de validação pendente.
+- `CONTRIBUTING.md`: define a documentação sincronizada e a exigência de evidência por SHA para alterações de dependências/identidade visual.
+- `docs/ARCHITECTURE.md`: descreve a splash nativa e a diferença entre configuração, asset e tela React Native.
+- `docs/DEVELOPMENT.md`: inclui o procedimento de validação da splash no build e em aparelho Android.
+- `docs/CONTRATO_ANTI_REGRESSAO.md`: fortalece RG-18 e adiciona RG-19 para consistência documental e alegações baseadas em evidência.
+- `docs/AUDITORIA_2026-10-02.md`, `docs/AUDITORIA_FASE0.md`, `docs/AUDITORIA_TECNICA_2026-10-03.md`: preservam os achados históricos, mas adicionam notas datadas para evitar que declarações antigas sobre splash/lockfile sejam confundidas com o estado atual.
+- Este diário: registra o lote e suas limitações.
+
+### Estado técnico documentado
+- `expo-splash-screen@~0.27.7` está declarado em `package.json` e alinhado com a dependência raiz/versão do `package-lock.json`.
+- `app.json` define `expo.splash.backgroundColor = #07111f` e `resizeMode = contain`.
+- A configuração não prova que um asset de logotipo exista ou esteja embutido no APK; essa inspeção continua pendente.
+- O workflow configurado executa `npm ci`, Expo Doctor, gate de baseline, TypeScript/testes e build Android release. Não se deve afirmar que esses passos passaram no SHA final sem consultar a execução correspondente.
+
+### Verificações realizadas nesta atualização
+- Arquivos recuperados diretamente da branch `fix/cockpit-live-autonomy-20261022` antes da edição.
+- Alterações documentais preparadas como um lote único para evitar commits parciais que disparem CI antes da revisão completa.
+- Ainda é necessário confirmar o SHA do commit documental, revisar o diff consolidado e verificar os resultados de CI somente depois de o lote estar completo.
+
+### Critérios de encerramento
+1. Confirmar que todas as 10 páginas listadas acima estão no mesmo commit.
+2. Rever diff para garantir que auditorias históricas foram anotadas, não reescritas como se os achados nunca tivessem existido.
+3. Executar/consultar gate, suíte, Expo Doctor e build Android para o SHA final, sem declarar aprovação antecipada.
+4. Conferir o asset de splash e a inicialização fria em APK instalado; se o asset estiver ausente, corrigir o recurso visual separadamente.
+5. Não fazer merge sem autorização explícita.
