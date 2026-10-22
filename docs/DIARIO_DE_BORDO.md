@@ -12,6 +12,9 @@
 - Trabalho em andamento: branch `fix/bt-reconnect-guard`, PR #77 contra `main`, aberta em rascunho e não mesclada. A PR trata concorrência RFCOMM, fechamento tardio e recuperação após desconexão.
 - CI #2690 para SHA `ff85c7556b090c52ee5acf30d46fdec731919414` aprovou `gate:baseline`, mas falhou em `validate` com TS2322 em `src/obd/sharedConnection.ts(88,54)`: stopBackgroundMonitoring retornava Promise<boolean> em callback com contrato Promise<void>. `android-build` foi ignorado. Correção localizada publicada no commit `dd9c00b3f21aca9d9e1f0905876947deb5a4fe09`; exige CI no novo SHA.
 - Auditoria de permissões encontrou `app/_layout.tsx` abortando a preparação quando a localização era negada, mesmo com Bluetooth concedido. Política separada em `src/permissions/permissionPolicy.ts`: OBD depende do Bluetooth; GPS depende da permissão de localização. Teste comportamental e gate anti-regressão adicionados; CI atual continua obrigatória.
+- CI #2704 (run `39720378776`, SHA `9013528314623ae4182b8e64ef8cbc5b3c78c43b`) passou no gate e no TypeScript, mas falhou em teste por duas asserções de `tests/bluetoothLifecycle.test.js` presas à implementação textual antiga. Asserções foram atualizadas para `canStartObdStartup()`/`canUseGps()`; commits `9013528314623ae4182b8e64ef8cbc5b3c78c43b` e `cd8f21fab14e8a94f8f37368320f31abd3dfafe8`.
+- A CI #2706 (run `39720499416`, SHA `c32ff0e1a1b8a2ce89dc372dfe55ad80aaabb7d8`) confirmou que a correção de tipo inicial foi incompleta: além do GPS, `closeObdAutosaveSession()` também retornava `Promise<boolean>` na tarefa tipada como `Promise<void>`. Callback normalizado em `c32ff0e1a1b8a2ce89dc372dfe55ad80aaabb7d8`; CI ainda falhou em teste legado antes da próxima correção.
+- CI #2715 (run `39720653130`) foi iniciada para SHA `e6d438ffbff8c4788ebd8978cc5a842aa23c71f4`, mas ainda estava pendente na última consulta. Esse SHA ainda antecede esta atualização documental; a CI nova do SHA final deverá ser consultada.
 - Auditoria adicional de persistência na desconexão: commits `d50b15a238a028f6c14c0d92923bfd13b54809cb`, `708288c38ee1f84f702e34a6e25bd94f8f2a1ebd` e `3027de27756027794e34566682b5a5342ef5ca6` fazem as operações de GPS/autosave/CSV serem tentadas independentemente e devolvem os erros à recuperação; a validação dessa alteração aguarda a nova CI do SHA final.
 - CI #2680, no SHA `e95a4e2fb5bcddc96abc9ebfec535c6a804ed310`, falhou em `validate` com `TS2304: Cannot find name 'cleanup'`; a correção de escopo saiu em `c564ec465e27f6e86f15b2d583a8cba2981a93c6`. A CI #2684 no SHA `ac5d173b1299abfa7cd87c445bc9c5df8b5e5768` aprovou `gate:baseline`, `validate` e `android-build`, mas antecede a auditoria atual de propagação de erros de persistência.
 - O teste físico está pendente. Não mesclar alterações novas sem autorização explícita; para esta branch, exigir `gate:baseline`, `validate` e `android-build` verdes no SHA final. Teste visual e físico com ELM327/ECU são etapas separadas.
@@ -134,6 +137,9 @@
 - **DB-098** · 2026-10-22 — Erros de persistência expostos na recuperação Bluetooth
 - **DB-099** · 2026-10-22 — Corrigir tipo de retorno no encerramento do GPS após falha da CI #2690
 - **DB-100** · 2026-10-22 — GPS opcional não pode bloquear a inicialização do diagnóstico OBD
+- **DB-101** · 2026-10-22 — Correções adicionais descobertas pela CI #2704 e proteção de permissões Android
+- **DB-102** · 2026-10-22 — Limitação por API das permissões Bluetooth legadas
+- **DB-103** · 2026-10-22 — Benchmark externo, versão das dependências e lacunas de inicialização
 
 ---
 
@@ -3298,3 +3304,69 @@ Verificar a última CI da cabeça atual da PR #77, corrigir falhas reveladas e m
 
 ### Próximo passo
 Conferir a CI da cabeça final para gate:baseline, validate e android-build. Testar em Android com Bluetooth permitido/localização negada e com ambas permitidas; confirmar conexão ECU, telemetria e comportamento GPS. Manter PR #77 em rascunho sem merge automático.
+## DB-101 · 2026-10-22 — Correções adicionais descobertas pela CI #2704 e proteção de permissões Android
+
+### Problema / evidência
+- CI #2704, SHA 9013528314623ae4182b8e64ef8cbc5b3c78c43b: `gate:baseline` passou e `validate` avançou ao `npm test`, mas `tests/bluetoothLifecycle.test.js` falhou em `RootLayout deve interromper a preparação sem permissão de Bluetooth`.
+- O teste dependia da forma textual antiga `if (audit.bluetooth !== 'GRANTED')`. Após a extração da política pura, o comportamento equivalente é `canStartObdStartup(audit)`; a asserção estava testando implementação, não contrato.
+- A mesma suíte também exigia erroneamente a forma textual antiga da condição de localização obrigatória, contrariando o requisito de GPS opcional.
+- CI #2706, SHA c32ff0e1a1b8a2ce89dc372dfe55ad80aaabb7d8: o TypeScript ainda apontou TS2322 na linha 88 porque `closeObdAutosaveSession()` também devolve `Promise<boolean>`, e o callback precisava cumprir `Promise<void>`.
+
+### Correções
+- `tests/bluetoothLifecycle.test.js`: asserções mudaram para as funções de política e garantem que GPS negado não bloqueia OBD, sem depender de expressão textual específica.
+- `src/obd/sharedConnection.ts`: callback de fechamento do autosave normalizado para `async () => { await closeObdAutosaveSession(); }`, assim como o callback GPS.
+- Nenhuma regra de reconexão foi enfraquecida; não houve comando novo para ECU.
+
+### Testes / CI
+- CI #2704 confirmou que `npm ci`, Expo Doctor e `gate:baseline` passaram, mas `validate` falhou na asserção antiga; `android-build` foi ignorado.
+- CI #2706 confirmou `gate:baseline` aprovado e o TypeScript avançou, mas `validate` falhou na asserção antiga de `tests/bluetoothLifecycle.test.js`; `android-build` foi ignorado.
+- Asserções atualizadas nos commits `9013528314623ae4182b8e64ef8cbc5b3c78c43b` e `cd8f21fab14e8a94f8f37368320f31abd3dfafe8`. Callback autosave corrigido em `c32ff0e1a1b8a2ce89dc372dfe55ad80aaabb7d8`.
+- Não declarar a validação concluída: confirmar uma CI verde para o SHA final, com gate, validate e android-build.
+
+### Próximo passo
+Consultar a próxima execução depois da atualização do diário; resolver qualquer falha real e manter a PR #77 em rascunho sem merge automático.
+
+## DB-102 · 2026-10-22 — Limitação por API das permissões Bluetooth legadas
+
+### Problema / evidência
+- `app.json` declara `BLUETOOTH` e `BLUETOOTH_ADMIN` sem `maxSdkVersion`. A documentação oficial Android recomenda limitar essas permissões legadas a API 30 para apps voltados ao Android 12 ou mais recente; as permissões runtime modernas `BLUETOOTH_CONNECT` e `BLUETOOTH_SCAN` continuam necessárias para comunicar com dispositivos pareados e procurar dispositivos.
+- Referência oficial verificada em 2026-10-22: https://developer.android.com/develop/connectivity/bluetooth/bt-permissions?hl=pt-br
+
+### Correção
+- Criado `plugins/withBluetoothLegacyPermissionLimits.js`, config plugin local de Expo que atribui `android:maxSdkVersion="30"` somente a `android.permission.BLUETOOTH` e `android.permission.BLUETOOTH_ADMIN` no Manifest gerado.
+- Registrado o plugin em `app.json` após o plugin `expo-location`. Mantidas as permissões modernas Bluetooth e as permissões de localização de que os recursos de GPS/viagem precisam.
+- `tests/permissions.test.js` aplica a função pura ao Manifest simulado e verifica os dois limites e que `BLUETOOTH_CONNECT`/`BLUETOOTH_SCAN` não recebem o limite.
+- `tests/projectBaseline.test.js` protege presença e registro do config plugin. `docs/CONTRATO_ANTI_REGRESSAO.md` recebeu RG-18; RG-17 agora inclui `bluetoothLifecycle.test.js`.
+- Commits: plugin `f6f422477575608856c0bae98d7761852be68189`; config `7ef18c5630fe0546d3493eea71fbede4c691c142`; testes de permissão `23be17fd134900cd4763fffe3839df9a4a995ceb`; gate `23a83e2f18b7551cd2834102405ca7cc8c958876`; RG-17/18 no contrato `16bc242568290f9e3eb2b74429cd6e124896e360`.
+
+### Validação e limites
+- O teste unitário cobre a transformação dos atributos e o CI `android-build` é necessário para confirmar a execução real do config plugin durante `expo prebuild --clean`.
+- Sem o job de build verde, o Manifest gerado não foi inspecionado em artefato e o resultado permanece pendente.
+
+### Próximo passo
+Conferir `validate` e `android-build` da CI no SHA final; se o plugin falhar no prebuild, corrigir sua transformação antes de considerar o limite de permissões aplicado no APK.
+
+## DB-103 · 2026-10-22 — Benchmark externo, versão das dependências e lacunas de inicialização
+
+### Referências verificáveis
+- Car Scanner ELM OBD2 — página oficial do Google Play: https://play.google.com/store/apps/details?hl=pt-BR&id=com.ovz.carscanner. A página lista painel personalizável, PIDs estendidos, DTC, freeze-frame, Mode 06, prontidão de emissões e visualização de sensores em tela.
+- Car Scanner — gravação e exportação: https://www.carscanner.info/records/. A documentação descreve registro de parâmetros exibidos, gráficos, seleção de sensores e exportação CSV/BRC.
+- Torque Pro — página oficial do Google Play: https://play.google.com/store/apps/details?hl=pt-BR&id=org.prowl.torque. Lista painel customizável, leituras OBD, DTC, logs associados a GPS e exportação CSV/KML.
+- OBD Auto Doctor — recursos oficiais: https://www.obdautodoctor.com/features/. Lista PIDs ao vivo, mínimos/médias/máximos, gráficos, DTC por estado, freeze-frame e exportação CSV/TXT.
+- Android Developers — permissões Bluetooth: https://developer.android.com/develop/connectivity/bluetooth/bt-permissions?hl=pt-br.
+- Expo SDK — versão atual e alinhamento com React Native: https://docs.expo.dev/versions/latest/ e https://expo.dev/changelog.
+
+### Achados comparativos e de manutenção
+- A comparação confirma oportunidades de UX verificáveis para benchmark: seleção explícita de vários parâmetros em gráficos, informação de fonte/idade da amostra, exportação evidente e separação clara de DTCs atuais/pendentes/permanentes. Não significa que todos os concorrentes suportem todos os recursos em toda ECU.
+- No branch atual, o cockpit reaproveita telemetria existente e filtra dados reais recentes; a página `Mais Recursos` expõe consulta manual de PID, testes de sensores, viagens, saúde, Bluetooth e histórico. Os testes protegem navegação e origem de dados.
+- `app/index.tsx` ainda não contém uma tela splash própria com etapa/estado de inicialização nem garantia visível de seis segundos e sequência `Bluetooth → ELM327 → resposta ECU → validação dos PIDs` antes do cockpit. Há carregamento do estado, conexão automática após hidratação e status no próprio cockpit. Isso é lacuna de UX/aceitação a tratar em uma etapa isolada, não declarar implementada.
+- O contrato do catálogo de testes exige cinco tentativas e cinco respostas válidas por PID; `tests/sensorTestEngine.test.js` verifica cinco leituras, catálogo com pelo menos 30 itens e resultados inconclusivos quando as amostras são insuficientes. Somente PID 010C tem evidência RAW_ECU documentada no JSON do catálogo; os demais PIDs devem continuar classificados como candidatos/confirmar no veículo, não como suportados comprovados.
+- `package.json` mantém Expo SDK 51 (`~51.0.39`) e `react-native-bluetooth-classic@1.73.0-rc.17`. Em 22/10/2026, fontes oficiais Expo já listavam SDK 57 estável e SDK 58 beta; o pacote Bluetooth permanece na versão RC publicada aproximadamente há um ano. Isso é risco de manutenção, não prova de falha de segurança. Não atualizar em bloco enquanto a reconexão/CI não estiver estável: abrir migração separada com matriz Android físico, compatibilidade nativa e build limpo.
+- O Android `BluetoothSocket.connect()` bloqueia até estabelecer/falhar e `close()` pode abortar a operação em outra thread (documentação: https://developer.android.com/reference/android/bluetooth/BluetoothSocket). A camada JS limita o tempo de espera e evita segundo socket, mas não prova cancelamento da operação nativa. Teste físico com adaptador permanece requisito.
+
+### Resultado / limites
+- Benchmark feito a partir de páginas oficiais públicas; os recursos são os anunciados pelos fabricantes das aplicações, não uma medição lado a lado em uma Meriva.
+- Nenhuma conclusão de testes em hardware é feita. A CI deve validar o build/config do Manifest e a PR #77 permanece em rascunho.
+
+### Próximo passo
+Após CI verde, teste controlado no Android com ELM327: Bluetooth desligado/ligado, ECU sem resposta, perda do link, reconexão e rotação. Depois, tratar a tela splash como tarefa isolada e planejar a atualização SDK/bibliotecas sem misturar com reparo de conectividade.
