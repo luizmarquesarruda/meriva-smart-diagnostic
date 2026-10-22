@@ -34,6 +34,7 @@ export class BluetoothClassicTransport implements ObdTransport {
   private diagnostics: string[] = [];
   private openPromise: Promise<void> | null = null;
   private connectTimer: ReturnType<typeof setTimeout> | null = null;
+  private pendingNativeIoCleanup: Promise<void> | null = null;
 
   private logDiagnostic(event: string, details?: unknown): void {
     const time = new Date().toISOString();
@@ -288,9 +289,13 @@ export class BluetoothClassicTransport implements ObdTransport {
     if (this.connectTimer) { clearTimeout(this.connectTimer); this.connectTimer = null; }
     const device = this.device;
     const wasConnected = this.connected;
+    const pendingIoCleanup = this.pendingNativeIoCleanup;
     this.removeSubscriptions();
 
     if (device && wasConnected) await this.safeDisconnect(device);
+    // A timed-out native write may still be unwinding. Do not report the
+    // transport closed (and allow reconnection) before its socket cleanup settles.
+    if (pendingIoCleanup) await pendingIoCleanup;
 
     this.device = null;
     this.connected = false;
@@ -314,7 +319,36 @@ export class BluetoothClassicTransport implements ObdTransport {
     }
 
     this.logDiagnostic('TX', { data });
-    await device.write(data, 'ascii');
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    const nativeWrite = Promise.resolve().then(() => device.write(data, 'ascii'));
+    try {
+      await Promise.race([
+        nativeWrite,
+        new Promise<void>((_resolve, reject) => {
+          timeout = setTimeout(
+            () => reject(new Error(`TIMEOUT: ESCRITA BLUETOOTH SEM CONCLUSÃO APÓS ${this.config.ioTimeoutMs} MS`)),
+            this.config.ioTimeoutMs,
+          );
+        }),
+      ]);
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      if (message.startsWith('TIMEOUT: ESCRITA BLUETOOTH')) {
+        this.logDiagnostic('WRITE_TIMEOUT', { timeoutMs: this.config.ioTimeoutMs, address: this.deviceAddress });
+        // Closing the socket is the only available cancellation path at this
+        // layer. Keep the cleanup promise and prevent a replacement socket from
+        // opening until the native operation has been torn down.
+        const cleanup = this.safeDisconnect(device).catch(() => undefined);
+        this.pendingNativeIoCleanup = cleanup;
+        void cleanup.then(() => {
+          if (this.pendingNativeIoCleanup === cleanup) this.pendingNativeIoCleanup = null;
+        });
+        this.markDisconnected();
+      }
+      throw cause;
+    } finally {
+      if (timeout) clearTimeout(timeout);
+    }
   }
 
   async readUntilPrompt(timeoutMs = 6000): Promise<string> {
