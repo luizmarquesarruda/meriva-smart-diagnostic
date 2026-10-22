@@ -104,6 +104,14 @@ assert.equal(lock.packages['node_modules/expo-font'].version, '12.0.10');
 assert.equal(lock.packages['node_modules/@react-native-community/netinfo'].version, packageJson.dependencies['@react-native-community/netinfo']);
 assert.equal(app.expo.orientation, 'default', 'a orientação livre não deve ser bloqueada');
 assert.ok(app.expo.plugins.some((plugin) => Array.isArray(plugin) && plugin[0] === 'expo-location'));
+assert.equal(packageJson.dependencies['expo-splash-screen'], '~0.27.7',
+  'a tela nativa de abertura é dependência necessária e não deve ser removida como pacote sem uso');
+assert.equal(lock.packages[''].dependencies['expo-splash-screen'], '~0.27.7');
+assert.equal(lock.packages['node_modules/expo-splash-screen'].version, '0.27.7');
+assert.equal(app.expo.splash?.backgroundColor, '#07111f',
+  'a splash nativa deve manter o fundo escuro da identidade visual');
+assert.equal(app.expo.splash?.resizeMode, 'contain',
+  'a imagem da splash, quando configurada, deve preservar a proporção');
 
 // Current cockpit expectations that previously regressed.
 for (const label of [
