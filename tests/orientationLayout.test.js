@@ -54,8 +54,10 @@ assert.match(index, /setActiveHeroMetric\(\(current\) => \(current \+ 1\) % Math
 assert.match(index, /activeHeroMetric \+ 1\}\/\{heroMetrics\.length\}/, 'contador visual deve usar o mesmo total dinâmico');
 assert.match(index, /href="[^"]*viagens"/);
 assert.match(index, /href="[^"]*dados"/);
-assert.match(index, /dashboardAction/);
-assert.match(index, /actionGridLandscape/);
+assert.match(index, /sessionCard/);
+assert.match(index, /bottomNavItem/);
+assert.match(index, /getCurrentAutonomyRangeKm/);
+assert.doesNotMatch(index, /actionGrid|dashboardAction/, 'navegação única não deve duplicar destinos');
 assert.match(index, /react-native-safe-area-context/);
 assert.match(layout, /SafeAreaProvider/);
 assert.match(midLayout, /size\.width > size\.height/);
