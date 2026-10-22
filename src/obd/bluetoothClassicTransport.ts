@@ -81,7 +81,6 @@ export class BluetoothClassicTransport implements ObdTransport {
 
   private registerPendingNativeSocketCleanup(
     device: BluetoothDevice,
-    promise: Promise<void> = this.safeDisconnect(device),
     event = 'NATIVE_SOCKET_CLEANUP',
   ): PendingNativeSocketCleanup {
     const addressKey = normalizeBluetoothAddress(this.deviceAddress);
@@ -92,7 +91,7 @@ export class BluetoothClassicTransport implements ObdTransport {
     }
 
     const record: PendingNativeSocketCleanup = {
-      promise,
+      promise: this.safeDisconnect(device),
       retry: () => this.safeDisconnect(device),
       retryPromise: null,
     };
@@ -436,7 +435,7 @@ export class BluetoothClassicTransport implements ObdTransport {
         // Closing the socket is the only available cancellation path at this
         // layer. Keep the cleanup promise and prevent a replacement socket from
         // opening until the native operation has been torn down.
-        this.registerPendingNativeSocketCleanup(device, this.safeDisconnect(device), 'WRITE_TIMEOUT_CLEANUP');
+        this.registerPendingNativeSocketCleanup(device, 'WRITE_TIMEOUT_CLEANUP');
         this.markDisconnected();
       }
       throw cause;
