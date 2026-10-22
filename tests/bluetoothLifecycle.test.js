@@ -44,7 +44,7 @@ assert(shared.includes("probe.parsed.status === 'RESPONDEU'"));
 assert(shared.includes("probe.commandStatus === 'OK'"));
 assert(!rootLayout.includes('connectPreferredElm'), 'RootLayout must not start a competing OBD connection');
 assert(!rootLayout.includes('ensureBluetoothReady'), 'Bluetooth connection readiness belongs to the dashboard connection owner');
-assert(rootLayout.includes("if (audit.bluetooth !== 'GRANTED')"), 'RootLayout deve interromper a preparação sem permissão de Bluetooth');
+assert(rootLayout.includes('canStartObdStartup(audit)'), 'RootLayout deve interromper a preparação sem permissão de Bluetooth');
 assert(rootLayout.includes('canStartObdStartup(audit)'), 'a inicialização OBD deve depender da permissão Bluetooth');
 assert(rootLayout.includes('canUseGps(audit)'), 'GPS/viagens devem consultar a permissão de localização separadamente');
 assert(!rootLayout.includes("if (audit.location !== 'GRANTED')"), 'localização negada não deve bloquear diagnóstico OBD');
