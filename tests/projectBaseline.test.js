@@ -116,6 +116,10 @@ assert.ok(read('app/laboratorio.tsx').includes('PIDs REGISTRADOS / DESCOBERTOS')
 assert.match(theme, /SCREEN_TITLE_STYLE/);
 assert.match(read('tests/screenTheme.test.js'), /Shared screen theme and title contract/);
 
+const androidPermissionPlugin = read('plugins/withBluetoothLegacyPermissionLimits.js');
+assert.match(androidPermissionPlugin, /android:maxSdkVersion/);
+assert.match(androidPermissionPlugin, /android.permission.BLUETOOTH_ADMIN/);
+assert.ok(JSON.parse(read('app.json')).expo.plugins.includes('./plugins/withBluetoothLegacyPermissionLimits'));
 const permissionPolicy = read('src/permissions/permissionPolicy.ts');
 assert.match(permissionPolicy, /canStartObdStartup/);
 assert.match(permissionPolicy, /status\.bluetooth === 'GRANTED'/);
