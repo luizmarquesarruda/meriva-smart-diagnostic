@@ -39,6 +39,7 @@ Este documento é o contrato de aceitação entre mudanças, testes, diário e C
 | RG-21 | Falha de `disconnect()` só pode ser tratada como já desconectado se `isConnected()` confirmar estado desligado; erro ou estado desconhecido deve ser propagado para bloquear nova sessão. | `regression.test.js` — falha de limpeza nativa; `connectionRecovery.test.js` |
 | RG-22 | Bloqueio de limpeza de socket RFCOMM deve ser compartilhado por todas as instâncias e por endereço normalizado; uma nova instância não pode conectar até que a limpeza anterior termine ou uma nova tentativa confirme o fechamento. | `regression.test.js` — reconnect cross-instance; `bluetoothLifecycle.test.js` |
 | RG-23 | Encerramento nativo da sessão tem deadline; timeout ou erro de fechamento não é sucesso e deve bloquear reconexão até liberação confirmada. | `connectionRecovery.test.js` — close pendente; `bluetoothLifecycle.test.js` |
+| RG-24 | Retry de limpeza de socket nativo também tem deadline; falha ou promessa pendente mantém a trava por endereço e nunca pode deixar a tentativa de conexão aguardando indefinidamente. | `connectionRecovery.test.js` — retry de cleanup pendente; `bluetoothLifecycle.test.js` |
 
 ## Regras para uma alteração legítima
 
