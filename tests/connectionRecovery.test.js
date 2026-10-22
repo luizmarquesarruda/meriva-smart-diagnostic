@@ -14,7 +14,7 @@ const loaded = { exports: {} };
 new Function('exports', 'module', js)(loaded.exports, loaded);
 
 async function run() {
-  const { cleanupDisconnectedSession, runDisconnectPersistenceTasks, shouldRetryAfterDisconnectCleanup, timedOutNativeAttemptStillPending, waitForNativeConnectAttempt } = loaded.exports;
+  const { awaitNativeCleanupRetry, cleanupDisconnectedSession, runDisconnectPersistenceTasks, shouldRetryAfterDisconnectCleanup, timedOutNativeAttemptStillPending, waitForNativeConnectAttempt } = loaded.exports;
   const order = [];
 
   const cleanupOperations = [];
@@ -94,6 +94,15 @@ async function run() {
   const neverSettles = new Promise(() => {});
   assert.equal(await waitForNativeConnectAttempt(neverSettles, 5), false,
     'a native request that never settles must not block a future open indefinitely');
+
+  let cleanupRetryTimedOut = false;
+  try {
+    await awaitNativeCleanupRetry(new Promise(() => {}), 5);
+  } catch (cause) {
+    cleanupRetryTimedOut = /RETRY DE LIMPEZA NATIVA AINDA PENDENTE/.test(String(cause));
+  }
+  assert.equal(cleanupRetryTimedOut, true,
+    'a native socket cleanup retry that never settles must not wedge the next connect attempt');
 
   console.log('connectionRecovery.test.js: OK');
 }
