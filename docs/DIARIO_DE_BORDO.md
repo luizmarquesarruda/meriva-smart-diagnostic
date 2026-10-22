@@ -10,6 +10,7 @@
 - PR #76 (`audit: restore anti-regression protections and cockpit fixes`) consta como mesclada no GitHub. A execução CI #2637 para esse SHA terminou com sucesso: `validate` passou (incluindo o gate `gate:baseline`) e `android-build` passou, com APK standalone verificado e enviado como artefato. Isto não comprova teste físico no telefone ou no ELM327.
 - PRs #74 e #75 permanecem fechadas sem merge próprio; as correções que agora estão em `main` são as efetivamente integradas pela PR #76, não uma aprovação implícita dos heads isolados.
 - Trabalho em andamento: branch `fix/bt-reconnect-guard`, PR #77 contra `main`, aberta em rascunho e não mesclada. A PR trata concorrência RFCOMM, fechamento tardio e recuperação após desconexão.
+- Correção adicional nesta rodada: `cleanupDisconnectedSession()` agora limita também a espera por `session.close()`. Se o fechamento nativo não resolver dentro do deadline, a recuperação registra erro e bloqueia nova conexão; timeout não é tratado como socket liberado. Teste adversarial `neverCloses` e regra RG-23 adicionados. Commits: `71be8bfd019197a409e94fb3069a0b05cd1d3ac3` (código), `4851f7b819c3dc2c307c552204b476f993036071` (teste), contrato atualizado em commit posterior. CI do novo SHA ainda pendente.
 - Validação mais recente concluída: CI #2746 no SHA `7aba139fcb13f71afba299a86505a7e5bc07ee29` passou `gate:baseline`, Expo Doctor e `npm run validate`; log confirmou 27 regressões aprovadas, teste de recuperação de protocolo serializada e motor de testes de sensores com cinco leituras. `expo prebuild --clean --platform android` também passou; o `android-build` ainda estava em `Assemble Android release APK` quando consultado. Esse SHA é anterior ao bloqueio global de cleanup `e8ed6e767ca8daeaf33cb36c6b7eec3aedcf7a5d` e ao teste `9689afa4d3b577c66b06c33c6f2049d28df8a9ed`; a CI verde de `validate` não valida o head atual.
 - CI #2690 para SHA `ff85c7556b090c52ee5acf30d46fdec731919414` aprovou `gate:baseline`, mas falhou em `validate` com TS2322 em `src/obd/sharedConnection.ts(88,54)`: stopBackgroundMonitoring retornava Promise<boolean> em callback com contrato Promise<void>. `android-build` foi ignorado. Correção localizada publicada no commit `dd9c00b3f21aca9d9e1f0905876947deb5a4fe09`; exige CI no novo SHA.
 - Auditoria de permissões encontrou `app/_layout.tsx` abortando a preparação quando a localização era negada, mesmo com Bluetooth concedido. Política separada em `src/permissions/permissionPolicy.ts`: OBD depende do Bluetooth; GPS depende da permissão de localização. Teste comportamental e gate anti-regressão adicionados; CI atual continua obrigatória.
@@ -153,6 +154,7 @@
 - **DB-108** · 2026-10-22 — Corrigir regex de resposta ECU na recuperação KWP/ELM
 - **DB-109** · 2026-10-22 — Bloqueio global de reconexão enquanto a limpeza do socket está incerta
 - **DB-110** · 2026-10-22 — Incluir falhas no fechamento normal no bloqueio global RFCOMM
+- **DB-111** · 2026-10-22 — Deadline para fechamento nativo de sessão que não conclui
 
 ---
 
@@ -3508,3 +3510,20 @@ Após CI verde, teste controlado no Android com ELM327: Bluetooth desligado/liga
 
 ### Validação / próximo passo
 - Nenhum resultado CI anterior cobre o SHA deste conjunto final. Executar `npm run gate:baseline`, `npm run validate` e `android-build` no HEAD atual. Teste simulado não demonstra cancelamento nativo nem substitui o ensaio físico controlado.
+
+## DB-111 · 2026-10-22 — Deadline para fechamento nativo de sessão que não conclui
+
+### Problema observado
+A função `cleanupDisconnectedSession()` limitava a espera da persistência, mas aguardava `close()` sem deadline. Se o fechamento da sessão nativa RFCOMM nunca resolvesse nem rejeitasse, o handler de desconexão continuaria suspenso, mantendo a recuperação travada.
+
+### Correção aplicada
+- Adicionado deadline independente ao fechamento da sessão.
+- A expiração é retornada como erro de fechamento, nunca como confirmação de liberação do socket.
+- A política `shouldRetryAfterDisconnectCleanup()` mantém a reconexão bloqueada quando o fechamento falha ou expira.
+- Adicionado teste adversarial com promessa de fechamento que nunca resolve.
+- Atualizado o contrato anti-regressão com RG-23.
+
+### Validação
+- Alterações publicadas na branch `fix/bt-reconnect-guard`, vinculada à PR #77.
+- O teste foi adicionado à suíte `npm test`; a execução real da suíte, `gate:baseline`, `validate` e `android-build` para o SHA resultante deve ser confirmada na CI.
+- Não há confirmação de teste físico com ELM327/ECU nesta etapa.
