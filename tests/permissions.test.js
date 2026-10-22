@@ -8,6 +8,19 @@ const policyJs = ts.transpileModule(policySource, { compilerOptions: { module: t
 const policyModule = { exports: {} };
 new Function('exports', 'module', policyJs)(policyModule.exports, policyModule);
 const { canStartObdStartup, canUseGps } = policyModule.exports;
+const { applyLegacyBluetoothPermissionLimits } = require('../plugins/withBluetoothLegacyPermissionLimits');
+const testManifest = { 'uses-permission': [
+  { $: { 'android:name': 'android.permission.BLUETOOTH' } },
+  { $: { 'android:name': 'android.permission.BLUETOOTH_ADMIN' } },
+  { $: { 'android:name': 'android.permission.BLUETOOTH_CONNECT' } },
+  { $: { 'android:name': 'android.permission.BLUETOOTH_SCAN' } },
+] };
+applyLegacyBluetoothPermissionLimits(testManifest);
+assert.equal(testManifest['uses-permission'][0].$['android:maxSdkVersion'], '30');
+assert.equal(testManifest['uses-permission'][1].$['android:maxSdkVersion'], '30');
+assert.equal(testManifest['uses-permission'][2].$['android:maxSdkVersion'], undefined, 'permissões modernas não devem ser limitadas');
+assert.equal(testManifest['uses-permission'][3].$['android:maxSdkVersion'], undefined, 'permissões modernas não devem ser limitadas');
+
 assert.equal(canStartObdStartup({ bluetooth: 'GRANTED', location: 'DENIED' }), true, 'GPS negado não pode bloquear o diagnóstico OBD');
 assert.equal(canStartObdStartup({ bluetooth: 'DENIED', location: 'GRANTED' }), false, 'Bluetooth negado deve bloquear o início do OBD');
 assert.equal(canUseGps({ location: 'DENIED' }), false, 'GPS deve permanecer indisponível sem permissão');
@@ -24,6 +37,7 @@ assert(storageSource.includes('StorageAccessFramework') || storageSource.include
 assert(layout.includes('requestAllRequiredPermissions'));
 assert(layout.includes('canStartObdStartup'));
 assert(layout.includes('canUseGps'));
+assert(appJson.expo.plugins.includes('./plugins/withBluetoothLegacyPermissionLimits'), 'o config plugin deve ser executado no prebuild Android');
 assert(!layout.includes('requestBluetoothPermissions'));
 assert(appJson.expo.android.permissions.includes('BLUETOOTH_CONNECT'));
 assert(appJson.expo.android.permissions.includes('BLUETOOTH_SCAN'));
