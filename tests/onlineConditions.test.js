@@ -18,6 +18,7 @@ const output = ts.transpileModule(source, {
 
 let permissionStatus = 'denied';
 let locationReads = 0;
+let geocodeResult = [{ city: 'Sorocaba' }];
 const fakeLocation = {
   PermissionStatus: { GRANTED: 'granted' },
   Accuracy: { Low: 2 },
@@ -26,7 +27,7 @@ const fakeLocation = {
     locationReads += 1;
     return { coords: { latitude: -23.5, longitude: -47.45 } };
   },
-  reverseGeocodeAsync: async () => [{ city: 'Sorocaba' }],
+  reverseGeocodeAsync: async () => geocodeResult,
 };
 
 const originalLoad = Module._load;
@@ -62,16 +63,24 @@ Module._load = originalLoad;
   assert.strictEqual(offline.city, 'Sorocaba');
   assert.ok(offline.description.includes('DIAGNÓSTICO OFFLINE'));
 
-  global.fetch = async () => ({
+  geocodeResult = [{ city: null, district: 'Júlio de Mesquita Filho', subregion: 'Sorocaba', region: 'São Paulo' }];
+  const onlineFetch = async () => ({
     ok: true,
     json: async () => ({ current: { temperature_2m: 27.4, weather_code: 1 } }),
   });
+  global.fetch = onlineFetch;
   const online = await loadCurrentConditions();
   global.fetch = originalFetch;
   assert.strictEqual(online.available, true);
-  assert.strictEqual(online.city, 'Sorocaba');
+  assert.strictEqual(online.city, 'Sorocaba', 'município deve ter prioridade sobre o bairro');
   assert.strictEqual(online.temperatureC, 27.4);
   assert.strictEqual(online.description, 'PARCIALMENTE NUBLADO');
+
+  geocodeResult = [{ city: null, district: 'Júlio de Mesquita Filho', subregion: null, region: 'São Paulo' }];
+  global.fetch = onlineFetch;
+  const districtOnly = await loadCurrentConditions();
+  global.fetch = originalFetch;
+  assert.strictEqual(districtOnly.city, null, 'bairro/estado não devem ser apresentados como cidade');
 
   console.log('onlineConditions.test.js: PASS');
 })().catch((error) => {
