@@ -21,7 +21,7 @@ assert.doesNotMatch(index, /\}, \[isHydrated, settings\]\);/, 'objeto settings i
 assert.match(index, /settings\?\.elmMaxConnectionAttempts/, 'efeito deve reagir às opções OBD efetivamente alteradas');
 assert.match(index, /bottomNavLandscape/, 'navegação inferior deve continuar disponível em paisagem');
 assert.doesNotMatch(index, /!layout\.landscape\s*&&\s*\(/, 'navegação não deve desaparecer ao girar o aparelho');
-assert.match(index, /<Text style=\{styles\.bottomNavText\}>Painel<\/Text>/, 'aba Painel deve ter rótulo visível');
+assert.match(index, /<Text style=\{\[styles\.bottomNavText, styles\.bottomNavTextActive\]\}>Painel<\/Text>/, 'aba Painel deve ter rótulo visível e estado ativo');
 assert.match(index, /<Text style=\{styles\.bottomNavText\}>Diagnóstico<\/Text>/, 'aba Diagnóstico deve ter rótulo visível');
 assert.match(index, /<Text style=\{styles\.bottomNavText\}>Dados<\/Text>/, 'aba Dados deve ter rótulo visível');
 assert.match(index, /<Text style=\{styles\.bottomNavText\}>Viagens<\/Text>/, 'aba Viagens deve ter rótulo visível');
@@ -53,7 +53,7 @@ assert.match(networkIndicator, /INTERNET OK/);
 assert.match(networkIndicator, /SEM INTERNET/);
 assert.ok(index.includes('href="/conectividade"'), 'cockpit deve expor conectividade 4G/5G');
 assert.match(index, /NetworkStatusIndicator/, 'cockpit deve exibir o estado da rede por eventos');
-assert.match(index, /href="\\/conectividade"/, 'estado de internet deve abrir a tela detalhada de conectividade');
+assert.ok(index.includes('href="/conectividade"'), 'estado de internet deve abrir a tela detalhada de conectividade');
 assert.match(more, /CONECTIVIDADE 4G\/5G/, 'Mais Recursos deve expor a página de conectividade');
 const connectivity = read('app/conectividade.tsx');
 assert.match(connectivity, /NetInfo\.refresh\(\)/, 'a tela de conectividade deve permitir atualizar o estado sob comando');
