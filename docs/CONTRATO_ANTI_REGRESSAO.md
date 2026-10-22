@@ -32,6 +32,7 @@ Este documento é o contrato de aceitação entre mudanças, testes, diário e C
 | RG-14 | Estado de rede pode ser reconsultado sob comando; valores de sinal fora de 0–100 são descartados e falha da consulta não afeta diagnóstico offline/OBD. | `connectivity.test.js`, `cockpitNavigation.test.js` |
 | RG-15 | Cockpit apresenta cidade, temperatura/condição e tipo de rede em hierarquia legível; o estado resumido da internet usa pelo menos 10 dp, a geração móvel usa 13 dp, os botões principais têm ao menos 56 dp de altura e os atalhos inferiores mantêm alvos ampliados e rótulos acessíveis, sem espalhar o conteúdo com espaços vazios. Rede permanece independente da sessão OBD. | `cockpitNavigation.test.js`, `connectivity.test.js`, `onlineConditions.test.js` |
 | RG-16 | Timeout nativo Bluetooth não pode levar a espera sem limite nem iniciar um segundo socket RFCOMM enquanto a chamada nativa anterior continua pendente. Falha de persistência após desconexão não pode impedir o fechamento da sessão nem deixar a reconexão permanentemente travada. | `connectionRecovery.test.js`, `bluetoothLifecycle.test.js` |
+| RG-17 | Permissão de localização/GPS é opcional para iniciar diagnóstico OBD. Sem localização, Bluetooth/ECU continua utilizável e recursos de GPS/viagem degradam sem bloquear a sessão. | `permissions.test.js`, `projectBaseline.test.js` |
 
 ## Regras para uma alteração legítima
 
