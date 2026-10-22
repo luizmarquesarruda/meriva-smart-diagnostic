@@ -17,6 +17,7 @@ const workflow = read('.github/workflows/ci.yml');
 const elm = read('src/obd/elm327.ts');
 const sharedObd = read('src/obd/sharedConnection.ts');
 const home = read('app/index.tsx');
+const tripService = read('src/trip/autoTripService.ts');
 const diagnostics = read('src/diagnostics/diagnosticEngine.ts');
 const sensorEngine = read('src/diagnostics/sensorTestEngine.ts');
 const projectContract = read('docs/CONTRATO_ANTI_REGRESSAO.md');
@@ -45,6 +46,7 @@ const requiredSuites = [
   'autosaveTxtFormatter.test.js',
   'merivaAutosave.test.js',
   'onlineConditions.test.js',
+  'autonomyPresentation.test.js',
   'connectivity.test.js',
   'screenTheme.test.js',
 ];
@@ -109,6 +111,14 @@ for (const label of [
   assert.ok(home.includes("label: '" + label + "'"), 'indicador principal ausente: ' + label);
 }
 assert.match(home, /10_000/);
+assert.match(home, /getCurrentAutonomyRangeKm/);
+assert.match(home, /coolantUnavailable/);
+assert.ok(!tripService.includes('averageConsumptionKml * state.autonomy.tankCapacityL'),
+  'autonomia não deve assumir tanque cheio sem nível real do PID 012F');
+assert.ok(tripService.includes('estimateRangeFromFuelLevel(this.state.fuelLevelPercent, averageConsumptionKml)'),
+  'autonomia persistida deve usar o nível real do tanque');
+assert.ok(!home.includes('actionGrid') && !home.includes('dashboardAction'),
+  'cockpit não deve duplicar destinos em uma segunda fileira de ações');
 assert.ok(read('app/mais.tsx').includes('CONSULTA MANUAL DE PID'), 'atalho de consulta manual precisa existir');
 assert.ok(read('app/laboratorio.tsx').includes('PIDs REGISTRADOS / DESCOBERTOS'), 'lista de PIDs precisa continuar acessível');
 
