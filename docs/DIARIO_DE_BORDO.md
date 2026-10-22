@@ -12,6 +12,7 @@
 - Trabalho em andamento: branch `fix/bt-reconnect-guard`, PR #77 contra `main`, aberta em rascunho e não mesclada. A PR trata concorrência RFCOMM, fechamento tardio e recuperação após desconexão.
 - CI #2690 para SHA `ff85c7556b090c52ee5acf30d46fdec731919414` aprovou `gate:baseline`, mas falhou em `validate` com TS2322 em `src/obd/sharedConnection.ts(88,54)`: stopBackgroundMonitoring retornava Promise<boolean> em callback com contrato Promise<void>. `android-build` foi ignorado. Correção localizada publicada no commit `dd9c00b3f21aca9d9e1f0905876947deb5a4fe09`; exige CI no novo SHA.
 - Auditoria de permissões encontrou `app/_layout.tsx` abortando a preparação quando a localização era negada, mesmo com Bluetooth concedido. Política separada em `src/permissions/permissionPolicy.ts`: OBD depende do Bluetooth; GPS depende da permissão de localização. Teste comportamental e gate anti-regressão adicionados; CI atual continua obrigatória.
+- Revisão posterior encontrou que `Elm327Session.recoverProtocol()` executava ATZ/ATSP5/010C/ATDP fora da fila serial. Agora a sequência é envolvida por `enqueueCommand()` e lê ATDP sem reencaminhar para `identifyProtocol()` (o que causaria deadlock se enfileirado dentro da recuperação). Commit de código `a581e0bf410f9e46e2b30b24446925951ff25b60`; teste simulado de interleaving adicionado em `tests/regression.test.js`, commit `735b95e9d2d4502fea5656d11bdf0968d749b548`; contrato RG-19 no commit `c3274ebb8436960f026ffa0547407f6521e46d92`. Esses commits exigem CI nova; sem teste físico.
 - CI #2704 (run `39720378776`, SHA `9013528314623ae4182b8e64ef8cbc5b3c78c43b`) passou no gate e no TypeScript, mas falhou em teste por duas asserções de `tests/bluetoothLifecycle.test.js` presas à implementação textual antiga. Asserções foram atualizadas para `canStartObdStartup()`/`canUseGps()`; commits `9013528314623ae4182b8e64ef8cbc5b3c78c43b` e `cd8f21fab14e8a94f8f37368320f31abd3dfafe8`.
 - A CI #2706 (run `39720499416`, SHA `c32ff0e1a1b8a2ce89dc372dfe55ad80aaabb7d8`) confirmou que a correção de tipo inicial foi incompleta: além do GPS, `closeObdAutosaveSession()` também retornava `Promise<boolean>` na tarefa tipada como `Promise<void>`. Callback normalizado em `c32ff0e1a1b8a2ce89dc372dfe55ad80aaabb7d8`; CI ainda falhou em teste legado antes da próxima correção.
 - CI #2715 (run `39720653130`) foi iniciada para SHA `e6d438ffbff8c4788ebd8978cc5a842aa23c71f4`, mas ainda estava pendente na última consulta. Esse SHA ainda antecede esta atualização documental; a CI nova do SHA final deverá ser consultada.
@@ -140,6 +141,7 @@
 - **DB-101** · 2026-10-22 — Correções adicionais descobertas pela CI #2704 e proteção de permissões Android
 - **DB-102** · 2026-10-22 — Limitação por API das permissões Bluetooth legadas
 - **DB-103** · 2026-10-22 — Benchmark externo, versão das dependências e lacunas de inicialização
+- **DB-104** · 2026-10-22 — Tornar atômica a recuperação de protocolo ELM na fila serial
 
 ---
 
@@ -3370,3 +3372,25 @@ Conferir `validate` e `android-build` da CI no SHA final; se o plugin falhar no 
 
 ### Próximo passo
 Após CI verde, teste controlado no Android com ELM327: Bluetooth desligado/ligado, ECU sem resposta, perda do link, reconexão e rotação. Depois, tratar a tela splash como tarefa isolada e planejar a atualização SDK/bibliotecas sem misturar com reparo de conectividade.
+## DB-104 · 2026-10-22 — Tornar atômica a recuperação de protocolo ELM na fila serial
+
+### Problema / evidência
+- Revisão direta de `src/obd/elm327.ts` encontrou que `recoverProtocol()` executava `this.command()` diretamente, enquanto `executeCommand()` e `queryPid()` usam `commandQueue` por meio de `enqueueCommand()`.
+- A sequência ATZ → espera do firmware → ATSP5/ATSP0 → consulta ECU 010C → ATDP poderia ser intercalada por PID manual ou polling de Viagem durante a janela de espera do reset, comprometendo a negociação do protocolo.
+- A recuperação também chamava `identifyProtocol()` no final. Ao tornar o fluxo inteiro serial, manter essa chamada criaria deadlock porque `identifyProtocol()` tenta enfileirar ATDP atrás da própria recuperação; a chamada foi substituída por uma leitura interna direta enquanto a fila permanece ocupada.
+
+### Correção
+- `recoverProtocol()` agora retorna `enqueueCommand(async () => ...)`, mantendo a sequência inteira dentro de um único intervalo da fila serial.
+- Mantida a sequência e os critérios de recuperação existentes: reset ELM, seleção de protocolo, resposta válida a 010C e leitura de ATDP; sem comandos de alteração de configuração do veículo ou escrita de parâmetros.
+- `tests/regression.test.js` contém `testProtocolRecoverySerializesWholeNegotiation`, com transporte simulado e sem conexão física. O teste disputa uma consulta 0105 durante a janela de recuperação e exige que ela ocorra após ATZ/ATSP5/010C/ATDP.
+- Contrato anti-regressão atualizado com RG-19.
+
+### Evidência / validação
+- Implementação: `a581e0bf410f9e46e2b30b24446925951ff25b60`.
+- Teste de regressão: `735b95e9d2d4502fea5656d11bdf0968d749b548`.
+- Contrato RG-19: `c3274ebb8436960f026ffa0547407f6521e46d92`.
+- A CI anterior #2719 (SHA `612e28c6e92703b4f992b1f5264035a24aa38bad`) antecede esta alteração e não pode ser usada para validar o reparo. A CI do novo SHA final deve executar `gate:baseline`, `validate` e `android-build`; nenhuma aprovação é presumida.
+
+### Limites / próximo passo
+- O teste comprova a ordem de operações no transporte simulado, não a recuperação real do adaptador K-Line/KWP.
+- Confirmar CI verde no SHA final, revisar os logs, manter PR #77 em rascunho e executar teste físico controlado com ELM327 antes de considerar conectividade estável.
