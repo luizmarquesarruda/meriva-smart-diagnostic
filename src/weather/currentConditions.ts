@@ -40,7 +40,9 @@ export async function loadCurrentConditions(): Promise<CurrentConditions> {
         longitude: position.coords.longitude,
       });
       const address = addresses[0];
-      city = address?.city || address?.district || address?.subregion || address?.region || null;
+      // Some Android reverse-geocoders put a neighborhood in `district`.
+      // Prefer the municipality fallback and never promote a district/state to city.
+      city = address?.city || address?.subregion || null;
     } catch {
       // Reverse geocoding is optional; weather may still be available.
     }
