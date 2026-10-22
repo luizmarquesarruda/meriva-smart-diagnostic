@@ -749,6 +749,25 @@ async function testBluetoothEventTransport() {
     'a new socket is allowed only after a later cleanup retry succeeds',
   );
   await recoveredReplacement.close();
+
+  // The same global guard must also cover a regular close failure (not only write timeout).
+  bluetoothDisconnectFails = true;
+  const regularCloseFailure = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF', { ioTimeoutMs: 1000 });
+  await regularCloseFailure.open();
+  const callsBeforeRegularCloseRetry = bluetoothConnectCalls;
+  await assert.rejects(regularCloseFailure.close(), /TEST DISCONNECT FAILURE/);
+  const blockedAfterRegularClose = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF', { ioTimeoutMs: 1000 });
+  await assert.rejects(blockedAfterRegularClose.open(), /TEST DISCONNECT FAILURE/);
+  assert.strictEqual(
+    bluetoothConnectCalls,
+    callsBeforeRegularCloseRetry,
+    'a normal close failure must also block another transport instance',
+  );
+  bluetoothDisconnectFails = false;
+  const recoveredAfterRegularClose = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF', { ioTimeoutMs: 1000 });
+  await recoveredAfterRegularClose.open();
+  assert.strictEqual(bluetoothConnectCalls, callsBeforeRegularCloseRetry + 1);
+  await recoveredAfterRegularClose.close();
 }
 
 async function testQuota() {
