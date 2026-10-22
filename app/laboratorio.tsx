@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { PrimaryTabBar } from '../src/ui/PrimaryTabBar';
 import * as FileSystem from 'expo-file-system';
 import { Elm327Session } from '../src/obd/elm327';
 import { parseDtcResponse, parsePidResponse } from '../src/obd/parser';
@@ -677,6 +678,7 @@ export default function LaboratorioScreen() {
       {!!error && <Text style={styles.error}>{error}</Text>}
       </View>
     </ScrollView>
+    <PrimaryTabBar active="diagnostic" />
     </SafeAreaView>
   );
 }

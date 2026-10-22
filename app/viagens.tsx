@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { PrimaryTabBar } from '../src/ui/PrimaryTabBar';
 import { useMidLayout } from '../src/ui/midLayout';
 import { COLORS, SCREEN_TITLE_STYLE } from '../src/ui/theme';
 import * as FileSystem from 'expo-file-system';
@@ -99,7 +100,8 @@ export default function ViagensScreen() {
         </>}
       </View>
     </ScrollView>
-  </SafeAreaView>;
+  <PrimaryTabBar active="trips" />
+    </SafeAreaView>;
 }
 
 function TripDetails({cycle,onBack}:{cycle:DriveCycle;onBack:()=>void}) {

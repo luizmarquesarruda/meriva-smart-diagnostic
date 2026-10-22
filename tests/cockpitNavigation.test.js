@@ -19,12 +19,26 @@ for (const file of ['app/dados.tsx', 'app/saude.tsx', 'app/mais.tsx', 'app/veicu
 // in both orientations.
 assert.doesNotMatch(index, /\}, \[isHydrated, settings\]\);/, 'objeto settings inteiro não pode reiniciar o efeito de conexão');
 assert.match(index, /settings\?\.elmMaxConnectionAttempts/, 'efeito deve reagir às opções OBD efetivamente alteradas');
-assert.match(index, /bottomNavLandscape/, 'navegação inferior deve continuar disponível em paisagem');
+const primaryTabs = read('src/ui/PrimaryTabBar.tsx');
 assert.doesNotMatch(index, /!layout\.landscape\s*&&\s*\(/, 'navegação não deve desaparecer ao girar o aparelho');
-assert.doesNotMatch(index, /<Text style=\{styles\.bottomNavText\}>/, 'navegação inferior do cockpit deve ser icon-only');
-assert.match(index, /bottomNavItem:\{[^}]*minHeight:56/, 'atalhos inferiores devem ter área de toque de 56 dp');
-assert.match(index, /accessibilityLabel="Mais recursos"/, 'botão sem legenda visual precisa de nome acessível');
-assert.match(index, /accessibilityHint="Abre os módulos adicionais do aplicativo"/, 'atalho Mais precisa explicar a ação ao leitor de tela');
+assert.match(index, /<PrimaryTabBar active="cockpit" \/>/, 'cockpit deve mostrar a navegação principal compartilhada');
+for (const [file, active] of [
+  ['app/laboratorio.tsx', 'diagnostic'],
+  ['app/dados.tsx', 'data'],
+  ['app/viagens.tsx', 'trips'],
+  ['app/mais.tsx', 'more'],
+]) {
+  assert.match(read(file), new RegExp('<PrimaryTabBar active="' + active + '" \\/>'), file + ' deve mostrar a navegação principal');
+}
+for (const route of ['href="/"', 'href="/laboratorio"', 'href="/dados"', 'href="/viagens"', 'href="/mais"']) {
+  assert.ok(primaryTabs.includes(route), 'barra principal deve expor ' + route);
+}
+for (const label of ['Painel', 'Diagnóstico', 'Dados', 'Viagens', 'Mais']) {
+  assert.ok(primaryTabs.includes('>' + label + '</Text>'), 'barra principal deve mostrar o rótulo ' + label);
+}
+assert.match(primaryTabs, /accessibilityRole="tab"/, 'itens de navegação devem expor semântica de aba');
+assert.match(primaryTabs, /accessibilityState=\{\{ selected: active === 'cockpit' \}\}/, 'a aba atual deve ser anunciada por tecnologia assistiva');
+assert.match(primaryTabs, /minHeight: 58/, 'itens da navegação devem manter alvo tátil alto e consistente');
 assert.match(index, /dashboardAction:\{[^}]*minHeight:56/, 'ações principais devem ter altura tátil mínima de 56 dp');
 assert.match(index, /accessibilityLabel="Abrir laboratório de diagnóstico OBD"/, 'ação de diagnóstico deve ter nome acessível explícito');
 assert.match(index, /accessibilityLabel="Abrir dados em tempo real"/, 'ação de dados deve ter nome acessível explícito');
@@ -47,7 +61,7 @@ assert.match(networkIndicator, /INTERNET OK/);
 assert.match(networkIndicator, /SEM INTERNET/);
 assert.ok(index.includes('href="/conectividade"'), 'cockpit deve expor conectividade 4G/5G');
 assert.match(index, /NetworkStatusIndicator/, 'cockpit deve exibir o estado da rede por eventos');
-assert.match(index, /AppIcon name="connectivity"/, 'atalho de conectividade deve usar a biblioteca compartilhada');
+assert.match(networkIndicator, /connectivity/, 'indicador de rede deve usar ícone da biblioteca compartilhada');
 assert.match(more, /CONECTIVIDADE 4G\/5G/, 'Mais Recursos deve expor a página de conectividade');
 const connectivity = read('app/conectividade.tsx');
 assert.match(connectivity, /NetInfo\.refresh\(\)/, 'a tela de conectividade deve permitir atualizar o estado sob comando');

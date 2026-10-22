@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMidLayout } from '../src/ui/midLayout';
 import { AppIcon, type AppIconName } from '../src/ui/AppIcon';
+import { PrimaryTabBar } from '../src/ui/PrimaryTabBar';
 import { COLORS, SCREEN_TITLE_STYLE } from '../src/ui/theme';
 
 const items = [
@@ -48,6 +49,7 @@ export default function MaisScreen() {
           </Link>
         </View>
       </ScrollView>
+    <PrimaryTabBar active="more" />
     </SafeAreaView>
   );
 }

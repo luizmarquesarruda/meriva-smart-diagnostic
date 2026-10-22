@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { PrimaryTabBar } from '../src/ui/PrimaryTabBar';
 import { useMidLayout } from '../src/ui/midLayout';
 import { COLORS, SCREEN_TITLE_STYLE } from '../src/ui/theme';
 import { getAutoSaveState } from '../src/meriva/autosaveManager';
@@ -192,6 +193,7 @@ export default function DadosScreen() {
           <Back />
         </View>
       </ScrollView>
+    <PrimaryTabBar active="data" />
     </SafeAreaView>
   );
 }
