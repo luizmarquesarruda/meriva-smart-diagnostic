@@ -105,3 +105,8 @@ O autosave escreve primeiro em arquivo temporário, valida o conteúdo e só ent
 A aplicação exige build nativo Android por usar Bluetooth Classic. Expo Go não é suficiente para validar o transporte.
 
 A disponibilidade dos PIDs, a qualidade do GPS e a comunicação com a ECU da Meriva dependem do hardware físico e devem ser confirmadas no veículo.
+
+
+## Inicialização e splash screen nativa
+
+A configuração de abertura Android fica em `app.json`, em `expo.splash`. O tema atual usa fundo `#07111f` e `resizeMode: contain`; a dependência `expo-splash-screen@~0.27.7` deve permanecer compatível com Expo SDK 51 e sincronizada no lockfile. A tela nativa de abertura é distinta da primeira tela React Native renderizada após a inicialização. Alterar a configuração não garante que exista uma imagem de logotipo: a presença do asset, seu caminho e sua inclusão no APK precisam ser verificadas separadamente. O baseline protege a dependência e os campos de configuração, enquanto a CI Android valida a compilação nativa; nenhuma dessas verificações substitui inspeção visual no aparelho.
