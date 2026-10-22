@@ -3101,3 +3101,25 @@ Concluir a revisão final do conjunto e restaurar os gatilhos da CI para executa
 - Correção enviada à branch `fix/cockpit-live-autonomy-20261022` para nova execução da CI.
 - Não fazer merge enquanto a nova execução não verificar Expo Doctor, gate de baseline, TypeScript e suíte de regressão.
 
+## DB-092 · 2026-10-22 — Restauração da splash screen e falha de cobertura antirregressão
+
+### Evidência
+- O usuário reportou que a splash screen desapareceu.
+- `app.json` não continha configuração `expo.splash`.
+- `package.json` não declarava `expo-splash-screen`, embora o `package-lock.json` ainda contivesse a versão `0.27.7`.
+- A auditoria `docs/AUDITORIA_2026-10-02.md` registrava explicitamente a remoção do Expo Splash Screen por ser considerado sem uso.
+- `tests/projectBaseline.test.js` não protegia a dependência nem a configuração de splash; portanto, o gate podia passar sem detectar a regressão. A regra antirregressão estava incompleta, não era uma garantia de comportamento.
+
+### Correção preparada
+- Reintroduzido `expo-splash-screen@~0.27.7` em `package.json` e no conjunto de dependências raiz do lockfile.
+- Restaurada em `app.json` a configuração de splash nativa com fundo `#07111f` e `resizeMode: contain`, coerente com o tema escuro.
+- Adicionadas asserções ao `tests/projectBaseline.test.js` para a dependência, versão do lockfile e configuração de fundo.
+- Adicionado RG-18 a `docs/CONTRATO_ANTI_REGRESSAO.md` para impedir nova remoção silenciosa.
+
+### Limites de validação
+- Não foi confirmado um arquivo de imagem de splash existente no repositório durante esta inspeção; por isso, esta correção restaura a configuração/fundo nativo, mas não afirma que o logotipo ilustrado foi restaurado.
+- A correção precisa passar pelo gate, Expo Doctor, suíte completa e build Android da CI antes de ser considerada validada.
+- Sem merge automático: manter a correção isolada na branch/PR até todos os jobs passarem e o usuário autorizar integração.
+
+### Lição de processo
+Uma anotação de auditoria que remove uma funcionalidade visível precisa de evidência de que ela é realmente redundante e de uma atualização explícita do contrato de regressão. A ausência de teste não é prova de ausência de uso.
