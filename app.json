@@ -43,6 +43,10 @@
           "barStyle": "light"
         }
       ]
-    ]
+    ],
+    "splash": {
+      "backgroundColor": "#07111f",
+      "resizeMode": "contain"
+    }
   }
 }
