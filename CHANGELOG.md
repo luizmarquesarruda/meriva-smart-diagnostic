@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Splash screen e documentação
+- Restaurada a dependência `expo-splash-screen@~0.27.7` e alinhado o lockfile.
+- Restaurada a configuração `expo.splash` em `app.json` com fundo escuro `#07111f` e `resizeMode: contain`.
+- Adicionada proteção antirregressão para a dependência e configuração nativa da splash.
+- Atualizados README, arquitetura, desenvolvimento, contribuição, auditoria e contrato antirregressão para refletir o estado atual e diferenciar configuração de splash de confirmação de uma imagem/logotipo.
+- Validação automatizada e build Android pendentes até a CI do SHA final.
+
 ## 1.0.1
 
 ### Bluetooth
