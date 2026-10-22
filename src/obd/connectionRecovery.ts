@@ -3,6 +3,33 @@ export interface DisconnectCleanupResult {
   closeError: unknown | null;
 }
 
+export interface DisconnectPersistenceTask {
+  label: string;
+  run: () => Promise<void>;
+}
+
+/**
+ * Run independent disconnect persistence/cleanup actions even if one fails.
+ * Reject after all actions settle so the caller can record the aggregate failure.
+ */
+export async function runDisconnectPersistenceTasks(
+  tasks: DisconnectPersistenceTask[],
+): Promise<void> {
+  const results = await Promise.all(tasks.map(async (task) => {
+    try {
+      await task.run();
+      return null;
+    } catch (cause) {
+      const detail = cause instanceof Error ? cause.message : String(cause);
+      return `${task.label}: ${detail}`;
+    }
+  }));
+  const failures = results.filter((item): item is string => item !== null);
+  if (failures.length > 0) {
+    throw new Error(`FALHA NAS OPERAÇÕES DE DESCONEXÃO: ${failures.join('; ')}`);
+  }
+}
+
 /**
  * Best-effort cleanup after an unexpected disconnect.
  * A storage failure must not prevent closing the old serial session or entering recovery.
