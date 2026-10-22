@@ -11,8 +11,7 @@
 - PRs #74 e #75 permanecem fechadas sem merge próprio; as correções que agora estão em `main` são as efetivamente integradas pela PR #76, não uma aprovação implícita dos heads isolados.
 - Trabalho em andamento: branch `fix/bt-reconnect-guard`, PR #77 contra `main`, aberta em rascunho e não mesclada. A PR trata concorrência RFCOMM, fechamento tardio e recuperação após desconexão.
 - CI #2680, no SHA anterior `e95a4e2fb5bcddc96abc9ebfec535c6a804ed310`, falhou em `validate` com `TS2304: Cannot find name 'cleanup'` em `src/obd/sharedConnection.ts`; `gate:baseline` passou e `android-build` foi ignorado após a falha. A correção de escopo foi publicada em `c564ec465e27f6e86f15b2d583a8cba2981a93c6`; a nova CI desse SHA precisa ser consultada.
-- O teste físico está pendente. Não mesclar alterações novas sem autorização explícita. Exigir `gate:baseline`, `validate` e `android-build` verdes no SHA final; teste visual e físico com ELM327/ECU são etapas separadas.
-- Não mesclar alterações novas sem autorização explícita. Para esta branch, exigir `gate:baseline`, `validate` e `android-build` verdes no SHA final; teste visual e físico com ELM327/ECU são etapas separadas.
+- O teste físico está pendente. Não mesclar alterações novas sem autorização explícita; para esta branch, exigir `gate:baseline`, `validate` e `android-build` verdes no SHA final. Teste visual e físico com ELM327/ECU são etapas separadas.
 
 ### Contratos que não podem regredir
 1. **Testes de sensores:** cinco tentativas sequenciais por PID e cinco respostas válidas para uma avaliação numérica. Calcular a média aritmética das cinco amostras válidas. Resposta ausente, inválida ou timeout não vira zero e não conta como leitura válida; amostragem incompleta = inconclusiva/sem resposta, nunca aprovada.
@@ -128,13 +127,7 @@
 - **DB-094** · 2026-10-21 — Auditoria da CI #2669 e validação parcial da correção de recuperação
 - **DB-095** · 2026-10-21 — Impedir nova conexão quando o fechamento do socket falha
 - **DB-096** · 2026-10-21 — Corrigir escopo do resultado de limpeza revelado pela CI #2680
-- **DB-089** · 2026-10-21 — Rotação automática da tela
-- **DB-090** · 2026-10-21 — Timeout Bluetooth pendente e resiliência da recuperação
-- **DB-091** · 2026-10-21 — CI detecta regressão de concorrência e corrige espera Bluetooth limitada
-- **DB-092** · 2026-10-21 — Serialização do fechamento tardio de socket após timeout
-- **DB-093** · 2026-10-21 — Limite para persistência travada durante a desconexão
-- **DB-094** · 2026-10-21 — Auditoria da CI #2669 e validação parcial da correção de recuperação
-- **DB-095** · 2026-10-21 — Impedir nova conexão quando o fechamento do socket falha
+- **DB-097** · 2026-10-22 — Auditoria de integridade do índice do Diário de Bordo
 
 ---
 
@@ -3217,3 +3210,23 @@ Consultar CI #2678 no SHA final depois desta atualização do diário. Exigir `g
 ### Regressões e pendências
 - A suíte completa precisa passar no SHA corrigido; confirmar os três gates e revisar a PR #77.
 - Teste físico com ELM327, desconexão real, reconexão e inspeção visual continuam pendentes. Não mesclar sem autorização explícita.
+
+
+## DB-097 · 2026-10-22 — Auditoria de integridade do índice do Diário de Bordo
+
+### Problema / evidência
+- A leitura integral do diário encontrou sete IDs repetidos no índice inicial: DB-089 a DB-095. O corpo continha cada uma dessas entradas uma única vez, mas o índice de retomada as listava duas vezes.
+- O resumo de estado inicial também repetia a instrução de não mesclar sem autorização em dois bullets consecutivos.
+
+### Correção documental
+- Removida a segunda ocorrência de DB-089 a DB-095 no índice, mantendo a sequência única DB-001 a DB-097.
+- Consolidada a instrução de não mesclar sem autorização em um único bullet, preservando os gates e a exigência de teste físico separados.
+- Nenhum código de produção, configuração de Bluetooth ou regra diagnóstica foi alterado.
+
+### Validação
+- Verificada programaticamente a unicidade do índice e dos cabeçalhos DB-NNN no conteúdo resultante.
+- A CI #2684 passou para o SHA anterior da PR #77, mas **não valida este novo commit documental**. É necessário conferir a nova execução de `gate:baseline`, `validate` e `android-build`.
+
+### Próximo passo
+- Acompanhar a CI do novo SHA e manter a PR #77 em rascunho. Não mesclar sem autorização explícita.
+- Após a CI, testar conexão, timeout, desconexão e reconexão com o ELM327 real; CI verde não substitui o teste no veículo.
