@@ -696,6 +696,7 @@ async function testBluetoothEventTransport() {
   await transport.close();
 
   // A never-settling native write must hit the I/O deadline and initiate socket cleanup.
+  fakeDeviceConnected = true;
   bluetoothWriteNeverSettles = true;
   const timeoutEvents = [];
   const stalledTransport = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF', { ioTimeoutMs: 1000 }, {
