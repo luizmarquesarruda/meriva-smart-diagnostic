@@ -38,6 +38,7 @@ export async function cleanupDisconnectedSession(
   persist: () => Promise<void>,
   close: () => Promise<void>,
   persistenceTimeoutMs = 1_000,
+  closeTimeoutMs = 1_000,
 ): Promise<DisconnectCleanupResult> {
   let persistenceError: unknown | null = null;
   let closeError: unknown | null = null;
@@ -57,13 +58,34 @@ export async function cleanupDisconnectedSession(
     (cause) => ({ timedOut: false as const, error: cause as unknown }),
   );
 
+  // Native close() can itself stall. Bound the wait, but never interpret a
+  // timeout as proof that the socket was released: the caller must block retry.
+  let closeOperation: Promise<void>;
   try {
-    // Do not start recovery until close settles: opening a second RFCOMM socket
-    // while the old session is still closing can recreate the connection loop.
-    await close();
+    closeOperation = Promise.resolve(close());
   } catch (cause) {
-    closeError = cause;
+    closeOperation = Promise.reject(cause);
   }
+  const closeSettled = closeOperation.then(
+    () => ({ timedOut: false as const, error: null as unknown | null }),
+    (cause) => ({ timedOut: false as const, error: cause as unknown }),
+  );
+  let closeTimer: ReturnType<typeof setTimeout> | undefined;
+  const closeResult = await Promise.race([
+    closeSettled,
+    new Promise<{ timedOut: true; error: unknown }>((resolve) => {
+      closeTimer = setTimeout(
+        () => resolve({
+          timedOut: true,
+          error: new Error(`FECHAMENTO DA SESSÃO EXCEDEU ${closeTimeoutMs} MS; SOCKET NÃO CONSIDERADO LIBERADO`),
+        }),
+        Math.max(1, closeTimeoutMs),
+      );
+    }),
+  ]).finally(() => {
+    if (closeTimer) clearTimeout(closeTimer);
+  });
+  closeError = closeResult.error;
 
   let timer: ReturnType<typeof setTimeout> | undefined;
   const persistenceResult = await Promise.race([
