@@ -725,8 +725,30 @@ async function testBluetoothEventTransport() {
     'failed native cleanup must propagate and keep recovery blocked',
   );
   assert.match(cleanupFailureTransport.getDiagnosticsText(), /WRITE_TIMEOUT_CLEANUP_FAILED/);
+
+  // A different transport instance must also be blocked while native closure is unconfirmed.
+  const connectCallsBeforeBlockedRetry = bluetoothConnectCalls;
+  const blockedReplacement = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF', { ioTimeoutMs: 1000 });
+  await assert.rejects(
+    blockedReplacement.open(),
+    /LIMPEZA NATIVA ANTERIOR AINDA PENDENTE|TEST DISCONNECT FAILURE/,
+  );
+  assert.strictEqual(
+    bluetoothConnectCalls,
+    connectCallsBeforeBlockedRetry,
+    'a new transport instance must not open another RFCOMM socket while cleanup is unconfirmed',
+  );
+
   bluetoothDisconnectFails = false;
   bluetoothWriteNeverSettles = false;
+  const recoveredReplacement = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF', { ioTimeoutMs: 1000 });
+  await recoveredReplacement.open();
+  assert.strictEqual(
+    bluetoothConnectCalls,
+    connectCallsBeforeBlockedRetry + 1,
+    'a new socket is allowed only after a later cleanup retry succeeds',
+  );
+  await recoveredReplacement.close();
 }
 
 async function testQuota() {
