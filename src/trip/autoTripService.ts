@@ -482,8 +482,8 @@ class AutoTripService {
             ? (estimateRangeFromFuelLevel(
                 fuelLevelPercent,
                 tripConsumptionKml ?? this.state.averageConsumptionKml,
-              ) ?? this.state.estimatedRangeKm)
-            : this.state.estimatedRangeKm,
+              ) ?? 0)
+            : 0,
           error: rpm === 0 && obdSpeedKmh === 0 && fuelRateForDisplayLph == null
             ? 'MOTOR DESLIGADO? / ECU SEM TELEMETRIA VÁLIDA'
             : fuelRateForDisplaySource && fuelRateForDisplaySource !== 'MEASURED_015E'
@@ -575,9 +575,7 @@ class AutoTripService {
         const averageConsumptionKml = cumulativeFuelUsedL > 0
           ? cumulativeDistanceKm / cumulativeFuelUsedL
           : 0;
-        const estimatedRangeKm = averageConsumptionKml > 0
-          ? averageConsumptionKml * state.autonomy.tankCapacityL
-          : 0;
+        const estimatedRangeKm = estimateRangeFromFuelLevel(this.state.fuelLevelPercent, averageConsumptionKml) ?? 0;
 
         state.autonomy = {
           ...state.autonomy,
