@@ -10,11 +10,13 @@
 - PR #76 (`audit: restore anti-regression protections and cockpit fixes`) consta como mesclada no GitHub. A execução CI #2637 para esse SHA terminou com sucesso: `validate` passou (incluindo o gate `gate:baseline`) e `android-build` passou, com APK standalone verificado e enviado como artefato. Isto não comprova teste físico no telefone ou no ELM327.
 - PRs #74 e #75 permanecem fechadas sem merge próprio; as correções que agora estão em `main` são as efetivamente integradas pela PR #76, não uma aprovação implícita dos heads isolados.
 - Trabalho em andamento: branch `fix/bt-reconnect-guard`, PR #77 contra `main`, aberta em rascunho e não mesclada. A PR trata concorrência RFCOMM, fechamento tardio e recuperação após desconexão.
+- Validação mais recente concluída: CI #2746 no SHA `7aba139fcb13f71afba299a86505a7e5bc07ee29` passou `gate:baseline`, Expo Doctor e `npm run validate`; log confirmou 27 regressões aprovadas, teste de recuperação de protocolo serializada e motor de testes de sensores com cinco leituras. `expo prebuild --clean --platform android` também passou; o `android-build` ainda estava em `Assemble Android release APK` quando consultado. Esse SHA é anterior ao bloqueio global de cleanup `e8ed6e767ca8daeaf33cb36c6b7eec3aedcf7a5d` e ao teste `9689afa4d3b577c66b06c33c6f2049d28df8a9ed`; a CI verde de `validate` não valida o head atual.
 - CI #2690 para SHA `ff85c7556b090c52ee5acf30d46fdec731919414` aprovou `gate:baseline`, mas falhou em `validate` com TS2322 em `src/obd/sharedConnection.ts(88,54)`: stopBackgroundMonitoring retornava Promise<boolean> em callback com contrato Promise<void>. `android-build` foi ignorado. Correção localizada publicada no commit `dd9c00b3f21aca9d9e1f0905876947deb5a4fe09`; exige CI no novo SHA.
 - Auditoria de permissões encontrou `app/_layout.tsx` abortando a preparação quando a localização era negada, mesmo com Bluetooth concedido. Política separada em `src/permissions/permissionPolicy.ts`: OBD depende do Bluetooth; GPS depende da permissão de localização. Teste comportamental e gate anti-regressão adicionados; CI atual continua obrigatória.
 - Revisão posterior encontrou que `Elm327Session.recoverProtocol()` executava ATZ/ATSP5/010C/ATDP fora da fila serial. Agora a sequência é envolvida por `enqueueCommand()` e lê ATDP sem reencaminhar para `identifyProtocol()` (o que causaria deadlock se enfileirado dentro da recuperação). Commit de código `a581e0bf410f9e46e2b30b24446925951ff25b60`; teste simulado de interleaving adicionado em `tests/regression.test.js`, commit `735b95e9d2d4502fea5656d11bdf0968d749b548`; contrato RG-19 no commit `c3274ebb8436960f026ffa0547407f6521e46d92`. Esses commits exigem CI nova; sem teste físico.
 - Nova varredura encontrou que `BluetoothClassicTransport.write()` aguardava a chamada nativa sem deadline. Escrita agora usa `ioTimeoutMs`, loga `WRITE_TIMEOUT`, sinaliza link perdido e inicia desconexão; `close()` aguarda `pendingNativeIoCleanup` antes de a sessão ser considerada fechada. Commits `a5cee123d38da75eafc6e7b59ec8ea8cfcebee02` (código) e `75c61b87923ce250a5c23a4e0eaef505a6912aa9` (teste simulado); RG-20 no contrato `c34621be08c54f70453f5fc1f8aed37c16fec648`. CI desses SHAs ainda não foi confirmada.
 - Reforço de segurança após o deadline: `safeDisconnect()` não deve considerar qualquer exceção como confirmação de fechamento. Agora verifica `isConnected()`; se permanece conectado ou o estado é indeterminado, propaga o erro, conserva a limpeza rejeitada e impede retry. Código `e656f6428eea730840282a41a1094718b24514b1`, teste `07e3991c3c70c20bcf13192e1d64b7d55f58c442`, contrato RG-21 `2f427ad83c4e8edd02840ff1c2e6d463bcfaafc5`. CI do SHA atual ainda obrigatória.
+- O teste RFCOMM inicialmente deixou `fakeDeviceConnected=false` de uma etapa anterior; fixture corrigida em `6bf1aa67f43cc0dd0a52af7533cbcb3c57332b06`. A CI #2745 então isolou um defeito real: regex do probe ECU em `recoverProtocol()` tinha escapes duplicados e podia rejeitar `41 0C ...`. Código corrigido no commit `7aba139fcb13f71afba299a86505a7e5bc07ee29`; a CI #2746/#2747 validou o código desse SHA, mas o APK ainda estava em montagem e alterações globais de cleanup foram adicionadas depois.
 - CI #2704 (run `39720378776`, SHA `9013528314623ae4182b8e64ef8cbc5b3c78c43b`) passou no gate e no TypeScript, mas falhou em teste por duas asserções de `tests/bluetoothLifecycle.test.js` presas à implementação textual antiga. Asserções foram atualizadas para `canStartObdStartup()`/`canUseGps()`; commits `9013528314623ae4182b8e64ef8cbc5b3c78c43b` e `cd8f21fab14e8a94f8f37368320f31abd3dfafe8`.
 - A CI #2706 (run `39720499416`, SHA `c32ff0e1a1b8a2ce89dc372dfe55ad80aaabb7d8`) confirmou que a correção de tipo inicial foi incompleta: além do GPS, `closeObdAutosaveSession()` também retornava `Promise<boolean>` na tarefa tipada como `Promise<void>`. Callback normalizado em `c32ff0e1a1b8a2ce89dc372dfe55ad80aaabb7d8`; CI ainda falhou em teste legado antes da próxima correção.
 - CI #2715 (run `39720653130`) foi iniciada para SHA `e6d438ffbff8c4788ebd8978cc5a842aa23c71f4`, mas ainda estava pendente na última consulta. Esse SHA ainda antecede esta atualização documental; a CI nova do SHA final deverá ser consultada.
@@ -146,6 +148,9 @@
 - **DB-104** · 2026-10-22 — Tornar atômica a recuperação de protocolo ELM na fila serial
 - **DB-105** · 2026-10-22 — Deadline para escrita RFCOMM travada e limpeza segura do socket
 - **DB-106** · 2026-10-22 — Não tratar falha de desconexão nativa como socket liberado
+- **DB-107** · 2026-10-22 — Corrigir fixture do teste de timeout RFCOMM
+- **DB-108** · 2026-10-22 — Corrigir regex de resposta ECU na recuperação KWP/ELM
+- **DB-109** · 2026-10-22 — Bloqueio global de reconexão enquanto a limpeza do socket está incerta
 
 ---
 
@@ -3439,3 +3444,45 @@ Após CI verde, teste controlado no Android com ELM327: Bluetooth desligado/liga
 - A CI deve confirmar a compilação TypeScript, testes, Expo Prebuild e `android-build` para o SHA final; testes simulados não substituem verificação com biblioteca nativa e adaptador reais.
 - A política é conservadora: se a desconexão nativa falhar e não houver confirmação de que o socket caiu, a reconexão pode ficar bloqueada até intervenção/reinício. Isso prefere não duplicar sockets a tentar recuperação insegura.
 - Próximo passo: consultar CI no SHA final; em dispositivo real, simular apenas desconexão controlada e verificar que, em caso de erro de fechamento, não há nova tentativa RFCOMM concorrente.
+## DB-107 · 2026-10-22 — Corrigir fixture do teste de timeout RFCOMM
+
+### Problema / evidência
+- A suíte de regressão do commit `6bf1aa67f43cc0dd0a52af7533cbcb3c57332b06` precisava simular uma escrita nativa que nunca termina. Uma etapa anterior do mesmo teste já havia marcado o adaptador falso como desconectado; o caso de timeout não isolava corretamente o estado de pré-condição.
+
+### Correção
+- `tests/regression.test.js` redefine `fakeDeviceConnected = true` imediatamente antes de abrir o transporte travado, para o teste alcançar o caminho de timeout de escrita em vez de falhar na validação de link prévia.
+- Nenhuma condição da produção foi relaxada.
+
+### Validação
+- Correção no commit `6bf1aa67f43cc0dd0a52af7533cbcb3c57332b06`. Após essa alteração, a CI #2745 avançou e revelou uma falha independente no código de recuperação, registrada em DB-108.
+
+## DB-108 · 2026-10-22 — Corrigir regex de resposta ECU na recuperação KWP/ELM
+
+### Problema / evidência
+- CI #2745 (`39721294082`), SHA `6bf1aa67f43cc0dd0a52af7533cbcb3c57332b06`, falhou no teste `recuperação de protocolo serializada`, com `protocol recovery should succeed with valid simulated responses`.
+- A inspeção direta do código mostrou que `src/obd/elm327.ts` usava `/41\\s*0C/` e `.replace(/\\s/g, '')` (duas barras invertidas reais no fonte). Isso corresponde a uma busca literal por `\s`, não a whitespace, e rejeitava a resposta comum `41 0C 0C 18` do probe ECU.
+
+### Correção
+- As expressões foram normalizadas para `/41\s*0C/` e `.replace(/\s/g, '')`, preservando a validação de serviço/PID e aceitando espaçamento válido na resposta.
+- O teste de recuperação serializada permaneceu e agora comprova a ordem de comandos ATZ → ATSP5 → 010C → ATDP, além de confirmar que o PID 0105 aguarda a renegociação inteira.
+
+### Testes / CI
+- Correção: `7aba139fcb13f71afba299a86505a7e5bc07ee29`.
+- CI #2746 (`39721534991`) e CI #2747 (`39721538865`) passaram `gate:baseline`, Expo Doctor e `npm run validate`; o log da #2746 registra `protocol recovery serialization: OK`, `27 regressões: TODAS PASSARAM` e `Motor de avaliação dos testes de sensores (5 leituras e média): OK`.
+- `android-build` executou `expo prebuild --clean --platform android --non-interactive` com sucesso. No momento desta anotação, `Assemble Android release APK` ainda estava em execução; não registrar build APK como aprovado.
+
+## DB-109 · 2026-10-22 — Bloqueio global de reconexão enquanto a limpeza do socket está incerta
+
+### Problema / evidência
+- O bloqueio de cleanup de escrita anteriormente vivia no objeto `BluetoothClassicTransport`. Se uma nova ação manual construísse outra instância para o mesmo endereço após uma falha de `disconnect()`, ela não enxergaria o estado pendente da instância antiga. Isso podia contornar o fail-closed do caminho automático.
+
+### Correção
+- Adicionado `pendingNativeSocketCleanups`, mapa compartilhado por instâncias e indexado pelo endereço Bluetooth normalizado. Antes de abrir qualquer socket RFCOMM, a nova instância deve aguardar a limpeza anterior.
+- Se a limpeza prévia falhou, a nova tentativa repete `safeDisconnect()` serialmente sobre o mesmo dispositivo retido pela closure. Se o estado continua conectado/desconhecido ou a limpeza não termina dentro do deadline, a nova abertura é recusada e registra `CONNECT_ABORT_NATIVE_SOCKET_CLEANUP_PENDING`.
+- A trava global é removida somente depois que a limpeza conclui; a falha não é silenciosamente convertida em sucesso. Um teste simulado verifica que uma segunda instância não chama `connectToDevice` enquanto a limpeza está falhando, e pode prosseguir depois de uma tentativa posterior confirmar limpeza.
+- Implementação `e8ed6e767ca8daeaf33cb36c6b7eec3aedcf7a5d`; teste cross-instance `9689afa4d3b577c66b06c33c6f2049d28df8a9ed`; contrato RG-22 `0922e0838d7e644dabff57def4f297aaf03201c6`.
+
+### Validação / limites
+- O teste usa um adaptador falso e não prova cancelamento de chamada nativa no Android; a CI deve executar `gate:baseline`, `validate` e `android-build` no SHA final.
+- A intenção do bloqueio é preferir falha explícita a criar sockets concorrentes. Se a desconexão nativa falhar persistentemente, a tentativa nova deve continuar bloqueada até uma limpeza real ser confirmada.
+- Próximo passo: confirmar CI verde no SHA final após esta atualização documental. Manter PR #77 em rascunho, sem merge, e fazer teste controlado com ELM327 físico e inspeção visual separadamente.
