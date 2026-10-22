@@ -3056,3 +3056,33 @@ O usuário pediu que a interface acompanhe a rotação física do aparelho, mant
 
 ### Próximo passo
 Aguardar a CI da PR #76 após as últimas alterações; corrigir qualquer falha real de instalação, TypeScript, testes ou build antes de considerar a alteração pronta.
+
+## DB-090 · 2026-10-22 — Correção da autonomia, conexão explícita e navegação única
+
+### Problemas corrigidos
+- O cockpit podia apresentar autonomia persistida como se fosse atual mesmo com ECU desconectada.
+- A fórmula persistida multiplicava o consumo médio pela capacidade total do tanque, em vez de considerar o nível real lido pelo PID 012F.
+- O valor de temperatura `N/D` recebia a cor verde, apesar de não existir leitura válida.
+- O cartão de clima podia promover o bairro a nome de cidade quando o município não era retornado no primeiro campo do geocodificador.
+- A tela tinha uma fileira de atalhos (Diagnóstico, Dados, Viagens) além da navegação inferior, duplicando destinos na versão exibida pelo usuário.
+- O rótulo genérico `OFFLINE` não identificava se a ECU, o Bluetooth ou a internet estava indisponível.
+- A barra inferior nativa do Android usava cores desalinhadas com o cockpit escuro.
+
+### Alterações preparadas
+- `src/trip/autonomyPresentation.ts`: função pura que só expõe autonomia atual quando há sessão ECU válida, suporte e amostra válida de nível de combustível; usa o consumo da viagem quando válido e a média histórica como fallback.
+- `src/trip/autoTripService.ts`: cálculo e persistência da autonomia passaram a considerar o percentual real de combustível; sem nível válido, a estimativa atual fica indisponível em vez de reutilizar silenciosamente a autonomia antiga ou presumir tanque cheio.
+- `app/index.tsx`: `N/D` da temperatura agora é neutro; a autonomia do cockpit vem da sessão ativa; estados `ECU CONECTADA`, `ECU SEM RESPOSTA`, `BLUETOOTH ATIVO`, `CONECTANDO ELM327` e `ECU DESCONECTADA` são separados; a barra principal passou a ter cinco destinos rotulados; os atalhos duplicados foram substituídos por um cartão de conexão acionável; a barra de status superior usa ícones claros no tema escuro.
+- `app.json` e `package.json`: configurado `expo-navigation-bar@~3.0.7` (SDK 51) para a barra nativa inferior escura, com botões claros; `package-lock.json` sincronizado.
+- `src/weather/currentConditions.ts`: ao resolver o nome mostrado, prioriza município (`city`/`subregion`) e não transforma bairro ou estado em cidade.
+- `tests/autonomyPresentation.test.js` e regressões em `tests/onlineConditions.test.js`, `tests/cockpitNavigation.test.js`, `tests/orientationLayout.test.js`, `tests/screenTheme.test.js` e `tests/projectBaseline.test.js`; o novo teste foi conectado a `npm test`.
+- `docs/CONTRATO_ANTI_REGRESSAO.md`: RG-15 atualizado para navegação única e RG-16 adicionado para autonomia e estados sem leitura.
+
+### Verificação e limites
+- Alterações agrupadas na branch `fix/cockpit-live-autonomy-20261022`, sem merge em `main`.
+- O código, as configurações Expo e as expectativas dos testes foram revisados estaticamente. **TypeScript, suíte completa e APK ainda não foram executados neste ambiente**, portanto não declarar os resultados como aprovados antes da CI.
+- O workflow padrão fica temporariamente restrito a `workflow_dispatch` nesta branch durante a montagem das mudanças; `main` permanece inalterada. Os gatilhos normais só serão restaurados depois da revisão estática completa do conjunto.
+- O teste físico no Android ainda é necessário para confirmar contraste real da barra nativa inferior, rótulos da navegação em retrato/paisagem e conexão com ELM327/ECU.
+
+### Próximo passo
+Concluir a revisão final do conjunto e restaurar os gatilhos da CI para executar `gate:baseline`, TypeScript, suíte de regressão e build Android no SHA exato. Não fazer merge sem autorização explícita.
+
