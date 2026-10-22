@@ -380,25 +380,19 @@ export class BluetoothClassicTransport implements ObdTransport {
     const device = this.device;
     const wasConnected = this.connected;
     const pendingIoCleanup = this.pendingNativeIoCleanup;
+    const addressKey = normalizeBluetoothAddress(this.deviceAddress);
     this.removeSubscriptions();
 
-    if (device && wasConnected) {
-      try {
-        await this.safeDisconnect(device);
-      } catch (cause) {
-        // A regular close can fail too (not only a write-timeout cleanup).
-        // Register it globally so another transport instance cannot bypass it.
-        this.registerPendingNativeSocketCleanup(device, Promise.reject(cause), 'DISCONNECT');
-        throw cause;
-      }
-    }
-    // A timed-out native write may still be unwinding. Retry cleanup serially,
-    // but never open another RFCOMM socket while its state is unknown.
-    if (pendingIoCleanup) {
-      await waitForPendingNativeSocketCleanup(
-        normalizeBluetoothAddress(this.deviceAddress),
-        this.config.bluetoothConnectTimeoutMs,
-      );
+    if (pendingNativeSocketCleanups.has(addressKey)) {
+      // The global guard owns the cleanup; don't issue a parallel disconnect.
+      await waitForPendingNativeSocketCleanup(addressKey, this.config.bluetoothConnectTimeoutMs);
+    } else if (device && wasConnected) {
+      // Register before awaiting native disconnect so another transport
+      // cannot race into a new socket while this close is still in flight.
+      const cleanup = this.registerPendingNativeSocketCleanup(device);
+      await cleanup.promise;
+    } else if (pendingIoCleanup) {
+      await waitForPendingNativeSocketCleanup(addressKey, this.config.bluetoothConnectTimeoutMs);
     }
 
     this.device = null;
