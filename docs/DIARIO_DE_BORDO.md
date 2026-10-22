@@ -10,6 +10,8 @@
 - PR #76 (`audit: restore anti-regression protections and cockpit fixes`) consta como mesclada no GitHub. A execução CI #2637 para esse SHA terminou com sucesso: `validate` passou (incluindo o gate `gate:baseline`) e `android-build` passou, com APK standalone verificado e enviado como artefato. Isto não comprova teste físico no telefone ou no ELM327.
 - PRs #74 e #75 permanecem fechadas sem merge próprio; as correções que agora estão em `main` são as efetivamente integradas pela PR #76, não uma aprovação implícita dos heads isolados.
 - Trabalho em andamento: branch `fix/bt-reconnect-guard`, PR #77 contra `main`, aberta em rascunho e não mesclada. A PR trata concorrência RFCOMM, fechamento tardio e recuperação após desconexão.
+- CI #2690 para SHA `ff85c7556b090c52ee5acf30d46fdec731919414` aprovou `gate:baseline`, mas falhou em `validate` com TS2322 em `src/obd/sharedConnection.ts(88,54)`: stopBackgroundMonitoring retornava Promise<boolean> em callback com contrato Promise<void>. `android-build` foi ignorado. Correção localizada publicada no commit `dd9c00b3f21aca9d9e1f0905876947deb5a4fe09`; exige CI no novo SHA.
+- Auditoria de permissões encontrou `app/_layout.tsx` abortando a preparação quando a localização era negada, mesmo com Bluetooth concedido. Política separada em `src/permissions/permissionPolicy.ts`: OBD depende do Bluetooth; GPS depende da permissão de localização. Teste comportamental e gate anti-regressão adicionados; CI atual continua obrigatória.
 - Auditoria adicional de persistência na desconexão: commits `d50b15a238a028f6c14c0d92923bfd13b54809cb`, `708288c38ee1f84f702e34a6e25bd94f8f2a1ebd` e `3027de27756027794e34566682b5a5342ef5ca6` fazem as operações de GPS/autosave/CSV serem tentadas independentemente e devolvem os erros à recuperação; a validação dessa alteração aguarda a nova CI do SHA final.
 - CI #2680, no SHA `e95a4e2fb5bcddc96abc9ebfec535c6a804ed310`, falhou em `validate` com `TS2304: Cannot find name 'cleanup'`; a correção de escopo saiu em `c564ec465e27f6e86f15b2d583a8cba2981a93c6`. A CI #2684 no SHA `ac5d173b1299abfa7cd87c445bc9c5df8b5e5768` aprovou `gate:baseline`, `validate` e `android-build`, mas antecede a auditoria atual de propagação de erros de persistência.
 - O teste físico está pendente. Não mesclar alterações novas sem autorização explícita; para esta branch, exigir `gate:baseline`, `validate` e `android-build` verdes no SHA final. Teste visual e físico com ELM327/ECU são etapas separadas.
@@ -130,6 +132,8 @@
 - **DB-096** · 2026-10-21 — Corrigir escopo do resultado de limpeza revelado pela CI #2680
 - **DB-097** · 2026-10-22 — Auditoria de integridade do índice do Diário de Bordo
 - **DB-098** · 2026-10-22 — Erros de persistência expostos na recuperação Bluetooth
+- **DB-099** · 2026-10-22 — Corrigir tipo de retorno no encerramento do GPS após falha da CI #2690
+- **DB-100** · 2026-10-22 — GPS opcional não pode bloquear a inicialização do diagnóstico OBD
 
 ---
 
@@ -3255,3 +3259,42 @@ Consultar CI #2678 no SHA final depois desta atualização do diário. Exigir `g
 
 ### Próximo passo
 Acompanhar a CI do SHA deste registro, revisar os logs se houver falha e manter a PR #77 em rascunho. Não mesclar sem autorização explícita.
+
+## DB-099 · 2026-10-22 — Corrigir tipo de retorno no encerramento do GPS após falha da CI #2690
+
+### Problema / evidência
+- Execução CI #2690 (run 39718055268), para SHA ff85c7556b090c52ee5acf30d46fdec731919414: gate:baseline passou, mas validate falhou no TypeScript em src/obd/sharedConnection.ts(88,54).
+- Erro: TS2322: Type Promise<boolean> is not assignable to type Promise<void>. O callback de parada do monitoramento GPS retornava diretamente o booleano da função nativa, incompatível com o contrato de tarefa Promise<void>. O job android-build foi ignorado por depender de validate.
+
+### Correção
+- Em src/obd/sharedConnection.ts, o callback foi normalizado para async () => { await stopBackgroundMonitoring(); }, preservando a parada sem propagar o booleano.
+- Commit da correção: dd9c00b3f21aca9d9e1f0905876947deb5a4fe09.
+- Nenhuma regra de recuperação, protocolo OBD, comando enviado à ECU ou lógica de persistência foi relaxada.
+
+### Testes / CI
+- Evidência anterior: gate:baseline passou; validate falhou no erro de tipo; android-build não executou.
+- A correção altera o SHA da branch. A nova execução deve confirmar gate:baseline, validate e android-build; CI #2690 não valida o commit corrigido.
+
+### Próximo passo
+Verificar a última CI da cabeça atual da PR #77, corrigir falhas reveladas e manter a PR em rascunho enquanto algum gate estiver pendente/vermelho. Teste físico com ELM327 continua separado.
+
+## DB-100 · 2026-10-22 — GPS opcional não pode bloquear a inicialização do diagnóstico OBD
+
+### Problema / evidência
+- A revisão de app/_layout.tsx mostrou que preparePermissions lançava uma exceção quando audit.location não era GRANTED, mesmo com Bluetooth concedido. O tratamento mostraria um erro de permissão Bluetooth e a inicialização não marcaria as permissões como verificadas.
+- O contrato operacional estabelece que o diagnóstico OBD funciona sem localização; GPS/viagens dependentes de localização podem ficar indisponíveis, mas não podem bloquear a conexão ou as leituras ECU.
+
+### Correção
+- Criado src/permissions/permissionPolicy.ts com funções puras canStartObdStartup() (Bluetooth concedido) e canUseGps() (localização concedida).
+- app/_layout.tsx continua exigindo Bluetooth, mas trata localização negada como limitação de GPS/viagem, com aviso, sem abortar a preparação OBD.
+- tests/permissions.test.js adiciona testes comportamentais para Bluetooth concedido + localização negada, Bluetooth negado e GPS ausente/presente.
+- tests/projectBaseline.test.js e docs/CONTRATO_ANTI_REGRESSAO.md registram RG-17.
+- Commits sequenciais: helper 6c7734d188c5a9b768f9743683e2a54fe272c3eb; layout c25962acb1c775fc0d2c0d53e9e8b6733c3dd5c5; teste 2f46b0c80ee361fbacf8f07d7edfda8a26d817fb; gate 9ce9deebab700d3596b2f4c37dcc5fec6f6f97dd. Contrato atualizado no commit 6fb108d4601691314368c07c171c3f5b7f242958.
+
+### Validação e limites
+- Os testes foram adicionados ao script de teste existente por meio de tests/permissions.test.js; a validação depende da CI completa do SHA final após esta atualização e não é presumida como aprovada.
+- A solicitação de localização ainda pode aparecer durante a preparação inicial por causa do registro automático de viagens; a recusa deve degradar apenas os recursos dependentes de GPS.
+- Nenhum teste físico foi declarado nesta entrada.
+
+### Próximo passo
+Conferir a CI da cabeça final para gate:baseline, validate e android-build. Testar em Android com Bluetooth permitido/localização negada e com ambas permitidas; confirmar conexão ECU, telemetria e comportamento GPS. Manter PR #77 em rascunho sem merge automático.
