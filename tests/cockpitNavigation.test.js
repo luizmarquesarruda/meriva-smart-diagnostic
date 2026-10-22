@@ -61,7 +61,7 @@ assert.match(networkIndicator, /INTERNET OK/);
 assert.match(networkIndicator, /SEM INTERNET/);
 assert.ok(index.includes('href="/conectividade"'), 'cockpit deve expor conectividade 4G/5G');
 assert.match(index, /NetworkStatusIndicator/, 'cockpit deve exibir o estado da rede por eventos');
-assert.match(networkIndicator, /connectivity/, 'indicador de rede deve usar ícone da biblioteca compartilhada');
+assert.match(index, /NetworkStatusIndicator/, 'atalho de conectividade deve usar o indicador de rede compartilhado');
 assert.match(more, /CONECTIVIDADE 4G\/5G/, 'Mais Recursos deve expor a página de conectividade');
 const connectivity = read('app/conectividade.tsx');
 assert.match(connectivity, /NetInfo\.refresh\(\)/, 'a tela de conectividade deve permitir atualizar o estado sob comando');
