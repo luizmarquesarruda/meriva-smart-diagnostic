@@ -116,5 +116,12 @@ assert.ok(read('app/laboratorio.tsx').includes('PIDs REGISTRADOS / DESCOBERTOS')
 assert.match(theme, /SCREEN_TITLE_STYLE/);
 assert.match(read('tests/screenTheme.test.js'), /Shared screen theme and title contract/);
 
+const permissionPolicy = read('src/permissions/permissionPolicy.ts');
+assert.match(permissionPolicy, /canStartObdStartup/);
+assert.match(permissionPolicy, /status\.bluetooth === 'GRANTED'/);
+assert.match(permissionPolicy, /canUseGps/);
+assert.match(read('app/_layout.tsx'), /canStartObdStartup\(audit\)/);
+assert.match(read('app/_layout.tsx'), /canUseGps\(audit\)/);
+
 console.log('Anti-regression baseline gate: PASS');
 console.log('Protected contracts: five-read sensor tests, manual PID flow, single ELM327 queue, offline diagnosis, Expo SDK 51, GPS/Trip, TXT/history and cockpit/graphs.');
