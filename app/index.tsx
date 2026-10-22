@@ -209,6 +209,7 @@ export default function IndexScreen() {
     tripConnected: tripState.connected,
     fuelLevelSupported: tripState.fuelLevelSupported,
     fuelLevelPercent: tripState.fuelLevelPercent,
+    fuelLevelReadAtMs: tripState.fuelLevelReadAtMs,
     tripConsumptionKml: tripState.consumptionKml,
     averageConsumptionKml: tripState.averageConsumptionKml,
   });

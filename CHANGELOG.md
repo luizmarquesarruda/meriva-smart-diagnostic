@@ -6,6 +6,7 @@
 - Criado `docs/TEST_PLAN.md` com cenários críticos para ECU/ELM327, frescor de dados, autonomia, navegação, DTC, splash e validação de release.
 - Adicionado o contrato RG-20 e uma verificação no gate para manter o plano de aceitação junto ao código.
 - Os casos pendentes permanecem identificados como pendentes; não se presume teste físico nem recurso futuro implementado.
+- A autonomia atual descarta nível de combustível PID 012F sem timestamp válido ou com mais de 30 s, inclusive após perda de resposta da ECU; testes de validade temporal ampliados.
 
 ### Splash screen e documentação
 - Restaurada a dependência `expo-splash-screen@~0.27.7` e alinhado o lockfile.

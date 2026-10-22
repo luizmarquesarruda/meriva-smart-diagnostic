@@ -124,11 +124,15 @@ for (const label of [
 }
 assert.match(home, /10_000/);
 assert.match(home, /getCurrentAutonomyRangeKm/);
+assert.match(home, /fuelLevelReadAtMs: tripState\.fuelLevelReadAtMs/);
+assert.match(tripService, /fuelLevelReadAtMs/);
+assert.match(read('src/trip/autonomyPresentation.ts'), /CURRENT_FUEL_LEVEL_STALE_AFTER_MS\s*=\s*30_000/);
 assert.match(home, /coolantUnavailable/);
 assert.ok(!tripService.includes('averageConsumptionKml * state.autonomy.tankCapacityL'),
   'autonomia não deve assumir tanque cheio sem nível real do PID 012F');
-assert.ok(tripService.includes('estimateRangeFromFuelLevel(this.state.fuelLevelPercent, averageConsumptionKml)'),
-  'autonomia persistida deve usar o nível real do tanque');
+assert.ok(tripService.includes('estimateRangeFromFuelLevel(currentFuelLevelPercent, averageConsumptionKml)'),
+  'autonomia persistida deve usar apenas nível de combustível atual');
+assert.match(tripService, /isCurrentFuelLevelSample\(this\.state\.fuelLevelReadAtMs\)/);
 assert.ok(!home.includes('actionGrid') && !home.includes('dashboardAction'),
   'cockpit não deve duplicar destinos em uma segunda fileira de ações');
 assert.ok(read('app/mais.tsx').includes('CONSULTA MANUAL DE PID'), 'atalho de consulta manual precisa existir');

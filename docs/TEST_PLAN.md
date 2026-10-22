@@ -16,7 +16,7 @@ A branch mantém o fluxo OBD/ELM327 existente e inclui testes automatizados para
 | OBD-02 | Bluetooth conectado, ECU sem resposta | Estado distinto de Bluetooth conectado; não declarar diagnóstico pronto | `tests/bluetoothState.test.js`, `tests/ecuHealth.test.js` |
 | OBD-03 | Perder ECU durante uma leitura | Encerrar/recuperar a sessão com erro explícito; nenhuma resposta ausente vira zero | testes de ciclo de vida ELM327 e validação física |
 | DATA-01 | Leitura ausente, inválida ou com mais de 30 s | Não exibir como leitura atual; usar N/D neutro | `tests/regression.test.js`, testes de telemetria |
-| DATA-02 | Autonomia sem nível de combustível atual válido | Exibir N/D; nunca presumir tanque cheio nem reutilizar autonomia persistida como atual | `tests/autonomyPresentation.test.js` |
+| DATA-02 | Autonomia sem nível de combustível atual válido, com timestamp ausente/inválido ou amostra do PID 012F acima de 30 s | Exibir N/D; nunca presumir tanque cheio nem reutilizar amostra vencida como atual | `tests/autonomyPresentation.test.js` |
 | DATA-03 | Sem internet, com ECU funcional | Diagnóstico local continua funcional; clima/rede falham de forma isolada | `tests/onlineConditions.test.js`, `tests/connectivity.test.js` |
 | NAV-01 | Navegar entre as cinco áreas principais | Um único conjunto de destinos, rótulos visíveis e alvos acessíveis | `tests/cockpitNavigation.test.js` |
 | NAV-02 | Girar aparelho entre retrato e paisagem | Conteúdo e navegação continuam acessíveis; sem sobreposição crítica | `tests/orientationLayout.test.js` |

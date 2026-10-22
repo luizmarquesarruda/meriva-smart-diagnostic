@@ -39,8 +39,10 @@ const valid = {
   tripConnected: true,
   fuelLevelSupported: true,
   fuelLevelPercent: 50,
+  fuelLevelReadAtMs: 1_000_000,
   tripConsumptionKml: null,
   averageConsumptionKml: 10,
+  nowMs: 1_000_000,
 };
 
 assert.strictEqual(getCurrentAutonomyRangeKm(valid), 280,
@@ -61,5 +63,15 @@ assert.strictEqual(getCurrentAutonomyRangeKm({ ...valid, fuelLevelPercent: 101 }
   'nível de combustível fora da faixa deve ser rejeitado');
 assert.strictEqual(getCurrentAutonomyRangeKm({ ...valid, averageConsumptionKml: 0 }), null,
   'sem consumo válido não deve existir estimativa de autonomia');
+assert.strictEqual(getCurrentAutonomyRangeKm({ ...valid, fuelLevelReadAtMs: 970_000 }), 280,
+  'a amostra de nível no limite de 30 s ainda é válida');
+assert.strictEqual(getCurrentAutonomyRangeKm({ ...valid, fuelLevelReadAtMs: 969_999 }), null,
+  'amostra de nível com mais de 30 s deve ser considerada desatualizada');
+assert.strictEqual(getCurrentAutonomyRangeKm({ ...valid, fuelLevelReadAtMs: null }), null,
+  'percentual sem timestamp de leitura atual não pode gerar autonomia');
+assert.strictEqual(getCurrentAutonomyRangeKm({ ...valid, fuelLevelReadAtMs: Number.NaN }), null,
+  'timestamp inválido não pode gerar autonomia');
+assert.strictEqual(getCurrentAutonomyRangeKm({ ...valid, fuelLevelReadAtMs: 1_000_001 }), null,
+  'timestamp futuro não pode ser tratado como leitura atual');
 
 console.log('autonomyPresentation.test.js: PASS');

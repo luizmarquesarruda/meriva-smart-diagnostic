@@ -3181,3 +3181,23 @@ Transformar as prioridades do relatório analítico em critérios verificáveis 
 3. Confirmar splash e navegação visualmente em aparelho Android.
 4. Testar ELM327/ECU reais separadamente; CI verde não equivale a validação física.
 5. Não fazer merge sem autorização explícita.
+
+
+## DB-095 · 2026-10-22 — Expiração de nível de combustível antigo na autonomia atual
+
+### Achado funcional
+- `AutoTripService` mantinha o percentual do PID 012F sem registrar a hora da última resposta válida. Se consultas subsequentes falhassem enquanto a sessão continuasse ativa, o cockpit podia calcular autonomia com evidência antiga.
+- O helper da autonomia verificava conexão/suporte/faixa, mas não a idade da amostra. A regra documental de não reutilizar dados vencidos não estava totalmente implementada para nível do tanque.
+
+### Correção aplicada
+- `src/trip/autoTripService.ts`: registra o timestamp em memória quando o PID 012F retorna um percentual válido; invalida percentual/timestamp após 30 s, limpa a evidência ao perder a resposta da ECU e impede a persistência de autonomia baseada em nível vencido.
+- `src/trip/autonomyPresentation.ts`: centraliza o limite de frescor de 30 s e rejeita timestamp ausente, inválido, futuro ou vencido.
+- `app/index.tsx`: fornece o timestamp da amostra atual ao cálculo da autonomia do cockpit.
+- `tests/autonomyPresentation.test.js`: adicionados testes para o limite exato de 30 s, amostra vencida (>30 s), timestamp ausente/inválido e timestamp futuro.
+- `tests/projectBaseline.test.js`, `docs/TEST_PLAN.md`, `docs/CONTRATO_ANTI_REGRESSAO.md` e `CHANGELOG.md`: o contrato de frescor passa a ser explícito e protegido.
+
+### Limites e validação
+- Nenhuma dependência foi adicionada; a API, o transporte Bluetooth/ELM327 e o protocolo OBD não foram alterados.
+- O timestamp é runtime-only e não transforma dados persistidos em dados atuais. A ausência de uma nova leitura após 30 s resulta em `N/D`/autonomia indisponível.
+- A CI ainda deve ser conferida no SHA consolidado depois da atualização da branch. APK/build não substitui teste físico com ELM327/ECU. A splash continua pendente de asset visual nativo confirmado.
+- Nenhum merge automático; modo oficina avançado e sincronização em nuvem/perfis seguem fora do escopo.
