@@ -8,7 +8,7 @@ const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
 const index = read('app/index.tsx');
 const more = read('app/mais.tsx');
 const laboratory = read('app/laboratorio.tsx');
-assert.match(index, /href="\\/dados"/, 'cockpit deve expor a rota de dados ao vivo');
+assert.ok(index.includes('href="/dados"'), 'cockpit deve expor a rota de dados ao vivo');
 assert.doesNotMatch(index, /href="\/saude"/, 'saúde detalhada não deve duplicar o cartão na página inicial');
 assert.match(more, /'\/saude'/, 'a central de saúde deve continuar acessível em Mais Recursos');
 for (const file of ['app/dados.tsx', 'app/saude.tsx', 'app/mais.tsx', 'app/veiculo.tsx', 'app/viagens.tsx', 'app/aprendizado.tsx']) {
@@ -21,7 +21,7 @@ assert.doesNotMatch(index, /\}, \[isHydrated, settings\]\);/, 'objeto settings i
 assert.match(index, /settings\?\.elmMaxConnectionAttempts/, 'efeito deve reagir às opções OBD efetivamente alteradas');
 const primaryTabs = read('src/ui/PrimaryTabBar.tsx');
 assert.doesNotMatch(index, /!layout\.landscape\s*&&\s*\(/, 'navegação não deve desaparecer ao girar o aparelho');
-assert.match(index, /<PrimaryTabBar active="cockpit" \/>/, 'cockpit deve mostrar a navegação principal compartilhada');
+assert.ok(read(file).includes('<PrimaryTabBar active="' + active + '" />'), file + ' deve mostrar a navegação principal');
 for (const [file, active] of [
   ['app/laboratorio.tsx', 'diagnostic'],
   ['app/dados.tsx', 'data'],
