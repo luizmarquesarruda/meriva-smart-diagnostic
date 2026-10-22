@@ -17,6 +17,7 @@
 - Nova varredura encontrou que `BluetoothClassicTransport.write()` aguardava a chamada nativa sem deadline. Escrita agora usa `ioTimeoutMs`, loga `WRITE_TIMEOUT`, sinaliza link perdido e inicia desconexão; `close()` aguarda `pendingNativeIoCleanup` antes de a sessão ser considerada fechada. Commits `a5cee123d38da75eafc6e7b59ec8ea8cfcebee02` (código) e `75c61b87923ce250a5c23a4e0eaef505a6912aa9` (teste simulado); RG-20 no contrato `c34621be08c54f70453f5fc1f8aed37c16fec648`. CI desses SHAs ainda não foi confirmada.
 - Reforço de segurança após o deadline: `safeDisconnect()` não deve considerar qualquer exceção como confirmação de fechamento. Agora verifica `isConnected()`; se permanece conectado ou o estado é indeterminado, propaga o erro, conserva a limpeza rejeitada e impede retry. Código `e656f6428eea730840282a41a1094718b24514b1`, teste `07e3991c3c70c20bcf13192e1d64b7d55f58c442`, contrato RG-21 `2f427ad83c4e8edd02840ff1c2e6d463bcfaafc5`. CI do SHA atual ainda obrigatória.
 - O teste RFCOMM inicialmente deixou `fakeDeviceConnected=false` de uma etapa anterior; fixture corrigida em `6bf1aa67f43cc0dd0a52af7533cbcb3c57332b06`. A CI #2745 então isolou um defeito real: regex do probe ECU em `recoverProtocol()` tinha escapes duplicados e podia rejeitar `41 0C ...`. Código corrigido no commit `7aba139fcb13f71afba299a86505a7e5bc07ee29`; a CI #2746/#2747 validou o código desse SHA, mas o APK ainda estava em montagem e alterações globais de cleanup foram adicionadas depois.
+- Depois do RG-22, a revisão ampliou a trava global a falhas de `close()` normal, não apenas timeout de escrita. `close()` agora registra o cleanup antes de aguardar a chamada nativa, consulta/reutiliza a trava existente em vez de executar uma segunda desconexão paralela, e `registerPendingNativeSocketCleanup()` só inicia `disconnect()` depois de verificar se já existe um registro. Commits `c156e9edfe31c017cfea9e7d1ca0a5bbaf6037ad`, `1c872584d60b95994b8cd02b99a69430f82b9c7d`, teste normal close `dc092ceca62b4544007e1b8307a8733871d5d461` e ajuste de registro `62a89f0bd0690c6a837df5c386b991ed5111d74b`. O SHA final exige nova CI.
 - CI #2704 (run `39720378776`, SHA `9013528314623ae4182b8e64ef8cbc5b3c78c43b`) passou no gate e no TypeScript, mas falhou em teste por duas asserções de `tests/bluetoothLifecycle.test.js` presas à implementação textual antiga. Asserções foram atualizadas para `canStartObdStartup()`/`canUseGps()`; commits `9013528314623ae4182b8e64ef8cbc5b3c78c43b` e `cd8f21fab14e8a94f8f37368320f31abd3dfafe8`.
 - A CI #2706 (run `39720499416`, SHA `c32ff0e1a1b8a2ce89dc372dfe55ad80aaabb7d8`) confirmou que a correção de tipo inicial foi incompleta: além do GPS, `closeObdAutosaveSession()` também retornava `Promise<boolean>` na tarefa tipada como `Promise<void>`. Callback normalizado em `c32ff0e1a1b8a2ce89dc372dfe55ad80aaabb7d8`; CI ainda falhou em teste legado antes da próxima correção.
 - CI #2715 (run `39720653130`) foi iniciada para SHA `e6d438ffbff8c4788ebd8978cc5a842aa23c71f4`, mas ainda estava pendente na última consulta. Esse SHA ainda antecede esta atualização documental; a CI nova do SHA final deverá ser consultada.
@@ -151,6 +152,7 @@
 - **DB-107** · 2026-10-22 — Corrigir fixture do teste de timeout RFCOMM
 - **DB-108** · 2026-10-22 — Corrigir regex de resposta ECU na recuperação KWP/ELM
 - **DB-109** · 2026-10-22 — Bloqueio global de reconexão enquanto a limpeza do socket está incerta
+- **DB-110** · 2026-10-22 — Incluir falhas no fechamento normal no bloqueio global RFCOMM
 
 ---
 
@@ -3486,3 +3488,23 @@ Após CI verde, teste controlado no Android com ELM327: Bluetooth desligado/liga
 - O teste usa um adaptador falso e não prova cancelamento de chamada nativa no Android; a CI deve executar `gate:baseline`, `validate` e `android-build` no SHA final.
 - A intenção do bloqueio é preferir falha explícita a criar sockets concorrentes. Se a desconexão nativa falhar persistentemente, a tentativa nova deve continuar bloqueada até uma limpeza real ser confirmada.
 - Próximo passo: confirmar CI verde no SHA final após esta atualização documental. Manter PR #77 em rascunho, sem merge, e fazer teste controlado com ELM327 físico e inspeção visual separadamente.
+## DB-110 · 2026-10-22 — Incluir falhas no fechamento normal no bloqueio global RFCOMM
+
+### Problema / evidência
+- A primeira trava global (DB-109) protegida por teste o caminho de timeout de escrita. A inspeção seguinte mostrou que uma falha de `disconnect()` no fechamento normal da sessão também poderia deixar o estado nativo indeterminado sem registrar o endereço no mapa compartilhado; outra instância poderia tentar conectar pelo mesmo endereço.
+- Também era possível iniciar um segundo `disconnect()` ao registrar uma falha quando já existia uma limpeza para o mesmo endereço.
+
+### Correção
+- `close()` agora consulta a trava global por endereço normalizado antes de iniciar outra desconexão. Em fechamento normal sem trava prévia, registra a limpeza antes de aguardar o `disconnect()`; erro mantém a trava global e faz `close()` rejeitar.
+- `registerPendingNativeSocketCleanup()` primeiro consulta o mapa existente; só inicia uma chamada nativa nova quando não há limpeza pendente para esse endereço. Isso evita duas operações de desconexão concorrentes sobre o mesmo socket.
+- `tests/regression.test.js` ampliado: simula falha de `close()` normal, confirma que uma nova instância é recusada sem aumentar a contagem de `connectToDevice`, e permite a conexão depois que uma tentativa posterior de limpeza tem sucesso.
+
+### Commits e contrato
+- Código (registro das falhas): `c156e9edfe31c017cfea9e7d1ca0a5bbaf6037ad`.
+- Ajuste do fluxo de fechamento/serialização: `1c872584d60b95994b8cd02b99a69430f82b9c7d`.
+- Teste: `dc092ceca62b4544007e1b8307a8733871d5d461`.
+- Registro de limpeza sem `disconnect()` duplicado: `62a89f0bd0690c6a837df5c386b991ed5111d74b`.
+- Contrato RG-22 já está em `docs/CONTRATO_ANTI_REGRESSAO.md`, commit `0922e0838d7e644dabff57def4f297aaf03201c6`.
+
+### Validação / próximo passo
+- Nenhum resultado CI anterior cobre o SHA deste conjunto final. Executar `npm run gate:baseline`, `npm run validate` e `android-build` no HEAD atual. Teste simulado não demonstra cancelamento nativo nem substitui o ensaio físico controlado.
