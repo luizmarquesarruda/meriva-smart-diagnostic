@@ -13,6 +13,7 @@
 - CI #2690 para SHA `ff85c7556b090c52ee5acf30d46fdec731919414` aprovou `gate:baseline`, mas falhou em `validate` com TS2322 em `src/obd/sharedConnection.ts(88,54)`: stopBackgroundMonitoring retornava Promise<boolean> em callback com contrato Promise<void>. `android-build` foi ignorado. Correção localizada publicada no commit `dd9c00b3f21aca9d9e1f0905876947deb5a4fe09`; exige CI no novo SHA.
 - Auditoria de permissões encontrou `app/_layout.tsx` abortando a preparação quando a localização era negada, mesmo com Bluetooth concedido. Política separada em `src/permissions/permissionPolicy.ts`: OBD depende do Bluetooth; GPS depende da permissão de localização. Teste comportamental e gate anti-regressão adicionados; CI atual continua obrigatória.
 - Revisão posterior encontrou que `Elm327Session.recoverProtocol()` executava ATZ/ATSP5/010C/ATDP fora da fila serial. Agora a sequência é envolvida por `enqueueCommand()` e lê ATDP sem reencaminhar para `identifyProtocol()` (o que causaria deadlock se enfileirado dentro da recuperação). Commit de código `a581e0bf410f9e46e2b30b24446925951ff25b60`; teste simulado de interleaving adicionado em `tests/regression.test.js`, commit `735b95e9d2d4502fea5656d11bdf0968d749b548`; contrato RG-19 no commit `c3274ebb8436960f026ffa0547407f6521e46d92`. Esses commits exigem CI nova; sem teste físico.
+- Nova varredura encontrou que `BluetoothClassicTransport.write()` aguardava a chamada nativa sem deadline. Escrita agora usa `ioTimeoutMs`, loga `WRITE_TIMEOUT`, sinaliza link perdido e inicia desconexão; `close()` aguarda `pendingNativeIoCleanup` antes de a sessão ser considerada fechada. Commits `a5cee123d38da75eafc6e7b59ec8ea8cfcebee02` (código) e `75c61b87923ce250a5c23a4e0eaef505a6912aa9` (teste simulado); RG-20 no contrato `c34621be08c54f70453f5fc1f8aed37c16fec648`. CI desses SHAs ainda não foi confirmada.
 - CI #2704 (run `39720378776`, SHA `9013528314623ae4182b8e64ef8cbc5b3c78c43b`) passou no gate e no TypeScript, mas falhou em teste por duas asserções de `tests/bluetoothLifecycle.test.js` presas à implementação textual antiga. Asserções foram atualizadas para `canStartObdStartup()`/`canUseGps()`; commits `9013528314623ae4182b8e64ef8cbc5b3c78c43b` e `cd8f21fab14e8a94f8f37368320f31abd3dfafe8`.
 - A CI #2706 (run `39720499416`, SHA `c32ff0e1a1b8a2ce89dc372dfe55ad80aaabb7d8`) confirmou que a correção de tipo inicial foi incompleta: além do GPS, `closeObdAutosaveSession()` também retornava `Promise<boolean>` na tarefa tipada como `Promise<void>`. Callback normalizado em `c32ff0e1a1b8a2ce89dc372dfe55ad80aaabb7d8`; CI ainda falhou em teste legado antes da próxima correção.
 - CI #2715 (run `39720653130`) foi iniciada para SHA `e6d438ffbff8c4788ebd8978cc5a842aa23c71f4`, mas ainda estava pendente na última consulta. Esse SHA ainda antecede esta atualização documental; a CI nova do SHA final deverá ser consultada.
@@ -142,6 +143,7 @@
 - **DB-102** · 2026-10-22 — Limitação por API das permissões Bluetooth legadas
 - **DB-103** · 2026-10-22 — Benchmark externo, versão das dependências e lacunas de inicialização
 - **DB-104** · 2026-10-22 — Tornar atômica a recuperação de protocolo ELM na fila serial
+- **DB-105** · 2026-10-22 — Deadline para escrita RFCOMM travada e limpeza segura do socket
 
 ---
 
@@ -3394,3 +3396,23 @@ Após CI verde, teste controlado no Android com ELM327: Bluetooth desligado/liga
 ### Limites / próximo passo
 - O teste comprova a ordem de operações no transporte simulado, não a recuperação real do adaptador K-Line/KWP.
 - Confirmar CI verde no SHA final, revisar os logs, manter PR #77 em rascunho e executar teste físico controlado com ELM327 antes de considerar conectividade estável.
+## DB-105 · 2026-10-22 — Deadline para escrita RFCOMM travada e limpeza segura do socket
+
+### Problema / evidência
+- `src/obd/bluetoothClassicTransport.ts` tinha timeout para conexão (`open`) e leitura (`readUntilPrompt`), mas `write()` aguardava diretamente `device.write(data, 'ascii')` sem deadline. Uma Promise nativa que nunca resolvesse deixaria `Elm327Session.command()` preso antes de chegar ao timeout de leitura; os comandos enfileirados também aguardariam indefinidamente.
+
+### Correção
+- A escrita agora concorre com um temporizador derivado de `this.config.ioTimeoutMs`. Em caso de timeout, registra `WRITE_TIMEOUT`, inicia `safeDisconnect(device)`, conserva a Promise de limpeza em `pendingNativeIoCleanup` e emite o callback de desconexão.
+- `close()` aguarda a limpeza nativa pendente antes de completar. Isso evita tratar o transporte como liberado e abrir outro RFCOMM socket enquanto a desconexão nativa anterior ainda está em andamento.
+- O controle não afirma cancelar magicamente a Promise nativa original: o caminho disponível na camada é desconectar o socket. Se a própria operação nativa de desconexão não concluir, a recuperação deve permanecer bloqueada por segurança; esse cenário continua exigindo tratamento/observação em aparelho.
+- Teste simulado adicionado a `tests/regression.test.js`: escrita que nunca resolve deve rejeitar no deadline configurado, emitir evento de desconexão e registrar `WRITE_TIMEOUT`. Nenhum adaptador físico ou ECU é acionado.
+- Contrato de anti-regressão inclui RG-20.
+
+### Evidência / validação
+- Implementação: `a5cee123d38da75eafc6e7b59ec8ea8cfcebee02`.
+- Teste: `75c61b87923ce250a5c23a4e0eaef505a6912aa9`.
+- Contrato: `c34621be08c54f70453f5fc1f8aed37c16fec648`.
+- As execuções anteriores têm SHA anterior às mudanças e não comprovam a nova implementação. A CI do SHA final precisa passar `gate:baseline`, `validate` e `android-build`.
+
+### Risco residual / próximo passo
+- A chamada nativa de escrita em si não é cancelada por um timeout JavaScript; a rotina inicia desconexão nativa e impede avanço até a limpeza terminar. Se `disconnect()` não resolver, o fluxo fica em estado de falha seguro, mas pode exigir reinício manual do aplicativo/adaptador. Validar com write/read travados em hardware controlado antes de considerar resolvido.
