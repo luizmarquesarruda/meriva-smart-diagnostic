@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
 import { Elm327Session } from '../src/obd/elm327';
 import { parseDtcResponse, parsePidResponse } from '../src/obd/parser';
+import { isValidDtcResponseForService } from '../src/obd/dtcParser';
 import { SimulatedObdTransport } from '../src/obd/simulatedTransport';
 import { BluetoothDeviceInfo } from '../src/obd/bluetoothClassicTransport';
 import { createRealElmSession, discoverPairedDevices } from '../src/obd/bluetoothManager';
@@ -445,11 +446,17 @@ export default function LaboratorioScreen() {
       const result = mode === 'REAL'
         ? await autoTripService.withPollingPaused(() => activeSession.executeCommand('03'))
         : await activeSession.executeCommand('03');
-      const codes = parseDtcResponse(result.response);
       setTx(result.command);
       setRx(result.response);
       setElapsedMs(result.elapsedMs);
       setProtocol(activeSession.getProtocol() ?? 'N/D');
+      if (result.status !== 'OK') {
+        throw new Error(result.errorMessage || 'ECU não confirmou uma resposta válida ao comando de leitura de DTC.');
+      }
+      if (!isValidDtcResponseForService('03', result.response)) {
+        throw new Error('RESPOSTA DTC INVÁLIDA OU INCOMPLETA; não é possível confirmar ausência de falhas.');
+      }
+      const codes = parseDtcResponse(result.response);
       setDtcCodes(codes);
 
       if (mode === 'REAL') {

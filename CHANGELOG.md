@@ -9,6 +9,7 @@
 - A autonomia atual descarta nível de combustível PID 012F sem timestamp válido ou com mais de 30 s, inclusive após perda de resposta da ECU; testes de validade temporal ampliados.
 - O serviço de viagens filtra a autonomia em seu estado público e a tela Dados usa apenas estimativa atual, impedindo que o valor persistido de viagens anteriores apareça como atual.
 - Telemetria ao vivo rejeita timestamps inválidos ou futuros antes de produzir tendências e contexto operacional.
+- Leitura de DTC diferencia quadro positivo válido de NO DATA/timeout/quadro incompleto; falha de leitura não é exibida como ausência de códigos.
 
 ### Splash screen e documentação
 - Restaurada a dependência `expo-splash-screen@~0.27.7` e alinhado o lockfile.

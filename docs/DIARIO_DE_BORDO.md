@@ -3235,3 +3235,21 @@ Transformar as prioridades do relatório analítico em critérios verificáveis 
 ### Validação
 - Mudança sem nova dependência e sem alterar consulta OBD, fila Bluetooth ou origem das amostras.
 - Testes automatizados e build Android da cabeça mais recente devem ser confirmados na CI automática; sem merge e sem declaração de teste físico ELM327/ECU.
+
+
+## DB-098 · 2026-10-22 — DTC: distinguir ausência de códigos de falha de leitura
+
+### Achado funcional
+- `readCurrentDtcs()` interpretava uma resposta sem códigos parseáveis como “NENHUM DTC RETORNADO” sem verificar `ElmCommandResult.status` nem confirmar um quadro positivo completo. `NO DATA`/timeout ou resposta malformada podia ser confundida com ausência de falhas.
+- `scanDtcServices()` classificava a string `NO DATA` como serviço disponível porque ela era aceita como sinônimo de “no codes”; isso também poderia marcar códigos previamente salvos como inativos sem evidência válida.
+
+### Correção aplicada
+- `src/obd/dtcParser.ts`: acrescentada validação de resposta por serviço, aceitando quadro positivo completo ou mensagem explícita de ausência de códigos; rejeita `NO DATA`, erro e quadro truncado.
+- `src/obd/dtcScanner.ts`: serviço só é marcado disponível com status `OK` e resposta válida.
+- `app/laboratorio.tsx`: leitura direta Mode 03 preserva RX/tempo para diagnóstico, mas interrompe a interpretação de códigos quando status/resposta não são válidos; erro não limpa nem inativa histórico.
+- `tests/dtcScanner.test.js`: cenários positivos, nenhum DTC explícito, `NO DATA`, ausência de cabeçalho e resposta truncada.
+- `tests/projectBaseline.test.js`, `docs/TEST_PLAN.md`, `docs/CONTRATO_ANTI_REGRESSAO.md` e `CHANGELOG.md` atualizados; RG-21 registra o contrato.
+
+### Limites e validação
+- Nenhuma dependência ou comando de limpeza de DTC foi adicionado. O lote só altera classificação da leitura.
+- A CI do SHA final precisa concluir `validate` e `android-build`. O teste físico de ECU/ELM327 continua pendente; sem merge.

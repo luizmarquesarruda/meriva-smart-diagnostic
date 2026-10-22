@@ -1,5 +1,5 @@
 import type { Elm327Session } from './elm327';
-import { parseDtcResponseForService } from './dtcParser';
+import { isValidDtcResponseForService, parseDtcResponseForService } from './dtcParser';
 import { parsePidResponse } from './parser';
 
 export type DtcServiceKind = 'STORED' | 'PENDING' | 'PERMANENT';
@@ -25,10 +25,6 @@ const REQUESTS: Array<{
   { service: '0A', kind: 'PERMANENT', label: 'PERMANENTES' },
 ];
 
-function isNoCodeResponse(response: string): boolean {
-  return /NO DATA|NO CODES?|NENHUM/i.test(response);
-}
-
 export async function scanDtcServices(
   session: Elm327Session,
   execute: (command: string) => Promise<Awaited<ReturnType<Elm327Session['executeCommand']>>> = (command) =>
@@ -40,7 +36,7 @@ export async function scanDtcServices(
     try {
       const reply = await execute(request.service);
       const response = reply.response ?? '';
-      const available = reply.status === 'OK' || isNoCodeResponse(response);
+      const available = reply.status === 'OK' && isValidDtcResponseForService(request.service, response);
 
       results.push({
         ...request,
