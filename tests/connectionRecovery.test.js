@@ -64,6 +64,18 @@ async function run() {
   assert.equal(bothFailed.persistenceError, diskError);
   assert.equal(bothFailed.closeError, closeError, 'cleanup errors must be reported without escaping');
 
+  const neverCloses = new Promise(() => {});
+  const stalledClose = await cleanupDisconnectedSession(
+    async () => {},
+    () => neverCloses,
+    5,
+    5,
+  );
+  assert.match(String(stalledClose.closeError), /FECHAMENTO DA SESSÃO EXCEDEU 5 MS/,
+    'a native close() that never settles must not wedge recovery forever');
+  assert.equal(shouldRetryAfterDisconnectCleanup(stalledClose.closeError), false,
+    'a close timeout must keep reconnection blocked because socket release is unconfirmed');
+
   assert.equal(shouldRetryAfterDisconnectCleanup(null), true,
     'recovery may retry after the old session closes successfully');
   assert.equal(shouldRetryAfterDisconnectCleanup(closeError), false,
