@@ -32,6 +32,7 @@ Este documento é o contrato de aceitação entre mudanças, testes, diário e C
 | RG-14 | Estado de rede pode ser reconsultado sob comando; valores de sinal fora de 0–100 são descartados e falha da consulta não afeta diagnóstico offline/OBD. | `connectivity.test.js`, `cockpitNavigation.test.js` |
 | RG-15 | Cockpit usa uma única navegação inferior de cinco destinos (Painel, Diagnóstico, Dados, Viagens, Mais), sem repetir esses destinos em uma segunda fileira de botões; cada aba tem rótulo visível, nome acessível e alvo de toque de pelo menos 58 dp. Estado da ECU/Bluetooth permanece distinto da disponibilidade da internet e nunca é comunicado como `OFFLINE` genérico. | `cockpitNavigation.test.js`, `connectivity.test.js`, `onlineConditions.test.js` |
 | RG-16 | Autonomia atual só aparece com ECU respondendo e nível válido do PID 012F na sessão atual; o cálculo usa litros restantes × consumo válido, nunca a capacidade total como se o tanque estivesse cheio. Sem evidência atual, apresentar `N/D`; temperatura indisponível deve usar cor neutra, não verde. | `autonomyPresentation.test.js`, `orientationLayout.test.js`, `projectBaseline.test.js` |
+| RG-17 | Barra superior e navegação nativa inferior do Android seguem o tema escuro com ícones/botões contrastantes; a configuração do plugin deve estar no app config e o pacote deve permanecer no lockfile compatível com Expo SDK 51. | `screenTheme.test.js`, `projectBaseline.test.js` |
 
 ## Regras para uma alteração legítima
 
