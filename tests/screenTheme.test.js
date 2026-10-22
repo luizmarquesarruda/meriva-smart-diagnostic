@@ -33,6 +33,9 @@ const navBarPlugin = app.expo.plugins.find((plugin) => Array.isArray(plugin) && 
 assert.ok(navBarPlugin, 'barra inferior Android deve estar configurada pelo plugin Expo');
 assert.equal(navBarPlugin[1].backgroundColor, '#07111f', 'barra inferior deve usar o fundo escuro');
 assert.equal(navBarPlugin[1].barStyle, 'light', 'botões nativos devem ter contraste claro no fundo escuro');
+const cockpit = fs.readFileSync(path.join(root, 'app/index.tsx'), 'utf8');
+assert.match(cockpit, /<StatusBar style="light" backgroundColor=\{COLORS\.screen\} \/>/,
+  'status bar superior deve usar ícones claros sobre o fundo escuro');
 const layout = fs.readFileSync(path.join(root, 'app/_layout.tsx'), 'utf8');
 assert.match(layout, /headerStyle:\s*\{\s*backgroundColor:\s*COLORS\.screen/);
 assert.match(layout, /headerTintColor:\s*COLORS\.accent/);
