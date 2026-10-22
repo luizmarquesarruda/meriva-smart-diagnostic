@@ -76,3 +76,8 @@ Uma funcionalidade só deve ser marcada como concluída depois de:
 ## Regra principal
 
 **Sem evidência, o sistema deve dizer que não sabe.**
+
+
+## Nota de atualização documental — 2026-10-22
+
+As referências nesta auditoria a um repositório sem `package-lock.json` descrevem o estado observado naquela fase e são históricas. A branch atual possui `package-lock.json`; as dependências diretas e as dependências raiz do lockfile devem ser mantidas sincronizadas e validadas com `npm ci`. Para a regressão da splash, consultar DB-092/DB-093 em `docs/DIARIO_DE_BORDO.md` e RG-18/RG-19 em `docs/CONTRATO_ANTI_REGRESSAO.md`. Esta nota não afirma que a CI atual esteja verde.
