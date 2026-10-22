@@ -79,6 +79,42 @@ export class BluetoothClassicTransport implements ObdTransport {
   private connectTimer: ReturnType<typeof setTimeout> | null = null;
   private pendingNativeIoCleanup: Promise<void> | null = null;
 
+  private registerPendingNativeSocketCleanup(
+    device: BluetoothDevice,
+    promise: Promise<void> = this.safeDisconnect(device),
+    event = 'NATIVE_SOCKET_CLEANUP',
+  ): PendingNativeSocketCleanup {
+    const addressKey = normalizeBluetoothAddress(this.deviceAddress);
+    const existing = pendingNativeSocketCleanups.get(addressKey);
+    if (existing) {
+      this.pendingNativeIoCleanup = existing.promise;
+      return existing;
+    }
+
+    const record: PendingNativeSocketCleanup = {
+      promise,
+      retry: () => this.safeDisconnect(device),
+      retryPromise: null,
+    };
+    pendingNativeSocketCleanups.set(addressKey, record);
+    this.pendingNativeIoCleanup = record.promise;
+    void record.promise.then(
+      () => {
+        if (pendingNativeSocketCleanups.get(addressKey) === record) {
+          pendingNativeSocketCleanups.delete(addressKey);
+        }
+        if (this.pendingNativeIoCleanup === record.promise) this.pendingNativeIoCleanup = null;
+      },
+      (cleanupError) => {
+        this.logDiagnostic(`${event}_FAILED`, {
+          address: this.deviceAddress,
+          error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+        });
+      },
+    );
+    return record;
+  }
+
   private logDiagnostic(event: string, details?: unknown): void {
     const time = new Date().toISOString();
     let line = `[${time}] ${event}`;
@@ -346,10 +382,24 @@ export class BluetoothClassicTransport implements ObdTransport {
     const pendingIoCleanup = this.pendingNativeIoCleanup;
     this.removeSubscriptions();
 
-    if (device && wasConnected) await this.safeDisconnect(device);
-    // A timed-out native write may still be unwinding. Do not report the
-    // transport closed (and allow reconnection) before its socket cleanup settles.
-    if (pendingIoCleanup) await pendingIoCleanup;
+    if (device && wasConnected) {
+      try {
+        await this.safeDisconnect(device);
+      } catch (cause) {
+        // A regular close can fail too (not only a write-timeout cleanup).
+        // Register it globally so another transport instance cannot bypass it.
+        this.registerPendingNativeSocketCleanup(device, Promise.reject(cause), 'DISCONNECT');
+        throw cause;
+      }
+    }
+    // A timed-out native write may still be unwinding. Retry cleanup serially,
+    // but never open another RFCOMM socket while its state is unknown.
+    if (pendingIoCleanup) {
+      await waitForPendingNativeSocketCleanup(
+        normalizeBluetoothAddress(this.deviceAddress),
+        this.config.bluetoothConnectTimeoutMs,
+      );
+    }
 
     this.device = null;
     this.connected = false;
@@ -392,28 +442,7 @@ export class BluetoothClassicTransport implements ObdTransport {
         // Closing the socket is the only available cancellation path at this
         // layer. Keep the cleanup promise and prevent a replacement socket from
         // opening until the native operation has been torn down.
-        const addressKey = normalizeBluetoothAddress(this.deviceAddress);
-        const record: PendingNativeSocketCleanup = {
-          promise: this.safeDisconnect(device),
-          retry: () => this.safeDisconnect(device),
-          retryPromise: null,
-        };
-        pendingNativeSocketCleanups.set(addressKey, record);
-        this.pendingNativeIoCleanup = record.promise;
-        void record.promise.then(
-          () => {
-            if (pendingNativeSocketCleanups.get(addressKey) === record) {
-              pendingNativeSocketCleanups.delete(addressKey);
-            }
-            if (this.pendingNativeIoCleanup === record.promise) this.pendingNativeIoCleanup = null;
-          },
-          (cleanupError) => {
-            this.logDiagnostic('WRITE_TIMEOUT_CLEANUP_FAILED', {
-              address: this.deviceAddress,
-              error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
-            });
-          },
-        );
+        this.registerPendingNativeSocketCleanup(device, this.safeDisconnect(device), 'WRITE_TIMEOUT_CLEANUP');
         this.markDisconnected();
       }
       throw cause;
