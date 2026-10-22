@@ -14,8 +14,26 @@ const loaded = { exports: {} };
 new Function('exports', 'module', js)(loaded.exports, loaded);
 
 async function run() {
-  const { cleanupDisconnectedSession, shouldRetryAfterDisconnectCleanup, timedOutNativeAttemptStillPending, waitForNativeConnectAttempt } = loaded.exports;
+  const { cleanupDisconnectedSession, runDisconnectPersistenceTasks, shouldRetryAfterDisconnectCleanup, timedOutNativeAttemptStillPending, waitForNativeConnectAttempt } = loaded.exports;
   const order = [];
+
+  const cleanupOperations = [];
+  let aggregateError = null;
+  try {
+    await runDisconnectPersistenceTasks([
+      { label: 'GPS', run: async () => { cleanupOperations.push('GPS'); throw new Error('permission denied'); } },
+      { label: 'autosave', run: async () => { cleanupOperations.push('autosave'); } },
+      { label: 'CSV', run: async () => { cleanupOperations.push('CSV'); throw new Error('disk unavailable'); } },
+    ]);
+  } catch (cause) {
+    aggregateError = cause;
+  }
+  assert.deepEqual(cleanupOperations, ['GPS', 'autosave', 'CSV'],
+    'every disconnect cleanup operation must be attempted even if others fail');
+  assert.match(String(aggregateError), /GPS: permission denied/,
+    'GPS cleanup errors must be surfaced to the recovery layer');
+  assert.match(String(aggregateError), /CSV: disk unavailable/,
+    'CSV flush errors must be surfaced to the recovery layer');
   const diskError = new Error('disk unavailable');
   const cleanup = await cleanupDisconnectedSession(
     async () => { order.push('persist'); throw diskError; },
