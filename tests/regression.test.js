@@ -339,6 +339,47 @@ async function testElmAndProtocol() {
   await unsupportedAtSession.close();
 }
 
+async function testProtocolRecoverySerializesWholeNegotiation() {
+  const { Elm327Session } = loadTs(path.join(ROOT, 'src/obd/elm327.ts'));
+  const commands = [];
+  let currentCommand = '';
+  const responses = {
+    ATZ: 'ELM327 v1.5',
+    ATSP5: 'OK',
+    '010C': '41 0C 0C 18',
+    ATDP: 'ISO 14230-4 (KWP FAST)',
+    '0105': '41 05 82',
+  };
+  const transport = {
+    async open() {},
+    async close() {},
+    async write(data) {
+      currentCommand = data.trim().toUpperCase();
+      commands.push(currentCommand);
+    },
+    async readUntilPrompt() { return responses[currentCommand] || 'OK'; },
+  };
+  const session = new Elm327Session(transport, { commandDelayMs: 0, ioTimeoutMs: 1000, adaptiveTiming: false });
+  // The test starts at an already-open session so it focuses on recovery's queue ownership.
+  session.opened = true;
+  session.protocol = 'ISO 14230-4 (KWP FAST)';
+
+  const recoveryPromise = session.recoverProtocol();
+  await wait(20);
+  const pidPromise = session.queryPid('0105');
+  assert.equal(await recoveryPromise, true, 'protocol recovery should succeed with valid simulated responses');
+  const pidResult = await pidPromise;
+  assert.equal(pidResult.parsed.value, 90);
+
+  const recoveryCommands = ['ATZ', 'ATSP5', '010C', 'ATDP'];
+  const positions = recoveryCommands.map((command) => commands.indexOf(command));
+  assert.ok(positions.every((position) => position >= 0), 'recovery should issue reset, protocol selection, ECU probe and protocol read');
+  assert.deepEqual([...positions].sort((a, b) => a - b), positions, 'recovery commands must retain their sequence');
+  assert.ok(commands.indexOf('0105') > positions[positions.length - 1],
+    'a regular PID request must wait until the entire protocol recovery sequence completes');
+  await session.close();
+  console.log('protocol recovery serialization: OK');
+}
 async function testConfiguredBluetoothRetryLimit() {
   const managerPath = path.join(ROOT, 'src/obd/bluetoothManager.ts');
   const source = fs.readFileSync(managerPath, 'utf8');
@@ -1150,6 +1191,7 @@ async function main() {
     ['banco de fórmulas OBD', testFormulaKnowledgeBank],
     ['parser + DTC', testParser],
     ['elm/protocolo/serialização', testElmAndProtocol],
+    ['recuperação de protocolo serializada', testProtocolRecoverySerializesWholeNegotiation],
     ['limite configurável de retry Bluetooth', testConfiguredBluetoothRetryLimit],
     ['ativação oficial do Bluetooth', testBluetoothActivationRequest],
     ['bloqueio de troca silenciosa de adaptador', testActiveAdapterCannotBeSilentlySwitched],
