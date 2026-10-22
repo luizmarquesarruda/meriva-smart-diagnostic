@@ -14,6 +14,10 @@ O GPS do celular inicia automaticamente ao abrir o aplicativo. Ele fornece veloc
 
 Bluetooth Classic exige build nativo Android. Expo Go não é o ambiente de validação do transporte.
 
+### Inicialização e splash screen
+
+A configuração da splash nativa é mantida em `app.json` (`expo.splash`) com fundo `#07111f` e `resizeMode: contain`. A dependência `expo-splash-screen` deve permanecer alinhada entre `package.json` e `package-lock.json`, conforme o Expo SDK 51. Essa configuração protege o fundo e o comportamento nativo de abertura; ela **não comprova por si só que exista um logotipo/imagem de splash configurado**. Antes de publicar um APK, confira a imagem de marca e valide a inicialização em build Android nativo. O contrato é protegido por `tests/projectBaseline.test.js` e RG-18 em `docs/CONTRATO_ANTI_REGRESSAO.md`.
+
 ## Estrutura
 
 ```text
