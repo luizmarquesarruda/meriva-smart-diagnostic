@@ -338,11 +338,19 @@ export class BluetoothClassicTransport implements ObdTransport {
         // Closing the socket is the only available cancellation path at this
         // layer. Keep the cleanup promise and prevent a replacement socket from
         // opening until the native operation has been torn down.
-        const cleanup = this.safeDisconnect(device).catch(() => undefined);
+        const cleanup = this.safeDisconnect(device);
         this.pendingNativeIoCleanup = cleanup;
-        void cleanup.then(() => {
-          if (this.pendingNativeIoCleanup === cleanup) this.pendingNativeIoCleanup = null;
-        });
+        void cleanup.then(
+          () => {
+            if (this.pendingNativeIoCleanup === cleanup) this.pendingNativeIoCleanup = null;
+          },
+          (cleanupError) => {
+            this.logDiagnostic('WRITE_TIMEOUT_CLEANUP_FAILED', {
+              address: this.deviceAddress,
+              error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+            });
+          },
+        );
         this.markDisconnected();
       }
       throw cause;
@@ -408,8 +416,23 @@ export class BluetoothClassicTransport implements ObdTransport {
   }
 
   private async safeDisconnect(device: BluetoothDevice): Promise<void> {
-    try { await device.disconnect(); }
-    catch { /* já desconectado */ }
+    try {
+      await device.disconnect();
+    } catch (cause) {
+      // Do not treat an arbitrary native disconnect error as success. Confirm
+      // the socket is already down; otherwise propagate the failure so the
+      // shared connection owner will not open a replacement RFCOMM socket.
+      try {
+        if (typeof device.isConnected === 'function' && !(await device.isConnected())) return;
+      } catch {
+        // Unknown native state is not proof that the socket was released.
+      }
+      this.logDiagnostic('BLUETOOTH_DISCONNECT_FAILED', {
+        address: this.deviceAddress,
+        error: cause instanceof Error ? cause.message : String(cause),
+      });
+      throw cause instanceof Error ? cause : new Error(String(cause));
+    }
   }
 
   private markDisconnected(): void {
