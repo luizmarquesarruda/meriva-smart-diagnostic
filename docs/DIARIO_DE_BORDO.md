@@ -14,6 +14,7 @@
 - Auditoria de permissões encontrou `app/_layout.tsx` abortando a preparação quando a localização era negada, mesmo com Bluetooth concedido. Política separada em `src/permissions/permissionPolicy.ts`: OBD depende do Bluetooth; GPS depende da permissão de localização. Teste comportamental e gate anti-regressão adicionados; CI atual continua obrigatória.
 - Revisão posterior encontrou que `Elm327Session.recoverProtocol()` executava ATZ/ATSP5/010C/ATDP fora da fila serial. Agora a sequência é envolvida por `enqueueCommand()` e lê ATDP sem reencaminhar para `identifyProtocol()` (o que causaria deadlock se enfileirado dentro da recuperação). Commit de código `a581e0bf410f9e46e2b30b24446925951ff25b60`; teste simulado de interleaving adicionado em `tests/regression.test.js`, commit `735b95e9d2d4502fea5656d11bdf0968d749b548`; contrato RG-19 no commit `c3274ebb8436960f026ffa0547407f6521e46d92`. Esses commits exigem CI nova; sem teste físico.
 - Nova varredura encontrou que `BluetoothClassicTransport.write()` aguardava a chamada nativa sem deadline. Escrita agora usa `ioTimeoutMs`, loga `WRITE_TIMEOUT`, sinaliza link perdido e inicia desconexão; `close()` aguarda `pendingNativeIoCleanup` antes de a sessão ser considerada fechada. Commits `a5cee123d38da75eafc6e7b59ec8ea8cfcebee02` (código) e `75c61b87923ce250a5c23a4e0eaef505a6912aa9` (teste simulado); RG-20 no contrato `c34621be08c54f70453f5fc1f8aed37c16fec648`. CI desses SHAs ainda não foi confirmada.
+- Reforço de segurança após o deadline: `safeDisconnect()` não deve considerar qualquer exceção como confirmação de fechamento. Agora verifica `isConnected()`; se permanece conectado ou o estado é indeterminado, propaga o erro, conserva a limpeza rejeitada e impede retry. Código `e656f6428eea730840282a41a1094718b24514b1`, teste `07e3991c3c70c20bcf13192e1d64b7d55f58c442`, contrato RG-21 `2f427ad83c4e8edd02840ff1c2e6d463bcfaafc5`. CI do SHA atual ainda obrigatória.
 - CI #2704 (run `39720378776`, SHA `9013528314623ae4182b8e64ef8cbc5b3c78c43b`) passou no gate e no TypeScript, mas falhou em teste por duas asserções de `tests/bluetoothLifecycle.test.js` presas à implementação textual antiga. Asserções foram atualizadas para `canStartObdStartup()`/`canUseGps()`; commits `9013528314623ae4182b8e64ef8cbc5b3c78c43b` e `cd8f21fab14e8a94f8f37368320f31abd3dfafe8`.
 - A CI #2706 (run `39720499416`, SHA `c32ff0e1a1b8a2ce89dc372dfe55ad80aaabb7d8`) confirmou que a correção de tipo inicial foi incompleta: além do GPS, `closeObdAutosaveSession()` também retornava `Promise<boolean>` na tarefa tipada como `Promise<void>`. Callback normalizado em `c32ff0e1a1b8a2ce89dc372dfe55ad80aaabb7d8`; CI ainda falhou em teste legado antes da próxima correção.
 - CI #2715 (run `39720653130`) foi iniciada para SHA `e6d438ffbff8c4788ebd8978cc5a842aa23c71f4`, mas ainda estava pendente na última consulta. Esse SHA ainda antecede esta atualização documental; a CI nova do SHA final deverá ser consultada.
@@ -144,6 +145,7 @@
 - **DB-103** · 2026-10-22 — Benchmark externo, versão das dependências e lacunas de inicialização
 - **DB-104** · 2026-10-22 — Tornar atômica a recuperação de protocolo ELM na fila serial
 - **DB-105** · 2026-10-22 — Deadline para escrita RFCOMM travada e limpeza segura do socket
+- **DB-106** · 2026-10-22 — Não tratar falha de desconexão nativa como socket liberado
 
 ---
 
@@ -3416,3 +3418,24 @@ Após CI verde, teste controlado no Android com ELM327: Bluetooth desligado/liga
 
 ### Risco residual / próximo passo
 - A chamada nativa de escrita em si não é cancelada por um timeout JavaScript; a rotina inicia desconexão nativa e impede avanço até a limpeza terminar. Se `disconnect()` não resolver, o fluxo fica em estado de falha seguro, mas pode exigir reinício manual do aplicativo/adaptador. Validar com write/read travados em hardware controlado antes de considerar resolvido.
+## DB-106 · 2026-10-22 — Não tratar falha de desconexão nativa como socket liberado
+
+### Problema / evidência
+- `safeDisconnect()` tratava todas as exceções de `device.disconnect()` como se o dispositivo já estivesse desconectado. Em um erro nativo real, isso poderia produzir falsa confirmação de limpeza; a recuperação poderia abrir outro socket mesmo sem confirmação de que o anterior fora liberado.
+- O risco foi aumentado pelo novo caminho de timeout de escrita, no qual a desconexão é o mecanismo disponível para abortar a chamada nativa pendente.
+
+### Correção
+- `safeDisconnect()` agora consulta `device.isConnected()` quando `disconnect()` falha. Só ignora a exceção se a API confirma explicitamente `false`; se ainda conectado ou se o estado não puder ser consultado, registra `BLUETOOTH_DISCONNECT_FAILED` e propaga o erro.
+- A limpeza pendente de timeout não converte mais erro nativo em sucesso. Um `pendingNativeIoCleanup` rejeitado continua a ser aguardado por `close()`, fazendo a limpeza de sessão reportar `closeError` e bloqueando nova conexão.
+- `tests/regression.test.js` simula desconexão nativa que falha com o dispositivo ainda conectado e exige que `close()` propague `TEST DISCONNECT FAILURE`, em vez de declarar fechamento bem-sucedido. Teste sem hardware.
+- O contrato anti-regressão recebeu RG-21.
+
+### Commits
+- Implementação: `e656f6428eea730840282a41a1094718b24514b1`.
+- Teste: `07e3991c3c70c20bcf13192e1d64b7d55f58c442`.
+- Contrato RG-21: `2f427ad83c4e8edd02840ff1c2e6d463bcfaafc5`.
+
+### Validação / risco residual
+- A CI deve confirmar a compilação TypeScript, testes, Expo Prebuild e `android-build` para o SHA final; testes simulados não substituem verificação com biblioteca nativa e adaptador reais.
+- A política é conservadora: se a desconexão nativa falhar e não houver confirmação de que o socket caiu, a reconexão pode ficar bloqueada até intervenção/reinício. Isso prefere não duplicar sockets a tentar recuperação insegura.
+- Próximo passo: consultar CI no SHA final; em dispositivo real, simular apenas desconexão controlada e verificar que, em caso de erro de fechamento, não há nova tentativa RFCOMM concorrente.
