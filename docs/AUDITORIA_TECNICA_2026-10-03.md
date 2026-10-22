@@ -56,3 +56,8 @@ A auditoria priorizou comportamento real do Android/ELM327 e dados observados. N
 Fontes cruzadas: ELM327, SAE J1979/ISO 15031-5, react-native-bluetooth-classic e implementações abertas de OBD.
 
 Correções desta revisão: transporte documentado como `delimited` em vez de `raw`; fallback de protocolo alinhado ao código; relato do protocolo corrigido após fallback; Expo alinhado ao patch 51.0.39; Java 17 mantido como referência de CI; banco de PIDs confirmado separado de candidatos; unidade de MAP/MAF normalizada; PID 012F mantido no runtime como fonte absoluta de nível de combustível/autonomia; testes e documentação sincronizados.
+
+
+## Nota de atualização documental — 2026-10-22
+
+A afirmação desta auditoria de que o CI usa `npm install` porque o repositório não versiona `package-lock.json` é histórica e não corresponde à configuração atual da branch: o workflow usa `npm ci --no-audit --no-fund` e exige o lockfile. O estado atual da splash e a falha de cobertura antirregressão estão documentados em DB-092/DB-093 e RG-18/RG-19. Não interpretar esta nota histórica como resultado de validação da CI atual.
