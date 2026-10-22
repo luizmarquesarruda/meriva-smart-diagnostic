@@ -44,6 +44,7 @@ let bluetoothActiveNativeConnections = 0;
 let bluetoothMaxNativeConnections = 0;
 let bluetoothConnectDelayMs = 0;
 let bluetoothWriteNeverSettles = false;
+let bluetoothDisconnectFails = false;
 
 function parentDir(p) {
   const i = p.lastIndexOf('/');
@@ -196,6 +197,7 @@ const fakeBluetooth = {
       throw new Error('read() não deve ser usado com listener');
     },
     disconnect: async () => {
+      if (bluetoothDisconnectFails) throw new Error('TEST DISCONNECT FAILURE');
       bluetoothListener = null;
     },
       };
@@ -707,6 +709,22 @@ async function testBluetoothEventTransport() {
   assert.deepStrictEqual(timeoutEvents, ['BLUETOOTH DESCONECTADO']);
   assert.match(stalledTransport.getDiagnosticsText(), /WRITE_TIMEOUT/);
   await stalledTransport.close();
+
+  // An unconfirmed native socket closure is a hard stop: never silently retry.
+  bluetoothDisconnectFails = true;
+  const cleanupFailureTransport = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF', { ioTimeoutMs: 1000 });
+  await cleanupFailureTransport.open();
+  await assert.rejects(
+    cleanupFailureTransport.write('010C\r'),
+    /TIMEOUT: ESCRITA BLUETOOTH SEM CONCLUSÃO/,
+  );
+  await assert.rejects(
+    cleanupFailureTransport.close(),
+    /TEST DISCONNECT FAILURE/,
+    'failed native cleanup must propagate and keep recovery blocked',
+  );
+  assert.match(cleanupFailureTransport.getDiagnosticsText(), /WRITE_TIMEOUT_CLEANUP_FAILED/);
+  bluetoothDisconnectFails = false;
   bluetoothWriteNeverSettles = false;
 }
 
