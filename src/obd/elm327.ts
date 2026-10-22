@@ -226,23 +226,39 @@ export class Elm327Session {
     return this.getHealthSnapshot().recoveryRecommended;
   }
 
-  /** Reinicializa o ELM e renegocia o protocolo sem destruir o transporte Bluetooth. */
+  /** Reinicializa o ELM e renegocia o protocolo como uma única operação serial. */
   async recoverProtocol(): Promise<boolean> {
     if (!this.opened) return false;
-    const protocol = (this.protocol ?? '').toUpperCase();
-    const preferred = /KWP|14230/.test(protocol) ? 'ATSP5' : 'ATSP0';
-    const reset = await this.command('ATZ');
-    if (reset.status !== 'OK') return false;
-    await new Promise((resolve) => setTimeout(resolve, 1200));
-    const selected = await this.command(preferred);
-    if (selected.status !== 'OK') return false;
-    const probe = await this.command('010C');
-    if (probe.status !== 'OK' || !/41\\s*0C/i.test(probe.response.replace(/\\s/g, ''))) return false;
-    this.noDataCount = 0;
-    this.consecutiveFailures = 0;
-    this.lastSuccessfulResponseAt = new Date().toISOString();
-    await this.identifyProtocol();
-    return true;
+
+    return this.enqueueCommand(async () => {
+      if (!this.opened) return false;
+
+      const protocol = (this.protocol ?? '').toUpperCase();
+      const preferred = /KWP|14230/.test(protocol) ? 'ATSP5' : 'ATSP0';
+      const reset = await this.command('ATZ');
+      if (reset.status !== 'OK') return false;
+
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+
+      const selected = await this.command(preferred);
+      if (selected.status !== 'OK') return false;
+
+      const probe = await this.command('010C');
+      if (probe.status !== 'OK' || !/41\\s*0C/i.test(probe.response.replace(/\\s/g, ''))) return false;
+
+      // Read the protocol directly while holding the queue. Calling
+      // identifyProtocol() here would enqueue behind this recovery and deadlock.
+      const protocolResult = await this.command('ATDP');
+      if (protocolResult.status === 'OK') {
+        const detected = normalizeElmResponse(protocolResult.response);
+        this.protocol = detected || null;
+      }
+
+      this.noDataCount = 0;
+      this.consecutiveFailures = 0;
+      this.lastSuccessfulResponseAt = new Date().toISOString();
+      return true;
+    });
   }
 
   /** KWP2000 TesterPresent (3E 00) para manter a sessão diagnóstica viva. */
