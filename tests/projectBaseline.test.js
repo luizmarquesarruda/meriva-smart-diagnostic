@@ -17,6 +17,7 @@ const workflow = read('.github/workflows/ci.yml');
 const elm = read('src/obd/elm327.ts');
 const sharedObd = read('src/obd/sharedConnection.ts');
 const home = read('app/index.tsx');
+const dataScreen = read('app/dados.tsx');
 const tripService = read('src/trip/autoTripService.ts');
 const diagnostics = read('src/diagnostics/diagnosticEngine.ts');
 const sensorEngine = read('src/diagnostics/sensorTestEngine.ts');
@@ -133,6 +134,12 @@ assert.ok(!tripService.includes('averageConsumptionKml * state.autonomy.tankCapa
 assert.ok(tripService.includes('estimateRangeFromFuelLevel(currentFuelLevelPercent, averageConsumptionKml)'),
   'autonomia persistida deve usar apenas nível de combustível atual');
 assert.match(tripService, /isCurrentFuelLevelSample\(this\.state\.fuelLevelReadAtMs\)/);
+assert.match(tripService, /listener\(this\.getState\(\)\)/, 'new service subscribers must receive freshness-filtered state');
+assert.match(tripService, /const snapshot = this\.getState\(\)/, 'service updates must emit freshness-filtered state');
+assert.ok(!tripService.includes('estimatedRangeKm: persisted.autonomy.estimatedRangeKm'), 'current state cannot be seeded with saved range');
+assert.ok(!tripService.includes('estimatedRangeKm: persistedAutonomy.estimatedRangeKm'), 'new ECU session cannot start from saved range');
+assert.match(dataScreen, /label="AUTONOMIA" value=\{trip\.estimatedRangeKm > 0/);
+assert.doesNotMatch(dataScreen, /label="AUTONOMIA" value=\{state\.autonomy\.estimatedRangeKm/, 'real-time screen must not show persisted range as current');
 assert.ok(!home.includes('actionGrid') && !home.includes('dashboardAction'),
   'cockpit não deve duplicar destinos em uma segunda fileira de ações');
 assert.ok(read('app/mais.tsx').includes('CONSULTA MANUAL DE PID'), 'atalho de consulta manual precisa existir');

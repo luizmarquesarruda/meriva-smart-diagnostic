@@ -3201,3 +3201,21 @@ Transformar as prioridades do relatório analítico em critérios verificáveis 
 - O timestamp é runtime-only e não transforma dados persistidos em dados atuais. A ausência de uma nova leitura após 30 s resulta em `N/D`/autonomia indisponível.
 - A CI ainda deve ser conferida no SHA consolidado depois da atualização da branch. APK/build não substitui teste físico com ELM327/ECU. A splash continua pendente de asset visual nativo confirmado.
 - Nenhum merge automático; modo oficina avançado e sincronização em nuvem/perfis seguem fora do escopo.
+
+
+## DB-096 · 2026-10-22 — Fechar outros caminhos de exibição da autonomia persistida
+
+### Achado complementar
+- Após DB-095, o cockpit principal rejeitava nível vencido, mas a API `autoTripService.getState()` ainda retornava `estimatedRangeKm` persistido antes de uma nova leitura 012F; telas como Laboratório e Dados podiam receber uma autonomia histórica como se fosse atual.
+- A tela `app/dados.tsx` mostrava diretamente `state.autonomy.estimatedRangeKm` sob o título “DADOS EM TEMPO REAL”, misturando um snapshot persistido com métricas atuais.
+
+### Correção aplicada
+- `getState()`, `subscribe()` e notificações internas passam a expor estado sanitizado: se a ECU não responde, não existe sessão válida ou a amostra de combustível tem mais de 30 s, o nível atual e a autonomia pública são indisponíveis.
+- O estado de autonomia do serviço começa em zero quando o app inicia ou abre uma nova sessão ECU; a média histórica continua disponível apenas como contexto de consumo, não como nível atual do tanque.
+- `app/dados.tsx` passa a usar `trip.estimatedRangeKm`, vindo do serviço com filtro de frescor, em vez de usar `state.autonomy.estimatedRangeKm` diretamente.
+- `tests/projectBaseline.test.js` impede regressão nesses caminhos de estado público e tela em tempo real.
+
+### Validação
+- Alteração adicional de revisão funcional; nenhuma dependência ou protocolo alterado.
+- A CI #2841 está associada ao commit anterior de frescor DB-095, não valida esta alteração complementar. A atualização desta branch poderá iniciar automaticamente uma nova execução; conferir o resultado correspondente ao SHA mais recente.
+- Teste físico ELM327/ECU e inspeção visual da splash continuam pendentes. Sem merge; modo oficina avançado e sincronização em nuvem/perfis permanecem fora do escopo.

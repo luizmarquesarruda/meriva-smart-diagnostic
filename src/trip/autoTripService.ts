@@ -80,12 +80,24 @@ class AutoTripService {
 
   subscribe(listener: Listener): () => void {
     this.listeners.add(listener);
-    listener({ ...this.state });
+    listener(this.getState());
     return () => this.listeners.delete(listener);
   }
 
   getState(): AutoTripServiceState {
-    return { ...this.state };
+    const snapshot = { ...this.state };
+    const currentFuelLevelIsValid = snapshot.connected
+      && getSharedObdStatus().ecuConnected
+      && isCurrentFuelLevelSample(snapshot.fuelLevelReadAtMs);
+    if (currentFuelLevelIsValid) return snapshot;
+    return {
+      ...snapshot,
+      fuelLevelPercent: null,
+      fuelLevelReadAtMs: null,
+      fuelRemainingL: null,
+      fuelReserve: null,
+      estimatedRangeKm: 0,
+    };
   }
 
   async withPollingPaused<T>(operation: () => Promise<T>): Promise<T> {
@@ -116,7 +128,7 @@ class AutoTripService {
       averageConsumptionKml: persisted.autonomy.averageConsumptionKml > 0
         ? persisted.autonomy.averageConsumptionKml
         : 0,
-      estimatedRangeKm: persisted.autonomy.estimatedRangeKm,
+      estimatedRangeKm: 0,
     };
     this.emit();
     this.running = true;
@@ -189,7 +201,7 @@ class AutoTripService {
       averageConsumptionKml: persistedAutonomy.averageConsumptionKml > 0
         ? persistedAutonomy.averageConsumptionKml
         : 0,
-      estimatedRangeKm: persistedAutonomy.estimatedRangeKm,
+      estimatedRangeKm: 0,
     };
     this.emit();
 
@@ -653,7 +665,7 @@ class AutoTripService {
   }
 
   private emit(): void {
-    const snapshot = { ...this.state };
+    const snapshot = this.getState();
     for (const listener of this.listeners) listener(snapshot);
   }
 }

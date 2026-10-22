@@ -7,6 +7,7 @@
 - Adicionado o contrato RG-20 e uma verificação no gate para manter o plano de aceitação junto ao código.
 - Os casos pendentes permanecem identificados como pendentes; não se presume teste físico nem recurso futuro implementado.
 - A autonomia atual descarta nível de combustível PID 012F sem timestamp válido ou com mais de 30 s, inclusive após perda de resposta da ECU; testes de validade temporal ampliados.
+- O serviço de viagens filtra a autonomia em seu estado público e a tela Dados usa apenas estimativa atual, impedindo que o valor persistido de viagens anteriores apareça como atual.
 
 ### Splash screen e documentação
 - Restaurada a dependência `expo-splash-screen@~0.27.7` e alinhado o lockfile.
