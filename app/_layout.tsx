@@ -123,12 +123,20 @@ export default function RootLayout() {
         headerTitleStyle: { fontWeight: '900' },
       }}
     >
+      {/* Todas as telas usam cabeçalho próprio; evite um segundo cabeçalho do Stack. */}
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="bluetooth" options={{ headerShown: false }} />
       <Stack.Screen name="conectividade" options={{ headerShown: false }} />
-      <Stack.Screen name="laboratorio" options={{ title: 'DIAGNÓSTICO OBD' }} />
-      <Stack.Screen name="armazenamento" options={{ title: 'HISTÓRICO E DADOS' }} />
-      <Stack.Screen name="configuracoes" options={{ title: 'CONFIGURAÇÕES' }} />
+      <Stack.Screen name="laboratorio" options={{ headerShown: false }} />
+      <Stack.Screen name="dados" options={{ headerShown: false }} />
+      <Stack.Screen name="saude" options={{ headerShown: false }} />
+      <Stack.Screen name="mais" options={{ headerShown: false }} />
+      <Stack.Screen name="viagens" options={{ headerShown: false }} />
+      <Stack.Screen name="veiculo" options={{ headerShown: false }} />
+      <Stack.Screen name="aprendizado" options={{ headerShown: false }} />
+      <Stack.Screen name="testes-sensores" options={{ headerShown: false }} />
+      <Stack.Screen name="armazenamento" options={{ headerShown: false }} />
+      <Stack.Screen name="configuracoes" options={{ headerShown: false }} />
     </Stack>
     </SafeAreaProvider>
   );

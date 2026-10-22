@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { PrimaryTabBar } from '../src/ui/PrimaryTabBar';
 import { useMidLayout } from '../src/ui/midLayout';
 import { COLORS, SCREEN_TITLE_STYLE } from '../src/ui/theme';
 import { AppIcon } from '../src/ui/AppIcon';
 import * as FileSystem from 'expo-file-system';
-import { Link } from 'expo-router';
 import { BluetoothDeviceInfo } from '../src/obd/bluetoothClassicTransport';
 import { discoverPairedDevices, ensureBluetoothReady } from '../src/obd/bluetoothManager';
 import { connectPreferredElm, getSharedObdConnection, getSharedObdStatus, subscribeSharedObd, subscribeSharedObdStatus, disconnectSharedObd } from '../src/obd/sharedConnection';
@@ -223,18 +223,9 @@ export default function BluetoothScreen() {
           <Text style={styles.rule}>Pareado não significa conectado. ECU só fica verde após resposta OBD real.</Text>
         </View>
 
-        <View style={styles.bottomNav}>
-          <Link href="/" asChild>
-            <TouchableOpacity style={styles.bottomItem} accessibilityRole="button" accessibilityLabel="Voltar ao cockpit">
-              <AppIcon name="cockpit" size={22} color={COLORS.accent} />
-            </TouchableOpacity>
-          </Link>
-          <TouchableOpacity style={[styles.bottomItem, styles.bottomActive]} accessibilityRole="button" accessibilityLabel="Bluetooth, tela atual" accessibilityState={{ selected: true }}>
-            <AppIcon name="bluetooth" size={22} color={COLORS.accent} />
-          </TouchableOpacity>
-        </View>
         </View>
       </ScrollView>
+    <PrimaryTabBar active="more" />
     </SafeAreaView>
   );
 }
@@ -271,8 +262,4 @@ const styles = StyleSheet.create({
   ruleCard: { backgroundColor: '#111c2e', borderRadius: 12, borderWidth: 1, borderColor: '#243652', padding: 13, marginTop: 4 },
   ruleTitle: { color: '#7db3ff', fontSize: 10, fontWeight: '900', marginBottom: 6 },
   rule: { color: '#a9b9cc', fontSize: 10, lineHeight: 17 },
-  bottomNav: { flexDirection: 'row', backgroundColor: '#111c2e', borderRadius: 14, borderWidth: 1, borderColor: '#29415f', marginTop: 12, padding: 5 },
-  bottomItem: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 48, borderRadius: 10 },
-  bottomActive: { backgroundColor: '#1a3150' },
-  bottomIcon: { fontSize: 22, marginBottom: 0 },
 });

@@ -24,9 +24,17 @@ assert.doesNotMatch(index, /!layout\.landscape\s*&&\s*\(/, 'navegação não dev
 assert.ok(index.includes('<PrimaryTabBar active="cockpit" />'), 'cockpit deve mostrar a navegação principal compartilhada');
 for (const [file, active] of [
   ['app/laboratorio.tsx', 'diagnostic'],
+  ['app/testes-sensores.tsx', 'diagnostic'],
+  ['app/saude.tsx', 'diagnostic'],
   ['app/dados.tsx', 'data'],
   ['app/viagens.tsx', 'trips'],
   ['app/mais.tsx', 'more'],
+  ['app/bluetooth.tsx', 'more'],
+  ['app/conectividade.tsx', 'more'],
+  ['app/armazenamento.tsx', 'more'],
+  ['app/configuracoes.tsx', 'more'],
+  ['app/aprendizado.tsx', 'more'],
+  ['app/veiculo.tsx', 'more'],
 ]) {
   assert.ok(read(file).includes('<PrimaryTabBar active="' + active + '" />'), file + ' deve mostrar a navegação principal');
 }
@@ -38,7 +46,8 @@ for (const label of ['Painel', 'Diagnóstico', 'Dados', 'Viagens', 'Mais']) {
 }
 assert.match(primaryTabs, /accessibilityRole="tab"/, 'itens de navegação devem expor semântica de aba');
 assert.match(primaryTabs, /accessibilityState=\{\{ selected: active === 'cockpit' \}\}/, 'a aba atual deve ser anunciada por tecnologia assistiva');
-assert.match(primaryTabs, /minHeight: 58/, 'itens da navegação devem manter alvo tátil alto e consistente');
+assert.match(primaryTabs, /minHeight: 60/, 'itens da navegação devem manter alvo tátil alto e consistente');
+assert.match(primaryTabs, /fontSize: 9, lineHeight: 11/, 'rótulos da navegação devem permanecer legíveis em telefone');
 assert.match(index, /dashboardAction:\{[^}]*minHeight:56/, 'ações principais devem ter altura tátil mínima de 56 dp');
 assert.match(index, /accessibilityLabel="Abrir laboratório de diagnóstico OBD"/, 'ação de diagnóstico deve ter nome acessível explícito');
 assert.match(index, /accessibilityLabel="Abrir dados em tempo real"/, 'ação de dados deve ter nome acessível explícito');
@@ -69,9 +78,12 @@ assert.match(connectivity, /accessibilityLabel="Atualizar estado da rede"/, 'a a
 assert.match(connectivity, /minHeight:48/, 'o botão de atualização deve respeitar alvo mínimo de 48 dp');
 assert.match(more, /AppIcon name=\{icon as AppIconName\}/, 'recursos devem usar a biblioteca de ícones compartilhada');
 const bluetooth = read('app/bluetooth.tsx');
-assert.doesNotMatch(bluetooth, /<Text style=\{styles\.bottomText\}>|<Text style=\{styles\.bottomActiveText\}>/, 'navegação Bluetooth deve ser icon-only');
-assert.match(bluetooth, /minHeight:\s*48/, 'botões inferiores Bluetooth devem ter alvo de 48 dp');
-assert.match(bluetooth, /accessibilityLabel="Bluetooth, tela atual"/, 'estado atual precisa de rótulo acessível');
+assert.ok(bluetooth.includes('<PrimaryTabBar active="more" />'), 'Bluetooth deve compartilhar a navegação principal');
+assert.doesNotMatch(bluetooth, /styles\.bottomNav/, 'Bluetooth não deve manter uma segunda barra concorrente');
+const rootLayout = read('app/_layout.tsx');
+for (const route of ['index', 'bluetooth', 'conectividade', 'laboratorio', 'dados', 'saude', 'mais', 'viagens', 'veiculo', 'aprendizado', 'testes-sensores', 'armazenamento', 'configuracoes']) {
+  assert.ok(rootLayout.includes('<Stack.Screen name="' + route + '" options={{ headerShown: false }} />'), route + ' deve evitar cabeçalho duplicado');
+}
 
 const dataScreen = read('app/dados.tsx');
 assert.match(dataScreen, /buildTelemetryChart/, 'tela Dados deve usar o modelo de gráfico testável');

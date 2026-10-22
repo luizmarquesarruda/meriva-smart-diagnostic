@@ -44,8 +44,8 @@ export function PrimaryTabBar({ active }: { active: PrimaryTabKey }) {
 
 const styles = StyleSheet.create({
   bar: { width: '100%', flexDirection: 'row', gap: 3, padding: 4, marginTop: 8, backgroundColor: COLORS.surface, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border },
-  tab: { flex: 1, minWidth: 0, minHeight: 58, paddingHorizontal: 2, paddingVertical: 5, borderRadius: 11, alignItems: 'center', justifyContent: 'center', gap: 3 },
+  tab: { flex: 1, minWidth: 0, minHeight: 60, paddingHorizontal: 2, paddingVertical: 5, borderRadius: 11, alignItems: 'center', justifyContent: 'center', gap: 4 },
   tabActive: { backgroundColor: '#17345b', borderWidth: 1, borderColor: '#315c8c' },
-  tabLabel: { color: COLORS.textMuted, fontSize: 8, lineHeight: 10, fontWeight: '800', letterSpacing: -0.15, textAlign: 'center', flexShrink: 1 },
+  tabLabel: { color: COLORS.textMuted, fontSize: 9, lineHeight: 11, fontWeight: '800', letterSpacing: -0.15, textAlign: 'center', flexShrink: 1 },
   tabLabelActive: { color: COLORS.textStrong },
 });

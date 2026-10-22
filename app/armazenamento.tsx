@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { PrimaryTabBar } from '../src/ui/PrimaryTabBar';
 import * as FileSystem from 'expo-file-system';
 import { flushCsvLogs } from '../src/database/csvLogger';
 import { checkStorageQuota, getStorageBreakdown, StorageQuotaConfig } from '../src/storage/quotaManager';
@@ -127,6 +128,7 @@ export default function ArmazenamentoScreen() {
       </TouchableOpacity>
       </View>
     </ScrollView>
+    <PrimaryTabBar active="more" />
     </SafeAreaView>
   );
 }

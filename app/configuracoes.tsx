@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import Constants from 'expo-constants';
 import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { PrimaryTabBar } from '../src/ui/PrimaryTabBar';
 import * as FileSystem from 'expo-file-system';
 import { createBackup } from '../src/storage/backup';
 import { cleanupOldLogs, cleanupOldReadings } from '../src/storage/cleanup';
@@ -279,6 +280,7 @@ export default function ConfiguracaoScreen() {
       ) : <Text style={styles.info}>Veículo: N/D</Text>}
       </View>
     </ScrollView>
+    <PrimaryTabBar active="more" />
     </SafeAreaView>
   );
 }
