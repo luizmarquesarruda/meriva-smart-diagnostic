@@ -3156,3 +3156,28 @@ Sincronizar a documentação de entrada, arquitetura, desenvolvimento, contribui
 3. Executar/consultar gate, suíte, Expo Doctor e build Android para o SHA final, sem declarar aprovação antecipada.
 4. Conferir o asset de splash e a inicialização fria em APK instalado; se o asset estiver ausente, corrigir o recurso visual separadamente.
 5. Não fazer merge sem autorização explícita.
+
+
+## DB-094 · 2026-10-22 — Plano de aceitação para o lote de confiabilidade e UX
+
+### Objetivo
+Transformar as prioridades do relatório analítico em critérios verificáveis e separar funcionalidade existente, trabalho proposto e validação física. Este registro não declara novas funcionalidades de produto como concluídas.
+
+### Alterações deste lote
+- `docs/TEST_PLAN.md`: criado plano de regressão com cenários críticos de OBD/ECU, frescor dos dados, autonomia, conectividade offline, navegação, DTC, splash, build e critérios de recursos futuros.
+- `docs/CONTRATO_ANTI_REGRESSAO.md`: adicionado RG-20 para exigir cobertura rastreável e distinguir CI/build de teste físico.
+- `tests/projectBaseline.test.js`: protege a existência do plano e seus cenários centrais para que a documentação de aceitação não desapareça silenciosamente.
+- `CHANGELOG.md`: registra o plano de testes e a próxima etapa de validação.
+
+### Limites e estado
+- A PR #78 já contém correções de cockpit/navegação, apresentação de autonomia, temperatura indisponível e estados de conexão, com testes associados.
+- O plano documenta casos de teste existentes e pendentes; não afirma que Detox/Appium, lembretes de manutenção, mapas, OTA, analytics, login ou sincronização em nuvem estejam implementados.
+- O modo oficina avançado e a sincronização em nuvem/perfis permanecem fora do escopo autorizado.
+- Nenhuma CI nova foi disparada durante a preparação do conteúdo. Após o commit consolidado, a CI pode iniciar automaticamente conforme os gatilhos do repositório; os resultados precisam ser consultados para o SHA final.
+
+### Critérios de encerramento
+1. Conferir o diff consolidado e o RG-20.
+2. Verificar o gate, TypeScript, suíte e build Android na CI do SHA atualizado.
+3. Confirmar splash e navegação visualmente em aparelho Android.
+4. Testar ELM327/ECU reais separadamente; CI verde não equivale a validação física.
+5. Não fazer merge sem autorização explícita.

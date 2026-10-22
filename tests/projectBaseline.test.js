@@ -137,5 +137,13 @@ assert.ok(read('app/laboratorio.tsx').includes('PIDs REGISTRADOS / DESCOBERTOS')
 assert.match(theme, /SCREEN_TITLE_STYLE/);
 assert.match(read('tests/screenTheme.test.js'), /Shared screen theme and title contract/);
 
+// Critical acceptance plan must stay versioned with the anti-regression contract.
+const testPlan = read('docs/TEST_PLAN.md');
+assert.match(testPlan, /OBD-01/);
+assert.match(testPlan, /DATA-02/);
+assert.match(testPlan, /SPLASH-01/);
+assert.match(testPlan, /teste físico/);
+assert.match(read('docs/CONTRATO_ANTI_REGRESSAO.md'), /\| RG-20 \|/);
+
 console.log('Anti-regression baseline gate: PASS');
 console.log('Protected contracts: five-read sensor tests, manual PID flow, single ELM327 queue, offline diagnosis, Expo SDK 51, GPS/Trip, TXT/history and cockpit/graphs.');

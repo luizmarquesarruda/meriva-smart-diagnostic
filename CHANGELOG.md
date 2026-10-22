@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Confiabilidade e aceitação
+- Criado `docs/TEST_PLAN.md` com cenários críticos para ECU/ELM327, frescor de dados, autonomia, navegação, DTC, splash e validação de release.
+- Adicionado o contrato RG-20 e uma verificação no gate para manter o plano de aceitação junto ao código.
+- Os casos pendentes permanecem identificados como pendentes; não se presume teste físico nem recurso futuro implementado.
+
 ### Splash screen e documentação
 - Restaurada a dependência `expo-splash-screen@~0.27.7` e alinhado o lockfile.
 - Restaurada a configuração `expo.splash` em `app.json` com fundo escuro `#07111f` e `resizeMode: contain`.
