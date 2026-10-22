@@ -3072,7 +3072,7 @@ Aguardar a CI da PR #76 após as últimas alterações; corrigir qualquer falha 
 - `src/trip/autonomyPresentation.ts`: função pura que só expõe autonomia atual quando há sessão ECU válida, suporte e amostra válida de nível de combustível; usa o consumo da viagem quando válido e a média histórica como fallback.
 - `src/trip/autoTripService.ts`: cálculo e persistência da autonomia passaram a considerar o percentual real de combustível; sem nível válido, a estimativa atual fica indisponível em vez de reutilizar silenciosamente a autonomia antiga ou presumir tanque cheio.
 - `app/index.tsx`: `N/D` da temperatura agora é neutro; a autonomia do cockpit vem da sessão ativa; estados `ECU CONECTADA`, `ECU SEM RESPOSTA`, `BLUETOOTH ATIVO`, `CONECTANDO ELM327` e `ECU DESCONECTADA` são separados; a barra principal passou a ter cinco destinos rotulados; os atalhos duplicados foram substituídos por um cartão de conexão acionável; a barra de status superior usa ícones claros no tema escuro.
-- `app.json` e `package.json`: configurado `expo-navigation-bar@~3.0.4` (SDK 51) para a barra nativa inferior escura, com botões claros; `package-lock.json` sincronizado.
+- `app.json` e `package.json`: configurado `expo-navigation-bar@~3.0.7` (SDK 51) para a barra nativa inferior escura, com botões claros; `package-lock.json` sincronizado.
 - `src/weather/currentConditions.ts`: ao resolver o nome mostrado, prioriza município (`city`/`subregion`) e não transforma bairro ou estado em cidade.
 - `tests/autonomyPresentation.test.js` e regressões em `tests/onlineConditions.test.js`, `tests/cockpitNavigation.test.js`, `tests/orientationLayout.test.js`, `tests/screenTheme.test.js` e `tests/projectBaseline.test.js`; o novo teste foi conectado a `npm test`.
 - `docs/CONTRATO_ANTI_REGRESSAO.md`: RG-15 atualizado para navegação única e RG-16 adicionado para autonomia e estados sem leitura.
@@ -3085,4 +3085,19 @@ Aguardar a CI da PR #76 após as últimas alterações; corrigir qualquer falha 
 
 ### Próximo passo
 Concluir a revisão final do conjunto e restaurar os gatilhos da CI para executar `gate:baseline`, TypeScript, suíte de regressão e build Android no SHA exato. Não fazer merge sem autorização explícita.
+
+## DB-091 · 2026-10-22 — Compatibilidade da barra nativa com Expo Doctor
+
+### Evidência da CI
+- A primeira execução do PR `#78` instalou as dependências com sucesso, mas `npm run doctor` falhou porque `expo-navigation-bar@3.0.4` não atendia à versão exigida pelo Expo SDK 51 (`~3.0.7`).
+- A falha ocorreu antes do gate de baseline e antes de `npm run validate`; portanto, aqueles passos ainda não têm resultado nessa execução.
+
+### Correção
+- `package.json` e `package-lock.json` foram alinhados para `expo-navigation-bar@~3.0.7`.
+- `tests/projectBaseline.test.js` foi atualizado para proteger a versão exigida pelo Expo Doctor.
+- A configuração nativa de fundo escuro e botões claros foi preservada.
+
+### Estado
+- Correção enviada à branch `fix/cockpit-live-autonomy-20261022` para nova execução da CI.
+- Não fazer merge enquanto a nova execução não verificar Expo Doctor, gate de baseline, TypeScript e suíte de regressão.
 
