@@ -95,6 +95,10 @@ assert.deepEqual(lock.packages[''].devDependencies, packageJson.devDependencies,
 assert.equal(packageJson.dependencies['@expo/vector-icons'], '14.1.0');
 assert.equal(lock.packages['node_modules/@expo/vector-icons'].version, packageJson.dependencies['@expo/vector-icons']);
 assert.equal(packageJson.dependencies['@react-native-community/netinfo'], '11.3.1');
+assert.equal(packageJson.dependencies['expo-navigation-bar'], '~3.0.7');
+assert.equal(lock.packages['node_modules/expo-navigation-bar'].version, '3.0.7',
+  'plugin de barra nativa deve permanecer compatível com Expo SDK 51');
+assert.deepEqual(lock.packages['node_modules/expo-navigation-bar'].peerDependencies, { expo: '*' });
 assert.equal(packageJson.dependencies['expo-font'], '~12.0.10');
 assert.equal(lock.packages['node_modules/expo-font'].version, '12.0.10');
 assert.equal(lock.packages['node_modules/@react-native-community/netinfo'].version, packageJson.dependencies['@react-native-community/netinfo']);
