@@ -3239,17 +3239,17 @@ Consultar CI #2678 no SHA final depois desta atualização do diário. Exigir `g
 ### Problema / evidência
 - Na revisão da PR #77, `handleUnexpectedDisconnect()` já tratava `cleanup.persistenceError`, mas `persistDisconnectedState()` capturava silenciosamente as falhas de `stopBackgroundMonitoring()`/`closeObdAutosaveSession()` e de `flushCsvLogs()`.
 - Por isso, a camada nova não conseguiria relatar essas falhas reais: o callback de persistência normalmente resolvia com sucesso mesmo quando uma ou mais operações tinham falhado.
-- A CI #2684 havia passado para o SHA anterior `ac5d173b1299abfa7cd87c445bc9c5df8b5e5768`; ela não cobre estes commits.
+- CI #2687 e #2688, no SHA `fa6aa59ba76b29c7276320e13e3f8466178976a4`, passaram em `npm ci`, Expo Doctor (17/17) e `gate:baseline`, mas falharam no TypeScript: `flushCsvLogs()` retorna `Promise<boolean>`, incompatível com o contrato `Promise<void>` do helper. A correção foi aplicada em `src/obd/sharedConnection.ts` no commit `2763c506b99e99474dc15d940c708d7100f43ffe`, aguardando a nova CI.
 
 ### Correção
 - `src/obd/connectionRecovery.ts`: criado `runDisconnectPersistenceTasks()`, que tenta todas as ações fornecidas, agrega as falhas e rejeita só depois de os resultados disponíveis serem tratados.
 - `src/obd/sharedConnection.ts`: GPS em segundo plano, encerramento do autosave e flush dos CSVs são tentados independentemente; a falha agregada é recebida por `cleanupDisconnectedSession()`, sem impedir o fechamento da sessão ELM327.
 - `tests/connectionRecovery.test.js`: teste comportamental confirma que todas as ações são tentadas e que falhas de GPS/CSV chegam ao erro agregado.
-- Commits de código/teste: `d50b15a238a028f6c14c0d92923bfd13b54809cb`, `708288c38ee1f84f702e34a6e25bd94f8f2a1ebd` e `3027de27756027794e34566682b5a5342ef5ca6`.
+- Commits de código/teste: `d50b15a238a028f6c14c0d92923bfd13b54809cb`, `708288c38ee1f84f702e34a6e25bd94f8f2a1ebd` e `3027de27756027794e34566682b5a5342ef5ca6`; correção do retorno incompatível `Promise<boolean>`: `2763c506b99e99474dc15d940c708d7100f43ffe`.
 - Nenhuma dependência, fórmula de PID, comando OBD ou regra de abertura paralela de socket foi alterada.
 
 ### Validação e limite
-- Os commits intermediários não iniciaram CI para evitar validar uma revisão parcial. Este commit documental deve disparar a validação do conjunto completo.
+- Os commits intermediários não iniciaram CI para evitar validar uma revisão parcial. A primeira execução do conjunto completo detectou a incompatibilidade de tipo descrita acima; o callback CSV foi corrigido para aguardar `flushCsvLogs()` sem retornar seu booleano. Este commit documental deve disparar a nova validação do conjunto.
 - Não declarar a correção concluída até a CI no SHA final aprovar `gate:baseline`, `validate` e `android-build`.
 - Teste físico de desconexão, falha de GPS/armazenamento e reconexão com ELM327 continua pendente.
 
