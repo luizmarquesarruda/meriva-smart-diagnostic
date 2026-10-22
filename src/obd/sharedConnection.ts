@@ -86,7 +86,7 @@ async function persistDisconnectedState(): Promise<void> {
   await runDisconnectPersistenceTasks([
     { label: 'parar monitoramento em segundo plano', run: () => stopBackgroundMonitoring() },
     { label: 'fechar sessão de autosave', run: () => closeObdAutosaveSession() },
-    { label: 'descarregar logs CSV', run: () => flushCsvLogs() },
+    { label: 'descarregar logs CSV', run: async () => { await flushCsvLogs(); } },
   ]);
 }
 
