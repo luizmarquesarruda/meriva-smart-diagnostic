@@ -42,7 +42,12 @@
       "0143",
       "0146",
       "015A",
-      "015C"
+      "015C",
+      "010A",
+      "010E",
+      "012C",
+      "012D",
+      "012E"
     ],
     "fuelComposition": {
       "pid": "0152",
@@ -59,12 +64,12 @@
     "PID 015E medido tem precedência sobre estimativas derivadas de MAF/MAP.",
     "Não aplicar temporizações específicas de CAN a uma sessão K-Line sem medições no adaptador e veículo reais.",
     "A confirmação e a estatística de aprendizado do mesmo PID não são persistidas mais de uma vez em learningSampleMinIntervalMs, mas cada resposta real continua na fila CSV.",
-    "O cockpit exibe no máximo vinte PIDs anunciados pela ECU e só usa leituras reais com timestamp válido; valores vencidos viram N/D.",
+    "O cockpit exibe no máximo vinte e cinco PIDs anunciados pela ECU e só usa leituras reais com timestamp válido; valores vencidos viram N/D.",
     "A rotação auxiliar é serial e não repete no mesmo ciclo PIDs consultados no caminho crítico ou na estimativa/combustível."
   ],
   "learningSampleMinIntervalMs": 5000,
   "cockpit": {
-    "maxDisplayedPids": 20,
+    "maxDisplayedPids": 25,
     "displayFreshAfterMs": 20000,
     "displayStaleAfterMs": 45000,
     "pidOrder": [
@@ -87,7 +92,12 @@
       "0152",
       "015E",
       "015A",
-      "015C"
+      "015C",
+      "010A",
+      "010E",
+      "012C",
+      "012D",
+      "012E"
     ]
   }
 }
