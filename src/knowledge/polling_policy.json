@@ -29,9 +29,20 @@
     },
     "rotatingTelemetryPids": [
       "0105",
-      "010B",
+      "0142",
       "0111",
-      "0142"
+      "0104",
+      "0106",
+      "0107",
+      "010B",
+      "010F",
+      "0110",
+      "0114",
+      "0133",
+      "0143",
+      "0146",
+      "015A",
+      "015C"
     ],
     "fuelComposition": {
       "pid": "0152",
@@ -47,7 +58,36 @@
     "No modo FLEX, a estimativa MAF/MAP exige composição de etanol válida via PID 0152; nunca assumir gasolina como fallback silencioso.",
     "PID 015E medido tem precedência sobre estimativas derivadas de MAF/MAP.",
     "Não aplicar temporizações específicas de CAN a uma sessão K-Line sem medições no adaptador e veículo reais.",
-    "A confirmação e a estatística de aprendizado do mesmo PID não são persistidas mais de uma vez em learningSampleMinIntervalMs, mas cada resposta real continua na fila CSV."
+    "A confirmação e a estatística de aprendizado do mesmo PID não são persistidas mais de uma vez em learningSampleMinIntervalMs, mas cada resposta real continua na fila CSV.",
+    "O cockpit exibe no máximo vinte PIDs anunciados pela ECU e só usa leituras reais com timestamp válido; valores vencidos viram N/D.",
+    "A rotação auxiliar é serial e não repete no mesmo ciclo PIDs consultados no caminho crítico ou na estimativa/combustível."
   ],
-  "learningSampleMinIntervalMs": 5000
+  "learningSampleMinIntervalMs": 5000,
+  "cockpit": {
+    "maxDisplayedPids": 20,
+    "displayFreshAfterMs": 20000,
+    "displayStaleAfterMs": 45000,
+    "pidOrder": [
+      "0105",
+      "0142",
+      "0111",
+      "010C",
+      "010D",
+      "0104",
+      "0106",
+      "0107",
+      "010B",
+      "010F",
+      "0110",
+      "0114",
+      "012F",
+      "0133",
+      "0143",
+      "0146",
+      "0152",
+      "015E",
+      "015A",
+      "015C"
+    ]
+  }
 }

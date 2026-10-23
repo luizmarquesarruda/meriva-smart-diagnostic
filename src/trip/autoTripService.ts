@@ -253,7 +253,7 @@ class AutoTripService {
         let fuelRateSource: FuelRateSource | undefined;
         let fuelRateForDisplayLph: number | null = null;
         let fuelRateForDisplaySource: FuelRateSource | null = null;
-        let mapFallbackQueriedThisCycle = false;
+        const queriedPidsThisCycle = new Set<string>();
         const fuelEstimateDue = this.pollCycleNumber % FUEL_ESTIMATE_EVERY_N_CYCLES === pollingPolicy.polling.estimatedFuelRate.phase;
         let fuelLevelPercent: number | null = this.state.fuelLevelPercent;
         let fuelLevelReadAtMs: number | null = this.state.fuelLevelReadAtMs;
@@ -265,6 +265,7 @@ class AutoTripService {
         // a detecção de movimento antes das consultas secundárias.
         if (obdSpeedSupported) {
           const speedResult = await connection.session.queryPid('010D');
+          queriedPidsThisCycle.add('010D');
           await registerObdQuery(this.basePath, speedResult, 'REAL');
           if (
             speedResult.parsed.status === 'RESPONDEU' &&
@@ -282,6 +283,7 @@ class AutoTripService {
         // da detecção de motor ligado/desligado.
         if (connection.supportedPids.includes('010C')) {
           const rpmResult = await connection.session.queryPid('010C');
+          queriedPidsThisCycle.add('010C');
           await registerObdQuery(this.basePath, rpmResult, 'REAL');
           if (
             rpmResult.parsed.status === 'RESPONDEU' &&
@@ -296,6 +298,7 @@ class AutoTripService {
         // para manter o indicador responsivo sempre que a ECU o suporta.
         if (this.state.fuelSupported) {
           const fuelResult = await connection.session.queryPid('015E');
+          queriedPidsThisCycle.add('015E');
           await registerObdQuery(this.basePath, fuelResult, 'REAL');
           if (
             fuelResult.parsed.status === 'RESPONDEU' &&
@@ -316,6 +319,7 @@ class AutoTripService {
         // reduz tráfego serial sem limpar o último valor válido da interface.
         if (this.state.fuelLevelSupported && this.pollCycleNumber % FUEL_LEVEL_EVERY_N_CYCLES === pollingPolicy.polling.fuelLevel.phase) {
           const fuelLevelResult = await connection.session.queryPid('012F');
+          queriedPidsThisCycle.add('012F');
           await registerObdQuery(this.basePath, fuelLevelResult, 'REAL');
           if (
             fuelLevelResult.parsed.status === 'RESPONDEU' &&
@@ -352,6 +356,7 @@ class AutoTripService {
           this.pollCycleNumber % fuelCompositionPolicy.everyCycles === fuelCompositionPolicy.phase
         ) {
           const compositionResult = await connection.session.queryPid(fuelCompositionPolicy.pid);
+          queriedPidsThisCycle.add(fuelCompositionPolicy.pid);
           await registerObdQuery(this.basePath, compositionResult, 'REAL');
           if (
             compositionResult.parsed.status === 'RESPONDEU' &&
@@ -369,6 +374,7 @@ class AutoTripService {
           // MAF é estimativa secundária: amostrar a cada quatro ciclos reduz tráfego
           // K-Line. Só valores positivos produzem estimativa de taxa de combustível.
           const mafResult = await connection.session.queryPid('0110');
+          queriedPidsThisCycle.add('0110');
           await registerObdQuery(this.basePath, mafResult, 'REAL');
           const mafGs = mafResult.parsed.status === 'RESPONDEU' ? mafResult.parsed.value : null;
           const estimate = mafGs != null && Number.isFinite(mafGs)
@@ -396,9 +402,10 @@ class AutoTripService {
         ) {
           // MAP e IAT são consultados juntos e só na cadência de estimativa.
           // Marcar MAP evita repetir o mesmo PID na telemetria rotativa deste ciclo.
-          mapFallbackQueriedThisCycle = true;
           const mapResult = await connection.session.queryPid('010B');
+          queriedPidsThisCycle.add('010B');
           const iatResult = await connection.session.queryPid('010F');
+          queriedPidsThisCycle.add('010F');
           await registerObdQuery(this.basePath, mapResult, 'REAL');
           await registerObdQuery(this.basePath, iatResult, 'REAL');
           const mapKpa = mapResult.parsed.status === 'RESPONDEU' ? mapResult.parsed.value : null;
@@ -443,13 +450,13 @@ class AutoTripService {
         // Mantém um PID secundário por ciclo para tendências sem monopolizar o ELM.
         const telemetryCandidates = pollingPolicy.polling.rotatingTelemetryPids;
         const supportedTelemetry = telemetryCandidates.filter((item) =>
-          connection.supportedPids.includes(item) &&
-          !(mapFallbackQueriedThisCycle && item === pollingPolicy.polling.estimatedFuelRate.mapPid)
+          connection.supportedPids.includes(item) && !queriedPidsThisCycle.has(item)
         );
         if (supportedTelemetry.length > 0) {
           const telemetryPid = supportedTelemetry[this.telemetryCursor % supportedTelemetry.length];
           this.telemetryCursor += 1;
           const telemetryResult = await connection.session.queryPid(telemetryPid);
+          queriedPidsThisCycle.add(telemetryPid);
           await registerObdQuery(this.basePath, telemetryResult, 'REAL');
         }
 

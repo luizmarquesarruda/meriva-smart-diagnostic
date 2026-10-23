@@ -37,6 +37,7 @@ const requiredSuites = [
   'sensorTestEngine.test.js',
   'knowledgeJson.test.js',
   'cockpitNavigation.test.js',
+  'cockpitTelemetry.test.js',
   'orientationLayout.test.js',
   'liveTelemetry.test.js',
   'bluetoothLifecycle.test.js',

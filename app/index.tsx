@@ -20,6 +20,7 @@ import { connectPreferredElm, getSharedObdConnection, getSharedObdLastError, get
 import { autoTripService, type AutoTripServiceState } from '../src/trip/autoTripService';
 import { loadCurrentConditions, type CurrentConditions } from '../src/weather/currentConditions';
 import { getCurrentAutonomyRangeKm } from '../src/trip/autonomyPresentation';
+import { buildCockpitPidMetrics, type CockpitPidMetric } from '../src/obd/cockpitTelemetry';
 
 export default function IndexScreen() {
   const [cycles, setCycles] = useState<DriveCycle[]>([]);
@@ -212,8 +213,6 @@ export default function IndexScreen() {
     const ageMs = Date.now() - timestampMs;
     return connectionStatus.ecuConnected && Number.isFinite(timestampMs) && ageMs >= 0 && ageMs <= 30_000;
   });
-  const rpmReading = freshRealReading((item) => item.pid === '010C' || /rpm|rotação/i.test(item.name));
-  const rpmValue = rpmReading?.value ?? null;
   const coolantReading = freshRealReading((item) => item.pid === '0105' || /coolant|arrefecimento|temperatura.*motor/i.test(item.name));
   const coolantValue = coolantReading?.value ?? null;
   const currentAutonomyKm = getCurrentAutonomyRangeKm({
@@ -225,32 +224,38 @@ export default function IndexScreen() {
     tripConsumptionKml: tripState.consumptionKml,
     averageConsumptionKml: tripState.averageConsumptionKml,
   });
-  const voltageReading = freshRealReading((item) => item.pid === '0142' || /module.*voltage|voltagem|tensão.*módulo/i.test(item.name));
-  const voltageValue = voltageReading?.value ?? null;
-  const throttleReading = freshRealReading((item) => item.pid === '0111' || /throttle|borboleta/i.test(item.name));
-  const throttleValue = throttleReading?.value ?? null;
-  const heroMetrics = [
-    { label: 'TEMPERATURA DO MOTOR', value: coolantValue != null ? String(Math.round(coolantValue)) : 'N/D', unit: coolantValue != null ? '°C' : '', hint: coolantValue != null ? 'LEITURA REAL • PID 0105' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0105' : 'ECU DESCONECTADA', tone: coolantValue != null && coolantValue >= 115 ? 'danger' : coolantValue != null && coolantValue >= 110 ? 'warning' : 'normal' },
-    { label: 'VOLTAGEM DO SISTEMA', value: voltageValue != null ? voltageValue.toFixed(1) : 'N/D', unit: voltageValue != null ? 'V' : '', hint: voltageValue != null ? 'LEITURA REAL • PID 0142' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0142' : 'ECU DESCONECTADA', tone: 'normal' },
-    { label: 'POSIÇÃO DA BORBOLETA', value: throttleValue != null ? throttleValue.toFixed(1) : 'N/D', unit: throttleValue != null ? '%' : '', hint: throttleValue != null ? 'LEITURA REAL • PID 0111' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0111' : 'ECU DESCONECTADA', tone: 'normal' },
-    { label: 'ROTAÇÃO DO MOTOR', value: rpmValue != null ? String(Math.round(rpmValue)) : 'N/D', unit: rpmValue != null ? 'RPM' : '', hint: rpmValue != null ? 'LEITURA REAL • PID 010C' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 010C' : 'ECU DESCONECTADA', tone: 'normal' },
-  ];
+  const connectedSupportedPids = connectionStatus.ecuConnected
+    ? getSharedObdConnection()?.supportedPids ?? []
+    : [];
+  const discoveredHeroMetrics = buildCockpitPidMetrics(connectedSupportedPids, liveReadings);
+  const fallbackHeroMetrics: CockpitPidMetric[] = [{
+    pid: '',
+    label: 'DADOS OBD EM TEMPO REAL',
+    value: null,
+    unit: '',
+    severity: 'normal',
+    freshness: 'missing',
+    hint: connectionStatus.ecuConnected
+      ? 'NENHUM DOS PIDs DO PAINEL FOI ANUNCIADO PELA ECU'
+      : 'CONECTE A ECU PARA IDENTIFICAR OS PIDs SUPORTADOS',
+  }];
+  const heroMetrics: CockpitPidMetric[] = discoveredHeroMetrics.length > 0
+    ? discoveredHeroMetrics
+    : fallbackHeroMetrics;
+  const abnormalMetrics = heroMetrics.filter((metric) => metric.value != null && metric.severity !== 'normal');
+  const visibleHeroMetrics = abnormalMetrics.length > 0 ? abnormalMetrics : heroMetrics;
 
-  // The displayed metric count is the single source of truth for both timed
-  // and touch-driven rotation; adding/removing metrics cannot desynchronize it.
-  // Uma anomalia térmica tem prioridade sobre a rotação cíclica do painel.
-  // Quando a temperatura volta à faixa normal, a rotação volta ao modo usual.
-  const priorityHeroMetricIndex = coolantValue != null && coolantValue >= 110 ? 0 : null;
+  // O painel roda os PIDs realmente anunciados pela ECU a cada 10 s.
+  // Quando existe alerta, exibe apenas as leituras em alerta até serem resolvidas.
   useEffect(() => {
     const timer = setInterval(() => {
-      setActiveHeroMetric((current) => priorityHeroMetricIndex != null
-        ? priorityHeroMetricIndex
-        : (current + 1) % Math.max(1, heroMetrics.length));
+      setActiveHeroMetric((current) => (current + 1) % Math.max(1, visibleHeroMetrics.length));
     }, 10_000);
     return () => clearInterval(timer);
-  }, [heroMetrics.length, priorityHeroMetricIndex]);
+  }, [visibleHeroMetrics.length]);
 
-  const selectedHeroMetric = heroMetrics[activeHeroMetric] ?? heroMetrics[0];
+  const activeMetricIndex = activeHeroMetric % Math.max(1, visibleHeroMetrics.length);
+  const selectedHeroMetric = visibleHeroMetrics[activeMetricIndex] ?? visibleHeroMetrics[0];
   const coolantStatus = coolantValue != null && coolantValue >= 115
     ? 'TEMPERATURA ALTA'
     : coolantValue != null && coolantValue >= 110
@@ -326,25 +331,23 @@ export default function IndexScreen() {
               </Link>
             </View>
           </View>
-          <View style={[styles.heroCard, layout.landscape && styles.heroCardLandscape]}>
+          <View style={[styles.heroCard, layout.landscape && styles.heroCardLandscape, selectedHeroMetric.severity === 'danger' && styles.heroCardDanger, selectedHeroMetric.severity === 'warning' && styles.heroCardWarning]}>
             <TouchableOpacity
               accessibilityRole="button"
-              accessibilityLabel={selectedHeroMetric.label + (priorityHeroMetricIndex != null ? '. Indicador prioritário devido à temperatura alta' : '. Toque para trocar o indicador')}
-              onPress={() => setActiveHeroMetric((current) => priorityHeroMetricIndex != null
-                ? priorityHeroMetricIndex
-                : (current + 1) % Math.max(1, heroMetrics.length))}
+              accessibilityLabel={selectedHeroMetric.label + (abnormalMetrics.length > 0 ? '. Indicador prioritário devido a uma leitura fora da referência monitorada' : '. Toque para trocar o indicador')}
+              onPress={() => setActiveHeroMetric((current) => (current + 1) % Math.max(1, visibleHeroMetrics.length))}
               activeOpacity={0.82}
               style={styles.heroReadout}
             >
               <Text style={styles.heroEyebrow}>{selectedHeroMetric.label}</Text>
               <View style={styles.heroNumberRow}>
-                <Text style={[styles.heroValue, layout.landscape && styles.heroValueLandscape, selectedHeroMetric.tone === 'danger' && styles.danger, selectedHeroMetric.tone === 'warning' && styles.heroWarning]}>{selectedHeroMetric.value}</Text>
+                <Text style={[styles.heroValue, layout.landscape && styles.heroValueLandscape, selectedHeroMetric.severity === 'danger' && styles.danger, selectedHeroMetric.severity === 'warning' && styles.heroWarning]}>{selectedHeroMetric.value == null ? 'N/D' : Number.isInteger(selectedHeroMetric.value) ? String(selectedHeroMetric.value) : selectedHeroMetric.value.toFixed(1)}</Text>
                 {!!selectedHeroMetric.unit && <Text style={styles.heroUnit}>{selectedHeroMetric.unit}</Text>}
               </View>
               <Text style={styles.heroState}>{selectedHeroMetric.hint}</Text>
               <View style={styles.heroSwitchHintRow}>
                 <AppIcon name="refresh" size={10} color={COLORS.textSubtle} />
-                <Text style={styles.heroSwitchHint}>{activeHeroMetric + 1}/{heroMetrics.length}  •  TOQUE PARA TROCAR  •  10 S</Text>
+                <Text style={styles.heroSwitchHint}>{abnormalMetrics.length > 0 ? 'ALERTAS' : 'PIDs'} {activeMetricIndex + 1}/{visibleHeroMetrics.length}  •  {selectedHeroMetric.pid || 'OBD'}  •  TOQUE PARA TROCAR  •  10 S</Text>
               </View>
             </TouchableOpacity>
             <View style={[styles.metricRow, layout.landscape && styles.metricRowLandscape]}>
@@ -413,7 +416,7 @@ const styles = StyleSheet.create({
   networkChip:{minHeight:64,minWidth:96,maxWidth:112,alignItems:'stretch',justifyContent:'center',paddingHorizontal:7,paddingVertical:6,backgroundColor:COLORS.surfaceInset,borderRadius:11,borderWidth:1,borderColor:COLORS.border},networkChipLandscape:{minHeight:50,minWidth:82,maxWidth:92,paddingHorizontal:5,paddingVertical:4},
   header:{backgroundColor:'#0e1b2d',borderRadius:16,borderWidth:1,borderColor:'#28415f',padding:14,marginBottom:8,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:10},headerLandscape:{paddingVertical:12},headerTitle:{flex:1,minWidth:0},brand:{color:'#f8fafc',fontSize:18,fontWeight:'900',letterSpacing:1.2},subtitle:{color:'#7db3ff',fontSize:9,fontWeight:'900',letterSpacing:1,marginTop:3},
   connectionPill:{flexDirection:'row',alignItems:'center',gap:6,flexShrink:0,backgroundColor:'#091526',borderRadius:20,borderWidth:1,borderColor:'#29415f',paddingHorizontal:10,paddingVertical:7},dot:{width:8,height:8,borderRadius:4},dotOk:{backgroundColor:'#4ade80'},dotWarn:{backgroundColor:'#fbbf24'},dotDanger:{backgroundColor:'#fb7185'},connectionText:{color:'#dbeafe',fontSize:9,fontWeight:'900'},
-  heroCard:{backgroundColor:'#0f2035',borderRadius:18,borderWidth:1,borderColor:'#2d5278',padding:12,alignItems:'center',marginBottom:8},heroCardLandscape:{padding:7,marginBottom:4},heroReadout:{width:'100%',alignItems:'center',paddingVertical:1},heroEyebrow:{color:'#7db3ff',fontSize:10,fontWeight:'900',letterSpacing:1.4,textAlign:'center'},heroNumberRow:{flexDirection:'row',alignItems:'baseline',justifyContent:'center',gap:6},heroUnit:{color:'#a9c8ef',fontSize:18,fontWeight:'900'},heroSwitchHintRow:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:4,marginTop:4},heroSwitchHint:{color:'#6884a6',fontSize:8,fontWeight:'900',letterSpacing:.6},heroWarning:{color:'#fbbf24'},heroValue:{color:'#f8fafc',fontSize:50,lineHeight:56,fontWeight:'900',marginTop:2,fontVariant:['tabular-nums']},heroValueLandscape:{fontSize:36,lineHeight:40,marginTop:0},heroState:{color:'#8fa6c1',fontSize:9,fontWeight:'800',letterSpacing:.5,textAlign:'center'},
+  heroCard:{backgroundColor:'#0f2035',borderRadius:18,borderWidth:1,borderColor:'#2d5278',padding:12,alignItems:'center',marginBottom:8},heroCardWarning:{borderColor:'#fbbf24',backgroundColor:'#2a2412'},heroCardDanger:{borderColor:'#fb7185',backgroundColor:'#2b1420'},heroCardLandscape:{padding:7,marginBottom:4},heroReadout:{width:'100%',alignItems:'center',paddingVertical:1},heroEyebrow:{color:'#7db3ff',fontSize:10,fontWeight:'900',letterSpacing:1.4,textAlign:'center'},heroNumberRow:{flexDirection:'row',alignItems:'baseline',justifyContent:'center',gap:6},heroUnit:{color:'#a9c8ef',fontSize:18,fontWeight:'900'},heroSwitchHintRow:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:4,marginTop:4},heroSwitchHint:{color:'#6884a6',fontSize:8,fontWeight:'900',letterSpacing:.6},heroWarning:{color:'#fbbf24'},heroValue:{color:'#f8fafc',fontSize:50,lineHeight:56,fontWeight:'900',marginTop:2,fontVariant:['tabular-nums']},heroValueLandscape:{fontSize:36,lineHeight:40,marginTop:0},heroState:{color:'#8fa6c1',fontSize:9,fontWeight:'800',letterSpacing:.5,textAlign:'center'},
   metricRow:{width:'100%',flexDirection:'row',gap:6,marginTop:10},metricRowLandscape:{marginTop:4},cockpitMetric:{flex:1,minWidth:0,backgroundColor:'#091626',borderRadius:11,borderWidth:1,borderColor:'#233d5b',paddingVertical:9,paddingHorizontal:5,alignItems:'center'},metricLabel:{color:'#9aacc4',fontSize:8,fontWeight:'900',letterSpacing:.3,textAlign:'center'},metricValue:{color:'#e5edf7',fontSize:12,fontWeight:'900',marginTop:3,textAlign:'center'},
   coolantCard:{width:'100%',flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:12,marginTop:9,paddingHorizontal:13,paddingVertical:11,backgroundColor:'#091626',borderRadius:12,borderWidth:1,borderColor:'#315579'},coolantCardLandscape:{marginTop:4,paddingVertical:5,paddingHorizontal:9},coolantCopy:{flex:1,minWidth:0},coolantHeading:{flexDirection:'row',alignItems:'center',gap:5},coolantLabel:{color:'#c5d8f2',fontSize:9,fontWeight:'900',letterSpacing:.4},coolantStatus:{color:'#7185a1',fontSize:8,fontWeight:'800',marginTop:4},coolantValue:{fontSize:23,fontWeight:'900',fontVariant:['tabular-nums']},coolantOk:{color:'#4ade80'},coolantWarning:{color:'#fbbf24'},coolantUnavailable:{color:'#8fa6c1'},
   danger:{color:'#fb7185'},

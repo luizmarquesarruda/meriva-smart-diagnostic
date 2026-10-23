@@ -3402,3 +3402,12 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - A UI valida litros, custo, data, quilometragem e mantém valores manuais separados do autosave/telemetria OBD.
 - Referências do Meriva são lembretes e não se aplicam automaticamente a outro carro sem confirmação do plano. Não foi testado abastecimento físico nem instalado APK nesta etapa; a CI do SHA final ainda precisa concluir inclusive o build standalone.
 - Nenhum merge executado.
+
+
+### DB-107 — 2026-10-23 — Cockpit OBD com até 20 PIDs reais
+
+- **Problema:** painel inicial limitado a quatro métricas fixas; leituras auxiliares restringidas a quatro PIDs rotativos, com N/D durante janelas sem leitura.
+- **Causa confirmada:** a tela usava uma lista fixa de quatro métricas e a política de polling só rotacionava quatro PIDs. O caminho serial também precisava evitar repetir um PID quando ele já tivesse sido consultado no mesmo ciclo para consumo ou estimativa.
+- **Alterações:** política explícita com 20 PIDs candidatos e apresentação apenas de PIDs anunciados pela ECU; rotação auxiliar ampliada, com exclusão dinâmica dos PIDs já consultados no ciclo; janela explícita para leituras reais recentes, descarte de timestamps inválidos/futuros, N/D quando o dado vence e alertas visuais para limites operacionais definidos; alertas passam à frente da rotação normal e alternam a cada 10 s.
+- **Proteções:** não criar segunda fila/sondagem OBD, não promover catálogo a suporte real e não reutilizar valores vencidos como atuais. Limites de alerta são indicações de referência, não DTCs nem prova isolada de defeito.
+- **Validação:** teste cockpitTelemetry.test.js adicionado a npm test e ao gate anti-regressão. CI, TypeScript e build Android ainda aguardam execução para este commit; não presumir aprovação. A validação física com ELM327/ECU continua separada.
