@@ -116,8 +116,8 @@ function main() {
   for (const id of policyPids) {
     assert.ok(pidIds.has(String(id).toUpperCase()), 'polling policy referencia PID ausente no catálogo: ' + id);
   }
-  assert.strictEqual(pollingPolicy.cockpit.maxDisplayedPids, 20, 'cockpit deve limitar a vinte PIDs reais suportados');
-  assert.strictEqual(pollingPolicy.cockpit.pidOrder.length, 20, 'cockpit deve definir exatamente vinte PIDs candidatos');
+  assert.strictEqual(pollingPolicy.cockpit.maxDisplayedPids, 25, 'cockpit deve limitar a vinte e cinco PIDs reais suportados');
+  assert.strictEqual(pollingPolicy.cockpit.pidOrder.length, 25, 'cockpit deve definir exatamente vinte e cinco PIDs candidatos');
   assertUnique(pollingPolicy.cockpit.pidOrder.map((id) => String(id).toUpperCase()), 'PID do cockpit');
   for (const id of pollingPolicy.cockpit.pidOrder) {
     assert.ok(pidIds.has(String(id).toUpperCase()), 'cockpit referencia PID ausente do catálogo: ' + id);

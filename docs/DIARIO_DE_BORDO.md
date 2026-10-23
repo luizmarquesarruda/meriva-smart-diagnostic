@@ -3463,3 +3463,15 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 ### Validação pendente
 - A CI do novo SHA deve executar novamente a suíte completa e o build Android. Não considerar a falha anterior resolvida até consultar o resultado dessa nova execução.
 - Permanecem pendentes inspeção visual em Android e teste físico com ELM327/ECU; a disponibilidade dos cinco PIDs adicionados depende do suporte e das respostas reais do veículo.
+
+
+## DB-111 — 2026-10-23 — Sincronizar auditoria JSON com cockpit de 25 PIDs
+
+### Evidência da CI
+- Na CI do SHA `e5ab95269b4de3448cea1e616ca65522e60886ff`, `npm run validate` voltou a falhar em `tests/knowledgeJson.test.js:119`: as asserções do contrato JSON ainda exigiam 20 PIDs, enquanto `polling_policy.json` configura 25.
+- A política contém 25 PIDs candidatos distintos; os testes de telemetria e orientação já exigem esse mesmo total. A correção é atualizar o teste de contrato, não reduzir a configuração do cockpit.
+
+### Correção aplicada
+- Atualizadas em `tests/knowledgeJson.test.js` as expectativas de `maxDisplayedPids` e `cockpit.pidOrder.length` para 25, preservando as verificações de unicidade e existência no catálogo.
+- A alteração será validada pela nova CI disparada pelo commit resultante desta correção; nenhum resultado de execução é presumido.
+- Permanecem pendentes a inspeção visual no Android e o teste físico com ELM327/ECU. Nenhum merge realizado.
