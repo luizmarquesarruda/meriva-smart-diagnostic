@@ -80,3 +80,7 @@ for (const file of screenFiles) {
 assert.match(midLayout, /export function useMidLayout\(\)/);
 
 console.log('Rotação livre e proteção responsiva: OK');
+
+assert.match(index, /bottomNavLandscape:\{position:'absolute',left:0,top:0,bottom:34,width:50,flexDirection:'column'/, 'paisagem deve posicionar navegação à esquerda');
+assert.match(index, /screenFrameLandscape:\{paddingLeft:56/, 'conteúdo deve reservar espaço para navegação lateral');
+assert.match(index, /href="\/bluetooth" asChild/, 'Bluetooth deve estar disponível na navegação principal');
