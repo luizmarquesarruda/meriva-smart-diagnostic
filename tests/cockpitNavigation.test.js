@@ -26,11 +26,10 @@ assert.doesNotMatch(index, /\}, \[isHydrated, settings\]\);/, 'objeto settings i
 assert.match(index, /settings\?\.elmMaxConnectionAttempts/, 'efeito deve reagir às opções OBD efetivamente alteradas');
 assert.match(index, /bottomNavLandscape/, 'navegação inferior deve continuar disponível em paisagem');
 assert.doesNotMatch(index, /!layout\.landscape\s*&&\s*\(/, 'navegação não deve desaparecer ao girar o aparelho');
-assert.match(index, /<Text style=\{\[styles\.bottomNavText, styles\.bottomNavTextActive\]\}>Painel<\/Text>/, 'aba Painel deve ter rótulo visível e estado ativo');
-assert.match(index, /<Text style=\{styles\.bottomNavText\}>Diagnóstico<\/Text>/, 'aba Diagnóstico deve ter rótulo visível');
-assert.match(index, /<Text style=\{styles\.bottomNavText\}>Dados<\/Text>/, 'aba Dados deve ter rótulo visível');
-assert.match(index, /<Text style=\{styles\.bottomNavText\}>Viagens<\/Text>/, 'aba Viagens deve ter rótulo visível');
-assert.match(index, /<Text style=\{styles\.bottomNavText\}>Mais<\/Text>/, 'aba Mais deve ter rótulo visível');
+assert.doesNotMatch(index, /<Text style=\{\[styles\.bottomNavText, styles\.bottomNavTextActive\]\}>Painel<\/Text>/, 'navegação inferior deve usar ícones sem legenda visual');
+for (const label of ['Painel, tela atual', 'Diagnóstico', 'Dados', 'Viagens', 'Mais recursos']) {
+  assert.ok(index.includes('accessibilityLabel="' + label + '"'), 'aba deve manter rótulo acessível: ' + label);
+}
 assert.match(index, /bottomNavItem:\{[^}]*minHeight:58/, 'abas inferiores devem ter alvo de toque de 58 dp');
 assert.match(index, /bottomNavText:\{[^}]*fontSize:8/, 'rótulos das abas devem continuar compactos e visíveis');
 assert.match(index, /accessibilityLabel="Mais recursos"/, 'aba Mais precisa de nome acessível explícito');
