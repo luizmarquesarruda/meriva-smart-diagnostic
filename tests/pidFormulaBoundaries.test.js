@@ -40,6 +40,10 @@ function main() {
   assert.strictEqual(maxFuelTrim.value, 99.21875);
   assert.strictEqual(maxFuelTrim.valid, true, 'PID 0106 max byte value is valid');
 
+  const maxLongTrim = decodeFormula('FUEL_TRIM', '0107', [0xFF]);
+  assert.strictEqual(maxLongTrim.value, 99.21875);
+  assert.strictEqual(maxLongTrim.valid, true, 'PID 0107 max byte value is valid');
+
   const maxEgrError = decodeFormula('FUEL_TRIM', '012D', [0xFF]);
   assert.strictEqual(maxEgrError.value, 99.21875);
   assert.strictEqual(maxEgrError.valid, true, 'PID 012D max byte value is valid');
