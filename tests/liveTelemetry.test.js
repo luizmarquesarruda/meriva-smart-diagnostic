@@ -72,7 +72,17 @@ telemetry.recordLivePidReading({ pid: '010C', name: 'RPM', value: 800, unit: 'rp
 telemetry.recordLivePidReading({ pid: '0105', name: 'Coolant', value: 85, unit: 'celsius', timestamp: stale, source: 'REAL' });
 assert.strictEqual(telemetry.getVehicleConditionSnapshot().condition, 'UNKNOWN');
 
-
+telemetry.resetLiveTelemetry();
+const future = new Date(Date.now() + 60_000).toISOString();
+for (const sample of [
+  { pid: '010D', name: 'Speed', value: 0, unit: 'km/h', timestamp: future, source: 'REAL' },
+  { pid: '010C', name: 'RPM', value: 800, unit: 'rpm', timestamp: future, source: 'REAL' },
+  { pid: '0105', name: 'Coolant', value: 85, unit: 'celsius', timestamp: future, source: 'REAL' },
+  { pid: '0111', name: 'Throttle', value: 30, unit: '%', timestamp: 'not-a-timestamp', source: 'REAL' },
+]) telemetry.recordLivePidReading(sample);
+assert.strictEqual(telemetry.getLiveSeries('010D').length, 0, 'future timestamp must not enter live telemetry');
+assert.strictEqual(telemetry.getLivePidTrend('010C'), null, 'future timestamp must not appear as a current trend');
+assert.strictEqual(telemetry.getVehicleConditionSnapshot().condition, 'UNKNOWN', 'future timestamps must not affect operational context');
 
 // Chart geometry: real finite timestamps only, fixed window, and gaps are not connected.
 const now = Date.now();

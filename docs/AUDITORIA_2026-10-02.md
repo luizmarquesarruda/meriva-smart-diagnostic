@@ -82,3 +82,8 @@ A nova rodada deve passar por:
 5. `./gradlew :app:assembleRelease --no-daemon --stacktrace`.
 
 A confirmação do Bluetooth Classic, GPS e ECU continua sendo feita em aparelho físico.
+
+
+## Nota de atualização posterior — 2026-10-22
+
+Este documento é um registro histórico da auditoria de 2026-10-02. As frases acima que dizem “Removidos pacotes diretos sem uso: ... Expo Splash Screen” e “Sem `package-lock.json`” **não descrevem o estado atual desta branch**. A remoção da dependência de splash contribuiu para a regressão reportada; posteriormente, `expo-splash-screen@~0.27.7` foi reintroduzido em `package.json` e sincronizado no `package-lock.json`, e `app.json` recebeu `expo.splash` com fundo `#07111f` e `resizeMode: contain`. O asset de imagem/logotipo ainda exige verificação separada. Consultar DB-092/DB-093 no Diário de Bordo e RG-18/RG-19 no contrato. A presente nota documenta a correção preparada, não certifica a CI nem o APK.

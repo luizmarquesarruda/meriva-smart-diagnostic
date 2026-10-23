@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
 import { Elm327Session } from '../src/obd/elm327';
 import { parseDtcResponse, parsePidResponse } from '../src/obd/parser';
+import { isValidDtcResponseForService } from '../src/obd/dtcParser';
 import { SimulatedObdTransport } from '../src/obd/simulatedTransport';
 import { BluetoothDeviceInfo } from '../src/obd/bluetoothClassicTransport';
 import { createRealElmSession, discoverPairedDevices } from '../src/obd/bluetoothManager';
@@ -107,7 +108,7 @@ export default function LaboratorioScreen() {
           setProtocol(state.obd.protocol ?? 'N/D');
           const persistedPids = state.pidDiscovery?.supportedPids ?? [];
           if (persistedPids.length) setSupportedPids((current) => current.length ? current : persistedPids);
-          setStatus('BLUETOOTH PRONTO PARA TESTE');
+          setStatus(getSharedObdConnection() ? 'ECU CONECTADA / DIAGNÓSTICO DISPONÍVEL' : 'AGUARDANDO CONEXÃO ELM327');
         }
       })
       .catch((cause) => {
@@ -445,11 +446,17 @@ export default function LaboratorioScreen() {
       const result = mode === 'REAL'
         ? await autoTripService.withPollingPaused(() => activeSession.executeCommand('03'))
         : await activeSession.executeCommand('03');
-      const codes = parseDtcResponse(result.response);
       setTx(result.command);
       setRx(result.response);
       setElapsedMs(result.elapsedMs);
       setProtocol(activeSession.getProtocol() ?? 'N/D');
+      if (result.status !== 'OK') {
+        throw new Error(result.errorMessage || 'ECU não confirmou uma resposta válida ao comando de leitura de DTC.');
+      }
+      if (!isValidDtcResponseForService('03', result.response)) {
+        throw new Error('RESPOSTA DTC INVÁLIDA OU INCOMPLETA; não é possível confirmar ausência de falhas.');
+      }
+      const codes = parseDtcResponse(result.response);
       setDtcCodes(codes);
 
       if (mode === 'REAL') {
@@ -555,8 +562,8 @@ export default function LaboratorioScreen() {
           <TouchableOpacity style={[styles.button, layout.landscape && styles.flexButton]} onPress={connectReal} disabled={!devices.length || !storageReady}>
             <Text style={styles.buttonText}>CONECTAR AUTOMATICAMENTE AO ELM327</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.button, styles.disconnect, layout.landscape && styles.flexButton]} onPress={() => void disconnectReal()} disabled={!sessionRef.current}>
-            <Text style={styles.buttonText}>DESCONECTAR ELM327</Text>
+          <TouchableOpacity style={[styles.button, styles.disconnect, !sessionRef.current && styles.disabledButton, layout.landscape && styles.flexButton]} onPress={() => void disconnectReal()} disabled={!sessionRef.current}>
+            <Text style={styles.buttonText}>{sessionRef.current ? 'DESCONECTAR ELM327' : 'ELM327 DESCONECTADO'}</Text>
           </TouchableOpacity>
         </>
       ) : (
@@ -682,7 +689,7 @@ export default function LaboratorioScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, paddingVertical: 16, backgroundColor: COLORS.screen },
+  container: { flexGrow: 1, paddingTop: 16, paddingBottom: 132, backgroundColor: COLORS.screen },
   title: { ...SCREEN_TITLE_STYLE, marginBottom: 6 },
   status: { color: COLORS.primary, fontWeight: '700', marginBottom: 6 },
   protocol: { color: COLORS.textMuted, fontWeight: '600', marginBottom: 8 },
@@ -706,6 +713,7 @@ const styles = StyleSheet.create({
   secondaryButton: { backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1, borderRadius: 7, padding: 12, alignItems: 'center', marginBottom: 9 },
   secondaryButtonText: { color: COLORS.text, fontWeight: '700' },
   disconnect: { backgroundColor: '#64748b' },
+  disabledButton: { backgroundColor: '#26374b', borderWidth: 1, borderColor: COLORS.border, opacity: 0.72 },
   buttonText: { color: COLORS.textStrong, fontWeight: '700' },
   device: { backgroundColor: COLORS.surface, borderRadius: 10, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: COLORS.border },
   selected: { borderColor: '#2563eb', borderWidth: 2 },

@@ -1,6 +1,6 @@
-# MERIVA SMART DIAGNOSTIC
+# SMART OBD DIAGNOSTIC
 
-Aplicativo Android offline de diagnóstico OBD-II para Chevrolet Meriva Maxx 1.4L 8V ECONO.FLEX.
+Aplicativo Android offline de diagnóstico OBD-II com marca Smart OBD Diagnostic. O perfil do veículo e as especificações específicas permanecem configuráveis conforme o carro conectado.
 
 As especificações físicas e de manutenção do veículo são mantidas em `src/database/merivaManual.ts`, com referência ao Manual do Proprietário Chevrolet Meriva 2012.
 
@@ -8,11 +8,21 @@ Versão: 1.0.1 | Plataforma: Android | Transporte: Bluetooth Classic | ECU: OBD-
 
 ## Estado atual
 
-O projeto prioriza dados reais, rastreabilidade e diagnóstico explicável. Uma resposta ausente não vira um valor inventado.
+O projeto prioriza dados reais, rastreabilidade e diagnóstico explicável. Uma resposta ausente não vira um valor inventado. No cockpit, a cidade e o bairro alternam em intervalos de 10 s quando os dois rótulos estão disponíveis; anomalia de temperatura mantém o indicador térmico em destaque.
 
-O GPS do celular inicia automaticamente ao abrir o aplicativo. Ele fornece velocidade e distância em primeiro plano, mesmo quando a ECU não oferece o PID 015E. A gravação de litros e consumo depende de taxa de combustível OBD válida. Litros consumidos só entram no cálculo quando a ECU fornece uma taxa de combustível válida pelo PID OBD 015E. O GPS sozinho não mede litros. O aplicativo não aceita litros digitados manualmente na tela principal.
+O GPS do celular tenta iniciar ao abrir o aplicativo quando autorizado. Negar localização limita clima, velocidade/distância GPS e gravação de percurso, mas não deve impedir a conexão Bluetooth/ECU nem a consulta manual OBD. Ele fornece velocidade e distância em primeiro plano, mesmo quando a ECU não oferece o PID 015E. A gravação de litros e consumo depende de taxa de combustível OBD válida. Litros consumidos só entram no cálculo quando a ECU fornece uma taxa de combustível válida pelo PID OBD 015E. O GPS sozinho não mede litros. O aplicativo não aceita litros digitados manualmente na tela principal.
 
 Bluetooth Classic exige build nativo Android. Expo Go não é o ambiente de validação do transporte.
+
+### Inicialização e splash screen
+
+A rota operacional `app/splash.tsx` é a entrada inicial: tenta conectar ao ELM327 pareado, valida uma resposta real da ECU, consulta cinco vezes cada PID anunciado e só então abre o cockpit. Em caso de falha, continua tentando com espera progressiva e, após tentativas repetidas, permite abrir o painel para configurar a conexão manualmente. Quando `autoConnectObd` está desativado nas configurações, pula as tentativas automáticas.
+
+A splash nativa usa o asset transparente `assets/splash.png` e o plugin `expo-splash-screen` configurado explicitamente em `app.json` com fundo `#07111f`, largura de 280 dp e `resizeMode: contain`. A configuração legada `expo.splash` aponta para o mesmo PNG. O baseline confirma o caminho e a assinatura do arquivo; antes de publicar, ainda é obrigatório instalar um APK de release e validar a inicialização fria em Android real. O contrato é protegido por `tests/projectBaseline.test.js` e RG-18 em `docs/CONTRATO_ANTI_REGRESSAO.md`.
+
+## Manutenção e abastecimento
+
+A página **Mais recursos → Manutenção e abastecimento** registra a quilometragem do painel, histórico de óleo/filtro, revisão, fluido de arrefecimento, fluido de freio e rodízio dos pneus, com lembretes por km ou calendário. O modo de uso severo adota os intervalos de referência do manual do Meriva 2012. Abastecimentos manuais são guardados em arquivo local separado e não são tratados como telemetria real nem entram no cálculo de consumo OBD. Os prazos são lembretes e devem ser confirmados no manual aplicável ao veículo.
 
 ## Estrutura
 

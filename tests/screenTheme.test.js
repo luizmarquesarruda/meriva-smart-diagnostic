@@ -14,7 +14,7 @@ const screens = [
   'app/index.tsx', 'app/dados.tsx', 'app/saude.tsx', 'app/mais.tsx',
   'app/veiculo.tsx', 'app/viagens.tsx', 'app/aprendizado.tsx',
   'app/bluetooth.tsx', 'app/armazenamento.tsx', 'app/configuracoes.tsx',
-  'app/laboratorio.tsx', 'app/testes-sensores.tsx', 'app/conectividade.tsx',
+  'app/laboratorio.tsx', 'app/testes-sensores.tsx', 'app/conectividade.tsx', 'app/manutencao.tsx',
 ];
 for (const file of screens) {
   const source = fs.readFileSync(path.join(root, file), 'utf8');
@@ -29,6 +29,13 @@ assert.doesNotMatch(lab, /#eef3fb|backgroundColor:\s*'#fff'|color:\s*'#1f2937'/i
   'o laboratório não pode voltar à paleta clara incompatível com o app');
 const app = JSON.parse(fs.readFileSync(path.join(root, 'app.json'), 'utf8'));
 assert.equal(app.expo.userInterfaceStyle, 'dark', 'barras/controles do sistema devem seguir o tema escuro');
+const navBarPlugin = app.expo.plugins.find((plugin) => Array.isArray(plugin) && plugin[0] === 'expo-navigation-bar');
+assert.ok(navBarPlugin, 'barra inferior Android deve estar configurada pelo plugin Expo');
+assert.equal(navBarPlugin[1].backgroundColor, '#07111f', 'barra inferior deve usar o fundo escuro');
+assert.equal(navBarPlugin[1].barStyle, 'light', 'botões nativos devem ter contraste claro no fundo escuro');
+const cockpit = fs.readFileSync(path.join(root, 'app/index.tsx'), 'utf8');
+assert.match(cockpit, /<StatusBar style="light" backgroundColor=\{COLORS\.screen\} \/>/,
+  'status bar superior deve usar ícones claros sobre o fundo escuro');
 const layout = fs.readFileSync(path.join(root, 'app/_layout.tsx'), 'utf8');
 assert.match(layout, /headerStyle:\s*\{\s*backgroundColor:\s*COLORS\.screen/);
 assert.match(layout, /headerTintColor:\s*COLORS\.accent/);

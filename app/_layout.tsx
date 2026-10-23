@@ -66,7 +66,10 @@ export default function RootLayout() {
           throw new Error('PERMISSÃO DE BLUETOOTH/DISPOSITIVOS PRÓXIMOS NÃO CONCEDIDA.');
         }
         if (audit.location !== 'GRANTED') {
-          throw new Error('PERMISSÃO DE GPS/LOCALIZAÇÃO NÃO CONCEDIDA.');
+          // GPS/clima/registro de percurso são recursos opcionais. Não bloquear
+          // o diagnóstico OBD: o rastreador informa seu próprio estado e degrada
+          // sem amostras quando a localização não está autorizada.
+          console.info('[Permissions] GPS indisponível; diagnóstico OBD permanece habilitado.');
         }
       }
       permissionsChecked.current = true;
@@ -116,13 +119,16 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
     <Stack
+      initialRouteName="splash"
       screenOptions={{
         headerStyle: { backgroundColor: COLORS.screen },
         headerTintColor: COLORS.accent,
         headerTitleStyle: { fontWeight: '900' },
       }}
     >
+      <Stack.Screen name="splash" options={{ headerShown: false, gestureEnabled: false }} />
       <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="manutencao" options={{ headerShown: false }} />
       <Stack.Screen name="bluetooth" options={{ headerShown: false }} />
       <Stack.Screen name="conectividade" options={{ headerShown: false }} />
       <Stack.Screen name="laboratorio" options={{ title: 'DIAGNÓSTICO OBD' }} />

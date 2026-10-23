@@ -6,6 +6,7 @@ import { forceSaveOnObdEvent, registerObdQuery } from '../meriva/autosaveIntegra
 import { getAutoSaveState, updateAutoSaveState, initAutoSave } from '../meriva/autosaveManager';
 import { RealTripRecorder, shouldFinalizeStoppedTrip } from './tripRecorder';
 import { estimateRangeFromFuelLevel, fuelLevelPercentToLiters, isFuelReserve } from './fuelLevel';
+import { isCurrentFuelLevelSample } from './autonomyPresentation';
 import { getLivePidTrend, resetLiveTelemetry } from '../obd/liveTelemetry';
 import { estimateFuelRateLph, type FuelRateSource } from '../obd/fuelConsumption';
 import { startBackgroundMonitoring } from '../gps/backgroundMonitoring';
@@ -19,6 +20,7 @@ export interface AutoTripServiceState {
   fuelSupported: boolean;
   fuelLevelSupported: boolean;
   fuelLevelPercent: number | null;
+  fuelLevelReadAtMs: number | null;
   fuelRemainingL: number | null;
   fuelReserve: boolean | null;
   distanceKm: number;
@@ -43,6 +45,7 @@ const INITIAL_STATE: AutoTripServiceState = {
   fuelSupported: false,
   fuelLevelSupported: false,
   fuelLevelPercent: null,
+  fuelLevelReadAtMs: null,
   fuelRemainingL: null,
   fuelReserve: null,
   distanceKm: 0,
@@ -77,12 +80,24 @@ class AutoTripService {
 
   subscribe(listener: Listener): () => void {
     this.listeners.add(listener);
-    listener({ ...this.state });
+    listener(this.getState());
     return () => this.listeners.delete(listener);
   }
 
   getState(): AutoTripServiceState {
-    return { ...this.state };
+    const snapshot = { ...this.state };
+    const currentFuelLevelIsValid = snapshot.connected
+      && getSharedObdStatus().ecuConnected
+      && isCurrentFuelLevelSample(snapshot.fuelLevelReadAtMs);
+    if (currentFuelLevelIsValid) return snapshot;
+    return {
+      ...snapshot,
+      fuelLevelPercent: null,
+      fuelLevelReadAtMs: null,
+      fuelRemainingL: null,
+      fuelReserve: null,
+      estimatedRangeKm: 0,
+    };
   }
 
   async withPollingPaused<T>(operation: () => Promise<T>): Promise<T> {
@@ -113,7 +128,7 @@ class AutoTripService {
       averageConsumptionKml: persisted.autonomy.averageConsumptionKml > 0
         ? persisted.autonomy.averageConsumptionKml
         : 0,
-      estimatedRangeKm: persisted.autonomy.estimatedRangeKm,
+      estimatedRangeKm: 0,
     };
     this.emit();
     this.running = true;
@@ -179,13 +194,14 @@ class AutoTripService {
       fuelSupported,
       fuelLevelSupported,
       fuelLevelPercent: null,
+      fuelLevelReadAtMs: null,
       fuelRemainingL: null,
       fuelReserve: null,
       error: null,
       averageConsumptionKml: persistedAutonomy.averageConsumptionKml > 0
         ? persistedAutonomy.averageConsumptionKml
         : 0,
-      estimatedRangeKm: persistedAutonomy.estimatedRangeKm,
+      estimatedRangeKm: 0,
     };
     this.emit();
 
@@ -208,7 +224,16 @@ class AutoTripService {
         await this.stopGpsForEcu();
         await this.finalizeRecorder();
         this.stoppedSinceMs = null;
-        this.setState({ connected: true, active: false, error: 'ADAPTADOR OK / ECU SEM RESPOSTA' });
+        this.setState({
+          connected: true,
+          active: false,
+          fuelLevelPercent: null,
+          fuelLevelReadAtMs: null,
+          fuelRemainingL: null,
+          fuelReserve: null,
+          estimatedRangeKm: 0,
+          error: 'ADAPTADOR OK / ECU SEM RESPOSTA',
+        });
         await new Promise((resolve) => setTimeout(resolve, 1000));
         continue;
       }
@@ -231,6 +256,7 @@ class AutoTripService {
         let mapFallbackQueriedThisCycle = false;
         const fuelEstimateDue = this.pollCycleNumber % FUEL_ESTIMATE_EVERY_N_CYCLES === pollingPolicy.polling.estimatedFuelRate.phase;
         let fuelLevelPercent: number | null = this.state.fuelLevelPercent;
+        let fuelLevelReadAtMs: number | null = this.state.fuelLevelReadAtMs;
         let obdSpeedKmh: number | null = null;
         let rpm: number | null = null;
         if (obdSpeedSupported) gpsTracker.setVehicleSpeedHintKmh(null);
@@ -300,9 +326,19 @@ class AutoTripService {
             fuelLevelResult.parsed.value <= 100
           ) {
             fuelLevelPercent = fuelLevelResult.parsed.value;
+            fuelLevelReadAtMs = Date.now();
           }
         } else {
           fuelLevelPercent = this.state.fuelLevelPercent;
+          fuelLevelReadAtMs = this.state.fuelLevelReadAtMs;
+        }
+
+        // Never keep an old or future-dated level as current evidence. The PID is
+        // polled periodically; if repeated queries fail for 30 s, all current-range
+        // consumers should move to N/D until a new valid response arrives.
+        if (!isCurrentFuelLevelSample(fuelLevelReadAtMs)) {
+          fuelLevelPercent = null;
+          fuelLevelReadAtMs = null;
         }
 
         // FLEX composition is stable and expensive enough to keep off the hot
@@ -476,14 +512,15 @@ class AutoTripService {
           instantaneousConsumptionKml,
           instantaneousConsumptionSource: instantaneousConsumptionKml != null ? fuelRateForDisplaySource : null,
           fuelLevelPercent,
+          fuelLevelReadAtMs,
           fuelRemainingL: fuelLevelPercentToLiters(fuelLevelPercent),
           fuelReserve: isFuelReserve(fuelLevelPercent),
-          estimatedRangeKm: fuelLevelPercent != null
+          estimatedRangeKm: fuelLevelPercent != null && isCurrentFuelLevelSample(fuelLevelReadAtMs)
             ? (estimateRangeFromFuelLevel(
                 fuelLevelPercent,
                 tripConsumptionKml ?? this.state.averageConsumptionKml,
-              ) ?? this.state.estimatedRangeKm)
-            : this.state.estimatedRangeKm,
+              ) ?? 0)
+            : 0,
           error: rpm === 0 && obdSpeedKmh === 0 && fuelRateForDisplayLph == null
             ? 'MOTOR DESLIGADO? / ECU SEM TELEMETRIA VÁLIDA'
             : fuelRateForDisplaySource && fuelRateForDisplaySource !== 'MEASURED_015E'
@@ -491,8 +528,14 @@ class AutoTripService {
               : null,
         });
       } catch (cause) {
+        const fuelLevelIsCurrent = isCurrentFuelLevelSample(this.state.fuelLevelReadAtMs);
         this.setState({
           error: cause instanceof Error ? cause.message : 'FALHA NA LEITURA AUTOMÁTICA OBD',
+          fuelLevelPercent: fuelLevelIsCurrent ? this.state.fuelLevelPercent : null,
+          fuelLevelReadAtMs: fuelLevelIsCurrent ? this.state.fuelLevelReadAtMs : null,
+          fuelRemainingL: fuelLevelIsCurrent ? this.state.fuelRemainingL : null,
+          fuelReserve: fuelLevelIsCurrent ? this.state.fuelReserve : null,
+          estimatedRangeKm: fuelLevelIsCurrent ? this.state.estimatedRangeKm : 0,
         });
       }
 
@@ -575,9 +618,10 @@ class AutoTripService {
         const averageConsumptionKml = cumulativeFuelUsedL > 0
           ? cumulativeDistanceKm / cumulativeFuelUsedL
           : 0;
-        const estimatedRangeKm = averageConsumptionKml > 0
-          ? averageConsumptionKml * state.autonomy.tankCapacityL
-          : 0;
+        const currentFuelLevelPercent = isCurrentFuelLevelSample(this.state.fuelLevelReadAtMs)
+          ? this.state.fuelLevelPercent
+          : null;
+        const estimatedRangeKm = estimateRangeFromFuelLevel(currentFuelLevelPercent, averageConsumptionKml) ?? 0;
 
         state.autonomy = {
           ...state.autonomy,
@@ -586,9 +630,9 @@ class AutoTripService {
           cumulativeFuelUsedL: Number(cumulativeFuelUsedL.toFixed(3)),
           averageConsumptionKml: Number(averageConsumptionKml.toFixed(3)),
           estimatedRangeKm: Number(estimatedRangeKm.toFixed(1)),
-          fuelLevelPercent: this.state.fuelLevelPercent,
-          fuelRemainingL: this.state.fuelRemainingL,
-          fuelReserve: this.state.fuelReserve,
+          fuelLevelPercent: currentFuelLevelPercent,
+          fuelRemainingL: fuelLevelPercentToLiters(currentFuelLevelPercent),
+          fuelReserve: isFuelReserve(currentFuelLevelPercent),
           realReadingCount: (Number(state.autonomy.realReadingCount) || 0) + 1,
           lastReadingAt: cycle.finishedAt,
           readings: [
@@ -621,7 +665,7 @@ class AutoTripService {
   }
 
   private emit(): void {
-    const snapshot = { ...this.state };
+    const snapshot = this.getState();
     for (const listener of this.listeners) listener(snapshot);
   }
 }

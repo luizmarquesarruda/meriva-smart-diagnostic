@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased
+
+### Manutenção e combustível
+- Adicionada página local para registrar quilometragem, histórico de serviços, lembretes por km/data (considerando uso normal ou severo) e abastecimentos por combustível/litros/valor.
+- Persistência isolada dos autosaves OBD: abastecimentos manuais não alimentam as estimativas nem os cálculos de consumo do motor diagnóstico.
+- Testes de regras de calendário, intervalos, dados ausentes e acesso à tela incluídos na validação e no gate antirregressão.
+
+### Confiabilidade e aceitação
+- O cockpit alterna cidade/bairro a cada 10 s somente quando os rótulos estão disponíveis sob permissão de localização já concedida; alerta térmico a partir de 110 °C mantém prioridade no indicador central durante a anomalia. Testes de geocodificação e layout ampliados.
+- Permissão de localização deixa de bloquear a preparação do diagnóstico OBD; GPS, clima e captura de percurso permanecem degradáveis quando o usuário não autoriza localização. O teste de permissões foi reforçado e incluído no gate antirregressão.
+- Criado `docs/TEST_PLAN.md` com cenários críticos para ECU/ELM327, frescor de dados, autonomia, navegação, DTC, splash e validação de release.
+- Adicionado o contrato RG-20 e uma verificação no gate para manter o plano de aceitação junto ao código.
+- Os casos pendentes permanecem identificados como pendentes; não se presume teste físico nem recurso futuro implementado.
+- A autonomia atual descarta nível de combustível PID 012F sem timestamp válido ou com mais de 30 s, inclusive após perda de resposta da ECU; testes de validade temporal ampliados.
+- O serviço de viagens filtra a autonomia em seu estado público e a tela Dados usa apenas estimativa atual, impedindo que o valor persistido de viagens anteriores apareça como atual.
+- Telemetria ao vivo rejeita timestamps inválidos ou futuros antes de produzir tendências e contexto operacional.
+- Leitura de DTC diferencia quadro positivo válido de NO DATA/timeout/quadro incompleto; falha de leitura não é exibida como ausência de códigos.
+
+### Splash screen e documentação
+- A splash operacional respeita `autoConnectObd=false` e permite abrir o cockpit após falhas repetidas, evitando bloquear configurações e conexão manual quando não há ECU disponível.
+- O teste antirregressão e `docs/TEST_PLAN.md` agora cobrem o caminho alternativo de inicialização sem conexão.
+- Restaurada a dependência `expo-splash-screen@~0.27.7` e alinhado o lockfile.
+- Adicionado `assets/splash.png` (PNG transparente 512×512) com a marca MERIVA SMART e configurado no plugin nativo `expo-splash-screen` com largura de 280 dp, fundo `#07111f` e `resizeMode: contain`.
+- Mantida a configuração `expo.splash` legada apontando para o mesmo asset e reforçado `tests/projectBaseline.test.js` para exigir o plugin, o caminho e a assinatura PNG real.
+- Atualizados README, arquitetura, desenvolvimento, contribuição, auditoria e contrato antirregressão para refletir o estado atual e diferenciar configuração de splash de confirmação de uma imagem/logotipo.
+- Validação de CI/build e inspeção visual de inicialização fria ainda pendentes para o SHA que contém o asset.
+
 ## 1.0.1
 
 ### Bluetooth

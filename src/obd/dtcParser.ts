@@ -34,3 +34,17 @@ export function parseDtcResponseForService(
 
   return codes;
 }
+
+
+/** True only for a complete positive DTC response or an explicit no-codes message. */
+export function isValidDtcResponseForService(service: '03' | '07' | '0A', rawResponse: string): boolean {
+  if (/\b(NO DATA|UNABLE TO CONNECT|BUS INIT|BUS ERROR|STOPPED|ERROR)\b/i.test(rawResponse)) return false;
+  if (/\bNO CODES?\b|\bNENHUM(?:\s+(?:DTC|C[ÓO]DIGOS?))?\b/i.test(rawResponse)) return true;
+  const stream = normalizeHexStream(rawResponse);
+  const serviceNumber = Number.parseInt(service, 16);
+  const positiveHeader = (0x40 + serviceNumber).toString(16).padStart(2, '0').toUpperCase();
+  const headerIndex = stream.indexOf(positiveHeader);
+  if (headerIndex < 0) return false;
+  const payload = stream.slice(headerIndex + positiveHeader.length);
+  return payload.length >= 4 && payload.length % 4 === 0;
+}

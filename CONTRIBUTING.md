@@ -58,3 +58,16 @@ Descreva:
 - testes executados;
 - impacto no Android/ELM327;
 - riscos conhecidos.
+
+
+## Documentação obrigatória para mudanças
+
+Ao alterar inicialização, identidade visual, navegação, dependências Expo ou configuração nativa:
+
+- atualize o README e o documento técnico afetado;
+- atualize `CHANGELOG.md` para mudanças voltadas ao usuário;
+- acrescente uma entrada sequencial a `docs/DIARIO_DE_BORDO.md` com causa, arquivos, correções, testes e estado real da CI;
+- atualize `docs/CONTRATO_ANTI_REGRESSAO.md` e o teste executável quando um requisito crítico precisar de proteção;
+- mantenha auditorias antigas como registro histórico, adicionando uma nota datada quando a conclusão for superada por evidência posterior;
+- não declare a CI aprovada antes de verificar os jobs do SHA exato. Teste de código, build nativo e teste físico são evidências diferentes.
+- proteja a splash com asset PNG versionado, plugin `expo-splash-screen` explícito e teste de assinatura/caminho no baseline; não afirme a aceitação visual final até instalar e conferir o APK de release em Android real.

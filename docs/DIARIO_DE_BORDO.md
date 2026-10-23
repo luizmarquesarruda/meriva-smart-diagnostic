@@ -3056,3 +3056,349 @@ O usuário pediu que a interface acompanhe a rotação física do aparelho, mant
 
 ### Próximo passo
 Aguardar a CI da PR #76 após as últimas alterações; corrigir qualquer falha real de instalação, TypeScript, testes ou build antes de considerar a alteração pronta.
+
+## DB-090 · 2026-10-22 — Correção da autonomia, conexão explícita e navegação única
+
+### Problemas corrigidos
+- O cockpit podia apresentar autonomia persistida como se fosse atual mesmo com ECU desconectada.
+- A fórmula persistida multiplicava o consumo médio pela capacidade total do tanque, em vez de considerar o nível real lido pelo PID 012F.
+- O valor de temperatura `N/D` recebia a cor verde, apesar de não existir leitura válida.
+- O cartão de clima podia promover o bairro a nome de cidade quando o município não era retornado no primeiro campo do geocodificador.
+- A tela tinha uma fileira de atalhos (Diagnóstico, Dados, Viagens) além da navegação inferior, duplicando destinos na versão exibida pelo usuário.
+- O rótulo genérico `OFFLINE` não identificava se a ECU, o Bluetooth ou a internet estava indisponível.
+- A barra inferior nativa do Android usava cores desalinhadas com o cockpit escuro.
+
+### Alterações preparadas
+- `src/trip/autonomyPresentation.ts`: função pura que só expõe autonomia atual quando há sessão ECU válida, suporte e amostra válida de nível de combustível; usa o consumo da viagem quando válido e a média histórica como fallback.
+- `src/trip/autoTripService.ts`: cálculo e persistência da autonomia passaram a considerar o percentual real de combustível; sem nível válido, a estimativa atual fica indisponível em vez de reutilizar silenciosamente a autonomia antiga ou presumir tanque cheio.
+- `app/index.tsx`: `N/D` da temperatura agora é neutro; a autonomia do cockpit vem da sessão ativa; estados `ECU CONECTADA`, `ECU SEM RESPOSTA`, `BLUETOOTH ATIVO`, `CONECTANDO ELM327` e `ECU DESCONECTADA` são separados; a barra principal passou a ter cinco destinos rotulados; os atalhos duplicados foram substituídos por um cartão de conexão acionável; a barra de status superior usa ícones claros no tema escuro.
+- `app.json` e `package.json`: configurado `expo-navigation-bar@~3.0.7` (SDK 51) para a barra nativa inferior escura, com botões claros; `package-lock.json` sincronizado.
+- `src/weather/currentConditions.ts`: ao resolver o nome mostrado, prioriza município (`city`/`subregion`) e não transforma bairro ou estado em cidade.
+- `tests/autonomyPresentation.test.js` e regressões em `tests/onlineConditions.test.js`, `tests/cockpitNavigation.test.js`, `tests/orientationLayout.test.js`, `tests/screenTheme.test.js` e `tests/projectBaseline.test.js`; o novo teste foi conectado a `npm test`.
+- `docs/CONTRATO_ANTI_REGRESSAO.md`: RG-15 atualizado para navegação única e RG-16 adicionado para autonomia e estados sem leitura.
+
+### Verificação e limites
+- Alterações agrupadas na branch `fix/cockpit-live-autonomy-20261022`, sem merge em `main`.
+- O código, as configurações Expo e as expectativas dos testes foram revisados estaticamente. **TypeScript, suíte completa e APK ainda não foram executados neste ambiente**, portanto não declarar os resultados como aprovados antes da CI.
+- O workflow padrão fica temporariamente restrito a `workflow_dispatch` nesta branch durante a montagem das mudanças; `main` permanece inalterada. Os gatilhos normais só serão restaurados depois da revisão estática completa do conjunto.
+- O teste físico no Android ainda é necessário para confirmar contraste real da barra nativa inferior, rótulos da navegação em retrato/paisagem e conexão com ELM327/ECU.
+
+### Próximo passo
+Concluir a revisão final do conjunto e restaurar os gatilhos da CI para executar `gate:baseline`, TypeScript, suíte de regressão e build Android no SHA exato. Não fazer merge sem autorização explícita.
+
+## DB-091 · 2026-10-22 — Compatibilidade da barra nativa com Expo Doctor
+
+### Evidência da CI
+- A primeira execução do PR `#78` instalou as dependências com sucesso, mas `npm run doctor` falhou porque `expo-navigation-bar@3.0.4` não atendia à versão exigida pelo Expo SDK 51 (`~3.0.7`).
+- A falha ocorreu antes do gate de baseline e antes de `npm run validate`; portanto, aqueles passos ainda não têm resultado nessa execução.
+
+### Correção
+- `package.json` e `package-lock.json` foram alinhados para `expo-navigation-bar@~3.0.7`.
+- `tests/projectBaseline.test.js` foi atualizado para proteger a versão exigida pelo Expo Doctor.
+- A configuração nativa de fundo escuro e botões claros foi preservada.
+
+### Estado
+- Correção enviada à branch `fix/cockpit-live-autonomy-20261022` para nova execução da CI.
+- Não fazer merge enquanto a nova execução não verificar Expo Doctor, gate de baseline, TypeScript e suíte de regressão.
+
+## DB-092 · 2026-10-22 — Restauração da splash screen e falha de cobertura antirregressão
+
+### Evidência
+- O usuário reportou que a splash screen desapareceu.
+- `app.json` não continha configuração `expo.splash`.
+- `package.json` não declarava `expo-splash-screen`, embora o `package-lock.json` ainda contivesse a versão `0.27.7`.
+- A auditoria `docs/AUDITORIA_2026-10-02.md` registrava explicitamente a remoção do Expo Splash Screen por ser considerado sem uso.
+- `tests/projectBaseline.test.js` não protegia a dependência nem a configuração de splash; portanto, o gate podia passar sem detectar a regressão. A regra antirregressão estava incompleta, não era uma garantia de comportamento.
+
+### Correção preparada
+- Reintroduzido `expo-splash-screen@~0.27.7` em `package.json` e no conjunto de dependências raiz do lockfile.
+- Restaurada em `app.json` a configuração de splash nativa com fundo `#07111f` e `resizeMode: contain`, coerente com o tema escuro.
+- Adicionadas asserções ao `tests/projectBaseline.test.js` para a dependência, versão do lockfile e configuração de fundo.
+- Adicionado RG-18 a `docs/CONTRATO_ANTI_REGRESSAO.md` para impedir nova remoção silenciosa.
+
+### Limites de validação
+- Não foi confirmado um arquivo de imagem de splash existente no repositório durante esta inspeção; por isso, esta correção restaura a configuração/fundo nativo, mas não afirma que o logotipo ilustrado foi restaurado.
+- A correção precisa passar pelo gate, Expo Doctor, suíte completa e build Android da CI antes de ser considerada validada.
+- Sem merge automático: manter a correção isolada na branch/PR até todos os jobs passarem e o usuário autorizar integração.
+
+### Lição de processo
+Uma anotação de auditoria que remove uma funcionalidade visível precisa de evidência de que ela é realmente redundante e de uma atualização explícita do contrato de regressão. A ausência de teste não é prova de ausência de uso.
+
+## DB-093 · 2026-10-22 — Reconciliação da documentação após regressão da splash
+
+### Objetivo
+Sincronizar a documentação de entrada, arquitetura, desenvolvimento, contribuição, changelog, auditorias históricas e contrato antirregressão com a correção preparada em DB-092, sem apagar decisões antigas nem declarar validação não comprovada.
+
+### Arquivos atualizados neste lote
+- `README.md`: documenta a configuração atual de splash, a dependência necessária e a distinção entre configuração nativa e asset visual confirmado.
+- `CHANGELOG.md`: adiciona a seção Unreleased com as mudanças da splash e o estado de validação pendente.
+- `CONTRIBUTING.md`: define a documentação sincronizada e a exigência de evidência por SHA para alterações de dependências/identidade visual.
+- `docs/ARCHITECTURE.md`: descreve a splash nativa e a diferença entre configuração, asset e tela React Native.
+- `docs/DEVELOPMENT.md`: inclui o procedimento de validação da splash no build e em aparelho Android.
+- `docs/CONTRATO_ANTI_REGRESSAO.md`: fortalece RG-18 e adiciona RG-19 para consistência documental e alegações baseadas em evidência.
+- `docs/AUDITORIA_2026-10-02.md`, `docs/AUDITORIA_FASE0.md`, `docs/AUDITORIA_TECNICA_2026-10-03.md`: preservam os achados históricos, mas adicionam notas datadas para evitar que declarações antigas sobre splash/lockfile sejam confundidas com o estado atual.
+- Este diário: registra o lote e suas limitações.
+
+### Estado técnico documentado
+- `expo-splash-screen@~0.27.7` está declarado em `package.json` e alinhado com a dependência raiz/versão do `package-lock.json`.
+- `app.json` define `expo.splash.backgroundColor = #07111f` e `resizeMode = contain`.
+- A configuração não prova que um asset de logotipo exista ou esteja embutido no APK; essa inspeção continua pendente.
+- O workflow configurado executa `npm ci`, Expo Doctor, gate de baseline, TypeScript/testes e build Android release. Não se deve afirmar que esses passos passaram no SHA final sem consultar a execução correspondente.
+
+### Verificações realizadas nesta atualização
+- Arquivos recuperados diretamente da branch `fix/cockpit-live-autonomy-20261022` antes da edição.
+- Alterações documentais preparadas como um lote único para evitar commits parciais que disparem CI antes da revisão completa.
+- Ainda é necessário confirmar o SHA do commit documental, revisar o diff consolidado e verificar os resultados de CI somente depois de o lote estar completo.
+
+### Critérios de encerramento
+1. Confirmar que todas as 10 páginas listadas acima estão no mesmo commit.
+2. Rever diff para garantir que auditorias históricas foram anotadas, não reescritas como se os achados nunca tivessem existido.
+3. Executar/consultar gate, suíte, Expo Doctor e build Android para o SHA final, sem declarar aprovação antecipada.
+4. Conferir o asset de splash e a inicialização fria em APK instalado; se o asset estiver ausente, corrigir o recurso visual separadamente.
+5. Não fazer merge sem autorização explícita.
+
+
+## DB-094 · 2026-10-22 — Plano de aceitação para o lote de confiabilidade e UX
+
+### Objetivo
+Transformar as prioridades do relatório analítico em critérios verificáveis e separar funcionalidade existente, trabalho proposto e validação física. Este registro não declara novas funcionalidades de produto como concluídas.
+
+### Alterações deste lote
+- `docs/TEST_PLAN.md`: criado plano de regressão com cenários críticos de OBD/ECU, frescor dos dados, autonomia, conectividade offline, navegação, DTC, splash, build e critérios de recursos futuros.
+- `docs/CONTRATO_ANTI_REGRESSAO.md`: adicionado RG-20 para exigir cobertura rastreável e distinguir CI/build de teste físico.
+- `tests/projectBaseline.test.js`: protege a existência do plano e seus cenários centrais para que a documentação de aceitação não desapareça silenciosamente.
+- `CHANGELOG.md`: registra o plano de testes e a próxima etapa de validação.
+
+### Limites e estado
+- A PR #78 já contém correções de cockpit/navegação, apresentação de autonomia, temperatura indisponível e estados de conexão, com testes associados.
+- O plano documenta casos de teste existentes e pendentes; não afirma que Detox/Appium, lembretes de manutenção, mapas, OTA, analytics, login ou sincronização em nuvem estejam implementados.
+- O modo oficina avançado e a sincronização em nuvem/perfis permanecem fora do escopo autorizado.
+- Nenhuma CI nova foi disparada durante a preparação do conteúdo. Após o commit consolidado, a CI pode iniciar automaticamente conforme os gatilhos do repositório; os resultados precisam ser consultados para o SHA final.
+
+### Critérios de encerramento
+1. Conferir o diff consolidado e o RG-20.
+2. Verificar o gate, TypeScript, suíte e build Android na CI do SHA atualizado.
+3. Confirmar splash e navegação visualmente em aparelho Android.
+4. Testar ELM327/ECU reais separadamente; CI verde não equivale a validação física.
+5. Não fazer merge sem autorização explícita.
+
+
+## DB-095 · 2026-10-22 — Expiração de nível de combustível antigo na autonomia atual
+
+### Achado funcional
+- `AutoTripService` mantinha o percentual do PID 012F sem registrar a hora da última resposta válida. Se consultas subsequentes falhassem enquanto a sessão continuasse ativa, o cockpit podia calcular autonomia com evidência antiga.
+- O helper da autonomia verificava conexão/suporte/faixa, mas não a idade da amostra. A regra documental de não reutilizar dados vencidos não estava totalmente implementada para nível do tanque.
+
+### Correção aplicada
+- `src/trip/autoTripService.ts`: registra o timestamp em memória quando o PID 012F retorna um percentual válido; invalida percentual/timestamp após 30 s, limpa a evidência ao perder a resposta da ECU e impede a persistência de autonomia baseada em nível vencido.
+- `src/trip/autonomyPresentation.ts`: centraliza o limite de frescor de 30 s e rejeita timestamp ausente, inválido, futuro ou vencido.
+- `app/index.tsx`: fornece o timestamp da amostra atual ao cálculo da autonomia do cockpit.
+- `tests/autonomyPresentation.test.js`: adicionados testes para o limite exato de 30 s, amostra vencida (>30 s), timestamp ausente/inválido e timestamp futuro.
+- `tests/projectBaseline.test.js`, `docs/TEST_PLAN.md`, `docs/CONTRATO_ANTI_REGRESSAO.md` e `CHANGELOG.md`: o contrato de frescor passa a ser explícito e protegido.
+
+### Limites e validação
+- Nenhuma dependência foi adicionada; a API, o transporte Bluetooth/ELM327 e o protocolo OBD não foram alterados.
+- O timestamp é runtime-only e não transforma dados persistidos em dados atuais. A ausência de uma nova leitura após 30 s resulta em `N/D`/autonomia indisponível.
+- A CI ainda deve ser conferida no SHA consolidado depois da atualização da branch. APK/build não substitui teste físico com ELM327/ECU. A splash continua pendente de asset visual nativo confirmado.
+- Nenhum merge automático; modo oficina avançado e sincronização em nuvem/perfis seguem fora do escopo.
+
+
+## DB-096 · 2026-10-22 — Fechar outros caminhos de exibição da autonomia persistida
+
+### Achado complementar
+- Após DB-095, o cockpit principal rejeitava nível vencido, mas a API `autoTripService.getState()` ainda retornava `estimatedRangeKm` persistido antes de uma nova leitura 012F; telas como Laboratório e Dados podiam receber uma autonomia histórica como se fosse atual.
+- A tela `app/dados.tsx` mostrava diretamente `state.autonomy.estimatedRangeKm` sob o título “DADOS EM TEMPO REAL”, misturando um snapshot persistido com métricas atuais.
+
+### Correção aplicada
+- `getState()`, `subscribe()` e notificações internas passam a expor estado sanitizado: se a ECU não responde, não existe sessão válida ou a amostra de combustível tem mais de 30 s, o nível atual e a autonomia pública são indisponíveis.
+- O estado de autonomia do serviço começa em zero quando o app inicia ou abre uma nova sessão ECU; a média histórica continua disponível apenas como contexto de consumo, não como nível atual do tanque.
+- `app/dados.tsx` passa a usar `trip.estimatedRangeKm`, vindo do serviço com filtro de frescor, em vez de usar `state.autonomy.estimatedRangeKm` diretamente.
+- `tests/projectBaseline.test.js` impede regressão nesses caminhos de estado público e tela em tempo real.
+
+### Validação
+- Alteração adicional de revisão funcional; nenhuma dependência ou protocolo alterado.
+- A CI #2841 está associada ao commit anterior de frescor DB-095, não valida esta alteração complementar. A atualização desta branch poderá iniciar automaticamente uma nova execução; conferir o resultado correspondente ao SHA mais recente.
+- Teste físico ELM327/ECU e inspeção visual da splash continuam pendentes. Sem merge; modo oficina avançado e sincronização em nuvem/perfis permanecem fora do escopo.
+
+
+## DB-097 · 2026-10-22 — Rejeitar timestamps inválidos/futuros na telemetria ao vivo
+
+### Achado funcional
+- `getVehicleConditionSnapshot()` tratava qualquer timestamp que fosse no máximo 10 s no passado como atual, sem exigir idade não negativa. Uma amostra marcada no futuro poderia entrar no contexto de motor/veículo.
+- `getLivePidTrend()` também convertia idade negativa em zero, permitindo que timestamp futuro fosse mostrado como leitura recém-recebida, e `recordLivePidReading()` aceitava timestamps inválidos.
+
+### Correção aplicada
+- `src/obd/liveTelemetry.ts`: timestamps ISO inválidos/futuros são rejeitados na entrada; tendência e contexto operacional calculam idade usando o mesmo instante de referência e exigem idade entre 0 e 10 s para classificar o estado atual.
+- `tests/liveTelemetry.test.js`: adiciona regressão para timestamps futuros e inválidos, assegurando ausência de tendência/contexto fabricado.
+- `tests/projectBaseline.test.js`, `docs/TEST_PLAN.md`, `docs/CONTRATO_ANTI_REGRESSAO.md` e `CHANGELOG.md` foram atualizados para registrar a regra.
+
+### Validação
+- Mudança sem nova dependência e sem alterar consulta OBD, fila Bluetooth ou origem das amostras.
+- Testes automatizados e build Android da cabeça mais recente devem ser confirmados na CI automática; sem merge e sem declaração de teste físico ELM327/ECU.
+
+
+## DB-098 · 2026-10-22 — DTC: distinguir ausência de códigos de falha de leitura
+
+### Achado funcional
+- `readCurrentDtcs()` interpretava uma resposta sem códigos parseáveis como “NENHUM DTC RETORNADO” sem verificar `ElmCommandResult.status` nem confirmar um quadro positivo completo. `NO DATA`/timeout ou resposta malformada podia ser confundida com ausência de falhas.
+- `scanDtcServices()` classificava a string `NO DATA` como serviço disponível porque ela era aceita como sinônimo de “no codes”; isso também poderia marcar códigos previamente salvos como inativos sem evidência válida.
+
+### Correção aplicada
+- `src/obd/dtcParser.ts`: acrescentada validação de resposta por serviço, aceitando quadro positivo completo ou mensagem explícita de ausência de códigos; rejeita `NO DATA`, erro e quadro truncado.
+- `src/obd/dtcScanner.ts`: serviço só é marcado disponível com status `OK` e resposta válida.
+- `app/laboratorio.tsx`: leitura direta Mode 03 preserva RX/tempo para diagnóstico, mas interrompe a interpretação de códigos quando status/resposta não são válidos; erro não limpa nem inativa histórico.
+- `tests/dtcScanner.test.js`: cenários positivos, nenhum DTC explícito, `NO DATA`, ausência de cabeçalho e resposta truncada.
+- `tests/projectBaseline.test.js`, `docs/TEST_PLAN.md`, `docs/CONTRATO_ANTI_REGRESSAO.md` e `CHANGELOG.md` atualizados; RG-21 registra o contrato.
+
+### Limites e validação
+- Nenhuma dependência ou comando de limpeza de DTC foi adicionado. O lote só altera classificação da leitura.
+- A CI do SHA final precisa concluir `validate` e `android-build`. O teste físico de ECU/ELM327 continua pendente; sem merge.
+
+
+## DB-099 · 2026-10-22 — Pendências de splash screen e rodada de estabilização
+
+### Objetivo
+Consolidar as pendências da auditoria e iniciar a validação com critérios verificáveis, sem presumir que a CI de um commit anterior valide mudanças posteriores.
+
+### Estado verificado antes desta entrada
+- Branch consultada: `fix/cockpit-live-autonomy-20261022`.
+- `app.json` contém a configuração de splash com fundo `#07111f` e `resizeMode: contain`, mas essa configuração, sozinha, não comprova a presença do logotipo no APK.
+- O workflow `.github/workflows/ci.yml` é acionado em push para branches e executa `npm ci`, Expo Doctor, `gate:baseline`, `npm run validate` e build APK Android.
+- O SHA atual da branch e a presença de asset visual de splash ainda precisam ser confirmados nesta rodada; não declarar a CI anterior como validação do estado atual.
+
+### Pendências prioritárias
+1. Inspecionar assets existentes e confirmar se a splash visual está referenciada e empacotada no Android; validar cold start em aparelho.
+2. Confirmar HEAD da branch e vincular todos os resultados de teste ao mesmo SHA candidato.
+3. Executar CI completa: baseline antirregressão, TypeScript/suíte de testes, Expo Doctor, prebuild e APK standalone.
+4. Preservar Bluetooth Classic, fila serial compartilhada, distinção entre adaptador conectado e ECU respondendo, consulta manual de PID, cinco leituras válidas, separação entre dados reais e simulados, GPS, viagens, telemetria e histórico.
+5. Revisar navegação Diagnóstico/Dados/Viagem, legibilidade e orientação sem remover funcionalidades.
+6. Testar ELM327/ECU fisicamente e registrar esse resultado separadamente da CI.
+7. Atualizar changelog, plano de testes e contrato antirregressão conforme as alterações efetivamente verificadas.
+
+### Sequência de execução
+- Confirmar branch e SHA.
+- Inspecionar assets antes de criar, substituir ou renomear arquivos.
+- Corrigir a integração da splash sem alterar o fluxo de inicialização além do necessário.
+- Implementar alterações pequenas e rastreáveis; rodar validações no mesmo commit final.
+- Registrar falhas, evidências, artefatos e testes físicos pendentes.
+
+### Restrições e critério de conclusão
+- Não remover funcionalidades existentes para contornar falhas.
+- Não marcar testes como aprovados sem evidências.
+- Não fazer merge sem validação final e autorização explícita.
+- Modo oficina avançado e sincronização em nuvem/perfis permanecem fora do escopo.
+- Esta entrada permanece em andamento até a CI da cabeça final estar concluída e os testes físicos serem identificados como aprovados ou pendentes.
+
+
+## DB-100 · 2026-10-23 — Implementar asset visual e configuração explícita da splash nativa
+
+### Causa confirmada
+- A branch não continha pasta `assets/`; `app.json` configurava apenas a cor de fundo e o modo de escala, sem apontar para uma imagem.
+- A dependência `expo-splash-screen@~0.27.7` já existia, mas isso, isoladamente, não cria um logotipo para o launch screen.
+
+### Alterações preparadas neste commit
+- Adicionado `assets/splash.png`, PNG transparente de 512×512 com marca MERIVA SMART, contraste ciano/branco e fundo compatível com `#07111f`.
+- Configurado explicitamente o plugin `expo-splash-screen` com o asset versionado, largura de 280 dp, `resizeMode: contain` e o fundo escuro.
+- Mantida a configuração legada `expo.splash` usando o mesmo PNG.
+- Ampliado `tests/projectBaseline.test.js` para verificar o plugin, o caminho, a dimensão configurada e a assinatura real do PNG; a configuração não pode mais passar sem um asset existente.
+- Atualizados `CHANGELOG.md`, `README.md`, arquitetura, desenvolvimento, contribuição, plano de testes e contrato antirregressão para refletir a correção.
+
+### Preservação e validação
+- Não foram alterados layout de navegação, Bluetooth Classic, fila serial, consulta OBD, diagnóstico, GPS, viagens ou persistência.
+- O baseline está reforçado no código; o resultado real de `gate:baseline`, TypeScript, testes, Expo Doctor e build Android depende da CI do novo SHA e será registrado após consulta.
+- A aceitação visual ainda exige instalar o APK de release e conferir a inicialização fria em aparelho Android. CI verde, por si só, não comprova o resultado visual no dispositivo.
+- Nenhum merge executado; modo oficina avançado e sincronização em nuvem/perfis continuam fora do escopo.
+
+
+## DB-101 · 2026-10-23 — Splash operacional, conexão automática e identidade Smart OBD
+
+### Implementação
+- Adicionada a rota inicial `app/splash.tsx` com identidade Smart OBD Diagnostic e estados visíveis de conexão.
+- A splash tenta conectar automaticamente ao ELM327 entre dispositivos Bluetooth Classic pareados, valida uma resposta real da ECU e repete tentativas com backoff limitado até conectar ou a tela ser desmontada.
+- Após validar a ECU, consulta cada PID anunciado cinco vezes pela fila serial da sessão antes de navegar ao cockpit. Falhas de PID não são convertidas em valores numéricos nem interrompem o restante do aquecimento.
+- O cockpit agora usa o nome Smart OBD Diagnostic e os cinco destinos inferiores ficam em modo somente ícone, preservando rótulos de acessibilidade.
+- Nome, slug e scheme Expo atualizados para Smart OBD Diagnostic; o identificador Android permanece estável para não quebrar instalações existentes.
+- O gate antirregressão agora exige a splash operacional, as cinco consultas por PID e o início de navegação pelo fluxo de splash.
+
+### Referências técnicas aplicadas
+- Painel ao vivo, DTC, viagens, logs e instrumentos configuráveis são padrões comuns em Car Scanner ELM OBD2, Torque Pro e OBDLink.
+- A aquisição segue a lista de PIDs descoberta da ECU; PIDs padrão não são assumidos como universalmente suportados.
+- Ícones mantêm o sistema vetorial existente `@expo/vector-icons`; não foram copiados assets de terceiros com licenciamento incerto.
+
+### Limites e riscos controlados
+- A descoberta disponível é de dispositivos pareados Bluetooth Classic; Android não permite conectar arbitrariamente a dispositivos não pareados sem o fluxo de pareamento do sistema.
+- A splash exige permissões de Bluetooth/localização já tratadas pelo fluxo de permissões Android; nenhuma autenticação de conta foi adicionada.
+- O aquecimento executa cinco consultas por PID suportado e pode demorar conforme a quantidade de PIDs e a latência K-Line/ELM327.
+- Não alterados parser OBD, fila serial, regras de confiança dos dados, persistência de viagens ou cálculos de combustível.
+- A CI do novo SHA precisa validar TypeScript, baseline, suíte completa e APK Android. A aceitação final também exige teste físico com ELM327 e ECU reais.
+- Nenhum merge executado.
+
+
+## DB-102 · 2026-10-23 — Desbloquear o acesso ao cockpit quando a ECU está indisponível
+
+### Causa confirmada
+- A splash operacional repetia as tentativas indefinidamente sem uma ação visível para entrar no aplicativo; sem ELM327 ou ECU, ficavam inacessíveis o cockpit, as configurações e a conexão manual.
+- O fluxo de inicialização não respeitava `autoConnectObd=false`, embora essa preferência já existisse e fosse aplicada pelo cockpit.
+
+### Alterações
+- A splash agora pula a conexão automática e abre o cockpit quando `autoConnectObd=false`.
+- Após duas tentativas com falha, aparece uma ação acessível para abrir o cockpit sem declarar a ECU conectada; o estado de conexão continua sendo determinado pela validação OBD real.
+- Atualizados o gate antirregressão, o plano de aceitação, o README e o changelog para proteger e descrever o comportamento.
+- Não foram alterados Bluetooth Classic, a fila serial, o parser, as regras de amostras válidas, dados reais/simulados, GPS, viagens ou armazenamento.
+
+### Verificação pendente no momento do commit
+- Duas execuções de CI para o SHA anterior haviam concluído `validate` com sucesso e estavam montando o APK release; a mudança desta entrada gera um novo SHA e exige nova execução completa.
+- Não foi possível realizar inspeção física do APK ou validar um ELM327/veículo nesta etapa. Esses testes continuam pendentes e não serão tratados como aprovados por CI.
+- Nenhum merge executado.
+
+
+## DB-103 · 2026-10-23 — Permissões de localização deixam de bloquear diagnóstico OBD
+
+### Causa confirmada
+- `app/_layout.tsx` tratava a ausência de permissão de GPS/localização como falha fatal da preparação geral, exibindo alerta e deixando `permissionsChecked` falso. Isso podia bloquear a entrada estável no aplicativo mesmo quando a conexão Bluetooth tinha permissão.
+- O contrato anti-regressão já descrevia localização/clima como enriquecimento opcional e exigia que falhas de permissão não interrompessem o diagnóstico.
+
+### Alterações
+- Mantida a exigência de permissão Bluetooth para a conexão OBD real; a falta de localização agora gera aviso informativo, sem lançar exceção fatal no layout.
+- Adicionada verificação no teste de permissões e tornada a suíte `permissions.test.js` obrigatória no gate de baseline.
+- Atualizados plano de aceitação, README e changelog. GPS, clima e percurso continuam dependentes da disponibilidade/permissão correspondente; não passam a produzir dados simulados.
+
+### Validação pendente
+- A CI completa precisa ser observada no SHA final deste commit. Nenhum teste físico de GPS/ELM327 foi executado nesta rodada.
+- Nenhum merge executado.
+
+
+## DB-104 · 2026-10-23 — Prioridade de alerta térmico e localização contextual
+
+### Alterações
+- Quando a leitura OBD real e recente de temperatura do líquido chega a 110 °C ou mais, o indicador central permanece fixado na temperatura e não pode ser trocado para outro indicador até a temperatura voltar abaixo do limiar. O cartão térmico existente permanece visível.
+- O enriquecimento de clima agora conserva rótulos distintos `CIDADE:` e `BAIRRO:` quando ambos são fornecidos pelo geocodificador, e a faixa superior alterna entre eles a cada 10 s. A geolocalização segue condicionada à permissão de primeiro plano já concedida; nenhuma permissão nova ou rastreamento extra foi introduzido.
+- Ampliados os testes de geocodificação e de contrato do cockpit; atualizado o plano de aceitação, changelog e README.
+
+### Integridade e limites
+- Não foi alterada a cadência de consultas OBD, nem foram aumentadas consultas ao ELM327 para a rotação visual. O limiar térmico reutiliza o mesmo valor real/fresco já usado pelo cockpit.
+- A alternância só tem dois estados quando geocodificação retorna cidade e bairro distintos; se faltar bairro, a UI preserva o rótulo disponível. Sem permissão, mostra `CLIMA LOCAL` e não solicita localização.
+- CI para este SHA ainda precisa concluir baseline, TypeScript/testes, Expo Doctor e APK Android; não foi executado teste físico de ECU, GPS ou aparência.
+- Nenhum merge executado.
+
+
+## DB-105 · 2026-10-23 — Sincronizar contrato de teste com callback de prioridade térmica
+
+- Revisão do diff do cockpit identificou uma asserção textual antiga que esperava o callback do timer em expressão de uma linha; o código correto passou a usar um bloco para manter a prioridade térmica durante a anomalia.
+- A asserção foi ajustada para validar a estrutura real do timer e continuar exigindo que a rotação permaneça protegida por teste. Nenhum comportamento OBD ou limiar foi alterado.
+- A CI do SHA atualizado é a evidência decisiva; nenhum resultado de teste é antecipado nesta entrada.
+
+
+## DB-106 · 2026-10-23 — Manutenção preventiva e diário local de abastecimentos
+
+### Objetivo e escopo
+- Adicionada rota `app/manutencao.tsx` acessível pela página Mais Recursos, com layout responsivo e área segura.
+- A tela permite salvar a quilometragem atual, registrar data e km da última manutenção, marcar um serviço realizado hoje, alternar plano de uso normal/severo para óleo e registrar abastecimentos (gasolina ou etanol, litros e valor opcional).
+- Os lembretes usam as referências já versionadas no manual local do Meriva 2012. Se não houver dados suficientes, o status fica como `CADASTRAR`, nunca como “em dia”. Vencimento por quilometragem ou calendário sinaliza serviço vencido.
+- Abastecimentos são persistidos em `MERIVA_SMART/MANUTENCAO/registros.json`, limitados a 100 registros, sem serem convertidos em amostras OBD ou alimentar os cálculos existentes de consumo.
+
+### Testes e limites
+- Criado teste de regras puras para intervalos normal/severo, validação de data, limite de mês, vencimento por km/data e histórico ausente; ligado a `npm test` e ao gate de baseline.
+- A UI valida litros, custo, data, quilometragem e mantém valores manuais separados do autosave/telemetria OBD.
+- Referências do Meriva são lembretes e não se aplicam automaticamente a outro carro sem confirmação do plano. Não foi testado abastecimento físico nem instalado APK nesta etapa; a CI do SHA final ainda precisa concluir inclusive o build standalone.
+- Nenhum merge executado.

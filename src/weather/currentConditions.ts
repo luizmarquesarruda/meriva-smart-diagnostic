@@ -2,9 +2,20 @@ import * as Location from 'expo-location';
 
 export interface CurrentConditions {
   city: string | null;
+  /** Locality labels are only populated when foreground location was already authorized. */
+  locationLabels: string[];
   temperatureC: number | null;
   description: string;
   available: boolean;
+}
+
+function buildLocationLabels(city: string | null, district: string | null): string[] {
+  const labels: string[] = [];
+  if (city) labels.push(`CIDADE: ${city}`);
+  if (district && district.trim().toLocaleLowerCase('pt-BR') !== city?.trim().toLocaleLowerCase('pt-BR')) {
+    labels.push(`BAIRRO: ${district.trim()}`);
+  }
+  return labels;
 }
 
 export function describeWeatherCode(code: number | null | undefined): string {
@@ -27,10 +38,11 @@ export function describeWeatherCode(code: number | null | undefined): string {
  */
 export async function loadCurrentConditions(): Promise<CurrentConditions> {
   let city: string | null = null;
+  let locationLabels: string[] = [];
   try {
     const permission = await Location.getForegroundPermissionsAsync();
     if (permission.status !== Location.PermissionStatus.GRANTED) {
-      return { city: null, temperatureC: null, description: 'CLIMA OPCIONAL • LOCALIZAÇÃO NÃO AUTORIZADA', available: false };
+      return { city: null, locationLabels: [], temperatureC: null, description: 'CLIMA OPCIONAL • LOCALIZAÇÃO NÃO AUTORIZADA', available: false };
     }
 
     const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
@@ -40,7 +52,10 @@ export async function loadCurrentConditions(): Promise<CurrentConditions> {
         longitude: position.coords.longitude,
       });
       const address = addresses[0];
-      city = address?.city || address?.district || address?.subregion || address?.region || null;
+      // Some Android reverse-geocoders put a neighborhood in `district`.
+      // Prefer the municipality fallback and never promote a district/state to city.
+      city = address?.city || address?.subregion || null;
+      locationLabels = buildLocationLabels(city, address?.district || null);
     } catch {
       // Reverse geocoding is optional; weather may still be available.
     }
@@ -64,6 +79,7 @@ export async function loadCurrentConditions(): Promise<CurrentConditions> {
 
     return {
       city,
+      locationLabels,
       temperatureC,
       description: describeWeatherCode(weatherCode),
       available: true,
@@ -71,6 +87,7 @@ export async function loadCurrentConditions(): Promise<CurrentConditions> {
   } catch {
     return {
       city,
+      locationLabels,
       temperatureC: null,
       description: 'CLIMA INDISPONÍVEL • DIAGNÓSTICO OFFLINE',
       available: false,

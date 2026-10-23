@@ -10,7 +10,7 @@ const tripService = fs.readFileSync('src/trip/autoTripService.ts', 'utf8');
 const screenFiles = [
   'app/mais.tsx', 'app/dados.tsx', 'app/saude.tsx', 'app/veiculo.tsx',
   'app/viagens.tsx', 'app/aprendizado.tsx', 'app/bluetooth.tsx',
-  'app/armazenamento.tsx', 'app/configuracoes.tsx', 'app/laboratorio.tsx',
+  'app/armazenamento.tsx', 'app/configuracoes.tsx', 'app/laboratorio.tsx', 'app/manutencao.tsx',
 ];
 
 // Expo's default orientation means no orientation lock; do not introduce a native portrait/landscape lock.
@@ -27,7 +27,7 @@ assert.match(index, /content:\{flex:1,width:'100%'/);
 assert.match(index, /maxContentWidth/);
 assert.match(index, /const rpmReading/);
 assert.match(index, /coolantValue/);
-assert.match(index, /setInterval\(\s*\(\) => setActiveHeroMetric/, 'a rotação automática deve usar um timer de ciclo de vida');
+assert.match(index, /setInterval\(\s*\(\) => \{\s*setActiveHeroMetric/, 'a rotação automática deve usar um timer de ciclo de vida');
 assert.match(index, /10_000/);
 assert.doesNotMatch(index, /VELOCIDADE GPS/, 'GPS não deve ocupar um dos quatro indicadores rotativos principais');
 assert.match(index, /label: 'TEMPERATURA DO MOTOR'/);
@@ -50,12 +50,18 @@ assert.match(index, /item\.pid === '0142'/);
 assert.match(tripService, /telemetryCandidates = pollingPolicy\.polling\.rotatingTelemetryPids/);
 assert.match(index, /item\.pid === '0111'/);
 assert.match(index, /item\.pid === '010C'/);
-assert.match(index, /setActiveHeroMetric\(\(current\) => \(current \+ 1\) % Math\.max\(1, heroMetrics\.length\)\)/);
+assert.match(index, /priorityHeroMetricIndex != null[\s\S]*?: \(current \+ 1\) % Math\.max\(1, heroMetrics\.length\)/, 'a anomalia térmica deve prevalecer, mantendo a rotação quando normal');
+assert.match(index, /priorityHeroMetricIndex = coolantValue != null && coolantValue >= 110/);
+assert.match(index, /Indicador prioritário devido à temperatura alta/);
+assert.match(index, /locationLabelsKey/);
+assert.match(index, /setLocationLabelIndex/);
 assert.match(index, /activeHeroMetric \+ 1\}\/\{heroMetrics\.length\}/, 'contador visual deve usar o mesmo total dinâmico');
 assert.match(index, /href="[^"]*viagens"/);
 assert.match(index, /href="[^"]*dados"/);
-assert.match(index, /dashboardAction/);
-assert.match(index, /actionGridLandscape/);
+assert.match(index, /sessionCard/);
+assert.match(index, /bottomNavItem/);
+assert.match(index, /getCurrentAutonomyRangeKm/);
+assert.doesNotMatch(index, /actionGrid|dashboardAction/, 'navegação única não deve duplicar destinos');
 assert.match(index, /react-native-safe-area-context/);
 assert.match(layout, /SafeAreaProvider/);
 assert.match(midLayout, /size\.width > size\.height/);

@@ -105,3 +105,8 @@ O autosave escreve primeiro em arquivo temporário, valida o conteúdo e só ent
 A aplicação exige build nativo Android por usar Bluetooth Classic. Expo Go não é suficiente para validar o transporte.
 
 A disponibilidade dos PIDs, a qualidade do GPS e a comunicação com a ECU da Meriva dependem do hardware físico e devem ser confirmadas no veículo.
+
+
+## Inicialização e splash screen nativa
+
+A tela nativa de abertura usa `assets/splash.png`, PNG transparente versionado, explicitamente referenciado pelo plugin `expo-splash-screen` em `app.json` (largura de 280 dp, fundo `#07111f`, `resizeMode: contain`). A configuração `expo.splash` legada aponta para a mesma imagem. A splash nativa é distinta da primeira tela React Native. O gate de baseline valida caminho/configuração/assinatura PNG e a CI valida a compilação; a inicialização fria instalada em dispositivo ainda exige inspeção visual separada.
