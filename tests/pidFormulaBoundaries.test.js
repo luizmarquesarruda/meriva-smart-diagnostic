@@ -26,7 +26,14 @@ function loadTs(relativePath) {
 }
 
 function main() {
-  const { decodeFormula } = loadTs('src/obd/formulaEngine.ts');
+  const { applyFormula, decodeFormula } = loadTs('src/obd/formulaEngine.ts');
+
+  assert.throws(() => applyFormula('RPM', [0x1A, 256]), /Byte OBD inválido/,
+    'byte acima de FF deve ser rejeitado');
+  assert.throws(() => applyFormula('RPM', [0x1A, -1]), /Byte OBD inválido/,
+    'byte negativo deve ser rejeitado');
+  assert.throws(() => applyFormula('RPM', [0x1A, 1.5]), /Byte OBD inválido/,
+    'byte fracionário deve ser rejeitado');
 
   // SAE J1979 boundary values must not be rejected because of rounded ranges.
   const maxFuelTrim = decodeFormula('FUEL_TRIM', '0106', [0xFF]);
