@@ -42,9 +42,19 @@
           "backgroundColor": "#07111f",
           "barStyle": "light"
         }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "imageWidth": 280,
+          "resizeMode": "contain",
+          "backgroundColor": "#07111f"
+        }
       ]
     ],
     "splash": {
+      "image": "./assets/splash.png",
       "backgroundColor": "#07111f",
       "resizeMode": "contain"
     }

@@ -3288,3 +3288,23 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Não fazer merge sem validação final e autorização explícita.
 - Modo oficina avançado e sincronização em nuvem/perfis permanecem fora do escopo.
 - Esta entrada permanece em andamento até a CI da cabeça final estar concluída e os testes físicos serem identificados como aprovados ou pendentes.
+
+
+## DB-100 · 2026-10-23 — Implementar asset visual e configuração explícita da splash nativa
+
+### Causa confirmada
+- A branch não continha pasta `assets/`; `app.json` configurava apenas a cor de fundo e o modo de escala, sem apontar para uma imagem.
+- A dependência `expo-splash-screen@~0.27.7` já existia, mas isso, isoladamente, não cria um logotipo para o launch screen.
+
+### Alterações preparadas neste commit
+- Adicionado `assets/splash.png`, PNG transparente de 512×512 com marca MERIVA SMART, contraste ciano/branco e fundo compatível com `#07111f`.
+- Configurado explicitamente o plugin `expo-splash-screen` com o asset versionado, largura de 280 dp, `resizeMode: contain` e o fundo escuro.
+- Mantida a configuração legada `expo.splash` usando o mesmo PNG.
+- Ampliado `tests/projectBaseline.test.js` para verificar o plugin, o caminho, a dimensão configurada e a assinatura real do PNG; a configuração não pode mais passar sem um asset existente.
+- Atualizados `CHANGELOG.md`, `README.md`, arquitetura, desenvolvimento, contribuição, plano de testes e contrato antirregressão para refletir a correção.
+
+### Preservação e validação
+- Não foram alterados layout de navegação, Bluetooth Classic, fila serial, consulta OBD, diagnóstico, GPS, viagens ou persistência.
+- O baseline está reforçado no código; o resultado real de `gate:baseline`, TypeScript, testes, Expo Doctor e build Android depende da CI do novo SHA e será registrado após consulta.
+- A aceitação visual ainda exige instalar o APK de release e conferir a inicialização fria em aparelho Android. CI verde, por si só, não comprova o resultado visual no dispositivo.
+- Nenhum merge executado; modo oficina avançado e sincronização em nuvem/perfis continuam fora do escopo.

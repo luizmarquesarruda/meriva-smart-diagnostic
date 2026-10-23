@@ -13,10 +13,10 @@
 
 ### Splash screen e documentação
 - Restaurada a dependência `expo-splash-screen@~0.27.7` e alinhado o lockfile.
-- Restaurada a configuração `expo.splash` em `app.json` com fundo escuro `#07111f` e `resizeMode: contain`.
-- Adicionada proteção antirregressão para a dependência e configuração nativa da splash.
+- Adicionado `assets/splash.png` (PNG transparente 512×512) com a marca MERIVA SMART e configurado no plugin nativo `expo-splash-screen` com largura de 280 dp, fundo `#07111f` e `resizeMode: contain`.
+- Mantida a configuração `expo.splash` legada apontando para o mesmo asset e reforçado `tests/projectBaseline.test.js` para exigir o plugin, o caminho e a assinatura PNG real.
 - Atualizados README, arquitetura, desenvolvimento, contribuição, auditoria e contrato antirregressão para refletir o estado atual e diferenciar configuração de splash de confirmação de uma imagem/logotipo.
-- Validação automatizada e build Android pendentes até a CI do SHA final.
+- Validação de CI/build e inspeção visual de inicialização fria ainda pendentes para o SHA que contém o asset.
 
 ## 1.0.1
 

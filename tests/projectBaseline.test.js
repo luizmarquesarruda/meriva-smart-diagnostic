@@ -115,6 +115,18 @@ assert.equal(app.expo.splash?.backgroundColor, '#07111f',
   'a splash nativa deve manter o fundo escuro da identidade visual');
 assert.equal(app.expo.splash?.resizeMode, 'contain',
   'a imagem da splash, quando configurada, deve preservar a proporção');
+assert.equal(app.expo.splash?.image, './assets/splash.png',
+  'a splash nativa deve apontar para o asset visual versionado');
+const splashPlugin = app.expo.plugins.find((plugin) => Array.isArray(plugin) && plugin[0] === 'expo-splash-screen');
+assert.ok(splashPlugin, 'o plugin nativo expo-splash-screen precisa estar configurado explicitamente');
+assert.equal(splashPlugin[1]?.image, './assets/splash.png');
+assert.equal(splashPlugin[1]?.imageWidth, 280);
+assert.equal(splashPlugin[1]?.resizeMode, 'contain');
+assert.equal(splashPlugin[1]?.backgroundColor, '#07111f');
+const splashAsset = fs.readFileSync(path.join(ROOT, 'assets/splash.png'));
+assert.equal(splashAsset.subarray(0, 8).toString('hex'), '89504e470d0a1a0a',
+  'asset de splash precisa ser um PNG real, não somente um caminho configurado');
+assert.ok(splashAsset.length > 4000, 'asset de splash está vazio ou incompleto');
 
 // Current cockpit expectations that previously regressed.
 for (const label of [
