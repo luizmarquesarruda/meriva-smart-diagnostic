@@ -44,8 +44,8 @@ assert.match(index, /const heroMetrics: CockpitPidMetric\[\]/, 'lista de indicad
 assert.doesNotMatch(index, /SAÚDE DO VEÍCULO|ABRIR CENTRAL DE SAÚDE/, 'não duplicar a central de saúde na página inicial');
 assert.match(index, /danger:\{color:'#fb7185'\}/, 'alerta térmico deve mudar a cor sem encolher o valor principal');
 assert.match(index, /!connectionStatus\.ecuConnected \? 'N\/D'/, 'não declarar ausência de DTC como normal sem ECU conectada');
-assert.match(index, /POSIÇÃO DA BORBOLETA/);
-assert.match(index, /VOLTAGEM DO SISTEMA/);
+assert.ok(cockpitTelemetry.includes("'0111': 'POSIÇÃO DA BORBOLETA'"));
+assert.ok(cockpitTelemetry.includes("'0142': 'VOLTAGEM DO SISTEMA'"));
 assert.match(index, /heroSwitchHint/);
 assert.match(index, /item\.source !== 'REAL'/);
 for (const marker of ["'0142': 'VOLTAGEM DO SISTEMA'", "'0111': 'POSIÇÃO DA BORBOLETA'", "'010C': 'ROTAÇÃO DO MOTOR'"]) {
