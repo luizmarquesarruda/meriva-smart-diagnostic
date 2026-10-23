@@ -52,6 +52,11 @@ function main() {
   assert.strictEqual(maxInjectionTiming.value, 301.9921875);
   assert.strictEqual(maxInjectionTiming.valid, true, 'PID 015D maximum 16-bit value is valid');
 
+  const labScreen = require('fs').readFileSync(path.join(ROOT, 'app/laboratorio.tsx'), 'utf8');
+  assert.ok(labScreen.includes('INTEGRIDADE DO DECODIFICADOR'), 'laboratório deve exibir a seção de integridade das fórmulas');
+  assert.ok(labScreen.includes('decodeFormula(item.formula, item.pid, item.bytes)'), 'a tela deve reutilizar o motor oficial, sem duplicar fórmulas');
+  assert.ok(labScreen.includes('Não são leituras do veículo'), 'os casos de fronteira devem ser identificados como exemplos matemáticos');
+
   console.log('PID formula boundary tests passed');
 }
 
