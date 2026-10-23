@@ -273,7 +273,7 @@ export default function IndexScreen() {
           <View style={styles.topSection}>
             <View style={[styles.header, layout.landscape && styles.headerLandscape]}>
               <View style={styles.headerTitle}>
-                <Text style={styles.brand} numberOfLines={1}>MERIVA SMART</Text>
+                <Text style={styles.brand} numberOfLines={1}>SMART OBD DIAGNOSTIC</Text>
                 <Text style={styles.subtitle} numberOfLines={1}>COCKPIT DE DIAGNÓSTICO</Text>
               </View>
               <View style={styles.connectionPill}><View style={[styles.dot, connectionStatus.ecuConnected ? styles.dotOk : bluetoothError ? styles.dotDanger : styles.dotWarn]} /><Text style={styles.connectionText}>{connectionLabel}</Text></View>
@@ -372,11 +372,11 @@ export default function IndexScreen() {
           </Link>
           <View style={styles.layoutSpacer} />
           <View style={[styles.bottomNav, layout.landscape && styles.bottomNavLandscape]}>
-            <Link href="/" asChild><TouchableOpacity style={[styles.bottomNavItem, styles.bottomNavActive]} accessibilityRole="button" accessibilityLabel="Painel, tela atual" accessibilityHint="Exibe o cockpit do veículo" accessibilityState={{ selected: true }} activeOpacity={0.72}><AppIcon name="cockpit" size={22} color="#f8fafc" /><Text style={[styles.bottomNavText, styles.bottomNavTextActive]}>Painel</Text></TouchableOpacity></Link>
-            <Link href="/laboratorio" asChild><TouchableOpacity style={styles.bottomNavItem} accessibilityRole="button" accessibilityLabel="Diagnóstico" accessibilityHint="Abre os testes e as consultas OBD" activeOpacity={0.72}><AppIcon name="diagnostic" size={22} color={COLORS.accent} /><Text style={styles.bottomNavText}>Diagnóstico</Text></TouchableOpacity></Link>
-            <Link href="/dados" asChild><TouchableOpacity style={styles.bottomNavItem} accessibilityRole="button" accessibilityLabel="Dados" accessibilityHint="Abre gráficos e leituras de telemetria" activeOpacity={0.72}><AppIcon name="data" size={22} color={COLORS.accent} /><Text style={styles.bottomNavText}>Dados</Text></TouchableOpacity></Link>
-            <Link href="/viagens" asChild><TouchableOpacity style={styles.bottomNavItem} accessibilityRole="button" accessibilityLabel="Viagens" accessibilityHint="Abre o histórico de trajetos registrados" activeOpacity={0.72}><AppIcon name="trips" size={22} color={COLORS.accent} /><Text style={styles.bottomNavText}>Viagens</Text></TouchableOpacity></Link>
-            <Link href="/mais" asChild><TouchableOpacity style={styles.bottomNavItem} accessibilityRole="button" accessibilityLabel="Mais recursos" accessibilityHint="Abre os módulos adicionais do aplicativo" activeOpacity={0.72}><AppIcon name="more" size={22} color={COLORS.accent} /><Text style={styles.bottomNavText}>Mais</Text></TouchableOpacity></Link>
+            <Link href="/" asChild><TouchableOpacity style={[styles.bottomNavItem, styles.bottomNavActive]} accessibilityRole="button" accessibilityLabel="Painel, tela atual" accessibilityHint="Exibe o cockpit do veículo" accessibilityState={{ selected: true }} activeOpacity={0.72}><AppIcon name="cockpit" size={22} color="#f8fafc" /></TouchableOpacity></Link>
+            <Link href="/laboratorio" asChild><TouchableOpacity style={styles.bottomNavItem} accessibilityRole="button" accessibilityLabel="Diagnóstico" accessibilityHint="Abre os testes e as consultas OBD" activeOpacity={0.72}><AppIcon name="diagnostic" size={22} color={COLORS.accent} /></TouchableOpacity></Link>
+            <Link href="/dados" asChild><TouchableOpacity style={styles.bottomNavItem} accessibilityRole="button" accessibilityLabel="Dados" accessibilityHint="Abre gráficos e leituras de telemetria" activeOpacity={0.72}><AppIcon name="data" size={22} color={COLORS.accent} /></TouchableOpacity></Link>
+            <Link href="/viagens" asChild><TouchableOpacity style={styles.bottomNavItem} accessibilityRole="button" accessibilityLabel="Viagens" accessibilityHint="Abre o histórico de trajetos registrados" activeOpacity={0.72}><AppIcon name="trips" size={22} color={COLORS.accent} /></TouchableOpacity></Link>
+            <Link href="/mais" asChild><TouchableOpacity style={styles.bottomNavItem} accessibilityRole="button" accessibilityLabel="Mais recursos" accessibilityHint="Abre os módulos adicionais do aplicativo" activeOpacity={0.72}><AppIcon name="more" size={22} color={COLORS.accent} /></TouchableOpacity></Link>
           </View>
           <Text style={styles.footerStatus}>{!isHydrated ? 'CARREGANDO...' : saveStatus.obdSessionActive ? 'DIÁRIO DE BORDO • GRAVANDO' : 'DIÁRIO DE BORDO • AGUARDANDO ECU'}</Text>
         </View>

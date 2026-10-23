@@ -1,6 +1,6 @@
-# MERIVA SMART DIAGNOSTIC
+# SMART OBD DIAGNOSTIC
 
-Aplicativo Android offline de diagnóstico OBD-II para Chevrolet Meriva Maxx 1.4L 8V ECONO.FLEX.
+Aplicativo Android offline de diagnóstico OBD-II com marca Smart OBD Diagnostic. O perfil do veículo e as especificações específicas permanecem configuráveis conforme o carro conectado.
 
 As especificações físicas e de manutenção do veículo são mantidas em `src/database/merivaManual.ts`, com referência ao Manual do Proprietário Chevrolet Meriva 2012.
 
@@ -15,6 +15,8 @@ O GPS do celular inicia automaticamente ao abrir o aplicativo. Ele fornece veloc
 Bluetooth Classic exige build nativo Android. Expo Go não é o ambiente de validação do transporte.
 
 ### Inicialização e splash screen
+
+A rota operacional `app/splash.tsx` é a entrada inicial: tenta conectar ao ELM327 pareado, valida uma resposta real da ECU, consulta cinco vezes cada PID anunciado e só então abre o cockpit. Em caso de falha, continua tentando com espera progressiva.
 
 A splash nativa usa o asset transparente `assets/splash.png` e o plugin `expo-splash-screen` configurado explicitamente em `app.json` com fundo `#07111f`, largura de 280 dp e `resizeMode: contain`. A configuração legada `expo.splash` aponta para o mesmo PNG. O baseline confirma o caminho e a assinatura do arquivo; antes de publicar, ainda é obrigatório instalar um APK de release e validar a inicialização fria em Android real. O contrato é protegido por `tests/projectBaseline.test.js` e RG-18 em `docs/CONTRATO_ANTI_REGRESSAO.md`.
 

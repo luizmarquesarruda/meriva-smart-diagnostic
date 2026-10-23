@@ -116,12 +116,14 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
     <Stack
+      initialRouteName="splash"
       screenOptions={{
         headerStyle: { backgroundColor: COLORS.screen },
         headerTintColor: COLORS.accent,
         headerTitleStyle: { fontWeight: '900' },
       }}
     >
+      <Stack.Screen name="splash" options={{ headerShown: false, gestureEnabled: false }} />
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="bluetooth" options={{ headerShown: false }} />
       <Stack.Screen name="conectividade" options={{ headerShown: false }} />

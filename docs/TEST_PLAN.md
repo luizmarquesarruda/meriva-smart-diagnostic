@@ -45,3 +45,12 @@ A branch mantém o fluxo OBD/ELM327 existente e inclui testes automatizados para
 ## Não objetivos deste lote
 
 Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis, login, rastreamento remoto, mudanças no protocolo Bluetooth ou publicação/merge automático.
+
+
+## SPLASH-02 — Inicialização com ELM327/ECU
+- Iniciar sem adaptador: a splash permanece ativa, informa o estado e tenta novamente com backoff; não abre o cockpit como se estivesse pronta.
+- Conectar somente Bluetooth: não declarar ECU pronta sem resposta OBD válida.
+- ECU válida: executar cinco consultas por PID anunciado usando a fila serial compartilhada e abrir o cockpit após o aquecimento.
+- PID não suportado ou sem resposta: não fabricar valores, não marcar amostra como válida e continuar os testes restantes.
+- Rotação durante splash e cockpit: conteúdo deve permanecer dentro da área segura; validar em Android físico retrato/paisagem.
+- O gate automatizado verifica a estrutura do fluxo; a validação física confirma comportamento real de Bluetooth Classic e ELM327.

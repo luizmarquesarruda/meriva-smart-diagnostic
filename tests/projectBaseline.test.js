@@ -128,6 +128,16 @@ assert.equal(splashAsset.subarray(0, 8).toString('hex'), '89504e470d0a1a0a',
   'asset de splash precisa ser um PNG real, não somente um caminho configurado');
 assert.ok(splashAsset.length > 4000, 'asset de splash está vazio ou incompleto');
 
+// Startup splash must gate the cockpit on a real ECU response and warm up supported PIDs.
+const startup = read('app/splash.tsx');
+const rootLayout = read('app/_layout.tsx');
+assert.match(rootLayout, /initialRouteName="splash"/, 'o fluxo de inicialização deve começar na splash operacional');
+assert.match(startup, /while \(!cancelled\)/, 'a busca do ELM327 deve continuar até conectar ou desmontar a tela');
+assert.match(startup, /connection\.supportedPids/, 'a validação inicial deve usar apenas PIDs descobertos');
+assert.match(startup, /round < 5/, 'cada PID suportado deve receber pelo menos cinco consultas iniciais');
+assert.match(startup, /router\.replace\('\/'\)/, 'o painel só abre depois da etapa de conexão e aquecimento');
+assert.equal(app.expo.name, 'Smart OBD Diagnostic', 'a marca do app não deve ficar presa ao nome Meriva');
+
 // Current cockpit expectations that previously regressed.
 for (const label of [
   'TEMPERATURA DO MOTOR',

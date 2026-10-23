@@ -3308,3 +3308,27 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - O baseline está reforçado no código; o resultado real de `gate:baseline`, TypeScript, testes, Expo Doctor e build Android depende da CI do novo SHA e será registrado após consulta.
 - A aceitação visual ainda exige instalar o APK de release e conferir a inicialização fria em aparelho Android. CI verde, por si só, não comprova o resultado visual no dispositivo.
 - Nenhum merge executado; modo oficina avançado e sincronização em nuvem/perfis continuam fora do escopo.
+
+
+## DB-101 · 2026-10-23 — Splash operacional, conexão automática e identidade Smart OBD
+
+### Implementação
+- Adicionada a rota inicial `app/splash.tsx` com identidade Smart OBD Diagnostic e estados visíveis de conexão.
+- A splash tenta conectar automaticamente ao ELM327 entre dispositivos Bluetooth Classic pareados, valida uma resposta real da ECU e repete tentativas com backoff limitado até conectar ou a tela ser desmontada.
+- Após validar a ECU, consulta cada PID anunciado cinco vezes pela fila serial da sessão antes de navegar ao cockpit. Falhas de PID não são convertidas em valores numéricos nem interrompem o restante do aquecimento.
+- O cockpit agora usa o nome Smart OBD Diagnostic e os cinco destinos inferiores ficam em modo somente ícone, preservando rótulos de acessibilidade.
+- Nome, slug e scheme Expo atualizados para Smart OBD Diagnostic; o identificador Android permanece estável para não quebrar instalações existentes.
+- O gate antirregressão agora exige a splash operacional, as cinco consultas por PID e o início de navegação pelo fluxo de splash.
+
+### Referências técnicas aplicadas
+- Painel ao vivo, DTC, viagens, logs e instrumentos configuráveis são padrões comuns em Car Scanner ELM OBD2, Torque Pro e OBDLink.
+- A aquisição segue a lista de PIDs descoberta da ECU; PIDs padrão não são assumidos como universalmente suportados.
+- Ícones mantêm o sistema vetorial existente `@expo/vector-icons`; não foram copiados assets de terceiros com licenciamento incerto.
+
+### Limites e riscos controlados
+- A descoberta disponível é de dispositivos pareados Bluetooth Classic; Android não permite conectar arbitrariamente a dispositivos não pareados sem o fluxo de pareamento do sistema.
+- A splash exige permissões de Bluetooth/localização já tratadas pelo fluxo de permissões Android; nenhuma autenticação de conta foi adicionada.
+- O aquecimento executa cinco consultas por PID suportado e pode demorar conforme a quantidade de PIDs e a latência K-Line/ELM327.
+- Não alterados parser OBD, fila serial, regras de confiança dos dados, persistência de viagens ou cálculos de combustível.
+- A CI do novo SHA precisa validar TypeScript, baseline, suíte completa e APK Android. A aceitação final também exige teste físico com ELM327 e ECU reais.
+- Nenhum merge executado.
