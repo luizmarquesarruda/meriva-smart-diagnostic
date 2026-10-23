@@ -290,7 +290,7 @@ export default function IndexScreen() {
     <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
       <StatusBar style="light" backgroundColor={COLORS.screen} />
       <View style={[styles.content, { paddingHorizontal: layout.horizontalPadding }]}>
-        <View style={[styles.screenFrame, { maxWidth: layout.maxContentWidth }]}>
+        <View style={[styles.screenFrame, { maxWidth: layout.maxContentWidth }, layout.landscape && styles.screenFrameLandscape]}>
           <View style={styles.topSection}>
             <View style={[styles.header, layout.landscape && styles.headerLandscape]}>
               <View style={styles.headerTitle}>
@@ -376,13 +376,6 @@ export default function IndexScreen() {
               accessibilityHint="Abre o adaptador ELM327 e a validação da ECU"
               activeOpacity={0.78}
             >
-              <View style={[styles.sessionIconWrap, connectionStatus.ecuConnected && styles.sessionIconWrapOk]}>
-                <AppIcon
-                  name={connectionStatus.ecuConnected ? 'check' : bluetoothError ? 'warning' : 'bluetooth'}
-                  size={22}
-                  color={connectionStatus.ecuConnected ? COLORS.success : bluetoothError ? COLORS.danger : COLORS.accent}
-                />
-              </View>
               <View style={styles.sessionCopy}>
                 <Text style={styles.sessionTitle}>SESSÃO DE DIAGNÓSTICO</Text>
                 <Text style={styles.sessionHeadline} numberOfLines={2}>{connectionLabel}</Text>
@@ -393,11 +386,12 @@ export default function IndexScreen() {
           </Link>
           <View style={styles.layoutSpacer} />
           <View style={[styles.bottomNav, layout.landscape && styles.bottomNavLandscape]}>
-            <Link href="/" asChild><TouchableOpacity style={[styles.bottomNavItem, styles.bottomNavActive]} accessibilityRole="button" accessibilityLabel="Painel, tela atual" accessibilityHint="Exibe o cockpit do veículo" accessibilityState={{ selected: true }} activeOpacity={0.72}><AppIcon name="cockpit" size={22} color="#f8fafc" /></TouchableOpacity></Link>
-            <Link href="/laboratorio" asChild><TouchableOpacity style={styles.bottomNavItem} accessibilityRole="button" accessibilityLabel="Diagnóstico" accessibilityHint="Abre os testes e as consultas OBD" activeOpacity={0.72}><AppIcon name="diagnostic" size={22} color={COLORS.accent} /></TouchableOpacity></Link>
-            <Link href="/dados" asChild><TouchableOpacity style={styles.bottomNavItem} accessibilityRole="button" accessibilityLabel="Dados" accessibilityHint="Abre gráficos e leituras de telemetria" activeOpacity={0.72}><AppIcon name="data" size={22} color={COLORS.accent} /></TouchableOpacity></Link>
-            <Link href="/viagens" asChild><TouchableOpacity style={styles.bottomNavItem} accessibilityRole="button" accessibilityLabel="Viagens" accessibilityHint="Abre o histórico de trajetos registrados" activeOpacity={0.72}><AppIcon name="trips" size={22} color={COLORS.accent} /></TouchableOpacity></Link>
-            <Link href="/mais" asChild><TouchableOpacity style={styles.bottomNavItem} accessibilityRole="button" accessibilityLabel="Mais recursos" accessibilityHint="Abre os módulos adicionais do aplicativo" activeOpacity={0.72}><AppIcon name="more" size={22} color={COLORS.accent} /></TouchableOpacity></Link>
+            <Link href="/" asChild><TouchableOpacity style={[styles.bottomNavItem, layout.landscape && styles.bottomNavItemLandscape, styles.bottomNavActive]} accessibilityRole="button" accessibilityLabel="Painel, tela atual" accessibilityHint="Exibe o cockpit do veículo" accessibilityState={{ selected: true }} activeOpacity={0.72}><AppIcon name="cockpit" size={22} color="#f8fafc" /></TouchableOpacity></Link>
+            <Link href="/bluetooth" asChild><TouchableOpacity style={[styles.bottomNavItem, layout.landscape && styles.bottomNavItemLandscape]} accessibilityRole="button" accessibilityLabel={connectionStatus.ecuConnected ? "Bluetooth, ECU conectada" : bluetoothError ? "Bluetooth, falha de conexão" : "Bluetooth, abrir conexão"} accessibilityHint="Abre a conexão Bluetooth Classic e a validação do ELM327" accessibilityState={{ selected: false }} activeOpacity={0.72}><AppIcon name={connectionStatus.ecuConnected ? 'check' : bluetoothError ? 'warning' : 'bluetooth'} size={22} color={connectionStatus.ecuConnected ? COLORS.success : bluetoothError ? COLORS.danger : COLORS.accent} /></TouchableOpacity></Link>
+            <Link href="/laboratorio" asChild><TouchableOpacity style={[styles.bottomNavItem, layout.landscape && styles.bottomNavItemLandscape]} accessibilityRole="button" accessibilityLabel="Diagnóstico" accessibilityHint="Abre os testes e as consultas OBD" activeOpacity={0.72}><AppIcon name="diagnostic" size={22} color={COLORS.accent} /></TouchableOpacity></Link>
+            <Link href="/dados" asChild><TouchableOpacity style={[styles.bottomNavItem, layout.landscape && styles.bottomNavItemLandscape]} accessibilityRole="button" accessibilityLabel="Dados" accessibilityHint="Abre gráficos e leituras de telemetria" activeOpacity={0.72}><AppIcon name="data" size={22} color={COLORS.accent} /></TouchableOpacity></Link>
+            <Link href="/viagens" asChild><TouchableOpacity style={[styles.bottomNavItem, layout.landscape && styles.bottomNavItemLandscape]} accessibilityRole="button" accessibilityLabel="Viagens" accessibilityHint="Abre o histórico de trajetos registrados" activeOpacity={0.72}><AppIcon name="trips" size={22} color={COLORS.accent} /></TouchableOpacity></Link>
+            <Link href="/mais" asChild><TouchableOpacity style={[styles.bottomNavItem, layout.landscape && styles.bottomNavItemLandscape]} accessibilityRole="button" accessibilityLabel="Mais recursos" accessibilityHint="Abre os módulos adicionais do aplicativo" activeOpacity={0.72}><AppIcon name="more" size={22} color={COLORS.accent} /></TouchableOpacity></Link>
           </View>
           <Text style={styles.footerStatus}>{!isHydrated ? 'CARREGANDO...' : saveStatus.obdSessionActive ? 'DIÁRIO DE BORDO • GRAVANDO' : 'DIÁRIO DE BORDO • AGUARDANDO ECU'}</Text>
         </View>
@@ -409,7 +403,7 @@ export default function IndexScreen() {
 function CockpitMetric({ label, value }: { label: string; value: string }) { return <View style={styles.cockpitMetric}><Text style={styles.metricLabel}>{label}</Text><Text style={styles.metricValue}>{value}</Text></View>; }
 
 const styles = StyleSheet.create({
-  container:{flex:1,backgroundColor:COLORS.screen},content:{flex:1,width:'100%',paddingVertical:6,paddingBottom:6},screenFrame:{width:'100%',flex:1,alignSelf:'center'},topSection:{marginBottom:8},layoutSpacer:{flexGrow:1,minHeight:8},
+  container:{flex:1,backgroundColor:COLORS.screen},content:{flex:1,width:'100%',paddingVertical:6,paddingBottom:6},screenFrame:{width:'100%',flex:1,alignSelf:'center'},screenFrameLandscape:{paddingLeft:56},topSection:{marginBottom:8},layoutSpacer:{flexGrow:1,minHeight:8},
   infoStrip:{minHeight:88,flexDirection:'row',alignItems:'center',gap:9,paddingHorizontal:10,paddingVertical:8,backgroundColor:COLORS.surface,borderRadius:13,borderWidth:1,borderColor:COLORS.border},infoStripLandscape:{minHeight:60,paddingHorizontal:8,paddingVertical:5,gap:7},
   weatherContent:{flex:1,minWidth:0,flexDirection:'row',alignItems:'center',gap:9},weatherIconWrap:{width:42,height:42,borderRadius:12,alignItems:'center',justifyContent:'center',backgroundColor:COLORS.surfaceInset,borderWidth:1,borderColor:COLORS.border},weatherIconWrapLandscape:{width:34,height:34,borderRadius:10},weatherDetails:{flex:1,minWidth:0,gap:2},weatherCity:{color:COLORS.textStrong,fontSize:15,lineHeight:18,fontWeight:'900',letterSpacing:.35},weatherCityLandscape:{fontSize:13,lineHeight:15},weatherMeta:{flexDirection:'row',alignItems:'center',gap:8,flexWrap:'wrap'},weatherTemperature:{color:COLORS.textStrong,fontSize:24,lineHeight:28,fontWeight:'900',fontVariant:['tabular-nums']},weatherTemperatureLandscape:{fontSize:20,lineHeight:23},weatherDescription:{flexShrink:1,color:COLORS.textMuted,fontSize:12,lineHeight:16,fontWeight:'800'},weatherDescriptionLandscape:{fontSize:10,lineHeight:13},
   
@@ -424,5 +418,5 @@ const styles = StyleSheet.create({
   connectionCard:{backgroundColor:'#0e1b2d',borderRadius:15,borderWidth:1,borderColor:'#28415f',padding:14,marginBottom:10},chain:{flexDirection:'row',alignItems:'center',marginTop:10},chainStep:{flex:1,alignItems:'center'},chainCircle:{width:30,height:30,borderRadius:15,alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:'#3b516b',backgroundColor:'#0a1727'},chainCircleOk:{borderColor:'#3b8c5a',backgroundColor:'#10261b'},chainCircleText:{color:'#7185a1',fontSize:11,fontWeight:'900'},chainCircleTextOk:{color:'#4ade80'},chainLabel:{color:'#9fb4cf',fontSize:8,fontWeight:'900',marginTop:4},chainArrow:{color:'#526a86',fontSize:24,paddingHorizontal:4},
   
   statusGrid:{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',marginBottom:2},statusGridLandscape:{flexWrap:'nowrap',gap:8},statusCardLandscape:{width:'auto',flex:1},statusCard:{width:'48%',minWidth:0,backgroundColor:'#0e1b2d',borderRadius:12,borderWidth:1,borderColor:'#233a56',padding:11,marginBottom:8},moreButton:{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:'#0e1b2d',borderRadius:14,borderWidth:1,borderColor:'#28415f',padding:13,marginTop:2},moreIcon:{color:'#7db3ff',fontSize:24,fontWeight:'900'},moreBody:{flex:1,minWidth:0},moreTitle:{color:'#e5edf7',fontSize:11,fontWeight:'900'},moreHint:{color:'#7185a1',fontSize:8,marginTop:3,flexShrink:1},moreArrow:{color:'#7db3ff',fontSize:24},
-  error:{color:'#fb7185',fontWeight:'800',fontSize:10,marginTop:8},bottomNav:{flexDirection:'row',backgroundColor:'#0e1b2d',borderRadius:14,borderWidth:1,borderColor:'#28415f',marginTop:0,padding:4,gap:2},bottomNavLandscape:{marginTop:2,paddingVertical:2},bottomNavItem:{flex:1,minWidth:0,alignItems:'center',justifyContent:'center',minHeight:58,borderRadius:10,paddingHorizontal:1,paddingVertical:4,gap:3},bottomNavActive:{backgroundColor:'#152a45'},bottomNavText:{color:'#7db3ff',fontSize:8,fontWeight:'900',textAlign:'center'},bottomNavTextActive:{color:'#f8fafc'},footerStatus:{color:'#60748f',textAlign:'center',fontSize:9,marginTop:9},
+  error:{color:'#fb7185',fontWeight:'800',fontSize:10,marginTop:8},bottomNav:{flexDirection:'row',backgroundColor:'#0e1b2d',borderRadius:14,borderWidth:1,borderColor:'#28415f',marginTop:0,padding:4,gap:2},bottomNavLandscape:{position:'absolute',left:0,top:0,bottom:34,width:50,flexDirection:'column',marginTop:0,paddingHorizontal:3,paddingVertical:4,gap:3},bottomNavItem:{flex:1,minWidth:0,alignItems:'center',justifyContent:'center',minHeight:58,borderRadius:10,paddingHorizontal:1,paddingVertical:4,gap:3},bottomNavItemLandscape:{flex:0,minHeight:42,paddingVertical:2},bottomNavActive:{backgroundColor:'#152a45'},bottomNavText:{color:'#7db3ff',fontSize:8,fontWeight:'900',textAlign:'center'},bottomNavTextActive:{color:'#f8fafc'},footerStatus:{color:'#60748f',textAlign:'center',fontSize:9,marginTop:9},
 });
