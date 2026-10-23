@@ -27,7 +27,7 @@ assert.match(index, /content:\{flex:1,width:'100%'/);
 assert.match(index, /maxContentWidth/);
 assert.match(index, /const rpmReading/);
 assert.match(index, /coolantValue/);
-assert.match(index, /setInterval\(\s*\(\) => setActiveHeroMetric/, 'a rotação automática deve usar um timer de ciclo de vida');
+assert.match(index, /setInterval\(\s*\(\) => \{\s*setActiveHeroMetric/, 'a rotação automática deve usar um timer de ciclo de vida');
 assert.match(index, /10_000/);
 assert.doesNotMatch(index, /VELOCIDADE GPS/, 'GPS não deve ocupar um dos quatro indicadores rotativos principais');
 assert.match(index, /label: 'TEMPERATURA DO MOTOR'/);

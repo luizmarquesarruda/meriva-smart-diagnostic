@@ -3380,3 +3380,10 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - A alternância só tem dois estados quando geocodificação retorna cidade e bairro distintos; se faltar bairro, a UI preserva o rótulo disponível. Sem permissão, mostra `CLIMA LOCAL` e não solicita localização.
 - CI para este SHA ainda precisa concluir baseline, TypeScript/testes, Expo Doctor e APK Android; não foi executado teste físico de ECU, GPS ou aparência.
 - Nenhum merge executado.
+
+
+## DB-105 · 2026-10-23 — Sincronizar contrato de teste com callback de prioridade térmica
+
+- Revisão do diff do cockpit identificou uma asserção textual antiga que esperava o callback do timer em expressão de uma linha; o código correto passou a usar um bloco para manter a prioridade térmica durante a anomalia.
+- A asserção foi ajustada para validar a estrutura real do timer e continuar exigindo que a rotação permaneça protegida por teste. Nenhum comportamento OBD ou limiar foi alterado.
+- A CI do SHA atualizado é a evidência decisiva; nenhum resultado de teste é antecipado nesta entrada.
