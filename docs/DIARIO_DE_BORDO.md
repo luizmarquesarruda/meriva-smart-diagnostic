@@ -1,5 +1,15 @@
 # Diário de Bordo - Meriva Smart Diagnostic
 
+## Atualização de auditoria — 2026-10-23
+
+- Repositório: `luizmarquesarruda/meriva-smart-diagnostic`; trabalho isolado na branch `fix/pid-formula-boundaries-20261023`, PR #80 aberta contra `main`. Não mesclar antes da CI completa.
+- Problema confirmado: limites arredondados rejeitavam os máximos matemáticos das fórmulas dos PIDs 0106, 0107, 012D e 015D. Para 0106/0107/012D, o máximo de A=255 é 99,21875%; para 015D, A=B=255 produz 301,9921875°.
+- Correção: `src/knowledge/ranges.json` atualizado para esses limites exatos. `src/obd/formulaEngine.ts` agora rejeita bytes consumidos que não sejam inteiros no intervalo 0–255.
+- Regressão: criado `tests/pidFormulaBoundaries.test.js`, incluído no script `npm test`; cobre os limites e entradas inválidas. Documentação técnica e changelog atualizados.
+- CI do SHA final ainda não tem resultado confirmado neste registro; consultar a PR #80 antes de aceitar. Teste físico com ELM327/ECU continua pendente. A captura de 2026-10-23 mostra falha Bluetooth/ECU desconectada, portanto não prova defeito de fórmula nem suporte dos PIDs candidatos.
+- Escopo desta rodada: auditoria direcionada de catálogo, fórmulas, parser e faixas; não afirmar que todos os módulos do repositório foram executados ou validados fisicamente.
+
+
 ## ESTADO VIGENTE E REGRAS ANTI-REGRESSÃO — 2026-10-21
 
 > **Esta seção é a referência operacional atual.** O restante deste arquivo contém registros históricos: falhas, decisões e “próximos passos” antigos descrevem o estado da época e não devem ser tratados como tarefas ainda abertas sem nova verificação. Quando dois registros divergirem, prevalecem este contrato e a entrada cronologicamente mais recente que tenha evidência verificável.
