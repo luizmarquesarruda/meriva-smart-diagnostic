@@ -84,6 +84,18 @@ function main() {
   assert.strictEqual(o2Pid.bytes, 2, 'PID 0114 deve carregar os dois bytes da resposta padronizada');
   assert.strictEqual(o2Pid.formulaId, 'O2_VOLTS');
 
+  const equivalenceRatioPid = pids.pids.find((item) => item.pid === '0144');
+  assert.ok(equivalenceRatioPid, 'PID 0144 deve estar no catálogo OBD padrão');
+  assert.strictEqual(equivalenceRatioPid.bytes, 2, 'PID 0144 exige dois bytes');
+  assert.strictEqual(equivalenceRatioPid.unit, 'ratio', 'PID 0144 é adimensional');
+  assert.strictEqual(equivalenceRatioPid.formulaId, 'U16_DIV_32768');
+  assert.strictEqual(ranges.ranges['0144'].min, 0);
+  assert.strictEqual(ranges.ranges['0144'].max, 65535 / 32768);
+  assert.strictEqual(formulas.formulas.U16_DIV_32768.operation, 'u16_div');
+  assert.strictEqual(formulas.formulas.U16_DIV_32768.divisor, 32768);
+  assert.ok(confirmed.next_confirmation_targets.includes('0144'),
+    'PID 0144 permanece alvo de confirmação, não PID confirmado da Meriva');
+
   const pidList = [...pidIds];
   const rangeIds = Object.keys(ranges.ranges).map((id) => id.toUpperCase());
   const polling = pollingPolicy.polling;

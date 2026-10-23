@@ -3438,3 +3438,11 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - **Protocolo e permissões:** recuperação ELM (ATZ/ATSP/prova ECU/ATDP) é serializada; GPS segue opcional para iniciar OBD; o plugin limita permissões Bluetooth legadas no Android até API 30 sem limitar as permissões modernas.
 - **Proteções:** testes adversariais de promessa pendente, falha de fechamento, bloqueio entre instâncias e ordem de protocolo ficam ligados a `npm test` e ao gate anti-regressão. Os requisitos Bluetooth recebem IDs RG-22 a RG-31, sem duplicar RGs existentes.
 - **Validação:** conferir `gate:baseline`, `validate` e `android-build` no SHA final desta atualização. A CI não substitui teste físico com ELM327/ECU; esse teste e a inspeção no aparelho permanecem pendentes.
+
+### DB-109 — 2026-10-23 — Auditoria do PID 0144 e razão de equivalência
+
+- **Falha encontrada:** a fórmula `U16_DIV_32768` existia no catálogo, mas não estava associada a nenhum PID. A sequência de PIDs pulava de `0143` para `0145`, deixando de interpretar o PID padrão `0144` (Commanded Equivalence Ratio).
+- **Correção:** adicionado o PID `0144` ao catálogo com dois bytes, fórmula `U16_DIV_32768`, unidade adimensional e faixa matemática de `0` a `65535/32768`. A unidade foi declarada em `units.json`.
+- **Testes:** adicionados casos para `80 00 → 1,0` e `FF FF → 1,999969482421875`, além de contrato para garantir o mapeamento PID–fórmula–faixa.
+- **Limites:** o registro permanece em `next_confirmation_targets`; não foi marcado como confirmado para a Meriva nem incluído no polling automático/painel de 20 métricas.
+- **Documentação:** relatório técnico e banco de fórmulas atualizados. A CI deverá validar o commit final; confirmação física com ELM327/ECU continua pendente.

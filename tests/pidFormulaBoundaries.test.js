@@ -52,6 +52,14 @@ function main() {
   assert.strictEqual(maxInjectionTiming.value, 301.9921875);
   assert.strictEqual(maxInjectionTiming.valid, true, 'PID 015D maximum 16-bit value is valid');
 
+  const stoichiometricEquivalenceRatio = decodeFormula('U16_DIV_32768', '0144', [0x80, 0x00]);
+  assert.strictEqual(stoichiometricEquivalenceRatio.value, 1);
+  assert.strictEqual(stoichiometricEquivalenceRatio.valid, true, 'PID 0144 must accept equivalence ratio 1.0');
+
+  const maxEquivalenceRatio = decodeFormula('U16_DIV_32768', '0144', [0xFF, 0xFF]);
+  assert.strictEqual(maxEquivalenceRatio.value, 65535 / 32768);
+  assert.strictEqual(maxEquivalenceRatio.valid, true, 'PID 0144 maximum 16-bit value must remain within range');
+
   const labScreen = require('fs').readFileSync(path.join(ROOT, 'app/laboratorio.tsx'), 'utf8');
   assert.ok(labScreen.includes('INTEGRIDADE DO DECODIFICADOR'), 'laboratório deve exibir a seção de integridade das fórmulas');
   assert.ok(labScreen.includes('decodeFormula(item.formula, item.pid, item.bytes)'), 'a tela deve reutilizar o motor oficial, sem duplicar fórmulas');
