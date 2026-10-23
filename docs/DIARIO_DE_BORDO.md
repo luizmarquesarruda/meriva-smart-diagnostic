@@ -3438,3 +3438,11 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - **Protocolo e permissões:** recuperação ELM (ATZ/ATSP/prova ECU/ATDP) é serializada; GPS segue opcional para iniciar OBD; o plugin limita permissões Bluetooth legadas no Android até API 30 sem limitar as permissões modernas.
 - **Proteções:** testes adversariais de promessa pendente, falha de fechamento, bloqueio entre instâncias e ordem de protocolo ficam ligados a `npm test` e ao gate anti-regressão. Os requisitos Bluetooth recebem IDs RG-22 a RG-31, sem duplicar RGs existentes.
 - **Validação:** conferir `gate:baseline`, `validate` e `android-build` no SHA final desta atualização. A CI não substitui teste físico com ELM327/ECU; esse teste e a inspeção no aparelho permanecem pendentes.
+
+
+## DB-109 — 2026-10-23 — Navegação responsiva e atalho Bluetooth fixo
+- Requisito: na paisagem, exibir os botões principais como ícones em coluna à esquerda; em retrato, manter a barra inferior. O Bluetooth deve ser acessível diretamente pela barra, sem ícone flutuante no cartão de sessão.
+- Alterações: adicionado o atalho Bluetooth na navegação principal com indicação visual derivada do estado real da ECU/falha; removido o ícone Bluetooth do cartão de sessão, preservando os detalhes textuais e o destino existente. Na paisagem, os seis ícones passam a usar uma coluna compacta à esquerda e o conteúdo reserva espaço.
+- Acessibilidade: rótulos e dicas continuam disponíveis para leitores de tela, embora não apareçam como texto visual.
+- Validação: adicionadas asserções para navegação, estado Bluetooth e orientação. CI, build Android e inspeção visual do APK ainda precisam ser executados no SHA final; teste físico com ELM327/ECU permanece separado.
+- Nenhum merge realizado.
