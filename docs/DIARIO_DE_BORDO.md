@@ -3056,3 +3056,19 @@ O usuário pediu que a interface acompanhe a rotação física do aparelho, mant
 
 ### Próximo passo
 Aguardar a CI da PR #76 após as últimas alterações; corrigir qualquer falha real de instalação, TypeScript, testes ou build antes de considerar a alteração pronta.
+
+
+## DB-090 · 2026-10-23 — Melhoria de autonomia no cockpit
+
+### Solicitação
+Dar destaque à autonomia na página inicial, mantendo a tela responsiva e evitando dados apresentados como telemetria atual quando estão desatualizados.
+
+### Alterações
+- Autonomia estimada integra o ciclo dos indicadores principais sem remover temperatura, tensão do sistema, posição da borboleta ou RPM.
+- O cartão secundário apresenta o nível atual do combustível, evitando repetir autonomia em dois locais.
+- A autonomia só é apresentada como atual quando a ECU responde, há nível válido pelo PID 012F e existe consumo válido; caso contrário, a interface mostra N/D e o motivo.
+- O teste de layout e o contrato anti-regressão protegem os cinco indicadores e a regra de validade da autonomia.
+
+### Validação
+- A CI foi solicitada pelo usuário após a preparação das alterações.
+- Registrar o resultado real dos testes e do build após a execução; não presumir sucesso antes do término.

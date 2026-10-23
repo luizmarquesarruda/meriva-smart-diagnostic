@@ -206,8 +206,27 @@ export default function IndexScreen() {
   const voltageValue = voltageReading?.value ?? null;
   const throttleReading = freshRealReading((item) => item.pid === '0111' || /throttle|borboleta/i.test(item.name));
   const throttleValue = throttleReading?.value ?? null;
+  const fuelLevelReading = freshRealReading((item) => item.pid === '012F' || /fuel.*level|nível.*combustível/i.test(item.name));
+  const rawFuelLevelPercent = fuelLevelReading?.value ?? null;
+  const liveFuelLevelPercent = rawFuelLevelPercent != null && rawFuelLevelPercent >= 0 && rawFuelLevelPercent <= 100
+    ? rawFuelLevelPercent
+    : null;
+  // A autonomia só é mostrada como atual quando a ECU está respondendo,
+  // o PID 012F forneceu nível de combustível válido e existe consumo válido.
+  // Isso evita exibir uma estimativa persistida como se fosse telemetria atual.
+  const autonomyConsumptionKml = tripState.consumptionKml != null && tripState.consumptionKml > 0
+    ? tripState.consumptionKml
+    : tripState.averageConsumptionKml;
+  const liveAutonomyKm = connectionStatus.ecuConnected
+    && liveFuelLevelPercent != null
+    && autonomyConsumptionKml > 0
+    && Number.isFinite(tripState.estimatedRangeKm)
+    && tripState.estimatedRangeKm > 0
+    ? tripState.estimatedRangeKm
+    : null;
   const heroMetrics = [
     { label: 'TEMPERATURA DO MOTOR', value: coolantValue != null ? String(Math.round(coolantValue)) : 'N/D', unit: coolantValue != null ? '°C' : '', hint: coolantValue != null ? 'LEITURA REAL • PID 0105' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0105' : 'ECU DESCONECTADA', tone: coolantValue != null && coolantValue >= 115 ? 'danger' : coolantValue != null && coolantValue >= 110 ? 'warning' : 'normal' },
+    { label: 'AUTONOMIA ESTIMADA', value: liveAutonomyKm != null ? String(Math.round(liveAutonomyKm)) : 'N/D', unit: liveAutonomyKm != null ? 'km' : '', hint: liveAutonomyKm != null ? 'ESTIMADA • NÍVEL OBD REAL ' + Math.round(liveFuelLevelPercent ?? 0) + '%' : !connectionStatus.ecuConnected ? 'ECU DESCONECTADA' : liveFuelLevelPercent == null ? 'AGUARDANDO PID 012F' : 'CONSUMO VÁLIDO INSUFICIENTE', tone: liveAutonomyKm != null && tripState.fuelReserve === true ? 'warning' : 'normal' },
     { label: 'VOLTAGEM DO SISTEMA', value: voltageValue != null ? voltageValue.toFixed(1) : 'N/D', unit: voltageValue != null ? 'V' : '', hint: voltageValue != null ? 'LEITURA REAL • PID 0142' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0142' : 'ECU DESCONECTADA', tone: 'normal' },
     { label: 'POSIÇÃO DA BORBOLETA', value: throttleValue != null ? throttleValue.toFixed(1) : 'N/D', unit: throttleValue != null ? '%' : '', hint: throttleValue != null ? 'LEITURA REAL • PID 0111' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0111' : 'ECU DESCONECTADA', tone: 'normal' },
     { label: 'ROTAÇÃO DO MOTOR', value: rpmValue != null ? String(Math.round(rpmValue)) : 'N/D', unit: rpmValue != null ? 'RPM' : '', hint: rpmValue != null ? 'LEITURA REAL • PID 010C' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 010C' : 'ECU DESCONECTADA', tone: 'normal' },
@@ -295,7 +314,7 @@ export default function IndexScreen() {
             </TouchableOpacity>
             <View style={[styles.metricRow, layout.landscape && styles.metricRowLandscape]}>
               <CockpitMetric label={consumptionLabel} value={availableConsumptionKml != null ? availableConsumptionKml.toFixed(1) + ' km/L' : 'N/D'} />
-              <CockpitMetric label="AUTONOMIA" value={getAutoSaveState().autonomy.estimatedRangeKm > 0 ? getAutoSaveState().autonomy.estimatedRangeKm.toFixed(0) + ' km' : 'N/D'} />
+              <CockpitMetric label="NÍVEL DO TANQUE" value={liveFuelLevelPercent != null ? Math.round(liveFuelLevelPercent) + '%' : 'N/D'} />
               <CockpitMetric label="FALHAS ATIVAS" value={!connectionStatus.ecuConnected ? 'N/D' : dtcCount > 0 ? String(dtcCount) + ' DTC' : 'SEM DTC'} />
             </View>
             <View style={[styles.coolantCard, layout.landscape && styles.coolantCardLandscape]}>
