@@ -28,6 +28,11 @@ const catalogByPid = new Map<string, PidCatalogEntry>(
 
 const labels: Record<string, string> = {
   '0105': 'TEMPERATURA DO MOTOR',
+  '010A': 'PRESSÃO DE COMBUSTÍVEL',
+  '010E': 'AVANÇO DE IGNIÇÃO',
+  '012C': 'EGR COMANDADA',
+  '012D': 'ERRO DA EGR',
+  '012E': 'PURGA EVAP COMANDADA',
   '0142': 'VOLTAGEM DO SISTEMA',
   '0111': 'POSIÇÃO DA BORBOLETA',
   '010C': 'ROTAÇÃO DO MOTOR',

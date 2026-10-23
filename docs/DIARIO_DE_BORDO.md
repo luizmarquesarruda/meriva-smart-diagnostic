@@ -3438,3 +3438,40 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - **Protocolo e permissões:** recuperação ELM (ATZ/ATSP/prova ECU/ATDP) é serializada; GPS segue opcional para iniciar OBD; o plugin limita permissões Bluetooth legadas no Android até API 30 sem limitar as permissões modernas.
 - **Proteções:** testes adversariais de promessa pendente, falha de fechamento, bloqueio entre instâncias e ordem de protocolo ficam ligados a `npm test` e ao gate anti-regressão. Os requisitos Bluetooth recebem IDs RG-22 a RG-31, sem duplicar RGs existentes.
 - **Validação:** conferir `gate:baseline`, `validate` e `android-build` no SHA final desta atualização. A CI não substitui teste físico com ELM327/ECU; esse teste e a inspeção no aparelho permanecem pendentes.
+
+
+## DB-109 — 2026-10-23 — Navegação responsiva e atalho Bluetooth fixo
+- Requisito: na paisagem, exibir os botões principais como ícones em coluna à esquerda; em retrato, manter a barra inferior. O Bluetooth deve ser acessível diretamente pela barra, sem ícone flutuante no cartão de sessão.
+- Alterações: adicionado o atalho Bluetooth na navegação principal com indicação visual derivada do estado real da ECU/falha; removido o ícone Bluetooth do cartão de sessão, preservando os detalhes textuais e o destino existente. Na paisagem, os seis ícones passam a usar uma coluna compacta à esquerda e o conteúdo reserva espaço.
+- Acessibilidade: rótulos e dicas continuam disponíveis para leitores de tela, embora não apareçam como texto visual.
+- Validação: adicionadas asserções para navegação, estado Bluetooth e orientação. CI, build Android e inspeção visual do APK ainda precisam ser executados no SHA final; teste físico com ELM327/ECU permanece separado.
+- Nenhum merge realizado.
+
+
+## DB-110 — 2026-10-23 — Expansão do cockpit para 25 PIDs e correção do contrato de orientação
+
+### Evidência da CI
+- A CI do SHA `da9cbc248514e032fefc6931a11c61f10308d740`, run [#40037769234](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40037769234), terminou com falha em `npm run validate`.
+- `npm ci`, Expo Doctor (17/17 checks) e gate anti-regressão passaram. TypeScript também passou; a suíte de testes parou em `tests/orientationLayout.test.js:35`, cuja expectativa ainda exigia 20 indicadores, embora a política do cockpit já estivesse ampliada para 25.
+- A falha era uma asserção de teste desatualizada, não evidência de falha no decodificador OBD nem no polling.
+
+### Correção aplicada
+- Atualizado `tests/orientationLayout.test.js` para exigir 25 indicadores, 25 PIDs candidatos e 25 entradas únicas, alinhando o contrato de orientação à expansão documentada.
+- Commit da correção: `e1423186f25855cb5035aa810b6d1ecfd213f27f` (`test(cockpit): align orientation contract with 25 PIDs`).
+- A alteração foi enviada à branch `feat/landscape-icon-sidebar-20261023`, associada à PR #82. Não houve merge.
+
+### Validação pendente
+- A CI do novo SHA deve executar novamente a suíte completa e o build Android. Não considerar a falha anterior resolvida até consultar o resultado dessa nova execução.
+- Permanecem pendentes inspeção visual em Android e teste físico com ELM327/ECU; a disponibilidade dos cinco PIDs adicionados depende do suporte e das respostas reais do veículo.
+
+
+## DB-111 — 2026-10-23 — Sincronizar auditoria JSON com cockpit de 25 PIDs
+
+### Evidência da CI
+- Na CI do SHA `e5ab95269b4de3448cea1e616ca65522e60886ff`, `npm run validate` voltou a falhar em `tests/knowledgeJson.test.js:119`: as asserções do contrato JSON ainda exigiam 20 PIDs, enquanto `polling_policy.json` configura 25.
+- A política contém 25 PIDs candidatos distintos; os testes de telemetria e orientação já exigem esse mesmo total. A correção é atualizar o teste de contrato, não reduzir a configuração do cockpit.
+
+### Correção aplicada
+- Atualizadas em `tests/knowledgeJson.test.js` as expectativas de `maxDisplayedPids` e `cockpit.pidOrder.length` para 25, preservando as verificações de unicidade e existência no catálogo.
+- A alteração será validada pela nova CI disparada pelo commit resultante desta correção; nenhum resultado de execução é presumido.
+- Permanecem pendentes a inspeção visual no Android e o teste físico com ELM327/ECU. Nenhum merge realizado.

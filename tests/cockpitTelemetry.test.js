@@ -12,13 +12,17 @@ const helper = read('src/obd/cockpitTelemetry.ts');
 
 const configuredPids = policy.cockpit.pidOrder.map((pid) => String(pid).toUpperCase());
 const catalogPids = new Set(catalog.pids.map((item) => String(item.pid).toUpperCase()));
-assert.equal(policy.cockpit.maxDisplayedPids, 20);
-assert.equal(configuredPids.length, 20, 'o cockpit deve configurar vinte PIDs candidatos');
-assert.equal(new Set(configuredPids).size, 20, 'PIDs do cockpit não podem se repetir');
+assert.equal(policy.cockpit.maxDisplayedPids, 25);
+assert.equal(configuredPids.length, 25, 'o cockpit deve configurar vinte e cinco PIDs candidatos');
+assert.equal(new Set(configuredPids).size, 25, 'PIDs do cockpit não podem se repetir');
 for (const pid of configuredPids) assert.ok(catalogPids.has(pid), 'PID ausente do catálogo: ' + pid);
 assert.ok(policy.cockpit.displayFreshAfterMs > 0);
 assert.ok(policy.cockpit.displayStaleAfterMs > policy.cockpit.displayFreshAfterMs);
-assert.ok(policy.polling.rotatingTelemetryPids.length >= 12, 'rotação auxiliar não pode ficar limitada a quatro PIDs');
+assert.ok(policy.polling.rotatingTelemetryPids.length >= 20, 'rotação auxiliar deve incluir os novos PIDs sem ficar limitada a quatro');
+for (const pid of ['010A', '010E', '012C', '012D', '012E']) {
+  assert.ok(configuredPids.includes(pid), 'PID adicional ausente do cockpit: ' + pid);
+  assert.ok(policy.polling.rotatingTelemetryPids.includes(pid), 'PID adicional ausente da rotação: ' + pid);
+}
 for (const pid of ['010C', '010D', '012F', '0152', '015E']) {
   assert.ok(!policy.polling.rotatingTelemetryPids.includes(pid), 'caminho dedicado não deve ser polled de novo: ' + pid);
 }

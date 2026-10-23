@@ -13,7 +13,7 @@ assert.match(laboratory, /getSharedObdConnection\(\) \? 'ECU CONECTADA \/ DIAGN�
 assert.match(laboratory, /disabledButton/, 'botão de desconexão precisa ter estilo visual explícito quando desabilitado');
 assert.match(laboratory, /ELM327 DESCONECTADO/, 'botão desabilitado deve comunicar que não existe sessão ativa');
 assert.match(laboratory, /paddingBottom: 132/, 'conteúdo rolável deve reservar espaço para a navegação inferior fixa');
-for (const route of ['/dados', '/laboratorio', '/mais', '/viagens', '/conectividade']) assert.match(index, new RegExp(route.replace('/', '\\/')), 'cockpit deve expor a rota ' + route);
+for (const route of ['/dados', '/laboratorio', '/mais', '/viagens', '/conectividade', '/bluetooth']) assert.match(index, new RegExp(route.replace('/', '\\/')), 'cockpit deve expor a rota ' + route);
 assert.doesNotMatch(index, /href="\/saude"/, 'saúde detalhada não deve duplicar o cartão na página inicial');
 assert.match(more, /'\/saude'/, 'a central de saúde deve continuar acessível em Mais Recursos');
 for (const file of ['app/dados.tsx', 'app/saude.tsx', 'app/mais.tsx', 'app/veiculo.tsx', 'app/viagens.tsx', 'app/aprendizado.tsx']) {
@@ -90,3 +90,9 @@ assert.match(laboratory, /setSupportedPids\(existing\.supportedPids\)/);
 assert.match(laboratory, /PID inválido/);
 assert.match(laboratory, /setPid\(value\)/);
 console.log('Cockpit e telas secundárias: OK');
+assert.match(index, /href="\/bluetooth" asChild><TouchableOpacity style=\{\[styles\.bottomNavItem, layout\.landscape && styles\.bottomNavItemLandscape\]\} accessibilityRole="button" accessibilityLabel=\{connectionStatus\.ecuConnected \? "Bluetooth, ECU conectada"/, 'Bluetooth deve estar fixo na navegação com estado real da ECU');
+assert.match(index, /accessibilityHint="Abre a conexão Bluetooth Classic e a validação do ELM327"/, 'botão Bluetooth deve explicar sua ação a leitores de tela');
+assert.doesNotMatch(index, /styles\.sessionIconWrap/, 'cockpit não deve manter o ícone Bluetooth flutuante no cartão de sessão');
+assert.match(index, /bottomNavLandscape:\{position:'absolute',left:0,top:0,bottom:34,width:50,flexDirection:'column'/, 'em paisagem a navegação deve ser uma coluna à esquerda');
+assert.match(index, /screenFrameLandscape:\{paddingLeft:56/, 'cockpit deve reservar espaço para a navegação lateral');
+assert.match(index, /bottomNavItemLandscape:\{flex:0,minHeight:42/, 'ícones da barra lateral devem caber em paisagem sem perder alvo de toque razoável');
