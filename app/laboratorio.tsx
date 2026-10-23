@@ -18,6 +18,7 @@ import { getMidLayout } from '../src/ui/midLayout';
 import { COLORS, SCREEN_TITLE_STYLE } from '../src/ui/theme';
 import { scanDtcServices, readFreezeFrame, type DtcServiceScan } from '../src/obd/dtcScanner';
 import { getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
+import { decodeFormula } from '../src/obd/formulaEngine';
 
 import { DtcRecord, nextDtcOccurrences, readDtcs, recordDtc } from '../src/database/dtcManager';
 import { recordDiscoveredPids } from '../src/database/pidBank';
@@ -494,6 +495,12 @@ export default function LaboratorioScreen() {
   const parsed = rx ? parsePidResponse(queriedPid, rx) : null;
   const knownSupported = supportedPids.filter((value) => KNOWN_PIDS.includes(value));
   const identifiedSupportedPids = supportedPids.map((value) => ({ pid: value, definition: getPidDefinition(value) }));
+  const formulaBoundaryChecks = [
+    { pid: '0106', name: 'Ajuste de combustível — curto prazo', formula: 'FUEL_TRIM', bytes: [0xFF], expected: '99,21875%' },
+    { pid: '0107', name: 'Ajuste de combustível — longo prazo', formula: 'FUEL_TRIM', bytes: [0xFF], expected: '99,21875%' },
+    { pid: '012D', name: 'Erro do EGR', formula: 'FUEL_TRIM', bytes: [0xFF], expected: '99,21875%' },
+    { pid: '015D', name: 'Tempo de injeção', formula: 'INJECTION_TIMING', bytes: [0xFF, 0xFF], expected: '301,9921875°' },
+  ].map((item) => ({ ...item, result: decodeFormula(item.formula, item.pid, item.bytes) }));
   const diagnostic: DiagnosticResult = runLocalDiagnostic({
     observations: getAutoSaveState().lastReadings.map((reading): PidObservation => ({
       pid: reading.pid,
@@ -603,7 +610,30 @@ export default function LaboratorioScreen() {
           ))}
         </View>
       ) : null}
-      <TouchableOpacity style={styles.secondaryButton} onPress={readAllDtcs} disabled={!storageReady || dtcScanning || (mode === 'REAL' && !sessionRef.current)}>
+      <View style={styles.formulaPanel}>
+        <View style={styles.formulaHeader}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.dtcTitle}>INTEGRIDADE DO DECODIFICADOR</Text>
+            <Text style={styles.formulaTitle}>Validação de fórmulas PID</Text>
+          </View>
+          <Text style={styles.formulaBadge}>4 LIMITES CORRIGIDOS</Text>
+        </View>
+        <Text style={styles.formulaDescription}>Casos matemáticos com bytes-limite 0xFF. Não são leituras do veículo e não comprovam suporte da ECU.</Text>
+        {formulaBoundaryChecks.map((item) => (
+          <View key={item.pid} style={styles.formulaRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.pidName}>PID {item.pid}</Text>
+              <Text style={styles.pidDescription}>{item.name}</Text>
+            </View>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={styles.formulaValue}>{item.expected}</Text>
+              <Text style={item.result.valid ? styles.dtcAvailable : styles.dtcUnavailable}>{item.result.valid ? 'LIMITE VÁLIDO' : 'FALHA'}</Text>
+            </View>
+          </View>
+        ))}
+        <Text style={styles.formulaDescription}>Bytes inválidos e respostas incompletas são rejeitados. A conexão física Bluetooth/ECU é verificada separadamente.</Text>
+      </View>
+            <TouchableOpacity style={styles.secondaryButton} onPress={readAllDtcs} disabled={!storageReady || dtcScanning || (mode === 'REAL' && !sessionRef.current)}>
         <Text style={styles.secondaryButtonText}>{dtcScanning ? 'VARRENDO DTC 03/07/0A...' : 'VARREDURA COMPLETA DE DTC • 03 / 07 / 0A'}</Text>
       </TouchableOpacity>
       {!!dtcScan.length ? (
@@ -761,6 +791,13 @@ const styles = StyleSheet.create({
   pidName: { color: COLORS.text, fontWeight: '900', fontSize: 11 },
   pidDescription: { color: COLORS.textSubtle, fontSize: 9, lineHeight: 14, marginTop: 2 },
   pidMeta: { color: COLORS.primary, fontSize: 8, fontWeight: '800', marginTop: 3 },
+  formulaPanel: { backgroundColor: COLORS.surface, borderRadius: 10, padding: 13, marginBottom: 10, borderWidth: 1, borderColor: '#315579' },
+  formulaHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 7 },
+  formulaTitle: { color: COLORS.textStrong, fontSize: 16, fontWeight: '900', marginTop: 3 },
+  formulaBadge: { color: COLORS.success, fontSize: 8, fontWeight: '900', borderWidth: 1, borderColor: '#246747', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 5, overflow: 'hidden' },
+  formulaDescription: { color: COLORS.textSubtle, fontSize: 10, lineHeight: 15, marginTop: 5, marginBottom: 7 },
+  formulaRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderTopWidth: 1, borderTopColor: COLORS.border, paddingVertical: 9 },
+  formulaValue: { color: COLORS.text, fontSize: 11, fontWeight: '900', marginBottom: 3 },
   panel: { backgroundColor: COLORS.surface, borderRadius: 14, padding: 16, marginTop: 8 },
   label: { color: COLORS.accent, marginTop: 8 },
   value: { color: '#f8fafc', fontSize: 16, marginTop: 3 },
