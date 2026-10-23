@@ -29,6 +29,12 @@ function requireBytes(data: number[], count: number): void {
   if (data.length < count) {
     throw new Error(`Fórmula exige ${count} byte(s), recebido ${data.length}`);
   }
+  for (let index = 0; index < count; index += 1) {
+    const byte = data[index];
+    if (!Number.isInteger(byte) || byte < 0 || byte > 255) {
+      throw new Error(`Byte OBD inválido na posição ${index}: ${String(byte)}`);
+    }
+  }
 }
 
 export function applyFormula(formulaId: string, data: number[]): number {
