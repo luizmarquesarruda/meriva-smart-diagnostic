@@ -614,7 +614,7 @@ export default function LaboratorioScreen() {
         <View style={styles.formulaHeader}>
           <View style={{ flex: 1 }}>
             <Text style={styles.dtcTitle}>INTEGRIDADE DO DECODIFICADOR</Text>
-            <Text style={styles.formulaTitle}>Validação de fórmulas PID</Text>
+            <Text style={styles.formulaTitle} accessibilityRole="header">Validação de fórmulas PID</Text>
           </View>
           <Text style={styles.formulaBadge}>4 LIMITES CORRIGIDOS</Text>
         </View>
