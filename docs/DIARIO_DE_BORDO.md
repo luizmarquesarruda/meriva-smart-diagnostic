@@ -3446,3 +3446,20 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Acessibilidade: rótulos e dicas continuam disponíveis para leitores de tela, embora não apareçam como texto visual.
 - Validação: adicionadas asserções para navegação, estado Bluetooth e orientação. CI, build Android e inspeção visual do APK ainda precisam ser executados no SHA final; teste físico com ELM327/ECU permanece separado.
 - Nenhum merge realizado.
+
+
+## DB-110 — 2026-10-23 — Expansão do cockpit para 25 PIDs e correção do contrato de orientação
+
+### Evidência da CI
+- A CI do SHA `da9cbc248514e032fefc6931a11c61f10308d740`, run [#40037769234](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40037769234), terminou com falha em `npm run validate`.
+- `npm ci`, Expo Doctor (17/17 checks) e gate anti-regressão passaram. TypeScript também passou; a suíte de testes parou em `tests/orientationLayout.test.js:35`, cuja expectativa ainda exigia 20 indicadores, embora a política do cockpit já estivesse ampliada para 25.
+- A falha era uma asserção de teste desatualizada, não evidência de falha no decodificador OBD nem no polling.
+
+### Correção aplicada
+- Atualizado `tests/orientationLayout.test.js` para exigir 25 indicadores, 25 PIDs candidatos e 25 entradas únicas, alinhando o contrato de orientação à expansão documentada.
+- Commit da correção: `e1423186f25855cb5035aa810b6d1ecfd213f27f` (`test(cockpit): align orientation contract with 25 PIDs`).
+- A alteração foi enviada à branch `feat/landscape-icon-sidebar-20261023`, associada à PR #82. Não houve merge.
+
+### Validação pendente
+- A CI do novo SHA deve executar novamente a suíte completa e o build Android. Não considerar a falha anterior resolvida até consultar o resultado dessa nova execução.
+- Permanecem pendentes inspeção visual em Android e teste físico com ELM327/ECU; a disponibilidade dos cinco PIDs adicionados depende do suporte e das respostas reais do veículo.
