@@ -32,9 +32,9 @@ assert.match(index, /coolantValue/);
 assert.match(index, /setInterval\(\s*\(\) => \{\s*setActiveHeroMetric/, 'a rotação automática deve usar um timer de ciclo de vida');
 assert.match(index, /10_000/);
 assert.doesNotMatch(index, /VELOCIDADE GPS/, 'GPS não deve ocupar um dos indicadores OBD rotativos principais');
-assert.equal(pollingPolicy.cockpit.maxDisplayedPids, 20, 'o cockpit deve suportar até vinte indicadores');
-assert.equal(pollingPolicy.cockpit.pidOrder.length, 20, 'a política deve configurar vinte PIDs candidatos');
-assert.equal(new Set(pollingPolicy.cockpit.pidOrder).size, 20, 'a lista de PIDs do cockpit não deve conter duplicados');
+assert.equal(pollingPolicy.cockpit.maxDisplayedPids, 25, 'o cockpit deve suportar até vinte e cinco indicadores');
+assert.equal(pollingPolicy.cockpit.pidOrder.length, 25, 'a política deve configurar vinte e cinco PIDs candidatos');
+assert.equal(new Set(pollingPolicy.cockpit.pidOrder).size, 25, 'a lista de PIDs do cockpit não deve conter duplicados');
 for (const label of ['TEMPERATURA DO MOTOR', 'VOLTAGEM DO SISTEMA', 'POSIÇÃO DA BORBOLETA', 'ROTAÇÃO DO MOTOR']) {
   assert.ok(cockpitTelemetry.includes("'" + label + "'"), 'definição do cockpit ausente: ' + label);
 }
