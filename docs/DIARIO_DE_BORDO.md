@@ -1,5 +1,14 @@
 # Diário de Bordo - Meriva Smart Diagnostic
 
+## Portabilidade Floot → aplicativo Expo — 2026-10-23
+
+- A seção de validação matemática criada no protótipo Floot foi portada para a tela nativa `app/laboratorio.tsx`; não foi copiada literalmente a implementação React web, pois o repositório usa Expo/React Native.
+- A interface nativa reutiliza `src/obd/formulaEngine.ts` como fonte única para as fórmulas e apresenta os quatro casos de fronteira dos PIDs 0106, 0107, 012D e 015D.
+- A tela deixa explícito que os valores de fronteira são casos matemáticos com bytes 0xFF, não leituras reais e não evidência de suporte da ECU.
+- Adicionado teste de regressão para verificar a presença da seção e o reuso do motor oficial. A CI precisa executar novamente sobre o novo HEAD; nenhuma compilação nem teste físico deve ser presumido nesta anotação.
+- Branch de trabalho: `fix/pid-formula-boundaries-20261023`; mudança enviada para a PR #80, ainda sem merge.
+
+
 ## Atualização de auditoria — 2026-10-23
 
 - Repositório: `luizmarquesarruda/meriva-smart-diagnostic`; trabalho isolado na branch `fix/pid-formula-boundaries-20261023`, PR #80 aberta contra `main`. Não mesclar antes da CI completa.
