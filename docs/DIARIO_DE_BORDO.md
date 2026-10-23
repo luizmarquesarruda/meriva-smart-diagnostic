@@ -3366,3 +3366,17 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 ### Validação pendente
 - A CI completa precisa ser observada no SHA final deste commit. Nenhum teste físico de GPS/ELM327 foi executado nesta rodada.
 - Nenhum merge executado.
+
+
+## DB-104 · 2026-10-23 — Prioridade de alerta térmico e localização contextual
+
+### Alterações
+- Quando a leitura OBD real e recente de temperatura do líquido chega a 110 °C ou mais, o indicador central permanece fixado na temperatura e não pode ser trocado para outro indicador até a temperatura voltar abaixo do limiar. O cartão térmico existente permanece visível.
+- O enriquecimento de clima agora conserva rótulos distintos `CIDADE:` e `BAIRRO:` quando ambos são fornecidos pelo geocodificador, e a faixa superior alterna entre eles a cada 10 s. A geolocalização segue condicionada à permissão de primeiro plano já concedida; nenhuma permissão nova ou rastreamento extra foi introduzido.
+- Ampliados os testes de geocodificação e de contrato do cockpit; atualizado o plano de aceitação, changelog e README.
+
+### Integridade e limites
+- Não foi alterada a cadência de consultas OBD, nem foram aumentadas consultas ao ELM327 para a rotação visual. O limiar térmico reutiliza o mesmo valor real/fresco já usado pelo cockpit.
+- A alternância só tem dois estados quando geocodificação retorna cidade e bairro distintos; se faltar bairro, a UI preserva o rótulo disponível. Sem permissão, mostra `CLIMA LOCAL` e não solicita localização.
+- CI para este SHA ainda precisa concluir baseline, TypeScript/testes, Expo Doctor e APK Android; não foi executado teste físico de ECU, GPS ou aparência.
+- Nenhum merge executado.

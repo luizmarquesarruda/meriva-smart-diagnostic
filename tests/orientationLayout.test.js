@@ -51,6 +51,10 @@ assert.match(tripService, /telemetryCandidates = pollingPolicy\.polling\.rotatin
 assert.match(index, /item\.pid === '0111'/);
 assert.match(index, /item\.pid === '010C'/);
 assert.match(index, /setActiveHeroMetric\(\(current\) => \(current \+ 1\) % Math\.max\(1, heroMetrics\.length\)\)/);
+assert.match(index, /priorityHeroMetricIndex = coolantValue != null && coolantValue >= 110/);
+assert.match(index, /Indicador prioritário devido à temperatura alta/);
+assert.match(index, /locationLabelsKey/);
+assert.match(index, /setLocationLabelIndex/);
 assert.match(index, /activeHeroMetric \+ 1\}\/\{heroMetrics\.length\}/, 'contador visual deve usar o mesmo total dinâmico');
 assert.match(index, /href="[^"]*viagens"/);
 assert.match(index, /href="[^"]*dados"/);

@@ -56,3 +56,10 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 - PID não suportado ou sem resposta: não fabricar valores, não marcar amostra como válida e continuar os testes restantes.
 - Rotação durante splash e cockpit: conteúdo deve permanecer dentro da área segura; validar em Android físico retrato/paisagem.
 - O gate automatizado verifica a estrutura do fluxo; a validação física confirma comportamento real de Bluetooth Classic e ELM327.
+
+
+## UI-LOC-01 — Alternância de cidade/bairro e prioridade térmica
+- Com permissão de localização previamente concedida e geocodificação contendo cidade e bairro, a faixa de clima alterna os rótulos a cada 10 s; se o bairro não existir, manter cidade/estado disponíveis sem inventar bairro.
+- Sem permissão de localização, não solicitar permissão apenas para clima e exibir indicação opcional indisponível.
+- Ao atingir temperatura de arrefecimento de 110 °C, manter o indicador térmico principal priorizado durante o alerta; restaurar a rotação habitual abaixo do limiar.
+- Confirmar por testes de origem/geocodificação e gate de layout; a apresentação física permanece parte da validação em Android.

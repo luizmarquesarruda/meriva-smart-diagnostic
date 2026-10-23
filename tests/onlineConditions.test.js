@@ -73,6 +73,8 @@ Module._load = originalLoad;
   global.fetch = originalFetch;
   assert.strictEqual(online.available, true);
   assert.strictEqual(online.city, 'Sorocaba', 'município deve ter prioridade sobre o bairro');
+  assert.ok(online.locationLabels.includes('CIDADE: Sorocaba'));
+  assert.ok(online.locationLabels.includes('BAIRRO: Júlio de Mesquita Filho'), 'cidade e bairro devem ficar disponíveis para alternância da UI');
   assert.strictEqual(online.temperatureC, 27.4);
   assert.strictEqual(online.description, 'PARCIALMENTE NUBLADO');
 
@@ -81,6 +83,7 @@ Module._load = originalLoad;
   const districtOnly = await loadCurrentConditions();
   global.fetch = originalFetch;
   assert.strictEqual(districtOnly.city, null, 'bairro/estado não devem ser apresentados como cidade');
+  assert.ok(districtOnly.locationLabels.includes('BAIRRO: Júlio de Mesquita Filho'), 'bairro pode aparecer explicitamente quando a cidade não está disponível');
 
   console.log('onlineConditions.test.js: PASS');
 })().catch((error) => {

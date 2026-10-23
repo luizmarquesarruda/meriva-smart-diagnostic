@@ -33,8 +33,20 @@ export default function IndexScreen() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [dtcCount, setDtcCount] = useState(0);
   const [activeHeroMetric, setActiveHeroMetric] = useState(0);
-  const [conditions, setConditions] = useState<CurrentConditions>({ city: null, temperatureC: null, description: 'CLIMA OPCIONAL', available: false });
+  const [conditions, setConditions] = useState<CurrentConditions>({ city: null, locationLabels: [], temperatureC: null, description: 'CLIMA OPCIONAL', available: false });
+  const [locationLabelIndex, setLocationLabelIndex] = useState(0);
   const layout = useMidLayout();
+
+  const locationLabels = conditions.locationLabels.length > 0 ? conditions.locationLabels : ['CLIMA LOCAL'];
+  const locationLabelsKey = locationLabels.join('|');
+
+  useEffect(() => {
+    setLocationLabelIndex(0);
+    const timer = setInterval(() => {
+      setLocationLabelIndex((current) => (current + 1) % Math.max(1, locationLabels.length));
+    }, 10_000);
+    return () => clearInterval(timer);
+  }, [locationLabelsKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -226,13 +238,17 @@ export default function IndexScreen() {
 
   // The displayed metric count is the single source of truth for both timed
   // and touch-driven rotation; adding/removing metrics cannot desynchronize it.
+  // Uma anomalia térmica tem prioridade sobre a rotação cíclica do painel.
+  // Quando a temperatura volta à faixa normal, a rotação volta ao modo usual.
+  const priorityHeroMetricIndex = coolantValue != null && coolantValue >= 110 ? 0 : null;
   useEffect(() => {
-    const timer = setInterval(
-      () => setActiveHeroMetric((current) => (current + 1) % Math.max(1, heroMetrics.length)),
-      10_000,
-    );
+    const timer = setInterval(() => {
+      setActiveHeroMetric((current) => priorityHeroMetricIndex != null
+        ? priorityHeroMetricIndex
+        : (current + 1) % Math.max(1, heroMetrics.length));
+    }, 10_000);
     return () => clearInterval(timer);
-  }, [heroMetrics.length]);
+  }, [heroMetrics.length, priorityHeroMetricIndex]);
 
   const selectedHeroMetric = heroMetrics[activeHeroMetric] ?? heroMetrics[0];
   const coolantStatus = coolantValue != null && coolantValue >= 115
@@ -285,7 +301,7 @@ export default function IndexScreen() {
                 </View>
                 <View style={styles.weatherDetails}>
                   <Text style={[styles.weatherCity, layout.landscape && styles.weatherCityLandscape]} numberOfLines={layout.landscape ? 1 : 2}>
-                    {conditions.city ? conditions.city.toLocaleUpperCase('pt-BR') : 'CLIMA LOCAL'}
+                    {(locationLabels[locationLabelIndex % locationLabels.length] ?? 'CLIMA LOCAL').toLocaleUpperCase('pt-BR')}
                   </Text>
                   <View style={styles.weatherMeta}>
                     <Text style={[styles.weatherTemperature, layout.landscape && styles.weatherTemperatureLandscape]} numberOfLines={1}>
@@ -313,8 +329,10 @@ export default function IndexScreen() {
           <View style={[styles.heroCard, layout.landscape && styles.heroCardLandscape]}>
             <TouchableOpacity
               accessibilityRole="button"
-              accessibilityLabel={selectedHeroMetric.label + '. Toque para trocar o indicador'}
-              onPress={() => setActiveHeroMetric((current) => (current + 1) % Math.max(1, heroMetrics.length))}
+              accessibilityLabel={selectedHeroMetric.label + (priorityHeroMetricIndex != null ? '. Indicador prioritário devido à temperatura alta' : '. Toque para trocar o indicador')}
+              onPress={() => setActiveHeroMetric((current) => priorityHeroMetricIndex != null
+                ? priorityHeroMetricIndex
+                : (current + 1) % Math.max(1, heroMetrics.length))}
               activeOpacity={0.82}
               style={styles.heroReadout}
             >
