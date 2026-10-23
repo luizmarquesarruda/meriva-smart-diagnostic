@@ -50,7 +50,7 @@ assert.match(index, /item\.pid === '0142'/);
 assert.match(tripService, /telemetryCandidates = pollingPolicy\.polling\.rotatingTelemetryPids/);
 assert.match(index, /item\.pid === '0111'/);
 assert.match(index, /item\.pid === '010C'/);
-assert.match(index, /setActiveHeroMetric\(\(current\) => \(current \+ 1\) % Math\.max\(1, heroMetrics\.length\)\)/);
+assert.match(index, /priorityHeroMetricIndex != null[\s\S]*?: \(current \+ 1\) % Math\.max\(1, heroMetrics\.length\)/, 'a anomalia térmica deve prevalecer, mantendo a rotação quando normal');
 assert.match(index, /priorityHeroMetricIndex = coolantValue != null && coolantValue >= 110/);
 assert.match(index, /Indicador prioritário devido à temperatura alta/);
 assert.match(index, /locationLabelsKey/);
