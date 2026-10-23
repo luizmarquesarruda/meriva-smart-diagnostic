@@ -83,3 +83,9 @@
 ### Engenharia
 - CI com Expo Doctor, TypeScript, testes e build Android release standalone;
 - documentação de arquitetura, desenvolvimento e auditoria.
+
+### Cockpit dinâmico — expansão para 25 PIDs
+- Ampliada a lista dinâmica de 20 para 25 PIDs candidatos, incluindo pressão de combustível (010A), avanço de ignição (010E), EGR comandada (012C), erro da EGR (012D) e purga EVAP comandada (012E).
+- Os novos PIDs entram na rotação serial de telemetria; continuam condicionados ao suporte anunciado pela ECU e a respostas reais recentes. Não são criadas leituras simuladas nem consultas duplicadas no mesmo ciclo.
+- Atualizados os testes de contrato para exigir 25 candidatos, presença no catálogo e inclusão dos cinco PIDs na rotação.
+- CI e validação física com ELM327/ECU devem ser conferidas separadamente; nenhum merge automático.
