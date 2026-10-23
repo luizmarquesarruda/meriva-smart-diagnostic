@@ -3350,3 +3350,19 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Duas execuções de CI para o SHA anterior haviam concluído `validate` com sucesso e estavam montando o APK release; a mudança desta entrada gera um novo SHA e exige nova execução completa.
 - Não foi possível realizar inspeção física do APK ou validar um ELM327/veículo nesta etapa. Esses testes continuam pendentes e não serão tratados como aprovados por CI.
 - Nenhum merge executado.
+
+
+## DB-103 · 2026-10-23 — Permissões de localização deixam de bloquear diagnóstico OBD
+
+### Causa confirmada
+- `app/_layout.tsx` tratava a ausência de permissão de GPS/localização como falha fatal da preparação geral, exibindo alerta e deixando `permissionsChecked` falso. Isso podia bloquear a entrada estável no aplicativo mesmo quando a conexão Bluetooth tinha permissão.
+- O contrato anti-regressão já descrevia localização/clima como enriquecimento opcional e exigia que falhas de permissão não interrompessem o diagnóstico.
+
+### Alterações
+- Mantida a exigência de permissão Bluetooth para a conexão OBD real; a falta de localização agora gera aviso informativo, sem lançar exceção fatal no layout.
+- Adicionada verificação no teste de permissões e tornada a suíte `permissions.test.js` obrigatória no gate de baseline.
+- Atualizados plano de aceitação, README e changelog. GPS, clima e percurso continuam dependentes da disponibilidade/permissão correspondente; não passam a produzir dados simulados.
+
+### Validação pendente
+- A CI completa precisa ser observada no SHA final deste commit. Nenhum teste físico de GPS/ELM327 foi executado nesta rodada.
+- Nenhum merge executado.

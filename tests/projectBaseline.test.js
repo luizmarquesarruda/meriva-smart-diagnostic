@@ -51,6 +51,7 @@ const requiredSuites = [
   'onlineConditions.test.js',
   'autonomyPresentation.test.js',
   'connectivity.test.js',
+  'permissions.test.js',
   'screenTheme.test.js',
 ];
 const scriptedTests = new Set(testCommand.map((command) => {

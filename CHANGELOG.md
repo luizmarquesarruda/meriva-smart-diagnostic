@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Confiabilidade e aceitação
+- Permissão de localização deixa de bloquear a preparação do diagnóstico OBD; GPS, clima e captura de percurso permanecem degradáveis quando o usuário não autoriza localização. O teste de permissões foi reforçado e incluído no gate antirregressão.
 - Criado `docs/TEST_PLAN.md` com cenários críticos para ECU/ELM327, frescor de dados, autonomia, navegação, DTC, splash e validação de release.
 - Adicionado o contrato RG-20 e uma verificação no gate para manter o plano de aceitação junto ao código.
 - Os casos pendentes permanecem identificados como pendentes; não se presume teste físico nem recurso futuro implementado.
