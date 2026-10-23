@@ -136,6 +136,10 @@ assert.match(startup, /while \(!cancelled\)/, 'a busca do ELM327 deve continuar 
 assert.match(startup, /connection\.supportedPids/, 'a validação inicial deve usar apenas PIDs descobertos');
 assert.match(startup, /round < 5/, 'cada PID suportado deve receber pelo menos cinco consultas iniciais');
 assert.match(startup, /router\.replace\('\/'\)/, 'o painel só abre depois da etapa de conexão e aquecimento');
+assert.match(startup, /settings\.autoConnectObd === false/, 'a preferência de conexão automática deve ser respeitada na splash');
+assert.match(startup, /retry >= 2/, 'deve existir uma saída para o cockpit após falhas de conexão repetidas');
+assert.match(startup, /accessibilityLabel="Abrir painel sem conexão OBD"/, 'a saída alternativa da splash precisa ser acessível');
+assert.match(startup, /ABRIR PAINEL SEM CONEXÃO/, 'o usuário não pode ficar preso na splash quando não há ECU disponível');
 assert.equal(app.expo.name, 'Smart OBD Diagnostic', 'a marca do app não deve ficar presa ao nome Meriva');
 
 // Current cockpit expectations that previously regressed.

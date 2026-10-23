@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
@@ -21,6 +21,7 @@ function connectionMessage(): string {
 export default function StartupScreen() {
   const [message, setMessage] = useState('PREPARANDO DIAGNÓSTICO');
   const [attempt, setAttempt] = useState(0);
+  const [canContinue, setCanContinue] = useState(false);
   const [pidProgress, setPidProgress] = useState({ done: 0, total: 0 });
 
   useEffect(() => {
@@ -33,6 +34,12 @@ export default function StartupScreen() {
         try {
           setMessage('VERIFICANDO BLUETOOTH E DISPOSITIVOS PAREADOS');
           const settings = await readAppSettings(basePath);
+          if (settings.autoConnectObd === false) {
+            setMessage('CONEXÃO AUTOMÁTICA DESATIVADA • ABRINDO PAINEL');
+            await wait(250);
+            if (!cancelled) router.replace('/');
+            return;
+          }
           const connection = await connectPreferredElm(settings.selectedAdapterAddress, {
             ioTimeoutMs: settings.elmIoTimeoutMs,
             bluetoothConnectTimeoutMs: settings.elmBluetoothTimeoutMs,
@@ -46,6 +53,7 @@ export default function StartupScreen() {
             adaptiveTimeoutMaxMs: settings.elmAdaptiveTimeoutMaxMs,
           });
           if (cancelled) return;
+          setCanContinue(false);
           if (!connection.ecuValidated || !getSharedObdStatus().ecuConnected) {
             throw new Error('O ELM327 ainda não confirmou resposta válida da ECU.');
           }
@@ -76,6 +84,7 @@ export default function StartupScreen() {
         } catch {
           retry += 1;
           setAttempt(retry);
+          if (retry >= 2) setCanContinue(true);
           setMessage(connectionMessage());
           // Retentativa contínua com backoff limitado evita tempestade de conexões.
           await wait(Math.min(15_000, 1_000 * (2 ** Math.min(retry - 1, 4))));
@@ -105,12 +114,22 @@ export default function StartupScreen() {
         <View style={styles.statusPanel}>
           <ActivityIndicator size="large" color={COLORS.accent} />
           <Text style={styles.status}>{message}</Text>
-          <Text style={styles.detail}>Pronto somente após uma resposta OBD válida da ECU.</Text>
+          <Text style={styles.detail}>{canContinue ? 'Confirme se o ELM327 está pareado, ligado e conectado ao veículo. Você também pode abrir o painel e ajustar a conexão depois.' : 'Pronto somente após uma resposta OBD válida da ECU.'}</Text>
           {pidProgress.total > 0 && <>
             <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${progress}%` }]} /></View>
             <Text style={styles.progressText}>TESTES DE PIDs: {pidProgress.done}/{pidProgress.total} • {progress}%</Text>
           </>}
           <Text style={styles.attempt}>TENTATIVA DE CONEXÃO {attempt + 1}</Text>
+          {canContinue && <TouchableOpacity
+            style={styles.continueButton}
+            accessibilityRole="button"
+            accessibilityLabel="Abrir painel sem conexão OBD"
+            accessibilityHint="Abre o cockpit para consultar configurações e tentar a conexão manualmente"
+            onPress={() => router.replace('/')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.continueButtonText}>ABRIR PAINEL SEM CONEXÃO</Text>
+          </TouchableOpacity>}
         </View>
         <Text style={styles.footer}>BLUETOOTH CLASSIC • ELM327 • OBD-II</Text>
       </View>
@@ -132,5 +151,7 @@ const styles = StyleSheet.create({
   progressFill: { height: '100%', backgroundColor: COLORS.accent, borderRadius: 4 },
   progressText: { color: COLORS.accent, fontSize: 10, fontWeight: '800', marginTop: 8 },
   attempt: { color: '#607e97', fontSize: 9, fontWeight: '800', letterSpacing: 1, marginTop: 18 },
+  continueButton: { width: '100%', minHeight: 48, marginTop: 18, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: '#2c7890', backgroundColor: '#123248', alignItems: 'center', justifyContent: 'center' },
+  continueButtonText: { color: COLORS.accent, fontSize: 11, fontWeight: '900', letterSpacing: 0.6, textAlign: 'center' },
   footer: { position: 'absolute', bottom: 18, color: '#607e97', fontSize: 9, fontWeight: '800', letterSpacing: 1.5, textAlign: 'center' },
 });

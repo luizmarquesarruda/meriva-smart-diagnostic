@@ -16,7 +16,7 @@ Bluetooth Classic exige build nativo Android. Expo Go não é o ambiente de vali
 
 ### Inicialização e splash screen
 
-A rota operacional `app/splash.tsx` é a entrada inicial: tenta conectar ao ELM327 pareado, valida uma resposta real da ECU, consulta cinco vezes cada PID anunciado e só então abre o cockpit. Em caso de falha, continua tentando com espera progressiva.
+A rota operacional `app/splash.tsx` é a entrada inicial: tenta conectar ao ELM327 pareado, valida uma resposta real da ECU, consulta cinco vezes cada PID anunciado e só então abre o cockpit. Em caso de falha, continua tentando com espera progressiva e, após tentativas repetidas, permite abrir o painel para configurar a conexão manualmente. Quando `autoConnectObd` está desativado nas configurações, pula as tentativas automáticas.
 
 A splash nativa usa o asset transparente `assets/splash.png` e o plugin `expo-splash-screen` configurado explicitamente em `app.json` com fundo `#07111f`, largura de 280 dp e `resizeMode: contain`. A configuração legada `expo.splash` aponta para o mesmo PNG. O baseline confirma o caminho e a assinatura do arquivo; antes de publicar, ainda é obrigatório instalar um APK de release e validar a inicialização fria em Android real. O contrato é protegido por `tests/projectBaseline.test.js` e RG-18 em `docs/CONTRATO_ANTI_REGRESSAO.md`.
 

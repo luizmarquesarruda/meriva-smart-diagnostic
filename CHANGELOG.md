@@ -12,6 +12,8 @@
 - Leitura de DTC diferencia quadro positivo válido de NO DATA/timeout/quadro incompleto; falha de leitura não é exibida como ausência de códigos.
 
 ### Splash screen e documentação
+- A splash operacional respeita `autoConnectObd=false` e permite abrir o cockpit após falhas repetidas, evitando bloquear configurações e conexão manual quando não há ECU disponível.
+- O teste antirregressão e `docs/TEST_PLAN.md` agora cobrem o caminho alternativo de inicialização sem conexão.
 - Restaurada a dependência `expo-splash-screen@~0.27.7` e alinhado o lockfile.
 - Adicionado `assets/splash.png` (PNG transparente 512×512) com a marca MERIVA SMART e configurado no plugin nativo `expo-splash-screen` com largura de 280 dp, fundo `#07111f` e `resizeMode: contain`.
 - Mantida a configuração `expo.splash` legada apontando para o mesmo asset e reforçado `tests/projectBaseline.test.js` para exigir o plugin, o caminho e a assinatura PNG real.

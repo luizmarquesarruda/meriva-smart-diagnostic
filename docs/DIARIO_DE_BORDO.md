@@ -3332,3 +3332,21 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Não alterados parser OBD, fila serial, regras de confiança dos dados, persistência de viagens ou cálculos de combustível.
 - A CI do novo SHA precisa validar TypeScript, baseline, suíte completa e APK Android. A aceitação final também exige teste físico com ELM327 e ECU reais.
 - Nenhum merge executado.
+
+
+## DB-102 · 2026-10-23 — Desbloquear o acesso ao cockpit quando a ECU está indisponível
+
+### Causa confirmada
+- A splash operacional repetia as tentativas indefinidamente sem uma ação visível para entrar no aplicativo; sem ELM327 ou ECU, ficavam inacessíveis o cockpit, as configurações e a conexão manual.
+- O fluxo de inicialização não respeitava `autoConnectObd=false`, embora essa preferência já existisse e fosse aplicada pelo cockpit.
+
+### Alterações
+- A splash agora pula a conexão automática e abre o cockpit quando `autoConnectObd=false`.
+- Após duas tentativas com falha, aparece uma ação acessível para abrir o cockpit sem declarar a ECU conectada; o estado de conexão continua sendo determinado pela validação OBD real.
+- Atualizados o gate antirregressão, o plano de aceitação, o README e o changelog para proteger e descrever o comportamento.
+- Não foram alterados Bluetooth Classic, a fila serial, o parser, as regras de amostras válidas, dados reais/simulados, GPS, viagens ou armazenamento.
+
+### Verificação pendente no momento do commit
+- Duas execuções de CI para o SHA anterior haviam concluído `validate` com sucesso e estavam montando o APK release; a mudança desta entrada gera um novo SHA e exige nova execução completa.
+- Não foi possível realizar inspeção física do APK ou validar um ELM327/veículo nesta etapa. Esses testes continuam pendentes e não serão tratados como aprovados por CI.
+- Nenhum merge executado.

@@ -48,7 +48,8 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 
 
 ## SPLASH-02 — Inicialização com ELM327/ECU
-- Iniciar sem adaptador: a splash permanece ativa, informa o estado e tenta novamente com backoff; não abre o cockpit como se estivesse pronta.
+- Iniciar sem adaptador: a splash informa o estado e tenta novamente com backoff; após duas falhas, oferece abrir o cockpit sem declarar a ECU conectada.
+- `autoConnectObd=false`: pular as tentativas automáticas e abrir o cockpit para conexão manual, conforme preferência salva.
 - Conectar somente Bluetooth: não declarar ECU pronta sem resposta OBD válida.
 - ECU válida: executar cinco consultas por PID anunciado usando a fila serial compartilhada e abrir o cockpit após o aquecimento.
 - PID não suportado ou sem resposta: não fabricar valores, não marcar amostra como válida e continuar os testes restantes.
