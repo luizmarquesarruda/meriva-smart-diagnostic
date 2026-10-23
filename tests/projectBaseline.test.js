@@ -53,6 +53,7 @@ const requiredSuites = [
   'connectivity.test.js',
   'permissions.test.js',
   'screenTheme.test.js',
+  'maintenanceRules.test.js',
 ];
 const scriptedTests = new Set(testCommand.map((command) => {
   const match = command.match(/^node tests\/([A-Za-z0-9._-]+)$/);
@@ -190,5 +191,9 @@ assert.match(testPlan, /SPLASH-01/);
 assert.match(testPlan, /teste físico/);
 assert.match(read('docs/CONTRATO_ANTI_REGRESSAO.md'), /\| RG-20 \|/);
 
+assert.ok(read('app/mais.tsx').includes('/manutencao'), 'manutenção e abastecimento deve continuar acessível pelo menu Mais');
+assert.match(read('src/maintenance/maintenanceRules.ts'), /evaluateMaintenance/);
+assert.match(read('src/database/maintenanceStorage.ts'), /writeMaintenanceData/);
+assert.ok(scriptedTests.has('maintenanceRules.test.js'), 'regras de manutenção precisam ser testadas pelo npm test');
 console.log('Anti-regression baseline gate: PASS');
 console.log('Protected contracts: five-read sensor tests, manual PID flow, single ELM327 queue, offline diagnosis, Expo SDK 51, GPS/Trip, TXT/history and cockpit/graphs.');

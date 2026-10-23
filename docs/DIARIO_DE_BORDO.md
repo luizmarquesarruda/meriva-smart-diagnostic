@@ -3387,3 +3387,18 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Revisão do diff do cockpit identificou uma asserção textual antiga que esperava o callback do timer em expressão de uma linha; o código correto passou a usar um bloco para manter a prioridade térmica durante a anomalia.
 - A asserção foi ajustada para validar a estrutura real do timer e continuar exigindo que a rotação permaneça protegida por teste. Nenhum comportamento OBD ou limiar foi alterado.
 - A CI do SHA atualizado é a evidência decisiva; nenhum resultado de teste é antecipado nesta entrada.
+
+
+## DB-106 · 2026-10-23 — Manutenção preventiva e diário local de abastecimentos
+
+### Objetivo e escopo
+- Adicionada rota `app/manutencao.tsx` acessível pela página Mais Recursos, com layout responsivo e área segura.
+- A tela permite salvar a quilometragem atual, registrar data e km da última manutenção, marcar um serviço realizado hoje, alternar plano de uso normal/severo para óleo e registrar abastecimentos (gasolina ou etanol, litros e valor opcional).
+- Os lembretes usam as referências já versionadas no manual local do Meriva 2012. Se não houver dados suficientes, o status fica como `CADASTRAR`, nunca como “em dia”. Vencimento por quilometragem ou calendário sinaliza serviço vencido.
+- Abastecimentos são persistidos em `MERIVA_SMART/MANUTENCAO/registros.json`, limitados a 100 registros, sem serem convertidos em amostras OBD ou alimentar os cálculos existentes de consumo.
+
+### Testes e limites
+- Criado teste de regras puras para intervalos normal/severo, validação de data, limite de mês, vencimento por km/data e histórico ausente; ligado a `npm test` e ao gate de baseline.
+- A UI valida litros, custo, data, quilometragem e mantém valores manuais separados do autosave/telemetria OBD.
+- Referências do Meriva são lembretes e não se aplicam automaticamente a outro carro sem confirmação do plano. Não foi testado abastecimento físico nem instalado APK nesta etapa; a CI do SHA final ainda precisa concluir inclusive o build standalone.
+- Nenhum merge executado.

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Manutenção e combustível
+- Adicionada página local para registrar quilometragem, histórico de serviços, lembretes por km/data (considerando uso normal ou severo) e abastecimentos por combustível/litros/valor.
+- Persistência isolada dos autosaves OBD: abastecimentos manuais não alimentam as estimativas nem os cálculos de consumo do motor diagnóstico.
+- Testes de regras de calendário, intervalos, dados ausentes e acesso à tela incluídos na validação e no gate antirregressão.
+
 ### Confiabilidade e aceitação
 - O cockpit alterna cidade/bairro a cada 10 s somente quando os rótulos estão disponíveis sob permissão de localização já concedida; alerta térmico a partir de 110 °C mantém prioridade no indicador central durante a anomalia. Testes de geocodificação e layout ampliados.
 - Permissão de localização deixa de bloquear a preparação do diagnóstico OBD; GPS, clima e captura de percurso permanecem degradáveis quando o usuário não autoriza localização. O teste de permissões foi reforçado e incluído no gate antirregressão.

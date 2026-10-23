@@ -20,6 +20,10 @@ A rota operacional `app/splash.tsx` é a entrada inicial: tenta conectar ao ELM3
 
 A splash nativa usa o asset transparente `assets/splash.png` e o plugin `expo-splash-screen` configurado explicitamente em `app.json` com fundo `#07111f`, largura de 280 dp e `resizeMode: contain`. A configuração legada `expo.splash` aponta para o mesmo PNG. O baseline confirma o caminho e a assinatura do arquivo; antes de publicar, ainda é obrigatório instalar um APK de release e validar a inicialização fria em Android real. O contrato é protegido por `tests/projectBaseline.test.js` e RG-18 em `docs/CONTRATO_ANTI_REGRESSAO.md`.
 
+## Manutenção e abastecimento
+
+A página **Mais recursos → Manutenção e abastecimento** registra a quilometragem do painel, histórico de óleo/filtro, revisão, fluido de arrefecimento, fluido de freio e rodízio dos pneus, com lembretes por km ou calendário. O modo de uso severo adota os intervalos de referência do manual do Meriva 2012. Abastecimentos manuais são guardados em arquivo local separado e não são tratados como telemetria real nem entram no cálculo de consumo OBD. Os prazos são lembretes e devem ser confirmados no manual aplicável ao veículo.
+
 ## Estrutura
 
 ```text

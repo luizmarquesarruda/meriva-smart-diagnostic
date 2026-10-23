@@ -128,6 +128,7 @@ export default function RootLayout() {
     >
       <Stack.Screen name="splash" options={{ headerShown: false, gestureEnabled: false }} />
       <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="manutencao" options={{ headerShown: false }} />
       <Stack.Screen name="bluetooth" options={{ headerShown: false }} />
       <Stack.Screen name="conectividade" options={{ headerShown: false }} />
       <Stack.Screen name="laboratorio" options={{ title: 'DIAGNÓSTICO OBD' }} />

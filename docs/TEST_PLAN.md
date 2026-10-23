@@ -63,3 +63,15 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 - Sem permissão de localização, não solicitar permissão apenas para clima e exibir indicação opcional indisponível.
 - Ao atingir temperatura de arrefecimento de 110 °C, manter o indicador térmico principal priorizado durante o alerta; restaurar a rotação habitual abaixo do limiar.
 - Confirmar por testes de origem/geocodificação e gate de layout; a apresentação física permanece parte da validação em Android.
+
+
+## MAINT-01 — Lembretes locais de manutenção
+- Sem histórico: cada item aparece como “CADASTRAR”, sem afirmar que está em dia.
+- Histórico por data e/ou odômetro: avaliar vencimento por km ou calendário, o que ocorrer primeiro; validar transição para vencida.
+- Óleo: comparar uso normal (10.000 km/12 meses) e severo (5.000 km/6 meses) com o manual do Meriva 2012.
+- Dados devem persistir localmente e sobreviver ao reinício; registros incompletos ou datas inválidas não podem confirmar manutenção como em dia.
+
+## FUELLOG-01 — Registro de abastecimentos
+- Exigir litros positivos, quilometragem atual salva e quilometragem não inferior ao registro anterior.
+- Total pago é opcional; se preenchido, deve ser positivo e ficar separado de consumo OBD.
+- Gravar até 100 registros locais; não converter abastecimentos manuais em amostras reais da ECU nem alterar a média OBD.

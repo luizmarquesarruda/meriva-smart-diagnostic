@@ -10,7 +10,7 @@ const tripService = fs.readFileSync('src/trip/autoTripService.ts', 'utf8');
 const screenFiles = [
   'app/mais.tsx', 'app/dados.tsx', 'app/saude.tsx', 'app/veiculo.tsx',
   'app/viagens.tsx', 'app/aprendizado.tsx', 'app/bluetooth.tsx',
-  'app/armazenamento.tsx', 'app/configuracoes.tsx', 'app/laboratorio.tsx',
+  'app/armazenamento.tsx', 'app/configuracoes.tsx', 'app/laboratorio.tsx', 'app/manutencao.tsx',
 ];
 
 // Expo's default orientation means no orientation lock; do not introduce a native portrait/landscape lock.

@@ -9,6 +9,7 @@ const items = [
   ['manualPid', 'CONSULTA MANUAL DE PID', 'Consultar valores atuais e escolher códigos da lista descoberta', '/laboratorio'],
   ['sensors', 'TESTES DE SENSORES', 'Varredura guiada com cinco leituras válidas por PID', '/testes-sensores'],
   ['vehicle', 'VEÍCULO', 'Perfil, motor, combustível e ECU', '/veiculo'],
+  ['vehicle', 'MANUTENÇÃO E ABASTECIMENTO', 'Lembretes por km/data e histórico de abastecimentos', '/manutencao'],
   ['trips', 'VIAGENS', 'Distância, consumo e ciclos registrados', '/viagens'],
   ['learning', 'APRENDIZADO', 'Amostras reais, confiança e contaminação', '/aprendizado'],
   ['health', 'SAÚDE', 'DTCs, evidências e hipóteses locais', '/saude'],

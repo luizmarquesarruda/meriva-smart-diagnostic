@@ -14,7 +14,7 @@ const screens = [
   'app/index.tsx', 'app/dados.tsx', 'app/saude.tsx', 'app/mais.tsx',
   'app/veiculo.tsx', 'app/viagens.tsx', 'app/aprendizado.tsx',
   'app/bluetooth.tsx', 'app/armazenamento.tsx', 'app/configuracoes.tsx',
-  'app/laboratorio.tsx', 'app/testes-sensores.tsx', 'app/conectividade.tsx',
+  'app/laboratorio.tsx', 'app/testes-sensores.tsx', 'app/conectividade.tsx', 'app/manutencao.tsx',
 ];
 for (const file of screens) {
   const source = fs.readFileSync(path.join(root, file), 'utf8');
