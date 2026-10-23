@@ -17,6 +17,7 @@ const workflow = read('.github/workflows/ci.yml');
 const elm = read('src/obd/elm327.ts');
 const sharedObd = read('src/obd/sharedConnection.ts');
 const home = read('app/index.tsx');
+const cockpitTelemetry = read('src/obd/cockpitTelemetry.ts');
 const laboratory = read('app/laboratorio.tsx');
 const dataScreen = read('app/dados.tsx');
 const tripService = read('src/trip/autoTripService.ts');
@@ -37,6 +38,7 @@ const requiredSuites = [
   'sensorTestEngine.test.js',
   'knowledgeJson.test.js',
   'cockpitNavigation.test.js',
+  'cockpitTelemetry.test.js',
   'orientationLayout.test.js',
   'liveTelemetry.test.js',
   'bluetoothLifecycle.test.js',
@@ -145,13 +147,14 @@ assert.match(startup, /ABRIR PAINEL SEM CONEXÃO/, 'o usuário não pode ficar p
 assert.equal(app.expo.name, 'Smart OBD Diagnostic', 'a marca do app não deve ficar presa ao nome Meriva');
 
 // Current cockpit expectations that previously regressed.
+assert.match(home, /buildCockpitPidMetrics/, 'cockpit deve consumir o modelo dinâmico de PIDs');
 for (const label of [
   'TEMPERATURA DO MOTOR',
   'VOLTAGEM DO SISTEMA',
   'POSIÇÃO DA BORBOLETA',
   'ROTAÇÃO DO MOTOR',
 ]) {
-  assert.ok(home.includes("label: '" + label + "'"), 'indicador principal ausente: ' + label);
+  assert.ok(cockpitTelemetry.includes("'" + label + "'"), 'indicador principal ausente no catálogo do cockpit: ' + label);
 }
 assert.match(home, /10_000/);
 assert.match(home, /getCurrentAutonomyRangeKm/);

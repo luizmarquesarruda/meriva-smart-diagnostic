@@ -116,6 +116,17 @@ function main() {
   for (const id of policyPids) {
     assert.ok(pidIds.has(String(id).toUpperCase()), 'polling policy referencia PID ausente no catálogo: ' + id);
   }
+  assert.strictEqual(pollingPolicy.cockpit.maxDisplayedPids, 20, 'cockpit deve limitar a vinte PIDs reais suportados');
+  assert.strictEqual(pollingPolicy.cockpit.pidOrder.length, 20, 'cockpit deve definir exatamente vinte PIDs candidatos');
+  assertUnique(pollingPolicy.cockpit.pidOrder.map((id) => String(id).toUpperCase()), 'PID do cockpit');
+  for (const id of pollingPolicy.cockpit.pidOrder) {
+    assert.ok(pidIds.has(String(id).toUpperCase()), 'cockpit referencia PID ausente do catálogo: ' + id);
+  }
+  assert.ok(pollingPolicy.cockpit.displayFreshAfterMs > 0 && pollingPolicy.cockpit.displayFreshAfterMs < pollingPolicy.cockpit.displayStaleAfterMs,
+    'leituras precisam separar frescor e validade máxima de exibição');
+  for (const id of ['010C', '010D', '012F', '0152', '015E']) {
+    assert.ok(!polling.rotatingTelemetryPids.includes(id), 'PID de caminho prioritário/lento não deve ser duplicado na rotação: ' + id);
+  }
   assert.deepStrictEqual(new Set(rangeIds), pidIds, 'ranges.json deve ter exatamente os mesmos PIDs do catálogo');
 
   for (const id of rangeIds) {

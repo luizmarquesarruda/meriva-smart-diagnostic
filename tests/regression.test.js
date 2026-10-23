@@ -1042,7 +1042,11 @@ async function testPidAndLearningWriteSerialization() {
   assert.ok(!autoTripServiceSource.includes("fuelLevelResult.parsed.unit === '%'"), 'a unidade incompatível não deve invalidar o PID 012F');
   assert.ok(autoTripServiceSource.includes("fuelRateLph == null && fuelEstimateDue && connection.supportedPids.includes('0110')"), 'MAF só deve ser consultado como fallback quando suportado e na cadência reduzida');
   assert.ok(autoTripServiceSource.includes("connection.supportedPids.includes('010B') &&\n          connection.supportedPids.includes('010F')"), 'fallback MAP exige suporte confirmado aos PIDs MAP e IAT');
-  assert.ok(autoTripServiceSource.includes('!(mapFallbackQueriedThisCycle && item === pollingPolicy.polling.estimatedFuelRate.mapPid)'), 'MAP usado no fallback não deve ser consultado novamente na telemetria rotativa');
+  assert.ok(autoTripServiceSource.includes("const queriedPidsThisCycle = new Set<string>()"), 'o ciclo OBD deve rastrear os PIDs já consultados');
+  assert.ok(autoTripServiceSource.includes("queriedPidsThisCycle.add('010B')"), 'MAP usado no fallback deve ser marcado como já consultado');
+  assert.ok(autoTripServiceSource.includes("queriedPidsThisCycle.add('010F')"), 'IAT usado no fallback deve ser marcado como já consultado');
+  assert.ok(autoTripServiceSource.includes("connection.supportedPids.includes(item) && !queriedPidsThisCycle.has(item)"),
+    'a telemetria rotativa não pode consultar de novo nenhum PID já usado no mesmo ciclo');
   assert.ok(autoTripServiceSource.includes('FUEL_RATE_DISPLAY_STALE_AFTER_MS'), 'valor em cache deve ter prazo explícito de expiração para exibição');
   assert.ok(!autoTripServiceSource.includes('recordLivePidQuery('), 'telemetria automática deve registrar cada resposta uma única vez via registerObdQuery');
   writeDelayMs = 0;
