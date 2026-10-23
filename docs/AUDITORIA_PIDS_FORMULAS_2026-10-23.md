@@ -30,3 +30,7 @@ Revisão direcionada do catálogo `src/knowledge/pids.json`, motor `src/obd/form
 ## Estado
 
 Correções de código preparadas em branch isolada para revisão. Não mesclar em `main` até a CI completa da PR passar.
+
+## Portabilidade da interface Floot para o aplicativo nativo
+
+A seção visual de verificação de limites foi portada para `app/laboratorio.tsx` em React Native, reutilizando `decodeFormula` de `src/obd/formulaEngine.ts`. Não foi adicionada uma segunda implementação das fórmulas. Os valores apresentados são casos de teste de fronteira com bytes `0xFF`, identificados na interface como exemplos matemáticos; não são dados de ECU. A validação da portabilidade depende da CI da PR #80 após este commit.
