@@ -2,6 +2,7 @@ import RNBluetoothClassic, { BluetoothDevice } from 'react-native-bluetooth-clas
 import { Platform } from 'react-native';
 import { ObdTransport } from './elm327';
 import { DEFAULT_ELM327_COMPATIBILITY, Elm327CompatibilityConfig, mergeCompatibilityConfig } from './elm327Compatibility';
+import { awaitNativeCleanupRetry, timedOutNativeAttemptStillPending, waitForNativeConnectAttempt } from './connectionRecovery';
 
 export interface BluetoothDeviceInfo {
   address: string;
@@ -11,6 +12,50 @@ export interface BluetoothDeviceInfo {
 
 type NativeConnectPromise = Promise<BluetoothDevice>;
 const pendingNativeConnections = new Map<string, NativeConnectPromise>();
+const pendingNativeConnectionSettlements = new Map<string, Promise<void>>();
+
+interface PendingNativeSocketCleanup {
+  promise: Promise<void>;
+  retry: () => Promise<void>;
+  retryPromise: Promise<void> | null;
+}
+
+// Shared across transport instances: a manual reconnect must respect cleanup
+// from a timed-out write on the same adapter address.
+const pendingNativeSocketCleanups = new Map<string, PendingNativeSocketCleanup>();
+
+async function waitForPendingNativeSocketCleanup(addressKey: string, timeoutMs: number): Promise<void> {
+  const pending = pendingNativeSocketCleanups.get(addressKey);
+  if (!pending) return;
+
+  const currentPromise = pending.promise;
+  const settled = await waitForNativeConnectAttempt(currentPromise, timeoutMs);
+  if (!settled) {
+    throw new Error('LIMPEZA NATIVA ANTERIOR AINDA PENDENTE; NOVA CONEXÃO RFCOMM BLOQUEADA');
+  }
+
+  try {
+    await currentPromise;
+  } catch {
+    // A cleanup attempt failed earlier. Retry it serially before opening a new
+    // socket; retain the guard if the adapter is still connected or unknown.
+    let retryPromise = pending.retryPromise;
+    if (!retryPromise) {
+      retryPromise = Promise.resolve().then(() => pending.retry());
+      pending.retryPromise = retryPromise;
+      pending.promise = retryPromise;
+      void retryPromise.then(
+        () => { if (pending.retryPromise === retryPromise) pending.retryPromise = null; },
+        () => { if (pending.retryPromise === retryPromise) pending.retryPromise = null; },
+      );
+    }
+    await awaitNativeCleanupRetry(retryPromise, timeoutMs);
+  }
+
+  if (pendingNativeSocketCleanups.get(addressKey) === pending) {
+    pendingNativeSocketCleanups.delete(addressKey);
+  }
+}
 
 function normalizeBluetoothAddress(address: string): string {
   return address.replace(/:/g, '').toUpperCase();
@@ -32,6 +77,42 @@ export class BluetoothClassicTransport implements ObdTransport {
   private diagnostics: string[] = [];
   private openPromise: Promise<void> | null = null;
   private connectTimer: ReturnType<typeof setTimeout> | null = null;
+  private pendingNativeIoCleanup: Promise<void> | null = null;
+
+  private registerPendingNativeSocketCleanup(
+    device: BluetoothDevice,
+    event = 'NATIVE_SOCKET_CLEANUP',
+  ): PendingNativeSocketCleanup {
+    const addressKey = normalizeBluetoothAddress(this.deviceAddress);
+    const existing = pendingNativeSocketCleanups.get(addressKey);
+    if (existing) {
+      this.pendingNativeIoCleanup = existing.promise;
+      return existing;
+    }
+
+    const record: PendingNativeSocketCleanup = {
+      promise: this.safeDisconnect(device),
+      retry: () => this.safeDisconnect(device),
+      retryPromise: null,
+    };
+    pendingNativeSocketCleanups.set(addressKey, record);
+    this.pendingNativeIoCleanup = record.promise;
+    void record.promise.then(
+      () => {
+        if (pendingNativeSocketCleanups.get(addressKey) === record) {
+          pendingNativeSocketCleanups.delete(addressKey);
+        }
+        if (this.pendingNativeIoCleanup === record.promise) this.pendingNativeIoCleanup = null;
+      },
+      (cleanupError) => {
+        this.logDiagnostic(`${event}_FAILED`, {
+          address: this.deviceAddress,
+          error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+        });
+      },
+    );
+    return record;
+  }
 
   private logDiagnostic(event: string, details?: unknown): void {
     const time = new Date().toISOString();
@@ -126,6 +207,17 @@ export class BluetoothClassicTransport implements ObdTransport {
     let connectPromise: NativeConnectPromise | null = null;
     const addressKey = normalizeBluetoothAddress(this.deviceAddress);
 
+    try {
+      await waitForPendingNativeSocketCleanup(addressKey, this.config.bluetoothConnectTimeoutMs);
+    } catch (cause) {
+      this.logDiagnostic('CONNECT_ABORT_NATIVE_SOCKET_CLEANUP_PENDING', {
+        address: this.deviceAddress,
+        timeoutMs: this.config.bluetoothConnectTimeoutMs,
+        error: cause instanceof Error ? cause.message : String(cause),
+      });
+      throw cause;
+    }
+
     for (const secureSocket of socketModes) {
       let connectionRaceTimedOut = false;
       connectPromise = null;
@@ -138,8 +230,26 @@ export class BluetoothClassicTransport implements ObdTransport {
         if (pending) {
           this.logDiagnostic('CONNECT_WAITING_PREVIOUS_NATIVE_ATTEMPT', {
             address: this.deviceAddress,
+            timeoutMs: this.config.bluetoothConnectTimeoutMs,
           });
-          try { await pending; } catch { /* próxima tentativa após término */ }
+          // Wait for the native call AND any late-success cleanup to finish before
+          // opening another RFCOMM socket for the same adapter.
+          const pendingSettlement = pendingNativeConnectionSettlements.get(addressKey) ?? pending;
+          const previousSettled = await waitForNativeConnectAttempt(
+            pendingSettlement,
+            this.config.bluetoothConnectTimeoutMs,
+          );
+          if (!previousSettled) {
+            this.logDiagnostic('CONNECT_ABORT_PREVIOUS_NATIVE_ATTEMPT_PENDING', {
+              address: this.deviceAddress,
+              timeoutMs: this.config.bluetoothConnectTimeoutMs,
+            });
+            lastCause = new Error(
+              'TENTATIVA NATIVA ANTERIOR AINDA PENDENTE APÓS O TIMEOUT. EVITE UMA SEGUNDA CONEXÃO SIMULTÂNEA; TENTE NOVAMENTE APÓS A LIBERAÇÃO DO ADAPTADOR.',
+            );
+            break;
+          }
+          try { await pendingSettlement; } catch { /* retry after failed native attempt */ }
         }
 
         this.logDiagnostic('CONNECT_ATTEMPT', {
@@ -158,18 +268,22 @@ export class BluetoothClassicTransport implements ObdTransport {
         pendingNativeConnections.set(addressKey, connectPromise);
 
         const currentPromise = connectPromise;
-        void currentPromise.then(async (lateDevice) => {
+        const settlement = currentPromise.then(async (lateDevice) => {
           if (!connectionRaceTimedOut || !lateDevice) return;
           this.logDiagnostic('LATE_CONNECT_SUCCESS_AFTER_TIMEOUT', { secureSocket });
           await this.safeDisconnect(lateDevice);
           this.logDiagnostic('LATE_CONNECT_DISCONNECTED', { secureSocket });
         }).catch(() => {
           // A tentativa nativa atrasada também pode terminar com erro.
-        }).finally(() => {
+        }).then(() => {
           if (pendingNativeConnections.get(addressKey) === currentPromise) {
             pendingNativeConnections.delete(addressKey);
           }
+          if (pendingNativeConnectionSettlements.get(addressKey) === settlement) {
+            pendingNativeConnectionSettlements.delete(addressKey);
+          }
         });
+        pendingNativeConnectionSettlements.set(addressKey, settlement);
 
         device = await Promise.race([
           connectPromise,
@@ -195,6 +309,19 @@ export class BluetoothClassicTransport implements ObdTransport {
           error: cause instanceof Error ? cause.message : String(cause),
         });
         lastCause = cause;
+        if (timedOutNativeAttemptStillPending(
+          connectionRaceTimedOut,
+          connectPromise,
+          pendingNativeConnections.get(addressKey),
+        )) {
+          this.logDiagnostic('CONNECT_ABORT_NATIVE_ATTEMPT_STILL_PENDING', {
+            secureSocket,
+            timeoutMs: this.config.bluetoothConnectTimeoutMs,
+          });
+          // The JS timeout cannot cancel the native request. Do not wait forever
+          // or race a second RFCOMM socket against the same adapter.
+          break;
+        }
         if (device) await this.safeDisconnect(device);
         device = null;
       }
@@ -251,9 +378,21 @@ export class BluetoothClassicTransport implements ObdTransport {
     if (this.connectTimer) { clearTimeout(this.connectTimer); this.connectTimer = null; }
     const device = this.device;
     const wasConnected = this.connected;
+    const pendingIoCleanup = this.pendingNativeIoCleanup;
+    const addressKey = normalizeBluetoothAddress(this.deviceAddress);
     this.removeSubscriptions();
 
-    if (device && wasConnected) await this.safeDisconnect(device);
+    if (pendingNativeSocketCleanups.has(addressKey)) {
+      // The global guard owns the cleanup; don't issue a parallel disconnect.
+      await waitForPendingNativeSocketCleanup(addressKey, this.config.bluetoothConnectTimeoutMs);
+    } else if (device && wasConnected) {
+      // Register before awaiting native disconnect so another transport
+      // cannot race into a new socket while this close is still in flight.
+      const cleanup = this.registerPendingNativeSocketCleanup(device);
+      await cleanup.promise;
+    } else if (pendingIoCleanup) {
+      await waitForPendingNativeSocketCleanup(addressKey, this.config.bluetoothConnectTimeoutMs);
+    }
 
     this.device = null;
     this.connected = false;
@@ -277,7 +416,32 @@ export class BluetoothClassicTransport implements ObdTransport {
     }
 
     this.logDiagnostic('TX', { data });
-    await device.write(data, 'ascii');
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    const nativeWrite = Promise.resolve().then(() => device.write(data, 'ascii'));
+    try {
+      await Promise.race([
+        nativeWrite,
+        new Promise<void>((_resolve, reject) => {
+          timeout = setTimeout(
+            () => reject(new Error(`TIMEOUT: ESCRITA BLUETOOTH SEM CONCLUSÃO APÓS ${this.config.ioTimeoutMs} MS`)),
+            this.config.ioTimeoutMs,
+          );
+        }),
+      ]);
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      if (message.startsWith('TIMEOUT: ESCRITA BLUETOOTH')) {
+        this.logDiagnostic('WRITE_TIMEOUT', { timeoutMs: this.config.ioTimeoutMs, address: this.deviceAddress });
+        // Closing the socket is the only available cancellation path at this
+        // layer. Keep the cleanup promise and prevent a replacement socket from
+        // opening until the native operation has been torn down.
+        this.registerPendingNativeSocketCleanup(device, 'WRITE_TIMEOUT_CLEANUP');
+        this.markDisconnected();
+      }
+      throw cause;
+    } finally {
+      if (timeout) clearTimeout(timeout);
+    }
   }
 
   async readUntilPrompt(timeoutMs = 6000): Promise<string> {
@@ -337,8 +501,23 @@ export class BluetoothClassicTransport implements ObdTransport {
   }
 
   private async safeDisconnect(device: BluetoothDevice): Promise<void> {
-    try { await device.disconnect(); }
-    catch { /* já desconectado */ }
+    try {
+      await device.disconnect();
+    } catch (cause) {
+      // Do not treat an arbitrary native disconnect error as success. Confirm
+      // the socket is already down; otherwise propagate the failure so the
+      // shared connection owner will not open a replacement RFCOMM socket.
+      try {
+        if (typeof device.isConnected === 'function' && !(await device.isConnected())) return;
+      } catch {
+        // Unknown native state is not proof that the socket was released.
+      }
+      this.logDiagnostic('BLUETOOTH_DISCONNECT_FAILED', {
+        address: this.deviceAddress,
+        error: cause instanceof Error ? cause.message : String(cause),
+      });
+      throw cause instanceof Error ? cause : new Error(String(cause));
+    }
   }
 
   private markDisconnected(): void {

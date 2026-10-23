@@ -38,6 +38,17 @@ Este documento é o contrato de aceitação entre mudanças, testes, diário e C
 | RG-20 | Mudanças de confiabilidade/UX devem manter um plano de aceitação rastreável em `docs/TEST_PLAN.md`, separar o que já existe do que é proposto e distinguir teste automatizado, CI/build Android, inspeção visual em aparelho e teste físico ELM327/ECU. Não declarar recursos futuros como implementados nem validação física a partir de CI verde. | `projectBaseline.test.js`, `docs/TEST_PLAN.md`, CI do SHA final |
 | RG-21 | Um resultado vazio de DTC só é válido com quadro positivo completo ou resposta explícita “NO CODES/NENHUM DTC”. `NO DATA`, timeout, resposta ausente ou quadro incompleto/malformado são indisponibilidade, nunca ausência de falha nem base para inativar DTCs salvos. | `dtcScanner.test.js`, `projectBaseline.test.js`, `TEST_PLAN.md` |
 
+| RG-22 | Timeout nativo Bluetooth não pode causar espera sem limite nem iniciar segundo socket RFCOMM enquanto a chamada anterior continua pendente. Falha ao persistir estado não pode impedir o fechamento da sessão. | `connectionRecovery.test.js`, `bluetoothLifecycle.test.js` |
+| RG-23 | Falhas de persistência e fechamento são independentes; cada tarefa de limpeza deve ser tentada e os erros registrados sem mascarar o estado do socket. | `connectionRecovery.test.js` |
+| RG-24 | Permissão de localização/GPS é opcional para iniciar diagnóstico OBD; sem localização, recursos GPS/viagens degradam sem bloquear Bluetooth/ECU. | `permissions.test.js`, `projectBaseline.test.js` |
+| RG-25 | No Manifest Android, permissões legadas `BLUETOOTH` e `BLUETOOTH_ADMIN` devem ter `maxSdkVersion=30`; `BLUETOOTH_CONNECT` e `BLUETOOTH_SCAN` modernos ficam sem esse limite. | `permissions.test.js`, validação de `android-build` |
+| RG-26 | Renegociação do protocolo ELM (ATZ, ATSP, prova ECU e ATDP) é serializada como operação única; consultas PID aguardam a conclusão da recuperação. | `regression.test.js` — recuperação de protocolo serializada |
+| RG-27 | Escrita RFCOMM nativa sem conclusão atinge deadline I/O, marca link como perdido e inicia limpeza; nova conexão não avança antes da liberação confirmada. | `regression.test.js`, `bluetoothLifecycle.test.js` |
+| RG-28 | Falha de `disconnect()` só é considerada desconectada se estado nativo for confirmado; erro ou estado desconhecido bloqueia nova sessão. | `regression.test.js`, `connectionRecovery.test.js` |
+| RG-29 | A trava de limpeza de socket RFCOMM é compartilhada por instâncias e endereço normalizado; uma nova instância não conecta enquanto a limpeza anterior estiver incerta. | `regression.test.js`, `bluetoothLifecycle.test.js` |
+| RG-30 | Encerramento nativo da sessão tem deadline; timeout/erro de fechamento não confirma liberação e bloqueia reconexão. | `connectionRecovery.test.js`, `bluetoothLifecycle.test.js` |
+| RG-31 | Retry de limpeza do socket também tem deadline; falha ou promessa pendente mantém a trava por endereço e nunca deixa a nova tentativa aguardando indefinidamente. | `connectionRecovery.test.js`, `bluetoothLifecycle.test.js` |
+
 ## Regras para uma alteração legítima
 
 - Não reduzir ou excluir um teste essencial só para deixar a CI verde.

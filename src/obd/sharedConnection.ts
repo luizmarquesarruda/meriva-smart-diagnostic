@@ -11,6 +11,7 @@ import { flushCsvLogs } from '../database/csvLogger';
 import { readAppSettings, writeAppSettings } from '../database/appSettings';
 import { startBackgroundMonitoring, stopBackgroundMonitoring } from '../gps/backgroundMonitoring';
 import { readVehicleIdentity } from './vehicleIdentity';
+import { cleanupDisconnectedSession, runDisconnectPersistenceTasks, shouldRetryAfterDisconnectCleanup } from './connectionRecovery';
 
 export interface SharedObdConnection {
   session: Elm327Session;
@@ -80,15 +81,13 @@ function setEcuResponseState(next: EcuResponseState, error?: string): void {
 
 
 async function persistDisconnectedState(): Promise<void> {
-  try {
-    await stopBackgroundMonitoring();
-    await closeObdAutosaveSession();
-  } catch {
-    // a perda de conectividade não deve derrubar a interface
-  } finally {
-    // Não perder amostras pendentes quando o link ECU/Bluetooth cair.
-    try { await flushCsvLogs(); } catch { /* a fila retenta sem bloquear a reconexão */ }
-  }
+  // Cada ação é tentada mesmo quando outra falha. A camada de recuperação
+  // registra o erro agregado sem impedir o fechamento da sessão ELM327.
+  await runDisconnectPersistenceTasks([
+    { label: 'parar monitoramento em segundo plano', run: async () => { await stopBackgroundMonitoring(); } },
+    { label: 'fechar sessão de autosave', run: async () => { await closeObdAutosaveSession(); } },
+    { label: 'descarregar logs CSV', run: async () => { await flushCsvLogs(); } },
+  ]);
 }
 
 async function handleUnexpectedDisconnect(reason: string): Promise<void> {
@@ -114,11 +113,37 @@ async function handleUnexpectedDisconnect(reason: string): Promise<void> {
 
   if (connection) {
     intentionalDisconnect = true;
+    // Keep the cleanup result in the enclosing scope so retry policy can use it
+    // after the finally block without a block-scoped TypeScript error.
+    let cleanup: Awaited<ReturnType<typeof cleanupDisconnectedSession>>;
     try {
-      await persistDisconnectedState();
-      try { await connection.session.close(); } catch { /* sessão já perdida */ }
+      cleanup = await cleanupDisconnectedSession(
+        () => persistDisconnectedState(),
+        () => connection.session.close(),
+      );
+      if (cleanup.persistenceError) {
+        const detail = cleanup.persistenceError instanceof Error
+          ? cleanup.persistenceError.message
+          : String(cleanup.persistenceError);
+        lastConnectionError = `${reason}; FALHA AO PERSISTIR ESTADO DA DESCONEXÃO: ${detail}`;
+      }
+      if (cleanup.closeError) {
+        const detail = cleanup.closeError instanceof Error
+          ? cleanup.closeError.message
+          : String(cleanup.closeError);
+        lastConnectionError = `${lastConnectionError ?? reason}; FALHA AO FECHAR SESSÃO ELM327: ${detail}`;
+      }
     } finally {
       intentionalDisconnect = false;
+    }
+
+    // If close() rejects, the native socket state is unknown. Do not open a
+    // replacement RFCOMM socket until the old session is known to be released.
+    if (!shouldRetryAfterDisconnectCleanup(cleanup.closeError)) {
+      reconnecting = false;
+      lifecycle = 'ERROR';
+      emit();
+      return;
     }
 
     if (!reason.includes('BLUETOOTH DESLIGADO')) {

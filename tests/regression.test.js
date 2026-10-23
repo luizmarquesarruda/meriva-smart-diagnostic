@@ -43,6 +43,8 @@ let bluetoothConnectCalls = 0;
 let bluetoothActiveNativeConnections = 0;
 let bluetoothMaxNativeConnections = 0;
 let bluetoothConnectDelayMs = 0;
+let bluetoothWriteNeverSettles = false;
+let bluetoothDisconnectFails = false;
 
 function parentDir(p) {
   const i = p.lastIndexOf('/');
@@ -184,6 +186,7 @@ const fakeBluetooth = {
       return { remove() { bluetoothListener = null; } };
     },
     write: async () => {
+      if (bluetoothWriteNeverSettles) return new Promise(() => {});
       bluetoothListener?.({ data: '41 0C ' });
       bluetoothListener?.({ data: '0C 18\r\n>' });
     },
@@ -194,6 +197,7 @@ const fakeBluetooth = {
       throw new Error('read() não deve ser usado com listener');
     },
     disconnect: async () => {
+      if (bluetoothDisconnectFails) throw new Error('TEST DISCONNECT FAILURE');
       bluetoothListener = null;
     },
       };
@@ -339,6 +343,41 @@ async function testElmAndProtocol() {
   await unsupportedAtSession.close();
 }
 
+async function testProtocolRecoverySerializesWholeNegotiation() {
+  const { Elm327Session } = loadTs(path.join(ROOT, 'src/obd/elm327.ts'));
+  const commands = [];
+  let currentCommand = '';
+  const responses = {
+    ATZ: 'ELM327 v1.5',
+    ATSP5: 'OK',
+    '010C': '41 0C 0C 18',
+    ATDP: 'ISO 14230-4 (KWP FAST)',
+    '0105': '41 05 82',
+  };
+  const transport = {
+    async open() {},
+    async close() {},
+    async write(data) { currentCommand = data.trim().toUpperCase(); commands.push(currentCommand); },
+    async readUntilPrompt() { return responses[currentCommand] || 'OK'; },
+  };
+  const session = new Elm327Session(transport, { commandDelayMs: 0, ioTimeoutMs: 1000, adaptiveTiming: false });
+  session.opened = true;
+  session.protocol = 'ISO 14230-4 (KWP FAST)';
+  const recoveryPromise = session.recoverProtocol();
+  await wait(20);
+  const pidPromise = session.queryPid('0105');
+  assert.equal(await recoveryPromise, true, 'protocol recovery should succeed with valid simulated responses');
+  const pidResult = await pidPromise;
+  assert.equal(pidResult.parsed.value, 90);
+  const recoveryCommands = ['ATZ', 'ATSP5', '010C', 'ATDP'];
+  const positions = recoveryCommands.map((command) => commands.indexOf(command));
+  assert.ok(positions.every((position) => position >= 0), 'recovery should issue reset, protocol selection, ECU probe and protocol read');
+  assert.deepEqual([...positions].sort((a, b) => a - b), positions, 'recovery commands must retain their sequence');
+  assert.ok(commands.indexOf('0105') > positions[positions.length - 1],
+    'a regular PID request must wait until the entire protocol recovery sequence completes');
+  await session.close();
+  console.log('protocol recovery serialization: OK');
+}
 async function testConfiguredBluetoothRetryLimit() {
   const managerPath = path.join(ROOT, 'src/obd/bluetoothManager.ts');
   const source = fs.readFileSync(managerPath, 'utf8');
@@ -649,6 +688,52 @@ async function testBluetoothEventTransport() {
   bluetoothDisconnectListener?.({ address: 'AA:BB:CC:DD:EE:FF' });
   await assert.rejects(pendingRead, /BLUETOOTH DESCONECTADO|BLUETOOTH NÃO CONECTADO/);
   await transport.close();
+
+  fakeDeviceConnected = true;
+  bluetoothWriteNeverSettles = true;
+  const timeoutEvents = [];
+  const stalledTransport = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF', { ioTimeoutMs: 1000 }, {
+    onDisconnected: (reason) => timeoutEvents.push(reason),
+  });
+  await stalledTransport.open();
+  await assert.rejects(stalledTransport.write('010C\r'), /TIMEOUT: ESCRITA BLUETOOTH SEM CONCLUSÃO/);
+  assert.deepStrictEqual(timeoutEvents, ['BLUETOOTH DESCONECTADO']);
+  assert.match(stalledTransport.getDiagnosticsText(), /WRITE_TIMEOUT/);
+  await stalledTransport.close();
+
+  bluetoothDisconnectFails = true;
+  const cleanupFailureTransport = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF', { ioTimeoutMs: 1000 });
+  await cleanupFailureTransport.open();
+  await assert.rejects(cleanupFailureTransport.write('010C\r'), /TIMEOUT: ESCRITA BLUETOOTH SEM CONCLUSÃO/);
+  await assert.rejects(cleanupFailureTransport.close(), /TEST DISCONNECT FAILURE/);
+  assert.match(cleanupFailureTransport.getDiagnosticsText(), /WRITE_TIMEOUT_CLEANUP_FAILED/);
+
+  const connectCallsBeforeBlockedRetry = bluetoothConnectCalls;
+  const blockedReplacement = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF', { ioTimeoutMs: 1000 });
+  await assert.rejects(blockedReplacement.open(), /LIMPEZA NATIVA ANTERIOR AINDA PENDENTE|TEST DISCONNECT FAILURE/);
+  assert.strictEqual(bluetoothConnectCalls, connectCallsBeforeBlockedRetry,
+    'a new transport instance must not open another RFCOMM socket while cleanup is unconfirmed');
+
+  bluetoothDisconnectFails = false;
+  bluetoothWriteNeverSettles = false;
+  const recoveredReplacement = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF', { ioTimeoutMs: 1000 });
+  await recoveredReplacement.open();
+  assert.strictEqual(bluetoothConnectCalls, connectCallsBeforeBlockedRetry + 1);
+  await recoveredReplacement.close();
+
+  bluetoothDisconnectFails = true;
+  const regularCloseFailure = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF', { ioTimeoutMs: 1000 });
+  await regularCloseFailure.open();
+  const callsBeforeRegularCloseRetry = bluetoothConnectCalls;
+  await assert.rejects(regularCloseFailure.close(), /TEST DISCONNECT FAILURE/);
+  const blockedAfterRegularClose = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF', { ioTimeoutMs: 1000 });
+  await assert.rejects(blockedAfterRegularClose.open(), /TEST DISCONNECT FAILURE/);
+  assert.strictEqual(bluetoothConnectCalls, callsBeforeRegularCloseRetry);
+  bluetoothDisconnectFails = false;
+  const recoveredAfterRegularClose = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF', { ioTimeoutMs: 1000 });
+  await recoveredAfterRegularClose.open();
+  assert.strictEqual(bluetoothConnectCalls, callsBeforeRegularCloseRetry + 1);
+  await recoveredAfterRegularClose.close();
 }
 
 async function testQuota() {
@@ -1154,6 +1239,7 @@ async function main() {
     ['banco de fórmulas OBD', testFormulaKnowledgeBank],
     ['parser + DTC', testParser],
     ['elm/protocolo/serialização', testElmAndProtocol],
+    ['recuperação de protocolo serializada', testProtocolRecoverySerializesWholeNegotiation],
     ['limite configurável de retry Bluetooth', testConfiguredBluetoothRetryLimit],
     ['ativação oficial do Bluetooth', testBluetoothActivationRequest],
     ['bloqueio de troca silenciosa de adaptador', testActiveAdapterCannotBeSilentlySwitched],
