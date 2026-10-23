@@ -42,6 +42,7 @@ const requiredSuites = [
   'orientationLayout.test.js',
   'liveTelemetry.test.js',
   'bluetoothLifecycle.test.js',
+  'connectionRecovery.test.js',
   'elm327Compatibility.test.js',
   'regression.test.js',
   'diagnosticEngine.test.js',
@@ -77,6 +78,15 @@ assert.match(sensorEngine, /validRows/);
 assert.match(sensorEngine, /average\(/);
 assert.match(projectContract, /cinco tentativas sequenciais/i);
 assert.match(projectContract, /fila serial única/i);
+
+// Bluetooth recovery must stay bounded and must never race an unconfirmed native socket.
+const bluetoothRecovery = read('src/obd/connectionRecovery.ts');
+const bluetoothTransport = read('src/obd/bluetoothClassicTransport.ts');
+assert.match(bluetoothRecovery, /awaitNativeCleanupRetry/);
+assert.match(bluetoothTransport, /awaitNativeCleanupRetry/);
+assert.match(read('app/_layout.tsx'), /canStartObdStartup\(audit\)/);
+assert.match(read('app/_layout.tsx'), /canUseGps\(audit\)/);
+assert.ok(app.expo.plugins.includes('./plugins/withBluetoothLegacyPermissionLimits'));
 
 // The ELM protocol must serialize all commands through the shared session queue.
 assert.match(elm, /private commandQueue:\s*Promise<void>\s*=\s*Promise\.resolve\(\)/);

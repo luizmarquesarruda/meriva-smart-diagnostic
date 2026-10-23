@@ -8,6 +8,7 @@ import { disconnectSharedObd } from '../src/obd/sharedConnection';
 import * as FileSystem from 'expo-file-system';
 import { autoTripService } from '../src/trip/autoTripService';
 import { requestAllRequiredPermissions } from '../src/permissions/permissionManager';
+import { canStartObdStartup, canUseGps } from '../src/permissions/permissionPolicy';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { COLORS } from '../src/ui/theme';
@@ -62,14 +63,14 @@ export default function RootLayout() {
       if (permissionsChecked.current) return;
       if (Platform.OS === 'android') {
         const audit = await requestAllRequiredPermissions();
-        if (audit.bluetooth !== 'GRANTED') {
+        if (!canStartObdStartup(audit)) {
           throw new Error('PERMISSÃO DE BLUETOOTH/DISPOSITIVOS PRÓXIMOS NÃO CONCEDIDA.');
         }
-        if (audit.location !== 'GRANTED') {
+        if (!canUseGps(audit)) {
           // GPS/clima/registro de percurso são recursos opcionais. Não bloquear
           // o diagnóstico OBD: o rastreador informa seu próprio estado e degrada
           // sem amostras quando a localização não está autorizada.
-          console.info('[Permissions] GPS indisponível; diagnóstico OBD permanece habilitado.');
+          console.warn('[Permissions] Localização não concedida; o diagnóstico OBD permanece habilitado, mas GPS/viagens podem ficar indisponíveis.');
         }
       }
       permissionsChecked.current = true;

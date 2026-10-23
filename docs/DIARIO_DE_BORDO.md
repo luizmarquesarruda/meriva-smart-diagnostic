@@ -3411,3 +3411,11 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - **Alterações:** política explícita com 20 PIDs candidatos e apresentação apenas de PIDs anunciados pela ECU; rotação auxiliar ampliada, com exclusão dinâmica dos PIDs já consultados no ciclo; janela explícita para leituras reais recentes, descarte de timestamps inválidos/futuros, N/D quando o dado vence e alertas visuais para limites operacionais definidos; alertas passam à frente da rotação normal e alternam a cada 10 s.
 - **Proteções:** não criar segunda fila/sondagem OBD, não promover catálogo a suporte real e não reutilizar valores vencidos como atuais. Limites de alerta são indicações de referência, não DTCs nem prova isolada de defeito.
 - **Validação:** teste cockpitTelemetry.test.js adicionado a npm test e ao gate anti-regressão. CI, TypeScript e build Android ainda aguardam execução para este commit; não presumir aprovação. A validação física com ELM327/ECU continua separada.
+
+### DB-108 — 2026-10-23 — Recuperação Bluetooth/ELM327 e reconciliação de PR
+
+- **Falha de integração:** a PR #77 ficou baseada no HEAD anterior às PRs #78 e #79 e tocava arquivos de cockpit/navegação atualizados desde então. A reconciliação mantém o código atual de splash, cockpit e telemetria; mudanças de navegação antigas não devem substituir essas versões.
+- **Recuperação OBD:** timeouts de conexão/escrita/fechamento nativo têm deadlines; persistência da desconexão não bloqueia a tentativa de fechar a sessão; reconexão permanece bloqueada quando a liberação do socket RFCOMM não está confirmada; retry de limpeza também é limitado.
+- **Protocolo e permissões:** recuperação ELM (ATZ/ATSP/prova ECU/ATDP) é serializada; GPS segue opcional para iniciar OBD; o plugin limita permissões Bluetooth legadas no Android até API 30 sem limitar as permissões modernas.
+- **Proteções:** testes adversariais de promessa pendente, falha de fechamento, bloqueio entre instâncias e ordem de protocolo ficam ligados a `npm test` e ao gate anti-regressão. Os requisitos Bluetooth recebem IDs RG-22 a RG-31, sem duplicar RGs existentes.
+- **Validação:** conferir `gate:baseline`, `validate` e `android-build` no SHA final desta atualização. A CI não substitui teste físico com ELM327/ECU; esse teste e a inspeção no aparelho permanecem pendentes.

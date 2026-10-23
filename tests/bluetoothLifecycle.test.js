@@ -44,8 +44,10 @@ assert(shared.includes("probe.parsed.status === 'RESPONDEU'"));
 assert(shared.includes("probe.commandStatus === 'OK'"));
 assert(!rootLayout.includes('connectPreferredElm'), 'RootLayout must not start a competing OBD connection');
 assert(!rootLayout.includes('ensureBluetoothReady'), 'Bluetooth connection readiness belongs to the dashboard connection owner');
-assert(rootLayout.includes("if (audit.bluetooth !== 'GRANTED')"), 'RootLayout deve interromper a preparação sem permissão de Bluetooth');
-assert(rootLayout.includes("if (audit.location !== 'GRANTED')"), 'RootLayout deve exigir permissão de localização antes dos serviços que dependem dela');
+assert(rootLayout.includes('canStartObdStartup(audit)'), 'RootLayout deve interromper a preparação sem permissão de Bluetooth');
+assert(rootLayout.includes('canStartObdStartup(audit)'), 'a inicialização OBD deve depender da permissão Bluetooth');
+assert(rootLayout.includes('canUseGps(audit)'), 'GPS/viagens devem consultar a permissão de localização separadamente');
+assert(!rootLayout.includes("if (audit.location !== 'GRANTED')"), 'localização negada não deve bloquear diagnóstico OBD');
 assert(bluetoothScreen.includes('ATIVAR BLUETOOTH'));
 assert(bluetoothScreen.includes('CONECTAR E VALIDAR ELM327'));
 assert(bluetoothScreen.includes('bluetoothConnected ? styles.online'));
@@ -53,6 +55,14 @@ assert(dashboard.includes('connectPreferredElm(settings.selectedAdapterAddress')
 assert(shared.includes('const compatibility = connection?.session.getCompatibilityConfig()'), 'recovery must preserve the active session compatibility settings');
 assert(shared.includes("connectPreferredElm(connection.device.address, compatibility, 'EXPLICIT')"), 'recovery must pass the original compatibility settings');
 assert(shared.includes('if (connection) reconnecting = true'), 'reserve recovery before awaiting async cleanup to ignore duplicate disconnect callbacks');
+assert(transport.includes('timedOutNativeAttemptStillPending('), 'timed-out native connect must not race a second socket mode');
+assert(transport.includes('waitForNativeConnectAttempt('), 'waiting for a concurrent native attempt must have an explicit timeout');
+assert(transport.includes('pendingNativeConnectionSettlements'), 'a late native connection must be serialized through its cleanup completion');
+assert.match(transport, /pendingNativeConnectionSettlements\.get\(addressKey\) \?\? pending/, 'concurrent opens must wait for native cleanup, not only the raw socket promise');
+assert.match(transport, /await this\.safeDisconnect\(lateDevice\)[\s\S]*?LATE_CONNECT_DISCONNECTED/, 'a timed-out late success must be disconnected before the settlement completes');
+assert(transport.includes("CONNECT_ABORT_PREVIOUS_NATIVE_ATTEMPT_PENDING"), 'a stale native connection must fail fast instead of being awaited forever');
+assert(shared.includes('cleanupDisconnectedSession('), 'disconnect recovery must isolate persistence failure from session close');
+
 
 console.log('bluetoothLifecycle.test.js: OK');
 

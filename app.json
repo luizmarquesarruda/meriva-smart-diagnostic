@@ -51,7 +51,8 @@
           "resizeMode": "contain",
           "backgroundColor": "#07111f"
         }
-      ]
+      ],
+      "./plugins/withBluetoothLegacyPermissionLimits"
     ],
     "splash": {
       "image": "./assets/splash.png",
