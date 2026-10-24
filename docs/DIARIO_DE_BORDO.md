@@ -3462,3 +3462,11 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - CSV: campos com retorno de carro (`\r`) passam a ser citados; teste de regressão foi incluído.
 - O baseline de autonomia já está alinhado com `getCurrentAutonomyRangeKm`, usando sessão/ECU ativa e leitura recente do PID 012F.
 - A CI do SHA final deve comprovar gate, suíte completa e build Android. Inspeção visual em aparelho e teste físico com ELM327/ECU continuam pendentes.
+
+## DB-111 — 2026-10-24 — Mapa integral de PIDs e fórmulas
+
+- Mapa completo criado em `docs/PID_FORMULA_MAP_2026-10-24.md` a partir dos catálogos versionados.
+- Catálogo com 34 PIDs Mode 01; somente `010C` confirmado via RAW_ECU na ficha da Meriva; 10 candidatos.
+- PID 0101 retorna contagem `A & 0x7F` e interpreta MIL/readiness SI/CI; 0114 decodifica STFT do byte B; 0151 interpreta enums e recusa código desconhecido.
+- Laboratório mostra interpretação complementar; testes foram ampliados.
+- A CI do SHA final deve validar TypeScript, barreira, suíte completa e build Android. Suporte real depende da resposta da ECU.
