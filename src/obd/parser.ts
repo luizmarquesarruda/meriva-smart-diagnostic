@@ -27,10 +27,34 @@ function findResponsePayload(rawResponse: string, pid: string, byteCount: number
   const requestedPid = pid.slice(-2).toUpperCase();
   const serviceOffsetBytes = service === '42' ? 1 : 0;
 
-  // Parse each response line separately. Removing all separators from the full
-  // stream can accidentally join adapter chatter, headers, payloads and extra
-  // bytes into a seemingly valid response.
+  // Keep response lines separate so adapter chatter cannot be joined to payload bytes.
   for (const line of rawResponse.split(/[\r\n]+/)) {
+    const compactLine = line.trim().toUpperCase();
+    if (/^[0-9A-F]+$/.test(compactLine)) {
+      // ELM adapters may emit compact hex such as 410C1AF8. Validate its exact
+      // payload length just as strictly as a space-separated response.
+      const marker = service + requestedPid;
+      let markerIndex = compactLine.indexOf(marker);
+      while (markerIndex >= 0) {
+        const payloadStart = markerIndex + marker.length + serviceOffsetBytes * 2;
+        const payloadHex = compactLine.slice(payloadStart, payloadStart + byteCount * 2);
+        const trailingHex = compactLine.slice(payloadStart + byteCount * 2);
+        if (
+          payloadHex.length === byteCount * 2 &&
+          trailingHex.length === 0 &&
+          /^[0-9A-F]+$/.test(payloadHex)
+        ) {
+          const bytes: number[] = [];
+          for (let offset = 0; offset < payloadHex.length; offset += 2) {
+            bytes.push(Number.parseInt(payloadHex.slice(offset, offset + 2), 16));
+          }
+          return bytes;
+        }
+        markerIndex = compactLine.indexOf(marker, markerIndex + 1);
+      }
+      continue;
+    }
+
     const tokens = line.toUpperCase().match(/\b[0-9A-F]{2}\b/g) ?? [];
     for (let index = 0; index < tokens.length - 1; index += 1) {
       if (tokens[index] !== service || tokens[index + 1] !== requestedPid) continue;
@@ -40,8 +64,6 @@ function findResponsePayload(rawResponse: string, pid: string, byteCount: number
       const trailing = tokens.slice(payloadStart + byteCount);
       // Some legacy ISO/K-line ELM responses include a three-byte header and
       // one checksum byte after the OBD payload (e.g. 48 6B 10 ... 82).
-      // Accept that known envelope only; arbitrary extra bytes on a bare PID
-      // response remain invalid.
       const legacyKLineEnvelope = index === 3
         && tokens[0] === '48'
         && tokens[1] === '6B'
