@@ -12,6 +12,18 @@ export interface FuelIntegrationState {
 
 const MAX_INTERVAL_MS = 30_000;
 
+// OBD-II input ranges: MAF (PID 0110), MAP (010B), RPM (010C), and IAT (010F).
+// These caps stop synthetic/corrupt sensor values from yielding plausible-looking
+// but physically impossible fuel rates. The estimate is only a fallback; 015E wins.
+const MAX_OBD_MAF_GS = 655.35;
+const MAX_OBD_MAP_KPA = 255;
+const MAX_OBD_ENGINE_RPM = 16_383.75;
+const MIN_OBD_IAT_C = -40;
+const MAX_OBD_IAT_C = 215;
+const MAX_ENGINE_DISPLACEMENT_L = 50;
+const MAX_VOLUMETRIC_EFFICIENCY = 2;
+const MAX_ESTIMATED_FUEL_RATE_LPH = 500;
+
 export function integrateFuelRateLph(
   previous: FuelRateSample | null,
   current: FuelRateSample,
@@ -133,10 +145,12 @@ export function estimateFuelRateLph(input: FuelRateEstimateInput): { rateLph: nu
     afr <= 0 || density <= 0
   ) return null;
 
-  if (Number.isFinite(input.mafGs) && (input.mafGs ?? 0) > 0 && afr > 0 && density > 0) {
+  if (Number.isFinite(input.mafGs) && (input.mafGs ?? 0) > 0 && (input.mafGs ?? 0) <= MAX_OBD_MAF_GS && afr > 0 && density > 0) {
     const fuelKgPerSecond = (input.mafGs as number) / 1000 / afr;
     const rateLph = fuelKgPerSecond * 3600 / density;
-    if (Number.isFinite(rateLph) && rateLph > 0) return { rateLph, source: 'ESTIMATED_MAF' };
+    if (Number.isFinite(rateLph) && rateLph > 0 && rateLph <= MAX_ESTIMATED_FUEL_RATE_LPH) {
+      return { rateLph, source: 'ESTIMATED_MAF' };
+    }
   }
 
   const map = input.mapKpa;
@@ -145,12 +159,11 @@ export function estimateFuelRateLph(input: FuelRateEstimateInput): { rateLph: nu
   const displacementL = (input.displacementCm3 ?? 0) / 1000;
   const ve = input.volumetricEfficiency ?? 0.80;
   if (
-    Number.isFinite(map) && (map ?? 0) > 0
-    && Number.isFinite(rpm) && (rpm ?? 0) > 0
-    && Number.isFinite(iat)
-    && (iat as number) > -273.15
-    && Number.isFinite(displacementL) && displacementL > 0
-    && afr > 0 && density > 0 && Number.isFinite(ve) && ve > 0
+    Number.isFinite(map) && (map ?? 0) > 0 && (map ?? 0) <= MAX_OBD_MAP_KPA
+    && Number.isFinite(rpm) && (rpm ?? 0) > 0 && (rpm ?? 0) <= MAX_OBD_ENGINE_RPM
+    && Number.isFinite(iat) && (iat as number) >= MIN_OBD_IAT_C && (iat as number) <= MAX_OBD_IAT_C
+    && Number.isFinite(displacementL) && displacementL > 0 && displacementL <= MAX_ENGINE_DISPLACEMENT_L
+    && afr > 0 && density > 0 && Number.isFinite(ve) && ve > 0 && ve <= MAX_VOLUMETRIC_EFFICIENCY
   ) {
     const absolutePressurePa = (map as number) * 1000;
     const temperatureK = (iat as number) + 273.15;
@@ -160,7 +173,9 @@ export function estimateFuelRateLph(input: FuelRateEstimateInput): { rateLph: nu
     const mafGs = airDensityGPerL * volumetricFlowLPerSecond;
     const fuelKgPerSecond = mafGs / 1000 / afr;
     const rateLph = fuelKgPerSecond * 3600 / density;
-    if (Number.isFinite(rateLph) && rateLph > 0) return { rateLph, source: 'ESTIMATED_MAP' };
+    if (Number.isFinite(rateLph) && rateLph > 0 && rateLph <= MAX_ESTIMATED_FUEL_RATE_LPH) {
+      return { rateLph, source: 'ESTIMATED_MAP' };
+    }
   }
 
   return null;
