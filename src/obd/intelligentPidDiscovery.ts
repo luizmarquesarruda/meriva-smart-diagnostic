@@ -1,6 +1,7 @@
 import type { Elm327Session, ElmCommandResult } from './elm327';
 import { parsePidResponse, validateOBDResponse } from './parser';
 import { DISCOVERY_PIDS, KNOWN_PIDS, decodeSupportedPids } from './pidScanner';
+import { PidDiscoveryBuffer } from './pidDiscoveryBuffer';
 
 export type IntelligentPidStatus =
   | 'CONFIRMADO'
@@ -24,6 +25,7 @@ export interface IntelligentPidDiscoveryResult {
   observations: IntelligentPidObservation[];
   supportResponses: Record<string, string>;
   confidence: Record<string, number>;
+  responseBuffer: ElmCommandResult[];
 }
 
 /**
@@ -40,6 +42,11 @@ export async function discoverIntelligentPids(
   const observations: IntelligentPidObservation[] = [];
   const supportResponses: Record<string, string> = {};
   const confidence: Record<string, number> = {};
+  // Buffer local à esta execução: nunca reaproveita resposta de outra ECU/sessão.
+  const responseBuffer = new PidDiscoveryBuffer();
+  for (const item of options?.prevalidatedResults ?? []) {
+    try { responseBuffer.record(item); } catch { /* ignora comandos que não são PIDs OBD */ }
+  }
   // A bitmap is an advertisement, not proof that a PID returned a valid payload.
   const bitmapAdvertised = new Set<string>();
   const supported = new Set<string>();
@@ -53,7 +60,8 @@ export async function discoverIntelligentPids(
   const probePid = async (pid: string, prevalidated?: ElmCommandResult): Promise<void> => {
     let result: ElmCommandResult;
     try {
-      result = prevalidated ?? await session.executeCommand(pid);
+      result = prevalidated ?? responseBuffer.get(pid) ?? await session.executeCommand(pid);
+      responseBuffer.record(result);
     } catch {
       return;
     }
@@ -104,6 +112,7 @@ export async function discoverIntelligentPids(
     let result: ElmCommandResult;
     try {
       result = await session.executeCommand(supportPid);
+      responseBuffer.record(result);
     } catch {
       break;
     }
@@ -171,6 +180,7 @@ export async function discoverIntelligentPids(
     let result: ElmCommandResult;
     try {
       result = await session.executeCommand(pid);
+      responseBuffer.record(result);
     } catch {
       continue;
     }
@@ -209,5 +219,6 @@ export async function discoverIntelligentPids(
     observations,
     supportResponses,
     confidence,
+    responseBuffer: responseBuffer.snapshot(),
   };
 }
