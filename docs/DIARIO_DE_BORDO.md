@@ -3658,3 +3658,20 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - A validação automatizada da PR precisa terminar no HEAD que contém estas alterações; os testes determinísticos não substituem teste físico com ELM327 e ECU da Meriva.
 - O buffer é volátil e existe para a descoberta atual; não é uma base persistente de suporte de PIDs.
 - Nenhuma PR foi mesclada nesta atualização.
+
+## DB-116 · 2026-10-24 — Buffer RX limitado no transporte Bluetooth
+
+### Problema confirmado
+- `BluetoothClassicTransport` acumulava indefinidamente os chunks recebidos em `received` até localizar o prompt `>`. Se o adaptador enviasse ruído sem prompt, o tamanho não era limitado.
+- O evento `RX_CHUNK` também guardava o chunk completo e sua conversão hexadecimal em memória de diagnóstico, mesmo para eventos anormalmente grandes.
+
+### Correção na PR #86
+- `src/obd/bluetoothClassicTransport.ts`: introduz limite de 16 KiB para o buffer RX; quando excedido, descarta o quadro até o prompt e lança erro explícito em vez de aceitar uma resposta potencialmente truncada.
+- O estado de overflow é limpo após consumir o erro, timeout, fechamento ou desconexão; o transporte pode receber um quadro válido seguinte.
+- Os logs preservam o tamanho integral do chunk, mas limitam o texto e a representação hexadecimal a uma amostra de 256 caracteres.
+- `tests/regression.test.js`: verifica overflow, truncamento dos diagnósticos, rejeição explícita do quadro grande e recuperação para uma resposta válida subsequente.
+
+### Validação e limites
+- A CI deve terminar no HEAD que contém estas alterações.
+- O limite protege o processo JavaScript contra acúmulo anormal; não comprova comportamento de todos os firmwares/clones ELM327 em conexão física.
+- Nenhuma PR foi mesclada nesta atualização.
