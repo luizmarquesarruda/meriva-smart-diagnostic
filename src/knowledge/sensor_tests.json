@@ -266,7 +266,7 @@
       "diagnosticRuleIds": [
         "DTC_P0301_MISFIRE"
       ],
-      "aiGuidance": "Compare com IAT após repouso a frio e acompanhe aquecimento. Três valores plausíveis não comprovam calibração."
+      "aiGuidance": "Compare com IAT após repouso a frio e acompanhe aquecimento. Cinco leituras válidas também não comprovam calibração do sensor."
     },
     {
       "id": "PID_0106",
@@ -400,7 +400,7 @@
         "DTC_P0301_MISFIRE",
         "FUEL_TRIM_LEAN"
       ],
-      "aiGuidance": "Motor parado: compare medianas MAP/BARO. Motor aquecido: avalie com RPM. MAP alto cria hipótese de vácuo/entrada de ar/sincronismo, não prova sensor ruim."
+      "aiGuidance": "Motor parado: compare médias aritméticas MAP/BARO. Motor aquecido: avalie com RPM. MAP alto cria hipótese de vácuo/entrada de ar/sincronismo, não prova sensor ruim."
     },
     {
       "id": "PID_010E",
