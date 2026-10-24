@@ -83,7 +83,10 @@ export function normalizeGpsSpeedKmh(speedMs: number | null | undefined): number
 }
 
 function isAccurate(sample: GpsSample): boolean {
-  return sample.accuracyM == null || sample.accuracyM <= MAX_ACCURACY_M;
+  return sample.accuracyM != null
+    && Number.isFinite(sample.accuracyM)
+    && sample.accuracyM >= 0
+    && sample.accuracyM <= MAX_ACCURACY_M;
 }
 
 export class GpsTracker {
@@ -211,7 +214,7 @@ export class GpsTracker {
   }
 
   private getSignalQuality(accuracyM: number | null): GpsTripState['signalQuality'] {
-    if (accuracyM == null || !Number.isFinite(accuracyM) || accuracyM > MAX_ACCURACY_M) return 'SEM_FIX';
+    if (accuracyM == null || !Number.isFinite(accuracyM) || accuracyM < 0 || accuracyM > MAX_ACCURACY_M) return 'SEM_FIX';
     if (accuracyM <= 5) return 'EXCELENTE';
     if (accuracyM <= 15) return 'BOA';
     return 'FRACA';
@@ -315,7 +318,10 @@ export class GpsTracker {
 
   handleLocation(location: Location.LocationObject): void {
     const c = location.coords;
-    if (!Number.isFinite(c.latitude) || !Number.isFinite(c.longitude)) return;
+    if (
+      !Number.isFinite(c.latitude) || c.latitude < -90 || c.latitude > 90
+      || !Number.isFinite(c.longitude) || c.longitude < -180 || c.longitude > 180
+    ) return;
 
     const sample: GpsSample = {
       latitude: c.latitude,
