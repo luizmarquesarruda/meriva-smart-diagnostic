@@ -107,6 +107,9 @@ assert.match(dataScreen, /item\.source === 'REAL'/, 'últimas leituras devem exc
 assert.match(dataScreen, /telemetrySamples/, 'histórico deve reutilizar amostras persistidas por viagem');
 assert.match(dataScreen, /VIAGENS SALVAS/, 'tela deve oferecer modo interativo de histórico');
 assert.match(read('app/saude.tsx'), /runLocalDiagnostic/);
+assert.ok(health.includes('isCurrentLiveDtc'), 'Saúde não deve exibir DTC histórico como atual');
+assert.ok(health.includes("value:r.status==='RESPONDEU'?r.value:null"), 'falha de consulta não pode alimentar hipótese atual');
+assert.ok(health.includes('ECU desconectada. Os registros salvos não confirmam o estado atual das falhas.'), 'desconexão não confirma ausência de falhas');
 assert.match(read('app/saude.tsx'), /activeDtcs/);
 assert.match(read('app/aprendizado.tsx'), /realSamples/);
 assert.match(read('app/laboratorio.tsx'), /03 \/ 07 \/ 0A/);
