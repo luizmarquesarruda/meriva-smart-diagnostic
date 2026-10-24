@@ -6,7 +6,7 @@
 import type { AutoSaveEnvelope } from './autosaveTypes';
 import type { MerivaPersistedState } from './autosaveState';
 import { createEmptyMerivaState } from './autosaveState';
-import { AUTOSAVE_DATA_TYPE, AUTOSAVE_SOURCE } from './autosaveTypes';
+import { AUTOSAVE_DATA_TYPE } from './autosaveTypes';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
