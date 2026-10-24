@@ -8,9 +8,10 @@ const dtcQueues = new Map<string, Promise<void>>();
 function queueDtcWrite(target: string, operation: () => Promise<void>): Promise<void> {
   const previous = dtcQueues.get(target) ?? Promise.resolve();
   const current = previous.catch(() => undefined).then(operation);
-  dtcQueues.set(target, current.catch(() => undefined));
+  const tail = current.catch(() => undefined);
+  dtcQueues.set(target, tail);
   return current.finally(() => {
-    if (dtcQueues.get(target) === current) dtcQueues.delete(target);
+    if (dtcQueues.get(target) === tail) dtcQueues.delete(target);
   });
 }
 
