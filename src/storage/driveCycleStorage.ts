@@ -23,31 +23,35 @@ function indexBackupPath(indexFile: string): string { return indexFile.replace(/
 function indexTempPath(indexFile: string): string { return indexFile.replace(/\.json$/, '.tmp'); }
 
 function isDriveCycle(value: unknown): value is DriveCycle {
-  if (typeof value !== 'object' || value === null) return false;
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
   const cycle = value as Partial<DriveCycle>;
+  const finiteNonNegative = (item: unknown): item is number =>
+    typeof item === 'number' && Number.isFinite(item) && item >= 0;
+  const validDate = (item: unknown): item is string =>
+    typeof item === 'string' && item.trim().length > 0 && Number.isFinite(Date.parse(item));
+  const rawCycles = cycle.telemetrySamples;
   return (
-    typeof cycle.id === 'string' &&
-    typeof cycle.startedAt === 'string' &&
-    typeof cycle.finishedAt === 'string' &&
-    typeof cycle.distanceTotalKm === 'number' &&
-    typeof cycle.distanceIceKm === 'number' &&
-    typeof cycle.fuelUsedL === 'number' &&
+    typeof cycle.id === 'string' && cycle.id.trim().length > 0 &&
+    validDate(cycle.startedAt) && validDate(cycle.finishedAt) &&
+    finiteNonNegative(cycle.distanceTotalKm) &&
+    finiteNonNegative(cycle.distanceIceKm) &&
+    finiteNonNegative(cycle.fuelUsedL) &&
     typeof cycle.totalTimeHms === 'string' &&
     typeof cycle.drivingTimeHms === 'string' &&
     typeof cycle.standingTimeHms === 'string' &&
-    typeof cycle.avgDrivingSpeedKmh === 'number' &&
-    typeof cycle.avgFuelConsumptionKml === 'number' &&
+    finiteNonNegative(cycle.avgDrivingSpeedKmh) &&
+    finiteNonNegative(cycle.avgFuelConsumptionKml) &&
     (cycle.fuelDataValid === undefined || typeof cycle.fuelDataValid === 'boolean') &&
-    (cycle.maxSpeedKmh === undefined || (typeof cycle.maxSpeedKmh === 'number' && Number.isFinite(cycle.maxSpeedKmh) && cycle.maxSpeedKmh >= 0)) &&
-    (cycle.telemetrySamples === undefined || (Array.isArray(cycle.telemetrySamples) && cycle.telemetrySamples.every((sample) =>
-      typeof sample === 'object' && sample !== null &&
-      typeof sample.timestamp === 'string' &&
-      (sample.speedKmh === null || (typeof sample.speedKmh === 'number' && Number.isFinite(sample.speedKmh))) &&
-      (sample.rpm === null || (typeof sample.rpm === 'number' && Number.isFinite(sample.rpm))) &&
+    (cycle.maxSpeedKmh === undefined || finiteNonNegative(cycle.maxSpeedKmh)) &&
+    (rawCycles === undefined || (Array.isArray(rawCycles) && rawCycles.every((sample) =>
+      typeof sample === 'object' && sample !== null && !Array.isArray(sample) &&
+      validDate(sample.timestamp) &&
+      (sample.speedKmh === null || finiteNonNegative(sample.speedKmh)) &&
+      (sample.rpm === null || finiteNonNegative(sample.rpm)) &&
       (sample.coolantTempC === null || (typeof sample.coolantTempC === 'number' && Number.isFinite(sample.coolantTempC)))
     ))) &&
     ['CARSCANNER_SEED', 'REAL_OBD', 'SIMULACAO'].includes(cycle.source as string) &&
-    typeof cycle.importedAt === 'string'
+    validDate(cycle.importedAt)
   );
 }
 
@@ -122,7 +126,18 @@ async function readCyclesFromFile(filePath: string): Promise<DriveCycle[] | null
     if (!info.exists || info.isDirectory) return null;
     const data = JSON.parse(await FileSystem.readAsStringAsync(filePath)) as { cycles?: unknown };
     if (!Array.isArray(data.cycles)) return null;
-    return cyclesFromUnknown(data.cycles).filter((cycle) => cycle.source !== 'CARSCANNER_SEED');
+    const onlySeeds = data.cycles.every((cycle) =>
+      typeof cycle === 'object' && cycle !== null &&
+      (cycle as { source?: unknown }).source === 'CARSCANNER_SEED',
+    );
+    const valid = cyclesFromUnknown(data.cycles);
+    const invalidNonSeeds = data.cycles.some((cycle) =>
+      !(typeof cycle === 'object' && cycle !== null &&
+        (cycle as { source?: unknown }).source === 'CARSCANNER_SEED') &&
+      !isDriveCycle(cycle),
+    );
+    if (invalidNonSeeds || (data.cycles.length > 0 && valid.length === 0 && !onlySeeds)) return null;
+    return valid.filter((cycle) => cycle.source !== 'CARSCANNER_SEED');
   } catch {
     return null;
   }
@@ -157,8 +172,13 @@ export async function addDriveCycle(basePath: string, cycle: DriveCycle): Promis
         totalCount?: number;
       };
       if (!Array.isArray(parsed.cycles)) throw new Error('INDEX_CYCLES_NOT_ARRAY');
+      const invalidNonSeeds = parsed.cycles.some((item) =>
+        !(typeof item === 'object' && item !== null &&
+          (item as { source?: unknown }).source === 'CARSCANNER_SEED') &&
+        !isDriveCycle(item),
+      );
+      if (invalidNonSeeds) throw new Error('INDEX_HAS_INVALID_CYCLES');
       const validCycles = cyclesFromUnknown(parsed.cycles).filter((item) => item.source !== 'CARSCANNER_SEED');
-      if (parsed.cycles.length > 0 && validCycles.length === 0) throw new Error('INDEX_HAS_NO_VALID_CYCLES');
       data = {
         version: typeof parsed.version === 'string' ? parsed.version : '1.0',
         cycles: validCycles,
