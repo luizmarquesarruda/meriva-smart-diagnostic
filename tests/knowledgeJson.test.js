@@ -63,6 +63,8 @@ function main() {
     assert.ok(sourcesById.has(requiredSource), 'fonte técnica obrigatória ausente: ' + requiredSource);
   }
   assert.match(sourcesById.get('MERIVA_OWNER_MANUAL').url, /chevrolet\.com\.br.*manual-meriva-2012\.pdf/);
+  assert.strictEqual(sourcesById.get('SAE_J1979_CURRENT_EDITION').url, 'https://saemobilus.sae.org/standards/j1979_202505-e-e-diagnostic-test-modes');
+  assert.strictEqual(sourcesById.get('SAE_J1979_DA_CURRENT').url, 'https://doi.org/10.4271/J1979DA');
   assert.match(sourcesById.get('MERIVA_OWNER_MANUAL').limitation, /não contém tabela de PIDs OBD/i);
   assert.ok(sensorTests.supportPolicy.distinctions.includes('OWNER_MANUAL_DOES_NOT_DEFINE_PID_SUPPORT'));
   assert.ok(sensorTests.supportPolicy.distinctions.includes('STANDARD_PID_CATALOG_IS_NOT_VEHICLE_COMPATIBILITY'));
