@@ -1017,6 +1017,22 @@ async function testDriveCycleValidation() {
   );
   assert.strictEqual(files.get(damagedIndex), damagedContent,
     'índice inválido deve ser preservado para recuperação manual');
+
+  resetFS();
+  await fakeFS.makeDirectoryAsync(BASE + '/VIAGENS', { intermediates: true });
+  files.set(BASE + '/VIAGENS/index.previous.json', JSON.stringify({
+    version: '1.0',
+    cycles: [cycle],
+    totalCount: 1,
+  }));
+  await storage.addDriveCycle(BASE, { ...cycle, id: 'after-main-loss' });
+  assert.deepStrictEqual(
+    (await storage.readDriveCycles(BASE)).map((item) => item.id).sort(),
+    ['after-main-loss', 'test-1'],
+    'índice principal ausente deve ser recuperado do backup antes de acrescentar uma viagem',
+  );
+  assert.ok(files.has(BASE + '/VIAGENS/index.previous.json'),
+    'backup anterior deve permanecer disponível durante a recuperação');
 }
 
 async function testDriveCycleSummaryUsesWeightedRealSpeed() {
