@@ -78,8 +78,19 @@ function findResponsePayload(rawResponse: string, pid: string, byteCount: number
 }
 
 export function extractHexBytes(rawResponse: string): number[] {
-  const tokens = rawResponse.toUpperCase().match(/(?:^|\s)([0-9A-F]{2})(?=\s|$)/g) ?? [];
-  return tokens.map((token) => Number.parseInt(token.trim(), 16));
+  const bytes: number[] = [];
+  for (const line of rawResponse.split(/[\r\n]+/)) {
+    const trimmed = line.trim().toUpperCase();
+    if (/^(?:[0-9A-F]{2})+$/.test(trimmed)) {
+      for (let offset = 0; offset < trimmed.length; offset += 2) {
+        bytes.push(Number.parseInt(trimmed.slice(offset, offset + 2), 16));
+      }
+      continue;
+    }
+    const tokens = line.toUpperCase().match(/(?:^|\s)([0-9A-F]{2})(?=\s|$)/g) ?? [];
+    bytes.push(...tokens.map((token) => Number.parseInt(token.trim(), 16)));
+  }
+  return bytes;
 }
 
 export function validateOBDResponse(response: string, positiveService = '41'): boolean {
