@@ -47,7 +47,7 @@ O motor consome os avaliadores e limites do JSON e agrega cinco amostras válida
 
 - SAE J1979, cópia pública de edição anterior: https://law.resource.org/pub/us/cfr/ibr/005/sae.j1979.2002.pdf
 - SAE J1979_202505, página oficial: https://saemobilus.sae.org/standards/j1979_202505-e-e-diagnostic-test-modes
-- SAE J1979-DA_202608, Digital Annex revisado em agosto de 2026: https://saemobilus.sae.org/standards/j1979da_202608-j1979-da-digital-annex-e-e-diagnostic-test-modes
+- SAE J1979-DA_202608, Digital Annex revisado em agosto de 2026: https://doi.org/10.4271/J1979DA
 - Dashlogic, tabela OBD-II: https://www.dashlogic.com/docs/technical/obdii_pids
 - OBD2 PID Knowledge: https://obd2pid.com/pids
 - Manual do Proprietário Chevrolet Meriva 2012: https://www.chevrolet.com.br/content/dam/chevrolet/south-america/brazil/portuguese/index/services/owner-manuals/05-pdf/meriva/manual-meriva-2012.pdf
