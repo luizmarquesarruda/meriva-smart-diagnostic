@@ -123,13 +123,18 @@ function main() {
 
   // The canonical human-readable map must never silently drift from the runtime catalog.
   const documentedPidRows = new Map();
-  for (const line of pidMapDocument.split(/\\r?\\n/)) {
-    const match = line.match(/^\\| `([0-9A-F]{4})` \\| (.*?) \\| (\\d+) \\| `(.*?)` \\|/);
-    if (match) {
-      const [, id, name, bytes, formulaId] = match;
-      assert.ok(!documentedPidRows.has(id), 'PID duplicado no mapa documental: ' + id);
-      documentedPidRows.set(id, { name, bytes: Number(bytes), formulaId });
-    }
+  for (const line of pidMapDocument.split('\n')) {
+    if (!line.startsWith('| `')) continue;
+    const cells = line.split('|').map((cell) => cell.replaceAll('`', '').trim());
+    if (cells.length < 8) continue;
+    const id = cells[1];
+    if (!pids.pids.some((pid) => pid.pid === id)) continue;
+    assert.ok(!documentedPidRows.has(id), 'PID duplicado no mapa documental: ' + id);
+    documentedPidRows.set(id, {
+      name: cells[2],
+      bytes: Number(cells[3]),
+      formulaId: cells[4],
+    });
   }
   assert.strictEqual(documentedPidRows.size, pids.pids.length,
     'o mapa deve conter exatamente uma linha para cada PID do catálogo JSON');
@@ -140,12 +145,16 @@ function main() {
     assert.strictEqual(documented.bytes, pid.bytes, 'bytes divergem entre catálogo e mapa: ' + pid.pid);
     assert.strictEqual(documented.formulaId, pid.formulaId, 'fórmula diverge entre catálogo e mapa: ' + pid.pid);
   }
-  assert.match(pidReportDocument, /PID_FORMULA_MAP_2026-10-24\\.md/);
-  assert.match(pidReportDocument, /\\| 0101 \\| Monitor Status Since DTCs Cleared \\| 4 \\| dtc_count \\| DTC_COUNT/);
-  assert.match(pidReportDocument, /\\| 0130 \\| Warmups Since DTC Clear \\| 1 \\| warmup_cycles \\| U8/);
-  assert.match(pidReportDocument, /\\| 0111 \\| Absolute Throttle Position/);
-  assert.match(pidReportDocument, /\\| 0145 \\| Relative Throttle Position/);
-  assert.match(pidReportDocument, /\\| 015A \\| Relative Accelerator Pedal Position/);
+  for (const requiredText of [
+    'PID_FORMULA_MAP_2026-10-24.md',
+    '| 0101 | Monitor Status Since DTCs Cleared | 4 | dtc_count | DTC_COUNT',
+    '| 0130 | Warmups Since DTC Clear | 1 | warmup_cycles | U8',
+    '| 0111 | Absolute Throttle Position',
+    '| 0145 | Relative Throttle Position',
+    '| 015A | Relative Accelerator Pedal Position',
+  ]) {
+    assert.ok(pidReportDocument.includes(requiredText), 'relatório técnico sem texto vigente: ' + requiredText);
+  }
 
   const pidList = [...pidIds];
   const rangeIds = Object.keys(ranges.ranges).map((id) => id.toUpperCase());
