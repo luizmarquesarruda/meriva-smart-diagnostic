@@ -3612,7 +3612,7 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 ### Correção aplicada na PR #87
 - O caminho compacto de `findResponsePayload` agora permite exatamente um byte terminal extra somente quando o prefixo é o envelope conhecido `486B10`. Respostas OBD diretas continuam exigindo payload exato sem bytes extras.
 - Cabeçalhos CAN compactos agora exigem ID de 11/29 bits seguido de DLC compatível com o comprimento esperado para serviço, PID, quadro e payload; prefixos arbitrários e DLC incorreto são rejeitados.
-- Adicionados testes para aceitar o envelope K-Line compacto e rejeitar outro byte adicional depois do checksum, aceitar IDs CAN compactos de 11/29 bits e rejeitar DLC incorreto ou prefixo hexadecimal arbitrário.
+- Adicionados testes para aceitar o envelope K-Line compacto e rejeitar outro byte adicional depois do checksum, aceitar IDs CAN compactos de 11/29 bits e rejeitar DLC incorreto ou prefixo hexadecimal arbitrário. A validação equivalente foi aplicada ao caminho espaçado: IDs CAN e DLC são conferidos, e bytes arbitrários antes da resposta ou DLC incompatível são rejeitados.
 - O contrato RG-33 agora documenta o envelope K-Line compacto e a validação do DLC CAN; RG-32 permanece reservado à integridade/descoberta das bitmaps, sem colisão entre PRs.
 
 ### Validação e limites
