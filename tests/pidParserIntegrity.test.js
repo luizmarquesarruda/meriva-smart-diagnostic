@@ -146,6 +146,15 @@ assert.equal(parser.parsePidResponse('0110', '41 10 03 E8').value, 10,
   'MAF deve aplicar (A*256+B)/100 g/s');
 assert.equal(parser.parsePidResponse('0114', '41 14 6A 80').value, 0.53,
   'PID 0114 usa o byte A para tensão e exige dois bytes de payload');
+const o2Trim = parser.parsePidResponse('0114', '41 14 6A 76');
+assert.equal(o2Trim.value, 0.53, 'PID 0114 mantém a tensão baseada apenas no byte A');
+assert.equal(o2Trim.interpretation, 'AJUSTE CURTO B1S1=-7.81%',
+  'PID 0114 deve expor o ajuste de curto prazo do byte B separadamente');
+assert.equal(
+  parser.parsePidResponse('0114', '41 14 6A FF').interpretation,
+  'AJUSTE CURTO B1S1=NÃO USADO (B=FF)',
+  'byte B=FF significa que o sensor não é usado no cálculo do ajuste e não deve virar +99,22%',
+);
 assert.equal(parser.parsePidResponse('015E', '41 5E 00 C8').value, 10,
   'taxa de combustível deve aplicar (A*256+B)/20 L/h');
 
