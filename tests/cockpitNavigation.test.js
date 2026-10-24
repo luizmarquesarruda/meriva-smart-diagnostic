@@ -27,11 +27,11 @@ assert.match(index, /settings\?\.elmMaxConnectionAttempts/, 'efeito deve reagir 
 assert.match(index, /bottomNavLandscape/, 'navegação inferior deve continuar disponível em paisagem');
 assert.doesNotMatch(index, /!layout\.landscape\s*&&\s*\(/, 'navegação não deve desaparecer ao girar o aparelho');
 assert.doesNotMatch(index, /<Text style=\{\[styles\.bottomNavText, styles\.bottomNavTextActive\]\}>Painel<\/Text>/, 'navegação inferior deve usar ícones sem legenda visual');
-for (const label of ['Painel, tela atual', 'Diagnóstico', 'Dados', 'Viagens', 'Mais recursos']) {
+for (const label of ['Painel, tela atual', 'Conexões Bluetooth e ECU', 'Diagnóstico', 'Viagens', 'Dados e telemetria', 'Mais recursos']) {
   assert.ok(index.includes('accessibilityLabel="' + label + '"'), 'aba deve manter rótulo acessível: ' + label);
 }
 assert.match(index, /bottomNavItem:\{[^}]*minHeight:58/, 'abas inferiores devem ter alvo de toque de 58 dp');
-assert.match(index, /bottomNavText:\{[^}]*fontSize:8/, 'rótulos das abas devem continuar compactos e visíveis');
+assert.match(index, /AppIcon name="bluetooth" size=\{28\}/, 'a navegação deve incluir conexões com ícone ampliado');
 assert.match(index, /accessibilityLabel="Mais recursos"/, 'aba Mais precisa de nome acessível explícito');
 assert.match(index, /accessibilityHint="Abre os módulos adicionais do aplicativo"/, 'aba Mais precisa explicar a ação ao leitor de tela');
 assert.doesNotMatch(index, /actionGrid|dashboardAction/, 'não repetir Diagnóstico, Dados e Viagens em uma segunda fileira');
@@ -50,7 +50,7 @@ assert.match(index, /layoutSpacer:\{flexGrow:1,minHeight:8/, 'a navegação deve
 const networkIndicator = read('src/ui/NetworkStatusIndicator.tsx');
 assert.match(networkIndicator, /label: \{ fontSize: 13/, 'geração Wi-Fi/4G/5G deve ter maior legibilidade no cockpit');
 assert.match(networkIndicator, /AppIcon name=\{presentation\.icon\} size=\{20\}/, 'ícone da rede deve ficar visível sem dominar o cartão');
-assert.match(index, /bottomNavText:\{[^}]*fontSize:8/, 'rótulos da navegação devem permanecer legíveis');
+
 assert.match(index, /networkChipLandscape:\{[^}]*minHeight:50,[^}]*maxWidth:92/, 'cartão de rede permanece compacto em paisagem');
 assert.match(networkIndicator, /internetStatus: \{ fontSize: 10/, 'estado da internet deve usar tipografia legível em uma segunda linha');
 assert.match(networkIndicator, /INTERNET OK/);
