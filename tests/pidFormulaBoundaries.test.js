@@ -52,6 +52,13 @@ function main() {
   assert.strictEqual(maxInjectionTiming.value, 301.9921875);
   assert.strictEqual(maxInjectionTiming.valid, true, 'PID 015D maximum 16-bit value is valid');
 
+  const monitorCount = decodeFormula('DTC_COUNT', '0101', [0x83, 0x33, 0xA1, 0x81]);
+  assert.strictEqual(monitorCount.value, 3, 'PID 0101 deve extrair os sete bits da contagem de DTCs');
+  assert.strictEqual(monitorCount.valid, true);
+  const maxMonitorCount = decodeFormula('DTC_COUNT', '0101', [0xFF, 0, 0, 0]);
+  assert.strictEqual(maxMonitorCount.value, 127, 'bit MIL não pode ser contado como DTC adicional');
+  assert.strictEqual(maxMonitorCount.valid, true);
+
   const labScreen = require('fs').readFileSync(path.join(ROOT, 'app/laboratorio.tsx'), 'utf8');
   assert.ok(labScreen.includes('INTEGRIDADE DO DECODIFICADOR'), 'laboratório deve exibir a seção de integridade das fórmulas');
   assert.ok(labScreen.includes('decodeFormula(item.formula, item.pid, item.bytes)'), 'a tela deve reutilizar o motor oficial, sem duplicar fórmulas');
