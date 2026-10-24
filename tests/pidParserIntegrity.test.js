@@ -57,6 +57,9 @@ for (const definition of catalog.pids) {
   assert.ok(Number.isFinite(parsed.value), `PID ${definition.pid} deve produzir valor finito`);
 }
 
+const compactParsed = parser.parsePidResponse('010C', '410C1AF8');
+assert.deepEqual(compactParsed.rawBytes, [0x41, 0x0C, 0x1A, 0xF8],
+  'resposta compacta deve preservar os bytes brutos para auditoria');
 assert.equal(parser.parsePidResponse('010C', '410C1AF8').value, 1726,
   'resposta compacta sem espaços deve continuar compatível');
 assert.equal(parser.parsePidResponse('010C', '410C1AF8FF').status, 'VALOR NÃO INTERPRETADO',
