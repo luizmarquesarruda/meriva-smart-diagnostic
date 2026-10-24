@@ -23,21 +23,27 @@ function normalizeHexStream(rawResponse: string): string {
 }
 
 function findResponsePayload(rawResponse: string, pid: string, byteCount: number, positiveService = '41'): number[] {
-  const stream = normalizeHexStream(rawResponse);
-  const marker = `${positiveService}${pid.slice(-2)}`;
-  const markerIndex = stream.indexOf(marker);
-  if (markerIndex < 0) return [];
+  const service = positiveService.toUpperCase();
+  const requestedPid = pid.slice(-2).toUpperCase();
+  const serviceOffsetBytes = service === '42' ? 1 : 0;
 
-  const frameOffset = positiveService === '42' ? 2 : 0;
-  const payloadStart = markerIndex + marker.length + frameOffset;
-  const payloadHex = stream.slice(payloadStart, payloadStart + byteCount * 2);
-  if (payloadHex.length !== byteCount * 2 || !/^[0-9A-F]+$/.test(payloadHex)) return [];
+  // Parse each response line separately. Removing all separators from the full
+  // stream can accidentally join adapter chatter, headers, payloads and extra
+  // bytes into a seemingly valid response.
+  for (const line of rawResponse.split(/[\r\n]+/)) {
+    const tokens = line.toUpperCase().match(/\b[0-9A-F]{2}\b/g) ?? [];
+    for (let index = 0; index < tokens.length - 1; index += 1) {
+      if (tokens[index] !== service || tokens[index + 1] !== requestedPid) continue;
 
-  const bytes: number[] = [];
-  for (let index = 0; index < payloadHex.length; index += 2) {
-    bytes.push(Number.parseInt(payloadHex.slice(index, index + 2), 16));
+      const payloadStart = index + 2 + serviceOffsetBytes;
+      const payload = tokens.slice(payloadStart, payloadStart + byteCount);
+      const trailing = tokens.slice(payloadStart + byteCount);
+      if (payload.length !== byteCount || trailing.length !== 0) continue;
+      if (!payload.every((token) => /^[0-9A-F]{2}$/.test(token))) continue;
+      return payload.map((token) => Number.parseInt(token, 16));
+    }
   }
-  return bytes;
+  return [];
 }
 
 export function extractHexBytes(rawResponse: string): number[] {
