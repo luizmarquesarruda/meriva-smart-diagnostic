@@ -3468,7 +3468,7 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - A capacidade de tanque de 56 L foi mantida: corresponde ao manual oficial Chevrolet Meriva MY12 consultado nesta auditoria. Não há evidência de que a capacidade nominal seja a causa do problema.
 
 ### Alterações implementadas nesta branch
-- `src/obd/parser.ts`: resposta PID analisada linha a linha; payload truncado ou com bytes excedentes é recusado tanto em formato espaçado quanto compacto (`410C1AF8`); cabeçalhos CAN e o envelope legado K-Line `48 6B 10 ... checksum` continuam aceitos.
+- `src/obd/parser.ts`: resposta PID analisada linha a linha; payload truncado ou com bytes excedentes é recusado tanto em formato espaçado quanto compacto (`410C1AF8`); cabeçalhos CAN e o envelope legado K-Line `48 6B 10 ... checksum` continuam aceitos. `extractHexBytes()` também preserva os bytes brutos da resposta compacta para auditoria.
 - `src/trip/tripRecorder.ts`: criado `getReliableTripConsumptionKml()` como critério único para consumo ao vivo e viagens persistidas.
 - `src/trip/autoTripService.ts`: autonomia/consumo da viagem só prioriza o consumo atual depois dos limites mínimos de distância, combustível e amostras válidas; antes disso, o serviço não usa consumo transitório para inflar a estimativa.
 - `tests/pidParserIntegrity.test.js`: nova auditoria determinística de cada PID do catálogo, bytes esperados, respostas truncadas/excedentes, cabeçalho CAN e limiares do consumo.
