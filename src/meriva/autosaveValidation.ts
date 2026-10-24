@@ -24,7 +24,7 @@ export function isValidEnvelope(value: unknown): value is AutoSaveEnvelope<Meriv
     Number.isInteger(env.schemaVersion) &&
     (env.schemaVersion as number) >= 0 &&
     env.dataType === AUTOSAVE_DATA_TYPE &&
-    env.source === AUTOSAVE_SOURCE &&
+    typeof env.source === 'string' && env.source.trim().length > 0 &&
     Number.isFinite(savedAtMs) &&
     isRecord(env.payload)
   );
