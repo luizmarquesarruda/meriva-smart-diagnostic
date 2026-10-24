@@ -62,7 +62,7 @@ assert.match(health, /getSharedObdStatus/, 'a central de saúde deve usar o esta
 assert.match(health, /ECU NÃO VALIDADA/, 'ausência de conexão não pode ser apresentada como sistema normal');
 assert.match(health, /ageMs >= 0 && ageMs <= 30_000/, 'a central de saúde deve usar só leituras reais recentes');
 assert.match(health, /r\.source==='REAL'\?'REAL_OBD':r\.source==='SIMULACAO'\?'SIMULACAO':'IMPORTADO'/, 'fonte desconhecida/importada não pode ser promovida a telemetria OBD real');
-assert.match(health, /confidence:r\.source==='REAL'\?'GOOD':'LOW'/, 'confiança deve refletir apenas a origem real conhecida');
+assert.match(health, /confidence:r\.source==='REAL'&&r\.status==='RESPONDEU'\?'GOOD':'LOW'/, 'confiança só pode ser alta quando a leitura real foi respondida');
 assert.doesNotMatch(health, /SISTEMA NORMAL/, 'ausência de hipótese sem ECU validada não prova normalidade');
 assert.match(index, /weatherCity:\{[^}]*fontSize:15/, 'cidade/clima deve estar em tamanho legível no retrato');
 assert.match(index, /numberOfLines=\{layout\.landscape \? 1 : 2\}/, 'nome de cidade longo deve caber em duas linhas no retrato e uma na paisagem');
