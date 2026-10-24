@@ -134,6 +134,9 @@ function main() {
       name: cells[2],
       bytes: Number(cells[3]),
       formulaId: cells[4],
+      expression: cells[5],
+      unit: cells[6],
+      range: cells[7],
     });
   }
   const expectedFormulaExpressions = {
