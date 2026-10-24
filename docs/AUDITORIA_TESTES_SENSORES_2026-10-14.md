@@ -18,7 +18,7 @@
 
 Arquivo principal: src/knowledge/sensor_tests.json.
 
-- 30 parâmetros padronizados candidatos: rotação, velocidade reportada, carga, ECT, STFT/LTFT, pressão combustível, MAP, avanço, IAT, MAF, borboleta, O2, EGR, EVAP, nível combustível, BARO, tensão do módulo, carga absoluta, pedal, temperaturas ambiente/óleo, álcool reportado, pressão rail, tempo injeção, taxa combustível e torque calculado.
+- 30 parâmetros padronizados no catálogo de testes: PID 010C (RPM) tem evidência RAW_ECU no inventário atual; os outros 29 parâmetros ainda não estão confirmados para esta ECU. A lista cobre velocidade reportada, carga, ECT, trims de combustível, pressões, MAP, avanço, IAT, MAF, borboleta, O2, EGR, EVAP, nível combustível, BARO, tensão do módulo, carga absoluta, pedal, temperaturas ambiente/óleo, etanol reportado, pressão rail, tempo de injeção, taxa de combustível e torque.
 - Cada entrada referencia PID, fórmula/unidade de pids.json, modos, pré-requisitos, avaliador, limites heurísticos, guias da IA offline e vínculos a regras DTC/PID.
 - Uma entrada só entra no plano quando o PID é anunciado pela bitmap e existe uma definição local. Os 29 parâmetros restantes não são declarados suportados/confirmados nesta ECU.
 - A lista contém parâmetros calculados/comandados além de sensores físicos; a avaliação expõe essa limitação.
