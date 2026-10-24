@@ -47,6 +47,21 @@ function main() {
   assert.strictEqual(sensorTests.minimumReadingsPerPid, 5, 'cada PID suportado exige cinco tentativas');
   assert.ok(Array.isArray(sensorTests.tests) && sensorTests.tests.length > 0, 'catálogo de testes vazio');
   assert.ok(Array.isArray(sensorTests.sources) && sensorTests.sources.length >= 5, 'fontes pesquisadas ausentes');
+  const sourcesById = new Map(sensorTests.sources.map((source) => [source.id, source]));
+  for (const requiredSource of [
+    'MERIVA_OWNER_MANUAL',
+    'MERIVA_OWNER_MANUAL_2011',
+    'CHEVROLET_OLDER_MANUALS_PORTAL',
+    'OBD_AUTO_DOCTOR_PID_REFERENCE',
+    'OBDLINK_PID_REFERENCE',
+    'OBD2PID_0101_BIT_MAP',
+  ]) {
+    assert.ok(sourcesById.has(requiredSource), 'fonte técnica obrigatória ausente: ' + requiredSource);
+  }
+  assert.match(sourcesById.get('MERIVA_OWNER_MANUAL').url, /chevrolet\.com\.br.*manual-meriva-2012\.pdf/);
+  assert.match(sourcesById.get('MERIVA_OWNER_MANUAL').limitation, /não contém tabela de PIDs OBD/i);
+  assert.ok(sensorTests.supportPolicy.distinctions.includes('OWNER_MANUAL_DOES_NOT_DEFINE_PID_SUPPORT'));
+  assert.ok(sensorTests.supportPolicy.distinctions.includes('STANDARD_PID_CATALOG_IS_NOT_VEHICLE_COMPATIBILITY'));
   assert.strictEqual(typeof dtcCatalog.version, 'number');
   assert.strictEqual(typeof pollingPolicy.version, 'number');
   assert.strictEqual(pollingPolicy.version, 2, 'cadência flex-fuel exige versão de contrato atualizada');
@@ -86,6 +101,8 @@ function main() {
   assert.strictEqual(formulas.formulas.DTC_COUNT.operation, 'u8_mask');
   assert.strictEqual(formulas.formulas.DTC_COUNT.mask, 0x7F);
   assert.deepStrictEqual(ranges.ranges['0101'], { min: 0, max: 127 });
+  assert.match(monitorStatusPid.description, /C4\/D4.*filtro de partículas de gasolina/i);
+  assert.doesNotMatch(monitorStatusPid.description, /refrigerante do ar-condicionado/i);
 
   const o2Pid = pids.pids.find((item) => item.pid === '0114');
   assert.strictEqual(o2Pid.bytes, 2, 'PID 0114 deve carregar os dois bytes da resposta padronizada');
