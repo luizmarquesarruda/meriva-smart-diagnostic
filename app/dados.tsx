@@ -10,6 +10,7 @@ import { gpsTracker } from '../src/gps';
 import { getLivePidTrend, getLiveSeries, getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
 import { buildTelemetryChart, type TelemetryChartSample } from '../src/obd/telemetryChart';
 import { getSharedObdStatus } from '../src/obd/sharedConnection';
+import { getCurrentAutonomyRangeKm } from '../src/trip/autonomyPresentation';
 import { getPidDefinition } from '../src/obd/pidDefinition';
 import type { DriveCycle } from '../src/data/driveCycles';
 
@@ -50,6 +51,15 @@ export default function DadosScreen() {
   }, []);
 
   const ecuConnected = getSharedObdStatus().ecuConnected;
+  const currentAutonomyKm = getCurrentAutonomyRangeKm({
+    ecuConnected,
+    tripConnected: trip.connected,
+    fuelLevelSupported: trip.fuelLevelSupported,
+    fuelLevelPercent: trip.fuelLevelPercent,
+    fuelLevelReadAtMs: trip.fuelLevelReadAtMs,
+    tripConsumptionKml: trip.consumptionKml,
+    averageConsumptionKml: trip.averageConsumptionKml,
+  });
   const readings = [...state.lastReadings]
     .filter((item) => item.source === 'REAL')
     .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp));
@@ -94,7 +104,7 @@ export default function DadosScreen() {
             <Metric landscape={layout.landscape} label="VELOCIDADE GPS" value={gpsTracker.getState().running ? Math.round(gpsTracker.getState().currentSpeedKmh) + ' km/h' : 'N/D'} />
             <Metric landscape={layout.landscape} label="DISTÂNCIA DA VIAGEM" value={trip.active ? trip.distanceKm.toFixed(2) + ' km' : 'N/D'} />
             <Metric landscape={layout.landscape} label="CONSUMO" value={trip.consumptionKml != null && trip.consumptionKml > 0 ? trip.consumptionKml.toFixed(1) + ' km/L' : 'N/D'} />
-            <Metric landscape={layout.landscape} label="AUTONOMIA" value={trip.estimatedRangeKm > 0 ? trip.estimatedRangeKm.toFixed(0) + ' km' : 'N/D'} />
+            <Metric landscape={layout.landscape} label="AUTONOMIA" value={currentAutonomyKm != null ? currentAutonomyKm.toFixed(0) + ' km' : 'N/D'} />
           </View>
 
           <Text style={styles.section}>CONTEXTO OPERACIONAL</Text>
