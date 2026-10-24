@@ -1,4 +1,4 @@
-import { gpsTracker } from '../gps';
+import { gpsTracker, isGpsSampleFresh } from '../gps';
 import type { SharedObdConnection } from '../obd/sharedConnection';
 import { getSharedObdConnection, getSharedObdStatus, subscribeSharedObd } from '../obd/sharedConnection';
 import { addDriveCycle, readDriveCycles } from '../storage/driveCycleStorage';
@@ -461,7 +461,10 @@ class AutoTripService {
         }
 
         const gps = gpsTracker.getState();
-        const vehicleSpeedKmh = obdSpeedKmh ?? gps.currentSpeedKmh;
+        const gpsSpeedIsCurrent = gps.running
+          && gps.signalQuality !== 'SEM_FIX'
+          && isGpsSampleFresh(gps.lastTimestamp);
+        const vehicleSpeedKmh = obdSpeedKmh ?? (gpsSpeedIsCurrent ? gps.currentSpeedKmh : 0);
         // If RPM is temporarily unavailable, valid vehicle speed is still movement evidence.
         const moving = vehicleSpeedKmh > 0 && (rpm == null || rpm > 0);
 
@@ -480,9 +483,13 @@ class AutoTripService {
 
         const recorder = this.recorder;
         const tripGps = gpsTracker.getState();
+        const tripGpsSpeedIsCurrent = tripGps.running
+          && tripGps.signalQuality !== 'SEM_FIX'
+          && isGpsSampleFresh(tripGps.lastTimestamp);
         // A leitura instantânea deve ser publicada a cada ciclo OBD válido,
         // mesmo antes de iniciar uma viagem ou enquanto não existe viagem ativa.
-        const tripVehicleSpeedKmh = obdSpeedKmh ?? tripGps.currentSpeedKmh;
+        // GPS sem amostra recente nunca pode iniciar/manter uma viagem sozinho.
+        const tripVehicleSpeedKmh = obdSpeedKmh ?? (tripGpsSpeedIsCurrent ? tripGps.currentSpeedKmh : 0);
         let tripDistanceKm = 0;
         let tripFuelUsedL = 0;
         let tripConsumptionKml: number | null = null;
