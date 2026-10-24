@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
-import { flushCsvLogs } from '../src/database/csvLogger';
+import { flushCsvLogs, getCsvQueueStatus } from '../src/database/csvLogger';
 import { checkStorageQuota, getStorageBreakdown, StorageQuotaConfig } from '../src/storage/quotaManager';
 import { cleanupOldLogs, cleanupOldReadings } from '../src/storage/cleanup';
 import { getMidLayout } from '../src/ui/midLayout';
@@ -24,11 +24,13 @@ export default function ArmazenamentoScreen() {
   const [basePath, setBasePath] = useState<string | null>(null);
   const [quota, setQuota] = useState<{ warning: boolean; critical: boolean; message: string } | null>(null);
   const [usageBreakdown, setUsageBreakdown] = useState<Record<string, number>>({});
+  const [csvQueueStatus, setCsvQueueStatus] = useState(getCsvQueueStatus());
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [cycles, setCycles] = useState<DriveCycle[]>([]);
 
   async function refresh(path: string) {
+    setCsvQueueStatus(getCsvQueueStatus());
     try {
       const status = await checkStorageQuota(path, DEFAULT_QUOTA);
       setQuota(status);
@@ -61,6 +63,7 @@ export default function ArmazenamentoScreen() {
     setMessage('LIMPANDO...');
     try {
       await flushCsvLogs();
+      setCsvQueueStatus(getCsvQueueStatus());
       const logs = await cleanupOldLogs(basePath);
       const readings = await cleanupOldReadings(basePath);
       setMessage(`REMOVIDOS: ${logs} LOGS, ${readings} LEITURAS`);
@@ -80,6 +83,7 @@ export default function ArmazenamentoScreen() {
     setMessage('EXPORTANDO...');
     try {
       await flushCsvLogs();
+      setCsvQueueStatus(getCsvQueueStatus());
       const path = format === 'JSON'
         ? await exportDiagnosticsJson(basePath)
         : await exportDriveCyclesCsv(basePath);
@@ -111,6 +115,10 @@ export default function ArmazenamentoScreen() {
           </View>
         ))}
         <Text style={styles.note}>Limite configurado: 2 GB. A limpeza remove somente dados antigos permitidos pelo sistema.</Text>
+        <Text style={styles.note}>
+          Fila CSV: {csvQueueStatus.pendingRows}/{csvQueueStatus.maxPendingRows} pendentes.
+          Registros descartados por saturação: {csvQueueStatus.droppedRows}.
+        </Text>
       </View>
       <View style={[styles.historyCard, layout.landscape && styles.dataColumnCard]}>
         <Text style={styles.cardTitle}>VIAGENS SALVAS</Text>
