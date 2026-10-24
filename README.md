@@ -22,6 +22,16 @@ A rota operacional `app/splash.tsx` é a entrada inicial: tenta conectar ao ELM3
 
 A splash nativa usa o asset transparente `assets/splash.png` e o plugin `expo-splash-screen` configurado explicitamente em `app.json` com fundo `#07111f`, largura de 280 dp e `resizeMode: contain`. A configuração legada `expo.splash` aponta para o mesmo PNG. O baseline confirma o caminho e a assinatura do arquivo; antes de publicar, ainda é obrigatório instalar um APK de release e validar a inicialização fria em Android real. O contrato é protegido por `tests/projectBaseline.test.js` e RG-18 em `docs/CONTRATO_ANTI_REGRESSAO.md`.
 
+## Documentação técnica e compatibilidade dos PIDs
+
+A referência do carro e a definição OBD são fontes diferentes. Os manuais oficiais da [Meriva 2011](https://www.chevrolet.com.br/content/dam/chevrolet/south-america/brazil/portuguese/index/services/owner-manuals/05-pdf/meriva/manual-meriva-2011.pdf) e [Meriva 2012](https://www.chevrolet.com.br/content/dam/chevrolet/south-america/brazil/portuguese/index/services/owner-manuals/05-pdf/meriva/manual-meriva-2012.pdf) documentam operação, advertências e manutenção, mas não listam os PIDs OBD-II suportados pela ECU. O catálogo local contém definições SAE genéricas; isso não significa que os 34 PIDs estejam disponíveis neste veículo.
+
+- [Auditoria documental Meriva × OBD/PIDs](docs/MERIVA_OBD_SOURCE_AUDIT_2026-10-24.md): fontes, limites, diferenças entre padrão e suporte real e revisão bit a bit do PID 0101.
+- [Mapa de PIDs e fórmulas](docs/PID_FORMULA_MAP_2026-10-24.md): bytes, fórmulas, unidades, faixas e evidência específica disponível.
+- [Relatório de PIDs e fórmulas](docs/RELATORIO_PIDS_E_FORMULAS.md): resumo técnico histórico com link para o mapa vigente.
+
+Só uma resposta individual válida da ECU na sessão atual pode promover um PID de catálogo para evidência de resposta; bitmap anuncia suporte, mas não comprova a leitura nem a exatidão física do sensor. O inventário vigente registra `010C` como único PID com RAW_ECU documentada.
+
 ## Manutenção e abastecimento
 
 A página **Mais recursos → Manutenção e abastecimento** registra a quilometragem do painel, histórico de óleo/filtro, revisão, fluido de arrefecimento, fluido de freio e rodízio dos pneus, com lembretes por km ou calendário. O modo de uso severo adota os intervalos de referência do manual do Meriva 2012. Abastecimentos manuais são guardados em arquivo local separado e não são tratados como telemetria real nem entram no cálculo de consumo OBD. Os prazos são lembretes e devem ser confirmados no manual aplicável ao veículo.
