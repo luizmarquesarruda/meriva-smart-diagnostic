@@ -86,4 +86,40 @@ assert.equal(getReliableTripConsumptionKml(Number.NaN, 0.05, 2), null,
 assert.equal(getReliableTripConsumptionKml(0.2, Number.POSITIVE_INFINITY, 2), null,
   'combustível não finito não pode produzir consumo');
 
+const formulaVectors = [
+  ['U8', [42], 42],
+  ['U16', [1, 2], 258],
+  ['RPM', [0x1A, 0xF8], 1726],
+  ['TEMP_C', [0x69], 65],
+  ['PERCENT_255', [255], 100],
+  ['FUEL_TRIM', [255], 99.21875],
+  ['MAF_GS', [3, 232], 10],
+  ['TIMING_DEG', [128], 0],
+  ['VOLTS_1000', [0x34, 0xB0], 13.488],
+  ['O2_VOLTS', [0x6A, 0x80], 0.53],
+  ['DISTANCE_KM', [0x12, 0x34], 4660],
+  ['FUEL_RATE_LH', [0, 200], 10],
+  ['ETHANOL_PERCENT', [255], 100],
+  ['U8_X3', [42], 126],
+  ['U16_SCALE_255', [0, 255], 100],
+  ['U16_X10', [1, 2], 2580],
+  ['INJECTION_TIMING', [0x69, 0x80], 1],
+  ['TORQUE_PERCENT', [125], 0],
+  ['U16_DIV_32768', [0x80, 0], 1],
+  ['U32', [1, 2, 3, 4], 16909060],
+];
+for (const [formulaId, bytes, expected] of formulaVectors) {
+  const actual = formulaEngine.applyFormula(formulaId, bytes);
+  assert.ok(Math.abs(actual - expected) < 1e-9,
+    `fórmula ${formulaId}: esperado ${expected}, recebido ${actual}`);
+}
+assert.equal(parser.parsePidResponse('010C', '41 0C 1A F8').value, 1726,
+  'RPM Mode 01 deve aplicar (A*256+B)/4');
+assert.equal(parser.parsePidResponse('0110', '41 10 03 E8').value, 10,
+  'MAF deve aplicar (A*256+B)/100 g/s');
+assert.equal(parser.parsePidResponse('0114', '41 14 6A 80').value, 0.53,
+  'PID 0114 usa o byte A para tensão e exige dois bytes de payload');
+assert.equal(parser.parsePidResponse('015E', '41 5E 00 C8').value, 10,
+  'taxa de combustível deve aplicar (A*256+B)/20 L/h');
+
 console.log('pidParserIntegrity.test.js: PASS — catálogo de PIDs, payloads exatos e limiares de autonomia');
