@@ -61,6 +61,8 @@ assert.equal(parser.parsePidResponse('010C', '41 0C 1A').status, 'VALOR NÃO INT
   'payload truncado não pode virar leitura válida');
 assert.equal(parser.parsePidResponse('010C', '41 0C 1A F8 FF').status, 'VALOR NÃO INTERPRETADO',
   'byte excedente no mesmo quadro deve ser rejeitado');
+assert.equal(parser.parsePidResponse('010C', '48 6B 10 41 0C 1A F8 82').value, 1726,
+  'envelope legado K-Line com checksum deve continuar aceito');
 assert.equal(parser.parsePidResponse('010C', '7E8 04 41 0C 1A F8').status, 'RESPONDEU',
   'cabeçalho CAN/ELM antes da resposta não pode contaminar os bytes do PID');
 assert.equal(parser.parsePidResponse('010C', 'SEARCHING...\r\n41 0C 1A F8\r\n>').status, 'RESPONDEU',
