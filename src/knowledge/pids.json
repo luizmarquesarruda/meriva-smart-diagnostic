@@ -1,15 +1,15 @@
 {
-  "version": 2,
+  "version": 3,
   "source": "SAE J1979 / ISO 15031-5 cross-checked against open OBD implementations",
   "pids": [
     {
       "pid": "0101",
       "name": "Monitor Status Since DTCs Cleared",
       "bytes": 4,
-      "unit": "status",
-      "formulaId": "U32",
+      "unit": "dtc_count",
+      "formulaId": "DTC_COUNT",
       "classification": "PADRAO_OBD",
-      "description": "Status do MIL, quantidade de DTCs e monitores de prontidão desde a limpeza dos DTCs."
+      "description": "Status MIL e prontidão OBD. O valor principal é a contagem de DTCs (bits A6..A0); a interpretação detalhada decodifica MIL e os monitores dos quatro bytes."
     },
     {
       "pid": "0104",
