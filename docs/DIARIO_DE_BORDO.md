@@ -136,6 +136,27 @@
 - **DB-086** · 2026-10-21 — Cockpit: informações de rede/clima legíveis e botões com áreas de toque ampliadas
 - **DB-087** · 2026-10-21 — Ajuste adicional de legibilidade da rede e tamanho dos botões principais
 - **DB-088** · 2026-10-21 — Auditoria contra regressões, reconciliação das PRs fechadas e CI do conjunto combinado
+- **DB-089** · 2026-10-21 — Rotação automática da tela
+- **DB-090** · 2026-10-22 — Correção da autonomia, conexão explícita e navegação única
+- **DB-091** · 2026-10-22 — Compatibilidade da barra nativa com Expo Doctor
+- **DB-092** · 2026-10-22 — Restauração da splash screen e falha de cobertura antirregressão
+- **DB-093** · 2026-10-22 — Reconciliação da documentação após regressão da splash
+- **DB-094** · 2026-10-22 — Plano de aceitação para o lote de confiabilidade e UX
+- **DB-095** · 2026-10-22 — Expiração de nível de combustível antigo na autonomia atual
+- **DB-096** · 2026-10-22 — Fechar outros caminhos de exibição da autonomia persistida
+- **DB-097** · 2026-10-22 — Rejeitar timestamps inválidos/futuros na telemetria ao vivo
+- **DB-098** · 2026-10-22 — DTC: distinguir ausência de códigos de falha de leitura
+- **DB-099** · 2026-10-22 — Pendências de splash screen e rodada de estabilização
+- **DB-100** · 2026-10-23 — Implementar asset visual e configuração explícita da splash nativa
+- **DB-101** · 2026-10-23 — Splash operacional, conexão automática e identidade Smart OBD
+- **DB-102** · 2026-10-23 — Desbloquear o acesso ao cockpit quando a ECU está indisponível
+- **DB-103** · 2026-10-23 — Permissões de localização deixam de bloquear diagnóstico OBD
+- **DB-104** · 2026-10-23 — Prioridade de alerta térmico e localização contextual
+- **DB-105** · 2026-10-23 — Sincronizar contrato de teste com callback de prioridade térmica
+- **DB-106** · 2026-10-23 — Manutenção preventiva e diário local de abastecimentos
+- **DB-107** · 2026-10-23 — Cockpit OBD com até 20 PIDs reais
+- **DB-108** · 2026-10-23 — Recuperação Bluetooth/ELM327 e reconciliação de PR
+- **DB-109** · 2026-10-24 — Auditoria de PIDs e correção da autonomia em tempo real
 
 ---
 
@@ -3438,3 +3459,28 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - **Protocolo e permissões:** recuperação ELM (ATZ/ATSP/prova ECU/ATDP) é serializada; GPS segue opcional para iniciar OBD; o plugin limita permissões Bluetooth legadas no Android até API 30 sem limitar as permissões modernas.
 - **Proteções:** testes adversariais de promessa pendente, falha de fechamento, bloqueio entre instâncias e ordem de protocolo ficam ligados a `npm test` e ao gate anti-regressão. Os requisitos Bluetooth recebem IDs RG-22 a RG-31, sem duplicar RGs existentes.
 - **Validação:** conferir `gate:baseline`, `validate` e `android-build` no SHA final desta atualização. A CI não substitui teste físico com ELM327/ECU; esse teste e a inspeção no aparelho permanecem pendentes.
+
+## DB-109 · 2026-10-24 — Auditoria de PIDs e correção da autonomia em tempo real
+
+### Problema e causa confirmada
+- A auditoria do parser encontrou que o payload era recortado ao tamanho esperado, mas bytes excedentes no mesmo quadro não eram rejeitados. A normalização do fluxo inteiro também apagava a separação entre linhas do adaptador.
+- No serviço de viagem, o consumo ao vivo era calculado assim que distância e combustível fossem apenas maiores que zero. Isso divergia do critério já usado para persistir viagens (distância mínima de 0,1 km, combustível integrado mínimo de 0,05 L e duas amostras válidas) e podia gerar km/L exagerado nas primeiras amostras, inflando a autonomia.
+- A capacidade de tanque de 56 L foi mantida: corresponde ao manual oficial Chevrolet Meriva MY12 consultado nesta auditoria. Não há evidência de que a capacidade nominal seja a causa do problema.
+
+### Alterações implementadas nesta branch
+- `src/obd/parser.ts`: resposta PID analisada linha a linha; payload truncado ou com bytes excedentes no mesmo quadro é recusado; cabeçalho CAN antes da resposta continua permitido.
+- `src/trip/tripRecorder.ts`: criado `getReliableTripConsumptionKml()` como critério único para consumo ao vivo e viagens persistidas.
+- `src/trip/autoTripService.ts`: autonomia/consumo da viagem só prioriza o consumo atual depois dos limites mínimos de distância, combustível e amostras válidas; antes disso, o serviço não usa consumo transitório para inflar a estimativa.
+- `tests/pidParserIntegrity.test.js`: nova auditoria determinística de cada PID do catálogo, bytes esperados, respostas truncadas/excedentes, cabeçalho CAN e limiares do consumo.
+- `package.json`, `tests/projectBaseline.test.js`, `docs/CONTRATO_ANTI_REGRESSAO.md` e `docs/TEST_PLAN.md`: suíte incluída no comando de teste e no gate; novo contrato RG-32 e plano PID-AUTO-01.
+- PR #87: https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/87. Branch de trabalho: `fix/pid-autonomy-audit-20261024`. Nenhum merge executado.
+
+### Validação e limites
+- A suíte automatizada nova foi adicionada, mas ainda precisa executar na CI do HEAD final da PR. Não declarar TypeScript, suíte completa ou build Android como aprovados antes dos respectivos checks verdes.
+- O teste de bytes sintéticos verifica integridade de parsing/fórmulas; não prova que todos os PIDs são suportados pela ECU específica do veículo.
+- A validação física ainda exige ELM327 conectado à ECU, confirmação do PID 012F com timestamp atual e observação de autonomia durante uma viagem real.
+- MagicPath não foi usado porque esta rodada altera lógica de diagnóstico/telemetria, não o desenho de uma tela. A busca de apps Replit não encontrou um app correspondente acessível; o repositório GitHub é a fonte de código usada nesta tarefa.
+
+### Próximo passo
+Conferir a CI da PR #87 no SHA mais recente: gate de baseline, TypeScript e suíte completa via `validate`, além de `android-build`. Corrigir qualquer falha com base nos logs; não fazer merge sem autorização explícita.
+
