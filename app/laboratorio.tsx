@@ -703,6 +703,12 @@ export default function LaboratorioScreen() {
           <Text style={styles.label}>TEMPO</Text><Text style={styles.value}>{elapsedMs === null ? 'SEM DADOS' : elapsedMs + ' ms'}</Text>
           <Text style={styles.label}>STATUS</Text><Text style={styles.value}>{parsed?.status || 'COMANDO'}</Text>
           <Text style={styles.label}>VALOR</Text><Text style={styles.value}>{parsed?.value === null || !parsed ? 'SEM DADOS' : parsed.value + ' ' + parsed.unit}</Text>
+          {parsed?.interpretation ? (
+            <>
+              <Text style={styles.label}>INTERPRETAÇÃO</Text>
+              <Text style={styles.value}>{parsed.interpretation}</Text>
+            </>
+          ) : null}
           <Text style={styles.label}>COMBUSTÍVEL INTEGRADO (PID 015E)</Text><Text style={styles.value}>{fuelUsedL.toFixed(6)} L</Text>
           <Text style={styles.label}>CONTEXTO OPERACIONAL</Text><Text style={styles.value}>{getVehicleConditionSnapshot().condition}</Text>
           <Text style={styles.label}>DTC ARMAZENADOS</Text><Text style={styles.value}>{dtcCodes.length ? dtcCodes.join(', ') : 'NENHUM'}</Text>
