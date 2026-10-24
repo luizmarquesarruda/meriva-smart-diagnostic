@@ -74,6 +74,14 @@ assert.equal(parser.parsePidResponse('010C', '486B10410C1AF882').value, 1726,
   'envelope K-Line compacto deve continuar aceito quando o ELM desativa espaços');
 assert.equal(parser.parsePidResponse('010C', '486B10410C1AF88299').status, 'VALOR NÃO INTERPRETADO',
   'envelope K-Line compacto não pode ignorar bytes após o checksum');
+assert.equal(parser.parsePidResponse('010C', '7E804410C1AF8').value, 1726,
+  'resposta CAN compacta deve validar o ID e o DLC antes do payload');
+assert.equal(parser.parsePidResponse('010C', '18DAF11004410C1AF8').value, 1726,
+  'resposta CAN compacta com ID estendido deve ser aceita');
+assert.equal(parser.parsePidResponse('010C', '7E806410C1AF8').status, 'VALOR NÃO INTERPRETADO',
+  'DLC CAN divergente do tamanho do quadro não pode ser aceito');
+assert.equal(parser.parsePidResponse('010C', 'DEADBEEF410C1AF8').status, 'VALOR NÃO INTERPRETADO',
+  'prefixo hexadecimal arbitrário não pode ser tratado como cabeçalho CAN');
 assert.equal(parser.parsePidResponse('010C', '7E8 04 41 0C 1A F8').status, 'RESPONDEU',
   'cabeçalho CAN/ELM antes da resposta não pode contaminar os bytes do PID');
 assert.equal(parser.parsePidResponse('010C', 'SEARCHING...\r\n41 0C 1A F8\r\n>').status, 'RESPONDEU',
