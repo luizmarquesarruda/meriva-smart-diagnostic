@@ -97,6 +97,8 @@ assert.match(read('src/obd/dtcParser.ts'), /validAdditiveChecksum/);
 assert.match(read('src/storage/driveCycleStorage.ts'), /HISTORICO_DE_VIAGENS_CORROMPIDO/);
 assert.match(read('src/storage/driveCycleStorage.ts'), /indexWriteQueues/);
 assert.match(read('src/database/csvLogger.ts'), /MAX_PENDING_CSV_ROWS/);
+assert.match(read('app/armazenamento.tsx'), /csvQueueStatus\.droppedRows/);
+assert.match(read('app/armazenamento.tsx'), /csvQueueStatus\.pendingRows/);
 assert.match(read('src/database/csvLogger.ts'), /parseCsvRecords/);
 assert.match(read('src/storage/quotaManager.ts'), /cleanupToTarget/);
 assert.match(read('src/storage/quotaManager.ts'), /TAMANHO_DE_ARQUIVO_INDISPONIVEL/);
