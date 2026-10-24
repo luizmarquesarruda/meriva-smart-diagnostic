@@ -152,7 +152,7 @@ export function parsePidResponse(pidRequested: string, rawResponse: string, posi
             ]
           : [
               ['CATALISADOR', 0x01], ['CATALISADOR_AQUECIDO', 0x02], ['EVAP', 0x04],
-              ['AR_SECUNDARIO', 0x08], ['REFRIGERANTE_AR_CONDICIONADO', 0x10],
+              ['AR_SECUNDARIO', 0x08], ['FILTRO_PARTICULAS_GASOLINA', 0x10],
               ['O2', 0x20], ['AQUECEDOR_O2', 0x40], ['EGR/VVT', 0x80],
             ];
         for (const [name, mask] of ignitionMonitors) {
