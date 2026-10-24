@@ -4,6 +4,7 @@
 - Correção: a viagem usa `getReliableTripConsumptionKml`, exigindo distância ≥ 0,1 km, combustível integrado ≥ 0,05 L e pelo menos duas amostras válidas. Sem evidência suficiente, a autonomia recorre à média histórica válida; sem média válida, mostra N/D por meio do valor de estado zero.
 - Integração: `autoTripService` agora chama `getCurrentAutonomyRangeKm`, a mesma função exercitada pelos testes, centralizando validação da conexão ECU, suporte e atualidade do PID 012F, faixa do nível e consumo positivo.
 - Regressão: adicionados casos para limites mínimos, distância/combustível insuficientes, contagem inválida de amostras e entradas não finitas em `tests/tripRecorder.test.js`.
+- Correção complementar de interface: nível 012F atual e igual a 0% agora é exibido como `0 km` nas telas Dados e Laboratório; `N/D` fica reservado para leitura vencida/ausente ou consumo indisponível com combustível restante. O gate anti-regressão protege esse comportamento.
 - Estado da validação: alteração enviada à branch `fix/pid-autonomy-audit-20261024`. CI completa, build Android e teste físico com ELM327/ECU ainda precisam ser confirmados no HEAD final; não declarar sucesso sem evidência.
 
 # Diário de Bordo - Meriva Smart Diagnostic
