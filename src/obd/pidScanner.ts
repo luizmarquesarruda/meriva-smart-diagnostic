@@ -13,11 +13,11 @@ export interface DiscoveryItem {
   supportedPids: string[];
 }
 
-export function decodeSupportedPids(requestedPid: string, response: string): string[] {
+function extractBitmapPayload(requestedPid: string, response: string): string | null {
   const normalized = requestedPid.replace(/\s/g, '').toUpperCase();
-  if (!/^01(?:00|20|40|60)$/.test(normalized) || !validateOBDResponse(response)) return [];
+  if (!/^01(?:00|20|40|60)$/.test(normalized) || !validateOBDResponse(response)) return null;
 
-  const marker = `41${normalized.slice(-2)}`;
+  const marker = '41' + normalized.slice(-2);
   const bitmapFrames: string[] = [];
 
   // Each physical response line is parsed separately. Do not concatenate
@@ -45,8 +45,14 @@ export function decodeSupportedPids(requestedPid: string, response: string): str
   // Multiple matching ECU frames are ambiguous for this scanner; reject rather
   // than silently choosing one ECU's bitmap. A single accepted frame contains
   // exactly four bitmap bytes (plus only the known K-Line checksum, if present).
-  if (bitmapFrames.length !== 1 || !/^[0-9A-F]{8}$/.test(bitmapFrames[0])) return [];
-  const bitmapHex = bitmapFrames[0];
+  if (bitmapFrames.length !== 1 || !/^[0-9A-F]{8}$/.test(bitmapFrames[0])) return null;
+  return bitmapFrames[0];
+}
+
+export function decodeSupportedPids(requestedPid: string, response: string): string[] {
+  const normalized = requestedPid.replace(/\s/g, '').toUpperCase();
+  const bitmapHex = extractBitmapPayload(normalized, response);
+  if (!bitmapHex) return [];
 
   const bitmap = [];
   for (let index = 0; index < bitmapHex.length; index += 2) {
@@ -60,7 +66,7 @@ export function decodeSupportedPids(requestedPid: string, response: string): str
       if ((bitmap[byteIndex] & (1 << bit)) !== 0) {
         const pidNumber = startPid + byteIndex * 8 + (7 - bit);
         if (pidNumber <= startPid + 31) {
-          supported.push(`01${pidNumber.toString(16).padStart(2, '0').toUpperCase()}`);
+          supported.push('01' + pidNumber.toString(16).padStart(2, '0').toUpperCase());
         }
       }
     }
@@ -92,7 +98,7 @@ export async function discoverSupportedPids(
       const item: DiscoveryItem = {
         pid,
         response: reply.response,
-        responded: reply.status === 'OK' && validateOBDResponse(reply.response),
+        responded: reply.status === 'OK' && extractBitmapPayload(pid, reply.response) !== null,
         elapsedMs: reply.elapsedMs || Date.now() - started,
         supportedPids,
       };
