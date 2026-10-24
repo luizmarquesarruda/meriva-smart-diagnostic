@@ -520,6 +520,31 @@ async function testPidScanner() {
 }
 
 
+function testPidDiscoveryBuffer() {
+  const { PidDiscoveryBuffer } = loadTs(path.join(ROOT, 'src/obd/pidDiscoveryBuffer.ts'));
+  const buffer = new PidDiscoveryBuffer(2);
+  const result = (command, response) => ({
+    command, response, elapsedMs: 12, status: 'OK', attempt: 1,
+  });
+
+  buffer.record(result('01 0C', '41 0C 1A F8'));
+  assert.strictEqual(buffer.has('010C'), true, 'PID deve ser normalizado para consulta no buffer');
+  assert.strictEqual(buffer.get('010C').response, '41 0C 1A F8');
+  buffer.record(result('0105', '41 05 69'));
+  buffer.record(result('010D', '41 0D 28'));
+  assert.strictEqual(buffer.size, 2, 'buffer deve respeitar limite de capacidade');
+  assert.strictEqual(buffer.has('010C'), false, 'FIFO deve descartar a entrada mais antiga');
+  assert.deepStrictEqual(buffer.snapshot().map((item) => item.command), ['0105', '010D']);
+  assert.throws(() => buffer.record(result('ATZ', 'OK')), /FORA DO BUFFER/,
+    'comandos AT não devem contaminar o buffer de PIDs');
+  const secondSession = new PidDiscoveryBuffer(2);
+  assert.strictEqual(secondSession.has('010D'), false,
+    'respostas não podem ser reaproveitadas por outra sessão/ECU');
+  buffer.clear();
+  assert.strictEqual(buffer.size, 0);
+  console.log('PID discovery response buffer: OK');
+}
+
 async function testIntelligentPidDiscovery() {
   const ai = loadTs(path.join(ROOT, 'src/obd/intelligentPidDiscovery.ts'));
   const commands = [];
@@ -550,6 +575,9 @@ async function testIntelligentPidDiscovery() {
   });
   assert.ok(result.supportedPids.includes('010C'));
   assert.strictEqual(result.confidence['010C'], 1);
+  assert.ok(result.responseBuffer.some((item) => item.command === '0100'), 'buffer deve expor a resposta bruta da bitmap atual');
+  assert.strictEqual(result.responseBuffer.filter((item) => item.command === '010C').length, 1,
+    'a resposta pré-validada deve permanecer uma única entrada no buffer');
   assert.strictEqual(result.observations.find((item) => item.pid === '010C').status, 'CONFIRMADO');
   assert.strictEqual(result.observations.find((item) => item.pid === '010C').value, 1726);
   assert.strictEqual(commands.filter((pid) => pid === '010C').length, 0, 'descoberta deve reaproveitar a sonda 010C validada');
@@ -660,6 +688,22 @@ async function testBluetoothEventTransport() {
   const response = await transport.readUntilPrompt(500);
   assert.strictEqual(response, '41 0C 0C 18');
   await transport.close();
+
+  // RX deve ter limite estrito; uma resposta enorme não pode ser aceita como
+  // telemetria válida, e os diagnósticos devem truncar chunks excessivos.
+  const overflowTransport = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF');
+  await overflowTransport.open();
+  bluetoothListener?.({ data: 'X'.repeat(16 * 1024 + 1) });
+  bluetoothListener?.({ data: '>' });
+  await assert.rejects(overflowTransport.readUntilPrompt(500), /BUFFER RX ELM EXCEDIDO/,
+    'resposta maior que o limite deve ser descartada explicitamente');
+  assert.match(overflowTransport.getDiagnosticsText(), /RX_BUFFER_OVERFLOW/);
+  assert.match(overflowTransport.getDiagnosticsText(), /truncated/,
+    'logs de RX não devem reter chunks integrais muito grandes');
+  bluetoothListener?.({ data: '41 0C 0C 18>' });
+  assert.strictEqual(await overflowTransport.readUntilPrompt(500), '41 0C 0C 18',
+    'buffer deve recuperar-se depois de descartar o quadro excessivo');
+  await overflowTransport.close();
 
   // O bloqueio deve funcionar entre instâncias diferentes. Sem ele, duas
   // instâncias chamam connectToDevice simultaneamente e o Android pode retornar
@@ -1289,6 +1333,7 @@ async function main() {
     ['bloqueio de troca silenciosa de adaptador', testActiveAdapterCannotBeSilentlySwitched],
     ['seleção estrita + gate ECU', testConnectionSelectionAndStrictEcuGate],
     ['gate de validação ECU/010C', testEcuValidationGate],
+    ['buffer de respostas da descoberta de PIDs', testPidDiscoveryBuffer],
     ['descoberta de PIDs', testPidScanner],
     ['IA burrinha de PIDs', testIntelligentPidDiscovery],
     ['CarScanner baseline + PID 012F', testCarScannerBaselineAndFuel012F],
