@@ -3,6 +3,8 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
+const pidMapDocument = fs.readFileSync(path.join(ROOT, 'docs/PID_FORMULA_MAP_2026-10-24.md'), 'utf8');
+const pidReportDocument = fs.readFileSync(path.join(ROOT, 'docs/RELATORIO_PIDS_E_FORMULAS.md'), 'utf8');
 
 function readJson(relativePath) {
   const file = path.join(ROOT, relativePath);
@@ -118,6 +120,32 @@ function main() {
   const warmupsPid = pids.pids.find((item) => item.pid === '0130');
   assert.strictEqual(warmupsPid.unit, 'warmup_cycles');
   assert.strictEqual(units.units.warmup_cycles.symbol, 'ciclos');
+
+  // The canonical human-readable map must never silently drift from the runtime catalog.
+  const documentedPidRows = new Map();
+  for (const line of pidMapDocument.split(/\\r?\\n/)) {
+    const match = line.match(/^\\| `([0-9A-F]{4})` \\| (.*?) \\| (\\d+) \\| `(.*?)` \\|/);
+    if (match) {
+      const [, id, name, bytes, formulaId] = match;
+      assert.ok(!documentedPidRows.has(id), 'PID duplicado no mapa documental: ' + id);
+      documentedPidRows.set(id, { name, bytes: Number(bytes), formulaId });
+    }
+  }
+  assert.strictEqual(documentedPidRows.size, pids.pids.length,
+    'o mapa deve conter exatamente uma linha para cada PID do catálogo JSON');
+  for (const pid of pids.pids) {
+    const documented = documentedPidRows.get(pid.pid);
+    assert.ok(documented, 'PID sem linha no mapa documental: ' + pid.pid);
+    assert.strictEqual(documented.name, pid.name, 'nome diverge entre catálogo e mapa: ' + pid.pid);
+    assert.strictEqual(documented.bytes, pid.bytes, 'bytes divergem entre catálogo e mapa: ' + pid.pid);
+    assert.strictEqual(documented.formulaId, pid.formulaId, 'fórmula diverge entre catálogo e mapa: ' + pid.pid);
+  }
+  assert.match(pidReportDocument, /PID_FORMULA_MAP_2026-10-24\\.md/);
+  assert.match(pidReportDocument, /\\| 0101 \\| Monitor Status Since DTCs Cleared \\| 4 \\| dtc_count \\| DTC_COUNT/);
+  assert.match(pidReportDocument, /\\| 0130 \\| Warmups Since DTC Clear \\| 1 \\| warmup_cycles \\| U8/);
+  assert.match(pidReportDocument, /\\| 0111 \\| Absolute Throttle Position/);
+  assert.match(pidReportDocument, /\\| 0145 \\| Relative Throttle Position/);
+  assert.match(pidReportDocument, /\\| 015A \\| Relative Accelerator Pedal Position/);
 
   const pidList = [...pidIds];
   const rangeIds = Object.keys(ranges.ranges).map((id) => id.toUpperCase());
