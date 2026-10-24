@@ -22,6 +22,17 @@ function normalizeHexStream(rawResponse: string): string {
   return rawResponse.replace(/[^0-9A-F]/gi, '').toUpperCase();
 }
 
+function hasValidKLineChecksum(frameHex: string, checksumHex: string): boolean {
+  const frame = frameHex.toUpperCase();
+  const checksum = checksumHex.toUpperCase();
+  if (!/^(?:[0-9A-F]{2})+$/.test(frame) || !/^[0-9A-F]{2}$/.test(checksum)) return false;
+  let sum = 0;
+  for (let offset = 0; offset < frame.length; offset += 2) {
+    sum = (sum + Number.parseInt(frame.slice(offset, offset + 2), 16)) & 0xFF;
+  }
+  return sum === Number.parseInt(checksum, 16);
+}
+
 function findResponsePayload(rawResponse: string, pid: string, byteCount: number, positiveService = '41'): number[] {
   const service = positiveService.toUpperCase();
   const requestedPid = pid.slice(-2).toUpperCase();
@@ -54,7 +65,10 @@ function findResponsePayload(rawResponse: string, pid: string, byteCount: number
         // exact envelope in compact form as well as in the spaced-token path.
         const compactKLineChecksum = prefix === '486B10'
           && trailingHex.length === 2
-          && /^[0-9A-F]{2}$/.test(trailingHex);
+          && hasValidKLineChecksum(
+            compactLine.slice(0, payloadStart + byteCount * 2),
+            trailingHex,
+          );
         if (
           payloadHex.length === byteCount * 2 &&
           ((trailingHex.length === 0 && acceptedPrefix) || compactKLineChecksum) &&
@@ -96,7 +110,14 @@ function findResponsePayload(rawResponse: string, pid: string, byteCount: number
       const trailing = tokens.slice(payloadStart + byteCount);
       // Legacy ISO/K-line responses may include one checksum byte after the
       // payload; it is only permitted with the explicit 48 6B 10 envelope.
-      const legacyKLineChecksum = legacyKLineHeader && trailing.length === 1;
+      const legacyKLineChecksum = legacyKLineHeader
+        && trailing.length === 1
+        && hasValidKLineChecksum(
+          tokens.slice(0, payloadStart + byteCount)
+            .map((token) => Number.parseInt(token, 16).toString(16).padStart(2, '0'))
+            .join(''),
+          trailing[0],
+        );
       if (payload.length !== byteCount || (trailing.length !== 0 && !legacyKLineChecksum)) continue;
       if (!payload.every((token) => /^[0-9A-F]{2}$/.test(token))) continue;
       return payload.map((token) => Number.parseInt(token, 16));
