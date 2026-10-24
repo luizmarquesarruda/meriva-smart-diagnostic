@@ -19,6 +19,12 @@ function linkedSensorRecommendations(ruleId: string): string[] {
 const ACTIVE_DTC_STATUSES = new Set(['CONFIRMED', 'PENDING', 'PERMANENT', 'CURRENT']);
 const MAX_DIAGNOSTIC_READING_AGE_MS = 30_000;
 
+export function isCurrentLiveDtc(item: DtcRecord): boolean {
+  return String(item.source ?? '').trim().toUpperCase() === 'REAL_OBD'
+    && item.historical !== true
+    && ACTIVE_DTC_STATUSES.has(String(item.status ?? '').trim().toUpperCase());
+}
+
 function isSimulation(item: PidObservation): boolean { return String(item.source ?? '').trim().toUpperCase() === 'SIMULACAO'; }
 function isLiveObd(item: PidObservation): boolean { return String(item.source ?? '').trim().toUpperCase() === 'REAL_OBD'; }
 
@@ -51,10 +57,7 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
   const rawObservations = input.observations ?? [];
   const observations = rawObservations.filter((item) => !isSimulation(item));
   const rawDtcs = input.dtcs ?? [];
-  const liveDtcs = rawDtcs.filter((item) =>
-    String(item.source ?? '').trim().toUpperCase() === 'REAL_OBD'
-    && ACTIVE_DTC_STATUSES.has(String(item.status ?? '').trim().toUpperCase()),
-  );
+  const liveDtcs = rawDtcs.filter(isCurrentLiveDtc);
   const blockedSimulationSamples = rawObservations.filter(isSimulation).length;
   const blockedNonLiveDtcs = rawDtcs.length - liveDtcs.length;
   const hypotheses = new Map<string, DiagnosticHypothesis>();
