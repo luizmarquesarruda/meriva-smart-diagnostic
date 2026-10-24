@@ -48,6 +48,7 @@ Este documento é o contrato de aceitação entre mudanças, testes, diário e C
 | RG-29 | A trava de limpeza de socket RFCOMM é compartilhada por instâncias e endereço normalizado; uma nova instância não conecta enquanto a limpeza anterior estiver incerta. | `regression.test.js`, `bluetoothLifecycle.test.js` |
 | RG-30 | Encerramento nativo da sessão tem deadline; timeout/erro de fechamento não confirma liberação e bloqueia reconexão. | `connectionRecovery.test.js`, `bluetoothLifecycle.test.js` |
 | RG-31 | Retry de limpeza do socket também tem deadline; falha ou promessa pendente mantém a trava por endereço e nunca deixa a nova tentativa aguardando indefinidamente. | `connectionRecovery.test.js`, `bluetoothLifecycle.test.js` |
+| RG-32 | Consumo de viagem só alimenta autonomia/indicador médio após distância ≥ 0,1 km, combustível integrado ≥ 0,05 L e pelo menos duas amostras válidas; dados insuficientes resultam em N/D ou fallback para média histórica válida, nunca em consumo inflado. Respostas PID devem conter exatamente o número de bytes definido no catálogo. | `pidParserIntegrity.test.js`, `tripRecorder.test.js`, `autonomyPresentation.test.js` |
 
 ## Regras para uma alteração legítima
 
