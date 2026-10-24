@@ -12,6 +12,12 @@ const packageJson = readJson('package.json');
 const lock = readJson('package-lock.json');
 const app = readJson('app.json');
 const sensorCatalog = readJson('src/knowledge/sensor_tests.json');
+const pidCatalog = readJson('src/knowledge/pids.json');
+const unitCatalog = readJson('src/knowledge/units.json');
+const pidParser = read('src/obd/parser.ts');
+const pidMap = read('docs/PID_FORMULA_MAP_2026-10-24.md');
+const merivaSourceAudit = read('docs/MERIVA_OBD_SOURCE_AUDIT_2026-10-24.md');
+const historicalObdAudit = read('docs/OBD_KNOWLEDGE_AUDIT_2026-10-08.md');
 const testCommand = packageJson.scripts.test.split('&&').map((command) => command.trim());
 const workflow = read('.github/workflows/ci.yml');
 const elm = read('src/obd/elm327.ts');
@@ -26,6 +32,29 @@ const diagnostics = read('src/diagnostics/diagnosticEngine.ts');
 const sensorEngine = read('src/diagnostics/sensorTestEngine.ts');
 const projectContract = read('docs/CONTRATO_ANTI_REGRESSAO.md');
 const theme = read('src/ui/theme.ts');
+
+// Documentation provenance and PID semantics must fail closed against silent regressions.
+assert.match(read('README.md'), /MERIVA_OBD_SOURCE_AUDIT_2026-10-24\.md/);
+assert.match(historicalObdAudit, /MERIVA_OBD_SOURCE_AUDIT_2026-10-24\.md/);
+assert.match(projectContract, /\| RG-35 \|/);
+assert.match(merivaSourceAudit, /manual do propriet.rio Meriva 2011\/2012 \*\*n.o fornece uma tabela de PIDs OBD-II/i);
+assert.match(merivaSourceAudit, /C4 em SI . “monitor de filtro de part.culas de gasolina dispon.vel”/);
+assert.doesNotMatch(merivaSourceAudit, /C4[^\n]{0,100}refrigerante do ar-condicionado/i);
+assert.match(pidParser, /FILTRO_PARTICULAS_GASOLINA/);
+assert.doesNotMatch(pidParser, /REFRIGERANTE_AR_CONDICIONADO/);
+assert.match(pidMap, /C4.*filtro de part.culas de gasolina/i);
+assert.doesNotMatch(pidMap, /C4[^\n]{0,100}refrigerante do ar-condicionado/i);
+const pidById = new Map(pidCatalog.pids.map((pid) => [pid.pid, pid]));
+assert.equal(pidById.get('0111').name, 'Absolute Throttle Position');
+assert.equal(pidById.get('0145').name, 'Relative Throttle Position');
+assert.equal(pidById.get('015A').name, 'Relative Accelerator Pedal Position');
+assert.equal(pidById.get('0130').unit, 'warmup_cycles');
+assert.equal(unitCatalog.units.warmup_cycles.symbol, 'ciclos');
+assert.equal(pidById.get('0101').unit, 'dtc_count');
+assert.ok(sensorCatalog.supportPolicy.confirmedPids.every((pid) => pid === '010C'),
+  'o catálogo não deve promover PIDs à evidência real sem registro explícito');
+assert.match(read('tests/regression.test.js'), /FILTRO_PARTICULAS_GASOLINA:NÃO PRONTO/);
+assert.match(read('tests/regression.test.js'), /PID 0101 C4/);
 
 // Gate itself must be a first-class CI step, not a note in the diary.
 assert.equal(packageJson.scripts['gate:baseline'], 'node tests/projectBaseline.test.js');
