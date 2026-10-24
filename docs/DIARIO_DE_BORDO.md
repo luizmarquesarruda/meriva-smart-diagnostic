@@ -1,32 +1,33 @@
 # Diário de Bordo - Meriva Smart Diagnostic
 
-## ESTADO VIGENTE — 2026-10-24
+## ESTADO VIGENTE — 2026-10-24 (revisão DB-121)
 
-> Este bloco resume o estado confirmado no GitHub nesta data. Os registros numerados abaixo são históricos e preservam o estado que existia quando cada ocorrência foi escrita. Uma CI verde em uma branch/PR não significa que a mudança já esteja em `main`.
+> Estado conferido no GitHub em 24/10/2026. Este arquivo está na branch de revisão da PR #89; não altera o `main`. As PRs abertas são propostas isoladas, mesmo quando a CI de seu SHA está verde.
 
-### Repositório principal
+### `main` e última integração confirmada
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
-- `main` consultada em 2026-10-24: `701474de2cb3ed8a617a66d87fe3b5e368366acb`.
-- CI do `main` para esse SHA: [run 39985825746 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/39985825746).
-- PR [#80 — Corrige limites e validação de fórmulas OBD-II](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/80): **mesclada em 2026-10-23**, com merge commit `701474de2cb3ed8a617a66d87fe3b5e368366acb`, que corresponde à cabeça atual de `main`. O registro no início deste arquivo que dizia “ainda sem merge” é um retrato anterior ao merge, não o estado atual.
+- `main`: `701474de2cb3ed8a617a66d87fe3b5e368366acb`.
+- CI do `main`: [run 39985825746 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/39985825746).
+- [PR #80 — limites e validação das fórmulas OBD-II](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/80): mesclada em 23/10/2026; esse SHA é a cabeça atual de `main`. É a última PR de código confirmada como integrada nesta consulta.
 
-### Pull requests abertas consultadas
-As PRs abaixo continuam abertas e não fazem parte de `main` enquanto não forem mescladas. Os resultados de CI indicados são específicos aos respectivos SHAs de branch:
-- [PR #81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81): head `5ece9c7da470bb56ca7687826fc17df2c00cefab`; run [40007637159 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40007637159).
-- [PR #82 — navegação responsiva](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/82): head `d4bae6f794d78e59bb7c1323e11deb2978eefa92`; run [40039535306 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40039535306).
-- [PR #83 — portar layout Floot ao cockpit Android](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83): head `85078c2aacd4ff7427b5ded7c1b1ce0e1f6803cf`; run [40098343069 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40098343069).
-- [PR #84 — inventário do catálogo de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84): head `3c60528017d37744954d2430fca9737ee78a71bd`; run [40089022363 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40089022363).
-- [PR #85 — reconciliação documental](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/85): aberta; esta atualização do diário exige nova CI no HEAD resultante.
-- [PR #86 — descoberta OBD e latência](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/86): head `9f12e54aa1b8f32f0e293cf775f9cbcc80544c04`; run [40124875595 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40124875595), com `validate` e `android-build` aprovados nesse SHA.
-- [PR #87 — parser e autonomia](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/87): head `2997136881dc27bfbed37c12babc6c7ff5b4343e`; run [40122815647 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40122815647), com `validate` e `android-build` aprovados nesse SHA.
-- PRs [#74](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/74) e [#75](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/75) estão fechadas **sem merge**; não presumir que os seus heads estejam em `main`.
+### PRs abertas e evidência da CI por SHA
+- [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81): draft, head `5ece9c7da470bb56ca7687826fc17df2c00cefab`; CI [run 40007637159 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40007637159). A inclusão do PID 0144 ainda não está em `main` nem na consolidação #89.
+- [#82 — navegação responsiva](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/82): draft, head `d4bae6f794d78e59bb7c1323e11deb2978eefa92`; CI [run 40039535306 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40039535306).
+- [#83 — portar layout Floot para o cockpit Android](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83): aberta, head `85078c2aacd4ff7427b5ded7c1b1ce0e1f6803cf`; CI [run 40098343069 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40098343069). Continua separada da consolidação de hardening.
+- [#84 — mapeamento de 34 PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84): aberta, head `3c60528017d37744954d2430fca9737ee78a71bd`; CI [run 40089022363 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40089022363). O documento `docs/MAPEAMENTO_COMPLETO_PIDS_2026-10-24.md` ainda não foi integrado.
+- [#85 — reconciliação do Diário de Bordo](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/85): aberta, head `969aa89276c0c9ce43489244779dd09069c8fbc8`; CI [run 40122820230 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40122820230). Não integrar seu diário isoladamente sem preservar os registros da consolidação #89.
+- [#86 — descoberta OBD e tempos por comando](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/86): aberta, head `9f12e54aa1b8f32f0e293cf775f9cbcc80544c04`; CI [run 40124875595 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40124875595).
+- [#87 — integridade do parser e autonomia](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/87): aberta, head `2997136881dc27bfbed37c12babc6c7ff5b4343e`; CI [run 40122815647 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40122815647).
+- [Issue #88 — migração gradual do Expo SDK 51](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/issues/88): aberta e separada; não misturar migração de plataforma com correções de integridade OBD/armazenamento.
+- [#89 — consolidação de descoberta de PIDs, autonomia e armazenamento](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/89): draft; antes deste commit documental, head `30c0d3a9e256e220e43195546693fd331a7d7720`. A [run 40132625053](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40132625053) concluiu com sucesso os jobs `validate` e `android-build` nesse SHA. Este commit atualiza o diário e muda o HEAD; a CI precisa ser confirmada novamente no novo SHA.
 
-### Limites de validação
-- CI valida o SHA executado, não outro commit e nem o comportamento físico do veículo.
-- O teste com ELM327/ECU reais e a inspeção visual no aparelho Android continuam sendo validações independentes; este diário não registra evidência de que tenham sido realizados.
-- O protótipo web Floot e o aplicativo Expo/React Native são alvos distintos. Alterações no Floot não atualizam automaticamente o repositório Android; a PR #83 é uma proposta separada e ainda aberta.
+### Riscos de regressão e regras de integração
+- As PRs #85, #86 e #87 trabalham sobrepostas: todas editam o diário; #86 e #87 também compartilham contrato anti-regressão, plano de testes e baseline. A PR #89 consolida as alterações relevantes em vez de tornar essas branches automaticamente integradas. Não mesclar as três branches irmãs em sequência sem reconciliar os arquivos e revalidar o SHA resultante.
+- A PR #83 compartilha 17 arquivos alterados com a #89, incluindo `app/dados.tsx`, `app/laboratorio.tsx`, `src/obd/parser.ts`, `src/trip/autoTripService.ts`, contrato, diário, plano de testes e testes de baseline/regressão. É risco concreto de sobrescrever hardening de parser, viagens e validação ao integrar o layout antigo sem revisão por arquivo. A #83 também compartilha nove arquivos com a proposta de navegação #82; decidir uma única versão final de navegação.
+- A PR #81 altera catálogo/formulação e o relatório técnico, mas permanece separada. A PR #84 acrescenta o inventário completo em arquivo distinto e também permanece separada. Nenhuma delas prova suporte físico de um PID pela ECU da Meriva.
+- O contrato anti-regressão foi relido: 35 regras, sem identificadores RG duplicados na branch #89. O índice do diário contém DB-001 a DB-120 sem duplicatas ou lacunas; a entrada DB-121 registra esta nova revisão.
+- CI verde é evidência apenas do SHA executado. Testes físicos com ELM327/ECU, comparação de autonomia/consumo em veículo real e inspeção do APK instalado permanecem pendentes; não afirmar validação de hardware a partir do build.
 
-**Nota de leitura:** os dois registros de contexto datados de 2026-10-23 logo abaixo foram escritos antes do merge da PR #80. Seus estados de “aguardando CI/merge” são preservados como histórico; para o estado atual, vale esta seção e a evidência vinculada acima.
 
 ---
 
@@ -3733,5 +3734,26 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 
 ### Custo e validação pendente
 - Como o sistema de arquivos legado não oferece append nessa API, o lote CSV é persistido por leitura e regravação do arquivo. Isso preserva os dados, mas pode custar mais em arquivos diários grandes; considerar segmentação ou append nativo suportado em uma rodada específica de desempenho.
-- Esta alteração foi preparada após corrigir a falha de TypeScript identificada no HEAD anterior. A CI de `validate` e `android-build` precisa ser confirmada no novo SHA.
+- No HEAD anterior desta branch (`30c0d3a9e256e220e43195546693fd331a7d7720`), a run [40132625053](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40132625053) concluiu os jobs `validate` e `android-build` com sucesso, incluindo prebuild e verificação do APK standalone. A atualização DB-121 muda o HEAD; esse resultado não valida o novo SHA e a CI precisa ser confirmada novamente.
 - Teste físico com ELM327/ECU e inspeção do APK instalado permanecem pendentes.
+
+
+## DB-121 · 2026-10-24 — Releitura integral do diário e reconciliação das PRs mais recentes
+
+### Escopo da revisão
+- Relido `docs/DIARIO_DE_BORDO.md` na branch `fix/repository-audit-hardening-20261024` antes da edição. Conferidos os cabeçalhos `DB-001` a `DB-120`: 120 entradas sequenciais, sem IDs duplicados nem lacunas.
+- Relido `docs/CONTRATO_ANTI_REGRESSAO.md`: 35 regras RG na branch, sem identificadores duplicados. Os estados antigos foram preservados como histórico; somente o bloco de estado vigente e a conclusão da CI de DB-120 foram reconciliados.
+- Conferidos metadados das PRs #81–#89 e as execuções vinculadas aos respectivos SHAs. A única PR confirmada como mesclada entre as recentes é a #80; as PRs abertas não fazem parte de `main`.
+
+### Regressões e riscos encontrados
+- **Diário divergente entre branches:** as PRs #85, #86 e #87 tinham cópias paralelas do Diário de Bordo; houve conflito anterior de numeração e de identificador RG-32. A branch de consolidação #89 mantém a sequência DB e separa RG-32 (integridade/descoberta das bitmaps) de RG-33 (consumo/autonomia e enquadramento), documentando a reconciliação nas entradas anteriores. Não substituir este diário pela cópia de uma branch irmã sem comparar os registros DB/RG.
+- **Risco elevado de conflito com a portabilidade visual:** a PR #83 altera 17 caminhos também alterados pela #89 e ainda compartilha nove caminhos com a PR #82. Os pontos mais sensíveis são cockpit, laboratório, parser, gravação de viagens e testes/contratos; merge sem reconciliação pode recuperar código antigo ou retirar proteções novas.
+- **Funcionalidades ainda não integradas:** PID 0144 (#81), inventário completo de PIDs (#84) e navegação/portabilidade visual (#82/#83) continuam em PRs próprias. Não apresentar essas mudanças como parte de `main` nem assumir suporte físico dos PIDs candidatos.
+- **Estado real da validação:** no SHA anterior da #89, a CI terminou `validate` e `android-build` com sucesso (run 40132625053). A presente alteração é um novo commit documental, portanto requer sua própria execução de CI. A validação física e inspeção do APK continuam fora da evidência disponível.
+
+### Próxima sequência segura
+1. Confirmar CI para o novo HEAD da PR #89 e revisar os diffs resultantes, sem mesclar automaticamente PRs irmãs.
+2. Reconciliar #82/#83 com o hardening da #89 por arquivo, preservando a versão escolhida de cockpit/navegação e os testes de parser/viagens.
+3. Tratar #81 e #84 após a consolidação, validando catálogo/fórmulas, faixas e evidência real separadamente.
+4. Manter a migração do Expo SDK em #88 separada e realizar teste em Android físico com ELM327/ECU antes de declarar o comportamento OBD validado.
+
