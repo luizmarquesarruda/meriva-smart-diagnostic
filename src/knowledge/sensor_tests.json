@@ -160,8 +160,8 @@
     },
     {
       "id": "SAE_J1979_DA_CURRENT",
-      "title": "SAE J1979-DA_202608 — Digital Annex of E/E Diagnostic Test Modes",
-      "url": "https://saemobilus.sae.org/standards/j1979da_202608-j1979-da-digital-annex-e-e-diagnostic-test-modes",
+      "title": "SAE J1979-DA — Digital Annex of E/E Diagnostic Test Modes (latest record checked: J1979DA_202608)",
+      "url": "https://doi.org/10.4271/J1979DA",
       "usedFor": "Registro global mais recente consultado de identificadores de dados OBD relacionados a emissões/propulsão; versão revisada em agosto de 2026.",
       "limitation": "A página pública descreve o escopo, não substitui o conteúdo licenciado do anexo nem confirma que uma ECU local implemente cada PID."
     }
