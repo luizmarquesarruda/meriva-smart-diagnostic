@@ -121,11 +121,15 @@ export function hydrateState(payload: MerivaPersistedState): MerivaPersistedStat
     driveCycles: Array.isArray(raw.driveCycles) ? raw.driveCycles as MerivaPersistedState['driveCycles'] : [],
     learning: isRecord(raw.learning) ? raw.learning as unknown as MerivaPersistedState['learning'] : null,
     pidDiscovery,
-    autonomy: {
-      ...defaults.autonomy,
-      ...autonomy,
-      readings: Array.isArray(autonomy.readings) ? autonomy.readings as MerivaPersistedState['autonomy']['readings'] : [],
-    },
+    autonomy: validateAutonomy(autonomy)
+      ? {
+          ...defaults.autonomy,
+          ...autonomy,
+          readings: Array.isArray(autonomy.readings)
+            ? autonomy.readings as MerivaPersistedState['autonomy']['readings']
+            : [],
+        }
+      : defaults.autonomy,
     settings: Object.fromEntries(Object.entries(settings).filter(([, value]) =>
       typeof value === 'string' || typeof value === 'boolean' ||
       (typeof value === 'number' && Number.isFinite(value)),
