@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "units": {
     "rpm": {
       "symbol": "rpm",
@@ -60,6 +60,10 @@
     "dtc_count": {
       "symbol": "DTC",
       "name": "quantidade de códigos de falha indicada pelo monitor OBD"
+    },
+    "warmup_cycles": {
+      "symbol": "ciclos",
+      "name": "ciclos de aquecimento desde a limpeza dos DTCs"
     }
   }
 }
