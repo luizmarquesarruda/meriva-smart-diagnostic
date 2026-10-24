@@ -1,5 +1,7 @@
 # Auditoria documental OBD/PID/DTC — 2026-10-08
 
+> **Estado:** documento histórico. Para fontes oficiais Chevrolet, limite do manual do proprietário e compatibilidade real do veículo, consulte [Auditoria de fontes da Meriva e compatibilidade OBD — 2026-10-24](MERIVA_OBD_SOURCE_AUDIT_2026-10-24.md) e o [mapa vigente de PIDs e fórmulas](PID_FORMULA_MAP_2026-10-24.md). A presença de um PID no padrão SAE não comprova que a ECU da Meriva o suporte.
+
 ## Escopo
 Auditoria do conhecimento usado pelo Meriva Smart Diagnostic para o veículo documentado no projeto: Chevrolet Meriva Maxx 1.4 8V ECONO.FLEX, MY 2012 / referência 2011/2012.
 
