@@ -1,6 +1,6 @@
 # Auditoria documental OBD/PID/DTC — 2026-10-08
 
-> **Estado:** documento histórico. Para fontes oficiais Chevrolet, limite do manual do proprietário e compatibilidade real do veículo, consulte [Auditoria de fontes da Meriva e compatibilidade OBD — 2026-10-24](MERIVA_OBD_SOURCE_AUDIT_2026-10-24.md) e o [mapa vigente de PIDs e fórmulas](PID_FORMULA_MAP_2026-10-24.md). A presença de um PID no padrão SAE não comprova que a ECU da Meriva o suporte.
+> **Estado:** documento histórico. A edição do Digital Annex foi atualizada no registro de fontes em 24/10/2026 para J1979-DA_202608 (revisão de agosto de 2026). Para fontes oficiais Chevrolet, limite do manual do proprietário e compatibilidade real do veículo, consulte [Auditoria de fontes da Meriva e compatibilidade OBD — 2026-10-24](MERIVA_OBD_SOURCE_AUDIT_2026-10-24.md) e o [mapa vigente de PIDs e fórmulas](PID_FORMULA_MAP_2026-10-24.md). A presença de um PID no padrão SAE não comprova que a ECU da Meriva o suporte.
 
 ## Escopo
 Auditoria do conhecimento usado pelo Meriva Smart Diagnostic para o veículo documentado no projeto: Chevrolet Meriva Maxx 1.4 8V ECONO.FLEX, MY 2012 / referência 2011/2012.
@@ -99,6 +99,6 @@ Essa informação não foi transformada em regra genérica de falha de RPM porqu
 - Chevrolet Brasil — manuais: https://www.chevrolet.com.br/servicos/manuais-veiculos/anos-anteriores
 - Manual Chevrolet Meriva MY12: https://meu.chevrolet.com.br/content/dam/gmownercenter/gmsa/gmbr/dynamic/manuals/2012/chevrolet/Meriva/pt/om_ng-chevrolet_Meriva_my12-pt_BR.pdf
 - SAE J1979_202505 — E/E Diagnostic Test Modes: https://saemobilus.sae.org/standards/j1979_202505-e-e-diagnostic-test-modes
-- SAE J1979-DA — Digital Annex: https://saemobilus.sae.org/standards/j1979da_202510-j1979-da-digital-annex-e-e-diagnostic-test-modes
+- SAE J1979-DA — Digital Annex: https://saemobilus.sae.org/standards/j1979da_202608-j1979-da-digital-annex-e-e-diagnostic-test-modes
 - SAE J2012 — Diagnostic Trouble Code Definitions: https://saemobilus.sae.org/standards/j2012_202509-diagnostic-trouble-code-definitions
 - SAE J2012 Digital Annex: https://saemobilus.sae.org/standards/j2012da_202403-digital-annex-diagnostic-trouble-code-definitions-failure-type-byte-definitions
