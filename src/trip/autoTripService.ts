@@ -5,7 +5,7 @@ import { addDriveCycle, readDriveCycles } from '../storage/driveCycleStorage';
 import { forceSaveOnObdEvent, registerObdQuery } from '../meriva/autosaveIntegration';
 import { getAutoSaveState, updateAutoSaveState, initAutoSave } from '../meriva/autosaveManager';
 import { RealTripRecorder, getReliableTripConsumptionKml, shouldFinalizeStoppedTrip } from './tripRecorder';
-import { estimateRangeFromFuelLevel, fuelLevelPercentToLiters, isFuelReserve } from './fuelLevel';
+import { fuelLevelPercentToLiters, isFuelReserve } from './fuelLevel';
 import { getCurrentAutonomyRangeKm, isCurrentFuelLevelSample } from './autonomyPresentation';
 import { getLivePidTrend, resetLiveTelemetry } from '../obd/liveTelemetry';
 import { estimateFuelRateLph, type FuelRateSource } from '../obd/fuelConsumption';
