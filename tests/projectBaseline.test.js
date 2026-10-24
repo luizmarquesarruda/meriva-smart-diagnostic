@@ -194,6 +194,7 @@ assert.ok(!home.includes('actionGrid') && !home.includes('dashboardAction'),
   'cockpit não deve duplicar destinos em uma segunda fileira de ações');
 assert.ok(read('app/mais.tsx').includes('CONSULTA MANUAL DE PID'), 'atalho de consulta manual precisa existir');
 assert.ok(read('app/laboratorio.tsx').includes('PIDs REGISTRADOS / DESCOBERTOS'), 'lista de PIDs precisa continuar acessível');
+assert.match(laboratory, /parsed\?\.interpretation/, 'interpretações secundárias de PIDs devem ser visíveis nos detalhes técnicos do Laboratório');
 assert.match(laboratory, /result\.status !== 'OK'/, 'DTC read must not interpret command error as no failures');
 assert.match(laboratory, /isValidDtcResponseForService\('03', result\.response\)/, 'DTC read must validate a complete response');
 assert.match(read('src/obd/dtcScanner.ts'), /reply\.status === 'OK' && isValidDtcResponseForService/, 'bulk scan requires valid response data');
