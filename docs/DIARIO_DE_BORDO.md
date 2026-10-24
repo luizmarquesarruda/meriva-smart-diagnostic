@@ -3475,8 +3475,17 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 ## DB-112 — 2026-10-24 — Auditoria cruzada de semântica dos PIDs
 
 - Comparadas as definições locais com a SAE J1979 de acesso público, Dashlogic, OBD Auto Doctor e OBDLink.
-- Corrigido o PID 0101: o bit C4 para ciclo Otto passa a identificar monitor do refrigerante do ar-condicionado, não filtro de partículas de gasolina.
+- Revisão corretiva posterior: a primeira interpretação do bit C4 estava incorreta. Após conferir a tabela de bits do PID 0101 na referência SAE J1979 e na referência independente OBD2PID, o código correto foi restaurado: C4 em ciclo Otto indica disponibilidade do monitor do filtro de partículas de gasolina. O novo teste de regressão trava essa semântica.
 - Corrigidos os rótulos: 0111 = posição absoluta da borboleta; 0145 = posição relativa; 015A = posição relativa do pedal do acelerador.
 - PID 0130 agora usa unidade `warmup_cycles`/`ciclos`, separada de códigos enumerados como o tipo de combustível 0151.
 - Atualizados os catálogos de testes, inventário de evidência, mapa de PIDs e contrato anti-regressão. Testes adicionados para as distinções semânticas.
 - A auditoria documental não comprova suporte físico da ECU da Meriva. `010C` continua como único PID com resposta RAW_ECU documentada; a CI do HEAD atualizado deve ser validada.
+
+
+## DB-113 — 2026-10-24 — Fontes oficiais da Meriva e limites de compatibilidade OBD
+
+- Localizados os manuais oficiais Chevrolet Meriva 2011 e 2012 no portal de manuais de anos anteriores da Chevrolet Brasil.
+- Os manuais confirmam contexto operacional do motor ECONO.FLEX, controles/advertências e manutenção. A busca textual por “OBD” e “conector de diagnóstico” não localizou uma tabela de PIDs ou bitmap de suporte; por isso, os manuais do proprietário não são usados como prova de suporte de PID.
+- A página de manuais técnicos Peça Chevrolet informa disponibilidade de manual de reparação e diagramas, mas o conteúdo completo não foi validado linha a linha nesta auditoria. O catálogo de treinamento comercial do Meriva Econo.Flex descreve Multec HX14YFH e testes de sensores, mas isso não prova que essa ECU específica esteja instalada em toda Meriva 2011/2012.
+- Adicionado `docs/MERIVA_OBD_SOURCE_AUDIT_2026-10-24.md`, com matriz de fontes, limites e comparativo entre a lista SAE genérica e a evidência atual da ECU.
+- Reforçada a barreira anti-regressão para impedir a associação errada de PID 0101 C4, divergência de nomes/unidades e alegações de compatibilidade sem evidência RAW_ECU. Nenhuma alteração foi mesclada em `main`.
