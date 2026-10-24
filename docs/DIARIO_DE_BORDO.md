@@ -191,6 +191,7 @@ As PRs abaixo continuam abertas e não fazem parte de `main` enquanto não forem
 - **DB-111** · 2026-10-24 — Continuidade da auditoria e reconciliação documental das PRs
 - **DB-112** · 2026-10-24 — Validação estrita de bitmaps OBD e reconciliação dos IDs anti-regressão
 - **DB-113** · 2026-10-24 — Compatibilidade do parser com envelope K-Line compacto
+- **DB-114** · 2026-10-24 — Exibição do ajuste de combustível do segundo byte do PID 0114
 
 ---
 
@@ -3618,4 +3619,25 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 ### Validação e limites
 - Parser, teste de integridade e contrato foram alterados em novos commits da branch #87. A CI do HEAD final precisa terminar antes de considerar a mudança validada.
 - O teste cobre o formato de resposta, não a comunicação física nem a validade elétrica dos dados. ELM327/ECU reais e inspeção visual do APK continuam pendentes.
+- Nenhuma PR foi mesclada nesta atualização.
+
+
+## DB-114 · 2026-10-24 — Exibição do ajuste de combustível do segundo byte do PID 0114
+
+### Problema confirmado
+- O catálogo já definia o PID `0114` com dois bytes, e a fórmula `O2_VOLTS` corretamente calculava a tensão a partir do byte A. Porém, o byte B — que contém o ajuste de combustível de curto prazo (STFT) associado à sonda B1S1 — era preservado em bytes brutos mas não interpretado nem mostrado ao operador.
+- O valor especial `B=0xFF` significa que essa sonda não é usada no cálculo do ajuste de combustível; calculá-lo como número daria uma interpretação semântica incorreta.
+
+### Correções aplicadas na PR #87
+- `src/obd/parser.ts`: mantém o valor principal em volts e preenche `interpretation` com `AJUSTE CURTO B1S1=...` usando `(B × 100 / 128) − 100`; para `B=0xFF`, informa `NÃO USADO` sem gerar percentual.
+- `app/laboratorio.tsx`: apresenta o campo `INTERPRETAÇÃO` nos detalhes técnicos quando o parser oferece uma interpretação secundária.
+- `tests/pidParserIntegrity.test.js`: verifica que o valor de tensão não muda, que `B=0x76` resulta em `-7,81%` arredondado para exibição e que `B=0xFF` é tratado como não usado.
+- `tests/projectBaseline.test.js`: protege contra regressão que esconda interpretações secundárias dos detalhes técnicos.
+- Atualizados `docs/RELATORIO_PIDS_E_FORMULAS.md` e `docs/TEST_PLAN.md`.
+- Referências técnicas consultadas: [SAE J1979 (tabela do PID $14)](https://law.resource.org/pub/us/cfr/ibr/005/sae.j1979.2002.pdf) e [catálogo público de PIDs OBD-II](https://www.dashlogic.com/docs/technical/obdii_pids).
+
+### Validação e limites
+- As novas alterações de parser, teste, interface e documentação precisam de CI própria no SHA final desta sincronização.
+- A fórmula e a apresentação têm testes determinísticos; isso não confirma que a ECU específica da Meriva suporte o PID 0114 nem que a leitura física da sonda esteja calibrada.
+- Teste com ELM327/ECU e inspeção visual do APK continuam pendentes.
 - Nenhuma PR foi mesclada nesta atualização.
