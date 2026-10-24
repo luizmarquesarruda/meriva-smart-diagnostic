@@ -3470,3 +3470,13 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - PID 0101 retorna contagem `A & 0x7F` e interpreta MIL/readiness SI/CI; 0114 decodifica STFT do byte B; 0151 interpreta enums e recusa código desconhecido.
 - Laboratório mostra interpretação complementar; testes foram ampliados.
 - A CI do SHA final deve validar TypeScript, barreira, suíte completa e build Android. Suporte real depende da resposta da ECU.
+
+
+## DB-112 — 2026-10-24 — Auditoria cruzada de semântica dos PIDs
+
+- Comparadas as definições locais com a SAE J1979 de acesso público, Dashlogic, OBD Auto Doctor e OBDLink.
+- Corrigido o PID 0101: o bit C4 para ciclo Otto passa a identificar monitor do refrigerante do ar-condicionado, não filtro de partículas de gasolina.
+- Corrigidos os rótulos: 0111 = posição absoluta da borboleta; 0145 = posição relativa; 015A = posição relativa do pedal do acelerador.
+- PID 0130 agora usa unidade `warmup_cycles`/`ciclos`, separada de códigos enumerados como o tipo de combustível 0151.
+- Atualizados os catálogos de testes, inventário de evidência, mapa de PIDs e contrato anti-regressão. Testes adicionados para as distinções semânticas.
+- A auditoria documental não comprova suporte físico da ECU da Meriva. `010C` continua como único PID com resposta RAW_ECU documentada; a CI do HEAD atualizado deve ser validada.
