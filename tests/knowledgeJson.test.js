@@ -51,6 +51,8 @@ function main() {
   assert.ok(Array.isArray(sensorTests.sources) && sensorTests.sources.length >= 5, 'fontes pesquisadas ausentes');
   const sourcesById = new Map(sensorTests.sources.map((source) => [source.id, source]));
   for (const requiredSource of [
+    'SAE_J1979_CURRENT_EDITION',
+    'SAE_J1979_DA_CURRENT',
     'MERIVA_OWNER_MANUAL',
     'MERIVA_OWNER_MANUAL_2011',
     'CHEVROLET_OLDER_MANUALS_PORTAL',
