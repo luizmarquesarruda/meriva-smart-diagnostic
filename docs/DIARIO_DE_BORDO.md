@@ -3468,7 +3468,7 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - A capacidade de tanque de 56 L foi mantida: corresponde ao manual oficial Chevrolet Meriva MY12 consultado nesta auditoria. Não há evidência de que a capacidade nominal seja a causa do problema.
 
 ### Alterações implementadas nesta branch
-- `src/obd/parser.ts`: resposta PID analisada linha a linha; payload truncado ou com bytes excedentes no mesmo quadro é recusado; cabeçalho CAN antes da resposta continua permitido.
+- `src/obd/parser.ts`: resposta PID analisada linha a linha; payload truncado ou com bytes excedentes é recusado tanto em formato espaçado quanto compacto (`410C1AF8`); cabeçalhos CAN e o envelope legado K-Line `48 6B 10 ... checksum` continuam aceitos.
 - `src/trip/tripRecorder.ts`: criado `getReliableTripConsumptionKml()` como critério único para consumo ao vivo e viagens persistidas.
 - `src/trip/autoTripService.ts`: autonomia/consumo da viagem só prioriza o consumo atual depois dos limites mínimos de distância, combustível e amostras válidas; antes disso, o serviço não usa consumo transitório para inflar a estimativa.
 - `tests/pidParserIntegrity.test.js`: nova auditoria determinística de cada PID do catálogo, bytes esperados, respostas truncadas/excedentes, cabeçalho CAN e limiares do consumo.
@@ -3476,7 +3476,7 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - PR #87: https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/87. Branch de trabalho: `fix/pid-autonomy-audit-20261024`. Nenhum merge executado.
 
 ### Validação e limites
-- A suíte automatizada nova foi adicionada, mas ainda precisa executar na CI do HEAD final da PR. Não declarar TypeScript, suíte completa ou build Android como aprovados antes dos respectivos checks verdes.
+- A primeira CI (`#3187`) confirmou `npm ci`, Expo Doctor, gate de baseline e TypeScript, mas a suíte falhou porque o parser novo não preservava a resposta compacta sem espaços `410C1AF8`; a tentativa seguinte (`#3190`) reproduziu o mesmo caso. A compatibilidade compacta foi corrigida sem permitir bytes excedentes; a CI do HEAD posterior ainda precisa concluir antes de declarar a suíte aprovada.
 - O teste de bytes sintéticos verifica integridade de parsing/fórmulas; não prova que todos os PIDs são suportados pela ECU específica do veículo.
 - A validação física ainda exige ELM327 conectado à ECU, confirmação do PID 012F com timestamp atual e observação de autonomia durante uma viagem real.
 - MagicPath não foi usado porque esta rodada altera lógica de diagnóstico/telemetria, não o desenho de uma tela. A busca de apps Replit não encontrou um app correspondente acessível; o repositório GitHub é a fonte de código usada nesta tarefa.
