@@ -68,6 +68,10 @@ function main() {
   assert.match(sourcesById.get('MERIVA_OWNER_MANUAL').limitation, /não contém tabela de PIDs OBD/i);
   assert.ok(sensorTests.supportPolicy.distinctions.includes('OWNER_MANUAL_DOES_NOT_DEFINE_PID_SUPPORT'));
   assert.ok(sensorTests.supportPolicy.distinctions.includes('STANDARD_PID_CATALOG_IS_NOT_VEHICLE_COMPATIBILITY'));
+  assert.doesNotMatch(sensorTests.tests.find((item) => item.pid === '0105').aiGuidance, /três valores plausíveis/i);
+  assert.match(sensorTests.tests.find((item) => item.pid === '0105').aiGuidance, /cinco leituras válidas/i);
+  assert.match(sensorTests.tests.find((item) => item.pid === '010B').aiGuidance, /médias aritméticas MAP\/BARO/i);
+  assert.doesNotMatch(sensorTests.tests.find((item) => item.pid === '010B').aiGuidance, /medianas MAP\/BARO/i);
   assert.strictEqual(typeof dtcCatalog.version, 'number');
   assert.strictEqual(typeof pollingPolicy.version, 'number');
   assert.strictEqual(pollingPolicy.version, 2, 'cadência flex-fuel exige versão de contrato atualizada');
