@@ -3641,3 +3641,20 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - A fórmula e a apresentação têm testes determinísticos; isso não confirma que a ECU específica da Meriva suporte o PID 0114 nem que a leitura física da sonda esteja calibrada.
 - Teste com ELM327/ECU e inspeção visual do APK continuam pendentes.
 - Nenhuma PR foi mesclada nesta atualização.
+
+## DB-115 · 2026-10-24 — Buffer limitado para respostas da descoberta de PIDs
+
+### Problema e objetivo
+- A descoberta já preservava respostas em observações, mas não oferecia um buffer explícito e limitado para recuperar respostas brutas durante a execução e inspecionar o conjunto de comandos consultados.
+- Reaproveitar respostas entre conexões poderia misturar dados de ECUs diferentes; manter um cache global ou ilimitado não seria seguro.
+
+### Implementação na PR #86
+- Criado `src/obd/pidDiscoveryBuffer.ts` com buffer FIFO limitado (padrão 64 entradas, limite configurável entre 1 e 256), normalização dos PIDs e cópias defensivas ao ler os resultados.
+- O buffer aceita apenas comandos PID do serviço `01`, preserva resposta/status/tempo brutos e descarta a entrada mais antiga quando atinge a capacidade.
+- `src/obd/intelligentPidDiscovery.ts` cria um buffer novo por descoberta, registra respostas da sonda prioritária, bitmaps e consultas individuais e devolve `responseBuffer` para auditoria. Nenhuma resposta sobrevive à execução ou é compartilhada entre sessões.
+- `tests/regression.test.js` cobre normalização, recuperação, limite FIFO, rejeição de comandos AT e isolamento entre sessões.
+
+### Validação e limites
+- A validação automatizada da PR precisa terminar no HEAD que contém estas alterações; os testes determinísticos não substituem teste físico com ELM327 e ECU da Meriva.
+- O buffer é volátil e existe para a descoberta atual; não é uma base persistente de suporte de PIDs.
+- Nenhuma PR foi mesclada nesta atualização.
