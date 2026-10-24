@@ -28,7 +28,8 @@ export function integrateFuelRateLph(
   if (!Number.isFinite(elapsedMs) || elapsedMs <= 0 || elapsedMs > MAX_INTERVAL_MS) return 0;
 
   const averageLph = (previous.fuelRateLph + current.fuelRateLph) / 2;
-  return averageLph * (elapsedMs / 3_600_000);
+  const increment = averageLph * (elapsedMs / 3_600_000);
+  return Number.isFinite(increment) && increment >= 0 ? increment : 0;
 }
 
 export class FuelRateIntegrator {
@@ -134,7 +135,8 @@ export function estimateFuelRateLph(input: FuelRateEstimateInput): { rateLph: nu
 
   if (Number.isFinite(input.mafGs) && (input.mafGs ?? 0) > 0 && afr > 0 && density > 0) {
     const fuelKgPerSecond = (input.mafGs as number) / 1000 / afr;
-    return { rateLph: fuelKgPerSecond * 3600 / density, source: 'ESTIMATED_MAF' };
+    const rateLph = fuelKgPerSecond * 3600 / density;
+    if (Number.isFinite(rateLph) && rateLph > 0) return { rateLph, source: 'ESTIMATED_MAF' };
   }
 
   const map = input.mapKpa;
@@ -146,16 +148,19 @@ export function estimateFuelRateLph(input: FuelRateEstimateInput): { rateLph: nu
     Number.isFinite(map) && (map ?? 0) > 0
     && Number.isFinite(rpm) && (rpm ?? 0) > 0
     && Number.isFinite(iat)
-    && displacementL > 0
-    && afr > 0 && density > 0 && ve > 0
+    && (iat as number) > -273.15
+    && Number.isFinite(displacementL) && displacementL > 0
+    && afr > 0 && density > 0 && Number.isFinite(ve) && ve > 0
   ) {
     const absolutePressurePa = (map as number) * 1000;
     const temperatureK = (iat as number) + 273.15;
+    if (!Number.isFinite(temperatureK) || temperatureK <= 0) return null;
     const airDensityGPerL = absolutePressurePa / (287.05 * temperatureK);
     const volumetricFlowLPerSecond = displacementL * (rpm as number) / 120 * ve;
     const mafGs = airDensityGPerL * volumetricFlowLPerSecond;
     const fuelKgPerSecond = mafGs / 1000 / afr;
-    return { rateLph: fuelKgPerSecond * 3600 / density, source: 'ESTIMATED_MAP' };
+    const rateLph = fuelKgPerSecond * 3600 / density;
+    if (Number.isFinite(rateLph) && rateLph > 0) return { rateLph, source: 'ESTIMATED_MAP' };
   }
 
   return null;
