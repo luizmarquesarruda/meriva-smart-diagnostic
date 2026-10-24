@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Layout e navegação Floot
+- Alinhada a barra inferior do cockpit ao layout de referência: seis destinos com ícones de 32 dp, uniformemente distribuídos e sem legendas visíveis.
+- Corrigido o mapeamento de cada ícone para sua tela funcional: Painel, Conexões, Diagnóstico, Viagem, Laboratório e Configurações; nomes acessíveis preservados.
+- Mantidos Dados/Telemetria e Mais Recursos em caminhos secundários para não remover funções existentes.
+- Nenhuma alteração na conexão Bluetooth Classic, fila ELM327, validação da ECU, fórmulas PID, consumo, autonomia ou histórico.
+
 ### Integridade OBD-II
 - Portada do protótipo Floot para a tela nativa `app/laboratorio.tsx` a seção visual de validação de fórmulas; a interface reutiliza `decodeFormula` e sinaliza que os valores-limite são casos matemáticos, não telemetria real.
 - Corrigidas as faixas máximas de plausibilidade dos PIDs 0106, 0107, 012D e 015D para aceitar os máximos matemáticos exatos das fórmulas padronizadas, sem arredondamento que rejeite uma resposta válida.
