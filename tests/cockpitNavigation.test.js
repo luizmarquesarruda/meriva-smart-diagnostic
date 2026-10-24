@@ -50,7 +50,10 @@ assert.doesNotMatch(index, /actionGrid|dashboardAction/, 'não repetir Diagnóst
 assert.match(index, /styles\.sessionCard/, 'cockpit deve ter cartão acionável de conexão/ECU');
 assert.match(index, /accessibilityLabel="Abrir configurações de conexão do veículo"/, 'cartão de conexão precisa de nome acessível');
 assert.match(index, /ECU DESCONECTADA/, 'não usar OFFLINE genérico para representar a ECU');
-assert.match(index, /label="FALHAS ATIVAS"/, 'o redesenho do cockpit não pode remover a contagem de DTCs');
+assert.match(index, /label="DTC REGISTRADOS"/, 'o redesenho do cockpit não pode remover a contagem de DTCs');
+const dtcMetric = index.split('label="DTC REGISTRADOS"')[1]?.split('/>')[0] ?? '';
+assert.match(dtcMetric, /VARREDURA NÃO CONFIRMADA/, 'zero registros de DTC não pode ser apresentado como ausência confirmada de falhas');
+assert.doesNotMatch(dtcMetric, /SEM DTC|SEM CÓDIGOS ATIVOS/, 'o cockpit não pode declarar ausência de DTC sem resultado de varredura confirmado');
 assert.match(index, /LÍQUIDO DE ARREFECIMENTO/, 'a temperatura deve identificar o sistema de arrefecimento');
 assert.match(index, /secondaryGrid:\{[^}]*flexWrap:'wrap'/, 'métricas secundárias devem ocupar duas colunas no celular');
 assert.match(index, /secondaryGridLandscape:\{flexWrap:'nowrap'/, 'métricas secundárias devem voltar a uma linha na paisagem');

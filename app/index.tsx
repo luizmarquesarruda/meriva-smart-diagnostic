@@ -423,10 +423,14 @@ export default function IndexScreen() {
               landscape={layout.landscape}
             />
             <SecondaryMetric
-              label="FALHAS ATIVAS"
-              value={!connectionStatus.ecuConnected ? 'N/D' : dtcCount > 0 ? String(dtcCount) + ' DTC' : 'SEM DTC'}
-              detail={!connectionStatus.ecuConnected ? 'ECU NÃO VALIDADA' : dtcCount > 0 ? 'VERIFICAR DIAGNÓSTICO' : 'SEM CÓDIGOS ATIVOS'}
-              status={!connectionStatus.ecuConnected ? 'neutral' : dtcCount > 0 ? 'danger' : 'ok'}
+              label="DTC REGISTRADOS"
+              value={!connectionStatus.ecuConnected ? 'N/D' : dtcCount > 0 ? String(dtcCount) + ' DTC' : 'N/D'}
+              detail={!connectionStatus.ecuConnected
+                ? 'ECU NÃO VALIDADA'
+                : dtcCount > 0
+                  ? 'REGISTROS SALVOS • CONFIRMAR'
+                  : 'VARREDURA NÃO CONFIRMADA'}
+              status={!connectionStatus.ecuConnected ? 'neutral' : dtcCount > 0 ? 'warning' : 'neutral'}
               landscape={layout.landscape}
             />
           </View>
