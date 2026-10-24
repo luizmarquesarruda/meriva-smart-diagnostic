@@ -37,8 +37,8 @@ function loadTs(tsPath) {
   return mod.exports;
 }
 
-function obs(pid, value, source = 'REAL_OBD') {
-  return { pid, name: pid, value, unit: 'N/D', source, timestamp: new Date().toISOString(), confidence: 'HIGH' };
+function obs(pid, value, source = 'REAL_OBD', timestamp = new Date().toISOString()) {
+  return { pid, name: pid, value, unit: 'N/D', source, timestamp, confidence: 'HIGH' };
 }
 
 function main() {
@@ -79,6 +79,36 @@ function main() {
     observations: [obs('010B', 50)],
   });
   assert.strictEqual(result.hypotheses[0].id, 'VACUO_DO_MOTOR_POSSIVELMENTE_ANORMAL');
+  
+  const freshnessNow = Date.now();
+  result = engine.runLocalDiagnostic({
+    ...base,
+    nowMs: freshnessNow,
+    observations: [obs('010B', 80, 'REAL_OBD', new Date(freshnessNow - 31_000).toISOString())],
+  });
+  assert.strictEqual(result.hypotheses.length, 0, 'leitura real vencida não pode gerar hipótese atual');
+
+  result = engine.runLocalDiagnostic({
+    ...base,
+    nowMs: freshnessNow,
+    observations: [obs('010B', 80, 'REAL_OBD', new Date(freshnessNow + 1_000).toISOString())],
+  });
+  assert.strictEqual(result.hypotheses.length, 0, 'timestamp futuro não pode gerar hipótese atual');
+
+  result = engine.runLocalDiagnostic({
+    ...base,
+    nowMs: freshnessNow,
+    observations: [obs('010B', Number.NaN, 'REAL_OBD', new Date(freshnessNow - 1_000).toISOString())],
+  });
+  assert.strictEqual(result.hypotheses.length, 0, 'valor não finito não pode gerar hipótese atual');
+
+  result = engine.runLocalDiagnostic({
+    ...base,
+    nowMs: freshnessNow,
+    observations: [obs('010B', 80, 'REAL_OBD', new Date(freshnessNow - 5_000).toISOString())],
+  });
+  assert.strictEqual(result.hypotheses[0].id, 'VACUO_DO_MOTOR_POSSIVELMENTE_ANORMAL',
+    'leitura real recente deve continuar disponível para o motor de evidências');
 
   result = engine.runLocalDiagnostic({
     ...base,

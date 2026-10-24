@@ -418,7 +418,7 @@ export default function IndexScreen() {
             <SecondaryMetric
               label="LÍQUIDO DE ARREFECIMENTO"
               value={coolantValue != null ? Math.round(coolantValue) + ' °C' : 'N/D'}
-              detail={coolantStatus}
+              detail={'LÍQUIDO DE ARREFECIMENTO • ' + coolantStatus}
               status={coolantValue == null ? 'neutral' : coolantValue >= 115 ? 'danger' : coolantValue >= 110 ? 'warning' : 'ok'}
               landscape={layout.landscape}
             />
