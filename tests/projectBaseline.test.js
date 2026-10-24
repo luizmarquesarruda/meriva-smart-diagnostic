@@ -184,7 +184,9 @@ assert.match(tripService, /listener\(this\.getState\(\)\)/, 'new service subscri
 assert.match(tripService, /const snapshot = this\.getState\(\)/, 'service updates must emit freshness-filtered state');
 assert.ok(!tripService.includes('estimatedRangeKm: persisted.autonomy.estimatedRangeKm'), 'current state cannot be seeded with saved range');
 assert.ok(!tripService.includes('estimatedRangeKm: persistedAutonomy.estimatedRangeKm'), 'new ECU session cannot start from saved range');
-assert.match(dataScreen, /label="AUTONOMIA" value=\{trip\.estimatedRangeKm > 0/);
+assert.match(dataScreen, /getCurrentAutonomyRangeKm/, 'autonomia ao vivo deve depender do nível de combustível atual e válido');
+assert.match(dataScreen, /currentAutonomyKm != null/, 'autonomia zero válida não deve ser confundida com dado ausente');
+assert.doesNotMatch(dataScreen, /label="AUTONOMIA" value=\{trip\.estimatedRangeKm > 0/, 'a tela Dados não deve reutilizar a faixa estimada guardada como se fosse atual');
 assert.doesNotMatch(dataScreen, /label="AUTONOMIA" value=\{state\.autonomy\.estimatedRangeKm/, 'real-time screen must not show persisted range as current');
 assert.ok(!home.includes('actionGrid') && !home.includes('dashboardAction'),
   'cockpit não deve duplicar destinos em uma segunda fileira de ações');
