@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 5,
   "source": "SAE J1979 / ISO 15031-5 cross-checked against open OBD implementations",
   "pids": [
     {
@@ -9,7 +9,7 @@
       "unit": "dtc_count",
       "formulaId": "DTC_COUNT",
       "classification": "PADRAO_OBD",
-      "description": "Status MIL e prontidão OBD. O valor principal é a contagem de DTCs (bits A6..A0); a interpretação detalhada decodifica MIL e os monitores dos quatro bytes."
+      "description": "Status MIL e prontidão OBD. O valor principal é a contagem DTC (A6..A0); A7 é MIL. A interpretação detalhada decodifica disponibilidade/incompletude por tipo de ignição; em ciclo Otto, C4/D4 referem-se ao monitor de filtro de partículas de gasolina."
     },
     {
       "pid": "0104",
