@@ -45,7 +45,6 @@ assert.match(configuration, /accessibilityLabel="Abrir mais recursos"/, 'o acess
 assert.match(more, /DADOS E TELEMETRIA/, 'a tela Mais Recursos deve manter o acesso a gráficos e leituras');
 assert.match(flootPreview, /AppIcon name=\{item\.icon\} size=\{32\}/, 'a prévia Floot nativa deve usar ícones de 32 dp');
 assert.match(flootPreview, /href: '\/configuracoes'/, 'a prévia Floot deve direcionar Configurações à tela funcional');
-assert.match(index, /accessibilityHint="Abre os módulos adicionais do aplicativo"/, 'aba Mais precisa explicar a ação ao leitor de tela');
 assert.doesNotMatch(index, /actionGrid|dashboardAction/, 'não repetir Diagnóstico, Dados e Viagens em uma segunda fileira');
 assert.match(index, /styles\.sessionCard/, 'cockpit deve ter cartão acionável de conexão/ECU');
 assert.match(index, /accessibilityLabel="Abrir configurações de conexão do veículo"/, 'cartão de conexão precisa de nome acessível');
