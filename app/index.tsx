@@ -422,6 +422,13 @@ export default function IndexScreen() {
               status={coolantValue == null ? 'neutral' : coolantValue >= 115 ? 'danger' : coolantValue >= 110 ? 'warning' : 'ok'}
               landscape={layout.landscape}
             />
+            <SecondaryMetric
+              label="FALHAS ATIVAS"
+              value={!connectionStatus.ecuConnected ? 'N/D' : dtcCount > 0 ? String(dtcCount) + ' DTC' : 'SEM DTC'}
+              detail={!connectionStatus.ecuConnected ? 'ECU NÃO VALIDADA' : dtcCount > 0 ? 'VERIFICAR DIAGNÓSTICO' : 'SEM CÓDIGOS ATIVOS'}
+              status={!connectionStatus.ecuConnected ? 'neutral' : dtcCount > 0 ? 'danger' : 'ok'}
+              landscape={layout.landscape}
+            />
           </View>
 
           <View style={[styles.heroCard, layout.landscape && styles.heroCardLandscape, selectedHeroMetric.severity === 'danger' && styles.heroCardDanger, selectedHeroMetric.severity === 'warning' && styles.heroCardWarning]}>
