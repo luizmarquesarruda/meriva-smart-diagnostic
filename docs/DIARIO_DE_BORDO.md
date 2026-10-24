@@ -1,3 +1,11 @@
+## Auditoria de autonomia ao vivo — 2026-10-24
+
+- Achado: o cálculo de consumo da viagem precisava obedecer aos mesmos critérios de confiabilidade do consumo persistido; resultados iniciais com pouca distância/combustível podiam distorcer a autonomia estimada.
+- Correção: a viagem usa `getReliableTripConsumptionKml`, exigindo distância ≥ 0,1 km, combustível integrado ≥ 0,05 L e pelo menos duas amostras válidas. Sem evidência suficiente, a autonomia recorre à média histórica válida; sem média válida, mostra N/D por meio do valor de estado zero.
+- Integração: `autoTripService` agora chama `getCurrentAutonomyRangeKm`, a mesma função exercitada pelos testes, centralizando validação da conexão ECU, suporte e atualidade do PID 012F, faixa do nível e consumo positivo.
+- Regressão: adicionados casos para limites mínimos, distância/combustível insuficientes, contagem inválida de amostras e entradas não finitas em `tests/tripRecorder.test.js`.
+- Estado da validação: alteração enviada à branch `fix/pid-autonomy-audit-20261024`. CI completa, build Android e teste físico com ELM327/ECU ainda precisam ser confirmados no HEAD final; não declarar sucesso sem evidência.
+
 # Diário de Bordo - Meriva Smart Diagnostic
 
 ## Portabilidade Floot → aplicativo Expo — 2026-10-23
