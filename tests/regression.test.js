@@ -90,19 +90,26 @@ const fakeFS = {
     ensureDirTree(p);
   },
 
-  async readAsStringAsync(p) {
+  async readAsStringAsync(p, options = {}) {
     if (failReadPath === p) {
       failReadPath = null;
       throw new Error('READ IO FAILURE: ' + p);
     }
     if (!files.has(p)) throw new Error('ARQUIVO NAO EXISTE: ' + p);
-    return files.get(p);
+    const content = files.get(p);
+    if (Number.isInteger(options.position) && Number.isInteger(options.length)) {
+      return Buffer.from(content, 'utf8')
+        .subarray(options.position, options.position + options.length)
+        .toString('utf8');
+    }
+    return content;
   },
 
-  async writeAsStringAsync(p, content) {
+  async writeAsStringAsync(p, content, options = {}) {
     if (writeDelayMs > 0) await wait(writeDelayMs);
     ensureDirTree(parentDir(p));
-    files.set(p, String(content));
+    const next = String(content);
+    files.set(p, options.append ? (files.get(p) ?? '') + next : next);
   },
 
   async copyAsync({ from, to }) {
