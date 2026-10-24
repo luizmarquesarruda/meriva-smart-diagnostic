@@ -348,7 +348,7 @@ export default function IndexScreen() {
                     style={[
                       styles.connectionSummaryValue,
                       connectionStatus.bluetoothConnected && styles.connectedText,
-                      !connectionStatus.bluetoothConnected && bluetoothError && styles.danger,
+                      !connectionStatus.bluetoothConnected && !!bluetoothError && styles.danger,
                     ]}
                     numberOfLines={1}
                   >
