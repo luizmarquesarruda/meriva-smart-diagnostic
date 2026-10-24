@@ -29,10 +29,19 @@ export default function ArmazenamentoScreen() {
   const [cycles, setCycles] = useState<DriveCycle[]>([]);
 
   async function refresh(path: string) {
-    const status = await checkStorageQuota(path, DEFAULT_QUOTA);
-    setQuota(status);
-    const breakdown = await getStorageBreakdown(path);
-    setUsageBreakdown(breakdown);
+    try {
+      const status = await checkStorageQuota(path, DEFAULT_QUOTA);
+      setQuota(status);
+      setUsageBreakdown(await getStorageBreakdown(path));
+    } catch (cause) {
+      setQuota({
+        warning: true,
+        critical: true,
+        message: 'NÃO FOI POSSÍVEL VERIFICAR O ARMAZENAMENTO COM SEGURANÇA: ' +
+          (cause instanceof Error ? cause.message : String(cause)),
+      });
+      setUsageBreakdown({});
+    }
     setCycles((await readDriveCycles(path)).filter((cycle) => cycle.source === 'REAL_OBD').sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()));
   }
 
