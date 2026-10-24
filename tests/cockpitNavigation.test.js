@@ -52,6 +52,9 @@ assert.match(index, /accessibilityLabel="Abrir configurações de conexão do ve
 assert.match(index, /ECU DESCONECTADA/, 'não usar OFFLINE genérico para representar a ECU');
 assert.match(index, /label="FALHAS ATIVAS"/, 'o redesenho do cockpit não pode remover a contagem de DTCs');
 assert.match(index, /LÍQUIDO DE ARREFECIMENTO/, 'a temperatura deve identificar o sistema de arrefecimento');
+assert.match(index, /secondaryGrid:\{[^}]*flexWrap:'wrap'/, 'métricas secundárias devem ocupar duas colunas no celular');
+assert.match(index, /secondaryGridLandscape:\{flexWrap:'nowrap'/, 'métricas secundárias devem voltar a uma linha na paisagem');
+assert.match(index, /secondaryMetricCard:\{[^}]*width:'47%'/, 'cartões secundários não podem apertar quatro métricas em uma linha no retrato');
 assert.match(health, /getSharedObdStatus/, 'a central de saúde deve usar o estado real da ECU');
 assert.match(health, /ECU NÃO VALIDADA/, 'ausência de conexão não pode ser apresentada como sistema normal');
 assert.match(health, /ageMs >= 0 && ageMs <= 30_000/, 'a central de saúde deve usar só leituras reais recentes');

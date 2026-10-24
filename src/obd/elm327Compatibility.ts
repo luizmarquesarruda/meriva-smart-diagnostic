@@ -95,7 +95,7 @@ export function classifyElmError(response: string, message = ''): ElmErrorType {
   if (isNoDataResponse(value)) return 'NO_DATA';
   if (/BUFFER FULL/.test(value)) return 'BUFFER_FULL';
   if (/BUS INIT/.test(value)) return 'BUS_INIT_ERROR';
-  if (/BUS ERROR|CAN ERROR|CAN ERROR/.test(value)) return 'BUS_ERROR';
+  if (/BUS ERROR|CAN ERROR/.test(value)) return 'BUS_ERROR';
   if (/RX ERROR|RXERROR/.test(value)) return 'RX_ERROR';
   if (/DATA ERROR/.test(value)) return 'DATA_ERROR';
   if (/DISCONNECT|NOT CONNECTED/.test(value + ' ' + detail)) return 'DISCONNECTED';

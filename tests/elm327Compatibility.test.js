@@ -38,6 +38,7 @@ const { classifyElmError, mergeCompatibilityConfig, DEFAULT_ELM327_COMPATIBILITY
 assert.equal(classifyElmError('NO DATA'), 'NO_DATA');
 assert.equal(classifyElmError('BUFFER FULL'), 'BUFFER_FULL');
 assert.equal(classifyElmError('BUS ERROR'), 'BUS_ERROR');
+assert.equal(classifyElmError('CAN ERROR'), 'BUS_ERROR');
 assert.equal(classifyElmError('', 'TIMEOUT'), 'TIMEOUT');
 assert.equal(classifyElmError('?'), 'UNSUPPORTED');
 const cfg = mergeCompatibilityConfig({ adaptiveTiming: true, adaptiveTimeoutMinMs: 2500, adaptiveTimeoutMaxMs: 12000 });
