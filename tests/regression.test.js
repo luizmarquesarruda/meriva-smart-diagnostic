@@ -1133,6 +1133,7 @@ async function testPidAndLearningWriteSerialization() {
   assert.ok(autoTripServiceSource.includes("connection.supportedPids.includes(item) && !queriedPidsThisCycle.has(item)"),
     'a telemetria rotativa não pode consultar de novo nenhum PID já usado no mesmo ciclo');
   assert.ok(autoTripServiceSource.includes('FUEL_RATE_DISPLAY_STALE_AFTER_MS'), 'valor em cache deve ter prazo explícito de expiração para exibição');
+  assert.ok(autoTripServiceSource.includes('Number.isFinite(estimateAgeMs) && estimateAgeMs >= 0 && estimateAgeMs <= FUEL_RATE_DISPLAY_STALE_AFTER_MS'), 'estimativa em cache deve rejeitar timestamps futuros e vencidos');
   assert.ok(!autoTripServiceSource.includes('recordLivePidQuery('), 'telemetria automática deve registrar cada resposta uma única vez via registerObdQuery');
   assert.ok(autoTripServiceSource.includes('isGpsSampleFresh(gps.lastTimestamp)'), 'detecção de movimento não pode usar velocidade GPS vencida');
   assert.ok(autoTripServiceSource.includes('isGpsSampleFresh(tripGps.lastTimestamp)'), 'gravação da viagem deve descartar velocidade GPS vencida');

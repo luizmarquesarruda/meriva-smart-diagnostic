@@ -436,7 +436,7 @@ class AutoTripService {
         // recém-calculada acima, não valores estimados reaproveitados.
         if (fuelRateForDisplayLph == null && this.lastEstimatedFuelRate) {
           const estimateAgeMs = Date.now() - this.lastEstimatedFuelRate.timestampMs;
-          if (estimateAgeMs <= FUEL_RATE_DISPLAY_STALE_AFTER_MS) {
+          if (Number.isFinite(estimateAgeMs) && estimateAgeMs >= 0 && estimateAgeMs <= FUEL_RATE_DISPLAY_STALE_AFTER_MS) {
             fuelRateForDisplayLph = this.lastEstimatedFuelRate.rateLph;
             fuelRateForDisplaySource = this.lastEstimatedFuelRate.source;
           } else {
