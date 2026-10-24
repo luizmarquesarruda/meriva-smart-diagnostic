@@ -16,6 +16,9 @@ As PRs abaixo continuam abertas e não fazem parte de `main` enquanto não forem
 - [PR #82 — navegação responsiva](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/82): head `d4bae6f794d78e59bb7c1323e11deb2978eefa92`; run [40039535306 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40039535306).
 - [PR #83 — portar layout Floot ao cockpit Android](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83): head `85078c2aacd4ff7427b5ded7c1b1ce0e1f6803cf`; run [40098343069 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40098343069).
 - [PR #84 — inventário do catálogo de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84): head `3c60528017d37744954d2430fca9737ee78a71bd`; run [40089022363 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40089022363).
+- [PR #85 — reconciliação documental](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/85): aberta; esta atualização do diário exige nova CI no HEAD resultante.
+- [PR #86 — descoberta OBD e latência](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/86): head `f9afaed53132521f8fbfc09d59cf6ab90bac9536`; run [40102952556 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40102952556), com `validate` e `android-build` aprovados.
+- [PR #87 — parser e autonomia](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/87): head `fb475eb4908311a666c304af59d9e6007a092a9f`; run [40114505089 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40114505089), com `validate` e `android-build` aprovados.
 - PRs [#74](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/74) e [#75](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/75) estão fechadas **sem merge**; não presumir que os seus heads estejam em `main`.
 
 ### Limites de validação
@@ -184,7 +187,8 @@ As PRs abaixo continuam abertas e não fazem parte de `main` enquanto não forem
 - **DB-107** · 2026-10-23 — Cockpit OBD com até 20 PIDs reais
 - **DB-108** · 2026-10-23 — Recuperação Bluetooth/ELM327 e reconciliação de PR
 - **DB-109** · 2026-10-24 — Auditoria integral, correção do índice e reconciliação do estado atual
-- **DB-110** · 2026-10-24 — Auditoria cruzada de PIDs, parser, autonomia e integração das PRs
+- **DB-110** · 2026-10-24 — Descoberta OBD mais rápida, cache não autoritativo e latência por comando
+- **DB-111** · 2026-10-24 — Continuidade da auditoria e reconciliação documental das PRs
 
 ---
 
@@ -3521,7 +3525,36 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 
 
 
-## DB-110 · 2026-10-24 — Auditoria cruzada de PIDs, parser, autonomia e integração das PRs
+## DB-110 · 2026-10-24 — Descoberta OBD mais rápida, cache não autoritativo e latência por comando
+
+### Auditoria do fluxo real
+- O repositório nativo já tinha `src/obd/intelligentPidDiscovery.ts`, chamado por `src/obd/bluetoothManager.ts`, usando a fila serial de `Elm327Session`. Portanto, não foi criado um segundo motor nem uma segunda fila.
+- Foram encontrados dois gargalos de arranque: a splash repetia cinco consultas seriais para cada PID suportado antes de abrir o cockpit; além disso, quando o cache batia com o protocolo, o manager reutilizava a lista cacheada e pulava a bitmap da sessão corrente.
+- As cinco leituras válidas continuam exigidas para a avaliação de sensores no Laboratório. Elas não são necessárias para fazer a descoberta inicial e não devem bloquear a entrada no cockpit.
+
+### Correções aplicadas neste branch
+- `src/obd/bluetoothManager.ts`: toda sessão válida executa `discoverIntelligentPids`; o cache compatível passa como `knownPids` para ordenar os candidatos, nunca como prova de suporte. A resposta `010C` já usada para validar a ECU é reutilizada sem um round trip duplicado.
+- Instrumentação por comando: `PID_DISCOVERY_COMMAND_RESULT` registra tipo de comando, status, tempo `elapsedMs`, valor/unidade, justificativa e RX bruto. `PID_DISCOVERY_SUMMARY` registra páginas bitmap consultadas, quantidade de sondagens, soma/máximo dos tempos reportados, duração total de parede e PIDs que responderam validamente.
+- `app/splash.tsx`: removido o ciclo extra de cinco consultas por PID antes do cockpit. O painel abre depois que a descoberta/validação na conexão termina e a splash apresenta a contagem de PIDs com resposta válida.
+- `tests/regression.test.js`: reforça que um PID guardado em cache compatível é priorizado, mas somente depois da bitmap corrente, e que os tempos por comando ficam disponíveis no resultado.
+- `tests/projectBaseline.test.js`: protege contra o retorno de aquecimento serial na splash e contra o uso do cache para pular a descoberta.
+- Atualizados `docs/CONTRATO_ANTI_REGRESSAO.md` (RG-32), `docs/TEST_PLAN.md` e `README.md`.
+
+### Critérios técnicos preservados
+- A fila ELM327 continua única e serial; nenhum comando concorrente foi adicionado.
+- PIDs não anunciados pela bitmap atual não são consultados com base apenas em cache antigo.
+- O PID `010C` permanece reutilizado como prova real da ECU, sem duplicar a consulta na descoberta.
+- Cinco leituras sequenciais e cinco valores válidos continuam obrigatórios no teste de sensores; a mudança remove apenas o pré-aquecimento duplicado de startup.
+- Catálogo e bitmap não provam precisão física/elétrica do sensor. Somente resposta válida comprova resposta atual do PID.
+
+### Validação e limites
+- CI [40102952556](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40102952556), run #3170, para o HEAD `f9afaed53132521f8fbfc09d59cf6ab90bac9536`: `validate` e `android-build` concluídos com sucesso.
+- A CI comprova apenas o SHA da branch #86; não comprova que a alteração esteja em `main`, nem mede latência real em um veículo.
+- O teste físico com ELM327/ECU continua pendente; latência real, bitmap e PIDs suportados devem ser registrados a partir de uma sessão real.
+- PR #86 aberta, sem merge.
+
+
+## DB-111 · 2026-10-24 — Continuidade da auditoria e reconciliação documental das PRs
 
 ### Escopo da auditoria
 - O Diário de Bordo foi consultado antes da inspeção do código, com atenção ao estado vigente, às regras anti-regressão, ao índice e às entradas mais recentes.
@@ -3532,17 +3565,17 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - **Catálogo e fórmulas:** o catálogo contém 34 PIDs e 18 identificadores de fórmula distintos. Todos os identificadores usados no catálogo aparecem cobertos por vetores determinísticos em `tests/pidParserIntegrity.test.js`. O teste também percorre todos os PIDs para verificar comprimento declarado, interpretação finita e preservação dos bytes básicos.
 - **Parser:** a suíte cobre payload truncado e excedente, resposta hexadecimal compacta e espaçada, cabeçalho CAN, envelope legado K-Line com checksum e mensagens de estado do adaptador. A validação de bytes sintéticos não demonstra que a ECU deste veículo suporte todos os PIDs catalogados.
 - **Autonomia:** a lógica central exige ECU conectada, sessão ativa, PID 012F suportado e leitura de combustível recente (janela de 30 s); consumo da viagem só é priorizado depois dos limiares de distância, combustível integrado e amostras válidas. A API pública do serviço filtra leituras vencidas antes de entregar o estado às telas. Na revisão estática deste caminho, não foi confirmado defeito adicional que justifique alterar a lógica sem teste comportamental específico.
-- **CI da PR #87:** execução [40114505089](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40114505089), no HEAD `fb475eb4908311a666c304af59d9e6007a092a9f`: `validate` concluído com sucesso; `android-build` ainda estava em execução na consulta. Portanto, o build Android final não foi declarado aprovado.
+- **CI da PR #87:** execução [40114505089](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40114505089), no HEAD `fb475eb4908311a666c304af59d9e6007a092a9f`: `validate` e `android-build` concluídos com sucesso.
 - **Coordenação documental:** a PR [#85](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/85) e a PR [#87](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/87) modificam `docs/DIARIO_DE_BORDO.md` a partir de bases distintas e usam `DB-109` para conteúdos diferentes. Há risco concreto de conflito de conteúdo/ordenação e de um dos registros ser perdido se as branches forem integradas sem reconciliação. Esta atualização reserva `DB-110` nesta branch documental; a branch da PR #87 ainda precisa ser sincronizada com o índice e a numeração final antes de qualquer merge.
 
 ### Limites de validação
 - Nenhuma alteração em código de produção, fórmulas, catálogo de PIDs, dependências ou configuração Android foi feita nesta rodada; a alteração desta rodada é documental.
-- O resultado de `validate` é evidência apenas para o SHA indicado. A etapa `android-build` ainda precisa terminar com sucesso no mesmo SHA.
+- A execução anterior da PR #87 concluiu `validate` e `android-build` com sucesso no SHA indicado. Como o Diário será sincronizado, cada novo HEAD gerado pela edição documental precisa de CI própria.
 - Não foi executado teste físico com ELM327/ECU nem inspeção visual do APK instalado. Esses itens permanecem pendentes.
 - Nenhum merge foi executado ou autorizado.
 
 ### Próximos passos
-1. Aguardar o resultado final de `android-build` na CI da PR #87.
-2. Reconciliar o Diário de Bordo nas branches #85 e #87 para que haja uma única sequência de IDs e nenhum registro seja sobrescrito.
+1. Confirmar a CI de cada branch depois da sincronização documental, pois cada commit recebe um SHA novo.
+2. Manter uma única sequência DB-001 a DB-111 nas PRs #85, #86 e #87; não sobrescrever registros históricos.
 3. Se a CI falhar ou o build expuser problema, registrar o log e a causa antes de alterar código.
-4. Validar fisicamente o PID 012F, a autonomia durante uma viagem real e a resposta dos PIDs pretendidos antes de afirmar compatibilidade com a Meriva específica.
+4. Validar fisicamente a descoberta bitmap, o PID 012F e a autonomia durante uma viagem real antes de afirmar compatibilidade com a Meriva específica.
