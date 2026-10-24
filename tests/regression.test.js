@@ -1135,6 +1135,21 @@ async function testBackupCompleteness() {
       `backup deve conter ${dir}`,
     );
   }
+
+  const historicalBackupRoot = `${BASE}/BACKUP`;
+  for (let index = 0; index < 6; index += 1) {
+    await fakeFS.makeDirectoryAsync(
+      `${historicalBackupRoot}/meriva_smart_2020-01-${String(index + 1).padStart(2, '0')}T00-00-00-000Z`,
+      { intermediates: true },
+    );
+  }
+  await backup.createBackup(BASE);
+  const retained = (await fakeFS.readDirectoryAsync(historicalBackupRoot))
+    .filter((name) => name.startsWith('meriva_smart_'));
+  assert.strictEqual(retained.length, 5,
+    'retenção deve manter no máximo cinco backups após confirmar que o novo backup foi criado');
+  assert.ok(retained.some((name) => name === `meriva_smart_${info.timestamp}`),
+    'backup recém-validado deve ser mantido');
   m.disposeAutoSave();
 }
 
