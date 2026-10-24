@@ -48,7 +48,7 @@ Este documento é o contrato de aceitação entre mudanças, testes, diário e C
 | RG-29 | A trava de limpeza de socket RFCOMM é compartilhada por instâncias e endereço normalizado; uma nova instância não conecta enquanto a limpeza anterior estiver incerta. | `regression.test.js`, `bluetoothLifecycle.test.js` |
 | RG-30 | Encerramento nativo da sessão tem deadline; timeout/erro de fechamento não confirma liberação e bloqueia reconexão. | `connectionRecovery.test.js`, `bluetoothLifecycle.test.js` |
 | RG-31 | Retry de limpeza do socket também tem deadline; falha ou promessa pendente mantém a trava por endereço e nunca deixa a nova tentativa aguardando indefinidamente. | `connectionRecovery.test.js`, `bluetoothLifecycle.test.js` |
-| RG-32 | Cada sessão deve consultar as bitmaps da ECU atual mesmo com cache; cache compatível só prioriza a ordem. Não executar cinco leituras de cada PID na splash: cinco leituras válidas ficam no teste de sensores. Registrar RX/status/`elapsedMs` por comando e duração total da descoberta. | `regression.test.js`, `projectBaseline.test.js`, logs `PID_DISCOVERY_COMMAND_RESULT`/`PID_DISCOVERY_SUMMARY` |
+| RG-32 | Cada sessão deve consultar as bitmaps da ECU atual mesmo com cache; cache compatível só prioriza a ordem. Cada bitmap exige exatamente quatro bytes de payload, não pode juntar linhas ou ignorar bytes excedentes, e respostas de múltiplas ECUs ambíguas são rejeitadas. Não executar cinco leituras de cada PID na splash: cinco leituras válidas ficam no teste de sensores. Registrar RX/status/`elapsedMs` por comando e duração total da descoberta. | `regression.test.js`, `projectBaseline.test.js`, `pidScanner.ts`, logs `PID_DISCOVERY_COMMAND_RESULT`/`PID_DISCOVERY_SUMMARY` |
 
 ## Regras para uma alteração legítima
 
