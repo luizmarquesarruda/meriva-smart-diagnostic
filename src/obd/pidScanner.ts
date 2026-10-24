@@ -14,16 +14,39 @@ export interface DiscoveryItem {
 }
 
 export function decodeSupportedPids(requestedPid: string, response: string): string[] {
-  const normalized = requestedPid.replace(/\s/g, '').toUpperCase();
+  const normalized = requestedPid.replace(/\\s/g, '').toUpperCase();
   if (!/^01(?:00|20|40|60)$/.test(normalized) || !validateOBDResponse(response)) return [];
 
-  const stream = response.replace(/[^0-9A-F]/gi, '').toUpperCase();
   const marker = `41${normalized.slice(-2)}`;
-  const headerIndex = stream.indexOf(marker);
-  if (headerIndex < 0) return [];
+  const bitmapFrames: string[] = [];
 
-  const bitmapHex = stream.slice(headerIndex + marker.length, headerIndex + marker.length + 8);
-  if (bitmapHex.length !== 8 || !/^[0-9A-F]{8}$/.test(bitmapHex)) return [];
+  // Each physical response line is parsed separately. Do not concatenate
+  // unrelated lines or accept a valid four-byte bitmap followed by extra data.
+  for (const line of response.split(/[\\r\\n]+/)) {
+    const compact = line.toUpperCase().replace(/[^0-9A-F]/g, '');
+    if (!compact) continue;
+
+    let markerIndex = compact.indexOf(marker);
+    while (markerIndex >= 0) {
+      const prefix = compact.slice(0, markerIndex);
+      const trailing = compact.slice(markerIndex + marker.length);
+      const exactObdPayload = prefix.length === 0 && trailing.length === 8;
+      const can11BitFrame = /^[0-9A-F]{3}06$/.test(prefix) && trailing.length === 8;
+      const can29BitFrame = /^[0-9A-F]{8}06$/.test(prefix) && trailing.length === 8;
+      const legacyKLineFrame = prefix === '486B10' && trailing.length === 10;
+
+      if (exactObdPayload || can11BitFrame || can29BitFrame || legacyKLineFrame) {
+        bitmapFrames.push(trailing.slice(0, 8));
+      }
+      markerIndex = compact.indexOf(marker, markerIndex + 1);
+    }
+  }
+
+  // Multiple matching ECU frames are ambiguous for this scanner; reject rather
+  // than silently choosing one ECU's bitmap. A single accepted frame contains
+  // exactly four bitmap bytes (plus only the known K-Line checksum, if present).
+  if (bitmapFrames.length !== 1 || !/^[0-9A-F]{8}$/.test(bitmapFrames[0])) return [];
+  const bitmapHex = bitmapFrames[0];
 
   const bitmap = [];
   for (let index = 0; index < bitmapHex.length; index += 2) {
