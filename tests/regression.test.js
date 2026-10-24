@@ -1033,6 +1033,20 @@ async function testDriveCycleValidation() {
   );
   assert.ok(files.has(BASE + '/VIAGENS/index.previous.json'),
     'backup anterior deve permanecer disponível durante a recuperação');
+
+  resetFS();
+  await fakeFS.makeDirectoryAsync(BASE + '/VIAGENS', { intermediates: true });
+  files.set(BASE + '/VIAGENS/index.previous.json', JSON.stringify({
+    version: '1.0',
+    cycles: [cycle],
+    totalCount: 1,
+  }));
+  await storage.initializeDriveCycles(BASE);
+  assert.deepStrictEqual(
+    (await storage.readDriveCycles(BASE)).map((item) => item.id),
+    ['test-1'],
+    'startup initialization must recover a missing main index from its valid backup',
+  );
 }
 
 async function testDriveCycleSummaryUsesWeightedRealSpeed() {
