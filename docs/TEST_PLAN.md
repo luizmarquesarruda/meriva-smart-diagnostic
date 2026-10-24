@@ -80,6 +80,7 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 ## PID-AUTO-01 — Integridade de respostas PID e autonomia em tempo real
 - Para cada PID catalogado, validar o comprimento de payload definido no catálogo e o resultado da fórmula com bytes de teste; resposta truncada ou com bytes excedentes deve ser recusada.
 - Aceitar resposta ELM327 com cabeçalho CAN antes do serviço positivo, sem incluir o cabeçalho no payload.
+- No PID 0114, manter o valor principal em volts (A/200) e exibir a interpretação do byte B como STFT = (B×100/128)−100%; quando B=0xFF, informar que o sensor não é usado no cálculo, sem exibir +99,22%.
 - A autonomia em tempo real só pode priorizar consumo da viagem quando houver distância ≥ 0,1 km, combustível integrado ≥ 0,05 L e pelo menos duas amostras válidas.
 - Antes desse limiar, usar apenas uma média histórica positiva válida; se não existir, apresentar N/D, nunca transformar amostra insuficiente em consumo alto.
 - CI automatizada não substitui teste físico com ELM327/ECU; validar no veículo a resposta real do PID 012F e a estabilidade da autonomia.
