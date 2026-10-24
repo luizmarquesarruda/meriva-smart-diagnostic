@@ -150,6 +150,20 @@
       "url": "https://obd2pid.com/pids/01-01",
       "usedFor": "Conferir MIL, contagem de DTC, tipo de ignição e readiness, inclusive C4/D4 no ciclo Otto.",
       "limitation": "Referência secundária de apoio; a definição normativa SAE tem precedência."
+    },
+    {
+      "id": "SAE_J1979_CURRENT_EDITION",
+      "title": "SAE J1979_202505 — E/E Diagnostic Test Modes",
+      "url": "https://saemobilus.sae.org/standards/j1979_202505-e-e-diagnostic-test-modes",
+      "usedFor": "Referência normativa atual consultada para o escopo dos serviços de diagnóstico e a arquitetura de comunicação OBD genérica.",
+      "limitation": "A página pública oferece resumo/metadados; o texto normativo integral não foi baixado nesta auditoria e esta fonte não comprova suporte numa ECU específica."
+    },
+    {
+      "id": "SAE_J1979_DA_CURRENT",
+      "title": "SAE J1979-DA_202608 — Digital Annex of E/E Diagnostic Test Modes",
+      "url": "https://saemobilus.sae.org/standards/j1979da_202608-j1979-da-digital-annex-e-e-diagnostic-test-modes",
+      "usedFor": "Registro global mais recente consultado de identificadores de dados OBD relacionados a emissões/propulsão; versão revisada em agosto de 2026.",
+      "limitation": "A página pública descreve o escopo, não substitui o conteúdo licenciado do anexo nem confirma que uma ECU local implemente cada PID."
     }
   ],
   "tests": [
