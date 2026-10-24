@@ -27,8 +27,8 @@ export default function SaudeScreen() {
     ()=>runLocalDiagnostic({
       observations:state.lastReadings.map(r=>({
         pid:r.pid,name:r.name,value:r.value,unit:r.unit,
-        source:r.source==='SIMULACAO'?'SIMULACAO':'REAL_OBD',
-        timestamp:r.timestamp,confidence:r.source==='SIMULACAO'?'LOW':'GOOD',
+        source:r.source==='REAL'?'REAL_OBD':r.source==='SIMULACAO'?'SIMULACAO':'IMPORTADO',
+        timestamp:r.timestamp,confidence:r.source==='REAL'?'GOOD':'LOW',
       } as PidObservation)),
       dtcs:state.dtcs,condition:context.condition,
     }),
