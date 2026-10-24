@@ -162,7 +162,7 @@ assert.match(home, /buildCockpitPidMetrics/, 'cockpit deve consumir o modelo din
 for (const label of [
   'TEMPERATURA DO MOTOR',
   'VOLTAGEM DO SISTEMA',
-  'POSIÇÃO DA BORBOLETA',
+  'POSIÇÃO ABSOLUTA DA BORBOLETA',
   'ROTAÇÃO DO MOTOR',
 ]) {
   assert.ok(cockpitTelemetry.includes("'" + label + "'"), 'indicador principal ausente no catálogo do cockpit: ' + label);
