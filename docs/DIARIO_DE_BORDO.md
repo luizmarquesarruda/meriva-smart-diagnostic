@@ -184,6 +184,7 @@ As PRs abaixo continuam abertas e não fazem parte de `main` enquanto não forem
 - **DB-107** · 2026-10-23 — Cockpit OBD com até 20 PIDs reais
 - **DB-108** · 2026-10-23 — Recuperação Bluetooth/ELM327 e reconciliação de PR
 - **DB-109** · 2026-10-24 — Auditoria integral, correção do índice e reconciliação do estado atual
+- **DB-110** · 2026-10-24 — Auditoria cruzada de PIDs, parser, autonomia e integração das PRs
 
 ---
 
@@ -3518,3 +3519,30 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Ao criar uma nova entrada `DB-NNN`, atualizar também o índice no início e usar o próximo ID disponível.
 - Nunca declarar uma branch/PR como mesclada ou validada com base em status de outra branch, outro SHA ou uma etapa intermediária de CI.
 
+
+
+## DB-110 · 2026-10-24 — Auditoria cruzada de PIDs, parser, autonomia e integração das PRs
+
+### Escopo da auditoria
+- O Diário de Bordo foi consultado antes da inspeção do código, com atenção ao estado vigente, às regras anti-regressão, ao índice e às entradas mais recentes.
+- Revisados no GitHub: `package.json`, workflow `.github/workflows/ci.yml`, `docs/CONTRATO_ANTI_REGRESSAO.md`, `docs/TEST_PLAN.md`, catálogo `src/knowledge/pids.json`, parser `src/obd/parser.ts`, definição/fórmulas de PID, cálculo de consumo de combustível, apresentação de autonomia, serviço de viagem e testes associados.
+- A análise foi estática, apoiada nos arquivos e no estado da CI no GitHub. Não foi executada uma sessão local com veículo ou adaptador físico.
+
+### Resultados e evidências
+- **Catálogo e fórmulas:** o catálogo contém 34 PIDs e 18 identificadores de fórmula distintos. Todos os identificadores usados no catálogo aparecem cobertos por vetores determinísticos em `tests/pidParserIntegrity.test.js`. O teste também percorre todos os PIDs para verificar comprimento declarado, interpretação finita e preservação dos bytes básicos.
+- **Parser:** a suíte cobre payload truncado e excedente, resposta hexadecimal compacta e espaçada, cabeçalho CAN, envelope legado K-Line com checksum e mensagens de estado do adaptador. A validação de bytes sintéticos não demonstra que a ECU deste veículo suporte todos os PIDs catalogados.
+- **Autonomia:** a lógica central exige ECU conectada, sessão ativa, PID 012F suportado e leitura de combustível recente (janela de 30 s); consumo da viagem só é priorizado depois dos limiares de distância, combustível integrado e amostras válidas. A API pública do serviço filtra leituras vencidas antes de entregar o estado às telas. Na revisão estática deste caminho, não foi confirmado defeito adicional que justifique alterar a lógica sem teste comportamental específico.
+- **CI da PR #87:** execução [40114505089](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40114505089), no HEAD `fb475eb4908311a666c304af59d9e6007a092a9f`: `validate` concluído com sucesso; `android-build` ainda estava em execução na consulta. Portanto, o build Android final não foi declarado aprovado.
+- **Coordenação documental:** a PR [#85](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/85) e a PR [#87](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/87) modificam `docs/DIARIO_DE_BORDO.md) a partir de bases distintas e usam `DB-109` para conteúdos diferentes. Há risco concreto de conflito de conteúdo/ordenação e de um dos registros ser perdido se as branches forem integradas sem reconciliação. Esta atualização reserva `DB-110` nesta branch documental; a branch da PR #87 ainda precisa ser sincronizada com o índice e a numeração final antes de qualquer merge.
+
+### Limites de validação
+- Nenhuma alteração em código de produção, fórmulas, catálogo de PIDs, dependências ou configuração Android foi feita nesta rodada; a alteração desta rodada é documental.
+- O resultado de `validate` é evidência apenas para o SHA indicado. A etapa `android-build) ainda precisa terminar com sucesso no mesmo SHA.
+- Não foi executado teste físico com ELM327/ECU nem inspeção visual do APK instalado. Esses itens permanecem pendentes.
+- Nenhum merge foi executado ou autorizado.
+
+### Próximos passos
+1. Aguardar o resultado final de `android-build` na CI da PR #87.
+2. Reconciliar o Diário de Bordo nas branches #85 e #87 para que haja uma única sequência de IDs e nenhum registro seja sobrescrito.
+3. Se a CI falhar ou o build expuser problema, registrar o log e a causa antes de alterar código.
+4. Validar fisicamente o PID 012F, a autonomia durante uma viagem real e a resposta dos PIDs pretendidos antes de afirmar compatibilidade com a Meriva específica.
