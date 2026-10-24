@@ -1,5 +1,8 @@
 # Referência externa de engenharia: projetos GitHub testados
 
+> **Documentação vigente:** este registro é histórico. Para a tabela de PIDs, semântica dos bytes, fórmulas, unidades e a separação entre catálogo SAE e suporte observado no veículo, use [Mapa de PIDs e fórmulas](PID_FORMULA_MAP_2026-10-24.md) e [Auditoria de fontes da Meriva × OBD](MERIVA_OBD_SOURCE_AUDIT_2026-10-24.md). A confirmação específica atual permanece limitada ao PID `010C` com resposta `RAW_ECU` registrada.
+
+
 Data da comparação: 2026-10-02.
 
 Este documento registra padrões encontrados em projetos públicos de diagnóstico OBD/GPS e o que foi ou não aproveitado no Meriva Smart Diagnostic.
