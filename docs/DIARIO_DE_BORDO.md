@@ -1,17 +1,44 @@
 # Diário de Bordo - Meriva Smart Diagnostic
 
+## ESTADO VIGENTE — 2026-10-24
+
+> Este bloco resume o estado confirmado no GitHub nesta data. Os registros numerados abaixo são históricos e preservam o estado que existia quando cada ocorrência foi escrita. Uma CI verde em uma branch/PR não significa que a mudança já esteja em `main`.
+
+### Repositório principal
+- Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
+- `main` consultada em 2026-10-24: `701474de2cb3ed8a617a66d87fe3b5e368366acb`.
+- CI do `main` para esse SHA: [run 39985825746 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/39985825746).
+- PR [#80 — Corrige limites e validação de fórmulas OBD-II](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/80): **mesclada em 2026-10-23**, com merge commit `701474de2cb3ed8a617a66d87fe3b5e368366acb`, que corresponde à cabeça atual de `main). O registro no início deste arquivo que dizia “ainda sem merge” é um retrato anterior ao merge, não o estado atual.
+
+### Pull requests abertas consultadas
+As PRs abaixo continuam abertas e não fazem parte de `main` enquanto não forem mescladas. Os resultados de CI indicados são específicos aos respectivos SHAs de branch:
+- [PR #81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81): head `5ece9c7da470bb56ca7687826fc17df2c00cefab`; run [40007637159 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40007637159).
+- [PR #82 — navegação responsiva](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/82): head `d4bae6f794d78e59bb7c1323e11deb2978eefa92`; run [40039535306 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40039535306).
+- [PR #83 — portar layout Floot ao cockpit Android](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83): head `85078c2aacd4ff7427b5ded7c1b1ce0e1f6803cf`; run [40098343069 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40098343069).
+- [PR #84 — inventário do catálogo de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84): head `3c60528017d37744954d2430fca9737ee78a71bd`; run [40089022363 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40089022363).
+- PRs [#74](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/74) e [#75](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/75) estão fechadas **sem merge**; não presumir que os seus heads estejam em `main`.
+
+### Limites de validação
+- CI valida o SHA executado, não outro commit e nem o comportamento físico do veículo.
+- O teste com ELM327/ECU reais e a inspeção visual no aparelho Android continuam sendo validações independentes; este diário não registra evidência de que tenham sido realizados.
+- O protótipo web Floot e o aplicativo Expo/React Native são alvos distintos. Alterações no Floot não atualizam automaticamente o repositório Android; a PR #83 é uma proposta separada e ainda aberta.
+
+**Nota de leitura:** os dois registros de contexto datados de 2026-10-23 logo abaixo foram escritos antes do merge da PR #80. Seus estados de “aguardando CI/merge” são preservados como histórico; para o estado atual, vale esta seção e a evidência vinculada acima.
+
+---
+
 ## Portabilidade Floot → aplicativo Expo — 2026-10-23
 
 - A seção de validação matemática criada no protótipo Floot foi portada para a tela nativa `app/laboratorio.tsx`; não foi copiada literalmente a implementação React web, pois o repositório usa Expo/React Native.
 - A interface nativa reutiliza `src/obd/formulaEngine.ts` como fonte única para as fórmulas e apresenta os quatro casos de fronteira dos PIDs 0106, 0107, 012D e 015D.
 - A tela deixa explícito que os valores de fronteira são casos matemáticos com bytes 0xFF, não leituras reais e não evidência de suporte da ECU.
 - Adicionado teste de regressão para verificar a presença da seção e o reuso do motor oficial. A CI precisa executar novamente sobre o novo HEAD; nenhuma compilação nem teste físico deve ser presumido nesta anotação.
-- Branch de trabalho: `fix/pid-formula-boundaries-20261023`; mudança enviada para a PR #80, ainda sem merge.
+- Branch de trabalho: `fix/pid-formula-boundaries-20261023`; na data deste registro, a mudança estava na PR #80 e ainda não havia sido mesclada. O estado posterior está reconciliado no bloco “ESTADO VIGENTE” no início do arquivo.
 
 
 ## Atualização de auditoria — 2026-10-23
 
-- Repositório: `luizmarquesarruda/meriva-smart-diagnostic`; trabalho isolado na branch `fix/pid-formula-boundaries-20261023`, PR #80 aberta contra `main`. Não mesclar antes da CI completa.
+- Repositório: `luizmarquesarruda/meriva-smart-diagnostic`; no momento deste registro, o trabalho estava isolado na branch `fix/pid-formula-boundaries-20261023`, com PR #80 aberta contra `main`. A instrução de não mesclar e o status de CI abaixo representam aquele momento; consulte o bloco “ESTADO VIGENTE” para o resultado posterior.
 - Problema confirmado: limites arredondados rejeitavam os máximos matemáticos das fórmulas dos PIDs 0106, 0107, 012D e 015D. Para 0106/0107/012D, o máximo de A=255 é 99,21875%; para 015D, A=B=255 produz 301,9921875°.
 - Correção: `src/knowledge/ranges.json` atualizado para esses limites exatos. `src/obd/formulaEngine.ts` agora rejeita bytes consumidos que não sejam inteiros no intervalo 0–255.
 - Regressão: criado `tests/pidFormulaBoundaries.test.js`, incluído no script `npm test`; cobre os limites e entradas inválidas. Documentação técnica e changelog atualizados.
@@ -19,9 +46,9 @@
 - Escopo desta rodada: auditoria direcionada de catálogo, fórmulas, parser e faixas; não afirmar que todos os módulos do repositório foram executados ou validados fisicamente.
 
 
-## ESTADO VIGENTE E REGRAS ANTI-REGRESSÃO — 2026-10-21
+## ESTADO HISTÓRICO E REGRAS ANTI-REGRESSÃO — 2026-10-21 (SUPERSEDIDO EM 2026-10-24)
 
-> **Esta seção é a referência operacional atual.** O restante deste arquivo contém registros históricos: falhas, decisões e “próximos passos” antigos descrevem o estado da época e não devem ser tratados como tarefas ainda abertas sem nova verificação. Quando dois registros divergirem, prevalecem este contrato e a entrada cronologicamente mais recente que tenha evidência verificável.
+> **Snapshot histórico de 2026-10-21 — não é mais a referência operacional atual.** Os estados de branches, SHAs e PRs abaixo registram o que foi observado naquela data. Para o estado atual, use a seção “ESTADO VIGENTE — 2026-10-24” no início do arquivo. Os contratos anti-regressão permanecem como requisitos técnicos até que sejam alterados com evidência e teste.
 
 ### Estado atual do trabalho
 - Repositório: `luizmarquesarruda/meriva-smart-diagnostic`.
@@ -44,9 +71,9 @@
 11. **Diário em primeiro lugar:** antes de editar código, ler esta seção e a entrada final mais recente; conferir branch, SHA e CI no GitHub; escrever problema → causa comprovada → alteração → testes → commit → CI → resultado → próximos passos. Atualizar este arquivo com evidências, nunca com resultados presumidos.
 12. **Histórico não é fila de tarefas:** entradas anteriores preservam o contexto da época. Não repetir seus “próximos passos” automaticamente nem desfazer correções posteriores; confirmar primeiro se ainda estão pendentes no código e na CI.
 
-## ÍNDICE SEQUENCIAL — TODAS AS ATUALIZAÇÕES
+## ÍNDICE SEQUENCIAL — ENTRADAS DB
 
-**Regra:** o maior ID identifica a atualização documental mais recente. O índice é sequencial pela ordem de registro (não necessariamente ordenado estritamente pela data do evento). Na retomada, comece pelo maior ID e confira o HEAD e a CI atuais diretamente no GitHub.
+**Regra:** este índice cobre as entradas identificadas por `DB-NNN`; os dois registros de contexto sem ID que aparecem antes dele são notas históricas preservadas separadamente. O maior ID identifica a última entrada documental. A ordem segue a de registro no arquivo, não necessariamente a data estrita do evento. Na retomada, comece pelo maior ID e confira o HEAD e a CI atuais diretamente no GitHub.
 
 - **DB-001** · 2026-10-06 — Correção do carregamento do catálogo de combustível
 - **DB-002** · 2026-10-07 — Continuidade do fluxo Bluetooth
@@ -136,6 +163,27 @@
 - **DB-086** · 2026-10-21 — Cockpit: informações de rede/clima legíveis e botões com áreas de toque ampliadas
 - **DB-087** · 2026-10-21 — Ajuste adicional de legibilidade da rede e tamanho dos botões principais
 - **DB-088** · 2026-10-21 — Auditoria contra regressões, reconciliação das PRs fechadas e CI do conjunto combinado
+- **DB-089** · 2026-10-21 — Rotação automática da tela
+- **DB-090** · 2026-10-22 — Correção da autonomia, conexão explícita e navegação única
+- **DB-091** · 2026-10-22 — Compatibilidade da barra nativa com Expo Doctor
+- **DB-092** · 2026-10-22 — Restauração da splash screen e falha de cobertura antirregressão
+- **DB-093** · 2026-10-22 — Reconciliação da documentação após regressão da splash
+- **DB-094** · 2026-10-22 — Plano de aceitação para o lote de confiabilidade e UX
+- **DB-095** · 2026-10-22 — Expiração de nível de combustível antigo na autonomia atual
+- **DB-096** · 2026-10-22 — Fechar outros caminhos de exibição da autonomia persistida
+- **DB-097** · 2026-10-22 — Rejeitar timestamps inválidos/futuros na telemetria ao vivo
+- **DB-098** · 2026-10-22 — DTC: distinguir ausência de códigos de falha de leitura
+- **DB-099** · 2026-10-22 — Pendências de splash screen e rodada de estabilização
+- **DB-100** · 2026-10-23 — Implementar asset visual e configuração explícita da splash nativa
+- **DB-101** · 2026-10-23 — Splash operacional, conexão automática e identidade Smart OBD
+- **DB-102** · 2026-10-23 — Desbloquear o acesso ao cockpit quando a ECU está indisponível
+- **DB-103** · 2026-10-23 — Permissões de localização deixam de bloquear diagnóstico OBD
+- **DB-104** · 2026-10-23 — Prioridade de alerta térmico e localização contextual
+- **DB-105** · 2026-10-23 — Sincronizar contrato de teste com callback de prioridade térmica
+- **DB-106** · 2026-10-23 — Manutenção preventiva e diário local de abastecimentos
+- **DB-107** · 2026-10-23 — Cockpit OBD com até 20 PIDs reais
+- **DB-108** · 2026-10-23 — Recuperação Bluetooth/ELM327 e reconciliação de PR
+- **DB-109** · 2026-10-24 — Auditoria integral, correção do índice e reconciliação do estado atual
 
 ---
 
@@ -3423,7 +3471,7 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Nenhum merge executado.
 
 
-### DB-107 — 2026-10-23 — Cockpit OBD com até 20 PIDs reais
+## DB-107 · 2026-10-23 — Cockpit OBD com até 20 PIDs reais
 
 - **Problema:** painel inicial limitado a quatro métricas fixas; leituras auxiliares restringidas a quatro PIDs rotativos, com N/D durante janelas sem leitura.
 - **Causa confirmada:** a tela usava uma lista fixa de quatro métricas e a política de polling só rotacionava quatro PIDs. O caminho serial também precisava evitar repetir um PID quando ele já tivesse sido consultado no mesmo ciclo para consumo ou estimativa.
@@ -3431,10 +3479,42 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - **Proteções:** não criar segunda fila/sondagem OBD, não promover catálogo a suporte real e não reutilizar valores vencidos como atuais. Limites de alerta são indicações de referência, não DTCs nem prova isolada de defeito.
 - **Validação:** teste cockpitTelemetry.test.js adicionado a npm test e ao gate anti-regressão. CI, TypeScript e build Android ainda aguardam execução para este commit; não presumir aprovação. A validação física com ELM327/ECU continua separada.
 
-### DB-108 — 2026-10-23 — Recuperação Bluetooth/ELM327 e reconciliação de PR
+## DB-108 · 2026-10-23 — Recuperação Bluetooth/ELM327 e reconciliação de PR
 
 - **Falha de integração:** a PR #77 ficou baseada no HEAD anterior às PRs #78 e #79 e tocava arquivos de cockpit/navegação atualizados desde então. A reconciliação mantém o código atual de splash, cockpit e telemetria; mudanças de navegação antigas não devem substituir essas versões.
 - **Recuperação OBD:** timeouts de conexão/escrita/fechamento nativo têm deadlines; persistência da desconexão não bloqueia a tentativa de fechar a sessão; reconexão permanece bloqueada quando a liberação do socket RFCOMM não está confirmada; retry de limpeza também é limitado.
 - **Protocolo e permissões:** recuperação ELM (ATZ/ATSP/prova ECU/ATDP) é serializada; GPS segue opcional para iniciar OBD; o plugin limita permissões Bluetooth legadas no Android até API 30 sem limitar as permissões modernas.
 - **Proteções:** testes adversariais de promessa pendente, falha de fechamento, bloqueio entre instâncias e ordem de protocolo ficam ligados a `npm test` e ao gate anti-regressão. Os requisitos Bluetooth recebem IDs RG-22 a RG-31, sem duplicar RGs existentes.
 - **Validação:** conferir `gate:baseline`, `validate` e `android-build` no SHA final desta atualização. A CI não substitui teste físico com ELM327/ECU; esse teste e a inspeção no aparelho permanecem pendentes.
+
+## DB-109 · 2026-10-24 — Auditoria integral, correção do índice e reconciliação do estado atual
+
+### Escopo e leitura
+- Foi lido o conteúdo completo de `docs/DIARIO_DE_BORDO.md` (3.441 linhas antes desta correção), incluindo os registros de contexto do início, a seção de regras operacionais e todas as entradas históricas `DB-001` a `DB-108`.
+- As entradas históricas foram preservadas. Correções foram aplicadas ao estado documental atual, ao índice e à formatação dos cabeçalhos, sem reescrever falhas antigas como se não tivessem ocorrido.
+
+### Inconsistências corrigidas
+- O bloco chamado “ESTADO VIGENTE” datado de 2026-10-21 estava desatualizado e mencionava um SHA antigo de `main`; ele foi renomeado para snapshot histórico e apontado ao bloco de estado atual.
+- O índice listava somente até `DB-088`, apesar de o arquivo já conter as entradas `DB-089` a `DB-108`. Todas foram incluídas e a entrada atual `DB-109` foi acrescentada.
+- Os cabeçalhos de `DB-107` e `DB-108` usavam nível `###`, ao contrário das demais entradas; foram normalizados para `##`.
+- Os dois resumos de contexto de 2026-10-23 diziam que a PR #80 ainda não havia sido mesclada. A redação agora deixa explícito que esse era o estado na data de registro e remete à confirmação posterior, sem apagar o histórico.
+- Foi adicionado no início um resumo atual datado com os SHAs e links de CI/PR consultados. O índice agora declara com precisão que enumera entradas `DB-NNN`, mantendo separadas as notas iniciais sem ID.
+
+### Estado do GitHub verificado em 2026-10-24
+- `main`: `701474de2cb3ed8a617a66d87fe3b5e368366acb`; CI [39985825746](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/39985825746) concluída com sucesso nesse SHA.
+- PR #80 foi mesclada em 2026-10-23 e seu merge commit é o próprio SHA atual de `main`.
+- PRs #81, #82, #83 e #84 estavam abertas na consulta. Suas CIs consultadas terminaram com sucesso nos SHAs de suas respectivas branches, mas nenhuma dessas mudanças deve ser descrita como estando em `main` antes do merge.
+- PRs #74 e #75 estavam fechadas sem merge.
+- O protótipo Floot e o app Expo/React Native continuam sendo alvos distintos; a portabilidade proposta na PR #83 é separada e não se presume integrada.
+
+### Validação e limites
+- Verificação documental: IDs `DB-001` a `DB-109` conferidos em sequência; as lacunas antes desta correção eram do índice, não das entradas históricas.
+- Esta alteração muda documentação somente; não altera código de produção, catálogo JSON, fórmulas, dependências, configuração Android ou transporte OBD.
+- A CI do novo commit documental ainda precisa ser consultada pelo SHA exato. Não declarar essa alteração validada por CI até que a execução correspondente termine.
+- Teste físico com ELM327/ECU e inspeção visual no aparelho não são comprovados por CI e continuam a exigir evidência própria.
+
+### Regra de manutenção a partir desta revisão
+- Preservar como históricos os estados registrados em cada data; corrigir o estado atual em bloco próprio, com links e SHAs consultáveis.
+- Ao criar uma nova entrada `DB-NNN`, atualizar também o índice no início e usar o próximo ID disponível.
+- Nunca declarar uma branch/PR como mesclada ou validada com base em status de outra branch, outro SHA ou uma etapa intermediária de CI.
+
