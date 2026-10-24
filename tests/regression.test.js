@@ -130,6 +130,11 @@ const fakeFS = {
     throw new Error('ORIGEM NAO EXISTE: ' + from);
   },
 
+  async moveAsync({ from, to }) {
+    await fakeFS.copyAsync({ from, to });
+    await fakeFS.deleteAsync(from, { idempotent: true });
+  },
+
   async deleteAsync(p) {
     files.delete(p);
     for (const key of Array.from(files.keys())) {
