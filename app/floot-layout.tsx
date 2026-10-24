@@ -13,11 +13,11 @@ import { COLORS } from '../src/ui/theme';
 export default function FlootLayoutPreviewScreen() {
   const nav = [
     { href: '/', icon: 'cockpit' as const, label: 'Painel' },
-    { href: '/bluetooth', icon: 'bluetooth' as const, label: 'Conexões' },
-    { href: '/laboratorio', icon: 'diagnostic' as const, label: 'Diagnóstico' },
+    { href: '/bluetooth', icon: 'bluetooth' as const, label: 'Conexões Bluetooth e ECU' },
+    { href: '/saude', icon: 'health' as const, label: 'Diagnóstico' },
     { href: '/viagens', icon: 'trips' as const, label: 'Viagem' },
-    { href: '/dados', icon: 'data' as const, label: 'Laboratório' },
-    { href: '/mais', icon: 'more' as const, label: 'Configurações' },
+    { href: '/laboratorio', icon: 'sensors' as const, label: 'Laboratório' },
+    { href: '/configuracoes', icon: 'settings' as const, label: 'Configurações' },
   ];
 
   return (
@@ -42,7 +42,7 @@ export default function FlootLayoutPreviewScreen() {
             <Text style={styles.weatherValue}>N/D <Text style={styles.weatherDescription}>CLIMA INDISPONÍVEL</Text></Text>
           </View>
           <View style={styles.networkCopy}>
-            <AppIcon name="network" size={23} color={COLORS.success} />
+            <AppIcon name="network" size={23} color={COLORS.textMuted} />
             <Text style={styles.networkTitle}>REDE</Text>
             <Text style={styles.networkState}>NÃO VERIFICADA</Text>
           </View>
@@ -78,7 +78,7 @@ export default function FlootLayoutPreviewScreen() {
                 accessibilityHint={`Abre a seção ${item.label}`}
                 activeOpacity={0.75}
               >
-                <AppIcon name={item.icon} size={28} color={index === 0 ? '#f8fafc' : COLORS.accent} />
+                <AppIcon name={item.icon} size={32} color={index === 0 ? '#f8fafc' : COLORS.accent} />
               </TouchableOpacity>
             </Link>
           ))}
@@ -115,8 +115,8 @@ const styles = StyleSheet.create({
   weatherValue: { color: '#f8fafc', fontSize: 26, lineHeight: 32, fontWeight: '900', marginTop: 2 },
   weatherDescription: { color: '#9aacc4', fontSize: 10, fontWeight: '800' },
   networkCopy: { alignItems: 'center', justifyContent: 'center', minWidth: 92, gap: 3 },
-  networkTitle: { color: '#4ade80', fontSize: 14, fontWeight: '900' },
-  networkState: { color: '#4ade80', fontSize: 8, fontWeight: '900' },
+  networkTitle: { color: '#9aacc4', fontSize: 14, fontWeight: '900' },
+  networkState: { color: '#9aacc4', fontSize: 8, fontWeight: '900' },
   heroCard: { backgroundColor: '#0f2035', borderRadius: 20, borderWidth: 1, borderColor: '#2d5278', padding: 12, alignItems: 'center' },
   eyebrow: { color: '#7db3ff', fontSize: 11, fontWeight: '900', letterSpacing: 1.35, textAlign: 'center' },
   heroValue: { color: '#f8fafc', fontSize: 58, lineHeight: 66, fontWeight: '900', marginTop: 2 },
@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
   coolantHint: { color: '#7185a1', fontSize: 9, fontWeight: '800', marginTop: 5 },
   coolantValue: { color: '#8fa6c1', fontSize: 28, fontWeight: '900' },
   spacer: { flexGrow: 1, minHeight: 12 },
-  bottomNav: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingHorizontal: 7, paddingVertical: 5, gap: 2, backgroundColor: '#0e1b2d', borderRadius: 17, borderWidth: 1, borderColor: '#28415f' },
-  navItem: { flex: 1, minWidth: 0, minHeight: 54, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
+  bottomNav: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingHorizontal: 10, paddingVertical: 6, gap: 5, backgroundColor: '#0e1b2d', borderRadius: 18, borderWidth: 1, borderColor: '#28415f' },
+  navItem: { flex: 1, minWidth: 0, minHeight: 60, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
   footer: { color: '#60748f', textAlign: 'center', fontSize: 9, marginTop: 10 },
 });
