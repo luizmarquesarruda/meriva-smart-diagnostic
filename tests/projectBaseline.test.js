@@ -35,6 +35,7 @@ assert.equal(packageJson.scripts.validate, 'npm run typecheck && npm test');
 // Regression-sensitive suites must remain connected to npm test.
 // Removing a test file from the script must fail this gate before merge.
 const requiredSuites = [
+  'pidParserIntegrity.test.js',
   'sensorTestEngine.test.js',
   'knowledgeJson.test.js',
   'cockpitNavigation.test.js',
@@ -203,6 +204,8 @@ assert.match(testPlan, /DATA-02/);
 assert.match(testPlan, /SPLASH-01/);
 assert.match(testPlan, /teste físico/);
 assert.match(read('docs/CONTRATO_ANTI_REGRESSAO.md'), /\| RG-20 \|/);
+assert.match(projectContract, /\\| RG-32 \\|/, 'trip consumption used for autonomy must be reliability-gated');
+assert.match(read('docs/TEST_PLAN.md'), /PID-AUTO-01/);
 
 assert.ok(read('app/mais.tsx').includes('/manutencao'), 'manutenção e abastecimento deve continuar acessível pelo menu Mais');
 assert.match(read('src/maintenance/maintenanceRules.ts'), /evaluateMaintenance/);
