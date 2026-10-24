@@ -91,6 +91,17 @@ function main() {
   assert.strictEqual(o2Pid.bytes, 2, 'PID 0114 deve carregar os dois bytes da resposta padronizada');
   assert.strictEqual(o2Pid.formulaId, 'O2_VOLTS');
 
+  const absoluteThrottlePid = pids.pids.find((item) => item.pid === '0111');
+  assert.strictEqual(absoluteThrottlePid.name, 'Absolute Throttle Position');
+  assert.match(absoluteThrottlePid.description, /posição absoluta/i);
+  const relativeThrottlePid = pids.pids.find((item) => item.pid === '0145');
+  assert.strictEqual(relativeThrottlePid.name, 'Relative Throttle Position');
+  const relativePedalPid = pids.pids.find((item) => item.pid === '015A');
+  assert.strictEqual(relativePedalPid.name, 'Relative Accelerator Pedal Position');
+  const warmupsPid = pids.pids.find((item) => item.pid === '0130');
+  assert.strictEqual(warmupsPid.unit, 'warmup_cycles');
+  assert.strictEqual(units.units.warmup_cycles.symbol, 'ciclos');
+
   const pidList = [...pidIds];
   const rangeIds = Object.keys(ranges.ranges).map((id) => id.toUpperCase());
   const polling = pollingPolicy.polling;
