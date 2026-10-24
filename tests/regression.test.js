@@ -277,16 +277,16 @@ async function testParser() {
   assert.match(dieselMonitorStatus.interpretation, /MOTOR=DIESEL\/CI/);
   assert.match(dieselMonitorStatus.interpretation, /FILTRO_PARTICULAS:NÃO PRONTO/);
   assert.doesNotMatch(dieselMonitorStatus.interpretation, /CATALISADOR_AQUECIDO/);
-  const acRefrigerantStatus = parser.parsePidResponse('0101', '41 01 00 00 10 10');
+  const gasolineParticleFilterStatus = parser.parsePidResponse('0101', '41 01 00 00 10 10');
   assert.match(
-    acRefrigerantStatus.interpretation,
-    /REFRIGERANTE_AR_CONDICIONADO:NÃO PRONTO/,
-    'PID 0101 C4 em motor SI representa o monitor de refrigerante do ar-condicionado',
+    gasolineParticleFilterStatus.interpretation,
+    /FILTRO_PARTICULAS_GASOLINA:NÃO PRONTO/,
+    'PID 0101 C4 em motor SI representa disponibilidade do monitor de filtro de partículas de gasolina',
   );
   assert.doesNotMatch(
-    acRefrigerantStatus.interpretation,
-    /FILTRO_PARTICULAS_GASOLINA/,
-    'o bit C4 não representa filtro de partículas de gasolina',
+    gasolineParticleFilterStatus.interpretation,
+    /REFRIGERANTE_AR_CONDICIONADO/,
+    'PID 0101 não define um monitor de refrigerante do ar-condicionado',
   );
   assert.strictEqual(
     parser.parsePidResponse('0111', '41 11 80').definition.name,
