@@ -84,3 +84,19 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 - A autonomia em tempo real só pode priorizar consumo da viagem quando houver distância ≥ 0,1 km, combustível integrado ≥ 0,05 L e pelo menos duas amostras válidas.
 - Antes desse limiar, usar apenas uma média histórica positiva válida; se não existir, apresentar N/D, nunca transformar amostra insuficiente em consumo alto.
 - CI automatizada não substitui teste físico com ELM327/ECU; validar no veículo a resposta real do PID 012F e a estabilidade da autonomia.
+
+## AUDIT-HARDENING-01 — Integridade e recuperação de dados
+
+- K-Line: checksum aditivo de 8 bits válido deve ser aceito; checksum incorreto, ausente quando exigido ou bytes extras devem ser rejeitados nos formatos compactos e espaçados.
+- DTC: aceitar resposta direta válida; aceitar quadro CAN single-frame somente quando ID, byte de comprimento e payload concordam; processar linhas de ECUs separadamente; rejeitar comprimento inconsistente e checksum K-Line inválido.
+- Histórico de viagens: gravações concorrentes não perdem nenhuma viagem; substituir o índice somente após validar o temporário; se índice principal e backup forem inválidos, preservar o arquivo e falhar explicitamente.
+- Data do CSV de viagem: usar o calendário local da data de início da viagem, não a data UTC do momento de gravação.
+- CSV: manter ordenação de colunas existente; ao aparecer campo novo, migrar cabeçalho e linhas antigas sem deslocar valores. Fila pendente possui teto explícito e contador de linhas descartadas.
+- Cota: quando ultrapassada, limpeza remove apenas arquivos descartáveis de LOGS/LEITURAS até a meta possível. Erro ao consultar tamanho deve ser propagado e nunca virar zero silencioso.
+- Backup: descarregar CSV antes de copiar, verificar tamanho copiado por diretório, validar manifesto, remover backup parcial em caso de erro e reter no máximo cinco backups verificados.
+- Autosave: schema, dataType, timestamp e subestruturas devem ser validados; testar v0 com migração cadastrada, schema futuro, payload parcial, valores NaN/Infinity e restauração de previous.json.
+- GPS: coordenadas inválidas são ignoradas; precisão nula/negativa/não finita não conta como fix preciso; Haversine retorna NaN para coordenadas fora da faixa.
+- Consumo estimado: rejeitar temperaturas absolutas impossíveis e taxas calculadas NaN/Infinity/negativas.
+- Buffer RX: exceder 16 KiB precisa gerar erro explícito, limitar diagnósticos a 256 caracteres e permitir receber um próximo quadro válido.
+- Buffer de descoberta: FIFO limitado, normalização, capacidade ajustável e isolamento por execução.
+- Aceitação física: comparar capturas RAW do ELM327/ECU para confirmar framing/checksum e precisão; testes sintéticos não substituem validação no veículo.
