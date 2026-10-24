@@ -22,8 +22,19 @@ function queueDtcWrite(target: string, operation: () => Promise<void>): Promise<
  */
 export function nextDtcOccurrences(previous?: DtcRecord): number {
   if (!previous) return 1;
-  const active = ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(previous.status);
+  const active = !previous.historical && ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(previous.status);
   return active ? Math.max(1, previous.occurrences || 1) : Math.max(1, previous.occurrences || 0) + 1;
+}
+
+
+/** Mode 03 reconciliation helper. Call only after a complete, valid positive response. */
+export function markMissingStoredDtcsInactive(existing: DtcRecord[], detectedCodes: string[], now: string): DtcRecord[] {
+  const detected = new Set(detectedCodes.map((code) => String(code).trim().toUpperCase()));
+  return existing
+    .filter((item) => item.source === 'REAL_OBD' && item.historical !== true
+      && ['CURRENT', 'CONFIRMED'].includes(String(item.status ?? '').trim().toUpperCase())
+      && !detected.has(String(item.code ?? '').trim().toUpperCase()))
+    .map((item) => ({ ...item, status: 'INACTIVE' as const, historical: true, lastSeen: now }));
 }
 
 export async function recordDtc(basePath: string, dtc: DtcRecord): Promise<void> {
@@ -96,7 +107,7 @@ export async function readDtcs(basePath: string): Promise<DtcRecord[]> {
 
 export async function getCurrentDtcs(basePath: string): Promise<DtcRecord[]> {
   const all = await readDtcs(basePath);
-  return all.filter((dtc) => ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(dtc.status));
+  return all.filter((dtc) => !dtc.historical && ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(dtc.status));
 }
 
 export async function getHistoricalDtcs(basePath: string): Promise<DtcRecord[]> {
