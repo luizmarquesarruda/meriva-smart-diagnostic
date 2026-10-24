@@ -117,11 +117,13 @@ Rodar `npm run gate:baseline` e `npm run validate`. CI valida o código daquele 
 - [PID 0114 — tensão O₂ e STFT](https://obd2pid.com/pids/01-14), revisado publicamente em 31/08/2026.
 - [Referência pública de fórmulas OBD-II](https://imatrixsys.com/tutorials/pages/OBD-01-fundamentals.html). SAE J1979 / ISO 15031-5 é a referência normativa; páginas abertas são cruzamento secundário.
 - [OBD Auto Doctor — parâmetros suportados](https://www.obdautodoctor.com/help/articles/supported-obd-parameters/): identifica `0111` como posição absoluta, `0145` como relativa e `015A` como posição relativa do pedal.
-- [Dashlogic — referência J1979](https://www.dashlogic.com/docs/technical/obdii_pids): o bit `C4` do PID `0101` é o monitor do refrigerante do ar-condicionado em ciclo Otto; não é filtro de partículas de gasolina.
+- [Manual do Proprietário Chevrolet Meriva 2012 — fonte oficial](https://www.chevrolet.com.br/content/dam/chevrolet/south-america/brazil/portuguese/index/services/owner-manuals/05-pdf/meriva/manual-meriva-2012.pdf) e [manual 2011](https://www.chevrolet.com.br/content/dam/chevrolet/south-america/brazil/portuguese/index/services/owner-manuals/05-pdf/meriva/manual-meriva-2011.pdf): contexto e configuração do veículo; não documentam quais PIDs a ECU específica responde.
+- [Dashlogic — referência J1979](https://www.dashlogic.com/docs/technical/obdii_pids) e [mapa de bits do PID 0101](https://obd2pid.com/pids/01-01): no ciclo Otto, `C4` significa disponibilidade do monitor do filtro de partículas de gasolina; o byte D usa a mesma posição para indicar incompletude. Não existe monitor de refrigerante do ar-condicionado nesse bit.
 
 ## 7. Limitações
 
 - O catálogo tem 34 definições; não inclui todos os PIDs padronizados Mode 01.
 - `010C` é o único PID confirmado por RAW_ECU na ficha específica da Meriva.
+- O manual do proprietário Chevrolet Meriva 2011/2012 descreve o funcionamento do motor, a luz de anomalia e a manutenção, mas não contém um inventário de PIDs OBD nem uma bitmap da ECU. Consulte [`docs/MERIVA_OBD_SOURCE_AUDIT_2026-10-24.md`](MERIVA_OBD_SOURCE_AUDIT_2026-10-24.md) para os limites das fontes.
 - `0114` transporta dois resultados sob o mesmo PID; tensão permanece o valor numérico principal e STFT é interpretação adicional.
 - Fórmulas não calibram sensores e não substituem teste físico no veículo.
