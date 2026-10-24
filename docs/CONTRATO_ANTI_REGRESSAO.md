@@ -69,3 +69,4 @@ Este documento é o contrato de aceitação entre mudanças, testes, diário e C
 ## Limitações
 
 O gate é uma barreira contra regressões acidentais, não uma prova formal nem uma proteção contra alteração deliberada simultânea do código e de seus testes. Por isso, revisão de diff, CI do HEAD real e testes físicos continuam obrigatórios.
+| RG-32 | DTC com `historical=true` nunca é atual mesmo com status conflitante; Mode 03 válido reconcilia somente CURRENT/CONFIRMED REAL_OBD ausentes, enquanto timeout, NO DATA, quadro inválido, pending/permanent e origem importada preservam evidência. Diagnóstico exige resposta PID válida; CSV cita campos com vírgula, aspas, `\n` e `\r`; autonomia atual exige sessão ativa e nível recente. | `regression.test.js`, `diagnosticEngine.test.js`, `cockpitNavigation.test.js` |
