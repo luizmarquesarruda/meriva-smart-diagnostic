@@ -3590,7 +3590,8 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 
 ### Correções aplicadas
 - PR #86: `decodeSupportedPids` agora valida uma única bitmap com exatamente quatro bytes de payload, preservando envelopes aceitos de OBD direto, CAN de 11/29 bits com DLC correspondente e K-Line legado com checksum final. Rejeita bytes excedentes, payload repartido entre linhas e respostas de múltiplas ECUs ambíguas.
-- PR #86: adicionados testes de regressão para bitmap truncada/estendida, linhas separadas, cabeçalhos CAN de 11/29 bits, envelope K-Line e respostas múltiplas.
+- PR #86: o campo `responded` do scanner legado só confirma uma bitmap válida para o PID de descoberta solicitado. Uma resposta positiva para outro PID é rejeitada, enquanto uma bitmap válida com zero bits suportados continua sendo uma resposta válida.
+- PR #86: adicionados testes de regressão para bytes extras, linhas separadas, cabeçalhos CAN de 11/29 bits, envelope K-Line, respostas múltiplas, PID de resposta divergente e bitmap válida vazia.
 - PR #86: o contrato RG-32 foi ampliado para incluir a integridade das bitmaps da sessão atual, além da regra de cache apenas como prioridade e dos registros de latência.
 - PR #87: o requisito de consumo confiável/autonomia foi renumerado para RG-33; o teste `projectBaseline.test.js` passou a exigir RG-33 para esse requisito, eliminando a colisão com RG-32.
 
