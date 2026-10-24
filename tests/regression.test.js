@@ -1053,14 +1053,15 @@ async function testCsvWriteSerialization() {
 
   writeDelayMs = 30;
   await Promise.all([
-    logger.appendCsvRow(target, { id: 'A', timestamp: 't1' }),
-    logger.appendCsvRow(target, { id: 'B', timestamp: 't2' }),
+    logger.appendCsvRow(target, { id: 'A', timestamp: 't1', notes: 'linha simples' }),
+    logger.appendCsvRow(target, { id: 'B', timestamp: 't2', notes: 'linha 1\rlinha 2' }),
   ]);
   writeDelayMs = 0;
 
   const content = files.get(target);
   assert.ok(content.includes('A,t1'));
   assert.ok(content.includes('B,t2'));
+  assert.ok(content.includes('"linha 1\rlinha 2"'), 'campo com CR deve ser citado para não quebrar registros CSV');
   assert.strictEqual(content.split('\n').filter(Boolean).length, 3);
 }
 
