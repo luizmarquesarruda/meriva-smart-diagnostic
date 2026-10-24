@@ -190,6 +190,7 @@ As PRs abaixo continuam abertas e não fazem parte de `main` enquanto não forem
 - **DB-110** · 2026-10-24 — Descoberta OBD mais rápida, cache não autoritativo e latência por comando
 - **DB-111** · 2026-10-24 — Continuidade da auditoria e reconciliação documental das PRs
 - **DB-112** · 2026-10-24 — Validação estrita de bitmaps OBD e reconciliação dos IDs anti-regressão
+- **DB-113** · 2026-10-24 — Compatibilidade do parser com envelope K-Line compacto
 
 ---
 
@@ -3599,4 +3600,21 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - As alterações de código/testes/documentação geraram novos HEADs nas branches #86 e #87. A CI deve ser confirmada nos SHAs finais depois desta sincronização; resultados de commits anteriores não validam estes novos HEADs.
 - Os testes adicionados cobrem formatos determinísticos, mas não comprovam suporte/precisão de sensores na Meriva específica.
 - Teste físico com ELM327/ECU, medição de latência real e inspeção do APK instalado continuam pendentes.
+- Nenhuma PR foi mesclada nesta atualização.
+
+
+## DB-113 · 2026-10-24 — Compatibilidade do parser com envelope K-Line compacto
+
+### Problema confirmado
+- A configuração de inicialização do ELM327 usa `ATS0`, que remove separadores entre bytes. O parser da PR #87 aceitava o checksum do envelope K-Line legado apenas no caminho de tokens separados por espaços; uma resposta compacta como `486B10410C1AF882` era rejeitada por conter um byte terminal além do payload PID.
+- Esse caminho é relevante para protocolos K-Line presentes em veículos mais antigos; testes apenas com respostas espaçadas não cobriam a combinação com `ATS0`.
+
+### Correção aplicada na PR #87
+- O caminho compacto de `findResponsePayload` agora permite exatamente um byte terminal extra somente quando o prefixo é o envelope conhecido `486B10`. Respostas OBD diretas continuam exigindo payload exato sem bytes extras.
+- Adicionados testes para aceitar o envelope K-Line compacto e rejeitar outro byte adicional depois do checksum.
+- O contrato RG-33 agora documenta esse caso; RG-32 permanece reservado à integridade/descoberta das bitmaps, sem colisão entre PRs.
+
+### Validação e limites
+- Parser, teste de integridade e contrato foram alterados em novos commits da branch #87. A CI do HEAD final precisa terminar antes de considerar a mudança validada.
+- O teste cobre o formato de resposta, não a comunicação física nem a validade elétrica dos dados. ELM327/ECU reais e inspeção visual do APK continuam pendentes.
 - Nenhuma PR foi mesclada nesta atualização.
