@@ -31,7 +31,7 @@ Na notação abaixo, A, B, C e D são os bytes de dados da resposta positiva, ap
 | MAF_GS | `u16_div` | (A × 256 + B) / 100 g/s |
 | TIMING_DEG | `u8_scale_offset` | A × 0,5 − 64° |
 | VOLTS_1000 | `u16_div` | (A × 256 + B) / 1000 V |
-| O2_VOLTS | `u8_div` | A / 200 V (B não entra na tensão) |
+| O2_VOLTS | `u8_div` | Valor principal: A / 200 V; byte B interpretado separadamente como STFT = (B × 100 / 128) − 100 %, exceto B = FF (ajuste não usado) |
 | DISTANCE_KM | `u16` | A × 256 + B km |
 | FUEL_RATE_LH | `u16_div` | (A × 256 + B) / 20 L/h |
 | ETHANOL_PERCENT | `u8_scale` | A × 100 / 255 % |
