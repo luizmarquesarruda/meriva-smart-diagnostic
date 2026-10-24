@@ -71,21 +71,33 @@ function findResponsePayload(rawResponse: string, pid: string, byteCount: number
       continue;
     }
 
-    const tokens = line.toUpperCase().match(/\b[0-9A-F]{2}\b/g) ?? [];
+    const lineText = line.trim().toUpperCase();
+    const tokens = lineText.match(/\b[0-9A-F]{2}\b/g) ?? [];
+    const canHeader = lineText.match(/^([0-9A-F]{3}|[0-9A-F]{8})\s+([0-9A-F]{2})\s+/);
+    const isLegacyKLineHeader = /^48\s+6B\s+10\s+/.test(lineText);
+    const expectedCanDlc = byteCount + 2 + serviceOffsetBytes;
+    const isDirectResponse = new RegExp('^' + service + '\\s+' + requestedPid + '(?:\\s|$)').test(lineText);
+
     for (let index = 0; index < tokens.length - 1; index += 1) {
       if (tokens[index] !== service || tokens[index + 1] !== requestedPid) continue;
+
+      const canEnvelope = index === 1
+        && canHeader !== null
+        && Number.parseInt(canHeader[2], 16) === expectedCanDlc;
+      const legacyKLineHeader = index === 3
+        && isLegacyKLineHeader
+        && tokens[0] === '48'
+        && tokens[1] === '6B'
+        && tokens[2] === '10';
+      if (!(index === 0 && isDirectResponse) && !canEnvelope && !legacyKLineHeader) continue;
 
       const payloadStart = index + 2 + serviceOffsetBytes;
       const payload = tokens.slice(payloadStart, payloadStart + byteCount);
       const trailing = tokens.slice(payloadStart + byteCount);
-      // Some legacy ISO/K-line ELM responses include a three-byte header and
-      // one checksum byte after the OBD payload (e.g. 48 6B 10 ... 82).
-      const legacyKLineEnvelope = index === 3
-        && tokens[0] === '48'
-        && tokens[1] === '6B'
-        && tokens[2] === '10'
-        && trailing.length === 1;
-      if (payload.length !== byteCount || (trailing.length !== 0 && !legacyKLineEnvelope)) continue;
+      // Legacy ISO/K-line responses may include one checksum byte after the
+      // payload; it is only permitted with the explicit 48 6B 10 envelope.
+      const legacyKLineChecksum = legacyKLineHeader && trailing.length === 1;
+      if (payload.length !== byteCount || (trailing.length !== 0 && !legacyKLineChecksum)) continue;
       if (!payload.every((token) => /^[0-9A-F]{2}$/.test(token))) continue;
       return payload.map((token) => Number.parseInt(token, 16));
     }
