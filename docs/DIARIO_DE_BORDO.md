@@ -3452,3 +3452,13 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Não foram alterados transporte Bluetooth Classic, sessão/serialização ELM327, validação de resposta real da ECU, telemetria, fórmulas PID, consumo, autonomia ou histórico.
 - Alterações versionadas na branch `feat/port-floot-layout-20261024`, PR #83; nenhuma alteração direta à `main` e nenhum merge executado.
 - TypeScript/testes da Floot e CI do GitHub precisam ser reexecutados para o novo SHA; inspeção visual em Android físico e teste ELM327/ECU real continuam pendentes. A aprovação de CI não substitui a validação física.
+
+## DB-110 — 2026-10-24 — Auditoria técnica — DTC, CSV e evidências
+
+- Branch `feat/port-floot-layout-20261024`; PR #83 segue aberta, sem merge e sem alteração direta à `main`.
+- DTC histórico: `historical=true` prevalece sobre status contraditório na tela Saúde, no armazenamento e no motor diagnóstico.
+- Reconciliação: somente resposta Mode 03 completa/validada inativa DTC REAL_OBD CURRENT/CONFIRMED ausente. NO DATA, timeout, resposta inválida, pending/permanent e dados importados são preservados.
+- PID: valor de consulta que não terminou em `RESPONDEU` não alimenta hipótese numérica atual; origem desconhecida não é promovida a OBD real.
+- CSV: campos com retorno de carro (`\r`) passam a ser citados; teste de regressão foi incluído.
+- O baseline de autonomia já está alinhado com `getCurrentAutonomyRangeKm`, usando sessão/ECU ativa e leitura recente do PID 012F.
+- A CI do SHA final deve comprovar gate, suíte completa e build Android. Inspeção visual em aparelho e teste físico com ELM327/ECU continuam pendentes.
