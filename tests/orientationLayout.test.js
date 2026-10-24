@@ -38,7 +38,7 @@ assert.doesNotMatch(index, /VELOCIDADE GPS/, 'GPS não deve ocupar um dos indica
 assert.equal(pollingPolicy.cockpit.maxDisplayedPids, 20, 'o cockpit deve suportar até vinte indicadores');
 assert.equal(pollingPolicy.cockpit.pidOrder.length, 20, 'a política deve configurar vinte PIDs candidatos');
 assert.equal(new Set(pollingPolicy.cockpit.pidOrder).size, 20, 'a lista de PIDs do cockpit não deve conter duplicados');
-for (const label of ['TEMPERATURA DO MOTOR', 'VOLTAGEM DO SISTEMA', 'POSIÇÃO DA BORBOLETA', 'ROTAÇÃO DO MOTOR']) {
+for (const label of ['TEMPERATURA DO MOTOR', 'VOLTAGEM DO SISTEMA', 'POSIÇÃO ABSOLUTA DA BORBOLETA', 'ROTAÇÃO DO MOTOR']) {
   assert.ok(cockpitTelemetry.includes("'" + label + "'"), 'definição do cockpit ausente: ' + label);
 }
 assert.match(index, /const visibleHeroMetrics = abnormalMetrics\.length > 0 \? abnormalMetrics : heroMetrics/,
@@ -47,11 +47,11 @@ assert.match(index, /const heroMetrics: CockpitPidMetric\[\]/, 'lista de indicad
 assert.doesNotMatch(index, /SAÚDE DO VEÍCULO|ABRIR CENTRAL DE SAÚDE/, 'não duplicar a central de saúde na página inicial');
 assert.match(index, /danger:\{color:'#fb7185'\}/, 'alerta térmico deve mudar a cor sem encolher o valor principal');
 assert.match(index, /!connectionStatus\.ecuConnected \? 'N\/D'/, 'não declarar ausência de DTC como normal sem ECU conectada');
-assert.ok(cockpitTelemetry.includes("'0111': 'POSIÇÃO DA BORBOLETA'"));
+assert.ok(cockpitTelemetry.includes("'0111': 'POSIÇÃO ABSOLUTA DA BORBOLETA'"));
 assert.ok(cockpitTelemetry.includes("'0142': 'VOLTAGEM DO SISTEMA'"));
 assert.match(index, /heroSwitchHint/);
 assert.match(index, /item\.source !== 'REAL'/);
-for (const marker of ["'0142': 'VOLTAGEM DO SISTEMA'", "'0111': 'POSIÇÃO DA BORBOLETA'", "'010C': 'ROTAÇÃO DO MOTOR'"]) {
+for (const marker of ["'0142': 'VOLTAGEM DO SISTEMA'", "'0111': 'POSIÇÃO ABSOLUTA DA BORBOLETA'", "'010C': 'ROTAÇÃO DO MOTOR'"]) {
   assert.ok(cockpitTelemetry.includes(marker), 'definição de telemetria ausente: ' + marker);
 }
 assert.match(tripService, /telemetryCandidates = pollingPolicy\.polling\.rotatingTelemetryPids/);
