@@ -36,7 +36,7 @@ Arquivo principal: src/knowledge/sensor_tests.json.
 
 O motor consome os avaliadores e limites do JSON e agrega cinco amostras válidas pela média; os pré-requisitos precisam de cinco leituras válidas também.
 
-- MAP parado: comparar medianas MAP/BARO; diferença é gatilho heurístico.
+- MAP parado: comparar as médias aritméticas de MAP/BARO calculadas a partir de cinco respostas válidas; a diferença é um gatilho heurístico.
 - MAP funcionando: exige RPM/temperatura estáveis e motor aquecido; MAP elevado vira hipótese para investigar vácuo, entrada de ar e sincronismo, não prova de sensor defeituoso.
 - STFT/LTFT: requer contexto aquecido/estável; o subconjunto não confirma malha fechada, portanto a conclusão é limitada.
 - O2: cinco amostras estáticas não validam alternância nem aquecedor.
