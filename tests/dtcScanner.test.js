@@ -50,6 +50,31 @@ assert.strictEqual(isValidDtcResponseForService('03', 'NO CODES'), true, 'an exp
 assert.strictEqual(isValidDtcResponseForService('03', 'NO DATA'), false, 'NO DATA is not proof of no DTC');
 assert.strictEqual(isValidDtcResponseForService('03', '43 01 30 00'), false, 'truncated positive response is invalid');
 assert.strictEqual(isValidDtcResponseForService('03', 'garbage'), false, 'missing positive header is invalid');
+assert.deepStrictEqual(
+  parseDtcResponseForService('03', '7E8 05 43 01 30 00 00'),
+  ['P0130'],
+  'CAN DTC frame must remove its arbitration ID and validate declared single-frame length',
+);
+assert.strictEqual(
+  isValidDtcResponseForService('03', '7E8 06 43 01 30 00 00'),
+  false,
+  'CAN DTC frame with inconsistent length must be rejected',
+);
+assert.deepStrictEqual(
+  parseDtcResponseForService('03', '7E8 05 43 01 30 00 00\r\n7E9 05 43 01 23 00 00'),
+  ['P0130', 'P0123'],
+  'valid responses from separate ECU lines must be parsed independently',
+);
+assert.deepStrictEqual(
+  parseDtcResponseForService('03', '48 6B 10 43 01 30 00 00 37'),
+  ['P0130'],
+  'K-Line DTC frame must pass additive checksum validation',
+);
+assert.strictEqual(
+  isValidDtcResponseForService('03', '48 6B 10 43 01 30 00 00 36'),
+  false,
+  'K-Line DTC frame with incorrect checksum must be rejected',
+);
 
 (async () => {
   const replies = {
