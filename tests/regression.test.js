@@ -277,6 +277,29 @@ async function testParser() {
   assert.match(dieselMonitorStatus.interpretation, /MOTOR=DIESEL\/CI/);
   assert.match(dieselMonitorStatus.interpretation, /FILTRO_PARTICULAS:NÃO PRONTO/);
   assert.doesNotMatch(dieselMonitorStatus.interpretation, /CATALISADOR_AQUECIDO/);
+  const acRefrigerantStatus = parser.parsePidResponse('0101', '41 01 00 00 10 10');
+  assert.match(
+    acRefrigerantStatus.interpretation,
+    /REFRIGERANTE_AR_CONDICIONADO:NÃO PRONTO/,
+    'PID 0101 C4 em motor SI representa o monitor de refrigerante do ar-condicionado',
+  );
+  assert.doesNotMatch(
+    acRefrigerantStatus.interpretation,
+    /FILTRO_PARTICULAS_GASOLINA/,
+    'o bit C4 não representa filtro de partículas de gasolina',
+  );
+  assert.strictEqual(
+    parser.parsePidResponse('0111', '41 11 80').definition.name,
+    'Absolute Throttle Position',
+  );
+  assert.strictEqual(
+    parser.parsePidResponse('0145', '41 45 80').definition.name,
+    'Relative Throttle Position',
+  );
+  assert.strictEqual(
+    parser.parsePidResponse('015A', '41 5A 80').definition.name,
+    'Relative Accelerator Pedal Position',
+  );
   assert.strictEqual(parser.parsePidResponse('01 0C', '41 0C 1A F8').value, 1726);
   assert.strictEqual(parser.validateOBDResponse('410C1AF8'), true);
   assert.strictEqual(parser.parsePidResponse('010C', '410C1AF8').value, 1726);
