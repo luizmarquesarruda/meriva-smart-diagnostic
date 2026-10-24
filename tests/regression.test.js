@@ -268,7 +268,7 @@ async function testParser() {
   assert.strictEqual(parser.parsePidResponse('0199', '41 99 FF').status, 'VALOR NÃO INTERPRETADO');
   assert.strictEqual(parser.parsePidResponse('010C', 'NO DATA').status, 'NÃO RESPONDEU');
   assert.deepStrictEqual(parser.parseDtcResponse('43 01 33 00 00 00'), ['P0133']);
-  assert.deepStrictEqual(parser.parseDtcResponse('48 6B 10 43 01 33 00 00 82'), ['P0133']);
+  assert.deepStrictEqual(parser.parseDtcResponse('48 6B 10 43 01 33 00 00 3A'), ['P0133']);
 }
 
 async function testElmAndProtocol() {
