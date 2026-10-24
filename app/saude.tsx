@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMidLayout } from '../src/ui/midLayout';
 import { COLORS, SCREEN_TITLE_STYLE } from '../src/ui/theme';
 import { getAutoSaveState } from '../src/meriva/autosaveManager';
-import { runLocalDiagnostic, type DiagnosticResult } from '../src/diagnostics/diagnosticEngine';
+import { isCurrentLiveDtc, runLocalDiagnostic, type DiagnosticResult } from '../src/diagnostics/diagnosticEngine';
 import type { PidObservation } from '../src/types/sourceTypes';
 import { getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
 import { getDtcDefinition } from '../src/obd/dtcDefinition';
@@ -21,14 +21,13 @@ export default function SaudeScreen() {
     return ()=>{clearInterval(timer);unsubscribeStatus();};
   },[]);
   const context = getVehicleConditionSnapshot();
-  const activeDtcs = state.dtcs.filter((item) =>
-    item.source === 'REAL_OBD' && ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(item.status));
+  const activeDtcs = state.dtcs.filter(isCurrentLiveDtc);
   const diagnostic: DiagnosticResult = useMemo(
     ()=>runLocalDiagnostic({
       observations:state.lastReadings.map(r=>({
-        pid:r.pid,name:r.name,value:r.value,unit:r.unit,
+        pid:r.pid,name:r.name,value:r.status==='RESPONDEU'?r.value:null,unit:r.unit,
         source:r.source==='REAL'?'REAL_OBD':r.source==='SIMULACAO'?'SIMULACAO':'IMPORTADO',
-        timestamp:r.timestamp,confidence:r.source==='REAL'?'GOOD':'LOW',
+        timestamp:r.timestamp,confidence:r.source==='REAL'&&r.status==='RESPONDEU'?'GOOD':'LOW',
       } as PidObservation)),
       dtcs:state.dtcs,condition:context.condition,
     }),
@@ -67,6 +66,13 @@ export default function SaudeScreen() {
         : state.dtcs.length > 0
           ? state.dtcs.length + ' registro(s) histórico(s); sem hipótese local detectada nas leituras recentes.'
           : 'Sem hipótese local nas leituras recentes. Execute uma varredura de DTC para confirmar.';
+  const dtcEmptyMessage = !connectionStatus.ecuConnected
+    ? state.dtcs.length > 0
+      ? 'ECU desconectada. Os registros salvos não confirmam o estado atual das falhas.'
+      : 'ECU não validada; ausência de registros não confirma ausência de falhas.'
+    : state.dtcs.length > 0
+      ? 'Nenhum DTC marcado como ativo nos registros. Execute uma nova varredura para confirmar.'
+      : 'Nenhum DTC armazenado. Execute uma varredura para confirmar.';
   return <SafeAreaView style={styles.container} edges={["top","bottom","left","right"]}><ScrollView contentContainerStyle={[styles.content,{paddingHorizontal:layout.horizontalPadding}]} showsHorizontalScrollIndicator={false}><View style={[styles.screenFrame,{maxWidth:layout.maxContentWidth}]}>
     <View style={styles.header}><Text style={styles.title}>CENTRAL DE SAÚDE</Text><Text style={styles.subtitle}>EVIDÊNCIAS • DTC • HIPÓTESES</Text></View>
     <View style={[styles.health, healthState === 'attention' ? styles.healthWarn : healthState === 'observed' ? styles.healthOk : styles.healthPending]}><Text style={healthState === 'attention' ? styles.bigWarn : healthState === 'observed' ? styles.bigOk : styles.bigPending}>{healthTitle}</Text><Text style={styles.hint}>{healthHint}</Text></View>
@@ -82,7 +88,7 @@ export default function SaudeScreen() {
     </View>
     <Text style={styles.section}>FALHAS</Text>
     {!connectionStatus.ecuConnected && activeDtcs.length > 0 ? <Text style={styles.detail}>Os códigos abaixo são registros salvos; sem ECU conectada, não representam uma nova varredura atual.</Text> : null}
-    {!activeDtcs.length?<View style={styles.empty}><Text style={styles.emptyText}>{state.dtcs.length ? 'Nenhum DTC ativo. Há apenas histórico registrado.' : 'Nenhum DTC armazenado.'}</Text></View>:activeDtcs.map(d=>{const definition=getDtcDefinition(d.code);return <View key={d.code} style={styles.row}><View style={{flex:1}}><Text style={styles.name}>{d.code} • {definition?.name ?? 'Descrição não catalogada localmente'}</Text><Text style={styles.detail}>{definition?.description ?? 'Código recebido da ECU sem descrição local detalhada.'}</Text><Text style={styles.detail}>{d.status} • {d.occurrences} ocorrência(s) • fonte {d.source}</Text></View><Text style={styles.warn}>ATENÇÃO</Text></View>})}
+    {!activeDtcs.length?<View style={styles.empty}><Text style={styles.emptyText}>{dtcEmptyMessage}</Text></View>:activeDtcs.map(d=>{const definition=getDtcDefinition(d.code);return <View key={d.code} style={styles.row}><View style={{flex:1}}><Text style={styles.name}>{d.code} • {definition?.name ?? 'Descrição não catalogada localmente'}</Text><Text style={styles.detail}>{definition?.description ?? 'Código recebido da ECU sem descrição local detalhada.'}</Text><Text style={styles.detail}>{d.status} • {d.occurrences} ocorrência(s) • fonte {d.source}</Text></View><Text style={styles.warn}>ATENÇÃO</Text></View>})}
     <Text style={styles.section}>HIPÓTESES LOCAIS</Text>
     {!diagnostic.hypotheses.length?<View style={styles.empty}><Text style={styles.emptyText}>Ainda não há evidência suficiente para gerar hipótese.</Text></View>:diagnostic.hypotheses.map(h=><View key={h.id} style={styles.hyp}><View style={styles.rowHead}><Text style={styles.name}>{h.label}</Text><Text style={styles.score}>{Math.round(h.score*100)}%</Text></View><Text style={styles.detail}>CONFIANÇA: {h.confidence}</Text>{h.evidence.map((e,i)=><Text key={i} style={styles.evidence}>• {e.text}</Text>)}<Text style={styles.next}>PRÓXIMOS TESTES: {h.nextTests.join(' • ')}</Text></View>)}
     <Text style={styles.disclaimer}>{diagnostic.disclaimer}</Text>
