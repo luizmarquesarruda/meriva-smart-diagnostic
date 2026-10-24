@@ -184,6 +184,7 @@ As PRs abaixo continuam abertas e não fazem parte de `main` enquanto não forem
 - **DB-107** · 2026-10-23 — Cockpit OBD com até 20 PIDs reais
 - **DB-108** · 2026-10-23 — Recuperação Bluetooth/ELM327 e reconciliação de PR
 - **DB-109** · 2026-10-24 — Auditoria integral, correção do índice e reconciliação do estado atual
+- **DB-110** · 2026-10-24 — Descoberta OBD mais rápida, cache não autoritativo e latência por comando
 
 ---
 
@@ -3517,4 +3518,31 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Preservar como históricos os estados registrados em cada data; corrigir o estado atual em bloco próprio, com links e SHAs consultáveis.
 - Ao criar uma nova entrada `DB-NNN`, atualizar também o índice no início e usar o próximo ID disponível.
 - Nunca declarar uma branch/PR como mesclada ou validada com base em status de outra branch, outro SHA ou uma etapa intermediária de CI.
+
+## DB-110 · 2026-10-24 — Descoberta OBD mais rápida, cache não autoritativo e latência por comando
+
+### Auditoria do fluxo real
+- O repositório nativo já tinha `src/obd/intelligentPidDiscovery.ts`, chamado por `src/obd/bluetoothManager.ts`, usando a fila serial de `Elm327Session`. Portanto, não foi criado um segundo motor nem uma segunda fila.
+- Foram encontrados dois gargalos de arranque: a splash repetia cinco consultas seriais para cada PID suportado antes de abrir o cockpit; além disso, quando o cache batia com o protocolo, o manager reutilizava a lista cacheada e pulava a bitmap da sessão corrente.
+- As cinco leituras válidas continuam exigidas para a avaliação de sensores no Laboratório. Elas não são necessárias para fazer a descoberta inicial e não devem bloquear a entrada no cockpit.
+
+### Correções aplicadas neste branch
+- `src/obd/bluetoothManager.ts`: toda sessão válida executa `discoverIntelligentPids`; o cache compatível passa como `knownPids` para ordenar os candidatos, nunca como prova de suporte. A resposta `010C` já usada para validar a ECU é reutilizada sem um round trip duplicado.
+- Instrumentação por comando: `PID_DISCOVERY_COMMAND_RESULT` registra tipo de comando, status, tempo `elapsedMs`, valor/unidade, justificativa e RX bruto. `PID_DISCOVERY_SUMMARY` registra páginas bitmap consultadas, quantidade de sondagens, soma/máximo dos tempos reportados, duração total de parede e PIDs que responderam validamente.
+- `app/splash.tsx`: removido o ciclo extra de cinco consultas por PID antes do cockpit. O painel abre depois que a descoberta/validação na conexão termina e a splash apresenta a contagem de PIDs com resposta válida.
+- `tests/regression.test.js`: reforça que um PID guardado em cache compatível é priorizado, mas somente depois da bitmap corrente, e que os tempos por comando ficam disponíveis no resultado.
+- `tests/projectBaseline.test.js`: protege contra o retorno de aquecimento serial na splash e contra o uso do cache para pular a descoberta.
+- Atualizados `docs/CONTRATO_ANTI_REGRESSAO.md` (RG-32), `docs/TEST_PLAN.md` e `README.md`.
+
+### Critérios técnicos preservados
+- A fila ELM327 continua única e serial; nenhum comando concorrente foi adicionado.
+- PIDs não anunciados pela bitmap atual não são consultados com base apenas em cache antigo.
+- O PID `010C` permanece reutilizado como prova real da ECU, sem duplicar a consulta na descoberta.
+- Cinco leituras sequenciais e cinco valores válidos continuam obrigatórios no teste de sensores; a mudança remove apenas o pré-aquecimento duplicado de startup.
+- Catálogo e bitmap não provam precisão física/elétrica do sensor. Somente resposta válida comprova resposta atual do PID.
+
+### Validação e limites
+- Os testes de regressão foram atualizados, mas precisam passar por `gate:baseline`, TypeScript, suíte completa e APK Android na CI do SHA final deste branch.
+- A instrumentação permite medir o custo por comando, mas **nenhum benchmark físico foi alegado** nesta etapa. Os tempos reais só podem ser coletados conectando o APK a um ELM327 e à ECU da Meriva; o log deve preservar protocolo, status, elapsedMs e RX.
+- Nenhuma leitura de ECU física foi simulada ou marcada como confirmada por esta alteração de código.
 

@@ -539,7 +539,7 @@ async function testIntelligentPidDiscovery() {
     },
   };
   const result = await ai.discoverIntelligentPids(fakeSession, {
-    knownPids: ['015E', '0110'],
+    knownPids: ['010F'],
     prevalidatedResults: [{
       command: '010C',
       response: '41 0C 1A F8',
@@ -562,6 +562,12 @@ async function testIntelligentPidDiscovery() {
   assert.ok(!result.supportedPids.includes('010D'), 'bitmap não deve transformar PID sem payload válido em PID operacional');
   assert.ok(!result.supportedPids.includes('012F'), 'PID anunciado mas sem resposta individual não deve entrar no polling runtime');
   assert.ok(result.supportedPids.includes('0105'), 'PID com resposta real válida deve continuar disponível');
+  assert.ok(commands.indexOf('010F') < commands.indexOf('010D'),
+    'PID em cache compatível deve ser priorizado, mas somente depois da bitmap atual');
+  assert.strictEqual(result.observations.find((item) => item.pid === '0100').elapsedMs, 8,
+    'a latência observada da bitmap deve ser preservada por comando');
+  assert.strictEqual(result.observations.find((item) => item.pid === '010F').elapsedMs, 10,
+    'a latência individual do PID deve ser preservada por comando');
 }
 
 async function testCarScannerBaselineAndFuel012F() {

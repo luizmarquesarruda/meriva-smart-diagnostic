@@ -301,20 +301,69 @@ async function createRealElmSessionAttempt(
       : (identifiedProtocol ?? 'AUTO');
     const negotiatedProtocol = session.getProtocol() ?? activeProtocol;
     const cacheMatchesProtocol = Boolean(pidDiscoveryCache) && pidDiscoveryCache?.protocol === negotiatedProtocol;
+    // O cache só prioriza candidatos. A cada sessão, a ECU atual precisa anunciar
+    // os bitmaps e responder aos PIDs sondados; um cache não prova suporte atual.
+    const cachedPidPriority = cacheMatchesProtocol && pidDiscoveryCache
+      ? Array.from(new Set(pidDiscoveryCache.supportedPids)).sort()
+      : [];
 
     let supportedPids: string[] = [];
-    let pidDiscoverySource: RealElmConnection['pidDiscoverySource'] = 'CACHE';
+    const pidDiscoverySource: RealElmConnection['pidDiscoverySource'] = 'ECU';
+    const pidDiscoveryStartedAt = Date.now();
+    logBluetoothDiagnostic('PID_DISCOVERY_START', {
+      protocol: negotiatedProtocol,
+      cacheMatchesProtocol,
+      cachedPriorityCount: cachedPidPriority.length,
+      gatePid: '010C',
+      gateResponseReused: true,
+    });
 
-    if (cacheMatchesProtocol && pidDiscoveryCache) {
-      supportedPids = Array.from(new Set(pidDiscoveryCache.supportedPids)).sort();
-    } else {
-      pidDiscoverySource = 'ECU';
-      try {
-        const discovery = await discoverIntelligentPids(session, { prevalidatedResults: [ecuProbe] });
-        supportedPids = discovery.supportedPids;
-      } catch {
-        supportedPids = [];
+    try {
+      const discovery = await discoverIntelligentPids(session, {
+        knownPids: cachedPidPriority,
+        prevalidatedResults: [ecuProbe],
+      });
+      supportedPids = discovery.supportedPids;
+
+      for (const observation of discovery.observations) {
+        const isBitmap = observation.unit === 'BITMAP';
+        logBluetoothDiagnostic('PID_DISCOVERY_COMMAND_RESULT', {
+          command: observation.pid,
+          kind: isBitmap ? 'BITMAP' : observation.pid === '010C' ? 'REUSED_ECU_GATE' : 'PID_PROBE',
+          status: observation.status,
+          elapsedMs: observation.elapsedMs,
+          value: observation.value,
+          unit: observation.unit,
+          confidence: observation.confidence,
+          reason: observation.reason,
+          response: observation.response,
+        });
       }
+
+      const measured = discovery.observations.filter((item) =>
+        item.pid !== '010C' && Number.isFinite(item.elapsedMs) && item.elapsedMs >= 0
+      );
+      logBluetoothDiagnostic('PID_DISCOVERY_SUMMARY', {
+        protocol: negotiatedProtocol,
+        cacheUsedForPriorityOnly: cacheMatchesProtocol,
+        cachedPriorityCount: cachedPidPriority.length,
+        bitmapPages: Object.keys(discovery.supportResponses),
+        bitmapCommandCount: measured.filter((item) => item.unit === 'BITMAP').length,
+        pidProbeCount: measured.filter((item) => item.unit !== 'BITMAP').length,
+        measuredCommandCount: measured.length,
+        commandElapsedTotalMs: measured.reduce((total, item) => total + item.elapsedMs, 0),
+        maxCommandElapsedMs: measured.reduce((maximum, item) => Math.max(maximum, item.elapsedMs), 0),
+        wallElapsedMs: Date.now() - pidDiscoveryStartedAt,
+        supportedPidCount: supportedPids.length,
+        supportedPids,
+      });
+    } catch (cause) {
+      supportedPids = [];
+      logBluetoothDiagnostic('PID_DISCOVERY_FAILURE', {
+        protocol: negotiatedProtocol,
+        wallElapsedMs: Date.now() - pidDiscoveryStartedAt,
+        error: cause instanceof Error ? cause.message : String(cause),
+      });
     }
 
     return {

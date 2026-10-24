@@ -52,7 +52,7 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 - `autoConnectObd=false`: pular as tentativas automáticas e abrir o cockpit para conexão manual, conforme preferência salva.
 - Negar localização/GPS na inicialização: a tela principal e a consulta OBD devem continuar disponíveis; GPS, clima e captura de percurso devem exibir indisponibilidade sem bloquear a ECU.
 - Conectar somente Bluetooth: não declarar ECU pronta sem resposta OBD válida.
-- ECU válida: executar cinco consultas por PID anunciado usando a fila serial compartilhada e abrir o cockpit após o aquecimento.
+- ECU válida: reutilizar a prova `010C` já recebida, consultar bitmaps anunciadas e confirmar candidatos catalogados com respostas individuais válidas; abrir o cockpit ao concluir a descoberta, sem cinco leituras extras de cada PID. As cinco leituras sequenciais e válidas permanecem obrigatórias no teste de sensores, não na splash.
 - PID não suportado ou sem resposta: não fabricar valores, não marcar amostra como válida e continuar os testes restantes.
 - Rotação durante splash e cockpit: conteúdo deve permanecer dentro da área segura; validar em Android físico retrato/paisagem.
 - O gate automatizado verifica a estrutura do fluxo; a validação física confirma comportamento real de Bluetooth Classic e ELM327.
