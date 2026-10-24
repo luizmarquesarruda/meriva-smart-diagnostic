@@ -82,6 +82,12 @@ assert.equal(parser.parsePidResponse('010C', '7E806410C1AF8').status, 'VALOR NÃ
   'DLC CAN divergente do tamanho do quadro não pode ser aceito');
 assert.equal(parser.parsePidResponse('010C', 'DEADBEEF410C1AF8').status, 'VALOR NÃO INTERPRETADO',
   'prefixo hexadecimal arbitrário não pode ser tratado como cabeçalho CAN');
+assert.equal(parser.parsePidResponse('010C', '18DAF110 04 41 0C 1A F8').value, 1726,
+  'cabeçalho CAN espaçado com ID estendido deve ser aceito');
+assert.equal(parser.parsePidResponse('010C', '7E8 06 41 0C 1A F8').status, 'VALOR NÃO INTERPRETADO',
+  'DLC incorreto em cabeçalho CAN espaçado deve ser rejeitado');
+assert.equal(parser.parsePidResponse('010C', 'DE AD BE EF 41 0C 1A F8').status, 'VALOR NÃO INTERPRETADO',
+  'bytes arbitrários antes da resposta não podem ser confundidos com cabeçalho');
 assert.equal(parser.parsePidResponse('010C', '7E8 04 41 0C 1A F8').status, 'RESPONDEU',
   'cabeçalho CAN/ELM antes da resposta não pode contaminar os bytes do PID');
 assert.equal(parser.parsePidResponse('010C', 'SEARCHING...\r\n41 0C 1A F8\r\n>').status, 'RESPONDEU',
