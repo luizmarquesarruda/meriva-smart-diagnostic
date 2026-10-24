@@ -2,7 +2,10 @@
 
 **Projeto:** Meriva Smart Diagnostic  
 **Veículo de referência:** Chevrolet Meriva Maxx 1.4 8V ECONO.FLEX 2011/2012  
-**Atualizado:** 2026-10-10  
+**Atualizado:** 2026-10-24  
+
+> **Nota de versão:** para o inventário integral e as referências externas mais recentes, consulte [Mapa de PIDs e fórmulas de 2026-10-24](PID_FORMULA_MAP_2026-10-24.md). A revisão cruzada corrigiu também a semântica do PID 0101, o rótulo do PID 0111, o nome do PID 015A e a unidade do PID 0130.
+
 **Fontes internas:** `src/knowledge/pids.json`, `formulas.json`, `ranges.json`, `meriva_confirmed_pids.json`; `src/obd/parser.ts`, `formulaEngine.ts`, `pidDefinition.ts`; `src/meriva/autosaveIntegration.ts`.
 
 ## 1. Resumo do inventário
@@ -69,13 +72,13 @@ As faixas são verificações de plausibilidade do software, não limites de def
 | 010E | Timing Advance | 1 | degrees | TIMING_DEG | -64–63.5 |
 | 010F | Intake Air Temperature | 1 | celsius | TEMP_C | -40–215 |
 | 0110 | MAF | 2 | grams_per_second | MAF_GS | 0–655.35 |
-| 0111 | Throttle Position | 1 | percent | PERCENT_255 | 0–100 |
+| 0111 | Absolute Throttle Position | 1 | percent | PERCENT_255 | 0–100 |
 | 0114 | O2 Sensor 1 Voltage | 2 | volts | O2_VOLTS | 0–1.275 |
 | 012C | Commanded EGR | 1 | percent | PERCENT_255 | 0–100 |
 | 012D | EGR Error | 1 | percent | FUEL_TRIM | -100–99.2 |
 | 012E | Commanded Evaporative Purge | 1 | percent | PERCENT_255 | 0–100 |
 | 012F | Fuel Level Input | 1 | percent | PERCENT_255 | 0–100 |
-| 0130 | Warmups Since DTC Clear | 1 | code | U8 | 0–255 |
+| 0130 | Warmups Since DTC Clear | 1 | warmup_cycles | U8 | 0–255 |
 | 0131 | Distance Since DTC Clear | 2 | km | DISTANCE_KM | 0–65535 |
 | 0133 | Barometric Pressure | 1 | kpa | U8 | 0–255 |
 | 0142 | ECU Voltage | 2 | volts | VOLTS_1000 | 0–65.535 |
@@ -85,7 +88,7 @@ As faixas são verificações de plausibilidade do software, não limites de def
 | 0151 | Fuel Type | 1 | code | U8 | 0–255 |
 | 0152 | Alcohol Fuel Percentage | 1 | percent | ETHANOL_PERCENT | 0–100 |
 | 0159 | Fuel Rail Absolute Pressure | 2 | kpa | U16_X10 | 0–655350 |
-| 015A | Accelerator Pedal Position | 1 | percent | PERCENT_255 | 0–100 |
+| 015A | Relative Accelerator Pedal Position | 1 | percent | PERCENT_255 | 0–100 |
 | 015C | Engine Oil Temperature | 1 | celsius | TEMP_C | -40–210 |
 | 015D | Fuel Injection Timing | 2 | degrees | INJECTION_TIMING | -210–301.99 |
 | 015E | Engine Fuel Rate | 2 | L/h | FUEL_RATE_LH | 0–3276.75 |
@@ -111,7 +114,7 @@ As faixas são verificações de plausibilidade do software, não limites de def
 | 010E | Timing Advance | CANDIDATO | CARSCANNER_SEED | TIMING_DEG | 8 |
 | 010F | Intake Air Temperature | CANDIDATO | CARSCANNER_SEED | TEMP_C | 33 |
 | 0110 | MAF | CANDIDATO | CARSCANNER_SEED | MAF_GS | 2.48 |
-| 0111 | Throttle Position | CANDIDATO | CARSCANNER_SEED | PERCENT_255 | 3.53 |
+| 0111 | Absolute Throttle Position | CANDIDATO | CARSCANNER_SEED | PERCENT_255 | 3.53 |
 | 0114 | O2 Sensor 1 Voltage | CANDIDATO | CARSCANNER_SEED | O2_VOLTS | 0.53 |
 | 012F | Fuel Level Input | CANDIDATO | STANDARD_OBD | PERCENT_255 | — |
 
