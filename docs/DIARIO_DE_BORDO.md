@@ -189,6 +189,7 @@ As PRs abaixo continuam abertas e não fazem parte de `main` enquanto não forem
 - **DB-109** · 2026-10-24 — Auditoria integral, correção do índice e reconciliação do estado atual
 - **DB-110** · 2026-10-24 — Descoberta OBD mais rápida, cache não autoritativo e latência por comando
 - **DB-111** · 2026-10-24 — Continuidade da auditoria e reconciliação documental das PRs
+- **DB-112** · 2026-10-24 — Validação estrita de bitmaps OBD e reconciliação dos IDs anti-regressão
 
 ---
 
@@ -3579,3 +3580,22 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 2. Manter uma única sequência DB-001 a DB-111 nas PRs #85, #86 e #87; não sobrescrever registros históricos.
 3. Se a CI falhar ou o build expuser problema, registrar o log e a causa antes de alterar código.
 4. Validar fisicamente a descoberta bitmap, o PID 012F e a autonomia durante uma viagem real antes de afirmar compatibilidade com a Meriva específica.
+
+
+## DB-112 · 2026-10-24 — Validação estrita de bitmaps OBD e reconciliação dos IDs anti-regressão
+
+### Problemas confirmados na revisão das PRs
+- As PRs #86 e #87 atribuíam significados distintos ao mesmo identificador `RG-32`: descoberta OBD na #86 e confiabilidade de consumo/autonomia na #87. Essa colisão dificultava a integração e fazia uma asserção de baseline proteger o requisito errado após a combinação das mudanças.
+- `src/obd/pidScanner.ts` extraía os primeiros quatro bytes após o marcador da bitmap, mas não validava bytes excedentes nem mantinha as linhas de resposta separadas. Assim, uma resposta malformada poderia ser aceita como bitmap válida.
+
+### Correções aplicadas
+- PR #86: `decodeSupportedPids` agora valida uma única bitmap com exatamente quatro bytes de payload, preservando envelopes aceitos de OBD direto, CAN de 11/29 bits com DLC correspondente e K-Line legado com checksum final. Rejeita bytes excedentes, payload repartido entre linhas e respostas de múltiplas ECUs ambíguas.
+- PR #86: adicionados testes de regressão para bitmap truncada/estendida, linhas separadas, cabeçalhos CAN de 11/29 bits, envelope K-Line e respostas múltiplas.
+- PR #86: o contrato RG-32 foi ampliado para incluir a integridade das bitmaps da sessão atual, além da regra de cache apenas como prioridade e dos registros de latência.
+- PR #87: o requisito de consumo confiável/autonomia foi renumerado para RG-33; o teste `projectBaseline.test.js` passou a exigir RG-33 para esse requisito, eliminando a colisão com RG-32.
+
+### Validação e limites
+- As alterações de código/testes/documentação geraram novos HEADs nas branches #86 e #87. A CI deve ser confirmada nos SHAs finais depois desta sincronização; resultados de commits anteriores não validam estes novos HEADs.
+- Os testes adicionados cobrem formatos determinísticos, mas não comprovam suporte/precisão de sensores na Meriva específica.
+- Teste físico com ELM327/ECU, medição de latência real e inspeção do APK instalado continuam pendentes.
+- Nenhuma PR foi mesclada nesta atualização.
