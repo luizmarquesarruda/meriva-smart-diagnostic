@@ -115,9 +115,10 @@ async function writeRowsUnsafe(filePath: string, rows: CsvRow[]): Promise<void> 
     return;
   }
 
-  // Existing logs are appended incrementally. Only the header and terminal byte
-  // are read on the hot path, not the full history. Full-file migration occurs
-  // only when a row introduces a new column.
+  // Validate the existing header before writing. The SDK 51 legacy filesystem
+  // API has no native append option, so ordinary flushes preserve rows by
+  // reading and rewriting the current file. Large daily files may eventually
+  // benefit from a supported native append API or segmented log format.
   const headerPreview = await FileSystem.readAsStringAsync(filePath, {
     encoding: FileSystem.EncodingType.UTF8,
     position: 0,
@@ -164,17 +165,15 @@ async function writeRowsUnsafe(filePath: string, rows: CsvRow[]): Promise<void> 
   }
 
   const lines = rows.map((row) => serializeRow(row, oldHeaders));
-  const lastCharacter = (info.size ?? 0) > 0
-    ? await FileSystem.readAsStringAsync(filePath, {
-        encoding: FileSystem.EncodingType.UTF8,
-        position: Math.max(0, (info.size ?? 1) - 1),
-        length: 1,
-      })
-    : '';
-  const separator = lastCharacter.endsWith('\n') ? '' : '\n';
-  await FileSystem.writeAsStringAsync(filePath, `${separator}${lines.join('\n')}\n`, {
+  // Expo SDK 51's legacy API has no supported append option. Rewrite the
+  // existing content plus this batch so a flush cannot silently replace the
+  // previous rows with only the newest batch.
+  const current = await FileSystem.readAsStringAsync(filePath, {
     encoding: FileSystem.EncodingType.UTF8,
-    append: true,
+  });
+  const separator = current.length > 0 && !current.endsWith('\n') ? '\n' : '';
+  await FileSystem.writeAsStringAsync(filePath, `${current}${separator}${lines.join('\n')}\n`, {
+    encoding: FileSystem.EncodingType.UTF8,
   });
 }
 function scheduleBatchFlush(): void {

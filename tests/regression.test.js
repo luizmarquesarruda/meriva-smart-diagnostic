@@ -516,6 +516,42 @@ async function testPidScanner() {
   assert.ok(supported60.includes('0179'));
   assert.ok(!supported60.includes('0180'));
 
+  assert.deepStrictEqual(
+    scanner.decodeSupportedPids('0100', '41 00 BE 3E B8 13 FF'),
+    [],
+    'bitmap com byte de payload excedente deve ser rejeitada',
+  );
+  assert.deepStrictEqual(
+    scanner.decodeSupportedPids('0100', '41 00 BE 3E\r\nB8 13'),
+    [],
+    'bytes da bitmap não podem ser juntados entre linhas',
+  );
+  assert.deepStrictEqual(
+    scanner.decodeSupportedPids('0100', '7E8 06 41 00 BE 3E B8 13'),
+    supported,
+    'quadro CAN de 11 bits deve aceitar cabeçalho/DLC coerentes',
+  );
+  assert.deepStrictEqual(
+    scanner.decodeSupportedPids('0100', '18DAF110 06 41 00 BE 3E B8 13'),
+    supported,
+    'quadro CAN de 29 bits deve aceitar cabeçalho/DLC coerentes',
+  );
+  assert.deepStrictEqual(
+    scanner.decodeSupportedPids('0100', '48 6B 10 41 00 BE 3E B8 13 CB'),
+    supported,
+    'envelope K-Line deve aceitar checksum aditivo válido',
+  );
+  assert.deepStrictEqual(
+    scanner.decodeSupportedPids('0100', '48 6B 10 41 00 BE 3E B8 13 82'),
+    [],
+    'envelope K-Line com checksum inválido deve ser rejeitado',
+  );
+  assert.deepStrictEqual(
+    scanner.decodeSupportedPids('0100', '41 00 BE 3E B8 13\r\n41 00 00 00 00 00'),
+    [],
+    'respostas de múltiplas ECUs devem ser rejeitadas como ambíguas',
+  );
+
   const fakeSession = {
     async executeCommand(pid) {
       const responses = {

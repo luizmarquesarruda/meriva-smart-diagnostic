@@ -92,6 +92,9 @@ assert.match(bluetoothTransport, /BUFFER RX ELM EXCEDIDO/);
 const pidDiscovery = read('src/obd/intelligentPidDiscovery.ts');
 assert.match(pidDiscovery, /responseBuffer:\s*responseBuffer\.snapshot\(\)/);
 assert.match(read('src/obd/pidDiscoveryBuffer.ts'), /MAX|capacity/);
+assert.match(read('src/obd/pidScanner.ts'), /extractBitmapPayload/);
+assert.match(read('src/obd/pidScanner.ts'), /validAdditiveChecksum/);
+assert.match(read('src/obd/bluetoothManager.ts'), /PID_DISCOVERY_SUMMARY/);
 assert.match(read('src/obd/parser.ts'), /hasValidKLineChecksum/);
 assert.match(read('src/obd/dtcParser.ts'), /validAdditiveChecksum/);
 assert.match(read('src/storage/driveCycleStorage.ts'), /HISTORICO_DE_VIAGENS_CORROMPIDO/);
@@ -166,13 +169,14 @@ assert.equal(splashAsset.subarray(0, 8).toString('hex'), '89504e470d0a1a0a',
   'asset de splash precisa ser um PNG real, não somente um caminho configurado');
 assert.ok(splashAsset.length > 4000, 'asset de splash está vazio ou incompleto');
 
-// Startup splash must gate the cockpit on a real ECU response and warm up supported PIDs.
+// Startup validates the current ECU and opens without redundant warm-up commands.
 const startup = read('app/splash.tsx');
 const rootLayout = read('app/_layout.tsx');
 assert.match(rootLayout, /initialRouteName="splash"/, 'o fluxo de inicialização deve começar na splash operacional');
 assert.match(startup, /while \(!cancelled\)/, 'a busca do ELM327 deve continuar até conectar ou desmontar a tela');
 assert.match(startup, /connection\.supportedPids/, 'a validação inicial deve usar apenas PIDs descobertos');
-assert.match(startup, /round < 5/, 'cada PID suportado deve receber pelo menos cinco consultas iniciais');
+assert.doesNotMatch(startup, /round < 5/, 'a splash não pode repetir cinco consultas redundantes por PID');
+assert.match(startup, /PIDs COM RESPOSTA VÁLIDA/, 'a splash deve informar a contagem de PIDs confirmados');
 assert.match(startup, /router\.replace\('\/'\)/, 'o painel só abre depois da etapa de conexão e aquecimento');
 assert.match(startup, /settings\.autoConnectObd === false/, 'a preferência de conexão automática deve ser respeitada na splash');
 assert.match(startup, /retry >= 2/, 'deve existir uma saída para o cockpit após falhas de conexão repetidas');

@@ -17,8 +17,8 @@ As PRs abaixo continuam abertas e não fazem parte de `main` enquanto não forem
 - [PR #83 — portar layout Floot ao cockpit Android](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83): head `85078c2aacd4ff7427b5ded7c1b1ce0e1f6803cf`; run [40098343069 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40098343069).
 - [PR #84 — inventário do catálogo de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84): head `3c60528017d37744954d2430fca9737ee78a71bd`; run [40089022363 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40089022363).
 - [PR #85 — reconciliação documental](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/85): aberta; esta atualização do diário exige nova CI no HEAD resultante.
-- [PR #86 — descoberta OBD e latência](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/86): head `f9afaed53132521f8fbfc09d59cf6ab90bac9536`; run [40102952556 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40102952556), com `validate` e `android-build` aprovados.
-- [PR #87 — parser e autonomia](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/87): head `fb475eb4908311a666c304af59d9e6007a092a9f`; run [40114505089 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40114505089), com `validate` e `android-build` aprovados.
+- [PR #86 — descoberta OBD e latência](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/86): head `9f12e54aa1b8f32f0e293cf775f9cbcc80544c04`; run [40124875595 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40124875595), com `validate` e `android-build` aprovados nesse SHA.
+- [PR #87 — parser e autonomia](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/87): head `2997136881dc27bfbed37c12babc6c7ff5b4343e`; run [40122815647 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40122815647), com `validate` e `android-build` aprovados nesse SHA.
 - PRs [#74](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/74) e [#75](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/75) estão fechadas **sem merge**; não presumir que os seus heads estejam em `main`.
 
 ### Limites de validação
@@ -3721,3 +3721,17 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 ### Validação e limites
 - A CI do HEAD final precisa terminar verde em `validate` e `android-build`.
 - Teste em aparelho, captura real ELM327/ECU, verificação visual de telas e recuperação real de backup continuam fora da validação estática/automatizada.
+
+## DB-120 · 2026-10-24 — Descoberta rápida e integridade de quadros OBD
+
+### Correções integradas nesta branch
+- `app/splash.tsx`: removidas cinco consultas extras por PID na inicialização. A descoberta individual já é feita pela fila compartilhada; o teste de sensores mantém cinco amostras válidas.
+- `src/obd/pidScanner.ts`: cada bitmap é validada sem concatenar linhas e deve ter exatamente quatro bytes; envelopes CAN precisam de ID/DLC coerentes e K-Line exige checksum aditivo válido.
+- `src/obd/bluetoothManager.ts`: cache compatível apenas prioriza a ordem. A ECU da sessão atual é consultada sempre; diagnóstico registra status, latência por comando e resumo da descoberta.
+- `src/database/csvLogger.ts`: removido o uso de `append: true`, não suportado por `writeAsStringAsync` no Expo SDK 51 legado. A gravação preserva os registros anteriores ao acrescentar um lote.
+- Os testes de regressão cobrem bitmap com bytes excedentes, quadro dividido entre linhas, CAN 11/29 bits, múltiplas ECUs e checksum K-Line correto/incorreto.
+
+### Custo e validação pendente
+- Como o sistema de arquivos legado não oferece append nessa API, o lote CSV é persistido por leitura e regravação do arquivo. Isso preserva os dados, mas pode custar mais em arquivos diários grandes; considerar segmentação ou append nativo suportado em uma rodada específica de desempenho.
+- Esta alteração foi preparada após corrigir a falha de TypeScript identificada no HEAD anterior. A CI de `validate` e `android-build` precisa ser confirmada no novo SHA.
+- Teste físico com ELM327/ECU e inspeção do APK instalado permanecem pendentes.
