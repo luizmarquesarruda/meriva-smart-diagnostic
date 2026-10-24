@@ -8,10 +8,12 @@
 
 **Fontes internas:** `src/knowledge/pids.json`, `formulas.json`, `ranges.json`, `meriva_confirmed_pids.json`; `src/obd/parser.ts`, `formulaEngine.ts`, `pidDefinition.ts`; `src/meriva/autosaveIntegration.ts`.
 
+> A avaliação de fontes oficiais do veículo está em [Auditoria documental Meriva × OBD/PIDs](MERIVA_OBD_SOURCE_AUDIT_2026-10-24.md). O manual do proprietário não fornece uma lista de PIDs suportados; este relatório descreve padrões SAE e a evidência RAW_ECU registrada separadamente.
+
 ## 1. Resumo do inventário
 
 - **34 PIDs** no catálogo padrão local.
-- **20 fórmulas/operações nomeadas** no motor determinístico.
+- **21 definições de fórmula** no catálogo determinístico; três fórmulas genéricas não estão ligadas a um PID atual.
 - **1 PID** com evidência RAW_ECU no arquivo de referência da Meriva: `010C` (RPM).
 - **10 candidatos** no arquivo de referência; a maior parte veio de um baseline do Car Scanner e não comprova suporte na ECU.
 - **27 alvos** listados para futura confirmação real.
@@ -60,11 +62,11 @@ As faixas são verificações de plausibilidade do software, não limites de def
 
 | PID | Parâmetro | Bytes de dados | Unidade | Fórmula | Faixa local |
 |---|---|---:|---|---|---|
-| 0101 | Monitor Status Since DTCs Cleared | 4 | status | U32 | 0–4294967295 |
+| 0101 | Monitor Status Since DTCs Cleared | 4 | dtc_count | DTC_COUNT (`A & 0x7F`; MIL/readiness separados) | 0–127 |
 | 0104 | Calculated Engine Load | 1 | percent | PERCENT_255 | 0–100 |
 | 0105 | Coolant Temperature | 1 | celsius | TEMP_C | -40–215 |
-| 0106 | STFT Bank 1 | 1 | percent | FUEL_TRIM | -100–99.2 |
-| 0107 | LTFT Bank 1 | 1 | percent | FUEL_TRIM | -100–99.2 |
+| 0106 | STFT Bank 1 | 1 | percent | FUEL_TRIM | -100–99.21875 |
+| 0107 | LTFT Bank 1 | 1 | percent | FUEL_TRIM | -100–99.21875 |
 | 010A | Fuel Pressure | 1 | kpa | U8_X3 | 0–765 |
 | 010B | MAP | 1 | kpa | U8 | 0–255 |
 | 010C | Engine RPM | 2 | rpm | RPM | 0–16383.75 |
@@ -75,7 +77,7 @@ As faixas são verificações de plausibilidade do software, não limites de def
 | 0111 | Absolute Throttle Position | 1 | percent | PERCENT_255 | 0–100 |
 | 0114 | O2 Sensor 1 Voltage | 2 | volts | O2_VOLTS | 0–1.275 |
 | 012C | Commanded EGR | 1 | percent | PERCENT_255 | 0–100 |
-| 012D | EGR Error | 1 | percent | FUEL_TRIM | -100–99.2 |
+| 012D | EGR Error | 1 | percent | FUEL_TRIM | -100–99.21875 |
 | 012E | Commanded Evaporative Purge | 1 | percent | PERCENT_255 | 0–100 |
 | 012F | Fuel Level Input | 1 | percent | PERCENT_255 | 0–100 |
 | 0130 | Warmups Since DTC Clear | 1 | warmup_cycles | U8 | 0–255 |
@@ -90,7 +92,7 @@ As faixas são verificações de plausibilidade do software, não limites de def
 | 0159 | Fuel Rail Absolute Pressure | 2 | kpa | U16_X10 | 0–655350 |
 | 015A | Relative Accelerator Pedal Position | 1 | percent | PERCENT_255 | 0–100 |
 | 015C | Engine Oil Temperature | 1 | celsius | TEMP_C | -40–210 |
-| 015D | Fuel Injection Timing | 2 | degrees | INJECTION_TIMING | -210–301.99 |
+| 015D | Fuel Injection Timing | 2 | degrees | INJECTION_TIMING | -210–301.9921875 |
 | 015E | Engine Fuel Rate | 2 | L/h | FUEL_RATE_LH | 0–3276.75 |
 | 0161 | Driver Demand Engine Torque | 1 | percent | TORQUE_PERCENT | -125–130 |
 | 0162 | Actual Engine Torque | 1 | percent | TORQUE_PERCENT | -125–130 |
