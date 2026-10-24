@@ -24,6 +24,10 @@ interface PendingNativeSocketCleanup {
 // from a timed-out write on the same adapter address.
 const pendingNativeSocketCleanups = new Map<string, PendingNativeSocketCleanup>();
 
+// ELM327 retorna linhas curtas; 16 KiB é uma margem generosa e evita RX ilimitado.
+export const MAX_ELM_RX_BUFFER_CHARS = 16 * 1024;
+const RX_DIAGNOSTIC_PREVIEW_CHARS = 256;
+
 async function waitForPendingNativeSocketCleanup(addressKey: string, timeoutMs: number): Promise<void> {
   const pending = pendingNativeSocketCleanups.get(addressKey);
   if (!pending) return;
@@ -72,6 +76,7 @@ export class BluetoothClassicTransport implements ObdTransport {
   private device: BluetoothDevice | null = null;
   private connected = false;
   private received = '';
+  private receiveOverflow = false;
   private dataSubscription?: RemovableSubscription;
   private disconnectSubscription?: RemovableSubscription;
   private diagnostics: string[] = [];
@@ -173,6 +178,7 @@ export class BluetoothClassicTransport implements ObdTransport {
     if (!enabled) throw new Error('BLUETOOTH DESLIGADO');
 
     this.received = '';
+    this.receiveOverflow = false;
     this.connected = false;
     this.removeSubscriptions();
 
@@ -353,12 +359,51 @@ export class BluetoothClassicTransport implements ObdTransport {
     this.dataSubscription = device.onDataReceived((event) => {
       if (event?.data) {
         const chunk = String(event.data);
+        const preview = chunk.slice(0, RX_DIAGNOSTIC_PREVIEW_CHARS);
         this.logDiagnostic('RX_CHUNK', {
           length: chunk.length,
-          data: chunk,
-          hex: Array.from(chunk).map((char) => char.charCodeAt(0).toString(16).padStart(2, '0')).join(' '),
+          data: preview,
+          ...(chunk.length > RX_DIAGNOSTIC_PREVIEW_CHARS ? { truncated: true } : {}),
+          hex: Array.from(preview).map((char) => char.charCodeAt(0).toString(16).padStart(2, '0')).join(' '),
         });
-        this.received += chunk;
+
+        // After overflow, discard all payload until the framing prompt arrives.
+        // Never let a damaged response look like a valid, complete OBD reply.
+        if (this.receiveOverflow) {
+          if (chunk.includes('>')) this.received = '>';
+          return;
+        }
+
+        const combined = this.received + chunk;
+        const promptIndex = combined.indexOf('>');
+        if (promptIndex >= 0) {
+          if (promptIndex > MAX_ELM_RX_BUFFER_CHARS) {
+            this.receiveOverflow = true;
+            this.received = '>';
+            this.logDiagnostic('RX_BUFFER_OVERFLOW', {
+              maxChars: MAX_ELM_RX_BUFFER_CHARS,
+              bufferedChars: promptIndex,
+              promptSeen: true,
+            });
+          } else {
+            // Keep only the first response up to its prompt; trailing bytes
+            // belong to the consumed response and are intentionally discarded.
+            this.received = combined.slice(0, promptIndex + 1);
+          }
+          return;
+        }
+
+        if (combined.length > MAX_ELM_RX_BUFFER_CHARS) {
+          this.receiveOverflow = true;
+          this.received = '';
+          this.logDiagnostic('RX_BUFFER_OVERFLOW', {
+            maxChars: MAX_ELM_RX_BUFFER_CHARS,
+            bufferedChars: combined.length,
+            promptSeen: false,
+          });
+          return;
+        }
+        this.received = combined;
       }
     });
 
@@ -397,6 +442,7 @@ export class BluetoothClassicTransport implements ObdTransport {
     this.device = null;
     this.connected = false;
     this.received = '';
+    this.receiveOverflow = false;
   }
 
   async write(data: string): Promise<void> {
@@ -469,6 +515,12 @@ export class BluetoothClassicTransport implements ObdTransport {
 
       const promptIndex = this.received.indexOf('>');
       if (promptIndex >= 0) {
+        if (this.receiveOverflow) {
+          this.received = '';
+          this.receiveOverflow = false;
+          this.logDiagnostic('RX_BUFFER_OVERFLOW_CONSUMED', { maxChars: MAX_ELM_RX_BUFFER_CHARS });
+          throw new Error('BUFFER RX ELM EXCEDIDO; RESPOSTA DESCARTADA');
+        }
         const response = this.received.slice(0, promptIndex);
         const trailing = this.received.slice(promptIndex + 1);
         // O ELM327 Mini genérico pode repetir a mesma resposta e prompt no mesmo
@@ -491,12 +543,16 @@ export class BluetoothClassicTransport implements ObdTransport {
 
     const partial = this.received.replace(/^\s+|\s+$/g, '');
     const bufferedLength = this.received.length;
+    const receiveOverflow = this.receiveOverflow;
     this.received = '';
+    this.receiveOverflow = false;
     this.logDiagnostic('READ_TIMEOUT', {
       partial,
       bufferedLength,
       promptExpected: true,
+      receiveOverflow,
     });
+    if (receiveOverflow) throw new Error('BUFFER RX ELM EXCEDIDO SEM PROMPT FINAL');
     throw new Error(partial ? 'TIMEOUT: RESPOSTA ELM SEM PROMPT FINAL' : 'TIMEOUT');
   }
 
@@ -527,6 +583,7 @@ export class BluetoothClassicTransport implements ObdTransport {
     this.device = null;
     this.connected = false;
     this.received = '';
+    this.receiveOverflow = false;
     this.callbacks?.onDisconnected?.('BLUETOOTH DESCONECTADO');
   }
 
