@@ -22,6 +22,8 @@ const fileQueues = new Map<string, Promise<void>>();
 const pendingRows = new Map<string, CsvRow[]>();
 const BATCH_FLUSH_INTERVAL_MS = 1000;
 const BATCH_FLUSH_ROW_LIMIT = 8;
+const MAX_PENDING_CSV_ROWS = 10_000;
+let droppedPendingRows = 0;
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 let flushPromise: Promise<void> | null = null;
 
@@ -33,8 +35,22 @@ function formatCsvValue(value: CsvValue): string {
     : asString;
 }
 
-function serializeRow(row: CsvRow): string {
-  return Object.keys(row).map((key) => formatCsvValue(row[key])).join(',');
+function serializeRow(row: CsvRow, headers: string[] = Object.keys(row)): string {
+  const unknownKeys = Object.keys(row).filter((key) => !headers.includes(key));
+  if (unknownKeys.length) {
+    throw new Error('CSV_SCHEMA_MISMATCH: colunas novas não podem ser gravadas sob cabeçalho antigo: ' + unknownKeys.join(','));
+  }
+  return headers.map((key) => formatCsvValue(row[key])).join(',');
+}
+
+export function getCsvQueueStatus(): { pendingRows: number; droppedRows: number; maxPendingRows: number } {
+  let pendingRows = 0;
+  for (const rows of pendingRowsMapValues()) pendingRows += rows.length;
+  return { pendingRows, droppedRows: droppedPendingRows, maxPendingRows: MAX_PENDING_CSV_ROWS };
+}
+
+function* pendingRowsMapValues(): IterableIterator<CsvRow[]> {
+  yield* pendingRows.values();
 }
 
 async function enqueueFileOperation(filePath: string, operation: () => Promise<void>): Promise<void> {
@@ -54,9 +70,10 @@ async function writeRowsUnsafe(filePath: string, rows: CsvRow[]): Promise<void> 
   await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
 
   const info = await FileSystem.getInfoAsync(filePath);
-  const lines = rows.map(serializeRow);
   if (!info.exists) {
-    const header = Object.keys(rows[0]).join(',');
+    const headers = Object.keys(rows[0]);
+    const lines = rows.map((row) => serializeRow(row, headers));
+    const header = headers.join(',');
     await FileSystem.writeAsStringAsync(filePath, `${header}\n${lines.join('\n')}\n`, {
       encoding: FileSystem.EncodingType.UTF8,
     });
@@ -64,11 +81,18 @@ async function writeRowsUnsafe(filePath: string, rows: CsvRow[]): Promise<void> 
   }
 
   const current = await FileSystem.readAsStringAsync(filePath);
-  const trimmed = current.trim();
+  const trimmed = current.trimEnd();
+  const headers = (trimmed.split(/\r?\n/, 1)[0] ?? '').split(',');
+  if (!headers.length || headers.some((header) => !header)) {
+    throw new Error('CSV_HEADER_INVALIDO: ' + filePath);
+  }
+  // Stable header mapping prevents a later object with a different insertion
+  // order from silently writing values into the wrong CSV columns.
+  const lines = rows.map((row) => serializeRow(row, headers));
   // One read/write per batch instead of one full-file rewrite per sensor sample.
   const content = trimmed.length > 0
     ? `${trimmed}\n${lines.join('\n')}\n`
-    : `${Object.keys(rows[0]).join(',')}\n${lines.join('\n')}\n`;
+    : `${headers.join(',')}\n${lines.join('\n')}\n`;
   await FileSystem.writeAsStringAsync(filePath, content, {
     encoding: FileSystem.EncodingType.UTF8,
   });
@@ -86,12 +110,20 @@ function scheduleBatchFlush(): void {
 }
 
 export function queueCsvRow(filePath: string, row: CsvRow): void {
+  let totalPending = 0;
+  for (const rows of pendingRows.values()) totalPending += rows.length;
+  if (totalPending >= MAX_PENDING_CSV_ROWS) {
+    droppedPendingRows += 1;
+    if (droppedPendingRows === 1 || droppedPendingRows % 100 === 0) {
+      console.warn(`[csv] fila limitada a ${MAX_PENDING_CSV_ROWS}; registros entrantes descartados: ${droppedPendingRows}`);
+    }
+    return;
+  }
+
   const queue = pendingRows.get(filePath) ?? [];
   queue.push({ ...row });
   pendingRows.set(filePath, queue);
-
-  let totalPending = 0;
-  for (const rows of pendingRows.values()) totalPending += rows.length;
+  totalPending += 1;
   if (totalPending >= BATCH_FLUSH_ROW_LIMIT) {
     if (flushTimer) {
       clearTimeout(flushTimer);
