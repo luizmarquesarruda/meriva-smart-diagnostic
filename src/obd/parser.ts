@@ -40,6 +40,15 @@ function findResponsePayload(rawResponse: string, pid: string, byteCount: number
         const payloadStart = markerIndex + marker.length + serviceOffsetBytes * 2;
         const payloadHex = compactLine.slice(payloadStart, payloadStart + byteCount * 2);
         const trailingHex = compactLine.slice(payloadStart + byteCount * 2);
+        const expectedCanDlc = (byteCount + 2 + serviceOffsetBytes).toString(16).padStart(2, '0').toUpperCase();
+        const can11BitFrame = /^[0-9A-F]{3}[0-9A-F]{2}$/.test(prefix)
+          && prefix.slice(3) === expectedCanDlc;
+        const can29BitFrame = /^[0-9A-F]{8}[0-9A-F]{2}$/.test(prefix)
+          && prefix.slice(8) === expectedCanDlc;
+        const acceptedPrefix = prefix.length === 0
+          || can11BitFrame
+          || can29BitFrame
+          || prefix === '486B10';
         // ATS0 removes byte separators, so legacy K-Line framing may arrive as
         // 486B10 + positive response + payload + one checksum byte. Accept that
         // exact envelope in compact form as well as in the spaced-token path.
@@ -48,7 +57,7 @@ function findResponsePayload(rawResponse: string, pid: string, byteCount: number
           && /^[0-9A-F]{2}$/.test(trailingHex);
         if (
           payloadHex.length === byteCount * 2 &&
-          (trailingHex.length === 0 || compactKLineChecksum) &&
+          ((trailingHex.length === 0 && acceptedPrefix) || compactKLineChecksum) &&
           /^[0-9A-F]+$/.test(payloadHex)
         ) {
           const bytes: number[] = [];
