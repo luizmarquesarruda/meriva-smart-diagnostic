@@ -76,9 +76,16 @@ function main() {
     assert.ok(formulas.formulas[pid.formulaId], 'formulaId sem definição: ' + id + ' -> ' + pid.formulaId);
 
     const operation = formulas.formulas[pid.formulaId].operation;
-    const minimumBytes = ['u8', 'u8_offset', 'u8_scale', 'u8_offset_scale', 'u8_scale_offset', 'u8_div', 'u8_scale_div'].includes(operation) ? 1 : 2;
+    const minimumBytes = ['u8', 'u8_offset', 'u8_scale', 'u8_offset_scale', 'u8_scale_offset', 'u8_div', 'u8_scale_div', 'u8_mask'].includes(operation) ? 1 : 2;
     assert.ok(pid.bytes >= minimumBytes, 'bytes insuficientes para a fórmula: ' + id + ' -> ' + operation);
   }
+
+  const monitorStatusPid = pids.pids.find((item) => item.pid === '0101');
+  assert.strictEqual(monitorStatusPid.formulaId, 'DTC_COUNT', 'PID 0101 deve retornar contagem DTC, não inteiro bruto de status');
+  assert.strictEqual(monitorStatusPid.unit, 'dtc_count');
+  assert.strictEqual(formulas.formulas.DTC_COUNT.operation, 'u8_mask');
+  assert.strictEqual(formulas.formulas.DTC_COUNT.mask, 0x7F);
+  assert.deepStrictEqual(ranges.ranges['0101'], { min: 0, max: 127 });
 
   const o2Pid = pids.pids.find((item) => item.pid === '0114');
   assert.strictEqual(o2Pid.bytes, 2, 'PID 0114 deve carregar os dois bytes da resposta padronizada');
@@ -138,14 +145,17 @@ function main() {
 
   const supportedFormulaOperations = new Set([
     'u8', 'u16', 'u16_div', 'u8_offset', 'u8_scale',
-    'u8_offset_scale', 'u8_scale_offset', 'u8_div', 'u8_scale_div', 'u16_scale', 'u16_scale_div', 'u16_offset_scale', 'u32',
+    'u8_offset_scale', 'u8_scale_offset', 'u8_div', 'u8_scale_div', 'u8_mask', 'u16_scale', 'u16_scale_div', 'u16_offset_scale', 'u32',
   ]);
   const formulaIds = Object.keys(formulas.formulas);
   assertUnique(formulaIds, 'formulaId');
   for (const [id, spec] of Object.entries(formulas.formulas)) {
     assert.ok(supportedFormulaOperations.has(spec.operation), 'operação de fórmula não implementada: ' + id + ' -> ' + spec.operation);
-    for (const key of ['offset', 'scale', 'divisor']) {
+    for (const key of ['offset', 'scale', 'divisor', 'mask']) {
       if (spec[key] !== undefined) assert.ok(Number.isFinite(spec[key]), 'parâmetro não numérico em fórmula ' + id + ': ' + key);
+    }
+    if (spec.operation === 'u8_mask') {
+      assert.ok(Number.isInteger(spec.mask) && spec.mask >= 0 && spec.mask <= 255, 'máscara inválida na fórmula ' + id);
     }
     if (['u16_div', 'u8_div', 'u8_scale', 'u8_offset_scale', 'u8_scale_div', 'u16_scale_div'].includes(spec.operation)) {
       assert.ok(Number.isFinite(spec.divisor) && spec.divisor !== 0, 'divisor inválido na fórmula ' + id);
