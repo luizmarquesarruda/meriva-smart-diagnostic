@@ -3489,3 +3489,13 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - A página de manuais técnicos Peça Chevrolet informa disponibilidade de manual de reparação e diagramas, mas o conteúdo completo não foi validado linha a linha nesta auditoria. O catálogo de treinamento comercial do Meriva Econo.Flex descreve Multec HX14YFH e testes de sensores, mas isso não prova que essa ECU específica esteja instalada em toda Meriva 2011/2012.
 - Adicionado `docs/MERIVA_OBD_SOURCE_AUDIT_2026-10-24.md`, com matriz de fontes, limites e comparativo entre a lista SAE genérica e a evidência atual da ECU.
 - Reforçada a barreira anti-regressão para impedir a associação errada de PID 0101 C4, divergência de nomes/unidades e alegações de compatibilidade sem evidência RAW_ECU. Nenhuma alteração foi mesclada em `main`.
+
+
+## DB-114 — 2026-10-24 — Fechamento documental e validação da CI
+
+- Verificados os PDFs oficiais da Chevrolet Meriva e a página oficial de manuais de anos anteriores. A tabela de especificações confirma o contexto do motor 1.4L 8V ECONO.FLEX; o manual descreve a luz de anomalia do controle de emissões, mas não enumera PIDs Mode 01 nem uma bitmap de suporte.
+- Cross-check dos nomes padronizados no OBD Auto Doctor e do byte C/D do PID 0101 no OBD2PID. C4/D4 para ciclo Otto são disponibilidade/incompletude do monitor de filtro de partículas de gasolina. A alteração anterior que associava C4 ao ar-condicionado foi revertida e protegida com teste.
+- Corrigida a orientação de teste do PID 0105 para exigir cinco leituras válidas sem declarar calibração; corrigida a orientação MAP/BARO para médias aritméticas, conforme o executor atual.
+- Alinhados o relatório principal, mapa de PIDs, auditoria histórica de sensores, README, changelog e contrato anti-regressão. O teste baseline protege a tabela atual do PID 0101, nomes de 0111/0145/015A, unidade de 0130 e a ausência de linguagem antiga de três leituras no relatório ativo.
+- A execução CI `40093368099` passou nos jobs `validate` e `android-build` para o commit auditado àquele momento. Esse resultado não cobre commits posteriores; a CI precisa terminar novamente para o HEAD final.
+- Nenhuma alteração foi mesclada em `main`; o teste físico com ELM327/ECU e validação da identidade real do módulo continuam pendentes.
