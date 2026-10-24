@@ -136,6 +136,29 @@ function main() {
       formulaId: cells[4],
     });
   }
+  const expectedFormulaExpressions = {
+    DTC_COUNT: 'A & 0x7F',
+    PERCENT_255: 'A × 100 / 255',
+    TEMP_C: 'A − 40',
+    FUEL_TRIM: '(A − 128) × 100 / 128',
+    U8_X3: 'A × 3',
+    U8: 'A',
+    RPM: '(256 × A + B) / 4',
+    TIMING_DEG: 'A × 0,5 − 64',
+    MAF_GS: '(256 × A + B) / 100',
+    O2_VOLTS: 'A / 200; B é STFT separado',
+    DISTANCE_KM: '256 × A + B',
+    VOLTS_1000: '(256 × A + B) / 1000',
+    U16_SCALE_255: '(256 × A + B) × 100 / 255',
+    ETHANOL_PERCENT: 'A × 100 / 255',
+    U16_X10: '(256 × A + B) × 10',
+    INJECTION_TIMING: '((256 × A + B) − 26880) / 128',
+    FUEL_RATE_LH: '(256 × A + B) / 20',
+    TORQUE_PERCENT: 'A − 125',
+  };
+  const linkedFormulaIds = new Set(pids.pids.map((pid) => pid.formulaId));
+  assert.strictEqual(linkedFormulaIds.size, Object.keys(expectedFormulaExpressions).length,
+    'fórmula nova requer expressão documental e teste explícitos');
   assert.strictEqual(documentedPidRows.size, pids.pids.length,
     'o mapa deve conter exatamente uma linha para cada PID do catálogo JSON');
   for (const pid of pids.pids) {
@@ -144,6 +167,13 @@ function main() {
     assert.strictEqual(documented.name, pid.name, 'nome diverge entre catálogo e mapa: ' + pid.pid);
     assert.strictEqual(documented.bytes, pid.bytes, 'bytes divergem entre catálogo e mapa: ' + pid.pid);
     assert.strictEqual(documented.formulaId, pid.formulaId, 'fórmula diverge entre catálogo e mapa: ' + pid.pid);
+    assert.strictEqual(documented.expression, expectedFormulaExpressions[pid.formulaId],
+      'expressão matemática diverge entre fórmula catalogada e mapa: ' + pid.pid);
+    assert.strictEqual(documented.unit, units.units[pid.unit].symbol,
+      'unidade diverge entre catálogo e mapa: ' + pid.pid);
+    const declaredRange = ranges.ranges[pid.pid];
+    assert.strictEqual(documented.range, String(declaredRange.min) + '…' + String(declaredRange.max),
+      'faixa diverge entre catálogo e mapa: ' + pid.pid);
   }
   for (const requiredText of [
     'PID_FORMULA_MAP_2026-10-24.md',
