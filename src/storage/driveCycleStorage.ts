@@ -195,6 +195,19 @@ export async function addDriveCycle(basePath: string, cycle: DriveCycle): Promis
     }
   } else if (info.exists && info.isDirectory) {
     throw new Error('INDEX_DE_VIAGENS_E_DIRETORIO; NENHUMA GRAVACAO EXECUTADA');
+  } else if (!info.exists) {
+    // A missing main index can be the result of interrupted replacement.
+    // If a previous snapshot exists, it must be validated and restored rather
+    // than silently starting with empty history.
+    const previousPath = indexBackupPath(indexFile);
+    const previousInfo = await FileSystem.getInfoAsync(previousPath);
+    if (previousInfo.exists) {
+      const backupCycles = await readCyclesFromFile(previousPath);
+      if (backupCycles === null) {
+        throw new Error('BACKUP_DO_HISTORICO_CORROMPIDO; HISTORICO_NAO_SUBSTITUIDO');
+      }
+      data = { version: '1.0', cycles: backupCycles, totalCount: backupCycles.length };
+    }
   }
 
   data.cycles = data.cycles.filter((item) => item.id !== cycle.id);
@@ -225,8 +238,13 @@ export async function addDriveCycle(basePath: string, cycle: DriveCycle): Promis
     }
   }
   try {
-    await FileSystem.copyAsync({ from: tempFile, to: indexFile });
-    await FileSystem.deleteAsync(tempFile, { idempotent: true });
+    // expo-file-system's copy may reject an existing destination. The previous
+    // validated snapshot is already secured, so remove the main path and move
+    // the verified temporary file into place. If move fails, recovery can use
+    // the backup rather than an unvalidated or partially written main file.
+    const mainNow = await FileSystem.getInfoAsync(indexFile);
+    if (mainNow.exists) await FileSystem.deleteAsync(indexFile, { idempotent: true });
+    await FileSystem.moveAsync({ from: tempFile, to: indexFile });
   } catch (cause) {
     throw new Error('FALHA_AO_SUBSTITUIR_INDICE; BACKUP_PRESERVADO: ' + (cause instanceof Error ? cause.message : String(cause)));
   }
