@@ -105,20 +105,8 @@ async function writeRowsUnsafe(filePath: string, rows: CsvRow[]): Promise<void> 
   const directory = filePath.includes('/') ? filePath.substring(0, filePath.lastIndexOf('/')) : '.';
   await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
 
-  const info = await FileSystem.getInfoAsync(filePath);
+  const info = await FileSystem.getInfoAsync(filePath, { size: true });
   if (!info.exists) {
-    const headers = Object.keys(rows[0]);
-    const lines = rows.map((row) => serializeRow(row, headers));
-    const header = headers.join(',');
-    await FileSystem.writeAsStringAsync(filePath, `${header}\n${lines.join('\n')}\n`, {
-      encoding: FileSystem.EncodingType.UTF8,
-    });
-    return;
-  }
-
-  const current = await FileSystem.readAsStringAsync(filePath);
-  const records = parseCsvRecords(current);
-  if (records.length === 0) {
     const headers = Object.keys(rows[0]);
     const lines = rows.map((row) => serializeRow(row, headers));
     await FileSystem.writeAsStringAsync(filePath, `${headers.join(',')}\n${lines.join('\n')}\n`, {
@@ -127,26 +115,68 @@ async function writeRowsUnsafe(filePath: string, rows: CsvRow[]): Promise<void> 
     return;
   }
 
-  const oldHeaders = records[0];
+  // Existing logs are appended incrementally. Only the header and terminal byte
+  // are read on the hot path, not the full history. Full-file migration occurs
+  // only when a row introduces a new column.
+  const headerPreview = await FileSystem.readAsStringAsync(filePath, {
+    encoding: FileSystem.EncodingType.UTF8,
+    position: 0,
+    length: 8192,
+  });
+  const firstNewline = headerPreview.indexOf('\n');
+  if (firstNewline < 0 && (info.size ?? 0) > headerPreview.length) {
+    throw new Error('CSV_HEADER_EXCEEDS_READ_WINDOW: ' + filePath);
+  }
+  const headerLine = (firstNewline >= 0
+    ? headerPreview.slice(0, firstNewline)
+    : headerPreview).replace(/\r$/, '');
+  if (!headerLine.trim()) {
+    const headers = Object.keys(rows[0]);
+    const lines = rows.map((row) => serializeRow(row, headers));
+    await FileSystem.writeAsStringAsync(filePath, `${headers.join(',')}\n${lines.join('\n')}\n`, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
+    return;
+  }
+  const oldHeaders = headerLine.split(',');
   if (!oldHeaders.length || oldHeaders.some((header) => !header)) {
     throw new Error('CSV_HEADER_INVALIDO: ' + filePath);
   }
+
   const addedHeaders = Array.from(new Set(rows.flatMap((row) =>
     Object.keys(row).filter((key) => !oldHeaders.includes(key)),
   )));
-  const headers = [...oldHeaders, ...addedHeaders];
-  // Schema evolution is lossless: old rows receive blank values for new columns,
-  // and every current row is serialized against the same canonical header order.
-  const existingLines = records.slice(1).map((oldRow) =>
-    headers.map((_, index) => formatCsvValue(oldRow[index] ?? '')).join(','),
-  );
-  const newLines = rows.map((row) => serializeRow(row, headers));
-  const content = `${headers.join(',')}\n${[...existingLines, ...newLines].join('\n')}\n`;
-  await FileSystem.writeAsStringAsync(filePath, content, {
+  if (addedHeaders.length > 0) {
+    const current = await FileSystem.readAsStringAsync(filePath);
+    const records = parseCsvRecords(current);
+    if (!records.length || records[0].join(',') !== oldHeaders.join(',')) {
+      throw new Error('CSV_HEADER_CHANGED_DURING_SCHEMA_MIGRATION: ' + filePath);
+    }
+    const headers = [...oldHeaders, ...addedHeaders];
+    const existingLines = records.slice(1).map((oldRow) =>
+      headers.map((_, index) => formatCsvValue(oldRow[index] ?? '')).join(','),
+    );
+    const newLines = rows.map((row) => serializeRow(row, headers));
+    await FileSystem.writeAsStringAsync(filePath, `${headers.join(',')}\n${[...existingLines, ...newLines].join('\n')}\n`, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
+    return;
+  }
+
+  const lines = rows.map((row) => serializeRow(row, oldHeaders));
+  const lastCharacter = (info.size ?? 0) > 0
+    ? await FileSystem.readAsStringAsync(filePath, {
+        encoding: FileSystem.EncodingType.UTF8,
+        position: Math.max(0, (info.size ?? 1) - 1),
+        length: 1,
+      })
+    : '';
+  const separator = lastCharacter.endsWith('\n') ? '' : '\n';
+  await FileSystem.writeAsStringAsync(filePath, `${separator}${lines.join('\n')}\n`, {
     encoding: FileSystem.EncodingType.UTF8,
+    append: true,
   });
 }
-
 function scheduleBatchFlush(): void {
   if (flushTimer) return;
   flushTimer = setTimeout(() => {
