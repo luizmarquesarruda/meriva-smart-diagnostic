@@ -61,7 +61,7 @@ export async function discoverIntelligentPids(
     let result: ElmCommandResult;
     try {
       result = prevalidated ?? responseBuffer.get(pid) ?? await session.executeCommand(pid);
-      responseBuffer.record(result);
+      responseBuffer.record({ ...result, command: result.command || pid });
     } catch {
       return;
     }
@@ -112,7 +112,7 @@ export async function discoverIntelligentPids(
     let result: ElmCommandResult;
     try {
       result = await session.executeCommand(supportPid);
-      responseBuffer.record(result);
+      responseBuffer.record({ ...result, command: result.command || supportPid });
     } catch {
       break;
     }
@@ -180,7 +180,7 @@ export async function discoverIntelligentPids(
     let result: ElmCommandResult;
     try {
       result = await session.executeCommand(pid);
-      responseBuffer.record(result);
+      responseBuffer.record({ ...result, command: result.command || pid });
     } catch {
       continue;
     }
