@@ -192,6 +192,11 @@ As PRs abaixo continuam abertas e não fazem parte de `main` enquanto não forem
 - **DB-112** · 2026-10-24 — Validação estrita de bitmaps OBD e reconciliação dos IDs anti-regressão
 - **DB-113** · 2026-10-24 — Compatibilidade do parser com envelope K-Line compacto
 - **DB-114** · 2026-10-24 — Exibição do ajuste de combustível do segundo byte do PID 0114
+- **DB-115** · 2026-10-24 — Buffer limitado para respostas da descoberta de PIDs
+- **DB-116** · 2026-10-24 — Buffer RX limitado no transporte Bluetooth
+- **DB-117** · 2026-10-24 — Integridade de checksum K-Line e enquadramento de DTC
+- **DB-118** · 2026-10-24 — Persistência segura de viagens, CSV, cota e backups
+- **DB-119** · 2026-10-24 — Validação profunda do autosave, GPS e estimativas de combustível
 
 ---
 
@@ -3641,3 +3646,78 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - A fórmula e a apresentação têm testes determinísticos; isso não confirma que a ECU específica da Meriva suporte o PID 0114 nem que a leitura física da sonda esteja calibrada.
 - Teste com ELM327/ECU e inspeção visual do APK continuam pendentes.
 - Nenhuma PR foi mesclada nesta atualização.
+
+## DB-115 · 2026-10-24 — Buffer limitado para respostas da descoberta de PIDs
+
+### Problema e objetivo
+- A descoberta preservava observações mas não oferecia uma estrutura limitada reutilizável para inspecionar respostas brutas.
+- Cache global de respostas poderia misturar ECUs e sessões diferentes.
+
+### Implementação
+- Criado `src/obd/pidDiscoveryBuffer.ts`, um FIFO limitado (padrão 64, ajustável de 1 a 256), exclusivo da descoberta atual, com normalização de PIDs e cópias defensivas.
+- `src/obd/intelligentPidDiscovery.ts` registra respostas da sonda prioritária, bitmaps e PIDs individuais e devolve `responseBuffer` para auditoria.
+- Testes cobrem capacidade, FIFO, normalização e isolamento.
+
+### Limites
+- O buffer é volátil por execução; não substitui a validação de suporte na ECU atual nem é persistência histórica.
+
+## DB-116 · 2026-10-24 — Buffer RX limitado no transporte Bluetooth
+
+### Problema confirmado
+- O transporte acumulava chunks até o prompt `>` sem limite explícito; chunks muito grandes também podiam inchar os diagnósticos.
+
+### Correção
+- `src/obd/bluetoothClassicTransport.ts`: limite RX de 16 KiB; após overflow, descarta a resposta até o prompt e emite erro explícito em vez de aceitar dados truncados.
+- Diagnósticos guardam no máximo 256 caracteres de texto/hex por chunk, mantendo o tamanho original reportado.
+- Testes verificam rejeição do quadro excessivo, truncamento dos logs e recuperação para a próxima resposta.
+
+## DB-117 · 2026-10-24 — Integridade de checksum K-Line e enquadramento de DTC
+
+### Problema confirmado
+- A aceitação do envelope legado `48 6B 10` permitia byte terminal sem verificar que ele correspondia ao checksum aditivo.
+- O parser DTC anterior retirava caracteres não hexadecimais do conjunto da resposta e podia juntar linhas de ECUs distintas, sem validar adequadamente o enquadramento CAN.
+
+### Correção
+- `src/obd/parser.ts`: checksum K-Line aditivo de 8 bits validado no caminho compacto e espaçado.
+- `src/obd/dtcParser.ts`: linhas processadas separadamente; aceita resposta direta, quadro CAN de quadro único com comprimento declarado compatível e envelope K-Line reconhecido com checksum válido. Códigos repetidos são deduplicados.
+- `tests/pidParserIntegrity.test.js`, `tests/regression.test.js` e `tests/dtcScanner.test.js`: quadros com checksum incorreto ou comprimento CAN errado são rejeitados; respostas válidas em linhas separadas continuam reconhecidas.
+
+### Limites
+- As regras de quadro foram testadas com fixtures determinísticas. Capturas físicas K-Line/CAN ainda são necessárias para verificar todos os clones de adaptador e ECU da Meriva.
+
+## DB-118 · 2026-10-24 — Persistência segura de viagens, CSV, cota e backups
+
+### Problemas confirmados
+- Uma falha de leitura de `VIAGENS/index.json` podia fazer uma nova gravação começar em índice vazio, substituindo o histórico anterior.
+- Gravações concorrentes de viagens podiam disputar o mesmo índice; nomes diários baseados em UTC podiam colocar viagens no dia local errado.
+- CSVs existentes precisavam de ordem estável de colunas e a fila de telemetria não tinha limite explícito.
+- A verificação de cota tratava alguns erros de leitura como tamanho zero; a meta `cleanupTargetMb` não orientava efetivamente a limpeza. Backups não eram verificados nem rotacionados.
+
+### Correção
+- `src/storage/driveCycleStorage.ts`: fila serial por índice, arquivo temporário validado, cópia anterior válida, recuperação a partir do backup e erro explícito se o índice for inválido sem cópia recuperável. O CSV diário usa a data local do início da viagem.
+- `src/database/csvLogger.ts`: fila limitada a 10.000 linhas pendentes, status de fila, cabeçalho estável e migração sem perda de linhas ao adicionar colunas.
+- `src/storage/quotaManager.ts`: tamanhos desconhecidos geram erro explícito; limpeza até a meta remove somente os arquivos mais antigos de `LOGS` e `LEITURAS`, nunca viagens, configuração, aprendizado ou backups.
+- `app/armazenamento.tsx`: erro de verificação aparece na tela em vez de simular ocupação baixa.
+- `src/storage/backup.ts`: CSVs são descarregados antes da cópia; cada diretório é comparado por tamanho, um manifesto é validado e a retenção mantém os cinco backups mais recentes.
+- Testes cobrem gravações concorrentes, recuperação/preservação do índice, migração de cabeçalho CSV e manifesto de backup.
+
+### Limites
+- CSV continua baseado em leitura e regravação do arquivo para implementar migração de esquema; arquivos muito grandes podem exigir segmentação/append nativo futuro.
+- A fila tem teto explícito: se permanecer saturada, novas linhas são descartadas e o contador é incrementado; monitorar esse contador é importante para diagnósticos de longa duração.
+
+## DB-119 · 2026-10-24 — Validação profunda do autosave, GPS e estimativas de combustível
+
+### Problemas confirmados
+- A validação do autosave era superficial em subestruturas; coordenadas fora das faixas geográficas ou precisão GPS ausente podiam ser tratadas como evidência utilizável; estimativas de combustível precisavam rejeitar casos físicos/numericamente inválidos.
+- A fila serial do DTC retinha entradas concluídas por comparação entre promises diferentes.
+
+### Correção
+- `src/meriva/autosaveValidation.ts`: valida envelope, timestamps, leituras finitas, DTCs, viagens, autonomia, discovery e configurações; a hidratação retorna defaults seguros para objetos parciais. Schemas antigos só passam se houver uma migração registrada.
+- `src/gps/gpsTracker.ts`: rejeita latitude/longitude fora de faixa, precisão negativa/infinita e usa `NaN` para coordenadas inválidas na função Haversine; precisão ausente deixa de ser evidência de movimento confiável.
+- `src/obd/fuelConsumption.ts`: rejeita temperatura absoluta não física, parâmetros não finitos e resultados de taxa de combustível que transbordem para infinito.
+- `src/database/dtcManager.ts`: remove corretamente a referência de fila após o término da gravação.
+- Testes adicionados para envelopes parcialmente inválidos, GPS inválido/drift e estimativas MAF/MAP impossíveis.
+
+### Validação e limites
+- A CI do HEAD final precisa terminar verde em `validate` e `android-build`.
+- Teste em aparelho, captura real ELM327/ECU, verificação visual de telas e recuperação real de backup continuam fora da validação estática/automatizada.
