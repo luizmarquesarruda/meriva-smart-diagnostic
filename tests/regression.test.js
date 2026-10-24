@@ -504,6 +504,40 @@ async function testPidScanner() {
   assert.ok(supported60.includes('0179'));
   assert.ok(!supported60.includes('0180'));
 
+  // Bitmap payloads must be exactly four bytes. Accept common raw OBD, CAN
+  // (11/29-bit identifier), and legacy K-Line envelopes, but reject extra or
+  // split payload bytes and ambiguous multi-ECU responses.
+  assert.deepStrictEqual(
+    scanner.decodeSupportedPids('0100', '41 00 BE 3E B8 13 FF'),
+    [],
+    'bitmap with an extra payload byte must be rejected',
+  );
+  assert.deepStrictEqual(
+    scanner.decodeSupportedPids('0100', '41 00 BE 3E\\r\\nB8 13'),
+    [],
+    'bitmap bytes cannot be joined across response lines',
+  );
+  assert.deepStrictEqual(
+    scanner.decodeSupportedPids('0100', '7E8 06 41 00 BE 3E B8 13'),
+    supported,
+    'CAN header and DLC must not be confused with bitmap payload',
+  );
+  assert.deepStrictEqual(
+    scanner.decodeSupportedPids('0100', '18DAF110 06 41 00 BE 3E B8 13'),
+    supported,
+    '29-bit CAN responses must retain the same bitmap mapping',
+  );
+  assert.deepStrictEqual(
+    scanner.decodeSupportedPids('0100', '48 6B 10 41 00 BE 3E B8 13 82'),
+    supported,
+    'legacy K-Line checksum must be allowed only after an exact bitmap',
+  );
+  assert.deepStrictEqual(
+    scanner.decodeSupportedPids('0100', '41 00 BE 3E B8 13\\r\\n41 00 00 00 00 00'),
+    [],
+    'multiple ECU bitmaps must be rejected as ambiguous',
+  );
+
   const fakeSession = {
     async executeCommand(pid) {
       const responses = {
