@@ -513,7 +513,7 @@ async function testPidScanner() {
     'bitmap with an extra payload byte must be rejected',
   );
   assert.deepStrictEqual(
-    scanner.decodeSupportedPids('0100', '41 00 BE 3E\\r\\nB8 13'),
+    scanner.decodeSupportedPids('0100', '41 00 BE 3E\r\nB8 13'),
     [],
     'bitmap bytes cannot be joined across response lines',
   );
@@ -533,7 +533,7 @@ async function testPidScanner() {
     'legacy K-Line checksum must be allowed only after an exact bitmap',
   );
   assert.deepStrictEqual(
-    scanner.decodeSupportedPids('0100', '41 00 BE 3E B8 13\\r\\n41 00 00 00 00 00'),
+    scanner.decodeSupportedPids('0100', '41 00 BE 3E B8 13\r\n41 00 00 00 00 00'),
     [],
     'multiple ECU bitmaps must be rejected as ambiguous',
   );
