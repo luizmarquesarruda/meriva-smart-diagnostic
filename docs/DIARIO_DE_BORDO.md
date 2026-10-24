@@ -25,7 +25,7 @@
 - **#82:** navegação inferior no retrato e coluna lateral em paisagem; `screenFrameLandscape` reserva 56 dp à esquerda e o teste verifica essa regra. A CI está verde isoladamente.
 - **#83:** mantém a barra horizontal de seis ícones no rodapé também em paisagem, com estilo mais compacto. O arquivo não posiciona essa barra absolutamente à esquerda, portanto a acusação anterior de sobreposição não se sustenta; a diferença real é o padrão de navegação em paisagem.
 - **Prévia de layout:** `app/floot-layout.tsx` está sob o diretório de rotas do Expo Router e renderiza estado de demonstração estático. Confirmar se essa rota é intencional para o produto; se for apenas ferramenta de revisão, removê-la/movê-la para fora de `app/` antes da publicação.
-- **Modelo fixo:** o cabeçalho da #83 mostra literalmente `MERIVA MAXX 1.4`, apesar de o perfil do veículo ser configurável. Usar o perfil salvo ou um rótulo neutro.
+- **Origem do rótulo do veículo:** o cabeçalho da #83 mostra literalmente `MERIVA MAXX 1.4`. O serviço atual `ensureMerivaVehicleProfile()` também normaliza o perfil para Meriva Maxx/ano do manual; o rótulo coincide com o perfil padrão, mas duplica a fonte de verdade e diverge da promessa do README de perfis configuráveis. Definir se o app será específico da Meriva ou se o cabeçalho deve refletir um perfil variável.
 - **Catálogo de PIDs:** #82 aumenta a política do cockpit de 20 para 25 candidatos; #83 conserva testes e política de 20. Não combinar as branches sem reconciliar a lista, o limite e as expectativas dos testes.
 - **Arquivos compartilhados:** #82 e #83 têm propostas concorrentes para `app/index.tsx). A #83 compartilha 17 arquivos com #89, incluindo parser, serviço de viagem, catálogo, contratos e testes; revisar esses arquivos preservando o hardening da #89.
 - **Limites da CI:** as execuções verdes verificam os SHAs individuais. Não comprovam o resultado de um merge combinado, inspeção visual do APK ou comportamento real da ECU.
@@ -3793,7 +3793,21 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 
 ### Estado correto após retificação
 - O problema é a divergência de proposta: #82 usa coluna lateral em paisagem; #83 usa barra inferior horizontal. Escolher uma solução e verificar a legibilidade/área de toque no aparelho; não manter a acusação de sobreposição à #83.
-- Permanecem válidos os pontos sobre a rota de prévia estática dentro de `app/`, o texto literal `MERIVA MAXX 1.4`, o conflito de política 20/25 PIDs e os arquivos de OBD compartilhados com #89.
+- Permanecem válidos os pontos sobre a rota de prévia estática dentro de `app/`, a divergência README-versus-serviço sobre perfis de veículo, o conflito de política 20/25 PIDs e os arquivos de OBD compartilhados com #89.
 - As descrições das PRs #82, #83 e #89 e o comentário na conversa da #83 foram corrigidos para refletir essa distinção.
 - Esta entrada corrige a conclusão anterior sem apagar o histórico da auditoria. Nenhum merge foi feito. A nova edição documental exige CI para seu SHA; CI verde não substitui testes físicos e inspeção visual.
+
+
+
+## DB-124 · 2026-10-24 — Delimitação do risco de modelo fixo no layout
+
+### Verificação de fonte de verdade
+- O cabeçalho da PR #83 escreve literalmente `MERIVA MAXX 1.4`.
+- A leitura de `src/database/vehicleConfig.ts` mostra que `ensureMerivaVehicleProfile()` força atualmente `vehicleName/model = Meriva Maxx`, Chevrolet, ano do manual Meriva e motorização do manual, inclusive ao normalizar um perfil já existente. Assim, o texto do cabeçalho corresponde ao perfil padrão atual; não está comprovado que essa PR passe a exibir um modelo errado.
+- Contudo, o README descreve o perfil do veículo como configurável. Há, portanto, uma divergência preexistente entre a promessa documental e o serviço de perfil, além da duplicação do nome do veículo na UI.
+
+### Decisão recomendada
+- Não classificar o texto literal como falha funcional comprovada na PR #83. Tratar como decisão de produto/manutenção: ou o aplicativo fica explicitamente restrito à Meriva e a documentação reflete esse limite, ou o serviço de perfil e o cabeçalho passam a respeitar valores configuráveis.
+- Essa questão é independente da escolha visual entre a barra inferior da #83 e a coluna lateral da #82, do conflito 20/25 PIDs e da reconciliação de parser/persistência com a #89.
+- Nenhuma alteração de código foi feita nesta entrada. O commit documental cria novo SHA e deve passar pela CI correspondente.
 
