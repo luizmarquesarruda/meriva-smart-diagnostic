@@ -27,13 +27,13 @@ Perfil registrado: Chevrolet Meriva Maxx 1.4 8V ECONO.FLEX 2011/2012; KWP Fast I
 | `010E` | Timing Advance | 1 | `TIMING_DEG` | A × 0,5 − 64 | `°` | -64…63.5 | CANDIDATO; não confirmação |
 | `010F` | Intake Air Temperature | 1 | `TEMP_C` | A − 40 | `°C` | -40…215 | CANDIDATO; não confirmação |
 | `0110` | MAF | 2 | `MAF_GS` | (256 × A + B) / 100 | `g/s` | 0…655.35 | CANDIDATO; não confirmação |
-| `0111` | Throttle Position | 1 | `PERCENT_255` | A × 100 / 255 | `%` | 0…100 | CANDIDATO; não confirmação |
+| `0111` | Absolute Throttle Position | 1 | `PERCENT_255` | A × 100 / 255 | `%` | 0…100 | CANDIDATO; não confirmação |
 | `0114` | O2 Sensor 1 Voltage | 2 | `O2_VOLTS` | A / 200; B é STFT separado | `V` | 0…1.275 | CANDIDATO; não confirmação |
 | `012C` | Commanded EGR | 1 | `PERCENT_255` | A × 100 / 255 | `%` | 0…100 | Sem evidência RAW específica |
 | `012D` | EGR Error | 1 | `FUEL_TRIM` | (A − 128) × 100 / 128 | `%` | -100…99.21875 | Sem evidência RAW específica |
 | `012E` | Commanded Evaporative Purge | 1 | `PERCENT_255` | A × 100 / 255 | `%` | 0…100 | Sem evidência RAW específica |
 | `012F` | Fuel Level Input | 1 | `PERCENT_255` | A × 100 / 255 | `%` | 0…100 | CANDIDATO; não confirmação |
-| `0130` | Warmups Since DTC Clear | 1 | `U8` | A | `código` | 0…255 | Sem evidência RAW específica |
+| `0130` | Warmups Since DTC Clear | 1 | `U8` | A | `ciclos` | 0…255 | Sem evidência RAW específica |
 | `0131` | Distance Since DTC Clear | 2 | `DISTANCE_KM` | 256 × A + B | `km` | 0…65535 | Sem evidência RAW específica |
 | `0133` | Barometric Pressure | 1 | `U8` | A | `kPa` | 0…255 | Sem evidência RAW específica |
 | `0142` | ECU Voltage | 2 | `VOLTS_1000` | (256 × A + B) / 1000 | `V` | 0…65.535 | Sem evidência RAW específica |
@@ -43,7 +43,7 @@ Perfil registrado: Chevrolet Meriva Maxx 1.4 8V ECONO.FLEX 2011/2012; KWP Fast I
 | `0151` | Fuel Type | 1 | `U8` | A | `código` | 0…255 | Sem evidência RAW específica |
 | `0152` | Alcohol Fuel Percentage | 1 | `ETHANOL_PERCENT` | A × 100 / 255 | `%` | 0…100 | Sem evidência RAW específica |
 | `0159` | Fuel Rail Absolute Pressure | 2 | `U16_X10` | (256 × A + B) × 10 | `kPa` | 0…655350 | Sem evidência RAW específica |
-| `015A` | Accelerator Pedal Position | 1 | `PERCENT_255` | A × 100 / 255 | `%` | 0…100 | Sem evidência RAW específica |
+| `015A` | Relative Accelerator Pedal Position | 1 | `PERCENT_255` | A × 100 / 255 | `%` | 0…100 | Sem evidência RAW específica |
 | `015C` | Engine Oil Temperature | 1 | `TEMP_C` | A − 40 | `°C` | -40…210 | Sem evidência RAW específica |
 | `015D` | Fuel Injection Timing | 2 | `INJECTION_TIMING` | ((256 × A + B) − 26880) / 128 | `°` | -210…301.9921875 | Sem evidência RAW específica |
 | `015E` | Engine Fuel Rate | 2 | `FUEL_RATE_LH` | (256 × A + B) / 20 | `L/h` | 0…3276.75 | Sem evidência RAW específica |
@@ -54,6 +54,9 @@ Perfil registrado: Chevrolet Meriva Maxx 1.4 8V ECONO.FLEX 2011/2012; KWP Fast I
 
 - **0101:** valor principal = contagem DTC (`A6..A0`); `A7` é MIL. A interpretação decodifica readiness. Bytes C/D diferem entre ciclo Otto (SI) e ignição por compressão (CI/diesel).
 - **010A versus 010B:** 010A é pressão manométrica de combustível (`A×3 kPa`); 010B é MAP, pressão absoluta do coletor (`A kPa`).
+- **0111 versus 0145:** `0111` é a posição absoluta da borboleta; `0145` é a posição relativa. Não comparar os dois como se fossem o mesmo parâmetro.
+- **015A:** é posição relativa do pedal do acelerador, não uma posição absoluta.
+- **0130:** é contagem de ciclos de aquecimento desde a limpeza dos DTCs; a unidade é ciclos, não código enumerado.
 - **0114:** byte A gera tensão O₂ (`A/200 V`); byte B é STFT. `B=FF` significa que o trim não é usado.
 - **012F:** autonomia atual exige ECU/sessão ativa e leitura válida/recente. A presença no catálogo não prova suporte da ECU.
 - **0151:** enum de tipo de combustível; código não listado fica `VALOR NÃO INTERPRETADO`. `0152` é percentual de etanol, não o mesmo dado.
@@ -113,6 +116,8 @@ Rodar `npm run gate:baseline` e `npm run validate`. CI valida o código daquele 
 - [PID 0101 — MIL, contagem DTC e readiness](https://obd2pid.com/pids/01-01), revisado publicamente em 31/08/2026.
 - [PID 0114 — tensão O₂ e STFT](https://obd2pid.com/pids/01-14), revisado publicamente em 31/08/2026.
 - [Referência pública de fórmulas OBD-II](https://imatrixsys.com/tutorials/pages/OBD-01-fundamentals.html). SAE J1979 / ISO 15031-5 é a referência normativa; páginas abertas são cruzamento secundário.
+- [OBD Auto Doctor — parâmetros suportados](https://www.obdautodoctor.com/help/articles/supported-obd-parameters/): identifica `0111` como posição absoluta, `0145` como relativa e `015A` como posição relativa do pedal.
+- [Dashlogic — referência J1979](https://www.dashlogic.com/docs/technical/obdii_pids): o bit `C4` do PID `0101` é o monitor do refrigerante do ar-condicionado em ciclo Otto; não é filtro de partículas de gasolina.
 
 ## 7. Limitações
 
