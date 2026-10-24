@@ -16,6 +16,26 @@ export interface RealTripSample {
 export const MIN_TRIP_FUEL_L = 0.05;
 
 /**
+ * Live and persisted trip consumption must share the same evidence threshold.
+ * Tiny/early integrations are not a reliable km/L sample and must not inflate
+ * the live range estimate.
+ */
+export function getReliableTripConsumptionKml(
+  distanceKm: number,
+  fuelUsedL: number,
+  validFuelSamples: number,
+): number | null {
+  if (
+    !Number.isFinite(distanceKm) || distanceKm < 0.1 ||
+    !Number.isFinite(fuelUsedL) || fuelUsedL < MIN_TRIP_FUEL_L ||
+    !Number.isInteger(validFuelSamples) || validFuelSamples < 2
+  ) return null;
+
+  const consumptionKml = distanceKm / fuelUsedL;
+  return Number.isFinite(consumptionKml) && consumptionKml > 0 ? consumptionKml : null;
+}
+
+/**
  * Do not split a drive every time the vehicle stops briefly at a traffic light.
  * An explicit zero RPM is stronger evidence of engine-off than missing RPM data.
  */
@@ -163,8 +183,13 @@ export class RealTripRecorder {
     // never discard the trip or publish an unstable km/L value.
     if (state.distanceKm < 0.1) return null;
 
-    const fuelDataValid = state.fuelUsedL >= MIN_TRIP_FUEL_L && state.validFuelSamples >= 2;
-    const avgFuelConsumptionKml = fuelDataValid ? state.distanceKm / state.fuelUsedL : 0;
+    const reliableConsumptionKml = getReliableTripConsumptionKml(
+      state.distanceKm,
+      state.fuelUsedL,
+      state.validFuelSamples,
+    );
+    const fuelDataValid = reliableConsumptionKml !== null;
+    const avgFuelConsumptionKml = reliableConsumptionKml ?? 0;
     const avgDrivingSpeedKmh = state.movingTimeMs > 0
       ? state.distanceKm / (state.movingTimeMs / 3_600_000)
       : 0;
