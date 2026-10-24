@@ -8,7 +8,7 @@
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
 - `main` consultada em 2026-10-24: `701474de2cb3ed8a617a66d87fe3b5e368366acb`.
 - CI do `main` para esse SHA: [run 39985825746 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/39985825746).
-- PR [#80 — Corrige limites e validação de fórmulas OBD-II](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/80): **mesclada em 2026-10-23**, com merge commit `701474de2cb3ed8a617a66d87fe3b5e368366acb`, que corresponde à cabeça atual de `main). O registro no início deste arquivo que dizia “ainda sem merge” é um retrato anterior ao merge, não o estado atual.
+- PR [#80 — Corrige limites e validação de fórmulas OBD-II](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/80): **mesclada em 2026-10-23**, com merge commit `701474de2cb3ed8a617a66d87fe3b5e368366acb`, que corresponde à cabeça atual de `main`. O registro no início deste arquivo que dizia “ainda sem merge” é um retrato anterior ao merge, não o estado atual.
 
 ### Pull requests abertas consultadas
 As PRs abaixo continuam abertas e não fazem parte de `main` enquanto não forem mescladas. Os resultados de CI indicados são específicos aos respectivos SHAs de branch:
