@@ -38,7 +38,16 @@ function findResponsePayload(rawResponse: string, pid: string, byteCount: number
       const payloadStart = index + 2 + serviceOffsetBytes;
       const payload = tokens.slice(payloadStart, payloadStart + byteCount);
       const trailing = tokens.slice(payloadStart + byteCount);
-      if (payload.length !== byteCount || trailing.length !== 0) continue;
+      // Some legacy ISO/K-line ELM responses include a three-byte header and
+      // one checksum byte after the OBD payload (e.g. 48 6B 10 ... 82).
+      // Accept that known envelope only; arbitrary extra bytes on a bare PID
+      // response remain invalid.
+      const legacyKLineEnvelope = index === 3
+        && tokens[0] === '48'
+        && tokens[1] === '6B'
+        && tokens[2] === '10'
+        && trailing.length === 1;
+      if (payload.length !== byteCount || (trailing.length !== 0 && !legacyKLineEnvelope)) continue;
       if (!payload.every((token) => /^[0-9A-F]{2}$/.test(token))) continue;
       return payload.map((token) => Number.parseInt(token, 16));
     }
