@@ -1,8 +1,8 @@
 # Diário de Bordo - Meriva Smart Diagnostic
 
-## ESTADO VIGENTE — 2026-10-24 (revisão DB-122)
+## ESTADO VIGENTE — 2026-10-24 (revisão DB-123)
 
-> Estado conferido no GitHub em 24/10/2026. Este diário está na branch da PR #89; não altera `main`. CI verde em uma branch não comprova o resultado combinado de branches independentes, nem substitui teste físico.
+> Estado conferido no GitHub em 24/10/2026. Este diário está na branch da PR #89; não altera `main`. CI verde em branches separadas não comprova o merge combinado e não substitui testes físicos.
 
 ### `main` e última integração confirmada
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
@@ -12,22 +12,23 @@
 
 ### PRs abertas, HEADs e CI consultadas
 - [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81): draft, head `5ece9c7da470bb56ca7687826fc17df2c00cefab`; [run 40007637159 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40007637159).
-- [#82 — navegação responsiva](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/82): draft, head `d4bae6f794d78e59bb7c1323e11deb2978eefa92`; [run 40039535306 — `validate` e `android-build` passaram](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40039535306). Descrição atualizada para expor os conflitos de integração com #83/#89.
-- [#83 — layout Floot para Android](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83): aberta, head `85078c2aacd4ff7427b5ded7c1b1ce0e1f6803cf`; [run 40098343069 — `validate` e `android-build` passaram](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40098343069). A descrição foi atualizada com os bloqueios identificados na revisão.
+- [#82 — navegação responsiva](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/82): draft, head `d4bae6f794d78e59bb7c1323e11deb2978eefa92`; [run 40039535306 — `validate` e `android-build` passaram](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40039535306). Mantém navegação inferior em retrato e propõe uma coluna lateral à esquerda em paisagem, com 56 dp reservados no quadro.
+- [#83 — layout Floot para Android](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83): aberta, head `85078c2aacd4ff7427b5ded7c1b1ce0e1f6803cf`; [run 40098343069 — `validate` e `android-build` passaram](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40098343069). Mantém uma barra inferior horizontal compacta na paisagem; isso difere da coluna lateral da #82, não sendo uma sobreposição comprovada.
 - [#84 — inventário de 34 PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84): aberta, head `3c60528017d37744954d2430fca9737ee78a71bd`; [run 40089022363 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40089022363).
 - [#85 — reconciliação documental](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/85): aberta, head `969aa89276c0c9ce43489244779dd09069c8fbc8`; [run 40122820230 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40122820230).
 - [#86 — descoberta OBD e latência](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/86): aberta, head `9f12e54aa1b8f32f0e293cf775f9cbcc80544c04`; [run 40124875595 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40124875595).
 - [#87 — integridade do parser e autonomia](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/87): aberta, head `2997136881dc27bfbed37c12babc6c7ff5b4343e`; [run 40122815647 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40122815647).
-- [Issue #88 — migração gradual do Expo SDK 51](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/issues/88): aberta; manter separada do hardening de OBD e persistência.
-- [#89 — consolidação da auditoria e hardening](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/89): draft. O HEAD imediatamente anterior à presente revisão documental era `9a7b747c3210b8b4a7b7a1468dfd1b289717329b`; [run 40133491810 — `validate` e `android-build` passaram](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40133491810). DB-122 gera outro commit, que precisa ser validado pela CI no SHA resultante.
+- [Issue #88 — migração gradual do Expo SDK 51](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/issues/88): aberta; manter separada do hardening OBD e persistência.
+- [#89 — consolidação da auditoria e hardening](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/89): draft. HEAD imediatamente antes da atualização documental DB-122 era `9a7b747c3210b8b4a7b7a1468dfd1b289717329b`; [run 40133491810 — `validate` e `android-build` passaram](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40133491810). O commit DB-122 é `d873736c2cd5fb6000de02b58fd93483dd663c20`; para ele, `validate` passou e `android-build` estava em execução na última verificação ([run 40135072754](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40135072754)). DB-123 gera outro SHA documental e requer nova CI no resultado.
 
-### Conclusões da releitura das PRs de layout
-- **#82:** a branch inclui `screenFrameLandscape` com `paddingLeft:56`, testa esse espaço e expande a política do cockpit de 20 para 25 PIDs. A CI passou isoladamente; inspeção visual física e ELM327/ECU permanecem pendentes.
-- **#83:** a branch posiciona `bottomNavLandscape` de forma absoluta à esquerda, mas o `screenFrame` não reserva espaço equivalente. Falta a proteção de layout que existe na #82; a tela pode ficar sob a navegação em paisagem.
-- **Rota de demonstração:** `app/floot-layout.tsx` torna-se uma rota Expo Router e exibe estado estático de demonstração. Remover/mover a prévia para fora de `app/` ou transformá-la em uma tela intencional com estado real antes de publicar.
-- **Modelo fixo:** o cabeçalho da #83 exibe literalmente `MERIVA MAXX 1.4`, apesar do perfil do veículo ser configurável. Usar perfil salvo ou texto neutro.
-- **Conflitos de integração:** #82 e #83 compartilham `app/index.tsx` e têm destinos diferentes na navegação. A #83 ainda espera 20 PIDs nos testes, enquanto #82 usa 25. A #83 compartilha 17 arquivos com #89, incluindo parser, serviço de viagem, catálogo, contratos e testes; reconciliar arquivo a arquivo, preservando o hardening.
-- **CI não é teste físico:** os jobs verdes validam os respectivos SHAs isolados. Nenhuma CI confirma a combinação das PRs nem substitui inspeção visual do APK, leitura real de PIDs/DTCs, desconexão/reconexão ou comparação real de autonomia/consumo.
+### Conclusões atualizadas da releitura das PRs de layout
+- **#82:** navegação inferior no retrato e coluna lateral em paisagem; `screenFrameLandscape` reserva 56 dp à esquerda e o teste verifica essa regra. A CI está verde isoladamente.
+- **#83:** mantém a barra horizontal de seis ícones no rodapé também em paisagem, com estilo mais compacto. O arquivo não posiciona essa barra absolutamente à esquerda, portanto a acusação anterior de sobreposição não se sustenta; a diferença real é o padrão de navegação em paisagem.
+- **Prévia de layout:** `app/floot-layout.tsx` está sob o diretório de rotas do Expo Router e renderiza estado de demonstração estático. Confirmar se essa rota é intencional para o produto; se for apenas ferramenta de revisão, removê-la/movê-la para fora de `app/` antes da publicação.
+- **Modelo fixo:** o cabeçalho da #83 mostra literalmente `MERIVA MAXX 1.4`, apesar de o perfil do veículo ser configurável. Usar o perfil salvo ou um rótulo neutro.
+- **Catálogo de PIDs:** #82 aumenta a política do cockpit de 20 para 25 candidatos; #83 conserva testes e política de 20. Não combinar as branches sem reconciliar a lista, o limite e as expectativas dos testes.
+- **Arquivos compartilhados:** #82 e #83 têm propostas concorrentes para `app/index.tsx). A #83 compartilha 17 arquivos com #89, incluindo parser, serviço de viagem, catálogo, contratos e testes; revisar esses arquivos preservando o hardening da #89.
+- **Limites da CI:** as execuções verdes verificam os SHAs individuais. Não comprovam o resultado de um merge combinado, inspeção visual do APK ou comportamento real da ECU.
 
 
 ---
@@ -3780,4 +3781,19 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Não fazer merge automático nem integrar #82, #83 e #89 em sequência sem uma branch consolidada/rebase com revisão de diffs. A #83 mexe em lógica de parser, telemetria, viagem e catálogo além do layout; esses trechos precisam ser reconciliados com as correções mais recentes de #89.
 - A descrição das PRs #82/#83 foi atualizada com os resultados reais de CI e os riscos. A revisão do layout da #83 identificou os bloqueios acima; a PR deve ficar aberta para correções.
 - Permanecem pendentes inspeção visual em aparelho Android e teste físico com ELM327/ECU, incluindo confirmação dos PIDs, leitura de DTC, desconexão/reconexão e verificação da autonomia/consumo.
+
+
+
+## DB-123 · 2026-10-24 — Correção da atribuição de layout após releitura direta da PR #83
+
+### Retificação necessária
+- A anotação DB-122 atribuiu à PR #83 a navegação vertical absoluta à esquerda, sem reserva de espaço. A releitura direta de `app/index.tsx` no head `85078c2aacd4ff7427b5ded7c1b1ce0e1f6803cf` demonstrou que essa atribuição estava incorreta.
+- **PR #82:** possui `bottomNavLandscape` com `position:'absolute'`, `left:0`, largura de 50 dp e `screenFrameLandscape` com `paddingLeft:56`; o conteúdo reserva espaço para a coluna lateral.
+- **PR #83:** possui `bottomNavLandscape` apenas com ajustes compactos de margem/preenchimento; os seis ícones permanecem numa barra horizontal no rodapé em paisagem. Portanto, não foi comprovada sobreposição causada por navegação lateral nessa PR.
+
+### Estado correto após retificação
+- O problema é a divergência de proposta: #82 usa coluna lateral em paisagem; #83 usa barra inferior horizontal. Escolher uma solução e verificar a legibilidade/área de toque no aparelho; não manter a acusação de sobreposição à #83.
+- Permanecem válidos os pontos sobre a rota de prévia estática dentro de `app/`, o texto literal `MERIVA MAXX 1.4`, o conflito de política 20/25 PIDs e os arquivos de OBD compartilhados com #89.
+- As descrições das PRs #82, #83 e #89 e o comentário na conversa da #83 foram corrigidos para refletir essa distinção.
+- Esta entrada corrige a conclusão anterior sem apagar o histórico da auditoria. Nenhum merge foi feito. A nova edição documental exige CI para seu SHA; CI verde não substitui testes físicos e inspeção visual.
 
