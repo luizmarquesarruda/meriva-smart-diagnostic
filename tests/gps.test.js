@@ -144,6 +144,20 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
   watcher({ coords: { latitude: 0, longitude: 0.00175, speed: 10, accuracy: 5 }, timestamp: 29000 });
   assert.strictEqual(tracker.getState().distanceKm, distanceAfterObdMovement);
 
+  const distanceBeforeBadFix = tracker.getState().distanceKm;
+  const samplesBeforeBadCoordinate = tracker.getState().samples;
+  watcher({ coords: { latitude: 91, longitude: 0, speed: 50, accuracy: 1 }, timestamp: 30000 });
+  assert.strictEqual(tracker.getState().samples, samplesBeforeBadCoordinate,
+    'coordenadas fora da faixa geográfica devem ser descartadas por completo');
+  watcher({ coords: { latitude: 0, longitude: 0.0020, speed: 50 }, timestamp: 31000 });
+  watcher({ coords: { latitude: 0, longitude: 0.0025, speed: 50 }, timestamp: 32000 });
+  assert.strictEqual(tracker.getState().distanceKm, distanceBeforeBadFix,
+    'sem precisão GPS conhecida, o drift não deve alimentar distância');
+  assert.ok(Number.isNaN(haversineDistanceKm(
+    { latitude: 91, longitude: 0 },
+    { latitude: 0, longitude: 0 },
+  )), 'haversine deve recusar coordenadas fora da faixa válida');
+
   await tracker.stop();
   assert.strictEqual(tracker.getState().running, false);
   unsubscribe();
