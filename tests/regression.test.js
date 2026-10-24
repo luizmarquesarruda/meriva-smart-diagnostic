@@ -797,7 +797,23 @@ async function testQuota() {
     cleanupTargetMb: 0.4,
     autoCleanupEnabled: true,
   });
-  assert.strictEqual(status.critical, true);
+  assert.strictEqual(status.critical, false, 'limpeza segura deve remover o log descartável e voltar para abaixo do limite');
+  assert.match(status.message, /LIMPEZA/);
+  assert.strictEqual(files.has(`${BASE}/LOGS/a.csv`), false,
+    'cota deve limpar arquivos descartáveis antigos até a meta quando possível');
+
+  await fakeFS.writeAsStringAsync(`${BASE}/LOGS/b.csv`, 'x'.repeat(100));
+  const originalGetInfo = fakeFS.getInfoAsync;
+  fakeFS.getInfoAsync = async (target, ...args) => {
+    if (target === `${BASE}/LOGS/b.csv`) throw new Error('SIZE LOOKUP FAILURE');
+    return originalGetInfo.call(fakeFS, target, ...args);
+  };
+  try {
+    await assert.rejects(() => quota.getStorageUsage(BASE, 0.5), /SIZE LOOKUP FAILURE/,
+      'erro de inspeção de tamanho não pode ser convertido em ocupação zero');
+  } finally {
+    fakeFS.getInfoAsync = originalGetInfo;
+  }
   m.disposeAutoSave();
 }
 
