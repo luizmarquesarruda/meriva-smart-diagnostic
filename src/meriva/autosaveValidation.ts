@@ -43,6 +43,43 @@ function validateReadings(value: unknown): boolean {
   });
 }
 
+function validateDriveCycles(value: unknown): boolean {
+  return Array.isArray(value) && value.every((item) => {
+    if (!isRecord(item)) return false;
+    const validDate = (entry: unknown): boolean =>
+      typeof entry === 'string' && entry.trim().length > 0 && Number.isFinite(Date.parse(entry));
+    const nonNegativeFields = [
+      'distanceTotalKm', 'distanceIceKm', 'fuelUsedL',
+      'avgDrivingSpeedKmh', 'avgFuelConsumptionKml',
+    ];
+    return typeof item.id === 'string' && item.id.length > 0 &&
+      validDate(item.startedAt) && validDate(item.finishedAt) &&
+      nonNegativeFields.every((key) => isFiniteNonNegative(item[key])) &&
+      typeof item.totalTimeHms === 'string' &&
+      typeof item.drivingTimeHms === 'string' &&
+      typeof item.standingTimeHms === 'string' &&
+      (item.fuelDataValid === undefined || typeof item.fuelDataValid === 'boolean') &&
+      ['CARSCANNER_SEED', 'REAL_OBD', 'SIMULACAO'].includes(String(item.source)) &&
+      validDate(item.importedAt);
+  });
+}
+
+function validateDtcs(value: unknown): boolean {
+  return Array.isArray(value) && value.every((item) => {
+    if (!isRecord(item)) return false;
+    return typeof item.code === 'string' && item.code.length > 0 &&
+      typeof item.status === 'string' &&
+      typeof item.firstSeen === 'string' &&
+      typeof item.lastSeen === 'string' &&
+      Number.isInteger(item.occurrences) &&
+      typeof item.occurrences === 'number' && item.occurrences >= 0 &&
+      typeof item.source === 'string' &&
+      typeof item.historical === 'boolean' &&
+      (item.confirmed === undefined || typeof item.confirmed === 'boolean') &&
+      (item.freezeFrame === undefined || item.freezeFrame === null || isRecord(item.freezeFrame));
+  });
+}
+
 function validateAutonomy(value: unknown): boolean {
   if (!isRecord(value)) return false;
   const nonNegativeKeys = [
@@ -78,8 +115,8 @@ export function validatePayload(payload: MerivaPersistedState): boolean {
   if (!isRecord(payload.obd)) return false;
   if ('connected' in payload.obd && typeof payload.obd.connected !== 'boolean') return false;
   if (!validateReadings(payload.lastReadings)) return false;
-  if (payload.driveCycles.some((cycle) => !isRecord(cycle))) return false;
-  if (payload.dtcs.some((dtc) => !isRecord(dtc))) return false;
+  if (!validateDriveCycles(payload.driveCycles)) return false;
+  if (!validateDtcs(payload.dtcs)) return false;
 
   if ('learning' in payload && payload.learning !== null && !isRecord(payload.learning)) return false;
   if ('pidDiscovery' in payload && payload.pidDiscovery !== null) {
