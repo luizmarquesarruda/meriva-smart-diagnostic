@@ -2,6 +2,26 @@ import * as FileSystem from 'expo-file-system';
 import { appendCsvRow, CsvRow } from '../database/csvLogger';
 import { DriveCycle } from '../data/driveCycles';
 
+const indexWriteQueues = new Map<string, Promise<unknown>>();
+
+async function serializeIndexWrite<T>(indexFile: string, operation: () => Promise<T>): Promise<T> {
+  const previous = indexWriteQueues.get(indexFile) ?? Promise.resolve();
+  const current = previous.catch(() => undefined).then(operation);
+  indexWriteQueues.set(indexFile, current);
+  try {
+    return await current;
+  } finally {
+    if (indexWriteQueues.get(indexFile) === current) indexWriteQueues.delete(indexFile);
+  }
+}
+
+function localDateKey(date: Date): string {
+  return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
+}
+
+function indexBackupPath(indexFile: string): string { return indexFile.replace(/\.json$/, '.previous.json'); }
+function indexTempPath(indexFile: string): string { return indexFile.replace(/\.json$/, '.tmp'); }
+
 function isDriveCycle(value: unknown): value is DriveCycle {
   if (typeof value !== 'object' || value === null) return false;
   const cycle = value as Partial<DriveCycle>;
@@ -96,25 +116,29 @@ export async function initializeDriveCycles(basePath: string): Promise<void> {
   );
 }
 
-export async function readDriveCycles(basePath: string): Promise<DriveCycle[]> {
-  const indexFile = `${basePath}/VIAGENS/index.json`;
-
+async function readCyclesFromFile(filePath: string): Promise<DriveCycle[] | null> {
   try {
-    const info = await FileSystem.getInfoAsync(indexFile);
-    if (!info.exists || info.isDirectory) return [];
-
-    const content = await FileSystem.readAsStringAsync(indexFile);
-    const data = JSON.parse(content) as { cycles?: unknown };
+    const info = await FileSystem.getInfoAsync(filePath);
+    if (!info.exists || info.isDirectory) return null;
+    const data = JSON.parse(await FileSystem.readAsStringAsync(filePath)) as { cycles?: unknown };
+    if (!Array.isArray(data.cycles)) return null;
     return cyclesFromUnknown(data.cycles).filter((cycle) => cycle.source !== 'CARSCANNER_SEED');
   } catch {
-    return [];
+    return null;
   }
+}
+
+export async function readDriveCycles(basePath: string): Promise<DriveCycle[]> {
+  const indexFile = `${basePath}/VIAGENS/index.json`;
+  const main = await readCyclesFromFile(indexFile);
+  if (main) return main;
+  return (await readCyclesFromFile(indexBackupPath(indexFile))) ?? [];
 }
 
 export async function addDriveCycle(basePath: string, cycle: DriveCycle): Promise<void> {
   const viagensDir = `${basePath}/VIAGENS`;
   const indexFile = `${viagensDir}/index.json`;
-
+  return serializeIndexWrite(indexFile, async () => {
   await FileSystem.makeDirectoryAsync(viagensDir, { intermediates: true });
 
   let data: { version: string; cycles: DriveCycle[]; totalCount: number; lastModified?: string } = {
@@ -123,35 +147,73 @@ export async function addDriveCycle(basePath: string, cycle: DriveCycle): Promis
     totalCount: 0,
   };
 
-  try {
-    const info = await FileSystem.getInfoAsync(indexFile);
-    if (info.exists && !info.isDirectory) {
+  const info = await FileSystem.getInfoAsync(indexFile);
+  let mainIsValid = !info.exists;
+  if (info.exists && !info.isDirectory) {
+    try {
       const parsed = JSON.parse(await FileSystem.readAsStringAsync(indexFile)) as {
         version?: string;
         cycles?: unknown;
         totalCount?: number;
       };
+      if (!Array.isArray(parsed.cycles)) throw new Error('INDEX_CYCLES_NOT_ARRAY');
+      const validCycles = cyclesFromUnknown(parsed.cycles).filter((item) => item.source !== 'CARSCANNER_SEED');
+      if (parsed.cycles.length > 0 && validCycles.length === 0) throw new Error('INDEX_HAS_NO_VALID_CYCLES');
       data = {
         version: typeof parsed.version === 'string' ? parsed.version : '1.0',
-        cycles: cyclesFromUnknown(parsed.cycles).filter((item) => item.source !== 'CARSCANNER_SEED'),
-        totalCount: cyclesFromUnknown(parsed.cycles).filter((item) => item.source !== 'CARSCANNER_SEED').length,
+        cycles: validCycles,
+        totalCount: validCycles.length,
       };
+      mainIsValid = true;
+    } catch (mainError) {
+      const backupCycles = await readCyclesFromFile(indexBackupPath(indexFile));
+      if (backupCycles === null) {
+        throw new Error('HISTORICO_DE_VIAGENS_CORROMPIDO; ARQUIVO PRESERVADO PARA RECUPERACAO');
+      }
+      data = { version: '1.0', cycles: backupCycles, totalCount: backupCycles.length };
+      mainIsValid = false;
     }
-  } catch {
-    // arquivo ausente ou corrompido: começa um índice vazio seguro
+  } else if (info.exists && info.isDirectory) {
+    throw new Error('INDEX_DE_VIAGENS_E_DIRETORIO; NENHUMA GRAVACAO EXECUTADA');
   }
 
+  data.cycles = data.cycles.filter((item) => item.id !== cycle.id);
   data.cycles.push(cycle);
   data.totalCount = data.cycles.length;
   data.lastModified = new Date().toISOString();
 
-  await FileSystem.writeAsStringAsync(
-    indexFile,
-    JSON.stringify(data, null, 2),
-    { encoding: FileSystem.EncodingType.UTF8 },
-  );
+  const serializedIndex = JSON.stringify(data, null, 2);
+  const tempFile = indexTempPath(indexFile);
+  const previousFile = indexBackupPath(indexFile);
+  await FileSystem.writeAsStringAsync(tempFile, serializedIndex, { encoding: FileSystem.EncodingType.UTF8 });
+  const verified = JSON.parse(await FileSystem.readAsStringAsync(tempFile)) as { cycles?: unknown };
+  if (!Array.isArray(verified.cycles) || verified.cycles.length !== data.cycles.length ||
+      !verified.cycles.every(isDriveCycle)) {
+    await FileSystem.deleteAsync(tempFile, { idempotent: true });
+    throw new Error('VALIDACAO_DO_INDICE_TEMPORARIO_FALHOU; HISTORICO_NAO_SUBSTITUIDO');
+  }
 
-  const today = new Date().toISOString().split('T')[0];
+  // Preserve the last known-good index before replacement. Do not copy a
+  // corrupt main index over the backup when recovering from backup.
+  if (info.exists && mainIsValid) {
+    try { await FileSystem.deleteAsync(previousFile, { idempotent: true }); } catch { /* attempt safe copy below */ }
+    await FileSystem.copyAsync({ from: indexFile, to: previousFile });
+    const backup = await readCyclesFromFile(previousFile);
+    if (backup === null) {
+      await FileSystem.deleteAsync(tempFile, { idempotent: true });
+      throw new Error('BACKUP_PREVIO_DO_INDICE_NAO_VALIDADO; HISTORICO_NAO_SUBSTITUIDO');
+    }
+  }
+  try {
+    await FileSystem.copyAsync({ from: tempFile, to: indexFile });
+    await FileSystem.deleteAsync(tempFile, { idempotent: true });
+  } catch (cause) {
+    throw new Error('FALHA_AO_SUBSTITUIR_INDICE; BACKUP_PRESERVADO: ' + (cause instanceof Error ? cause.message : String(cause)));
+  }
+
+  const parsedStart = Date.parse(cycle.startedAt);
+  const csvDate = new Date(Number.isFinite(parsedStart) ? parsedStart : Date.now());
+  const today = localDateKey(csvDate);
   const csvFile = `${viagensDir}/viagens_${today}.csv`;
 
   const row: CsvRow = {
@@ -171,4 +233,5 @@ export async function addDriveCycle(basePath: string, cycle: DriveCycle): Promis
   };
 
   await appendCsvRow(csvFile, row);
+  });
 }
