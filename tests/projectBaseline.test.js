@@ -38,6 +38,8 @@ assert.match(read('README.md'), /MERIVA_OBD_SOURCE_AUDIT_2026-10-24\.md/);
 assert.match(historicalObdAudit, /MERIVA_OBD_SOURCE_AUDIT_2026-10-24\.md/);
 assert.match(projectContract, /\| RG-35 \|/);
 assert.match(merivaSourceAudit, /manual do propriet.rio Meriva 2011\/2012 \*\*n.o fornece uma tabela de PIDs OBD-II/i);
+assert.match(merivaSourceAudit, /Seção 6, p\. 6-3/);
+assert.match(merivaSourceAudit, /seção 13, p\. 13-6/);
 assert.match(merivaSourceAudit, /C4 em SI . “monitor de filtro de part.culas de gasolina dispon.vel”/);
 assert.doesNotMatch(merivaSourceAudit, /C4[^\n]{0,100}refrigerante do ar-condicionado/i);
 assert.match(pidParser, /FILTRO_PARTICULAS_GASOLINA/);
