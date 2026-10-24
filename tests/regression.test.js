@@ -573,6 +573,31 @@ async function testPidScanner() {
 }
 
 
+async function testPidDiscoveryBuffer() {
+  const { PidDiscoveryBuffer } = loadTs(path.join(ROOT, 'src/obd/pidDiscoveryBuffer.ts'));
+  const buffer = new PidDiscoveryBuffer(2);
+  const result = (command, response) => ({
+    command, response, elapsedMs: 12, status: 'OK', attempt: 1,
+  });
+
+  buffer.record(result('01 0C', '41 0C 1A F8'));
+  assert.strictEqual(buffer.has('010C'), true, 'PID deve ser normalizado para consulta no buffer');
+  assert.strictEqual(buffer.get('010C').response, '41 0C 1A F8');
+  buffer.record(result('0105', '41 05 69'));
+  buffer.record(result('010D', '41 0D 28'));
+  assert.strictEqual(buffer.size, 2, 'buffer deve respeitar limite de capacidade');
+  assert.strictEqual(buffer.has('010C'), false, 'FIFO deve descartar a entrada mais antiga');
+  assert.deepStrictEqual(buffer.snapshot().map((item) => item.command), ['0105', '010D']);
+  assert.throws(() => buffer.record(result('ATZ', 'OK')), /FORA DO BUFFER/,
+    'comandos AT não devem contaminar o buffer de PIDs');
+  const secondSession = new PidDiscoveryBuffer(2);
+  assert.strictEqual(secondSession.has('010D'), false,
+    'respostas não podem ser reaproveitadas por outra sessão/ECU');
+  buffer.clear();
+  assert.strictEqual(buffer.size, 0);
+  console.log('PID discovery response buffer: OK');
+}
+
 async function testIntelligentPidDiscovery() {
   const ai = loadTs(path.join(ROOT, 'src/obd/intelligentPidDiscovery.ts'));
   const commands = [];
@@ -1304,6 +1329,7 @@ async function main() {
     ['bloqueio de troca silenciosa de adaptador', testActiveAdapterCannotBeSilentlySwitched],
     ['seleção estrita + gate ECU', testConnectionSelectionAndStrictEcuGate],
     ['gate de validação ECU/010C', testEcuValidationGate],
+    ['buffer de respostas da descoberta de PIDs', testPidDiscoveryBuffer],
     ['descoberta de PIDs', testPidScanner],
     ['IA burrinha de PIDs', testIntelligentPidDiscovery],
     ['CarScanner baseline + PID 012F', testCarScannerBaselineAndFuel012F],
