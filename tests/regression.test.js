@@ -907,7 +907,11 @@ async function testDriveCycleValidation() {
   assert.ok(migratedIndex.cycles.every((item) => item.source !== 'CARSCANNER_SEED'), 'adding a real trip must remove legacy seeds from active index');
 
   files.set(indexFile, JSON.stringify({ cycles: 'corrompido' }));
-  assert.deepStrictEqual(await storage.readDriveCycles(BASE), []);
+  assert.deepStrictEqual(
+    (await storage.readDriveCycles(BASE)).map((item) => item.id),
+    ['test-1'],
+    'índice corrompido deve recuperar a última cópia válida em vez de ocultar o histórico',
+  );
 
   resetFS();
   await storage.initializeDriveCycles(BASE);
@@ -918,6 +922,29 @@ async function testDriveCycleValidation() {
     false,
     'seed rows must not be written to the operational trip CSV',
   );
+
+  await Promise.all([
+    storage.addDriveCycle(BASE, { ...cycle, id: 'parallel-1' }),
+    storage.addDriveCycle(BASE, { ...cycle, id: 'parallel-2' }),
+  ]);
+  assert.deepStrictEqual(
+    (await storage.readDriveCycles(BASE)).map((item) => item.id).sort(),
+    ['parallel-1', 'parallel-2'],
+    'gravações concorrentes de viagens não podem sobrescrever a atualização umas das outras',
+  );
+
+  resetFS();
+  const damagedIndex = BASE + '/VIAGENS/index.json';
+  await fakeFS.makeDirectoryAsync(BASE + '/VIAGENS', { intermediates: true });
+  const damagedContent = JSON.stringify({ cycles: 'corrompido' });
+  files.set(damagedIndex, damagedContent);
+  await assert.rejects(
+    () => storage.addDriveCycle(BASE, { ...cycle, id: 'must-not-overwrite-damaged-index' }),
+    /HISTORICO_DE_VIAGENS_CORROMPIDO/,
+    'índice corrompido sem backup deve impedir gravação destrutiva',
+  );
+  assert.strictEqual(files.get(damagedIndex), damagedContent,
+    'índice inválido deve ser preservado para recuperação manual');
 }
 
 async function testDriveCycleSummaryUsesWeightedRealSpeed() {
