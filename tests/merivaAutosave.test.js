@@ -96,14 +96,21 @@ function createMemoryFS() {
         dirs.add(acc);
       }
     },
-    async readAsStringAsync(p) {
+    async readAsStringAsync(p, options = {}) {
       if (!files.has(p)) throw new Error('ARQUIVO NAO EXISTE: ' + p);
-      return files.get(p);
+      const content = files.get(p);
+      if (Number.isInteger(options.position) && Number.isInteger(options.length)) {
+        return Buffer.from(content, 'utf8')
+          .subarray(options.position, options.position + options.length)
+          .toString('utf8');
+      }
+      return content;
     },
-    async writeAsStringAsync(p, content) {
+    async writeAsStringAsync(p, content, options = {}) {
       const parent = parentDir(p);
       if (parent && !dirs.has(parent)) await fakeFS.makeDirectoryAsync(parent);
-      files.set(p, String(content));
+      const next = String(content);
+      files.set(p, options.append ? (files.get(p) ?? '') + next : next);
     },
     async copyAsync(options) {
       const { from, to } = options;
