@@ -17,18 +17,18 @@ Branch: `feat/port-floot-layout-20261024`
 ## Melhorias integradas à branch
 
 - Cockpit Android atualizado para a marca visual `MERIVA SMART`.
-- Barra inferior operacional expandida de cinco para seis destinos, incluindo Conexões Bluetooth/ECU.
-- Ícones inferiores ampliados de 22 para 28 dp, mantendo a navegação sem legendas visíveis.
-- Distribuição horizontal uniforme e área de toque existente preservada.
-- Rótulos e dicas de acessibilidade mantidos para leitores de tela.
-- Teste de navegação atualizado para exigir os seis destinos e ícones ampliados.
+- Barra inferior operacional expandida de cinco para seis destinos: Painel, Conexões, Diagnóstico, Viagem, Laboratório e Configurações.
+- Ícones ampliados de 22 para 32 dp, distribuídos uniformemente e sem legendas visíveis.
+- Mantidos nomes/dicas de acessibilidade e alvos de toque de pelo menos 60 dp.
+- Dados/Telemetria e Mais Recursos continuam acessíveis em telas secundárias, sem exclusão de funcionalidades.
+- Teste de navegação atualizado para exigir destinos, rotas, ícones ampliados e ausência de legendas visíveis.
 - Prévia visual nativa `app/floot-layout.tsx` mantida como referência independente; não substitui os serviços reais do cockpit.
 - Dados continuam dependendo de leituras reais; nenhum estado visual simula uma conexão OBD confirmada.
 
 ## Achados da auditoria
 
 1. **Risco de regressão se a tela fosse substituída integralmente:** o cockpit Android contém conexão ELM327, atualização de telemetria, validação de frescor das leituras, autonomia, temperatura, DTC e histórico. A integração foi feita de modo incremental para preservar esses fluxos.
-2. **Diferença de navegação:** a tela web do Floot já tinha seis botões acessíveis; a tela nativa tinha cinco. Corrigido na branch.
+2. **Diferença de navegação:** a tela web do Floot já tinha seis botões acessíveis; a tela nativa tinha cinco e mantinha Dados/Mais como atalhos principais. Corrigido na branch com mapeamento direto às telas funcionais equivalentes e acesso secundário preservado para Dados/Mais.
 3. **Risco de estado falso:** o protótipo web declara explicitamente que a conexão é demonstrativa. Essa regra foi preservada; a tela Android segue ligada aos serviços reais.
 4. **Fórmulas OBD:** fórmulas e limites verificados no protótipo incluem trim de combustível, erro EGR e timing de injeção. Os testes de borda existentes passaram; a integração não alterou fórmulas nem dados.
 5. **Limitação de validação visual:** a captura automática do Floot não foi concluída porque não havia janela de preview aberta. É necessária revisão visual no preview e em Android físico antes de mesclar.

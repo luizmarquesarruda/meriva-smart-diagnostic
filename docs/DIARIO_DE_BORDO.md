@@ -3438,3 +3438,17 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - **Protocolo e permissões:** recuperação ELM (ATZ/ATSP/prova ECU/ATDP) é serializada; GPS segue opcional para iniciar OBD; o plugin limita permissões Bluetooth legadas no Android até API 30 sem limitar as permissões modernas.
 - **Proteções:** testes adversariais de promessa pendente, falha de fechamento, bloqueio entre instâncias e ordem de protocolo ficam ligados a `npm test` e ao gate anti-regressão. Os requisitos Bluetooth recebem IDs RG-22 a RG-31, sem duplicar RGs existentes.
 - **Validação:** conferir `gate:baseline`, `validate` e `android-build` no SHA final desta atualização. A CI não substitui teste físico com ELM327/ECU; esse teste e a inspeção no aparelho permanecem pendentes.
+
+### DB-109 — 2026-10-24 — Ajuste de navegação Floot → cockpit Android
+
+#### Alterações
+- Alinhada a barra inferior operacional com as seis seções do layout Floot: Painel, Conexões, Diagnóstico, Viagem, Laboratório e Configurações.
+- Aumentados os ícones de navegação para 32 dp, com distribuição uniforme, sem legendas visíveis e nomes/dicas de acessibilidade preservados.
+- Corrigidos os destinos: Diagnóstico abre a central de saúde/DTCs, Laboratório abre as ferramentas técnicas de OBD e Configurações abre as preferências reais.
+- Dados/Telemetria continua acessível em Mais Recursos; Mais Recursos continua acessível por Configurações para evitar perda de telas existentes.
+- Atualizados testes de navegação, contrato antirregressão, plano de testes, README, changelog e documentação de portabilidade Floot.
+
+#### Integridade e validação
+- Não foram alterados transporte Bluetooth Classic, sessão/serialização ELM327, validação de resposta real da ECU, telemetria, fórmulas PID, consumo, autonomia ou histórico.
+- Alterações versionadas na branch `feat/port-floot-layout-20261024`, PR #83; nenhuma alteração direta à `main` e nenhum merge executado.
+- TypeScript/testes da Floot e CI do GitHub precisam ser reexecutados para o novo SHA; inspeção visual em Android físico e teste ELM327/ECU real continuam pendentes. A aprovação de CI não substitui a validação física.

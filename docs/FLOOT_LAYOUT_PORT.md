@@ -14,7 +14,8 @@ Foi criada a rota de pré-visualização nativa `app/floot-layout.tsx` para tran
 - Cartão principal de dados OBD em tempo real.
 - Três indicadores compactos: média histórica, autonomia e falhas ativas.
 - Cartão de temperatura do líquido de arrefecimento.
-- Barra inferior fixa com seis ícones sem legendas visíveis, maiores e distribuídos uniformemente.
+- Barra inferior com seis ícones de 32 dp, sem legendas visíveis, nomes acessíveis e distribuição uniforme: Painel, Conexões, Diagnóstico, Viagem, Laboratório e Configurações.
+- Destinos de Dados/Telemetria e Mais Recursos preservados por navegação secundária.
 - Cores, contornos azulados, fundos escuros, cantos arredondados e hierarquia tipográfica inspirados no layout Floot.
 
 ## Integridade dos dados
