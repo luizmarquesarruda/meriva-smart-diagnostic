@@ -1018,6 +1018,23 @@ async function testDtcStorage() {
   writeDelayMs = 0;
   const concurrentDtcs = await dtcManager.readDtcs(BASE);
   assert.strictEqual(concurrentDtcs.length, 3, 'gravações concorrentes de DTC não podem perder registros');
+
+  await dtcManager.recordDtc(BASE, { code: 'P0420', status: 'CONFIRMED', firstSeen: '2026-10-02T20:02:00.000Z', lastSeen: '2026-10-02T20:02:00.000Z', occurrences: 2, source: 'REAL_OBD', historical: true, confirmed: true });
+  assert.equal((await dtcManager.getCurrentDtcs(BASE)).some((item) => item.code === 'P0420'), false, 'historical=true deve prevalecer sobre status CONFIRMED inconsistente');
+  assert.equal(dtcManager.nextDtcOccurrences({ status: 'CONFIRMED', historical: true, occurrences: 2 }), 3, 'leitura posterior ao registro histórico deve contar nova ocorrência');
+
+  const toReconcile = [
+    { code: 'P0130', status: 'CURRENT', source: 'REAL_OBD', historical: false, firstSeen: 't1', lastSeen: 't1', occurrences: 1 },
+    { code: 'P0135', status: 'CONFIRMED', source: 'REAL_OBD', historical: false, firstSeen: 't1', lastSeen: 't1', occurrences: 1 },
+    { code: 'P0420', status: 'PERMANENT', source: 'REAL_OBD', historical: false, firstSeen: 't1', lastSeen: 't1', occurrences: 1 },
+    { code: 'P0301', status: 'CONFIRMED', source: 'REAL_OBD', historical: true, firstSeen: 't1', lastSeen: 't1', occurrences: 1 },
+    { code: 'P0171', status: 'CONFIRMED', source: 'CARSCANNER_BASELINE', historical: false, firstSeen: 't1', lastSeen: 't1', occurrences: 1 },
+  ];
+  const now = '2026-10-24T10:00:00.000Z';
+  const inactive = dtcManager.markMissingStoredDtcsInactive(toReconcile, [], now);
+  assert.deepStrictEqual(inactive.map((item) => item.code), ['P0130', 'P0135']);
+  assert.ok(inactive.every((item) => item.status === 'INACTIVE' && item.historical === true && item.lastSeen === now));
+  assert.deepStrictEqual(dtcManager.markMissingStoredDtcsInactive(toReconcile, ['P0130'], now).map((item) => item.code), ['P0135']);
 }
 
 async function testBackupCompleteness() {
