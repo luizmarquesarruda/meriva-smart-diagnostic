@@ -60,64 +60,125 @@ function cyclesFromUnknown(value: unknown): DriveCycle[] {
   return value.filter(isDriveCycle);
 }
 
+type DriveCycleIndex = {
+  version: string;
+  cycles: DriveCycle[];
+  totalCount: number;
+  initializedAt?: string;
+  lastModified?: string;
+  [key: string]: unknown;
+};
+
+async function persistIndexSnapshot(indexFile: string, data: DriveCycleIndex): Promise<void> {
+  const tempFile = indexTempPath(indexFile);
+  await FileSystem.writeAsStringAsync(tempFile, JSON.stringify(data, null, 2), {
+    encoding: FileSystem.EncodingType.UTF8,
+  });
+  try {
+    const verified = JSON.parse(await FileSystem.readAsStringAsync(tempFile)) as { cycles?: unknown };
+    if (!Array.isArray(verified.cycles) || verified.cycles.length !== data.cycles.length ||
+        !verified.cycles.every(isDriveCycle)) {
+      throw new Error('VALIDACAO_DO_INDICE_TEMPORARIO_FALHOU');
+    }
+  } catch (cause) {
+    await FileSystem.deleteAsync(tempFile, { idempotent: true });
+    throw cause;
+  }
+
+  try {
+    const main = await FileSystem.getInfoAsync(indexFile);
+    if (main.exists) await FileSystem.deleteAsync(indexFile, { idempotent: true });
+    await FileSystem.moveAsync({ from: tempFile, to: indexFile });
+  } catch (cause) {
+    throw new Error('FALHA_AO_SUBSTITUIR_INDICE; BACKUP_PRESERVADO: ' +
+      (cause instanceof Error ? cause.message : String(cause)));
+  }
+}
+
 export async function initializeDriveCycles(basePath: string): Promise<void> {
   const viagensDir = `${basePath}/VIAGENS`;
   const indexFile = `${viagensDir}/index.json`;
 
-  await FileSystem.makeDirectoryAsync(viagensDir, { intermediates: true });
-  const indexInfo = await FileSystem.getInfoAsync(indexFile);
-  if (indexInfo.exists) {
-    // Upgrade old installations in place, retaining real/simulated records and
-    // removing only the explicitly imported CarScanner reference trips.
-    if (!indexInfo.isDirectory) {
-      try {
-        const parsed = JSON.parse(await FileSystem.readAsStringAsync(indexFile)) as {
-          version?: string;
-          initializedAt?: string;
-          cycles?: unknown;
-          totalCount?: number;
-          [key: string]: unknown;
-        };
-        const originalCycles = Array.isArray(parsed.cycles) ? parsed.cycles : [];
-        const hasSeed = originalCycles.some(
-          (cycle) => typeof cycle === 'object' && cycle !== null &&
-            (cycle as { source?: unknown }).source === 'CARSCANNER_SEED',
-        );
-        if (hasSeed) {
-          const cycles = cyclesFromUnknown(parsed.cycles).filter(
-            (cycle) => cycle.source !== 'CARSCANNER_SEED',
+  return serializeIndexWrite(indexFile, async () => {
+    await FileSystem.makeDirectoryAsync(viagensDir, { intermediates: true });
+    const indexInfo = await FileSystem.getInfoAsync(indexFile);
+    if (indexInfo.exists) {
+      // Upgrade old installations in place, retaining real/simulated records and
+      // removing only explicitly imported CarScanner reference trips.
+      if (!indexInfo.isDirectory) {
+        try {
+          const parsed = JSON.parse(await FileSystem.readAsStringAsync(indexFile)) as {
+            version?: string;
+            initializedAt?: string;
+            cycles?: unknown;
+            totalCount?: number;
+            [key: string]: unknown;
+          };
+          const originalCycles = Array.isArray(parsed.cycles) ? parsed.cycles : [];
+          const hasSeed = originalCycles.some(
+            (cycle) => typeof cycle === 'object' && cycle !== null &&
+              (cycle as { source?: unknown }).source === 'CARSCANNER_SEED',
           );
-          await FileSystem.writeAsStringAsync(
-            indexFile,
-            JSON.stringify({
+          if (hasSeed) {
+            const invalidNonSeeds = originalCycles.some((cycle) =>
+              !(typeof cycle === 'object' && cycle !== null &&
+                (cycle as { source?: unknown }).source === 'CARSCANNER_SEED') &&
+              !isDriveCycle(cycle),
+            );
+            if (invalidNonSeeds) throw new Error('INDEX_HAS_INVALID_CYCLES_DURING_MIGRATION');
+            const cycles = cyclesFromUnknown(originalCycles).filter(
+              (cycle) => cycle.source !== 'CARSCANNER_SEED',
+            );
+            const previousFile = indexBackupPath(indexFile);
+            await FileSystem.deleteAsync(previousFile, { idempotent: true });
+            await FileSystem.copyAsync({ from: indexFile, to: previousFile });
+            if (await readCyclesFromFile(previousFile) === null) {
+              throw new Error('BACKUP_PREVIO_DO_INDICE_NAO_VALIDADO');
+            }
+            await persistIndexSnapshot(indexFile, {
               ...parsed,
+              version: typeof parsed.version === 'string' ? parsed.version : '1.0',
               cycles,
               totalCount: cycles.length,
               lastModified: new Date().toISOString(),
-            }, null, 2),
-            { encoding: FileSystem.EncodingType.UTF8 },
-          );
+            });
+          }
+        } catch (cause) {
+          // Never overwrite an index that could not be read or validated.
+          console.warn('[trips] índice existente não foi migrado:', cause instanceof Error ? cause.message : cause);
         }
-      } catch {
-        // Do not overwrite an index whose contents cannot be read safely.
       }
+      return;
     }
-    return;
-  }
 
-  // New installations start with no trips. CarScanner seed data remains
-  // available only as a separately identified learning/reference baseline.
-  const emptyData = {
-    version: '1.0',
-    initializedAt: new Date().toISOString(),
-    cycles: [] as DriveCycle[],
-    totalCount: 0,
-  };
-  await FileSystem.writeAsStringAsync(
-    indexFile,
-    JSON.stringify(emptyData, null, 2),
-    { encoding: FileSystem.EncodingType.UTF8 },
-  );
+    // If the main index disappeared during a previous replacement, recover the
+    // validated previous snapshot before considering an empty installation.
+    const previousFile = indexBackupPath(indexFile);
+    const previousInfo = await FileSystem.getInfoAsync(previousFile);
+    if (previousInfo.exists) {
+      const backupCycles = await readCyclesFromFile(previousFile);
+      if (backupCycles === null) {
+        throw new Error('BACKUP_DO_HISTORICO_CORROMPIDO; HISTORICO_NAO_SUBSTITUIDO');
+      }
+      await persistIndexSnapshot(indexFile, {
+        version: '1.0',
+        initializedAt: new Date().toISOString(),
+        cycles: backupCycles,
+        totalCount: backupCycles.length,
+      });
+      return;
+    }
+
+    // New installations start with no trips. CarScanner seed data remains
+    // available only as a separately identified learning/reference baseline.
+    const emptyData = {
+      version: '1.0',
+      initializedAt: new Date().toISOString(),
+      cycles: [] as DriveCycle[],
+      totalCount: 0,
+    };
+    await persistIndexSnapshot(indexFile, emptyData);
+  });
 }
 
 async function readCyclesFromFile(filePath: string): Promise<DriveCycle[] | null> {
@@ -215,39 +276,18 @@ export async function addDriveCycle(basePath: string, cycle: DriveCycle): Promis
   data.totalCount = data.cycles.length;
   data.lastModified = new Date().toISOString();
 
-  const serializedIndex = JSON.stringify(data, null, 2);
-  const tempFile = indexTempPath(indexFile);
-  const previousFile = indexBackupPath(indexFile);
-  await FileSystem.writeAsStringAsync(tempFile, serializedIndex, { encoding: FileSystem.EncodingType.UTF8 });
-  const verified = JSON.parse(await FileSystem.readAsStringAsync(tempFile)) as { cycles?: unknown };
-  if (!Array.isArray(verified.cycles) || verified.cycles.length !== data.cycles.length ||
-      !verified.cycles.every(isDriveCycle)) {
-    await FileSystem.deleteAsync(tempFile, { idempotent: true });
-    throw new Error('VALIDACAO_DO_INDICE_TEMPORARIO_FALHOU; HISTORICO_NAO_SUBSTITUIDO');
-  }
-
   // Preserve the last known-good index before replacement. Do not copy a
   // corrupt main index over the backup when recovering from backup.
+  const previousFile = indexBackupPath(indexFile);
   if (info.exists && mainIsValid) {
-    try { await FileSystem.deleteAsync(previousFile, { idempotent: true }); } catch { /* attempt safe copy below */ }
+    await FileSystem.deleteAsync(previousFile, { idempotent: true });
     await FileSystem.copyAsync({ from: indexFile, to: previousFile });
     const backup = await readCyclesFromFile(previousFile);
     if (backup === null) {
-      await FileSystem.deleteAsync(tempFile, { idempotent: true });
       throw new Error('BACKUP_PREVIO_DO_INDICE_NAO_VALIDADO; HISTORICO_NAO_SUBSTITUIDO');
     }
   }
-  try {
-    // expo-file-system's copy may reject an existing destination. The previous
-    // validated snapshot is already secured, so remove the main path and move
-    // the verified temporary file into place. If move fails, recovery can use
-    // the backup rather than an unvalidated or partially written main file.
-    const mainNow = await FileSystem.getInfoAsync(indexFile);
-    if (mainNow.exists) await FileSystem.deleteAsync(indexFile, { idempotent: true });
-    await FileSystem.moveAsync({ from: tempFile, to: indexFile });
-  } catch (cause) {
-    throw new Error('FALHA_AO_SUBSTITUIR_INDICE; BACKUP_PRESERVADO: ' + (cause instanceof Error ? cause.message : String(cause)));
-  }
+  await persistIndexSnapshot(indexFile, data);
 
   const parsedStart = Date.parse(cycle.startedAt);
   const csvDate = new Date(Number.isFinite(parsedStart) ? parsedStart : Date.now());
