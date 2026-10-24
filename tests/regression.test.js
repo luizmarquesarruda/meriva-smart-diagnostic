@@ -1145,10 +1145,10 @@ async function testCsvWriteSerialization() {
     'colunas devem seguir o cabeçalho mesmo quando as chaves chegam em outra ordem');
   await logger.appendCsvRow(target, { id: 'D', timestamp: 't4', unexpected: 'x' });
   const migrated = files.get(target);
-  assert.ok(migrated.startsWith('id,timestamp,unexpected\\n'),
+  assert.ok(migrated.startsWith('id,timestamp,unexpected\n'),
     'coluna nova deve ser incluída no cabeçalho mediante migração explícita');
-  assert.ok(migrated.includes('A,t1,\\n') && migrated.includes('B,t2,\\n') &&
-    migrated.includes('C,t3,\\n') && migrated.includes('D,t4,x\\n'),
+  assert.ok(migrated.includes('A,t1,\n') && migrated.includes('B,t2,\n') &&
+    migrated.includes('C,t3,\n') && migrated.includes('D,t4,x\n'),
     'migração de esquema deve preservar linhas antigas e alinhar as novas');
 }
 
