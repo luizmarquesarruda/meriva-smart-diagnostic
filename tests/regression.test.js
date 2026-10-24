@@ -551,6 +551,25 @@ async function testPidScanner() {
   };
   const discovered = await scanner.discoverSupportedPids(fakeSession);
   assert.deepStrictEqual(discovered.map((item) => item.pid), ['0100', '0120', '0140', '0160']);
+
+  const mismatchedPid = await scanner.discoverSupportedPids({
+    async executeCommand() {
+      return { response: '41 05 69', status: 'OK', elapsedMs: 1 };
+    },
+  }, ['0100']);
+  assert.strictEqual(
+    mismatchedPid[0].responded,
+    false,
+    'response for a different PID must not be marked as a successful bitmap response',
+  );
+
+  const emptyBitmap = await scanner.discoverSupportedPids({
+    async executeCommand() {
+      return { response: '41 00 00 00 00 00', status: 'OK', elapsedMs: 1 };
+    },
+  }, ['0100']);
+  assert.strictEqual(emptyBitmap[0].responded, true,
+    'a valid empty bitmap is still a valid response to the requested discovery PID');
 }
 
 
