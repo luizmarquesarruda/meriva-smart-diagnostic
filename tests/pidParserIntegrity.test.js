@@ -57,6 +57,10 @@ for (const definition of catalog.pids) {
   assert.ok(Number.isFinite(parsed.value), `PID ${definition.pid} deve produzir valor finito`);
 }
 
+assert.equal(parser.parsePidResponse('010C', '410C1AF8').value, 1726,
+  'resposta compacta sem espaços deve continuar compatível');
+assert.equal(parser.parsePidResponse('010C', '410C1AF8FF').status, 'VALOR NÃO INTERPRETADO',
+  'resposta compacta com bytes excedentes deve ser rejeitada');
 assert.equal(parser.parsePidResponse('010C', '41 0C 1A').status, 'VALOR NÃO INTERPRETADO',
   'payload truncado não pode virar leitura válida');
 assert.equal(parser.parsePidResponse('010C', '41 0C 1A F8 FF').status, 'VALOR NÃO INTERPRETADO',
