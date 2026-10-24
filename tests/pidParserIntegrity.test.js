@@ -68,11 +68,13 @@ assert.equal(parser.parsePidResponse('010C', '41 0C 1A').status, 'VALOR NÃO INT
   'payload truncado não pode virar leitura válida');
 assert.equal(parser.parsePidResponse('010C', '41 0C 1A F8 FF').status, 'VALOR NÃO INTERPRETADO',
   'byte excedente no mesmo quadro deve ser rejeitado');
-assert.equal(parser.parsePidResponse('010C', '48 6B 10 41 0C 1A F8 82').value, 1726,
+assert.equal(parser.parsePidResponse('010C', '48 6B 10 41 0C 1A F8 22').value, 1726,
   'envelope legado K-Line com checksum deve continuar aceito');
-assert.equal(parser.parsePidResponse('010C', '486B10410C1AF882').value, 1726,
+assert.equal(parser.parsePidResponse('010C', '486B10410C1AF822').value, 1726,
   'envelope K-Line compacto deve continuar aceito quando o ELM desativa espaços');
-assert.equal(parser.parsePidResponse('010C', '486B10410C1AF88299').status, 'VALOR NÃO INTERPRETADO',
+assert.equal(parser.parsePidResponse('010C', '48 6B 10 41 0C 1A F8 82').status, 'VALOR NÃO INTERPRETADO',
+  'checksum aditivo incorreto deve ser rejeitado');
+assert.equal(parser.parsePidResponse('010C', '486B10410C1AF82299').status, 'VALOR NÃO INTERPRETADO',
   'envelope K-Line compacto não pode ignorar bytes após o checksum');
 assert.equal(parser.parsePidResponse('010C', '7E804410C1AF8').value, 1726,
   'resposta CAN compacta deve validar o ID e o DLC antes do payload');
