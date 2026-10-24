@@ -748,6 +748,22 @@ async function testBluetoothEventTransport() {
   assert.strictEqual(response, '41 0C 0C 18');
   await transport.close();
 
+  // RX deve ter limite estrito; uma resposta enorme não pode ser aceita como
+  // telemetria válida, e os diagnósticos devem truncar chunks excessivos.
+  const overflowTransport = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF');
+  await overflowTransport.open();
+  bluetoothListener?.({ data: 'X'.repeat(16 * 1024 + 1) });
+  bluetoothListener?.({ data: '>' });
+  await assert.rejects(overflowTransport.readUntilPrompt(500), /BUFFER RX ELM EXCEDIDO/,
+    'resposta maior que o limite deve ser descartada explicitamente');
+  assert.match(overflowTransport.getDiagnosticsText(), /RX_BUFFER_OVERFLOW/);
+  assert.match(overflowTransport.getDiagnosticsText(), /truncated/,
+    'logs de RX não devem reter chunks integrais muito grandes');
+  bluetoothListener?.({ data: '41 0C 0C 18>' });
+  assert.strictEqual(await overflowTransport.readUntilPrompt(500), '41 0C 0C 18',
+    'buffer deve recuperar-se depois de descartar o quadro excessivo');
+  await overflowTransport.close();
+
   // O bloqueio deve funcionar entre instâncias diferentes. Sem ele, duas
   // instâncias chamam connectToDevice simultaneamente e o Android pode retornar
   // "Already attempting connection to device ...".
