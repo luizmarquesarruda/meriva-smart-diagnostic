@@ -70,6 +70,10 @@ assert.equal(parser.parsePidResponse('010C', '41 0C 1A F8 FF').status, 'VALOR N�
   'byte excedente no mesmo quadro deve ser rejeitado');
 assert.equal(parser.parsePidResponse('010C', '48 6B 10 41 0C 1A F8 82').value, 1726,
   'envelope legado K-Line com checksum deve continuar aceito');
+assert.equal(parser.parsePidResponse('010C', '486B10410C1AF882').value, 1726,
+  'envelope K-Line compacto deve continuar aceito quando o ELM desativa espaços');
+assert.equal(parser.parsePidResponse('010C', '486B10410C1AF88299').status, 'VALOR NÃO INTERPRETADO',
+  'envelope K-Line compacto não pode ignorar bytes após o checksum');
 assert.equal(parser.parsePidResponse('010C', '7E8 04 41 0C 1A F8').status, 'RESPONDEU',
   'cabeçalho CAN/ELM antes da resposta não pode contaminar os bytes do PID');
 assert.equal(parser.parsePidResponse('010C', 'SEARCHING...\r\n41 0C 1A F8\r\n>').status, 'RESPONDEU',
