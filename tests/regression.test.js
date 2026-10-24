@@ -1036,6 +1036,11 @@ async function testBackupCompleteness() {
   assert.deepStrictEqual(info.includes, expectedDirs);
 
   const backupRoot = `${BASE}/BACKUP/meriva_smart_${info.timestamp}`;
+  const manifest = JSON.parse(files.get(`${backupRoot}/manifest.json`));
+  assert.strictEqual(manifest.schemaVersion, 1);
+  assert.strictEqual(manifest.payloadSizeBytes, info.sizeBytes,
+    'manifest deve declarar tamanho verificado do conteúdo copiado');
+  assert.deepStrictEqual(manifest.directories.map((item) => item.directory), expectedDirs);
   for (const dir of expectedDirs) {
     assert.strictEqual(
       files.get(`${backupRoot}/${dir}/arquivo.txt`),
@@ -1062,6 +1067,16 @@ async function testCsvWriteSerialization() {
   assert.ok(content.includes('A,t1'));
   assert.ok(content.includes('B,t2'));
   assert.strictEqual(content.split('\n').filter(Boolean).length, 3);
+
+  await logger.appendCsvRow(target, { timestamp: 't3', id: 'C' });
+  const reordered = files.get(target);
+  assert.ok(reordered.includes('C,t3'),
+    'colunas devem seguir o cabeçalho mesmo quando as chaves chegam em outra ordem');
+  await assert.rejects(
+    () => logger.appendCsvRow(target, { id: 'D', timestamp: 't4', unexpected: 'x' }),
+    /CSV_SCHEMA_MISMATCH/,
+    'coluna nova não pode deslocar valores silenciosamente sob cabeçalho antigo',
+  );
 }
 
 async function testPidAndLearningWriteSerialization() {
