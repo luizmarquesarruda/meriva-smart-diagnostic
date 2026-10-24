@@ -216,7 +216,16 @@ export function parsePidResponse(pidRequested: string, rawResponse: string, posi
           + ' | CATALISADOR=' + (catalystSupported ? (catalystIncomplete ? 'NÃO PRONTO' : 'PRONTO') : 'NÃO SUPORTADO')
           + ' | INCOMPLETOS=' + (incomplete.length ? incomplete.join(', ') : 'NENHUM');
       })()
-    : undefined;
+    : pid === '0114'
+      ? (() => {
+          const trimByte = data[1];
+          // PID 0114 byte B is STFT for B1S1; 0xFF means the sensor is
+          // not used in the fuel-trim calculation, not a 99.22% correction.
+          if (trimByte === 0xFF) return 'AJUSTE CURTO B1S1=NÃO USADO (B=FF)';
+          const trimPercent = (trimByte * 100 / 128) - 100;
+          return 'AJUSTE CURTO B1S1=' + trimPercent.toFixed(2) + '%';
+        })()
+      : undefined;
   const validation = validatePidValue(pid, value);
   if (!validation.valid) {
     return {
