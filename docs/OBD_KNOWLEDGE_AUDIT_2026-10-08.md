@@ -97,7 +97,7 @@ Essa informação não foi transformada em regra genérica de falha de RPM porqu
 
 ## Fontes externas
 - Chevrolet Brasil — manuais: https://www.chevrolet.com.br/servicos/manuais-veiculos/anos-anteriores
-- Manual Chevrolet Meriva MY12: https://meu.chevrolet.com.br/content/dam/gmownercenter/gmsa/gmbr/dynamic/manuals/2012/chevrolet/Meriva/pt/om_ng-chevrolet_Meriva_my12-pt_BR.pdf
+- Manual Chevrolet Meriva MY12: https://www.chevrolet.com.br/content/dam/chevrolet/south-america/brazil/portuguese/index/services/owner-manuals/05-pdf/meriva/manual-meriva-2012.pdf
 - SAE J1979_202505 — E/E Diagnostic Test Modes: https://saemobilus.sae.org/standards/j1979_202505-e-e-diagnostic-test-modes
 - SAE J1979-DA — Digital Annex: https://doi.org/10.4271/J1979DA
 - SAE J2012 — Diagnostic Trouble Code Definitions: https://saemobilus.sae.org/standards/j2012_202509-diagnostic-trouble-code-definitions
