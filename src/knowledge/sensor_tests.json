@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "catalogId": "MERIVA_SMART_SENSOR_TESTS",
-  "updatedAt": "2026-10-20",
+  "updatedAt": "2026-10-24",
   "vehicleProfile": {
     "make": "Chevrolet",
     "model": "Meriva Maxx",
@@ -421,8 +421,8 @@
     {
       "id": "PID_0111",
       "pid": "0111",
-      "label": "Posição da borboleta",
-      "catalogName": "Throttle Position",
+      "label": "Posição absoluta da borboleta",
+      "catalogName": "Absolute Throttle Position",
       "unit": "percent",
       "formulaId": "PERCENT_255",
       "category": "acelerador",
@@ -756,8 +756,8 @@
     {
       "id": "PID_015A",
       "pid": "015A",
-      "label": "Posição do pedal do acelerador",
-      "catalogName": "Accelerator Pedal Position",
+      "label": "Posição relativa do pedal do acelerador",
+      "catalogName": "Relative Accelerator Pedal Position",
       "unit": "percent",
       "formulaId": "PERCENT_255",
       "category": "acelerador",
