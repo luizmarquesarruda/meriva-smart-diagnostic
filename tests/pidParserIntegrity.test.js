@@ -63,7 +63,7 @@ assert.equal(parser.parsePidResponse('010C', '41 0C 1A F8 FF').status, 'VALOR N�
   'byte excedente no mesmo quadro deve ser rejeitado');
 assert.equal(parser.parsePidResponse('010C', '7E8 04 41 0C 1A F8').status, 'RESPONDEU',
   'cabeçalho CAN/ELM antes da resposta não pode contaminar os bytes do PID');
-assert.equal(parser.parsePidResponse('010C', 'SEARCHING...\\r\\n41 0C 1A F8\\r\\n>').status, 'RESPONDEU',
+assert.equal(parser.parsePidResponse('010C', 'SEARCHING...\r\n41 0C 1A F8\r\n>').status, 'RESPONDEU',
   'mensagens de estado do adaptador não podem alterar o payload válido');
 
 const fuelConsumption = loadTs(path.join(ROOT, 'src/obd/fuelConsumption.ts'));
