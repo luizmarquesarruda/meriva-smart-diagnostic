@@ -628,6 +628,9 @@ async function testIntelligentPidDiscovery() {
   });
   assert.ok(result.supportedPids.includes('010C'));
   assert.strictEqual(result.confidence['010C'], 1);
+  assert.ok(result.responseBuffer.some((item) => item.command === '0100'), 'buffer deve expor a resposta bruta da bitmap atual');
+  assert.strictEqual(result.responseBuffer.filter((item) => item.command === '010C').length, 1,
+    'a resposta pré-validada deve permanecer uma única entrada no buffer');
   assert.strictEqual(result.observations.find((item) => item.pid === '010C').status, 'CONFIRMADO');
   assert.strictEqual(result.observations.find((item) => item.pid === '010C').value, 1726);
   assert.strictEqual(commands.filter((pid) => pid === '010C').length, 0, 'descoberta deve reaproveitar a sonda 010C validada');
