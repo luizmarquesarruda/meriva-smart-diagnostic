@@ -1,6 +1,6 @@
 # Diário de Bordo - Meriva Smart Diagnostic
 
-## ESTADO VIGENTE — 2026-10-24 (revisão DB-123)
+## ESTADO VIGENTE — 2026-10-24 (auditoria histórica DB-125)
 
 > Estado conferido no GitHub em 24/10/2026. Este diário está na branch da PR #89; não altera `main`. CI verde em branches separadas não comprova o merge combinado e não substitui testes físicos.
 
@@ -19,7 +19,7 @@
 - [#86 — descoberta OBD e latência](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/86): aberta, head `9f12e54aa1b8f32f0e293cf775f9cbcc80544c04`; [run 40124875595 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40124875595).
 - [#87 — integridade do parser e autonomia](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/87): aberta, head `2997136881dc27bfbed37c12babc6c7ff5b4343e`; [run 40122815647 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40122815647).
 - [Issue #88 — migração gradual do Expo SDK 51](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/issues/88): aberta; manter separada do hardening OBD e persistência.
-- [#89 — consolidação da auditoria e hardening](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/89): draft. HEAD imediatamente antes da atualização documental DB-122 era `9a7b747c3210b8b4a7b7a1468dfd1b289717329b`; [run 40133491810 — `validate` e `android-build` passaram](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40133491810). O commit DB-122 é `d873736c2cd5fb6000de02b58fd93483dd663c20`; para ele, `validate` passou e `android-build` estava em execução na última verificação ([run 40135072754](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40135072754)). DB-123 gera outro SHA documental e requer nova CI no resultado.
+- [#89 — consolidação da auditoria e hardening](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/89): draft. HEAD auditado antes deste novo registro: `931973310f955a8d527401d51c33b7d55feb79e7` (DB-124); [run 40135579130 — validate e android-build aprovados](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40135579130) e [run 40135575547 — push CI aprovada](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40135575547). O novo registro DB-125 cria um SHA posterior e exige nova CI.
 
 ### Conclusões atualizadas da releitura das PRs de layout
 - **#82:** navegação inferior no retrato e coluna lateral em paisagem; `screenFrameLandscape` reserva 56 dp à esquerda e o teste verifica essa regra. A CI está verde isoladamente.
@@ -3811,3 +3811,60 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Essa questão é independente da escolha visual entre a barra inferior da #83 e a coluna lateral da #82, do conflito 20/25 PIDs e da reconciliação de parser/persistência com a #89.
 - Nenhuma alteração de código foi feita nesta entrada. O commit documental cria novo SHA e deve passar pela CI correspondente.
 
+
+
+## DB-125 · 2026-10-24 — Auditoria retrospectiva das PRs, CI e diário desde o início
+
+### Escopo e evidência
+- Repositório auditado: `luizmarquesarruda/meriva-smart-diagnostic`.
+- Foram consultados os metadados de todas as PRs listadas no endpoint do repositório, do #1 à #89, o histórico de Actions com 3.444 execuções reportadas pela API, o run número 1 e os SHAs atuais das PRs abertas.
+- O diário foi lido em dois estados distintos: `main` e a branch desta PR. Não confundir o conteúdo de uma branch de auditoria com o que já foi integrado.
+- Também foi lida a entrada cronológica mais antiga identificada, DB-001, e o início atual do arquivo, que é organizado com atualizações recentes no topo e registros DB históricos abaixo.
+
+### Resultado retrospectivo das PRs
+- A API retornou **86 PRs existentes**, com lacunas de numeração; #23 e #57 não aparecem como PRs existentes e #88 é uma issue, não uma PR.
+- Estado consultado: **23 mescladas**, **8 abertas** (#81–#87 e #89) e **55 fechadas sem merge**. A PR #1 foi encerrada sem merge; a #2 foi a primeira auditoria ampla mesclada. PR fechada sem merge não deve ser presumida incorporada, mesmo quando seu título descreve uma correção importante.
+- A #80 é a última integração confirmada em `main` no momento desta auditoria. A #89 permanece draft e fora de `main`.
+- Há histórico de PRs de validação/teste que foram fechadas sem merge depois que uma PR seguinte foi mesclada (ex.: #34/#35 e #28–#31). Isso pode ser intencional, mas os títulos não são prova de código integrado; rastrear o SHA/merge commit antes de reaplicar qualquer patch.
+- PRs fechadas sem merge com funcionalidades de consumo, GPS, viagem, Bluetooth, armazenamento e design devem ser tratadas como propostas históricas. Verificar cada requisito contra `main` antes de reabrir ou copiar código, para evitar ressuscitar regressões antigas.
+
+### Resultado retrospectivo da CI
+- Primeira execução: [run #1, ID 37022666513](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/37022666513), em 2026-10-02, falhou **antes de executar instalação ou testes**. O log identifica a causa: `actions/setup-node@v4` com `cache: npm` não encontrou `package-lock.json`, `npm-shrinkwrap.json` ou `yarn.lock`. Portanto, essa primeira falha foi de configuração/cache do workflow, não evidência de defeito no motor OBD.
+- O histórico inicial contém uma sequência de execuções rápidas com falha na CI do `main` antes da execução de testes; o diário deve separar falhas de infraestrutura/configuração, falhas de TypeScript/testes e falhas de build Android, sem somá-las como se fossem o mesmo tipo de regressão.
+- No snapshot mais recente consultado, a API reportava 3.444 runs; os runs finais 3393 (push) e 3394 (pull request), ambos no SHA `931973310f955a8d527401d51c33b7d55feb79e7`, concluíram com sucesso, incluindo `validate` e `android-build`. Isso valida aquele SHA, não o commit documental DB-125 que vem depois.
+- A CI verde não demonstra conectividade Bluetooth, compatibilidade com um ELM327 físico, suporte dos PIDs na ECU ou precisão de autonomia/consumo em condução real.
+
+### Releitura desde o primeiro registro do Diário de Bordo
+- O começo atual do arquivo descreve a portabilidade da seção de fronteiras matemáticas do Floot para `app/laboratorio.tsx` no Expo, com dados artificiais explicitamente identificados. Essa seção não deve ser confundida com uma leitura física.
+- A primeira entrada cronológica, **DB-001 (2026-10-06)**, registra uma falha de importação CommonJS do catálogo `fuel_types.json` no teste `fuelIdentification.test.js`. A correção foi compatibilizar o import; o próprio registro pedia aguardar o build Android. A regra processual original — problema, diagnóstico, correção, testes, commit, CI, resultado e próximo passo — continua válida.
+- `main` contém 3.441 linhas e vai até DB-106; a branch da #89 contém 3.814 linhas e DB-125 após esta atualização. A diferença é explicada por trabalho posterior em branches ainda não integradas, mas representa um risco documental real: abrir apenas o diário de `main` omite as auditorias DB-107 em diante. Não copiar DB-125 para `main` sem a integração aprovada da PR que o contém.
+- A seção de estado vigente na branch foi corrigida para refletir a CI verde de DB-124; DB-125 exige uma nova execução de CI.
+
+### Regressões, inconsistências e riscos recorrentes encontrados
+1. **Código não integrado versus documentação:** há 55 PRs fechadas sem merge. O título e a descrição de uma PR não provam que o seu código esteja no produto. Antes de cada correção, comparar o estado atual de `main` e o diff do SHA proposto.
+2. **Explosão de execuções de CI:** o histórico tem centenas/milhares de runs de validação. A falha original por lockfile ausente e os ciclos de reexecução/testes desatualizados indicam a necessidade de evitar commits corretivos pequenos em sequência sem uma rodada local integrada. Consolidar mudanças coerentes, executar `npm ci`, testes, gate anti-regressão, `npm run validate` e build Android antes de pedir revisão.
+3. **Validação por SHA:** CI verde de PRs separadas não valida o merge combinado; qualquer alteração posterior, inclusive só documental, muda o SHA e requer verificação correspondente.
+4. **PIDs:** catálogo/bitmap indicam candidatos; suporte exige resposta positiva válida, PID correto, payload exato e sessão ECU atual. O inventário de 34/35 PIDs não deve ser comunicado como 34/35 PIDs suportados pela Meriva. Resolver a divergência de política 20/25 PIDs antes de combinar #82/#83.
+5. **Fórmulas e autonomia:** os testes matemáticos confirmam a implementação sobre entradas sintéticas, não a calibração em veículo. PID 015E é preferível quando a ECU realmente o fornece; MAF/MAP é estimativa e precisa ser identificada como tal. Validar unidades, faixas, dados obsoletos e denominadores mínimos.
+6. **Bluetooth/ELM327:** estados Bluetooth e ECU devem permanecer separados; a ECU exige resposta OBD válida. Testes de mocks e CI não substituem teste com adaptador físico, reconexão, timeout e desconexão.
+7. **Persistência:** autosave, histórico de viagem, CSV, quota e backup precisam ser validados em upgrade/restauração, interrupção durante escrita e falta de espaço; não presumir segurança física apenas pelos testes unitários.
+8. **Layout:** #82 e #83 apresentam navegações diferentes na paisagem; decidir uma só. A rota demonstrativa `app/floot-layout.tsx` deve ser tratada deliberadamente como rota de produto ou ferramenta de revisão. O rótulo fixo do veículo corresponde ao perfil Meriva forçado pelo serviço atual, mas contradiz a promessa documental de perfil configurável.
+9. **Floot e repositório nativo:** Floot é um protótipo web sem transporte físico Bluetooth/ECU. Seus testes/typecheck podem validar fórmulas e UX do protótipo, mas não alteram nem substituem CI/build do Expo/Android.
+10. **Ferramentas externas:** a busca por apps Replit retornou zero aplicativos editáveis correspondentes a Meriva; portanto, nenhuma mudança foi feita no Replit. O screenshot do Floot não foi capturado porque não havia janela/preview aberta na sessão do usuário. A auditoria visual completa do Product Design requer Work Mode, conforme disponibilidade do plugin.
+
+### Validação do protótipo Floot nesta rodada
+- Testes: 4 arquivos de especificação aprovados, 0 falhas (`themeMode`, `dashboardUx`, `obdPidFormulas`, `obdPidDiscovery`); dois testes de hooks estão excluídos da execução padrão.
+- Typecheck: limpo.
+- A leitura do código confirma que o estado Bluetooth é rotulado como simulado e que não existe conexão física nesta tela. Os dados de autonomia, consumo, velocidade, distância e temperatura aparecem como N/D até integração real.
+- Não foi possível validar visualmente em screenshot nesta sessão porque o preview Floot não estava aberto. Abrir o preview e repetir a captura em retrato e paisagem antes de declarar a auditoria visual concluída.
+- As funções especiais de alta precisão do plugin Precise Special Functions não são apropriadas para as fórmulas OBD aqui analisadas, que são conversões lineares/afins e operações de bytes. A validação relevante é aritmética de referência, testes de fronteira e comparação com SAE J1979/ISO 15031-5 e evidência da ECU.
+
+### Próximas ações ordenadas
+1. Aguardar CI do SHA DB-125.
+2. Auditar e reconciliar os arquivos compartilhados entre #82, #83 e #89 em uma integração controlada, sem merge automático.
+3. Confirmar a política final de PIDs (20 ou 25), manter os testes alinhados e medir a latência real por comando.
+4. Executar teste físico Android/ELM327/ECU para 010C, 010D, 0105, 0110, 012F e 015E conforme suporte anunciado e respostas reais; comparar autonomia/consumo com um trajeto medido.
+5. Testar restauração de backup, rotação, GPS em segundo plano, desconexão/reconexão e falta de espaço em aparelho físico.
+6. Atualizar a seção vigente e o índice quando houver novo SHA validado; manter a história anterior e rotular claramente o que permanece fora de `main`.
+
+**Resultado DB-125:** auditoria retrospectiva documental/CI e validação do protótipo concluídas dentro do acesso disponível. A auditoria de integração combinada, visual em aparelho e hardware físico permanece pendente. Nenhum merge foi feito.
