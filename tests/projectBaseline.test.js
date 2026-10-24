@@ -18,6 +18,9 @@ const pidParser = read('src/obd/parser.ts');
 const pidMap = read('docs/PID_FORMULA_MAP_2026-10-24.md');
 const merivaSourceAudit = read('docs/MERIVA_OBD_SOURCE_AUDIT_2026-10-24.md');
 const historicalObdAudit = read('docs/OBD_KNOWLEDGE_AUDIT_2026-10-08.md');
+const pidReport = read('docs/RELATORIO_PIDS_E_FORMULAS.md');
+const sensorAudit = read('docs/AUDITORIA_TESTES_SENSORES_2026-10-14.md');
+
 const testCommand = packageJson.scripts.test.split('&&').map((command) => command.trim());
 const workflow = read('.github/workflows/ci.yml');
 const elm = read('src/obd/elm327.ts');
@@ -37,6 +40,15 @@ const theme = read('src/ui/theme.ts');
 assert.match(read('README.md'), /MERIVA_OBD_SOURCE_AUDIT_2026-10-24\.md/);
 assert.match(historicalObdAudit, /MERIVA_OBD_SOURCE_AUDIT_2026-10-24\.md/);
 assert.match(projectContract, /\| RG-35 \|/);
+assert.match(pidReport, /\| 0101 \| Monitor Status Since DTCs Cleared \| 4 \| dtc_count \| DTC_COUNT/);
+assert.doesNotMatch(pidReport, /\| 0101 \|[^\n]*\| U32 \|/);
+assert.match(pidReport, /\| 0111 \| Absolute Throttle Position/);
+assert.match(pidReport, /\| 0145 \| Relative Throttle Position/);
+assert.match(pidReport, /\| 015A \| Relative Accelerator Pedal Position/);
+assert.match(pidReport, /\| 0130 \| Warmups Since DTC Clear \| 1 \| warmup_cycles/);
+assert.match(sensorAudit, /exige cinco tentativas e cinco respostas válidas por PID/i);
+assert.doesNotMatch(sensorAudit, /pelo menos três tentativas por PID|agrega três amostras válidas|medianas MAP\/BARO/i);
+
 assert.match(merivaSourceAudit, /manual do propriet.rio Meriva 2011\/2012 \*\*n.o fornece uma tabela de PIDs OBD-II/i);
 assert.match(merivaSourceAudit, /Seção 6, p\. 6-3/);
 assert.match(merivaSourceAudit, /SAE J1979_202505/);
