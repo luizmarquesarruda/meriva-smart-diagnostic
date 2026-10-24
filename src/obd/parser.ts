@@ -36,12 +36,19 @@ function findResponsePayload(rawResponse: string, pid: string, byteCount: number
       const marker = service + requestedPid;
       let markerIndex = compactLine.indexOf(marker);
       while (markerIndex >= 0) {
+        const prefix = compactLine.slice(0, markerIndex);
         const payloadStart = markerIndex + marker.length + serviceOffsetBytes * 2;
         const payloadHex = compactLine.slice(payloadStart, payloadStart + byteCount * 2);
         const trailingHex = compactLine.slice(payloadStart + byteCount * 2);
+        // ATS0 removes byte separators, so legacy K-Line framing may arrive as
+        // 486B10 + positive response + payload + one checksum byte. Accept that
+        // exact envelope in compact form as well as in the spaced-token path.
+        const compactKLineChecksum = prefix === '486B10'
+          && trailingHex.length === 2
+          && /^[0-9A-F]{2}$/.test(trailingHex);
         if (
           payloadHex.length === byteCount * 2 &&
-          trailingHex.length === 0 &&
+          (trailingHex.length === 0 || compactKLineChecksum) &&
           /^[0-9A-F]+$/.test(payloadHex)
         ) {
           const bytes: number[] = [];
