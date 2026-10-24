@@ -110,5 +110,12 @@ assert.ok(estimateFuelRateLph({ mafGs: 2.5, fuelType: 'FLEX', ethanolPercent: 0 
 assert.strictEqual(estimateFuelRateLph({ mafGs: NaN, fuelType: 'ETANOL' }), null);
 assert.strictEqual(estimateFuelRateLph({ mafGs: 2.5, airFuelRatio: 14.7, fuelDensityKgPerL: 0.745 }).source,
   'ESTIMATED_MAF', 'calibração explícita deve continuar disponível');
+assert.strictEqual(estimateFuelRateLph({
+  mapKpa: 100, rpm: 1500, intakeAirTempC: -273.15,
+  displacementCm3: 1389, fuelType: 'GASOLINA',
+}), null, 'temperatura absoluta inválida deve impedir estimativa MAP');
+assert.strictEqual(estimateFuelRateLph({
+  mafGs: Number.MAX_VALUE, fuelType: 'GASOLINA',
+}), null, 'estimativa que transborda para infinito deve ser rejeitada');
 
 console.log('fuelConsumption fallback: OK');
