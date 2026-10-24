@@ -16,6 +16,9 @@ A documentação oficial Chevrolet é usada para configuração do veículo e co
 
 ## Resultado da auditoria de PIDs
 
+> **Errata / superseded by 2026-10-24:** a tabela abaixo é um recorte histórico, não a lista canônica completa. Para valores vigentes use o [mapa completo](PID_FORMULA_MAP_2026-10-24.md) e confira-o contra `src/knowledge/pids.json`. Na revisão atual, PID 0101 usa `DTC_COUNT` (A & 0x7F) com MIL/readiness decodificados à parte; em ciclo Otto, C4/D4 é disponibilidade/incompletude do monitor de filtro de partículas de gasolina. PID 0111 = posição absoluta da borboleta, PID 0145 = posição relativa, PID 015A = posição relativa do pedal e PID 0130 tem unidade de ciclos de aquecimento. Os manuais do proprietário Meriva 2011/2012 não são uma tabela de PIDs e não provam suporte de ECU.
+
+
 | PID | Fórmula / interpretação | Bytes | Situação |
 |---|---|---:|---|
 | 0104 | A × 100 / 255 | 1 | correto |
