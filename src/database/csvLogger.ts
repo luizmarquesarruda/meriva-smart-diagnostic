@@ -36,11 +36,47 @@ function formatCsvValue(value: CsvValue): string {
 }
 
 function serializeRow(row: CsvRow, headers: string[] = Object.keys(row)): string {
-  const unknownKeys = Object.keys(row).filter((key) => !headers.includes(key));
-  if (unknownKeys.length) {
-    throw new Error('CSV_SCHEMA_MISMATCH: colunas novas não podem ser gravadas sob cabeçalho antigo: ' + unknownKeys.join(','));
-  }
   return headers.map((key) => formatCsvValue(row[key])).join(',');
+}
+
+function parseCsvRecords(content: string): string[][] {
+  const records: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let inQuotes = false;
+  for (let index = 0; index < content.length; index += 1) {
+    const character = content[index];
+    if (inQuotes) {
+      if (character === '"' && content[index + 1] === '"') {
+        field += '"';
+        index += 1;
+      } else if (character === '"') {
+        inQuotes = false;
+      } else {
+        field += character;
+      }
+      continue;
+    }
+    if (character === '"' && field.length === 0) {
+      inQuotes = true;
+    } else if (character === ',') {
+      row.push(field);
+      field = '';
+    } else if (character === '\n') {
+      row.push(field.replace(/\r$/, ''));
+      if (row.some((value) => value.length > 0)) records.push(row);
+      row = [];
+      field = '';
+    } else {
+      field += character;
+    }
+  }
+  if (inQuotes) throw new Error('CSV_PARSE_FAILED: aspas não fechadas no arquivo existente');
+  if (field.length > 0 || row.length > 0) {
+    row.push(field.replace(/\r$/, ''));
+    if (row.some((value) => value.length > 0)) records.push(row);
+  }
+  return records;
 }
 
 export function getCsvQueueStatus(): { pendingRows: number; droppedRows: number; maxPendingRows: number } {
@@ -81,18 +117,31 @@ async function writeRowsUnsafe(filePath: string, rows: CsvRow[]): Promise<void> 
   }
 
   const current = await FileSystem.readAsStringAsync(filePath);
-  const trimmed = current.trimEnd();
-  const headers = (trimmed.split(/\r?\n/, 1)[0] ?? '').split(',');
-  if (!headers.length || headers.some((header) => !header)) {
+  const records = parseCsvRecords(current);
+  if (records.length === 0) {
+    const headers = Object.keys(rows[0]);
+    const lines = rows.map((row) => serializeRow(row, headers));
+    await FileSystem.writeAsStringAsync(filePath, `${headers.join(',')}\n${lines.join('\n')}\n`, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
+    return;
+  }
+
+  const oldHeaders = records[0];
+  if (!oldHeaders.length || oldHeaders.some((header) => !header)) {
     throw new Error('CSV_HEADER_INVALIDO: ' + filePath);
   }
-  // Stable header mapping prevents a later object with a different insertion
-  // order from silently writing values into the wrong CSV columns.
-  const lines = rows.map((row) => serializeRow(row, headers));
-  // One read/write per batch instead of one full-file rewrite per sensor sample.
-  const content = trimmed.length > 0
-    ? `${trimmed}\n${lines.join('\n')}\n`
-    : `${headers.join(',')}\n${lines.join('\n')}\n`;
+  const addedHeaders = Array.from(new Set(rows.flatMap((row) =>
+    Object.keys(row).filter((key) => !oldHeaders.includes(key)),
+  )));
+  const headers = [...oldHeaders, ...addedHeaders];
+  // Schema evolution is lossless: old rows receive blank values for new columns,
+  // and every current row is serialized against the same canonical header order.
+  const existingLines = records.slice(1).map((oldRow) =>
+    headers.map((_, index) => formatCsvValue(oldRow[index] ?? '')).join(','),
+  );
+  const newLines = rows.map((row) => serializeRow(row, headers));
+  const content = `${headers.join(',')}\n${[...existingLines, ...newLines].join('\n')}\n`;
   await FileSystem.writeAsStringAsync(filePath, content, {
     encoding: FileSystem.EncodingType.UTF8,
   });
