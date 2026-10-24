@@ -22,7 +22,7 @@ export function isValidEnvelope(value: unknown): value is AutoSaveEnvelope<Meriv
   const savedAtMs = typeof env.savedAt === 'string' ? Date.parse(env.savedAt) : Number.NaN;
   return (
     Number.isInteger(env.schemaVersion) &&
-    (env.schemaVersion as number) > 0 &&
+    (env.schemaVersion as number) >= 0 &&
     env.dataType === AUTOSAVE_DATA_TYPE &&
     env.source === AUTOSAVE_SOURCE &&
     Number.isFinite(savedAtMs) &&
