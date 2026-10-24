@@ -14,7 +14,7 @@ export interface DiscoveryItem {
 }
 
 export function decodeSupportedPids(requestedPid: string, response: string): string[] {
-  const normalized = requestedPid.replace(/\\s/g, '').toUpperCase();
+  const normalized = requestedPid.replace(/\s/g, '').toUpperCase();
   if (!/^01(?:00|20|40|60)$/.test(normalized) || !validateOBDResponse(response)) return [];
 
   const marker = `41${normalized.slice(-2)}`;
@@ -22,7 +22,7 @@ export function decodeSupportedPids(requestedPid: string, response: string): str
 
   // Each physical response line is parsed separately. Do not concatenate
   // unrelated lines or accept a valid four-byte bitmap followed by extra data.
-  for (const line of response.split(/[\\r\\n]+/)) {
+  for (const line of response.split(/[\r\n]+/)) {
     const compact = line.toUpperCase().replace(/[^0-9A-F]/g, '');
     if (!compact) continue;
 
