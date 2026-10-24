@@ -33,6 +33,13 @@ const MIN_MOVEMENT_DISTANCE_M = 8;
 const STOP_SPEED_KMH = 2;
 const MIN_MOVING_SAMPLES = 3;
 const MAX_SEGMENT_GAP_MS = 5_000;
+export const GPS_SAMPLE_STALE_AFTER_MS = 5_000;
+
+export function isGpsSampleFresh(timestamp: number | null, nowMs = Date.now()): boolean {
+  if (timestamp == null || !Number.isFinite(timestamp) || !Number.isFinite(nowMs)) return false;
+  const ageMs = nowMs - timestamp;
+  return ageMs >= 0 && ageMs <= GPS_SAMPLE_STALE_AFTER_MS;
+}
 
 function movementThresholdM(sample: GpsSample, previous: GpsSample): number {
   const accuracies = [sample.accuracyM, previous.accuracyM].filter(
@@ -76,7 +83,10 @@ export function normalizeGpsSpeedKmh(speedMs: number | null | undefined): number
 }
 
 function isAccurate(sample: GpsSample): boolean {
-  return sample.accuracyM == null || sample.accuracyM <= MAX_ACCURACY_M;
+  return sample.accuracyM != null
+    && Number.isFinite(sample.accuracyM)
+    && sample.accuracyM >= 0
+    && sample.accuracyM <= MAX_ACCURACY_M;
 }
 
 export class GpsTracker {
@@ -204,7 +214,7 @@ export class GpsTracker {
   }
 
   private getSignalQuality(accuracyM: number | null): GpsTripState['signalQuality'] {
-    if (accuracyM == null || !Number.isFinite(accuracyM) || accuracyM > MAX_ACCURACY_M) return 'SEM_FIX';
+    if (accuracyM == null || !Number.isFinite(accuracyM) || accuracyM < 0 || accuracyM > MAX_ACCURACY_M) return 'SEM_FIX';
     if (accuracyM <= 5) return 'EXCELENTE';
     if (accuracyM <= 15) return 'BOA';
     return 'FRACA';
@@ -308,7 +318,10 @@ export class GpsTracker {
 
   handleLocation(location: Location.LocationObject): void {
     const c = location.coords;
-    if (!Number.isFinite(c.latitude) || !Number.isFinite(c.longitude)) return;
+    if (
+      !Number.isFinite(c.latitude) || c.latitude < -90 || c.latitude > 90
+      || !Number.isFinite(c.longitude) || c.longitude < -180 || c.longitude > 180
+    ) return;
 
     const sample: GpsSample = {
       latitude: c.latitude,

@@ -8,13 +8,18 @@ const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
 const index = read('app/index.tsx');
 const more = read('app/mais.tsx');
 const laboratory = read('app/laboratorio.tsx');
+const configuration = read('app/configuracoes.tsx');
+const flootPreview = read('app/floot-layout.tsx');
+const health = read('app/saude.tsx');
 assert.match(laboratory, /AGUARDANDO CONEXÃO ELM327/, 'tela OBD não deve chamar Bluetooth pronto quando a ECU ainda não está conectada');
 assert.match(laboratory, /getSharedObdConnection\(\) \? 'ECU CONECTADA \/ DIAGNÓSTICO DISPONÍVEL' : 'AGUARDANDO CONEXÃO ELM327'/, 'estado inicial deve refletir a conexão real');
 assert.match(laboratory, /disabledButton/, 'botão de desconexão precisa ter estilo visual explícito quando desabilitado');
 assert.match(laboratory, /ELM327 DESCONECTADO/, 'botão desabilitado deve comunicar que não existe sessão ativa');
 assert.match(laboratory, /paddingBottom: 132/, 'conteúdo rolável deve reservar espaço para a navegação inferior fixa');
-for (const route of ['/dados', '/laboratorio', '/mais', '/viagens', '/conectividade']) assert.match(index, new RegExp(route.replace('/', '\\/')), 'cockpit deve expor a rota ' + route);
-assert.doesNotMatch(index, /href="\/saude"/, 'saúde detalhada não deve duplicar o cartão na página inicial');
+for (const route of ['/bluetooth', '/saude', '/laboratorio', '/viagens', '/configuracoes', '/conectividade']) assert.match(index, new RegExp(route.replace('/', '\\/')), 'cockpit deve expor a rota ' + route);
+assert.match(index, /href="\/saude"/, 'a navegação inferior deve abrir a tela de diagnóstico de falhas');
+assert.match(more, /'\/dados'/, 'Dados e Telemetria deve continuar acessível em Mais Recursos');
+assert.match(configuration, /href="\/mais"/, 'Mais Recursos deve continuar acessível em Configurações');
 assert.match(more, /'\/saude'/, 'a central de saúde deve continuar acessível em Mais Recursos');
 for (const file of ['app/dados.tsx', 'app/saude.tsx', 'app/mais.tsx', 'app/veiculo.tsx', 'app/viagens.tsx', 'app/aprendizado.tsx']) {
   assert.equal(fs.existsSync(path.join(ROOT, file)), true, file + ' deve existir');
@@ -27,17 +32,38 @@ assert.match(index, /settings\?\.elmMaxConnectionAttempts/, 'efeito deve reagir 
 assert.match(index, /bottomNavLandscape/, 'navegação inferior deve continuar disponível em paisagem');
 assert.doesNotMatch(index, /!layout\.landscape\s*&&\s*\(/, 'navegação não deve desaparecer ao girar o aparelho');
 assert.doesNotMatch(index, /<Text style=\{\[styles\.bottomNavText, styles\.bottomNavTextActive\]\}>Painel<\/Text>/, 'navegação inferior deve usar ícones sem legenda visual');
-for (const label of ['Painel, tela atual', 'Diagnóstico', 'Dados', 'Viagens', 'Mais recursos']) {
+for (const label of ['Painel, tela atual', 'Conexões Bluetooth e ECU', 'Diagnóstico', 'Viagem', 'Laboratório', 'Configurações']) {
   assert.ok(index.includes('accessibilityLabel="' + label + '"'), 'aba deve manter rótulo acessível: ' + label);
 }
-assert.match(index, /bottomNavItem:\{[^}]*minHeight:58/, 'abas inferiores devem ter alvo de toque de 58 dp');
-assert.match(index, /bottomNavText:\{[^}]*fontSize:8/, 'rótulos das abas devem continuar compactos e visíveis');
-assert.match(index, /accessibilityLabel="Mais recursos"/, 'aba Mais precisa de nome acessível explícito');
-assert.match(index, /accessibilityHint="Abre os módulos adicionais do aplicativo"/, 'aba Mais precisa explicar a ação ao leitor de tela');
+assert.match(index, /bottomNavItem:\{[^}]*minHeight:60/, 'abas inferiores devem ter alvo de toque de 60 dp');
+assert.match(index, /AppIcon name="bluetooth" size=\{32\}/, 'a navegação deve incluir conexões com ícone ampliado');
+assert.match(index, /AppIcon name="health" size=\{32\}/, 'a aba Diagnóstico deve usar o ícone de saúde/diagnóstico');
+assert.match(index, /AppIcon name="sensors" size=\{32\}/, 'a aba Laboratório deve usar o ícone de laboratório');
+assert.match(index, /AppIcon name="settings" size=\{32\}/, 'a aba Configurações deve abrir as preferências');
+assert.match(index, /accessibilityLabel="Configurações"/, 'a sexta aba precisa de nome acessível explícito');
+assert.match(index, /accessibilityHint="Abre preferências, armazenamento e opções do aplicativo"/, 'a aba Configurações precisa explicar sua ação');
+assert.match(configuration, /accessibilityLabel="Abrir mais recursos"/, 'o acesso a Mais Recursos precisa ser acessível');
+assert.match(more, /DADOS E TELEMETRIA/, 'a tela Mais Recursos deve manter o acesso a gráficos e leituras');
+assert.match(flootPreview, /AppIcon name=\{item\.icon\} size=\{32\}/, 'a prévia Floot nativa deve usar ícones de 32 dp');
+assert.match(flootPreview, /href: '\/configuracoes'/, 'a prévia Floot deve direcionar Configurações à tela funcional');
 assert.doesNotMatch(index, /actionGrid|dashboardAction/, 'não repetir Diagnóstico, Dados e Viagens em uma segunda fileira');
 assert.match(index, /styles\.sessionCard/, 'cockpit deve ter cartão acionável de conexão/ECU');
 assert.match(index, /accessibilityLabel="Abrir configurações de conexão do veículo"/, 'cartão de conexão precisa de nome acessível');
 assert.match(index, /ECU DESCONECTADA/, 'não usar OFFLINE genérico para representar a ECU');
+assert.match(index, /label="DTC REGISTRADOS"/, 'o redesenho do cockpit não pode remover a contagem de DTCs');
+const dtcMetric = index.split('label="DTC REGISTRADOS"')[1]?.split('/>')[0] ?? '';
+assert.match(dtcMetric, /VARREDURA NÃO CONFIRMADA/, 'zero registros de DTC não pode ser apresentado como ausência confirmada de falhas');
+assert.doesNotMatch(dtcMetric, /SEM DTC|SEM CÓDIGOS ATIVOS/, 'o cockpit não pode declarar ausência de DTC sem resultado de varredura confirmado');
+assert.match(index, /LÍQUIDO DE ARREFECIMENTO/, 'a temperatura deve identificar o sistema de arrefecimento');
+assert.match(index, /secondaryGrid:\{[^}]*flexWrap:'wrap'/, 'métricas secundárias devem ocupar duas colunas no celular');
+assert.match(index, /secondaryGridLandscape:\{flexWrap:'nowrap'/, 'métricas secundárias devem voltar a uma linha na paisagem');
+assert.match(index, /secondaryMetricCard:\{[^}]*width:'47%'/, 'cartões secundários não podem apertar quatro métricas em uma linha no retrato');
+assert.match(health, /getSharedObdStatus/, 'a central de saúde deve usar o estado real da ECU');
+assert.match(health, /ECU NÃO VALIDADA/, 'ausência de conexão não pode ser apresentada como sistema normal');
+assert.match(health, /ageMs >= 0 && ageMs <= 30_000/, 'a central de saúde deve usar só leituras reais recentes');
+assert.match(health, /r\.source==='REAL'\?'REAL_OBD':r\.source==='SIMULACAO'\?'SIMULACAO':'IMPORTADO'/, 'fonte desconhecida/importada não pode ser promovida a telemetria OBD real');
+assert.match(health, /confidence:r\.source==='REAL'&&r\.status==='RESPONDEU'\?'GOOD':'LOW'/, 'confiança só pode ser alta quando a leitura real foi respondida');
+assert.doesNotMatch(health, /SISTEMA NORMAL/, 'ausência de hipótese sem ECU validada não prova normalidade');
 assert.match(index, /weatherCity:\{[^}]*fontSize:15/, 'cidade/clima deve estar em tamanho legível no retrato');
 assert.match(index, /numberOfLines=\{layout\.landscape \? 1 : 2\}/, 'nome de cidade longo deve caber em duas linhas no retrato e uma na paisagem');
 assert.match(index, /weatherCity:\{[^}]*lineHeight:18/, 'quebra de linha da cidade deve preservar a hierarquia vertical');
@@ -50,7 +76,11 @@ assert.match(index, /layoutSpacer:\{flexGrow:1,minHeight:8/, 'a navegação deve
 const networkIndicator = read('src/ui/NetworkStatusIndicator.tsx');
 assert.match(networkIndicator, /label: \{ fontSize: 13/, 'geração Wi-Fi/4G/5G deve ter maior legibilidade no cockpit');
 assert.match(networkIndicator, /AppIcon name=\{presentation\.icon\} size=\{20\}/, 'ícone da rede deve ficar visível sem dominar o cartão');
-assert.match(index, /bottomNavText:\{[^}]*fontSize:8/, 'rótulos da navegação devem permanecer legíveis');
+
+const navStart = index.indexOf('<View style={[styles.bottomNav, layout.landscape && styles.bottomNavLandscape]}>');
+const navEnd = index.indexOf('</View>', navStart);
+assert.ok(navStart >= 0 && navEnd > navStart, 'a barra inferior deve ser identificável no cockpit');
+assert.doesNotMatch(index.slice(navStart, navEnd), /<Text\b/, 'a barra inferior deve ter somente ícones, sem legendas visíveis');
 assert.match(index, /networkChipLandscape:\{[^}]*minHeight:50,[^}]*maxWidth:92/, 'cartão de rede permanece compacto em paisagem');
 assert.match(networkIndicator, /internetStatus: \{ fontSize: 10/, 'estado da internet deve usar tipografia legível em uma segunda linha');
 assert.match(networkIndicator, /INTERNET OK/);
@@ -77,6 +107,9 @@ assert.match(dataScreen, /item\.source === 'REAL'/, 'últimas leituras devem exc
 assert.match(dataScreen, /telemetrySamples/, 'histórico deve reutilizar amostras persistidas por viagem');
 assert.match(dataScreen, /VIAGENS SALVAS/, 'tela deve oferecer modo interativo de histórico');
 assert.match(read('app/saude.tsx'), /runLocalDiagnostic/);
+assert.ok(health.includes('isCurrentLiveDtc'), 'Saúde não deve exibir DTC histórico como atual');
+assert.ok(health.includes("value:r.status==='RESPONDEU'?r.value:null"), 'falha de consulta não pode alimentar hipótese atual');
+assert.ok(health.includes('ECU desconectada. Os registros salvos não confirmam o estado atual das falhas.'), 'desconexão não confirma ausência de falhas');
 assert.match(read('app/saude.tsx'), /activeDtcs/);
 assert.match(read('app/aprendizado.tsx'), /realSamples/);
 assert.match(read('app/laboratorio.tsx'), /03 \/ 07 \/ 0A/);

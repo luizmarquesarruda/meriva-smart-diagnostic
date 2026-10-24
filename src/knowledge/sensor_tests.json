@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "catalogId": "MERIVA_SMART_SENSOR_TESTS",
-  "updatedAt": "2026-10-20",
+  "updatedAt": "2026-10-24",
   "vehicleProfile": {
     "make": "Chevrolet",
     "model": "Meriva Maxx",
@@ -11,12 +11,14 @@
     "note": "Perfil de referência; não inferir ECU instalada nem suporte de PID por modelo/ano."
   },
   "supportPolicy": {
-    "requiredEvidence": "Bitmap de suporte anunciada em runtime e definição válida em src/knowledge/pids.json.",
+    "requiredEvidence": "Definição SAE válida, bitmap de suporte anunciada na sessão atual e resposta individual completa que o parser valide. Manual do proprietário e catálogo genérico não confirmam suporte de PID.",
     "distinctions": [
       "STANDARD_DEFINITION_IS_NOT_VEHICLE_SUPPORT",
       "BITMAP_ANNOUNCED_IS_DISCOVERED_NOT_PHYSICAL_SENSOR_VALIDATION",
       "POSITIVE_RESPONSE_IS_NOT_SENSOR_ACCURACY_PROOF",
-      "CARSCANNER_BASELINE_IS_NOT_REAL_ECU_EVIDENCE"
+      "CARSCANNER_BASELINE_IS_NOT_REAL_ECU_EVIDENCE",
+      "OWNER_MANUAL_DOES_NOT_DEFINE_PID_SUPPORT",
+      "STANDARD_PID_CATALOG_IS_NOT_VEHICLE_COMPATIBILITY"
     ],
     "confirmedPids": [
       "010C"
@@ -75,9 +77,9 @@
     {
       "id": "MERIVA_OWNER_MANUAL",
       "title": "Manual do Proprietário Chevrolet Meriva 2012 — Brasil",
-      "url": "https://meu.chevrolet.com.br/content/dam/gmownercenter/gmsa/gmbr/dynamic/manuals/2012/chevrolet/Meriva/pt/om_ng-chevrolet_Meriva_my12-pt_BR.pdf",
-      "usedFor": "Identidade do veículo e contexto operacional.",
-      "limitation": "Manual não informa bitmap de suporte OBD."
+      "url": "https://www.chevrolet.com.br/content/dam/chevrolet/south-america/brazil/portuguese/index/services/owner-manuals/05-pdf/meriva/manual-meriva-2012.pdf",
+      "usedFor": "Contexto de variante, advertências, funcionamento geral e manutenção do Meriva 2012; não definir suporte de PIDs.",
+      "limitation": "O texto do manual do proprietário não contém tabela de PIDs OBD nem bitmap específica da ECU."
     },
     {
       "id": "MERIVA_BIBLE_LOCAL_AUDIT",
@@ -99,6 +101,55 @@
       "repositoryPath": "src/knowledge/pids.json; src/knowledge/meriva_confirmed_pids.json",
       "usedFor": "Fórmulas e evidência real específica atual.",
       "limitation": "Somente 010C tem resposta RAW_ECU documentada atualmente."
+    },
+    {
+      "id": "MERIVA_OWNER_MANUAL_2011",
+      "title": "Manual do Proprietário Chevrolet Meriva 2011 — portal oficial Chevrolet Brasil",
+      "url": "https://www.chevrolet.com.br/content/dam/chevrolet/south-america/brazil/portuguese/index/services/owner-manuals/05-pdf/meriva/manual-meriva-2011.pdf",
+      "usedFor": "Contexto operacional, avisos e manutenção.",
+      "limitation": "Não documenta uma tabela de PIDs ou bitmap de suporte OBD."
+    },
+    {
+      "id": "CHEVROLET_OLDER_MANUALS_PORTAL",
+      "title": "Chevrolet Brasil — manuais de proprietários de anos anteriores",
+      "url": "https://www.chevrolet.com.br/servicos/manuais-veiculos/anos-anteriores",
+      "usedFor": "Verificação de disponibilidade dos manuais Meriva 2008–2012.",
+      "limitation": "Disponibilidade do manual não prova compatibilidade ECU/PID."
+    },
+    {
+      "id": "CHEVROLET_MERIVA_REPAIR_MANUAL_PORTAL",
+      "title": "Peça Chevrolet — portal de manuais técnicos da Meriva",
+      "url": "https://www.pecachevrolet.com.br/reparador-man/meriva",
+      "usedFor": "Confirma que o portal lista manuais de reparação, especificações, manutenção e diagramas.",
+      "limitation": "O manual de reparação completo não foi inspecionado integralmente nesta auditoria; não extrair afirmações de PID da página de índice."
+    },
+    {
+      "id": "MERIVA_ECONOFLEX_TRAINING_INDEX",
+      "title": "Mecânica 2000 — índice do treinamento Meriva Econo.Flex 1.4",
+      "url": "https://www.mecanica2000.com.br/produto-detalhe/53/meriva-econoflex-14",
+      "usedFor": "Índice comercial lista Multec HX14YFH e cobertura de testes de sensores (ECT, MAP/IAT, O2, CKP, VSS, pedal e borboleta).",
+      "limitation": "Índice comercial secundário não comprova ECU instalada no veículo conectado nem suporte de PIDs para ano/variante específica."
+    },
+    {
+      "id": "OBD_AUTO_DOCTOR_PID_REFERENCE",
+      "title": "OBD Auto Doctor — parâmetros OBD suportados",
+      "url": "https://www.obdautodoctor.com/help/articles/supported-obd-parameters/",
+      "usedFor": "Conferência cruzada de nomes e distinção entre IDs SAE e parâmetros efetivamente disponíveis.",
+      "limitation": "A própria documentação afirma que o subconjunto disponível depende de cada veículo; não é uma lista OEM da Meriva."
+    },
+    {
+      "id": "OBDLINK_PID_REFERENCE",
+      "title": "OBDLink App — lista de PIDs SAE",
+      "url": "https://www.obdlink.com/obd-apps/obdlink-app/",
+      "usedFor": "Segunda referência de nomes padrão e advertência de que cada veículo suporta apenas um subconjunto.",
+      "limitation": "Referência genérica, não certifica suporte da ECU da Meriva."
+    },
+    {
+      "id": "OBD2PID_0101_BIT_MAP",
+      "title": "OBD2 PID Knowledge — mapa de bits do PID 0101",
+      "url": "https://obd2pid.com/pids/01-01",
+      "usedFor": "Conferir MIL, contagem de DTC, tipo de ignição e readiness, inclusive C4/D4 no ciclo Otto.",
+      "limitation": "Referência secundária de apoio; a definição normativa SAE tem precedência."
     }
   ],
   "tests": [
@@ -421,8 +472,8 @@
     {
       "id": "PID_0111",
       "pid": "0111",
-      "label": "Posição da borboleta",
-      "catalogName": "Throttle Position",
+      "label": "Posição absoluta da borboleta",
+      "catalogName": "Absolute Throttle Position",
       "unit": "percent",
       "formulaId": "PERCENT_255",
       "category": "acelerador",
@@ -756,8 +807,8 @@
     {
       "id": "PID_015A",
       "pid": "015A",
-      "label": "Posição do pedal do acelerador",
-      "catalogName": "Accelerator Pedal Position",
+      "label": "Posição relativa do pedal do acelerador",
+      "catalogName": "Relative Accelerator Pedal Position",
       "unit": "percent",
       "formulaId": "PERCENT_255",
       "category": "acelerador",

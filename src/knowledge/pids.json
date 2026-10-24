@@ -1,15 +1,15 @@
 {
-  "version": 2,
+  "version": 5,
   "source": "SAE J1979 / ISO 15031-5 cross-checked against open OBD implementations",
   "pids": [
     {
       "pid": "0101",
       "name": "Monitor Status Since DTCs Cleared",
       "bytes": 4,
-      "unit": "status",
-      "formulaId": "U32",
+      "unit": "dtc_count",
+      "formulaId": "DTC_COUNT",
       "classification": "PADRAO_OBD",
-      "description": "Status do MIL, quantidade de DTCs e monitores de prontidão desde a limpeza dos DTCs."
+      "description": "Status MIL e prontidão OBD. O valor principal é a contagem DTC (A6..A0); A7 é MIL. A interpretação detalhada decodifica disponibilidade/incompletude por tipo de ignição; em ciclo Otto, C4/D4 referem-se ao monitor de filtro de partículas de gasolina."
     },
     {
       "pid": "0104",
@@ -112,12 +112,12 @@
     },
     {
       "pid": "0111",
-      "name": "Throttle Position",
+      "name": "Absolute Throttle Position",
       "bytes": 1,
       "unit": "percent",
       "formulaId": "PERCENT_255",
       "classification": "PADRAO_OBD",
-      "description": "Posição relativa da borboleta"
+      "description": "Posição absoluta da borboleta; distinta da posição relativa do PID 0145."
     },
     {
       "pid": "0114",
@@ -168,7 +168,7 @@
       "pid": "0130",
       "name": "Warmups Since DTC Clear",
       "bytes": 1,
-      "unit": "code",
+      "unit": "warmup_cycles",
       "formulaId": "U8",
       "classification": "PADRAO_OBD",
       "description": "Número de ciclos de aquecimento desde a limpeza dos DTCs."
@@ -216,7 +216,7 @@
       "unit": "percent",
       "formulaId": "PERCENT_255",
       "classification": "PADRAO_OBD",
-      "description": "Posição relativa da borboleta."
+      "description": "Posição relativa da borboleta; distinta da posição absoluta do PID 0111."
     },
     {
       "pid": "0146",
@@ -256,7 +256,7 @@
     },
     {
       "pid": "015A",
-      "name": "Accelerator Pedal Position",
+      "name": "Relative Accelerator Pedal Position",
       "bytes": 1,
       "unit": "percent",
       "formulaId": "PERCENT_255",

@@ -95,7 +95,7 @@ export function classifyElmError(response: string, message = ''): ElmErrorType {
   if (isNoDataResponse(value)) return 'NO_DATA';
   if (/BUFFER FULL/.test(value)) return 'BUFFER_FULL';
   if (/BUS INIT/.test(value)) return 'BUS_INIT_ERROR';
-  if (/BUS ERROR|CAN ERROR|CAN ERROR/.test(value)) return 'BUS_ERROR';
+  if (/BUS ERROR|CAN ERROR/.test(value)) return 'BUS_ERROR';
   if (/RX ERROR|RXERROR/.test(value)) return 'RX_ERROR';
   if (/DATA ERROR/.test(value)) return 'DATA_ERROR';
   if (/DISCONNECT|NOT CONNECTED/.test(value + ' ' + detail)) return 'DISCONNECTED';
@@ -108,24 +108,67 @@ export function isPartialResponseError(message: string): boolean {
   return /PARTIAL|SEM PROMPT|FINAL DE LINHA|INCOMPLETA/i.test(message);
 }
 
+function boundedInteger(value: unknown, fallback: number, min: number, max: number): number {
+  const numeric = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(numeric)));
+}
+
 export function mergeCompatibilityConfig(
   partial?: Partial<Elm327CompatibilityConfig>,
 ): Elm327CompatibilityConfig {
   const merged = { ...DEFAULT_ELM327_COMPATIBILITY, ...(partial ?? {}) };
+  const adaptiveTimeoutMinMs = boundedInteger(
+    merged.adaptiveTimeoutMinMs,
+    DEFAULT_ELM327_COMPATIBILITY.adaptiveTimeoutMinMs,
+    1000,
+    30_000,
+  );
+  const adaptiveTimeoutMaxMs = boundedInteger(
+    merged.adaptiveTimeoutMaxMs,
+    Math.max(adaptiveTimeoutMinMs, DEFAULT_ELM327_COMPATIBILITY.adaptiveTimeoutMaxMs),
+    adaptiveTimeoutMinMs,
+    120_000,
+  );
+  const recoveryBackoffMs = Array.isArray(merged.recoveryBackoffMs) && merged.recoveryBackoffMs.length
+    ? merged.recoveryBackoffMs.slice(0, 5).map((value, index) => boundedInteger(
+        value,
+        DEFAULT_ELM327_COMPATIBILITY.recoveryBackoffMs[index] ?? 5000,
+        500,
+        120_000,
+      ))
+    : [...DEFAULT_ELM327_COMPATIBILITY.recoveryBackoffMs];
+  const configuredCommands = Array.isArray(merged.forceInitCommands)
+    ? merged.forceInitCommands
+      .filter((command): command is string => typeof command === 'string')
+      .map((command) => command.toUpperCase())
+      .filter((command) => /^AT[A-Z0-9]+$/.test(command))
+    : [];
   return {
     ...merged,
-    ioTimeoutMs: Math.max(1000, Math.round(merged.ioTimeoutMs)),
-    bluetoothConnectTimeoutMs: Math.max(1000, Math.round(merged.bluetoothConnectTimeoutMs)),
-    commandDelayMs: Math.max(0, Math.round(merged.commandDelayMs)),
-    maxConnectionAttempts: Math.max(0, Math.round(merged.maxConnectionAttempts)),
-    noDataReconnectThreshold: Math.max(1, Math.round(merged.noDataReconnectThreshold)),
-    recoveryBackoffMs: Array.isArray(merged.recoveryBackoffMs) && merged.recoveryBackoffMs.length
-      ? merged.recoveryBackoffMs.map((value) => Math.max(500, Math.round(Number(value) || 0))).slice(0, 5)
-      : [2000, 5000, 15000],
-    adaptiveTimeoutMinMs: Math.max(1000, Math.round(merged.adaptiveTimeoutMinMs)),
-    adaptiveTimeoutMaxMs: Math.max(1000, Math.round(merged.adaptiveTimeoutMaxMs)),
-    adaptiveTimeoutStepMs: Math.max(50, Math.round(merged.adaptiveTimeoutStepMs)),
-    optionalAtTimeoutMs: Math.max(1000, Math.round(merged.optionalAtTimeoutMs)),
-    protocolSelectionTimeoutMs: Math.max(1000, Math.round(merged.protocolSelectionTimeoutMs)),
+    ioTimeoutMs: boundedInteger(merged.ioTimeoutMs, DEFAULT_ELM327_COMPATIBILITY.ioTimeoutMs, 1000, 120_000),
+    bluetoothConnectTimeoutMs: boundedInteger(merged.bluetoothConnectTimeoutMs, DEFAULT_ELM327_COMPATIBILITY.bluetoothConnectTimeoutMs, 1000, 120_000),
+    commandDelayMs: boundedInteger(merged.commandDelayMs, DEFAULT_ELM327_COMPATIBILITY.commandDelayMs, 0, 5000),
+    maxConnectionAttempts: boundedInteger(merged.maxConnectionAttempts, DEFAULT_ELM327_COMPATIBILITY.maxConnectionAttempts, 0, 100),
+    noDataReconnectThreshold: boundedInteger(merged.noDataReconnectThreshold, DEFAULT_ELM327_COMPATIBILITY.noDataReconnectThreshold, 1, 100),
+    recoveryBackoffMs,
+    partialResponseAction: ['RECONNECT_AND_INITIALIZE', 'RECONNECT', 'IGNORE'].includes(merged.partialResponseAction)
+      ? merged.partialResponseAction
+      : DEFAULT_ELM327_COMPATIBILITY.partialResponseAction,
+    forceInitialization: typeof merged.forceInitialization === 'boolean'
+      ? merged.forceInitialization
+      : DEFAULT_ELM327_COMPATIBILITY.forceInitialization,
+    forceInitCommands: configuredCommands.length ? [...new Set(configuredCommands)] : [...DEFAULT_ELM327_COMPATIBILITY.forceInitCommands],
+    allowUnsupportedAtCommands: typeof merged.allowUnsupportedAtCommands === 'boolean'
+      ? merged.allowUnsupportedAtCommands
+      : DEFAULT_ELM327_COMPATIBILITY.allowUnsupportedAtCommands,
+    adaptiveTiming: typeof merged.adaptiveTiming === 'boolean'
+      ? merged.adaptiveTiming
+      : DEFAULT_ELM327_COMPATIBILITY.adaptiveTiming,
+    adaptiveTimeoutMinMs,
+    adaptiveTimeoutMaxMs,
+    adaptiveTimeoutStepMs: boundedInteger(merged.adaptiveTimeoutStepMs, DEFAULT_ELM327_COMPATIBILITY.adaptiveTimeoutStepMs, 50, 10_000),
+    optionalAtTimeoutMs: boundedInteger(merged.optionalAtTimeoutMs, DEFAULT_ELM327_COMPATIBILITY.optionalAtTimeoutMs, 1000, 30_000),
+    protocolSelectionTimeoutMs: boundedInteger(merged.protocolSelectionTimeoutMs, DEFAULT_ELM327_COMPATIBILITY.protocolSelectionTimeoutMs, 1000, 120_000),
   };
 }

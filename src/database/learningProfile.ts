@@ -231,7 +231,7 @@ export const CARSCANNER_SEED_SAMPLES: CarScannerSeedSample[] = [
   { pidName: 'Timing Advance', value: 8, condition: 'IDLE_WARM', timestamp: '2026-09-24T14:48:00.000Z' },
   { pidName: 'Intake Air Temperature', value: 33, condition: 'IDLE_WARM', timestamp: '2026-09-24T14:48:00.000Z' },
   { pidName: 'MAF', value: 2.48, condition: 'IDLE_WARM', timestamp: '2026-09-24T14:48:00.000Z' },
-  { pidName: 'Throttle Position', value: 3.53, condition: 'IDLE_WARM', timestamp: '2026-09-24T14:48:00.000Z' },
+  { pidName: 'Absolute Throttle Position', value: 3.53, condition: 'IDLE_WARM', timestamp: '2026-09-24T14:48:00.000Z' },
   { pidName: 'O2 Sensor 1 Voltage', value: 0.53, condition: 'IDLE_WARM', timestamp: '2026-09-24T14:48:00.000Z' },
 ];
 

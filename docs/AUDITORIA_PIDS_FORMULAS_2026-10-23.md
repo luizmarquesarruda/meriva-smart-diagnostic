@@ -1,5 +1,7 @@
 # Auditoria de fórmulas e PIDs OBD-II — 2026-10-23
 
+> **Nota de versão:** auditoria histórica centrada em limites de fórmula. Para nomes/unidades atuais, o significado de PID 0101 e fontes oficiais da Meriva, consulte [mapa vigente](PID_FORMULA_MAP_2026-10-24.md) e [auditoria de fontes Meriva × OBD](MERIVA_OBD_SOURCE_AUDIT_2026-10-24.md).
+
 ## Escopo
 
 Revisão direcionada do catálogo `src/knowledge/pids.json`, motor `src/obd/formulaEngine.ts`, faixas `src/knowledge/ranges.json` e parser `src/obd/parser.ts` no repositório Meriva Smart Diagnostic.

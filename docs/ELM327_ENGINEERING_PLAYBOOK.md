@@ -1,5 +1,7 @@
 # ELM327 Engineering Playbook
 
+> Para nomes/fórmulas dos PIDs e limites da documentação do veículo, consulte [Auditoria de fontes da Meriva e compatibilidade OBD](MERIVA_OBD_SOURCE_AUDIT_2026-10-24.md). O gate por resposta real de `010C` é um critério operacional observado no projeto, não uma promessa de que todos os PIDs SAE estejam disponíveis.
+
 ## Objetivo
 Construir uma sessão OBD-II tolerante a clones ELM327, mas rigorosa com evidência.
 

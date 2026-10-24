@@ -50,6 +50,8 @@ const {
   haversineDistanceKm,
   normalizeGpsSpeedKmh,
   calculateConsumptionKml,
+  isGpsSampleFresh,
+  GPS_SAMPLE_STALE_AFTER_MS,
 } = mod.exports;
 
 assert.strictEqual(normalizeGpsSpeedKmh(10), 36);
@@ -65,6 +67,12 @@ assert.ok(
 assert.strictEqual(calculateConsumptionKml(100, 8), 12.5);
 assert.strictEqual(calculateConsumptionKml(0, 8), null);
 assert.strictEqual(calculateConsumptionKml(100, 0), null);
+assert.strictEqual(GPS_SAMPLE_STALE_AFTER_MS, 5000);
+assert.strictEqual(isGpsSampleFresh(10_000, 15_000), true, 'sample within the freshness window is current');
+assert.strictEqual(isGpsSampleFresh(10_000, 15_001), false, 'sample beyond the freshness window is stale');
+assert.strictEqual(isGpsSampleFresh(10_001, 10_000), false, 'future-dated sample is not current');
+assert.strictEqual(isGpsSampleFresh(null, 10_000), false, 'missing sample timestamp is not current');
+assert.strictEqual(isGpsSampleFresh(Number.NaN, 10_000), false, 'invalid timestamp is not current');
 
 (async () => {
   const tracker = new GpsTracker();
@@ -143,6 +151,17 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
 
   watcher({ coords: { latitude: 0, longitude: 0.00175, speed: 10, accuracy: 5 }, timestamp: 29000 });
   assert.strictEqual(tracker.getState().distanceKm, distanceAfterObdMovement);
+
+  const beforeInvalidCoordinates = tracker.getState();
+  watcher({ coords: { latitude: 91, longitude: 0, speed: 50, accuracy: 5 }, timestamp: 30000 });
+  assert.deepStrictEqual(tracker.getState(), beforeInvalidCoordinates, 'latitude outside [-90, 90] must be discarded');
+  watcher({ coords: { latitude: 0, longitude: 181, speed: 50, accuracy: 5 }, timestamp: 31000 });
+  assert.deepStrictEqual(tracker.getState(), beforeInvalidCoordinates, 'longitude outside [-180, 180] must be discarded');
+
+  watcher({ coords: { latitude: 0, longitude: 0.00175, speed: 50, accuracy: -1 }, timestamp: 32000 });
+  assert.strictEqual(tracker.getState().signalQuality, 'SEM_FIX', 'negative GPS accuracy must not be treated as excellent');
+  assert.strictEqual(tracker.getState().currentSpeedKmh, 0, 'unknown/invalid accuracy must not establish GPS motion');
+  assert.strictEqual(tracker.getState().distanceKm, distanceAfterObdMovement, 'invalid accuracy must not add distance');
 
   await tracker.stop();
   assert.strictEqual(tracker.getState().running, false);

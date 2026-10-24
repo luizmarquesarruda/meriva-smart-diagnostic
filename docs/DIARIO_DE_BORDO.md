@@ -3438,3 +3438,54 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - **Protocolo e permissões:** recuperação ELM (ATZ/ATSP/prova ECU/ATDP) é serializada; GPS segue opcional para iniciar OBD; o plugin limita permissões Bluetooth legadas no Android até API 30 sem limitar as permissões modernas.
 - **Proteções:** testes adversariais de promessa pendente, falha de fechamento, bloqueio entre instâncias e ordem de protocolo ficam ligados a `npm test` e ao gate anti-regressão. Os requisitos Bluetooth recebem IDs RG-22 a RG-31, sem duplicar RGs existentes.
 - **Validação:** conferir `gate:baseline`, `validate` e `android-build` no SHA final desta atualização. A CI não substitui teste físico com ELM327/ECU; esse teste e a inspeção no aparelho permanecem pendentes.
+
+### DB-109 — 2026-10-24 — Ajuste de navegação Floot → cockpit Android
+
+#### Alterações
+- Alinhada a barra inferior operacional com as seis seções do layout Floot: Painel, Conexões, Diagnóstico, Viagem, Laboratório e Configurações.
+- Aumentados os ícones de navegação para 32 dp, com distribuição uniforme, sem legendas visíveis e nomes/dicas de acessibilidade preservados.
+- Corrigidos os destinos: Diagnóstico abre a central de saúde/DTCs, Laboratório abre as ferramentas técnicas de OBD e Configurações abre as preferências reais.
+- Dados/Telemetria continua acessível em Mais Recursos; Mais Recursos continua acessível por Configurações para evitar perda de telas existentes.
+- Atualizados testes de navegação, contrato antirregressão, plano de testes, README, changelog e documentação de portabilidade Floot.
+
+#### Integridade e validação
+- Não foram alterados transporte Bluetooth Classic, sessão/serialização ELM327, validação de resposta real da ECU, telemetria, fórmulas PID, consumo, autonomia ou histórico.
+- Alterações versionadas na branch `feat/port-floot-layout-20261024`, PR #83; nenhuma alteração direta à `main` e nenhum merge executado.
+- TypeScript/testes da Floot e CI do GitHub precisam ser reexecutados para o novo SHA; inspeção visual em Android físico e teste ELM327/ECU real continuam pendentes. A aprovação de CI não substitui a validação física.
+
+## DB-110 — 2026-10-24 — Auditoria técnica — DTC, CSV e evidências
+
+- Branch `feat/port-floot-layout-20261024`; PR #83 segue aberta, sem merge e sem alteração direta à `main`.
+- DTC histórico: `historical=true` prevalece sobre status contraditório na tela Saúde, no armazenamento e no motor diagnóstico.
+- Reconciliação: somente resposta Mode 03 completa/validada inativa DTC REAL_OBD CURRENT/CONFIRMED ausente. NO DATA, timeout, resposta inválida, pending/permanent e dados importados são preservados.
+- PID: valor de consulta que não terminou em `RESPONDEU` não alimenta hipótese numérica atual; origem desconhecida não é promovida a OBD real.
+- CSV: campos com retorno de carro (`\r`) passam a ser citados; teste de regressão foi incluído.
+- O baseline de autonomia já está alinhado com `getCurrentAutonomyRangeKm`, usando sessão/ECU ativa e leitura recente do PID 012F.
+- A CI do SHA final deve comprovar gate, suíte completa e build Android. Inspeção visual em aparelho e teste físico com ELM327/ECU continuam pendentes.
+
+## DB-111 — 2026-10-24 — Mapa integral de PIDs e fórmulas
+
+- Mapa completo criado em `docs/PID_FORMULA_MAP_2026-10-24.md` a partir dos catálogos versionados.
+- Catálogo com 34 PIDs Mode 01; somente `010C` confirmado via RAW_ECU na ficha da Meriva; 10 candidatos.
+- PID 0101 retorna contagem `A & 0x7F` e interpreta MIL/readiness SI/CI; 0114 decodifica STFT do byte B; 0151 interpreta enums e recusa código desconhecido.
+- Laboratório mostra interpretação complementar; testes foram ampliados.
+- A CI do SHA final deve validar TypeScript, barreira, suíte completa e build Android. Suporte real depende da resposta da ECU.
+
+
+## DB-112 — 2026-10-24 — Auditoria cruzada de semântica dos PIDs
+
+- Comparadas as definições locais com a SAE J1979 de acesso público, Dashlogic, OBD Auto Doctor e OBDLink.
+- Revisão corretiva posterior: a primeira interpretação do bit C4 estava incorreta. Após conferir a tabela de bits do PID 0101 na referência SAE J1979 e na referência independente OBD2PID, o código correto foi restaurado: C4 em ciclo Otto indica disponibilidade do monitor do filtro de partículas de gasolina. O novo teste de regressão trava essa semântica.
+- Corrigidos os rótulos: 0111 = posição absoluta da borboleta; 0145 = posição relativa; 015A = posição relativa do pedal do acelerador.
+- PID 0130 agora usa unidade `warmup_cycles`/`ciclos`, separada de códigos enumerados como o tipo de combustível 0151.
+- Atualizados os catálogos de testes, inventário de evidência, mapa de PIDs e contrato anti-regressão. Testes adicionados para as distinções semânticas.
+- A auditoria documental não comprova suporte físico da ECU da Meriva. `010C` continua como único PID com resposta RAW_ECU documentada; a CI do HEAD atualizado deve ser validada.
+
+
+## DB-113 — 2026-10-24 — Fontes oficiais da Meriva e limites de compatibilidade OBD
+
+- Localizados os manuais oficiais Chevrolet Meriva 2011 e 2012 no portal de manuais de anos anteriores da Chevrolet Brasil.
+- Os manuais confirmam contexto operacional do motor ECONO.FLEX, controles/advertências e manutenção. A busca textual por “OBD” e “conector de diagnóstico” não localizou uma tabela de PIDs ou bitmap de suporte; por isso, os manuais do proprietário não são usados como prova de suporte de PID.
+- A página de manuais técnicos Peça Chevrolet informa disponibilidade de manual de reparação e diagramas, mas o conteúdo completo não foi validado linha a linha nesta auditoria. O catálogo de treinamento comercial do Meriva Econo.Flex descreve Multec HX14YFH e testes de sensores, mas isso não prova que essa ECU específica esteja instalada em toda Meriva 2011/2012.
+- Adicionado `docs/MERIVA_OBD_SOURCE_AUDIT_2026-10-24.md`, com matriz de fontes, limites e comparativo entre a lista SAE genérica e a evidência atual da ECU.
+- Reforçada a barreira anti-regressão para impedir a associação errada de PID 0101 C4, divergência de nomes/unidades e alegações de compatibilidade sem evidência RAW_ECU. Nenhuma alteração foi mesclada em `main`.

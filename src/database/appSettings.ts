@@ -61,6 +61,15 @@ function numberSetting(value: unknown, fallback: number, min: number, max: numbe
   return Math.min(max, Math.max(min, Math.round(numeric)));
 }
 
+function normalizeAdaptiveTimeouts(minValue: unknown, maxValue: unknown): Pick<AppSettings, 'elmAdaptiveTimeoutMinMs' | 'elmAdaptiveTimeoutMaxMs'> {
+  const elmAdaptiveTimeoutMinMs = numberSetting(minValue, DEFAULT_SETTINGS.elmAdaptiveTimeoutMinMs, 1000, 15000);
+  const configuredMax = numberSetting(maxValue, DEFAULT_SETTINGS.elmAdaptiveTimeoutMaxMs, 3000, 30000);
+  return {
+    elmAdaptiveTimeoutMinMs,
+    elmAdaptiveTimeoutMaxMs: Math.max(elmAdaptiveTimeoutMinMs, configuredMax),
+  };
+}
+
 async function settingsPath(basePath: string): Promise<string> {
   const dir = `${basePath}/CONFIG`;
   await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
@@ -77,6 +86,7 @@ export async function readAppSettings(basePath: string): Promise<AppSettings> {
 
   try {
     const parsed = JSON.parse(await FileSystem.readAsStringAsync(target)) as Partial<AppSettings>;
+    const adaptiveTimeouts = normalizeAdaptiveTimeouts(parsed.elmAdaptiveTimeoutMinMs, parsed.elmAdaptiveTimeoutMaxMs);
     const settings: AppSettings = {
       fuelType: parsed.fuelType === 'GASOLINA' ? 'GASOLINA' : parsed.fuelType === 'ETANOL' ? 'ETANOL' : 'FLEX',
       distanceUnit: parsed.distanceUnit === 'MI' ? 'MI' : 'KM',
@@ -95,8 +105,7 @@ export async function readAppSettings(basePath: string): Promise<AppSettings> {
         : 'RECONNECT_AND_INITIALIZE',
       elmForceInitialization: parsed.elmForceInitialization !== false,
       elmAdaptiveTiming: parsed.elmAdaptiveTiming !== false,
-      elmAdaptiveTimeoutMinMs: numberSetting(parsed.elmAdaptiveTimeoutMinMs, 3000, 1000, 15000),
-      elmAdaptiveTimeoutMaxMs: numberSetting(parsed.elmAdaptiveTimeoutMaxMs, 15000, 3000, 30000),
+      ...adaptiveTimeouts,
     };
     publishSettings(settings);
     return settings;
@@ -108,10 +117,14 @@ export async function readAppSettings(basePath: string): Promise<AppSettings> {
 
 export async function writeAppSettings(basePath: string, settings: AppSettings): Promise<void> {
   const target = await settingsPath(basePath);
-  await FileSystem.writeAsStringAsync(target, JSON.stringify(settings, null, 2), {
+  const safeSettings: AppSettings = {
+    ...settings,
+    ...normalizeAdaptiveTimeouts(settings.elmAdaptiveTimeoutMinMs, settings.elmAdaptiveTimeoutMaxMs),
+  };
+  await FileSystem.writeAsStringAsync(target, JSON.stringify(safeSettings, null, 2), {
     encoding: FileSystem.EncodingType.UTF8,
   });
-  publishSettings(settings);
+  publishSettings(safeSettings);
 }
 
 export { DEFAULT_SETTINGS };

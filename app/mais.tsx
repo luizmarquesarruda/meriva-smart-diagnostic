@@ -11,6 +11,7 @@ const items = [
   ['vehicle', 'VEÍCULO', 'Perfil, motor, combustível e ECU', '/veiculo'],
   ['vehicle', 'MANUTENÇÃO E ABASTECIMENTO', 'Lembretes por km/data e histórico de abastecimentos', '/manutencao'],
   ['trips', 'VIAGENS', 'Distância, consumo e ciclos registrados', '/viagens'],
+  ['data', 'DADOS E TELEMETRIA', 'Gráficos e leituras de telemetria ao vivo', '/dados'],
   ['learning', 'APRENDIZADO', 'Amostras reais, confiança e contaminação', '/aprendizado'],
   ['health', 'SAÚDE', 'DTCs, evidências e hipóteses locais', '/saude'],
   ['bluetooth', 'BLUETOOTH / ELM327', 'Dispositivos, conexão e validação', '/bluetooth'],

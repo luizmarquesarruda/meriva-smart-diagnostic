@@ -256,7 +256,50 @@ async function testParser() {
   const o2 = parser.parsePidResponse('0114', '41 14 6A 80');
   assert.strictEqual(o2.status, 'RESPONDEU');
   assert.strictEqual(o2.value, 0.53);
+  assert.match(o2.interpretation, /STFT B1S1=0\.00%/, 'PID 0114 deve decodificar o byte B como STFT');
   assert.strictEqual(o2.rawBytes.length, 4);
+  const o2NoTrim = parser.parsePidResponse('0114', '41 14 6A FF');
+  assert.match(o2NoTrim.interpretation, /STFT B1S1=NÃO UTILIZADA/, 'B=FF indica que o trim não é usado');
+  const fuelType = parser.parsePidResponse('0151', '41 51 03');
+  assert.strictEqual(fuelType.status, 'RESPONDEU');
+  assert.strictEqual(fuelType.value, 3);
+  assert.match(fuelType.interpretation, /Etanol/, 'PID 0151 deve usar a tabela enum do combustível');
+  const unknownFuelType = parser.parsePidResponse('0151', '41 51 FF');
+  assert.strictEqual(unknownFuelType.status, 'VALOR NÃO INTERPRETADO');
+  assert.strictEqual(unknownFuelType.value, null);
+  const monitorStatus = parser.parsePidResponse('0101', '41 01 83 33 A1 81');
+  assert.strictEqual(monitorStatus.status, 'RESPONDEU');
+  assert.strictEqual(monitorStatus.value, 3, 'PID 0101 deve publicar contagem de DTC, não os quatro bytes como inteiro');
+  assert.match(monitorStatus.interpretation, /MIL=ON/);
+  assert.match(monitorStatus.interpretation, /MISFIRE:NÃO PRONTO/);
+  assert.match(monitorStatus.interpretation, /CATALISADOR:NÃO PRONTO/);
+  const dieselMonitorStatus = parser.parsePidResponse('0101', '41 01 00 08 C0 C0');
+  assert.match(dieselMonitorStatus.interpretation, /MOTOR=DIESEL\/CI/);
+  assert.match(dieselMonitorStatus.interpretation, /FILTRO_PARTICULAS:NÃO PRONTO/);
+  assert.doesNotMatch(dieselMonitorStatus.interpretation, /CATALISADOR_AQUECIDO/);
+  const gasolineParticleFilterStatus = parser.parsePidResponse('0101', '41 01 00 00 10 10');
+  assert.match(
+    gasolineParticleFilterStatus.interpretation,
+    /FILTRO_PARTICULAS_GASOLINA:NÃO PRONTO/,
+    'PID 0101 C4 em motor SI representa disponibilidade do monitor de filtro de partículas de gasolina',
+  );
+  assert.doesNotMatch(
+    gasolineParticleFilterStatus.interpretation,
+    /REFRIGERANTE_AR_CONDICIONADO/,
+    'PID 0101 não define um monitor de refrigerante do ar-condicionado',
+  );
+  assert.strictEqual(
+    parser.parsePidResponse('0111', '41 11 80').definition.name,
+    'Absolute Throttle Position',
+  );
+  assert.strictEqual(
+    parser.parsePidResponse('0145', '41 45 80').definition.name,
+    'Relative Throttle Position',
+  );
+  assert.strictEqual(
+    parser.parsePidResponse('015A', '41 5A 80').definition.name,
+    'Relative Accelerator Pedal Position',
+  );
   assert.strictEqual(parser.parsePidResponse('01 0C', '41 0C 1A F8').value, 1726);
   assert.strictEqual(parser.validateOBDResponse('410C1AF8'), true);
   assert.strictEqual(parser.parsePidResponse('010C', '410C1AF8').value, 1726);
@@ -1018,6 +1061,23 @@ async function testDtcStorage() {
   writeDelayMs = 0;
   const concurrentDtcs = await dtcManager.readDtcs(BASE);
   assert.strictEqual(concurrentDtcs.length, 3, 'gravações concorrentes de DTC não podem perder registros');
+
+  await dtcManager.recordDtc(BASE, { code: 'P0420', status: 'CONFIRMED', firstSeen: '2026-10-02T20:02:00.000Z', lastSeen: '2026-10-02T20:02:00.000Z', occurrences: 2, source: 'REAL_OBD', historical: true, confirmed: true });
+  assert.equal((await dtcManager.getCurrentDtcs(BASE)).some((item) => item.code === 'P0420'), false, 'historical=true deve prevalecer sobre status CONFIRMED inconsistente');
+  assert.equal(dtcManager.nextDtcOccurrences({ status: 'CONFIRMED', historical: true, occurrences: 2 }), 3, 'leitura posterior ao registro histórico deve contar nova ocorrência');
+
+  const toReconcile = [
+    { code: 'P0130', status: 'CURRENT', source: 'REAL_OBD', historical: false, firstSeen: 't1', lastSeen: 't1', occurrences: 1 },
+    { code: 'P0135', status: 'CONFIRMED', source: 'REAL_OBD', historical: false, firstSeen: 't1', lastSeen: 't1', occurrences: 1 },
+    { code: 'P0420', status: 'PERMANENT', source: 'REAL_OBD', historical: false, firstSeen: 't1', lastSeen: 't1', occurrences: 1 },
+    { code: 'P0301', status: 'CONFIRMED', source: 'REAL_OBD', historical: true, firstSeen: 't1', lastSeen: 't1', occurrences: 1 },
+    { code: 'P0171', status: 'CONFIRMED', source: 'CARSCANNER_BASELINE', historical: false, firstSeen: 't1', lastSeen: 't1', occurrences: 1 },
+  ];
+  const now = '2026-10-24T10:00:00.000Z';
+  const inactive = dtcManager.markMissingStoredDtcsInactive(toReconcile, [], now);
+  assert.deepStrictEqual(inactive.map((item) => item.code), ['P0130', 'P0135']);
+  assert.ok(inactive.every((item) => item.status === 'INACTIVE' && item.historical === true && item.lastSeen === now));
+  assert.deepStrictEqual(dtcManager.markMissingStoredDtcsInactive(toReconcile, ['P0130'], now).map((item) => item.code), ['P0135']);
 }
 
 async function testBackupCompleteness() {
@@ -1053,14 +1113,15 @@ async function testCsvWriteSerialization() {
 
   writeDelayMs = 30;
   await Promise.all([
-    logger.appendCsvRow(target, { id: 'A', timestamp: 't1' }),
-    logger.appendCsvRow(target, { id: 'B', timestamp: 't2' }),
+    logger.appendCsvRow(target, { id: 'A', timestamp: 't1', notes: 'linha simples' }),
+    logger.appendCsvRow(target, { id: 'B', timestamp: 't2', notes: 'linha 1\rlinha 2' }),
   ]);
   writeDelayMs = 0;
 
   const content = files.get(target);
   assert.ok(content.includes('A,t1'));
   assert.ok(content.includes('B,t2'));
+  assert.ok(content.includes('"linha 1\rlinha 2"'), 'campo com CR deve ser citado para não quebrar registros CSV');
   assert.strictEqual(content.split('\n').filter(Boolean).length, 3);
 }
 
@@ -1133,7 +1194,11 @@ async function testPidAndLearningWriteSerialization() {
   assert.ok(autoTripServiceSource.includes("connection.supportedPids.includes(item) && !queriedPidsThisCycle.has(item)"),
     'a telemetria rotativa não pode consultar de novo nenhum PID já usado no mesmo ciclo');
   assert.ok(autoTripServiceSource.includes('FUEL_RATE_DISPLAY_STALE_AFTER_MS'), 'valor em cache deve ter prazo explícito de expiração para exibição');
+  assert.ok(autoTripServiceSource.includes('Number.isFinite(estimateAgeMs) && estimateAgeMs >= 0 && estimateAgeMs <= FUEL_RATE_DISPLAY_STALE_AFTER_MS'), 'estimativa em cache deve rejeitar timestamps futuros e vencidos');
   assert.ok(!autoTripServiceSource.includes('recordLivePidQuery('), 'telemetria automática deve registrar cada resposta uma única vez via registerObdQuery');
+  assert.ok(autoTripServiceSource.includes('isGpsSampleFresh(gps.lastTimestamp)'), 'detecção de movimento não pode usar velocidade GPS vencida');
+  assert.ok(autoTripServiceSource.includes('isGpsSampleFresh(tripGps.lastTimestamp)'), 'gravação da viagem deve descartar velocidade GPS vencida');
+  assert.ok(autoTripServiceSource.includes('gps.signalQuality !== \'SEM_FIX\''), 'GPS sem fix válido não deve confirmar movimento');
   writeDelayMs = 0;
 }
 

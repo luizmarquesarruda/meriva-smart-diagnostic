@@ -47,6 +47,21 @@ function main() {
   assert.strictEqual(sensorTests.minimumReadingsPerPid, 5, 'cada PID suportado exige cinco tentativas');
   assert.ok(Array.isArray(sensorTests.tests) && sensorTests.tests.length > 0, 'catálogo de testes vazio');
   assert.ok(Array.isArray(sensorTests.sources) && sensorTests.sources.length >= 5, 'fontes pesquisadas ausentes');
+  const sourcesById = new Map(sensorTests.sources.map((source) => [source.id, source]));
+  for (const requiredSource of [
+    'MERIVA_OWNER_MANUAL',
+    'MERIVA_OWNER_MANUAL_2011',
+    'CHEVROLET_OLDER_MANUALS_PORTAL',
+    'OBD_AUTO_DOCTOR_PID_REFERENCE',
+    'OBDLINK_PID_REFERENCE',
+    'OBD2PID_0101_BIT_MAP',
+  ]) {
+    assert.ok(sourcesById.has(requiredSource), 'fonte técnica obrigatória ausente: ' + requiredSource);
+  }
+  assert.match(sourcesById.get('MERIVA_OWNER_MANUAL').url, /chevrolet\.com\.br.*manual-meriva-2012\.pdf/);
+  assert.match(sourcesById.get('MERIVA_OWNER_MANUAL').limitation, /não contém tabela de PIDs OBD/i);
+  assert.ok(sensorTests.supportPolicy.distinctions.includes('OWNER_MANUAL_DOES_NOT_DEFINE_PID_SUPPORT'));
+  assert.ok(sensorTests.supportPolicy.distinctions.includes('STANDARD_PID_CATALOG_IS_NOT_VEHICLE_COMPATIBILITY'));
   assert.strictEqual(typeof dtcCatalog.version, 'number');
   assert.strictEqual(typeof pollingPolicy.version, 'number');
   assert.strictEqual(pollingPolicy.version, 2, 'cadência flex-fuel exige versão de contrato atualizada');
@@ -76,13 +91,33 @@ function main() {
     assert.ok(formulas.formulas[pid.formulaId], 'formulaId sem definição: ' + id + ' -> ' + pid.formulaId);
 
     const operation = formulas.formulas[pid.formulaId].operation;
-    const minimumBytes = ['u8', 'u8_offset', 'u8_scale', 'u8_offset_scale', 'u8_scale_offset', 'u8_div', 'u8_scale_div'].includes(operation) ? 1 : 2;
+    const minimumBytes = ['u8', 'u8_offset', 'u8_scale', 'u8_offset_scale', 'u8_scale_offset', 'u8_div', 'u8_scale_div', 'u8_mask'].includes(operation) ? 1 : 2;
     assert.ok(pid.bytes >= minimumBytes, 'bytes insuficientes para a fórmula: ' + id + ' -> ' + operation);
   }
+
+  const monitorStatusPid = pids.pids.find((item) => item.pid === '0101');
+  assert.strictEqual(monitorStatusPid.formulaId, 'DTC_COUNT', 'PID 0101 deve retornar contagem DTC, não inteiro bruto de status');
+  assert.strictEqual(monitorStatusPid.unit, 'dtc_count');
+  assert.strictEqual(formulas.formulas.DTC_COUNT.operation, 'u8_mask');
+  assert.strictEqual(formulas.formulas.DTC_COUNT.mask, 0x7F);
+  assert.deepStrictEqual(ranges.ranges['0101'], { min: 0, max: 127 });
+  assert.match(monitorStatusPid.description, /C4\/D4.*filtro de partículas de gasolina/i);
+  assert.doesNotMatch(monitorStatusPid.description, /refrigerante do ar-condicionado/i);
 
   const o2Pid = pids.pids.find((item) => item.pid === '0114');
   assert.strictEqual(o2Pid.bytes, 2, 'PID 0114 deve carregar os dois bytes da resposta padronizada');
   assert.strictEqual(o2Pid.formulaId, 'O2_VOLTS');
+
+  const absoluteThrottlePid = pids.pids.find((item) => item.pid === '0111');
+  assert.strictEqual(absoluteThrottlePid.name, 'Absolute Throttle Position');
+  assert.match(absoluteThrottlePid.description, /posição absoluta/i);
+  const relativeThrottlePid = pids.pids.find((item) => item.pid === '0145');
+  assert.strictEqual(relativeThrottlePid.name, 'Relative Throttle Position');
+  const relativePedalPid = pids.pids.find((item) => item.pid === '015A');
+  assert.strictEqual(relativePedalPid.name, 'Relative Accelerator Pedal Position');
+  const warmupsPid = pids.pids.find((item) => item.pid === '0130');
+  assert.strictEqual(warmupsPid.unit, 'warmup_cycles');
+  assert.strictEqual(units.units.warmup_cycles.symbol, 'ciclos');
 
   const pidList = [...pidIds];
   const rangeIds = Object.keys(ranges.ranges).map((id) => id.toUpperCase());
@@ -138,14 +173,17 @@ function main() {
 
   const supportedFormulaOperations = new Set([
     'u8', 'u16', 'u16_div', 'u8_offset', 'u8_scale',
-    'u8_offset_scale', 'u8_scale_offset', 'u8_div', 'u8_scale_div', 'u16_scale', 'u16_scale_div', 'u16_offset_scale', 'u32',
+    'u8_offset_scale', 'u8_scale_offset', 'u8_div', 'u8_scale_div', 'u8_mask', 'u16_scale', 'u16_scale_div', 'u16_offset_scale', 'u32',
   ]);
   const formulaIds = Object.keys(formulas.formulas);
   assertUnique(formulaIds, 'formulaId');
   for (const [id, spec] of Object.entries(formulas.formulas)) {
     assert.ok(supportedFormulaOperations.has(spec.operation), 'operação de fórmula não implementada: ' + id + ' -> ' + spec.operation);
-    for (const key of ['offset', 'scale', 'divisor']) {
+    for (const key of ['offset', 'scale', 'divisor', 'mask']) {
       if (spec[key] !== undefined) assert.ok(Number.isFinite(spec[key]), 'parâmetro não numérico em fórmula ' + id + ': ' + key);
+    }
+    if (spec.operation === 'u8_mask') {
+      assert.ok(Number.isInteger(spec.mask) && spec.mask >= 0 && spec.mask <= 255, 'máscara inválida na fórmula ' + id);
     }
     if (['u16_div', 'u8_div', 'u8_scale', 'u8_offset_scale', 'u8_scale_div', 'u16_scale_div'].includes(spec.operation)) {
       assert.ok(Number.isFinite(spec.divisor) && spec.divisor !== 0, 'divisor inválido na fórmula ' + id);

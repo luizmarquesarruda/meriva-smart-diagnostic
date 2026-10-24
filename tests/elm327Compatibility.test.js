@@ -32,12 +32,13 @@ assert.equal(classify('BUS ERROR\r\n'), 'ERROR');
 assert.equal(classify('ELM327 v1.5\r\n>'), 'OK');
 assert.equal(classify(''), 'NO_RESPONSE');
 
-const { classifyElmError, mergeCompatibilityConfig } = loadTs(
+const { classifyElmError, mergeCompatibilityConfig, DEFAULT_ELM327_COMPATIBILITY } = loadTs(
   path.join(__dirname, '..', 'src', 'obd', 'elm327Compatibility.ts'),
 );
 assert.equal(classifyElmError('NO DATA'), 'NO_DATA');
 assert.equal(classifyElmError('BUFFER FULL'), 'BUFFER_FULL');
 assert.equal(classifyElmError('BUS ERROR'), 'BUS_ERROR');
+assert.equal(classifyElmError('CAN ERROR'), 'BUS_ERROR');
 assert.equal(classifyElmError('', 'TIMEOUT'), 'TIMEOUT');
 assert.equal(classifyElmError('?'), 'UNSUPPORTED');
 const cfg = mergeCompatibilityConfig({ adaptiveTiming: true, adaptiveTimeoutMinMs: 2500, adaptiveTimeoutMaxMs: 12000 });
@@ -52,4 +53,24 @@ assert.equal(defaults.protocolSelectionTimeoutMs, 15000);
 const customTimeouts = mergeCompatibilityConfig({ optionalAtTimeoutMs: 1800, protocolSelectionTimeoutMs: 9000 });
 assert.equal(customTimeouts.optionalAtTimeoutMs, 1800);
 assert.equal(customTimeouts.protocolSelectionTimeoutMs, 9000);
+
+const malformed = mergeCompatibilityConfig({
+  ioTimeoutMs: Number.NaN,
+  bluetoothConnectTimeoutMs: Number.POSITIVE_INFINITY,
+  commandDelayMs: Number.NaN,
+  adaptiveTimeoutMinMs: 12000,
+  adaptiveTimeoutMaxMs: 3000,
+  recoveryBackoffMs: [Number.NaN, Number.POSITIVE_INFINITY],
+});
+assert.equal(malformed.ioTimeoutMs, DEFAULT_ELM327_COMPATIBILITY.ioTimeoutMs);
+assert.equal(malformed.bluetoothConnectTimeoutMs, DEFAULT_ELM327_COMPATIBILITY.bluetoothConnectTimeoutMs);
+assert.equal(malformed.commandDelayMs, DEFAULT_ELM327_COMPATIBILITY.commandDelayMs);
+assert.equal(malformed.adaptiveTimeoutMinMs, 12000);
+assert.equal(malformed.adaptiveTimeoutMaxMs, 12000, 'adaptive maximum must never be below its minimum');
+assert.deepEqual(malformed.recoveryBackoffMs, [2000, 5000], 'invalid backoff values must use finite defaults');
+
+const invalidCommands = mergeCompatibilityConfig({ forceInitCommands: ['ATZ', 'not an AT command'] });
+assert.deepEqual(invalidCommands.forceInitCommands, ['ATZ']);
+const invalidEnum = mergeCompatibilityConfig({ partialResponseAction: 'BAD_VALUE' });
+assert.equal(invalidEnum.partialResponseAction, DEFAULT_ELM327_COMPATIBILITY.partialResponseAction);
 console.log('ELM327 compatibility regression tests: PASS');

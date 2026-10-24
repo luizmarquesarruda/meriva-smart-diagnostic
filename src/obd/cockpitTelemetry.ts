@@ -29,7 +29,7 @@ const catalogByPid = new Map<string, PidCatalogEntry>(
 const labels: Record<string, string> = {
   '0105': 'TEMPERATURA DO MOTOR',
   '0142': 'VOLTAGEM DO SISTEMA',
-  '0111': 'POSIÇÃO DA BORBOLETA',
+  '0111': 'POSIÇÃO ABSOLUTA DA BORBOLETA',
   '010C': 'ROTAÇÃO DO MOTOR',
   '010D': 'VELOCIDADE DO VEÍCULO',
   '0104': 'CARGA CALCULADA DO MOTOR',
@@ -45,7 +45,7 @@ const labels: Record<string, string> = {
   '0146': 'TEMPERATURA AMBIENTE',
   '0152': 'PERCENTUAL DE ETANOL',
   '015E': 'TAXA DE COMBUSTÍVEL',
-  '015A': 'POSIÇÃO DO PEDAL DO ACELERADOR',
+  '015A': 'POSIÇÃO RELATIVA DO PEDAL DO ACELERADOR',
   '015C': 'TEMPERATURA DO ÓLEO DO MOTOR',
 };
 
