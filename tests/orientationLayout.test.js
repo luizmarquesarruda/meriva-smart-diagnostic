@@ -5,6 +5,7 @@ const appJson = JSON.parse(fs.readFileSync('app.json', 'utf8'));
 const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 const index = fs.readFileSync('app/index.tsx', 'utf8');
 const data = fs.readFileSync('app/dados.tsx', 'utf8');
+const gps = fs.readFileSync('src/gps/gpsTracker.ts', 'utf8');
 const more = fs.readFileSync('app/mais.tsx', 'utf8');
 const cockpitTelemetry = fs.readFileSync('src/obd/cockpitTelemetry.ts', 'utf8');
 const pollingPolicy = JSON.parse(fs.readFileSync('src/knowledge/polling_policy.json', 'utf8'));
@@ -62,6 +63,8 @@ assert.match(index, /activeMetricIndex \+ 1\}\/\{visibleHeroMetrics\.length\}/, 
 assert.match(index, /href="[^"]*viagens"/);
 assert.match(more, /'\/dados'/, 'Dados e Telemetria deve continuar acessível em Mais Recursos');
 assert.match(data, /getCurrentAutonomyRangeKm/, 'Dados deve usar a apresentação de autonomia atual e validada');
+assert.match(data, /isGpsSampleFresh/, 'Dados deve descartar velocidade GPS antiga quando o serviço deixa de receber amostras');
+assert.match(gps, /GPS_SAMPLE_STALE_AFTER_MS = 5_000/, 'freshness do GPS deve ter prazo explícito');
 assert.match(data, /currentAutonomyKm != null \? currentAutonomyKm\.toFixed\(0\) \+ ' km' : 'N\/D'/, 'autonomia zero válida deve aparecer como 0 km, não N/D');
 assert.doesNotMatch(data, /trip\.estimatedRangeKm > 0 \? trip\.estimatedRangeKm/, 'Dados não deve apresentar autonomia guardada como valor atual');
 assert.match(index, /sessionCard/);

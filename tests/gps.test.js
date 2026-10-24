@@ -50,6 +50,8 @@ const {
   haversineDistanceKm,
   normalizeGpsSpeedKmh,
   calculateConsumptionKml,
+  isGpsSampleFresh,
+  GPS_SAMPLE_STALE_AFTER_MS,
 } = mod.exports;
 
 assert.strictEqual(normalizeGpsSpeedKmh(10), 36);
@@ -65,6 +67,12 @@ assert.ok(
 assert.strictEqual(calculateConsumptionKml(100, 8), 12.5);
 assert.strictEqual(calculateConsumptionKml(0, 8), null);
 assert.strictEqual(calculateConsumptionKml(100, 0), null);
+assert.strictEqual(GPS_SAMPLE_STALE_AFTER_MS, 5000);
+assert.strictEqual(isGpsSampleFresh(10_000, 15_000), true, 'sample within the freshness window is current');
+assert.strictEqual(isGpsSampleFresh(10_000, 15_001), false, 'sample beyond the freshness window is stale');
+assert.strictEqual(isGpsSampleFresh(10_001, 10_000), false, 'future-dated sample is not current');
+assert.strictEqual(isGpsSampleFresh(null, 10_000), false, 'missing sample timestamp is not current');
+assert.strictEqual(isGpsSampleFresh(Number.NaN, 10_000), false, 'invalid timestamp is not current');
 
 (async () => {
   const tracker = new GpsTracker();

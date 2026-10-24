@@ -6,7 +6,7 @@ import { useMidLayout } from '../src/ui/midLayout';
 import { COLORS, SCREEN_TITLE_STYLE } from '../src/ui/theme';
 import { getAutoSaveState } from '../src/meriva/autosaveManager';
 import { autoTripService } from '../src/trip/autoTripService';
-import { gpsTracker } from '../src/gps';
+import { gpsTracker, isGpsSampleFresh } from '../src/gps';
 import { getLivePidTrend, getLiveSeries, getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
 import { buildTelemetryChart, type TelemetryChartSample } from '../src/obd/telemetryChart';
 import { getSharedObdStatus } from '../src/obd/sharedConnection';
@@ -51,6 +51,10 @@ export default function DadosScreen() {
   }, []);
 
   const ecuConnected = getSharedObdStatus().ecuConnected;
+  const gpsState = gpsTracker.getState();
+  const gpsSpeedIsFresh = gpsState.running
+    && gpsState.signalQuality !== 'SEM_FIX'
+    && isGpsSampleFresh(gpsState.lastTimestamp);
   const currentAutonomyKm = getCurrentAutonomyRangeKm({
     ecuConnected,
     tripConnected: trip.connected,
@@ -101,7 +105,7 @@ export default function DadosScreen() {
           </View>
 
           <View style={styles.grid}>
-            <Metric landscape={layout.landscape} label="VELOCIDADE GPS" value={gpsTracker.getState().running ? Math.round(gpsTracker.getState().currentSpeedKmh) + ' km/h' : 'N/D'} />
+            <Metric landscape={layout.landscape} label="VELOCIDADE GPS" value={gpsSpeedIsFresh ? Math.round(gpsState.currentSpeedKmh) + ' km/h' : 'N/D'} />
             <Metric landscape={layout.landscape} label="DISTÂNCIA DA VIAGEM" value={trip.active ? trip.distanceKm.toFixed(2) + ' km' : 'N/D'} />
             <Metric landscape={layout.landscape} label="CONSUMO" value={trip.consumptionKml != null && trip.consumptionKml > 0 ? trip.consumptionKml.toFixed(1) + ' km/L' : 'N/D'} />
             <Metric landscape={layout.landscape} label="AUTONOMIA" value={currentAutonomyKm != null ? currentAutonomyKm.toFixed(0) + ' km' : 'N/D'} />

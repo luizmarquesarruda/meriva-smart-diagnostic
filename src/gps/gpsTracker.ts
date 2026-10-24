@@ -33,6 +33,13 @@ const MIN_MOVEMENT_DISTANCE_M = 8;
 const STOP_SPEED_KMH = 2;
 const MIN_MOVING_SAMPLES = 3;
 const MAX_SEGMENT_GAP_MS = 5_000;
+export const GPS_SAMPLE_STALE_AFTER_MS = 5_000;
+
+export function isGpsSampleFresh(timestamp: number | null, nowMs = Date.now()): boolean {
+  if (timestamp == null || !Number.isFinite(timestamp) || !Number.isFinite(nowMs)) return false;
+  const ageMs = nowMs - timestamp;
+  return ageMs >= 0 && ageMs <= GPS_SAMPLE_STALE_AFTER_MS;
+}
 
 function movementThresholdM(sample: GpsSample, previous: GpsSample): number {
   const accuracies = [sample.accuracyM, previous.accuracyM].filter(
