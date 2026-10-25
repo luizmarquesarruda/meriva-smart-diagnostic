@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### CSV de alta frequência
+- Lotes com esquema estável usam append nativo; o histórico não é reescrito integralmente a cada flush. Migração de colunas continua preservando registros existentes.
+
 ### Integridade de telemetria GPS
 - Timestamps inválidos, repetidos ou regressivos são descartados sem fabricar uma marca temporal atual.
 
