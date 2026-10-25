@@ -2,7 +2,7 @@ import type { DtcRecord, PidObservation, VehicleCondition } from '../types/sourc
 import ruleCatalog from '../knowledge/diagnostic_rules.json';
 import sensorTestCatalogJson from '../knowledge/sensor_tests.json';
 
-export interface DiagnosticInput { observations: PidObservation[]; dtcs?: DtcRecord[]; condition?: VehicleCondition; }
+export interface DiagnosticInput { observations: PidObservation[]; dtcs?: DtcRecord[]; condition?: VehicleCondition; nowMs?: number; }
 export interface DiagnosticEvidence { ruleId: string; text: string; source: 'DTC' | 'PID'; pid?: string; dtc?: string; value?: number; }
 export interface DiagnosticHypothesis { id: string; label: string; score: number; confidence: 'LOW' | 'MEDIUM' | 'HIGH'; evidence: DiagnosticEvidence[]; nextTests: string[]; }
 export interface DiagnosticResult { engine: 'LOCAL_EVIDENCE_ENGINE'; version: 1; generatedAt: string; hypotheses: DiagnosticHypothesis[]; blockedSimulationSamples: number; blockedNonLiveDtcs: number; disclaimer: string; }
@@ -17,13 +17,28 @@ function linkedSensorRecommendations(ruleId: string): string[] {
   .map((test)=>test.label+' (PID '+test.pid+'): '+test.aiGuidance);
 }
 const ACTIVE_DTC_STATUSES = new Set(['CONFIRMED', 'PENDING', 'PERMANENT', 'CURRENT']);
+const MAX_DIAGNOSTIC_READING_AGE_MS = 30_000;
+
+export function isCurrentLiveDtc(item: DtcRecord): boolean {
+  return String(item.source ?? '').trim().toUpperCase() === 'REAL_OBD'
+    && item.historical !== true
+    && ACTIVE_DTC_STATUSES.has(String(item.status ?? '').trim().toUpperCase());
+}
 
 function isSimulation(item: PidObservation): boolean { return String(item.source ?? '').trim().toUpperCase() === 'SIMULACAO'; }
 function isLiveObd(item: PidObservation): boolean { return String(item.source ?? '').trim().toUpperCase() === 'REAL_OBD'; }
 
-function pidValue(observations: PidObservation[], pid: string): PidObservation | undefined {
+function pidValue(observations: PidObservation[], pid: string, nowMs: number): PidObservation | undefined {
   return observations
-    .filter((item) => item.pid.toUpperCase() === pid.toUpperCase() && item.value !== null && isLiveObd(item))
+    .filter((item) => {
+      if (item.pid.toUpperCase() !== pid.toUpperCase() || item.value == null
+        || !Number.isFinite(item.value) || !isLiveObd(item)) return false;
+      const timestampMs = Date.parse(item.timestamp);
+      const ageMs = nowMs - timestampMs;
+      return Number.isFinite(timestampMs)
+        && ageMs >= 0
+        && ageMs <= MAX_DIAGNOSTIC_READING_AGE_MS;
+    })
     .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))[0];
 }
 
@@ -38,13 +53,11 @@ function isTrimContext(condition?: VehicleCondition): boolean {
 }
 
 export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
+  const nowMs = Number.isFinite(input.nowMs) ? input.nowMs! : Date.now();
   const rawObservations = input.observations ?? [];
   const observations = rawObservations.filter((item) => !isSimulation(item));
   const rawDtcs = input.dtcs ?? [];
-  const liveDtcs = rawDtcs.filter((item) =>
-    String(item.source ?? '').trim().toUpperCase() === 'REAL_OBD'
-    && ACTIVE_DTC_STATUSES.has(String(item.status ?? '').trim().toUpperCase()),
-  );
+  const liveDtcs = rawDtcs.filter(isCurrentLiveDtc);
   const blockedSimulationSamples = rawObservations.filter(isSimulation).length;
   const blockedNonLiveDtcs = rawDtcs.length - liveDtcs.length;
   const hypotheses = new Map<string, DiagnosticHypothesis>();
@@ -79,8 +92,8 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
     });
   }
 
-  const stft = pidValue(observations, '0106');
-  const ltft = pidValue(observations, '0107');
+  const stft = pidValue(observations, '0106', nowMs);
+  const ltft = pidValue(observations, '0107', nowMs);
   if (stft && ltft && isTrimContext(input.condition)) {
     const combinedTrim = stft.value! + ltft.value!;
     const lean = rules.find((item) => item.id === 'FUEL_TRIM_LEAN');
@@ -92,7 +105,7 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
     }
   }
 
-  const map = pidValue(observations, '010B');
+  const map = pidValue(observations, '010B', nowMs);
   const mapRule = rules.find((item) => item.id === 'MAP_HIGH_IDLE');
   if (map && mapRule && input.condition === mapRule.trigger.condition && map.value! >= (mapRule.trigger.mapMinKpa ?? Number.POSITIVE_INFINITY)) {
     add(mapRule, { ruleId: mapRule.id, text: 'MAP em marcha lenta aquecida = ' + map.value!.toFixed(2) + ' kPa.', source: 'PID', pid: '010B', value: map.value! });
@@ -101,7 +114,7 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
   return {
     engine: 'LOCAL_EVIDENCE_ENGINE',
     version: 1,
-    generatedAt: new Date().toISOString(),
+    generatedAt: new Date(nowMs).toISOString(),
     hypotheses: [...hypotheses.values()].sort((a, b) => b.score - a.score),
     blockedSimulationSamples,
     blockedNonLiveDtcs,
