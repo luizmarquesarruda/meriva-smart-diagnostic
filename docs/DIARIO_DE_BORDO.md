@@ -1,24 +1,20 @@
-## ESTADO VIGENTE — 2026-10-25 (retomada da integração DB-132)
+## ESTADO VIGENTE — 2026-10-25 (retomada da integração DB-133)
 
-> Estado consultado no GitHub em 25/10/2026. Este resumo acompanha a branch `integration/reconcile-pid-ui-20261025`. A validação deve corresponder ao HEAD final exato; CI verde de branches isoladas não comprova integração combinada nem validação física.
+> Estado observado durante a retomada, na branch `integration/reconcile-pid-ui-20261025`. O SHA exato da próxima execução de CI deve ser conferido; nenhuma aprovação é transferida entre SHAs.
 
-### `main` e consolidação
+### Integração e validação
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
-- HEAD atual de `main`: `8e95b2b59e0aa4c76027b638e49d4453a0a4b54c`.
-- A PR [#89 — consolidação da auditoria/hardening](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/89) foi mesclada em 25/10/2026; suas correções de hardening já fazem parte do histórico de `main`.
-- PR [#90 — recuperação Bluetooth Android 16](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/90) e PR [#82 — navegação responsiva](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/82) estão fechadas sem merge.
-- A branch de integração `integration/reconcile-pid-ui-20261025` está 48 commits à frente e 0 atrás de `main`, HEAD `3fa337d47fe91fbfa7babe9a469136b293e1edd9`. Ainda não existe PR para essa branch nem merge dessas 48 alterações em `main`.
-- A última CI consultada para esse HEAD, [run 40202965367](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40202965367), falhou no gate anti-regressão; `validate` parou antes de `npm run validate` e `android-build` foi ignorado.
+- `main` observado: `8e95b2b59e0aa4c76027b638e49d4453a0a4b54c`.
+- A PR [#89 — hardening](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/89) foi mesclada. As PRs [#90 — recuperação Bluetooth](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/90) e [#82 — navegação responsiva](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/82) foram fechadas sem merge.
+- A branch de integração contém o histórico de consolidação de UI/OBD e deve ser tratada como candidata, não como código aprovado para produção. Ao início desta rodada, o HEAD era `4cb9217bb6e2ef9356b3aeb87345d5eeded3b01f`; o commit anterior corrigiu IDs duplicados do contrato RG-32…RG-35 para RG-40…RG-43.
+- A CI [run 40235137103](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40235137103) mostrou que o gate já passa pela verificação de IDs RG, mas falha numa expectativa de rótulo antiga em `tests/projectBaseline.test.js:242`. `android-build` foi ignorado e `npm run validate` não começou.
+- As PRs [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81) (rascunho), [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) e [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84) continuam abertas; verificar quais alterações estão realmente incorporadas na branch candidata antes de concluir ou fechar qualquer uma.
 
-### PRs ainda pendentes
-- [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81): aberta em rascunho; o estado e a CI da branch precisam ser reconciliados com a integração antes de fechar.
-- [#83 — layout Floot e navegação Android](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) e [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84): abertas e não em rascunho. Seus arquivos alterados se sobrepõem à branch de integração; revisar e consolidar o diff combinado antes de fechar ou mesclar.
-- A branch candidata não deve ser mesclada até passar o gate, `validate` e `android-build` no SHA final e até a revisão funcional do catálogo, layout, Bluetooth e autonomia. Teste físico Galaxy A06/Android 16 + ELM327/ECU é uma validação separada.
-
-### Critério de aceitação
-- Os contratos RG devem ser únicos, sequenciais e ordenados; o gate não será relaxado para mascarar divergências.
-- Toda alteração deve ser documentada aqui e validada na CI do HEAD exato; não reutilizar resultados de SHAs anteriores.
-- Não declarar PIDs suportados, Bluetooth físico ou precisão da autonomia com base apenas em testes sintéticos/CI.
+### Critérios de aceitação
+- Manter IDs RG e entradas DB únicas, sequenciais e sincronizados com seus índices.
+- Executar o gate anti-regressão, TypeScript, suíte completa e build Android no HEAD final exato antes de qualquer merge.
+- Testes de CI não comprovam compatibilidade Bluetooth física, suporte de PID ou precisão da autonomia. Testes físicos com Galaxy A06/Android 16 e ELM327/ECU ainda são necessários.
+- Não mesclar ou fechar PRs enquanto o diff combinado, os testes e o inventário do catálogo não estiverem reconciliados.
 ---
 
 ## Portabilidade Floot → aplicativo Expo — 2026-10-23
@@ -201,6 +197,7 @@
 - **DB-130** · 2026-10-25 — Otimização CSV avaliada e bloqueada pela versão instalada
 - **DB-131** · 2026-10-25 — Atualização periódica de localização/clima baseada em conectividade
 - **DB-132** · 2026-10-25 — Retomada da integração e reconciliação dos IDs RG duplicados
+- **DB-133** · 2026-10-25 — Alinhamento do baseline com o rótulo correto do PID 0111
 
 ---
 
@@ -4007,3 +4004,20 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - A correção documental deve produzir uma nova execução da CI. No momento deste registro, ainda não há resultado confirmado para o novo SHA; consultar o run e conferir separadamente o gate, `validate` e `android-build`.
 - A validação visual do layout, os testes Bluetooth no Galaxy A06/Android 16, a resposta real de `010C`, a confirmação de suporte dos outros PIDs e a comparação da autonomia em percurso continuam pendentes.
 - Não houve merge nesta etapa. As PRs concorrentes não devem ser fechadas como substituídas até confirmar que a branch candidata preserva o escopo desejado e passa pela CI completa.
+
+## DB-133 · 2026-10-25 — Alinhamento do baseline com o rótulo correto do PID 0111
+
+### Causa confirmada pela CI
+- A [run 40235137103](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40235137103) passou por `npm run doctor` (17/17), depois falhou no gate em `tests/projectBaseline.test.js:242`: o teste exigia o literal `POSIÇÃO DA BORBOLETA`, já não presente na implementação.
+- `src/obd/cockpitTelemetry.ts` usa a chave PID `0111` com o rótulo `POSIÇÃO ABSOLUTA DA BORBOLETA`. O catálogo e a suíte específica `tests/cockpitTelemetry.test.js` já distinguem esse PID do `0145` (posição relativa da borboleta).
+- O conflito era de expectativa de teste, não evidência de regressão visual ou de cálculo.
+
+### Correção aplicada
+- Atualizada a expectativa do baseline de `POSIÇÃO DA BORBOLETA` para `POSIÇÃO ABSOLUTA DA BORBOLETA`, mantendo a verificação do indicador principal.
+- Nenhum teste foi removido e nenhuma regra funcional foi alterada.
+- O resumo vigente foi atualizado para não reapresentar como atual o resultado da CI anterior.
+
+### Validação pendente
+- A CI do novo SHA precisa confirmar gate, `validate` e `android-build`; nenhum desses resultados pode ser inferido da CI anterior.
+- O PID `0144` ainda não aparece em `src/knowledge/pids.json` na branch candidata, embora esteja na PR #81. Esse conteúdo precisa ser reconciliado com fórmulas, faixas, testes e documentação sem colocá-lo automaticamente na fila de polling do cockpit.
+- A auditoria de layout e a verificação de PIDs na ECU real continuam pendentes. Nenhum merge foi feito nesta etapa.
