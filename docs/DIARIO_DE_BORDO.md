@@ -200,7 +200,7 @@
 - **DB-127** · 2026-10-25 — CI como auditoria de regressão e cobertura completa das suítes
 - **DB-128** · 2026-10-25 — Revalidar bloqueio RFCOMM após cada espera e corrigir IDs RG duplicados
 - **DB-129** · 2026-10-25 — GPS rejeita timestamps inválidos e fora de ordem
-- **DB-130** · 2026-10-25 — CSV usa append nativo no caminho comum
+- **DB-130** · 2026-10-25 — Otimização CSV avaliada e bloqueada pela versão instalada
 
 ---
 
