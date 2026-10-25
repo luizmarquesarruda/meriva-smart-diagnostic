@@ -1,20 +1,20 @@
-## ESTADO VIGENTE — 2026-10-25 (retomada da integração DB-133)
+## ESTADO VIGENTE — 2026-10-25 (retomada da integração DB-134)
 
-> Estado observado durante a retomada, na branch `integration/reconcile-pid-ui-20261025`. O SHA exato da próxima execução de CI deve ser conferido; nenhuma aprovação é transferida entre SHAs.
+> Estado observado na branch `integration/reconcile-pid-ui-20261025`; validação deve corresponder ao SHA exato. Resultados de commits anteriores não são transferidos.
 
-### Integração e validação
+### Integração, CI e riscos restantes
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
-- `main` observado: `8e95b2b59e0aa4c76027b638e49d4453a0a4b54c`.
-- A PR [#89 — hardening](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/89) foi mesclada. As PRs [#90 — recuperação Bluetooth](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/90) e [#82 — navegação responsiva](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/82) foram fechadas sem merge.
-- A branch de integração contém o histórico de consolidação de UI/OBD e deve ser tratada como candidata, não como código aprovado para produção. Ao início desta rodada, o HEAD era `4cb9217bb6e2ef9356b3aeb87345d5eeded3b01f`; o commit anterior corrigiu IDs duplicados do contrato RG-32…RG-35 para RG-40…RG-43.
-- A CI [run 40235137103](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40235137103) mostrou que o gate já passa pela verificação de IDs RG, mas falha numa expectativa de rótulo antiga em `tests/projectBaseline.test.js:242`. `android-build` foi ignorado e `npm run validate` não começou.
-- As PRs [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81) (rascunho), [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) e [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84) continuam abertas; verificar quais alterações estão realmente incorporadas na branch candidata antes de concluir ou fechar qualquer uma.
+- `main` observado: `8e95b2b59e0aa4c76027b638e49d4453a0a4b54c`; PR [#89 — hardening](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/89) foi mesclada. PRs [#90](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/90) e [#82](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/82) foram fechadas sem merge.
+- HEAD verificado antes desta correção: `c9f33896d351dd00f524ab8c4a2ae9b87dc1052e`. A CI [run 40235326174](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40235326174) passou por Expo Doctor (17/17), mas falhou no gate: `tests/projectBaseline.test.js` ainda esperava a expressão antiga `trip.estimatedRangeKm > 0`. Por isso `npm run validate` e `android-build` foram ignorados.
+- O contrato anti-regressão está reconciliado em RG-01…RG-43 sem duplicatas. O teste de cockpit já valida o rótulo correto do PID 0111: posição absoluta da borboleta.
+- PR [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81) continua em rascunho; [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) e [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84) continuam abertas. O PID 0144 está na PR #81, mas ainda não está no catálogo da branch candidata.
+- `app/floot-layout.tsx` é uma rota Expo com dados demonstrativos estáticos (N/D, ECU desconectada e modelo fixo). A auditoria de layout ainda exige removê-la/movê-la para fora da árvore de rotas ou convertê-la numa função de produto real sem telemetria fictícia.
 
 ### Critérios de aceitação
-- Manter IDs RG e entradas DB únicas, sequenciais e sincronizados com seus índices.
-- Executar o gate anti-regressão, TypeScript, suíte completa e build Android no HEAD final exato antes de qualquer merge.
-- Testes de CI não comprovam compatibilidade Bluetooth física, suporte de PID ou precisão da autonomia. Testes físicos com Galaxy A06/Android 16 e ELM327/ECU ainda são necessários.
-- Não mesclar ou fechar PRs enquanto o diff combinado, os testes e o inventário do catálogo não estiverem reconciliados.
+- Manter IDs RG/DB únicos, contínuos e sincronizados com os índices.
+- Exigir gate anti-regressão, TypeScript, suíte completa e build Android no SHA final antes de concluir a integração.
+- O catálogo padrão não comprova suporte da ECU da Meriva. Bluetooth, telemetria física e precisão da autonomia exigem ensaios no Galaxy A06/Android 16 com ELM327/ECU reais.
+- Não fechar PRs concorrentes até reconciliar o diff e provar que suas alterações relevantes estão presentes na integração.
 ---
 
 ## Portabilidade Floot → aplicativo Expo — 2026-10-23
@@ -198,6 +198,7 @@
 - **DB-131** · 2026-10-25 — Atualização periódica de localização/clima baseada em conectividade
 - **DB-132** · 2026-10-25 — Retomada da integração e reconciliação dos IDs RG duplicados
 - **DB-133** · 2026-10-25 — Alinhamento do baseline com o rótulo correto do PID 0111
+- **DB-134** · 2026-10-25 — Autonomia atual: remover expectativa obsoleta do baseline
 
 ---
 
@@ -4021,3 +4022,19 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - A CI do novo SHA precisa confirmar gate, `validate` e `android-build`; nenhum desses resultados pode ser inferido da CI anterior.
 - O PID `0144` ainda não aparece em `src/knowledge/pids.json` na branch candidata, embora esteja na PR #81. Esse conteúdo precisa ser reconciliado com fórmulas, faixas, testes e documentação sem colocá-lo automaticamente na fila de polling do cockpit.
 - A auditoria de layout e a verificação de PIDs na ECU real continuam pendentes. Nenhum merge foi feito nesta etapa.
+
+## DB-134 · 2026-10-25 — Autonomia atual: remover expectativa obsoleta do baseline
+
+### Causa confirmada pela CI
+- A [run 40235326174](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40235326174) confirmou o rótulo do PID 0111 após DB-133 e avançou até outra asserção antiga em `tests/projectBaseline.test.js`.
+- O gate ainda esperava `trip.estimatedRangeKm > 0` em `app/dados.tsx`, mas a tela chama `getCurrentAutonomyRangeKm` com estado atual da ECU, nível do PID 012F e timestamp da leitura. Valores de viagens anteriores não devem aparecer como autonomia atual.
+- A suíte de orientação já exige o comportamento novo e `app/dados.tsx` usa o resultado validado ou `N/D`; a correção não deve restaurar o uso de autonomia persistida.
+
+### Correção aplicada
+- O baseline agora verifica o uso de `getCurrentAutonomyRangeKm` e a apresentação do resultado atual validado ou `N/D`.
+- Nenhum teste foi removido e nenhuma regra funcional foi afrouxada.
+
+### Validação e pendências
+- A alteração exige nova CI no SHA seguinte. A execução anterior passou Expo Doctor 17/17, mas falhou no gate; TypeScript, suíte completa e build Android não executaram.
+- O PID 0144 continua ausente do catálogo da branch candidata, embora esteja na PR #81. Integrá-lo exige manter fórmula, faixa e testes coerentes e não tratá-lo como suportado pela ECU nem incluí-lo no polling sem confirmação atual.
+- A rota demonstrativa `app/floot-layout.tsx`, o layout, Bluetooth e autonomia continuam pendentes de revisão final. Nenhum merge foi feito.
