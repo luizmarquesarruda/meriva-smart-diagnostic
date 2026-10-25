@@ -3951,18 +3951,18 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - A validação do SHA anterior `76360ad15466e5e7b0cb64a1b68e33d1814e5ee1` tinha `validate` verde e `android-build` ainda em execução. Esta correção gera novo SHA e exige uma execução CI completa própria; resultados anteriores não contam como aprovação.
 - Teste físico de GPS e validação ELM327/ECU continuam pendentes. Nenhum merge foi executado.
 
-## DB-130 · 2026-10-25 — CSV usa append nativo no caminho comum
+## DB-130 · 2026-10-25 — Otimização CSV avaliada e bloqueada pela versão instalada
 
-### Achado confirmado
-- `src/database/csvLogger.ts` afirmava que o FileSystem legado do Expo SDK 51 não tinha append nativo. A opção `append` está disponível em `writeAsStringAsync`; o comportamento anterior relia e regravava todo o histórico em cada flush quando o cabeçalho não mudava.
-- Conforme o histórico de telemetria cresce, isso multiplica leitura/escrita e alocação de memória.
+### Achado
+- `src/database/csvLogger.ts` reescreve o conteúdo CSV existente em flushes de esquema estável, de modo que o custo cresce com o tamanho do histórico. O comentário dessa dívida técnica está mantido explícito no código.
+- A documentação atual do Expo descreve append para a API legada, mas o projeto está fixado em Expo SDK 51 / `expo-file-system` 17. A CI de TypeScript rejeitou `append: true` porque o `WritingOptions` instalado não declara esse campo. A documentação mais recente, sozinha, não é evidência suficiente para ativar uma opção no pacote instalado.
 
-### Correção
-- O caminho de esquema estável valida o tamanho, lê o cabeçalho e o último byte para preservar a quebra de linha e grava com `append: true`.
-- Migração de esquema continua lendo todas as linhas e reescrevendo explicitamente as colunas, preservando os registros antigos.
-- O mock de filesystem mede leituras integrais e append; os testes provam que a gravação comum não relê o arquivo inteiro, que append nativo é usado e que falha de escrita mantém o lote para retry.
-- RG-39, CSV-01, baseline, README, changelog e auditoria foram atualizados.
+### Decisão
+- A tentativa de usar append foi revertida; o código não usa `as any` nem ignora o erro de TypeScript.
+- A implementação compatível atual continua preservando registros, embora tenha custo O(tamanho do arquivo) por flush. A otimização deve ser retomada como tarefa separada com upgrade de SDK validado, API nativa compatível ou desenho de arquivos segmentados, e testes de leitura/exportação/migração.
+- README e changelog não afirmam que append está implementado; o contrato de aceitação não inclui uma capacidade ainda não suportada.
 
-### Validação
-- O SHA anterior `8ca18ce0103d949580a56dd158e8b993aa69e1ac` tinha `validate` concluída com sucesso e `android-build` em andamento. Esta alteração gera novo SHA e exige CI própria; resultados anteriores não contam como aprovação.
-- Nenhum merge foi executado. Testes em aparelho e ELM327/ECU continuam níveis de validação independentes.
+### Evidência e estado
+- A CI realmente rejeitou a alteração em `android-build`/typecheck no SHA experimental; o erro não foi contornado nem a suíte relaxada.
+- Os resultados do SHA anterior `8ca18ce0103d949580a56dd158e8b993aa69e1ac` não validam as alterações subsequentes de tentativa/reversão e documentação. O SHA final desta consolidação precisa de CI própria.
+- Nenhum merge foi executado. Testes em aparelho e validação ELM327/ECU continuam independentes da CI.
