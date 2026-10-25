@@ -119,7 +119,7 @@ O módulo src/obd/fuelIdentification.ts é deliberadamente conservador. Ele sepa
 
 O aplicativo mantém CONFIG, BANCO, LEITURAS, APRENDIZADO, DTC, LOGS, VIAGENS e BACKUP.
 
-O autosave usa arquivo temporário, valida o conteúdo e mantém uma cópia anterior para recuperação.
+O autosave usa arquivo temporário, valida o conteúdo e mantém uma cópia anterior para recuperação. Os logs CSV de telemetria são gravados em lotes; quando o cabeçalho permanece estável, o logger usa append nativo e reserva a reescrita integral para migrações de esquema.
 
 ## Bluetooth
 
