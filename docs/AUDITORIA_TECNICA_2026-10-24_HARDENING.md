@@ -105,3 +105,10 @@ Este trabalho está em branch e PR separados. Não houve merge nem alteração d
 - O rastreador agora descarta timestamp não finito/não positivo e fixes com tempo menor/igual ao último fix válido, sem alterar o estado. O teste cobre descarte e recuperação.
 - Contrato RG-38 e caso GPS-02 foram adicionados; o baseline verifica que o fallback não retorne.
 - O HEAD anterior estava com `validate` verde e `android-build` em execução; esta alteração exige CI própria do início ao fim.
+
+
+## Correção do caminho de gravação CSV — 2026-10-25
+
+- O logger declarava incorretamente que `writeAsStringAsync` da API legada não suportava append. A documentação do FileSystem legado contém `WritingOptions.append`.
+- A reescrita integral por lote foi substituída por append quando o esquema não muda. A validação do cabeçalho continua; migração de esquema ainda relê e reserializa todas as linhas para manter colunas alinhadas.
+- O teste prova que o caminho comum não lê o histórico inteiro, usa append nativo e mantém o lote após falha de escrita. O novo SHA precisa passar em CI, inclusive build Android.
