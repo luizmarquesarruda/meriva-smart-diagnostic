@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'expo-router';
 import Constants from 'expo-constants';
 import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -277,6 +278,11 @@ export default function ConfiguracaoScreen() {
           <Text style={styles.note}>Especificações físicas conforme o Manual do Proprietário Chevrolet Meriva 2012.</Text>
         </>
       ) : <Text style={styles.info}>Veículo: N/D</Text>}
+      <Link href="/mais" asChild>
+        <TouchableOpacity style={styles.button} accessibilityRole="button" accessibilityLabel="Abrir mais recursos">
+          <Text style={styles.buttonText}>ABRIR MAIS RECURSOS</Text>
+        </TouchableOpacity>
+      </Link>
       </View>
     </ScrollView>
     </SafeAreaView>
