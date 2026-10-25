@@ -231,34 +231,6 @@ export class BluetoothClassicTransport implements ObdTransport {
       device = null;
 
       try {
-        // O timeout JS não cancela a tentativa RFCOMM nativa. O bloqueio é
-        // GLOBAL por endereço para impedir chamadas concorrentes ao mesmo MAC.
-        const pending = pendingNativeConnections.get(addressKey);
-        if (pending) {
-          this.logDiagnostic('CONNECT_WAITING_PREVIOUS_NATIVE_ATTEMPT', {
-            address: this.deviceAddress,
-            timeoutMs: this.config.bluetoothConnectTimeoutMs,
-          });
-          // Wait for the native call AND any late-success cleanup to finish before
-          // opening another RFCOMM socket for the same adapter.
-          const pendingSettlement = pendingNativeConnectionSettlements.get(addressKey) ?? pending;
-          const previousSettled = await waitForNativeConnectAttempt(
-            pendingSettlement,
-            this.config.bluetoothConnectTimeoutMs,
-          );
-          if (!previousSettled) {
-            this.logDiagnostic('CONNECT_ABORT_PREVIOUS_NATIVE_ATTEMPT_PENDING', {
-              address: this.deviceAddress,
-              timeoutMs: this.config.bluetoothConnectTimeoutMs,
-            });
-            lastCause = new Error(
-              'TENTATIVA NATIVA ANTERIOR AINDA PENDENTE APÓS O TIMEOUT. EVITE UMA SEGUNDA CONEXÃO SIMULTÂNEA; TENTE NOVAMENTE APÓS A LIBERAÇÃO DO ADAPTADOR.',
-            );
-            break;
-          }
-          try { await pendingSettlement; } catch { /* retry after failed native attempt */ }
-        }
-
         let radioEnabledBeforeSocket: boolean | null = null;
         let radioStateBeforeSocketError: unknown = null;
         try {
@@ -293,6 +265,34 @@ export class BluetoothClassicTransport implements ObdTransport {
             });
           }
           break;
+        }
+
+        // O timeout JS não cancela a tentativa RFCOMM nativa. O bloqueio é
+        // GLOBAL por endereço para impedir chamadas concorrentes ao mesmo MAC.
+        const pending = pendingNativeConnections.get(addressKey);
+        if (pending) {
+          this.logDiagnostic('CONNECT_WAITING_PREVIOUS_NATIVE_ATTEMPT', {
+            address: this.deviceAddress,
+            timeoutMs: this.config.bluetoothConnectTimeoutMs,
+          });
+          // Wait for the native call AND any late-success cleanup to finish before
+          // opening another RFCOMM socket for the same adapter.
+          const pendingSettlement = pendingNativeConnectionSettlements.get(addressKey) ?? pending;
+          const previousSettled = await waitForNativeConnectAttempt(
+            pendingSettlement,
+            this.config.bluetoothConnectTimeoutMs,
+          );
+          if (!previousSettled) {
+            this.logDiagnostic('CONNECT_ABORT_PREVIOUS_NATIVE_ATTEMPT_PENDING', {
+              address: this.deviceAddress,
+              timeoutMs: this.config.bluetoothConnectTimeoutMs,
+            });
+            lastCause = new Error(
+              'TENTATIVA NATIVA ANTERIOR AINDA PENDENTE APÓS O TIMEOUT. EVITE UMA SEGUNDA CONEXÃO SIMULTÂNEA; TENTE NOVAMENTE APÓS A LIBERAÇÃO DO ADAPTADOR.',
+            );
+            break;
+          }
+          try { await pendingSettlement; } catch { /* retry after failed native attempt */ }
         }
 
         this.logDiagnostic('CONNECT_ATTEMPT', {
