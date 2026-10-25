@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "standard": "SAE J1979 / ISO 15031-5",
   "description": "Banco local de fórmulas determinísticas para converter bytes OBD-II em unidades de engenharia. Não usa eval.",
   "provenance": [
@@ -97,6 +97,11 @@
     },
     "U32": {
       "operation": "u32"
+    },
+    "DTC_COUNT": {
+      "operation": "u8_mask",
+      "mask": 127,
+      "notes": "PID 0101: byte A, bits 6..0 representam quantidade de DTCs; bit 7 (MIL) é decodificado separadamente."
     }
   }
 }
