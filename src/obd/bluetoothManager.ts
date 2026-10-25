@@ -199,11 +199,22 @@ export async function createRealElmSession(
       return session;
     } catch (cause) {
       lastCause = cause;
+      const errorMessage = cause instanceof Error ? cause.message : String(cause);
       logBluetoothDiagnostic('BLUETOOTH_ATTEMPT_RESULT', {
         attempt,
         result: 'FAILURE',
-        error: cause instanceof Error ? cause.message : String(cause),
+        error: errorMessage,
       });
+
+      // Do not repeat adapter connection attempts while the Android radio is off.
+      if (/BLUETOOTH.*DESLIGADO|DESLIGADO.*BLUETOOTH/i.test(errorMessage)) {
+        logBluetoothDiagnostic('BLUETOOTH_RETRY_STOPPED', {
+          attempt,
+          reason: 'RADIO_OFF',
+          error: errorMessage,
+        });
+        break;
+      }
 
       if (attempt === effectiveMaxAttempts) {
         break;
