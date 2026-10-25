@@ -1,26 +1,24 @@
-## ESTADO VIGENTE — 2026-10-25 (auditoria de estabilidade DB-130)
+## ESTADO VIGENTE — 2026-10-25 (retomada da integração DB-132)
 
-> Estado consultado no GitHub em 25/10/2026. Este diário acompanha a branch de consolidação #89; não representa merge em `main`. CI verde por branch isolada não comprova integração combinada nem teste físico.
+> Estado consultado no GitHub em 25/10/2026. Este resumo acompanha a branch `integration/reconcile-pid-ui-20261025`. A validação deve corresponder ao HEAD final exato; CI verde de branches isoladas não comprova integração combinada nem validação física.
 
-### `main` e proteção de integração
+### `main` e consolidação
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
-- SHA de `main` observado antes desta rodada: `701474de2cb3ed8a617a66d87fe3b5e368366acb`.
-- A API informa `protected: false` e a listagem de rulesets retorna vazia. Checks obrigatórios na branch principal não estão confirmados. A consulta detalhada de proteção foi negada pela integração (403), portanto não foi alterada.
-- PR #80 é a última integração de código confirmada. Nenhuma correção desta rodada foi mesclada em `main`.
+- HEAD atual de `main`: `8e95b2b59e0aa4c76027b638e49d4453a0a4b54c`.
+- A PR [#89 — consolidação da auditoria/hardening](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/89) foi mesclada em 25/10/2026; suas correções de hardening já fazem parte do histórico de `main`.
+- PR [#90 — recuperação Bluetooth Android 16](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/90) e PR [#82 — navegação responsiva](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/82) estão fechadas sem merge.
+- A branch de integração `integration/reconcile-pid-ui-20261025` está 48 commits à frente e 0 atrás de `main`, HEAD `3fa337d47fe91fbfa7babe9a469136b293e1edd9`. Ainda não existe PR para essa branch nem merge dessas 48 alterações em `main`.
+- A última CI consultada para esse HEAD, [run 40202965367](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40202965367), falhou no gate anti-regressão; `validate` parou antes de `npm run validate` e `android-build` foi ignorado.
 
-### PRs ativas e conflitos de integração
-- [#89 — consolidação da auditoria/hardening](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/89): começou esta rodada no SHA `73df16b3c7606595806d67c14c2f95f7fae37e2e`, cuja CI anterior estava verde. As correções encontradas nas iterações estão registradas em DB-126/DB-127; consulte o HEAD atual e a CI do SHA exato antes de aceitar.
-- [#90 — recuperação Bluetooth Android 16](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/90): [run 40171897065 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40171897065) no SHA anterior. A lógica está sendo consolidada na #89 para evitar duas propostas nos mesmos três arquivos; a branch é preservada como referência.
-- [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81): aberta; DB-109 desta branch significa PID 0144, enquanto DB-109 na #89 tem outro conteúdo. Deve ser renumerada/sincronizada sobre a sequência consolidada antes de integrar.
-- [#82 — navegação responsiva](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/82), [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) e [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84) seguem abertas. #82 e #83 dividem nove arquivos e discordam sobre a navegação em paisagem e a política de 20 versus 25 PIDs; #83 compartilha 17 arquivos com #89. CI verde isolada não resolve esses conflitos.
-- PRs #85, #86 e #87 estão fechadas sem merge; o conteúdo dessas branches não se considera integrado apenas porque foram encerradas. Partes das correções foram reconciliadas na #89 conforme o diff.
+### PRs ainda pendentes
+- [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81): aberta em rascunho; o estado e a CI da branch precisam ser reconciliados com a integração antes de fechar.
+- [#83 — layout Floot e navegação Android](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) e [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84): abertas e não em rascunho. Seus arquivos alterados se sobrepõem à branch de integração; revisar e consolidar o diff combinado antes de fechar ou mesclar.
+- A branch candidata não deve ser mesclada até passar o gate, `validate` e `android-build` no SHA final e até a revisão funcional do catálogo, layout, Bluetooth e autonomia. Teste físico Galaxy A06/Android 16 + ELM327/ECU é uma validação separada.
 
 ### Critério de aceitação
-- A suíte protege fórmulas, parser, DTC, consumo, combustível, Bluetooth, autonomia, persistência, GPS, navegação e histórico.
-- O diário deve manter IDs DB-NNN únicos, contínuos e na mesma ordem do índice. Qualquer combinação de branches deve reconciliar numeração antes de integração.
-- Nenhuma PR deve ser mesclada sem diff final contra `main`, CI do SHA exato com `validate` e `android-build` verdes e reconciliação dos arquivos compartilhados.
-- Teste físico do Galaxy A06/Android 16 + ELM327 e validação da ECU são etapas separadas.
-
+- Os contratos RG devem ser únicos, sequenciais e ordenados; o gate não será relaxado para mascarar divergências.
+- Toda alteração deve ser documentada aqui e validada na CI do HEAD exato; não reutilizar resultados de SHAs anteriores.
+- Não declarar PIDs suportados, Bluetooth físico ou precisão da autonomia com base apenas em testes sintéticos/CI.
 ---
 
 ## Portabilidade Floot → aplicativo Expo — 2026-10-23
@@ -202,6 +200,7 @@
 - **DB-129** · 2026-10-25 — GPS rejeita timestamps inválidos e fora de ordem
 - **DB-130** · 2026-10-25 — Otimização CSV avaliada e bloqueada pela versão instalada
 - **DB-131** · 2026-10-25 — Atualização periódica de localização/clima baseada em conectividade
+- **DB-132** · 2026-10-25 — Retomada da integração e reconciliação dos IDs RG duplicados
 
 ---
 
@@ -3987,3 +3986,24 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Commits criados na branch `fix/repository-audit-hardening-20261024` da PR #89. A CI deve ser verificada no HEAD final desta alteração; resultados de SHAs anteriores não contam como aprovação.
 - Ainda não foi executado teste físico de geolocalização em Android 16 alternando Wi-Fi/4G/5G. A CI não comprova recepção GPS pelo provedor fused, disponibilidade da operadora nem funcionamento do ELM327/ECU reais.
 - Nenhuma mudança foi mesclada em `main`. A atualização de clima é opcional e não deve afetar polling, conexão Bluetooth, autonomia ou diagnóstico local.
+
+## DB-132 · 2026-10-25 — Retomada da integração e reconciliação dos IDs RG duplicados
+
+### Ponto de retomada confirmado
+- Repositório: `luizmarquesarruda/meriva-smart-diagnostic`; branch candidata: `integration/reconcile-pid-ui-20261025`.
+- HEAD consultado antes desta correção: `3fa337d47fe91fbfa7babe9a469136b293e1edd9`. A comparação com `main` indicava 48 commits à frente e nenhum commit atrás; a branch ainda não tinha uma PR de integração.
+- O estado anterior no início deste diário estava desatualizado: a PR #89 já havia sido mesclada; a #90 e a #82 estavam fechadas sem merge. Permanecem abertas a #81 (rascunho), #83 e #84 (não rascunho).
+
+### Causa confirmada pela CI
+- [Run 40202965367](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40202965367) falhou em `tests/projectBaseline.test.js:126`, no gate anti-regressão, antes de iniciar `npm run validate`; `android-build` foi ignorado.
+- O contrato já continha RG-01 a RG-39. Quatro exigências adicionadas para a reconciliação de DTCs, catálogo/fórmulas, rótulos Mode 01 e fonte documental repetiam RG-32 a RG-35, produzindo 43 entradas e apenas 39 IDs únicos.
+
+### Correção aplicada
+- As quatro exigências específicas de catálogo/documentação foram renumeradas para RG-40 a RG-43, preservando RG-01 a RG-39 e a exigência automatizada de sequência/uniquidade.
+- Não foram removidos testes, alteradas regras funcionais ou reduzidos limites da CI.
+- Atualizado o resumo vigente deste diário para refletir o HEAD real de `main`, os estados atuais das PRs e a falha exata da integração.
+
+### Validação e pendências
+- A correção documental deve produzir uma nova execução da CI. No momento deste registro, ainda não há resultado confirmado para o novo SHA; consultar o run e conferir separadamente o gate, `validate` e `android-build`.
+- A validação visual do layout, os testes Bluetooth no Galaxy A06/Android 16, a resposta real de `010C`, a confirmação de suporte dos outros PIDs e a comparação da autonomia em percurso continuam pendentes.
+- Não houve merge nesta etapa. As PRs concorrentes não devem ser fechadas como substituídas até confirmar que a branch candidata preserva o escopo desejado e passa pela CI completa.
