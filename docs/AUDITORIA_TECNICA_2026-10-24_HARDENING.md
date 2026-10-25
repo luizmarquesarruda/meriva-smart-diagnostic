@@ -89,3 +89,11 @@ Este trabalho está em branch e PR separados. Não houve merge nem alteração d
 - O gate agora exige que todo `tests/*.test.js`, com exceção do próprio baseline executado em um passo separado, apareça em `npm test`. Também valida sequência completa e índice do diário.
 - Como o gate e o diário foram modificados após essa CI, o novo SHA deve passar novamente em `validate` e `android-build`; resultados anteriores não são reutilizados como aprovação.
 
+
+
+## Concorrência RFCOMM com múltiplos waiters e IDs de contrato — 2026-10-25
+
+- A sonda assíncrona de rádio não pode ficar entre a leitura de `pendingNativeConnections` e a chamada a `connectToDevice`; a CI identificou a regressão porque duas instâncias abriram sockets simultâneos.
+- A primeira correção moveu a sonda para antes do bloqueio compartilhado. Auditoria adicional mostrou que três instâncias podem aguardar a mesma promessa e acordar juntas, portanto o transporte agora revalida rádio/bloqueio em loop depois de cada espera. O teste passa a exercitar três instâncias e exigir no máximo um socket nativo ativo.
+- Revisão do contrato identificou IDs RG-34 e RG-35 duplicados introduzidos durante a consolidação. Renumerados para RG-34…RG-37, e o baseline agora reprova se houver IDs RG duplicados, lacunas ou ordem incorreta.
+- Nova CI é obrigatória para o SHA resultante; nenhum resultado de um SHA anterior é reutilizado como aprovação.

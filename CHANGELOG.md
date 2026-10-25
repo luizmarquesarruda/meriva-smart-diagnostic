@@ -4,6 +4,7 @@
 
 ### Estabilidade Bluetooth Classic
 - Estado do rádio revalidado antes de cada socket RFCOMM; fallback/retry interrompido quando o Bluetooth está desligado ou o estado é indeterminado.
+- Espera por conexões nativas pendentes revalida rádio e bloqueio compartilhado após cada await, impedindo sockets simultâneos entre múltiplas instâncias.
 - Causa nativa preservada na splash com opção de abrir o painel; CI não substitui teste físico do ELM327.
 
 ### Integridade OBD-II

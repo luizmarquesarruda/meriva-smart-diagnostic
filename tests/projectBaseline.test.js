@@ -113,6 +113,17 @@ assert.match(read('src/obd/bluetoothManager.ts'), /getBluetoothRadioRecoveryStop
 assert.match(read('app/splash.tsx'), /getBluetoothRadioRecoveryStopReason/);
 assert.match(bluetoothRadioPolicy, /STOP_RADIO_STATE_UNKNOWN/);
 assert.match(projectContract, /\| RG-34 \|/, 'radio recovery must remain a documented acceptance invariant');
+assert.match(projectContract, /\| RG-37 \|/, 'concurrent RFCOMM waiters must remain a documented invariant');
+const regressionRequirementIds = [...projectContract.matchAll(/^\| (RG-\d{2}) \|/gm)].map((match) => match[1]);
+assert.ok(regressionRequirementIds.length > 0, 'o contrato anti-regressão não pode ficar vazio');
+assert.equal(new Set(regressionRequirementIds).size, regressionRequirementIds.length, 'o contrato contém IDs RG duplicados');
+for (let index = 0; index < regressionRequirementIds.length; index++) {
+  assert.equal(
+    regressionRequirementIds[index],
+    'RG-' + String(index + 1).padStart(2, '0'),
+    'IDs RG devem estar contínuos e ordenados; erro na posição ' + (index + 1),
+  );
+}
 assert.match(bluetoothTransport, /BUFFER RX ELM EXCEDIDO/);
 const pidDiscovery = read('src/obd/intelligentPidDiscovery.ts');
 assert.match(pidDiscovery, /responseBuffer:\s*responseBuffer\.snapshot\(\)/);

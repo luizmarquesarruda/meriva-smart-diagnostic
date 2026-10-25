@@ -764,11 +764,13 @@ async function testBluetoothEventTransport() {
   bluetoothConnectDelayMs = 30;
   const transportA = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF');
   const transportB = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF');
-  await Promise.all([transportA.open(), transportB.open()]);
-  assert.strictEqual(bluetoothConnectCalls, 2, 'instâncias diferentes devem serializar as tentativas nativas');
-  assert.strictEqual(bluetoothMaxNativeConnections, 1, 'não pode haver duas tentativas RFCOMM simultâneas');
+  const transportC = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF');
+  await Promise.all([transportA.open(), transportB.open(), transportC.open()]);
+  assert.strictEqual(bluetoothConnectCalls, 3, 'todas as instâncias devem completar sua conexão serializada');
+  assert.strictEqual(bluetoothMaxNativeConnections, 1, 'três instâncias concorrentes ainda não podem abrir RFCOMM simultaneamente');
   await transportA.close();
   await transportB.close();
+  await transportC.close();
   bluetoothConnectDelayMs = 0;
 
   bluetoothConnectCalls = 0;

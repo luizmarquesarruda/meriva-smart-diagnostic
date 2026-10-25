@@ -231,52 +231,55 @@ export class BluetoothClassicTransport implements ObdTransport {
       device = null;
 
       try {
-        let radioEnabledBeforeSocket: boolean | null = null;
-        let radioStateBeforeSocketError: unknown = null;
-        try {
-          radioEnabledBeforeSocket = await RNBluetoothClassic.isBluetoothEnabled();
-        } catch (radioCause) {
-          radioStateBeforeSocketError = radioCause;
-        }
-        const beforeSocketDecision = decideBluetoothRadioRecovery(
-          radioEnabledBeforeSocket,
-          radioStateBeforeSocketError,
-        );
-        this.logDiagnostic('BLUETOOTH_ENABLED_BEFORE_SOCKET_ATTEMPT', {
-          radioEnabled: radioEnabledBeforeSocket,
-          decision: beforeSocketDecision,
-          secureSocket,
-        });
-        if (beforeSocketDecision !== 'CONTINUE') {
-          if (beforeSocketDecision === 'STOP_RADIO_OFF') {
-            lastCause = new Error('BLUETOOTH DESLIGADO DURANTE A CONEXÃO; ATIVE O BLUETOOTH E TENTE NOVAMENTE');
-            this.logDiagnostic('CONNECT_ABORT_BLUETOOTH_RADIO_OFF', { secureSocket });
-          } else {
-            const originalMessage = radioStateBeforeSocketError instanceof Error
-              ? radioStateBeforeSocketError.message
-              : String(radioStateBeforeSocketError ?? 'ESTADO INDETERMINADO');
-            const radioStateError = new Error(
-              'ESTADO DO BLUETOOTH NÃO PÔDE SER CONFIRMADO ANTES DO SOCKET RFCOMM. ' + originalMessage,
-            );
-            lastCause = radioStateError;
-            this.logDiagnostic('CONNECT_ABORT_RADIO_STATE_UNKNOWN', {
-              secureSocket,
-              error: radioStateError.message,
-            });
+        let abortSocketAttempt = false;
+        while (true) {
+          let radioEnabledBeforeSocket: boolean | null = null;
+          let radioStateBeforeSocketError: unknown = null;
+          try {
+            radioEnabledBeforeSocket = await RNBluetoothClassic.isBluetoothEnabled();
+          } catch (radioCause) {
+            radioStateBeforeSocketError = radioCause;
           }
-          break;
-        }
+          const beforeSocketDecision = decideBluetoothRadioRecovery(
+            radioEnabledBeforeSocket,
+            radioStateBeforeSocketError,
+          );
+          this.logDiagnostic('BLUETOOTH_ENABLED_BEFORE_SOCKET_ATTEMPT', {
+            radioEnabled: radioEnabledBeforeSocket,
+            decision: beforeSocketDecision,
+            secureSocket,
+          });
+          if (beforeSocketDecision !== 'CONTINUE') {
+            if (beforeSocketDecision === 'STOP_RADIO_OFF') {
+              lastCause = new Error('BLUETOOTH DESLIGADO DURANTE A CONEXÃO; ATIVE O BLUETOOTH E TENTE NOVAMENTE');
+              this.logDiagnostic('CONNECT_ABORT_BLUETOOTH_RADIO_OFF', { secureSocket });
+            } else {
+              const originalMessage = radioStateBeforeSocketError instanceof Error
+                ? radioStateBeforeSocketError.message
+                : String(radioStateBeforeSocketError ?? 'ESTADO INDETERMINADO');
+              const radioStateError = new Error(
+                'ESTADO DO BLUETOOTH NÃO PÔDE SER CONFIRMADO ANTES DO SOCKET RFCOMM. ' + originalMessage,
+              );
+              lastCause = radioStateError;
+              this.logDiagnostic('CONNECT_ABORT_RADIO_STATE_UNKNOWN', {
+                secureSocket,
+                error: radioStateError.message,
+              });
+            }
+            abortSocketAttempt = true;
+            break;
+          }
 
-        // O timeout JS não cancela a tentativa RFCOMM nativa. O bloqueio é
-        // GLOBAL por endereço para impedir chamadas concorrentes ao mesmo MAC.
-        const pending = pendingNativeConnections.get(addressKey);
-        if (pending) {
+          // Check the shared lock only after the asynchronous radio probe.
+          // After waiting, loop to re-check both radio state and the lock: multiple
+          // waiters may otherwise resume together and open concurrent RFCOMM sockets.
+          const pending = pendingNativeConnections.get(addressKey);
+          if (!pending) break;
+
           this.logDiagnostic('CONNECT_WAITING_PREVIOUS_NATIVE_ATTEMPT', {
             address: this.deviceAddress,
             timeoutMs: this.config.bluetoothConnectTimeoutMs,
           });
-          // Wait for the native call AND any late-success cleanup to finish before
-          // opening another RFCOMM socket for the same adapter.
           const pendingSettlement = pendingNativeConnectionSettlements.get(addressKey) ?? pending;
           const previousSettled = await waitForNativeConnectAttempt(
             pendingSettlement,
@@ -290,10 +293,14 @@ export class BluetoothClassicTransport implements ObdTransport {
             lastCause = new Error(
               'TENTATIVA NATIVA ANTERIOR AINDA PENDENTE APÓS O TIMEOUT. EVITE UMA SEGUNDA CONEXÃO SIMULTÂNEA; TENTE NOVAMENTE APÓS A LIBERAÇÃO DO ADAPTADOR.',
             );
+            abortSocketAttempt = true;
             break;
           }
           try { await pendingSettlement; } catch { /* retry after failed native attempt */ }
+          // Deliberately loop: do not trust a pending-map snapshot taken before await.
         }
+        if (abortSocketAttempt) break;
+
 
         this.logDiagnostic('CONNECT_ATTEMPT', {
           secureSocket,

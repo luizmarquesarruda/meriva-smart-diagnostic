@@ -1,4 +1,4 @@
-## ESTADO VIGENTE — 2026-10-25 (auditoria de estabilidade DB-127)
+## ESTADO VIGENTE — 2026-10-25 (auditoria de estabilidade DB-128)
 
 > Estado consultado no GitHub em 25/10/2026. Este diário acompanha a branch de consolidação #89; não representa merge em `main`. CI verde por branch isolada não comprova integração combinada nem teste físico.
 
@@ -198,6 +198,7 @@
 - **DB-125** · 2026-10-24 — Auditoria retrospectiva das PRs, CI e diário desde o início
 - **DB-126** · 2026-10-25 — Auditoria de estabilidade, rádio Bluetooth e controle de regressões
 - **DB-127** · 2026-10-25 — CI como auditoria de regressão e cobertura completa das suítes
+- **DB-128** · 2026-10-25 — Revalidar bloqueio RFCOMM após cada espera e corrigir IDs RG duplicados
 
 ---
 
@@ -3918,3 +3919,16 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Ainda não houve teste físico no Galaxy A06/Android 16 com ELM327/ECU reais. CI verde não comprova Bluetooth real, suporte de PID nem precisão da autonomia.
 - Nenhum merge foi executado.
 
+## DB-128 · 2026-10-25 — Revalidar bloqueio RFCOMM após cada espera e corrigir IDs RG duplicados
+
+### Causa e ajuste
+- Na tentativa anterior, a sonda de rádio passou a preceder a leitura do bloqueio compartilhado e o teste de duas instâncias voltou a passar. A releitura de três instâncias mostrou um risco residual: dois waiters podem acordar pela mesma promessa anterior e ambos presumir que o bloqueio está livre.
+- O transporte agora repete, em loop, a sequência: consultar rádio → ler bloqueio compartilhado → aguardar tentativa anterior se existir → voltar ao início e revalidar rádio/bloqueio. A região entre o último bloqueio vazio e `connectToDevice` continua sem `await`, mantendo a criação/registro da tentativa como trecho síncrono.
+- `tests/regression.test.js` agora abre três instâncias simultâneas para o mesmo endereço e exige três conexões concluídas, mas `bluetoothMaxNativeConnections === 1`. O teste não foi relaxado.
+- O contrato tinha IDs duplicados: RG-34 era usado por Bluetooth e persistência; RG-35 por autosave e a nova persistência. Corrigido para RG-34 (rádio), RG-35 (persistência segura), RG-36 (autosave/GPS/estimadores) e RG-37 (waiters RFCOMM). O gate agora verifica IDs RG únicos e contínuos, além do índice/entradas DB-NNN.
+- O plano de testes recebeu o caso de três instâncias simultâneas e de revalidação após await.
+
+### Validação
+- A correção de lock é uma alteração de comportamento nova. O SHA anterior `3bd9fd6c7721be706e920595d4991ea8e67d5bcf` tem CI própria em execução sobre os testes/gate/documentação da etapa anterior; não representa esta mudança de concorrência.
+- Este registro gera um novo SHA; só sua execução CI completa com `validate` e `android-build` verdes pode aprovar o código. O teste físico Android 16 + ELM327/ECU reais continua pendente.
+- A proteção de `main` permanece pendente por falta de permissão para configurar required checks. Nenhum merge foi executado.

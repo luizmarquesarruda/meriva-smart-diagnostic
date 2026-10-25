@@ -39,6 +39,8 @@ A branch mantém o fluxo OBD/ELM327 existente e inclui testes automatizados para
 - Estado indeterminado interrompe o fallback; erro nativo de rádio desligado ou estado desconhecido interrompe retries no manager e no splash.
 - A splash preserva a mensagem real e oferece abrir o painel sem declarar a ECU conectada.
 - Testes determinísticos: `tests/bluetoothRadioRecovery.test.js`; contratos de integração: `tests/projectBaseline.test.js`; validação final do Bluetooth Classic exige aparelho Android e ELM327 reais.
+- Abrir três instâncias em paralelo para o mesmo endereço: todas podem concluir em sequência, mas o máximo de conexões nativas ativas permanece 1.
+- Depois que um waiter aguardar uma tentativa anterior, revalidar o rádio e reler o bloqueio compartilhado antes de abrir outro socket.
 
 ## Sequência de validação para um lote
 
