@@ -6,6 +6,7 @@ type FormulaSpec = {
   offset?: number;
   scale?: number;
   divisor?: number;
+  mask?: number;
 };
 
 type FormulaCatalog = {
@@ -45,6 +46,14 @@ export function applyFormula(formulaId: string, data: number[]): number {
     case 'u8':
       requireBytes(data, 1);
       return data[0];
+    case 'u8_mask': {
+      requireBytes(data, 1);
+      const mask = spec.mask ?? 0xFF;
+      if (!Number.isInteger(mask) || mask < 0 || mask > 255) {
+        throw new Error(`Máscara de bits inválida: ${String(mask)}`);
+      }
+      return data[0] & mask;
+    }
     case 'u16':
       requireBytes(data, 2);
       return data[0] * 256 + data[1];
