@@ -201,6 +201,7 @@
 - **DB-128** · 2026-10-25 — Revalidar bloqueio RFCOMM após cada espera e corrigir IDs RG duplicados
 - **DB-129** · 2026-10-25 — GPS rejeita timestamps inválidos e fora de ordem
 - **DB-130** · 2026-10-25 — Otimização CSV avaliada e bloqueada pela versão instalada
+- **DB-131** · 2026-10-25 — Atualização periódica de localização/clima baseada em conectividade
 
 ---
 
@@ -3966,3 +3967,23 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - A CI realmente rejeitou a alteração em `android-build`/typecheck no SHA experimental; o erro não foi contornado nem a suíte relaxada.
 - Os resultados do SHA anterior `8ca18ce0103d949580a56dd158e8b993aa69e1ac` não validam as alterações subsequentes de tentativa/reversão e documentação. O SHA final desta consolidação precisa de CI própria.
 - Nenhum merge foi executado. Testes em aparelho e validação ELM327/ECU continuam independentes da CI.
+
+
+## DB-131 · 2026-10-25 — Atualização periódica de localização/clima baseada em conectividade
+
+### Achado confirmado
+- `app/index.tsx` chamava `loadCurrentConditions()` apenas uma vez, no primeiro mount da tela. Assim, clima/localidade não eram atualizados periodicamente e a volta da internet por dados móveis não disparava uma nova consulta.
+- O projeto já contém `@react-native-community/netinfo`, usado para identificar conectividade; não era necessário introduzir uma dependência nova.
+- O contrato permanece: localização não solicita permissão automaticamente; clima/cidade são enriquecimento opcional e não participam do diagnóstico OBD local.
+
+### Correção implementada nesta branch
+- Criado `src/weather/conditionsRefresh.ts` com início imediato quando há internet, refresh periódico de 15 minutos, atualização imediata após transição offline→online, cooldown de retry de 60 segundos e proteção contra chamadas simultâneas.
+- Ligado o serviço ao NetInfo na tela principal para Wi-Fi e dados móveis (incluindo 4G/5G); inscrições e temporizador são removidos no unmount.
+- Em falha de atualização após clima válido, a temperatura antiga deixa de ser apresentada como atual; somente a última localidade pode ser preservada com indicação explícita de dados desatualizados. Permissão revogada limpa a localização anterior.
+- Criado `tests/weatherRefresh.test.js` para testar conectividade disponível/indisponível, retomada de rede, refresh periódico, ausência de spam, limpeza e retenção segura de localidade. O novo teste foi incluído em `npm test` e no gate de baseline.
+- Adicionados os contratos RG-39 e NET-WEATHER-01 ao contrato anti-regressão e plano de testes.
+
+### Validação e limites
+- Commits criados na branch `fix/repository-audit-hardening-20261024` da PR #89. A CI deve ser verificada no HEAD final desta alteração; resultados de SHAs anteriores não contam como aprovação.
+- Ainda não foi executado teste físico de geolocalização em Android 16 alternando Wi-Fi/4G/5G. A CI não comprova recepção GPS pelo provedor fused, disponibilidade da operadora nem funcionamento do ELM327/ECU reais.
+- Nenhuma mudança foi mesclada em `main`. A atualização de clima é opcional e não deve afetar polling, conexão Bluetooth, autonomia ou diagnóstico local.
