@@ -27,6 +27,8 @@ assert.match(helper, /Number\.isFinite\(timestampMs\)/, 'timestamps inválidos d
 assert.match(helper, /timestampMs > nowMs/, 'leituras futuras devem ser descartadas');
 assert.match(helper, /displayStaleAfterMs/, 'leituras vencidas devem virar N/D');
 assert.match(helper, /classifySeverity/, 'limites monitorados devem gerar severidade');
+assert.ok(helper.includes("'0111': 'POSIÇÃO ABSOLUTA DA BORBOLETA'"), 'PID 0111 é posição absoluta da borboleta');
+assert.ok(helper.includes("'015A': 'POSIÇÃO RELATIVA DO PEDAL DO ACELERADOR'"), 'PID 015A é posição relativa do pedal do acelerador');
 assert.match(home, /buildCockpitPidMetrics\(connectedSupportedPids, liveReadings\)/);
 assert.match(home, /visibleHeroMetrics/, 'o painel deve alternar a lista dinâmica de PIDs/alertas');
 assert.match(home, /10_000/, 'a rotação visual deve permanecer em dez segundos');
