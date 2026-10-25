@@ -1,20 +1,20 @@
-## ESTADO VIGENTE — 2026-10-25 (retomada da integração DB-134)
+## ESTADO VIGENTE — 2026-10-25 (retomada da integração DB-135)
 
-> Estado observado na branch `integration/reconcile-pid-ui-20261025`; validação deve corresponder ao SHA exato. Resultados de commits anteriores não são transferidos.
+> Estado observado na branch `integration/reconcile-pid-ui-20261025`. A aprovação depende de uma CI completa no SHA final, sem reutilizar resultados anteriores.
 
-### Integração, CI e riscos restantes
+### Integração, CI e pendências
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
-- `main` observado: `8e95b2b59e0aa4c76027b638e49d4453a0a4b54c`; PR [#89 — hardening](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/89) foi mesclada. PRs [#90](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/90) e [#82](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/82) foram fechadas sem merge.
-- HEAD verificado antes desta correção: `c9f33896d351dd00f524ab8c4a2ae9b87dc1052e`. A CI [run 40235326174](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40235326174) passou por Expo Doctor (17/17), mas falhou no gate: `tests/projectBaseline.test.js` ainda esperava a expressão antiga `trip.estimatedRangeKm > 0`. Por isso `npm run validate` e `android-build` foram ignorados.
-- O contrato anti-regressão está reconciliado em RG-01…RG-43 sem duplicatas. O teste de cockpit já valida o rótulo correto do PID 0111: posição absoluta da borboleta.
-- PR [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81) continua em rascunho; [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) e [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84) continuam abertas. O PID 0144 está na PR #81, mas ainda não está no catálogo da branch candidata.
-- `app/floot-layout.tsx` é uma rota Expo com dados demonstrativos estáticos (N/D, ECU desconectada e modelo fixo). A auditoria de layout ainda exige removê-la/movê-la para fora da árvore de rotas ou convertê-la numa função de produto real sem telemetria fictícia.
+- `main` observado: `8e95b2b59e0aa4c76027b638e49d4453a0a4b54c`; PR [#89 — hardening](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/89) foi mesclada; PRs [#90](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/90) e [#82](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/82) foram fechadas sem merge.
+- A CI confirmada mais recente é [run 40235326174](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40235326174) no SHA `c9f33896d351dd00f524ab8c4a2ae9b87dc1052e). Expo Doctor passou 17/17; o gate falhou por expectativa obsoleta de autonomia, antes de executar TypeScript/suíte e build Android.
+- O commit `27cb5035580c0822b9d52f455ebb13c50508eefe` atualizou essa expectativa, mas a revisão subsequente identificou escapes duplicados na expressão regular do teste. Essa edição está sendo corrigida em DB-135; não está validada por CI.
+- PR [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81) permanece em rascunho; [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) e [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84) permanecem abertas. O PID 0144 ainda não está no catálogo da branch candidata.
+- `app/floot-layout.tsx` é uma rota Expo de demonstração com ECU desconectada e dados estáticos; a auditoria exige decidir/remover essa rota antes do release.
+- Nenhuma integração/merge foi feita com a branch candidata. Bluetooth físico, suporte PID e autonomia real continuam sem validação em aparelho.
 
 ### Critérios de aceitação
-- Manter IDs RG/DB únicos, contínuos e sincronizados com os índices.
-- Exigir gate anti-regressão, TypeScript, suíte completa e build Android no SHA final antes de concluir a integração.
-- O catálogo padrão não comprova suporte da ECU da Meriva. Bluetooth, telemetria física e precisão da autonomia exigem ensaios no Galaxy A06/Android 16 com ELM327/ECU reais.
-- Não fechar PRs concorrentes até reconciliar o diff e provar que suas alterações relevantes estão presentes na integração.
+- RG-01…RG-43 únicos e sequenciais; DB-001…DB-NNN e índice sempre coincidentes.
+- Gate anti-regressão, TypeScript, suíte completa e build Android verdes no mesmo SHA antes da integração.
+- Não reintroduzir autonomia persistida como atual; não declarar suportado um PID padrão sem resposta real da ECU.
 ---
 
 ## Portabilidade Floot → aplicativo Expo — 2026-10-23
@@ -199,6 +199,7 @@
 - **DB-132** · 2026-10-25 — Retomada da integração e reconciliação dos IDs RG duplicados
 - **DB-133** · 2026-10-25 — Alinhamento do baseline com o rótulo correto do PID 0111
 - **DB-134** · 2026-10-25 — Autonomia atual: remover expectativa obsoleta do baseline
+- **DB-135** · 2026-10-25 — Corrigir escapes da asserção de autonomia no baseline
 
 ---
 
@@ -4038,3 +4039,17 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - A alteração exige nova CI no SHA seguinte. A execução anterior passou Expo Doctor 17/17, mas falhou no gate; TypeScript, suíte completa e build Android não executaram.
 - O PID 0144 continua ausente do catálogo da branch candidata, embora esteja na PR #81. Integrá-lo exige manter fórmula, faixa e testes coerentes e não tratá-lo como suportado pela ECU nem incluí-lo no polling sem confirmação atual.
 - A rota demonstrativa `app/floot-layout.tsx`, o layout, Bluetooth e autonomia continuam pendentes de revisão final. Nenhum merge foi feito.
+
+## DB-135 · 2026-10-25 — Corrigir escapes da asserção de autonomia no baseline
+
+### Achado da revisão
+- Ao atualizar o baseline para exigir a autonomia calculada e validada em DB-134, a expressão regular foi escrita com barras invertidas duplicadas. A verificação de conteúdo da preparação do commit não detectou que a string gerada não correspondia ao escape necessário no código JavaScript.
+- O erro está no teste de contrato, não na apresentação de autonomia em `app/dados.tsx`. Nenhum resultado de CI foi presumido para esse commit.
+
+### Correção
+- Reescrita a asserção com uma barra invertida por escape de regex e verificações explícitas do próprio texto para prevenir nova duplicação.
+- Preservada a exigência funcional: a tela usa `getCurrentAutonomyRangeKm` e mostra o valor validado ou `N/D`, nunca uma estimativa persistida de viagem anterior como valor atual.
+
+### Validação pendente
+- Nova CI no SHA produzido por esta correção é obrigatória; não considerar o gate, TypeScript, suíte ou build Android aprovados antes dos resultados correspondentes.
+- Permanecem pendentes a reconciliação do PID 0144 da PR #81, a remoção/reclassificação da rota de demonstração `app/floot-layout.tsx` e a revisão final do diff agregado.
