@@ -219,6 +219,25 @@ export class BluetoothClassicTransport implements ObdTransport {
     }
 
     for (const secureSocket of socketModes) {
+      // Android may turn the adapter off while the native RFCOMM call is pending.
+      // Do not start the secure fallback against a disabled radio.
+      let radioEnabled: boolean;
+      try {
+        radioEnabled = await RNBluetoothClassic.isBluetoothEnabled();
+      } catch (cause) {
+        this.logDiagnostic('CONNECT_ABORT_RADIO_STATE_UNKNOWN', {
+          error: cause instanceof Error ? cause.message : String(cause),
+        });
+        lastCause = cause;
+        break;
+      }
+      this.logDiagnostic('BLUETOOTH_ENABLED_BEFORE_SOCKET_ATTEMPT', { radioEnabled, secureSocket });
+      if (!radioEnabled) {
+        lastCause = new Error('BLUETOOTH DESLIGADO DURANTE A CONEXÃO; ATIVE O BLUETOOTH E TENTE NOVAMENTE');
+        this.logDiagnostic('CONNECT_ABORT_BLUETOOTH_RADIO_OFF', { secureSocket });
+        break;
+      }
+
       let connectionRaceTimedOut = false;
       connectPromise = null;
       device = null;
@@ -309,6 +328,21 @@ export class BluetoothClassicTransport implements ObdTransport {
           error: cause instanceof Error ? cause.message : String(cause),
         });
         lastCause = cause;
+        // A failed insecure socket can coincide with Android powering down the radio.
+        // In that case a secure-socket retry cannot succeed and can obscure the root cause.
+        try {
+          const radioStillEnabled = await RNBluetoothClassic.isBluetoothEnabled();
+          this.logDiagnostic('BLUETOOTH_ENABLED_AFTER_SOCKET_FAILURE', { radioStillEnabled, secureSocket });
+          if (!radioStillEnabled) {
+            lastCause = new Error('BLUETOOTH DESLIGADO DURANTE A CONEXÃO; ATIVE O BLUETOOTH E TENTE NOVAMENTE');
+            this.logDiagnostic('CONNECT_ABORT_BLUETOOTH_RADIO_OFF', { secureSocket });
+            break;
+          }
+        } catch (radioCause) {
+          this.logDiagnostic('CONNECT_RADIO_STATE_CHECK_FAILED', {
+            error: radioCause instanceof Error ? radioCause.message : String(radioCause),
+          });
+        }
         if (timedOutNativeAttemptStillPending(
           connectionRaceTimedOut,
           connectPromise,
