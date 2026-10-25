@@ -80,3 +80,12 @@ Este trabalho está em branch e PR separados. Não houve merge nem alteração d
 - As execuções anteriores [run 40138131245](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40138131245) e [run 40171897065](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40171897065) foram verdes em SHAs anteriores. O novo SHA precisa da própria CI.
 - A proteção de `main` com required checks precisa ser configurada no GitHub; a integração atual não permite alterar branch protection (403).
 - Teste físico no Galaxy A06/Android 16 com ELM327 e ECU reais, descoberta de PIDs e autonomia em percurso continuam pendentes. Nenhum merge foi feito.
+
+
+## CI regressiva, iterações e cobertura de testes — 2026-10-25
+
+- A CI identificou três defeitos introduzidos durante a consolidação e eles foram corrigidos sem remover/relaxar os testes: regex do gate do diário com escape duplo; erro TypeScript por acesso a propriedade de valor `unknown`; e corrida RFCOMM causada por um `await` entre a leitura do bloqueio compartilhado e a criação do socket.
+- `tests/regression.test.js` detectou a corrida ao exigir `bluetoothMaxNativeConnections === 1`; a verificação do rádio foi movida antes de `pendingNativeConnections.get(addressKey)`, preservando a região sem `await` antes de registrar a tentativa nativa. A CI de validação passou para o SHA `2a5117a5566a0f993e7a45a20c19d0d92671b9c8`; o build Android desse SHA ainda estava em andamento.
+- O gate agora exige que todo `tests/*.test.js`, com exceção do próprio baseline executado em um passo separado, apareça em `npm test`. Também valida sequência completa e índice do diário.
+- Como o gate e o diário foram modificados após essa CI, o novo SHA deve passar novamente em `validate` e `android-build`; resultados anteriores não são reutilizados como aprovação.
+

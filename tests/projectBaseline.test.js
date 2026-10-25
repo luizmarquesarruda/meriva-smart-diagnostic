@@ -77,6 +77,16 @@ for (const suite of requiredSuites) {
   assert.ok(scriptedTests.has(suite), 'suite essencial não ligada a npm test: ' + suite);
 }
 
+// Every test file must run via npm test; the baseline gate itself is run separately by CI.
+const testFilesOnDisk = fs.readdirSync(path.join(ROOT, 'tests'))
+  .filter((file) => file.endsWith('.test.js') && file !== 'projectBaseline.test.js')
+  .sort();
+assert.deepEqual(
+  [...scriptedTests].sort(),
+  testFilesOnDisk,
+  'todo arquivo tests/*.test.js deve estar ligado ao npm test; projectBaseline roda no gate separado',
+);
+
 // Prevent the known 3 -> 5 readings regression at both data and execution layers.
 assert.equal(sensorCatalog.minimumReadingsPerPid, 5, 'o contrato global exige cinco leituras por PID');
 assert.ok(sensorCatalog.tests.length > 0, 'catálogo de testes não pode ficar vazio');

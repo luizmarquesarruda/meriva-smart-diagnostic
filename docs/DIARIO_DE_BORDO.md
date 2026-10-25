@@ -1,4 +1,4 @@
-## ESTADO VIGENTE — 2026-10-25 (auditoria de estabilidade DB-126)
+## ESTADO VIGENTE — 2026-10-25 (auditoria de estabilidade DB-127)
 
 > Estado consultado no GitHub em 25/10/2026. Este diário acompanha a branch de consolidação #89; não representa merge em `main`. CI verde por branch isolada não comprova integração combinada nem teste físico.
 
@@ -9,7 +9,7 @@
 - PR #80 é a última integração de código confirmada. Nenhuma correção desta rodada foi mesclada em `main`.
 
 ### PRs ativas e conflitos de integração
-- [#89 — consolidação da auditoria/hardening](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/89): branch desta auditoria; SHA anterior `73df16b3c7606595806d67c14c2f95f7fae37e2e`, com [run 40138131245 — validate e android-build aprovados](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40138131245). Este commit muda o SHA e exige nova CI.
+- [#89 — consolidação da auditoria/hardening](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/89): começou esta rodada no SHA `73df16b3c7606595806d67c14c2f95f7fae37e2e`, cuja CI anterior estava verde. As correções encontradas nas iterações estão registradas em DB-126/DB-127; consulte o HEAD atual e a CI do SHA exato antes de aceitar.
 - [#90 — recuperação Bluetooth Android 16](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/90): [run 40171897065 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40171897065) no SHA anterior. A lógica está sendo consolidada na #89 para evitar duas propostas nos mesmos três arquivos; a branch é preservada como referência.
 - [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81): aberta; DB-109 desta branch significa PID 0144, enquanto DB-109 na #89 tem outro conteúdo. Deve ser renumerada/sincronizada sobre a sequência consolidada antes de integrar.
 - [#82 — navegação responsiva](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/82), [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) e [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84) seguem abertas. #82 e #83 dividem nove arquivos e discordam sobre a navegação em paisagem e a política de 20 versus 25 PIDs; #83 compartilha 17 arquivos com #89. CI verde isolada não resolve esses conflitos.
@@ -197,6 +197,7 @@
 - **DB-124** · 2026-10-24 — Delimitação do risco de modelo fixo no layout
 - **DB-125** · 2026-10-24 — Auditoria retrospectiva das PRs, CI e diário desde o início
 - **DB-126** · 2026-10-25 — Auditoria de estabilidade, rádio Bluetooth e controle de regressões
+- **DB-127** · 2026-10-25 — CI como auditoria de regressão e cobertura completa das suítes
 
 ---
 
@@ -3885,7 +3886,9 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Atualizados RG-34, plano BT-RADIO-01, README, changelog e auditoria técnica.
 
 ### Validação e limites
-- SHA anterior de #89: `73df16b3c7606595806d67c14c2f95f7fae37e2e`; [CI run 40138131245](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40138131245), ambos os jobs verdes. Esta alteração cria SHA novo e exige a própria CI.
+- CI iterativa revelou problemas reais em sequência: no SHA `f1655177d939563e013373f7c48230da4135d90d`, o gate falhou por regex de diário com escapes incorretos; em `f9d718a7d7a5fe555fea2d04fe1c83eeb8c55ae1`, o gate passou, mas TypeScript apontou TS18046 por acesso a `lastCause: unknown`, corrigido com erro local tipado.
+- Em `43dda6925b6cb4acfef1cf177391a0b7b9731742`, `tests/regression.test.js` detectou duas tentativas RFCOMM simultâneas: a sonda extra do rádio havia ficado depois da leitura do bloqueio compartilhado. A verificação foi movida para antes do bloqueio em `2a5117a5566a0f993e7a45a20c19d0d92671b9c8`; o `validate` passou nos eventos push/PR [run 40185128970](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40185128970) e [run 40185132846](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40185132846). O build Android desses SHAs ainda estava em andamento no momento do registro, e a alteração deste diário/gate gera outro SHA com CI própria.
+- Adicionada verificação de inventário para garantir que todos os arquivos `tests/*.test.js`, exceto o próprio `projectBaseline.test.js` (executado no gate separado), estejam conectados ao comando `npm test`.
 - A proteção de `main` com required checks segue pendente porque a integração disponível não tem permissão para alterar branch protection (403).
 - O teste da política é determinístico; não substitui teste do Galaxy A06/Android 16 com ELM327/ECU reais. Teste físico, confirmação de PIDs e autonomia em percurso permanecem pendentes.
 - Nenhum merge executado.
@@ -3895,4 +3898,23 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 2. Comparar o diff agregado #81–#84 e #89; resolver arquivos comuns de #82/#83 e #83/#89 sem remover contratos.
 3. Executar gate, TypeScript, suíte completa e build Android no SHA final combinado.
 4. Instalar o APK e validar Bluetooth, splash, navegação, resposta 010C e apenas PIDs anunciados/respondidos pela ECU.
+
+## DB-127 · 2026-10-25 — CI como auditoria de regressão e cobertura completa das suítes
+
+### Correções confirmadas pela CI
+- A primeira revisão do novo gate apontou escape incorreto nas regex de sequência/índice; foi corrigido antes de concluir a validação.
+- TypeScript detectou leitura de `lastCause.message` quando `lastCause` era `unknown`. Foi substituída por variável local `Error` tipada.
+- A suíte `testBluetoothEventTransport` detectou um efeito colateral da correção: a verificação assíncrona do rádio entre a consulta do bloqueio e a abertura RFCOMM abriu uma janela de corrida. O rádio agora é verificado primeiro, e o mapa global de tentativa pendente é conferido logo depois, sem outro `await` entre a checagem do bloqueio e a criação/registro da tentativa.
+- A suíte que detectou a corrida não foi relaxada nem removida; seu limite continua exigindo no máximo uma tentativa nativa concorrente por adaptador.
+- As execuções no SHA `2a5117a5566a0f993e7a45a20c19d0d92671b9c8` passaram por `validate` nos eventos push e pull request; os builds Android estavam em andamento. Este novo commit de documentação/gate exige nova CI no SHA resultante.
+
+### Controle adicional
+- O gate agora compara o conjunto de arquivos `tests/*.test.js` com as suítes presentes em `npm test`, excluindo somente `projectBaseline.test.js`, que é executado como passo independente da CI. Isso impede que uma suíte seja esquecida do runner mesmo quando não estiver na lista de suítes obrigatórias.
+- A sequência DB-001…DB-127 e o índice correspondente são validados automaticamente; a divergência anterior (índice terminando em DB-119 enquanto o corpo chegava a DB-125) foi reparada em DB-126.
+
+### Limites restantes
+- Branch `main` continua sem proteção confirmada e sem rulesets. A integração conectada devolveu 403 para alteração de proteção; checks obrigatórios precisam ser configurados nas regras do repositório.
+- PRs #82/#83 continuam propostas concorrentes de navegação e PIDs; a consolidação precisa resolver o diff combinado antes de qualquer merge.
+- Ainda não houve teste físico no Galaxy A06/Android 16 com ELM327/ECU reais. CI verde não comprova Bluetooth real, suporte de PID nem precisão da autonomia.
+- Nenhum merge foi executado.
 
