@@ -1,5 +1,7 @@
 # Banco de Fórmulas OBD-II
 
+> Para compatibilidade específica, consulte [Auditoria de fontes da Meriva e compatibilidade OBD](MERIVA_OBD_SOURCE_AUDIT_2026-10-24.md). O banco de fórmulas reproduz definições genéricas SAE; sua existência não declara que a ECU responda a esse PID.
+
 O Meriva Smart Diagnostic agora separa conhecimento técnico de aprendizado do veículo.
 
 ## Fontes pesquisadas
