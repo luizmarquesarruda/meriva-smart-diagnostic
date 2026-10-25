@@ -112,3 +112,11 @@ Este trabalho está em branch e PR separados. Não houve merge nem alteração d
 - O logger declarava incorretamente que `writeAsStringAsync` da API legada não suportava append. A documentação do FileSystem legado contém `WritingOptions.append`.
 - A reescrita integral por lote foi substituída por append quando o esquema não muda. A validação do cabeçalho continua; migração de esquema ainda relê e reserializa todas as linhas para manter colunas alinhadas.
 - O teste prova que o caminho comum não lê o histórico inteiro, usa append nativo e mantém o lote após falha de escrita. O novo SHA precisa passar em CI, inclusive build Android.
+
+
+## Otimização CSV avaliada, mas não aplicada — 2026-10-25
+
+- Foi identificada uma oportunidade de desempenho: no esquema estável, `src/database/csvLogger.ts` lê e reescreve o histórico integral em cada flush.
+- A proposta de usar `append: true` foi rejeitada pela CI de TypeScript: `WritingOptions` da versão instalada `expo-file-system` 17 / SDK 51 não expõe essa opção. A documentação consultada foi redirecionada para uma versão posterior e não comprova compatibilidade da versão fixada.
+- O patch experimental foi revertido; o código não mascara o erro de tipo. A dívida de desempenho permanece documentada até uma migração compatível ou segmentação do log, incluindo testes de exportação, migração de cabeçalho e recuperação de escrita.
+- A CI do SHA final após a reversão precisa concluir `validate` e `android-build`. Nenhuma aprovação de um SHA anterior é reutilizada.
