@@ -1,5 +1,8 @@
 # Referência do Manual do Proprietário da Chevrolet Meriva
 
+
+> **Referência técnica vigente (2026-10-24):** este documento é histórico/contextual. Para as definições atuais, nomes, bytes, unidades, fórmulas e limites de evidência dos PIDs, consulte [Mapa de PIDs e fórmulas](PID_FORMULA_MAP_2026-10-24.md) e [Auditoria de fontes da Meriva × OBD](MERIVA_OBD_SOURCE_AUDIT_2026-10-24.md). O manual do proprietário não confirma o suporte de PIDs pela ECU; a única resposta `RAW_ECU` específica hoje registrada é `010C`.
+
 Data da auditoria: 2026-10-04
 
 Fonte principal: Manual do Proprietário Chevrolet Meriva 2012, edição Brasil, Seções 12 e 13.
@@ -67,4 +70,4 @@ A pressão correta também deve ser conferida na etiqueta da portinhola de abast
 
 Manual do Proprietário Chevrolet Meriva 2012, General Motors do Brasil:
 
-https://meu.chevrolet.com.br/content/dam/gmownercenter/gmsa/gmbr/dynamic/manuals/2012/chevrolet/Meriva/pt/om_ng-chevrolet_Meriva_my12-pt_BR.pdf
+https://www.chevrolet.com.br/content/dam/chevrolet/south-america/brazil/portuguese/index/services/owner-manuals/05-pdf/meriva/manual-meriva-2012.pdf
