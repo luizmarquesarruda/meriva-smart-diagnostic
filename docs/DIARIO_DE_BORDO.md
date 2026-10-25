@@ -1,20 +1,20 @@
-## ESTADO VIGENTE — 2026-10-25 (retomada da integração DB-136)
+## ESTADO VIGENTE — 2026-10-25 (retomada da integração DB-137)
 
-> Estado consultado na branch `integration/reconcile-pid-ui-20261025`. A validação de release exige CI completa no mesmo SHA final, sem reaproveitar resultados de commits anteriores.
+> Estado observado na branch `integration/reconcile-pid-ui-20261025`. Aprovação requer CI completa no SHA final.
 
 ### Integração e CI
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
-- `main` observado: `8e95b2b59e0aa4c76027b638e49d4453a0a4b54c`; PR [#89 — hardening](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/89) foi mesclada. PRs [#90](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/90) e [#82](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/82) foram fechadas sem merge.
-- HEAD examinado antes desta correção: `ade7f92901bc58800e0ccb0a260bfbeda6221f78`. A CI [run 40235589104](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40235589104) passou Expo Doctor 17/17 e voltou a falhar no gate em `tests/projectBaseline.test.js:264`: ainda exigia que `app/dados.tsx` verificasse nível zero diretamente.
-- O comportamento correto está centralizado em `getCurrentAutonomyRangeKm`; `tests/autonomyPresentation.test.js` já valida que nível atual válido de 0% resulta em autonomia `0`, e a tela apresenta `currentAutonomyKm` quando não é `null`. `npm run validate` e `android-build` não foram executados nessa CI.
-- PR [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81) permanece em rascunho; [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) e [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84) permanecem abertas. PID 0144 está ausente do catálogo desta branch.
-- `app/floot-layout.tsx` continua sendo rota Expo de prévia com dados demonstrativos estáticos e deve ser removida/movida para fora das rotas antes de release ou deliberadamente convertida em funcionalidade real.
-- Nenhum merge da branch candidata foi feito. Validação física Android 16/ELM327/ECU continua pendente.
+- `main` observado: `8e95b2b59e0aa4c76027b638e49d4453a0a4b54c`; PR [#89](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/89) foi mesclada, enquanto [#90](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/90) e [#82](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/82) foram fechadas sem merge.
+- HEAD examinado antes desta correção: `dbd5790b77b6c300a08d337e53e95be3d9dababe`. A CI [run 40235734258](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40235734258) passou Expo Doctor 17/17, mas o gate falhou por erro de sintaxe em `tests/projectBaseline.test.js:267`: sobrou a mensagem de uma antiga asserção de tanque vazio depois de sua substituição.
+- O cálculo de autonomia usa `getCurrentAutonomyRangeKm`; `tests/autonomyPresentation.test.js` cobre 0% válido como `0 km`. A tela Dados mostra `currentAutonomyKm` ou `N/D`. O run anterior não executou TypeScript, a suíte completa nem Android build.
+- PR [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81) permanece em rascunho; [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) e [#84 — inventário](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84) permanecem abertas. PID 0144 ainda está ausente do catálogo integrado.
+- `app/floot-layout.tsx` é uma rota Expo com estado demonstrativo e valores estáticos; decidir remoção/movimentação para fora de `app/` antes de release.
+- Nenhum merge foi feito a partir da branch candidata. O hardware Android 16/ELM327/ECU ainda não foi testado nesta retomada.
 
 ### Critérios de aceitação
-- RG-01…RG-43 únicos/sequenciais; DB-001…DB-NNN e o índice sincronizados.
-- Gate, TypeScript, suíte completa e Android build verdes no mesmo SHA antes da integração.
-- Não restaurar dados de autonomia persistidos como atuais nem afirmar suporte real a PID sem resposta válida da ECU.
+- RG-01…RG-43 únicos/sequenciais; DB-001…DB-NNN e índice coincidentes.
+- Gate, TypeScript, suíte completa e Android build verdes no mesmo SHA antes de integração.
+- Não reintroduzir autonomia persistida como atual nem afirmar suporte real de PID sem resposta válida da ECU.
 ---
 
 ## Portabilidade Floot → aplicativo Expo — 2026-10-23
@@ -201,6 +201,7 @@
 - **DB-134** · 2026-10-25 — Autonomia atual: remover expectativa obsoleta do baseline
 - **DB-135** · 2026-10-25 — Corrigir escapes da asserção de autonomia no baseline
 - **DB-136** · 2026-10-25 — Validar tanque vazio pela regra central de autonomia
+- **DB-137** · 2026-10-25 — Remover linha órfã no baseline de autonomia
 
 ---
 
@@ -4069,3 +4070,17 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 ### Validação pendente
 - A nova CI deve executar novamente o gate e, se passar, TypeScript, suíte completa e build Android. O SHA anterior falhou apenas no gate, então nenhuma dessas etapas foi aprovada por aquela execução.
 - Permanecem pendentes a integração completa da PR #81 (PID 0144), o tratamento da rota demonstrativa `app/floot-layout.tsx`, e a revisão combinada do layout/polling/consumo/autonomia. Nenhum merge foi feito.
+
+## DB-137 · 2026-10-25 — Remover linha órfã no baseline de autonomia
+
+### Causa confirmada
+- A [run 40235734258](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40235734258) confirmou Expo Doctor 17/17, mas o gate não conseguiu iniciar as asserções porque havia uma linha de mensagem órfã após a substituição da verificação antiga de tanque vazio. O erro foi `SyntaxError: Unexpected token ')'` em `tests/projectBaseline.test.js:267`.
+- O problema estava no próprio teste, não em `autonomyPresentation.ts` nem na tela Dados. O diff havia removido a condição antiga, porém deixou a linha de mensagem separada e também duplicou a asserção do helper.
+
+### Correção aplicada
+- Removidas a mensagem órfã e a verificação duplicada, preservando uma única exigência de que a tela use `getCurrentAutonomyRangeKm` e uma exigência de que a suíte unitária verifique 0% válido como `0`.
+- Verificado no texto gerado que não restam as linhas órfãs/duplicadas nem foi removida a proteção do caso zero.
+
+### Validação pendente
+- Nova CI é necessária para confirmar sintaxe e gate. Até ela passar, TypeScript, suíte completa e Android build continuam sem resultado válido para esta revisão.
+- O PID 0144 da PR #81 e a rota demonstrativa `app/floot-layout.tsx` continuam pendentes de integração/revisão. Nenhum merge foi feito.
