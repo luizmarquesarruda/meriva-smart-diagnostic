@@ -96,14 +96,21 @@ function createMemoryFS() {
         dirs.add(acc);
       }
     },
-    async readAsStringAsync(p) {
+    async readAsStringAsync(p, options = {}) {
       if (!files.has(p)) throw new Error('ARQUIVO NAO EXISTE: ' + p);
-      return files.get(p);
+      const content = files.get(p);
+      if (Number.isInteger(options.position) && Number.isInteger(options.length)) {
+        return Buffer.from(content, 'utf8')
+          .subarray(options.position, options.position + options.length)
+          .toString('utf8');
+      }
+      return content;
     },
-    async writeAsStringAsync(p, content) {
+    async writeAsStringAsync(p, content, options = {}) {
       const parent = parentDir(p);
       if (parent && !dirs.has(parent)) await fakeFS.makeDirectoryAsync(parent);
-      files.set(p, String(content));
+      const next = String(content);
+      files.set(p, options.append ? (files.get(p) ?? '') + next : next);
     },
     async copyAsync(options) {
       const { from, to } = options;
@@ -932,6 +939,56 @@ test('histórico de autosave não sobrescreve arquivo existente quando a leitura
   }
 
   assert.strictEqual(files.get(target), originalContent, 'o histórico autosave anterior deve permanecer intacto');
+});
+
+test('validação estrutural de autosave rejeita envelopes e subestruturas inválidas', async () => {
+  const validation = loadTs(path.join(ROOT, 'src/meriva/autosaveValidation.ts'));
+  const stateModule = loadTs(path.join(ROOT, 'src/meriva/autosaveState.ts'));
+  const state = stateModule.createEmptyMerivaState();
+  const envelope = {
+    schemaVersion: 1,
+    savedAt: '2026-10-24T12:00:00.000Z',
+    dataType: 'APP_STATE',
+    source: 'autosaveManager',
+    payload: state,
+  };
+
+  assert.strictEqual(validation.isValidEnvelope(envelope), true);
+  assert.strictEqual(validation.validatePayload(state), true);
+  assert.strictEqual(validation.isValidEnvelope({ ...envelope, dataType: 'OTHER' }), false,
+    'tipo de envelope desconhecido deve ser rejeitado');
+  assert.strictEqual(validation.isValidEnvelope({ ...envelope, savedAt: 'data inválida' }), false,
+    'timestamp inválido não pode ser aceito como envelope íntegro');
+  assert.strictEqual(validation.isValidEnvelope({ ...envelope, schemaVersion: 1.5 }), false,
+    'schema version deve ser inteiro');
+  assert.strictEqual(validation.validatePayload({ ...state, obd: { connected: 'sim' } }), false,
+    'estado de conexão deve ser booleano');
+  assert.strictEqual(validation.validatePayload({
+    ...state,
+    autonomy: { ...state.autonomy, averageConsumptionKml: Number.NaN },
+  }), false, 'NaN em autonomia deve impedir hidratação do snapshot');
+  assert.strictEqual(validation.validatePayload({
+    ...state,
+    lastReadings: [{
+      pid: '010C', name: 'RPM', value: Number.POSITIVE_INFINITY, unit: 'rpm',
+      status: 'RESPONDEU', timestamp: '2026-10-24T12:00:00.000Z', source: 'REAL',
+    }],
+  }), false, 'leitura não finita deve ser rejeitada');
+
+  const partial = {
+    ...state,
+    obd: {},
+    autonomy: { readings: [] },
+    settings: { okay: true, nested: { invalid: true } },
+  };
+  const hydrated = validation.hydrateState(partial);
+  assert.strictEqual(hydrated.obd.connected, false,
+    'campo conectado ausente deve assumir padrão desconectado');
+  assert.strictEqual(hydrated.autonomy.tankCapacityL, 56,
+    'autonomia parcial deve herdar os defaults');
+  assert.strictEqual(hydrated.autonomy.readings.length, 0);
+  assert.deepStrictEqual(hydrated.settings, { okay: true },
+    'hidratação não deve repassar valores arbitrários às configurações');
 });
 
 // ---------- executor ----------

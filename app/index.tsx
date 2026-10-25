@@ -8,6 +8,7 @@ import { COLORS } from '../src/ui/theme';
 import { AppIcon } from '../src/ui/AppIcon';
 import { NetworkStatusIndicator } from '../src/ui/NetworkStatusIndicator';
 import * as FileSystem from 'expo-file-system';
+import NetInfo from '@react-native-community/netinfo';
 import { readDriveCycles, initializeDriveCycles } from '../src/storage/driveCycleStorage';
 import { getDriveCycleSummary, type DriveCycle } from '../src/data/driveCycles';
 import { getAutoSaveState, getAutoSaveStatus, initAutoSave, updateAutoSaveState } from '../src/meriva/autosaveManager';
@@ -19,6 +20,7 @@ import { readAppSettings, type AppSettings } from '../src/database/appSettings';
 import { connectPreferredElm, getSharedObdConnection, getSharedObdLastError, getSharedObdStatus, subscribeSharedObd, subscribeSharedObdStatus } from '../src/obd/sharedConnection';
 import { autoTripService, type AutoTripServiceState } from '../src/trip/autoTripService';
 import { loadCurrentConditions, type CurrentConditions } from '../src/weather/currentConditions';
+import { mergeCurrentConditions, startCurrentConditionsRefresh, type NetworkReachabilitySnapshot } from '../src/weather/conditionsRefresh';
 import { getCurrentAutonomyRangeKm } from '../src/trip/autonomyPresentation';
 import { buildCockpitPidMetrics, type CockpitPidMetric } from '../src/obd/cockpitTelemetry';
 
@@ -50,11 +52,26 @@ export default function IndexScreen() {
   }, [locationLabelsKey]);
 
   useEffect(() => {
-    let cancelled = false;
-    void loadCurrentConditions().then((result) => {
-      if (!cancelled) setConditions(result);
-    });
-    return () => { cancelled = true; };
+    const monitor = {
+      fetch: async () => {
+        const state = await NetInfo.fetch();
+        return {
+          isConnected: state.isConnected,
+          isInternetReachable: state.isInternetReachable,
+        };
+      },
+      addEventListener: (listener: (state: NetworkReachabilitySnapshot) => void) =>
+        NetInfo.addEventListener((state) => listener({
+          isConnected: state.isConnected,
+          isInternetReachable: state.isInternetReachable,
+        })),
+    };
+
+    return startCurrentConditionsRefresh(
+      monitor,
+      loadCurrentConditions,
+      (result) => setConditions((previous) => mergeCurrentConditions(previous, result)),
+    );
   }, []);
 
   useEffect(() => autoTripService.subscribe(setTripState), []);

@@ -144,6 +144,36 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
   watcher({ coords: { latitude: 0, longitude: 0.00175, speed: 10, accuracy: 5 }, timestamp: 29000 });
   assert.strictEqual(tracker.getState().distanceKm, distanceAfterObdMovement);
 
+  const distanceBeforeBadFix = tracker.getState().distanceKm;
+  const samplesBeforeBadCoordinate = tracker.getState().samples;
+  watcher({ coords: { latitude: 91, longitude: 0, speed: 50, accuracy: 1 }, timestamp: 30000 });
+  assert.strictEqual(tracker.getState().samples, samplesBeforeBadCoordinate,
+    'coordenadas fora da faixa geográfica devem ser descartadas por completo');
+  watcher({ coords: { latitude: 0, longitude: 0.0020, speed: 50 }, timestamp: 31000 });
+  watcher({ coords: { latitude: 0, longitude: 0.0025, speed: 50 }, timestamp: 32000 });
+  assert.strictEqual(tracker.getState().distanceKm, distanceBeforeBadFix,
+    'sem precisão GPS conhecida, o drift não deve alimentar distância');
+  assert.ok(Number.isNaN(haversineDistanceKm(
+    { latitude: 91, longitude: 0 },
+    { latitude: 0, longitude: 0 },
+  )), 'haversine deve recusar coordenadas fora da faixa válida');
+
+  const samplesBeforeBadTimestamp = tracker.getState().samples;
+  const distanceBeforeBadTimestamp = tracker.getState().distanceKm;
+  watcher({ coords: { latitude: 0, longitude: 0.00175, speed: 0, accuracy: 5 }, timestamp: Number.NaN });
+  assert.strictEqual(tracker.getState().samples, samplesBeforeBadTimestamp,
+    'timestamp inválido deve descartar a amostra inteira, não substituí-lo por Date.now()');
+  watcher({ coords: { latitude: 0, longitude: 0.00175, speed: 0, accuracy: 5 }, timestamp: 23000 });
+  assert.strictEqual(tracker.getState().samples, samplesBeforeBadTimestamp,
+    'amostra com timestamp anterior ao último fix válido deve ser descartada');
+  assert.strictEqual(tracker.getState().distanceKm, distanceBeforeBadTimestamp,
+    'timestamp atrasado não deve alterar distância');
+  watcher({ coords: { latitude: 0, longitude: 0.00175, speed: 0, accuracy: 5 }, timestamp: 30000 });
+  assert.strictEqual(tracker.getState().samples, samplesBeforeBadTimestamp + 1,
+    'a coleta deve se recuperar quando chega um timestamp válido crescente');
+  assert.strictEqual(tracker.getState().distanceKm, distanceBeforeBadTimestamp,
+    'a amostra válida de recuperação não deve inventar deslocamento');
+
   await tracker.stop();
   assert.strictEqual(tracker.getState().running, false);
   unsubscribe();

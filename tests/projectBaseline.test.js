@@ -22,9 +22,12 @@ const laboratory = read('app/laboratorio.tsx');
 const dataScreen = read('app/dados.tsx');
 const tripService = read('src/trip/autoTripService.ts');
 const liveTelemetry = read('src/obd/liveTelemetry.ts');
+const weatherRefresh = read('src/weather/conditionsRefresh.ts');
+const gpsTracker = read('src/gps/gpsTracker.ts');
 const diagnostics = read('src/diagnostics/diagnosticEngine.ts');
 const sensorEngine = read('src/diagnostics/sensorTestEngine.ts');
 const projectContract = read('docs/CONTRATO_ANTI_REGRESSAO.md');
+const diary = read('docs/DIARIO_DE_BORDO.md');
 const theme = read('src/ui/theme.ts');
 
 // Gate itself must be a first-class CI step, not a note in the diary.
@@ -35,6 +38,16 @@ assert.equal(packageJson.scripts.validate, 'npm run typecheck && npm test');
 // Regression-sensitive suites must remain connected to npm test.
 // Removing a test file from the script must fail this gate before merge.
 const requiredSuites = [
+  'pidParserIntegrity.test.js',
+  'weatherRefresh.test.js',
+  'bluetoothRadioRecovery.test.js',
+  'pidFormulaBoundaries.test.js',
+  'dtcScanner.test.js',
+  'fuelConsumption.test.js',
+  'fuelIdentification.test.js',
+  'bluetoothConfig.test.js',
+  'bluetoothState.test.js',
+  'ecuHealth.test.js',
   'sensorTestEngine.test.js',
   'knowledgeJson.test.js',
   'cockpitNavigation.test.js',
@@ -67,6 +80,16 @@ for (const suite of requiredSuites) {
   assert.ok(scriptedTests.has(suite), 'suite essencial não ligada a npm test: ' + suite);
 }
 
+// Every test file must run via npm test; the baseline gate itself is run separately by CI.
+const testFilesOnDisk = fs.readdirSync(path.join(ROOT, 'tests'))
+  .filter((file) => file.endsWith('.test.js') && file !== 'projectBaseline.test.js')
+  .sort();
+assert.deepEqual(
+  [...scriptedTests].sort(),
+  testFilesOnDisk,
+  'todo arquivo tests/*.test.js deve estar ligado ao npm test; projectBaseline roda no gate separado',
+);
+
 // Prevent the known 3 -> 5 readings regression at both data and execution layers.
 assert.equal(sensorCatalog.minimumReadingsPerPid, 5, 'o contrato global exige cinco leituras por PID');
 assert.ok(sensorCatalog.tests.length > 0, 'catálogo de testes não pode ficar vazio');
@@ -84,6 +107,53 @@ const bluetoothRecovery = read('src/obd/connectionRecovery.ts');
 const bluetoothTransport = read('src/obd/bluetoothClassicTransport.ts');
 assert.match(bluetoothRecovery, /awaitNativeCleanupRetry/);
 assert.match(bluetoothTransport, /awaitNativeCleanupRetry/);
+assert.match(bluetoothTransport, /MAX_ELM_RX_BUFFER_CHARS\s*=\s*16\s*\*\s*1024/);
+assert.match(bluetoothTransport, /RX_DIAGNOSTIC_PREVIEW_CHARS\s*=\s*256/);
+assert.match(bluetoothTransport, /RX_BUFFER_OVERFLOW/);
+const bluetoothRadioPolicy = read('src/obd/bluetoothRadioRecovery.ts');
+assert.match(bluetoothTransport, /decideBluetoothRadioRecovery/);
+assert.match(read('src/obd/bluetoothManager.ts'), /getBluetoothRadioRecoveryStopReason/);
+assert.match(read('app/splash.tsx'), /getBluetoothRadioRecoveryStopReason/);
+assert.match(bluetoothRadioPolicy, /STOP_RADIO_STATE_UNKNOWN/);
+assert.match(projectContract, /\| RG-34 \|/, 'radio recovery must remain a documented acceptance invariant');
+assert.match(projectContract, /\| RG-37 \|/, 'concurrent RFCOMM waiters must remain a documented invariant');
+assert.match(projectContract, /\| RG-38 \|/, 'GPS must reject invalid/out-of-order timestamps');
+assert.match(gpsTracker, /!Number\.isFinite\(location\.timestamp\) \|\| location\.timestamp <= 0/);
+assert.match(gpsTracker, /location\.timestamp <= this\.previous\.timestamp/);
+assert.doesNotMatch(gpsTracker, /timestamp:\s*Date\.now\(\)/, 'GPS must not fabricate timestamps');
+const regressionRequirementIds = [...projectContract.matchAll(/^\| (RG-\d{2}) \|/gm)].map((match) => match[1]);
+assert.ok(regressionRequirementIds.length > 0, 'o contrato anti-regressão não pode ficar vazio');
+assert.equal(new Set(regressionRequirementIds).size, regressionRequirementIds.length, 'o contrato contém IDs RG duplicados');
+for (let index = 0; index < regressionRequirementIds.length; index++) {
+  assert.equal(
+    regressionRequirementIds[index],
+    'RG-' + String(index + 1).padStart(2, '0'),
+    'IDs RG devem estar contínuos e ordenados; erro na posição ' + (index + 1),
+  );
+}
+assert.match(bluetoothTransport, /BUFFER RX ELM EXCEDIDO/);
+const pidDiscovery = read('src/obd/intelligentPidDiscovery.ts');
+assert.match(pidDiscovery, /responseBuffer:\s*responseBuffer\.snapshot\(\)/);
+assert.match(read('src/obd/pidDiscoveryBuffer.ts'), /MAX|capacity/);
+assert.match(read('src/obd/pidScanner.ts'), /extractBitmapPayload/);
+assert.match(read('src/obd/pidScanner.ts'), /validAdditiveChecksum/);
+assert.match(read('src/obd/bluetoothManager.ts'), /PID_DISCOVERY_SUMMARY/);
+assert.match(read('src/obd/parser.ts'), /hasValidKLineChecksum/);
+assert.match(read('src/obd/dtcParser.ts'), /validAdditiveChecksum/);
+assert.match(read('src/storage/driveCycleStorage.ts'), /HISTORICO_DE_VIAGENS_CORROMPIDO/);
+assert.match(read('src/storage/driveCycleStorage.ts'), /indexWriteQueues/);
+assert.match(read('src/database/csvLogger.ts'), /MAX_PENDING_CSV_ROWS/);
+assert.match(read('app/armazenamento.tsx'), /csvQueueStatus\.droppedRows/);
+assert.match(read('app/armazenamento.tsx'), /csvQueueStatus\.pendingRows/);
+assert.match(read('src/database/csvLogger.ts'), /parseCsvRecords/);
+assert.match(read('src/storage/quotaManager.ts'), /cleanupToTarget/);
+assert.match(read('src/storage/quotaManager.ts'), /TAMANHO_DE_ARQUIVO_INDISPONIVEL/);
+assert.match(read('src/storage/backup.ts'), /MAX_BACKUPS_TO_KEEP\s*=\s*5/);
+assert.match(read('src/storage/backup.ts'), /manifest\.json/);
+assert.match(read('src/meriva/autosaveValidation.ts'), /validateDriveCycles/);
+assert.match(read('src/meriva/autosaveValidation.ts'), /validateDtcs/);
+assert.match(read('src/gps/gpsTracker.ts'), /c\.latitude < -90/);
+assert.match(read('src/obd/fuelConsumption.ts'), /temperatureK <= 0/);
 assert.match(read('app/_layout.tsx'), /canStartObdStartup\(audit\)/);
 assert.match(read('app/_layout.tsx'), /canUseGps\(audit\)/);
 assert.ok(app.expo.plugins.includes('./plugins/withBluetoothLegacyPermissionLimits'));
@@ -97,6 +167,10 @@ assert.match(sharedObd, /let connecting: Promise<SharedObdConnection> \| null = 
 assert.ok(!read('app/_layout.tsx').includes('connectPreferredElm'), 'layout não pode criar uma segunda conexão automática');
 
 // Local diagnosis stays separate from optional network enrichment.
+assert.match(home, /startCurrentConditionsRefresh/, 'weather/location enrichment must refresh beyond initial mount');
+assert.match(weatherRefresh, /CURRENT_CONDITIONS_REFRESH_INTERVAL_MS/);
+assert.match(weatherRefresh, /isInternetReachable !== false/);
+assert.match(weatherRefresh, /inFlight/, 'weather refresh must not overlap concurrent HTTP requests');
 assert.match(diagnostics, /diagnostic_rules\.json/);
 assert.doesNotMatch(diagnostics, /currentConditions|open-meteo|https?:\/\//i);
 assert.match(home, /loadCurrentConditions/);
@@ -142,13 +216,14 @@ assert.equal(splashAsset.subarray(0, 8).toString('hex'), '89504e470d0a1a0a',
   'asset de splash precisa ser um PNG real, não somente um caminho configurado');
 assert.ok(splashAsset.length > 4000, 'asset de splash está vazio ou incompleto');
 
-// Startup splash must gate the cockpit on a real ECU response and warm up supported PIDs.
+// Startup validates the current ECU and opens without redundant warm-up commands.
 const startup = read('app/splash.tsx');
 const rootLayout = read('app/_layout.tsx');
 assert.match(rootLayout, /initialRouteName="splash"/, 'o fluxo de inicialização deve começar na splash operacional');
 assert.match(startup, /while \(!cancelled\)/, 'a busca do ELM327 deve continuar até conectar ou desmontar a tela');
 assert.match(startup, /connection\.supportedPids/, 'a validação inicial deve usar apenas PIDs descobertos');
-assert.match(startup, /round < 5/, 'cada PID suportado deve receber pelo menos cinco consultas iniciais');
+assert.doesNotMatch(startup, /round < 5/, 'a splash não pode repetir cinco consultas redundantes por PID');
+assert.match(startup, /PIDs COM RESPOSTA VÁLIDA/, 'a splash deve informar a contagem de PIDs confirmados');
 assert.match(startup, /router\.replace\('\/'\)/, 'o painel só abre depois da etapa de conexão e aquecimento');
 assert.match(startup, /settings\.autoConnectObd === false/, 'a preferência de conexão automática deve ser respeitada na splash');
 assert.match(startup, /retry >= 2/, 'deve existir uma saída para o cockpit após falhas de conexão repetidas');
@@ -184,11 +259,16 @@ assert.match(tripService, /const snapshot = this\.getState\(\)/, 'service update
 assert.ok(!tripService.includes('estimatedRangeKm: persisted.autonomy.estimatedRangeKm'), 'current state cannot be seeded with saved range');
 assert.ok(!tripService.includes('estimatedRangeKm: persistedAutonomy.estimatedRangeKm'), 'new ECU session cannot start from saved range');
 assert.match(dataScreen, /label="AUTONOMIA" value=\{trip\.estimatedRangeKm > 0/);
+assert.match(dataScreen, /trip\.fuelLevelPercent === 0 && trip\.fuelLevelReadAtMs != null/,
+  'a current, valid empty-tank reading must show 0 km instead of N/D');
+assert.match(laboratory, /fuelLevelPercent === 0/,
+  'laboratory autonomy must distinguish a valid zero range from unavailable data');
 assert.doesNotMatch(dataScreen, /label="AUTONOMIA" value=\{state\.autonomy\.estimatedRangeKm/, 'real-time screen must not show persisted range as current');
 assert.ok(!home.includes('actionGrid') && !home.includes('dashboardAction'),
   'cockpit não deve duplicar destinos em uma segunda fileira de ações');
 assert.ok(read('app/mais.tsx').includes('CONSULTA MANUAL DE PID'), 'atalho de consulta manual precisa existir');
 assert.ok(read('app/laboratorio.tsx').includes('PIDs REGISTRADOS / DESCOBERTOS'), 'lista de PIDs precisa continuar acessível');
+assert.match(laboratory, /parsed\?\.interpretation/, 'interpretações secundárias de PIDs devem ser visíveis nos detalhes técnicos do Laboratório');
 assert.match(laboratory, /result\.status !== 'OK'/, 'DTC read must not interpret command error as no failures');
 assert.match(laboratory, /isValidDtcResponseForService\('03', result\.response\)/, 'DTC read must validate a complete response');
 assert.match(read('src/obd/dtcScanner.ts'), /reply\.status === 'OK' && isValidDtcResponseForService/, 'bulk scan requires valid response data');
@@ -203,10 +283,27 @@ assert.match(testPlan, /DATA-02/);
 assert.match(testPlan, /SPLASH-01/);
 assert.match(testPlan, /teste físico/);
 assert.match(read('docs/CONTRATO_ANTI_REGRESSAO.md'), /\| RG-20 \|/);
+assert.match(projectContract, /\| RG-33 \|/, 'trip consumption used for autonomy must be reliability-gated');
+assert.match(read('docs/TEST_PLAN.md'), /PID-AUTO-01/);
 
 assert.ok(read('app/mais.tsx').includes('/manutencao'), 'manutenção e abastecimento deve continuar acessível pelo menu Mais');
 assert.match(read('src/maintenance/maintenanceRules.ts'), /evaluateMaintenance/);
 assert.match(read('src/database/maintenanceStorage.ts'), /writeMaintenanceData/);
 assert.ok(scriptedTests.has('maintenanceRules.test.js'), 'regras de manutenção precisam ser testadas pelo npm test');
+
+// The diary is part of the release contract: entries and the index must remain identical.
+const diaryEntryIds = [...diary.matchAll(/^#{1,4}\s+(DB-\d{3})\b/gm)].map((match) => match[1]);
+const diaryIndexIds = [...diary.matchAll(/^- \*\*(DB-\d{3})\*\*/gm)].map((match) => match[1]);
+assert.ok(diaryEntryIds.length > 0, 'o Diário de Bordo deve conter entradas DB-NNN');
+assert.equal(new Set(diaryEntryIds).size, diaryEntryIds.length, 'o diário contém IDs DB-NNN duplicados');
+for (let index = 0; index < diaryEntryIds.length; index++) {
+  assert.equal(
+    diaryEntryIds[index],
+    'DB-' + String(index + 1).padStart(3, '0'),
+    'as entradas do diário devem permanecer contínuas e ordenadas; erro na posição ' + (index + 1),
+  );
+}
+assert.deepEqual(diaryIndexIds, diaryEntryIds, 'o índice DB-NNN precisa corresponder exatamente às entradas do diário');
+
 console.log('Anti-regression baseline gate: PASS');
 console.log('Protected contracts: five-read sensor tests, manual PID flow, single ELM327 queue, offline diagnosis, Expo SDK 51, GPS/Trip, TXT/history and cockpit/graphs.');

@@ -90,19 +90,26 @@ const fakeFS = {
     ensureDirTree(p);
   },
 
-  async readAsStringAsync(p) {
+  async readAsStringAsync(p, options = {}) {
     if (failReadPath === p) {
       failReadPath = null;
       throw new Error('READ IO FAILURE: ' + p);
     }
     if (!files.has(p)) throw new Error('ARQUIVO NAO EXISTE: ' + p);
-    return files.get(p);
+    const content = files.get(p);
+    if (Number.isInteger(options.position) && Number.isInteger(options.length)) {
+      return Buffer.from(content, 'utf8')
+        .subarray(options.position, options.position + options.length)
+        .toString('utf8');
+    }
+    return content;
   },
 
-  async writeAsStringAsync(p, content) {
+  async writeAsStringAsync(p, content, options = {}) {
     if (writeDelayMs > 0) await wait(writeDelayMs);
     ensureDirTree(parentDir(p));
-    files.set(p, String(content));
+    const next = String(content);
+    files.set(p, options.append ? (files.get(p) ?? '') + next : next);
   },
 
   async copyAsync({ from, to }) {
@@ -121,6 +128,11 @@ const fakeFS = {
       return;
     }
     throw new Error('ORIGEM NAO EXISTE: ' + from);
+  },
+
+  async moveAsync({ from, to }) {
+    await fakeFS.copyAsync({ from, to });
+    await fakeFS.deleteAsync(from, { idempotent: true });
   },
 
   async deleteAsync(p) {
@@ -262,13 +274,15 @@ async function testParser() {
   assert.strictEqual(parser.parsePidResponse('010C', '410C1AF8').value, 1726);
   assert.strictEqual(parser.validateOBDResponse('41 0C 1A F8'), true);
   assert.strictEqual(parser.parsePidResponse('010C', '41 0C 1A F8').value, 1726);
-  assert.strictEqual(parser.parsePidResponse('010C', '48 6B 10 41 0C 1A F8 82').value, 1726);
+  assert.strictEqual(parser.parsePidResponse('010C', '48 6B 10 41 0C 1A F8 22').value, 1726);
   assert.strictEqual(parser.parsePidResponse('010C', '7E8 04 41 0C 1A F8').value, 1726);
   assert.strictEqual(parser.parsePidResponse('010C', '41 0C 1A').value, null);
   assert.strictEqual(parser.parsePidResponse('0199', '41 99 FF').status, 'VALOR NÃO INTERPRETADO');
   assert.strictEqual(parser.parsePidResponse('010C', 'NO DATA').status, 'NÃO RESPONDEU');
-  assert.deepStrictEqual(parser.parseDtcResponse('43 01 33 00 00 00'), ['P0133']);
-  assert.deepStrictEqual(parser.parseDtcResponse('48 6B 10 43 01 33 00 00 82'), ['P0133']);
+  assert.deepStrictEqual(parser.parseDtcResponse('43 01 33 00 00 00'), [],
+    'payload DTC com byte solto deve ser rejeitado em vez de truncado');
+  assert.deepStrictEqual(parser.parseDtcResponse('43 01 33 00 00'), ['P0133']);
+  assert.deepStrictEqual(parser.parseDtcResponse('48 6B 10 43 01 33 00 00 3A'), ['P0133']);
 }
 
 async function testElmAndProtocol() {
@@ -504,6 +518,42 @@ async function testPidScanner() {
   assert.ok(supported60.includes('0179'));
   assert.ok(!supported60.includes('0180'));
 
+  assert.deepStrictEqual(
+    scanner.decodeSupportedPids('0100', '41 00 BE 3E B8 13 FF'),
+    [],
+    'bitmap com byte de payload excedente deve ser rejeitada',
+  );
+  assert.deepStrictEqual(
+    scanner.decodeSupportedPids('0100', '41 00 BE 3E\r\nB8 13'),
+    [],
+    'bytes da bitmap não podem ser juntados entre linhas',
+  );
+  assert.deepStrictEqual(
+    scanner.decodeSupportedPids('0100', '7E8 06 41 00 BE 3E B8 13'),
+    supported,
+    'quadro CAN de 11 bits deve aceitar cabeçalho/DLC coerentes',
+  );
+  assert.deepStrictEqual(
+    scanner.decodeSupportedPids('0100', '18DAF110 06 41 00 BE 3E B8 13'),
+    supported,
+    'quadro CAN de 29 bits deve aceitar cabeçalho/DLC coerentes',
+  );
+  assert.deepStrictEqual(
+    scanner.decodeSupportedPids('0100', '48 6B 10 41 00 BE 3E B8 13 CB'),
+    supported,
+    'envelope K-Line deve aceitar checksum aditivo válido',
+  );
+  assert.deepStrictEqual(
+    scanner.decodeSupportedPids('0100', '48 6B 10 41 00 BE 3E B8 13 82'),
+    [],
+    'envelope K-Line com checksum inválido deve ser rejeitado',
+  );
+  assert.deepStrictEqual(
+    scanner.decodeSupportedPids('0100', '41 00 BE 3E B8 13\r\n41 00 00 00 00 00'),
+    [],
+    'respostas de múltiplas ECUs devem ser rejeitadas como ambíguas',
+  );
+
   const fakeSession = {
     async executeCommand(pid) {
       const responses = {
@@ -519,6 +569,31 @@ async function testPidScanner() {
   assert.deepStrictEqual(discovered.map((item) => item.pid), ['0100', '0120', '0140', '0160']);
 }
 
+
+function testPidDiscoveryBuffer() {
+  const { PidDiscoveryBuffer } = loadTs(path.join(ROOT, 'src/obd/pidDiscoveryBuffer.ts'));
+  const buffer = new PidDiscoveryBuffer(2);
+  const result = (command, response) => ({
+    command, response, elapsedMs: 12, status: 'OK', attempt: 1,
+  });
+
+  buffer.record(result('01 0C', '41 0C 1A F8'));
+  assert.strictEqual(buffer.has('010C'), true, 'PID deve ser normalizado para consulta no buffer');
+  assert.strictEqual(buffer.get('010C').response, '41 0C 1A F8');
+  buffer.record(result('0105', '41 05 69'));
+  buffer.record(result('010D', '41 0D 28'));
+  assert.strictEqual(buffer.size, 2, 'buffer deve respeitar limite de capacidade');
+  assert.strictEqual(buffer.has('010C'), false, 'FIFO deve descartar a entrada mais antiga');
+  assert.deepStrictEqual(buffer.snapshot().map((item) => item.command), ['0105', '010D']);
+  assert.throws(() => buffer.record(result('ATZ', 'OK')), /FORA DO BUFFER/,
+    'comandos AT não devem contaminar o buffer de PIDs');
+  const secondSession = new PidDiscoveryBuffer(2);
+  assert.strictEqual(secondSession.has('010D'), false,
+    'respostas não podem ser reaproveitadas por outra sessão/ECU');
+  buffer.clear();
+  assert.strictEqual(buffer.size, 0);
+  console.log('PID discovery response buffer: OK');
+}
 
 async function testIntelligentPidDiscovery() {
   const ai = loadTs(path.join(ROOT, 'src/obd/intelligentPidDiscovery.ts'));
@@ -550,6 +625,9 @@ async function testIntelligentPidDiscovery() {
   });
   assert.ok(result.supportedPids.includes('010C'));
   assert.strictEqual(result.confidence['010C'], 1);
+  assert.ok(result.responseBuffer.some((item) => item.command === '0100'), 'buffer deve expor a resposta bruta da bitmap atual');
+  assert.strictEqual(result.responseBuffer.filter((item) => item.command === '010C').length, 1,
+    'a resposta pré-validada deve permanecer uma única entrada no buffer');
   assert.strictEqual(result.observations.find((item) => item.pid === '010C').status, 'CONFIRMADO');
   assert.strictEqual(result.observations.find((item) => item.pid === '010C').value, 1726);
   assert.strictEqual(commands.filter((pid) => pid === '010C').length, 0, 'descoberta deve reaproveitar a sonda 010C validada');
@@ -661,6 +739,22 @@ async function testBluetoothEventTransport() {
   assert.strictEqual(response, '41 0C 0C 18');
   await transport.close();
 
+  // RX deve ter limite estrito; uma resposta enorme não pode ser aceita como
+  // telemetria válida, e os diagnósticos devem truncar chunks excessivos.
+  const overflowTransport = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF');
+  await overflowTransport.open();
+  bluetoothListener?.({ data: 'X'.repeat(16 * 1024 + 1) });
+  bluetoothListener?.({ data: '>' });
+  await assert.rejects(overflowTransport.readUntilPrompt(500), /BUFFER RX ELM EXCEDIDO/,
+    'resposta maior que o limite deve ser descartada explicitamente');
+  assert.match(overflowTransport.getDiagnosticsText(), /RX_BUFFER_OVERFLOW/);
+  assert.match(overflowTransport.getDiagnosticsText(), /truncated/,
+    'logs de RX não devem reter chunks integrais muito grandes');
+  bluetoothListener?.({ data: '41 0C 0C 18>' });
+  assert.strictEqual(await overflowTransport.readUntilPrompt(500), '41 0C 0C 18',
+    'buffer deve recuperar-se depois de descartar o quadro excessivo');
+  await overflowTransport.close();
+
   // O bloqueio deve funcionar entre instâncias diferentes. Sem ele, duas
   // instâncias chamam connectToDevice simultaneamente e o Android pode retornar
   // "Already attempting connection to device ...".
@@ -670,11 +764,13 @@ async function testBluetoothEventTransport() {
   bluetoothConnectDelayMs = 30;
   const transportA = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF');
   const transportB = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF');
-  await Promise.all([transportA.open(), transportB.open()]);
-  assert.strictEqual(bluetoothConnectCalls, 2, 'instâncias diferentes devem serializar as tentativas nativas');
-  assert.strictEqual(bluetoothMaxNativeConnections, 1, 'não pode haver duas tentativas RFCOMM simultâneas');
+  const transportC = new BluetoothClassicTransport('AA:BB:CC:DD:EE:FF');
+  await Promise.all([transportA.open(), transportB.open(), transportC.open()]);
+  assert.strictEqual(bluetoothConnectCalls, 3, 'todas as instâncias devem completar sua conexão serializada');
+  assert.strictEqual(bluetoothMaxNativeConnections, 1, 'três instâncias concorrentes ainda não podem abrir RFCOMM simultaneamente');
   await transportA.close();
   await transportB.close();
+  await transportC.close();
   bluetoothConnectDelayMs = 0;
 
   bluetoothConnectCalls = 0;
@@ -753,7 +849,23 @@ async function testQuota() {
     cleanupTargetMb: 0.4,
     autoCleanupEnabled: true,
   });
-  assert.strictEqual(status.critical, true);
+  assert.strictEqual(status.critical, false, 'limpeza segura deve remover o log descartável e voltar para abaixo do limite');
+  assert.match(status.message, /LIMPEZA/);
+  assert.strictEqual(files.has(`${BASE}/LOGS/a.csv`), false,
+    'cota deve limpar arquivos descartáveis antigos até a meta quando possível');
+
+  await fakeFS.writeAsStringAsync(`${BASE}/LOGS/b.csv`, 'x'.repeat(100));
+  const originalGetInfo = fakeFS.getInfoAsync;
+  fakeFS.getInfoAsync = async (target, ...args) => {
+    if (target === `${BASE}/LOGS/b.csv`) throw new Error('SIZE LOOKUP FAILURE');
+    return originalGetInfo.call(fakeFS, target, ...args);
+  };
+  try {
+    await assert.rejects(() => quota.getStorageUsage(BASE, 0.5), /SIZE LOOKUP FAILURE/,
+      'erro de inspeção de tamanho não pode ser convertido em ocupação zero');
+  } finally {
+    fakeFS.getInfoAsync = originalGetInfo;
+  }
   m.disposeAutoSave();
 }
 
@@ -907,7 +1019,11 @@ async function testDriveCycleValidation() {
   assert.ok(migratedIndex.cycles.every((item) => item.source !== 'CARSCANNER_SEED'), 'adding a real trip must remove legacy seeds from active index');
 
   files.set(indexFile, JSON.stringify({ cycles: 'corrompido' }));
-  assert.deepStrictEqual(await storage.readDriveCycles(BASE), []);
+  assert.deepStrictEqual(
+    (await storage.readDriveCycles(BASE)).map((item) => item.id),
+    ['test-1'],
+    'índice corrompido deve recuperar a última cópia válida em vez de ocultar o histórico',
+  );
 
   resetFS();
   await storage.initializeDriveCycles(BASE);
@@ -917,6 +1033,59 @@ async function testDriveCycleValidation() {
     Array.from(files.keys()).some((name) => name.includes('/VIAGENS/viagens_')),
     false,
     'seed rows must not be written to the operational trip CSV',
+  );
+
+  await Promise.all([
+    storage.addDriveCycle(BASE, { ...cycle, id: 'parallel-1' }),
+    storage.addDriveCycle(BASE, { ...cycle, id: 'parallel-2' }),
+  ]);
+  assert.deepStrictEqual(
+    (await storage.readDriveCycles(BASE)).map((item) => item.id).sort(),
+    ['parallel-1', 'parallel-2'],
+    'gravações concorrentes de viagens não podem sobrescrever a atualização umas das outras',
+  );
+
+  resetFS();
+  const damagedIndex = BASE + '/VIAGENS/index.json';
+  await fakeFS.makeDirectoryAsync(BASE + '/VIAGENS', { intermediates: true });
+  const damagedContent = JSON.stringify({ cycles: 'corrompido' });
+  files.set(damagedIndex, damagedContent);
+  await assert.rejects(
+    () => storage.addDriveCycle(BASE, { ...cycle, id: 'must-not-overwrite-damaged-index' }),
+    /HISTORICO_DE_VIAGENS_CORROMPIDO/,
+    'índice corrompido sem backup deve impedir gravação destrutiva',
+  );
+  assert.strictEqual(files.get(damagedIndex), damagedContent,
+    'índice inválido deve ser preservado para recuperação manual');
+
+  resetFS();
+  await fakeFS.makeDirectoryAsync(BASE + '/VIAGENS', { intermediates: true });
+  files.set(BASE + '/VIAGENS/index.previous.json', JSON.stringify({
+    version: '1.0',
+    cycles: [cycle],
+    totalCount: 1,
+  }));
+  await storage.addDriveCycle(BASE, { ...cycle, id: 'after-main-loss' });
+  assert.deepStrictEqual(
+    (await storage.readDriveCycles(BASE)).map((item) => item.id).sort(),
+    ['after-main-loss', 'test-1'],
+    'índice principal ausente deve ser recuperado do backup antes de acrescentar uma viagem',
+  );
+  assert.ok(files.has(BASE + '/VIAGENS/index.previous.json'),
+    'backup anterior deve permanecer disponível durante a recuperação');
+
+  resetFS();
+  await fakeFS.makeDirectoryAsync(BASE + '/VIAGENS', { intermediates: true });
+  files.set(BASE + '/VIAGENS/index.previous.json', JSON.stringify({
+    version: '1.0',
+    cycles: [cycle],
+    totalCount: 1,
+  }));
+  await storage.initializeDriveCycles(BASE);
+  assert.deepStrictEqual(
+    (await storage.readDriveCycles(BASE)).map((item) => item.id),
+    ['test-1'],
+    'startup initialization must recover a missing main index from its valid backup',
   );
 }
 
@@ -1036,6 +1205,11 @@ async function testBackupCompleteness() {
   assert.deepStrictEqual(info.includes, expectedDirs);
 
   const backupRoot = `${BASE}/BACKUP/meriva_smart_${info.timestamp}`;
+  const manifest = JSON.parse(files.get(`${backupRoot}/manifest.json`));
+  assert.strictEqual(manifest.schemaVersion, 1);
+  assert.strictEqual(manifest.payloadSizeBytes, info.sizeBytes,
+    'manifest deve declarar tamanho verificado do conteúdo copiado');
+  assert.deepStrictEqual(manifest.directories.map((item) => item.directory), expectedDirs);
   for (const dir of expectedDirs) {
     assert.strictEqual(
       files.get(`${backupRoot}/${dir}/arquivo.txt`),
@@ -1043,6 +1217,21 @@ async function testBackupCompleteness() {
       `backup deve conter ${dir}`,
     );
   }
+
+  const historicalBackupRoot = `${BASE}/BACKUP`;
+  for (let index = 0; index < 6; index += 1) {
+    await fakeFS.makeDirectoryAsync(
+      `${historicalBackupRoot}/meriva_smart_2020-01-${String(index + 1).padStart(2, '0')}T00-00-00-000Z`,
+      { intermediates: true },
+    );
+  }
+  await backup.createBackup(BASE);
+  const retained = (await fakeFS.readDirectoryAsync(historicalBackupRoot))
+    .filter((name) => name.startsWith('meriva_smart_'));
+  assert.strictEqual(retained.length, 5,
+    'retenção deve manter no máximo cinco backups após confirmar que o novo backup foi criado');
+  assert.ok(retained.some((name) => name === `meriva_smart_${info.timestamp}`),
+    'backup recém-validado deve ser mantido');
   m.disposeAutoSave();
 }
 
@@ -1062,6 +1251,18 @@ async function testCsvWriteSerialization() {
   assert.ok(content.includes('A,t1'));
   assert.ok(content.includes('B,t2'));
   assert.strictEqual(content.split('\n').filter(Boolean).length, 3);
+
+  await logger.appendCsvRow(target, { timestamp: 't3', id: 'C' });
+  const reordered = files.get(target);
+  assert.ok(reordered.includes('C,t3'),
+    'colunas devem seguir o cabeçalho mesmo quando as chaves chegam em outra ordem');
+  await logger.appendCsvRow(target, { id: 'D', timestamp: 't4', unexpected: 'x' });
+  const migrated = files.get(target);
+  assert.ok(migrated.startsWith('id,timestamp,unexpected\n'),
+    'coluna nova deve ser incluída no cabeçalho mediante migração explícita');
+  assert.ok(migrated.includes('A,t1,\n') && migrated.includes('B,t2,\n') &&
+    migrated.includes('C,t3,\n') && migrated.includes('D,t4,x\n'),
+    'migração de esquema deve preservar linhas antigas e alinhar as novas');
 }
 
 async function testPidAndLearningWriteSerialization() {
@@ -1245,6 +1446,7 @@ async function main() {
     ['bloqueio de troca silenciosa de adaptador', testActiveAdapterCannotBeSilentlySwitched],
     ['seleção estrita + gate ECU', testConnectionSelectionAndStrictEcuGate],
     ['gate de validação ECU/010C', testEcuValidationGate],
+    ['buffer de respostas da descoberta de PIDs', testPidDiscoveryBuffer],
     ['descoberta de PIDs', testPidScanner],
     ['IA burrinha de PIDs', testIntelligentPidDiscovery],
     ['CarScanner baseline + PID 012F', testCarScannerBaselineAndFuel012F],

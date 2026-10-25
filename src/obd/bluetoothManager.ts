@@ -5,6 +5,7 @@ import { ElmCommandResult, Elm327Session } from './elm327';
 import { parsePidResponse } from './parser';
 import { Elm327CompatibilityConfig, DEFAULT_ELM327_COMPATIBILITY, mergeCompatibilityConfig } from './elm327Compatibility';
 import { discoverIntelligentPids } from './intelligentPidDiscovery';
+import { getBluetoothRadioRecoveryStopReason } from './bluetoothRadioRecovery';
 import type { PidDiscoveryCache } from '../meriva/autosaveState';
 import bluetoothConfig from '../knowledge/bluetooth_config.json';
 import { requestBluetoothPermissionsOnly } from '../permissions/permissionManager';
@@ -157,6 +158,8 @@ export async function createRealElmSession(
   callbacks?: RealElmSessionCallbacks,
 ): Promise<RealElmConnection> {
   let lastCause: unknown = null;
+  let attemptsExecuted = 0;
+  let terminalReason = 'MAX_ATTEMPTS_REACHED';
   const config = mergeCompatibilityConfig({
     ...(compatibility ?? DEFAULT_ELM327_COMPATIBILITY),
     optionalAtTimeoutMs: compatibility?.optionalAtTimeoutMs ?? bluetoothConfig.initialization.optionalCommandTimeoutMs,
@@ -167,6 +170,7 @@ export async function createRealElmSession(
     : MAX_BLUETOOTH_ATTEMPTS;
 
   for (let attempt = 1; attempt <= effectiveMaxAttempts; attempt++) {
+    attemptsExecuted = attempt;
     logBluetoothDiagnostic('BLUETOOTH_ATTEMPT_START', {
       attempt,
       maxAttempts: effectiveMaxAttempts,
@@ -199,11 +203,23 @@ export async function createRealElmSession(
       return session;
     } catch (cause) {
       lastCause = cause;
+      const errorMessage = cause instanceof Error ? cause.message : String(cause);
       logBluetoothDiagnostic('BLUETOOTH_ATTEMPT_RESULT', {
         attempt,
         result: 'FAILURE',
-        error: cause instanceof Error ? cause.message : String(cause),
+        error: errorMessage,
       });
+
+      const radioStopReason = getBluetoothRadioRecoveryStopReason(cause);
+      if (radioStopReason) {
+        terminalReason = radioStopReason;
+        logBluetoothDiagnostic('BLUETOOTH_RETRY_STOPPED', {
+          attempt,
+          reason: radioStopReason,
+          error: errorMessage,
+        });
+        break;
+      }
 
       if (attempt === effectiveMaxAttempts) {
         break;
@@ -223,10 +239,10 @@ export async function createRealElmSession(
   }
 
   logBluetoothDiagnostic('BLUETOOTH_TEST_SESSION_END', {
-    attemptsTotal: effectiveMaxAttempts,
+    attemptsTotal: attemptsExecuted,
     successes: 0,
-    failures: effectiveMaxAttempts,
-    reason: 'MAX_ATTEMPTS_REACHED',
+    failures: attemptsExecuted,
+    reason: terminalReason,
   });
 
   throw lastCause instanceof Error
@@ -301,20 +317,69 @@ async function createRealElmSessionAttempt(
       : (identifiedProtocol ?? 'AUTO');
     const negotiatedProtocol = session.getProtocol() ?? activeProtocol;
     const cacheMatchesProtocol = Boolean(pidDiscoveryCache) && pidDiscoveryCache?.protocol === negotiatedProtocol;
+    // O cache só prioriza candidatos. A cada sessão, a ECU atual precisa anunciar
+    // os bitmaps e responder aos PIDs sondados; um cache não prova suporte atual.
+    const cachedPidPriority = cacheMatchesProtocol && pidDiscoveryCache
+      ? Array.from(new Set(pidDiscoveryCache.supportedPids)).sort()
+      : [];
 
     let supportedPids: string[] = [];
-    let pidDiscoverySource: RealElmConnection['pidDiscoverySource'] = 'CACHE';
+    const pidDiscoverySource: RealElmConnection['pidDiscoverySource'] = 'ECU';
+    const pidDiscoveryStartedAt = Date.now();
+    logBluetoothDiagnostic('PID_DISCOVERY_START', {
+      protocol: negotiatedProtocol,
+      cacheMatchesProtocol,
+      cachedPriorityCount: cachedPidPriority.length,
+      gatePid: '010C',
+      gateResponseReused: true,
+    });
 
-    if (cacheMatchesProtocol && pidDiscoveryCache) {
-      supportedPids = Array.from(new Set(pidDiscoveryCache.supportedPids)).sort();
-    } else {
-      pidDiscoverySource = 'ECU';
-      try {
-        const discovery = await discoverIntelligentPids(session, { prevalidatedResults: [ecuProbe] });
-        supportedPids = discovery.supportedPids;
-      } catch {
-        supportedPids = [];
+    try {
+      const discovery = await discoverIntelligentPids(session, {
+        knownPids: cachedPidPriority,
+        prevalidatedResults: [ecuProbe],
+      });
+      supportedPids = discovery.supportedPids;
+
+      for (const observation of discovery.observations) {
+        const isBitmap = observation.unit === 'BITMAP';
+        logBluetoothDiagnostic('PID_DISCOVERY_COMMAND_RESULT', {
+          command: observation.pid,
+          kind: isBitmap ? 'BITMAP' : observation.pid === '010C' ? 'REUSED_ECU_GATE' : 'PID_PROBE',
+          status: observation.status,
+          elapsedMs: observation.elapsedMs,
+          value: observation.value,
+          unit: observation.unit,
+          confidence: observation.confidence,
+          reason: observation.reason,
+          response: observation.response,
+        });
       }
+
+      const measured = discovery.observations.filter((item) =>
+        item.pid !== '010C' && Number.isFinite(item.elapsedMs) && item.elapsedMs >= 0
+      );
+      logBluetoothDiagnostic('PID_DISCOVERY_SUMMARY', {
+        protocol: negotiatedProtocol,
+        cacheUsedForPriorityOnly: cacheMatchesProtocol,
+        cachedPriorityCount: cachedPidPriority.length,
+        bitmapPages: Object.keys(discovery.supportResponses),
+        bitmapCommandCount: measured.filter((item) => item.unit === 'BITMAP').length,
+        pidProbeCount: measured.filter((item) => item.unit !== 'BITMAP').length,
+        measuredCommandCount: measured.length,
+        commandElapsedTotalMs: measured.reduce((total, item) => total + item.elapsedMs, 0),
+        maxCommandElapsedMs: measured.reduce((maximum, item) => Math.max(maximum, item.elapsedMs), 0),
+        wallElapsedMs: Date.now() - pidDiscoveryStartedAt,
+        supportedPidCount: supportedPids.length,
+        supportedPids,
+      });
+    } catch (cause) {
+      supportedPids = [];
+      logBluetoothDiagnostic('PID_DISCOVERY_FAILURE', {
+        protocol: negotiatedProtocol,
+        wallElapsedMs: Date.now() - pidDiscoveryStartedAt,
+        error: cause instanceof Error ? cause.message : String(cause),
+      });
     }
 
     return {

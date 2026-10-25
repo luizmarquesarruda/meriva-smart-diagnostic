@@ -46,14 +46,21 @@ export function haversineDistanceKm(
   a: Pick<GpsSample, 'latitude' | 'longitude'>,
   b: Pick<GpsSample, 'latitude' | 'longitude'>,
 ): number {
+  if (
+    !Number.isFinite(a.latitude) || !Number.isFinite(a.longitude) ||
+    !Number.isFinite(b.latitude) || !Number.isFinite(b.longitude) ||
+    Math.abs(a.latitude) > 90 || Math.abs(b.latitude) > 90 ||
+    Math.abs(a.longitude) > 180 || Math.abs(b.longitude) > 180
+  ) return Number.NaN;
   const R = 6371;
   const lat1 = (a.latitude * Math.PI) / 180;
   const lat2 = (b.latitude * Math.PI) / 180;
   const dLat = ((b.latitude - a.latitude) * Math.PI) / 180;
   const dLon = ((b.longitude - a.longitude) * Math.PI) / 180;
-  const h =
+  const h = Math.min(1, Math.max(0,
     Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2,
+  ));
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
@@ -76,7 +83,11 @@ export function normalizeGpsSpeedKmh(speedMs: number | null | undefined): number
 }
 
 function isAccurate(sample: GpsSample): boolean {
-  return sample.accuracyM == null || sample.accuracyM <= MAX_ACCURACY_M;
+  // Missing/negative accuracy is unknown evidence, not a precise fix.
+  return sample.accuracyM != null &&
+    Number.isFinite(sample.accuracyM) &&
+    sample.accuracyM >= 0 &&
+    sample.accuracyM <= MAX_ACCURACY_M;
 }
 
 export class GpsTracker {
@@ -308,7 +319,13 @@ export class GpsTracker {
 
   handleLocation(location: Location.LocationObject): void {
     const c = location.coords;
-    if (!Number.isFinite(c.latitude) || !Number.isFinite(c.longitude)) return;
+    if (
+      !Number.isFinite(c.latitude) || !Number.isFinite(c.longitude) ||
+      c.latitude < -90 || c.latitude > 90 ||
+      c.longitude < -180 || c.longitude > 180 ||
+      !Number.isFinite(location.timestamp) || location.timestamp <= 0
+    ) return;
+    if (this.previous && location.timestamp <= this.previous.timestamp) return;
 
     const sample: GpsSample = {
       latitude: c.latitude,
@@ -316,8 +333,10 @@ export class GpsTracker {
       speedKmh: Number.isFinite(c.speed) && (c.speed as number) >= 0
         ? normalizeGpsSpeedKmh(c.speed)
         : null,
-      accuracyM: c.accuracy ?? null,
-      timestamp: Number.isFinite(location.timestamp) ? location.timestamp : Date.now(),
+      accuracyM: Number.isFinite(c.accuracy) && (c.accuracy as number) >= 0
+        ? c.accuracy as number
+        : null,
+      timestamp: location.timestamp,
     };
 
     const accurate = isAccurate(sample);

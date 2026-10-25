@@ -40,7 +40,24 @@ function assertApprox(actual, expected, epsilon = 1e-9) {
   assert.ok(Math.abs(actual - expected) <= epsilon, `expected ${actual} ≈ ${expected}`);
 }
 
-const { RealTripRecorder, shouldFinalizeStoppedTrip } = loadTs('src/trip/tripRecorder.ts');
+const { RealTripRecorder, getReliableTripConsumptionKml, shouldFinalizeStoppedTrip } = loadTs('src/trip/tripRecorder.ts');
+
+assert.strictEqual(getReliableTripConsumptionKml(0.04, 0.01, 3), null,
+  'distância insuficiente não pode produzir km/L de viagem');
+assert.strictEqual(getReliableTripConsumptionKml(1, 0.049, 3), null,
+  'menos de 0,05 L não pode produzir km/L de viagem');
+assert.strictEqual(getReliableTripConsumptionKml(1, 0.05, 1), null,
+  'uma única amostra válida não é suficiente');
+assert.strictEqual(getReliableTripConsumptionKml(0.1, 0.05, 2), 2,
+  'limites mínimos válidos devem ser aceitos');
+assert.strictEqual(getReliableTripConsumptionKml(10, 1, 2), 10,
+  'consumo de viagem confiável deve ser distância dividida pelo combustível');
+assert.strictEqual(getReliableTripConsumptionKml(Number.NaN, 1, 2), null,
+  'distância inválida deve ser rejeitada');
+assert.strictEqual(getReliableTripConsumptionKml(10, Number.POSITIVE_INFINITY, 2), null,
+  'combustível infinito deve ser rejeitado');
+assert.strictEqual(getReliableTripConsumptionKml(10, 1, 1.5), null,
+  'contagem fracionária de amostras deve ser rejeitada');
 Module._load = originalLoad;
 
 const recorder = new RealTripRecorder(1000, 5.000);

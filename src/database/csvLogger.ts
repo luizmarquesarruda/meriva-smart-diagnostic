@@ -22,6 +22,8 @@ const fileQueues = new Map<string, Promise<void>>();
 const pendingRows = new Map<string, CsvRow[]>();
 const BATCH_FLUSH_INTERVAL_MS = 1000;
 const BATCH_FLUSH_ROW_LIMIT = 8;
+const MAX_PENDING_CSV_ROWS = 10_000;
+let droppedPendingRows = 0;
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 let flushPromise: Promise<void> | null = null;
 
@@ -33,8 +35,58 @@ function formatCsvValue(value: CsvValue): string {
     : asString;
 }
 
-function serializeRow(row: CsvRow): string {
-  return Object.keys(row).map((key) => formatCsvValue(row[key])).join(',');
+function serializeRow(row: CsvRow, headers: string[] = Object.keys(row)): string {
+  return headers.map((key) => formatCsvValue(row[key])).join(',');
+}
+
+function parseCsvRecords(content: string): string[][] {
+  const records: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let inQuotes = false;
+  for (let index = 0; index < content.length; index += 1) {
+    const character = content[index];
+    if (inQuotes) {
+      if (character === '"' && content[index + 1] === '"') {
+        field += '"';
+        index += 1;
+      } else if (character === '"') {
+        inQuotes = false;
+      } else {
+        field += character;
+      }
+      continue;
+    }
+    if (character === '"' && field.length === 0) {
+      inQuotes = true;
+    } else if (character === ',') {
+      row.push(field);
+      field = '';
+    } else if (character === '\n') {
+      row.push(field.replace(/\r$/, ''));
+      if (row.some((value) => value.length > 0)) records.push(row);
+      row = [];
+      field = '';
+    } else {
+      field += character;
+    }
+  }
+  if (inQuotes) throw new Error('CSV_PARSE_FAILED: aspas não fechadas no arquivo existente');
+  if (field.length > 0 || row.length > 0) {
+    row.push(field.replace(/\r$/, ''));
+    if (row.some((value) => value.length > 0)) records.push(row);
+  }
+  return records;
+}
+
+export function getCsvQueueStatus(): { pendingRows: number; droppedRows: number; maxPendingRows: number } {
+  let pendingRows = 0;
+  for (const rows of pendingRowsMapValues()) pendingRows += rows.length;
+  return { pendingRows, droppedRows: droppedPendingRows, maxPendingRows: MAX_PENDING_CSV_ROWS };
+}
+
+function* pendingRowsMapValues(): IterableIterator<CsvRow[]> {
+  yield* pendingRows.values();
 }
 
 async function enqueueFileOperation(filePath: string, operation: () => Promise<void>): Promise<void> {
@@ -53,27 +105,78 @@ async function writeRowsUnsafe(filePath: string, rows: CsvRow[]): Promise<void> 
   const directory = filePath.includes('/') ? filePath.substring(0, filePath.lastIndexOf('/')) : '.';
   await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
 
-  const info = await FileSystem.getInfoAsync(filePath);
-  const lines = rows.map(serializeRow);
+  const info = await FileSystem.getInfoAsync(filePath, { size: true });
   if (!info.exists) {
-    const header = Object.keys(rows[0]).join(',');
-    await FileSystem.writeAsStringAsync(filePath, `${header}\n${lines.join('\n')}\n`, {
+    const headers = Object.keys(rows[0]);
+    const lines = rows.map((row) => serializeRow(row, headers));
+    await FileSystem.writeAsStringAsync(filePath, `${headers.join(',')}\n${lines.join('\n')}\n`, {
       encoding: FileSystem.EncodingType.UTF8,
     });
     return;
   }
 
-  const current = await FileSystem.readAsStringAsync(filePath);
-  const trimmed = current.trim();
-  // One read/write per batch instead of one full-file rewrite per sensor sample.
-  const content = trimmed.length > 0
-    ? `${trimmed}\n${lines.join('\n')}\n`
-    : `${Object.keys(rows[0]).join(',')}\n${lines.join('\n')}\n`;
-  await FileSystem.writeAsStringAsync(filePath, content, {
+  // Validate the existing header before writing. The SDK 51 legacy filesystem
+  // API has no native append option, so ordinary flushes preserve rows by
+  // reading and rewriting the current file. Large daily files may eventually
+  // benefit from a supported native append API or segmented log format.
+  const headerPreview = await FileSystem.readAsStringAsync(filePath, {
+    encoding: FileSystem.EncodingType.UTF8,
+    position: 0,
+    length: 8192,
+  });
+  const firstNewline = headerPreview.indexOf('\n');
+  if (firstNewline < 0 && (info.size ?? 0) > headerPreview.length) {
+    throw new Error('CSV_HEADER_EXCEEDS_READ_WINDOW: ' + filePath);
+  }
+  const headerLine = (firstNewline >= 0
+    ? headerPreview.slice(0, firstNewline)
+    : headerPreview).replace(/\r$/, '');
+  if (!headerLine.trim()) {
+    const headers = Object.keys(rows[0]);
+    const lines = rows.map((row) => serializeRow(row, headers));
+    await FileSystem.writeAsStringAsync(filePath, `${headers.join(',')}\n${lines.join('\n')}\n`, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
+    return;
+  }
+  const oldHeaders = headerLine.split(',');
+  if (!oldHeaders.length || oldHeaders.some((header) => !header)) {
+    throw new Error('CSV_HEADER_INVALIDO: ' + filePath);
+  }
+
+  const addedHeaders = Array.from(new Set(rows.flatMap((row) =>
+    Object.keys(row).filter((key) => !oldHeaders.includes(key)),
+  )));
+  if (addedHeaders.length > 0) {
+    const current = await FileSystem.readAsStringAsync(filePath);
+    const records = parseCsvRecords(current);
+    if (!records.length || records[0].join(',') !== oldHeaders.join(',')) {
+      throw new Error('CSV_HEADER_CHANGED_DURING_SCHEMA_MIGRATION: ' + filePath);
+    }
+    const headers = [...oldHeaders, ...addedHeaders];
+    const existingLines = records.slice(1).map((oldRow) =>
+      headers.map((_, index) => formatCsvValue(oldRow[index] ?? '')).join(','),
+    );
+    const newLines = rows.map((row) => serializeRow(row, headers));
+    await FileSystem.writeAsStringAsync(filePath, `${headers.join(',')}\n${[...existingLines, ...newLines].join('\n')}\n`, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
+    return;
+  }
+
+  const lines = rows.map((row) => serializeRow(row, oldHeaders));
+  // Expo SDK 51 / expo-file-system 17 legacy WritingOptions has no typed append
+  // option. Preserve older rows using this compatibility path; it is O(file size)
+  // per flush. Optimize only with an SDK-supported/native append implementation
+  // and regression tests for schema migration and recovery.
+  const current = await FileSystem.readAsStringAsync(filePath, {
+    encoding: FileSystem.EncodingType.UTF8,
+  });
+  const separator = current.length > 0 && !current.endsWith('\n') ? '\n' : '';
+  await FileSystem.writeAsStringAsync(filePath, `${current}${separator}${lines.join('\n')}\n`, {
     encoding: FileSystem.EncodingType.UTF8,
   });
 }
-
 function scheduleBatchFlush(): void {
   if (flushTimer) return;
   flushTimer = setTimeout(() => {
@@ -86,12 +189,20 @@ function scheduleBatchFlush(): void {
 }
 
 export function queueCsvRow(filePath: string, row: CsvRow): void {
+  let totalPending = 0;
+  for (const rows of pendingRows.values()) totalPending += rows.length;
+  if (totalPending >= MAX_PENDING_CSV_ROWS) {
+    droppedPendingRows += 1;
+    if (droppedPendingRows === 1 || droppedPendingRows % 100 === 0) {
+      console.warn(`[csv] fila limitada a ${MAX_PENDING_CSV_ROWS}; registros entrantes descartados: ${droppedPendingRows}`);
+    }
+    return;
+  }
+
   const queue = pendingRows.get(filePath) ?? [];
   queue.push({ ...row });
   pendingRows.set(filePath, queue);
-
-  let totalPending = 0;
-  for (const rows of pendingRows.values()) totalPending += rows.length;
+  totalPending += 1;
   if (totalPending >= BATCH_FLUSH_ROW_LIMIT) {
     if (flushTimer) {
       clearTimeout(flushTimer);

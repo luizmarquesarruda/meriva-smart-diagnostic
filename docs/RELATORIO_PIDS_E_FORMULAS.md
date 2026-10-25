@@ -31,7 +31,7 @@ Na notação abaixo, A, B, C e D são os bytes de dados da resposta positiva, ap
 | MAF_GS | `u16_div` | (A × 256 + B) / 100 g/s |
 | TIMING_DEG | `u8_scale_offset` | A × 0,5 − 64° |
 | VOLTS_1000 | `u16_div` | (A × 256 + B) / 1000 V |
-| O2_VOLTS | `u8_div` | A / 200 V (B não entra na tensão) |
+| O2_VOLTS | `u8_div` | Valor principal: A / 200 V; byte B interpretado separadamente como STFT = (B × 100 / 128) − 100 %, exceto B = FF (ajuste não usado) |
 | DISTANCE_KM | `u16` | A × 256 + B km |
 | FUEL_RATE_LH | `u16_div` | (A × 256 + B) / 20 L/h |
 | ETHANOL_PERCENT | `u8_scale` | A × 100 / 255 % |
@@ -275,3 +275,16 @@ O TXT traz leituras e viagens incompletas; não constitui benchmark do tempo de 
 A auditoria adicional encontrou que o limite de persistência de 10 s cobria leituras idênticas, mas uma alteração constante de valor (por exemplo, RPM/velocidade) ainda fazia cada consulta disparar uma gravação completa. `pushLastReading` agora sempre atualiza a última leitura em memória, mas persiste mudanças numéricas ordinárias uma vez por PID por janela de 10 s. PIDs novos e mudanças de status/unidade/origem permanecem imediatas. Ao entrar em background, o serviço compara o fingerprint entre o estado em memória e o último snapshot gravado para salvar a leitura mais recente ainda não persistida. O CSV bruto/interpretado continua mantendo cada consulta real.
 
 Regressão adicionada: mudar o mesmo PID dentro da janela altera o cache imediato, não regrava o JSON; o evento background salva o último valor; após vencer a janela, a próxima amostra volta a ser persistida.
+
+### Complemento — integridade de enquadramento e persistência (auditoria 2026-10-24)
+
+- O envelope K-Line legado `48 6B 10` somente é aceito quando o checksum aditivo de 8 bits confere com o byte terminal; a presença de um byte hexadecimal isolada não demonstra integridade.
+- O scanner de DTC valida quadros por linha. Respostas CAN single-frame precisam concordar com o tamanho declarado; respostas de ECUs diferentes não são concatenadas como um payload único.
+- O buffer de descoberta de PIDs é volátil e isolado por sessão. Buffer RX Bluetooth é limitado a 16 KiB; overflow torna a resposta inválida, e logs de chunks são limitados a 256 caracteres.
+- Respostas com checksum/framing válidos e valores plausíveis ainda não provam que todos os PIDs sejam suportados ou calibrados para esta Meriva. O catálogo identifica apenas `010C` como resposta real confirmada na evidência atualmente registrada.
+- A confiabilidade da autonomia depende do PID 012F obtido nesta sessão e de consumo real ou estimativa válida com limites explícitos. Valores derivados de MAF/MAP são estimativas, não equivalem à taxa medida por `015E`.
+- O histórico de viagens, o CSV e o autosave devem preservar dados anteriores em erro de leitura/gravação; a CI precisa cobrir recuperação de cópia anterior, schema CSV evolutivo, limites da fila e falhas de tamanho/backup.
+
+### Limites de validação
+
+A CI automatizada verifica os contratos e o APK compila, mas não substitui a confirmação com ELM327 físico. Para concluir a auditoria no veículo, registrar respostas brutas repetidas dos PIDs prioritários, protocolo detectado, latência, checksum/framing real e comparação de consumo estimado com `015E` quando suportado. Não marcar PIDs candidatos como confirmados apenas porque respondem em fixture sintética.

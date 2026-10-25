@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Integridade de telemetria GPS
+- Timestamps inválidos, repetidos ou regressivos são descartados sem fabricar uma marca temporal atual.
+
+### Atualização de localização e clima online
+- Localidade/clima opcional atualizados na abertura, a cada 15 minutos e quando a conectividade volta; funciona tanto em Wi-Fi quanto em dados móveis 4G/5G.
+- Consultas respeitam disponibilidade de internet, impedem chamadas simultâneas, têm intervalo mínimo de repetição e limpam inscrições/temporizadores ao desmontar.
+- Falha de rede invalida a temperatura antiga e preserva apenas a última localidade identificada; permissões de localização continuam não sendo solicitadas automaticamente.
+
+### Estabilidade Bluetooth Classic
+- Estado do rádio revalidado antes de cada socket RFCOMM; fallback/retry interrompido quando o Bluetooth está desligado ou o estado é indeterminado.
+- Espera por conexões nativas pendentes revalida rádio e bloqueio compartilhado após cada await, impedindo sockets simultâneos entre múltiplas instâncias.
+- Causa nativa preservada na splash com opção de abrir o painel; CI não substitui teste físico do ELM327.
+
 ### Integridade OBD-II
 - Portada do protótipo Floot para a tela nativa `app/laboratorio.tsx` a seção visual de validação de fórmulas; a interface reutiliza `decodeFormula` e sinaliza que os valores-limite são casos matemáticos, não telemetria real.
 - Corrigidas as faixas máximas de plausibilidade dos PIDs 0106, 0107, 012D e 015D para aceitar os máximos matemáticos exatos das fórmulas padronizadas, sem arredondamento que rejeite uma resposta válida.

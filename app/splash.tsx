@@ -7,13 +7,14 @@ import * as FileSystem from 'expo-file-system';
 import { AppIcon } from '../src/ui/AppIcon';
 import { readAppSettings } from '../src/database/appSettings';
 import { connectPreferredElm, getSharedObdConnection, getSharedObdStatus } from '../src/obd/sharedConnection';
+import { getBluetoothRadioRecoveryStopReason } from '../src/obd/bluetoothRadioRecovery';
 
 const COLORS = { screen: '#07111f', accent: '#42d7f5' };
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 function connectionMessage(): string {
   const state = getSharedObdStatus();
-  if (state.ecuConnected) return 'ECU CONECTADA • VALIDANDO SENSORES';
+  if (state.ecuConnected) return 'ECU CONECTADA • DESCOBRINDO PIDs';
   if (state.bluetoothConnected) return 'BLUETOOTH ATIVO • VALIDANDO ELM327';
   return 'PROCURANDO ELM327 ENTRE DISPOSITIVOS PAREADOS';
 }
@@ -22,7 +23,6 @@ export default function StartupScreen() {
   const [message, setMessage] = useState('PREPARANDO DIAGNÓSTICO');
   const [attempt, setAttempt] = useState(0);
   const [canContinue, setCanContinue] = useState(false);
-  const [pidProgress, setPidProgress] = useState({ done: 0, total: 0 });
 
   useEffect(() => {
     let cancelled = false;
@@ -58,34 +58,31 @@ export default function StartupScreen() {
             throw new Error('O ELM327 ainda não confirmou resposta válida da ECU.');
           }
 
-          const pids = [...new Set(connection.supportedPids.map((pid) => pid.toUpperCase()).filter((pid) => /^01[0-9A-F]{2}$/.test(pid)))];
-          if (pids.length) {
-            setPidProgress({ done: 0, total: pids.length * 5 });
-            for (let round = 0; round < 5 && !cancelled; round += 1) {
-              for (const pid of pids) {
-                if (cancelled) return;
-                setMessage(`TESTE DOS PIDs • CICLO ${round + 1}/5`);
-                try {
-                  // Usa a fila serial compartilhada: nunca paraleliza comandos ELM.
-                  // Respostas ausentes continuam ausentes; não são convertidas em zero.
-                  await connection.session.queryPid(pid);
-                } catch {
-                  // A falha de um PID não interrompe a validação dos demais.
-                }
-                setPidProgress((current) => ({ ...current, done: Math.min(current.total, current.done + 1) }));
-              }
-            }
-          }
+          const pids = [...new Set(connection.supportedPids
+            .map((pid) => pid.toUpperCase())
+            .filter((pid) => /^01[0-9A-F]{2}$/.test(pid)))];
           if (cancelled) return;
-          setMessage('DIAGNÓSTICO PRONTO • ABRINDO PAINEL');
-          await wait(450);
+          // Descoberta/validação individual já ocorre na sessão compartilhada.
+          // Não repetir cinco leituras de todos os PIDs aqui: isso bloqueava o
+          // cockpit com dezenas de round trips sem acrescentar evidência ao bitmap.
+          setMessage(`ECU VALIDADA • ${pids.length} PIDs COM RESPOSTA VÁLIDA • ABRINDO PAINEL`);
+          await wait(250);
           if (!cancelled) router.replace('/');
           return;
-        } catch {
+        } catch (cause) {
+          const errorMessage = cause instanceof Error ? cause.message : String(cause);
           retry += 1;
           setAttempt(retry);
           if (retry >= 2) setCanContinue(true);
-          setMessage(connectionMessage());
+
+          // Rádio desligado ou estado indeterminado exige intervenção do usuário, não retry automático.
+          if (getBluetoothRadioRecoveryStopReason(cause)) {
+            setCanContinue(true);
+            setMessage(errorMessage);
+            return;
+          }
+
+          setMessage(errorMessage || connectionMessage());
           // Retentativa contínua com backoff limitado evita tempestade de conexões.
           await wait(Math.min(15_000, 1_000 * (2 ** Math.min(retry - 1, 4))));
         }
@@ -102,7 +99,6 @@ export default function StartupScreen() {
     };
   }, []);
 
-  const progress = pidProgress.total ? Math.round((pidProgress.done / pidProgress.total) * 100) : 0;
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
       <StatusBar style="light" backgroundColor={COLORS.screen} />
@@ -115,10 +111,6 @@ export default function StartupScreen() {
           <ActivityIndicator size="large" color={COLORS.accent} />
           <Text style={styles.status}>{message}</Text>
           <Text style={styles.detail}>{canContinue ? 'Confirme se o ELM327 está pareado, ligado e conectado ao veículo. Você também pode abrir o painel e ajustar a conexão depois.' : 'Pronto somente após uma resposta OBD válida da ECU.'}</Text>
-          {pidProgress.total > 0 && <>
-            <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${progress}%` }]} /></View>
-            <Text style={styles.progressText}>TESTES DE PIDs: {pidProgress.done}/{pidProgress.total} • {progress}%</Text>
-          </>}
           <Text style={styles.attempt}>TENTATIVA DE CONEXÃO {attempt + 1}</Text>
           {canContinue && <TouchableOpacity
             style={styles.continueButton}
@@ -147,9 +139,6 @@ const styles = StyleSheet.create({
   statusPanel: { width: '100%', maxWidth: 430, marginTop: 36, padding: 22, borderRadius: 20, borderWidth: 1, borderColor: '#21415b', backgroundColor: '#0c1c2d', alignItems: 'center' },
   status: { color: '#eaf6ff', fontSize: 13, fontWeight: '900', textAlign: 'center', marginTop: 16, letterSpacing: 0.5 },
   detail: { color: '#93a9bc', fontSize: 11, textAlign: 'center', lineHeight: 17, marginTop: 10 },
-  progressTrack: { width: '100%', height: 6, borderRadius: 4, backgroundColor: '#20364a', overflow: 'hidden', marginTop: 18 },
-  progressFill: { height: '100%', backgroundColor: COLORS.accent, borderRadius: 4 },
-  progressText: { color: COLORS.accent, fontSize: 10, fontWeight: '800', marginTop: 8 },
   attempt: { color: '#607e97', fontSize: 9, fontWeight: '800', letterSpacing: 1, marginTop: 18 },
   continueButton: { width: '100%', minHeight: 48, marginTop: 18, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: '#2c7890', backgroundColor: '#123248', alignItems: 'center', justifyContent: 'center' },
   continueButtonText: { color: COLORS.accent, fontSize: 11, fontWeight: '900', letterSpacing: 0.6, textAlign: 'center' },

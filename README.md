@@ -16,7 +16,7 @@ Bluetooth Classic exige build nativo Android. Expo Go não é o ambiente de vali
 
 ### Inicialização e splash screen
 
-A rota operacional `app/splash.tsx` é a entrada inicial: tenta conectar ao ELM327 pareado, valida uma resposta real da ECU, consulta cinco vezes cada PID anunciado e só então abre o cockpit. Em caso de falha, continua tentando com espera progressiva e, após tentativas repetidas, permite abrir o painel para configurar a conexão manualmente. Quando `autoConnectObd` está desativado nas configurações, pula as tentativas automáticas.
+A rota operacional `app/splash.tsx` é a entrada inicial: tenta conectar ao ELM327 pareado, valida uma resposta real da ECU e executa a descoberta determinística por bitmap na fila serial compartilhada. O cache de uma sessão anterior só prioriza os candidatos; a ECU atual anuncia suporte e precisa devolver resposta individual válida para cada PID operacional. A splash abre o cockpit após a descoberta, sem repetir cinco leituras de cada PID; as cinco amostras sequenciais permanecem no teste de sensores. A duração total, latência, status e resposta bruta dos comandos de descoberta ficam no diagnóstico Bluetooth (`PID_DISCOVERY_COMMAND_RESULT`/`PID_DISCOVERY_SUMMARY`). Em caso de falha de conexão, continua tentando com espera progressiva e, após tentativas repetidas, permite abrir o painel para configurar a conexão manualmente. Quando `autoConnectObd` está desativado nas configurações, pula as tentativas automáticas.
 
 A splash nativa usa o asset transparente `assets/splash.png` e o plugin `expo-splash-screen` configurado explicitamente em `app.json` com fundo `#07111f`, largura de 280 dp e `resizeMode: contain`. A configuração legada `expo.splash` aponta para o mesmo PNG. O baseline confirma o caminho e a assinatura do arquivo; antes de publicar, ainda é obrigatório instalar um APK de release e validar a inicialização fria em Android real. O contrato é protegido por `tests/projectBaseline.test.js` e RG-18 em `docs/CONTRATO_ANTI_REGRESSAO.md`.
 
@@ -125,7 +125,7 @@ O autosave usa arquivo temporário, valida o conteúdo e mantém uma cópia ante
 
 Na abertura do aplicativo, o sistema verifica suporte, solicita permissões, verifica o estado do Bluetooth, solicita ativação quando necessário e repete a verificação ao retornar ao aplicativo.
 
-O ELM327 deve estar previamente pareado no Android. O aplicativo escolhe automaticamente os candidatos pareados: primeiro nomes compatíveis com ELM/OBD e depois outros dispositivos Classic, aceitando somente o candidato que passa pela inicialização do ELM e pelo teste real 010C. A conexão usa Bluetooth Classic/RFCOMM e preserva o prompt > para o parser do ELM.
+O ELM327 deve estar previamente pareado no Android. O aplicativo escolhe automaticamente os candidatos pareados: primeiro nomes compatíveis com ELM/OBD e depois outros dispositivos Classic, aceitando somente o candidato que passa pela inicialização do ELM e pelo teste real 010C. A conexão usa Bluetooth Classic/RFCOMM e preserva o prompt > para o parser do ELM. O estado do rádio é revalidado antes de cada socket; se estiver desligado ou não puder ser confirmado, o fallback e os retries são interrompidos com erro explícito, sem iniciar outra conexão concorrente. Reative o Bluetooth no Android e tente novamente pelo painel.
 
 ## Testes
 

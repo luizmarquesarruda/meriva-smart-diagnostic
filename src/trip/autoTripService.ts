@@ -4,9 +4,9 @@ import { getSharedObdConnection, getSharedObdStatus, subscribeSharedObd } from '
 import { addDriveCycle, readDriveCycles } from '../storage/driveCycleStorage';
 import { forceSaveOnObdEvent, registerObdQuery } from '../meriva/autosaveIntegration';
 import { getAutoSaveState, updateAutoSaveState, initAutoSave } from '../meriva/autosaveManager';
-import { RealTripRecorder, shouldFinalizeStoppedTrip } from './tripRecorder';
+import { RealTripRecorder, getReliableTripConsumptionKml, shouldFinalizeStoppedTrip } from './tripRecorder';
 import { estimateRangeFromFuelLevel, fuelLevelPercentToLiters, isFuelReserve } from './fuelLevel';
-import { isCurrentFuelLevelSample } from './autonomyPresentation';
+import { getCurrentAutonomyRangeKm, isCurrentFuelLevelSample } from './autonomyPresentation';
 import { getLivePidTrend, resetLiveTelemetry } from '../obd/liveTelemetry';
 import { estimateFuelRateLph, type FuelRateSource } from '../obd/fuelConsumption';
 import { startBackgroundMonitoring } from '../gps/backgroundMonitoring';
@@ -499,10 +499,11 @@ class AutoTripService {
           });
           tripDistanceKm = sampleState.distanceKm;
           tripFuelUsedL = sampleState.fuelUsedL;
-          tripConsumptionKml =
-            sampleState.distanceKm > 0 && sampleState.fuelUsedL > 0
-              ? sampleState.distanceKm / sampleState.fuelUsedL
-              : null;
+          tripConsumptionKml = getReliableTripConsumptionKml(
+            sampleState.distanceKm,
+            sampleState.fuelUsedL,
+            sampleState.validFuelSamples,
+          );
         }
 
         const instantaneousConsumptionKml =
@@ -522,12 +523,15 @@ class AutoTripService {
           fuelLevelReadAtMs,
           fuelRemainingL: fuelLevelPercentToLiters(fuelLevelPercent),
           fuelReserve: isFuelReserve(fuelLevelPercent),
-          estimatedRangeKm: fuelLevelPercent != null && isCurrentFuelLevelSample(fuelLevelReadAtMs)
-            ? (estimateRangeFromFuelLevel(
-                fuelLevelPercent,
-                tripConsumptionKml ?? this.state.averageConsumptionKml,
-              ) ?? 0)
-            : 0,
+          estimatedRangeKm: getCurrentAutonomyRangeKm({
+            ecuConnected: getSharedObdStatus().ecuConnected,
+            tripConnected: true,
+            fuelLevelSupported: this.state.fuelLevelSupported,
+            fuelLevelPercent,
+            fuelLevelReadAtMs,
+            tripConsumptionKml,
+            averageConsumptionKml: this.state.averageConsumptionKml,
+          }) ?? 0,
           error: rpm === 0 && obdSpeedKmh === 0 && fuelRateForDisplayLph == null
             ? 'MOTOR DESLIGADO? / ECU SEM TELEMETRIA VÁLIDA'
             : fuelRateForDisplaySource && fuelRateForDisplaySource !== 'MEASURED_015E'

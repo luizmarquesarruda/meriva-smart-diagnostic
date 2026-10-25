@@ -1,4 +1,27 @@
-# Diário de Bordo - Meriva Smart Diagnostic
+## ESTADO VIGENTE — 2026-10-25 (auditoria de estabilidade DB-130)
+
+> Estado consultado no GitHub em 25/10/2026. Este diário acompanha a branch de consolidação #89; não representa merge em `main`. CI verde por branch isolada não comprova integração combinada nem teste físico.
+
+### `main` e proteção de integração
+- Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
+- SHA de `main` observado antes desta rodada: `701474de2cb3ed8a617a66d87fe3b5e368366acb`.
+- A API informa `protected: false` e a listagem de rulesets retorna vazia. Checks obrigatórios na branch principal não estão confirmados. A consulta detalhada de proteção foi negada pela integração (403), portanto não foi alterada.
+- PR #80 é a última integração de código confirmada. Nenhuma correção desta rodada foi mesclada em `main`.
+
+### PRs ativas e conflitos de integração
+- [#89 — consolidação da auditoria/hardening](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/89): começou esta rodada no SHA `73df16b3c7606595806d67c14c2f95f7fae37e2e`, cuja CI anterior estava verde. As correções encontradas nas iterações estão registradas em DB-126/DB-127; consulte o HEAD atual e a CI do SHA exato antes de aceitar.
+- [#90 — recuperação Bluetooth Android 16](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/90): [run 40171897065 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40171897065) no SHA anterior. A lógica está sendo consolidada na #89 para evitar duas propostas nos mesmos três arquivos; a branch é preservada como referência.
+- [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81): aberta; DB-109 desta branch significa PID 0144, enquanto DB-109 na #89 tem outro conteúdo. Deve ser renumerada/sincronizada sobre a sequência consolidada antes de integrar.
+- [#82 — navegação responsiva](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/82), [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) e [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84) seguem abertas. #82 e #83 dividem nove arquivos e discordam sobre a navegação em paisagem e a política de 20 versus 25 PIDs; #83 compartilha 17 arquivos com #89. CI verde isolada não resolve esses conflitos.
+- PRs #85, #86 e #87 estão fechadas sem merge; o conteúdo dessas branches não se considera integrado apenas porque foram encerradas. Partes das correções foram reconciliadas na #89 conforme o diff.
+
+### Critério de aceitação
+- A suíte protege fórmulas, parser, DTC, consumo, combustível, Bluetooth, autonomia, persistência, GPS, navegação e histórico.
+- O diário deve manter IDs DB-NNN únicos, contínuos e na mesma ordem do índice. Qualquer combinação de branches deve reconciliar numeração antes de integração.
+- Nenhuma PR deve ser mesclada sem diff final contra `main`, CI do SHA exato com `validate` e `android-build` verdes e reconciliação dos arquivos compartilhados.
+- Teste físico do Galaxy A06/Android 16 + ELM327 e validação da ECU são etapas separadas.
+
+---
 
 ## Portabilidade Floot → aplicativo Expo — 2026-10-23
 
@@ -6,12 +29,12 @@
 - A interface nativa reutiliza `src/obd/formulaEngine.ts` como fonte única para as fórmulas e apresenta os quatro casos de fronteira dos PIDs 0106, 0107, 012D e 015D.
 - A tela deixa explícito que os valores de fronteira são casos matemáticos com bytes 0xFF, não leituras reais e não evidência de suporte da ECU.
 - Adicionado teste de regressão para verificar a presença da seção e o reuso do motor oficial. A CI precisa executar novamente sobre o novo HEAD; nenhuma compilação nem teste físico deve ser presumido nesta anotação.
-- Branch de trabalho: `fix/pid-formula-boundaries-20261023`; mudança enviada para a PR #80, ainda sem merge.
+- Branch de trabalho: `fix/pid-formula-boundaries-20261023`; na data deste registro, a mudança estava na PR #80 e ainda não havia sido mesclada. O estado posterior está reconciliado no bloco “ESTADO VIGENTE” no início do arquivo.
 
 
 ## Atualização de auditoria — 2026-10-23
 
-- Repositório: `luizmarquesarruda/meriva-smart-diagnostic`; trabalho isolado na branch `fix/pid-formula-boundaries-20261023`, PR #80 aberta contra `main`. Não mesclar antes da CI completa.
+- Repositório: `luizmarquesarruda/meriva-smart-diagnostic`; no momento deste registro, o trabalho estava isolado na branch `fix/pid-formula-boundaries-20261023`, com PR #80 aberta contra `main`. A instrução de não mesclar e o status de CI abaixo representam aquele momento; consulte o bloco “ESTADO VIGENTE” para o resultado posterior.
 - Problema confirmado: limites arredondados rejeitavam os máximos matemáticos das fórmulas dos PIDs 0106, 0107, 012D e 015D. Para 0106/0107/012D, o máximo de A=255 é 99,21875%; para 015D, A=B=255 produz 301,9921875°.
 - Correção: `src/knowledge/ranges.json` atualizado para esses limites exatos. `src/obd/formulaEngine.ts` agora rejeita bytes consumidos que não sejam inteiros no intervalo 0–255.
 - Regressão: criado `tests/pidFormulaBoundaries.test.js`, incluído no script `npm test`; cobre os limites e entradas inválidas. Documentação técnica e changelog atualizados.
@@ -19,9 +42,9 @@
 - Escopo desta rodada: auditoria direcionada de catálogo, fórmulas, parser e faixas; não afirmar que todos os módulos do repositório foram executados ou validados fisicamente.
 
 
-## ESTADO VIGENTE E REGRAS ANTI-REGRESSÃO — 2026-10-21
+## ESTADO HISTÓRICO E REGRAS ANTI-REGRESSÃO — 2026-10-21 (SUPERSEDIDO EM 2026-10-24)
 
-> **Esta seção é a referência operacional atual.** O restante deste arquivo contém registros históricos: falhas, decisões e “próximos passos” antigos descrevem o estado da época e não devem ser tratados como tarefas ainda abertas sem nova verificação. Quando dois registros divergirem, prevalecem este contrato e a entrada cronologicamente mais recente que tenha evidência verificável.
+> **Snapshot histórico de 2026-10-21 — não é mais a referência operacional atual.** Os estados de branches, SHAs e PRs abaixo registram o que foi observado naquela data. Para o estado atual, use a seção “ESTADO VIGENTE — 2026-10-24” no início do arquivo. Os contratos anti-regressão permanecem como requisitos técnicos até que sejam alterados com evidência e teste.
 
 ### Estado atual do trabalho
 - Repositório: `luizmarquesarruda/meriva-smart-diagnostic`.
@@ -44,9 +67,9 @@
 11. **Diário em primeiro lugar:** antes de editar código, ler esta seção e a entrada final mais recente; conferir branch, SHA e CI no GitHub; escrever problema → causa comprovada → alteração → testes → commit → CI → resultado → próximos passos. Atualizar este arquivo com evidências, nunca com resultados presumidos.
 12. **Histórico não é fila de tarefas:** entradas anteriores preservam o contexto da época. Não repetir seus “próximos passos” automaticamente nem desfazer correções posteriores; confirmar primeiro se ainda estão pendentes no código e na CI.
 
-## ÍNDICE SEQUENCIAL — TODAS AS ATUALIZAÇÕES
+## ÍNDICE SEQUENCIAL — ENTRADAS DB
 
-**Regra:** o maior ID identifica a atualização documental mais recente. O índice é sequencial pela ordem de registro (não necessariamente ordenado estritamente pela data do evento). Na retomada, comece pelo maior ID e confira o HEAD e a CI atuais diretamente no GitHub.
+**Regra:** este índice cobre as entradas identificadas por `DB-NNN`; os dois registros de contexto sem ID que aparecem antes dele são notas históricas preservadas separadamente. O maior ID identifica a última entrada documental. A ordem segue a de registro no arquivo, não necessariamente a data estrita do evento. Na retomada, comece pelo maior ID e confira o HEAD e a CI atuais diretamente no GitHub.
 
 - **DB-001** · 2026-10-06 — Correção do carregamento do catálogo de combustível
 - **DB-002** · 2026-10-07 — Continuidade do fluxo Bluetooth
@@ -136,6 +159,49 @@
 - **DB-086** · 2026-10-21 — Cockpit: informações de rede/clima legíveis e botões com áreas de toque ampliadas
 - **DB-087** · 2026-10-21 — Ajuste adicional de legibilidade da rede e tamanho dos botões principais
 - **DB-088** · 2026-10-21 — Auditoria contra regressões, reconciliação das PRs fechadas e CI do conjunto combinado
+- **DB-089** · 2026-10-21 — Rotação automática da tela
+- **DB-090** · 2026-10-22 — Correção da autonomia, conexão explícita e navegação única
+- **DB-091** · 2026-10-22 — Compatibilidade da barra nativa com Expo Doctor
+- **DB-092** · 2026-10-22 — Restauração da splash screen e falha de cobertura antirregressão
+- **DB-093** · 2026-10-22 — Reconciliação da documentação após regressão da splash
+- **DB-094** · 2026-10-22 — Plano de aceitação para o lote de confiabilidade e UX
+- **DB-095** · 2026-10-22 — Expiração de nível de combustível antigo na autonomia atual
+- **DB-096** · 2026-10-22 — Fechar outros caminhos de exibição da autonomia persistida
+- **DB-097** · 2026-10-22 — Rejeitar timestamps inválidos/futuros na telemetria ao vivo
+- **DB-098** · 2026-10-22 — DTC: distinguir ausência de códigos de falha de leitura
+- **DB-099** · 2026-10-22 — Pendências de splash screen e rodada de estabilização
+- **DB-100** · 2026-10-23 — Implementar asset visual e configuração explícita da splash nativa
+- **DB-101** · 2026-10-23 — Splash operacional, conexão automática e identidade Smart OBD
+- **DB-102** · 2026-10-23 — Desbloquear o acesso ao cockpit quando a ECU está indisponível
+- **DB-103** · 2026-10-23 — Permissões de localização deixam de bloquear diagnóstico OBD
+- **DB-104** · 2026-10-23 — Prioridade de alerta térmico e localização contextual
+- **DB-105** · 2026-10-23 — Sincronizar contrato de teste com callback de prioridade térmica
+- **DB-106** · 2026-10-23 — Manutenção preventiva e diário local de abastecimentos
+- **DB-107** · 2026-10-23 — Cockpit OBD com até 20 PIDs reais
+- **DB-108** · 2026-10-23 — Recuperação Bluetooth/ELM327 e reconciliação de PR
+- **DB-109** · 2026-10-24 — Auditoria integral, correção do índice e reconciliação do estado atual
+- **DB-110** · 2026-10-24 — Descoberta OBD mais rápida, cache não autoritativo e latência por comando
+- **DB-111** · 2026-10-24 — Continuidade da auditoria e reconciliação documental das PRs
+- **DB-112** · 2026-10-24 — Validação estrita de bitmaps OBD e reconciliação dos IDs anti-regressão
+- **DB-113** · 2026-10-24 — Compatibilidade do parser com envelope K-Line compacto
+- **DB-114** · 2026-10-24 — Exibição do ajuste de combustível do segundo byte do PID 0114
+- **DB-115** · 2026-10-24 — Buffer limitado para respostas da descoberta de PIDs
+- **DB-116** · 2026-10-24 — Buffer RX limitado no transporte Bluetooth
+- **DB-117** · 2026-10-24 — Integridade de checksum K-Line e enquadramento de DTC
+- **DB-118** · 2026-10-24 — Persistência segura de viagens, CSV, cota e backups
+- **DB-119** · 2026-10-24 — Validação profunda do autosave, GPS e estimativas de combustível
+- **DB-120** · 2026-10-24 — Descoberta rápida e integridade de quadros OBD
+- **DB-121** · 2026-10-24 — Releitura integral do diário e reconciliação das PRs mais recentes
+- **DB-122** · 2026-10-24 — Confirmação das CI e revisão das PRs de layout
+- **DB-123** · 2026-10-24 — Correção da atribuição de layout após releitura direta da PR #83
+- **DB-124** · 2026-10-24 — Delimitação do risco de modelo fixo no layout
+- **DB-125** · 2026-10-24 — Auditoria retrospectiva das PRs, CI e diário desde o início
+- **DB-126** · 2026-10-25 — Auditoria de estabilidade, rádio Bluetooth e controle de regressões
+- **DB-127** · 2026-10-25 — CI como auditoria de regressão e cobertura completa das suítes
+- **DB-128** · 2026-10-25 — Revalidar bloqueio RFCOMM após cada espera e corrigir IDs RG duplicados
+- **DB-129** · 2026-10-25 — GPS rejeita timestamps inválidos e fora de ordem
+- **DB-130** · 2026-10-25 — Otimização CSV avaliada e bloqueada pela versão instalada
+- **DB-131** · 2026-10-25 — Atualização periódica de localização/clima baseada em conectividade
 
 ---
 
@@ -3423,7 +3489,7 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Nenhum merge executado.
 
 
-### DB-107 — 2026-10-23 — Cockpit OBD com até 20 PIDs reais
+## DB-107 · 2026-10-23 — Cockpit OBD com até 20 PIDs reais
 
 - **Problema:** painel inicial limitado a quatro métricas fixas; leituras auxiliares restringidas a quatro PIDs rotativos, com N/D durante janelas sem leitura.
 - **Causa confirmada:** a tela usava uma lista fixa de quatro métricas e a política de polling só rotacionava quatro PIDs. O caminho serial também precisava evitar repetir um PID quando ele já tivesse sido consultado no mesmo ciclo para consumo ou estimativa.
@@ -3431,10 +3497,493 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - **Proteções:** não criar segunda fila/sondagem OBD, não promover catálogo a suporte real e não reutilizar valores vencidos como atuais. Limites de alerta são indicações de referência, não DTCs nem prova isolada de defeito.
 - **Validação:** teste cockpitTelemetry.test.js adicionado a npm test e ao gate anti-regressão. CI, TypeScript e build Android ainda aguardam execução para este commit; não presumir aprovação. A validação física com ELM327/ECU continua separada.
 
-### DB-108 — 2026-10-23 — Recuperação Bluetooth/ELM327 e reconciliação de PR
+## DB-108 · 2026-10-23 — Recuperação Bluetooth/ELM327 e reconciliação de PR
 
 - **Falha de integração:** a PR #77 ficou baseada no HEAD anterior às PRs #78 e #79 e tocava arquivos de cockpit/navegação atualizados desde então. A reconciliação mantém o código atual de splash, cockpit e telemetria; mudanças de navegação antigas não devem substituir essas versões.
 - **Recuperação OBD:** timeouts de conexão/escrita/fechamento nativo têm deadlines; persistência da desconexão não bloqueia a tentativa de fechar a sessão; reconexão permanece bloqueada quando a liberação do socket RFCOMM não está confirmada; retry de limpeza também é limitado.
 - **Protocolo e permissões:** recuperação ELM (ATZ/ATSP/prova ECU/ATDP) é serializada; GPS segue opcional para iniciar OBD; o plugin limita permissões Bluetooth legadas no Android até API 30 sem limitar as permissões modernas.
 - **Proteções:** testes adversariais de promessa pendente, falha de fechamento, bloqueio entre instâncias e ordem de protocolo ficam ligados a `npm test` e ao gate anti-regressão. Os requisitos Bluetooth recebem IDs RG-22 a RG-31, sem duplicar RGs existentes.
 - **Validação:** conferir `gate:baseline`, `validate` e `android-build` no SHA final desta atualização. A CI não substitui teste físico com ELM327/ECU; esse teste e a inspeção no aparelho permanecem pendentes.
+
+## DB-109 · 2026-10-24 — Auditoria integral, correção do índice e reconciliação do estado atual
+
+### Escopo e leitura
+- Foi lido o conteúdo completo de `docs/DIARIO_DE_BORDO.md` (3.441 linhas antes desta correção), incluindo os registros de contexto do início, a seção de regras operacionais e todas as entradas históricas `DB-001` a `DB-108`.
+- As entradas históricas foram preservadas. Correções foram aplicadas ao estado documental atual, ao índice e à formatação dos cabeçalhos, sem reescrever falhas antigas como se não tivessem ocorrido.
+
+### Inconsistências corrigidas
+- O bloco chamado “ESTADO VIGENTE” datado de 2026-10-21 estava desatualizado e mencionava um SHA antigo de `main`; ele foi renomeado para snapshot histórico e apontado ao bloco de estado atual.
+- O índice listava somente até `DB-088`, apesar de o arquivo já conter as entradas `DB-089` a `DB-108`. Todas foram incluídas e a entrada atual `DB-109` foi acrescentada.
+- Os cabeçalhos de `DB-107` e `DB-108` usavam nível `###`, ao contrário das demais entradas; foram normalizados para `##`.
+- Os dois resumos de contexto de 2026-10-23 diziam que a PR #80 ainda não havia sido mesclada. A redação agora deixa explícito que esse era o estado na data de registro e remete à confirmação posterior, sem apagar o histórico.
+- Foi adicionado no início um resumo atual datado com os SHAs e links de CI/PR consultados. O índice agora declara com precisão que enumera entradas `DB-NNN`, mantendo separadas as notas iniciais sem ID.
+
+### Estado do GitHub verificado em 2026-10-24
+- `main`: `701474de2cb3ed8a617a66d87fe3b5e368366acb`; CI [39985825746](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/39985825746) concluída com sucesso nesse SHA.
+- PR #80 foi mesclada em 2026-10-23 e seu merge commit é o próprio SHA atual de `main`.
+- PRs #81, #82, #83 e #84 estavam abertas na consulta. Suas CIs consultadas terminaram com sucesso nos SHAs de suas respectivas branches, mas nenhuma dessas mudanças deve ser descrita como estando em `main` antes do merge.
+- PRs #74 e #75 estavam fechadas sem merge.
+- O protótipo Floot e o app Expo/React Native continuam sendo alvos distintos; a portabilidade proposta na PR #83 é separada e não se presume integrada.
+
+### Validação e limites
+- Verificação documental: IDs `DB-001` a `DB-109` conferidos em sequência; as lacunas antes desta correção eram do índice, não das entradas históricas.
+- Esta alteração muda documentação somente; não altera código de produção, catálogo JSON, fórmulas, dependências, configuração Android ou transporte OBD.
+- A CI do novo commit documental ainda precisa ser consultada pelo SHA exato. Não declarar essa alteração validada por CI até que a execução correspondente termine.
+- Teste físico com ELM327/ECU e inspeção visual no aparelho não são comprovados por CI e continuam a exigir evidência própria.
+
+### Regra de manutenção a partir desta revisão
+- Preservar como históricos os estados registrados em cada data; corrigir o estado atual em bloco próprio, com links e SHAs consultáveis.
+- Ao criar uma nova entrada `DB-NNN`, atualizar também o índice no início e usar o próximo ID disponível.
+- Nunca declarar uma branch/PR como mesclada ou validada com base em status de outra branch, outro SHA ou uma etapa intermediária de CI.
+
+
+
+## DB-110 · 2026-10-24 — Descoberta OBD mais rápida, cache não autoritativo e latência por comando
+
+### Auditoria do fluxo real
+- O repositório nativo já tinha `src/obd/intelligentPidDiscovery.ts`, chamado por `src/obd/bluetoothManager.ts`, usando a fila serial de `Elm327Session`. Portanto, não foi criado um segundo motor nem uma segunda fila.
+- Foram encontrados dois gargalos de arranque: a splash repetia cinco consultas seriais para cada PID suportado antes de abrir o cockpit; além disso, quando o cache batia com o protocolo, o manager reutilizava a lista cacheada e pulava a bitmap da sessão corrente.
+- As cinco leituras válidas continuam exigidas para a avaliação de sensores no Laboratório. Elas não são necessárias para fazer a descoberta inicial e não devem bloquear a entrada no cockpit.
+
+### Correções aplicadas neste branch
+- `src/obd/bluetoothManager.ts`: toda sessão válida executa `discoverIntelligentPids`; o cache compatível passa como `knownPids` para ordenar os candidatos, nunca como prova de suporte. A resposta `010C` já usada para validar a ECU é reutilizada sem um round trip duplicado.
+- Instrumentação por comando: `PID_DISCOVERY_COMMAND_RESULT` registra tipo de comando, status, tempo `elapsedMs`, valor/unidade, justificativa e RX bruto. `PID_DISCOVERY_SUMMARY` registra páginas bitmap consultadas, quantidade de sondagens, soma/máximo dos tempos reportados, duração total de parede e PIDs que responderam validamente.
+- `app/splash.tsx`: removido o ciclo extra de cinco consultas por PID antes do cockpit. O painel abre depois que a descoberta/validação na conexão termina e a splash apresenta a contagem de PIDs com resposta válida.
+- `tests/regression.test.js`: reforça que um PID guardado em cache compatível é priorizado, mas somente depois da bitmap corrente, e que os tempos por comando ficam disponíveis no resultado.
+- `tests/projectBaseline.test.js`: protege contra o retorno de aquecimento serial na splash e contra o uso do cache para pular a descoberta.
+- Atualizados `docs/CONTRATO_ANTI_REGRESSAO.md` (RG-32), `docs/TEST_PLAN.md` e `README.md`.
+
+### Critérios técnicos preservados
+- A fila ELM327 continua única e serial; nenhum comando concorrente foi adicionado.
+- PIDs não anunciados pela bitmap atual não são consultados com base apenas em cache antigo.
+- O PID `010C` permanece reutilizado como prova real da ECU, sem duplicar a consulta na descoberta.
+- Cinco leituras sequenciais e cinco valores válidos continuam obrigatórios no teste de sensores; a mudança remove apenas o pré-aquecimento duplicado de startup.
+- Catálogo e bitmap não provam precisão física/elétrica do sensor. Somente resposta válida comprova resposta atual do PID.
+
+### Validação e limites
+- CI [40102952556](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40102952556), run #3170, para o HEAD `f9afaed53132521f8fbfc09d59cf6ab90bac9536`: `validate` e `android-build` concluídos com sucesso.
+- A CI comprova apenas o SHA da branch #86; não comprova que a alteração esteja em `main`, nem mede latência real em um veículo.
+- O teste físico com ELM327/ECU continua pendente; latência real, bitmap e PIDs suportados devem ser registrados a partir de uma sessão real.
+- PR #86 aberta, sem merge.
+
+
+## DB-111 · 2026-10-24 — Continuidade da auditoria e reconciliação documental das PRs
+
+### Escopo da auditoria
+- O Diário de Bordo foi consultado antes da inspeção do código, com atenção ao estado vigente, às regras anti-regressão, ao índice e às entradas mais recentes.
+- Revisados no GitHub: `package.json`, workflow `.github/workflows/ci.yml`, `docs/CONTRATO_ANTI_REGRESSAO.md`, `docs/TEST_PLAN.md`, catálogo `src/knowledge/pids.json`, parser `src/obd/parser.ts`, definição/fórmulas de PID, cálculo de consumo de combustível, apresentação de autonomia, serviço de viagem e testes associados.
+- A análise foi estática, apoiada nos arquivos e no estado da CI no GitHub. Não foi executada uma sessão local com veículo ou adaptador físico.
+
+### Resultados e evidências
+- **Catálogo e fórmulas:** o catálogo contém 34 PIDs e 18 identificadores de fórmula distintos. Todos os identificadores usados no catálogo aparecem cobertos por vetores determinísticos em `tests/pidParserIntegrity.test.js`. O teste também percorre todos os PIDs para verificar comprimento declarado, interpretação finita e preservação dos bytes básicos.
+- **Parser:** a suíte cobre payload truncado e excedente, resposta hexadecimal compacta e espaçada, cabeçalho CAN, envelope legado K-Line com checksum e mensagens de estado do adaptador. A validação de bytes sintéticos não demonstra que a ECU deste veículo suporte todos os PIDs catalogados.
+- **Autonomia:** a lógica central exige ECU conectada, sessão ativa, PID 012F suportado e leitura de combustível recente (janela de 30 s); consumo da viagem só é priorizado depois dos limiares de distância, combustível integrado e amostras válidas. A API pública do serviço filtra leituras vencidas antes de entregar o estado às telas. Na revisão estática deste caminho, não foi confirmado defeito adicional que justifique alterar a lógica sem teste comportamental específico.
+- **CI da PR #87:** execução [40114505089](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40114505089), no HEAD `fb475eb4908311a666c304af59d9e6007a092a9f`: `validate` e `android-build` concluídos com sucesso.
+- **Coordenação documental:** a PR [#85](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/85) e a PR [#87](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/87) modificam `docs/DIARIO_DE_BORDO.md` a partir de bases distintas e usam `DB-109` para conteúdos diferentes. Há risco concreto de conflito de conteúdo/ordenação e de um dos registros ser perdido se as branches forem integradas sem reconciliação. Esta atualização reserva `DB-110` nesta branch documental; a branch da PR #87 ainda precisa ser sincronizada com o índice e a numeração final antes de qualquer merge.
+
+### Limites de validação
+- Nenhuma alteração em código de produção, fórmulas, catálogo de PIDs, dependências ou configuração Android foi feita nesta rodada; a alteração desta rodada é documental.
+- A execução anterior da PR #87 concluiu `validate` e `android-build` com sucesso no SHA indicado. Como o Diário será sincronizado, cada novo HEAD gerado pela edição documental precisa de CI própria.
+- Não foi executado teste físico com ELM327/ECU nem inspeção visual do APK instalado. Esses itens permanecem pendentes.
+- Nenhum merge foi executado ou autorizado.
+
+### Próximos passos
+1. Confirmar a CI de cada branch depois da sincronização documental, pois cada commit recebe um SHA novo.
+2. Manter uma única sequência DB-001 a DB-111 nas PRs #85, #86 e #87; não sobrescrever registros históricos.
+3. Se a CI falhar ou o build expuser problema, registrar o log e a causa antes de alterar código.
+4. Validar fisicamente a descoberta bitmap, o PID 012F e a autonomia durante uma viagem real antes de afirmar compatibilidade com a Meriva específica.
+
+
+## DB-112 · 2026-10-24 — Validação estrita de bitmaps OBD e reconciliação dos IDs anti-regressão
+
+### Problemas confirmados na revisão das PRs
+- As PRs #86 e #87 atribuíam significados distintos ao mesmo identificador `RG-32`: descoberta OBD na #86 e confiabilidade de consumo/autonomia na #87. Essa colisão dificultava a integração e fazia uma asserção de baseline proteger o requisito errado após a combinação das mudanças.
+- `src/obd/pidScanner.ts` extraía os primeiros quatro bytes após o marcador da bitmap, mas não validava bytes excedentes nem mantinha as linhas de resposta separadas. Assim, uma resposta malformada poderia ser aceita como bitmap válida.
+
+### Correções aplicadas
+- PR #86: `decodeSupportedPids` agora valida uma única bitmap com exatamente quatro bytes de payload, preservando envelopes aceitos de OBD direto, CAN de 11/29 bits com DLC correspondente e K-Line legado com checksum final. Rejeita bytes excedentes, payload repartido entre linhas e respostas de múltiplas ECUs ambíguas.
+- PR #86: o campo `responded` do scanner legado só confirma uma bitmap válida para o PID de descoberta solicitado. Uma resposta positiva para outro PID é rejeitada, enquanto uma bitmap válida com zero bits suportados continua sendo uma resposta válida.
+- PR #86: adicionados testes de regressão para bytes extras, linhas separadas, cabeçalhos CAN de 11/29 bits, envelope K-Line, respostas múltiplas, PID de resposta divergente e bitmap válida vazia.
+- PR #86: o contrato RG-32 foi ampliado para incluir a integridade das bitmaps da sessão atual, além da regra de cache apenas como prioridade e dos registros de latência.
+- PR #87: o requisito de consumo confiável/autonomia foi renumerado para RG-33; o teste `projectBaseline.test.js` passou a exigir RG-33 para esse requisito, eliminando a colisão com RG-32.
+
+### Validação e limites
+- As alterações de código/testes/documentação geraram novos HEADs nas branches #86 e #87. A CI deve ser confirmada nos SHAs finais depois desta sincronização; resultados de commits anteriores não validam estes novos HEADs.
+- Os testes adicionados cobrem formatos determinísticos, mas não comprovam suporte/precisão de sensores na Meriva específica.
+- Teste físico com ELM327/ECU, medição de latência real e inspeção do APK instalado continuam pendentes.
+- Nenhuma PR foi mesclada nesta atualização.
+
+
+## DB-113 · 2026-10-24 — Compatibilidade do parser com envelope K-Line compacto
+
+### Problema confirmado
+- A configuração de inicialização do ELM327 usa `ATS0`, que remove separadores entre bytes. O parser da PR #87 aceitava o checksum do envelope K-Line legado apenas no caminho de tokens separados por espaços; uma resposta compacta como `486B10410C1AF882` era rejeitada por conter um byte terminal além do payload PID.
+- Esse caminho é relevante para protocolos K-Line presentes em veículos mais antigos; testes apenas com respostas espaçadas não cobriam a combinação com `ATS0`.
+
+### Correção aplicada na PR #87
+- O caminho compacto de `findResponsePayload` agora permite exatamente um byte terminal extra somente quando o prefixo é o envelope conhecido `486B10`. Respostas OBD diretas continuam exigindo payload exato sem bytes extras.
+- Cabeçalhos CAN compactos agora exigem ID de 11/29 bits seguido de DLC compatível com o comprimento esperado para serviço, PID, quadro e payload; prefixos arbitrários e DLC incorreto são rejeitados.
+- Adicionados testes para aceitar o envelope K-Line compacto e rejeitar outro byte adicional depois do checksum, aceitar IDs CAN compactos de 11/29 bits e rejeitar DLC incorreto ou prefixo hexadecimal arbitrário. A validação equivalente foi aplicada ao caminho espaçado: IDs CAN e DLC são conferidos, e bytes arbitrários antes da resposta ou DLC incompatível são rejeitados.
+- O contrato RG-33 agora documenta o envelope K-Line compacto e a validação do DLC CAN; RG-32 permanece reservado à integridade/descoberta das bitmaps, sem colisão entre PRs.
+
+### Validação e limites
+- Parser, teste de integridade e contrato foram alterados em novos commits da branch #87. A CI do HEAD final precisa terminar antes de considerar a mudança validada.
+- O teste cobre o formato de resposta, não a comunicação física nem a validade elétrica dos dados. ELM327/ECU reais e inspeção visual do APK continuam pendentes.
+- Nenhuma PR foi mesclada nesta atualização.
+
+
+## DB-114 · 2026-10-24 — Exibição do ajuste de combustível do segundo byte do PID 0114
+
+### Problema confirmado
+- O catálogo já definia o PID `0114` com dois bytes, e a fórmula `O2_VOLTS` corretamente calculava a tensão a partir do byte A. Porém, o byte B — que contém o ajuste de combustível de curto prazo (STFT) associado à sonda B1S1 — era preservado em bytes brutos mas não interpretado nem mostrado ao operador.
+- O valor especial `B=0xFF` significa que essa sonda não é usada no cálculo do ajuste de combustível; calculá-lo como número daria uma interpretação semântica incorreta.
+
+### Correções aplicadas na PR #87
+- `src/obd/parser.ts`: mantém o valor principal em volts e preenche `interpretation` com `AJUSTE CURTO B1S1=...` usando `(B × 100 / 128) − 100`; para `B=0xFF`, informa `NÃO USADO` sem gerar percentual.
+- `app/laboratorio.tsx`: apresenta o campo `INTERPRETAÇÃO` nos detalhes técnicos quando o parser oferece uma interpretação secundária.
+- `tests/pidParserIntegrity.test.js`: verifica que o valor de tensão não muda, que `B=0x76` resulta em `-7,81%` arredondado para exibição e que `B=0xFF` é tratado como não usado.
+- `tests/projectBaseline.test.js`: protege contra regressão que esconda interpretações secundárias dos detalhes técnicos.
+- Atualizados `docs/RELATORIO_PIDS_E_FORMULAS.md` e `docs/TEST_PLAN.md`.
+- Referências técnicas consultadas: [SAE J1979 (tabela do PID $14)](https://law.resource.org/pub/us/cfr/ibr/005/sae.j1979.2002.pdf) e [catálogo público de PIDs OBD-II](https://www.dashlogic.com/docs/technical/obdii_pids).
+
+### Validação e limites
+- As novas alterações de parser, teste, interface e documentação precisam de CI própria no SHA final desta sincronização.
+- A fórmula e a apresentação têm testes determinísticos; isso não confirma que a ECU específica da Meriva suporte o PID 0114 nem que a leitura física da sonda esteja calibrada.
+- Teste com ELM327/ECU e inspeção visual do APK continuam pendentes.
+- Nenhuma PR foi mesclada nesta atualização.
+
+## DB-115 · 2026-10-24 — Buffer limitado para respostas da descoberta de PIDs
+
+### Problema e objetivo
+- A descoberta preservava observações mas não oferecia uma estrutura limitada reutilizável para inspecionar respostas brutas.
+- Cache global de respostas poderia misturar ECUs e sessões diferentes.
+
+### Implementação
+- Criado `src/obd/pidDiscoveryBuffer.ts`, um FIFO limitado (padrão 64, ajustável de 1 a 256), exclusivo da descoberta atual, com normalização de PIDs e cópias defensivas.
+- `src/obd/intelligentPidDiscovery.ts` registra respostas da sonda prioritária, bitmaps e PIDs individuais e devolve `responseBuffer` para auditoria.
+- Testes cobrem capacidade, FIFO, normalização e isolamento.
+
+### Limites
+- O buffer é volátil por execução; não substitui a validação de suporte na ECU atual nem é persistência histórica.
+
+## DB-116 · 2026-10-24 — Buffer RX limitado no transporte Bluetooth
+
+### Problema confirmado
+- O transporte acumulava chunks até o prompt `>` sem limite explícito; chunks muito grandes também podiam inchar os diagnósticos.
+
+### Correção
+- `src/obd/bluetoothClassicTransport.ts`: limite RX de 16 KiB; após overflow, descarta a resposta até o prompt e emite erro explícito em vez de aceitar dados truncados.
+- Diagnósticos guardam no máximo 256 caracteres de texto/hex por chunk, mantendo o tamanho original reportado.
+- Testes verificam rejeição do quadro excessivo, truncamento dos logs e recuperação para a próxima resposta.
+
+## DB-117 · 2026-10-24 — Integridade de checksum K-Line e enquadramento de DTC
+
+### Problema confirmado
+- A aceitação do envelope legado `48 6B 10` permitia byte terminal sem verificar que ele correspondia ao checksum aditivo.
+- O parser DTC anterior retirava caracteres não hexadecimais do conjunto da resposta e podia juntar linhas de ECUs distintas, sem validar adequadamente o enquadramento CAN.
+
+### Correção
+- `src/obd/parser.ts`: checksum K-Line aditivo de 8 bits validado no caminho compacto e espaçado.
+- `src/obd/dtcParser.ts`: linhas processadas separadamente; aceita resposta direta, quadro CAN de quadro único com comprimento declarado compatível e envelope K-Line reconhecido com checksum válido. Códigos repetidos são deduplicados.
+- `tests/pidParserIntegrity.test.js`, `tests/regression.test.js` e `tests/dtcScanner.test.js`: quadros com checksum incorreto ou comprimento CAN errado são rejeitados; respostas válidas em linhas separadas continuam reconhecidas.
+
+### Limites
+- As regras de quadro foram testadas com fixtures determinísticas. Capturas físicas K-Line/CAN ainda são necessárias para verificar todos os clones de adaptador e ECU da Meriva.
+
+## DB-118 · 2026-10-24 — Persistência segura de viagens, CSV, cota e backups
+
+### Problemas confirmados
+- Uma falha de leitura de `VIAGENS/index.json` podia fazer uma nova gravação começar em índice vazio, substituindo o histórico anterior.
+- Gravações concorrentes de viagens podiam disputar o mesmo índice; nomes diários baseados em UTC podiam colocar viagens no dia local errado.
+- CSVs existentes precisavam de ordem estável de colunas e a fila de telemetria não tinha limite explícito.
+- A verificação de cota tratava alguns erros de leitura como tamanho zero; a meta `cleanupTargetMb` não orientava efetivamente a limpeza. Backups não eram verificados nem rotacionados.
+
+### Correção
+- `src/storage/driveCycleStorage.ts`: fila serial por índice, arquivo temporário validado, cópia anterior válida, recuperação a partir do backup e erro explícito se o índice for inválido sem cópia recuperável. O CSV diário usa a data local do início da viagem.
+- `src/database/csvLogger.ts`: fila limitada a 10.000 linhas pendentes, status de fila, cabeçalho estável e migração sem perda de linhas ao adicionar colunas.
+- `src/storage/quotaManager.ts`: tamanhos desconhecidos geram erro explícito; limpeza até a meta remove somente os arquivos mais antigos de `LOGS` e `LEITURAS`, nunca viagens, configuração, aprendizado ou backups.
+- `app/armazenamento.tsx`: erro de verificação aparece na tela em vez de simular ocupação baixa.
+- `src/storage/backup.ts`: CSVs são descarregados antes da cópia; cada diretório é comparado por tamanho, um manifesto é validado e a retenção mantém os cinco backups mais recentes.
+- Testes cobrem gravações concorrentes, recuperação/preservação do índice, migração de cabeçalho CSV e manifesto de backup.
+
+### Limites
+- CSV continua baseado em leitura e regravação do arquivo para implementar migração de esquema; arquivos muito grandes podem exigir segmentação/append nativo futuro.
+- A fila tem teto explícito: se permanecer saturada, novas linhas são descartadas e o contador é incrementado; monitorar esse contador é importante para diagnósticos de longa duração.
+
+## DB-119 · 2026-10-24 — Validação profunda do autosave, GPS e estimativas de combustível
+
+### Problemas confirmados
+- A validação do autosave era superficial em subestruturas; coordenadas fora das faixas geográficas ou precisão GPS ausente podiam ser tratadas como evidência utilizável; estimativas de combustível precisavam rejeitar casos físicos/numericamente inválidos.
+- A fila serial do DTC retinha entradas concluídas por comparação entre promises diferentes.
+
+### Correção
+- `src/meriva/autosaveValidation.ts`: valida envelope, timestamps, leituras finitas, DTCs, viagens, autonomia, discovery e configurações; a hidratação retorna defaults seguros para objetos parciais. Schemas antigos só passam se houver uma migração registrada.
+- `src/gps/gpsTracker.ts`: rejeita latitude/longitude fora de faixa, precisão negativa/infinita e usa `NaN` para coordenadas inválidas na função Haversine; precisão ausente deixa de ser evidência de movimento confiável.
+- `src/obd/fuelConsumption.ts`: rejeita temperatura absoluta não física, parâmetros não finitos e resultados de taxa de combustível que transbordem para infinito.
+- `src/database/dtcManager.ts`: remove corretamente a referência de fila após o término da gravação.
+- Testes adicionados para envelopes parcialmente inválidos, GPS inválido/drift e estimativas MAF/MAP impossíveis.
+
+### Validação e limites
+- A CI do HEAD final precisa terminar verde em `validate` e `android-build`.
+- Teste em aparelho, captura real ELM327/ECU, verificação visual de telas e recuperação real de backup continuam fora da validação estática/automatizada.
+
+## DB-120 · 2026-10-24 — Descoberta rápida e integridade de quadros OBD
+
+### Correções integradas nesta branch
+- `app/splash.tsx`: removidas cinco consultas extras por PID na inicialização. A descoberta individual já é feita pela fila compartilhada; o teste de sensores mantém cinco amostras válidas.
+- `src/obd/pidScanner.ts`: cada bitmap é validada sem concatenar linhas e deve ter exatamente quatro bytes; envelopes CAN precisam de ID/DLC coerentes e K-Line exige checksum aditivo válido.
+- `src/obd/bluetoothManager.ts`: cache compatível apenas prioriza a ordem. A ECU da sessão atual é consultada sempre; diagnóstico registra status, latência por comando e resumo da descoberta.
+- `src/database/csvLogger.ts`: removido o uso de `append: true`, não suportado por `writeAsStringAsync` no Expo SDK 51 legado. A gravação preserva os registros anteriores ao acrescentar um lote.
+- Os testes de regressão cobrem bitmap com bytes excedentes, quadro dividido entre linhas, CAN 11/29 bits, múltiplas ECUs e checksum K-Line correto/incorreto.
+
+### Custo e validação pendente
+- Como o sistema de arquivos legado não oferece append nessa API, o lote CSV é persistido por leitura e regravação do arquivo. Isso preserva os dados, mas pode custar mais em arquivos diários grandes; considerar segmentação ou append nativo suportado em uma rodada específica de desempenho.
+- No HEAD anterior desta branch (`30c0d3a9e256e220e43195546693fd331a7d7720`), a run [40132625053](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40132625053) concluiu os jobs `validate` e `android-build` com sucesso, incluindo prebuild e verificação do APK standalone. A atualização DB-121 muda o HEAD; esse resultado não valida o novo SHA e a CI precisa ser confirmada novamente.
+- Teste físico com ELM327/ECU e inspeção do APK instalado permanecem pendentes.
+
+
+## DB-121 · 2026-10-24 — Releitura integral do diário e reconciliação das PRs mais recentes
+
+### Escopo da revisão
+- Relido `docs/DIARIO_DE_BORDO.md` na branch `fix/repository-audit-hardening-20261024` antes da edição. Conferidos os cabeçalhos `DB-001` a `DB-120`: 120 entradas sequenciais, sem IDs duplicados nem lacunas.
+- Relido `docs/CONTRATO_ANTI_REGRESSAO.md`: 35 regras RG na branch, sem identificadores duplicados. Os estados antigos foram preservados como histórico; somente o bloco de estado vigente e a conclusão da CI de DB-120 foram reconciliados.
+- Conferidos metadados das PRs #81–#89 e as execuções vinculadas aos respectivos SHAs. A única PR confirmada como mesclada entre as recentes é a #80; as PRs abertas não fazem parte de `main`.
+
+### Regressões e riscos encontrados
+- **Diário divergente entre branches:** as PRs #85, #86 e #87 tinham cópias paralelas do Diário de Bordo; houve conflito anterior de numeração e de identificador RG-32. A branch de consolidação #89 mantém a sequência DB e separa RG-32 (integridade/descoberta das bitmaps) de RG-33 (consumo/autonomia e enquadramento), documentando a reconciliação nas entradas anteriores. Não substituir este diário pela cópia de uma branch irmã sem comparar os registros DB/RG.
+- **Risco elevado de conflito com a portabilidade visual:** a PR #83 altera 17 caminhos também alterados pela #89 e ainda compartilha nove caminhos com a PR #82. Os pontos mais sensíveis são cockpit, laboratório, parser, gravação de viagens e testes/contratos; merge sem reconciliação pode recuperar código antigo ou retirar proteções novas.
+- **Funcionalidades ainda não integradas:** PID 0144 (#81), inventário completo de PIDs (#84) e navegação/portabilidade visual (#82/#83) continuam em PRs próprias. Não apresentar essas mudanças como parte de `main` nem assumir suporte físico dos PIDs candidatos.
+- **Estado real da validação:** no SHA anterior da #89, a CI terminou `validate` e `android-build` com sucesso (run 40132625053). A presente alteração é um novo commit documental, portanto requer sua própria execução de CI. A validação física e inspeção do APK continuam fora da evidência disponível.
+
+### Próxima sequência segura
+1. Confirmar CI para o novo HEAD da PR #89 e revisar os diffs resultantes, sem mesclar automaticamente PRs irmãs.
+2. Reconciliar #82/#83 com o hardening da #89 por arquivo, preservando a versão escolhida de cockpit/navegação e os testes de parser/viagens.
+3. Tratar #81 e #84 após a consolidação, validando catálogo/fórmulas, faixas e evidência real separadamente.
+4. Manter a migração do Expo SDK em #88 separada e realizar teste em Android físico com ELM327/ECU antes de declarar o comportamento OBD validado.
+
+
+
+## DB-122 · 2026-10-24 — Confirmação das CI e revisão das PRs de layout
+
+### Evidência confirmada
+- Consultados os metadados atuais das PRs #82, #83, #85, #86, #87 e #89, seus HEADs e as execuções mais recentes acessíveis.
+- PR #82: `validate` e `android-build` concluíram com sucesso em `d4bae6f794d78e59bb7c1323e11deb2978eefa92`, run 40039535306.
+- PR #83: `validate` e `android-build` concluíram com sucesso em `85078c2aacd4ff7427b5ded7c1b1ce0e1f6803cf`, run 40098343069.
+- PR #89, antes desta atualização do diário: `validate` e `android-build` concluíram com sucesso em `9a7b747c3210b8b4a7b7a1468dfd1b289717329b`, run 40133491810.
+- A CI bem-sucedida é por SHA; os commits gerados por alterações documentais exigem nova CI. A conclusão não declara que o APK foi instalado nem que uma ECU real foi testada.
+
+### Pontos de layout que precisam permanecer protegidos
+1. A navegação absoluta em paisagem precisa reservar espaço no quadro do cockpit (`paddingLeft:56`) e ter teste de regressão explícito. A implementação da #82 inclui essa defesa; a #83 precisa portá-la.
+2. A tela de prévia `app/floot-layout.tsx` deve ser removida/movida para fora da árvore de rotas de produção ou convertida em uma tela real e deliberada, sem telemetria simulada.
+3. O nome do veículo no cabeçalho deve vir do perfil configurado ou ser neutro, não um valor literal potencialmente incorreto.
+4. A equipe deve escolher uma navegação principal definitiva entre as propostas #82 e #83 e preservar destinos existentes, acessibilidade, layout responsivo e acesso a Dados/Mais Recursos.
+5. A política de 25 PIDs da #82 e a expectativa de 20 da #83 devem ser reconciliadas junto com `polling_policy.json` e os testes, sem remover proteção para fazer a CI passar.
+
+### Integração recomendada
+- Não fazer merge automático nem integrar #82, #83 e #89 em sequência sem uma branch consolidada/rebase com revisão de diffs. A #83 mexe em lógica de parser, telemetria, viagem e catálogo além do layout; esses trechos precisam ser reconciliados com as correções mais recentes de #89.
+- A descrição das PRs #82/#83 foi atualizada com os resultados reais de CI e os riscos. A revisão do layout da #83 identificou os bloqueios acima; a PR deve ficar aberta para correções.
+- Permanecem pendentes inspeção visual em aparelho Android e teste físico com ELM327/ECU, incluindo confirmação dos PIDs, leitura de DTC, desconexão/reconexão e verificação da autonomia/consumo.
+
+
+
+## DB-123 · 2026-10-24 — Correção da atribuição de layout após releitura direta da PR #83
+
+### Retificação necessária
+- A anotação DB-122 atribuiu à PR #83 a navegação vertical absoluta à esquerda, sem reserva de espaço. A releitura direta de `app/index.tsx` no head `85078c2aacd4ff7427b5ded7c1b1ce0e1f6803cf` demonstrou que essa atribuição estava incorreta.
+- **PR #82:** possui `bottomNavLandscape` com `position:'absolute'`, `left:0`, largura de 50 dp e `screenFrameLandscape` com `paddingLeft:56`; o conteúdo reserva espaço para a coluna lateral.
+- **PR #83:** possui `bottomNavLandscape` apenas com ajustes compactos de margem/preenchimento; os seis ícones permanecem numa barra horizontal no rodapé em paisagem. Portanto, não foi comprovada sobreposição causada por navegação lateral nessa PR.
+
+### Estado correto após retificação
+- O problema é a divergência de proposta: #82 usa coluna lateral em paisagem; #83 usa barra inferior horizontal. Escolher uma solução e verificar a legibilidade/área de toque no aparelho; não manter a acusação de sobreposição à #83.
+- Permanecem válidos os pontos sobre a rota de prévia estática dentro de `app/`, a divergência README-versus-serviço sobre perfis de veículo, o conflito de política 20/25 PIDs e os arquivos de OBD compartilhados com #89.
+- As descrições das PRs #82, #83 e #89 e o comentário na conversa da #83 foram corrigidos para refletir essa distinção.
+- Esta entrada corrige a conclusão anterior sem apagar o histórico da auditoria. Nenhum merge foi feito. A nova edição documental exige CI para seu SHA; CI verde não substitui testes físicos e inspeção visual.
+
+
+
+## DB-124 · 2026-10-24 — Delimitação do risco de modelo fixo no layout
+
+### Verificação de fonte de verdade
+- O cabeçalho da PR #83 escreve literalmente `MERIVA MAXX 1.4`.
+- A leitura de `src/database/vehicleConfig.ts` mostra que `ensureMerivaVehicleProfile()` força atualmente `vehicleName/model = Meriva Maxx`, Chevrolet, ano do manual Meriva e motorização do manual, inclusive ao normalizar um perfil já existente. Assim, o texto do cabeçalho corresponde ao perfil padrão atual; não está comprovado que essa PR passe a exibir um modelo errado.
+- Contudo, o README descreve o perfil do veículo como configurável. Há, portanto, uma divergência preexistente entre a promessa documental e o serviço de perfil, além da duplicação do nome do veículo na UI.
+
+### Decisão recomendada
+- Não classificar o texto literal como falha funcional comprovada na PR #83. Tratar como decisão de produto/manutenção: ou o aplicativo fica explicitamente restrito à Meriva e a documentação reflete esse limite, ou o serviço de perfil e o cabeçalho passam a respeitar valores configuráveis.
+- Essa questão é independente da escolha visual entre a barra inferior da #83 e a coluna lateral da #82, do conflito 20/25 PIDs e da reconciliação de parser/persistência com a #89.
+- Nenhuma alteração de código foi feita nesta entrada. O commit documental cria novo SHA e deve passar pela CI correspondente.
+
+
+
+## DB-125 · 2026-10-24 — Auditoria retrospectiva das PRs, CI e diário desde o início
+
+### Escopo e evidência
+- Repositório auditado: `luizmarquesarruda/meriva-smart-diagnostic`.
+- Foram consultados os metadados de todas as PRs listadas no endpoint do repositório, do #1 à #89, o histórico de Actions com 3.444 execuções reportadas pela API, o run número 1 e os SHAs atuais das PRs abertas.
+- O diário foi lido em dois estados distintos: `main` e a branch desta PR. Não confundir o conteúdo de uma branch de auditoria com o que já foi integrado.
+- Também foi lida a entrada cronológica mais antiga identificada, DB-001, e o início atual do arquivo, que é organizado com atualizações recentes no topo e registros DB históricos abaixo.
+
+### Resultado retrospectivo das PRs
+- A API retornou **86 PRs existentes**, com lacunas de numeração; #23 e #57 não aparecem como PRs existentes e #88 é uma issue, não uma PR.
+- Estado consultado: **23 mescladas**, **8 abertas** (#81–#87 e #89) e **55 fechadas sem merge**. A PR #1 foi encerrada sem merge; a #2 foi a primeira auditoria ampla mesclada. PR fechada sem merge não deve ser presumida incorporada, mesmo quando seu título descreve uma correção importante.
+- A #80 é a última integração confirmada em `main` no momento desta auditoria. A #89 permanece draft e fora de `main`.
+- Há histórico de PRs de validação/teste que foram fechadas sem merge depois que uma PR seguinte foi mesclada (ex.: #34/#35 e #28–#31). Isso pode ser intencional, mas os títulos não são prova de código integrado; rastrear o SHA/merge commit antes de reaplicar qualquer patch.
+- PRs fechadas sem merge com funcionalidades de consumo, GPS, viagem, Bluetooth, armazenamento e design devem ser tratadas como propostas históricas. Verificar cada requisito contra `main` antes de reabrir ou copiar código, para evitar ressuscitar regressões antigas.
+
+### Resultado retrospectivo da CI
+- Primeira execução: [run #1, ID 37022666513](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/37022666513), em 2026-10-02, falhou **antes de executar instalação ou testes**. O log identifica a causa: `actions/setup-node@v4` com `cache: npm` não encontrou `package-lock.json`, `npm-shrinkwrap.json` ou `yarn.lock`. Portanto, essa primeira falha foi de configuração/cache do workflow, não evidência de defeito no motor OBD.
+- O histórico inicial contém uma sequência de execuções rápidas com falha na CI do `main` antes da execução de testes; o diário deve separar falhas de infraestrutura/configuração, falhas de TypeScript/testes e falhas de build Android, sem somá-las como se fossem o mesmo tipo de regressão.
+- No snapshot mais recente consultado, a API reportava 3.444 runs; os runs finais 3393 (push) e 3394 (pull request), ambos no SHA `931973310f955a8d527401d51c33b7d55feb79e7`, concluíram com sucesso, incluindo `validate` e `android-build`. Isso valida aquele SHA, não o commit documental DB-125 que vem depois.
+- A CI verde não demonstra conectividade Bluetooth, compatibilidade com um ELM327 físico, suporte dos PIDs na ECU ou precisão de autonomia/consumo em condução real.
+
+### Releitura desde o primeiro registro do Diário de Bordo
+- O começo atual do arquivo descreve a portabilidade da seção de fronteiras matemáticas do Floot para `app/laboratorio.tsx` no Expo, com dados artificiais explicitamente identificados. Essa seção não deve ser confundida com uma leitura física.
+- A primeira entrada cronológica, **DB-001 (2026-10-06)**, registra uma falha de importação CommonJS do catálogo `fuel_types.json` no teste `fuelIdentification.test.js`. A correção foi compatibilizar o import; o próprio registro pedia aguardar o build Android. A regra processual original — problema, diagnóstico, correção, testes, commit, CI, resultado e próximo passo — continua válida.
+- `main` contém 3.441 linhas e vai até DB-106; a branch da #89 contém 3.814 linhas e DB-125 após esta atualização. A diferença é explicada por trabalho posterior em branches ainda não integradas, mas representa um risco documental real: abrir apenas o diário de `main` omite as auditorias DB-107 em diante. Não copiar DB-125 para `main` sem a integração aprovada da PR que o contém.
+- A seção de estado vigente na branch foi corrigida para refletir a CI verde de DB-124; DB-125 exige uma nova execução de CI.
+
+### Regressões, inconsistências e riscos recorrentes encontrados
+1. **Código não integrado versus documentação:** há 55 PRs fechadas sem merge. O título e a descrição de uma PR não provam que o seu código esteja no produto. Antes de cada correção, comparar o estado atual de `main` e o diff do SHA proposto.
+2. **Explosão de execuções de CI:** o histórico tem centenas/milhares de runs de validação. A falha original por lockfile ausente e os ciclos de reexecução/testes desatualizados indicam a necessidade de evitar commits corretivos pequenos em sequência sem uma rodada local integrada. Consolidar mudanças coerentes, executar `npm ci`, testes, gate anti-regressão, `npm run validate` e build Android antes de pedir revisão.
+3. **Validação por SHA:** CI verde de PRs separadas não valida o merge combinado; qualquer alteração posterior, inclusive só documental, muda o SHA e requer verificação correspondente.
+4. **PIDs:** catálogo/bitmap indicam candidatos; suporte exige resposta positiva válida, PID correto, payload exato e sessão ECU atual. O inventário de 34/35 PIDs não deve ser comunicado como 34/35 PIDs suportados pela Meriva. Resolver a divergência de política 20/25 PIDs antes de combinar #82/#83.
+5. **Fórmulas e autonomia:** os testes matemáticos confirmam a implementação sobre entradas sintéticas, não a calibração em veículo. PID 015E é preferível quando a ECU realmente o fornece; MAF/MAP é estimativa e precisa ser identificada como tal. Validar unidades, faixas, dados obsoletos e denominadores mínimos.
+6. **Bluetooth/ELM327:** estados Bluetooth e ECU devem permanecer separados; a ECU exige resposta OBD válida. Testes de mocks e CI não substituem teste com adaptador físico, reconexão, timeout e desconexão.
+7. **Persistência:** autosave, histórico de viagem, CSV, quota e backup precisam ser validados em upgrade/restauração, interrupção durante escrita e falta de espaço; não presumir segurança física apenas pelos testes unitários.
+8. **Layout:** #82 e #83 apresentam navegações diferentes na paisagem; decidir uma só. A rota demonstrativa `app/floot-layout.tsx` deve ser tratada deliberadamente como rota de produto ou ferramenta de revisão. O rótulo fixo do veículo corresponde ao perfil Meriva forçado pelo serviço atual, mas contradiz a promessa documental de perfil configurável.
+9. **Floot e repositório nativo:** Floot é um protótipo web sem transporte físico Bluetooth/ECU. Seus testes/typecheck podem validar fórmulas e UX do protótipo, mas não alteram nem substituem CI/build do Expo/Android.
+10. **Ferramentas externas:** a busca por apps Replit retornou zero aplicativos editáveis correspondentes a Meriva; portanto, nenhuma mudança foi feita no Replit. O screenshot do Floot não foi capturado porque não havia janela/preview aberta na sessão do usuário. A auditoria visual completa do Product Design requer Work Mode, conforme disponibilidade do plugin.
+
+### Validação do protótipo Floot nesta rodada
+- Testes: 4 arquivos de especificação aprovados, 0 falhas (`themeMode`, `dashboardUx`, `obdPidFormulas`, `obdPidDiscovery`); dois testes de hooks estão excluídos da execução padrão.
+- Typecheck: limpo.
+- A leitura do código confirma que o estado Bluetooth é rotulado como simulado e que não existe conexão física nesta tela. Os dados de autonomia, consumo, velocidade, distância e temperatura aparecem como N/D até integração real.
+- Não foi possível validar visualmente em screenshot nesta sessão porque o preview Floot não estava aberto. Abrir o preview e repetir a captura em retrato e paisagem antes de declarar a auditoria visual concluída.
+- As funções especiais de alta precisão do plugin Precise Special Functions não são apropriadas para as fórmulas OBD aqui analisadas, que são conversões lineares/afins e operações de bytes. A validação relevante é aritmética de referência, testes de fronteira e comparação com SAE J1979/ISO 15031-5 e evidência da ECU.
+
+### Próximas ações ordenadas
+1. Aguardar CI do SHA DB-125.
+2. Auditar e reconciliar os arquivos compartilhados entre #82, #83 e #89 em uma integração controlada, sem merge automático.
+3. Confirmar a política final de PIDs (20 ou 25), manter os testes alinhados e medir a latência real por comando.
+4. Executar teste físico Android/ELM327/ECU para 010C, 010D, 0105, 0110, 012F e 015E conforme suporte anunciado e respostas reais; comparar autonomia/consumo com um trajeto medido.
+5. Testar restauração de backup, rotação, GPS em segundo plano, desconexão/reconexão e falta de espaço em aparelho físico.
+6. Atualizar a seção vigente e o índice quando houver novo SHA validado; manter a história anterior e rotular claramente o que permanece fora de `main`.
+
+**Resultado DB-125:** auditoria retrospectiva documental/CI e validação do protótipo concluídas dentro do acesso disponível. A auditoria de integração combinada, visual em aparelho e hardware físico permanece pendente. Nenhum merge foi feito.
+
+## DB-126 · 2026-10-25 — Auditoria de estabilidade, rádio Bluetooth e controle de regressões
+
+### Achados confirmados
+- O diário da branch de hardening tinha 125 entradas sequenciais e índice correspondente. O índice, porém, terminava em DB-119 e omitia DB-120 a DB-125. Isso é uma regressão documental objetiva; agora a proteção automatizada exige o mesmo conjunto e a mesma ordem.
+- Branches de PR independentes reutilizaram DB-109 para conteúdos distintos: #81 (PID 0144), #82 (navegação responsiva), #83 (layout Floot) e #89 (auditoria). O conflito surge ao combinar históricos independentes.
+- `main` foi reportada como não protegida (`protected: false`) e sem rulesets; a CI não está confirmada como requisito obrigatório de integração.
+- #89 e #90 alteravam os mesmos três arquivos Bluetooth/splash. CIs antigas verdes em SHAs diferentes não validavam a combinação.
+- #82 e #83 dividem nove arquivos e propõem navegação diferente, além de política de 20 versus 25 PIDs. #83 compartilha 17 arquivos com #89. Esses conflitos ficam pendentes, sem merge automático.
+
+### Correções nesta branch
+- Criada `src/obd/bluetoothRadioRecovery.ts` como política pura para reconhecer rádio desligado, estado indeterminado e erros nativos equivalentes.
+- `src/obd/bluetoothClassicTransport.ts` verifica o rádio antes de cada socket RFCOMM e após falha. Fallback só segue quando a tentativa anterior terminou e o rádio foi confirmado ligado.
+- `src/obd/bluetoothManager.ts` interrompe retry ao identificar rádio desligado ou estado não confirmado; os logs informam tentativas executadas e causa terminal.
+- `app/splash.tsx` preserva a mensagem nativa e disponibiliza a abertura manual do painel.
+- Criado `tests/bluetoothRadioRecovery.test.js`; conectado ao `npm test` e ao gate.
+- O gate protege suítes críticas adicionais e valida IDs do diário sem duplicação/lacuna e com índice sincronizado.
+- Atualizados RG-34, plano BT-RADIO-01, README, changelog e auditoria técnica.
+
+### Validação e limites
+- CI iterativa revelou problemas reais em sequência: no SHA `f1655177d939563e013373f7c48230da4135d90d`, o gate falhou por regex de diário com escapes incorretos; em `f9d718a7d7a5fe555fea2d04fe1c83eeb8c55ae1`, o gate passou, mas TypeScript apontou TS18046 por acesso a `lastCause: unknown`, corrigido com erro local tipado.
+- Em `43dda6925b6cb4acfef1cf177391a0b7b9731742`, `tests/regression.test.js` detectou duas tentativas RFCOMM simultâneas: a sonda extra do rádio havia ficado depois da leitura do bloqueio compartilhado. A verificação foi movida para antes do bloqueio em `2a5117a5566a0f993e7a45a20c19d0d92671b9c8`; o `validate` passou nos eventos push/PR [run 40185128970](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40185128970) e [run 40185132846](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40185132846). O build Android desses SHAs ainda estava em andamento no momento do registro, e a alteração deste diário/gate gera outro SHA com CI própria.
+- Adicionada verificação de inventário para garantir que todos os arquivos `tests/*.test.js`, exceto o próprio `projectBaseline.test.js` (executado no gate separado), estejam conectados ao comando `npm test`.
+- A proteção de `main` com required checks segue pendente porque a integração disponível não tem permissão para alterar branch protection (403).
+- O teste da política é determinístico; não substitui teste do Galaxy A06/Android 16 com ELM327/ECU reais. Teste físico, confirmação de PIDs e autonomia em percurso permanecem pendentes.
+- Nenhum merge executado.
+
+### Matriz mínima antes de integrar
+1. Atualizar PR candidata sobre o head efetivamente integrado e revalidar a sequência do diário.
+2. Comparar o diff agregado #81–#84 e #89; resolver arquivos comuns de #82/#83 e #83/#89 sem remover contratos.
+3. Executar gate, TypeScript, suíte completa e build Android no SHA final combinado.
+4. Instalar o APK e validar Bluetooth, splash, navegação, resposta 010C e apenas PIDs anunciados/respondidos pela ECU.
+
+## DB-127 · 2026-10-25 — CI como auditoria de regressão e cobertura completa das suítes
+
+### Correções confirmadas pela CI
+- A primeira revisão do novo gate apontou escape incorreto nas regex de sequência/índice; foi corrigido antes de concluir a validação.
+- TypeScript detectou leitura de `lastCause.message` quando `lastCause` era `unknown`. Foi substituída por variável local `Error` tipada.
+- A suíte `testBluetoothEventTransport` detectou um efeito colateral da correção: a verificação assíncrona do rádio entre a consulta do bloqueio e a abertura RFCOMM abriu uma janela de corrida. O rádio agora é verificado primeiro, e o mapa global de tentativa pendente é conferido logo depois, sem outro `await` entre a checagem do bloqueio e a criação/registro da tentativa.
+- A suíte que detectou a corrida não foi relaxada nem removida; seu limite continua exigindo no máximo uma tentativa nativa concorrente por adaptador.
+- As execuções no SHA `2a5117a5566a0f993e7a45a20c19d0d92671b9c8` passaram por `validate` nos eventos push e pull request; os builds Android estavam em andamento. Este novo commit de documentação/gate exige nova CI no SHA resultante.
+
+### Controle adicional
+- O gate agora compara o conjunto de arquivos `tests/*.test.js` com as suítes presentes em `npm test`, excluindo somente `projectBaseline.test.js`, que é executado como passo independente da CI. Isso impede que uma suíte seja esquecida do runner mesmo quando não estiver na lista de suítes obrigatórias.
+- A sequência DB-001…DB-127 e o índice correspondente são validados automaticamente; a divergência anterior (índice terminando em DB-119 enquanto o corpo chegava a DB-125) foi reparada em DB-126.
+
+### Limites restantes
+- Branch `main` continua sem proteção confirmada e sem rulesets. A integração conectada devolveu 403 para alteração de proteção; checks obrigatórios precisam ser configurados nas regras do repositório.
+- PRs #82/#83 continuam propostas concorrentes de navegação e PIDs; a consolidação precisa resolver o diff combinado antes de qualquer merge.
+- Ainda não houve teste físico no Galaxy A06/Android 16 com ELM327/ECU reais. CI verde não comprova Bluetooth real, suporte de PID nem precisão da autonomia.
+- Nenhum merge foi executado.
+
+## DB-128 · 2026-10-25 — Revalidar bloqueio RFCOMM após cada espera e corrigir IDs RG duplicados
+
+### Causa e ajuste
+- Na tentativa anterior, a sonda de rádio passou a preceder a leitura do bloqueio compartilhado e o teste de duas instâncias voltou a passar. A releitura de três instâncias mostrou um risco residual: dois waiters podem acordar pela mesma promessa anterior e ambos presumir que o bloqueio está livre.
+- O transporte agora repete, em loop, a sequência: consultar rádio → ler bloqueio compartilhado → aguardar tentativa anterior se existir → voltar ao início e revalidar rádio/bloqueio. A região entre o último bloqueio vazio e `connectToDevice` continua sem `await`, mantendo a criação/registro da tentativa como trecho síncrono.
+- `tests/regression.test.js` agora abre três instâncias simultâneas para o mesmo endereço e exige três conexões concluídas, mas `bluetoothMaxNativeConnections === 1`. O teste não foi relaxado.
+- O contrato tinha IDs duplicados: RG-34 era usado por Bluetooth e persistência; RG-35 por autosave e a nova persistência. Corrigido para RG-34 (rádio), RG-35 (persistência segura), RG-36 (autosave/GPS/estimadores) e RG-37 (waiters RFCOMM). O gate agora verifica IDs RG únicos e contínuos, além do índice/entradas DB-NNN.
+- O plano de testes recebeu o caso de três instâncias simultâneas e de revalidação após await.
+
+### Validação
+- A correção de lock é uma alteração de comportamento nova. O SHA anterior `3bd9fd6c7721be706e920595d4991ea8e67d5bcf` tem CI própria em execução sobre os testes/gate/documentação da etapa anterior; não representa esta mudança de concorrência.
+- Este registro gera um novo SHA; só sua execução CI completa com `validate` e `android-build` verdes pode aprovar o código. O teste físico Android 16 + ELM327/ECU reais continua pendente.
+- A proteção de `main` permanece pendente por falta de permissão para configurar required checks. Nenhum merge foi executado.
+
+## DB-129 · 2026-10-25 — GPS rejeita timestamps inválidos e fora de ordem
+
+### Achado confirmado
+- O rastreador GPS substituía timestamp inválido/não positivo por `Date.now()`. Isso transforma dado malformado em uma marca temporal aparentemente atual e pode alterar o cálculo do intervalo/distância em relação às próximas leituras.
+- Timestamp repetido ou regressivo não era rejeitado antes de criar a amostra; o último ponto válido podia ser substituído por uma leitura temporalmente mais antiga.
+
+### Correção
+- `src/gps/gpsTracker.ts` agora descarta coordenadas inválidas, timestamp não finito/não positivo e timestamp menor ou igual ao último fix válido antes de atualizar qualquer estado.
+- Removido o fallback para `Date.now()`; preserva-se o timestamp original somente quando válido.
+- `tests/gps.test.js` cobre timestamp NaN, amostra atrasada, distância inalterada e recuperação ao chegar um timestamp crescente.
+- RG-38, caso GPS-02, baseline e este diário documentam o contrato. O gate verifica que o fallback artificial não retorne.
+
+### Validação
+- A validação do SHA anterior `76360ad15466e5e7b0cb64a1b68e33d1814e5ee1` tinha `validate` verde e `android-build` ainda em execução. Esta correção gera novo SHA e exige uma execução CI completa própria; resultados anteriores não contam como aprovação.
+- Teste físico de GPS e validação ELM327/ECU continuam pendentes. Nenhum merge foi executado.
+
+## DB-130 · 2026-10-25 — Otimização CSV avaliada e bloqueada pela versão instalada
+
+### Achado
+- `src/database/csvLogger.ts` reescreve o conteúdo CSV existente em flushes de esquema estável, de modo que o custo cresce com o tamanho do histórico. O comentário dessa dívida técnica está mantido explícito no código.
+- A documentação atual do Expo descreve append para a API legada, mas o projeto está fixado em Expo SDK 51 / `expo-file-system` 17. A CI de TypeScript rejeitou `append: true` porque o `WritingOptions` instalado não declara esse campo. A documentação mais recente, sozinha, não é evidência suficiente para ativar uma opção no pacote instalado.
+
+### Decisão
+- A tentativa de usar append foi revertida; o código não usa `as any` nem ignora o erro de TypeScript.
+- A implementação compatível atual continua preservando registros, embora tenha custo O(tamanho do arquivo) por flush. A otimização deve ser retomada como tarefa separada com upgrade de SDK validado, API nativa compatível ou desenho de arquivos segmentados, e testes de leitura/exportação/migração.
+- README e changelog não afirmam que append está implementado; o contrato de aceitação não inclui uma capacidade ainda não suportada.
+
+### Evidência e estado
+- A CI realmente rejeitou a alteração em `android-build`/typecheck no SHA experimental; o erro não foi contornado nem a suíte relaxada.
+- Os resultados do SHA anterior `8ca18ce0103d949580a56dd158e8b993aa69e1ac` não validam as alterações subsequentes de tentativa/reversão e documentação. O SHA final desta consolidação precisa de CI própria.
+- Nenhum merge foi executado. Testes em aparelho e validação ELM327/ECU continuam independentes da CI.
+
+
+## DB-131 · 2026-10-25 — Atualização periódica de localização/clima baseada em conectividade
+
+### Achado confirmado
+- `app/index.tsx` chamava `loadCurrentConditions()` apenas uma vez, no primeiro mount da tela. Assim, clima/localidade não eram atualizados periodicamente e a volta da internet por dados móveis não disparava uma nova consulta.
+- O projeto já contém `@react-native-community/netinfo`, usado para identificar conectividade; não era necessário introduzir uma dependência nova.
+- O contrato permanece: localização não solicita permissão automaticamente; clima/cidade são enriquecimento opcional e não participam do diagnóstico OBD local.
+
+### Correção implementada nesta branch
+- Criado `src/weather/conditionsRefresh.ts` com início imediato quando há internet, refresh periódico de 15 minutos, atualização imediata após transição offline→online, cooldown de retry de 60 segundos e proteção contra chamadas simultâneas.
+- Ligado o serviço ao NetInfo na tela principal para Wi-Fi e dados móveis (incluindo 4G/5G); inscrições e temporizador são removidos no unmount.
+- Em falha de atualização após clima válido, a temperatura antiga deixa de ser apresentada como atual; somente a última localidade pode ser preservada com indicação explícita de dados desatualizados. Permissão revogada limpa a localização anterior.
+- Criado `tests/weatherRefresh.test.js` para testar conectividade disponível/indisponível, retomada de rede, refresh periódico, ausência de spam, limpeza e retenção segura de localidade. O novo teste foi incluído em `npm test` e no gate de baseline.
+- Adicionados os contratos RG-39 e NET-WEATHER-01 ao contrato anti-regressão e plano de testes.
+
+### Validação e limites
+- Commits criados na branch `fix/repository-audit-hardening-20261024` da PR #89. A CI deve ser verificada no HEAD final desta alteração; resultados de SHAs anteriores não contam como aprovação.
+- Ainda não foi executado teste físico de geolocalização em Android 16 alternando Wi-Fi/4G/5G. A CI não comprova recepção GPS pelo provedor fused, disponibilidade da operadora nem funcionamento do ELM327/ECU reais.
+- Nenhuma mudança foi mesclada em `main`. A atualização de clima é opcional e não deve afetar polling, conexão Bluetooth, autonomia ou diagnóstico local.
