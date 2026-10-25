@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "vehicle": {
     "make": "Chevrolet",
     "model": "Meriva Maxx",
@@ -119,7 +119,7 @@
     },
     {
       "pid": "0111",
-      "name": "Throttle Position",
+      "name": "Absolute Throttle Position",
       "unit": "percent",
       "formulaId": "PERCENT_255",
       "bytes": 1,
