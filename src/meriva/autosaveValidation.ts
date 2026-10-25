@@ -190,5 +190,5 @@ export function shouldFeedLearning(
   status: string,
   value: number | null,
 ): boolean {
-  return source === 'REAL' && status === 'RESPONDEU' && value !== null;
+  return source === 'REAL' && status === 'RESPONDEU' && value !== null && Number.isFinite(value);
 }
