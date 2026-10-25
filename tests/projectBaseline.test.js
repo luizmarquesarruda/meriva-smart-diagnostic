@@ -22,6 +22,7 @@ const laboratory = read('app/laboratorio.tsx');
 const dataScreen = read('app/dados.tsx');
 const tripService = read('src/trip/autoTripService.ts');
 const liveTelemetry = read('src/obd/liveTelemetry.ts');
+const weatherRefresh = read('src/weather/conditionsRefresh.ts');
 const gpsTracker = read('src/gps/gpsTracker.ts');
 const diagnostics = read('src/diagnostics/diagnosticEngine.ts');
 const sensorEngine = read('src/diagnostics/sensorTestEngine.ts');
@@ -38,6 +39,7 @@ assert.equal(packageJson.scripts.validate, 'npm run typecheck && npm test');
 // Removing a test file from the script must fail this gate before merge.
 const requiredSuites = [
   'pidParserIntegrity.test.js',
+  'weatherRefresh.test.js',
   'bluetoothRadioRecovery.test.js',
   'pidFormulaBoundaries.test.js',
   'dtcScanner.test.js',
@@ -165,6 +167,10 @@ assert.match(sharedObd, /let connecting: Promise<SharedObdConnection> \| null = 
 assert.ok(!read('app/_layout.tsx').includes('connectPreferredElm'), 'layout não pode criar uma segunda conexão automática');
 
 // Local diagnosis stays separate from optional network enrichment.
+assert.match(home, /startCurrentConditionsRefresh/, 'weather/location enrichment must refresh beyond initial mount');
+assert.match(weatherRefresh, /CURRENT_CONDITIONS_REFRESH_INTERVAL_MS/);
+assert.match(weatherRefresh, /isInternetReachable !== false/);
+assert.match(weatherRefresh, /inFlight/, 'weather refresh must not overlap concurrent HTTP requests');
 assert.match(diagnostics, /diagnostic_rules\.json/);
 assert.doesNotMatch(diagnostics, /currentConditions|open-meteo|https?:\/\//i);
 assert.match(home, /loadCurrentConditions/);
