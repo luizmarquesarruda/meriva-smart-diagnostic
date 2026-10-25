@@ -283,12 +283,13 @@ export class BluetoothClassicTransport implements ObdTransport {
             const originalMessage = radioStateBeforeSocketError instanceof Error
               ? radioStateBeforeSocketError.message
               : String(radioStateBeforeSocketError ?? 'ESTADO INDETERMINADO');
-            lastCause = new Error(
+            const radioStateError = new Error(
               'ESTADO DO BLUETOOTH NÃO PÔDE SER CONFIRMADO ANTES DO SOCKET RFCOMM. ' + originalMessage,
             );
+            lastCause = radioStateError;
             this.logDiagnostic('CONNECT_ABORT_RADIO_STATE_UNKNOWN', {
               secureSocket,
-              error: lastCause.message,
+              error: radioStateError.message,
             });
           }
           break;
