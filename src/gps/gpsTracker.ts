@@ -322,8 +322,10 @@ export class GpsTracker {
     if (
       !Number.isFinite(c.latitude) || !Number.isFinite(c.longitude) ||
       c.latitude < -90 || c.latitude > 90 ||
-      c.longitude < -180 || c.longitude > 180
+      c.longitude < -180 || c.longitude > 180 ||
+      !Number.isFinite(location.timestamp) || location.timestamp <= 0
     ) return;
+    if (this.previous && location.timestamp <= this.previous.timestamp) return;
 
     const sample: GpsSample = {
       latitude: c.latitude,
@@ -334,7 +336,7 @@ export class GpsTracker {
       accuracyM: Number.isFinite(c.accuracy) && (c.accuracy as number) >= 0
         ? c.accuracy as number
         : null,
-      timestamp: Number.isFinite(location.timestamp) && location.timestamp > 0 ? location.timestamp : Date.now(),
+      timestamp: location.timestamp,
     };
 
     const accurate = isAccurate(sample);

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Integridade de telemetria GPS
+- Timestamps inválidos, repetidos ou regressivos são descartados sem fabricar uma marca temporal atual.
+
 ### Estabilidade Bluetooth Classic
 - Estado do rádio revalidado antes de cada socket RFCOMM; fallback/retry interrompido quando o Bluetooth está desligado ou o estado é indeterminado.
 - Espera por conexões nativas pendentes revalida rádio e bloqueio compartilhado após cada await, impedindo sockets simultâneos entre múltiplas instâncias.

@@ -97,3 +97,11 @@ Este trabalho está em branch e PR separados. Não houve merge nem alteração d
 - A primeira correção moveu a sonda para antes do bloqueio compartilhado. Auditoria adicional mostrou que três instâncias podem aguardar a mesma promessa e acordar juntas, portanto o transporte agora revalida rádio/bloqueio em loop depois de cada espera. O teste passa a exercitar três instâncias e exigir no máximo um socket nativo ativo.
 - Revisão do contrato identificou IDs RG-34 e RG-35 duplicados introduzidos durante a consolidação. Renumerados para RG-34…RG-37, e o baseline agora reprova se houver IDs RG duplicados, lacunas ou ordem incorreta.
 - Nova CI é obrigatória para o SHA resultante; nenhum resultado de um SHA anterior é reutilizado como aprovação.
+
+
+## Correção adicional de integridade temporal do GPS — 2026-10-25
+
+- A auditoria do diff identificou fallback de `location.timestamp` inválido para `Date.now()`. O fallback fazia dados malformados parecerem atuais e podia tornar inválido o intervalo da próxima amostra.
+- O rastreador agora descarta timestamp não finito/não positivo e fixes com tempo menor/igual ao último fix válido, sem alterar o estado. O teste cobre descarte e recuperação.
+- Contrato RG-38 e caso GPS-02 foram adicionados; o baseline verifica que o fallback não retorne.
+- O HEAD anterior estava com `validate` verde e `android-build` em execução; esta alteração exige CI própria do início ao fim.

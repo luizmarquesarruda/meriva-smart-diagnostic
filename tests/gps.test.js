@@ -158,6 +158,22 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
     { latitude: 0, longitude: 0 },
   )), 'haversine deve recusar coordenadas fora da faixa válida');
 
+  const samplesBeforeBadTimestamp = tracker.getState().samples;
+  const distanceBeforeBadTimestamp = tracker.getState().distanceKm;
+  watcher({ coords: { latitude: 0, longitude: 0.00175, speed: 0, accuracy: 5 }, timestamp: Number.NaN });
+  assert.strictEqual(tracker.getState().samples, samplesBeforeBadTimestamp,
+    'timestamp inválido deve descartar a amostra inteira, não substituí-lo por Date.now()');
+  watcher({ coords: { latitude: 0, longitude: 0.00175, speed: 0, accuracy: 5 }, timestamp: 23000 });
+  assert.strictEqual(tracker.getState().samples, samplesBeforeBadTimestamp,
+    'amostra com timestamp anterior ao último fix válido deve ser descartada');
+  assert.strictEqual(tracker.getState().distanceKm, distanceBeforeBadTimestamp,
+    'timestamp atrasado não deve alterar distância');
+  watcher({ coords: { latitude: 0, longitude: 0.00175, speed: 0, accuracy: 5 }, timestamp: 30000 });
+  assert.strictEqual(tracker.getState().samples, samplesBeforeBadTimestamp + 1,
+    'a coleta deve se recuperar quando chega um timestamp válido crescente');
+  assert.strictEqual(tracker.getState().distanceKm, distanceBeforeBadTimestamp,
+    'a amostra válida de recuperação não deve inventar deslocamento');
+
   await tracker.stop();
   assert.strictEqual(tracker.getState().running, false);
   unsubscribe();

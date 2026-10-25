@@ -1,4 +1,4 @@
-## ESTADO VIGENTE — 2026-10-25 (auditoria de estabilidade DB-128)
+## ESTADO VIGENTE — 2026-10-25 (auditoria de estabilidade DB-129)
 
 > Estado consultado no GitHub em 25/10/2026. Este diário acompanha a branch de consolidação #89; não representa merge em `main`. CI verde por branch isolada não comprova integração combinada nem teste físico.
 
@@ -199,6 +199,7 @@
 - **DB-126** · 2026-10-25 — Auditoria de estabilidade, rádio Bluetooth e controle de regressões
 - **DB-127** · 2026-10-25 — CI como auditoria de regressão e cobertura completa das suítes
 - **DB-128** · 2026-10-25 — Revalidar bloqueio RFCOMM após cada espera e corrigir IDs RG duplicados
+- **DB-129** · 2026-10-25 — GPS rejeita timestamps inválidos e fora de ordem
 
 ---
 
@@ -3932,3 +3933,19 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - A correção de lock é uma alteração de comportamento nova. O SHA anterior `3bd9fd6c7721be706e920595d4991ea8e67d5bcf` tem CI própria em execução sobre os testes/gate/documentação da etapa anterior; não representa esta mudança de concorrência.
 - Este registro gera um novo SHA; só sua execução CI completa com `validate` e `android-build` verdes pode aprovar o código. O teste físico Android 16 + ELM327/ECU reais continua pendente.
 - A proteção de `main` permanece pendente por falta de permissão para configurar required checks. Nenhum merge foi executado.
+
+## DB-129 · 2026-10-25 — GPS rejeita timestamps inválidos e fora de ordem
+
+### Achado confirmado
+- O rastreador GPS substituía timestamp inválido/não positivo por `Date.now()`. Isso transforma dado malformado em uma marca temporal aparentemente atual e pode alterar o cálculo do intervalo/distância em relação às próximas leituras.
+- Timestamp repetido ou regressivo não era rejeitado antes de criar a amostra; o último ponto válido podia ser substituído por uma leitura temporalmente mais antiga.
+
+### Correção
+- `src/gps/gpsTracker.ts` agora descarta coordenadas inválidas, timestamp não finito/não positivo e timestamp menor ou igual ao último fix válido antes de atualizar qualquer estado.
+- Removido o fallback para `Date.now()`; preserva-se o timestamp original somente quando válido.
+- `tests/gps.test.js` cobre timestamp NaN, amostra atrasada, distância inalterada e recuperação ao chegar um timestamp crescente.
+- RG-38, caso GPS-02, baseline e este diário documentam o contrato. O gate verifica que o fallback artificial não retorne.
+
+### Validação
+- A validação do SHA anterior `76360ad15466e5e7b0cb64a1b68e33d1814e5ee1` tinha `validate` verde e `android-build` ainda em execução. Esta correção gera novo SHA e exige uma execução CI completa própria; resultados anteriores não contam como aprovação.
+- Teste físico de GPS e validação ELM327/ECU continuam pendentes. Nenhum merge foi executado.
