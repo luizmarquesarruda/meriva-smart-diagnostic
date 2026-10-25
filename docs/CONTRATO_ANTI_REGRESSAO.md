@@ -55,7 +55,6 @@ Este documento é o contrato de aceitação entre mudanças, testes, diário e C
 | RG-36 | Autosave valida schemas e subestruturas antes de confiar nos dados; GPS rejeita coordenadas inválidas e não usa precisão desconhecida como evidência de distância. Estimativas MAF/MAP não retornam resultados não finitos nem usam temperatura absoluta impossível. | `merivaAutosave.test.js`, `gps.test.js`, `fuelConsumption.test.js`, `projectBaseline.test.js` |
 | RG-37 | Múltiplas instâncias que aguardam a mesma tentativa nativa RFCOMM devem revalidar o estado do rádio e reler o bloqueio compartilhado após cada espera; nenhum waiter pode abrir socket com base em uma observação de bloqueio anterior ao `await`. | `tests/regression.test.js` (três instâncias concorrentes), `tests/bluetoothLifecycle.test.js`, `tests/projectBaseline.test.js` |
 | RG-38 | GPS descarta coordenadas inválidas, timestamps não finitos/não positivos e fixes que não são temporalmente posteriores ao último fix válido. Nunca substitui timestamp inválido por `Date.now()`; amostra descartada não atualiza contagem, velocidade nem distância. | `tests/gps.test.js`, `tests/projectBaseline.test.js` |
-| RG-39 | CSV com cabeçalho/esquema estável usa append nativo, lê somente o cabeçalho e o último byte e não reescreve o histórico a cada flush. Reescrita completa só é permitida na migração explícita de esquema; falha de escrita mantém o lote pendente para retry. | `tests/regression.test.js` (`testRawLogger`, `testCsvWriteSerialization`), `tests/projectBaseline.test.js` |
 
 ## Regras para uma alteração legítima
 
