@@ -25,6 +25,7 @@ const liveTelemetry = read('src/obd/liveTelemetry.ts');
 const diagnostics = read('src/diagnostics/diagnosticEngine.ts');
 const sensorEngine = read('src/diagnostics/sensorTestEngine.ts');
 const projectContract = read('docs/CONTRATO_ANTI_REGRESSAO.md');
+const diary = read('docs/DIARIO_DE_BORDO.md');
 const theme = read('src/ui/theme.ts');
 
 // Gate itself must be a first-class CI step, not a note in the diary.
@@ -36,6 +37,14 @@ assert.equal(packageJson.scripts.validate, 'npm run typecheck && npm test');
 // Removing a test file from the script must fail this gate before merge.
 const requiredSuites = [
   'pidParserIntegrity.test.js',
+  'bluetoothRadioRecovery.test.js',
+  'pidFormulaBoundaries.test.js',
+  'dtcScanner.test.js',
+  'fuelConsumption.test.js',
+  'fuelIdentification.test.js',
+  'bluetoothConfig.test.js',
+  'bluetoothState.test.js',
+  'ecuHealth.test.js',
   'sensorTestEngine.test.js',
   'knowledgeJson.test.js',
   'cockpitNavigation.test.js',
@@ -88,6 +97,12 @@ assert.match(bluetoothTransport, /awaitNativeCleanupRetry/);
 assert.match(bluetoothTransport, /MAX_ELM_RX_BUFFER_CHARS\s*=\s*16\s*\*\s*1024/);
 assert.match(bluetoothTransport, /RX_DIAGNOSTIC_PREVIEW_CHARS\s*=\s*256/);
 assert.match(bluetoothTransport, /RX_BUFFER_OVERFLOW/);
+const bluetoothRadioPolicy = read('src/obd/bluetoothRadioRecovery.ts');
+assert.match(bluetoothTransport, /decideBluetoothRadioRecovery/);
+assert.match(read('src/obd/bluetoothManager.ts'), /getBluetoothRadioRecoveryStopReason/);
+assert.match(read('app/splash.tsx'), /getBluetoothRadioRecoveryStopReason/);
+assert.match(bluetoothRadioPolicy, /STOP_RADIO_STATE_UNKNOWN/);
+assert.match(projectContract, /\| RG-34 \|/, 'radio recovery must remain a documented acceptance invariant');
 assert.match(bluetoothTransport, /BUFFER RX ELM EXCEDIDO/);
 const pidDiscovery = read('src/obd/intelligentPidDiscovery.ts');
 assert.match(pidDiscovery, /responseBuffer:\s*responseBuffer\.snapshot\(\)/);
@@ -243,5 +258,20 @@ assert.ok(read('app/mais.tsx').includes('/manutencao'), 'manutenção e abasteci
 assert.match(read('src/maintenance/maintenanceRules.ts'), /evaluateMaintenance/);
 assert.match(read('src/database/maintenanceStorage.ts'), /writeMaintenanceData/);
 assert.ok(scriptedTests.has('maintenanceRules.test.js'), 'regras de manutenção precisam ser testadas pelo npm test');
+
+// The diary is part of the release contract: entries and the index must remain identical.
+const diaryEntryIds = [...diary.matchAll(/^#{1,4}\\s+(DB-\\d{3})\\b/gm)].map((match) => match[1]);
+const diaryIndexIds = [...diary.matchAll(/^- \\*\\*(DB-\\d{3})\\*\\*/gm)].map((match) => match[1]);
+assert.ok(diaryEntryIds.length > 0, 'o Diário de Bordo deve conter entradas DB-NNN');
+assert.equal(new Set(diaryEntryIds).size, diaryEntryIds.length, 'o diário contém IDs DB-NNN duplicados');
+for (let index = 0; index < diaryEntryIds.length; index++) {
+  assert.equal(
+    diaryEntryIds[index],
+    'DB-' + String(index + 1).padStart(3, '0'),
+    'as entradas do diário devem permanecer contínuas e ordenadas; erro na posição ' + (index + 1),
+  );
+}
+assert.deepEqual(diaryIndexIds, diaryEntryIds, 'o índice DB-NNN precisa corresponder exatamente às entradas do diário');
+
 console.log('Anti-regression baseline gate: PASS');
 console.log('Protected contracts: five-read sensor tests, manual PID flow, single ELM327 queue, offline diagnosis, Expo SDK 51, GPS/Trip, TXT/history and cockpit/graphs.');

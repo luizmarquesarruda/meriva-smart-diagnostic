@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Estabilidade Bluetooth Classic
+- Estado do rádio revalidado antes de cada socket RFCOMM; fallback/retry interrompido quando o Bluetooth está desligado ou o estado é indeterminado.
+- Causa nativa preservada na splash com opção de abrir o painel; CI não substitui teste físico do ELM327.
+
 ### Integridade OBD-II
 - Portada do protótipo Floot para a tela nativa `app/laboratorio.tsx` a seção visual de validação de fórmulas; a interface reutiliza `decodeFormula` e sinaliza que os valores-limite são casos matemáticos, não telemetria real.
 - Corrigidas as faixas máximas de plausibilidade dos PIDs 0106, 0107, 012D e 015D para aceitar os máximos matemáticos exatos das fórmulas padronizadas, sem arredondamento que rejeite uma resposta válida.

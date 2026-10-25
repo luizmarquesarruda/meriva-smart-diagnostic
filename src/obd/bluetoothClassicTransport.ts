@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import { ObdTransport } from './elm327';
 import { DEFAULT_ELM327_COMPATIBILITY, Elm327CompatibilityConfig, mergeCompatibilityConfig } from './elm327Compatibility';
 import { awaitNativeCleanupRetry, timedOutNativeAttemptStillPending, waitForNativeConnectAttempt } from './connectionRecovery';
+import { decideBluetoothRadioRecovery } from './bluetoothRadioRecovery';
 
 export interface BluetoothDeviceInfo {
   address: string;
@@ -258,6 +259,41 @@ export class BluetoothClassicTransport implements ObdTransport {
           try { await pendingSettlement; } catch { /* retry after failed native attempt */ }
         }
 
+        let radioEnabledBeforeSocket: boolean | null = null;
+        let radioStateBeforeSocketError: unknown = null;
+        try {
+          radioEnabledBeforeSocket = await RNBluetoothClassic.isBluetoothEnabled();
+        } catch (radioCause) {
+          radioStateBeforeSocketError = radioCause;
+        }
+        const beforeSocketDecision = decideBluetoothRadioRecovery(
+          radioEnabledBeforeSocket,
+          radioStateBeforeSocketError,
+        );
+        this.logDiagnostic('BLUETOOTH_ENABLED_BEFORE_SOCKET_ATTEMPT', {
+          radioEnabled: radioEnabledBeforeSocket,
+          decision: beforeSocketDecision,
+          secureSocket,
+        });
+        if (beforeSocketDecision !== 'CONTINUE') {
+          if (beforeSocketDecision === 'STOP_RADIO_OFF') {
+            lastCause = new Error('BLUETOOTH DESLIGADO DURANTE A CONEXÃO; ATIVE O BLUETOOTH E TENTE NOVAMENTE');
+            this.logDiagnostic('CONNECT_ABORT_BLUETOOTH_RADIO_OFF', { secureSocket });
+          } else {
+            const originalMessage = radioStateBeforeSocketError instanceof Error
+              ? radioStateBeforeSocketError.message
+              : String(radioStateBeforeSocketError ?? 'ESTADO INDETERMINADO');
+            lastCause = new Error(
+              'ESTADO DO BLUETOOTH NÃO PÔDE SER CONFIRMADO ANTES DO SOCKET RFCOMM. ' + originalMessage,
+            );
+            this.logDiagnostic('CONNECT_ABORT_RADIO_STATE_UNKNOWN', {
+              secureSocket,
+              error: lastCause.message,
+            });
+          }
+          break;
+        }
+
         this.logDiagnostic('CONNECT_ATTEMPT', {
           secureSocket,
           connectionType,
@@ -328,6 +364,42 @@ export class BluetoothClassicTransport implements ObdTransport {
           // or race a second RFCOMM socket against the same adapter.
           break;
         }
+
+        let radioEnabledAfterFailure: boolean | null = null;
+        let radioStateAfterFailureError: unknown = null;
+        try {
+          radioEnabledAfterFailure = await RNBluetoothClassic.isBluetoothEnabled();
+        } catch (radioCause) {
+          radioStateAfterFailureError = radioCause;
+        }
+        const afterFailureDecision = decideBluetoothRadioRecovery(
+          radioEnabledAfterFailure,
+          radioStateAfterFailureError ?? cause,
+        );
+        this.logDiagnostic('CONNECT_RADIO_STATE_AFTER_FAILURE', {
+          radioEnabled: radioEnabledAfterFailure,
+          decision: afterFailureDecision,
+          secureSocket,
+          ...(radioStateAfterFailureError instanceof Error ? { stateError: radioStateAfterFailureError.message } : {}),
+        });
+        if (afterFailureDecision !== 'CONTINUE') {
+          if (afterFailureDecision === 'STOP_RADIO_OFF') {
+            lastCause = new Error('BLUETOOTH DESLIGADO DURANTE A TENTATIVA RFCOMM. ATIVE O BLUETOOTH E TENTE NOVAMENTE.');
+            this.logDiagnostic('CONNECT_ABORT_BLUETOOTH_RADIO_OFF', { secureSocket });
+          } else {
+            const originalError = cause instanceof Error ? cause.message : String(cause);
+            lastCause = new Error(
+              'ESTADO DO BLUETOOTH NÃO PÔDE SER CONFIRMADO APÓS FALHA RFCOMM; RETENTATIVA CANCELADA. ' + originalError,
+            );
+            const radioStateError = lastCause as Error;
+            this.logDiagnostic('CONNECT_ABORT_RADIO_STATE_UNKNOWN', {
+              secureSocket,
+              error: radioStateError.message,
+            });
+          }
+          break;
+        }
+
         if (device) await this.safeDisconnect(device);
         device = null;
       }

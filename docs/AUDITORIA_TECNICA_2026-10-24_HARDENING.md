@@ -60,3 +60,23 @@ A CI é o critério final para o HEAD entregue. Os primeiros ciclos revelaram pr
 ## Política de integração
 
 Este trabalho está em branch e PR separados. Não houve merge nem alteração direta de `main`. A integração deve ocorrer apenas após CI final verde, revisão do diff e autorização de merge.
+
+## Continuidade da auditoria de estabilidade — 2026-10-25
+
+### Evidência de integração
+- A API informa `protected: false` para `main` e a listagem de rulesets retorna vazia. Checks obrigatórios na branch principal não estão confirmados; a consulta detalhada de proteção retornou 403 para a integração disponível e nenhuma regra foi alterada.
+- PR #89 e PR #90 alteravam os mesmos três arquivos de conexão/splash. CIs verdes em SHAs individuais não validavam a combinação. A recuperação de rádio está consolidada na #89 com política pura e teste determinístico.
+- PRs #82 e #83 dividem nove arquivos, discordam sobre navegação em paisagem e diferem entre 20 e 25 PIDs; #83 compartilha 17 arquivos com #89. A integração combinada continua pendente.
+- PR #81 usa DB-109 para o PID 0144; a branch #89 usa DB-109 para outra entrada. IDs são únicos por branch, mas não globalmente únicos ao combinar históricos independentes.
+
+### Correção Bluetooth
+- Criada política pura `src/obd/bluetoothRadioRecovery.ts` para rádio ligado, desligado e indeterminado, reconhecendo mensagens nativas como `mAdapter is not enabled`.
+- O transporte consulta o rádio antes de cada socket e depois de falha; fallback só continua se a chamada anterior terminou e o rádio foi confirmado ligado.
+- Manager interrompe retries quando o erro indica rádio desligado ou estado não confirmado; os logs reportam tentativas reais e a causa terminal.
+- Splash preserva a causa e permite abrir o painel manual.
+- Criado `tests/bluetoothRadioRecovery.test.js`; conectado ao `npm test` e ao gate. O gate também protege suítes críticas adicionais e a sequência/índice do diário.
+
+### Pendências
+- As execuções anteriores [run 40138131245](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40138131245) e [run 40171897065](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40171897065) foram verdes em SHAs anteriores. O novo SHA precisa da própria CI.
+- A proteção de `main` com required checks precisa ser configurada no GitHub; a integração atual não permite alterar branch protection (403).
+- Teste físico no Galaxy A06/Android 16 com ELM327 e ECU reais, descoberta de PIDs e autonomia em percurso continuam pendentes. Nenhum merge foi feito.

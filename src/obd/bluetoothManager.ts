@@ -5,6 +5,7 @@ import { ElmCommandResult, Elm327Session } from './elm327';
 import { parsePidResponse } from './parser';
 import { Elm327CompatibilityConfig, DEFAULT_ELM327_COMPATIBILITY, mergeCompatibilityConfig } from './elm327Compatibility';
 import { discoverIntelligentPids } from './intelligentPidDiscovery';
+import { getBluetoothRadioRecoveryStopReason } from './bluetoothRadioRecovery';
 import type { PidDiscoveryCache } from '../meriva/autosaveState';
 import bluetoothConfig from '../knowledge/bluetooth_config.json';
 import { requestBluetoothPermissionsOnly } from '../permissions/permissionManager';
@@ -157,6 +158,8 @@ export async function createRealElmSession(
   callbacks?: RealElmSessionCallbacks,
 ): Promise<RealElmConnection> {
   let lastCause: unknown = null;
+  let attemptsExecuted = 0;
+  let terminalReason = 'MAX_ATTEMPTS_REACHED';
   const config = mergeCompatibilityConfig({
     ...(compatibility ?? DEFAULT_ELM327_COMPATIBILITY),
     optionalAtTimeoutMs: compatibility?.optionalAtTimeoutMs ?? bluetoothConfig.initialization.optionalCommandTimeoutMs,
@@ -167,6 +170,7 @@ export async function createRealElmSession(
     : MAX_BLUETOOTH_ATTEMPTS;
 
   for (let attempt = 1; attempt <= effectiveMaxAttempts; attempt++) {
+    attemptsExecuted = attempt;
     logBluetoothDiagnostic('BLUETOOTH_ATTEMPT_START', {
       attempt,
       maxAttempts: effectiveMaxAttempts,
@@ -199,11 +203,23 @@ export async function createRealElmSession(
       return session;
     } catch (cause) {
       lastCause = cause;
+      const errorMessage = cause instanceof Error ? cause.message : String(cause);
       logBluetoothDiagnostic('BLUETOOTH_ATTEMPT_RESULT', {
         attempt,
         result: 'FAILURE',
-        error: cause instanceof Error ? cause.message : String(cause),
+        error: errorMessage,
       });
+
+      const radioStopReason = getBluetoothRadioRecoveryStopReason(cause);
+      if (radioStopReason) {
+        terminalReason = radioStopReason;
+        logBluetoothDiagnostic('BLUETOOTH_RETRY_STOPPED', {
+          attempt,
+          reason: radioStopReason,
+          error: errorMessage,
+        });
+        break;
+      }
 
       if (attempt === effectiveMaxAttempts) {
         break;
@@ -223,10 +239,10 @@ export async function createRealElmSession(
   }
 
   logBluetoothDiagnostic('BLUETOOTH_TEST_SESSION_END', {
-    attemptsTotal: effectiveMaxAttempts,
+    attemptsTotal: attemptsExecuted,
     successes: 0,
-    failures: effectiveMaxAttempts,
-    reason: 'MAX_ATTEMPTS_REACHED',
+    failures: attemptsExecuted,
+    reason: terminalReason,
   });
 
   throw lastCause instanceof Error

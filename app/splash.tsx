@@ -7,6 +7,7 @@ import * as FileSystem from 'expo-file-system';
 import { AppIcon } from '../src/ui/AppIcon';
 import { readAppSettings } from '../src/database/appSettings';
 import { connectPreferredElm, getSharedObdConnection, getSharedObdStatus } from '../src/obd/sharedConnection';
+import { getBluetoothRadioRecoveryStopReason } from '../src/obd/bluetoothRadioRecovery';
 
 const COLORS = { screen: '#07111f', accent: '#42d7f5' };
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -68,11 +69,20 @@ export default function StartupScreen() {
           await wait(250);
           if (!cancelled) router.replace('/');
           return;
-        } catch {
+        } catch (cause) {
+          const errorMessage = cause instanceof Error ? cause.message : String(cause);
           retry += 1;
           setAttempt(retry);
           if (retry >= 2) setCanContinue(true);
-          setMessage(connectionMessage());
+
+          // Rádio desligado ou estado indeterminado exige intervenção do usuário, não retry automático.
+          if (getBluetoothRadioRecoveryStopReason(cause)) {
+            setCanContinue(true);
+            setMessage(errorMessage);
+            return;
+          }
+
+          setMessage(errorMessage || connectionMessage());
           // Retentativa contínua com backoff limitado evita tempestade de conexões.
           await wait(Math.min(15_000, 1_000 * (2 ** Math.min(retry - 1, 4))));
         }

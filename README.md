@@ -125,7 +125,7 @@ O autosave usa arquivo temporário, valida o conteúdo e mantém uma cópia ante
 
 Na abertura do aplicativo, o sistema verifica suporte, solicita permissões, verifica o estado do Bluetooth, solicita ativação quando necessário e repete a verificação ao retornar ao aplicativo.
 
-O ELM327 deve estar previamente pareado no Android. O aplicativo escolhe automaticamente os candidatos pareados: primeiro nomes compatíveis com ELM/OBD e depois outros dispositivos Classic, aceitando somente o candidato que passa pela inicialização do ELM e pelo teste real 010C. A conexão usa Bluetooth Classic/RFCOMM e preserva o prompt > para o parser do ELM.
+O ELM327 deve estar previamente pareado no Android. O aplicativo escolhe automaticamente os candidatos pareados: primeiro nomes compatíveis com ELM/OBD e depois outros dispositivos Classic, aceitando somente o candidato que passa pela inicialização do ELM e pelo teste real 010C. A conexão usa Bluetooth Classic/RFCOMM e preserva o prompt > para o parser do ELM. O estado do rádio é revalidado antes de cada socket; se estiver desligado ou não puder ser confirmado, o fallback e os retries são interrompidos com erro explícito, sem iniciar outra conexão concorrente. Reative o Bluetooth no Android e tente novamente pelo painel.
 
 ## Testes
 

@@ -1,35 +1,25 @@
-# Diário de Bordo - Meriva Smart Diagnostic
+## ESTADO VIGENTE — 2026-10-25 (auditoria de estabilidade DB-126)
 
-## ESTADO VIGENTE — 2026-10-24 (auditoria histórica DB-125)
+> Estado consultado no GitHub em 25/10/2026. Este diário acompanha a branch de consolidação #89; não representa merge em `main`. CI verde por branch isolada não comprova integração combinada nem teste físico.
 
-> Estado conferido no GitHub em 24/10/2026. Este diário está na branch da PR #89; não altera `main`. CI verde em branches separadas não comprova o merge combinado e não substitui testes físicos.
-
-### `main` e última integração confirmada
+### `main` e proteção de integração
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
-- `main`: `701474de2cb3ed8a617a66d87fe3b5e368366acb`.
-- CI do `main`: [run 39985825746 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/39985825746).
-- [PR #80 — limites e validação das fórmulas OBD-II](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/80) é a última PR recente de código confirmada como mesclada. As demais PRs listadas abaixo continuam abertas e não estão em `main`.
+- SHA de `main` observado antes desta rodada: `701474de2cb3ed8a617a66d87fe3b5e368366acb`.
+- A API informa `protected: false` e a listagem de rulesets retorna vazia. Checks obrigatórios na branch principal não estão confirmados. A consulta detalhada de proteção foi negada pela integração (403), portanto não foi alterada.
+- PR #80 é a última integração de código confirmada. Nenhuma correção desta rodada foi mesclada em `main`.
 
-### PRs abertas, HEADs e CI consultadas
-- [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81): draft, head `5ece9c7da470bb56ca7687826fc17df2c00cefab`; [run 40007637159 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40007637159).
-- [#82 — navegação responsiva](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/82): draft, head `d4bae6f794d78e59bb7c1323e11deb2978eefa92`; [run 40039535306 — `validate` e `android-build` passaram](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40039535306). Mantém navegação inferior em retrato e propõe uma coluna lateral à esquerda em paisagem, com 56 dp reservados no quadro.
-- [#83 — layout Floot para Android](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83): aberta, head `85078c2aacd4ff7427b5ded7c1b1ce0e1f6803cf`; [run 40098343069 — `validate` e `android-build` passaram](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40098343069). Mantém uma barra inferior horizontal compacta na paisagem; isso difere da coluna lateral da #82, não sendo uma sobreposição comprovada.
-- [#84 — inventário de 34 PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84): aberta, head `3c60528017d37744954d2430fca9737ee78a71bd`; [run 40089022363 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40089022363).
-- [#85 — reconciliação documental](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/85): aberta, head `969aa89276c0c9ce43489244779dd09069c8fbc8`; [run 40122820230 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40122820230).
-- [#86 — descoberta OBD e latência](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/86): aberta, head `9f12e54aa1b8f32f0e293cf775f9cbcc80544c04`; [run 40124875595 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40124875595).
-- [#87 — integridade do parser e autonomia](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/87): aberta, head `2997136881dc27bfbed37c12babc6c7ff5b4343e`; [run 40122815647 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40122815647).
-- [Issue #88 — migração gradual do Expo SDK 51](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/issues/88): aberta; manter separada do hardening OBD e persistência.
-- [#89 — consolidação da auditoria e hardening](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/89): draft. HEAD auditado antes deste novo registro: `931973310f955a8d527401d51c33b7d55feb79e7` (DB-124); [run 40135579130 — validate e android-build aprovados](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40135579130) e [run 40135575547 — push CI aprovada](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40135575547). O novo registro DB-125 cria um SHA posterior e exige nova CI.
+### PRs ativas e conflitos de integração
+- [#89 — consolidação da auditoria/hardening](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/89): branch desta auditoria; SHA anterior `73df16b3c7606595806d67c14c2f95f7fae37e2e`, com [run 40138131245 — validate e android-build aprovados](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40138131245). Este commit muda o SHA e exige nova CI.
+- [#90 — recuperação Bluetooth Android 16](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/90): [run 40171897065 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40171897065) no SHA anterior. A lógica está sendo consolidada na #89 para evitar duas propostas nos mesmos três arquivos; a branch é preservada como referência.
+- [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81): aberta; DB-109 desta branch significa PID 0144, enquanto DB-109 na #89 tem outro conteúdo. Deve ser renumerada/sincronizada sobre a sequência consolidada antes de integrar.
+- [#82 — navegação responsiva](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/82), [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) e [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84) seguem abertas. #82 e #83 dividem nove arquivos e discordam sobre a navegação em paisagem e a política de 20 versus 25 PIDs; #83 compartilha 17 arquivos com #89. CI verde isolada não resolve esses conflitos.
+- PRs #85, #86 e #87 estão fechadas sem merge; o conteúdo dessas branches não se considera integrado apenas porque foram encerradas. Partes das correções foram reconciliadas na #89 conforme o diff.
 
-### Conclusões atualizadas da releitura das PRs de layout
-- **#82:** navegação inferior no retrato e coluna lateral em paisagem; `screenFrameLandscape` reserva 56 dp à esquerda e o teste verifica essa regra. A CI está verde isoladamente.
-- **#83:** mantém a barra horizontal de seis ícones no rodapé também em paisagem, com estilo mais compacto. O arquivo não posiciona essa barra absolutamente à esquerda, portanto a acusação anterior de sobreposição não se sustenta; a diferença real é o padrão de navegação em paisagem.
-- **Prévia de layout:** `app/floot-layout.tsx` está sob o diretório de rotas do Expo Router e renderiza estado de demonstração estático. Confirmar se essa rota é intencional para o produto; se for apenas ferramenta de revisão, removê-la/movê-la para fora de `app/` antes da publicação.
-- **Origem do rótulo do veículo:** o cabeçalho da #83 mostra literalmente `MERIVA MAXX 1.4`. O serviço atual `ensureMerivaVehicleProfile()` também normaliza o perfil para Meriva Maxx/ano do manual; o rótulo coincide com o perfil padrão, mas duplica a fonte de verdade e diverge da promessa do README de perfis configuráveis. Definir se o app será específico da Meriva ou se o cabeçalho deve refletir um perfil variável.
-- **Catálogo de PIDs:** #82 aumenta a política do cockpit de 20 para 25 candidatos; #83 conserva testes e política de 20. Não combinar as branches sem reconciliar a lista, o limite e as expectativas dos testes.
-- **Arquivos compartilhados:** #82 e #83 têm propostas concorrentes para `app/index.tsx). A #83 compartilha 17 arquivos com #89, incluindo parser, serviço de viagem, catálogo, contratos e testes; revisar esses arquivos preservando o hardening da #89.
-- **Limites da CI:** as execuções verdes verificam os SHAs individuais. Não comprovam o resultado de um merge combinado, inspeção visual do APK ou comportamento real da ECU.
-
+### Critério de aceitação
+- A suíte protege fórmulas, parser, DTC, consumo, combustível, Bluetooth, autonomia, persistência, GPS, navegação e histórico.
+- O diário deve manter IDs DB-NNN únicos, contínuos e na mesma ordem do índice. Qualquer combinação de branches deve reconciliar numeração antes de integração.
+- Nenhuma PR deve ser mesclada sem diff final contra `main`, CI do SHA exato com `validate` e `android-build` verdes e reconciliação dos arquivos compartilhados.
+- Teste físico do Galaxy A06/Android 16 + ELM327 e validação da ECU são etapas separadas.
 
 ---
 
@@ -200,6 +190,13 @@
 - **DB-117** · 2026-10-24 — Integridade de checksum K-Line e enquadramento de DTC
 - **DB-118** · 2026-10-24 — Persistência segura de viagens, CSV, cota e backups
 - **DB-119** · 2026-10-24 — Validação profunda do autosave, GPS e estimativas de combustível
+- **DB-120** · 2026-10-24 — Descoberta rápida e integridade de quadros OBD
+- **DB-121** · 2026-10-24 — Releitura integral do diário e reconciliação das PRs mais recentes
+- **DB-122** · 2026-10-24 — Confirmação das CI e revisão das PRs de layout
+- **DB-123** · 2026-10-24 — Correção da atribuição de layout após releitura direta da PR #83
+- **DB-124** · 2026-10-24 — Delimitação do risco de modelo fixo no layout
+- **DB-125** · 2026-10-24 — Auditoria retrospectiva das PRs, CI e diário desde o início
+- **DB-126** · 2026-10-25 — Auditoria de estabilidade, rádio Bluetooth e controle de regressões
 
 ---
 
@@ -3868,3 +3865,34 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 6. Atualizar a seção vigente e o índice quando houver novo SHA validado; manter a história anterior e rotular claramente o que permanece fora de `main`.
 
 **Resultado DB-125:** auditoria retrospectiva documental/CI e validação do protótipo concluídas dentro do acesso disponível. A auditoria de integração combinada, visual em aparelho e hardware físico permanece pendente. Nenhum merge foi feito.
+
+## DB-126 · 2026-10-25 — Auditoria de estabilidade, rádio Bluetooth e controle de regressões
+
+### Achados confirmados
+- O diário da branch de hardening tinha 125 entradas sequenciais e índice correspondente. O índice, porém, terminava em DB-119 e omitia DB-120 a DB-125. Isso é uma regressão documental objetiva; agora a proteção automatizada exige o mesmo conjunto e a mesma ordem.
+- Branches de PR independentes reutilizaram DB-109 para conteúdos distintos: #81 (PID 0144), #82 (navegação responsiva), #83 (layout Floot) e #89 (auditoria). O conflito surge ao combinar históricos independentes.
+- `main` foi reportada como não protegida (`protected: false`) e sem rulesets; a CI não está confirmada como requisito obrigatório de integração.
+- #89 e #90 alteravam os mesmos três arquivos Bluetooth/splash. CIs antigas verdes em SHAs diferentes não validavam a combinação.
+- #82 e #83 dividem nove arquivos e propõem navegação diferente, além de política de 20 versus 25 PIDs. #83 compartilha 17 arquivos com #89. Esses conflitos ficam pendentes, sem merge automático.
+
+### Correções nesta branch
+- Criada `src/obd/bluetoothRadioRecovery.ts` como política pura para reconhecer rádio desligado, estado indeterminado e erros nativos equivalentes.
+- `src/obd/bluetoothClassicTransport.ts` verifica o rádio antes de cada socket RFCOMM e após falha. Fallback só segue quando a tentativa anterior terminou e o rádio foi confirmado ligado.
+- `src/obd/bluetoothManager.ts` interrompe retry ao identificar rádio desligado ou estado não confirmado; os logs informam tentativas executadas e causa terminal.
+- `app/splash.tsx` preserva a mensagem nativa e disponibiliza a abertura manual do painel.
+- Criado `tests/bluetoothRadioRecovery.test.js`; conectado ao `npm test` e ao gate.
+- O gate protege suítes críticas adicionais e valida IDs do diário sem duplicação/lacuna e com índice sincronizado.
+- Atualizados RG-34, plano BT-RADIO-01, README, changelog e auditoria técnica.
+
+### Validação e limites
+- SHA anterior de #89: `73df16b3c7606595806d67c14c2f95f7fae37e2e`; [CI run 40138131245](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40138131245), ambos os jobs verdes. Esta alteração cria SHA novo e exige a própria CI.
+- A proteção de `main` com required checks segue pendente porque a integração disponível não tem permissão para alterar branch protection (403).
+- O teste da política é determinístico; não substitui teste do Galaxy A06/Android 16 com ELM327/ECU reais. Teste físico, confirmação de PIDs e autonomia em percurso permanecem pendentes.
+- Nenhum merge executado.
+
+### Matriz mínima antes de integrar
+1. Atualizar PR candidata sobre o head efetivamente integrado e revalidar a sequência do diário.
+2. Comparar o diff agregado #81–#84 e #89; resolver arquivos comuns de #82/#83 e #83/#89 sem remover contratos.
+3. Executar gate, TypeScript, suíte completa e build Android no SHA final combinado.
+4. Instalar o APK e validar Bluetooth, splash, navegação, resposta 010C e apenas PIDs anunciados/respondidos pela ECU.
+

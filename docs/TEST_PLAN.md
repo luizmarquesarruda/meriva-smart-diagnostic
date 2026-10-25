@@ -33,6 +33,13 @@ A branch mantém o fluxo OBD/ELM327 existente e inclui testes automatizados para
 - **OTA, analytics, crash reporting e login:** são decisões de arquitetura e privacidade; não habilitar implicitamente durante um lote de UX.
 - **Testes E2E:** Detox/Appium não devem ser declarados instalados ou executados até que dependências, configuração nativa, fixture de transporte OBD simulado e workflow estejam presentes e validados.
 
+## BT-RADIO-01 — Rádio Bluetooth desligado ou indeterminado
+- Antes de cada tentativa RFCOMM, confirmar o estado do rádio; desligado interrompe a tentativa antes de criar socket.
+- Após falha da chamada nativa, só permitir fallback se o rádio continuar confirmado como ligado e a chamada anterior não estiver pendente.
+- Estado indeterminado interrompe o fallback; erro nativo de rádio desligado ou estado desconhecido interrompe retries no manager e no splash.
+- A splash preserva a mensagem real e oferece abrir o painel sem declarar a ECU conectada.
+- Testes determinísticos: `tests/bluetoothRadioRecovery.test.js`; contratos de integração: `tests/projectBaseline.test.js`; validação final do Bluetooth Classic exige aparelho Android e ELM327 reais.
+
 ## Sequência de validação para um lote
 
 1. Inspecionar o diff consolidado e confirmar que nenhuma dependência/lockfile foi alterada sem justificativa.
