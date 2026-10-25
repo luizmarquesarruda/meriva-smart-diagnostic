@@ -322,6 +322,22 @@ export class BluetoothClassicTransport implements ObdTransport {
           // or race a second RFCOMM socket against the same adapter.
           break;
         }
+
+        // Do not attempt the secure-socket fallback after Android has turned
+        // the radio off. That fallback can only produce a misleading native
+        // "mAdapter is not enabled" error and may obscure the first failure.
+        let radioEnabled = false;
+        try {
+          radioEnabled = await RNBluetoothClassic.isBluetoothEnabled();
+        } catch {
+          // Preserve the original connection error when radio state is unreadable.
+        }
+        this.logDiagnostic('CONNECT_RADIO_STATE_AFTER_FAILURE', { radioEnabled, secureSocket });
+        if (!radioEnabled) {
+          lastCause = new Error('BLUETOOTH DESLIGADO DURANTE A TENTATIVA RFCOMM. ATIVE O BLUETOOTH E TENTE NOVAMENTE.');
+          this.logDiagnostic('CONNECT_ABORT_BLUETOOTH_DISABLED', { secureSocket });
+          break;
+        }
         if (device) await this.safeDisconnect(device);
         device = null;
       }
