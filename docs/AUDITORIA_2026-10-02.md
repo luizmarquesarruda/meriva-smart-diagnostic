@@ -1,5 +1,8 @@
 # Auditoria do repositório: 2026-10-02
 
+
+> **Referência técnica vigente (2026-10-24):** este documento é histórico/contextual. Para as definições atuais, nomes, bytes, unidades, fórmulas e limites de evidência dos PIDs, consulte [Mapa de PIDs e fórmulas](PID_FORMULA_MAP_2026-10-24.md) e [Auditoria de fontes da Meriva × OBD](MERIVA_OBD_SOURCE_AUDIT_2026-10-24.md). O manual do proprietário não confirma o suporte de PIDs pela ECU; a única resposta `RAW_ECU` específica hoje registrada é `010C`.
+
 ## Escopo
 
 Revisão do código rastreado no branch principal e da integração GPS subsequente, incluindo UI Expo Router, Bluetooth Classic, sessão ELM327, parser e PIDs, DTC, persistência, autosave, ciclos, storage, testes, CI e documentação.
