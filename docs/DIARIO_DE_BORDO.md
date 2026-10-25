@@ -1,4 +1,4 @@
-## ESTADO VIGENTE — 2026-10-25 (auditoria de estabilidade DB-129)
+## ESTADO VIGENTE — 2026-10-25 (auditoria de estabilidade DB-130)
 
 > Estado consultado no GitHub em 25/10/2026. Este diário acompanha a branch de consolidação #89; não representa merge em `main`. CI verde por branch isolada não comprova integração combinada nem teste físico.
 
@@ -200,6 +200,7 @@
 - **DB-127** · 2026-10-25 — CI como auditoria de regressão e cobertura completa das suítes
 - **DB-128** · 2026-10-25 — Revalidar bloqueio RFCOMM após cada espera e corrigir IDs RG duplicados
 - **DB-129** · 2026-10-25 — GPS rejeita timestamps inválidos e fora de ordem
+- **DB-130** · 2026-10-25 — CSV usa append nativo no caminho comum
 
 ---
 
@@ -3949,3 +3950,19 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 ### Validação
 - A validação do SHA anterior `76360ad15466e5e7b0cb64a1b68e33d1814e5ee1` tinha `validate` verde e `android-build` ainda em execução. Esta correção gera novo SHA e exige uma execução CI completa própria; resultados anteriores não contam como aprovação.
 - Teste físico de GPS e validação ELM327/ECU continuam pendentes. Nenhum merge foi executado.
+
+## DB-130 · 2026-10-25 — CSV usa append nativo no caminho comum
+
+### Achado confirmado
+- `src/database/csvLogger.ts` afirmava que o FileSystem legado do Expo SDK 51 não tinha append nativo. A opção `append` está disponível em `writeAsStringAsync`; o comportamento anterior relia e regravava todo o histórico em cada flush quando o cabeçalho não mudava.
+- Conforme o histórico de telemetria cresce, isso multiplica leitura/escrita e alocação de memória.
+
+### Correção
+- O caminho de esquema estável valida o tamanho, lê o cabeçalho e o último byte para preservar a quebra de linha e grava com `append: true`.
+- Migração de esquema continua lendo todas as linhas e reescrevendo explicitamente as colunas, preservando os registros antigos.
+- O mock de filesystem mede leituras integrais e append; os testes provam que a gravação comum não relê o arquivo inteiro, que append nativo é usado e que falha de escrita mantém o lote para retry.
+- RG-39, CSV-01, baseline, README, changelog e auditoria foram atualizados.
+
+### Validação
+- O SHA anterior `8ca18ce0103d949580a56dd158e8b993aa69e1ac` tinha `validate` concluída com sucesso e `android-build` em andamento. Esta alteração gera novo SHA e exige CI própria; resultados anteriores não contam como aprovação.
+- Nenhum merge foi executado. Testes em aparelho e ELM327/ECU continuam níveis de validação independentes.
