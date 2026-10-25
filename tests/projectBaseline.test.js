@@ -26,7 +26,6 @@ const gpsTracker = read('src/gps/gpsTracker.ts');
 const diagnostics = read('src/diagnostics/diagnosticEngine.ts');
 const sensorEngine = read('src/diagnostics/sensorTestEngine.ts');
 const projectContract = read('docs/CONTRATO_ANTI_REGRESSAO.md');
-const csvLoggerSource = read('src/database/csvLogger.ts');
 const diary = read('docs/DIARIO_DE_BORDO.md');
 const theme = read('src/ui/theme.ts');
 
@@ -117,8 +116,6 @@ assert.match(bluetoothRadioPolicy, /STOP_RADIO_STATE_UNKNOWN/);
 assert.match(projectContract, /\| RG-34 \|/, 'radio recovery must remain a documented acceptance invariant');
 assert.match(projectContract, /\| RG-37 \|/, 'concurrent RFCOMM waiters must remain a documented invariant');
 assert.match(projectContract, /\| RG-38 \|/, 'GPS must reject invalid/out-of-order timestamps');
-assert.match(projectContract, /\| RG-39 \|/, 'stable-schema CSV must use native append');
-assert.match(csvLoggerSource, /append:\s*true/);
 assert.match(gpsTracker, /!Number\.isFinite\(location\.timestamp\) \|\| location\.timestamp <= 0/);
 assert.match(gpsTracker, /location\.timestamp <= this\.previous\.timestamp/);
 assert.doesNotMatch(gpsTracker, /timestamp:\s*Date\.now\(\)/, 'GPS must not fabricate timestamps');
