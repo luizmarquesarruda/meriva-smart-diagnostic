@@ -10,6 +10,8 @@ Versão: 1.0.1 | Plataforma: Android | Transporte: Bluetooth Classic | ECU: OBD-
 
 O projeto prioriza dados reais, rastreabilidade e diagnóstico explicável. Uma resposta ausente não vira um valor inventado. No cockpit, a cidade e o bairro alternam em intervalos de 10 s quando os dois rótulos estão disponíveis; anomalia de temperatura mantém o indicador térmico em destaque.
 
+A navegação do cockpit segue o layout visual de referência do Floot: seis ícones de 32 dp, uniformemente distribuídos, sem legendas visíveis e com nomes acessíveis. Os destinos são Painel, Conexões, Diagnóstico, Viagem, Laboratório e Configurações. Dados/telemetria e Mais Recursos continuam disponíveis nas telas secundárias. A alteração é visual/navegacional e não substitui nem simula a conexão ELM327/ECU real.
+
 O GPS do celular tenta iniciar ao abrir o aplicativo quando autorizado. Negar localização limita clima, velocidade/distância GPS e gravação de percurso, mas não deve impedir a conexão Bluetooth/ECU nem a consulta manual OBD. Ele fornece velocidade e distância em primeiro plano, mesmo quando a ECU não oferece o PID 015E. A gravação de litros e consumo depende de taxa de combustível OBD válida. Litros consumidos só entram no cálculo quando a ECU fornece uma taxa de combustível válida pelo PID OBD 015E. O GPS sozinho não mede litros. O aplicativo não aceita litros digitados manualmente na tela principal.
 
 Bluetooth Classic exige build nativo Android. Expo Go não é o ambiente de validação do transporte.
@@ -19,6 +21,16 @@ Bluetooth Classic exige build nativo Android. Expo Go não é o ambiente de vali
 A rota operacional `app/splash.tsx` é a entrada inicial: tenta conectar ao ELM327 pareado, valida uma resposta real da ECU e executa a descoberta determinística por bitmap na fila serial compartilhada. O cache de uma sessão anterior só prioriza os candidatos; a ECU atual anuncia suporte e precisa devolver resposta individual válida para cada PID operacional. A splash abre o cockpit após a descoberta, sem repetir cinco leituras de cada PID; as cinco amostras sequenciais permanecem no teste de sensores. A duração total, latência, status e resposta bruta dos comandos de descoberta ficam no diagnóstico Bluetooth (`PID_DISCOVERY_COMMAND_RESULT`/`PID_DISCOVERY_SUMMARY`). Em caso de falha de conexão, continua tentando com espera progressiva e, após tentativas repetidas, permite abrir o painel para configurar a conexão manualmente. Quando `autoConnectObd` está desativado nas configurações, pula as tentativas automáticas.
 
 A splash nativa usa o asset transparente `assets/splash.png` e o plugin `expo-splash-screen` configurado explicitamente em `app.json` com fundo `#07111f`, largura de 280 dp e `resizeMode: contain`. A configuração legada `expo.splash` aponta para o mesmo PNG. O baseline confirma o caminho e a assinatura do arquivo; antes de publicar, ainda é obrigatório instalar um APK de release e validar a inicialização fria em Android real. O contrato é protegido por `tests/projectBaseline.test.js` e RG-18 em `docs/CONTRATO_ANTI_REGRESSAO.md`.
+
+## Documentação técnica e compatibilidade dos PIDs
+
+A referência do carro e a definição OBD são fontes diferentes. Os manuais oficiais da [Meriva 2011](https://www.chevrolet.com.br/content/dam/chevrolet/south-america/brazil/portuguese/index/services/owner-manuals/05-pdf/meriva/manual-meriva-2011.pdf) e [Meriva 2012](https://www.chevrolet.com.br/content/dam/chevrolet/south-america/brazil/portuguese/index/services/owner-manuals/05-pdf/meriva/manual-meriva-2012.pdf) documentam operação, advertências e manutenção, mas não listam os PIDs OBD-II suportados pela ECU. O catálogo local contém definições SAE genéricas; isso não significa que os 34 PIDs estejam disponíveis neste veículo.
+
+- [Auditoria documental Meriva × OBD/PIDs](docs/MERIVA_OBD_SOURCE_AUDIT_2026-10-24.md): fontes, limites, diferenças entre padrão e suporte real e revisão bit a bit do PID 0101.
+- [Mapa de PIDs e fórmulas](docs/PID_FORMULA_MAP_2026-10-24.md): bytes, fórmulas, unidades, faixas e evidência específica disponível.
+- [Relatório de PIDs e fórmulas](docs/RELATORIO_PIDS_E_FORMULAS.md): resumo técnico histórico com link para o mapa vigente.
+
+Só uma resposta individual válida da ECU na sessão atual pode promover um PID de catálogo para evidência de resposta; bitmap anuncia suporte, mas não comprova a leitura nem a exatidão física do sensor. O inventário vigente registra `010C` como único PID com RAW_ECU documentada.
 
 ## Manutenção e abastecimento
 
