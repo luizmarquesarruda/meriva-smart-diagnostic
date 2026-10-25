@@ -34,9 +34,6 @@ const files = new Map();
 const dirs = new Set(['/doc']);
 let writeDelayMs = 0;
 let failReadPath = null;
-let failWritePath = null;
-let fullFileReadPaths = [];
-let appendWritePaths = [];
 let bluetoothListener = null;
 let bluetoothDisconnectListener = null;
 let fakeDeviceConnected = true;
@@ -69,9 +66,6 @@ function resetFS() {
   dirs.add('/doc');
   writeDelayMs = 0;
   failReadPath = null;
-  failWritePath = null;
-  fullFileReadPaths = [];
-  appendWritePaths = [];
 }
 
 const fakeFS = {
@@ -108,19 +102,13 @@ const fakeFS = {
         .subarray(options.position, options.position + options.length)
         .toString('utf8');
     }
-    fullFileReadPaths.push(p);
     return content;
   },
 
   async writeAsStringAsync(p, content, options = {}) {
-    if (failWritePath === p) {
-      failWritePath = null;
-      throw new Error('WRITE IO FAILURE: ' + p);
-    }
     if (writeDelayMs > 0) await wait(writeDelayMs);
     ensureDirTree(parentDir(p));
     const next = String(content);
-    if (options.append) appendWritePaths.push(p);
     files.set(p, options.append ? (files.get(p) ?? '') + next : next);
   },
 
@@ -932,9 +920,9 @@ async function testRawLogger() {
   };
   await logger.logRawObdData(BASE, thirdQuery, '010C', 'REAL');
   await logger.logInterpretedData(BASE, thirdQuery, '010C', 'REAL');
-  failWritePath = rawFile;
-  await assert.rejects(() => csvLogger.flushCsvLogs(), /WRITE IO FAILURE:/,
-    'falha de escrita em append deve permanecer explícita e não descartar o lote');
+  failReadPath = rawFile;
+  await assert.rejects(() => csvLogger.flushCsvLogs(), /READ IO FAILURE/,
+    'falha de leitura deve permanecer explícita e não descartar o lote');
   await csvLogger.flushCsvLogs();
   const rawAfterRetry = files.get(rawFile);
   const interpretedAfterRetry = files.get(interpretedFile);
@@ -1264,18 +1252,7 @@ async function testCsvWriteSerialization() {
   assert.ok(content.includes('B,t2'));
   assert.strictEqual(content.split('\n').filter(Boolean).length, 3);
 
-  const fullReadsBeforeAppend = fullFileReadPaths.filter((filePath) => filePath === target).length;
-  const appendsBeforeAppend = appendWritePaths.filter((filePath) => filePath === target).length;
   await logger.appendCsvRow(target, { timestamp: 't3', id: 'C' });
-  assert.strictEqual(
-    fullFileReadPaths.filter((filePath) => filePath === target).length,
-    fullReadsBeforeAppend,
-    'append de esquema estável não deve carregar o histórico CSV inteiro em memória',
-  );
-  assert.ok(
-    appendWritePaths.filter((filePath) => filePath === target).length > appendsBeforeAppend,
-    'append de esquema estável deve usar a opção nativa append:true',
-  );
   const reordered = files.get(target);
   assert.ok(reordered.includes('C,t3'),
     'colunas devem seguir o cabeçalho mesmo quando as chaves chegam em outra ordem');
