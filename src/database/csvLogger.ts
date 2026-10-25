@@ -115,17 +115,20 @@ async function writeRowsUnsafe(filePath: string, rows: CsvRow[]): Promise<void> 
     return;
   }
 
-  // Validate the existing header before writing. The SDK 51 legacy filesystem
-  // API has no native append option, so ordinary flushes preserve rows by
-  // reading and rewriting the current file. Large daily files may eventually
-  // benefit from a supported native append API or segmented log format.
+  // Read only the header and file size for the common stable-schema path.
+  // The SDK 51 legacy API supports append:true; do not rewrite the growing log
+  // at every batch flush. Full reads are reserved for explicit schema migration.
+  const fileSize = info.size;
+  if (typeof fileSize !== 'number' || !Number.isFinite(fileSize) || fileSize < 0) {
+    throw new Error('CSV_SIZE_UNAVAILABLE: ' + filePath);
+  }
   const headerPreview = await FileSystem.readAsStringAsync(filePath, {
     encoding: FileSystem.EncodingType.UTF8,
     position: 0,
     length: 8192,
   });
   const firstNewline = headerPreview.indexOf('\n');
-  if (firstNewline < 0 && (info.size ?? 0) > headerPreview.length) {
+  if (firstNewline < 0 && fileSize > headerPreview.length) {
     throw new Error('CSV_HEADER_EXCEEDS_READ_WINDOW: ' + filePath);
   }
   const headerLine = (firstNewline >= 0
@@ -165,15 +168,18 @@ async function writeRowsUnsafe(filePath: string, rows: CsvRow[]): Promise<void> 
   }
 
   const lines = rows.map((row) => serializeRow(row, oldHeaders));
-  // Expo SDK 51's legacy API has no supported append option. Rewrite the
-  // existing content plus this batch so a flush cannot silently replace the
-  // previous rows with only the newest batch.
-  const current = await FileSystem.readAsStringAsync(filePath, {
+  // Read only the final byte to preserve row framing, then use native append.
+  const tail = fileSize > 0
+    ? await FileSystem.readAsStringAsync(filePath, {
+        encoding: FileSystem.EncodingType.UTF8,
+        position: fileSize - 1,
+        length: 1,
+      })
+    : '';
+  const separator = fileSize > 0 && !tail.endsWith('\n') ? '\n' : '';
+  await FileSystem.writeAsStringAsync(filePath, `${separator}${lines.join('\n')}\n`, {
     encoding: FileSystem.EncodingType.UTF8,
-  });
-  const separator = current.length > 0 && !current.endsWith('\n') ? '\n' : '';
-  await FileSystem.writeAsStringAsync(filePath, `${current}${separator}${lines.join('\n')}\n`, {
-    encoding: FileSystem.EncodingType.UTF8,
+    append: true,
   });
 }
 function scheduleBatchFlush(): void {
