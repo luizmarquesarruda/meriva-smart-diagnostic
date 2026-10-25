@@ -260,8 +260,8 @@ assert.match(read('src/database/maintenanceStorage.ts'), /writeMaintenanceData/)
 assert.ok(scriptedTests.has('maintenanceRules.test.js'), 'regras de manutenção precisam ser testadas pelo npm test');
 
 // The diary is part of the release contract: entries and the index must remain identical.
-const diaryEntryIds = [...diary.matchAll(/^#{1,4}\\s+(DB-\\d{3})\\b/gm)].map((match) => match[1]);
-const diaryIndexIds = [...diary.matchAll(/^- \\*\\*(DB-\\d{3})\\*\\*/gm)].map((match) => match[1]);
+const diaryEntryIds = [...diary.matchAll(/^#{1,4}\s+(DB-\d{3})\b/gm)].map((match) => match[1]);
+const diaryIndexIds = [...diary.matchAll(/^- \*\*(DB-\d{3})\*\*/gm)].map((match) => match[1]);
 assert.ok(diaryEntryIds.length > 0, 'o Diário de Bordo deve conter entradas DB-NNN');
 assert.equal(new Set(diaryEntryIds).size, diaryEntryIds.length, 'o diário contém IDs DB-NNN duplicados');
 for (let index = 0; index < diaryEntryIds.length; index++) {
