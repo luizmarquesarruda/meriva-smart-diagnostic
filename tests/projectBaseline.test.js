@@ -261,7 +261,9 @@ assert.ok(!tripService.includes('estimatedRangeKm: persistedAutonomy.estimatedRa
 assert.match(dataScreen, /const currentAutonomyKm = getCurrentAutonomyRangeKm\(\{/);
 assert.match(dataScreen, /label="AUTONOMIA" value=\{currentAutonomyKm != null \? currentAutonomyKm\.toFixed\(0\) \+ ' km' : 'N\/D'\}/,
   'Dados deve apresentar apenas a autonomia recalculada a partir de nível de combustível atual e válido');
-assert.match(dataScreen, /trip\.fuelLevelPercent === 0 && trip\.fuelLevelReadAtMs != null/,
+assert.match(dataScreen, /const currentAutonomyKm = getCurrentAutonomyRangeKm\(\{/);
+assert.match(read('tests/autonomyPresentation.test.js'), /assert\.strictEqual\(getCurrentAutonomyRangeKm\(\{ \.\.\.valid, fuelLevelPercent: 0 \}\), 0,/,
+  'uma amostra válida de tanque vazio deve resultar em autonomia 0 km, não N/D');
   'a current, valid empty-tank reading must show 0 km instead of N/D');
 assert.match(laboratory, /fuelLevelPercent === 0/,
   'laboratory autonomy must distinguish a valid zero range from unavailable data');
