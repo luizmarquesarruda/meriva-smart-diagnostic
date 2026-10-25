@@ -95,6 +95,14 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 - Antes desse limiar, usar apenas uma média histórica positiva válida; se não existir, apresentar N/D, nunca transformar amostra insuficiente em consumo alto.
 - CI automatizada não substitui teste físico com ELM327/ECU; validar no veículo a resposta real do PID 012F e a estabilidade da autonomia.
 
+## NET-WEATHER-01 — Atualização de localização/clima por conectividade
+- Com internet disponível em Wi-Fi ou rede celular (4G/5G), carregar clima/localidade sem solicitar permissão de localização nova.
+- Atualizar após retornar de offline para online e no ciclo de 15 minutos; eventos de rede repetidos não podem disparar requisições concorrentes nem refresh contínuo.
+- Quando a rede confirma ausência de internet, não iniciar consulta remota; ao restabelecer a conexão, fazer uma atualização imediata.
+- Em falha após leitura anterior, limpar a temperatura como dado atual, preservar apenas a última localidade e apresentar estado de atualização indisponível/desatualizado.
+- Ao desmontar a tela, remover listener e temporizador; nenhuma atualização pode alterar estado depois da desmontagem.
+- A tela e o motor de diagnóstico local devem continuar disponíveis offline e independentes da atualização de clima.
+
 ## AUDIT-HARDENING-01 — Integridade e recuperação de dados
 
 - K-Line: checksum aditivo de 8 bits válido deve ser aceito; checksum incorreto, ausente quando exigido ou bytes extras devem ser rejeitados nos formatos compactos e espaçados.
