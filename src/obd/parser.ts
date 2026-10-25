@@ -1,6 +1,7 @@
 import { parseDtcResponseForService } from './dtcParser';
 import { getPidDefinition } from './pidDefinition';
-import { validatePidValue } from './formulaEngine';
+import { decodeFormula, validatePidValue } from './formulaEngine';
+import fuelTypesCatalog from '../knowledge/fuel_types.json';
 import type { PidDefinition } from './pidDefinition';
 
 export type ParseStatus = 'RESPONDEU' | 'NÃO RESPONDEU' | 'VALOR NÃO INTERPRETADO';
