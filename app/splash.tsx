@@ -81,11 +81,21 @@ export default function StartupScreen() {
           await wait(450);
           if (!cancelled) router.replace('/');
           return;
-        } catch {
+        } catch (cause) {
+          const errorMessage = cause instanceof Error ? cause.message : String(cause);
           retry += 1;
           setAttempt(retry);
           if (retry >= 2) setCanContinue(true);
-          setMessage(connectionMessage());
+
+          // A repeated startup loop cannot enable Bluetooth on modern Android.
+          // Preserve the real cause and let the user enable the radio in system settings.
+          if (/BLUETOOTH.*DESLIGADO|DESLIGADO.*BLUETOOTH/i.test(errorMessage)) {
+            setCanContinue(true);
+            setMessage(errorMessage);
+            return;
+          }
+
+          setMessage(errorMessage || connectionMessage());
           // Retentativa contínua com backoff limitado evita tempestade de conexões.
           await wait(Math.min(15_000, 1_000 * (2 ** Math.min(retry - 1, 4))));
         }
