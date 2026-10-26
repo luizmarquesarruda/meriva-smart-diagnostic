@@ -5,6 +5,12 @@
 ### CI e controle de regressões
 - Evitada a execução duplicada da mesma CI em branches que já possuem PR para `main`: commits de branches são validados pelo evento `pull_request`, e o evento `push` fica reservado a `main`. O despacho manual permanece disponível.
 
+### Fila ELM327 e custo de escrita CSV
+- A fila rejeita novas consultas ordinárias quando há 16 comandos aguardando; a rejeição é explícita em vez de permitir acúmulo ilimitado. Fechamento e recuperação continuam reservados e serializados.
+- O snapshot de saúde expõe profundidade atual/máxima, rejeições e métricas de espera para diagnosticar rajadas e contenção.
+- Logs de alto volume em LOGS/ rotacionam aproximadamente a cada 1 MiB em segmentos CSV independentes com cabeçalho; a reescrita fica limitada ao segmento ativo e os anteriores permanecem intactos.
+- CSV de viagens fora de LOGS/ conserva o caminho existente; não é usado append não suportado pela API legada do Expo FileSystem.
+
 ### Limites de memória da telemetria
 - Telemetria ao vivo valida IDs Mode 01 e limita o armazenamento a 64 séries ativas, com até 120 amostras por PID; LRU mantém streams recentes e remove de forma sincronizada o índice atual.
 - A auditoria de buffers não adiciona janelas a GPS, diagnóstico ou Bluetooth sem evidência; registra como candidatos distintos o backpressure da fila de comandos ELM e a escrita segmentada de logs CSV.

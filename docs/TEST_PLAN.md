@@ -48,6 +48,18 @@ A branch mantém o fluxo OBD/ELM327 existente e inclui testes automatizados para
 - Cada PID conserva no máximo 120 amostras e o processo conserva no máximo 64 séries distintas. Ao receber o 65.º PID, deve sair o menos recentemente usado; atualização da série deve refrescar sua posição LRU e a remoção deve limpar também o índice de leituras atuais.
 - Executar `node tests/liveTelemetry.test.js`, `node tests/projectBaseline.test.js`, TypeScript e a CI completa no SHA exato; teste físico continua separado.
 
+## ELM-QUEUE-01 — Backpressure e espera da fila serial
+- Bloquear artificialmente a primeira resposta, enfileirar acima de 16 comandos e verificar que apenas 16 aguardam além da transação ativa; excessos devem rejeitar com ELM_COMMAND_QUEUE_FULL antes de escrever no transporte.
+- O snapshot deve expor profundidade atual/máxima, rejeições, espera média e máxima. Após liberar o transporte, a profundidade retorna a zero e a ordem dos comandos aceitos continua serial.
+- Saturar a fila e solicitar close(): o fechamento precisa ser aceito como operação reservada e executar depois das operações já aceitas. A recuperação também é reservada, mas não pode contornar a serialização.
+- CI automatizada não substitui medição de latência real com ELM327/K-Line.
+
+## CSV-ROTATE-01 — Rotação segura de logs de alto volume
+- Em LOGS/, quando o segmento ativo atingir aproximadamente 1 MiB, novas linhas vão para .part-0001.csv, .part-0002.csv etc.; segmentos anteriores permanecem intactos.
+- Cada segmento novo começa com cabeçalho independente e mantém a ordem de colunas do segmento anterior, acrescentando novas colunas pelo mecanismo de migração existente.
+- Se o tamanho não puder ser verificado, falhar explicitamente. CSVs de viagens fora de LOGS/ permanecem no caminho compatível.
+- Verificar rotação em duas fronteiras, cabeçalho, preservação do conteúdo anterior, esquema, gravações concorrentes e inclusão automática de segmentos no backup.
+
 ## Sequência de validação para um lote
 
 1. Inspecionar o diff consolidado e confirmar que nenhuma dependência/lockfile foi alterada sem justificativa.
