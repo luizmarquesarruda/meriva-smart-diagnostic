@@ -1,15 +1,16 @@
-## ESTADO VIGENTE — 2026-10-26 (auditoria sistêmica DB-147; nova CI pendente)
+## ESTADO VIGENTE — 2026-10-26 (auditoria sistêmica DB-148; CI verde no HEAD atual)
 
-> HEAD de referência anterior à correção documental: `826df0ae23ef30e602418721c521be271c6e5ff6`. Na CI [40313041670](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40313041670), `validate` passou; `android-build` ainda estava em andamento quando a releitura encontrou divergências no inventário. A CI do SHA DB-147 deve validar o conjunto completo.
+> HEAD anterior a esta atualização documental: `c02fecb6abe876c1a1f0ca275330f33af3ec6e91`. CI [40313779041](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40313779041) passou validação e build Android standalone, incluindo verificação e upload do APK. Esta nova entrada de diário precisa de CI própria por alterar o HEAD.
 
 ### Integração, CI e riscos
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
-- `main`: `02773b71ca9bd428b832d53a386655dd80acd80b`; PR [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84) foi mesclada, mas a auditoria subsequente identificou divergências na própria documentação da PR, agora corrigidas e protegidas por teste.
-- DB-146 adicionou PID 0144 ao catálogo padrão com fórmula/faixa/unidade e testes, sem marcar suporte físico nem incluí-lo na fila automática. O PID permanece apenas como alvo de confirmação até existir resposta RAW_ECU válida.
-- DB-147 sincroniza README, auditoria de fontes, inventário completo, testes e changelog com o catálogo runtime: 35 PIDs, 35 faixas, 21 definições de fórmula; corrige também a semântica documental do PID 0101, o rótulo de 0111 e a unidade de 0130.
-- A CI [40264314431](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40264314431) passou validação e APK standalone no SHA anterior a DB-146. A CI [40313041670](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40313041670) validou DB-146 no job `validate`; o build Android ainda não tinha concluído na última consulta.
+- `main`: `02773b71ca9bd428b832d53a386655dd80acd80b`; PR [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84) foi mesclada. A branch de integração contém o inventário documental e as correções DB-146/147.
+- CI [40313779041](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40313779041), SHA `c02fecb6abe876c1a1f0ca275330f33af3ec6e91`: `validate` e `android-build` passaram; APK standalone montado, verificado e enviado como artefato.
+- CI anterior [40313041670](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40313041670), SHA `826df0ae23ef30e602418721c521be271c6e5ff6`, passou validação, mas falhou em `mergeReleaseResources` para `drawable-mdpi/splashscreen_image.png`. A repetição sobre o descendente `c02fecb6abe876c1a1f0ca275330f33af3ec6e91`, sem alterar a imagem, passou o build completo; falha tratada como transitória e registrada, sem modificação desnecessária do splash.
+- DB-146 adicionou PID 0144 ao catálogo padrão com fórmula/faixa/unidade e testes, sem marcar suporte físico nem incluí-lo na fila automática. Ele permanece alvo de confirmação até existir resposta RAW_ECU válida.
+- DB-147 sincronizou README, auditoria de fontes e inventário completo com o catálogo runtime: 35 PIDs, 35 faixas e 21 definições de fórmula. Também corrigiu a semântica documental de 0101, 0111 e 0130 e adicionou testes de consistência.
 - A autonomia DB-143–145 usa janela móvel de dez leituras e balanço do último tanque completo. O balanço é uma estimativa e depende de todas as viagens e abastecimentos serem registrados; precisão física ainda não foi medida.
-- PR [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81) será encerrada como substituída apenas depois da validação final da integração. PR [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) está divergente; a portabilidade visual foi incorporada, e a prévia foi movida para `src/ui/FlootLayoutPreview.tsx`, fora das rotas Expo.
+- PR [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81) e PR [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) continuam abertas por divergência. O código útil de #81 está portado; o layout de #83 está incorporado, e a prévia foi movida para `src/ui/FlootLayoutPreview.tsx`, fora das rotas Expo. Ambas serão encerradas como substituídas após validação da PR consolidada para `main`.
 - Somente `010C` tem resposta RAW_ECU específica documentada para a Meriva (`41 0C 1A F8` = 1726 rpm). Catálogo SAE não é prova de suporte do veículo.
 - Não foi executado teste físico no Galaxy A06/Android 16 nem com ELM327/ECU real.
 
@@ -215,6 +216,7 @@
 - **DB-145** · 2026-10-26 — Estimar autonomia sem PID 012F com balanço de tanque cheio
 - **DB-146** · 2026-10-26 — Reconciliar PID 0144 com catálogo, fórmula e evidência da ECU
 - **DB-147** · 2026-10-26 — Corrigir divergências do inventário completo de PIDs
+- **DB-148** · 2026-10-26 — Corrigir registro de evidência e fechar ciclo de CI
 
 ---
 
@@ -4220,18 +4222,18 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 
 ### Causa confirmada
 - A PR #81 propunha o PID 0144, mas a branch integrada ainda mantinha 34 PIDs e documentava `U16_DIV_32768` como fórmula sem PID ligado. O catálogo e o relatório estavam divergentes da fórmula já implementada.
-- A PR também adicionava 0144 ao arquivo `meriva_confirmed_pids.json` como se fosse confirmação/candidato com evidência associada. Isso conflita com o contrato desse arquivo: somente uma resposta RAW_ECU válida pode promover um PID a confirmado.
+- A PR #81 propunha 0144 no catálogo padrão, mas a branch de integração ainda não ligava a fórmula `U16_DIV_32768` a um PID. A PR já colocava 0144 em `next_confirmation_targets`; a port manteve essa intenção e garantiu que ele não fosse promovido a `confirmed_pids` nem à lista de candidatos com baseline.
 
 ### Correção aplicada
 - Adicionado 0144 — Commanded Equivalence Ratio — ao catálogo padrão de 35 PIDs, com dois bytes, fórmula `(256 × A + B) / 32768`, unidade adimensional e faixa exata de `0…65535/32768`.
-- Adicionado 0144 a `next_confirmation_targets`, mas não a `confirmed_pids` nem à lista `candidates`; não foi incluído no polling automático do cockpit.
+- Mantido 0144 em `next_confirmation_targets` (como proposto na PR #81), sem adicioná-lo a `confirmed_pids` nem à lista `candidates`; não foi incluído no polling automático do cockpit.
 - Atualizados testes JSON, teste de fronteira para `80 00 → 1,0` e `FF FF → 1,999969482421875`, e teste de integração do parser com resposta positiva Mode 01.
 - Sincronizados `docs/PID_FORMULA_MAP_2026-10-24.md`, `docs/RELATORIO_PIDS_E_FORMULAS.md`, `docs/FORMULA_ENGINE.md` e `CHANGELOG.md`.
 - Atualizado o índice DB-001…DB-146 e o resumo vigente; preservadas as entradas históricas.
 
 ### Validação
 - CI do HEAD anterior `20f6dcbb04d72c178db95fdf5dcd23815bb7e904`: run [40264314431](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40264314431) passou `validate` e `android-build`, mas não valida este commit.
-- A nova CI do commit DB-146 precisa passar gate anti-regressão, TypeScript, suíte completa, prebuild, APK standalone, verificação e upload. Resultado pendente até a execução terminar.
+- A CI 40313779041, em commit descendente com DB-147, passou gate anti-regressão, TypeScript, suíte completa, prebuild, APK standalone, verificação e upload. A CI 40313041670 teve falha transitória de AAPT no splash e foi seguida pela execução completa bem-sucedida.
 - Teste físico do PID 0144 com ELM327/ECU continua pendente; não há evidência para marcá-lo como suportado na Meriva.
 
 ## DB-147 · 2026-10-26 — Corrigir divergências do inventário completo de PIDs
@@ -4249,7 +4251,19 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Atualizados o changelog, o resumo vigente e o índice sequencial DB-001…DB-147.
 
 ### Validação
-- No commit DB-146, o job `validate` da CI [40313041670](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40313041670) passou; o job Android ainda estava em andamento na última leitura. Isso não valida o commit DB-147.
-- A CI do SHA DB-147 deve passar gate anti-regressão, TypeScript, testes completos, prebuild, APK standalone, verificação e upload.
+- Na CI [40313041670](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40313041670), `validate` passou, mas o build Android falhou ao compilar `splashscreen_image.png`. A execução seguinte [40313779041](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40313779041), no descendente com DB-147, passou validação e build Android completo, sem alteração do asset.
+- A CI 40313779041 passou gate anti-regressão, TypeScript, testes completos, prebuild, APK standalone, verificação e upload no SHA DB-147. O novo commit DB-148 precisa de validação própria.
 - Teste físico com ELM327/ECU permanece pendente; não se atribui suporte real a 0144.
+
+## DB-148 · 2026-10-26 — Corrigir registro de evidência e fechar ciclo de CI
+
+### Auditoria do diário
+- Corrigida a redação de DB-146: a PR #81 já colocava o PID 0144 em `next_confirmation_targets`; o problema real era a ausência do PID no catálogo/fórmula da branch de integração. Não atribuir à PR uma falsa promoção para PID confirmado.
+- Registrada a CI 40313041670: validação passou, build Android falhou em `mergeReleaseResources` para `splashscreen_image.png`.
+- Registrada a repetição 40313779041 no descendente DB-147: validação e build Android passaram, incluindo montagem, verificação e upload do APK standalone, sem alteração do splash. Nenhuma correção de imagem foi feita sem evidência de falha reproduzível.
+
+### Validação pendente
+- Este commit altera o diário; a CI deve validar o novo SHA antes da PR consolidada ser criada/mesclada.
+- PR #81 e #83 não foram mescladas. O plano é consolidar as mudanças validadas em uma PR única para `main`, depois encerrar as PRs divergentes como substituídas, com justificativa registrada.
+- A confirmação física do PID 0144 e a validação de autonomia com o veículo real continuam pendentes.
 
