@@ -1,13 +1,13 @@
-## ESTADO VIGENTE — 2026-10-25 (retomada da integração DB-138)
+## ESTADO VIGENTE — 2026-10-25 (retomada da integração DB-139)
 
 > Estado observado na branch `integration/reconcile-pid-ui-20261025`; a validação deve ser feita novamente no SHA final.
 
 ### Integração, CI e riscos
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
 - `main` observado: `8e95b2b59e0aa4c76027b638e49d4453a0a4b54c`; PR [#89](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/89) foi mesclada; PRs [#90](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/90) e [#82](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/82) foram fechadas sem merge.
-- A [CI run 40235872428](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40235872428) passou Expo Doctor (17/17) e o gate anti-regressão, mas falhou no TypeScript: `src/gps/index.ts` exportava `isGpsSampleFresh` e `GPS_SAMPLE_STALE_AFTER_MS`, símbolos inexistentes em `src/gps/gpsTracker.ts`.
-- A comparação com `main` confirmou que o barrel export correto não inclui esses símbolos. A correção DB-138 remove apenas os exports obsoletos; não cria uma regra de frescor GPS sem requisito/implementação comprovados.
-- O baseline passou no SHA `f22dda1f52d6487a481cbfc10fafcac25acd6e3c`; a validação completa não passou porque o TypeScript parou antes dos testes. A build Android ainda não foi executada nessa CI.
+- A [CI run 40259463231](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40259463231), no HEAD `d88678d7c5cbee17ae55bc9e8d09b808ffc94db4`, passou Expo Doctor (17/17) e o gate anti-regressão, mas falhou no TypeScript: `app/dados.tsx:9` e `src/trip/autoTripService.ts:1` importam `isGpsSampleFresh`, removido do barrel na DB-138. O job `android-build` foi pulado após a falha de `validate`.
+- A leitura dos consumidores confirmou que a função é um contrato funcional: impede velocidade GPS antiga de aparecer como atual e impede que amostra vencida inicie/mantenha uma viagem. Remover o export sem mapear os usos criou a regressão; DB-139 restaura a função e a constante com teste comportamental.
+- Neste SHA, a suíte completa não foi executada porque `npm run validate` parou no TypeScript; o build Android não tem resultado aprovável. Nova CI precisa validar o commit DB-139.
 - PR [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81) continua em rascunho; [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) e [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84) continuam abertas. PID 0144 ainda não foi incorporado ao catálogo da branch candidata.
 - `app/floot-layout.tsx` continua uma rota de demonstração estática na árvore Expo; precisa ser removida/movida ou transformada em funcionalidade real antes do release. Hardware Android/ELM327/ECU não foi validado nesta retomada.
 
@@ -203,6 +203,7 @@
 - **DB-136** · 2026-10-25 — Validar tanque vazio pela regra central de autonomia
 - **DB-137** · 2026-10-25 — Remover linha órfã no baseline de autonomia
 - **DB-138** · 2026-10-25 — Remover exports GPS inexistentes identificados pelo TypeScript
+- **DB-139** · 2026-10-25 — Restaurar contrato de frescor GPS usado pelo painel e serviço de viagens
 
 ---
 
@@ -4099,3 +4100,19 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 ### Validação pendente
 - CI completa necessária no commit resultante: TypeScript, testes, build Android e demais etapas ainda não estão aprovados para este SHA.
 - Permanecem pendentes a reconciliação do PID 0144, o layout demonstrativo Floot e a revisão agregada das PRs #81/#83/#84. Nenhum merge foi feito.
+
+## DB-139 · 2026-10-25 — Restaurar contrato de frescor GPS usado pelo painel e serviço de viagens
+
+### Causa confirmada pela CI
+- A [CI run 40259463231](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40259463231), executada no commit `d88678d7c5cbee17ae55bc9e8d09b808ffc94db4`, passou Expo Doctor (17/17) e o gate, mas falhou em TypeScript com TS2305 em `app/dados.tsx:9` e `src/trip/autoTripService.ts:1`: ambos importam `isGpsSampleFresh` do barrel `src/gps`.
+- A alteração DB-138 retirou os exports por não estarem definidos no módulo, mas não conferiu os consumidores; a afirmação de que não havia usos estava incorreta. O helper é necessário para rejeitar velocidade GPS antiga no painel e para impedir que amostra vencida sustente movimento de viagem.
+
+### Correção aplicada
+- Introduzido `GPS_SAMPLE_STALE_AFTER_MS = 5_000` e usado esse mesmo valor para `MAX_SEGMENT_GAP_MS`, mantendo uma única fonte de verdade para o limite já adotado pelo rastreador.
+- Implementado `isGpsSampleFresh(timestamp, nowMs)`: timestamps ausentes, não numéricos, não finitos, não positivos, futuros ou com idade superior a 5 s são inválidos. O parâmetro `nowMs` permite teste determinístico.
+- Restaurados os dois exports no barrel; adicionadas regressões de limite, amostra vencida, futura e timestamp inválido em `tests/gps.test.js`.
+- Atualizados RG-38, o plano de testes GPS-02 e o gate anti-regressão, além deste diário.
+
+### Validação pendente
+- A nova CI no SHA DB-139 deve concluir `npm run doctor`, `gate:baseline`, `npm run validate` e `android-build`. Os resultados anteriores não validam este commit.
+- Ainda não há validação física de GPS no Galaxy A06/Android 16, Bluetooth Classic, ELM327 ou respostas reais da ECU. Nenhum merge foi feito nesta etapa.

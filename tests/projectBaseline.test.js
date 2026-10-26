@@ -121,6 +121,11 @@ assert.match(projectContract, /\| RG-38 \|/, 'GPS must reject invalid/out-of-ord
 assert.match(gpsTracker, /!Number\.isFinite\(location\.timestamp\) \|\| location\.timestamp <= 0/);
 assert.match(gpsTracker, /location\.timestamp <= this\.previous\.timestamp/);
 assert.doesNotMatch(gpsTracker, /timestamp:\s*Date\.now\(\)/, 'GPS must not fabricate timestamps');
+assert.match(gpsTracker, /export const GPS_SAMPLE_STALE_AFTER_MS = 5_000/);
+assert.match(gpsTracker, /const MAX_SEGMENT_GAP_MS = GPS_SAMPLE_STALE_AFTER_MS/);
+assert.match(gpsTracker, /export function isGpsSampleFresh\(/);
+assert.match(read('src/gps/index.ts'), /isGpsSampleFresh/);
+assert.match(read('tests/gps.test.js'), /isGpsSampleFresh/);
 const regressionRequirementIds = [...projectContract.matchAll(/^\| (RG-\d{2}) \|/gm)].map((match) => match[1]);
 assert.ok(regressionRequirementIds.length > 0, 'o contrato anti-regressão não pode ficar vazio');
 assert.equal(new Set(regressionRequirementIds).size, regressionRequirementIds.length, 'o contrato contém IDs RG duplicados');

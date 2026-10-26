@@ -32,7 +32,8 @@ const MIN_MOVEMENT_SPEED_KMH = 5;
 const MIN_MOVEMENT_DISTANCE_M = 8;
 const STOP_SPEED_KMH = 2;
 const MIN_MOVING_SAMPLES = 3;
-const MAX_SEGMENT_GAP_MS = 5_000;
+export const GPS_SAMPLE_STALE_AFTER_MS = 5_000;
+const MAX_SEGMENT_GAP_MS = GPS_SAMPLE_STALE_AFTER_MS;
 
 function movementThresholdM(sample: GpsSample, previous: GpsSample): number {
   const accuracies = [sample.accuracyM, previous.accuracyM].filter(
@@ -80,6 +81,25 @@ export function normalizeGpsSpeedKmh(speedMs: number | null | undefined): number
   return Number.isFinite(speedMs) && (speedMs as number) >= 0
     ? (speedMs as number) * 3.6
     : 0;
+}
+
+/**
+ * GPS speed is current only while its provider fix is within the same
+ * time window accepted for calculating a distance segment.
+ */
+export function isGpsSampleFresh(
+  timestamp: number | null | undefined,
+  nowMs: number = Date.now(),
+): boolean {
+  if (
+    typeof timestamp !== 'number' ||
+    !Number.isFinite(timestamp) ||
+    timestamp <= 0 ||
+    !Number.isFinite(nowMs)
+  ) return false;
+
+  const ageMs = nowMs - timestamp;
+  return ageMs >= 0 && ageMs <= GPS_SAMPLE_STALE_AFTER_MS;
 }
 
 function isAccurate(sample: GpsSample): boolean {

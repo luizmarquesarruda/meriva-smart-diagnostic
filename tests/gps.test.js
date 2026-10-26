@@ -50,10 +50,25 @@ const {
   haversineDistanceKm,
   normalizeGpsSpeedKmh,
   calculateConsumptionKml,
+  isGpsSampleFresh,
+  GPS_SAMPLE_STALE_AFTER_MS,
 } = mod.exports;
 
 assert.strictEqual(normalizeGpsSpeedKmh(10), 36);
 assert.strictEqual(normalizeGpsSpeedKmh(null), 0);
+assert.strictEqual(GPS_SAMPLE_STALE_AFTER_MS, 5_000);
+assert.strictEqual(isGpsSampleFresh(10_000, 15_000), true,
+  'amostra no limite de cinco segundos ainda é atual');
+assert.strictEqual(isGpsSampleFresh(10_000, 15_001), false,
+  'amostra GPS vencida não deve sustentar velocidade nem iniciar/manter viagem');
+assert.strictEqual(isGpsSampleFresh(10_001, 10_000), false,
+  'timestamp GPS futuro deve ser rejeitado');
+assert.strictEqual(isGpsSampleFresh(null, 10_000), false,
+  'ausência de timestamp GPS não é amostra atual');
+assert.strictEqual(isGpsSampleFresh(Number.NaN, 10_000), false,
+  'timestamp GPS não finito não é amostra atual');
+assert.strictEqual(isGpsSampleFresh(0, 10_000), false,
+  'timestamp GPS não positivo não é amostra atual');
 assert.ok(
   Math.abs(
     haversineDistanceKm(
