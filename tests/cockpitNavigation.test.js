@@ -24,9 +24,9 @@ for (const route of ['/bluetooth', '/saude', '/viagens', '/laboratorio', '/confi
   assert.ok(bottomNav.includes('href="' + route + '"'), 'navegação principal deve expor ' + route);
 }
 assert.ok(index.includes('href="/conectividade"'), 'cockpit deve expor o detalhe da rede');
-assert.match(more, /'\\/dados'/, 'Dados/Telemetria deve continuar acessível em Mais Recursos');
+assert.ok(more.includes("'/dados'"), 'Dados/Telemetria deve continuar acessível em Mais Recursos');
 assert.match(more, /DADOS E TELEMETRIA/, 'atalho secundário deve identificar Dados/Telemetria');
-assert.match(settingsScreen, /href="\\/mais"/, 'Configurações deve manter acesso a Mais Recursos');
+assert.ok(settingsScreen.includes('href="/mais"'), 'Configurações deve manter acesso a Mais Recursos');
 assert.match(settingsScreen, /accessibilityLabel="Abrir mais recursos"/, 'o acesso a Mais Recursos deve ter rótulo acessível');
 assert.ok(bottomNav.includes('href="/saude"') && bottomNav.includes('accessibilityLabel="Diagnóstico"'), 'Diagnóstico deve ser destino primário acessível');
 assert.match(more, /'\/saude'/, 'a central de saúde deve continuar acessível em Mais Recursos');
@@ -40,11 +40,11 @@ assert.doesNotMatch(index, /\}, \[isHydrated, settings\]\);/, 'objeto settings i
 assert.match(index, /settings\?\.elmMaxConnectionAttempts/, 'efeito deve reagir às opções OBD efetivamente alteradas');
 assert.match(index, /bottomNavLandscape/, 'navegação inferior deve continuar disponível em paisagem');
 assert.doesNotMatch(index, /!layout\.landscape\s*&&\s*\(/, 'navegação não deve desaparecer ao girar o aparelho');
-assert.doesNotMatch(bottomNav, /<Text\\b/, 'navegação principal deve usar somente ícones, sem legendas visíveis');
+assert.equal(bottomNav.includes('<Text'), false, 'navegação principal deve usar somente ícones, sem legendas visíveis');
 for (const label of ['Painel, tela atual', 'Conexões Bluetooth e ECU', 'Diagnóstico', 'Viagem', 'Laboratório', 'Configurações']) {
   assert.ok(bottomNav.includes('accessibilityLabel="' + label + '"'), 'destino deve manter rótulo acessível: ' + label);
 }
-assert.match(index, /bottomNavItem:\\{[^}]*minHeight:60/, 'alvos da navegação principal devem ter pelo menos 60 dp');
+assert.ok(index.includes('bottomNavItem:{') && index.includes('minHeight:60'), 'alvos da navegação principal devem ter pelo menos 60 dp');
 assert.doesNotMatch(index, /actionGrid|dashboardAction/, 'não repetir Diagnóstico, Dados e Viagens em uma segunda fileira');
 assert.match(index, /styles\.sessionCard/, 'cockpit deve ter cartão acionável de conexão/ECU');
 assert.match(index, /accessibilityLabel="Abrir configurações de conexão do veículo"/, 'cartão de conexão precisa de nome acessível');

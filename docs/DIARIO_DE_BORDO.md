@@ -1,12 +1,12 @@
-## ESTADO VIGENTE — 2026-10-25 (retomada da integração DB-140)
+## ESTADO VIGENTE — 2026-10-25 (retomada da integração DB-141)
 
 > Estado observado na branch `integration/reconcile-pid-ui-20261025`; a validação deve ser feita novamente no SHA final.
 
 ### Integração, CI e riscos
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
 - `main` observado: `8e95b2b59e0aa4c76027b638e49d4453a0a4b54c`; PR [#89](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/89) foi mesclada; PRs [#90](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/90) e [#82](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/82) foram fechadas sem merge.
-- A CI [run 40259949056](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40259949056), no SHA `d69de78e1719037327a174e5d856777e0243e72f`, passou Expo Doctor (17/17), gate anti-regressão e TypeScript; falhou em `tests/cockpitNavigation.test.js:16` porque o teste exigia rotas secundárias na tela inicial e correspondia a uma versão anterior da navegação. A inspeção confirmou `/dados` em `app/mais.tsx` e `/mais` em Configurações.
-- DB-140 atualiza somente as expectativas obsoletas de navegação, preservando o teste de acesso à rota secundária e os requisitos de acessibilidade. O job `android-build` foi pulado; nenhum build ou teste físico é presumido.
+- A CI [run 40260345975](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40260345975), no SHA `3463c932c706afce950918fb58478f3554829aa4`, passou Expo Doctor (17/17) e o gate anti-regressão, mas TypeScript falhou ao analisar escapes inválidos em `tests/cockpitNavigation.test.js:27-30`. A mudança DB-140 introduziu esse erro de sintaxe ao escrever regex para rotas; o job `android-build` foi pulado.
+- DB-141 troca essas verificações por comparações de strings, sem reduzir as exigências de navegação ou acessibilidade. Nova CI no SHA corrigido é necessária; nenhum teste comportamental ou build Android pode ser presumido.
 - PR [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81) continua em rascunho; [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) e [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84) continuam abertas. PID 0144 ainda não foi incorporado ao catálogo da branch candidata.
 - `app/floot-layout.tsx` continua uma rota de demonstração estática na árvore Expo; precisa ser removida/movida ou transformada em funcionalidade real antes do release. Hardware Android/ELM327/ECU não foi validado nesta retomada.
 
@@ -204,6 +204,7 @@
 - **DB-138** · 2026-10-25 — Remover exports GPS inexistentes identificados pelo TypeScript
 - **DB-139** · 2026-10-25 — Restaurar contrato de frescor GPS usado pelo painel e serviço de viagens
 - **DB-140** · 2026-10-25 — Alinhar teste de navegação ao contrato vigente de seis ícones
+- **DB-141** · 2026-10-25 — Eliminar escapes inválidos nas verificações de navegação
 
 ---
 
@@ -4132,3 +4133,17 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 ### Validação pendente
 - Nova CI deve validar o commit DB-140, incluindo execução completa de `npm test` e `android-build` se `validate` passar.
 - A inspeção visual responsiva e os testes físicos com Galaxy A06/Android 16 + ELM327/ECU permanecem separados e ainda não foram executados nesta retomada. Nenhum merge foi feito.
+
+## DB-141 · 2026-10-25 — Eliminar escapes inválidos nas verificações de navegação
+
+### Causa confirmada pela CI
+- A [CI run 40260345975](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40260345975) passou Expo Doctor (17/17) e `gate:baseline`, mas TypeScript falhou ao analisar `tests/cockpitNavigation.test.js` nas linhas 27–30. A atualização DB-140 escreveu escapes de regex inválidos para verificar caminhos, resultando em erros de sintaxe/strings não terminadas.
+- A falha está no próprio teste introduzido na etapa anterior, não na implementação das rotas.
+
+### Correção aplicada
+- Substituídas as regex para `/dados`, `/mais`, alvo icon-only e tamanho mínimo da navegação por verificações com `String.includes`/comparações diretas, adequadas para o contrato textual dessas propriedades.
+- Mantidas as exigências de seis destinos, rótulos acessíveis, ausência de texto visível na barra e acesso secundário a Dados.
+
+### Validação pendente
+- Nova CI no commit DB-141 deve validar o TypeScript, suíte comportamental e build Android. O resultado da CI que encontrou esta falha não valida o SHA corrigido.
+- Nenhum merge foi feito; testes visuais e físicos permanecem pendentes.
