@@ -4175,7 +4175,7 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Criado `src/trip/autonomyBuffer.ts`: FIFO de até dez leituras válidas do PID 012F, mediana contra picos e dez intervalos de consumo integrados por velocidade e fluxo.
 - O consumo móvel exige timestamps monotônicos, intervalos de no máximo 10 s, velocidade ≥5 km/h, dez intervalos, distância ≥0,1 km e combustível ≥0,05 L. Leituras ausentes/inválidas, gaps e taxas em cache não são reintegrados; o buffer é limpo ao mudar/perder a sessão ECU.
 - A autonomia prioriza consumo móvel recente, depois consumo confiável da viagem e média histórica positiva. A validade do nível 012F atual continua obrigatória; autonomia persistida nunca é tratada como atual.
-- Criado `tests/autonomyBuffer.test.js`, integrado ao `npm test`; a cobertura de prioridade, contrato RG-44, PID-AUTO-02 e changelog será completada no próximo commit desta mesma unidade de trabalho.
+- Criado `tests/autonomyBuffer.test.js`, integrado ao `npm test`; a suíte verifica preenchimento/rotação, mediana contra outlier, timestamps fora de ordem, valores inválidos, gaps, limites de distância/combustível, frescor e reset. Adicionadas as verificações de prioridade da autonomia, RG-44, PID-AUTO-02 e changelog.
 ### Validação
 - A mudança só será concluída quando a CI do SHA final aprovar Expo Doctor, gate anti-regressão, TypeScript, suíte completa, prebuild, APK Android standalone e verificação/upload do artefato.
 - Teste físico pendente: confirmar no Meriva a resposta real de 012F/015E ou MAF/MAP e composição de combustível; comparar autonomia com distância e abastecimento reais. Não converter ausência de resposta em zero nem declarar candidatos como suporte confirmado.

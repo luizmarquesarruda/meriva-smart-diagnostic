@@ -53,7 +53,7 @@ const INITIAL_STATE: AutoTripServiceState = {
   fuelLevelBufferCount: 0,
   rollingConsumptionKml: null,
   rollingConsumptionBufferCount: 0,
-  fuelRemainingL: null;
+  fuelRemainingL: null,
   fuelReserve: null,
   distanceKm: 0,
   fuelUsedL: 0,

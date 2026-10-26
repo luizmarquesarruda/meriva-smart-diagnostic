@@ -95,6 +95,13 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 - Antes desse limiar, usar apenas uma média histórica positiva válida; se não existir, apresentar N/D, nunca transformar amostra insuficiente em consumo alto.
 - CI automatizada não substitui teste físico com ELM327/ECU; validar no veículo a resposta real do PID 012F e a estabilidade da autonomia.
 
+## PID-AUTO-02 — Buffer móvel de autonomia com dez leituras
+- O nível do PID 012F mantém uma janela FIFO de no máximo dez respostas reais válidas; valor exibido é a mediana para reduzir picos, sem criar valores iniciais sintéticos.
+- O buffer de consumo mantém até dez intervalos calculados por integração trapezoidal de velocidade e fluxo; só aceita fluxo recém-medido (015E) ou estimativa recém-calculada (MAF/MAP), nunca uma taxa em cache reintegrada.
+- A estimativa móvel só fica pronta após dez intervalos válidos, pelo menos 0,1 km e 0,05 L integrados; intervalos não monotônicos, longos, fora de faixa ou sem movimento são rejeitados.
+- O consumo móvel recente tem prioridade sobre o consumo acumulado da viagem e a média histórica; se estiver vazio/vencido, usa-se uma fonte confiável anterior, nunca autonomia persistida como valor atual.
+- Testes determinísticos cobrem rotação das dez amostras, mediana contra outlier, entradas inválidas, gaps, limiares, frescor e reset ao desconectar. Teste físico de precisão continua obrigatório.
+
 ## NET-WEATHER-01 — Atualização de localização/clima por conectividade
 - Com internet disponível em Wi-Fi ou rede celular (4G/5G), carregar clima/localidade sem solicitar permissão de localização nova.
 - Atualizar após retornar de offline para online e no ciclo de 15 minutos; eventos de rede repetidos não podem disparar requisições concorrentes nem refresh contínuo.

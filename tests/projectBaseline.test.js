@@ -66,6 +66,7 @@ const requiredSuites = [
   'merivaAutosave.test.js',
   'onlineConditions.test.js',
   'autonomyPresentation.test.js',
+  'autonomyBuffer.test.js',
   'connectivity.test.js',
   'permissions.test.js',
   'screenTheme.test.js',
@@ -248,6 +249,11 @@ for (const label of [
 }
 assert.match(home, /10_000/);
 assert.match(home, /getCurrentAutonomyRangeKm/);
+assert.match(home, /rollingConsumptionKml: tripState\.rollingConsumptionKml/);
+assert.match(dataScreen, /rollingConsumptionKml: trip\.rollingConsumptionKml/);
+assert.match(tripService, /this\.autonomyBuffer\.addFuelLevelSample/);
+assert.match(tripService, /this\.autonomyBuffer\.addFuelFlowSample/);
+assert.match(read('src/trip/autonomyPresentation.ts'), /input\.rollingConsumptionKml/);
 assert.match(home, /fuelLevelReadAtMs: tripState\.fuelLevelReadAtMs/);
 assert.match(tripService, /fuelLevelReadAtMs/);
 assert.match(read('src/trip/autonomyPresentation.ts'), /CURRENT_FUEL_LEVEL_STALE_AFTER_MS\s*=\s*30_000/);
@@ -290,6 +296,8 @@ assert.match(testPlan, /DATA-02/);
 assert.match(testPlan, /SPLASH-01/);
 assert.match(testPlan, /teste físico/);
 assert.match(read('docs/CONTRATO_ANTI_REGRESSAO.md'), /\| RG-20 \|/);
+assert.match(projectContract, /\| RG-44 \|/, 'buffer móvel de autonomia deve permanecer no contrato anti-regressão');
+assert.match(read('docs/TEST_PLAN.md'), /PID-AUTO-02/);
 assert.match(projectContract, /\| RG-33 \|/, 'trip consumption used for autonomy must be reliability-gated');
 assert.match(read('docs/TEST_PLAN.md'), /PID-AUTO-01/);
 

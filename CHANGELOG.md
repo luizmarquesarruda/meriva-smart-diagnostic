@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Autonomia e consumo móvel
+- Criado buffer real de até dez leituras do PID 012F com mediana para reduzir oscilações de nível, além de janela móvel de dez intervalos de velocidade/fluxo para calcular consumo atual por distância e combustível integrados.
+- A autonomia prioriza consumo móvel recente, depois consumo confiável da viagem e média histórica; valores sintéticos, fluxo em cache reintegrado e nível vencido continuam proibidos.
+- Incluídos testes determinísticos para preenchimento/rotação do buffer, outliers, lacunas, limites físicos, frescor e integração nas telas.
+
 ### Layout e navegação Floot
 - Alinhada a barra inferior do cockpit ao layout de referência: seis destinos com ícones de 32 dp, uniformemente distribuídos e sem legendas visíveis.
 - Corrigido o mapeamento de cada ícone para sua tela funcional: Painel, Conexões, Diagnóstico, Viagem, Laboratório e Configurações; nomes acessíveis preservados.
