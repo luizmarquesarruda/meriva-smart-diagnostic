@@ -1,6 +1,6 @@
-## ESTADO VIGENTE — 2026-10-26 (contagem da fila ELM DB-157; CI pendente)
+## ESTADO VIGENTE — 2026-10-26 (atualização do gate serial DB-158; CI pendente)
 
-> DB-153 `b0864f7e7f8005c95a7da85867d68e9be58b9604` passou na CI [40318919363](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40318919363). DB-154 falhou por asserção ELM obsoleta; DB-155 corrigiu o gate e escapes CSV; DB-156 corrigiu a guarda do tipo `FileInfo`. A CI [40322799675](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40322799675) passou gate e TypeScript, mas o teste concorrente encontrou erro de contagem: a primeira operação era contabilizada temporariamente como pendente. DB-157 distingue a vaga ativa das operações que realmente aguardam.
+> DB-153 passou em validate e android-build. DB-154/155/156 corrigiram regressões sequenciais do gate, escapes CSV e tipo `FileInfo`. A CI [40322799675](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40322799675) passou gate/TypeScript, mas o teste concorrente encontrou erro na contagem pendente. DB-157 reserva sincronicamente a vaga ativa. A CI [40323498797](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40323498797) falhou no gate porque ele ainda exigia `release()` como corpo único da expressão `finally`; DB-158 atualiza a asserção para o bloco multilinha utilizado.
 
 ### Integração, CI e riscos
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
@@ -227,6 +227,7 @@
 - **DB-155** · 2026-10-26 — Corrigir o gate ELM e os escapes de fim de linha CSV
 - **DB-156** · 2026-10-26 — Restringir leitura de tamanho CSV a arquivos existentes
 - **DB-157** · 2026-10-26 — Corrigir contagem ativa versus pendente na fila ELM
+- **DB-158** · 2026-10-26 — Atualizar a asserção do gate para finally multilinha
 
 ---
 
@@ -4427,3 +4428,17 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 ### Validação
 - DB-157 precisa de CI integral no SHA final. Na execução anterior, a suíte reportou uma falha no teste concorrente da fila; não se declara o lote aprovado antes de repetir.
 - O build Android do commit anterior foi ignorado pela falha na suíte. Testes físicos ELM327/Android continuam pendentes.
+
+
+## DB-158 · 2026-10-26 — Atualizar a asserção do gate para finally multilinha
+
+### Causa confirmada
+- A CI [40323498797](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40323498797) falhou no gate anti-regressão. A lógica da fila estava serializada e o teste anterior verificava a antiga linha `finally(() => release())`, mas o DB-157 passou a liberar a próxima operação e a atualizar `queueRunning` dentro de um bloco `finally(() => { ... })`.
+
+### Correção aplicada
+- A asserção agora verifica que o bloco `finally` começa com a chamada `release()`, permitindo a atualização de estado posterior sem exigir a forma sintática antiga.
+- A validação do limite de 16 comandos pendentes e da vaga ativa reservada continua obrigatória; nenhum contrato comportamental foi removido.
+
+### Validação
+- DB-158 necessita de nova CI integral. A execução anterior falhou no gate antes de iniciar a suíte ou o build Android; não é evidência de falha de runtime nem de aprovação do código.
+- O teste concorrente da fila e as duas fronteiras da rotação CSV devem passar no próximo SHA.

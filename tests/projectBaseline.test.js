@@ -170,8 +170,8 @@ assert.match(elm, /private commandQueue:\s*Promise<void>\s*=\s*Promise\.resolve\
 assert.match(elm, /return this\.enqueueCommand\(\(\) => this\.command\(normalized\)\)/);
 assert.match(elm, /return previous\.then\(\(\) => \{/,
   'ELM queue must execute accepted operations serially after measuring queue wait');
-assert.match(elm, /\.finally\(\(\) => release\(\)\)/,
-  'ELM queue gate must release the next operation even when the current one rejects');
+assert.match(elm, /\.finally\(\(\) => \{\s*release\(\);/,
+  'ELM queue gate must release the next operation in its finally block even when the current one rejects');
 assert.match(elm, /this\.pendingQueueDepth >= ELM_MAX_PENDING_COMMANDS/,
   'ELM queue must apply backpressure before accepting more ordinary commands');
 assert.match(elm, /allowWhenSaturated: true/,

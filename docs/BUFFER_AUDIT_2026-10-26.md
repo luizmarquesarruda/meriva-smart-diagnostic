@@ -28,7 +28,7 @@
 3. Logs de alto volume em `LOGS/` são particionados em segmentos de aproximadamente 1 MiB, cada um com cabeçalho consistente. A rotação preserva os arquivos anteriores e mantém o caminho não segmentado de CSVs de viagens.
 4. `tests/liveTelemetry.test.js` cobre a cota LRU; `tests/regression.test.js` cobre saturação/serialização ELM e rotação CSV em duas fronteiras.
 5. `docs/CONTRATO_ANTI_REGRESSAO.md`, `docs/TEST_PLAN.md`, `CHANGELOG.md` e o Diário de Bordo registram as regras e a aceitação.
-6. DB-155 atualiza o gate ELM e corrige escapes LF/CR. DB-156 confirma `FileInfo.exists` antes de ler `size`. DB-157 separa a vaga ativa das pendentes.
+6. DB-155 atualiza o gate ELM e corrige escapes LF/CR. DB-156 confirma `FileInfo.exists` antes de ler `size`. DB-157 separa a vaga ativa das pendentes. DB-158 atualiza o gate para conferir o bloco `finally` multilinha.
 
 ## Critério de encerramento
 

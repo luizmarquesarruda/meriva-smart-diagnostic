@@ -50,7 +50,7 @@ A branch mantém o fluxo OBD/ELM327 existente e inclui testes automatizados para
 
 ## ELM-QUEUE-01 — Backpressure e espera da fila serial
 - Bloquear artificialmente a primeira resposta, enfileirar acima de 16 comandos e verificar que apenas 16 aguardam além da transação ativa; excessos devem rejeitar com ELM_COMMAND_QUEUE_FULL antes de escrever no transporte. A vaga da operação ativa deve ser reservada sincronicamente para não consumir uma posição das 16 pendentes em chamadas concorrentes no mesmo turno.
-- O snapshot deve expor profundidade atual/máxima, rejeições, espera média e máxima. Após liberar o transporte, a profundidade retorna a zero e a ordem dos comandos aceitos continua serial.
+- O snapshot deve expor profundidade atual/máxima, rejeições, espera média e máxima. Após liberar o transporte, a profundidade retorna a zero e a ordem dos comandos aceitos continua serial. O gate estático verifica liberação em `finally` sem depender de o corpo do callback caber em uma única linha.
 - Saturar a fila e solicitar close(): o fechamento precisa ser aceito como operação reservada e executar depois das operações já aceitas. A recuperação também é reservada, mas não pode contornar a serialização.
 - CI automatizada não substitui medição de latência real com ELM327/K-Line.
 
