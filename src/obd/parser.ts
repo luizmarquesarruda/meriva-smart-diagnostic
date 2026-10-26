@@ -212,30 +212,58 @@ export function parsePidResponse(pidRequested: string, rawResponse: string, posi
   }
 
   const value = definition.formula(data);
+  const fuelTypeCodes = fuelTypesCatalog.codes as Record<string, string>;
+  const fuelTypeLabel = pid === '0151' ? fuelTypeCodes[String(data[0])] : undefined;
+  if (pid === '0151' && !fuelTypeLabel) {
+    return {
+      pid, name: definition.name, value: null, unit: definition.unit, rawResponse, rawBytes,
+      status: 'VALOR NÃO INTERPRETADO',
+      errorMessage: 'Código de combustível não catalogado: ' + String(data[0]),
+      definition,
+    };
+  }
+
   const interpretation = pid === '0101'
     ? (() => {
-        const [a, b, readinessSupported, readiness] = data;
+        const [a, b, supportedByte, incompleteByte] = data;
         const mil = (a & 0x80) !== 0;
         const dtcCount = a & 0x7f;
         const compressionIgnition = (b & 0x08) !== 0;
-        const catalystSupported = (readinessSupported & 0x01) !== 0;
-        const catalystIncomplete = (readiness & 0x01) !== 0;
-        const incomplete = [
-          ['MISFIRE', (b & 0x10) !== 0],
-          ['FUEL_SYSTEM', (b & 0x20) !== 0],
-          ['COMPONENTES', (b & 0x40) !== 0],
-          ['CATALISADOR', catalystSupported && catalystIncomplete],
-          ['CATALISADOR_AQUECIDO', (readinessSupported & 0x02) !== 0 && (readiness & 0x02) !== 0],
-          ['EVAP', (readinessSupported & 0x04) !== 0 && (readiness & 0x04) !== 0],
-          ['AR_SECUNDARIO', (readinessSupported & 0x08) !== 0 && (readiness & 0x08) !== 0],
-          ['O2', (readinessSupported & 0x20) !== 0 && (readiness & 0x20) !== 0],
-          ['AQUECEDOR_O2', (readinessSupported & 0x40) !== 0 && (readiness & 0x40) !== 0],
-          ['EGR/VVT', (readinessSupported & 0x80) !== 0 && (readiness & 0x80) !== 0],
-        ].filter(([, notReady]) => notReady).map(([name]) => name);
+        const monitored: string[] = [];
+        const incomplete: string[] = [];
+        const continuousMonitors: Array<[string, number, number]> = [
+          ['MISFIRE', 0x01, 0x10],
+          ['FUEL_SYSTEM', 0x02, 0x20],
+          ['COMPONENTES', 0x04, 0x40],
+        ];
+        for (const [name, supportMask, incompleteMask] of continuousMonitors) {
+          if ((b & supportMask) !== 0) {
+            const notReady = (b & incompleteMask) !== 0;
+            monitored.push(name + ':' + (notReady ? 'NÃO PRONTO' : 'PRONTO'));
+            if (notReady) incomplete.push(name);
+          }
+        }
+        const ignitionMonitors: Array<[string, number]> = compressionIgnition
+          ? [
+              ['CATALISADOR_NMHC', 0x01], ['NOX/SCR', 0x02], ['PRESSAO_BOOST', 0x08],
+              ['SENSOR_GASES_ESCAPE', 0x20], ['FILTRO_PARTICULAS', 0x40], ['EGR/VVT', 0x80],
+            ]
+          : [
+              ['CATALISADOR', 0x01], ['CATALISADOR_AQUECIDO', 0x02], ['EVAP', 0x04],
+              ['AR_SECUNDARIO', 0x08], ['FILTRO_PARTICULAS_GASOLINA', 0x10],
+              ['O2', 0x20], ['AQUECEDOR_O2', 0x40], ['EGR/VVT', 0x80],
+            ];
+        for (const [name, mask] of ignitionMonitors) {
+          if ((supportedByte & mask) !== 0) {
+            const notReady = (incompleteByte & mask) !== 0;
+            monitored.push(name + ':' + (notReady ? 'NÃO PRONTO' : 'PRONTO'));
+            if (notReady) incomplete.push(name);
+          }
+        }
         return 'MIL=' + (mil ? 'ON' : 'OFF')
           + ' | DTCs=' + dtcCount
           + ' | MOTOR=' + (compressionIgnition ? 'DIESEL/CI' : 'CICLO OTTO/SI')
-          + ' | CATALISADOR=' + (catalystSupported ? (catalystIncomplete ? 'NÃO PRONTO' : 'PRONTO') : 'NÃO SUPORTADO')
+          + ' | MONITORES=' + (monitored.length ? monitored.join(', ') : 'NENHUM SUPORTADO')
           + ' | INCOMPLETOS=' + (incomplete.length ? incomplete.join(', ') : 'NENHUM');
       })()
     : pid === '0114'
@@ -247,7 +275,9 @@ export function parsePidResponse(pidRequested: string, rawResponse: string, posi
           const trimPercent = (trimByte * 100 / 128) - 100;
           return 'AJUSTE CURTO B1S1=' + trimPercent.toFixed(2) + '%';
         })()
-      : undefined;
+      : pid === '0151'
+        ? 'Combustível reportado pela ECU: ' + fuelTypeLabel + ' (código ' + data[0] + ')'
+        : undefined;
   const validation = validatePidValue(pid, value);
   if (!validation.valid) {
     return {

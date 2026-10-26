@@ -20,7 +20,7 @@ import { scanDtcServices, readFreezeFrame, type DtcServiceScan } from '../src/ob
 import { getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
 import { decodeFormula } from '../src/obd/formulaEngine';
 
-import { DtcRecord, nextDtcOccurrences, readDtcs, recordDtc } from '../src/database/dtcManager';
+import { DtcRecord, markMissingStoredDtcsInactive, nextDtcOccurrences, readDtcs, recordDtc } from '../src/database/dtcManager';
 import { recordDiscoveredPids } from '../src/database/pidBank';
 import {
   initAutoSave,
@@ -402,12 +402,9 @@ export default function LaboratorioScreen() {
 
         for (const record of records) await recordDtc(getBasePath(), record);
         const detectedCodes = new Set(records.map((item) => item.code));
-        const storedCodes = new Set(stored?.codes ?? []);
         const storedAvailable = stored?.available === true;
         const becameInactive: DtcRecord[] = storedAvailable
-          ? existing
-            .filter((item) => ['CURRENT', 'CONFIRMED'].includes(item.status) && !storedCodes.has(item.code) && !detectedCodes.has(item.code))
-            .map((item) => ({ ...item, status: 'INACTIVE', historical: true, lastSeen: now }))
+          ? markMissingStoredDtcsInactive(existing, [...detectedCodes], now)
           : [];
         for (const record of becameInactive) await recordDtc(getBasePath(), record);
         const allDetectedOrInactive = new Set([...detectedCodes, ...becameInactive.map((item) => item.code)]);
@@ -478,9 +475,12 @@ export default function LaboratorioScreen() {
           };
         });
 
-        for (const record of records) await recordDtc(getBasePath(), record);
+        const becameInactive = markMissingStoredDtcsInactive(existing, codes, now);
+        for (const record of [...records, ...becameInactive]) await recordDtc(getBasePath(), record);
+        const updatedCodes = new Set([...records, ...becameInactive].map((item) => item.code));
         updateAutoSaveState((state) => {
-          state.dtcs = records.length ? records : existing;
+          const preserved = state.dtcs.filter((item) => !updatedCodes.has(item.code));
+          state.dtcs = [...records, ...becameInactive, ...preserved];
         });
         await forceSaveOnObdEvent();
       }

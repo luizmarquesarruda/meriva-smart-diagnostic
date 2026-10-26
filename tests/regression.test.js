@@ -269,6 +269,25 @@ async function testParser() {
   assert.strictEqual(o2.status, 'RESPONDEU');
   assert.strictEqual(o2.value, 0.53);
   assert.strictEqual(o2.rawBytes.length, 4);
+  const fuelType = parser.parsePidResponse('0151', '41 51 03');
+  assert.strictEqual(fuelType.status, 'RESPONDEU');
+  assert.strictEqual(fuelType.value, 3);
+  assert.match(fuelType.interpretation, /Etanol/, 'PID 0151 deve decodificar o código de combustível conhecido');
+  const unknownFuelType = parser.parsePidResponse('0151', '41 51 FF');
+  assert.strictEqual(unknownFuelType.status, 'VALOR NÃO INTERPRETADO');
+  assert.strictEqual(unknownFuelType.value, null, 'código de combustível desconhecido não pode ser apresentado como valor válido');
+  const monitorStatus = parser.parsePidResponse('0101', '41 01 83 33 A1 81');
+  assert.strictEqual(monitorStatus.value, 3, 'PID 0101 publica contagem de DTC separada dos bits de status');
+  assert.match(monitorStatus.interpretation, /MIL=ON/);
+  assert.match(monitorStatus.interpretation, /MISFIRE:NÃO PRONTO/);
+  assert.match(monitorStatus.interpretation, /CATALISADOR:NÃO PRONTO/);
+  const dieselMonitorStatus = parser.parsePidResponse('0101', '41 01 00 08 C0 C0');
+  assert.match(dieselMonitorStatus.interpretation, /MOTOR=DIESEL\/CI/);
+  assert.match(dieselMonitorStatus.interpretation, /FILTRO_PARTICULAS:NÃO PRONTO/);
+  assert.doesNotMatch(dieselMonitorStatus.interpretation, /CATALISADOR_AQUECIDO/);
+  const gasolineParticleFilterStatus = parser.parsePidResponse('0101', '41 01 00 00 10 10');
+  assert.match(gasolineParticleFilterStatus.interpretation, /FILTRO_PARTICULAS_GASOLINA:NÃO PRONTO/);
+  assert.doesNotMatch(gasolineParticleFilterStatus.interpretation, /REFRIGERANTE_AR_CONDICIONADO/);
   assert.strictEqual(parser.parsePidResponse('01 0C', '41 0C 1A F8').value, 1726);
   assert.strictEqual(parser.validateOBDResponse('410C1AF8'), true);
   assert.strictEqual(parser.parsePidResponse('010C', '410C1AF8').value, 1726);
@@ -1187,6 +1206,25 @@ async function testDtcStorage() {
   writeDelayMs = 0;
   const concurrentDtcs = await dtcManager.readDtcs(BASE);
   assert.strictEqual(concurrentDtcs.length, 3, 'gravações concorrentes de DTC não podem perder registros');
+  await dtcManager.recordDtc(BASE, {
+    code: 'P0420', status: 'CONFIRMED', firstSeen: '2026-10-02T20:02:00.000Z',
+    lastSeen: '2026-10-02T20:02:00.000Z', occurrences: 2, source: 'REAL_OBD',
+    historical: true, confirmed: true,
+  });
+  assert.equal((await dtcManager.getCurrentDtcs(BASE)).some((item) => item.code === 'P0420'), false,
+    'historical=true deve prevalecer sobre status CONFIRMED inconsistente');
+  const toReconcile = [
+    { code: 'P0130', status: 'CURRENT', source: 'REAL_OBD', historical: false, firstSeen: 't1', lastSeen: 't1', occurrences: 1 },
+    { code: 'P0135', status: 'CONFIRMED', source: 'REAL_OBD', historical: false, firstSeen: 't1', lastSeen: 't1', occurrences: 1 },
+    { code: 'P0421', status: 'PERMANENT', source: 'REAL_OBD', historical: false, firstSeen: 't1', lastSeen: 't1', occurrences: 1 },
+    { code: 'P0301', status: 'CONFIRMED', source: 'REAL_OBD', historical: true, firstSeen: 't1', lastSeen: 't1', occurrences: 1 },
+    { code: 'P0171', status: 'CONFIRMED', source: 'CARSCANNER_BASELINE', historical: false, firstSeen: 't1', lastSeen: 't1', occurrences: 1 },
+  ];
+  const now = '2026-10-24T10:00:00.000Z';
+  const inactive = dtcManager.markMissingStoredDtcsInactive(toReconcile, [], now);
+  assert.deepStrictEqual(inactive.map((item) => item.code), ['P0130', 'P0135']);
+  assert.ok(inactive.every((item) => item.status === 'INACTIVE' && item.historical === true && item.lastSeen === now));
+  assert.deepStrictEqual(dtcManager.markMissingStoredDtcsInactive(toReconcile, ['P0130'], now).map((item) => item.code), ['P0135']);
 }
 
 async function testBackupCompleteness() {
@@ -1433,6 +1471,7 @@ async function testAutosaveRace() {
   assert.strictEqual(dtcManager.nextDtcOccurrences(undefined), 1, 'novo DTC deve iniciar em 1');
   assert.strictEqual(dtcManager.nextDtcOccurrences({ status: 'CURRENT', occurrences: 4 }), 4, 'leitura repetida não deve inflar ocorrências');
   assert.strictEqual(dtcManager.nextDtcOccurrences({ status: 'INACTIVE', occurrences: 4 }), 5, 'novo ciclo após inatividade deve incrementar ocorrência');
+  assert.strictEqual(dtcManager.nextDtcOccurrences({ status: 'CONFIRMED', historical: true, occurrences: 2 }), 3, 'DTC histórico reativado deve iniciar nova ocorrência');
 })();
 
 async function main() {

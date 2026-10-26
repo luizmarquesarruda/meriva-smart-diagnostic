@@ -19,6 +19,10 @@
 - Mantidos Dados/Telemetria e Mais Recursos em caminhos secundários para não remover funções existentes.
 - Nenhuma alteração na conexão Bluetooth Classic, fila ELM327, validação da ECU, fórmulas PID, consumo, autonomia ou histórico.
 
+### Integridade de DTC e enum de combustível
+- DTC histórico deixa de ser retornado como atual mesmo se o status persistido estiver em conflito; nova ocorrência só incrementa ao reaparecer, e Mode 03 reconcilia ausências apenas para CURRENT/CONFIRMED REAL_OBD após resposta válida.
+- PID 0101 separa contagem DTC, MIL e readiness com máscaras corretas para motores SI/CI; PID 0151 decodifica códigos de combustível conhecidos e rejeita códigos desconhecidos.
+
 ### Auditoria de documentação OBD/Meriva
 - Incluídos links oficiais para os manuais do proprietário Meriva 2011 e 2012 e separada a documentação do veículo das definições genéricas SAE.
 - Corrigido o mapa do PID 0101: C4/D4 para ciclo Otto são disponibilidade/incompletude do monitor de filtro de partículas de gasolina; nenhum dos bits significa refrigerante do ar-condicionado.

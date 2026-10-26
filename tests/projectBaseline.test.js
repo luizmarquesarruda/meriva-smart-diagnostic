@@ -291,6 +291,11 @@ assert.match(laboratory, /parsed\?\.interpretation/, 'interpretações secundár
 assert.match(laboratory, /result\.status !== 'OK'/, 'DTC read must not interpret command error as no failures');
 assert.match(laboratory, /isValidDtcResponseForService\('03', result\.response\)/, 'DTC read must validate a complete response');
 assert.match(read('src/obd/dtcScanner.ts'), /reply\.status === 'OK' && isValidDtcResponseForService/, 'bulk scan requires valid response data');
+const dtcManagerSource = read('src/database/dtcManager.ts');
+assert.match(dtcManagerSource, /!dtc\.historical/, 'historical=true nunca pode ser classificado como DTC atual');
+assert.match(dtcManagerSource, /markMissingStoredDtcsInactive/, 'reconciliação DTC deve ficar centralizada e testável');
+assert.match(read('app/laboratorio.tsx'), /markMissingStoredDtcsInactive/, 'as duas leituras Mode 03 devem usar a mesma reconciliação DTC');
+assert.match(read('src/obd/parser.ts'), /fuelTypeCodes\[String\(data\[0\]\)\]/, 'PID 0151 deve usar a tabela enumerada de combustível');
 
 assert.match(theme, /SCREEN_TITLE_STYLE/);
 assert.match(read('tests/screenTheme.test.js'), /Shared screen theme and title contract/);

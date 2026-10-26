@@ -1,6 +1,6 @@
-## ESTADO VIGENTE — 2026-10-26 (auditoria sistêmica DB-150; CI da revisão em andamento)
+## ESTADO VIGENTE — 2026-10-26 (auditoria sistêmica DB-151; CI da revisão em andamento)
 
-> HEAD anterior a esta atualização: `fef9b2e6afdfb8682fb7f3c18ebedc800f257443` (DB-149). A CI do SHA DB-149 iniciou em eventos push e pull_request duplicados; a execução de PR deve validar o novo SHA depois desta correção de gatilhos. Não considerar o build Android anterior como validação deste commit.
+> HEAD anterior a esta atualização: `1d12c795a1714e44e99b7a9d8a34b504d08d95c5` (DB-150). A CI de PR passou validação e está/estava no build Android; esta correção DTC/parser exige CI própria no novo SHA.
 
 ### Integração, CI e riscos
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
@@ -9,6 +9,7 @@
 - CI anterior [40313041670](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40313041670), SHA `826df0ae23ef30e602418721c521be271c6e5ff6`, passou validação, mas falhou em `mergeReleaseResources` para `drawable-mdpi/splashscreen_image.png`. A repetição sobre o descendente `c02fecb6abe876c1a1f0ca275330f33af3ec6e91`, sem alterar a imagem, passou o build completo; falha tratada como transitória e registrada, sem modificação desnecessária do splash.
 - DB-146 adicionou PID 0144 ao catálogo padrão com fórmula/faixa/unidade e testes, sem marcar suporte físico nem incluí-lo na fila automática. Ele permanece alvo de confirmação até existir resposta RAW_ECU válida.
 - DB-147 sincronizou README, auditoria de fontes e inventário completo com o catálogo runtime: 35 PIDs, 35 faixas e 21 definições de fórmula. Também corrigiu a semântica documental de 0101, 0111 e 0130 e adicionou testes de consistência.
+- DB-151 recupera correções relevantes da PR #83 que ainda não estavam no código consolidado: status histórico de DTC, reconciliação segura de Mode 03, interpretação correta dos monitores PID 0101 e enum PID 0151.
 - A autonomia DB-143–145 usa janela móvel de dez leituras e balanço do último tanque completo. O balanço é uma estimativa e depende de todas as viagens e abastecimentos serem registrados; DB-149 acrescenta a comparação do odômetro atual com a distância rastreada. Precisão física ainda não foi medida.
 - PR [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81) e PR [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) continuam abertas por divergência. O código útil de #81 está portado; o layout de #83 está incorporado, e a prévia foi movida para `src/ui/FlootLayoutPreview.tsx`, fora das rotas Expo. Ambas serão encerradas como substituídas após validação da PR consolidada para `main`.
 - Somente `010C` tem resposta RAW_ECU específica documentada para a Meriva (`41 0C 1A F8` = 1726 rpm). Catálogo SAE não é prova de suporte do veículo.
@@ -219,6 +220,7 @@
 - **DB-148** · 2026-10-26 — Corrigir registro de evidência e fechar ciclo de CI
 - **DB-149** · 2026-10-26 — Rejeitar autonomia estimada quando o odômetro diverge da distância rastreada
 - **DB-150** · 2026-10-26 — Eliminar CI duplicada entre push e pull_request
+- **DB-151** · 2026-10-26 — Reintegrar correções de DTC histórico e interpretação dos PIDs 0101/0151
 
 ---
 
@@ -4303,4 +4305,24 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - A CI da PR precisa validar a nova configuração e todo o código consolidado no SHA final, incluindo Expo Doctor, gate anti-regressão, TypeScript, suíte completa e APK Android standalone.
 - A CI anterior do SHA DB-149 foi iniciada em duplicidade; não usar resultados de um SHA anterior como evidência do novo commit.
 - Testes físicos com Galaxy A06/Android 16 e ELM327/ECU real permanecem pendentes.
+
+
+## DB-151 · 2026-10-26 — Reintegrar correções de DTC histórico e interpretação dos PIDs 0101/0151
+
+### Causa confirmada
+- A comparação direta da PR #83 com a branch consolidada revelou correções de DTC que não tinham sido portadas: `getCurrentDtcs` aceitava registros `historical=true` se o status persistido dissesse CONFIRMED/CURRENT; a contagem de ocorrências tratava um DTC histórico como se ainda estivesse ativo; e a leitura direta Mode 03 substituía o estado em memória pelos resultados da última leitura.
+- A mesma comparação revelou que o catálogo de combustível PID 0151 já estava importado no parser, mas não era utilizado. A interpretação do PID 0101 também ainda aplicava uma leitura simplificada dos bits de readiness e não distinguia os mapas SI/CI nem o monitor de filtro de partículas de gasolina.
+- Portanto, a PR #83 não podia ser encerrada como substituída antes de recuperar esses comportamentos relevantes. O protótipo de rota Floot, por outro lado, permanece movido para fora de `app/` para não expor uma tela estática de demonstração.
+
+### Correção aplicada
+- `getCurrentDtcs` exclui registros históricos independentemente do status conflitante; `nextDtcOccurrences` incrementa quando um código histórico volta a aparecer.
+- Criado `markMissingStoredDtcsInactive`, que só reconcilia DTCs CURRENT/CONFIRMED de origem REAL_OBD ausentes após resposta Mode 03 válida. PENDING, PERMANENT, históricos e registros importados são preservados.
+- As duas rotas de leitura Mode 03 usam a mesma reconciliação; a tela preserva outros DTCs não alterados no estado do autosave.
+- PID 0101 agora publica contagem DTC separada e interpreta monitores contínuos e de ignição com mapas SI/CI distintos; PID 0151 decodifica enums conhecidos e recusa código desconhecido.
+- Acrescentados testes comportamentais e proteções de baseline; RG-40, plano de testes, changelog, resumo vigente e índice DB-001…DB-151 atualizados.
+
+### Validação
+- O novo SHA precisa passar gate anti-regressão, Expo Doctor, TypeScript, suíte completa e build Android standalone antes de mesclar a PR consolidada.
+- A correção de parser é validada com respostas sintéticas; não comprova que a ECU específica da Meriva anuncie ou responda a PID 0151.
+- Testes físicos com Galaxy A06/Android 16, ELM327 e ECU permanecem pendentes.
 
