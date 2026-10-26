@@ -5,6 +5,12 @@
 ### CI e controle de regressões
 - Evitada a execução duplicada da mesma CI em branches que já possuem PR para `main`: commits de branches são validados pelo evento `pull_request`, e o evento `push` fica reservado a `main`. O despacho manual permanece disponível.
 
+### Autonomia com fallback controlado e tela dedicada
+- A tela nativa de autonomia segue a referência grafite/âmbar, mostra estado real da ECU, origem do cálculo, idade do PID 012F, consumo usado e regras de segurança; os valores demonstrativos do protótipo não foram portados para produção.
+- A mediana do PID 012F continua sendo considerada atual até 30 s. Entre >30 s e 60 s, uma estimativa temporária só é autorizada com pelo menos duas amostras reais no buffer, ECU e sessão conectadas, timestamp não futuro e consumo válido. Após 60 s, o buffer não sustenta autonomia.
+- A tela e o cockpit rotulam separadamente leitura atual, ESTIMADA · BUFFER, balanço de tanque cheio e N/D; a tela Dados usa a mesma regra de cálculo. O fallback por tanque cheio permanece sujeito à validação independente existente.
+- A interface não presume suporte/calibração física do PID 012F e declara que a capacidade nominal de 56 L não comprova linearidade percentual→litros na ECU específica.
+
 ### Autonomia: continuidade do consumo e integridade do balanço
 - A mediana de nível de combustível tem limite simultâneo de 10 leituras e 60 segundos, para que um valor extremo antigo não sobreviva só porque cada consulta chegou em menos de 30 segundos.
 - O consumo móvel perde sua janela quando a taxa é inválida, a origem muda, o timestamp sai de ordem, o intervalo supera 10 segundos ou a taxa deixa de atualizar por mais de 10 segundos; exige dez novos intervalos válidos antes de voltar a alimentar autonomia.

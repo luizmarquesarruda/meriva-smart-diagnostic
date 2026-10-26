@@ -258,6 +258,18 @@ for (const label of [
 assert.match(home, /10_000/);
 assert.match(home, /getCurrentAutonomyRangeKm/);
 assert.match(home, /rollingConsumptionKml: tripState\.rollingConsumptionKml/);
+assert.match(home, /href="\/autonomia"/, 'o cockpit deve abrir a tela completa da autonomia ao tocar no cartão');
+const autonomyScreen = read('app/autonomia.tsx');
+assert.match(autonomyScreen, /ESTIMADA · BUFFER/, 'a tela de autonomia precisa identificar o fallback temporário');
+assert.match(autonomyScreen, /subscribeSharedObdStatus/, 'o estado da ECU exibido na tela deve ser real e atualizado');
+assert.match(autonomyScreen, /getCurrentAutonomyRangeKm/, 'a tela deve reutilizar o contrato único de cálculo de autonomia');
+assert.match(autonomyScreen, /linearidade do PID 012F não calibrada/i, 'a UI não pode sugerir uma calibração física não verificada');
+assert.doesNotMatch(autonomyScreen, /level:\s*42|consumption:\s*8\.4|age:\s*44/, 'valores demonstrativos do protótipo não podem entrar na produção');
+assert.match(read('src/trip/autonomyPresentation.ts'), /BUFFER_FUEL_LEVEL_MAX_AGE_MS\s*=\s*60_000/);
+assert.match(read('src/trip/autonomyPresentation.ts'), /MIN_BUFFER_FUEL_LEVEL_SAMPLES\s*=\s*2/);
+assert.match(tripService, /fuelLevelBufferPercent/);
+assert.match(projectContract, /\| RG-51 \|/, 'fallback de autonomia precisa de contrato anti-regressão próprio');
+assert.match(read('docs/TEST_PLAN.md'), /DATA-04/, 'a janela temporária de autonomia precisa constar no plano de aceitação');
 assert.match(dataScreen, /rollingConsumptionKml: trip\.rollingConsumptionKml/);
 assert.match(tripService, /this\.autonomyBuffer\.addFuelLevelSample/);
 assert.match(tripService, /this\.autonomyBuffer\.addFuelFlowSample/);

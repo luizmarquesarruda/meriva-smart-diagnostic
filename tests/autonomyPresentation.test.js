@@ -32,7 +32,7 @@ function loadTs(file, overrides = {}) {
 const root = path.resolve(__dirname, '..');
 const fuelLevel = loadTs(path.join(root, 'src/trip/fuelLevel.ts'));
 const presentation = loadTs(path.join(root, 'src/trip/autonomyPresentation.ts'), { './fuelLevel': fuelLevel });
-const { getCurrentAutonomyRangeKm } = presentation;
+const { getCurrentAutonomyRangeKm, isBufferEstimatedFuelLevelSample } = presentation;
 
 const valid = {
   ecuConnected: true,
@@ -66,7 +66,32 @@ assert.strictEqual(getCurrentAutonomyRangeKm({ ...valid, averageConsumptionKml: 
 assert.strictEqual(getCurrentAutonomyRangeKm({ ...valid, fuelLevelReadAtMs: 970_000 }), 280,
   'a amostra de nível no limite de 30 s ainda é válida');
 assert.strictEqual(getCurrentAutonomyRangeKm({ ...valid, fuelLevelReadAtMs: 969_999 }), null,
-  'amostra de nível com mais de 30 s deve ser considerada desatualizada');
+  'amostra vencida sem buffer explícito nunca é tratada como atual');
+assert.strictEqual(isBufferEstimatedFuelLevelSample(969_999, 2, 1_000_000), true,
+  'buffer com duas amostras entre 30 e 60 s é elegível apenas à estimativa temporária');
+assert.strictEqual(isBufferEstimatedFuelLevelSample(970_000, 2, 1_000_000), false,
+  'a janela atual até 30 s não deve ser rotulada como fallback');
+assert.strictEqual(isBufferEstimatedFuelLevelSample(940_000, 2, 1_000_000), true,
+  'idade de exatamente 60 s ainda pode entrar na janela temporária');
+assert.strictEqual(isBufferEstimatedFuelLevelSample(939_999, 2, 1_000_000), false,
+  'acima de 60 s o buffer deixa de autorizar a estimativa');
+assert.strictEqual(isBufferEstimatedFuelLevelSample(969_999, 1, 1_000_000), false,
+  'uma amostra isolada não autoriza a estimativa');
+assert.strictEqual(getCurrentAutonomyRangeKm({
+  ...valid, fuelLevelReadAtMs: null, fuelLevelPercent: null,
+  fuelLevelBufferPercent: 50, fuelLevelBufferReadAtMs: 969_999,
+  fuelLevelBufferSampleCount: 3,
+}), 280, 'buffer elegível calcula autonomia com a mediana real');
+assert.strictEqual(getCurrentAutonomyRangeKm({
+  ...valid, fuelLevelReadAtMs: null, fuelLevelPercent: null,
+  fuelLevelBufferPercent: 50, fuelLevelBufferReadAtMs: 939_999,
+  fuelLevelBufferSampleCount: 3,
+}), null, 'buffer acima de 60 s não autoriza autonomia');
+assert.strictEqual(getCurrentAutonomyRangeKm({
+  ...valid, ecuConnected: false, fuelLevelReadAtMs: null, fuelLevelPercent: null,
+  fuelLevelBufferPercent: 50, fuelLevelBufferReadAtMs: 969_999,
+  fuelLevelBufferSampleCount: 3,
+}), null, 'buffer nunca contorna a guarda de ECU desconectada');
 assert.strictEqual(getCurrentAutonomyRangeKm({ ...valid, fuelLevelReadAtMs: null }), null,
   'percentual sem timestamp de leitura atual não pode gerar autonomia');
 assert.strictEqual(getCurrentAutonomyRangeKm({ ...valid, fuelLevelReadAtMs: Number.NaN }), null,

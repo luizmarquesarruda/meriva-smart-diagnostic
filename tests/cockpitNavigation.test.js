@@ -10,6 +10,7 @@ const more = read('app/mais.tsx');
 const settingsScreen = read('app/configuracoes.tsx');
 const previewComponent = read('src/ui/FlootLayoutPreview.tsx');
 const laboratory = read('app/laboratorio.tsx');
+const autonomy = read('app/autonomia.tsx');
 assert.match(laboratory, /AGUARDANDO CONEXÃO ELM327/, 'tela OBD não deve chamar Bluetooth pronto quando a ECU ainda não está conectada');
 assert.match(laboratory, /getSharedObdConnection\(\) \? 'ECU CONECTADA \/ DIAGNÓSTICO DISPONÍVEL' : 'AGUARDANDO CONEXÃO ELM327'/, 'estado inicial deve refletir a conexão real');
 assert.match(laboratory, /disabledButton/, 'botão de desconexão precisa ter estilo visual explícito quando desabilitado');
@@ -25,6 +26,11 @@ for (const route of ['/bluetooth', '/saude', '/viagens', '/laboratorio', '/confi
   assert.ok(bottomNav.includes('href="' + route + '"'), 'navegação principal deve expor ' + route);
 }
 assert.ok(index.includes('href="/conectividade"'), 'cockpit deve expor o detalhe da rede');
+assert.ok(index.includes('href="/autonomia"'), 'cartão de autonomia deve abrir a tela detalhada');
+assert.ok(autonomy.includes('VOLTAR AO COCKPIT'), 'tela de autonomia deve oferecer retorno ao painel');
+assert.match(autonomy, /ESTIMADA · BUFFER/);
+assert.match(autonomy, /ageSeconds/);
+assert.match(more, /AUTONOMIA E COMBUSTÍVEL/, 'a tela de autonomia também deve ser acessível em Mais Recursos');
 assert.ok(more.includes("'/dados'"), 'Dados/Telemetria deve continuar acessível em Mais Recursos');
 assert.match(more, /DADOS E TELEMETRIA/, 'atalho secundário deve identificar Dados/Telemetria');
 assert.ok(settingsScreen.includes('href="/mais"'), 'Configurações deve manter acesso a Mais Recursos');

@@ -1,6 +1,6 @@
-## ESTADO VIGENTE — 2026-10-26 (autonomia DB-159; nova CI pendente)
+## ESTADO VIGENTE — 2026-10-26 (autonomia DB-160; CI do novo SHA pendente)
 
-> DB-153 passou em validate e android-build. DB-154…DB-158 corrigiram e documentaram os problemas encontrados nas validações intermediárias. A CI [40323823689](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40323823689) aprovou validate e android-build no HEAD anterior d0437327d02eca1f7443561bf4c5deff14bcc3ac. DB-159 modifica autonomia, integrador de combustível, validação do balanço e testes; a CI desse novo SHA está pendente e resultados anteriores não se transferem.
+> DB-153…DB-158 corrigiram e documentaram regressões encontradas durante as validações. A CI [40332739335](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40332739335) concluiu com sucesso no SHA DB-159 6d503d1f4043332df066f816dd60d607a118f410. DB-160 adiciona a janela temporária de autonomia, tela nativa em grafite/âmbar e novos testes; o novo commit exige CI completa própria e não herda validações anteriores.
 
 ### Integração, CI e riscos
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
@@ -16,7 +16,7 @@
 - Não foi executado teste físico no Galaxy A06/Android 16 nem com ELM327/ECU real.
 
 ### Critérios de aceitação
-- RG-01…RG-50 únicos e sequenciais; DB-001…DB-NNN e índice sincronizados.
+- RG-01…RG-51 únicos e sequenciais; DB-001…DB-160 e índice sincronizados.
 - Gate anti-regressão, TypeScript, suíte completa e build Android aprovados no mesmo SHA final.
 - Nenhum PID passa a confirmado sem evidência RAW_ECU válida; autonomia persistida não pode ser exibida como atual.
 
@@ -229,6 +229,7 @@
 - **DB-157** · 2026-10-26 — Corrigir contagem ativa versus pendente na fila ELM
 - **DB-158** · 2026-10-26 — Atualizar a asserção do gate para finally multilinha
 - **DB-159** · 2026-10-26 — Reforçar continuidade das amostras e validade do balanço de autonomia
+- **DB-160** — Fallback de autonomia pelo buffer entre 30–60 s, tela nativa grafite/âmbar e testes/contratos atualizados.
 
 ---
 
@@ -4465,3 +4466,23 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - A capacidade nominal do tanque continua em 56 L. Isso não comprova que percentual do PID 012F corresponda linearmente a litros na ECU específica, nem calibra o sensor. Nenhum resultado físico foi inventado.
 - A CI [40323823689](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40323823689) passou validate e android-build somente no SHA anterior DB-158. DB-159 exige nova execução integral de CI no SHA final.
 - Testes físicos com o ELM327, ECU real, odômetro e abastecimento medido permanecem pendentes. O cálculo é uma estimativa e depende de registrar todas as viagens e abastecimentos; quando a evidência não fecha, a tela deve exibir N/D.
+
+
+## DB-160 · 2026-10-26 — Autonomia temporária pelo buffer e tela nativa grafite/âmbar
+
+### Objetivo
+Aplicar no aplicativo nativo a referência visual do painel de autonomia, conectada à telemetria real, sem preservar os números demonstrativos do protótipo.
+
+### Correções aplicadas
+- src/trip/autonomyBuffer.ts expõe mediana, contagem e timestamp real do buffer do PID 012F na janela de 60 s. O contrato de frescor de 30 s continua inalterado para que dados antigos nunca sejam reportados como leitura atual.
+- src/trip/autonomyPresentation.ts aceita estimativa temporária apenas entre >30 s e 60 s, com pelo menos duas amostras válidas, timestamp não futuro, ECU/sessão conectadas e consumo positivo. PID atual tem prioridade; o buffer vem depois; o balanço explícito de tanque cheio mantém as guardas independentes de RG-45.
+- src/trip/autoTripService.ts expõe os campos de buffer somente enquanto a sessão/ECU está conectada. O timestamp de fallback é o da última amostra real; após 60 s ou desconexão, o buffer não fornece base para autonomia.
+- Criada app/autonomia.tsx com fundo grafite, cartão escuro, destaque âmbar para ESTIMADA · BUFFER, verde apenas para ECU conectada, indicador neutro para indisponível, idade da leitura, consumo utilizado, fonte do combustível e regras expansíveis. Todos os números vêm do serviço e do histórico validado, sem simular conexão ou amostras.
+- O cartão de autonomia no cockpit abre a página; a página também está em Mais Recursos. A tela Dados usa os mesmos parâmetros de buffer e exige consumo confiável da viagem para o balanço.
+- Atualizados testes de autonomyBuffer, autonomyPresentation, navegação, gate de baseline, RG-51, plano de testes e changelog. A idade e a quantidade de amostras são verificadas nos limites 30/60 s, com desconexão e buffer insuficiente.
+- A identidade visual grafite/âmbar está restrita à tela de autonomia e ao cartão clicável, sem alterar indiscriminadamente as cores de outros módulos nem o fundo configurado da splash.
+
+### Validação e limites
+- A CI [40332739335](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40332739335) passou no SHA de base DB-159. Ela não valida DB-160; a nova CI no SHA deste commit é obrigatória.
+- Não se presume linearidade física da conversão percentual→litros do PID 012F. A capacidade nominal de 56 L permanece apenas uma referência; confirmar precisão exige leituras reais com ELM327/ECU, odômetro e abastecimento medido.
+- Até a CI do SHA DB-160 completar, status de build/testes é pendente. Nenhum teste físico foi executado nesta anotação.

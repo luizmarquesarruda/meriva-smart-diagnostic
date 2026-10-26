@@ -18,6 +18,9 @@ export interface AutonomyBufferSnapshot {
   fuelLevelPercent: number | null;
   fuelLevelSampleCount: number;
   fuelLevelBufferReady: boolean;
+  fuelLevelBufferPercent: number | null;
+  fuelLevelBufferReadAtMs: number | null;
+  fuelLevelBufferSampleCount: number;
   rollingConsumptionKml: number | null;
   rollingConsumptionSampleCount: number;
   rollingConsumptionBufferReady: boolean;
@@ -118,16 +121,30 @@ export class AutonomyBuffer {
   getFuelLevelPercent(nowMs = Date.now()): number | null {
     const last = this.fuelLevels[this.fuelLevels.length - 1];
     if (!last || !this.isFresh(last.timestampMs, nowMs)) return null;
-    const sorted = this.fuelLevels.map((sample) => sample.percent).sort((a, b) => a - b);
-    const middle = Math.floor(sorted.length / 2);
-    const median = sorted.length % 2 === 0
-      ? (sorted[middle - 1] + sorted[middle]) / 2
-      : sorted[middle];
-    return Number(median.toFixed(2));
+    return this.getMedianFuelLevel(this.getFuelLevelSamplesInWindow(nowMs));
   }
 
   getFuelLevelSampleCount(nowMs = Date.now()): number {
-    return this.getFuelLevelPercent(nowMs) == null ? 0 : this.fuelLevels.length;
+    return this.getFuelLevelPercent(nowMs) == null ? 0 : this.getFuelLevelSamplesInWindow(nowMs).length;
+  }
+
+  /** Last real PID 012F timestamp retained for the bounded grace window. */
+  getFuelLevelBufferReadAtMs(nowMs = Date.now()): number | null {
+    const last = this.fuelLevels[this.fuelLevels.length - 1];
+    if (!last || !Number.isFinite(nowMs)) return null;
+    const ageMs = nowMs - last.timestampMs;
+    return ageMs >= 0 && ageMs <= AUTONOMY_BUFFER_FUEL_LEVEL_WINDOW_MS ? last.timestampMs : null;
+  }
+
+  getFuelLevelBufferSampleCount(nowMs = Date.now()): number {
+    if (this.getFuelLevelBufferReadAtMs(nowMs) == null) return 0;
+    return this.getFuelLevelSamplesInWindow(nowMs).length;
+  }
+
+  /** Median from real buffered samples; two or more are required for fallback. */
+  getFuelLevelBufferPercent(nowMs = Date.now()): number | null {
+    if (this.getFuelLevelBufferSampleCount(nowMs) < 2) return null;
+    return this.getMedianFuelLevel(this.getFuelLevelSamplesInWindow(nowMs));
   }
 
   getRollingConsumptionKml(nowMs = Date.now()): number | null {
@@ -158,15 +175,39 @@ export class AutonomyBuffer {
     const fuelLevelPercent = this.getFuelLevelPercent(nowMs);
     const rollingConsumptionKml = this.getRollingConsumptionKml(nowMs);
     const fuelLevelSampleCount = this.getFuelLevelSampleCount(nowMs);
+    const fuelLevelBufferPercent = this.getFuelLevelBufferPercent(nowMs);
+    const fuelLevelBufferReadAtMs = this.getFuelLevelBufferReadAtMs(nowMs);
+    const fuelLevelBufferSampleCount = this.getFuelLevelBufferSampleCount(nowMs);
     const rollingConsumptionSampleCount = this.getRollingConsumptionSampleCount(nowMs);
     return {
       fuelLevelPercent,
       fuelLevelSampleCount,
       fuelLevelBufferReady: fuelLevelSampleCount >= AUTONOMY_BUFFER_CAPACITY,
+      fuelLevelBufferPercent,
+      fuelLevelBufferReadAtMs,
+      fuelLevelBufferSampleCount,
       rollingConsumptionKml,
       rollingConsumptionSampleCount,
       rollingConsumptionBufferReady: rollingConsumptionSampleCount >= AUTONOMY_BUFFER_MIN_INTERVALS,
     };
+  }
+
+  private getFuelLevelSamplesInWindow(nowMs: number): FuelLevelReading[] {
+    if (!Number.isFinite(nowMs)) return [];
+    return this.fuelLevels.filter((sample) => {
+      const ageMs = nowMs - sample.timestampMs;
+      return ageMs >= 0 && ageMs <= AUTONOMY_BUFFER_FUEL_LEVEL_WINDOW_MS;
+    });
+  }
+
+  private getMedianFuelLevel(samples: FuelLevelReading[]): number | null {
+    if (samples.length === 0) return null;
+    const sorted = samples.map((sample) => sample.percent).sort((a, b) => a - b);
+    const middle = Math.floor(sorted.length / 2);
+    const median = sorted.length % 2 === 0
+      ? (sorted[middle - 1] + sorted[middle]) / 2
+      : sorted[middle];
+    return Number(median.toFixed(2));
   }
 
   private isFresh(timestampMs: number, nowMs: number): boolean {

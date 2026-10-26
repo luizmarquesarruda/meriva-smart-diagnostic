@@ -23,7 +23,7 @@ import { connectPreferredElm, getSharedObdConnection, getSharedObdLastError, get
 import { autoTripService, type AutoTripServiceState } from '../src/trip/autoTripService';
 import { loadCurrentConditions, type CurrentConditions } from '../src/weather/currentConditions';
 import { mergeCurrentConditions, startCurrentConditionsRefresh, type NetworkReachabilitySnapshot } from '../src/weather/conditionsRefresh';
-import { getCurrentAutonomyRangeKm, isCurrentFuelLevelSample } from '../src/trip/autonomyPresentation';
+import { getCurrentAutonomyRangeKm, isBufferEstimatedFuelLevelSample, isCurrentFuelLevelSample } from '../src/trip/autonomyPresentation';
 import { buildCockpitPidMetrics, type CockpitPidMetric } from '../src/obd/cockpitTelemetry';
 
 export default function IndexScreen() {
@@ -261,6 +261,9 @@ export default function IndexScreen() {
     fuelLevelSupported: tripState.fuelLevelSupported,
     fuelLevelPercent: tripState.fuelLevelPercent,
     fuelLevelReadAtMs: tripState.fuelLevelReadAtMs,
+    fuelLevelBufferPercent: tripState.fuelLevelBufferPercent,
+    fuelLevelBufferReadAtMs: tripState.fuelLevelBufferReadAtMs,
+    fuelLevelBufferSampleCount: tripState.fuelLevelBufferSampleCount,
     tripConsumptionKml: tripState.consumptionKml,
     rollingConsumptionKml: tripState.rollingConsumptionKml,
     fallbackFuelRemainingL: fuelBalanceFallback?.remainingFuelL ?? null,
@@ -268,11 +271,36 @@ export default function IndexScreen() {
   });
   const hasCurrentPidFuelLevel = tripState.fuelLevelSupported
     && isCurrentFuelLevelSample(tripState.fuelLevelReadAtMs);
-  const autonomyDetail = currentAutonomyKm == null
-    ? 'AGUARDANDO PID 012F OU TANQUE CHEIO'
+  const hasBufferPidFuelLevel = tripState.fuelLevelSupported
+    && tripState.fuelLevelBufferPercent != null
+    && isBufferEstimatedFuelLevelSample(
+      tripState.fuelLevelBufferReadAtMs,
+      tripState.fuelLevelBufferSampleCount,
+    );
+  const autonomySource = currentAutonomyKm == null
+    ? 'unavailable'
     : hasCurrentPidFuelLevel
-      ? `PID 012F • BUFFER ${tripState.fuelLevelBufferCount}/10`
-      : `TANQUE ESTIMADO • ${fuelBalanceFallback?.tripsCount ?? 0} VIAGENS`;
+      ? 'current'
+      : hasBufferPidFuelLevel
+        ? 'buffer'
+        : 'tank';
+  const autonomyStatusLabel = autonomySource === 'current'
+    ? 'ATUAL'
+    : autonomySource === 'buffer'
+      ? 'ESTIMADA · BUFFER'
+      : autonomySource === 'tank'
+        ? 'TANQUE ESTIMADO'
+        : 'INDISPONÍVEL';
+  const autonomyDetail = currentAutonomyKm == null
+    ? hasBufferPidFuelLevel
+      ? 'BUFFER PID 012F • AGUARDANDO CONSUMO VÁLIDO'
+      : 'AGUARDANDO PID 012F OU TANQUE VALIDADO'
+    : autonomySource === 'current'
+      ? 'PID 012F • BUFFER ' + tripState.fuelLevelBufferCount + '/10'
+      : autonomySource === 'buffer'
+        ? 'BUFFER PID 012F • ' + tripState.fuelLevelBufferSampleCount + '/10 • '
+          + Math.max(0, Math.round((Date.now() - (tripState.fuelLevelBufferReadAtMs ?? Date.now())) / 1000)) + ' S'
+        : 'BALANÇO DO TANQUE • ' + (fuelBalanceFallback?.tripsCount ?? 0) + ' VIAGENS';
   const connectedSupportedPids = connectionStatus.ecuConnected
     ? getSharedObdConnection()?.supportedPids ?? []
     : [];
@@ -433,13 +461,25 @@ export default function IndexScreen() {
           </Link>
 
           <View style={[styles.primaryMetricGrid, layout.landscape && styles.primaryMetricGridLandscape]}>
-            <PrimaryMetric
-              icon="battery"
-              label="AUTONOMIA"
-              value={currentAutonomyKm != null ? Math.round(currentAutonomyKm) + ' km' : 'N/D'}
-              detail={autonomyDetail}
-              landscape={layout.landscape}
-            />
+            <Link href="/autonomia" asChild>
+              <TouchableOpacity
+                style={styles.autonomyMetricTap}
+                accessibilityRole="button"
+                accessibilityLabel="Abrir autonomia estimada e fonte do combustível"
+                accessibilityHint="Mostra idade da leitura, consumo usado, estado do buffer e regras de segurança"
+                activeOpacity={0.82}
+              >
+                <PrimaryMetric
+                  icon="battery"
+                  label="AUTONOMIA"
+                  value={currentAutonomyKm != null ? Math.round(currentAutonomyKm) + ' km' : 'N/D'}
+                  detail={autonomyDetail}
+                  landscape={layout.landscape}
+                  variant={autonomySource}
+                  statusLabel={autonomyStatusLabel}
+                />
+              </TouchableOpacity>
+            </Link>
             <PrimaryMetric
               icon="cockpit"
               label="CONSUMO"
@@ -518,15 +558,33 @@ export default function IndexScreen() {
   );
 }
 
-function PrimaryMetric({ icon, label, value, detail, landscape }: { icon: 'battery' | 'cockpit'; label: string; value: string; detail: string; landscape: boolean }) {
+type AutonomyMetricVariant = 'default' | 'current' | 'buffer' | 'tank' | 'unavailable';
+
+function PrimaryMetric({ icon, label, value, detail, landscape, variant = 'default', statusLabel }: {
+  icon: 'battery' | 'cockpit';
+  label: string;
+  value: string;
+  detail: string;
+  landscape: boolean;
+  variant?: AutonomyMetricVariant;
+  statusLabel?: string;
+}) {
+  const variantCardStyle = variant === 'current' ? styles.autonomyMetricCurrent
+    : variant === 'buffer' ? styles.autonomyMetricBuffer
+      : variant === 'tank' ? styles.autonomyMetricTank
+        : variant === 'unavailable' ? styles.autonomyMetricUnavailable : null;
+  const variantTagStyle = variant === 'current' ? styles.autonomyStatusCurrent
+    : variant === 'buffer' || variant === 'tank' ? styles.autonomyStatusBuffer
+      : styles.autonomyStatusUnavailable;
   return (
-    <View style={[styles.primaryMetricCard, landscape && styles.primaryMetricCardLandscape]}>
+    <View style={[styles.primaryMetricCard, landscape && styles.primaryMetricCardLandscape, variantCardStyle]}>
       <View style={styles.primaryMetricHeading}>
-        <AppIcon name={icon} size={16} color={COLORS.accent} />
-        <Text style={styles.primaryMetricLabel}>{label}</Text>
+        <AppIcon name={icon} size={16} color={variant === 'default' ? COLORS.accent : '#e8b451'} />
+        <Text style={[styles.primaryMetricLabel, variant !== 'default' && styles.autonomyMetricLabel]}>{label}</Text>
+        {statusLabel ? <Text style={[styles.autonomyStatusTag, variantTagStyle]} numberOfLines={1}>{statusLabel}</Text> : null}
       </View>
       <Text style={[styles.primaryMetricValue, landscape && styles.primaryMetricValueLandscape]} numberOfLines={1}>{value}</Text>
-      <Text style={styles.primaryMetricDetail} numberOfLines={1}>{detail}</Text>
+      <Text style={[styles.primaryMetricDetail, variant === 'buffer' && styles.autonomyMetricDetailBuffer]} numberOfLines={1}>{detail}</Text>
     </View>
   );
 }
@@ -554,6 +612,7 @@ const styles = StyleSheet.create({
   connectionPill:{flexDirection:'row',alignItems:'center',gap:6,flexShrink:0,backgroundColor:'#091526',borderRadius:20,borderWidth:1,borderColor:'#29415f',paddingHorizontal:10,paddingVertical:7},dot:{width:8,height:8,borderRadius:4},dotOk:{backgroundColor:'#4ade80'},dotWarn:{backgroundColor:'#fbbf24'},dotDanger:{backgroundColor:'#fb7185'},connectionText:{color:'#dbeafe',fontSize:9,fontWeight:'900'},
   connectedText:{color:'#4ade80'},
   connectionSummaryGrid:{flex:1,minWidth:0,flexDirection:'row',alignItems:'center',gap:12},connectionSummaryCell:{flex:1,minWidth:0,gap:3},connectionSummaryLabel:{color:'#7db3ff',fontSize:8,fontWeight:'900',letterSpacing:.7},connectionSummaryValue:{color:'#e5edf7',fontSize:10,fontWeight:'900'},
+  autonomyMetricTap:{flex:1,minWidth:0},autonomyMetricCurrent:{backgroundColor:'#121d1a',borderColor:'#35624f'},autonomyMetricBuffer:{backgroundColor:'#211b11',borderColor:'#866a37'},autonomyMetricTank:{backgroundColor:'#1c1913',borderColor:'#6b5732'},autonomyMetricUnavailable:{backgroundColor:'#141a1e',borderColor:'#354149'},autonomyMetricLabel:{color:'#e8b451'},autonomyStatusTag:{maxWidth:82,marginLeft:'auto',paddingHorizontal:4,paddingVertical:3,borderRadius:4,fontSize:6,fontWeight:'900',letterSpacing:.25,textAlign:'center',overflow:'hidden'},autonomyStatusCurrent:{color:'#91e5bd',backgroundColor:'#18392e',borderWidth:1,borderColor:'#275747'},autonomyStatusBuffer:{color:'#ffda8d',backgroundColor:'#3b2e19',borderWidth:1,borderColor:'#866a37'},autonomyStatusUnavailable:{color:'#a0aab1',backgroundColor:'#20292f',borderWidth:1,borderColor:'#354149'},autonomyMetricDetailBuffer:{color:'#ffda8d'},
   primaryMetricGrid:{width:'100%',flexDirection:'row',gap:10,marginBottom:8},primaryMetricGridLandscape:{gap:7,marginBottom:4},primaryMetricCard:{flex:1,minWidth:0,minHeight:82,justifyContent:'center',paddingHorizontal:12,paddingVertical:9,backgroundColor:'#0f2035',borderRadius:15,borderWidth:1,borderColor:'#2d5278'},primaryMetricCardLandscape:{minHeight:62,paddingHorizontal:8,paddingVertical:6},primaryMetricHeading:{flexDirection:'row',alignItems:'center',gap:6},primaryMetricLabel:{color:'#9aacc4',fontSize:9,fontWeight:'900',letterSpacing:.65},primaryMetricValue:{color:'#f8fafc',fontSize:25,lineHeight:29,fontWeight:'900',marginTop:5,fontVariant:['tabular-nums']},primaryMetricValueLandscape:{fontSize:20,lineHeight:23,marginTop:2},primaryMetricDetail:{color:'#8fa6c1',fontSize:7,fontWeight:'800',marginTop:3},
   secondaryGrid:{width:'100%',flexDirection:'row',flexWrap:'wrap',gap:7,marginBottom:8},secondaryGridLandscape:{flexWrap:'nowrap',gap:5,marginBottom:4},secondaryMetricCard:{width:'47%',flexBasis:'47%',minWidth:0,minHeight:62,justifyContent:'center',paddingHorizontal:7,paddingVertical:7,backgroundColor:'#091626',borderRadius:11,borderWidth:1,borderColor:'#233d5b'},secondaryMetricCardLandscape:{width:'auto',flexBasis:0,flexGrow:1,minHeight:52,paddingHorizontal:5,paddingVertical:5},secondaryMetricLabel:{color:'#9aacc4',fontSize:8,fontWeight:'900',letterSpacing:.3},secondaryMetricValue:{color:'#e5edf7',fontSize:14,fontWeight:'900',marginTop:4,fontVariant:['tabular-nums']},secondaryMetricValueLandscape:{fontSize:12,marginTop:2},secondaryMetricDetail:{color:'#7185a1',fontSize:7,fontWeight:'800',marginTop:2},
   heroCard:{backgroundColor:'#0f2035',borderRadius:18,borderWidth:1,borderColor:'#2d5278',padding:12,alignItems:'center',marginBottom:8},heroCardWarning:{borderColor:'#fbbf24',backgroundColor:'#2a2412'},heroCardDanger:{borderColor:'#fb7185',backgroundColor:'#2b1420'},heroCardLandscape:{padding:7,marginBottom:4},heroReadout:{width:'100%',alignItems:'center',paddingVertical:1},heroEyebrow:{color:'#7db3ff',fontSize:10,fontWeight:'900',letterSpacing:1.4,textAlign:'center'},heroNumberRow:{flexDirection:'row',alignItems:'baseline',justifyContent:'center',gap:6},heroUnit:{color:'#a9c8ef',fontSize:18,fontWeight:'900'},heroSwitchHintRow:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:4,marginTop:4},heroSwitchHint:{color:'#6884a6',fontSize:8,fontWeight:'900',letterSpacing:.6},heroWarning:{color:'#fbbf24'},heroValue:{color:'#f8fafc',fontSize:50,lineHeight:56,fontWeight:'900',marginTop:2,fontVariant:['tabular-nums']},heroValueLandscape:{fontSize:36,lineHeight:40,marginTop:0},heroState:{color:'#8fa6c1',fontSize:9,fontWeight:'800',letterSpacing:.5,textAlign:'center'},

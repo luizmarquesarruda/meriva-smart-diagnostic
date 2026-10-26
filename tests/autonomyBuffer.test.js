@@ -44,6 +44,25 @@ assert.equal(agedLevels.getFuelLevelSampleCount(226_000), 3,
 assert.equal(agedLevels.getFuelLevelPercent(226_000), 40,
   'um pico antigo não pode dominar a mediana depois de vários minutos de polling lento');
 
+const graceLevels = new AutonomyBuffer();
+for (let index = 0; index < 3; index += 1) {
+  assert.equal(graceLevels.addFuelLevelSample(42, 1_000_000 + index * 5_000), true);
+}
+assert.equal(graceLevels.getFuelLevelPercent(1_050_000), null,
+  'uma leitura com 40 s não deve ser apresentada como PID atual');
+assert.equal(graceLevels.getFuelLevelBufferPercent(1_050_000), 42,
+  'buffer recente com pelo menos duas amostras válidas sustenta apenas a estimativa temporária');
+assert.equal(graceLevels.getFuelLevelBufferReadAtMs(1_050_000), 1_010_000,
+  'a idade da estimativa vem do timestamp real da última amostra');
+assert.equal(graceLevels.getFuelLevelBufferSampleCount(1_050_000), 3);
+assert.equal(graceLevels.getFuelLevelBufferPercent(1_070_001), null,
+  'o buffer não pode sustentar autonomia após 60 s');
+assert.equal(graceLevels.getFuelLevelBufferReadAtMs(1_070_001), null);
+const singleGraceLevel = new AutonomyBuffer();
+singleGraceLevel.addFuelLevelSample(42, 1_000_000);
+assert.equal(singleGraceLevel.getFuelLevelBufferPercent(1_040_001), null,
+  'uma única amostra não autoriza fallback pela mediana');
+
 const flow = new AutonomyBuffer();
 for (let index = 0; index <= 10; index += 1) flow.addFuelFlowSample({ timestampMs: 1_000 + index * 1_500, speedKmh: 36, fuelRateLph: 12.6 });
 assert.equal(AUTONOMY_BUFFER_CAPACITY, 10);

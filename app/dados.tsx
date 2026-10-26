@@ -79,18 +79,19 @@ export default function DadosScreen() {
       startedAtMs: trip.tripStartedAtMs,
       distanceKm: trip.distanceKm,
       fuelUsedL: trip.fuelUsedL,
-      fuelDataValid: trip.fuelSupported || trip.rollingConsumptionKml != null
-        || trip.instantaneousConsumptionSource != null || trip.fuelUsedL >= 0.02,
+      fuelDataValid: trip.consumptionKml != null,
     },
   }), [maintenanceData?.fuelings, maintenanceData?.currentOdometerKm, state.driveCycles, trip.active,
-    trip.tripStartedAtMs, trip.distanceKm, trip.fuelUsedL, trip.fuelSupported,
-    trip.rollingConsumptionKml, trip.instantaneousConsumptionSource]);
+    trip.tripStartedAtMs, trip.distanceKm, trip.fuelUsedL, trip.consumptionKml]);
   const currentAutonomyKm = getCurrentAutonomyRangeKm({
     ecuConnected,
     tripConnected: trip.connected,
     fuelLevelSupported: trip.fuelLevelSupported,
     fuelLevelPercent: trip.fuelLevelPercent,
     fuelLevelReadAtMs: trip.fuelLevelReadAtMs,
+    fuelLevelBufferPercent: trip.fuelLevelBufferPercent,
+    fuelLevelBufferReadAtMs: trip.fuelLevelBufferReadAtMs,
+    fuelLevelBufferSampleCount: trip.fuelLevelBufferSampleCount,
     tripConsumptionKml: trip.consumptionKml,
     rollingConsumptionKml: trip.rollingConsumptionKml,
     fallbackFuelRemainingL: fuelBalanceFallback?.remainingFuelL ?? null,

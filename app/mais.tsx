@@ -6,6 +6,7 @@ import { AppIcon, type AppIconName } from '../src/ui/AppIcon';
 import { COLORS, SCREEN_TITLE_STYLE } from '../src/ui/theme';
 
 const items = [
+  ['battery', 'AUTONOMIA E COMBUSTÍVEL', 'Nível, consumo, idade da leitura e fonte da estimativa', '/autonomia'],
   ['manualPid', 'CONSULTA MANUAL DE PID', 'Consultar valores atuais e escolher códigos da lista descoberta', '/laboratorio'],
   ['sensors', 'TESTES DE SENSORES', 'Varredura guiada com cinco leituras válidas por PID', '/testes-sensores'],
   ['vehicle', 'VEÍCULO', 'Perfil, motor, combustível e ECU', '/veiculo'],

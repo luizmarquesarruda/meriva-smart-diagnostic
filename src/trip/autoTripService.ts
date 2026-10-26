@@ -24,6 +24,9 @@ export interface AutoTripServiceState {
   fuelLevelPercent: number | null;
   fuelLevelReadAtMs: number | null;
   fuelLevelBufferCount: number;
+  fuelLevelBufferPercent: number | null;
+  fuelLevelBufferReadAtMs: number | null;
+  fuelLevelBufferSampleCount: number;
   rollingConsumptionKml: number | null;
   rollingConsumptionBufferCount: number;
   fuelRemainingL: number | null;
@@ -53,6 +56,9 @@ const INITIAL_STATE: AutoTripServiceState = {
   fuelLevelPercent: null,
   fuelLevelReadAtMs: null,
   fuelLevelBufferCount: 0,
+  fuelLevelBufferPercent: null,
+  fuelLevelBufferReadAtMs: null,
+  fuelLevelBufferSampleCount: 0,
   rollingConsumptionKml: null,
   rollingConsumptionBufferCount: 0,
   fuelRemainingL: null,
@@ -97,16 +103,22 @@ class AutoTripService {
   getState(): AutoTripServiceState {
     const snapshot = { ...this.state };
     const buffer = this.autonomyBuffer.getSnapshot();
-    const currentFuelLevelIsValid = snapshot.connected
-      && getSharedObdStatus().ecuConnected
+    const sessionConnected = snapshot.connected && getSharedObdStatus().ecuConnected;
+    const currentFuelLevelIsValid = sessionConnected
       && isCurrentFuelLevelSample(snapshot.fuelLevelReadAtMs);
-    const withCurrentBuffer = {
+    const hasBufferedFuelLevel = sessionConnected && buffer.fuelLevelBufferReadAtMs != null;
+    const withCurrentBuffer: AutoTripServiceState = {
       ...snapshot,
       fuelLevelPercent: currentFuelLevelIsValid
         ? buffer.fuelLevelPercent ?? snapshot.fuelLevelPercent
         : null,
       fuelLevelReadAtMs: currentFuelLevelIsValid ? snapshot.fuelLevelReadAtMs : null,
-      fuelLevelBufferCount: currentFuelLevelIsValid ? buffer.fuelLevelSampleCount : 0,
+      fuelLevelBufferCount: currentFuelLevelIsValid
+        ? buffer.fuelLevelSampleCount
+        : hasBufferedFuelLevel ? buffer.fuelLevelBufferSampleCount : 0,
+      fuelLevelBufferPercent: hasBufferedFuelLevel ? buffer.fuelLevelBufferPercent : null,
+      fuelLevelBufferReadAtMs: hasBufferedFuelLevel ? buffer.fuelLevelBufferReadAtMs : null,
+      fuelLevelBufferSampleCount: hasBufferedFuelLevel ? buffer.fuelLevelBufferSampleCount : 0,
       rollingConsumptionKml: buffer.rollingConsumptionKml,
       rollingConsumptionBufferCount: buffer.rollingConsumptionSampleCount,
     };
