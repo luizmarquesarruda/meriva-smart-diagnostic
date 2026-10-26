@@ -270,6 +270,24 @@ assert.match(dataScreen, /fallbackFuelRemainingL: fuelBalanceFallback\?\.remaini
 assert.match(home, /fuelLevelReadAtMs: tripState\.fuelLevelReadAtMs/);
 assert.match(tripService, /fuelLevelReadAtMs/);
 assert.match(read('src/trip/autonomyPresentation.ts'), /CURRENT_FUEL_LEVEL_STALE_AFTER_MS\s*=\s*30_000/);
+assert.match(read('src/trip/autonomyBuffer.ts'), /AUTONOMY_BUFFER_FUEL_LEVEL_WINDOW_MS\s*=\s*60_000/,
+  'fuel-level median must not retain older values without a time bound');
+assert.match(read('src/trip/autonomyBuffer.ts'), /elapsedMs > AUTONOMY_BUFFER_MAX_INTERVAL_MS[\s\S]*this\.flowIntervals = \[\]/,
+  'rolling consumption intervals must reset after telemetry gaps');
+assert.match(read('src/obd/fuelConsumption.ts'), /noteMissingSample|hasGap/,
+  'fuel integration must expose missing-data continuity');
+assert.match(read('src/trip/tripRecorder.ts'), /!this\.fuelIntegrator\.hasGap\(\)/,
+  'a trip with a long fuel-flow gap must not publish km/L');
+assert.match(read('src/trip/fuelBalance.ts'), /calculatedConsumptionKml/,
+  'full-tank fallback must cross-check trip litres against distance and average');
+assert.match(read('src/trip/fuelBalance.ts'), /tripEvents\[index\]\.startedAtMs < tripEvents\[index - 1\]\.atMs/,
+  'overlapping recorded trips must invalidate the fuel balance');
+assert.match(home, /fuelDataValid: tripState\.consumptionKml != null/,
+  'active-trip fuel balance must require reliable current-trip consumption');
+assert.match(projectContract, /\\| RG-49 \\|/,
+  'fuel-level and rolling-flow continuity must remain in the anti-regression contract');
+assert.match(projectContract, /\\| RG-50 \\|/,
+  'fuel-balance fallback validation must remain in the anti-regression contract');
 assert.match(home, /coolantUnavailable/);
 assert.ok(!tripService.includes('averageConsumptionKml * state.autonomy.tankCapacityL'),
   'autonomia não deve assumir tanque cheio sem nível real do PID 012F');

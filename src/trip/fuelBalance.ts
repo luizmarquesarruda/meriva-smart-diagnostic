@@ -1,6 +1,7 @@
 import type { FuelingRecord } from '../database/maintenanceStorage';
 import type { DriveCycle } from '../data/driveCycles';
 import { TANK_CAPACITY_L } from './fuelLevel';
+import { MIN_TRIP_FUEL_L } from './tripRecorder';
 
 export interface ActiveFuelBalanceTrip {
   active: boolean;
@@ -82,10 +83,13 @@ export function estimateFuelRemainingFromFullTank(input: FuelBalanceInput): Fuel
     if (finishedAtMs <= baselineAtMs) continue;
     if (startedAtMs < baselineAtMs && finishedAtMs > baselineAtMs) return null;
     if (trip.fuelDataValid === false
-        || !Number.isFinite(trip.distanceTotalKm) || trip.distanceTotalKm < 0
-        || !Number.isFinite(trip.fuelUsedL) || trip.fuelUsedL < 0
-        || (trip.distanceTotalKm > 0 && trip.fuelUsedL <= 0)
-        || (trip.distanceTotalKm >= 0.1 && !(Number.isFinite(trip.avgFuelConsumptionKml) && trip.avgFuelConsumptionKml > 0))) return null;
+        || !Number.isFinite(trip.distanceTotalKm) || trip.distanceTotalKm < 0.1
+        || !Number.isFinite(trip.fuelUsedL) || trip.fuelUsedL < MIN_TRIP_FUEL_L
+        || !(Number.isFinite(trip.avgFuelConsumptionKml) && trip.avgFuelConsumptionKml > 0)) return null;
+    const calculatedConsumptionKml = trip.distanceTotalKm / trip.fuelUsedL;
+    const allowedConsumptionDifference = Math.max(0.005, calculatedConsumptionKml * 0.05);
+    if (!Number.isFinite(calculatedConsumptionKml) ||
+        Math.abs(trip.avgFuelConsumptionKml - calculatedConsumptionKml) > allowedConsumptionDifference) return null;
     tripEvents.push({
       kind: 'trip',
       atMs: finishedAtMs,
@@ -93,6 +97,11 @@ export function estimateFuelRemainingFromFullTank(input: FuelBalanceInput): Fuel
       distanceKm: trip.distanceTotalKm,
       fuelUsedL: trip.fuelUsedL,
     });
+  }
+
+  tripEvents.sort((a, b) => a.startedAtMs - b.startedAtMs || a.atMs - b.atMs);
+  for (let index = 1; index < tripEvents.length; index += 1) {
+    if (tripEvents[index].startedAtMs < tripEvents[index - 1].atMs) return null;
   }
 
   for (const trip of tripEvents) {
@@ -139,6 +148,7 @@ export function estimateFuelRemainingFromFullTank(input: FuelBalanceInput): Fuel
   const activeTrip = input.activeTrip;
   if (activeTrip?.active) {
     if (!Number.isFinite(activeTrip.startedAtMs) || activeTrip.startedAtMs == null || activeTrip.startedAtMs < baselineAtMs) return null;
+    if (tripEvents.some((trip) => trip.atMs > activeTrip.startedAtMs!)) return null;
     if (partialFuelings.some((fueling) => Date.parse(fueling.occurredAt) > activeTrip.startedAtMs!)) return null;
     if (!Number.isFinite(activeTrip.distanceKm) || activeTrip.distanceKm < 0
         || !Number.isFinite(activeTrip.fuelUsedL) || activeTrip.fuelUsedL < 0) return null;

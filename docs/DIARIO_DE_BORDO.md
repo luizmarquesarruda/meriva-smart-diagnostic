@@ -1,6 +1,6 @@
-## ESTADO VIGENTE — 2026-10-26 (atualização do gate serial DB-158; CI pendente)
+## ESTADO VIGENTE — 2026-10-26 (autonomia DB-159; nova CI pendente)
 
-> DB-153 passou em validate e android-build. DB-154/155/156 corrigiram regressões sequenciais do gate, escapes CSV e tipo `FileInfo`. A CI [40322799675](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40322799675) passou gate/TypeScript, mas o teste concorrente encontrou erro na contagem pendente. DB-157 reserva sincronicamente a vaga ativa. A CI [40323498797](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40323498797) falhou no gate porque ele ainda exigia `release()` como corpo único da expressão `finally`; DB-158 atualiza a asserção para o bloco multilinha utilizado.
+> DB-153 passou em validate e android-build. DB-154…DB-158 corrigiram e documentaram os problemas encontrados nas validações intermediárias. A CI [40323823689](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40323823689) aprovou validate e android-build no HEAD anterior d0437327d02eca1f7443561bf4c5deff14bcc3ac. DB-159 modifica autonomia, integrador de combustível, validação do balanço e testes; a CI desse novo SHA está pendente e resultados anteriores não se transferem.
 
 ### Integração, CI e riscos
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
@@ -16,7 +16,7 @@
 - Não foi executado teste físico no Galaxy A06/Android 16 nem com ELM327/ECU real.
 
 ### Critérios de aceitação
-- RG-01…RG-48 únicos e sequenciais; DB-001…DB-NNN e índice sincronizados.
+- RG-01…RG-50 únicos e sequenciais; DB-001…DB-NNN e índice sincronizados.
 - Gate anti-regressão, TypeScript, suíte completa e build Android aprovados no mesmo SHA final.
 - Nenhum PID passa a confirmado sem evidência RAW_ECU válida; autonomia persistida não pode ser exibida como atual.
 
@@ -228,6 +228,7 @@
 - **DB-156** · 2026-10-26 — Restringir leitura de tamanho CSV a arquivos existentes
 - **DB-157** · 2026-10-26 — Corrigir contagem ativa versus pendente na fila ELM
 - **DB-158** · 2026-10-26 — Atualizar a asserção do gate para finally multilinha
+- **DB-159** · 2026-10-26 — Reforçar continuidade das amostras e validade do balanço de autonomia
 
 ---
 
@@ -4442,3 +4443,25 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 ### Validação
 - DB-158 necessita de nova CI integral. A execução anterior falhou no gate antes de iniciar a suíte ou o build Android; não é evidência de falha de runtime nem de aprovação do código.
 - O teste concorrente da fila e as duas fronteiras da rotação CSV devem passar no próximo SHA.
+
+
+## DB-159 · 2026-10-26 — Reforçar continuidade das amostras e validade do balanço de autonomia
+
+### Causa confirmada
+- A mediana do PID 012F era limitada a dez leituras, mas não à idade total da janela. Com consulta lenta porém frequente, um pico muito antigo podia continuar influenciando a estimativa atual.
+- O consumo móvel podia conservar intervalos anteriores depois de uma taxa inválida ou de um gap acima de 10 s. O getter podia tratá-los como atuais se a amostra mais recente que completava um intervalo ainda estivesse dentro da tolerância de frescor.
+- O integrador de cada viagem ignorava intervalos >30 s numericamente, mas não conservava um sinal permanente de perda de continuidade. Se houvesse combustível suficiente antes e depois do gap, a viagem ainda poderia ser marcada como consumo válido, gerando km/L e autonomia excessivamente otimistas.
+- O fallback por tanque cheio dependia da consistência dos registros, porém não cruzava a média registrada com distância/litros e não rejeitava sobreposição entre viagens. A viagem ativa usava uma heurística de presença de fontes de combustível em vez do resultado de confiabilidade da própria viagem.
+
+### Correções aplicadas
+- src/trip/autonomyBuffer.ts: a mediana do nível conserva no máximo dez amostras dos últimos 60 s. Uma amostra de fluxo inválida, troca de origem, timestamp não monotônico ou gap acima de 10 s limpa a janela de consumo. Sem fluxo novo por mais de 10 s, o buffer é invalidado; a janela precisa reunir dez novos intervalos contínuos, >=0,1 km e >=0,05 L.
+- src/obd/fuelConsumption.ts: FuelRateIntegrator agora registra lacunas de combustível >30 s e limpa o baseline antigo. A flag persiste até o reset da viagem, mesmo quando novas leituras voltam.
+- src/trip/tripRecorder.ts e src/trip/autoTripService.ts: amostras ausentes notificam o integrador. Se a continuidade for quebrada, o histórico da viagem permanece, mas fuelDataValid=false, média de consumo indisponível e consumo da viagem ativa não pode alimentar a autonomia.
+- src/trip/fuelBalance.ts: fallback exige viagens REAL_OBD com >=0,1 km e >=0,05 L, média registrada coerente com distância/litros (diferença máxima de 5% ou 0,005 km/L), períodos sem sobreposição, abastecimentos coerentes e odômetro verificado.
+- app/index.tsx: a viagem ativa só conta como evidência de combustível quando tripState.consumptionKml é confiável; possuir um PID de fluxo ou um valor instantâneo não basta.
+- Testes ampliados em autonomyBuffer.test.js, fuelConsumption.test.js, tripRecorder.test.js e fuelBalance.test.js; gate de baseline, RG-49/RG-50, plano de testes, changelog e auditoria atualizados.
+
+### Limites e validação
+- A capacidade nominal do tanque continua em 56 L. Isso não comprova que percentual do PID 012F corresponda linearmente a litros na ECU específica, nem calibra o sensor. Nenhum resultado físico foi inventado.
+- A CI [40323823689](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40323823689) passou validate e android-build somente no SHA anterior DB-158. DB-159 exige nova execução integral de CI no SHA final.
+- Testes físicos com o ELM327, ECU real, odômetro e abastecimento medido permanecem pendentes. O cálculo é uma estimativa e depende de registrar todas as viagens e abastecimentos; quando a evidência não fecha, a tela deve exibir N/D.

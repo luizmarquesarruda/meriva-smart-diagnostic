@@ -48,6 +48,18 @@ A branch mantém o fluxo OBD/ELM327 existente e inclui testes automatizados para
 - Cada PID conserva no máximo 120 amostras e o processo conserva no máximo 64 séries distintas. Ao receber o 65.º PID, deve sair o menos recentemente usado; atualização da série deve refrescar sua posição LRU e a remoção deve limpar também o índice de leituras atuais.
 - Executar `node tests/liveTelemetry.test.js`, `node tests/projectBaseline.test.js`, TypeScript e a CI completa no SHA exato; teste físico continua separado.
 
+## AUTONOMY-GAP-01 — Continuidade da janela de consumo móvel
+- Inserir dez intervalos válidos de fluxo/velocidade. Depois enviar taxa inválida, trocar origem, fornecer timestamp fora de ordem ou criar intervalo >10 s; a janela anterior deve ser descartada e a autonomia móvel deve voltar a N/D.
+- Deixar de receber taxa por >10 s; o consumo móvel não deve continuar como atual apenas porque ainda existem dez intervalos antigos no buffer.
+- A mediana de nível deve conservar no máximo dez leituras e só considerar amostras dos últimos 60 s. Com leituras a cada 25 s, um pico com mais de 60 s deve sair da mediana.
+- Após a lacuna, a janela só pode voltar ao estado pronto depois de dez novos intervalos contínuos que somem pelo menos 0,1 km e 0,05 L. Não integrar valores em cache para preencher amostras ausentes.
+
+## FUEL-BALANCE-01 — Validade do consumo e fallback de tanque cheio
+- Uma viagem com lacuna de taxa >30 s deve manter a distância no histórico, mas persistir fuelDataValid=false e avgFuelConsumptionKml=0, mesmo que já tenha integrado 0,05 L ou mais.
+- Sem PID 012F atual, o fallback exige abastecimento explicitamente marcado como tanque cheio, viagens REAL_OBD com >=0,1 km e >=0,05 L, média coerente com distância/litros dentro de 5% ou 0,005 km/L e nenhuma sobreposição temporal. Divergência de odômetro ou evento entre o fim e início de viagens exige N/D.
+- A viagem ativa só pode subtrair combustível se a média da própria viagem atual for confiável. Histórico parcial, simulado ou importado não pode servir de evidência.
+- Executar node tests/autonomyBuffer.test.js, node tests/fuelConsumption.test.js, node tests/tripRecorder.test.js, node tests/fuelBalance.test.js, gate anti-regressão, TypeScript, suíte completa e build Android no mesmo SHA. Teste real no veículo e comparação de litros/odômetro continuam necessários para validar precisão física.
+
 ## ELM-QUEUE-01 — Backpressure e espera da fila serial
 - Bloquear artificialmente a primeira resposta, enfileirar acima de 16 comandos e verificar que apenas 16 aguardam além da transação ativa; excessos devem rejeitar com ELM_COMMAND_QUEUE_FULL antes de escrever no transporte. A vaga da operação ativa deve ser reservada sincronicamente para não consumir uma posição das 16 pendentes em chamadas concorrentes no mesmo turno.
 - O snapshot deve expor profundidade atual/máxima, rejeições, espera média e máxima. Após liberar o transporte, a profundidade retorna a zero e a ordem dos comandos aceitos continua serial. O gate estático verifica liberação em `finally` sem depender de o corpo do callback caber em uma única linha.

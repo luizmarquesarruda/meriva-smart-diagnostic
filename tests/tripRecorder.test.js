@@ -152,6 +152,21 @@ gap.addSample({ timestampMs: 40_001, distanceKm: 1, speedKmh: 30, fuelRateLph: 1
 assert.strictEqual(gap.getState().durationMs, 0);
 assert.strictEqual(gap.getState().fuelUsedL, 0);
 
+const interruptedFuel = new RealTripRecorder(1_000, 0);
+interruptedFuel.addSample({ timestampMs: 1_000, distanceKm: 0, speedKmh: 0, fuelRateLph: 12 });
+interruptedFuel.addSample({ timestampMs: 11_000, distanceKm: 1, speedKmh: 36, fuelRateLph: 12 });
+interruptedFuel.addSample({ timestampMs: 21_000, distanceKm: 2, speedKmh: 36, fuelRateLph: 12 });
+interruptedFuel.addSample({ timestampMs: 52_001, distanceKm: 3, speedKmh: 36, fuelRateLph: null });
+interruptedFuel.addSample({ timestampMs: 62_001, distanceKm: 4, speedKmh: 36, fuelRateLph: 12 });
+assert.ok(interruptedFuel.getState().fuelUsedL >= 0.05,
+  'o cenário acumula combustível acima do limiar numérico');
+assert.strictEqual(interruptedFuel.hasFuelDataGap(), true);
+const interruptedCycle = interruptedFuel.buildDriveCycle(63_000);
+assert.ok(interruptedCycle);
+assert.strictEqual(interruptedCycle.fuelDataValid, false,
+  'lacuna longa deve invalidar consumo, evitando km/L excessivo e autonomia otimista');
+assert.strictEqual(interruptedCycle.avgFuelConsumptionKml, 0);
+
 // Short stationary periods must not fragment a real drive into tiny trips.
 assert.strictEqual(shouldFinalizeStoppedTrip(15_000, 850), false, 'idle at a traffic light must not close a trip after 15 seconds');
 assert.strictEqual(shouldFinalizeStoppedTrip(299_999, 850), false, 'engine-running stop remains open until the longer threshold');

@@ -561,6 +561,7 @@ class AutoTripService {
             sampleState.distanceKm,
             sampleState.fuelUsedL,
             sampleState.validFuelSamples,
+            !recorder.hasFuelDataGap(),
           );
         }
 

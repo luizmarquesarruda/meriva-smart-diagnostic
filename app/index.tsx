@@ -248,12 +248,13 @@ export default function IndexScreen() {
       startedAtMs: tripState.tripStartedAtMs,
       distanceKm: tripState.distanceKm,
       fuelUsedL: tripState.fuelUsedL,
-      fuelDataValid: tripState.fuelSupported || tripState.rollingConsumptionKml != null
-        || tripState.instantaneousConsumptionSource != null || tripState.fuelUsedL >= 0.02,
+      // A live trip is eligible only if its own integrated consumption passed
+      // the distance/fuel/sample/continuity checks. Presence of any fuel PID alone
+      // is not sufficient evidence for remaining-fuel estimation.
+      fuelDataValid: tripState.consumptionKml != null,
     },
   }), [maintenanceData?.fuelings, maintenanceData?.currentOdometerKm, cycles, tripState.active,
-    tripState.tripStartedAtMs, tripState.distanceKm, tripState.fuelUsedL, tripState.fuelSupported,
-    tripState.rollingConsumptionKml, tripState.instantaneousConsumptionSource]);
+    tripState.tripStartedAtMs, tripState.distanceKm, tripState.fuelUsedL, tripState.consumptionKml]);
   const currentAutonomyKm = getCurrentAutonomyRangeKm({
     ecuConnected: connectionStatus.ecuConnected,
     tripConnected: tripState.connected,

@@ -21,7 +21,7 @@ function loadTs(file, overrides = {}) {
   return loaded.exports;
 }
 const fuelLevel = loadTs(path.join(ROOT, 'src/trip/fuelLevel.ts'));
-const { estimateFuelRemainingFromFullTank } = loadTs(path.join(ROOT, 'src/trip/fuelBalance.ts'), { './fuelLevel': fuelLevel });
+const { estimateFuelRemainingFromFullTank } = loadTs(path.join(ROOT, 'src/trip/fuelBalance.ts'), { './fuelLevel': fuelLevel, './tripRecorder': { MIN_TRIP_FUEL_L: 0.05 } });
 const full = { id: 'full', occurredAt: '2026-10-01T08:00:00.000Z', odometerKm: 10000, liters: 40, totalCost: 250, type: 'GASOLINA', fullTank: true };
 const partial = { id: 'partial', occurredAt: '2026-10-01T09:10:00.000Z', odometerKm: 10100, liters: 6, totalCost: 40, type: 'GASOLINA', fullTank: false };
 const trip1 = { id: 'real1', startedAt: '2026-10-01T08:10:00.000Z', finishedAt: '2026-10-01T09:00:00.000Z', distanceTotalKm: 100, fuelUsedL: 8, avgFuelConsumptionKml: 12.5, fuelDataValid: true, source: 'REAL_OBD', telemetrySamples: [] };
@@ -69,4 +69,22 @@ assert.equal(estimateFuelRemainingFromFullTank({
 }), null, 'viagem ativa iniciada antes do baseline não pode ser subtraída integralmente');
 assert.equal(estimateFuelRemainingFromFullTank({ fuelings: [full], trips: [] })?.remainingFuelL, 56,
   'tanque completo válido sem viagens posteriores começa em 56 L');
+
+assert.equal(estimateFuelRemainingFromFullTank({
+  fuelings: [full],
+  trips: [{ ...trip1, fuelUsedL: 1 }],
+}), null, 'consumo da viagem deve ser coerente com distância / litros');
+
+assert.equal(estimateFuelRemainingFromFullTank({
+  fuelings: [full],
+  trips: [{ ...trip1, distanceTotalKm: 1, fuelUsedL: 0.01, avgFuelConsumptionKml: 100, fuelDataValid: undefined }],
+}), null, 'menos de 0,05 L não deve alimentar o balanço e superestimar a autonomia');
+
+assert.equal(estimateFuelRemainingFromFullTank({
+  fuelings: [full],
+  trips: [
+    trip1,
+    { ...trip2, startedAt: '2026-10-01T08:50:00.000Z' },
+  ],
+}), null, 'viagens REAL_OBD sobrepostas indicam histórico incoerente e invalidam o fallback');
 console.log('fuelBalance.test.js: PASS');

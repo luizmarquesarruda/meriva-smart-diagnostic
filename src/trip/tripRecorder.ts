@@ -24,11 +24,13 @@ export function getReliableTripConsumptionKml(
   distanceKm: number,
   fuelUsedL: number,
   validFuelSamples: number,
+  fuelDataContinuous = true,
 ): number | null {
   if (
     !Number.isFinite(distanceKm) || distanceKm < 0.1 ||
     !Number.isFinite(fuelUsedL) || fuelUsedL < MIN_TRIP_FUEL_L ||
-    !Number.isInteger(validFuelSamples) || validFuelSamples < 2
+    !Number.isInteger(validFuelSamples) || validFuelSamples < 2 ||
+    !fuelDataContinuous
   ) return null;
 
   const consumptionKml = distanceKm / fuelUsedL;
@@ -156,9 +158,15 @@ export class RealTripRecorder {
     ) {
       this.fuelIntegrator.addSample(sample.fuelRateLph, timestampMs);
       if (sample.fuelRateSource) this.fuelRateSources.add(sample.fuelRateSource);
+    } else {
+      this.fuelIntegrator.noteMissingSample(timestampMs);
     }
 
     return this.getState();
+  }
+
+  hasFuelDataGap(): boolean {
+    return this.fuelIntegrator.hasGap();
   }
 
   getState(): RealTripRecorderState {
@@ -187,6 +195,7 @@ export class RealTripRecorder {
       state.distanceKm,
       state.fuelUsedL,
       state.validFuelSamples,
+      !this.fuelIntegrator.hasGap(),
     );
     const fuelDataValid = reliableConsumptionKml !== null;
     const avgFuelConsumptionKml = reliableConsumptionKml ?? 0;

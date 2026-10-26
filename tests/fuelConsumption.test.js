@@ -87,6 +87,29 @@ assertApprox(integrator.addSample(10, 3000).fuelUsedL, 10 / 3600, 1e-12,
 integrator.reset();
 assert.strictEqual(integrator.getState().fuelUsedL, 0);
 
+const continuity = new FuelRateIntegrator();
+continuity.addSample(12, 1_000);
+continuity.noteMissingSample(10_000);
+assert.strictEqual(continuity.hasGap(), false,
+  'lacuna curta pode continuar integrada no próximo intervalo válido');
+continuity.noteMissingSample(32_001);
+assert.strictEqual(continuity.hasGap(), true,
+  'ausência de taxa superior a 30 s invalida a continuidade da viagem');
+assert.strictEqual(continuity.getState().lastTimestampMs, null,
+  'baseline anterior deve ser limpo depois de lacuna longa');
+continuity.addSample(12, 33_000);
+assert.strictEqual(continuity.hasGap(), true,
+  'novas leituras não tornam retroativamente íntegra uma viagem com lacuna');
+continuity.reset();
+assert.strictEqual(continuity.hasGap(), false, 'viagem nova começa sem lacunas herdadas');
+
+const skippedInterval = new FuelRateIntegrator();
+skippedInterval.addSample(12, 1_000);
+skippedInterval.addSample(12, 11_000);
+skippedInterval.addSample(12, 42_001);
+assert.strictEqual(skippedInterval.hasGap(), true,
+  'intervalo válido que chega depois de mais de 30 s também registra a lacuna');
+
 console.log('PASS combustível OBD: integração L/h, intervalos e dados inválidos');
 
 

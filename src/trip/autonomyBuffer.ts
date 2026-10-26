@@ -1,4 +1,5 @@
 export const AUTONOMY_BUFFER_CAPACITY = 10;
+export const AUTONOMY_BUFFER_FUEL_LEVEL_WINDOW_MS = 60_000;
 export const AUTONOMY_BUFFER_MIN_INTERVALS = 10;
 export const AUTONOMY_BUFFER_MAX_INTERVAL_MS = 10_000;
 export const AUTONOMY_BUFFER_STALE_AFTER_MS = 30_000;
@@ -52,6 +53,11 @@ export class AutonomyBuffer {
     if (last && timestampMs - last.timestampMs > AUTONOMY_BUFFER_STALE_AFTER_MS) {
       this.fuelLevels = [];
     }
+    // Bound the median by both sample count and elapsed time, so slow polling
+    // cannot let a stale outlier influence the current tank estimate.
+    this.fuelLevels = this.fuelLevels.filter(
+      (sample) => timestampMs - sample.timestampMs <= AUTONOMY_BUFFER_FUEL_LEVEL_WINDOW_MS,
+    );
     this.fuelLevels.push({ percent, timestampMs });
     if (this.fuelLevels.length > AUTONOMY_BUFFER_CAPACITY) {
       this.fuelLevels.splice(0, this.fuelLevels.length - AUTONOMY_BUFFER_CAPACITY);
@@ -66,7 +72,9 @@ export class AutonomyBuffer {
     if (!Number.isFinite(timestampMs) || timestampMs <= 0 ||
         !Number.isFinite(speedKmh) || speedKmh < 0 || speedKmh > MAX_SPEED_KMH ||
         !Number.isFinite(fuelRateLph) || fuelRateLph <= 0 || fuelRateLph > MAX_FUEL_RATE_LPH) {
-      this.previousFlowReading = null;
+      // A missing/corrupt flow sample breaks continuity; previous intervals
+      // must not survive and later masquerade as the current rolling estimate.
+      this.resetConsumption();
       return;
     }
     if (this.flowSourceKey !== null && this.flowSourceKey !== sourceKey) {
@@ -78,9 +86,18 @@ export class AutonomyBuffer {
     const previous = this.previousFlowReading;
     if (previous) {
       const elapsedMs = timestampMs - previous.timestampMs;
-      if (elapsedMs <= 0) return;
-      if (elapsedMs <= AUTONOMY_BUFFER_MAX_INTERVAL_MS &&
-          previous.speedKmh >= MIN_MOVING_SPEED_KMH &&
+      if (elapsedMs <= 0) {
+        this.resetConsumption();
+        return;
+      }
+      if (elapsedMs > AUTONOMY_BUFFER_MAX_INTERVAL_MS) {
+        // Do not bridge an OBD telemetry gap with old rolling intervals.
+        // This reading is only the new baseline for subsequent short intervals.
+        this.flowIntervals = [];
+        this.previousFlowReading = current;
+        return;
+      }
+      if (previous.speedKmh >= MIN_MOVING_SPEED_KMH &&
           current.speedKmh >= MIN_MOVING_SPEED_KMH) {
         const averageSpeedKmh = (previous.speedKmh + current.speedKmh) / 2;
         const averageFuelRateLph = (previous.fuelRateLph + current.fuelRateLph) / 2;
@@ -114,6 +131,12 @@ export class AutonomyBuffer {
   }
 
   getRollingConsumptionKml(nowMs = Date.now()): number | null {
+    const latestFlow = this.previousFlowReading;
+    if (!latestFlow || !Number.isFinite(nowMs) || nowMs < latestFlow.timestampMs ||
+        nowMs - latestFlow.timestampMs > AUTONOMY_BUFFER_MAX_INTERVAL_MS) {
+      this.resetConsumption();
+      return null;
+    }
     const last = this.flowIntervals[this.flowIntervals.length - 1];
     if (!last || !this.isFresh(last.timestampMs, nowMs) ||
         this.flowIntervals.length < AUTONOMY_BUFFER_MIN_INTERVALS) return null;

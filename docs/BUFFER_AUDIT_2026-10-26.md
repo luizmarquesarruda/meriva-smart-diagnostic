@@ -4,14 +4,14 @@
 
 - Repositório: `luizmarquesarruda/meriva-smart-diagnostic`.
 - HEAD anterior a DB-153: `80fdb6ffe0a32b8cb1d402466b091b5b448fcf47` (DB-152); HEAD DB-153: `b0864f7e7f8005c95a7da85867d68e9be58b9604`.
-- A CI [40318919363](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40318919363) passou `validate` e `android-build` para DB-153. DB-154 falhou no gate por uma asserção estática obsoleta; DB-155 corrigiu-a e a CI seguinte encontrou erro de estreitamento FileInfo no TypeScript. DB-156 corrige a guarda e exige CI própria. A CI [40322799675](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40322799675) passou gate/TypeScript mas falhou no teste de contagem da fila; DB-157 corrige a distinção entre vaga ativa e pendentes.
+- A CI [40318919363](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40318919363) validou DB-153. As execuções intermediárias seguintes encontraram e documentaram regressões no gate ELM, no tipo FileInfo, na contagem da fila e na asserção multilinha; DB-155…DB-158 corrigiram esses pontos. A CI [40323823689](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40323823689) passou validate e android-build no HEAD anterior d0437327d02eca1f7443561bf4c5deff14bcc3ac. DB-159 modifica autonomia e exige CI nova no SHA resultante.
 - Esta auditoria separa buffers de amostragem (para ruído/mediana), buffers de transporte (para serializar/limitar carga) e buffers de persistência (para lote/recuperação). Não se deve reutilizar a mesma política para todos.
 
 ## Resultado por subsistema
 
 | Subsistema | Situação encontrada | Decisão |
 |---|---|---|
-| Autonomia/combustível | `AutonomyBuffer` já mantém até 10 níveis reais do PID 012F, mediana, até 10 intervalos integrados de fluxo/distância, valida ordem/frescor, rompe lacunas e reseta quando muda a origem do fluxo. | **Não ampliar agora.** Dez intervalos já exigem amostra suficiente; uma janela maior atrasaria o cálculo e poderia esconder mudança real de consumo. |
+| Autonomia/combustível | AutonomyBuffer já limitava a dez níveis reais do PID 012F e dez intervalos de fluxo/distância; antes de DB-159 a janela de nível não tinha limite global de idade e lacunas >10 s podiam deixar intervalos anteriores no buffer. O integrador da viagem também não registrava lacunas longas como motivo de invalidação. | **Aprimorado em DB-159.** Nível usa no máximo dez leituras dos últimos 60 s. Amostra de fluxo inválida, origem/timestamp incoerente, lacuna >10 s ou falta de atualização >10 s limpa a janela móvel; ela só retorna após dez novos intervalos. A viagem é marcada como consumo inválido após lacuna >30 s, e o fallback do tanque cheio rejeita viagens pequenas/incoerentes/sobrepostas. Sem alegar calibração física do PID 012F. |
 | Descoberta de PIDs | `PidDiscoveryBuffer` é FIFO limitado por execução (padrão 64), normaliza IDs e rejeita comandos não PID. A instância não é reutilizada entre ECUs/sessões. | **Não ampliar.** A separação por sessão e a evidência RAW são mais importantes que reutilizar respostas antigas. Bitmaps continuam sendo anúncio, não prova de suporte. |
 | Telemetria ao vivo | Cada PID já tinha um limite de 120 pontos, mas o mapa total de séries não tinha cota e aceitava chaves de PID não validadas. | **Corrigido nesta rodada.** Só IDs Mode 01 `01XX` são aceitos; no máximo 64 séries ficam na memória. A série menos recentemente usada é removida junto com seu índice `latest`. O limite potencial passa a 64 × 120 amostras. |
 | Cockpit/alertas | O cockpit já seleciona a leitura real mais recente, rejeita timestamp inválido/futuro e transforma dados vencidos em N/D. Os alertas se baseiam no valor atual válido. | **Não suavizar alertas com média/mediana sem critério físico.** Um buffer de suavização pode atrasar temperatura alta, tensão anormal ou baixa reserva. Histórico de tendência já existe separadamente em `liveTelemetry`. |
@@ -29,9 +29,10 @@
 4. `tests/liveTelemetry.test.js` cobre a cota LRU; `tests/regression.test.js` cobre saturação/serialização ELM e rotação CSV em duas fronteiras.
 5. `docs/CONTRATO_ANTI_REGRESSAO.md`, `docs/TEST_PLAN.md`, `CHANGELOG.md` e o Diário de Bordo registram as regras e a aceitação.
 6. DB-155 atualiza o gate ELM e corrige escapes LF/CR. DB-156 confirma `FileInfo.exists` antes de ler `size`. DB-157 separa a vaga ativa das pendentes. DB-158 atualiza o gate para conferir o bloco `finally` multilinha.
+7. DB-159 limita temporalmente a mediana de combustível, invalida janelas móveis após lacunas e protege o balanço por tanque cheio contra viagens com integração incompleta ou inconsistente.
 
 ## Critério de encerramento
 
-- `node tests/liveTelemetry.test.js`, a regressão integrada e `node tests/projectBaseline.test.js` precisam passar.
+- node tests/autonomyBuffer.test.js, node tests/fuelConsumption.test.js, node tests/tripRecorder.test.js, node tests/fuelBalance.test.js, node tests/projectBaseline.test.js, TypeScript e a suíte completa precisam passar no SHA final.
 - A CI da PR #92 valida o novo SHA, incluindo TypeScript, suíte completa, gate anti-regressão e APK Android standalone.
 - Isso não substitui validação física de GPS, Android, ELM327 ou ECU. Não foram feitas medições físicas de precisão neste lote.

@@ -35,6 +35,15 @@ assert.equal(levels.addFuelLevelSample(101, 56_000), false, 'percentual fora de 
 assert.equal(levels.addFuelLevelSample(40, 50_999), false, 'timestamp fora de ordem é inválido');
 assert.equal(levels.getFuelLevelPercent(81_001), null, 'nível vencido não alimenta autonomia');
 assert.equal(levels.getFuelLevelSampleCount(81_001), 0);
+const agedLevels = new AutonomyBuffer();
+for (let index = 0; index < 10; index += 1) {
+  agedLevels.addFuelLevelSample(index === 0 ? 100 : 40, 1_000 + index * 25_000);
+}
+assert.equal(agedLevels.getFuelLevelSampleCount(226_000), 3,
+  'a janela temporal remove leituras antigas mesmo que nenhum intervalo adjacente supere 30 s');
+assert.equal(agedLevels.getFuelLevelPercent(226_000), 40,
+  'um pico antigo não pode dominar a mediana depois de vários minutos de polling lento');
+
 const flow = new AutonomyBuffer();
 for (let index = 0; index <= 10; index += 1) flow.addFuelFlowSample({ timestampMs: 1_000 + index * 1_500, speedKmh: 36, fuelRateLph: 12.6 });
 assert.equal(AUTONOMY_BUFFER_CAPACITY, 10);
@@ -46,6 +55,34 @@ flow.addFuelFlowSample({ timestampMs: 17_500, speedKmh: 0, fuelRateLph: 12.6 });
 assert.equal(flow.getRollingConsumptionKml(46_001), null, 'consumo móvel vencido não é atual');
 flow.reset();
 assert.equal(flow.getRollingConsumptionKml(17_500), null, 'reset limpa a janela da sessão');
+
+const interrupted = new AutonomyBuffer();
+for (let index = 0; index <= 10; index += 1) {
+  interrupted.addFuelFlowSample({ timestampMs: 1_000 + index * 1_500, speedKmh: 36, fuelRateLph: 12.6 });
+}
+assert.ok(interrupted.getRollingConsumptionKml(16_000) != null);
+interrupted.addFuelFlowSample({ timestampMs: 17_500, speedKmh: 36, fuelRateLph: Number.NaN });
+assert.equal(interrupted.getRollingConsumptionKml(17_500), null,
+  'uma taxa inválida limpa a janela móvel anterior, não apenas a amostra anterior');
+assert.equal(interrupted.getRollingConsumptionSampleCount(17_500), 0);
+
+const gapAfterReady = new AutonomyBuffer();
+for (let index = 0; index <= 10; index += 1) {
+  gapAfterReady.addFuelFlowSample({ timestampMs: 1_000 + index * 1_500, speedKmh: 36, fuelRateLph: 12.6 });
+}
+gapAfterReady.addFuelFlowSample({ timestampMs: 27_001, speedKmh: 36, fuelRateLph: 12.6 });
+assert.equal(gapAfterReady.getRollingConsumptionKml(27_001), null,
+  'gap acima de 10 s deve descartar os dez intervalos antigos');
+gapAfterReady.addFuelFlowSample({ timestampMs: 28_501, speedKmh: 36, fuelRateLph: 12.6 });
+assert.equal(gapAfterReady.getRollingConsumptionKml(28_501), null,
+  'é necessário construir dez novos intervalos contínuos depois do gap');
+
+const stalled = new AutonomyBuffer();
+for (let index = 0; index <= 10; index += 1) {
+  stalled.addFuelFlowSample({ timestampMs: 1_000 + index * 1_500, speedKmh: 36, fuelRateLph: 12.6 });
+}
+assert.equal(stalled.getRollingConsumptionKml(26_001), null,
+  'consumo móvel fica indisponível quando não há nova taxa por mais de 10 s');
 const gaps = new AutonomyBuffer();
 gaps.addFuelFlowSample({ timestampMs: 1_000, speedKmh: 36, fuelRateLph: 12 });
 gaps.addFuelFlowSample({ timestampMs: 12_000, speedKmh: 36, fuelRateLph: 12 });

@@ -45,6 +45,7 @@ export function integrateFuelRateLph(
 }
 
 export class FuelRateIntegrator {
+  private gapDetected = false;
   private state: FuelIntegrationState = {
     fuelUsedL: 0,
     validSamples: 0,
@@ -53,12 +54,31 @@ export class FuelRateIntegrator {
   };
 
   reset(): void {
+    this.gapDetected = false;
     this.state = {
       fuelUsedL: 0,
       validSamples: 0,
       lastRateLph: null,
       lastTimestampMs: null,
     };
+  }
+
+  /** True if any >30 s fuel-flow gap occurred during this trip. */
+  hasGap(): boolean {
+    return this.gapDetected;
+  }
+
+  /**
+   * Notify the integrator when the trip loop had no usable fuel-rate sample.
+   * If the gap exceeds the integration window, clear the old baseline.
+   */
+  noteMissingSample(timestampMs = Date.now()): void {
+    const lastTimestampMs = this.state.lastTimestampMs;
+    if (!Number.isFinite(timestampMs) || lastTimestampMs == null || timestampMs <= lastTimestampMs) return;
+    if (timestampMs - lastTimestampMs > MAX_INTERVAL_MS) {
+      this.gapDetected = true;
+      this.state = { ...this.state, lastRateLph: null, lastTimestampMs: null };
+    }
   }
 
   addSample(fuelRateLph: number, timestampMs = Date.now()): FuelIntegrationState {
@@ -75,6 +95,9 @@ export class FuelRateIntegrator {
     // invalid interval but then moving the baseline backward would corrupt the
     // next otherwise-valid interval and can over/under-count fuel.
     if (!valid || !timestampIsMonotonic) return { ...this.state };
+    if (previous && timestampMs - previous.timestampMs > MAX_INTERVAL_MS) {
+      this.gapDetected = true;
+    }
 
     const increment = integrateFuelRateLph(previous, current);
     this.state = {

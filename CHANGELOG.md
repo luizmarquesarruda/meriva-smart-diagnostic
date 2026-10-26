@@ -5,6 +5,13 @@
 ### CI e controle de regressões
 - Evitada a execução duplicada da mesma CI em branches que já possuem PR para `main`: commits de branches são validados pelo evento `pull_request`, e o evento `push` fica reservado a `main`. O despacho manual permanece disponível.
 
+### Autonomia: continuidade do consumo e integridade do balanço
+- A mediana de nível de combustível tem limite simultâneo de 10 leituras e 60 segundos, para que um valor extremo antigo não sobreviva só porque cada consulta chegou em menos de 30 segundos.
+- O consumo móvel perde sua janela quando a taxa é inválida, a origem muda, o timestamp sai de ordem, o intervalo supera 10 segundos ou a taxa deixa de atualizar por mais de 10 segundos; exige dez novos intervalos válidos antes de voltar a alimentar autonomia.
+- Viagens com lacuna de combustível superior a 30 segundos ficam com consumo N/D, mesmo quando há litros acumulados suficientes numericamente.
+- O fallback por tanque cheio rejeita viagens com menos de 0,05 L, média incoerente com distância/litros ou períodos sobrepostos; o estado da viagem ativa só conta se a própria média atual passar na validação de confiabilidade.
+- Não houve alteração da capacidade nominal de 56 L nem declaração de que o PID 012F esteja calibrado para a ECU específica. A linearidade percentual→litros e a precisão física ainda exigem comparação com o carro.
+
 ### Fila ELM327 e custo de escrita CSV
 - A fila rejeita novas consultas ordinárias quando há 16 comandos aguardando; a rejeição é explícita em vez de permitir acúmulo ilimitado. Fechamento e recuperação continuam reservados e serializados.
 - O snapshot de saúde expõe profundidade atual/máxima, rejeições e métricas de espera para diagnosticar rajadas e contenção.
