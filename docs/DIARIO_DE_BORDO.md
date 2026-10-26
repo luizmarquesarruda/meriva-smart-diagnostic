@@ -204,7 +204,6 @@
 - **DB-131** · 2026-10-25 — Atualização periódica de localização/clima baseada em conectividade
 - **DB-132** · 2026-10-26 — Auditoria específica do histórico de viagens, telemetria e armazenamento
 - **DB-133** · 2026-10-26 — SQLite como fonte de verdade do histórico de viagens
-- **DB-132** · 2026-10-26 — Auditoria específica do histórico de viagens, telemetria e armazenamento
 
 ---
 
