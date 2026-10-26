@@ -11,6 +11,8 @@ export interface FuelingRecord {
   liters: number;
   totalCost: number | null;
   type: FuelingType;
+  /** True only when the driver confirms the tank was filled to full. */
+  fullTank?: boolean;
 }
 
 export interface MaintenanceData {
@@ -64,6 +66,7 @@ function normalizeFueling(value: unknown): FuelingRecord | null {
     liters: raw.liters,
     totalCost: raw.totalCost ?? null,
     type: raw.type,
+    fullTank: raw.fullTank === true,
   };
 }
 

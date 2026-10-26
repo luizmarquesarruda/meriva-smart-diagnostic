@@ -1,11 +1,12 @@
-## ESTADO VIGENTE — 2026-10-26 (auditoria sistêmica DB-144)
+## ESTADO VIGENTE — 2026-10-26 (auditoria sistêmica DB-145)
 
 > Estado observado na branch `integration/reconcile-pid-ui-20261025`; a validação deve ser feita novamente no SHA final.
 
 ### Integração, CI e riscos
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
 - `main` observado: `8e95b2b59e0aa4c76027b638e49d4453a0a4b54c`; PR [#89](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/89) foi mesclada; PRs [#90](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/90) e [#82](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/82) foram fechadas sem merge.
-- HEAD validado antes desta rodada: `4e3aa299ab9b244f224e5ead4b06931a47291690`. A CI [run 40260998729](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40260998729) concluiu com sucesso: Expo Doctor, gate anti-regressão, TypeScript, suíte completa, prebuild Android, APK standalone, verificação e upload do artefato.
+- HEAD validado antes da janela móvel: `4e3aa299ab9b244f224e5ead4b06931a47291690`; a CI [run 40260998729](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40260998729) passou Expo Doctor, gate anti-regressão, TypeScript, suíte completa, prebuild, APK standalone, verificação e upload.
+- O buffer móvel DB-143/144 passou a CI completa no SHA `cb0e6826305c2fc0e28db6c4d290663562c6d688`, run [40263017066](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40263017066): validação e build Android standalone concluídos com sucesso. Essa CI antecede o fallback de tanque cheio DB-145.
 - A primeira CI de desenvolvimento do buffer ([run 40262740602](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40262740602), SHA `7afb9a1109432d84f1af05532e794c8142294585`) detectou separadores de objeto inválidos em `src/trip/autoTripService.ts` e `app/index.tsx`. Foram corrigidos em `1c704cb1ffbdd8f0b9c292b22598d1a88c92fe65`; a CI desse SHA está em fila e ainda não é resultado final.
 - A prévia Floot já está em `src/ui/FlootLayoutPreview.tsx`, fora da árvore de rotas Expo; `app/floot-layout.tsx` não existe no HEAD validado.
 - PRs ainda abertas no último estado consultado: [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81) em rascunho, [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) e [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84). Serão reconciliadas após a nova CI, sem merge/fechamento por conveniência.
@@ -210,6 +211,7 @@
 - **DB-142** · 2026-10-25 — Remover a prévia Floot da árvore de rotas de produção
 - **DB-143** · 2026-10-26 — Implementar buffer móvel real de dez leituras para autonomia
 - **DB-144** · 2026-10-26 — Endurecer a validação de timestamps do buffer de autonomia
+- **DB-145** · 2026-10-26 — Estimar autonomia sem PID 012F com balanço de tanque cheio
 
 ---
 
@@ -4192,3 +4194,21 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 ### Validação pendente
 - Executar o gate, TypeScript, toda a suíte e build Android no novo SHA.
 - Não considerar o buffer concluído até a CI completa passar e o cálculo ser comparado com telemetria e abastecimento reais.
+
+## DB-145 · 2026-10-26 — Estimar autonomia sem PID 012F com balanço de tanque cheio
+
+### Causa confirmada
+- A janela móvel anterior não resolvia o caso em que a ECU não anuncia PID 012F: a função de apresentação exigia esse PID e, por isso, devolvia N/D mesmo havendo histórico real de combustível e consumo.
+- Aplicativos OBD que calculam combustível restante dependem de um perfil de veículo e de consumo acumulado/monitorado durante os trajetos. Essa abordagem exige registrar todos os deslocamentos; não há como inferir viagens que o aplicativo não observou. O balanço abaixo é identificado como estimativa e não como leitura direta da ECU.
+
+### Implementação
+- O abastecimento agora permite marcar explicitamente “tanque completo”. Registros legados e abastecimentos parciais não viram baseline por inferência.
+- Criado `src/trip/fuelBalance.ts`: parte de 56 L no último tanque completo, subtrai viagens REAL_OBD com combustível válido e soma abastecimentos parciais posteriores. Rejeita viagens inválidas, sobreposição temporal com abastecimento, balanço negativo/maior que a capacidade e divergência de odômetro no próximo abastecimento.
+- A autonomia mantém a prioridade da leitura atual do PID 012F; se indisponível, usa o balanço de tanque cheio apenas quando ECU e consumo confiável estão disponíveis. A tela identifica a fonte e avisa que viagens não registradas podem superestimar o alcance.
+- O buffer de consumo agora isola janelas quando muda a fonte de fluxo ou a banda de composição do combustível FLEX, e é reiniciado quando o tipo de combustível configurado muda. Isso impede misturar taxas calculadas por fórmulas diferentes.
+- O salvamento de abastecimento só limpa os campos depois de confirmação real do armazenamento; falha de persistência mantém os dados para nova tentativa.
+- Adicionados testes de balanço de tanque cheio, abastecimento parcial, viagens inválidas, gaps de odômetro, troca de fonte e prioridade de fallback; contrato RG-45 e plano PID-AUTO-03.
+
+### Validação pendente
+- A nova CI deve passar Expo Doctor, gate anti-regressão, TypeScript, suíte completa, prebuild e APK Android standalone no mesmo SHA.
+- Teste físico ainda necessário: confirmar PID 012F/015E/MAF/MAP na ECU da Meriva, marcar um tanque realmente cheio, registrar todas as viagens e comparar litros restantes/autonomia com abastecimento e distância reais. O fallback não é confiável se houver viagens não registradas.

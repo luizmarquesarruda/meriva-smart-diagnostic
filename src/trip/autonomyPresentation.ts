@@ -1,4 +1,4 @@
-import { estimateRangeFromFuelLevel } from './fuelLevel';
+import { estimateRangeFromFuelLevel, estimateRangeFromFuelRemainingL, fuelLevelPercentToLiters, TANK_CAPACITY_L } from './fuelLevel';
 
 export const CURRENT_FUEL_LEVEL_STALE_AFTER_MS = 30_000;
 
@@ -16,6 +16,7 @@ export interface CurrentAutonomyInput {
   fuelLevelReadAtMs: number | null;
   tripConsumptionKml: number | null;
   rollingConsumptionKml?: number | null;
+  fallbackFuelRemainingL?: number | null;
   averageConsumptionKml: number;
   nowMs?: number;
 }
@@ -25,12 +26,7 @@ export interface CurrentAutonomyInput {
  * fuel-level evidence is unavailable. Persisted range history is not current range.
  */
 export function getCurrentAutonomyRangeKm(input: CurrentAutonomyInput): number | null {
-  if (
-    !input.ecuConnected ||
-    !input.tripConnected ||
-    !input.fuelLevelSupported ||
-    !isCurrentFuelLevelSample(input.fuelLevelReadAtMs, input.nowMs)
-  ) return null;
+  if (!input.ecuConnected || !input.tripConnected) return null;
 
   const consumptionKml = input.rollingConsumptionKml != null
     && Number.isFinite(input.rollingConsumptionKml)
@@ -42,5 +38,12 @@ export function getCurrentAutonomyRangeKm(input: CurrentAutonomyInput): number |
       ? input.tripConsumptionKml
       : input.averageConsumptionKml;
 
-  return estimateRangeFromFuelLevel(input.fuelLevelPercent, consumptionKml);
+  const hasCurrentPidLevel = input.fuelLevelSupported
+    && isCurrentFuelLevelSample(input.fuelLevelReadAtMs, input.nowMs);
+  if (hasCurrentPidLevel) return estimateRangeFromFuelLevel(input.fuelLevelPercent, consumptionKml);
+
+  const fallbackFuelRemainingL = input.fallbackFuelRemainingL;
+  if (fallbackFuelRemainingL == null || !Number.isFinite(fallbackFuelRemainingL) ||
+      fallbackFuelRemainingL < 0 || fallbackFuelRemainingL > TANK_CAPACITY_L) return null;
+  return estimateRangeFromFuelRemainingL(fallbackFuelRemainingL, consumptionKml);
 }

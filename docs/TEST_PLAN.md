@@ -102,6 +102,13 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 - O consumo móvel recente tem prioridade sobre o consumo acumulado da viagem e a média histórica; se estiver vazio/vencido, usa-se uma fonte confiável anterior, nunca autonomia persistida como valor atual.
 - Testes determinísticos cobrem rotação das dez amostras, mediana contra outlier, entradas inválidas, gaps, limiares, frescor e reset ao desconectar. Teste físico de precisão continua obrigatório.
 
+## PID-AUTO-03 — Autonomia sem PID 012F por balanço de tanque cheio
+- A tela de abastecimento deve permitir marcar explicitamente “tanque completo”; registros antigos e abastecimentos parciais nunca podem ser tratados como tanque cheio.
+- O balanço começa na capacidade nominal de 56 L após o último tanque completo, subtrai somente viagens REAL_OBD com combustível válido e soma abastecimentos parciais posteriores sem ultrapassar a capacidade.
+- Rejeitar viagens inválidas, viagens que cruzem o evento de abastecimento, falta de ordenação temporal, combustível negativo/maior que a capacidade e odômetro incompatível no próximo abastecimento.
+- O PID 012F atual prevalece; sem PID 012F, o balanço de tanque cheio pode fornecer litros restantes somente com ECU conectada e consumo móvel/viagem/histórico confiável. Sem baseline válido, retornar N/D.
+- A UI deve distinguir “PID 012F • BUFFER n/10” de “TANQUE ESTIMADO • n VIAGENS” e avisar que viagens não registradas podem superestimar o alcance. Testar falha de salvamento sem limpar os campos digitados.
+
 ## NET-WEATHER-01 — Atualização de localização/clima por conectividade
 - Com internet disponível em Wi-Fi ou rede celular (4G/5G), carregar clima/localidade sem solicitar permissão de localização nova.
 - Atualizar após retornar de offline para online e no ciclo de 15 minutos; eventos de rede repetidos não podem disparar requisições concorrentes nem refresh contínuo.

@@ -58,6 +58,16 @@ assert.equal(invalid.getRollingConsumptionSampleCount(4_000), 0, 'taxa inválida
 const slow = new AutonomyBuffer();
 for (let index = 0; index <= 10; index += 1) slow.addFuelFlowSample({ timestampMs: 1_000 + index * 1_500, speedKmh: 3, fuelRateLph: 12 });
 assert.equal(slow.getRollingConsumptionSampleCount(16_000), 0, 'velocidade baixa não calibra km/L');
+const sourceSwitch = new AutonomyBuffer();
+for (let index = 0; index <= 10; index += 1) {
+  sourceSwitch.addFuelFlowSample({ timestampMs: 1_000 + index * 1_500, speedKmh: 36, fuelRateLph: 12.6, sourceKey: 'MEASURED_015E' });
+}
+assert.ok(sourceSwitch.getRollingConsumptionKml(16_000) != null);
+sourceSwitch.addFuelFlowSample({ timestampMs: 17_500, speedKmh: 36, fuelRateLph: 12.6, sourceKey: 'ESTIMATED_MAF:FLEX:30' });
+assert.equal(sourceSwitch.getRollingConsumptionKml(17_500), null, 'troca de fonte de fluxo deve reiniciar a janela para não misturar fórmulas');
+sourceSwitch.resetConsumption();
+assert.equal(sourceSwitch.getRollingConsumptionKml(17_500), null, 'reset de consumo preserva o contrato de janela vazia');
+
 const { getCurrentAutonomyRangeKm } = presentation;
 const input = { ecuConnected: true, tripConnected: true, fuelLevelSupported: true, fuelLevelPercent: 50,
   fuelLevelReadAtMs: 1_000_000, tripConsumptionKml: 12, rollingConsumptionKml: 8,
@@ -65,4 +75,8 @@ const input = { ecuConnected: true, tripConnected: true, fuelLevelSupported: tru
 assert.equal(getCurrentAutonomyRangeKm(input), 224, 'consumo móvel recente tem prioridade');
 assert.equal(getCurrentAutonomyRangeKm({ ...input, rollingConsumptionKml: null }), 336, 'consumo da viagem é fallback');
 assert.equal(getCurrentAutonomyRangeKm({ ...input, rollingConsumptionKml: null, tripConsumptionKml: null }), 280, 'média histórica é último fallback');
+assert.equal(getCurrentAutonomyRangeKm({ ...input, fuelLevelSupported: false, fuelLevelPercent: null, fuelLevelReadAtMs: null, fallbackFuelRemainingL: 20, rollingConsumptionKml: 8 }), 160,
+  'balanço de tanque cheio pode fornecer autonomia quando o PID 012F não é suportado');
+assert.equal(getCurrentAutonomyRangeKm({ ...input, fuelLevelSupported: false, fuelLevelPercent: null, fuelLevelReadAtMs: null, fallbackFuelRemainingL: null }), null,
+  'sem PID 012F e sem balanço de tanque cheio não inventar autonomia');
 console.log('autonomyBuffer.test.js: PASS');

@@ -17,11 +17,13 @@ import type { ObdConnectionState } from '../src/meriva/autosaveState';
 import { ensureMerivaVehicleProfile } from '../src/database/vehicleConfig';
 import { createLearningProfile, initializeCarScannerSeed, readLearningProfile } from '../src/database/learningProfile';
 import { readAppSettings, type AppSettings } from '../src/database/appSettings';
+import { readMaintenanceData, type MaintenanceData } from '../src/database/maintenanceStorage';
+import { estimateFuelRemainingFromFullTank } from '../src/trip/fuelBalance';
 import { connectPreferredElm, getSharedObdConnection, getSharedObdLastError, getSharedObdStatus, subscribeSharedObd, subscribeSharedObdStatus } from '../src/obd/sharedConnection';
 import { autoTripService, type AutoTripServiceState } from '../src/trip/autoTripService';
 import { loadCurrentConditions, type CurrentConditions } from '../src/weather/currentConditions';
 import { mergeCurrentConditions, startCurrentConditionsRefresh, type NetworkReachabilitySnapshot } from '../src/weather/conditionsRefresh';
-import { getCurrentAutonomyRangeKm } from '../src/trip/autonomyPresentation';
+import { getCurrentAutonomyRangeKm, isCurrentFuelLevelSample } from '../src/trip/autonomyPresentation';
 import { buildCockpitPidMetrics, type CockpitPidMetric } from '../src/obd/cockpitTelemetry';
 
 export default function IndexScreen() {
@@ -34,6 +36,7 @@ export default function IndexScreen() {
   const [isHydrated, setIsHydrated] = useState(false);
   const [tripState, setTripState] = useState<AutoTripServiceState>(autoTripService.getState());
   const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [maintenanceData, setMaintenanceData] = useState<MaintenanceData | null>(null);
   const [dtcCount, setDtcCount] = useState(0);
   const [activeHeroMetric, setActiveHeroMetric] = useState(0);
   const [conditions, setConditions] = useState<CurrentConditions>({ city: null, locationLabels: [], temperatureC: null, description: 'CLIMA OPCIONAL', available: false });
@@ -105,6 +108,7 @@ export default function IndexScreen() {
     const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
     try {
       const nextSettings = await readAppSettings(basePath);
+      const nextMaintenanceData = await readMaintenanceData(basePath);
       const restored = await initAutoSave(basePath);
       await initializeDriveCycles(basePath);
       await ensureMerivaVehicleProfile(basePath);
@@ -121,6 +125,7 @@ export default function IndexScreen() {
       }
 
       setSettings(nextSettings);
+      setMaintenanceData(nextMaintenanceData);
       setCycles(loaded);
       setConnectionStatus(getSharedObdStatus());
       setObd({ ...restored.obd, connected: getSharedObdStatus().ecuConnected });
@@ -234,6 +239,21 @@ export default function IndexScreen() {
   const coolantValue = coolantReading?.value ?? null;
   const speedReading = freshRealReading((item) => item.pid === '010D' || /speed|velocidade/i.test(item.name));
   const currentSpeedKmh = speedReading?.value ?? null;
+  const fuelBalanceFallback = useMemo(() => estimateFuelRemainingFromFullTank({
+    fuelings: maintenanceData?.fuelings ?? [],
+    trips: cycles,
+    currentOdometerKm: maintenanceData?.currentOdometerKm,
+    activeTrip: {
+      active: tripState.active,
+      startedAtMs: tripState.tripStartedAtMs,
+      distanceKm: tripState.distanceKm,
+      fuelUsedL: tripState.fuelUsedL,
+      fuelDataValid: tripState.fuelSupported || tripState.rollingConsumptionKml != null
+        || tripState.instantaneousConsumptionSource != null || tripState.fuelUsedL >= 0.02,
+    },
+  }), [maintenanceData?.fuelings, maintenanceData?.currentOdometerKm, cycles, tripState.active,
+    tripState.tripStartedAtMs, tripState.distanceKm, tripState.fuelUsedL, tripState.fuelSupported,
+    tripState.rollingConsumptionKml, tripState.instantaneousConsumptionSource]);
   const currentAutonomyKm = getCurrentAutonomyRangeKm({
     ecuConnected: connectionStatus.ecuConnected,
     tripConnected: tripState.connected,
@@ -242,8 +262,16 @@ export default function IndexScreen() {
     fuelLevelReadAtMs: tripState.fuelLevelReadAtMs,
     tripConsumptionKml: tripState.consumptionKml,
     rollingConsumptionKml: tripState.rollingConsumptionKml,
+    fallbackFuelRemainingL: fuelBalanceFallback?.remainingFuelL ?? null,
     averageConsumptionKml: tripState.averageConsumptionKml,
   });
+  const hasCurrentPidFuelLevel = tripState.fuelLevelSupported
+    && isCurrentFuelLevelSample(tripState.fuelLevelReadAtMs);
+  const autonomyDetail = currentAutonomyKm == null
+    ? 'AGUARDANDO PID 012F OU TANQUE CHEIO'
+    : hasCurrentPidFuelLevel
+      ? `PID 012F • BUFFER ${tripState.fuelLevelBufferCount}/10`
+      : `TANQUE ESTIMADO • ${fuelBalanceFallback?.tripsCount ?? 0} VIAGENS`;
   const connectedSupportedPids = connectionStatus.ecuConnected
     ? getSharedObdConnection()?.supportedPids ?? []
     : [];
@@ -408,7 +436,7 @@ export default function IndexScreen() {
               icon="battery"
               label="AUTONOMIA"
               value={currentAutonomyKm != null ? Math.round(currentAutonomyKm) + ' km' : 'N/D'}
-              detail={currentAutonomyKm != null ? 'NÍVEL ATUAL VALIDADO' : 'AGUARDANDO NÍVEL VÁLIDO'}
+              detail={autonomyDetail}
               landscape={layout.landscape}
             />
             <PrimaryMetric

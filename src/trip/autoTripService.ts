@@ -18,6 +18,7 @@ import pollingPolicy from '../knowledge/polling_policy.json';
 export interface AutoTripServiceState {
   connected: boolean;
   active: boolean;
+  tripStartedAtMs: number | null;
   fuelSupported: boolean;
   fuelLevelSupported: boolean;
   fuelLevelPercent: number | null;
@@ -46,6 +47,7 @@ const FUEL_LEVEL_EVERY_N_CYCLES = pollingPolicy.polling.fuelLevel.everyCycles;
 const INITIAL_STATE: AutoTripServiceState = {
   connected: false,
   active: false,
+  tripStartedAtMs: null,
   fuelSupported: false,
   fuelLevelSupported: false,
   fuelLevelPercent: null,
@@ -139,6 +141,7 @@ class AutoTripService {
         this.fuelType = nextSettings.fuelType;
         this.lastFuelEthanolPercent = null;
         this.lastEstimatedFuelRate = null;
+        this.autonomyBuffer.resetConsumption();
       }
     });
     const persisted = await initAutoSave(basePath);
@@ -253,6 +256,7 @@ class AutoTripService {
           fuelLevelBufferCount: 0,
           rollingConsumptionKml: null,
           rollingConsumptionBufferCount: 0,
+          tripStartedAtMs: null,
           fuelLevelReadAtMs: null,
           fuelRemainingL: null,
           fuelReserve: null,
@@ -522,10 +526,17 @@ class AutoTripService {
         // Feed only freshly acquired/calculated flow. Missing samples do not get
         // re-integrated from display cache; the buffer rejects overlong gaps.
         if (fuelRateLph != null) {
+          const compositionBand = this.fuelType === 'FLEX'
+            ? Math.round((this.lastFuelEthanolPercent ?? 0) / 5) * 5
+            : 'FIXED';
+          const fuelRateContextKey = fuelRateSource === 'MEASURED_015E'
+            ? 'MEASURED_015E'
+            : `${fuelRateSource ?? 'UNKNOWN'}:${this.fuelType}:${compositionBand}`;
           this.autonomyBuffer.addFuelFlowSample({
             timestampMs: autonomySampleAtMs,
             speedKmh: tripVehicleSpeedKmh,
             fuelRateLph,
+            sourceKey: fuelRateContextKey,
           });
         }
         const autonomyBuffer = this.autonomyBuffer.getSnapshot(autonomySampleAtMs);
@@ -561,6 +572,7 @@ class AutoTripService {
         this.setState({
           connected: true,
           active: Boolean(recorder),
+          tripStartedAtMs: recorder?.getState().startedAtMs ?? null,
           distanceKm: tripDistanceKm,
           fuelUsedL: tripFuelUsedL,
           consumptionKml: tripConsumptionKml,

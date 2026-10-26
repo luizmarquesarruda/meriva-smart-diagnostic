@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link, useFocusEffect } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as FileSystem from 'expo-file-system';
 import { useMidLayout } from '../src/ui/midLayout';
 import { COLORS, SCREEN_TITLE_STYLE } from '../src/ui/theme';
 import { getAutoSaveState } from '../src/meriva/autosaveManager';
@@ -11,6 +12,8 @@ import { getLivePidTrend, getLiveSeries, getVehicleConditionSnapshot } from '../
 import { buildTelemetryChart, type TelemetryChartSample } from '../src/obd/telemetryChart';
 import { getSharedObdStatus } from '../src/obd/sharedConnection';
 import { getCurrentAutonomyRangeKm } from '../src/trip/autonomyPresentation';
+import { readMaintenanceData, type MaintenanceData } from '../src/database/maintenanceStorage';
+import { estimateFuelRemainingFromFullTank } from '../src/trip/fuelBalance';
 import { getPidDefinition } from '../src/obd/pidDefinition';
 import type { DriveCycle } from '../src/data/driveCycles';
 
@@ -37,10 +40,22 @@ export default function DadosScreen() {
   const window = useWindowDimensions();
   const [state, setState] = useState(getAutoSaveState());
   const [trip, setTrip] = useState(autoTripService.getState());
+  const [maintenanceData, setMaintenanceData] = useState<MaintenanceData | null>(null);
+  const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
   const [chartMode, setChartMode] = useState<ChartMode>('LIVE');
   const [livePid, setLivePid] = useState<LiveChartPid>('0105');
   const [tripMetric, setTripMetric] = useState<TripChartMetric>('coolantTempC');
   const [historyTripIndex, setHistoryTripIndex] = useState(0);
+
+  useFocusEffect(useCallback(() => {
+    let cancelled = false;
+    void readMaintenanceData(basePath).then((loaded) => {
+      if (!cancelled) setMaintenanceData(loaded);
+    }).catch(() => {
+      if (!cancelled) setMaintenanceData(null);
+    });
+    return () => { cancelled = true; };
+  }, [basePath]));
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -55,6 +70,21 @@ export default function DadosScreen() {
   const gpsSpeedIsFresh = gpsState.running
     && gpsState.signalQuality !== 'SEM_FIX'
     && isGpsSampleFresh(gpsState.lastTimestamp);
+  const fuelBalanceFallback = useMemo(() => estimateFuelRemainingFromFullTank({
+    fuelings: maintenanceData?.fuelings ?? [],
+    trips: state.driveCycles,
+    currentOdometerKm: maintenanceData?.currentOdometerKm,
+    activeTrip: {
+      active: trip.active,
+      startedAtMs: trip.tripStartedAtMs,
+      distanceKm: trip.distanceKm,
+      fuelUsedL: trip.fuelUsedL,
+      fuelDataValid: trip.fuelSupported || trip.rollingConsumptionKml != null
+        || trip.instantaneousConsumptionSource != null || trip.fuelUsedL >= 0.02,
+    },
+  }), [maintenanceData?.fuelings, maintenanceData?.currentOdometerKm, state.driveCycles, trip.active,
+    trip.tripStartedAtMs, trip.distanceKm, trip.fuelUsedL, trip.fuelSupported,
+    trip.rollingConsumptionKml, trip.instantaneousConsumptionSource]);
   const currentAutonomyKm = getCurrentAutonomyRangeKm({
     ecuConnected,
     tripConnected: trip.connected,
@@ -63,6 +93,7 @@ export default function DadosScreen() {
     fuelLevelReadAtMs: trip.fuelLevelReadAtMs,
     tripConsumptionKml: trip.consumptionKml,
     rollingConsumptionKml: trip.rollingConsumptionKml,
+    fallbackFuelRemainingL: fuelBalanceFallback?.remainingFuelL ?? null,
     averageConsumptionKml: trip.averageConsumptionKml,
   });
   const readings = [...state.lastReadings]

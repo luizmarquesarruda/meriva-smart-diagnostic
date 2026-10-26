@@ -12,11 +12,18 @@ export function isFuelReserve(percent: number | null): boolean | null {
   return percent <= RESERVE_THRESHOLD_PERCENT;
 }
 
+export function estimateRangeFromFuelRemainingL(
+  remainingFuelL: number | null,
+  consumptionKml: number | null,
+): number | null {
+  if (remainingFuelL == null || !Number.isFinite(remainingFuelL) || remainingFuelL < 0 || remainingFuelL > TANK_CAPACITY_L ||
+      consumptionKml == null || !Number.isFinite(consumptionKml) || consumptionKml <= 0) return null;
+  return Number((remainingFuelL * consumptionKml).toFixed(1));
+}
+
 export function estimateRangeFromFuelLevel(
   percent: number | null,
   consumptionKml: number | null,
 ): number | null {
-  const liters = fuelLevelPercentToLiters(percent);
-  if (liters == null || consumptionKml == null || !Number.isFinite(consumptionKml) || consumptionKml <= 0) return null;
-  return Number((liters * consumptionKml).toFixed(1));
+  return estimateRangeFromFuelRemainingL(fuelLevelPercentToLiters(percent), consumptionKml);
 }

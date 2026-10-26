@@ -10,7 +10,7 @@ const MIN_ROLLING_DISTANCE_KM = 0.1;
 const MIN_ROLLING_FUEL_L = 0.05;
 
 interface FuelLevelReading { percent: number; timestampMs: number; }
-interface FuelFlowReading { timestampMs: number; speedKmh: number; fuelRateLph: number; }
+interface FuelFlowReading { timestampMs: number; speedKmh: number; fuelRateLph: number; sourceKey: string; }
 interface FuelFlowInterval { timestampMs: number; distanceKm: number; fuelUsedL: number; }
 
 export interface AutonomyBufferSnapshot {
@@ -31,11 +31,17 @@ export class AutonomyBuffer {
   private fuelLevels: FuelLevelReading[] = [];
   private previousFlowReading: FuelFlowReading | null = null;
   private flowIntervals: FuelFlowInterval[] = [];
+  private flowSourceKey: string | null = null;
+
+  resetConsumption(): void {
+    this.previousFlowReading = null;
+    this.flowIntervals = [];
+    this.flowSourceKey = null;
+  }
 
   reset(): void {
     this.fuelLevels = [];
-    this.previousFlowReading = null;
-    this.flowIntervals = [];
+    this.resetConsumption();
   }
 
   addFuelLevelSample(percent: number, timestampMs = Date.now()): boolean {
@@ -54,15 +60,21 @@ export class AutonomyBuffer {
   }
 
   /** Feed only a fresh PID 015E value or freshly calculated MAF/MAP estimate. */
-  addFuelFlowSample(sample: { timestampMs: number; speedKmh: number; fuelRateLph: number }): void {
+  addFuelFlowSample(sample: { timestampMs: number; speedKmh: number; fuelRateLph: number; sourceKey?: string }): void {
     const { timestampMs, speedKmh, fuelRateLph } = sample;
+    const sourceKey = sample.sourceKey?.trim() || 'DEFAULT';
     if (!Number.isFinite(timestampMs) || timestampMs <= 0 ||
         !Number.isFinite(speedKmh) || speedKmh < 0 || speedKmh > MAX_SPEED_KMH ||
         !Number.isFinite(fuelRateLph) || fuelRateLph <= 0 || fuelRateLph > MAX_FUEL_RATE_LPH) {
       this.previousFlowReading = null;
       return;
     }
-    const current: FuelFlowReading = { timestampMs, speedKmh, fuelRateLph };
+    if (this.flowSourceKey !== null && this.flowSourceKey !== sourceKey) {
+      this.previousFlowReading = null;
+      this.flowIntervals = [];
+    }
+    this.flowSourceKey = sourceKey;
+    const current: FuelFlowReading = { timestampMs, speedKmh, fuelRateLph, sourceKey };
     const previous = this.previousFlowReading;
     if (previous) {
       const elapsedMs = timestampMs - previous.timestampMs;

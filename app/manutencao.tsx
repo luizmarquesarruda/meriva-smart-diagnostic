@@ -71,6 +71,7 @@ export default function MaintenanceScreen() {
   const [litersInput, setLitersInput] = useState('');
   const [costInput, setCostInput] = useState('');
   const [fuelType, setFuelType] = useState<FuelingType>('GASOLINA');
+  const [fullTank, setFullTank] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -89,8 +90,8 @@ export default function MaintenanceScreen() {
   const tasks = useMemo(() => getMaintenanceTasks(Boolean(data?.severeUse)), [data?.severeUse]);
   const latestFueling = data?.fuelings[data.fuelings.length - 1] ?? null;
 
-  async function persist(next: MaintenanceData, message: string): Promise<void> {
-    if (busy) return;
+  async function persist(next: MaintenanceData, message: string): Promise<boolean> {
+    if (busy) return false;
     setBusy(true);
     try {
       await writeMaintenanceData(basePath, next);
@@ -98,9 +99,11 @@ export default function MaintenanceScreen() {
       setData(saved);
       setDrafts(buildDrafts(saved));
       setStatus(message);
+      return true;
     } catch {
       setStatus('FALHA AO SALVAR • DADOS NÃO CONFIRMADOS');
       Alert.alert('Falha no salvamento', 'O registro não foi confirmado. Tente novamente.');
+      return false;
     } finally {
       setBusy(false);
     }
@@ -184,14 +187,17 @@ export default function MaintenanceScreen() {
       liters,
       totalCost,
       type: fuelType,
+      fullTank,
     };
-    await persist({
+    const saved = await persist({
       ...data,
       currentOdometerKm: odometer,
       fuelings: [...data.fuelings, fueling].slice(-100),
     }, 'ABASTECIMENTO SALVO');
+    if (!saved) return;
     setLitersInput('');
     setCostInput('');
+    setFullTank(false);
   }
 
   return (
@@ -321,10 +327,24 @@ export default function MaintenanceScreen() {
                 <TextInput value={costInput} onChangeText={setCostInput} keyboardType="decimal-pad" placeholder="150,00" placeholderTextColor={COLORS.textSubtle} style={styles.input} accessibilityLabel="Valor total do abastecimento" />
               </View>
             </View>
+            <View style={styles.severeRow}>
+              <View style={styles.severeCopy}>
+                <Text style={styles.fieldLabel}>TANQUE COMPLETO</Text>
+                <Text style={styles.subtle}>Marque apenas se completou até o automático. Inicia/recalibra a estimativa alternativa quando o PID 012F não estiver disponível.</Text>
+              </View>
+              <Switch
+                value={fullTank}
+                disabled={!data || busy}
+                onValueChange={setFullTank}
+                trackColor={{ false: '#30445b', true: COLORS.primary }}
+                thumbColor={COLORS.textStrong}
+                accessibilityLabel="Abastecimento completou o tanque"
+              />
+            </View>
             <TouchableOpacity style={[styles.primaryButton, styles.fullButton, busy && styles.disabled]} disabled={!data || busy} onPress={() => void saveFueling()}>
               <Text style={styles.primaryButtonText}>REGISTRAR ABASTECIMENTO</Text>
             </TouchableOpacity>
-            <Text style={styles.subtle}>O registro usa a quilometragem salva acima e não altera cálculos de consumo OBD. Cadastre cada abastecimento manualmente.</Text>
+            <Text style={styles.subtle}>Sem PID 012F, a estimativa depende de registrar o tanque cheio e todas as viagens desde então. Viagens não registradas podem superestimar o alcance.</Text>
           </View>
 
           <Text style={styles.sectionHeading}>HISTÓRICO RECENTE</Text>
@@ -332,7 +352,7 @@ export default function MaintenanceScreen() {
             <View key={item.id} style={styles.historyCard}>
               <View style={styles.historyCopy}>
                 <Text style={styles.taskTitle}>{item.type} • {item.liters.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} L</Text>
-                <Text style={styles.subtle}>{new Date(item.occurredAt).toLocaleString('pt-BR')} • {formatKm(item.odometerKm)}</Text>
+                <Text style={styles.subtle}>{new Date(item.occurredAt).toLocaleString('pt-BR')} • {formatKm(item.odometerKm)}{item.fullTank ? ' • TANQUE COMPLETO' : ' • ABASTECIMENTO PARCIAL'}</Text>
               </View>
               <Text style={styles.historyValue}>{item.totalCost != null ? item.totalCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'VALOR N/D'}</Text>
             </View>

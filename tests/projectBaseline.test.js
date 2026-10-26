@@ -67,6 +67,7 @@ const requiredSuites = [
   'onlineConditions.test.js',
   'autonomyPresentation.test.js',
   'autonomyBuffer.test.js',
+  'fuelBalance.test.js',
   'connectivity.test.js',
   'permissions.test.js',
   'screenTheme.test.js',
@@ -254,6 +255,11 @@ assert.match(dataScreen, /rollingConsumptionKml: trip\.rollingConsumptionKml/);
 assert.match(tripService, /this\.autonomyBuffer\.addFuelLevelSample/);
 assert.match(tripService, /this\.autonomyBuffer\.addFuelFlowSample/);
 assert.match(read('src/trip/autonomyPresentation.ts'), /input\.rollingConsumptionKml/);
+assert.match(read('src/trip/autonomyPresentation.ts'), /fallbackFuelRemainingL/);
+assert.match(read('src/trip/fuelBalance.ts'), /item\.fullTank === true/);
+assert.match(read('app/manutencao.tsx'), /accessibilityLabel="Abastecimento completou o tanque"/);
+assert.match(home, /fallbackFuelRemainingL: fuelBalanceFallback\?\.remainingFuelL/);
+assert.match(dataScreen, /fallbackFuelRemainingL: fuelBalanceFallback\?\.remainingFuelL/);
 assert.match(home, /fuelLevelReadAtMs: tripState\.fuelLevelReadAtMs/);
 assert.match(tripService, /fuelLevelReadAtMs/);
 assert.match(read('src/trip/autonomyPresentation.ts'), /CURRENT_FUEL_LEVEL_STALE_AFTER_MS\s*=\s*30_000/);

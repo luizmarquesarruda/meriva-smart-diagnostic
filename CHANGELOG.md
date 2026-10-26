@@ -6,6 +6,8 @@
 - Criado buffer real de até dez leituras do PID 012F com mediana para reduzir oscilações de nível, além de janela móvel de dez intervalos de velocidade/fluxo para calcular consumo atual por distância e combustível integrados.
 - A autonomia prioriza consumo móvel recente, depois consumo confiável da viagem e média histórica; valores sintéticos, fluxo em cache reintegrado e nível vencido continuam proibidos.
 - Incluídos testes determinísticos para preenchimento/rotação do buffer, outliers, lacunas, limites físicos, frescor e integração nas telas.
+- Adicionado fallback de combustível restante por balanço do último tanque completo quando o PID 012F não está disponível, com validação de viagens reais, abastecimentos parciais e origem explícita da estimativa.
+- A janela móvel é reiniciada quando muda a fonte de fluxo ou a configuração do combustível; falhas ao salvar abastecimento preservam os campos preenchidos.
 
 ### Layout e navegação Floot
 - Alinhada a barra inferior do cockpit ao layout de referência: seis destinos com ícones de 32 dp, uniformemente distribuídos e sem legendas visíveis.
