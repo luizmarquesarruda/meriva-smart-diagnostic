@@ -1,6 +1,6 @@
-## ESTADO VIGENTE — 2026-10-26 (auditoria sistêmica DB-151; CI da revisão em andamento)
+## ESTADO VIGENTE — 2026-10-26 (auditoria sistêmica DB-152; CI da revisão em andamento)
 
-> HEAD anterior a esta atualização: `1d12c795a1714e44e99b7a9d8a34b504d08d95c5` (DB-150). A CI de PR passou validação e está/estava no build Android; esta correção DTC/parser exige CI própria no novo SHA.
+> HEAD anterior a esta atualização: `fb38dba4081c835a63466df73ea0350bf3dfaf8b` (DB-151). A correção DTC/parser ainda precisa de CI própria; DB-152 acrescenta a regressão CSV encontrada na releitura da PR #83 e também exige validação do novo SHA.
 
 ### Integração, CI e riscos
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
@@ -221,6 +221,7 @@
 - **DB-149** · 2026-10-26 — Rejeitar autonomia estimada quando o odômetro diverge da distância rastreada
 - **DB-150** · 2026-10-26 — Eliminar CI duplicada entre push e pull_request
 - **DB-151** · 2026-10-26 — Reintegrar correções de DTC histórico e interpretação dos PIDs 0101/0151
+- **DB-152** · 2026-10-26 — Escapar retorno de carro em células CSV
 
 ---
 
@@ -4325,4 +4326,20 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - O novo SHA precisa passar gate anti-regressão, Expo Doctor, TypeScript, suíte completa e build Android standalone antes de mesclar a PR consolidada.
 - A correção de parser é validada com respostas sintéticas; não comprova que a ECU específica da Meriva anuncie ou responda a PID 0151.
 - Testes físicos com Galaxy A06/Android 16, ELM327 e ECU permanecem pendentes.
+
+
+## DB-152 · 2026-10-26 — Escapar retorno de carro em células CSV
+
+### Causa confirmada
+- A releitura do diff da PR #83 identificou que o serializador CSV colocava aspas em campos com vírgula, aspas ou LF, mas não em campos com CR isolado. Um texto com retorno de carro podia quebrar a interpretação de registros CSV por consumidores que reconhecem CR como separador de linha.
+
+### Correção aplicada
+- `formatCsvValue` agora cita e escapa campos que contenham CR, mantendo o escape de aspas e os tratamentos existentes para vírgula e LF.
+- Adicionado teste comportamental que grava uma célula com CR isolado depois da migração de cabeçalho e verifica que o campo foi citado.
+- Esta correção, somada à DB-151, conclui a reconciliação das regressões relevantes encontradas ao comparar a PR #83 com a branch consolidada. A PR antiga só será encerrada depois que a PR #92 passar CI e for mesclada.
+- Atualizados changelog, resumo vigente e índice DB-001…DB-152.
+
+### Validação
+- A CI da PR deve executar o teste CSV, gate anti-regressão, TypeScript, suíte completa e build Android standalone no SHA final.
+- Nenhum teste físico Android/ELM327/ECU foi executado por esta alteração.
 

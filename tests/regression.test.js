@@ -1301,6 +1301,11 @@ async function testCsvWriteSerialization() {
   assert.ok(migrated.includes('A,t1,\n') && migrated.includes('B,t2,\n') &&
     migrated.includes('C,t3,\n') && migrated.includes('D,t4,x\n'),
     'migração de esquema deve preservar linhas antigas e alinhar as novas');
+
+  await logger.appendCsvRow(target, { id: 'E', timestamp: 't5', unexpected: 'x', notes: 'linha 1\rlinha 2' });
+  const carriageReturn = files.get(target);
+  assert.ok(carriageReturn.includes('"linha 1\rlinha 2"'),
+    'CSV precisa citar campos com CR para não criar uma quebra de registro dentro de uma célula');
 }
 
 async function testPidAndLearningWriteSerialization() {

@@ -30,7 +30,7 @@ let flushPromise: Promise<void> | null = null;
 function formatCsvValue(value: CsvValue): string {
   if (value === null || value === undefined) return '';
   const asString = String(value);
-  return asString.includes(',') || asString.includes('"') || asString.includes('\n')
+  return asString.includes(',') || asString.includes('"') || asString.includes('\n') || asString.includes('\r')
     ? `"${asString.replace(/"/g, '""')}"`
     : asString;
 }

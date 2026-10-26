@@ -21,6 +21,7 @@
 
 ### Integridade de DTC e enum de combustível
 - DTC histórico deixa de ser retornado como atual mesmo se o status persistido estiver em conflito; nova ocorrência só incrementa ao reaparecer, e Mode 03 reconcilia ausências apenas para CURRENT/CONFIRMED REAL_OBD após resposta válida.
+- Campos CSV com CR isolado agora são citados corretamente, assim como campos com vírgulas, aspas e LF.
 - PID 0101 separa contagem DTC, MIL e readiness com máscaras corretas para motores SI/CI; PID 0151 decodifica códigos de combustível conhecidos e rejeita códigos desconhecidos.
 
 ### Auditoria de documentação OBD/Meriva
