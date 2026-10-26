@@ -112,7 +112,7 @@ A recomendação de pesquisa é **não fundir todos os JSON num arquivo único n
 ## 6. Fontes públicas consultadas
 
 ### Aplicativos e documentação
-- Car Scanner — sensores/PIDs personalizados: https://www.carscanner.info/category/bez-rubriki/ (artigo “Custom sensors (PIDs)”)
+- Car Scanner — sensores/PIDs personalizados: https://www.carscanner.info/2019/07/ (arquivo do artigo “Custom sensors (PIDs)”)
 - Car Scanner — gravação e exportação CSV/BRC: https://www.carscanner.info/records/
 - Torque Pro — esquema CSV para PIDs estendidos: https://wiki.torque-bhp.com/view/PIDs
 - OBDLink — configuração de logs CSV/binários e seleção de PIDs: https://support.obdlink.com/support/solutions/articles/43000709894-get-started-with-logs
