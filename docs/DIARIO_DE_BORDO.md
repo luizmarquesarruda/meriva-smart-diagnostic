@@ -1,6 +1,6 @@
-## ESTADO VIGENTE — 2026-10-26 (auditoria sistêmica DB-149; CI da revisão em andamento)
+## ESTADO VIGENTE — 2026-10-26 (auditoria sistêmica DB-150; CI da revisão em andamento)
 
-> HEAD anterior a esta atualização: `defdacf9f6c1efa187f821aae775063fa982aa28`. Na CI [40315053418](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40315053418), `validate` passou e o build Android estava em execução; essa execução não valida o novo commit. A CI do SHA DB-149 precisa concluir validação e APK standalone.
+> HEAD anterior a esta atualização: `fef9b2e6afdfb8682fb7f3c18ebedc800f257443` (DB-149). A CI do SHA DB-149 iniciou em eventos push e pull_request duplicados; a execução de PR deve validar o novo SHA depois desta correção de gatilhos. Não considerar o build Android anterior como validação deste commit.
 
 ### Integração, CI e riscos
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
@@ -218,6 +218,7 @@
 - **DB-147** · 2026-10-26 — Corrigir divergências do inventário completo de PIDs
 - **DB-148** · 2026-10-26 — Corrigir registro de evidência e fechar ciclo de CI
 - **DB-149** · 2026-10-26 — Rejeitar autonomia estimada quando o odômetro diverge da distância rastreada
+- **DB-150** · 2026-10-26 — Eliminar CI duplicada entre push e pull_request
 
 ---
 
@@ -4285,4 +4286,21 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - O novo teste `fuelBalance.test.js` e a suíte completa precisam passar na CI do novo SHA, junto de TypeScript, Expo Doctor e build Android standalone.
 - O balanço continua sendo estimativa: é necessário registrar todas as viagens e abastecimentos; sem odômetro atual confiável, a limitação permanece.
 - Não foi executado teste físico no Galaxy A06/Android 16 nem com ELM327/ECU real. A comparação de autonomia com abastecimento real segue pendente.
+
+
+## DB-150 · 2026-10-26 — Eliminar CI duplicada entre push e pull_request
+
+### Causa confirmada
+- O workflow era disparado por `push` em todas as branches e por `pull_request` contra `main`. Para uma branch já aberta em PR, cada commit iniciava duas execuções equivalentes, duplicando gate, suíte, prebuild e build Android.
+- A duplicação consumia runners e tornava o estado mais confuso: a execução de push e a execução associada à PR tinham grupos de concorrência diferentes, portanto não se cancelavam mutuamente.
+
+### Correção aplicada
+- O workflow agora executa em `push` apenas para `main` e em `pull_request` para `main`; commits de branches com PR continuam validados no evento de PR. O gatilho manual `workflow_dispatch` foi preservado.
+- A alteração evita a duplicação normal de CI para o mesmo commit em uma PR e mantém a validação pós-merge em `main`.
+- Atualizados changelog, resumo vigente e índice DB-001…DB-150.
+
+### Validação
+- A CI da PR precisa validar a nova configuração e todo o código consolidado no SHA final, incluindo Expo Doctor, gate anti-regressão, TypeScript, suíte completa e APK Android standalone.
+- A CI anterior do SHA DB-149 foi iniciada em duplicidade; não usar resultados de um SHA anterior como evidência do novo commit.
+- Testes físicos com Galaxy A06/Android 16 e ELM327/ECU real permanecem pendentes.
 
