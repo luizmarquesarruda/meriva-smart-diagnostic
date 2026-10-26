@@ -1,6 +1,6 @@
-## ESTADO VIGENTE — 2026-10-26 (correção de tipo FileInfo e regressões DB-156; CI pendente)
+## ESTADO VIGENTE — 2026-10-26 (contagem da fila ELM DB-157; CI pendente)
 
-> DB-153 `b0864f7e7f8005c95a7da85867d68e9be58b9604` passou na CI [40318919363](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40318919363). DB-154 `35723aa0806f6c9d09c933d0be3c1b249937105f` falhou no gate por asserção ELM obsoleta; DB-155 `e33264b8c393ccbf2689636bb3de9ed98df4d91c` passou o gate mas falhou no TypeScript por estreitamento do tipo FileInfo. DB-156 corrige essa guarda e exige CI integral no novo SHA.
+> DB-153 `b0864f7e7f8005c95a7da85867d68e9be58b9604` passou na CI [40318919363](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40318919363). DB-154 falhou por asserção ELM obsoleta; DB-155 corrigiu o gate e escapes CSV; DB-156 corrigiu a guarda do tipo `FileInfo`. A CI [40322799675](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40322799675) passou gate e TypeScript, mas o teste concorrente encontrou erro de contagem: a primeira operação era contabilizada temporariamente como pendente. DB-157 distingue a vaga ativa das operações que realmente aguardam.
 
 ### Integração, CI e riscos
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
@@ -226,6 +226,7 @@
 - **DB-154** · 2026-10-26 — Limitar fila ELM327 e rotacionar logs CSV de alto volume
 - **DB-155** · 2026-10-26 — Corrigir o gate ELM e os escapes de fim de linha CSV
 - **DB-156** · 2026-10-26 — Restringir leitura de tamanho CSV a arquivos existentes
+- **DB-157** · 2026-10-26 — Corrigir contagem ativa versus pendente na fila ELM
 
 ---
 
@@ -4412,3 +4413,17 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 
 ### Validação
 - DB-156 exige nova CI no SHA final. Testes físicos ELM327/Android e verificação de exportação/backup permanecem pendentes; o teste automatizado não substitui a checagem no aparelho.
+
+
+## DB-157 · 2026-10-26 — Corrigir contagem ativa versus pendente na fila ELM
+
+### Causa confirmada
+- A CI [40322799675](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40322799675) passou gate anti-regressão e TypeScript, e executou a suíte completa. O teste concorrente revelou que, no pico de chamadas no mesmo turno, a primeira operação era contada temporariamente no conjunto pendente até começar a microtask, diminuindo a capacidade real da fila.
+
+### Correção aplicada
+- A fila agora reserva sincronicamente a vaga ativa com `queueRunning`. `pendingQueueDepth` conta somente operações que aguardam atrás da ativa; o limite continua em 16 pendentes.
+- O high-water mark continua observável. A serialização FIFO e liberação em `finally` foram preservadas; o teste exige 16 pendentes mais uma transação ativa e confere rejeição anterior à escrita do transporte.
+
+### Validação
+- DB-157 precisa de CI integral no SHA final. Na execução anterior, a suíte reportou uma falha no teste concorrente da fila; não se declara o lote aprovado antes de repetir.
+- O build Android do commit anterior foi ignorado pela falha na suíte. Testes físicos ELM327/Android continuam pendentes.

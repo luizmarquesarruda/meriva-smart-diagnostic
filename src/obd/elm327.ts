@@ -66,6 +66,7 @@ export class Elm327Session {
   private initializationPromise: Promise<ElmCommandResult[]> | null = null;
   private commandQueue: Promise<void> = Promise.resolve();
   private pendingQueueDepth = 0;
+  private queueRunning = false;
   private maxQueueDepth = 0;
   private queueRejections = 0;
   private totalQueueWaitMs = 0;
@@ -333,7 +334,11 @@ export class Elm327Session {
     operation: () => Promise<T>,
     options: { allowWhenSaturated?: boolean } = {},
   ): Promise<T> {
-    if (!options.allowWhenSaturated && this.pendingQueueDepth >= ELM_MAX_PENDING_COMMANDS) {
+    if (
+      !options.allowWhenSaturated &&
+      this.queueRunning &&
+      this.pendingQueueDepth >= ELM_MAX_PENDING_COMMANDS
+    ) {
       this.queueRejections += 1;
       return Promise.reject(new Error(
         'ELM_COMMAND_QUEUE_FULL: ' + this.pendingQueueDepth +
@@ -342,8 +347,17 @@ export class Elm327Session {
     }
 
     const queuedAtMs = Date.now();
-    this.pendingQueueDepth += 1;
+    const waitsForPrevious = this.queueRunning;
+    if (waitsForPrevious) {
+      // Count only operations that wait behind the active transaction.
+      this.pendingQueueDepth += 1;
+    } else {
+      // Reserve the active slot synchronously so same-tick calls cannot all
+      // believe the queue is empty before the first microtask starts.
+      this.queueRunning = true;
+    }
     this.maxQueueDepth = Math.max(this.maxQueueDepth, this.pendingQueueDepth);
+
     const previous = this.commandQueue;
     let release!: () => void;
     this.commandQueue = new Promise<void>((resolve) => {
@@ -351,13 +365,20 @@ export class Elm327Session {
     });
 
     return previous.then(() => {
-      this.pendingQueueDepth = Math.max(0, this.pendingQueueDepth - 1);
+      if (waitsForPrevious) {
+        this.pendingQueueDepth = Math.max(0, this.pendingQueueDepth - 1);
+      }
       const waitMs = Math.max(0, Date.now() - queuedAtMs);
       this.totalQueueWaitMs += waitMs;
       this.maxQueueWaitMs = Math.max(this.maxQueueWaitMs, waitMs);
       this.completedQueueWaitSamples += 1;
       return operation();
-    }).finally(() => release());
+    }).finally(() => {
+      release();
+      if (this.pendingQueueDepth === 0) {
+        this.queueRunning = false;
+      }
+    });
   }
 
   private async command(command: string, attempt = 1, timeoutOverrideMs?: number): Promise<ElmCommandResult> {

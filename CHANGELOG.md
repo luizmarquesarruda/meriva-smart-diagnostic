@@ -11,6 +11,7 @@
 - Logs de alto volume em LOGS/ rotacionam aproximadamente a cada 1 MiB em segmentos CSV independentes com cabeçalho; a reescrita fica limitada ao segmento ativo e os anteriores permanecem intactos.
 - CSV de viagens fora de LOGS/ conserva o caminho existente; não é usado append não suportado pela API legada do Expo FileSystem.
 - O gate anti-regressão foi alinhado à fila instrumentada e os literais LF/CR das fixtures foram corrigidos; a CI seguinte apontou uma guarda TypeScript em FileInfo, corrigida no DB-156.
+- DB-157 distingue a operação ativa das consultas que aguardam para que o limite de 16 se aplique a operações realmente pendentes; a CI anterior exigiu correção após o teste de saturação.
 
 ### Limites de memória da telemetria
 - Telemetria ao vivo valida IDs Mode 01 e limita o armazenamento a 64 séries ativas, com até 120 amostras por PID; LRU mantém streams recentes e remove de forma sincronizada o índice atual.
