@@ -1,6 +1,6 @@
-## ESTADO VIGENTE — 2026-10-26 (fila ELM, rotação CSV e regressões DB-154; nova CI pendente)
+## ESTADO VIGENTE — 2026-10-26 (correção de tipo FileInfo e regressões DB-156; CI pendente)
 
-> HEAD anterior a DB-153: `80fdb6ffe0a32b8cb1d402466b091b5b448fcf47` (DB-152). A CI [40318919363](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40318919363) passou `validate` e `android-build` para DB-153 `b0864f7e7f8005c95a7da85867d68e9be58b9604`. DB-154 altera código e contratos; precisa de CI própria.
+> DB-153 `b0864f7e7f8005c95a7da85867d68e9be58b9604` passou na CI [40318919363](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40318919363). DB-154 `35723aa0806f6c9d09c933d0be3c1b249937105f` falhou no gate por asserção ELM obsoleta; DB-155 `e33264b8c393ccbf2689636bb3de9ed98df4d91c` passou o gate mas falhou no TypeScript por estreitamento do tipo FileInfo. DB-156 corrige essa guarda e exige CI integral no novo SHA.
 
 ### Integração, CI e riscos
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
@@ -224,6 +224,8 @@
 - **DB-152** · 2026-10-26 — Escapar retorno de carro em células CSV
 - **DB-153** · 2026-10-26 — Limitar globalmente os buffers de telemetria PID e auditar filas
 - **DB-154** · 2026-10-26 — Limitar fila ELM327 e rotacionar logs CSV de alto volume
+- **DB-155** · 2026-10-26 — Corrigir o gate ELM e os escapes de fim de linha CSV
+- **DB-156** · 2026-10-26 — Restringir leitura de tamanho CSV a arquivos existentes
 
 ---
 
@@ -4385,3 +4387,28 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - A CI [40318919363](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40318919363) aprovou validate e android-build somente no SHA DB-153 b0864f7e7f8005c95a7da85867d68e9be58b9604.
 - Pendente para DB-154: gate anti-regressão, TypeScript, suíte completa e APK Android standalone no novo SHA.
 - As medições de latência com o adaptador ELM327 e a confirmação da rotação/exportação no Android físico continuam pendentes. Testes simulados não são validação de hardware.
+
+
+## DB-155 · 2026-10-26 — Corrigir o gate ELM e os escapes de fim de linha CSV
+
+### Causa confirmada
+- A CI [40321725557](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40321725557) falhou no gate anti-regressão porque o teste ainda exigia literalmente a antiga implementação `previous.then(operation)`, incompatível com a nova instrumentação da fila serial.
+- A revisão encontrou escapes duplicados nos helpers/fixtures de rotação; sem a correção, a detecção do cabeçalho poderia procurar uma barra literal em lugar de LF e o teste não representaria um CSV real.
+
+### Correção aplicada
+- O gate exige agora serialização, liberação em `finally`, limite de backpressure e operações reservadas de fechamento/recuperação.
+- Os helpers e fixtures CSV usam LF/CR reais, com regex de dígitos corretamente escapada.
+
+### Validação
+- DB-155 foi publicado como `e33264b8c393ccbf2689636bb3de9ed98df4d91c`; a CI [40322458446](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40322458446) passou Expo Doctor e o gate, mas falhou no TypeScript porque `FileInfo.size` foi lido sem estreitar `exists`. O APK foi ignorado. O estado não foi declarado aprovado.
+
+## DB-156 · 2026-10-26 — Restringir leitura de tamanho CSV a arquivos existentes
+
+### Causa confirmada
+- O tipo discriminado `FileInfo` da versão Expo instalada não garante a propriedade `size` quando `exists=false`. O acesso no helper `readCsvHeaders` falhava no `tsc --noEmit`, interrompendo a validação antes da suíte e do build Android.
+
+### Correção aplicada
+- A guarda confirma `info.exists` antes de consultar `info.size`. Não altera o tamanho de corte, a ordem de rotação nem o formato dos segmentos.
+
+### Validação
+- DB-156 exige nova CI no SHA final. Testes físicos ELM327/Android e verificação de exportação/backup permanecem pendentes; o teste automatizado não substitui a checagem no aparelho.

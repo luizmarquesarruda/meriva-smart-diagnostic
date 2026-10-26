@@ -59,6 +59,7 @@ A branch mantém o fluxo OBD/ELM327 existente e inclui testes automatizados para
 - Cada segmento novo começa com cabeçalho independente e mantém a ordem de colunas do segmento anterior, acrescentando novas colunas pelo mecanismo de migração existente.
 - Se o tamanho não puder ser verificado, falhar explicitamente. CSVs de viagens fora de LOGS/ permanecem no caminho compatível.
 - Verificar rotação em duas fronteiras, cabeçalho, preservação do conteúdo anterior, esquema, gravações concorrentes e inclusão automática de segmentos no backup.
+- O leitor do cabeçalho deve verificar `exists` antes de acessar `FileInfo.size`; o gate do repositório e o TypeScript devem passar com a versão atual do Expo.
 
 ## Sequência de validação para um lote
 

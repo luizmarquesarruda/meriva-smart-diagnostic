@@ -4,7 +4,7 @@
 
 - Repositório: `luizmarquesarruda/meriva-smart-diagnostic`.
 - HEAD anterior a DB-153: `80fdb6ffe0a32b8cb1d402466b091b5b448fcf47` (DB-152); HEAD DB-153: `b0864f7e7f8005c95a7da85867d68e9be58b9604`.
-- A CI [40318919363](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40318919363) passou `validate` e `android-build` para DB-153. DB-154 altera código novamente e precisa de CI própria.
+- A CI [40318919363](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40318919363) passou `validate` e `android-build` para DB-153. DB-154 falhou no gate por uma asserção estática obsoleta; DB-155 corrigiu-a e a CI seguinte encontrou erro de estreitamento FileInfo no TypeScript. DB-156 corrige a guarda e exige CI própria.
 - Esta auditoria separa buffers de amostragem (para ruído/mediana), buffers de transporte (para serializar/limitar carga) e buffers de persistência (para lote/recuperação). Não se deve reutilizar a mesma política para todos.
 
 ## Resultado por subsistema
@@ -28,6 +28,7 @@
 3. Logs de alto volume em `LOGS/` são particionados em segmentos de aproximadamente 1 MiB, cada um com cabeçalho consistente. A rotação preserva os arquivos anteriores e mantém o caminho não segmentado de CSVs de viagens.
 4. `tests/liveTelemetry.test.js` cobre a cota LRU; `tests/regression.test.js` cobre saturação/serialização ELM e rotação CSV em duas fronteiras.
 5. `docs/CONTRATO_ANTI_REGRESSAO.md`, `docs/TEST_PLAN.md`, `CHANGELOG.md` e o Diário de Bordo registram as regras e a aceitação.
+6. DB-155 atualiza o gate ELM e corrige os escapes LF/CR. DB-156 confirma `FileInfo.exists` antes de ler `size`.
 
 ## Critério de encerramento
 

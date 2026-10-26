@@ -10,6 +10,7 @@
 - O snapshot de saúde expõe profundidade atual/máxima, rejeições e métricas de espera para diagnosticar rajadas e contenção.
 - Logs de alto volume em LOGS/ rotacionam aproximadamente a cada 1 MiB em segmentos CSV independentes com cabeçalho; a reescrita fica limitada ao segmento ativo e os anteriores permanecem intactos.
 - CSV de viagens fora de LOGS/ conserva o caminho existente; não é usado append não suportado pela API legada do Expo FileSystem.
+- O gate anti-regressão foi alinhado à fila instrumentada e os literais LF/CR das fixtures foram corrigidos; a CI seguinte apontou uma guarda TypeScript em FileInfo, corrigida no DB-156.
 
 ### Limites de memória da telemetria
 - Telemetria ao vivo valida IDs Mode 01 e limita o armazenamento a 64 séries ativas, com até 120 amostras por PID; LRU mantém streams recentes e remove de forma sincronizada o índice atual.

@@ -123,7 +123,7 @@ async function readCsvHeaders(filePath: string): Promise<string[]> {
     length: 8192,
   });
   const firstNewline = preview.indexOf('\n');
-  if (firstNewline < 0 && typeof info.size === 'number' && info.size > preview.length) {
+  if (info.exists && firstNewline < 0 && typeof info.size === 'number' && info.size > preview.length) {
     throw new Error('CSV_HEADER_EXCEEDS_READ_WINDOW: ' + filePath);
   }
   const headerLine = (firstNewline >= 0 ? preview.slice(0, firstNewline) : preview).replace(/\r$/, '');
