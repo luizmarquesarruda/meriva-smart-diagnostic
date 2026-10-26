@@ -48,8 +48,8 @@ export function estimateFuelRemainingFromFullTank(input: FuelBalanceInput): Fuel
   if (!baseline || baseline.liters > capacity + 1) return null;
   const baselineAtMs = Date.parse(baseline.occurredAt);
 
-  if (input.currentOdometerKm != null && Number.isFinite(input.currentOdometerKm)
-      && input.currentOdometerKm > 0 && input.currentOdometerKm < baseline.odometerKm) return null;
+  if (input.currentOdometerKm != null &&
+      (!Number.isFinite(input.currentOdometerKm) || input.currentOdometerKm < 0)) return null;
 
   const partialFuelings = input.fuelings
     .filter((item) => Date.parse(item.occurredAt) > baselineAtMs && item.fullTank !== true)
@@ -62,6 +62,10 @@ export function estimateFuelRemainingFromFullTank(input: FuelBalanceInput): Fuel
         || !Number.isFinite(fueling.odometerKm) || fueling.odometerKm < previousFuelingOdometer) return null;
     previousFuelingOdometer = fueling.odometerKm;
   }
+
+  const latestOdometerReference = partialFuelings[partialFuelings.length - 1] ?? baseline;
+  if (input.currentOdometerKm != null &&
+      input.currentOdometerKm < latestOdometerReference.odometerKm) return null;
 
   const tripEvents: Array<{
     kind: 'trip';
@@ -142,6 +146,23 @@ export function estimateFuelRemainingFromFullTank(input: FuelBalanceInput): Fuel
     if (activeTrip.fuelUsedL > remainingFuelL + 0.25) return null;
     remainingFuelL = Math.max(0, remainingFuelL - activeTrip.fuelUsedL);
     fuelUsedSinceFullTankL += activeTrip.fuelUsedL;
+  }
+
+  // Cross-check the driver's latest odometer against all tracked distance since
+  // the latest fueling reference. A mismatch means an untracked trip or stale
+  // odometer could make the estimated range dangerously optimistic.
+  if (input.currentOdometerKm != null) {
+    const referenceAtMs = Date.parse(latestOdometerReference.occurredAt);
+    const trackedDistanceKm = tripEvents
+      .filter((trip) => trip.startedAtMs >= referenceAtMs)
+      .reduce((sum, trip) => sum + trip.distanceKm, 0)
+      + (activeTrip?.active && activeTrip.startedAtMs != null && activeTrip.startedAtMs >= referenceAtMs
+        ? activeTrip.distanceKm
+        : 0);
+    const observedDistanceKm = input.currentOdometerKm - latestOdometerReference.odometerKm;
+    const toleranceKm = Math.max(2, observedDistanceKm * 0.05);
+    if (!Number.isFinite(trackedDistanceKm) || trackedDistanceKm < 0 ||
+        Math.abs(observedDistanceKm - trackedDistanceKm) > toleranceKm) return null;
   }
 
   return {

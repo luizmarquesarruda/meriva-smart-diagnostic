@@ -1,6 +1,6 @@
-## ESTADO VIGENTE — 2026-10-26 (auditoria sistêmica DB-148; CI verde no HEAD atual)
+## ESTADO VIGENTE — 2026-10-26 (auditoria sistêmica DB-149; CI da revisão em andamento)
 
-> HEAD anterior a esta atualização documental: `c02fecb6abe876c1a1f0ca275330f33af3ec6e91`. CI [40313779041](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40313779041) passou validação e build Android standalone, incluindo verificação e upload do APK. Esta nova entrada de diário precisa de CI própria por alterar o HEAD.
+> HEAD anterior a esta atualização: `defdacf9f6c1efa187f821aae775063fa982aa28`. Na CI [40315053418](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40315053418), `validate` passou e o build Android estava em execução; essa execução não valida o novo commit. A CI do SHA DB-149 precisa concluir validação e APK standalone.
 
 ### Integração, CI e riscos
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
@@ -9,7 +9,7 @@
 - CI anterior [40313041670](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40313041670), SHA `826df0ae23ef30e602418721c521be271c6e5ff6`, passou validação, mas falhou em `mergeReleaseResources` para `drawable-mdpi/splashscreen_image.png`. A repetição sobre o descendente `c02fecb6abe876c1a1f0ca275330f33af3ec6e91`, sem alterar a imagem, passou o build completo; falha tratada como transitória e registrada, sem modificação desnecessária do splash.
 - DB-146 adicionou PID 0144 ao catálogo padrão com fórmula/faixa/unidade e testes, sem marcar suporte físico nem incluí-lo na fila automática. Ele permanece alvo de confirmação até existir resposta RAW_ECU válida.
 - DB-147 sincronizou README, auditoria de fontes e inventário completo com o catálogo runtime: 35 PIDs, 35 faixas e 21 definições de fórmula. Também corrigiu a semântica documental de 0101, 0111 e 0130 e adicionou testes de consistência.
-- A autonomia DB-143–145 usa janela móvel de dez leituras e balanço do último tanque completo. O balanço é uma estimativa e depende de todas as viagens e abastecimentos serem registrados; precisão física ainda não foi medida.
+- A autonomia DB-143–145 usa janela móvel de dez leituras e balanço do último tanque completo. O balanço é uma estimativa e depende de todas as viagens e abastecimentos serem registrados; DB-149 acrescenta a comparação do odômetro atual com a distância rastreada. Precisão física ainda não foi medida.
 - PR [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81) e PR [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) continuam abertas por divergência. O código útil de #81 está portado; o layout de #83 está incorporado, e a prévia foi movida para `src/ui/FlootLayoutPreview.tsx`, fora das rotas Expo. Ambas serão encerradas como substituídas após validação da PR consolidada para `main`.
 - Somente `010C` tem resposta RAW_ECU específica documentada para a Meriva (`41 0C 1A F8` = 1726 rpm). Catálogo SAE não é prova de suporte do veículo.
 - Não foi executado teste físico no Galaxy A06/Android 16 nem com ELM327/ECU real.
@@ -217,6 +217,7 @@
 - **DB-146** · 2026-10-26 — Reconciliar PID 0144 com catálogo, fórmula e evidência da ECU
 - **DB-147** · 2026-10-26 — Corrigir divergências do inventário completo de PIDs
 - **DB-148** · 2026-10-26 — Corrigir registro de evidência e fechar ciclo de CI
+- **DB-149** · 2026-10-26 — Rejeitar autonomia estimada quando o odômetro diverge da distância rastreada
 
 ---
 
@@ -4266,4 +4267,22 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Este commit altera o diário; a CI deve validar o novo SHA antes da PR consolidada ser criada/mesclada.
 - PR #81 e #83 não foram mescladas. O plano é consolidar as mudanças validadas em uma PR única para `main`, depois encerrar as PRs divergentes como substituídas, com justificativa registrada.
 - A confirmação física do PID 0144 e a validação de autonomia com o veículo real continuam pendentes.
+
+
+## DB-149 · 2026-10-26 — Rejeitar autonomia estimada quando o odômetro diverge da distância rastreada
+
+### Causa confirmada
+- O fallback por tanque cheio verificava a coerência do odômetro apenas quando havia um abastecimento parcial posterior. Se o motorista registrasse novas viagens, mas não houvesse outro abastecimento, a estimativa podia continuar subtraindo somente as viagens conhecidas sem comparar a distância acumulada com o odômetro atual.
+- O campo `currentOdometerKm` já era fornecido pelas telas do cockpit e Dados, mas só era usado para rejeitar valores anteriores ao baseline; a existência do dado não protegia contra viagens não registradas ou odômetro desatualizado.
+
+### Correção aplicada
+- O balanço agora usa como referência o odômetro/data do último abastecimento (completo ou parcial) e compara a distância observada no odômetro atual com a soma das viagens REAL_OBD concluídas e da viagem ativa desde essa referência.
+- Divergência superior à tolerância conservadora de `max(2 km, 5% da distância observada)`, odômetro inválido ou anterior ao último abastecimento resulta em N/D; a estimativa não tenta preencher a diferença com dados inventados.
+- Acrescentados testes para odômetro coerente, odômetro parado/desatualizado apesar de 60 km rastreados e odômetro anterior ao abastecimento.
+- Atualizados RG-45, PID-AUTO-03, changelog, resumo vigente e índice DB-001…DB-149.
+
+### Validação
+- O novo teste `fuelBalance.test.js` e a suíte completa precisam passar na CI do novo SHA, junto de TypeScript, Expo Doctor e build Android standalone.
+- O balanço continua sendo estimativa: é necessário registrar todas as viagens e abastecimentos; sem odômetro atual confiável, a limitação permanece.
+- Não foi executado teste físico no Galaxy A06/Android 16 nem com ELM327/ECU real. A comparação de autonomia com abastecimento real segue pendente.
 

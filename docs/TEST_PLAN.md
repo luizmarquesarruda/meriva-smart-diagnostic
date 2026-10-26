@@ -106,6 +106,7 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 - A tela de abastecimento deve permitir marcar explicitamente “tanque completo”; registros antigos e abastecimentos parciais nunca podem ser tratados como tanque cheio.
 - O balanço começa na capacidade nominal de 56 L após o último tanque completo, subtrai somente viagens REAL_OBD com combustível válido e soma abastecimentos parciais posteriores sem ultrapassar a capacidade.
 - Rejeitar viagens inválidas, viagens que cruzem o evento de abastecimento, falta de ordenação temporal, combustível negativo/maior que a capacidade e odômetro incompatível no próximo abastecimento.
+- Quando houver odômetro atual informado, comparar a distância desde o último abastecimento com a soma das viagens registradas (incluindo a viagem ativa); odômetro desatualizado, anterior ao abastecimento ou divergente acima da tolerância deve resultar em N/D.
 - O PID 012F atual prevalece; sem PID 012F, o balanço de tanque cheio pode fornecer litros restantes somente com ECU conectada e consumo móvel/viagem/histórico confiável. Sem baseline válido, retornar N/D.
 - A UI deve distinguir “PID 012F • BUFFER n/10” de “TANQUE ESTIMADO • n VIAGENS” e avisar que viagens não registradas podem superestimar o alcance. Testar falha de salvamento sem limpar os campos digitados.
 

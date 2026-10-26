@@ -31,6 +31,23 @@ const estimate = estimateFuelRemainingFromFullTank({ fuelings: [full, partial], 
 assert.equal(estimate?.remainingFuelL, 49, '56 L - 8 L + 6 L - 4 L - 1 L');
 assert.equal(estimate?.tripsCount, 3);
 assert.equal(estimate?.partialFuelingsCount, 1);
+assert.equal(estimateFuelRemainingFromFullTank({
+  fuelings: [full, partial],
+  trips: [trip1, trip2],
+  activeTrip: active,
+  currentOdometerKm: 10160,
+})?.remainingFuelL, 49, 'odômetro atual coerente com 50 km após o abastecimento parcial e 10 km ativos');
+assert.equal(estimateFuelRemainingFromFullTank({
+  fuelings: [full, partial],
+  trips: [trip1, trip2],
+  activeTrip: active,
+  currentOdometerKm: 10100,
+}), null, 'odômetro desatualizado não pode ocultar 60 km percorridos depois do abastecimento parcial');
+assert.equal(estimateFuelRemainingFromFullTank({
+  fuelings: [full, partial],
+  trips: [trip1, trip2],
+  currentOdometerKm: 10050,
+}), null, 'odômetro anterior ao último abastecimento invalida a estimativa');
 assert.equal(estimateFuelRemainingFromFullTank({ fuelings: [partial], trips: [trip1] }), null,
   'abastecimento parcial sem baseline completo não permite inferir o tanque');
 assert.equal(estimateFuelRemainingFromFullTank({ fuelings: [full], trips: [{ ...trip1, fuelDataValid: false }]}), null,
