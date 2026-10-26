@@ -62,6 +62,7 @@ export default function DadosScreen() {
     fuelLevelPercent: trip.fuelLevelPercent,
     fuelLevelReadAtMs: trip.fuelLevelReadAtMs,
     tripConsumptionKml: trip.consumptionKml,
+    rollingConsumptionKml: trip.rollingConsumptionKml,
     averageConsumptionKml: trip.averageConsumptionKml,
   });
   const readings = [...state.lastReadings]

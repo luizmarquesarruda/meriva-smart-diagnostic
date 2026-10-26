@@ -241,7 +241,8 @@ export default function IndexScreen() {
     fuelLevelPercent: tripState.fuelLevelPercent,
     fuelLevelReadAtMs: tripState.fuelLevelReadAtMs,
     tripConsumptionKml: tripState.consumptionKml,
-    averageConsumptionKml: tripState.averageConsumptionKml,
+    rollingConsumptionKml: tripState.rollingConsumptionKml,
+    averageConsumptionKml: tripState.averageConsumptionKml;
   });
   const connectedSupportedPids = connectionStatus.ecuConnected
     ? getSharedObdConnection()?.supportedPids ?? []

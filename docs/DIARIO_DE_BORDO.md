@@ -1,14 +1,15 @@
-## ESTADO VIGENTE — 2026-10-25 (retomada da integração DB-142)
+## ESTADO VIGENTE — 2026-10-26 (auditoria sistêmica DB-143)
 
 > Estado observado na branch `integration/reconcile-pid-ui-20261025`; a validação deve ser feita novamente no SHA final.
 
 ### Integração, CI e riscos
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
 - `main` observado: `8e95b2b59e0aa4c76027b638e49d4453a0a4b54c`; PR [#89](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/89) foi mesclada; PRs [#90](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/90) e [#82](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/82) foram fechadas sem merge.
-- No commit `97b58e50a4fadf6254fa269d00db11021f506a68`, a CI [run 40260455597](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40260455597) aprovou Expo Doctor (17/17), gate anti-regressão e `npm run validate`, incluindo TypeScript e a suíte completa. O `expo prebuild` Android também passou; o APK de release ainda estava em montagem no último estado observado, sem conclusão confirmada.
-- DB-142 move a prévia Floot para fora da árvore de rotas de produção. Esse novo SHA requer CI própria; não assumir que a aprovação parcial do SHA anterior valida a mudança.
-- PR [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81) continua em rascunho; [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) e [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84) continuam abertas. PID 0144 ainda não foi incorporado ao catálogo da branch candidata.
-- `app/floot-layout.tsx` continua uma rota de demonstração estática na árvore Expo; precisa ser removida/movida ou transformada em funcionalidade real antes do release. Hardware Android/ELM327/ECU não foi validado nesta retomada.
+- HEAD validado antes desta rodada: `4e3aa299ab9b244f224e5ead4b06931a47291690`. A CI [run 40260998729](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40260998729) concluiu com sucesso: Expo Doctor, gate anti-regressão, TypeScript, suíte completa, prebuild Android, APK standalone, verificação e upload do artefato.
+- A prévia Floot já está em `src/ui/FlootLayoutPreview.tsx`, fora da árvore de rotas Expo; `app/floot-layout.tsx` não existe no HEAD validado.
+- PRs ainda abertas no último estado consultado: [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81) em rascunho, [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) e [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84). Serão reconciliadas após a nova CI, sem merge/fechamento por conveniência.
+- Auditoria de autonomia DB-143: antes da mudança, sem média histórica salva e sem consumo confiável da viagem, a autonomia permanecia N/D. A nova janela móvel usa dez leituras reais do nível de combustível e dez intervalos recentes de fluxo/distância para iniciar uma estimativa atual.
+- Não foi executado teste físico no Galaxy A06/Android 16 nem com o ELM327/ECU real. A CI e testes sintéticos não comprovam a precisão no Meriva; comparação com percurso e abastecimento reais segue pendente.
 
 ### Critérios de aceitação
 - RG-01…RG-43 únicos e sequenciais; DB-001…DB-NNN e índice sincronizados.
@@ -206,6 +207,7 @@
 - **DB-140** · 2026-10-25 — Alinhar teste de navegação ao contrato vigente de seis ícones
 - **DB-141** · 2026-10-25 — Eliminar escapes inválidos nas verificações de navegação
 - **DB-142** · 2026-10-25 — Remover a prévia Floot da árvore de rotas de produção
+- **DB-143** · 2026-10-26 — Implementar buffer móvel real de dez leituras para autonomia
 
 ---
 
@@ -4163,3 +4165,17 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 ### Validação pendente
 - O commit precisa passar npm run doctor, gate:baseline, TypeScript, suíte completa e build Android no mesmo SHA.
 - O APK da CI anterior ainda estava em montagem no último estado consultado. Não houve merge nem teste físico de UI/ELM327/ECU.
+
+## DB-143 · 2026-10-26 — Implementar buffer móvel real de dez leituras para autonomia
+
+### Diagnóstico sistêmico
+- A base anterior estava verde no SHA `4e3aa299ab9b244f224e5ead4b06931a47291690` (CI [40260998729](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40260998729), incluindo APK Android standalone). O bloqueio de autonomia era lógico: sem média histórica e antes de o consumo da viagem atingir os limiares, não existia uma média móvel que permitisse estimar alcance com dados atuais.
+- Torque documenta “Fuel Remaining” como estimativa dependente do perfil do veículo, capacidade do tanque e medição do combustível enquanto o app está conectado; sua média de viagem deriva de distância/combustível ([Fuel Remaining](https://wiki.torque-bhp.com/view/Fuel_Remaining), [MPG](https://wiki.torque-bhp.com/view/MPG)). O OBD Auto Doctor esclarece que o suporte de PID varia por veículo e calcula consumo com MAF/MAP quando disponíveis ([parâmetros OBD](https://www.obdautodoctor.com/help/articles/supported-obd-parameters/)). Converter apenas o PID 012F em litros não basta: também é necessária uma taxa de consumo válida.
+### Implementação
+- Criado `src/trip/autonomyBuffer.ts`: FIFO de até dez leituras válidas do PID 012F, mediana contra picos e dez intervalos de consumo integrados por velocidade e fluxo.
+- O consumo móvel exige timestamps monotônicos, intervalos de no máximo 10 s, velocidade ≥5 km/h, dez intervalos, distância ≥0,1 km e combustível ≥0,05 L. Leituras ausentes/inválidas, gaps e taxas em cache não são reintegrados; o buffer é limpo ao mudar/perder a sessão ECU.
+- A autonomia prioriza consumo móvel recente, depois consumo confiável da viagem e média histórica positiva. A validade do nível 012F atual continua obrigatória; autonomia persistida nunca é tratada como atual.
+- Criado `tests/autonomyBuffer.test.js`, integrado ao `npm test`; a cobertura de prioridade, contrato RG-44, PID-AUTO-02 e changelog será completada no próximo commit desta mesma unidade de trabalho.
+### Validação
+- A mudança só será concluída quando a CI do SHA final aprovar Expo Doctor, gate anti-regressão, TypeScript, suíte completa, prebuild, APK Android standalone e verificação/upload do artefato.
+- Teste físico pendente: confirmar no Meriva a resposta real de 012F/015E ou MAF/MAP e composição de combustível; comparar autonomia com distância e abastecimento reais. Não converter ausência de resposta em zero nem declarar candidatos como suporte confirmado.

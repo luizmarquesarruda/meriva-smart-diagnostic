@@ -15,6 +15,7 @@ export interface CurrentAutonomyInput {
   fuelLevelPercent: number | null;
   fuelLevelReadAtMs: number | null;
   tripConsumptionKml: number | null;
+  rollingConsumptionKml?: number | null;
   averageConsumptionKml: number;
   nowMs?: number;
 }
@@ -31,11 +32,15 @@ export function getCurrentAutonomyRangeKm(input: CurrentAutonomyInput): number |
     !isCurrentFuelLevelSample(input.fuelLevelReadAtMs, input.nowMs)
   ) return null;
 
-  const consumptionKml = input.tripConsumptionKml != null
-    && Number.isFinite(input.tripConsumptionKml)
-    && input.tripConsumptionKml > 0
-    ? input.tripConsumptionKml
-    : input.averageConsumptionKml;
+  const consumptionKml = input.rollingConsumptionKml != null
+    && Number.isFinite(input.rollingConsumptionKml)
+    && input.rollingConsumptionKml > 0
+    ? input.rollingConsumptionKml
+    : input.tripConsumptionKml != null
+      && Number.isFinite(input.tripConsumptionKml)
+      && input.tripConsumptionKml > 0
+      ? input.tripConsumptionKml
+      : input.averageConsumptionKml;
 
   return estimateRangeFromFuelLevel(input.fuelLevelPercent, consumptionKml);
 }
