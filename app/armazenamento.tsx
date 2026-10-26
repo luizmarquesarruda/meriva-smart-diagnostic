@@ -126,7 +126,7 @@ export default function ArmazenamentoScreen() {
           <View key={cycle.id} style={styles.historyRow}>
             <View style={styles.historyMain}>
               <Text style={styles.historyDate}>{cycle.startedAt}</Text>
-              <Text style={styles.historyMeta}>{cycle.distanceTotalKm.toFixed(2)} km • {(cycle.fuelDataValid !== false && Number.isFinite(cycle.fuelUsedL) && cycle.fuelUsedL >= 0.05 && Number.isFinite(cycle.avgFuelConsumptionKml) && cycle.avgFuelConsumptionKml > 0) ? `${cycle.avgFuelConsumptionKml.toFixed(2)} km/L` : 'Consumo: N/D'}</Text>
+              <Text style={styles.historyMeta}>{cycle.distanceTotalKm.toFixed(2)} km • {hasReliableTripFuel(cycle) ? `${cycle.avgFuelConsumptionKml.toFixed(2)} km/L` : 'Consumo: N/D'}</Text>
             </View>
             <Text style={cycle.source === 'REAL_OBD' ? styles.real : styles.reference}>{cycle.source === 'REAL_OBD' ? 'REAL' : 'REF.'}</Text>
           </View>

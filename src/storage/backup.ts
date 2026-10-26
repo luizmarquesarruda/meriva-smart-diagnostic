@@ -1,5 +1,6 @@
 import * as FileSystem from 'expo-file-system';
 import { flushCsvLogs } from '../database/csvLogger';
+import { withDriveCycleStorageExclusive } from './driveCycleStorage';
 
 export interface BackupInfo {
   timestamp: string;
@@ -49,19 +50,21 @@ export async function createBackup(basePath: string): Promise<BackupInfo> {
   let totalSize = 0;
 
   try {
-    for (const dir of dirs) {
-      const source = `${basePath}/${dir}`;
-      const dest = `${backupDir}/${dir}`;
-      const info = await FileSystem.getInfoAsync(source);
-      if (!info.exists) continue;
-      if (!info.isDirectory) throw new Error('BACKUP_SOURCE_NOT_DIRECTORY: ' + source);
-
-      const sourceSize = await getDirectorySize(source);
-      await FileSystem.copyAsync({ from: source, to: dest });
-      const copiedSize = await getDirectorySize(dest);
-      if (copiedSize !== sourceSize) {
-        throw new Error(`BACKUP_VERIFICATION_FAILED: ${dir} source=${sourceSize} copied=${copiedSize}`);
-      }
+    await withDriveCycleStorageExclusive(basePath, async () => {
+      for (const dir of dirs) {
+        const source = `${basePath}/${dir}`;
+        const dest = `${backupDir}/${dir}`;
+        const info = await FileSystem.getInfoAsync(source);
+        if (!info.exists) continue;
+        if (!info.isDirectory) throw new Error('BACKUP_SOURCE_NOT_DIRECTORY: ' + source);
+  
+        const sourceSize = await getDirectorySize(source);
+        await FileSystem.copyAsync({ from: source, to: dest });
+        const copiedSize = await getDirectorySize(dest);
+        if (copiedSize !== sourceSize) {
+          throw new Error(`BACKUP_VERIFICATION_FAILED: ${dir} source=${sourceSize} copied=${copiedSize}`);
+        }
+    });
       totalSize += copiedSize;
       included.push(dir);
       files.push({ directory: dir, sizeBytes: copiedSize });

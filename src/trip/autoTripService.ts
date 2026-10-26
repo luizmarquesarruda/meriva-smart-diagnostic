@@ -610,7 +610,7 @@ class AutoTripService {
     await addDriveCycle(this.basePath, cycle);
     const storedCycles = await readDriveCycles(this.basePath);
     updateAutoSaveState((state) => {
-      state.driveCycles = storedCycles;
+      state.driveCycles = storedCycles.slice(-10); // SQLite owns the complete trip history.
 
       // O PID 012F é a fonte absoluta de nível de combustível para autonomia.
       // A capacidade nominal de 56 L converte o percentual da ECU em litros.

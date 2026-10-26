@@ -7,6 +7,7 @@
 import type { MerivaPersistedState } from './autosaveState';
 import { AUTOSAVE_SCHEMA_VERSION } from './autosaveTypes';
 import { getDtcDefinition } from '../obd/dtcDefinition';
+import { hasReliableTripFuel } from '../data/driveCycles';
 
 export const ND = 'N/D';
 
@@ -100,7 +101,7 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
   if (displayedCycles.length) {
     for (const cycle of displayedCycles) {
       L.push(
-        `${cycle.startedAt} -> ${cycle.finishedAt} | ${cycle.distanceTotalKm} km | ${cycle.fuelUsedL} L | ${(cycle.fuelDataValid === false || cycle.fuelUsedL < 0.05 || cycle.avgFuelConsumptionKml <= 0) ? ND : `${cycle.avgFuelConsumptionKml} km/L`} | fonte=${cycle.source} | combustivel=${or(cycle.fuelRateSource)}`,
+        `${cycle.startedAt} -> ${cycle.finishedAt} | ${cycle.distanceTotalKm} km | ${cycle.fuelUsedL} L | ${hasReliableTripFuel(cycle) ? `${cycle.avgFuelConsumptionKml} km/L` : ND} | fonte=${cycle.source} | combustivel=${or(cycle.fuelRateSource)}`,
       );
     }
   } else {

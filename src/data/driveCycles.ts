@@ -93,6 +93,12 @@ export const INITIAL_DRIVE_CYCLES: DriveCycle[] = [
   },
 ];
 
+export function hasReliableTripFuel(cycle: Pick<DriveCycle, 'fuelDataValid' | 'fuelUsedL' | 'avgFuelConsumptionKml'>): boolean {
+  return cycle.fuelDataValid !== false &&
+    Number.isFinite(cycle.fuelUsedL) && cycle.fuelUsedL >= 0.05 &&
+    Number.isFinite(cycle.avgFuelConsumptionKml) && cycle.avgFuelConsumptionKml > 0;
+}
+
 export interface DriveCycleSummary {
   totalDistanceKm: number;
   totalFuelL: number;
@@ -114,11 +120,7 @@ export function getDriveCycleSummary(cycles: DriveCycle[]): DriveCycleSummary {
   const realCycles = cycles.filter((cycle) => cycle.source === 'REAL_OBD');
   const referenceCycles = cycles.filter((cycle) => cycle.source === 'CARSCANNER_SEED');
   const realDistanceKm = realCycles.reduce((sum, cycle) => sum + cycle.distanceTotalKm, 0);
-  const consumptionCycles = realCycles.filter((cycle) =>
-    cycle.fuelDataValid === false
-      ? false
-      : cycle.fuelUsedL >= 0.05 && cycle.avgFuelConsumptionKml > 0,
-  );
+  const consumptionCycles = realCycles.filter(hasReliableTripFuel);
   const realFuelL = consumptionCycles.reduce((sum, cycle) => sum + cycle.fuelUsedL, 0);
   const consumptionDistanceKm = consumptionCycles.reduce((sum, cycle) => sum + cycle.distanceTotalKm, 0);
   const realMovingTimeMs = realCycles.reduce(

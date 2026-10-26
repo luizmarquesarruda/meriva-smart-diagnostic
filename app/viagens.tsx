@@ -6,7 +6,7 @@ import { useMidLayout } from '../src/ui/midLayout';
 import { COLORS, SCREEN_TITLE_STYLE } from '../src/ui/theme';
 import * as FileSystem from 'expo-file-system';
 import { readDriveCycles } from '../src/storage/driveCycleStorage';
-import { getDriveCycleSummary, type DriveCycle } from '../src/data/driveCycles';
+import { getDriveCycleSummary, hasReliableTripFuel, type DriveCycle } from '../src/data/driveCycles';
 
 const BASE_PATH = FileSystem.documentDirectory + 'MERIVA_SMART';
 const DAY_MS = 86_400_000;
@@ -83,7 +83,7 @@ export default function ViagensScreen() {
             <View style={s.tripFooter}>
               <Text style={s.tripFooterText}>Máxima: {mv(n(cycle.maxSpeedKmh),'km/h')}</Text>
               <Text style={[s.consumption,cycle.fuelDataValid === false && s.muted]}>
-                {cycle.fuelDataValid === false || cycle.fuelUsedL < 0.05 || cycle.avgFuelConsumptionKml <= 0 ? 'CONSUMO N/D' : mv(cycle.avgFuelConsumptionKml,'km/L')}
+                {!hasReliableTripFuel(cycle) ? 'CONSUMO N/D' : mv(cycle.avgFuelConsumptionKml,'km/L')}
               </Text>
             </View>
           </TouchableOpacity>) : <View style={s.empty}>

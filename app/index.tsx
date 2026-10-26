@@ -11,7 +11,7 @@ import * as FileSystem from 'expo-file-system';
 import NetInfo from '@react-native-community/netinfo';
 import { readDriveCycles, initializeDriveCycles } from '../src/storage/driveCycleStorage';
 import { getDriveCycleSummary, type DriveCycle } from '../src/data/driveCycles';
-import { getAutoSaveState, getAutoSaveStatus, initAutoSave, updateAutoSaveState } from '../src/meriva/autosaveManager';
+import { getAutoSaveState, getAutoSaveStatus, initAutoSave, saveNow, updateAutoSaveState } from '../src/meriva/autosaveManager';
 import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
 import type { ObdConnectionState } from '../src/meriva/autosaveState';
 import { ensureMerivaVehicleProfile } from '../src/database/vehicleConfig';
@@ -106,19 +106,21 @@ export default function IndexScreen() {
     try {
       const nextSettings = await readAppSettings(basePath);
       const restored = await initAutoSave(basePath);
-      await initializeDriveCycles(basePath);
+      await initializeDriveCycles(basePath, restored.driveCycles);
       await ensureMerivaVehicleProfile(basePath);
       const learningProfile = await readLearningProfile(basePath);
       if (!learningProfile) await createLearningProfile(basePath, '2026-09-24T14:48:00.000Z');
       await initializeCarScannerSeed(basePath);
       const storedCycles = await readDriveCycles(basePath);
-      const loaded = restored.driveCycles.length ? restored.driveCycles : storedCycles;
-
-      if (!restored.driveCycles.length && loaded.length) {
-        updateAutoSaveState((state) => {
-          state.driveCycles = loaded;
-        });
+      const recentCycles = storedCycles.slice(-10);
+      const autosaveTripsMatch = restored.driveCycles.length === recentCycles.length &&
+        restored.driveCycles.every((cycle, index) => cycle.id === recentCycles[index]?.id);
+      if (!autosaveTripsMatch) {
+        updateAutoSaveState((state) => { state.driveCycles = recentCycles; });
+        const compacted = await saveNow('checkpoint');
+        if (!compacted) throw new Error('FALHA_AO_COMPACTAR_AUTOSAVE_DE_VIAGENS');
       }
+      const loaded = storedCycles;
 
       setSettings(nextSettings);
       setCycles(loaded);

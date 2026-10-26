@@ -203,6 +203,8 @@
 - **DB-130** · 2026-10-25 — Otimização CSV avaliada e bloqueada pela versão instalada
 - **DB-131** · 2026-10-25 — Atualização periódica de localização/clima baseada em conectividade
 - **DB-132** · 2026-10-26 — Auditoria específica do histórico de viagens, telemetria e armazenamento
+- **DB-133** · 2026-10-26 — SQLite como fonte de verdade do histórico de viagens
+- **DB-132** · 2026-10-26 — Auditoria específica do histórico de viagens, telemetria e armazenamento
 
 ---
 
@@ -4019,3 +4021,23 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Nenhuma correção foi aplicada ao app, não houve PR/merge e não foi alegado sucesso de teste/CI.
 - O diário e o relatório estão nesta branch de pesquisa; não estão incorporados em `main`.
 
+
+
+## DB-133 · 2026-10-26 — SQLite como fonte de verdade do histórico de viagens
+
+### Solicitação
+Aplicar SQLite onde há histórico estruturado crescente e reserialização repetida, sem converter configurações JSON, logs CSV ou relatórios TXT indiscriminadamente.
+
+### Implementação nesta branch
+- Adicionado `expo-sqlite ~14.0.6`, versão compatível com Expo SDK 51. Nenhum upgrade de SDK ou plugin nativo extra foi introduzido.
+- `src/storage/driveCycleStorage.ts` usa `VIAGENS/drive_cycles.db` como fonte ativa, com schema versionado, índices por data/origem e transações. A primeira migração importa registros válidos do JSON legado e ciclos recuperáveis do autosave por ID, excluindo `CARSCANNER_SEED` do histórico operacional.
+- Os JSONs legados são preservados como evidência. Depois de migrar, não são fonte ativa. Se o banco desaparecer, o app sinaliza erro explícito e exige restauração de backup validado, em vez de apresentar histórico vazio.
+- O autosave passa a guardar somente dez viagens recentes. As telas de viagens/armazenamento e o gráfico de histórico leem a base SQLite completa.
+- O backup serializa a cópia de `VIAGENS` com as gravações SQLite.
+- A validade do consumo é centralizada em `hasReliableTripFuel`; CSV exportado declara `fuelDataValid` e deixa consumo em branco quando a evidência é insuficiente.
+
+### Testes e limites
+- Atualizado `tests/regression.test.js` para cobrir migração JSON, exclusão de seeds, gravação concorrente, leitura SQLite mesmo com JSON legado corrompido/obsoleto, recuperação da cópia anterior e detecção de banco ausente.
+- Atualizado `tests/projectBaseline.test.js` para proteger dependência compatível, lockfile e contratos da migração.
+- Não há resultados de CI para o SHA desta alteração. Teste físico no Galaxy A06/Android 16 com ELM327/ECU ainda não foi executado.
+- Nenhum merge foi feito. Código e documentação estão na branch `feature/sqlite-trip-history-20261026`; integrar somente após inspeção do diff e CI verde.

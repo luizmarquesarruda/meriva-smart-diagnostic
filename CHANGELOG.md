@@ -90,3 +90,12 @@
 ### Engenharia
 - CI com Expo Doctor, TypeScript, testes e build Android release standalone;
 - documentação de arquitetura, desenvolvimento e auditoria.
+
+
+## 2026-10-26 — SQLite para histórico de viagens
+
+- Adicionado `expo-sqlite ~14.0.6` compatível com Expo SDK 51.
+- Histórico estruturado migra uma única vez do JSON legado e passa a usar SQLite como fonte ativa, com schema versionado, índices e transações.
+- Autosave limitado a dez trajetos recentes; histórico e gráficos consultam SQLite. CSV/TXT mantidos para exportação e diagnóstico legível.
+- Exportação CSV alinha a validade do consumo à interface e declara `fuelDataValid`.
+- Backups sincronizam a cópia de `VIAGENS` com a fila de escrita SQLite. CI e teste físico ainda precisam validar o SHA desta mudança.

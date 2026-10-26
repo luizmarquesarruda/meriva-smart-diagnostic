@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import * as FileSystem from 'expo-file-system';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMidLayout } from '../src/ui/midLayout';
 import { COLORS, SCREEN_TITLE_STYLE } from '../src/ui/theme';
@@ -12,6 +13,7 @@ import { buildTelemetryChart, type TelemetryChartSample } from '../src/obd/telem
 import { getSharedObdStatus } from '../src/obd/sharedConnection';
 import { getPidDefinition } from '../src/obd/pidDefinition';
 import type { DriveCycle } from '../src/data/driveCycles';
+import { readDriveCycles } from '../src/storage/driveCycleStorage';
 
 type ChartMode = 'LIVE' | 'TRIPS';
 type LiveChartPid = '0105' | '0142' | '0111' | '010C' | '010D';
@@ -40,6 +42,7 @@ export default function DadosScreen() {
   const [livePid, setLivePid] = useState<LiveChartPid>('0105');
   const [tripMetric, setTripMetric] = useState<TripChartMetric>('coolantTempC');
   const [historyTripIndex, setHistoryTripIndex] = useState(0);
+  const [storedCycles, setStoredCycles] = useState<DriveCycle[]>([]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -54,13 +57,29 @@ export default function DadosScreen() {
     .filter((item) => item.source === 'REAL')
     .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp));
 
-  // Completed stored trips only: imported CarScanner/reference rows and
-  // simulated cycles can never become "real vehicle history".
+  // SQLite owns the complete trip history; autosave intentionally stores a bounded recent window.
+  useEffect(() => {
+    if (chartMode !== 'TRIPS') return;
+    let cancelled = false;
+    const loadHistory = async () => {
+      try {
+        const cycles = await readDriveCycles(`${FileSystem.documentDirectory}MERIVA_SMART`);
+        if (!cancelled) setStoredCycles(cycles);
+      } catch {
+        // Keep the last successful result; storage errors are not an empty history.
+      }
+    };
+    void loadHistory();
+    const timer = setInterval(() => { void loadHistory(); }, 30_000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [chartMode]);
+
+  // Only completed real trips can appear in this graph.
   const historyTrips = useMemo(
-    () => state.driveCycles
+    () => storedCycles
       .filter((cycle) => cycle.source === 'REAL_OBD' && Array.isArray(cycle.telemetrySamples) && cycle.telemetrySamples.length > 0)
       .sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt)),
-    [state.driveCycles],
+    [storedCycles],
   );
 
   useEffect(() => {

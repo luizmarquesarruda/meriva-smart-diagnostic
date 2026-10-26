@@ -2,6 +2,7 @@ import * as FileSystem from 'expo-file-system';
 import { getAutoSaveState } from '../meriva/autosaveManager';
 import { readDtcs } from '../database/dtcManager';
 import { readDriveCycles } from './driveCycleStorage';
+import { hasReliableTripFuel } from '../data/driveCycles';
 
 function csv(value: unknown): string {
   const text = String(value ?? '');
@@ -40,17 +41,14 @@ export async function exportDriveCyclesCsv(basePath: string): Promise<string> {
   const cycles = await readDriveCycles(basePath);
   const dir = await ensureExportDir(basePath);
   const path = `${dir}/drive_cycles_${Date.now()}.csv`;
-  const header = ['startedAt','finishedAt','distanceKm','fuelUsedL','consumptionKml','source','fuelRateSource'];
+  const header = ['startedAt','finishedAt','distanceKm','fuelUsedL','consumptionKml','fuelDataValid','source','fuelRateSource','maxSpeedKmh','telemetrySamples'];
   const lines = [
     header.join(','),
     ...cycles.map((cycle) => [
-      csv(cycle.startedAt),
-      csv(cycle.finishedAt),
-      csv(cycle.distanceTotalKm),
-      csv(cycle.fuelUsedL),
-      csv(cycle.avgFuelConsumptionKml),
-      csv(cycle.source),
-      csv(cycle.fuelRateSource),
+      csv(cycle.startedAt),csv(cycle.finishedAt),csv(cycle.distanceTotalKm),csv(cycle.fuelUsedL),
+      csv(hasReliableTripFuel(cycle) ? cycle.avgFuelConsumptionKml : ''),
+      csv(hasReliableTripFuel(cycle)),csv(cycle.source),csv(cycle.fuelRateSource),
+      csv(cycle.maxSpeedKmh ?? ''),csv(cycle.telemetrySamples?.length ?? 0),
     ].join(',')),
   ];
   await FileSystem.writeAsStringAsync(path, lines.join('\n') + '\n', { encoding: FileSystem.EncodingType.UTF8 });

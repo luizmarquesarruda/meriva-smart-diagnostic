@@ -206,3 +206,7 @@ A revisão cruzou código, catálogos JSON, testes e o TXT de autosaves fornecid
 ### Throttle do autosave de telemetria
 
 As últimas leituras em memória são atualizadas a cada resposta; mudanças contínuas de RPM/velocidade não regravam todo o autosave e o histórico TXT a cada ciclo. A persistência ordinária por PID fica limitada a uma vez por 10 segundos; PID novo e mudanças de status/unidade/origem são persistidos imediatamente. Ao sair para background, o app compara o fingerprint do estado para descarregar também valores em memória que ainda não venceram a janela. A fila CSV continua preservando cada amostra real.
+
+
+### Persistência do histórico de viagens
+O histórico completo é armazenado em SQLite versionado em `VIAGENS/drive_cycles.db`. Na primeira inicialização o aplicativo importa registros JSON legados válidos e preserva as fontes; após migração, SQLite é a fonte ativa. O autosave conserva somente as dez viagens mais recentes, enquanto a tela de viagens/gráficos consulta o histórico completo. CSV é formato de exportação e TXT é voltado a diagnóstico legível. Backups incluem a base e o marcador de migração; um banco ausente após migração gera erro explícito, não histórico vazio.

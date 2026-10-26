@@ -45,6 +45,7 @@ let bluetoothMaxNativeConnections = 0;
 let bluetoothConnectDelayMs = 0;
 let bluetoothWriteNeverSettles = false;
 let bluetoothDisconnectFails = false;
+const sqliteStates = new Map();
 
 function parentDir(p) {
   const i = p.lastIndexOf('/');
@@ -66,6 +67,9 @@ function resetFS() {
   dirs.add('/doc');
   writeDelayMs = 0;
   failReadPath = null;
+  sqliteStates.clear();
+  const storagePath = path.normalize(path.join(ROOT, 'src/storage/driveCycleStorage.ts'));
+  compiled.get(storagePath)?.exports?.resetDriveCycleStorageForTests?.();
 }
 
 const fakeFS = {
@@ -219,9 +223,83 @@ const fakeBluetooth = {
   },
 };
 
+
+const fakeSQLite = {
+  async openDatabaseAsync(name, _options, directory) {
+    const databasePath = directory + '/' + name;
+    if (!files.has(databasePath)) files.set(databasePath, '');
+    if (!sqliteStates.has(databasePath)) {
+      let persisted = {};
+      try { persisted = JSON.parse(files.get(databasePath) || '{}'); } catch {}
+      const rows = Array.isArray(persisted.rows) ? persisted.rows : [];
+      sqliteStates.set(databasePath, {
+        version: Number(persisted.version) || 0,
+        rows,
+        metadata: new Map(Array.isArray(persisted.metadata) ? persisted.metadata : []),
+        nextRowId: rows.reduce((max, row) => Math.max(max, Number(row.row_id) || 0), 0) + 1,
+        cyclesTable: false, metadataTable: false,
+      });
+    }
+    const state = () => sqliteStates.get(databasePath);
+    const persist = () => {
+      const current = state();
+      files.set(databasePath, JSON.stringify({
+        version: current.version, rows: current.rows, metadata: Array.from(current.metadata.entries()),
+      }));
+    };
+    return {
+      async execAsync(sql) {
+        const current = state();
+        const versionMatch = /PRAGMA\s+user_version\s*=\s*(\d+)/i.exec(sql);
+        if (versionMatch) current.version = Number(versionMatch[1]);
+        if (/CREATE TABLE IF NOT EXISTS drive_cycles/i.test(sql)) current.cyclesTable = true;
+        if (/CREATE TABLE IF NOT EXISTS drive_cycle_metadata/i.test(sql)) current.metadataTable = true;
+        persist();
+      },
+      async getFirstAsync(sql, ...params) {
+        const current = state();
+        if (/PRAGMA\s+user_version/i.test(sql)) return { user_version: current.version };
+        if (/SELECT value FROM drive_cycle_metadata WHERE key = \?/i.test(sql)) {
+          return current.metadata.has(params[0]) ? { value: current.metadata.get(params[0]) } : null;
+        }
+        return null;
+      },
+      async getAllAsync(sql) {
+        if (/SELECT payload_json FROM drive_cycles ORDER BY row_id ASC/i.test(sql)) {
+          return state().rows.slice().sort((a,b)=>a.row_id-b.row_id).map(row=>({payload_json:row.payload_json}));
+        }
+        return [];
+      },
+      async runAsync(sql, ...params) {
+        const current=state(), normalized=sql.trim().replace(/\s+/g,' ').toUpperCase();
+        if(normalized.startsWith('DELETE FROM DRIVE_CYCLES WHERE ID = ?')){
+          current.rows=current.rows.filter(row=>row.id!==params[0]);
+        }else if(normalized.startsWith('INSERT OR IGNORE INTO DRIVE_CYCLES')){
+          if(!current.rows.some(row=>row.id===params[0]))
+            current.rows.push({row_id:current.nextRowId++,id:params[0],started_at:params[1],finished_at:params[2],source:params[3],payload_json:params[4]});
+        }else if(normalized.startsWith('INSERT INTO DRIVE_CYCLES')){
+          current.rows.push({row_id:current.nextRowId++,id:params[0],started_at:params[1],finished_at:params[2],source:params[3],payload_json:params[4]});
+        }else if(normalized.startsWith('INSERT OR REPLACE INTO DRIVE_CYCLE_METADATA')){
+          current.metadata.set(params[0],params[1]);
+        }else throw new Error('SQLITE_TEST_UNSUPPORTED_STATEMENT: '+normalized);
+        persist();
+        return {changes:1,lastInsertRowId:current.nextRowId-1};
+      },
+      async withTransactionAsync(operation) {
+        const current=state();
+        const before=JSON.parse(JSON.stringify({version:current.version,rows:current.rows,metadata:Array.from(current.metadata.entries()),nextRowId:current.nextRowId,cyclesTable:current.cyclesTable,metadataTable:current.metadataTable}));
+        try{await operation();}
+        catch(cause){sqliteStates.set(databasePath,{...before,metadata:new Map(before.metadata)});persist();throw cause;}
+      },
+      async closeAsync(){}
+    };
+  }
+};
+
 const originalLoad = Module._load;
 Module._load = function (request, parent, isMain) {
   if (request === 'expo-file-system') return fakeFS;
+  if (request === 'expo-sqlite') return fakeSQLite;
   if (request === 'react-native') return fakeRN;
   if (request === 'react-native-bluetooth-classic') return fakeBluetooth;
   if (request === 'expo-location') return { PermissionStatus: { GRANTED: 'granted' }, requestForegroundPermissionsAsync: async () => ({ status: 'granted' }), getBackgroundPermissionsAsync: async () => ({ status: 'granted' }), requestBackgroundPermissionsAsync: async () => ({ status: 'granted' }), hasStartedLocationUpdatesAsync: async () => false, startLocationUpdatesAsync: async () => {}, stopLocationUpdatesAsync: async () => {}, Accuracy: { BestForNavigation: 6 } };
@@ -982,111 +1060,75 @@ async function testDriveCycleValidation() {
   resetFS();
   const storage = loadTs(path.join(ROOT, 'src/storage/driveCycleStorage.ts'));
   const cycle = {
-    id: 'test-1',
-    startedAt: '2026-10-02 10:00:00',
-    finishedAt: '2026-10-02 10:10:00',
-    distanceTotalKm: 5,
-    distanceIceKm: 5,
-    fuelUsedL: 0.5,
-    totalTimeHms: '00:10:00',
-    drivingTimeHms: '00:09:00',
-    standingTimeHms: '00:01:00',
-    avgDrivingSpeedKmh: 33.3,
-    avgFuelConsumptionKml: 10,
-    source: 'REAL_OBD',
-    importedAt: '2026-10-02T13:00:00.000Z',
+    id:'test-1',startedAt:'2026-10-02T10:00:00.000Z',finishedAt:'2026-10-02T10:10:00.000Z',
+    distanceTotalKm:5,distanceIceKm:5,fuelUsedL:0.5,totalTimeHms:'00:10:00',
+    drivingTimeHms:'00:09:00',standingTimeHms:'00:01:00',avgDrivingSpeedKmh:33.3,
+    avgFuelConsumptionKml:10,source:'REAL_OBD',importedAt:'2026-10-02T13:00:00.000Z'
   };
+  const indexFile=BASE+'/VIAGENS/index.json';
+  const seed={...cycle,id:'legacy-seed',source:'CARSCANNER_SEED'};
+  await fakeFS.makeDirectoryAsync(BASE+'/VIAGENS',{intermediates:true});
+  files.set(indexFile,JSON.stringify({version:'1.0',cycles:[seed,cycle],totalCount:2}));
 
-  await storage.addDriveCycle(BASE, cycle);
-  const read = await storage.readDriveCycles(BASE);
-  assert.strictEqual(read.length, 1);
-  assert.strictEqual(read[0].id, 'test-1');
+  await storage.initializeDriveCycles(BASE);
+  let read=await storage.readDriveCycles(BASE);
+  assert.deepStrictEqual(read.map(item=>item.id),['test-1'],'JSON migration imports valid real history but excludes seeds');
+  assert.ok(files.has(BASE+'/VIAGENS/drive_cycles.db'),'SQLite DB must be persisted');
+  assert.ok(files.has(BASE+'/VIAGENS/drive_cycles.sqlite.migrated.json'),'migration marker must be durable');
+  assert.ok(files.get(indexFile).includes('legacy-seed'),'legacy JSON evidence must remain unchanged');
 
-  const indexFile = `${BASE}/VIAGENS/index.json`;
-  files.set(indexFile, JSON.stringify({
-    version: '1.0',
-    cycles: [
-      { ...cycle, id: 'legacy-seed', source: 'CARSCANNER_SEED' },
-      cycle,
-    ],
-    totalCount: 2,
-  }));
-  const filtered = await storage.readDriveCycles(BASE);
-  assert.deepStrictEqual(filtered.map((item) => item.id), ['test-1'], 'legacy seed trips must not appear in operational trip history');
-
-  await storage.addDriveCycle(BASE, { ...cycle, id: 'test-2' });
-  const migratedIndex = JSON.parse(files.get(indexFile));
-  assert.ok(migratedIndex.cycles.every((item) => item.source !== 'CARSCANNER_SEED'), 'adding a real trip must remove legacy seeds from active index');
-
-  files.set(indexFile, JSON.stringify({ cycles: 'corrompido' }));
-  assert.deepStrictEqual(
-    (await storage.readDriveCycles(BASE)).map((item) => item.id),
-    ['test-1'],
-    'índice corrompido deve recuperar a última cópia válida em vez de ocultar o histórico',
-  );
+  await storage.addDriveCycle(BASE,{...cycle,id:'test-2'});
+  read=await storage.readDriveCycles(BASE);
+  assert.deepStrictEqual(read.map(item=>item.id),['test-1','test-2'],'SQLite is the active source of truth');
+  sqliteStates.delete(BASE+'/VIAGENS/drive_cycles.db');
+  storage.resetDriveCycleStorageForTests();
+  assert.deepStrictEqual((await storage.readDriveCycles(BASE)).map(item=>item.id),['test-1','test-2'],
+    'reopening the database must retain persisted trips');
+  files.set(indexFile,JSON.stringify({cycles:'corrompido'}));
+  assert.deepStrictEqual((await storage.readDriveCycles(BASE)).map(item=>item.id),['test-1','test-2'],
+    'a stale legacy index cannot hide SQLite history');
+  await storage.addDriveCycle(BASE,{...cycle,id:'test-3'});
+  assert.deepStrictEqual((await storage.readDriveCycles(BASE)).map(item=>item.id),['test-1','test-2','test-3']);
 
   resetFS();
   await storage.initializeDriveCycles(BASE);
-  const emptyIndex = JSON.parse(files.get(indexFile));
-  assert.deepStrictEqual(emptyIndex.cycles, [], 'new installations must start with an empty operational trip history');
-  assert.strictEqual(
-    Array.from(files.keys()).some((name) => name.includes('/VIAGENS/viagens_')),
-    false,
-    'seed rows must not be written to the operational trip CSV',
-  );
-
+  assert.deepStrictEqual(await storage.readDriveCycles(BASE),[],'new installation starts with empty SQLite history');
+  assert.ok(files.has(BASE+'/VIAGENS/drive_cycles.db'));
+  assert.strictEqual(Array.from(files.keys()).some(name=>name.includes('/VIAGENS/viagens_')),false,
+    'initialization must not create fake CSV trip rows');
   await Promise.all([
-    storage.addDriveCycle(BASE, { ...cycle, id: 'parallel-1' }),
-    storage.addDriveCycle(BASE, { ...cycle, id: 'parallel-2' }),
+    storage.addDriveCycle(BASE,{...cycle,id:'parallel-1'}),
+    storage.addDriveCycle(BASE,{...cycle,id:'parallel-2'})
   ]);
-  assert.deepStrictEqual(
-    (await storage.readDriveCycles(BASE)).map((item) => item.id).sort(),
-    ['parallel-1', 'parallel-2'],
-    'gravações concorrentes de viagens não podem sobrescrever a atualização umas das outras',
-  );
+  assert.deepStrictEqual((await storage.readDriveCycles(BASE)).map(item=>item.id),['parallel-1','parallel-2'],
+    'concurrent writes must not drop trips');
 
   resetFS();
-  const damagedIndex = BASE + '/VIAGENS/index.json';
-  await fakeFS.makeDirectoryAsync(BASE + '/VIAGENS', { intermediates: true });
-  const damagedContent = JSON.stringify({ cycles: 'corrompido' });
-  files.set(damagedIndex, damagedContent);
-  await assert.rejects(
-    () => storage.addDriveCycle(BASE, { ...cycle, id: 'must-not-overwrite-damaged-index' }),
-    /HISTORICO_DE_VIAGENS_CORROMPIDO/,
-    'índice corrompido sem backup deve impedir gravação destrutiva',
-  );
-  assert.strictEqual(files.get(damagedIndex), damagedContent,
-    'índice inválido deve ser preservado para recuperação manual');
+  const damagedIndex=BASE+'/VIAGENS/index.json';
+  await fakeFS.makeDirectoryAsync(BASE+'/VIAGENS',{intermediates:true});
+  const damagedContent=JSON.stringify({cycles:'corrompido'});
+  files.set(damagedIndex,damagedContent);
+  await assert.rejects(()=>storage.addDriveCycle(BASE,{...cycle,id:'must-not-overwrite-damaged-index'}),
+    /HISTORICO_DE_VIAGENS_CORROMPIDO/,'corrupt legacy history without validated backup blocks migration');
+  assert.strictEqual(files.get(damagedIndex),damagedContent,'corrupt evidence must remain intact');
 
   resetFS();
-  await fakeFS.makeDirectoryAsync(BASE + '/VIAGENS', { intermediates: true });
-  files.set(BASE + '/VIAGENS/index.previous.json', JSON.stringify({
-    version: '1.0',
-    cycles: [cycle],
-    totalCount: 1,
-  }));
-  await storage.addDriveCycle(BASE, { ...cycle, id: 'after-main-loss' });
-  assert.deepStrictEqual(
-    (await storage.readDriveCycles(BASE)).map((item) => item.id).sort(),
-    ['after-main-loss', 'test-1'],
-    'índice principal ausente deve ser recuperado do backup antes de acrescentar uma viagem',
-  );
-  assert.ok(files.has(BASE + '/VIAGENS/index.previous.json'),
-    'backup anterior deve permanecer disponível durante a recuperação');
+  await fakeFS.makeDirectoryAsync(BASE+'/VIAGENS',{intermediates:true});
+  files.set(BASE+'/VIAGENS/index.previous.json',JSON.stringify({version:'1.0',cycles:[cycle],totalCount:1}));
+  await storage.addDriveCycle(BASE,{...cycle,id:'after-main-loss'});
+  assert.deepStrictEqual((await storage.readDriveCycles(BASE)).map(item=>item.id),['test-1','after-main-loss'],
+    'valid previous JSON snapshot recovers missing main index');
+  assert.ok(files.has(BASE+'/VIAGENS/index.previous.json'));
 
   resetFS();
-  await fakeFS.makeDirectoryAsync(BASE + '/VIAGENS', { intermediates: true });
-  files.set(BASE + '/VIAGENS/index.previous.json', JSON.stringify({
-    version: '1.0',
-    cycles: [cycle],
-    totalCount: 1,
-  }));
+  await fakeFS.makeDirectoryAsync(BASE+'/VIAGENS',{intermediates:true});
+  files.set(BASE+'/VIAGENS/index.previous.json',JSON.stringify({version:'1.0',cycles:[cycle],totalCount:1}));
   await storage.initializeDriveCycles(BASE);
-  assert.deepStrictEqual(
-    (await storage.readDriveCycles(BASE)).map((item) => item.id),
-    ['test-1'],
-    'startup initialization must recover a missing main index from its valid backup',
-  );
+  assert.deepStrictEqual((await storage.readDriveCycles(BASE)).map(item=>item.id),['test-1']);
+  files.delete(BASE+'/VIAGENS/drive_cycles.db');
+  storage.resetDriveCycleStorageForTests();
+  await assert.rejects(()=>storage.readDriveCycles(BASE),/BANCO_SQLITE_DE_VIAGENS_AUSENTE/,
+    'missing SQLite after migration must not become empty history or resurrect stale JSON');
 }
 
 async function testDriveCycleSummaryUsesWeightedRealSpeed() {
