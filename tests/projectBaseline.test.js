@@ -168,7 +168,14 @@ assert.ok(app.expo.plugins.includes('./plugins/withBluetoothLegacyPermissionLimi
 // The ELM protocol must serialize all commands through the shared session queue.
 assert.match(elm, /private commandQueue:\s*Promise<void>\s*=\s*Promise\.resolve\(\)/);
 assert.match(elm, /return this\.enqueueCommand\(\(\) => this\.command\(normalized\)\)/);
-assert.match(elm, /return previous\.then\(operation\)\.finally\(\(\) => release\(\)\)/);
+assert.match(elm, /return previous\.then\(\(\) => \{/,
+  'ELM queue must execute accepted operations serially after measuring queue wait');
+assert.match(elm, /\.finally\(\(\) => release\(\)\)/,
+  'ELM queue gate must release the next operation even when the current one rejects');
+assert.match(elm, /this\.pendingQueueDepth >= ELM_MAX_PENDING_COMMANDS/,
+  'ELM queue must apply backpressure before accepting more ordinary commands');
+assert.match(elm, /allowWhenSaturated: true/,
+  'reserved teardown/recovery operations must remain serializable under saturation');
 assert.match(sharedObd, /let active: SharedObdConnection \| null = null/);
 assert.match(sharedObd, /let connecting: Promise<SharedObdConnection> \| null = null/);
 assert.ok(!read('app/_layout.tsx').includes('connectPreferredElm'), 'layout não pode criar uma segunda conexão automática');

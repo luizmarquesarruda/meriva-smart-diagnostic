@@ -1365,21 +1365,21 @@ async function testCsvWriteSerialization() {
     'CSV precisa citar campos com CR para não criar uma quebra de registro dentro de uma célula');
   // The legacy Expo write path rewrites a whole file; high-volume logs rotate to bounded segments.
   const rotatingTarget = `${BASE}/LOGS/obd_raw_2026-10-26.csv`;
-  const header = 'timestamp,pid,rx\\n';
-  const oversized = header + 'old,010C,' + 'x'.repeat(logger.CSV_LOG_SEGMENT_MAX_BYTES + 8) + '\\n';
+  const header = 'timestamp,pid,rx\n';
+  const oversized = header + 'old,010C,' + 'x'.repeat(logger.CSV_LOG_SEGMENT_MAX_BYTES + 8) + '\n';
   files.set(rotatingTarget, oversized);
   await logger.appendCsvRow(rotatingTarget, { timestamp: 'next', pid: '010C', rx: '41 0C 0C 18' });
   const firstSegment = `${BASE}/LOGS/obd_raw_2026-10-26.part-0001.csv`;
   assert.strictEqual(files.get(rotatingTarget), oversized, 'rotação não pode alterar o segmento anterior');
-  assert.strictEqual(files.get(firstSegment), 'timestamp,pid,rx\\nnext,010C,41 0C 0C 18\\n',
+  assert.strictEqual(files.get(firstSegment), 'timestamp,pid,rx\nnext,010C,41 0C 0C 18\n',
     'novo segmento deve ter cabeçalho independente e herdar o esquema anterior');
 
-  const oversizedFirstSegment = header + 'old,010C,' + 'y'.repeat(logger.CSV_LOG_SEGMENT_MAX_BYTES + 8) + '\\n';
+  const oversizedFirstSegment = header + 'old,010C,' + 'y'.repeat(logger.CSV_LOG_SEGMENT_MAX_BYTES + 8) + '\n';
   files.set(firstSegment, oversizedFirstSegment);
   await logger.appendCsvRow(rotatingTarget, { timestamp: 'next2', pid: '010C', rx: '41 0C 0C 19' });
   const secondSegment = `${BASE}/LOGS/obd_raw_2026-10-26.part-0002.csv`;
   assert.strictEqual(files.get(firstSegment), oversizedFirstSegment, 'segmento cheio deve permanecer intacto');
-  assert.strictEqual(files.get(secondSegment), 'timestamp,pid,rx\\nnext2,010C,41 0C 0C 19\\n',
+  assert.strictEqual(files.get(secondSegment), 'timestamp,pid,rx\nnext2,010C,41 0C 0C 19\n',
     'a rotação seguinte deve avançar o índice e manter o cabeçalho consistente');
 
 }

@@ -122,12 +122,12 @@ async function readCsvHeaders(filePath: string): Promise<string[]> {
     position: 0,
     length: 8192,
   });
-  const firstNewline = preview.indexOf('\\n');
+  const firstNewline = preview.indexOf('\n');
   if (firstNewline < 0 && typeof info.size === 'number' && info.size > preview.length) {
     throw new Error('CSV_HEADER_EXCEEDS_READ_WINDOW: ' + filePath);
   }
-  const headerLine = (firstNewline >= 0 ? preview.slice(0, firstNewline) : preview).replace(/\\r$/, '');
-  const records = parseCsvRecords(headerLine + '\\n');
+  const headerLine = (firstNewline >= 0 ? preview.slice(0, firstNewline) : preview).replace(/\r$/, '');
+  const records = parseCsvRecords(headerLine + '\n');
   const headers = records[0] ?? [];
   if (!headers.length || headers.some((header) => !header.trim())) {
     throw new Error('CSV_HEADER_INVALIDO: ' + filePath);
@@ -149,7 +149,7 @@ async function selectWritableLogCsv(filePath: string): Promise<CsvWriteTarget> {
   const segmentIndexes = entries
     .filter((entry) => entry.startsWith(prefix) && entry.endsWith('.csv'))
     .map((entry) => entry.slice(prefix.length, -4))
-    .filter((part) => /^\\d{4,}$/.test(part))
+    .filter((part) => /^\d{4,}$/.test(part))
     .map(Number)
     .filter((index) => Number.isSafeInteger(index) && index > 0)
     .sort((a, b) => a - b);
