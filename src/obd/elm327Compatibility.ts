@@ -32,6 +32,16 @@ export interface Elm327CompatibilityConfig {
 }
 
 export interface ElmHealthSnapshot {
+  /** Commands waiting behind the active transaction, excluding the active command. */
+  queueDepth: number;
+  /** High-water mark of waiting operations, including reserved internal operations. */
+  maxQueueDepth: number;
+  /** Ordinary commands refused due to queue saturation. */
+  queueRejections: number;
+  /** Mean wait in milliseconds before queued operations begin. */
+  averageQueueWaitMs: number;
+  /** Maximum observed queue wait in milliseconds. */
+  maxQueueWaitMs: number;
   commands: number;
   successfulCommands: number;
   noData: number;

@@ -376,6 +376,63 @@ async function testElmAndProtocol() {
   await unsupportedAtSession.close();
 }
 
+async function testElmCommandQueueBackpressure() {
+  const { Elm327Session, ELM_MAX_PENDING_COMMANDS } = loadTs(path.join(ROOT, 'src/obd/elm327.ts'));
+  let currentCommand = '';
+  let firstReadStarted = false;
+  let releaseFirstRead;
+  let transportClosed = false;
+  const written = [];
+  const transport = {
+    async open() {},
+    async close() { transportClosed = true; },
+    async write(data) { currentCommand = data.trim().toUpperCase(); written.push(currentCommand); },
+    async readUntilPrompt() {
+      if (!firstReadStarted) {
+        firstReadStarted = true;
+        return new Promise((resolve) => { releaseFirstRead = () => resolve('41 0C 0C 18'); });
+      }
+      await wait(2);
+      return currentCommand === '010C' ? '41 0C 0C 18' : 'OK';
+    },
+  };
+  const session = new Elm327Session(transport, { commandDelayMs: 0, ioTimeoutMs: 1000, adaptiveTiming: false });
+  session.opened = true;
+  const requests = Array.from({ length: ELM_MAX_PENDING_COMMANDS + 8 }, () => session.executeCommand('010C'));
+  const requestsSettled = Promise.allSettled(requests);
+  await wait(20);
+  assert.ok(firstReadStarted, 'a primeira operação deve estar ativa antes de medir saturação');
+  const saturated = session.getHealthSnapshot();
+  assert.equal(saturated.queueDepth, ELM_MAX_PENDING_COMMANDS,
+    'a fila ordinária deve parar no limite enquanto a primeira transação está bloqueada');
+  assert.ok(saturated.maxQueueDepth <= ELM_MAX_PENDING_COMMANDS,
+    'a profundidade ordinária não pode ultrapassar o limite de backpressure');
+
+  const closePromise = session.close();
+  await assert.rejects(session.executeCommand('0105'), /ELM_COMMAND_QUEUE_FULL/,
+    'novas consultas devem falhar explicitamente enquanto a fila está saturada');
+  releaseFirstRead();
+  const outcomes = await requestsSettled;
+  await closePromise;
+
+  const fulfilled = outcomes.filter((item) => item.status === 'fulfilled').length;
+  const rejected = outcomes.filter((item) => item.status === 'rejected');
+  assert.ok(rejected.length >= 7, 'o excesso de consultas deve ser rejeitado explicitamente');
+  assert.ok(rejected.every((item) => /ELM_COMMAND_QUEUE_FULL/.test(String(item.reason))),
+    'rejeições por saturação precisam de um código rastreável');
+  assert.equal(written.length, fulfilled, 'consultas rejeitadas não devem chegar ao transporte');
+  assert.equal(transportClosed, true, 'fechamento não pode ser rejeitado pela saturação');
+  const finalHealth = session.getHealthSnapshot();
+  assert.equal(finalHealth.queueDepth, 0, 'profundidade deve retornar a zero após drenar a fila');
+  assert.ok(finalHealth.maxQueueDepth <= ELM_MAX_PENDING_COMMANDS + 1,
+    'somente operação interna reservada pode ultrapassar a cota ordinária');
+  assert.equal(finalHealth.queueRejections, rejected.length + 1,
+    'contador deve incluir as rejeições iniciais e a consulta adicional saturada');
+  assert.ok(finalHealth.averageQueueWaitMs >= 0);
+  assert.ok(finalHealth.maxQueueWaitMs >= 0);
+  console.log('ELM command queue backpressure and metrics: OK');
+}
+
 async function testProtocolRecoverySerializesWholeNegotiation() {
   const { Elm327Session } = loadTs(path.join(ROOT, 'src/obd/elm327.ts'));
   const commands = [];
@@ -1306,6 +1363,25 @@ async function testCsvWriteSerialization() {
   const carriageReturn = files.get(target);
   assert.ok(carriageReturn.includes('"linha 1\rlinha 2"'),
     'CSV precisa citar campos com CR para não criar uma quebra de registro dentro de uma célula');
+  // The legacy Expo write path rewrites a whole file; high-volume logs rotate to bounded segments.
+  const rotatingTarget = `${BASE}/LOGS/obd_raw_2026-10-26.csv`;
+  const header = 'timestamp,pid,rx\\n';
+  const oversized = header + 'old,010C,' + 'x'.repeat(logger.CSV_LOG_SEGMENT_MAX_BYTES + 8) + '\\n';
+  files.set(rotatingTarget, oversized);
+  await logger.appendCsvRow(rotatingTarget, { timestamp: 'next', pid: '010C', rx: '41 0C 0C 18' });
+  const firstSegment = `${BASE}/LOGS/obd_raw_2026-10-26.part-0001.csv`;
+  assert.strictEqual(files.get(rotatingTarget), oversized, 'rotação não pode alterar o segmento anterior');
+  assert.strictEqual(files.get(firstSegment), 'timestamp,pid,rx\\nnext,010C,41 0C 0C 18\\n',
+    'novo segmento deve ter cabeçalho independente e herdar o esquema anterior');
+
+  const oversizedFirstSegment = header + 'old,010C,' + 'y'.repeat(logger.CSV_LOG_SEGMENT_MAX_BYTES + 8) + '\\n';
+  files.set(firstSegment, oversizedFirstSegment);
+  await logger.appendCsvRow(rotatingTarget, { timestamp: 'next2', pid: '010C', rx: '41 0C 0C 19' });
+  const secondSegment = `${BASE}/LOGS/obd_raw_2026-10-26.part-0002.csv`;
+  assert.strictEqual(files.get(firstSegment), oversizedFirstSegment, 'segmento cheio deve permanecer intacto');
+  assert.strictEqual(files.get(secondSegment), 'timestamp,pid,rx\\nnext2,010C,41 0C 0C 19\\n',
+    'a rotação seguinte deve avançar o índice e manter o cabeçalho consistente');
+
 }
 
 async function testPidAndLearningWriteSerialization() {
@@ -1484,6 +1560,7 @@ async function main() {
     ['banco de fórmulas OBD', testFormulaKnowledgeBank],
     ['parser + DTC', testParser],
     ['elm/protocolo/serialização', testElmAndProtocol],
+    ['backpressure e métricas da fila ELM', testElmCommandQueueBackpressure],
     ['recuperação de protocolo serializada', testProtocolRecoverySerializesWholeNegotiation],
     ['limite configurável de retry Bluetooth', testConfiguredBluetoothRetryLimit],
     ['ativação oficial do Bluetooth', testBluetoothActivationRequest],

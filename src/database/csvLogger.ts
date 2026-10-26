@@ -23,6 +23,8 @@ const pendingRows = new Map<string, CsvRow[]>();
 const BATCH_FLUSH_INTERVAL_MS = 1000;
 const BATCH_FLUSH_ROW_LIMIT = 8;
 const MAX_PENDING_CSV_ROWS = 10_000;
+/** Rotate high-volume logs to bound full-file rewrite cost under Expo SDK 51. */
+export const CSV_LOG_SEGMENT_MAX_BYTES = 1_048_576;
 let droppedPendingRows = 0;
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 let flushPromise: Promise<void> | null = null;
@@ -100,14 +102,94 @@ async function enqueueFileOperation(filePath: string, operation: () => Promise<v
   }
 }
 
+
+interface CsvWriteTarget {
+  filePath: string;
+  inheritedHeaders?: string[];
+}
+
+function csvSegmentPath(basePath: string, segmentIndex: number): string {
+  const extensionIndex = basePath.toLowerCase().lastIndexOf('.csv');
+  if (extensionIndex < 0) return basePath;
+  return basePath.slice(0, extensionIndex) + '.part-' +
+    String(segmentIndex).padStart(4, '0') + '.csv';
+}
+
+async function readCsvHeaders(filePath: string): Promise<string[]> {
+  const info = await FileSystem.getInfoAsync(filePath, { size: true });
+  const preview = await FileSystem.readAsStringAsync(filePath, {
+    encoding: FileSystem.EncodingType.UTF8,
+    position: 0,
+    length: 8192,
+  });
+  const firstNewline = preview.indexOf('\\n');
+  if (firstNewline < 0 && typeof info.size === 'number' && info.size > preview.length) {
+    throw new Error('CSV_HEADER_EXCEEDS_READ_WINDOW: ' + filePath);
+  }
+  const headerLine = (firstNewline >= 0 ? preview.slice(0, firstNewline) : preview).replace(/\\r$/, '');
+  const records = parseCsvRecords(headerLine + '\\n');
+  const headers = records[0] ?? [];
+  if (!headers.length || headers.some((header) => !header.trim())) {
+    throw new Error('CSV_HEADER_INVALIDO: ' + filePath);
+  }
+  return headers;
+}
+
+async function selectWritableLogCsv(filePath: string): Promise<CsvWriteTarget> {
+  // Only high-volume diagnostic logs are segmented; trip CSV compatibility remains unchanged.
+  if (!filePath.includes('/LOGS/') || !filePath.toLowerCase().endsWith('.csv')) {
+    return { filePath };
+  }
+  const directory = filePath.substring(0, filePath.lastIndexOf('/')) || '.';
+  const fileName = filePath.slice(filePath.lastIndexOf('/') + 1);
+  const extensionIndex = fileName.toLowerCase().lastIndexOf('.csv');
+  const stem = fileName.slice(0, extensionIndex);
+  const prefix = stem + '.part-';
+  const entries = await FileSystem.readDirectoryAsync(directory);
+  const segmentIndexes = entries
+    .filter((entry) => entry.startsWith(prefix) && entry.endsWith('.csv'))
+    .map((entry) => entry.slice(prefix.length, -4))
+    .filter((part) => /^\\d{4,}$/.test(part))
+    .map(Number)
+    .filter((index) => Number.isSafeInteger(index) && index > 0)
+    .sort((a, b) => a - b);
+  const candidates = [
+    { index: 0, path: filePath },
+    ...segmentIndexes.map((index) => ({ index, path: csvSegmentPath(filePath, index) })),
+  ];
+  let active: { index: number; path: string; size: number } | null = null;
+  for (const candidate of candidates) {
+    const info = await FileSystem.getInfoAsync(candidate.path, { size: true });
+    if (!info.exists) continue;
+    if (typeof info.size !== 'number' || !Number.isFinite(info.size) || info.size < 0) {
+      throw new Error('CSV_SIZE_UNKNOWN: ' + candidate.path);
+    }
+    if (!active || candidate.index > active.index) {
+      active = { index: candidate.index, path: candidate.path, size: info.size };
+    }
+  }
+  if (!active) return { filePath };
+  if (active.size < CSV_LOG_SEGMENT_MAX_BYTES) return { filePath: active.path };
+  return {
+    filePath: csvSegmentPath(filePath, active.index + 1),
+    inheritedHeaders: await readCsvHeaders(active.path),
+  };
+}
+
 async function writeRowsUnsafe(filePath: string, rows: CsvRow[]): Promise<void> {
   if (!rows.length) return;
   const directory = filePath.includes('/') ? filePath.substring(0, filePath.lastIndexOf('/')) : '.';
   await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
 
+  const target = await selectWritableLogCsv(filePath);
+  filePath = target.filePath;
+  const inheritedHeaders = target.inheritedHeaders;
   const info = await FileSystem.getInfoAsync(filePath, { size: true });
   if (!info.exists) {
-    const headers = Object.keys(rows[0]);
+    const headers = Array.from(new Set([
+      ...(inheritedHeaders ?? []),
+      ...rows.flatMap((row) => Object.keys(row)),
+    ]));
     const lines = rows.map((row) => serializeRow(row, headers));
     await FileSystem.writeAsStringAsync(filePath, `${headers.join(',')}\n${lines.join('\n')}\n`, {
       encoding: FileSystem.EncodingType.UTF8,

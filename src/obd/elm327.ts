@@ -57,11 +57,20 @@ function normalizeCommand(command: string): string {
   return normalized;
 }
 
+/** Maximum pending ordinary commands beyond the active ELM transaction. */
+export const ELM_MAX_PENDING_COMMANDS = 16;
+
 export class Elm327Session {
   private opened = false;
   private protocol: string | null = null;
   private initializationPromise: Promise<ElmCommandResult[]> | null = null;
   private commandQueue: Promise<void> = Promise.resolve();
+  private pendingQueueDepth = 0;
+  private maxQueueDepth = 0;
+  private queueRejections = 0;
+  private totalQueueWaitMs = 0;
+  private maxQueueWaitMs = 0;
+  private completedQueueWaitSamples = 0;
   private noDataCount = 0;
   private consecutiveFailures = 0;
   private lastSuccessfulResponseAt: string | null = null;
@@ -219,6 +228,13 @@ export class Elm327Session {
       lastErrorType: this.lastErrorType,
       consecutiveFailures: this.consecutiveFailures,
       lastSuccessfulResponseAt: this.lastSuccessfulResponseAt,
+      queueDepth: this.pendingQueueDepth,
+      maxQueueDepth: this.maxQueueDepth,
+      queueRejections: this.queueRejections,
+      averageQueueWaitMs: this.completedQueueWaitSamples
+        ? Math.round(this.totalQueueWaitMs / this.completedQueueWaitSamples)
+        : 0,
+      maxQueueWaitMs: this.maxQueueWaitMs,
     };
   }
 
@@ -258,7 +274,7 @@ export class Elm327Session {
       this.consecutiveFailures = 0;
       this.lastSuccessfulResponseAt = new Date().toISOString();
       return true;
-    });
+    }, { allowWhenSaturated: true });
   }
 
   /** KWP2000 TesterPresent (3E 00) para manter a sessão diagnóstica viva. */
@@ -310,17 +326,38 @@ export class Elm327Session {
       } else {
         this.protocol = null;
       }
-    });
+    }, { allowWhenSaturated: true });
   }
 
-  private enqueueCommand<T>(operation: () => Promise<T>): Promise<T> {
+  private enqueueCommand<T>(
+    operation: () => Promise<T>,
+    options: { allowWhenSaturated?: boolean } = {},
+  ): Promise<T> {
+    if (!options.allowWhenSaturated && this.pendingQueueDepth >= ELM_MAX_PENDING_COMMANDS) {
+      this.queueRejections += 1;
+      return Promise.reject(new Error(
+        'ELM_COMMAND_QUEUE_FULL: ' + this.pendingQueueDepth +
+        ' comandos aguardando; limite=' + ELM_MAX_PENDING_COMMANDS,
+      ));
+    }
+
+    const queuedAtMs = Date.now();
+    this.pendingQueueDepth += 1;
+    this.maxQueueDepth = Math.max(this.maxQueueDepth, this.pendingQueueDepth);
     const previous = this.commandQueue;
     let release!: () => void;
     this.commandQueue = new Promise<void>((resolve) => {
       release = resolve;
     });
 
-    return previous.then(operation).finally(() => release());
+    return previous.then(() => {
+      this.pendingQueueDepth = Math.max(0, this.pendingQueueDepth - 1);
+      const waitMs = Math.max(0, Date.now() - queuedAtMs);
+      this.totalQueueWaitMs += waitMs;
+      this.maxQueueWaitMs = Math.max(this.maxQueueWaitMs, waitMs);
+      this.completedQueueWaitSamples += 1;
+      return operation();
+    }).finally(() => release());
   }
 
   private async command(command: string, attempt = 1, timeoutOverrideMs?: number): Promise<ElmCommandResult> {

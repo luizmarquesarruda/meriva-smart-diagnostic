@@ -1,6 +1,6 @@
-## ESTADO VIGENTE — 2026-10-26 (auditoria de buffers e correção de SHA DB-153; nova CI pendente)
+## ESTADO VIGENTE — 2026-10-26 (fila ELM, rotação CSV e regressões DB-154; nova CI pendente)
 
-> HEAD de referência antes desta rodada: `80fdb6ffe0a32b8cb1d402466b091b5b448fcf47` (DB-152). A CI [40317403065](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40317403065) passou `validate` e `android-build` nesse SHA. Esta rodada altera o código e a documentação; o novo SHA precisa de CI própria e não herda o resultado anterior.
+> HEAD anterior a DB-153: `80fdb6ffe0a32b8cb1d402466b091b5b448fcf47` (DB-152). A CI [40318919363](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40318919363) passou `validate` e `android-build` para DB-153 `b0864f7e7f8005c95a7da85867d68e9be58b9604`. DB-154 altera código e contratos; precisa de CI própria.
 
 ### Integração, CI e riscos
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
@@ -16,7 +16,7 @@
 - Não foi executado teste físico no Galaxy A06/Android 16 nem com ELM327/ECU real.
 
 ### Critérios de aceitação
-- RG-01…RG-46 únicos e sequenciais; DB-001…DB-NNN e índice sincronizados.
+- RG-01…RG-48 únicos e sequenciais; DB-001…DB-NNN e índice sincronizados.
 - Gate anti-regressão, TypeScript, suíte completa e build Android aprovados no mesmo SHA final.
 - Nenhum PID passa a confirmado sem evidência RAW_ECU válida; autonomia persistida não pode ser exibida como atual.
 
@@ -223,6 +223,7 @@
 - **DB-151** · 2026-10-26 — Reintegrar correções de DTC histórico e interpretação dos PIDs 0101/0151
 - **DB-152** · 2026-10-26 — Escapar retorno de carro em células CSV
 - **DB-153** · 2026-10-26 — Limitar globalmente os buffers de telemetria PID e auditar filas
+- **DB-154** · 2026-10-26 — Limitar fila ELM327 e rotacionar logs CSV de alto volume
 
 ---
 
@@ -4363,3 +4364,24 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Resultado confirmado antes desta alteração: CI [40317403065](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40317403065) aprovou `validate` e `android-build` no SHA DB-152 `80fdb6ffe0a32b8cb1d402466b091b5b448fcf47`.
 - **Pendente para o novo commit:** executar o gate anti-regressão, TypeScript, suíte completa e build Android standalone no novo SHA, sem reutilizar os resultados de DB-152.
 - Testes físicos com Android 16, ELM327 e ECU real não foram executados nesta rodada.
+
+
+## DB-154 · 2026-10-26 — Limitar fila ELM327 e rotacionar logs CSV de alto volume
+
+### Causa confirmada
+- A Elm327Session preservava a ordem serial via Promises, mas a quantidade de consultas ordinárias aguardando não tinha limite nem métricas públicas. Rajadas de consultas poderiam acumular espera sem indicação objetiva de profundidade ou latência.
+- O logger CSV fazia lotes e restaurava lotes se uma escrita falhasse, porém a API legada do Expo FileSystem não oferece append confiável tipado. Cada flush lia e reescrevia o arquivo diário inteiro, tornando o custo de escrita crescente com o tamanho do arquivo.
+- Não foi introduzido append não suportado nem buffer extra de respostas OBD antigas: ambos poderiam quebrar compatibilidade ou misturar sessões.
+
+### Correção aplicada
+- Elm327Session expõe queueDepth, maxQueueDepth, queueRejections, averageQueueWaitMs e maxQueueWaitMs no snapshot de saúde.
+- A fila admite até 16 comandos ordinários aguardando além da transação ativa. A nova consulta é rejeitada com ELM_COMMAND_QUEUE_FULL antes de escrever no transporte. Fechamento e recuperação do protocolo são operações reservadas e continuam serializadas na mesma fila.
+- Logs de alto volume em LOGS/ rotacionam aproximadamente a cada 1 MiB em .part-0001.csv, .part-0002.csv etc. Cada segmento tem cabeçalho próprio com o esquema mais recente; os segmentos anteriores não são reescritos pela rotação. Se o tamanho ou cabeçalho não puder ser validado, a operação falha explicitamente.
+- CSVs de viagens fora de LOGS/ mantêm o caminho anterior. A fila de escrita de 10.000 linhas e a política existente de descarte contado permanecem inalteradas.
+- Adicionados testes concorrentes de saturação ELM, reserva de fechamento, métricas e rejeição antes da escrita; testes CSV verificam preservação de dois segmentos cheios e consistência de cabeçalho.
+- Atualizados RG-47/RG-48, ELM-QUEUE-01, CSV-ROTATE-01, changelog e auditoria de buffers.
+
+### Validação
+- A CI [40318919363](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40318919363) aprovou validate e android-build somente no SHA DB-153 b0864f7e7f8005c95a7da85867d68e9be58b9604.
+- Pendente para DB-154: gate anti-regressão, TypeScript, suíte completa e APK Android standalone no novo SHA.
+- As medições de latência com o adaptador ELM327 e a confirmação da rotação/exportação no Android físico continuam pendentes. Testes simulados não são validação de hardware.

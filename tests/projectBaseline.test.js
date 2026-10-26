@@ -271,6 +271,15 @@ assert.ok(tripService.includes('estimateRangeFromFuelLevel(currentFuelLevelPerce
 assert.match(tripService, /isCurrentFuelLevelSample\(this\.state\.fuelLevelReadAtMs\)/);
 assert.match(liveTelemetry, /!hasUsableTimestamp\(reading\.timestamp\)/, 'live samples must reject invalid or future timestamps at ingestion');
 assert.match(liveTelemetry, /ageMs >= 0 && ageMs <= STALE_AFTER_MS/, 'operational context must reject timestamps from the future');
+assert.match(elm, /export const ELM_MAX_PENDING_COMMANDS = 16;/, 'ELM must bound pending ordinary commands');
+assert.match(elm, /queueRejections/, 'ELM queue saturation must be observable');
+assert.match(projectContract, /\\| RG-47 \\|/, 'ELM queue backpressure must remain in the anti-regression contract');
+const csvLogger = read('src/database/csvLogger.ts');
+assert.match(csvLogger, /CSV_LOG_SEGMENT_MAX_BYTES = 1_048_576/, 'high-volume CSV must use bounded segments');
+assert.match(csvLogger, /selectWritableLogCsv/, 'CSV rotation must remain isolated to LOGS');
+assert.match(projectContract, /\\| RG-48 \\|/, 'CSV rotation must remain in the anti-regression contract');
+assert.match(read('docs/TEST_PLAN.md'), /ELM-QUEUE-01/, 'ELM queue saturation requires an explicit test case');
+assert.match(read('docs/TEST_PLAN.md'), /CSV-ROTATE-01/, 'CSV rotation requires an explicit test case');
 assert.ok(liveTelemetry.includes('const MAX_TRACKED_PIDS = 64;'), 'live PID streams must have a bounded global capacity');
 assert.ok(liveTelemetry.includes('function isValidMode01Pid(pid: string): boolean'), 'live telemetry must validate PID identifiers');
 assert.match(projectContract, /\| RG-46 \|/, 'global live telemetry capacity must remain in the anti-regression contract');
