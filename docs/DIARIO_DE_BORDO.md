@@ -202,6 +202,7 @@
 - **DB-129** · 2026-10-25 — GPS rejeita timestamps inválidos e fora de ordem
 - **DB-130** · 2026-10-25 — Otimização CSV avaliada e bloqueada pela versão instalada
 - **DB-131** · 2026-10-25 — Atualização periódica de localização/clima baseada em conectividade
+- **DB-132** · 2026-10-26 — Auditoria específica do histórico de viagens, telemetria e armazenamento
 
 ---
 
@@ -3987,3 +3988,34 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Commits criados na branch `fix/repository-audit-hardening-20261024` da PR #89. A CI deve ser verificada no HEAD final desta alteração; resultados de SHAs anteriores não contam como aprovação.
 - Ainda não foi executado teste físico de geolocalização em Android 16 alternando Wi-Fi/4G/5G. A CI não comprova recepção GPS pelo provedor fused, disponibilidade da operadora nem funcionamento do ELM327/ECU reais.
 - Nenhuma mudança foi mesclada em `main`. A atualização de clima é opcional e não deve afetar polling, conexão Bluetooth, autonomia ou diagnóstico local.
+
+## DB-132 · 2026-10-26 — Auditoria específica do histórico de viagens, telemetria e armazenamento
+
+### Escopo e evidências
+- Auditoria documental dos caminhos de persistência de viagens, autosave, histórico TXT, sessões ECU, CSV, DTC, cotas, backups e exportações no snapshot de `main` `02773b71ca9bd428b832d53a386655dd80acd80b`.
+- Artefato `meriva_smart_autosave_history(9).txt` da Biblioteca: 2.725.564 bytes, 516 blocos de salvamento e IDs repetidos, embora declare limite de 200. O arquivo contém marcadores de redação em parte de valores numéricos; estes valores não foram usados em cálculos de consumo.
+- O código atualmente versionado em `autosaveHistoryTxt.ts` deduplica IDs, limita a saída lida/exportada a 200 snapshots e usa somente as dez viagens reais mais recentes em cada snapshot. `tests/merivaAutosave.test.js` já cobre limite de 200 e deduplicação/serialização concorrente. Portanto, o artefato antigo não prova sozinho que o código atual viole o limite; é necessário comparar o arquivo físico vigente no aparelho.
+- Nenhum teste ou CI foi executado nesta auditoria. Nenhum código, interface, fórmula, dependência ou configuração do aplicativo foi alterado.
+
+### Achados confirmados
+1. **Exportação CSV não usa a mesma regra de validade de consumo da tela/TXT.** `exportDriveCyclesCsv()` exporta sempre `avgFuelConsumptionKml`, não exporta `fuelDataValid` e não converte consumo inválido em campo vazio. A interface e o formatador TXT apresentam `N/D` quando a amostra não é confiável. O relatório detalhado está em `docs/AUDITORIA_HISTORICO_TELEMETRIA_ARMAZENAMENTO_2026-10-26.md`; este achado requer correção e teste numa tarefa futura autorizada.
+2. **Duplicação e retenção de histórico.** `VIAGENS/index.json` não tem limite explícito de ciclos por quantidade, idade ou tamanho. Os ciclos são copiados para o payload `driveCycles` do autosave, além de cópia anterior e backups. Cada ciclo admite até 720 amostras esparsas. A limpeza de cota atua apenas em `LOGS` e `LEITURAS`; exportações sob `BACKUP/EXPORTS` não têm retenção explícita identificada no caminho examinado.
+3. **Custo de escrita CSV cresce com o arquivo.** O flush de arquivo existente lê e reescreve o CSV completo. DB-130 já registrou que `append: true` não é compatível com os tipos da versão instalada Expo SDK 51 / `expo-file-system` 17, e a tentativa foi revertida. Não repetir sem API compatível e testes.
+4. **Estado de frescor de leitura.** O snapshot de 2026-10-24 contém uma leitura `0101` de 2026-10-08 na seção `LAST READINGS`. O timestamp aparece, mas a seção não apresenta estado explícito de obsolescência/idade.
+5. **Fluxos DTC divergem ao receber resposta válida sem códigos.** A varredura completa reconcilia registros `CURRENT/CONFIRMED` ausentes do serviço 03 para `INACTIVE` somente quando a resposta de serviço 03 é válida. A rotina simples `readCurrentDtcs()`, quando recebe uma resposta válida sem códigos, preserva a lista anterior em `state.dtcs`. Assim, o status persistido pode depender do caminho de leitura usado. Timeout, `NO DATA` e resposta malformada devem continuar preservando evidência anterior e não podem ser tratados como ausência de falhas.
+6. **TXT de autosave é um anel de snapshots, não uma tabela de viagens.** Nos 200 blocos recentes do artefato foram observadas 2.000 aparições de linhas de viagem, mas apenas 30 linhas distintas, porque cada snapshot repete as dez viagens mais recentes. Não usar essas linhas para contar viagens nem calcular totais sem deduplicação por ID.
+7. **SQLite ainda não está justificado por medição.** A arquitetura sugere medir o custo de histórico e serialização antes da escolha. Não foi realizado benchmark em Android nem comparação JSON/CSV/SQLite nesta auditoria.
+
+### Priorização para tarefa futura autorizada
+1. Corrigir e testar a validade/proveniência do CSV exportado de viagens.
+2. Unificar semântica de reconciliação DTC entre leitura simples e varredura completa, preservando a diferença entre dado ausente e serviço indisponível.
+3. Explicitar frescor das leituras exportadas sem apagar evidência histórica.
+4. Medir bytes, latência de flush, tempo de exportação, ciclos/amostras, uso máximo de memória e descartes da fila no Galaxy A06.
+5. Definir retenção/arquivamento para viagens e exportações, com backup/restauração verificados, antes de qualquer alteração destrutiva.
+6. Só então comparar JSON atual, arquivos segmentados e SQLite com fixtures reais anonimizadas e testes de interrupção/recuperação.
+
+### Estado e limites
+- Documento detalhado criado em `docs/AUDITORIA_HISTORICO_TELEMETRIA_ARMAZENAMENTO_2026-10-26.md`, commit documental `5ba563084cb953d16184ef1eeccf337ae6835b41`.
+- Nenhuma correção foi aplicada ao app, não houve PR/merge e não foi alegado sucesso de teste/CI.
+- O diário e o relatório estão nesta branch de pesquisa; não estão incorporados em `main`.
+
