@@ -24,7 +24,7 @@ A splash nativa usa o asset transparente `assets/splash.png` e o plugin `expo-sp
 
 ## Documentação técnica e compatibilidade dos PIDs
 
-A referência do carro e a definição OBD são fontes diferentes. Os manuais oficiais da [Meriva 2011](https://www.chevrolet.com.br/content/dam/chevrolet/south-america/brazil/portuguese/index/services/owner-manuals/05-pdf/meriva/manual-meriva-2011.pdf) e [Meriva 2012](https://www.chevrolet.com.br/content/dam/chevrolet/south-america/brazil/portuguese/index/services/owner-manuals/05-pdf/meriva/manual-meriva-2012.pdf) documentam operação, advertências e manutenção, mas não listam os PIDs OBD-II suportados pela ECU. O catálogo local contém definições SAE genéricas; isso não significa que os 34 PIDs estejam disponíveis neste veículo.
+A referência do carro e a definição OBD são fontes diferentes. Os manuais oficiais da [Meriva 2011](https://www.chevrolet.com.br/content/dam/chevrolet/south-america/brazil/portuguese/index/services/owner-manuals/05-pdf/meriva/manual-meriva-2011.pdf) e [Meriva 2012](https://www.chevrolet.com.br/content/dam/chevrolet/south-america/brazil/portuguese/index/services/owner-manuals/05-pdf/meriva/manual-meriva-2012.pdf) documentam operação, advertências e manutenção, mas não listam os PIDs OBD-II suportados pela ECU. O catálogo local contém definições SAE genéricas; isso não significa que os 35 PIDs estejam disponíveis neste veículo.
 
 - [Auditoria documental Meriva × OBD/PIDs](docs/MERIVA_OBD_SOURCE_AUDIT_2026-10-24.md): fontes, limites, diferenças entre padrão e suporte real e revisão bit a bit do PID 0101.
 - [Mapa de PIDs e fórmulas](docs/PID_FORMULA_MAP_2026-10-24.md): bytes, fórmulas, unidades, faixas e evidência específica disponível.

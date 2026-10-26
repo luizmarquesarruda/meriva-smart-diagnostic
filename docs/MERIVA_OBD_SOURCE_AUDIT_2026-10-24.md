@@ -8,7 +8,7 @@ Esta nota separa três evidências diferentes que não podem ser misturadas:
 2. **Definição SAE de um PID**: define o significado dos bytes, fórmula e unidade de um parâmetro padronizado.
 3. **Suporte na ECU deste carro**: exige bitmap de suporte observada na sessão e resposta individual válida, com bytes completos. A leitura repetida e plausível é necessária para elevar a confiança; uma resposta isolada não certifica a saúde física do sensor.
 
-O Manual do Proprietário Meriva 2011/2012 **não fornece uma tabela de PIDs OBD-II nem uma bitmap de suporte da ECU**. Portanto, ele não pode ser usado para declarar que a Meriva suporta todos os PIDs catalogados. O catálogo de 34 PIDs do aplicativo é uma seleção de definições SAE, não uma lista OEM garantida para o veículo.
+O Manual do Proprietário Meriva 2011/2012 **não fornece uma tabela de PIDs OBD-II nem uma bitmap de suporte da ECU**. Portanto, ele não pode ser usado para declarar que a Meriva suporta todos os PIDs catalogados. O catálogo de 35 PIDs do aplicativo é uma seleção de definições SAE, não uma lista OEM garantida para o veículo.
 
 No inventário atual do projeto, somente PID `010C` (RPM) possui evidência `RAW_ECU` específica documentada: resposta `41 0C 1A F8`, interpretada como 1726 rpm. Outros parâmetros permanecem candidatos, definições genéricas ou descobertas de runtime até ser obtida resposta válida da ECU.
 
@@ -52,6 +52,7 @@ As fórmulas abaixo são definições genéricas do padrão. A confirmação de 
 | `0130` / `0131` | Ciclos de aquecimento / distância desde limpeza de DTCs | A (contagem de ciclos) / 256 × A + B (km) | Sem RAW_ECU específica |
 | `0133` | Pressão barométrica absoluta | A (kPa) | Sem RAW_ECU específica |
 | `0142` / `0143` | Tensão do módulo de controle / carga absoluta | (256 × A + B) / 1000 (V) / (256 × A + B) × 100 / 255 (%) | Sem RAW_ECU específica |
+| `0144` | Razão de equivalência comandada | (256 × A + B) / 32768 (adimensional) | Alvo de confirmação; sem RAW_ECU específica |
 | `0145` / `0146` | Posição relativa da borboleta / temperatura ambiente | A × 100 / 255 (%) / A − 40 (°C) | Sem RAW_ECU específica |
 | `0151` / `0152` | Tipo de combustível (enum) / percentual de etanol | A lookup / A × 100 / 255 (%) | Sem RAW_ECU específica |
 | `0159` | Pressão absoluta do rail de combustível | (256 × A + B) × 10 (kPa) | Sem RAW_ECU específica |
@@ -80,7 +81,7 @@ No PID `0101`, a interpretação **não** deve tratar os quatro bytes como um ú
 5. Não transformar falta de resposta em zero; não usar o valor para diagnóstico se a resposta não passou no parser e na validação de plausibilidade.
 6. Aumentar confiança apenas com amostras reais repetidas, coerentes com a condição de teste; um PID que responde não prova a exatidão física do sensor.
 7. Para Flex, não confundir o enum de tipo de combustível `0151` com percentual de etanol `0152`; ausência de `0152` não significa combustível fixo.
-8. Nunca declarar que o veículo suporta todos os 34 PIDs do catálogo.
+8. Nunca declarar que o veículo suporta todos os 35 PIDs do catálogo.
 
 ## Fontes da documentação do app
 

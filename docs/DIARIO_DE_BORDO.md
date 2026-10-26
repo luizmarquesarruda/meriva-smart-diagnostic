@@ -1,17 +1,17 @@
-## ESTADO VIGENTE — 2026-10-26 (auditoria sistêmica DB-146; nova CI pendente)
+## ESTADO VIGENTE — 2026-10-26 (auditoria sistêmica DB-147; nova CI pendente)
 
-> Estado observado antes da nova alteração: branch `integration/reconcile-pid-ui-20261025`, HEAD `20f6dcbb04d72c178db95fdf5dcd23815bb7e904`. A CI do HEAD anterior passou; o commit DB-146 ainda precisa de validação própria.
+> HEAD de referência anterior à correção documental: `826df0ae23ef30e602418721c521be271c6e5ff6`. Na CI [40313041670](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40313041670), `validate` passou; `android-build` ainda estava em andamento quando a releitura encontrou divergências no inventário. A CI do SHA DB-147 deve validar o conjunto completo.
 
 ### Integração, CI e riscos
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
-- `main` atual: `02773b71ca9bd428b832d53a386655dd80acd80b`; PR [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84) foi mesclada por ser documental e estar limpa. O commit de integração incorpora esse HEAD e o inventário documental.
-- A CI [run 40264314431](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40264314431), SHA `20f6dcbb04d72c178db95fdf5dcd23815bb7e904`, concluiu `validate` e `android-build` com sucesso, incluindo APK standalone, verificação e upload. Esse resultado não valida as alterações DB-146 posteriores.
-- A auditoria de autonomia DB-143–145 adicionou janela móvel de dez leituras e balanço de tanque cheio. O fallback continua identificado como estimativa e exige registro das viagens/abastecimentos; precisão física ainda não foi medida.
-- O PID 0144 da PR #81 estava ausente do catálogo da branch de integração. A implementação foi portada com fórmula/faixa/unidade/testes e documentação coerentes. Por regra semântica, **não** foi adicionado a `confirmed_pids`: entrou somente em `next_confirmation_targets`, sem resposta RAW_ECU registrada e sem inclusão na fila automática de polling.
-- PR [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81) permanece aberta até validar o port; depois será fechada como substituída se o mesmo conteúdo estiver integralmente coberto na branch consolidada. PR [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) segue em conflito/divergência e não será mesclada sem reconciliação visual/funcional.
-- A prévia Floot está em `src/ui/FlootLayoutPreview.tsx`, fora de `app/`; a rota de demonstração não faz parte do fluxo operacional.
-- O catálogo padrão descreve fórmulas OBD genéricas, não suporte físico de todos os PIDs. A evidência específica documentada da Meriva continua sendo `010C` (`41 0C 1A F8` = 1726 rpm).
-- Não foi executado teste físico no Galaxy A06/Android 16 nem no ELM327/ECU real. CI, testes sintéticos e compilação não comprovam precisão de autonomia, suporte do PID 0144 ou aparência no aparelho.
+- `main`: `02773b71ca9bd428b832d53a386655dd80acd80b`; PR [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84) foi mesclada, mas a auditoria subsequente identificou divergências na própria documentação da PR, agora corrigidas e protegidas por teste.
+- DB-146 adicionou PID 0144 ao catálogo padrão com fórmula/faixa/unidade e testes, sem marcar suporte físico nem incluí-lo na fila automática. O PID permanece apenas como alvo de confirmação até existir resposta RAW_ECU válida.
+- DB-147 sincroniza README, auditoria de fontes, inventário completo, testes e changelog com o catálogo runtime: 35 PIDs, 35 faixas, 21 definições de fórmula; corrige também a semântica documental do PID 0101, o rótulo de 0111 e a unidade de 0130.
+- A CI [40264314431](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40264314431) passou validação e APK standalone no SHA anterior a DB-146. A CI [40313041670](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40313041670) validou DB-146 no job `validate`; o build Android ainda não tinha concluído na última consulta.
+- A autonomia DB-143–145 usa janela móvel de dez leituras e balanço do último tanque completo. O balanço é uma estimativa e depende de todas as viagens e abastecimentos serem registrados; precisão física ainda não foi medida.
+- PR [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81) será encerrada como substituída apenas depois da validação final da integração. PR [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) está divergente; a portabilidade visual foi incorporada, e a prévia foi movida para `src/ui/FlootLayoutPreview.tsx`, fora das rotas Expo.
+- Somente `010C` tem resposta RAW_ECU específica documentada para a Meriva (`41 0C 1A F8` = 1726 rpm). Catálogo SAE não é prova de suporte do veículo.
+- Não foi executado teste físico no Galaxy A06/Android 16 nem com ELM327/ECU real.
 
 ### Critérios de aceitação
 - RG-01…RG-45 únicos e sequenciais; DB-001…DB-NNN e índice sincronizados.
@@ -214,6 +214,7 @@
 - **DB-144** · 2026-10-26 — Endurecer a validação de timestamps do buffer de autonomia
 - **DB-145** · 2026-10-26 — Estimar autonomia sem PID 012F com balanço de tanque cheio
 - **DB-146** · 2026-10-26 — Reconciliar PID 0144 com catálogo, fórmula e evidência da ECU
+- **DB-147** · 2026-10-26 — Corrigir divergências do inventário completo de PIDs
 
 ---
 
@@ -4232,3 +4233,23 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - CI do HEAD anterior `20f6dcbb04d72c178db95fdf5dcd23815bb7e904`: run [40264314431](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40264314431) passou `validate` e `android-build`, mas não valida este commit.
 - A nova CI do commit DB-146 precisa passar gate anti-regressão, TypeScript, suíte completa, prebuild, APK standalone, verificação e upload. Resultado pendente até a execução terminar.
 - Teste físico do PID 0144 com ELM327/ECU continua pendente; não há evidência para marcá-lo como suportado na Meriva.
+
+## DB-147 · 2026-10-26 — Corrigir divergências do inventário completo de PIDs
+
+### Causa confirmada
+- A releitura do inventário adicionado pela PR #84 revelou que a documentação ainda dizia 34 PIDs, 20 fórmulas e 34 faixas depois da integração do PID 0144.
+- A tabela documental também divergia do catálogo runtime: PID 0101 aparecia como `U32/status` em vez de `DTC_COUNT/dtc_count`; PID 0111 era rotulado como posição relativa, embora seja a posição absoluta da borboleta; PID 0130 usava a unidade genérica `código` em vez de ciclos de aquecimento.
+- O teste de consistência protegia o mapa canônico e o relatório técnico, mas não verificava esse inventário completo, permitindo que o documento divergisse sem falhar na CI.
+
+### Correção aplicada
+- Atualizados README, auditoria de fontes e inventário completo para 35 PIDs, 35 faixas e 21 definições de fórmula.
+- Adicionada a linha do PID 0144 ao inventário e à auditoria de fontes, com fórmula `(A × 256 + B) / 32768`, unidade adimensional e estado de alvo de confirmação; ele não entra na lista de dez candidatos com baseline nem é tratado como suportado.
+- Corrigidos PID 0101 (`DTC_COUNT`), PID 0111 (posição absoluta), PID 0130 (ciclos) e PID 015A (posição relativa do pedal). O total de PIDs sem teste específico no catálogo de sensores passa a cinco, incluindo 0144.
+- Ampliado `tests/knowledgeJson.test.js` para proteger o inventário completo contra os rótulos/fórmulas antigos e exigir a linha de 0144.
+- Atualizados o changelog, o resumo vigente e o índice sequencial DB-001…DB-147.
+
+### Validação
+- No commit DB-146, o job `validate` da CI [40313041670](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40313041670) passou; o job Android ainda estava em andamento na última leitura. Isso não valida o commit DB-147.
+- A CI do SHA DB-147 deve passar gate anti-regressão, TypeScript, testes completos, prebuild, APK standalone, verificação e upload.
+- Teste físico com ELM327/ECU permanece pendente; não se atribui suporte real a 0144.
+

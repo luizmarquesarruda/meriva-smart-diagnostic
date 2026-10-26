@@ -5,6 +5,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const pidMapDocument = fs.readFileSync(path.join(ROOT, 'docs/PID_FORMULA_MAP_2026-10-24.md'), 'utf8');
 const pidReportDocument = fs.readFileSync(path.join(ROOT, 'docs/RELATORIO_PIDS_E_FORMULAS.md'), 'utf8');
+const completePidInventoryDocument = fs.readFileSync(path.join(ROOT, 'docs/MAPEAMENTO_COMPLETO_PIDS_2026-10-24.md'), 'utf8');
 
 function readJson(relativePath) {
   const file = path.join(ROOT, relativePath);
@@ -208,6 +209,14 @@ function main() {
   ]) {
     assert.ok(pidReportDocument.includes(requiredText), 'relatório técnico sem texto vigente: ' + requiredText);
   }
+
+  assert.match(completePidInventoryDocument, /\*\*35 PIDs\*\*/);
+  assert.match(completePidInventoryDocument, /\*\*35 faixas\*\*/);
+  assert.match(completePidInventoryDocument, /\| 0101 \| Contagem de DTCs e estado MIL\/readiness \| 4 \| dtc_count \| DTC_COUNT/);
+  assert.match(completePidInventoryDocument, /\| 0111 \| Posição absoluta da borboleta/);
+  assert.match(completePidInventoryDocument, /\| 0144 \| Razão de equivalência comandada \| 2 \| razão \| U16_DIV_32768/);
+  assert.match(completePidInventoryDocument, /\| 0130 \| Ciclos de aquecimento desde limpeza de DTCs \| 1 \| ciclos \| U8/);
+  assert.doesNotMatch(completePidInventoryDocument, /\| 0101 \| Estado dos monitores desde limpeza de DTCs \| 4 \| status \| U32/);
 
   const pidList = [...pidIds];
   const rangeIds = Object.keys(ranges.ranges).map((id) => id.toUpperCase());

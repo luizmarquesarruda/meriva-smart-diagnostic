@@ -7,14 +7,14 @@
 
 ## Resumo da auditoria estática
 
-- **34 PIDs** cadastrados em `src/knowledge/pids.json`.
-- **20 fórmulas** em `src/knowledge/formulas.json`.
-- **34 faixas** em `src/knowledge/ranges.json`.
+- **35 PIDs** cadastrados em `src/knowledge/pids.json`.
+- **21 fórmulas** em `src/knowledge/formulas.json`.
+- **35 faixas** em `src/knowledge/ranges.json`.
 - **30 testes/avaliações** em `src/knowledge/sensor_tests.json`.
 - **1 PID confirmado por evidência RAW_ECU** no inventário específico: `010C` (RPM).
 - **10 PIDs candidatos** registrados a partir de baseline/seed; não são confirmações da ECU.
-- Todos os 34 PIDs têm fórmula referenciada existente e faixa cadastrada.
-- Quatro PIDs do catálogo não possuem teste no catálogo de sensores: `0101`, `0130`, `0131`, `0151`.
+- Todos os 35 PIDs têm fórmula referenciada existente e faixa cadastrada.
+- Cinco PIDs do catálogo não possuem teste no catálogo de sensores: `0101`, `0130`, `0131`, `0144`, `0151`.
 - Nenhum teste do catálogo de sensores referencia PID ausente de `pids.json`.
 
 ## Status e critérios
@@ -28,7 +28,7 @@
 
 | PID Mode 01 | Parâmetro | Bytes | Unidade | Fórmula | Teste local | Evidência Meriva |
 |---|---|---:|---|---|---|---|
-| 0101 | Estado dos monitores desde limpeza de DTCs | 4 | status | U32 | Não | Catálogo / não confirmado |
+| 0101 | Contagem de DTCs e estado MIL/readiness | 4 | dtc_count | DTC_COUNT | Não | Catálogo / não confirmado |
 | 0104 | Carga calculada do motor | 1 | % | PERCENT_255 | Sim | Catálogo / não confirmado |
 | 0105 | Temperatura do líquido de arrefecimento (ECT) | 1 | °C | TEMP_C | Sim | Candidato |
 | 0106 | Correção de combustível de curto prazo (STFT B1) | 1 | % | FUEL_TRIM | Sim | Candidato |
@@ -40,23 +40,24 @@
 | 010E | Avanço de ignição | 1 | graus | TIMING_DEG | Sim | Candidato |
 | 010F | Temperatura do ar de admissão (IAT) | 1 | °C | TEMP_C | Sim | Candidato |
 | 0110 | Fluxo de ar (MAF) | 2 | g/s | MAF_GS | Sim | Candidato |
-| 0111 | Posição relativa da borboleta | 1 | % | PERCENT_255 | Sim | Candidato |
+| 0111 | Posição absoluta da borboleta | 1 | % | PERCENT_255 | Sim | Candidato |
 | 0114 | Tensão do O2 B1S1 e dado adicional de ajuste | 2 | V (byte A) | O2_VOLTS | Sim | Candidato |
 | 012C | EGR comandada | 1 | % | PERCENT_255 | Sim | Catálogo / não confirmado |
 | 012D | Erro EGR | 1 | % | FUEL_TRIM | Sim | Catálogo / não confirmado |
 | 012E | Purga EVAP comandada | 1 | % | PERCENT_255 | Sim | Catálogo / não confirmado |
 | 012F | Nível de combustível informado pela ECU | 1 | % | PERCENT_255 | Sim | Candidato |
-| 0130 | Ciclos de aquecimento desde limpeza de DTCs | 1 | código | U8 | Não | Catálogo / não confirmado |
+| 0130 | Ciclos de aquecimento desde limpeza de DTCs | 1 | ciclos | U8 | Não | Catálogo / não confirmado |
 | 0131 | Distância desde limpeza de DTCs | 2 | km | DISTANCE_KM | Não | Catálogo / não confirmado |
 | 0133 | Pressão barométrica (BARO) | 1 | kPa | U8 | Sim | Catálogo / não confirmado |
 | 0142 | Tensão informada pela ECU | 2 | V | VOLTS_1000 | Sim | Catálogo / não confirmado |
 | 0143 | Carga absoluta calculada do motor | 2 | % escalado | U16_SCALE_255 | Sim | Catálogo / não confirmado |
+| 0144 | Razão de equivalência comandada | 2 | razão | U16_DIV_32768 | Não | Alvo de confirmação; não confirmado |
 | 0145 | Posição relativa da borboleta | 1 | % | PERCENT_255 | Sim | Catálogo / não confirmado |
 | 0146 | Temperatura do ar ambiente | 1 | °C | TEMP_C | Sim | Catálogo / não confirmado |
 | 0151 | Tipo de combustível (enumeração) | 1 | código | U8 | Não | Catálogo / não confirmado |
 | 0152 | Percentual de álcool reportado pela ECU | 1 | % | ETHANOL_PERCENT | Sim | Catálogo / não confirmado |
 | 0159 | Pressão absoluta do rail de combustível | 2 | kPa | U16_X10 | Sim | Catálogo / não confirmado |
-| 015A | Posição do pedal do acelerador | 1 | % | PERCENT_255 | Sim | Catálogo / não confirmado |
+| 015A | Posição relativa do pedal do acelerador | 1 | % | PERCENT_255 | Sim | Catálogo / não confirmado |
 | 015C | Temperatura do óleo do motor | 1 | °C | TEMP_C | Sim | Catálogo / não confirmado |
 | 015D | Temporização da injeção | 2 | graus | INJECTION_TIMING | Sim | Catálogo / não confirmado |
 | 015E | Taxa de combustível calculada | 2 | L/h | FUEL_RATE_LH | Sim | Catálogo / não confirmado |
@@ -65,7 +66,7 @@
 
 ## Candidatos atualmente registrados
 
-O arquivo `src/knowledge/meriva_confirmed_pids.json` registra como candidatos: `0105`, `0106`, `0107`, `010B`, `010E`, `010F`, `0110`, `0111`, `0114` e `012F`.
+O arquivo `src/knowledge/meriva_confirmed_pids.json` registra como candidatos: `0105`, `0106`, `0107`, `010B`, `010E`, `010F`, `0110`, `0111`, `0114` e `012F`. O PID `0144` é um alvo de confirmação separado, sem resposta RAW_ECU e sem status de candidato com baseline.
 
 Os valores de baseline associados a esses candidatos servem para comparação inicial, não como prova de resposta atual da ECU. Somente `010C` possui atualmente resposta bruta documentada (`41 0C 1A F8`, valor calculado de 1726 rpm).
 
