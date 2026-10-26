@@ -53,7 +53,7 @@ function isDriveCycle(value: unknown): value is DriveCycle {
       (sample.rpm === null || finiteNonNegative(sample.rpm)) &&
       (sample.coolantTempC === null ||
        (typeof sample.coolantTempC === 'number' && Number.isFinite(sample.coolantTempC)))
-    )) &&
+    ))) &&
     ['CARSCANNER_SEED','REAL_OBD','SIMULACAO'].includes(cycle.source as string) &&
     validDate(cycle.importedAt);
 }
