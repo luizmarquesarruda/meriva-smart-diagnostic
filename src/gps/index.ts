@@ -4,8 +4,6 @@ export {
   calculateConsumptionKml,
   haversineDistanceKm,
   normalizeGpsSpeedKmh,
-  isGpsSampleFresh,
-  GPS_SAMPLE_STALE_AFTER_MS,
 } from './gpsTracker';
 
 export type {

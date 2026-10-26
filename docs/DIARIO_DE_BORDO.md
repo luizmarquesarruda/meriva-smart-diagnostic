@@ -1,20 +1,20 @@
-## ESTADO VIGENTE — 2026-10-25 (retomada da integração DB-137)
+## ESTADO VIGENTE — 2026-10-25 (retomada da integração DB-138)
 
-> Estado observado na branch `integration/reconcile-pid-ui-20261025`. Aprovação requer CI completa no SHA final.
+> Estado observado na branch `integration/reconcile-pid-ui-20261025`; a validação deve ser feita novamente no SHA final.
 
-### Integração e CI
+### Integração, CI e riscos
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
-- `main` observado: `8e95b2b59e0aa4c76027b638e49d4453a0a4b54c`; PR [#89](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/89) foi mesclada, enquanto [#90](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/90) e [#82](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/82) foram fechadas sem merge.
-- HEAD examinado antes desta correção: `dbd5790b77b6c300a08d337e53e95be3d9dababe`. A CI [run 40235734258](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40235734258) passou Expo Doctor 17/17, mas o gate falhou por erro de sintaxe em `tests/projectBaseline.test.js:267`: sobrou a mensagem de uma antiga asserção de tanque vazio depois de sua substituição.
-- O cálculo de autonomia usa `getCurrentAutonomyRangeKm`; `tests/autonomyPresentation.test.js` cobre 0% válido como `0 km`. A tela Dados mostra `currentAutonomyKm` ou `N/D`. O run anterior não executou TypeScript, a suíte completa nem Android build.
-- PR [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81) permanece em rascunho; [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) e [#84 — inventário](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84) permanecem abertas. PID 0144 ainda está ausente do catálogo integrado.
-- `app/floot-layout.tsx` é uma rota Expo com estado demonstrativo e valores estáticos; decidir remoção/movimentação para fora de `app/` antes de release.
-- Nenhum merge foi feito a partir da branch candidata. O hardware Android 16/ELM327/ECU ainda não foi testado nesta retomada.
+- `main` observado: `8e95b2b59e0aa4c76027b638e49d4453a0a4b54c`; PR [#89](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/89) foi mesclada; PRs [#90](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/90) e [#82](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/82) foram fechadas sem merge.
+- A [CI run 40235872428](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40235872428) passou Expo Doctor (17/17) e o gate anti-regressão, mas falhou no TypeScript: `src/gps/index.ts` exportava `isGpsSampleFresh` e `GPS_SAMPLE_STALE_AFTER_MS`, símbolos inexistentes em `src/gps/gpsTracker.ts`.
+- A comparação com `main` confirmou que o barrel export correto não inclui esses símbolos. A correção DB-138 remove apenas os exports obsoletos; não cria uma regra de frescor GPS sem requisito/implementação comprovados.
+- O baseline passou no SHA `f22dda1f52d6487a481cbfc10fafcac25acd6e3c`; a validação completa não passou porque o TypeScript parou antes dos testes. A build Android ainda não foi executada nessa CI.
+- PR [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81) continua em rascunho; [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) e [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84) continuam abertas. PID 0144 ainda não foi incorporado ao catálogo da branch candidata.
+- `app/floot-layout.tsx` continua uma rota de demonstração estática na árvore Expo; precisa ser removida/movida ou transformada em funcionalidade real antes do release. Hardware Android/ELM327/ECU não foi validado nesta retomada.
 
 ### Critérios de aceitação
-- RG-01…RG-43 únicos/sequenciais; DB-001…DB-NNN e índice coincidentes.
-- Gate, TypeScript, suíte completa e Android build verdes no mesmo SHA antes de integração.
-- Não reintroduzir autonomia persistida como atual nem afirmar suporte real de PID sem resposta válida da ECU.
+- RG-01…RG-43 únicos e sequenciais; DB-001…DB-NNN e índice sincronizados.
+- Gate, TypeScript, suíte completa e build Android aprovados no mesmo SHA final.
+- Não declarar PID como suportado sem resposta válida da ECU nem usar autonomia persistida como valor atual.
 ---
 
 ## Portabilidade Floot → aplicativo Expo — 2026-10-23
@@ -202,6 +202,7 @@
 - **DB-135** · 2026-10-25 — Corrigir escapes da asserção de autonomia no baseline
 - **DB-136** · 2026-10-25 — Validar tanque vazio pela regra central de autonomia
 - **DB-137** · 2026-10-25 — Remover linha órfã no baseline de autonomia
+- **DB-138** · 2026-10-25 — Remover exports GPS inexistentes identificados pelo TypeScript
 
 ---
 
@@ -4084,3 +4085,17 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 ### Validação pendente
 - Nova CI é necessária para confirmar sintaxe e gate. Até ela passar, TypeScript, suíte completa e Android build continuam sem resultado válido para esta revisão.
 - O PID 0144 da PR #81 e a rota demonstrativa `app/floot-layout.tsx` continuam pendentes de integração/revisão. Nenhum merge foi feito.
+
+## DB-138 · 2026-10-25 — Remover exports GPS inexistentes identificados pelo TypeScript
+
+### Causa confirmada
+- A [CI run 40235872428](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40235872428) passou Expo Doctor 17/17 e o gate anti-regressão, mas falhou em `npm run typecheck` com TS2305: `src/gps/index.ts` tentava exportar `isGpsSampleFresh` e `GPS_SAMPLE_STALE_AFTER_MS`, ausentes de `src/gps/gpsTracker.ts`.
+- A comparação com `main` confirmou que esses dois exports não existem no contrato público vigente. Não há uso encontrado no código para esses nomes.
+
+### Correção aplicada
+- Removidos apenas os dois exports inexistentes de `src/gps/index.ts`, alinhando o barrel ao módulo real e ao `main`.
+- Não foram inventados helpers/limites de frescor GPS para fazer o TypeScript passar.
+
+### Validação pendente
+- CI completa necessária no commit resultante: TypeScript, testes, build Android e demais etapas ainda não estão aprovados para este SHA.
+- Permanecem pendentes a reconciliação do PID 0144, o layout demonstrativo Floot e a revisão agregada das PRs #81/#83/#84. Nenhum merge foi feito.
