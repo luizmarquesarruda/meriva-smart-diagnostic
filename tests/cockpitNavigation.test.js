@@ -7,14 +7,28 @@ const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
 
 const index = read('app/index.tsx');
 const more = read('app/mais.tsx');
+const settingsScreen = read('app/configuracoes.tsx');
 const laboratory = read('app/laboratorio.tsx');
 assert.match(laboratory, /AGUARDANDO CONEXÃO ELM327/, 'tela OBD não deve chamar Bluetooth pronto quando a ECU ainda não está conectada');
 assert.match(laboratory, /getSharedObdConnection\(\) \? 'ECU CONECTADA \/ DIAGNÓSTICO DISPONÍVEL' : 'AGUARDANDO CONEXÃO ELM327'/, 'estado inicial deve refletir a conexão real');
 assert.match(laboratory, /disabledButton/, 'botão de desconexão precisa ter estilo visual explícito quando desabilitado');
 assert.match(laboratory, /ELM327 DESCONECTADO/, 'botão desabilitado deve comunicar que não existe sessão ativa');
 assert.match(laboratory, /paddingBottom: 132/, 'conteúdo rolável deve reservar espaço para a navegação inferior fixa');
-for (const route of ['/dados', '/laboratorio', '/mais', '/viagens', '/conectividade']) assert.match(index, new RegExp(route.replace('/', '\\/')), 'cockpit deve expor a rota ' + route);
-assert.doesNotMatch(index, /href="\/saude"/, 'saúde detalhada não deve duplicar o cartão na página inicial');
+// RG-15: six primary icon-only destinations; secondary modules stay in Mais Recursos.
+const bottomNavStart = index.indexOf('<View style={[styles.bottomNav,');
+assert.ok(bottomNavStart >= 0, 'cockpit deve manter a navegação principal');
+const bottomNavEnd = index.indexOf('</View>', bottomNavStart);
+assert.ok(bottomNavEnd > bottomNavStart, 'navegação principal deve ter contêiner completo');
+const bottomNav = index.slice(bottomNavStart, bottomNavEnd);
+for (const route of ['/bluetooth', '/saude', '/viagens', '/laboratorio', '/configuracoes']) {
+  assert.ok(bottomNav.includes('href="' + route + '"'), 'navegação principal deve expor ' + route);
+}
+assert.ok(index.includes('href="/conectividade"'), 'cockpit deve expor o detalhe da rede');
+assert.match(more, /'\\/dados'/, 'Dados/Telemetria deve continuar acessível em Mais Recursos');
+assert.match(more, /DADOS E TELEMETRIA/, 'atalho secundário deve identificar Dados/Telemetria');
+assert.match(settingsScreen, /href="\\/mais"/, 'Configurações deve manter acesso a Mais Recursos');
+assert.match(settingsScreen, /accessibilityLabel="Abrir mais recursos"/, 'o acesso a Mais Recursos deve ter rótulo acessível');
+assert.ok(bottomNav.includes('href="/saude"') && bottomNav.includes('accessibilityLabel="Diagnóstico"'), 'Diagnóstico deve ser destino primário acessível');
 assert.match(more, /'\/saude'/, 'a central de saúde deve continuar acessível em Mais Recursos');
 for (const file of ['app/dados.tsx', 'app/saude.tsx', 'app/mais.tsx', 'app/veiculo.tsx', 'app/viagens.tsx', 'app/aprendizado.tsx']) {
   assert.equal(fs.existsSync(path.join(ROOT, file)), true, file + ' deve existir');
@@ -26,14 +40,11 @@ assert.doesNotMatch(index, /\}, \[isHydrated, settings\]\);/, 'objeto settings i
 assert.match(index, /settings\?\.elmMaxConnectionAttempts/, 'efeito deve reagir às opções OBD efetivamente alteradas');
 assert.match(index, /bottomNavLandscape/, 'navegação inferior deve continuar disponível em paisagem');
 assert.doesNotMatch(index, /!layout\.landscape\s*&&\s*\(/, 'navegação não deve desaparecer ao girar o aparelho');
-assert.doesNotMatch(index, /<Text style=\{\[styles\.bottomNavText, styles\.bottomNavTextActive\]\}>Painel<\/Text>/, 'navegação inferior deve usar ícones sem legenda visual');
-for (const label of ['Painel, tela atual', 'Diagnóstico', 'Dados', 'Viagens', 'Mais recursos']) {
-  assert.ok(index.includes('accessibilityLabel="' + label + '"'), 'aba deve manter rótulo acessível: ' + label);
+assert.doesNotMatch(bottomNav, /<Text\\b/, 'navegação principal deve usar somente ícones, sem legendas visíveis');
+for (const label of ['Painel, tela atual', 'Conexões Bluetooth e ECU', 'Diagnóstico', 'Viagem', 'Laboratório', 'Configurações']) {
+  assert.ok(bottomNav.includes('accessibilityLabel="' + label + '"'), 'destino deve manter rótulo acessível: ' + label);
 }
-assert.match(index, /bottomNavItem:\{[^}]*minHeight:58/, 'abas inferiores devem ter alvo de toque de 58 dp');
-assert.match(index, /bottomNavText:\{[^}]*fontSize:8/, 'rótulos das abas devem continuar compactos e visíveis');
-assert.match(index, /accessibilityLabel="Mais recursos"/, 'aba Mais precisa de nome acessível explícito');
-assert.match(index, /accessibilityHint="Abre os módulos adicionais do aplicativo"/, 'aba Mais precisa explicar a ação ao leitor de tela');
+assert.match(index, /bottomNavItem:\\{[^}]*minHeight:60/, 'alvos da navegação principal devem ter pelo menos 60 dp');
 assert.doesNotMatch(index, /actionGrid|dashboardAction/, 'não repetir Diagnóstico, Dados e Viagens em uma segunda fileira');
 assert.match(index, /styles\.sessionCard/, 'cockpit deve ter cartão acionável de conexão/ECU');
 assert.match(index, /accessibilityLabel="Abrir configurações de conexão do veículo"/, 'cartão de conexão precisa de nome acessível');
@@ -50,7 +61,6 @@ assert.match(index, /layoutSpacer:\{flexGrow:1,minHeight:8/, 'a navegação deve
 const networkIndicator = read('src/ui/NetworkStatusIndicator.tsx');
 assert.match(networkIndicator, /label: \{ fontSize: 13/, 'geração Wi-Fi/4G/5G deve ter maior legibilidade no cockpit');
 assert.match(networkIndicator, /AppIcon name=\{presentation\.icon\} size=\{20\}/, 'ícone da rede deve ficar visível sem dominar o cartão');
-assert.match(index, /bottomNavText:\{[^}]*fontSize:8/, 'rótulos da navegação devem permanecer legíveis');
 assert.match(index, /networkChipLandscape:\{[^}]*minHeight:50,[^}]*maxWidth:92/, 'cartão de rede permanece compacto em paisagem');
 assert.match(networkIndicator, /internetStatus: \{ fontSize: 10/, 'estado da internet deve usar tipografia legível em uma segunda linha');
 assert.match(networkIndicator, /INTERNET OK/);

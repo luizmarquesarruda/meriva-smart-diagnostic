@@ -1,13 +1,12 @@
-## ESTADO VIGENTE — 2026-10-25 (retomada da integração DB-139)
+## ESTADO VIGENTE — 2026-10-25 (retomada da integração DB-140)
 
 > Estado observado na branch `integration/reconcile-pid-ui-20261025`; a validação deve ser feita novamente no SHA final.
 
 ### Integração, CI e riscos
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
 - `main` observado: `8e95b2b59e0aa4c76027b638e49d4453a0a4b54c`; PR [#89](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/89) foi mesclada; PRs [#90](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/90) e [#82](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/82) foram fechadas sem merge.
-- A [CI run 40259463231](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40259463231), no HEAD `d88678d7c5cbee17ae55bc9e8d09b808ffc94db4`, passou Expo Doctor (17/17) e o gate anti-regressão, mas falhou no TypeScript: `app/dados.tsx:9` e `src/trip/autoTripService.ts:1` importam `isGpsSampleFresh`, removido do barrel na DB-138. O job `android-build` foi pulado após a falha de `validate`.
-- A leitura dos consumidores confirmou que a função é um contrato funcional: impede velocidade GPS antiga de aparecer como atual e impede que amostra vencida inicie/mantenha uma viagem. Remover o export sem mapear os usos criou a regressão; DB-139 restaura a função e a constante com teste comportamental.
-- Neste SHA, a suíte completa não foi executada porque `npm run validate` parou no TypeScript; o build Android não tem resultado aprovável. Nova CI precisa validar o commit DB-139.
+- A CI [run 40259949056](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40259949056), no SHA `d69de78e1719037327a174e5d856777e0243e72f`, passou Expo Doctor (17/17), gate anti-regressão e TypeScript; falhou em `tests/cockpitNavigation.test.js:16` porque o teste exigia rotas secundárias na tela inicial e correspondia a uma versão anterior da navegação. A inspeção confirmou `/dados` em `app/mais.tsx` e `/mais` em Configurações.
+- DB-140 atualiza somente as expectativas obsoletas de navegação, preservando o teste de acesso à rota secundária e os requisitos de acessibilidade. O job `android-build` foi pulado; nenhum build ou teste físico é presumido.
 - PR [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81) continua em rascunho; [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) e [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84) continuam abertas. PID 0144 ainda não foi incorporado ao catálogo da branch candidata.
 - `app/floot-layout.tsx` continua uma rota de demonstração estática na árvore Expo; precisa ser removida/movida ou transformada em funcionalidade real antes do release. Hardware Android/ELM327/ECU não foi validado nesta retomada.
 
@@ -204,6 +203,7 @@
 - **DB-137** · 2026-10-25 — Remover linha órfã no baseline de autonomia
 - **DB-138** · 2026-10-25 — Remover exports GPS inexistentes identificados pelo TypeScript
 - **DB-139** · 2026-10-25 — Restaurar contrato de frescor GPS usado pelo painel e serviço de viagens
+- **DB-140** · 2026-10-25 — Alinhar teste de navegação ao contrato vigente de seis ícones
 
 ---
 
@@ -4116,3 +4116,19 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 ### Validação pendente
 - A nova CI no SHA DB-139 deve concluir `npm run doctor`, `gate:baseline`, `npm run validate` e `android-build`. Os resultados anteriores não validam este commit.
 - Ainda não há validação física de GPS no Galaxy A06/Android 16, Bluetooth Classic, ELM327 ou respostas reais da ECU. Nenhum merge foi feito nesta etapa.
+
+## DB-140 · 2026-10-25 — Alinhar teste de navegação ao contrato vigente de seis ícones
+
+### Causa confirmada pela CI
+- A [CI run 40259949056](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40259949056) aprovou TypeScript, Expo Doctor (17/17) e `gate:baseline`, mas falhou em `tests/cockpitNavigation.test.js:16` com `cockpit deve expor a rota /dados`.
+- A expectativa era obsoleta: `docs/CONTRATO_ANTI_REGRESSAO.md` RG-15 exige seis destinos principais icon-only; a tela inicial expõe Painel, Bluetooth/ECU, Diagnóstico, Viagens, Laboratório e Configurações. Conectividade tem atalho na faixa de rede.
+- A rota `/dados` não foi perdida: `app/mais.tsx` já contém o item “DADOS E TELEMETRIA” ligado a `/dados`, e `app/configuracoes.tsx` mantém o acesso a Mais Recursos. Outros testes de navegação ainda exigiam os rótulos e estilos da versão anterior.
+
+### Correção aplicada
+- Atualizado `tests/cockpitNavigation.test.js` para validar os seis destinos e seus rótulos acessíveis reais, ícones de 32 dp, alvo de toque mínimo de 60 dp e ausência de legendas visuais.
+- Adicionadas verificações explícitas de que Dados/Telemetria continua em Mais Recursos e que Configurações abre esse menu.
+- Mantidos os testes funcionais das telas, conexão, telemetria, rede, Bluetooth e consulta manual; nenhuma regra funcional foi alterada.
+
+### Validação pendente
+- Nova CI deve validar o commit DB-140, incluindo execução completa de `npm test` e `android-build` se `validate` passar.
+- A inspeção visual responsiva e os testes físicos com Galaxy A06/Android 16 + ELM327/ECU permanecem separados e ainda não foram executados nesta retomada. Nenhum merge foi feito.
