@@ -5,7 +5,7 @@ Branch: `feat/port-floot-layout-20261024`
 
 ## Escopo
 
-Foi criada a rota de pré-visualização nativa `app/floot-layout.tsx` para transportar a estrutura visual do cockpit do projeto Floot para o repositório Expo/React Native. A implementação é nativa; não copia componentes web/CSS do Floot diretamente, pois esses componentes não são compatíveis com React Native.
+Foi criado o componente de pré-visualização nativo `src/ui/FlootLayoutPreview.tsx` para revisar a estrutura visual do cockpit inspirada no projeto Floot. Ele fica fora de `app/`, portanto não é registrado como rota Expo de produção. A implementação é nativa; não copia componentes web/CSS do Floot diretamente, pois esses componentes não são compatíveis com React Native.
 
 ## Elementos transportados
 
@@ -20,8 +20,8 @@ Foi criada a rota de pré-visualização nativa `app/floot-layout.tsx` para tran
 
 ## Integridade dos dados
 
-A rota é explicitamente uma prévia visual. Não inicia Bluetooth, não conecta ao ELM327 e não declara conexão com a ECU. Valores veiculares ficam como N/D para não apresentar dados inventados. A tela operacional existente permanece intacta nesta etapa, preservando o fluxo real de conexão e os serviços de telemetria.
+O componente é explicitamente uma prévia visual e não deve ser montado em produção como rota. Não inicia Bluetooth, não conecta ao ELM327 e não declara conexão com a ECU. Valores veiculares ficam como N/D para não apresentar dados inventados. A tela operacional existente permanece intacta nesta etapa, preservando o fluxo real de conexão e os serviços de telemetria.
 
 ## Validação pendente
 
-A CI da branch deve confirmar TypeScript, testes e build Android. Depois da CI, revisar a prévia em aparelho Android para confirmar dimensões, safe areas e ícones. Esta alteração não foi mesclada em `main`, não foi publicada e não foi testada com ELM327 físico.
+A CI deve confirmar TypeScript, testes e build Android após mover a prévia para fora da árvore de rotas. Depois da CI, revisar a prévia em aparelho Android para confirmar dimensões, safe areas e ícones. Esta alteração não foi mesclada em `main`, não foi publicada e não foi testada com ELM327 físico.

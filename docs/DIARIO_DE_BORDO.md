@@ -1,12 +1,12 @@
-## ESTADO VIGENTE — 2026-10-25 (retomada da integração DB-141)
+## ESTADO VIGENTE — 2026-10-25 (retomada da integração DB-142)
 
 > Estado observado na branch `integration/reconcile-pid-ui-20261025`; a validação deve ser feita novamente no SHA final.
 
 ### Integração, CI e riscos
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
 - `main` observado: `8e95b2b59e0aa4c76027b638e49d4453a0a4b54c`; PR [#89](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/89) foi mesclada; PRs [#90](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/90) e [#82](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/82) foram fechadas sem merge.
-- A CI [run 40260345975](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40260345975), no SHA `3463c932c706afce950918fb58478f3554829aa4`, passou Expo Doctor (17/17) e o gate anti-regressão, mas TypeScript falhou ao analisar escapes inválidos em `tests/cockpitNavigation.test.js:27-30`. A mudança DB-140 introduziu esse erro de sintaxe ao escrever regex para rotas; o job `android-build` foi pulado.
-- DB-141 troca essas verificações por comparações de strings, sem reduzir as exigências de navegação ou acessibilidade. Nova CI no SHA corrigido é necessária; nenhum teste comportamental ou build Android pode ser presumido.
+- No commit `97b58e50a4fadf6254fa269d00db11021f506a68`, a CI [run 40260455597](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40260455597) aprovou Expo Doctor (17/17), gate anti-regressão e `npm run validate`, incluindo TypeScript e a suíte completa. O `expo prebuild` Android também passou; o APK de release ainda estava em montagem no último estado observado, sem conclusão confirmada.
+- DB-142 move a prévia Floot para fora da árvore de rotas de produção. Esse novo SHA requer CI própria; não assumir que a aprovação parcial do SHA anterior valida a mudança.
 - PR [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81) continua em rascunho; [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) e [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84) continuam abertas. PID 0144 ainda não foi incorporado ao catálogo da branch candidata.
 - `app/floot-layout.tsx` continua uma rota de demonstração estática na árvore Expo; precisa ser removida/movida ou transformada em funcionalidade real antes do release. Hardware Android/ELM327/ECU não foi validado nesta retomada.
 
@@ -205,6 +205,7 @@
 - **DB-139** · 2026-10-25 — Restaurar contrato de frescor GPS usado pelo painel e serviço de viagens
 - **DB-140** · 2026-10-25 — Alinhar teste de navegação ao contrato vigente de seis ícones
 - **DB-141** · 2026-10-25 — Eliminar escapes inválidos nas verificações de navegação
+- **DB-142** · 2026-10-25 — Remover a prévia Floot da árvore de rotas de produção
 
 ---
 
@@ -4147,3 +4148,18 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 ### Validação pendente
 - Nova CI no commit DB-141 deve validar o TypeScript, suíte comportamental e build Android. O resultado da CI que encontrou esta falha não valida o SHA corrigido.
 - Nenhum merge foi feito; testes visuais e físicos permanecem pendentes.
+
+## DB-142 · 2026-10-25 — Remover a prévia Floot da árvore de rotas de produção
+
+### Causa confirmada
+- app/floot-layout.tsx registrava automaticamente a prévia visual como uma rota Expo, apesar de não pertencer ao fluxo operacional nem ser acessada pela navegação principal. O conteúdo é um protótipo estático, com N/D e estado desconectado por segurança.
+- O relatório docs/FLOOT_LAYOUT_PORT.md e o diário pediam explicitamente uma decisão entre rota de produto e ferramenta de revisão, para não publicar uma rota de demonstração não deliberada.
+
+### Correção aplicada
+- Movido o componente para src/ui/FlootLayoutPreview.tsx, fora de app/; ajustados os imports relativos para a nova localização. A prévia continua disponível para revisão de interface, sem registro de rota.
+- Atualizado docs/FLOOT_LAYOUT_PORT.md para descrever corretamente o componente e sua condição de ferramenta de revisão.
+- Estendido tests/cockpitNavigation.test.js para falhar se app/floot-layout.tsx voltar a existir e para verificar que o componente de revisão mantém texto explícito de ausência de leituras e ECU desconectada.
+
+### Validação pendente
+- O commit precisa passar npm run doctor, gate:baseline, TypeScript, suíte completa e build Android no mesmo SHA.
+- O APK da CI anterior ainda estava em montagem no último estado consultado. Não houve merge nem teste físico de UI/ELM327/ECU.

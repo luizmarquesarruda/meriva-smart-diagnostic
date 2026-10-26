@@ -8,6 +8,7 @@ const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
 const index = read('app/index.tsx');
 const more = read('app/mais.tsx');
 const settingsScreen = read('app/configuracoes.tsx');
+const previewComponent = read('src/ui/FlootLayoutPreview.tsx');
 const laboratory = read('app/laboratorio.tsx');
 assert.match(laboratory, /AGUARDANDO CONEXÃO ELM327/, 'tela OBD não deve chamar Bluetooth pronto quando a ECU ainda não está conectada');
 assert.match(laboratory, /getSharedObdConnection\(\) \? 'ECU CONECTADA \/ DIAGNÓSTICO DISPONÍVEL' : 'AGUARDANDO CONEXÃO ELM327'/, 'estado inicial deve refletir a conexão real');
@@ -79,6 +80,9 @@ assert.doesNotMatch(bluetooth, /<Text style=\{styles\.bottomText\}>|<Text style=
 assert.match(bluetooth, /minHeight:\s*48/, 'botões inferiores Bluetooth devem ter alvo de 48 dp');
 assert.match(bluetooth, /accessibilityLabel="Bluetooth, tela atual"/, 'estado atual precisa de rótulo acessível');
 
+assert.equal(fs.existsSync(path.join(ROOT, 'app/floot-layout.tsx')), false, 'prévia Floot não deve ser registrada como rota Expo de produção');
+assert.ok(previewComponent.includes('All vehicle readings remain N/D'), 'componente de prévia deve manter a ausência explícita de dados simulados');
+assert.ok(previewComponent.includes('ECU DESCONECTADA'), 'prévia não deve declarar ECU conectada');
 const dataScreen = read('app/dados.tsx');
 assert.match(dataScreen, /buildTelemetryChart/, 'tela Dados deve usar o modelo de gráfico testável');
 assert.match(dataScreen, /getLiveSeries/, 'gráfico ao vivo deve reutilizar a janela de telemetria existente');

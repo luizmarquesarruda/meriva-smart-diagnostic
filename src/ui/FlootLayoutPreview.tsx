@@ -2,8 +2,8 @@ import { Link } from 'expo-router';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { AppIcon } from '../src/ui/AppIcon';
-import { COLORS } from '../src/ui/theme';
+import { AppIcon } from './AppIcon';
+import { COLORS } from './theme';
 
 /**
  * Floot layout port preview.
