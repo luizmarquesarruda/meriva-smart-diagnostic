@@ -1,4 +1,4 @@
-## ESTADO VIGENTE — 2026-10-26 (auditoria sistêmica DB-143)
+## ESTADO VIGENTE — 2026-10-26 (auditoria sistêmica DB-144)
 
 > Estado observado na branch `integration/reconcile-pid-ui-20261025`; a validação deve ser feita novamente no SHA final.
 
@@ -6,6 +6,7 @@
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
 - `main` observado: `8e95b2b59e0aa4c76027b638e49d4453a0a4b54c`; PR [#89](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/89) foi mesclada; PRs [#90](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/90) e [#82](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/82) foram fechadas sem merge.
 - HEAD validado antes desta rodada: `4e3aa299ab9b244f224e5ead4b06931a47291690`. A CI [run 40260998729](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40260998729) concluiu com sucesso: Expo Doctor, gate anti-regressão, TypeScript, suíte completa, prebuild Android, APK standalone, verificação e upload do artefato.
+- A primeira CI de desenvolvimento do buffer ([run 40262740602](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40262740602), SHA `7afb9a1109432d84f1af05532e794c8142294585`) detectou separadores de objeto inválidos em `src/trip/autoTripService.ts` e `app/index.tsx`. Foram corrigidos em `1c704cb1ffbdd8f0b9c292b22598d1a88c92fe65`; a CI desse SHA está em fila e ainda não é resultado final.
 - A prévia Floot já está em `src/ui/FlootLayoutPreview.tsx`, fora da árvore de rotas Expo; `app/floot-layout.tsx` não existe no HEAD validado.
 - PRs ainda abertas no último estado consultado: [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81) em rascunho, [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) e [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84). Serão reconciliadas após a nova CI, sem merge/fechamento por conveniência.
 - Auditoria de autonomia DB-143: antes da mudança, sem média histórica salva e sem consumo confiável da viagem, a autonomia permanecia N/D. A nova janela móvel usa dez leituras reais do nível de combustível e dez intervalos recentes de fluxo/distância para iniciar uma estimativa atual.
@@ -208,6 +209,7 @@
 - **DB-141** · 2026-10-25 — Eliminar escapes inválidos nas verificações de navegação
 - **DB-142** · 2026-10-25 — Remover a prévia Floot da árvore de rotas de produção
 - **DB-143** · 2026-10-26 — Implementar buffer móvel real de dez leituras para autonomia
+- **DB-144** · 2026-10-26 — Endurecer a validação de timestamps do buffer de autonomia
 
 ---
 
@@ -4179,3 +4181,14 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 ### Validação
 - A mudança só será concluída quando a CI do SHA final aprovar Expo Doctor, gate anti-regressão, TypeScript, suíte completa, prebuild, APK Android standalone e verificação/upload do artefato.
 - Teste físico pendente: confirmar no Meriva a resposta real de 012F/015E ou MAF/MAP e composição de combustível; comparar autonomia com distância e abastecimento reais. Não converter ausência de resposta em zero nem declarar candidatos como suporte confirmado.
+
+## DB-144 · 2026-10-26 — Endurecer a validação de timestamps do buffer de autonomia
+
+### Revisão preventiva
+- A revisão do teste do buffer encontrou um caso de teste incorreto: a amostra supostamente regressiva usava timestamp maior que o último timestamp aceito, então não exercitava o contrato de ordem temporal.
+- Corrigido o cenário para usar um timestamp realmente anterior à última amostra válida. O comportamento produtivo não foi alterado por esta correção.
+- A mesma revisão registra a falha de sintaxe detectada pela CI do commit intermediário `7afb9a1109432d84f1af05532e794c8142294585`: separadores de objeto incorretos em `src/trip/autoTripService.ts` e `app/index.tsx`. Ambos foram corrigidos no commit `1c704cb1ffbdd8f0b9c292b22598d1a88c92fe65`; o SHA final desta unidade ainda precisa de CI completa.
+
+### Validação pendente
+- Executar o gate, TypeScript, toda a suíte e build Android no novo SHA.
+- Não considerar o buffer concluído até a CI completa passar e o cálculo ser comparado com telemetria e abastecimento reais.

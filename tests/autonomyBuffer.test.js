@@ -32,7 +32,7 @@ assert.equal(levels.addFuelLevelSample(100, 51_000), true);
 assert.equal(levels.getFuelLevelSampleCount(51_000), 10, 'janela FIFO mantém dez leituras');
 assert.equal(levels.getFuelLevelPercent(51_000), 50, 'mediana rejeita um pico isolado');
 assert.equal(levels.addFuelLevelSample(101, 56_000), false, 'percentual fora de 0–100 é inválido');
-assert.equal(levels.addFuelLevelSample(40, 55_999), false, 'timestamp fora de ordem é inválido');
+assert.equal(levels.addFuelLevelSample(40, 50_999), false, 'timestamp fora de ordem é inválido');
 assert.equal(levels.getFuelLevelPercent(81_001), null, 'nível vencido não alimenta autonomia');
 assert.equal(levels.getFuelLevelSampleCount(81_001), 0);
 const flow = new AutonomyBuffer();
