@@ -5,6 +5,10 @@
 ### CI e controle de regressões
 - Evitada a execução duplicada da mesma CI em branches que já possuem PR para `main`: commits de branches são validados pelo evento `pull_request`, e o evento `push` fica reservado a `main`. O despacho manual permanece disponível.
 
+### Limites de memória da telemetria
+- Telemetria ao vivo valida IDs Mode 01 e limita o armazenamento a 64 séries ativas, com até 120 amostras por PID; LRU mantém streams recentes e remove de forma sincronizada o índice atual.
+- A auditoria de buffers não adiciona janelas a GPS, diagnóstico ou Bluetooth sem evidência; registra como candidatos distintos o backpressure da fila de comandos ELM e a escrita segmentada de logs CSV.
+
 ### Autonomia e consumo móvel
 - Criado buffer real de até dez leituras do PID 012F com mediana para reduzir oscilações de nível, além de janela móvel de dez intervalos de velocidade/fluxo para calcular consumo atual por distância e combustível integrados.
 - A autonomia prioriza consumo móvel recente, depois consumo confiável da viagem e média histórica; valores sintéticos, fluxo em cache reintegrado e nível vencido continuam proibidos.

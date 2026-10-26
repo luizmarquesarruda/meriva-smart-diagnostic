@@ -31,12 +31,17 @@ export interface VehicleConditionSnapshot {
 }
 
 const MAX_POINTS_PER_PID = 120;
+const MAX_TRACKED_PIDS = 64;
 const STALE_AFTER_MS = 10_000;
 const series = new Map<string, LiveTelemetryPoint[]>();
 const latest = new Map<string, LiveTelemetryPoint>();
 
 function normalizePid(pid: string): string {
   return pid.replace(/\s/g, '').toUpperCase();
+}
+
+function isValidMode01Pid(pid: string): boolean {
+  return /^01[0-9A-F]{2}$/.test(normalizePid(pid));
 }
 
 function finiteValue(value: number | null | undefined): value is number {
@@ -50,10 +55,24 @@ function hasUsableTimestamp(timestamp: string, nowMs = Date.now()): boolean {
 
 function store(point: LiveTelemetryPoint): void {
   const pid = normalizePid(point.pid);
-  const current = series.get(pid) ?? [];
-  const next = [...current, point].slice(-MAX_POINTS_PER_PID);
+  if (!isValidMode01Pid(pid)) return;
+
+  const current = series.get(pid);
+  if (!current && series.size >= MAX_TRACKED_PIDS) {
+    // Map insertion order is the LRU order: each accepted sample refreshes its PID.
+    const leastRecentlyUsedPid = series.keys().next().value as string | undefined;
+    if (leastRecentlyUsedPid !== undefined) {
+      series.delete(leastRecentlyUsedPid);
+      latest.delete(leastRecentlyUsedPid);
+    }
+  }
+
+  // Touch this stream so the least recently active PID is evicted first.
+  series.delete(pid);
+  const next = [...(current ?? []), { ...point, pid }].slice(-MAX_POINTS_PER_PID);
   series.set(pid, next);
-  latest.set(pid, point);
+  latest.delete(pid);
+  latest.set(pid, next[next.length - 1]);
 }
 
 export function resetLiveTelemetry(): void {
@@ -64,9 +83,10 @@ export function resetLiveTelemetry(): void {
 export function recordLivePidReading(
   reading: Pick<LastPidReading, 'pid' | 'name' | 'value' | 'unit' | 'timestamp' | 'source'>,
 ): void {
-  if (reading.source !== 'REAL' || !finiteValue(reading.value) || !hasUsableTimestamp(reading.timestamp)) return;
+  const pid = normalizePid(reading.pid);
+  if (!isValidMode01Pid(pid) || reading.source !== 'REAL' || !finiteValue(reading.value) || !hasUsableTimestamp(reading.timestamp)) return;
   store({
-    pid: normalizePid(reading.pid),
+    pid,
     name: reading.name,
     value: reading.value,
     unit: reading.unit,
@@ -218,4 +238,5 @@ export function getLiveTelemetryPidCount(): number {
 }
 
 export const LIVE_TELEMETRY_MAX_POINTS = MAX_POINTS_PER_PID;
+export const LIVE_TELEMETRY_MAX_TRACKED_PIDS = MAX_TRACKED_PIDS;
 export const LIVE_TELEMETRY_STALE_AFTER_MS = STALE_AFTER_MS;

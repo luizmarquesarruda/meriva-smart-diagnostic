@@ -43,6 +43,11 @@ A branch mantém o fluxo OBD/ELM327 existente e inclui testes automatizados para
 - Abrir três instâncias em paralelo para o mesmo endereço: todas podem concluir em sequência, mas o máximo de conexões nativas ativas permanece 1.
 - Depois que um waiter aguardar uma tentativa anterior, revalidar o rádio e reler o bloqueio compartilhado antes de abrir outro socket.
 
+## TELEM-BUF-01 — Cota global de séries da telemetria ao vivo
+- A ingestão aceita somente IDs Mode 01 normalizados no formato `01XX`; comandos de outro modo, IDs malformados, fontes sintéticas e timestamps inválidos/futuros não entram no buffer.
+- Cada PID conserva no máximo 120 amostras e o processo conserva no máximo 64 séries distintas. Ao receber o 65.º PID, deve sair o menos recentemente usado; atualização da série deve refrescar sua posição LRU e a remoção deve limpar também o índice de leituras atuais.
+- Executar `node tests/liveTelemetry.test.js`, `node tests/projectBaseline.test.js`, TypeScript e a CI completa no SHA exato; teste físico continua separado.
+
 ## Sequência de validação para um lote
 
 1. Inspecionar o diff consolidado e confirmar que nenhuma dependência/lockfile foi alterada sem justificativa.

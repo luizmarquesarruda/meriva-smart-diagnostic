@@ -271,6 +271,10 @@ assert.ok(tripService.includes('estimateRangeFromFuelLevel(currentFuelLevelPerce
 assert.match(tripService, /isCurrentFuelLevelSample\(this\.state\.fuelLevelReadAtMs\)/);
 assert.match(liveTelemetry, /!hasUsableTimestamp\(reading\.timestamp\)/, 'live samples must reject invalid or future timestamps at ingestion');
 assert.match(liveTelemetry, /ageMs >= 0 && ageMs <= STALE_AFTER_MS/, 'operational context must reject timestamps from the future');
+assert.ok(liveTelemetry.includes('const MAX_TRACKED_PIDS = 64;'), 'live PID streams must have a bounded global capacity');
+assert.ok(liveTelemetry.includes('function isValidMode01Pid(pid: string): boolean'), 'live telemetry must validate PID identifiers');
+assert.match(projectContract, /\| RG-46 \|/, 'global live telemetry capacity must remain in the anti-regression contract');
+assert.match(read('docs/TEST_PLAN.md'), /TELEM-BUF-01/, 'bounded live telemetry needs an explicit acceptance case');
 assert.match(tripService, /listener\(this\.getState\(\)\)/, 'new service subscribers must receive freshness-filtered state');
 assert.match(tripService, /const snapshot = this\.getState\(\)/, 'service updates must emit freshness-filtered state');
 assert.ok(!tripService.includes('estimatedRangeKm: persisted.autonomy.estimatedRangeKm'), 'current state cannot be seeded with saved range');

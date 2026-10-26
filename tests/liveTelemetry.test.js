@@ -51,6 +51,26 @@ assert.strictEqual(trend.current, 124);
 assert.strictEqual(trend.values.length, 30);
 assert.ok(telemetry.formatSparkline(trend.values).length === 30);
 
+telemetry.resetLiveTelemetry();
+const currentTimestamp = new Date().toISOString();
+for (const pid of ['PID-INVALIDO', '020C', '010', '010C-EXTRA']) {
+  telemetry.recordLivePidReading({ pid, name: 'invalid', value: 1, unit: '', timestamp: currentTimestamp, source: 'REAL' });
+}
+assert.strictEqual(telemetry.getLiveTelemetryPidCount(), 0, 'somente identificadores Mode 01 de quatro dígitos podem entrar no buffer');
+
+for (let index = 0; index < telemetry.LIVE_TELEMETRY_MAX_TRACKED_PIDS; index += 1) {
+  const pid = '01' + index.toString(16).padStart(2, '0').toUpperCase();
+  telemetry.recordLivePidReading({ pid, name: pid, value: index, unit: '', timestamp: currentTimestamp, source: 'REAL' });
+}
+assert.strictEqual(telemetry.getLiveTelemetryPidCount(), telemetry.LIVE_TELEMETRY_MAX_TRACKED_PIDS);
+telemetry.recordLivePidReading({ pid: '0100', name: '0100', value: 100, unit: '', timestamp: currentTimestamp, source: 'REAL' });
+telemetry.recordLivePidReading({ pid: '0140', name: '0140', value: 64, unit: '', timestamp: currentTimestamp, source: 'REAL' });
+assert.strictEqual(telemetry.getLiveTelemetryPidCount(), 64, 'número global de séries PID deve permanecer limitado');
+assert.strictEqual(telemetry.getLiveSeries('0100').length, 2, 'uma série recentemente usada deve sobreviver à rotação LRU');
+assert.strictEqual(telemetry.getLiveSeries('0101').length, 0, 'o PID menos recentemente usado deve ser removido da série e do índice atual');
+assert.strictEqual(telemetry.getLiveSeries('0140').length, 1, 'novo PID válido deve ocupar o espaço liberado');
+telemetry.resetLiveTelemetry();
+
 let values = new Map([
   ['010D', 0],
   ['010C', 800],

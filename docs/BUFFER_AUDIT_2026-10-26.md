@@ -1,0 +1,35 @@
+# Auditoria de buffers e filas — 2026-10-26
+
+## Escopo e referência
+
+- Repositório: `luizmarquesarruda/meriva-smart-diagnostic`.
+- HEAD auditado antes desta rodada: `80fdb6ffe0a32b8cb1d402466b091b5b448fcf47` (DB-152).
+- A CI [40317403065](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40317403065) concluiu `validate` e `android-build` com sucesso para esse SHA. Ela não valida o commit de DB-153; a nova cabeça da PR precisa de CI própria.
+- Esta auditoria separa buffers de amostragem (para ruído/mediana), buffers de transporte (para serializar/limitar carga) e buffers de persistência (para lote/recuperação). Não se deve reutilizar a mesma política para todos.
+
+## Resultado por subsistema
+
+| Subsistema | Situação encontrada | Decisão |
+|---|---|---|
+| Autonomia/combustível | `AutonomyBuffer` já mantém até 10 níveis reais do PID 012F, mediana, até 10 intervalos integrados de fluxo/distância, valida ordem/frescor, rompe lacunas e reseta quando muda a origem do fluxo. | **Não ampliar agora.** Dez intervalos já exigem amostra suficiente; uma janela maior atrasaria o cálculo e poderia esconder mudança real de consumo. |
+| Descoberta de PIDs | `PidDiscoveryBuffer` é FIFO limitado por execução (padrão 64), normaliza IDs e rejeita comandos não PID. A instância não é reutilizada entre ECUs/sessões. | **Não ampliar.** A separação por sessão e a evidência RAW são mais importantes que reutilizar respostas antigas. Bitmaps continuam sendo anúncio, não prova de suporte. |
+| Telemetria ao vivo | Cada PID já tinha um limite de 120 pontos, mas o mapa total de séries não tinha cota e aceitava chaves de PID não validadas. | **Corrigido nesta rodada.** Só IDs Mode 01 `01XX` são aceitos; no máximo 64 séries ficam na memória. A série menos recentemente usada é removida junto com seu índice `latest`. O limite potencial passa a 64 × 120 amostras. |
+| Cockpit/alertas | O cockpit já seleciona a leitura real mais recente, rejeita timestamp inválido/futuro e transforma dados vencidos em N/D. Os alertas se baseiam no valor atual válido. | **Não suavizar alertas com média/mediana sem critério físico.** Um buffer de suavização pode atrasar temperatura alta, tensão anormal ou baixa reserva. Histórico de tendência já existe separadamente em `liveTelemetry`. |
+| GPS/distância | `GpsTracker` calcula segmentos entre fixes precisos, exige amostras móveis consecutivas e acumula distância pendente até confirmar movimento. Fixes fora de ordem, muito separados ou imprecisos não servem de base. | **Não adicionar janela móvel de coordenadas agora.** Suavização geográfica pode atrasar velocidade, apagar curvas ou somar distância incorretamente. Só adotar com trilhas reais de teste, perfil de precisão e métricas de erro. |
+| Consumo/viagem | O consumo da viagem integra amostras válidas e o buffer de autonomia integra velocidade e taxa de combustível. O serviço serializa cada ciclo de polling e limita a idade de leituras de contexto. | **Não criar outro buffer paralelo.** Duplicaria estados e poderia somar de novo combustível/fluxo em cache. |
+| Bluetooth/ELM327 | `Elm327Session` serializa comandos por uma fila de Promises; o monitor de saúde tem trava contra ciclos sobrepostos e recuperação é uma operação serial. A fila de comandos não expõe cota/telemetria de profundidade. | **Candidato para segunda fase, não alterar sem teste de carga.** Uma cota ingênua pode rejeitar fechamento, recovery ou consultas críticas; implementar primeiro profundidade/idade da fila e teste concorrente que prove ordenação, timeout e fechamento prioritário. Evitar buffer extra de respostas antigas. |
+| Logs CSV | Já existe fila por arquivo, lotes por tempo/contagem, limite de 10.000 linhas pendentes e restauração do lote em falhas. Cada flush ainda precisa ler e reescrever o arquivo acumulado na API legada do Expo FileSystem usada pelo projeto. | **Não adicionar outro buffer.** O gargalo potencial é o custo de I/O crescente, não a falta de lote em memória. Próxima melhoria deve comparar append nativo compatível ou arquivos segmentados/rotativos, com migração e crash-recovery testados. A fila atual pode descartar novas linhas na saturação e registra isso como aviso/contador em memória. |
+| Autosave/histórico | Leituras recentes já têm limite de 50 por estado; histórico de séries ao vivo tem limite por PID; persistências de aprendizado/histórico usam serialização/deduplicação. | **Sem novo buffer genérico.** Manter cota e consistência na camada dona dos dados; não duplicar os mesmos registros entre buffers paralelos. |
+
+## Alteração aplicada
+
+1. `src/obd/liveTelemetry.ts` passa a validar `01XX` e manter no máximo 64 séries PID ativas.
+2. Cada nova amostra válida move a série para o fim da ordem LRU. Ao exceder a cota, remove a série menos recentemente ativa e também sua entrada em `latest`.
+3. `tests/liveTelemetry.test.js` cobre IDs malformados/fora do Mode 01, cota global, atualização LRU e remoção sincronizada.
+4. `docs/CONTRATO_ANTI_REGRESSAO.md`, `docs/TEST_PLAN.md`, `CHANGELOG.md` e o Diário de Bordo registram a regra e a aceitação.
+
+## Critério de encerramento
+
+- `node tests/liveTelemetry.test.js` e `node tests/projectBaseline.test.js` passam.
+- A CI da PR #92 valida o novo SHA, incluindo TypeScript, suíte completa, gate anti-regressão e APK Android standalone.
+- Isso não substitui validação física de GPS, Android, ELM327 ou ECU. Não foram feitas medições físicas de precisão neste lote.

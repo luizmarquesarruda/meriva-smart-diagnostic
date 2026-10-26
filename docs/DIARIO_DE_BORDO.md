@@ -1,6 +1,6 @@
-## ESTADO VIGENTE — 2026-10-26 (auditoria sistêmica DB-152; CI da revisão em andamento)
+## ESTADO VIGENTE — 2026-10-26 (auditoria de buffers e correção de SHA DB-153; nova CI pendente)
 
-> HEAD anterior a esta atualização: `fb38dba4081c835a63466df73ea0350bf3dfaf8b` (DB-151). A correção DTC/parser ainda precisa de CI própria; DB-152 acrescenta a regressão CSV encontrada na releitura da PR #83 e também exige validação do novo SHA.
+> HEAD de referência antes desta rodada: `80fdb6ffe0a32b8cb1d402466b091b5b448fcf47` (DB-152). A CI [40317403065](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40317403065) passou `validate` e `android-build` nesse SHA. Esta rodada altera o código e a documentação; o novo SHA precisa de CI própria e não herda o resultado anterior.
 
 ### Integração, CI e riscos
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
@@ -11,12 +11,12 @@
 - DB-147 sincronizou README, auditoria de fontes e inventário completo com o catálogo runtime: 35 PIDs, 35 faixas e 21 definições de fórmula. Também corrigiu a semântica documental de 0101, 0111 e 0130 e adicionou testes de consistência.
 - DB-151 recupera correções relevantes da PR #83 que ainda não estavam no código consolidado: status histórico de DTC, reconciliação segura de Mode 03, interpretação correta dos monitores PID 0101 e enum PID 0151.
 - A autonomia DB-143–145 usa janela móvel de dez leituras e balanço do último tanque completo. O balanço é uma estimativa e depende de todas as viagens e abastecimentos serem registrados; DB-149 acrescenta a comparação do odômetro atual com a distância rastreada. Precisão física ainda não foi medida.
-- PR [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81) e PR [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) continuam abertas por divergência. O código útil de #81 está portado; o layout de #83 está incorporado, e a prévia foi movida para `src/ui/FlootLayoutPreview.tsx`, fora das rotas Expo. Ambas serão encerradas como substituídas após validação da PR consolidada para `main`.
+- PR [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81) e PR [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) estão fechadas sem merge; o código útil foi portado/reconciliado na branch de integração. O histórico dessas PRs foi preservado e não deve ser descrito como aberto nem mesclado.
 - Somente `010C` tem resposta RAW_ECU específica documentada para a Meriva (`41 0C 1A F8` = 1726 rpm). Catálogo SAE não é prova de suporte do veículo.
 - Não foi executado teste físico no Galaxy A06/Android 16 nem com ELM327/ECU real.
 
 ### Critérios de aceitação
-- RG-01…RG-45 únicos e sequenciais; DB-001…DB-NNN e índice sincronizados.
+- RG-01…RG-46 únicos e sequenciais; DB-001…DB-NNN e índice sincronizados.
 - Gate anti-regressão, TypeScript, suíte completa e build Android aprovados no mesmo SHA final.
 - Nenhum PID passa a confirmado sem evidência RAW_ECU válida; autonomia persistida não pode ser exibida como atual.
 
@@ -222,6 +222,7 @@
 - **DB-150** · 2026-10-26 — Eliminar CI duplicada entre push e pull_request
 - **DB-151** · 2026-10-26 — Reintegrar correções de DTC histórico e interpretação dos PIDs 0101/0151
 - **DB-152** · 2026-10-26 — Escapar retorno de carro em células CSV
+- **DB-153** · 2026-10-26 — Limitar globalmente os buffers de telemetria PID e auditar filas
 
 ---
 
@@ -4343,3 +4344,22 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - A CI da PR deve executar o teste CSV, gate anti-regressão, TypeScript, suíte completa e build Android standalone no SHA final.
 - Nenhum teste físico Android/ELM327/ECU foi executado por esta alteração.
 
+
+## DB-153 · 2026-10-26 — Limitar globalmente os buffers de telemetria PID e auditar filas
+
+### Causa confirmada
+- `src/obd/liveTelemetry.ts` já limitava cada PID a 120 amostras, mas não tinha limite global para o número de séries e não validava sintaticamente o identificador antes de usá-lo como chave de memória.
+- A releitura mostrou que autonomia, descoberta de PIDs, GPS, CSV e autosave já têm limites/filas/serialização específicos. Criar buffers paralelos indiscriminadamente poderia aumentar latência, misturar sessões ou somar dados duas vezes.
+- O estado documental do SHA estava desatualizado: antes desta rodada, a PR #92 já apontava para `80fdb6ffe0a32b8cb1d402466b091b5b448fcf47`, enquanto o cabeçalho do Diário ainda citava o SHA anterior. O estado das PRs #81 e #83 também estava descrito como aberto apesar de ambas estarem fechadas sem merge.
+
+### Correção aplicada
+- A telemetria em memória aceita agora apenas IDs Mode 01 normalizados no formato `01XX`; o limite global é 64 séries ativas e o limite existente de 120 amostras por PID foi mantido.
+- A série tocada por uma nova amostra válida vai para o fim da ordem LRU; ao exceder a cota, a mais antiga é removida tanto do mapa de séries quanto do mapa de leitura atual.
+- Testes cobrem IDs malformados/fora do Mode 01, cota de 64, atualização LRU e evicção sincronizada. O gate de baseline também exige o contrato RG-46 e o caso TELEM-BUF-01.
+- Criado `docs/BUFFER_AUDIT_2026-10-26.md` com o inventário e decisão por subsistema. A fila ELM/ Bluetooth e o I/O CSV ficam como oportunidades de segunda fase; não foram alterados sem prova de carga/latência e teste de recuperação.
+- Corrigida a referência SHA do Diário para o HEAD auditado `80fdb6ffe0a32b8cb1d402466b091b5b448fcf47`, atualizado o status das PRs #81/#83 e sincronizado índice DB-001…DB-153.
+
+### Validação
+- Resultado confirmado antes desta alteração: CI [40317403065](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40317403065) aprovou `validate` e `android-build` no SHA DB-152 `80fdb6ffe0a32b8cb1d402466b091b5b448fcf47`.
+- **Pendente para o novo commit:** executar o gate anti-regressão, TypeScript, suíte completa e build Android standalone no novo SHA, sem reutilizar os resultados de DB-152.
+- Testes físicos com Android 16, ELM327 e ECU real não foram executados nesta rodada.
