@@ -57,18 +57,18 @@ export async function createBackup(basePath: string): Promise<BackupInfo> {
         const info = await FileSystem.getInfoAsync(source);
         if (!info.exists) continue;
         if (!info.isDirectory) throw new Error('BACKUP_SOURCE_NOT_DIRECTORY: ' + source);
-  
+
         const sourceSize = await getDirectorySize(source);
         await FileSystem.copyAsync({ from: source, to: dest });
         const copiedSize = await getDirectorySize(dest);
         if (copiedSize !== sourceSize) {
           throw new Error(`BACKUP_VERIFICATION_FAILED: ${dir} source=${sourceSize} copied=${copiedSize}`);
         }
+        totalSize += copiedSize;
+        included.push(dir);
+        files.push({ directory: dir, sizeBytes: copiedSize });
+      }
     });
-      totalSize += copiedSize;
-      included.push(dir);
-      files.push({ directory: dir, sizeBytes: copiedSize });
-    }
 
     const manifest = {
       schemaVersion: 1,
