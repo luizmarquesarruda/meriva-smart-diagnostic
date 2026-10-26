@@ -28,6 +28,12 @@ Ela mantém um banco próprio em JSON:
 - src/knowledge/fuel_types.json: enumeração do PID 0151, separada das fórmulas numéricas.
 - src/obd/formulaEngine.ts: executor seguro das fórmulas, sem eval.
 
+## PID 0144 — Commanded Equivalence Ratio
+
+O PID padrão `0144` contém dois bytes de dados e usa a fórmula `(A × 256 + B) / 32768`. O valor é uma razão adimensional: `80 00` resulta em `1,0`; `FF FF` resulta em `1,999969482421875`.
+
+A definição e a presença no catálogo permitem interpretar uma resposta positiva válida, mas **não comprovam suporte da ECU da Meriva**. O PID fica como alvo de confirmação e não entra automaticamente na fila de polling do cockpit. Somente uma resposta bruta válida da ECU, com PID e comprimento corretos, pode atualizar a evidência do veículo.
+
 ## Fluxo
 
 resposta ELM327

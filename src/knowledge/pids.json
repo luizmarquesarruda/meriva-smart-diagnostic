@@ -210,6 +210,15 @@
       "description": "Carga absoluta calculada do motor."
     },
     {
+      "pid": "0144",
+      "name": "Commanded Equivalence Ratio",
+      "bytes": 2,
+      "unit": "ratio",
+      "formulaId": "U16_DIV_32768",
+      "classification": "PADRAO_OBD",
+      "description": "Razão de equivalência comandada pela ECU; valor adimensional. A definição padrão não confirma suporte pela ECU específica."
+    },
+    {
       "pid": "0145",
       "name": "Relative Throttle Position",
       "bytes": 1,

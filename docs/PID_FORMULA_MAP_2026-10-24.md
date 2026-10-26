@@ -5,7 +5,7 @@
 
 ## 1. Escopo
 
-O catálogo implementado define **34 PIDs Mode 01** com bytes, unidade, fórmula e faixa de plausibilidade. Não é a lista completa de PIDs padronizados nem prova de suporte da ECU específica.
+O catálogo implementado define **35 PIDs Mode 01** com bytes, unidade, fórmula e faixa de plausibilidade. Não é a lista completa de PIDs padronizados nem prova de suporte da ECU específica.
 
 Na ficha da Meriva, `010C` (RPM) é o único PID marcado como **CONFIRMADO / RAW_ECU**: `41 0C 1A F8` = 1726 rpm. Há 10 candidatos, não confirmados. Bitmap positiva, seed do CarScanner e presença no catálogo não substituem resposta individual válida na sessão.
 
@@ -38,6 +38,7 @@ Perfil registrado: Chevrolet Meriva Maxx 1.4 8V ECONO.FLEX 2011/2012; KWP Fast I
 | `0133` | Barometric Pressure | 1 | `U8` | A | `kPa` | 0…255 | Sem evidência RAW específica |
 | `0142` | ECU Voltage | 2 | `VOLTS_1000` | (256 × A + B) / 1000 | `V` | 0…65.535 | Sem evidência RAW específica |
 | `0143` | Absolute Load | 2 | `U16_SCALE_255` | (256 × A + B) × 100 / 255 | `%` | 0…25700 | Sem evidência RAW específica |
+| `0144` | Commanded Equivalence Ratio | 2 | `U16_DIV_32768` | (256 × A + B) / 32768 | `razão` | 0…1.999969482421875 | Alvo de confirmação; sem evidência RAW |
 | `0145` | Relative Throttle Position | 1 | `PERCENT_255` | A × 100 / 255 | `%` | 0…100 | Sem evidência RAW específica |
 | `0146` | Ambient Air Temperature | 1 | `TEMP_C` | A − 40 | `°C` | -40…215 | Sem evidência RAW específica |
 | `0151` | Fuel Type | 1 | `U8` | A | `código` | 0…255 | Sem evidência RAW específica |
@@ -87,11 +88,11 @@ A = primeiro byte após `41 PID`; B = segundo; C = terceiro; D = quarto. Os byte
 | `U16_X10` | `u16_scale` | (256 × A + B) × 10 | `0159` | Pressão absoluta do rail, resolução 10 kPa. |
 | `INJECTION_TIMING` | `u16_offset_scale` | ((256 × A + B) − 26880) / 128 | `015D` | Temporização da injeção em graus. |
 | `TORQUE_PERCENT` | `u8_offset` | A − 125 | `0161`, `0162` | Torque relativo A−125. |
-| `U16_DIV_32768` | `u16_div` | (256 × A + B) / 32768 | Nenhum PID atual | Fórmula definida sem PID ligado atualmente. |
+| `U16_DIV_32768` | `u16_div` | (256 × A + B) / 32768 | `0144` | Razão de equivalência comandada; fórmula padrão não comprova suporte da ECU. |
 | `U32` | `u32` | 16 777 216 × A + 65 536 × B + 256 × C + D | Nenhum PID atual | Inteiro big-endian de 32 bits; sem PID atual no catálogo. |
 | `DTC_COUNT` | `u8_mask` | A & 0x7F | `0101` | PID 0101: A6..A0 = quantidade; A7/MIL é interpretado separadamente. |
 
-Fórmulas definidas sem PID ligado atualmente: `U16`, `U16_DIV_32768`, `U32`. Operação genérica no motor não significa PID suportado.
+Fórmulas definidas sem PID ligado atualmente: `U16`, `U32`. Operação genérica no motor não significa PID suportado.
 
 ## 4. Aquisição e prioridade
 

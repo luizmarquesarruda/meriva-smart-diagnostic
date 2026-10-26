@@ -118,6 +118,16 @@ function main() {
   assert.strictEqual(o2Pid.bytes, 2, 'PID 0114 deve carregar os dois bytes da resposta padronizada');
   assert.strictEqual(o2Pid.formulaId, 'O2_VOLTS');
 
+  const equivalenceRatioPid = pids.pids.find((item) => item.pid === '0144');
+  assert.ok(equivalenceRatioPid, 'PID 0144 deve existir no catálogo padrão OBD');
+  assert.strictEqual(equivalenceRatioPid.bytes, 2);
+  assert.strictEqual(equivalenceRatioPid.unit, 'ratio');
+  assert.strictEqual(equivalenceRatioPid.formulaId, 'U16_DIV_32768');
+  assert.deepStrictEqual(ranges.ranges['0144'], { min: 0, max: 65535 / 32768 });
+  assert.strictEqual(units.units.ratio.symbol, 'razão');
+  assert.ok(confirmed.next_confirmation_targets.includes('0144'), 'PID 0144 deve aguardar confirmação real');
+  assert.ok(!confirmed.confirmed_pids.some((item) => item.pid === '0144'), 'PID 0144 não pode ser confirmado sem RAW_ECU');
+
   const absoluteThrottlePid = pids.pids.find((item) => item.pid === '0111');
   assert.strictEqual(absoluteThrottlePid.name, 'Absolute Throttle Position');
   assert.match(absoluteThrottlePid.description, /posição absoluta/i);
@@ -161,6 +171,7 @@ function main() {
     DISTANCE_KM: '256 × A + B',
     VOLTS_1000: '(256 × A + B) / 1000',
     U16_SCALE_255: '(256 × A + B) × 100 / 255',
+    U16_DIV_32768: '(256 × A + B) / 32768',
     ETHANOL_PERCENT: 'A × 100 / 255',
     U16_X10: '(256 × A + B) × 10',
     INJECTION_TIMING: '((256 × A + B) − 26880) / 128',
@@ -191,6 +202,7 @@ function main() {
     '| 0101 | Monitor Status Since DTCs Cleared | 4 | dtc_count | DTC_COUNT',
     '| 0130 | Warmups Since DTC Clear | 1 | warmup_cycles | U8',
     '| 0111 | Absolute Throttle Position',
+    '| 0144 | Commanded Equivalence Ratio | 2 | ratio | U16_DIV_32768',
     '| 0145 | Relative Throttle Position',
     '| 015A | Relative Accelerator Pedal Position',
   ]) {

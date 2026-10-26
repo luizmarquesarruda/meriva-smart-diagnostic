@@ -21,6 +21,10 @@
       "symbol": "%",
       "name": "por cento"
     },
+    "ratio": {
+      "symbol": "razão",
+      "name": "razão adimensional"
+    },
     "grams_per_second": {
       "symbol": "g/s",
       "name": "gramas por segundo"

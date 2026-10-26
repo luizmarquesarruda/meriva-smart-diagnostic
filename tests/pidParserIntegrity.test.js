@@ -144,6 +144,10 @@ for (const [formulaId, bytes, expected] of formulaVectors) {
 }
 assert.equal(parser.parsePidResponse('010C', '41 0C 1A F8').value, 1726,
   'RPM Mode 01 deve aplicar (A*256+B)/4');
+assert.equal(parser.parsePidResponse('0144', '41 44 80 00').value, 1,
+  'PID 0144 deve decodificar a razão de equivalência comandada com dois bytes');
+assert.equal(parser.parsePidResponse('0144', '41 44 FF FF').value, 65535 / 32768,
+  'PID 0144 deve preservar a resolução exata no limite superior');
 assert.equal(parser.parsePidResponse('0110', '41 10 03 E8').value, 10,
   'MAF deve aplicar (A*256+B)/100 g/s');
 assert.equal(parser.parsePidResponse('0114', '41 14 6A 80').value, 0.53,

@@ -1,22 +1,23 @@
-## ESTADO VIGENTE — 2026-10-26 (auditoria sistêmica DB-145)
+## ESTADO VIGENTE — 2026-10-26 (auditoria sistêmica DB-146; nova CI pendente)
 
-> Estado observado na branch `integration/reconcile-pid-ui-20261025`; a validação deve ser feita novamente no SHA final.
+> Estado observado antes da nova alteração: branch `integration/reconcile-pid-ui-20261025`, HEAD `20f6dcbb04d72c178db95fdf5dcd23815bb7e904`. A CI do HEAD anterior passou; o commit DB-146 ainda precisa de validação própria.
 
 ### Integração, CI e riscos
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
-- `main` observado: `8e95b2b59e0aa4c76027b638e49d4453a0a4b54c`; PR [#89](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/89) foi mesclada; PRs [#90](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/90) e [#82](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/82) foram fechadas sem merge.
-- HEAD validado antes da janela móvel: `4e3aa299ab9b244f224e5ead4b06931a47291690`; a CI [run 40260998729](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40260998729) passou Expo Doctor, gate anti-regressão, TypeScript, suíte completa, prebuild, APK standalone, verificação e upload.
-- O buffer móvel DB-143/144 passou a CI completa no SHA `cb0e6826305c2fc0e28db6c4d290663562c6d688`, run [40263017066](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40263017066): validação e build Android standalone concluídos com sucesso. Essa CI antecede o fallback de tanque cheio DB-145.
-- A primeira CI de desenvolvimento do buffer ([run 40262740602](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40262740602), SHA `7afb9a1109432d84f1af05532e794c8142294585`) detectou separadores de objeto inválidos em `src/trip/autoTripService.ts` e `app/index.tsx`. Foram corrigidos em `1c704cb1ffbdd8f0b9c292b22598d1a88c92fe65`; a CI desse SHA está em fila e ainda não é resultado final.
-- A prévia Floot já está em `src/ui/FlootLayoutPreview.tsx`, fora da árvore de rotas Expo; `app/floot-layout.tsx` não existe no HEAD validado.
-- PRs ainda abertas no último estado consultado: [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81) em rascunho, [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) e [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84). Serão reconciliadas após a nova CI, sem merge/fechamento por conveniência.
-- Auditoria de autonomia DB-143: antes da mudança, sem média histórica salva e sem consumo confiável da viagem, a autonomia permanecia N/D. A nova janela móvel usa dez leituras reais do nível de combustível e dez intervalos recentes de fluxo/distância para iniciar uma estimativa atual.
-- Não foi executado teste físico no Galaxy A06/Android 16 nem com o ELM327/ECU real. A CI e testes sintéticos não comprovam a precisão no Meriva; comparação com percurso e abastecimento reais segue pendente.
+- `main` atual: `02773b71ca9bd428b832d53a386655dd80acd80b`; PR [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84) foi mesclada por ser documental e estar limpa. O commit de integração incorpora esse HEAD e o inventário documental.
+- A CI [run 40264314431](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40264314431), SHA `20f6dcbb04d72c178db95fdf5dcd23815bb7e904`, concluiu `validate` e `android-build` com sucesso, incluindo APK standalone, verificação e upload. Esse resultado não valida as alterações DB-146 posteriores.
+- A auditoria de autonomia DB-143–145 adicionou janela móvel de dez leituras e balanço de tanque cheio. O fallback continua identificado como estimativa e exige registro das viagens/abastecimentos; precisão física ainda não foi medida.
+- O PID 0144 da PR #81 estava ausente do catálogo da branch de integração. A implementação foi portada com fórmula/faixa/unidade/testes e documentação coerentes. Por regra semântica, **não** foi adicionado a `confirmed_pids`: entrou somente em `next_confirmation_targets`, sem resposta RAW_ECU registrada e sem inclusão na fila automática de polling.
+- PR [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81) permanece aberta até validar o port; depois será fechada como substituída se o mesmo conteúdo estiver integralmente coberto na branch consolidada. PR [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) segue em conflito/divergência e não será mesclada sem reconciliação visual/funcional.
+- A prévia Floot está em `src/ui/FlootLayoutPreview.tsx`, fora de `app/`; a rota de demonstração não faz parte do fluxo operacional.
+- O catálogo padrão descreve fórmulas OBD genéricas, não suporte físico de todos os PIDs. A evidência específica documentada da Meriva continua sendo `010C` (`41 0C 1A F8` = 1726 rpm).
+- Não foi executado teste físico no Galaxy A06/Android 16 nem no ELM327/ECU real. CI, testes sintéticos e compilação não comprovam precisão de autonomia, suporte do PID 0144 ou aparência no aparelho.
 
 ### Critérios de aceitação
-- RG-01…RG-43 únicos e sequenciais; DB-001…DB-NNN e índice sincronizados.
-- Gate, TypeScript, suíte completa e build Android aprovados no mesmo SHA final.
-- Não declarar PID como suportado sem resposta válida da ECU nem usar autonomia persistida como valor atual.
+- RG-01…RG-45 únicos e sequenciais; DB-001…DB-NNN e índice sincronizados.
+- Gate anti-regressão, TypeScript, suíte completa e build Android aprovados no mesmo SHA final.
+- Nenhum PID passa a confirmado sem evidência RAW_ECU válida; autonomia persistida não pode ser exibida como atual.
+
 ---
 
 ## Portabilidade Floot → aplicativo Expo — 2026-10-23
@@ -212,6 +213,7 @@
 - **DB-143** · 2026-10-26 — Implementar buffer móvel real de dez leituras para autonomia
 - **DB-144** · 2026-10-26 — Endurecer a validação de timestamps do buffer de autonomia
 - **DB-145** · 2026-10-26 — Estimar autonomia sem PID 012F com balanço de tanque cheio
+- **DB-146** · 2026-10-26 — Reconciliar PID 0144 com catálogo, fórmula e evidência da ECU
 
 ---
 
@@ -4212,3 +4214,21 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 ### Validação pendente
 - A nova CI deve passar Expo Doctor, gate anti-regressão, TypeScript, suíte completa, prebuild e APK Android standalone no mesmo SHA.
 - Teste físico ainda necessário: confirmar PID 012F/015E/MAF/MAP na ECU da Meriva, marcar um tanque realmente cheio, registrar todas as viagens e comparar litros restantes/autonomia com abastecimento e distância reais. O fallback não é confiável se houver viagens não registradas.
+
+## DB-146 · 2026-10-26 — Reconciliar PID 0144 com catálogo, fórmula e evidência da ECU
+
+### Causa confirmada
+- A PR #81 propunha o PID 0144, mas a branch integrada ainda mantinha 34 PIDs e documentava `U16_DIV_32768` como fórmula sem PID ligado. O catálogo e o relatório estavam divergentes da fórmula já implementada.
+- A PR também adicionava 0144 ao arquivo `meriva_confirmed_pids.json` como se fosse confirmação/candidato com evidência associada. Isso conflita com o contrato desse arquivo: somente uma resposta RAW_ECU válida pode promover um PID a confirmado.
+
+### Correção aplicada
+- Adicionado 0144 — Commanded Equivalence Ratio — ao catálogo padrão de 35 PIDs, com dois bytes, fórmula `(256 × A + B) / 32768`, unidade adimensional e faixa exata de `0…65535/32768`.
+- Adicionado 0144 a `next_confirmation_targets`, mas não a `confirmed_pids` nem à lista `candidates`; não foi incluído no polling automático do cockpit.
+- Atualizados testes JSON, teste de fronteira para `80 00 → 1,0` e `FF FF → 1,999969482421875`, e teste de integração do parser com resposta positiva Mode 01.
+- Sincronizados `docs/PID_FORMULA_MAP_2026-10-24.md`, `docs/RELATORIO_PIDS_E_FORMULAS.md`, `docs/FORMULA_ENGINE.md` e `CHANGELOG.md`.
+- Atualizado o índice DB-001…DB-146 e o resumo vigente; preservadas as entradas históricas.
+
+### Validação
+- CI do HEAD anterior `20f6dcbb04d72c178db95fdf5dcd23815bb7e904`: run [40264314431](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40264314431) passou `validate` e `android-build`, mas não valida este commit.
+- A nova CI do commit DB-146 precisa passar gate anti-regressão, TypeScript, suíte completa, prebuild, APK standalone, verificação e upload. Resultado pendente até a execução terminar.
+- Teste físico do PID 0144 com ELM327/ECU continua pendente; não há evidência para marcá-lo como suportado na Meriva.

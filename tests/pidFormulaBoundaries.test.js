@@ -52,6 +52,13 @@ function main() {
   assert.strictEqual(maxInjectionTiming.value, 301.9921875);
   assert.strictEqual(maxInjectionTiming.valid, true, 'PID 015D maximum 16-bit value is valid');
 
+  const equivalenceRatio = decodeFormula('U16_DIV_32768', '0144', [0x80, 0x00]);
+  assert.strictEqual(equivalenceRatio.value, 1);
+  assert.strictEqual(equivalenceRatio.valid, true, 'PID 0144 deve aceitar razão estequiométrica 1,0');
+  const maxEquivalenceRatio = decodeFormula('U16_DIV_32768', '0144', [0xFF, 0xFF]);
+  assert.strictEqual(maxEquivalenceRatio.value, 65535 / 32768);
+  assert.strictEqual(maxEquivalenceRatio.valid, true, 'PID 0144 deve aceitar o máximo de 16 bits');
+
   const monitorCount = decodeFormula('DTC_COUNT', '0101', [0x83, 0x33, 0xA1, 0x81]);
   assert.strictEqual(monitorCount.value, 3, 'PID 0101 deve extrair os sete bits da contagem de DTCs');
   assert.strictEqual(monitorCount.valid, true);

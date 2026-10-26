@@ -12,11 +12,11 @@
 
 ## 1. Resumo do inventário
 
-- **34 PIDs** no catálogo padrão local.
-- **21 definições de fórmula** no catálogo determinístico; três fórmulas genéricas não estão ligadas a um PID atual.
+- **35 PIDs** no catálogo padrão local.
+- **21 definições de fórmula** no catálogo determinístico; duas fórmulas genéricas não estão ligadas a um PID atual.
 - **1 PID** com evidência RAW_ECU no arquivo de referência da Meriva: `010C` (RPM).
 - **10 candidatos** no arquivo de referência; a maior parte veio de um baseline do Car Scanner e não comprova suporte na ECU.
-- **27 alvos** listados para futura confirmação real.
+- **28 alvos** listados para futura confirmação real.
 - Protocolo observado no baseline do projeto: **ISO 14230-4 KWP Fast Init, K-Line, 10400 baud**, endereço ECU `0x11`. Validar novamente no veículo antes de tratar como universal para toda Meriva.
 
 **Distinção essencial:** o catálogo informa como interpretar um PID padrão; não prova que a ECU específica o suporte. Um PID anunciado pela bitmap é *descoberto*. Uma resposta positiva bem formada indica *respondeu*. Isso ainda não comprova a exatidão do sensor/valor contra instrumento independente.
@@ -85,6 +85,7 @@ As faixas são verificações de plausibilidade do software, não limites de def
 | 0133 | Barometric Pressure | 1 | kpa | U8 | 0–255 |
 | 0142 | ECU Voltage | 2 | volts | VOLTS_1000 | 0–65.535 |
 | 0143 | Absolute Load | 2 | percent | U16_SCALE_255 | 0–25700 |
+| 0144 | Commanded Equivalence Ratio | 2 | ratio | U16_DIV_32768 | 0–1.999969482421875 |
 | 0145 | Relative Throttle Position | 1 | percent | PERCENT_255 | 0–100 |
 | 0146 | Ambient Air Temperature | 1 | celsius | TEMP_C | -40–215 |
 | 0151 | Fuel Type | 1 | code | U8 | 0–255 |
@@ -120,7 +121,7 @@ As faixas são verificações de plausibilidade do software, não limites de def
 | 0114 | O2 Sensor 1 Voltage | CANDIDATO | CARSCANNER_SEED | O2_VOLTS | 0.53 |
 | 012F | Fuel Level Input | CANDIDATO | STANDARD_OBD | PERCENT_255 | — |
 
-Os valores de baseline são úteis para escolher o que testar e comparar; não são leituras atuais e não devem ser importados como telemetria real. Próximos alvos de confirmação definidos no catálogo: 0105, 0106, 0107, 010A, 010B, 010D, 010E, 010F, 0110, 0111, 0114, 012C, 012D, 012E, 012F, 0133, 0142, 0143, 0145, 0146, 0159, 015A, 015C, 015D, 015E, 0161, 0162.
+Os valores de baseline são úteis para escolher o que testar e comparar; não são leituras atuais e não devem ser importados como telemetria real. Próximos alvos de confirmação definidos no catálogo: 0105, 0106, 0107, 010A, 010B, 010D, 010E, 010F, 0110, 0111, 0114, 012C, 012D, 012E, 012F, 0133, 0142, 0143, 0144, 0145, 0159, 015A, 015C, 015D, 015E, 0161, 0162.
 
 ## 5. Estados de evidência recomendados
 

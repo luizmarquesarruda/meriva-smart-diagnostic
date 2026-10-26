@@ -35,6 +35,7 @@
 - Causa nativa preservada na splash com opção de abrir o painel; CI não substitui teste físico do ELM327.
 
 ### Integridade OBD-II
+- Integrado o PID padrão 0144 (Commanded Equivalence Ratio) com fórmula de dois bytes, unidade adimensional, faixa exata e testes de fronteira; mantido como alvo de confirmação, sem presumir suporte da ECU nem adicioná-lo ao polling automático.
 - Portada do protótipo Floot para a tela nativa `app/laboratorio.tsx` a seção visual de validação de fórmulas; a interface reutiliza `decodeFormula` e sinaliza que os valores-limite são casos matemáticos, não telemetria real.
 - Corrigidas as faixas máximas de plausibilidade dos PIDs 0106, 0107, 012D e 015D para aceitar os máximos matemáticos exatos das fórmulas padronizadas, sem arredondamento que rejeite uma resposta válida.
 - O motor de fórmulas agora rejeita bytes de entrada não inteiros ou fora de 0–255; adicionados testes de regressão para limites e bytes inválidos.
