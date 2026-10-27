@@ -230,3 +230,14 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 
 - Ao marcar código como histórico/inativo porque ele não apareceu no Mode 03 válido, preservar `lastSeen`.
 - O teste usa uma data de última observação anterior à leitura de reconciliação e garante que o histórico não apresente a reconciliação como se o DTC estivesse presente.
+
+
+## SQLITE-01 — Migração e restauração do histórico de viagens
+
+- Em instalação legada válida, inicializar SQLite importando todas as viagens operacionais, sem misturar registros `CARSCANNER_SEED`; conferir o número de IDs únicos antes de confirmar a transação.
+- Inicializar duas vezes e reiniciar o módulo: não duplicar registros nem reimportar o JSON após o marcador `legacy_json_migration_v1` ter sido gravado.
+- Adicionar viagem nova e verificar que SQLite é a fonte de verdade; o `index.json` derivado e a cópia validada `VIAGENS/meriva_smart_history.db` devem refletir o estado confirmado.
+- Corromper o espelho JSON após migração: a leitura deve continuar retornando as linhas válidas do SQLite. Corromper o legado antes da migração e sem backup válido: abortar, preservar a origem e não gravar marcador de conclusão.
+- Fornecer IDs duplicados no JSON legado: abortar antes de importar, mantendo a origem integral para reconciliação. Não descartar uma linha silenciosamente por causa da chave primária.
+- Validar a restauração usando `index.previous.json` ou `index.pre-sqlite.json`: escolher backup válido antes de alterar SQLite, restaurar em transação, atualizar espelho e sincronizar a cópia SQLite para backup.
+- Executar `npm run gate:baseline`, `npm run typecheck`, `npm test` e build Android no mesmo SHA. O mock SQLite não substitui validação do banco nativo no APK.
