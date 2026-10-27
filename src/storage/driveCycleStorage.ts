@@ -169,7 +169,7 @@ async function ensureSqliteMigration(basePath: string): Promise<void> {
     const viagensDir = `${basePath}/VIAGENS`;
     const indexFile = `${viagensDir}/index.json`;
     const previousFile = indexBackupPath(indexFile);
-    const preSqliteFile = indexFile.replace(/\\.json$/, '.pre-sqlite.json');
+    const preSqliteFile = indexFile.replace(/\.json$/, '.pre-sqlite.json');
     await FileSystem.makeDirectoryAsync(viagensDir, { intermediates: true });
     const db = await openDriveCycleDatabase(basePath);
     const marker = await db.getFirstAsync<{ value: string }>(
@@ -248,7 +248,7 @@ export async function restoreDriveCyclesFromBackup(basePath: string): Promise<Dr
   const indexFile = `${basePath}/VIAGENS/index.json`;
   const candidates = [
     indexBackupPath(indexFile),
-    indexFile.replace(/\\.json$/, '.pre-sqlite.json'),
+    indexFile.replace(/\.json$/, '.pre-sqlite.json'),
     indexFile,
   ];
   let restoredCycles: DriveCycle[] | null = null;
