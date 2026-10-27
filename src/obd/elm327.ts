@@ -5,6 +5,7 @@ import {
   isNoDataResponse,
   isPartialResponseError,
   classifyElmError,
+  getRecoveryProtocolCommand,
   ElmErrorType,
   ElmHealthSnapshot,
   isUnsupportedAtResponse,
@@ -250,8 +251,7 @@ export class Elm327Session {
     return this.enqueueCommand(async () => {
       if (!this.opened) return false;
 
-      const protocol = (this.protocol ?? '').toUpperCase();
-      const preferred = /KWP|14230/.test(protocol) ? 'ATSP5' : 'ATSP0';
+      const preferred = getRecoveryProtocolCommand(this.protocol);
       const reset = await this.command('ATZ');
       if (reset.status !== 'OK') return false;
 
