@@ -115,7 +115,7 @@ assert.equal(bluetoothConfig.retry.intervalMs, 1500, 'intervalo de retry deve ev
 const bluetoothManagerSource = read('src/obd/bluetoothManager.ts');
 assert.match(bluetoothManagerSource, /shouldRetryElmSessionAttempt/,
   'falha após varredura completa da ECU não deve disparar a mesma varredura repetidamente');
-assert.match(bluetoothManagerSource, /ELM_PROTOCOL_FALLBACKS[\\s\\S]*?'2', '1'/,
+assert.ok(bluetoothManagerSource.includes("['5', '3', '4', '6', '7', '8', '9', '2', '1']"),
   'fallback precisa incluir SAE J1850 VPW/PWM além de KWP e CAN');
 assert.match(bluetoothTransport, /MAX_ELM_RX_BUFFER_CHARS\s*=\s*16\s*\*\s*1024/);
 assert.match(bluetoothTransport, /RX_DIAGNOSTIC_PREVIEW_CHARS\s*=\s*256/);
