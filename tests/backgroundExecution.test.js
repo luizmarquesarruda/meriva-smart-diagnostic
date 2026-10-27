@@ -57,5 +57,13 @@ assert(!layout.includes('startGps(settings.diagnosticAlerts)'), 'startup não de
 assert(autoTrip.includes('await this.ensureGpsForEcu()'), 'serviço de viagem inicia GPS somente após a ECU responder');
 assert(autoTrip.includes('await this.stopGpsForEcu()'), 'serviço de viagem para GPS quando ECU perde resposta/desconecta');
 assert(autoTrip.includes("if (!getSharedObdStatus().ecuConnected)"), 'gravação deve exigir estado ECU conectado');
+assert(autoTrip.includes("NetInfo.addEventListener"), 'network restoration must be observed through one connectivity subscription');
+assert(autoTrip.includes("network.details.cellularGeneration"), '4G/5G transitions may trigger recovery when the last GPS fix is stale');
+assert(autoTrip.includes("gpsTracker.refreshLocationAfterNetworkChange()"), 'network changes must request a one-shot GPS fix, never create a second watcher');
+assert(autoTrip.includes("this.unsubscribeNetwork?.()"), 'the connectivity listener must be removed when the trip service stops');
+assert(gps.includes("GPS_NETWORK_REFRESH_COOLDOWN_MS = 30_000"));
+assert(gps.includes("GPS_NETWORK_REFRESH_TIMEOUT_MS = 8_000"));
+assert(gps.includes("Location.getCurrentPositionAsync"), 'network recovery may request one fresh system fix');
+assert(gps.includes("isGpsSampleFresh(this.state.lastTimestamp"), 'network recovery must not query when the last GPS fix is already fresh');
 
 console.log('background execution: Android FGS + TaskManager + lifecycle: OK');
