@@ -1,3 +1,4 @@
+import NetInfo from '@react-native-community/netinfo';
 import { gpsTracker, isGpsSampleFresh } from '../gps';
 import type { SharedObdConnection } from '../obd/sharedConnection';
 import { getSharedObdConnection, getSharedObdStatus, subscribeSharedObd } from '../obd/sharedConnection';
@@ -82,6 +83,8 @@ class AutoTripService {
   private pollingPauseCount = 0;
   private transition: Promise<void> = Promise.resolve();
   private unsubscribeConnection: (() => void) | null = null;
+  private unsubscribeNetwork: (() => void) | null = null;
+  private lastNetworkLocationKey: string | null = null;
   private readonly listeners = new Set<Listener>();
   private telemetryCursor = 0;
   private pollCycleNumber = 0;
@@ -166,6 +169,23 @@ class AutoTripService {
     };
     this.emit();
     this.running = true;
+    // Network state is only a recovery signal for a stale Android location fix.
+    // It never becomes a coordinate source and never creates another location watcher.
+    this.unsubscribeNetwork?.();
+    this.lastNetworkLocationKey = null;
+    this.unsubscribeNetwork = NetInfo.addEventListener((network) => {
+      const available = network.isConnected === true && network.isInternetReachable !== false;
+      const networkKey = !available
+        ? 'offline'
+        : network.type === 'cellular'
+          ? `cellular:${network.details.cellularGeneration ?? 'unknown'}`
+          : `network:${network.type}`;
+      const previousKey = this.lastNetworkLocationKey;
+      this.lastNetworkLocationKey = networkKey;
+      if (previousKey !== null && previousKey !== networkKey && available) {
+        void gpsTracker.refreshLocationAfterNetworkChange();
+      }
+    });
     this.unsubscribeConnection = subscribeSharedObd((connection) => {
       this.transition = this.transition
         .then(() => this.applyConnection(connection))
@@ -182,6 +202,9 @@ class AutoTripService {
     this.generation += 1;
     this.unsubscribeConnection?.();
     this.unsubscribeConnection = null;
+    this.unsubscribeNetwork?.();
+    this.unsubscribeNetwork = null;
+    this.lastNetworkLocationKey = null;
     this.unsubscribeAppSettings?.();
     this.unsubscribeAppSettings = null;
     await this.transition;
