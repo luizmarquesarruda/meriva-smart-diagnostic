@@ -30,6 +30,7 @@ const MAX_ACCURACY_M = 30;
 const MAX_SPEED_KMH = 220;
 const MIN_MOVEMENT_SPEED_KMH = 5;
 const MIN_MOVEMENT_DISTANCE_M = 8;
+const MAX_ACCEPTED_SEGMENT_KM = 0.25;
 const STOP_SPEED_KMH = 2;
 const MIN_MOVING_SAMPLES = 3;
 export const GPS_SAMPLE_STALE_AFTER_MS = 5_000;
@@ -117,6 +118,8 @@ export class GpsTracker {
   private readonly listeners = new Set<GpsListener>();
   private consecutiveMovingSamples = 0;
   private pendingMovingDistanceKm = 0;
+  private pendingMovingStart: GpsSample | null = null;
+  private movementEstablished = false;
   private vehicleSpeedHintKmh: number | null = null;
 
   private state: GpsTripState = {
@@ -176,6 +179,8 @@ export class GpsTracker {
       this.previous = null;
       this.consecutiveMovingSamples = 0;
       this.pendingMovingDistanceKm = 0;
+      this.pendingMovingStart = null;
+      this.movementEstablished = false;
       this.emit();
     }
 
@@ -308,6 +313,8 @@ export class GpsTracker {
     this.previous = null;
     this.consecutiveMovingSamples = 0;
     this.pendingMovingDistanceKm = 0;
+    this.pendingMovingStart = null;
+    this.movementEstablished = false;
     this.emit();
 
     try {
@@ -369,34 +376,71 @@ export class GpsTracker {
         derivedSpeedKmh = segmentKm / (elapsedMs / 3600000);
 
         const segmentDistanceM = segmentKm * 1000;
+        const confidenceDistanceM = movementThresholdM(sample, this.previous);
+        // A 1 s GPS callback at 10 km/h moves only ~2.8 m. Requiring 8 m in
+        // every individual segment would therefore reject normal slow driving.
+        // Keep each segment above a time-scaled floor, then require the whole
+        // consecutive window to exceed the accuracy-aware displacement gate.
+        const timeBasedMinimumM = (MIN_MOVEMENT_SPEED_KMH * elapsedMs) / 3600;
+        const minimumSegmentDistanceM = Math.max(
+          1,
+          Math.min(confidenceDistanceM * 0.5, timeBasedMinimumM),
+        );
+        const reportedSpeedConfirmsMovement = this.vehicleSpeedHintKmh != null
+          ? this.vehicleSpeedHintKmh >= MIN_MOVEMENT_SPEED_KMH
+          : sample.speedKmh != null &&
+            sample.speedKmh >= MIN_MOVEMENT_SPEED_KMH &&
+            sample.speedKmh <= MAX_SPEED_KMH;
         const derivedMoving =
-          segmentDistanceM >= movementThresholdM(sample, this.previous) &&
+          segmentKm <= MAX_ACCEPTED_SEGMENT_KM &&
+          segmentDistanceM >= minimumSegmentDistanceM &&
           derivedSpeedKmh >= MIN_MOVEMENT_SPEED_KMH &&
           derivedSpeedKmh <= MAX_SPEED_KMH &&
-          (this.vehicleSpeedHintKmh != null
-            ? this.vehicleSpeedHintKmh >= MIN_MOVEMENT_SPEED_KMH
-            : sample.speedKmh != null &&
-              sample.speedKmh >= MIN_MOVEMENT_SPEED_KMH &&
-              sample.speedKmh <= MAX_SPEED_KMH);
+          reportedSpeedConfirmsMovement;
 
         if (derivedMoving) {
+          if (this.consecutiveMovingSamples === 0) {
+            this.pendingMovingStart = this.previous;
+          }
           this.consecutiveMovingSamples += 1;
-          if (segmentKm <= 0.25) this.pendingMovingDistanceKm += segmentKm;
+          this.pendingMovingDistanceKm += segmentKm;
+
+          const start = this.pendingMovingStart ?? this.previous;
+          const netDisplacementKm = haversineDistanceKm(start, sample);
+          const requiredNetDisplacementM = movementThresholdM(sample, start);
+          // Three valid consecutive segments are the minimum (four positions).
+          // Confirm accumulated route distance only if the endpoint also moved
+          // far enough from the start; zig-zag GPS jitter must not become odometer.
+          if (
+            this.consecutiveMovingSamples >= MIN_MOVING_SAMPLES &&
+            Number.isFinite(netDisplacementKm) &&
+            netDisplacementKm * 1000 >= requiredNetDisplacementM
+          ) {
+            this.state.distanceKm = Number(
+              (this.state.distanceKm + this.pendingMovingDistanceKm).toFixed(3),
+            );
+            this.pendingMovingDistanceKm = 0;
+            this.pendingMovingStart = sample;
+            this.movementEstablished = true;
+          }
         } else {
           this.consecutiveMovingSamples = 0;
           this.pendingMovingDistanceKm = 0;
-        }
-
-        if (derivedMoving && this.consecutiveMovingSamples >= MIN_MOVING_SAMPLES) {
-          this.state.distanceKm = Number(
-            (this.state.distanceKm + this.pendingMovingDistanceKm).toFixed(3),
-          );
-          this.pendingMovingDistanceKm = 0;
+          this.pendingMovingStart = null;
+          this.movementEstablished = false;
         }
       } else if (elapsedMs > MAX_SEGMENT_GAP_MS) {
         this.consecutiveMovingSamples = 0;
         this.pendingMovingDistanceKm = 0;
+        this.pendingMovingStart = null;
+        this.movementEstablished = false;
       }
+    } else if (!accurate) {
+      // A missing/poor-accuracy fix breaks the consecutive-valid-segment rule.
+      this.consecutiveMovingSamples = 0;
+      this.pendingMovingDistanceKm = 0;
+      this.pendingMovingStart = null;
+      this.movementEstablished = false;
     }
 
     const movementConfirmed =
@@ -411,7 +455,7 @@ export class GpsTracker {
         : sample.speedKmh != null &&
           sample.speedKmh >= MIN_MOVEMENT_SPEED_KMH &&
           sample.speedKmh <= MAX_SPEED_KMH) &&
-      this.consecutiveMovingSamples >= MIN_MOVING_SAMPLES;
+      this.movementEstablished;
     let speedKmh = movementConfirmed
       ? (sample.speedKmh != null && sample.speedKmh <= MAX_SPEED_KMH
         ? sample.speedKmh
@@ -446,6 +490,8 @@ export class GpsTracker {
     this.previous = null;
     this.consecutiveMovingSamples = 0;
     this.pendingMovingDistanceKm = 0;
+    this.pendingMovingStart = null;
+    this.movementEstablished = false;
     this.vehicleSpeedHintKmh = null;
 
     if (options.resetTrip) {
