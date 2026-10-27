@@ -249,13 +249,28 @@ export async function prepareDriveCycleDatabaseBackup(basePath: string): Promise
  * Explicit recovery path. It validates a JSON backup completely before replacing
  * SQLite rows; a missing/corrupt backup never clears the active database.
  */
-export async function restoreDriveCyclesFromBackup(basePath: string): Promise<DriveCycle[]> {
+export async function restoreDriveCyclesFromBackup(basePath: string, backupDirectory?: string): Promise<DriveCycle[]> {
   const indexFile = `${basePath}/VIAGENS/index.json`;
-  const candidates = [
+  const localCandidates = [
     indexBackupPath(indexFile),
     indexFile.replace(/\.json$/, '.pre-sqlite.json'),
     indexFile,
   ];
+  const candidates: string[] = [];
+  if (backupDirectory) {
+    const backupRoot = backupDirectory.replace(/\/+$/, '');
+    const nestedViagens = `${backupRoot}/VIAGENS`;
+    const nestedInfo = await FileSystem.getInfoAsync(nestedViagens);
+    const backupViagens = nestedInfo.exists && nestedInfo.isDirectory ? nestedViagens : backupRoot;
+    // A packaged backup's index.json is the state captured at backup time;
+    // live recovery instead prefers the previous verified snapshot for rollback.
+    candidates.push(
+      `${backupViagens}/index.json`,
+      `${backupViagens}/index.previous.json`,
+      `${backupViagens}/index.pre-sqlite.json`,
+    );
+  }
+  candidates.push(...localCandidates);
   let restoredCycles: DriveCycle[] | null = null;
   let sourceFile: string | null = null;
   for (const candidate of candidates) {
