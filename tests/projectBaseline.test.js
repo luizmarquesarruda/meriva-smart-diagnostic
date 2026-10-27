@@ -435,7 +435,9 @@ assert.ok(projectContract.includes('| RG-54 |'), 'retry settings must have one e
 assert.ok(projectContract.includes('| RG-55 |'), 'rolling consumption must count fuel burned at idle');
 assert.ok(projectContract.includes('| RG-56 |'), 'tank balance must reject trips with unknown fuel-data validity');
 assert.ok(projectContract.includes('| RG-57 |'), 'DTC lastSeen must represent actual observation, not later absence');
+assert.ok(projectContract.includes('| RG-58 |'), 'checksummed KWP frames must be protected by RG-58');
 assert.ok(read('docs/TEST_PLAN.md').includes('BT-CONN-04'), 'strict ECU recovery must have explicit test criteria');
+assert.ok(read('docs/TEST_PLAN.md').includes('BT-CONN-06'), 'real KWP-frame parsing must have explicit test criteria');
 
 console.log('Anti-regression baseline gate: PASS');
 console.log('Protected contracts: five-read sensor tests, manual PID flow, single ELM327 queue, offline diagnosis, Expo SDK 51, GPS/Trip, TXT/history and cockpit/graphs.');
