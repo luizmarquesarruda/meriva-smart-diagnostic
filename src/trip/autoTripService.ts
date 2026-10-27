@@ -1,5 +1,5 @@
 import NetInfo from '@react-native-community/netinfo';
-import { gpsTracker, isGpsSampleFresh } from '../gps';
+import { gpsTracker, isGpsSampleFresh, GPS_NETWORK_REFRESH_INTERVAL_MS } from '../gps';
 import type { SharedObdConnection } from '../obd/sharedConnection';
 import { getSharedObdConnection, getSharedObdStatus, subscribeSharedObd } from '../obd/sharedConnection';
 import { addDriveCycle, readDriveCycles } from '../storage/driveCycleStorage';
@@ -84,6 +84,7 @@ class AutoTripService {
   private transition: Promise<void> = Promise.resolve();
   private unsubscribeConnection: (() => void) | null = null;
   private unsubscribeNetwork: (() => void) | null = null;
+  private networkLocationRefreshTimer: ReturnType<typeof setInterval> | null = null;
   private lastNetworkLocationKey: string | null = null;
   private readonly listeners = new Set<Listener>();
   private telemetryCursor = 0;
@@ -186,6 +187,14 @@ class AutoTripService {
         void gpsTracker.refreshLocationAfterNetworkChange();
       }
     });
+    if (this.networkLocationRefreshTimer !== null) clearInterval(this.networkLocationRefreshTimer);
+    this.networkLocationRefreshTimer = setInterval(() => {
+      // 4G/5G can help Android reacquire a fix, but is not itself a location.
+      // Poll only the stale-fix gate every 30 s and do not start another watcher.
+      if (this.running && this.lastNetworkLocationKey?.startsWith('cellular:')) {
+        void gpsTracker.refreshLocationAfterNetworkChange();
+      }
+    }, GPS_NETWORK_REFRESH_INTERVAL_MS);
     this.unsubscribeConnection = subscribeSharedObd((connection) => {
       this.transition = this.transition
         .then(() => this.applyConnection(connection))
@@ -204,6 +213,10 @@ class AutoTripService {
     this.unsubscribeConnection = null;
     this.unsubscribeNetwork?.();
     this.unsubscribeNetwork = null;
+    if (this.networkLocationRefreshTimer !== null) {
+      clearInterval(this.networkLocationRefreshTimer);
+      this.networkLocationRefreshTimer = null;
+    }
     this.lastNetworkLocationKey = null;
     this.unsubscribeAppSettings?.();
     this.unsubscribeAppSettings = null;
