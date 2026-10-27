@@ -174,6 +174,7 @@ assert.match(read('src/storage/driveCycleStorage.ts'), /ensureSqliteMigration/);
 assert.match(read('src/storage/driveCycleStorage.ts'), /restoreDriveCyclesFromBackup/);
 assert.match(read('src/storage/driveCycleStorage.ts'), /withTransactionAsync/);
 assert.match(read('src/storage/driveCycleStorage.ts'), /SQLITE_MIGRATION_KEY/);
+assert.match(read('src/storage/driveCycleStorage.ts'), /LEGACY_TRIP_HISTORY_DUPLICATE_IDS/);
 assert.match(read('tests/sqliteTripHistory.test.js'), /idempotent/);
 assert.match(read('src/storage/driveCycleStorage.ts'), /indexWriteQueues/);
 assert.match(read('src/database/csvLogger.ts'), /MAX_PENDING_CSV_ROWS/);
@@ -390,7 +391,7 @@ assert.match(bluetoothScreen, /formatElmQueueHealth\(health\)/, 'Bluetooth deve 
 assert.match(bluetoothScreen, /queueHealth\.queue/, 'a tela Bluetooth deve expor profundidade, pico e recusas da fila');
 assert.match(bluetoothScreen, /queueHealth\.wait/, 'a tela Bluetooth deve expor a espera média e máxima');
 assert.match(read('src/obd/elmHealthPresentation.ts'), /queueRejections > 0|rejected > 0/, 'recusas de fila precisam elevar o aviso de saúde');
-assert.ok(read('docs/OBD_APP_FEATURE_AUDIT_2026-10-27.md').includes('Lacuna aberta'), 'a auditoria não pode declarar SQLite implementado sem migração');
+assert.ok(read('docs/OBD_APP_FEATURE_AUDIT_2026-10-27.md').includes('DB-170') && read('docs/OBD_APP_FEATURE_AUDIT_2026-10-27.md').includes('CI final'), 'a auditoria deve distinguir implementação em branch de validação final e integração na main');
 
 assert.match(theme, /SCREEN_TITLE_STYLE/);
 assert.match(read('tests/screenTheme.test.js'), /Shared screen theme and title contract/);
