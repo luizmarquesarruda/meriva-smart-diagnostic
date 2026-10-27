@@ -1,6 +1,6 @@
-## ESTADO VIGENTE — 2026-10-27 (P1–P2; DB-163)
+## ESTADO VIGENTE — 2026-10-27 (P1–P2; DB-164)
 
-> A CI [40448437601](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40448437601) passou no SHA `e57a18bfe7aa9885b9b38403ce31487d90ab3d6e` antes das alterações DB-163; ela valida DB-162, mas não valida os ajustes subsequentes de retry/fallback. A CI integral (gate, TypeScript, suíte completa e build Android) precisa confirmar o HEAD final desta rodada. Testes físicos no Galaxy A06/Android 16 com ELM327/ECU real continuam pendentes.
+> A CI [40450705220](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40450705220) passou em `validate` (incluindo gate anti-regressão) e `android-build` para o SHA `23cb21120a80829cd7e6636c2ad2a1fc90059606`, validando DB-163 até RG-52. DB-164 adiciona o plano BT-CONN-03 e ainda requer nova CI no HEAD atualizado. Testes físicos no Galaxy A06/Android 16 com ELM327/ECU real continuam pendentes.
 
 ### Integração, CI e riscos
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
@@ -234,6 +234,7 @@
 - **DB-161** · 2026-10-26 — Exigir odômetro atual válido para fallback do tanque cheio; adicionar teste e registrar o bloqueio em caso de histórico não reconciliável.
 - **DB-162** · 2026-10-27 — Integrar métricas de fila ELM à tela Bluetooth, com alerta de saturação/espera e teste; documentar adoção de funcionalidades de apps OBD2 e lacunas de SQLite.
 - **DB-163** · 2026-10-27 — Reduzir latência da conexão, limitar retries por adaptador e ampliar fallback de protocolo com testes e rastreabilidade.
+- **DB-164** · 2026-10-27 — Corrigir seleção de protocolo durante recuperação/reconexão para evitar forçar KWP fast em ECU KWP 5-baud; cobrir protocolos e documentar teste BT-CONN-03.
 
 ---
 
@@ -4549,3 +4550,21 @@ Aplicar no aplicativo nativo a referência visual do painel de autonomia, conect
 - A nova CI do HEAD final deve concluir gate anti-regressão, TypeScript, testes completos, Expo Doctor e build APK Android; corrigir qualquer falha pelo log sem enfraquecer os contratos.
 - Ensaio físico ainda pendente no Samsung Galaxy A06/Android 16 com ELM327 e ECU real: medir tempo até `41 0C`, adaptador candidato escolhido, protocolo, latência, timeouts/`NO DATA` e reconexão. Não alegar melhoria quantificada de velocidade/estabilidade até coletar essa evidência.
 - PR #92 permanece sem merge até a revisão da CI do SHA final e reconciliação da divergência com `main`. SQLite para histórico operacional também permanece uma lacuna separada e não faz parte desta correção de conexão.
+
+
+## DB-164 · 2026-10-27 — Preservar o protocolo real durante recuperação e reconexão
+
+### Falha encontrada
+- A recuperação do ELM327 classificava qualquer texto contendo `KWP` ou `14230` como `ATSP5`. Isso mistura KWP fast (protocolo 5) com KWP 5-baud/slow (protocolo 4). Uma conexão inicial bem-sucedida poderia falhar depois de uma reconexão por selecionar o modo de inicialização errado.
+
+### Correção aplicada
+1. `src/obd/elm327Compatibility.ts` acrescenta `getRecoveryProtocolCommand`: reconhece `ATSP0–ATSP9/ATSPA–ATSPC` e IDs explícitos; mapeia KWP 5-baud para `ATSP4`, KWP fast para `ATSP5`, ISO 9141 para `ATSP3`, J1850 PWM/VPW para `ATSP1/ATSP2` e CAN para o protocolo correspondente.
+2. Protocolo desconhecido ou ambíguo retorna `ATSP0` automático em vez de adivinhar. `src/obd/elm327.ts` usa essa função durante `recoverProtocol`.
+3. `tests/elm327Compatibility.test.js` cobre os mapeamentos e o fallback automático; `tests/projectBaseline.test.js` protege o uso da função pela camada real de recuperação.
+4. `docs/TEST_PLAN.md` recebeu BT-CONN-03 com os critérios de regressão e o protocolo de evidência física.
+
+### Evidência de CI e limite
+- A CI [40450705220](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40450705220) terminou verde em `validate` (gate anti-regressão incluído) e `android-build`, no SHA `23cb21120a80829cd7e6636c2ad2a1fc90059606`, que continha a correção de código e os testes de DB-164, mas antecedia a adição documental de BT-CONN-03.
+- Como o plano de teste foi atualizado depois, executar/confirmar nova CI para o HEAD final antes de merge.
+- Teste físico continua pendente: Galaxy A06 / Android 16, ELM327 real e ECU real. Registrar o `ATDP` recebido, o `ATSP` de recuperação e a resposta válida `010C -> 41 0C`. Não afirmar que o problema foi reproduzido ou resolvido no veículo sem esse ensaio.
+- PR #92 permanece aberto e não deve ser mesclado até CI verde no HEAD final, divergência com `main` reconciliada e revisão de merge segura.
