@@ -363,3 +363,28 @@ A alteração da fila de aprendizado visa reduzir espera no caminho crítico, ma
 O app separa o cache vivo do autosave persistente. `pushLastReading` atualiza a última leitura na memória em todas as respostas, mas evita a regravação completa do JSON/TXT para cada mudança numérica: uma vez por PID por janela de 10 s é a cadência normal de persistência. PID novo e alterações de status/unidade/origem continuam imediatas. Ao sair do primeiro plano, a persistência compara o fingerprint do estado em memória com o snapshot persistido e descarrega o valor mais recente mesmo dentro da janela. Nenhuma amostra RAW/interpretada do CSV é removida por essa regra.
 
 Essa diferença é importante: o painel segue rápido e responsivo, enquanto o armazenamento reduz operações completas no filesystem. O ganho precisa ser medido na próxima captura física; não se deve inferir taxa de atualização do ELM a partir da frequência de snapshots TXT.
+
+## Atualização de conexão — 2026-10-27
+
+### Referências de comportamento em outros aplicativos
+
+- [Car Scanner — conexão Bluetooth Android](https://www.carscanner.info/android-bluetooth/): parear no Android, selecionar o adaptador na configuração da aplicação e iniciar a conexão.
+- [Torque — Getting Started](https://wiki.torque-bhp.com/view/Getting_Started): escolher conexão Bluetooth e o dispositivo previamente pareado.
+- [OBDLink — Connection Wizard e troubleshooting](https://support.obdlink.com/support/solutions/articles/43000715570): protocolo OBD-II automático como ponto de partida; verificar se outro aplicativo manteve a conexão, pois alguns adaptadores só aceitam um cliente por vez.
+- [python-OBD — Connections](https://python-obd.readthedocs.io/en/latest/Connections/): timeouts configuráveis e negociação automática como base, sem tratar a conexão serial como prova de ECU operacional.
+- [Android — permissões Bluetooth](https://developer.android.com/develop/connectivity/bluetooth/bt-permissions) e [BluetoothSocket](https://developer.android.com/reference/android/bluetooth/BluetoothSocket): permissões runtime atuais, RFCOMM como stream, cancelamento da descoberta antes de conectar e fechamento do socket como mecanismo de cancelamento.
+
+### Decisões aplicadas ao Meriva Smart
+
+1. **Não substituir a biblioteca nativa sem evidência.** A ponte `react-native-bluetooth-classic` já fornece RFCOMM/SPP, dois modos de socket, leitura contínua e evento de desconexão. A camada TypeScript já protege conexão nativa concorrente e exige enquadramento pelo prompt `>`. Uma reescrita Java antes de captura física aumentaria o risco sem provar que é necessária.
+2. **Limitar a espera de conexão.** `src/knowledge/bluetooth_config.json` agora define três tentativas por adaptador e 1500 ms entre falhas transitórias, em vez de 20 tentativas e 8000 ms. O limite é configurável e permanece validado por teste.
+3. **Não repetir uma negociação completa sem evidência nova.** Quando o candidato termina o fallback de protocolo sem resposta válida do PID `010C`, o manager registra `ECU_PROBE_EXHAUSTED` e segue para o próximo dispositivo pareado; não repete a mesma varredura no mesmo adaptador. Falhas de abertura/transientes continuam elegíveis ao retry limitado.
+4. **Completar a tabela de protocolos.** O fallback inclui SAE J1850 VPW (ID `2`) e PWM (ID `1`) além de KWP/CAN. A negociação automática `ATSP0` continua inicial; os fallbacks não são prova de suporte e a ECU só valida com resposta OBD `41 0C` correta.
+5. **Manter descoberta automática segura.** O último adaptador validado tem prioridade, nomes ELM/OBD vêm em seguida e os demais pareados continuam candidatos. A seleção manual é estrita: não troca silenciosamente de adaptador. Não exigir MAC fixo e não confiar somente no nome anunciado.
+6. **Preservar separação dos estados.** Bluetooth/radio pronto, socket RFCOMM, ELM respondendo, ECU respondendo e diagnóstico pronto seguem separados. Timeout, `NO DATA`, erro de protocolo, rádio desligado e estado nativo indeterminado não podem virar “ECU conectada”.
+
+### Limites de validação
+
+- A suíte automatizada valida a política e as funções puras; a CI atual deve ser repetida no novo SHA final.
+- O ensaio físico deve registrar no Samsung Galaxy A06/Android 16: tempo entre toque e primeiro `41 0C`, adaptador escolhido, protocolo identificado, latência por resposta, timeouts/NO DATA e resultado da reconexão. Testar com nenhum outro app OBD aberto para evitar disputa pelo mesmo adaptador.
+- Não alegar melhoria de velocidade percentual, estabilidade ou compatibilidade com o veículo antes de medir o mesmo ELM327 e a mesma ECU em condições repetíveis.
