@@ -117,6 +117,12 @@ assert.match(bluetoothManagerSource, /shouldRetryElmSessionAttempt/,
   'falha após varredura completa da ECU não deve disparar a mesma varredura repetidamente');
 assert.ok(bluetoothManagerSource.includes("['5', '3', '4', '6', '7', '8', '9', '2', '1']"),
   'fallback precisa incluir SAE J1850 VPW/PWM além de KWP e CAN');
+const elmCompatibilitySource = read('src/obd/elm327Compatibility.ts');
+assert.match(elmCompatibilitySource, /export function getRecoveryProtocolCommand/);
+assert.match(read('src/obd/elm327.ts'), /getRecoveryProtocolCommand\(this\.protocol\)/,
+  'recuperação deve usar o protocolo identificado em vez de forçar ATSP5 para todo KWP');
+assert.match(read('tests/elm327Compatibility.test.js'), /KWP 5BAUD/,
+  'o mapeamento de recuperação precisa ter regressão para KWP lento');
 assert.match(bluetoothTransport, /MAX_ELM_RX_BUFFER_CHARS\s*=\s*16\s*\*\s*1024/);
 assert.match(bluetoothTransport, /RX_DIAGNOSTIC_PREVIEW_CHARS\s*=\s*256/);
 assert.match(bluetoothTransport, /RX_BUFFER_OVERFLOW/);
