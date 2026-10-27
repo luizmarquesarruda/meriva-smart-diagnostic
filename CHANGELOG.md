@@ -6,7 +6,8 @@
 - Reduzido o padrão de retry de conexão de 20 tentativas com intervalo de 8 s para 3 tentativas por adaptador com intervalo de 1,5 s, mantendo os limites configuráveis.
 - Depois que todos os protocolos de fallback falham em obter resposta ECU válida ao PID 010C, a aplicação registra o esgotamento e avança ao próximo dispositivo pareado, sem repetir a mesma varredura completa no adaptador atual.
 - A tabela de fallback agora inclui os protocolos SAE J1850 VPW/PWM (IDs 2 e 1); ATSP0 continua sendo a tentativa automática inicial e 41 0C continua sendo o gate de ECU.
-- Adicionados testes de política de retry/fallback e contrato anti-regressão RG-52. O comportamento físico e qualquer ganho de estabilidade/latência continuam pendentes de teste no Galaxy A06/Android 16 com ELM327/ECU real; a CI do SHA final ainda precisa ser verificada.
+- Adicionados testes de política de retry/fallback e contrato anti-regressão RG-52. A validação física e qualquer ganho de estabilidade/latência continuam pendentes de teste no Galaxy A06/Android 16 com ELM327/ECU real.
+- A recuperação do ELM327 agora exige payload completo de `010C` validado pelo parser canônico; `41 0C` isolado ou payload malformado não confirma recuperação. Adicionados teste dinâmico com sessão ELM e contrato RG-53.
 
 ### Comparativo de apps OBD-II e saúde Bluetooth
 - Consolidada a auditoria comparativa de Car Scanner, Torque, OBDLink, OBD Auto Doctor, OBD Fusion, ScanMyOpel, python-OBD/OBDvis, OBD Metrics e OBD-Droid, mapeando funções úteis para recursos já existentes e registrando a lacuna de SQLite para o histórico operacional.
