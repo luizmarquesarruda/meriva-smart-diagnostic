@@ -7,11 +7,11 @@ const Module = require('node:module');
 const ts = require('typescript');
 
 const ROOT = path.resolve(__dirname, '..');
-const DOCUMENT_DIRECTORY = 'file:///doc/';
+const DOCUMENT_DIRECTORY = '/doc/';
 const BASE = DOCUMENT_DIRECTORY + 'MERIVA_SMART';
 const SQLITE_NAME = 'meriva_smart_history.db';
 const files = new Map();
-const directories = new Set(['file:///doc/']);
+const directories = new Set(['/doc']);
 const databases = new Map();
 const compiled = new Map();
 
@@ -254,7 +254,7 @@ function validCycle(id, overrides = {}) {
 function resetHarness({ keepFiles = false, keepDb = false } = {}) {
   files.clear();
   directories.clear();
-  directories.add('file:///doc/');
+  directories.add('/doc');
   if (!keepFiles) files.clear();
   if (!keepDb) databases.clear();
   compiled.clear();
