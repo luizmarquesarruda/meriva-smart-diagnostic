@@ -1,6 +1,6 @@
-## ESTADO VIGENTE — 2026-10-26 (autonomia DB-160; CI do novo SHA pendente)
+## ESTADO VIGENTE — 2026-10-26 (P0 DB-161; consulte a CI do HEAD atual)
 
-> DB-153…DB-158 corrigiram e documentaram regressões encontradas durante as validações. A CI [40332739335](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40332739335) concluiu com sucesso no SHA DB-159 6d503d1f4043332df066f816dd60d607a118f410. DB-160 adiciona a janela temporária de autonomia, tela nativa em grafite/âmbar e novos testes; o novo commit exige CI completa própria e não herda validações anteriores.
+> A CI [40342361110](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40342361110) concluiu `validate` e `android-build` com sucesso no SHA DB-160 `993322c2230c69954b790ae12e43e290ef6b4df6`, incluindo gate anti-regressão, TypeScript, suíte completa, APK standalone verificado e artefato enviado. DB-161 corrige um caso de fallback que não estava protegido; essa validação anterior não cobre o novo SHA. Testes físicos no Galaxy A06/Android 16 com ELM327/ECU real continuam pendentes.
 
 ### Integração, CI e riscos
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
@@ -16,9 +16,21 @@
 - Não foi executado teste físico no Galaxy A06/Android 16 nem com ELM327/ECU real.
 
 ### Critérios de aceitação
-- RG-01…RG-51 únicos e sequenciais; DB-001…DB-160 e índice sincronizados.
+- RG-01…RG-51 únicos e sequenciais; DB-001…DB-161 e índice sincronizados.
 - Gate anti-regressão, TypeScript, suíte completa e build Android aprovados no mesmo SHA final.
 - Nenhum PID passa a confirmado sem evidência RAW_ECU válida; autonomia persistida não pode ser exibida como atual.
+
+## DB-160 · 2026-10-26 — Fallback temporário de autonomia e tela nativa
+- `src/trip/autonomyBuffer.ts` publica uma estimativa temporária do nível apenas entre 30 e 60 segundos após a última leitura real do PID 012F, com pelo menos duas amostras válidas e sessão ECU ativa.
+- A tela `app/autonomia.tsx` exibe origem do cálculo, idade da leitura, consumo usado e limite de calibração. Valores demonstrativos do MagicPath não foram transportados para produção.
+- `tests/autonomyBuffer.test.js`, `tests/autonomyPresentation.test.js` e contratos RG-49/RG-50/RG-51 cobrem envelhecimento, perda de amostras, lacunas de fluxo e saída N/D.
+- CI [40342361110](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40342361110) validou `validate` e `android-build` no SHA `993322c2230c69954b790ae12e43e290ef6b4df6`; artefato APK standalone foi verificado e enviado. Isso não comprova instalação no telefone nem validação física.
+
+## DB-161 · 2026-10-26 — Exigir odômetro atual para fallback por tanque cheio
+- A auditoria encontrou que `estimateFuelRemainingFromFullTank` podia retornar a capacidade nominal mesmo sem odômetro atual; nesse cenário, trajetos ausentes do histórico não podiam ser detectados e a autonomia podia ficar otimista.
+- O fallback agora exige odômetro atual finito, não negativo e coerente com o histórico; sem esse dado, retorna `null` e a UI apresenta N/D em vez de uma estimativa não verificável.
+- `tests/fuelBalance.test.js` foi ajustado para provar que o caso sem odômetro retorna N/D e que a capacidade nominal só é aceita quando o odômetro atual valida a ausência de deslocamento.
+- Estado de validação: DB-161 requer `validate`, gate anti-regressão e `android-build` executados no novo HEAD. Nenhuma calibração de tanque/PID 012F foi presumida; teste físico permanece pendente.
 
 ---
 
@@ -229,7 +241,8 @@
 - **DB-157** · 2026-10-26 — Corrigir contagem ativa versus pendente na fila ELM
 - **DB-158** · 2026-10-26 — Atualizar a asserção do gate para finally multilinha
 - **DB-159** · 2026-10-26 — Reforçar continuidade das amostras e validade do balanço de autonomia
-- **DB-160** — Fallback de autonomia pelo buffer entre 30–60 s, tela nativa grafite/âmbar e testes/contratos atualizados.
+- **DB-160** · 2026-10-26 — Fallback de autonomia pelo buffer entre 30–60 s, tela nativa grafite/âmbar e testes/contratos atualizados.
+- **DB-161** · 2026-10-26 — Exigir odômetro atual válido para fallback do tanque cheio; adicionar teste e registrar o bloqueio em caso de histórico não reconciliável.
 
 ---
 
