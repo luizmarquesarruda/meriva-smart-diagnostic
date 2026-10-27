@@ -10,7 +10,7 @@ const SQLITE_MIGRATION_KEY = 'legacy_json_migration_v1';
 let databasePromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 function joinPath(base: string, child: string): string {
-  return `${base.replace(/\\/+$/, '')}/${child.replace(/^\\/+/, '')}`;
+  return `${base.replace(/\/+$/, '')}/${child.replace(/^\/+/, '')}`;
 }
 
 function sqliteDatabasePath(): string {
@@ -24,8 +24,10 @@ function sqliteSnapshotPath(basePath: string): string {
 }
 
 async function openDriveCycleDatabase(basePath: string): Promise<SQLite.SQLiteDatabase> {
-  const databasePath = sqliteDatabasePath();
-  const sqliteDir = joinPath(FileSystem.documentDirectory, 'SQLite');
+  const root = FileSystem.documentDirectory;
+  if (!root) throw new Error('SQLITE_DOCUMENT_DIRECTORY_UNAVAILABLE');
+  const sqliteDir = joinPath(root, 'SQLite');
+  const databasePath = joinPath(sqliteDir, SQLITE_DATABASE_NAME);
   const viagensDir = `${basePath}/VIAGENS`;
   await FileSystem.makeDirectoryAsync(sqliteDir, { intermediates: true });
   await FileSystem.makeDirectoryAsync(viagensDir, { intermediates: true });
