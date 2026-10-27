@@ -20,18 +20,6 @@
 - Gate anti-regressão, TypeScript, suíte completa e build Android aprovados no mesmo SHA final.
 - Nenhum PID passa a confirmado sem evidência RAW_ECU válida; autonomia persistida não pode ser exibida como atual.
 
-## DB-160 · 2026-10-26 — Fallback temporário de autonomia e tela nativa
-- `src/trip/autonomyBuffer.ts` publica uma estimativa temporária do nível apenas entre 30 e 60 segundos após a última leitura real do PID 012F, com pelo menos duas amostras válidas e sessão ECU ativa.
-- A tela `app/autonomia.tsx` exibe origem do cálculo, idade da leitura, consumo usado e limite de calibração. Valores demonstrativos do MagicPath não foram transportados para produção.
-- `tests/autonomyBuffer.test.js`, `tests/autonomyPresentation.test.js` e contratos RG-49/RG-50/RG-51 cobrem envelhecimento, perda de amostras, lacunas de fluxo e saída N/D.
-- CI [40342361110](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40342361110) validou `validate` e `android-build` no SHA `993322c2230c69954b790ae12e43e290ef6b4df6`; artefato APK standalone foi verificado e enviado. Isso não comprova instalação no telefone nem validação física.
-
-## DB-161 · 2026-10-26 — Exigir odômetro atual para fallback por tanque cheio
-- A auditoria encontrou que `estimateFuelRemainingFromFullTank` podia retornar a capacidade nominal mesmo sem odômetro atual; nesse cenário, trajetos ausentes do histórico não podiam ser detectados e a autonomia podia ficar otimista.
-- O fallback agora exige odômetro atual finito, não negativo e coerente com o histórico; sem esse dado, retorna `null` e a UI apresenta N/D em vez de uma estimativa não verificável.
-- `tests/fuelBalance.test.js` foi ajustado para provar que o caso sem odômetro retorna N/D e que a capacidade nominal só é aceita quando o odômetro atual valida a ausência de deslocamento.
-- Estado de validação: DB-161 requer `validate`, gate anti-regressão e `android-build` executados no novo HEAD. Nenhuma calibração de tanque/PID 012F foi presumida; teste físico permanece pendente.
-
 ---
 
 ## Portabilidade Floot → aplicativo Expo — 2026-10-23
@@ -4498,4 +4486,20 @@ Aplicar no aplicativo nativo a referência visual do painel de autonomia, conect
 ### Validação e limites
 - A CI [40332739335](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40332739335) passou no SHA de base DB-159. Ela não valida DB-160; a nova CI no SHA deste commit é obrigatória.
 - Não se presume linearidade física da conversão percentual→litros do PID 012F. A capacidade nominal de 56 L permanece apenas uma referência; confirmar precisão exige leituras reais com ELM327/ECU, odômetro e abastecimento medido.
-- Até a CI do SHA DB-160 completar, status de build/testes é pendente. Nenhum teste físico foi executado nesta anotação.
+- A CI [40342361110](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40342361110) posteriormente passou `validate` e `android-build` no SHA `993322c2230c69954b790ae12e43e290ef6b4df6`. Esse resultado antecede DB-161 e não o valida. Nenhum teste físico foi executado nesta anotação.
+
+## DB-161 · 2026-10-26 — Exigir odômetro atual para fallback por tanque cheio
+
+### Causa confirmada
+- A CI [40440083955](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40440083955) foi interrompida no gate anti-regressão, que identificou IDs DB duplicados no Diário: o detalhamento novo havia sido colocado na seção de estado vigente, além da sequência cronológica. O gate não foi afrouxado.
+
+### Correção aplicada
+- `src/trip/fuelBalance.ts`: o fallback agora exige odômetro atual finito, não negativo e coerente com o histórico. Sem odômetro, retorna `null`, porque trajetos não registrados não podem ser detectados.
+- `tests/fuelBalance.test.js`: adicionada regressão que rejeita o fallback sem odômetro e mantém o caso válido quando o odômetro coincide com o registro de tanque cheio; os demais cenários fornecem odômetro explícito para testar suas próprias condições.
+- `docs/CONTRATO_ANTI_REGRESSAO.md`: RG-45 exige explicitamente odômetro atual válido.
+- O estado operacional e a descrição da PR #92 registram os resultados da CI por SHA, sem reaproveitar aprovação de um SHA anterior.
+
+### Validação e limites
+- A CI [40440083955](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40440083955) falhou no gate porque as entradas DB-160/DB-161 estavam duplicadas e fora de sequência. O detalhamento foi movido para a sequência histórica e o gate permanece intacto; a próxima CI deve repetir gate, TypeScript, suíte completa e APK standalone no novo HEAD.
+- Não se declara P0 concluída até CI verde no SHA atual. Não houve teste físico com Galaxy A06/Android 16, ELM327/ECU real, comparação com odômetro ou abastecimento medido.
+
