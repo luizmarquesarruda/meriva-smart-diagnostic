@@ -32,6 +32,11 @@ Filtros Kalman e outros filtros adaptativos podem ser úteis, mas acrescentam pa
 - O app mantém um único proprietário do tracker. Não criar um segundo watcher na volta da rede: isso poderia duplicar callbacks e somar a mesma distância duas vezes.
 - Quando a rede retorna ou muda de tipo/geração (incluindo 4G/5G), o serviço pode solicitar um único `getCurrentPositionAsync` apenas se o último fix venceu: limite de 8 s e cooldown de 30 s. Enquanto a rede celular permanece disponível, também verifica a cada 30 s se o fix venceu — não consulta quando o fix está fresco. A consulta passa pela mesma validação de coordenadas/timestamp; resposta antiga ou futura não vira fix atual. É uma reacquisição do provedor Android, não uma localização calculada pela internet.
 
+### Proteção de ciclo de vida da reacquisição
+
+- Um timestamp recente com qualidade `SEM_FIX` (por exemplo, precisão acima de 30 m) não conta como fix utilizável e não deve impedir nova consulta pontual após mudança de rede.
+- Cada consulta captura a geração da sessão de rastreamento. Se `stop()`/reinício ocorrer antes da resposta, a resposta tardia é descartada e não pode semear a viagem seguinte.
+
 ## Background e bateria
 
 - Foreground usa `watchPositionAsync`; background usa o task declarado no início do aplicativo e o serviço foreground Android quando permitido.

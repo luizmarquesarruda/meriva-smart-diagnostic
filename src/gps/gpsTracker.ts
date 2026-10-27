@@ -126,6 +126,8 @@ export class GpsTracker {
   private vehicleSpeedHintKmh: number | null = null;
   private networkRefreshInFlight = false;
   private lastNetworkRefreshAtMs = 0;
+  // Invalidates one-shot location fixes when a tracking session stops/restarts.
+  private trackingGeneration = 0;
 
   private state: GpsTripState = {
     running: false,
@@ -168,6 +170,7 @@ export class GpsTracker {
     this.subscription = null;
 
     if (!this.state.running) {
+      this.trackingGeneration += 1;
       this.state = {
         ...this.state,
         running: true,
@@ -245,9 +248,11 @@ export class GpsTracker {
   async refreshLocationAfterNetworkChange(): Promise<boolean> {
     const nowMs = Date.now();
     if (!this.state.running || this.networkRefreshInFlight) return false;
-    if (isGpsSampleFresh(this.state.lastTimestamp, nowMs)) return false;
+    // A recent fix with unusable accuracy (SEM_FIX) must not suppress reacquisition.
+    if (this.state.signalQuality !== 'SEM_FIX' && isGpsSampleFresh(this.state.lastTimestamp, nowMs)) return false;
     if (nowMs - this.lastNetworkRefreshAtMs < GPS_NETWORK_REFRESH_COOLDOWN_MS) return false;
 
+    const trackingGeneration = this.trackingGeneration;
     this.networkRefreshInFlight = true;
     this.lastNetworkRefreshAtMs = nowMs;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -262,8 +267,10 @@ export class GpsTracker {
         }),
       ]);
       if (result.kind !== 'FIX') return false;
+      // A request from a stopped/restarted trip must not seed the new session.
+      if (!this.state.running || trackingGeneration !== this.trackingGeneration) return false;
       this.handleLocation(result.location);
-      return isGpsSampleFresh(this.state.lastTimestamp, Date.now());
+      return this.state.signalQuality !== 'SEM_FIX' && isGpsSampleFresh(this.state.lastTimestamp, Date.now());
     } catch {
       // Network recovery is opportunistic; failure must not interrupt OBD or tracking.
       return false;
@@ -526,6 +533,8 @@ export class GpsTracker {
   }
 
   async stop(options: { resetTrip?: boolean } = {}): Promise<void> {
+    // Invalidate pending one-shot fixes before asynchronous native cleanup.
+    this.trackingGeneration += 1;
     await this.stopBackgroundLocation();
     this.subscription?.remove();
     this.subscription = null;

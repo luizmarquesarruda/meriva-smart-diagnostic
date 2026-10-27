@@ -277,7 +277,37 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
   assert.strictEqual(currentPositionCalls, 1, 'cooldown impede nova requisição por 30 s');
   await cooldownTracker.stop();
 
-  console.log('PASS GPS: frescor, movimento urbano, deriva, refresh pontual de rede e consumo');
+  // A fresh timestamp with unusable accuracy must still allow reacquisition.
+  const poorFixTracker = new GpsTracker();
+  assert.strictEqual(await poorFixTracker.start(), true);
+  watcher({ coords: { latitude: -23.55, longitude: -46.63, speed: 0, accuracy: 100 }, timestamp: Date.now() });
+  assert.strictEqual(poorFixTracker.getState().signalQuality, 'SEM_FIX');
+  currentPositionCalls = 0;
+  currentPositionMock = { coords: { latitude: -23.55, longitude: -46.63, speed: 0, accuracy: 8 }, timestamp: Date.now() };
+  assert.strictEqual(await poorFixTracker.refreshLocationAfterNetworkChange(), true, 'fix recente, mas com precisão inutilizável, deve permitir pedir um fix válido');
+  assert.strictEqual(currentPositionCalls, 1);
+  assert.strictEqual(poorFixTracker.getState().signalQuality, 'BOA');
+  await poorFixTracker.stop();
+
+  // A pending network fix from an old tracking session must not seed a restarted trip.
+  const lifecycleTracker = new GpsTracker();
+  assert.strictEqual(await lifecycleTracker.start(), true);
+  currentPositionCalls = 0;
+  let resolvePendingFix;
+  currentPositionMock = new Promise((resolve) => { resolvePendingFix = resolve; });
+  const pendingRefresh = lifecycleTracker.refreshLocationAfterNetworkChange();
+  assert.strictEqual(currentPositionCalls, 1);
+  await lifecycleTracker.stop({ resetTrip: true });
+  assert.strictEqual(await lifecycleTracker.start(), true);
+  resolvePendingFix({ coords: { latitude: -23.55, longitude: -46.63, speed: 0, accuracy: 8 }, timestamp: Date.now() });
+  assert.strictEqual(await pendingRefresh, false, 'resposta assíncrona da sessão encerrada não deve ser aplicada à nova viagem');
+  assert.strictEqual(lifecycleTracker.getState().running, true);
+  assert.strictEqual(lifecycleTracker.getState().samples, 0, 'fix da sessão antiga não pode atualizar a contagem da nova viagem');
+  assert.strictEqual(lifecycleTracker.getState().lastTimestamp, null, 'fix da sessão antiga não pode preencher o timestamp da nova viagem');
+  await lifecycleTracker.stop();
+  currentPositionMock = null;
+
+  console.log('PASS GPS: frescor, movimento urbano, deriva, refresh pontual, qualidade e ciclo de vida');
 })().catch((error) => {
   console.error(error);
   process.exitCode = 1;

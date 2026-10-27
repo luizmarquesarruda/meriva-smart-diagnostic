@@ -1,6 +1,6 @@
-## ESTADO VIGENTE — 2026-10-27 (P0 Bluetooth / P1 SQLite / GPS; DB-172)
+## ESTADO VIGENTE — 2026-10-27 (P0 Bluetooth / P1 SQLite / GPS; DB-173)
 
-> Esta seção substitui o snapshot operacional anterior. A PR #92 está **fechada sem merge** por decisão de não manter PR aberta nem mesclar antes da validação completa. A branch consolidada foi preservada; o código de DB-170 está isolado em `fix/sqlite-trip-history-20261027`. Nenhuma alteração deste trabalho foi incorporada à `main`.
+> Estado verificado em 2026-10-27: a branch `fix/gps-movement-confirmation-20261027` contém a pilha consolidada DB-170–DB-173 e está 213 commits à frente de `main` (sem commits da `main` faltando no comparativo consultado). As PRs #92–#94 foram fechadas sem merge; nenhuma PR permanece aberta e nenhuma dessas alterações foi incorporada à `main`. A CI 40549984999 validou o SHA `bad9338199370a84bdf558b1fc935ae943ece3aa` (DB-172), mas não valida DB-173; validar o novo HEAD antes de qualquer integração.
 
 ### P0 — Bluetooth Classic / ELM327
 
@@ -24,16 +24,16 @@
 
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
 - PR [#92 — consolidação P0–P2](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/92): fechada sem merge em 2026-10-27; branch `integration/reconcile-pid-ui-20261025` preservada no SHA `b96a315239c9482d51f06436f67201fc2a73d76a`.
-- Na última consulta antes do trabalho DB-170, não havia PRs abertas. Não criar uma PR e deixá-la em aberto ao encerrar a rodada.
-- Branch atual: `fix/sqlite-trip-history-20261027`; HEAD muda conforme os commits DB-170 são adicionados. A CI anterior [40506098887](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40506098887) não valida os novos commits.
-- `main` consultada anteriormente: `7eec3afecb3718020724baf053f8b6d2ca636fab`. Não houve merge automático; fechar PR não incorpora código a `main`.
+- Estado consultado em 2026-10-27: não há PRs abertas; #92, #93 e #94 estão fechadas sem merge. Não abrir PR que permaneça aberta ao encerrar a rodada.
+- Branch auditada atual: `fix/gps-movement-confirmation-20261027`, SHA-base antes de DB-173 `bad9338199370a84bdf558b1fc935ae943ece3aa`. A CI [40549984999](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40549984999) validou DB-172 e produziu APK standalone; o novo commit DB-173 exige CI própria.
+- `main` consultada: `7eec3afecb3718020724baf053f8b6d2ca636fab`. O comparativo `main...fix/gps-movement-confirmation-20261027` retornou `ahead_by=213`, `behind_by=0`; fechar PR não incorpora código a `main`.
 - PRs #81 e #83 continuam fechadas sem merge. O código útil já portado/reconciliado deve continuar sendo verificado no diff consolidado; seu histórico não deve ser descrito como mesclado.
 - A auditoria comparativa de apps está em `docs/OBD_APP_FEATURE_AUDIT_2026-10-27.md`; a auditoria anterior de buffers está em `docs/BUFFER_AUDIT_2026-10-26.md`.
-- GPS: a auditoria comparativa Android/Expo/Strava/OsmAnd/Waze está em `docs/GPS_IMPLEMENTATION_AUDIT_2026-10-27.md`; o limiar de movimento foi ajustado para não exigir 8 m em cada callback de 1 s, mantendo três segmentos consecutivos, margem de precisão e deslocamento líquido. Mudanças de conectividade (incluindo 4G↔5G) podem pedir um único fix pontual quando o último GPS venceu; enquanto o serviço está ativo e a rede celular disponível, o frescor também é verificado a cada 30 s. Cada consulta tem timeout de 8 s/cooldown de 30 s; timestamps futuros e respostas antigas não viram fix atual. Isso não promete callbacks em background quando o Android suspende JS: o task nativo continua sendo o dono das atualizações de fundo. RG-62 / GPS-03. CI no novo SHA ainda pendente; percurso físico no Galaxy A06 também pendente.
+- GPS DB-172: auditoria Android/Expo/Strava/OsmAnd/Waze, filtro para movimento urbano e deriva, reacquisição por rede a cada 30 s quando necessário, timeout de 8 s e cooldown de 30 s. DB-173 acrescenta proteção contra `SEM_FIX` recente que bloqueava reacquisição e contra resultado assíncrono de sessão encerrada. CI 40549984999 passou no SHA DB-172; nova CI para DB-173 e teste físico de percurso no Galaxy A06 permanecem pendentes.
 
 ### Critérios para considerar a rodada concluída
 
-- RG-01…RG-62 únicos, contínuos e ordenados; DB-001…DB-172 e índice sincronizados.
+- RG-01…RG-63 únicos, contínuos e ordenados; DB-001…DB-173 e índice sincronizados.
 - Gate anti-regressão, TypeScript, suíte completa e build Android aprovados no mesmo SHA final.
 - Migração JSON→SQLite idempotente demonstrada por teste; cópia SQLite incluída em backup; restauração testada; origem inválida ou duplicata não pode provocar perda silenciosa.
 - Nenhum PID passa a confirmado sem evidência RAW_ECU válida; autonomia persistida não deve aparecer como atual sem amostra vigente.
@@ -261,6 +261,7 @@
 - **DB-170** · 2026-10-27 — Migrar histórico operacional de viagens para SQLite com migração idempotente/transacional, backup verificado, restauração e testes RG-60/SQLITE-01.
 - **DB-171** · 2026-10-27 — Aumentar a janela da primeira sondagem ECU `010C` após `ATSP0`, mantendo timeout adaptativo nas sondagens seguintes; proteger via RG-61/BT-CONN-08.
 - **DB-172** · 2026-10-27 — Corrigir confirmação de movimento GPS urbano: piso de deslocamento adaptado ao intervalo, três segmentos válidos, deslocamento líquido e rejeição de saltos/zigue-zague; documentar benchmarks Android/Expo/Strava/OsmAnd/Waze e proteger com RG-62/GPS-03.
+- **DB-173** · 2026-10-27 — Corrigir corrida de ciclo de vida na reacquisição GPS e permitir reacquisição quando timestamp recente não tem qualidade utilizável; registrar RG-63 e teste GPS-03.
 
 ---
 
@@ -4739,3 +4740,21 @@ Aplicar no aplicativo nativo a referência visual do painel de autonomia, conect
 - O novo HEAD precisa passar Expo Doctor, gate anti-regressão, TypeScript, suíte completa e build Android standalone no mesmo SHA.
 - O teste físico continua obrigatório: instalar APK de SHA verde no Galaxy A06 / Android 16, capturar percurso real em velocidades urbanas e em parada, e comparar a distância GPS com rota/odômetro conhecidos. Aumentar a fidelidade lógica não comprova precisão física nem desempenho da economia de bateria do aparelho.
 
+
+
+## DB-173 · 2026-10-27 — Proteger reacquisição GPS contra fix inutilizável e corrida de sessão
+
+### Achados da auditoria
+- `refreshLocationAfterNetworkChange()` ignorava a qualidade do fix ao aplicar a regra de frescor: timestamp recente com `SEM_FIX` podia impedir novas tentativas mesmo com precisão acima do limite aceito.
+- A consulta pontual assíncrona podia terminar depois de `stop()` ou do reinício de uma viagem. Sem vincular a resposta à sessão iniciadora, um fix tardio poderia atualizar o estado de uma sessão parada ou virar referência da viagem seguinte.
+
+### Correção aplicada
+1. `src/gps/gpsTracker.ts`: reacquisição só é suprimida por timestamp recente quando a qualidade do fix é utilizável; cada consulta captura `trackingGeneration` e descarta a resposta se a sessão foi encerrada/reiniciada.
+2. `tests/gps.test.js`: casos comportamentais para recuperação a partir de `SEM_FIX` recente e para resolução tardia depois de parar/reiniciar; a nova sessão precisa continuar sem amostras nem timestamp herdado.
+3. `tests/projectBaseline.test.js`: protege a implementação, a presença dos testes e o contrato RG-63.
+4. Atualizados `docs/CONTRATO_ANTI_REGRESSAO.md`, `docs/TEST_PLAN.md`, `docs/GPS_DRIFT_AND_DISTANCE.md`, `docs/GPS_IMPLEMENTATION_AUDIT_2026-10-27.md` e `CHANGELOG.md`.
+
+### Estado de validação
+- A CI [40549984999](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40549984999) foi verde nos jobs `validate` e `android-build` no SHA anterior `bad9338199370a84bdf558b1fc935ae943ece3aa`; o APK standalone de DB-172 foi gerado e não deve ser tratado como build de DB-173.
+- A nova revisão deve passar pelo gate anti-regressão, TypeScript, suíte completa e build Android no novo SHA. O teste físico continua pendente no Galaxy A06 / Android 16, com comparação da distância em percurso conhecido.
+- Não houve merge nem PR aberta; manter a branch de auditoria e não incorporar à `main` antes de validar o novo SHA e reconciliar o escopo completo de 213 commits.

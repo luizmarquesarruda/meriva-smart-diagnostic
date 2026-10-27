@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### GPS: proteger reacquisição e reinício de viagem — DB-173
+- Reacquisição não é bloqueada por timestamp recente se o fix tem qualidade `SEM_FIX`.
+- Fix pontual que resolve após parada/reinício é descartado por geração de sessão; não pode alterar a nova viagem.
+- Incluídos testes comportamentais e extensão do contrato RG-63. A CI do novo SHA e o ensaio físico continuam necessários.
+
 ### GPS: confirmação de movimento urbano e deriva — DB-172
 - O tracker deixa de exigir 8 m em cada segmento GPS individual, incompatível com callbacks de 1 s em velocidades urbanas.
 - O piso por segmento agora depende do intervalo entre fixes; a distância só é somada depois de três segmentos válidos consecutivos (quatro posições), com precisão aceitável e deslocamento líquido da janela acima da margem de confiança.

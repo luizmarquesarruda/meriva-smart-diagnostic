@@ -202,6 +202,10 @@ assert.ok(gpsTracker.includes('GPS_NETWORK_REFRESH_INTERVAL_MS = 30_000'), 'GPS 
 assert.ok(gpsTracker.includes('GPS_NETWORK_REFRESH_COOLDOWN_MS = 30_000'), 'GPS recovery requests must be throttled');
 assert.ok(gpsTracker.includes('GPS_NETWORK_REFRESH_TIMEOUT_MS = 8_000'), 'GPS recovery requests must be bounded');
 assert.ok(gpsTracker.includes('refreshLocationAfterNetworkChange'), 'a stale GPS fix can be reacquired once after a network/provider transition');
+assert.ok(gpsTracker.includes("this.state.signalQuality !== 'SEM_FIX' && isGpsSampleFresh"), 'poor-quality GPS fixes must not suppress reacquisition');
+assert.ok(gpsTracker.includes('trackingGeneration !== this.trackingGeneration'), 'late one-shot GPS results must be rejected after stop/restart');
+assert.ok(read('tests/gps.test.js').includes('resposta assíncrona da sessão encerrada'), 'GPS lifecycle race must have a behavioral regression test');
+assert.ok(projectContract.includes('| RG-63 |'), 'GPS refresh lifecycle and usable-fix quality must remain contractual');
 assert.ok(tripService.includes("NetInfo.addEventListener"), 'trip service must observe network transitions without creating location watchers');
 assert.ok(tripService.includes("network.details.cellularGeneration"), 'cellular generation changes (4G/5G) must be detectable');
 assert.ok(read('tests/gps.test.js').includes('cooldown impede nova requisição'), 'network refresh cooldown must have a behavioral regression test');

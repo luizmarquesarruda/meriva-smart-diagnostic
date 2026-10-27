@@ -57,6 +57,12 @@ A arquitetura continua sendo local-first: Android/Expo fornece os fixes; o app v
 - OsmAnd — Gravação de Viagem: https://www.osmand.net/pt/docs/user/plugins/trip-recording/
 - Waze Help — Permitir uso do GPS e precisão de localização no Android: https://support.google.com/waze/answer/6083679?hl=pt-br
 
+## Achados adicionais da auditoria de integração — DB-173
+
+- Um timestamp recente não caracteriza por si só um fix utilizável: o estado `SEM_FIX` também deve permitir reacquisição se a precisão reportada for inadequada.
+- Uma chamada assíncrona de `getCurrentPositionAsync` pode sobreviver ao cancelamento lógico de uma viagem. A resposta precisa estar vinculada à geração do tracker e ser ignorada após parar/reiniciar a sessão.
+- Foram adicionados testes comportamentais para ambas as condições. A CI deve ser verificada no novo SHA e o percurso físico continua obrigatório.
+
 ## Limites da evidência
 
 Esta revisão aplica os comportamentos documentados como princípios de desenho; não copia código proprietário dos apps citados nem afirma conhecimento de algoritmos internos não publicados. O código e os mocks conseguem demonstrar o comportamento de lógica, mas só um percurso real confirma a precisão de GPS, o impacto da economia de bateria do Samsung e a qualidade de posição do aparelho.
