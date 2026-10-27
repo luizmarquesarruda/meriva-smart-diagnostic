@@ -10,7 +10,7 @@
 - DB-169 corrigiu a guarda de tipo para `tokens[0]` após falha de TypeScript. A CI `40506098887` passou em `validate` e `android-build` no SHA `b96a315239c9482d51f06436f67201fc2a73d76a`, incluindo DB-167–169. Essa CI é anterior às alterações DB-170 e não as valida.
 - **Ainda pendente:** teste físico pós-correção, com um novo trace, no Galaxy A06 / Android 16 / adaptador ELM327 e ECU reais. CI e mocks não substituem esse ensaio. Não atribuir suporte a PID ou protocolo sem resposta RAW_ECU válida.
 
-### DB-170 — Histórico operacional em SQLite
+**DB-170 — Histórico operacional em SQLite**
 
 - Adicionado `expo-sqlite` na faixa compatível do app Expo SDK 51; o lockfile fixa a versão resolvida dentro dessa faixa e mantém a árvore de dependências registrada.
 - SQLite passa a ser a fonte de verdade de `readDriveCycles` e `addDriveCycle`, com chave primária por viagem, transações para importação/gravação, marcador de migração e validação dos registros. Viagens com IDs duplicados na origem são bloqueadas para reconciliação explícita; não são descartadas silenciosamente.
@@ -256,6 +256,7 @@
 - **DB-167** · 2026-10-27 — Corrigir parsing de trama KWP compacta e espaçada, validar comprimento/checksum, cobrir o RX real `84F111410C0000D3` e acrescentar RG-58/BT-CONN-06.
 - **DB-168** · 2026-10-27 — Corrigir documentação/interface do perfil ELM327 genérico, retry e catálogo de fallback; RG-59/BT-CONN-07.
 - **DB-169** · 2026-10-27 — Corrigir narrowing TypeScript para o primeiro byte opcional no parser KWP; validar na CI.
+- **DB-170** · 2026-10-27 — Migrar histórico operacional de viagens para SQLite com migração idempotente/transacional, backup verificado, restauração e testes RG-60/SQLITE-01.
 
 ---
 
@@ -4672,3 +4673,25 @@ Aplicar no aplicativo nativo a referência visual do painel de autonomia, conect
 
 ### Validação pendente
 - Reexecutar CI no SHA atualizado e revisar todos os jobs antes de declarar a correção validada. Não fazer merge até CI verde e teste físico pós-correção no Galaxy A06/Android 16 com o adaptador e ECU reais.
+
+
+## DB-170 · 2026-10-27 — Migrar histórico operacional de viagens para SQLite
+
+### Lacuna e decisão
+- A auditoria comparativa de apps OBD-II identificou que o histórico operacional estava concentrado em `VIAGENS/index.json`, reescrito a cada viagem, sem armazenamento transacional próprio. SQLite foi delimitado às viagens estruturadas; JSON permanece como catálogo/configuração e espelho de compatibilidade, CSV como exportação e TXT como relatório legível.
+- Criada branch isolada `fix/sqlite-trip-history-20261027`, baseada no SHA de integração anterior `b96a315239c9482d51f06436f67201fc2a73d76a`; nenhuma destas alterações foi incorporada à `main`.
+
+### Correções implementadas
+1. Adicionado `expo-sqlite` compatível com Expo SDK 51. `src/storage/driveCycleStorage.ts` usa SQLite como fonte de verdade de leitura/gravação, com transação de importação/gravação, chave primária por ID e marcador `legacy_json_migration_v1`.
+2. Migração idempotente preserva o JSON legado em `index.pre-sqlite.json` antes de atualizar o espelho. Usa `index.previous.json` como segunda origem se o índice principal estiver ausente. Exclui explicitamente `CARSCANNER_SEED`; JSON corrompido sem backup e IDs duplicados abortam a migração, sem descarte silencioso ou inicialização vazia.
+3. O banco validado é copiado a `VIAGENS/meriva_smart_history.db`. `src/storage/backup.ts` sincroniza essa cópia antes de criar o pacote de backup. `restoreDriveCyclesFromBackup` permite restauração do pacote local ou do snapshot validado, com origem validada e atualização transacional.
+4. Adicionados `tests/sqliteTripHistory.test.js` e mock SQLite no teste de regressão; contratos RG-60, SQLITE-01, changelog e auditoria comparativa sincronizados.
+
+### Validação e falha identificada
+- A primeira CI DB-170 [40534916847](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40534916847), SHA `ddef5cedd6a28512e72ca3a2504a85185a255e63`, passou `npm ci` e Expo Doctor (17/17), mas falhou no gate anti-regressão. O log identificou ordem errada de documentação: a nota `### DB-170` foi posicionada antes das entradas DB-001…DB-169, violando o contrato de sequência. O gate não foi afrouxado; o título da nota operacional foi convertido para texto e esta entrada DB-170 será registrada após DB-169, com o índice sequencial atualizado.
+- Reexecutar gate, TypeScript, suíte completa e build Android no SHA corrigido antes de declarar o código validado. Testes com mock SQLite não substituem validação no banco nativo do APK.
+
+### Bloqueios externos restantes
+- P0 Bluetooth permanece sem confirmação física pós-DB-167: é necessário instalar um APK vindo de SHA validado no Galaxy A06 `SM-A065M` / Android 16, conectar ao ELM327 e ECU reais, guardar o trace novo e confirmar resposta positiva válida de `010C`. O erro mais recente registrado era `ECU NÃO RESPONDEU AO 010C: TIMEOUT | RX=N/D`; não presumir solução até novo relatório.
+- Não mesclar a branch nem qualquer PR enquanto a CI não estiver verde no SHA final e o ensaio físico estiver pendente.
+
