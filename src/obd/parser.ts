@@ -102,6 +102,7 @@ function findResponsePayload(rawResponse: string, pid: string, byteCount: number
     const expectedCanDlc = byteCount + 2 + serviceOffsetBytes;
     const isKwpHeader = /^8[0-9A-F]\s+[0-9A-F]{2}\s+[0-9A-F]{2}\s+/.test(lineText)
       && tokens.length >= byteCount + 4
+      && tokens[0] !== undefined
       && (Number.parseInt(tokens[0], 16) & 0x3F) === expectedCanDlc;
     const isDirectResponse = new RegExp('^' + service + '\\s+' + requestedPid + '(?:\\s|$)').test(lineText);
 

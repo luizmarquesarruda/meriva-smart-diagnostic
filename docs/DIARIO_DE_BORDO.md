@@ -1,8 +1,9 @@
-## ESTADO VIGENTE — 2026-10-27 (P0 Bluetooth/Autonomia; DB-168)
+## ESTADO VIGENTE — 2026-10-27 (P0 Bluetooth/Autonomia; DB-169)
 
 > DB-168 corrige divergências na documentação/interface do perfil ELM327 genérico. DB-167 corrige a rejeição de uma trama KWP real recebida no teste Bluetooth: `84F111410C0000D3` contém resposta positiva para `010C`, mas o parser anterior não reconhecia esse cabeçalho/checksum e continuava o fallback de protocolos. A CI verde anterior (run [40495852871](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40495852871), SHA `b226809cd3802679bed5c4c7d1abe9c243dc16dc`) é anterior a esta correção e não a valida. PR #92 permanece sem merge até a CI ficar verde no HEAD que inclui código, testes e documentação; teste físico pós-correção ainda pendente.
 
 ### Integração, CI e riscos
+- DB-169: a primeira CI após DB-168 encontrou erro de TypeScript em `src/obd/parser.ts`: `tokens[0]` podia ser `undefined` no acesso ao cabeçalho KWP. Adicionada guarda explícita antes de analisar o primeiro byte; a CI do novo SHA ainda precisa confirmar a correção.
 - DB-168: documentação de retry corrigida para o padrão runtime (3 tentativas/candidato, 1500 ms); sequência de protocolos atualizada para `5,3,4,6,7,8,9,2,1` após `ATSP0`. J1850 é fallback genérico não confirmado na Meriva. CI no novo SHA ainda precisa validar.
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
 - `main`: `7eec3afecb3718020724baf053f8b6d2ca636fab`; PR [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84) foi mesclada. A branch de integração contém o inventário documental e as correções DB-146/147.
@@ -18,7 +19,7 @@
 - Não foi executado teste físico no Galaxy A06/Android 16 nem com ELM327/ECU real.
 
 ### Critérios de aceitação
-- RG-01…RG-59 únicos e sequenciais; DB-001…DB-168 e índice sincronizados.
+- RG-01…RG-59 únicos e sequenciais; DB-001…DB-169 e índice sincronizados.
 - Gate anti-regressão, TypeScript, suíte completa e build Android aprovados no mesmo SHA final.
 - Nenhum PID passa a confirmado sem evidência RAW_ECU válida; autonomia persistida não pode ser exibida como atual.
 - A auditoria comparativa de apps está em `docs/OBD_APP_FEATURE_AUDIT_2026-10-27.md`; ela distingue funcionalidades já presentes de lacunas reais. SQLite para histórico operacional continua pendente e não é declarado implementado.
@@ -241,6 +242,7 @@
 - **DB-166** · 2026-10-27 — Corrigir limite efetivo de retry Bluetooth, integrar combustível em marcha lenta, exigir validade explícita do consumo para balanço e preservar lastSeen em DTC ausente.
 - **DB-167** · 2026-10-27 — Corrigir parsing de trama KWP compacta e espaçada, validar comprimento/checksum, cobrir o RX real `84F111410C0000D3` e acrescentar RG-58/BT-CONN-06.
 - **DB-168** · 2026-10-27 — Corrigir documentação/interface do perfil ELM327 genérico, retry e catálogo de fallback; RG-59/BT-CONN-07.
+- **DB-169** · 2026-10-27 — Corrigir narrowing TypeScript para o primeiro byte opcional no parser KWP; validar na CI.
 
 ---
 
@@ -4645,3 +4647,15 @@ Aplicar no aplicativo nativo a referência visual do painel de autonomia, conect
 ### Validação pendente
 - Confirmar a sequência `0,5,3,4,6,7,8,9,2,1` e a coerência dos textos por meio dos testes automatizados.
 - A CI deve validar este commit no SHA final. O ensaio físico no Galaxy A06/Android 16 com o ELM327 real continua obrigatório; a documentação corrigida não comprova que a conexão já funciona.
+
+
+## DB-169 · 2026-10-27 — Corrigir guarda TypeScript no parser KWP
+
+### Evidência
+- A CI `40505787050`, no SHA `e70257004999df2fd1c11ed29f9ab01b1399ac2c`, passou `npm ci`, Expo Doctor (17/17) e gate anti-regressão, mas falhou em `npm run typecheck` porque `tokens[0]` tem tipo `string | undefined` no parser KWP.
+
+### Correção
+- Adicionada verificação explícita de `tokens[0] !== undefined` antes de executar `Number.parseInt` e validar o comprimento do cabeçalho KWP. A intenção do contrato permanece inalterada: quadro KWP só passa com quantidade de bytes e checksum válidos.
+
+### Validação pendente
+- Reexecutar CI no SHA atualizado e revisar todos os jobs antes de declarar a correção validada. Não fazer merge até CI verde e teste físico pós-correção no Galaxy A06/Android 16 com o adaptador e ECU reais.

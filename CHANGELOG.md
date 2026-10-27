@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Guarda de tipo no parser KWP — DB-169
+- Corrigido erro TypeScript por acesso potencialmente indefinido a `tokens[0]` durante validação do cabeçalho KWP; a CI anterior detectou a falha antes dos testes.
+
 ### Correção do parser KWP — DB-167
 - Reconhecido o quadro compacto KWP com cabeçalho de três bytes e checksum, incluindo o RX real `84F111410C0000D3` do teste Bluetooth.
 - O parser agora valida o comprimento declarado e a soma de verificação antes de aceitar a resposta; checksum incorreto, bytes extras e quadros incompletos continuam rejeitados.
