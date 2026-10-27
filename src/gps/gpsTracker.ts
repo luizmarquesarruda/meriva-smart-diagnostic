@@ -34,6 +34,8 @@ const MAX_ACCEPTED_SEGMENT_KM = 0.25;
 const STOP_SPEED_KMH = 2;
 const MIN_MOVING_SAMPLES = 3;
 export const GPS_SAMPLE_STALE_AFTER_MS = 5_000;
+export const GPS_NETWORK_REFRESH_COOLDOWN_MS = 30_000;
+export const GPS_NETWORK_REFRESH_TIMEOUT_MS = 8_000;
 const MAX_SEGMENT_GAP_MS = GPS_SAMPLE_STALE_AFTER_MS;
 
 function movementThresholdM(sample: GpsSample, previous: GpsSample): number {
@@ -121,6 +123,8 @@ export class GpsTracker {
   private pendingMovingStart: GpsSample | null = null;
   private movementEstablished = false;
   private vehicleSpeedHintKmh: number | null = null;
+  private networkRefreshInFlight = false;
+  private lastNetworkRefreshAtMs = 0;
 
   private state: GpsTripState = {
     running: false,
@@ -230,6 +234,42 @@ export class GpsTracker {
 
   isBackgroundLocationRunning(): boolean {
     return this.backgroundTaskRunning;
+  }
+
+  /**
+   * Connectivity changes can alter which Android location providers are available.
+   * Request one bounded fix only when the active track's last fix has expired;
+   * this is a one-shot refresh, never a second watcher or a network-derived coordinate.
+   */
+  async refreshLocationAfterNetworkChange(): Promise<boolean> {
+    const nowMs = Date.now();
+    if (!this.state.running || this.networkRefreshInFlight) return false;
+    if (isGpsSampleFresh(this.state.lastTimestamp, nowMs)) return false;
+    if (nowMs - this.lastNetworkRefreshAtMs < GPS_NETWORK_REFRESH_COOLDOWN_MS) return false;
+
+    this.networkRefreshInFlight = true;
+    this.lastNetworkRefreshAtMs = nowMs;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    try {
+      const result = await Promise.race([
+        Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.BestForNavigation,
+          mayShowUserSettingsDialog: false,
+        }).then((location) => ({ kind: 'FIX' as const, location })),
+        new Promise<{ kind: 'TIMEOUT' }>((resolve) => {
+          timeoutId = setTimeout(() => resolve({ kind: 'TIMEOUT' }), GPS_NETWORK_REFRESH_TIMEOUT_MS);
+        }),
+      ]);
+      if (result.kind !== 'FIX') return false;
+      this.handleLocation(result.location);
+      return isGpsSampleFresh(this.state.lastTimestamp, Date.now());
+    } catch {
+      // Network recovery is opportunistic; failure must not interrupt OBD or tracking.
+      return false;
+    } finally {
+      if (timeoutId !== null) clearTimeout(timeoutId);
+      this.networkRefreshInFlight = false;
+    }
   }
 
   setVehicleSpeedHintKmh(speedKmh: number | null): void {
