@@ -10,6 +10,7 @@ import { BluetoothDeviceInfo } from '../src/obd/bluetoothClassicTransport';
 import { discoverPairedDevices, ensureBluetoothReady } from '../src/obd/bluetoothManager';
 import { connectPreferredElm, getSharedObdConnection, getSharedObdStatus, subscribeSharedObd, subscribeSharedObdStatus, disconnectSharedObd } from '../src/obd/sharedConnection';
 import { readAppSettings, writeAppSettings } from '../src/database/appSettings';
+import { formatElmQueueHealth } from '../src/obd/elmHealthPresentation';
 
 function lifecycleLabel(lifecycle: ReturnType<typeof getSharedObdStatus>['lifecycle']): string {
   const labels: Record<typeof lifecycle, string> = {
@@ -168,15 +169,19 @@ export default function BluetoothScreen() {
             <Text style={styles.label}>SAÚDE DO ELM327</Text>
             {(() => {
               const health = getSharedObdConnection()?.session.getHealthSnapshot();
-              return health ? (
+              if (!health) return <Text style={styles.detail}>Conecte o ELM327 para medir a saúde da sessão.</Text>;
+              const queueHealth = formatElmQueueHealth(health);
+              return (
                 <>
                   <Text style={styles.detail}>COMANDOS {health.successfulCommands}/{health.commands} • MÉDIA {health.averageResponseMs} ms</Text>
                   <Text style={styles.detail}>TIMEOUTS {health.timeouts} • ERROS {health.errors} • SEM DADOS {health.noData}</Text>
+                  <Text style={styles.detail}>{queueHealth.queue}</Text>
+                  <Text style={queueHealth.warning ? styles.warning : styles.detail}>{queueHealth.wait}</Text>
                   <Text style={health.recoveryRecommended ? styles.warning : styles.detail}>
                     {health.recoveryRecommended ? 'RECUPERAÇÃO RECOMENDADA' : 'COMUNICAÇÃO ESTÁVEL'}
                   </Text>
                 </>
-              ) : <Text style={styles.detail}>Conecte o ELM327 para medir a saúde da sessão.</Text>;
+              );
             })()}
           </View>
         </View>
