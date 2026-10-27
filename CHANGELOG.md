@@ -16,7 +16,7 @@
 ### Correção do parser KWP — DB-167
 - Reconhecido o quadro compacto KWP com cabeçalho de três bytes e checksum, incluindo o RX real `84F111410C0000D3` do teste Bluetooth.
 - O parser agora valida o comprimento declarado e a soma de verificação antes de aceitar a resposta; checksum incorreto, bytes extras e quadros incompletos continuam rejeitados.
-- Incluídos casos compactos/espaçados em `pidParserIntegrity.test.js`, contrato RG-58 e plano BT-CONN-06. A CI anterior não valida esta alteração; o ensaio físico pós-correção permanece pendente.
+- Incluídos casos compactos/espaçados em `pidParserIntegrity.test.js`, contrato RG-58 e plano BT-CONN-06. A CI 40506098887 passou no SHA b96a315 (DB-167–169); a validação dos novos commits DB-170 exige uma CI própria, e o ensaio físico pós-correção permanece pendente.
 
 ### Correções de revisão DB-166
 - Alinhado o limite efetivo de retry Bluetooth: sem override, usa a política do catálogo (3 tentativas); as opções explícitas 3/10/20 continuam configuráveis.
