@@ -402,5 +402,18 @@ for (let index = 0; index < diaryEntryIds.length; index++) {
 }
 assert.deepEqual(diaryIndexIds, diaryEntryIds, 'o índice DB-NNN precisa corresponder exatamente às entradas do diário');
 
+// Strict ECU payload validation must remain present in the actual recovery path.
+const recoverySource = read('src/obd/elm327.ts');
+assert.ok(recoverySource.includes("const parsedProbe = parsePidResponse('010C', probe.response)"),
+  'ECU recovery must use the canonical PID parser');
+assert.ok(recoverySource.includes("parsedProbe.status !== 'RESPONDEU'"),
+  'a positive service marker without a valid payload cannot confirm recovery');
+assert.ok(recoverySource.includes('parsedProbe.value === null'),
+  'a null parsed RPM value cannot confirm recovery');
+assert.ok(recoverySource.includes('Number.isFinite(parsedProbe.value)'),
+  'recovered RPM must be finite');
+assert.ok(projectContract.includes('| RG-53 |'), 'strict ECU recovery must be protected by RG-53');
+assert.ok(read('docs/TEST_PLAN.md').includes('BT-CONN-04'), 'strict ECU recovery must have explicit test criteria');
+
 console.log('Anti-regression baseline gate: PASS');
 console.log('Protected contracts: five-read sensor tests, manual PID flow, single ELM327 queue, offline diagnosis, Expo SDK 51, GPS/Trip, TXT/history and cockpit/graphs.');
