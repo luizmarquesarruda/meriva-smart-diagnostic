@@ -1,4 +1,4 @@
-## ESTADO VIGENTE — 2026-10-27 (P0 Bluetooth / P1 SQLite; DB-171)
+## ESTADO VIGENTE — 2026-10-27 (P0 Bluetooth / P1 SQLite / GPS; DB-172)
 
 > Esta seção substitui o snapshot operacional anterior. A PR #92 está **fechada sem merge** por decisão de não manter PR aberta nem mesclar antes da validação completa. A branch consolidada foi preservada; o código de DB-170 está isolado em `fix/sqlite-trip-history-20261027`. Nenhuma alteração deste trabalho foi incorporada à `main`.
 
@@ -29,10 +29,11 @@
 - `main` consultada anteriormente: `7eec3afecb3718020724baf053f8b6d2ca636fab`. Não houve merge automático; fechar PR não incorpora código a `main`.
 - PRs #81 e #83 continuam fechadas sem merge. O código útil já portado/reconciliado deve continuar sendo verificado no diff consolidado; seu histórico não deve ser descrito como mesclado.
 - A auditoria comparativa de apps está em `docs/OBD_APP_FEATURE_AUDIT_2026-10-27.md`; a auditoria anterior de buffers está em `docs/BUFFER_AUDIT_2026-10-26.md`.
+- GPS: a auditoria comparativa Android/Expo/Strava/OsmAnd/Waze está em `docs/GPS_IMPLEMENTATION_AUDIT_2026-10-27.md`; o limiar de movimento foi ajustado para não exigir 8 m em cada callback de 1 s, mantendo três segmentos consecutivos, margem de precisão e deslocamento líquido. RG-62 / GPS-03. CI no novo SHA ainda pendente; percurso físico no Galaxy A06 também pendente.
 
 ### Critérios para considerar a rodada concluída
 
-- RG-01…RG-61 únicos, contínuos e ordenados; DB-001…DB-171 e índice sincronizados.
+- RG-01…RG-62 únicos, contínuos e ordenados; DB-001…DB-172 e índice sincronizados.
 - Gate anti-regressão, TypeScript, suíte completa e build Android aprovados no mesmo SHA final.
 - Migração JSON→SQLite idempotente demonstrada por teste; cópia SQLite incluída em backup; restauração testada; origem inválida ou duplicata não pode provocar perda silenciosa.
 - Nenhum PID passa a confirmado sem evidência RAW_ECU válida; autonomia persistida não deve aparecer como atual sem amostra vigente.
@@ -259,6 +260,7 @@
 - **DB-169** · 2026-10-27 — Corrigir narrowing TypeScript para o primeiro byte opcional no parser KWP; validar na CI.
 - **DB-170** · 2026-10-27 — Migrar histórico operacional de viagens para SQLite com migração idempotente/transacional, backup verificado, restauração e testes RG-60/SQLITE-01.
 - **DB-171** · 2026-10-27 — Aumentar a janela da primeira sondagem ECU `010C` após `ATSP0`, mantendo timeout adaptativo nas sondagens seguintes; proteger via RG-61/BT-CONN-08.
+- **DB-172** · 2026-10-27 — Corrigir confirmação de movimento GPS urbano: piso de deslocamento adaptado ao intervalo, três segmentos válidos, deslocamento líquido e rejeição de saltos/zigue-zague; documentar benchmarks Android/Expo/Strava/OsmAnd/Waze e proteger com RG-62/GPS-03.
 
 ---
 
@@ -4713,4 +4715,26 @@ Aplicar no aplicativo nativo a referência visual do painel de autonomia, conect
 - O teste físico continua obrigatório: instalar APK do SHA validado no Galaxy A06 / Android 16 e repetir `010C` com o ELM327/ECU reais. Aumentar a janela não garante que o adaptador ou ECU responderão; não declarar correção física sem trace novo.
 - PR #93 é temporária para validação automatizada; encerrar sem merge quando a CI final terminar, preservando a branch até a verificação física. Não mesclar antes desse bloqueio.
 
+
+## DB-172 · 2026-10-27 — Corrigir confirmação de movimento GPS em velocidade urbana
+
+### Auditoria e referências
+- Revisados `src/gps/gpsTracker.ts`, `src/gps/backgroundLocationTask.ts`, `src/gps/backgroundMonitoring.ts`, `src/trip/autoTripService.ts`, `src/trip/tripRecorder.ts`, `tests/gps.test.js`, `tests/backgroundExecution.test.js` e o contrato GPS anterior.
+- Documentada a comparação em `docs/GPS_IMPLEMENTATION_AUDIT_2026-10-27.md`: Android Fused Location Provider, Expo Location, gravação/pausa automática do Strava, intervalo e filtro de deslocamento mínimo do OsmAnd e recomendações de permissão/precisão do Waze.
+- A documentação oficial explica que o Android combina provedores de localização disponíveis e que a precisão/frequência dependem de provedor, permissões e parâmetros. 4G/5G não é uma coordenada nem garante um fix; não usar internet para fabricar/reciclar localização. Manter um único watcher evita callbacks duplicados.
+
+### Causa concreta
+- O watcher pede fixes com intervalo mínimo de 1 s e distância de 1 m, enquanto o código exigia 8 m em cada segmento. Em movimento real a 10 km/h, um segmento de 1 s mede aproximadamente 2,8 m; portanto, o algoritmo rejeitava vários segmentos legítimos antes de aplicar a regra definida de três segmentos consecutivos (quatro posições válidas).
+- A soma de caminho isoladamente também não basta: uma sequência em zigue-zague pode acumular comprimento sem deslocamento líquido suficiente. É necessário validar velocidade/precisão por segmento e a deslocação líquida da janela.
+
+### Correção aplicada
+1. `src/gps/gpsTracker.ts`: piso por segmento adaptado ao intervalo; mantém velocidade derivada ≥5 km/h, precisão conhecida e velocidade confirmatória de GPS/OBD; mantém três segmentos válidos como mínimo e exige deslocamento líquido de confiança antes de somar distância.
+2. Segmentos maiores que 250 m são explicitamente rejeitados, reiniciando a sequência. Fix inválido ou baixa precisão também quebra candidatos pendentes sem apagar distância confirmada.
+3. `tests/gps.test.js`: adicionados casos de quatro posições a 10 km/h com ~2,8 m por segundo e de speed positivo em zigue-zague cujo ponto final não confirma deslocamento líquido.
+4. Criados `docs/GPS_IMPLEMENTATION_AUDIT_2026-10-27.md`, atualização de `docs/GPS_DRIFT_AND_DISTANCE.md`, critério GPS-03, contrato RG-62, assertions no baseline e changelog.
+
+### Validação e limites
+- Base utilizada: CI [40537159575](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40537159575) verde no SHA `deee73a571c5a39946bc143bda918a7e205a5c92` antes desta mudança GPS. Essa CI não valida DB-172.
+- O novo HEAD precisa passar Expo Doctor, gate anti-regressão, TypeScript, suíte completa e build Android standalone no mesmo SHA.
+- O teste físico continua obrigatório: instalar APK de SHA verde no Galaxy A06 / Android 16, capturar percurso real em velocidades urbanas e em parada, e comparar a distância GPS com rota/odômetro conhecidos. Aumentar a fidelidade lógica não comprova precisão física nem desempenho da economia de bateria do aparelho.
 
