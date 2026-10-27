@@ -72,6 +72,7 @@ const requiredSuites = [
   'permissions.test.js',
   'screenTheme.test.js',
   'maintenanceRules.test.js',
+  'sqliteTripHistory.test.js',
 ];
 const scriptedTests = new Set(testCommand.map((command) => {
   const match = command.match(/^node tests\/([A-Za-z0-9._-]+)$/);
@@ -168,7 +169,12 @@ assert.match(read('src/obd/pidScanner.ts'), /validAdditiveChecksum/);
 assert.match(read('src/obd/bluetoothManager.ts'), /PID_DISCOVERY_SUMMARY/);
 assert.match(read('src/obd/parser.ts'), /hasValidKLineChecksum/);
 assert.match(read('src/obd/dtcParser.ts'), /validAdditiveChecksum/);
-assert.match(read('src/storage/driveCycleStorage.ts'), /HISTORICO_DE_VIAGENS_CORROMPIDO/);
+assert.match(read('src/storage/driveCycleStorage.ts'), /LEGACY_TRIP_HISTORY_INVALID/);
+assert.match(read('src/storage/driveCycleStorage.ts'), /ensureSqliteMigration/);
+assert.match(read('src/storage/driveCycleStorage.ts'), /restoreDriveCyclesFromBackup/);
+assert.match(read('src/storage/driveCycleStorage.ts'), /withTransactionAsync/);
+assert.match(read('src/storage/driveCycleStorage.ts'), /SQLITE_MIGRATION_KEY/);
+assert.match(read('tests/sqliteTripHistory.test.js'), /idempotent/);
 assert.match(read('src/storage/driveCycleStorage.ts'), /indexWriteQueues/);
 assert.match(read('src/database/csvLogger.ts'), /MAX_PENDING_CSV_ROWS/);
 assert.match(read('app/armazenamento.tsx'), /csvQueueStatus\.droppedRows/);
