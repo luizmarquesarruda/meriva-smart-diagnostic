@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Histórico operacional de viagens em SQLite — DB-170
+- Adicionado `expo-sqlite` compatível com o app Expo SDK 51 e migrado `VIAGENS/index.json` para SQLite como fonte de verdade de leitura/gravação.
+- Migração transacional e idempotente, com marcador de conclusão, chave primária por viagem e interrupção segura diante de JSON legado inválido ou IDs duplicados.
+- `index.json` permanece como espelho de compatibilidade; `index.pre-sqlite.json` preserva a origem e uma cópia SQLite verificada em `VIAGENS/meriva_smart_history.db` acompanha os backups.
+- Adicionada restauração explícita de viagens a partir do último espelho validado e suíte `sqliteTripHistory.test.js`; a execução completa da CI no SHA final ainda precisa confirmar a mudança.
+- A validação física pós-correção Bluetooth no Galaxy A06 / Android 16 / ELM327 e ECU reais permanece pendente.
+
+
 ### Guarda de tipo no parser KWP — DB-169
 - Corrigido erro TypeScript por acesso potencialmente indefinido a `tokens[0]` durante validação do cabeçalho KWP; a CI anterior detectou a falha antes dos testes.
 
