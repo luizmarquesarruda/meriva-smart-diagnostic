@@ -175,3 +175,10 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 - A negociação começa em `ATSP0` (automático). Fallback ordenado inclui os IDs 5, 3, 4, 6, 7, 8, 9, 2 e 1; 1/2 correspondem às famílias SAE J1850 PWM/VPW. Só usar o protocolo detectado/forçado após resposta real do veículo.
 - Testes automatizados devem verificar limites JSON, função de decisão de retry, presença dos protocolos 1 e 2, seleção explícita e gate real `010C -> 41 0C`.
 - Aceite de hardware continua obrigatório: Samsung Galaxy A06 / Android 16, adaptador ELM327 real, ECU real, captura TX/RX, tempo até a primeira resposta válida, falhas/timeout e reconexão. A CI e o transporte simulado não substituem este ensaio.
+
+## BT-CONN-03 — Recuperação pelo protocolo identificado
+
+- Após falha parcial ou reconexão, a escolha de protocolo deve refletir o protocolo identificado por `ATDP`: KWP 5-baud = `ATSP4`, KWP fast = `ATSP5`, ISO 9141 = `ATSP3`, J1850 PWM/VPW = `ATSP1`/`ATSP2`, CAN deve mapear para o ID correspondente à família e velocidade.
+- Rótulo desconhecido/ambíguo deve voltar a `ATSP0` (automático); não assumir que qualquer ISO 14230 é KWP fast.
+- Testes obrigatórios em `tests/elm327Compatibility.test.js`: cobrir todos os mapeamentos e o fallback de protocolo desconhecido. `tests/projectBaseline.test.js` protege a utilização da função pela recuperação real.
+- Validação física segue obrigatória: registrar protocolo devolvido pelo `ATDP`, comando `ATSP` de recuperação, resposta real ao `010C` e resultado de reconexão. Não declarar êxito com base apenas em testes simulados.
