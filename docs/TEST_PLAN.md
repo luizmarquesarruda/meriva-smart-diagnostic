@@ -240,4 +240,5 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 - Corromper o espelho JSON após migração: a leitura deve continuar retornando as linhas válidas do SQLite. Corromper o legado antes da migração e sem backup válido: abortar, preservar a origem e não gravar marcador de conclusão.
 - Fornecer IDs duplicados no JSON legado: abortar antes de importar, mantendo a origem integral para reconciliação. Não descartar uma linha silenciosamente por causa da chave primária.
 - Validar a restauração usando `index.previous.json` ou `index.pre-sqlite.json`: escolher backup válido antes de alterar SQLite, restaurar em transação, atualizar espelho e sincronizar a cópia SQLite para backup.
+- Criar pacote por `createBackup()`, confirmar `VIAGENS/meriva_smart_history.db` e `manifest.json`, depois restaurar indicando a pasta do pacote; nenhum arquivo de origem do backup pode ser alterado durante a restauração.
 - Executar `npm run gate:baseline`, `npm run typecheck`, `npm test` e build Android no mesmo SHA. O mock SQLite não substitui validação do banco nativo no APK.
