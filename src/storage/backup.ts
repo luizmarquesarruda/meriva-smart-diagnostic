@@ -1,5 +1,6 @@
 import * as FileSystem from 'expo-file-system';
 import { flushCsvLogs } from '../database/csvLogger';
+import { prepareDriveCycleDatabaseBackup } from './driveCycleStorage';
 
 export interface BackupInfo {
   timestamp: string;
@@ -38,6 +39,7 @@ async function pruneOldBackups(basePath: string): Promise<void> {
 
 export async function createBackup(basePath: string): Promise<BackupInfo> {
   await flushCsvLogs();
+  await prepareDriveCycleDatabaseBackup(basePath);
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const backupRoot = `${basePath}/BACKUP`;
   const backupDir = `${backupRoot}/meriva_smart_${timestamp}`;
