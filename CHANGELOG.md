@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Timeout da primeira sondagem ECU — DB-171
+- A primeira consulta real `010C` após `ATSP0` usa a janela limitada de negociação de protocolo (padrão 15 s) em vez do timeout adaptativo mínimo de 3 s.
+- Consultas após protocolos forçados continuam no timeout adaptativo para evitar alongar todas as tentativas; o diagnóstico registra o timeout usado.
+- Adicionado teste dinâmico, contrato RG-61 e plano BT-CONN-08. O ensaio físico pós-correção no Galaxy A06 / Android 16 / ELM327 e ECU reais continua pendente.
+
 ### Histórico operacional de viagens em SQLite — DB-170
 - Adicionado `expo-sqlite` compatível com o app Expo SDK 51 e migrado `VIAGENS/index.json` para SQLite como fonte de verdade de leitura/gravação.
 - Migração transacional e idempotente, com marcador de conclusão, chave primária por viagem e interrupção segura diante de JSON legado inválido ou IDs duplicados.
