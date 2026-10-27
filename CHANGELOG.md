@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Correção do parser KWP — DB-167
+- Reconhecido o quadro compacto KWP com cabeçalho de três bytes e checksum, incluindo o RX real `84F111410C0000D3` do teste Bluetooth.
+- O parser agora valida o comprimento declarado e a soma de verificação antes de aceitar a resposta; checksum incorreto, bytes extras e quadros incompletos continuam rejeitados.
+- Incluídos casos compactos/espaçados em `pidParserIntegrity.test.js`, contrato RG-58 e plano BT-CONN-06. A CI anterior não valida esta alteração; o ensaio físico pós-correção permanece pendente.
+
 ### Correções de revisão DB-166
 - Alinhado o limite efetivo de retry Bluetooth: sem override, usa a política do catálogo (3 tentativas); as opções explícitas 3/10/20 continuam configuráveis.
 - O buffer de consumo agora integra o combustível durante baixa velocidade e marcha lenta sem acrescentar distância quando o veículo está parado.
