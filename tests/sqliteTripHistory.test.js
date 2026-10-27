@@ -207,7 +207,7 @@ const originalLoad = Module._load;
 Module._load = function(request, parent, isMain) {
   if (request === 'expo-file-system') return fakeFS;
   if (request === 'expo-sqlite') return fakeSQLite;
-  if (request === '../database/csvLogger') return { appendCsvRow: async () => {} };
+  if (request === '../database/csvLogger') return { appendCsvRow: async () => {}, flushCsvLogs: async () => {} };
   if (parent && parent.filename && (request.startsWith('./') || request.startsWith('../'))) {
     const resolved = path.resolve(path.dirname(parent.filename), request);
     if (fs.existsSync(resolved + '.ts')) return loadTs(resolved + '.ts');
@@ -305,12 +305,23 @@ async function main() {
     'JSON compatibility snapshot must follow authoritative SQLite state',
   );
 
+  const backupModule = loadTs('src/storage/backup.ts');
+  const backup = await backupModule.createBackup(BASE);
+  const backupDirectory = BASE + '/BACKUP/meriva_smart_' + backup.timestamp;
+  assert.ok(backup.includes.includes('VIAGENS'), 'full app backup must include the operational history folder');
+  assert.ok(files.has(backupDirectory + '/VIAGENS/' + SQLITE_NAME),
+    'full app backup must contain the verified SQLite database snapshot');
+  assert.ok(files.has(backupDirectory + '/manifest.json'), 'backup package must include its verified manifest');
+
   files.set(indexPath, '{broken json');
   assert.deepStrictEqual(
     (await storage.readDriveCycles(BASE)).map(cycle => cycle.id),
     ['legacy-real', 'new-real'],
     'corrupt JSON compatibility data must not hide or destroy valid SQLite rows',
   );
+  const archiveRestore = await storage.restoreDriveCyclesFromBackup(BASE, backupDirectory);
+  assert.deepStrictEqual(archiveRestore.map(cycle => cycle.id), ['legacy-real', 'new-real'],
+    'restoration from a full local backup must restore the state captured in that backup');
 
   // The previous checked snapshot is preferred for explicit rollback/restore.
   const restored = await storage.restoreDriveCyclesFromBackup(BASE);
