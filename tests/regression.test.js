@@ -474,7 +474,24 @@ async function testConfiguredBluetoothRetryLimit() {
   assert.ok(source.includes('const effectiveMaxAttempts = config.maxConnectionAttempts > 0'), 'retry deve derivar do maxConnectionAttempts configurado');
   assert.ok(source.includes('attempt <= effectiveMaxAttempts'), 'loop de retry deve respeitar o limite efetivo');
   assert.ok(!source.includes('const maxAttempts = config.maxConnectionAttempts'), 'não pode haver shadowing de maxAttempts');
-  console.log('configured Bluetooth retry limit: OK');
+
+  const manager = loadTs(managerPath);
+  assert.strictEqual(
+    manager.shouldRetryElmSessionAttempt(new Error('ECU NÃO RESPONDEU AO 010C: ERROR | RX=NO DATA')),
+    false,
+    'após uma varredura completa sem resposta válida do PID 010C, avançar ao próximo adaptador',
+  );
+  assert.strictEqual(
+    manager.shouldRetryElmSessionAttempt(new Error('TIMEOUT CONEXÃO BLUETOOTH')),
+    true,
+    'falhas transitórias de abertura do socket continuam elegíveis a retry limitado',
+  );
+  assert.deepStrictEqual(
+    [...manager.ELM_PROTOCOL_FALLBACKS],
+    ['5', '3', '4', '6', '7', '8', '9', '2', '1'],
+    'a lista de fallback deve incluir os nove protocolos definidos, incluindo SAE J1850',
+  );
+  console.log('configured Bluetooth retry limit and protocol fallback: OK');
 }
 
 async function testBluetoothActivationRequest() {
@@ -567,13 +584,15 @@ async function testEcuValidationGate() {
   assert.strictEqual(manager.getElmProtocolName('3'), 'ISO 9141-2');
   assert.strictEqual(manager.getElmProtocolName('6'), 'ISO 15765-4 CAN 11/500');
   assert.strictEqual(manager.getElmProtocolName('9'), 'ISO 15765-4 CAN 29/250');
+  assert.strictEqual(manager.getElmProtocolName('1'), 'SAE J1850 PWM');
+  assert.strictEqual(manager.getElmProtocolName('2'), 'SAE J1850 VPW');
   assert.strictEqual(manager.getElmProtocolName('X'), 'ELM327 PROTOCOLO X');
   assert.strictEqual(manager.isValidEcuProbe({ status: 'OK', response: '41 0C 1A F8', command: '010C', elapsedMs: 10, attempt: 1 }), true);
   assert.strictEqual(manager.isValidEcuProbe({ status: 'OK', response: 'NO DATA', command: '010C', elapsedMs: 10, attempt: 1 }), false);
   assert.strictEqual(manager.isValidEcuProbe({ status: 'TIMEOUT', response: '', command: '010C', elapsedMs: 1000, attempt: 1 }), false);
   assert.strictEqual(manager.isValidEcuProbe({ status: 'OK', response: '41 0B 25', command: '010C', elapsedMs: 10, attempt: 1 }), false);
-  assert.strictEqual(manager.MAX_BLUETOOTH_ATTEMPTS, 20);
-  assert.strictEqual(manager.BLUETOOTH_RETRY_INTERVAL_MS, 8000);
+  assert.strictEqual(manager.MAX_BLUETOOTH_ATTEMPTS, 3);
+  assert.strictEqual(manager.BLUETOOTH_RETRY_INTERVAL_MS, 1500);
 }
 
 async function testPidScanner() {
