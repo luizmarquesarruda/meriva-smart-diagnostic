@@ -81,7 +81,8 @@ export const DEFAULT_ELM327_COMPATIBILITY: Elm327CompatibilityConfig = {
   ioTimeoutMs: 15_000,
   bluetoothConnectTimeoutMs: 5_000,
   commandDelayMs: 20,
-  maxConnectionAttempts: 20,
+  // 0 means defer to bluetooth_config.json; the UI can still override with 3/10/20.
+  maxConnectionAttempts: 0,
   noDataReconnectThreshold: 4,
   recoveryBackoffMs: [2000, 5000, 15000],
   partialResponseAction: 'RECONNECT_AND_INITIALIZE',
@@ -143,6 +144,15 @@ function boundedInteger(value: unknown, fallback: number, min: number, max: numb
   const numeric = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(numeric)) return fallback;
   return Math.min(max, Math.max(min, Math.round(numeric)));
+}
+
+/** Resolve the user override, falling back to the finite catalog policy. */
+export function resolveMaxConnectionAttempts(configuredAttempts: number, catalogMaxAttempts: number): number {
+  const configured = Number(configuredAttempts);
+  if (Number.isFinite(configured) && configured > 0) {
+    return boundedInteger(configured, 3, 1, 100);
+  }
+  return boundedInteger(catalogMaxAttempts, 3, 1, 100);
 }
 
 export function mergeCompatibilityConfig(

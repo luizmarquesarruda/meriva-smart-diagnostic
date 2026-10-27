@@ -68,6 +68,14 @@ assert.equal(cfg.adaptiveTiming, true);
 assert.equal(cfg.adaptiveTimeoutMinMs, 2500);
 assert.equal(cfg.adaptiveTimeoutMaxMs, 12000);
 const defaults = mergeCompatibilityConfig();
+assert.equal(defaults.maxConnectionAttempts, 0,
+  'sem preferência explícita, limite de tentativas vem do catálogo Bluetooth e não de um segundo default');
+assert.equal(compatibility.resolveMaxConnectionAttempts(defaults.maxConnectionAttempts, 3), 3,
+  'a política padrão deve efetivamente resolver para três tentativas');
+assert.equal(compatibility.resolveMaxConnectionAttempts(10, 3), 10,
+  'a opção explícita do usuário deve continuar permitindo dez tentativas');
+assert.equal(compatibility.resolveMaxConnectionAttempts(Number.NaN, 3), 3,
+  'configuração inválida deve retornar ao limite seguro do catálogo');
 assert.equal(defaults.ioTimeoutMs, 15000);
 assert.equal(defaults.adaptiveTimeoutMaxMs, 15000);
 assert.equal(defaults.optionalAtTimeoutMs, 2500);

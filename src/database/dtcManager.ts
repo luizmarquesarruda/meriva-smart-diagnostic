@@ -28,13 +28,13 @@ export function nextDtcOccurrences(previous?: DtcRecord): number {
 }
 
 /** Mode 03 reconciliation helper; call only after a complete, valid positive response. */
-export function markMissingStoredDtcsInactive(existing: DtcRecord[], detectedCodes: string[], now: string): DtcRecord[] {
+export function markMissingStoredDtcsInactive(existing: DtcRecord[], detectedCodes: string[], _now: string): DtcRecord[] {
   const detected = new Set(detectedCodes.map((code) => String(code).trim().toUpperCase()));
   return existing
     .filter((item) => item.source === 'REAL_OBD' && item.historical !== true
       && ['CURRENT', 'CONFIRMED'].includes(String(item.status ?? '').trim().toUpperCase())
       && !detected.has(String(item.code ?? '').trim().toUpperCase()))
-    .map((item) => ({ ...item, status: 'INACTIVE' as const, historical: true, lastSeen: now }));
+    .map((item) => ({ ...item, status: 'INACTIVE' as const, historical: true }));
 }
 
 export async function recordDtc(basePath: string, dtc: DtcRecord): Promise<void> {

@@ -51,7 +51,9 @@ assert.equal(estimateFuelRemainingFromFullTank({
 assert.equal(estimateFuelRemainingFromFullTank({ fuelings: [partial], trips: [trip1] }), null,
   'abastecimento parcial sem baseline completo não permite inferir o tanque');
 assert.equal(estimateFuelRemainingFromFullTank({ fuelings: [full], trips: [{ ...trip1, fuelDataValid: false }], currentOdometerKm: 10100 }), null,
-  'viagem real sem combustível válido invalida o balanço');
+  'viagem real explicitamente inválida invalida o balanço');
+assert.equal(estimateFuelRemainingFromFullTank({ fuelings: [full], trips: [{ ...trip1, fuelDataValid: undefined }], currentOdometerKm: 10100 }), null,
+  'registro legado sem comprovação explícita da validade de combustível não pode alimentar o balanço');
 assert.equal(estimateFuelRemainingFromFullTank({ fuelings: [full, { ...partial, liters: 10 }], trips: [trip1], currentOdometerKm: 10100 }), null,
   'abastecimento que excede a capacidade física não é aceito');
 assert.equal(estimateFuelRemainingFromFullTank({

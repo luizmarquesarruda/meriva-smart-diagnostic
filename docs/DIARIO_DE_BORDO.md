@@ -1,11 +1,11 @@
-## ESTADO VIGENTE — 2026-10-27 (P0 Bluetooth; DB-165)
+## ESTADO VIGENTE — 2026-10-27 (P0 Bluetooth/Autonomia; DB-166)
 
-> A CI [40486556497](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40486556497) passou `validate` e `android-build` no SHA anterior `a63d0aecebfc9416be53ffd73144a263fe55fa71`. DB-165 já atualiza código, teste dinâmico, gate anti-regressão e critérios de aceitação; a CI deve validar o HEAD final que contém essas mudanças. Não há teste físico no Galaxy A06/Android 16 com ELM327/ECU real.
+> DB-166 corrige quatro riscos encontrados na auditoria da PR #92: limite de retry padrão divergente, combustível não integrado em marcha lenta, viagens com validade desconhecida aceitas no balanço e `lastSeen` incorreto na reconciliação DTC. A CI anterior não valida essas correções; aguardar `validate` e `android-build` verdes no SHA que as contém. Não há teste físico no Galaxy A06/Android 16 com ELM327/ECU real.
 
 ### Integração, CI e riscos
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
 - `main`: `7eec3afecb3718020724baf053f8b6d2ca636fab`; PR [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84) foi mesclada. A branch de integração contém o inventário documental e as correções DB-146/147.
-- PR [#92 — consolidação P0–P2](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/92) continua aberta e fora de rascunho. Antes de DB-165, a comparação indicava 115 commits à frente e 1 atrás de `main`; não mesclar antes da CI verde no HEAD final e reconciliação segura.
+- PR [#92 — consolidação P0–P2](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/92) continua aberta e fora de rascunho. Na auditoria anterior a DB-166, a comparação indicava 122 commits à frente e 1 atrás de `main`; conferir novamente após o commit e reconciliar antes de merge.
 - CI [40313779041](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40313779041), SHA `c02fecb6abe876c1a1f0ca275330f33af3ec6e91`: `validate` e `android-build` passaram; APK standalone montado, verificado e enviado como artefato.
 - CI anterior [40313041670](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40313041670), SHA `826df0ae23ef30e602418721c521be271c6e5ff6`, passou validação, mas falhou em `mergeReleaseResources` para `drawable-mdpi/splashscreen_image.png`. A repetição sobre o descendente `c02fecb6abe876c1a1f0ca275330f33af3ec6e91`, sem alterar a imagem, passou o build completo; falha tratada como transitória e registrada, sem modificação desnecessária do splash.
 - DB-146 adicionou PID 0144 ao catálogo padrão com fórmula/faixa/unidade e testes, sem marcar suporte físico nem incluí-lo na fila automática. Ele permanece alvo de confirmação até existir resposta RAW_ECU válida.
@@ -237,6 +237,7 @@
 - **DB-163** · 2026-10-27 — Reduzir latência da conexão, limitar retries por adaptador e ampliar fallback de protocolo com testes e rastreabilidade.
 - **DB-164** · 2026-10-27 — Corrigir seleção de protocolo durante recuperação/reconexão para evitar forçar KWP fast em ECU KWP 5-baud; cobrir protocolos e documentar teste BT-CONN-03.
 - **DB-165** · 2026-10-27 — Validar payload completo do PID 010C durante a recuperação do ELM327; adicionar teste dinâmico e proteção anti-regressão RG-53/BT-CONN-04.
+- **DB-166** · 2026-10-27 — Corrigir limite efetivo de retry Bluetooth, integrar combustível em marcha lenta, exigir validade explícita do consumo para balanço e preservar lastSeen em DTC ausente.
 
 ---
 
@@ -4587,3 +4588,23 @@ Aplicar no aplicativo nativo a referência visual do painel de autonomia, conect
 - A CI [40486556497](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40486556497) passou `validate` e `android-build` somente no SHA anterior `a63d0aecebfc9416be53ffd73144a263fe55fa71`; não valida DB-165.
 - A nova execução de CI precisa passar no HEAD que inclui código, regressões e documentação. A suíte dinâmica é simulada e não substitui o ensaio físico no Samsung Galaxy A06 / Android 16 com ELM327 e ECU reais.
 - A PR #92 continua aberta: não mesclar até CI verde no HEAD final, revisão de diff e reconciliação com `main`. SQLite para histórico operacional permanece uma lacuna P1 separada.
+
+## DB-166 · 2026-10-27 — Corrigir quatro riscos de regressão na PR #92
+
+### Causas confirmadas
+- `DEFAULT_ELM327_COMPATIBILITY.maxConnectionAttempts` ainda era 20 enquanto o catálogo Bluetooth declarava 3 como padrão. Chamadas sem override podiam, portanto, usar um limite diferente do documentado.
+- O buffer móvel descartava o intervalo completo sempre que a velocidade anterior ou atual ficava abaixo de 5 km/h. Isso eliminava combustível gasto em marcha lenta e podia superestimar km/L e autonomia.
+- O balanço do tanque rejeitava `fuelDataValid === false`, mas aceitava `undefined`. Registros antigos sem evidência de continuidade podiam ser tratados como viagens confiáveis apenas por terem números aritmeticamente coerentes.
+- A reconciliação de DTCs ausentes atualizava `lastSeen` para o momento em que o código não foi encontrado, confundindo ausência com última observação real.
+
+### Correções aplicadas
+1. `src/obd/elm327Compatibility.ts`: o valor padrão de tentativas agora é 0 para delegar à política finita do catálogo; `resolveMaxConnectionAttempts` respeita override explícito e valida o limite efetivo. `src/obd/bluetoothManager.ts` utiliza essa função no loop real.
+2. `src/trip/autonomyBuffer.ts`: distância e combustível são integrados em todos os intervalos contínuos válidos. Um intervalo parado pode contribuir combustível com distância zero; a janela continua exigindo distância e litros suficientes.
+3. `src/trip/fuelBalance.ts`: somente viagens com `fuelDataValid === true` entram no balanço alternativo do tanque.
+4. `src/database/dtcManager.ts`: marcar um DTC ausente como histórico/inativo preserva `lastSeen`; o horário de ausência não é registrado como observação do defeito.
+5. Testes atualizados em `elm327Compatibility.test.js`, `autonomyBuffer.test.js`, `fuelBalance.test.js` e `regression.test.js`. O gate `projectBaseline.test.js`, contratos RG-54–RG-57, plano de aceitação, changelog e índice DB foram sincronizados.
+
+### Validação e limites
+- O job de validação que antecede DB-166 não valida este commit. A CI da PR deve executar gate anti-regressão, TypeScript, suíte completa e build Android standalone no novo HEAD; nenhuma dessas etapas será declarada aprovada por inferência.
+- Teste físico com Galaxy A06 / Android 16, ELM327 e ECU reais continua pendente. Não há calibração física confirmada para a conversão percentual→litros do PID 012F.
+- A migração de `VIAGENS/index.json` para SQLite continua pendente e não faz parte desta rodada.

@@ -4,7 +4,6 @@ export const AUTONOMY_BUFFER_MIN_INTERVALS = 10;
 export const AUTONOMY_BUFFER_MAX_INTERVAL_MS = 10_000;
 export const AUTONOMY_BUFFER_STALE_AFTER_MS = 30_000;
 
-const MIN_MOVING_SPEED_KMH = 5;
 const MAX_SPEED_KMH = 220;
 const MAX_FUEL_RATE_LPH = 500;
 const MIN_ROLLING_DISTANCE_KM = 0.1;
@@ -100,18 +99,18 @@ export class AutonomyBuffer {
         this.previousFlowReading = current;
         return;
       }
-      if (previous.speedKmh >= MIN_MOVING_SPEED_KMH &&
-          current.speedKmh >= MIN_MOVING_SPEED_KMH) {
-        const averageSpeedKmh = (previous.speedKmh + current.speedKmh) / 2;
-        const averageFuelRateLph = (previous.fuelRateLph + current.fuelRateLph) / 2;
-        const distanceKm = averageSpeedKmh * elapsedMs / 3_600_000;
-        const fuelUsedL = averageFuelRateLph * elapsedMs / 3_600_000;
-        if (Number.isFinite(distanceKm) && distanceKm > 0 &&
-            Number.isFinite(fuelUsedL) && fuelUsedL > 0) {
-          this.flowIntervals.push({ timestampMs, distanceKm, fuelUsedL });
-          if (this.flowIntervals.length > AUTONOMY_BUFFER_CAPACITY) {
-            this.flowIntervals.splice(0, this.flowIntervals.length - AUTONOMY_BUFFER_CAPACITY);
-          }
+      // Fuel is consumed at idle too. Integrate both quantities for every
+      // continuous interval, allowing a valid zero-distance interval to add
+      // fuel to the denominator without inventing distance.
+      const averageSpeedKmh = (previous.speedKmh + current.speedKmh) / 2;
+      const averageFuelRateLph = (previous.fuelRateLph + current.fuelRateLph) / 2;
+      const distanceKm = averageSpeedKmh * elapsedMs / 3_600_000;
+      const fuelUsedL = averageFuelRateLph * elapsedMs / 3_600_000;
+      if (Number.isFinite(distanceKm) && distanceKm >= 0 &&
+          Number.isFinite(fuelUsedL) && fuelUsedL > 0) {
+        this.flowIntervals.push({ timestampMs, distanceKm, fuelUsedL });
+        if (this.flowIntervals.length > AUTONOMY_BUFFER_CAPACITY) {
+          this.flowIntervals.splice(0, this.flowIntervals.length - AUTONOMY_BUFFER_CAPACITY);
         }
       }
     }

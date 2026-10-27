@@ -3,7 +3,7 @@ import RNBluetoothClassic from 'react-native-bluetooth-classic';
 import { BluetoothClassicTransport, BluetoothDeviceInfo, listBondedBluetoothDevices } from './bluetoothClassicTransport';
 import { ElmCommandResult, Elm327Session } from './elm327';
 import { parsePidResponse } from './parser';
-import { Elm327CompatibilityConfig, DEFAULT_ELM327_COMPATIBILITY, mergeCompatibilityConfig } from './elm327Compatibility';
+import { Elm327CompatibilityConfig, DEFAULT_ELM327_COMPATIBILITY, mergeCompatibilityConfig, resolveMaxConnectionAttempts } from './elm327Compatibility';
 import { discoverIntelligentPids } from './intelligentPidDiscovery';
 import { getBluetoothRadioRecoveryStopReason } from './bluetoothRadioRecovery';
 import type { PidDiscoveryCache } from '../meriva/autosaveState';
@@ -180,9 +180,10 @@ export async function createRealElmSession(
     optionalAtTimeoutMs: compatibility?.optionalAtTimeoutMs ?? bluetoothConfig.initialization.optionalCommandTimeoutMs,
     protocolSelectionTimeoutMs: compatibility?.protocolSelectionTimeoutMs ?? bluetoothConfig.initialization.protocolSelectionTimeoutMs,
   });
-  const effectiveMaxAttempts = config.maxConnectionAttempts > 0
-    ? config.maxConnectionAttempts
-    : MAX_BLUETOOTH_ATTEMPTS;
+  const effectiveMaxAttempts = resolveMaxConnectionAttempts(
+    config.maxConnectionAttempts,
+    MAX_BLUETOOTH_ATTEMPTS,
+  );
 
   for (let attempt = 1; attempt <= effectiveMaxAttempts; attempt++) {
     attemptsExecuted = attempt;

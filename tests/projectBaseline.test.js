@@ -118,6 +118,13 @@ assert.match(bluetoothManagerSource, /shouldRetryElmSessionAttempt/,
 assert.ok(bluetoothManagerSource.includes("['5', '3', '4', '6', '7', '8', '9', '2', '1']"),
   'fallback precisa incluir SAE J1850 VPW/PWM além de KWP e CAN');
 const elmCompatibilitySource = read('src/obd/elm327Compatibility.ts');
+assert.match(elmCompatibilitySource, /maxConnectionAttempts: 0/,
+  'sem override, o manager deve deferir ao limite finito do catálogo');
+assert.match(elmCompatibilitySource, /export function resolveMaxConnectionAttempts/);
+assert.match(bluetoothManagerSource, /resolveMaxConnectionAttempts\(/,
+  'o limite usado no laço de retry deve resolver a configuração padrão e o override explicitamente');
+assert.match(read('tests/elm327Compatibility.test.js'), /resolveMaxConnectionAttempts\(defaults\.maxConnectionAttempts, 3\), 3/,
+  'a política padrão efetiva de retry deve ser testada');
 assert.match(elmCompatibilitySource, /export function getRecoveryProtocolCommand/);
 assert.match(read('src/obd/elm327.ts'), /getRecoveryProtocolCommand\(this\.protocol\)/,
   'recuperação deve usar o protocolo identificado em vez de forçar ATSP5 para todo KWP');
@@ -289,6 +296,15 @@ assert.match(tripService, /this\.autonomyBuffer\.addFuelLevelSample/);
 assert.match(tripService, /this\.autonomyBuffer\.addFuelFlowSample/);
 assert.match(read('src/trip/autonomyPresentation.ts'), /input\.rollingConsumptionKml/);
 assert.match(read('src/trip/autonomyPresentation.ts'), /fallbackFuelRemainingL/);
+const autonomyBufferSource = read('src/trip/autonomyBuffer.ts');
+assert.doesNotMatch(autonomyBufferSource, /MIN_MOVING_SPEED_KMH/,
+  'o buffer não pode descartar combustível consumido em baixa velocidade ou marcha lenta');
+assert.match(autonomyBufferSource, /Number\.isFinite\(distanceKm\) && distanceKm >= 0/,
+  'intervalos estacionários precisam contribuir combustível sem acrescentar distância');
+assert.match(read('src/trip/fuelBalance.ts'), /trip\.fuelDataValid !== true/,
+  'o balanço do tanque exige evidência explícita de consumo válido');
+assert.match(read('tests/fuelBalance.test.js'), /fuelDataValid: undefined/,
+  'registro legado sem validade conhecida precisa de regressão');
 assert.match(read('src/trip/fuelBalance.ts'), /item\.fullTank === true/);
 assert.match(read('app/manutencao.tsx'), /accessibilityLabel="Abastecimento completou o tanque"/);
 assert.match(home, /fallbackFuelRemainingL: fuelBalanceFallback\?\.remainingFuelL/);
@@ -358,6 +374,8 @@ assert.match(read('src/obd/dtcScanner.ts'), /reply\.status === 'OK' && isValidDt
 const dtcManagerSource = read('src/database/dtcManager.ts');
 assert.match(dtcManagerSource, /!dtc\.historical/, 'historical=true nunca pode ser classificado como DTC atual');
 assert.match(dtcManagerSource, /markMissingStoredDtcsInactive/, 'reconciliação DTC deve ficar centralizada e testável');
+assert.doesNotMatch(dtcManagerSource, /lastSeen: now/,
+  'ausência do DTC não pode ser registrada como última observação física');
 assert.match(read('app/laboratorio.tsx'), /markMissingStoredDtcsInactive/, 'as duas leituras Mode 03 devem usar a mesma reconciliação DTC');
 assert.match(read('src/obd/parser.ts'), /fuelTypeCodes\[String\(data\[0\]\)\]/, 'PID 0151 deve usar a tabela enumerada de combustível');
 
@@ -413,6 +431,10 @@ assert.ok(recoverySource.includes('parsedProbe.value === null'),
 assert.ok(recoverySource.includes('Number.isFinite(parsedProbe.value)'),
   'recovered RPM must be finite');
 assert.ok(projectContract.includes('| RG-53 |'), 'strict ECU recovery must be protected by RG-53');
+assert.ok(projectContract.includes('| RG-54 |'), 'retry settings must have one effective default policy');
+assert.ok(projectContract.includes('| RG-55 |'), 'rolling consumption must count fuel burned at idle');
+assert.ok(projectContract.includes('| RG-56 |'), 'tank balance must reject trips with unknown fuel-data validity');
+assert.ok(projectContract.includes('| RG-57 |'), 'DTC lastSeen must represent actual observation, not later absence');
 assert.ok(read('docs/TEST_PLAN.md').includes('BT-CONN-04'), 'strict ECU recovery must have explicit test criteria');
 
 console.log('Anti-regression baseline gate: PASS');

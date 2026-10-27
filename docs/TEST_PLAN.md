@@ -189,3 +189,28 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 - Uma resposta completa válida, por exemplo `41 0C 1A F8` (1726 rpm), pode confirmar recuperação quando o status do comando também for `OK`.
 - `tests/elm327Compatibility.test.js` exercita a sessão ELM com transporte simulado: primeiro retorna apenas `41 0C` e exige `false`; depois retorna `41 0C 1A F8` e exige `true`. `tests/pidParserIntegrity.test.js` cobre payloads incompletos e excedentes; `tests/projectBaseline.test.js` protege o gate no código de produção.
 - A simulação não substitui a validação física no Galaxy A06 / Android 16 com ELM327 e ECU reais.
+
+## BT-CONN-05 — Limite efetivo de tentativas Bluetooth
+
+- Sem override do usuário, `DEFAULT_ELM327_COMPATIBILITY` deve delegar ao limite finito de `src/knowledge/bluetooth_config.json` (3 tentativas por candidato e intervalo de 1500 ms).
+- Override explícito de 3, 10 ou 20 tentativas nas Configurações deve continuar válido; a decisão precisa ocorrer numa única função de resolução usada pelo laço real.
+- Testar valores ausentes, zero, não finitos e overrides; confirmar que o número de tentativas executadas coincide com o limite efetivo e que falha de ECU após a varredura avança ao próximo candidato.
+- O teste de CI cobre política e caminho de código; capturas no Galaxy A06 / Android 16 com ELM327 real continuam necessárias para validar latência e reconexão.
+
+## DATA-05 — Consumo móvel com marcha lenta
+
+- Cada intervalo contínuo com taxa de combustível e velocidade válidas deve integrar combustível mesmo quando a velocidade é zero ou baixa.
+- Intervalos estacionários podem acrescentar combustível e zero distância; não podem inventar distância. A janela continua exigindo dez intervalos válidos, pelo menos 0,1 km e 0,05 L.
+- Regressão obrigatória: janela com movimento e marcha lenta deve ter consumo km/L inferior ao caso de mesma taxa e velocidade constante, se o combustível de marcha lenta não acrescentar distância proporcional.
+- Gap acima de 10 s, taxa inválida ou troca de origem deve invalidar/reconstruir a janela conforme RG-49.
+
+## DATA-06 — Integridade do balanço de tanque cheio com histórico legado
+
+- Cada viagem que alimenta o balanço precisa ter `source === 'REAL_OBD'` e `fuelDataValid === true`.
+- `fuelDataValid === false` ou ausente deve retornar N/D, mesmo que a média seja aritmeticamente compatível com distância/litros.
+- Testar dados legados sem flag, viagens com lacunas, viagens sobrepostas, abastecimentos parciais, odômetro divergente e um caso completo explicitamente válido.
+
+## DTC-02 — Preservar a última observação real
+
+- Ao marcar código como histórico/inativo porque ele não apareceu no Mode 03 válido, preservar `lastSeen`.
+- O teste usa uma data de última observação anterior à leitura de reconciliação e garante que o histórico não apresente a reconciliação como se o DTC estivesse presente.

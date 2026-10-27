@@ -113,7 +113,22 @@ invalid.addFuelFlowSample({ timestampMs: 4_000, speedKmh: 36, fuelRateLph: 12 })
 assert.equal(invalid.getRollingConsumptionSampleCount(4_000), 0, 'taxa inválida rompe a continuidade');
 const slow = new AutonomyBuffer();
 for (let index = 0; index <= 10; index += 1) slow.addFuelFlowSample({ timestampMs: 1_000 + index * 1_500, speedKmh: 3, fuelRateLph: 12 });
-assert.equal(slow.getRollingConsumptionSampleCount(16_000), 0, 'velocidade baixa não calibra km/L');
+assert.equal(slow.getRollingConsumptionSampleCount(16_000), 0, 'distância total insuficiente não calibra km/L');
+
+// A stop/idle period must add fuel consumption, even when it contributes zero distance.
+const idleIncluded = new AutonomyBuffer();
+for (let index = 0; index <= 8; index += 1) {
+  idleIncluded.addFuelFlowSample({ timestampMs: 1_000 + index * 1_500, speedKmh: 36, fuelRateLph: 12.6 });
+}
+idleIncluded.addFuelFlowSample({ timestampMs: 14_500, speedKmh: 0, fuelRateLph: 12.6 });
+idleIncluded.addFuelFlowSample({ timestampMs: 16_000, speedKmh: 0, fuelRateLph: 12.6 });
+assert.equal(idleIncluded.getRollingConsumptionSampleCount(16_000), 10,
+  'dez intervalos contínuos devem incluir a transição e a marcha lenta');
+assert.ok(idleIncluded.getRollingConsumptionKml(16_000) != null,
+  'janela mista de movimento e marcha lenta deve ser calculável quando distância e combustível bastam');
+assert.ok(idleIncluded.getRollingConsumptionKml(16_000) < 36 / 12.6,
+  'o combustível gasto durante a marcha lenta deve reduzir o consumo médio em km/L');
+
 const sourceSwitch = new AutonomyBuffer();
 for (let index = 0; index <= 10; index += 1) {
   sourceSwitch.addFuelFlowSample({ timestampMs: 1_000 + index * 1_500, speedKmh: 36, fuelRateLph: 12.6, sourceKey: 'MEASURED_015E' });

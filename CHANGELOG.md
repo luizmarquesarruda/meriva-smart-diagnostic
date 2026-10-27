@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Correções de revisão DB-166
+- Alinhado o limite efetivo de retry Bluetooth: sem override, usa a política do catálogo (3 tentativas); as opções explícitas 3/10/20 continuam configuráveis.
+- O buffer de consumo agora integra o combustível durante baixa velocidade e marcha lenta sem acrescentar distância quando o veículo está parado.
+- O balanço de tanque cheio rejeita viagens com validade do combustível ausente/desconhecida.
+- A reconciliação de DTC ausente preserva `lastSeen`, mantendo o horário da última observação real.
+
+
 ### Conexão Bluetooth Classic / ELM327
 - Reduzido o padrão de retry de conexão de 20 tentativas com intervalo de 8 s para 3 tentativas por adaptador com intervalo de 1,5 s, mantendo os limites configuráveis.
 - Depois que todos os protocolos de fallback falham em obter resposta ECU válida ao PID 010C, a aplicação registra o esgotamento e avança ao próximo dispositivo pareado, sem repetir a mesma varredura completa no adaptador atual.

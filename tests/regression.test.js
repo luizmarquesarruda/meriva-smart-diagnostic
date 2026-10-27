@@ -1299,7 +1299,8 @@ async function testDtcStorage() {
   const now = '2026-10-24T10:00:00.000Z';
   const inactive = dtcManager.markMissingStoredDtcsInactive(toReconcile, [], now);
   assert.deepStrictEqual(inactive.map((item) => item.code), ['P0130', 'P0135']);
-  assert.ok(inactive.every((item) => item.status === 'INACTIVE' && item.historical === true && item.lastSeen === now));
+  assert.ok(inactive.every((item) => item.status === 'INACTIVE' && item.historical === true && item.lastSeen === 't1'),
+    'a ausência no Mode 03 não pode reescrever lastSeen como se o DTC tivesse sido observado agora');
   assert.deepStrictEqual(dtcManager.markMissingStoredDtcsInactive(toReconcile, ['P0130'], now).map((item) => item.code), ['P0135']);
 }
 

@@ -83,7 +83,7 @@ export function estimateFuelRemainingFromFullTank(input: FuelBalanceInput): Fuel
     if (!Number.isFinite(startedAtMs) || !Number.isFinite(finishedAtMs) || finishedAtMs < startedAtMs) return null;
     if (finishedAtMs <= baselineAtMs) continue;
     if (startedAtMs < baselineAtMs && finishedAtMs > baselineAtMs) return null;
-    if (trip.fuelDataValid === false
+    if (trip.fuelDataValid !== true
         || !Number.isFinite(trip.distanceTotalKm) || trip.distanceTotalKm < 0.1
         || !Number.isFinite(trip.fuelUsedL) || trip.fuelUsedL < MIN_TRIP_FUEL_L
         || !(Number.isFinite(trip.avgFuelConsumptionKml) && trip.avgFuelConsumptionKml > 0)) return null;
