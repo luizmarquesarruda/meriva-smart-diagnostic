@@ -392,6 +392,8 @@ assert.match(bluetoothScreen, /queueHealth\.queue/, 'a tela Bluetooth deve expor
 assert.match(bluetoothScreen, /queueHealth\.wait/, 'a tela Bluetooth deve expor a espera média e máxima');
 assert.match(read('src/obd/elmHealthPresentation.ts'), /queueRejections > 0|rejected > 0/, 'recusas de fila precisam elevar o aviso de saúde');
 assert.ok(read('docs/OBD_APP_FEATURE_AUDIT_2026-10-27.md').includes('DB-170') && read('docs/OBD_APP_FEATURE_AUDIT_2026-10-27.md').includes('CI final'), 'a auditoria deve distinguir implementação em branch de validação final e integração na main');
+assert.ok(read('src/obd/bluetoothManager.ts').includes("session.executeCommand('010C', config.protocolSelectionTimeoutMs)"), 'the first ECU probe must use the bounded protocol-negotiation timeout');
+assert.match(read('tests/elm327Compatibility.test.js'), /testBoundedFirstProbeTimeoutOverride/, 'the first ECU probe timing must have a dynamic regression test');
 
 assert.match(theme, /SCREEN_TITLE_STYLE/);
 assert.match(read('tests/screenTheme.test.js'), /Shared screen theme and title contract/);
