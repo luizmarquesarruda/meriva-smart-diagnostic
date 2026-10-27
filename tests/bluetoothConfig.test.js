@@ -33,7 +33,7 @@ assert(manager.includes('bluetoothConfig.initialization.protocolSelectionTimeout
 const sharedConnection = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'sharedConnection.ts'), 'utf8');
 assert(sharedConnection.includes('três tentativas por'));
 assert(sharedConnection.includes('1,5 s entre falhas transitórias'));
-assert(sharedConnection.includes('Não repetir uma nova rodada inteira'));
+assert(sharedConnection.includes('não repetimos a mesma varredura'));
 assert(!sharedConnection.includes('while (!active)'), 'sharedConnection não deve repetir rodadas infinitamente após esgotar os candidatos');
 const exporter = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'exportBluetoothDiagnosticTxt.ts'), 'utf8');
 assert(exporter.includes('readLearningProfile'));
