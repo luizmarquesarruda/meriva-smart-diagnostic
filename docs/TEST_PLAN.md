@@ -162,5 +162,6 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 - GPS: coordenadas inválidas são ignoradas; precisão nula/negativa/não finita não conta como fix preciso; Haversine retorna NaN para coordenadas fora da faixa.
 - Consumo estimado: rejeitar temperaturas absolutas impossíveis e taxas calculadas NaN/Infinity/negativas.
 - Buffer RX: exceder 16 KiB precisa gerar erro explícito, limitar diagnósticos a 256 caracteres e permitir receber um próximo quadro válido.
+- Saúde Bluetooth/ELM327: a tela deve mostrar profundidade atual/pico da fila, recusas, espera média/máxima; recusas ou espera máxima >=5 s devem gerar aviso, e valores negativos/NaN/Infinity devem ser neutralizados. `tests/elmHealthPresentation.test.js` e `tests/projectBaseline.test.js`.
 - Buffer de descoberta: FIFO limitado, normalização, capacidade ajustável e isolamento por execução.
 - Aceitação física: comparar capturas RAW do ELM327/ECU para confirmar framing/checksum e precisão; testes sintéticos não substituem validação no veículo.
