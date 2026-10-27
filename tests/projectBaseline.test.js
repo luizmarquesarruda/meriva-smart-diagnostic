@@ -109,6 +109,14 @@ const bluetoothRecovery = read('src/obd/connectionRecovery.ts');
 const bluetoothTransport = read('src/obd/bluetoothClassicTransport.ts');
 assert.match(bluetoothRecovery, /awaitNativeCleanupRetry/);
 assert.match(bluetoothTransport, /awaitNativeCleanupRetry/);
+const bluetoothConfig = readJson('src/knowledge/bluetooth_config.json');
+assert.equal(bluetoothConfig.retry.maxAttempts, 3, 'tentativas Bluetooth por adaptador precisam permanecer limitadas');
+assert.equal(bluetoothConfig.retry.intervalMs, 1500, 'intervalo de retry deve evitar esperas longas entre falhas');
+const bluetoothManagerSource = read('src/obd/bluetoothManager.ts');
+assert.match(bluetoothManagerSource, /shouldRetryElmSessionAttempt/,
+  'falha após varredura completa da ECU não deve disparar a mesma varredura repetidamente');
+assert.match(bluetoothManagerSource, /ELM_PROTOCOL_FALLBACKS[\\s\\S]*?'2', '1'/,
+  'fallback precisa incluir SAE J1850 VPW/PWM além de KWP e CAN');
 assert.match(bluetoothTransport, /MAX_ELM_RX_BUFFER_CHARS\s*=\s*16\s*\*\s*1024/);
 assert.match(bluetoothTransport, /RX_DIAGNOSTIC_PREVIEW_CHARS\s*=\s*256/);
 assert.match(bluetoothTransport, /RX_BUFFER_OVERFLOW/);
