@@ -197,6 +197,14 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 - Testar valores ausentes, zero, não finitos e overrides; confirmar que o número de tentativas executadas coincide com o limite efetivo e que falha de ECU após a varredura avança ao próximo candidato.
 - O teste de CI cobre política e caminho de código; capturas no Galaxy A06 / Android 16 com ELM327 real continuam necessárias para validar latência e reconexão.
 
+## BT-CONN-06 — Interpretar resposta KWP com cabeçalho e checksum
+
+- Reproduzir o RX real observado no Galaxy A06: `SEARCHING...\n84F111410C0000D3`. O parser deve reconhecer o envelope KWP de três bytes, validar o comprimento e o checksum e retornar `010C = 0 rpm` com status `RESPONDEU`.
+- Repetir o teste com espaços (`84 F1 11 41 0C 00 00 D3`); ambos os formatos devem preservar os bytes brutos, incluindo cabeçalho e checksum.
+- Alterar o checksum (`D2`), comprimento declarado ou acrescentar bytes depois do checksum: a resposta deve ser rejeitada. A mensagem `SEARCHING...` não pode ser concatenada aos bytes do PID.
+- Com o quadro KWP válido recebido em `ATSP0`, a validação da ECU deve passar imediatamente; não executar a sequência de fallback `ATSP5/3/4/...` para essa mesma resposta.
+- Testes automatizados não substituem novo ensaio físico no Samsung Galaxy A06 / Android 16, com o mesmo adaptador ELM327 e a ECU do veículo. Guardar um trace pós-correção e confirmar que `010C` passa a validar; não exigir RPM diferente de zero para validar a comunicação.
+
 ## DATA-05 — Consumo móvel com marcha lenta
 
 - Cada intervalo contínuo com taxa de combustível e velocidade válidas deve integrar combustível mesmo quando a velocidade é zero ou baixa.
