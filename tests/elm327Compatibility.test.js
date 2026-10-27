@@ -161,5 +161,63 @@ async function testRecoveryRequiresValidPidPayload() {
   }
 }
 
+async function testBoundedFirstProbeTimeoutOverride() {
+  const root = path.resolve(__dirname, '..');
+  const formulaEngine = loadTs(path.join(root, 'src', 'obd', 'formulaEngine.ts'));
+  const pidDefinition = loadTs(path.join(root, 'src', 'obd', 'pidDefinition.ts'), {
+    './formulaEngine': formulaEngine,
+  });
+  const parser = loadTs(path.join(root, 'src', 'obd', 'parser.ts'), {
+    './pidDefinition': pidDefinition,
+    './formulaEngine': formulaEngine,
+    './dtcParser': { parseDtcResponseForService: () => [] },
+  });
+  const { Elm327Session } = loadTs(path.join(root, 'src', 'obd', 'elm327.ts'), {
+    './parser': parser,
+    './elm327Compatibility': compatibility,
+  });
+
+  let command = '';
+  const timeouts = [];
+  const transport = {
+    async open() {},
+    async close() {},
+    async write(data) { command = data.replace(/\\r/g, '').trim().toUpperCase(); },
+    async readUntilPrompt(timeoutMs) {
+      timeouts.push({ command, timeoutMs });
+      if (command === 'ATZ') return 'ELM327 v1.5';
+      if (command === 'ATDP') return 'ISO 14230-4 (KWP FAST)';
+      if (command === '010C') return '41 0C 1A F8';
+      return 'OK';
+    },
+  };
+
+  const session = new Elm327Session(transport, {
+    commandDelayMs: 0,
+    ioTimeoutMs: 15000,
+    optionalAtTimeoutMs: 1000,
+    protocolSelectionTimeoutMs: 9000,
+    adaptiveTiming: true,
+    adaptiveTimeoutMinMs: 3000,
+    adaptiveTimeoutMaxMs: 15000,
+    adaptiveTimeoutStepMs: 500,
+    forceInitialization: false,
+  });
+  try {
+    await session.initialize();
+    const result = await session.executeCommand('010C', 9000);
+    assert.equal(result.status, 'OK', '010C probe must still classify a complete ECU payload as a success');
+    const probe = timeouts.filter((entry) => entry.command === '010C').at(-1);
+    assert.equal(probe.timeoutMs, 9000,
+      'first automatic ECU probe must use the explicit bounded protocol window instead of the 3 s adaptive minimum');
+  } finally {
+    await session.close();
+  }
+}
+
 console.log('ELM327 compatibility regression tests: PASS');
-testRecoveryRequiresValidPidPayload().then(() => console.log('ELM327 recovery payload-gate regression: PASS')).catch((error) => { console.error(error && error.stack ? error.stack : error); process.exitCode = 1; });
+testRecoveryRequiresValidPidPayload()
+  .then(() => console.log('ELM327 recovery payload-gate regression: PASS'))
+  .then(() => testBoundedFirstProbeTimeoutOverride())
+  .then(() => console.log('ELM327 first ECU probe timeout regression: PASS'))
+  .catch((error) => { console.error(error && error.stack ? error.stack : error); process.exitCode = 1; });
