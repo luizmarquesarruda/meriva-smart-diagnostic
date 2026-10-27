@@ -261,7 +261,13 @@ export class Elm327Session {
       if (selected.status !== 'OK') return false;
 
       const probe = await this.command('010C');
-      if (probe.status !== 'OK' || !/41\s*0C/i.test(probe.response.replace(/\s/g, ''))) return false;
+      const parsedProbe = parsePidResponse('010C', probe.response);
+      if (
+        probe.status !== 'OK' ||
+        parsedProbe.status !== 'RESPONDEU' ||
+        parsedProbe.value === null ||
+        !Number.isFinite(parsedProbe.value)
+      ) return false;
 
       // Read the protocol directly while holding the queue. Calling
       // identifyProtocol() here would enqueue behind this recovery and deadlock.
