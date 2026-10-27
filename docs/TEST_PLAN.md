@@ -182,3 +182,10 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 - Rótulo desconhecido/ambíguo deve voltar a `ATSP0` (automático); não assumir que qualquer ISO 14230 é KWP fast.
 - Testes obrigatórios em `tests/elm327Compatibility.test.js`: cobrir todos os mapeamentos e o fallback de protocolo desconhecido. `tests/projectBaseline.test.js` protege a utilização da função pela recuperação real.
 - Validação física segue obrigatória: registrar protocolo devolvido pelo `ATDP`, comando `ATSP` de recuperação, resposta real ao `010C` e resultado de reconexão. Não declarar êxito com base apenas em testes simulados.
+
+## BT-CONN-04 — Gate íntegro do PID 010C durante recuperação
+
+- A recuperação deve validar a resposta de `010C` pelo mesmo parser estrito da conexão inicial. O texto `41 0C` isolado, payload truncado, bytes excedentes ou quadro inválido deve retornar falha de recuperação.
+- Uma resposta completa válida, por exemplo `41 0C 1A F8` (1726 rpm), pode confirmar recuperação quando o status do comando também for `OK`.
+- `tests/elm327Compatibility.test.js` exercita a sessão ELM com transporte simulado: primeiro retorna apenas `41 0C` e exige `false`; depois retorna `41 0C 1A F8` e exige `true`. `tests/pidParserIntegrity.test.js` cobre payloads incompletos e excedentes; `tests/projectBaseline.test.js` protege o gate no código de produção.
+- A simulação não substitui a validação física no Galaxy A06 / Android 16 com ELM327 e ECU reais.
