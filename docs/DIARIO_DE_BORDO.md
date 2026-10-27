@@ -1,6 +1,6 @@
-## ESTADO VIGENTE — 2026-10-27 (P0 Bluetooth/Autonomia; DB-166)
+## ESTADO VIGENTE — 2026-10-27 (P0 Bluetooth/Autonomia; DB-167)
 
-> DB-166 corrige quatro riscos encontrados na auditoria da PR #92: limite de retry padrão divergente, combustível não integrado em marcha lenta, viagens com validade desconhecida aceitas no balanço e `lastSeen` incorreto na reconciliação DTC. A CI anterior não valida essas correções; aguardar `validate` e `android-build` verdes no SHA que as contém. Não há teste físico no Galaxy A06/Android 16 com ELM327/ECU real.
+> DB-167 corrige a rejeição de uma trama KWP real recebida no teste Bluetooth: `84F111410C0000D3` contém resposta positiva para `010C`, mas o parser anterior não reconhecia esse cabeçalho/checksum e continuava o fallback de protocolos. A CI verde anterior (run [40495852871](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40495852871), SHA `b226809cd3802679bed5c4c7d1abe9c243dc16dc`) é anterior a esta correção e não a valida. PR #92 permanece sem merge até a CI ficar verde no HEAD que inclui código, testes e documentação; teste físico pós-correção ainda pendente.
 
 ### Integração, CI e riscos
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
@@ -13,11 +13,11 @@
 - DB-151 recupera correções relevantes da PR #83 que ainda não estavam no código consolidado: status histórico de DTC, reconciliação segura de Mode 03, interpretação correta dos monitores PID 0101 e enum PID 0151.
 - A autonomia DB-143–145 usa janela móvel de dez leituras e balanço do último tanque completo. O balanço é uma estimativa e depende de todas as viagens e abastecimentos serem registrados; DB-149 acrescenta a comparação do odômetro atual com a distância rastreada. Precisão física ainda não foi medida.
 - PR [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81) e PR [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) estão fechadas sem merge; o código útil foi portado/reconciliado na branch de integração. O histórico dessas PRs foi preservado e não deve ser descrito como aberto nem mesclado.
-- Somente `010C` tem resposta RAW_ECU específica documentada para a Meriva (`41 0C 1A F8` = 1726 rpm). Catálogo SAE não é prova de suporte do veículo.
+- O baseline anterior tinha `010C = 41 0C 1A F8` (1726 rpm). O trace físico de 2026-10-27 trouxe `84F111410C0000D3`: quadro KWP compacto com resposta positiva `41 0C 00 00` (0 rpm) e checksum consistente. Isso é evidência de resposta no instante capturado, não prova de que o motor deveria estar em marcha lenta; confirmar com novo trace após a correção. Catálogo SAE não prova suporte de outros PIDs.
 - Não foi executado teste físico no Galaxy A06/Android 16 nem com ELM327/ECU real.
 
 ### Critérios de aceitação
-- RG-01…RG-53 únicos e sequenciais; DB-001…DB-165 e índice sincronizados.
+- RG-01…RG-58 únicos e sequenciais; DB-001…DB-167 e índice sincronizados.
 - Gate anti-regressão, TypeScript, suíte completa e build Android aprovados no mesmo SHA final.
 - Nenhum PID passa a confirmado sem evidência RAW_ECU válida; autonomia persistida não pode ser exibida como atual.
 - A auditoria comparativa de apps está em `docs/OBD_APP_FEATURE_AUDIT_2026-10-27.md`; ela distingue funcionalidades já presentes de lacunas reais. SQLite para histórico operacional continua pendente e não é declarado implementado.
@@ -238,6 +238,7 @@
 - **DB-164** · 2026-10-27 — Corrigir seleção de protocolo durante recuperação/reconexão para evitar forçar KWP fast em ECU KWP 5-baud; cobrir protocolos e documentar teste BT-CONN-03.
 - **DB-165** · 2026-10-27 — Validar payload completo do PID 010C durante a recuperação do ELM327; adicionar teste dinâmico e proteção anti-regressão RG-53/BT-CONN-04.
 - **DB-166** · 2026-10-27 — Corrigir limite efetivo de retry Bluetooth, integrar combustível em marcha lenta, exigir validade explícita do consumo para balanço e preservar lastSeen em DTC ausente.
+- **DB-167** · 2026-10-27 — Corrigir parsing de trama KWP compacta e espaçada, validar comprimento/checksum, cobrir o RX real `84F111410C0000D3` e acrescentar RG-58/BT-CONN-06.
 
 ---
 
@@ -4608,3 +4609,20 @@ Aplicar no aplicativo nativo a referência visual do painel de autonomia, conect
 - O job de validação que antecede DB-166 não valida este commit. A CI da PR deve executar gate anti-regressão, TypeScript, suíte completa e build Android standalone no novo HEAD; nenhuma dessas etapas será declarada aprovada por inferência.
 - Teste físico com Galaxy A06 / Android 16, ELM327 e ECU reais continua pendente. Não há calibração física confirmada para a conversão percentual→litros do PID 012F.
 - A migração de `VIAGENS/index.json` para SQLite continua pendente e não faz parte desta rodada.
+
+## DB-167 · 2026-10-27 — Corrigir parsing de resposta KWP observada no trace Bluetooth
+
+### Evidência
+- No trace do Samsung Galaxy A06 / Android 16, `ATZ`, `ATI`, `ATE0`, `ATL0`, `ATS0`, `ATH1`, `ATSP0` e `ATDP` foram aceitos pelo adaptador.
+- Após `010C`, o RX bruto foi `SEARCHING...` seguido por `84F111410C0000D3`. A trama tem cabeçalho KWP de três bytes (`84 F1 11`), resposta positiva (`41 0C 00 00`) e checksum final (`D3`). O checksum aditivo dos bytes anteriores confere; o payload decodifica para 0 rpm.
+- `src/obd/parser.ts` aceitava o envelope K-Line antigo `48 6B 10` e quadros CAN conhecidos, mas não este cabeçalho KWP. Consequentemente, `isValidEcuProbe()` podia rejeitar a resposta e disparar o fallback `ATSP5/3/4/6/...`, terminando em timeout apesar do RX positivo. O trace sustenta fortemente essa causa; ainda precisa ser confirmado pelo ensaio físico pós-correção.
+
+### Correções aplicadas
+1. `src/obd/parser.ts`: adicionar suporte a quadros KWP compactos e espaçados com cabeçalho de três bytes, comprimento compatível com serviço/PID/dados e checksum aditivo obrigatório. Rejeitar checksum incorreto, quadro truncado, comprimento divergente e bytes excedentes.
+2. `tests/pidParserIntegrity.test.js`: reproduzir o RX real `SEARCHING...\n84F111410C0000D3`, verificar 0 rpm e preservação dos bytes brutos; cobrir formato espaçado e checksum inválido.
+3. `tests/projectBaseline.test.js`, `docs/CONTRATO_ANTI_REGRESSAO.md`, `docs/TEST_PLAN.md`, `docs/ELM327_ENGINEERING_PLAYBOOK.md` e `CHANGELOG.md`: proteger o caso com RG-58 e BT-CONN-06 e documentar a causa e os critérios de aceitação.
+
+### Validação e limites
+- A CI [40495852871](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40495852871) passou `validate` e `android-build` no SHA anterior `b226809cd3802679bed5c4c7d1abe9c243dc16dc`. Ela não inclui DB-167; uma nova CI precisa validar o HEAD após esta entrada.
+- Não afirmar resolução física até instalar o APK proveniente de um SHA validado e repetir a conexão com o mesmo adaptador e veículo. O critério é o parser aceitar o RX KWP válido e o fluxo parar o fallback após a primeira resposta positiva; 0 rpm é valor válido para testar comunicação, sem implicar que o motor estivesse funcionando.
+- PR #92 permanece aberta e sem merge. A revisão final, a CI no SHA exato e o ensaio físico continuam obrigatórios.
