@@ -1,8 +1,9 @@
-## ESTADO VIGENTE — 2026-10-27 (P0 Bluetooth/Autonomia; DB-167)
+## ESTADO VIGENTE — 2026-10-27 (P0 Bluetooth/Autonomia; DB-168)
 
-> DB-167 corrige a rejeição de uma trama KWP real recebida no teste Bluetooth: `84F111410C0000D3` contém resposta positiva para `010C`, mas o parser anterior não reconhecia esse cabeçalho/checksum e continuava o fallback de protocolos. A CI verde anterior (run [40495852871](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40495852871), SHA `b226809cd3802679bed5c4c7d1abe9c243dc16dc`) é anterior a esta correção e não a valida. PR #92 permanece sem merge até a CI ficar verde no HEAD que inclui código, testes e documentação; teste físico pós-correção ainda pendente.
+> DB-168 corrige divergências na documentação/interface do perfil ELM327 genérico. DB-167 corrige a rejeição de uma trama KWP real recebida no teste Bluetooth: `84F111410C0000D3` contém resposta positiva para `010C`, mas o parser anterior não reconhecia esse cabeçalho/checksum e continuava o fallback de protocolos. A CI verde anterior (run [40495852871](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40495852871), SHA `b226809cd3802679bed5c4c7d1abe9c243dc16dc`) é anterior a esta correção e não a valida. PR #92 permanece sem merge até a CI ficar verde no HEAD que inclui código, testes e documentação; teste físico pós-correção ainda pendente.
 
 ### Integração, CI e riscos
+- DB-168: documentação de retry corrigida para o padrão runtime (3 tentativas/candidato, 1500 ms); sequência de protocolos atualizada para `5,3,4,6,7,8,9,2,1` após `ATSP0`. J1850 é fallback genérico não confirmado na Meriva. CI no novo SHA ainda precisa validar.
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
 - `main`: `7eec3afecb3718020724baf053f8b6d2ca636fab`; PR [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84) foi mesclada. A branch de integração contém o inventário documental e as correções DB-146/147.
 - PR [#92 — consolidação P0–P2](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/92) continua aberta e fora de rascunho. Durante DB-166, a branch foi reconciliada com o commit vigente de `main`, incluindo `tests/elmHealthPresentation.test.js`, que antes existia apenas no lado de `main`. Confirmar a comparação final e CI verde no HEAD pós-merge antes de mesclar a PR.
@@ -17,7 +18,7 @@
 - Não foi executado teste físico no Galaxy A06/Android 16 nem com ELM327/ECU real.
 
 ### Critérios de aceitação
-- RG-01…RG-58 únicos e sequenciais; DB-001…DB-167 e índice sincronizados.
+- RG-01…RG-59 únicos e sequenciais; DB-001…DB-168 e índice sincronizados.
 - Gate anti-regressão, TypeScript, suíte completa e build Android aprovados no mesmo SHA final.
 - Nenhum PID passa a confirmado sem evidência RAW_ECU válida; autonomia persistida não pode ser exibida como atual.
 - A auditoria comparativa de apps está em `docs/OBD_APP_FEATURE_AUDIT_2026-10-27.md`; ela distingue funcionalidades já presentes de lacunas reais. SQLite para histórico operacional continua pendente e não é declarado implementado.
@@ -239,6 +240,7 @@
 - **DB-165** · 2026-10-27 — Validar payload completo do PID 010C durante a recuperação do ELM327; adicionar teste dinâmico e proteção anti-regressão RG-53/BT-CONN-04.
 - **DB-166** · 2026-10-27 — Corrigir limite efetivo de retry Bluetooth, integrar combustível em marcha lenta, exigir validade explícita do consumo para balanço e preservar lastSeen em DTC ausente.
 - **DB-167** · 2026-10-27 — Corrigir parsing de trama KWP compacta e espaçada, validar comprimento/checksum, cobrir o RX real `84F111410C0000D3` e acrescentar RG-58/BT-CONN-06.
+- **DB-168** · 2026-10-27 — Corrigir documentação/interface do perfil ELM327 genérico, retry e catálogo de fallback; RG-59/BT-CONN-07.
 
 ---
 
@@ -4626,3 +4628,20 @@ Aplicar no aplicativo nativo a referência visual do painel de autonomia, conect
 - A CI [40495852871](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40495852871) passou `validate` e `android-build` no SHA anterior `b226809cd3802679bed5c4c7d1abe9c243dc16dc`. Ela não inclui DB-167; uma nova CI precisa validar o HEAD após esta entrada.
 - Não afirmar resolução física até instalar o APK proveniente de um SHA validado e repetir a conexão com o mesmo adaptador e veículo. O critério é o parser aceitar o RX KWP válido e o fluxo parar o fallback após a primeira resposta positiva; 0 rpm é valor válido para testar comunicação, sem implicar que o motor estivesse funcionando.
 - PR #92 permanece aberta e sem merge. A revisão final, a CI no SHA exato e o ensaio físico continuam obrigatórios.
+
+
+## DB-168 · 2026-10-27 — Corrigir documentação e interface do perfil ELM327 genérico
+
+### Divergências encontradas
+- A tela Configurações afirmava que 20 tentativas eram o padrão, mas `src/knowledge/bluetooth_config.json` configura 3 tentativas por candidato e intervalo de 1500 ms; 10 e 20 são overrides explícitos.
+- O playbook técnico ainda documentava 20 tentativas/8 segundos e um exemplo de constantes hardcoded que não corresponde ao runtime.
+- O catálogo de protocolos omitia os fallbacks reais `ATSP2` (J1850 VPW) e `ATSP1` (J1850 PWM), e descrevia validação como se o RX bruto precisasse começar por `41 0C`, incompatível com a trama KWP encapsulada observada.
+
+### Correções registradas
+- Corrigida a nota visível em Configurações; atualizado o playbook para refletir catálogo, framing RFCOMM/ASCII e validação por payload interpretado.
+- Atualizado `meriva_protocols.json` com o perfil genérico, sequência completa e ressalva de que J1850 não foi observado nesta Meriva; `ATI` não é prova de autenticidade de clone.
+- Adicionados RG-59 e BT-CONN-07, com verificações de consistência no teste de catálogo e no gate documental.
+
+### Validação pendente
+- Confirmar a sequência `0,5,3,4,6,7,8,9,2,1` e a coerência dos textos por meio dos testes automatizados.
+- A CI deve validar este commit no SHA final. O ensaio físico no Galaxy A06/Android 16 com o ELM327 real continua obrigatório; a documentação corrigida não comprova que a conexão já funciona.

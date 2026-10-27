@@ -436,6 +436,8 @@ assert.ok(projectContract.includes('| RG-55 |'), 'rolling consumption must count
 assert.ok(projectContract.includes('| RG-56 |'), 'tank balance must reject trips with unknown fuel-data validity');
 assert.ok(projectContract.includes('| RG-57 |'), 'DTC lastSeen must represent actual observation, not later absence');
 assert.ok(projectContract.includes('| RG-58 |'), 'checksummed KWP frames must be protected by RG-58');
+assert.ok(projectContract.includes('| RG-59 |'), 'generic ELM327 profile and documented retry/protocol policy must stay aligned');
+assert.ok(read('docs/TEST_PLAN.md').includes('BT-CONN-07'), 'generic ELM327 documentation must have explicit consistency checks');
 assert.ok(read('docs/TEST_PLAN.md').includes('BT-CONN-04'), 'strict ECU recovery must have explicit test criteria');
 assert.ok(read('docs/TEST_PLAN.md').includes('BT-CONN-06'), 'real KWP-frame parsing must have explicit test criteria');
 

@@ -201,7 +201,7 @@ export default function ConfiguracaoScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-            <Text style={styles.note}>O limite é finito para evitar ciclos de conexão indefinidos. A opção 20 corresponde ao limite operacional padrão.</Text>
+            <Text style={styles.note}>O padrão do perfil genérico é 3 tentativas por dispositivo, com intervalo de 1,5 s. Você pode aumentar para 10 ou 20; a conexão para assim que a ECU responder validamente.</Text>
           </View>
 
           <View style={styles.card}>

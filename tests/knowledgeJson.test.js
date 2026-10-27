@@ -329,7 +329,7 @@ function main() {
   assertUnique(protocols.elm327_protocols.map((item) => String(item.elm)), 'protocolo ELM');
   assertUnique(protocols.elm327_protocols.map((item) => item.priority), 'prioridade de protocolo');
   for (const item of protocols.elm327_protocols) {
-    assert.ok(/^[03456789]$/.test(String(item.elm)), 'ID de protocolo inválido: ' + item.elm);
+    assert.ok(/^[0-9]$/.test(String(item.elm)), 'ID de protocolo inválido: ' + item.elm);
     assert.ok(typeof item.name === 'string' && item.name.trim(), 'protocolo sem nome: ' + item.elm);
     assert.ok(Number.isFinite(item.priority), 'prioridade inválida: ' + item.elm);
   }
@@ -345,6 +345,17 @@ function main() {
   assert.strictEqual(bluetooth.retry.stopOnSuccess, true);
   assert.strictEqual(bluetooth.validation.command, '010C');
   assert.strictEqual(bluetooth.validation.responsePrefix, '41 0C');
+  assert.strictEqual(bluetooth.adapterProfile, 'ELM327_MINI_GENERICO');
+  assert.strictEqual(bluetooth.transport.type, 'BLUETOOTH_CLASSIC_RFCOMM_SPP');
+  assert.strictEqual(bluetooth.transport.connectionType, 'delimited');
+  assert.strictEqual(bluetooth.transport.delimiter, '');
+  assert.strictEqual(bluetooth.transport.charset, 'ascii');
+  assert.strictEqual(bluetooth.retry.maxAttempts, 3);
+  assert.strictEqual(bluetooth.retry.intervalMs, 1500);
+  assert.strictEqual(bluetooth.retry.stopOnSuccess, true);
+  assert.deepStrictEqual(protocols.elm327_protocols.map((item) => item.elm), ['0', '5', '3', '4', '6', '7', '8', '9', '2', '1']);
+  assert.ok(protocols.generic_adapter_profile.response_framing.includes('prompt ELM'));
+  assert.ok(protocols.generic_adapter_profile.adapter_identity.includes('ATI'));
   assert.ok(bluetooth.initialization.required.includes('ATZ'));
   assert.ok(bluetooth.initialization.optional.includes('ATI'));
   assert.ok(Number.isInteger(bluetooth.initialization.optionalCommandTimeoutMs) && bluetooth.initialization.optionalCommandTimeoutMs >= 1000);

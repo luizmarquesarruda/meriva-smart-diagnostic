@@ -205,6 +205,14 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 - Com o quadro KWP válido recebido em `ATSP0`, a validação da ECU deve passar imediatamente; não executar a sequência de fallback `ATSP5/3/4/...` para essa mesma resposta.
 - Testes automatizados não substituem novo ensaio físico no Samsung Galaxy A06 / Android 16, com o mesmo adaptador ELM327 e a ECU do veículo. Guardar um trace pós-correção e confirmar que `010C` passa a validar; não exigir RPM diferente de zero para validar a comunicação.
 
+## BT-CONN-07 — Consistência do perfil ELM327 genérico
+
+- Validar que `bluetooth_config.json` e a tela de configurações apresentam o padrão real: 3 tentativas por candidato, intervalo de 1500 ms e parada imediata após sucesso; 10 e 20 são overrides, não o padrão.
+- Confirmar transporte Bluetooth Classic RFCOMM/SPP, ASCII, terminador CR real e framing robusto a fragmentação até o prompt `>`; não confundir `delimited` com socket binário/raw.
+- Confirmar que a sequência documentada corresponde a `ELM_PROTOCOL_FALLBACKS` (`5,3,4,6,7,8,9,2,1` após `ATSP0`). J1850 (`ATSP2/ATSP1`) é fallback genérico e não evidência de protocolo da Meriva.
+- `ATI` é informativo, não prova autenticidade de clone. A ECU só valida com resposta OBD real, incluindo envelopes KWP válidos com checksum.
+- Estes checks documentais não substituem CI verde no SHA final nem ensaio físico no veículo.
+
 ## DATA-05 — Consumo móvel com marcha lenta
 
 - Cada intervalo contínuo com taxa de combustível e velocidade válidas deve integrar combustível mesmo quando a velocidade é zero ou baixa.

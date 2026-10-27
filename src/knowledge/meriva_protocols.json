@@ -3,6 +3,15 @@
   "vehicle_family": "Chevrolet Corsa C / Meriva / Montana 1.4 8V Econoflex",
   "engine_system": "Multec H / X14YFH",
   "purpose": "Ordem de tentativa de protocolos para recuperar comunicação sem inventar compatibilidade.",
+  "scope_note": "Este catálogo descreve tentativas OBD-II do aplicativo e evidência específica da Meriva; não garante compatibilidade de todo clone ELM327 nem suporte de todos os PIDs.",
+  "generic_adapter_profile": {
+    "name": "ELM327_MINI_GENERICO",
+    "transport": "Bluetooth Classic RFCOMM/SPP",
+    "encoding": "ASCII",
+    "command_terminator": "CR (0x0D)",
+    "response_framing": "fragmentos RFCOMM reunidos até o prompt ELM '>'; não presumir que um evento de leitura seja uma resposta completa",
+    "adapter_identity": "ATI é informativo e pode ser ausente, impreciso ou falsificado em clones; não usar a string de versão como prova de autenticidade ou compatibilidade"
+  },
   "observed_on_meriva": "ISO 14230-4 KWP Fast Init",
   "elm327_protocols": [
     {
@@ -74,6 +83,24 @@
       "priority": 8,
       "confidence": 0.05,
       "evidence": "fallback genérico OBD, não observado na Meriva"
+    },
+    {
+      "elm": "2",
+      "name": "SAE J1850 VPW",
+      "standard": "SAE J1850 VPW",
+      "init": "J1850",
+      "priority": 9,
+      "confidence": 0.01,
+      "evidence": "fallback genérico final; não observado na Meriva"
+    },
+    {
+      "elm": "1",
+      "name": "SAE J1850 PWM",
+      "standard": "SAE J1850 PWM",
+      "init": "J1850",
+      "priority": 10,
+      "confidence": 0.01,
+      "evidence": "fallback genérico final; não observado na Meriva"
     }
   ],
   "rules": [
@@ -81,11 +108,12 @@
     "Se 010C não validar, tentar ATSP5 e repetir 010C.",
     "Depois tentar ATSP3 e repetir 010C.",
     "Depois tentar ATSP4 e repetir 010C.",
-    "Somente se os protocolos K-Line falharem, tentar ATSP6, ATSP7, ATSP8 e ATSP9, sempre validando com 010C.",
-    "Parar no primeiro protocolo que produza resposta 41 0C válida.",
+    "Depois de ATSP0, a ordem de fallback atualmente implementada é ATSP5, ATSP3, ATSP4, ATSP6, ATSP7, ATSP8, ATSP9, ATSP2 e ATSP1; cada candidato precisa ser validado por resposta real a 010C. ATSP2 e ATSP1 são últimos fallbacks genéricos, não evidência de uso na Meriva.",
+    "Parar no primeiro protocolo cuja resposta a 010C seja interpretada como payload positivo válido; aceitar envelopes suportados pelo parser, incluindo KWP com cabeçalho/checksum válido, sem exigir que o RX bruto comece literalmente por 41 0C.",
     "Um protocolo só é considerado confirmado quando um PID real retorna payload válido.",
     "ATSP6 é CAN 11/500, não KWP.",
     "ATSP7 é CAN 29/500; ATSP8 é CAN 11/250; ATSP9 é CAN 29/250.",
+    "ATSP2 é SAE J1850 VPW e ATSP1 é SAE J1850 PWM; são candidatos genéricos finais e não protocolos confirmados nesta Meriva.",
     "Não trocar de protocolo enquanto uma tentativa anterior de 010C ainda estiver pendente.",
     "Preservar TX, RX, tempo, status e protocolo escolhido para auditoria."
   ],

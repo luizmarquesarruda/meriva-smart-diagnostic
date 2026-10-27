@@ -263,22 +263,22 @@ Evitar mensagens genéricas como Erro Bluetooth.
 A documentação externa é referência de engenharia. Ela não substitui o comportamento medido no ELM327 real da Meriva.
 ## Política de teste Bluetooth
 
-Para diagnóstico físico, a sessão de conexão usa no máximo **20 tentativas automáticas por padrão**. O limite efetivo pode ser reduzido pelas configurações do aplicativo. Entre falhas há **8 segundos** de espera. Cada tentativa é registrada no trace TXT, incluindo TX/RX e erro de conexão quando disponível.
+O perfil `ELM327_MINI_GENERICO` define **3 tentativas por candidato por padrão**, com **1500 ms** entre falhas. A tela permite override explícito para 3, 10 ou 20; 10/20 não são o padrão do catálogo. A sequência para imediatamente quando a ECU valida `010C`. Cada tentativa deve ser registrada no trace TXT, incluindo TX/RX e erro quando disponível.
 
 Eventos principais: `BLUETOOTH_ATTEMPT_START`, `BLUETOOTH_ATTEMPT_RESULT`, `BLUETOOTH_RETRY_WAIT_START`, `BLUETOOTH_RETRY_WAIT_END` e `BLUETOOTH_TEST_SESSION_END`.
 
-A contagem é encerrada imediatamente quando a ECU é validada por `010C -> 41 0C XX XX`. Não são executadas 20 tentativas após uma conexão válida.
+A contagem é encerrada imediatamente quando a ECU valida `010C` e o parser retorna payload positivo válido. O envelope pode ser CAN, resposta direta suportada ou KWP com cabeçalho/checksum válido; não se deve exigir que o RX bruto comece literalmente por `41 0C`. Não são executadas tentativas adicionais após resposta válida.
 
 ## Correção da política de retry no TypeScript
 
 As constantes da política de teste ficam no escopo do módulo para serem reutilizadas pela aplicação e pelos testes de regressão:
 
 ~~~ts
-export const MAX_BLUETOOTH_ATTEMPTS = 20; // limite-base do catálogo Bluetooth
-export const BLUETOOTH_RETRY_INTERVAL_MS = 8000; // intervalo-base do catálogo Bluetooth
+export const MAX_BLUETOOTH_ATTEMPTS = bluetoothConfig.retry.maxAttempts; // 3 tentativas por candidato
+export const BLUETOOTH_RETRY_INTERVAL_MS = bluetoothConfig.retry.intervalMs; // 1500 ms
 
-// O limite efetivo de tentativas pode ser reduzido pela configuração do aplicativo;
-// valor 0/ausente usa o limite-base finito de 20 para impedir ciclos infinitos.
+// DEFAULT_ELM327_COMPATIBILITY.maxConnectionAttempts = 0 significa usar o catálogo;
+// as Configurações podem sobrescrever o limite com 3, 10 ou 20.
 ~~~
 
 Não declarar `export const` dentro de `createRealElmSession`. A função apenas consome as constantes exportadas.
@@ -286,7 +286,7 @@ Não declarar `export const` dentro de `createRealElmSession`. A função apenas
 
 ## Regra final de retry Bluetooth
 
-O ciclo executa no máximo o limite efetivo configurado; o padrão seguro é 20 tentativas. O intervalo de 8 segundos ocorre somente após uma falha. Ao obter SUCCESS, o ciclo termina imediatamente e a sessão bem-sucedida é devolvida ao aplicativo. Não existe reabertura ou tentativa adicional depois do sucesso.
+O ciclo executa no máximo o limite efetivo configurado; o padrão do catálogo é 3 tentativas por candidato. O intervalo de 1500 ms ocorre somente após uma falha. Ao obter SUCCESS, o ciclo termina imediatamente e a sessão bem-sucedida é devolvida ao aplicativo. Não existe reabertura ou tentativa adicional depois do sucesso.
 
 
 ## Aquisição e redução de latência — 2026-10-12
