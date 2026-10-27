@@ -27,7 +27,7 @@ const partial = { id: 'partial', occurredAt: '2026-10-01T09:10:00.000Z', odomete
 const trip1 = { id: 'real1', startedAt: '2026-10-01T08:10:00.000Z', finishedAt: '2026-10-01T09:00:00.000Z', distanceTotalKm: 100, fuelUsedL: 8, avgFuelConsumptionKml: 12.5, fuelDataValid: true, source: 'REAL_OBD', telemetrySamples: [] };
 const trip2 = { id: 'real2', startedAt: '2026-10-01T09:20:00.000Z', finishedAt: '2026-10-01T10:00:00.000Z', distanceTotalKm: 50, fuelUsedL: 4, avgFuelConsumptionKml: 12.5, fuelDataValid: true, source: 'REAL_OBD', telemetrySamples: [] };
 const active = { active: true, startedAtMs: Date.parse('2026-10-01T10:10:00.000Z'), distanceKm: 10, fuelUsedL: 1, fuelDataValid: true };
-const estimate = estimateFuelRemainingFromFullTank({ fuelings: [full, partial], trips: [trip1, trip2], activeTrip: active });
+const estimate = estimateFuelRemainingFromFullTank({ fuelings: [full, partial], trips: [trip1, trip2], activeTrip: active, currentOdometerKm: 10160 });
 assert.equal(estimate?.remainingFuelL, 49, '56 L - 8 L + 6 L - 4 L - 1 L');
 assert.equal(estimate?.tripsCount, 3);
 assert.equal(estimate?.partialFuelingsCount, 1);
@@ -50,34 +50,41 @@ assert.equal(estimateFuelRemainingFromFullTank({
 }), null, 'odômetro anterior ao último abastecimento invalida a estimativa');
 assert.equal(estimateFuelRemainingFromFullTank({ fuelings: [partial], trips: [trip1] }), null,
   'abastecimento parcial sem baseline completo não permite inferir o tanque');
-assert.equal(estimateFuelRemainingFromFullTank({ fuelings: [full], trips: [{ ...trip1, fuelDataValid: false }]}), null,
+assert.equal(estimateFuelRemainingFromFullTank({ fuelings: [full], trips: [{ ...trip1, fuelDataValid: false }], currentOdometerKm: 10100 }), null,
   'viagem real sem combustível válido invalida o balanço');
-assert.equal(estimateFuelRemainingFromFullTank({ fuelings: [full, { ...partial, liters: 10 }], trips: [trip1] }), null,
+assert.equal(estimateFuelRemainingFromFullTank({ fuelings: [full, { ...partial, liters: 10 }], trips: [trip1], currentOdometerKm: 10100 }), null,
   'abastecimento que excede a capacidade física não é aceito');
 assert.equal(estimateFuelRemainingFromFullTank({
   fuelings: [full, partial],
   trips: [{ ...trip1, distanceTotalKm: 80 }],
+  currentOdometerKm: 10100,
 }), null, 'odômetro divergente no próximo abastecimento denuncia viagem não contabilizada');
 assert.equal(estimateFuelRemainingFromFullTank({
   fuelings: [full, { ...partial, occurredAt: '2026-10-01T08:30:00.000Z' }],
   trips: [trip1],
+  currentOdometerKm: 10050,
 }), null, 'abastecimento no meio de uma viagem invalida a ordenação do balanço');
 assert.equal(estimateFuelRemainingFromFullTank({
   fuelings: [full],
   trips: [],
   activeTrip: { active: true, startedAtMs: Date.parse('2026-10-01T07:50:00.000Z'), distanceKm: 10, fuelUsedL: 1, fuelDataValid: true },
+  currentOdometerKm: 10010,
 }), null, 'viagem ativa iniciada antes do baseline não pode ser subtraída integralmente');
-assert.equal(estimateFuelRemainingFromFullTank({ fuelings: [full], trips: [] })?.remainingFuelL, 56,
-  'tanque completo válido sem viagens posteriores começa em 56 L');
+assert.equal(estimateFuelRemainingFromFullTank({ fuelings: [full], trips: [] }), null,
+  'sem odômetro atual, o balanço não consegue detectar viagens não registradas');
+assert.equal(estimateFuelRemainingFromFullTank({ fuelings: [full], trips: [], currentOdometerKm: 10000 })?.remainingFuelL, 56,
+  'tanque completo e odômetro atual coincidente podem começar em 56 L');
 
 assert.equal(estimateFuelRemainingFromFullTank({
   fuelings: [full],
   trips: [{ ...trip1, fuelUsedL: 1 }],
+  currentOdometerKm: 10100,
 }), null, 'consumo da viagem deve ser coerente com distância / litros');
 
 assert.equal(estimateFuelRemainingFromFullTank({
   fuelings: [full],
   trips: [{ ...trip1, distanceTotalKm: 1, fuelUsedL: 0.01, avgFuelConsumptionKml: 100, fuelDataValid: undefined }],
+  currentOdometerKm: 10001,
 }), null, 'menos de 0,05 L não deve alimentar o balanço e superestimar a autonomia');
 
 assert.equal(estimateFuelRemainingFromFullTank({
@@ -86,5 +93,6 @@ assert.equal(estimateFuelRemainingFromFullTank({
     trip1,
     { ...trip2, startedAt: '2026-10-01T08:50:00.000Z' },
   ],
+  currentOdometerKm: 10150,
 }), null, 'viagens REAL_OBD sobrepostas indicam histórico incoerente e invalidam o fallback');
 console.log('fuelBalance.test.js: PASS');
