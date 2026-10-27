@@ -77,7 +77,7 @@ assert.equal(parser.parsePidResponse('010C', '48 6B 10 41 0C 1A F8 82').status, 
 assert.equal(parser.parsePidResponse('010C', '486B10410C1AF82299').status, 'VALOR NÃO INTERPRETADO',
   'envelope K-Line compacto não pode ignorar bytes após o checksum');
 
-const kwpCompactResponse = parser.parsePidResponse('010C', 'SEARCHING...\\n84F111410C0000D3');
+const kwpCompactResponse = parser.parsePidResponse('010C', 'SEARCHING...\n84F111410C0000D3');
 assert.equal(kwpCompactResponse.status, 'RESPONDEU',
   'a resposta KWP fast real 84F111410C0000D3 deve validar o cabeçalho e checksum');
 assert.equal(kwpCompactResponse.value, 0,
