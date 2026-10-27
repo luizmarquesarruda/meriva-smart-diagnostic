@@ -397,88 +397,15 @@ export async function initializeDriveCycles(basePath: string): Promise<void> {
   const viagensDir = `${basePath}/VIAGENS`;
   const indexFile = `${viagensDir}/index.json`;
 
+  // Do not rewrite the legacy JSON before migration: the original must remain
+  // available as a verified recovery source until the SQLite transaction commits.
   await serializeIndexWrite(indexFile, async () => {
     await FileSystem.makeDirectoryAsync(viagensDir, { intermediates: true });
-    const indexInfo = await FileSystem.getInfoAsync(indexFile);
-    if (indexInfo.exists) {
-      // Upgrade old installations in place, retaining real/simulated records and
-      // removing only explicitly imported CarScanner reference trips.
-      if (!indexInfo.isDirectory) {
-        try {
-          const parsed = JSON.parse(await FileSystem.readAsStringAsync(indexFile)) as {
-            version?: string;
-            initializedAt?: string;
-            cycles?: unknown;
-            totalCount?: number;
-            [key: string]: unknown;
-          };
-          const originalCycles = Array.isArray(parsed.cycles) ? parsed.cycles : [];
-          const hasSeed = originalCycles.some(
-            (cycle) => typeof cycle === 'object' && cycle !== null &&
-              (cycle as { source?: unknown }).source === 'CARSCANNER_SEED',
-          );
-          if (hasSeed) {
-            const invalidNonSeeds = originalCycles.some((cycle) =>
-              !(typeof cycle === 'object' && cycle !== null &&
-                (cycle as { source?: unknown }).source === 'CARSCANNER_SEED') &&
-              !isDriveCycle(cycle),
-            );
-            if (invalidNonSeeds) throw new Error('INDEX_HAS_INVALID_CYCLES_DURING_MIGRATION');
-            const cycles = cyclesFromUnknown(originalCycles).filter(
-              (cycle) => cycle.source !== 'CARSCANNER_SEED',
-            );
-            const previousFile = indexBackupPath(indexFile);
-            await FileSystem.deleteAsync(previousFile, { idempotent: true });
-            await FileSystem.copyAsync({ from: indexFile, to: previousFile });
-            if (await readCyclesFromFile(previousFile) === null) {
-              throw new Error('BACKUP_PREVIO_DO_INDICE_NAO_VALIDADO');
-            }
-            await persistIndexSnapshot(indexFile, {
-              ...parsed,
-              version: typeof parsed.version === 'string' ? parsed.version : '1.0',
-              cycles,
-              totalCount: cycles.length,
-              lastModified: new Date().toISOString(),
-            });
-          }
-        } catch (cause) {
-          // Never overwrite an index that could not be read or validated.
-          console.warn('[trips] índice existente não foi migrado:', cause instanceof Error ? cause.message : cause);
-        }
-      }
-      return;
-    }
-
-    // If the main index disappeared during a previous replacement, recover the
-    // validated previous snapshot before considering an empty installation.
-    const previousFile = indexBackupPath(indexFile);
-    const previousInfo = await FileSystem.getInfoAsync(previousFile);
-    if (previousInfo.exists) {
-      const backupCycles = await readCyclesFromFile(previousFile);
-      if (backupCycles === null) {
-        throw new Error('BACKUP_DO_HISTORICO_CORROMPIDO; HISTORICO_NAO_SUBSTITUIDO');
-      }
-      await persistIndexSnapshot(indexFile, {
-        version: '1.0',
-        initializedAt: new Date().toISOString(),
-        cycles: backupCycles,
-        totalCount: backupCycles.length,
-      });
-      return;
-    }
-
-    // New installations start with no trips. CarScanner seed data remains
-    // available only as a separately identified learning/reference baseline.
-    const emptyData = {
-      version: '1.0',
-      initializedAt: new Date().toISOString(),
-      cycles: [] as DriveCycle[],
-      totalCount: 0,
-    };
-    await persistIndexSnapshot(indexFile, emptyData);
   });
+
   await ensureSqliteMigration(basePath);
-  await refreshLegacyIndexFromSqlite(basePath, await openDriveCycleDatabase(basePath), false);
+  const db = await openDriveCycleDatabase(basePath);
+  await refreshLegacyIndexFromSqlite(basePath, db, false);
   await copySqliteFileToSnapshot(basePath);
 }
 
