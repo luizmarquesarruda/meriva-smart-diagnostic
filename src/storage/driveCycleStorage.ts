@@ -247,9 +247,9 @@ export async function prepareDriveCycleDatabaseBackup(basePath: string): Promise
 export async function restoreDriveCyclesFromBackup(basePath: string): Promise<DriveCycle[]> {
   const indexFile = `${basePath}/VIAGENS/index.json`;
   const candidates = [
-    indexFile,
     indexBackupPath(indexFile),
     indexFile.replace(/\\.json$/, '.pre-sqlite.json'),
+    indexFile,
   ];
   let restoredCycles: DriveCycle[] | null = null;
   let sourceFile: string | null = null;
