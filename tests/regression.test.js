@@ -32,6 +32,7 @@ function loadTs(tsPath) {
 
 const files = new Map();
 const dirs = new Set(['/doc']);
+const sqliteDbStates = new Map();
 let writeDelayMs = 0;
 let failReadPath = null;
 let bluetoothListener = null;
@@ -64,6 +65,10 @@ function resetFS() {
   files.clear();
   dirs.clear();
   dirs.add('/doc');
+  sqliteDbStates.clear();
+  for (const mod of compiled.values()) {
+    mod.exports.__resetDriveCycleStorageForTests?.();
+  }
   writeDelayMs = 0;
   failReadPath = null;
 }
@@ -136,6 +141,7 @@ const fakeFS = {
   },
 
   async deleteAsync(p) {
+    if (p === '/doc/SQLite/meriva_smart_history.db') sqliteDbStates.delete('meriva_smart_history.db');
     files.delete(p);
     for (const key of Array.from(files.keys())) {
       if (key.startsWith(p + '/')) files.delete(key);
@@ -219,9 +225,107 @@ const fakeBluetooth = {
   },
 };
 
+function persistFakeSqlite(name, state) {
+  const file = fakeFS.documentDirectory + '/SQLite/' + name;
+  ensureDirTree(parentDir(file));
+  files.set(file, JSON.stringify({
+    __testSqlite: true,
+    rows: Array.from(state.rows.values()),
+    metadata: Array.from(state.metadata.entries()),
+  }));
+}
+
+function getFakeSqliteState(name) {
+  let state = sqliteDbStates.get(name);
+  if (state) return state;
+  state = { rows: new Map(), metadata: new Map() };
+  const file = fakeFS.documentDirectory + '/SQLite/' + name;
+  if (files.has(file)) {
+    try {
+      const stored = JSON.parse(files.get(file));
+      if (stored.__testSqlite) {
+        state.rows = new Map((stored.rows ?? []).map((row) => [row.id, row]));
+        state.metadata = new Map(stored.metadata ?? []);
+      }
+    } catch { /* corrupt SQLite files are not valid fixtures */ }
+  }
+  sqliteDbStates.set(name, state);
+  return state;
+}
+
+const fakeSQLite = {
+  async openDatabaseAsync(name) {
+    const state = getFakeSqliteState(name);
+    const file = fakeFS.documentDirectory + '/SQLite/' + name;
+    if (!files.has(file)) persistFakeSqlite(name, state);
+    return {
+      async execAsync() { persistFakeSqlite(name, state); },
+      async getFirstAsync(sql, ...params) {
+        if (/FROM\s+drive_cycle_metadata/i.test(sql)) {
+          const value = state.metadata.get(String(params[0]));
+          return value === undefined ? null : { value };
+        }
+        return null;
+      },
+      async getAllAsync(sql) {
+        if (/FROM\s+drive_cycles/i.test(sql) && /payload_json/i.test(sql)) {
+          return Array.from(state.rows.values()).map((row) => ({
+            id: row.id, payload_json: row.payload_json,
+          }));
+        }
+        if (/FROM\s+drive_cycles/i.test(sql) && /\bSELECT\s+id\b/i.test(sql)) {
+          return Array.from(state.rows.keys()).map((id) => ({ id }));
+        }
+        return [];
+      },
+      async runAsync(sql, ...params) {
+        if (/INSERT\s+OR\s+(?:IGNORE|REPLACE)\s+INTO\s+drive_cycles/i.test(sql)) {
+          const [id, startedAt, source, payloadJson, updatedAt] = params;
+          if (/INSERT\s+OR\s+IGNORE/i.test(sql) && state.rows.has(String(id))) return { changes: 0 };
+          state.rows.set(String(id), {
+            id: String(id), started_at: String(startedAt), source: String(source),
+            payload_json: String(payloadJson), updated_at: String(updatedAt),
+          });
+          persistFakeSqlite(name, state);
+          return { changes: 1 };
+        }
+        if (/DELETE\s+FROM\s+drive_cycles/i.test(sql)) {
+          const count = state.rows.size;
+          state.rows.clear();
+          persistFakeSqlite(name, state);
+          return { changes: count };
+        }
+        if (/INSERT\s+OR\s+REPLACE\s+INTO\s+drive_cycle_metadata/i.test(sql)) {
+          state.metadata.set(String(params[0]), String(params[1]));
+          persistFakeSqlite(name, state);
+          return { changes: 1 };
+        }
+        throw new Error('UNSUPPORTED_SQL_IN_TEST_DOUBLE: ' + sql);
+      },
+      async withTransactionAsync(operation) {
+        const snapshot = {
+          rows: new Map(state.rows),
+          metadata: new Map(state.metadata),
+        };
+        try {
+          await operation();
+          persistFakeSqlite(name, state);
+        } catch (error) {
+          state.rows = snapshot.rows;
+          state.metadata = snapshot.metadata;
+          persistFakeSqlite(name, state);
+          throw error;
+        }
+      },
+      async closeAsync() {},
+    };
+  },
+};
+
 const originalLoad = Module._load;
 Module._load = function (request, parent, isMain) {
   if (request === 'expo-file-system') return fakeFS;
+  if (request === 'expo-sqlite') return fakeSQLite;
   if (request === 'react-native') return fakeRN;
   if (request === 'react-native-bluetooth-classic') return fakeBluetooth;
   if (request === 'expo-location') return { PermissionStatus: { GRANTED: 'granted' }, requestForegroundPermissionsAsync: async () => ({ status: 'granted' }), getBackgroundPermissionsAsync: async () => ({ status: 'granted' }), requestBackgroundPermissionsAsync: async () => ({ status: 'granted' }), hasStartedLocationUpdatesAsync: async () => false, startLocationUpdatesAsync: async () => {}, stopLocationUpdatesAsync: async () => {}, Accuracy: { BestForNavigation: 6 } };
@@ -1122,8 +1226,8 @@ async function testDriveCycleValidation() {
   files.set(indexFile, JSON.stringify({ cycles: 'corrompido' }));
   assert.deepStrictEqual(
     (await storage.readDriveCycles(BASE)).map((item) => item.id),
-    ['test-1'],
-    'índice corrompido deve recuperar a última cópia válida em vez de ocultar o histórico',
+    ['test-1', 'test-2'],
+    'SQLite é a fonte de verdade e deve preservar todas as viagens apesar de corrupção do espelho JSON',
   );
 
   resetFS();
@@ -1153,8 +1257,8 @@ async function testDriveCycleValidation() {
   files.set(damagedIndex, damagedContent);
   await assert.rejects(
     () => storage.addDriveCycle(BASE, { ...cycle, id: 'must-not-overwrite-damaged-index' }),
-    /HISTORICO_DE_VIAGENS_CORROMPIDO/,
-    'índice corrompido sem backup deve impedir gravação destrutiva',
+    /LEGACY_TRIP_HISTORY_INVALID/,
+    'índice corrompido sem backup deve impedir a migração sem gravação destrutiva',
   );
   assert.strictEqual(files.get(damagedIndex), damagedContent,
     'índice inválido deve ser preservado para recuperação manual');
