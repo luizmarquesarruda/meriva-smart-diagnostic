@@ -235,8 +235,9 @@ async function ensureSqliteMigration(basePath: string): Promise<void> {
 /** Flushes the DB to a checked, restorable file inside VIAGENS before backup/export. */
 export async function prepareDriveCycleDatabaseBackup(basePath: string): Promise<void> {
   await ensureSqliteMigration(basePath);
-  const db = await openDriveCycleDatabase(basePath);
-  await db.execAsync('PRAGMA wal_checkpoint(FULL);');
+  await openDriveCycleDatabase(basePath);
+  // The database uses DELETE journaling and FULL synchronous mode; copy only
+  // after the last completed transaction, without invoking a WAL-only pragma.
   await copySqliteFileToSnapshot(basePath);
 }
 
@@ -275,6 +276,7 @@ export async function restoreDriveCyclesFromBackup(basePath: string): Promise<Dr
   await FileSystem.deleteAsync(databasePath + '-wal', { idempotent: true });
   await FileSystem.deleteAsync(databasePath + '-shm', { idempotent: true });
   await FileSystem.deleteAsync(databasePath + '-journal', { idempotent: true });
+  await FileSystem.deleteAsync(sqliteSnapshotPath(basePath), { idempotent: true });
   const db = await openDriveCycleDatabase(basePath);
   await db.withTransactionAsync(async () => {
     await db.runAsync('DELETE FROM drive_cycles');
