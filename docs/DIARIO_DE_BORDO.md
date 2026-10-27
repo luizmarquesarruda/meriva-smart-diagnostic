@@ -1,6 +1,6 @@
-## ESTADO VIGENTE — 2026-10-27 (P1–P2; DB-162)
+## ESTADO VIGENTE — 2026-10-27 (P1–P2; DB-163)
 
-> A CI [40440383974](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40440383974) passou `validate` e `android-build` no SHA P0 `446d5cdf4e09b2cd7e833905c4102f6f02d1fba0`, com APK standalone de 29.761.545 bytes verificado e artefato enviado. DB-162 acrescenta apresentação das métricas de fila ELM e uma nova regressão; essa aprovação anterior não valida as alterações DB-162. A nova CI deve validar o SHA mais recente. Testes físicos no Galaxy A06/Android 16 com ELM327/ECU real continuam pendentes.
+> A CI [40448437601](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40448437601) passou no SHA `e57a18bfe7aa9885b9b38403ce31487d90ab3d6e` antes das alterações DB-163; ela valida DB-162, mas não valida os ajustes subsequentes de retry/fallback. A CI integral (gate, TypeScript, suíte completa e build Android) precisa confirmar o HEAD final desta rodada. Testes físicos no Galaxy A06/Android 16 com ELM327/ECU real continuam pendentes.
 
 ### Integração, CI e riscos
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
@@ -16,7 +16,7 @@
 - Não foi executado teste físico no Galaxy A06/Android 16 nem com ELM327/ECU real.
 
 ### Critérios de aceitação
-- RG-01…RG-51 únicos e sequenciais; DB-001…DB-162 e índice sincronizados.
+- RG-01…RG-52 únicos e sequenciais; DB-001…DB-163 e índice sincronizados.
 - Gate anti-regressão, TypeScript, suíte completa e build Android aprovados no mesmo SHA final.
 - Nenhum PID passa a confirmado sem evidência RAW_ECU válida; autonomia persistida não pode ser exibida como atual.
 - A auditoria comparativa de apps está em `docs/OBD_APP_FEATURE_AUDIT_2026-10-27.md`; ela distingue funcionalidades já presentes de lacunas reais. SQLite para histórico operacional continua pendente e não é declarado implementado.
@@ -233,6 +233,7 @@
 - **DB-160** · 2026-10-26 — Fallback de autonomia pelo buffer entre 30–60 s, tela nativa grafite/âmbar e testes/contratos atualizados.
 - **DB-161** · 2026-10-26 — Exigir odômetro atual válido para fallback do tanque cheio; adicionar teste e registrar o bloqueio em caso de histórico não reconciliável.
 - **DB-162** · 2026-10-27 — Integrar métricas de fila ELM à tela Bluetooth, com alerta de saturação/espera e teste; documentar adoção de funcionalidades de apps OBD2 e lacunas de SQLite.
+- **DB-163** · 2026-10-27 — Reduzir latência da conexão, limitar retries por adaptador e ampliar fallback de protocolo com testes e rastreabilidade.
 
 ---
 
@@ -4522,3 +4523,29 @@ Aplicar no aplicativo nativo a referência visual do painel de autonomia, conect
 - CI P0 [40440383974](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40440383974) passou validate e APK standalone no SHA anterior `446d5cdf4e09b2cd7e833905c4102f6f02d1fba0`. DB-162 exige CI nova no SHA final, incluindo gate, TypeScript, suíte completa e Android standalone.
 - O comportamento de fila é coberto por testes sintéticos; ainda é necessário medir latência, saturação e recuperação no Galaxy A06/Android 16 com o ELM327 físico. Não há evidência física nesta anotação.
 
+## DB-163 · 2026-10-27 — Reduzir latência da conexão Bluetooth e completar fallback de protocolo
+
+### Causa confirmada na auditoria do código
+- `src/knowledge/bluetooth_config.json` configurava até 20 tentativas por dispositivo, com intervalo de 8000 ms entre falhas transitórias. Em uma lista de adaptadores pareados, o tempo de conexão podia crescer de forma desnecessária.
+- Depois de a mesma sessão esgotar o gate real `010C`, o retry externo podia repetir a inicialização e a varredura completa de protocolos no mesmo candidato, sem evidência nova de que esse adaptador iria responder.
+- A lista de protocolos alternativos priorizava KWP/CAN, mas não incluía os IDs 2 e 1 (SAE J1850 VPW/PWM).
+- A camada de conexão já tinha partes corretas que foram mantidas: RFCOMM/SPP Classic, stream ASCII enquadrado pelo prompt `>`, uma fila serial compartilhada, proteção de socket nativo concorrente, seleção automática de dispositivos pareados e gate de ECU por resposta OBD válida.
+
+### Correções aplicadas
+1. `src/knowledge/bluetooth_config.json`: padrão passa a 3 tentativas por adaptador e intervalo de 1500 ms; ambos continuam configuráveis.
+2. `src/obd/bluetoothManager.ts`: tabela de nomes documenta protocolos 1/2; constante `ELM_PROTOCOL_FALLBACKS` inclui IDs 5, 3, 4, 6, 7, 8, 9, 2 e 1, preservando `ATSP0` automático como ponto de partida.
+3. Após uma varredura completa sem resposta ECU válida ao `010C`, a função `shouldRetryElmSessionAttempt` classifica o candidato como esgotado, registra `ECU_PROBE_EXHAUSTED` e deixa o fluxo de seleção avançar ao próximo dispositivo pareado. Falhas transitórias de abertura e problemas não classificados como esgotamento continuam sujeitos ao retry limitado. Rádio desligado ou estado de rádio indeterminado continua interrompendo tentativas.
+4. `src/obd/sharedConnection.ts` documenta a nova política sem introduzir uma segunda fila, segundo proprietário de conexão ou socket adicional.
+5. `tests/bluetoothConfig.test.js`, `tests/regression.test.js` e `tests/projectBaseline.test.js` atualizam os limites, verificam protocolos 1/2 e protegem a política de avançar após o gate ECU esgotado.
+6. `docs/CONTRATO_ANTI_REGRESSAO.md` acrescenta RG-52; `docs/TEST_PLAN.md`, `docs/ELM327_ENGINEERING_PLAYBOOK.md`, `docs/OBD_APP_FEATURE_AUDIT_2026-10-27.md` e `CHANGELOG.md` registram a decisão e o ensaio pendente.
+
+### Comparação externa e limite da conclusão
+- Car Scanner e Torque documentam fluxo de parear no Android, selecionar o adaptador na aplicação e iniciar a conexão. A documentação do OBDLink recomenda começar com protocolo automático e diagnosticar adaptadores ocupados por outro cliente. As referências e URLs estão no playbook de engenharia.
+- A decisão não é trocar de biblioteca: a camada atual já implementa a maior parte dos padrões importantes. O gargalo comprovado era a política de retry/fallback, não prova de defeito no transporte RFCOMM.
+- A lista expandida de protocolos não garante suporte do veículo. A confirmação continua sendo uma resposta real válida `010C -> 41 0C`; nenhum nome do dispositivo ou cache autoriza o estado ECU pronta.
+
+### Validação e próximos passos
+- A CI [40448437601](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40448437601) ficou verde no SHA anterior `e57a18bfe7aa9885b9b38403ce31487d90ab3d6e`; não se reutiliza esse resultado como aprovação dos commits DB-163.
+- A nova CI do HEAD final deve concluir gate anti-regressão, TypeScript, testes completos, Expo Doctor e build APK Android; corrigir qualquer falha pelo log sem enfraquecer os contratos.
+- Ensaio físico ainda pendente no Samsung Galaxy A06/Android 16 com ELM327 e ECU real: medir tempo até `41 0C`, adaptador candidato escolhido, protocolo, latência, timeouts/`NO DATA` e reconexão. Não alegar melhoria quantificada de velocidade/estabilidade até coletar essa evidência.
+- PR #92 permanece sem merge até a revisão da CI do SHA final e reconciliação da divergência com `main`. SQLite para histórico operacional também permanece uma lacuna separada e não faz parte desta correção de conexão.
