@@ -1,8 +1,298 @@
 import * as FileSystem from 'expo-file-system';
+import * as SQLite from 'expo-sqlite';
 import { appendCsvRow, CsvRow } from '../database/csvLogger';
 import { DriveCycle } from '../data/driveCycles';
 
 const indexWriteQueues = new Map<string, Promise<unknown>>();
+const migrationPromises = new Map<string, Promise<void>>();
+const SQLITE_DATABASE_NAME = 'meriva_smart_history.db';
+const SQLITE_MIGRATION_KEY = 'legacy_json_migration_v1';
+let databasePromise: Promise<SQLite.SQLiteDatabase> | null = null;
+
+function joinPath(base: string, child: string): string {
+  return `${base.replace(/\\/+$/, '')}/${child.replace(/^\\/+/, '')}`;
+}
+
+function sqliteDatabasePath(): string {
+  const root = FileSystem.documentDirectory;
+  if (!root) throw new Error('SQLITE_DOCUMENT_DIRECTORY_UNAVAILABLE');
+  return joinPath(joinPath(root, 'SQLite'), SQLITE_DATABASE_NAME);
+}
+
+function sqliteSnapshotPath(basePath: string): string {
+  return `${basePath}/VIAGENS/${SQLITE_DATABASE_NAME}`;
+}
+
+async function openDriveCycleDatabase(basePath: string): Promise<SQLite.SQLiteDatabase> {
+  const databasePath = sqliteDatabasePath();
+  const sqliteDir = joinPath(FileSystem.documentDirectory, 'SQLite');
+  const viagensDir = `${basePath}/VIAGENS`;
+  await FileSystem.makeDirectoryAsync(sqliteDir, { intermediates: true });
+  await FileSystem.makeDirectoryAsync(viagensDir, { intermediates: true });
+
+  // If the app's standard SQLite file was lost while the last verified
+  // snapshot survived inside VIAGENS, restore that copy before opening it.
+  const databaseInfo = await FileSystem.getInfoAsync(databasePath);
+  const snapshotInfo = await FileSystem.getInfoAsync(sqliteSnapshotPath(basePath));
+  if (!databaseInfo.exists && snapshotInfo.exists && !snapshotInfo.isDirectory) {
+    await FileSystem.copyAsync({ from: sqliteSnapshotPath(basePath), to: databasePath });
+  }
+
+  if (!databasePromise) {
+    databasePromise = SQLite.openDatabaseAsync(SQLITE_DATABASE_NAME)
+      .then(async (db) => {
+        await db.execAsync(`
+          PRAGMA journal_mode = DELETE;
+          PRAGMA synchronous = FULL;
+          CREATE TABLE IF NOT EXISTS drive_cycles (
+            id TEXT PRIMARY KEY NOT NULL,
+            started_at TEXT NOT NULL,
+            source TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+          );
+          CREATE INDEX IF NOT EXISTS idx_drive_cycles_started_at
+            ON drive_cycles(started_at);
+          CREATE TABLE IF NOT EXISTS drive_cycle_metadata (
+            key TEXT PRIMARY KEY NOT NULL,
+            value TEXT NOT NULL
+          );
+        `);
+        return db;
+      })
+      .catch((cause) => {
+        databasePromise = null;
+        throw cause;
+      });
+  }
+  return databasePromise;
+}
+
+async function readSqliteDriveCycles(db: SQLite.SQLiteDatabase): Promise<DriveCycle[]> {
+  const rows = await db.getAllAsync<{ id: string; payload_json: string }>(
+    'SELECT id, payload_json FROM drive_cycles ORDER BY rowid ASC',
+  );
+  const cycles: DriveCycle[] = [];
+  for (const row of rows) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(row.payload_json);
+    } catch {
+      throw new Error('SQLITE_TRIP_HISTORY_CORRUPTED_JSON:' + row.id);
+    }
+    if (!isDriveCycle(parsed) || parsed.id !== row.id) {
+      throw new Error('SQLITE_TRIP_HISTORY_INVALID_ROW:' + row.id);
+    }
+    if (parsed.source !== 'CARSCANNER_SEED') cycles.push(parsed);
+  }
+  return cycles;
+}
+
+async function insertDriveCycle(db: SQLite.SQLiteDatabase, cycle: DriveCycle, mode: 'IGNORE' | 'REPLACE'): Promise<void> {
+  const statement = mode === 'IGNORE'
+    ? 'INSERT OR IGNORE INTO drive_cycles (id, started_at, source, payload_json, updated_at) VALUES (?, ?, ?, ?, ?)'
+    : 'INSERT OR REPLACE INTO drive_cycles (id, started_at, source, payload_json, updated_at) VALUES (?, ?, ?, ?, ?)';
+  await db.runAsync(statement, cycle.id, cycle.startedAt, cycle.source, JSON.stringify(cycle), new Date().toISOString());
+}
+
+async function copySqliteFileToSnapshot(basePath: string): Promise<void> {
+  const source = sqliteDatabasePath();
+  const destination = sqliteSnapshotPath(basePath);
+  const temporary = destination + '.tmp';
+  const sourceInfo = await FileSystem.getInfoAsync(source, { size: true });
+  if (!sourceInfo.exists || sourceInfo.isDirectory) throw new Error('SQLITE_DATABASE_FILE_UNAVAILABLE_FOR_BACKUP');
+  await FileSystem.deleteAsync(temporary, { idempotent: true });
+  await FileSystem.copyAsync({ from: source, to: temporary });
+  const temporaryInfo = await FileSystem.getInfoAsync(temporary, { size: true });
+  if (!temporaryInfo.exists || temporaryInfo.isDirectory ||
+      (typeof sourceInfo.size === 'number' && temporaryInfo.size !== sourceInfo.size)) {
+    await FileSystem.deleteAsync(temporary, { idempotent: true });
+    throw new Error('SQLITE_SNAPSHOT_SIZE_MISMATCH');
+  }
+  await FileSystem.deleteAsync(destination, { idempotent: true });
+  await FileSystem.moveAsync({ from: temporary, to: destination });
+  const verified = await FileSystem.getInfoAsync(destination, { size: true });
+  if (!verified.exists || verified.isDirectory ||
+      (typeof sourceInfo.size === 'number' && verified.size !== sourceInfo.size)) {
+    throw new Error('SQLITE_SNAPSHOT_VERIFICATION_FAILED');
+  }
+}
+
+async function refreshLegacyIndexFromSqlite(
+  basePath: string,
+  db: SQLite.SQLiteDatabase,
+  preserveCurrentIndex = true,
+): Promise<void> {
+  const viagensDir = `${basePath}/VIAGENS`;
+  const indexFile = `${viagensDir}/index.json`;
+  await FileSystem.makeDirectoryAsync(viagensDir, { intermediates: true });
+  const cycles = await readSqliteDriveCycles(db);
+  const currentInfo = await FileSystem.getInfoAsync(indexFile);
+  if (preserveCurrentIndex && currentInfo.exists && !currentInfo.isDirectory) {
+    const currentCycles = await readCyclesFromFile(indexFile);
+    if (currentCycles !== null) {
+      const previousFile = indexBackupPath(indexFile);
+      await FileSystem.deleteAsync(previousFile, { idempotent: true });
+      await FileSystem.copyAsync({ from: indexFile, to: previousFile });
+      if (await readCyclesFromFile(previousFile) === null) {
+        throw new Error('JSON_TRIP_BACKUP_VERIFICATION_FAILED');
+      }
+    }
+  }
+
+  let existing: Record<string, unknown> = {};
+  try {
+    const parsed = JSON.parse(await FileSystem.readAsStringAsync(indexFile)) as unknown;
+    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+      existing = parsed as Record<string, unknown>;
+    }
+  } catch {
+    // SQLite has already been committed and validated; rebuild only the
+    // derived JSON compatibility snapshot from this authoritative store.
+  }
+  await persistIndexSnapshot(indexFile, {
+    ...existing,
+    version: '2.0-sqlite',
+    initializedAt: typeof existing.initializedAt === 'string' ? existing.initializedAt : new Date().toISOString(),
+    cycles,
+    totalCount: cycles.length,
+    lastModified: new Date().toISOString(),
+  });
+}
+
+async function ensureSqliteMigration(basePath: string): Promise<void> {
+  const alreadyRunning = migrationPromises.get(basePath);
+  if (alreadyRunning) return alreadyRunning;
+  const operation = (async () => {
+    const viagensDir = `${basePath}/VIAGENS`;
+    const indexFile = `${viagensDir}/index.json`;
+    const previousFile = indexBackupPath(indexFile);
+    const preSqliteFile = indexFile.replace(/\\.json$/, '.pre-sqlite.json');
+    await FileSystem.makeDirectoryAsync(viagensDir, { intermediates: true });
+    const db = await openDriveCycleDatabase(basePath);
+    const marker = await db.getFirstAsync<{ value: string }>(
+      'SELECT value FROM drive_cycle_metadata WHERE key = ?', SQLITE_MIGRATION_KEY,
+    );
+    if (marker?.value === 'completed') return;
+
+    const mainInfo = await FileSystem.getInfoAsync(indexFile);
+    const previousInfo = await FileSystem.getInfoAsync(previousFile);
+    let legacyCycles: DriveCycle[] | null = await readCyclesFromFile(indexFile);
+    let sourceFile = legacyCycles !== null ? indexFile : null;
+    if (legacyCycles === null) {
+      legacyCycles = await readCyclesFromFile(previousFile);
+      if (legacyCycles !== null) sourceFile = previousFile;
+    }
+    if (legacyCycles === null) {
+      if (mainInfo.exists || previousInfo.exists) {
+        throw new Error('LEGACY_TRIP_HISTORY_INVALID; SQLITE_MIGRATION_ABORTED_WITHOUT_DATA_LOSS');
+      }
+      legacyCycles = [];
+    }
+
+    // Keep a one-time untouched migration source. It is distinct from the
+    // rolling .previous.json snapshot so recovery remains possible after later writes.
+    const preSqliteInfo = await FileSystem.getInfoAsync(preSqliteFile);
+    if (preSqliteInfo.exists) {
+      if (await readCyclesFromFile(preSqliteFile) === null) {
+        throw new Error('PRE_SQLITE_BACKUP_INVALID; SQLITE_MIGRATION_ABORTED');
+      }
+    } else if (sourceFile !== null) {
+      await FileSystem.copyAsync({ from: sourceFile, to: preSqliteFile });
+      if (await readCyclesFromFile(preSqliteFile) === null) {
+        throw new Error('PRE_SQLITE_BACKUP_VERIFICATION_FAILED; SQLITE_MIGRATION_ABORTED');
+      }
+    }
+
+    const validCycles = legacyCycles.filter((cycle) => cycle.source !== 'CARSCANNER_SEED');
+    await db.withTransactionAsync(async () => {
+      for (const cycle of validCycles) await insertDriveCycle(db, cycle, 'IGNORE');
+      const ids = await db.getAllAsync<{ id: string }>('SELECT id FROM drive_cycles');
+      const storedIds = new Set(ids.map((row) => row.id));
+      if (!validCycles.every((cycle) => storedIds.has(cycle.id))) {
+        throw new Error('SQLITE_MIGRATION_COUNT_VALIDATION_FAILED');
+      }
+      await db.runAsync(
+        'INSERT OR REPLACE INTO drive_cycle_metadata (key, value) VALUES (?, ?)',
+        SQLITE_MIGRATION_KEY, 'completed',
+      );
+    });
+
+    await refreshLegacyIndexFromSqlite(basePath, db, false);
+    await copySqliteFileToSnapshot(basePath);
+  })();
+  migrationPromises.set(basePath, operation);
+  try {
+    await operation;
+  } catch (cause) {
+    if (migrationPromises.get(basePath) === operation) migrationPromises.delete(basePath);
+    throw cause;
+  }
+}
+
+/** Flushes the DB to a checked, restorable file inside VIAGENS before backup/export. */
+export async function prepareDriveCycleDatabaseBackup(basePath: string): Promise<void> {
+  await ensureSqliteMigration(basePath);
+  const db = await openDriveCycleDatabase(basePath);
+  await db.execAsync('PRAGMA wal_checkpoint(FULL);');
+  await copySqliteFileToSnapshot(basePath);
+}
+
+/**
+ * Explicit recovery path. It validates a JSON backup completely before replacing
+ * SQLite rows; a missing/corrupt backup never clears the active database.
+ */
+export async function restoreDriveCyclesFromBackup(basePath: string): Promise<DriveCycle[]> {
+  const indexFile = `${basePath}/VIAGENS/index.json`;
+  const candidates = [
+    indexFile,
+    indexBackupPath(indexFile),
+    indexFile.replace(/\\.json$/, '.pre-sqlite.json'),
+  ];
+  let restoredCycles: DriveCycle[] | null = null;
+  let sourceFile: string | null = null;
+  for (const candidate of candidates) {
+    const cycles = await readCyclesFromFile(candidate);
+    if (cycles !== null) {
+      restoredCycles = cycles.filter((cycle) => cycle.source !== 'CARSCANNER_SEED');
+      sourceFile = candidate;
+      break;
+    }
+  }
+  if (restoredCycles === null || sourceFile === null) {
+    throw new Error('NO_VALID_TRIP_HISTORY_BACKUP; SQLITE_DATA_PRESERVED');
+  }
+
+  // Do not delete the current database until a valid source has been found.
+  if (databasePromise) {
+    try { await (await databasePromise).closeAsync(); } catch { /* a failed/corrupt DB may not close */ }
+  }
+  databasePromise = null;
+  const databasePath = sqliteDatabasePath();
+  await FileSystem.deleteAsync(databasePath, { idempotent: true });
+  await FileSystem.deleteAsync(databasePath + '-wal', { idempotent: true });
+  await FileSystem.deleteAsync(databasePath + '-shm', { idempotent: true });
+  await FileSystem.deleteAsync(databasePath + '-journal', { idempotent: true });
+  const db = await openDriveCycleDatabase(basePath);
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('DELETE FROM drive_cycles');
+    for (const cycle of restoredCycles as DriveCycle[]) await insertDriveCycle(db, cycle, 'IGNORE');
+    await db.runAsync(
+      'INSERT OR REPLACE INTO drive_cycle_metadata (key, value) VALUES (?, ?)',
+      SQLITE_MIGRATION_KEY, 'completed',
+    );
+  });
+  await refreshLegacyIndexFromSqlite(basePath, db, false);
+  await copySqliteFileToSnapshot(basePath);
+  return restoredCycles;
+}
+
+/** @internal Test-only reset for the module's connection/cache state. */
+export function __resetDriveCycleStorageForTests(): void {
+  databasePromise = null;
+  migrationPromises.clear();
+  indexWriteQueues.clear();
+}
 
 async function serializeIndexWrite<T>(indexFile: string, operation: () => Promise<T>): Promise<T> {
   const previous = indexWriteQueues.get(indexFile) ?? Promise.resolve();
@@ -99,7 +389,7 @@ export async function initializeDriveCycles(basePath: string): Promise<void> {
   const viagensDir = `${basePath}/VIAGENS`;
   const indexFile = `${viagensDir}/index.json`;
 
-  return serializeIndexWrite(indexFile, async () => {
+  await serializeIndexWrite(indexFile, async () => {
     await FileSystem.makeDirectoryAsync(viagensDir, { intermediates: true });
     const indexInfo = await FileSystem.getInfoAsync(indexFile);
     if (indexInfo.exists) {
@@ -179,6 +469,9 @@ export async function initializeDriveCycles(basePath: string): Promise<void> {
     };
     await persistIndexSnapshot(indexFile, emptyData);
   });
+  await ensureSqliteMigration(basePath);
+  await refreshLegacyIndexFromSqlite(basePath, await openDriveCycleDatabase(basePath), false);
+  await copySqliteFileToSnapshot(basePath);
 }
 
 async function readCyclesFromFile(filePath: string): Promise<DriveCycle[] | null> {
@@ -205,111 +498,46 @@ async function readCyclesFromFile(filePath: string): Promise<DriveCycle[] | null
 }
 
 export async function readDriveCycles(basePath: string): Promise<DriveCycle[]> {
-  const indexFile = `${basePath}/VIAGENS/index.json`;
-  const main = await readCyclesFromFile(indexFile);
-  if (main) return main;
-  return (await readCyclesFromFile(indexBackupPath(indexFile))) ?? [];
+  await ensureSqliteMigration(basePath);
+  const db = await openDriveCycleDatabase(basePath);
+  return readSqliteDriveCycles(db);
 }
 
 export async function addDriveCycle(basePath: string, cycle: DriveCycle): Promise<void> {
-  const viagensDir = `${basePath}/VIAGENS`;
-  const indexFile = `${viagensDir}/index.json`;
+  if (!isDriveCycle(cycle)) throw new Error('DRIVE_CYCLE_INVALID_NOT_SAVED');
+  if (cycle.source === 'CARSCANNER_SEED') return;
+  await ensureSqliteMigration(basePath);
+  const indexFile = `${basePath}/VIAGENS/index.json`;
   return serializeIndexWrite(indexFile, async () => {
-  await FileSystem.makeDirectoryAsync(viagensDir, { intermediates: true });
+    const db = await openDriveCycleDatabase(basePath);
+    await db.withTransactionAsync(async () => {
+      await insertDriveCycle(db, cycle, 'REPLACE');
+    });
 
-  let data: { version: string; cycles: DriveCycle[]; totalCount: number; lastModified?: string } = {
-    version: '1.0',
-    cycles: [],
-    totalCount: 0,
-  };
+    // SQLite is authoritative. JSON and the checked DB snapshot remain
+    // compatibility/recovery artifacts and are refreshed only after commit.
+    await refreshLegacyIndexFromSqlite(basePath, db, true);
+    await copySqliteFileToSnapshot(basePath);
 
-  const info = await FileSystem.getInfoAsync(indexFile);
-  let mainIsValid = !info.exists;
-  if (info.exists && !info.isDirectory) {
-    try {
-      const parsed = JSON.parse(await FileSystem.readAsStringAsync(indexFile)) as {
-        version?: string;
-        cycles?: unknown;
-        totalCount?: number;
-      };
-      if (!Array.isArray(parsed.cycles)) throw new Error('INDEX_CYCLES_NOT_ARRAY');
-      const invalidNonSeeds = parsed.cycles.some((item) =>
-        !(typeof item === 'object' && item !== null &&
-          (item as { source?: unknown }).source === 'CARSCANNER_SEED') &&
-        !isDriveCycle(item),
-      );
-      if (invalidNonSeeds) throw new Error('INDEX_HAS_INVALID_CYCLES');
-      const validCycles = cyclesFromUnknown(parsed.cycles).filter((item) => item.source !== 'CARSCANNER_SEED');
-      data = {
-        version: typeof parsed.version === 'string' ? parsed.version : '1.0',
-        cycles: validCycles,
-        totalCount: validCycles.length,
-      };
-      mainIsValid = true;
-    } catch (mainError) {
-      const backupCycles = await readCyclesFromFile(indexBackupPath(indexFile));
-      if (backupCycles === null) {
-        throw new Error('HISTORICO_DE_VIAGENS_CORROMPIDO; ARQUIVO PRESERVADO PARA RECUPERACAO');
-      }
-      data = { version: '1.0', cycles: backupCycles, totalCount: backupCycles.length };
-      mainIsValid = false;
-    }
-  } else if (info.exists && info.isDirectory) {
-    throw new Error('INDEX_DE_VIAGENS_E_DIRETORIO; NENHUMA GRAVACAO EXECUTADA');
-  } else if (!info.exists) {
-    // A missing main index can be the result of interrupted replacement.
-    // If a previous snapshot exists, it must be validated and restored rather
-    // than silently starting with empty history.
-    const previousPath = indexBackupPath(indexFile);
-    const previousInfo = await FileSystem.getInfoAsync(previousPath);
-    if (previousInfo.exists) {
-      const backupCycles = await readCyclesFromFile(previousPath);
-      if (backupCycles === null) {
-        throw new Error('BACKUP_DO_HISTORICO_CORROMPIDO; HISTORICO_NAO_SUBSTITUIDO');
-      }
-      data = { version: '1.0', cycles: backupCycles, totalCount: backupCycles.length };
-    }
-  }
-
-  data.cycles = data.cycles.filter((item) => item.id !== cycle.id);
-  data.cycles.push(cycle);
-  data.totalCount = data.cycles.length;
-  data.lastModified = new Date().toISOString();
-
-  // Preserve the last known-good index before replacement. Do not copy a
-  // corrupt main index over the backup when recovering from backup.
-  const previousFile = indexBackupPath(indexFile);
-  if (info.exists && mainIsValid) {
-    await FileSystem.deleteAsync(previousFile, { idempotent: true });
-    await FileSystem.copyAsync({ from: indexFile, to: previousFile });
-    const backup = await readCyclesFromFile(previousFile);
-    if (backup === null) {
-      throw new Error('BACKUP_PREVIO_DO_INDICE_NAO_VALIDADO; HISTORICO_NAO_SUBSTITUIDO');
-    }
-  }
-  await persistIndexSnapshot(indexFile, data);
-
-  const parsedStart = Date.parse(cycle.startedAt);
-  const csvDate = new Date(Number.isFinite(parsedStart) ? parsedStart : Date.now());
-  const today = localDateKey(csvDate);
-  const csvFile = `${viagensDir}/viagens_${today}.csv`;
-
-  const row: CsvRow = {
-    id: cycle.id,
-    timestamp: cycle.startedAt,
-    distanceTotalKm: cycle.distanceTotalKm,
-    distanceIceKm: cycle.distanceIceKm,
-    fuelUsedL: cycle.fuelUsedL,
-    totalTime: cycle.totalTimeHms,
-    drivingTime: cycle.drivingTimeHms,
-    standingTime: cycle.standingTimeHms,
-    avgSpeed: cycle.avgDrivingSpeedKmh,
-    maxSpeed: cycle.maxSpeedKmh ?? '',
-    avgConsumption: cycle.fuelDataValid === false ? '' : cycle.avgFuelConsumptionKml,
-    telemetrySamples: cycle.telemetrySamples?.length ?? 0,
-    source: cycle.source,
-  };
-
-  await appendCsvRow(csvFile, row);
+    const parsedStart = Date.parse(cycle.startedAt);
+    const csvDate = new Date(Number.isFinite(parsedStart) ? parsedStart : Date.now());
+    const today = localDateKey(csvDate);
+    const csvFile = `${basePath}/VIAGENS/viagens_${today}.csv`;
+    const row: CsvRow = {
+      id: cycle.id,
+      timestamp: cycle.startedAt,
+      distanceTotalKm: cycle.distanceTotalKm,
+      distanceIceKm: cycle.distanceIceKm,
+      fuelUsedL: cycle.fuelUsedL,
+      totalTime: cycle.totalTimeHms,
+      drivingTime: cycle.drivingTimeHms,
+      standingTime: cycle.standingTimeHms,
+      avgSpeed: cycle.avgDrivingSpeedKmh,
+      maxSpeed: cycle.maxSpeedKmh ?? '',
+      avgConsumption: cycle.fuelDataValid === false ? '' : cycle.avgFuelConsumptionKml,
+      telemetrySamples: cycle.telemetrySamples?.length ?? 0,
+      source: cycle.source,
+    };
+    await appendCsvRow(csvFile, row);
   });
 }
