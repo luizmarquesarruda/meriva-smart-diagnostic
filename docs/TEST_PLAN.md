@@ -250,3 +250,13 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 - Confirmar que apenas a primeira sondagem automática recebe essa janela; probes após ATSP5/3/4/... continuam usando a política adaptativa normal, evitando alongar todas as tentativas.
 - Confirmar no diagnóstico o campo timeoutOverrideMs em ECU_PROBE_START; no ensaio físico, guardar latência/resposta de 010C e comparar resultado com o build anterior.
 - Rodar o gate anti-regressão, TypeScript, suíte completa e build Android no mesmo SHA. Este teste automatizado não substitui a confirmação física no Galaxy A06 / Android 16 com ELM327/ECU reais.
+
+
+## GPS-03 — Movimento urbano, deriva e integridade do odômetro GPS
+
+- Usar quatro posições válidas em sequência, com timestamps crescentes de 1 s, accuracy de 5 m, distância aproximada de 2,8 m por segmento e velocidade reportada/derivada de 10 km/h. Após três segmentos, o tracker deve confirmar o movimento e somar pelo menos 0,008 km.
+- Fornecer quatro posições com speed positivo, mas trajetória em zigue-zague cuja posição final está a menos de 8 m da origem. A velocidade não pode ser confirmada e a distância deve permanecer em zero.
+- Confirmar que o tracker continua exigindo precisão conhecida ≤30 m, timestamp válido, lacuna ≤5 s, velocidade derivada de pelo menos 5 km/h e limite de segmento de 250 m.
+- Inserir um fix de baixa precisão ou velocidade incompatível no meio da sequência: a contagem/pêndencia deve reiniciar, sem apagar distância já confirmada.
+- Confirmar que 4G/5G não é tratado como coordenada. O tracker permanece com um único watcher e o sistema Android/Expo escolhe os provedores disponíveis; sem fix atual, velocidade deve ser N/D e a distância não pode ser interpolada.
+- Reexecutar gate anti-regressão, TypeScript, suíte completa e build Android no mesmo SHA. Fazer percurso físico com APK validado e comparar o total GPS com rota/odômetro conhecidos antes de declarar precisão real.
