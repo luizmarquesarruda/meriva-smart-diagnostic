@@ -6,7 +6,7 @@
 - O tracker deixa de exigir 8 m em cada segmento GPS individual, incompatível com callbacks de 1 s em velocidades urbanas.
 - O piso por segmento agora depende do intervalo entre fixes; a distância só é somada depois de três segmentos válidos consecutivos (quatro posições), com precisão aceitável e deslocamento líquido da janela acima da margem de confiança.
 - Segmentos acima de 250 m, zigue-zague com deslocamento líquido insuficiente e sequência quebrada por fix inválido não somam distância.
-- Adicionados testes GPS de movimento a 10 km/h, rejeição de deriva, timestamp futuro e reacquisição pontual em mudança de rede com timeout/cooldown; auditoria comparativa Android/Expo/Strava/OsmAnd/Waze, RG-62 e GPS-03. Teste físico ainda pendente.
+- Adicionados testes GPS de movimento a 10 km/h, rejeição de deriva, timestamp futuro e reacquisição pontual em mudança de rede; enquanto a rede celular permanece disponível, o frescor é verificado a cada 30 s e só há pedido se o fix venceu (timeout de 8 s/cooldown de 30 s). Auditoria Android/Expo/Strava/OsmAnd/Waze, RG-62 e GPS-03. Teste físico ainda pendente.
 
 ### Timeout da primeira sondagem ECU — DB-171
 - A primeira consulta real `010C` após `ATSP0` usa a janela limitada de negociação de protocolo (padrão 15 s) em vez do timeout adaptativo mínimo de 3 s.
