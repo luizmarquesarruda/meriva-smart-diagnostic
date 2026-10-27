@@ -192,6 +192,11 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
     'amostra com timestamp anterior ao último fix válido deve ser descartada');
   assert.strictEqual(tracker.getState().distanceKm, distanceBeforeBadTimestamp,
     'timestamp atrasado não deve alterar distância');
+  watcher({ coords: { latitude: 0, longitude: 0.00175, speed: 0, accuracy: 5 }, timestamp: Date.now() + 60_000 });
+  assert.strictEqual(tracker.getState().samples, samplesBeforeBadTimestamp,
+    'fix com timestamp no futuro deve ser descartado na ingestão, não apenas ocultado pelo painel');
+  assert.strictEqual(tracker.getState().distanceKm, distanceBeforeBadTimestamp,
+    'timestamp futuro não pode alterar a distância do odômetro');
   watcher({ coords: { latitude: 0, longitude: 0.00175, speed: 0, accuracy: 5 }, timestamp: 30000 });
   assert.strictEqual(tracker.getState().samples, samplesBeforeBadTimestamp + 1,
     'a coleta deve se recuperar quando chega um timestamp válido crescente');
