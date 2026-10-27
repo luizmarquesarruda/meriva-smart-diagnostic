@@ -32,9 +32,25 @@ assert.equal(classify('BUS ERROR\r\n'), 'ERROR');
 assert.equal(classify('ELM327 v1.5\r\n>'), 'OK');
 assert.equal(classify(''), 'NO_RESPONSE');
 
-const { classifyElmError, mergeCompatibilityConfig, DEFAULT_ELM327_COMPATIBILITY } = loadTs(
-  path.join(__dirname, '..', 'src', 'obd', 'elm327Compatibility.ts'),
-);
+const {
+  classifyElmError,
+  getRecoveryProtocolCommand,
+  mergeCompatibilityConfig,
+  DEFAULT_ELM327_COMPATIBILITY,
+} = loadTs(path.join(__dirname, '..', 'src', 'obd', 'elm327Compatibility.ts'));
+
+assert.equal(getRecoveryProtocolCommand('ISO 14230-4 (KWP FAST)'), 'ATSP5');
+assert.equal(getRecoveryProtocolCommand('ISO 14230-4 (KWP 5BAUD)'), 'ATSP4',
+  'KWP 5-baud must not be forced into fast initialization during recovery');
+assert.equal(getRecoveryProtocolCommand('ISO 9141-2'), 'ATSP3');
+assert.equal(getRecoveryProtocolCommand('SAE J1850 PWM'), 'ATSP1');
+assert.equal(getRecoveryProtocolCommand('SAE J1850 VPW'), 'ATSP2');
+assert.equal(getRecoveryProtocolCommand('ISO 15765-4 CAN 11/500'), 'ATSP6');
+assert.equal(getRecoveryProtocolCommand('ISO 15765-4 CAN 29/500'), 'ATSP7');
+assert.equal(getRecoveryProtocolCommand('ISO 15765-4 CAN 11/250'), 'ATSP8');
+assert.equal(getRecoveryProtocolCommand('ISO 15765-4 CAN 29/250'), 'ATSP9');
+assert.equal(getRecoveryProtocolCommand('SIMULATED OBD TRANSPORT'), 'ATSP0',
+  'unknown protocol must fall back to automatic detection, not a guessed forced protocol');
 assert.equal(classifyElmError('NO DATA'), 'NO_DATA');
 assert.equal(classifyElmError('BUFFER FULL'), 'BUFFER_FULL');
 assert.equal(classifyElmError('BUS ERROR'), 'BUS_ERROR');
