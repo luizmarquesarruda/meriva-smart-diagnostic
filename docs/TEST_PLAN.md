@@ -242,3 +242,11 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 - Validar a restauração usando `index.previous.json` ou `index.pre-sqlite.json`: escolher backup válido antes de alterar SQLite, restaurar em transação, atualizar espelho e sincronizar a cópia SQLite para backup.
 - Criar pacote por `createBackup()`, confirmar `VIAGENS/meriva_smart_history.db` e `manifest.json`, depois restaurar indicando a pasta do pacote; nenhum arquivo de origem do backup pode ser alterado durante a restauração.
 - Executar `npm run gate:baseline`, `npm run typecheck`, `npm test` e build Android no mesmo SHA. O mock SQLite não substitui validação do banco nativo no APK.
+
+
+## BT-CONN-08 — Timeout da primeira sondagem ECU após ATSP0
+
+- Configurar timeout adaptativo mínimo de 3000 ms e protocolSelectionTimeoutMs de 9000 ms; confirmar que a primeira execução de 010C recebe override de 9000 ms e que o payload válido continua aceito.
+- Confirmar que apenas a primeira sondagem automática recebe essa janela; probes após ATSP5/3/4/... continuam usando a política adaptativa normal, evitando alongar todas as tentativas.
+- Confirmar no diagnóstico o campo timeoutOverrideMs em ECU_PROBE_START; no ensaio físico, guardar latência/resposta de 010C e comparar resultado com o build anterior.
+- Rodar o gate anti-regressão, TypeScript, suíte completa e build Android no mesmo SHA. Este teste automatizado não substitui a confirmação física no Galaxy A06 / Android 16 com ELM327/ECU reais.
