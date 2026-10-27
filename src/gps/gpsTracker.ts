@@ -390,7 +390,8 @@ export class GpsTracker {
       !Number.isFinite(c.latitude) || !Number.isFinite(c.longitude) ||
       c.latitude < -90 || c.latitude > 90 ||
       c.longitude < -180 || c.longitude > 180 ||
-      !Number.isFinite(location.timestamp) || location.timestamp <= 0
+      !Number.isFinite(location.timestamp) || location.timestamp <= 0 ||
+      location.timestamp > Date.now()
     ) return;
     if (this.previous && location.timestamp <= this.previous.timestamp) return;
 
