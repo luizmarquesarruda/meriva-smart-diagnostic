@@ -347,6 +347,13 @@ assert.match(dtcManagerSource, /markMissingStoredDtcsInactive/, 'reconciliação
 assert.match(read('app/laboratorio.tsx'), /markMissingStoredDtcsInactive/, 'as duas leituras Mode 03 devem usar a mesma reconciliação DTC');
 assert.match(read('src/obd/parser.ts'), /fuelTypeCodes\[String\(data\[0\]\)\]/, 'PID 0151 deve usar a tabela enumerada de combustível');
 
+const bluetoothScreen = read('app/bluetooth.tsx');
+assert.match(bluetoothScreen, /formatElmQueueHealth\(health\)/, 'Bluetooth deve exibir as métricas de pressão da fila ELM');
+assert.match(bluetoothScreen, /queueHealth\.queue/, 'a tela Bluetooth deve expor profundidade, pico e recusas da fila');
+assert.match(bluetoothScreen, /queueHealth\.wait/, 'a tela Bluetooth deve expor a espera média e máxima');
+assert.match(read('src/obd/elmHealthPresentation.ts'), /queueRejections > 0|rejected > 0/, 'recusas de fila precisam elevar o aviso de saúde');
+assert.ok(read('docs/OBD_APP_FEATURE_AUDIT_2026-10-27.md').includes('Lacuna aberta'), 'a auditoria não pode declarar SQLite implementado sem migração');
+
 assert.match(theme, /SCREEN_TITLE_STYLE/);
 assert.match(read('tests/screenTheme.test.js'), /Shared screen theme and title contract/);
 
