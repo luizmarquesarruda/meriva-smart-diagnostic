@@ -195,7 +195,7 @@ assert.ok(app.expo.plugins.includes('./plugins/withBluetoothLegacyPermissionLimi
 
 // The ELM protocol must serialize all commands through the shared session queue.
 assert.match(elm, /private commandQueue:\s*Promise<void>\s*=\s*Promise\.resolve\(\)/);
-assert.match(elm, /return this\.enqueueCommand\(\(\) => this\.command\(normalized\)\)/);
+assert.match(elm, /return this\.enqueueCommand\(\(\) => this\.command\(normalized, 1, timeoutOverrideMs\)\)/, 'optional probe timeout must stay inside the serialized ELM command queue');
 assert.match(elm, /return previous\.then\(\(\) => \{/,
   'ELM queue must execute accepted operations serially after measuring queue wait');
 assert.match(elm, /\.finally\(\(\) => \{\s*release\(\);/,
