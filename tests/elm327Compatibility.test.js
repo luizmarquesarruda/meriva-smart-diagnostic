@@ -4,7 +4,7 @@ const path = require('path');
 const Module = require('module');
 const ts = require('typescript');
 
-function loadTs(tsPath) {
+function loadTs(tsPath, overrides = {}) {
   const source = fs.readFileSync(tsPath, 'utf8');
   const output = ts.transpileModule(source, {
     compilerOptions: {
@@ -16,7 +16,12 @@ function loadTs(tsPath) {
   const mod = new Module(tsPath, null);
   mod.filename = tsPath;
   mod.paths = Module._nodeModulePaths(path.dirname(tsPath));
-  mod._compile(output, tsPath);
+  const originalLoad = Module._load;
+  Module._load = function (request, parent, isMain) {
+    if (parent && parent.filename === tsPath && Object.prototype.hasOwnProperty.call(overrides, request)) return overrides[request];
+    return originalLoad.apply(this, arguments);
+  };
+  try { mod._compile(output, tsPath); } finally { Module._load = originalLoad; }
   return mod.exports;
 }
 
@@ -32,12 +37,13 @@ assert.equal(classify('BUS ERROR\r\n'), 'ERROR');
 assert.equal(classify('ELM327 v1.5\r\n>'), 'OK');
 assert.equal(classify(''), 'NO_RESPONSE');
 
+const compatibility = loadTs(path.join(__dirname, '..', 'src', 'obd', 'elm327Compatibility.ts'));
 const {
   classifyElmError,
   getRecoveryProtocolCommand,
   mergeCompatibilityConfig,
   DEFAULT_ELM327_COMPATIBILITY,
-} = loadTs(path.join(__dirname, '..', 'src', 'obd', 'elm327Compatibility.ts'));
+} = compatibility;
 
 assert.equal(getRecoveryProtocolCommand('ISO 14230-4 (KWP FAST)'), 'ATSP5');
 assert.equal(getRecoveryProtocolCommand('ISO 14230-4 (KWP 5BAUD)'), 'ATSP4',
@@ -89,4 +95,63 @@ const invalidCommands = mergeCompatibilityConfig({ forceInitCommands: ['ATZ', 'n
 assert.deepEqual(invalidCommands.forceInitCommands, ['ATZ']);
 const invalidEnum = mergeCompatibilityConfig({ partialResponseAction: 'BAD_VALUE' });
 assert.equal(invalidEnum.partialResponseAction, DEFAULT_ELM327_COMPATIBILITY.partialResponseAction);
+
+async function testRecoveryRequiresValidPidPayload() {
+  const root = path.resolve(__dirname, '..');
+  const formulaEngine = loadTs(path.join(root, 'src', 'obd', 'formulaEngine.ts'));
+  const pidDefinition = loadTs(path.join(root, 'src', 'obd', 'pidDefinition.ts'), {
+    './formulaEngine': formulaEngine,
+  });
+  const parser = loadTs(path.join(root, 'src', 'obd', 'parser.ts'), {
+    './pidDefinition': pidDefinition,
+    './formulaEngine': formulaEngine,
+    './dtcParser': { parseDtcResponseForService: () => [] },
+  });
+  const { Elm327Session } = loadTs(path.join(root, 'src', 'obd', 'elm327.ts'), {
+    './parser': parser,
+    './elm327Compatibility': compatibility,
+  });
+
+  let command = '';
+  const probeResponses = ['41 0C', '41 0C 1A F8'];
+  const transport = {
+    async open() {},
+    async close() {},
+    async write(data) {
+      command = data.replace(/\r/g, '').trim().toUpperCase();
+    },
+    async readUntilPrompt() {
+      if (command === 'ATZ') return 'ELM327 v1.5';
+      if (command === 'ATDP') return 'ISO 14230-4 (KWP FAST)';
+      if (command === '010C') return probeResponses.shift() ?? 'NO DATA';
+      return 'OK';
+    },
+  };
+
+  const session = new Elm327Session(transport, {
+    commandDelayMs: 0,
+    ioTimeoutMs: 2500,
+    optionalAtTimeoutMs: 1000,
+    protocolSelectionTimeoutMs: 2500,
+    adaptiveTiming: false,
+    forceInitialization: false,
+  });
+  try {
+    await session.initialize();
+    assert.equal(
+      await session.recoverProtocol(),
+      false,
+      'marcador 41 0C sem payload não pode confirmar recuperação da ECU',
+    );
+    assert.equal(
+      await session.recoverProtocol(),
+      true,
+      'payload completo 41 0C 1A F8 deve confirmar recuperação da ECU',
+    );
+  } finally {
+    await session.close();
+  }
+}
+
 console.log('ELM327 compatibility regression tests: PASS');
+testRecoveryRequiresValidPidPayload().then(() => console.log('ELM327 recovery payload-gate regression: PASS')).catch((error) => { console.error(error && error.stack ? error.stack : error); process.exitCode = 1; });
