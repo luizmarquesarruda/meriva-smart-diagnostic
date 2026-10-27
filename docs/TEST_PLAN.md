@@ -165,3 +165,13 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 - Saúde Bluetooth/ELM327: a tela deve mostrar profundidade atual/pico da fila, recusas, espera média/máxima; recusas ou espera máxima >=5 s devem gerar aviso, e valores negativos/NaN/Infinity devem ser neutralizados. `tests/elmHealthPresentation.test.js` e `tests/projectBaseline.test.js`.
 - Buffer de descoberta: FIFO limitado, normalização, capacidade ajustável e isolamento por execução.
 - Aceitação física: comparar capturas RAW do ELM327/ECU para confirmar framing/checksum e precisão; testes sintéticos não substituem validação no veículo.
+
+## BT-CONN-02 — Tentativas limitadas e descoberta de protocolo
+
+- A lista automática testa primeiro o endereço do último adaptador validado, depois candidatos com nome compatível com ELM/OBD e por fim os demais dispositivos pareados; endereço salvo não é prova de conexão.
+- Seleção explícita testa somente o dispositivo escolhido; se ele não estiver mais pareado, deve falhar claramente, sem trocar silenciosamente para outro adaptador.
+- Padrão de recuperação: no máximo três tentativas por candidato, com 1500 ms entre falhas transitórias. Rádio desligado/estado indeterminado interrompe o retry.
+- Após a varredura completa de protocolos de um candidato terminar sem resposta ECU válida para `010C`, o manager deve registrar `ECU_PROBE_EXHAUSTED` e avançar ao próximo candidato, sem repetir a mesma varredura longa no mesmo adaptador. Não reduzir validação, não criar outra fila e não abrir sockets RFCOMM concorrentes.
+- A negociação começa em `ATSP0` (automático). Fallback ordenado inclui os IDs 5, 3, 4, 6, 7, 8, 9, 2 e 1; 1/2 correspondem às famílias SAE J1850 PWM/VPW. Só usar o protocolo detectado/forçado após resposta real do veículo.
+- Testes automatizados devem verificar limites JSON, função de decisão de retry, presença dos protocolos 1 e 2, seleção explícita e gate real `010C -> 41 0C`.
+- Aceite de hardware continua obrigatório: Samsung Galaxy A06 / Android 16, adaptador ELM327 real, ECU real, captura TX/RX, tempo até a primeira resposta válida, falhas/timeout e reconexão. A CI e o transporte simulado não substituem este ensaio.
