@@ -49,8 +49,9 @@ export function estimateFuelRemainingFromFullTank(input: FuelBalanceInput): Fuel
   if (!baseline || baseline.liters > capacity + 1) return null;
   const baselineAtMs = Date.parse(baseline.occurredAt);
 
-  if (input.currentOdometerKm != null &&
-      (!Number.isFinite(input.currentOdometerKm) || input.currentOdometerKm < 0)) return null;
+  // Without a current odometer, unrecorded driving cannot be detected; never return a tank-based range.
+  if (input.currentOdometerKm == null ||
+      !Number.isFinite(input.currentOdometerKm) || input.currentOdometerKm < 0) return null;
 
   const partialFuelings = input.fuelings
     .filter((item) => Date.parse(item.occurredAt) > baselineAtMs && item.fullTank !== true)
