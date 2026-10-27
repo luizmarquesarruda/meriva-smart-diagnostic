@@ -1,4 +1,4 @@
-## ESTADO VIGENTE — 2026-10-27 (P0 Bluetooth / P1 SQLite; DB-170)
+## ESTADO VIGENTE — 2026-10-27 (P0 Bluetooth / P1 SQLite; DB-171)
 
 > Esta seção substitui o snapshot operacional anterior. A PR #92 está **fechada sem merge** por decisão de não manter PR aberta nem mesclar antes da validação completa. A branch consolidada foi preservada; o código de DB-170 está isolado em `fix/sqlite-trip-history-20261027`. Nenhuma alteração deste trabalho foi incorporada à `main`.
 
@@ -8,6 +8,7 @@
 - DB-167 ajustou `src/obd/parser.ts` para reconhecer o quadro KWP compacto `84F111410C0000D3`, validar tamanho e checksum, e rejeitar checksum incorreto, bytes extras e quadro incompleto. O quadro observado é uma resposta positiva `010C = 0 rpm` naquele instante; não prova que o motor deveria estar em marcha lenta.
 - DB-168 alinhou interface e playbook ELM327 genérico com o runtime: Bluetooth Classic RFCOMM/SPP, ASCII, CR real, framing até o prompt `>`, 3 tentativas por candidato e intervalo de 1500 ms; fallback após `ATSP0` documentado como `5,3,4,6,7,8,9,2,1`. J1850 é fallback genérico, não evidência de protocolo da Meriva; `ATI` não autentica clone.
 - DB-169 corrigiu a guarda de tipo para `tokens[0]` após falha de TypeScript. A CI `40506098887` passou em `validate` e `android-build` no SHA `b96a315239c9482d51f06436f67201fc2a73d76a`, incluindo DB-167–169. Essa CI é anterior às alterações DB-170 e não as valida.
+- DB-171: o primeiro `010C` após `ATSP0` agora solicita explicitamente o limite `protocolSelectionTimeoutMs` (padrão 15 s), em vez do timeout adaptativo mínimo de 3 s. As consultas após protocolos forçados mantêm o timeout adaptativo. O diagnóstico registra `timeoutOverrideMs`; RG-61 e BT-CONN-08 protegem a política.
 - **Ainda pendente:** teste físico pós-correção, com um novo trace, no Galaxy A06 / Android 16 / adaptador ELM327 e ECU reais. CI e mocks não substituem esse ensaio. Não atribuir suporte a PID ou protocolo sem resposta RAW_ECU válida.
 
 **DB-170 — Histórico operacional em SQLite**
@@ -31,7 +32,7 @@
 
 ### Critérios para considerar a rodada concluída
 
-- RG-01…RG-60 únicos, contínuos e ordenados; DB-001…DB-170 e índice sincronizados.
+- RG-01…RG-61 únicos, contínuos e ordenados; DB-001…DB-171 e índice sincronizados.
 - Gate anti-regressão, TypeScript, suíte completa e build Android aprovados no mesmo SHA final.
 - Migração JSON→SQLite idempotente demonstrada por teste; cópia SQLite incluída em backup; restauração testada; origem inválida ou duplicata não pode provocar perda silenciosa.
 - Nenhum PID passa a confirmado sem evidência RAW_ECU válida; autonomia persistida não deve aparecer como atual sem amostra vigente.
@@ -257,6 +258,7 @@
 - **DB-168** · 2026-10-27 — Corrigir documentação/interface do perfil ELM327 genérico, retry e catálogo de fallback; RG-59/BT-CONN-07.
 - **DB-169** · 2026-10-27 — Corrigir narrowing TypeScript para o primeiro byte opcional no parser KWP; validar na CI.
 - **DB-170** · 2026-10-27 — Migrar histórico operacional de viagens para SQLite com migração idempotente/transacional, backup verificado, restauração e testes RG-60/SQLITE-01.
+- **DB-171** · 2026-10-27 — Aumentar a janela da primeira sondagem ECU `010C` após `ATSP0`, mantendo timeout adaptativo nas sondagens seguintes; proteger via RG-61/BT-CONN-08.
 
 ---
 
@@ -4694,4 +4696,21 @@ Aplicar no aplicativo nativo a referência visual do painel de autonomia, conect
 ### Bloqueios externos restantes
 - P0 Bluetooth permanece sem confirmação física pós-DB-167: é necessário instalar um APK vindo de SHA validado no Galaxy A06 `SM-A065M` / Android 16, conectar ao ELM327 e ECU reais, guardar o trace novo e confirmar resposta positiva válida de `010C`. O erro mais recente registrado era `ECU NÃO RESPONDEU AO 010C: TIMEOUT | RX=N/D`; não presumir solução até novo relatório.
 - Não mesclar a branch nem qualquer PR enquanto a CI não estiver verde no SHA final e o ensaio físico estiver pendente.
+
+## DB-171 · 2026-10-27 — Ampliar somente o timeout da primeira sondagem ECU após ATSP0
+
+### Evidência e causa provável
+- O relatório mais recente do Galaxy A06 indicava que o socket RFCOMM/SPP abria e o ELM respondia aos comandos AT, mas o gate de ECU terminava em `ECU NÃO RESPONDEU AO 010C: TIMEOUT | RX=N/D`. O trace anterior continha uma resposta KWP válida `84F111410C0000D3`, já coberta pela correção DB-167.
+- Em `Elm327Session.command`, o timeout adaptativo inicial era de 3000 ms, enquanto a negociação `ATSP0` admitia até 15000 ms. Assim, a primeira consulta real `010C` podia vencer antes da resposta tardia durante a negociação; isso é uma hipótese sustentada pelo fluxo de timeout, ainda não confirmada fisicamente.
+
+### Correção aplicada
+- `src/obd/elm327.ts`: `executeCommand` aceita um override opcional de timeout limitado pelo `ioTimeoutMs` configurado.
+- `src/obd/bluetoothManager.ts`: apenas a primeira sondagem `010C` após `ATSP0` utiliza `protocolSelectionTimeoutMs`; sondagens após protocolo forçado continuam no timeout adaptativo normal. `ECU_PROBE_START` registra `timeoutOverrideMs`.
+- `tests/elm327Compatibility.test.js`: teste dinâmico confirma que o timeout explícito de 9000 ms chega ao transporte mesmo com mínimo adaptativo de 3000 ms. `tests/projectBaseline.test.js`, RG-61 e BT-CONN-08 guardam a mudança.
+
+### Validação e limite
+- A execução [40535443730](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40535443730) aprovou gate anti-regressão e `npm run validate` em `5e073437cadad19ede00a79abf5520754bdca7e0`; o build Android estava em andamento quando DB-171 foi iniciado, e não valida o novo SHA. A CI precisa ser executada novamente no HEAD DB-171.
+- O teste físico continua obrigatório: instalar APK do SHA validado no Galaxy A06 / Android 16 e repetir `010C` com o ELM327/ECU reais. Aumentar a janela não garante que o adaptador ou ECU responderão; não declarar correção física sem trace novo.
+- PR #93 é temporária para validação automatizada; encerrar sem merge quando a CI final terminar, preservando a branch até a verificação física. Não mesclar antes desse bloqueio.
+
 
