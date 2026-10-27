@@ -143,6 +143,7 @@ assert.match(projectContract, /\| RG-34 \|/, 'radio recovery must remain a docum
 assert.match(projectContract, /\| RG-37 \|/, 'concurrent RFCOMM waiters must remain a documented invariant');
 assert.match(projectContract, /\| RG-38 \|/, 'GPS must reject invalid/out-of-order timestamps');
 assert.match(gpsTracker, /!Number\.isFinite\(location\.timestamp\) \|\| location\.timestamp <= 0/);
+assert.ok(gpsTracker.includes('location.timestamp > Date.now()'), 'future GPS fixes must be rejected at ingestion');
 assert.match(gpsTracker, /location\.timestamp <= this\.previous\.timestamp/);
 assert.doesNotMatch(gpsTracker, /timestamp:\s*Date\.now\(\)/, 'GPS must not fabricate timestamps');
 assert.match(gpsTracker, /export const GPS_SAMPLE_STALE_AFTER_MS = 5_000/);
