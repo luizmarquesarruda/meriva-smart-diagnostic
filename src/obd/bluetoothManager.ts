@@ -315,8 +315,16 @@ async function createRealElmSessionAttempt(
     callbacks?.onElmInitialized?.();
     logBluetoothDiagnostic('ELM_INITIALIZED', { attempt });
     logBluetoothDiagnostic('ELM_INITIALIZATION_RESULT', initialization.map((item) => ({ command: item.command, status: item.status, response: item.response })));
-    logBluetoothDiagnostic('ECU_PROBE_START', { command: '010C', attempt, maxAttempts });
-    let ecuProbe = await session.executeCommand('010C');
+    logBluetoothDiagnostic('ECU_PROBE_START', {
+      command: '010C',
+      attempt,
+      maxAttempts,
+      timeoutOverrideMs: config.protocolSelectionTimeoutMs,
+    });
+    // ATSP0 may still be negotiating a protocol when the first real PID request
+    // is sent. Give this first ECU probe the same bounded window as negotiation;
+    // subsequent forced-protocol probes keep their normal adaptive timing.
+    let ecuProbe = await session.executeCommand('010C', config.protocolSelectionTimeoutMs);
     logBluetoothDiagnostic('ECU_PROBE_RESULT', { status: ecuProbe.status, response: ecuProbe.response, attempt });
     let probeIsValid = isValidEcuProbe(ecuProbe);
 
