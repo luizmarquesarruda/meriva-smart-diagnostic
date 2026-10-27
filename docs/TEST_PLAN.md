@@ -259,4 +259,5 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 - Confirmar que o tracker continua exigindo precisão conhecida ≤30 m, timestamp válido, lacuna ≤5 s, velocidade derivada de pelo menos 5 km/h e limite de segmento de 250 m.
 - Inserir um fix de baixa precisão ou velocidade incompatível no meio da sequência: a contagem/pêndencia deve reiniciar, sem apagar distância já confirmada.
 - Confirmar que 4G/5G não é tratado como coordenada. O tracker permanece com um único watcher e o sistema Android/Expo escolhe os provedores disponíveis; sem fix atual, velocidade deve ser N/D e a distância não pode ser interpolada.
+- Na transição offline→online ou mudança de tipo/geração celular, quando o último fix venceu, permitir uma consulta pontual do provedor com timeout de 8 s e cooldown de 30 s. Fix fresco não gera consulta; falha/retorno antigo não altera distância e nenhum watcher adicional pode ser criado.
 - Reexecutar gate anti-regressão, TypeScript, suíte completa e build Android no mesmo SHA. Fazer percurso físico com APK validado e comparar o total GPS com rota/odômetro conhecidos antes de declarar precisão real.
