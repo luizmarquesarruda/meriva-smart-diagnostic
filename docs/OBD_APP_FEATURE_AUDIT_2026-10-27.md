@@ -16,7 +16,7 @@ Consolidar a pesquisa anterior sobre Car Scanner, Torque, OBDLink, OBD Auto Doct
 | ScanMyOpel | Especialização por fabricante/veículo (detalhes públicos de formato são limitados) | Usar perfis Opel/Meriva somente para priorizar candidatos; nunca marcar suporte de PID sem resposta RAW_ECU válida | Parcial: catálogo Meriva e evidência RAW; somente PID 010C tem resposta específica documentada no Diário |
 | python-OBD / OBDvis | Implementação transparente por comando, parser e telemetria | Preservar TX/RX, validar bytes, tamanho e cabeçalho, distinguir timeout/NO DATA/unsupported e evitar valores sintéticos | Implementado em parser, camada ELM, logs e testes de limites |
 | OBD Metrics | Catálogo estruturado de PID em JSON | Continuar usando JSON para catálogo, fórmulas, unidades, faixas e políticas estáticas; versionar e validar integridade no CI | Implementado em `src/knowledge/*.json` e testes de consistência |
-| OBD-Droid | CSV para intercâmbio e SQLite para dados estruturados/customizados | Manter CSV como exportação e estudar SQLite para o histórico operacional de viagens, não para substituir todos os formatos | **Lacuna aberta**: viagens operacionais ainda usam `VIAGENS/index.json`; migração SQLite não foi implementada nesta revisão |
+| OBD-Droid | CSV para intercâmbio e SQLite para dados estruturados/customizados | Manter CSV como exportação e estudar SQLite para o histórico operacional de viagens, não para substituir todos os formatos | **DB-170 implementado em branch isolada; CI final pendente**: SQLite passa a ser fonte de verdade de viagens; `index.json` fica como espelho/recuperação. Ainda não incorporado à `main`. |
 
 ## Arquitetura de formatos aprovada
 
@@ -34,7 +34,7 @@ Consolidar a pesquisa anterior sobre Car Scanner, Torque, OBDLink, OBD Auto Doct
 3. **Descoberta/consulta de PID por sessão**: cache apenas prioriza candidatos; a confirmação exige resposta ECU válida na sessão atual. Não reutilizar descoberta entre ECUs/sessões.
 4. **Diagnóstico DTC com proveniência**: código atual, histórico, status, quadro de resposta e definição legível separados.
 5. **Consumo/viagem com qualidade explícita**: viagens sem combustível confiável permanecem no histórico, mas não contaminam médias ou autonomia.
-6. **Exportação e backup verificáveis**: CSV/TXT para interoperabilidade/suporte; manifesto de backup verificado. A futura migração SQLite deve incluir o banco no backup e falhar explicitamente se o banco estiver ausente/corrompido, sem declarar histórico vazio.
+6. **Exportação e backup verificáveis**: CSV/TXT para interoperabilidade/suporte; manifesto de backup verificado. DB-170 sincroniza a cópia SQLite antes do pacote de backup e expõe restauração a partir de snapshots locais validados; a CI ainda deve confirmar a implementação antes da integração.
 7. **UI nativa**: padrões visuais de MagicPath/Floot devem ser traduzidos para Expo/React Native; a tela web de protótipo não é fonte de verdade de conexão ou cálculo. Manter estados desconectado, conectando, adaptador conectado, ECU validada, dados vencidos e indisponível distintos.
 
 ## P1–P2: critérios de execução
@@ -44,7 +44,7 @@ Consolidar a pesquisa anterior sobre Car Scanner, Torque, OBDLink, OBD Auto Doct
 - [x] Inventário runtime sincronizado: 35 PIDs, 35 faixas e 21 definições de fórmula na auditoria vigente.
 - [x] Correções DTC, PID 0101 e enum PID 0151 reconciliadas.
 - [x] Catálogo JSON e exportações CSV/TXT mantidos em papéis separados.
-- [ ] Histórico operacional SQLite: requer migração transacional e testes dedicados; não marcar como concluído apenas por estar documentado.
+- [ ] Validar DB-170: migração transacional/idempotente, backup incluindo SQLite, restauração e suíte dedicada devem passar na CI do SHA final; somente então atualizar o status. A branch ainda não foi incorporada à `main`.
 
 ### P2 — Bluetooth Classic / ELM327 e evidência real
 - [x] Uma única fila serial compartilhada; no máximo 16 comandos ordinários pendentes, com rejeição explícita e acesso reservado a fechamento/recuperação.
