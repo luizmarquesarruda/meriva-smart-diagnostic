@@ -207,6 +207,10 @@ async function ensureSqliteMigration(basePath: string): Promise<void> {
     }
 
     const validCycles = legacyCycles.filter((cycle) => cycle.source !== 'CARSCANNER_SEED');
+    const legacyIds = validCycles.map((cycle) => cycle.id);
+    if (new Set(legacyIds).size !== legacyIds.length) {
+      throw new Error('LEGACY_TRIP_HISTORY_DUPLICATE_IDS; SQLITE_MIGRATION_ABORTED_WITHOUT_DATA_LOSS');
+    }
     await db.withTransactionAsync(async () => {
       for (const cycle of validCycles) await insertDriveCycle(db, cycle, 'IGNORE');
       const ids = await db.getAllAsync<{ id: string }>('SELECT id FROM drive_cycles');
