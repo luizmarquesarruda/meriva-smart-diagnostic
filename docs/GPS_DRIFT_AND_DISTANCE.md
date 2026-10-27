@@ -30,7 +30,7 @@ Filtros Kalman e outros filtros adaptativos podem ser úteis, mas acrescentam pa
 - 4G/5G não é uma coordenada e não garante um fix. A rede pode ajudar o provedor do sistema, mas o app não deve gerar latitude/longitude por conta própria nem trocar uma posição vencida por uma estimativa online.
 - As opções `timeInterval: 1000` e `distanceInterval: 1` são pedidos ao sistema, não garantias de callback em exatamente um segundo ou a cada metro. Todo consumidor deve aplicar a regra de frescor.
 - O app mantém um único proprietário do tracker. Não criar um segundo watcher na volta da rede: isso poderia duplicar callbacks e somar a mesma distância duas vezes.
-- Quando a rede retorna ou muda de tipo/geração (incluindo 4G/5G), o serviço pode solicitar um único `getCurrentPositionAsync` apenas se o último fix venceu: limite de 8 s e cooldown de 30 s. A consulta passa pela mesma validação de coordenadas/timestamp; resposta antiga ou futura não vira fix atual. É uma reacquisição do provedor Android, não uma localização calculada pela internet.
+- Quando a rede retorna ou muda de tipo/geração (incluindo 4G/5G), o serviço pode solicitar um único `getCurrentPositionAsync` apenas se o último fix venceu: limite de 8 s e cooldown de 30 s. Enquanto a rede celular permanece disponível, também verifica a cada 30 s se o fix venceu — não consulta quando o fix está fresco. A consulta passa pela mesma validação de coordenadas/timestamp; resposta antiga ou futura não vira fix atual. É uma reacquisição do provedor Android, não uma localização calculada pela internet.
 
 ## Background e bateria
 
