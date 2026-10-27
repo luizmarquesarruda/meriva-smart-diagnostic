@@ -1,28 +1,41 @@
-## ESTADO VIGENTE — 2026-10-27 (P0 Bluetooth/Autonomia; DB-169)
+## ESTADO VIGENTE — 2026-10-27 (P0 Bluetooth / P1 SQLite; DB-170)
 
-> DB-168 corrige divergências na documentação/interface do perfil ELM327 genérico. DB-167 corrige a rejeição de uma trama KWP real recebida no teste Bluetooth: `84F111410C0000D3` contém resposta positiva para `010C`, mas o parser anterior não reconhecia esse cabeçalho/checksum e continuava o fallback de protocolos. A CI verde anterior (run [40495852871](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40495852871), SHA `b226809cd3802679bed5c4c7d1abe9c243dc16dc`) é anterior a esta correção e não a valida. PR #92 permanece sem merge até a CI ficar verde no HEAD que inclui código, testes e documentação; teste físico pós-correção ainda pendente.
+> Esta seção substitui o snapshot operacional anterior. A PR #92 está **fechada sem merge** por decisão de não manter PR aberta nem mesclar antes da validação completa. A branch consolidada foi preservada; o código de DB-170 está isolado em `fix/sqlite-trip-history-20261027`. Nenhuma alteração deste trabalho foi incorporada à `main`.
 
-### Integração, CI e riscos
-- DB-169: a primeira CI após DB-168 encontrou erro de TypeScript em `src/obd/parser.ts`: `tokens[0]` podia ser `undefined` no acesso ao cabeçalho KWP. Adicionada guarda explícita antes de analisar o primeiro byte; a CI do novo SHA ainda precisa confirmar a correção.
-- DB-168: documentação de retry corrigida para o padrão runtime (3 tentativas/candidato, 1500 ms); sequência de protocolos atualizada para `5,3,4,6,7,8,9,2,1` após `ATSP0`. J1850 é fallback genérico não confirmado na Meriva. CI no novo SHA ainda precisa validar.
+### P0 — Bluetooth Classic / ELM327
+
+- Relatório mais recente do aparelho: Galaxy A06 (`SM-A065M`), Android 16 / platform 36; adaptador pareado `OBDII`; a falha registrada no app é `ECU NÃO RESPONDEU AO 010C: TIMEOUT | RX=N/D`.
+- DB-167 ajustou `src/obd/parser.ts` para reconhecer o quadro KWP compacto `84F111410C0000D3`, validar tamanho e checksum, e rejeitar checksum incorreto, bytes extras e quadro incompleto. O quadro observado é uma resposta positiva `010C = 0 rpm` naquele instante; não prova que o motor deveria estar em marcha lenta.
+- DB-168 alinhou interface e playbook ELM327 genérico com o runtime: Bluetooth Classic RFCOMM/SPP, ASCII, CR real, framing até o prompt `>`, 3 tentativas por candidato e intervalo de 1500 ms; fallback após `ATSP0` documentado como `5,3,4,6,7,8,9,2,1`. J1850 é fallback genérico, não evidência de protocolo da Meriva; `ATI` não autentica clone.
+- DB-169 corrigiu a guarda de tipo para `tokens[0]` após falha de TypeScript. A CI `40506098887` passou em `validate` e `android-build` no SHA `b96a315239c9482d51f06436f67201fc2a73d76a`, incluindo DB-167–169. Essa CI é anterior às alterações DB-170 e não as valida.
+- **Ainda pendente:** teste físico pós-correção, com um novo trace, no Galaxy A06 / Android 16 / adaptador ELM327 e ECU reais. CI e mocks não substituem esse ensaio. Não atribuir suporte a PID ou protocolo sem resposta RAW_ECU válida.
+
+### DB-170 — Histórico operacional em SQLite
+
+- Adicionado `expo-sqlite` na faixa compatível do app Expo SDK 51; o lockfile fixa a versão resolvida dentro dessa faixa e mantém a árvore de dependências registrada.
+- SQLite passa a ser a fonte de verdade de `readDriveCycles` e `addDriveCycle`, com chave primária por viagem, transações para importação/gravação, marcador de migração e validação dos registros. Viagens com IDs duplicados na origem são bloqueadas para reconciliação explícita; não são descartadas silenciosamente.
+- A migração importa o histórico válido de `VIAGENS/index.json` ou de `index.previous.json` se o índice principal estiver ausente. Mantém uma cópia `index.pre-sqlite.json`, trata `index.json` como espelho de compatibilidade/recuperação e não inclui `CARSCANNER_SEED` no histórico operacional.
+- Se o JSON legado e seu backup forem inválidos, a migração aborta e preserva os arquivos em vez de iniciar silenciosamente um histórico vazio.
+- A cópia SQLite verificada fica em `VIAGENS/meriva_smart_history.db`; `createBackup()` sincroniza essa cópia antes de empacotar o diretório `VIAGENS`. Há função explícita de restauração a partir do último espelho JSON verificado, com validação prévia e atualização transacional.
+- A suíte `tests/sqliteTripHistory.test.js` cobre migração idempotente, exclusão do seed, leitura/gravação, corrupção do espelho, restauração e prevenção de perda com IDs duplicados. `tests/regression.test.js` e o gate de baseline também foram adaptados. **O código só poderá ser declarado validado depois de CI verde no SHA final.**
+
+### Integração, CI e estado de PRs
+
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
-- `main`: `7eec3afecb3718020724baf053f8b6d2ca636fab`; PR [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84) foi mesclada. A branch de integração contém o inventário documental e as correções DB-146/147.
-- PR [#92 — consolidação P0–P2](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/92) continua aberta e fora de rascunho. Durante DB-166, a branch foi reconciliada com o commit vigente de `main`, incluindo `tests/elmHealthPresentation.test.js`, que antes existia apenas no lado de `main`. Confirmar a comparação final e CI verde no HEAD pós-merge antes de mesclar a PR.
-- CI [40313779041](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40313779041), SHA `c02fecb6abe876c1a1f0ca275330f33af3ec6e91`: `validate` e `android-build` passaram; APK standalone montado, verificado e enviado como artefato.
-- CI anterior [40313041670](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40313041670), SHA `826df0ae23ef30e602418721c521be271c6e5ff6`, passou validação, mas falhou em `mergeReleaseResources` para `drawable-mdpi/splashscreen_image.png`. A repetição sobre o descendente `c02fecb6abe876c1a1f0ca275330f33af3ec6e91`, sem alterar a imagem, passou o build completo; falha tratada como transitória e registrada, sem modificação desnecessária do splash.
-- DB-146 adicionou PID 0144 ao catálogo padrão com fórmula/faixa/unidade e testes, sem marcar suporte físico nem incluí-lo na fila automática. Ele permanece alvo de confirmação até existir resposta RAW_ECU válida.
-- DB-147 sincronizou README, auditoria de fontes e inventário completo com o catálogo runtime: 35 PIDs, 35 faixas e 21 definições de fórmula. Também corrigiu a semântica documental de 0101, 0111 e 0130 e adicionou testes de consistência.
-- DB-151 recupera correções relevantes da PR #83 que ainda não estavam no código consolidado: status histórico de DTC, reconciliação segura de Mode 03, interpretação correta dos monitores PID 0101 e enum PID 0151.
-- A autonomia DB-143–145 usa janela móvel de dez leituras e balanço do último tanque completo. O balanço é uma estimativa e depende de todas as viagens e abastecimentos serem registrados; DB-149 acrescenta a comparação do odômetro atual com a distância rastreada. Precisão física ainda não foi medida.
-- PR [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81) e PR [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) estão fechadas sem merge; o código útil foi portado/reconciliado na branch de integração. O histórico dessas PRs foi preservado e não deve ser descrito como aberto nem mesclado.
-- O baseline anterior tinha `010C = 41 0C 1A F8` (1726 rpm). O trace físico de 2026-10-27 trouxe `84F111410C0000D3`: quadro KWP compacto com resposta positiva `41 0C 00 00` (0 rpm) e checksum consistente. Isso é evidência de resposta no instante capturado, não prova de que o motor deveria estar em marcha lenta; confirmar com novo trace após a correção. Catálogo SAE não prova suporte de outros PIDs.
-- Não foi executado teste físico no Galaxy A06/Android 16 nem com ELM327/ECU real.
+- PR [#92 — consolidação P0–P2](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/92): fechada sem merge em 2026-10-27; branch `integration/reconcile-pid-ui-20261025` preservada no SHA `b96a315239c9482d51f06436f67201fc2a73d76a`.
+- Na última consulta antes do trabalho DB-170, não havia PRs abertas. Não criar uma PR e deixá-la em aberto ao encerrar a rodada.
+- Branch atual: `fix/sqlite-trip-history-20261027`; HEAD muda conforme os commits DB-170 são adicionados. A CI anterior [40506098887](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40506098887) não valida os novos commits.
+- `main` consultada anteriormente: `7eec3afecb3718020724baf053f8b6d2ca636fab`. Não houve merge automático; fechar PR não incorpora código a `main`.
+- PRs #81 e #83 continuam fechadas sem merge. O código útil já portado/reconciliado deve continuar sendo verificado no diff consolidado; seu histórico não deve ser descrito como mesclado.
+- A auditoria comparativa de apps está em `docs/OBD_APP_FEATURE_AUDIT_2026-10-27.md`; a auditoria anterior de buffers está em `docs/BUFFER_AUDIT_2026-10-26.md`.
 
-### Critérios de aceitação
-- RG-01…RG-59 únicos e sequenciais; DB-001…DB-169 e índice sincronizados.
+### Critérios para considerar a rodada concluída
+
+- RG-01…RG-60 únicos, contínuos e ordenados; DB-001…DB-170 e índice sincronizados.
 - Gate anti-regressão, TypeScript, suíte completa e build Android aprovados no mesmo SHA final.
-- Nenhum PID passa a confirmado sem evidência RAW_ECU válida; autonomia persistida não pode ser exibida como atual.
-- A auditoria comparativa de apps está em `docs/OBD_APP_FEATURE_AUDIT_2026-10-27.md`; ela distingue funcionalidades já presentes de lacunas reais. SQLite para histórico operacional continua pendente e não é declarado implementado.
+- Migração JSON→SQLite idempotente demonstrada por teste; cópia SQLite incluída em backup; restauração testada; origem inválida ou duplicata não pode provocar perda silenciosa.
+- Nenhum PID passa a confirmado sem evidência RAW_ECU válida; autonomia persistida não deve aparecer como atual sem amostra vigente.
+- **O teste físico Bluetooth segue como bloqueio externo obrigatório** até que se execute a aplicação num Galaxy A06 e se anexe um novo relatório do adaptador/ECU reais.
 
 ---
 
