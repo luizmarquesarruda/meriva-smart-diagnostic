@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### GPS: confirmação de movimento urbano e deriva — DB-172
+- O tracker deixa de exigir 8 m em cada segmento GPS individual, incompatível com callbacks de 1 s em velocidades urbanas.
+- O piso por segmento agora depende do intervalo entre fixes; a distância só é somada depois de três segmentos válidos consecutivos (quatro posições), com precisão aceitável e deslocamento líquido da janela acima da margem de confiança.
+- Segmentos acima de 250 m, zigue-zague com deslocamento líquido insuficiente e sequência quebrada por fix inválido não somam distância.
+- Adicionados testes GPS de movimento a 10 km/h e rejeição de deriva, auditoria comparativa com Android/Expo/Strava/OsmAnd/Waze, RG-62 e GPS-03. Teste físico ainda pendente.
+
 ### Timeout da primeira sondagem ECU — DB-171
 - A primeira consulta real `010C` após `ATSP0` usa a janela limitada de negociação de protocolo (padrão 15 s) em vez do timeout adaptativo mínimo de 3 s.
 - Consultas após protocolos forçados continuam no timeout adaptativo para evitar alongar todas as tentativas; o diagnóstico registra o timeout usado.
