@@ -17,12 +17,19 @@ const output = ts.transpileModule(fs.readFileSync(sourcePath, 'utf8'), {
 }).outputText;
 
 let watcher = null;
+let currentPositionMock = null;
+let currentPositionCalls = 0;
 const fakeLocation = {
   Accuracy: { BestForNavigation: 6 },
   PermissionStatus: { GRANTED: 'granted' },
   hasServicesEnabledAsync: async () => true,
   getForegroundPermissionsAsync: async () => ({ status: 'granted' }),
   requestForegroundPermissionsAsync: async () => ({ status: 'granted' }),
+  getCurrentPositionAsync: async () => {
+    currentPositionCalls += 1;
+    if (!currentPositionMock) throw new Error('NO_CURRENT_POSITION_FIX');
+    return currentPositionMock;
+  },
   watchPositionAsync: async (_options, callback) => {
     watcher = callback;
     return {
@@ -52,11 +59,13 @@ const {
   calculateConsumptionKml,
   isGpsSampleFresh,
   GPS_SAMPLE_STALE_AFTER_MS,
+  GPS_NETWORK_REFRESH_COOLDOWN_MS,
 } = mod.exports;
 
 assert.strictEqual(normalizeGpsSpeedKmh(10), 36);
 assert.strictEqual(normalizeGpsSpeedKmh(null), 0);
 assert.strictEqual(GPS_SAMPLE_STALE_AFTER_MS, 5_000);
+assert.strictEqual(GPS_NETWORK_REFRESH_COOLDOWN_MS, 30_000);
 assert.strictEqual(isGpsSampleFresh(10_000, 15_000), true,
   'amostra no limite de cinco segundos ainda é atual');
 assert.strictEqual(isGpsSampleFresh(10_000, 15_001), false,
@@ -223,7 +232,47 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
     'movimento ainda não confirmado deve ser exibido como parado');
   await driftTracker.stop();
 
-  console.log('PASS GPS: frescor, baixa velocidade urbana, distância por três segmentos, deriva e consumo');
+  // On network/provider transition, only request one current fix if the tracker
+  // is active and its last sample has expired. The existing watcher is preserved.
+  const refreshTracker = new GpsTracker();
+  assert.strictEqual(await refreshTracker.start(), true);
+  const watcherBeforeRefresh = watcher;
+  currentPositionCalls = 0;
+  currentPositionMock = {
+    coords: { latitude: -23.55, longitude: -46.63, speed: 0, accuracy: 8 },
+    timestamp: Date.now(),
+  };
+  assert.strictEqual(await refreshTracker.refreshLocationAfterNetworkChange(), true,
+    'um fix atual do provedor deve recuperar o estado GPS vencido após mudança de rede');
+  assert.strictEqual(currentPositionCalls, 1, 'a recuperação deve fazer uma única consulta pontual');
+  assert.strictEqual(watcher, watcherBeforeRefresh, 'a recuperação não pode criar um segundo watcher');
+  assert.strictEqual(await refreshTracker.refreshLocationAfterNetworkChange(), false,
+    'um fix ainda fresco dispensa nova consulta pontual');
+  assert.strictEqual(currentPositionCalls, 1, 'não consultar novamente enquanto o fix está fresco');
+  await refreshTracker.stop();
+
+  // A stale fix from the provider is not promoted to current state, and repeated
+  // network events cannot issue another request inside the cooldown window.
+  const cooldownTracker = new GpsTracker();
+  assert.strictEqual(await cooldownTracker.start(), true);
+  currentPositionCalls = 0;
+  currentPositionMock = {
+    coords: { latitude: -23.55, longitude: -46.63, speed: 0, accuracy: 8 },
+    timestamp: Date.now() - 10_000,
+  };
+  assert.strictEqual(await cooldownTracker.refreshLocationAfterNetworkChange(), false,
+    'o provedor pode devolver uma posição antiga; ela não deve ser declarada fresca');
+  assert.strictEqual(currentPositionCalls, 1);
+  currentPositionMock = {
+    coords: { latitude: -23.55, longitude: -46.63, speed: 0, accuracy: 8 },
+    timestamp: Date.now(),
+  };
+  assert.strictEqual(await cooldownTracker.refreshLocationAfterNetworkChange(), false,
+    'eventos repetidos não podem disparar consultas fora da janela de cooldown');
+  assert.strictEqual(currentPositionCalls, 1, 'cooldown impede nova requisição por 30 s');
+  await cooldownTracker.stop();
+
+  console.log('PASS GPS: frescor, movimento urbano, deriva, refresh pontual de rede e consumo');
 })().catch((error) => {
   console.error(error);
   process.exitCode = 1;
