@@ -19,12 +19,12 @@ function normalizePath(value) {
   return value.replace(/\/+/g, '/').replace(/^file:\//, 'file:///').replace(/\/$/, '');
 }
 function ensureDirectory(directory) {
-  const normalized = normalizePath(directory);
-  const parts = normalized.split('/').filter(Boolean);
-  let current = normalized.startsWith('file:///') ? 'file:///' : '';
-  for (const part of parts.slice(normalized.startsWith('file:///') ? 2 : 0)) {
-    current = current.endsWith('/') ? current + part : current + '/' + part;
+  let current = normalizePath(directory).replace(/\/+$/, '');
+  while (current && current !== 'file:') {
     directories.add(current);
+    const separator = current.lastIndexOf('/');
+    if (separator < 0) break;
+    current = current.slice(0, separator);
   }
 }
 function parentDirectory(filePath) {
