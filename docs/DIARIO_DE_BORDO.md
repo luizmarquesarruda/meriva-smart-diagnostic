@@ -29,7 +29,7 @@
 - `main` consultada anteriormente: `7eec3afecb3718020724baf053f8b6d2ca636fab`. Não houve merge automático; fechar PR não incorpora código a `main`.
 - PRs #81 e #83 continuam fechadas sem merge. O código útil já portado/reconciliado deve continuar sendo verificado no diff consolidado; seu histórico não deve ser descrito como mesclado.
 - A auditoria comparativa de apps está em `docs/OBD_APP_FEATURE_AUDIT_2026-10-27.md`; a auditoria anterior de buffers está em `docs/BUFFER_AUDIT_2026-10-26.md`.
-- GPS: a auditoria comparativa Android/Expo/Strava/OsmAnd/Waze está em `docs/GPS_IMPLEMENTATION_AUDIT_2026-10-27.md`; o limiar de movimento foi ajustado para não exigir 8 m em cada callback de 1 s, mantendo três segmentos consecutivos, margem de precisão e deslocamento líquido. RG-62 / GPS-03. CI no novo SHA ainda pendente; percurso físico no Galaxy A06 também pendente.
+- GPS: a auditoria comparativa Android/Expo/Strava/OsmAnd/Waze está em `docs/GPS_IMPLEMENTATION_AUDIT_2026-10-27.md`; o limiar de movimento foi ajustado para não exigir 8 m em cada callback de 1 s, mantendo três segmentos consecutivos, margem de precisão e deslocamento líquido. Mudanças de conectividade (incluindo 4G↔5G) podem pedir um único fix pontual somente quando o último GPS venceu, com timeout de 8 s/cooldown de 30 s; timestamps futuros e respostas antigas não viram fix atual. RG-62 / GPS-03. CI no novo SHA ainda pendente; percurso físico no Galaxy A06 também pendente.
 
 ### Critérios para considerar a rodada concluída
 
@@ -4732,6 +4732,7 @@ Aplicar no aplicativo nativo a referência visual do painel de autonomia, conect
 2. Segmentos maiores que 250 m são explicitamente rejeitados, reiniciando a sequência. Fix inválido ou baixa precisão também quebra candidatos pendentes sem apagar distância confirmada.
 3. `tests/gps.test.js`: adicionados casos de quatro posições a 10 km/h com ~2,8 m por segundo e de speed positivo em zigue-zague cujo ponto final não confirma deslocamento líquido.
 4. Criados `docs/GPS_IMPLEMENTATION_AUDIT_2026-10-27.md`, atualização de `docs/GPS_DRIFT_AND_DISTANCE.md`, critério GPS-03, contrato RG-62, assertions no baseline e changelog.
+5. `src/trip/autoTripService.ts` observa NetInfo e compara tipo/geração celular; uma transição solicita um fix pontual apenas quando o último timestamp venceu. `src/gps/gpsTracker.ts` limita a consulta a 8 s, aplica cooldown de 30 s, mantém o watcher original e não promove resposta vencida/futura a atual.
 
 ### Validação e limites
 - Base utilizada: CI [40537159575](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40537159575) verde no SHA `deee73a571c5a39946bc143bda918a7e205a5c92` antes desta mudança GPS. Essa CI não valida DB-172.
