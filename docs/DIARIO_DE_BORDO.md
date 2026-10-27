@@ -1,10 +1,11 @@
-## ESTADO VIGENTE — 2026-10-27 (P1–P2; DB-164)
+## ESTADO VIGENTE — 2026-10-27 (P0 Bluetooth; DB-165)
 
-> A CI [40450705220](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40450705220) passou em `validate` (incluindo gate anti-regressão) e `android-build` para o SHA `23cb21120a80829cd7e6636c2ad2a1fc90059606`, validando DB-163 até RG-52. DB-164 adiciona o plano BT-CONN-03 e ainda requer nova CI no HEAD atualizado. Testes físicos no Galaxy A06/Android 16 com ELM327/ECU real continuam pendentes.
+> A CI [40486556497](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40486556497) passou `validate` e `android-build` no SHA anterior `a63d0aecebfc9416be53ffd73144a263fe55fa71`. DB-165 já atualiza código, teste dinâmico, gate anti-regressão e critérios de aceitação; a CI deve validar o HEAD final que contém essas mudanças. Não há teste físico no Galaxy A06/Android 16 com ELM327/ECU real.
 
 ### Integração, CI e riscos
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
-- `main`: `02773b71ca9bd428b832d53a386655dd80acd80b`; PR [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84) foi mesclada. A branch de integração contém o inventário documental e as correções DB-146/147.
+- `main`: `7eec3afecb3718020724baf053f8b6d2ca636fab`; PR [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84) foi mesclada. A branch de integração contém o inventário documental e as correções DB-146/147.
+- PR [#92 — consolidação P0–P2](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/92) continua aberta e fora de rascunho. Antes de DB-165, a comparação indicava 115 commits à frente e 1 atrás de `main`; não mesclar antes da CI verde no HEAD final e reconciliação segura.
 - CI [40313779041](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40313779041), SHA `c02fecb6abe876c1a1f0ca275330f33af3ec6e91`: `validate` e `android-build` passaram; APK standalone montado, verificado e enviado como artefato.
 - CI anterior [40313041670](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40313041670), SHA `826df0ae23ef30e602418721c521be271c6e5ff6`, passou validação, mas falhou em `mergeReleaseResources` para `drawable-mdpi/splashscreen_image.png`. A repetição sobre o descendente `c02fecb6abe876c1a1f0ca275330f33af3ec6e91`, sem alterar a imagem, passou o build completo; falha tratada como transitória e registrada, sem modificação desnecessária do splash.
 - DB-146 adicionou PID 0144 ao catálogo padrão com fórmula/faixa/unidade e testes, sem marcar suporte físico nem incluí-lo na fila automática. Ele permanece alvo de confirmação até existir resposta RAW_ECU válida.
@@ -16,7 +17,7 @@
 - Não foi executado teste físico no Galaxy A06/Android 16 nem com ELM327/ECU real.
 
 ### Critérios de aceitação
-- RG-01…RG-52 únicos e sequenciais; DB-001…DB-163 e índice sincronizados.
+- RG-01…RG-53 únicos e sequenciais; DB-001…DB-165 e índice sincronizados.
 - Gate anti-regressão, TypeScript, suíte completa e build Android aprovados no mesmo SHA final.
 - Nenhum PID passa a confirmado sem evidência RAW_ECU válida; autonomia persistida não pode ser exibida como atual.
 - A auditoria comparativa de apps está em `docs/OBD_APP_FEATURE_AUDIT_2026-10-27.md`; ela distingue funcionalidades já presentes de lacunas reais. SQLite para histórico operacional continua pendente e não é declarado implementado.
@@ -235,6 +236,7 @@
 - **DB-162** · 2026-10-27 — Integrar métricas de fila ELM à tela Bluetooth, com alerta de saturação/espera e teste; documentar adoção de funcionalidades de apps OBD2 e lacunas de SQLite.
 - **DB-163** · 2026-10-27 — Reduzir latência da conexão, limitar retries por adaptador e ampliar fallback de protocolo com testes e rastreabilidade.
 - **DB-164** · 2026-10-27 — Corrigir seleção de protocolo durante recuperação/reconexão para evitar forçar KWP fast em ECU KWP 5-baud; cobrir protocolos e documentar teste BT-CONN-03.
+- **DB-165** · 2026-10-27 — Validar payload completo do PID 010C durante a recuperação do ELM327; adicionar teste dinâmico e proteção anti-regressão RG-53/BT-CONN-04.
 
 ---
 
@@ -4568,3 +4570,20 @@ Aplicar no aplicativo nativo a referência visual do painel de autonomia, conect
 - Como o plano de teste foi atualizado depois, executar/confirmar nova CI para o HEAD final antes de merge.
 - Teste físico continua pendente: Galaxy A06 / Android 16, ELM327 real e ECU real. Registrar o `ATDP` recebido, o `ATSP` de recuperação e a resposta válida `010C -> 41 0C`. Não afirmar que o problema foi reproduzido ou resolvido no veículo sem esse ensaio.
 - PR #92 permanece aberto e não deve ser mesclado até CI verde no HEAD final, divergência com `main` reconciliada e revisão de merge segura.
+
+## DB-165 · 2026-10-27 — Validar payload completo durante a recuperação do ELM327
+
+### Causa confirmada na revisão do código
+- A conexão inicial usava `parsePidResponse('010C', ...)` e exigia payload interpretável com valor finito; `recoverProtocol()` verificava somente se a resposta continha `41 0C`.
+- Assim, um retorno positivo truncado ou malformado podia liberar a recuperação mesmo sem RPM validado. Isso violava o contrato de que a ECU só está respondendo após uma resposta OBD válida.
+
+### Correção aplicada
+- `src/obd/elm327.ts`: a recuperação agora usa o parser canônico e exige status `OK`, `RESPONDEU`, valor não nulo e valor finito.
+- `tests/elm327Compatibility.test.js`: acrescentada regressão de sessão ELM simulada que rejeita `41 0C` isolado e aceita `41 0C 1A F8` completo.
+- `tests/projectBaseline.test.js`: o gate anti-regressão protege o uso do parser e as condições de valor/status no caminho real de recuperação.
+- `docs/CONTRATO_ANTI_REGRESSAO.md`: incluído RG-53; `docs/TEST_PLAN.md`: incluído BT-CONN-04; `CHANGELOG.md` e este diário registram a correção.
+
+### Validação e limites
+- A CI [40486556497](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40486556497) passou `validate` e `android-build` somente no SHA anterior `a63d0aecebfc9416be53ffd73144a263fe55fa71`; não valida DB-165.
+- A nova execução de CI precisa passar no HEAD que inclui código, regressões e documentação. A suíte dinâmica é simulada e não substitui o ensaio físico no Samsung Galaxy A06 / Android 16 com ELM327 e ECU reais.
+- A PR #92 continua aberta: não mesclar até CI verde no HEAD final, revisão de diff e reconciliação com `main`. SQLite para histórico operacional permanece uma lacuna P1 separada.
