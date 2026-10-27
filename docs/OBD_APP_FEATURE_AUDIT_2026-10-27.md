@@ -53,6 +53,7 @@ Consolidar a pesquisa anterior sobre Car Scanner, Torque, OBDLink, OBD Auto Doct
 - [x] Buffer de descoberta limitado por execução/sessão; cache não comprova suporte.
 - [x] Descoberta automática prioriza o último adaptador validado, depois nomes ELM/OBD e então outros dispositivos pareados; seleção explícita não troca de adaptador silenciosamente.
 - [x] Retry padrão reduzido de 20 tentativas/8 s para 3 tentativas/1,5 s por candidato; uma varredura de protocolos esgotada sem resposta válida ao PID 010C avança ao próximo candidato, sem repetir a varredura longa no mesmo adaptador.
+- [ ] DB-171: primeira sondagem `010C` após `ATSP0` passou a usar a janela limitada `protocolSelectionTimeoutMs` (padrão 15 s), mantendo sondagens forçadas com timeout adaptativo; aguarda CI final e ensaio físico pós-correção.
 - [x] Fallback acrescentado para protocolos SAE J1850 PWM/VPW (IDs 1 e 2), mantendo ATSP0 como negociação inicial e a exigência de resposta ECU real 41 0C.
 - [ ] Teste físico no Samsung Galaxy A06 / Android 16 com ELM327 e ECU real; comparar leituras com instrumento/condição conhecida. Não pode ser substituído por CI.
 - [ ] Medir perfil, latência até 41 0C, timeout/NO DATA e reconexão no adaptador real; não alegar ganho de velocidade ou estabilidade sem captura física.
