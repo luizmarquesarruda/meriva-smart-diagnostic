@@ -48,6 +48,8 @@ export interface RealElmSessionCallbacks {
 /** A conexão só é considerada OBD real quando existe um payload 41 0C válido. */
 const ELM_PROTOCOL_NAMES: Record<string, string> = {
   '0': 'AUTO',
+  '1': 'SAE J1850 PWM',
+  '2': 'SAE J1850 VPW',
   '3': 'ISO 9141-2',
   '4': 'ISO 14230-4 KWP 5-BAUD',
   '5': 'ISO 14230-4 KWP FAST',
@@ -57,6 +59,9 @@ const ELM_PROTOCOL_NAMES: Record<string, string> = {
   '9': 'ISO 15765-4 CAN 29/250',
 };
 
+/** Protocols probed after ATSP0, ordered for common European/GM OBD-II first. */
+export const ELM_PROTOCOL_FALLBACKS = ['5', '3', '4', '6', '7', '8', '9', '2', '1'] as const;
+
 export function getElmProtocolName(protocolId: string): string {
   return ELM_PROTOCOL_NAMES[protocolId] ?? 'ELM327 PROTOCOLO ' + protocolId;
 }
@@ -65,6 +70,16 @@ export function isValidEcuProbe(result: ElmCommandResult): boolean {
   if (result.status !== 'OK' || !result.response.trim()) return false;
   const parsed = parsePidResponse('010C', result.response);
   return parsed.status === 'RESPONDEU' && parsed.value !== null && Number.isFinite(parsed.value);
+}
+
+/**
+ * Once all candidate protocols have failed the real ECU gate, retrying the
+ * same adapter repeats a costly full protocol sweep without new evidence.
+ * Move to the next paired candidate instead; other transient failures can retry.
+ */
+export function shouldRetryElmSessionAttempt(cause: unknown): boolean {
+  const message = cause instanceof Error ? cause.message : String(cause ?? '');
+  return !/ECU NÃO RESPONDEU AO 010C/i.test(message);
 }
 
 export async function requestBluetoothPermissions(): Promise<void> {
@@ -221,6 +236,17 @@ export async function createRealElmSession(
         break;
       }
 
+      if (!shouldRetryElmSessionAttempt(cause)) {
+        terminalReason = 'ECU_PROBE_EXHAUSTED';
+        logBluetoothDiagnostic('BLUETOOTH_RETRY_STOPPED', {
+          attempt,
+          reason: terminalReason,
+          error: errorMessage,
+          action: 'NEXT_PAIRED_CANDIDATE',
+        });
+        break;
+      }
+
       if (attempt === effectiveMaxAttempts) {
         break;
       }
@@ -293,7 +319,7 @@ async function createRealElmSessionAttempt(
     logBluetoothDiagnostic('ECU_PROBE_RESULT', { status: ecuProbe.status, response: ecuProbe.response, attempt });
     let probeIsValid = isValidEcuProbe(ecuProbe);
 
-    const protocolFallbacks = ['5', '3', '4', '6', '7', '8', '9'];
+    const protocolFallbacks = ELM_PROTOCOL_FALLBACKS;
     let successfulForcedProtocol: string | null = null;
 
     for (const protocol of protocolFallbacks) {
