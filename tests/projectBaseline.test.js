@@ -197,6 +197,12 @@ assert.ok(read('tests/gps.test.js').includes('posição final não confirma desl
 assert.match(read('docs/TEST_PLAN.md'), /GPS-03/);
 assert.ok(read('docs/GPS_IMPLEMENTATION_AUDIT_2026-10-27.md').includes('Fused Location Provider') && read('docs/GPS_IMPLEMENTATION_AUDIT_2026-10-27.md').includes('4G/5G'));
 assert.ok(projectContract.includes('| RG-62 |'), 'GPS slow-motion and drift requirements must remain protected');
+assert.ok(gpsTracker.includes('GPS_NETWORK_REFRESH_COOLDOWN_MS = 30_000'), 'GPS recovery requests must be throttled');
+assert.ok(gpsTracker.includes('GPS_NETWORK_REFRESH_TIMEOUT_MS = 8_000'), 'GPS recovery requests must be bounded');
+assert.ok(gpsTracker.includes('refreshLocationAfterNetworkChange'), 'a stale GPS fix can be reacquired once after a network/provider transition');
+assert.ok(autoTrip.includes("NetInfo.addEventListener"), 'trip service must observe network transitions without creating location watchers');
+assert.ok(autoTrip.includes("network.details.cellularGeneration"), 'cellular generation changes (4G/5G) must be detectable');
+assert.ok(read('tests/gps.test.js').includes('cooldown impede nova requisição'), 'network refresh cooldown must have a behavioral regression test');
 assert.match(read('src/obd/fuelConsumption.ts'), /temperatureK <= 0/);
 assert.match(read('app/_layout.tsx'), /canStartObdStartup\(audit\)/);
 assert.match(read('app/_layout.tsx'), /canUseGps\(audit\)/);
