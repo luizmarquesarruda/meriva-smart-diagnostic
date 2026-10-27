@@ -31,6 +31,7 @@ A arquitetura continua sendo local-first: Android/Expo fornece os fixes; o app v
 - Movimento só se torna confirmado depois de ao menos três segmentos válidos (quatro posições) e de deslocamento líquido da janela acima da margem orientada pela precisão.
 - Rejeitados explicitamente segmentos acima de 250 m; deixam de contribuir para o contador de movimento ou para distância.
 - Fix inválido/sem precisão aceitável quebra a sequência de segmentos, zerando candidatos pendentes sem apagar a distância já confirmada.
+- `src/trip/autoTripService.ts` observa mudanças do NetInfo, incluindo `cellularGeneration`. Se a rede retorna/muda e o último fix já venceu, pede um fix pontual ao provedor Android/Expo. O pedido tem timeout de 8 s e cooldown de 30 s; não inicia um segundo watcher. `handleLocation` descarta timestamp futuro, e um retorno antigo não pode ser promovido a posição atual.
 - Testes novos cobrem movimento de 10 km/h em callbacks de 1 s e fixes com speed positivo em zigue-zague curto, que não podem gerar distância.
 
 ## Testes de aceitação
@@ -40,6 +41,7 @@ A arquitetura continua sendo local-first: Android/Expo fornece os fixes; o app v
 - Zigue-zague curto, GPS jitter, speed ausente, precisão desconhecida/inaceitável, coordenada inválida, timestamp futuro ou fora de ordem e lacunas acima de 5 s não adicionam distância.
 - Segmento acima de 250 m é rejeitado e reinicia a sequência de movimento.
 - Uma amostra de velocidade GPS fica obsoleta após 5 s sem novo fix; não pode alimentar painel/viagem como velocidade atual.
+- Após transição de rede/geração celular, a consulta pontual só ocorre se o fix venceu; fix fresco, retorno antigo, falha e cooldown não podem acrescentar distância nem disparar consulta duplicada.
 - Sem permissão, serviço de localização ou fix confiável, o app mantém OBD local disponível e mostra indisponibilidade GPS; não simula localização nem depende de internet para diagnóstico.
 - Background Task/Foreground Service tem um único proprietário e não deve duplicar callbacks ou somar a mesma distância duas vezes.
 - Executar `npm run gate:baseline`, `npm run typecheck`, `npm test` e build Android no mesmo SHA. O teste físico no Galaxy A06 ainda deve comparar distância GPS com um percurso/odômetro conhecido.
