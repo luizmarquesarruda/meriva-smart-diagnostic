@@ -1,6 +1,6 @@
-## ESTADO VIGENTE — 2026-10-26 (P0 DB-161; consulte a CI do HEAD atual)
+## ESTADO VIGENTE — 2026-10-27 (P1–P2; DB-162)
 
-> A CI [40342361110](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40342361110) concluiu `validate` e `android-build` com sucesso no SHA DB-160 `993322c2230c69954b790ae12e43e290ef6b4df6`, incluindo gate anti-regressão, TypeScript, suíte completa, APK standalone verificado e artefato enviado. DB-161 corrige um caso de fallback que não estava protegido; essa validação anterior não cobre o novo SHA. Testes físicos no Galaxy A06/Android 16 com ELM327/ECU real continuam pendentes.
+> A CI [40440383974](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40440383974) passou `validate` e `android-build` no SHA P0 `446d5cdf4e09b2cd7e833905c4102f6f02d1fba0`, com APK standalone de 29.761.545 bytes verificado e artefato enviado. DB-162 acrescenta apresentação das métricas de fila ELM e uma nova regressão; essa aprovação anterior não valida as alterações DB-162. A nova CI deve validar o SHA mais recente. Testes físicos no Galaxy A06/Android 16 com ELM327/ECU real continuam pendentes.
 
 ### Integração, CI e riscos
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
@@ -16,9 +16,10 @@
 - Não foi executado teste físico no Galaxy A06/Android 16 nem com ELM327/ECU real.
 
 ### Critérios de aceitação
-- RG-01…RG-51 únicos e sequenciais; DB-001…DB-161 e índice sincronizados.
+- RG-01…RG-51 únicos e sequenciais; DB-001…DB-162 e índice sincronizados.
 - Gate anti-regressão, TypeScript, suíte completa e build Android aprovados no mesmo SHA final.
 - Nenhum PID passa a confirmado sem evidência RAW_ECU válida; autonomia persistida não pode ser exibida como atual.
+- A auditoria comparativa de apps está em `docs/OBD_APP_FEATURE_AUDIT_2026-10-27.md`; ela distingue funcionalidades já presentes de lacunas reais. SQLite para histórico operacional continua pendente e não é declarado implementado.
 
 ---
 
@@ -231,6 +232,7 @@
 - **DB-159** · 2026-10-26 — Reforçar continuidade das amostras e validade do balanço de autonomia
 - **DB-160** · 2026-10-26 — Fallback de autonomia pelo buffer entre 30–60 s, tela nativa grafite/âmbar e testes/contratos atualizados.
 - **DB-161** · 2026-10-26 — Exigir odômetro atual válido para fallback do tanque cheio; adicionar teste e registrar o bloqueio em caso de histórico não reconciliável.
+- **DB-162** · 2026-10-27 — Integrar métricas de fila ELM à tela Bluetooth, com alerta de saturação/espera e teste; documentar adoção de funcionalidades de apps OBD2 e lacunas de SQLite.
 
 ---
 
@@ -4502,4 +4504,21 @@ Aplicar no aplicativo nativo a referência visual do painel de autonomia, conect
 ### Validação e limites
 - A CI [40440083955](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40440083955) falhou no gate porque as entradas DB-160/DB-161 estavam duplicadas e fora de sequência. O detalhamento foi movido para a sequência histórica e o gate permanece intacto; a próxima CI deve repetir gate, TypeScript, suíte completa e APK standalone no novo HEAD.
 - Não se declara P0 concluída até CI verde no SHA atual. Não houve teste físico com Galaxy A06/Android 16, ELM327/ECU real, comparação com odômetro ou abastecimento medido.
+
+## DB-162 · 2026-10-27 — Visibilidade da fila ELM e auditoria comparativa de apps OBD-II
+
+### P1 — Funcionalidades de referência reconciliadas
+- Criado `docs/OBD_APP_FEATURE_AUDIT_2026-10-27.md`, consolidando Car Scanner, Torque, OBDLink, OBD Auto Doctor, OBD Fusion, ScanMyOpel, python-OBD/OBDvis, OBD Metrics e OBD-Droid.
+- A auditoria registra o que já existe no app para evitar duplicações: catálogo JSON de PIDs/fórmulas, CSV de telemetria/viagens, relatório TXT, evidência TX/RX, scanner DTC, saúde do ELM327, cache de descoberta isolado por sessão, buffers limitados e validação de origem/frescor.
+- A lacuna de SQLite foi explicitada: o histórico operacional ainda usa `VIAGENS/index.json`. A migração não foi falsamente marcada como pronta; exige projeto separado com transação, migração idempotente, recuperação e backup do banco. JSON continua adequado para catálogo/configuração, CSV para intercâmbio e TXT para diagnóstico.
+
+### P2 — Melhoria funcional aplicada
+- `src/obd/elmHealthPresentation.ts` transforma métricas reais de fila em informação legível e neutraliza valores negativos/NaN/Infinity.
+- `app/bluetooth.tsx` agora mostra profundidade atual/pico da fila, recusas, espera média e máxima. Recusas ou espera máxima >=5 s exibem aviso; não há novo socket, fila paralela nem alteração do protocolo de transporte.
+- `tests/elmHealthPresentation.test.js` cobre apresentação normal, saturação, espera degradada e valores inválidos; foi incluído no `npm test`.
+- `tests/projectBaseline.test.js`, RG-22 e `docs/TEST_PLAN.md` protegem a visibilidade das métricas e a honestidade documental da lacuna SQLite.
+
+### Validação e limites
+- CI P0 [40440383974](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40440383974) passou validate e APK standalone no SHA anterior `446d5cdf4e09b2cd7e833905c4102f6f02d1fba0`. DB-162 exige CI nova no SHA final, incluindo gate, TypeScript, suíte completa e Android standalone.
+- O comportamento de fila é coberto por testes sintéticos; ainda é necessário medir latência, saturação e recuperação no Galaxy A06/Android 16 com o ELM327 físico. Não há evidência física nesta anotação.
 
