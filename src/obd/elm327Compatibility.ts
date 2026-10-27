@@ -1,4 +1,25 @@
 export type PartialResponseAction = 'RECONNECT_AND_INITIALIZE' | 'RECONNECT' | 'IGNORE';
+
+/**
+ * Select the protocol actually reported by ATDP for recovery.
+ * Guessing ATSP5 for every KWP/ISO 14230 ECU breaks KWP 5-baud vehicles.
+ * Unknown or ambiguous protocol labels fall back to ELM automatic selection.
+ */
+export function getRecoveryProtocolCommand(protocol: string | null | undefined): string {
+  const value = String(protocol ?? '').trim().toUpperCase();
+  if (/^ATSP[0-9A-C]$/.test(value)) return value;
+  if (/^[0-9A-C]$/.test(value)) return 'ATSP' + value;
+  if (/KWP.*(?:5[\\s-]?BAUD|SLOW)|(?:5[\\s-]?BAUD|SLOW).*KWP/.test(value)) return 'ATSP4';
+  if (/KWP.*FAST|FAST.*KWP/.test(value)) return 'ATSP5';
+  if (/ISO\\s*9141/.test(value)) return 'ATSP3';
+  if (/J1850.*PWM|PWM.*J1850/.test(value)) return 'ATSP1';
+  if (/J1850.*VPW|VPW.*J1850/.test(value)) return 'ATSP2';
+  if (/(?:CAN.*11\\s*\\/\\s*500|11\\s*\\/\\s*500.*CAN)/.test(value)) return 'ATSP6';
+  if (/(?:CAN.*29\\s*\\/\\s*500|29\\s*\\/\\s*500.*CAN)/.test(value)) return 'ATSP7';
+  if (/(?:CAN.*11\\s*\\/\\s*250|11\\s*\\/\\s*250.*CAN)/.test(value)) return 'ATSP8';
+  if (/(?:CAN.*29\\s*\\/\\s*250|29\\s*\\/\\s*250.*CAN)/.test(value)) return 'ATSP9';
+  return 'ATSP0';
+}
 export type ElmErrorType =
   | 'NONE'
   | 'NO_DATA'
