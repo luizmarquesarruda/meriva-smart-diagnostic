@@ -334,7 +334,24 @@ async function main() {
   );
   assert.equal(files.get(indexPath), corrupted, 'invalid source JSON remains untouched for manual recovery');
 
-  console.log('PASS sqlite trip history: idempotent legacy migration, seed filtering, read/write, JSON fallback, verified restore, corruption safety');
+  // Duplicate IDs cannot be silently collapsed by the SQLite primary key.
+  resetHarness();
+  storage.__resetDriveCycleStorageForTests();
+  await fakeFS.makeDirectoryAsync(BASE + '/VIAGENS');
+  await fakeFS.writeAsStringAsync(indexPath, JSON.stringify({
+    version: '1.0',
+    cycles: [validCycle('duplicate'), validCycle('duplicate', { distanceTotalKm: 9 })],
+    totalCount: 2,
+  }));
+  await assert.rejects(
+    () => storage.initializeDriveCycles(BASE),
+    /LEGACY_TRIP_HISTORY_DUPLICATE_IDS/,
+    'migration must not silently discard distinct legacy records that share a primary key',
+  );
+  assert.equal(JSON.parse(files.get(indexPath)).cycles.length, 2,
+    'duplicate-ID legacy source must remain intact for manual reconciliation');
+
+  console.log('PASS sqlite trip history: idempotent migration, seed filtering, read/write, recovery, corruption and duplicate-ID safety');
 }
 
 main().catch(error => {
