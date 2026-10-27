@@ -192,7 +192,38 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
   await tracker.stop();
   assert.strictEqual(tracker.getState().running, false);
   unsubscribe();
-  console.log('PASS GPS: automático, velocidade, distância e consumo');
+
+  // Em velocidade urbana, cada fix de 1 s pode representar menos de 8 m.
+  // Quatro posições válidas ainda precisam confirmar movimento após três segmentos.
+  const slowTracker = new GpsTracker();
+  assert.strictEqual(await slowTracker.start(), true);
+  const slowSpeedMs = 10 / 3.6;
+  watcher({ coords: { latitude: 0, longitude: 0, speed: slowSpeedMs, accuracy: 5 }, timestamp: 1000 });
+  watcher({ coords: { latitude: 0, longitude: 0.000025, speed: slowSpeedMs, accuracy: 5 }, timestamp: 2000 });
+  watcher({ coords: { latitude: 0, longitude: 0.000050, speed: slowSpeedMs, accuracy: 5 }, timestamp: 3000 });
+  watcher({ coords: { latitude: 0, longitude: 0.000075, speed: slowSpeedMs, accuracy: 5 }, timestamp: 4000 });
+  assert.ok(slowTracker.getState().distanceKm >= 0.008,
+    'movimento real de 10 km/h não deve ser rejeitado por exigir 8 m em cada callback de 1 s');
+  assert.strictEqual(slowTracker.getState().currentSpeedKmh, 10,
+    'velocidade GPS validada deve manter o valor do provedor após três segmentos pequenos consecutivos');
+  await slowTracker.stop();
+
+  // Um zig-zag de poucos metros pode produzir speed positivo nos fixes, mas
+  // não deve passar a distância líquida/confiança da janela de quatro posições.
+  const driftTracker = new GpsTracker();
+  assert.strictEqual(await driftTracker.start(), true);
+  const reportedSpeedMs = 10 / 3.6;
+  watcher({ coords: { latitude: 0, longitude: 0, speed: reportedSpeedMs, accuracy: 5 }, timestamp: 1000 });
+  watcher({ coords: { latitude: 0, longitude: 0.000018, speed: reportedSpeedMs, accuracy: 5 }, timestamp: 1500 });
+  watcher({ coords: { latitude: 0, longitude: 0.000009, speed: reportedSpeedMs, accuracy: 5 }, timestamp: 2000 });
+  watcher({ coords: { latitude: 0, longitude: 0.000018, speed: reportedSpeedMs, accuracy: 5 }, timestamp: 2500 });
+  assert.strictEqual(driftTracker.getState().distanceKm, 0,
+    'três segmentos com speed positivo não podem somar distância quando a posição final não confirma deslocamento líquido');
+  assert.strictEqual(driftTracker.getState().currentSpeedKmh, 0,
+    'movimento ainda não confirmado deve ser exibido como parado');
+  await driftTracker.stop();
+
+  console.log('PASS GPS: frescor, baixa velocidade urbana, distância por três segmentos, deriva e consumo');
 })().catch((error) => {
   console.error(error);
   process.exitCode = 1;
