@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Conexão Bluetooth Classic / ELM327
+- Reduzido o padrão de retry de conexão de 20 tentativas com intervalo de 8 s para 3 tentativas por adaptador com intervalo de 1,5 s, mantendo os limites configuráveis.
+- Depois que todos os protocolos de fallback falham em obter resposta ECU válida ao PID 010C, a aplicação registra o esgotamento e avança ao próximo dispositivo pareado, sem repetir a mesma varredura completa no adaptador atual.
+- A tabela de fallback agora inclui os protocolos SAE J1850 VPW/PWM (IDs 2 e 1); ATSP0 continua sendo a tentativa automática inicial e 41 0C continua sendo o gate de ECU.
+- Adicionados testes de política de retry/fallback e contrato anti-regressão RG-52. O comportamento físico e qualquer ganho de estabilidade/latência continuam pendentes de teste no Galaxy A06/Android 16 com ELM327/ECU real; a CI do SHA final ainda precisa ser verificada.
+
 ### Comparativo de apps OBD-II e saúde Bluetooth
 - Consolidada a auditoria comparativa de Car Scanner, Torque, OBDLink, OBD Auto Doctor, OBD Fusion, ScanMyOpel, python-OBD/OBDvis, OBD Metrics e OBD-Droid, mapeando funções úteis para recursos já existentes e registrando a lacuna de SQLite para o histórico operacional.
 - A tela Bluetooth agora exibe profundidade/pico/recusas da fila ELM327 e espera média/máxima. Recusas ou espera máxima de pelo menos 5 s geram aviso; métricas inválidas são neutralizadas.
