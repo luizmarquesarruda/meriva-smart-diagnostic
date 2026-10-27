@@ -471,11 +471,17 @@ async function testProtocolRecoverySerializesWholeNegotiation() {
 async function testConfiguredBluetoothRetryLimit() {
   const managerPath = path.join(ROOT, 'src/obd/bluetoothManager.ts');
   const source = fs.readFileSync(managerPath, 'utf8');
-  assert.ok(source.includes('const effectiveMaxAttempts = config.maxConnectionAttempts > 0'), 'retry deve derivar do maxConnectionAttempts configurado');
+  assert.ok(source.includes('resolveMaxConnectionAttempts('), 'retry deve usar a resolução única entre override e política do catálogo');
+  assert.ok(source.includes('config.maxConnectionAttempts,') && source.includes('MAX_BLUETOOTH_ATTEMPTS,'), 'loop deve passar o override e o limite-base real do catálogo ao resolver');
   assert.ok(source.includes('attempt <= effectiveMaxAttempts'), 'loop de retry deve respeitar o limite efetivo');
   assert.ok(!source.includes('const maxAttempts = config.maxConnectionAttempts'), 'não pode haver shadowing de maxAttempts');
 
   const manager = loadTs(managerPath);
+  const compatibility = loadTs(path.join(ROOT, 'src/obd/elm327Compatibility.ts'));
+  assert.strictEqual(compatibility.resolveMaxConnectionAttempts(0, manager.MAX_BLUETOOTH_ATTEMPTS), 3,
+    'sem override, as tentativas efetivas devem vir do catálogo e resultar em três por padrão');
+  assert.strictEqual(compatibility.resolveMaxConnectionAttempts(10, manager.MAX_BLUETOOTH_ATTEMPTS), 10,
+    'o override explícito deve continuar respeitado');
   assert.strictEqual(
     manager.shouldRetryElmSessionAttempt(new Error('ECU NÃO RESPONDEU AO 010C: ERROR | RX=NO DATA')),
     false,
