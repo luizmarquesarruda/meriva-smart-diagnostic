@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Comparativo de apps OBD-II e saúde Bluetooth
+- Consolidada a auditoria comparativa de Car Scanner, Torque, OBDLink, OBD Auto Doctor, OBD Fusion, ScanMyOpel, python-OBD/OBDvis, OBD Metrics e OBD-Droid, mapeando funções úteis para recursos já existentes e registrando a lacuna de SQLite para o histórico operacional.
+- A tela Bluetooth agora exibe profundidade/pico/recusas da fila ELM327 e espera média/máxima. Recusas ou espera máxima de pelo menos 5 s geram aviso; métricas inválidas são neutralizadas.
+- Incluído teste unitário de apresentação das métricas e proteção no gate de baseline. A validação de DB-162 deve ocorrer na CI do novo SHA; a CI verde anterior não se transfere.
+- Não houve teste físico no Galaxy A06/Android 16 com ELM327/ECU real. A migração SQLite ainda não foi implementada.
+
+
 ### CI e controle de regressões
 - Evitada a execução duplicada da mesma CI em branches que já possuem PR para `main`: commits de branches são validados pelo evento `pull_request`, e o evento `push` fica reservado a `main`. O despacho manual permanece disponível.
 
