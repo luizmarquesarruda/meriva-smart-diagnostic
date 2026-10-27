@@ -45,6 +45,12 @@ A biblioteca também possui um modo `binary`, mas nele o Android entrega os byte
 
 Esta decisão foi baseada no código/documentação da `react-native-bluetooth-classic` e no datasheet do ELM327.
 
+### Evidência do trace real — 2026-10-27
+
+O retorno `010C` registrado como `84F111410C0000D3` não é ausência de resposta: é compatível com um quadro KWP compacto. O cabeçalho `84 F1 11` declara quatro bytes de mensagem, `41 0C 00 00` é a resposta positiva do PID e `D3` confere como checksum aditivo dos bytes anteriores. O payload representa 0 rpm; isso pode ocorrer com o motor parado e continua sendo uma resposta válida para confirmar comunicação com a ECU.
+
+O parser deve aceitar esse envelope apenas quando comprimento declarado e checksum forem válidos. Não deve exigir que todo K-Line/KWP retorne o formato antigo `48 6B 10`, nem deve avançar para `ATSP5/3/4/...` depois de já receber uma resposta `010C` válida. Quadros com checksum errado, comprimento divergente ou bytes extras continuam inválidos.
+
 ## Comparação com implementações reais
 
 | Implementação | Transporte | Inicialização | Timeout | Recuperação |
