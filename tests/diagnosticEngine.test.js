@@ -40,8 +40,19 @@ function loadTs(tsPath) {
   return mod.exports;
 }
 
-function obs(pid, value, source = 'REAL_OBD') {
-  return { pid, name: pid, value, unit: 'N/D', source, timestamp: new Date().toISOString(), confidence: 'HIGH' };
+function obs(pid, value, source = 'REAL_OBD', timestamp = new Date().toISOString(), extras = {}) {
+  return { pid, name: pid, value, unit: 'N/D', source, timestamp, confidence: 'HIGH', ...extras };
+}
+
+function series(pid, values, source = 'REAL_OBD', extras = {}) {
+  const now = Date.now();
+  return values.map((value, index) =>
+    obs(pid, value, source, new Date(now - (values.length - index) * 1000).toISOString(), extras),
+  );
+}
+
+function repeated(pid, value, source = 'REAL_OBD', extras = {}) {
+  return series(pid, [value, value, value], source, extras);
 }
 
 function main() {
@@ -54,45 +65,45 @@ function main() {
 
   let result = engine.runLocalDiagnostic({
     ...base,
-    dtcs: [{ code: 'P0301', status: 'CONFIRMED', firstSeen: '', lastSeen: '', occurrences: 1, source: 'REAL_OBD', historical: false, confirmed: true }],
+    dtcs: [{ code: 'P0301', status: 'CONFIRMED', firstSeen: new Date().toISOString(), lastSeen: new Date().toISOString(), occurrences: 1, source: 'REAL_OBD', historical: false, confirmed: true }],
   });
   assert.strictEqual(result.hypotheses[0].id, 'FALHA_DE_COMBUSTAO_CILINDRO_1');
   assert.strictEqual(result.hypotheses[0].confidence, 'MEDIUM');
 
   result = engine.runLocalDiagnostic({
     ...base,
-    observations: [obs('0106', 10), obs('0107', 4)],
+    observations: [...repeated('0106', 10), ...repeated('0107', 4)],
   });
   assert.strictEqual(result.hypotheses.length, 0);
 
   result = engine.runLocalDiagnostic({
     ...base,
-    observations: [obs('0106', 12), obs('0107', 5)],
+    observations: [...repeated('0106', 12), ...repeated('0107', 5)],
   });
   assert.strictEqual(result.hypotheses[0].id, 'MISTURA_POBRE');
 
   result = engine.runLocalDiagnostic({
     ...base,
-    observations: [obs('0106', -20), obs('0107', -5)],
+    observations: [...repeated('0106', -20), ...repeated('0107', -5)],
   });
   assert.strictEqual(result.hypotheses[0].id, 'MISTURA_RICA');
 
   result = engine.runLocalDiagnostic({
     ...base,
-    observations: [obs('010B', 50)],
+    observations: repeated('010B', 50),
   });
   assert.strictEqual(result.hypotheses[0].id, 'VACUO_DO_MOTOR_POSSIVELMENTE_ANORMAL');
 
   result = engine.runLocalDiagnostic({
     ...base,
-    observations: [obs('010B', 80, 'SIMULACAO')],
+    observations: repeated('010B', 80, 'SIMULACAO'),
   });
   assert.strictEqual(result.hypotheses.length, 0);
   assert.strictEqual(result.blockedSimulationSamples, 1);
 
   result = engine.runLocalDiagnostic({
     ...base,
-    observations: [obs('010B', 80, 'CARSCANNER_BASELINE')],
+    observations: repeated('010B', 80, 'CARSCANNER_BASELINE'),
   });
   assert.strictEqual(result.hypotheses.length, 0, 'baseline CarScanner não pode virar diagnóstico de ECU atual');
   assert.strictEqual(result.blockedNonLiveSamples, 1, 'baseline deve ser contado como evidência não ao vivo bloqueada');
@@ -127,7 +138,7 @@ function main() {
   });
   assert.strictEqual(result.hypotheses.length, 0, 'fuel trim isolado em aceleração não deve ser classificado pela regra de marcha lenta/cruzeiro');
 
-  result = engine.runLocalDiagnostic({ ...base, observations: [obs('010B', 80, 'simulacao'), obs('0106', 20, 'REAL_OBD'), obs('0107', 0, 'REAL_OBD')] });
+  result = engine.runLocalDiagnostic({ ...base, observations: [...repeated('010B', 80, 'simulacao'), ...repeated('0106', 20), ...repeated('0107', 0)] });
   assert.strictEqual(result.hypotheses.length, 1);
   assert.strictEqual(result.hypotheses[0].id, 'MISTURA_POBRE');
   assert.strictEqual(result.blockedSimulationSamples, 1);
@@ -150,21 +161,21 @@ function main() {
   assert.equal(result.hypotheses.length, 0, 'MAP fora da faixa configurada não pode alimentar IA');
   assert.equal(result.blockedInvalidSamples, 1);
 
-  const spacedMap = { ...obs('01 0B', 50), timestamp: new Date(nowMs).toISOString() };
-  result = engine.runLocalDiagnostic({ ...base, observations: [spacedMap], nowMs });
+  const spacedMap = series('01 0B', [50, 50, 50]).map((item) => ({ ...item, timestamp: new Date(nowMs - 1000).toISOString() }));
+  result = engine.runLocalDiagnostic({ ...base, observations: spacedMap, nowMs });
   assert.equal(result.hypotheses[0]?.id, 'VACUO_DO_MOTOR_POSSIVELMENTE_ANORMAL',
     'PID com espaços deve ser normalizado antes de validar faixa e regra');
 
-  const spacedInvalidMap = { ...obs('01 0B', 300), timestamp: new Date(nowMs).toISOString() };
-  result = engine.runLocalDiagnostic({ ...base, observations: [spacedInvalidMap], nowMs });
-  assert.equal(result.blockedInvalidSamples, 1,
+  const spacedInvalidMap = series('01 0B', [300, 300, 300]).map((item) => ({ ...item, timestamp: new Date(nowMs - 1000).toISOString() }));
+  result = engine.runLocalDiagnostic({ ...base, observations: spacedInvalidMap, nowMs });
+  assert.equal(result.blockedInvalidSamples, 3,
     'PID com espaços não pode contornar a faixa de plausibilidade');
 
-  const derivedMap = { ...obs('010B', 80), derived: true };
-  result = engine.runLocalDiagnostic({ ...base, observations: [derivedMap], nowMs });
+  const derivedMap = repeated('010B', 80).map((item) => ({ ...item, derived: true }));
+  result = engine.runLocalDiagnostic({ ...base, observations: derivedMap, nowMs });
   assert.equal(result.hypotheses.length, 0, 'valor derivado não é leitura RAW da ECU');
   assert.equal(result.acceptedLiveSamples, 0);
-  assert.equal(result.blockedInvalidSamples, 1);
+  assert.equal(result.blockedInvalidSamples, 3);
 
   const nullMap = { ...obs('010B', null), timestamp: new Date(nowMs).toISOString() };
   result = engine.runLocalDiagnostic({ ...base, observations: [nullMap], nowMs });
