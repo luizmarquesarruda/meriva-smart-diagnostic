@@ -41,6 +41,8 @@ function isLiveObd(item: PidObservation): boolean {
   return normalizeDiagnosticSource(item.source) === 'REAL_OBD';
 }
 
+function normalizePid(pid: string): string { return pid.replace(/\s/g, '').toUpperCase(); }
+
 function isFreshTimestamp(timestamp: string, nowMs: number, maxAgeMs: number): boolean {
   const parsed = Date.parse(timestamp);
   return Number.isFinite(parsed) && parsed <= nowMs && nowMs - parsed <= maxAgeMs;
@@ -53,7 +55,7 @@ function isCurrentValidLiveObservation(
 ): boolean {
   if (!isLiveObd(item) || item.derived === true || item.value === null || !Number.isFinite(item.value)) return false;
   if (!isFreshTimestamp(item.timestamp, nowMs, maxAgeMs)) return false;
-  return validatePidValue(item.pid, item.value).valid;
+  return validatePidValue(normalizePid(item.pid), item.value).valid;
 }
 
 function pidValue(
@@ -102,7 +104,7 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
   const blockedInvalidSamples = rawObservations.filter((item) =>
     isLiveObd(item)
     && isFreshTimestamp(item.timestamp, nowMs, maxObservationAgeMs)
-    && (item.derived === true || item.value === null || !Number.isFinite(item.value) || !validatePidValue(item.pid, item.value).valid),
+    && (item.derived === true || item.value === null || !Number.isFinite(item.value) || !validatePidValue(normalizePid(item.pid), item.value).valid),
   ).length;
   const blockedNonLiveDtcs = rawDtcs.length - liveDtcs.length;
   const hypotheses = new Map<string, DiagnosticHypothesis>();
