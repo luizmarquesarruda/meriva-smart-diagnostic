@@ -538,6 +538,37 @@ test('8. REAL + RESPONDEU entra no learning e no banco', async () => {
   m.disposeAutoSave();
 });
 
+test('8a. interpretação composta do PID 0101 persiste e aparece no relatório TXT', async () => {
+  const m = manager();
+  m.disposeAutoSave();
+  resetFS();
+  await m.initAutoSave(BASE);
+  const integration = loadTs(path.join(ROOT, 'src/meriva/autosaveIntegration.ts'));
+  const parser = loadTs(path.join(ROOT, 'src/obd/parser.ts'));
+  const formatter = loadTs(path.join(ROOT, 'src/meriva/autosaveTxtFormatter.ts'));
+  const raw = '41 01 80 08 01 01';
+  const parsed = parser.parsePidResponse('0101', raw);
+  assert.equal(parsed.status, 'RESPONDEU');
+  assert.match(parsed.interpretation, /MIL=ON/);
+  await integration.registerObdQuery(BASE, {
+    tx: '0101',
+    rx: raw,
+    elapsedMs: 20,
+    commandStatus: 'OK',
+    parsed,
+  }, 'REAL');
+  await m.saveNow('critical');
+  const persisted = JSON.parse(files.get(`${CONFIG_DIR}/autosave.json`)).payload.lastReadings[0];
+  assert.equal(persisted.pid, '0101');
+  assert.equal(persisted.interpretation, parsed.interpretation, 'interpretação semântica deve sobreviver ao autosave');
+  const restored = formatter.formatAutoSaveTxt(m.getAutoSaveState(), {
+    appVersion: '1.0.1',
+    exportedAt: '2026-10-28 00:00:00',
+  });
+  assert.ok(restored.includes('Interpretacao: ' + parsed.interpretation), 'TXT deve preservar os bits interpretados, sem exigir que usuário converta um U32');
+  m.disposeAutoSave();
+});
+
 test('9. DTC real persiste no módulo existente e no autosave', async () => {
   const m = manager();
   m.disposeAutoSave();
