@@ -5,9 +5,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMidLayout } from '../src/ui/midLayout';
 import { COLORS, SCREEN_TITLE_STYLE } from '../src/ui/theme';
 import { getAutoSaveState } from '../src/meriva/autosaveManager';
-import { normalizeDiagnosticSource, runLocalDiagnostic, type DiagnosticResult } from '../src/diagnostics/diagnosticEngine';
+import { isCurrentDiagnosticDtc, runLocalDiagnostic, type DiagnosticResult } from '../src/diagnostics/diagnosticEngine';
 import type { PidObservation } from '../src/types/sourceTypes';
-import { getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
+import { getLiveSeries, getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
 import { getSharedObdStatus } from '../src/obd/sharedConnection';
 import { getDtcDefinition } from '../src/obd/dtcDefinition';
 
@@ -16,11 +16,25 @@ export default function SaudeScreen() {
   const [state,setState]=useState(getAutoSaveState());
   useEffect(()=>{const t=setInterval(()=>setState(getAutoSaveState()),1000);return()=>clearInterval(t)},[]);
   const context = getVehicleConditionSnapshot();
-  const activeDtcs = state.dtcs.filter((item) => item.source === 'REAL_OBD' && !item.historical && ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(item.status));
-  const diagnostic: DiagnosticResult = useMemo(()=>runLocalDiagnostic({observations:state.lastReadings.map(r=>({pid:r.pid,name:r.name,value:r.value,unit:r.unit,source:normalizeDiagnosticSource(r.source),timestamp:r.timestamp,confidence:r.source==='SIMULACAO'?'LOW':'GOOD'} as PidObservation)),dtcs:state.dtcs,condition:context.condition}),[state,context.condition]);
+  const activeDtcs = state.dtcs.filter((item) => isCurrentDiagnosticDtc(item));
+  const diagnostic: DiagnosticResult = useMemo(() => {
+    // Somente a série em RAM da sessão OBD atual; nunca um último valor persistido de conexão anterior.
+    const observations = ['0106', '0107', '010B'].flatMap((pid) =>
+      getLiveSeries(pid).slice(-5).map((reading) => ({
+        pid: reading.pid,
+        name: reading.name,
+        value: reading.value,
+        unit: reading.unit,
+        source: 'REAL_OBD' as const,
+        timestamp: reading.timestamp,
+        confidence: 'GOOD' as const,
+      })),
+    ) as PidObservation[];
+    return runLocalDiagnostic({ observations, dtcs: state.dtcs, condition: context.condition });
+  }, [state, context.condition]);
   const ecuCurrentlyValidated = getSharedObdStatus().ecuConnected;
   const noCurrentFindings = diagnostic.hypotheses.length === 0 && activeDtcs.length === 0;
-  const normal = noCurrentFindings && ecuCurrentlyValidated && diagnostic.acceptedLiveSamples > 0;
+  const normal = noCurrentFindings && ecuCurrentlyValidated && diagnostic.evaluatedRuleGroups > 0;
   const inconclusive = noCurrentFindings && !normal;
   return <SafeAreaView style={styles.container} edges={["top","bottom","left","right"]}><ScrollView contentContainerStyle={[styles.content,{paddingHorizontal:layout.horizontalPadding}]} showsHorizontalScrollIndicator={false}><View style={[styles.screenFrame,{maxWidth:layout.maxContentWidth}]}>
     <View style={styles.header}><Text style={styles.title}>CENTRAL DE SAÚDE</Text><Text style={styles.subtitle}>EVIDÊNCIAS • DTC • HIPÓTESES</Text></View>
