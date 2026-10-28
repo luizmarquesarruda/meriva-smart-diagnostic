@@ -1,4 +1,4 @@
-## ESTADO VIGENTE — 2026-10-28 (auditoria de obsolescência)
+## ESTADO VIGENTE — 2026-10-28 (recuperação Bluetooth/KWP e auditoria de obsolescência)
 
 > Frente única de trabalho: PR #96, branch `ui/cockpit-instant-consumption-20261027`. Este bloco é a referência operacional; snapshots abaixo são históricos.
 
@@ -9,6 +9,8 @@
 - Após qualquer alteração, reconsultar o HEAD e a CI correspondentes. Só considerar a PR validada com `validate` e `android-build` verdes no mesmo SHA, diff reconciliado contra `main` e validação física separada.
 - A auditoria atual encontrou divergências de documentação e um débito relevante de modernização do SDK. Não houve upgrade de SDK nem remoção de dependências nativas nesta rodada: fazê-los antes de preservar um baseline físico poderia introduzir regressão no Bluetooth Classic.
 - Testes com Galaxy A06/Android 16/ELM327 real, confirmação de resposta `010C`, inspeção do APK instalado e validação GPS/autonomia continuam pendentes.
+- DB-145 registra a regressão de leitura KWP e classificação de estado ECU/Bluetooth na frente única PR #96. Consultar HEAD e CI correspondentes ao mesmo SHA antes de qualquer integração; uma CI anterior não valida alterações posteriores.
+- O cockpit deve continuar mostrando N/D até existir leitura OBD real, completa e recente; seed ou histórico não deve ser reapresentado como valor atual.
 ---
 
 ## ESTADO HISTÓRICO — 2026-10-25 (snapshot DB-130; superado em 2026-10-28)
@@ -228,6 +230,7 @@
 - **DB-142** · 2026-10-28 — Corrigir polaridade da prontidão no PID 0101
 - **DB-143** · 2026-10-28 — Decisão arquitetural: APK independente, sem dependência do Bubble
 - **DB-144** · 2026-10-28 — Navegação por categorias, ícones e qualidade dos dados
+- **DB-145** · 2026-10-28 — Corrigir leitura KWP, retry e classificação do estado ECU/Bluetooth
 
 ---
 
@@ -4271,3 +4274,12 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Mantidos o tema escuro, os ícones Ionicons já instalados, o comportamento retrato/paisagem e os fluxos sem cadastro, login ou Bubble.
 - Adicionado teste de regressão ligado a `npm test` cobrindo os cinco grupos, destinos, ícones e rótulos de qualidade.
 - Validação desta alteração depende da CI do novo SHA; isto não atesta teste físico com ELM327 nem APK instalado.
+
+## DB-145 · 2026-10-28 — Corrigir leitura KWP, retry e classificação do estado ECU/Bluetooth
+
+- Causa identificada no código: o parser da branch não reconhecia o quadro KWP compacto 84F111410C0000D3; a resposta positiva 41 0C 00 00 não passava pelo gate de validação da ECU. O trace comprova uma resposta no instante capturado, não suporte a outros PIDs nem condição mecânica do motor.
+- Parser: adicionados caminhos compacto e espaçado KWP com comprimento declarado e checksum aditivo; preservadas as correções já presentes para PID 0101. Respostas truncadas, checksum incorreto e bytes excedentes continuam rejeitados.
+- Conexão: retry padrão ajustado para 3 tentativas por adaptador com intervalo de 1500 ms; após falha conclusiva no PID 010C, avançar ao próximo dispositivo pareado em vez de repetir a mesma varredura. O fallback inclui J1850 PWM/VPW e a recuperação usa o protocolo identificado, incluindo KWP slow/fast, em vez de adivinhar ATSP5.
+- Gate: a recuperação só confirma ECU quando parsePidResponse para 010C retorna resposta válida com valor finito e payload completo. A CI deve ser consultada no HEAD final; não reutilizar o resultado de SHA anterior.
+- Cockpit: se o PID 010C não tiver resposta válida, mostrar ECU SEM RESPOSTA e orientar a consultar o RX, sem rotular automaticamente como rádio Bluetooth desligado. O placeholder sem PID não é apresentado como OBD 1/1.
+- Dados e limitações: N/D permanece correto para autonomia, temperatura e PIDs sem leitura REAL recente. Conexão física com Galaxy A06/Android 16 + ELM327/ECU real, inspeção do APK instalado e confirmação de 010C continuam pendentes de ensaio físico.

@@ -119,6 +119,20 @@ O catálogo atual contém 34 PIDs, 20 fórmulas, 34 faixas e 30 avaliações de 
 - Ao desmontar a tela, remover listener e temporizador; nenhuma atualização pode alterar estado depois da desmontagem.
 - A tela e o motor de diagnóstico local devem continuar disponíveis offline e independentes da atualização de clima.
 
+## BT-CONN-08 — Resposta KWP real e validação de checksum
+
+- Entrada compacta SEARCHING...\n84F111410C0000D3 para PID 010C: reconhecer o cabeçalho KWP, validar comprimento e checksum, preservar os bytes brutos e retornar 0 rpm como valor válido porque existe payload completo.
+- Repetir no formato espaçado 84 F1 11 41 0C 00 00 D3; ambos devem produzir a mesma interpretação.
+- Alterar checksum para D2, truncar a resposta ou acrescentar byte após D3: rejeitar como valor não interpretado. Não declarar ECU conectada a partir de um marcador 41 0C sem payload.
+- Testes: tests/pidParserIntegrity.test.js e tests/elm327Compatibility.test.js.
+
+## BT-CONN-09 — Recuperação, retry e mensagem de estado
+
+- Usar 3 tentativas padrão por adaptador e intervalo de 1500 ms. Após esgotar a varredura de protocolos sem resposta válida ao PID 010C, avançar ao próximo candidato pareado, sem repetir indefinidamente o mesmo adaptador.
+- Recuperação usa ATDP para mapear o protocolo conhecido (KWP 5-baud → ATSP4; KWP fast → ATSP5; ISO 9141 → ATSP3; CAN/J1850 conforme identificado); protocolo desconhecido retorna a ATSP0.
+- Sem 41 0C válido, a interface deve mostrar ECU sem resposta, não presumir falha do rádio Bluetooth. Sem ECU/leitura real válida, telemetria e autonomia continuam N/D.
+- Testes: tests/bluetoothConfig.test.js, tests/elm327Compatibility.test.js e tests/projectBaseline.test.js.
+
 ## AUDIT-HARDENING-01 — Integridade e recuperação de dados
 
 - K-Line: checksum aditivo de 8 bits válido deve ser aceito; checksum incorreto, ausente quando exigido ou bytes extras devem ser rejeitados nos formatos compactos e espaçados.

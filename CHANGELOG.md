@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Bluetooth Classic / ELM327 — regressão de resposta ECU
+- Reconhece quadros KWP compactos e espaçados com comprimento e checksum verificados, incluindo o trace 84F111410C0000D3; a confirmação da ECU exige payload completo do PID 010C.
+- Retry padrão limitado a três tentativas por adaptador, espaçadas em 1,5 s; recuperação usa o protocolo identificado em vez de forçar KWP fast em toda ECU KWP.
+- O cockpit diferencia ECU sem resposta de falha do rádio e não apresenta o placeholder OBD 1/1 como PID real. Os valores atuais continuam N/D sem evidência real válida.
+
 ### Integração Bubble nativa
 - Portados os contratos dos workflows para um cliente HTTPS tipado; validações para fonte OBD real, PID/bytes, frescor, GPS, eventos idempotentes e respostas de duplicata/rejeição.
 - Nenhuma alteração foi feita no Bubble; sincronização automática segue desativada até provisionamento seguro de dispositivo e token.
