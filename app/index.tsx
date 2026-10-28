@@ -34,7 +34,6 @@ export default function IndexScreen() {
   const [isHydrated, setIsHydrated] = useState(false);
   const [tripState, setTripState] = useState<AutoTripServiceState>(autoTripService.getState());
   const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [dtcCount, setDtcCount] = useState(0);
   const [activeHeroMetric, setActiveHeroMetric] = useState(0);
   const [conditions, setConditions] = useState<CurrentConditions>({ city: null, locationLabels: [], temperatureC: null, description: 'CLIMA OPCIONAL', available: false });
   const [locationLabelIndex, setLocationLabelIndex] = useState(0);
@@ -85,7 +84,6 @@ export default function IndexScreen() {
     const state = getAutoSaveState();
     const live = getSharedObdConnection();
     const liveConnected = getSharedObdStatus().ecuConnected;
-    setDtcCount(state.dtcs.filter((item) => ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(item.status)).length);
     setConnectionStatus(getSharedObdStatus());
     setObd({
       ...state.obd,
@@ -125,7 +123,6 @@ export default function IndexScreen() {
       setConnectionStatus(getSharedObdStatus());
       setObd({ ...restored.obd, connected: getSharedObdStatus().ecuConnected });
       setSaveStatus(getAutoSaveStatus());
-      setDtcCount(restored.dtcs.filter((item) => ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(item.status)).length);
       setIsHydrated(true);
     } catch {
       setSaveStatus(getAutoSaveStatus());
