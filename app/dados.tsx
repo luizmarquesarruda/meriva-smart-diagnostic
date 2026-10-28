@@ -179,6 +179,7 @@ export default function DadosScreen() {
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={styles.name} numberOfLines={2}>{item.pid} • {definition?.name ?? item.name}</Text>
                   <Text style={styles.pid}>{definition?.description ?? 'Descrição não catalogada localmente'} • {item.status}</Text>
+                  {item.interpretation ? <Text style={styles.pid}>{item.interpretation}</Text> : null}
                   <Text style={styles.pid}>{formatAgeFromTimestamp(item.timestamp)}</Text>
                 </View>
                 <Text style={styles.value}>{item.value == null ? 'N/D' : String(item.value) + (item.unit ? ' ' + item.unit : '')}</Text>
