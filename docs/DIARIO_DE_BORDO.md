@@ -12,6 +12,7 @@
 - DB-145 registra a regressão de leitura KWP e classificação de estado ECU/Bluetooth na frente única PR #96. Consultar HEAD e CI correspondentes ao mesmo SHA antes de qualquer integração; uma CI anterior não valida alterações posteriores.
 - O cockpit deve continuar mostrando N/D até existir leitura OBD real, completa e recente; seed ou histórico não deve ser reapresentado como valor atual.
 - DB-146 restaura os quatro quadrantes de telemetria em simultâneo; os PIDs adicionais continuam acessíveis em páginas de quatro métricas. A ausência de ECU não remove a grade, apenas mantém os valores em N/D.
+- DB-147 fixa os quatro PIDs principais na primeira página e transforma os restantes PIDs suportados em carrossel completo, com setas anterior/próxima e avanço automático a cada 10 s. Anomalias adicionais são priorizadas sem deslocar os quadrantes principais.
 ---
 
 ## ESTADO HISTÓRICO — 2026-10-25 (snapshot DB-130; superado em 2026-10-28)
@@ -233,6 +234,7 @@
 - **DB-144** · 2026-10-28 — Navegação por categorias, ícones e qualidade dos dados
 - **DB-145** · 2026-10-28 — Corrigir leitura KWP, retry e classificação do estado ECU/Bluetooth
 - **DB-146** · 2026-10-28 — Restaurar quadrantes 2×2 e paginação de PIDs no cockpit
+- **DB-147** · 2026-10-28 — Incluir os PIDs restantes no carrossel principal com navegação por setas
 
 ---
 
@@ -4292,3 +4294,11 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - **Sem perda dos PIDs extras:** indicadores adicionais anunciados pela ECU continuam em páginas de quatro; anomalias recebem prioridade, a alternância ocorre a cada 10 segundos e o cabeçalho permite avançar por toque.
 - **Integridade de dados:** cada quadrante usa somente leitura real, respondida, finita e recente. Se a ECU estiver desconectada ou o PID não for anunciado/estiver sem amostra válida, o quadrante permanece visível com N/D e motivo explícito. Nenhum seed é usado como telemetria atual.
 - **Validação:** adicionados testes unitários para paginação, retorno circular, grade 2×2 e barreira anti-regressão. A CI do novo SHA e o build standalone devem passar antes de integrar; o teste físico no Galaxy A06/Android 16 continua separado.
+ 
+## DB-147 · 2026-10-28 — Incluir os PIDs restantes no carrossel principal com navegação por setas
+
+- **Comportamento solicitado:** o painel principal deve incluir os demais PIDs, não apenas os quatro indicadores fixos. A grade continua exibindo quatro quadrantes simultâneos, enquanto os outros PIDs suportados percorrem páginas no mesmo carrossel.
+- **Primeira página estável:** temperatura (0105), tensão (0142), posição da borboleta (0111) e RPM (010C) ficam sempre na primeira página. A priorização de alertas se aplica aos PIDs adicionais e não retira um dos quatro principais do cockpit inicial.
+- **Carrossel completo:** todas as métricas suportadas/catalogadas entram na sequência sem duplicação; cada página tem até quatro itens. Setas acessíveis anterior/próxima complementam a rotação automática de 10 segundos. Navegação circular volta ao início.
+- **Integridade:** PIDs não anunciados não são tratados como suportados. Todos os valores continuam dependendo de leitura real, resposta válida e janela de frescor; sem evidência, o indicador permanece em N/D.
+- **Proteção contra regressão:** a suíte percorre os 20 PIDs da política em páginas de quatro, verifica que não há PID saltado nem repetido e preserva a ordem fixa da primeira página. A CI do novo SHA precisa validar testes e build Android antes de distribuir qualquer APK.

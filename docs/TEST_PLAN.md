@@ -133,6 +133,14 @@ O catálogo atual contém 34 PIDs, 20 fórmulas, 34 faixas e 30 avaliações de 
 - Sem 41 0C válido, a interface deve mostrar ECU sem resposta, não presumir falha do rádio Bluetooth. Sem ECU/leitura real válida, telemetria e autonomia continuam N/D.
 - Testes: tests/bluetoothConfig.test.js, tests/elm327Compatibility.test.js e tests/projectBaseline.test.js.
 
+## UI-COCKPIT-05 — Carrossel completo dos PIDs na área principal
+
+- A primeira página mantém em ordem fixa quatro quadrantes principais: 0105 (temperatura), 0142 (tensão), 0111 (posição da borboleta) e 010C (RPM).
+- Os demais PIDs suportados e catalogados são incluídos no mesmo carrossel, quatro por página; todos devem ser alcançáveis sem lacunas nem duplicações. A quantidade depende da bitmap anunciada pela ECU; PIDs não suportados não são apresentados como leituras disponíveis.
+- O carrossel tem setas acessíveis de página anterior/próxima, retorna circularmente ao início e avança automaticamente a cada 10 segundos. Alertas entre os PIDs adicionais podem subir na ordem das páginas sem deslocar os quatro indicadores principais.
+- Sem ECU ou leitura REAL/RESPONDEU válida, finita e recente, manter os quadrantes em N/D; não preencher com seed, histórico ou valores simulados.
+- Testes: tests/cockpitTelemetry.test.js percorre os 20 PIDs de referência; tests/orientationLayout.test.js e tests/projectBaseline.test.js protegem a interface.
+
 ## UI-COCKPIT-04 — Quadrantes simultâneos e navegação de PIDs
 
 - O cockpit deve exibir ao mesmo tempo uma grade 2×2 para os indicadores principais: PID 0105 (temperatura), 0142 (tensão), 0111 (borboleta) e 010C (RPM). Não substituir a grade por um único número grande que alterna a cada 10 s.

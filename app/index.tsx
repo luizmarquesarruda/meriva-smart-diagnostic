@@ -272,13 +272,14 @@ export default function IndexScreen() {
   const additionalMetrics = discoveredHeroMetrics
     .filter((metric) => !primaryPidSet.has(metric.pid))
     .slice(0, 20 - COCKPIT_QUADRANT_PAGE_SIZE);
-  const heroMetrics: CockpitPidMetric[] = [...primaryMetrics, ...additionalMetrics];
-  const abnormalMetrics = heroMetrics.filter((metric) => metric.value != null && metric.severity !== 'normal');
-  // Anomalies move to the first page, but normal metrics remain reachable in the other quadrants/pages.
-  const visibleHeroMetrics = abnormalMetrics.length > 0
-    ? [...abnormalMetrics, ...heroMetrics.filter((metric) => !abnormalMetrics.includes(metric))]
-    : heroMetrics;
-  const quadrantPageCount = Math.max(1, Math.ceil(visibleHeroMetrics.length / COCKPIT_QUADRANT_PAGE_SIZE));
+  const abnormalMetrics = additionalMetrics.filter((metric) => metric.value != null && metric.severity !== 'normal');
+  const orderedAdditionalMetrics: CockpitPidMetric[] = abnormalMetrics.length > 0
+    ? [...abnormalMetrics, ...additionalMetrics.filter((metric) => !abnormalMetrics.includes(metric))]
+    : additionalMetrics;
+  const heroMetrics: CockpitPidMetric[] = [...primaryMetrics, ...orderedAdditionalMetrics];
+  // Keep the first page stable; additional supported PIDs are paged after the main four.
+  const visibleHeroMetrics: CockpitPidMetric[] = [...primaryMetrics, ...orderedAdditionalMetrics];
+
 
   useEffect(() => {
     setActiveQuadrantPage(0);
@@ -384,29 +385,44 @@ export default function IndexScreen() {
             </View>
           </View>
           <View style={[styles.heroCard, layout.landscape && styles.heroCardLandscape]}>
-            <TouchableOpacity
-              style={styles.quadrantHeader}
-              accessibilityRole="button"
-              accessibilityLabel={'Trocar página dos quadrantes, página ' + (currentQuadrantPage + 1) + ' de ' + quadrantPageCount}
-              accessibilityHint="Alterne os indicadores do painel; a página também muda automaticamente a cada 10 segundos"
-              onPress={() => setActiveQuadrantPage((current) => (current + 1) % quadrantPageCount)}
-              activeOpacity={0.8}
-            >
+            <View style={styles.quadrantHeader}>
               <View style={styles.quadrantHeaderCopy}>
                 <Text style={styles.quadrantTitle}>DADOS OBD EM TEMPO REAL</Text>
                 <Text style={styles.quadrantSubtitle}>
                   {discoveredHeroMetrics.length > 0
-                    ? 'PIDs reais anunciados • ' + heroMetrics.length + ' indicadores disponíveis'
+                    ? 'PIDs suportados • ' + heroMetrics.length + ' indicadores no carrossel'
                     : connectionStatus.ecuConnected
                       ? 'ECU CONECTADA • AGUARDANDO LEITURAS VÁLIDAS'
                       : 'CONECTE A ECU PARA LIBERAR OS QUADRANTES'}
                 </Text>
               </View>
-              <View style={styles.quadrantPageButton}>
-                <AppIcon name="refresh" size={12} color={COLORS.textSubtle} />
-                <Text style={styles.quadrantPageText}>{currentQuadrantPage + 1}/{quadrantPageCount}</Text>
+              <View style={styles.quadrantControls}>
+                <TouchableOpacity
+                  style={[styles.quadrantNavButton, quadrantPageCount <= 1 && styles.quadrantNavButtonDisabled]}
+                  accessibilityRole="button"
+                  accessibilityLabel={'Página anterior dos PIDs; página ' + (currentQuadrantPage + 1) + ' de ' + quadrantPageCount}
+                  disabled={quadrantPageCount <= 1}
+                  onPress={() => setActiveQuadrantPage((current) => (current - 1 + quadrantPageCount) % quadrantPageCount)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={styles.quadrantNavGlyph}>‹</Text>
+                </TouchableOpacity>
+                <View style={styles.quadrantPageButton} accessible accessibilityLabel={'Página ' + (currentQuadrantPage + 1) + ' de ' + quadrantPageCount}>
+                  <AppIcon name="refresh" size={12} color={COLORS.textSubtle} />
+                  <Text style={styles.quadrantPageText}>{currentQuadrantPage + 1}/{quadrantPageCount}</Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.quadrantNavButton, quadrantPageCount <= 1 && styles.quadrantNavButtonDisabled]}
+                  accessibilityRole="button"
+                  accessibilityLabel={'Próxima página dos PIDs; página ' + (currentQuadrantPage + 1) + ' de ' + quadrantPageCount}
+                  disabled={quadrantPageCount <= 1}
+                  onPress={() => setActiveQuadrantPage((current) => (current + 1) % quadrantPageCount)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={styles.quadrantNavGlyph}>›</Text>
+                </TouchableOpacity>
               </View>
-            </TouchableOpacity>
+            </View>
             <View style={[styles.quadrantGrid, layout.landscape && styles.quadrantGridLandscape]}>
               {displayedQuadrantMetrics.map((metric, index) => (
                 <View
@@ -435,7 +451,7 @@ export default function IndexScreen() {
             </View>
             <Text style={styles.quadrantInstruction}>
               {quadrantPageCount > 1
-                ? 'TOQUE NO TÍTULO OU AGUARDE 10 S • 4 QUADRANTES POR PÁGINA'
+                ? 'USE ‹ / › OU AGUARDE 10 S • 4 QUADRANTES POR PÁGINA'
                 : connectionStatus.ecuConnected
                   ? 'N/D ATÉ EXISTIR LEITURA REAL, COMPLETA E RECENTE'
                   : 'OS QUADRANTES FICAM PRONTOS APÓS VALIDAR A ECU'}
@@ -500,6 +516,10 @@ const styles = StyleSheet.create({
   quadrantHeaderCopy:{flex:1,minWidth:0},
   quadrantTitle:{color:'#7db3ff',fontSize:10,fontWeight:'900',letterSpacing:1.2},
   quadrantSubtitle:{color:'#849ab5',fontSize:8,fontWeight:'800',marginTop:3},
+  quadrantControls:{flexDirection:'row',alignItems:'center',gap:4},
+  quadrantNavButton:{width:30,height:32,alignItems:'center',justifyContent:'center',borderRadius:9,borderWidth:1,borderColor:'#294562',backgroundColor:'#091626'},
+  quadrantNavButtonDisabled:{opacity:0.4},
+  quadrantNavGlyph:{color:'#a9c8ef',fontSize:23,lineHeight:25,fontWeight:'700'},
   quadrantPageButton:{flexDirection:'row',alignItems:'center',gap:4,paddingVertical:7,paddingHorizontal:9,borderRadius:9,borderWidth:1,borderColor:'#294562',backgroundColor:'#091626'},
   quadrantPageText:{color:'#a9c8ef',fontSize:9,fontWeight:'900'},
   quadrantGrid:{width:'100%',flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',gap:8},

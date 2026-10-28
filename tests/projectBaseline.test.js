@@ -259,6 +259,9 @@ assert.equal(app.expo.name, 'Smart OBD Diagnostic', 'a marca do app não deve fi
 assert.match(home, /buildCockpitPidMetrics/, 'cockpit deve consumir o modelo dinâmico de PIDs');
 assert.match(home, /quadrantDefinitions/, 'o cockpit deve manter quatro indicadores simultâneos');
 assert.match(home, /getCockpitMetricPage/, 'os PIDs extras devem continuar acessíveis por páginas');
+assert.match(home, /const visibleHeroMetrics: CockpitPidMetric\[\] = \[\.\.\.primaryMetrics, \.\.\.orderedAdditionalMetrics\]/, 'os quatro quadrantes fixos devem vir antes dos PIDs adicionais');
+assert.match(home, /Página anterior dos PIDs/);
+assert.match(home, /Próxima página dos PIDs/);
 assert.match(home, /quadrantGrid/, 'o cockpit deve preservar a grade de quadrantes');
 assert.doesNotMatch(home, /selectedHeroMetric/, 'não regredir para um único mostrador rotativo');
 for (const label of [

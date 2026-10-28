@@ -5,6 +5,7 @@
 ### Cockpit — quadrantes restaurados
 - Retornada a grade simultânea 2×2 para temperatura, tensão do sistema, posição da borboleta e RPM.
 - Os demais PIDs continuam acessíveis por páginas de quatro indicadores, com anomalias priorizadas; os valores permanecem N/D sem leitura real, completa e recente.
+- A primeira página mantém os quatro indicadores principais em ordem fixa; o carrossel percorre os demais PIDs suportados com setas acessíveis de página anterior/próxima e avanço automático de 10 segundos.
 - Removido o mostrador único como substituto da grade e eliminado o cartão de arrefecimento duplicado.
 
 ### Bluetooth Classic / ELM327 — regressão de resposta ECU

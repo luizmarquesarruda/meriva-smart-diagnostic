@@ -38,8 +38,12 @@ assert.equal(new Set(pollingPolicy.cockpit.pidOrder).size, 20, 'a lista de PIDs 
 for (const label of ['TEMPERATURA DO MOTOR', 'VOLTAGEM DO SISTEMA', 'POSIÇÃO DA BORBOLETA', 'ROTAÇÃO DO MOTOR']) {
   assert.ok(cockpitTelemetry.includes("'" + label + "'"), 'definição do cockpit ausente: ' + label);
 }
-assert.match(index, /const visibleHeroMetrics = abnormalMetrics\.length > 0\s*\? \[\.\.\.abnormalMetrics, \.\.\.heroMetrics\.filter/,
-  'alertas devem vir primeiro sem remover os outros indicadores das páginas');
+assert.match(index, /const orderedAdditionalMetrics: CockpitPidMetric\[\] = abnormalMetrics\.length > 0/,
+  'os alertas adicionais devem ser priorizados dentro do carrossel');
+assert.match(index, /const visibleHeroMetrics: CockpitPidMetric\[\] = \[\.\.\.primaryMetrics, \.\.\.orderedAdditionalMetrics\]/,
+  'os quatro indicadores principais permanecem na primeira página');
+assert.match(index, /Página anterior dos PIDs/);
+assert.match(index, /Próxima página dos PIDs/);
 assert.match(index, /const heroMetrics: CockpitPidMetric\[\]/, 'lista de indicadores deve ser dinâmica');
 assert.doesNotMatch(index, /SAÚDE DO VEÍCULO|ABRIR CENTRAL DE SAÚDE/, 'não duplicar a central de saúde na página inicial');
 assert.match(index, /danger:\{color:'#fb7185'\}/, 'alerta térmico deve mudar a cor sem encolher o valor principal');

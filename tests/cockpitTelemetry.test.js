@@ -49,19 +49,25 @@ assert.match(helper, /displayStaleAfterMs/, 'leituras vencidas devem virar N/D')
 assert.match(helper, /classifySeverity/, 'limites monitorados devem gerar severidade');
 assert.match(home, /buildCockpitPidMetrics\(connectedSupportedPids, liveReadings\)/);
 assert.match(home, /const quadrantDefinitions = \[/, 'o cockpit deve preservar os quatro indicadores principais em quadrantes');
-assert.match(home, /getCockpitMetricPage\(visibleHeroMetrics, currentQuadrantPage\)/, 'os PIDs adicionais devem continuar acessíveis por páginas de quadrantes');
+assert.match(home, /getCockpitMetricPage\(visibleHeroMetrics, currentQuadrantPage\)/, 'todos os PIDs suportados devem continuar acessíveis no carrossel de quadrantes');
 assert.match(home, /quadrantGrid/, 'os indicadores devem renderizar em grade simultânea 2x2');
 assert.match(home, /displayedQuadrantMetrics\.map/, 'a tela deve renderizar quatro quadrantes por página');
 assert.match(home, /COCKPIT_QUADRANT_PAGE_SIZE/, 'o tamanho da página deve vir do contrato central');
+assert.match(home, /Página anterior dos PIDs/, 'o carrossel deve ter controle acessível para voltar');
+assert.match(home, /Próxima página dos PIDs/, 'o carrossel deve ter controle acessível para avançar');
 assert.match(home, /setActiveQuadrantPage/, 'o usuário deve poder alternar de página por toque');
 assert.match(home, /10_000/, 'as páginas dos quadrantes devem alternar a cada dez segundos');
+assert.match(home, /const visibleHeroMetrics: CockpitPidMetric\[\] = \[\.\.\.primaryMetrics, \.\.\.orderedAdditionalMetrics\]/,
+  'a página inicial mantém os quatro PIDs principais antes das páginas adicionais');
+assert.match(home, /orderedAdditionalMetrics: CockpitPidMetric\[\]/,
+  'anomalias adicionais são priorizadas sem retirar os indicadores principais da primeira página');
 assert.match(home, /quadrantCardDanger/);
 assert.match(home, /quadrantCardWarning/);
 assert.doesNotMatch(home, /selectedHeroMetric/, 'um único mostrador rotativo não pode substituir os quadrantes simultâneos');
 
-const sampleMetrics = Array.from({ length: 9 }, (_, index) => ({
-  pid: 'PID-' + index,
-  label: 'Métrica ' + index,
+const sampleMetrics = configuredPids.map((pid, index) => ({
+  pid,
+  label: 'Métrica ' + pid,
   value: index,
   unit: 'u',
   severity: 'normal',
@@ -69,14 +75,18 @@ const sampleMetrics = Array.from({ length: 9 }, (_, index) => ({
   hint: 'leitura real',
 }));
 assert.equal(telemetryModule.COCKPIT_QUADRANT_PAGE_SIZE, 4);
-assert.deepEqual(telemetryModule.getCockpitMetricPage(sampleMetrics, 0).map((metric) => metric.pid),
-  ['PID-0', 'PID-1', 'PID-2', 'PID-3']);
-assert.deepEqual(telemetryModule.getCockpitMetricPage(sampleMetrics, 1).map((metric) => metric.pid),
-  ['PID-4', 'PID-5', 'PID-6', 'PID-7']);
-assert.deepEqual(telemetryModule.getCockpitMetricPage(sampleMetrics, 2).map((metric) => metric.pid), ['PID-8']);
-assert.deepEqual(telemetryModule.getCockpitMetricPage(sampleMetrics, 3).map((metric) => metric.pid),
-  ['PID-0', 'PID-1', 'PID-2', 'PID-3'], 'a navegação deve voltar à primeira página após a última');
-assert.deepEqual(telemetryModule.getCockpitMetricPage(sampleMetrics, -1).map((metric) => metric.pid), ['PID-8']);
+assert.equal(sampleMetrics.length, 20);
+assert.deepEqual(telemetryModule.getCockpitMetricPage(sampleMetrics, 0).map((metric) => metric.pid), configuredPids.slice(0, 4));
+assert.deepEqual(telemetryModule.getCockpitMetricPage(sampleMetrics, 1).map((metric) => metric.pid), configuredPids.slice(4, 8));
+assert.deepEqual(telemetryModule.getCockpitMetricPage(sampleMetrics, 4).map((metric) => metric.pid), configuredPids.slice(16, 20));
+const carouselSequence = Array.from(
+  { length: Math.ceil(sampleMetrics.length / telemetryModule.COCKPIT_QUADRANT_PAGE_SIZE) },
+  (_, page) => telemetryModule.getCockpitMetricPage(sampleMetrics, page),
+).flat().map((metric) => metric.pid);
+assert.deepEqual(carouselSequence, configuredPids, 'o carrossel deve percorrer todos os PIDs configurados sem duplicar nem pular');
+assert.deepEqual(telemetryModule.getCockpitMetricPage(sampleMetrics, 5).map((metric) => metric.pid),
+  configuredPids.slice(0, 4), 'a navegação deve voltar à primeira página após a última');
+assert.deepEqual(telemetryModule.getCockpitMetricPage(sampleMetrics, -1).map((metric) => metric.pid), configuredPids.slice(16, 20));
 assert.match(trip, /queriedPidsThisCycle\.add\('010C'\)/);
 assert.match(trip, /queriedPidsThisCycle\.add\('010D'\)/);
 assert.match(trip, /!queriedPidsThisCycle\.has\(item\)/, 'a fila serial não deve consultar duas vezes o mesmo PID por ciclo');
