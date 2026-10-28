@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Rede móvel e localização Android
+- Tela Conectividade mostra o estado dos serviços de localização, do provedor GPS/GNSS e do provedor de localização pela rede informado pelo Android, sem solicitar permissões adicionais.
+- Adicionada normalização testável dos estados de provedor; valores ausentes permanecem desconhecidos.
+- Documentado que 4G/5G ajuda na conectividade e no diagnóstico do provedor, mas não substitui posições válidas para distância, velocidade ou autonomia.
+
 ### Auditoria de obsolescência
 - Esclarecida a distinção entre o nome do projeto MERIVA SMART e o rótulo genérico `Smart OBD Diagnostic` do app Expo; corrigidas descrições antigas de navegação e framing Bluetooth.
 - Registrado débito de modernização do Expo SDK 51 e da API antiga de FileSystem; upgrade permanece separado até existir baseline físico de Bluetooth/GPS e plano de migração validado.
