@@ -5,7 +5,7 @@ import { getLastBluetoothDiagnosticText } from '../obd/bluetoothManager';
 import { getSharedObdConnection, getSharedObdLastError, getSharedObdDiagnosticContext } from '../obd/sharedConnection';
 import { readLearningProfile, type MerivaLearningProfile } from '../database/learningProfile';
 import { getAutoSaveState } from '../meriva/autosaveManager';
-import { runLocalDiagnostic, type DiagnosticResult } from '../diagnostics/diagnosticEngine';
+import { normalizeDiagnosticSource, runLocalDiagnostic, type DiagnosticResult } from '../diagnostics/diagnosticEngine';
 import type { PidObservation } from '../types/sourceTypes';
 
 async function readCurrentLearningProfile(): Promise<MerivaLearningProfile | null> {
@@ -38,14 +38,18 @@ function diagnosticReportLines(result: DiagnosticResult): string[] {
     '--- DIAGNÓSTICO LOCAL / MOTOR DE EVIDÊNCIAS ---',
     `MOTOR: ${result.engine}`,
     `VERSÃO: ${result.version}`,
+    `AMOSTRAS REAIS ACEITAS (FINITAS, PLAUSÍVEIS E RECENTES): ${result.acceptedLiveSamples}`,
     `AMOSTRAS DE SIMULAÇÃO BLOQUEADAS: ${result.blockedSimulationSamples}`,
+    `AMOSTRAS DE ORIGEM NÃO AO VIVO BLOQUEADAS: ${result.blockedNonLiveSamples}`,
+    `AMOSTRAS ANTIGAS/FUTURAS BLOQUEADAS: ${result.blockedStaleSamples}`,
+    `AMOSTRAS INVÁLIDAS/IMPLAUSÍVEIS BLOQUEADAS: ${result.blockedInvalidSamples}`,
   ];
   if (result.hypotheses.length === 0) {
     lines.push('NENHUMA HIPÓTESE DIAGNÓSTICA GERADA COM AS EVIDÊNCIAS DISPONÍVEIS.');
   }
   for (const hypothesis of result.hypotheses) {
     lines.push(`HIPÓTESE: ${hypothesis.label}`);
-    lines.push(`CONFIANÇA: ${hypothesis.confidence} | SCORE: ${hypothesis.score}`);
+    lines.push(`NÍVEL QUALITATIVO: ${hypothesis.confidence} | PONTUAÇÃO HEURÍSTICA: ${Math.round(hypothesis.score * 100)}/100 (NÃO É PROBABILIDADE)`);
     for (const evidence of hypothesis.evidence) {
       lines.push(`  EVIDÊNCIA: ${evidence.text}`);
     }
@@ -64,7 +68,7 @@ function buildLocalDiagnostic(): DiagnosticResult {
     name: reading.name,
     value: reading.value,
     unit: reading.unit,
-    source: reading.source === 'SIMULACAO' ? 'SIMULACAO' : 'REAL_OBD',
+    source: normalizeDiagnosticSource(reading.source),
     timestamp: reading.timestamp,
     confidence: reading.source === 'SIMULACAO' ? 'LOW' : 'GOOD',
   }));
