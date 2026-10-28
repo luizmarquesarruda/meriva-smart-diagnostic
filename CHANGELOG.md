@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Auditoria de obsolescência
+- Padronizado o nome exibido como MERIVA SMART e corrigidas descrições antigas de navegação e framing Bluetooth.
+- Registrado débito de modernização do Expo SDK 51 e da API antiga de FileSystem; upgrade permanece separado até existir baseline físico de Bluetooth/GPS e plano de migração validado.
+
 ### Cockpit
 - Removido o resumo de falhas/DTC do cockpit para evitar duplicação com a página Saúde.
 - O terceiro cartão agora mostra pressão do coletor (PID 010B) apenas com leitura real e recente; sem leitura válida, mostra N/D.

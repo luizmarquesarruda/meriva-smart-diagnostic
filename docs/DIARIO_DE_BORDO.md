@@ -1,6 +1,20 @@
-## ESTADO VIGENTE — 2026-10-25 (auditoria de estabilidade DB-130)
+## ESTADO VIGENTE — 2026-10-28 (auditoria de obsolescência)
 
-> Estado consultado no GitHub em 25/10/2026. Este diário acompanha a branch de consolidação #89; não representa merge em `main`. CI verde por branch isolada não comprova integração combinada nem teste físico.
+> Frente única de trabalho: PR #96, branch `ui/cockpit-instant-consumption-20261027`. Este bloco é a referência operacional; snapshots abaixo são históricos.
+
+- Repositório: [luizmarquesarruda/meriva-smart-diagnostic](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
+- PR #96: [Evita DTC duplicado no cockpit e mostra pressão do coletor](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/96), aberta, fora de rascunho e sem merge. Base `main` observada nesta PR: `7eec3afecb3718020724baf053f8b6d2ca636fab`.
+- HEAD antes desta auditoria: `bd44575d633129ec85e288883e7376cbda2b105f`.
+- CI base `40625512427`: `validate` passou (Expo Doctor 17/17, gate anti-regressão e `npm run validate`); `android-build` estava em montagem do APK quando a verificação foi consultada. Esse resultado não valida o novo commit desta auditoria.
+- Após qualquer alteração, reconsultar o HEAD e a CI correspondentes. Só considerar a PR validada com `validate` e `android-build` verdes no mesmo SHA, diff reconciliado contra `main` e validação física separada.
+- A auditoria atual encontrou divergências de documentação e um débito relevante de modernização do SDK. Não houve upgrade de SDK nem remoção de dependências nativas nesta rodada: fazê-los antes de preservar um baseline físico poderia introduzir regressão no Bluetooth Classic.
+- Testes com Galaxy A06/Android 16/ELM327 real, confirmação de resposta `010C`, inspeção do APK instalado e validação GPS/autonomia continuam pendentes.
+
+---
+
+## ESTADO HISTÓRICO — 2026-10-25 (snapshot DB-130; superado em 2026-10-28)
+
+> Snapshot histórico consultado no GitHub em 25/10/2026. A lista de PRs e SHAs abaixo descreve apenas aquele momento; não use esse bloco como inventário operacional atual.
 
 ### `main` e proteção de integração
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
@@ -209,6 +223,7 @@
 - **DB-136** · 2026-10-28 — Sincronizar índice do diário após as novas entradas
 - **DB-137** · 2026-10-28 — Fechar lacuna de índice detectada pela segunda execução da CI
 - **DB-138** · 2026-10-28 — Remover teste ELM órfão sem implementação correspondente
+- **DB-139** · 2026-10-28 — Auditoria de obsolescência: reconciliar marca, arquitetura e framing ELM327
 
 ---
 
@@ -4103,3 +4118,29 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Commits: `25943462950c0440ff923abf30101341c109b46e` (script) e `0049d1dcadbb4c6ac367b0da7441bb1367d1cab1` (teste órfão).
 - Novo HEAD exige CI completa. O teste físico do ELM327/ECU e a inspeção visual Android permanecem separados da CI.
 - Esta entrada substitui a hipótese anterior de DB-133 de que o teste órfão podia ser reintegrado apenas adicionando-o ao script.
+
+
+## DB-139 · 2026-10-28 — Auditoria de obsolescência: reconciliar marca, arquitetura e framing ELM327
+
+### Achados confirmados e correções
+- O rótulo de aplicativo em `app.json` e o título/descrição do README diziam `Smart OBD Diagnostic`, enquanto a interface e o projeto são identificados como `MERIVA SMART`. Nome visível padronizado em `app.json` e README. Slug, scheme e package Android foram preservados para evitar quebra de identidade técnica.
+- O README tinha uma seção `Validação CI` de 2026-10-06 dizendo que o commit servia como gatilho técnico e afirmando delimiter CR, em contradição com o código vigente. A seção/meta repetidas foram removidas; o contrato operacional fica na seção de engenharia ELM327 e no playbook atual.
+- `docs/ELM327_COMPATIBILITY_REVIEW_2026-10-05.md` descrevia delimiter CR real, retry default 2/infinito e ATI como obrigatório. Corrigido para o código/catalogação atuais: `delimiter: ''`, RX delimitado pelo prompt `>`, CR no TX, 20 tentativas-base finitas/8 s, `ATZ` obrigatório e `ATI` best-effort.
+- `docs/ARCHITECTURE.md` descrevia quatro áreas genéricas e incluía DTC como conteúdo do cockpit. Atualizado para refletir as rotas existentes e a responsabilidade exclusiva da tela Saúde pelos DTCs.
+
+### Itens avaliados e mantidos
+- `plugins/withBluetoothLegacyPermissionLimits.js` está ativo em `app.json`; não é plugin órfão.
+- `src/storage/backup.ts` é usado por Configurações e por testes de regressão; não é módulo morto.
+- `app/testes-sensores.tsx` existe como rota operacional de testes; não foi eliminado por ser técnico.
+- Dependências não foram removidas por simples ausência de import direto: Expo Router, ícones, plugins e pares nativos podem exigir dependência explícita.
+
+### Débito de modernização identificado — não alterado nesta rodada
+- O projeto usa Expo SDK 51 / React Native 0.74.5. A documentação oficial anuncia SDK 58 em 15/10/2026 e SDK 57 em 30/06/2026; SDK 51 é um baseline antigo. Fontes: https://expo.dev/changelog e https://expo.dev/sdk
+- O projeto usa a família legada de métodos de `expo-file-system` (`readAsStringAsync`, `writeAsStringAsync`, etc.). A documentação mais recente separa a compatibilidade antiga em `expo-file-system/legacy`: https://docs.expo.dev/versions/latest/sdk/filesystem-legacy/
+- O pacote `react-native-bluetooth-classic` instalado `1.73.0-rc.17` aparece como tag latest na página npm consultada, mas continua sendo release candidate: https://www.npmjs.com/package/react-native-bluetooth-classic
+- Não atualizar Expo/FileSystem/Bluetooth como correção isolada. Próximo bloco de modernização deve ser dedicado, por etapas, com lockfile, Expo Doctor, TypeScript, suíte completa, APK e testes físicos de pareamento, framing CR/`>`, ECU `010C`, GPS e persistência. Preservar SDK 51 na PR de cockpit até a baseline física estar documentada.
+
+### Validação e limites
+- As correções foram consolidadas nesta frente da PR #96, sem abrir branch paralela nem fazer merge.
+- Conferir a CI do novo SHA: o resultado verde anterior pertence ao SHA base e não aprova estas alterações.
+- Nenhum arquivo foi removido nesta auditoria por heurística de nome; exclusões anteriores foram apenas o teste ELM órfão comprovadamente sem módulo de implementação e continuam documentadas em DB-138.

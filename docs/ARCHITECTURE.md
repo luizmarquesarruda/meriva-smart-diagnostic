@@ -41,12 +41,9 @@
 
 ### UI
 
-`app/` contém as quatro áreas de uso do aplicativo:
+`app/` contém rotas separadas para splash/inicialização, cockpit, Bluetooth, conectividade, Saúde/DTC, Laboratório/consulta PID, Dados/telemetria, Viagens, Mais recursos, configurações, veículo, manutenção, aprendizado, armazenamento e testes de sensores. A lista de arquivos em `app/` é a referência operacional para o inventário de telas; não agrupar rotas distintas numa contagem fixa de áreas.
 
-1. **Início**: autonomia estimada, estado OBD/GPS, consumo, falhas e viagem atual.
-2. **Diagnóstico OBD**: conexão ELM327, consulta de PID, DTC e detalhes técnicos.
-3. **Histórico e dados**: espaço usado, limpeza e manutenção dos dados.
-4. **Configurações**: somente preferências básicas que fazem sentido para o motorista.
+O cockpit prioriza consumo e autonomia e não repete o resumo de DTC; códigos e estado diagnóstico detalhado pertencem à tela Saúde. Protocolo, respostas brutas e detalhes de engenharia pertencem ao Bluetooth/Laboratório.
 
 A interface usa um layout responsivo comum em `src/ui/midLayout.ts`. Em retrato, as informações ficam empilhadas; em paisagem, métricas e ações ocupam a largura disponível. Dados RAW e informações de engenharia ficam escondidos em detalhes técnicos para não poluir a tela de uso diário.
 
