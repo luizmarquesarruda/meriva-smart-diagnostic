@@ -208,6 +208,7 @@
 - **DB-135** · 2026-10-28 — Corrigir navegação icon-only no cockpit
 - **DB-136** · 2026-10-28 — Sincronizar índice do diário após as novas entradas
 - **DB-137** · 2026-10-28 — Fechar lacuna de índice detectada pela segunda execução da CI
+- **DB-138** · 2026-10-28 — Remover teste ELM órfão sem implementação correspondente
 
 ---
 
@@ -4086,3 +4087,19 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 ### Validação e limites
 - Novo HEAD exige nova CI. A última execução falhou no gate antes de `validate`; isso não representa falha de TypeScript ou da suíte comportamental, pois essas etapas foram puladas.
 - Não fazer merge até o novo HEAD passar pelo gate, `validate` e `android-build`.
+
+
+## DB-138 · 2026-10-28 — Remover teste ELM órfão sem implementação correspondente
+
+### Achado confirmado
+- A CI `40625299840` passou pelo doctor (17/17) e pelo gate anti-regressão, mas `validate` falhou ao executar `tests/elmHealthPresentation.test.js`: o teste tentava abrir `src/obd/elmHealthPresentation.ts`, arquivo inexistente tanto na branch quanto em `main`.
+- Busca no repositório confirmou que `formatElmQueueHealth`, `queueDepth` e as métricas de fila só apareciam nesse teste; a interface Bluetooth usa diretamente o snapshot real de saúde de `Elm327Session` e não consome esse formatter.
+
+### Correção
+- Removido o teste órfão e sua chamada em `package.json`, em vez de criar um módulo morto ou fingir que existe uma telemetria de fila que o transporte não fornece.
+- A barreira anti-regressão continua exigindo que toda suíte `*.test.js` existente seja incluída em `npm test`; nenhuma regra do gate foi relaxada.
+
+### Validação e limites
+- Commits: `25943462950c0440ff923abf30101341c109b46e` (script) e `0049d1dcadbb4c6ac367b0da7441bb1367d1cab1` (teste órfão).
+- Novo HEAD exige CI completa. O teste físico do ELM327/ECU e a inspeção visual Android permanecem separados da CI.
+- Esta entrada substitui a hipótese anterior de DB-133 de que o teste órfão podia ser reintegrado apenas adicionando-o ao script.
