@@ -224,6 +224,7 @@
 - **DB-137** · 2026-10-28 — Fechar lacuna de índice detectada pela segunda execução da CI
 - **DB-138** · 2026-10-28 — Remover teste ELM órfão sem implementação correspondente
 - **DB-139** · 2026-10-28 — Auditoria de obsolescência: reconciliar marca, arquitetura e framing ELM327
+- **DB-140** · 2026-10-28 — Auditoria da rede móvel e dos provedores de localização
 
 ---
 
@@ -4144,3 +4145,33 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - As correções foram consolidadas nesta frente da PR #96, sem abrir branch paralela nem fazer merge.
 - Conferir a CI do novo SHA: o resultado verde anterior pertence ao SHA base e não aprova estas alterações.
 - Nenhum arquivo foi removido nesta auditoria por heurística de nome; exclusões anteriores foram apenas o teste ELM órfão comprovadamente sem módulo de implementação e continuam documentadas em DB-138.
+
+
+## DB-140 · 2026-10-28 — Auditoria da rede móvel e dos provedores de localização
+
+### Pergunta e fontes
+- Investigar o uso das informações 4G/5G para localização, GPS, velocidade e autonomia sem presumir que a rede celular fornece coordenadas confiáveis.
+- Documentação consultada: Android ConnectivityManager/NetworkCapabilities (https://developer.android.com/develop/connectivity/network-ops/reading-network-state), Expo NetInfo (https://docs.expo.dev/versions/latest/sdk/netinfo/), Expo Location `getProviderStatusAsync()`/`LocationProviderStatus` (https://docs.expo.dev/versions/latest/sdk/location/), permissões de localização Android (https://developer.android.com/develop/sensors-and-location/location/permissions?hl=pt-br) e Android `TelephonyManager.getAllCellInfo()` (https://developer.android.com/reference/android/telephony/TelephonyManager#getAllCellInfo()).
+
+### Estado encontrado
+- O app já recebe eventos de conectividade e identifica o tipo de transporte, geração móvel informada, disponibilidade de internet e informação de conexão tarifada por meio de NetInfo.
+- O enriquecimento opcional de clima/localidade já atualiza após reconexão e a cada 15 minutos, com cooldown e uma única solicitação em voo. Esse fluxo não altera o ciclo OBD.
+- O rastreador de viagem já solicita localização de alta precisão e valida precisão, timestamp e segmentos consecutivos. A lacuna era a falta de visibilidade na tela Conectividade sobre os estados dos provedores Android.
+- NetInfo não fornece RSSI celular nem coordenada de torre. `networkAvailable` do Android indica disponibilidade do provedor de localização por rede; não garante que o último fix tenha usado essa fonte nem que seja preciso.
+
+### Implementação
+- Criado `src/network/locationProviders.ts` para normalizar `locationServicesEnabled`, `gpsAvailable` e `networkAvailable`. Valores ausentes ou malformados continuam desconhecidos, sem conversão para verdadeiro/falso.
+- `app/conectividade.tsx` consulta `Location.getProviderStatusAsync()` na abertura da tela e ao atualizar o estado da rede, mostrando os serviços de localização, GPS/GNSS e provedor por rede sem solicitar permissões extras.
+- Criado `tests/locationProviders.test.js` para serviços ativados/desativados, GPS disponível sem provedor de rede e campos ausentes/inválidos; incluída em `npm test`.
+- Criado `docs/AUDITORIA_REDE_MOVEL_E_LOCALIZACAO_2026-10-28.md` com matriz de usos, limites, regras de aceitação e documentação oficial.
+
+### Decisão de engenharia
+- 4G/5G e mudanças de conectividade são gatilhos para atualizar dados online opcionais e ajudar a diagnosticar os provedores Android; não são dados para calcular posição, velocidade, distância, consumo ou autonomia.
+- Não adicionar agora leitura de IDs de células/dBm. Isso exigiria outra camada nativa e avaliação específica de permissões, privacidade, compatibilidade e utilidade; dados de célula podem não estar atualizados e não substituem um fix de viagem validado.
+- Não criar um segundo watcher de localização nem alterar o cálculo de distância. Qualquer futura tentativa de recuperar posição quando o fix estiver antigo deve ser limitada, coordenada com o GpsTracker existente e protegida contra callbacks duplicados.
+- Falhas de rede/provedor não podem interromper a sessão Bluetooth/ELM327, a fila serial, o diagnóstico local ou a persistência.
+
+### Validação e limites
+- O código e os testes foram adicionados à branch `ui/cockpit-instant-consumption-20261027` da PR #96; CI do HEAD resultante obrigatória para gate anti-regressão, TypeScript, suíte completa e build APK.
+- Não considerar a mudança validada até os jobs ficarem verdes no mesmo SHA e a tela ser conferida em APK instalado no Galaxy A06/Android 16.
+- Esta alteração não comprova a disponibilidade real de GPS/rede do aparelho e não resolve, por si só, os problemas físicos pendentes de GPS ou ELM327/ECU.
