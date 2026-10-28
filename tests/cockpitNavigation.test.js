@@ -78,6 +78,10 @@ assert.match(dataScreen, /telemetrySamples/, 'histórico deve reutilizar amostra
 assert.match(dataScreen, /VIAGENS SALVAS/, 'tela deve oferecer modo interativo de histórico');
 assert.match(read('app/saude.tsx'), /runLocalDiagnostic/);
 assert.match(read('app/saude.tsx'), /activeDtcs/);
+assert.doesNotMatch(index, /FALHAS ATIVAS|SEM DTC|\\bDTC\\b/, 'cockpit não deve duplicar o resumo de DTC da tela Saúde');
+assert.match(index, /label="PRESSÃO DO COLETOR"/, 'o terceiro cartão do cockpit deve mostrar uma métrica diferente da página DTC');
+assert.match(index, /item\.pid === '010B'/, 'pressão do coletor deve vir do PID 010B real');
+assert.match(index, /manifoldPressureKpa != null \? manifoldPressureKpa\.toFixed\(0\) \+ ' kPa' : 'N\/D'/, 'pressão do coletor inválida ou ausente deve aparecer como N/D');
 assert.match(read('app/aprendizado.tsx'), /realSamples/);
 assert.match(read('app/laboratorio.tsx'), /03 \/ 07 \/ 0A/);
 assert.match(read('app/bluetooth.tsx'), /SAÚDE DO ELM327/);
