@@ -165,7 +165,7 @@ export class BubbleWorkflowClient {
     return this.post('v1_heartbeat', prepareBubbleHeartbeat(deviceId, connection, signal, firmware), true);
   }
 
-  private async post(endpoint: string, payload: Record<string, unknown>, authenticated: boolean): Promise<unknown> {
+  private async post(endpoint: string, payload: unknown, authenticated: boolean): Promise<unknown> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json', Accept: 'application/json' };
     if (authenticated) {
       if (this.accessToken == null) {
