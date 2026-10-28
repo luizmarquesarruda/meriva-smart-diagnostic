@@ -60,6 +60,7 @@ A documentação normativa integral da SAE é comercial. As páginas públicas e
 A resposta Mode 01 PID 0101 contém quatro bytes de dados com estado da MIL, contador de DTCs e monitores de prontidão. Não deve ser apresentada ao motorista como um número U32 gigante.
 
 - A interpretação agora verifica bit de suporte e bit de incompletude dos monitores comuns.
+- Segunda validação bit a bit contra a tabela J1979: no byte B, os bits de “incompleto” valem 1; nos bits de prontidão do byte D, o valor 1 significa monitor concluído/pronto e o valor 0 significa incompleto. O código antigo invertia o byte D, gerando um falso alerta de prontidão. Corrigido para considerar incompleto somente quando o monitor está suportado e o respectivo bit D está em 0. Adicionados vetores separados para monitores prontos e incompletos em SI, além dos casos CI.
 - A interpretação de bytes C/D diferencia ciclo Otto/ignição por centelha e diesel/ignição por compressão; não rotula EVAP ou catalisador aquecido como monitores de diesel quando esses bits têm outra semântica.
 - O valor bruto numérico permanece para compatibilidade e rastreabilidade, mas a tela Dados apresenta “STATUS OBD-II” e a interpretação legível.
 - `LastPidReading` pode preservar `interpretation` no autosave, validação do schema e exportação TXT.
