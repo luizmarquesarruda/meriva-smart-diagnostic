@@ -4,9 +4,9 @@ import ruleCatalog from '../knowledge/diagnostic_rules.json';
 import sensorTestCatalogJson from '../knowledge/sensor_tests.json';
 
 export interface DiagnosticInput { observations: PidObservation[]; dtcs?: DtcRecord[]; condition?: VehicleCondition; nowMs?: number; maxObservationAgeMs?: number; }
-export interface DiagnosticEvidence { ruleId: string; text: string; source: 'DTC' | 'PID'; pid?: string; dtc?: string; value?: number; }
+export interface DiagnosticEvidence { ruleId: string; text: string; source: 'DTC' | 'PID'; pid?: string; dtc?: string; value?: number; sampleCount?: number; }
 export interface DiagnosticHypothesis { id: string; label: string; score: number; confidence: 'LOW' | 'MEDIUM' | 'HIGH'; evidence: DiagnosticEvidence[]; nextTests: string[]; }
-export interface DiagnosticResult { engine: 'LOCAL_EVIDENCE_ENGINE'; version: 2; generatedAt: string; hypotheses: DiagnosticHypothesis[]; acceptedLiveSamples: number; blockedSimulationSamples: number; blockedNonLiveSamples: number; blockedStaleSamples: number; blockedInvalidSamples: number; blockedNonLiveDtcs: number; disclaimer: string; }
+export interface DiagnosticResult { engine: 'LOCAL_EVIDENCE_ENGINE'; version: 2; generatedAt: string; hypotheses: DiagnosticHypothesis[]; acceptedLiveSamples: number; evaluatedRuleGroups: number; blockedSimulationSamples: number; blockedNonLiveSamples: number; blockedStaleSamples: number; blockedInvalidSamples: number; blockedNonLiveDtcs: number; disclaimer: string; }
 
 interface Rule { id: string; trigger: { dtc?: string; combinedTrimMin?: number; combinedTrimMax?: number; condition?: VehicleCondition; mapMinKpa?: number; }; hypothesis: string; baseScore: number; tests: string[]; }
 
@@ -19,6 +19,8 @@ function linkedSensorRecommendations(ruleId: string): string[] {
 }
 const ACTIVE_DTC_STATUSES = new Set(['CONFIRMED', 'PENDING', 'PERMANENT', 'CURRENT']);
 export const MAX_DIAGNOSTIC_OBSERVATION_AGE_MS = 45_000;
+export const MIN_DIAGNOSTIC_SAMPLES_PER_PID = 3;
+export const MAX_DIAGNOSTIC_SAMPLES_PER_PID = 5;
 
 /**
  * Preserve provenance explicitly. Unknown/imported sources must never be
@@ -58,18 +60,35 @@ function isCurrentValidLiveObservation(
   return validatePidValue(normalizePid(item.pid), item.value).valid;
 }
 
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1
+    ? sorted[middle]
+    : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
 function pidValue(
   observations: PidObservation[],
   pid: string,
   nowMs: number,
   maxAgeMs: number,
-): PidObservation | undefined {
-  return observations
+): (PidObservation & { sampleCount: number }) | undefined {
+  const valid = observations
     .filter((item) =>
-      item.pid.replace(/\s/g, '').toUpperCase() === pid.toUpperCase()
+      normalizePid(item.pid) === pid.toUpperCase()
       && isCurrentValidLiveObservation(item, nowMs, maxAgeMs),
     )
-    .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))[0];
+    .sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp))
+    .slice(-MAX_DIAGNOSTIC_SAMPLES_PER_PID);
+  if (valid.length < MIN_DIAGNOSTIC_SAMPLES_PER_PID) return undefined;
+
+  const latest = valid[valid.length - 1];
+  return {
+    ...latest,
+    value: median(valid.map((item) => item.value as number)),
+    sampleCount: valid.length,
+  };
 }
 
 function confidence(score: number): DiagnosticHypothesis['confidence'] {
@@ -109,6 +128,7 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
   ).length;
   const blockedNonLiveDtcs = rawDtcs.length - liveDtcs.length;
   const hypotheses = new Map<string, DiagnosticHypothesis>();
+  let evaluatedRuleGroups = 0;
 
   const add = (rule: Rule, evidence: DiagnosticEvidence): void => {
     const current = hypotheses.get(rule.hypothesis);
@@ -145,20 +165,24 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
   const stft = pidValue(observations, '0106', nowMs, maxObservationAgeMs);
   const ltft = pidValue(observations, '0107', nowMs, maxObservationAgeMs);
   if (stft && ltft && isTrimContext(input.condition)) {
+    evaluatedRuleGroups += 1;
     const combinedTrim = stft.value! + ltft.value!;
     const lean = rules.find((item) => item.id === 'FUEL_TRIM_LEAN');
     const rich = rules.find((item) => item.id === 'FUEL_TRIM_RICH');
     if (lean && combinedTrim >= (lean.trigger.combinedTrimMin ?? Number.POSITIVE_INFINITY)) {
-      add(lean, { ruleId: lean.id, text: 'STFT + LTFT = ' + combinedTrim.toFixed(2) + '% em contexto ' + input.condition + '.', source: 'PID', pid: '0106/0107', value: combinedTrim });
+      add(lean, { ruleId: lean.id, text: 'Mediana de ' + stft.sampleCount + ' leituras STFT e ' + ltft.sampleCount + ' leituras LTFT: soma = ' + combinedTrim.toFixed(2) + '% em contexto ' + input.condition + '.', source: 'PID', pid: '0106/0107', value: combinedTrim, sampleCount: Math.min(stft.sampleCount, ltft.sampleCount) });
     } else if (rich && combinedTrim <= (rich.trigger.combinedTrimMax ?? Number.NEGATIVE_INFINITY)) {
-      add(rich, { ruleId: rich.id, text: 'STFT + LTFT = ' + combinedTrim.toFixed(2) + '% em contexto ' + input.condition + '.', source: 'PID', pid: '0106/0107', value: combinedTrim });
+      add(rich, { ruleId: rich.id, text: 'Mediana de ' + stft.sampleCount + ' leituras STFT e ' + ltft.sampleCount + ' leituras LTFT: soma = ' + combinedTrim.toFixed(2) + '% em contexto ' + input.condition + '.', source: 'PID', pid: '0106/0107', value: combinedTrim, sampleCount: Math.min(stft.sampleCount, ltft.sampleCount) });
     }
   }
 
   const map = pidValue(observations, '010B', nowMs, maxObservationAgeMs);
   const mapRule = rules.find((item) => item.id === 'MAP_HIGH_IDLE');
-  if (map && mapRule && input.condition === mapRule.trigger.condition && map.value! >= (mapRule.trigger.mapMinKpa ?? Number.POSITIVE_INFINITY)) {
-    add(mapRule, { ruleId: mapRule.id, text: 'MAP em marcha lenta aquecida = ' + map.value!.toFixed(2) + ' kPa.', source: 'PID', pid: '010B', value: map.value! });
+  if (map && mapRule && input.condition === mapRule.trigger.condition) {
+    evaluatedRuleGroups += 1;
+    if (map.value! >= (mapRule.trigger.mapMinKpa ?? Number.POSITIVE_INFINITY)) {
+      add(mapRule, { ruleId: mapRule.id, text: 'Mediana de ' + map.sampleCount + ' leituras MAP em marcha lenta aquecida = ' + map.value!.toFixed(2) + ' kPa.', source: 'PID', pid: '010B', value: map.value!, sampleCount: map.sampleCount });
+    }
   }
 
   return {
@@ -167,11 +191,12 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
     generatedAt: new Date().toISOString(),
     hypotheses: [...hypotheses.values()].sort((a, b) => b.score - a.score),
     acceptedLiveSamples: observations.length,
+    evaluatedRuleGroups,
     blockedSimulationSamples,
     blockedNonLiveSamples,
     blockedStaleSamples,
     blockedInvalidSamples,
     blockedNonLiveDtcs,
-    disclaimer: 'Pontuação e nível de evidência são heurísticos, não probabilidades estatísticas. Leituras OBD usadas por hipóteses precisam ser REAL_OBD, finitas, plausíveis e recentes (até ' + Math.round(maxObservationAgeMs / 1000) + ' s). Nenhuma hipótese isolada confirma defeito; ausência de hipótese não certifica saúde do veículo.'
+    disclaimer: 'Pontuação e nível de evidência são heurísticos, não probabilidades estatísticas. Regras de tendência exigem ao menos ' + MIN_DIAGNOSTIC_SAMPLES_PER_PID + ' amostras REAL_OBD finitas, plausíveis, distintas e recentes (até ' + Math.round(maxObservationAgeMs / 1000) + ' s); a comparação usa a mediana das últimas amostras. Nenhuma hipótese isolada confirma defeito; ausência de hipótese não certifica a saúde do veículo.'
   };
 }
