@@ -4036,7 +4036,7 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Não foi removido nem enfraquecido o gate de baseline; apenas alinhado o teste de layout com a arquitetura atual.
 
 ### Validação e próximos passos
-- Commit da correção: `aabc06bea4f93c479417f90101ac77095187d3af`.
+- Commits da correção do contrato de teste: `aabc06bea4f93c479417f90101ac77095187d3af` e `93527a815a2c42de6e8ff15895a2abd512eca8f3`; a asserção final verifica diretamente a ausência de DTC no cockpit.
 - A CI do novo HEAD deve concluir `validate` e `android-build` com sucesso antes de considerar a PR pronta.
 - P0 continua bloqueado até CI verde no SHA exato e reconciliação da divergência entre a captura instalada e o layout do código. Testes físicos de Bluetooth/ECU, GPS e autonomia no Galaxy A06 seguem pendentes.
 - Não houve merge. As tarefas P1/P2 permanecem na mesma frente consolidada; não abrir branch paralela.
