@@ -1308,11 +1308,12 @@ async function testPidAndLearningWriteSerialization() {
   assert.strictEqual(profile.learningStatus, 'COLD_START');
   const autoTripServiceSource = fs.readFileSync(path.join(ROOT, 'src', 'trip', 'autoTripService.ts'), 'utf8');
   const cockpitSource = fs.readFileSync(path.join(ROOT, 'app', 'index.tsx'), 'utf8');
-  assert.ok(cockpitSource.includes("item.pid === '0105'"), 'cockpit deve identificar temperatura do líquido pelo PID 0105');
+  assert.ok(cockpitSource.includes("pid: '0105'") && cockpitSource.includes('TEMPERATURA DO MOTOR'), 'quadrante de temperatura deve mapear o PID 0105');
   assert.ok(cockpitSource.includes("item.source !== 'REAL'"), 'cockpit não deve exibir temperatura simulada como dado real');
   assert.ok(cockpitSource.includes('ageMs >= 0 && ageMs <= 30_000'), 'cockpit deve descartar temperatura OBD futura ou obsoleta após 30 segundos');
-  assert.ok(cockpitSource.includes('LÍQUIDO DE ARREFECIMENTO'), 'página inicial deve apresentar métrica de temperatura do arrefecimento');
-  assert.ok(cockpitSource.includes("'TEMPERATURA ALTA'"), 'cockpit deve destacar temperatura alta sem esconder o valor numérico');
+  assert.ok(cockpitSource.includes('quadrantDefinitions') && cockpitSource.includes('TEMPERATURA DO MOTOR'), 'temperatura deve aparecer no quadrante principal, sem cartão duplicado');
+  const cockpitTelemetrySource = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'cockpitTelemetry.ts'), 'utf8');
+  assert.ok(cockpitTelemetrySource.includes("if (value >= 115) return 'danger'") && cockpitSource.includes('quadrantCardDanger'), 'temperatura alta deve ganhar destaque no quadrante sem esconder o valor numérico');
   assert.ok(autoTripServiceSource.includes('registerObdQuery(this.basePath, fuelLevelResult, \'REAL\')'), 'PID 012F automático deve alimentar o pipeline de persistência');
   assert.ok(autoTripServiceSource.includes('registerObdQuery(this.basePath, fuelResult, \'REAL\')'), 'PID 015E automático deve alimentar o pipeline de persistência');
   assert.ok(autoTripServiceSource.includes('registerObdQuery(this.basePath, speedResult, \'REAL\')'), 'PID 010D automático deve alimentar o pipeline de persistência');
