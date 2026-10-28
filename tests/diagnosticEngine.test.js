@@ -190,6 +190,8 @@ function main() {
   assert.equal(result.hypotheses[0].score, 0.55);
   assert.match(result.disclaimer, /não probabilidades estatísticas/i);
 
+  assert.equal(result.version, 2, 'o contrato de saída da IA deve identificar a versão de evidência v2');
+
   console.log('Diagnostic engine: OK');
 }
 
