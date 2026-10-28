@@ -16,7 +16,7 @@ export default function SaudeScreen() {
   const [state,setState]=useState(getAutoSaveState());
   useEffect(()=>{const t=setInterval(()=>setState(getAutoSaveState()),1000);return()=>clearInterval(t)},[]);
   const context = getVehicleConditionSnapshot();
-  const activeDtcs = state.dtcs.filter((item) => item.source === 'REAL_OBD' && ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(item.status));
+  const activeDtcs = state.dtcs.filter((item) => item.source === 'REAL_OBD' && !item.historical && ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(item.status));
   const diagnostic: DiagnosticResult = useMemo(()=>runLocalDiagnostic({observations:state.lastReadings.map(r=>({pid:r.pid,name:r.name,value:r.value,unit:r.unit,source:normalizeDiagnosticSource(r.source),timestamp:r.timestamp,confidence:r.source==='SIMULACAO'?'LOW':'GOOD'} as PidObservation)),dtcs:state.dtcs,condition:context.condition}),[state,context.condition]);
   const ecuCurrentlyValidated = getSharedObdStatus().ecuConnected;
   const noCurrentFindings = diagnostic.hypotheses.length === 0 && activeDtcs.length === 0;
