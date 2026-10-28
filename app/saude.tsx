@@ -56,6 +56,9 @@ export default function SaudeScreen() {
     {diagnostic.blockedStaleSamples > 0 ? <Text style={styles.detail}>LEITURAS ANTIGAS/FUTURAS BLOQUEADAS: {diagnostic.blockedStaleSamples}</Text> : null}
     {diagnostic.blockedInvalidSamples > 0 ? <Text style={styles.detail}>LEITURAS INVÁLIDAS/IMPLAUSÍVEIS BLOQUEADAS: {diagnostic.blockedInvalidSamples}</Text> : null}
     {diagnostic.blockedNonLiveSamples > 0 ? <Text style={styles.detail}>DADOS IMPORTADOS/REFERÊNCIA BLOQUEADOS: {diagnostic.blockedNonLiveSamples}</Text> : null}
+    {diagnostic.blockedDuplicateSamples > 0 ? <Text style={styles.detail}>AMOSTRAS COM TIMESTAMP DUPLICADO BLOQUEADAS: {diagnostic.blockedDuplicateSamples}</Text> : null}
+    {diagnostic.blockedStaleDtcs > 0 ? <Text style={styles.detail}>DTCs COM ÚLTIMA OBSERVAÇÃO ANTIGA/FUTURA BLOQUEADOS: {diagnostic.blockedStaleDtcs}</Text> : null}
+    <Text style={styles.detail}>AMOSTRAS OBD ATUAIS ACEITAS: {diagnostic.acceptedLiveSamples} · GRUPOS DE REGRAS AVALIADOS: {diagnostic.evaluatedRuleGroups}</Text>
     <Text style={styles.disclaimer}>{diagnostic.disclaimer}</Text>
     <Link href="/laboratorio" asChild><TouchableOpacity style={styles.primary}><Text style={styles.primaryText}>🔧 EXECUTAR NOVO DIAGNÓSTICO</Text></TouchableOpacity></Link>
     <Link href="/" asChild><TouchableOpacity style={styles.back}><Text style={styles.backText}>← VOLTAR AO COCKPIT</Text></TouchableOpacity></Link>
