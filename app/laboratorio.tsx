@@ -17,7 +17,7 @@ import { autoTripService } from '../src/trip/autoTripService';
 import { getMidLayout } from '../src/ui/midLayout';
 import { COLORS, SCREEN_TITLE_STYLE } from '../src/ui/theme';
 import { scanDtcServices, readFreezeFrame, type DtcServiceScan } from '../src/obd/dtcScanner';
-import { getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
+import { getLiveSeries, getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
 import { decodeFormula } from '../src/obd/formulaEngine';
 
 import { DtcRecord, nextDtcOccurrences, readDtcs, recordDtc } from '../src/database/dtcManager';
@@ -28,7 +28,7 @@ import {
   getAutoSaveState,
 } from '../src/meriva/autosaveManager';
 import { forceSaveOnObdEvent, registerObdQuery } from '../src/meriva/autosaveIntegration';
-import { normalizeDiagnosticSource, runLocalDiagnostic, type DiagnosticResult } from '../src/diagnostics/diagnosticEngine';
+import { runLocalDiagnostic, type DiagnosticResult } from '../src/diagnostics/diagnosticEngine';
 import type { PidObservation } from '../src/types/sourceTypes';
 
 type Mode = 'REAL' | 'SIMULACAO';
@@ -501,17 +501,21 @@ export default function LaboratorioScreen() {
     { pid: '012D', name: 'Erro do EGR', formula: 'FUEL_TRIM', bytes: [0xFF], expected: '99,21875%' },
     { pid: '015D', name: 'Tempo de injeção', formula: 'INJECTION_TIMING', bytes: [0xFF, 0xFF], expected: '301,9921875°' },
   ].map((item) => ({ ...item, result: decodeFormula(item.formula, item.pid, item.bytes) }));
-  const diagnostic: DiagnosticResult = runLocalDiagnostic({
-    observations: getAutoSaveState().lastReadings.map((reading): PidObservation => ({
+  const diagnosticState = getAutoSaveState();
+  const diagnosticObservations = ['0106', '0107', '010B'].flatMap((pid) =>
+    getLiveSeries(pid).slice(-5).map((reading): PidObservation => ({
       pid: reading.pid,
       name: reading.name,
       value: reading.value,
       unit: reading.unit,
-      source: normalizeDiagnosticSource(reading.source),
+      source: 'REAL_OBD',
       timestamp: reading.timestamp,
-      confidence: reading.source === 'SIMULACAO' ? 'LOW' : 'GOOD',
+      confidence: 'GOOD',
     })),
-    dtcs: getAutoSaveState().dtcs,
+  );
+  const diagnostic: DiagnosticResult = runLocalDiagnostic({
+    observations: diagnosticObservations,
+    dtcs: diagnosticState.dtcs,
     condition: getVehicleConditionSnapshot().condition,
   });
 
@@ -675,7 +679,7 @@ export default function LaboratorioScreen() {
           <Text style={styles.aiEngine}>EVIDÊNCIAS v{diagnostic.version}</Text>
         </View>
         {diagnostic.hypotheses.length === 0 ? (
-          <Text style={styles.aiMuted}>Nenhuma hipótese com evidência suficiente neste momento.</Text>
+          <Text style={styles.aiMuted}>{diagnostic.evaluatedRuleGroups === 0 ? 'DADOS INSUFICIENTES: conecte a ECU e aguarde pelo menos três leituras recentes e distintas dos PIDs necessários. A ausência de hipótese não significa sistema normal.' : 'Nenhuma hipótese acionada pelas regras avaliadas. Isso não certifica a saúde total do veículo.'}</Text>
         ) : diagnostic.hypotheses.map((hypothesis) => (
           <View key={hypothesis.id} style={styles.hypothesis}>
             <Text style={styles.hypothesisTitle}>{hypothesis.label}</Text>
@@ -692,6 +696,8 @@ export default function LaboratorioScreen() {
         {diagnostic.blockedStaleSamples > 0 ? <Text style={styles.aiWarning}>LEITURAS ANTIGAS/FUTURAS BLOQUEADAS: {diagnostic.blockedStaleSamples}</Text> : null}
         {diagnostic.blockedInvalidSamples > 0 ? <Text style={styles.aiWarning}>LEITURAS INVÁLIDAS/IMPLAUSÍVEIS BLOQUEADAS: {diagnostic.blockedInvalidSamples}</Text> : null}
         {diagnostic.blockedNonLiveSamples > 0 ? <Text style={styles.aiWarning}>DADOS IMPORTADOS/REFERÊNCIA BLOQUEADOS: {diagnostic.blockedNonLiveSamples}</Text> : null}
+        {diagnostic.blockedDuplicateSamples > 0 ? <Text style={styles.aiWarning}>AMOSTRAS COM TIMESTAMP DUPLICADO BLOQUEADAS: {diagnostic.blockedDuplicateSamples}</Text> : null}
+        {diagnostic.blockedStaleDtcs > 0 ? <Text style={styles.aiWarning}>DTCs COM ÚLTIMA OBSERVAÇÃO ANTIGA/FUTURA BLOQUEADOS: {diagnostic.blockedStaleDtcs}</Text> : null}
         <Text style={styles.aiDisclaimer}>{diagnostic.disclaimer}</Text>
       </View>
 
