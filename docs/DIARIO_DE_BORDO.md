@@ -226,6 +226,7 @@
 - **DB-139** · 2026-10-28 — Auditoria de obsolescência: reconciliar marca, arquitetura e framing ELM327
 - **DB-140** · 2026-10-28 — Auditoria da rede móvel e dos provedores de localização
 - **DB-141** · 2026-10-28 — Auditoria profunda de PIDs, interpretação e integridade da IA local
+- **DB-142** · 2026-10-28 — Corrigir polaridade da prontidão no PID 0101
 
 ---
 
@@ -4211,4 +4212,22 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Depois da CI, inspecionar o APK em Galaxy A06/Android 16 e conferir os novos textos/status no app. A interpretação de PID 0101 é coberta por testes automatizados, mas ainda requer inspeção de interface instalada.
 - Validação física do ELM327/ECU real permanece pendente; a resposta `010C` em 2026-10-27 foi timeout, então nenhum PID candidato está fisicamente confirmado por esta rodada.
 - Não inferir precisão de sensor a partir da bitmap, da fórmula, da ausência de DTC ou do score local. Próxima fase de IA deve ampliar a corroborabilidade e avaliar falsos positivos/negativos em dados reais rotulados, não simplesmente adicionar mais regras ou PIDs.
+
+
+
+## DB-142 · 2026-10-28 — Corrigir polaridade da prontidão no PID 0101
+
+### Achado confirmado em documentação bit a bit
+- O cruzamento da tabela do PID 0101 no padrão J1979 com o parser revelou que os bits de prontidão do byte D estavam invertidos na lógica. Nos bits contínuos do byte B, bit de incompletude em 1 significa incompleto. Já no byte D, bit de prontidão em 1 significa concluído/pronto e bit 0 significa não concluído. Fonte pública técnica consultada: https://www.dashlogic.com/docs/technical/obdii_pids (tabela Mode 01 PID 01, bytes B–D, linhas 83–133 na consulta) e https://obd2pid.com/pids/01-01 (mapa dos bits, revisado em 2026-08-31).
+- Consequência: a implementação anterior podia exibir monitor concluído como incompleto, confundindo a prontidão OBD com defeito.
+
+### Correção aplicada
+- `src/obd/parser.ts`: os monitores não contínuos por SI e CI agora são tratados como incompletos quando o bit D correspondente é zero e o bit C correspondente confirma suporte. O bit de incompletude do byte B mantém a polaridade inversa definida para os três monitores contínuos. Bits reservados ou monitores não suportados não criam alertas.
+- `tests/pidParserIntegrity.test.js`: ampliados casos separados para SI pronto/incompleto, CI, monitor não suportado e verificação dos campos específicos. Fixtures corrigidas para que o bit B3 represente SI ou CI intencionalmente; não se assume tipo de motor a partir de outros bytes.
+- Atualizados `docs/AUDITORIA_PIDS_IA_2026-10-28.md` e `CHANGELOG.md`.
+
+### Validação e limites
+- A nova alteração exige CI do HEAD final com gate, TypeScript, todas as suítes e build Android verdes.
+- Este teste prova a interpretação do bitmap sintético, não o estado de prontidão atual da ECU da Meriva. A sessão física e a resposta real de PID 0101 continuam pendentes.
+- A correção não altera fórmula de PID nem fluxo de polling; é uma correção semântica de bitmask de segurança diagnóstica.
 
