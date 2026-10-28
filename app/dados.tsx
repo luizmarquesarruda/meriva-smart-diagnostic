@@ -182,7 +182,7 @@ export default function DadosScreen() {
                   {item.interpretation ? <Text style={styles.pid}>{item.interpretation}</Text> : null}
                   <Text style={styles.pid}>{formatAgeFromTimestamp(item.timestamp)}</Text>
                 </View>
-                <Text style={styles.value}>{item.value == null ? 'N/D' : String(item.value) + (item.unit ? ' ' + item.unit : '')}</Text>
+                <Text style={styles.value}>{item.pid === '0101' && item.interpretation ? 'STATUS OBD-II' : item.value == null ? 'N/D' : String(item.value) + (item.unit ? ' ' + item.unit : '')}</Text>
               </View>
             );
           })}
