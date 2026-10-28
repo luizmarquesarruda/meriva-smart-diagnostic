@@ -3,7 +3,7 @@
 ## Unreleased
 
 ### Auditoria de obsolescência
-- Padronizado o nome exibido como MERIVA SMART e corrigidas descrições antigas de navegação e framing Bluetooth.
+- Esclarecida a distinção entre o nome do projeto MERIVA SMART e o rótulo genérico `Smart OBD Diagnostic` do app Expo; corrigidas descrições antigas de navegação e framing Bluetooth.
 - Registrado débito de modernização do Expo SDK 51 e da API antiga de FileSystem; upgrade permanece separado até existir baseline físico de Bluetooth/GPS e plano de migração validado.
 
 ### Cockpit

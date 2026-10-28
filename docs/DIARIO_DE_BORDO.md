@@ -4123,7 +4123,7 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 ## DB-139 · 2026-10-28 — Auditoria de obsolescência: reconciliar marca, arquitetura e framing ELM327
 
 ### Achados confirmados e correções
-- O rótulo de aplicativo em `app.json` e o título/descrição do README diziam `Smart OBD Diagnostic`, enquanto a interface e o projeto são identificados como `MERIVA SMART`. Nome visível padronizado em `app.json` e README. Slug, scheme e package Android foram preservados para evitar quebra de identidade técnica.
+- O rótulo nativo `Smart OBD Diagnostic` diferia da marca do projeto MERIVA SMART, mas o gate `tests/projectBaseline.test.js` exige explicitamente que o app não fique preso ao nome Meriva. O nome nativo foi mantido genérico; README e changelog agora distinguem a marca do projeto da identidade do app. Slug, scheme e package Android continuam estáveis.
 - O README tinha uma seção `Validação CI` de 2026-10-06 dizendo que o commit servia como gatilho técnico e afirmando delimiter CR, em contradição com o código vigente. A seção/meta repetidas foram removidas; o contrato operacional fica na seção de engenharia ELM327 e no playbook atual.
 - `docs/ELM327_COMPATIBILITY_REVIEW_2026-10-05.md` descrevia delimiter CR real, retry default 2/infinito e ATI como obrigatório. Corrigido para o código/catalogação atuais: `delimiter: ''`, RX delimitado pelo prompt `>`, CR no TX, 20 tentativas-base finitas/8 s, `ATZ` obrigatório e `ATI` best-effort.
 - `docs/ARCHITECTURE.md` descrevia quatro áreas genéricas e incluía DTC como conteúdo do cockpit. Atualizado para refletir as rotas existentes e a responsabilidade exclusiva da tela Saúde pelos DTCs.

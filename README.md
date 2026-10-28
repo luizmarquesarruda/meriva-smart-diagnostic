@@ -1,6 +1,6 @@
 # MERIVA SMART
 
-Aplicativo Android offline de diagnóstico OBD-II. O nome exibido do produto é Meriva Smart; os identificadores técnicos do aplicativo são mantidos estáveis para preservar compatibilidade com a instalação e links existentes.
+Repositório e linha de desenvolvimento: MERIVA SMART. O rótulo do aplicativo Expo permanece `Smart OBD Diagnostic`, genérico para permitir configurar diferentes veículos; o perfil Chevrolet Meriva é o foco de validação atual, não uma restrição do motor OBD.
 
 As especificações físicas e de manutenção do veículo são mantidas em `src/database/merivaManual.ts`, com referência ao Manual do Proprietário Chevrolet Meriva 2012.
 

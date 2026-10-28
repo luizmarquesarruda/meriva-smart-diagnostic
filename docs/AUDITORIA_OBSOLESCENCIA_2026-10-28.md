@@ -7,13 +7,13 @@
 
 ## Resultado executivo
 
-Foram corrigidas divergências documentais que apresentavam a marca, o inventário de telas e o framing ELM de modo inconsistente com o código. Nenhum componente foi apagado apenas por parecer antigo pelo nome. O maior débito de obsolescência é a plataforma: Expo SDK 51 e a API antiga do FileSystem precisam de um projeto de atualização separado e testável.
+Foram corrigidas divergências documentais sobre o inventário de telas e o framing ELM. A hipótese de que o rótulo nativo deveria mudar para MERIVA SMART foi rejeitada pelo gate: o app precisa continuar genérico para veículos configuráveis. Nenhum componente foi apagado apenas por parecer antigo pelo nome. O maior débito de obsolescência é a plataforma: Expo SDK 51 e a API antiga do FileSystem precisam de um projeto de atualização separado e testável.
 
 ## Achados e ações
 
 | ID | Severidade | Achado | Ação |
 |---|---|---|---|
-| OBS-01 | P2 | Nome de exibição `Smart OBD Diagnostic` divergente da marca `MERIVA SMART`. | Corrigido em `app.json` e README; mantidos slug, scheme e package Android. |
+| OBS-01 | Verificado — não é obsolescência | Nome nativo `Smart OBD Diagnostic` difere da marca/repositório MERIVA SMART. O baseline contém um contrato explícito para não prender o app a um único veículo. | Mantido o nome genérico em `app.json`; README explica a distinção entre identidade do projeto e label do app. O teste anti-regressão foi preservado. |
 | OBS-02 | P1 | README mantinha um bloco datado de gatilho de CI e descrevia delimiter CR, contrariando o transporte atual. | Removida seção/meta obsoleta e duplicada. |
 | OBS-03 | P1 | Revisão ELM antiga afirmava delimiter CR, 2 tentativas/infinito e ATI obrigatório. | Corrigida contra o código/catalogação atuais. |
 | OBS-04 | P2 | Arquitetura documentava quatro áreas fixas e DTC no cockpit. | Corrigida para as rotas reais e para DTC na tela Saúde. |

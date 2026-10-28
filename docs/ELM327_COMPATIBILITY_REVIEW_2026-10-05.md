@@ -41,6 +41,6 @@ A repository audit can prove source-level behavior, but it cannot prove that a s
 6. 010C returns a valid 410C payload.
 7. App reports OBD ONLINE only after these checks.
 
-## Correção documental 2026-10-06
+## Configuração vigente reconfirmada — 2026-10-28
 
 O código vigente usa Bluetooth Classic/RFCOMM com `connectionType: delimited`, delimitador vazio (`delimiter: ''`) e charset `ascii`; o RX é anexado ao buffer e a resposta fecha no prompt `>`. CR (`0x0D`) termina o comando TX. A política-base de retry é finita: 20 tentativas e 8 s entre falhas; `ATI` é best-effort e a validação da ECU exige uma resposta OBD válida ao PID `010C`. A seleção automática não depende de MAC informado pelo usuário.
