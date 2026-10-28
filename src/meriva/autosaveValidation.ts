@@ -38,6 +38,7 @@ function validateReadings(value: unknown): boolean {
       (item.value === null || (typeof item.value === 'number' && Number.isFinite(item.value))) &&
       typeof item.unit === 'string' &&
       typeof item.status === 'string' &&
+      (item.interpretation === undefined || typeof item.interpretation === 'string') &&
       typeof item.timestamp === 'string' && Number.isFinite(Date.parse(item.timestamp)) &&
       (item.source === 'REAL' || item.source === 'SIMULACAO');
   });
