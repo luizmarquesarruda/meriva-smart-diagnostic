@@ -219,22 +219,36 @@ export function parsePidResponse(pidRequested: string, rawResponse: string, posi
         const compressionIgnition = (b & 0x08) !== 0;
         const catalystSupported = (readinessSupported & 0x01) !== 0;
         const catalystIncomplete = (readiness & 0x01) !== 0;
-        const incomplete = [
-          ['MISFIRE', (b & 0x10) !== 0],
-          ['FUEL_SYSTEM', (b & 0x20) !== 0],
-          ['COMPONENTES', (b & 0x40) !== 0],
-          ['CATALISADOR', catalystSupported && catalystIncomplete],
-          ['CATALISADOR_AQUECIDO', (readinessSupported & 0x02) !== 0 && (readiness & 0x02) !== 0],
-          ['EVAP', (readinessSupported & 0x04) !== 0 && (readiness & 0x04) !== 0],
-          ['AR_SECUNDARIO', (readinessSupported & 0x08) !== 0 && (readiness & 0x08) !== 0],
-          ['O2', (readinessSupported & 0x20) !== 0 && (readiness & 0x20) !== 0],
-          ['AQUECEDOR_O2', (readinessSupported & 0x40) !== 0 && (readiness & 0x40) !== 0],
-          ['EGR/VVT', (readinessSupported & 0x80) !== 0 && (readiness & 0x80) !== 0],
-        ].filter(([, notReady]) => notReady).map(([name]) => name);
+        const commonIncomplete = [
+          ['MISFIRE', (b & 0x01) !== 0 && (b & 0x10) !== 0],
+          ['FUEL_SYSTEM', (b & 0x02) !== 0 && (b & 0x20) !== 0],
+          ['COMPONENTES', (b & 0x04) !== 0 && (b & 0x40) !== 0],
+        ];
+        const engineIncomplete = compressionIgnition
+          ? [
+              ['CATALISADOR_NMHC', (readinessSupported & 0x01) !== 0 && (readiness & 0x01) !== 0],
+              ['NOX_SCR', (readinessSupported & 0x02) !== 0 && (readiness & 0x02) !== 0],
+              ['PRESSAO_TURBO', (readinessSupported & 0x08) !== 0 && (readiness & 0x08) !== 0],
+              ['SENSOR_GASES_ESCAPE', (readinessSupported & 0x20) !== 0 && (readiness & 0x20) !== 0],
+              ['FILTRO_PM', (readinessSupported & 0x40) !== 0 && (readiness & 0x40) !== 0],
+              ['EGR/VVT', (readinessSupported & 0x80) !== 0 && (readiness & 0x80) !== 0],
+            ]
+          : [
+              ['CATALISADOR', catalystSupported && catalystIncomplete],
+              ['CATALISADOR_AQUECIDO', (readinessSupported & 0x02) !== 0 && (readiness & 0x02) !== 0],
+              ['EVAP', (readinessSupported & 0x04) !== 0 && (readiness & 0x04) !== 0],
+              ['AR_SECUNDARIO', (readinessSupported & 0x08) !== 0 && (readiness & 0x08) !== 0],
+              ['FILTRO_PARTICULAS_GASOLINA', (readinessSupported & 0x10) !== 0 && (readiness & 0x10) !== 0],
+              ['O2', (readinessSupported & 0x20) !== 0 && (readiness & 0x20) !== 0],
+              ['AQUECEDOR_O2', (readinessSupported & 0x40) !== 0 && (readiness & 0x40) !== 0],
+              ['EGR/VVT', (readinessSupported & 0x80) !== 0 && (readiness & 0x80) !== 0],
+            ];
+        const incomplete = [...commonIncomplete, ...engineIncomplete]
+          .filter(([, notReady]) => notReady)
+          .map(([name]) => name);
         return 'MIL=' + (mil ? 'ON' : 'OFF')
           + ' | DTCs=' + dtcCount
           + ' | MOTOR=' + (compressionIgnition ? 'DIESEL/CI' : 'CICLO OTTO/SI')
-          + ' | CATALISADOR=' + (catalystSupported ? (catalystIncomplete ? 'NÃO PRONTO' : 'PRONTO') : 'NÃO SUPORTADO')
           + ' | INCOMPLETOS=' + (incomplete.length ? incomplete.join(', ') : 'NENHUM');
       })()
     : pid === '0114'
