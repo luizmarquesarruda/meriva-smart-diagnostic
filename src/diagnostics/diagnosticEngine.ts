@@ -3,10 +3,10 @@ import { validatePidValue } from '../obd/formulaEngine';
 import ruleCatalog from '../knowledge/diagnostic_rules.json';
 import sensorTestCatalogJson from '../knowledge/sensor_tests.json';
 
-export interface DiagnosticInput { observations: PidObservation[]; dtcs?: DtcRecord[]; condition?: VehicleCondition; nowMs?: number; maxObservationAgeMs?: number; }
+export interface DiagnosticInput { observations: PidObservation[]; dtcs?: DtcRecord[]; condition?: VehicleCondition; nowMs?: number; maxObservationAgeMs?: number; maxDtcAgeMs?: number; }
 export interface DiagnosticEvidence { ruleId: string; text: string; source: 'DTC' | 'PID'; pid?: string; dtc?: string; value?: number; sampleCount?: number; }
 export interface DiagnosticHypothesis { id: string; label: string; score: number; confidence: 'LOW' | 'MEDIUM' | 'HIGH'; evidence: DiagnosticEvidence[]; nextTests: string[]; }
-export interface DiagnosticResult { engine: 'LOCAL_EVIDENCE_ENGINE'; version: 2; generatedAt: string; hypotheses: DiagnosticHypothesis[]; acceptedLiveSamples: number; evaluatedRuleGroups: number; blockedSimulationSamples: number; blockedNonLiveSamples: number; blockedStaleSamples: number; blockedInvalidSamples: number; blockedNonLiveDtcs: number; disclaimer: string; }
+export interface DiagnosticResult { engine: 'LOCAL_EVIDENCE_ENGINE'; version: 2; generatedAt: string; hypotheses: DiagnosticHypothesis[]; acceptedLiveSamples: number; evaluatedRuleGroups: number; blockedSimulationSamples: number; blockedNonLiveSamples: number; blockedStaleSamples: number; blockedInvalidSamples: number; blockedNonLiveDtcs: number; blockedStaleDtcs: number; disclaimer: string; }
 
 interface Rule { id: string; trigger: { dtc?: string; combinedTrimMin?: number; combinedTrimMax?: number; condition?: VehicleCondition; mapMinKpa?: number; }; hypothesis: string; baseScore: number; tests: string[]; }
 
@@ -21,6 +21,7 @@ const ACTIVE_DTC_STATUSES = new Set(['CONFIRMED', 'PENDING', 'PERMANENT', 'CURRE
 export const MAX_DIAGNOSTIC_OBSERVATION_AGE_MS = 45_000;
 export const MIN_DIAGNOSTIC_SAMPLES_PER_PID = 3;
 export const MAX_DIAGNOSTIC_SAMPLES_PER_PID = 5;
+export const MAX_DIAGNOSTIC_DTC_AGE_MS = 5 * 60_000;
 
 /**
  * Preserve provenance explicitly. Unknown/imported sources must never be
@@ -110,11 +111,16 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
   const observations = rawObservations.filter((item) =>
     isCurrentValidLiveObservation(item, nowMs, maxObservationAgeMs),
   );
+  const maxDtcAgeMs = Number.isFinite(input.maxDtcAgeMs) && (input.maxDtcAgeMs as number) > 0
+    ? input.maxDtcAgeMs as number
+    : MAX_DIAGNOSTIC_DTC_AGE_MS;
   const rawDtcs = input.dtcs ?? [];
-  const liveDtcs = rawDtcs.filter((item) =>
+  const isLiveDtcRecord = (item: DtcRecord) =>
     String(item.source ?? '').trim().toUpperCase() === 'REAL_OBD'
     && item.historical !== true
-    && ACTIVE_DTC_STATUSES.has(String(item.status ?? '').trim().toUpperCase()),
+    && ACTIVE_DTC_STATUSES.has(String(item.status ?? '').trim().toUpperCase());
+  const liveDtcs = rawDtcs.filter((item) =>
+    isLiveDtcRecord(item) && isFreshTimestamp(item.lastSeen, nowMs, maxDtcAgeMs),
   );
   const blockedSimulationSamples = rawObservations.filter(isSimulation).length;
   const blockedNonLiveSamples = rawObservations.filter((item) => !isLiveObd(item) && !isSimulation(item)).length;
@@ -126,7 +132,8 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
     && isFreshTimestamp(item.timestamp, nowMs, maxObservationAgeMs)
     && (item.derived === true || item.value === null || !Number.isFinite(item.value) || !validatePidValue(normalizePid(item.pid), item.value).valid),
   ).length;
-  const blockedNonLiveDtcs = rawDtcs.length - liveDtcs.length;
+  const blockedNonLiveDtcs = rawDtcs.filter((item) => !isLiveDtcRecord(item)).length;
+  const blockedStaleDtcs = rawDtcs.filter((item) => isLiveDtcRecord(item) && !isFreshTimestamp(item.lastSeen, nowMs, maxDtcAgeMs)).length;
   const hypotheses = new Map<string, DiagnosticHypothesis>();
   let evaluatedRuleGroups = 0;
 
@@ -197,6 +204,7 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
     blockedStaleSamples,
     blockedInvalidSamples,
     blockedNonLiveDtcs,
+    blockedStaleDtcs,
     disclaimer: 'Pontuação e nível de evidência são heurísticos, não probabilidades estatísticas. Regras de tendência exigem ao menos ' + MIN_DIAGNOSTIC_SAMPLES_PER_PID + ' amostras REAL_OBD finitas, plausíveis, distintas e recentes (até ' + Math.round(maxObservationAgeMs / 1000) + ' s); a comparação usa a mediana das últimas amostras. Nenhuma hipótese isolada confirma defeito; ausência de hipótese não certifica a saúde do veículo.'
   };
 }
