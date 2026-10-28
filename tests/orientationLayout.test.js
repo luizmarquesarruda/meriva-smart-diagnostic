@@ -28,8 +28,8 @@ assert.doesNotMatch(index, /ScrollView/);
 assert.match(index, /content:\{flex:1,width:'100%'/);
 assert.match(index, /maxContentWidth/);
 assert.match(index, /buildCockpitPidMetrics\(connectedSupportedPids, liveReadings\)/, 'cockpit deve consumir leituras reais e PIDs suportados pela ECU');
-assert.match(index, /coolantValue/);
-assert.match(index, /setInterval\(\s*\(\) => \{\s*setActiveHeroMetric/, 'a rotação automática deve usar um timer de ciclo de vida');
+assert.match(index, /quadrantDefinitions/, 'o painel deve reservar quadrantes para os quatro indicadores principais');
+assert.match(index, /setInterval\(\s*\(\) => \{\s*setActiveQuadrantPage/, 'a paginação automática dos quadrantes deve usar um timer com cleanup');
 assert.match(index, /10_000/);
 assert.doesNotMatch(index, /VELOCIDADE GPS/, 'GPS não deve ocupar um dos indicadores OBD rotativos principais');
 assert.equal(pollingPolicy.cockpit.maxDisplayedPids, 20, 'o cockpit deve suportar até vinte indicadores');
@@ -38,25 +38,25 @@ assert.equal(new Set(pollingPolicy.cockpit.pidOrder).size, 20, 'a lista de PIDs 
 for (const label of ['TEMPERATURA DO MOTOR', 'VOLTAGEM DO SISTEMA', 'POSIÇÃO DA BORBOLETA', 'ROTAÇÃO DO MOTOR']) {
   assert.ok(cockpitTelemetry.includes("'" + label + "'"), 'definição do cockpit ausente: ' + label);
 }
-assert.match(index, /const visibleHeroMetrics = abnormalMetrics\.length > 0 \? abnormalMetrics : heroMetrics/,
-  'leituras fora da faixa monitorada devem ter prioridade visual');
+assert.match(index, /const visibleHeroMetrics = abnormalMetrics\.length > 0\s*\? \[\.\.\.abnormalMetrics, \.\.\.heroMetrics\.filter/,
+  'alertas devem vir primeiro sem remover os outros indicadores das páginas');
 assert.match(index, /const heroMetrics: CockpitPidMetric\[\]/, 'lista de indicadores deve ser dinâmica');
 assert.doesNotMatch(index, /SAÚDE DO VEÍCULO|ABRIR CENTRAL DE SAÚDE/, 'não duplicar a central de saúde na página inicial');
 assert.match(index, /danger:\{color:'#fb7185'\}/, 'alerta térmico deve mudar a cor sem encolher o valor principal');
 assert.doesNotMatch(index, /DTC/, 'o cockpit não deve resumir DTC; essa informação pertence à tela Saúde');
 assert.ok(cockpitTelemetry.includes("'0111': 'POSIÇÃO DA BORBOLETA'"));
 assert.ok(cockpitTelemetry.includes("'0142': 'VOLTAGEM DO SISTEMA'"));
-assert.match(index, /heroSwitchHint/);
+assert.match(index, /quadrantInstruction/);
 assert.match(index, /item\.source !== 'REAL'/);
 for (const marker of ["'0142': 'VOLTAGEM DO SISTEMA'", "'0111': 'POSIÇÃO DA BORBOLETA'", "'010C': 'ROTAÇÃO DO MOTOR'"]) {
   assert.ok(cockpitTelemetry.includes(marker), 'definição de telemetria ausente: ' + marker);
 }
 assert.match(tripService, /telemetryCandidates = pollingPolicy\.polling\.rotatingTelemetryPids/);
 assert.match(index, /abnormalMetrics\.length > 0/, 'alertas devem ser priorizados na rotação');
-assert.match(index, /Indicador prioritário devido a uma leitura fora da referência monitorada/);
+assert.match(index, /abnormalMetrics\.includes\(metric\)/, 'anomalias devem ser priorizadas na ordem das páginas');
 assert.match(index, /locationLabelsKey/);
 assert.match(index, /setLocationLabelIndex/);
-assert.match(index, /activeMetricIndex \+ 1\}\/\{visibleHeroMetrics\.length\}/, 'contador visual deve seguir os PIDs visíveis');
+assert.match(index, /currentQuadrantPage \+ 1\}\/\{quadrantPageCount\}/, 'contador visual deve seguir a página atual dos quadrantes');
 assert.match(index, /href="[^"]*viagens"/);
 assert.match(index, /href="[^"]*dados"/);
 assert.match(index, /sessionCard/);
