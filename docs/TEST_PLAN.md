@@ -96,6 +96,21 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 - Antes desse limiar, usar apenas uma média histórica positiva válida; se não existir, apresentar N/D, nunca transformar amostra insuficiente em consumo alto.
 - CI automatizada não substitui teste físico com ELM327/ECU; validar no veículo a resposta real do PID 012F e a estabilidade da autonomia.
 
+## PID-AI-01 — Proveniência, frescor e rastreabilidade do diagnóstico local
+
+- Catalogar todas as entradas em `pids.json` e confirmar correspondência exata com `formulas.json` e `ranges.json`; nenhum PID duplicado, fórmula inexistente, unidade ausente ou payload divergente.
+- Ao avaliar a IA, aceitar somente origem explícita `REAL`/`REAL_OBD` conforme o contrato da telemetria do app, sem converter fonte desconhecida/importada em real. Rejeitar origem `SIMULACAO`, baseline/seed, telemetria derivada, valor nulo/não finito, faixa inválida, timestamp futuro ou leitura com mais de 45 s por padrão.
+- Normalizar o identificador antes da validação da faixa: `01 0B` e `010B` devem apontar para a mesma faixa; espaços não podem permitir que um valor impossível passe na triagem.
+- DTC cuja origem não seja `REAL_OBD`, cujo status não esteja ativo ou que esteja marcado `historical=true` não pode gerar hipótese atual. Duplicatas do mesmo DTC/evidência não podem aumentar pontuação.
+- Exibir score e LOW/MEDIUM/HIGH como pontuação/nível qualitativo heurístico, nunca como probabilidade de defeito. Não apresentar sistema normal só por inexistência de hipótese: exigir ECU respondendo na sessão atual e dados OBD reais recentes; sem isso, exibir dados insuficientes.
+- PID 0101: testar MIL, contador DTC, estado de monitores comuns, suporte por monitor e mapas distintos para ciclo Otto/SI e diesel/CI; bits de incompletude não devem acusar monitores não suportados. Preservar interpretação semântica no autosave/TXT e não exibir o U32 empacotado como medição.
+- Testes de sensores: pelo menos cinco tentativas numeradas distintas e cinco respostas válidas para um resultado conclusivo; timestamp inválido/futuro e número de tentativa duplicado não contam. Falha/timeout não vira zero nem aprovação.
+- A CI deve validar gate anti-regressão, TypeScript e suíte completa no mesmo SHA. Após build, verificar a tela Saúde/Dados/Laboratório no APK. A confirmação de qualquer novo PID na Meriva exige resposta RAW da ECU; validação física do sensor requer evidência adicional e não é inferida do bitmap ou do valor escalado.
+
+### Decisão de cobertura
+
+O catálogo atual contém 34 PIDs, 20 fórmulas, 34 faixas e 30 avaliações de sensores. Quatro PIDs (`0101`, `0130`, `0131`, `0151`) não têm avaliação de sensor própria, por se tratarem de estado/código/contador e não terem uma regra de teste operacional dedicada. Somente `010C` possui resposta RAW_ECU documentada para a Meriva; dez PIDs são apenas candidatos. Expandir o catálogo requer, em lote controlado, fórmula/documentação, bytes, unidade, faixa, parser vector, política de polling, custo de descoberta e evidência por veículo. Nunca marcar PID padronizado como suportado apenas porque está definido em JSON.
+
 ## NET-WEATHER-01 — Atualização de localização/clima por conectividade
 - Com internet disponível em Wi-Fi ou rede celular (4G/5G), carregar clima/localidade sem solicitar permissão de localização nova.
 - Atualizar após retornar de offline para online e no ciclo de 15 minutos; eventos de rede repetidos não podem disparar requisições concorrentes nem refresh contínuo.
