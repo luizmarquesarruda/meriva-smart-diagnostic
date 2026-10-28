@@ -202,6 +202,7 @@
 - **DB-129** · 2026-10-25 — GPS rejeita timestamps inválidos e fora de ordem
 - **DB-130** · 2026-10-25 — Otimização CSV avaliada e bloqueada pela versão instalada
 - **DB-131** · 2026-10-25 — Atualização periódica de localização/clima baseada em conectividade
+- **DB-132** · 2026-10-27 — Cockpit sem duplicação de DTC; cartão substituído por pressão do coletor
 
 ---
 
@@ -3987,3 +3988,20 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Commits criados na branch `fix/repository-audit-hardening-20261024` da PR #89. A CI deve ser verificada no HEAD final desta alteração; resultados de SHAs anteriores não contam como aprovação.
 - Ainda não foi executado teste físico de geolocalização em Android 16 alternando Wi-Fi/4G/5G. A CI não comprova recepção GPS pelo provedor fused, disponibilidade da operadora nem funcionamento do ELM327/ECU reais.
 - Nenhuma mudança foi mesclada em `main`. A atualização de clima é opcional e não deve afetar polling, conexão Bluetooth, autonomia ou diagnóstico local.
+
+## DB-132 · 2026-10-27 — Cockpit sem duplicação de DTC; cartão substituído por pressão do coletor
+
+### Solicitação
+- Evitar repetir no cockpit o resumo de DTC, já disponível na página específica Saúde/Diagnóstico.
+- Preservar o cartão de consumo e autonomia e preencher o terceiro cartão com outra informação útil, sem duplicação.
+
+### Alteração
+- `app/index.tsx`: removidos o estado e a contagem de DTC do cockpit; a tela Saúde continua responsável pelos DTCs.
+- O terceiro cartão passa a mostrar pressão do coletor em kPa a partir do PID 010B, somente usando leitura real, finita e recente (até 30 s) com ECU conectada. Sem leitura válida, apresenta N/D; não infere nem simula valor.
+- `tests/cockpitNavigation.test.js`: adicionadas verificações contra a repetição de DTC e para o uso de PID 010B e fallback N/D.
+- Atualizados o contrato RG-08, o plano de testes e o changelog.
+
+### Validação e limites
+- A mudança está isolada na branch `ui/cockpit-instant-consumption-20261027`; não foi feito merge.
+- A CI ainda precisa executar no HEAD final da branch. Nenhum teste automatizado, build APK ou inspeção visual no aparelho é declarado concluído nesta entrada.
+- O PID 010B pode não estar disponível em todas as ECUs; nesse caso, N/D é o comportamento correto. DTC continua acessível na tela Saúde.
