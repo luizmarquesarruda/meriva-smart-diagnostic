@@ -279,6 +279,7 @@ export default function IndexScreen() {
   const heroMetrics: CockpitPidMetric[] = [...primaryMetrics, ...orderedAdditionalMetrics];
   // Keep the first page stable; additional supported PIDs are paged after the main four.
   const visibleHeroMetrics: CockpitPidMetric[] = [...primaryMetrics, ...orderedAdditionalMetrics];
+  const quadrantPageCount = Math.max(1, Math.ceil(visibleHeroMetrics.length / COCKPIT_QUADRANT_PAGE_SIZE));
 
 
   useEffect(() => {
