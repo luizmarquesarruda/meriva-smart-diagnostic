@@ -4231,3 +4231,12 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Este teste prova a interpretação do bitmap sintético, não o estado de prontidão atual da ECU da Meriva. A sessão física e a resposta real de PID 0101 continuam pendentes.
 - A correção não altera fórmula de PID nem fluxo de polling; é uma correção semântica de bitmask de segurança diagnóstica.
 
+
+
+## Continuidade — correção da CI e rotulagem diagnóstica (2026-10-28)
+
+- Auditoria da execução CI no SHA `3a19b1cc6113ffc315dee81f945a4b84f4205dd9`: o job `validate` falhou em `tests/diagnosticEngine.test.js:133` com `ReferenceError: Cannot access 'nowMs' before initialization`; `android-build` foi ignorado por depender da validação.
+- Correção aplicada na frente única da PR #96: mover a inicialização do relógio de teste para antes do primeiro uso; nenhum limiar ou fórmula diagnóstica foi alterado.
+- Tela Saúde: substituir o símbolo de porcentagem por escala heurística `0–100` e rotular o nível como qualitativo, explicitando que não é probabilidade estatística.
+- Validação pendente: aguardar nova CI no SHA resultante; confirmar `validate` e `android-build` verdes no mesmo SHA. Nenhum merge foi executado.
+- Teste físico em Galaxy A06/Android 16/ELM327 real continua pendente; CI não substitui verificação da conexão e da resposta `010C`.
