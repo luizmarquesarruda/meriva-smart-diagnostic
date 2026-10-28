@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Integração Bubble nativa
+- Portados os contratos dos workflows para um cliente HTTPS tipado; validações para fonte OBD real, PID/bytes, frescor, GPS, eventos idempotentes e respostas de duplicata/rejeição.
+- Nenhuma alteração foi feita no Bubble; sincronização automática segue desativada até provisionamento seguro de dispositivo e token.
+
 ### PIDs e IA local
 - Endurecida a IA com origem explícita, bloqueio de leituras derivadas/antigas/futuras/inválidas, PID normalizado antes da validação de faixa, descarte de DTCs históricos e deduplicação de evidência.
 - Versionado o contrato do motor de evidências como v2; score e níveis LOW/MEDIUM/HIGH agora são descritos explicitamente como heurísticos, não probabilidades.

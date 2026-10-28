@@ -107,3 +107,10 @@ A disponibilidade dos PIDs, a qualidade do GPS e a comunicação com a ECU da Me
 ## Inicialização e splash screen nativa
 
 A tela nativa de abertura usa `assets/splash.png`, PNG transparente versionado, explicitamente referenciado pelo plugin `expo-splash-screen` em `app.json` (largura de 280 dp, fundo `#07111f`, `resizeMode: contain`). A configuração `expo.splash` legada aponta para a mesma imagem. A splash nativa é distinta da primeira tela React Native. O gate de baseline valida caminho/configuração/assinatura PNG e a CI valida a compilação; a inicialização fria instalada em dispositivo ainda exige inspeção visual separada.
+
+
+## Sincronização opcional com Bubble
+
+`src/cloud/bubbleWorkflowContract.ts` valida os contratos de entrada do backend sem alterar as regras operacionais locais. `src/cloud/bubbleWorkflowClient.ts` fornece a camada HTTPS para login, leituras OBD, GPS, viagens, DTC, suporte de PID e heartbeat. O token fica apenas em memória nessa camada; a integração de produção precisa usar Keystore/SecureStore e uma fila durável com IDs de evento estáveis.
+
+O Bubble é cópia sincronizada, não fonte da verdade para Bluetooth/ELM327, filtros GPS, fórmulas de combustível, histórico ou aprendizado. A sincronização live permanece desligada até haver um `custom.device` provisionado para o usuário e ID de viagem conhecido. Não usar token administrativo no APK. Ver `docs/BUBBLE_WORKFLOW_PORT.md` para a matriz do contrato e os bloqueios identificados.

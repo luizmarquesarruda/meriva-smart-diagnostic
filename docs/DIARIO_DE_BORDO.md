@@ -1,3 +1,15 @@
+## DB-133 — Portagem do contrato Bubble para a camada nativa (2026-10-28)
+
+- Fonte de consulta somente leitura: app Bubble `meriva-smart`, versão `test`; nenhum workflow, tipo, registro ou configuração Bubble foi alterado.
+- Base do código antes da portagem: `f8987268cf633e0720210ee279fee41da551dc82`, branch `ui/cockpit-instant-consumption-20261027`, dentro da PR #96.
+- Criados `src/cloud/bubbleWorkflowContract.ts` e `src/cloud/bubbleWorkflowClient.ts`, além de testes de regressão e documentação da matriz de endpoints.
+- Regras aproveitadas: autenticação por token de usuário (sem chave administrativa no APK), byte A/B de 0–255, catálogo explícito de PIDs, evento idempotente, frescor de 24 h, throttle OBD de 1 Hz, guardas GPS e resposta distinguindo aceitação/duplicata/rejeição.
+- Não importada a fórmula de combustível do workflow Bubble porque a expressão observada parece incorreta dimensionalmente; manter o integrador nativo do PID 015E.
+- Limitação aberta de integração (não é alteração no Bubble): não há workflow de provisionamento de dispositivo disponível e o plano não permite Data API; o cliente exige IDs válidos de `custom.device`/`custom.trip` e token de usuário guardado por componente seguro. Nenhum envio live foi ativado.
+- CI no novo SHA precisa ser conferida antes de considerar esta portagem validada. Teste físico Galaxy A06/Android 16/ELM327 e validação de sincronização real continuam pendentes.
+
+---
+
 ## ESTADO VIGENTE — 2026-10-28 (auditoria de obsolescência)
 
 > Frente única de trabalho: PR #96, branch `ui/cockpit-instant-consumption-20261027`. Este bloco é a referência operacional; snapshots abaixo são históricos.
