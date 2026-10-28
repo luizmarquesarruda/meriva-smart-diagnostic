@@ -4040,3 +4040,19 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - A CI do novo HEAD deve concluir `validate` e `android-build` com sucesso antes de considerar a PR pronta.
 - P0 continua bloqueado até CI verde no SHA exato e reconciliação da divergência entre a captura instalada e o layout do código. Testes físicos de Bluetooth/ECU, GPS e autonomia no Galaxy A06 seguem pendentes.
 - Não houve merge. As tarefas P1/P2 permanecem na mesma frente consolidada; não abrir branch paralela.
+
+
+## DB-135 · 2026-10-28 — Corrigir navegação icon-only no cockpit
+
+### Achado confirmado
+- A auditoria do código encontrou conflito entre o contrato RG-15/plano de testes (rótulos visíveis) e o teste `tests/cockpitNavigation.test.js`, que proibia explicitamente as legendas. A tela usava somente ícones, deixando a descoberta dos destinos dependente de memória do usuário, apesar de já existirem estilos de rótulo e nomes de acessibilidade.
+
+### Correção
+- `app/index.tsx`: adicionados rótulos visíveis Painel, Diagnóstico, Dados, Viagens e Mais às cinco abas, mantendo os ícones, rótulos de acessibilidade e alvos de toque existentes.
+- `tests/cockpitNavigation.test.js`: removida a asserção contraditória e adicionada verificação dos cinco rótulos visíveis.
+- `CHANGELOG.md` atualizado. O plano de testes já exigia rótulos visíveis e não precisou de alteração.
+
+### Validação e limites
+- Commits de código/teste: `7ce769c3b71ced1444f7556144c1bc1913f2754b` e `040bc92132b278ce10e1571305d8e19f9406aa9c`; changelog: `11238600e94d91dc6ff0ba75095e19130c4063be`.
+- A CI do HEAD final precisa confirmar typecheck, suíte completa e build Android. A redução de lacunas e legibilidade deve ser inspecionada em retrato/paisagem; não declarar validação visual sem captura atual do app.
+- Nenhum merge. A captura fornecida anteriormente ainda não foi reconciliada com a versão/build instalada.
