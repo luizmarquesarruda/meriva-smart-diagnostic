@@ -20,6 +20,10 @@ const plan=e.createSensorTestPlan(['010C','010B','0133','015E'],pid=>pid!=='015E
 assert.deepEqual(plan.map(x=>x.pid),['010C','010B','0133']);
 assert.equal(e.createSensorTestPlan(['010C','010C'],()=>true).length,1);
 assert.equal(e.assessSensorSample(sample('010B',36),'ENGINE_OFF',[...many('010B',[36,36,36,36]),...five('0133',38)]).state,'NAO_CONCLUSIVO','quatro tentativas não aprovam o PID');
+const duplicateReadNumbers=five('010B',36).map(row=>({...row,readingNumber:1}));
+assert.equal(e.assessSensorSample(sample('010B',36),'ENGINE_OFF',[...duplicateReadNumbers,...five('0133',38)]).state,'NAO_CONCLUSIVO','números de leitura duplicados não podem completar cinco tentativas');
+const futureReadings=five('010B',36).map(row=>({...row,timestamp:new Date(Date.now()+60_000).toISOString()}));
+assert.equal(e.assessSensorSample(sample('010B',36),'ENGINE_OFF',[...futureReadings,...five('0133',38)]).state,'NAO_CONCLUSIVO','amostras com timestamp futuro não podem aprovar um sensor');
 assert.equal(e.assessSensorSample(sample('010B',36),'ENGINE_OFF',[...five('010B',36),...five('0133',38)]).state,'CONSISTENTE');
 assert.equal(e.assessSensorSample(sample('010B',55),'ENGINE_OFF',[...five('010B',55),...five('0133',38)]).state,'INVESTIGAR');
 assert.equal(e.assessSensorSample(sample('010B',52),'ENGINE_ON',[...five('010B',52),...five('010C',800),...five('0105',90)]).state,'INVESTIGAR');
