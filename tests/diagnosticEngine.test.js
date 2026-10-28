@@ -62,6 +62,7 @@ function main() {
 
   const engine = loadTs(path.join(ROOT, 'src/diagnostics/diagnosticEngine.ts'));
   const base = { observations: [], dtcs: [], condition: 'IDLE_WARM' };
+  const nowMs = Date.now();
 
   let result = engine.runLocalDiagnostic({
     ...base,
@@ -156,7 +157,6 @@ function main() {
   assert.strictEqual(result.blockedSimulationSamples, 3);
 
   // A ausência de evidência corrente nunca equivale a um veículo saudável.
-  const nowMs = Date.now();
   const staleMap = { ...obs('010B', 80), timestamp: new Date(nowMs - 120_000).toISOString() };
   result = engine.runLocalDiagnostic({ ...base, observations: [staleMap], nowMs });
   assert.equal(result.hypotheses.length, 0, 'MAP antigo não pode disparar hipótese atual');
