@@ -22,7 +22,7 @@ import { autoTripService, type AutoTripServiceState } from '../src/trip/autoTrip
 import { loadCurrentConditions, type CurrentConditions } from '../src/weather/currentConditions';
 import { mergeCurrentConditions, startCurrentConditionsRefresh, type NetworkReachabilitySnapshot } from '../src/weather/conditionsRefresh';
 import { getCurrentAutonomyRangeKm } from '../src/trip/autonomyPresentation';
-import { buildCockpitPidMetrics, type CockpitPidMetric } from '../src/obd/cockpitTelemetry';
+import { buildCockpitPidMetrics, COCKPIT_QUADRANT_PAGE_SIZE, getCockpitMetricPage, type CockpitPidMetric } from '../src/obd/cockpitTelemetry';
 
 export default function IndexScreen() {
   const [cycles, setCycles] = useState<DriveCycle[]>([]);
@@ -34,7 +34,7 @@ export default function IndexScreen() {
   const [isHydrated, setIsHydrated] = useState(false);
   const [tripState, setTripState] = useState<AutoTripServiceState>(autoTripService.getState());
   const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [activeHeroMetric, setActiveHeroMetric] = useState(0);
+  const [activeQuadrantPage, setActiveQuadrantPage] = useState(0);
   const [conditions, setConditions] = useState<CurrentConditions>({ city: null, locationLabels: [], temperatureC: null, description: 'CLIMA OPCIONAL', available: false });
   const [locationLabelIndex, setLocationLabelIndex] = useState(0);
   const layout = useMidLayout();
@@ -227,8 +227,6 @@ export default function IndexScreen() {
     const ageMs = Date.now() - timestampMs;
     return connectionStatus.ecuConnected && Number.isFinite(timestampMs) && ageMs >= 0 && ageMs <= 30_000;
   });
-  const coolantReading = freshRealReading((item) => item.pid === '0105' || /coolant|arrefecimento|temperatura.*motor/i.test(item.name));
-  const coolantValue = coolantReading?.value ?? null;
   const manifoldPressureReading = freshRealReading((item) => item.pid === '010B' || /manifold.*pressure|press[aã]o.*coletor/i.test(item.name));
   const manifoldPressureKpa = manifoldPressureReading?.value ?? null;
   const currentAutonomyKm = getCurrentAutonomyRangeKm({
@@ -244,39 +242,70 @@ export default function IndexScreen() {
     ? getSharedObdConnection()?.supportedPids ?? []
     : [];
   const discoveredHeroMetrics = buildCockpitPidMetrics(connectedSupportedPids, liveReadings);
-  const fallbackHeroMetrics: CockpitPidMetric[] = [{
-    pid: '',
-    label: 'DADOS OBD EM TEMPO REAL',
-    value: null,
-    unit: '',
-    severity: 'normal',
-    freshness: 'missing',
-    hint: connectionStatus.ecuConnected
-      ? 'NENHUM DOS PIDs DO PAINEL FOI ANUNCIADO PELA ECU'
-      : 'CONECTE A ECU PARA IDENTIFICAR OS PIDs SUPORTADOS',
-  }];
-  const heroMetrics: CockpitPidMetric[] = discoveredHeroMetrics.length > 0
-    ? discoveredHeroMetrics
-    : fallbackHeroMetrics;
+  const quadrantDefinitions = [
+    { pid: '0105', label: 'TEMPERATURA DO MOTOR', unit: '°C' },
+    { pid: '0142', label: 'VOLTAGEM DO SISTEMA', unit: 'V' },
+    { pid: '0111', label: 'POSIÇÃO DA BORBOLETA', unit: '%' },
+    { pid: '010C', label: 'ROTAÇÃO DO MOTOR', unit: 'RPM' },
+  ] as const;
+  const discoveredByPid = new Map(discoveredHeroMetrics.map((metric) => [metric.pid, metric] as const));
+  const normalizedSupportedPids = new Set(connectedSupportedPids.map((pid) => String(pid).replace(/\s/g, '').toUpperCase()));
+  const primaryMetrics: CockpitPidMetric[] = quadrantDefinitions.map<CockpitPidMetric>((definition) => {
+    const discovered = discoveredByPid.get(definition.pid);
+    if (discovered) return discovered;
+    const isAnnounced = normalizedSupportedPids.has(definition.pid);
+    return {
+      pid: definition.pid,
+      label: definition.label,
+      value: null,
+      unit: definition.unit,
+      severity: 'normal',
+      freshness: 'missing',
+      hint: !connectionStatus.ecuConnected
+        ? 'ECU DESCONECTADA'
+        : isAnnounced
+          ? 'AGUARDANDO LEITURA REAL RECENTE • PID ' + definition.pid
+          : 'PID ' + definition.pid + ' NÃO ANUNCIADO PELA ECU',
+    };
+  });
+  const primaryPidSet = new Set<string>(quadrantDefinitions.map((definition) => definition.pid));
+  const additionalMetrics = discoveredHeroMetrics
+    .filter((metric) => !primaryPidSet.has(metric.pid))
+    .slice(0, 20 - COCKPIT_QUADRANT_PAGE_SIZE);
+  const heroMetrics: CockpitPidMetric[] = [...primaryMetrics, ...additionalMetrics];
   const abnormalMetrics = heroMetrics.filter((metric) => metric.value != null && metric.severity !== 'normal');
-  const visibleHeroMetrics = abnormalMetrics.length > 0 ? abnormalMetrics : heroMetrics;
+  // Anomalies move to the first page, but normal metrics remain reachable in the other quadrants/pages.
+  const visibleHeroMetrics = abnormalMetrics.length > 0
+    ? [...abnormalMetrics, ...heroMetrics.filter((metric) => !abnormalMetrics.includes(metric))]
+    : heroMetrics;
+  const quadrantPageCount = Math.max(1, Math.ceil(visibleHeroMetrics.length / COCKPIT_QUADRANT_PAGE_SIZE));
 
-  // O painel roda os PIDs realmente anunciados pela ECU a cada 10 s.
-  // Quando existe alerta, exibe apenas as leituras em alerta até serem resolvidas.
   useEffect(() => {
+    setActiveQuadrantPage(0);
+  }, [quadrantPageCount, connectionStatus.ecuConnected]);
+
+  useEffect(() => {
+    if (quadrantPageCount <= 1) return;
     const timer = setInterval(() => {
-      setActiveHeroMetric((current) => (current + 1) % Math.max(1, visibleHeroMetrics.length));
+      setActiveQuadrantPage((current) => (current + 1) % quadrantPageCount);
     }, 10_000);
     return () => clearInterval(timer);
-  }, [visibleHeroMetrics.length]);
+  }, [quadrantPageCount]);
 
-  const activeMetricIndex = activeHeroMetric % Math.max(1, visibleHeroMetrics.length);
-  const selectedHeroMetric = visibleHeroMetrics[activeMetricIndex] ?? visibleHeroMetrics[0];
-  const coolantStatus = coolantValue != null && coolantValue >= 115
-    ? 'TEMPERATURA ALTA'
-    : coolantValue != null && coolantValue >= 110
-      ? 'ATENÇÃO'
-      : coolantValue != null ? 'LEITURA REAL • PID 0105' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0105' : 'ECU DESCONECTADA';
+  const currentQuadrantPage = activeQuadrantPage % quadrantPageCount;
+  const quadrantPageMetrics = getCockpitMetricPage(visibleHeroMetrics, currentQuadrantPage);
+  const displayedQuadrantMetrics: CockpitPidMetric[] = Array.from(
+    { length: COCKPIT_QUADRANT_PAGE_SIZE },
+    (_, index): CockpitPidMetric => quadrantPageMetrics[index] ?? {
+      pid: 'EMPTY-' + currentQuadrantPage + '-' + index,
+      label: 'SEM OUTRO PID',
+      value: null,
+      unit: '',
+      severity: 'normal',
+      freshness: 'missing',
+      hint: 'NENHUM OUTRO PID NESTA PÁGINA',
+    },
+  );
   const obdErrorText = (bluetoothError ?? getSharedObdLastError() ?? '').toUpperCase();
   const ecuProbeFailed = /ECU NÃO RESPONDEU AO 010C|ECU NÃO VALIDADA|ECU SEM RESPOSTA/.test(obdErrorText);
 
@@ -354,43 +383,67 @@ export default function IndexScreen() {
               </Link>
             </View>
           </View>
-          <View style={[styles.heroCard, layout.landscape && styles.heroCardLandscape, selectedHeroMetric.severity === 'danger' && styles.heroCardDanger, selectedHeroMetric.severity === 'warning' && styles.heroCardWarning]}>
+          <View style={[styles.heroCard, layout.landscape && styles.heroCardLandscape]}>
             <TouchableOpacity
+              style={styles.quadrantHeader}
               accessibilityRole="button"
-              accessibilityLabel={selectedHeroMetric.label + (abnormalMetrics.length > 0 ? '. Indicador prioritário devido a uma leitura fora da referência monitorada' : '. Toque para trocar o indicador')}
-              onPress={() => setActiveHeroMetric((current) => (current + 1) % Math.max(1, visibleHeroMetrics.length))}
-              activeOpacity={0.82}
-              style={styles.heroReadout}
+              accessibilityLabel={'Trocar página dos quadrantes, página ' + (currentQuadrantPage + 1) + ' de ' + quadrantPageCount}
+              accessibilityHint="Alterne os indicadores do painel; a página também muda automaticamente a cada 10 segundos"
+              onPress={() => setActiveQuadrantPage((current) => (current + 1) % quadrantPageCount)}
+              activeOpacity={0.8}
             >
-              <Text style={styles.heroEyebrow}>{selectedHeroMetric.label}</Text>
-              <View style={styles.heroNumberRow}>
-                <Text style={[styles.heroValue, layout.landscape && styles.heroValueLandscape, selectedHeroMetric.severity === 'danger' && styles.danger, selectedHeroMetric.severity === 'warning' && styles.heroWarning]}>{selectedHeroMetric.value == null ? 'N/D' : Number.isInteger(selectedHeroMetric.value) ? String(selectedHeroMetric.value) : selectedHeroMetric.value.toFixed(1)}</Text>
-                {!!selectedHeroMetric.unit && <Text style={styles.heroUnit}>{selectedHeroMetric.unit}</Text>}
+              <View style={styles.quadrantHeaderCopy}>
+                <Text style={styles.quadrantTitle}>DADOS OBD EM TEMPO REAL</Text>
+                <Text style={styles.quadrantSubtitle}>
+                  {discoveredHeroMetrics.length > 0
+                    ? 'PIDs reais anunciados • ' + heroMetrics.length + ' indicadores disponíveis'
+                    : connectionStatus.ecuConnected
+                      ? 'ECU CONECTADA • AGUARDANDO LEITURAS VÁLIDAS'
+                      : 'CONECTE A ECU PARA LIBERAR OS QUADRANTES'}
+                </Text>
               </View>
-              <Text style={styles.heroState}>{selectedHeroMetric.hint}</Text>
-              <View style={styles.heroSwitchHintRow}>
-                <AppIcon name="refresh" size={10} color={COLORS.textSubtle} />
-                <Text style={styles.heroSwitchHint}>{selectedHeroMetric.pid
-                  ? <>{abnormalMetrics.length > 0 ? 'ALERTAS' : 'PIDs'} {activeMetricIndex + 1}/{visibleHeroMetrics.length}  •  {selectedHeroMetric.pid}  •  TOQUE PARA TROCAR  •  10 S</>
-                  : 'AGUARDANDO ECU • SEM PIDs REAIS VÁLIDOS'}</Text>
+              <View style={styles.quadrantPageButton}>
+                <AppIcon name="refresh" size={12} color={COLORS.textSubtle} />
+                <Text style={styles.quadrantPageText}>{currentQuadrantPage + 1}/{quadrantPageCount}</Text>
               </View>
             </TouchableOpacity>
+            <View style={[styles.quadrantGrid, layout.landscape && styles.quadrantGridLandscape]}>
+              {displayedQuadrantMetrics.map((metric, index) => (
+                <View
+                  key={metric.pid || 'quadrant-' + index}
+                  style={[
+                    styles.quadrantCard,
+                    layout.landscape && styles.quadrantCardLandscape,
+                    metric.severity === 'danger' && styles.quadrantCardDanger,
+                    metric.severity === 'warning' && styles.quadrantCardWarning,
+                  ]}
+                >
+                  <Text style={styles.quadrantLabel}>{metric.label}</Text>
+                  <View style={styles.quadrantValueRow}>
+                    <Text style={[
+                      styles.quadrantValue,
+                      metric.severity === 'danger' && styles.danger,
+                      metric.severity === 'warning' && styles.heroWarning,
+                    ]}>
+                      {metric.value == null ? 'N/D' : Number.isInteger(metric.value) ? String(metric.value) : metric.value.toFixed(1)}
+                    </Text>
+                    {metric.value != null && !!metric.unit && <Text style={styles.quadrantUnit}>{metric.unit}</Text>}
+                  </View>
+                  <Text style={styles.quadrantHint} numberOfLines={2}>{metric.hint}</Text>
+                </View>
+              ))}
+            </View>
+            <Text style={styles.quadrantInstruction}>
+              {quadrantPageCount > 1
+                ? 'TOQUE NO TÍTULO OU AGUARDE 10 S • 4 QUADRANTES POR PÁGINA'
+                : connectionStatus.ecuConnected
+                  ? 'N/D ATÉ EXISTIR LEITURA REAL, COMPLETA E RECENTE'
+                  : 'OS QUADRANTES FICAM PRONTOS APÓS VALIDAR A ECU'}
+            </Text>
             <View style={[styles.metricRow, layout.landscape && styles.metricRowLandscape]}>
               <CockpitMetric label={consumptionLabel} value={availableConsumptionKml != null ? availableConsumptionKml.toFixed(1) + ' km/L' : 'N/D'} />
               <CockpitMetric label="AUTONOMIA ATUAL" value={currentAutonomyKm != null ? Math.round(currentAutonomyKm) + ' km' : 'N/D'} />
               <CockpitMetric label="PRESSÃO DO COLETOR" value={manifoldPressureKpa != null ? manifoldPressureKpa.toFixed(0) + ' kPa' : 'N/D'} />
-            </View>
-            <View style={[styles.coolantCard, layout.landscape && styles.coolantCardLandscape]}>
-              <View style={styles.coolantCopy}>
-                <View style={styles.coolantHeading}>
-                  <AppIcon name="coolant" size={14} color={COLORS.accent} />
-                  <Text style={styles.coolantLabel}>LÍQUIDO DE ARREFECIMENTO</Text>
-                </View>
-                <Text style={styles.coolantStatus}>{coolantStatus}</Text>
-              </View>
-              <Text style={[styles.coolantValue, coolantValue == null ? styles.coolantUnavailable : coolantValue >= 115 ? styles.danger : coolantValue >= 110 ? styles.coolantWarning : styles.coolantOk]}>
-                {coolantValue != null ? `${Math.round(coolantValue)} °C` : 'N/D'}
-              </Text>
             </View>
           </View>
           <Link href="/bluetooth" asChild>
@@ -443,6 +496,24 @@ const styles = StyleSheet.create({
   connectionPill:{flexDirection:'row',alignItems:'center',gap:6,flexShrink:0,backgroundColor:'#091526',borderRadius:20,borderWidth:1,borderColor:'#29415f',paddingHorizontal:10,paddingVertical:7},dot:{width:8,height:8,borderRadius:4},dotOk:{backgroundColor:'#4ade80'},dotWarn:{backgroundColor:'#fbbf24'},dotDanger:{backgroundColor:'#fb7185'},connectionText:{color:'#dbeafe',fontSize:9,fontWeight:'900'},
   heroCard:{backgroundColor:'#0f2035',borderRadius:18,borderWidth:1,borderColor:'#2d5278',padding:12,alignItems:'center',marginBottom:8},heroCardWarning:{borderColor:'#fbbf24',backgroundColor:'#2a2412'},heroCardDanger:{borderColor:'#fb7185',backgroundColor:'#2b1420'},heroCardLandscape:{padding:7,marginBottom:4},heroReadout:{width:'100%',alignItems:'center',paddingVertical:1},heroEyebrow:{color:'#7db3ff',fontSize:10,fontWeight:'900',letterSpacing:1.4,textAlign:'center'},heroNumberRow:{flexDirection:'row',alignItems:'baseline',justifyContent:'center',gap:6},heroUnit:{color:'#a9c8ef',fontSize:18,fontWeight:'900'},heroSwitchHintRow:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:4,marginTop:4},heroSwitchHint:{color:'#6884a6',fontSize:8,fontWeight:'900',letterSpacing:.6},heroWarning:{color:'#fbbf24'},heroValue:{color:'#f8fafc',fontSize:50,lineHeight:56,fontWeight:'900',marginTop:2,fontVariant:['tabular-nums']},heroValueLandscape:{fontSize:36,lineHeight:40,marginTop:0},heroState:{color:'#8fa6c1',fontSize:9,fontWeight:'800',letterSpacing:.5,textAlign:'center'},
   metricRow:{width:'100%',flexDirection:'row',gap:6,marginTop:10},metricRowLandscape:{marginTop:4},cockpitMetric:{flex:1,minWidth:0,backgroundColor:'#091626',borderRadius:11,borderWidth:1,borderColor:'#233d5b',paddingVertical:9,paddingHorizontal:5,alignItems:'center'},metricLabel:{color:'#9aacc4',fontSize:8,fontWeight:'900',letterSpacing:.3,textAlign:'center'},metricValue:{color:'#e5edf7',fontSize:12,fontWeight:'900',marginTop:3,textAlign:'center'},
+  quadrantHeader:{width:'100%',flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:10},
+  quadrantHeaderCopy:{flex:1,minWidth:0},
+  quadrantTitle:{color:'#7db3ff',fontSize:10,fontWeight:'900',letterSpacing:1.2},
+  quadrantSubtitle:{color:'#849ab5',fontSize:8,fontWeight:'800',marginTop:3},
+  quadrantPageButton:{flexDirection:'row',alignItems:'center',gap:4,paddingVertical:7,paddingHorizontal:9,borderRadius:9,borderWidth:1,borderColor:'#294562',backgroundColor:'#091626'},
+  quadrantPageText:{color:'#a9c8ef',fontSize:9,fontWeight:'900'},
+  quadrantGrid:{width:'100%',flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',gap:8},
+  quadrantGridLandscape:{gap:6},
+  quadrantCard:{width:'48%',minHeight:91,paddingVertical:10,paddingHorizontal:9,backgroundColor:'#091626',borderRadius:12,borderWidth:1,borderColor:'#294562'},
+  quadrantCardLandscape:{minHeight:76,paddingVertical:7,paddingHorizontal:8},
+  quadrantCardWarning:{borderColor:'#fbbf24',backgroundColor:'#2a2412'},
+  quadrantCardDanger:{borderColor:'#fb7185',backgroundColor:'#2b1420'},
+  quadrantLabel:{color:'#9fb7d5',fontSize:8,fontWeight:'900',letterSpacing:.4},
+  quadrantValueRow:{flexDirection:'row',alignItems:'baseline',gap:4,marginTop:5},
+  quadrantValue:{color:'#f8fafc',fontSize:25,lineHeight:29,fontWeight:'900',fontVariant:['tabular-nums']},
+  quadrantUnit:{color:'#a9c8ef',fontSize:10,fontWeight:'900'},
+  quadrantHint:{color:'#6884a6',fontSize:7,fontWeight:'800',marginTop:3},
+  quadrantInstruction:{color:'#6884a6',fontSize:7,fontWeight:'900',letterSpacing:.4,textAlign:'center',marginTop:7},
   coolantCard:{width:'100%',flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:12,marginTop:9,paddingHorizontal:13,paddingVertical:11,backgroundColor:'#091626',borderRadius:12,borderWidth:1,borderColor:'#315579'},coolantCardLandscape:{marginTop:4,paddingVertical:5,paddingHorizontal:9},coolantCopy:{flex:1,minWidth:0},coolantHeading:{flexDirection:'row',alignItems:'center',gap:5},coolantLabel:{color:'#c5d8f2',fontSize:9,fontWeight:'900',letterSpacing:.4},coolantStatus:{color:'#7185a1',fontSize:8,fontWeight:'800',marginTop:4},coolantValue:{fontSize:23,fontWeight:'900',fontVariant:['tabular-nums']},coolantOk:{color:'#4ade80'},coolantWarning:{color:'#fbbf24'},coolantUnavailable:{color:'#8fa6c1'},
   danger:{color:'#fb7185'},
   sessionCard:{minHeight:68,flexDirection:'row',alignItems:'center',gap:10,paddingHorizontal:12,paddingVertical:10,backgroundColor:'#0e1b2d',borderRadius:13,borderWidth:1,borderColor:'#28415f',marginBottom:8},sessionCardLandscape:{minHeight:56,paddingVertical:6,marginBottom:4},sessionIconWrap:{width:36,height:36,borderRadius:11,alignItems:'center',justifyContent:'center',backgroundColor:'#091626',borderWidth:1,borderColor:'#29415f'},sessionIconWrapOk:{borderColor:'#3b8c5a',backgroundColor:'#10261b'},sessionCopy:{flex:1,minWidth:0,gap:2},sessionTitle:{color:'#7db3ff',fontSize:8,fontWeight:'900',letterSpacing:.7},sessionHeadline:{color:'#e5edf7',fontSize:10,fontWeight:'900'},sessionDetail:{color:'#8fa6c1',fontSize:8,lineHeight:12},

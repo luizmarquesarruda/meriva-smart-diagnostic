@@ -133,6 +133,13 @@ O catálogo atual contém 34 PIDs, 20 fórmulas, 34 faixas e 30 avaliações de 
 - Sem 41 0C válido, a interface deve mostrar ECU sem resposta, não presumir falha do rádio Bluetooth. Sem ECU/leitura real válida, telemetria e autonomia continuam N/D.
 - Testes: tests/bluetoothConfig.test.js, tests/elm327Compatibility.test.js e tests/projectBaseline.test.js.
 
+## UI-COCKPIT-04 — Quadrantes simultâneos e navegação de PIDs
+
+- O cockpit deve exibir ao mesmo tempo uma grade 2×2 para os indicadores principais: PID 0105 (temperatura), 0142 (tensão), 0111 (borboleta) e 010C (RPM). Não substituir a grade por um único número grande que alterna a cada 10 s.
+- PIDs adicionais anunciados e catalogados permanecem disponíveis em páginas de quatro quadrantes, com prioridade visual para anomalias; a página muda por toque no cabeçalho ou automaticamente a cada 10 s. A última página pode ter posições vazias, mas elas devem ser rotuladas como sem PID, nunca como leitura.
+- Cada valor só pode vir de amostra REAL/RESPONDEU, finita, com timestamp válido e dentro da janela de frescor. Sem ECU ou amostra recente, exibir N/D e estado explicativo; não usar seed ou histórico como telemetria atual.
+- Testes: tests/cockpitTelemetry.test.js valida paginação/retorno circular e tests/projectBaseline.test.js impede regressão para o mostrador único.
+
 ## AUDIT-HARDENING-01 — Integridade e recuperação de dados
 
 - K-Line: checksum aditivo de 8 bits válido deve ser aceito; checksum incorreto, ausente quando exigido ou bytes extras devem ser rejeitados nos formatos compactos e espaçados.

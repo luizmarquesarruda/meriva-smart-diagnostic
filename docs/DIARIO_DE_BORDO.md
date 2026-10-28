@@ -1,4 +1,4 @@
-## ESTADO VIGENTE — 2026-10-28 (recuperação Bluetooth/KWP e auditoria de obsolescência)
+## ESTADO VIGENTE — 2026-10-28 (cockpit 2×2 + recuperação Bluetooth/KWP e auditoria de obsolescência)
 
 > Frente única de trabalho: PR #96, branch `ui/cockpit-instant-consumption-20261027`. Este bloco é a referência operacional; snapshots abaixo são históricos.
 
@@ -11,6 +11,7 @@
 - Testes com Galaxy A06/Android 16/ELM327 real, confirmação de resposta `010C`, inspeção do APK instalado e validação GPS/autonomia continuam pendentes.
 - DB-145 registra a regressão de leitura KWP e classificação de estado ECU/Bluetooth na frente única PR #96. Consultar HEAD e CI correspondentes ao mesmo SHA antes de qualquer integração; uma CI anterior não valida alterações posteriores.
 - O cockpit deve continuar mostrando N/D até existir leitura OBD real, completa e recente; seed ou histórico não deve ser reapresentado como valor atual.
+- DB-146 restaura os quatro quadrantes de telemetria em simultâneo; os PIDs adicionais continuam acessíveis em páginas de quatro métricas. A ausência de ECU não remove a grade, apenas mantém os valores em N/D.
 ---
 
 ## ESTADO HISTÓRICO — 2026-10-25 (snapshot DB-130; superado em 2026-10-28)
@@ -231,6 +232,7 @@
 - **DB-143** · 2026-10-28 — Decisão arquitetural: APK independente, sem dependência do Bubble
 - **DB-144** · 2026-10-28 — Navegação por categorias, ícones e qualidade dos dados
 - **DB-145** · 2026-10-28 — Corrigir leitura KWP, retry e classificação do estado ECU/Bluetooth
+- **DB-146** · 2026-10-28 — Restaurar quadrantes 2×2 e paginação de PIDs no cockpit
 
 ---
 
@@ -4283,3 +4285,10 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Gate: a recuperação só confirma ECU quando parsePidResponse para 010C retorna resposta válida com valor finito e payload completo. A CI deve ser consultada no HEAD final; não reutilizar o resultado de SHA anterior.
 - Cockpit: se o PID 010C não tiver resposta válida, mostrar ECU SEM RESPOSTA e orientar a consultar o RX, sem rotular automaticamente como rádio Bluetooth desligado. O placeholder sem PID não é apresentado como OBD 1/1.
 - Dados e limitações: N/D permanece correto para autonomia, temperatura e PIDs sem leitura REAL recente. Conexão física com Galaxy A06/Android 16 + ELM327/ECU real, inspeção do APK instalado e confirmação de 010C continuam pendentes de ensaio físico.
+## DB-146 · 2026-10-28 — Restaurar quadrantes 2×2 e paginação de PIDs no cockpit
+
+- **Regressão identificada:** o cockpit concentrava o indicador principal em um único mostrador de alternância temporal, com apenas três cartões auxiliares e um cartão de arrefecimento separado. Isso escondia a leitura simultânea dos quatro indicadores principais.
+- **Alteração:** restaurada a grade 2×2 com temperatura do motor (0105), tensão do sistema (0142), posição da borboleta (0111) e rotação (010C) sempre visíveis no primeiro conjunto. O cartão duplicado de arrefecimento foi removido; temperatura continua disponível no quadrante.
+- **Sem perda dos PIDs extras:** indicadores adicionais anunciados pela ECU continuam em páginas de quatro; anomalias recebem prioridade, a alternância ocorre a cada 10 segundos e o cabeçalho permite avançar por toque.
+- **Integridade de dados:** cada quadrante usa somente leitura real, respondida, finita e recente. Se a ECU estiver desconectada ou o PID não for anunciado/estiver sem amostra válida, o quadrante permanece visível com N/D e motivo explícito. Nenhum seed é usado como telemetria atual.
+- **Validação:** adicionados testes unitários para paginação, retorno circular, grade 2×2 e barreira anti-regressão. A CI do novo SHA e o build standalone devem passar antes de integrar; o teste físico no Galaxy A06/Android 16 continua separado.

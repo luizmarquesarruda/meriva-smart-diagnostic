@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Cockpit — quadrantes restaurados
+- Retornada a grade simultânea 2×2 para temperatura, tensão do sistema, posição da borboleta e RPM.
+- Os demais PIDs continuam acessíveis por páginas de quatro indicadores, com anomalias priorizadas; os valores permanecem N/D sem leitura real, completa e recente.
+- Removido o mostrador único como substituto da grade e eliminado o cartão de arrefecimento duplicado.
+
 ### Bluetooth Classic / ELM327 — regressão de resposta ECU
 - Reconhece quadros KWP compactos e espaçados com comprimento e checksum verificados, incluindo o trace 84F111410C0000D3; a confirmação da ECU exige payload completo do PID 010C.
 - Retry padrão limitado a três tentativas por adaptador, espaçadas em 1,5 s; recuperação usa o protocolo identificado em vez de forçar KWP fast em toda ECU KWP.
