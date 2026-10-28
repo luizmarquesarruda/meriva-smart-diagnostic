@@ -8,6 +8,7 @@ import { getAutoSaveState } from '../src/meriva/autosaveManager';
 import { normalizeDiagnosticSource, runLocalDiagnostic, type DiagnosticResult } from '../src/diagnostics/diagnosticEngine';
 import type { PidObservation } from '../src/types/sourceTypes';
 import { getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
+import { getSharedObdStatus } from '../src/obd/sharedConnection';
 import { getDtcDefinition } from '../src/obd/dtcDefinition';
 
 export default function SaudeScreen() {
@@ -17,7 +18,7 @@ export default function SaudeScreen() {
   const context = getVehicleConditionSnapshot();
   const activeDtcs = state.dtcs.filter((item) => item.source === 'REAL_OBD' && ['CURRENT', 'CONFIRMED', 'PENDING', 'PERMANENT'].includes(item.status));
   const diagnostic: DiagnosticResult = useMemo(()=>runLocalDiagnostic({observations:state.lastReadings.map(r=>({pid:r.pid,name:r.name,value:r.value,unit:r.unit,source:normalizeDiagnosticSource(r.source),timestamp:r.timestamp,confidence:r.source==='SIMULACAO'?'LOW':'GOOD'} as PidObservation)),dtcs:state.dtcs,condition:context.condition}),[state,context.condition]);
-  const ecuCurrentlyValidated = state.obd.connected && Boolean(state.obd.ecuValidatedAt);
+  const ecuCurrentlyValidated = getSharedObdStatus().ecuConnected;
   const noCurrentFindings = diagnostic.hypotheses.length === 0 && activeDtcs.length === 0;
   const normal = noCurrentFindings && ecuCurrentlyValidated && diagnostic.acceptedLiveSamples > 0;
   const inconclusive = noCurrentFindings && !normal;
