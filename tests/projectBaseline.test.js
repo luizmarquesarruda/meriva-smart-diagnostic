@@ -127,7 +127,7 @@ assert.ok(read('src/obd/elm327.ts').includes("const parsedProbe = parsePidRespon
 assert.ok(read('src/obd/bluetoothManager.ts').includes('ELM_PROTOCOL_FALLBACKS'), 'fallback inclui protocolos OBD clássicos');
 assert.ok(read('src/obd/parser.ts').includes('compactKwpHeader') && read('src/obd/parser.ts').includes('const isKwpHeader'), 'parser precisa validar KWP compacto e espaçado');
 assert.ok(read('app/index.tsx').includes('ECU SEM RESPOSTA'), 'UI precisa separar falha ECU de falha de rádio');
-assert.ok(read('app/index.tsx').includes('SEM PIDs REAIS VÁLIDOS'), 'placeholder sem PID não pode parecer telemetria real');
+assert.ok(read('app/index.tsx').includes('CONECTE A ECU PARA LIBERAR OS QUADRANTES'), 'os quadrantes devem continuar visíveis sem ECU, com valores N/D e instrução de conexão');
 assert.match(projectContract, /\| RG-42 \|/, 'recuperação KWP/ECU precisa do contrato RG-42');
 assert.ok(read('docs/TEST_PLAN.md').includes('BT-CONN-08'), 'teste de quadro KWP precisa permanecer no plano');
 assert.ok(read('docs/TEST_PLAN.md').includes('BT-CONN-09'), 'teste de retry e estado ECU precisa permanecer no plano');
