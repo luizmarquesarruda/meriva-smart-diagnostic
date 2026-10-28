@@ -10,6 +10,16 @@
 - A auditoria atual encontrou divergências de documentação e um débito relevante de modernização do SDK. Não houve upgrade de SDK nem remoção de dependências nativas nesta rodada: fazê-los antes de preservar um baseline físico poderia introduzir regressão no Bluetooth Classic.
 - Testes com Galaxy A06/Android 16/ELM327 real, confirmação de resposta `010C`, inspeção do APK instalado e validação GPS/autonomia continuam pendentes.
 
+
+## DB-144 · 2026-10-28 — Navegação por categorias, ícones e qualidade dos dados
+
+- Reorganizada a central “Mais Recursos” em cinco grupos iconográficos: diagnóstico/conexão; veículo/condução; dados/aprendizado; histórico/relatórios; sistema/preferências. Mantidos os destinos nativos existentes e acrescentado atalho para telemetria em tempo real.
+- Criado o componente compartilhado `SourceStatusLegend` para explicar cinco estados: medido, estimado, referência, simulado e indisponível. O componente é explicativo: não altera a classificação nem fabrica leituras.
+- Inserida a guia em telemetria, viagens e histórico local; viagens e exportações ganharam marcadores visuais por ícones compartilhados. Exportação e limpeza continuam locais.
+- Mantidos o tema escuro, os ícones Ionicons já instalados, o comportamento retrato/paisagem e os fluxos sem cadastro, login ou Bubble.
+- Adicionado teste de regressão ligado a `npm test` cobrindo os cinco grupos, destinos, ícones e rótulos de qualidade.
+- Validação desta alteração depende da CI do novo SHA; isto não atesta teste físico com ELM327 nem APK instalado.
+
 ---
 
 ## ESTADO HISTÓRICO — 2026-10-25 (snapshot DB-130; superado em 2026-10-28)

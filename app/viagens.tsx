@@ -4,6 +4,8 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMidLayout } from '../src/ui/midLayout';
 import { COLORS, SCREEN_TITLE_STYLE } from '../src/ui/theme';
+import { AppIcon } from '../src/ui/AppIcon';
+import { SourceStatusLegend } from '../src/ui/SourceStatusLegend';
 import * as FileSystem from 'expo-file-system';
 import { readDriveCycles } from '../src/storage/driveCycleStorage';
 import { getDriveCycleSummary, type DriveCycle } from '../src/data/driveCycles';
@@ -53,6 +55,7 @@ export default function ViagensScreen() {
           <Text style={s.eyebrow}>MERIVA SMART DIAGNOSTIC</Text>
           <Text style={s.title}>RELATÓRIO DE VIAGENS</Text>
           <Text style={s.subtitle}>HISTÓRICO REAL • SESSÕES INDEPENDENTES • DADOS AUDITÁVEIS</Text>
+          <SourceStatusLegend compact />
           <View style={s.grid}>
             <Metric l="VIAGENS" v={String(visible.length)} />
             <Metric l="DISTÂNCIA TOTAL" v={mv(summary.totalDistanceKm,'km')} />
@@ -69,6 +72,7 @@ export default function ViagensScreen() {
           <Text style={s.section}>HISTÓRICO DE VIAGENS</Text>
           {visible.length ? visible.map(cycle => <TouchableOpacity accessibilityRole="button" onPress={() => setSelectedId(cycle.id)} style={s.card} key={cycle.id}>
             <View style={s.cardHeader}>
+              <AppIcon name="trips" size={20} color={COLORS.accent} />
               <View style={{flex:1}}>
                 <Text style={s.tripDate}>{dateLabel(cycle.startedAt)}</Text>
                 <Text style={s.tripRange}>Até {dateLabel(cycle.finishedAt)}</Text>

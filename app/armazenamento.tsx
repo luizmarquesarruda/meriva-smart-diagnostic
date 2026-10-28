@@ -7,6 +7,8 @@ import { checkStorageQuota, getStorageBreakdown, StorageQuotaConfig } from '../s
 import { cleanupOldLogs, cleanupOldReadings } from '../src/storage/cleanup';
 import { getMidLayout } from '../src/ui/midLayout';
 import { COLORS, SCREEN_TITLE_STYLE } from '../src/ui/theme';
+import { AppIcon } from '../src/ui/AppIcon';
+import { SourceStatusLegend } from '../src/ui/SourceStatusLegend';
 import { readDriveCycles } from '../src/storage/driveCycleStorage';
 import type { DriveCycle } from '../src/data/driveCycles';
 import { exportDiagnosticsJson, exportDriveCyclesCsv } from '../src/storage/exportDiagnostics';
@@ -100,7 +102,8 @@ export default function ArmazenamentoScreen() {
     <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
       <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
       <Text style={styles.title}>HISTÓRICO E DADOS</Text>
-      <Text style={styles.subtitle}>O app salva as viagens e leituras automaticamente. Esta tela serve para acompanhar o espaço usado e fazer limpeza quando necessário.</Text>
+      <Text style={styles.subtitle}>O app salva as viagens e leituras automaticamente. Esta tela acompanha o espaço local, o histórico e as exportações.</Text>
+      <SourceStatusLegend compact />
       <Text style={[styles.status, quota?.critical ? styles.critical : quota?.warning ? styles.warning : styles.ok]}>
         {quota?.message || 'VERIFICANDO'}
       </Text>
@@ -135,11 +138,16 @@ export default function ArmazenamentoScreen() {
       </View>
 
       <View style={styles.exportRow}>
-        <TouchableOpacity style={styles.button} onPress={() => void handleExport('JSON')} disabled={!basePath || busy}><Text style={styles.buttonText}>EXPORTAR JSON</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.button} onPress={() => void handleExport('CSV')} disabled={!basePath || busy}><Text style={styles.buttonText}>EXPORTAR CSV</Text></TouchableOpacity>
+        <TouchableOpacity style={[styles.button, styles.buttonWithIcon]} onPress={() => void handleExport('JSON')} disabled={!basePath || busy}>
+          <AppIcon name="history" size={18} color="#fff" /><Text style={styles.buttonText}>EXPORTAR JSON</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.button, styles.buttonWithIcon]} onPress={() => void handleExport('CSV')} disabled={!basePath || busy}>
+          <AppIcon name="data" size={18} color="#fff" /><Text style={styles.buttonText}>EXPORTAR CSV</Text>
+        </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={styles.button} onPress={handleClean} disabled={!basePath || busy}>
+      <TouchableOpacity style={[styles.button, styles.buttonWithIcon]} onPress={handleClean} disabled={!basePath || busy}>
+        <AppIcon name="warning" size={18} color="#fff" />
         <Text style={styles.buttonText}>{busy ? 'LIMPANDO...' : 'LIMPAR DADOS ANTIGOS'}</Text>
       </TouchableOpacity>
       </View>
@@ -176,5 +184,6 @@ const styles = StyleSheet.create({
   value: { color: '#2563eb', fontWeight: '700' },
   exportRow: { width: '100%', flexDirection: 'row', gap: 8, marginTop: 4 },
   button: { flex: 1, backgroundColor: '#1557a6', borderRadius: 7, padding: 13, alignItems: 'center', marginTop: 4 },
+  buttonWithIcon: { flexDirection: 'row', justifyContent: 'center', gap: 7 },
   buttonText: { color: '#fff', fontWeight: '700' },
 });

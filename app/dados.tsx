@@ -11,6 +11,7 @@ import { getLivePidTrend, getLiveSeries, getVehicleConditionSnapshot } from '../
 import { buildTelemetryChart, type TelemetryChartSample } from '../src/obd/telemetryChart';
 import { getSharedObdStatus } from '../src/obd/sharedConnection';
 import { getPidDefinition } from '../src/obd/pidDefinition';
+import { SourceStatusLegend } from '../src/ui/SourceStatusLegend';
 import type { DriveCycle } from '../src/data/driveCycles';
 
 type ChartMode = 'LIVE' | 'TRIPS';
@@ -85,6 +86,7 @@ export default function DadosScreen() {
       <ScrollView contentContainerStyle={[styles.content, { paddingHorizontal: layout.horizontalPadding }]} showsHorizontalScrollIndicator={false}>
         <View style={[styles.screenFrame, { maxWidth: layout.maxContentWidth }]}>
           <Header title="DADOS EM TEMPO REAL" subtitle="PIDs • TELEMETRIA • HISTÓRICO LOCAL" />
+          <SourceStatusLegend />
           <View style={[styles.liveCard, ecuConnected ? styles.connectedCard : styles.disconnectedCard]}>
             <Text style={styles.liveTitle}>{ecuConnected ? '● ECU RESPONDENDO' : '○ ECU DESCONECTADA / SEM RESPOSTA'}</Text>
             <Text style={styles.liveHint}>{state.obd.protocol ? 'PROTOCOLO ' + state.obd.protocol : 'Conecte o ELM327 e valide a ECU para iniciar uma nova série.'}</Text>
