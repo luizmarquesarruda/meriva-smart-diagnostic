@@ -159,10 +159,10 @@ assert.match(dieselStatus.interpretation, /SENSOR_GASES_ESCAPE/);
 assert.doesNotMatch(dieselStatus.interpretation, /EVAP|CATALISADOR_AQUECIDO/,
   'byte C/D tem semântica diferente em motores diesel');
 
-const completeSparkMonitors = parser.parsePidResponse('0101', '41 01 00 08 21 21');
+const completeSparkMonitors = parser.parsePidResponse('0101', '41 01 00 00 21 21');
 assert.match(completeSparkMonitors.interpretation, /INCOMPLETOS=NENHUM/,
   'D=1 significa monitor concluído, não incompleto');
-const incompleteSparkMonitors = parser.parsePidResponse('0101', '41 01 00 08 21 00');
+const incompleteSparkMonitors = parser.parsePidResponse('0101', '41 01 00 00 21 00');
 assert.match(incompleteSparkMonitors.interpretation, /CATALISADOR/);
 assert.match(incompleteSparkMonitors.interpretation, /O2/);
 
