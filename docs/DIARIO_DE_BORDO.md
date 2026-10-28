@@ -4023,3 +4023,20 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - A alteração foi registrada na branch `ui/cockpit-instant-consumption-20261027` da PR #96.
 - A nova execução de CI no SHA resultante é obrigatória; os resultados anteriores não validam este commit.
 - Teste físico do ELM327/ECU e inspeção visual no Galaxy A06 continuam pendentes.
+
+
+## DB-134 · 2026-10-28 — Corrigir contrato de layout obsoleto após remoção do DTC do cockpit
+
+### Achado confirmado
+- A CI do SHA `a4d2ef54d06850fcaf740a722bbc8b7b703b8f1f` executou `npm run doctor` (17/17) e o gate anti-regressão (PASS), mas `validate` falhou em `tests/orientationLayout.test.js:46`.
+- O teste ainda exigia uma expressão de fallback de DTC na tela inicial, embora a decisão DB-132 tenha removido o resumo de DTC do cockpit e mantido a informação na tela Saúde. O contrato de teste ficou desatualizado em relação à mudança intencional de produto.
+
+### Correção
+- Substituída a asserção obsoleta por uma verificação explícita de que o cockpit não contenha resumo de DTC. A validação de DTC continua coberta pela tela Saúde e pelos testes de diagnóstico correspondentes.
+- Não foi removido nem enfraquecido o gate de baseline; apenas alinhado o teste de layout com a arquitetura atual.
+
+### Validação e próximos passos
+- Commit da correção: `aabc06bea4f93c479417f90101ac77095187d3af`.
+- A CI do novo HEAD deve concluir `validate` e `android-build` com sucesso antes de considerar a PR pronta.
+- P0 continua bloqueado até CI verde no SHA exato e reconciliação da divergência entre a captura instalada e o layout do código. Testes físicos de Bluetooth/ECU, GPS e autonomia no Galaxy A06 seguem pendentes.
+- Não houve merge. As tarefas P1/P2 permanecem na mesma frente consolidada; não abrir branch paralela.
