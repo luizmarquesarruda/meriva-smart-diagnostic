@@ -204,6 +204,8 @@
 - **DB-131** · 2026-10-25 — Atualização periódica de localização/clima baseada em conectividade
 - **DB-132** · 2026-10-27 — Cockpit sem duplicação de DTC; cartão substituído por pressão do coletor
 - **DB-133** · 2026-10-28 — CI: suíte de apresentação de saúde do ELM reintegrada ao npm test
+- **DB-134** · 2026-10-28 — Corrigir contrato de layout obsoleto após remoção do DTC do cockpit
+- **DB-135** · 2026-10-28 — Corrigir navegação icon-only no cockpit
 
 ---
 
@@ -4056,3 +4058,16 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Commits de código/teste: `7ce769c3b71ced1444f7556144c1bc1913f2754b` e `040bc92132b278ce10e1571305d8e19f9406aa9c`; changelog: `11238600e94d91dc6ff0ba75095e19130c4063be`.
 - A CI do HEAD final precisa confirmar typecheck, suíte completa e build Android. A redução de lacunas e legibilidade deve ser inspecionada em retrato/paisagem; não declarar validação visual sem captura atual do app.
 - Nenhum merge. A captura fornecida anteriormente ainda não foi reconciliada com a versão/build instalada.
+
+
+## DB-136 · 2026-10-28 — Sincronizar índice do diário após as novas entradas
+
+### Achado confirmado
+- A CI do SHA `f705cb9e93ca91a3f784a7ea81a54b16b186e5de` falhou no gate anti-regressão porque DB-134 e DB-135 já existiam no corpo do diário, mas ainda não apareciam no índice sequencial. O gate corretamente compara as entradas DB-NNN com o índice.
+
+### Correção
+- Incluídas DB-134 e DB-135 no índice, preservando a sequência e os registros completos. O gate não foi alterado nem enfraquecido.
+
+### Validação e limites
+- Esta atualização documental gera novo HEAD e exige nova CI. Ainda não declarar `validate` nem `android-build` verdes até os jobs terminarem no mesmo SHA.
+- Nenhum merge. A captura visual do app instalado e os testes físicos Android/ELM327/GPS continuam pendentes.
