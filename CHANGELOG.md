@@ -7,6 +7,7 @@
 - Versionado o contrato do motor de evidências como v2; score e níveis LOW/MEDIUM/HIGH agora são descritos explicitamente como heurísticos, não probabilidades.
 - A tela Saúde só apresenta ausência de alertas quando a ECU está respondendo na sessão atual e há amostras reais recentes; caso contrário mostra dados insuficientes.
 - Corrigido o decode de PID 0101 para respeitar bits de suporte e diferenciar motores SI e CI; interpretação legível preservada no autosave/TXT e exibida em Dados no lugar do bitmap como número físico.
+- Corrigida a polaridade do byte D no PID 0101: bit 1 indica monitor concluído; bit 0 indica incompleto. A prontidão só é sinalizada como incompleta se o monitor for suportado.
 - Testes de sensores rejeitam tentativas numeradas duplicadas e timestamps futuros; adicionadas regressões para origem, frescor, histórico, PID 0101 e persistência da interpretação.
 
 
