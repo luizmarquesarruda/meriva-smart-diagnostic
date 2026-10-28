@@ -206,6 +206,7 @@
 - **DB-133** · 2026-10-28 — CI: suíte de apresentação de saúde do ELM reintegrada ao npm test
 - **DB-134** · 2026-10-28 — Corrigir contrato de layout obsoleto após remoção do DTC do cockpit
 - **DB-135** · 2026-10-28 — Corrigir navegação icon-only no cockpit
+- **DB-136** · 2026-10-28 — Sincronizar índice do diário após as novas entradas
 
 ---
 
@@ -4071,3 +4072,16 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 ### Validação e limites
 - Esta atualização documental gera novo HEAD e exige nova CI. Ainda não declarar `validate` nem `android-build` verdes até os jobs terminarem no mesmo SHA.
 - Nenhum merge. A captura visual do app instalado e os testes físicos Android/ELM327/GPS continuam pendentes.
+
+
+## DB-137 · 2026-10-28 — Fechar lacuna de índice detectada pela segunda execução da CI
+
+### Achado confirmado
+- A execução CI `40625197616` voltou a falhar no gate porque a entrada DB-136, que registrava a própria correção do índice, também não tinha sido acrescentada ao índice. O teste exige correspondência exata entre índice e todas as entradas, incluindo a entrada que corrige o índice.
+
+### Correção
+- Acrescentada DB-136 ao índice sequencial. A verificação de integridade não foi relaxada.
+
+### Validação e limites
+- Novo HEAD exige nova CI. A última execução falhou no gate antes de `validate`; isso não representa falha de TypeScript ou da suíte comportamental, pois essas etapas foram puladas.
+- Não fazer merge até o novo HEAD passar pelo gate, `validate` e `android-build`.
