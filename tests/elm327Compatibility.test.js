@@ -54,6 +54,7 @@ assert.equal(getRecoveryProtocolCommand('unknown'), 'ATSP0');
 assert.equal(resolveMaxConnectionAttempts(0, 3), 3);
 assert.equal(resolveMaxConnectionAttempts(10, 3), 10);
 assert.equal(resolveMaxConnectionAttempts(Number.NaN, 3), 3);
+assert.equal(mergeCompatibilityConfig().maxConnectionAttempts, 0, 'zero means use finite catalog retry default');
 const defaults = mergeCompatibilityConfig();
 assert.equal(defaults.maxConnectionAttempts, 0);
 assert.equal(defaults.ioTimeoutMs, 15000);

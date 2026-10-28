@@ -371,7 +371,7 @@ export default function IndexScreen() {
               <View style={styles.heroSwitchHintRow}>
                 <AppIcon name="refresh" size={10} color={COLORS.textSubtle} />
                 <Text style={styles.heroSwitchHint}>{selectedHeroMetric.pid
-                  ? `${abnormalMetrics.length > 0 ? 'ALERTAS' : 'PIDs'} ${activeMetricIndex + 1}/${visibleHeroMetrics.length}  •  ${selectedHeroMetric.pid}  •  TOQUE PARA TROCAR  •  10 S`
+                  ? <>{abnormalMetrics.length > 0 ? 'ALERTAS' : 'PIDs'} {activeMetricIndex + 1}/{visibleHeroMetrics.length}  •  {selectedHeroMetric.pid}  •  TOQUE PARA TROCAR  •  10 S</>
                   : 'AGUARDANDO ECU • SEM PIDs REAIS VÁLIDOS'}</Text>
               </View>
             </TouchableOpacity>
