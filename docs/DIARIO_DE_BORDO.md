@@ -225,6 +225,7 @@
 - **DB-138** · 2026-10-28 — Remover teste ELM órfão sem implementação correspondente
 - **DB-139** · 2026-10-28 — Auditoria de obsolescência: reconciliar marca, arquitetura e framing ELM327
 - **DB-140** · 2026-10-28 — Auditoria da rede móvel e dos provedores de localização
+- **DB-141** · 2026-10-28 — Auditoria profunda de PIDs, interpretação e integridade da IA local
 
 ---
 
@@ -4175,3 +4176,39 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - O código e os testes foram adicionados à branch `ui/cockpit-instant-consumption-20261027` da PR #96; CI do HEAD resultante obrigatória para gate anti-regressão, TypeScript, suíte completa e build APK.
 - Não considerar a mudança validada até os jobs ficarem verdes no mesmo SHA e a tela ser conferida em APK instalado no Galaxy A06/Android 16.
 - Esta alteração não comprova a disponibilidade real de GPS/rede do aparelho e não resolve, por si só, os problemas físicos pendentes de GPS ou ELM327/ECU.
+
+
+## DB-141 · 2026-10-28 — Auditoria profunda de PIDs, interpretação e integridade da IA local
+
+### Fontes e método
+- Revisado o diário e o contrato anti-regressão antes das alterações, seguido de leitura estática cruzada entre `pids.json`, `formulas.json`, `ranges.json`, `sensor_tests.json`, `polling_policy.json`, `meriva_confirmed_pids.json`, parser, banco/autosave, tela Saúde, Laboratório, sensor-test engine e exportação TXT.
+- Documentação técnica consultada: SAE J1979-DA revisão J1979DA_202608 (https://saemobilus-test.cld.sae.org/standards/j1979da_202608-j1979-da-digital-annex-e-e-diagnostic-test-modes); ISO 15031-5:2015, confirmada como atual após revisão em 2026 (https://www.iso.org/standard/66368.html); decodificação customizada de python-OBD (https://python-obd.readthedocs.io/en/latest/Custom%20Commands/); mapa de bits de PID 0101 (https://obd2pid.com/pids/01-01); NIST AI RMF (https://www.nist.gov/itl/ai-risk-management-framework).
+- Relatório da rodada: [AUDITORIA_PIDS_IA_2026-10-28.md](AUDITORIA_PIDS_IA_2026-10-28.md).
+
+### Auditoria estrutural dos catálogos
+- Confirmada estrutura: 34 PIDs, 20 fórmulas, 34 faixas e 30 testes/avaliações de sensores. Não foram encontrados IDs duplicados nem PIDs sem fórmula/faixa; os testes de sensor não apontam a PID ausente do catálogo.
+- Quatro PIDs não têm teste dedicado: 0101 (estado/readiness), 0130 (contador de ciclos), 0131 (distância desde limpeza) e 0151 (enumeração de combustível). Não se inventou um teste de sensor analógico para esses parâmetros.
+- Só 010C tem evidência RAW_ECU documentada especificamente para a Meriva; dez outros PIDs são candidatos, não confirmações. Não expandir o catálogo em massa: a descoberta ocorre em fila serial e deve respeitar tempo de polling, K-Line, payloads, fórmulas, unidades, faixas e evidência por ECU.
+- Confirmado que as faixas atuais são limites amplos de codificação/plausibilidade, não valores de operação saudável OEM. Exemplo: o máximo matemático do PID 0143 pode alcançar 25.700% pela escala U16; isso não representa uma condição fisicamente normal.
+
+### Falhas encontradas e correções
+- `src/diagnostics/diagnosticEngine.ts`: antes desta rodada, o motor local não exigia diretamente idade máxima para as observações recebidas. Agora usa limite padrão de 45 s, timestamp válido não futuro, número finito, PID normalizado e faixa catalogada; rejeita origem desconhecida/importada, simulação/seed, valores derivados e amostras inválidas/antigas. Expõe contadores de observações aceitas/bloqueadas.
+- A origem é agora normalizada explicitamente. A compatibilidade `REAL` só vale para o contrato local de `LastPidReading`; origem desconhecida é `IMPORTADO` e não pode ser promovida a `REAL_OBD` por exclusão de `SIMULACAO`.
+- DTCs marcados `historical=true` são bloqueados para hipóteses atuais, mesmo se um registro legado tiver `status=CONFIRMED`. A mesma evidência duplicada não aumenta o score.
+- Contrato de resultado do motor alterado para v2. Telas e TXT nomeiam score/LOW-MEDIUM-HIGH como pontuação/nível qualitativo heurístico, não probabilidade estatística.
+- `app/saude.tsx` usa `getSharedObdStatus().ecuConnected`, fonte do estado atual de resposta da ECU. Ausência de hipóteses sem ECU respondendo e evidência atual suficiente resulta em “DADOS INSUFICIENTES”, não em falsa declaração de normalidade.
+- `src/obd/parser.ts`: interpretação de PID 0101 ajustada para aplicar os bits de suporte e prontidão em conjunto e separar mapas de ignição por centelha/SI de ignição por compressão/CI. Em dados, 0101 passa a aparecer como “STATUS OBD-II”, e sua interpretação legível é preservada no autosave e no TXT.
+- `src/diagnostics/sensorTestEngine.ts`: timestamps inválidos/futuros e números de tentativa duplicados não contam para a série de teste. Mantido o requisito de cinco tentativas distintas e cinco respostas válidas.
+
+### Testes e documentação
+- Estendidos `tests/diagnosticEngine.test.js`, `tests/pidParserIntegrity.test.js`, `tests/sensorTestEngine.test.js` e `tests/merivaAutosave.test.js` para frescor, futuro, PID com espaços, derivação, DTC histórico/duplicado, decode de SI/CI de 0101 e persistência da interpretação.
+- Reforçado `tests/projectBaseline.test.js` para proteger os contratos de origem/frescor, status vivo da ECU, semântica do PID 0101, RG-40/RG-41 e PID-AI-01.
+- Adicionados RG-40 e RG-41 em `docs/CONTRATO_ANTI_REGRESSAO.md`, seção PID-AI-01 em `docs/TEST_PLAN.md`, changelog e este relatório.
+- Nenhuma dependência, SDK Expo ou fluxo Bluetooth foi alterado; nenhum merge foi executado.
+
+### Validação / pendências
+- A CI deve ser consultada novamente no HEAD final desta série documental/código. Nenhum resultado anterior à última alteração serve como prova do SHA final. Critério: gate anti-regressão, TypeScript, suíte completa e `android-build` verdes no mesmo SHA.
+- Depois da CI, inspecionar o APK em Galaxy A06/Android 16 e conferir os novos textos/status no app. A interpretação de PID 0101 é coberta por testes automatizados, mas ainda requer inspeção de interface instalada.
+- Validação física do ELM327/ECU real permanece pendente; a resposta `010C` em 2026-10-27 foi timeout, então nenhum PID candidato está fisicamente confirmado por esta rodada.
+- Não inferir precisão de sensor a partir da bitmap, da fórmula, da ausência de DTC ou do score local. Próxima fase de IA deve ampliar a corroborabilidade e avaliar falsos positivos/negativos em dados reais rotulados, não simplesmente adicionar mais regras ou PIDs.
+
