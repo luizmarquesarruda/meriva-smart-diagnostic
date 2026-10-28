@@ -51,6 +51,20 @@ function isFreshTimestamp(timestamp: string, nowMs: number, maxAgeMs: number): b
   return Number.isFinite(parsed) && parsed <= nowMs && nowMs - parsed <= maxAgeMs;
 }
 
+function isEligibleDtcBase(item: DtcRecord): boolean {
+  return String(item.source ?? '').trim().toUpperCase() === 'REAL_OBD'
+    && item.historical !== true
+    && ACTIVE_DTC_STATUSES.has(String(item.status ?? '').trim().toUpperCase());
+}
+
+export function isCurrentDiagnosticDtc(
+  item: DtcRecord,
+  nowMs = Date.now(),
+  maxAgeMs = MAX_DIAGNOSTIC_DTC_AGE_MS,
+): boolean {
+  return isEligibleDtcBase(item) && isFreshTimestamp(item.lastSeen, nowMs, maxAgeMs);
+}
+
 function isCurrentValidLiveObservation(
   item: PidObservation,
   nowMs: number,
@@ -115,13 +129,7 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
     ? input.maxDtcAgeMs as number
     : MAX_DIAGNOSTIC_DTC_AGE_MS;
   const rawDtcs = input.dtcs ?? [];
-  const isLiveDtcRecord = (item: DtcRecord) =>
-    String(item.source ?? '').trim().toUpperCase() === 'REAL_OBD'
-    && item.historical !== true
-    && ACTIVE_DTC_STATUSES.has(String(item.status ?? '').trim().toUpperCase());
-  const liveDtcs = rawDtcs.filter((item) =>
-    isLiveDtcRecord(item) && isFreshTimestamp(item.lastSeen, nowMs, maxDtcAgeMs),
-  );
+  const liveDtcs = rawDtcs.filter((item) => isCurrentDiagnosticDtc(item, nowMs, maxDtcAgeMs));
   const blockedSimulationSamples = rawObservations.filter(isSimulation).length;
   const blockedNonLiveSamples = rawObservations.filter((item) => !isLiveObd(item) && !isSimulation(item)).length;
   const blockedStaleSamples = rawObservations.filter((item) =>
@@ -132,8 +140,8 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
     && isFreshTimestamp(item.timestamp, nowMs, maxObservationAgeMs)
     && (item.derived === true || item.value === null || !Number.isFinite(item.value) || !validatePidValue(normalizePid(item.pid), item.value).valid),
   ).length;
-  const blockedNonLiveDtcs = rawDtcs.filter((item) => !isLiveDtcRecord(item)).length;
-  const blockedStaleDtcs = rawDtcs.filter((item) => isLiveDtcRecord(item) && !isFreshTimestamp(item.lastSeen, nowMs, maxDtcAgeMs)).length;
+  const blockedNonLiveDtcs = rawDtcs.filter((item) => !isEligibleDtcBase(item)).length;
+  const blockedStaleDtcs = rawDtcs.filter((item) => isEligibleDtcBase(item) && !isFreshTimestamp(item.lastSeen, nowMs, maxDtcAgeMs)).length;
   const hypotheses = new Map<string, DiagnosticHypothesis>();
   let evaluatedRuleGroups = 0;
 
