@@ -4243,19 +4243,22 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Teste físico em Galaxy A06/Android 16/ELM327 real continua pendente; CI não substitui verificação da conexão e da resposta `010C`.
 
 
-## DB-143 · 2026-10-28 — Decisão arquitetural: APK independente, sem dependência do Bubble
+## DB-143 · 2026-10-28 — Aplicativo pessoal, independente e sem conta/login
 
 ### Decisão
-- O MERIVA SMART será um aplicativo Android nativo distribuído em APK. Bubble não será backend obrigatório, serviço de autenticação, sincronização nem dependência de execução.
-- Removida a camada experimental de cliente Bubble adicionada nesta frente, incluindo seus contratos, testes e documentação de portagem. Nenhuma alteração foi feita no app Bubble.
+- O MERIVA SMART é de uso pessoal, instalado como APK Android. Não será preparado como produto distribuído a terceiros.
+- Não criar fluxo de cadastro, login, conta de usuário, autenticação remota ou dependência de um serviço em nuvem.
+- O aplicativo não se conecta ao Bubble. Nenhuma alteração foi feita no app Bubble.
+- O uso principal é local e offline: conexão Bluetooth Classic com ELM327, diagnóstico, PIDs, fórmulas, GPS/autonomia e histórico.
 
 ### Conhecimento técnico preservado para implementação independente
-- Manter eventos com identificadores estáveis para evitar duplicação em retries da fila offline.
+- Manter identificadores estáveis para eventos locais e evitar duplicação em retries da fila offline.
 - Validar bytes OBD no intervalo 0–255 e distinguir suporte declarado de resposta real da ECU.
-- Manter o SQLite local como fonte de verdade para histórico, fila offline e evidências; não depender de rede para diagnóstico.
+- Manter SQLite local como fonte de verdade para histórico e dados persistentes; não depender de rede para diagnóstico.
 - Preservar validação temporal e geográfica do GPS, incluindo os três segmentos válidos exigidos para confirmar movimento.
 - PID 012F continua autoritativo para nível de combustível quando válido; PID 015E continua sendo taxa de combustível em L/h, sem copiar fórmulas experimentais do Bubble.
 
 ### Escopo
-- Não adicionar chamadas HTTP para Bubble nem exigir credenciais ou IDs do Bubble no APK.
-- Serviços online futuros deverão ser independentes e opcionais; a aplicação principal deve funcionar offline.
+- Removida a camada experimental de cliente Bubble, seus contratos, testes e documentação específica.
+- Não adicionar chamadas HTTP, credenciais, provisionamento de dispositivos ou telas de login/cadastro.
+- Recursos de backup/exportação devem ser locais e iniciados pelo usuário. Integrações futuras só podem ser consideradas se forem explicitamente solicitadas; não fazem parte do escopo atual.
