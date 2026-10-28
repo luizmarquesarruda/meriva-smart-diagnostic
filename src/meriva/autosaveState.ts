@@ -9,6 +9,8 @@ export interface LastPidReading {
   value: number | null;
   unit: string;
   status: string;
+  /** Human-readable interpretation for composite/status PIDs such as 0101 and 0114. */
+  interpretation?: string;
   timestamp: string;
   source: 'REAL' | 'SIMULACAO';
 }
