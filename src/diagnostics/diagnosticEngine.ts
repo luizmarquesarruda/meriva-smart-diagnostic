@@ -6,7 +6,7 @@ import sensorTestCatalogJson from '../knowledge/sensor_tests.json';
 export interface DiagnosticInput { observations: PidObservation[]; dtcs?: DtcRecord[]; condition?: VehicleCondition; nowMs?: number; maxObservationAgeMs?: number; maxDtcAgeMs?: number; }
 export interface DiagnosticEvidence { ruleId: string; text: string; source: 'DTC' | 'PID'; pid?: string; dtc?: string; value?: number; sampleCount?: number; }
 export interface DiagnosticHypothesis { id: string; label: string; score: number; confidence: 'LOW' | 'MEDIUM' | 'HIGH'; evidence: DiagnosticEvidence[]; nextTests: string[]; }
-export interface DiagnosticResult { engine: 'LOCAL_EVIDENCE_ENGINE'; version: 2; generatedAt: string; hypotheses: DiagnosticHypothesis[]; acceptedLiveSamples: number; evaluatedRuleGroups: number; blockedSimulationSamples: number; blockedNonLiveSamples: number; blockedStaleSamples: number; blockedInvalidSamples: number; blockedNonLiveDtcs: number; blockedStaleDtcs: number; disclaimer: string; }
+export interface DiagnosticResult { engine: 'LOCAL_EVIDENCE_ENGINE'; version: 2; generatedAt: string; hypotheses: DiagnosticHypothesis[]; acceptedLiveSamples: number; evaluatedRuleGroups: number; blockedSimulationSamples: number; blockedNonLiveSamples: number; blockedStaleSamples: number; blockedInvalidSamples: number; blockedDuplicateSamples: number; blockedNonLiveDtcs: number; blockedStaleDtcs: number; disclaimer: string; }
 
 interface Rule { id: string; trigger: { dtc?: string; combinedTrimMin?: number; combinedTrimMax?: number; condition?: VehicleCondition; mapMinKpa?: number; }; hypothesis: string; baseScore: number; tests: string[]; }
 
@@ -122,9 +122,18 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
     ? input.maxObservationAgeMs as number
     : MAX_DIAGNOSTIC_OBSERVATION_AGE_MS;
   const rawObservations = input.observations ?? [];
-  const observations = rawObservations.filter((item) =>
-    isCurrentValidLiveObservation(item, nowMs, maxObservationAgeMs),
-  );
+  const seenObservationKeys = new Set<string>();
+  let blockedDuplicateSamples = 0;
+  const observations = rawObservations.filter((item) => {
+    if (!isCurrentValidLiveObservation(item, nowMs, maxObservationAgeMs)) return false;
+    const key = normalizePid(item.pid) + ':' + item.timestamp;
+    if (seenObservationKeys.has(key)) {
+      blockedDuplicateSamples += 1;
+      return false;
+    }
+    seenObservationKeys.add(key);
+    return true;
+  });
   const maxDtcAgeMs = Number.isFinite(input.maxDtcAgeMs) && (input.maxDtcAgeMs as number) > 0
     ? input.maxDtcAgeMs as number
     : MAX_DIAGNOSTIC_DTC_AGE_MS;
@@ -211,6 +220,7 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
     blockedNonLiveSamples,
     blockedStaleSamples,
     blockedInvalidSamples,
+    blockedDuplicateSamples,
     blockedNonLiveDtcs,
     blockedStaleDtcs,
     disclaimer: 'Pontuação e nível de evidência são heurísticos, não probabilidades estatísticas. Regras de tendência exigem ao menos ' + MIN_DIAGNOSTIC_SAMPLES_PER_PID + ' amostras REAL_OBD finitas, plausíveis, distintas e recentes (até ' + Math.round(maxObservationAgeMs / 1000) + ' s); a comparação usa a mediana das últimas amostras. Nenhuma hipótese isolada confirma defeito; ausência de hipótese não certifica a saúde do veículo.'
