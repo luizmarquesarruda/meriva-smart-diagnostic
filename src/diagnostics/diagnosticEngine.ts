@@ -6,7 +6,7 @@ import sensorTestCatalogJson from '../knowledge/sensor_tests.json';
 export interface DiagnosticInput { observations: PidObservation[]; dtcs?: DtcRecord[]; condition?: VehicleCondition; nowMs?: number; maxObservationAgeMs?: number; }
 export interface DiagnosticEvidence { ruleId: string; text: string; source: 'DTC' | 'PID'; pid?: string; dtc?: string; value?: number; }
 export interface DiagnosticHypothesis { id: string; label: string; score: number; confidence: 'LOW' | 'MEDIUM' | 'HIGH'; evidence: DiagnosticEvidence[]; nextTests: string[]; }
-export interface DiagnosticResult { engine: 'LOCAL_EVIDENCE_ENGINE'; version: 1; generatedAt: string; hypotheses: DiagnosticHypothesis[]; acceptedLiveSamples: number; blockedSimulationSamples: number; blockedNonLiveSamples: number; blockedStaleSamples: number; blockedInvalidSamples: number; blockedNonLiveDtcs: number; disclaimer: string; }
+export interface DiagnosticResult { engine: 'LOCAL_EVIDENCE_ENGINE'; version: 2; generatedAt: string; hypotheses: DiagnosticHypothesis[]; acceptedLiveSamples: number; blockedSimulationSamples: number; blockedNonLiveSamples: number; blockedStaleSamples: number; blockedInvalidSamples: number; blockedNonLiveDtcs: number; disclaimer: string; }
 
 interface Rule { id: string; trigger: { dtc?: string; combinedTrimMin?: number; combinedTrimMax?: number; condition?: VehicleCondition; mapMinKpa?: number; }; hypothesis: string; baseScore: number; tests: string[]; }
 
@@ -163,7 +163,7 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
 
   return {
     engine: 'LOCAL_EVIDENCE_ENGINE',
-    version: 1,
+    version: 2,
     generatedAt: new Date().toISOString(),
     hypotheses: [...hypotheses.values()].sort((a, b) => b.score - a.score),
     acceptedLiveSamples: observations.length,
