@@ -232,6 +232,8 @@ export default function IndexScreen() {
   });
   const coolantReading = freshRealReading((item) => item.pid === '0105' || /coolant|arrefecimento|temperatura.*motor/i.test(item.name));
   const coolantValue = coolantReading?.value ?? null;
+  const manifoldPressureReading = freshRealReading((item) => item.pid === '010B' || /manifold.*pressure|press[aã]o.*coletor/i.test(item.name));
+  const manifoldPressureKpa = manifoldPressureReading?.value ?? null;
   const currentAutonomyKm = getCurrentAutonomyRangeKm({
     ecuConnected: connectionStatus.ecuConnected,
     tripConnected: tripState.connected,
@@ -370,7 +372,7 @@ export default function IndexScreen() {
             <View style={[styles.metricRow, layout.landscape && styles.metricRowLandscape]}>
               <CockpitMetric label={consumptionLabel} value={availableConsumptionKml != null ? availableConsumptionKml.toFixed(1) + ' km/L' : 'N/D'} />
               <CockpitMetric label="AUTONOMIA ATUAL" value={currentAutonomyKm != null ? Math.round(currentAutonomyKm) + ' km' : 'N/D'} />
-              <CockpitMetric label="FALHAS ATIVAS" value={!connectionStatus.ecuConnected ? 'N/D' : dtcCount > 0 ? String(dtcCount) + ' DTC' : 'SEM DTC'} />
+              <CockpitMetric label="PRESSÃO DO COLETOR" value={manifoldPressureKpa != null ? manifoldPressureKpa.toFixed(0) + ' kPa' : 'N/D'} />
             </View>
             <View style={[styles.coolantCard, layout.landscape && styles.coolantCardLandscape]}>
               <View style={styles.coolantCopy}>
