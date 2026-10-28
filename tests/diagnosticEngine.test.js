@@ -70,6 +70,10 @@ function main() {
   assert.strictEqual(result.hypotheses[0].id, 'FALHA_DE_COMBUSTAO_CILINDRO_1');
   assert.strictEqual(result.hypotheses[0].confidence, 'MEDIUM');
 
+  result = engine.runLocalDiagnostic({ ...base, observations: [obs('0106', 20), obs('0107', 0)] });
+  assert.equal(result.hypotheses.length, 0, 'uma amostra por PID não é suficiente');
+  assert.equal(result.evaluatedRuleGroups, 0, 'grupo sem três amostras por PID deve permanecer não avaliado');
+
   result = engine.runLocalDiagnostic({
     ...base,
     observations: [...repeated('0106', 10), ...repeated('0107', 4)],
@@ -99,34 +103,42 @@ function main() {
     observations: repeated('010B', 80, 'SIMULACAO'),
   });
   assert.strictEqual(result.hypotheses.length, 0);
-  assert.strictEqual(result.blockedSimulationSamples, 1);
+  assert.strictEqual(result.blockedSimulationSamples, 3);
 
   result = engine.runLocalDiagnostic({
     ...base,
     observations: repeated('010B', 80, 'CARSCANNER_BASELINE'),
   });
   assert.strictEqual(result.hypotheses.length, 0, 'baseline CarScanner não pode virar diagnóstico de ECU atual');
-  assert.strictEqual(result.blockedNonLiveSamples, 1, 'baseline deve ser contado como evidência não ao vivo bloqueada');
+  assert.strictEqual(result.blockedNonLiveSamples, 3, 'baseline deve ser contado como evidência não ao vivo bloqueada');
 
 
 
   result = engine.runLocalDiagnostic({
     ...base,
-    dtcs: [{ code: 'P0420', status: 'HISTORICAL', firstSeen: '', lastSeen: '', occurrences: 1, source: 'REAL_OBD', historical: true, confirmed: false }],
+    dtcs: [{ code: 'P0420', status: 'HISTORICAL', firstSeen: new Date().toISOString(), lastSeen: new Date().toISOString(), occurrences: 1, source: 'REAL_OBD', historical: true, confirmed: false }],
   });
   assert.strictEqual(result.hypotheses.length, 0, 'DTC histórico não pode gerar falha atual');
   assert.strictEqual(result.blockedNonLiveDtcs, 1);
 
   result = engine.runLocalDiagnostic({
     ...base,
-    dtcs: [{ code: 'P0420', status: 'CONFIRMED', firstSeen: '', lastSeen: '', occurrences: 1, source: 'REAL_OBD', historical: true, confirmed: true }],
+    dtcs: [{ code: 'P0420', status: 'CONFIRMED', firstSeen: new Date().toISOString(), lastSeen: new Date().toISOString(), occurrences: 1, source: 'REAL_OBD', historical: true, confirmed: true }],
   });
   assert.equal(result.hypotheses.length, 0, 'flag histórico deve bloquear o DTC mesmo se o status legado disser CONFIRMED');
   assert.equal(result.blockedNonLiveDtcs, 1);
 
   result = engine.runLocalDiagnostic({
     ...base,
-    dtcs: [{ code: 'P0135', status: 'CONFIRMED', firstSeen: '', lastSeen: '', occurrences: 1, source: 'REAL_OBD', historical: false, confirmed: true }],
+    dtcs: [{ code: 'P0135', status: 'CONFIRMED', firstSeen: new Date(nowMs - 86_400_000).toISOString(), lastSeen: new Date(nowMs - 86_400_000).toISOString(), occurrences: 1, source: 'REAL_OBD', historical: false, confirmed: true }],
+    nowMs,
+  });
+  assert.equal(result.hypotheses.length, 0, 'DTC antigo não pode disparar hipótese atual');
+  assert.equal(result.blockedStaleDtcs, 1);
+
+  result = engine.runLocalDiagnostic({
+    ...base,
+    dtcs: [{ code: 'P0135', status: 'CONFIRMED', firstSeen: new Date().toISOString(), lastSeen: new Date().toISOString(), occurrences: 1, source: 'REAL_OBD', historical: false, confirmed: true }],
   });
   assert.strictEqual(result.hypotheses[0].id, 'FALHA_CIRCUITO_AQUECEDOR_O2_B1S1');
   assert.ok(result.hypotheses[0].nextTests.some((item) => item.includes('0114')), 'IA usa sensor_tests.json para recomendar avaliação O2 no P0135');
@@ -141,7 +153,7 @@ function main() {
   result = engine.runLocalDiagnostic({ ...base, observations: [...repeated('010B', 80, 'simulacao'), ...repeated('0106', 20), ...repeated('0107', 0)] });
   assert.strictEqual(result.hypotheses.length, 1);
   assert.strictEqual(result.hypotheses[0].id, 'MISTURA_POBRE');
-  assert.strictEqual(result.blockedSimulationSamples, 1);
+  assert.strictEqual(result.blockedSimulationSamples, 3);
 
   // A ausência de evidência corrente nunca equivale a um veículo saudável.
   const nowMs = Date.now();
@@ -193,8 +205,8 @@ function main() {
   result = engine.runLocalDiagnostic({
     ...base,
     dtcs: [
-      { code: 'P0301', status: 'CONFIRMED', firstSeen: '', lastSeen: '', occurrences: 1, source: 'REAL_OBD', historical: false, confirmed: true },
-      { code: 'P0301', status: 'CONFIRMED', firstSeen: '', lastSeen: '', occurrences: 1, source: 'REAL_OBD', historical: false, confirmed: true },
+      { code: 'P0301', status: 'CONFIRMED', firstSeen: new Date().toISOString(), lastSeen: new Date().toISOString(), occurrences: 1, source: 'REAL_OBD', historical: false, confirmed: true },
+      { code: 'P0301', status: 'CONFIRMED', firstSeen: new Date().toISOString(), lastSeen: new Date().toISOString(), occurrences: 1, source: 'REAL_OBD', historical: false, confirmed: true },
     ],
   });
   assert.equal(result.hypotheses[0].evidence.length, 1, 'DTC duplicado não deve inflar evidência nem pontuação');
