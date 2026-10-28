@@ -173,12 +173,22 @@ function main() {
   assert.equal(result.hypotheses.length, 0, 'MAP fora da faixa configurada não pode alimentar IA');
   assert.equal(result.blockedInvalidSamples, 1);
 
-  const spacedMap = series('01 0B', [50, 50, 50]).map((item) => ({ ...item, timestamp: new Date(nowMs - 1000).toISOString() }));
+  const spacedMap = series('01 0B', [50, 50, 50]).map((item, index) => ({ ...item, timestamp: new Date(nowMs - (3 - index) * 1000).toISOString() }));
   result = engine.runLocalDiagnostic({ ...base, observations: spacedMap, nowMs });
   assert.equal(result.hypotheses[0]?.id, 'VACUO_DO_MOTOR_POSSIVELMENTE_ANORMAL',
     'PID com espaços deve ser normalizado antes de validar faixa e regra');
 
-  const spacedInvalidMap = series('01 0B', [300, 300, 300]).map((item) => ({ ...item, timestamp: new Date(nowMs - 1000).toISOString() }));
+  const repeatedTimestampMap = series('010B', [50, 50, 50]).map((item) => ({ ...item, timestamp: new Date(nowMs - 1000).toISOString() }));
+  result = engine.runLocalDiagnostic({ ...base, observations: repeatedTimestampMap, nowMs });
+  assert.equal(result.blockedDuplicateSamples, 2, 'timestamps duplicados não devem contar como três amostras independentes');
+  assert.equal(result.evaluatedRuleGroups, 0, 'timestamps duplicados devem deixar o grupo não avaliado');
+
+  const mapOutlier = series('010B', [80, 40, 40]).map((item, index) => ({ ...item, timestamp: new Date(nowMs - (3 - index) * 1000).toISOString() }));
+  result = engine.runLocalDiagnostic({ ...base, observations: mapOutlier, nowMs });
+  assert.equal(result.hypotheses.length, 0, 'pico isolado não deve ultrapassar a mediana de três leituras');
+  assert.equal(result.evaluatedRuleGroups, 1);
+
+  const spacedInvalidMap = series('01 0B', [300, 300, 300]).map((item, index) => ({ ...item, timestamp: new Date(nowMs - (3 - index) * 1000).toISOString() }));
   result = engine.runLocalDiagnostic({ ...base, observations: spacedInvalidMap, nowMs });
   assert.equal(result.blockedInvalidSamples, 3,
     'PID com espaços não pode contornar a faixa de plausibilidade');
