@@ -13,7 +13,23 @@ export function createSensorTestPlan(supportedPids:string[],hasDefinition:(pid:s
  const supported=new Set(supportedPids.map(normalizeSensorPid));
  return catalog.tests.filter(test=>supported.has(normalizeSensorPid(test.pid))&&test.modes.length>0&&hasDefinition(test.pid));
 }
-function validRows(samples:SensorTestSample[],pid:string):SensorTestSample[]{return samples.filter(item=>normalizeSensorPid(item.pid)===normalizeSensorPid(pid)&&item.status==='RESPONDEU'&&item.value!==null&&Number.isFinite(item.value));}
+function rowsForPid(samples:SensorTestSample[],pid:string):SensorTestSample[]{
+ const seenReadNumbers=new Set<number>();
+ const now=Date.now();
+ return samples.filter(item=>{
+  if(normalizeSensorPid(item.pid)!==normalizeSensorPid(pid))return false;
+  const timestamp=Date.parse(item.timestamp);
+  if(!Number.isFinite(timestamp)||timestamp>now)return false;
+  if(item.readingNumber!==undefined){
+   if(!Number.isInteger(item.readingNumber)||item.readingNumber<1||seenReadNumbers.has(item.readingNumber))return false;
+   seenReadNumbers.add(item.readingNumber);
+  }
+  return true;
+ });
+}
+function validRows(samples:SensorTestSample[],pid:string):SensorTestSample[]{
+ return rowsForPid(samples,pid).filter(item=>item.status==='RESPONDEU'&&item.value!==null&&Number.isFinite(item.value));
+}
 function average(values:number[]):number|null{return values.length?values.reduce((total,value)=>total+value,0)/values.length:null;}
 function valueOf(samples:SensorTestSample[],pid:string):number|null{const rows=validRows(samples,pid);if(rows.length<MIN_SENSOR_TEST_READINGS)return null;return average(rows.map(item=>item.value as number));}
 function result(state:SensorAssessmentState,title:string,explanation:string):SensorAssessment{return{state,title,explanation};}
@@ -26,7 +42,7 @@ function rangeAssessment(value:number,test:SensorTestDefinition):SensorAssessmen
 export function assessSensorSample(sample:SensorTestSample,mode:SensorTestMode,all:SensorTestSample[]):SensorAssessment{
  const pid=normalizeSensorPid(sample.pid),test=catalog.tests.find(item=>normalizeSensorPid(item.pid)===pid);
  if(!test)return result('NAO_CONCLUSIVO','PID fora do catálogo','Nenhuma regra inferida porque o PID não está cadastrado em sensor_tests.json.');
- const attempts=all.filter(item=>normalizeSensorPid(item.pid)===pid),valid=validRows(all,pid);
+ const attempts=rowsForPid(all,pid),valid=validRows(all,pid);
  if(attempts.length<test.minimumReadings)return result('NAO_CONCLUSIVO','Aguardando '+test.minimumReadings+' leituras','Leituras válidas/total: '+valid.length+'/'+attempts.length+'. O resultado requer '+test.minimumReadings+' tentativas.');
  if(valid.length===0)return result('SEM_RESPOSTA','Sem resposta interpretável nas '+test.minimumReadings+' tentativas','O PID não forneceu valor interpretável. Pode ser suporte, comunicação ou parser; não prova falha física.');
  if(valid.length<test.minimumReadings)return result('NAO_CONCLUSIVO','Menos de '+test.minimumReadings+' leituras válidas','Foram obtidas '+valid.length+' leituras válidas em '+attempts.length+' tentativas; não há amostragem suficiente.');
