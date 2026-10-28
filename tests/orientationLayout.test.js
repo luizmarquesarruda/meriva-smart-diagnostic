@@ -43,7 +43,7 @@ assert.match(index, /const visibleHeroMetrics = abnormalMetrics\.length > 0 \? a
 assert.match(index, /const heroMetrics: CockpitPidMetric\[\]/, 'lista de indicadores deve ser dinâmica');
 assert.doesNotMatch(index, /SAÚDE DO VEÍCULO|ABRIR CENTRAL DE SAÚDE/, 'não duplicar a central de saúde na página inicial');
 assert.match(index, /danger:\{color:'#fb7185'\}/, 'alerta térmico deve mudar a cor sem encolher o valor principal');
-assert.doesNotMatch(index, /FALHAS ATIVAS|SEM DTC|\\bDTC\\b/, 'o cockpit não deve resumir DTC; essa informação pertence à tela Saúde');
+assert.doesNotMatch(index, /DTC/, 'o cockpit não deve resumir DTC; essa informação pertence à tela Saúde');
 assert.ok(cockpitTelemetry.includes("'0111': 'POSIÇÃO DA BORBOLETA'"));
 assert.ok(cockpitTelemetry.includes("'0142': 'VOLTAGEM DO SISTEMA'"));
 assert.match(index, /heroSwitchHint/);
