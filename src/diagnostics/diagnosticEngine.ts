@@ -51,7 +51,7 @@ function isCurrentValidLiveObservation(
   nowMs: number,
   maxAgeMs: number,
 ): boolean {
-  if (!isLiveObd(item) || item.value === null || !Number.isFinite(item.value)) return false;
+  if (!isLiveObd(item) || item.derived === true || item.value === null || !Number.isFinite(item.value)) return false;
   if (!isFreshTimestamp(item.timestamp, nowMs, maxAgeMs)) return false;
   return validatePidValue(item.pid, item.value).valid;
 }
@@ -64,7 +64,7 @@ function pidValue(
 ): PidObservation | undefined {
   return observations
     .filter((item) =>
-      item.pid.replace(/\\s/g, '').toUpperCase() === pid.toUpperCase()
+      item.pid.replace(/\s/g, '').toUpperCase() === pid.toUpperCase()
       && isCurrentValidLiveObservation(item, nowMs, maxAgeMs),
     )
     .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))[0];
@@ -102,7 +102,7 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
   const blockedInvalidSamples = rawObservations.filter((item) =>
     isLiveObd(item)
     && isFreshTimestamp(item.timestamp, nowMs, maxObservationAgeMs)
-    && (item.value === null || !Number.isFinite(item.value) || !validatePidValue(item.pid, item.value).valid),
+    && (item.derived === true || item.value === null || !Number.isFinite(item.value) || !validatePidValue(item.pid, item.value).valid),
   ).length;
   const blockedNonLiveDtcs = rawDtcs.length - liveDtcs.length;
   const hypotheses = new Map<string, DiagnosticHypothesis>();
