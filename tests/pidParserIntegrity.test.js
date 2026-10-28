@@ -142,6 +142,27 @@ for (const [formulaId, bytes, expected] of formulaVectors) {
   assert.ok(Math.abs(actual - expected) < 1e-9,
     `fórmula ${formulaId}: esperado ${expected}, recebido ${actual}`);
 }
+const sparkStatus = parser.parsePidResponse('0101', '41 01 80 13 21 21');
+assert.equal(sparkStatus.status, 'RESPONDEU');
+assert.match(sparkStatus.interpretation, /MIL=ON/);
+assert.match(sparkStatus.interpretation, /MISFIRE/);
+assert.match(sparkStatus.interpretation, /CATALISADOR/);
+assert.match(sparkStatus.interpretation, /O2/);
+assert.doesNotMatch(sparkStatus.interpretation, /EVAP/,
+  'bit de EVAP não deve ser inferido quando o mapa diz que EVAP não foi suportado');
+
+const dieselStatus = parser.parsePidResponse('0101', '41 01 00 19 29 29');
+assert.match(dieselStatus.interpretation, /MOTOR=DIESEL\/CI/);
+assert.match(dieselStatus.interpretation, /CATALISADOR_NMHC/);
+assert.match(dieselStatus.interpretation, /PRESSAO_TURBO/);
+assert.match(dieselStatus.interpretation, /SENSOR_GASES_ESCAPE/);
+assert.doesNotMatch(dieselStatus.interpretation, /EVAP|CATALISADOR_AQUECIDO/,
+  'byte C/D tem semântica diferente em motores diesel');
+
+const unsupportedCommon = parser.parsePidResponse('0101', '41 01 00 10 00 FF');
+assert.match(unsupportedCommon.interpretation, /MONITORES_INCOMPLETOS=NENHUM/,
+  'bit de incompletude não informa monitor se o bit de suporte estiver desligado');
+
 assert.equal(parser.parsePidResponse('010C', '41 0C 1A F8').value, 1726,
   'RPM Mode 01 deve aplicar (A*256+B)/4');
 assert.equal(parser.parsePidResponse('0110', '41 10 03 E8').value, 10,
