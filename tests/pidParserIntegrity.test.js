@@ -142,7 +142,7 @@ for (const [formulaId, bytes, expected] of formulaVectors) {
   assert.ok(Math.abs(actual - expected) < 1e-9,
     `fórmula ${formulaId}: esperado ${expected}, recebido ${actual}`);
 }
-const sparkStatus = parser.parsePidResponse('0101', '41 01 80 13 21 21');
+const sparkStatus = parser.parsePidResponse('0101', '41 01 80 13 21 00');
 assert.equal(sparkStatus.status, 'RESPONDEU');
 assert.match(sparkStatus.interpretation, /MIL=ON/);
 assert.match(sparkStatus.interpretation, /MISFIRE/);
@@ -151,13 +151,20 @@ assert.match(sparkStatus.interpretation, /O2/);
 assert.doesNotMatch(sparkStatus.interpretation, /EVAP/,
   'bit de EVAP não deve ser inferido quando o mapa diz que EVAP não foi suportado');
 
-const dieselStatus = parser.parsePidResponse('0101', '41 01 00 19 29 29');
+const dieselStatus = parser.parsePidResponse('0101', '41 01 00 19 29 00');
 assert.match(dieselStatus.interpretation, /MOTOR=DIESEL\/CI/);
 assert.match(dieselStatus.interpretation, /CATALISADOR_NMHC/);
 assert.match(dieselStatus.interpretation, /PRESSAO_TURBO/);
 assert.match(dieselStatus.interpretation, /SENSOR_GASES_ESCAPE/);
 assert.doesNotMatch(dieselStatus.interpretation, /EVAP|CATALISADOR_AQUECIDO/,
   'byte C/D tem semântica diferente em motores diesel');
+
+const completeSparkMonitors = parser.parsePidResponse('0101', '41 01 00 08 21 21');
+assert.match(completeSparkMonitors.interpretation, /INCOMPLETOS=NENHUM/,
+  'D=1 significa monitor concluído, não incompleto');
+const incompleteSparkMonitors = parser.parsePidResponse('0101', '41 01 00 08 21 00');
+assert.match(incompleteSparkMonitors.interpretation, /CATALISADOR/);
+assert.match(incompleteSparkMonitors.interpretation, /O2/);
 
 const unsupportedCommon = parser.parsePidResponse('0101', '41 01 00 10 00 FF');
 assert.match(unsupportedCommon.interpretation, /INCOMPLETOS=NENHUM/,
