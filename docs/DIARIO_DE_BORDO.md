@@ -203,6 +203,7 @@
 - **DB-130** · 2026-10-25 — Otimização CSV avaliada e bloqueada pela versão instalada
 - **DB-131** · 2026-10-25 — Atualização periódica de localização/clima baseada em conectividade
 - **DB-132** · 2026-10-27 — Cockpit sem duplicação de DTC; cartão substituído por pressão do coletor
+- **DB-133** · 2026-10-28 — CI: suíte de apresentação de saúde do ELM reintegrada ao npm test
 
 ---
 
@@ -4005,3 +4006,19 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - A mudança está isolada na branch `ui/cockpit-instant-consumption-20261027`; não foi feito merge.
 - A CI ainda precisa executar no HEAD final da branch. Nenhum teste automatizado, build APK ou inspeção visual no aparelho é declarado concluído nesta entrada.
 - O PID 010B pode não estar disponível em todas as ECUs; nesse caso, N/D é o comportamento correto. DTC continua acessível na tela Saúde.
+
+
+## DB-133 · 2026-10-28 — CI: reintegrar suíte de apresentação de saúde do ELM
+
+### Achado confirmado
+- A CI da PR #96 falhou no gate anti-regressão porque `tests/elmHealthPresentation.test.js` existia no diretório `tests/`, mas não estava incluído em `package.json` → `scripts.test`.
+- O gate compara todas as suítes `tests/*.test.js` com os comandos executados por `npm test`; essa regra está correta e não deve ser enfraquecida.
+
+### Correção
+- Incluída a suíte `tests/elmHealthPresentation.test.js` no comando `npm test`, preservando o gate e as demais suítes.
+- Esta correção é limitada à integração do teste e não altera lógica de conexão ELM327 ou apresentação do cockpit.
+
+### Validação e limites
+- A alteração foi registrada na branch `ui/cockpit-instant-consumption-20261027` da PR #96.
+- A nova execução de CI no SHA resultante é obrigatória; os resultados anteriores não validam este commit.
+- Teste físico do ELM327/ECU e inspeção visual no Galaxy A06 continuam pendentes.
