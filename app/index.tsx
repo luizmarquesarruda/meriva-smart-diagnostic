@@ -222,7 +222,7 @@ export default function IndexScreen() {
     : tripState.consumptionKml != null && tripState.consumptionKml > 0 ? 'MÉDIA DA VIAGEM' : 'MÉDIA HISTÓRICA';
   const liveReadings = getAutoSaveState().lastReadings;
   const freshRealReading = (matches: (item: (typeof liveReadings)[number]) => boolean) => liveReadings.find((item) => {
-    if (!matches(item) || item.source !== 'REAL' || item.value == null || !Number.isFinite(item.value)) return false;
+    if (!matches(item) || item.source !== 'REAL' || item.status !== 'RESPONDEU' || item.value == null || !Number.isFinite(item.value)) return false;
     const timestampMs = Date.parse(item.timestamp);
     const ageMs = Date.now() - timestampMs;
     return connectionStatus.ecuConnected && Number.isFinite(timestampMs) && ageMs >= 0 && ageMs <= 30_000;
