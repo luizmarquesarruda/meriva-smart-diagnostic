@@ -227,7 +227,7 @@
 - **DB-140** · 2026-10-28 — Auditoria da rede móvel e dos provedores de localização
 - **DB-141** · 2026-10-28 — Auditoria profunda de PIDs, interpretação e integridade da IA local
 - **DB-142** · 2026-10-28 — Corrigir polaridade da prontidão no PID 0101
-- **DB-143** · 2026-10-28 — Portagem do contrato Bubble para cliente nativo, sem alterar o Bubble
+- **DB-143** · 2026-10-28 — Decisão arquitetural: APK independente, sem dependência do Bubble
 
 ---
 
@@ -4243,21 +4243,19 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Teste físico em Galaxy A06/Android 16/ELM327 real continua pendente; CI não substitui verificação da conexão e da resposta `010C`.
 
 
-## DB-143 · 2026-10-28 — Portagem do contrato Bubble para cliente nativo, sem alterar o Bubble
+## DB-143 · 2026-10-28 — Decisão arquitetural: APK independente, sem dependência do Bubble
 
-### Fonte e alteração aplicada
-- Consultado em modo somente leitura o app Bubble \`meriva-smart\`, versão de desenvolvimento \`test\`. Não foram alterados workflows, tipos, registros, configurações nem telas do Bubble.
-- Portados os contratos em \`src/cloud/bubbleWorkflowContract.ts\` e \`src/cloud/bubbleWorkflowClient.ts\`; incluídos testes automatizados em \`tests/bubbleWorkflowContract.test.js\` e a matriz técnica em \`docs/BUBBLE_WORKFLOW_PORT.md\`.
-- A camada cobre login, leituras OBD, GPS, viagens, DTC, suporte de PID e heartbeat. Exige HTTPS, token de usuário, IDs estáveis e validações explícitas de entrada. Token fica em memória na camada; persistência futura precisa usar Keystore/SecureStore.
+### Decisão
+- O MERIVA SMART será um aplicativo Android nativo distribuído em APK. Bubble não será backend obrigatório, serviço de autenticação, sincronização nem dependência de execução.
+- Removida a camada experimental de cliente Bubble adicionada nesta frente, incluindo seus contratos, testes e documentação de portagem. Nenhuma alteração foi feita no app Bubble.
 
-### Aprendizados preservados
-- Amostras de telemetria não podem transformar suporte declarado, simulação ou baseline em evidência de ECU real.
-- Reutilizar \`event_id\` em retries; diferenciar aceitação, duplicata aceita e rejeição; não gerar ID novo em timeout.
-- Aplicar bytes OBD inteiros de 0–255, catálogo de PID que o Bubble conhece, limite de frescor de 24 h e throttle de um envio por PID/segundo.
-- O filtro local GPS do app continua mais estrito que o contrato da nuvem. A nuvem não reduz a exigência de três segmentos válidos do rastreador.
-- Não copiar a expressão de integração de combustível encontrada no workflow Bubble; a integração nativa do PID 015E permanece como fonte de cálculo.
+### Conhecimento técnico preservado para implementação independente
+- Manter eventos com identificadores estáveis para evitar duplicação em retries da fila offline.
+- Validar bytes OBD no intervalo 0–255 e distinguir suporte declarado de resposta real da ECU.
+- Manter o SQLite local como fonte de verdade para histórico, fila offline e evidências; não depender de rede para diagnóstico.
+- Preservar validação temporal e geográfica do GPS, incluindo os três segmentos válidos exigidos para confirmar movimento.
+- PID 012F continua autoritativo para nível de combustível quando válido; PID 015E continua sendo taxa de combustível em L/h, sem copiar fórmulas experimentais do Bubble.
 
-### Limites e validação
-- A implementação é uma camada de cliente/contrato, não uma ativação de sincronização automática. O inventário Bubble não expõe workflow para provisionar dispositivo; os endpoints exigem ID existente de \`custom.device\`, e a consulta anterior indicou que o plano não habilita Data API.
-- Falha encontrada na primeira execução CI: o gate anti-regressão detectou ID documental fora da sequência porque a entrada foi inicialmente inserida no início do arquivo. A correção reorganiza a entrada como DB-143, após DB-142, e sincroniza o índice.
-- O novo SHA precisa passar gate anti-regressão, TypeScript, suíte completa e Android build; sem resultado presumido. Teste físico e chamada real autenticada continuam pendentes.
+### Escopo
+- Não adicionar chamadas HTTP para Bubble nem exigir credenciais ou IDs do Bubble no APK.
+- Serviços online futuros deverão ser independentes e opcionais; a aplicação principal deve funcionar offline.
