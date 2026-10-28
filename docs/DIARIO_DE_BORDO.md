@@ -207,6 +207,7 @@
 - **DB-134** · 2026-10-28 — Corrigir contrato de layout obsoleto após remoção do DTC do cockpit
 - **DB-135** · 2026-10-28 — Corrigir navegação icon-only no cockpit
 - **DB-136** · 2026-10-28 — Sincronizar índice do diário após as novas entradas
+- **DB-137** · 2026-10-28 — Fechar lacuna de índice detectada pela segunda execução da CI
 
 ---
 
