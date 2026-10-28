@@ -94,6 +94,7 @@ export function runLocalDiagnostic(input: DiagnosticInput): DiagnosticResult {
   const rawDtcs = input.dtcs ?? [];
   const liveDtcs = rawDtcs.filter((item) =>
     String(item.source ?? '').trim().toUpperCase() === 'REAL_OBD'
+    && item.historical !== true
     && ACTIVE_DTC_STATUSES.has(String(item.status ?? '').trim().toUpperCase()),
   );
   const blockedSimulationSamples = rawObservations.filter(isSimulation).length;
