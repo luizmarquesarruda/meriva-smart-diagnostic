@@ -28,7 +28,7 @@ import {
   getAutoSaveState,
 } from '../src/meriva/autosaveManager';
 import { forceSaveOnObdEvent, registerObdQuery } from '../src/meriva/autosaveIntegration';
-import { runLocalDiagnostic, type DiagnosticResult } from '../src/diagnostics/diagnosticEngine';
+import { normalizeDiagnosticSource, runLocalDiagnostic, type DiagnosticResult } from '../src/diagnostics/diagnosticEngine';
 import type { PidObservation } from '../src/types/sourceTypes';
 
 type Mode = 'REAL' | 'SIMULACAO';
@@ -507,7 +507,7 @@ export default function LaboratorioScreen() {
       name: reading.name,
       value: reading.value,
       unit: reading.unit,
-      source: reading.source === 'SIMULACAO' ? 'SIMULACAO' : 'REAL_OBD',
+      source: normalizeDiagnosticSource(reading.source),
       timestamp: reading.timestamp,
       confidence: reading.source === 'SIMULACAO' ? 'LOW' : 'GOOD',
     })),
@@ -679,7 +679,7 @@ export default function LaboratorioScreen() {
         ) : diagnostic.hypotheses.map((hypothesis) => (
           <View key={hypothesis.id} style={styles.hypothesis}>
             <Text style={styles.hypothesisTitle}>{hypothesis.label}</Text>
-            <Text style={styles.hypothesisConfidence}>CONFIANÇA: {hypothesis.confidence} · SCORE: {hypothesis.score.toFixed(2)}</Text>
+            <Text style={styles.hypothesisConfidence}>NÍVEL QUALITATIVO: {hypothesis.confidence} · PONTUAÇÃO HEURÍSTICA: {Math.round(hypothesis.score * 100)}/100</Text>
             {hypothesis.evidence.map((item, index) => (
               <Text key={`e-${hypothesis.id}-${index}`} style={styles.aiLine}>• Evidência: {item.text}</Text>
             ))}
@@ -687,8 +687,11 @@ export default function LaboratorioScreen() {
           </View>
         ))}
         {diagnostic.blockedSimulationSamples > 0 ? (
-          <Text style={styles.aiWarning}>SIMULAÇÃO BLOQUEADA: {diagnostic.blockedSimulationSamples} amostra(s) não aumentaram a confiança.</Text>
+          <Text style={styles.aiWarning}>SIMULAÇÃO BLOQUEADA: {diagnostic.blockedSimulationSamples} amostra(s) excluída(s).</Text>
         ) : null}
+        {diagnostic.blockedStaleSamples > 0 ? <Text style={styles.aiWarning}>LEITURAS ANTIGAS/FUTURAS BLOQUEADAS: {diagnostic.blockedStaleSamples}</Text> : null}
+        {diagnostic.blockedInvalidSamples > 0 ? <Text style={styles.aiWarning}>LEITURAS INVÁLIDAS/IMPLAUSÍVEIS BLOQUEADAS: {diagnostic.blockedInvalidSamples}</Text> : null}
+        {diagnostic.blockedNonLiveSamples > 0 ? <Text style={styles.aiWarning}>DADOS IMPORTADOS/REFERÊNCIA BLOQUEADOS: {diagnostic.blockedNonLiveSamples}</Text> : null}
         <Text style={styles.aiDisclaimer}>{diagnostic.disclaimer}</Text>
       </View>
 
