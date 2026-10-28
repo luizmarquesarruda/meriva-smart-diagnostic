@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Cockpit
+- Removido o resumo de falhas/DTC do cockpit para evitar duplicação com a página Saúde.
+- O terceiro cartão agora mostra pressão do coletor (PID 010B) apenas com leitura real e recente; sem leitura válida, mostra N/D.
+
 ### Integridade de telemetria GPS
 - Timestamps inválidos, repetidos ou regressivos são descartados sem fabricar uma marca temporal atual.
 
