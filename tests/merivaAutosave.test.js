@@ -546,6 +546,9 @@ test('8a. interpretação composta do PID 0101 persiste e aparece no relatório 
   const integration = loadTs(path.join(ROOT, 'src/meriva/autosaveIntegration.ts'));
   const parser = loadTs(path.join(ROOT, 'src/obd/parser.ts'));
   const formatter = loadTs(path.join(ROOT, 'src/meriva/autosaveTxtFormatter.ts'));
+  const learning = loadTs(path.join(ROOT, 'src/database/learningProfile.ts'));
+  const csvLogger = loadTs(path.join(ROOT, 'src/database/csvLogger.ts'));
+  await learning.createLearningProfile(BASE, new Date().toISOString());
   const raw = '41 01 80 08 01 01';
   const parsed = parser.parsePidResponse('0101', raw);
   assert.equal(parsed.status, 'RESPONDEU');
@@ -557,6 +560,8 @@ test('8a. interpretação composta do PID 0101 persiste e aparece no relatório 
     commandStatus: 'OK',
     parsed,
   }, 'REAL');
+  await integration.flushLearningPersistenceQueue();
+  await csvLogger.flushCsvLogs();
   await m.saveNow('critical');
   const persisted = JSON.parse(files.get(`${CONFIG_DIR}/autosave.json`)).payload.lastReadings[0];
   assert.equal(persisted.pid, '0101');
