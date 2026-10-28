@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### PIDs e IA local
+- Endurecida a IA com origem explícita, bloqueio de leituras derivadas/antigas/futuras/inválidas, PID normalizado antes da validação de faixa, descarte de DTCs históricos e deduplicação de evidência.
+- Versionado o contrato do motor de evidências como v2; score e níveis LOW/MEDIUM/HIGH agora são descritos explicitamente como heurísticos, não probabilidades.
+- A tela Saúde só apresenta ausência de alertas quando a ECU está respondendo na sessão atual e há amostras reais recentes; caso contrário mostra dados insuficientes.
+- Corrigido o decode de PID 0101 para respeitar bits de suporte e diferenciar motores SI e CI; interpretação legível preservada no autosave/TXT e exibida em Dados no lugar do bitmap como número físico.
+- Testes de sensores rejeitam tentativas numeradas duplicadas e timestamps futuros; adicionadas regressões para origem, frescor, histórico, PID 0101 e persistência da interpretação.
+
+
 ### Rede móvel e localização Android
 - Tela Conectividade mostra o estado dos serviços de localização, do provedor GPS/GNSS e do provedor de localização pela rede informado pelo Android, sem solicitar permissões adicionais.
 - Adicionada normalização testável dos estados de provedor; valores ausentes permanecem desconhecidos.
