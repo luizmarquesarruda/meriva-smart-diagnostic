@@ -277,6 +277,9 @@ export default function IndexScreen() {
     : coolantValue != null && coolantValue >= 110
       ? 'ATENÇÃO'
       : coolantValue != null ? 'LEITURA REAL • PID 0105' : connectionStatus.ecuConnected ? 'AGUARDANDO PID 0105' : 'ECU DESCONECTADA';
+  const obdErrorText = (bluetoothError ?? getSharedObdLastError() ?? '').toUpperCase();
+  const ecuProbeFailed = /ECU NÃO RESPONDEU AO 010C|ECU NÃO VALIDADA|ECU SEM RESPOSTA/.test(obdErrorText);
+
   const connectionLabel = connectionStatus.ecuResponseState === 'NO_RESPONSE'
     ? 'ECU SEM RESPOSTA'
     : connectionStatus.ecuResponseState === 'RECOVERING'
@@ -285,22 +288,26 @@ export default function IndexScreen() {
         ? 'ECU CONECTADA'
         : bluetoothSearching
           ? 'CONECTANDO ELM327'
-          : connectionStatus.bluetoothConnected
-            ? 'BLUETOOTH ATIVO'
-            : bluetoothError
-              ? 'FALHA BLUETOOTH'
-              : 'ECU DESCONECTADA';
+          : ecuProbeFailed
+            ? 'ECU SEM RESPOSTA'
+            : connectionStatus.bluetoothConnected
+              ? 'BLUETOOTH ATIVO'
+              : bluetoothError
+                ? 'FALHA BLUETOOTH'
+                : 'ECU DESCONECTADA';
   const obdSessionDetail = connectionStatus.ecuConnected
     ? 'LEITURAS OBD REAIS DISPONÍVEIS'
     : connectionStatus.ecuResponseState === 'NO_RESPONSE'
       ? 'ADAPTADOR PRESENTE, MAS A ECU NÃO RESPONDE'
       : bluetoothSearching
         ? 'PROCURANDO UM ADAPTADOR ELM327 PAREADO'
-        : connectionStatus.bluetoothConnected
-          ? 'BLUETOOTH ATIVO, MAS A ECU AINDA NÃO FOI VALIDADA'
-          : bluetoothError
-            ? 'TOQUE PARA ABRIR A TELA DE CONEXÃO E TENTAR NOVAMENTE'
-            : 'CONECTE O ELM327 PARA LER DADOS REAIS DO VEÍCULO';
+        : ecuProbeFailed
+          ? 'O PID 010C NÃO TEVE RESPOSTA VÁLIDA. ABRA DIAGNÓSTICO PARA VER O RX.'
+          : connectionStatus.bluetoothConnected
+            ? 'BLUETOOTH ATIVO, MAS A ECU AINDA NÃO FOI VALIDADA'
+            : bluetoothError
+              ? 'TOQUE PARA ABRIR A TELA DE CONEXÃO E TENTAR NOVAMENTE'
+              : 'CONECTE O ELM327 PARA LER DADOS REAIS DO VEÍCULO';
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
@@ -363,7 +370,9 @@ export default function IndexScreen() {
               <Text style={styles.heroState}>{selectedHeroMetric.hint}</Text>
               <View style={styles.heroSwitchHintRow}>
                 <AppIcon name="refresh" size={10} color={COLORS.textSubtle} />
-                <Text style={styles.heroSwitchHint}>{abnormalMetrics.length > 0 ? 'ALERTAS' : 'PIDs'} {activeMetricIndex + 1}/{visibleHeroMetrics.length}  •  {selectedHeroMetric.pid || 'OBD'}  •  TOQUE PARA TROCAR  •  10 S</Text>
+                <Text style={styles.heroSwitchHint}>{selectedHeroMetric.pid
+                  ? `${abnormalMetrics.length > 0 ? 'ALERTAS' : 'PIDs'} ${activeMetricIndex + 1}/${visibleHeroMetrics.length}  •  ${selectedHeroMetric.pid}  •  TOQUE PARA TROCAR  •  10 S`
+                  : 'AGUARDANDO ECU • SEM PIDs REAIS VÁLIDOS'}</Text>
               </View>
             </TouchableOpacity>
             <View style={[styles.metricRow, layout.landscape && styles.metricRowLandscape]}>

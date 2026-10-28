@@ -32,7 +32,7 @@ assert.equal(classify('BUS ERROR\r\n'), 'ERROR');
 assert.equal(classify('ELM327 v1.5\r\n>'), 'OK');
 assert.equal(classify(''), 'NO_RESPONSE');
 
-const { classifyElmError, mergeCompatibilityConfig } = loadTs(
+const { classifyElmError, mergeCompatibilityConfig, getRecoveryProtocolCommand, resolveMaxConnectionAttempts } = loadTs(
   path.join(__dirname, '..', 'src', 'obd', 'elm327Compatibility.ts'),
 );
 assert.equal(classifyElmError('NO DATA'), 'NO_DATA');
@@ -44,7 +44,18 @@ const cfg = mergeCompatibilityConfig({ adaptiveTiming: true, adaptiveTimeoutMinM
 assert.equal(cfg.adaptiveTiming, true);
 assert.equal(cfg.adaptiveTimeoutMinMs, 2500);
 assert.equal(cfg.adaptiveTimeoutMaxMs, 12000);
+assert.equal(getRecoveryProtocolCommand('ISO 14230-4 (KWP FAST)'), 'ATSP5');
+assert.equal(getRecoveryProtocolCommand('ISO 14230-4 (KWP 5BAUD)'), 'ATSP4');
+assert.equal(getRecoveryProtocolCommand('ISO 9141-2'), 'ATSP3');
+assert.equal(getRecoveryProtocolCommand('SAE J1850 PWM'), 'ATSP1');
+assert.equal(getRecoveryProtocolCommand('SAE J1850 VPW'), 'ATSP2');
+assert.equal(getRecoveryProtocolCommand('ISO 15765-4 CAN 11/500'), 'ATSP6');
+assert.equal(getRecoveryProtocolCommand('unknown'), 'ATSP0');
+assert.equal(resolveMaxConnectionAttempts(0, 3), 3);
+assert.equal(resolveMaxConnectionAttempts(10, 3), 10);
+assert.equal(resolveMaxConnectionAttempts(Number.NaN, 3), 3);
 const defaults = mergeCompatibilityConfig();
+assert.equal(defaults.maxConnectionAttempts, 0);
 assert.equal(defaults.ioTimeoutMs, 15000);
 assert.equal(defaults.adaptiveTimeoutMaxMs, 15000);
 assert.equal(defaults.optionalAtTimeoutMs, 2500);

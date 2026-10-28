@@ -1,3 +1,32 @@
+/**
+ * Pick the protocol reported by ATDP; do not guess KWP fast for all KWP ECUs.
+ */
+export function getRecoveryProtocolCommand(protocol: string | null | undefined): string {
+  const value = String(protocol ?? '').trim().toUpperCase();
+  if (/^ATSP[0-9A-C]$/.test(value)) return value;
+  if (/^[0-9A-C]$/.test(value)) return 'ATSP' + value;
+  if (/KWP.*(?:5[\s-]?BAUD|SLOW)|(?:5[\s-]?BAUD|SLOW).*KWP/.test(value)) return 'ATSP4';
+  if (/KWP.*FAST|FAST.*KWP/.test(value)) return 'ATSP5';
+  if (/ISO\s*9141/.test(value)) return 'ATSP3';
+  if (/J1850.*PWM|PWM.*J1850/.test(value)) return 'ATSP1';
+  if (/J1850.*VPW|VPW.*J1850/.test(value)) return 'ATSP2';
+  if (/(?:CAN.*11\s*\/\s*500|11\s*\/\s*500.*CAN)/.test(value)) return 'ATSP6';
+  if (/(?:CAN.*29\s*\/\s*500|29\s*\/\s*500.*CAN)/.test(value)) return 'ATSP7';
+  if (/(?:CAN.*11\s*\/\s*250|11\s*\/\s*250.*CAN)/.test(value)) return 'ATSP8';
+  if (/(?:CAN.*29\s*\/\s*250|29\s*\/\s*250.*CAN)/.test(value)) return 'ATSP9';
+  return 'ATSP0';
+}
+
+function boundedAttempts(value: number, fallback: number, minimum: number, maximum: number): number {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.min(maximum, Math.max(minimum, Math.round(value)));
+}
+
+export function resolveMaxConnectionAttempts(configuredAttempts: number, catalogMaxAttempts: number): number {
+  if (Number.isFinite(configuredAttempts) && configuredAttempts > 0) return boundedAttempts(configuredAttempts, 3, 1, 100);
+  return boundedAttempts(catalogMaxAttempts, 3, 1, 100);
+}
+
 export type PartialResponseAction = 'RECONNECT_AND_INITIALIZE' | 'RECONNECT' | 'IGNORE';
 export type ElmErrorType =
   | 'NONE'
@@ -50,7 +79,7 @@ export const DEFAULT_ELM327_COMPATIBILITY: Elm327CompatibilityConfig = {
   ioTimeoutMs: 15_000,
   bluetoothConnectTimeoutMs: 5_000,
   commandDelayMs: 20,
-  maxConnectionAttempts: 20,
+  maxConnectionAttempts: 0,
   noDataReconnectThreshold: 4,
   recoveryBackoffMs: [2000, 5000, 15000],
   partialResponseAction: 'RECONNECT_AND_INITIALIZE',
@@ -117,7 +146,7 @@ export function mergeCompatibilityConfig(
     ioTimeoutMs: Math.max(1000, Math.round(merged.ioTimeoutMs)),
     bluetoothConnectTimeoutMs: Math.max(1000, Math.round(merged.bluetoothConnectTimeoutMs)),
     commandDelayMs: Math.max(0, Math.round(merged.commandDelayMs)),
-    maxConnectionAttempts: Math.max(0, Math.round(merged.maxConnectionAttempts)),
+    maxConnectionAttempts: boundedAttempts(merged.maxConnectionAttempts, DEFAULT_ELM327_COMPATIBILITY.maxConnectionAttempts, 0, 100),
     noDataReconnectThreshold: Math.max(1, Math.round(merged.noDataReconnectThreshold)),
     recoveryBackoffMs: Array.isArray(merged.recoveryBackoffMs) && merged.recoveryBackoffMs.length
       ? merged.recoveryBackoffMs.map((value) => Math.max(500, Math.round(Number(value) || 0))).slice(0, 5)

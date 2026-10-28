@@ -76,6 +76,14 @@ assert.equal(parser.parsePidResponse('010C', '48 6B 10 41 0C 1A F8 82').status, 
   'checksum aditivo incorreto deve ser rejeitado');
 assert.equal(parser.parsePidResponse('010C', '486B10410C1AF82299').status, 'VALOR NÃO INTERPRETADO',
   'envelope K-Line compacto não pode ignorar bytes após o checksum');
+const kwpCompactResponse = parser.parsePidResponse('010C', 'SEARCHING...\n84F111410C0000D3');
+assert.equal(kwpCompactResponse.status, 'RESPONDEU', 'quadro KWP real deve passar pelo parser e checksum');
+assert.equal(kwpCompactResponse.value, 0, 'payload 00 00 é uma resposta real válida de 0 RPM, não dado ausente');
+assert.deepEqual(kwpCompactResponse.rawBytes, [0x84, 0xF1, 0x11, 0x41, 0x0C, 0x00, 0x00, 0xD3]);
+assert.equal(parser.parsePidResponse('010C', '84 F1 11 41 0C 00 00 D3').value, 0, 'KWP espaçado deve ser aceito');
+assert.equal(parser.parsePidResponse('010C', '84F111410C0000D2').status, 'VALOR NÃO INTERPRETADO', 'checksum KWP incorreto deve ser rejeitado');
+assert.equal(parser.parsePidResponse('010C', '84 F1 11 41 0C 00 00 D2').status, 'VALOR NÃO INTERPRETADO');
+assert.equal(parser.parsePidResponse('010C', '84F111410C0000D3FF').status, 'VALOR NÃO INTERPRETADO', 'byte excedente KWP deve ser rejeitado');
 assert.equal(parser.parsePidResponse('010C', '7E804410C1AF8').value, 1726,
   'resposta CAN compacta deve validar o ID e o DLC antes do payload');
 assert.equal(parser.parsePidResponse('010C', '18DAF11004410C1AF8').value, 1726,

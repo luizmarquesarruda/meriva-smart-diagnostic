@@ -516,11 +516,10 @@ export async function connectPreferredElm(
   const config = mergeCompatibilityConfig(compatibility ?? DEFAULT_ELM327_COMPATIBILITY);
 
   connecting = (async () => {
-    // O fluxo de tentativa já é controlado por bluetooth_config.json:
-    // cada candidato usa o limite efetivo configurado (20 por padrão), com 8 s
-    // entre falhas, e para imediatamente no primeiro sucesso. Não repetir uma nova rodada inteira
-    // após esgotar os candidatos evita um ciclo de conexão potencialmente
-    // infinito quando nenhum adaptador responde.
+    // O fluxo usa a política limitada de bluetooth_config.json: três tentativas
+    // por candidato por padrão, com 1,5 s entre falhas transitórias. Após uma
+    // varredura completa sem resposta ECU válida ao 010C, avança ao próximo
+    // adaptador em vez de repetir a mesma varredura no mesmo dispositivo.
     try {
       return await connectPreferredElmOnce(config, preferredAddress, selectionMode);
     } catch (cause) {

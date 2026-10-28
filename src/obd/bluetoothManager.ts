@@ -3,7 +3,7 @@ import RNBluetoothClassic from 'react-native-bluetooth-classic';
 import { BluetoothClassicTransport, BluetoothDeviceInfo, listBondedBluetoothDevices } from './bluetoothClassicTransport';
 import { ElmCommandResult, Elm327Session } from './elm327';
 import { parsePidResponse } from './parser';
-import { Elm327CompatibilityConfig, DEFAULT_ELM327_COMPATIBILITY, mergeCompatibilityConfig } from './elm327Compatibility';
+import { Elm327CompatibilityConfig, DEFAULT_ELM327_COMPATIBILITY, mergeCompatibilityConfig, resolveMaxConnectionAttempts } from './elm327Compatibility';
 import { discoverIntelligentPids } from './intelligentPidDiscovery';
 import { getBluetoothRadioRecoveryStopReason } from './bluetoothRadioRecovery';
 import type { PidDiscoveryCache } from '../meriva/autosaveState';
@@ -48,6 +48,8 @@ export interface RealElmSessionCallbacks {
 /** A conexão só é considerada OBD real quando existe um payload 41 0C válido. */
 const ELM_PROTOCOL_NAMES: Record<string, string> = {
   '0': 'AUTO',
+  '1': 'SAE J1850 PWM',
+  '2': 'SAE J1850 VPW',
   '3': 'ISO 9141-2',
   '4': 'ISO 14230-4 KWP 5-BAUD',
   '5': 'ISO 14230-4 KWP FAST',
@@ -57,6 +59,8 @@ const ELM_PROTOCOL_NAMES: Record<string, string> = {
   '9': 'ISO 15765-4 CAN 29/250',
 };
 
+export const ELM_PROTOCOL_FALLBACKS = ['5', '3', '4', '6', '7', '8', '9', '2', '1'] as const;
+
 export function getElmProtocolName(protocolId: string): string {
   return ELM_PROTOCOL_NAMES[protocolId] ?? 'ELM327 PROTOCOLO ' + protocolId;
 }
@@ -65,6 +69,11 @@ export function isValidEcuProbe(result: ElmCommandResult): boolean {
   if (result.status !== 'OK' || !result.response.trim()) return false;
   const parsed = parsePidResponse('010C', result.response);
   return parsed.status === 'RESPONDEU' && parsed.value !== null && Number.isFinite(parsed.value);
+}
+
+export function shouldRetryElmSessionAttempt(cause: unknown): boolean {
+  const message = cause instanceof Error ? cause.message : String(cause ?? '');
+  return !/ECU NÃO RESPONDEU AO 010C/i.test(message);
 }
 
 export async function requestBluetoothPermissions(): Promise<void> {
@@ -165,9 +174,7 @@ export async function createRealElmSession(
     optionalAtTimeoutMs: compatibility?.optionalAtTimeoutMs ?? bluetoothConfig.initialization.optionalCommandTimeoutMs,
     protocolSelectionTimeoutMs: compatibility?.protocolSelectionTimeoutMs ?? bluetoothConfig.initialization.protocolSelectionTimeoutMs,
   });
-  const effectiveMaxAttempts = config.maxConnectionAttempts > 0
-    ? config.maxConnectionAttempts
-    : MAX_BLUETOOTH_ATTEMPTS;
+  const effectiveMaxAttempts = resolveMaxConnectionAttempts(config.maxConnectionAttempts, MAX_BLUETOOTH_ATTEMPTS);
 
   for (let attempt = 1; attempt <= effectiveMaxAttempts; attempt++) {
     attemptsExecuted = attempt;
@@ -218,6 +225,12 @@ export async function createRealElmSession(
           reason: radioStopReason,
           error: errorMessage,
         });
+        break;
+      }
+
+      if (!shouldRetryElmSessionAttempt(cause)) {
+        terminalReason = 'ECU_PROBE_EXHAUSTED';
+        logBluetoothDiagnostic('BLUETOOTH_RETRY_STOPPED', { attempt, reason: terminalReason, error: errorMessage, action: 'NEXT_PAIRED_CANDIDATE' });
         break;
       }
 
@@ -293,7 +306,7 @@ async function createRealElmSessionAttempt(
     logBluetoothDiagnostic('ECU_PROBE_RESULT', { status: ecuProbe.status, response: ecuProbe.response, attempt });
     let probeIsValid = isValidEcuProbe(ecuProbe);
 
-    const protocolFallbacks = ['5', '3', '4', '6', '7', '8', '9'];
+    const protocolFallbacks = ELM_PROTOCOL_FALLBACKS;
     let successfulForcedProtocol: string | null = null;
 
     for (const protocol of protocolFallbacks) {

@@ -60,18 +60,17 @@ function findResponsePayload(rawResponse: string, pid: string, byteCount: number
           || can11BitFrame
           || can29BitFrame
           || prefix === '486B10';
-        // ATS0 removes byte separators, so legacy K-Line framing may arrive as
-        // 486B10 + positive response + payload + one checksum byte. Accept that
-        // exact envelope in compact form as well as in the spaced-token path.
+        const compactKwpHeader = /^8[0-9A-F]{5}$/.test(prefix)
+          && (Number.parseInt(prefix.slice(0, 2), 16) & 0x3F) === Number.parseInt(expectedCanDlc, 16);
+        const compactKwpChecksum = compactKwpHeader
+          && trailingHex.length === 2
+          && hasValidKLineChecksum(compactLine.slice(0, payloadStart + byteCount * 2), trailingHex);
         const compactKLineChecksum = prefix === '486B10'
           && trailingHex.length === 2
-          && hasValidKLineChecksum(
-            compactLine.slice(0, payloadStart + byteCount * 2),
-            trailingHex,
-          );
+          && hasValidKLineChecksum(compactLine.slice(0, payloadStart + byteCount * 2), trailingHex);
         if (
           payloadHex.length === byteCount * 2 &&
-          ((trailingHex.length === 0 && acceptedPrefix) || compactKLineChecksum) &&
+          ((trailingHex.length === 0 && acceptedPrefix) || compactKLineChecksum || compactKwpChecksum) &&
           /^[0-9A-F]+$/.test(payloadHex)
         ) {
           const bytes: number[] = [];
@@ -90,6 +89,10 @@ function findResponsePayload(rawResponse: string, pid: string, byteCount: number
     const canHeader = lineText.match(/^([0-9A-F]{3}|[0-9A-F]{8})\s+([0-9A-F]{2})\s+/);
     const isLegacyKLineHeader = /^48\s+6B\s+10\s+/.test(lineText);
     const expectedCanDlc = byteCount + 2 + serviceOffsetBytes;
+    const isKwpHeader = /^8[0-9A-F]\s+[0-9A-F]{2}\s+[0-9A-F]{2}\s+/.test(lineText)
+      && tokens.length >= byteCount + 4
+      && tokens[0] !== undefined
+      && (Number.parseInt(tokens[0], 16) & 0x3F) === expectedCanDlc;
     const isDirectResponse = new RegExp('^' + service + '\\s+' + requestedPid + '(?:\\s|$)').test(lineText);
 
     for (let index = 0; index < tokens.length - 1; index += 1) {
@@ -103,13 +106,20 @@ function findResponsePayload(rawResponse: string, pid: string, byteCount: number
         && tokens[0] === '48'
         && tokens[1] === '6B'
         && tokens[2] === '10';
-      if (!(index === 0 && isDirectResponse) && !canEnvelope && !legacyKLineHeader) continue;
+      const kwpEnvelope = index === 3 && isKwpHeader;
+      if (!(index === 0 && isDirectResponse) && !canEnvelope && !legacyKLineHeader && !kwpEnvelope) continue;
 
       const payloadStart = index + 2 + serviceOffsetBytes;
       const payload = tokens.slice(payloadStart, payloadStart + byteCount);
       const trailing = tokens.slice(payloadStart + byteCount);
-      // Legacy ISO/K-line responses may include one checksum byte after the
-      // payload; it is only permitted with the explicit 48 6B 10 envelope.
+      const kwpChecksum = kwpEnvelope
+        && trailing.length === 1
+        && hasValidKLineChecksum(
+          tokens.slice(0, payloadStart + byteCount)
+            .map((token) => Number.parseInt(token, 16).toString(16).padStart(2, '0'))
+            .join(''),
+          trailing[0],
+        );
       const legacyKLineChecksum = legacyKLineHeader
         && trailing.length === 1
         && hasValidKLineChecksum(
@@ -118,7 +128,8 @@ function findResponsePayload(rawResponse: string, pid: string, byteCount: number
             .join(''),
           trailing[0],
         );
-      if (payload.length !== byteCount || (trailing.length !== 0 && !legacyKLineChecksum)) continue;
+      const validTrailing = trailing.length === 0 ? !kwpEnvelope : legacyKLineChecksum || kwpChecksum;
+      if (payload.length !== byteCount || !validTrailing) continue;
       if (!payload.every((token) => /^[0-9A-F]{2}$/.test(token))) continue;
       return payload.map((token) => Number.parseInt(token, 16));
     }
