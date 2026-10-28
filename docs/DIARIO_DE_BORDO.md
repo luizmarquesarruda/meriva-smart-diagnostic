@@ -4016,6 +4016,7 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 
 ### Correção
 - Incluída a suíte `tests/elmHealthPresentation.test.js` no comando `npm test`, preservando o gate e as demais suítes.
+- Na revisão do cartão de pressão, foi encontrado que a validação aceitava leituras `source: REAL` sem exigir `status: RESPONDEU`. O filtro agora exige resposta OBD válida além de valor finito, conexão ECU e idade máxima de 30 s; teste de regressão e RG-08 foram reforçados.
 - Esta correção é limitada à integração do teste e não altera lógica de conexão ELM327 ou apresentação do cockpit.
 
 ### Validação e limites
