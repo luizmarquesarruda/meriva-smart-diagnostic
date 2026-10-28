@@ -143,6 +143,22 @@ function main() {
   assert.equal(result.hypotheses.length, 0, 'MAP fora da faixa configurada não pode alimentar IA');
   assert.equal(result.blockedInvalidSamples, 1);
 
+  const spacedMap = { ...obs('01 0B', 50), timestamp: new Date(nowMs).toISOString() };
+  result = engine.runLocalDiagnostic({ ...base, observations: [spacedMap], nowMs });
+  assert.equal(result.hypotheses[0]?.id, 'VACUO_DO_MOTOR_POSSIVELMENTE_ANORMAL',
+    'PID com espaços deve ser normalizado antes de validar faixa e regra');
+
+  const spacedInvalidMap = { ...obs('01 0B', 300), timestamp: new Date(nowMs).toISOString() };
+  result = engine.runLocalDiagnostic({ ...base, observations: [spacedInvalidMap], nowMs });
+  assert.equal(result.blockedInvalidSamples, 1,
+    'PID com espaços não pode contornar a faixa de plausibilidade');
+
+  const derivedMap = { ...obs('010B', 80), derived: true };
+  result = engine.runLocalDiagnostic({ ...base, observations: [derivedMap], nowMs });
+  assert.equal(result.hypotheses.length, 0, 'valor derivado não é leitura RAW da ECU');
+  assert.equal(result.acceptedLiveSamples, 0);
+  assert.equal(result.blockedInvalidSamples, 1);
+
   const nullMap = { ...obs('010B', null), timestamp: new Date(nowMs).toISOString() };
   result = engine.runLocalDiagnostic({ ...base, observations: [nullMap], nowMs });
   assert.equal(result.acceptedLiveSamples, 0);
