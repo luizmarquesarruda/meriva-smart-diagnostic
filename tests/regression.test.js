@@ -395,8 +395,9 @@ async function testProtocolRecoverySerializesWholeNegotiation() {
 async function testConfiguredBluetoothRetryLimit() {
   const managerPath = path.join(ROOT, 'src/obd/bluetoothManager.ts');
   const source = fs.readFileSync(managerPath, 'utf8');
-  assert.ok(source.includes('const effectiveMaxAttempts = config.maxConnectionAttempts > 0'), 'retry deve derivar do maxConnectionAttempts configurado');
+  assert.ok(source.includes('const effectiveMaxAttempts = resolveMaxConnectionAttempts(config.maxConnectionAttempts, MAX_BLUETOOTH_ATTEMPTS)'), 'retry deve respeitar configuração e limite padrão finito');
   assert.ok(source.includes('attempt <= effectiveMaxAttempts'), 'loop de retry deve respeitar o limite efetivo');
+  assert.ok(source.includes('shouldRetryElmSessionAttempt'), 'falha conclusiva da ECU não deve repetir toda a sequência no mesmo adaptador');
   assert.ok(!source.includes('const maxAttempts = config.maxConnectionAttempts'), 'não pode haver shadowing de maxAttempts');
   console.log('configured Bluetooth retry limit: OK');
 }
@@ -496,8 +497,8 @@ async function testEcuValidationGate() {
   assert.strictEqual(manager.isValidEcuProbe({ status: 'OK', response: 'NO DATA', command: '010C', elapsedMs: 10, attempt: 1 }), false);
   assert.strictEqual(manager.isValidEcuProbe({ status: 'TIMEOUT', response: '', command: '010C', elapsedMs: 1000, attempt: 1 }), false);
   assert.strictEqual(manager.isValidEcuProbe({ status: 'OK', response: '41 0B 25', command: '010C', elapsedMs: 10, attempt: 1 }), false);
-  assert.strictEqual(manager.MAX_BLUETOOTH_ATTEMPTS, 20);
-  assert.strictEqual(manager.BLUETOOTH_RETRY_INTERVAL_MS, 8000);
+  assert.strictEqual(manager.MAX_BLUETOOTH_ATTEMPTS, 3);
+  assert.strictEqual(manager.BLUETOOTH_RETRY_INTERVAL_MS, 1500);
 }
 
 async function testPidScanner() {
