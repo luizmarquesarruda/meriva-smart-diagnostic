@@ -698,6 +698,7 @@ export default function LaboratorioScreen() {
         {diagnostic.blockedNonLiveSamples > 0 ? <Text style={styles.aiWarning}>DADOS IMPORTADOS/REFERÊNCIA BLOQUEADOS: {diagnostic.blockedNonLiveSamples}</Text> : null}
         {diagnostic.blockedDuplicateSamples > 0 ? <Text style={styles.aiWarning}>AMOSTRAS COM TIMESTAMP DUPLICADO BLOQUEADAS: {diagnostic.blockedDuplicateSamples}</Text> : null}
         {diagnostic.blockedStaleDtcs > 0 ? <Text style={styles.aiWarning}>DTCs COM ÚLTIMA OBSERVAÇÃO ANTIGA/FUTURA BLOQUEADOS: {diagnostic.blockedStaleDtcs}</Text> : null}
+        <Text style={styles.aiLine}>AMOSTRAS ATUAIS ACEITAS: {diagnostic.acceptedLiveSamples} · GRUPOS AVALIADOS: {diagnostic.evaluatedRuleGroups}</Text>
         <Text style={styles.aiDisclaimer}>{diagnostic.disclaimer}</Text>
       </View>
 
