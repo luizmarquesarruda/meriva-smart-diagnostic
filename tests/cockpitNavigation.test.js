@@ -26,7 +26,7 @@ assert.doesNotMatch(index, /\}, \[isHydrated, settings\]\);/, 'objeto settings i
 assert.match(index, /settings\?\.elmMaxConnectionAttempts/, 'efeito deve reagir às opções OBD efetivamente alteradas');
 assert.match(index, /bottomNavLandscape/, 'navegação inferior deve continuar disponível em paisagem');
 assert.doesNotMatch(index, /!layout\.landscape\s*&&\s*\(/, 'navegação não deve desaparecer ao girar o aparelho');
-assert.doesNotMatch(index, /<Text style=\{\[styles\.bottomNavText, styles\.bottomNavTextActive\]\}>Painel<\/Text>/, 'navegação inferior deve usar ícones sem legenda visual');
+for (const label of ['Painel', 'Diagnóstico', 'Dados', 'Viagens', 'Mais']) { assert.ok(index.includes('>' + label + '</Text>'), 'navegação deve exibir rótulo visível: ' + label); }
 for (const label of ['Painel, tela atual', 'Diagnóstico', 'Dados', 'Viagens', 'Mais recursos']) {
   assert.ok(index.includes('accessibilityLabel="' + label + '"'), 'aba deve manter rótulo acessível: ' + label);
 }
