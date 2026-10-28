@@ -64,7 +64,7 @@ assert.throws(() => prepareBubbleReading(validReading({ at: new Date(nowMs + 1).
 assert.throws(() => prepareBubbleReading(validReading({ at: new Date(nowMs - 86400001).toISOString() }), nowMs), /24 horas/i);
 assert.throws(() => prepareBubbleReading(validReading({ previousAtMs: nowMs - 1200 }), nowMs), /1 segundo/i);
 
-const gps = prepareBubbleGps({
+const gpsDraft = {
   deviceId: 'bubble-device-1',
   tripId: 'bubble-trip-1',
   eventId: 'event-gps-0001',
@@ -73,14 +73,15 @@ const gps = prepareBubbleGps({
   lng: -46.63,
   accuracy: 12,
   speedKmh: 42,
-}, nowMs);
+};
+const gps = prepareBubbleGps(gpsDraft, nowMs);
 assert.equal(gps.version, 1);
 assert.equal(gps.speed, 42);
-assert.throws(() => prepareBubbleGps({ ...gps, lat: 90 }, nowMs), /Latitude/i);
-assert.throws(() => prepareBubbleGps({ ...gps, accuracy: 51 }, nowMs), /Precisão/i);
-assert.throws(() => prepareBubbleGps({ ...gps, speedKmh: 251 }, nowMs), /Velocidade/i);
-assert.throws(() => prepareBubbleGps({ ...gps, at: new Date(nowMs + 1000).toISOString() }, nowMs), /futuro/i);
-assert.throws(() => prepareBubbleGps({ ...gps, previousAtMs: nowMs - 1500 }, nowMs), /1 segundo/i);
+assert.throws(() => prepareBubbleGps({ ...gpsDraft, lat: 90 }, nowMs), /Latitude/i);
+assert.throws(() => prepareBubbleGps({ ...gpsDraft, accuracy: 51 }, nowMs), /Precisão/i);
+assert.throws(() => prepareBubbleGps({ ...gpsDraft, speedKmh: 251 }, nowMs), /Velocidade/i);
+assert.throws(() => prepareBubbleGps({ ...gpsDraft, at: new Date(nowMs + 1000).toISOString() }, nowMs), /futuro/i);
+assert.throws(() => prepareBubbleGps({ ...gpsDraft, previousAtMs: nowMs - 1500 }, nowMs), /1 segundo/i);
 
 const trip = prepareBubbleTrip({
   deviceId: 'bubble-device-1',
