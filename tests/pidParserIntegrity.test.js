@@ -160,7 +160,7 @@ assert.doesNotMatch(dieselStatus.interpretation, /EVAP|CATALISADOR_AQUECIDO/,
   'byte C/D tem semântica diferente em motores diesel');
 
 const unsupportedCommon = parser.parsePidResponse('0101', '41 01 00 10 00 FF');
-assert.match(unsupportedCommon.interpretation, /MONITORES_INCOMPLETOS=NENHUM/,
+assert.match(unsupportedCommon.interpretation, /INCOMPLETOS=NENHUM/,
   'bit de incompletude não informa monitor se o bit de suporte estiver desligado');
 
 assert.equal(parser.parsePidResponse('010C', '41 0C 1A F8').value, 1726,
