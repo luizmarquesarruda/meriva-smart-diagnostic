@@ -112,8 +112,8 @@ assert.match(storageScreen, /href=\"\/viagens\"/, 'armazenamento deve encaminhar
 assert.match(index, /SMART OBD DIAGNOSTIC/, 'cockpit deve usar o nome genérico definido para o aplicativo');
 assert.match(tripScreen, /SMART OBD DIAGNOSTIC/, 'telas de relatórios devem manter a mesma marca visual do cockpit');
 assert.doesNotMatch(tripScreen, /MERIVA SMART DIAGNOSTIC/, 'uma tela secundária não pode exibir uma marca divergente do cabeçalho do app');
-assert.match(configurationScreen, /href=\"\\/veiculo\"/, 'configurações deve encaminhar ao perfil canônico do veículo');
-assert.doesNotMatch(configurationScreen, /profile\\.engine|profile\\.tankCapacityL|profile\\.reserveCapacityL/, 'configurações não deve repetir motor, tanque e reserva já mostrados no perfil do veículo');
+assert.ok(configurationScreen.includes('href="/veiculo"'), 'configurações deve encaminhar ao perfil canônico do veículo');
+assert.ok(!configurationScreen.includes('profile.engine') && !configurationScreen.includes('profile.tankCapacityL') && !configurationScreen.includes('profile.reserveCapacityL'), 'configurações não deve repetir motor, tanque e reserva já mostrados no perfil do veículo');
 assert.match(moreScreen, /title: 'ARQUIVOS E EXPORTAÇÃO'/, 'categoria Mais deve descrever armazenamento/exportação, sem duplicar a lista de viagens');
 for (const file of screenFiles) {
   const source = fs.readFileSync(file, 'utf8');

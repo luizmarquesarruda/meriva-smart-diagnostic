@@ -245,6 +245,7 @@
 - **DB-154** · 2026-10-28 — Mover teste de integridade de viagens para a tela canônica
 - **DB-155** · 2026-10-28 — Diferenciar armazenamento de histórico de viagens
 - **DB-156** · 2026-10-28 — Remover cópia do perfil do veículo em Configurações
+- **DB-157** · 2026-10-28 — Tornar robustas as asserções da navegação do perfil
 
 ---
 
@@ -4387,3 +4388,10 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Removida a cópia textual e substituída por um atalho acessível `VER PERFIL DO VEÍCULO` para `/veiculo`. Nenhum campo de perfil ou dado persistido foi alterado.
 - Acrescentada barreira de regressão para impedir o reaparecimento da cópia e manter a tela canônica como única fonte visual dos detalhes físicos.
 - CI do novo SHA e validação no aparelho continuam pendentes; esta alteração não declara build APK nem validação física.
+
+
+## DB-157 · 2026-10-28 — Tornar robustas as asserções da navegação do perfil
+
+- As novas asserções do perfil em Configurações tinham escaping excessivo nos padrões de caminho e propriedades, arriscando validar uma expressão textual diferente da pretendida.
+- Substituídas por verificações de substring explícitas para `href="/veiculo"` e para os campos que não devem ser duplicados. A proteção continua verificando o contrato real, sem depender de escape de regex.
+- A CI do SHA seguinte precisa confirmar a suíte completa e o build Android; não declarar aprovação a partir apenas da inspeção estática.
