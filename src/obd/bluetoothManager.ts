@@ -288,8 +288,11 @@ async function createRealElmSessionAttempt(
     callbacks?.onElmInitialized?.();
     logBluetoothDiagnostic('ELM_INITIALIZED', { attempt });
     logBluetoothDiagnostic('ELM_INITIALIZATION_RESULT', initialization.map((item) => ({ command: item.command, status: item.status, response: item.response })));
-    logBluetoothDiagnostic('ECU_PROBE_START', { command: '010C', attempt, maxAttempts });
-    let ecuProbe = await session.executeCommand('010C');
+    logBluetoothDiagnostic('ECU_PROBE_START', { command: '010C', timeoutMs: config.protocolSelectionTimeoutMs, attempt, maxAttempts });
+    // A janela de ATSP0 pode ter reduzido o timeout adaptativo durante a inicialização.
+    // A primeira sonda real da ECU usa o limite de negociação configurado; as tentativas
+    // posteriores por protocolo forçado continuam com timeout adaptativo.
+    let ecuProbe = await session.executeCommand('010C', config.protocolSelectionTimeoutMs);
     logBluetoothDiagnostic('ECU_PROBE_RESULT', { status: ecuProbe.status, response: ecuProbe.response, attempt });
     let probeIsValid = isValidEcuProbe(ecuProbe);
 
