@@ -240,6 +240,7 @@
 - **DB-149** · 2026-10-28 — Grade 2×2 adaptável e navegação lateral direita em paisagem
 - **DB-150** · 2026-10-28 — Auditoria crítica de layout e duplicações de conteúdo
 - **DB-151** · 2026-10-28 — Remoção do setter órfão após consolidar o Laboratório
+- **DB-152** · 2026-10-28 — Unificar marca visual entre cockpit e tela Viagens
 
 ---
 
@@ -4344,3 +4345,11 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Causa: a declaração de estado e suas atualizações normais foram eliminadas junto com o painel duplicado, mas uma chamada residual no bloco de erro permaneceu.
 - Correção: removida a última chamada ao setter que não tinha mais estado correspondente. O estado de erro geral e o encerramento da sessão continuam preservados.
 - Validação ainda depende da CI do novo SHA; não interpretar TypeScript corrigido como build Android ou ensaio físico aprovado.
+
+
+## DB-152 · 2026-10-28 — Unificar marca visual entre cockpit e tela Viagens
+
+- A inspeção de todos os mastheads identificou que o cockpit e a splash usam a identidade genérica `SMART OBD` / `SMART OBD DIAGNOSTIC`, enquanto a lista de viagens introduzia isoladamente `MERIVA SMART DIAGNOSTIC`.
+- Corrigido o masthead de `app/viagens.tsx` para `SMART OBD DIAGNOSTIC`. Mantido o nome de pacote Expo existente, cuja regra de baseline exige marca genérica; não houve alteração de applicationId, slug ou dados de perfil do veículo.
+- Adicionada asserção anti-regressão para impedir o reaparecimento de uma marca divergente na tela secundária.
+- Resultado visual no dispositivo e CI do SHA final ainda precisam ser validados; nenhuma afirmação de teste físico decorre desta alteração.

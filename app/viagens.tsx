@@ -52,7 +52,7 @@ export default function ViagensScreen() {
     <ScrollView contentContainerStyle={[s.content,{paddingHorizontal:layout.horizontalPadding}]} showsVerticalScrollIndicator={false}>
       <View style={[s.frame,{maxWidth:layout.maxContentWidth}]}>
         {selected ? <TripDetails cycle={selected} onBack={() => setSelectedId(null)} /> : <>
-          <Text style={s.eyebrow}>MERIVA SMART DIAGNOSTIC</Text>
+          <Text style={s.eyebrow}>SMART OBD DIAGNOSTIC</Text>
           <Text style={s.title}>RELATÓRIO DE VIAGENS</Text>
           <Text style={s.subtitle}>HISTÓRICO REAL • SESSÕES INDEPENDENTES • DADOS AUDITÁVEIS</Text>
           <SourceStatusLegend compact />

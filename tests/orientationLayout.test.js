@@ -12,6 +12,7 @@ const tripService = fs.readFileSync('src/trip/autoTripService.ts', 'utf8');
 const healthScreen = fs.readFileSync('app/saude.tsx', 'utf8');
 const laboratoryScreen = fs.readFileSync('app/laboratorio.tsx', 'utf8');
 const storageScreen = fs.readFileSync('app/armazenamento.tsx', 'utf8');
+const tripScreen = fs.readFileSync('app/viagens.tsx', 'utf8');
 const screenFiles = [
   'app/mais.tsx', 'app/dados.tsx', 'app/saude.tsx', 'app/veiculo.tsx',
   'app/viagens.tsx', 'app/aprendizado.tsx', 'app/bluetooth.tsx',
@@ -106,6 +107,9 @@ assert.doesNotMatch(laboratoryScreen, /tripPanel|tripMetric|tripGrid|tripLabel|t
 assert.match(laboratoryScreen, /paddingBottom: 30/, 'Laboratório deve usar margem final normal, sem reservar uma barra inexistente');
 assert.doesNotMatch(storageScreen, /VIAGENS SALVAS/, 'armazenamento não deve duplicar a lista da tela Viagens');
 assert.match(storageScreen, /href=\"\/viagens\"/, 'armazenamento deve encaminhar para o relatório canônico de viagens');
+assert.match(index, /SMART OBD DIAGNOSTIC/, 'cockpit deve usar o nome genérico definido para o aplicativo');
+assert.match(tripScreen, /SMART OBD DIAGNOSTIC/, 'telas de relatórios devem manter a mesma marca visual do cockpit');
+assert.doesNotMatch(tripScreen, /MERIVA SMART DIAGNOSTIC/, 'uma tela secundária não pode exibir uma marca divergente do cabeçalho do app');
 for (const file of screenFiles) {
   const source = fs.readFileSync(file, 'utf8');
   assert.ok(/useMidLayout\(\)/.test(source) || /useWindowDimensions\(\)/.test(source) && /getMidLayout\(windowSize\)/.test(source), file + ' deve usar o layout responsivo centralizado');
