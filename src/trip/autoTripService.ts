@@ -38,6 +38,7 @@ type Listener = (state: AutoTripServiceState) => void;
 const FUEL_ESTIMATE_EVERY_N_CYCLES = pollingPolicy.polling.estimatedFuelRate.everyCycles;
 const FUEL_RATE_DISPLAY_STALE_AFTER_MS = pollingPolicy.polling.estimatedFuelRate.displayStaleAfterMs;
 const FUEL_LEVEL_EVERY_N_CYCLES = pollingPolicy.polling.fuelLevel.everyCycles;
+const GPS_START_RETRY_COOLDOWN_MS = 15_000;
 
 const INITIAL_STATE: AutoTripServiceState = {
   connected: false,
@@ -72,6 +73,8 @@ class AutoTripService {
   private pollCycleNumber = 0;
   private stoppedSinceMs: number | null = null;
   private gpsStartedForEcu = false;
+  private gpsStartPromise: Promise<void> | null = null;
+  private gpsStartRetryAfterMs = 0;
   private lastEstimatedFuelRate: { rateLph: number; source: FuelRateSource; timestampMs: number } | null = null;
   private fuelType: FuelType = 'FLEX';
   private lastFuelEthanolPercent: number | null = null;
@@ -185,6 +188,7 @@ class AutoTripService {
     this.recorder = null;
     this.stoppedSinceMs = null;
     const generation = ++this.generation;
+    this.gpsStartRetryAfterMs = 0;
 
     const persistedAutonomy = (await initAutoSave(this.basePath)).autonomy;
     this.state = {
@@ -243,7 +247,9 @@ class AutoTripService {
         continue;
       }
 
-      if (!this.gpsStartedForEcu) await this.ensureGpsForEcu();
+      if (!this.gpsStartedForEcu && !this.gpsStartPromise && Date.now() >= this.gpsStartRetryAfterMs) {
+        this.scheduleGpsStart(generation);
+      }
 
       const loopStartedAt = Date.now();
       this.pollCycleNumber += 1;
@@ -557,23 +563,63 @@ class AutoTripService {
     }
   }
 
-  private async ensureGpsForEcu(): Promise<void> {
-    if (this.gpsStartedForEcu) return;
+  private scheduleGpsStart(generation: number): void {
+    if (this.gpsStartedForEcu || this.gpsStartPromise || Date.now() < this.gpsStartRetryAfterMs) return;
     if (gpsTracker.getState().running) {
       this.gpsStartedForEcu = true;
+      this.gpsStartRetryAfterMs = 0;
       return;
     }
 
-    // No Android, priorizar o serviço nativo para continuar registrando em
-    // segundo plano. Se a permissão ou o serviço falhar, manter fallback em
-    // primeiro plano sem bloquear a leitura OBD.
+    const pending = this.startGpsForEcu(generation);
+    this.gpsStartPromise = pending;
+    void pending.catch((cause) => {
+      if (this.running && generation === this.generation) {
+        this.setState({
+          error: cause instanceof Error ? 'GPS: ' + cause.message : 'FALHA AO INICIAR GPS',
+        });
+      }
+    }).finally(() => {
+      if (this.gpsStartPromise === pending) {
+        this.gpsStartPromise = null;
+        this.gpsStartRetryAfterMs = this.gpsStartedForEcu
+          ? 0
+          : Date.now() + GPS_START_RETRY_COOLDOWN_MS;
+      }
+    });
+  }
+
+  private async startGpsForEcu(generation: number): Promise<void> {
+    const generationIsCurrent = () => this.running
+      && generation === this.generation
+      && getSharedObdStatus().ecuConnected;
+
+    if (!generationIsCurrent()) return;
+
+    // GPS acquisition must never gate the serial OBD polling loop. Keep one
+    // start attempt in flight; if the ECU/trip generation ends while native
+    // startup is pending, tear down any late-started location task.
     let backgroundStarted = false;
     try {
       backgroundStarted = await startBackgroundMonitoring();
     } catch {
       backgroundStarted = false;
     }
-    if (!backgroundStarted) await gpsTracker.start();
+
+    if (!backgroundStarted && generationIsCurrent()) {
+      await gpsTracker.start();
+    }
+
+    if (!generationIsCurrent()) {
+      const anotherEcuSessionIsActive = this.running && getSharedObdStatus().ecuConnected;
+      if (!anotherEcuSessionIsActive && (gpsTracker.getState().running || gpsTracker.isBackgroundLocationRunning())) {
+        await gpsTracker.stop();
+      }
+      this.gpsStartedForEcu = anotherEcuSessionIsActive
+        && (gpsTracker.getState().running || gpsTracker.isBackgroundLocationRunning());
+      return;
+    }
+
     this.gpsStartedForEcu = gpsTracker.getState().running || gpsTracker.isBackgroundLocationRunning();
   }
 

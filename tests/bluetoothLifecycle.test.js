@@ -36,7 +36,7 @@ assert(shared.includes('handleUnexpectedDisconnect'));
 assert(shared.includes('readBluetoothEnabledForMonitor'), 'health monitor must centralize radio-state probes');
 assert(shared.includes('BLUETOOTH_MONITOR_STATE_TIMEOUT_MS'), 'health monitor radio-state probe must have a finite timeout');
 assert(shared.includes("runWithTimeout, shouldRetryAfterDisconnectCleanup"), 'health monitor must use the bounded-wait helper');
-assert(!/await RNBluetoothClassic\\.isBluetoothEnabled\\(\\)/.test(shared), 'unbounded native radio-state await must not return in the health monitor');
+assert(!/await RNBluetoothClassic\.isBluetoothEnabled\(\)/.test(shared), 'unbounded native radio-state await must not return in the health monitor');
 assert(shared.includes('ESTADO DO BLUETOOTH NÃO CONFIRMADO PELO MONITOR'), 'unknown radio state must not be mislabeled as ECU failure');
 assert(shared.includes('startObdAutosaveSession'));
 assert(shared.includes('closeObdAutosaveSession'));
