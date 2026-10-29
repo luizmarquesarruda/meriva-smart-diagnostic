@@ -24,6 +24,7 @@ interface PendingNativeSocketCleanup {
 // Shared across transport instances: a manual reconnect must respect cleanup
 // from a timed-out write on the same adapter address.
 const pendingNativeSocketCleanups = new Map<string, PendingNativeSocketCleanup>();
+const pendingNativeDisconnectOperations = new Map<string, Promise<void>>();
 
 // ELM327 retorna linhas curtas; 16 KiB é uma margem generosa e evita RX ilimitado.
 export const MAX_ELM_RX_BUFFER_CHARS = 16 * 1024;
@@ -750,9 +751,24 @@ export class BluetoothClassicTransport implements ObdTransport {
   }
 
   private async safeDisconnect(device: BluetoothDevice): Promise<void> {
+    const addressKey = normalizeBluetoothAddress(this.deviceAddress);
+    let nativeDisconnect = pendingNativeDisconnectOperations.get(addressKey);
+    if (!nativeDisconnect) {
+      nativeDisconnect = Promise.resolve().then(() => device.disconnect());
+      pendingNativeDisconnectOperations.set(addressKey, nativeDisconnect);
+      const clearIfSettled = () => {
+        if (pendingNativeDisconnectOperations.get(addressKey) === nativeDisconnect) {
+          pendingNativeDisconnectOperations.delete(addressKey);
+        }
+      };
+      // Keep the raw native promise tracked after the JavaScript timeout. A
+      // retry must reuse it while pending, never invoke disconnect() in parallel.
+      void nativeDisconnect.then(clearIfSettled, clearIfSettled);
+    }
+
     try {
       await runWithTimeout(
-        () => device.disconnect(),
+        () => nativeDisconnect!,
         this.config.bluetoothConnectTimeoutMs,
         `TIMEOUT: DESCONEXÃO BLUETOOTH APÓS ${this.config.bluetoothConnectTimeoutMs} MS`,
       );
