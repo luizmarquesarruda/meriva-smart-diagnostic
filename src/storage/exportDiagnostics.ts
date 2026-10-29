@@ -2,11 +2,7 @@ import * as FileSystem from 'expo-file-system';
 import { getAutoSaveState } from '../meriva/autosaveManager';
 import { readDtcs } from '../database/dtcManager';
 import { readDriveCycles } from './driveCycleStorage';
-
-function csv(value: unknown): string {
-  const text = String(value ?? '');
-  return '"' + text.replace(/"/g, '""') + '"';
-}
+import { escapeCsvCell } from './csvEncoding';
 
 async function ensureExportDir(basePath: string): Promise<string> {
   const dir = `${basePath}/BACKUP/EXPORTS`;
@@ -44,13 +40,13 @@ export async function exportDriveCyclesCsv(basePath: string): Promise<string> {
   const lines = [
     header.join(','),
     ...cycles.map((cycle) => [
-      csv(cycle.startedAt),
-      csv(cycle.finishedAt),
-      csv(cycle.distanceTotalKm),
-      csv(cycle.fuelUsedL),
-      csv(cycle.avgFuelConsumptionKml),
-      csv(cycle.source),
-      csv(cycle.fuelRateSource),
+      escapeCsvCell(cycle.startedAt),
+      escapeCsvCell(cycle.finishedAt),
+      escapeCsvCell(cycle.distanceTotalKm),
+      escapeCsvCell(cycle.fuelUsedL),
+      escapeCsvCell(cycle.avgFuelConsumptionKml),
+      escapeCsvCell(cycle.source),
+      escapeCsvCell(cycle.fuelRateSource),
     ].join(',')),
   ];
   await FileSystem.writeAsStringAsync(path, lines.join('\n') + '\n', { encoding: FileSystem.EncodingType.UTF8 });

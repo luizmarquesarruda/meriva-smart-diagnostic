@@ -210,6 +210,10 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
   fakeNow += 5001;
   staleTracker.setVehicleSpeedHintKmh(36); // simulate fresh OBD polling while GNSS remains unavailable
   watchdogHandler();
+  const samplesBeforeDelayedFix = staleTracker.getState().samples;
+  staleWatcher({ coords: { latitude: 0, longitude: 0.00025, speed: 10, accuracy: 5 }, timestamp: 3500 });
+  assert.strictEqual(staleTracker.getState().samples, samplesBeforeDelayedFix,
+    'a delayed fix older than the last accepted timestamp must be rejected after stale-baseline reset');
   assert.strictEqual(staleTracker.getState().signalQuality, 'SEM_FIX');
   assert.strictEqual(staleTracker.getState().lastAccuracyM, null);
   assert.strictEqual(staleTracker.getState().currentSpeedKmh, 36,

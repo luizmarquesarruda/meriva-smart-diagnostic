@@ -30,6 +30,8 @@ const sensorEngine = read('src/diagnostics/sensorTestEngine.ts');
 const projectContract = read('docs/CONTRATO_ANTI_REGRESSAO.md');
 const diary = read('docs/DIARIO_DE_BORDO.md');
 const theme = read('src/ui/theme.ts');
+const csvEncoding = read('src/storage/csvEncoding.ts');
+const diagnosticsExporter = read('src/storage/exportDiagnostics.ts');
 
 // Gate itself must be a first-class CI step, not a note in the diary.
 assert.equal(packageJson.scripts['gate:baseline'], 'node tests/projectBaseline.test.js');
@@ -64,6 +66,7 @@ const requiredSuites = [
   'backgroundExecution.test.js',
   'tripRecorder.test.js',
   'autosaveTxtFormatter.test.js',
+  'csvEncoding.test.js',
   'merivaAutosave.test.js',
   'onlineConditions.test.js',
   'autonomyPresentation.test.js',
@@ -106,6 +109,8 @@ assert.match(projectContract, /fila serial única/i);
 // Bluetooth recovery must stay bounded and must never race an unconfirmed native socket.
 const bluetoothRecovery = read('src/obd/connectionRecovery.ts');
 const bluetoothTransport = read('src/obd/bluetoothClassicTransport.ts');
+assert.match(csvEncoding, /formulaLikeText/);
+assert.match(diagnosticsExporter, /escapeCsvCell/);
 assert.match(bluetoothRecovery, /awaitNativeCleanupRetry/);
 assert.match(bluetoothTransport, /awaitNativeCleanupRetry/);
 assert.match(bluetoothTransport, /MAX_ELM_RX_BUFFER_CHARS\s*=\s*16\s*\*\s*1024/);

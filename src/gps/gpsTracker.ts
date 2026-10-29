@@ -409,7 +409,7 @@ export class GpsTracker {
       c.longitude < -180 || c.longitude > 180 ||
       !Number.isFinite(location.timestamp) || location.timestamp <= 0
     ) return;
-    if (this.previous && location.timestamp <= this.previous.timestamp) return;
+    if (this.state.lastTimestamp != null && location.timestamp <= this.state.lastTimestamp) return;
 
     const sample: GpsSample = {
       latitude: c.latitude,

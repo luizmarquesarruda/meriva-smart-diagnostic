@@ -256,6 +256,7 @@
 - **DB-165** · 2026-10-29 — Limitar a consulta HTTP opcional de clima e cancelar requisição vencida
 - **DB-166** · 2026-10-29 — Limitar sonda de rádio no monitor de saúde Bluetooth/ECU
 - **DB-167** · 2026-10-29 — Expirar velocidade GPS antiga sem perder distância acumulada
+- **DB-168** · 2026-10-29 — Neutralizar fórmulas em campos textuais de exportação CSV
 
 ---
 
@@ -4544,3 +4545,19 @@ Após DB-163, ainda havia operações nativas sem prazo em `src/obd/bluetoothMan
 - As referências de Android orientam atualizações por callback, timestamps e remoção de updates para controlar ciclo de vida/energia; a falta de callbacks não pode ser tomada como prova de movimento atual. Ver: https://developer.android.com/develop/sensors-and-location/location/request-updates
 - A CI para o SHA novo precisa executar TypeScript, suíte completa, gate anti-regressão e build APK. Nenhum teste físico foi executado nesta sessão.
 - O watchdog corrige frescor do estado apresentado; o GPS continua sendo a fonte de distância e o OBD continua sendo a fonte de velocidade quando há uma leitura OBD válida. Ele não estima distância durante interrupções.
+
+## DB-168 · 2026-10-29 — Neutralizar fórmulas em campos textuais de exportação CSV
+
+### Causa
+A exportação CSV de viagens escapava aspas, mas não neutralizava campos textuais iniciados por operadores que planilhas podem interpretar como fórmula (`=`, `+`, `-` ou `@`, inclusive depois de espaços/controle). Dados importados ou persistidos poderiam virar fórmulas ao abrir o arquivo em software de planilha.
+
+### Alterações
+- Criado `src/storage/csvEncoding.ts` com `escapeCsvCell()`: mantém o quoting/escape de aspas e prefixa texto formula-like com apóstrofo. Valores numéricos continuam numéricos, inclusive os negativos.
+- `src/storage/exportDiagnostics.ts` passa a usar o codificador compartilhado nas sete colunas exportadas.
+- Criado `tests/csvEncoding.test.js` para texto normal, aspas, fórmula direta, fórmula após espaços/tab, valores negativos numéricos e nulos; ligado a `npm test`.
+- `tests/projectBaseline.test.js` agora exige o teste no script e o uso do codificador pelo exportador.
+- Não foi alterado JSON de diagnóstico nem o formato/ordem das colunas CSV.
+
+### Validação e limites
+- Este commit exige nova execução do gate anti-regressão, TypeScript e suíte completa. O resultado da CI anterior não o valida.
+- O codificador reduz o risco de formula injection em planilhas comuns; não pretende validar o significado semântico de todos os campos de origem.
