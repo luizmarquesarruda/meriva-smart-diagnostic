@@ -9,6 +9,7 @@ const app = readJson('app.json').expo;
 const eas = readJson('eas.json');
 const pkg = readJson('package.json');
 const lock = readJson('package-lock.json');
+const workflow = fs.readFileSync(path.join(__dirname, '..', '.github/workflows/ci.yml'), 'utf8');
 
 const projectId = '013db816-eec1-4406-8952-d6c0731cf461';
 assert.equal(app.slug, 'meriva');
@@ -29,5 +30,14 @@ assert.equal(eas.build.preview.distribution, 'internal');
 assert.equal(eas.build.preview.android.buildType, 'apk');
 assert.equal(eas.build.production.distribution, 'internal');
 assert.equal(eas.build.production.android.buildType, 'apk');
+
+// Fail closed: OTA publication must only run on main after both validation and APK build,
+// and must require an explicit repository variable opt-in plus a secret token.
+assert.match(workflow, /publish-ota:[\s\S]*?needs:\s*\[validate, android-build\]/);
+assert.match(workflow, /if:\s*github\.event_name == 'push' && github\.ref == 'refs\/heads\/main' && vars\.EAS_UPDATE_ENABLED == 'true'/);
+assert.match(workflow, /EXPO_TOKEN:\s*\$\{\{ secrets\.EXPO_TOKEN \}\}/);
+assert.match(workflow, /eas-cli@latest update --channel production --platform android/);
+assert.match(workflow, /native_changed=true/);
+assert.match(workflow, /app_code_changed=true/);
 
 console.log('easUpdateConfig.test.js: OK');
