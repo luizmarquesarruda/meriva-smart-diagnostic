@@ -4,8 +4,8 @@
 
 - Repositório: [luizmarquesarruda/meriva-smart-diagnostic](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
 - PR #96: [Evita DTC duplicado no cockpit e mostra pressão do coletor](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/96), aberta, fora de rascunho e sem merge. Base `main` observada nesta PR: `7eec3afecb3718020724baf053f8b6d2ca636fab`.
-- HEAD antes da última correção de limpeza nativa: `1bd9ebfbd693a739d35f71d4bb050fe232597d87`; o HEAD esperado após DB-179 é `08835c1f8dd5b343155c9cabeab71d1df50f2853`.
-- As execuções de CI anteriores foram canceladas por novos commits na mesma branch. A falha histórica em `tests/orientationLayout.test.js:78` foi uma asserção textual obsoleta e foi corrigida em DB-176. DB-178 e DB-179 ainda exigem validação completa no mesmo SHA final.
+- HEAD/CI: consultar a PR #96 para o SHA atual e o workflow correspondente. As execuções listadas anteriormente foram canceladas durante a sequência de commits; DB-178, DB-179 e DB-180 precisam de validação integral no mesmo SHA final.
+- A falha histórica em `tests/orientationLayout.test.js:78` era uma asserção textual obsoleta, corrigida em DB-176. Não há confirmação de CI verde para as correções posteriores.
 - Após qualquer alteração, reconsultar o HEAD e a CI correspondentes. Só considerar a PR validada com `validate` e `android-build` verdes no mesmo SHA, diff reconciliado contra `main` e validação física separada.
 - A auditoria atual encontrou divergências de documentação e um débito relevante de modernização do SDK. Não houve upgrade de SDK nem remoção de dependências nativas nesta rodada: fazê-los antes de preservar um baseline físico poderia introduzir regressão no Bluetooth Classic.
 - Testes com Galaxy A06/Android 16/ELM327 real, confirmação de resposta `010C`, inspeção do APK instalado e validação GPS/autonomia continuam pendentes.
@@ -4714,3 +4714,22 @@ DB-177 adicionou timeout a `device.disconnect()` e preservou a trava de socket, 
 - Commit de implementação: `01cebfe60d7b7eb7a76dd18249762395a1a0e574`.
 - Commit de regressão: `08835c1f8dd5b343155c9cabeab71d1df50f2853`.
 - A CI precisa validar o HEAD final, incluindo typecheck, gate, suíte completa e build Android. Teste físico Bluetooth/ELM327/ECU no Galaxy A06 permanece pendente.
+
+
+## DB-180 · 2026-10-29 — Impedir que resposta ELM atrasada contamine o próximo PID
+
+### Causa
+Quando `readUntilPrompt()` expirava sem receber `>`, limpava o buffer e devolvia timeout, mas mantinha o stream disponível para o comando seguinte. Uma resposta atrasada do comando anterior podia chegar após a limpeza e ser interpretada como resposta do próximo PID, violando o framing serial e criando telemetria atribuída ao comando errado.
+
+### Correção
+- `src/obd/bluetoothClassicTransport.ts` agora marca o stream como dessincronizado quando a leitura expira sem prompt. Antes de transmitir um novo comando, a camada registra a limpeza compartilhada do socket, invalida o estado local e rejeita a escrita; a nova sessão só pode começar depois da limpeza RFCOMM confirmada.
+- O estado de dessincronização é reinicializado apenas ao abrir uma nova sessão ou concluir o fechamento. Não se tenta inferir o fim de uma resposta que não trouxe o delimitador real `>`.
+- `tests/bluetoothLifecycle.test.js` protege a marcação do timeout, o bloqueio de TX subsequente e a limpeza antes da reconexão.
+
+### Justificativa técnica
+A documentação Android informa que `BluetoothSocket.connect()` bloqueia e recomenda cancelar descoberta antes da conexão, além de fechar sockets para liberar recursos. A camada JS não pode assumir que um timeout cancela a operação nativa ou restaura o limite de mensagens. Referências oficiais: https://developer.android.com/develop/connectivity/bluetooth/connect-bluetooth-devices e https://developer.android.com/reference/android/bluetooth/BluetoothSocket.
+
+### Validação e limites
+- Commit de implementação: `4ee98580ca7542bd25bf7043a16c412ed6838d54`.
+- Commit de regressão: `711c8153f7a013ce75848466544157a00b86f7ca`.
+- A CI precisa validar typecheck, gate, suíte completa e build Android no HEAD final. O ensaio físico com Galaxy A06/Android 16, ELM327 real e ECU continua necessário para confirmar a recuperação no hardware.
