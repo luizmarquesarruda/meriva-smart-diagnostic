@@ -241,6 +241,7 @@
 - **DB-150** · 2026-10-28 — Auditoria crítica de layout e duplicações de conteúdo
 - **DB-151** · 2026-10-28 — Remoção do setter órfão após consolidar o Laboratório
 - **DB-152** · 2026-10-28 — Unificar marca visual entre cockpit e tela Viagens
+- **DB-153** · 2026-10-28 — Corrigir contrato de altura da tipografia do cockpit em paisagem
 
 ---
 
@@ -4353,3 +4354,10 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Corrigido o masthead de `app/viagens.tsx` para `SMART OBD DIAGNOSTIC`. Mantido o nome de pacote Expo existente, cuja regra de baseline exige marca genérica; não houve alteração de applicationId, slug ou dados de perfil do veículo.
 - Adicionada asserção anti-regressão para impedir o reaparecimento de uma marca divergente na tela secundária.
 - Resultado visual no dispositivo e CI do SHA final ainda precisam ser validados; nenhuma afirmação de teste físico decorre desta alteração.
+
+
+## DB-153 · 2026-10-28 — Corrigir contrato de altura da tipografia do cockpit em paisagem
+
+- A CI voltou a falhar em `tests/orientationLayout.test.js`: a asserção exigia `lineHeight:23` para o valor dos quadrantes, mas o estilo de paisagem vigente usa `fontSize:21,lineHeight:22`.
+- A inspeção do estilo e do JSX confirmou que a divergência era apenas do teste. Atualizada a expectativa para 22 dp, preservando a tipografia compacta que reduz a altura ocupada.
+- A CI precisa ser reavaliada no novo SHA, pois ainda pode revelar outras expectativas obsoletas. APK build e validação visual no Galaxy A06 continuam pendentes até a CI passar.
