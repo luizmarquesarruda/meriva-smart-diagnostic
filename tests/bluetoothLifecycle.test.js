@@ -90,6 +90,11 @@ assert(transport.includes('INITIAL_DEVICE_CONNECTED_CHECK_FAILED'), 'an unknown 
 assert(transport.includes('INITIAL_CONNECTION_CHECK_CLEANUP'), 'initial socket probe failure must preserve the native cleanup guard');
 assert.match(transport, /getBondedDevices\(\)[\s\S]*?TIMEOUT: LISTAGEM DE DISPOSITIVOS PAREADOS/, 'paired-device enumeration must be bounded');
 assert(transport.includes('DEVICE_CONNECTED_CHECK_FAILED'), 'unknown native connection state must be logged and fail closed');
+const connectedProbe = transport.slice(transport.indexOf('private async assertDeviceConnected'), transport.indexOf('async write('));
+assert(connectedProbe.includes("registerPendingNativeSocketCleanup(device, 'DEVICE_CONNECTED_CHECK_CLEANUP')"),
+  'a timed-out/rejected runtime socket-state probe must register shared cleanup before reconnect');
+assert(connectedProbe.includes('this.markDisconnected()'),
+  'unknown runtime socket state must clear local state after the cleanup guard is installed');
 assert(transport.includes('await this.assertDeviceConnected(device, NATIVE_CONNECTION_CHECK_TIMEOUT_MS)'), 'write must not transmit while native state is unknown');
 assert(transport.includes('Math.min(NATIVE_CONNECTION_CHECK_TIMEOUT_MS, remainingMs)'), 'read must reserve only the remaining response timeout for native state checks');
 assert(transport.includes('NATIVE_SOCKET_CLEANUP_TIMEOUT'), 'direct close timeout must be observable and keep the socket guard');
