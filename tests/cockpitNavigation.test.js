@@ -26,7 +26,8 @@ assert.doesNotMatch(index, /\}, \[isHydrated, settings\]\);/, 'objeto settings i
 assert.match(index, /settings\?\.elmMaxConnectionAttempts/, 'efeito deve reagir às opções OBD efetivamente alteradas');
 assert.match(index, /bottomNavLandscape/, 'navegação inferior deve continuar disponível em paisagem');
 assert.match(index, /screenFrameLandscape/, 'a tela deve reservar espaço para a navegação lateral em paisagem');
-assert.match(index, /bottomNavLandscape:\{position:'absolute',left:0,top:0,bottom:20,width:50/, 'as cinco abas devem caber na raia lateral em paisagem');
+assert.match(index, /bottomNavLandscape:\{position:'absolute',right:0,top:0,bottom:20,width:50/, 'as cinco abas devem caber na raia lateral direita em paisagem');
+assert.match(index, /screenFrameLandscape:\{paddingRight:56/, 'cockpit deve reservar espaço à direita para a navegação lateral');
 assert.match(index, /styles\.bottomNavItemLandscape/, 'alvos de toque da raia lateral devem ter tamanho reduzido mas acessível');
 
 assert.doesNotMatch(index, /!layout\.landscape\s*&&\s*\(/, 'navegação não deve desaparecer ao girar o aparelho');
