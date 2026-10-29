@@ -1,3 +1,36 @@
+## ESTADO VIGENTE — 2026-10-29 (preparação OTA pessoal)
+
+> Trabalho isolado na branch `fix/eas-ota-20261029`, baseada no `main` em `7eec3afecb3718020724baf053f8b6d2ca636fab`. Sem merge e sem publicação OTA nesta rodada. A CI do HEAD final deve confirmar lockfile, configuração Expo, testes e APK antes da integração.
+
+- Objetivo definido: atualizações OTA para mudanças compatíveis em JavaScript/TypeScript/assets; APK novo obrigatório para alterações de módulo nativo, permissões, plugins, dependências nativas ou configuração que altere o runtime.
+- Projeto Expo configurado conforme os identificadores informados: owner `luizarruda`, slug `meriva`, project ID `013db816-eec1-4406-8952-d6c0731cf461`. A sessão não autenticou contra a API Expo, portanto o vínculo no serviço e o canal remoto ainda precisam ser verificados.
+- Adicionado `expo-updates ~0.25.27`, compatível com a linha Expo SDK 51, e atualizado o lockfile. A consistência final será validada por `npm ci` e CI; o lockfile foi atualizado via GitHub e não executado localmente nesta sessão.
+- Configurado `runtimeVersion.policy=appVersion`, endpoint EAS Update, verificação em `ON_LOAD` e canal `production` explicitamente no header, necessário para o APK que é gerado por `expo prebuild` + Gradle e não por EAS Build.
+- Adicionado job `publish-ota` à CI. Ele só é elegível em push para `main`, requer sucesso em `validate` e `android-build`, exige secret `EXPO_TOKEN` e permanece bloqueado enquanto a variável GitHub `EAS_UPDATE_ENABLED` não for exatamente `true`. Alterações nativas/configuração fazem o job ignorar OTA.
+- Adicionado `tests/easUpdateConfig.test.js` à suíte e criado `docs/OTA_ATUALIZACOES.md` com ativação, limitações e passos para lançamento inicial.
+- Importante: o APK que já está instalado não contém o módulo nativo `expo-updates`; nenhuma OTA consegue adicioná-lo retroativamente. Depois de integrar esta branch, será necessária uma primeira APK nova instalada manualmente. A publicação deve continuar desativada até confirmar canal e fazer smoke test no Android real.
+- Antes da integração: conferir CI verde no SHA final desta branch; validar `npm ci`, `expo-doctor`, `gate:baseline`, `validate` e `android-build`; confirmar canal `production` no projeto EAS; cadastrar `EXPO_TOKEN` como secret sem expô-lo em código; manter `EAS_UPDATE_ENABLED` desativada até instalar o APK inicial e verificar uma OTA de teste.
+- A frente #96 Bluetooth/cockpit permanece separada e intocada. Não use CI de outra branch/SHA como prova desta alteração; antes de integrar frentes com diários divergentes, reconcilie DB IDs e conteúdo.
+
+## DB-132 · 2026-10-29 — Preparação segura de EAS Update para distribuição pessoal
+
+### Alterações propostas nesta branch
+- `package.json` e `package-lock.json`: incluir `expo-updates ~0.25.27` para Expo SDK 51 e teste contratual de configuração.
+- `app.json`: alinhar slug/owner/projectId com os dados fornecidos e configurar URL OTA, runtime por versão do app e header fixo do canal `production`.
+- `eas.json`: alinhar perfis preview/production ao mesmo canal, destinado ao uso pessoal.
+- `.github/workflows/ci.yml`: job de publicação com bloqueio explícito por variável, secret e sucesso dos dois jobs de validação/build. O gate ignora commits com alterações nativas ou sem alterações de código/assets do app.
+- `tests/easUpdateConfig.test.js`: validar endpoint, identidade, política de runtime, dependência/lockfile e canal.
+- `docs/OTA_ATUALIZACOES.md`: documentar diferença OTA/APK, segredo/variável necessários e instalação inicial obrigatória.
+
+### Critérios de aceitação ainda pendentes
+- CI verde no HEAD final e validação de que `npm ci` aceita o lockfile.
+- Confirmação no projeto Expo de que o project ID/owner estão vinculados e o canal remoto `production` existe e aponta para o branch de atualização desejado.
+- Build e instalação manual de APK nova, seguido de teste de recebimento de uma atualização OTA somente JS/TS/assets.
+- Não publicar enquanto a variável `EAS_UPDATE_ENABLED` estiver ausente/falsa; não publicar bundle que dependa de API nativa inexistente no APK instalado.
+- Nenhuma mudança foi mesclada em `main` e nenhuma OTA foi publicada durante esta rodada.
+
+---
+
 ## ESTADO VIGENTE — 2026-10-25 (auditoria de estabilidade DB-130)
 
 > Estado consultado no GitHub em 25/10/2026. Este diário acompanha a branch de consolidação #89; não representa merge em `main`. CI verde por branch isolada não comprova integração combinada nem teste físico.
