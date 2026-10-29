@@ -106,7 +106,7 @@ assert(transport.includes('TX_BLOCKED_RX_DESYNCHRONIZED'),
 assert(transport.includes("registerPendingNativeSocketCleanup(device, 'RX_DESYNCHRONIZED_CLEANUP')"),
   'an unframed ELM timeout must force socket cleanup before another command');
 assert(transport.includes('NATIVE_SOCKET_CLEANUP_TIMEOUT'), 'direct close timeout must be observable and keep the socket guard');
-assert.match(transport, /runWithTimeout\(\s*\(\) => device\.disconnect\(\)/, 'native socket disconnect must have a finite timeout');
+assert.match(transport, /runWithTimeout\(\s*\(\) => nativeDisconnect!/, 'native socket disconnect must have a finite timeout while reusing the tracked native promise');
 assert(transport.includes('BLUETOOTH_DISCONNECT_TIMEOUT'), 'timed-out native disconnect must be reported separately');
 assert(transport.includes('pendingNativeDisconnectOperations'),
   'the raw native disconnect promise must remain tracked after the JavaScript timeout');
