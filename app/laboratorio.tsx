@@ -503,7 +503,7 @@ export default function LaboratorioScreen() {
       {mode === 'REAL' ? (
         <>
           <TouchableOpacity style={[styles.button, layout.landscape && styles.flexButton]} onPress={loadDevices} disabled={loadingDevices || !storageReady}>
-            {loadingDevices ? <ActivityIndicator color=COLORS.white /> : <Text style={styles.buttonText}>LISTAR PAREADOS</Text>}
+            {loadingDevices ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.buttonText}>LISTAR PAREADOS</Text>}
           </TouchableOpacity>
 
           {devices.map((device) => (

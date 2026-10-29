@@ -125,7 +125,7 @@ export default function ArmazenamentoScreen() {
         <Text style={styles.note}>A lista completa, os detalhes por percurso e os gráficos históricos ficam na área Viagens. Esta tela concentra o armazenamento local e as exportações.</Text>
         <Link href="/viagens" asChild>
           <TouchableOpacity style={[styles.button, styles.buttonWithIcon]} accessibilityRole="button" accessibilityLabel="Abrir relatórios de viagens">
-            <AppIcon name="trips" size={18} color=COLORS.white />
+            <AppIcon name="trips" size={18} color={COLORS.white} />
             <Text style={styles.buttonText}>ABRIR HISTÓRICO DE VIAGENS</Text>
           </TouchableOpacity>
         </Link>
@@ -134,15 +134,15 @@ export default function ArmazenamentoScreen() {
 
       <View style={styles.exportRow}>
         <TouchableOpacity style={[styles.button, styles.buttonWithIcon]} onPress={() => void handleExport('JSON')} disabled={!basePath || busy}>
-          <AppIcon name="history" size={18} color=COLORS.white /><Text style={styles.buttonText}>EXPORTAR JSON</Text>
+          <AppIcon name="history" size={18} color={COLORS.white} /><Text style={styles.buttonText}>EXPORTAR JSON</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.button, styles.buttonWithIcon]} onPress={() => void handleExport('CSV')} disabled={!basePath || busy}>
-          <AppIcon name="data" size={18} color=COLORS.white /><Text style={styles.buttonText}>EXPORTAR CSV</Text>
+          <AppIcon name="data" size={18} color={COLORS.white} /><Text style={styles.buttonText}>EXPORTAR CSV</Text>
         </TouchableOpacity>
       </View>
 
       <TouchableOpacity style={[styles.button, styles.buttonWithIcon]} onPress={handleClean} disabled={!basePath || busy}>
-        <AppIcon name="warning" size={18} color=COLORS.white />
+        <AppIcon name="warning" size={18} color={COLORS.white} />
         <Text style={styles.buttonText}>{busy ? 'LIMPANDO...' : 'LIMPAR DADOS ANTIGOS'}</Text>
       </TouchableOpacity>
       </View>

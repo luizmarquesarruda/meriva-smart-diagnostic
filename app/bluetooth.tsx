@@ -188,7 +188,7 @@ export default function BluetoothScreen() {
         ) : null}
 
         <TouchableOpacity style={styles.primary} onPress={() => void loadPaired()} disabled={loading || connecting}>
-          {loading ? <ActivityIndicator color=COLORS.white /> : <Text style={styles.primaryText}>BUSCAR DISPOSITIVOS PAREADOS</Text>}
+          {loading ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.primaryText}>BUSCAR DISPOSITIVOS PAREADOS</Text>}
         </TouchableOpacity>
 
         <Text style={styles.section}>DISPOSITIVOS PAREADOS</Text>
@@ -206,7 +206,7 @@ export default function BluetoothScreen() {
         {!devices.length && !loading ? <Text style={styles.empty}>Pareie o ELM327 nas configurações do Android e volte aqui.</Text> : null}
 
         <TouchableOpacity style={[styles.primary, (!selected || connecting) && styles.disabled]} onPress={() => void connectSelected()} disabled={!selected || connecting}>
-          {connecting ? <ActivityIndicator color=COLORS.white /> : <Text style={styles.primaryText}>{lifecycle === 'DISCONNECTED' ? 'RECONECTAR E VALIDAR ELM327' : 'CONECTAR E VALIDAR ELM327'}</Text>}
+          {connecting ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.primaryText}>{lifecycle === 'DISCONNECTED' ? 'RECONECTAR E VALIDAR ELM327' : 'CONECTAR E VALIDAR ELM327'}</Text>}
         </TouchableOpacity>
 
         {connectedName ? (
