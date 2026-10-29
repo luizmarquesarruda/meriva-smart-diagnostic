@@ -97,3 +97,11 @@
 **Risco:** a dimensão resultante não é quilômetro. Com tanque nominal de 56 L, nível de 42% e consumo de 8,4 km/L, a fórmula correta daria `(0,42 × 56 L) × 8,4 km/L ≈ 197,6 km`; a fórmula do protótipo dá 280, o que superestima a autonomia nesse exemplo.
 
 **Correção proposta:** usar `litrosDisponiveis × kmPorLitro` e testar os casos de 0%, 42%, 100%, consumo ausente/inválido e rótulo da fonte LIVE/BUFFER/UNAVAILABLE. Esse achado diz respeito ao protótipo MagicPath; não prova que a mesma fórmula esteja no código Android, cuja função `estimateRangeFromFuelLevel()` nesta branch usa multiplicação e tem teste numérico correspondente.
+
+
+### Atualização DB-134 — resolução de AUD-01 e AUD-02 no branch P0
+
+- **AUD-01 (amostras envelhecidas): correção implementada.** `FuelLevelBuffer.getSnapshot(nowMs)` considera apenas leituras com timestamp válido dentro dos últimos 60 segundos. O `sampleCount` é calculado depois desse filtro; se expirarem amostras e restarem menos de dez, a apresentação continua `UNAVAILABLE`/N/D.
+- **AUD-02 (média versus mediana): contrato alinhado.** O buffer calcula a mediana, robusta contra um pico isolado, e o campo foi renomeado para `medianPercent`/`bufferMedianPercent` em toda a cadeia interna (buffer → serviço → apresentação → cockpit). O contrato RG-16 e o changelog foram sincronizados.
+- **Validação adicionada:** testes para outlier isolado, amostra individual com mais de 60 s, fallback com menos de dez amostras atuais e relógio inválido ao registrar. CI do SHA documental final ainda precisa ser consultada; o clone local não foi possível neste ambiente por falha de resolução de `github.com`. Nenhum resultado de teste local ou físico é alegado.
+- **Limites restantes:** AUD-03 (estatística de aprendizado), reconciliação SQLite/GPS, revisão ampla da PR #96 e conexão física Bluetooth/ECU continuam pendentes; esta correção não comprova resposta real `41 0C` no Galaxy A06.
