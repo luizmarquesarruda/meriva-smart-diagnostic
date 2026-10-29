@@ -4,8 +4,8 @@
 
 - Repositório: [luizmarquesarruda/meriva-smart-diagnostic](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
 - PR #96: [Evita DTC duplicado no cockpit e mostra pressão do coletor](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/96), aberta, fora de rascunho e sem merge. Base `main` observada nesta PR: `7eec3afecb3718020724baf053f8b6d2ca636fab`.
-- HEAD consultado antes desta correção: `57720ffeb046ecc2dba08a9a563ba4bc8d8bc7d5`; após a correção do transporte e do teste, o HEAD esperado é `053fa4a5f8c93592c3b7a5559027a6165d49e691`.
-- As execuções no SHA `57720ffeb046ecc2dba08a9a563ba4bc8d8bc7d5` foram canceladas durante commits concorrentes. Uma execução anterior falhou em `tests/orientationLayout.test.js:78` por procurar a cor literal antiga, divergente de `COLORS.danger`; DB-176 corrigiu essa asserção. A validação completa do novo HEAD continua pendente.
+- HEAD antes da última correção de limpeza nativa: `1bd9ebfbd693a739d35f71d4bb050fe232597d87`; o HEAD esperado após DB-179 é `08835c1f8dd5b343155c9cabeab71d1df50f2853`.
+- As execuções de CI anteriores foram canceladas por novos commits na mesma branch. A falha histórica em `tests/orientationLayout.test.js:78` foi uma asserção textual obsoleta e foi corrigida em DB-176. DB-178 e DB-179 ainda exigem validação completa no mesmo SHA final.
 - Após qualquer alteração, reconsultar o HEAD e a CI correspondentes. Só considerar a PR validada com `validate` e `android-build` verdes no mesmo SHA, diff reconciliado contra `main` e validação física separada.
 - A auditoria atual encontrou divergências de documentação e um débito relevante de modernização do SDK. Não houve upgrade de SDK nem remoção de dependências nativas nesta rodada: fazê-los antes de preservar um baseline físico poderia introduzir regressão no Bluetooth Classic.
 - Testes com Galaxy A06/Android 16/ELM327 real, confirmação de resposta `010C`, inspeção do APK instalado e validação GPS/autonomia continuam pendentes.
@@ -4698,3 +4698,19 @@ A sonda nativa `device.isConnected()` era limitada por timeout em leituras e esc
 - Commit de implementação: `877778ab667ff82ea0d3fcf9fa8002f4e7db9a90`.
 - Commit de regressão: `053fa4a5f8c93592c3b7a5559027a6165d49e691`.
 - A CI ainda precisa executar typecheck, gate anti-regressão, suíte completa e build Android no mesmo SHA final. Não houve teste físico do Galaxy A06/Android 16 com ELM327/ECU nesta alteração.
+
+
+## DB-179 · 2026-10-29 — Serializar tentativas nativas de desconexão após timeout
+
+### Causa
+DB-177 adicionou timeout a `device.disconnect()` e preservou a trava de socket, mas a rotina de recuperação tentava novamente qualquer limpeza rejeitada. Se a rejeição fosse apenas o timeout JavaScript, a chamada nativa original poderia continuar pendente; chamar `disconnect()` outra vez criaria operações nativas sobrepostas para o mesmo adaptador.
+
+### Correção
+- `src/obd/bluetoothClassicTransport.ts` mantém a Promise nativa original em `pendingNativeDisconnectOperations` por endereço. Enquanto a chamada não resolver/rejeitar de verdade, qualquer tentativa de cleanup reutiliza a mesma Promise em vez de iniciar outra desconexão.
+- A trava global `pendingNativeSocketCleanups` continua ativa até que o fluxo de limpeza seja confirmado; timeout JavaScript não é tratado como cancelamento da operação nativa.
+- `tests/bluetoothLifecycle.test.js` verifica que a Promise nativa é rastreada e reutilizada durante retries, evitando concorrência de cleanup.
+
+### Validação e limites
+- Commit de implementação: `01cebfe60d7b7eb7a76dd18249762395a1a0e574`.
+- Commit de regressão: `08835c1f8dd5b343155c9cabeab71d1df50f2853`.
+- A CI precisa validar o HEAD final, incluindo typecheck, gate, suíte completa e build Android. Teste físico Bluetooth/ELM327/ECU no Galaxy A06 permanece pendente.
