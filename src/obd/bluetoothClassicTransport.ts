@@ -105,6 +105,7 @@ export class BluetoothClassicTransport implements ObdTransport {
   private connected = false;
   private received = '';
   private receiveOverflow = false;
+  private receiveDesynchronized = false;
   private dataSubscription?: RemovableSubscription;
   private disconnectSubscription?: RemovableSubscription;
   private diagnostics: string[] = [];
@@ -215,6 +216,7 @@ export class BluetoothClassicTransport implements ObdTransport {
 
     this.received = '';
     this.receiveOverflow = false;
+    this.receiveDesynchronized = false;
     this.connected = false;
     this.removeSubscriptions();
 
@@ -614,6 +616,7 @@ export class BluetoothClassicTransport implements ObdTransport {
     this.connected = false;
     this.received = '';
     this.receiveOverflow = false;
+    this.receiveDesynchronized = false;
   }
 
   private async assertDeviceConnected(device: BluetoothDevice, timeoutMs: number): Promise<void> {
@@ -652,6 +655,16 @@ export class BluetoothClassicTransport implements ObdTransport {
   async write(data: string): Promise<void> {
     const device = this.device;
     if (!device || !this.connected) throw new Error('BLUETOOTH NÃO CONECTADO');
+
+    // A command timeout without an ELM prompt leaves the stream boundary unknown.
+    // Never send a new command into that stream: discard the socket under the
+    // shared cleanup guard so a late response cannot be mistaken for the next PID.
+    if (this.receiveDesynchronized) {
+      this.logDiagnostic('TX_BLOCKED_RX_DESYNCHRONIZED', { address: this.deviceAddress });
+      this.registerPendingNativeSocketCleanup(device, 'RX_DESYNCHRONIZED_CLEANUP');
+      this.markDisconnected();
+      throw new Error('STREAM ELM DESSINCRONIZADO APÓS TIMEOUT; SOCKET RFCOMM EM LIMPEZA');
+    }
 
     // Do not transmit if native connection state is false, hangs, or cannot be confirmed.
     await this.assertDeviceConnected(device, NATIVE_CONNECTION_CHECK_TIMEOUT_MS);
@@ -740,6 +753,7 @@ export class BluetoothClassicTransport implements ObdTransport {
     const receiveOverflow = this.receiveOverflow;
     this.received = '';
     this.receiveOverflow = false;
+    this.receiveDesynchronized = true;
     this.logDiagnostic('READ_TIMEOUT', {
       partial,
       bufferedLength,
