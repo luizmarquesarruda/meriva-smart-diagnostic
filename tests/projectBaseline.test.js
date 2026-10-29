@@ -321,6 +321,7 @@ assert.match(learningScreen, /LACUNAS DA REFERÊNCIA CARSCANNER/);
 assert.ok(learningPolicy.polling.rotatingTelemetryPids.includes('010E'));
 assert.ok(learningPolicy.cockpit.pidOrder.includes('010E'));
 assert.match(projectContract, /^\\| RG-42 \\|/m, 'referência CarScanner e aprendizado incremental precisam de contrato de regressão');
+assert.match(projectContract, /^\\| RG-43 \\|/m, 'timeout inicial da sonda ECU e retry limitado exigem contrato de regressão');
 assert.match(testPlan, /CARSCANNER-LEARNING-01/);
 
 console.log('Anti-regression baseline gate: PASS');
