@@ -12,6 +12,7 @@
 ### P0 — integridade de telemetria, autonomia e diagnóstico Bluetooth
 - Séries de PID passam a manter ordem cronológica; leituras fora de ordem não substituem a amostra mais recente e tendências ao vivo expiram após 10 s.
 - Adicionado buffer circular de até dez leituras reais válidas do PID 012F, isolado por sessão ECU e sem dados sintéticos. Após o dado ao vivo expirar, um fallback só aparece como `AUTONOMIA • BUFFER` após dez amostras e até 60 s desde a última leitura; fora disso, N/D.
+- O snapshot do buffer expira cada amostra após 60 s e usa mediana em vez de média para reduzir distorção por leituras isoladas; se restarem menos de dez amostras válidas, o fallback permanece indisponível. Timestamps de relógio inválido são rejeitados.
 - Diagnósticos Bluetooth limitados a 64 KiB agregados além do limite de 500 linhas e da prévia RX de 256 caracteres; o parser continua rejeitando RX acima de 16 KiB.
 - Testes de regressão adicionados para amostras fora de ordem, expiração de tendências, buffer real, prioridade da leitura atual, expiração do fallback e limite de logs.
 - Corrigido o gate preexistente: `tests/elmHealthPresentation.test.js` existia, mas não era executado por `npm test`; agora está no runner e na lista de suítes obrigatórias. O helper de formatação de saúde da fila ELM que a suíte esperava também foi restaurado.
