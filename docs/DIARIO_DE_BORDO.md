@@ -246,6 +246,7 @@
 - **DB-155** · 2026-10-28 — Diferenciar armazenamento de histórico de viagens
 - **DB-156** · 2026-10-28 — Remover cópia do perfil do veículo em Configurações
 - **DB-157** · 2026-10-28 — Tornar robustas as asserções da navegação do perfil
+- **DB-158** · 2026-10-28 — Melhorar legibilidade da tipografia em paisagem
 
 ---
 
@@ -4395,3 +4396,10 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - As novas asserções do perfil em Configurações tinham escaping excessivo nos padrões de caminho e propriedades, arriscando validar uma expressão textual diferente da pretendida.
 - Substituídas por verificações de substring explícitas para `href="/veiculo"` e para os campos que não devem ser duplicados. A proteção continua verificando o contrato real, sem depender de escape de regex.
 - A CI do SHA seguinte precisa confirmar a suíte completa e o build Android; não declarar aprovação a partir apenas da inspeção estática.
+
+
+## DB-158 · 2026-10-28 — Melhorar legibilidade da tipografia em paisagem
+
+- A inspeção de `app/index.tsx` encontrou rótulos/hints de quadrantes e rótulos auxiliares com `fontSize:6` em paisagem. O encaixe espacial era obtido com texto pequeno demais para o cockpit.
+- Aumentados os rótulos e dicas dos quadrantes para 8 dp (line-height 9), instrução do carrossel para 7 dp e rótulos auxiliares para 7 dp (line-height 9). Mantidas a grade 2×2, altura mínima do cartão e o contador/carrossel.
+- Acrescentados testes e contrato para proteger esse limite de leitura. A aprovação final ainda depende da CI do SHA e de inspeção visual no Galaxy A06, incluindo rotação retrato→paisagem→retrato para confirmar ausência de clipping.

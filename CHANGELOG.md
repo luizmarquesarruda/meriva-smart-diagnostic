@@ -10,6 +10,7 @@
 - Corrigido o masthead da tela Viagens para usar a mesma marca `SMART OBD DIAGNOSTIC` da página inicial, removendo a divergência `MERIVA SMART DIAGNOSTIC`.
 - Configurações deixou de repetir motor, tanque e reserva da tela Veículo; apresenta agora um atalho para o perfil canônico.
 - Corrigidos o fechamento duplicado de contêiner na tela Armazenamento, estilos órfãos do painel removido e testes de layout frágeis.
+- Em paisagem, aumentada a tipografia dos rótulos/dicas dos quadrantes e métricas auxiliares para evitar o uso de textos de 6 dp quase ilegíveis, preservando a grade 2×2 compacta.
 
 ### Cockpit em paisagem
 - Layout reorganizado em duas faixas horizontais: cabeçalho/clima no topo, cockpit ao lado do cartão de sessão e navegação vertical lateral.

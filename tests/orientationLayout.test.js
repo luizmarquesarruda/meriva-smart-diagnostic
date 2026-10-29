@@ -42,11 +42,13 @@ assert.match(index, /styles\.quadrantGrid, layout\.landscape && styles\.quadrant
 assert.match(index, /styles\.quadrantCard,\s*layout\.landscape && styles\.quadrantCardLandscape/, 'cada quadrante deve aplicar o estilo específico de paisagem mesmo com JSX multilinha');
 assert.match(index, /numberOfLines=\{layout\.landscape \? 1 : 2\}/, 'rótulos e dicas devem limitar linhas em paisagem para evitar clipping');
 assert.match(index, /quadrantValueLandscape:\{fontSize:21,lineHeight:22/, 'valores devem reduzir na paisagem com altura compacta de 22 dp');
-assert.match(index, /quadrantHintLandscape:\{fontSize:6/, 'dicas devem usar uma linha na paisagem');
+assert.match(index, /quadrantHintLandscape:\{fontSize:8,lineHeight:9/, 'dicas devem manter tamanho legível em uma linha na paisagem');
 assert.match(index, /quadrantHeaderLandscape:\{marginBottom:4/, 'cabeçalho do carrossel deve diminuir em paisagem');
 assert.match(index, /quadrantValueRowLandscape:\{marginTop:2,gap:3/, 'respiro do valor deve ser reduzido em paisagem');
-assert.match(index, /quadrantInstructionLandscape:\{fontSize:6,letterSpacing:0,marginTop:3/, 'instrução do carrossel deve ser compacta em paisagem');
+assert.match(index, /quadrantInstructionLandscape:\{fontSize:7,lineHeight:9,letterSpacing:0,marginTop:3/, 'instrução do carrossel deve continuar legível em paisagem');
 assert.match(index, /cockpitMetricCompact:\{paddingVertical:3,paddingHorizontal:3/, 'consumo/autonomia/pressão devem continuar visíveis em cartões compactos');
+assert.match(index, /metricLabelCompact:\{fontSize:7,letterSpacing:0,lineHeight:9/, 'rótulos das métricas auxiliares não devem cair para tipografia quase ilegível');
+assert.match(index, /quadrantLabelLandscape:\{fontSize:8,lineHeight:9/, 'rótulos dos quadrantes mantêm tamanho legível em paisagem');
 assert.match(index, /metricValueCompact:\{fontSize:10,marginTop:1/, 'valores auxiliares devem caber sem gastar altura excessiva');
 
 assert.match(index, /layoutSpacerLandscape:\{flexGrow:0,minHeight:0,height:4/, 'espaçador não deve consumir a altura útil na paisagem');
