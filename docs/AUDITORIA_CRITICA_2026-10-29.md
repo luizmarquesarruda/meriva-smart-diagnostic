@@ -80,3 +80,20 @@
 - Não foi possível inspecionar uma aplicação MERIVA SMART no Replit: a conta conectada não retornou apps editáveis correspondentes.
 - O protótipo MagicPath é uma simulação de interface e não estabelece comunicação física Bluetooth/ECU.
 - Nenhuma alteração funcional ou merge foi feito nesta revisão; este documento registra achados estáticos para guiar a correção e a integração.
+
+
+### AUD-07 — P0: CI verde não demonstra correção do timeout `010C`
+
+**Evidência estática:** a diferença da branch P0 atual em relação a `main` modifica o transporte Bluetooth para limitar o registro de diagnóstico, mas não altera `src/obd/elm327.ts`, `src/obd/elm327Compatibility.ts` nem `src/obd/bluetoothManager.ts`. O relatório mais recente de hardware fornecido anteriormente indicava que o adaptador era encontrado, mas a ECU não respondia a `010C`.
+
+**Risco:** a branch P0 está validada por CI para suas mudanças, mas não contém uma correção demonstrável do caminho central de inicialização/protocolo/sondagem da ECU. Os testes automatizados de framing e mocks não provam que a ECU real responderá.
+
+**Próxima ação:** tratar a causa do timeout `010C` como investigação P0 independente e rastreável: TX exato, resposta RX bruta, prompt ELM, tempo de espera, protocolo negociado e tentativa no próximo candidato pareado. Não declarar a conexão corrigida até validar a resposta real da ECU no Galaxy A06/Android 16.
+
+### AUD-08 — P1: fórmula de autonomia no protótipo MagicPath usa divisão por km/L
+
+**Evidência estática:** no componente MagicPath “Meriva Smart — Autonomia estimada pelo buffer” (`componentId=465468332217372672`), a fórmula divide o combustível calculado por `selected.consumption`, embora a interface rotule o consumo como `km/L`.
+
+**Risco:** a dimensão resultante não é quilômetro. Com tanque nominal de 56 L, nível de 42% e consumo de 8,4 km/L, a fórmula correta daria `(0,42 × 56 L) × 8,4 km/L ≈ 197,6 km`; a fórmula do protótipo dá 280, o que superestima a autonomia nesse exemplo.
+
+**Correção proposta:** usar `litrosDisponiveis × kmPorLitro` e testar os casos de 0%, 42%, 100%, consumo ausente/inválido e rótulo da fonte LIVE/BUFFER/UNAVAILABLE. Esse achado diz respeito ao protótipo MagicPath; não prova que a mesma fórmula esteja no código Android, cuja função `estimateRangeFromFuelLevel()` nesta branch usa multiplicação e tem teste numérico correspondente.
