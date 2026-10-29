@@ -472,7 +472,7 @@ export class BluetoothClassicTransport implements ObdTransport {
           error: message,
           cleanupRequired: true,
         });
-        const cleanup = this.registerPendingNativeSocketCleanup(device, 'INITIAL_CONNECTION_CHECK_CLEANUP');
+        this.registerPendingNativeSocketCleanup(device, 'INITIAL_CONNECTION_CHECK_CLEANUP');
         this.device = null;
         this.connected = false;
         this.received = '';
