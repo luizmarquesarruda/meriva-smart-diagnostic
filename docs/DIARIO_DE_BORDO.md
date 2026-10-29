@@ -248,6 +248,7 @@
 - **DB-157** · 2026-10-28 — Tornar robustas as asserções da navegação do perfil
 - **DB-158** · 2026-10-28 — Melhorar legibilidade da tipografia em paisagem
 - **DB-159** · 2026-10-28 — Atualizar teste do hub após separar armazenamento e viagens
+- **DB-160** · 2026-10-28 — Centralizar hipóteses da IA na tela Saúde
 
 ---
 
@@ -4411,3 +4412,12 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - A CI encontrou em `tests/sourceStatusLegend.test.js` uma expectativa antiga para a categoria `HISTÓRICO E RELATÓRIOS`. A categoria foi renomeada intencionalmente para `ARQUIVOS E EXPORTAÇÃO` porque a tela não apresenta mais uma lista de viagens; o histórico completo passou a ter um destino único em `/viagens`.
 - Atualizado o contrato do hub para o novo nome e reforçado que a tela de armazenamento mantém sua função de quota, arquivos, exportação e limpeza, sem renderizar `VIAGENS SALVAS`.
 - O teste não foi removido: foi adaptado à organização atual e conserva as verificações de ícones, rotas e legenda de qualidade de dados. CI completa no novo SHA continua obrigatória.
+
+
+## DB-160 · 2026-10-28 — Centralizar hipóteses da IA na tela Saúde
+
+- A revisão comparativa confirmou que `app/laboratorio.tsx` e `app/saude.tsx` calculavam e apresentavam as mesmas hipóteses locais, evidências, próximos testes e contadores de integridade a partir da telemetria em RAM.
+- A Central de Saúde fica como apresentação canônica de hipóteses e evidências. Removidos do Laboratório o cálculo duplicado via `runLocalDiagnostic`, a montagem paralela de observações e o painel correspondente; adicionada ligação acessível para `/saude`.
+- Mantidos no Laboratório os fluxos de consulta manual de PID, descoberta, varredura completa de DTC, validação de fórmulas, TX/RX e contexto operacional em detalhes técnicos. Não foi removido código de aquisição nem de persistência OBD.
+- Removidos os estilos órfãos ligados ao painel eliminado. Adicionada regressão para impedir retorno do motor/painel duplicado no Laboratório e confirmar que a Central de Saúde permanece como tela canônica.
+- Validação ainda depende da nova CI e do build APK no SHA resultante; teste visual real do layout no Galaxy A06 continua pendente.

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'expo-router';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
@@ -17,7 +18,7 @@ import { autoTripService } from '../src/trip/autoTripService';
 import { getMidLayout } from '../src/ui/midLayout';
 import { COLORS, SCREEN_TITLE_STYLE } from '../src/ui/theme';
 import { scanDtcServices, readFreezeFrame, type DtcServiceScan } from '../src/obd/dtcScanner';
-import { getLiveSeries, getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
+import { getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
 import { decodeFormula } from '../src/obd/formulaEngine';
 
 import { DtcRecord, nextDtcOccurrences, readDtcs, recordDtc } from '../src/database/dtcManager';
@@ -28,8 +29,6 @@ import {
   getAutoSaveState,
 } from '../src/meriva/autosaveManager';
 import { forceSaveOnObdEvent, registerObdQuery } from '../src/meriva/autosaveIntegration';
-import { runLocalDiagnostic, type DiagnosticResult } from '../src/diagnostics/diagnosticEngine';
-import type { PidObservation } from '../src/types/sourceTypes';
 
 type Mode = 'REAL' | 'SIMULACAO';
 
@@ -478,23 +477,7 @@ export default function LaboratorioScreen() {
     { pid: '012D', name: 'Erro do EGR', formula: 'FUEL_TRIM', bytes: [0xFF], expected: '99,21875%' },
     { pid: '015D', name: 'Tempo de injeção', formula: 'INJECTION_TIMING', bytes: [0xFF, 0xFF], expected: '301,9921875°' },
   ].map((item) => ({ ...item, result: decodeFormula(item.formula, item.pid, item.bytes) }));
-  const diagnosticState = getAutoSaveState();
-  const diagnosticObservations = ['0106', '0107', '010B'].flatMap((pid) =>
-    getLiveSeries(pid).slice(-5).map((reading): PidObservation => ({
-      pid: reading.pid,
-      name: reading.name,
-      value: reading.value,
-      unit: reading.unit,
-      source: 'REAL_OBD',
-      timestamp: reading.timestamp,
-      confidence: 'GOOD',
-    })),
-  );
-  const diagnostic: DiagnosticResult = runLocalDiagnostic({
-    observations: diagnosticObservations,
-    dtcs: diagnosticState.dtcs,
-    condition: getVehicleConditionSnapshot().condition,
-  });
+
 
   return (
     <SafeAreaView style={{flex:1,backgroundColor:COLORS.screen}} edges={["top","bottom","left","right"]}>
@@ -636,34 +619,15 @@ export default function LaboratorioScreen() {
         </View>
       ) : null}
 
-      <View style={styles.aiPanel}>
-        <View style={styles.aiHeader}>
-          <Text style={styles.aiTitle}>DIAGNÓSTICO DA IA LOCAL</Text>
-          <Text style={styles.aiEngine}>EVIDÊNCIAS v{diagnostic.version}</Text>
-        </View>
-        {diagnostic.hypotheses.length === 0 ? (
-          <Text style={styles.aiMuted}>{diagnostic.evaluatedRuleGroups === 0 ? 'DADOS INSUFICIENTES: conecte a ECU e aguarde pelo menos três leituras recentes e distintas dos PIDs necessários. A ausência de hipótese não significa sistema normal.' : 'Nenhuma hipótese acionada pelas regras avaliadas. Isso não certifica a saúde total do veículo.'}</Text>
-        ) : diagnostic.hypotheses.map((hypothesis) => (
-          <View key={hypothesis.id} style={styles.hypothesis}>
-            <Text style={styles.hypothesisTitle}>{hypothesis.label}</Text>
-            <Text style={styles.hypothesisConfidence}>NÍVEL QUALITATIVO: {hypothesis.confidence} · PONTUAÇÃO HEURÍSTICA: {Math.round(hypothesis.score * 100)}/100</Text>
-            {hypothesis.evidence.map((item, index) => (
-              <Text key={`e-${hypothesis.id}-${index}`} style={styles.aiLine}>• Evidência: {item.text}</Text>
-            ))}
-            {hypothesis.nextTests.map((item) => <Text key={`t-${hypothesis.id}-${item}`} style={styles.aiLine}>→ Próximo teste: {item}</Text>)}
-          </View>
-        ))}
-        {diagnostic.blockedSimulationSamples > 0 ? (
-          <Text style={styles.aiWarning}>SIMULAÇÃO BLOQUEADA: {diagnostic.blockedSimulationSamples} amostra(s) excluída(s).</Text>
-        ) : null}
-        {diagnostic.blockedStaleSamples > 0 ? <Text style={styles.aiWarning}>LEITURAS ANTIGAS/FUTURAS BLOQUEADAS: {diagnostic.blockedStaleSamples}</Text> : null}
-        {diagnostic.blockedInvalidSamples > 0 ? <Text style={styles.aiWarning}>LEITURAS INVÁLIDAS/IMPLAUSÍVEIS BLOQUEADAS: {diagnostic.blockedInvalidSamples}</Text> : null}
-        {diagnostic.blockedNonLiveSamples > 0 ? <Text style={styles.aiWarning}>DADOS IMPORTADOS/REFERÊNCIA BLOQUEADOS: {diagnostic.blockedNonLiveSamples}</Text> : null}
-        {diagnostic.blockedDuplicateSamples > 0 ? <Text style={styles.aiWarning}>AMOSTRAS COM TIMESTAMP DUPLICADO BLOQUEADAS: {diagnostic.blockedDuplicateSamples}</Text> : null}
-        {diagnostic.blockedStaleDtcs > 0 ? <Text style={styles.aiWarning}>DTCs COM ÚLTIMA OBSERVAÇÃO ANTIGA/FUTURA BLOQUEADOS: {diagnostic.blockedStaleDtcs}</Text> : null}
-        <Text style={styles.aiLine}>AMOSTRAS ATUAIS ACEITAS: {diagnostic.acceptedLiveSamples} · GRUPOS AVALIADOS: {diagnostic.evaluatedRuleGroups}</Text>
-        <Text style={styles.aiDisclaimer}>{diagnostic.disclaimer}</Text>
-      </View>
+      <Link href="/saude" asChild>
+        <TouchableOpacity
+          style={styles.secondaryButton}
+          accessibilityRole="button"
+          accessibilityLabel="Abrir Central de Saúde com hipóteses e evidências"
+        >
+          <Text style={styles.secondaryButtonText}>ABRIR CENTRAL DE SAÚDE · HIPÓTESES E EVIDÊNCIAS</Text>
+        </TouchableOpacity>
+      </Link>
 
       <TouchableOpacity style={styles.secondaryButton} onPress={() => setShowTechnicalDetails((value) => !value)}>
         <Text style={styles.secondaryButtonText}>{showTechnicalDetails ? 'OCULTAR DETALHES TÉCNICOS' : 'DETALHES TÉCNICOS'}</Text>
@@ -727,17 +691,6 @@ const styles = StyleSheet.create({
   deviceName: { fontWeight: '700', color: COLORS.text },
   warning: { color: COLORS.warning, marginBottom: 12 },
   input: { backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 12, color: COLORS.text },
-  aiPanel: { backgroundColor: COLORS.surface, borderRadius: 10, padding: 13, marginBottom: 10, borderWidth: 1, borderColor: '#315579' },
-  aiHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  aiTitle: { color: COLORS.accent, fontWeight: '900', fontSize: 14 },
-  aiEngine: { color: COLORS.textSubtle, fontSize: 9, fontWeight: '800' },
-  hypothesis: { borderTopWidth: 1, borderTopColor: COLORS.border, paddingTop: 9, marginTop: 8 },
-  hypothesisTitle: { color: COLORS.text, fontWeight: '900', fontSize: 14 },
-  hypothesisConfidence: { color: COLORS.primary, fontWeight: '800', fontSize: 11, marginTop: 3 },
-  aiLine: { color: '#c2d0df', fontSize: 11, marginTop: 4 },
-  aiMuted: { color: COLORS.textSubtle, fontSize: 11 },
-  aiWarning: { color: COLORS.warning, fontWeight: '800', fontSize: 11, marginTop: 9 },
-  aiDisclaimer: { color: COLORS.textSubtle, fontSize: 10, marginTop: 9 },
   dtcPanel: { backgroundColor: COLORS.surface, borderRadius: 10, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: COLORS.border },
   dtcTitle: { color: COLORS.accent, fontSize: 13, fontWeight: '900', marginBottom: 6 },
   dtcRow: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: COLORS.border, paddingVertical: 8 },
