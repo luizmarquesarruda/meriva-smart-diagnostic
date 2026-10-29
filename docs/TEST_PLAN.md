@@ -151,3 +151,10 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 - Include one isolated level spike among nine equal readings; the median must remain at the majority value.
 - Confirm the autonomy fallback remains unavailable unless ten readings are individually fresh (age <= 60 seconds) and the last reading is not in the future.
 - Confirm an invalid clock (NaN, non-finite or non-positive) is rejected during recording.
+
+
+## ELM-ECU-PROBE-02 — Timeout da primeira sonda real e orçamento de retries
+- Executar a sessão ELM com um transporte falso que registre `timeoutMs` recebido por `readUntilPrompt`; `executeCommand('010C', 9000)` precisa preservar 9000 ms dentro da fila serial.
+- Validar que `bluetoothManager` passa `config.protocolSelectionTimeoutMs` explicitamente à primeira sonda ECU depois da inicialização.
+- Na ausência de override, usar o orçamento do catálogo: três tentativas por candidato, intervalo de 1500 ms; ao informar um override finito, preservar o valor válido configurado.
+- Em aparelho físico, registrar TX/RX, prompt, protocolo e latência; a sonda só passa com resposta de PID 010C parseada e válida. A CI não comprova resposta ECU real.
