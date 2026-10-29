@@ -25,5 +25,9 @@ assert.equal(lock.packages[''].dependencies['expo-updates'], '~0.25.27');
 assert.equal(lock.packages['node_modules/expo-updates'].version, '0.25.27');
 assert.equal(eas.build.preview.channel, 'production');
 assert.equal(eas.build.production.channel, 'production');
+assert.equal(eas.build.preview.distribution, 'internal');
+assert.equal(eas.build.preview.android.buildType, 'apk');
+assert.equal(eas.build.production.distribution, 'internal');
+assert.equal(eas.build.production.android.buildType, 'apk');
 
 console.log('easUpdateConfig.test.js: OK');
