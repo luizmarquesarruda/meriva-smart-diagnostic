@@ -239,6 +239,7 @@
 - **DB-148** · 2026-10-28 — Auditoria e correção de cockpit em orientação paisagem
 - **DB-149** · 2026-10-28 — Grade 2×2 adaptável e navegação lateral direita em paisagem
 - **DB-150** · 2026-10-28 — Auditoria crítica de layout e duplicações de conteúdo
+- **DB-151** · 2026-10-28 — Remoção do setter órfão após consolidar o Laboratório
 
 ---
 
@@ -4335,3 +4336,11 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - **Espaço final incorreto no Laboratório:** removido o padding inferior de 132 dp que reservava altura para uma barra fixa não renderizada. O padding passa a 30 dp. Corrigido ainda um fechamento redundante de `View` que havia sido introduzido ao trocar a lista de viagens por um atalho.
 - **Arquitetura de navegação ainda merece acompanhamento:** Bluetooth e Laboratório mantêm fluxos de conexão distintos (seleção explícita em Bluetooth e tentativa automática de candidatos no Laboratório), embora publiquem a sessão compartilhada. Não foi feita uma consolidação do ciclo de vida nesta rodada para não arriscar regressão de RFCOMM/ECU; registrar como prioridade separada para uma alteração isolada com testes de conexão.
 - **Validação:** a CI do SHA anterior `e9229232dc518567c04e12106b5d55c8cc242cff` ainda estava em execução no momento da auditoria. Este registro não declara a nova versão aprovada. Exigir `validate` e `android-build` verdes no SHA final, revisar o diff contra `main` e executar a rotação retrato→paisagem→retrato e a inspeção das telas no Galaxy A06. O teste físico com ELM327/ECU permanece separado.
+
+
+## DB-151 · 2026-10-28 — Remoção do setter órfão após consolidar o Laboratório
+
+- A primeira CI após remover o resumo de viagem do Laboratório encontrou `TS2304: Cannot find name 'setTripFuelSupported'` no caminho de erro de conexão.
+- Causa: a declaração de estado e suas atualizações normais foram eliminadas junto com o painel duplicado, mas uma chamada residual no bloco de erro permaneceu.
+- Correção: removida a última chamada ao setter que não tinha mais estado correspondente. O estado de erro geral e o encerramento da sessão continuam preservados.
+- Validação ainda depende da CI do novo SHA; não interpretar TypeScript corrigido como build Android ou ensaio físico aprovado.

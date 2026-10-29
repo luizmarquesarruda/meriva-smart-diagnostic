@@ -241,7 +241,6 @@ export default function LaboratorioScreen() {
       } else {
         await activeSession?.close();
       }
-      setTripFuelSupported(null);
       setFuelUsedL(0);
       setStatus('BLUETOOTH OK / ELM DESCONECTADO');
     } catch (cause) {
