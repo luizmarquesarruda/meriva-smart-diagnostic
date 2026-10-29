@@ -66,6 +66,10 @@ assert(shared.includes('cleanupDisconnectedSession('), 'disconnect recovery must
 assert(recovery.includes('export async function runWithTimeout'), 'native asynchronous probes must use the tested bounded-wait helper');
 assert(transport.includes('private async assertDeviceConnected'), 'transport must centralize native connection-state checks');
 assert(transport.includes('runWithTimeout('), 'native isConnected calls must be bounded');
+assert.match(transport, /runWithTimeout\([\s\S]*?isBluetoothAvailable\(\)/, 'Bluetooth availability probe must be bounded');
+assert.match(transport, /runWithTimeout\([\s\S]*?isBluetoothEnabled\(\)/, 'Bluetooth radio-state probes must be bounded');
+assert(transport.includes('CANCEL_DISCOVERY_FAILED_OR_TIMED_OUT'), 'discovery cancellation must not wait forever');
+assert.match(transport, /getBondedDevices\(\)[\s\S]*?TIMEOUT: LISTAGEM DE DISPOSITIVOS PAREADOS/, 'paired-device enumeration must be bounded');
 assert(transport.includes('DEVICE_CONNECTED_CHECK_FAILED'), 'unknown native connection state must be logged and fail closed');
 assert(transport.includes('await this.assertDeviceConnected(device, NATIVE_CONNECTION_CHECK_TIMEOUT_MS)'), 'write must not transmit while native state is unknown');
 assert(transport.includes('Math.min(NATIVE_CONNECTION_CHECK_TIMEOUT_MS, remainingMs)'), 'read must reserve only the remaining response timeout for native state checks');
