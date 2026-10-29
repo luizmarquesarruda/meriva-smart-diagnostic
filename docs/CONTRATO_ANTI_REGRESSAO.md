@@ -80,3 +80,24 @@ Este documento é o contrato de aceitação entre mudanças, testes, diário e C
 ## Limitações
 
 O gate é uma barreira contra regressões acidentais, não uma prova formal nem uma proteção contra alteração deliberada simultânea do código e de seus testes. Por isso, revisão de diff, CI do HEAD real e testes físicos continuam obrigatórios.
+| RG-43 | A primeira sonda real `010C` após inicialização ELM usa `protocolSelectionTimeoutMs` explícito através da fila serial; sondas posteriores por protocolo forçado continuam com timeout adaptativo. Sem override do usuário, o orçamento padrão por adaptador é finito: três tentativas e intervalo de 1500 ms, derivado do catálogo Bluetooth; overrides explícitos permanecem permitidos. A validação da ECU exige payload positivo válido, não somente socket ou prompt ELM. | `tests/elm327Compatibility.test.js`, `tests/bluetoothConfig.test.js`, `tests/projectBaseline.test.js`; teste físico ELM327/ECU separado |
+## Regras para uma alteração legítima
+
+- Não reduzir ou excluir um teste essencial só para deixar a CI verde.
+- Quando um requisito mudar com autorização explícita, alterar em conjunto o código, o teste comportamental, o contrato e o Diário de Bordo; registrar por que a regra anterior foi substituída.
+- Testes devem privilegiar comportamento observável, JSON de contrato e funções puras. Não depender somente de comentários, texto narrativo, formatação ou ordem incidental de linhas.
+- Antes de adicionar biblioteca, auditar dependências existentes e compatibilidade com Expo SDK 51; atualizar `package.json` e lockfile juntos.
+- Não marcar uma funcionalidade “validada” apenas porque compila. Distinguir teste unitário, CI, teste no aparelho e validação física OBD.
+
+## Procedimento de retomada
+
+1. Ler a seção vigente no início de `docs/DIARIO_DE_BORDO.md`.
+2. Abrir a atualização com o maior ID `DB-NNN`.
+3. Consultar o HEAD da PR e a última execução de CI correspondente a esse SHA; conferir separadamente `validate` e `android-build`.
+4. Revisar as suítes dos RGs afetados antes de editar o código.
+5. Executar o gate e a suíte completa; corrigir pela evidência do log, sem alterar uma regra funcional para mascarar uma falha de teste.
+6. Atualizar o diário e o próximo ID; nunca fazer merge sem autorização explícita.
+
+## Limitações
+
+O gate é uma barreira contra regressões acidentais, não uma prova formal nem uma proteção contra alteração deliberada simultânea do código e de seus testes. Por isso, revisão de diff, CI do HEAD real e testes físicos continuam obrigatórios.
