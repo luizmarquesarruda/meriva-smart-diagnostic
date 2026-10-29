@@ -93,6 +93,9 @@ assert(transport.includes('DEVICE_CONNECTED_CHECK_FAILED'), 'unknown native conn
 assert(transport.includes('await this.assertDeviceConnected(device, NATIVE_CONNECTION_CHECK_TIMEOUT_MS)'), 'write must not transmit while native state is unknown');
 assert(transport.includes('Math.min(NATIVE_CONNECTION_CHECK_TIMEOUT_MS, remainingMs)'), 'read must reserve only the remaining response timeout for native state checks');
 assert(transport.includes('NATIVE_SOCKET_CLEANUP_TIMEOUT'), 'direct close timeout must be observable and keep the socket guard');
+assert.match(transport, /runWithTimeout\(\s*\(\) => device\.disconnect\(\)/, 'native socket disconnect must have a finite timeout');
+assert(transport.includes('BLUETOOTH_DISCONNECT_TIMEOUT'), 'timed-out native disconnect must be reported separately');
+assert(!/await device\.disconnect\(\)/.test(transport), 'unbounded native disconnect await must not return');
 assert(transport.includes('replacementSocketBlocked: true'), 'an unconfirmed native close must block replacement RFCOMM sockets');
 
 

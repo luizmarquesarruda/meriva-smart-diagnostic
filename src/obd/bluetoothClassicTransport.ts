@@ -745,21 +745,46 @@ export class BluetoothClassicTransport implements ObdTransport {
 
   private async safeDisconnect(device: BluetoothDevice): Promise<void> {
     try {
-      await device.disconnect();
+      await runWithTimeout(
+        () => device.disconnect(),
+        this.config.bluetoothConnectTimeoutMs,
+        `TIMEOUT: DESCONEXÃO BLUETOOTH APÓS ${this.config.bluetoothConnectTimeoutMs} MS`,
+      );
     } catch (cause) {
-      // Do not treat an arbitrary native disconnect error as success. Confirm
-      // the socket is already down; otherwise propagate the failure so the
-      // shared connection owner will not open a replacement RFCOMM socket.
+      const errorMessage = cause instanceof Error ? cause.message : String(cause);
+      // A JS timeout does not cancel device.disconnect(). Do not consider the
+      // resource released merely because a later probe says "disconnected":
+      // the original native operation may still be pending. Keep the shared
+      // socket-cleanup guard until a retry settles successfully.
+      if (/^TIMEOUT: DESCONEXÃO BLUETOOTH/.test(errorMessage)) {
+        this.logDiagnostic('BLUETOOTH_DISCONNECT_TIMEOUT', {
+          address: this.deviceAddress,
+          timeoutMs: this.config.bluetoothConnectTimeoutMs,
+          replacementSocketBlocked: true,
+        });
+        throw cause instanceof Error ? cause : new Error(errorMessage);
+      }
+
+      // An ordinary disconnect error may mean that the socket was already
+      // closed. Confirm that with its own finite native-state timeout.
       try {
-        if (typeof device.isConnected === 'function' && !(await device.isConnected())) return;
+        if (typeof device.isConnected === 'function') {
+          const connected = await runWithTimeout(
+            () => device.isConnected!(),
+            NATIVE_CONNECTION_CHECK_TIMEOUT_MS,
+            `TIMEOUT: VERIFICAÇÃO APÓS FALHA DE DESCONEXÃO APÓS ${NATIVE_CONNECTION_CHECK_TIMEOUT_MS} MS`,
+          );
+          if (!connected) return;
+        }
       } catch {
-        // Unknown native state is not proof that the socket was released.
+        // Unknown state is not evidence that the socket was released.
       }
       this.logDiagnostic('BLUETOOTH_DISCONNECT_FAILED', {
         address: this.deviceAddress,
-        error: cause instanceof Error ? cause.message : String(cause),
+        error: errorMessage,
+        replacementSocketBlocked: true,
       });
-      throw cause instanceof Error ? cause : new Error(String(cause));
+      throw cause instanceof Error ? cause : new Error(errorMessage);
     }
   }
 

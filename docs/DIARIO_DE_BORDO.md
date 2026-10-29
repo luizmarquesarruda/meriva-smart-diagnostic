@@ -4,12 +4,12 @@
 
 - Repositório: [luizmarquesarruda/meriva-smart-diagnostic](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
 - PR #96: [Evita DTC duplicado no cockpit e mostra pressão do coletor](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/96), aberta, fora de rascunho e sem merge. Base `main` observada nesta PR: `7eec3afecb3718020724baf053f8b6d2ca636fab`.
-- HEAD consultado: `ce77a177d36322b1c5aee6b9dfcc80e3df39c1ed`; `typecheck` passou, mas `npm test` falhou em `tests/orientationLayout.test.js` por uma asserção de cor obsoleta após DB-174. Correção de teste preparada para o commit seguinte.
-- A CI no SHA `ce77a177d36322b1c5aee6b9dfcc80e3df39c1ed` executou `typecheck` com sucesso e falhou em `npm test` na asserção textual da cor térmica; `android-build` foi ignorado. O teste está sendo atualizado para comparar o token compartilhado `COLORS.danger`.
+- HEAD consultado: `1b264cb3b2e86b1f9e0dd43aa9b231f29eae63aa`; duas execuções da CI estavam em progresso após ajustar a asserção térmica. DB-177 é posterior e exige uma nova CI.
+- A CI em `1b264cb3b2e86b1f9e0dd43aa9b231f29eae63aa` ainda estava em progresso na última consulta; `doctor` e gate estavam verdes. A asserção térmica foi alinhada para `COLORS.danger`; DB-177 ainda requer nova CI.
 - Após qualquer alteração, reconsultar o HEAD e a CI correspondentes. Só considerar a PR validada com `validate` e `android-build` verdes no mesmo SHA, diff reconciliado contra `main` e validação física separada.
 - A auditoria atual encontrou divergências de documentação e um débito relevante de modernização do SDK. Não houve upgrade de SDK nem remoção de dependências nativas nesta rodada: fazê-los antes de preservar um baseline físico poderia introduzir regressão no Bluetooth Classic.
 - Testes com Galaxy A06/Android 16/ELM327 real, confirmação de resposta `010C`, inspeção do APK instalado e validação GPS/autonomia continuam pendentes.
-- DB-145 registra a regressão de leitura KWP e classificação de estado ECU/Bluetooth; DB-162/163/164/166 protegem o ciclo RFCOMM; DB-165 limita HTTP de clima; DB-167 expira fixes GPS antigos; DB-168 neutraliza fórmula no CSV; DB-169 torna o start GPS não bloqueante para o polling OBD e aplica cooldown de retry. DB-170 atualiza o gate para aceitar a proteção de timestamp por `state.lastTimestamp`. DB-171 serializa cancelamento da descoberta; DB-172 valida coeficientes/resultados de fórmula; DB-173 corrige documentação cloud; DB-174 centraliza os tokens de cor compartilhados nas telas. DB-175 limita as chamadas de localização opcionais e usa backoff exponencial para o enriquecimento online.
+- DB-145 registra a regressão de leitura KWP e classificação de estado ECU/Bluetooth; DB-162/163/164/166 protegem o ciclo RFCOMM; DB-165 limita HTTP de clima; DB-167 expira fixes GPS antigos; DB-168 neutraliza fórmula no CSV; DB-169 torna o start GPS não bloqueante para o polling OBD e aplica cooldown de retry. DB-170 atualiza o gate para aceitar a proteção de timestamp por `state.lastTimestamp`. DB-171 serializa cancelamento da descoberta; DB-172 valida coeficientes/resultados de fórmula; DB-173 corrige documentação cloud; DB-174 centraliza os tokens de cor compartilhados nas telas. DB-175 limita as chamadas de localização opcionais e usa backoff exponencial para o enriquecimento online. DB-177 limita a própria operação nativa de desconexão e mantém o bloqueio RFCOMM se ela expirar.
 - O cockpit deve continuar mostrando N/D até existir leitura OBD real, completa e recente; seed ou histórico não deve ser reapresentado como valor atual.
 - DB-146 restaura os quatro quadrantes de telemetria em simultâneo; os PIDs adicionais continuam acessíveis em páginas de quatro métricas. A ausência de ECU não remove a grade, apenas mantém os valores em N/D.
 - DB-147 fixa os quatro PIDs principais na primeira página e transforma os restantes PIDs suportados em carrossel completo, com setas anterior/próxima e avanço automático a cada 10 s. Anomalias adicionais são priorizadas sem deslocar os quadrantes principais.
@@ -265,6 +265,7 @@
 - **DB-174** · 2026-10-29 — Consumir tokens compartilhados para a paleta base das telas
 - **DB-175** · 2026-10-29 — Limitar localização para clima e aplicar backoff exponencial
 - **DB-176** · 2026-10-29 — Atualizar contrato visual térmico para o token de tema
+- **DB-177** · 2026-10-29 — Limitar timeout da limpeza nativa de socket RFCOMM
 
 ---
 
@@ -4668,3 +4669,17 @@ A troca de `danger` no cockpit da literal `#fb7185` para `COLORS.danger` preserv
 
 ### Validação
 - `typecheck` passou no SHA `ce77a177d36322b1c5aee6b9dfcc80e3df39c1ed`; `npm test` falhou na asserção textual identificada. Nova CI completa no HEAD posterior é obrigatória.
+
+## DB-177 · 2026-10-29 — Limitar timeout da limpeza nativa de socket RFCOMM
+
+### Causa
+`safeDisconnect()` aguardava `device.disconnect()` sem timeout. Embora a limpeza compartilhada já bloqueie um novo socket enquanto a Promise não termina, um caminho de falha que aguardasse diretamente essa função podia permanecer pendente. Um timeout externo sem preservar o estado de limpeza poderia permitir conexão concorrente.
+
+### Correção
+- `src/obd/bluetoothClassicTransport.ts`: desconexão nativa agora passa por `runWithTimeout` usando o limite de conexão configurado. Timeout é registrado separadamente e rejeita sem tratar a chamada nativa como cancelada; o registro de limpeza compartilhada permanece pendente e bloqueia RFCOMM substituto.
+- Se a chamada de desconexão terminar com erro normal, a sonda `isConnected()` também é limitada a 1 s; só o estado explicitamente desconectado é tratado como cleanup concluído.
+- `tests/bluetoothLifecycle.test.js` exige timeout na desconexão e proíbe retorno ao `await device.disconnect()` sem limite.
+
+### Validação e limites
+- DB-177 exige uma nova execução de TypeScript, gate, suíte completa e build Android no mesmo SHA.
+- O código não pode cancelar à força uma Promise nativa que não oferece API de cancelamento. A política segura é manter o bloqueio até a limpeza realmente assentar; se o módulo nativo nunca resolver, o app não abrirá um socket concorrente para o mesmo adaptador.
