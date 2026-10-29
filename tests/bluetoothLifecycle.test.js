@@ -97,6 +97,14 @@ assert(connectedProbe.includes('this.markDisconnected()'),
   'unknown runtime socket state must clear local state after the cleanup guard is installed');
 assert(transport.includes('await this.assertDeviceConnected(device, NATIVE_CONNECTION_CHECK_TIMEOUT_MS)'), 'write must not transmit while native state is unknown');
 assert(transport.includes('Math.min(NATIVE_CONNECTION_CHECK_TIMEOUT_MS, remainingMs)'), 'read must reserve only the remaining response timeout for native state checks');
+assert(transport.includes('private receiveDesynchronized = false'),
+  'transport must remember when a response timed out before its framing prompt');
+assert.match(transport, /this\.receiveDesynchronized = true;[\s\S]*?READ_TIMEOUT/,
+  'a read timeout must poison the current stream boundary');
+assert(transport.includes('TX_BLOCKED_RX_DESYNCHRONIZED'),
+  'a late response must not be consumed as the next PID response');
+assert(transport.includes("registerPendingNativeSocketCleanup(device, 'RX_DESYNCHRONIZED_CLEANUP')"),
+  'an unframed ELM timeout must force socket cleanup before another command');
 assert(transport.includes('NATIVE_SOCKET_CLEANUP_TIMEOUT'), 'direct close timeout must be observable and keep the socket guard');
 assert.match(transport, /runWithTimeout\(\s*\(\) => device\.disconnect\(\)/, 'native socket disconnect must have a finite timeout');
 assert(transport.includes('BLUETOOTH_DISCONNECT_TIMEOUT'), 'timed-out native disconnect must be reported separately');
