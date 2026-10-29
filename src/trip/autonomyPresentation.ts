@@ -14,7 +14,7 @@ export interface CurrentAutonomyInput {
   fuelLevelReadAtMs: number | null;
   tripConsumptionKml: number | null;
   averageConsumptionKml: number;
-  bufferAveragePercent?: number | null;
+  bufferMedianPercent?: number | null;
   bufferSampleCount?: number;
   bufferLastReadAtMs?: number | null;
   nowMs?: number;
@@ -68,21 +68,21 @@ export function getCurrentAutonomyPresentation(input: CurrentAutonomyInput): Cur
   }
 
   const lastReadAtMs = input.bufferLastReadAtMs;
-  const bufferAveragePercent = input.bufferAveragePercent;
+  const bufferMedianPercent = input.bufferMedianPercent;
   const bufferAgeMs = lastReadAtMs == null || !Number.isFinite(lastReadAtMs)
     ? null
     : nowMs - lastReadAtMs;
   if (
     bufferSampleCount >= AUTONOMY_BUFFER_MIN_READINGS &&
-    bufferAveragePercent != null &&
-    Number.isFinite(bufferAveragePercent) &&
-    bufferAveragePercent >= 0 &&
-    bufferAveragePercent <= 100 &&
+    bufferMedianPercent != null &&
+    Number.isFinite(bufferMedianPercent) &&
+    bufferMedianPercent >= 0 &&
+    bufferMedianPercent <= 100 &&
     bufferAgeMs != null &&
     bufferAgeMs >= 0 &&
     bufferAgeMs <= AUTONOMY_BUFFER_MAX_AGE_MS
   ) {
-    const rangeKm = estimateRangeFromFuelLevel(bufferAveragePercent, consumptionKml);
+    const rangeKm = estimateRangeFromFuelLevel(bufferMedianPercent, consumptionKml);
     if (rangeKm != null) return { rangeKm, source: 'BUFFER', bufferSampleCount, bufferAgeMs };
   }
 
