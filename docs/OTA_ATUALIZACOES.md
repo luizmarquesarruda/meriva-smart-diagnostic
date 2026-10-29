@@ -10,6 +10,7 @@ O EAS Update distribui código JavaScript/TypeScript e assets compatíveis com o
 - O projeto está configurado com slug `meriva`, owner `luizarruda` e project ID `013db816-eec1-4406-8952-d6c0731cf461`, conforme os dados fornecidos.
 - O endpoint de update é `https://u.expo.dev/013db816-eec1-4406-8952-d6c0731cf461`.
 - O runtime segue `appVersion`; a versão nativa atual é `1.0.1`. Não publique código que exija nova API nativa mantendo a mesma versão de runtime.
+- Os perfis `preview` e `production` geram APK interno instalável, sem Google Play; ambos apontam para o canal `production`.
 - O canal escolhido para a distribuição pessoal é `production`. O header está no app config porque a CI gera o APK com `expo prebuild` + Gradle, sem EAS Build.
 
 ## Ativar publicação automática
