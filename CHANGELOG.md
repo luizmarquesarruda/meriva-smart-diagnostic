@@ -1,5 +1,11 @@
 # Changelog
 
+
+## 2026-10-29 — Consistência da política de retry Bluetooth
+- Corrigida a regressão do teste de conexão que ainda esperava 20 tentativas e atraso de 8 s; a suíte agora verifica o catálogo único e mantém retry finito.
+- Mantidos o gate de ECU por resposta OBD válida de `010C`, o enquadramento por prompt ELM `>` e a distinção entre link Bluetooth e ECU operacional.
+- Resultado de validação e build Android pendentes da CI no SHA gerado pela correção; não houve teste físico nem merge nesta alteração.
+
 ## Unreleased
 
 ### Referência CarScanner e aprendizado adaptativo local

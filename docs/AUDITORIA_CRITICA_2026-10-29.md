@@ -1,3 +1,15 @@
+## ADENDO DE ESTADO — 2026-10-29, antes da validação DB-136
+
+> Este relatório contém conclusões estáticas registradas em HEAD anterior. Use o Diário de Bordo e a CI do SHA atual como referência operacional; não apagar o histórico abaixo.
+
+- **AUD-01 / AUD-02: supersedidos pelo DB-134.** A revisão mais antiga descrevia buffer de combustível sem expiração individual e média aritmética. A implementação posterior em `src/trip/fuelLevel.ts` filtra amostras vencidas, calcula mediana e exige dez leituras reais elegíveis para o fallback temporário. Os testes novos em `tests/autonomyPresentation.test.js` cobrem amostras distribuídas por mais de 60 segundos, valor atípico e relógio inválido.
+- **AUD-03: ainda exige análise própria.** A coerência entre seed ponderado e estatísticas incrementais no perfil de aprendizagem não foi demonstrada corrigida por esta alteração; não considerar resolvida sem testes numéricos independentes para seed + 1, 2 e várias amostras.
+- **AUD-04: manter sob controle de integração.** Correções em branches encerradas sem merge não são consideradas integradas por esta auditoria; comparar os diffs contra o código atual antes de portar quaisquer alterações.
+- **Bluetooth / ECU:** a CI mais recente observada antes da correção, run 40859434816 no SHA `814f636ec7037d6989a7c4c7b7fa052c1097e0f7`, passou o gate de baseline mas falhou em `tests/regression.test.js`: expectativa antiga de 20 tentativas/8000 ms contra o catálogo atual de 3/1500 ms. DB-136 registra a reconciliação sem aumentar o orçamento de retry.
+- **Limites desta auditoria:** análise estática e resultados de CI não substituem o teste no Galaxy A06 / SM-A065M / Android 16 com ELM327 físico. Resposta real de `010C`/payload `41 0C` ainda é o gate necessário para confirmar a ECU.
+
+---
+
 # Auditoria crítica de integração — MERIVA SMART
 
 **Data:** 2026-10-29  

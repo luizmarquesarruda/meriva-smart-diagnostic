@@ -496,8 +496,23 @@ async function testEcuValidationGate() {
   assert.strictEqual(manager.isValidEcuProbe({ status: 'OK', response: 'NO DATA', command: '010C', elapsedMs: 10, attempt: 1 }), false);
   assert.strictEqual(manager.isValidEcuProbe({ status: 'TIMEOUT', response: '', command: '010C', elapsedMs: 1000, attempt: 1 }), false);
   assert.strictEqual(manager.isValidEcuProbe({ status: 'OK', response: '41 0B 25', command: '010C', elapsedMs: 10, attempt: 1 }), false);
-  assert.strictEqual(manager.MAX_BLUETOOTH_ATTEMPTS, 20);
-  assert.strictEqual(manager.BLUETOOTH_RETRY_INTERVAL_MS, 8000);
+  const bluetoothConfig = JSON.parse(fs.readFileSync(path.join(ROOT, 'src/knowledge/bluetooth_config.json'), 'utf8'));
+  assert.strictEqual(
+    manager.MAX_BLUETOOTH_ATTEMPTS,
+    bluetoothConfig.retry.maxAttempts,
+    'tentativas devem seguir a política única do catálogo Bluetooth',
+  );
+  assert.strictEqual(
+    manager.BLUETOOTH_RETRY_INTERVAL_MS,
+    bluetoothConfig.retry.intervalMs,
+    'intervalo de retry deve seguir a política única do catálogo Bluetooth',
+  );
+  assert.ok(
+    Number.isInteger(manager.MAX_BLUETOOTH_ATTEMPTS) &&
+      manager.MAX_BLUETOOTH_ATTEMPTS >= 1 &&
+      manager.MAX_BLUETOOTH_ATTEMPTS <= 5,
+    'retry precisa permanecer finito e limitado; não restaurar tentativas excessivas',
+  );
 }
 
 async function testPidScanner() {

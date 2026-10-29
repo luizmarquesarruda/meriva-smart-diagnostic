@@ -7,6 +7,7 @@
 - SHA de `main` observado antes desta rodada: `7eec3afecb3718020724baf053f8b6d2ca636fab`.
 - `.github/workflows/ci.yml` executa em qualquer `push`; o usuário autorizou explicitamente a CI automática nesta rodada.
 - A validação do SHA base `7e64be065e2367b03ecc7c8d652d36c78d92b4d3` passou em validate na CI `40811765248`; o android-build ainda estava em execução ao iniciar esta etapa. A revisão de CarScanner deve ter CI própria no novo SHA.
+- Última execução antes da correção DB-136: [CI 40859434816](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40859434816), SHA `814f636ec7037d6989a7c4c7b7fa052c1097e0f7`: `npm run doctor` e `gate:baseline` passaram; `npm run validate` falhou em `tests/regression.test.js` porque o teste ainda exigia 20 tentativas/8000 ms, divergindo do catálogo atual de 3 tentativas/1500 ms. `android-build` foi ignorado por depender de `validate`. A reconciliação foi registrada em DB-136; substituir este status pelo resultado da CI do novo HEAD após consultá-la.
 - Branch dedicada: `fix/p0-telemetry-autonomy-diagnostics-20261029`. A CI desta branch deve ser verificada no SHA exato do commit.
 
 ### PRs e integração
@@ -4070,3 +4071,24 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - `npm run validate` e `android-build` ainda precisam ser observados no SHA final. Não pude executar o clone/testes localmente porque o ambiente não resolveu `github.com`; os testes adicionados não devem ser considerados aprovados até CI verde.
 - Não houve teste físico no Galaxy A06 / SM-A065M / Android 16 com o ELM327 real. O timeout maior e retry menor atacam inconsistências comprováveis de software, mas não garantem que `010C` gere uma resposta válida: protocolo, alimentação, adaptador e comunicação ECU ainda precisam ser medidos.
 - Nenhum merge foi realizado.
+
+
+## DB-136 · 2026-10-29 — Correção da regressão de política de retry Bluetooth e reconciliação da auditoria
+
+### Falha reproduzida
+- A CI [40859434816](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40859434816), no SHA `814f636ec7037d6989a7c4c7b7fa052c1097e0f7`, passou em `npm run doctor` e `npm run gate:baseline`, mas falhou em `npm run validate` no teste `testEcuValidationGate`: o teste esperava `MAX_BLUETOOTH_ATTEMPTS = 20`, enquanto o código exportava `3`. A asserção seguinte também esperava `8000 ms`, mas o catálogo configurava `1500 ms`.
+- A divergência estava no teste, não no contrato executável: `src/knowledge/bluetooth_config.json`, `bluetoothManager.ts`, `bluetoothConfig.test.js`, `projectBaseline.test.js` e `sharedConnection.ts` já estabeleciam três tentativas finitas, intervalo de 1,5 s e parada no primeiro sucesso. Restaurar 20 tentativas aumentaria a duração das falhas e contradizia o objetivo de evitar reconexão excessiva.
+
+### Correção aplicada
+- `tests/regression.test.js` compara agora as constantes exportadas diretamente ao catálogo único `bluetooth_config.json` e impõe um intervalo finito de 1 a 5 tentativas. A validação de protocolo, o gate estrito da ECU por resposta válida `41 0C` e os casos de timeout permanecem intactos.
+- A revisão do transporte confirmou uma escolha deliberada, não obsoleta: `connectionType: "delimited"`, delimitador vazio e ASCII permitem acumular o stream fragmentado, e o aplicativo fecha a resposta no prompt `>`; os comandos são enviados com CR real. Não trocar o delimitador por CR no transporte nativo, pois isso conflitaria com o enquadramento por prompt. O fluxo continua Bluetooth Classic/RFCOMM, com fila serial, limites de RX e distinção entre Bluetooth, ELM e ECU.
+- O gate contra regressões e o teste de configuração já protegiam a política correta; esta correção sincroniza a suíte geral com esse contrato em vez de afrouxar os testes.
+
+### Auditoria e itens obsoletos
+- O estado da branch e a CI deste registro devem ser lidos pelo SHA exato. A CI anterior falhou e não valida o próximo commit; o build Android precisa ser verificado separadamente no SHA corrigido.
+- O relatório `AUDITORIA_CRITICA_2026-10-29.md` continha achados de buffer de combustível anteriores ao DB-134. O adendo do relatório aponta essas seções como histórico supersedido; a correção DB-134 já documenta expiração por amostra e mediana. O achado estatístico de aprendizagem ponderada permanece aberto para investigação; esta rodada não o declara resolvido.
+- Nenhuma alteração foi integrada em `main` e nenhuma PR foi mesclada. O teste físico permanece pendente: Galaxy A06 / SM-A065M / Android 16 com adaptador ELM327 real, resposta válida de `010C` e validação de estabilidade/latência em sessão.
+
+### Evidência de validação
+- A CI do SHA `814f636ec7037d6989a7c4c7b7fa052c1097e0f7` falhou na asserção obsoleta descrita acima; não interpretar os testes anteriores como aprovação do próximo commit.
+- Registrar aqui o resultado de `validate` e `android-build` após a execução da CI do SHA resultante desta correção. Até a confirmação, o estado é **validação pendente**, sem alegação de ausência de regressões.
