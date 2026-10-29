@@ -9,7 +9,7 @@
 - Após qualquer alteração, reconsultar o HEAD e a CI correspondentes. Só considerar a PR validada com `validate` e `android-build` verdes no mesmo SHA, diff reconciliado contra `main` e validação física separada.
 - A auditoria atual encontrou divergências de documentação e um débito relevante de modernização do SDK. Não houve upgrade de SDK nem remoção de dependências nativas nesta rodada: fazê-los antes de preservar um baseline físico poderia introduzir regressão no Bluetooth Classic.
 - Testes com Galaxy A06/Android 16/ELM327 real, confirmação de resposta `010C`, inspeção do APK instalado e validação GPS/autonomia continuam pendentes.
-- DB-145 registra a regressão de leitura KWP e classificação de estado ECU/Bluetooth; DB-162/163/164/166 protegem o ciclo RFCOMM; DB-165 limita HTTP de clima; DB-167 expira fixes GPS antigos; DB-168 neutraliza fórmula no CSV; DB-169 torna o start GPS não bloqueante para o polling OBD e aplica cooldown de retry. DB-170 atualiza o gate para aceitar a proteção de timestamp por `state.lastTimestamp`. DB-171 serializa cancelamento da descoberta; DB-172 valida coeficientes/resultados de fórmula; DB-173 corrige documentação cloud; DB-174 centraliza os tokens de cor compartilhados nas telas. DB-175 limita as chamadas de localização opcionais e usa backoff exponencial para o enriquecimento online. DB-177 limita a própria operação nativa de desconexão e mantém o bloqueio RFCOMM se ela expirar.
+- DB-145 registra a regressão de leitura KWP e classificação de estado ECU/Bluetooth; DB-162/163/164/166 protegem o ciclo RFCOMM; DB-165 limita HTTP de clima; DB-167 expira fixes GPS antigos; DB-168 neutraliza fórmula no CSV; DB-169 torna o start GPS não bloqueante para o polling OBD e aplica cooldown de retry. DB-170 atualiza o gate para aceitar a proteção de timestamp por `state.lastTimestamp`. DB-171 serializa cancelamento da descoberta; DB-172 valida coeficientes/resultados de fórmula; DB-173 corrige documentação cloud; DB-174 centraliza os tokens de cor compartilhados nas telas. DB-175 limita as chamadas de localização opcionais e usa backoff exponencial para o enriquecimento online. DB-177 limita a própria operação nativa de desconexão e mantém o bloqueio RFCOMM se ela expirar; DB-178 bloqueia reconexão quando a sonda do socket fica indeterminada; DB-179 reutiliza a Promise nativa pendente para impedir desconexões concorrentes; DB-180 bloqueia novos comandos após timeout sem prompt para evitar que resposta atrasada seja atribuída ao PID seguinte.
 - O cockpit deve continuar mostrando N/D até existir leitura OBD real, completa e recente; seed ou histórico não deve ser reapresentado como valor atual.
 - DB-146 restaura os quatro quadrantes de telemetria em simultâneo; os PIDs adicionais continuam acessíveis em páginas de quatro métricas. A ausência de ECU não remove a grade, apenas mantém os valores em N/D.
 - DB-147 fixa os quatro PIDs principais na primeira página e transforma os restantes PIDs suportados em carrossel completo, com setas anterior/próxima e avanço automático a cada 10 s. Anomalias adicionais são priorizadas sem deslocar os quadrantes principais.
@@ -266,6 +266,9 @@
 - **DB-175** · 2026-10-29 — Limitar localização para clima e aplicar backoff exponencial
 - **DB-176** · 2026-10-29 — Atualizar contrato visual térmico para o token de tema
 - **DB-177** · 2026-10-29 — Limitar timeout da limpeza nativa de socket RFCOMM
+- **DB-178** · 2026-10-29 — Preservar bloqueio RFCOMM quando a sonda de estado do socket expira
+- **DB-179** · 2026-10-29 — Serializar tentativas nativas de desconexão após timeout
+- **DB-180** · 2026-10-29 — Impedir que resposta ELM atrasada contamine o próximo PID
 
 ---
 
