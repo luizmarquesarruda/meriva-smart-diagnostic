@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Constants from 'expo-constants';
+import { Link } from 'expo-router';
 import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
@@ -270,12 +271,11 @@ export default function ConfiguracaoScreen() {
         <Text style={styles.buttonText}>{busy ? 'AGUARDE...' : 'EXPORTAR SALVAMENTO (.TXT)'}</Text>
       </TouchableOpacity>
       {profile ? (
-        <>
-          <Text style={styles.info}>Veículo: {profile.vehicleName}</Text>
-          <Text style={styles.info}>Motor: {profile.engine} • {profile.displacementCm3} cm³ • {profile.cylinders} cilindros</Text>
-          <Text style={styles.info}>Tanque: {profile.tankCapacityL} L • Reserva aprox.: {profile.reserveCapacityL} L</Text>
-          <Text style={styles.note}>Especificações físicas conforme o Manual do Proprietário Chevrolet Meriva 2012.</Text>
-        </>
+        <Link href="/veiculo" asChild>
+          <TouchableOpacity style={styles.button} accessibilityRole="button" accessibilityLabel="Abrir perfil do veículo">
+            <Text style={styles.buttonText}>VER PERFIL DO VEÍCULO</Text>
+          </TouchableOpacity>
+        </Link>
       ) : <Text style={styles.info}>Veículo: N/D</Text>}
       </View>
     </ScrollView>

@@ -13,6 +13,8 @@ const healthScreen = fs.readFileSync('app/saude.tsx', 'utf8');
 const laboratoryScreen = fs.readFileSync('app/laboratorio.tsx', 'utf8');
 const storageScreen = fs.readFileSync('app/armazenamento.tsx', 'utf8');
 const tripScreen = fs.readFileSync('app/viagens.tsx', 'utf8');
+const moreScreen = fs.readFileSync('app/mais.tsx', 'utf8');
+const configurationScreen = fs.readFileSync('app/configuracoes.tsx', 'utf8');
 const screenFiles = [
   'app/mais.tsx', 'app/dados.tsx', 'app/saude.tsx', 'app/veiculo.tsx',
   'app/viagens.tsx', 'app/aprendizado.tsx', 'app/bluetooth.tsx',
@@ -110,6 +112,9 @@ assert.match(storageScreen, /href=\"\/viagens\"/, 'armazenamento deve encaminhar
 assert.match(index, /SMART OBD DIAGNOSTIC/, 'cockpit deve usar o nome genérico definido para o aplicativo');
 assert.match(tripScreen, /SMART OBD DIAGNOSTIC/, 'telas de relatórios devem manter a mesma marca visual do cockpit');
 assert.doesNotMatch(tripScreen, /MERIVA SMART DIAGNOSTIC/, 'uma tela secundária não pode exibir uma marca divergente do cabeçalho do app');
+assert.match(configurationScreen, /href=\"\\/veiculo\"/, 'configurações deve encaminhar ao perfil canônico do veículo');
+assert.doesNotMatch(configurationScreen, /profile\\.engine|profile\\.tankCapacityL|profile\\.reserveCapacityL/, 'configurações não deve repetir motor, tanque e reserva já mostrados no perfil do veículo');
+assert.match(moreScreen, /title: 'ARQUIVOS E EXPORTAÇÃO'/, 'categoria Mais deve descrever armazenamento/exportação, sem duplicar a lista de viagens');
 for (const file of screenFiles) {
   const source = fs.readFileSync(file, 'utf8');
   assert.ok(/useMidLayout\(\)/.test(source) || /useWindowDimensions\(\)/.test(source) && /getMidLayout\(windowSize\)/.test(source), file + ' deve usar o layout responsivo centralizado');

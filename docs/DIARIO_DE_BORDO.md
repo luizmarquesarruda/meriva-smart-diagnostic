@@ -244,6 +244,7 @@
 - **DB-153** · 2026-10-28 — Corrigir contrato de altura da tipografia do cockpit em paisagem
 - **DB-154** · 2026-10-28 — Mover teste de integridade de viagens para a tela canônica
 - **DB-155** · 2026-10-28 — Diferenciar armazenamento de histórico de viagens
+- **DB-156** · 2026-10-28 — Remover cópia do perfil do veículo em Configurações
 
 ---
 
@@ -4378,3 +4379,11 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Após remover a lista duplicada, a tela Armazenamento ainda se intitulava “HISTÓRICO E DADOS” e a categoria Mais a chamava “HISTÓRICO E RELATÓRIOS”, embora a lista detalhada de viagens esteja em Viagens. Renomeados o título, subtítulo, grupo e atalho para “ARMAZENAMENTO E EXPORTAÇÃO” / “ARQUIVOS E EXPORTAÇÃO”.
 - A tela de Armazenamento fica dedicada a espaço local, fila CSV, limpeza e formatos exportados; a tela Viagens continua como local único da lista, detalhes e análise por percurso.
 - Não houve alteração dos formatos nem dos dados persistidos. A CI do SHA novo ainda deve comprovar os testes e o build Android.
+
+
+## DB-156 · 2026-10-28 — Remover cópia do perfil do veículo em Configurações
+
+- A comparação de telas identificou que Configurações repetia o nome do veículo, motorização, capacidade do tanque e reserva já expostos em Veículo. Os dados eram estáticos/contextuais e ocupavam espaço no final da tela de preferências.
+- Removida a cópia textual e substituída por um atalho acessível `VER PERFIL DO VEÍCULO` para `/veiculo`. Nenhum campo de perfil ou dado persistido foi alterado.
+- Acrescentada barreira de regressão para impedir o reaparecimento da cópia e manter a tela canônica como única fonte visual dos detalhes físicos.
+- CI do novo SHA e validação no aparelho continuam pendentes; esta alteração não declara build APK nem validação física.
