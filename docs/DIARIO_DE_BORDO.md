@@ -4,8 +4,8 @@
 
 - Repositório: [luizmarquesarruda/meriva-smart-diagnostic](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
 - PR #96: [Evita DTC duplicado no cockpit e mostra pressão do coletor](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/96), aberta, fora de rascunho e sem merge. Base `main` observada nesta PR: `7eec3afecb3718020724baf053f8b6d2ca636fab`.
-- HEAD consultado: `1b264cb3b2e86b1f9e0dd43aa9b231f29eae63aa`; duas execuções da CI estavam em progresso após ajustar a asserção térmica. DB-177 é posterior e exige uma nova CI.
-- A CI em `1b264cb3b2e86b1f9e0dd43aa9b231f29eae63aa` ainda estava em progresso na última consulta; `doctor` e gate estavam verdes. A asserção térmica foi alinhada para `COLORS.danger`; DB-177 ainda requer nova CI.
+- HEAD consultado antes desta correção: `57720ffeb046ecc2dba08a9a563ba4bc8d8bc7d5`; após a correção do transporte e do teste, o HEAD esperado é `053fa4a5f8c93592c3b7a5559027a6165d49e691`.
+- As execuções no SHA `57720ffeb046ecc2dba08a9a563ba4bc8d8bc7d5` foram canceladas durante commits concorrentes. Uma execução anterior falhou em `tests/orientationLayout.test.js:78` por procurar a cor literal antiga, divergente de `COLORS.danger`; DB-176 corrigiu essa asserção. A validação completa do novo HEAD continua pendente.
 - Após qualquer alteração, reconsultar o HEAD e a CI correspondentes. Só considerar a PR validada com `validate` e `android-build` verdes no mesmo SHA, diff reconciliado contra `main` e validação física separada.
 - A auditoria atual encontrou divergências de documentação e um débito relevante de modernização do SDK. Não houve upgrade de SDK nem remoção de dependências nativas nesta rodada: fazê-los antes de preservar um baseline físico poderia introduzir regressão no Bluetooth Classic.
 - Testes com Galaxy A06/Android 16/ELM327 real, confirmação de resposta `010C`, inspeção do APK instalado e validação GPS/autonomia continuam pendentes.
@@ -4683,3 +4683,18 @@ A troca de `danger` no cockpit da literal `#fb7185` para `COLORS.danger` preserv
 ### Validação e limites
 - DB-177 exige uma nova execução de TypeScript, gate, suíte completa e build Android no mesmo SHA.
 - O código não pode cancelar à força uma Promise nativa que não oferece API de cancelamento. A política segura é manter o bloqueio até a limpeza realmente assentar; se o módulo nativo nunca resolver, o app não abrirá um socket concorrente para o mesmo adaptador.
+
+
+## DB-178 · 2026-10-29 — Preservar bloqueio RFCOMM quando a sonda de estado do socket expira
+
+### Causa
+A sonda nativa `device.isConnected()` era limitada por timeout em leituras e escritas, mas, se expirasse ou rejeitasse, `assertDeviceConnected()` apenas lançava erro. O timeout JavaScript não cancela a chamada nativa e não comprova que o socket foi fechado. Sem registrar limpeza compartilhada nesse caminho, uma reconexão poderia tentar abrir outro RFCOMM para o mesmo endereço enquanto o estado anterior ainda era desconhecido.
+
+### Correção
+- `src/obd/bluetoothClassicTransport.ts`: falha/timeout de `isConnected()` agora registra `DEVICE_CONNECTED_CHECK_CLEANUP` na trava global antes de limpar o estado local e lançar erro. A nova conexão só pode prosseguir após a limpeza nativa ser confirmada; a operação pendente continua sem ser considerada cancelada.
+- `tests/bluetoothLifecycle.test.js`: adicionadas asserções para garantir a ordem de registro da limpeza compartilhada e descarte do estado local no caminho de estado desconhecido.
+
+### Validação e limites
+- Commit de implementação: `877778ab667ff82ea0d3fcf9fa8002f4e7db9a90`.
+- Commit de regressão: `053fa4a5f8c93592c3b7a5559027a6165d49e691`.
+- A CI ainda precisa executar typecheck, gate anti-regressão, suíte completa e build Android no mesmo SHA final. Não houve teste físico do Galaxy A06/Android 16 com ELM327/ECU nesta alteração.
