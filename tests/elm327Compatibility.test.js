@@ -50,6 +50,7 @@ assert.equal(defaults.adaptiveTimeoutMaxMs, 15000);
 assert.equal(defaults.optionalAtTimeoutMs, 2500);
 assert.equal(defaults.protocolSelectionTimeoutMs, 15000);
 assert.equal(defaults.maxConnectionAttempts, 0, 'retry count must be resolved from the bounded catalog policy');
+assert.equal(mergeCompatibilityConfig({ maxConnectionAttempts: 7 }).maxConnectionAttempts, 7, 'explicit retry override must remain supported');
 const customTimeouts = mergeCompatibilityConfig({ optionalAtTimeoutMs: 1800, protocolSelectionTimeoutMs: 9000 });
 assert.equal(customTimeouts.optionalAtTimeoutMs, 1800);
 assert.equal(customTimeouts.protocolSelectionTimeoutMs, 9000);
