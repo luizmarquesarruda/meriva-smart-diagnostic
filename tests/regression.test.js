@@ -663,6 +663,17 @@ async function testCarScannerBaselineAndFuel012F() {
 
   await learning.createLearningProfile(BASE, '2026-09-24T14:48:00.000Z');
   const seeded = await learning.initializeCarScannerSeed(BASE);
+  const initialCoverage = learning.getCarScannerLearningCoverage(seeded);
+  assert.strictEqual(initialCoverage.totalTargets, 12, 'referência CarScanner deve acompanhar os 12 parâmetros relatados');
+  assert.strictEqual(initialCoverage.totalConditions, 6, 'cobertura usa as seis condições do motor local');
+  assert.strictEqual(initialCoverage.totalSlots, 72, '12 PIDs × 6 condições devem formar 72 células de cobertura');
+  assert.strictEqual(initialCoverage.seedBackedTargets, 10, 'não criar valores seed para os dois parâmetros ausentes');
+  assert.strictEqual(initialCoverage.realObservedSlots, 0, 'seed não pode contar como observação real');
+  assert.strictEqual(initialCoverage.gapSlots, 72, 'célula sem REAL_OBD continua sendo lacuna');
+  assert.strictEqual(initialCoverage.seedOnlySlots, 10, 'somente os dez valores CarScanner existentes ficam como referência');
+  const rpmCoverageBefore = initialCoverage.targets.find((item) => item.pid === '010C');
+  assert.ok(rpmCoverageBefore);
+  assert.strictEqual(rpmCoverageBefore.cells.find((cell) => cell.condition === 'IDLE_WARM').status, 'CARSCANNER_ONLY');
   assert.strictEqual(seeded.globalSampleCounts.seedSamples, 10);
   assert.strictEqual(seeded.globalSampleCounts.realSamples, 0);
   assert.strictEqual(seeded.globalSampleCounts.totalSamples, 10);
@@ -675,6 +686,15 @@ async function testCarScannerBaselineAndFuel012F() {
   assert.deepStrictEqual(rpm.source, ['CARSCANNER_BASELINE']);
   await learning.updateLearningProfileRealSample(BASE, 'Engine RPM', 800, 'IDLE_WARM');
   const learned = await learning.readLearningProfile(BASE);
+  const learnedCoverage = learning.getCarScannerLearningCoverage(learned);
+  assert.strictEqual(learnedCoverage.realObservedSlots, 1, 'uma leitura REAL_OBD válida deve atualizar uma única célula de contexto');
+  assert.strictEqual(learnedCoverage.gapSlots, 71, 'a cobertura recalculada deve fechar somente a lacuna observada');
+  assert.strictEqual(learnedCoverage.seedOnlySlots, 9, 'o valor seed deixa de ser seed-only após a primeira leitura real no mesmo contexto');
+  const rpmCoverageAfter = learnedCoverage.targets.find((item) => item.pid === '010C');
+  assert.ok(rpmCoverageAfter);
+  assert.strictEqual(rpmCoverageAfter.coveredRealContexts, 1);
+  assert.strictEqual(rpmCoverageAfter.missingRealConditions.length, 5, 'outras condições não podem ser preenchidas por inferência');
+  assert.strictEqual(rpmCoverageAfter.cells.find((cell) => cell.condition === 'IDLE_WARM').status, 'REAL_SEEN');
   const learnedRpm = learned.contextualData.find((item) => item.condition === 'IDLE_WARM').statistics['Engine RPM'];
   assert.strictEqual(learned.globalSampleCounts.realSamples, 1);
   assert.ok(learnedRpm.mean > 778 && learnedRpm.mean < 800);

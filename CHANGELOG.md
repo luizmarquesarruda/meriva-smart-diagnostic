@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Referência CarScanner e aprendizado adaptativo local
+- A cobertura acompanha os 12 parâmetros informados no relatório CarScanner nas seis condições operacionais do app (72 combinações).
+- A tela de Aprendizado separa medições reais, lacunas sem evidência e contexto contendo somente seed; a cobertura se recalcula com o perfil local atualizado por respostas REAL_OBD válidas.
+- O seed numérico continua restrito às dez medições observadas em marcha lenta aquecida; nenhum valor é inventado para velocidade/carga ou para condições não medidas.
+- O PID 010E (avanço de ignição) passa a entrar na rotação e na lista do cockpit, substituindo o PID 0143 (Absolute Load), redundante para o conjunto de 20 parâmetros visíveis diante de 0104 (Calculated Engine Load). A aquisição continua condicionada à bitmap e à validação individual da resposta.
+
+
 ### P0 — integridade de telemetria, autonomia e diagnóstico Bluetooth
 - Séries de PID passam a manter ordem cronológica; leituras fora de ordem não substituem a amostra mais recente e tendências ao vivo expiram após 10 s.
 - Adicionado buffer circular de até dez leituras reais válidas do PID 012F, isolado por sessão ECU e sem dados sintéticos. Após o dado ao vivo expirar, um fallback só aparece como `AUTONOMIA • BUFFER` após dez amostras e até 60 s desde a última leitura; fora disso, N/D.

@@ -131,6 +131,16 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 - Testar rejeição de percentual fora de 0–100, timestamps futuros/regressivos e reinicialização do buffer em nova sessão ECU.
 - Em veículo real, comparar autonomia ao vivo e estimativa do buffer com leitura 012F e percurso medido; CI não comprova precisão física.
 
-- Forçar chunks RX repetidos e confirmar que o texto de diagnóstico permanece até 64 KiB, preservando o truncamento de prévia em 256 caracteres e o limite RX de 16 KiB.
+## BT-DIAG-01 — Limite agregado de logs Bluetooth
 - Forçar chunks RX repetidos e confirmar que o texto de diagnóstico permanece até 64 KiB, preservando o truncamento de prévia em 256 caracteres e o limite RX de 16 KiB.
 - Confirmar que, após um overflow descartado, o transporte continua podendo receber o próximo quadro válido; não aceitar payload parcial.
+
+
+## CARSCANNER-LEARNING-01 — Lacunas da referência e atualização local automática
+- Tratar a referência como 12 parâmetros × 6 condições operacionais; não criar valores numéricos para condições sem amostras de origem.
+- O seed de 24/09/2026 contém dez medições numéricas, todas em IDLE_WARM; continuam identificadas como referência histórica, nunca como leitura real atual.
+- Exibir células sem REAL_OBD como lacuna ou somente referência. Apenas respostas OBD reais válidas e aprovadas pelo filtro de origem aumentam a cobertura real.
+- Verificar que uma leitura real válida do mesmo PID/condição fecha somente aquela célula; outras condições permanecem sem evidência até serem observadas.
+- Todos os 12 PIDs de referência devem existir no catálogo e ser programados para aquisição ou caminho prioritário. O PID 010E (avanço de ignição) precisa estar na rotação e no cockpit, mas só pode ser consultado quando a bitmap da ECU anuncia suporte.
+- Confirmar que a tela de Aprendizado recalcula a cobertura a partir de dna_meriva.json e distingue quantidade global de leituras de contextos realmente cobertos.
+- Fonte: https://www.carscanner.info/records/ descreve que a gravação contém os dados exibidos e parâmetros relacionados; https://www.carscanner.info/compatibility/ informa que a lista de parâmetros suportados é reportada pela própria ECU. Esses limites impedem preencher lacunas com números supostos.

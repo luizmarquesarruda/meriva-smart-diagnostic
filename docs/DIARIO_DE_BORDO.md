@@ -1,4 +1,4 @@
-## ESTADO VIGENTE — 2026-10-29 (auditoria P0 de telemetria, autonomia e Bluetooth)
+## ESTADO VIGENTE — 2026-10-29 (P0 e cobertura CarScanner / aprendizado local)
 
 > Estado observado no GitHub em 29/10/2026. Este bloco descreve uma branch de correções baseada no SHA atual de `main`; não declara merge nem teste físico.
 
@@ -6,7 +6,7 @@
 - Repositório: [luizmarquesarruda/meriva-smart-diagnostic](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
 - SHA de `main` observado antes desta rodada: `7eec3afecb3718020724baf053f8b6d2ca636fab`.
 - `.github/workflows/ci.yml` executa em qualquer `push`; o usuário autorizou explicitamente a CI automática nesta rodada.
-- A CI inicial `40811128907` falhou no gate porque `tests/elmHealthPresentation.test.js` estava fora de `npm test`. Depois de registrar a suíte, `40811232971` executou o gate com sucesso e revelou que o teste também dependia de `src/obd/elmHealthPresentation.ts`, ausente no `main`. A branch restaura esse helper e registra o achado; a CI final precisa confirmar ambos os reparos.
+- A validação do SHA base `7e64be065e2367b03ecc7c8d652d36c78d92b4d3` passou em validate na CI `40811765248`; o android-build ainda estava em execução ao iniciar esta etapa. A revisão de CarScanner deve ter CI própria no novo SHA.
 - Branch dedicada: `fix/p0-telemetry-autonomy-diagnostics-20261029`. A CI desta branch deve ser verificada no SHA exato do commit.
 
 ### PRs e integração
@@ -18,6 +18,7 @@
 - Leituras de PID são ordenadas pelo timestamp, não pela chegada; tendência ao vivo expira após 10 s.
 - PID 012F é a fonte autoritativa de nível de combustível. O buffer só usa dez leituras reais válidas da sessão atual e pode ser mostrado temporariamente, explicitamente rotulado, por até 60 s desde a última leitura; não transforma dado obsoleto em leitura atual.
 - Logs Bluetooth são limitados por total de caracteres e quantidade de linhas; RX continua limitado a 16 KiB, sem aceitar resposta parcial.
+- Referência CarScanner: 12 PIDs × 6 contextos; a cobertura é derivada do perfil local e não inventa medições. Somente REAL_OBD fecha lacunas; o PID 010E está no polling/cockpit quando a ECU o anuncia.
 - Testes unitários e CI não substituem teste no Galaxy A06 / SM-A065M / Android 16 com ELM327 real, em especial resposta ECU ao PID 010C e precisão da autonomia em percurso.
 ---
 
@@ -201,6 +202,7 @@
 - **DB-130** · 2026-10-25 — Otimização CSV avaliada e bloqueada pela versão instalada
 - **DB-131** · 2026-10-25 — Atualização periódica de localização/clima baseada em conectividade
 - **DB-132** · 2026-10-29 — Integridade de telemetria, buffer de autonomia e limite de diagnósticos Bluetooth
+- **DB-133** · 2026-10-29 — Referência CarScanner, cobertura de lacunas e atualização incremental do aprendizado
 
 ---
 
@@ -4006,3 +4008,23 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - A CI `40811449218` passou pelo gate e pela suíte `elmHealthPresentation`, mas falhou porque o teste do limite de logs alimentou 120 chunks não delimitados, causando um segundo overflow RX legítimo. A CI `40811589957` confirmou que até quadros sintéticos delimitados acumulados antes da leitura interferem na recuperação esperada. O teste agora exercita o registrador de diagnóstico diretamente para medir o limite agregado, mantendo intacta a verificação de RX e recuperação. A validação final precisa ocorrer no próximo SHA.
 - A autonomia por buffer é uma estimativa temporária, não prova de que a ECU está enviando nível atual; expira para N/D após 60 s. A média de consumo precisa ser positiva e válida.
 - Teste físico pendente: Galaxy A06 / SM-A065M / Android 16 com ELM327 real, enquadramento CR/ASCII, resposta real de 010C, e comparação de autonomia com 012F e percurso medido. Nenhum merge foi executado.
+
+
+## DB-133 · 2026-10-29 — Referência CarScanner, cobertura de lacunas e atualização incremental do aprendizado
+
+### Lacuna confirmada
+- src/database/learningProfile.ts contém dez medições numéricas do CarScanner, todas datadas em 24/09/2026 e classificadas como IDLE_WARM. Os números existentes são referência inicial, não medições de todas as condições.
+- O relatório listado no projeto cobre 12 parâmetros (velocidade, RPM, MAF, MAP, IAT, temperatura do líquido, posição da borboleta, STFT, LTFT, avanço, O2 e carga calculada) e seis condições operacionais. Sem estatística real por PID/contexto, preencher as combinações restantes com estimativas fabricaria evidência.
+- A documentação pública do CarScanner informa que grava somente os dados exibidos e parâmetros recebidos junto deles (https://www.carscanner.info/records/); a disponibilidade de parâmetros depende do que a ECU reporta (https://www.carscanner.info/compatibility/).
+
+### Correções nesta branch
+- Criado manifesto de cobertura de 12 PIDs × 6 condições (72 células), separado da lista de dez amostras numéricas do seed. getCarScannerLearningCoverage deriva lacunas, células seed-only, contextos com evidência real, progresso e estado por PID a partir do perfil salvo.
+- A tela app/aprendizado.tsx mostra quantidade de PIDs com evidência real, cobertura por condição, contextos faltantes e os contextos que ainda têm somente referência CarScanner. Como relê o perfil local periodicamente, a cobertura se atualiza quando o aprendizado recebe novas observações.
+- registerObdQuery alimenta o perfil somente para respostas reais válidas, com limite de uma atualização de aprendizado por PID a cada cinco segundos; simulações permanecem bloqueadas. A cobertura torna explícita essa atualização incremental, em vez de contar seed como aprendizado real.
+- 010E (Timing Advance) não aparecia em rotatingTelemetryPids; foi incluído na rotação e na lista de cockpit substituindo 0143 (Absolute Load), redundante com 0104 (Calculated Engine Load) no conjunto limitado a 20 PIDs. A consulta continua restrita aos PIDs anunciados e validados pela ECU.
+- Atualizados testes de regressão, teste do catálogo de conhecimento, gate anti-regressão, contrato, plano de teste e changelog. O teste verifica que uma observação REAL_OBD fecha apenas a célula do contexto observado; as outras condições continuam lacunas.
+
+### Validação e limites
+- A validação do SHA base passou; esta revisão requer CI própria em novo SHA para TypeScript, suítes e APK. Não declarar build Android concluído sem o resultado dessa execução.
+- Não foram importados valores CarScanner de outras condições porque esta base não contém medições numéricas verificáveis para elas. O preenchimento ocorrerá conforme dados reais válidos sejam coletados; uma exportação CSV adicional pode ampliar o seed se for importada e classificada explicitamente como histórico, não como REAL_OBD atual.
+- Nenhum merge foi executado. A validação física de Bluetooth/ECU no Galaxy A06 e inspeção visual do app continuam requisitos separados.

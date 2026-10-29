@@ -308,5 +308,17 @@ for (let index = 0; index < diaryEntryIds.length; index++) {
 }
 assert.deepEqual(diaryIndexIds, diaryEntryIds, 'o índice DB-NNN precisa corresponder exatamente às entradas do diário');
 
+const learningSource = read('src/database/learningProfile.ts');
+const learningScreen = read('app/aprendizado.tsx');
+const learningPolicy = readJson('src/knowledge/polling_policy.json');
+assert.match(learningSource, /CARSCANNER_REFERENCE_TARGETS/);
+assert.match(learningSource, /getCarScannerLearningCoverage/);
+assert.match(learningScreen, /getCarScannerLearningCoverage/);
+assert.match(learningScreen, /LACUNAS DA REFERÊNCIA CARSCANNER/);
+assert.ok(learningPolicy.polling.rotatingTelemetryPids.includes('010E'));
+assert.ok(learningPolicy.cockpit.pidOrder.includes('010E'));
+assert.match(projectContract, /^\\| RG-42 \\|/m, 'referência CarScanner e aprendizado incremental precisam de contrato de regressão');
+assert.match(testPlan, /CARSCANNER-LEARNING-01/);
+
 console.log('Anti-regression baseline gate: PASS');
-console.log('Protected contracts: five-read sensor tests, manual PID flow, single ELM327 queue, offline diagnosis, Expo SDK 51, GPS/Trip, TXT/history and cockpit/graphs.');
+console.log('Protected contracts: CarScanner coverage gaps, real-only adaptive learning, five-read sensor tests, manual PID flow, single ELM327 queue, offline diagnosis, Expo SDK 51, GPS/Trip, TXT/history and cockpit/graphs.');

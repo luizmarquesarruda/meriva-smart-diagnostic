@@ -116,6 +116,19 @@ function main() {
   for (const id of policyPids) {
     assert.ok(pidIds.has(String(id).toUpperCase()), 'polling policy referencia PID ausente no catálogo: ' + id);
   }
+  const carScannerReferencePids = [
+    '010D', '010C', '0110', '010B', '010F', '0105',
+    '0111', '0106', '0107', '010E', '0114', '0104',
+  ];
+  assertUnique(carScannerReferencePids, 'PID de referência CarScanner');
+  const scheduledPids = new Set(policyPids.map((id) => String(id).toUpperCase()));
+  for (const id of carScannerReferencePids) {
+    assert.ok(pidIds.has(id), 'PID de referência CarScanner ausente do catálogo: ' + id);
+    assert.ok(scheduledPids.has(id), 'IA não poderá aprender um PID de referência sem aquisição agendada: ' + id);
+    assert.ok(polling.cockpit.pidOrder.includes(id), 'PID de referência CarScanner ausente do cockpit: ' + id);
+  }
+  assert.ok(polling.rotatingTelemetryPids.includes('010E'),
+    'avanço de ignição deve ser adquirido quando a bitmap atual anunciar 010E');
   assert.strictEqual(pollingPolicy.cockpit.maxDisplayedPids, 20, 'cockpit deve limitar a vinte PIDs reais suportados');
   assert.strictEqual(pollingPolicy.cockpit.pidOrder.length, 20, 'cockpit deve definir exatamente vinte PIDs candidatos');
   assertUnique(pollingPolicy.cockpit.pidOrder.map((id) => String(id).toUpperCase()), 'PID do cockpit');

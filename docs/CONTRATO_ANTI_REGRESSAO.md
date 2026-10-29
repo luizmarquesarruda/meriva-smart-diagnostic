@@ -58,6 +58,7 @@ Este documento é o contrato de aceitação entre mudanças, testes, diário e C
 | RG-39 | Enriquecimento de localização/clima escuta conectividade, usa Wi-Fi ou dados móveis com internet disponível, atualiza a cada 15 min e após reconexão, limita retries e não executa chamadas sobrepostas; falha não bloqueia OBD nem apresenta temperatura antiga como atual. | `tests/weatherRefresh.test.js`, `tests/onlineConditions.test.js`, `tests/projectBaseline.test.js` |
 | RG-40 | Telemetria ao vivo mantém séries em ordem cronológica independentemente da ordem de chegada; uma amostra atrasada não substitui a leitura mais recente e tendência atual expira após 10 s. | `tests/liveTelemetry.test.js`, `tests/projectBaseline.test.js` |
 | RG-41 | Diagnósticos Bluetooth mantêm RX preview de 256 caracteres, limite de buffer RX de 16 KiB e limite agregado de 64 KiB; evento excessivo trunca/descarta conteúdo antigo sem relaxar o parser de respostas. | `tests/regression.test.js`, `tests/projectBaseline.test.js` |
+| RG-42 | A referência CarScanner rastreia 12 PIDs em 6 condições (72 células), sem fabricar valores ausentes. Somente amostras REAL_OBD válidas fecham lacunas; seed permanece referência-only e a cobertura é recalculada a partir do perfil local. Todo PID-alvo deve existir no catálogo/polling/cockpit quando aplicável; 010E entra na rotação, condicionado ao suporte anunciado pela bitmap da ECU. | tests/regression.test.js, tests/knowledgeJson.test.js, tests/projectBaseline.test.js |
 
 ## Regras para uma alteração legítima
 

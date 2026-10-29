@@ -235,6 +235,168 @@ export const CARSCANNER_SEED_SAMPLES: CarScannerSeedSample[] = [
   { pidName: 'O2 Sensor 1 Voltage', value: 0.53, condition: 'IDLE_WARM', timestamp: '2026-09-24T14:48:00.000Z' },
 ];
 
+/** Coverage targets describe parameters, never fabricated sample values. */
+export interface CarScannerReferenceTarget {
+  pid: string;
+  pidName: string;
+}
+
+export const CARSCANNER_REFERENCE_TARGETS: ReadonlyArray<CarScannerReferenceTarget> = [
+  { pid: '010D', pidName: 'Vehicle Speed' },
+  { pid: '010C', pidName: 'Engine RPM' },
+  { pid: '0110', pidName: 'MAF' },
+  { pid: '010B', pidName: 'MAP' },
+  { pid: '010F', pidName: 'Intake Air Temperature' },
+  { pid: '0105', pidName: 'Coolant Temperature' },
+  { pid: '0111', pidName: 'Throttle Position' },
+  { pid: '0106', pidName: 'STFT Bank 1' },
+  { pid: '0107', pidName: 'LTFT Bank 1' },
+  { pid: '010E', pidName: 'Timing Advance' },
+  { pid: '0114', pidName: 'O2 Sensor 1 Voltage' },
+  { pid: '0104', pidName: 'Calculated Engine Load' },
+];
+
+export const CARSCANNER_REFERENCE_CONDITIONS: readonly VehicleCondition[] = [
+  'IDLE_COLD', 'IDLE_WARM', 'ACCELERATION', 'CRUISE', 'DECELERATION', 'UNKNOWN',
+];
+
+export const CARSCANNER_CONDITION_LABELS: Record<VehicleCondition, string> = {
+  IDLE_COLD: 'MARCHA LENTA FRIA',
+  IDLE_WARM: 'MARCHA LENTA AQUECIDA',
+  ACCELERATION: 'ACELERAÇÃO',
+  CRUISE: 'CRUZEIRO',
+  DECELERATION: 'DESACELERAÇÃO',
+  UNKNOWN: 'SEM CONTEXTO',
+};
+
+export type CarScannerCoverageStatus =
+  | 'GAP'
+  | 'CARSCANNER_ONLY'
+  | 'REAL_SEEN'
+  | 'LEARNING'
+  | 'ESTABLISHED'
+  | 'STRONG_REAL'
+  | 'CONFIDENT';
+
+export interface CarScannerCoverageCell {
+  condition: VehicleCondition;
+  conditionLabel: string;
+  realSamples: number;
+  seedSamples: number;
+  status: CarScannerCoverageStatus;
+}
+
+export interface CarScannerTargetCoverage {
+  pid: string;
+  pidName: string;
+  realSampleCount: number;
+  seedSampleCount: number;
+  coveredRealContexts: number;
+  totalContexts: number;
+  missingRealConditions: VehicleCondition[];
+  seedOnlyConditions: VehicleCondition[];
+  status: CarScannerCoverageStatus;
+  cells: CarScannerCoverageCell[];
+}
+
+export interface CarScannerLearningCoverage {
+  totalTargets: number;
+  totalConditions: number;
+  totalSlots: number;
+  realObservedSlots: number;
+  gapSlots: number;
+  seedOnlySlots: number;
+  realCoveragePercent: number;
+  seedBackedTargets: number;
+  targets: CarScannerTargetCoverage[];
+}
+
+function safeSampleCount(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+}
+
+function getCarScannerCoverageStatus(
+  realSamples: number,
+  seedSamples: number,
+  thresholds: MerivaLearningProfile['confidenceThresholds'],
+): CarScannerCoverageStatus {
+  if (realSamples >= thresholds.high) return 'CONFIDENT';
+  if (realSamples >= thresholds.good) return 'STRONG_REAL';
+  if (realSamples >= thresholds.medium) return 'ESTABLISHED';
+  if (realSamples >= thresholds.low) return 'LEARNING';
+  if (realSamples > 0) return 'REAL_SEEN';
+  if (seedSamples > 0) return 'CARSCANNER_ONLY';
+  return 'GAP';
+}
+
+/** Recompute coverage from the saved profile; only REAL_OBD closes a context gap. */
+export function getCarScannerLearningCoverage(
+  profile: Pick<MerivaLearningProfile, 'contextualData' | 'overallStatistics' | 'confidenceThresholds'>,
+): CarScannerLearningCoverage {
+  const contexts = Array.isArray(profile.contextualData) ? profile.contextualData : [];
+  const overall = profile.overallStatistics ?? {};
+  const thresholds = profile.confidenceThresholds ?? { low: 10, medium: 50, good: 200, high: 500 };
+
+  const targets = CARSCANNER_REFERENCE_TARGETS.map((target): CarScannerTargetCoverage => {
+    const cells = CARSCANNER_REFERENCE_CONDITIONS.map((condition): CarScannerCoverageCell => {
+      const context = contexts.find((item) => item.condition === condition);
+      const stats = context?.statistics?.[target.pidName];
+      const realSamples = safeSampleCount(stats?.realSamples);
+      const seedSamples = safeSampleCount(stats?.seedSamples);
+      return {
+        condition,
+        conditionLabel: CARSCANNER_CONDITION_LABELS[condition],
+        realSamples,
+        seedSamples,
+        status: getCarScannerCoverageStatus(realSamples, seedSamples, thresholds),
+      };
+    });
+
+    const contextualRealSamples = cells.reduce((total, cell) => total + cell.realSamples, 0);
+    const contextualSeedSamples = cells.reduce((total, cell) => total + cell.seedSamples, 0);
+    const realSampleCount = Math.max(contextualRealSamples, safeSampleCount(overall[target.pidName]?.realSamples));
+    const seedSampleCount = Math.max(contextualSeedSamples, safeSampleCount(overall[target.pidName]?.seedSamples));
+    const missingRealConditions = cells.filter((cell) => cell.realSamples === 0).map((cell) => cell.condition);
+    const seedOnlyConditions = cells.filter((cell) => cell.realSamples === 0 && cell.seedSamples > 0).map((cell) => cell.condition);
+
+    return {
+      ...target,
+      realSampleCount,
+      seedSampleCount,
+      coveredRealContexts: cells.filter((cell) => cell.realSamples > 0).length,
+      totalContexts: CARSCANNER_REFERENCE_CONDITIONS.length,
+      missingRealConditions,
+      seedOnlyConditions,
+      status: getCarScannerCoverageStatus(realSampleCount, seedSampleCount, thresholds),
+      cells,
+    };
+  }).sort((left, right) =>
+    right.missingRealConditions.length - left.missingRealConditions.length || left.pid.localeCompare(right.pid),
+  );
+
+  const totalSlots = CARSCANNER_REFERENCE_TARGETS.length * CARSCANNER_REFERENCE_CONDITIONS.length;
+  const realObservedSlots = targets.reduce((total, target) =>
+    total + target.cells.filter((cell) => cell.realSamples > 0).length, 0,
+  );
+  const seedOnlySlots = targets.reduce((total, target) =>
+    total + target.cells.filter((cell) => cell.realSamples === 0 && cell.seedSamples > 0).length, 0,
+  );
+
+  return {
+    totalTargets: CARSCANNER_REFERENCE_TARGETS.length,
+    totalConditions: CARSCANNER_REFERENCE_CONDITIONS.length,
+    totalSlots,
+    realObservedSlots,
+    gapSlots: totalSlots - realObservedSlots,
+    seedOnlySlots,
+    realCoveragePercent: totalSlots > 0 ? Number(((realObservedSlots / totalSlots) * 100).toFixed(1)) : 0,
+    seedBackedTargets: CARSCANNER_REFERENCE_TARGETS.filter((target) =>
+      CARSCANNER_SEED_SAMPLES.some((sample) => sample.pidName === target.pidName),
+    ).length,
+    targets,
+  };
+}
+
 export async function initializeCarScannerSeed(
   basePath: string,
   seedImportDate = '2026-09-24T14:48:00.000Z',
