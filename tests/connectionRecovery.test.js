@@ -14,7 +14,7 @@ const loaded = { exports: {} };
 new Function('exports', 'module', js)(loaded.exports, loaded);
 
 async function run() {
-  const { awaitNativeCleanupRetry, cleanupDisconnectedSession, runDisconnectPersistenceTasks, shouldRetryAfterDisconnectCleanup, timedOutNativeAttemptStillPending, waitForNativeConnectAttempt } = loaded.exports;
+  const { awaitNativeCleanupRetry, cleanupDisconnectedSession, runDisconnectPersistenceTasks, runWithTimeout, shouldRetryAfterDisconnectCleanup, timedOutNativeAttemptStillPending, waitForNativeConnectAttempt } = loaded.exports;
   const order = [];
 
   const cleanupOperations = [];
@@ -88,6 +88,19 @@ async function run() {
     'a non-timed-out attempt must not trigger timeout abort logic');
   assert.equal(timedOutNativeAttemptStillPending(true, attempt, Promise.resolve()), false,
     'an unrelated pending promise must not be mistaken for the current native call');
+
+  assert.equal(await runWithTimeout(() => Promise.resolve('ready'), 20, 'STATE CHECK TIMEOUT'), 'ready',
+    'a native operation that settles promptly must return its result');
+  await assert.rejects(
+    () => runWithTimeout(() => new Promise(() => {}), 5, 'STATE CHECK TIMEOUT'),
+    /STATE CHECK TIMEOUT/,
+    'a native operation that never settles must have a bounded wait',
+  );
+  await assert.rejects(
+    () => runWithTimeout(() => Promise.reject(new Error('native state query failed')), 20, 'STATE CHECK TIMEOUT'),
+    /native state query failed/,
+    'native state-check failures must propagate instead of being silently ignored',
+  );
 
   assert.equal(await waitForNativeConnectAttempt(Promise.resolve('connected'), 20), true,
     'concurrent opens must continue after the prior native request settles');

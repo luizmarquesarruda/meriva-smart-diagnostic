@@ -6,6 +6,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 const transport = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'bluetoothClassicTransport.ts'), 'utf8');
+const recovery = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'connectionRecovery.ts'), 'utf8');
 const manager = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'bluetoothManager.ts'), 'utf8');
 const shared = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'sharedConnection.ts'), 'utf8');
 const rootLayout = fs.readFileSync(path.join(ROOT, 'app', '_layout.tsx'), 'utf8');
@@ -62,6 +63,14 @@ assert.match(transport, /pendingNativeConnectionSettlements\.get\(addressKey\) \
 assert.match(transport, /await this\.safeDisconnect\(lateDevice\)[\s\S]*?LATE_CONNECT_DISCONNECTED/, 'a timed-out late success must be disconnected before the settlement completes');
 assert(transport.includes("CONNECT_ABORT_PREVIOUS_NATIVE_ATTEMPT_PENDING"), 'a stale native connection must fail fast instead of being awaited forever');
 assert(shared.includes('cleanupDisconnectedSession('), 'disconnect recovery must isolate persistence failure from session close');
+assert(recovery.includes('export async function runWithTimeout'), 'native asynchronous probes must use the tested bounded-wait helper');
+assert(transport.includes('private async assertDeviceConnected'), 'transport must centralize native connection-state checks');
+assert(transport.includes('runWithTimeout('), 'native isConnected calls must be bounded');
+assert(transport.includes('DEVICE_CONNECTED_CHECK_FAILED'), 'unknown native connection state must be logged and fail closed');
+assert(transport.includes('await this.assertDeviceConnected(device, NATIVE_CONNECTION_CHECK_TIMEOUT_MS)'), 'write must not transmit while native state is unknown');
+assert(transport.includes('Math.min(NATIVE_CONNECTION_CHECK_TIMEOUT_MS, remainingMs)'), 'read must reserve only the remaining response timeout for native state checks');
+assert(transport.includes('NATIVE_SOCKET_CLEANUP_TIMEOUT'), 'direct close timeout must be observable and keep the socket guard');
+assert(transport.includes('replacementSocketBlocked: true'), 'an unconfirmed native close must block replacement RFCOMM sockets');
 
 
 console.log('bluetoothLifecycle.test.js: OK');

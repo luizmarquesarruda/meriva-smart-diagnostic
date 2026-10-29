@@ -2,7 +2,7 @@ import RNBluetoothClassic, { BluetoothDevice } from 'react-native-bluetooth-clas
 import { Platform } from 'react-native';
 import { ObdTransport } from './elm327';
 import { DEFAULT_ELM327_COMPATIBILITY, Elm327CompatibilityConfig, mergeCompatibilityConfig } from './elm327Compatibility';
-import { awaitNativeCleanupRetry, timedOutNativeAttemptStillPending, waitForNativeConnectAttempt } from './connectionRecovery';
+import { awaitNativeCleanupRetry, runWithTimeout, timedOutNativeAttemptStillPending, waitForNativeConnectAttempt } from './connectionRecovery';
 import { decideBluetoothRadioRecovery } from './bluetoothRadioRecovery';
 
 export interface BluetoothDeviceInfo {
@@ -28,6 +28,7 @@ const pendingNativeSocketCleanups = new Map<string, PendingNativeSocketCleanup>(
 // ELM327 retorna linhas curtas; 16 KiB é uma margem generosa e evita RX ilimitado.
 export const MAX_ELM_RX_BUFFER_CHARS = 16 * 1024;
 const RX_DIAGNOSTIC_PREVIEW_CHARS = 256;
+const NATIVE_CONNECTION_CHECK_TIMEOUT_MS = 1000;
 
 async function waitForPendingNativeSocketCleanup(addressKey: string, timeoutMs: number): Promise<void> {
   const pending = pendingNativeSocketCleanups.get(addressKey);
@@ -511,9 +512,18 @@ export class BluetoothClassicTransport implements ObdTransport {
       // The global guard owns the cleanup; don't issue a parallel disconnect.
       await waitForPendingNativeSocketCleanup(addressKey, this.config.bluetoothConnectTimeoutMs);
     } else if (device && wasConnected) {
-      // Register before awaiting native disconnect so another transport
-      // cannot race into a new socket while this close is still in flight.
+      // Register before waiting; if Android never settles disconnect(), return
+      // after a bounded wait but keep the shared guard so no replacement socket opens.
       const cleanup = this.registerPendingNativeSocketCleanup(device);
+      const settled = await waitForNativeConnectAttempt(cleanup.promise, this.config.bluetoothConnectTimeoutMs);
+      if (!settled) {
+        this.logDiagnostic('NATIVE_SOCKET_CLEANUP_TIMEOUT', {
+          address: this.deviceAddress,
+          timeoutMs: this.config.bluetoothConnectTimeoutMs,
+          replacementSocketBlocked: true,
+        });
+        throw new Error('LIMPEZA NATIVA DO SOCKET EXCEDEU O TIMEOUT; NOVA CONEXÃO RFCOMM CONTINUA BLOQUEADA');
+      }
       await cleanup.promise;
     } else if (pendingIoCleanup) {
       await waitForPendingNativeSocketCleanup(addressKey, this.config.bluetoothConnectTimeoutMs);
@@ -525,21 +535,39 @@ export class BluetoothClassicTransport implements ObdTransport {
     this.receiveOverflow = false;
   }
 
+  private async assertDeviceConnected(device: BluetoothDevice, timeoutMs: number): Promise<void> {
+    if (typeof device.isConnected !== 'function') return;
+
+    let confirmed: boolean;
+    try {
+      confirmed = await runWithTimeout(
+        () => device.isConnected!(),
+        timeoutMs,
+        `TIMEOUT: VERIFICAÇÃO DO SOCKET BLUETOOTH APÓS ${timeoutMs} MS`,
+      );
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      this.logDiagnostic('DEVICE_CONNECTED_CHECK_FAILED', {
+        timeoutMs,
+        error: message,
+        failClosed: true,
+      });
+      throw new Error('ESTADO DO SOCKET BLUETOOTH INDETERMINADO: ' + message);
+    }
+
+    this.logDiagnostic('DEVICE_CONNECTED_CHECK', confirmed);
+    if (!confirmed) {
+      this.markDisconnected();
+      throw new Error('BLUETOOTH DESCONECTADO');
+    }
+  }
+
   async write(data: string): Promise<void> {
     const device = this.device;
     if (!device || !this.connected) throw new Error('BLUETOOTH NÃO CONECTADO');
 
-    if (typeof device.isConnected === 'function') {
-      try {
-        if (!(await device.isConnected())) {
-          this.markDisconnected();
-          throw new Error('BLUETOOTH DESCONECTADO');
-        }
-      } catch (cause) {
-        const message = cause instanceof Error ? cause.message : '';
-        if (message === 'BLUETOOTH DESCONECTADO') throw cause;
-      }
-    }
+    // Do not transmit if native connection state is false, hangs, or cannot be confirmed.
+    await this.assertDeviceConnected(device, NATIVE_CONNECTION_CHECK_TIMEOUT_MS);
 
     this.logDiagnostic('TX', { data });
     let timeout: ReturnType<typeof setTimeout> | null = null;
@@ -581,16 +609,15 @@ export class BluetoothClassicTransport implements ObdTransport {
       if (!this.connected || !this.device) throw new Error('BLUETOOTH DESCONECTADO');
 
       if (Date.now() >= nextConnectionCheck && typeof device.isConnected === 'function') {
+        const remainingMs = timeoutMs - (Date.now() - started);
+        if (remainingMs <= 0) break;
+        // The state probe uses only the remaining read budget, so it cannot
+        // silently extend the caller's response timeout by waiting forever.
+        await this.assertDeviceConnected(
+          device,
+          Math.min(NATIVE_CONNECTION_CHECK_TIMEOUT_MS, remainingMs),
+        );
         nextConnectionCheck = Date.now() + 250;
-        try {
-          if (!(await device.isConnected())) {
-            this.markDisconnected();
-            throw new Error('BLUETOOTH DESCONECTADO');
-          }
-        } catch (cause) {
-          const message = cause instanceof Error ? cause.message : '';
-          if (message === 'BLUETOOTH DESCONECTADO') throw cause;
-        }
       }
 
       const promptIndex = this.received.indexOf('>');

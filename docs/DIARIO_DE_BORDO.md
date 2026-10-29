@@ -1,15 +1,15 @@
-## ESTADO VIGENTE — 2026-10-28 (cockpit 2×2 + recuperação Bluetooth/KWP e auditoria de obsolescência)
+## ESTADO VIGENTE — 2026-10-29 (timeout nativo Bluetooth + recuperação ELM/KWP)
 
 > Frente única de trabalho: PR #96, branch `ui/cockpit-instant-consumption-20261027`. Este bloco é a referência operacional; snapshots abaixo são históricos.
 
 - Repositório: [luizmarquesarruda/meriva-smart-diagnostic](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
 - PR #96: [Evita DTC duplicado no cockpit e mostra pressão do coletor](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/96), aberta, fora de rascunho e sem merge. Base `main` observada nesta PR: `7eec3afecb3718020724baf053f8b6d2ca636fab`.
-- HEAD antes desta auditoria: `bd44575d633129ec85e288883e7376cbda2b105f`.
-- CI base `40625512427`: `validate` passou (Expo Doctor 17/17, gate anti-regressão e `npm run validate`); `android-build` estava em montagem do APK quando a verificação foi consultada. Esse resultado não valida o novo commit desta auditoria.
+- HEAD antes desta correção: `b21b574dbac25b8b417eb2540716e0c2503eb6eb`.
+- CI `40807259011` confirmou `validate` e `android-build` verdes nesse SHA anterior, incluindo Expo Doctor, gate anti-regressão, suíte completa e APK standalone. Esta nova correção altera o código e exige uma CI própria no SHA resultante.
 - Após qualquer alteração, reconsultar o HEAD e a CI correspondentes. Só considerar a PR validada com `validate` e `android-build` verdes no mesmo SHA, diff reconciliado contra `main` e validação física separada.
 - A auditoria atual encontrou divergências de documentação e um débito relevante de modernização do SDK. Não houve upgrade de SDK nem remoção de dependências nativas nesta rodada: fazê-los antes de preservar um baseline físico poderia introduzir regressão no Bluetooth Classic.
 - Testes com Galaxy A06/Android 16/ELM327 real, confirmação de resposta `010C`, inspeção do APK instalado e validação GPS/autonomia continuam pendentes.
-- DB-145 registra a regressão de leitura KWP e classificação de estado ECU/Bluetooth na frente única PR #96. Consultar HEAD e CI correspondentes ao mesmo SHA antes de qualquer integração; uma CI anterior não valida alterações posteriores.
+- DB-145 registra a regressão de leitura KWP e classificação de estado ECU/Bluetooth na frente única PR #96; DB-162 trata os bloqueios de timeout das sondas nativas do transporte. Consultar HEAD e CI correspondentes ao mesmo SHA antes de qualquer integração; a CI anterior não valida esta correção.
 - O cockpit deve continuar mostrando N/D até existir leitura OBD real, completa e recente; seed ou histórico não deve ser reapresentado como valor atual.
 - DB-146 restaura os quatro quadrantes de telemetria em simultâneo; os PIDs adicionais continuam acessíveis em páginas de quatro métricas. A ausência de ECU não remove a grade, apenas mantém os valores em N/D.
 - DB-147 fixa os quatro PIDs principais na primeira página e transforma os restantes PIDs suportados em carrossel completo, com setas anterior/próxima e avanço automático a cada 10 s. Anomalias adicionais são priorizadas sem deslocar os quadrantes principais.
@@ -250,6 +250,7 @@
 - **DB-159** · 2026-10-28 — Atualizar teste do hub após separar armazenamento e viagens
 - **DB-160** · 2026-10-28 — Centralizar hipóteses da IA na tela Saúde
 - **DB-161** · 2026-10-28 — Corrigir rótulo obsoleto do atalho de armazenamento em Viagens
+- **DB-162** · 2026-10-29 — Limitar sondas nativas Bluetooth e falhar fechado em estado indeterminado
 
 ---
 
@@ -4429,3 +4430,28 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Depois de centralizar a lista de percursos em `/viagens` e restringir `/armazenamento` a quota/arquivos/exportação, o link em Viagens ainda dizia “ABRIR HISTÓRICO E EXPORTAÇÃO”. O rótulo estava desatualizado e contradizia a nova divisão de responsabilidades.
 - Alterado para “ABRIR ARMAZENAMENTO E EXPORTAÇÃO”, alinhado ao título da tela de destino e ao grupo da central Mais. Adicionada asserção para evitar a regressão do texto antigo.
 - A navegação e os dados persistidos não foram alterados; CI do novo SHA e build APK permanecem obrigatórios.
+
+
+## DB-162 · 2026-10-29 — Limitar sondas nativas Bluetooth e falhar fechado em estado indeterminado
+
+### Problema confirmado
+- Em `src/obd/bluetoothClassicTransport.ts`, `write()` e `readUntilPrompt()` aguardavam `device.isConnected()` sem prazo. Uma Promise nativa que não concluísse podia impedir que o timeout do comando/RX encerrasse a operação.
+- Os dois caminhos também capturavam exceções nativas e ignoravam todas, exceto a mensagem exata `BLUETOOTH DESCONECTADO`; após uma falha de estado desconhecido, o código podia continuar como se o socket estivesse disponível.
+- O fechamento direto aguardava a Promise de desconexão sem limite. A recuperação inesperada tinha um limite externo, mas o fechamento explícito/inicialização falha ainda podia ficar aguardando indefinidamente.
+
+### Correções aplicadas nesta branch
+- Criado `runWithTimeout()` em `src/obd/connectionRecovery.ts`. O helper propaga falhas e limita a espera sem alegar que consegue cancelar uma chamada nativa já iniciada.
+- Centralizada a verificação em `assertDeviceConnected()`: timeout ou exceção é registrado como `DEVICE_CONNECTED_CHECK_FAILED` e tratado como estado indeterminado; a escrita TX não é iniciada se a verificação não for concluída com sucesso.
+- `readUntilPrompt()` usa apenas o orçamento restante da própria leitura para verificar o estado, impedindo que a sonda nativa prolongue indefinidamente o timeout OBD.
+- `close()` agora limita a espera pela limpeza nativa. Se o socket não tiver sido confirmado como liberado, retorna erro e preserva o bloqueio compartilhado, impedindo a abertura concorrente de outro RFCOMM para o mesmo adaptador.
+- Ampliados `tests/connectionRecovery.test.js` (operação concluída, rejeitada e travada) e `tests/bluetoothLifecycle.test.js` (integração, estado fail-closed e bloqueio após cleanup pendente). Adicionado OBD-04 a `docs/TEST_PLAN.md`, reforçado RG-03 e registrado o comportamento no CHANGELOG.
+
+### Validação e limites
+- A CI verde `40807259011` pertence ao SHA anterior `b21b574dbac25b8b417eb2540716e0c2503eb6eb`; não é evidência de aprovação destas mudanças. A CI do SHA que contém DB-162 deve passar por `validate` e `android-build`.
+- Não há execução local do Android nem hardware conectado nesta sessão. O ensaio Galaxy A06/SM-A065M, Android 16, adaptador ELM327 real e ECU continua pendente; testes de helper/CI não provam comunicação serial física.
+- Nenhuma alteração foi feita em `main` e não houve merge. Não integrar enquanto a CI do SHA final não estiver verde e enquanto o teste físico da cadeia Bluetooth → ELM327 → ECU não for executado.
+
+### Próximos passos
+1. Verificar a CI do SHA final desta branch e corrigir qualquer falha sem relaxar contratos nem testes.
+2. No Galaxy A06, observar TX/RX com timestamp e confirmar `ATZ`, resposta ao `ATDP` e ao `010C`; diferenciar erro de verificação do socket, timeout sem prompt ELM e falta de resposta da ECU.
+3. Repetir desconexão/reconexão e o fechamento manual para demonstrar que nenhum socket simultâneo abre enquanto a limpeza nativa permanece pendente.

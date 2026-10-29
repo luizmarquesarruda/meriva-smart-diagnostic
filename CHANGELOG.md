@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Bluetooth Classic — limites de espera nativa
+- A verificação nativa `isConnected()` agora tem timeout finito em escrita e leitura; exceções/timeout não são ignorados e impedem TX quando o estado do socket é desconhecido.
+- O timeout de leitura limita a sonda nativa ao orçamento restante, e o fechamento do socket retorna após espera limitada sem liberar o bloqueio RFCOMM enquanto a limpeza nativa continua pendente.
+- Adicionados testes para operação nativa concluída, rejeitada e travada; incluída proteção de ciclo de vida e caso OBD-04 no plano de aceitação.
+- CI do novo SHA e ensaio físico no Galaxy A06/Android 16 + ELM327/ECU são necessários antes de integrar/distribuir.
+
+
 ### Auditoria crítica do cockpit e das telas secundárias
 - Removidos contadores repetidos na Central de Saúde; a conexão Bluetooth/ECU agora é exibida a partir do estado ao vivo compartilhado.
 - Encurtado o estado de conexão no cabeçalho do cockpit, evitando repetir a mesma frase completa no cartão da sessão.
