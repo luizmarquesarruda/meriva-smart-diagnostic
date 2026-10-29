@@ -4025,6 +4025,6 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Atualizados testes de regressão, teste do catálogo de conhecimento, gate anti-regressão, contrato, plano de teste e changelog. O teste verifica que uma observação REAL_OBD fecha apenas a célula do contexto observado; as outras condições continuam lacunas.
 
 ### Validação e limites
-- A validação do SHA base passou; esta revisão requer CI própria em novo SHA para TypeScript, suítes e APK. Não declarar build Android concluído sem o resultado dessa execução.
+- A CI `40813157680` (`2f83780b7ecc246b7d81ee56fb5a8e48e9d9c696`) passou pelo gate e pelo TypeScript, mas parou em `tests/knowledgeJson.test.js`: o teste consultava `polling.cockpit` quando o contrato correto está em `pollingPolicy.cockpit`. Corrijo a referência no teste, sem alterar o catálogo ou enfraquecer o gate; a nova CI deve validar o SHA seguinte. O build Android dessa execução foi pulado devido à falha no job validate.
 - Não foram importados valores CarScanner de outras condições porque esta base não contém medições numéricas verificáveis para elas. O preenchimento ocorrerá conforme dados reais válidos sejam coletados; uma exportação CSV adicional pode ampliar o seed se for importada e classificada explicitamente como histórico, não como REAL_OBD atual.
 - Nenhum merge foi executado. A validação física de Bluetooth/ECU no Galaxy A06 e inspeção visual do app continuam requisitos separados.

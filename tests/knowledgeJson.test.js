@@ -125,7 +125,7 @@ function main() {
   for (const id of carScannerReferencePids) {
     assert.ok(pidIds.has(id), 'PID de referência CarScanner ausente do catálogo: ' + id);
     assert.ok(scheduledPids.has(id), 'IA não poderá aprender um PID de referência sem aquisição agendada: ' + id);
-    assert.ok(polling.cockpit.pidOrder.includes(id), 'PID de referência CarScanner ausente do cockpit: ' + id);
+    assert.ok(pollingPolicy.cockpit.pidOrder.includes(id), 'PID de referência CarScanner ausente do cockpit: ' + id);
   }
   assert.ok(polling.rotatingTelemetryPids.includes('010E'),
     'avanço de ignição deve ser adquirido quando a bitmap atual anunciar 010E');
