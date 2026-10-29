@@ -242,6 +242,7 @@
 - **DB-151** · 2026-10-28 — Remoção do setter órfão após consolidar o Laboratório
 - **DB-152** · 2026-10-28 — Unificar marca visual entre cockpit e tela Viagens
 - **DB-153** · 2026-10-28 — Corrigir contrato de altura da tipografia do cockpit em paisagem
+- **DB-154** · 2026-10-28 — Mover teste de integridade de viagens para a tela canônica
 
 ---
 
@@ -4361,3 +4362,10 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - A CI voltou a falhar em `tests/orientationLayout.test.js`: a asserção exigia `lineHeight:23` para o valor dos quadrantes, mas o estilo de paisagem vigente usa `fontSize:21,lineHeight:22`.
 - A inspeção do estilo e do JSX confirmou que a divergência era apenas do teste. Atualizada a expectativa para 22 dp, preservando a tipografia compacta que reduz a altura ocupada.
 - A CI precisa ser reavaliada no novo SHA, pois ainda pode revelar outras expectativas obsoletas. APK build e validação visual no Galaxy A06 continuam pendentes até a CI passar.
+
+
+## DB-154 · 2026-10-28 — Mover teste de integridade de viagens para a tela canônica
+
+- A regressão `histórico sem seed e consumo N/D` ainda testava os filtros de origem/combustível em `app/armazenamento.tsx`, local da lista redundante removida.
+- A proteção foi realocada para `app/viagens.tsx`, que agora é a tela canônica de histórico. O teste verifica a filtragem de `REAL_OBD`, os limites de validade de combustível e a apresentação `CONSUMO N/D`; também verifica que Armazenamento não volte a renderizar a lista duplicada.
+- A alteração preserva a verificação de integridade de dados, muda apenas o arquivo alvo conforme a arquitetura atual. CI do SHA seguinte continua obrigatória.

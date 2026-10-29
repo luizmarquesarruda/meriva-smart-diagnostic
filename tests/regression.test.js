@@ -1393,12 +1393,14 @@ function testPidResponseIsNotVehicleValidation() {
     'a cadência deve ser independente por PID');
 }
 
-function testStorageScreenDoesNotPromoteSeedOrInvalidFuel() {
+function testTripHistoryDoesNotPromoteSeedOrInvalidFuel() {
+  const tripScreen = fs.readFileSync(path.join(ROOT, 'app/viagens.tsx'), 'utf8');
   const storageScreen = fs.readFileSync(path.join(ROOT, 'app/armazenamento.tsx'), 'utf8');
-  assert.ok(storageScreen.includes("filter((cycle) => cycle.source === 'REAL_OBD')"), 'tela de histórico não deve apresentar viagens seed do Car Scanner como viagens do app');
-  assert.ok(storageScreen.includes("cycle.fuelDataValid !== false"), 'consumo precisa respeitar o indicador de confiabilidade');
-  assert.ok(storageScreen.includes("cycle.fuelUsedL >= 0.05"), 'consumo deve exigir volume de combustível válido');
-  assert.ok(storageScreen.includes("'Consumo: N/D'"), 'consumo inválido deve ser apresentado como N/D, nunca 0,00 km/L');
+  assert.ok(/filter\\(cycle => cycle\\.source === 'REAL_OBD'\\)/.test(tripScreen), 'tela canônica de viagens não deve apresentar viagens seed do Car Scanner como trajetos reais');
+  assert.ok(tripScreen.includes('cycle.fuelDataValid !== false'), 'consumo precisa respeitar o indicador de confiabilidade');
+  assert.ok(tripScreen.includes('cycle.fuelUsedL >= 0.05'), 'consumo deve exigir volume de combustível válido');
+  assert.ok(tripScreen.includes("'CONSUMO N/D'"), 'consumo inválido deve ser apresentado como N/D, nunca 0,00 km/L');
+  assert.ok(!storageScreen.includes('VIAGENS SALVAS'), 'armazenamento não deve renderizar uma segunda lista de viagens');
 }
 
 
@@ -1465,7 +1467,7 @@ async function main() {
     ['PID + DNA serializados', testPidAndLearningWriteSerialization],
     ['contratos de aquisição e persistência', testAcquisitionPolicyConsistency],
     ['PID respondeu não significa sensor validado', testPidResponseIsNotVehicleValidation],
-    ['histórico sem seed e consumo N/D', testStorageScreenDoesNotPromoteSeedOrInvalidFuel],
+    ['histórico sem seed e consumo N/D', testTripHistoryDoesNotPromoteSeedOrInvalidFuel],
 
     ['autosave race', testAutosaveRace],
   ];
