@@ -10,6 +10,7 @@
 - Corrigido o masthead da tela Viagens para usar a mesma marca `SMART OBD DIAGNOSTIC` da página inicial, removendo a divergência `MERIVA SMART DIAGNOSTIC`.
 - Configurações deixou de repetir motor, tanque e reserva da tela Veículo; apresenta agora um atalho para o perfil canônico.
 - Removida a segunda apresentação da IA local no Laboratório; a Central de Saúde passa a concentrar hipóteses/evidências e o Laboratório encaminha para ela mantendo consulta, descoberta e DTCs.
+- Atualizado o atalho da tela Viagens para “ARMAZENAMENTO E EXPORTAÇÃO”, sem o rótulo antigo que sugeria lista de trajetos duplicada.
 - Corrigidos o fechamento duplicado de contêiner na tela Armazenamento, estilos órfãos do painel removido e testes de layout frágeis.
 - Em paisagem, aumentada a tipografia dos rótulos/dicas dos quadrantes e métricas auxiliares para evitar o uso de textos de 6 dp quase ilegíveis, preservando a grade 2×2 compacta.
 

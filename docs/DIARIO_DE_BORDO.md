@@ -249,6 +249,7 @@
 - **DB-158** · 2026-10-28 — Melhorar legibilidade da tipografia em paisagem
 - **DB-159** · 2026-10-28 — Atualizar teste do hub após separar armazenamento e viagens
 - **DB-160** · 2026-10-28 — Centralizar hipóteses da IA na tela Saúde
+- **DB-161** · 2026-10-28 — Corrigir rótulo obsoleto do atalho de armazenamento em Viagens
 
 ---
 
@@ -4421,3 +4422,10 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Mantidos no Laboratório os fluxos de consulta manual de PID, descoberta, varredura completa de DTC, validação de fórmulas, TX/RX e contexto operacional em detalhes técnicos. Não foi removido código de aquisição nem de persistência OBD.
 - Removidos os estilos órfãos ligados ao painel eliminado. Adicionada regressão para impedir retorno do motor/painel duplicado no Laboratório e confirmar que a Central de Saúde permanece como tela canônica.
 - Validação ainda depende da nova CI e do build APK no SHA resultante; teste visual real do layout no Galaxy A06 continua pendente.
+
+
+## DB-161 · 2026-10-28 — Corrigir rótulo obsoleto do atalho de armazenamento em Viagens
+
+- Depois de centralizar a lista de percursos em `/viagens` e restringir `/armazenamento` a quota/arquivos/exportação, o link em Viagens ainda dizia “ABRIR HISTÓRICO E EXPORTAÇÃO”. O rótulo estava desatualizado e contradizia a nova divisão de responsabilidades.
+- Alterado para “ABRIR ARMAZENAMENTO E EXPORTAÇÃO”, alinhado ao título da tela de destino e ao grupo da central Mais. Adicionada asserção para evitar a regressão do texto antigo.
+- A navegação e os dados persistidos não foram alterados; CI do novo SHA e build APK permanecem obrigatórios.
