@@ -4,12 +4,12 @@
 
 - Repositório: [luizmarquesarruda/meriva-smart-diagnostic](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
 - PR #96: [Evita DTC duplicado no cockpit e mostra pressão do coletor](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/96), aberta, fora de rascunho e sem merge. Base `main` observada nesta PR: `7eec3afecb3718020724baf053f8b6d2ca636fab`.
-- HEAD consultado: `5666ca6a740d2ced768c3aa9acd894f0b0b5b914`; CI deste SHA na fila/em execução. A CI do SHA `182f09fbe7b3272763fa859db2bad8bd9bc7513a` falhou no gate por asserção GPS obsoleta, já corrigida no commit `03d92e5340b9fa4b2f98d3509d7b162768cc900b`. O HEAD atual precisa validar DB-171/172/173; DB-174 exige nova CI.
+- HEAD consultado: `ece379174636289d84825b11da30759c685a36a1`; CI deste SHA estava pendente. As alterações DB-171/172/173/174/175 precisam ser validadas no HEAD final.
 - A CI `40869798013` executou no SHA `182f09fbe7b3272763fa859db2bad8bd9bc7513a` e falhou no `gate:baseline` pelo contrato GPS obsoleto; `android-build` foi ignorado. O commit `03d92e5340b9fa4b2f98d3509d7b162768cc900b` atualizou o gate; a execução posterior ainda não confirmou `validate` e `android-build` verdes no mesmo SHA.
 - Após qualquer alteração, reconsultar o HEAD e a CI correspondentes. Só considerar a PR validada com `validate` e `android-build` verdes no mesmo SHA, diff reconciliado contra `main` e validação física separada.
 - A auditoria atual encontrou divergências de documentação e um débito relevante de modernização do SDK. Não houve upgrade de SDK nem remoção de dependências nativas nesta rodada: fazê-los antes de preservar um baseline físico poderia introduzir regressão no Bluetooth Classic.
 - Testes com Galaxy A06/Android 16/ELM327 real, confirmação de resposta `010C`, inspeção do APK instalado e validação GPS/autonomia continuam pendentes.
-- DB-145 registra a regressão de leitura KWP e classificação de estado ECU/Bluetooth; DB-162/163/164/166 protegem o ciclo RFCOMM; DB-165 limita HTTP de clima; DB-167 expira fixes GPS antigos; DB-168 neutraliza fórmula no CSV; DB-169 torna o start GPS não bloqueante para o polling OBD e aplica cooldown de retry. DB-170 atualiza o gate para aceitar a proteção de timestamp por `state.lastTimestamp`. DB-171 serializa cancelamento da descoberta; DB-172 valida coeficientes/resultados de fórmula; DB-173 corrige documentação cloud; DB-174 centraliza os tokens de cor compartilhados nas telas. DB-171 serializa cancelamento nativo da descoberta; DB-172 valida coeficientes/resultados das fórmulas; DB-173 corrige documentação obsoleta sobre sincronização cloud.
+- DB-145 registra a regressão de leitura KWP e classificação de estado ECU/Bluetooth; DB-162/163/164/166 protegem o ciclo RFCOMM; DB-165 limita HTTP de clima; DB-167 expira fixes GPS antigos; DB-168 neutraliza fórmula no CSV; DB-169 torna o start GPS não bloqueante para o polling OBD e aplica cooldown de retry. DB-170 atualiza o gate para aceitar a proteção de timestamp por `state.lastTimestamp`. DB-171 serializa cancelamento da descoberta; DB-172 valida coeficientes/resultados de fórmula; DB-173 corrige documentação cloud; DB-174 centraliza os tokens de cor compartilhados nas telas. DB-175 limita as chamadas de localização opcionais e usa backoff exponencial para o enriquecimento online. DB-171 serializa cancelamento nativo da descoberta; DB-172 valida coeficientes/resultados das fórmulas; DB-173 corrige documentação obsoleta sobre sincronização cloud.
 - O cockpit deve continuar mostrando N/D até existir leitura OBD real, completa e recente; seed ou histórico não deve ser reapresentado como valor atual.
 - DB-146 restaura os quatro quadrantes de telemetria em simultâneo; os PIDs adicionais continuam acessíveis em páginas de quatro métricas. A ausência de ECU não remove a grade, apenas mantém os valores em N/D.
 - DB-147 fixa os quatro PIDs principais na primeira página e transforma os restantes PIDs suportados em carrossel completo, com setas anterior/próxima e avanço automático a cada 10 s. Anomalias adicionais são priorizadas sem deslocar os quadrantes principais.
@@ -263,6 +263,7 @@
 - **DB-172** · 2026-10-29 — Rejeitar coeficientes e resultados de fórmula não finitos
 - **DB-173** · 2026-10-29 — Corrigir documentação obsoleta sobre sincronização em nuvem
 - **DB-174** · 2026-10-29 — Consumir tokens compartilhados para a paleta base das telas
+- **DB-175** · 2026-10-29 — Limitar localização para clima e aplicar backoff exponencial
 
 ---
 
@@ -4639,3 +4640,18 @@ As telas importavam `src/ui/theme.ts`, mas repetiam diretamente as cores base do
 ### Validação e limites
 - Mudança de referência de cores, sem alteração de fórmulas, navegação ou ciclo OBD; a CI precisa validar TypeScript, gate, suíte e build Android no novo SHA.
 - Não houve inspeção visual física em retrato/paisagem no Galaxy A06. O teste estático não substitui essa etapa.
+
+## DB-175 · 2026-10-29 — Limitar localização para clima e aplicar backoff exponencial
+
+### Causa
+A consulta de clima era limitada no `fetch()` HTTP, mas as chamadas Expo anteriores — permissão, posição e geocodificação reversa — não tinham prazo. Uma Promise nativa lenta podia deixar o atualizador opcional em `inFlight`. O retry de rede usava cooldown fixo, sem aumentar a espera após falhas consecutivas.
+
+### Alterações
+- `src/weather/currentConditions.ts`: timeout de 3 s para consultar permissão, 8 s para posição de baixa precisão, 4 s para geocodificação reversa e mantém HTTP/JSON limitado a 8 s. A falha retorna indisponibilidade de clima, não bloqueia o loop OBD e não fabrica posição.
+- `src/weather/conditionsRefresh.ts`: backoff exponencial por falha (60 s inicial padrão) com teto de 15 min; reconexão pode iniciar refresh imediato e sucesso zera a contagem.
+- `tests/onlineConditions.test.js` e `tests/weatherRefresh.test.js`: testes para timeout de operação que não responde e para o aumento/reinício do backoff.
+- `docs/AUDITORIA_REDE_MOVEL_E_LOCALIZACAO_2026-10-28.md`: documenta prazos, teto e escopo local do recurso.
+
+### Limites
+- Timeouts JavaScript limitam a espera do chamador; não garantem cancelamento de chamadas nativas Expo que não ofereçam cancelamento explícito. As operações expiram para o fluxo de enriquecimento sem criar coordenadas ou dados de clima.
+- Essa política é somente para clima/localidade; não implementa upload de telemetria, porque a branch não contém cliente/outbox cloud.

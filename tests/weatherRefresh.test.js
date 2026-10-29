@@ -19,6 +19,7 @@ loaded._compile(output, sourcePath);
 const {
   CURRENT_CONDITIONS_REFRESH_INTERVAL_MS,
   CURRENT_CONDITIONS_RETRY_COOLDOWN_MS,
+  CURRENT_CONDITIONS_MAX_RETRY_COOLDOWN_MS,
   isConditionsNetworkAvailable,
   mergeCurrentConditions,
   startCurrentConditionsRefresh,
@@ -46,6 +47,7 @@ function flushMicrotasks() {
 (async () => {
   assert.equal(CURRENT_CONDITIONS_REFRESH_INTERVAL_MS, 15 * 60 * 1000);
   assert.equal(CURRENT_CONDITIONS_RETRY_COOLDOWN_MS, 60 * 1000);
+  assert.equal(CURRENT_CONDITIONS_MAX_RETRY_COOLDOWN_MS, 15 * 60 * 1000);
 
   // Cellular data (4G/5G) and Wi-Fi use the same reachability contract.
   assert.equal(isConditionsNetworkAvailable({ isConnected: true, isInternetReachable: true }), true);
@@ -165,6 +167,51 @@ function flushMicrotasks() {
   await flushMicrotasks();
   assert.equal(offlineCalls, 1, 'a rede restabelecida deve iniciar a atualização');
   stopOffline();
+
+  // Consecutive optional weather failures use bounded exponential backoff.
+  let retryClock = 100;
+  let retryCalls = 0;
+  const retryListeners = new Set();
+  const stopRetry = startCurrentConditionsRefresh(
+    {
+      fetch: async () => ({ isConnected: true, isInternetReachable: true }),
+      addEventListener(listener) {
+        retryListeners.add(listener);
+        return () => retryListeners.delete(listener);
+      },
+    },
+    async () => {
+      retryCalls += 1;
+      return conditions({ temperatureC: null, available: false, description: 'CLIMA INDISPONÍVEL' });
+    },
+    () => {},
+    {
+      now: () => retryClock,
+      refreshIntervalMs: CURRENT_CONDITIONS_REFRESH_INTERVAL_MS,
+      retryCooldownMs: 1000,
+      setIntervalFn: () => 99,
+      clearIntervalFn: () => {},
+    },
+  );
+  await flushMicrotasks();
+  assert.equal(retryCalls, 1);
+  retryClock += 999;
+  for (const listener of retryListeners) listener({ isConnected: true, isInternetReachable: true });
+  await flushMicrotasks();
+  assert.equal(retryCalls, 1, 'first retry must respect the base cooldown');
+  retryClock += 1;
+  for (const listener of retryListeners) listener({ isConnected: true, isInternetReachable: true });
+  await flushMicrotasks();
+  assert.equal(retryCalls, 2, 'first retry must be allowed at the base cooldown');
+  retryClock += 1999;
+  for (const listener of retryListeners) listener({ isConnected: true, isInternetReachable: true });
+  await flushMicrotasks();
+  assert.equal(retryCalls, 2, 'second retry must observe doubled cooldown');
+  retryClock += 1;
+  for (const listener of retryListeners) listener({ isConnected: true, isInternetReachable: true });
+  await flushMicrotasks();
+  assert.equal(retryCalls, 3, 'second retry must be allowed after doubled cooldown');
+  stopRetry();
 
   console.log('weatherRefresh.test.js: PASS');
 })().catch((error) => {

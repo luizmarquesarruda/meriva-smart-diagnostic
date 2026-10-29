@@ -42,6 +42,15 @@ O que faltava era tornar visível o estado dos provedores nativos de localizaç�
 
 A alteração está na branch da PR #96. A CI deve executar novamente no SHA resultante: gate anti-regressão, TypeScript, suíte completa e build APK Android. Não considerar concluído até esses jobs passarem no mesmo SHA. A consulta a provedores deve ser inspecionada em um APK instalado no Galaxy A06/Android 16; a CI sozinha não comprova a disponibilidade real dos provedores do aparelho.
 
+## Timeout e backoff para enriquecimento online — revisão 2026-10-29
+
+- Consulta de permissão de localização para clima: timeout de 3 s.
+- Obtenção de posição de baixa precisão para clima: timeout de 8 s.
+- Geocodificação reversa: timeout auxiliar de 4 s.
+- HTTP/JSON do clima: timeout de 8 s com tentativa de abort via `AbortController`.
+- Falhas consecutivas do recurso opcional usam backoff exponencial a partir do cooldown configurado, limitado a 15 min; a reconexão de rede pode disparar uma tentativa imediata. Sucesso reinicia o contador.
+- Isso cobre somente a camada opcional clima/localidade. Não há sincronizador de telemetria cloud nesta branch; nenhum dado OBD/GPS de viagem é enviado por essa política.
+
 ## Estado real de telemetria em nuvem — revisão 2026-10-29
 
 A árvore atual da branch não contém cliente de upload/sincronização de telemetria nem fila outbox persistente. Os nomes Bubble citados em versões anteriores de `docs/ARCHITECTURE.md` e `docs/BUBBLE_WORKFLOW_PORT.md` não apontam para arquivos existentes nesta branch. O cliente implementado de rede é usado para status NetInfo e consulta opcional de clima.

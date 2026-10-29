@@ -42,7 +42,7 @@ mod._compile(output, sourcePath);
 Module._load = originalLoad;
 
 (async () => {
-  const { CURRENT_CONDITIONS_HTTP_TIMEOUT_MS, describeWeatherCode, fetchWeatherPayload, loadCurrentConditions } = mod.exports;
+  const { CURRENT_CONDITIONS_HTTP_TIMEOUT_MS, CURRENT_CONDITIONS_PERMISSION_TIMEOUT_MS, CURRENT_CONDITIONS_POSITION_TIMEOUT_MS, CURRENT_CONDITIONS_GEOCODE_TIMEOUT_MS, awaitCurrentConditionsOperation, describeWeatherCode, fetchWeatherPayload, loadCurrentConditions } = mod.exports;
   assert.strictEqual(describeWeatherCode(0), 'CÉU LIMPO');
   assert.strictEqual(describeWeatherCode(61), 'CHUVA');
   assert.strictEqual(describeWeatherCode(95), 'TEMPESTADE');
@@ -86,6 +86,14 @@ Module._load = originalLoad;
   assert.ok(districtOnly.locationLabels.includes('BAIRRO: Júlio de Mesquita Filho'), 'bairro pode aparecer explicitamente quando a cidade não está disponível');
 
   assert.strictEqual(CURRENT_CONDITIONS_HTTP_TIMEOUT_MS, 8000);
+  assert.strictEqual(CURRENT_CONDITIONS_PERMISSION_TIMEOUT_MS, 3000);
+  assert.strictEqual(CURRENT_CONDITIONS_POSITION_TIMEOUT_MS, 8000);
+  assert.strictEqual(CURRENT_CONDITIONS_GEOCODE_TIMEOUT_MS, 4000);
+  await assert.rejects(
+    () => awaitCurrentConditionsOperation(() => new Promise(() => {}), 15, 'LOCATION_TIMEOUT_TEST'),
+    /LOCATION_TIMEOUT_TEST/,
+    'optional native location operations must not hold the refresh lifecycle forever',
+  );
   let abortObserved = false;
   const originalFetchForTimeout = global.fetch;
   global.fetch = async (_url, options) => new Promise(() => {
