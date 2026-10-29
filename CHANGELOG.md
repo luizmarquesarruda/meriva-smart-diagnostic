@@ -10,6 +10,8 @@
 
 
 ### P0 — integridade de telemetria, autonomia e diagnóstico Bluetooth
+- A primeira sonda ECU real (`010C`) agora recebe explicitamente a janela `protocolSelectionTimeoutMs` dentro da fila serial, evitando que o timeout adaptativo reduzido durante AT initialization encerre cedo demais a primeira prova da ECU.
+- O retry padrão foi alinhado ao catálogo: três tentativas por candidato, intervalo de 1500 ms. `maxConnectionAttempts=0` significa usar a política finita do catálogo; overrides explícitos continuam válidos.
 - Séries de PID passam a manter ordem cronológica; leituras fora de ordem não substituem a amostra mais recente e tendências ao vivo expiram após 10 s.
 - Adicionado buffer circular de até dez leituras reais válidas do PID 012F, isolado por sessão ECU e sem dados sintéticos. Após o dado ao vivo expirar, um fallback só aparece como `AUTONOMIA • BUFFER` após dez amostras e até 60 s desde a última leitura; fora disso, N/D.
 - O snapshot do buffer expira cada amostra após 60 s e usa mediana em vez de média para reduzir distorção por leituras isoladas; se restarem menos de dez amostras válidas, o fallback permanece indisponível. Timestamps de relógio inválido são rejeitados.
