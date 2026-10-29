@@ -50,7 +50,7 @@ export const DEFAULT_ELM327_COMPATIBILITY: Elm327CompatibilityConfig = {
   ioTimeoutMs: 15_000,
   bluetoothConnectTimeoutMs: 5_000,
   commandDelayMs: 20,
-  maxConnectionAttempts: 20,
+  maxConnectionAttempts: 0,
   noDataReconnectThreshold: 4,
   recoveryBackoffMs: [2000, 5000, 15000],
   partialResponseAction: 'RECONNECT_AND_INITIALIZE',
