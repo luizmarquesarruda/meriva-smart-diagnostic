@@ -161,10 +161,13 @@ assert.ok(app.expo.plugins.includes('./plugins/withBluetoothLegacyPermissionLimi
 
 // The ELM protocol must serialize all commands through the shared session queue.
 assert.match(elm, /private commandQueue:\s*Promise<void>\s*=\s*Promise\.resolve\(\)/);
-assert.match(elm, /return this\.enqueueCommand\(\(\) => this\.command\(normalized\)\)/);
+assert.match(elm, /return this\.enqueueCommand\(\(\) => this\.command\(normalized, 1, timeoutOverrideMs\)\)/, 'timeout explícito precisa manter fila serial ELM');
 assert.match(elm, /return previous\.then\(operation\)\.finally\(\(\) => release\(\)\)/);
 assert.match(sharedObd, /let active: SharedObdConnection \| null = null/);
 assert.match(sharedObd, /let connecting: Promise<SharedObdConnection> \| null = null/);
+assert.match(read('src/obd/bluetoothManager.ts'), /session\.executeCommand\('010C', config\.protocolSelectionTimeoutMs\)/, 'sonda ECU inicial usa timeout de protocolo explícito');
+assert.equal(readJson('src/knowledge/bluetooth_config.json').retry.maxAttempts, 3, 'conexão Bluetooth deve respeitar limite finito padrão de três tentativas');
+assert.equal(readJson('src/knowledge/bluetooth_config.json').retry.intervalMs, 1500, 'retry Bluetooth não deve atrasar oito segundos entre tentativas');
 assert.ok(!read('app/_layout.tsx').includes('connectPreferredElm'), 'layout não pode criar uma segunda conexão automática');
 
 // Local diagnosis stays separate from optional network enrichment.
