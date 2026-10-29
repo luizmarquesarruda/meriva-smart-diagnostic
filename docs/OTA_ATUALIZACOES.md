@@ -24,7 +24,7 @@ Com essa chave habilitada, a workflow só tenta publicar em push para `main`, de
 
 ## Primeiro APK obrigatório
 
-O APK instalado antes desta alteração não contém o módulo nativo `expo-updates` e não pode ganhar esse módulo por OTA. Depois de integrar esta configuração, gere e instale uma nova APK via CI. Só então habilite `EAS_UPDATE_ENABLED=true). Essa primeira reinstalação é necessária; alterações futuras apenas JS/TS/assets poderão chegar via OTA.
+O APK instalado antes desta alteração não contém o módulo nativo `expo-updates` e não pode ganhar esse módulo por OTA. Depois de integrar esta configuração, gere e instale uma nova APK via CI. Só então habilite `EAS_UPDATE_ENABLED=true`. Essa primeira reinstalação é necessária; alterações futuras apenas JS/TS/assets poderão chegar via OTA.
 
 ## Limitações que permanecem
 
