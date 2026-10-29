@@ -144,3 +144,10 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 - Todos os 12 PIDs de referência devem existir no catálogo e ser programados para aquisição ou caminho prioritário. O PID 010E (avanço de ignição) precisa estar na rotação e no cockpit, mas só pode ser consultado quando a bitmap da ECU anuncia suporte.
 - Confirmar que a tela de Aprendizado recalcula a cobertura a partir de dna_meriva.json e distingue quantidade global de leituras de contextos realmente cobertos.
 - Fonte: https://www.carscanner.info/records/ descreve que a gravação contém os dados exibidos e parâmetros relacionados; https://www.carscanner.info/compatibility/ informa que a lista de parâmetros suportados é reportada pela própria ECU. Esses limites impedem preencher lacunas com números supostos.
+
+
+## Autonomy buffer regression — DB-134
+- Feed ten valid PID 012F readings with one sample older than 60 seconds while the newest is current; the snapshot must expose only nine valid samples.
+- Include one isolated level spike among nine equal readings; the median must remain at the majority value.
+- Confirm the autonomy fallback remains unavailable unless ten readings are individually fresh (age <= 60 seconds) and the last reading is not in the future.
+- Confirm an invalid clock (NaN, non-finite or non-positive) is rejected during recording.
