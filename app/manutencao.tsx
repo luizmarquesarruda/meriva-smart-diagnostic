@@ -363,7 +363,7 @@ const styles = StyleSheet.create({
   inlineInput: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   input: { flex: 1, minWidth: 0, minHeight: 46, borderRadius: 10, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surfaceInset, color: COLORS.textStrong, paddingHorizontal: 11, paddingVertical: 8, fontSize: 13 },
   primaryButton: { minHeight: 46, minWidth: 112, borderRadius: 10, paddingHorizontal: 13, paddingVertical: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.primary },
-  primaryButtonText: { color: '#fff', fontSize: 10, fontWeight: '900', letterSpacing: 0.4, textAlign: 'center' },
+  primaryButtonText: { color: COLORS.white, fontSize: 10, fontWeight: '900', letterSpacing: 0.4, textAlign: 'center' },
   secondaryButton: { flex: 1, minHeight: 46, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surfaceInset, alignItems: 'center', justifyContent: 'center' },
   secondaryButtonText: { color: COLORS.accent, fontSize: 10, fontWeight: '900', textAlign: 'center' },
   disabled: { opacity: 0.5 },
