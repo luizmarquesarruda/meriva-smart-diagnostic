@@ -64,14 +64,14 @@ class FakeElmTransport {
   async open() {}
   async close() {}
   async write(data) {
-    this.currentCommand = data.replace(/\\r$/, '');
+    this.currentCommand = data.slice(0, -1);
   }
   async readUntilPrompt(timeoutMs) {
     this.calls.push({ command: this.currentCommand, timeoutMs });
-    if (this.currentCommand === 'ATZ') return 'ELM327 v1.5\\r>';
-    if (this.currentCommand === 'ATDP') return 'AUTO\\r>';
-    if (this.currentCommand === '010C') return '41 0C 1A F8\\r>';
-    return 'OK\\r>';
+    if (this.currentCommand === 'ATZ') return 'ELM327 v1.5>';
+    if (this.currentCommand === 'ATDP') return 'AUTO>';
+    if (this.currentCommand === '010C') return '41 0C 1A F8>';
+    return 'OK>';
   }
 }
 
