@@ -243,6 +243,7 @@
 - **DB-152** · 2026-10-28 — Unificar marca visual entre cockpit e tela Viagens
 - **DB-153** · 2026-10-28 — Corrigir contrato de altura da tipografia do cockpit em paisagem
 - **DB-154** · 2026-10-28 — Mover teste de integridade de viagens para a tela canônica
+- **DB-155** · 2026-10-28 — Diferenciar armazenamento de histórico de viagens
 
 ---
 
@@ -4369,3 +4370,11 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - A regressão `histórico sem seed e consumo N/D` ainda testava os filtros de origem/combustível em `app/armazenamento.tsx`, local da lista redundante removida.
 - A proteção foi realocada para `app/viagens.tsx`, que agora é a tela canônica de histórico. O teste verifica a filtragem de `REAL_OBD`, os limites de validade de combustível e a apresentação `CONSUMO N/D`; também verifica que Armazenamento não volte a renderizar a lista duplicada.
 - A alteração preserva a verificação de integridade de dados, muda apenas o arquivo alvo conforme a arquitetura atual. CI do SHA seguinte continua obrigatória.
+
+
+## DB-155 · 2026-10-28 — Diferenciar armazenamento de histórico de viagens
+
+- O teste de integridade foi transferido para `app/viagens.tsx`, a tela canônica, mas a primeira formulação da expressão regular ficou escapada em excesso e não correspondia ao código-fonte. Corrigida para testar a expressão `filter(cycle => cycle.source === 'REAL_OBD')` de forma realista.
+- Após remover a lista duplicada, a tela Armazenamento ainda se intitulava “HISTÓRICO E DADOS” e a categoria Mais a chamava “HISTÓRICO E RELATÓRIOS”, embora a lista detalhada de viagens esteja em Viagens. Renomeados o título, subtítulo, grupo e atalho para “ARMAZENAMENTO E EXPORTAÇÃO” / “ARQUIVOS E EXPORTAÇÃO”.
+- A tela de Armazenamento fica dedicada a espaço local, fila CSV, limpeza e formatos exportados; a tela Viagens continua como local único da lista, detalhes e análise por percurso.
+- Não houve alteração dos formatos nem dos dados persistidos. A CI do SHA novo ainda deve comprovar os testes e o build Android.

@@ -98,8 +98,8 @@ export default function ArmazenamentoScreen() {
     <SafeAreaView style={{flex:1,backgroundColor:COLORS.screen}} edges={["top","bottom","left","right"]}>
     <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
       <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
-      <Text style={styles.title}>HISTÓRICO E DADOS</Text>
-      <Text style={styles.subtitle}>O app salva as viagens e leituras automaticamente. Esta tela acompanha o espaço local, o histórico e as exportações.</Text>
+      <Text style={styles.title}>ARMAZENAMENTO E EXPORTAÇÃO</Text>
+      <Text style={styles.subtitle}>Arquivos locais, fila de registros, espaço usado e exportações. Para ver trajetos, métricas e detalhes, abra Viagens.</Text>
       <SourceStatusLegend compact />
       <Text style={[styles.status, quota?.critical ? styles.critical : quota?.warning ? styles.warning : styles.ok]}>
         {quota?.message || 'VERIFICANDO'}

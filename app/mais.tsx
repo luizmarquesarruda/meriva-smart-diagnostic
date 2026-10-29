@@ -21,8 +21,8 @@ const groups = [
     ['data', 'DADOS EM TEMPO REAL', 'PIDs, séries temporais e estado da ECU', '/dados'],
     ['learning', 'APRENDIZADO', 'Amostras reais, referência e confiança', '/aprendizado'],
   ] },
-  { title: 'HISTÓRICO E RELATÓRIOS', icon: 'history', hint: 'Registros locais, espaço usado e exportações.', items: [
-    ['history', 'HISTÓRICO E ARQUIVOS', 'Autosave, diário, JSON e CSV', '/armazenamento'],
+  { title: 'ARQUIVOS E EXPORTAÇÃO', icon: 'history', hint: 'Espaço usado, fila CSV e arquivos exportados.', items: [
+    ['history', 'ARMAZENAMENTO E EXPORTAÇÃO', 'Uso local, limpeza, JSON e CSV', '/armazenamento'],
   ] },
   { title: 'SISTEMA E PREFERÊNCIAS', icon: 'settings', hint: 'Recursos complementares e configuração local.', items: [
     ['connectivity', 'CONECTIVIDADE 4G/5G', 'Rede disponível; diagnóstico segue offline', '/conectividade'],

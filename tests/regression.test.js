@@ -1396,7 +1396,7 @@ function testPidResponseIsNotVehicleValidation() {
 function testTripHistoryDoesNotPromoteSeedOrInvalidFuel() {
   const tripScreen = fs.readFileSync(path.join(ROOT, 'app/viagens.tsx'), 'utf8');
   const storageScreen = fs.readFileSync(path.join(ROOT, 'app/armazenamento.tsx'), 'utf8');
-  assert.ok(/filter\\(cycle => cycle\\.source === 'REAL_OBD'\\)/.test(tripScreen), 'tela canônica de viagens não deve apresentar viagens seed do Car Scanner como trajetos reais');
+  assert.ok(/filter\(cycle => cycle\.source === 'REAL_OBD'\)/.test(tripScreen), 'tela canônica de viagens não deve apresentar viagens seed do Car Scanner como trajetos reais');
   assert.ok(tripScreen.includes('cycle.fuelDataValid !== false'), 'consumo precisa respeitar o indicador de confiabilidade');
   assert.ok(tripScreen.includes('cycle.fuelUsedL >= 0.05'), 'consumo deve exigir volume de combustível válido');
   assert.ok(tripScreen.includes("'CONSUMO N/D'"), 'consumo inválido deve ser apresentado como N/D, nunca 0,00 km/L');

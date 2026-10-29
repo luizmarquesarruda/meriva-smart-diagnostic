@@ -6,7 +6,7 @@
 - Removidos contadores repetidos na Central de Saúde; a conexão Bluetooth/ECU agora é exibida a partir do estado ao vivo compartilhado.
 - Encurtado o estado de conexão no cabeçalho do cockpit, evitando repetir a mesma frase completa no cartão da sessão.
 - Retirado do Laboratório o resumo de viagem redundante e a reserva de 132 dp para uma barra fixa que não existia nessa tela.
-- A página Armazenamento aponta para o relatório canônico de viagens em vez de renderizar uma segunda lista de trajetos.
+- A página Armazenamento aponta para o relatório canônico de viagens em vez de renderizar uma segunda lista de trajetos; título e categoria Mais agora a identificam como armazenamento/exportação, separada do histórico de viagens.
 - Corrigido o masthead da tela Viagens para usar a mesma marca `SMART OBD DIAGNOSTIC` da página inicial, removendo a divergência `MERIVA SMART DIAGNOSTIC`.
 - Corrigidos o fechamento duplicado de contêiner na tela Armazenamento, estilos órfãos do painel removido e testes de layout frágeis.
 
