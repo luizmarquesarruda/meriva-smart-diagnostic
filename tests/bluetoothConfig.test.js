@@ -34,6 +34,7 @@ assert(manager.includes("session.executeCommand('010C', config.protocolSelection
 const sharedConnection = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'sharedConnection.ts'), 'utf8');
 assert(sharedConnection.includes('cada candidato usa o limite efetivo configurado'));
 assert(sharedConnection.includes('3 por padrão'));
+assert(sharedConnection.includes('1,5 s'), 'documentação da política de retry deve concordar com o intervalo do catálogo');
 assert(sharedConnection.includes('Não repetir uma nova rodada inteira'));
 assert(!sharedConnection.includes('while (!active)'), 'sharedConnection não deve repetir rodadas infinitamente após esgotar os candidatos');
 const exporter = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'exportBluetoothDiagnosticTxt.ts'), 'utf8');
