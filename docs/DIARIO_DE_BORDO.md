@@ -4,12 +4,12 @@
 
 - Repositório: [luizmarquesarruda/meriva-smart-diagnostic](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
 - PR #96: [Evita DTC duplicado no cockpit e mostra pressão do coletor](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/96), aberta, fora de rascunho e sem merge. Base `main` observada nesta PR: `7eec3afecb3718020724baf053f8b6d2ca636fab`.
-- HEAD validado parcialmente nesta rodada: `fdc78accd1b90a92a0392b89896e09a6ff3cb6dd`; `validate` passou no run `40866470621`, enquanto `android-build` ainda estava em andamento. As mudanças DB-164/DB-165 são posteriores e exigem CI própria.
-- A CI `40866470621` passou em `npm run doctor`, `gate:baseline` e `npm run validate` no SHA `fdc78accd1b90a92a0392b89896e09a6ff3cb6dd`; o build APK ainda estava em andamento na última consulta. Ela não valida DB-164/DB-165, que serão executadas em novo SHA.
+- HEAD base desta rodada: `ae78b9138a1289176b6409d1faa3578c945044de`; no run `40867200154`, `validate` passou e `android-build` estava em andamento. As mudanças DB-166/DB-167 exigem CI própria.
+- A CI `40867200154` passou em `npm run doctor`, `gate:baseline` e `npm run validate` no SHA `ae78b9138a1289176b6409d1faa3578c945044de`; o build APK ainda estava em andamento na última consulta. Ela não valida DB-166/DB-167, que precisam executar em novo SHA.
 - Após qualquer alteração, reconsultar o HEAD e a CI correspondentes. Só considerar a PR validada com `validate` e `android-build` verdes no mesmo SHA, diff reconciliado contra `main` e validação física separada.
 - A auditoria atual encontrou divergências de documentação e um débito relevante de modernização do SDK. Não houve upgrade de SDK nem remoção de dependências nativas nesta rodada: fazê-los antes de preservar um baseline físico poderia introduzir regressão no Bluetooth Classic.
 - Testes com Galaxy A06/Android 16/ELM327 real, confirmação de resposta `010C`, inspeção do APK instalado e validação GPS/autonomia continuam pendentes.
-- DB-145 registra a regressão de leitura KWP e classificação de estado ECU/Bluetooth; DB-162/DB-163 tratam timeouts e limpeza RFCOMM; DB-164 fecha as sondas nativas sem prazo na preparação Bluetooth; DB-165 limita a consulta HTTP opcional de clima. Nenhuma CI verde deve ser extrapolada para mudanças posteriores ao SHA validado.
+- DB-145 registra a regressão de leitura KWP e classificação de estado ECU/Bluetooth; DB-162/DB-163 tratam timeouts e limpeza RFCOMM; DB-164 fecha as sondas de prontidão Bluetooth; DB-165 limita HTTP de clima; DB-166 protege a sonda de rádio do monitor de saúde; DB-167 expira fixes GPS antigos sem fabricar distância.
 - O cockpit deve continuar mostrando N/D até existir leitura OBD real, completa e recente; seed ou histórico não deve ser reapresentado como valor atual.
 - DB-146 restaura os quatro quadrantes de telemetria em simultâneo; os PIDs adicionais continuam acessíveis em páginas de quatro métricas. A ausência de ECU não remove a grade, apenas mantém os valores em N/D.
 - DB-147 fixa os quatro PIDs principais na primeira página e transforma os restantes PIDs suportados em carrossel completo, com setas anterior/próxima e avanço automático a cada 10 s. Anomalias adicionais são priorizadas sem deslocar os quadrantes principais.
@@ -254,6 +254,8 @@
 - **DB-163** · 2026-10-29 — Aplicar timeout finito às sondas de disponibilidade e descoberta Bluetooth
 - **DB-164** · 2026-10-29 — Limitar sondas nativas na preparação e ativação Bluetooth
 - **DB-165** · 2026-10-29 — Limitar a consulta HTTP opcional de clima e cancelar requisição vencida
+- **DB-166** · 2026-10-29 — Limitar sonda de rádio no monitor de saúde Bluetooth/ECU
+- **DB-167** · 2026-10-29 — Expirar velocidade GPS antiga sem perder distância acumulada
 
 ---
 
@@ -4517,3 +4519,28 @@ Após DB-163, ainda havia operações nativas sem prazo em `src/obd/bluetoothMan
 - A nova CI no SHA que inclui DB-164/DB-165 é obrigatória; o resultado verde de `validate` no SHA anterior não valida estas alterações.
 - O timeout HTTP não transforma dados antigos em atuais. Falha de clima segue como indisponível, sem bloquear o motor OBD local.
 - O teste físico de Bluetooth/ECU permanece pendente.
+
+## DB-166 · 2026-10-29 — Limitar sonda de rádio no monitor de saúde Bluetooth/ECU
+
+### Causa
+`src/obd/sharedConnection.ts` consultava `RNBluetoothClassic.isBluetoothEnabled()` sem prazo no monitor de saúde. Se a Promise nativa travasse, `monitorBusy` poderia permanecer verdadeiro e os checks futuros seriam abandonados; uma falha no estado do rádio também não deve ser interpretada como falha da ECU.
+
+### Alterações
+- Reutiliza `runWithTimeout` com 1 s para a verificação do rádio.
+- Reutiliza uma Promise nativa ainda pendente para evitar múltiplas sondas simultâneas após timeout. Quando o estado é desconhecido, mantém o estado ECU separado e ainda permite que o monitor tente consultar a ECU.
+- `tests/bluetoothLifecycle.test.js` protege a presença do limite e proíbe o retorno do `await` nativo direto.
+
+## DB-167 · 2026-10-29 — Expirar velocidade GPS antiga sem perder distância acumulada
+
+### Causa
+`src/gps/gpsTracker.ts` atualizava velocidade e qualidade apenas quando recebia um callback de localização. Se as atualizações parassem, o último valor GPS podia continuar visível e ser reutilizado pelo serviço de viagem, embora nenhum fix novo tivesse chegado. Também se rotulava `OBD` uma velocidade que ainda podia vir do campo `speed` do GPS.
+
+### Alterações
+- Adicionado watchdog único, ativo apenas enquanto o rastreador está em execução, que marca o fix como `SEM_FIX` após 5 s sem posição precisa e reinicia a referência/segmentos pendentes. A distância acumulada é preservada; não são criadas posições nem segmentos artificiais.
+- Timestamp do hint OBD separado e finito (5 s). A fonte `OBD` passa a apresentar o valor OBD de fato; quando o hint vence e o GPS também está sem fix atual, a velocidade expira para zero/`PARADO`.
+- `tests/gps.test.js` usa relógio/temporizador controlados para testar perda do GPS, preservação de distância, continuidade de um hint OBD atualizado e expiração de hint obsoleto.
+
+### Validação e limites
+- As referências de Android orientam atualizações por callback, timestamps e remoção de updates para controlar ciclo de vida/energia; a falta de callbacks não pode ser tomada como prova de movimento atual. Ver: https://developer.android.com/develop/sensors-and-location/location/request-updates
+- A CI para o SHA novo precisa executar TypeScript, suíte completa, gate anti-regressão e build APK. Nenhum teste físico foi executado nesta sessão.
+- O watchdog corrige frescor do estado apresentado; o GPS continua sendo a fonte de distância e o OBD continua sendo a fonte de velocidade quando há uma leitura OBD válida. Ele não estima distância durante interrupções.

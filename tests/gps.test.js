@@ -177,7 +177,58 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
   await tracker.stop();
   assert.strictEqual(tracker.getState().running, false);
   unsubscribe();
-  console.log('PASS GPS: automático, velocidade, distância e consumo');
+
+  // A total loss of fresh GNSS fixes must expire stale GPS speed without erasing distance.
+  // A fresh OBD speed remains independent and must be the actual value labelled OBD.
+  let fakeNow = 100_000;
+  let watchdogHandler = null;
+  let clearedWatchdog = false;
+  const staleTracker = new GpsTracker({
+    now: () => fakeNow,
+    setIntervalFn: (handler, delayMs) => {
+      assert.strictEqual(delayMs, 1000, 'stale-fix watchdog should use the bounded tick');
+      watchdogHandler = handler;
+      return 42;
+    },
+    clearIntervalFn: (handle) => {
+      assert.strictEqual(handle, 42);
+      clearedWatchdog = true;
+    },
+  });
+  assert.strictEqual(await staleTracker.start(), true);
+  const staleWatcher = watcher;
+  staleTracker.setVehicleSpeedHintKmh(36);
+  staleWatcher({ coords: { latitude: 0, longitude: 0, speed: 10, accuracy: 5 }, timestamp: 1000 });
+  staleWatcher({ coords: { latitude: 0, longitude: 0.0001, speed: 10, accuracy: 5 }, timestamp: 2000 });
+  staleWatcher({ coords: { latitude: 0, longitude: 0.0002, speed: 10, accuracy: 5 }, timestamp: 3000 });
+  staleWatcher({ coords: { latitude: 0, longitude: 0.0003, speed: 10, accuracy: 5 }, timestamp: 4000 });
+  assert.strictEqual(staleTracker.getState().speedSource, 'OBD');
+  assert.strictEqual(staleTracker.getState().currentSpeedKmh, 36,
+    'a speed presented as OBD must use the actual fresh OBD value');
+  const distanceBeforeStale = staleTracker.getState().distanceKm;
+
+  fakeNow += 5001;
+  staleTracker.setVehicleSpeedHintKmh(36); // simulate fresh OBD polling while GNSS remains unavailable
+  watchdogHandler();
+  assert.strictEqual(staleTracker.getState().signalQuality, 'SEM_FIX');
+  assert.strictEqual(staleTracker.getState().lastAccuracyM, null);
+  assert.strictEqual(staleTracker.getState().currentSpeedKmh, 36,
+    'fresh OBD speed should survive a GPS outage without claiming a fresh GNSS fix');
+  assert.strictEqual(staleTracker.getState().speedSource, 'OBD');
+  assert.strictEqual(staleTracker.getState().distanceKm, distanceBeforeStale,
+    'GPS outage must preserve but not fabricate cumulative distance');
+
+  fakeNow += 5001;
+  watchdogHandler();
+  assert.strictEqual(staleTracker.getState().currentSpeedKmh, 0,
+    'stale OBD speed must not remain visible when neither source is fresh');
+  assert.strictEqual(staleTracker.getState().speedSource, 'PARADO');
+  assert.strictEqual(staleTracker.getState().signalQuality, 'SEM_FIX');
+  assert.strictEqual(staleTracker.getState().distanceKm, distanceBeforeStale);
+
+  await staleTracker.stop();
+  assert.strictEqual(clearedWatchdog, true, 'stop must remove the watchdog timer');
+  console.log('PASS GPS: automático, velocidade, distância, consumo e expiração de fix');
 })().catch((error) => {
   console.error(error);
   process.exitCode = 1;
