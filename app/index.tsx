@@ -241,7 +241,7 @@ export default function IndexScreen() {
     fuelLevelSupported: tripState.fuelLevelSupported,
     fuelLevelPercent: tripState.fuelLevelPercent,
     fuelLevelReadAtMs: tripState.fuelLevelReadAtMs,
-    bufferAveragePercent: tripState.fuelLevelBufferAveragePercent,
+    bufferMedianPercent: tripState.fuelLevelBufferMedianPercent,
     bufferSampleCount: tripState.fuelLevelBufferCount,
     bufferLastReadAtMs: tripState.fuelLevelBufferLastReadAtMs,
     tripConsumptionKml: tripState.consumptionKml,
