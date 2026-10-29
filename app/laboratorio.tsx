@@ -503,7 +503,7 @@ export default function LaboratorioScreen() {
       {mode === 'REAL' ? (
         <>
           <TouchableOpacity style={[styles.button, layout.landscape && styles.flexButton]} onPress={loadDevices} disabled={loadingDevices || !storageReady}>
-            {loadingDevices ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>LISTAR PAREADOS</Text>}
+            {loadingDevices ? <ActivityIndicator color=COLORS.white /> : <Text style={styles.buttonText}>LISTAR PAREADOS</Text>}
           </TouchableOpacity>
 
           {devices.map((device) => (
@@ -676,7 +676,7 @@ const styles = StyleSheet.create({
   commandCardLandscape: { maxWidth: 620 },
   modeButton: { flex: 1, padding: 10, borderRadius: 7, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center' },
   modeText: { color: COLORS.text, fontWeight: '900', fontSize: 11 },
-  active: { backgroundColor: '#152a45', borderColor: '#2563eb' },
+  active: { backgroundColor: '#152a45', borderColor: COLORS.primary },
   simActive: { backgroundColor: '#352b16', borderColor: COLORS.warning },
   commandCard: { backgroundColor: COLORS.surface, borderRadius: 8, padding: 11, marginBottom: 10, borderWidth: 1, borderColor: COLORS.border },
   commandTitle: { color: COLORS.text, fontSize: 12, fontWeight: '900', marginBottom: 7 },
@@ -687,7 +687,7 @@ const styles = StyleSheet.create({
   disabledButton: { backgroundColor: '#26374b', borderWidth: 1, borderColor: COLORS.border, opacity: 0.72 },
   buttonText: { color: COLORS.textStrong, fontWeight: '700' },
   device: { backgroundColor: COLORS.surface, borderRadius: 10, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: COLORS.border },
-  selected: { borderColor: '#2563eb', borderWidth: 2 },
+  selected: { borderColor: COLORS.primary, borderWidth: 2 },
   deviceName: { fontWeight: '700', color: COLORS.text },
   warning: { color: COLORS.warning, marginBottom: 12 },
   input: { backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 12, color: COLORS.text },
@@ -719,6 +719,6 @@ const styles = StyleSheet.create({
   formulaValue: { color: COLORS.text, fontSize: 11, fontWeight: '900', marginBottom: 3 },
   panel: { backgroundColor: COLORS.surface, borderRadius: 14, padding: 16, marginTop: 8 },
   label: { color: COLORS.accent, marginTop: 8 },
-  value: { color: '#f8fafc', fontSize: 16, marginTop: 3 },
+  value: { color: COLORS.textStrong, fontSize: 16, marginTop: 3 },
   error: { color: COLORS.danger, marginTop: 16 },
 });

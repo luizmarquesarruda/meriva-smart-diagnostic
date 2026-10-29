@@ -125,7 +125,7 @@ export default function ArmazenamentoScreen() {
         <Text style={styles.note}>A lista completa, os detalhes por percurso e os gráficos históricos ficam na área Viagens. Esta tela concentra o armazenamento local e as exportações.</Text>
         <Link href="/viagens" asChild>
           <TouchableOpacity style={[styles.button, styles.buttonWithIcon]} accessibilityRole="button" accessibilityLabel="Abrir relatórios de viagens">
-            <AppIcon name="trips" size={18} color="#fff" />
+            <AppIcon name="trips" size={18} color=COLORS.white />
             <Text style={styles.buttonText}>ABRIR HISTÓRICO DE VIAGENS</Text>
           </TouchableOpacity>
         </Link>
@@ -134,15 +134,15 @@ export default function ArmazenamentoScreen() {
 
       <View style={styles.exportRow}>
         <TouchableOpacity style={[styles.button, styles.buttonWithIcon]} onPress={() => void handleExport('JSON')} disabled={!basePath || busy}>
-          <AppIcon name="history" size={18} color="#fff" /><Text style={styles.buttonText}>EXPORTAR JSON</Text>
+          <AppIcon name="history" size={18} color=COLORS.white /><Text style={styles.buttonText}>EXPORTAR JSON</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.button, styles.buttonWithIcon]} onPress={() => void handleExport('CSV')} disabled={!basePath || busy}>
-          <AppIcon name="data" size={18} color="#fff" /><Text style={styles.buttonText}>EXPORTAR CSV</Text>
+          <AppIcon name="data" size={18} color=COLORS.white /><Text style={styles.buttonText}>EXPORTAR CSV</Text>
         </TouchableOpacity>
       </View>
 
       <TouchableOpacity style={[styles.button, styles.buttonWithIcon]} onPress={handleClean} disabled={!basePath || busy}>
-        <AppIcon name="warning" size={18} color="#fff" />
+        <AppIcon name="warning" size={18} color=COLORS.white />
         <Text style={styles.buttonText}>{busy ? 'LIMPANDO...' : 'LIMPAR DADOS ANTIGOS'}</Text>
       </TouchableOpacity>
       </View>
@@ -162,23 +162,23 @@ const styles = StyleSheet.create({
   ok: { color: '#16a34a' },
   warning: { color: '#d97706' },
   critical: { color: '#dc2626' },
-  cleanMessage: { color: '#e5edf7', marginBottom: 12 },
-  historyCard: { backgroundColor: '#111c2e', borderRadius: 8, padding: 11, borderWidth: 1, borderColor: '#243652', marginBottom: 10 },
+  cleanMessage: { color: COLORS.text, marginBottom: 12 },
+  historyCard: { backgroundColor: COLORS.surfaceRaised, borderRadius: 8, padding: 11, borderWidth: 1, borderColor: '#243652', marginBottom: 10 },
   historyRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#243652' },
   historyMain: { flex: 1, minWidth: 0 },
-  historyDate: { color: '#e5edf7', fontWeight: '800', fontSize: 11 },
+  historyDate: { color: COLORS.text, fontWeight: '800', fontSize: 11 },
   historyMeta: { color: '#8da2bd', fontSize: 10, marginTop: 2 },
   real: { color: '#15803d', fontWeight: '900', fontSize: 9 },
   reference: { color: '#b45309', fontWeight: '900', fontSize: 9 },
   empty: { color: '#8da2bd', fontSize: 11 },
-  card: { backgroundColor: '#111c2e', borderRadius: 8, padding: 11, borderWidth: 1, borderColor: '#243652', marginBottom: 10 },
-  cardTitle: { color: '#e5edf7', fontSize: 12, fontWeight: '900', marginBottom: 7 },
+  card: { backgroundColor: COLORS.surfaceRaised, borderRadius: 8, padding: 11, borderWidth: 1, borderColor: '#243652', marginBottom: 10 },
+  cardTitle: { color: COLORS.text, fontSize: 12, fontWeight: '900', marginBottom: 7 },
   row: { paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: '#243652', flexDirection: 'row', justifyContent: 'space-between' },
   note: { color: '#8da2bd', fontSize: 10, lineHeight: 15, marginTop: 8 },
-  label: { color: '#e5edf7', fontWeight: '600' },
-  value: { color: '#2563eb', fontWeight: '700' },
+  label: { color: COLORS.text, fontWeight: '600' },
+  value: { color: COLORS.primary, fontWeight: '700' },
   exportRow: { width: '100%', flexDirection: 'row', gap: 8, marginTop: 4 },
   button: { flex: 1, backgroundColor: '#1557a6', borderRadius: 7, padding: 13, alignItems: 'center', marginTop: 4 },
   buttonWithIcon: { flexDirection: 'row', justifyContent: 'center', gap: 7 },
-  buttonText: { color: '#fff', fontWeight: '700' },
+  buttonText: { color: COLORS.white, fontWeight: '700' },
 });
