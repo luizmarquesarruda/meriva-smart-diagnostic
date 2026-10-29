@@ -6,7 +6,7 @@
 - Repositório: [luizmarquesarruda/meriva-smart-diagnostic](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
 - SHA de `main` observado antes desta rodada: `7eec3afecb3718020724baf053f8b6d2ca636fab`.
 - `.github/workflows/ci.yml` executa em qualquer `push`; o usuário autorizou explicitamente a CI automática nesta rodada.
-- A primeira CI das correções (`40811128907`) confirmou que o `main` falhava no gate antes da suíte por `tests/elmHealthPresentation.test.js` estar fora de `npm test`; esta branch inclui a correção do runner/gate e requer nova CI no SHA subsequente.
+- A CI inicial `40811128907` falhou no gate porque `tests/elmHealthPresentation.test.js` estava fora de `npm test`. Depois de registrar a suíte, `40811232971` executou o gate com sucesso e revelou que o teste também dependia de `src/obd/elmHealthPresentation.ts`, ausente no `main`. A branch restaura esse helper e registra o achado; a CI final precisa confirmar ambos os reparos.
 - Branch dedicada: `fix/p0-telemetry-autonomy-diagnostics-20261029`. A CI desta branch deve ser verificada no SHA exato do commit.
 
 ### PRs e integração
@@ -4000,7 +4000,7 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - O cockpit, Dados e Laboratório distinguem `AUTONOMIA ATUAL`/`AUTONOMIA ESTIMADA`, `AUTONOMIA • BUFFER` e N/D; o fallback não é apresentado como leitura atual. Uma estimativa buffer válida de zero km continua distinta de N/D.
 - Diagnósticos Bluetooth agora têm teto agregado de 64 KiB além do teto de linhas, mantendo preview RX de 256 caracteres e buffer de protocolo de 16 KiB.
 - Atualizados contrato anti-regressão, plano de testes e changelog; ampliados os testes existentes de telemetria, autonomia e transporte.
-- A CI `40811128907` falhou no passo `gate:baseline` antes de executar `npm run validate`: detectou que `tests/elmHealthPresentation.test.js` estava no repositório, mas não no comando `npm test`. O mesmo problema apareceu na execução do SHA-base `7eec3afecb3718020724baf053f8b6d2ca636fab`, logo não foi causado pelas correções P0. A suíte foi adicionada ao runner e à lista obrigatória do gate; o próximo SHA precisa passar a CI completa.
+- A CI `40811128907` falhou no passo `gate:baseline` antes de executar `npm run validate`: detectou que `tests/elmHealthPresentation.test.js` estava no repositório, mas não no comando `npm test`. O mesmo problema apareceu no SHA-base `7eec3afecb3718020724baf053f8b6d2ca636fab`, logo não foi causado pelas correções P0. Após registrar a suíte, a CI `40811232971` passou pelo gate e falhou no teste porque faltava `src/obd/elmHealthPresentation.ts`. O helper está sendo restaurado com validação de métricas negativas/não finitas e limiares de alerta; a CI do SHA seguinte precisa executar a suíte completa e o build Android.
 
 ### Validação e limites
 - A aceitação depende da CI no SHA final desta branch. Não é possível validar Bluetooth físico por CI.

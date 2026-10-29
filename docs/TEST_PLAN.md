@@ -131,6 +131,6 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 - Testar rejeição de percentual fora de 0–100, timestamps futuros/regressivos e reinicialização do buffer em nova sessão ECU.
 - Em veículo real, comparar autonomia ao vivo e estimativa do buffer com leitura 012F e percurso medido; CI não comprova precisão física.
 
-## BT-DIAG-01 — Limite agregado de logs Bluetooth
+- Forçar chunks RX repetidos e confirmar que o texto de diagnóstico permanece até 64 KiB, preservando o truncamento de prévia em 256 caracteres e o limite RX de 16 KiB.
 - Forçar chunks RX repetidos e confirmar que o texto de diagnóstico permanece até 64 KiB, preservando o truncamento de prévia em 256 caracteres e o limite RX de 16 KiB.
 - Confirmar que, após um overflow descartado, o transporte continua podendo receber o próximo quadro válido; não aceitar payload parcial.
