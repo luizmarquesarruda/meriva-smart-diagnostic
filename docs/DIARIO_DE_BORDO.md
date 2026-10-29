@@ -4,12 +4,12 @@
 
 - Repositório: [luizmarquesarruda/meriva-smart-diagnostic](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
 - PR #96: [Evita DTC duplicado no cockpit e mostra pressão do coletor](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/96), aberta, fora de rascunho e sem merge. Base `main` observada nesta PR: `7eec3afecb3718020724baf053f8b6d2ca636fab`.
-- HEAD antes desta correção: `b21b574dbac25b8b417eb2540716e0c2503eb6eb`.
-- CI `40807259011` confirmou `validate` e `android-build` verdes nesse SHA anterior, incluindo Expo Doctor, gate anti-regressão, suíte completa e APK standalone. Esta nova correção altera o código e exige uma CI própria no SHA resultante.
+- HEAD consultado no início desta rodada: `4f9512c71c5305b551560ffc6908ffc232404e4a`; correção de timeout nativo aplicada depois desse SHA. O HEAD e a CI precisam ser reconsultados após os commits seguintes.
+- CI `40863609539` confirmou sucesso no SHA `4f9512c71c5305b551560ffc6908ffc232404e4a`; esse resultado é anterior às mudanças documentadas em DB-163 e não as valida. A nova CI precisa concluir `validate` e `android-build` no SHA resultante.
 - Após qualquer alteração, reconsultar o HEAD e a CI correspondentes. Só considerar a PR validada com `validate` e `android-build` verdes no mesmo SHA, diff reconciliado contra `main` e validação física separada.
 - A auditoria atual encontrou divergências de documentação e um débito relevante de modernização do SDK. Não houve upgrade de SDK nem remoção de dependências nativas nesta rodada: fazê-los antes de preservar um baseline físico poderia introduzir regressão no Bluetooth Classic.
 - Testes com Galaxy A06/Android 16/ELM327 real, confirmação de resposta `010C`, inspeção do APK instalado e validação GPS/autonomia continuam pendentes.
-- DB-145 registra a regressão de leitura KWP e classificação de estado ECU/Bluetooth na frente única PR #96; DB-162 trata os bloqueios de timeout das sondas nativas do transporte. Consultar HEAD e CI correspondentes ao mesmo SHA antes de qualquer integração; a CI anterior não valida esta correção.
+- DB-145 registra a regressão de leitura KWP e classificação de estado ECU/Bluetooth; DB-162 protege as sondas do socket; DB-163 estende timeouts finitos às sondas de disponibilidade/rádio, cancelamento de descoberta e listagem de pareados. A CI anterior a DB-163 não valida estas alterações.
 - O cockpit deve continuar mostrando N/D até existir leitura OBD real, completa e recente; seed ou histórico não deve ser reapresentado como valor atual.
 - DB-146 restaura os quatro quadrantes de telemetria em simultâneo; os PIDs adicionais continuam acessíveis em páginas de quatro métricas. A ausência de ECU não remove a grade, apenas mantém os valores em N/D.
 - DB-147 fixa os quatro PIDs principais na primeira página e transforma os restantes PIDs suportados em carrossel completo, com setas anterior/próxima e avanço automático a cada 10 s. Anomalias adicionais são priorizadas sem deslocar os quadrantes principais.
@@ -251,6 +251,7 @@
 - **DB-160** · 2026-10-28 — Centralizar hipóteses da IA na tela Saúde
 - **DB-161** · 2026-10-28 — Corrigir rótulo obsoleto do atalho de armazenamento em Viagens
 - **DB-162** · 2026-10-29 — Limitar sondas nativas Bluetooth e falhar fechado em estado indeterminado
+- **DB-163** · 2026-10-29 — Aplicar timeout finito às sondas de disponibilidade e descoberta Bluetooth
 
 ---
 
@@ -268,6 +269,29 @@ Antes de qualquer correção de código:
 7. Se a CI falhar, registrar a falha e somente então iniciar a próxima correção.
 8. Manter documentação e repositório sincronizados.
 
+## DB-163 · 2026-10-29 — Timeout finito para sondas de disponibilidade e descoberta Bluetooth
+
+### Problema e causa
+A auditoria da branch `ui/cockpit-instant-consumption-20261027` confirmou que os timeouts já cobriam conexão RFCOMM, leitura, escrita e verificação `isConnected` usada por leitura/escrita. Porém, algumas chamadas nativas auxiliares ainda eram aguardadas diretamente: disponibilidade do rádio, estado do Bluetooth antes/depois de tentativas, cancelamento de descoberta, confirmação inicial do socket e enumeração de dispositivos pareados. Se uma dessas Promises nativas não terminasse, o fluxo podia ficar suspenso antes de chegar ao timeout de conexão.
+
+### Alterações aplicadas
+- `src/obd/bluetoothClassicTransport.ts`: as sondas citadas agora passam por `runWithTimeout` com limites finitos. A falha/timeout de estado do rádio segue a política fail-closed existente; o cancelamento da descoberta é registrado como falha auxiliar e não pode bloquear indefinidamente o fluxo. A listagem de pareados também retorna erro explícito após o limite.
+- `tests/bluetoothLifecycle.test.js`: adicionadas verificações para exigir timeout em disponibilidade/estado do rádio, cancelamento de descoberta e enumeração de pareados.
+- Nenhuma dependência, versão Expo, regra de PID, fórmula de consumo/autonomia, algoritmo GPS ou política de origem de dados foi alterada.
+
+### Validação e limites
+- Commit da implementação: `2c5658c6cedbaf035b7a6824fb2f1fa217e97bd1`.
+- Commit do teste: `619fa54ffb2e17e61eae1ca545fa43bab10db47e`.
+- A CI `40863609539` é verde apenas no SHA anterior `4f9512c71c5305b551560ffc6908ffc232404e4a`; não conta como validação destas mudanças. Consultar a CI do HEAD final.
+- O timeout JavaScript não cancela por si só uma operação nativa já iniciada. Por isso, uma conexão/socket de resultado indeterminado continua sujeita ao bloqueio de concorrência já existente; timeout não é evidência de que o recurso nativo foi liberado.
+- O teste físico no Galaxy A06/Android 16 com ELM327 real, incluindo resposta válida a `010C`, permanece pendente.
+
+### Fontes técnicas
+- Android Developers — conexão Bluetooth Classic: https://developer.android.com/develop/connectivity/bluetooth/connect-bluetooth-devices
+- Android `BluetoothSocket` — RFCOMM é streaming e `connect()` pode bloquear; `close()` libera recursos: https://developer.android.com/reference/android/bluetooth/BluetoothSocket
+- Linux Kernel — protocolo ELM327, comandos terminados em CR e prompt `>`: https://cdn.kernel.org/doc/html/latest/networking/device_drivers/can/can327.html
+
+---
 ## DB-001 · 2026-10-06 - Correção do carregamento do catálogo de combustível
 
 ### Problema
