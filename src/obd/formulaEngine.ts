@@ -37,6 +37,13 @@ function requireBytes(data: number[], count: number): void {
   }
 }
 
+export function requireFiniteFormulaResult(formulaId: string, result: number): number {
+  if (!Number.isFinite(result)) {
+    throw new Error(`Fórmula ${formulaId} produziu valor não finito`);
+  }
+  return result;
+}
+
 export function validateFormulaSpec(formulaId: string, spec: FormulaSpec): void {
   if (spec.divisor !== undefined && (!Number.isFinite(spec.divisor) || spec.divisor <= 0)) {
     throw new Error(`Divisor inválido na fórmula ${formulaId}: ${String(spec.divisor)}`);
@@ -99,10 +106,7 @@ export function applyFormula(formulaId: string, data: number[]): number {
       throw new Error(`Operação de fórmula desconhecida: ${spec.operation}`);
   }
   })();
-  if (!Number.isFinite(result)) {
-    throw new Error(`Fórmula ${formulaId} produziu valor não finito`);
-  }
-  return result;
+  return requireFiniteFormulaResult(formulaId, result);
 }
 
 export function validatePidValue(pid: string, value: number): FormulaResult {

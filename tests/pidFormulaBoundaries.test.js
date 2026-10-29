@@ -26,7 +26,7 @@ function loadTs(relativePath) {
 }
 
 function main() {
-  const { applyFormula, decodeFormula, validateFormulaSpec } = loadTs('src/obd/formulaEngine.ts');
+  const { applyFormula, decodeFormula, requireFiniteFormulaResult, validateFormulaSpec } = loadTs('src/obd/formulaEngine.ts');
 
   assert.throws(() => applyFormula('RPM', [0x1A, 256]), /Byte OBD inválido/,
     'byte acima de FF deve ser rejeitado');
@@ -38,8 +38,8 @@ function main() {
     'zero divisor must be rejected instead of creating Infinity');
   assert.throws(() => validateFormulaSpec('BROKEN', { operation: 'u8_scale', scale: Number.POSITIVE_INFINITY }), /Escala inválida/,
     'non-finite catalog coefficients must be rejected');
-  assert.throws(() => applyFormula('RPM', [0xFF, 0xFF]), /Fórmula RPM produziu valor não finito/,
-    'formula output must be checked for finite values');
+  assert.throws(() => requireFiniteFormulaResult('BROKEN', Number.POSITIVE_INFINITY), /Fórmula BROKEN produziu valor não finito/,
+    'a non-finite intermediate/result must be rejected');
 
   // SAE J1979 boundary values must not be rejected because of rounded ranges.
   const maxFuelTrim = decodeFormula('FUEL_TRIM', '0106', [0xFF]);

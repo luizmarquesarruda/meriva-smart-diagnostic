@@ -4611,7 +4611,7 @@ O motor de fórmulas validava bytes OBD e o valor no parser, mas `applyFormula()
 
 ### Correção
 - `src/obd/formulaEngine.ts` valida divisor positivo e coeficientes finitos e rejeita qualquer resultado que não seja finito.
-- `tests/pidFormulaBoundaries.test.js` cobre divisor zero, escala infinita e resultado não finito; os limites válidos SAE existentes continuam intactos.
+- `tests/pidFormulaBoundaries.test.js` cobre divisor zero, escala infinita e o guard de resultado não finito por meio de um valor intermediário sintético; os limites válidos SAE existentes continuam intactos.
 
 ## DB-173 · 2026-10-29 — Corrigir documentação obsoleta sobre sincronização em nuvem
 
