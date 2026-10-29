@@ -203,6 +203,7 @@
 - **DB-131** · 2026-10-25 — Atualização periódica de localização/clima baseada em conectividade
 - **DB-132** · 2026-10-29 — Integridade de telemetria, buffer de autonomia e limite de diagnósticos Bluetooth
 - **DB-133** · 2026-10-29 — Referência CarScanner, cobertura de lacunas e atualização incremental do aprendizado
+- **DB-134** · 2026-10-29 — Buffer de autonomia com expiração por amostra e mediana robusta
 
 ---
 
@@ -4028,3 +4029,25 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - A CI `40813157680` (`2f83780b7ecc246b7d81ee56fb5a8e48e9d9c696`) passou pelo gate e pelo TypeScript, mas parou em `tests/knowledgeJson.test.js`: o teste consultava `polling.cockpit` quando o contrato correto está em `pollingPolicy.cockpit`. Corrijo a referência no teste, sem alterar o catálogo ou enfraquecer o gate; a nova CI deve validar o SHA seguinte. O build Android dessa execução foi pulado devido à falha no job validate.
 - Não foram importados valores CarScanner de outras condições porque esta base não contém medições numéricas verificáveis para elas. O preenchimento ocorrerá conforme dados reais válidos sejam coletados; uma exportação CSV adicional pode ampliar o seed se for importada e classificada explicitamente como histórico, não como REAL_OBD atual.
 - Nenhum merge foi executado. A validação física de Bluetooth/ECU no Galaxy A06 e inspeção visual do app continuam requisitos separados.
+
+
+## DB-134 · 2026-10-29 — Buffer de autonomia com expiração por amostra e mediana robusta
+
+### Problema confirmado
+- src/trip/fuelLevel.ts retinha no buffer de dez posições amostras com idade superior a 60 s. A validação da apresentação sobre a idade da última leitura não impedia uma amostra antiga de contaminar a estatística.
+- O snapshot calculava média aritmética, apesar de o contrato anterior registrar mediana para reduzir picos. record() também não rejeitava explicitamente nowMs inválido, podendo deixar a comparação de timestamp sem significado.
+
+### Correção implementada
+- getSnapshot(nowMs) filtra cada leitura pelo intervalo temporal máximo de 60 s e calcula sampleCount somente sobre as amostras válidas não vencidas.
+- O cálculo passou para mediana e o nome foi alinhado de ponta a ponta: medianPercent no buffer; fuelLevelBufferMedianPercent no serviço; bufferMedianPercent na apresentação/cockpit.
+- record() rejeita relógio não finito ou não positivo. O contrato RG-16 e o changelog registram que o fallback exige dez amostras válidas e não expiradas; com menos amostras, não há fallback.
+
+### Regressões adicionadas
+- Pico isolado de 90% sobre nove amostras de 40% não desloca a mediana.
+- Uma janela distribuída por mais de 60 s exclui individualmente a amostra envelhecida e reduz a contagem de dez para nove.
+- A apresentação fica UNAVAILABLE quando a expiração deixa menos de dez amostras elegíveis; record() rejeita relógio NaN.
+
+### Validação e limites
+- A execução local dos testes não foi possível porque o ambiente não conseguiu resolver github.com ao clonar o repositório. A CI do SHA final deverá validar o código, TypeScript, suíte completa, gate anti-regressão e APK Android standalone; resultados de SHA anterior não contam.
+- Não houve teste físico no Galaxy A06 / SM-A065M / Android 16 com ELM327 e ECU reais. A correção melhora o buffer de autonomia e não resolve nem comprova o timeout Bluetooth/ECU em 010C.
+- Nenhum merge foi executado nesta alteração.
