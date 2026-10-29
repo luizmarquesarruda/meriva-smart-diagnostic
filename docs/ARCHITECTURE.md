@@ -109,8 +109,10 @@ A disponibilidade dos PIDs, a qualidade do GPS e a comunicação com a ECU da Me
 A tela nativa de abertura usa `assets/splash.png`, PNG transparente versionado, explicitamente referenciado pelo plugin `expo-splash-screen` em `app.json` (largura de 280 dp, fundo `#07111f`, `resizeMode: contain`). A configuração `expo.splash` legada aponta para a mesma imagem. A splash nativa é distinta da primeira tela React Native. O gate de baseline valida caminho/configuração/assinatura PNG e a CI valida a compilação; a inicialização fria instalada em dispositivo ainda exige inspeção visual separada.
 
 
-## Sincronização opcional com Bubble
+## Rede móvel e integração em nuvem — estado verificado
 
-`src/cloud/bubbleWorkflowContract.ts` valida os contratos de entrada do backend sem alterar as regras operacionais locais. `src/cloud/bubbleWorkflowClient.ts` fornece a camada HTTPS para login, leituras OBD, GPS, viagens, DTC, suporte de PID e heartbeat. O token fica apenas em memória nessa camada; a integração de produção precisa usar Keystore/SecureStore e uma fila durável com IDs de evento estáveis.
+A aplicação usa `@react-native-community/netinfo` para apresentar conectividade e `src/weather/` para enriquecimento opcional de localização/clima. A conectividade 4G/5G não alimenta as fórmulas OBD, velocidade ou distância.
 
-O Bubble é cópia sincronizada, não fonte da verdade para Bluetooth/ELM327, filtros GPS, fórmulas de combustível, histórico ou aprendizado. A sincronização live permanece desligada até haver um `custom.device` provisionado para o usuário e ID de viagem conhecido. Não usar token administrativo no APK. Ver `docs/BUBBLE_WORKFLOW_PORT.md` para a matriz do contrato e os bloqueios identificados.
+**Integração de telemetria em nuvem não está implementada nesta branch.** No inventário do repositório não existem `src/cloud/bubbleWorkflowContract.ts`, `src/cloud/bubbleWorkflowClient.ts` nem `docs/BUBBLE_WORKFLOW_PORT.md`, apesar de versões anteriores desta documentação os citarem. Não pressupor que login/sincronização Bubble, outbox ou fila persistente de uploads esteja disponível.
+
+Qualquer integração futura precisa definir endpoint/schema versionados, autenticação de usuário por credenciais de escopo mínimo, IDs de evento idempotentes, retenção/consentimento, timeout, política de retry com backoff, fila local durável e mecanismo de descarte/retentativa. A fonte operacional continua local; indisponibilidade de rede não pode parar Bluetooth/ELM327, GPS local, diagnóstico, cálculos ou autosave.

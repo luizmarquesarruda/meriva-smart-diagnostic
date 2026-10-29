@@ -30,6 +30,30 @@ export const MAX_ELM_RX_BUFFER_CHARS = 16 * 1024;
 const RX_DIAGNOSTIC_PREVIEW_CHARS = 256;
 const NATIVE_CONNECTION_CHECK_TIMEOUT_MS = 1000;
 const NATIVE_DISCOVERY_TIMEOUT_MS = 2000;
+let pendingNativeDiscoveryCancellation: Promise<void> | null = null;
+
+/** Share a still-pending Android discovery cancellation across all transport instances. */
+async function cancelBluetoothDiscovery(): Promise<void> {
+  if (typeof RNBluetoothClassic.cancelDiscovery !== 'function') return;
+
+  if (!pendingNativeDiscoveryCancellation) {
+    const pending = Promise.resolve().then(async () => {
+      await RNBluetoothClassic.cancelDiscovery!();
+    });
+    pendingNativeDiscoveryCancellation = pending;
+    const clearIfSettled = () => {
+      if (pendingNativeDiscoveryCancellation === pending) pendingNativeDiscoveryCancellation = null;
+    };
+    void pending.then(clearIfSettled, clearIfSettled);
+  }
+
+  const pending = pendingNativeDiscoveryCancellation;
+  await runWithTimeout(
+    () => pending,
+    NATIVE_DISCOVERY_TIMEOUT_MS,
+    'TIMEOUT: CANCELAMENTO DA DESCOBERTA BLUETOOTH',
+  );
+}
 
 async function waitForPendingNativeSocketCleanup(addressKey: string, timeoutMs: number): Promise<void> {
   const pending = pendingNativeSocketCleanups.get(addressKey);
@@ -195,11 +219,7 @@ export class BluetoothClassicTransport implements ObdTransport {
 
     if (RNBluetoothClassic.cancelDiscovery) {
       try {
-        await runWithTimeout(
-          () => RNBluetoothClassic.cancelDiscovery!(),
-          NATIVE_DISCOVERY_TIMEOUT_MS,
-          'TIMEOUT: CANCELAMENTO DA DESCOBERTA BLUETOOTH',
-        );
+        await cancelBluetoothDiscovery();
       } catch (cause) {
         this.logDiagnostic('CANCEL_DISCOVERY_FAILED_OR_TIMED_OUT', {
           timeoutMs: NATIVE_DISCOVERY_TIMEOUT_MS,

@@ -82,6 +82,9 @@ assert(transport.includes('runWithTimeout('), 'native isConnected calls must be 
 assert.match(transport, /runWithTimeout\([\s\S]*?isBluetoothAvailable\(\)/, 'Bluetooth availability probe must be bounded');
 assert.match(transport, /runWithTimeout\([\s\S]*?isBluetoothEnabled\(\)/, 'Bluetooth radio-state probes must be bounded');
 assert(transport.includes('CANCEL_DISCOVERY_FAILED_OR_TIMED_OUT'), 'discovery cancellation must not wait forever');
+assert(transport.includes('pendingNativeDiscoveryCancellation'), 'timed-out discovery cancellation must be shared until the native promise settles');
+assert(transport.includes('cancelBluetoothDiscovery()'), 'RFCOMM open must use the shared bounded discovery cancellation');
+assert(!transport.includes("() => RNBluetoothClassic.cancelDiscovery!()"), 'native discovery cancellation must not be started independently on every retry');
 assert(transport.includes('ESTADO DA DESCOBERTA BLUETOOTH INDETERMINADO; CONEXÃO RFCOMM CANCELADA'), 'a stalled discovery cancellation must stop a new RFCOMM attempt');
 assert(transport.includes('INITIAL_DEVICE_CONNECTED_CHECK_FAILED'), 'an unknown initial socket state must register cleanup and fail closed');
 assert(transport.includes('INITIAL_CONNECTION_CHECK_CLEANUP'), 'initial socket probe failure must preserve the native cleanup guard');

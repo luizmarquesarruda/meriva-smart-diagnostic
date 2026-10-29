@@ -42,6 +42,12 @@ O que faltava era tornar visível o estado dos provedores nativos de localizaç�
 
 A alteração está na branch da PR #96. A CI deve executar novamente no SHA resultante: gate anti-regressão, TypeScript, suíte completa e build APK Android. Não considerar concluído até esses jobs passarem no mesmo SHA. A consulta a provedores deve ser inspecionada em um APK instalado no Galaxy A06/Android 16; a CI sozinha não comprova a disponibilidade real dos provedores do aparelho.
 
+## Estado real de telemetria em nuvem — revisão 2026-10-29
+
+A árvore atual da branch não contém cliente de upload/sincronização de telemetria nem fila outbox persistente. Os nomes Bubble citados em versões anteriores de `docs/ARCHITECTURE.md` e `docs/BUBBLE_WORKFLOW_PORT.md` não apontam para arquivos existentes nesta branch. O cliente implementado de rede é usado para status NetInfo e consulta opcional de clima.
+
+Consequência: o comportamento offline do diagnóstico local existe, mas não é correto dizer que leituras OBD/GPS/viagens são sincronizadas ou ficam enfileiradas para upload. Não foi criada uma fila sem consumidor/endpoints. Para implementá-la corretamente, primeiro definir o contrato do backend, modelo de autenticação, IDs idempotentes, política de expurgo e consentimento, e então testar persistência/replay sem acoplar falha da rede ao loop OBD.
+
 ## Documentação oficial consultada
 
 - Android — leitura orientada a eventos do estado da rede: https://developer.android.com/develop/connectivity/network-ops/reading-network-state

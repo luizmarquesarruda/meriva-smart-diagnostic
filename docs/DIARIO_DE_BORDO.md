@@ -9,7 +9,7 @@
 - Após qualquer alteração, reconsultar o HEAD e a CI correspondentes. Só considerar a PR validada com `validate` e `android-build` verdes no mesmo SHA, diff reconciliado contra `main` e validação física separada.
 - A auditoria atual encontrou divergências de documentação e um débito relevante de modernização do SDK. Não houve upgrade de SDK nem remoção de dependências nativas nesta rodada: fazê-los antes de preservar um baseline físico poderia introduzir regressão no Bluetooth Classic.
 - Testes com Galaxy A06/Android 16/ELM327 real, confirmação de resposta `010C`, inspeção do APK instalado e validação GPS/autonomia continuam pendentes.
-- DB-145 registra a regressão de leitura KWP e classificação de estado ECU/Bluetooth; DB-162/163/164/166 protegem o ciclo RFCOMM; DB-165 limita HTTP de clima; DB-167 expira fixes GPS antigos; DB-168 neutraliza fórmula no CSV; DB-169 torna o start GPS não bloqueante para o polling OBD e aplica cooldown de retry. DB-170 atualiza o gate para aceitar a proteção de timestamp por `state.lastTimestamp`.
+- DB-145 registra a regressão de leitura KWP e classificação de estado ECU/Bluetooth; DB-162/163/164/166 protegem o ciclo RFCOMM; DB-165 limita HTTP de clima; DB-167 expira fixes GPS antigos; DB-168 neutraliza fórmula no CSV; DB-169 torna o start GPS não bloqueante para o polling OBD e aplica cooldown de retry. DB-170 atualiza o gate para aceitar a proteção de timestamp por `state.lastTimestamp`. DB-171 serializa cancelamento nativo da descoberta; DB-172 valida coeficientes/resultados das fórmulas; DB-173 corrige documentação obsoleta sobre sincronização cloud.
 - O cockpit deve continuar mostrando N/D até existir leitura OBD real, completa e recente; seed ou histórico não deve ser reapresentado como valor atual.
 - DB-146 restaura os quatro quadrantes de telemetria em simultâneo; os PIDs adicionais continuam acessíveis em páginas de quatro métricas. A ausência de ECU não remove a grade, apenas mantém os valores em N/D.
 - DB-147 fixa os quatro PIDs principais na primeira página e transforma os restantes PIDs suportados em carrossel completo, com setas anterior/próxima e avanço automático a cada 10 s. Anomalias adicionais são priorizadas sem deslocar os quadrantes principais.
@@ -259,6 +259,9 @@
 - **DB-168** · 2026-10-29 — Neutralizar fórmulas em campos textuais de exportação CSV
 - **DB-169** · 2026-10-29 — Impedir que a inicialização GPS bloqueie polling OBD
 - **DB-170** · 2026-10-29 — Atualizar gate GPS para monotonicidade após perda de fix
+- **DB-171** · 2026-10-29 — Serializar cancelamento nativo da descoberta Bluetooth
+- **DB-172** · 2026-10-29 — Rejeitar coeficientes e resultados de fórmula não finitos
+- **DB-173** · 2026-10-29 — Corrigir documentação obsoleta sobre sincronização em nuvem
 
 ---
 
@@ -4591,3 +4594,33 @@ CI `40869798013` falhou antes de executar `validate`: `tests/projectBaseline.tes
 
 ### Validação
 - A falha comprovada foi de asserção do gate; `android-build` foi ignorado por dependência do job `validate`. A nova CI deve confirmar TypeScript, gate, suíte integral e APK no mesmo SHA.
+
+## DB-171 · 2026-10-29 — Serializar cancelamento nativo da descoberta Bluetooth
+
+### Causa
+DB-163 limitou o tempo de espera de `cancelDiscovery()`, mas um timeout JavaScript não cancela a operação nativa. Uma nova tentativa podia iniciar outra chamada de cancelamento enquanto a primeira ainda estivesse pendente, contrariando a intenção de não sobrepor operações nativas.
+
+### Correção
+- Criada `cancelBluetoothDiscovery()`, compartilhando uma única Promise nativa entre instâncias. Enquanto a Promise não resolver/rejeitar, novos `open()` reutilizam a mesma chamada e falham fechado após o timeout; não iniciam cancelamentos paralelos.
+- `tests/bluetoothLifecycle.test.js` protege o uso do helper e proíbe o callback direto por tentativa.
+
+## DB-172 · 2026-10-29 — Rejeitar coeficientes e resultados de fórmula não finitos
+
+### Causa
+O motor de fórmulas validava bytes OBD e o valor no parser, mas `applyFormula()` poderia retornar `Infinity` se o catálogo trouxesse divisor zero ou um coeficiente enorme, antes de chegar à validação de PID. Os catálogos atuais não usam divisor zero; o risco era a ausência de uma barreira no motor.
+
+### Correção
+- `src/obd/formulaEngine.ts` valida divisor positivo e coeficientes finitos e rejeita qualquer resultado que não seja finito.
+- `tests/pidFormulaBoundaries.test.js` cobre divisor zero, escala infinita e resultado não finito; os limites válidos SAE existentes continuam intactos.
+
+## DB-173 · 2026-10-29 — Corrigir documentação obsoleta sobre sincronização em nuvem
+
+### Causa
+`docs/ARCHITECTURE.md` afirmava que `src/cloud/bubbleWorkflowClient.ts`, `src/cloud/bubbleWorkflowContract.ts` e `docs/BUBBLE_WORKFLOW_PORT.md` estavam disponíveis, mas esses arquivos não existem na árvore atual. Isso criava uma falsa expectativa de upload/outbox de telemetria.
+
+### Correção
+- A arquitetura e a auditoria de rede agora afirmam explicitamente que só existe status de rede e enriquecimento opcional de clima; não há cliente de upload nem fila persistente de telemetria nesta branch.
+- O requisito futuro foi registrado com dependências claras: contrato do backend, autenticação, idempotência, consentimento/retenção e fila durável com replay. Nenhum fluxo cloud sem consumidor foi inventado.
+
+### Validação e limites
+- Esta rodada exige nova CI no HEAD final. Não houve teste físico no Galaxy A06/Android 16, conexão ELM327/ECU, nem inspeção visual de telas no hardware.

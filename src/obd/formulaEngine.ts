@@ -37,10 +37,24 @@ function requireBytes(data: number[], count: number): void {
   }
 }
 
+export function validateFormulaSpec(formulaId: string, spec: FormulaSpec): void {
+  if (spec.divisor !== undefined && (!Number.isFinite(spec.divisor) || spec.divisor <= 0)) {
+    throw new Error(`Divisor inválido na fórmula ${formulaId}: ${String(spec.divisor)}`);
+  }
+  if (spec.scale !== undefined && !Number.isFinite(spec.scale)) {
+    throw new Error(`Escala inválida na fórmula ${formulaId}: ${String(spec.scale)}`);
+  }
+  if (spec.offset !== undefined && !Number.isFinite(spec.offset)) {
+    throw new Error(`Offset inválido na fórmula ${formulaId}: ${String(spec.offset)}`);
+  }
+}
+
 export function applyFormula(formulaId: string, data: number[]): number {
   const spec = formulas[formulaId];
   if (!spec) throw new Error(`Fórmula desconhecida: ${formulaId}`);
+  validateFormulaSpec(formulaId, spec);
 
+  const result = (() => {
   switch (spec.operation) {
     case 'u8':
       requireBytes(data, 1);
@@ -84,6 +98,11 @@ export function applyFormula(formulaId: string, data: number[]): number {
     default:
       throw new Error(`Operação de fórmula desconhecida: ${spec.operation}`);
   }
+  })();
+  if (!Number.isFinite(result)) {
+    throw new Error(`Fórmula ${formulaId} produziu valor não finito`);
+  }
+  return result;
 }
 
 export function validatePidValue(pid: string, value: number): FormulaResult {
