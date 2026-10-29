@@ -32,6 +32,12 @@ assert.match(index, /bottomNavLandscape:\{position:'absolute',left:0,top:0,botto
 assert.match(index, /quadrantCardLandscape:\{minHeight:58,paddingVertical:4/, 'quadrantes devem reduzir espaçamento vertical em paisagem');
 assert.match(index, /quadrantValueLandscape:\{fontSize:21,lineHeight:23/, 'valores devem reduzir na paisagem');
 assert.match(index, /quadrantHintLandscape:\{fontSize:6/, 'dicas devem usar uma linha na paisagem');
+assert.match(index, /quadrantHeaderLandscape:\{marginBottom:4/, 'cabeçalho do carrossel deve diminuir em paisagem');
+assert.match(index, /quadrantValueRowLandscape:\{marginTop:2,gap:3/, 'respiro do valor deve ser reduzido em paisagem');
+assert.match(index, /quadrantInstructionLandscape:\{fontSize:6,letterSpacing:0,marginTop:3/, 'instrução do carrossel deve ser compacta em paisagem');
+assert.match(index, /cockpitMetricCompact:\{paddingVertical:3,paddingHorizontal:3/, 'consumo/autonomia/pressão devem continuar visíveis em cartões compactos');
+assert.match(index, /metricValueCompact:\{fontSize:10,marginTop:1/, 'valores auxiliares devem caber sem gastar altura excessiva');
+
 assert.match(index, /layoutSpacerLandscape:\{flexGrow:0,minHeight:0,height:4/, 'espaçador não deve consumir a altura útil na paisagem');
 
 assert.doesNotMatch(index, /ScrollView/);

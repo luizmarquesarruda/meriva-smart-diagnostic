@@ -5,6 +5,7 @@
 ### Cockpit em paisagem
 - Layout reorganizado em duas faixas horizontais: cabeçalho/clima no topo, cockpit ao lado do cartão de sessão e navegação vertical lateral.
 - Quadrantes, textos auxiliares e espaçamentos ficam compactos em paisagem; a navegação não consome a altura toda do rodapé.
+- Os cartões de consumo, autonomia e pressão também têm modo compacto em paisagem, sem remover nenhuma métrica.
 - A política de orientação continua livre e responsiva; nenhum lock fixo foi introduzido.
 
 ### Cockpit — quadrantes restaurados

@@ -387,7 +387,7 @@ export default function IndexScreen() {
           </View>
           <View style={[styles.mainContent, layout.landscape && styles.mainContentLandscape]}>
           <View style={[styles.heroCard, layout.landscape && styles.heroCardLandscape]}>
-            <View style={styles.quadrantHeader}>
+            <View style={[styles.quadrantHeader, layout.landscape && styles.quadrantHeaderLandscape]}>
               <View style={styles.quadrantHeaderCopy}>
                 <Text style={styles.quadrantTitle}>DADOS OBD EM TEMPO REAL</Text>
                 <Text style={styles.quadrantSubtitle}>
@@ -437,7 +437,7 @@ export default function IndexScreen() {
                   ]}
                 >
                   <Text style={[styles.quadrantLabel, layout.landscape && styles.quadrantLabelLandscape]} numberOfLines={layout.landscape ? 1 : 2}>{metric.label}</Text>
-                  <View style={styles.quadrantValueRow}>
+                  <View style={[styles.quadrantValueRow, layout.landscape && styles.quadrantValueRowLandscape]}>
                     <Text style={[
                       styles.quadrantValue,
                       layout.landscape && styles.quadrantValueLandscape,
@@ -452,7 +452,7 @@ export default function IndexScreen() {
                 </View>
               ))}
             </View>
-            <Text style={styles.quadrantInstruction}>
+            <Text style={[styles.quadrantInstruction, layout.landscape && styles.quadrantInstructionLandscape]}>
               {quadrantPageCount > 1
                 ? 'USE ‹ / › OU AGUARDE 10 S • 4 QUADRANTES POR PÁGINA'
                 : connectionStatus.ecuConnected
@@ -460,9 +460,9 @@ export default function IndexScreen() {
                   : 'OS QUADRANTES FICAM PRONTOS APÓS VALIDAR A ECU'}
             </Text>
             <View style={[styles.metricRow, layout.landscape && styles.metricRowLandscape]}>
-              <CockpitMetric label={consumptionLabel} value={availableConsumptionKml != null ? availableConsumptionKml.toFixed(1) + ' km/L' : 'N/D'} />
-              <CockpitMetric label="AUTONOMIA ATUAL" value={currentAutonomyKm != null ? Math.round(currentAutonomyKm) + ' km' : 'N/D'} />
-              <CockpitMetric label="PRESSÃO DO COLETOR" value={manifoldPressureKpa != null ? manifoldPressureKpa.toFixed(0) + ' kPa' : 'N/D'} />
+              <CockpitMetric compact={layout.landscape} label={consumptionLabel} value={availableConsumptionKml != null ? availableConsumptionKml.toFixed(1) + ' km/L' : 'N/D'} />
+              <CockpitMetric compact={layout.landscape} label="AUTONOMIA ATUAL" value={currentAutonomyKm != null ? Math.round(currentAutonomyKm) + ' km' : 'N/D'} />
+              <CockpitMetric compact={layout.landscape} label="PRESSÃO DO COLETOR" value={manifoldPressureKpa != null ? manifoldPressureKpa.toFixed(0) + ' kPa' : 'N/D'} />
             </View>
           </View>
           <Link href="/bluetooth" asChild>
@@ -504,7 +504,14 @@ export default function IndexScreen() {
   );
 }
 
-function CockpitMetric({ label, value }: { label: string; value: string }) { return <View style={styles.cockpitMetric}><Text style={styles.metricLabel}>{label}</Text><Text style={styles.metricValue}>{value}</Text></View>; }
+function CockpitMetric({ label, value, compact = false }: { label: string; value: string; compact?: boolean }) {
+  return (
+    <View style={[styles.cockpitMetric, compact && styles.cockpitMetricCompact]}>
+      <Text style={[styles.metricLabel, compact && styles.metricLabelCompact]}>{label}</Text>
+      <Text style={[styles.metricValue, compact && styles.metricValueCompact]}>{value}</Text>
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
   container:{flex:1,backgroundColor:COLORS.screen},content:{flex:1,width:'100%',paddingVertical:6,paddingBottom:6},screenFrame:{width:'100%',flex:1,alignSelf:'center'},screenFrameLandscape:{paddingLeft:56},topSection:{marginBottom:8},topSectionLandscape:{flexDirection:'row',alignItems:'stretch',gap:8,marginBottom:5},mainContent:{width:'100%',flexDirection:'column',minWidth:0},mainContentLandscape:{flex:1,flexDirection:'row',alignItems:'stretch',gap:8,minHeight:0},layoutSpacer:{flexGrow:1,minHeight:8},layoutSpacerLandscape:{flexGrow:0,minHeight:0,height:4},
@@ -515,8 +522,8 @@ const styles = StyleSheet.create({
   header:{backgroundColor:'#0e1b2d',borderRadius:16,borderWidth:1,borderColor:'#28415f',padding:14,marginBottom:8,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:10},headerLandscape:{flex:0.9,minWidth:0,paddingVertical:8,paddingHorizontal:10,marginBottom:0},headerTitle:{flex:1,minWidth:0},brand:{color:'#f8fafc',fontSize:18,fontWeight:'900',letterSpacing:1.2},subtitle:{color:'#7db3ff',fontSize:9,fontWeight:'900',letterSpacing:1,marginTop:3},
   connectionPill:{flexDirection:'row',alignItems:'center',gap:6,flexShrink:0,backgroundColor:'#091526',borderRadius:20,borderWidth:1,borderColor:'#29415f',paddingHorizontal:10,paddingVertical:7},dot:{width:8,height:8,borderRadius:4},dotOk:{backgroundColor:'#4ade80'},dotWarn:{backgroundColor:'#fbbf24'},dotDanger:{backgroundColor:'#fb7185'},connectionText:{color:'#dbeafe',fontSize:9,fontWeight:'900'},
   heroCard:{backgroundColor:'#0f2035',borderRadius:18,borderWidth:1,borderColor:'#2d5278',padding:12,alignItems:'center',marginBottom:8},heroCardWarning:{borderColor:'#fbbf24',backgroundColor:'#2a2412'},heroCardDanger:{borderColor:'#fb7185',backgroundColor:'#2b1420'},heroCardLandscape:{flex:1,minWidth:0,padding:6,marginBottom:0,justifyContent:'center'},heroReadout:{width:'100%',alignItems:'center',paddingVertical:1},heroEyebrow:{color:'#7db3ff',fontSize:10,fontWeight:'900',letterSpacing:1.4,textAlign:'center'},heroNumberRow:{flexDirection:'row',alignItems:'baseline',justifyContent:'center',gap:6},heroUnit:{color:'#a9c8ef',fontSize:18,fontWeight:'900'},heroSwitchHintRow:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:4,marginTop:4},heroSwitchHint:{color:'#6884a6',fontSize:8,fontWeight:'900',letterSpacing:.6},heroWarning:{color:'#fbbf24'},heroValue:{color:'#f8fafc',fontSize:50,lineHeight:56,fontWeight:'900',marginTop:2,fontVariant:['tabular-nums']},heroValueLandscape:{fontSize:36,lineHeight:40,marginTop:0},heroState:{color:'#8fa6c1',fontSize:9,fontWeight:'800',letterSpacing:.5,textAlign:'center'},
-  metricRow:{width:'100%',flexDirection:'row',gap:6,marginTop:10},metricRowLandscape:{marginTop:4},cockpitMetric:{flex:1,minWidth:0,backgroundColor:'#091626',borderRadius:11,borderWidth:1,borderColor:'#233d5b',paddingVertical:9,paddingHorizontal:5,alignItems:'center'},metricLabel:{color:'#9aacc4',fontSize:8,fontWeight:'900',letterSpacing:.3,textAlign:'center'},metricValue:{color:'#e5edf7',fontSize:12,fontWeight:'900',marginTop:3,textAlign:'center'},
-  quadrantHeader:{width:'100%',flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:10},
+  metricRow:{width:'100%',flexDirection:'row',gap:6,marginTop:10},metricRowLandscape:{marginTop:3,gap:4},cockpitMetric:{flex:1,minWidth:0,backgroundColor:'#091626',borderRadius:11,borderWidth:1,borderColor:'#233d5b',paddingVertical:9,paddingHorizontal:5,alignItems:'center'},cockpitMetricCompact:{paddingVertical:3,paddingHorizontal:3,borderRadius:8},metricLabel:{color:'#9aacc4',fontSize:8,fontWeight:'900',letterSpacing:.3,textAlign:'center'},metricLabelCompact:{fontSize:6,letterSpacing:0,lineHeight:7},metricValue:{color:'#e5edf7',fontSize:12,fontWeight:'900',marginTop:3,textAlign:'center'},metricValueCompact:{fontSize:10,marginTop:1},
+  quadrantHeader:{width:'100%',flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:10},quadrantHeaderLandscape:{marginBottom:4},
   quadrantHeaderCopy:{flex:1,minWidth:0},
   quadrantTitle:{color:'#7db3ff',fontSize:10,fontWeight:'900',letterSpacing:1.2},
   quadrantSubtitle:{color:'#849ab5',fontSize:8,fontWeight:'800',marginTop:3},
@@ -529,15 +536,15 @@ const styles = StyleSheet.create({
   quadrantGrid:{width:'100%',flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',gap:8},
   quadrantGridLandscape:{gap:5},
   quadrantCard:{width:'48%',minHeight:91,paddingVertical:10,paddingHorizontal:9,backgroundColor:'#091626',borderRadius:12,borderWidth:1,borderColor:'#294562'},
-  quadrantCardLandscape:{minHeight:58,paddingVertical:4,paddingHorizontal:6},
+  quadrantCardLandscape:{minHeight:54,paddingVertical:4,paddingHorizontal:6},
   quadrantCardWarning:{borderColor:'#fbbf24',backgroundColor:'#2a2412'},
   quadrantCardDanger:{borderColor:'#fb7185',backgroundColor:'#2b1420'},
   quadrantLabel:{color:'#9fb7d5',fontSize:8,fontWeight:'900',letterSpacing:.4},quadrantLabelLandscape:{fontSize:7,letterSpacing:0},
-  quadrantValueRow:{flexDirection:'row',alignItems:'baseline',gap:4,marginTop:5},
-  quadrantValue:{color:'#f8fafc',fontSize:25,lineHeight:29,fontWeight:'900',fontVariant:['tabular-nums']},quadrantValueLandscape:{fontSize:21,lineHeight:23},
+  quadrantValueRow:{flexDirection:'row',alignItems:'baseline',gap:4,marginTop:5},quadrantValueRowLandscape:{marginTop:2,gap:3},
+  quadrantValue:{color:'#f8fafc',fontSize:25,lineHeight:29,fontWeight:'900',fontVariant:['tabular-nums']},quadrantValueLandscape:{fontSize:21,lineHeight:22},
   quadrantUnit:{color:'#a9c8ef',fontSize:10,fontWeight:'900'},
   quadrantHint:{color:'#6884a6',fontSize:7,fontWeight:'800',marginTop:3},quadrantHintLandscape:{fontSize:6,marginTop:1},
-  quadrantInstruction:{color:'#6884a6',fontSize:7,fontWeight:'900',letterSpacing:.4,textAlign:'center',marginTop:7},
+  quadrantInstruction:{color:'#6884a6',fontSize:7,fontWeight:'900',letterSpacing:.4,textAlign:'center',marginTop:7},quadrantInstructionLandscape:{fontSize:6,letterSpacing:0,marginTop:3},
   coolantCard:{width:'100%',flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:12,marginTop:9,paddingHorizontal:13,paddingVertical:11,backgroundColor:'#091626',borderRadius:12,borderWidth:1,borderColor:'#315579'},coolantCardLandscape:{marginTop:4,paddingVertical:5,paddingHorizontal:9},coolantCopy:{flex:1,minWidth:0},coolantHeading:{flexDirection:'row',alignItems:'center',gap:5},coolantLabel:{color:'#c5d8f2',fontSize:9,fontWeight:'900',letterSpacing:.4},coolantStatus:{color:'#7185a1',fontSize:8,fontWeight:'800',marginTop:4},coolantValue:{fontSize:23,fontWeight:'900',fontVariant:['tabular-nums']},coolantOk:{color:'#4ade80'},coolantWarning:{color:'#fbbf24'},coolantUnavailable:{color:'#8fa6c1'},
   danger:{color:'#fb7185'},
   sessionCard:{minHeight:68,flexDirection:'row',alignItems:'center',gap:10,paddingHorizontal:12,paddingVertical:10,backgroundColor:'#0e1b2d',borderRadius:13,borderWidth:1,borderColor:'#28415f',marginBottom:8},sessionCardLandscape:{width:166,flexGrow:0,flexShrink:0,minHeight:56,alignSelf:'stretch',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:5,paddingHorizontal:8,paddingVertical:7,marginBottom:0},sessionIconWrap:{width:36,height:36,borderRadius:11,alignItems:'center',justifyContent:'center',backgroundColor:'#091626',borderWidth:1,borderColor:'#29415f'},sessionIconWrapOk:{borderColor:'#3b8c5a',backgroundColor:'#10261b'},sessionCopy:{flex:1,minWidth:0,gap:2},sessionCopyLandscape:{flex:0,width:'100%',alignItems:'center'},sessionTitle:{color:'#7db3ff',fontSize:8,fontWeight:'900',letterSpacing:.7},sessionHeadline:{color:'#e5edf7',fontSize:10,fontWeight:'900'},sessionDetail:{color:'#8fa6c1',fontSize:8,lineHeight:12,textAlign:'center'},
