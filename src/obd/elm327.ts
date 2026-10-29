@@ -283,10 +283,10 @@ export class Elm327Session {
     };
   }
 
-  async executeCommand(command: string): Promise<ElmCommandResult> {
+  async executeCommand(command: string, timeoutOverrideMs?: number): Promise<ElmCommandResult> {
     await this.initialize();
     const normalized = normalizeCommand(command);
-    return this.enqueueCommand(() => this.command(normalized));
+    return this.enqueueCommand(() => this.command(normalized, 1, timeoutOverrideMs));
   }
 
   async close(): Promise<void> {
