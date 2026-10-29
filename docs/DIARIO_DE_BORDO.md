@@ -204,6 +204,7 @@
 - **DB-132** · 2026-10-29 — Integridade de telemetria, buffer de autonomia e limite de diagnósticos Bluetooth
 - **DB-133** · 2026-10-29 — Referência CarScanner, cobertura de lacunas e atualização incremental do aprendizado
 - **DB-134** · 2026-10-29 — Buffer de autonomia com expiração por amostra e mediana robusta
+- **DB-135** · 2026-10-29 — Timeout explícito da primeira sonda ECU e retry Bluetooth limitado
 
 ---
 
@@ -4051,3 +4052,21 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - A execução local dos testes não foi possível porque o ambiente não conseguiu resolver github.com ao clonar o repositório. A CI do SHA final deverá validar o código, TypeScript, suíte completa, gate anti-regressão e APK Android standalone; resultados de SHA anterior não contam.
 - Não houve teste físico no Galaxy A06 / SM-A065M / Android 16 com ELM327 e ECU reais. A correção melhora o buffer de autonomia e não resolve nem comprova o timeout Bluetooth/ECU em 010C.
 - Nenhum merge foi executado nesta alteração.
+
+
+## DB-135 · 2026-10-29 — Timeout explícito da primeira sonda ECU e retry Bluetooth limitado
+
+### Achados confirmados
+- `Elm327Session` ajusta dinamicamente `adaptiveTimeoutMs` conforme a latência dos comandos. Depois de comandos AT rápidos, essa janela pode estar no mínimo de 3000 ms quando a sessão testa a ECU pela primeira vez com `010C`, embora o catálogo declare 15000 ms para seleção/prova de protocolo.
+- Havia divergência entre o contrato de orçamento finito e os defaults executáveis: `src/knowledge/bluetooth_config.json` trazia `maxAttempts=20` e `intervalMs=8000`; `DEFAULT_ELM327_COMPATIBILITY.maxConnectionAttempts` também era 20, o que sobrepunha a tentativa de derivar o limite do catálogo. Isso podia prolongar muito a falha para cada candidato.
+
+### Correções implementadas
+- `executeCommand(command, timeoutOverrideMs?)` encaminha o timeout à operação protegida pela fila ELM já existente; a primeira sonda ECU em `createRealElmSessionAttempt` passa `config.protocolSelectionTimeoutMs` e registra o limite no evento `ECU_PROBE_START`.
+- A configuração default passa a usar `maxConnectionAttempts=0` como sentinela de política derivada do catálogo; o catálogo tem três tentativas por candidato com 1500 ms entre tentativas. Um override explícito continua sendo respeitado.
+- Atualizadas as asserções de configuração e baseline; adicionado teste com transporte falso para garantir que o timeout de 9000 ms chega a `readUntilPrompt` dentro da fila serial.
+- Contrato RG-43, plano de testes, changelog e auditoria crítica foram atualizados, preservando o histórico anterior.
+
+### Validação e limites
+- `npm run validate` e `android-build` ainda precisam ser observados no SHA final. Não pude executar o clone/testes localmente porque o ambiente não resolveu `github.com`; os testes adicionados não devem ser considerados aprovados até CI verde.
+- Não houve teste físico no Galaxy A06 / SM-A065M / Android 16 com o ELM327 real. O timeout maior e retry menor atacam inconsistências comprováveis de software, mas não garantem que `010C` gere uma resposta válida: protocolo, alimentação, adaptador e comunicação ECU ainda precisam ser medidos.
+- Nenhum merge foi realizado.
