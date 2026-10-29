@@ -2,6 +2,7 @@
 
 > Trabalho isolado na branch `fix/eas-ota-20261029`, baseada no `main` em `7eec3afecb3718020724baf053f8b6d2ca636fab`. Sem merge e sem publicação OTA nesta rodada. A CI do HEAD final deve confirmar lockfile, configuração Expo, testes e APK antes da integração.
 
+- PR #97: [Configura atualizações OTA EAS para APK pessoal](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/97), aberta contra `main`; manter sem merge até CI e verificação inicial em Android real. `mergeable` deve ser reconsultado junto ao HEAD/CI atuais.
 - Objetivo definido: atualizações OTA para mudanças compatíveis em JavaScript/TypeScript/assets; APK novo obrigatório para alterações de módulo nativo, permissões, plugins, dependências nativas ou configuração que altere o runtime.
 - Projeto Expo configurado conforme os identificadores informados: owner `luizarruda`, slug `meriva`, project ID `013db816-eec1-4406-8952-d6c0731cf461`. A sessão não autenticou contra a API Expo, portanto o vínculo no serviço e o canal remoto ainda precisam ser verificados.
 - Adicionado `expo-updates ~0.25.27`, compatível com a linha Expo SDK 51, e atualizado o lockfile. A consistência final será validada por `npm ci` e CI; o lockfile foi atualizado via GitHub e não executado localmente nesta sessão.
