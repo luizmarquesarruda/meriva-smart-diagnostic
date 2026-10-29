@@ -20,7 +20,7 @@ A publicação está deliberadamente bloqueada por padrão. Para habilitar, na c
 2. **Repository variable** `EAS_UPDATE_ENABLED` com valor exato `true`.
 3. Confirme que o canal EAS `production` existe e aponta para o branch de updates desejado. No terminal autenticado na conta Expo, use `npx eas-cli@latest channel:list` e `npx eas-cli@latest channel:view production`. Se necessário, crie-o com `npx eas-cli@latest channel:create production` e confirme o vínculo do branch no dashboard/CLI.
 
-Com essa chave habilitada, a workflow só tenta publicar em push para `main), depois de `validate` e `android-build) passarem. Publica apenas alterações em `app/`, `src/`, `assets/`, `components/` ou `hooks/`; mudanças em configuração, dependências ou código nativo fazem o gate ignorar o OTA. Se houver código do app para publicar, a ausência de `EXPO_TOKEN` falha explicitamente.
+Com essa chave habilitada, a workflow só tenta publicar em push para `main`, depois de `validate` e `android-build` passarem. Publica apenas alterações em `app/`, `src/`, `assets/`, `components/` ou `hooks/`; mudanças em configuração, dependências ou código nativo fazem o gate ignorar o OTA. Se houver código do app para publicar, a ausência de `EXPO_TOKEN` falha explicitamente.
 
 ## Primeiro APK obrigatório
 
