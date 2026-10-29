@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
@@ -9,8 +10,6 @@ import { getMidLayout } from '../src/ui/midLayout';
 import { COLORS, SCREEN_TITLE_STYLE } from '../src/ui/theme';
 import { AppIcon } from '../src/ui/AppIcon';
 import { SourceStatusLegend } from '../src/ui/SourceStatusLegend';
-import { readDriveCycles } from '../src/storage/driveCycleStorage';
-import type { DriveCycle } from '../src/data/driveCycles';
 import { exportDiagnosticsJson, exportDriveCyclesCsv } from '../src/storage/exportDiagnostics';
 
 const DEFAULT_QUOTA: StorageQuotaConfig = {
@@ -29,7 +28,6 @@ export default function ArmazenamentoScreen() {
   const [csvQueueStatus, setCsvQueueStatus] = useState(getCsvQueueStatus());
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
-  const [cycles, setCycles] = useState<DriveCycle[]>([]);
 
   async function refresh(path: string) {
     setCsvQueueStatus(getCsvQueueStatus());
@@ -46,7 +44,6 @@ export default function ArmazenamentoScreen() {
       });
       setUsageBreakdown({});
     }
-    setCycles((await readDriveCycles(path)).filter((cycle) => cycle.source === 'REAL_OBD').sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()));
   }
 
   useEffect(() => {
@@ -124,16 +121,15 @@ export default function ArmazenamentoScreen() {
         </Text>
       </View>
       <View style={[styles.historyCard, layout.landscape && styles.dataColumnCard]}>
-        <Text style={styles.cardTitle}>VIAGENS SALVAS</Text>
-        {cycles.length ? cycles.slice(0, 6).map((cycle) => (
-          <View key={cycle.id} style={styles.historyRow}>
-            <View style={styles.historyMain}>
-              <Text style={styles.historyDate}>{cycle.startedAt}</Text>
-              <Text style={styles.historyMeta}>{cycle.distanceTotalKm.toFixed(2)} km • {(cycle.fuelDataValid !== false && Number.isFinite(cycle.fuelUsedL) && cycle.fuelUsedL >= 0.05 && Number.isFinite(cycle.avgFuelConsumptionKml) && cycle.avgFuelConsumptionKml > 0) ? `${cycle.avgFuelConsumptionKml.toFixed(2)} km/L` : 'Consumo: N/D'}</Text>
-            </View>
-            <Text style={cycle.source === 'REAL_OBD' ? styles.real : styles.reference}>{cycle.source === 'REAL_OBD' ? 'REAL' : 'REF.'}</Text>
-          </View>
-        )) : <Text style={styles.empty}>Nenhuma viagem salva ainda.</Text>}
+        <Text style={styles.cardTitle}>RELATÓRIOS DE VIAGENS</Text>
+        <Text style={styles.note}>A lista completa, os detalhes por percurso e os gráficos históricos ficam na área Viagens. Esta tela concentra o armazenamento local e as exportações.</Text>
+        <Link href="/viagens" asChild>
+          <TouchableOpacity style={[styles.button, styles.buttonWithIcon]} accessibilityRole="button" accessibilityLabel="Abrir relatórios de viagens">
+            <AppIcon name="trips" size={18} color="#fff" />
+            <Text style={styles.buttonText}>ABRIR HISTÓRICO DE VIAGENS</Text>
+          </TouchableOpacity>
+        </Link>
+      </View>
       </View>
       </View>
 

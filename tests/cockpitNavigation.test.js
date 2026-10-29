@@ -12,7 +12,8 @@ assert.match(laboratory, /AGUARDANDO CONEXÃO ELM327/, 'tela OBD não deve chama
 assert.match(laboratory, /getSharedObdConnection\(\) \? 'ECU CONECTADA \/ DIAGNÓSTICO DISPONÍVEL' : 'AGUARDANDO CONEXÃO ELM327'/, 'estado inicial deve refletir a conexão real');
 assert.match(laboratory, /disabledButton/, 'botão de desconexão precisa ter estilo visual explícito quando desabilitado');
 assert.match(laboratory, /ELM327 DESCONECTADO/, 'botão desabilitado deve comunicar que não existe sessão ativa');
-assert.match(laboratory, /paddingBottom: 132/, 'conteúdo rolável deve reservar espaço para a navegação inferior fixa');
+assert.match(laboratory, /paddingBottom: 30/, 'Laboratório sem navegação fixa deve usar margem final normal');
+assert.doesNotMatch(laboratory, /paddingBottom: 132/, 'não reservar altura para uma barra inferior que a tela não renderiza');
 for (const route of ['/dados', '/laboratorio', '/mais', '/viagens', '/conectividade']) assert.match(index, new RegExp(route.replace('/', '\\/')), 'cockpit deve expor a rota ' + route);
 assert.doesNotMatch(index, /href="\/saude"/, 'saúde detalhada não deve duplicar o cartão na página inicial');
 assert.match(more, /'\/saude'/, 'a central de saúde deve continuar acessível em Mais Recursos');

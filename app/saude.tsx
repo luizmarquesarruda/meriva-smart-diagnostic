@@ -32,7 +32,8 @@ export default function SaudeScreen() {
     ) as PidObservation[];
     return runLocalDiagnostic({ observations, dtcs: state.dtcs, condition: context.condition });
   }, [state, context.condition]);
-  const ecuCurrentlyValidated = getSharedObdStatus().ecuConnected;
+  const liveObdStatus = getSharedObdStatus();
+  const ecuCurrentlyValidated = liveObdStatus.ecuConnected;
   const noCurrentFindings = diagnostic.hypotheses.length === 0 && activeDtcs.length === 0;
   const normal = noCurrentFindings && ecuCurrentlyValidated && diagnostic.evaluatedRuleGroups > 0;
   const inconclusive = noCurrentFindings && !normal;
@@ -41,8 +42,18 @@ export default function SaudeScreen() {
     <View style={[styles.health, normal ? styles.healthOk : inconclusive ? styles.healthUnknown : styles.healthWarn]}><Text style={normal ? styles.bigOk : inconclusive ? styles.bigUnknown : styles.bigWarn}>{normal ? '● SEM ALERTAS NAS LEITURAS ATUAIS' : inconclusive ? '● DADOS INSUFICIENTES' : '● ATENÇÃO NECESSÁRIA'}</Text><Text style={styles.hint}>{normal ? 'Nenhuma hipótese local foi acionada pelos PIDs reais recentes; isso não certifica a saúde total do veículo.' : inconclusive ? 'Sem ECU validada e PIDs reais recentes, a ausência de alertas não significa que o sistema esteja normal.' : activeDtcs.length ? activeDtcs.length + ' DTC(s) ativo(s) de origem REAL_OBD registrados; confirme em nova leitura da ECU.' : 'Há hipóteses locais que exigem verificação; consulte as evidências e próximos testes.'}</Text></View>
     <Text style={styles.section}>CONEXÃO</Text>
     <View style={[styles.infoGrid, layout.landscape && styles.infoGridLandscape]}>
-      <View style={[styles.row, layout.landscape && styles.gridRow]}><Text style={styles.name}>Bluetooth</Text><Text style={state.obd.connected?styles.ok:styles.muted}>{state.obd.connected?'CONECTADO':'AGUARDANDO'}</Text></View>
-      <View style={[styles.row, layout.landscape && styles.gridRow]}><Text style={styles.name}>ECU</Text><Text style={state.obd.ecuValidatedAt?styles.ok:styles.muted}>{state.obd.ecuValidatedAt?'VALIDADA':'NÃO VALIDADA'}</Text></View>
+      <View style={[styles.row, layout.landscape && styles.gridRow]}>
+        <Text style={styles.name}>Bluetooth</Text>
+        <Text style={liveObdStatus.bluetoothConnected ? styles.ok : styles.muted}>
+          {liveObdStatus.bluetoothConnected ? 'CONECTADO' : liveObdStatus.lifecycle === 'BLUETOOTH_OFF' ? 'DESLIGADO' : 'DESCONECTADO'}
+        </Text>
+      </View>
+      <View style={[styles.row, layout.landscape && styles.gridRow]}>
+        <Text style={styles.name}>ECU</Text>
+        <Text style={liveObdStatus.ecuConnected ? styles.ok : liveObdStatus.ecuResponseState === 'NO_RESPONSE' ? styles.warn : styles.muted}>
+          {liveObdStatus.ecuConnected ? 'RESPONDENDO' : liveObdStatus.ecuResponseState === 'NO_RESPONSE' ? 'SEM RESPOSTA' : liveObdStatus.ecuResponseState === 'RECOVERING' ? 'RECUPERANDO' : 'NÃO VALIDADA'}
+        </Text>
+      </View>
     </View>
     <Text style={styles.section}>CONTEXTO OPERACIONAL</Text>
     <View style={[styles.contextGrid, layout.landscape && styles.infoGridLandscape]}>
@@ -56,9 +67,6 @@ export default function SaudeScreen() {
     {diagnostic.blockedStaleSamples > 0 ? <Text style={styles.detail}>LEITURAS ANTIGAS/FUTURAS BLOQUEADAS: {diagnostic.blockedStaleSamples}</Text> : null}
     {diagnostic.blockedInvalidSamples > 0 ? <Text style={styles.detail}>LEITURAS INVÁLIDAS/IMPLAUSÍVEIS BLOQUEADAS: {diagnostic.blockedInvalidSamples}</Text> : null}
     {diagnostic.blockedNonLiveSamples > 0 ? <Text style={styles.detail}>DADOS IMPORTADOS/REFERÊNCIA BLOQUEADOS: {diagnostic.blockedNonLiveSamples}</Text> : null}
-    {diagnostic.blockedDuplicateSamples > 0 ? <Text style={styles.detail}>AMOSTRAS COM TIMESTAMP DUPLICADO BLOQUEADAS: {diagnostic.blockedDuplicateSamples}</Text> : null}
-    {diagnostic.blockedStaleDtcs > 0 ? <Text style={styles.detail}>DTCs ANTIGOS BLOQUEADOS: {diagnostic.blockedStaleDtcs}</Text> : null}
-    <Text style={styles.detail}>AMOSTRAS OBD ATUAIS ACEITAS: {diagnostic.acceptedLiveSamples} · GRUPOS DE REGRAS AVALIADOS: {diagnostic.evaluatedRuleGroups}</Text>
     {diagnostic.blockedDuplicateSamples > 0 ? <Text style={styles.detail}>AMOSTRAS COM TIMESTAMP DUPLICADO BLOQUEADAS: {diagnostic.blockedDuplicateSamples}</Text> : null}
     {diagnostic.blockedStaleDtcs > 0 ? <Text style={styles.detail}>DTCs COM ÚLTIMA OBSERVAÇÃO ANTIGA/FUTURA BLOQUEADOS: {diagnostic.blockedStaleDtcs}</Text> : null}
     <Text style={styles.detail}>AMOSTRAS OBD ATUAIS ACEITAS: {diagnostic.acceptedLiveSamples} · GRUPOS DE REGRAS AVALIADOS: {diagnostic.evaluatedRuleGroups}</Text>

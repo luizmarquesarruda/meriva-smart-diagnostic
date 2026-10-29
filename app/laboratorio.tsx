@@ -55,11 +55,6 @@ export default function LaboratorioScreen() {
   const [supportedPids, setSupportedPids] = useState<string[]>([]);
   const [dtcCodes, setDtcCodes] = useState<string[]>([]);
   const [fuelUsedL, setFuelUsedL] = useState(0);
-  const [tripDistanceKm, setTripDistanceKm] = useState(0);
-  const [tripFuelUsedL, setTripFuelUsedL] = useState(0);
-  const [tripConsumptionKml, setTripConsumptionKml] = useState<number | null>(null);
-  const [tripActive, setTripActive] = useState(false);
-  const [tripFuelSupported, setTripFuelSupported] = useState<boolean | null>(null);
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const [dtcScan, setDtcScan] = useState<DtcServiceScan[]>([]);
   const [dtcScanning, setDtcScanning] = useState(false);
@@ -73,12 +68,7 @@ export default function LaboratorioScreen() {
 
   useEffect(() => {
     const unsubscribeTrip = autoTripService.subscribe((trip) => {
-      setTripActive(trip.active);
-      setTripFuelSupported(trip.connected ? trip.fuelSupported : null);
-      setTripDistanceKm(trip.distanceKm);
-      setTripFuelUsedL(trip.fuelUsedL);
       setFuelUsedL(trip.fuelUsedL);
-      setTripConsumptionKml(trip.consumptionKml);
       if (trip.error) setError(trip.error);
     });
 
@@ -225,14 +215,7 @@ export default function LaboratorioScreen() {
       // A conexão já fez a descoberta. Não repita a varredura imediatamente.
       const discovered = connected.supportedPids;
       setSupportedPids(discovered);
-      const fuelSupported = discovered.includes('015E');
-      setTripFuelSupported(fuelSupported);
-      setTripActive(true);
-      setStatus(
-        fuelSupported
-          ? connected.protocol ? 'VIAGEM AUTOMÁTICA / GPS + PID 015E' : 'VIAGEM AUTOMÁTICA / PROTOCOLO N/D'
-          : 'VIAGEM AUTOMÁTICA / GPS, SEM PID 015E',
-      );
+      setStatus('ECU VALIDADA / DIAGNÓSTICO DISPONÍVEL');
     } catch (cause) {
       const failedSession = sessionRef.current;
       sessionRef.current = null;
@@ -242,8 +225,6 @@ export default function LaboratorioScreen() {
         // sessão já encerrada ou transporte indisponível
       }
       setProtocol('N/D');
-      setTripFuelSupported(null);
-      setTripActive(false);
       setStatus('ELM NÃO RESPONDE');
       setError(cause instanceof Error ? cause.message : 'FALHA AO CONECTAR AO ELM327');
     }
@@ -261,9 +242,6 @@ export default function LaboratorioScreen() {
         await activeSession?.close();
       }
       setTripFuelSupported(null);
-      setTripConsumptionKml(null);
-      setTripDistanceKm(0);
-      setTripFuelUsedL(0);
       setFuelUsedL(0);
       setStatus('BLUETOOTH OK / ELM DESCONECTADO');
     } catch (cause) {
@@ -531,20 +509,6 @@ export default function LaboratorioScreen() {
         <View style={styles.connectionItem}><Text style={styles.connectionLabel}>PIDs</Text><Text style={styles.connectionValue}>{supportedPids.length || 'N/D'}</Text></View>
       </View>
       {!storageReady ? <Text style={styles.warning}>PREPARANDO AUTOSAVE...</Text> : null}
-      <View style={[styles.tripPanel, layout.landscape && styles.tripPanelLandscape]}>
-        <View style={styles.tripHeader}>
-          <Text style={styles.tripTitle}>VIAGEM AUTOMÁTICA</Text>
-          <Text style={tripActive ? styles.live : styles.muted}>{tripActive ? 'GRAVANDO' : 'AGUARDANDO'}</Text>
-        </View>
-        <View style={[styles.tripGrid, layout.landscape && styles.tripGridLandscape]}>
-          <View style={[styles.tripMetric, layout.landscape && styles.tripMetricLandscape]}><Text style={styles.tripLabel}>DISTÂNCIA GPS</Text><Text style={styles.tripValue}>{tripDistanceKm.toFixed(2)} km</Text></View>
-          <View style={[styles.tripMetric, layout.landscape && styles.tripMetricLandscape]}><Text style={styles.tripLabel}>CONSUMO</Text><Text style={styles.tripValue}>{tripConsumptionKml == null ? 'N/D' : tripConsumptionKml.toFixed(2) + ' km/L'}</Text></View>
-          <View style={[styles.tripMetric, layout.landscape && styles.tripMetricLandscape]}><Text style={styles.tripLabel}>PID 015E</Text><Text style={styles.tripValue}>{tripFuelSupported === null ? 'N/D' : (tripFuelSupported ? 'OK' : 'NÃO')}</Text></View>
-          <View style={[styles.tripMetric, layout.landscape && styles.tripMetricLandscape]}><Text style={styles.tripLabel}>AUTONOMIA ESTIMADA</Text><Text style={styles.tripValue}>{autoTripService.getState().estimatedRangeKm > 0 ? autoTripService.getState().estimatedRangeKm.toFixed(0) + ' km' : autoTripService.getState().fuelLevelPercent === 0 && autoTripService.getState().fuelLevelReadAtMs != null ? '0 km' : 'N/D'}</Text></View>
-        </View>
-        <Text style={styles.tripHelp}>Sem botão iniciar. O app registra somente dados reais válidos.</Text>
-      </View>
-
       <View style={[styles.modeRow, layout.landscape && styles.rowLandscape]}>
         <TouchableOpacity style={[styles.modeButton, mode === 'REAL' && styles.active]} onPress={() => setMode('REAL')}>
           <Text style={styles.modeText}>REAL</Text>
@@ -735,7 +699,7 @@ export default function LaboratorioScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, paddingTop: 16, paddingBottom: 132, backgroundColor: COLORS.screen },
+  container: { flexGrow: 1, paddingTop: 16, paddingBottom: 30, backgroundColor: COLORS.screen },
   title: { ...SCREEN_TITLE_STYLE, marginBottom: 6 },
   status: { color: COLORS.primary, fontWeight: '700', marginBottom: 6 },
   protocol: { color: COLORS.textMuted, fontWeight: '600', marginBottom: 8 },

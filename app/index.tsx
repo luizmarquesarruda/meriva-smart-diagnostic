@@ -351,7 +351,7 @@ export default function IndexScreen() {
                 <Text style={styles.brand} numberOfLines={1}>SMART OBD DIAGNOSTIC</Text>
                 <Text style={styles.subtitle} numberOfLines={1}>COCKPIT DE DIAGNÓSTICO</Text>
               </View>
-              <View style={styles.connectionPill}><View style={[styles.dot, connectionStatus.ecuConnected ? styles.dotOk : bluetoothError ? styles.dotDanger : styles.dotWarn]} /><Text style={styles.connectionText}>{connectionLabel}</Text></View>
+              <View style={styles.connectionPill}><View style={[styles.dot, connectionStatus.ecuConnected ? styles.dotOk : bluetoothError ? styles.dotDanger : styles.dotWarn]} /><Text style={styles.connectionText}>{connectionStatus.ecuConnected ? 'ECU OK' : connectionStatus.ecuResponseState === 'NO_RESPONSE' ? 'SEM RESPOSTA' : connectionStatus.ecuResponseState === 'RECOVERING' ? 'RECUPERANDO' : bluetoothSearching ? 'CONECTANDO' : connectionStatus.bluetoothConnected ? 'BT ATIVO' : bluetoothError ? 'FALHA' : 'SEM CONEXÃO'}</Text></View>
             </View>
             <View style={[styles.infoStrip, layout.landscape && styles.infoStripLandscape]}>
               <View style={styles.weatherContent}>

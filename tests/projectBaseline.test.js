@@ -292,8 +292,8 @@ assert.ok(!tripService.includes('estimatedRangeKm: persistedAutonomy.estimatedRa
 assert.match(dataScreen, /label="AUTONOMIA" value=\{trip\.estimatedRangeKm > 0/);
 assert.match(dataScreen, /trip\.fuelLevelPercent === 0 && trip\.fuelLevelReadAtMs != null/,
   'a current, valid empty-tank reading must show 0 km instead of N/D');
-assert.match(laboratory, /fuelLevelPercent === 0/,
-  'laboratory autonomy must distinguish a valid zero range from unavailable data');
+assert.doesNotMatch(laboratory, /tripPanel|label=\"AUTONOMIA ESTIMADA\"/,
+  'laboratory must not repeat the current trip summary already available in cockpit and data screens');
 assert.doesNotMatch(dataScreen, /label="AUTONOMIA" value=\{state\.autonomy\.estimatedRangeKm/, 'real-time screen must not show persisted range as current');
 assert.ok(!home.includes('actionGrid') && !home.includes('dashboardAction'),
   'cockpit não deve duplicar destinos em uma segunda fileira de ações');

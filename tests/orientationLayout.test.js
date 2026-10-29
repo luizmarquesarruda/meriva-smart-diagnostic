@@ -9,6 +9,9 @@ const pollingPolicy = JSON.parse(fs.readFileSync('src/knowledge/polling_policy.j
 const layout = fs.readFileSync('app/_layout.tsx', 'utf8');
 const midLayout = fs.readFileSync('src/ui/midLayout.ts', 'utf8');
 const tripService = fs.readFileSync('src/trip/autoTripService.ts', 'utf8');
+const healthScreen = fs.readFileSync('app/saude.tsx', 'utf8');
+const laboratoryScreen = fs.readFileSync('app/laboratorio.tsx', 'utf8');
+const storageScreen = fs.readFileSync('app/armazenamento.tsx', 'utf8');
 const screenFiles = [
   'app/mais.tsx', 'app/dados.tsx', 'app/saude.tsx', 'app/veiculo.tsx',
   'app/viagens.tsx', 'app/aprendizado.tsx', 'app/bluetooth.tsx',
@@ -33,7 +36,7 @@ assert.match(index, /quadrantCardLandscape:\{minHeight:54,paddingVertical:4/, 'q
 assert.match(index, /quadrantGrid:\{width:'100%',flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',gap:8\}/, 'quadrantes devem manter uma grade responsiva com quebra de linha');
 assert.match(index, /quadrantGridLandscape:\{gap:5\}/, 'a grade deve reduzir o espaçamento entre quadrantes em paisagem');
 assert.match(index, /styles\.quadrantGrid, layout\.landscape && styles\.quadrantGridLandscape/, 'a grade deve aplicar o estilo específico de paisagem');
-assert.match(index, /styles\.quadrantCard, layout\.landscape && styles\.quadrantCardLandscape/, 'cada quadrante deve aplicar o estilo específico de paisagem');
+assert.match(index, /styles\.quadrantCard,\s*layout\.landscape && styles\.quadrantCardLandscape/, 'cada quadrante deve aplicar o estilo específico de paisagem mesmo com JSX multilinha');
 assert.match(index, /numberOfLines=\{layout\.landscape \? 1 : 2\}/, 'rótulos e dicas devem limitar linhas em paisagem para evitar clipping');
 assert.match(index, /quadrantValueLandscape:\{fontSize:21,lineHeight:23/, 'valores devem reduzir na paisagem');
 assert.match(index, /quadrantHintLandscape:\{fontSize:6/, 'dicas devem usar uma linha na paisagem');
@@ -92,6 +95,17 @@ assert.match(index, /react-native-safe-area-context/);
 assert.match(layout, /SafeAreaProvider/);
 assert.match(midLayout, /size\.width > size\.height/);
 assert.doesNotMatch(index, /screenOrientation|OrientationLock\.(PORTRAIT|LANDSCAPE)/);
+
+assert.equal((healthScreen.match(/AMOSTRAS COM TIMESTAMP DUPLICADO BLOQUEADAS/g) || []).length, 1, 'Central de Saúde não deve duplicar o contador de timestamps');
+assert.equal((healthScreen.match(/AMOSTRAS OBD ATUAIS ACEITAS/g) || []).length, 1, 'Central de Saúde deve exibir uma única linha de amostras aceitas');
+assert.equal((healthScreen.match(/blockedStaleDtcs > 0/g) || []).length, 1, 'Central de Saúde deve exibir uma única linha de DTCs antigos');
+assert.match(healthScreen, /liveObdStatus\.bluetoothConnected/);
+assert.match(healthScreen, /liveObdStatus\.ecuConnected/);
+assert.doesNotMatch(healthScreen, /state\.obd\.connected|state\.obd\.ecuValidatedAt/, 'estado atual da conexão não pode vir de campos persistidos');
+assert.doesNotMatch(laboratoryScreen, /tripPanel|VIAGEM AUTOMÁTICA|DISTÂNCIA GPS|AUTONOMIA ESTIMADA/, 'Laboratório não deve repetir o resumo de viagem do cockpit/Dados');
+assert.match(laboratoryScreen, /paddingBottom: 30/, 'Laboratório deve usar margem final normal, sem reservar uma barra inexistente');
+assert.doesNotMatch(storageScreen, /VIAGENS SALVAS/, 'armazenamento não deve duplicar a lista da tela Viagens');
+assert.match(storageScreen, /href=\"\/viagens\"/, 'armazenamento deve encaminhar para o relatório canônico de viagens');
 for (const file of screenFiles) {
   const source = fs.readFileSync(file, 'utf8');
   assert.ok(/useMidLayout\(\)/.test(source) || /useWindowDimensions\(\)/.test(source) && /getMidLayout\(windowSize\)/.test(source), file + ' deve usar o layout responsivo centralizado');
