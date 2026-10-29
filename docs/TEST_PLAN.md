@@ -136,10 +136,17 @@ O catálogo atual contém 34 PIDs, 20 fórmulas, 34 faixas e 30 avaliações de 
 ## UI-COCKPIT-07 — Rotação e cockpit em paisagem
 
 - Permitir retrato/paisagem conforme a configuração do Android (expo.orientation: default) e a chamada ScreenOrientation.unlockAsync; remover o listener ao desmontar.
-- Em paisagem, usar faixa superior horizontal para título/conexão e clima/rede; cockpit de um lado e sessão de conexão em coluna compacta do outro. A navegação muda para raia vertical lateral para não consumir a altura que os quadrantes precisam.
+- Em paisagem, usar faixa superior horizontal para título/conexão e clima/rede; cockpit de um lado e sessão de conexão em coluna compacta do outro. A navegação muda para raia vertical à direita para não consumir a altura que os quadrantes precisam.
 - Manter os quatro quadrantes principais simultaneamente visíveis numa grade 2×2 em ambas as orientações. Em paisagem, reduzir gaps, altura, padding e tipografia dos cartões; ajustar rótulos/hints para não cortar valores, unidades nem estado N/D. A navegação passa da parte inferior para a lateral direita; reservar área para ela sem cobrir quadrantes. Compactar os cartões auxiliares de consumo/autonomia/pressão sem ocultá-los, limitar o espaçador e preservar sessão e dados durante a rotação. Não introduzir ScrollView ou lock fixo.
 - Testes: tests/orientationLayout.test.js e tests/cockpitNavigation.test.js devem validar configuração livre, estilos de duas colunas, raia lateral, compactação e presença dos cinco destinos.
 - Ensaio final no Galaxy A06: ativar Rotação automática no Android; alternar retrato→paisagem→retrato, confirmar que o carrossel continua a alternar a cada 10 s, setas, leitura dos quatro quadrantes e as cinco abas, sem clipping nem sobreposição.
+## UI-SCREEN-01 — Auditoria de layout e informação duplicada
+- A Central de Saúde mostra cada contador de integridade uma única vez e obtém Bluetooth/ECU do estado ao vivo compartilhado, não de flags persistidas.
+- O Laboratório fica focado em consulta de PID, descoberta, varredura DTC, integridade do decodificador e evidência técnica; não repete o resumo de distância/consumo/autonomia da viagem.
+- Armazenamento mostra quota, fila de logs, exportação e limpeza; a lista canônica de viagens e seus detalhes ficam em /viagens.
+- Uma tela sem navegação fixa não deve reservar espaço vertical para essa navegação. Revisar JSX aninhado/fechamento de views e remover estilos/estado mortos após retirar componentes repetidos.
+- Testes: tests/orientationLayout.test.js, tests/cockpitNavigation.test.js e tests/projectBaseline.test.js; inspeção visual ainda é necessária no Android real.
+
 ## UI-COCKPIT-05 — Carrossel completo dos PIDs na área principal
 
 - A primeira página mantém em ordem fixa quatro quadrantes principais: 0105 (temperatura), 0142 (tensão), 0111 (posição da borboleta) e 010C (RPM).

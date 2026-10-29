@@ -131,7 +131,6 @@ export default function ArmazenamentoScreen() {
         </Link>
       </View>
       </View>
-      </View>
 
       <View style={styles.exportRow}>
         <TouchableOpacity style={[styles.button, styles.buttonWithIcon]} onPress={() => void handleExport('JSON')} disabled={!basePath || busy}>

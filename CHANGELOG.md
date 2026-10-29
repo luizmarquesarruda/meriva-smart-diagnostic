@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Auditoria crítica do cockpit e das telas secundárias
+- Removidos contadores repetidos na Central de Saúde; a conexão Bluetooth/ECU agora é exibida a partir do estado ao vivo compartilhado.
+- Encurtado o estado de conexão no cabeçalho do cockpit, evitando repetir a mesma frase completa no cartão da sessão.
+- Retirado do Laboratório o resumo de viagem redundante e a reserva de 132 dp para uma barra fixa que não existia nessa tela.
+- A página Armazenamento aponta para o relatório canônico de viagens em vez de renderizar uma segunda lista de trajetos.
+- Corrigidos o fechamento duplicado de contêiner na tela Armazenamento, estilos órfãos do painel removido e testes de layout frágeis.
+
 ### Cockpit em paisagem
 - Layout reorganizado em duas faixas horizontais: cabeçalho/clima no topo, cockpit ao lado do cartão de sessão e navegação vertical lateral.
 - Os quatro quadrantes continuam visíveis simultaneamente em grade 2×2 nas duas orientações; em paisagem, cartões, gaps, valores, rótulos e hints usam dimensões compactas sem ocultar métricas nem cortar dados. A navegação muda para a lateral direita.

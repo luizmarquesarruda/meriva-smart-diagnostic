@@ -238,6 +238,7 @@
 - **DB-147** · 2026-10-28 — Incluir os PIDs restantes no carrossel principal com navegação por setas
 - **DB-148** · 2026-10-28 — Auditoria e correção de cockpit em orientação paisagem
 - **DB-149** · 2026-10-28 — Grade 2×2 adaptável e navegação lateral direita em paisagem
+- **DB-150** · 2026-10-28 — Auditoria crítica de layout e duplicações de conteúdo
 
 ---
 
@@ -4322,3 +4323,15 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - A barra de navegação permanece inferior em retrato e passa para a lateral direita em paisagem. A reorganização deve usar dimensões correntes da janela e preservar a sessão e leituras de PIDs.
 - Corrigida a asserção obsoleta de `tests/orientationLayout.test.js`: o estilo atual define altura mínima de 54 dp para os cartões em paisagem, não 58 dp. Ampliadas as proteções automatizadas para grade responsiva, estilo da grade/cartões em paisagem e limite de linhas.
 - Esta alteração documenta e testa o contrato; não prova CI verde nem substitui inspeção física no Galaxy A06. Validar `validate` e `android-build` no SHA final e executar retrato→paisagem→retrato no aparelho antes de merge.
+
+
+## DB-150 · 2026-10-28 — Auditoria crítica de layout e duplicações de conteúdo
+
+- **Falha inicial da CI:** o teste de orientação procurava a aplicação do estilo do quadrante em uma única linha, embora o JSX estivesse formatado em várias linhas. O teste foi ajustado para aceitar quebras de linha, mantendo a verificação do vínculo entre o cartão e o layout em paisagem.
+- **Duplicação na Central de Saúde:** contadores de timestamps duplicados, DTCs antigos e amostras aceitas estavam renderizados duas vezes. Foi preservada uma ocorrência de cada indicador. Os estados Bluetooth/ECU agora vêm de `getSharedObdStatus()`, não dos campos persistidos do autosave.
+- **Informação redundante no cockpit:** o cabeçalho repetia a mensagem completa de conexão já apresentada no cartão de sessão. O cabeçalho passou a mostrar um status compacto, enquanto o cartão de sessão mantém a explicação acionável.
+- **Resumo operacional repetido no Laboratório:** foi removido o painel de viagem com distância GPS, consumo, PID 015E e autonomia, já resumidos no cockpit/Dados e detalhados em Viagens. O painel podia exibir distância zero sem viagem real e rotular “GRAVANDO” apenas após conectar, confundindo sessão OBD com registro de trajeto. Foram removidos os estados e estilos órfãos associados.
+- **Duplicação de viagens no Armazenamento:** eliminada a segunda lista de seis viagens, substituída por link para o relatório canônico `/viagens`. A tela fica dedicada a quota, fila CSV, exportações e limpeza.
+- **Espaço final incorreto no Laboratório:** removido o padding inferior de 132 dp que reservava altura para uma barra fixa não renderizada. O padding passa a 30 dp. Corrigido ainda um fechamento redundante de `View` que havia sido introduzido ao trocar a lista de viagens por um atalho.
+- **Arquitetura de navegação ainda merece acompanhamento:** Bluetooth e Laboratório mantêm fluxos de conexão distintos (seleção explícita em Bluetooth e tentativa automática de candidatos no Laboratório), embora publiquem a sessão compartilhada. Não foi feita uma consolidação do ciclo de vida nesta rodada para não arriscar regressão de RFCOMM/ECU; registrar como prioridade separada para uma alteração isolada com testes de conexão.
+- **Validação:** a CI do SHA anterior `e9229232dc518567c04e12106b5d55c8cc242cff` ainda estava em execução no momento da auditoria. Este registro não declara a nova versão aprovada. Exigir `validate` e `android-build` verdes no SHA final, revisar o diff contra `main` e executar a rotação retrato→paisagem→retrato e a inspeção das telas no Galaxy A06. O teste físico com ELM327/ECU permanece separado.

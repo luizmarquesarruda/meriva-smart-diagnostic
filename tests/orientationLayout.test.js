@@ -102,7 +102,7 @@ assert.equal((healthScreen.match(/blockedStaleDtcs > 0/g) || []).length, 1, 'Cen
 assert.match(healthScreen, /liveObdStatus\.bluetoothConnected/);
 assert.match(healthScreen, /liveObdStatus\.ecuConnected/);
 assert.doesNotMatch(healthScreen, /state\.obd\.connected|state\.obd\.ecuValidatedAt/, 'estado atual da conexão não pode vir de campos persistidos');
-assert.doesNotMatch(laboratoryScreen, /tripPanel|VIAGEM AUTOMÁTICA|DISTÂNCIA GPS|AUTONOMIA ESTIMADA/, 'Laboratório não deve repetir o resumo de viagem do cockpit/Dados');
+assert.doesNotMatch(laboratoryScreen, /tripPanel|tripMetric|tripGrid|tripLabel|tripValue|tripHelp|VIAGEM AUTOMÁTICA|DISTÂNCIA GPS|AUTONOMIA ESTIMADA/, 'Laboratório não deve manter painel de viagem repetido nem estilos órfãos');
 assert.match(laboratoryScreen, /paddingBottom: 30/, 'Laboratório deve usar margem final normal, sem reservar uma barra inexistente');
 assert.doesNotMatch(storageScreen, /VIAGENS SALVAS/, 'armazenamento não deve duplicar a lista da tela Viagens');
 assert.match(storageScreen, /href=\"\/viagens\"/, 'armazenamento deve encaminhar para o relatório canônico de viagens');
