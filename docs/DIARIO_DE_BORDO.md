@@ -4,12 +4,12 @@
 
 - Repositório: [luizmarquesarruda/meriva-smart-diagnostic](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
 - PR #96: [Evita DTC duplicado no cockpit e mostra pressão do coletor](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/96), aberta, fora de rascunho e sem merge. Base `main` observada nesta PR: `7eec3afecb3718020724baf053f8b6d2ca636fab`.
-- HEAD consultado: `ece379174636289d84825b11da30759c685a36a1`; CI deste SHA estava pendente. As alterações DB-171/172/173/174/175 precisam ser validadas no HEAD final.
-- A CI `40869798013` executou no SHA `182f09fbe7b3272763fa859db2bad8bd9bc7513a` e falhou no `gate:baseline` pelo contrato GPS obsoleto; `android-build` foi ignorado. O commit `03d92e5340b9fa4b2f98d3509d7b162768cc900b` atualizou o gate; a execução posterior ainda não confirmou `validate` e `android-build` verdes no mesmo SHA.
+- HEAD consultado: `ce77a177d36322b1c5aee6b9dfcc80e3df39c1ed`; `typecheck` passou, mas `npm test` falhou em `tests/orientationLayout.test.js` por uma asserção de cor obsoleta após DB-174. Correção de teste preparada para o commit seguinte.
+- A CI no SHA `ce77a177d36322b1c5aee6b9dfcc80e3df39c1ed` executou `typecheck` com sucesso e falhou em `npm test` na asserção textual da cor térmica; `android-build` foi ignorado. O teste está sendo atualizado para comparar o token compartilhado `COLORS.danger`.
 - Após qualquer alteração, reconsultar o HEAD e a CI correspondentes. Só considerar a PR validada com `validate` e `android-build` verdes no mesmo SHA, diff reconciliado contra `main` e validação física separada.
 - A auditoria atual encontrou divergências de documentação e um débito relevante de modernização do SDK. Não houve upgrade de SDK nem remoção de dependências nativas nesta rodada: fazê-los antes de preservar um baseline físico poderia introduzir regressão no Bluetooth Classic.
 - Testes com Galaxy A06/Android 16/ELM327 real, confirmação de resposta `010C`, inspeção do APK instalado e validação GPS/autonomia continuam pendentes.
-- DB-145 registra a regressão de leitura KWP e classificação de estado ECU/Bluetooth; DB-162/163/164/166 protegem o ciclo RFCOMM; DB-165 limita HTTP de clima; DB-167 expira fixes GPS antigos; DB-168 neutraliza fórmula no CSV; DB-169 torna o start GPS não bloqueante para o polling OBD e aplica cooldown de retry. DB-170 atualiza o gate para aceitar a proteção de timestamp por `state.lastTimestamp`. DB-171 serializa cancelamento da descoberta; DB-172 valida coeficientes/resultados de fórmula; DB-173 corrige documentação cloud; DB-174 centraliza os tokens de cor compartilhados nas telas. DB-175 limita as chamadas de localização opcionais e usa backoff exponencial para o enriquecimento online. DB-171 serializa cancelamento nativo da descoberta; DB-172 valida coeficientes/resultados das fórmulas; DB-173 corrige documentação obsoleta sobre sincronização cloud.
+- DB-145 registra a regressão de leitura KWP e classificação de estado ECU/Bluetooth; DB-162/163/164/166 protegem o ciclo RFCOMM; DB-165 limita HTTP de clima; DB-167 expira fixes GPS antigos; DB-168 neutraliza fórmula no CSV; DB-169 torna o start GPS não bloqueante para o polling OBD e aplica cooldown de retry. DB-170 atualiza o gate para aceitar a proteção de timestamp por `state.lastTimestamp`. DB-171 serializa cancelamento da descoberta; DB-172 valida coeficientes/resultados de fórmula; DB-173 corrige documentação cloud; DB-174 centraliza os tokens de cor compartilhados nas telas. DB-175 limita as chamadas de localização opcionais e usa backoff exponencial para o enriquecimento online.
 - O cockpit deve continuar mostrando N/D até existir leitura OBD real, completa e recente; seed ou histórico não deve ser reapresentado como valor atual.
 - DB-146 restaura os quatro quadrantes de telemetria em simultâneo; os PIDs adicionais continuam acessíveis em páginas de quatro métricas. A ausência de ECU não remove a grade, apenas mantém os valores em N/D.
 - DB-147 fixa os quatro PIDs principais na primeira página e transforma os restantes PIDs suportados em carrossel completo, com setas anterior/próxima e avanço automático a cada 10 s. Anomalias adicionais são priorizadas sem deslocar os quadrantes principais.
@@ -264,6 +264,7 @@
 - **DB-173** · 2026-10-29 — Corrigir documentação obsoleta sobre sincronização em nuvem
 - **DB-174** · 2026-10-29 — Consumir tokens compartilhados para a paleta base das telas
 - **DB-175** · 2026-10-29 — Limitar localização para clima e aplicar backoff exponencial
+- **DB-176** · 2026-10-29 — Atualizar contrato visual térmico para o token de tema
 
 ---
 
@@ -4655,3 +4656,15 @@ A consulta de clima era limitada no `fetch()` HTTP, mas as chamadas Expo anterio
 ### Limites
 - Timeouts JavaScript limitam a espera do chamador; não garantem cancelamento de chamadas nativas Expo que não ofereçam cancelamento explícito. As operações expiram para o fluxo de enriquecimento sem criar coordenadas ou dados de clima.
 - Essa política é somente para clima/localidade; não implementa upload de telemetria, porque a branch não contém cliente/outbox cloud.
+
+## DB-176 · 2026-10-29 — Atualizar contrato visual térmico para o token de tema
+
+### Causa
+A troca de `danger` no cockpit da literal `#fb7185` para `COLORS.danger` preservou o valor exato, mas `tests/orientationLayout.test.js` continuava procurando a literal antiga e falhou durante `npm test`.
+
+### Correção
+- A asserção agora exige `danger:{color:COLORS.danger}` em vez da representação literal da cor.
+- O layout, tamanho e regra de apresentação do valor térmico não foram alterados; apenas o contrato estático foi atualizado para o design system.
+
+### Validação
+- `typecheck` passou no SHA `ce77a177d36322b1c5aee6b9dfcc80e3df39c1ed`; `npm test` falhou na asserção textual identificada. Nova CI completa no HEAD posterior é obrigatória.
