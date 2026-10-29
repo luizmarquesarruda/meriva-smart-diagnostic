@@ -201,12 +201,15 @@ export class BluetoothClassicTransport implements ObdTransport {
           'TIMEOUT: CANCELAMENTO DA DESCOBERTA BLUETOOTH',
         );
       } catch (cause) {
-        // A descoberta é auxiliar; timeout/erro é registrado, mas não autoriza
-        // uma espera infinita antes do connect, cujo timeout é independente.
         this.logDiagnostic('CANCEL_DISCOVERY_FAILED_OR_TIMED_OUT', {
           timeoutMs: NATIVE_DISCOVERY_TIMEOUT_MS,
           error: cause instanceof Error ? cause.message : String(cause),
         });
+        // A chamada nativa não pode ser cancelada por este timeout. Não inicie
+        // RFCOMM enquanto o cancelamento da descoberta ainda pode estar pendente.
+        if (cause instanceof Error && cause.message.startsWith('TIMEOUT:')) {
+          throw new Error('ESTADO DA DESCOBERTA BLUETOOTH INDETERMINADO; CONEXÃO RFCOMM CANCELADA');
+        }
       }
     }
 
@@ -455,15 +458,39 @@ export class BluetoothClassicTransport implements ObdTransport {
     await new Promise((resolve) => setTimeout(resolve, 250));
 
     if (typeof device.isConnected === 'function') {
-      const confirmed = await runWithTimeout(
-        () => device!.isConnected!(),
-        NATIVE_CONNECTION_CHECK_TIMEOUT_MS,
-        `TIMEOUT: VERIFICAÇÃO DO SOCKET BLUETOOTH APÓS ${NATIVE_CONNECTION_CHECK_TIMEOUT_MS} MS`,
-      );
+      let confirmed: boolean;
+      try {
+        confirmed = await runWithTimeout(
+          () => device!.isConnected!(),
+          NATIVE_CONNECTION_CHECK_TIMEOUT_MS,
+          `TIMEOUT: VERIFICAÇÃO DO SOCKET BLUETOOTH APÓS ${NATIVE_CONNECTION_CHECK_TIMEOUT_MS} MS`,
+        );
+      } catch (cause) {
+        const message = cause instanceof Error ? cause.message : String(cause);
+        this.logDiagnostic('INITIAL_DEVICE_CONNECTED_CHECK_FAILED', {
+          timeoutMs: NATIVE_CONNECTION_CHECK_TIMEOUT_MS,
+          error: message,
+          cleanupRequired: true,
+        });
+        const cleanup = this.registerPendingNativeSocketCleanup(device, 'INITIAL_CONNECTION_CHECK_CLEANUP');
+        this.device = null;
+        this.connected = false;
+        this.received = '';
+        this.receiveOverflow = false;
+        throw new Error('ESTADO INICIAL DO SOCKET BLUETOOTH INDETERMINADO; LIMPEZA NATIVA REGISTRADA: ' + message);
+      }
       this.logDiagnostic('DEVICE_CONNECTED_CHECK', confirmed);
       if (!confirmed) {
-        await this.safeDisconnect(device);
-        this.markDisconnected();
+        const cleanup = this.registerPendingNativeSocketCleanup(device, 'INITIAL_CONNECTION_REJECTED_CLEANUP');
+        this.device = null;
+        this.connected = false;
+        this.received = '';
+        this.receiveOverflow = false;
+        const settled = await waitForNativeConnectAttempt(cleanup.promise, this.config.bluetoothConnectTimeoutMs);
+        if (!settled) {
+          throw new Error('ELM327 NÃO CONFIRMOU A CONEXÃO BLUETOOTH; LIMPEZA NATIVA PENDENTE E NOVO SOCKET BLOQUEADO');
+        }
+        await cleanup.promise;
         throw new Error('ELM327 NÃO CONFIRMOU A CONEXÃO BLUETOOTH');
       }
     }
