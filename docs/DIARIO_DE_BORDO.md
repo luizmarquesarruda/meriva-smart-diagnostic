@@ -18,7 +18,7 @@
 ### Alterações propostas nesta branch
 - `package.json` e `package-lock.json`: incluir `expo-updates ~0.25.27` para Expo SDK 51 e teste contratual de configuração.
 - `app.json`: alinhar slug/owner/projectId com os dados fornecidos e configurar URL OTA, runtime por versão do app e header fixo do canal `production`.
-- `eas.json`: alinhar perfis preview/production ao mesmo canal, destinado ao uso pessoal.
+- `eas.json`: configurar ambos os perfis preview/production como APK com distribuição interna, sem AAB/Google Play, e manter o canal único `production` para uso pessoal.
 - `.github/workflows/ci.yml`: job de publicação com bloqueio explícito por variável, secret e sucesso dos dois jobs de validação/build. O gate ignora commits com alterações nativas ou sem alterações de código/assets do app.
 - `tests/easUpdateConfig.test.js`: validar endpoint, identidade, política de runtime, dependência/lockfile e canal.
 - `docs/OTA_ATUALIZACOES.md`: documentar diferença OTA/APK, segredo/variável necessários e instalação inicial obrigatória.
