@@ -4314,3 +4314,10 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Densidade: quadrantes reduzem fonte, padding e hints a uma linha em paisagem; o cabeçalho/instrução do carrossel e os cartões auxiliares de consumo, autonomia e pressão também usam modo compacto. O espaçador é limitado a 4 dp, evitando que consuma altura útil. Retrato permanece com fluxo vertical anterior.
 - Proteções: testes cobrem orientação padrão livre, liberação da orientação, estilos de paisagem, raia de navegação e cinco destinos visíveis. O checklist físico exige rotação retrato→paisagem→retrato, carrossel/setas e ausência de clipping/sobreposição.
 - Limite conhecido: a aplicação não deve forçar a rotação se a opção Rotação automática do Android estiver desligada. A validação de layout automatizada não substitui o teste visual no dispositivo real; o APK final depende da CI do SHA atualizado.
+
+## DB-149 · 2026-10-28 — Quadrantes adaptáveis em ambas as orientações
+
+- Requisito complementar: a rotação adapta a página inicial inteira, não só a navegação. Os quatro quadrantes principais devem continuar simultaneamente visíveis em grade 2×2, com dimensões, espaçamentos e tipografia compactados em paisagem; valores, unidades, rótulos e estados N/D não podem ser cortados nem sobrepostos.
+- A barra de navegação permanece inferior em retrato e passa para a lateral direita em paisagem. A reorganização deve usar dimensões correntes da janela e preservar a sessão e leituras de PIDs.
+- Corrigida a asserção obsoleta de `tests/orientationLayout.test.js`: o estilo atual define altura mínima de 54 dp para os cartões em paisagem, não 58 dp. Ampliadas as proteções automatizadas para grade responsiva, estilo da grade/cartões em paisagem e limite de linhas.
+- Esta alteração documenta e testa o contrato; não prova CI verde nem substitui inspeção física no Galaxy A06. Validar `validate` e `android-build` no SHA final e executar retrato→paisagem→retrato no aparelho antes de merge.

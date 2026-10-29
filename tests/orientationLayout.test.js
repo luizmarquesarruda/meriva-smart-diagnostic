@@ -29,7 +29,12 @@ assert.match(index, /topSectionLandscape:\{[^}]*flexDirection:'row'/, 'cabeçalh
 assert.match(index, /mainContentLandscape:\{[^}]*flexDirection:'row'/, 'cockpit e sessão devem dividir a largura em paisagem');
 assert.match(index, /sessionCardLandscape:\{width:166/, 'sessão deve usar coluna compacta em telas baixas');
 assert.match(index, /bottomNavLandscape:\{position:'absolute',left:0,top:0,bottom:20,width:50,flexDirection:'column'/, 'navegação deve virar uma raia vertical compacta');
-assert.match(index, /quadrantCardLandscape:\{minHeight:58,paddingVertical:4/, 'quadrantes devem reduzir espaçamento vertical em paisagem');
+assert.match(index, /quadrantCardLandscape:\{minHeight:54,paddingVertical:4/, 'quadrantes devem reduzir altura e espaçamento vertical em paisagem');
+assert.match(index, /quadrantGrid:\{width:'100%',flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',gap:8\}/, 'quadrantes devem manter uma grade responsiva com quebra de linha');
+assert.match(index, /quadrantGridLandscape:\{gap:5\}/, 'a grade deve reduzir o espaçamento entre quadrantes em paisagem');
+assert.match(index, /styles\.quadrantGrid, layout\.landscape && styles\.quadrantGridLandscape/, 'a grade deve aplicar o estilo específico de paisagem');
+assert.match(index, /styles\.quadrantCard, layout\.landscape && styles\.quadrantCardLandscape/, 'cada quadrante deve aplicar o estilo específico de paisagem');
+assert.match(index, /numberOfLines=\{layout\.landscape \? 1 : 2\}/, 'rótulos e dicas devem limitar linhas em paisagem para evitar clipping');
 assert.match(index, /quadrantValueLandscape:\{fontSize:21,lineHeight:23/, 'valores devem reduzir na paisagem');
 assert.match(index, /quadrantHintLandscape:\{fontSize:6/, 'dicas devem usar uma linha na paisagem');
 assert.match(index, /quadrantHeaderLandscape:\{marginBottom:4/, 'cabeçalho do carrossel deve diminuir em paisagem');
