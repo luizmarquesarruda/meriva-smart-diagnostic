@@ -631,8 +631,14 @@ export class BluetoothClassicTransport implements ObdTransport {
         timeoutMs,
         error: message,
         failClosed: true,
+        cleanupRequired: true,
       });
-      throw new Error('ESTADO DO SOCKET BLUETOOTH INDETERMINADO: ' + message);
+      // isConnected() timed out/rejected: this does not prove that RFCOMM is
+      // closed. Register shared cleanup before clearing local state so a
+      // reconnect cannot race the unresolved native probe or socket.
+      this.registerPendingNativeSocketCleanup(device, 'DEVICE_CONNECTED_CHECK_CLEANUP');
+      this.markDisconnected();
+      throw new Error('ESTADO DO SOCKET BLUETOOTH INDETERMINADO; LIMPEZA NATIVA REGISTRADA: ' + message);
     }
 
     this.logDiagnostic('DEVICE_CONNECTED_CHECK', confirmed);
