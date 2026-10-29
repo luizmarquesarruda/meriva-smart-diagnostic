@@ -1,5 +1,42 @@
 import * as Location from 'expo-location';
 
+export const CURRENT_CONDITIONS_HTTP_TIMEOUT_MS = 8_000;
+
+interface WeatherPayload {
+  current?: { temperature_2m?: unknown; weather_code?: unknown };
+}
+
+/** Bound the optional weather request and abort the fetch where supported. */
+export async function fetchWeatherPayload(
+  url: string,
+  timeoutMs = CURRENT_CONDITIONS_HTTP_TIMEOUT_MS,
+): Promise<WeatherPayload> {
+  const boundedTimeoutMs = Number.isFinite(timeoutMs)
+    ? Math.max(1, Math.round(timeoutMs))
+    : CURRENT_CONDITIONS_HTTP_TIMEOUT_MS;
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const request = (async () => {
+    const response = await fetch(url, controller ? { signal: controller.signal } : undefined);
+    if (!response.ok) throw new Error('Weather service unavailable');
+    return await response.json() as WeatherPayload;
+  })();
+
+  try {
+    return await Promise.race([
+      request,
+      new Promise<WeatherPayload>((_resolve, reject) => {
+        timer = setTimeout(() => {
+          controller?.abort();
+          reject(new Error(`TIMEOUT: CONSULTA HTTP DE CLIMA APÓS ${boundedTimeoutMs} MS`));
+        }, boundedTimeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 export interface CurrentConditions {
   city: string | null;
   /** Locality labels are only populated when foreground location was already authorized. */
@@ -64,11 +101,7 @@ export async function loadCurrentConditions(): Promise<CurrentConditions> {
       + '?latitude=' + encodeURIComponent(String(position.coords.latitude))
       + '&longitude=' + encodeURIComponent(String(position.coords.longitude))
       + '&current=temperature_2m,weather_code&timezone=auto';
-    const response = await fetch(url);
-    if (!response.ok) throw new Error('Weather service unavailable');
-    const payload = await response.json() as {
-      current?: { temperature_2m?: unknown; weather_code?: unknown };
-    };
+    const payload = await fetchWeatherPayload(url);
     const temperature = payload.current?.temperature_2m;
     const code = payload.current?.weather_code;
     const temperatureC = typeof temperature === 'number' && Number.isFinite(temperature)

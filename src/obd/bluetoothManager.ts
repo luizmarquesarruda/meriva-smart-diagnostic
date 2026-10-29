@@ -9,6 +9,7 @@ import { getBluetoothRadioRecoveryStopReason } from './bluetoothRadioRecovery';
 import type { PidDiscoveryCache } from '../meriva/autosaveState';
 import bluetoothConfig from '../knowledge/bluetooth_config.json';
 import { requestBluetoothPermissionsOnly } from '../permissions/permissionManager';
+import { runWithTimeout } from './connectionRecovery';
 
 let lastBluetoothDiagnosticText = '';
 
@@ -61,6 +62,9 @@ const ELM_PROTOCOL_NAMES: Record<string, string> = {
 
 export const ELM_PROTOCOL_FALLBACKS = ['5', '3', '4', '6', '7', '8', '9', '2', '1'] as const;
 
+const BLUETOOTH_NATIVE_PROBE_TIMEOUT_MS = 1_500;
+const BLUETOOTH_USER_ACTION_TIMEOUT_MS = 30_000;
+
 export function getElmProtocolName(protocolId: string): string {
   return ELM_PROTOCOL_NAMES[protocolId] ?? 'ELM327 PROTOCOLO ' + protocolId;
 }
@@ -78,7 +82,11 @@ export function shouldRetryElmSessionAttempt(cause: unknown): boolean {
 
 export async function requestBluetoothPermissions(): Promise<void> {
   logBluetoothDiagnostic('PERMISSIONS_START', { platform: Platform.OS, version: Platform.Version });
-  const status = await requestBluetoothPermissionsOnly();
+  const status = await runWithTimeout(
+    () => requestBluetoothPermissionsOnly(),
+    BLUETOOTH_USER_ACTION_TIMEOUT_MS,
+    `TIMEOUT: SOLICITAÇÃO DE PERMISSÃO BLUETOOTH APÓS ${BLUETOOTH_USER_ACTION_TIMEOUT_MS} MS`,
+  );
   if (status !== 'GRANTED') {
     throw new Error(
       status === 'BLOCKED'
@@ -106,17 +114,29 @@ export async function ensureBluetoothReady(): Promise<boolean> {
     throw new Error('MÓDULO BLUETOOTH CLASSIC NÃO ESTÁ DISPONÍVEL NO BUILD NATIVO. REINSTALE/RECONSTRUA O APK.');
   }
 
-  const available = await bluetoothClassic.isBluetoothAvailable();
+  const available = await runWithTimeout(
+    () => bluetoothClassic.isBluetoothAvailable(),
+    BLUETOOTH_NATIVE_PROBE_TIMEOUT_MS,
+    `TIMEOUT: VERIFICAÇÃO DE DISPONIBILIDADE BLUETOOTH APÓS ${BLUETOOTH_NATIVE_PROBE_TIMEOUT_MS} MS`,
+  );
   logBluetoothDiagnostic('BLUETOOTH_AVAILABLE', available);
   if (!available) {
     throw new Error('ESTE ANDROID NÃO POSSUI BLUETOOTH COMPATÍVEL');
   }
 
-  let enabled = await bluetoothClassic.isBluetoothEnabled();
+  let enabled = await runWithTimeout(
+    () => bluetoothClassic.isBluetoothEnabled(),
+    BLUETOOTH_NATIVE_PROBE_TIMEOUT_MS,
+    `TIMEOUT: VERIFICAÇÃO DO ESTADO BLUETOOTH APÓS ${BLUETOOTH_NATIVE_PROBE_TIMEOUT_MS} MS`,
+  );
   logBluetoothDiagnostic('BLUETOOTH_ENABLED', enabled);
   if (!enabled) {
     await new Promise((resolve) => setTimeout(resolve, 250));
-    enabled = await bluetoothClassic.isBluetoothEnabled();
+    enabled = await runWithTimeout(
+      () => bluetoothClassic.isBluetoothEnabled(),
+      BLUETOOTH_NATIVE_PROBE_TIMEOUT_MS,
+      `TIMEOUT: REVALIDAÇÃO DO ESTADO BLUETOOTH APÓS ${BLUETOOTH_NATIVE_PROBE_TIMEOUT_MS} MS`,
+    );
     logBluetoothDiagnostic('BLUETOOTH_ENABLED_RECHECK', enabled);
   }
   if (enabled) return true;
@@ -128,13 +148,21 @@ export async function ensureBluetoothReady(): Promise<boolean> {
   }
 
   logBluetoothDiagnostic('BLUETOOTH_ENABLE_REQUEST');
-  const requested = await requestBluetoothEnabled();
+  const requested = await runWithTimeout(
+    () => requestBluetoothEnabled(),
+    BLUETOOTH_USER_ACTION_TIMEOUT_MS,
+    `TIMEOUT: SOLICITAÇÃO DE ATIVAÇÃO DO BLUETOOTH APÓS ${BLUETOOTH_USER_ACTION_TIMEOUT_MS} MS`,
+  );
   logBluetoothDiagnostic('BLUETOOTH_ENABLE_RESULT', requested);
   if (!requested) {
     throw new Error('BLUETOOTH CONTINUA DESLIGADO. ATIVE-O PARA USAR O ELM327.');
   }
 
-  const enabledAfterRequest = await bluetoothClassic.isBluetoothEnabled();
+  const enabledAfterRequest = await runWithTimeout(
+    () => bluetoothClassic.isBluetoothEnabled(),
+    BLUETOOTH_NATIVE_PROBE_TIMEOUT_MS,
+    `TIMEOUT: CONFIRMAÇÃO DO ESTADO BLUETOOTH APÓS ${BLUETOOTH_NATIVE_PROBE_TIMEOUT_MS} MS`,
+  );
   if (!enabledAfterRequest) {
     throw new Error('BLUETOOTH NÃO FOI ATIVADO. ATIVE-O PARA USAR O ELM327.');
   }

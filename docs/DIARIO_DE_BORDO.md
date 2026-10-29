@@ -4,12 +4,12 @@
 
 - Repositório: [luizmarquesarruda/meriva-smart-diagnostic](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
 - PR #96: [Evita DTC duplicado no cockpit e mostra pressão do coletor](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/96), aberta, fora de rascunho e sem merge. Base `main` observada nesta PR: `7eec3afecb3718020724baf053f8b6d2ca636fab`.
-- HEAD consultado no início desta rodada: `4f9512c71c5305b551560ffc6908ffc232404e4a`; correção de timeout nativo aplicada depois desse SHA. O HEAD e a CI precisam ser reconsultados após os commits seguintes.
-- CI `40863609539` confirmou sucesso no SHA `4f9512c71c5305b551560ffc6908ffc232404e4a`; esse resultado é anterior às mudanças documentadas em DB-163 e não as valida. A nova CI precisa concluir `validate` e `android-build` no SHA resultante.
+- HEAD validado parcialmente nesta rodada: `fdc78accd1b90a92a0392b89896e09a6ff3cb6dd`; `validate` passou no run `40866470621`, enquanto `android-build` ainda estava em andamento. As mudanças DB-164/DB-165 são posteriores e exigem CI própria.
+- A CI `40866470621` passou em `npm run doctor`, `gate:baseline` e `npm run validate` no SHA `fdc78accd1b90a92a0392b89896e09a6ff3cb6dd`; o build APK ainda estava em andamento na última consulta. Ela não valida DB-164/DB-165, que serão executadas em novo SHA.
 - Após qualquer alteração, reconsultar o HEAD e a CI correspondentes. Só considerar a PR validada com `validate` e `android-build` verdes no mesmo SHA, diff reconciliado contra `main` e validação física separada.
 - A auditoria atual encontrou divergências de documentação e um débito relevante de modernização do SDK. Não houve upgrade de SDK nem remoção de dependências nativas nesta rodada: fazê-los antes de preservar um baseline físico poderia introduzir regressão no Bluetooth Classic.
 - Testes com Galaxy A06/Android 16/ELM327 real, confirmação de resposta `010C`, inspeção do APK instalado e validação GPS/autonomia continuam pendentes.
-- DB-145 registra a regressão de leitura KWP e classificação de estado ECU/Bluetooth; DB-162 protege as sondas do socket; DB-163 estende timeouts finitos às sondas de disponibilidade/rádio, cancelamento de descoberta e listagem de pareados. A CI anterior a DB-163 não valida estas alterações.
+- DB-145 registra a regressão de leitura KWP e classificação de estado ECU/Bluetooth; DB-162/DB-163 tratam timeouts e limpeza RFCOMM; DB-164 fecha as sondas nativas sem prazo na preparação Bluetooth; DB-165 limita a consulta HTTP opcional de clima. Nenhuma CI verde deve ser extrapolada para mudanças posteriores ao SHA validado.
 - O cockpit deve continuar mostrando N/D até existir leitura OBD real, completa e recente; seed ou histórico não deve ser reapresentado como valor atual.
 - DB-146 restaura os quatro quadrantes de telemetria em simultâneo; os PIDs adicionais continuam acessíveis em páginas de quatro métricas. A ausência de ECU não remove a grade, apenas mantém os valores em N/D.
 - DB-147 fixa os quatro PIDs principais na primeira página e transforma os restantes PIDs suportados em carrossel completo, com setas anterior/próxima e avanço automático a cada 10 s. Anomalias adicionais são priorizadas sem deslocar os quadrantes principais.
@@ -252,6 +252,8 @@
 - **DB-161** · 2026-10-28 — Corrigir rótulo obsoleto do atalho de armazenamento em Viagens
 - **DB-162** · 2026-10-29 — Limitar sondas nativas Bluetooth e falhar fechado em estado indeterminado
 - **DB-163** · 2026-10-29 — Aplicar timeout finito às sondas de disponibilidade e descoberta Bluetooth
+- **DB-164** · 2026-10-29 — Limitar sondas nativas na preparação e ativação Bluetooth
+- **DB-165** · 2026-10-29 — Limitar a consulta HTTP opcional de clima e cancelar requisição vencida
 
 ---
 
@@ -4481,3 +4483,37 @@ A auditoria da branch `ui/cockpit-instant-consumption-20261027` confirmou que os
 
 ---
 
+## DB-164 · 2026-10-29 — Limitar sondas nativas na preparação e ativação Bluetooth
+
+### Causa
+Após DB-163, ainda havia operações nativas sem prazo em `src/obd/bluetoothManager.ts`: `isBluetoothAvailable()`, `isBluetoothEnabled()`, o pedido de ativação do rádio e o pedido de permissões Android. Elas ocorrem antes da abertura RFCOMM; portanto, o timeout interno do transporte não as cobre.
+
+### Alterações
+- `src/obd/bluetoothManager.ts`: incluiu `runWithTimeout` para estado/disponibilidade do rádio (1,5 s) e para pedidos de permissões/ativação mediados pelo Android (30 s). Um timeout encerra a espera JavaScript e aborta o fluxo antes de abrir RFCOMM; isso não afirma que a chamada do sistema operacional foi cancelada.
+- `tests/bluetoothLifecycle.test.js`: adicionadas asserções para exigir os prazos e impedir o retorno dos awaits nativos diretos.
+- Mantidas as permissões BLUETOOTH_CONNECT/SCAN, o único dono da conexão e os estados distintos Bluetooth → ELM → ECU.
+
+### Validação
+- Esta alteração deve ser validada no novo HEAD por TypeScript, suíte completa e build Android.
+- Não houve teste físico no Galaxy A06/Android 16. A resposta `010C` da ECU permanece por confirmar.
+
+## DB-165 · 2026-10-29 — Limitar a consulta HTTP opcional de clima e cancelar requisição vencida
+
+### Causa
+`src/weather/currentConditions.ts` aguardava `fetch()` e a leitura do JSON sem timeout. Se a rede celular ficasse instável e a requisição nunca concluísse, `startCurrentConditionsRefresh()` manteria `inFlight=true` e bloquearia as próximas atualizações opcionais até que a Promise resolvesse.
+
+### Alterações
+- `src/weather/currentConditions.ts`: criada `fetchWeatherPayload()`, com limite padrão de 8 s para a requisição e a leitura do corpo JSON. O timeout chama `AbortController.abort()` quando disponível; o fallback mantém a espera do chamador limitada.
+- `tests/onlineConditions.test.js`: adicionada regressão simulando fetch sem resposta e verificando timeout + sinal de abort.
+- Esta camada só enriquece cidade/clima; ela não envia telemetria veicular. O inventário da branch não contém cliente de sincronização de telemetria/cloud nem outbox persistente conectado a servidor. Não foi criada uma fila órfã sem endpoint/contrato definido; isso continua como lacuna arquitetural para uma integração explícita.
+
+### Referências técnicas
+- Android Developers — conexão RFCOMM bloqueante, cancelamento de descoberta e fechamento de socket: https://developer.android.com/develop/connectivity/bluetooth/connect-bluetooth-devices
+- Android Developers — permissões Bluetooth em Android 12+: https://developer.android.com/develop/connectivity/bluetooth/bt-permissions
+- Linux Kernel — comandos ELM terminados em CR e prompt `>`: https://cdn.kernel.org/doc/html/latest/networking/device_drivers/can/can327.html
+- Expo Location — documentação oficial da biblioteca: https://docs.expo.dev/versions/v51.0.0/sdk/location/
+
+### Validação e limites
+- A nova CI no SHA que inclui DB-164/DB-165 é obrigatória; o resultado verde de `validate` no SHA anterior não valida estas alterações.
+- O timeout HTTP não transforma dados antigos em atuais. Falha de clima segue como indisponível, sem bloquear o motor OBD local.
+- O teste físico de Bluetooth/ECU permanece pendente.
