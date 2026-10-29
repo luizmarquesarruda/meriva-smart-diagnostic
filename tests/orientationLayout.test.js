@@ -24,6 +24,16 @@ assert.match(layout, /addOrientationChangeListener/);
 assert.match(layout, /subscription\.remove\(\)/, 'listener de orientação deve ser removido no cleanup');
 assert.match(index, /useMidLayout\(\)/);
 assert.match(index, /layout\.landscape/);
+assert.match(index, /screenFrameLandscape:\\{paddingLeft:56/, 'paisagem deve reservar uma raia lateral para navegação');
+assert.match(index, /topSectionLandscape:\\{[^}]*flexDirection:'row'/, 'cabeçalho e clima devem compartilhar a faixa superior em paisagem');
+assert.match(index, /mainContentLandscape:\\{[^}]*flexDirection:'row'/, 'cockpit e sessão devem dividir a largura em paisagem');
+assert.match(index, /sessionCardLandscape:\\{width:166/, 'sessão deve usar coluna compacta em telas baixas');
+assert.match(index, /bottomNavLandscape:\\{position:'absolute',left:0,top:0,bottom:20,width:50,flexDirection:'column'/, 'navegação deve virar uma raia vertical compacta');
+assert.match(index, /quadrantCardLandscape:\\{minHeight:58,paddingVertical:4/, 'quadrantes devem reduzir espaçamento vertical em paisagem');
+assert.match(index, /quadrantValueLandscape:\\{fontSize:21,lineHeight:23/, 'valores devem reduzir na paisagem');
+assert.match(index, /quadrantHintLandscape:\\{fontSize:6/, 'dicas devem usar uma linha na paisagem');
+assert.match(index, /layoutSpacerLandscape:\\{flexGrow:0,minHeight:0,height:4/, 'espaçador não deve consumir a altura útil na paisagem');
+
 assert.doesNotMatch(index, /ScrollView/);
 assert.match(index, /content:\{flex:1,width:'100%'/);
 assert.match(index, /maxContentWidth/);

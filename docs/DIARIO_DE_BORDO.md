@@ -13,6 +13,7 @@
 - O cockpit deve continuar mostrando N/D até existir leitura OBD real, completa e recente; seed ou histórico não deve ser reapresentado como valor atual.
 - DB-146 restaura os quatro quadrantes de telemetria em simultâneo; os PIDs adicionais continuam acessíveis em páginas de quatro métricas. A ausência de ECU não remove a grade, apenas mantém os valores em N/D.
 - DB-147 fixa os quatro PIDs principais na primeira página e transforma os restantes PIDs suportados em carrossel completo, com setas anterior/próxima e avanço automático a cada 10 s. Anomalias adicionais são priorizadas sem deslocar os quadrantes principais.
+- DB-148 corrige a ocupação vertical em paisagem: cabeçalho/clima na mesma faixa, cockpit + sessão lado a lado, navegação lateral e métricas compactas. O teste físico deve confirmar clipping/overlap no Galaxy A06.
 ---
 
 ## ESTADO HISTÓRICO — 2026-10-25 (snapshot DB-130; superado em 2026-10-28)
@@ -235,6 +236,7 @@
 - **DB-145** · 2026-10-28 — Corrigir leitura KWP, retry e classificação do estado ECU/Bluetooth
 - **DB-146** · 2026-10-28 — Restaurar quadrantes 2×2 e paginação de PIDs no cockpit
 - **DB-147** · 2026-10-28 — Incluir os PIDs restantes no carrossel principal com navegação por setas
+- **DB-148** · 2026-10-28 — Auditoria e correção de cockpit em orientação paisagem
 
 ---
 
@@ -4302,3 +4304,13 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - **Carrossel completo:** todas as métricas suportadas/catalogadas entram na sequência sem duplicação; cada página tem até quatro itens. Setas acessíveis anterior/próxima complementam a rotação automática de 10 segundos. Navegação circular volta ao início.
 - **Integridade:** PIDs não anunciados não são tratados como suportados. Todos os valores continuam dependendo de leitura real, resposta válida e janela de frescor; sem evidência, o indicador permanece em N/D.
 - **Proteção contra regressão:** a suíte percorre os 20 PIDs da política em páginas de quatro, verifica que não há PID saltado nem repetido e preserva a ordem fixa da primeira página. A CI do novo SHA precisa validar testes e build Android antes de distribuir qualquer APK.
+
+
+## DB-148 · 2026-10-28 — Auditoria e correção de cockpit em orientação paisagem
+
+- Auditoria: app.json permite orientação padrão e app/_layout.tsx chama ScreenOrientation.unlockAsync com listener removido no cleanup; o bloqueio global do Android continua sob controle do usuário. useMidLayout() recalcula layout.landscape usando useWindowDimensions(), portanto não era necessário impor orientação fixa.
+- Falha de layout identificada: a tela empilhava cabeçalho, clima, grade 2×2, sessão e navegação; em modo paisagem, a altura reduzida podia fazer o cockpit/navegação exceder a área visível. O espaçador elástico agravava o risco.
+- Correção: cabeçalho/clima agora dividem a faixa superior; cockpit e sessão de conexão dividem a largura; o cockpit ocupa a área flexível e a sessão usa coluna compacta; navegação vira raia lateral de 50 dp, com cinco destinos compactos.
+- Densidade: quadrantes reduzem fonte, padding e hints a uma linha em paisagem. O espaçador é limitado a 4 dp, evitando que consuma altura útil. Retrato permanece com fluxo vertical anterior.
+- Proteções: testes cobrem orientação padrão livre, liberação da orientação, estilos de paisagem, raia de navegação e cinco destinos visíveis. O checklist físico exige rotação retrato→paisagem→retrato, carrossel/setas e ausência de clipping/sobreposição.
+- Limite conhecido: a aplicação não deve forçar a rotação se a opção Rotação automática do Android estiver desligada. A validação de layout automatizada não substitui o teste visual no dispositivo real; o APK final depende da CI do SHA atualizado.

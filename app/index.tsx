@@ -344,8 +344,8 @@ export default function IndexScreen() {
     <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
       <StatusBar style="light" backgroundColor={COLORS.screen} />
       <View style={[styles.content, { paddingHorizontal: layout.horizontalPadding }]}>
-        <View style={[styles.screenFrame, { maxWidth: layout.maxContentWidth }]}>
-          <View style={styles.topSection}>
+        <View style={[styles.screenFrame, layout.landscape && styles.screenFrameLandscape, { maxWidth: layout.maxContentWidth }]}>
+          <View style={[styles.topSection, layout.landscape && styles.topSectionLandscape]}>
             <View style={[styles.header, layout.landscape && styles.headerLandscape]}>
               <View style={styles.headerTitle}>
                 <Text style={styles.brand} numberOfLines={1}>SMART OBD DIAGNOSTIC</Text>
@@ -385,6 +385,7 @@ export default function IndexScreen() {
               </Link>
             </View>
           </View>
+          <View style={[styles.mainContent, layout.landscape && styles.mainContentLandscape]}>
           <View style={[styles.heroCard, layout.landscape && styles.heroCardLandscape]}>
             <View style={styles.quadrantHeader}>
               <View style={styles.quadrantHeaderCopy}>
@@ -435,10 +436,11 @@ export default function IndexScreen() {
                     metric.severity === 'warning' && styles.quadrantCardWarning,
                   ]}
                 >
-                  <Text style={styles.quadrantLabel}>{metric.label}</Text>
+                  <Text style={[styles.quadrantLabel, layout.landscape && styles.quadrantLabelLandscape]} numberOfLines={layout.landscape ? 1 : 2}>{metric.label}</Text>
                   <View style={styles.quadrantValueRow}>
                     <Text style={[
                       styles.quadrantValue,
+                      layout.landscape && styles.quadrantValueLandscape,
                       metric.severity === 'danger' && styles.danger,
                       metric.severity === 'warning' && styles.heroWarning,
                     ]}>
@@ -446,7 +448,7 @@ export default function IndexScreen() {
                     </Text>
                     {metric.value != null && !!metric.unit && <Text style={styles.quadrantUnit}>{metric.unit}</Text>}
                   </View>
-                  <Text style={styles.quadrantHint} numberOfLines={2}>{metric.hint}</Text>
+                  <Text style={[styles.quadrantHint, layout.landscape && styles.quadrantHintLandscape]} numberOfLines={layout.landscape ? 1 : 2}>{metric.hint}</Text>
                 </View>
               ))}
             </View>
@@ -478,21 +480,22 @@ export default function IndexScreen() {
                   color={connectionStatus.ecuConnected ? COLORS.success : bluetoothError ? COLORS.danger : COLORS.accent}
                 />
               </View>
-              <View style={styles.sessionCopy}>
+              <View style={[styles.sessionCopy, layout.landscape && styles.sessionCopyLandscape]}>
                 <Text style={styles.sessionTitle}>SESSÃO DE DIAGNÓSTICO</Text>
                 <Text style={styles.sessionHeadline} numberOfLines={2}>{connectionLabel}</Text>
                 <Text style={styles.sessionDetail} numberOfLines={2}>{obdSessionDetail}</Text>
               </View>
-              <AppIcon name="arrowRight" size={18} color={COLORS.textSubtle} />
+              {!layout.landscape && <AppIcon name="arrowRight" size={18} color={COLORS.textSubtle} />}
             </TouchableOpacity>
           </Link>
-          <View style={styles.layoutSpacer} />
+          </View>
+          <View style={[styles.layoutSpacer, layout.landscape && styles.layoutSpacerLandscape]} />
           <View style={[styles.bottomNav, layout.landscape && styles.bottomNavLandscape]}>
-            <Link href="/" asChild><TouchableOpacity style={[styles.bottomNavItem, styles.bottomNavActive]} accessibilityRole="button" accessibilityLabel="Painel, tela atual" accessibilityHint="Exibe o cockpit do veículo" accessibilityState={{ selected: true }} activeOpacity={0.72}><AppIcon name="cockpit" size={22} color="#f8fafc" /><Text style={[styles.bottomNavText, styles.bottomNavTextActive]}>Painel</Text></TouchableOpacity></Link>
-            <Link href="/laboratorio" asChild><TouchableOpacity style={styles.bottomNavItem} accessibilityRole="button" accessibilityLabel="Diagnóstico" accessibilityHint="Abre os testes e as consultas OBD" activeOpacity={0.72}><AppIcon name="diagnostic" size={22} color={COLORS.accent} /><Text style={styles.bottomNavText}>Diagnóstico</Text></TouchableOpacity></Link>
-            <Link href="/dados" asChild><TouchableOpacity style={styles.bottomNavItem} accessibilityRole="button" accessibilityLabel="Dados" accessibilityHint="Abre gráficos e leituras de telemetria" activeOpacity={0.72}><AppIcon name="data" size={22} color={COLORS.accent} /><Text style={styles.bottomNavText}>Dados</Text></TouchableOpacity></Link>
-            <Link href="/viagens" asChild><TouchableOpacity style={styles.bottomNavItem} accessibilityRole="button" accessibilityLabel="Viagens" accessibilityHint="Abre o histórico de trajetos registrados" activeOpacity={0.72}><AppIcon name="trips" size={22} color={COLORS.accent} /><Text style={styles.bottomNavText}>Viagens</Text></TouchableOpacity></Link>
-            <Link href="/mais" asChild><TouchableOpacity style={styles.bottomNavItem} accessibilityRole="button" accessibilityLabel="Mais recursos" accessibilityHint="Abre os módulos adicionais do aplicativo" activeOpacity={0.72}><AppIcon name="more" size={22} color={COLORS.accent} /><Text style={styles.bottomNavText}>Mais</Text></TouchableOpacity></Link>
+            <Link href="/" asChild><TouchableOpacity style={[styles.bottomNavItem, layout.landscape && styles.bottomNavItemLandscape, styles.bottomNavActive]} accessibilityRole="button" accessibilityLabel="Painel, tela atual" accessibilityHint="Exibe o cockpit do veículo" accessibilityState={{ selected: true }} activeOpacity={0.72}><AppIcon name="cockpit" size={22} color="#f8fafc" /><Text style={[styles.bottomNavText, styles.bottomNavTextActive]}>Painel</Text></TouchableOpacity></Link>
+            <Link href="/laboratorio" asChild><TouchableOpacity style={[styles.bottomNavItem, layout.landscape && styles.bottomNavItemLandscape]} accessibilityRole="button" accessibilityLabel="Diagnóstico" accessibilityHint="Abre os testes e as consultas OBD" activeOpacity={0.72}><AppIcon name="diagnostic" size={22} color={COLORS.accent} /><Text style={styles.bottomNavText}>Diagnóstico</Text></TouchableOpacity></Link>
+            <Link href="/dados" asChild><TouchableOpacity style={[styles.bottomNavItem, layout.landscape && styles.bottomNavItemLandscape]} accessibilityRole="button" accessibilityLabel="Dados" accessibilityHint="Abre gráficos e leituras de telemetria" activeOpacity={0.72}><AppIcon name="data" size={22} color={COLORS.accent} /><Text style={styles.bottomNavText}>Dados</Text></TouchableOpacity></Link>
+            <Link href="/viagens" asChild><TouchableOpacity style={[styles.bottomNavItem, layout.landscape && styles.bottomNavItemLandscape]} accessibilityRole="button" accessibilityLabel="Viagens" accessibilityHint="Abre o histórico de trajetos registrados" activeOpacity={0.72}><AppIcon name="trips" size={22} color={COLORS.accent} /><Text style={styles.bottomNavText}>Viagens</Text></TouchableOpacity></Link>
+            <Link href="/mais" asChild><TouchableOpacity style={[styles.bottomNavItem, layout.landscape && styles.bottomNavItemLandscape]} accessibilityRole="button" accessibilityLabel="Mais recursos" accessibilityHint="Abre os módulos adicionais do aplicativo" activeOpacity={0.72}><AppIcon name="more" size={22} color={COLORS.accent} /><Text style={styles.bottomNavText}>Mais</Text></TouchableOpacity></Link>
           </View>
           <Text style={styles.footerStatus}>{!isHydrated ? 'CARREGANDO...' : saveStatus.obdSessionActive ? 'DIÁRIO DE BORDO • GRAVANDO' : 'DIÁRIO DE BORDO • AGUARDANDO ECU'}</Text>
         </View>
@@ -504,14 +507,14 @@ export default function IndexScreen() {
 function CockpitMetric({ label, value }: { label: string; value: string }) { return <View style={styles.cockpitMetric}><Text style={styles.metricLabel}>{label}</Text><Text style={styles.metricValue}>{value}</Text></View>; }
 
 const styles = StyleSheet.create({
-  container:{flex:1,backgroundColor:COLORS.screen},content:{flex:1,width:'100%',paddingVertical:6,paddingBottom:6},screenFrame:{width:'100%',flex:1,alignSelf:'center'},topSection:{marginBottom:8},layoutSpacer:{flexGrow:1,minHeight:8},
-  infoStrip:{minHeight:88,flexDirection:'row',alignItems:'center',gap:9,paddingHorizontal:10,paddingVertical:8,backgroundColor:COLORS.surface,borderRadius:13,borderWidth:1,borderColor:COLORS.border},infoStripLandscape:{minHeight:60,paddingHorizontal:8,paddingVertical:5,gap:7},
+  container:{flex:1,backgroundColor:COLORS.screen},content:{flex:1,width:'100%',paddingVertical:6,paddingBottom:6},screenFrame:{width:'100%',flex:1,alignSelf:'center'},screenFrameLandscape:{paddingLeft:56},topSection:{marginBottom:8},topSectionLandscape:{flexDirection:'row',alignItems:'stretch',gap:8,marginBottom:5},mainContent:{width:'100%',flexDirection:'column',minWidth:0},mainContentLandscape:{flex:1,flexDirection:'row',alignItems:'stretch',gap:8,minHeight:0},layoutSpacer:{flexGrow:1,minHeight:8},layoutSpacerLandscape:{flexGrow:0,minHeight:0,height:4},
+  infoStrip:{minHeight:88,flexDirection:'row',alignItems:'center',gap:9,paddingHorizontal:10,paddingVertical:8,backgroundColor:COLORS.surface,borderRadius:13,borderWidth:1,borderColor:COLORS.border},infoStripLandscape:{flex:1,minWidth:0,minHeight:54,paddingHorizontal:8,paddingVertical:4,gap:6},
   weatherContent:{flex:1,minWidth:0,flexDirection:'row',alignItems:'center',gap:9},weatherIconWrap:{width:42,height:42,borderRadius:12,alignItems:'center',justifyContent:'center',backgroundColor:COLORS.surfaceInset,borderWidth:1,borderColor:COLORS.border},weatherIconWrapLandscape:{width:34,height:34,borderRadius:10},weatherDetails:{flex:1,minWidth:0,gap:2},weatherCity:{color:COLORS.textStrong,fontSize:15,lineHeight:18,fontWeight:'900',letterSpacing:.35},weatherCityLandscape:{fontSize:13,lineHeight:15},weatherMeta:{flexDirection:'row',alignItems:'center',gap:8,flexWrap:'wrap'},weatherTemperature:{color:COLORS.textStrong,fontSize:24,lineHeight:28,fontWeight:'900',fontVariant:['tabular-nums']},weatherTemperatureLandscape:{fontSize:20,lineHeight:23},weatherDescription:{flexShrink:1,color:COLORS.textMuted,fontSize:12,lineHeight:16,fontWeight:'800'},weatherDescriptionLandscape:{fontSize:10,lineHeight:13},
   
   networkChip:{minHeight:64,minWidth:96,maxWidth:112,alignItems:'stretch',justifyContent:'center',paddingHorizontal:7,paddingVertical:6,backgroundColor:COLORS.surfaceInset,borderRadius:11,borderWidth:1,borderColor:COLORS.border},networkChipLandscape:{minHeight:50,minWidth:82,maxWidth:92,paddingHorizontal:5,paddingVertical:4},
-  header:{backgroundColor:'#0e1b2d',borderRadius:16,borderWidth:1,borderColor:'#28415f',padding:14,marginBottom:8,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:10},headerLandscape:{paddingVertical:12},headerTitle:{flex:1,minWidth:0},brand:{color:'#f8fafc',fontSize:18,fontWeight:'900',letterSpacing:1.2},subtitle:{color:'#7db3ff',fontSize:9,fontWeight:'900',letterSpacing:1,marginTop:3},
+  header:{backgroundColor:'#0e1b2d',borderRadius:16,borderWidth:1,borderColor:'#28415f',padding:14,marginBottom:8,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:10},headerLandscape:{flex:0.9,minWidth:0,paddingVertical:8,paddingHorizontal:10,marginBottom:0},headerTitle:{flex:1,minWidth:0},brand:{color:'#f8fafc',fontSize:18,fontWeight:'900',letterSpacing:1.2},subtitle:{color:'#7db3ff',fontSize:9,fontWeight:'900',letterSpacing:1,marginTop:3},
   connectionPill:{flexDirection:'row',alignItems:'center',gap:6,flexShrink:0,backgroundColor:'#091526',borderRadius:20,borderWidth:1,borderColor:'#29415f',paddingHorizontal:10,paddingVertical:7},dot:{width:8,height:8,borderRadius:4},dotOk:{backgroundColor:'#4ade80'},dotWarn:{backgroundColor:'#fbbf24'},dotDanger:{backgroundColor:'#fb7185'},connectionText:{color:'#dbeafe',fontSize:9,fontWeight:'900'},
-  heroCard:{backgroundColor:'#0f2035',borderRadius:18,borderWidth:1,borderColor:'#2d5278',padding:12,alignItems:'center',marginBottom:8},heroCardWarning:{borderColor:'#fbbf24',backgroundColor:'#2a2412'},heroCardDanger:{borderColor:'#fb7185',backgroundColor:'#2b1420'},heroCardLandscape:{padding:7,marginBottom:4},heroReadout:{width:'100%',alignItems:'center',paddingVertical:1},heroEyebrow:{color:'#7db3ff',fontSize:10,fontWeight:'900',letterSpacing:1.4,textAlign:'center'},heroNumberRow:{flexDirection:'row',alignItems:'baseline',justifyContent:'center',gap:6},heroUnit:{color:'#a9c8ef',fontSize:18,fontWeight:'900'},heroSwitchHintRow:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:4,marginTop:4},heroSwitchHint:{color:'#6884a6',fontSize:8,fontWeight:'900',letterSpacing:.6},heroWarning:{color:'#fbbf24'},heroValue:{color:'#f8fafc',fontSize:50,lineHeight:56,fontWeight:'900',marginTop:2,fontVariant:['tabular-nums']},heroValueLandscape:{fontSize:36,lineHeight:40,marginTop:0},heroState:{color:'#8fa6c1',fontSize:9,fontWeight:'800',letterSpacing:.5,textAlign:'center'},
+  heroCard:{backgroundColor:'#0f2035',borderRadius:18,borderWidth:1,borderColor:'#2d5278',padding:12,alignItems:'center',marginBottom:8},heroCardWarning:{borderColor:'#fbbf24',backgroundColor:'#2a2412'},heroCardDanger:{borderColor:'#fb7185',backgroundColor:'#2b1420'},heroCardLandscape:{flex:1,minWidth:0,padding:6,marginBottom:0,justifyContent:'center'},heroReadout:{width:'100%',alignItems:'center',paddingVertical:1},heroEyebrow:{color:'#7db3ff',fontSize:10,fontWeight:'900',letterSpacing:1.4,textAlign:'center'},heroNumberRow:{flexDirection:'row',alignItems:'baseline',justifyContent:'center',gap:6},heroUnit:{color:'#a9c8ef',fontSize:18,fontWeight:'900'},heroSwitchHintRow:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:4,marginTop:4},heroSwitchHint:{color:'#6884a6',fontSize:8,fontWeight:'900',letterSpacing:.6},heroWarning:{color:'#fbbf24'},heroValue:{color:'#f8fafc',fontSize:50,lineHeight:56,fontWeight:'900',marginTop:2,fontVariant:['tabular-nums']},heroValueLandscape:{fontSize:36,lineHeight:40,marginTop:0},heroState:{color:'#8fa6c1',fontSize:9,fontWeight:'800',letterSpacing:.5,textAlign:'center'},
   metricRow:{width:'100%',flexDirection:'row',gap:6,marginTop:10},metricRowLandscape:{marginTop:4},cockpitMetric:{flex:1,minWidth:0,backgroundColor:'#091626',borderRadius:11,borderWidth:1,borderColor:'#233d5b',paddingVertical:9,paddingHorizontal:5,alignItems:'center'},metricLabel:{color:'#9aacc4',fontSize:8,fontWeight:'900',letterSpacing:.3,textAlign:'center'},metricValue:{color:'#e5edf7',fontSize:12,fontWeight:'900',marginTop:3,textAlign:'center'},
   quadrantHeader:{width:'100%',flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:10},
   quadrantHeaderCopy:{flex:1,minWidth:0},
@@ -524,22 +527,22 @@ const styles = StyleSheet.create({
   quadrantPageButton:{flexDirection:'row',alignItems:'center',gap:4,paddingVertical:7,paddingHorizontal:9,borderRadius:9,borderWidth:1,borderColor:'#294562',backgroundColor:'#091626'},
   quadrantPageText:{color:'#a9c8ef',fontSize:9,fontWeight:'900'},
   quadrantGrid:{width:'100%',flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',gap:8},
-  quadrantGridLandscape:{gap:6},
+  quadrantGridLandscape:{gap:5},
   quadrantCard:{width:'48%',minHeight:91,paddingVertical:10,paddingHorizontal:9,backgroundColor:'#091626',borderRadius:12,borderWidth:1,borderColor:'#294562'},
-  quadrantCardLandscape:{minHeight:76,paddingVertical:7,paddingHorizontal:8},
+  quadrantCardLandscape:{minHeight:58,paddingVertical:4,paddingHorizontal:6},
   quadrantCardWarning:{borderColor:'#fbbf24',backgroundColor:'#2a2412'},
   quadrantCardDanger:{borderColor:'#fb7185',backgroundColor:'#2b1420'},
-  quadrantLabel:{color:'#9fb7d5',fontSize:8,fontWeight:'900',letterSpacing:.4},
+  quadrantLabel:{color:'#9fb7d5',fontSize:8,fontWeight:'900',letterSpacing:.4},quadrantLabelLandscape:{fontSize:7,letterSpacing:0},
   quadrantValueRow:{flexDirection:'row',alignItems:'baseline',gap:4,marginTop:5},
-  quadrantValue:{color:'#f8fafc',fontSize:25,lineHeight:29,fontWeight:'900',fontVariant:['tabular-nums']},
+  quadrantValue:{color:'#f8fafc',fontSize:25,lineHeight:29,fontWeight:'900',fontVariant:['tabular-nums']},quadrantValueLandscape:{fontSize:21,lineHeight:23},
   quadrantUnit:{color:'#a9c8ef',fontSize:10,fontWeight:'900'},
-  quadrantHint:{color:'#6884a6',fontSize:7,fontWeight:'800',marginTop:3},
+  quadrantHint:{color:'#6884a6',fontSize:7,fontWeight:'800',marginTop:3},quadrantHintLandscape:{fontSize:6,marginTop:1},
   quadrantInstruction:{color:'#6884a6',fontSize:7,fontWeight:'900',letterSpacing:.4,textAlign:'center',marginTop:7},
   coolantCard:{width:'100%',flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:12,marginTop:9,paddingHorizontal:13,paddingVertical:11,backgroundColor:'#091626',borderRadius:12,borderWidth:1,borderColor:'#315579'},coolantCardLandscape:{marginTop:4,paddingVertical:5,paddingHorizontal:9},coolantCopy:{flex:1,minWidth:0},coolantHeading:{flexDirection:'row',alignItems:'center',gap:5},coolantLabel:{color:'#c5d8f2',fontSize:9,fontWeight:'900',letterSpacing:.4},coolantStatus:{color:'#7185a1',fontSize:8,fontWeight:'800',marginTop:4},coolantValue:{fontSize:23,fontWeight:'900',fontVariant:['tabular-nums']},coolantOk:{color:'#4ade80'},coolantWarning:{color:'#fbbf24'},coolantUnavailable:{color:'#8fa6c1'},
   danger:{color:'#fb7185'},
-  sessionCard:{minHeight:68,flexDirection:'row',alignItems:'center',gap:10,paddingHorizontal:12,paddingVertical:10,backgroundColor:'#0e1b2d',borderRadius:13,borderWidth:1,borderColor:'#28415f',marginBottom:8},sessionCardLandscape:{minHeight:56,paddingVertical:6,marginBottom:4},sessionIconWrap:{width:36,height:36,borderRadius:11,alignItems:'center',justifyContent:'center',backgroundColor:'#091626',borderWidth:1,borderColor:'#29415f'},sessionIconWrapOk:{borderColor:'#3b8c5a',backgroundColor:'#10261b'},sessionCopy:{flex:1,minWidth:0,gap:2},sessionTitle:{color:'#7db3ff',fontSize:8,fontWeight:'900',letterSpacing:.7},sessionHeadline:{color:'#e5edf7',fontSize:10,fontWeight:'900'},sessionDetail:{color:'#8fa6c1',fontSize:8,lineHeight:12},
+  sessionCard:{minHeight:68,flexDirection:'row',alignItems:'center',gap:10,paddingHorizontal:12,paddingVertical:10,backgroundColor:'#0e1b2d',borderRadius:13,borderWidth:1,borderColor:'#28415f',marginBottom:8},sessionCardLandscape:{width:166,flexGrow:0,flexShrink:0,minHeight:56,alignSelf:'stretch',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:5,paddingHorizontal:8,paddingVertical:7,marginBottom:0},sessionIconWrap:{width:36,height:36,borderRadius:11,alignItems:'center',justifyContent:'center',backgroundColor:'#091626',borderWidth:1,borderColor:'#29415f'},sessionIconWrapOk:{borderColor:'#3b8c5a',backgroundColor:'#10261b'},sessionCopy:{flex:1,minWidth:0,gap:2},sessionCopyLandscape:{flex:0,width:'100%',alignItems:'center'},sessionTitle:{color:'#7db3ff',fontSize:8,fontWeight:'900',letterSpacing:.7},sessionHeadline:{color:'#e5edf7',fontSize:10,fontWeight:'900'},sessionDetail:{color:'#8fa6c1',fontSize:8,lineHeight:12,textAlign:'center'},
   connectionCard:{backgroundColor:'#0e1b2d',borderRadius:15,borderWidth:1,borderColor:'#28415f',padding:14,marginBottom:10},chain:{flexDirection:'row',alignItems:'center',marginTop:10},chainStep:{flex:1,alignItems:'center'},chainCircle:{width:30,height:30,borderRadius:15,alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:'#3b516b',backgroundColor:'#0a1727'},chainCircleOk:{borderColor:'#3b8c5a',backgroundColor:'#10261b'},chainCircleText:{color:'#7185a1',fontSize:11,fontWeight:'900'},chainCircleTextOk:{color:'#4ade80'},chainLabel:{color:'#9fb4cf',fontSize:8,fontWeight:'900',marginTop:4},chainArrow:{color:'#526a86',fontSize:24,paddingHorizontal:4},
   
   statusGrid:{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',marginBottom:2},statusGridLandscape:{flexWrap:'nowrap',gap:8},statusCardLandscape:{width:'auto',flex:1},statusCard:{width:'48%',minWidth:0,backgroundColor:'#0e1b2d',borderRadius:12,borderWidth:1,borderColor:'#233a56',padding:11,marginBottom:8},moreButton:{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:'#0e1b2d',borderRadius:14,borderWidth:1,borderColor:'#28415f',padding:13,marginTop:2},moreIcon:{color:'#7db3ff',fontSize:24,fontWeight:'900'},moreBody:{flex:1,minWidth:0},moreTitle:{color:'#e5edf7',fontSize:11,fontWeight:'900'},moreHint:{color:'#7185a1',fontSize:8,marginTop:3,flexShrink:1},moreArrow:{color:'#7db3ff',fontSize:24},
-  error:{color:'#fb7185',fontWeight:'800',fontSize:10,marginTop:8},bottomNav:{flexDirection:'row',backgroundColor:'#0e1b2d',borderRadius:14,borderWidth:1,borderColor:'#28415f',marginTop:0,padding:4,gap:2},bottomNavLandscape:{marginTop:2,paddingVertical:2},bottomNavItem:{flex:1,minWidth:0,alignItems:'center',justifyContent:'center',minHeight:58,borderRadius:10,paddingHorizontal:1,paddingVertical:4,gap:3},bottomNavActive:{backgroundColor:'#152a45'},bottomNavText:{color:'#7db3ff',fontSize:8,fontWeight:'900',textAlign:'center'},bottomNavTextActive:{color:'#f8fafc'},footerStatus:{color:'#60748f',textAlign:'center',fontSize:9,marginTop:9},
+  error:{color:'#fb7185',fontWeight:'800',fontSize:10,marginTop:8},bottomNav:{flexDirection:'row',backgroundColor:'#0e1b2d',borderRadius:14,borderWidth:1,borderColor:'#28415f',marginTop:0,padding:4,gap:2},bottomNavLandscape:{position:'absolute',left:0,top:0,bottom:20,width:50,flexDirection:'column',justifyContent:'space-around',marginTop:0,padding:3,gap:2},bottomNavItemLandscape:{flex:0,minWidth:0,minHeight:48,paddingHorizontal:0,paddingVertical:2,gap:1},bottomNavItem:{flex:1,minWidth:0,alignItems:'center',justifyContent:'center',minHeight:58,borderRadius:10,paddingHorizontal:1,paddingVertical:4,gap:3},bottomNavActive:{backgroundColor:'#152a45'},bottomNavText:{color:'#7db3ff',fontSize:8,fontWeight:'900',textAlign:'center'},bottomNavTextActive:{color:'#f8fafc'},footerStatus:{color:'#60748f',textAlign:'center',fontSize:9,marginTop:9},
 });

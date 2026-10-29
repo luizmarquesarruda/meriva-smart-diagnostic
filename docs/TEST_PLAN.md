@@ -133,6 +133,13 @@ O catálogo atual contém 34 PIDs, 20 fórmulas, 34 faixas e 30 avaliações de 
 - Sem 41 0C válido, a interface deve mostrar ECU sem resposta, não presumir falha do rádio Bluetooth. Sem ECU/leitura real válida, telemetria e autonomia continuam N/D.
 - Testes: tests/bluetoothConfig.test.js, tests/elm327Compatibility.test.js e tests/projectBaseline.test.js.
 
+## UI-COCKPIT-07 — Rotação e cockpit em paisagem
+
+- Permitir retrato/paisagem conforme a configuração do Android (expo.orientation: default) e a chamada ScreenOrientation.unlockAsync; remover o listener ao desmontar.
+- Em paisagem, usar faixa superior horizontal para título/conexão e clima/rede; cockpit de um lado e sessão de conexão em coluna compacta do outro. A navegação muda para raia vertical lateral para não consumir a altura que os quadrantes precisam.
+- Reduzir altura, padding, fonte e hints dos quadrantes em paisagem; reservar espaço de largura para as cinco abas e impedir que o espaçador elástico ocupe a altura útil. Não esconder a navegação nem introduzir ScrollView ou lock fixo de orientação.
+- Testes: tests/orientationLayout.test.js e tests/cockpitNavigation.test.js devem validar configuração livre, estilos de duas colunas, raia lateral, compactação e presença dos cinco destinos.
+- Ensaio final no Galaxy A06: ativar Rotação automática no Android; alternar retrato→paisagem→retrato, confirmar que o carrossel continua a alternar a cada 10 s, setas, leitura dos quatro quadrantes e as cinco abas, sem clipping nem sobreposição.
 ## UI-COCKPIT-05 — Carrossel completo dos PIDs na área principal
 
 - A primeira página mantém em ordem fixa quatro quadrantes principais: 0105 (temperatura), 0142 (tensão), 0111 (posição da borboleta) e 010C (RPM).

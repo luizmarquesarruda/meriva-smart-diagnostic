@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Cockpit em paisagem
+- Layout reorganizado em duas faixas horizontais: cabeçalho/clima no topo, cockpit ao lado do cartão de sessão e navegação vertical lateral.
+- Quadrantes, textos auxiliares e espaçamentos ficam compactos em paisagem; a navegação não consome a altura toda do rodapé.
+- A política de orientação continua livre e responsiva; nenhum lock fixo foi introduzido.
+
 ### Cockpit — quadrantes restaurados
 - Retornada a grade simultânea 2×2 para temperatura, tensão do sistema, posição da borboleta e RPM.
 - Os demais PIDs continuam acessíveis por páginas de quatro indicadores, com anomalias priorizadas; os valores permanecem N/D sem leitura real, completa e recente.

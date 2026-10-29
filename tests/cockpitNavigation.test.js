@@ -25,6 +25,10 @@ for (const file of ['app/dados.tsx', 'app/saude.tsx', 'app/mais.tsx', 'app/veicu
 assert.doesNotMatch(index, /\}, \[isHydrated, settings\]\);/, 'objeto settings inteiro não pode reiniciar o efeito de conexão');
 assert.match(index, /settings\?\.elmMaxConnectionAttempts/, 'efeito deve reagir às opções OBD efetivamente alteradas');
 assert.match(index, /bottomNavLandscape/, 'navegação inferior deve continuar disponível em paisagem');
+assert.match(index, /screenFrameLandscape/, 'a tela deve reservar espaço para a navegação lateral em paisagem');
+assert.match(index, /bottomNavLandscape:\\{position:'absolute',left:0,top:0,bottom:20,width:50/, 'as cinco abas devem caber na raia lateral em paisagem');
+assert.match(index, /styles\\.bottomNavItemLandscape/, 'alvos de toque da raia lateral devem ter tamanho reduzido mas acessível');
+
 assert.doesNotMatch(index, /!layout\.landscape\s*&&\s*\(/, 'navegação não deve desaparecer ao girar o aparelho');
 for (const label of ['Painel', 'Diagnóstico', 'Dados', 'Viagens', 'Mais']) { assert.ok(index.includes('>' + label + '</Text>'), 'navegação deve exibir rótulo visível: ' + label); }
 for (const label of ['Painel, tela atual', 'Diagnóstico', 'Dados', 'Viagens', 'Mais recursos']) {
