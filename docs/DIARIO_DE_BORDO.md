@@ -275,14 +275,14 @@ Antes de qualquer correção de código:
 A auditoria da branch `ui/cockpit-instant-consumption-20261027` confirmou que os timeouts já cobriam conexão RFCOMM, leitura, escrita e verificação `isConnected` usada por leitura/escrita. Porém, algumas chamadas nativas auxiliares ainda eram aguardadas diretamente: disponibilidade do rádio, estado do Bluetooth antes/depois de tentativas, cancelamento de descoberta, confirmação inicial do socket e enumeração de dispositivos pareados. Se uma dessas Promises nativas não terminasse, o fluxo podia ficar suspenso antes de chegar ao timeout de conexão.
 
 ### Alterações aplicadas
-- `src/obd/bluetoothClassicTransport.ts`: as sondas citadas agora passam por `runWithTimeout` com limites finitos. A falha/timeout de estado do rádio segue a política fail-closed existente; o cancelamento da descoberta é registrado como falha auxiliar e não pode bloquear indefinidamente o fluxo. A listagem de pareados também retorna erro explícito após o limite.
+- `src/obd/bluetoothClassicTransport.ts`: as sondas citadas agora passam por `runWithTimeout` com limites finitos. A falha/timeout de estado do rádio segue a política fail-closed existente; timeout no cancelamento da descoberta cancela a tentativa RFCOMM, pois a operação nativa pode continuar pendente. Falha/timeout da confirmação inicial do socket registra limpeza nativa e impede que o app trate o link como conectado. A listagem de pareados também retorna erro explícito após o limite.
 - `tests/bluetoothLifecycle.test.js`: adicionadas verificações para exigir timeout em disponibilidade/estado do rádio, cancelamento de descoberta e enumeração de pareados.
 - Nenhuma dependência, versão Expo, regra de PID, fórmula de consumo/autonomia, algoritmo GPS ou política de origem de dados foi alterada.
 
 ### Validação e limites
-- Commit da implementação: `2c5658c6cedbaf035b7a6824fb2f1fa217e97bd1`.
-- Commit do teste: `619fa54ffb2e17e61eae1ca545fa43bab10db47e`.
-- A CI `40863609539` é verde apenas no SHA anterior `4f9512c71c5305b551560ffc6908ffc232404e4a`; não conta como validação destas mudanças. Consultar a CI do HEAD final.
+- Commits da implementação: `2c5658c6cedbaf035b7a6824fb2f1fa217e97bd1`, `263f8b46b186c1c3c7d00726bd46087ac83a1ec5` e `650d23f9bd366f672141389fbc0ca5cff2931826`.
+- Commits dos testes: `619fa54ffb2e17e61eae1ca545fa43bab10db47e` e `a3d207cedf30e7a1ae29d19624e9b6683d513a79`.
+- A CI `40863609539` é verde apenas no SHA anterior `4f9512c71c5305b551560ffc6908ffc232404e4a`; não conta como validação destas mudanças. As execuções acionadas pelos commits desta entrada foram canceladas/reiniciadas durante a sequência de commits; consultar a execução do HEAD final, sem interpretar execução cancelada como falha de teste nem como aprovação.
 - O timeout JavaScript não cancela por si só uma operação nativa já iniciada. Por isso, uma conexão/socket de resultado indeterminado continua sujeita ao bloqueio de concorrência já existente; timeout não é evidência de que o recurso nativo foi liberado.
 - O teste físico no Galaxy A06/Android 16 com ELM327 real, incluindo resposta válida a `010C`, permanece pendente.
 
