@@ -48,12 +48,24 @@ function hasUsableTimestamp(timestamp: string, nowMs = Date.now()): boolean {
   return Number.isFinite(parsedTimestamp) && parsedTimestamp <= nowMs;
 }
 
+function isFreshTimestamp(timestamp: string, nowMs = Date.now()): boolean {
+  const parsedTimestamp = Date.parse(timestamp);
+  const ageMs = nowMs - parsedTimestamp;
+  return Number.isFinite(parsedTimestamp) && ageMs >= 0 && ageMs <= STALE_AFTER_MS;
+}
+
 function store(point: LiveTelemetryPoint): void {
   const pid = normalizePid(point.pid);
   const current = series.get(pid) ?? [];
-  const next = [...current, point].slice(-MAX_POINTS_PER_PID);
+  const next = [...current, point]
+    .sort((left, right) => Date.parse(left.timestamp) - Date.parse(right.timestamp))
+    .slice(-MAX_POINTS_PER_PID);
   series.set(pid, next);
-  latest.set(pid, point);
+
+  const currentLatest = latest.get(pid);
+  if (!currentLatest || Date.parse(point.timestamp) >= Date.parse(currentLatest.timestamp)) {
+    latest.set(pid, point);
+  }
 }
 
 export function resetLiveTelemetry(): void {
@@ -93,7 +105,13 @@ export function getLiveSeries(pid: string): LiveTelemetryPoint[] {
 
 export function getLivePidTrend(pid: string): PidTrend | null {
   const nowMs = Date.now();
-  const values = getLiveSeries(pid).filter((item) => hasUsableTimestamp(item.timestamp, nowMs));
+  const normalizedPid = normalizePid(pid);
+  const latestPoint = latest.get(normalizedPid);
+  if (!latestPoint || !isFreshTimestamp(latestPoint.timestamp, nowMs)) return null;
+
+  const values = getLiveSeries(normalizedPid)
+    .filter((item) => hasUsableTimestamp(item.timestamp, nowMs))
+    .sort((left, right) => Date.parse(left.timestamp) - Date.parse(right.timestamp));
   if (!values.length) return null;
 
   const numeric = values.map((item) => item.value);

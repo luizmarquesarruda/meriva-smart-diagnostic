@@ -118,3 +118,19 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 - Buffer RX: exceder 16 KiB precisa gerar erro explícito, limitar diagnósticos a 256 caracteres e permitir receber um próximo quadro válido.
 - Buffer de descoberta: FIFO limitado, normalização, capacidade ajustável e isolamento por execução.
 - Aceitação física: comparar capturas RAW do ELM327/ECU para confirmar framing/checksum e precisão; testes sintéticos não substituem validação no veículo.
+
+## LIVE-TELEMETRY-01 — Ordem temporal e obsolescência
+- Registrar primeiro uma leitura mais recente e depois uma leitura com timestamp mais antigo para o mesmo PID; a série precisa permanecer cronológica e o valor mais novo não pode ser substituído.
+- Confirmar que uma tendência com última leitura acima de 10 s retorna indisponível; dados históricos não podem ser apresentados como valor ao vivo.
+- Confirmar origem REAL e rejeição de valores não finitos e timestamps futuros.
+
+## AUTONOMY-BUFFER-01 — Buffer de dez leituras reais
+- O buffer começa vazio e só é semeado por dez leituras válidas, reais e temporalmente crescentes do PID 012F durante a sessão ECU atual.
+- Após o nível ao vivo expirar, permitir a etiqueta `AUTONOMIA • BUFFER` somente com dez amostras reais e última leitura há no máximo 60 s; sem dez leituras ou após expiração, exibir N/D.
+- Priorizar PID 012F atual sempre que válido. O buffer não deve substituir o percentual atual, litros, reserva, autosave ou histórico de leitura real.
+- Testar rejeição de percentual fora de 0–100, timestamps futuros/regressivos e reinicialização do buffer em nova sessão ECU.
+- Em veículo real, comparar autonomia ao vivo e estimativa do buffer com leitura 012F e percurso medido; CI não comprova precisão física.
+
+## BT-DIAG-01 — Limite agregado de logs Bluetooth
+- Forçar chunks RX repetidos e confirmar que o texto de diagnóstico permanece até 64 KiB, preservando o truncamento de prévia em 256 caracteres e o limite RX de 16 KiB.
+- Confirmar que, após um overflow descartado, o transporte continua podendo receber o próximo quadro válido; não aceitar payload parcial.

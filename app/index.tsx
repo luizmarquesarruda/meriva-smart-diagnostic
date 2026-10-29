@@ -21,7 +21,10 @@ import { connectPreferredElm, getSharedObdConnection, getSharedObdLastError, get
 import { autoTripService, type AutoTripServiceState } from '../src/trip/autoTripService';
 import { loadCurrentConditions, type CurrentConditions } from '../src/weather/currentConditions';
 import { mergeCurrentConditions, startCurrentConditionsRefresh, type NetworkReachabilitySnapshot } from '../src/weather/conditionsRefresh';
-import { getCurrentAutonomyRangeKm } from '../src/trip/autonomyPresentation';
+import {
+  getCurrentAutonomyPresentation,
+  getCurrentAutonomyRangeKm,
+} from '../src/trip/autonomyPresentation';
 import { buildCockpitPidMetrics, type CockpitPidMetric } from '../src/obd/cockpitTelemetry';
 
 export default function IndexScreen() {
@@ -232,15 +235,20 @@ export default function IndexScreen() {
   });
   const coolantReading = freshRealReading((item) => item.pid === '0105' || /coolant|arrefecimento|temperatura.*motor/i.test(item.name));
   const coolantValue = coolantReading?.value ?? null;
-  const currentAutonomyKm = getCurrentAutonomyRangeKm({
+  const autonomyInput = {
     ecuConnected: connectionStatus.ecuConnected,
     tripConnected: tripState.connected,
     fuelLevelSupported: tripState.fuelLevelSupported,
     fuelLevelPercent: tripState.fuelLevelPercent,
     fuelLevelReadAtMs: tripState.fuelLevelReadAtMs,
+    bufferAveragePercent: tripState.fuelLevelBufferAveragePercent,
+    bufferSampleCount: tripState.fuelLevelBufferCount,
+    bufferLastReadAtMs: tripState.fuelLevelBufferLastReadAtMs,
     tripConsumptionKml: tripState.consumptionKml,
     averageConsumptionKml: tripState.averageConsumptionKml,
-  });
+  };
+  const autonomyPresentation = getCurrentAutonomyPresentation(autonomyInput);
+  const currentAutonomyKm = getCurrentAutonomyRangeKm(autonomyInput);
   const connectedSupportedPids = connectionStatus.ecuConnected
     ? getSharedObdConnection()?.supportedPids ?? []
     : [];
@@ -369,7 +377,12 @@ export default function IndexScreen() {
             </TouchableOpacity>
             <View style={[styles.metricRow, layout.landscape && styles.metricRowLandscape]}>
               <CockpitMetric label={consumptionLabel} value={availableConsumptionKml != null ? availableConsumptionKml.toFixed(1) + ' km/L' : 'N/D'} />
-              <CockpitMetric label="AUTONOMIA ATUAL" value={currentAutonomyKm != null ? Math.round(currentAutonomyKm) + ' km' : 'N/D'} />
+              <CockpitMetric
+                label={autonomyPresentation.source === 'BUFFER'
+                  ? 'AUTONOMIA • BUFFER'
+                  : autonomyPresentation.source === 'LIVE' ? 'AUTONOMIA ATUAL' : 'AUTONOMIA N/D'}
+                value={currentAutonomyKm != null ? Math.round(currentAutonomyKm) + ' km' : 'N/D'}
+              />
               <CockpitMetric label="FALHAS ATIVAS" value={!connectionStatus.ecuConnected ? 'N/D' : dtcCount > 0 ? String(dtcCount) + ' DTC' : 'SEM DTC'} />
             </View>
             <View style={[styles.coolantCard, layout.landscape && styles.coolantCardLandscape]}>

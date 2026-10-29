@@ -28,6 +28,7 @@ const pendingNativeSocketCleanups = new Map<string, PendingNativeSocketCleanup>(
 // ELM327 retorna linhas curtas; 16 KiB é uma margem generosa e evita RX ilimitado.
 export const MAX_ELM_RX_BUFFER_CHARS = 16 * 1024;
 const RX_DIAGNOSTIC_PREVIEW_CHARS = 256;
+export const MAX_DIAGNOSTICS_CHARS = 64 * 1024;
 
 async function waitForPendingNativeSocketCleanup(addressKey: string, timeoutMs: number): Promise<void> {
   const pending = pendingNativeSocketCleanups.get(addressKey);
@@ -127,8 +128,16 @@ export class BluetoothClassicTransport implements ObdTransport {
       try { line += ` | ${JSON.stringify(details)}`; }
       catch { line += ` | ${String(details)}`; }
     }
+    if (line.length > MAX_DIAGNOSTICS_CHARS) {
+      line = line.slice(0, MAX_DIAGNOSTICS_CHARS - 28) + ' …[diagnostic truncated]';
+    }
     this.diagnostics.push(line);
-    if (this.diagnostics.length > 500) this.diagnostics.shift();
+    let totalChars = this.diagnostics.reduce((total, item) => total + item.length + 1, 0);
+    while (this.diagnostics.length > 500 || totalChars > MAX_DIAGNOSTICS_CHARS) {
+      const removed = this.diagnostics.shift();
+      if (removed == null) break;
+      totalChars -= removed.length + 1;
+    }
   }
 
   getDiagnosticsText(): string { return this.diagnostics.join('\n'); }

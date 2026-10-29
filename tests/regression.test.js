@@ -750,6 +750,9 @@ async function testBluetoothEventTransport() {
   assert.match(overflowTransport.getDiagnosticsText(), /RX_BUFFER_OVERFLOW/);
   assert.match(overflowTransport.getDiagnosticsText(), /truncated/,
     'logs de RX não devem reter chunks integrais muito grandes');
+  for (let i = 0; i < 120; i += 1) bluetoothListener?.({ data: 'z'.repeat(256) });
+  assert.ok(overflowTransport.getDiagnosticsText().length <= 64 * 1024,
+    'diagnósticos precisam respeitar um limite total de caracteres, não apenas de linhas');
   bluetoothListener?.({ data: '41 0C 0C 18>' });
   assert.strictEqual(await overflowTransport.readUntilPrompt(500), '41 0C 0C 18',
     'buffer deve recuperar-se depois de descartar o quadro excessivo');

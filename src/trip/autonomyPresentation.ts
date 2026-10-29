@@ -1,12 +1,10 @@
 import { estimateRangeFromFuelLevel } from './fuelLevel';
 
 export const CURRENT_FUEL_LEVEL_STALE_AFTER_MS = 30_000;
+export const AUTONOMY_BUFFER_MAX_AGE_MS = 60_000;
+export const AUTONOMY_BUFFER_MIN_READINGS = 10;
 
-export function isCurrentFuelLevelSample(readAtMs: number | null, nowMs = Date.now()): boolean {
-  if (readAtMs == null || !Number.isFinite(readAtMs) || !Number.isFinite(nowMs)) return false;
-  const ageMs = nowMs - readAtMs;
-  return ageMs >= 0 && ageMs <= CURRENT_FUEL_LEVEL_STALE_AFTER_MS;
-}
+export type AutonomyEstimateSource = 'LIVE' | 'BUFFER' | 'UNAVAILABLE';
 
 export interface CurrentAutonomyInput {
   ecuConnected: boolean;
@@ -16,26 +14,81 @@ export interface CurrentAutonomyInput {
   fuelLevelReadAtMs: number | null;
   tripConsumptionKml: number | null;
   averageConsumptionKml: number;
+  bufferAveragePercent?: number | null;
+  bufferSampleCount?: number;
+  bufferLastReadAtMs?: number | null;
   nowMs?: number;
 }
 
-/**
- * Return the range supported by the current ECU session, or null when the
- * fuel-level evidence is unavailable. Persisted range history is not current range.
- */
-export function getCurrentAutonomyRangeKm(input: CurrentAutonomyInput): number | null {
+export interface CurrentAutonomyPresentation {
+  rangeKm: number | null;
+  source: AutonomyEstimateSource;
+  bufferSampleCount: number;
+  bufferAgeMs: number | null;
+}
+
+export function isCurrentFuelLevelSample(readAtMs: number | null, nowMs = Date.now()): boolean {
+  if (readAtMs == null || !Number.isFinite(readAtMs) || !Number.isFinite(nowMs)) return false;
+  const ageMs = nowMs - readAtMs;
+  return ageMs >= 0 && ageMs <= CURRENT_FUEL_LEVEL_STALE_AFTER_MS;
+}
+
+function getConsumptionKml(input: CurrentAutonomyInput): number | null {
+  if (input.tripConsumptionKml != null &&
+      Number.isFinite(input.tripConsumptionKml) &&
+      input.tripConsumptionKml > 0) return input.tripConsumptionKml;
+  return Number.isFinite(input.averageConsumptionKml) && input.averageConsumptionKml > 0
+    ? input.averageConsumptionKml
+    : null;
+}
+
+/** Live range uses a fresh PID 012F sample. A ten-reading real buffer is a distinct temporary estimate. */
+export function getCurrentAutonomyPresentation(input: CurrentAutonomyInput): CurrentAutonomyPresentation {
+  const nowMs = input.nowMs ?? Date.now();
+  const bufferSampleCount = Number.isFinite(input.bufferSampleCount)
+    ? Math.max(0, Math.floor(input.bufferSampleCount as number))
+    : 0;
+  const unavailable: CurrentAutonomyPresentation = {
+    rangeKm: null,
+    source: 'UNAVAILABLE',
+    bufferSampleCount,
+    bufferAgeMs: null,
+  };
+
+  if (!input.ecuConnected || !input.tripConnected || !input.fuelLevelSupported || !Number.isFinite(nowMs)) {
+    return unavailable;
+  }
+
+  const consumptionKml = getConsumptionKml(input);
+  if (consumptionKml == null) return unavailable;
+
+  if (isCurrentFuelLevelSample(input.fuelLevelReadAtMs, nowMs)) {
+    const rangeKm = estimateRangeFromFuelLevel(input.fuelLevelPercent, consumptionKml);
+    if (rangeKm != null) return { rangeKm, source: 'LIVE', bufferSampleCount, bufferAgeMs: null };
+  }
+
+  const lastReadAtMs = input.bufferLastReadAtMs;
+  const bufferAveragePercent = input.bufferAveragePercent;
+  const bufferAgeMs = lastReadAtMs == null || !Number.isFinite(lastReadAtMs)
+    ? null
+    : nowMs - lastReadAtMs;
   if (
-    !input.ecuConnected ||
-    !input.tripConnected ||
-    !input.fuelLevelSupported ||
-    !isCurrentFuelLevelSample(input.fuelLevelReadAtMs, input.nowMs)
-  ) return null;
+    bufferSampleCount >= AUTONOMY_BUFFER_MIN_READINGS &&
+    bufferAveragePercent != null &&
+    Number.isFinite(bufferAveragePercent) &&
+    bufferAveragePercent >= 0 &&
+    bufferAveragePercent <= 100 &&
+    bufferAgeMs != null &&
+    bufferAgeMs >= 0 &&
+    bufferAgeMs <= AUTONOMY_BUFFER_MAX_AGE_MS
+  ) {
+    const rangeKm = estimateRangeFromFuelLevel(bufferAveragePercent, consumptionKml);
+    if (rangeKm != null) return { rangeKm, source: 'BUFFER', bufferSampleCount, bufferAgeMs };
+  }
 
-  const consumptionKml = input.tripConsumptionKml != null
-    && Number.isFinite(input.tripConsumptionKml)
-    && input.tripConsumptionKml > 0
-    ? input.tripConsumptionKml
-    : input.averageConsumptionKml;
+  return { ...unavailable, bufferAgeMs };
+}
 
-  return estimateRangeFromFuelLevel(input.fuelLevelPercent, consumptionKml);
+export function getCurrentAutonomyRangeKm(input: CurrentAutonomyInput): number | null {
+  return getCurrentAutonomyPresentation(input).rangeKm;
 }

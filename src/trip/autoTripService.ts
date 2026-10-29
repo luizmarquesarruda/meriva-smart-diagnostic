@@ -5,8 +5,13 @@ import { addDriveCycle, readDriveCycles } from '../storage/driveCycleStorage';
 import { forceSaveOnObdEvent, registerObdQuery } from '../meriva/autosaveIntegration';
 import { getAutoSaveState, updateAutoSaveState, initAutoSave } from '../meriva/autosaveManager';
 import { RealTripRecorder, getReliableTripConsumptionKml, shouldFinalizeStoppedTrip } from './tripRecorder';
-import { estimateRangeFromFuelLevel, fuelLevelPercentToLiters, isFuelReserve } from './fuelLevel';
-import { getCurrentAutonomyRangeKm, isCurrentFuelLevelSample } from './autonomyPresentation';
+import { estimateRangeFromFuelLevel, fuelLevelPercentToLiters, isFuelReserve, FuelLevelBuffer } from './fuelLevel';
+import {
+  getCurrentAutonomyPresentation,
+  getCurrentAutonomyRangeKm,
+  isCurrentFuelLevelSample,
+  type AutonomyEstimateSource,
+} from './autonomyPresentation';
 import { getLivePidTrend, resetLiveTelemetry } from '../obd/liveTelemetry';
 import { estimateFuelRateLph, type FuelRateSource } from '../obd/fuelConsumption';
 import { startBackgroundMonitoring } from '../gps/backgroundMonitoring';
@@ -21,6 +26,10 @@ export interface AutoTripServiceState {
   fuelLevelSupported: boolean;
   fuelLevelPercent: number | null;
   fuelLevelReadAtMs: number | null;
+  fuelLevelBufferAveragePercent: number | null;
+  fuelLevelBufferCount: number;
+  fuelLevelBufferLastReadAtMs: number | null;
+  autonomyEstimateSource: AutonomyEstimateSource;
   fuelRemainingL: number | null;
   fuelReserve: boolean | null;
   distanceKm: number;
@@ -46,6 +55,10 @@ const INITIAL_STATE: AutoTripServiceState = {
   fuelLevelSupported: false,
   fuelLevelPercent: null,
   fuelLevelReadAtMs: null,
+  fuelLevelBufferAveragePercent: null,
+  fuelLevelBufferCount: 0,
+  fuelLevelBufferLastReadAtMs: null,
+  autonomyEstimateSource: 'UNAVAILABLE',
   fuelRemainingL: null,
   fuelReserve: null,
   distanceKm: 0,
@@ -68,6 +81,7 @@ class AutoTripService {
   private transition: Promise<void> = Promise.resolve();
   private unsubscribeConnection: (() => void) | null = null;
   private readonly listeners = new Set<Listener>();
+  private readonly fuelLevelBuffer = new FuelLevelBuffer();
   private telemetryCursor = 0;
   private pollCycleNumber = 0;
   private stoppedSinceMs: number | null = null;
@@ -86,17 +100,30 @@ class AutoTripService {
 
   getState(): AutoTripServiceState {
     const snapshot = { ...this.state };
+    const ecuConnected = getSharedObdStatus().ecuConnected;
     const currentFuelLevelIsValid = snapshot.connected
-      && getSharedObdStatus().ecuConnected
+      && ecuConnected
       && isCurrentFuelLevelSample(snapshot.fuelLevelReadAtMs);
-    if (currentFuelLevelIsValid) return snapshot;
+    const autonomy = getCurrentAutonomyPresentation({
+      ecuConnected,
+      tripConnected: snapshot.connected,
+      fuelLevelSupported: snapshot.fuelLevelSupported,
+      fuelLevelPercent: currentFuelLevelIsValid ? snapshot.fuelLevelPercent : null,
+      fuelLevelReadAtMs: currentFuelLevelIsValid ? snapshot.fuelLevelReadAtMs : null,
+      bufferAveragePercent: snapshot.fuelLevelBufferAveragePercent,
+      bufferSampleCount: snapshot.fuelLevelBufferCount,
+      bufferLastReadAtMs: snapshot.fuelLevelBufferLastReadAtMs,
+      tripConsumptionKml: snapshot.consumptionKml,
+      averageConsumptionKml: snapshot.averageConsumptionKml,
+    });
     return {
       ...snapshot,
-      fuelLevelPercent: null,
-      fuelLevelReadAtMs: null,
-      fuelRemainingL: null,
-      fuelReserve: null,
-      estimatedRangeKm: 0,
+      fuelLevelPercent: currentFuelLevelIsValid ? snapshot.fuelLevelPercent : null,
+      fuelLevelReadAtMs: currentFuelLevelIsValid ? snapshot.fuelLevelReadAtMs : null,
+      fuelRemainingL: currentFuelLevelIsValid ? snapshot.fuelRemainingL : null,
+      fuelReserve: currentFuelLevelIsValid ? snapshot.fuelReserve : null,
+      estimatedRangeKm: autonomy.rangeKm ?? 0,
+      autonomyEstimateSource: autonomy.source,
     };
   }
 
@@ -144,6 +171,7 @@ class AutoTripService {
   async stop(): Promise<void> {
     if (!this.running) return;
     this.running = false;
+    this.fuelLevelBuffer.reset();
     gpsTracker.setVehicleSpeedHintKmh(null);
     this.generation += 1;
     this.unsubscribeConnection?.();
@@ -168,6 +196,7 @@ class AutoTripService {
     await this.finalizeRecorder();
 
     resetLiveTelemetry();
+    this.fuelLevelBuffer.reset();
     this.telemetryCursor = 0;
     this.pollCycleNumber = 0;
     this.lastEstimatedFuelRate = null;
@@ -329,8 +358,11 @@ class AutoTripService {
             fuelLevelResult.parsed.value >= 0 &&
             fuelLevelResult.parsed.value <= 100
           ) {
-            fuelLevelPercent = fuelLevelResult.parsed.value;
-            fuelLevelReadAtMs = Date.now();
+            const validFuelPercent = fuelLevelResult.parsed.value;
+            const validFuelReadAtMs = Date.now();
+            fuelLevelPercent = validFuelPercent;
+            fuelLevelReadAtMs = validFuelReadAtMs;
+            this.fuelLevelBuffer.record(validFuelPercent, validFuelReadAtMs);
           }
         } else {
           fuelLevelPercent = this.state.fuelLevelPercent;
@@ -510,6 +542,20 @@ class AutoTripService {
           fuelRateForDisplayLph != null && fuelRateForDisplayLph > 0 && tripVehicleSpeedKmh > 0
             ? tripVehicleSpeedKmh / fuelRateForDisplayLph
             : null;
+        const fuelLevelBuffer = this.fuelLevelBuffer.getSnapshot();
+        const autonomyInput = {
+          ecuConnected: getSharedObdStatus().ecuConnected,
+          tripConnected: true,
+          fuelLevelSupported: this.state.fuelLevelSupported,
+          fuelLevelPercent,
+          fuelLevelReadAtMs,
+          bufferAveragePercent: fuelLevelBuffer.averagePercent,
+          bufferSampleCount: fuelLevelBuffer.sampleCount,
+          bufferLastReadAtMs: fuelLevelBuffer.lastReadAtMs,
+          tripConsumptionKml,
+          averageConsumptionKml: this.state.averageConsumptionKml,
+        };
+        const autonomyPresentation = getCurrentAutonomyPresentation(autonomyInput);
 
         this.setState({
           connected: true,
@@ -521,17 +567,13 @@ class AutoTripService {
           instantaneousConsumptionSource: instantaneousConsumptionKml != null ? fuelRateForDisplaySource : null,
           fuelLevelPercent,
           fuelLevelReadAtMs,
+          fuelLevelBufferAveragePercent: fuelLevelBuffer.averagePercent,
+          fuelLevelBufferCount: fuelLevelBuffer.sampleCount,
+          fuelLevelBufferLastReadAtMs: fuelLevelBuffer.lastReadAtMs,
+          autonomyEstimateSource: autonomyPresentation.source,
           fuelRemainingL: fuelLevelPercentToLiters(fuelLevelPercent),
           fuelReserve: isFuelReserve(fuelLevelPercent),
-          estimatedRangeKm: getCurrentAutonomyRangeKm({
-            ecuConnected: getSharedObdStatus().ecuConnected,
-            tripConnected: true,
-            fuelLevelSupported: this.state.fuelLevelSupported,
-            fuelLevelPercent,
-            fuelLevelReadAtMs,
-            tripConsumptionKml,
-            averageConsumptionKml: this.state.averageConsumptionKml,
-          }) ?? 0,
+          estimatedRangeKm: getCurrentAutonomyRangeKm(autonomyInput) ?? 0,
           error: rpm === 0 && obdSpeedKmh === 0 && fuelRateForDisplayLph == null
             ? 'MOTOR DESLIGADO? / ECU SEM TELEMETRIA VÁLIDA'
             : fuelRateForDisplaySource && fuelRateForDisplaySource !== 'MEASURED_015E'

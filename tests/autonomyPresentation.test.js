@@ -32,7 +32,26 @@ function loadTs(file, overrides = {}) {
 const root = path.resolve(__dirname, '..');
 const fuelLevel = loadTs(path.join(root, 'src/trip/fuelLevel.ts'));
 const presentation = loadTs(path.join(root, 'src/trip/autonomyPresentation.ts'), { './fuelLevel': fuelLevel });
-const { getCurrentAutonomyRangeKm } = presentation;
+const { getCurrentAutonomyRangeKm, getCurrentAutonomyPresentation } = presentation;
+const buffer = new fuelLevel.FuelLevelBuffer();
+const bufferNow = Date.now();
+const bufferBase = bufferNow - 20_000;
+for (let i = 0; i < 10; i += 1) {
+  assert.strictEqual(buffer.record(40 + i, bufferBase + i * 1000, bufferNow), true);
+}
+let bufferSnapshot = buffer.getSnapshot(bufferNow);
+assert.strictEqual(bufferSnapshot.sampleCount, 10, 'buffer só fica semeado com dez leituras reais válidas');
+assert.strictEqual(bufferSnapshot.averagePercent, 44.5);
+assert.strictEqual(buffer.record(55, bufferBase + 8000, bufferNow), false,
+  'leitura fora de ordem não pode entrar no buffer');
+assert.strictEqual(buffer.record(101, bufferNow, bufferNow), false,
+  'percentual acima de 100 deve ser rejeitado');
+assert.strictEqual(buffer.record(50, bufferNow + 1000, bufferNow), false,
+  'timestamp futuro deve ser rejeitado');
+assert.strictEqual(buffer.record(55, bufferNow, bufferNow), true);
+bufferSnapshot = buffer.getSnapshot(bufferNow);
+assert.strictEqual(bufferSnapshot.sampleCount, 10, 'o buffer é rolling e permanece limitado a dez amostras');
+assert.strictEqual(bufferSnapshot.averagePercent, 46, 'a média usa apenas as dez leituras mais recentes');
 
 const valid = {
   ecuConnected: true,
@@ -73,5 +92,27 @@ assert.strictEqual(getCurrentAutonomyRangeKm({ ...valid, fuelLevelReadAtMs: Numb
   'timestamp inválido não pode gerar autonomia');
 assert.strictEqual(getCurrentAutonomyRangeKm({ ...valid, fuelLevelReadAtMs: 1_000_001 }), null,
   'timestamp futuro não pode ser tratado como leitura atual');
+
+const buffered = {
+  ...valid,
+  fuelLevelPercent: null,
+  fuelLevelReadAtMs: null,
+  bufferAveragePercent: 50,
+  bufferSampleCount: 10,
+  bufferLastReadAtMs: 960_000,
+};
+const bufferPresentation = getCurrentAutonomyPresentation(buffered);
+assert.strictEqual(bufferPresentation.source, 'BUFFER',
+  'fallback deve ser distinguido explicitamente da leitura atual do PID');
+assert.strictEqual(bufferPresentation.rangeKm, 280,
+  'buffer com dez leituras reais deve estimar autonomia com o consumo válido');
+assert.strictEqual(getCurrentAutonomyRangeKm(buffered), 280);
+assert.strictEqual(getCurrentAutonomyPresentation({ ...buffered, bufferSampleCount: 9 }).source, 'UNAVAILABLE',
+  'buffer incompleto não pode ser usado como fallback');
+assert.strictEqual(getCurrentAutonomyPresentation({ ...buffered, bufferLastReadAtMs: 939_999 }).source, 'UNAVAILABLE',
+  'buffer expirado depois de 60 s precisa voltar a N/D');
+assert.strictEqual(getCurrentAutonomyPresentation({
+  ...valid, bufferAveragePercent: 80, bufferSampleCount: 10, bufferLastReadAtMs: 999_000,
+}).source, 'LIVE', 'leitura válida atual tem prioridade sobre o buffer');
 
 console.log('autonomyPresentation.test.js: PASS');

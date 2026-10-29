@@ -1,26 +1,23 @@
-## ESTADO VIGENTE — 2026-10-25 (auditoria de estabilidade DB-130)
+## ESTADO VIGENTE — 2026-10-29 (auditoria P0 de telemetria, autonomia e Bluetooth)
 
-> Estado consultado no GitHub em 25/10/2026. Este diário acompanha a branch de consolidação #89; não representa merge em `main`. CI verde por branch isolada não comprova integração combinada nem teste físico.
+> Estado observado no GitHub em 29/10/2026. Este bloco descreve uma branch de correções baseada no SHA atual de `main`; não declara merge nem teste físico.
 
-### `main` e proteção de integração
-- Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
-- SHA de `main` observado antes desta rodada: `701474de2cb3ed8a617a66d87fe3b5e368366acb`.
-- A API informa `protected: false` e a listagem de rulesets retorna vazia. Checks obrigatórios na branch principal não estão confirmados. A consulta detalhada de proteção foi negada pela integração (403), portanto não foi alterada.
-- PR #80 é a última integração de código confirmada. Nenhuma correção desta rodada foi mesclada em `main`.
+### `main` e CI
+- Repositório: [luizmarquesarruda/meriva-smart-diagnostic](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
+- SHA de `main` observado antes desta rodada: `7eec3afecb3718020724baf053f8b6d2ca636fab`.
+- `.github/workflows/ci.yml` executa em qualquer `push`; o usuário autorizou explicitamente a CI automática nesta rodada.
+- Branch dedicada: `fix/p0-telemetry-autonomy-diagnostics-20261029`. A CI desta branch deve ser verificada no SHA exato do commit.
 
-### PRs ativas e conflitos de integração
-- [#89 — consolidação da auditoria/hardening](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/89): começou esta rodada no SHA `73df16b3c7606595806d67c14c2f95f7fae37e2e`, cuja CI anterior estava verde. As correções encontradas nas iterações estão registradas em DB-126/DB-127; consulte o HEAD atual e a CI do SHA exato antes de aceitar.
-- [#90 — recuperação Bluetooth Android 16](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/90): [run 40171897065 — sucesso](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/40171897065) no SHA anterior. A lógica está sendo consolidada na #89 para evitar duas propostas nos mesmos três arquivos; a branch é preservada como referência.
-- [#81 — PID 0144](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/81): aberta; DB-109 desta branch significa PID 0144, enquanto DB-109 na #89 tem outro conteúdo. Deve ser renumerada/sincronizada sobre a sequência consolidada antes de integrar.
-- [#82 — navegação responsiva](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/82), [#83 — layout Floot](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/83) e [#84 — inventário de PIDs](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/84) seguem abertas. #82 e #83 dividem nove arquivos e discordam sobre a navegação em paisagem e a política de 20 versus 25 PIDs; #83 compartilha 17 arquivos com #89. CI verde isolada não resolve esses conflitos.
-- PRs #85, #86 e #87 estão fechadas sem merge; o conteúdo dessas branches não se considera integrado apenas porque foram encerradas. Partes das correções foram reconciliadas na #89 conforme o diff.
+### PRs e integração
+- [PR #96 — Evita DTC duplicado no cockpit e mostra pressão do coletor](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/96) estava aberta, não draft, nem mesclada, no SHA `b21b574dbac25b8b417eb2540716e0c2503eb6eb`, com 50 arquivos alterados e 129 commits de diferença declarados. A amplitude precisa ser reconciliada com o título.
+- A PR #96 não foi mesclada nem recebe implicitamente estas alterações. Ela contém um registro DB-132 próprio; antes de integrar ambos os ramos, a numeração do diário precisa ser reconciliada sem apagar histórico.
+- Não fazer merge com base apenas em CI de outra branch ou SHA. Exigir diff final revisado, `validate` e `android-build` verdes no mesmo HEAD, mais teste físico e inspeção visual separados.
 
-### Critério de aceitação
-- A suíte protege fórmulas, parser, DTC, consumo, combustível, Bluetooth, autonomia, persistência, GPS, navegação e histórico.
-- O diário deve manter IDs DB-NNN únicos, contínuos e na mesma ordem do índice. Qualquer combinação de branches deve reconciliar numeração antes de integração.
-- Nenhuma PR deve ser mesclada sem diff final contra `main`, CI do SHA exato com `validate` e `android-build` verdes e reconciliação dos arquivos compartilhados.
-- Teste físico do Galaxy A06/Android 16 + ELM327 e validação da ECU são etapas separadas.
-
+### Critérios P0
+- Leituras de PID são ordenadas pelo timestamp, não pela chegada; tendência ao vivo expira após 10 s.
+- PID 012F é a fonte autoritativa de nível de combustível. O buffer só usa dez leituras reais válidas da sessão atual e pode ser mostrado temporariamente, explicitamente rotulado, por até 60 s desde a última leitura; não transforma dado obsoleto em leitura atual.
+- Logs Bluetooth são limitados por total de caracteres e quantidade de linhas; RX continua limitado a 16 KiB, sem aceitar resposta parcial.
+- Testes unitários e CI não substituem teste no Galaxy A06 / SM-A065M / Android 16 com ELM327 real, em especial resposta ECU ao PID 010C e precisão da autonomia em percurso.
 ---
 
 ## Portabilidade Floot → aplicativo Expo — 2026-10-23
@@ -202,6 +199,7 @@
 - **DB-129** · 2026-10-25 — GPS rejeita timestamps inválidos e fora de ordem
 - **DB-130** · 2026-10-25 — Otimização CSV avaliada e bloqueada pela versão instalada
 - **DB-131** · 2026-10-25 — Atualização periódica de localização/clima baseada em conectividade
+- **DB-132** · 2026-10-29 — Integridade de telemetria, buffer de autonomia e limite de diagnósticos Bluetooth
 
 ---
 
@@ -3987,3 +3985,22 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Commits criados na branch `fix/repository-audit-hardening-20261024` da PR #89. A CI deve ser verificada no HEAD final desta alteração; resultados de SHAs anteriores não contam como aprovação.
 - Ainda não foi executado teste físico de geolocalização em Android 16 alternando Wi-Fi/4G/5G. A CI não comprova recepção GPS pelo provedor fused, disponibilidade da operadora nem funcionamento do ELM327/ECU reais.
 - Nenhuma mudança foi mesclada em `main`. A atualização de clima é opcional e não deve afetar polling, conexão Bluetooth, autonomia ou diagnóstico local.
+
+## DB-132 · 2026-10-29 — Integridade de telemetria, buffer de autonomia e limite de diagnósticos Bluetooth
+
+### Achados confirmados na base `main`
+- `src/obd/liveTelemetry.ts` anexava amostras pela ordem de chegada e atualizava `latest` sem comparar timestamps. Uma leitura antiga atrasada podia substituir um valor recente; tendências mantinham aparência de dado atual depois do limite de 10 s usado no contexto operacional.
+- `src/trip/autonomyPresentation.ts` só aceitava nível atual do PID 012F por até 30 s; o serviço de viagem não tinha buffer circular de leituras reais.
+- `src/obd/bluetoothClassicTransport.ts` limitava o diagnóstico por 500 linhas, mas não por tamanho agregado; eventos RX repetidos podiam produzir log excessivo.
+
+### Correções nesta branch
+- Telemetria agora mantém a série em ordem cronológica, atualiza o valor mais recente somente se o timestamp não regredir e retorna N/D para tendências cuja amostra mais recente passou de 10 s.
+- Implementado buffer circular in-memory de dez amostras reais válidas do PID 012F. É reinicializado a cada sessão ECU, rejeita percentuais/timestamps inválidos e só permite fallback explicitamente rotulado quando há dez amostras e a última leitura tem no máximo 60 s. Litros e reserva continuam dependendo da leitura atual.
+- O cockpit distingue `AUTONOMIA ATUAL`, `AUTONOMIA • BUFFER` e `AUTONOMIA N/D`; o fallback não é apresentado como leitura atual.
+- Diagnósticos Bluetooth agora têm teto agregado de 64 KiB além do teto de linhas, mantendo preview RX de 256 caracteres e buffer de protocolo de 16 KiB.
+- Atualizados contrato anti-regressão, plano de testes e changelog; ampliados os testes existentes de telemetria, autonomia e transporte, sem criar suítes soltas fora do runner.
+
+### Validação e limites
+- A aceitação depende da CI no SHA final desta branch. Não é possível validar Bluetooth físico por CI.
+- A autonomia por buffer é uma estimativa temporária, não prova de que a ECU está enviando nível atual; expira para N/D após 60 s. A média de consumo precisa ser positiva e válida.
+- Teste físico pendente: Galaxy A06 / SM-A065M / Android 16 com ELM327 real, enquadramento CR/ASCII, resposta real de 010C, e comparação de autonomia com 012F e percurso medido. Nenhum merge foi executado.

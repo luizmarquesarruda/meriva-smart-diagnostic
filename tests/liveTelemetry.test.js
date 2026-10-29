@@ -51,6 +51,35 @@ assert.strictEqual(trend.current, 124);
 assert.strictEqual(trend.values.length, 30);
 assert.ok(telemetry.formatSparkline(trend.values).length === 30);
 
+// Out-of-order arrivals must not replace the latest timestamped observation.
+telemetry.resetLiveTelemetry();
+const newestMs = Date.now() - 100;
+const olderMs = newestMs - 1000;
+telemetry.recordLivePidReading({
+  pid: '010C', name: 'RPM', value: 1500, unit: 'rpm',
+  timestamp: new Date(newestMs).toISOString(), source: 'REAL',
+});
+telemetry.recordLivePidReading({
+  pid: '010C', name: 'RPM', value: 400, unit: 'rpm',
+  timestamp: new Date(olderMs).toISOString(), source: 'REAL',
+});
+trend = telemetry.getLivePidTrend('010C');
+assert.ok(trend);
+assert.strictEqual(trend.current, 1500, 'amostra atrasada não pode substituir o valor mais recente');
+assert.deepStrictEqual(
+  telemetry.getLiveSeries('010C').map((point) => Date.parse(point.timestamp)),
+  [olderMs, newestMs],
+  'série deve permanecer em ordem cronológica mesmo com chegada fora de ordem',
+);
+
+telemetry.resetLiveTelemetry();
+telemetry.recordLivePidReading({
+  pid: '010D', name: 'Speed', value: 30, unit: 'km/h',
+  timestamp: new Date(Date.now() - 30_000).toISOString(), source: 'REAL',
+});
+assert.strictEqual(telemetry.getLivePidTrend('010D'), null,
+  'tendência não pode apresentar uma amostra com mais de 10 s como dado atual');
+
 let values = new Map([
   ['010D', 0],
   ['010C', 800],
