@@ -247,6 +247,7 @@
 - **DB-156** · 2026-10-28 — Remover cópia do perfil do veículo em Configurações
 - **DB-157** · 2026-10-28 — Tornar robustas as asserções da navegação do perfil
 - **DB-158** · 2026-10-28 — Melhorar legibilidade da tipografia em paisagem
+- **DB-159** · 2026-10-28 — Atualizar teste do hub após separar armazenamento e viagens
 
 ---
 
@@ -4403,3 +4404,10 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - A inspeção de `app/index.tsx` encontrou rótulos/hints de quadrantes e rótulos auxiliares com `fontSize:6` em paisagem. O encaixe espacial era obtido com texto pequeno demais para o cockpit.
 - Aumentados os rótulos e dicas dos quadrantes para 8 dp (line-height 9), instrução do carrossel para 7 dp e rótulos auxiliares para 7 dp (line-height 9). Mantidas a grade 2×2, altura mínima do cartão e o contador/carrossel.
 - Acrescentados testes e contrato para proteger esse limite de leitura. A aprovação final ainda depende da CI do SHA e de inspeção visual no Galaxy A06, incluindo rotação retrato→paisagem→retrato para confirmar ausência de clipping.
+
+
+## DB-159 · 2026-10-28 — Atualizar teste do hub após separar armazenamento e viagens
+
+- A CI encontrou em `tests/sourceStatusLegend.test.js` uma expectativa antiga para a categoria `HISTÓRICO E RELATÓRIOS`. A categoria foi renomeada intencionalmente para `ARQUIVOS E EXPORTAÇÃO` porque a tela não apresenta mais uma lista de viagens; o histórico completo passou a ter um destino único em `/viagens`.
+- Atualizado o contrato do hub para o novo nome e reforçado que a tela de armazenamento mantém sua função de quota, arquivos, exportação e limpeza, sem renderizar `VIAGENS SALVAS`.
+- O teste não foi removido: foi adaptado à organização atual e conserva as verificações de ícones, rotas e legenda de qualidade de dados. CI completa no novo SHA continua obrigatória.

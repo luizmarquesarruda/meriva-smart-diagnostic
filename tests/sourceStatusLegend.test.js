@@ -21,7 +21,7 @@ for (const category of [
   'DIAGNÓSTICO E CONEXÃO',
   'VEÍCULO E CONDUÇÃO',
   'DADOS E APRENDIZADO',
-  'HISTÓRICO E RELATÓRIOS',
+  'ARQUIVOS E EXPORTAÇÃO',
   'SISTEMA E PREFERÊNCIAS',
 ]) {
   assert.ok(resources.includes(category), 'central de recursos deve apresentar grupo: ' + category);
@@ -34,7 +34,9 @@ assert.match(resources, /group\.icon as AppIconName/, 'cada grupo deve ter ícon
 assert.ok(data.includes('<SourceStatusLegend />'), 'telemetria deve explicar as classes de origem');
 assert.ok(trips.includes('<SourceStatusLegend compact />'), 'viagens devem explicar a origem dos dados');
 assert.match(trips, /AppIcon name="trips"/, 'cada viagem deve ter um marcador visual');
-assert.ok(storage.includes('<SourceStatusLegend compact />'), 'histórico deve exibir a regra de qualidade');
+assert.ok(storage.includes('<SourceStatusLegend compact />'), 'armazenamento deve exibir a regra de qualidade');
+assert.ok(storage.includes('ARMAZENAMENTO E EXPORTAÇÃO'), 'a tela de armazenamento deve manter seu título canônico');
+assert.ok(!storage.includes('VIAGENS SALVAS'), 'a tela de armazenamento não deve repetir a lista canônica de viagens');
 assert.match(storage, /AppIcon name="history"/, 'exportação JSON deve ter ícone');
 assert.match(storage, /AppIcon name="data"/, 'exportação CSV deve ter ícone');
 assert.match(storage, /AppIcon name="warning"/, 'limpeza de dados deve ter ícone de alerta');
