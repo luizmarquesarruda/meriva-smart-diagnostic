@@ -4,7 +4,7 @@
 
 - Repositório: [luizmarquesarruda/meriva-smart-diagnostic](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
 - PR #96: [Evita DTC duplicado no cockpit e mostra pressão do coletor](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/96), aberta, fora de rascunho e sem merge. Base `main` observada nesta PR: `7eec3afecb3718020724baf053f8b6d2ca636fab`.
-- HEAD/CI: consultar a PR #96 para o SHA atual e o workflow correspondente. As execuções listadas anteriormente foram canceladas durante a sequência de commits; DB-178, DB-179 e DB-180 precisam de validação integral no mesmo SHA final.
+- HEAD/CI: consultar a PR #96 para o SHA atual e o workflow correspondente. A execução no SHA `2441a48131517cf5dda600eb9ab2ec15c69ccfd4` falhou na asserção antiga de timeout; DB-181 atualiza o teste para o contrato novo. DB-178 a DB-181 precisam de validação integral no mesmo SHA final.
 - A falha histórica em `tests/orientationLayout.test.js:78` era uma asserção textual obsoleta, corrigida em DB-176. Não há confirmação de CI verde para as correções posteriores.
 - Após qualquer alteração, reconsultar o HEAD e a CI correspondentes. Só considerar a PR validada com `validate` e `android-build` verdes no mesmo SHA, diff reconciliado contra `main` e validação física separada.
 - A auditoria atual encontrou divergências de documentação e um débito relevante de modernização do SDK. Não houve upgrade de SDK nem remoção de dependências nativas nesta rodada: fazê-los antes de preservar um baseline físico poderia introduzir regressão no Bluetooth Classic.
