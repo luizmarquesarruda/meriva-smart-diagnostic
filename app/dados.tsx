@@ -94,7 +94,7 @@ export default function DadosScreen() {
             <Metric landscape={layout.landscape} label="VELOCIDADE GPS" value={gpsTracker.getState().running ? Math.round(gpsTracker.getState().currentSpeedKmh) + ' km/h' : 'N/D'} />
             <Metric landscape={layout.landscape} label="DISTÂNCIA DA VIAGEM" value={trip.active ? trip.distanceKm.toFixed(2) + ' km' : 'N/D'} />
             <Metric landscape={layout.landscape} label="CONSUMO" value={trip.consumptionKml != null && trip.consumptionKml > 0 ? trip.consumptionKml.toFixed(1) + ' km/L' : 'N/D'} />
-            <Metric landscape={layout.landscape} label="AUTONOMIA" value={trip.estimatedRangeKm > 0 ? trip.estimatedRangeKm.toFixed(0) + ' km' : trip.fuelLevelPercent === 0 && trip.fuelLevelReadAtMs != null ? '0 km' : 'N/D'} />
+            <Metric landscape={layout.landscape} label={trip.autonomyEstimateSource === 'BUFFER' ? 'AUTONOMIA • BUFFER' : 'AUTONOMIA'} value={trip.estimatedRangeKm > 0 ? trip.estimatedRangeKm.toFixed(0) + ' km' : trip.autonomyEstimateSource === 'BUFFER' && trip.estimatedRangeKm === 0 ? '0 km' : trip.fuelLevelPercent === 0 && trip.fuelLevelReadAtMs != null ? '0 km' : 'N/D'} />
           </View>
 
           <Text style={styles.section}>CONTEXTO OPERACIONAL</Text>

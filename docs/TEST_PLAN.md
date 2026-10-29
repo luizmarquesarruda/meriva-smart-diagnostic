@@ -126,7 +126,7 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 
 ## AUTONOMY-BUFFER-01 — Buffer de dez leituras reais
 - O buffer começa vazio e só é semeado por dez leituras válidas, reais e temporalmente crescentes do PID 012F durante a sessão ECU atual.
-- Após o nível ao vivo expirar, permitir a etiqueta `AUTONOMIA • BUFFER` somente com dez amostras reais e última leitura há no máximo 60 s; sem dez leituras ou após expiração, exibir N/D.
+- Após o nível ao vivo expirar, permitir a etiqueta `AUTONOMIA • BUFFER` somente com dez amostras reais e última leitura há no máximo 60 s; sem dez leituras ou após expiração, exibir N/D em todas as telas de tempo real (cockpit, Dados e Laboratório).
 - Priorizar PID 012F atual sempre que válido. O buffer não deve substituir o percentual atual, litros, reserva, autosave ou histórico de leitura real.
 - Testar rejeição de percentual fora de 0–100, timestamps futuros/regressivos e reinicialização do buffer em nova sessão ECU.
 - Em veículo real, comparar autonomia ao vivo e estimativa do buffer com leitura 012F e percurso medido; CI não comprova precisão física.

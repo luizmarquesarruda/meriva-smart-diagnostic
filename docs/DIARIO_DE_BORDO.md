@@ -3997,7 +3997,7 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 ### Correções nesta branch
 - Telemetria agora mantém a série em ordem cronológica, atualiza o valor mais recente somente se o timestamp não regredir e retorna N/D para tendências cuja amostra mais recente passou de 10 s.
 - Implementado buffer circular in-memory de dez amostras reais válidas do PID 012F. É reinicializado a cada sessão ECU, rejeita percentuais/timestamps inválidos e só permite fallback explicitamente rotulado quando há dez amostras e a última leitura tem no máximo 60 s. Litros e reserva continuam dependendo da leitura atual.
-- O cockpit distingue `AUTONOMIA ATUAL`, `AUTONOMIA • BUFFER` e `AUTONOMIA N/D`; o fallback não é apresentado como leitura atual.
+- O cockpit, Dados e Laboratório distinguem `AUTONOMIA ATUAL`/`AUTONOMIA ESTIMADA`, `AUTONOMIA • BUFFER` e N/D; o fallback não é apresentado como leitura atual. Uma estimativa buffer válida de zero km continua distinta de N/D.
 - Diagnósticos Bluetooth agora têm teto agregado de 64 KiB além do teto de linhas, mantendo preview RX de 256 caracteres e buffer de protocolo de 16 KiB.
 - Atualizados contrato anti-regressão, plano de testes e changelog; ampliados os testes existentes de telemetria, autonomia e transporte.
 - A CI `40811128907` falhou no passo `gate:baseline` antes de executar `npm run validate`: detectou que `tests/elmHealthPresentation.test.js` estava no repositório, mas não no comando `npm test`. O mesmo problema apareceu na execução do SHA-base `7eec3afecb3718020724baf053f8b6d2ca636fab`, logo não foi causado pelas correções P0. A suíte foi adicionada ao runner e à lista obrigatória do gate; o próximo SHA precisa passar a CI completa.

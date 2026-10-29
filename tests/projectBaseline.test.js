@@ -259,7 +259,9 @@ assert.match(tripService, /listener\(this\.getState\(\)\)/, 'new service subscri
 assert.match(tripService, /const snapshot = this\.getState\(\)/, 'service updates must emit freshness-filtered state');
 assert.ok(!tripService.includes('estimatedRangeKm: persisted.autonomy.estimatedRangeKm'), 'current state cannot be seeded with saved range');
 assert.ok(!tripService.includes('estimatedRangeKm: persistedAutonomy.estimatedRangeKm'), 'new ECU session cannot start from saved range');
-assert.match(dataScreen, /label="AUTONOMIA" value=\{trip\.estimatedRangeKm > 0/);
+assert.match(dataScreen, /label=\{trip\.autonomyEstimateSource === 'BUFFER' \? 'AUTONOMIA • BUFFER' : 'AUTONOMIA'\} value=\{trip\.estimatedRangeKm > 0/);
+assert.match(home, /AUTONOMIA • BUFFER/, 'cockpit deve identificar explicitamente a estimativa de buffer');
+assert.match(laboratory, /AUTONOMIA • BUFFER/, 'Laboratório deve identificar explicitamente a estimativa de buffer');
 assert.match(dataScreen, /trip\.fuelLevelPercent === 0 && trip\.fuelLevelReadAtMs != null/,
   'a current, valid empty-tank reading must show 0 km instead of N/D');
 assert.match(laboratory, /fuelLevelPercent === 0/,

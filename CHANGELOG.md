@@ -8,6 +8,7 @@
 - Diagnósticos Bluetooth limitados a 64 KiB agregados além do limite de 500 linhas e da prévia RX de 256 caracteres; o parser continua rejeitando RX acima de 16 KiB.
 - Testes de regressão adicionados para amostras fora de ordem, expiração de tendências, buffer real, prioridade da leitura atual, expiração do fallback e limite de logs.
 - Corrigido o gate preexistente: `tests/elmHealthPresentation.test.js` existia, mas não era executado por `npm test`; agora está no runner e na lista de suítes obrigatórias.
+- Cockpit, Dados e Laboratório identificam a autonomia baseada no buffer como estimativa temporária; zero km válido também é distinto de N/D.
 
 
 ### Integridade de telemetria GPS
