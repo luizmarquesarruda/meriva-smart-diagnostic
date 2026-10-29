@@ -100,6 +100,10 @@ assert(transport.includes('Math.min(NATIVE_CONNECTION_CHECK_TIMEOUT_MS, remainin
 assert(transport.includes('NATIVE_SOCKET_CLEANUP_TIMEOUT'), 'direct close timeout must be observable and keep the socket guard');
 assert.match(transport, /runWithTimeout\(\s*\(\) => device\.disconnect\(\)/, 'native socket disconnect must have a finite timeout');
 assert(transport.includes('BLUETOOTH_DISCONNECT_TIMEOUT'), 'timed-out native disconnect must be reported separately');
+assert(transport.includes('pendingNativeDisconnectOperations'),
+  'the raw native disconnect promise must remain tracked after the JavaScript timeout');
+assert.match(transport, /let nativeDisconnect = pendingNativeDisconnectOperations\.get\(addressKey\)[\s\S]*?if \(!nativeDisconnect\)[\s\S]*?device\.disconnect\(\)/,
+  'disconnect retries must reuse a pending native operation instead of opening overlapping native cleanup calls');
 assert(!/await device\.disconnect\(\)/.test(transport), 'unbounded native disconnect await must not return');
 assert(transport.includes('replacementSocketBlocked: true'), 'an unconfirmed native close must block replacement RFCOMM sockets');
 
