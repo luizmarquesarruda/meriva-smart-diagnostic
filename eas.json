@@ -9,9 +9,10 @@
     },
     "production": {
       "android": {
-        "buildType": "app-bundle"
+        "buildType": "apk"
       },
-      "channel": "production"
+      "channel": "production",
+      "distribution": "internal"
     }
   }
 }
