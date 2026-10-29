@@ -237,6 +237,7 @@
 - **DB-146** · 2026-10-28 — Restaurar quadrantes 2×2 e paginação de PIDs no cockpit
 - **DB-147** · 2026-10-28 — Incluir os PIDs restantes no carrossel principal com navegação por setas
 - **DB-148** · 2026-10-28 — Auditoria e correção de cockpit em orientação paisagem
+- **DB-149** · 2026-10-28 — Grade 2×2 adaptável e navegação lateral direita em paisagem
 
 ---
 
