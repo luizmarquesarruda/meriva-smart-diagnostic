@@ -137,7 +137,7 @@ assert.match(projectContract, /\| RG-42 \|/, 'recuperação KWP/ECU precisa do c
 assert.ok(read('docs/TEST_PLAN.md').includes('BT-CONN-08'), 'teste de quadro KWP precisa permanecer no plano');
 assert.ok(read('docs/TEST_PLAN.md').includes('BT-CONN-09'), 'teste de retry e estado ECU precisa permanecer no plano');
 assert.match(gpsTracker, /!Number\.isFinite\(location\.timestamp\) \|\| location\.timestamp <= 0/);
-assert.match(gpsTracker, /location\.timestamp <= this\.previous\.timestamp/);
+assert.match(gpsTracker, /location\.timestamp <= this\.state\.lastTimestamp/);
 assert.doesNotMatch(gpsTracker, /timestamp:\s*Date\.now\(\)/, 'GPS must not fabricate timestamps');
 const regressionRequirementIds = [...projectContract.matchAll(/^\| (RG-\d{2}) \|/gm)].map((match) => match[1]);
 assert.ok(regressionRequirementIds.length > 0, 'o contrato anti-regressão não pode ficar vazio');

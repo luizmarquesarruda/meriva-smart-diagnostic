@@ -4,12 +4,12 @@
 
 - Repositório: [luizmarquesarruda/meriva-smart-diagnostic](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
 - PR #96: [Evita DTC duplicado no cockpit e mostra pressão do coletor](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/96), aberta, fora de rascunho e sem merge. Base `main` observada nesta PR: `7eec3afecb3718020724baf053f8b6d2ca636fab`.
-- HEAD base desta rodada: `b7cda343edb3f6662b1c14f91e1eb602bbab172d`; CI correspondente ainda estava em fila. DB-169 exige validação no HEAD resultante.
-- A CI `40867200154` validou `doctor`, gate e `validate` somente no SHA `ae78b9138a1289176b6409d1faa3578c945044de`; o APK não foi confirmado nesse SHA antes de novos commits. Não extrapolar o resultado para b7cda nem para DB-169.
+- HEAD consultado: `182f09fbe7b3272763fa859db2bad8bd9bc7513a`; a CI `40869798013` falhou no gate porque o contrato estático ainda exigia comparar timestamps com `previous.timestamp`, enquanto DB-167 passou a manter monotonicidade por `state.lastTimestamp`. A correção do gate está no commit seguinte.
+- A CI `40869798013` executou no SHA `182f09fbe7b3272763fa859db2bad8bd9bc7513a` e falhou no `gate:baseline` pelo contrato GPS obsoleto; `android-build` foi ignorado. O código não deve ser considerado validado até a nova CI passar no SHA final.
 - Após qualquer alteração, reconsultar o HEAD e a CI correspondentes. Só considerar a PR validada com `validate` e `android-build` verdes no mesmo SHA, diff reconciliado contra `main` e validação física separada.
 - A auditoria atual encontrou divergências de documentação e um débito relevante de modernização do SDK. Não houve upgrade de SDK nem remoção de dependências nativas nesta rodada: fazê-los antes de preservar um baseline físico poderia introduzir regressão no Bluetooth Classic.
 - Testes com Galaxy A06/Android 16/ELM327 real, confirmação de resposta `010C`, inspeção do APK instalado e validação GPS/autonomia continuam pendentes.
-- DB-145 registra a regressão de leitura KWP e classificação de estado ECU/Bluetooth; DB-162/163/164/166 protegem o ciclo RFCOMM; DB-165 limita HTTP de clima; DB-167 expira fixes GPS antigos; DB-168 neutraliza fórmula no CSV; DB-169 torna o start GPS não bloqueante para o polling OBD e aplica cooldown de retry.
+- DB-145 registra a regressão de leitura KWP e classificação de estado ECU/Bluetooth; DB-162/163/164/166 protegem o ciclo RFCOMM; DB-165 limita HTTP de clima; DB-167 expira fixes GPS antigos; DB-168 neutraliza fórmula no CSV; DB-169 torna o start GPS não bloqueante para o polling OBD e aplica cooldown de retry. DB-170 atualiza o gate para aceitar a proteção de timestamp por `state.lastTimestamp`.
 - O cockpit deve continuar mostrando N/D até existir leitura OBD real, completa e recente; seed ou histórico não deve ser reapresentado como valor atual.
 - DB-146 restaura os quatro quadrantes de telemetria em simultâneo; os PIDs adicionais continuam acessíveis em páginas de quatro métricas. A ausência de ECU não remove a grade, apenas mantém os valores em N/D.
 - DB-147 fixa os quatro PIDs principais na primeira página e transforma os restantes PIDs suportados em carrossel completo, com setas anterior/próxima e avanço automático a cada 10 s. Anomalias adicionais são priorizadas sem deslocar os quadrantes principais.
@@ -258,6 +258,7 @@
 - **DB-167** · 2026-10-29 — Expirar velocidade GPS antiga sem perder distância acumulada
 - **DB-168** · 2026-10-29 — Neutralizar fórmulas em campos textuais de exportação CSV
 - **DB-169** · 2026-10-29 — Impedir que a inicialização GPS bloqueie polling OBD
+- **DB-170** · 2026-10-29 — Atualizar gate GPS para monotonicidade após perda de fix
 
 ---
 
@@ -4578,3 +4579,15 @@ A exportação CSV de viagens escapava aspas, mas não neutralizava campos textu
 - Esta alteração exige TypeScript, gate, suíte completa e build Android no SHA final.
 - Uma operação nativa GPS que não termina permanece como a única tentativa em voo; isso preserva o polling OBD e evita duplicar tarefas, mas pode exigir resolução da chamada nativa ou reinício do app para recuperar GPS.
 - Não houve teste físico GPS/ECU nesta sessão.
+
+## DB-170 · 2026-10-29 — Atualizar gate GPS para monotonicidade após perda de fix
+
+### Causa
+CI `40869798013` falhou antes de executar `validate`: `tests/projectBaseline.test.js` ainda exigia literalmente `location.timestamp <= this.previous.timestamp`, mas DB-167 foi reforçado para comparar com `state.lastTimestamp`. A comparação mais ampla permanece depois da limpeza de `previous` e impede aceitar um fix atrasado que não seja mais monotônico.
+
+### Correção
+- O contrato estático agora exige `location.timestamp <= this.state.lastTimestamp`, alinhando o gate à regra nova sem enfraquecer a proteção contra timestamps inválidos ou fora de ordem.
+- O teste funcional GPS já inclui um callback atrasado após stale-watchdog e espera que a contagem de amostras não mude.
+
+### Validação
+- A falha comprovada foi de asserção do gate; `android-build` foi ignorado por dependência do job `validate`. A nova CI deve confirmar TypeScript, gate, suíte integral e APK no mesmo SHA.
