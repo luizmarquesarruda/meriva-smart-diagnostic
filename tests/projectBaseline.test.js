@@ -48,6 +48,7 @@ const requiredSuites = [
   'bluetoothConfig.test.js',
   'bluetoothState.test.js',
   'ecuHealth.test.js',
+  'elmHealthPresentation.test.js',
   'sensorTestEngine.test.js',
   'knowledgeJson.test.js',
   'cockpitNavigation.test.js',
