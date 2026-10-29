@@ -13,8 +13,8 @@ assert.deepStrictEqual(config.transport.socketModes, ['INSECURE', 'SECURE']);
 assert.strictEqual(config.transport.connectionType, 'delimited');
 assert.strictEqual(config.transport.delimiter, '');
 assert.strictEqual(config.transport.charset, 'ascii');
-assert.strictEqual(config.retry.maxAttempts, 20);
-assert.strictEqual(config.retry.intervalMs, 8000);
+assert.strictEqual(config.retry.maxAttempts, 3);
+assert.strictEqual(config.retry.intervalMs, 1500);
 assert.strictEqual(config.retry.stopOnSuccess, true);
 assert.strictEqual(config.validation.command, '010C');
 assert.strictEqual(config.validation.responsePrefix, '41 0C');
@@ -29,10 +29,11 @@ assert(manager.includes('MAX_BLUETOOTH_ATTEMPTS = bluetoothConfig.retry.maxAttem
 assert(manager.includes('BLUETOOTH_RETRY_INTERVAL_MS = bluetoothConfig.retry.intervalMs'));
 assert(manager.includes('bluetoothConfig.initialization.optionalCommandTimeoutMs'));
 assert(manager.includes('bluetoothConfig.initialization.protocolSelectionTimeoutMs'));
+assert(manager.includes("session.executeCommand('010C', config.protocolSelectionTimeoutMs)"), 'primeira sonda ECU deve usar a janela de negociação configurada');
 
 const sharedConnection = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'sharedConnection.ts'), 'utf8');
 assert(sharedConnection.includes('cada candidato usa o limite efetivo configurado'));
-assert(sharedConnection.includes('20 por padrão'));
+assert(sharedConnection.includes('3 por padrão'));
 assert(sharedConnection.includes('Não repetir uma nova rodada inteira'));
 assert(!sharedConnection.includes('while (!active)'), 'sharedConnection não deve repetir rodadas infinitamente após esgotar os candidatos');
 const exporter = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'exportBluetoothDiagnosticTxt.ts'), 'utf8');
