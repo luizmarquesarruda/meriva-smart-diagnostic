@@ -26,7 +26,7 @@ export interface AutoTripServiceState {
   fuelLevelSupported: boolean;
   fuelLevelPercent: number | null;
   fuelLevelReadAtMs: number | null;
-  fuelLevelBufferAveragePercent: number | null;
+  fuelLevelBufferMedianPercent: number | null;
   fuelLevelBufferCount: number;
   fuelLevelBufferLastReadAtMs: number | null;
   autonomyEstimateSource: AutonomyEstimateSource;
@@ -55,7 +55,7 @@ const INITIAL_STATE: AutoTripServiceState = {
   fuelLevelSupported: false,
   fuelLevelPercent: null,
   fuelLevelReadAtMs: null,
-  fuelLevelBufferAveragePercent: null,
+  fuelLevelBufferMedianPercent: null,
   fuelLevelBufferCount: 0,
   fuelLevelBufferLastReadAtMs: null,
   autonomyEstimateSource: 'UNAVAILABLE',
@@ -110,7 +110,7 @@ class AutoTripService {
       fuelLevelSupported: snapshot.fuelLevelSupported,
       fuelLevelPercent: currentFuelLevelIsValid ? snapshot.fuelLevelPercent : null,
       fuelLevelReadAtMs: currentFuelLevelIsValid ? snapshot.fuelLevelReadAtMs : null,
-      bufferAveragePercent: snapshot.fuelLevelBufferAveragePercent,
+      bufferMedianPercent: snapshot.fuelLevelBufferMedianPercent,
       bufferSampleCount: snapshot.fuelLevelBufferCount,
       bufferLastReadAtMs: snapshot.fuelLevelBufferLastReadAtMs,
       tripConsumptionKml: snapshot.consumptionKml,
@@ -549,7 +549,7 @@ class AutoTripService {
           fuelLevelSupported: this.state.fuelLevelSupported,
           fuelLevelPercent,
           fuelLevelReadAtMs,
-          bufferAveragePercent: fuelLevelBuffer.averagePercent,
+          bufferMedianPercent: fuelLevelBuffer.medianPercent,
           bufferSampleCount: fuelLevelBuffer.sampleCount,
           bufferLastReadAtMs: fuelLevelBuffer.lastReadAtMs,
           tripConsumptionKml,
@@ -567,7 +567,7 @@ class AutoTripService {
           instantaneousConsumptionSource: instantaneousConsumptionKml != null ? fuelRateForDisplaySource : null,
           fuelLevelPercent,
           fuelLevelReadAtMs,
-          fuelLevelBufferAveragePercent: fuelLevelBuffer.averagePercent,
+          fuelLevelBufferMedianPercent: fuelLevelBuffer.medianPercent,
           fuelLevelBufferCount: fuelLevelBuffer.sampleCount,
           fuelLevelBufferLastReadAtMs: fuelLevelBuffer.lastReadAtMs,
           autonomyEstimateSource: autonomyPresentation.source,
