@@ -269,6 +269,7 @@
 - **DB-178** · 2026-10-29 — Preservar bloqueio RFCOMM quando a sonda de estado do socket expira
 - **DB-179** · 2026-10-29 — Serializar tentativas nativas de desconexão após timeout
 - **DB-180** · 2026-10-29 — Impedir que resposta ELM atrasada contamine o próximo PID
+- **DB-181** · 2026-10-29 — Atualizar asserção de timeout após serializar desconexão nativa
 
 ---
 
@@ -4736,3 +4737,18 @@ A documentação Android informa que `BluetoothSocket.connect()` bloqueia e reco
 - Commit de implementação: `4ee98580ca7542bd25bf7043a16c412ed6838d54`.
 - Commit de regressão: `711c8153f7a013ce75848466544157a00b86f7ca`.
 - A CI precisa validar typecheck, gate, suíte completa e build Android no HEAD final. O ensaio físico com Galaxy A06/Android 16, ELM327 real e ECU continua necessário para confirmar a recuperação no hardware.
+
+
+## DB-181 · 2026-10-29 — Atualizar asserção de timeout após serializar desconexão nativa
+
+### Causa
+DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise nativa compartilhada, mas `tests/bluetoothLifecycle.test.js` ainda exigia a forma textual antiga `() => device.disconnect()`. A validação CI de `npm run validate` falhou nessa asserção, embora a intenção do teste — garantir timeout finito — continue válida.
+
+### Correção
+- A asserção agora exige que `runWithTimeout()` aguarde `nativeDisconnect`, a Promise original rastreada por endereço. As verificações adicionais continuam garantindo que retries não iniciem outra chamada nativa enquanto a primeira estiver pendente.
+- A falha anterior foi uma incompatibilidade do teste com a implementação refatorada; não foi removida a exigência de timeout nem a proteção de concorrência.
+
+### Validação
+- Falha observada em `npm run validate` no SHA `2441a48131517cf5dda600eb9ab2ec15c69ccfd4`: `tests/bluetoothLifecycle.test.js:109`, mensagem `native socket disconnect must have a finite timeout`.
+- Commit de ajuste do teste: `fbc510857fb75a83fb638bcf7effd7609d07ab1c`.
+- A validação completa precisa ser reexecutada no HEAD posterior, incluindo gate e build Android.
