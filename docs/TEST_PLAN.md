@@ -27,6 +27,9 @@ A branch mantém o fluxo OBD/ELM327 existente e inclui testes automatizados para
 | DTC-02 | Limpar DTC | Confirmar a ação destrutiva, informar sucesso/erro conforme resposta ECU | teste automatizado com transporte simulado e teste físico |
 | SPLASH-01 | Inicialização fria de APK nativo | Fundo e imagem de marca corretos; transição para o app sem tela vazia persistente | gate de baseline verifica plugin, caminho e assinatura PNG; inspeção visual em Android instalado continua obrigatória |
 | BUILD-01 | Commit final da PR | Gate, TypeScript, suíte e build Android concluídos com sucesso para o mesmo SHA | execução GitHub Actions do SHA exato |
+| BACKUP-01 | Criar backup com registros de manutenção/abastecimento | Manifesto inclui MANUTENCAO e os tamanhos dos diretórios conferem; armazenamento mostra o tamanho da pasta | `tests/regression.test.js`, `tests/merivaAutosave.test.js` |
+| BACKUP-02 | Restaurar snapshot íntegro com dados posteriores no aparelho | Desconectar OBD, salvar estado atual, criar safety backup, restaurar diretórios listados e re-hidratar autosave; rollback em falha de cópia | `tests/regression.test.js`, CI e teste Android |
+| BACKUP-03 | Snapshot alterado ou incompleto | Não oferecer backup inválido e rejeitar restauração com divergência de manifesto/tamanho | `tests/regression.test.js` |
 
 ## Critérios para recursos adicionais
 
