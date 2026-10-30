@@ -284,8 +284,8 @@ assert.match(home, /getCurrentAutonomyRangeKm/);
 assert.match(home, /fuelLevelReadAtMs: tripState\.fuelLevelReadAtMs/);
 assert.match(tripService, /fuelLevelReadAtMs/);
 assert.match(fuelLevelBuffer, /FUEL_LEVEL_BUFFER_CAPACITY = 10/);
-assert.match(tripService, /new FuelLevelBuffer\\(\\)/);
-assert.match(tripService, /fuelLevelBuffer\\.addSample/);
+assert.match(tripService, /new FuelLevelBuffer\(\)/);
+assert.match(tripService, /fuelLevelBuffer\.addSample/);
 assert.match(read('src/trip/autonomyPresentation.ts'), /CURRENT_FUEL_LEVEL_STALE_AFTER_MS\s*=\s*30_000/);
 assert.match(home, /coolantUnavailable/);
 assert.ok(!tripService.includes('averageConsumptionKml * state.autonomy.tankCapacityL'),
