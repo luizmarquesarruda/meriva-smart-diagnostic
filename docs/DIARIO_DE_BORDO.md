@@ -1,4 +1,4 @@
-## ESTADO VIGENTE — 2026-10-29 (timeout nativo Bluetooth + recuperação ELM/KWP)
+## ESTADO VIGENTE — 2026-10-30 (correções GPS + acompanhamento CI)
 
 > Frente única de trabalho: PR #96, branch `ui/cockpit-instant-consumption-20261027`. Este bloco é a referência operacional; snapshots abaixo são históricos.
 
@@ -9,7 +9,7 @@
 - Após qualquer alteração, reconsultar o HEAD e a CI correspondentes. Só considerar a PR validada com `validate` e `android-build` verdes no mesmo SHA, diff reconciliado contra `main` e validação física separada.
 - A auditoria atual encontrou divergências de documentação e um débito relevante de modernização do SDK. Não houve upgrade de SDK nem remoção de dependências nativas nesta rodada: fazê-los antes de preservar um baseline físico poderia introduzir regressão no Bluetooth Classic.
 - Testes com Galaxy A06/Android 16/ELM327 real, confirmação de resposta `010C`, inspeção do APK instalado e validação GPS/autonomia continuam pendentes.
-- DB-145 registra a regressão de leitura KWP e classificação de estado ECU/Bluetooth; DB-162/163/164/166 protegem o ciclo RFCOMM; DB-165 limita HTTP de clima; DB-167 expira fixes GPS antigos; DB-168 neutraliza fórmula no CSV; DB-169 torna o start GPS não bloqueante para o polling OBD e aplica cooldown de retry. DB-170 atualiza o gate para aceitar a proteção de timestamp por `state.lastTimestamp`. DB-171 serializa cancelamento da descoberta; DB-172 valida coeficientes/resultados de fórmula; DB-173 corrige documentação cloud; DB-174 centraliza os tokens de cor compartilhados nas telas. DB-175 limita as chamadas de localização opcionais e usa backoff exponencial para o enriquecimento online. DB-177 limita a própria operação nativa de desconexão e mantém o bloqueio RFCOMM se ela expirar; DB-178 bloqueia reconexão quando a sonda do socket fica indeterminada; DB-179 reutiliza a Promise nativa pendente para impedir desconexões concorrentes; DB-180 bloqueia novos comandos após timeout sem prompt para evitar que resposta atrasada seja atribuída ao PID seguinte.
+- DB-145 registra a regressão de leitura KWP e classificação de estado ECU/Bluetooth; DB-162/163/164/166 protegem o ciclo RFCOMM; DB-165 limita HTTP de clima; DB-167 expira fixes GPS antigos; DB-168 neutraliza fórmula no CSV; DB-169 torna o start GPS não bloqueante para o polling OBD e aplica cooldown de retry. DB-170 atualiza o gate para aceitar a proteção de timestamp por `state.lastTimestamp`. DB-171 serializa cancelamento da descoberta; DB-172 valida coeficientes/resultados de fórmula; DB-173 corrige documentação cloud; DB-174 centraliza os tokens de cor compartilhados nas telas. DB-175 limita as chamadas de localização opcionais e usa backoff exponencial para o enriquecimento online. DB-177 limita a própria operação nativa de desconexão e mantém o bloqueio RFCOMM se ela expirar; DB-178 bloqueia reconexão quando a sonda do socket fica indeterminada; DB-179 reutiliza a Promise nativa pendente para impedir desconexões concorrentes; DB-180 bloqueia novos comandos após timeout sem prompt para evitar que resposta atrasada seja atribuída ao PID seguinte. DB-182/183 corrigem regressões e cobertura do GPS (timestamp monotônico, ciclo background e movimento urbano); DB-184 mantém o índice do diário alinhado à sequência de IDs.
 - O cockpit deve continuar mostrando N/D até existir leitura OBD real, completa e recente; seed ou histórico não deve ser reapresentado como valor atual.
 - DB-146 restaura os quatro quadrantes de telemetria em simultâneo; os PIDs adicionais continuam acessíveis em páginas de quatro métricas. A ausência de ECU não remove a grade, apenas mantém os valores em N/D.
 - DB-147 fixa os quatro PIDs principais na primeira página e transforma os restantes PIDs suportados em carrossel completo, com setas anterior/próxima e avanço automático a cada 10 s. Anomalias adicionais são priorizadas sem deslocar os quadrantes principais.
@@ -270,6 +270,9 @@
 - **DB-179** · 2026-10-29 — Serializar tentativas nativas de desconexão após timeout
 - **DB-180** · 2026-10-29 — Impedir que resposta ELM atrasada contamine o próximo PID
 - **DB-181** · 2026-10-29 — Atualizar asserção de timeout após serializar desconexão nativa
+- **DB-182** · 2026-10-30 — Corrigir fixture de timestamp GPS e mockar ciclo de vida nativo em segundo plano
+- **DB-183** · 2026-10-30 — Confirmar movimento urbano sem exigir 8 m em cada callback GPS
+- **DB-184** · 2026-10-30 — Sincronizar índice DB-NNN com as novas entradas de auditoria
 
 ---
 
@@ -4798,3 +4801,17 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - Teste de movimento urbano: `9213dc5d6fe9f164425d9c2e9c858b1d0403986d`.
 - A CI completa deve validar o HEAD final; testes automatizados não equivalem a percurso real.
 - Continua pendente ensaio físico no Galaxy A06 / SM-A065M / Android 16, comparando distância GPS com trajeto/odômetro conhecido, incluindo baixa velocidade e parada. Nenhuma validação física foi declarada e nenhum merge foi realizado.
+
+
+## DB-184 · 2026-10-30 — Sincronizar índice DB-NNN com as novas entradas de auditoria
+
+### Falha observada
+- A CI #4034 / run `40999871511`, SHA `8cd885fc4d8fe12501e58dfb297f1a717ee62964`, passou Expo Doctor (17/17), mas falhou em `tests/projectBaseline.test.js:345`.
+- A validação estrita encontrou as entradas DB-182 e DB-183 no corpo do diário, mas o índice em bullets terminava em DB-181. A verificação protege a correspondência exata e a continuidade da sequência; não deve ser afrouxada.
+
+### Correção aplicada
+- Adicionadas ao índice as entradas DB-182, DB-183 e DB-184, mantendo a sequência contínua.
+- Atualizado o bloco operacional inicial para registrar a falha real do gate e o novo estado de validação.
+
+### Validação
+- O próximo push deve disparar a CI para o HEAD atualizado. Ainda não há resultado de `validate` nem de `android-build` para esse novo SHA.
