@@ -4752,3 +4752,26 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - Falha observada em `npm run validate` no SHA `2441a48131517cf5dda600eb9ab2ec15c69ccfd4`: `tests/bluetoothLifecycle.test.js:109`, mensagem `native socket disconnect must have a finite timeout`.
 - Commit de ajuste do teste: `fbc510857fb75a83fb638bcf7effd7609d07ab1c`.
 - A validação completa precisa ser reexecutada no HEAD posterior, incluindo gate e build Android.
+
+
+## DB-182 · 2026-10-30 — Corrigir fixture de timestamp GPS e mockar ciclo de vida nativo em segundo plano
+
+### Falha confirmada
+- Em `tests/gps.test.js`, após o fix preciso de 29.000 ms, a suíte aceitava amostras com timestamps 31.000 e 32.000 ms, embora a precisão estivesse ausente. O rastreador preserva o último timestamp aceito mesmo quando a amostra não é precisa o suficiente para compor distância.
+- A asserção de recuperação enviava 30.000 ms e esperava nova amostra. Esse valor é regressivo perante 32.000 ms e deve ser rejeitado pelo contrato monotônico. O defeito estava no fixture/expectativa do teste, não no filtro temporal da aplicação.
+- O mock `expo-location` não implementava `hasStartedLocationUpdatesAsync`, `startLocationUpdatesAsync` e `stopLocationUpdatesAsync`. O código de produção capturava a exceção, mascarando a ausência desses métodos no mock e deixando o ciclo de vida de background sem cobertura.
+
+### Correção aplicada
+- A amostra de recuperação foi avançada para 33.000 ms e a mensagem da asserção explicita que precisa superar o último timestamp aceito.
+- O mock passou a representar as três APIs de background do Expo Location.
+- Incluídos testes para iniciar e parar o serviço de localização em segundo plano e para reutilizar uma tarefa nativa já ativa após recriação do contexto JS, sem registro duplicado.
+
+### Fundamentação e limites
+- A API `hasStartedLocationUpdatesAsync(taskName)` é documentada pelo Expo como `Promise<boolean>`; sua presença no rastreador é válida e não foi removida. A falha artificial era a implementação incompleta do mock.
+- A documentação Android separa `BLUETOOTH_CONNECT` para comunicação com dispositivos já pareados de `BLUETOOTH_SCAN` para descoberta; o app declara e solicita ambas, sem concluir que isso comprova conexão com ELM327.
+- Fontes: Expo Location API (hasStartedLocationUpdatesAsync) e Android Developers — Bluetooth permissions / Connect Bluetooth devices.
+
+### Validação
+- Commit desta correção GPS: `408cb7a558c069afeb3de446c08207be1df5f019`.
+- A validação automatizada no novo HEAD precisa concluir `validate` e `android-build`. Nenhuma aprovação de CI é presumida neste registro.
+- Não houve teste físico de GPS nem conexão real Bluetooth/ELM327/ECU no Galaxy A06 / Android 16. Nenhum merge foi realizado.
