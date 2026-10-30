@@ -282,6 +282,7 @@
 - **DB-189** · 2026-10-30 — Remover atualização OTA e simplificar a entrega por APK
 - **DB-190** · 2026-10-30 — Eliminar resíduos de build EAS e restaurar identidade Expo original
 - **DB-191** · 2026-10-30 — Atualizar manual Android para o fluxo real de APK via Gradle CI
+- **DB-192** · 2026-10-30 — Remover pacotes transitivos órfãos remanescentes da configuração OTA
 
 ---
 
@@ -4934,3 +4935,16 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 
 ### Validação
 - Conferir manual, workflow e artefato da CI no mesmo SHA após o commit.
+
+
+## DB-192 · 2026-10-30 — Remover pacotes transitivos órfãos remanescentes da configuração OTA
+
+### Achado
+- A comparação do lockfile da branch com `main` encontrou quatro pacotes novos sem dependentes externos: `expo-eas-client`, `expo-manifests`, `expo-json-utils` e `expo-structured-headers`. A única referência interna era `expo-manifests -> expo-json-utils`; a cadeia inteira ficou órfã após remover `expo-updates` e o fluxo EAS.
+
+### Correção
+- Removidas somente as quatro entradas órfãs do lockfile. Pacotes Expo usados pelo prebuild, incluindo `@expo/fingerprint`, foram preservados.
+- Nenhuma dependência direta do aplicativo foi removida; `package.json` e dependências-raiz do lockfile permanecem alinhados.
+
+### Validação
+- A CI deve comprovar `npm ci`, Expo Doctor, baseline, TypeScript, testes completos e APK no SHA final. Se o npm identificar inconsistência, reverter apenas esta poda e regenerar o lockfile pelo npm da toolchain oficial.
