@@ -127,7 +127,9 @@ jobs:
         run: npx --yes eas-cli@latest update --channel production --platform android --message "Meriva Smart OTA ${GITHUB_SHA}" --non-interactive
       - name: Explain native-change gate
         if: steps.ota-gate.outputs.native_changed == 'true'
-        run: echo "OTA não publicado: mudança nativa/configuração exige APK novo e runtime compatível."
+        run: |
+          echo "OTA não publicado: mudança nativa/configuração exige APK novo e runtime compatível."
       - name: Explain no app-code changes
         if: steps.ota-gate.outputs.app_code_changed == 'false' && steps.ota-gate.outputs.native_changed != 'true'
-        run: echo "OTA ignorado: este commit não alterou código ou assets do aplicativo."
+        run: |
+          echo "OTA ignorado: este commit não alterou código ou assets do aplicativo."
