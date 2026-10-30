@@ -1,6 +1,24 @@
-## ESTADO VIGENTE — 2026-10-25 (auditoria de estabilidade DB-130)
+## ESTADO VIGENTE — 2026-10-30 (correções GPS + acompanhamento CI)
 
-> Estado consultado no GitHub em 25/10/2026. Este diário acompanha a branch de consolidação #89; não representa merge em `main`. CI verde por branch isolada não comprova integração combinada nem teste físico.
+> Frente única de trabalho: PR #96, branch `ui/cockpit-instant-consumption-20261027`. Este bloco é a referência operacional; snapshots abaixo são históricos.
+
+- Repositório: [luizmarquesarruda/meriva-smart-diagnostic](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
+- PR #96: [Evita DTC duplicado no cockpit e mostra pressão do coletor](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/96), aberta, fora de rascunho e sem merge. Base `main` observada nesta PR: `7eec3afecb3718020724baf053f8b6d2ca636fab`.
+- HEAD/CI: consultar a PR #96 para o SHA atual e o workflow correspondente. A execução no SHA `2441a48131517cf5dda600eb9ab2ec15c69ccfd4` falhou na asserção antiga de timeout; DB-181 atualiza o teste para o contrato novo. DB-178 a DB-181 precisam de validação integral no mesmo SHA final.
+- A falha histórica em `tests/orientationLayout.test.js:78` era uma asserção textual obsoleta, corrigida em DB-176. Não há confirmação de CI verde para as correções posteriores.
+- Após qualquer alteração, reconsultar o HEAD e a CI correspondentes. Só considerar a PR validada com `validate` e `android-build` verdes no mesmo SHA, diff reconciliado contra `main` e validação física separada.
+- A auditoria atual encontrou divergências de documentação e um débito relevante de modernização do SDK. Não houve upgrade de SDK nem remoção de dependências nativas nesta rodada: fazê-los antes de preservar um baseline físico poderia introduzir regressão no Bluetooth Classic.
+- Testes com Galaxy A06/Android 16/ELM327 real, confirmação de resposta `010C`, inspeção do APK instalado e validação GPS/autonomia continuam pendentes.
+- DB-145 registra a regressão de leitura KWP e classificação de estado ECU/Bluetooth; DB-162/163/164/166 protegem o ciclo RFCOMM; DB-165 limita HTTP de clima; DB-167 expira fixes GPS antigos; DB-168 neutraliza fórmula no CSV; DB-169 torna o start GPS não bloqueante para o polling OBD e aplica cooldown de retry. DB-170 atualiza o gate para aceitar a proteção de timestamp por `state.lastTimestamp`. DB-171 serializa cancelamento da descoberta; DB-172 valida coeficientes/resultados de fórmula; DB-173 corrige documentação cloud; DB-174 centraliza os tokens de cor compartilhados nas telas. DB-175 limita as chamadas de localização opcionais e usa backoff exponencial para o enriquecimento online. DB-177 limita a própria operação nativa de desconexão e mantém o bloqueio RFCOMM se ela expirar; DB-178 bloqueia reconexão quando a sonda do socket fica indeterminada; DB-179 reutiliza a Promise nativa pendente para impedir desconexões concorrentes; DB-180 bloqueia novos comandos após timeout sem prompt para evitar que resposta atrasada seja atribuída ao PID seguinte. DB-182/183 corrigem regressões e cobertura do GPS (timestamp monotônico, ciclo background e movimento urbano); DB-184 mantém o índice do diário alinhado à sequência de IDs.
+- O cockpit deve continuar mostrando N/D até existir leitura OBD real, completa e recente; seed ou histórico não deve ser reapresentado como valor atual.
+- DB-146 restaura os quatro quadrantes de telemetria em simultâneo; os PIDs adicionais continuam acessíveis em páginas de quatro métricas. A ausência de ECU não remove a grade, apenas mantém os valores em N/D.
+- DB-147 fixa os quatro PIDs principais na primeira página e transforma os restantes PIDs suportados em carrossel completo, com setas anterior/próxima e avanço automático a cada 10 s. Anomalias adicionais são priorizadas sem deslocar os quadrantes principais.
+- DB-148 corrige a ocupação vertical em paisagem: cabeçalho/clima na mesma faixa, cockpit + sessão lado a lado, navegação lateral e métricas compactas. O teste físico deve confirmar clipping/overlap no Galaxy A06.
+---
+
+## ESTADO HISTÓRICO — 2026-10-25 (snapshot DB-130; superado em 2026-10-28)
+
+> Snapshot histórico consultado no GitHub em 25/10/2026. A lista de PRs e SHAs abaixo descreve apenas aquele momento; não use esse bloco como inventário operacional atual.
 
 ### `main` e proteção de integração
 - Repositório: [`luizmarquesarruda/meriva-smart-diagnostic`](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
@@ -202,6 +220,59 @@
 - **DB-129** · 2026-10-25 — GPS rejeita timestamps inválidos e fora de ordem
 - **DB-130** · 2026-10-25 — Otimização CSV avaliada e bloqueada pela versão instalada
 - **DB-131** · 2026-10-25 — Atualização periódica de localização/clima baseada em conectividade
+- **DB-132** · 2026-10-27 — Cockpit sem duplicação de DTC; cartão substituído por pressão do coletor
+- **DB-133** · 2026-10-28 — CI: suíte de apresentação de saúde do ELM reintegrada ao npm test
+- **DB-134** · 2026-10-28 — Corrigir contrato de layout obsoleto após remoção do DTC do cockpit
+- **DB-135** · 2026-10-28 — Corrigir navegação icon-only no cockpit
+- **DB-136** · 2026-10-28 — Sincronizar índice do diário após as novas entradas
+- **DB-137** · 2026-10-28 — Fechar lacuna de índice detectada pela segunda execução da CI
+- **DB-138** · 2026-10-28 — Remover teste ELM órfão sem implementação correspondente
+- **DB-139** · 2026-10-28 — Auditoria de obsolescência: reconciliar marca, arquitetura e framing ELM327
+- **DB-140** · 2026-10-28 — Auditoria da rede móvel e dos provedores de localização
+- **DB-141** · 2026-10-28 — Auditoria profunda de PIDs, interpretação e integridade da IA local
+- **DB-142** · 2026-10-28 — Corrigir polaridade da prontidão no PID 0101
+- **DB-143** · 2026-10-28 — Decisão arquitetural: APK independente, sem dependência do Bubble
+- **DB-144** · 2026-10-28 — Navegação por categorias, ícones e qualidade dos dados
+- **DB-145** · 2026-10-28 — Corrigir leitura KWP, retry e classificação do estado ECU/Bluetooth
+- **DB-146** · 2026-10-28 — Restaurar quadrantes 2×2 e paginação de PIDs no cockpit
+- **DB-147** · 2026-10-28 — Incluir os PIDs restantes no carrossel principal com navegação por setas
+- **DB-148** · 2026-10-28 — Auditoria e correção de cockpit em orientação paisagem
+- **DB-149** · 2026-10-28 — Grade 2×2 adaptável e navegação lateral direita em paisagem
+- **DB-150** · 2026-10-28 — Auditoria crítica de layout e duplicações de conteúdo
+- **DB-151** · 2026-10-28 — Remoção do setter órfão após consolidar o Laboratório
+- **DB-152** · 2026-10-28 — Unificar marca visual entre cockpit e tela Viagens
+- **DB-153** · 2026-10-28 — Corrigir contrato de altura da tipografia do cockpit em paisagem
+- **DB-154** · 2026-10-28 — Mover teste de integridade de viagens para a tela canônica
+- **DB-155** · 2026-10-28 — Diferenciar armazenamento de histórico de viagens
+- **DB-156** · 2026-10-28 — Remover cópia do perfil do veículo em Configurações
+- **DB-157** · 2026-10-28 — Tornar robustas as asserções da navegação do perfil
+- **DB-158** · 2026-10-28 — Melhorar legibilidade da tipografia em paisagem
+- **DB-159** · 2026-10-28 — Atualizar teste do hub após separar armazenamento e viagens
+- **DB-160** · 2026-10-28 — Centralizar hipóteses da IA na tela Saúde
+- **DB-161** · 2026-10-28 — Corrigir rótulo obsoleto do atalho de armazenamento em Viagens
+- **DB-162** · 2026-10-29 — Limitar sondas nativas Bluetooth e falhar fechado em estado indeterminado
+- **DB-163** · 2026-10-29 — Aplicar timeout finito às sondas de disponibilidade e descoberta Bluetooth
+- **DB-164** · 2026-10-29 — Limitar sondas nativas na preparação e ativação Bluetooth
+- **DB-165** · 2026-10-29 — Limitar a consulta HTTP opcional de clima e cancelar requisição vencida
+- **DB-166** · 2026-10-29 — Limitar sonda de rádio no monitor de saúde Bluetooth/ECU
+- **DB-167** · 2026-10-29 — Expirar velocidade GPS antiga sem perder distância acumulada
+- **DB-168** · 2026-10-29 — Neutralizar fórmulas em campos textuais de exportação CSV
+- **DB-169** · 2026-10-29 — Impedir que a inicialização GPS bloqueie polling OBD
+- **DB-170** · 2026-10-29 — Atualizar gate GPS para monotonicidade após perda de fix
+- **DB-171** · 2026-10-29 — Serializar cancelamento nativo da descoberta Bluetooth
+- **DB-172** · 2026-10-29 — Rejeitar coeficientes e resultados de fórmula não finitos
+- **DB-173** · 2026-10-29 — Corrigir documentação obsoleta sobre sincronização em nuvem
+- **DB-174** · 2026-10-29 — Consumir tokens compartilhados para a paleta base das telas
+- **DB-175** · 2026-10-29 — Limitar localização para clima e aplicar backoff exponencial
+- **DB-176** · 2026-10-29 — Atualizar contrato visual térmico para o token de tema
+- **DB-177** · 2026-10-29 — Limitar timeout da limpeza nativa de socket RFCOMM
+- **DB-178** · 2026-10-29 — Preservar bloqueio RFCOMM quando a sonda de estado do socket expira
+- **DB-179** · 2026-10-29 — Serializar tentativas nativas de desconexão após timeout
+- **DB-180** · 2026-10-29 — Impedir que resposta ELM atrasada contamine o próximo PID
+- **DB-181** · 2026-10-29 — Atualizar asserção de timeout após serializar desconexão nativa
+- **DB-182** · 2026-10-30 — Corrigir fixture de timestamp GPS e mockar ciclo de vida nativo em segundo plano
+- **DB-183** · 2026-10-30 — Confirmar movimento urbano sem exigir 8 m em cada callback GPS
+- **DB-184** · 2026-10-30 — Sincronizar índice DB-NNN com as novas entradas de auditoria
 
 ---
 
@@ -3987,3 +4058,760 @@ Consolidar as pendências da auditoria e iniciar a validação com critérios ve
 - Commits criados na branch `fix/repository-audit-hardening-20261024` da PR #89. A CI deve ser verificada no HEAD final desta alteração; resultados de SHAs anteriores não contam como aprovação.
 - Ainda não foi executado teste físico de geolocalização em Android 16 alternando Wi-Fi/4G/5G. A CI não comprova recepção GPS pelo provedor fused, disponibilidade da operadora nem funcionamento do ELM327/ECU reais.
 - Nenhuma mudança foi mesclada em `main`. A atualização de clima é opcional e não deve afetar polling, conexão Bluetooth, autonomia ou diagnóstico local.
+
+## DB-132 · 2026-10-27 — Cockpit sem duplicação de DTC; cartão substituído por pressão do coletor
+
+### Solicitação
+- Evitar repetir no cockpit o resumo de DTC, já disponível na página específica Saúde/Diagnóstico.
+- Preservar o cartão de consumo e autonomia e preencher o terceiro cartão com outra informação útil, sem duplicação.
+
+### Alteração
+- `app/index.tsx`: removidos o estado e a contagem de DTC do cockpit; a tela Saúde continua responsável pelos DTCs.
+- O terceiro cartão passa a mostrar pressão do coletor em kPa a partir do PID 010B, somente usando leitura real, finita e recente (até 30 s) com ECU conectada. Sem leitura válida, apresenta N/D; não infere nem simula valor.
+- `tests/cockpitNavigation.test.js`: adicionadas verificações contra a repetição de DTC e para o uso de PID 010B e fallback N/D.
+- Atualizados o contrato RG-08, o plano de testes e o changelog.
+
+### Validação e limites
+- A mudança está isolada na branch `ui/cockpit-instant-consumption-20261027`; não foi feito merge.
+- A CI ainda precisa executar no HEAD final da branch. Nenhum teste automatizado, build APK ou inspeção visual no aparelho é declarado concluído nesta entrada.
+- O PID 010B pode não estar disponível em todas as ECUs; nesse caso, N/D é o comportamento correto. DTC continua acessível na tela Saúde.
+
+
+## DB-133 · 2026-10-28 — CI: reintegrar suíte de apresentação de saúde do ELM
+
+### Achado confirmado
+- A CI da PR #96 falhou no gate anti-regressão porque `tests/elmHealthPresentation.test.js` existia no diretório `tests/`, mas não estava incluído em `package.json` → `scripts.test`.
+- O gate compara todas as suítes `tests/*.test.js` com os comandos executados por `npm test`; essa regra está correta e não deve ser enfraquecida.
+
+### Correção
+- Incluída a suíte `tests/elmHealthPresentation.test.js` no comando `npm test`, preservando o gate e as demais suítes.
+- Na revisão do cartão de pressão, foi encontrado que a validação aceitava leituras `source: REAL` sem exigir `status: RESPONDEU`. O filtro agora exige resposta OBD válida além de valor finito, conexão ECU e idade máxima de 30 s; teste de regressão e RG-08 foram reforçados.
+- Esta correção é limitada à integração do teste e não altera lógica de conexão ELM327 ou apresentação do cockpit.
+
+### Validação e limites
+- A alteração foi registrada na branch `ui/cockpit-instant-consumption-20261027` da PR #96.
+- A nova execução de CI no SHA resultante é obrigatória; os resultados anteriores não validam este commit.
+- Teste físico do ELM327/ECU e inspeção visual no Galaxy A06 continuam pendentes.
+
+
+## DB-134 · 2026-10-28 — Corrigir contrato de layout obsoleto após remoção do DTC do cockpit
+
+### Achado confirmado
+- A CI do SHA `a4d2ef54d06850fcaf740a722bbc8b7b703b8f1f` executou `npm run doctor` (17/17) e o gate anti-regressão (PASS), mas `validate` falhou em `tests/orientationLayout.test.js:46`.
+- O teste ainda exigia uma expressão de fallback de DTC na tela inicial, embora a decisão DB-132 tenha removido o resumo de DTC do cockpit e mantido a informação na tela Saúde. O contrato de teste ficou desatualizado em relação à mudança intencional de produto.
+
+### Correção
+- Substituída a asserção obsoleta por uma verificação explícita de que o cockpit não contenha resumo de DTC. A validação de DTC continua coberta pela tela Saúde e pelos testes de diagnóstico correspondentes.
+- Não foi removido nem enfraquecido o gate de baseline; apenas alinhado o teste de layout com a arquitetura atual.
+
+### Validação e próximos passos
+- Commits da correção do contrato de teste: `aabc06bea4f93c479417f90101ac77095187d3af` e `93527a815a2c42de6e8ff15895a2abd512eca8f3`; a asserção final verifica diretamente a ausência de DTC no cockpit.
+- A CI do novo HEAD deve concluir `validate` e `android-build` com sucesso antes de considerar a PR pronta.
+- P0 continua bloqueado até CI verde no SHA exato e reconciliação da divergência entre a captura instalada e o layout do código. Testes físicos de Bluetooth/ECU, GPS e autonomia no Galaxy A06 seguem pendentes.
+- Não houve merge. As tarefas P1/P2 permanecem na mesma frente consolidada; não abrir branch paralela.
+
+
+## DB-135 · 2026-10-28 — Corrigir navegação icon-only no cockpit
+
+### Achado confirmado
+- A auditoria do código encontrou conflito entre o contrato RG-15/plano de testes (rótulos visíveis) e o teste `tests/cockpitNavigation.test.js`, que proibia explicitamente as legendas. A tela usava somente ícones, deixando a descoberta dos destinos dependente de memória do usuário, apesar de já existirem estilos de rótulo e nomes de acessibilidade.
+
+### Correção
+- `app/index.tsx`: adicionados rótulos visíveis Painel, Diagnóstico, Dados, Viagens e Mais às cinco abas, mantendo os ícones, rótulos de acessibilidade e alvos de toque existentes.
+- `tests/cockpitNavigation.test.js`: removida a asserção contraditória e adicionada verificação dos cinco rótulos visíveis.
+- `CHANGELOG.md` atualizado. O plano de testes já exigia rótulos visíveis e não precisou de alteração.
+
+### Validação e limites
+- Commits de código/teste: `7ce769c3b71ced1444f7556144c1bc1913f2754b` e `040bc92132b278ce10e1571305d8e19f9406aa9c`; changelog: `11238600e94d91dc6ff0ba75095e19130c4063be`.
+- A CI do HEAD final precisa confirmar typecheck, suíte completa e build Android. A redução de lacunas e legibilidade deve ser inspecionada em retrato/paisagem; não declarar validação visual sem captura atual do app.
+- Nenhum merge. A captura fornecida anteriormente ainda não foi reconciliada com a versão/build instalada.
+
+
+## DB-136 · 2026-10-28 — Sincronizar índice do diário após as novas entradas
+
+### Achado confirmado
+- A CI do SHA `f705cb9e93ca91a3f784a7ea81a54b16b186e5de` falhou no gate anti-regressão porque DB-134 e DB-135 já existiam no corpo do diário, mas ainda não apareciam no índice sequencial. O gate corretamente compara as entradas DB-NNN com o índice.
+
+### Correção
+- Incluídas DB-134 e DB-135 no índice, preservando a sequência e os registros completos. O gate não foi alterado nem enfraquecido.
+
+### Validação e limites
+- Esta atualização documental gera novo HEAD e exige nova CI. Ainda não declarar `validate` nem `android-build` verdes até os jobs terminarem no mesmo SHA.
+- Nenhum merge. A captura visual do app instalado e os testes físicos Android/ELM327/GPS continuam pendentes.
+
+
+## DB-137 · 2026-10-28 — Fechar lacuna de índice detectada pela segunda execução da CI
+
+### Achado confirmado
+- A execução CI `40625197616` voltou a falhar no gate porque a entrada DB-136, que registrava a própria correção do índice, também não tinha sido acrescentada ao índice. O teste exige correspondência exata entre índice e todas as entradas, incluindo a entrada que corrige o índice.
+
+### Correção
+- Acrescentada DB-136 ao índice sequencial. A verificação de integridade não foi relaxada.
+
+### Validação e limites
+- Novo HEAD exige nova CI. A última execução falhou no gate antes de `validate`; isso não representa falha de TypeScript ou da suíte comportamental, pois essas etapas foram puladas.
+- Não fazer merge até o novo HEAD passar pelo gate, `validate` e `android-build`.
+
+
+## DB-138 · 2026-10-28 — Remover teste ELM órfão sem implementação correspondente
+
+### Achado confirmado
+- A CI `40625299840` passou pelo doctor (17/17) e pelo gate anti-regressão, mas `validate` falhou ao executar `tests/elmHealthPresentation.test.js`: o teste tentava abrir `src/obd/elmHealthPresentation.ts`, arquivo inexistente tanto na branch quanto em `main`.
+- Busca no repositório confirmou que `formatElmQueueHealth`, `queueDepth` e as métricas de fila só apareciam nesse teste; a interface Bluetooth usa diretamente o snapshot real de saúde de `Elm327Session` e não consome esse formatter.
+
+### Correção
+- Removido o teste órfão e sua chamada em `package.json`, em vez de criar um módulo morto ou fingir que existe uma telemetria de fila que o transporte não fornece.
+- A barreira anti-regressão continua exigindo que toda suíte `*.test.js` existente seja incluída em `npm test`; nenhuma regra do gate foi relaxada.
+
+### Validação e limites
+- Commits: `25943462950c0440ff923abf30101341c109b46e` (script) e `0049d1dcadbb4c6ac367b0da7441bb1367d1cab1` (teste órfão).
+- Novo HEAD exige CI completa. O teste físico do ELM327/ECU e a inspeção visual Android permanecem separados da CI.
+- Esta entrada substitui a hipótese anterior de DB-133 de que o teste órfão podia ser reintegrado apenas adicionando-o ao script.
+
+
+## DB-139 · 2026-10-28 — Auditoria de obsolescência: reconciliar marca, arquitetura e framing ELM327
+
+### Achados confirmados e correções
+- O rótulo nativo `Smart OBD Diagnostic` diferia da marca do projeto MERIVA SMART, mas o gate `tests/projectBaseline.test.js` exige explicitamente que o app não fique preso ao nome Meriva. O nome nativo foi mantido genérico; README e changelog agora distinguem a marca do projeto da identidade do app. Slug, scheme e package Android continuam estáveis.
+- O README tinha uma seção `Validação CI` de 2026-10-06 dizendo que o commit servia como gatilho técnico e afirmando delimiter CR, em contradição com o código vigente. A seção/meta repetidas foram removidas; o contrato operacional fica na seção de engenharia ELM327 e no playbook atual.
+- `docs/ELM327_COMPATIBILITY_REVIEW_2026-10-05.md` descrevia delimiter CR real, retry default 2/infinito e ATI como obrigatório. Corrigido para o código/catalogação atuais: `delimiter: ''`, RX delimitado pelo prompt `>`, CR no TX, 20 tentativas-base finitas/8 s, `ATZ` obrigatório e `ATI` best-effort.
+- `docs/ARCHITECTURE.md` descrevia quatro áreas genéricas e incluía DTC como conteúdo do cockpit. Atualizado para refletir as rotas existentes e a responsabilidade exclusiva da tela Saúde pelos DTCs.
+
+### Itens avaliados e mantidos
+- `plugins/withBluetoothLegacyPermissionLimits.js` está ativo em `app.json`; não é plugin órfão.
+- `src/storage/backup.ts` é usado por Configurações e por testes de regressão; não é módulo morto.
+- `app/testes-sensores.tsx` existe como rota operacional de testes; não foi eliminado por ser técnico.
+- Dependências não foram removidas por simples ausência de import direto: Expo Router, ícones, plugins e pares nativos podem exigir dependência explícita.
+
+### Débito de modernização identificado — não alterado nesta rodada
+- O projeto usa Expo SDK 51 / React Native 0.74.5. A documentação oficial anuncia SDK 58 em 15/10/2026 e SDK 57 em 30/06/2026; SDK 51 é um baseline antigo. Fontes: https://expo.dev/changelog e https://expo.dev/sdk
+- O projeto usa a família legada de métodos de `expo-file-system` (`readAsStringAsync`, `writeAsStringAsync`, etc.). A documentação mais recente separa a compatibilidade antiga em `expo-file-system/legacy`: https://docs.expo.dev/versions/latest/sdk/filesystem-legacy/
+- O pacote `react-native-bluetooth-classic` instalado `1.73.0-rc.17` aparece como tag latest na página npm consultada, mas continua sendo release candidate: https://www.npmjs.com/package/react-native-bluetooth-classic
+- Não atualizar Expo/FileSystem/Bluetooth como correção isolada. Próximo bloco de modernização deve ser dedicado, por etapas, com lockfile, Expo Doctor, TypeScript, suíte completa, APK e testes físicos de pareamento, framing CR/`>`, ECU `010C`, GPS e persistência. Preservar SDK 51 na PR de cockpit até a baseline física estar documentada.
+
+### Validação e limites
+- As correções foram consolidadas nesta frente da PR #96, sem abrir branch paralela nem fazer merge.
+- Conferir a CI do novo SHA: o resultado verde anterior pertence ao SHA base e não aprova estas alterações.
+- Nenhum arquivo foi removido nesta auditoria por heurística de nome; exclusões anteriores foram apenas o teste ELM órfão comprovadamente sem módulo de implementação e continuam documentadas em DB-138.
+
+
+## DB-140 · 2026-10-28 — Auditoria da rede móvel e dos provedores de localização
+
+### Pergunta e fontes
+- Investigar o uso das informações 4G/5G para localização, GPS, velocidade e autonomia sem presumir que a rede celular fornece coordenadas confiáveis.
+- Documentação consultada: Android ConnectivityManager/NetworkCapabilities (https://developer.android.com/develop/connectivity/network-ops/reading-network-state), Expo NetInfo (https://docs.expo.dev/versions/latest/sdk/netinfo/), Expo Location `getProviderStatusAsync()`/`LocationProviderStatus` (https://docs.expo.dev/versions/latest/sdk/location/), permissões de localização Android (https://developer.android.com/develop/sensors-and-location/location/permissions?hl=pt-br) e Android `TelephonyManager.getAllCellInfo()` (https://developer.android.com/reference/android/telephony/TelephonyManager#getAllCellInfo()).
+
+### Estado encontrado
+- O app já recebe eventos de conectividade e identifica o tipo de transporte, geração móvel informada, disponibilidade de internet e informação de conexão tarifada por meio de NetInfo.
+- O enriquecimento opcional de clima/localidade já atualiza após reconexão e a cada 15 minutos, com cooldown e uma única solicitação em voo. Esse fluxo não altera o ciclo OBD.
+- O rastreador de viagem já solicita localização de alta precisão e valida precisão, timestamp e segmentos consecutivos. A lacuna era a falta de visibilidade na tela Conectividade sobre os estados dos provedores Android.
+- NetInfo não fornece RSSI celular nem coordenada de torre. `networkAvailable` do Android indica disponibilidade do provedor de localização por rede; não garante que o último fix tenha usado essa fonte nem que seja preciso.
+
+### Implementação
+- Criado `src/network/locationProviders.ts` para normalizar `locationServicesEnabled`, `gpsAvailable` e `networkAvailable`. Valores ausentes ou malformados continuam desconhecidos, sem conversão para verdadeiro/falso.
+- `app/conectividade.tsx` consulta `Location.getProviderStatusAsync()` na abertura da tela e ao atualizar o estado da rede, mostrando os serviços de localização, GPS/GNSS e provedor por rede sem solicitar permissões extras.
+- Criado `tests/locationProviders.test.js` para serviços ativados/desativados, GPS disponível sem provedor de rede e campos ausentes/inválidos; incluída em `npm test`.
+- Criado `docs/AUDITORIA_REDE_MOVEL_E_LOCALIZACAO_2026-10-28.md` com matriz de usos, limites, regras de aceitação e documentação oficial.
+
+### Decisão de engenharia
+- 4G/5G e mudanças de conectividade são gatilhos para atualizar dados online opcionais e ajudar a diagnosticar os provedores Android; não são dados para calcular posição, velocidade, distância, consumo ou autonomia.
+- Não adicionar agora leitura de IDs de células/dBm. Isso exigiria outra camada nativa e avaliação específica de permissões, privacidade, compatibilidade e utilidade; dados de célula podem não estar atualizados e não substituem um fix de viagem validado.
+- Não criar um segundo watcher de localização nem alterar o cálculo de distância. Qualquer futura tentativa de recuperar posição quando o fix estiver antigo deve ser limitada, coordenada com o GpsTracker existente e protegida contra callbacks duplicados.
+- Falhas de rede/provedor não podem interromper a sessão Bluetooth/ELM327, a fila serial, o diagnóstico local ou a persistência.
+
+### Validação e limites
+- O código e os testes foram adicionados à branch `ui/cockpit-instant-consumption-20261027` da PR #96; CI do HEAD resultante obrigatória para gate anti-regressão, TypeScript, suíte completa e build APK.
+- Não considerar a mudança validada até os jobs ficarem verdes no mesmo SHA e a tela ser conferida em APK instalado no Galaxy A06/Android 16.
+- Esta alteração não comprova a disponibilidade real de GPS/rede do aparelho e não resolve, por si só, os problemas físicos pendentes de GPS ou ELM327/ECU.
+
+
+## DB-141 · 2026-10-28 — Auditoria profunda de PIDs, interpretação e integridade da IA local
+
+### Fontes e método
+- Revisado o diário e o contrato anti-regressão antes das alterações, seguido de leitura estática cruzada entre `pids.json`, `formulas.json`, `ranges.json`, `sensor_tests.json`, `polling_policy.json`, `meriva_confirmed_pids.json`, parser, banco/autosave, tela Saúde, Laboratório, sensor-test engine e exportação TXT.
+- Documentação técnica consultada: SAE J1979-DA revisão J1979DA_202608 (https://saemobilus-test.cld.sae.org/standards/j1979da_202608-j1979-da-digital-annex-e-e-diagnostic-test-modes); ISO 15031-5:2015, confirmada como atual após revisão em 2026 (https://www.iso.org/standard/66368.html); decodificação customizada de python-OBD (https://python-obd.readthedocs.io/en/latest/Custom%20Commands/); mapa de bits de PID 0101 (https://obd2pid.com/pids/01-01); NIST AI RMF (https://www.nist.gov/itl/ai-risk-management-framework).
+- Relatório da rodada: [AUDITORIA_PIDS_IA_2026-10-28.md](AUDITORIA_PIDS_IA_2026-10-28.md).
+
+### Auditoria estrutural dos catálogos
+- Confirmada estrutura: 34 PIDs, 20 fórmulas, 34 faixas e 30 testes/avaliações de sensores. Não foram encontrados IDs duplicados nem PIDs sem fórmula/faixa; os testes de sensor não apontam a PID ausente do catálogo.
+- Quatro PIDs não têm teste dedicado: 0101 (estado/readiness), 0130 (contador de ciclos), 0131 (distância desde limpeza) e 0151 (enumeração de combustível). Não se inventou um teste de sensor analógico para esses parâmetros.
+- Só 010C tem evidência RAW_ECU documentada especificamente para a Meriva; dez outros PIDs são candidatos, não confirmações. Não expandir o catálogo em massa: a descoberta ocorre em fila serial e deve respeitar tempo de polling, K-Line, payloads, fórmulas, unidades, faixas e evidência por ECU.
+- Confirmado que as faixas atuais são limites amplos de codificação/plausibilidade, não valores de operação saudável OEM. Exemplo: o máximo matemático do PID 0143 pode alcançar 25.700% pela escala U16; isso não representa uma condição fisicamente normal.
+
+### Falhas encontradas e correções
+- `src/diagnostics/diagnosticEngine.ts`: antes desta rodada, o motor local não exigia diretamente idade máxima para as observações recebidas. Agora usa limite padrão de 45 s, timestamp válido não futuro, número finito, PID normalizado e faixa catalogada; rejeita origem desconhecida/importada, simulação/seed, valores derivados e amostras inválidas/antigas. Expõe contadores de observações aceitas/bloqueadas.
+- A origem é agora normalizada explicitamente. A compatibilidade `REAL` só vale para o contrato local de `LastPidReading`; origem desconhecida é `IMPORTADO` e não pode ser promovida a `REAL_OBD` por exclusão de `SIMULACAO`.
+- DTCs marcados `historical=true` são bloqueados para hipóteses atuais, mesmo se um registro legado tiver `status=CONFIRMED`. A mesma evidência duplicada não aumenta o score.
+- Contrato de resultado do motor alterado para v2. Telas e TXT nomeiam score/LOW-MEDIUM-HIGH como pontuação/nível qualitativo heurístico, não probabilidade estatística.
+- `app/saude.tsx` usa `getSharedObdStatus().ecuConnected`, fonte do estado atual de resposta da ECU. Ausência de hipóteses sem ECU respondendo e evidência atual suficiente resulta em “DADOS INSUFICIENTES”, não em falsa declaração de normalidade.
+- `src/obd/parser.ts`: interpretação de PID 0101 ajustada para aplicar os bits de suporte e prontidão em conjunto e separar mapas de ignição por centelha/SI de ignição por compressão/CI. Em dados, 0101 passa a aparecer como “STATUS OBD-II”, e sua interpretação legível é preservada no autosave e no TXT.
+- `src/diagnostics/sensorTestEngine.ts`: timestamps inválidos/futuros e números de tentativa duplicados não contam para a série de teste. Mantido o requisito de cinco tentativas distintas e cinco respostas válidas.
+
+### Testes e documentação
+- Estendidos `tests/diagnosticEngine.test.js`, `tests/pidParserIntegrity.test.js`, `tests/sensorTestEngine.test.js` e `tests/merivaAutosave.test.js` para frescor, futuro, PID com espaços, derivação, DTC histórico/duplicado, decode de SI/CI de 0101 e persistência da interpretação.
+- Reforçado `tests/projectBaseline.test.js` para proteger os contratos de origem/frescor, status vivo da ECU, semântica do PID 0101, RG-40/RG-41 e PID-AI-01.
+- Adicionados RG-40 e RG-41 em `docs/CONTRATO_ANTI_REGRESSAO.md`, seção PID-AI-01 em `docs/TEST_PLAN.md`, changelog e este relatório.
+- Nenhuma dependência, SDK Expo ou fluxo Bluetooth foi alterado; nenhum merge foi executado.
+
+### Validação / pendências
+- A CI deve ser consultada novamente no HEAD final desta série documental/código. Nenhum resultado anterior à última alteração serve como prova do SHA final. Critério: gate anti-regressão, TypeScript, suíte completa e `android-build` verdes no mesmo SHA.
+- Depois da CI, inspecionar o APK em Galaxy A06/Android 16 e conferir os novos textos/status no app. A interpretação de PID 0101 é coberta por testes automatizados, mas ainda requer inspeção de interface instalada.
+- Validação física do ELM327/ECU real permanece pendente; a resposta `010C` em 2026-10-27 foi timeout, então nenhum PID candidato está fisicamente confirmado por esta rodada.
+- Não inferir precisão de sensor a partir da bitmap, da fórmula, da ausência de DTC ou do score local. Próxima fase de IA deve ampliar a corroborabilidade e avaliar falsos positivos/negativos em dados reais rotulados, não simplesmente adicionar mais regras ou PIDs.
+
+
+
+## DB-142 · 2026-10-28 — Corrigir polaridade da prontidão no PID 0101
+
+### Achado confirmado em documentação bit a bit
+- O cruzamento da tabela do PID 0101 no padrão J1979 com o parser revelou que os bits de prontidão do byte D estavam invertidos na lógica. Nos bits contínuos do byte B, bit de incompletude em 1 significa incompleto. Já no byte D, bit de prontidão em 1 significa concluído/pronto e bit 0 significa não concluído. Fonte pública técnica consultada: https://www.dashlogic.com/docs/technical/obdii_pids (tabela Mode 01 PID 01, bytes B–D, linhas 83–133 na consulta) e https://obd2pid.com/pids/01-01 (mapa dos bits, revisado em 2026-08-31).
+- Consequência: a implementação anterior podia exibir monitor concluído como incompleto, confundindo a prontidão OBD com defeito.
+
+### Correção aplicada
+- `src/obd/parser.ts`: os monitores não contínuos por SI e CI agora são tratados como incompletos quando o bit D correspondente é zero e o bit C correspondente confirma suporte. O bit de incompletude do byte B mantém a polaridade inversa definida para os três monitores contínuos. Bits reservados ou monitores não suportados não criam alertas.
+- `tests/pidParserIntegrity.test.js`: ampliados casos separados para SI pronto/incompleto, CI, monitor não suportado e verificação dos campos específicos. Fixtures corrigidas para que o bit B3 represente SI ou CI intencionalmente; não se assume tipo de motor a partir de outros bytes.
+- Atualizados `docs/AUDITORIA_PIDS_IA_2026-10-28.md` e `CHANGELOG.md`.
+
+### Validação e limites
+- A nova alteração exige CI do HEAD final com gate, TypeScript, todas as suítes e build Android verdes.
+- Este teste prova a interpretação do bitmap sintético, não o estado de prontidão atual da ECU da Meriva. A sessão física e a resposta real de PID 0101 continuam pendentes.
+- A correção não altera fórmula de PID nem fluxo de polling; é uma correção semântica de bitmask de segurança diagnóstica.
+
+
+
+## Continuidade — correção da CI e rotulagem diagnóstica (2026-10-28)
+
+- Auditoria da execução CI no SHA `3a19b1cc6113ffc315dee81f945a4b84f4205dd9`: o job `validate` falhou em `tests/diagnosticEngine.test.js:133` com `ReferenceError: Cannot access 'nowMs' before initialization`; `android-build` foi ignorado por depender da validação.
+- Correção aplicada na frente única da PR #96: mover a inicialização do relógio de teste para antes do primeiro uso; nenhum limiar ou fórmula diagnóstica foi alterado.
+- Tela Saúde: substituir o símbolo de porcentagem por escala heurística `0–100` e rotular o nível como qualitativo, explicitando que não é probabilidade estatística.
+- Validação pendente: aguardar nova CI no SHA resultante; confirmar `validate` e `android-build` verdes no mesmo SHA. Nenhum merge foi executado.
+- Teste físico em Galaxy A06/Android 16/ELM327 real continua pendente; CI não substitui verificação da conexão e da resposta `010C`.
+
+
+## DB-143 · 2026-10-28 — Aplicativo pessoal, independente e sem conta/login
+
+### Decisão
+- O MERIVA SMART é de uso pessoal, instalado como APK Android. Não será preparado como produto distribuído a terceiros.
+- Não criar fluxo de cadastro, login, conta de usuário, autenticação remota ou dependência de um serviço em nuvem.
+- O aplicativo não se conecta ao Bubble. Nenhuma alteração foi feita no app Bubble.
+- O uso principal é local e offline: conexão Bluetooth Classic com ELM327, diagnóstico, PIDs, fórmulas, GPS/autonomia e histórico.
+
+### Conhecimento técnico preservado para implementação independente
+- Manter identificadores estáveis para eventos locais e evitar duplicação em retries da fila offline.
+- Validar bytes OBD no intervalo 0–255 e distinguir suporte declarado de resposta real da ECU.
+- Manter SQLite local como fonte de verdade para histórico e dados persistentes; não depender de rede para diagnóstico.
+- Preservar validação temporal e geográfica do GPS, incluindo os três segmentos válidos exigidos para confirmar movimento.
+- PID 012F continua autoritativo para nível de combustível quando válido; PID 015E continua sendo taxa de combustível em L/h, sem copiar fórmulas experimentais do Bubble.
+
+### Escopo
+- Removida a camada experimental de cliente Bubble, seus contratos, testes e documentação específica.
+- Não adicionar chamadas HTTP, credenciais, provisionamento de dispositivos ou telas de login/cadastro.
+- Recursos de backup/exportação devem ser locais e iniciados pelo usuário. Integrações futuras só podem ser consideradas se forem explicitamente solicitadas; não fazem parte do escopo atual.
+
+## DB-144 · 2026-10-28 — Navegação por categorias, ícones e qualidade dos dados
+
+- Reorganizada a central “Mais Recursos” em cinco grupos iconográficos: diagnóstico/conexão; veículo/condução; dados/aprendizado; histórico/relatórios; sistema/preferências. Mantidos os destinos nativos existentes e acrescentado atalho para telemetria em tempo real.
+- Criado o componente compartilhado `SourceStatusLegend` para explicar cinco estados: medido, estimado, referência, simulado e indisponível. O componente é explicativo: não altera a classificação nem fabrica leituras.
+- Inserida a guia em telemetria, viagens e histórico local; viagens e exportações ganharam marcadores visuais por ícones compartilhados. Exportação e limpeza continuam locais.
+- Mantidos o tema escuro, os ícones Ionicons já instalados, o comportamento retrato/paisagem e os fluxos sem cadastro, login ou Bubble.
+- Adicionado teste de regressão ligado a `npm test` cobrindo os cinco grupos, destinos, ícones e rótulos de qualidade.
+- Validação desta alteração depende da CI do novo SHA; isto não atesta teste físico com ELM327 nem APK instalado.
+
+## DB-145 · 2026-10-28 — Corrigir leitura KWP, retry e classificação do estado ECU/Bluetooth
+
+- Causa identificada no código: o parser da branch não reconhecia o quadro KWP compacto 84F111410C0000D3; a resposta positiva 41 0C 00 00 não passava pelo gate de validação da ECU. O trace comprova uma resposta no instante capturado, não suporte a outros PIDs nem condição mecânica do motor.
+- Parser: adicionados caminhos compacto e espaçado KWP com comprimento declarado e checksum aditivo; preservadas as correções já presentes para PID 0101. Respostas truncadas, checksum incorreto e bytes excedentes continuam rejeitados.
+- Conexão: retry padrão ajustado para 3 tentativas por adaptador com intervalo de 1500 ms; após falha conclusiva no PID 010C, avançar ao próximo dispositivo pareado em vez de repetir a mesma varredura. O fallback inclui J1850 PWM/VPW e a recuperação usa o protocolo identificado, incluindo KWP slow/fast, em vez de adivinhar ATSP5.
+- Gate: a recuperação só confirma ECU quando parsePidResponse para 010C retorna resposta válida com valor finito e payload completo. A CI deve ser consultada no HEAD final; não reutilizar o resultado de SHA anterior.
+- Cockpit: se o PID 010C não tiver resposta válida, mostrar ECU SEM RESPOSTA e orientar a consultar o RX, sem rotular automaticamente como rádio Bluetooth desligado. O placeholder sem PID não é apresentado como OBD 1/1.
+- Dados e limitações: N/D permanece correto para autonomia, temperatura e PIDs sem leitura REAL recente. Conexão física com Galaxy A06/Android 16 + ELM327/ECU real, inspeção do APK instalado e confirmação de 010C continuam pendentes de ensaio físico.
+## DB-146 · 2026-10-28 — Restaurar quadrantes 2×2 e paginação de PIDs no cockpit
+
+- **Regressão identificada:** o cockpit concentrava o indicador principal em um único mostrador de alternância temporal, com apenas três cartões auxiliares e um cartão de arrefecimento separado. Isso escondia a leitura simultânea dos quatro indicadores principais.
+- **Alteração:** restaurada a grade 2×2 com temperatura do motor (0105), tensão do sistema (0142), posição da borboleta (0111) e rotação (010C) sempre visíveis no primeiro conjunto. O cartão duplicado de arrefecimento foi removido; temperatura continua disponível no quadrante.
+- **Sem perda dos PIDs extras:** indicadores adicionais anunciados pela ECU continuam em páginas de quatro; anomalias recebem prioridade, a alternância ocorre a cada 10 segundos e o cabeçalho permite avançar por toque.
+- **Integridade de dados:** cada quadrante usa somente leitura real, respondida, finita e recente. Se a ECU estiver desconectada ou o PID não for anunciado/estiver sem amostra válida, o quadrante permanece visível com N/D e motivo explícito. Nenhum seed é usado como telemetria atual.
+- **Validação:** adicionados testes unitários para paginação, retorno circular, grade 2×2 e barreira anti-regressão. A CI do novo SHA e o build standalone devem passar antes de integrar; o teste físico no Galaxy A06/Android 16 continua separado.
+ 
+## DB-147 · 2026-10-28 — Incluir os PIDs restantes no carrossel principal com navegação por setas
+
+- **Comportamento solicitado:** o painel principal deve incluir os demais PIDs, não apenas os quatro indicadores fixos. A grade continua exibindo quatro quadrantes simultâneos, enquanto os outros PIDs suportados percorrem páginas no mesmo carrossel.
+- **Primeira página estável:** temperatura (0105), tensão (0142), posição da borboleta (0111) e RPM (010C) ficam sempre na primeira página. A priorização de alertas se aplica aos PIDs adicionais e não retira um dos quatro principais do cockpit inicial.
+- **Carrossel completo:** todas as métricas suportadas/catalogadas entram na sequência sem duplicação; cada página tem até quatro itens. Setas acessíveis anterior/próxima complementam a rotação automática de 10 segundos. Navegação circular volta ao início.
+- **Integridade:** PIDs não anunciados não são tratados como suportados. Todos os valores continuam dependendo de leitura real, resposta válida e janela de frescor; sem evidência, o indicador permanece em N/D.
+- **Proteção contra regressão:** a suíte percorre os 20 PIDs da política em páginas de quatro, verifica que não há PID saltado nem repetido e preserva a ordem fixa da primeira página. A CI do novo SHA precisa validar testes e build Android antes de distribuir qualquer APK.
+
+
+## DB-148 · 2026-10-28 — Auditoria e correção de cockpit em orientação paisagem
+
+- Auditoria: app.json permite orientação padrão e app/_layout.tsx chama ScreenOrientation.unlockAsync com listener removido no cleanup; o bloqueio global do Android continua sob controle do usuário. useMidLayout() recalcula layout.landscape usando useWindowDimensions(), portanto não era necessário impor orientação fixa.
+- Falha de layout identificada: a tela empilhava cabeçalho, clima, grade 2×2, sessão e navegação; em modo paisagem, a altura reduzida podia fazer o cockpit/navegação exceder a área visível. O espaçador elástico agravava o risco.
+- Correção: cabeçalho/clima agora dividem a faixa superior; cockpit e sessão de conexão dividem a largura; o cockpit ocupa a área flexível e a sessão usa coluna compacta; navegação vira raia lateral de 50 dp, com cinco destinos compactos.
+- Densidade: quadrantes reduzem fonte, padding e hints a uma linha em paisagem; o cabeçalho/instrução do carrossel e os cartões auxiliares de consumo, autonomia e pressão também usam modo compacto. O espaçador é limitado a 4 dp, evitando que consuma altura útil. Retrato permanece com fluxo vertical anterior.
+- Proteções: testes cobrem orientação padrão livre, liberação da orientação, estilos de paisagem, raia de navegação e cinco destinos visíveis. O checklist físico exige rotação retrato→paisagem→retrato, carrossel/setas e ausência de clipping/sobreposição.
+- Limite conhecido: a aplicação não deve forçar a rotação se a opção Rotação automática do Android estiver desligada. A validação de layout automatizada não substitui o teste visual no dispositivo real; o APK final depende da CI do SHA atualizado.
+
+## DB-149 · 2026-10-28 — Quadrantes adaptáveis em ambas as orientações
+
+- Requisito complementar: a rotação adapta a página inicial inteira, não só a navegação. Os quatro quadrantes principais devem continuar simultaneamente visíveis em grade 2×2, com dimensões, espaçamentos e tipografia compactados em paisagem; valores, unidades, rótulos e estados N/D não podem ser cortados nem sobrepostos.
+- A barra de navegação permanece inferior em retrato e passa para a lateral direita em paisagem. A reorganização deve usar dimensões correntes da janela e preservar a sessão e leituras de PIDs.
+- Corrigida a asserção obsoleta de `tests/orientationLayout.test.js`: o estilo atual define altura mínima de 54 dp para os cartões em paisagem, não 58 dp. Ampliadas as proteções automatizadas para grade responsiva, estilo da grade/cartões em paisagem e limite de linhas.
+- Esta alteração documenta e testa o contrato; não prova CI verde nem substitui inspeção física no Galaxy A06. Validar `validate` e `android-build` no SHA final e executar retrato→paisagem→retrato no aparelho antes de merge.
+
+
+## DB-150 · 2026-10-28 — Auditoria crítica de layout e duplicações de conteúdo
+
+- **Falha inicial da CI:** o teste de orientação procurava a aplicação do estilo do quadrante em uma única linha, embora o JSX estivesse formatado em várias linhas. O teste foi ajustado para aceitar quebras de linha, mantendo a verificação do vínculo entre o cartão e o layout em paisagem.
+- **Duplicação na Central de Saúde:** contadores de timestamps duplicados, DTCs antigos e amostras aceitas estavam renderizados duas vezes. Foi preservada uma ocorrência de cada indicador. Os estados Bluetooth/ECU agora vêm de `getSharedObdStatus()`, não dos campos persistidos do autosave.
+- **Informação redundante no cockpit:** o cabeçalho repetia a mensagem completa de conexão já apresentada no cartão de sessão. O cabeçalho passou a mostrar um status compacto, enquanto o cartão de sessão mantém a explicação acionável.
+- **Resumo operacional repetido no Laboratório:** foi removido o painel de viagem com distância GPS, consumo, PID 015E e autonomia, já resumidos no cockpit/Dados e detalhados em Viagens. O painel podia exibir distância zero sem viagem real e rotular “GRAVANDO” apenas após conectar, confundindo sessão OBD com registro de trajeto. Foram removidos os estados e estilos órfãos associados.
+- **Duplicação de viagens no Armazenamento:** eliminada a segunda lista de seis viagens, substituída por link para o relatório canônico `/viagens`. A tela fica dedicada a quota, fila CSV, exportações e limpeza.
+- **Espaço final incorreto no Laboratório:** removido o padding inferior de 132 dp que reservava altura para uma barra fixa não renderizada. O padding passa a 30 dp. Corrigido ainda um fechamento redundante de `View` que havia sido introduzido ao trocar a lista de viagens por um atalho.
+- **Arquitetura de navegação ainda merece acompanhamento:** Bluetooth e Laboratório mantêm fluxos de conexão distintos (seleção explícita em Bluetooth e tentativa automática de candidatos no Laboratório), embora publiquem a sessão compartilhada. Não foi feita uma consolidação do ciclo de vida nesta rodada para não arriscar regressão de RFCOMM/ECU; registrar como prioridade separada para uma alteração isolada com testes de conexão.
+- **Validação:** a CI do SHA anterior `e9229232dc518567c04e12106b5d55c8cc242cff` ainda estava em execução no momento da auditoria. Este registro não declara a nova versão aprovada. Exigir `validate` e `android-build` verdes no SHA final, revisar o diff contra `main` e executar a rotação retrato→paisagem→retrato e a inspeção das telas no Galaxy A06. O teste físico com ELM327/ECU permanece separado.
+
+
+## DB-151 · 2026-10-28 — Remoção do setter órfão após consolidar o Laboratório
+
+- A primeira CI após remover o resumo de viagem do Laboratório encontrou `TS2304: Cannot find name 'setTripFuelSupported'` no caminho de erro de conexão.
+- Causa: a declaração de estado e suas atualizações normais foram eliminadas junto com o painel duplicado, mas uma chamada residual no bloco de erro permaneceu.
+- Correção: removida a última chamada ao setter que não tinha mais estado correspondente. O estado de erro geral e o encerramento da sessão continuam preservados.
+- Validação ainda depende da CI do novo SHA; não interpretar TypeScript corrigido como build Android ou ensaio físico aprovado.
+
+
+## DB-152 · 2026-10-28 — Unificar marca visual entre cockpit e tela Viagens
+
+- A inspeção de todos os mastheads identificou que o cockpit e a splash usam a identidade genérica `SMART OBD` / `SMART OBD DIAGNOSTIC`, enquanto a lista de viagens introduzia isoladamente `MERIVA SMART DIAGNOSTIC`.
+- Corrigido o masthead de `app/viagens.tsx` para `SMART OBD DIAGNOSTIC`. Mantido o nome de pacote Expo existente, cuja regra de baseline exige marca genérica; não houve alteração de applicationId, slug ou dados de perfil do veículo.
+- Adicionada asserção anti-regressão para impedir o reaparecimento de uma marca divergente na tela secundária.
+- Resultado visual no dispositivo e CI do SHA final ainda precisam ser validados; nenhuma afirmação de teste físico decorre desta alteração.
+
+
+## DB-153 · 2026-10-28 — Corrigir contrato de altura da tipografia do cockpit em paisagem
+
+- A CI voltou a falhar em `tests/orientationLayout.test.js`: a asserção exigia `lineHeight:23` para o valor dos quadrantes, mas o estilo de paisagem vigente usa `fontSize:21,lineHeight:22`.
+- A inspeção do estilo e do JSX confirmou que a divergência era apenas do teste. Atualizada a expectativa para 22 dp, preservando a tipografia compacta que reduz a altura ocupada.
+- A CI precisa ser reavaliada no novo SHA, pois ainda pode revelar outras expectativas obsoletas. APK build e validação visual no Galaxy A06 continuam pendentes até a CI passar.
+
+
+## DB-154 · 2026-10-28 — Mover teste de integridade de viagens para a tela canônica
+
+- A regressão `histórico sem seed e consumo N/D` ainda testava os filtros de origem/combustível em `app/armazenamento.tsx`, local da lista redundante removida.
+- A proteção foi realocada para `app/viagens.tsx`, que agora é a tela canônica de histórico. O teste verifica a filtragem de `REAL_OBD`, os limites de validade de combustível e a apresentação `CONSUMO N/D`; também verifica que Armazenamento não volte a renderizar a lista duplicada.
+- A alteração preserva a verificação de integridade de dados, muda apenas o arquivo alvo conforme a arquitetura atual. CI do SHA seguinte continua obrigatória.
+
+
+## DB-155 · 2026-10-28 — Diferenciar armazenamento de histórico de viagens
+
+- O teste de integridade foi transferido para `app/viagens.tsx`, a tela canônica, mas a primeira formulação da expressão regular ficou escapada em excesso e não correspondia ao código-fonte. Corrigida para testar a expressão `filter(cycle => cycle.source === 'REAL_OBD')` de forma realista.
+- Após remover a lista duplicada, a tela Armazenamento ainda se intitulava “HISTÓRICO E DADOS” e a categoria Mais a chamava “HISTÓRICO E RELATÓRIOS”, embora a lista detalhada de viagens esteja em Viagens. Renomeados o título, subtítulo, grupo e atalho para “ARMAZENAMENTO E EXPORTAÇÃO” / “ARQUIVOS E EXPORTAÇÃO”.
+- A tela de Armazenamento fica dedicada a espaço local, fila CSV, limpeza e formatos exportados; a tela Viagens continua como local único da lista, detalhes e análise por percurso.
+- Não houve alteração dos formatos nem dos dados persistidos. A CI do SHA novo ainda deve comprovar os testes e o build Android.
+
+
+## DB-156 · 2026-10-28 — Remover cópia do perfil do veículo em Configurações
+
+- A comparação de telas identificou que Configurações repetia o nome do veículo, motorização, capacidade do tanque e reserva já expostos em Veículo. Os dados eram estáticos/contextuais e ocupavam espaço no final da tela de preferências.
+- Removida a cópia textual e substituída por um atalho acessível `VER PERFIL DO VEÍCULO` para `/veiculo`. Nenhum campo de perfil ou dado persistido foi alterado.
+- Acrescentada barreira de regressão para impedir o reaparecimento da cópia e manter a tela canônica como única fonte visual dos detalhes físicos.
+- CI do novo SHA e validação no aparelho continuam pendentes; esta alteração não declara build APK nem validação física.
+
+
+## DB-157 · 2026-10-28 — Tornar robustas as asserções da navegação do perfil
+
+- As novas asserções do perfil em Configurações tinham escaping excessivo nos padrões de caminho e propriedades, arriscando validar uma expressão textual diferente da pretendida.
+- Substituídas por verificações de substring explícitas para `href="/veiculo"` e para os campos que não devem ser duplicados. A proteção continua verificando o contrato real, sem depender de escape de regex.
+- A CI do SHA seguinte precisa confirmar a suíte completa e o build Android; não declarar aprovação a partir apenas da inspeção estática.
+
+
+## DB-158 · 2026-10-28 — Melhorar legibilidade da tipografia em paisagem
+
+- A inspeção de `app/index.tsx` encontrou rótulos/hints de quadrantes e rótulos auxiliares com `fontSize:6` em paisagem. O encaixe espacial era obtido com texto pequeno demais para o cockpit.
+- Aumentados os rótulos e dicas dos quadrantes para 8 dp (line-height 9), instrução do carrossel para 7 dp e rótulos auxiliares para 7 dp (line-height 9). Mantidas a grade 2×2, altura mínima do cartão e o contador/carrossel.
+- Acrescentados testes e contrato para proteger esse limite de leitura. A aprovação final ainda depende da CI do SHA e de inspeção visual no Galaxy A06, incluindo rotação retrato→paisagem→retrato para confirmar ausência de clipping.
+
+
+## DB-159 · 2026-10-28 — Atualizar teste do hub após separar armazenamento e viagens
+
+- A CI encontrou em `tests/sourceStatusLegend.test.js` uma expectativa antiga para a categoria `HISTÓRICO E RELATÓRIOS`. A categoria foi renomeada intencionalmente para `ARQUIVOS E EXPORTAÇÃO` porque a tela não apresenta mais uma lista de viagens; o histórico completo passou a ter um destino único em `/viagens`.
+- Atualizado o contrato do hub para o novo nome e reforçado que a tela de armazenamento mantém sua função de quota, arquivos, exportação e limpeza, sem renderizar `VIAGENS SALVAS`.
+- O teste não foi removido: foi adaptado à organização atual e conserva as verificações de ícones, rotas e legenda de qualidade de dados. CI completa no novo SHA continua obrigatória.
+
+
+## DB-160 · 2026-10-28 — Centralizar hipóteses da IA na tela Saúde
+
+- A revisão comparativa confirmou que `app/laboratorio.tsx` e `app/saude.tsx` calculavam e apresentavam as mesmas hipóteses locais, evidências, próximos testes e contadores de integridade a partir da telemetria em RAM.
+- A Central de Saúde fica como apresentação canônica de hipóteses e evidências. Removidos do Laboratório o cálculo duplicado via `runLocalDiagnostic`, a montagem paralela de observações e o painel correspondente; adicionada ligação acessível para `/saude`.
+- Mantidos no Laboratório os fluxos de consulta manual de PID, descoberta, varredura completa de DTC, validação de fórmulas, TX/RX e contexto operacional em detalhes técnicos. Não foi removido código de aquisição nem de persistência OBD.
+- Removidos os estilos órfãos ligados ao painel eliminado. Adicionada regressão para impedir retorno do motor/painel duplicado no Laboratório e confirmar que a Central de Saúde permanece como tela canônica.
+- Validação ainda depende da nova CI e do build APK no SHA resultante; teste visual real do layout no Galaxy A06 continua pendente.
+
+
+## DB-161 · 2026-10-28 — Corrigir rótulo obsoleto do atalho de armazenamento em Viagens
+
+- Depois de centralizar a lista de percursos em `/viagens` e restringir `/armazenamento` a quota/arquivos/exportação, o link em Viagens ainda dizia “ABRIR HISTÓRICO E EXPORTAÇÃO”. O rótulo estava desatualizado e contradizia a nova divisão de responsabilidades.
+- Alterado para “ABRIR ARMAZENAMENTO E EXPORTAÇÃO”, alinhado ao título da tela de destino e ao grupo da central Mais. Adicionada asserção para evitar a regressão do texto antigo.
+- A navegação e os dados persistidos não foram alterados; CI do novo SHA e build APK permanecem obrigatórios.
+
+
+## DB-162 · 2026-10-29 — Limitar sondas nativas Bluetooth e falhar fechado em estado indeterminado
+
+### Problema confirmado
+- Em `src/obd/bluetoothClassicTransport.ts`, `write()` e `readUntilPrompt()` aguardavam `device.isConnected()` sem prazo. Uma Promise nativa que não concluísse podia impedir que o timeout do comando/RX encerrasse a operação.
+- Os dois caminhos também capturavam exceções nativas e ignoravam todas, exceto a mensagem exata `BLUETOOTH DESCONECTADO`; após uma falha de estado desconhecido, o código podia continuar como se o socket estivesse disponível.
+- O fechamento direto aguardava a Promise de desconexão sem limite. A recuperação inesperada tinha um limite externo, mas o fechamento explícito/inicialização falha ainda podia ficar aguardando indefinidamente.
+
+### Correções aplicadas nesta branch
+- Criado `runWithTimeout()` em `src/obd/connectionRecovery.ts`. O helper propaga falhas e limita a espera sem alegar que consegue cancelar uma chamada nativa já iniciada.
+- Centralizada a verificação em `assertDeviceConnected()`: timeout ou exceção é registrado como `DEVICE_CONNECTED_CHECK_FAILED` e tratado como estado indeterminado; a escrita TX não é iniciada se a verificação não for concluída com sucesso.
+- `readUntilPrompt()` usa apenas o orçamento restante da própria leitura para verificar o estado, impedindo que a sonda nativa prolongue indefinidamente o timeout OBD.
+- `close()` agora limita a espera pela limpeza nativa. Se o socket não tiver sido confirmado como liberado, retorna erro e preserva o bloqueio compartilhado, impedindo a abertura concorrente de outro RFCOMM para o mesmo adaptador.
+- Ampliados `tests/connectionRecovery.test.js` (operação concluída, rejeitada e travada) e `tests/bluetoothLifecycle.test.js` (integração, estado fail-closed e bloqueio após cleanup pendente). Adicionado OBD-04 a `docs/TEST_PLAN.md`, reforçado RG-03 e registrado o comportamento no CHANGELOG.
+
+### Validação e limites
+- A CI verde `40807259011` pertence ao SHA anterior `b21b574dbac25b8b417eb2540716e0c2503eb6eb`; não é evidência de aprovação destas mudanças. A CI do SHA que contém DB-162 deve passar por `validate` e `android-build`.
+- Não há execução local do Android nem hardware conectado nesta sessão. O ensaio Galaxy A06/SM-A065M, Android 16, adaptador ELM327 real e ECU continua pendente; testes de helper/CI não provam comunicação serial física.
+- Nenhuma alteração foi feita em `main` e não houve merge. Não integrar enquanto a CI do SHA final não estiver verde e enquanto o teste físico da cadeia Bluetooth → ELM327 → ECU não for executado.
+
+### Próximos passos
+1. Verificar a CI do SHA final desta branch e corrigir qualquer falha sem relaxar contratos nem testes.
+2. No Galaxy A06, observar TX/RX com timestamp e confirmar `ATZ`, resposta ao `ATDP` e ao `010C`; diferenciar erro de verificação do socket, timeout sem prompt ELM e falta de resposta da ECU.
+3. Repetir desconexão/reconexão e o fechamento manual para demonstrar que nenhum socket simultâneo abre enquanto a limpeza nativa permanece pendente.
+
+## DB-163 · 2026-10-29 — Timeout finito para sondas de disponibilidade e descoberta Bluetooth
+
+### Problema e causa
+A auditoria da branch `ui/cockpit-instant-consumption-20261027` confirmou que os timeouts já cobriam conexão RFCOMM, leitura, escrita e verificação `isConnected` usada por leitura/escrita. Porém, algumas chamadas nativas auxiliares ainda eram aguardadas diretamente: disponibilidade do rádio, estado do Bluetooth antes/depois de tentativas, cancelamento de descoberta, confirmação inicial do socket e enumeração de dispositivos pareados. Se uma dessas Promises nativas não terminasse, o fluxo podia ficar suspenso antes de chegar ao timeout de conexão.
+
+### Alterações aplicadas
+- `src/obd/bluetoothClassicTransport.ts`: as sondas citadas agora passam por `runWithTimeout` com limites finitos. A falha/timeout de estado do rádio segue a política fail-closed existente; timeout no cancelamento da descoberta cancela a tentativa RFCOMM, pois a operação nativa pode continuar pendente. Falha/timeout da confirmação inicial do socket registra limpeza nativa e impede que o app trate o link como conectado. A listagem de pareados também retorna erro explícito após o limite.
+- `tests/bluetoothLifecycle.test.js`: adicionadas verificações para exigir timeout em disponibilidade/estado do rádio, cancelamento de descoberta e enumeração de pareados.
+- Nenhuma dependência, versão Expo, regra de PID, fórmula de consumo/autonomia, algoritmo GPS ou política de origem de dados foi alterada.
+
+### Validação e limites
+- Commits da implementação: `2c5658c6cedbaf035b7a6824fb2f1fa217e97bd1`, `263f8b46b186c1c3c7d00726bd46087ac83a1ec5` e `650d23f9bd366f672141389fbc0ca5cff2931826`.
+- Commits dos testes: `619fa54ffb2e17e61eae1ca545fa43bab10db47e` e `a3d207cedf30e7a1ae29d19624e9b6683d513a79`.
+- A CI `40863609539` é verde apenas no SHA anterior `4f9512c71c5305b551560ffc6908ffc232404e4a`; não conta como validação destas mudanças. As execuções acionadas pelos commits desta entrada foram canceladas/reiniciadas durante a sequência de commits; consultar a execução do HEAD final, sem interpretar execução cancelada como falha de teste nem como aprovação.
+- O timeout JavaScript não cancela por si só uma operação nativa já iniciada. Por isso, uma conexão/socket de resultado indeterminado continua sujeita ao bloqueio de concorrência já existente; timeout não é evidência de que o recurso nativo foi liberado.
+- O teste físico no Galaxy A06/Android 16 com ELM327 real, incluindo resposta válida a `010C`, permanece pendente.
+
+### Fontes técnicas
+- Android Developers — conexão Bluetooth Classic: https://developer.android.com/develop/connectivity/bluetooth/connect-bluetooth-devices
+- Android `BluetoothSocket` — RFCOMM é streaming e `connect()` pode bloquear; `close()` libera recursos: https://developer.android.com/reference/android/bluetooth/BluetoothSocket
+- Linux Kernel — protocolo ELM327, comandos terminados em CR e prompt `>`: https://cdn.kernel.org/doc/html/latest/networking/device_drivers/can/can327.html
+
+---
+
+## DB-164 · 2026-10-29 — Limitar sondas nativas na preparação e ativação Bluetooth
+
+### Causa
+Após DB-163, ainda havia operações nativas sem prazo em `src/obd/bluetoothManager.ts`: `isBluetoothAvailable()`, `isBluetoothEnabled()`, o pedido de ativação do rádio e o pedido de permissões Android. Elas ocorrem antes da abertura RFCOMM; portanto, o timeout interno do transporte não as cobre.
+
+### Alterações
+- `src/obd/bluetoothManager.ts`: incluiu `runWithTimeout` para estado/disponibilidade do rádio (1,5 s) e para pedidos de permissões/ativação mediados pelo Android (30 s). Um timeout encerra a espera JavaScript e aborta o fluxo antes de abrir RFCOMM; isso não afirma que a chamada do sistema operacional foi cancelada.
+- `tests/bluetoothLifecycle.test.js`: adicionadas asserções para exigir os prazos e impedir o retorno dos awaits nativos diretos.
+- Mantidas as permissões BLUETOOTH_CONNECT/SCAN, o único dono da conexão e os estados distintos Bluetooth → ELM → ECU.
+
+### Validação
+- Esta alteração deve ser validada no novo HEAD por TypeScript, suíte completa e build Android.
+- Não houve teste físico no Galaxy A06/Android 16. A resposta `010C` da ECU permanece por confirmar.
+
+## DB-165 · 2026-10-29 — Limitar a consulta HTTP opcional de clima e cancelar requisição vencida
+
+### Causa
+`src/weather/currentConditions.ts` aguardava `fetch()` e a leitura do JSON sem timeout. Se a rede celular ficasse instável e a requisição nunca concluísse, `startCurrentConditionsRefresh()` manteria `inFlight=true` e bloquearia as próximas atualizações opcionais até que a Promise resolvesse.
+
+### Alterações
+- `src/weather/currentConditions.ts`: criada `fetchWeatherPayload()`, com limite padrão de 8 s para a requisição e a leitura do corpo JSON. O timeout chama `AbortController.abort()` quando disponível; o fallback mantém a espera do chamador limitada.
+- `tests/onlineConditions.test.js`: adicionada regressão simulando fetch sem resposta e verificando timeout + sinal de abort.
+- Esta camada só enriquece cidade/clima; ela não envia telemetria veicular. O inventário da branch não contém cliente de sincronização de telemetria/cloud nem outbox persistente conectado a servidor. Não foi criada uma fila órfã sem endpoint/contrato definido; isso continua como lacuna arquitetural para uma integração explícita.
+
+### Referências técnicas
+- Android Developers — conexão RFCOMM bloqueante, cancelamento de descoberta e fechamento de socket: https://developer.android.com/develop/connectivity/bluetooth/connect-bluetooth-devices
+- Android Developers — permissões Bluetooth em Android 12+: https://developer.android.com/develop/connectivity/bluetooth/bt-permissions
+- Linux Kernel — comandos ELM terminados em CR e prompt `>`: https://cdn.kernel.org/doc/html/latest/networking/device_drivers/can/can327.html
+- Expo Location — documentação oficial da biblioteca: https://docs.expo.dev/versions/v51.0.0/sdk/location/
+
+### Validação e limites
+- A nova CI no SHA que inclui DB-164/DB-165 é obrigatória; o resultado verde de `validate` no SHA anterior não valida estas alterações.
+- O timeout HTTP não transforma dados antigos em atuais. Falha de clima segue como indisponível, sem bloquear o motor OBD local.
+- O teste físico de Bluetooth/ECU permanece pendente.
+
+## DB-166 · 2026-10-29 — Limitar sonda de rádio no monitor de saúde Bluetooth/ECU
+
+### Causa
+`src/obd/sharedConnection.ts` consultava `RNBluetoothClassic.isBluetoothEnabled()` sem prazo no monitor de saúde. Se a Promise nativa travasse, `monitorBusy` poderia permanecer verdadeiro e os checks futuros seriam abandonados; uma falha no estado do rádio também não deve ser interpretada como falha da ECU.
+
+### Alterações
+- Reutiliza `runWithTimeout` com 1 s para a verificação do rádio.
+- Reutiliza uma Promise nativa ainda pendente para evitar múltiplas sondas simultâneas após timeout. Quando o estado é desconhecido, mantém o estado ECU separado e ainda permite que o monitor tente consultar a ECU.
+- `tests/bluetoothLifecycle.test.js` protege a presença do limite e proíbe o retorno do `await` nativo direto.
+
+## DB-167 · 2026-10-29 — Expirar velocidade GPS antiga sem perder distância acumulada
+
+### Causa
+`src/gps/gpsTracker.ts` atualizava velocidade e qualidade apenas quando recebia um callback de localização. Se as atualizações parassem, o último valor GPS podia continuar visível e ser reutilizado pelo serviço de viagem, embora nenhum fix novo tivesse chegado. Também se rotulava `OBD` uma velocidade que ainda podia vir do campo `speed` do GPS.
+
+### Alterações
+- Adicionado watchdog único, ativo apenas enquanto o rastreador está em execução, que marca o fix como `SEM_FIX` após 5 s sem posição precisa e reinicia a referência/segmentos pendentes. A distância acumulada é preservada; não são criadas posições nem segmentos artificiais.
+- Timestamp do hint OBD separado e finito (5 s). A fonte `OBD` passa a apresentar o valor OBD de fato; quando o hint vence e o GPS também está sem fix atual, a velocidade expira para zero/`PARADO`.
+- `tests/gps.test.js` usa relógio/temporizador controlados para testar perda do GPS, preservação de distância, continuidade de um hint OBD atualizado e expiração de hint obsoleto.
+
+### Validação e limites
+- As referências de Android orientam atualizações por callback, timestamps e remoção de updates para controlar ciclo de vida/energia; a falta de callbacks não pode ser tomada como prova de movimento atual. Ver: https://developer.android.com/develop/sensors-and-location/location/request-updates
+- A CI para o SHA novo precisa executar TypeScript, suíte completa, gate anti-regressão e build APK. Nenhum teste físico foi executado nesta sessão.
+- O watchdog corrige frescor do estado apresentado; o GPS continua sendo a fonte de distância e o OBD continua sendo a fonte de velocidade quando há uma leitura OBD válida. Ele não estima distância durante interrupções.
+
+## DB-168 · 2026-10-29 — Neutralizar fórmulas em campos textuais de exportação CSV
+
+### Causa
+A exportação CSV de viagens escapava aspas, mas não neutralizava campos textuais iniciados por operadores que planilhas podem interpretar como fórmula (`=`, `+`, `-` ou `@`, inclusive depois de espaços/controle). Dados importados ou persistidos poderiam virar fórmulas ao abrir o arquivo em software de planilha.
+
+### Alterações
+- Criado `src/storage/csvEncoding.ts` com `escapeCsvCell()`: mantém o quoting/escape de aspas e prefixa texto formula-like com apóstrofo. Valores numéricos continuam numéricos, inclusive os negativos.
+- `src/storage/exportDiagnostics.ts` passa a usar o codificador compartilhado nas sete colunas exportadas.
+- Criado `tests/csvEncoding.test.js` para texto normal, aspas, fórmula direta, fórmula após espaços/tab, valores negativos numéricos e nulos; ligado a `npm test`.
+- `tests/projectBaseline.test.js` agora exige o teste no script e o uso do codificador pelo exportador.
+- Não foi alterado JSON de diagnóstico nem o formato/ordem das colunas CSV.
+
+### Validação e limites
+- Este commit exige nova execução do gate anti-regressão, TypeScript e suíte completa. O resultado da CI anterior não o valida.
+- O codificador reduz o risco de formula injection em planilhas comuns; não pretende validar o significado semântico de todos os campos de origem.
+
+## DB-169 · 2026-10-29 — Impedir que a inicialização GPS bloqueie polling OBD
+
+### Causa
+`autoTripService.runLoop()` aguardava `ensureGpsForEcu()` antes de iniciar o próximo ciclo de consulta. A preparação de permissão, `startLocationUpdatesAsync` ou `watchPositionAsync` pode demorar por causa do sistema operacional; uma Promise suspensa podia interromper consultas OBD válidas mesmo com Bluetooth/ECU funcionais.
+
+### Alterações
+- O polling agenda a inicialização GPS sem `await`, usando uma única Promise em voo para evitar watchers/solicitações simultâneas.
+- A inicialização revalida o `generation` e o estado ECU antes/depois da operação; se o GPS terminar de iniciar após o ciclo/ECU já ter terminado, solicita a limpeza em vez de manter monitoramento órfão. Se outra sessão ECU já estiver ativa, a tentativa antiga não para o tracker compartilhado.
+- O retry de GPS é limitado a uma nova tentativa a cada 15 s depois de falha, evitando pedidos de permissão/start a cada ciclo OBD.
+- `tests/backgroundExecution.test.js` impede a regressão para `await ensureGpsForEcu()` dentro do ciclo serial OBD.
+
+### Validação e limites
+- Esta alteração exige TypeScript, gate, suíte completa e build Android no SHA final.
+- Uma operação nativa GPS que não termina permanece como a única tentativa em voo; isso preserva o polling OBD e evita duplicar tarefas, mas pode exigir resolução da chamada nativa ou reinício do app para recuperar GPS.
+- Não houve teste físico GPS/ECU nesta sessão.
+
+## DB-170 · 2026-10-29 — Atualizar gate GPS para monotonicidade após perda de fix
+
+### Causa
+CI `40869798013` falhou antes de executar `validate`: `tests/projectBaseline.test.js` ainda exigia literalmente `location.timestamp <= this.previous.timestamp`, mas DB-167 foi reforçado para comparar com `state.lastTimestamp`. A comparação mais ampla permanece depois da limpeza de `previous` e impede aceitar um fix atrasado que não seja mais monotônico.
+
+### Correção
+- O contrato estático agora exige `location.timestamp <= this.state.lastTimestamp`, alinhando o gate à regra nova sem enfraquecer a proteção contra timestamps inválidos ou fora de ordem.
+- O teste funcional GPS já inclui um callback atrasado após stale-watchdog e espera que a contagem de amostras não mude.
+
+### Validação
+- A falha comprovada foi de asserção do gate; `android-build` foi ignorado por dependência do job `validate`. A nova CI deve confirmar TypeScript, gate, suíte integral e APK no mesmo SHA.
+
+## DB-171 · 2026-10-29 — Serializar cancelamento nativo da descoberta Bluetooth
+
+### Causa
+DB-163 limitou o tempo de espera de `cancelDiscovery()`, mas um timeout JavaScript não cancela a operação nativa. Uma nova tentativa podia iniciar outra chamada de cancelamento enquanto a primeira ainda estivesse pendente, contrariando a intenção de não sobrepor operações nativas.
+
+### Correção
+- Criada `cancelBluetoothDiscovery()`, compartilhando uma única Promise nativa entre instâncias. Enquanto a Promise não resolver/rejeitar, novos `open()` reutilizam a mesma chamada e falham fechado após o timeout; não iniciam cancelamentos paralelos.
+- `tests/bluetoothLifecycle.test.js` protege o uso do helper e proíbe o callback direto por tentativa.
+
+## DB-172 · 2026-10-29 — Rejeitar coeficientes e resultados de fórmula não finitos
+
+### Causa
+O motor de fórmulas validava bytes OBD e o valor no parser, mas `applyFormula()` poderia retornar `Infinity` se o catálogo trouxesse divisor zero ou um coeficiente enorme, antes de chegar à validação de PID. Os catálogos atuais não usam divisor zero; o risco era a ausência de uma barreira no motor.
+
+### Correção
+- `src/obd/formulaEngine.ts` valida divisor positivo e coeficientes finitos e rejeita qualquer resultado que não seja finito.
+- `tests/pidFormulaBoundaries.test.js` cobre divisor zero, escala infinita e o guard de resultado não finito por meio de um valor intermediário sintético; os limites válidos SAE existentes continuam intactos.
+
+## DB-173 · 2026-10-29 — Corrigir documentação obsoleta sobre sincronização em nuvem
+
+### Causa
+`docs/ARCHITECTURE.md` afirmava que `src/cloud/bubbleWorkflowClient.ts`, `src/cloud/bubbleWorkflowContract.ts` e `docs/BUBBLE_WORKFLOW_PORT.md` estavam disponíveis, mas esses arquivos não existem na árvore atual. Isso criava uma falsa expectativa de upload/outbox de telemetria.
+
+### Correção
+- A arquitetura e a auditoria de rede agora afirmam explicitamente que só existe status de rede e enriquecimento opcional de clima; não há cliente de upload nem fila persistente de telemetria nesta branch.
+- O requisito futuro foi registrado com dependências claras: contrato do backend, autenticação, idempotência, consentimento/retenção e fila durável com replay. Nenhum fluxo cloud sem consumidor foi inventado.
+
+### Validação e limites
+- Esta rodada exige nova CI no HEAD final. Não houve teste físico no Galaxy A06/Android 16, conexão ELM327/ECU, nem inspeção visual de telas no hardware.
+
+## DB-174 · 2026-10-29 — Consumir tokens compartilhados para a paleta base das telas
+
+### Causa
+As telas importavam `src/ui/theme.ts`, mas repetiam diretamente as cores base do cockpit. Isso permitia que mudanças de paleta se desviassem gradualmente e impedia testes estáticos de garantir o uso efetivo dos tokens.
+
+### Alterações
+- As 14 rotas funcionais cobertas por `tests/screenTheme.test.js` agora referenciam `COLORS.*` para os valores base idênticos à paleta comum.
+- Incluído o token `COLORS.white` para preservar o branco puro (`#fff`) em texto/ícones sobre botões e superfícies de destaque, sem substituí-lo por um quase-branco.
+- O teste de tema agora reprova a reintrodução dos literais base nas telas; cores semânticas especiais e cores de gráfico fora da paleta comum permanecem explícitas quando são realmente distintas.
+
+### Validação e limites
+- Mudança de referência de cores, sem alteração de fórmulas, navegação ou ciclo OBD; a CI precisa validar TypeScript, gate, suíte e build Android no novo SHA.
+- Não houve inspeção visual física em retrato/paisagem no Galaxy A06. O teste estático não substitui essa etapa.
+
+## DB-175 · 2026-10-29 — Limitar localização para clima e aplicar backoff exponencial
+
+### Causa
+A consulta de clima era limitada no `fetch()` HTTP, mas as chamadas Expo anteriores — permissão, posição e geocodificação reversa — não tinham prazo. Uma Promise nativa lenta podia deixar o atualizador opcional em `inFlight`. O retry de rede usava cooldown fixo, sem aumentar a espera após falhas consecutivas.
+
+### Alterações
+- `src/weather/currentConditions.ts`: timeout de 3 s para consultar permissão, 8 s para posição de baixa precisão, 4 s para geocodificação reversa e mantém HTTP/JSON limitado a 8 s. A falha retorna indisponibilidade de clima, não bloqueia o loop OBD e não fabrica posição.
+- `src/weather/conditionsRefresh.ts`: backoff exponencial por falha (60 s inicial padrão) com teto de 15 min; reconexão pode iniciar refresh imediato e sucesso zera a contagem.
+- `tests/onlineConditions.test.js` e `tests/weatherRefresh.test.js`: testes para timeout de operação que não responde e para o aumento/reinício do backoff.
+- `docs/AUDITORIA_REDE_MOVEL_E_LOCALIZACAO_2026-10-28.md`: documenta prazos, teto e escopo local do recurso.
+
+### Limites
+- Timeouts JavaScript limitam a espera do chamador; não garantem cancelamento de chamadas nativas Expo que não ofereçam cancelamento explícito. As operações expiram para o fluxo de enriquecimento sem criar coordenadas ou dados de clima.
+- Essa política é somente para clima/localidade; não implementa upload de telemetria, porque a branch não contém cliente/outbox cloud.
+
+## DB-176 · 2026-10-29 — Atualizar contrato visual térmico para o token de tema
+
+### Causa
+A troca de `danger` no cockpit da literal `#fb7185` para `COLORS.danger` preservou o valor exato, mas `tests/orientationLayout.test.js` continuava procurando a literal antiga e falhou durante `npm test`.
+
+### Correção
+- A asserção agora exige `danger:{color:COLORS.danger}` em vez da representação literal da cor.
+- O layout, tamanho e regra de apresentação do valor térmico não foram alterados; apenas o contrato estático foi atualizado para o design system.
+
+### Validação
+- `typecheck` passou no SHA `ce77a177d36322b1c5aee6b9dfcc80e3df39c1ed`; `npm test` falhou na asserção textual identificada. Nova CI completa no HEAD posterior é obrigatória.
+
+## DB-177 · 2026-10-29 — Limitar timeout da limpeza nativa de socket RFCOMM
+
+### Causa
+`safeDisconnect()` aguardava `device.disconnect()` sem timeout. Embora a limpeza compartilhada já bloqueie um novo socket enquanto a Promise não termina, um caminho de falha que aguardasse diretamente essa função podia permanecer pendente. Um timeout externo sem preservar o estado de limpeza poderia permitir conexão concorrente.
+
+### Correção
+- `src/obd/bluetoothClassicTransport.ts`: desconexão nativa agora passa por `runWithTimeout` usando o limite de conexão configurado. Timeout é registrado separadamente e rejeita sem tratar a chamada nativa como cancelada; o registro de limpeza compartilhada permanece pendente e bloqueia RFCOMM substituto.
+- Se a chamada de desconexão terminar com erro normal, a sonda `isConnected()` também é limitada a 1 s; só o estado explicitamente desconectado é tratado como cleanup concluído.
+- `tests/bluetoothLifecycle.test.js` exige timeout na desconexão e proíbe retorno ao `await device.disconnect()` sem limite.
+
+### Validação e limites
+- DB-177 exige uma nova execução de TypeScript, gate, suíte completa e build Android no mesmo SHA.
+- O código não pode cancelar à força uma Promise nativa que não oferece API de cancelamento. A política segura é manter o bloqueio até a limpeza realmente assentar; se o módulo nativo nunca resolver, o app não abrirá um socket concorrente para o mesmo adaptador.
+
+
+## DB-178 · 2026-10-29 — Preservar bloqueio RFCOMM quando a sonda de estado do socket expira
+
+### Causa
+A sonda nativa `device.isConnected()` era limitada por timeout em leituras e escritas, mas, se expirasse ou rejeitasse, `assertDeviceConnected()` apenas lançava erro. O timeout JavaScript não cancela a chamada nativa e não comprova que o socket foi fechado. Sem registrar limpeza compartilhada nesse caminho, uma reconexão poderia tentar abrir outro RFCOMM para o mesmo endereço enquanto o estado anterior ainda era desconhecido.
+
+### Correção
+- `src/obd/bluetoothClassicTransport.ts`: falha/timeout de `isConnected()` agora registra `DEVICE_CONNECTED_CHECK_CLEANUP` na trava global antes de limpar o estado local e lançar erro. A nova conexão só pode prosseguir após a limpeza nativa ser confirmada; a operação pendente continua sem ser considerada cancelada.
+- `tests/bluetoothLifecycle.test.js`: adicionadas asserções para garantir a ordem de registro da limpeza compartilhada e descarte do estado local no caminho de estado desconhecido.
+
+### Validação e limites
+- Commit de implementação: `877778ab667ff82ea0d3fcf9fa8002f4e7db9a90`.
+- Commit de regressão: `053fa4a5f8c93592c3b7a5559027a6165d49e691`.
+- A CI ainda precisa executar typecheck, gate anti-regressão, suíte completa e build Android no mesmo SHA final. Não houve teste físico do Galaxy A06/Android 16 com ELM327/ECU nesta alteração.
+
+
+## DB-179 · 2026-10-29 — Serializar tentativas nativas de desconexão após timeout
+
+### Causa
+DB-177 adicionou timeout a `device.disconnect()` e preservou a trava de socket, mas a rotina de recuperação tentava novamente qualquer limpeza rejeitada. Se a rejeição fosse apenas o timeout JavaScript, a chamada nativa original poderia continuar pendente; chamar `disconnect()` outra vez criaria operações nativas sobrepostas para o mesmo adaptador.
+
+### Correção
+- `src/obd/bluetoothClassicTransport.ts` mantém a Promise nativa original em `pendingNativeDisconnectOperations` por endereço. Enquanto a chamada não resolver/rejeitar de verdade, qualquer tentativa de cleanup reutiliza a mesma Promise em vez de iniciar outra desconexão.
+- A trava global `pendingNativeSocketCleanups` continua ativa até que o fluxo de limpeza seja confirmado; timeout JavaScript não é tratado como cancelamento da operação nativa.
+- `tests/bluetoothLifecycle.test.js` verifica que a Promise nativa é rastreada e reutilizada durante retries, evitando concorrência de cleanup.
+
+### Validação e limites
+- Commit de implementação: `01cebfe60d7b7eb7a76dd18249762395a1a0e574`.
+- Commit de regressão: `08835c1f8dd5b343155c9cabeab71d1df50f2853`.
+- A CI precisa validar o HEAD final, incluindo typecheck, gate, suíte completa e build Android. Teste físico Bluetooth/ELM327/ECU no Galaxy A06 permanece pendente.
+
+
+## DB-180 · 2026-10-29 — Impedir que resposta ELM atrasada contamine o próximo PID
+
+### Causa
+Quando `readUntilPrompt()` expirava sem receber `>`, limpava o buffer e devolvia timeout, mas mantinha o stream disponível para o comando seguinte. Uma resposta atrasada do comando anterior podia chegar após a limpeza e ser interpretada como resposta do próximo PID, violando o framing serial e criando telemetria atribuída ao comando errado.
+
+### Correção
+- `src/obd/bluetoothClassicTransport.ts` agora marca o stream como dessincronizado quando a leitura expira sem prompt. Antes de transmitir um novo comando, a camada registra a limpeza compartilhada do socket, invalida o estado local e rejeita a escrita; a nova sessão só pode começar depois da limpeza RFCOMM confirmada.
+- O estado de dessincronização é reinicializado apenas ao abrir uma nova sessão ou concluir o fechamento. Não se tenta inferir o fim de uma resposta que não trouxe o delimitador real `>`.
+- `tests/bluetoothLifecycle.test.js` protege a marcação do timeout, o bloqueio de TX subsequente e a limpeza antes da reconexão.
+
+### Justificativa técnica
+A documentação Android informa que `BluetoothSocket.connect()` bloqueia e recomenda cancelar descoberta antes da conexão, além de fechar sockets para liberar recursos. A camada JS não pode assumir que um timeout cancela a operação nativa ou restaura o limite de mensagens. Referências oficiais: https://developer.android.com/develop/connectivity/bluetooth/connect-bluetooth-devices e https://developer.android.com/reference/android/bluetooth/BluetoothSocket.
+
+### Validação e limites
+- Commit de implementação: `4ee98580ca7542bd25bf7043a16c412ed6838d54`.
+- Commit de regressão: `711c8153f7a013ce75848466544157a00b86f7ca`.
+- A CI precisa validar typecheck, gate, suíte completa e build Android no HEAD final. O ensaio físico com Galaxy A06/Android 16, ELM327 real e ECU continua necessário para confirmar a recuperação no hardware.
+
+
+## DB-181 · 2026-10-29 — Atualizar asserção de timeout após serializar desconexão nativa
+
+### Causa
+DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise nativa compartilhada, mas `tests/bluetoothLifecycle.test.js` ainda exigia a forma textual antiga `() => device.disconnect()`. A validação CI de `npm run validate` falhou nessa asserção, embora a intenção do teste — garantir timeout finito — continue válida.
+
+### Correção
+- A asserção agora exige que `runWithTimeout()` aguarde `nativeDisconnect`, a Promise original rastreada por endereço. As verificações adicionais continuam garantindo que retries não iniciem outra chamada nativa enquanto a primeira estiver pendente.
+- A falha anterior foi uma incompatibilidade do teste com a implementação refatorada; não foi removida a exigência de timeout nem a proteção de concorrência.
+
+### Validação
+- Falha observada em `npm run validate` no SHA `2441a48131517cf5dda600eb9ab2ec15c69ccfd4`: `tests/bluetoothLifecycle.test.js:109`, mensagem `native socket disconnect must have a finite timeout`.
+- Commit de ajuste do teste: `fbc510857fb75a83fb638bcf7effd7609d07ab1c`.
+- A validação completa precisa ser reexecutada no HEAD posterior, incluindo gate e build Android.
+
+
+## DB-182 · 2026-10-30 — Corrigir fixture de timestamp GPS e mockar ciclo de vida nativo em segundo plano
+
+### Falha confirmada
+- Em `tests/gps.test.js`, após o fix preciso de 29.000 ms, a suíte aceitava amostras com timestamps 31.000 e 32.000 ms, embora a precisão estivesse ausente. O rastreador preserva o último timestamp aceito mesmo quando a amostra não é precisa o suficiente para compor distância.
+- A asserção de recuperação enviava 30.000 ms e esperava nova amostra. Esse valor é regressivo perante 32.000 ms e deve ser rejeitado pelo contrato monotônico. O defeito estava no fixture/expectativa do teste, não no filtro temporal da aplicação.
+- O mock `expo-location` não implementava `hasStartedLocationUpdatesAsync`, `startLocationUpdatesAsync` e `stopLocationUpdatesAsync`. O código de produção capturava a exceção, mascarando a ausência desses métodos no mock e deixando o ciclo de vida de background sem cobertura.
+
+### Correção aplicada
+- A amostra de recuperação foi avançada para 33.000 ms e a mensagem da asserção explicita que precisa superar o último timestamp aceito.
+- O mock passou a representar as três APIs de background do Expo Location.
+- Incluídos testes para iniciar e parar o serviço de localização em segundo plano e para reutilizar uma tarefa nativa já ativa após recriação do contexto JS, sem registro duplicado.
+
+### Fundamentação e limites
+- A API `hasStartedLocationUpdatesAsync(taskName)` é documentada pelo Expo como `Promise<boolean>`; sua presença no rastreador é válida e não foi removida. A falha artificial era a implementação incompleta do mock.
+- A documentação Android separa `BLUETOOTH_CONNECT` para comunicação com dispositivos já pareados de `BLUETOOTH_SCAN` para descoberta; o app declara e solicita ambas, sem concluir que isso comprova conexão com ELM327.
+- Fontes: Expo Location API (hasStartedLocationUpdatesAsync) e Android Developers — Bluetooth permissions / Connect Bluetooth devices.
+
+### Validação
+- Commit desta correção GPS: `408cb7a558c069afeb3de446c08207be1df5f019`.
+- A validação automatizada no novo HEAD precisa concluir `validate` e `android-build`. Nenhuma aprovação de CI é presumida neste registro.
+- Não houve teste físico de GPS nem conexão real Bluetooth/ELM327/ECU no Galaxy A06 / Android 16. Nenhum merge foi realizado.
+
+
+## DB-183 · 2026-10-30 — Confirmar movimento urbano sem exigir 8 m em cada callback GPS
+
+### Defeito confirmado
+- A lógica anterior exigia `MIN_MOVEMENT_DISTANCE_M = 8` em cada segmento de dois fixes. Com atualização configurada a cada 1 s e deslocamento de 10 km/h, o veículo percorre cerca de 2,8 m por segmento; nenhum segmento alcançava 8 m e o contador nunca chegava aos três segmentos necessários.
+- A branch histórica `fix/gps-movement-confirmation-20261027` continha uma correção direcionada para o problema, mas ela não estava presente no código da PR #96.
+
+### Correção portada
+- O limite mínimo por segmento passou a considerar o tempo decorrido e uma fração do limite de precisão; cada segmento ainda precisa indicar velocidade coerente e não pode exceder 250 m.
+- A confirmação exige três segmentos válidos consecutivos (quatro posições) e deslocamento líquido acumulado pelo menos igual ao limite de precisão entre o início e o fim da janela.
+- Segmento fora do limite, intervalo excessivo ou fix sem precisão aceitável reinicia a janela, impedindo acumular jitter em distância real.
+- A velocidade apresentada continua separando fonte OBD e GPS; a mudança não trata uma amostra GPS como resposta da ECU.
+
+### Regressões adicionadas
+- Cenário de 10 km/h com quatro posições separadas por 1 s e cerca de 2,8 m por segmento.
+- A suíte existente continua cobrindo zigue-zague parado, amostras sem precisão, timestamp inválido/regressivo, salto geográfico e expiração de fix.
+
+### Validação e limites
+- Implementação: `9b318122ce353279a0f2b3de6672c835772ef2dc`.
+- Teste de movimento urbano: `9213dc5d6fe9f164425d9c2e9c858b1d0403986d`.
+- A CI completa deve validar o HEAD final; testes automatizados não equivalem a percurso real.
+- Continua pendente ensaio físico no Galaxy A06 / SM-A065M / Android 16, comparando distância GPS com trajeto/odômetro conhecido, incluindo baixa velocidade e parada. Nenhuma validação física foi declarada e nenhum merge foi realizado.
+
+
+## DB-184 · 2026-10-30 — Sincronizar índice DB-NNN com as novas entradas de auditoria
+
+### Falha observada
+- A CI #4034 / run `40999871511`, SHA `8cd885fc4d8fe12501e58dfb297f1a717ee62964`, passou Expo Doctor (17/17), mas falhou em `tests/projectBaseline.test.js:345`.
+- A validação estrita encontrou as entradas DB-182 e DB-183 no corpo do diário, mas o índice em bullets terminava em DB-181. A verificação protege a correspondência exata e a continuidade da sequência; não deve ser afrouxada.
+
+### Correção aplicada
+- Adicionadas ao índice as entradas DB-182, DB-183 e DB-184, mantendo a sequência contínua.
+- Atualizado o bloco operacional inicial para registrar a falha real do gate e o novo estado de validação.
+
+### Validação
+- O próximo push deve disparar a CI para o HEAD atualizado. Ainda não há resultado de `validate` nem de `android-build` para esse novo SHA.

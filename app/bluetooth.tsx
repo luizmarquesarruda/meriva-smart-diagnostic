@@ -188,7 +188,7 @@ export default function BluetoothScreen() {
         ) : null}
 
         <TouchableOpacity style={styles.primary} onPress={() => void loadPaired()} disabled={loading || connecting}>
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>BUSCAR DISPOSITIVOS PAREADOS</Text>}
+          {loading ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.primaryText}>BUSCAR DISPOSITIVOS PAREADOS</Text>}
         </TouchableOpacity>
 
         <Text style={styles.section}>DISPOSITIVOS PAREADOS</Text>
@@ -206,7 +206,7 @@ export default function BluetoothScreen() {
         {!devices.length && !loading ? <Text style={styles.empty}>Pareie o ELM327 nas configurações do Android e volte aqui.</Text> : null}
 
         <TouchableOpacity style={[styles.primary, (!selected || connecting) && styles.disabled]} onPress={() => void connectSelected()} disabled={!selected || connecting}>
-          {connecting ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>{lifecycle === 'DISCONNECTED' ? 'RECONECTAR E VALIDAR ELM327' : 'CONECTAR E VALIDAR ELM327'}</Text>}
+          {connecting ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.primaryText}>{lifecycle === 'DISCONNECTED' ? 'RECONECTAR E VALIDAR ELM327' : 'CONECTAR E VALIDAR ELM327'}</Text>}
         </TouchableOpacity>
 
         {connectedName ? (
@@ -245,33 +245,33 @@ const styles = StyleSheet.create({
   screenFrame: { width: '100%', alignSelf: 'center' },
   header: { paddingVertical: 8, marginBottom: 10 },
   title: { ...SCREEN_TITLE_STYLE, marginBottom: 6 },
-  subtitle: { color: '#7db3ff', fontSize: 10, fontWeight: '900', marginTop: 3, letterSpacing: 0.8 },
+  subtitle: { color: COLORS.accent, fontSize: 10, fontWeight: '900', marginTop: 3, letterSpacing: 0.8 },
   connectionGrid: { width: '100%' },
   connectionGridLandscape: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   connectionCardLandscape: { width: '48.5%', marginBottom: 0 },
-  connectionCard: { width: '100%', backgroundColor: '#111c2e', borderRadius: 14, borderWidth: 1, borderColor: '#29415f', padding: 15, marginBottom: 10 },
-  label: { color: '#7185a1', fontSize: 9, fontWeight: '900', letterSpacing: 1 },
-  online: { color: '#4ade80', fontSize: 24, fontWeight: '900', marginTop: 3 },
-  waiting: { color: '#fbbf24', fontSize: 24, fontWeight: '900', marginTop: 3 },
+  connectionCard: { width: '100%', backgroundColor: COLORS.surfaceRaised, borderRadius: 14, borderWidth: 1, borderColor: '#29415f', padding: 15, marginBottom: 10 },
+  label: { color: COLORS.textSubtle, fontSize: 9, fontWeight: '900', letterSpacing: 1 },
+  online: { color: COLORS.success, fontSize: 24, fontWeight: '900', marginTop: 3 },
+  waiting: { color: COLORS.warning, fontSize: 24, fontWeight: '900', marginTop: 3 },
   detail: { color: '#cbd5e1', fontSize: 11, marginTop: 4 },
-  warning: { color: '#fbbf24', fontSize: 10, fontWeight: '900', marginTop: 5 },
-  section: { color: '#7db3ff', fontSize: 10, fontWeight: '900', letterSpacing: 1, marginTop: 7, marginBottom: 7 },
-  primary: { backgroundColor: '#2563eb', borderRadius: 11, padding: 14, alignItems: 'center', marginBottom: 9 },
-  primaryText: { color: '#fff', fontSize: 11, fontWeight: '900' },
+  warning: { color: COLORS.warning, fontSize: 10, fontWeight: '900', marginTop: 5 },
+  section: { color: COLORS.accent, fontSize: 10, fontWeight: '900', letterSpacing: 1, marginTop: 7, marginBottom: 7 },
+  primary: { backgroundColor: COLORS.primary, borderRadius: 11, padding: 14, alignItems: 'center', marginBottom: 9 },
+  primaryText: { color: COLORS.white, fontSize: 11, fontWeight: '900' },
   disabled: { opacity: 0.45 },
-  device: { backgroundColor: '#111c2e', borderRadius: 11, borderWidth: 1, borderColor: '#243652', padding: 13, marginBottom: 8 },
+  device: { backgroundColor: COLORS.surfaceRaised, borderRadius: 11, borderWidth: 1, borderColor: '#243652', padding: 13, marginBottom: 8 },
   selected: { borderColor: '#60a5fa', borderWidth: 2 },
-  deviceName: { color: '#f8fafc', fontSize: 14, fontWeight: '900', flexShrink: 1 },
-  address: { color: '#9fb4cf', fontSize: 11, marginTop: 3 },
-  deviceType: { color: '#7185a1', fontSize: 9, fontWeight: '800', marginTop: 4 },
+  deviceName: { color: COLORS.textStrong, fontSize: 14, fontWeight: '900', flexShrink: 1 },
+  address: { color: COLORS.textMuted, fontSize: 11, marginTop: 3 },
+  deviceType: { color: COLORS.textSubtle, fontSize: 9, fontWeight: '800', marginTop: 4 },
   empty: { color: '#94a3b8', fontSize: 11, padding: 10, textAlign: 'center' },
   secondary: { backgroundColor: '#1e293b', borderRadius: 11, padding: 13, alignItems: 'center', borderWidth: 1, borderColor: '#475569', marginBottom: 9 },
   secondaryText: { color: '#e2e8f0', fontWeight: '900', fontSize: 11 },
-  error: { color: '#fb7185', fontSize: 10, fontWeight: '800', marginVertical: 8 },
-  ruleCard: { backgroundColor: '#111c2e', borderRadius: 12, borderWidth: 1, borderColor: '#243652', padding: 13, marginTop: 4 },
-  ruleTitle: { color: '#7db3ff', fontSize: 10, fontWeight: '900', marginBottom: 6 },
+  error: { color: COLORS.danger, fontSize: 10, fontWeight: '800', marginVertical: 8 },
+  ruleCard: { backgroundColor: COLORS.surfaceRaised, borderRadius: 12, borderWidth: 1, borderColor: '#243652', padding: 13, marginTop: 4 },
+  ruleTitle: { color: COLORS.accent, fontSize: 10, fontWeight: '900', marginBottom: 6 },
   rule: { color: '#a9b9cc', fontSize: 10, lineHeight: 17 },
-  bottomNav: { flexDirection: 'row', backgroundColor: '#111c2e', borderRadius: 14, borderWidth: 1, borderColor: '#29415f', marginTop: 12, padding: 5 },
+  bottomNav: { flexDirection: 'row', backgroundColor: COLORS.surfaceRaised, borderRadius: 14, borderWidth: 1, borderColor: '#29415f', marginTop: 12, padding: 5 },
   bottomItem: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 48, borderRadius: 10 },
   bottomActive: { backgroundColor: '#1a3150' },
   bottomIcon: { fontSize: 22, marginBottom: 0 },

@@ -66,6 +66,7 @@ export async function registerObdQuery(
     value: result.parsed.value,
     unit: result.parsed.unit,
     status: result.parsed.status,
+    ...(result.parsed.interpretation ? { interpretation: result.parsed.interpretation } : {}),
     timestamp: new Date().toISOString(),
     source,
   });

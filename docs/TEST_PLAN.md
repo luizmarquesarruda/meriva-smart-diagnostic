@@ -15,12 +15,14 @@ A branch mantém o fluxo OBD/ELM327 existente e inclui testes automatizados para
 | OBD-01 | Abrir o app sem adaptador ELM327 | ECU desconectada; leituras atuais mostram N/D; app não trava | testes de conectividade e inspeção Android |
 | OBD-02 | Bluetooth conectado, ECU sem resposta | Estado distinto de Bluetooth conectado; não declarar diagnóstico pronto | `tests/bluetoothState.test.js`, `tests/ecuHealth.test.js` |
 | OBD-03 | Perder ECU durante uma leitura | Encerrar/recuperar a sessão com erro explícito; nenhuma resposta ausente vira zero | testes de ciclo de vida ELM327 e validação física |
+| OBD-04 | `isConnected()` nativo demora indefinidamente, rejeita ou retorna desconectado durante TX/RX/fechamento | Estado nativo tem timeout finito; escrita é bloqueada se o estado não for confirmado; o timeout do RX não é estendido indefinidamente; fechamento pendente mantém bloqueio RFCOMM | `tests/connectionRecovery.test.js`, `tests/bluetoothLifecycle.test.js`, teste físico Android/ELM327 |
 | DATA-01 | Leitura ausente, inválida, futura ou vencida conforme a janela do recurso (10 s para contexto operacional; 30 s para autonomia) | Não exibir como leitura atual; usar N/D neutro e não classificar contexto a partir de timestamp futuro | `tests/regression.test.js`, `tests/liveTelemetry.test.js`, `tests/autonomyPresentation.test.js` |
 | GPS-02 | GPS recebe timestamp ausente, não finito, zero ou anterior/igual ao último fix válido | Descartar a amostra inteira; não usar `Date.now()` como substituto nem alterar contagem, velocidade ou distância; retomar com o próximo timestamp crescente | `tests/gps.test.js`, RG-38 |
 | DATA-02 | Autonomia sem nível de combustível atual válido, com timestamp ausente/inválido ou amostra do PID 012F acima de 30 s | Exibir N/D em todas as telas de estado atual; nunca presumir tanque cheio nem reutilizar amostra vencida ou autonomia persistida como atual | `tests/autonomyPresentation.test.js` |
 | DATA-03 | Sem internet, com ECU funcional | Diagnóstico local continua funcional; clima/rede falham de forma isolada | `tests/onlineConditions.test.js`, `tests/connectivity.test.js` |
 | NAV-01 | Navegar entre as cinco áreas principais | Um único conjunto de destinos, rótulos visíveis e alvos acessíveis | `tests/cockpitNavigation.test.js` |
 | NAV-02 | Girar aparelho entre retrato e paisagem | Conteúdo e navegação continuam acessíveis; sem sobreposição crítica | `tests/orientationLayout.test.js` |
+| COCKPIT-01 | Abrir cockpit com DTCs presentes/ausentes e PID 010B válido/ausente | Não repetir contagem/status DTC na página inicial; mostrar pressão do coletor apenas com leitura real válida e recente, caso contrário N/D; DTC continua na página Saúde | `tests/cockpitNavigation.test.js`, `tests/liveTelemetry.test.js` |
 | DTC-01 | Ler DTC sem ECU conectada, com NO DATA, timeout ou quadro inválido/incompleto | Exibir erro/N/D; nunca declarar “nenhum DTC” nem tornar DTC anterior inativo sem resposta válida | `tests/dtcScanner.test.js`, `tests/regression.test.js` e gate de baseline |
 | DTC-02 | Limpar DTC | Confirmar a ação destrutiva, informar sucesso/erro conforme resposta ECU | teste automatizado com transporte simulado e teste físico |
 | SPLASH-01 | Inicialização fria de APK nativo | Fundo e imagem de marca corretos; transição para o app sem tela vazia persistente | gate de baseline verifica plugin, caminho e assinatura PNG; inspeção visual em Android instalado continua obrigatória |
@@ -95,6 +97,21 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 - Antes desse limiar, usar apenas uma média histórica positiva válida; se não existir, apresentar N/D, nunca transformar amostra insuficiente em consumo alto.
 - CI automatizada não substitui teste físico com ELM327/ECU; validar no veículo a resposta real do PID 012F e a estabilidade da autonomia.
 
+## PID-AI-01 — Proveniência, frescor e rastreabilidade do diagnóstico local
+
+- Catalogar todas as entradas em `pids.json` e confirmar correspondência exata com `formulas.json` e `ranges.json`; nenhum PID duplicado, fórmula inexistente, unidade ausente ou payload divergente.
+- Ao avaliar a IA, aceitar somente origem explícita `REAL`/`REAL_OBD` conforme o contrato da telemetria do app, sem converter fonte desconhecida/importada em real. Rejeitar origem `SIMULACAO`, baseline/seed, telemetria derivada, valor nulo/não finito, faixa inválida, timestamp futuro ou leitura com mais de 45 s por padrão.
+- Normalizar o identificador antes da validação da faixa: `01 0B` e `010B` devem apontar para a mesma faixa; espaços não podem permitir que um valor impossível passe na triagem.
+- DTC cuja origem não seja `REAL_OBD`, cujo status não esteja ativo ou que esteja marcado `historical=true` não pode gerar hipótese atual. Duplicatas do mesmo DTC/evidência não podem aumentar pontuação.
+- Exibir score e LOW/MEDIUM/HIGH como pontuação/nível qualitativo heurístico, nunca como probabilidade de defeito. Não apresentar sistema normal só por inexistência de hipótese: exigir ECU respondendo na sessão atual e dados OBD reais recentes; sem isso, exibir dados insuficientes.
+- PID 0101: testar MIL, contador DTC, estado de monitores comuns, suporte por monitor e mapas distintos para ciclo Otto/SI e diesel/CI; bits de incompletude não devem acusar monitores não suportados. Preservar interpretação semântica no autosave/TXT e não exibir o U32 empacotado como medição.
+- Testes de sensores: pelo menos cinco tentativas numeradas distintas e cinco respostas válidas para um resultado conclusivo; timestamp inválido/futuro e número de tentativa duplicado não contam. Falha/timeout não vira zero nem aprovação.
+- A CI deve validar gate anti-regressão, TypeScript e suíte completa no mesmo SHA. Após build, verificar a tela Saúde/Dados/Laboratório no APK. A confirmação de qualquer novo PID na Meriva exige resposta RAW da ECU; validação física do sensor requer evidência adicional e não é inferida do bitmap ou do valor escalado.
+
+### Decisão de cobertura
+
+O catálogo atual contém 34 PIDs, 20 fórmulas, 34 faixas e 30 avaliações de sensores. Quatro PIDs (`0101`, `0130`, `0131`, `0151`) não têm avaliação de sensor própria, por se tratarem de estado/código/contador e não terem uma regra de teste operacional dedicada. Somente `010C` possui resposta RAW_ECU documentada para a Meriva; dez PIDs são apenas candidatos. Expandir o catálogo requer, em lote controlado, fórmula/documentação, bytes, unidade, faixa, parser vector, política de polling, custo de descoberta e evidência por veículo. Nunca marcar PID padronizado como suportado apenas porque está definido em JSON.
+
 ## NET-WEATHER-01 — Atualização de localização/clima por conectividade
 - Com internet disponível em Wi-Fi ou rede celular (4G/5G), carregar clima/localidade sem solicitar permissão de localização nova.
 - Atualizar após retornar de offline para online e no ciclo de 15 minutos; eventos de rede repetidos não podem disparar requisições concorrentes nem refresh contínuo.
@@ -102,6 +119,49 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 - Em falha após leitura anterior, limpar a temperatura como dado atual, preservar apenas a última localidade e apresentar estado de atualização indisponível/desatualizado.
 - Ao desmontar a tela, remover listener e temporizador; nenhuma atualização pode alterar estado depois da desmontagem.
 - A tela e o motor de diagnóstico local devem continuar disponíveis offline e independentes da atualização de clima.
+
+## BT-CONN-08 — Resposta KWP real e validação de checksum
+
+- Entrada compacta SEARCHING...\n84F111410C0000D3 para PID 010C: reconhecer o cabeçalho KWP, validar comprimento e checksum, preservar os bytes brutos e retornar 0 rpm como valor válido porque existe payload completo.
+- Repetir no formato espaçado 84 F1 11 41 0C 00 00 D3; ambos devem produzir a mesma interpretação.
+- Alterar checksum para D2, truncar a resposta ou acrescentar byte após D3: rejeitar como valor não interpretado. Não declarar ECU conectada a partir de um marcador 41 0C sem payload.
+- Testes: tests/pidParserIntegrity.test.js e tests/elm327Compatibility.test.js.
+
+## BT-CONN-09 — Recuperação, retry e mensagem de estado
+
+- Usar 3 tentativas padrão por adaptador e intervalo de 1500 ms. Após esgotar a varredura de protocolos sem resposta válida ao PID 010C, avançar ao próximo candidato pareado, sem repetir indefinidamente o mesmo adaptador.
+- Recuperação usa ATDP para mapear o protocolo conhecido (KWP 5-baud → ATSP4; KWP fast → ATSP5; ISO 9141 → ATSP3; CAN/J1850 conforme identificado); protocolo desconhecido retorna a ATSP0.
+- Sem 41 0C válido, a interface deve mostrar ECU sem resposta, não presumir falha do rádio Bluetooth. Sem ECU/leitura real válida, telemetria e autonomia continuam N/D.
+- Testes: tests/bluetoothConfig.test.js, tests/elm327Compatibility.test.js e tests/projectBaseline.test.js.
+
+## UI-COCKPIT-07 — Rotação e cockpit em paisagem
+
+- Permitir retrato/paisagem conforme a configuração do Android (expo.orientation: default) e a chamada ScreenOrientation.unlockAsync; remover o listener ao desmontar.
+- Em paisagem, usar faixa superior horizontal para título/conexão e clima/rede; cockpit de um lado e sessão de conexão em coluna compacta do outro. A navegação muda para raia vertical à direita para não consumir a altura que os quadrantes precisam.
+- Manter os quatro quadrantes principais simultaneamente visíveis numa grade 2×2 em ambas as orientações. Em paisagem, reduzir gaps e padding e ajustar a altura dos cartões sem diminuir rótulos/dicas dos quadrantes abaixo de 8 dp nem a instrução/rótulos auxiliares abaixo de 7 dp. Valores, unidades e estado N/D não podem ser cortados. A navegação passa da parte inferior para a lateral direita; reservar área sem cobrir quadrantes. Compactar os cartões auxiliares sem ocultá-los, limitar o espaçador e preservar sessão/dados durante a rotação. Não introduzir ScrollView ou lock fixo.
+- Testes: tests/orientationLayout.test.js e tests/cockpitNavigation.test.js devem validar configuração livre, estilos de duas colunas, raia lateral, compactação e presença dos cinco destinos.
+- Ensaio final no Galaxy A06: ativar Rotação automática no Android; alternar retrato→paisagem→retrato, confirmar que o carrossel continua a alternar a cada 10 s, setas, leitura dos quatro quadrantes e as cinco abas, sem clipping nem sobreposição.
+## UI-SCREEN-01 — Auditoria de layout e informação duplicada
+- A Central de Saúde mostra cada contador de integridade uma única vez e obtém Bluetooth/ECU do estado ao vivo compartilhado, não de flags persistidas.
+- O Laboratório fica focado em consulta de PID, descoberta, varredura DTC, integridade do decodificador e evidência técnica; não repete o resumo de distância/consumo/autonomia da viagem.
+- Armazenamento mostra quota, fila de logs, exportação e limpeza; a lista canônica de viagens e seus detalhes ficam em /viagens.
+- Uma tela sem navegação fixa não deve reservar espaço vertical para essa navegação. Revisar JSX aninhado/fechamento de views e remover estilos/estado mortos após retirar componentes repetidos.
+- Testes: tests/orientationLayout.test.js, tests/cockpitNavigation.test.js e tests/projectBaseline.test.js; inspeção visual ainda é necessária no Android real.
+
+## UI-COCKPIT-05 — Carrossel completo dos PIDs na área principal
+
+- A primeira página mantém em ordem fixa quatro quadrantes principais: 0105 (temperatura), 0142 (tensão), 0111 (posição da borboleta) e 010C (RPM).
+- Os demais PIDs suportados e catalogados são incluídos no mesmo carrossel, quatro por página; todos devem ser alcançáveis sem lacunas nem duplicações. A quantidade depende da bitmap anunciada pela ECU; PIDs não suportados não são apresentados como leituras disponíveis.
+- O carrossel tem setas acessíveis de página anterior/próxima, retorna circularmente ao início e avança automaticamente a cada 10 segundos. Alertas entre os PIDs adicionais podem subir na ordem das páginas sem deslocar os quatro indicadores principais.
+- Sem ECU ou leitura REAL/RESPONDEU válida, finita e recente, manter os quadrantes em N/D; não preencher com seed, histórico ou valores simulados.
+- Testes: tests/cockpitTelemetry.test.js percorre os 20 PIDs de referência; tests/orientationLayout.test.js e tests/projectBaseline.test.js protegem a interface.
+
+## UI-COCKPIT-04 — Quadrantes simultâneos e navegação de PIDs
+
+- O cockpit deve exibir ao mesmo tempo uma grade 2×2 para os indicadores principais: PID 0105 (temperatura), 0142 (tensão), 0111 (borboleta) e 010C (RPM). Não substituir a grade por um único número grande que alterna a cada 10 s.
+- PIDs adicionais anunciados e catalogados permanecem disponíveis em páginas de quatro quadrantes, com prioridade visual para anomalias; a página muda por toque no cabeçalho ou automaticamente a cada 10 s. A última página pode ter posições vazias, mas elas devem ser rotuladas como sem PID, nunca como leitura.
+- Cada valor só pode vir de amostra REAL/RESPONDEU, finita, com timestamp válido e dentro da janela de frescor. Sem ECU ou amostra recente, exibir N/D e estado explicativo; não usar seed ou histórico como telemetria atual.
+- Testes: tests/cockpitTelemetry.test.js valida paginação/retorno circular e tests/projectBaseline.test.js impede regressão para o mostrador único.
 
 ## AUDIT-HARDENING-01 — Integridade e recuperação de dados
 
@@ -118,3 +178,18 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 - Buffer RX: exceder 16 KiB precisa gerar erro explícito, limitar diagnósticos a 256 caracteres e permitir receber um próximo quadro válido.
 - Buffer de descoberta: FIFO limitado, normalização, capacidade ajustável e isolamento por execução.
 - Aceitação física: comparar capturas RAW do ELM327/ECU para confirmar framing/checksum e precisão; testes sintéticos não substituem validação no veículo.
+
+
+## GPS-BG-02 — Lifecycle and timestamp recovery
+- A sample with a valid timestamp must be newer than the last accepted timestamp, including a sample whose coordinates were accepted but whose accuracy was unknown. Verify NaN, duplicate and regressive timestamps are rejected without changing sample count or distance.
+- After a regressive/invalid sample, recovery is permitted only with a strictly increasing timestamp.
+- The Expo Location test double must implement `hasStartedLocationUpdatesAsync`, `startLocationUpdatesAsync`, and `stopLocationUpdatesAsync`; do not let a caught TypeError stand in for a native lifecycle test.
+- Verify background task start, stop, and reuse when a native task is already active after JavaScript context recreation. Confirm no duplicate task registration and no retained watchdog timer after stop.
+- Physical validation remains required for Android foreground/background execution and permission transitions; mocked TaskManager/Location APIs are not a hardware or OS lifecycle test.
+
+
+## GPS-MOTION-04 — Movimento urbano em callbacks de 1 segundo
+- Com quatro posições GPS válidas a intervalos de 1 s, deslocamento aproximado de 2,8 m por segmento (10 km/h) e precisão de 5 m, confirmar movimento após três segmentos consecutivos sem exigir 8 m em cada segmento isolado.
+- Exigir deslocamento líquido do início ao fim da janela maior ou igual ao limite de precisão calculado; segmentos individuais acima de 250 m, velocidade incoerente, precisão inválida ou intervalo excessivo quebram a janela.
+- Confirmar que zigue-zague/jitter parado não aumenta a distância e que a distância só é adicionada após a confirmação da janela.
+- Ensaiar também no veículo, comparando com odômetro/percurso conhecido. O teste sintético não substitui validação de precisão GNSS no Android 16.

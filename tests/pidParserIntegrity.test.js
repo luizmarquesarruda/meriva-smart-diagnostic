@@ -76,6 +76,14 @@ assert.equal(parser.parsePidResponse('010C', '48 6B 10 41 0C 1A F8 82').status, 
   'checksum aditivo incorreto deve ser rejeitado');
 assert.equal(parser.parsePidResponse('010C', '486B10410C1AF82299').status, 'VALOR NÃO INTERPRETADO',
   'envelope K-Line compacto não pode ignorar bytes após o checksum');
+const kwpCompactResponse = parser.parsePidResponse('010C', 'SEARCHING...\n84F111410C0000D3');
+assert.equal(kwpCompactResponse.status, 'RESPONDEU', 'quadro KWP real deve passar pelo parser e checksum');
+assert.equal(kwpCompactResponse.value, 0, 'payload 00 00 é uma resposta real válida de 0 RPM, não dado ausente');
+assert.deepEqual(kwpCompactResponse.rawBytes, [0x84, 0xF1, 0x11, 0x41, 0x0C, 0x00, 0x00, 0xD3]);
+assert.equal(parser.parsePidResponse('010C', '84 F1 11 41 0C 00 00 D3').value, 0, 'KWP espaçado deve ser aceito');
+assert.equal(parser.parsePidResponse('010C', '84F111410C0000D2').status, 'VALOR NÃO INTERPRETADO', 'checksum KWP incorreto deve ser rejeitado');
+assert.equal(parser.parsePidResponse('010C', '84 F1 11 41 0C 00 00 D2').status, 'VALOR NÃO INTERPRETADO');
+assert.equal(parser.parsePidResponse('010C', '84F111410C0000D3FF').status, 'VALOR NÃO INTERPRETADO', 'byte excedente KWP deve ser rejeitado');
 assert.equal(parser.parsePidResponse('010C', '7E804410C1AF8').value, 1726,
   'resposta CAN compacta deve validar o ID e o DLC antes do payload');
 assert.equal(parser.parsePidResponse('010C', '18DAF11004410C1AF8').value, 1726,
@@ -142,6 +150,34 @@ for (const [formulaId, bytes, expected] of formulaVectors) {
   assert.ok(Math.abs(actual - expected) < 1e-9,
     `fórmula ${formulaId}: esperado ${expected}, recebido ${actual}`);
 }
+const sparkStatus = parser.parsePidResponse('0101', '41 01 80 13 21 00');
+assert.equal(sparkStatus.status, 'RESPONDEU');
+assert.match(sparkStatus.interpretation, /MIL=ON/);
+assert.match(sparkStatus.interpretation, /MISFIRE/);
+assert.match(sparkStatus.interpretation, /CATALISADOR/);
+assert.match(sparkStatus.interpretation, /O2/);
+assert.doesNotMatch(sparkStatus.interpretation, /EVAP/,
+  'bit de EVAP não deve ser inferido quando o mapa diz que EVAP não foi suportado');
+
+const dieselStatus = parser.parsePidResponse('0101', '41 01 00 19 29 00');
+assert.match(dieselStatus.interpretation, /MOTOR=DIESEL\/CI/);
+assert.match(dieselStatus.interpretation, /CATALISADOR_NMHC/);
+assert.match(dieselStatus.interpretation, /PRESSAO_TURBO/);
+assert.match(dieselStatus.interpretation, /SENSOR_GASES_ESCAPE/);
+assert.doesNotMatch(dieselStatus.interpretation, /EVAP|CATALISADOR_AQUECIDO/,
+  'byte C/D tem semântica diferente em motores diesel');
+
+const completeSparkMonitors = parser.parsePidResponse('0101', '41 01 00 00 21 21');
+assert.match(completeSparkMonitors.interpretation, /INCOMPLETOS=NENHUM/,
+  'D=1 significa monitor concluído, não incompleto');
+const incompleteSparkMonitors = parser.parsePidResponse('0101', '41 01 00 00 21 00');
+assert.match(incompleteSparkMonitors.interpretation, /CATALISADOR/);
+assert.match(incompleteSparkMonitors.interpretation, /O2/);
+
+const unsupportedCommon = parser.parsePidResponse('0101', '41 01 00 10 00 FF');
+assert.match(unsupportedCommon.interpretation, /INCOMPLETOS=NENHUM/,
+  'bit de incompletude não informa monitor se o bit de suporte estiver desligado');
+
 assert.equal(parser.parsePidResponse('010C', '41 0C 1A F8').value, 1726,
   'RPM Mode 01 deve aplicar (A*256+B)/4');
 assert.equal(parser.parsePidResponse('0110', '41 10 03 E8').value, 10,

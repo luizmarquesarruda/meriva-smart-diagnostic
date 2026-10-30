@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'expo-router';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
@@ -28,8 +29,6 @@ import {
   getAutoSaveState,
 } from '../src/meriva/autosaveManager';
 import { forceSaveOnObdEvent, registerObdQuery } from '../src/meriva/autosaveIntegration';
-import { runLocalDiagnostic, type DiagnosticResult } from '../src/diagnostics/diagnosticEngine';
-import type { PidObservation } from '../src/types/sourceTypes';
 
 type Mode = 'REAL' | 'SIMULACAO';
 
@@ -55,11 +54,6 @@ export default function LaboratorioScreen() {
   const [supportedPids, setSupportedPids] = useState<string[]>([]);
   const [dtcCodes, setDtcCodes] = useState<string[]>([]);
   const [fuelUsedL, setFuelUsedL] = useState(0);
-  const [tripDistanceKm, setTripDistanceKm] = useState(0);
-  const [tripFuelUsedL, setTripFuelUsedL] = useState(0);
-  const [tripConsumptionKml, setTripConsumptionKml] = useState<number | null>(null);
-  const [tripActive, setTripActive] = useState(false);
-  const [tripFuelSupported, setTripFuelSupported] = useState<boolean | null>(null);
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const [dtcScan, setDtcScan] = useState<DtcServiceScan[]>([]);
   const [dtcScanning, setDtcScanning] = useState(false);
@@ -73,12 +67,7 @@ export default function LaboratorioScreen() {
 
   useEffect(() => {
     const unsubscribeTrip = autoTripService.subscribe((trip) => {
-      setTripActive(trip.active);
-      setTripFuelSupported(trip.connected ? trip.fuelSupported : null);
-      setTripDistanceKm(trip.distanceKm);
-      setTripFuelUsedL(trip.fuelUsedL);
       setFuelUsedL(trip.fuelUsedL);
-      setTripConsumptionKml(trip.consumptionKml);
       if (trip.error) setError(trip.error);
     });
 
@@ -225,14 +214,7 @@ export default function LaboratorioScreen() {
       // A conexão já fez a descoberta. Não repita a varredura imediatamente.
       const discovered = connected.supportedPids;
       setSupportedPids(discovered);
-      const fuelSupported = discovered.includes('015E');
-      setTripFuelSupported(fuelSupported);
-      setTripActive(true);
-      setStatus(
-        fuelSupported
-          ? connected.protocol ? 'VIAGEM AUTOMÁTICA / GPS + PID 015E' : 'VIAGEM AUTOMÁTICA / PROTOCOLO N/D'
-          : 'VIAGEM AUTOMÁTICA / GPS, SEM PID 015E',
-      );
+      setStatus('ECU VALIDADA / DIAGNÓSTICO DISPONÍVEL');
     } catch (cause) {
       const failedSession = sessionRef.current;
       sessionRef.current = null;
@@ -242,8 +224,6 @@ export default function LaboratorioScreen() {
         // sessão já encerrada ou transporte indisponível
       }
       setProtocol('N/D');
-      setTripFuelSupported(null);
-      setTripActive(false);
       setStatus('ELM NÃO RESPONDE');
       setError(cause instanceof Error ? cause.message : 'FALHA AO CONECTAR AO ELM327');
     }
@@ -260,10 +240,6 @@ export default function LaboratorioScreen() {
       } else {
         await activeSession?.close();
       }
-      setTripFuelSupported(null);
-      setTripConsumptionKml(null);
-      setTripDistanceKm(0);
-      setTripFuelUsedL(0);
       setFuelUsedL(0);
       setStatus('BLUETOOTH OK / ELM DESCONECTADO');
     } catch (cause) {
@@ -501,19 +477,7 @@ export default function LaboratorioScreen() {
     { pid: '012D', name: 'Erro do EGR', formula: 'FUEL_TRIM', bytes: [0xFF], expected: '99,21875%' },
     { pid: '015D', name: 'Tempo de injeção', formula: 'INJECTION_TIMING', bytes: [0xFF, 0xFF], expected: '301,9921875°' },
   ].map((item) => ({ ...item, result: decodeFormula(item.formula, item.pid, item.bytes) }));
-  const diagnostic: DiagnosticResult = runLocalDiagnostic({
-    observations: getAutoSaveState().lastReadings.map((reading): PidObservation => ({
-      pid: reading.pid,
-      name: reading.name,
-      value: reading.value,
-      unit: reading.unit,
-      source: reading.source === 'SIMULACAO' ? 'SIMULACAO' : 'REAL_OBD',
-      timestamp: reading.timestamp,
-      confidence: reading.source === 'SIMULACAO' ? 'LOW' : 'GOOD',
-    })),
-    dtcs: getAutoSaveState().dtcs,
-    condition: getVehicleConditionSnapshot().condition,
-  });
+
 
   return (
     <SafeAreaView style={{flex:1,backgroundColor:COLORS.screen}} edges={["top","bottom","left","right"]}>
@@ -527,20 +491,6 @@ export default function LaboratorioScreen() {
         <View style={styles.connectionItem}><Text style={styles.connectionLabel}>PIDs</Text><Text style={styles.connectionValue}>{supportedPids.length || 'N/D'}</Text></View>
       </View>
       {!storageReady ? <Text style={styles.warning}>PREPARANDO AUTOSAVE...</Text> : null}
-      <View style={[styles.tripPanel, layout.landscape && styles.tripPanelLandscape]}>
-        <View style={styles.tripHeader}>
-          <Text style={styles.tripTitle}>VIAGEM AUTOMÁTICA</Text>
-          <Text style={tripActive ? styles.live : styles.muted}>{tripActive ? 'GRAVANDO' : 'AGUARDANDO'}</Text>
-        </View>
-        <View style={[styles.tripGrid, layout.landscape && styles.tripGridLandscape]}>
-          <View style={[styles.tripMetric, layout.landscape && styles.tripMetricLandscape]}><Text style={styles.tripLabel}>DISTÂNCIA GPS</Text><Text style={styles.tripValue}>{tripDistanceKm.toFixed(2)} km</Text></View>
-          <View style={[styles.tripMetric, layout.landscape && styles.tripMetricLandscape]}><Text style={styles.tripLabel}>CONSUMO</Text><Text style={styles.tripValue}>{tripConsumptionKml == null ? 'N/D' : tripConsumptionKml.toFixed(2) + ' km/L'}</Text></View>
-          <View style={[styles.tripMetric, layout.landscape && styles.tripMetricLandscape]}><Text style={styles.tripLabel}>PID 015E</Text><Text style={styles.tripValue}>{tripFuelSupported === null ? 'N/D' : (tripFuelSupported ? 'OK' : 'NÃO')}</Text></View>
-          <View style={[styles.tripMetric, layout.landscape && styles.tripMetricLandscape]}><Text style={styles.tripLabel}>AUTONOMIA ESTIMADA</Text><Text style={styles.tripValue}>{autoTripService.getState().estimatedRangeKm > 0 ? autoTripService.getState().estimatedRangeKm.toFixed(0) + ' km' : autoTripService.getState().fuelLevelPercent === 0 && autoTripService.getState().fuelLevelReadAtMs != null ? '0 km' : 'N/D'}</Text></View>
-        </View>
-        <Text style={styles.tripHelp}>Sem botão iniciar. O app registra somente dados reais válidos.</Text>
-      </View>
-
       <View style={[styles.modeRow, layout.landscape && styles.rowLandscape]}>
         <TouchableOpacity style={[styles.modeButton, mode === 'REAL' && styles.active]} onPress={() => setMode('REAL')}>
           <Text style={styles.modeText}>REAL</Text>
@@ -553,7 +503,7 @@ export default function LaboratorioScreen() {
       {mode === 'REAL' ? (
         <>
           <TouchableOpacity style={[styles.button, layout.landscape && styles.flexButton]} onPress={loadDevices} disabled={loadingDevices || !storageReady}>
-            {loadingDevices ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>LISTAR PAREADOS</Text>}
+            {loadingDevices ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.buttonText}>LISTAR PAREADOS</Text>}
           </TouchableOpacity>
 
           {devices.map((device) => (
@@ -669,28 +619,15 @@ export default function LaboratorioScreen() {
         </View>
       ) : null}
 
-      <View style={styles.aiPanel}>
-        <View style={styles.aiHeader}>
-          <Text style={styles.aiTitle}>DIAGNÓSTICO DA IA LOCAL</Text>
-          <Text style={styles.aiEngine}>EVIDÊNCIAS v{diagnostic.version}</Text>
-        </View>
-        {diagnostic.hypotheses.length === 0 ? (
-          <Text style={styles.aiMuted}>Nenhuma hipótese com evidência suficiente neste momento.</Text>
-        ) : diagnostic.hypotheses.map((hypothesis) => (
-          <View key={hypothesis.id} style={styles.hypothesis}>
-            <Text style={styles.hypothesisTitle}>{hypothesis.label}</Text>
-            <Text style={styles.hypothesisConfidence}>CONFIANÇA: {hypothesis.confidence} · SCORE: {hypothesis.score.toFixed(2)}</Text>
-            {hypothesis.evidence.map((item, index) => (
-              <Text key={`e-${hypothesis.id}-${index}`} style={styles.aiLine}>• Evidência: {item.text}</Text>
-            ))}
-            {hypothesis.nextTests.map((item) => <Text key={`t-${hypothesis.id}-${item}`} style={styles.aiLine}>→ Próximo teste: {item}</Text>)}
-          </View>
-        ))}
-        {diagnostic.blockedSimulationSamples > 0 ? (
-          <Text style={styles.aiWarning}>SIMULAÇÃO BLOQUEADA: {diagnostic.blockedSimulationSamples} amostra(s) não aumentaram a confiança.</Text>
-        ) : null}
-        <Text style={styles.aiDisclaimer}>{diagnostic.disclaimer}</Text>
-      </View>
+      <Link href="/saude" asChild>
+        <TouchableOpacity
+          style={styles.secondaryButton}
+          accessibilityRole="button"
+          accessibilityLabel="Abrir Central de Saúde com hipóteses e evidências"
+        >
+          <Text style={styles.secondaryButtonText}>ABRIR CENTRAL DE SAÚDE · HIPÓTESES E EVIDÊNCIAS</Text>
+        </TouchableOpacity>
+      </Link>
 
       <TouchableOpacity style={styles.secondaryButton} onPress={() => setShowTechnicalDetails((value) => !value)}>
         <Text style={styles.secondaryButtonText}>{showTechnicalDetails ? 'OCULTAR DETALHES TÉCNICOS' : 'DETALHES TÉCNICOS'}</Text>
@@ -725,7 +662,7 @@ export default function LaboratorioScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, paddingTop: 16, paddingBottom: 132, backgroundColor: COLORS.screen },
+  container: { flexGrow: 1, paddingTop: 16, paddingBottom: 30, backgroundColor: COLORS.screen },
   title: { ...SCREEN_TITLE_STYLE, marginBottom: 6 },
   status: { color: COLORS.primary, fontWeight: '700', marginBottom: 6 },
   protocol: { color: COLORS.textMuted, fontWeight: '600', marginBottom: 8 },
@@ -736,12 +673,10 @@ const styles = StyleSheet.create({
   modeRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
   rowLandscape: { alignItems: 'stretch' },
   flexButton: { flex: 1 },
-  tripPanelLandscape: { padding: 14 },
-  tripGridLandscape: { flexWrap: 'nowrap', gap: 12 },
   commandCardLandscape: { maxWidth: 620 },
   modeButton: { flex: 1, padding: 10, borderRadius: 7, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center' },
   modeText: { color: COLORS.text, fontWeight: '900', fontSize: 11 },
-  active: { backgroundColor: '#152a45', borderColor: '#2563eb' },
+  active: { backgroundColor: '#152a45', borderColor: COLORS.primary },
   simActive: { backgroundColor: '#352b16', borderColor: COLORS.warning },
   commandCard: { backgroundColor: COLORS.surface, borderRadius: 8, padding: 11, marginBottom: 10, borderWidth: 1, borderColor: COLORS.border },
   commandTitle: { color: COLORS.text, fontSize: 12, fontWeight: '900', marginBottom: 7 },
@@ -752,32 +687,10 @@ const styles = StyleSheet.create({
   disabledButton: { backgroundColor: '#26374b', borderWidth: 1, borderColor: COLORS.border, opacity: 0.72 },
   buttonText: { color: COLORS.textStrong, fontWeight: '700' },
   device: { backgroundColor: COLORS.surface, borderRadius: 10, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: COLORS.border },
-  selected: { borderColor: '#2563eb', borderWidth: 2 },
+  selected: { borderColor: COLORS.primary, borderWidth: 2 },
   deviceName: { fontWeight: '700', color: COLORS.text },
   warning: { color: COLORS.warning, marginBottom: 12 },
   input: { backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 12, color: COLORS.text },
-  tripPanel: { backgroundColor: COLORS.surface, borderRadius: 10, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: COLORS.border },
-  tripHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  tripTitle: { color: COLORS.text, fontWeight: '900', fontSize: 14 },
-  tripGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  tripMetric: { width: '48%', marginBottom: 8 },
-  tripMetricLandscape: { width: '23%', marginBottom: 0 },
-  tripLabel: { color: COLORS.textSubtle, fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
-  tripValue: { color: COLORS.text, fontWeight: '800', fontSize: 16, marginTop: 2 },
-  live: { color: COLORS.success, fontWeight: '900', fontSize: 10 },
-  muted: { color: COLORS.textSubtle, fontWeight: '900', fontSize: 10 },
-  tripHelp: { color: COLORS.textSubtle, fontSize: 11, marginTop: 2 },
-  aiPanel: { backgroundColor: COLORS.surface, borderRadius: 10, padding: 13, marginBottom: 10, borderWidth: 1, borderColor: '#315579' },
-  aiHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  aiTitle: { color: COLORS.accent, fontWeight: '900', fontSize: 14 },
-  aiEngine: { color: COLORS.textSubtle, fontSize: 9, fontWeight: '800' },
-  hypothesis: { borderTopWidth: 1, borderTopColor: COLORS.border, paddingTop: 9, marginTop: 8 },
-  hypothesisTitle: { color: COLORS.text, fontWeight: '900', fontSize: 14 },
-  hypothesisConfidence: { color: COLORS.primary, fontWeight: '800', fontSize: 11, marginTop: 3 },
-  aiLine: { color: '#c2d0df', fontSize: 11, marginTop: 4 },
-  aiMuted: { color: COLORS.textSubtle, fontSize: 11 },
-  aiWarning: { color: COLORS.warning, fontWeight: '800', fontSize: 11, marginTop: 9 },
-  aiDisclaimer: { color: COLORS.textSubtle, fontSize: 10, marginTop: 9 },
   dtcPanel: { backgroundColor: COLORS.surface, borderRadius: 10, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: COLORS.border },
   dtcTitle: { color: COLORS.accent, fontSize: 13, fontWeight: '900', marginBottom: 6 },
   dtcRow: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: COLORS.border, paddingVertical: 8 },
@@ -806,6 +719,6 @@ const styles = StyleSheet.create({
   formulaValue: { color: COLORS.text, fontSize: 11, fontWeight: '900', marginBottom: 3 },
   panel: { backgroundColor: COLORS.surface, borderRadius: 14, padding: 16, marginTop: 8 },
   label: { color: COLORS.accent, marginTop: 8 },
-  value: { color: '#f8fafc', fontSize: 16, marginTop: 3 },
+  value: { color: COLORS.textStrong, fontSize: 16, marginTop: 3 },
   error: { color: COLORS.danger, marginTop: 16 },
 });

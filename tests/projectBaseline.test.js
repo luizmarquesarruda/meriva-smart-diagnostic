@@ -25,10 +25,13 @@ const liveTelemetry = read('src/obd/liveTelemetry.ts');
 const weatherRefresh = read('src/weather/conditionsRefresh.ts');
 const gpsTracker = read('src/gps/gpsTracker.ts');
 const diagnostics = read('src/diagnostics/diagnosticEngine.ts');
+const healthScreen = read('app/saude.tsx');
 const sensorEngine = read('src/diagnostics/sensorTestEngine.ts');
 const projectContract = read('docs/CONTRATO_ANTI_REGRESSAO.md');
 const diary = read('docs/DIARIO_DE_BORDO.md');
 const theme = read('src/ui/theme.ts');
+const csvEncoding = read('src/storage/csvEncoding.ts');
+const diagnosticsExporter = read('src/storage/exportDiagnostics.ts');
 
 // Gate itself must be a first-class CI step, not a note in the diary.
 assert.equal(packageJson.scripts['gate:baseline'], 'node tests/projectBaseline.test.js');
@@ -63,6 +66,7 @@ const requiredSuites = [
   'backgroundExecution.test.js',
   'tripRecorder.test.js',
   'autosaveTxtFormatter.test.js',
+  'csvEncoding.test.js',
   'merivaAutosave.test.js',
   'onlineConditions.test.js',
   'autonomyPresentation.test.js',
@@ -105,6 +109,8 @@ assert.match(projectContract, /fila serial única/i);
 // Bluetooth recovery must stay bounded and must never race an unconfirmed native socket.
 const bluetoothRecovery = read('src/obd/connectionRecovery.ts');
 const bluetoothTransport = read('src/obd/bluetoothClassicTransport.ts');
+assert.match(csvEncoding, /formulaLikeText/);
+assert.match(diagnosticsExporter, /escapeCsvCell/);
 assert.match(bluetoothRecovery, /awaitNativeCleanupRetry/);
 assert.match(bluetoothTransport, /awaitNativeCleanupRetry/);
 assert.match(bluetoothTransport, /MAX_ELM_RX_BUFFER_CHARS\s*=\s*16\s*\*\s*1024/);
@@ -118,8 +124,20 @@ assert.match(bluetoothRadioPolicy, /STOP_RADIO_STATE_UNKNOWN/);
 assert.match(projectContract, /\| RG-34 \|/, 'radio recovery must remain a documented acceptance invariant');
 assert.match(projectContract, /\| RG-37 \|/, 'concurrent RFCOMM waiters must remain a documented invariant');
 assert.match(projectContract, /\| RG-38 \|/, 'GPS must reject invalid/out-of-order timestamps');
+const retryContract = JSON.parse(read('src/knowledge/bluetooth_config.json'));
+assert.equal(retryContract.retry.maxAttempts, 3, 'retry padrão permanece limitado a três tentativas');
+assert.equal(retryContract.retry.intervalMs, 1500, 'retry padrão não reintroduz espera de 8 s');
+assert.ok(read('src/obd/elm327Compatibility.ts').includes('getRecoveryProtocolCommand'), 'recuperação precisa usar o protocolo identificado');
+assert.ok(read('src/obd/elm327.ts').includes("const parsedProbe = parsePidResponse('010C', probe.response)"), 'recuperação exige parse completo de 010C');
+assert.ok(read('src/obd/bluetoothManager.ts').includes('ELM_PROTOCOL_FALLBACKS'), 'fallback inclui protocolos OBD clássicos');
+assert.ok(read('src/obd/parser.ts').includes('compactKwpHeader') && read('src/obd/parser.ts').includes('const isKwpHeader'), 'parser precisa validar KWP compacto e espaçado');
+assert.ok(read('app/index.tsx').includes('ECU SEM RESPOSTA'), 'UI precisa separar falha ECU de falha de rádio');
+assert.ok(read('app/index.tsx').includes('CONECTE A ECU PARA LIBERAR OS QUADRANTES'), 'os quadrantes devem continuar visíveis sem ECU, com valores N/D e instrução de conexão');
+assert.match(projectContract, /\| RG-42 \|/, 'recuperação KWP/ECU precisa do contrato RG-42');
+assert.ok(read('docs/TEST_PLAN.md').includes('BT-CONN-08'), 'teste de quadro KWP precisa permanecer no plano');
+assert.ok(read('docs/TEST_PLAN.md').includes('BT-CONN-09'), 'teste de retry e estado ECU precisa permanecer no plano');
 assert.match(gpsTracker, /!Number\.isFinite\(location\.timestamp\) \|\| location\.timestamp <= 0/);
-assert.match(gpsTracker, /location\.timestamp <= this\.previous\.timestamp/);
+assert.match(gpsTracker, /location\.timestamp <= this\.state\.lastTimestamp/);
 assert.doesNotMatch(gpsTracker, /timestamp:\s*Date\.now\(\)/, 'GPS must not fabricate timestamps');
 const regressionRequirementIds = [...projectContract.matchAll(/^\| (RG-\d{2}) \|/gm)].map((match) => match[1]);
 assert.ok(regressionRequirementIds.length > 0, 'o contrato anti-regressão não pode ficar vazio');
@@ -172,6 +190,17 @@ assert.match(weatherRefresh, /CURRENT_CONDITIONS_REFRESH_INTERVAL_MS/);
 assert.match(weatherRefresh, /isInternetReachable !== false/);
 assert.match(weatherRefresh, /inFlight/, 'weather refresh must not overlap concurrent HTTP requests');
 assert.match(diagnostics, /diagnostic_rules\.json/);
+assert.match(diagnostics, /MAX_DIAGNOSTIC_OBSERVATION_AGE_MS = 45_000/);
+assert.match(diagnostics, /normalizeDiagnosticSource/);
+assert.ok(diagnostics.includes('item.derived === true'), 'telemetria derivada não pode alimentar a IA');
+assert.ok(diagnostics.includes('item.historical !== true'), 'DTC histórico não pode gerar hipótese atual');
+assert.match(healthScreen, /getSharedObdStatus/);
+assert.match(read('src/obd/parser.ts'), /CATALISADOR_NMHC/);
+assert.match(read('src/meriva/autosaveState.ts'), /interpretation\?: string/);
+assert.match(read('app/dados.tsx'), /STATUS OBD-II/);
+assert.match(read('tests/diagnosticEngine.test.js'), /timestamp futuro/);
+assert.match(read('tests/pidParserIntegrity.test.js'), /MOTOR=DIESEL/);
+assert.match(read('tests/sensorTestEngine.test.js'), /números de leitura duplicados/);
 assert.doesNotMatch(diagnostics, /currentConditions|open-meteo|https?:\/\//i);
 assert.match(home, /loadCurrentConditions/);
 assert.match(read('tests/onlineConditions.test.js'), /offline/);
@@ -233,6 +262,13 @@ assert.equal(app.expo.name, 'Smart OBD Diagnostic', 'a marca do app não deve fi
 
 // Current cockpit expectations that previously regressed.
 assert.match(home, /buildCockpitPidMetrics/, 'cockpit deve consumir o modelo dinâmico de PIDs');
+assert.match(home, /quadrantDefinitions/, 'o cockpit deve manter quatro indicadores simultâneos');
+assert.match(home, /getCockpitMetricPage/, 'os PIDs extras devem continuar acessíveis por páginas');
+assert.match(home, /const visibleHeroMetrics: CockpitPidMetric\[\] = \[\.\.\.primaryMetrics, \.\.\.orderedAdditionalMetrics\]/, 'os quatro quadrantes fixos devem vir antes dos PIDs adicionais');
+assert.match(home, /Página anterior dos PIDs/);
+assert.match(home, /Próxima página dos PIDs/);
+assert.match(home, /quadrantGrid/, 'o cockpit deve preservar a grade de quadrantes');
+assert.doesNotMatch(home, /selectedHeroMetric/, 'não regredir para um único mostrador rotativo');
 for (const label of [
   'TEMPERATURA DO MOTOR',
   'VOLTAGEM DO SISTEMA',
@@ -261,8 +297,8 @@ assert.ok(!tripService.includes('estimatedRangeKm: persistedAutonomy.estimatedRa
 assert.match(dataScreen, /label="AUTONOMIA" value=\{trip\.estimatedRangeKm > 0/);
 assert.match(dataScreen, /trip\.fuelLevelPercent === 0 && trip\.fuelLevelReadAtMs != null/,
   'a current, valid empty-tank reading must show 0 km instead of N/D');
-assert.match(laboratory, /fuelLevelPercent === 0/,
-  'laboratory autonomy must distinguish a valid zero range from unavailable data');
+assert.doesNotMatch(laboratory, /tripPanel|label=\"AUTONOMIA ESTIMADA\"/,
+  'laboratory must not repeat the current trip summary already available in cockpit and data screens');
 assert.doesNotMatch(dataScreen, /label="AUTONOMIA" value=\{state\.autonomy\.estimatedRangeKm/, 'real-time screen must not show persisted range as current');
 assert.ok(!home.includes('actionGrid') && !home.includes('dashboardAction'),
   'cockpit não deve duplicar destinos em uma segunda fileira de ações');
@@ -283,6 +319,9 @@ assert.match(testPlan, /DATA-02/);
 assert.match(testPlan, /SPLASH-01/);
 assert.match(testPlan, /teste físico/);
 assert.match(read('docs/CONTRATO_ANTI_REGRESSAO.md'), /\| RG-20 \|/);
+assert.match(projectContract, /\| RG-40 \|/);
+assert.match(projectContract, /\| RG-41 \|/);
+assert.match(testPlan, /PID-AI-01/);
 assert.match(projectContract, /\| RG-33 \|/, 'trip consumption used for autonomy must be reliability-gated');
 assert.match(read('docs/TEST_PLAN.md'), /PID-AUTO-01/);
 

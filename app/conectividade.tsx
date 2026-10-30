@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import * as Location from 'expo-location';
 import NetInfo from '@react-native-community/netinfo';
 import { Link } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -8,17 +9,36 @@ import { AppIcon } from '../src/ui/AppIcon';
 import { COLORS, SCREEN_TITLE_STYLE } from '../src/ui/theme';
 import { getNetworkPresentation } from '../src/network/networkStatus';
 import { useNetworkStatus } from '../src/network/useNetworkStatus';
+import { getLocationProviderPresentation, normalizeLocationProviderSnapshot, type LocationProviderPresentation } from '../src/network/locationProviders';
 
 export default function ConectividadeScreen() {
   const layout = useMidLayout();
   const snapshot = useNetworkStatus();
   const [refreshing, setRefreshing] = useState(false);
   const [refreshFailed, setRefreshFailed] = useState(false);
+  const [providerPresentation, setProviderPresentation] = useState<LocationProviderPresentation | null>(null);
+  const [providerStatusFailed, setProviderStatusFailed] = useState(false);
+
+  const refreshLocationProviders = useCallback(async () => {
+    try {
+      const status = await Location.getProviderStatusAsync();
+      setProviderPresentation(getLocationProviderPresentation(normalizeLocationProviderSnapshot(status)));
+      setProviderStatusFailed(false);
+    } catch {
+      setProviderPresentation(null);
+      setProviderStatusFailed(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshLocationProviders();
+  }, [refreshLocationProviders]);
 
   const refreshNetwork = async () => {
     setRefreshing(true);
     try {
       await NetInfo.refresh();
+      await refreshLocationProviders();
       setRefreshFailed(false);
     } catch {
       setRefreshFailed(true);
@@ -70,6 +90,17 @@ export default function ConectividadeScreen() {
             <InfoCard title="GERAÇÃO MÓVEL" value={presentation.generationLabel} />
             <InfoCard title="TARIFAÇÃO" value={presentation.meteredLabel} />
             <InfoCard title="SINAL WI-FI" value={presentation.signalLabel} />
+          </View>
+          <Text style={styles.section}>PROVEDORES DE LOCALIZAÇÃO DO ANDROID</Text>
+          <View style={[styles.infoGrid,layout.landscape && styles.infoGridLandscape]}>
+            <InfoCard title="SERVIÇOS DE LOCALIZAÇÃO" value={providerPresentation?.servicesLabel ?? 'CONSULTANDO…'} />
+            <InfoCard title="GPS / GNSS" value={providerPresentation?.gpsLabel ?? 'N/D'} />
+            <InfoCard title="PROVEDOR PELA REDE" value={providerPresentation?.networkLabel ?? 'N/D'} />
+          </View>
+          <View style={styles.infoCard}>
+            <Text style={styles.infoBody}>{providerPresentation?.explanation ?? 'O Android ainda não informou o estado dos provedores. O Meriva Smart não usa barras 4G/5G como coordenadas.'}</Text>
+            {providerStatusFailed ? <Text style={styles.refreshError}>Não foi possível consultar os provedores de localização. O diagnóstico OBD permanece disponível.</Text> : null}
+            <Text style={styles.infoBody}>A disponibilidade do provedor não confirma qual fonte produziu uma posição nem sua precisão. O cálculo de viagem deve aceitar apenas amostras GPS que passem pelos filtros já existentes.</Text>
           </View>
           <Text style={styles.section}>DIAGNÓSTICO OFFLINE</Text>
           <View style={styles.infoCard}>

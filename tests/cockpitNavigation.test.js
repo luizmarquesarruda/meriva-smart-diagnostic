@@ -12,7 +12,8 @@ assert.match(laboratory, /AGUARDANDO CONEXÃO ELM327/, 'tela OBD não deve chama
 assert.match(laboratory, /getSharedObdConnection\(\) \? 'ECU CONECTADA \/ DIAGNÓSTICO DISPONÍVEL' : 'AGUARDANDO CONEXÃO ELM327'/, 'estado inicial deve refletir a conexão real');
 assert.match(laboratory, /disabledButton/, 'botão de desconexão precisa ter estilo visual explícito quando desabilitado');
 assert.match(laboratory, /ELM327 DESCONECTADO/, 'botão desabilitado deve comunicar que não existe sessão ativa');
-assert.match(laboratory, /paddingBottom: 132/, 'conteúdo rolável deve reservar espaço para a navegação inferior fixa');
+assert.match(laboratory, /paddingBottom: 30/, 'Laboratório sem navegação fixa deve usar margem final normal');
+assert.doesNotMatch(laboratory, /paddingBottom: 132/, 'não reservar altura para uma barra inferior que a tela não renderiza');
 for (const route of ['/dados', '/laboratorio', '/mais', '/viagens', '/conectividade']) assert.match(index, new RegExp(route.replace('/', '\\/')), 'cockpit deve expor a rota ' + route);
 assert.doesNotMatch(index, /href="\/saude"/, 'saúde detalhada não deve duplicar o cartão na página inicial');
 assert.match(more, /'\/saude'/, 'a central de saúde deve continuar acessível em Mais Recursos');
@@ -25,8 +26,13 @@ for (const file of ['app/dados.tsx', 'app/saude.tsx', 'app/mais.tsx', 'app/veicu
 assert.doesNotMatch(index, /\}, \[isHydrated, settings\]\);/, 'objeto settings inteiro não pode reiniciar o efeito de conexão');
 assert.match(index, /settings\?\.elmMaxConnectionAttempts/, 'efeito deve reagir às opções OBD efetivamente alteradas');
 assert.match(index, /bottomNavLandscape/, 'navegação inferior deve continuar disponível em paisagem');
+assert.match(index, /screenFrameLandscape/, 'a tela deve reservar espaço para a navegação lateral em paisagem');
+assert.match(index, /bottomNavLandscape:\{position:'absolute',right:0,top:0,bottom:20,width:50/, 'as cinco abas devem caber na raia lateral direita em paisagem');
+assert.match(index, /screenFrameLandscape:\{paddingRight:56/, 'cockpit deve reservar espaço à direita para a navegação lateral');
+assert.match(index, /styles\.bottomNavItemLandscape/, 'alvos de toque da raia lateral devem ter tamanho reduzido mas acessível');
+
 assert.doesNotMatch(index, /!layout\.landscape\s*&&\s*\(/, 'navegação não deve desaparecer ao girar o aparelho');
-assert.doesNotMatch(index, /<Text style=\{\[styles\.bottomNavText, styles\.bottomNavTextActive\]\}>Painel<\/Text>/, 'navegação inferior deve usar ícones sem legenda visual');
+for (const label of ['Painel', 'Diagnóstico', 'Dados', 'Viagens', 'Mais']) { assert.ok(index.includes('>' + label + '</Text>'), 'navegação deve exibir rótulo visível: ' + label); }
 for (const label of ['Painel, tela atual', 'Diagnóstico', 'Dados', 'Viagens', 'Mais recursos']) {
   assert.ok(index.includes('accessibilityLabel="' + label + '"'), 'aba deve manter rótulo acessível: ' + label);
 }
@@ -78,6 +84,11 @@ assert.match(dataScreen, /telemetrySamples/, 'histórico deve reutilizar amostra
 assert.match(dataScreen, /VIAGENS SALVAS/, 'tela deve oferecer modo interativo de histórico');
 assert.match(read('app/saude.tsx'), /runLocalDiagnostic/);
 assert.match(read('app/saude.tsx'), /activeDtcs/);
+assert.doesNotMatch(index, /FALHAS ATIVAS|SEM DTC|\bDTC\b/, 'cockpit não deve duplicar o resumo de DTC da tela Saúde');
+assert.match(index, /label="PRESSÃO DO COLETOR"/, 'o terceiro cartão do cockpit deve mostrar uma métrica diferente da página DTC');
+assert.match(index, /item\.pid === '010B'/, 'pressão do coletor deve vir do PID 010B real');
+assert.match(index, /item\.status !== 'RESPONDEU'/, 'leituras sem resposta OBD válida não podem alimentar o cartão de pressão');
+assert.match(index, /manifoldPressureKpa != null \? manifoldPressureKpa\.toFixed\(0\) \+ ' kPa' : 'N\/D'/, 'pressão do coletor inválida ou ausente deve aparecer como N/D');
 assert.match(read('app/aprendizado.tsx'), /realSamples/);
 assert.match(read('app/laboratorio.tsx'), /03 \/ 07 \/ 0A/);
 assert.match(read('app/bluetooth.tsx'), /SAÚDE DO ELM327/);

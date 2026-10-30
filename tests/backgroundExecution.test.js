@@ -54,7 +54,11 @@ assert(shared.includes('stopBackgroundMonitoring()'));
 assert(layout.includes("import '../src/gps/backgroundLocationTask';"));
 assert(!layout.includes('const startGps ='), 'layout não deve iniciar GPS independentemente da ECU');
 assert(!layout.includes('startGps(settings.diagnosticAlerts)'), 'startup não deve criar trilha GPS sem ECU');
-assert(autoTrip.includes('await this.ensureGpsForEcu()'), 'serviço de viagem inicia GPS somente após a ECU responder');
+assert(autoTrip.includes('this.scheduleGpsStart(generation)'), 'GPS startup is scheduled only after ECU validation');
+assert(!autoTrip.includes('await this.ensureGpsForEcu()'), 'GPS startup must not block serial OBD polling');
+assert(autoTrip.includes('this.gpsStartPromise'), 'GPS must use a single in-flight startup owner');
+assert(autoTrip.includes('GPS_START_RETRY_COOLDOWN_MS'), 'failed GPS startup must be throttled instead of prompting every OBD cycle');
+assert(autoTrip.includes('if (!generationIsCurrent())'), 'late GPS startup must be cleaned after the trip/ECU generation ends');
 assert(autoTrip.includes('await this.stopGpsForEcu()'), 'serviço de viagem para GPS quando ECU perde resposta/desconecta');
 assert(autoTrip.includes("if (!getSharedObdStatus().ecuConnected)"), 'gravação deve exigir estado ECU conectado');
 

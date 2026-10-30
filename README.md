@@ -1,6 +1,6 @@
-# SMART OBD DIAGNOSTIC
+# MERIVA SMART
 
-Aplicativo Android offline de diagnóstico OBD-II com marca Smart OBD Diagnostic. O perfil do veículo e as especificações específicas permanecem configuráveis conforme o carro conectado.
+Repositório e linha de desenvolvimento: MERIVA SMART. O rótulo do aplicativo Expo permanece `Smart OBD Diagnostic`, genérico para permitir configurar diferentes veículos; o perfil Chevrolet Meriva é o foco de validação atual, não uma restrição do motor OBD.
 
 As especificações físicas e de manutenção do veículo são mantidas em `src/database/merivaManual.ts`, com referência ao Manual do Proprietário Chevrolet Meriva 2012.
 
@@ -153,18 +153,12 @@ A suíte automatizada cobre autosave, parser, DTC, descoberta de PIDs, fila de c
 **Evidência antes de conclusão.**
 
 
-<!-- CI validation: 2026-10-06 -->
 ## Engenharia ELM327
 
 A camada Bluetooth usa o transporte nativo do react-native-bluetooth-classic com `connectionType: delimited`, **delimiter vazio** (`delimiter: ''`) e `charset: ascii`. O aplicativo mantém um buffer local e conclui a resposta no prompt `>` do ELM327; os bytes que sobrarem depois do primeiro prompt no mesmo evento são registrados como cauda obsoleta e descartados para impedir que clones contaminem o próximo comando. O TX termina em CR. O termo RAW no projeto significa preservar TX/RX recebidos, não o modo de framing do socket.
 
 A inicialização separa Bluetooth, ELM e ECU. A sonda real de referência da ECU é `010C -> 41 0C`; `ATI` é uma consulta best-effort e não deve ser tratada como requisito universal para clones. A arquitetura de transporte está em `docs/ELM327_ENGINEERING_PLAYBOOK.md`; o inventário de fórmulas/PIDs e a auditoria de desempenho estão em `docs/RELATORIO_PIDS_E_FORMULAS.md`.
 
-## Validação CI
-
-Este commit é um gatilho técnico para confirmar que o workflow `.github/workflows/ci.yml` continua disparando em `push` e executando a validação e o build Android nativo.
-
-O teste de transporte Bluetooth usa `connectionType: delimited`, `delimiter: \r` e buffering local até o prompt `>`. Esse contrato corresponde ao código atual e é protegido pela regressão automatizada.
 
 ## Execução em segundo plano
 

@@ -30,9 +30,19 @@ const MAX_ACCURACY_M = 30;
 const MAX_SPEED_KMH = 220;
 const MIN_MOVEMENT_SPEED_KMH = 5;
 const MIN_MOVEMENT_DISTANCE_M = 8;
+const MAX_ACCEPTED_SEGMENT_KM = 0.25;
 const STOP_SPEED_KMH = 2;
 const MIN_MOVING_SAMPLES = 3;
 const MAX_SEGMENT_GAP_MS = 5_000;
+export const GPS_FIX_STALE_AFTER_MS = 5_000;
+const GPS_STALENESS_WATCHDOG_INTERVAL_MS = 1_000;
+const VEHICLE_SPEED_HINT_STALE_AFTER_MS = 5_000;
+
+export interface GpsTrackerOptions {
+  now?: () => number;
+  setIntervalFn?: (handler: () => void, delayMs: number) => ReturnType<typeof setInterval>;
+  clearIntervalFn?: (handle: ReturnType<typeof setInterval>) => void;
+}
 
 function movementThresholdM(sample: GpsSample, previous: GpsSample): number {
   const accuracies = [sample.accuracyM, previous.accuracyM].filter(
@@ -97,7 +107,81 @@ export class GpsTracker {
   private readonly listeners = new Set<GpsListener>();
   private consecutiveMovingSamples = 0;
   private pendingMovingDistanceKm = 0;
+  private pendingMovingStart: GpsSample | null = null;
+  private movementEstablished = false;
   private vehicleSpeedHintKmh: number | null = null;
+  private vehicleSpeedHintAtMs: number | null = null;
+  private lastAccurateFixReceivedAtMs: number | null = null;
+  private stalenessWatchdog: ReturnType<typeof setInterval> | null = null;
+  private readonly now: () => number;
+  private readonly setIntervalFn: (handler: () => void, delayMs: number) => ReturnType<typeof setInterval>;
+  private readonly clearIntervalFn: (handle: ReturnType<typeof setInterval>) => void;
+
+  constructor(options: GpsTrackerOptions = {}) {
+    this.now = options.now ?? Date.now;
+    this.setIntervalFn = options.setIntervalFn ?? setInterval;
+    this.clearIntervalFn = options.clearIntervalFn ?? clearInterval;
+  }
+
+  private getFreshVehicleSpeedHintKmh(): number | null {
+    if (this.vehicleSpeedHintKmh == null || this.vehicleSpeedHintAtMs == null) return null;
+    const ageMs = this.now() - this.vehicleSpeedHintAtMs;
+    return ageMs >= 0 && ageMs <= VEHICLE_SPEED_HINT_STALE_AFTER_MS
+      ? this.vehicleSpeedHintKmh
+      : null;
+  }
+
+  private startStalenessWatchdog(): void {
+    if (this.stalenessWatchdog) return;
+    this.stalenessWatchdog = this.setIntervalFn(
+      () => this.handleStaleFixWatchdog(),
+      GPS_STALENESS_WATCHDOG_INTERVAL_MS,
+    );
+  }
+
+  private stopStalenessWatchdog(): void {
+    if (this.stalenessWatchdog) this.clearIntervalFn(this.stalenessWatchdog);
+    this.stalenessWatchdog = null;
+  }
+
+  private handleStaleFixWatchdog(): void {
+    if (!this.state.running) return;
+
+    const fixAgeMs = this.lastAccurateFixReceivedAtMs == null
+      ? Number.POSITIVE_INFINITY
+      : this.now() - this.lastAccurateFixReceivedAtMs;
+    if (fixAgeMs >= 0 && fixAgeMs < GPS_FIX_STALE_AFTER_MS) return;
+
+    // Never bridge a GPS outage with accumulated/interpolated movement.
+    this.previous = null;
+    this.consecutiveMovingSamples = 0;
+    this.pendingMovingDistanceKm = 0;
+    this.pendingMovingStart = null;
+    this.movementEstablished = false;
+
+    // GPS can become stale while valid OBD speed keeps arriving. Keep these
+    // sources distinct: preserve only a fresh OBD speed and mark GNSS as stale.
+    const hintedSpeed = this.getFreshVehicleSpeedHintKmh();
+    const speedKmh = hintedSpeed != null && hintedSpeed >= STOP_SPEED_KMH
+      ? Number(hintedSpeed.toFixed(1))
+      : 0;
+    const speedSource: GpsTripState['speedSource'] = speedKmh > 0 ? 'OBD' : 'PARADO';
+    const error = 'SINAL GPS SEM FIX ATUAL';
+    const changed = this.state.currentSpeedKmh !== speedKmh
+      || this.state.speedSource !== speedSource
+      || this.state.signalQuality !== 'SEM_FIX'
+      || this.state.lastAccuracyM !== null
+      || this.state.error !== error;
+    this.state = {
+      ...this.state,
+      currentSpeedKmh: speedKmh,
+      lastAccuracyM: null,
+      signalQuality: 'SEM_FIX',
+      speedSource,
+      error,
+    };
+    if (changed) this.emit();
+  }
 
   private state: GpsTripState = {
     running: false,
@@ -154,8 +238,11 @@ export class GpsTracker {
         speedSource: 'PARADO',
       };
       this.previous = null;
+      this.lastAccurateFixReceivedAtMs = null;
       this.consecutiveMovingSamples = 0;
       this.pendingMovingDistanceKm = 0;
+      this.pendingMovingStart = null;
+      this.movementEstablished = false;
       this.emit();
     }
 
@@ -176,6 +263,7 @@ export class GpsTracker {
       }
       this.backgroundTaskRunning = true;
       this.state = { ...this.state, running: true, error: null };
+      this.startStalenessWatchdog();
       this.emit();
       return true;
     } catch (cause) {
@@ -212,6 +300,7 @@ export class GpsTracker {
       speedKmh != null && Number.isFinite(speedKmh) && speedKmh >= 0 && speedKmh <= MAX_SPEED_KMH
         ? speedKmh
         : null;
+    this.vehicleSpeedHintAtMs = this.vehicleSpeedHintKmh == null ? null : this.now();
   }
 
   private getSignalQuality(accuracyM: number | null): GpsTripState['signalQuality'] {
@@ -286,8 +375,11 @@ export class GpsTracker {
       speedSource: 'PARADO',
     };
     this.previous = null;
+    this.lastAccurateFixReceivedAtMs = null;
     this.consecutiveMovingSamples = 0;
     this.pendingMovingDistanceKm = 0;
+    this.pendingMovingStart = null;
+    this.movementEstablished = false;
     this.emit();
 
     try {
@@ -300,6 +392,7 @@ export class GpsTracker {
         },
         (location) => this.handleLocation(location),
       );
+      this.startStalenessWatchdog();
       return true;
     } catch (cause) {
       this.subscription = null;
@@ -323,9 +416,10 @@ export class GpsTracker {
       !Number.isFinite(c.latitude) || !Number.isFinite(c.longitude) ||
       c.latitude < -90 || c.latitude > 90 ||
       c.longitude < -180 || c.longitude > 180 ||
-      !Number.isFinite(location.timestamp) || location.timestamp <= 0
+      !Number.isFinite(location.timestamp) || location.timestamp <= 0 ||
+      location.timestamp > this.now()
     ) return;
-    if (this.previous && location.timestamp <= this.previous.timestamp) return;
+    if (this.state.lastTimestamp != null && location.timestamp <= this.state.lastTimestamp) return;
 
     const sample: GpsSample = {
       latitude: c.latitude,
@@ -340,6 +434,8 @@ export class GpsTracker {
     };
 
     const accurate = isAccurate(sample);
+    if (accurate) this.lastAccurateFixReceivedAtMs = this.now();
+    const vehicleSpeedHintKmh = this.getFreshVehicleSpeedHintKmh();
     let derivedSpeedKmh: number | null = null;
 
     if (this.previous && accurate && isAccurate(this.previous)) {
@@ -349,34 +445,65 @@ export class GpsTracker {
         derivedSpeedKmh = segmentKm / (elapsedMs / 3600000);
 
         const segmentDistanceM = segmentKm * 1000;
+        const confidenceDistanceM = movementThresholdM(sample, this.previous);
+        // A 1 s GPS callback at 10 km/h moves only ~2.8 m. Requiring 8 m
+        // in every segment rejects ordinary urban movement. Use a time-scaled
+        // segment floor, then confirm the full three-segment window by net displacement.
+        const timeBasedMinimumM = (MIN_MOVEMENT_SPEED_KMH * elapsedMs) / 3600;
+        const minimumSegmentDistanceM = Math.max(
+          1,
+          Math.min(confidenceDistanceM * 0.5, timeBasedMinimumM),
+        );
+        const reportedSpeedConfirmsMovement = vehicleSpeedHintKmh != null
+          ? vehicleSpeedHintKmh >= MIN_MOVEMENT_SPEED_KMH
+          : sample.speedKmh != null &&
+            sample.speedKmh >= MIN_MOVEMENT_SPEED_KMH &&
+            sample.speedKmh <= MAX_SPEED_KMH;
         const derivedMoving =
-          segmentDistanceM >= movementThresholdM(sample, this.previous) &&
+          segmentKm <= MAX_ACCEPTED_SEGMENT_KM &&
+          segmentDistanceM >= minimumSegmentDistanceM &&
           derivedSpeedKmh >= MIN_MOVEMENT_SPEED_KMH &&
           derivedSpeedKmh <= MAX_SPEED_KMH &&
-          (this.vehicleSpeedHintKmh != null
-            ? this.vehicleSpeedHintKmh >= MIN_MOVEMENT_SPEED_KMH
-            : sample.speedKmh != null &&
-              sample.speedKmh >= MIN_MOVEMENT_SPEED_KMH &&
-              sample.speedKmh <= MAX_SPEED_KMH);
+          reportedSpeedConfirmsMovement;
 
         if (derivedMoving) {
+          if (this.consecutiveMovingSamples === 0) this.pendingMovingStart = this.previous;
           this.consecutiveMovingSamples += 1;
-          if (segmentKm <= 0.25) this.pendingMovingDistanceKm += segmentKm;
+          this.pendingMovingDistanceKm += segmentKm;
+
+          const start = this.pendingMovingStart ?? this.previous;
+          const netDisplacementKm = haversineDistanceKm(start, sample);
+          const requiredNetDisplacementM = movementThresholdM(sample, start);
+          if (
+            this.consecutiveMovingSamples >= MIN_MOVING_SAMPLES &&
+            Number.isFinite(netDisplacementKm) &&
+            netDisplacementKm * 1000 >= requiredNetDisplacementM
+          ) {
+            this.state.distanceKm = Number(
+              (this.state.distanceKm + this.pendingMovingDistanceKm).toFixed(3),
+            );
+            this.pendingMovingDistanceKm = 0;
+            this.pendingMovingStart = sample;
+            this.movementEstablished = true;
+          }
         } else {
           this.consecutiveMovingSamples = 0;
           this.pendingMovingDistanceKm = 0;
-        }
-
-        if (derivedMoving && this.consecutiveMovingSamples >= MIN_MOVING_SAMPLES) {
-          this.state.distanceKm = Number(
-            (this.state.distanceKm + this.pendingMovingDistanceKm).toFixed(3),
-          );
-          this.pendingMovingDistanceKm = 0;
+          this.pendingMovingStart = null;
+          this.movementEstablished = false;
         }
       } else if (elapsedMs > MAX_SEGMENT_GAP_MS) {
         this.consecutiveMovingSamples = 0;
         this.pendingMovingDistanceKm = 0;
+        this.pendingMovingStart = null;
+        this.movementEstablished = false;
       }
+    } else if (!accurate) {
+      // A low/unknown-accuracy fix breaks the consecutive-confirmation window.
+      this.consecutiveMovingSamples = 0;
+      this.pendingMovingDistanceKm = 0;
+      this.pendingMovingStart = null;
+      this.movementEstablished = false;
     }
 
     const movementConfirmed =
@@ -386,21 +513,23 @@ export class GpsTracker {
       derivedSpeedKmh != null &&
       derivedSpeedKmh >= MIN_MOVEMENT_SPEED_KMH &&
       derivedSpeedKmh <= MAX_SPEED_KMH &&
-      (this.vehicleSpeedHintKmh != null
-        ? this.vehicleSpeedHintKmh >= MIN_MOVEMENT_SPEED_KMH
+      (vehicleSpeedHintKmh != null
+        ? vehicleSpeedHintKmh >= MIN_MOVEMENT_SPEED_KMH
         : sample.speedKmh != null &&
           sample.speedKmh >= MIN_MOVEMENT_SPEED_KMH &&
           sample.speedKmh <= MAX_SPEED_KMH) &&
-      this.consecutiveMovingSamples >= MIN_MOVING_SAMPLES;
+      this.movementEstablished;
     let speedKmh = movementConfirmed
-      ? (sample.speedKmh != null && sample.speedKmh <= MAX_SPEED_KMH
-        ? sample.speedKmh
-        : (derivedSpeedKmh ?? 0))
+      ? (vehicleSpeedHintKmh != null
+        ? vehicleSpeedHintKmh
+        : sample.speedKmh != null && sample.speedKmh <= MAX_SPEED_KMH
+          ? sample.speedKmh
+          : (derivedSpeedKmh ?? 0))
       : 0;
     if (!Number.isFinite(speedKmh) || speedKmh < STOP_SPEED_KMH || speedKmh > MAX_SPEED_KMH) speedKmh = 0;
     const speedSource: GpsTripState['speedSource'] = speedKmh <= 0
       ? 'PARADO'
-      : this.vehicleSpeedHintKmh != null && this.vehicleSpeedHintKmh >= MIN_MOVEMENT_SPEED_KMH
+      : vehicleSpeedHintKmh != null && vehicleSpeedHintKmh >= MIN_MOVEMENT_SPEED_KMH
         ? 'OBD'
         : 'GPS';
 
@@ -420,13 +549,18 @@ export class GpsTracker {
   }
 
   async stop(options: { resetTrip?: boolean } = {}): Promise<void> {
+    this.stopStalenessWatchdog();
+    this.lastAccurateFixReceivedAtMs = null;
+    this.vehicleSpeedHintAtMs = null;
+    this.vehicleSpeedHintKmh = null;
     await this.stopBackgroundLocation();
     this.subscription?.remove();
     this.subscription = null;
     this.previous = null;
     this.consecutiveMovingSamples = 0;
     this.pendingMovingDistanceKm = 0;
-    this.vehicleSpeedHintKmh = null;
+    this.pendingMovingStart = null;
+    this.movementEstablished = false;
 
     if (options.resetTrip) {
       this.state = {

@@ -41,12 +41,9 @@
 
 ### UI
 
-`app/` contém as quatro áreas de uso do aplicativo:
+`app/` contém rotas separadas para splash/inicialização, cockpit, Bluetooth, conectividade, Saúde/DTC, Laboratório/consulta PID, Dados/telemetria, Viagens, Mais recursos, configurações, veículo, manutenção, aprendizado, armazenamento e testes de sensores. A lista de arquivos em `app/` é a referência operacional para o inventário de telas; não agrupar rotas distintas numa contagem fixa de áreas.
 
-1. **Início**: autonomia estimada, estado OBD/GPS, consumo, falhas e viagem atual.
-2. **Diagnóstico OBD**: conexão ELM327, consulta de PID, DTC e detalhes técnicos.
-3. **Histórico e dados**: espaço usado, limpeza e manutenção dos dados.
-4. **Configurações**: somente preferências básicas que fazem sentido para o motorista.
+O cockpit prioriza consumo e autonomia e não repete o resumo de DTC; códigos e estado diagnóstico detalhado pertencem à tela Saúde. Protocolo, respostas brutas e detalhes de engenharia pertencem ao Bluetooth/Laboratório.
 
 A interface usa um layout responsivo comum em `src/ui/midLayout.ts`. Em retrato, as informações ficam empilhadas; em paisagem, métricas e ações ocupam a largura disponível. Dados RAW e informações de engenharia ficam escondidos em detalhes técnicos para não poluir a tela de uso diário.
 
@@ -110,3 +107,12 @@ A disponibilidade dos PIDs, a qualidade do GPS e a comunicação com a ECU da Me
 ## Inicialização e splash screen nativa
 
 A tela nativa de abertura usa `assets/splash.png`, PNG transparente versionado, explicitamente referenciado pelo plugin `expo-splash-screen` em `app.json` (largura de 280 dp, fundo `#07111f`, `resizeMode: contain`). A configuração `expo.splash` legada aponta para a mesma imagem. A splash nativa é distinta da primeira tela React Native. O gate de baseline valida caminho/configuração/assinatura PNG e a CI valida a compilação; a inicialização fria instalada em dispositivo ainda exige inspeção visual separada.
+
+
+## Rede móvel e integração em nuvem — estado verificado
+
+A aplicação usa `@react-native-community/netinfo` para apresentar conectividade e `src/weather/` para enriquecimento opcional de localização/clima. A conectividade 4G/5G não alimenta as fórmulas OBD, velocidade ou distância.
+
+**Integração de telemetria em nuvem não está implementada nesta branch.** No inventário do repositório não existem `src/cloud/bubbleWorkflowContract.ts`, `src/cloud/bubbleWorkflowClient.ts` nem `docs/BUBBLE_WORKFLOW_PORT.md`, apesar de versões anteriores desta documentação os citarem. Não pressupor que login/sincronização Bubble, outbox ou fila persistente de uploads esteja disponível.
+
+Qualquer integração futura precisa definir endpoint/schema versionados, autenticação de usuário por credenciais de escopo mínimo, IDs de evento idempotentes, retenção/consentimento, timeout, política de retry com backoff, fila local durável e mecanismo de descarte/retentativa. A fonte operacional continua local; indisponibilidade de rede não pode parar Bluetooth/ELM327, GPS local, diagnóstico, cálculos ou autosave.

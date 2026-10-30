@@ -2,6 +2,75 @@
 
 ## Unreleased
 
+### GPS / background location
+- Corrigido o fixture de recuperação para respeitar o timestamp estritamente crescente após amostras com precisão desconhecida.
+- Expandido o mock de Expo Location e incluídos testes de start/stop/reuso da tarefa nativa de localização em segundo plano.
+- Corrigida a confirmação de movimento urbano: o limite por segmento considera o intervalo, enquanto a confirmação final exige três segmentos válidos e deslocamento líquido acima do limite de precisão.
+- Sincronizado o índice DB-NNN com os registros do Diário de Bordo sem afrouxar o gate anti-regressão.
+
+### Bluetooth Classic — limites de espera nativa
+- A verificação nativa `isConnected()` agora tem timeout finito em escrita e leitura; exceções/timeout não são ignorados e impedem TX quando o estado do socket é desconhecido.
+- O timeout de leitura limita a sonda nativa ao orçamento restante, e o fechamento do socket retorna após espera limitada sem liberar o bloqueio RFCOMM enquanto a limpeza nativa continua pendente.
+- Adicionados testes para operação nativa concluída, rejeitada e travada; incluída proteção de ciclo de vida e caso OBD-04 no plano de aceitação.
+- CI do novo SHA e ensaio físico no Galaxy A06/Android 16 + ELM327/ECU são necessários antes de integrar/distribuir.
+
+
+### Auditoria crítica do cockpit e das telas secundárias
+- Removidos contadores repetidos na Central de Saúde; a conexão Bluetooth/ECU agora é exibida a partir do estado ao vivo compartilhado.
+- Encurtado o estado de conexão no cabeçalho do cockpit, evitando repetir a mesma frase completa no cartão da sessão.
+- Retirado do Laboratório o resumo de viagem redundante e a reserva de 132 dp para uma barra fixa que não existia nessa tela.
+- A página Armazenamento aponta para o relatório canônico de viagens em vez de renderizar uma segunda lista de trajetos; título e categoria Mais agora a identificam como armazenamento/exportação, separada do histórico de viagens.
+- Corrigido o masthead da tela Viagens para usar a mesma marca `SMART OBD DIAGNOSTIC` da página inicial, removendo a divergência `MERIVA SMART DIAGNOSTIC`.
+- Configurações deixou de repetir motor, tanque e reserva da tela Veículo; apresenta agora um atalho para o perfil canônico.
+- Removida a segunda apresentação da IA local no Laboratório; a Central de Saúde passa a concentrar hipóteses/evidências e o Laboratório encaminha para ela mantendo consulta, descoberta e DTCs.
+- Atualizado o atalho da tela Viagens para “ARMAZENAMENTO E EXPORTAÇÃO”, sem o rótulo antigo que sugeria lista de trajetos duplicada.
+- Corrigidos o fechamento duplicado de contêiner na tela Armazenamento, estilos órfãos do painel removido e testes de layout frágeis.
+- Em paisagem, aumentada a tipografia dos rótulos/dicas dos quadrantes e métricas auxiliares para evitar o uso de textos de 6 dp quase ilegíveis, preservando a grade 2×2 compacta.
+
+### Cockpit em paisagem
+- Layout reorganizado em duas faixas horizontais: cabeçalho/clima no topo, cockpit ao lado do cartão de sessão e navegação vertical lateral.
+- Os quatro quadrantes continuam visíveis simultaneamente em grade 2×2 nas duas orientações; em paisagem, cartões, gaps, valores, rótulos e hints usam dimensões compactas sem ocultar métricas nem cortar dados. A navegação muda para a lateral direita.
+- Os cartões de consumo, autonomia e pressão também têm modo compacto em paisagem, sem remover nenhuma métrica.
+- A política de orientação continua livre e responsiva; nenhum lock fixo foi introduzido.
+
+### Cockpit — quadrantes restaurados
+- Retornada a grade simultânea 2×2 para temperatura, tensão do sistema, posição da borboleta e RPM.
+- Os demais PIDs continuam acessíveis por páginas de quatro indicadores, com anomalias priorizadas; os valores permanecem N/D sem leitura real, completa e recente.
+- A primeira página mantém os quatro indicadores principais em ordem fixa; o carrossel percorre os demais PIDs suportados com setas acessíveis de página anterior/próxima e avanço automático de 10 segundos.
+- Removido o mostrador único como substituto da grade e eliminado o cartão de arrefecimento duplicado.
+
+### Bluetooth Classic / ELM327 — regressão de resposta ECU
+- Reconhece quadros KWP compactos e espaçados com comprimento e checksum verificados, incluindo o trace 84F111410C0000D3; a confirmação da ECU exige payload completo do PID 010C.
+- Retry padrão limitado a três tentativas por adaptador, espaçadas em 1,5 s; recuperação usa o protocolo identificado em vez de forçar KWP fast em toda ECU KWP.
+- O cockpit diferencia ECU sem resposta de falha do rádio e não apresenta o placeholder OBD 1/1 como PID real. Os valores atuais continuam N/D sem evidência real válida.
+
+### Integração Bubble nativa
+- Portados os contratos dos workflows para um cliente HTTPS tipado; validações para fonte OBD real, PID/bytes, frescor, GPS, eventos idempotentes e respostas de duplicata/rejeição.
+- Nenhuma alteração foi feita no Bubble; sincronização automática segue desativada até provisionamento seguro de dispositivo e token.
+
+### PIDs e IA local
+- Endurecida a IA com origem explícita, bloqueio de leituras derivadas/antigas/futuras/inválidas, PID normalizado antes da validação de faixa, descarte de DTCs históricos e deduplicação de evidência.
+- Versionado o contrato do motor de evidências como v2; score e níveis LOW/MEDIUM/HIGH agora são descritos explicitamente como heurísticos, não probabilidades.
+- A tela Saúde só apresenta ausência de alertas quando a ECU está respondendo na sessão atual e há amostras reais recentes; caso contrário mostra dados insuficientes.
+- Corrigido o decode de PID 0101 para respeitar bits de suporte e diferenciar motores SI e CI; interpretação legível preservada no autosave/TXT e exibida em Dados no lugar do bitmap como número físico.
+- Corrigida a polaridade do byte D no PID 0101: bit 1 indica monitor concluído; bit 0 indica incompleto. A prontidão só é sinalizada como incompleta se o monitor for suportado.
+- Testes de sensores rejeitam tentativas numeradas duplicadas e timestamps futuros; adicionadas regressões para origem, frescor, histórico, PID 0101 e persistência da interpretação.
+
+
+### Rede móvel e localização Android
+- Tela Conectividade mostra o estado dos serviços de localização, do provedor GPS/GNSS e do provedor de localização pela rede informado pelo Android, sem solicitar permissões adicionais.
+- Adicionada normalização testável dos estados de provedor; valores ausentes permanecem desconhecidos.
+- Documentado que 4G/5G ajuda na conectividade e no diagnóstico do provedor, mas não substitui posições válidas para distância, velocidade ou autonomia.
+
+### Auditoria de obsolescência
+- Esclarecida a distinção entre o nome do projeto MERIVA SMART e o rótulo genérico `Smart OBD Diagnostic` do app Expo; corrigidas descrições antigas de navegação e framing Bluetooth.
+- Registrado débito de modernização do Expo SDK 51 e da API antiga de FileSystem; upgrade permanece separado até existir baseline físico de Bluetooth/GPS e plano de migração validado.
+
+### Cockpit
+- Removido o resumo de falhas/DTC do cockpit para evitar duplicação com a página Saúde.
+- O terceiro cartão agora mostra pressão do coletor (PID 010B) apenas com leitura real e recente; sem leitura válida, mostra N/D.
+- A navegação inferior do cockpit agora exibe rótulos visíveis para Painel, Diagnóstico, Dados, Viagens e Mais, mantendo nomes acessíveis e alvos de toque existentes.
+
 ### Integridade de telemetria GPS
 - Timestamps inválidos, repetidos ou regressivos são descartados sem fabricar uma marca temporal atual.
 

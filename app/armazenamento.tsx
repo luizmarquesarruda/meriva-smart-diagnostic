@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
@@ -7,8 +8,8 @@ import { checkStorageQuota, getStorageBreakdown, StorageQuotaConfig } from '../s
 import { cleanupOldLogs, cleanupOldReadings } from '../src/storage/cleanup';
 import { getMidLayout } from '../src/ui/midLayout';
 import { COLORS, SCREEN_TITLE_STYLE } from '../src/ui/theme';
-import { readDriveCycles } from '../src/storage/driveCycleStorage';
-import type { DriveCycle } from '../src/data/driveCycles';
+import { AppIcon } from '../src/ui/AppIcon';
+import { SourceStatusLegend } from '../src/ui/SourceStatusLegend';
 import { exportDiagnosticsJson, exportDriveCyclesCsv } from '../src/storage/exportDiagnostics';
 
 const DEFAULT_QUOTA: StorageQuotaConfig = {
@@ -27,7 +28,6 @@ export default function ArmazenamentoScreen() {
   const [csvQueueStatus, setCsvQueueStatus] = useState(getCsvQueueStatus());
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
-  const [cycles, setCycles] = useState<DriveCycle[]>([]);
 
   async function refresh(path: string) {
     setCsvQueueStatus(getCsvQueueStatus());
@@ -44,7 +44,6 @@ export default function ArmazenamentoScreen() {
       });
       setUsageBreakdown({});
     }
-    setCycles((await readDriveCycles(path)).filter((cycle) => cycle.source === 'REAL_OBD').sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()));
   }
 
   useEffect(() => {
@@ -99,8 +98,9 @@ export default function ArmazenamentoScreen() {
     <SafeAreaView style={{flex:1,backgroundColor:COLORS.screen}} edges={["top","bottom","left","right"]}>
     <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
       <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
-      <Text style={styles.title}>HISTÓRICO E DADOS</Text>
-      <Text style={styles.subtitle}>O app salva as viagens e leituras automaticamente. Esta tela serve para acompanhar o espaço usado e fazer limpeza quando necessário.</Text>
+      <Text style={styles.title}>ARMAZENAMENTO E EXPORTAÇÃO</Text>
+      <Text style={styles.subtitle}>Arquivos locais, fila de registros, espaço usado e exportações. Para ver trajetos, métricas e detalhes, abra Viagens.</Text>
+      <SourceStatusLegend compact />
       <Text style={[styles.status, quota?.critical ? styles.critical : quota?.warning ? styles.warning : styles.ok]}>
         {quota?.message || 'VERIFICANDO'}
       </Text>
@@ -121,25 +121,28 @@ export default function ArmazenamentoScreen() {
         </Text>
       </View>
       <View style={[styles.historyCard, layout.landscape && styles.dataColumnCard]}>
-        <Text style={styles.cardTitle}>VIAGENS SALVAS</Text>
-        {cycles.length ? cycles.slice(0, 6).map((cycle) => (
-          <View key={cycle.id} style={styles.historyRow}>
-            <View style={styles.historyMain}>
-              <Text style={styles.historyDate}>{cycle.startedAt}</Text>
-              <Text style={styles.historyMeta}>{cycle.distanceTotalKm.toFixed(2)} km • {(cycle.fuelDataValid !== false && Number.isFinite(cycle.fuelUsedL) && cycle.fuelUsedL >= 0.05 && Number.isFinite(cycle.avgFuelConsumptionKml) && cycle.avgFuelConsumptionKml > 0) ? `${cycle.avgFuelConsumptionKml.toFixed(2)} km/L` : 'Consumo: N/D'}</Text>
-            </View>
-            <Text style={cycle.source === 'REAL_OBD' ? styles.real : styles.reference}>{cycle.source === 'REAL_OBD' ? 'REAL' : 'REF.'}</Text>
-          </View>
-        )) : <Text style={styles.empty}>Nenhuma viagem salva ainda.</Text>}
+        <Text style={styles.cardTitle}>RELATÓRIOS DE VIAGENS</Text>
+        <Text style={styles.note}>A lista completa, os detalhes por percurso e os gráficos históricos ficam na área Viagens. Esta tela concentra o armazenamento local e as exportações.</Text>
+        <Link href="/viagens" asChild>
+          <TouchableOpacity style={[styles.button, styles.buttonWithIcon]} accessibilityRole="button" accessibilityLabel="Abrir relatórios de viagens">
+            <AppIcon name="trips" size={18} color={COLORS.white} />
+            <Text style={styles.buttonText}>ABRIR HISTÓRICO DE VIAGENS</Text>
+          </TouchableOpacity>
+        </Link>
       </View>
       </View>
 
       <View style={styles.exportRow}>
-        <TouchableOpacity style={styles.button} onPress={() => void handleExport('JSON')} disabled={!basePath || busy}><Text style={styles.buttonText}>EXPORTAR JSON</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.button} onPress={() => void handleExport('CSV')} disabled={!basePath || busy}><Text style={styles.buttonText}>EXPORTAR CSV</Text></TouchableOpacity>
+        <TouchableOpacity style={[styles.button, styles.buttonWithIcon]} onPress={() => void handleExport('JSON')} disabled={!basePath || busy}>
+          <AppIcon name="history" size={18} color={COLORS.white} /><Text style={styles.buttonText}>EXPORTAR JSON</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.button, styles.buttonWithIcon]} onPress={() => void handleExport('CSV')} disabled={!basePath || busy}>
+          <AppIcon name="data" size={18} color={COLORS.white} /><Text style={styles.buttonText}>EXPORTAR CSV</Text>
+        </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={styles.button} onPress={handleClean} disabled={!basePath || busy}>
+      <TouchableOpacity style={[styles.button, styles.buttonWithIcon]} onPress={handleClean} disabled={!basePath || busy}>
+        <AppIcon name="warning" size={18} color={COLORS.white} />
         <Text style={styles.buttonText}>{busy ? 'LIMPANDO...' : 'LIMPAR DADOS ANTIGOS'}</Text>
       </TouchableOpacity>
       </View>
@@ -159,22 +162,23 @@ const styles = StyleSheet.create({
   ok: { color: '#16a34a' },
   warning: { color: '#d97706' },
   critical: { color: '#dc2626' },
-  cleanMessage: { color: '#e5edf7', marginBottom: 12 },
-  historyCard: { backgroundColor: '#111c2e', borderRadius: 8, padding: 11, borderWidth: 1, borderColor: '#243652', marginBottom: 10 },
+  cleanMessage: { color: COLORS.text, marginBottom: 12 },
+  historyCard: { backgroundColor: COLORS.surfaceRaised, borderRadius: 8, padding: 11, borderWidth: 1, borderColor: '#243652', marginBottom: 10 },
   historyRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#243652' },
   historyMain: { flex: 1, minWidth: 0 },
-  historyDate: { color: '#e5edf7', fontWeight: '800', fontSize: 11 },
+  historyDate: { color: COLORS.text, fontWeight: '800', fontSize: 11 },
   historyMeta: { color: '#8da2bd', fontSize: 10, marginTop: 2 },
   real: { color: '#15803d', fontWeight: '900', fontSize: 9 },
   reference: { color: '#b45309', fontWeight: '900', fontSize: 9 },
   empty: { color: '#8da2bd', fontSize: 11 },
-  card: { backgroundColor: '#111c2e', borderRadius: 8, padding: 11, borderWidth: 1, borderColor: '#243652', marginBottom: 10 },
-  cardTitle: { color: '#e5edf7', fontSize: 12, fontWeight: '900', marginBottom: 7 },
+  card: { backgroundColor: COLORS.surfaceRaised, borderRadius: 8, padding: 11, borderWidth: 1, borderColor: '#243652', marginBottom: 10 },
+  cardTitle: { color: COLORS.text, fontSize: 12, fontWeight: '900', marginBottom: 7 },
   row: { paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: '#243652', flexDirection: 'row', justifyContent: 'space-between' },
   note: { color: '#8da2bd', fontSize: 10, lineHeight: 15, marginTop: 8 },
-  label: { color: '#e5edf7', fontWeight: '600' },
-  value: { color: '#2563eb', fontWeight: '700' },
+  label: { color: COLORS.text, fontWeight: '600' },
+  value: { color: COLORS.primary, fontWeight: '700' },
   exportRow: { width: '100%', flexDirection: 'row', gap: 8, marginTop: 4 },
   button: { flex: 1, backgroundColor: '#1557a6', borderRadius: 7, padding: 13, alignItems: 'center', marginTop: 4 },
-  buttonText: { color: '#fff', fontWeight: '700' },
+  buttonWithIcon: { flexDirection: 'row', justifyContent: 'center', gap: 7 },
+  buttonText: { color: COLORS.white, fontWeight: '700' },
 });

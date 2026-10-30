@@ -1,6 +1,9 @@
 # ELM327 Compatibility Review
 
-Data: 2026-10-06
+Data original: 2026-10-06  
+Reconciliação com o código: 2026-10-28
+
+> As decisões abaixo foram conferidas contra `src/obd/bluetoothClassicTransport.ts`, `src/knowledge/bluetooth_config.json` e `src/obd/elm327Compatibility.ts`. Esta atualização corrige descrições antigas; o teste com o adaptador físico continua obrigatório.
 
 ## Evidence used
 
@@ -17,11 +20,11 @@ https://github.com/fr3ts0n/AndrOBD/blob/master/library/src/main/java/com/fr3ts0n
 - Bluetooth Classic/SPP remains the transport for the tested adapter.
 - Bluetooth connection is not equivalent to ELM readiness.
 - ELM initialization is tolerant of unsupported optional AT commands.
-- ATZ and ATI are the mandatory proof path when forced initialization is enabled; ATE0 is best-effort.
+- `ATZ` é o comando obrigatório de reinicialização. `ATI` é opcional/best-effort e não valida a ECU; comandos opcionais não suportados não podem bloquear a sessão.
 - Commands remain serialized through the existing queue.
 - CR/LF and NUL noise are normalized before classification.
 - I/O timeout, Bluetooth timeout and inter-command delay are configurable.
-- Connection attempts default to 2 and remain configurable; zero may be used explicitly for infinite retry.
+- A política-base em `src/knowledge/bluetooth_config.json` é de 20 tentativas com intervalo de 8 s. O limite efetivo pode ser reduzido pela configuração. `maxConnectionAttempts = 0` usa o limite-base finito do catálogo; não significa retry infinito.
 - PID 010C remains the ECU proof test. A Bluetooth socket alone never makes the app OBD-ready.
 - Unsupported AT commands are compatibility information, not automatic fatal errors.
 - The code does not fabricate PID support or fuel data.
@@ -38,6 +41,6 @@ A repository audit can prove source-level behavior, but it cannot prove that a s
 6. 010C returns a valid 410C payload.
 7. App reports OBD ONLINE only after these checks.
 
-## Correção documental 2026-10-06
+## Configuração vigente reconfirmada — 2026-10-28
 
-O projeto usa Bluetooth Classic/RFCOMM com connectionType delimited, delimitador CR real e charset ascii. O default de conexão é 2 tentativas. A seleção não depende de MAC informado pelo usuário.
+O código vigente usa Bluetooth Classic/RFCOMM com `connectionType: delimited`, delimitador vazio (`delimiter: ''`) e charset `ascii`; o RX é anexado ao buffer e a resposta fecha no prompt `>`. CR (`0x0D`) termina o comando TX. A política-base de retry é finita: 20 tentativas e 8 s entre falhas; `ATI` é best-effort e a validação da ECU exige uma resposta OBD válida ao PID `010C`. A seleção automática não depende de MAC informado pelo usuário.

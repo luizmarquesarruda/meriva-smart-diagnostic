@@ -3,12 +3,13 @@ import RNBluetoothClassic from 'react-native-bluetooth-classic';
 import { BluetoothClassicTransport, BluetoothDeviceInfo, listBondedBluetoothDevices } from './bluetoothClassicTransport';
 import { ElmCommandResult, Elm327Session } from './elm327';
 import { parsePidResponse } from './parser';
-import { Elm327CompatibilityConfig, DEFAULT_ELM327_COMPATIBILITY, mergeCompatibilityConfig } from './elm327Compatibility';
+import { Elm327CompatibilityConfig, DEFAULT_ELM327_COMPATIBILITY, mergeCompatibilityConfig, resolveMaxConnectionAttempts } from './elm327Compatibility';
 import { discoverIntelligentPids } from './intelligentPidDiscovery';
 import { getBluetoothRadioRecoveryStopReason } from './bluetoothRadioRecovery';
 import type { PidDiscoveryCache } from '../meriva/autosaveState';
 import bluetoothConfig from '../knowledge/bluetooth_config.json';
 import { requestBluetoothPermissionsOnly } from '../permissions/permissionManager';
+import { runWithTimeout } from './connectionRecovery';
 
 let lastBluetoothDiagnosticText = '';
 
@@ -48,6 +49,8 @@ export interface RealElmSessionCallbacks {
 /** A conexão só é considerada OBD real quando existe um payload 41 0C válido. */
 const ELM_PROTOCOL_NAMES: Record<string, string> = {
   '0': 'AUTO',
+  '1': 'SAE J1850 PWM',
+  '2': 'SAE J1850 VPW',
   '3': 'ISO 9141-2',
   '4': 'ISO 14230-4 KWP 5-BAUD',
   '5': 'ISO 14230-4 KWP FAST',
@@ -56,6 +59,11 @@ const ELM_PROTOCOL_NAMES: Record<string, string> = {
   '8': 'ISO 15765-4 CAN 11/250',
   '9': 'ISO 15765-4 CAN 29/250',
 };
+
+export const ELM_PROTOCOL_FALLBACKS = ['5', '3', '4', '6', '7', '8', '9', '2', '1'] as const;
+
+const BLUETOOTH_NATIVE_PROBE_TIMEOUT_MS = 1_500;
+const BLUETOOTH_USER_ACTION_TIMEOUT_MS = 30_000;
 
 export function getElmProtocolName(protocolId: string): string {
   return ELM_PROTOCOL_NAMES[protocolId] ?? 'ELM327 PROTOCOLO ' + protocolId;
@@ -67,9 +75,18 @@ export function isValidEcuProbe(result: ElmCommandResult): boolean {
   return parsed.status === 'RESPONDEU' && parsed.value !== null && Number.isFinite(parsed.value);
 }
 
+export function shouldRetryElmSessionAttempt(cause: unknown): boolean {
+  const message = cause instanceof Error ? cause.message : String(cause ?? '');
+  return !/ECU NÃO RESPONDEU AO 010C/i.test(message);
+}
+
 export async function requestBluetoothPermissions(): Promise<void> {
   logBluetoothDiagnostic('PERMISSIONS_START', { platform: Platform.OS, version: Platform.Version });
-  const status = await requestBluetoothPermissionsOnly();
+  const status = await runWithTimeout(
+    () => requestBluetoothPermissionsOnly(),
+    BLUETOOTH_USER_ACTION_TIMEOUT_MS,
+    `TIMEOUT: SOLICITAÇÃO DE PERMISSÃO BLUETOOTH APÓS ${BLUETOOTH_USER_ACTION_TIMEOUT_MS} MS`,
+  );
   if (status !== 'GRANTED') {
     throw new Error(
       status === 'BLOCKED'
@@ -97,17 +114,29 @@ export async function ensureBluetoothReady(): Promise<boolean> {
     throw new Error('MÓDULO BLUETOOTH CLASSIC NÃO ESTÁ DISPONÍVEL NO BUILD NATIVO. REINSTALE/RECONSTRUA O APK.');
   }
 
-  const available = await bluetoothClassic.isBluetoothAvailable();
+  const available = await runWithTimeout(
+    () => bluetoothClassic.isBluetoothAvailable(),
+    BLUETOOTH_NATIVE_PROBE_TIMEOUT_MS,
+    `TIMEOUT: VERIFICAÇÃO DE DISPONIBILIDADE BLUETOOTH APÓS ${BLUETOOTH_NATIVE_PROBE_TIMEOUT_MS} MS`,
+  );
   logBluetoothDiagnostic('BLUETOOTH_AVAILABLE', available);
   if (!available) {
     throw new Error('ESTE ANDROID NÃO POSSUI BLUETOOTH COMPATÍVEL');
   }
 
-  let enabled = await bluetoothClassic.isBluetoothEnabled();
+  let enabled = await runWithTimeout(
+    () => bluetoothClassic.isBluetoothEnabled(),
+    BLUETOOTH_NATIVE_PROBE_TIMEOUT_MS,
+    `TIMEOUT: VERIFICAÇÃO DO ESTADO BLUETOOTH APÓS ${BLUETOOTH_NATIVE_PROBE_TIMEOUT_MS} MS`,
+  );
   logBluetoothDiagnostic('BLUETOOTH_ENABLED', enabled);
   if (!enabled) {
     await new Promise((resolve) => setTimeout(resolve, 250));
-    enabled = await bluetoothClassic.isBluetoothEnabled();
+    enabled = await runWithTimeout(
+      () => bluetoothClassic.isBluetoothEnabled(),
+      BLUETOOTH_NATIVE_PROBE_TIMEOUT_MS,
+      `TIMEOUT: REVALIDAÇÃO DO ESTADO BLUETOOTH APÓS ${BLUETOOTH_NATIVE_PROBE_TIMEOUT_MS} MS`,
+    );
     logBluetoothDiagnostic('BLUETOOTH_ENABLED_RECHECK', enabled);
   }
   if (enabled) return true;
@@ -119,13 +148,21 @@ export async function ensureBluetoothReady(): Promise<boolean> {
   }
 
   logBluetoothDiagnostic('BLUETOOTH_ENABLE_REQUEST');
-  const requested = await requestBluetoothEnabled();
+  const requested = await runWithTimeout(
+    () => requestBluetoothEnabled(),
+    BLUETOOTH_USER_ACTION_TIMEOUT_MS,
+    `TIMEOUT: SOLICITAÇÃO DE ATIVAÇÃO DO BLUETOOTH APÓS ${BLUETOOTH_USER_ACTION_TIMEOUT_MS} MS`,
+  );
   logBluetoothDiagnostic('BLUETOOTH_ENABLE_RESULT', requested);
   if (!requested) {
     throw new Error('BLUETOOTH CONTINUA DESLIGADO. ATIVE-O PARA USAR O ELM327.');
   }
 
-  const enabledAfterRequest = await bluetoothClassic.isBluetoothEnabled();
+  const enabledAfterRequest = await runWithTimeout(
+    () => bluetoothClassic.isBluetoothEnabled(),
+    BLUETOOTH_NATIVE_PROBE_TIMEOUT_MS,
+    `TIMEOUT: CONFIRMAÇÃO DO ESTADO BLUETOOTH APÓS ${BLUETOOTH_NATIVE_PROBE_TIMEOUT_MS} MS`,
+  );
   if (!enabledAfterRequest) {
     throw new Error('BLUETOOTH NÃO FOI ATIVADO. ATIVE-O PARA USAR O ELM327.');
   }
@@ -165,9 +202,7 @@ export async function createRealElmSession(
     optionalAtTimeoutMs: compatibility?.optionalAtTimeoutMs ?? bluetoothConfig.initialization.optionalCommandTimeoutMs,
     protocolSelectionTimeoutMs: compatibility?.protocolSelectionTimeoutMs ?? bluetoothConfig.initialization.protocolSelectionTimeoutMs,
   });
-  const effectiveMaxAttempts = config.maxConnectionAttempts > 0
-    ? config.maxConnectionAttempts
-    : MAX_BLUETOOTH_ATTEMPTS;
+  const effectiveMaxAttempts = resolveMaxConnectionAttempts(config.maxConnectionAttempts, MAX_BLUETOOTH_ATTEMPTS);
 
   for (let attempt = 1; attempt <= effectiveMaxAttempts; attempt++) {
     attemptsExecuted = attempt;
@@ -218,6 +253,12 @@ export async function createRealElmSession(
           reason: radioStopReason,
           error: errorMessage,
         });
+        break;
+      }
+
+      if (!shouldRetryElmSessionAttempt(cause)) {
+        terminalReason = 'ECU_PROBE_EXHAUSTED';
+        logBluetoothDiagnostic('BLUETOOTH_RETRY_STOPPED', { attempt, reason: terminalReason, error: errorMessage, action: 'NEXT_PAIRED_CANDIDATE' });
         break;
       }
 
@@ -293,7 +334,7 @@ async function createRealElmSessionAttempt(
     logBluetoothDiagnostic('ECU_PROBE_RESULT', { status: ecuProbe.status, response: ecuProbe.response, attempt });
     let probeIsValid = isValidEcuProbe(ecuProbe);
 
-    const protocolFallbacks = ['5', '3', '4', '6', '7', '8', '9'];
+    const protocolFallbacks = ELM_PROTOCOL_FALLBACKS;
     let successfulForcedProtocol: string | null = null;
 
     for (const protocol of protocolFallbacks) {

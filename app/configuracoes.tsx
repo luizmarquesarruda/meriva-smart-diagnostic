@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Constants from 'expo-constants';
+import { Link } from 'expo-router';
 import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
@@ -270,12 +271,11 @@ export default function ConfiguracaoScreen() {
         <Text style={styles.buttonText}>{busy ? 'AGUARDE...' : 'EXPORTAR SALVAMENTO (.TXT)'}</Text>
       </TouchableOpacity>
       {profile ? (
-        <>
-          <Text style={styles.info}>Veículo: {profile.vehicleName}</Text>
-          <Text style={styles.info}>Motor: {profile.engine} • {profile.displacementCm3} cm³ • {profile.cylinders} cilindros</Text>
-          <Text style={styles.info}>Tanque: {profile.tankCapacityL} L • Reserva aprox.: {profile.reserveCapacityL} L</Text>
-          <Text style={styles.note}>Especificações físicas conforme o Manual do Proprietário Chevrolet Meriva 2012.</Text>
-        </>
+        <Link href="/veiculo" asChild>
+          <TouchableOpacity style={styles.button} accessibilityRole="button" accessibilityLabel="Abrir perfil do veículo">
+            <Text style={styles.buttonText}>VER PERFIL DO VEÍCULO</Text>
+          </TouchableOpacity>
+        </Link>
       ) : <Text style={styles.info}>Veículo: N/D</Text>}
       </View>
     </ScrollView>
@@ -295,18 +295,18 @@ function SettingSwitch({ label, value, onChange }: { label: string; value: boole
 const styles = StyleSheet.create({
   container: { flexGrow: 1, paddingVertical: 16, backgroundColor: COLORS.screen },
   title: { ...SCREEN_TITLE_STYLE, marginBottom: 6 },
-  section: { fontSize: 12, fontWeight: '900', color: '#7db3ff', letterSpacing: 0.8, marginTop: 16, marginBottom: 8 },
-  status: { color: '#2563eb', fontWeight: '700', marginBottom: 12 },
-  card: { backgroundColor: '#111c2e', borderRadius: 8, padding: 11, marginBottom: 9, borderWidth: 1, borderColor: '#243652' },
-  label: { flex: 1, color: '#e5edf7', fontWeight: '600' },
+  section: { fontSize: 12, fontWeight: '900', color: COLORS.accent, letterSpacing: 0.8, marginTop: 16, marginBottom: 8 },
+  status: { color: COLORS.primary, fontWeight: '700', marginBottom: 12 },
+  card: { backgroundColor: COLORS.surfaceRaised, borderRadius: 8, padding: 11, marginBottom: 9, borderWidth: 1, borderColor: '#243652' },
+  label: { flex: 1, color: COLORS.text, fontWeight: '600' },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
   choice: { flexGrow: 1, flexBasis: 86, minWidth: 86, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, padding: 11, alignItems: 'center' },
   choiceActive: { backgroundColor: '#172f52', borderColor: '#3b82f6' },
-  choiceText: { color: '#e5edf7', fontWeight: '700', flexShrink: 1, textAlign: 'center', lineHeight: 16 },
-  switchRow: { backgroundColor: '#111c2e', borderRadius: 8, padding: 11, marginBottom: 9, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#243652' },
-  info: { color: '#e5edf7', marginBottom: 6, fontSize: 12 },
+  choiceText: { color: COLORS.text, fontWeight: '700', flexShrink: 1, textAlign: 'center', lineHeight: 16 },
+  switchRow: { backgroundColor: COLORS.surfaceRaised, borderRadius: 8, padding: 11, marginBottom: 9, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#243652' },
+  info: { color: COLORS.text, marginBottom: 6, fontSize: 12 },
   note: { color: '#8da2bd', fontSize: 10, lineHeight: 15, marginTop: -2, marginBottom: 8 },
   error: { color: '#dc2626', fontWeight: '600', marginBottom: 12 },
-  button: { backgroundColor: '#2563eb', borderRadius: 10, padding: 14, alignItems: 'center', marginBottom: 10, marginTop: 6 },
-  buttonText: { color: '#fff', fontWeight: '700' },
+  button: { backgroundColor: COLORS.primary, borderRadius: 10, padding: 14, alignItems: 'center', marginBottom: 10, marginTop: 6 },
+  buttonText: { color: COLORS.white, fontWeight: '700' },
 });

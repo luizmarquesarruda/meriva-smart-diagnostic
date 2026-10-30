@@ -17,12 +17,24 @@ const output = ts.transpileModule(fs.readFileSync(sourcePath, 'utf8'), {
 }).outputText;
 
 let watcher = null;
+let backgroundUpdatesStarted = false;
+let backgroundStartCalls = 0;
+let backgroundStopCalls = 0;
 const fakeLocation = {
   Accuracy: { BestForNavigation: 6 },
   PermissionStatus: { GRANTED: 'granted' },
   hasServicesEnabledAsync: async () => true,
   getForegroundPermissionsAsync: async () => ({ status: 'granted' }),
   requestForegroundPermissionsAsync: async () => ({ status: 'granted' }),
+  hasStartedLocationUpdatesAsync: async () => backgroundUpdatesStarted,
+  startLocationUpdatesAsync: async () => {
+    backgroundStartCalls += 1;
+    backgroundUpdatesStarted = true;
+  },
+  stopLocationUpdatesAsync: async () => {
+    backgroundStopCalls += 1;
+    backgroundUpdatesStarted = false;
+  },
   watchPositionAsync: async (_options, callback) => {
     watcher = callback;
     return {
@@ -168,16 +180,134 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
     'amostra com timestamp anterior ao último fix válido deve ser descartada');
   assert.strictEqual(tracker.getState().distanceKm, distanceBeforeBadTimestamp,
     'timestamp atrasado não deve alterar distância');
-  watcher({ coords: { latitude: 0, longitude: 0.00175, speed: 0, accuracy: 5 }, timestamp: 30000 });
+  // 31.000 e 32.000 ms foram aceitos acima, mesmo sem precisão GPS.
+  // A recuperação precisa ser posterior ao último timestamp aceito, não só ao último fix preciso.
+  watcher({ coords: { latitude: 0, longitude: 0.00175, speed: 0, accuracy: 5 }, timestamp: 33000 });
   assert.strictEqual(tracker.getState().samples, samplesBeforeBadTimestamp + 1,
-    'a coleta deve se recuperar quando chega um timestamp válido crescente');
+    'a coleta deve se recuperar somente quando chega um timestamp maior que o último aceito');
   assert.strictEqual(tracker.getState().distanceKm, distanceBeforeBadTimestamp,
     'a amostra válida de recuperação não deve inventar deslocamento');
 
   await tracker.stop();
   assert.strictEqual(tracker.getState().running, false);
   unsubscribe();
-  console.log('PASS GPS: automático, velocidade, distância e consumo');
+
+  // At 10 km/h, each 1 s segment is about 2.8 m. Three consecutive
+  // segments (four valid positions) must confirm urban movement without
+  // weakening the net-displacement gate against GPS drift.
+  const urbanTracker = new GpsTracker({
+    now: () => 150_000,
+    setIntervalFn: () => 43,
+    clearIntervalFn: (handle) => assert.strictEqual(handle, 43),
+  });
+  assert.strictEqual(await urbanTracker.start(), true);
+  urbanTracker.setVehicleSpeedHintKmh(10);
+  watcher({ coords: { latitude: 0, longitude: 0, speed: 10 / 3.6, accuracy: 5 }, timestamp: 40000 });
+  watcher({ coords: { latitude: 0, longitude: 0.000025, speed: 10 / 3.6, accuracy: 5 }, timestamp: 41000 });
+  watcher({ coords: { latitude: 0, longitude: 0.000050, speed: 10 / 3.6, accuracy: 5 }, timestamp: 42000 });
+  watcher({ coords: { latitude: 0, longitude: 0.000075, speed: 10 / 3.6, accuracy: 5 }, timestamp: 43000 });
+  assert.strictEqual(urbanTracker.getState().speedSource, 'OBD');
+  assert.strictEqual(urbanTracker.getState().currentSpeedKmh, 10);
+  assert.ok(urbanTracker.getState().distanceKm >= 0.008,
+    'three valid urban segments at 10 km/h must contribute confirmed distance');
+  await urbanTracker.stop();
+
+  // A total loss of fresh GNSS fixes must expire stale GPS speed without erasing distance.
+  // A fresh OBD speed remains independent and must be the actual value labelled OBD.
+  let fakeNow = 100_000;
+  let watchdogHandler = null;
+  let clearedWatchdog = false;
+  const staleTracker = new GpsTracker({
+    now: () => fakeNow,
+    setIntervalFn: (handler, delayMs) => {
+      assert.strictEqual(delayMs, 1000, 'stale-fix watchdog should use the bounded tick');
+      watchdogHandler = handler;
+      return 42;
+    },
+    clearIntervalFn: (handle) => {
+      assert.strictEqual(handle, 42);
+      clearedWatchdog = true;
+    },
+  });
+  assert.strictEqual(await staleTracker.start(), true);
+  const staleWatcher = watcher;
+  staleTracker.setVehicleSpeedHintKmh(36);
+  staleWatcher({ coords: { latitude: 0, longitude: 0, speed: 10, accuracy: 5 }, timestamp: 1000 });
+  staleWatcher({ coords: { latitude: 0, longitude: 0.0001, speed: 10, accuracy: 5 }, timestamp: 2000 });
+  staleWatcher({ coords: { latitude: 0, longitude: 0.0002, speed: 10, accuracy: 5 }, timestamp: 3000 });
+  staleWatcher({ coords: { latitude: 0, longitude: 0.0003, speed: 10, accuracy: 5 }, timestamp: 4000 });
+  assert.strictEqual(staleTracker.getState().speedSource, 'OBD');
+  assert.strictEqual(staleTracker.getState().currentSpeedKmh, 36,
+    'a speed presented as OBD must use the actual fresh OBD value');
+  const distanceBeforeStale = staleTracker.getState().distanceKm;
+
+  fakeNow += 5001;
+  staleTracker.setVehicleSpeedHintKmh(36); // simulate fresh OBD polling while GNSS remains unavailable
+  watchdogHandler();
+  const samplesBeforeDelayedFix = staleTracker.getState().samples;
+  staleWatcher({ coords: { latitude: 0, longitude: 0.00025, speed: 10, accuracy: 5 }, timestamp: 3500 });
+  assert.strictEqual(staleTracker.getState().samples, samplesBeforeDelayedFix,
+    'a delayed fix older than the last accepted timestamp must be rejected after stale-baseline reset');
+  assert.strictEqual(staleTracker.getState().signalQuality, 'SEM_FIX');
+  assert.strictEqual(staleTracker.getState().lastAccuracyM, null);
+  assert.strictEqual(staleTracker.getState().currentSpeedKmh, 36,
+    'fresh OBD speed should survive a GPS outage without claiming a fresh GNSS fix');
+  assert.strictEqual(staleTracker.getState().speedSource, 'OBD');
+  assert.strictEqual(staleTracker.getState().distanceKm, distanceBeforeStale,
+    'GPS outage must preserve but not fabricate cumulative distance');
+
+  fakeNow += 5001;
+  watchdogHandler();
+  assert.strictEqual(staleTracker.getState().currentSpeedKmh, 0,
+    'stale OBD speed must not remain visible when neither source is fresh');
+  assert.strictEqual(staleTracker.getState().speedSource, 'PARADO');
+  assert.strictEqual(staleTracker.getState().signalQuality, 'SEM_FIX');
+  assert.strictEqual(staleTracker.getState().distanceKm, distanceBeforeStale);
+
+  await staleTracker.stop();
+  assert.strictEqual(clearedWatchdog, true, 'stop must remove the watchdog timer');
+
+  // Background location API is part of expo-location and must be represented
+  // by the test double; silently catching a missing mock method hides test defects.
+  let backgroundWatchdogCleared = false;
+  const backgroundTracker = new GpsTracker({
+    now: () => 200_000,
+    setIntervalFn: (handler) => {
+      watchdogHandler = handler;
+      return 77;
+    },
+    clearIntervalFn: (handle) => {
+      assert.strictEqual(handle, 77);
+      backgroundWatchdogCleared = true;
+    },
+  });
+  const startsBeforeBackground = backgroundStartCalls;
+  const stopsBeforeBackground = backgroundStopCalls;
+  assert.strictEqual(await backgroundTracker.startBackgroundLocation(), true);
+  assert.strictEqual(backgroundUpdatesStarted, true);
+  assert.strictEqual(backgroundStartCalls, startsBeforeBackground + 1,
+    'background GPS must call the native start API once');
+  await backgroundTracker.stop();
+  assert.strictEqual(backgroundUpdatesStarted, false);
+  assert.strictEqual(backgroundStopCalls, stopsBeforeBackground + 1,
+    'stop must call the native background stop API');
+  assert.strictEqual(backgroundWatchdogCleared, true);
+
+  // Recreating the JS tracker while the native task survives must not start a duplicate task.
+  backgroundUpdatesStarted = true;
+  const recoveredBackgroundTracker = new GpsTracker({
+    now: () => 300_000,
+    setIntervalFn: () => 88,
+    clearIntervalFn: () => {},
+  });
+  const startsBeforeRecovery = backgroundStartCalls;
+  assert.strictEqual(await recoveredBackgroundTracker.startBackgroundLocation(), true);
+  assert.strictEqual(backgroundStartCalls, startsBeforeRecovery,
+    'an already-running native task must be reused rather than registered twice');
+  await recoveredBackgroundTracker.stop();
+  assert.strictEqual(backgroundUpdatesStarted, false);
+
+  console.log('PASS GPS: automático, velocidade, distância, consumo, watchdog e background');
 })().catch((error) => {
   console.error(error);
   process.exitCode = 1;

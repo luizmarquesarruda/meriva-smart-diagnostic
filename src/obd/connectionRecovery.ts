@@ -1,3 +1,29 @@
+/**
+ * Bound a potentially stalled asynchronous/native operation.
+ * The timeout cannot cancel the underlying native call; callers must fail closed
+ * and keep any resource/connection lock until cleanup is positively confirmed.
+ */
+export async function runWithTimeout<T>(
+  operation: () => Promise<T>,
+  timeoutMs: number,
+  timeoutMessage: string,
+): Promise<T> {
+  const boundedTimeoutMs = Number.isFinite(timeoutMs) ? Math.max(1, Math.round(timeoutMs)) : 1;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const operationPromise = Promise.resolve().then(operation);
+
+  try {
+    return await Promise.race([
+      operationPromise,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error(timeoutMessage)), boundedTimeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 export interface DisconnectCleanupResult {
   persistenceError: unknown | null;
   closeError: unknown | null;

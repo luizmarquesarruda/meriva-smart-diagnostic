@@ -157,3 +157,24 @@ export function buildCockpitPidMetrics(
       };
     });
 }
+
+
+export const COCKPIT_QUADRANT_PAGE_SIZE = 4;
+
+/**
+ * Returns one four-metric page, wrapping safely at either end of the list.
+ * It only arranges existing metric objects; it never creates sensor values.
+ */
+export function getCockpitMetricPage(
+  metrics: readonly CockpitPidMetric[],
+  pageIndex: number,
+  pageSize = COCKPIT_QUADRANT_PAGE_SIZE,
+): CockpitPidMetric[] {
+  if (metrics.length === 0 || !Number.isFinite(pageIndex) || !Number.isFinite(pageSize)) return [];
+  const size = Math.floor(pageSize);
+  if (size < 1) return [];
+  const pageCount = Math.ceil(metrics.length / size);
+  const normalizedPage = ((Math.floor(pageIndex) % pageCount) + pageCount) % pageCount;
+  const start = normalizedPage * size;
+  return metrics.slice(start, start + size);
+}

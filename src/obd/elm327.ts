@@ -5,6 +5,7 @@ import {
   isNoDataResponse,
   isPartialResponseError,
   classifyElmError,
+  getRecoveryProtocolCommand,
   ElmErrorType,
   ElmHealthSnapshot,
   isUnsupportedAtResponse,
@@ -233,8 +234,7 @@ export class Elm327Session {
     return this.enqueueCommand(async () => {
       if (!this.opened) return false;
 
-      const protocol = (this.protocol ?? '').toUpperCase();
-      const preferred = /KWP|14230/.test(protocol) ? 'ATSP5' : 'ATSP0';
+      const preferred = getRecoveryProtocolCommand(this.protocol);
       const reset = await this.command('ATZ');
       if (reset.status !== 'OK') return false;
 
@@ -244,7 +244,8 @@ export class Elm327Session {
       if (selected.status !== 'OK') return false;
 
       const probe = await this.command('010C');
-      if (probe.status !== 'OK' || !/41\s*0C/i.test(probe.response.replace(/\s/g, ''))) return false;
+      const parsedProbe = parsePidResponse('010C', probe.response);
+      if (probe.status !== 'OK' || parsedProbe.status !== 'RESPONDEU' || parsedProbe.value === null || !Number.isFinite(parsedProbe.value)) return false;
 
       // Read the protocol directly while holding the queue. Calling
       // identifyProtocol() here would enqueue behind this recovery and deadlock.

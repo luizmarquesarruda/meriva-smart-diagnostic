@@ -16,10 +16,21 @@ const screens = [
   'app/bluetooth.tsx', 'app/armazenamento.tsx', 'app/configuracoes.tsx',
   'app/laboratorio.tsx', 'app/testes-sensores.tsx', 'app/conectividade.tsx', 'app/manutencao.tsx',
 ];
+const sharedPaletteLiterals = [
+  '#07111f', '#0e1b2d', '#111c2e', '#091626', '#28415f',
+  '#e5edf7', '#f8fafc', '#fff', '#ffffff', '#9fb4cf',
+  '#7185a1', '#7db3ff', '#2563eb', '#4ade80', '#fbbf24', '#fb7185',
+];
 for (const file of screens) {
   const source = fs.readFileSync(path.join(root, file), 'utf8');
   assert.match(source, /from ['"]\.\.\/src\/ui\/theme['"]/, file + ' deve importar o tema comum');
   assert.match(source, /COLORS\.screen/, file + ' deve usar o fundo comum da tela');
+  for (const literal of sharedPaletteLiterals) {
+    assert.ok(
+      !source.includes("'" + literal + "'") && !source.includes('"' + literal + '"'),
+      file + ' deve consumir tokens do tema compartilhado, não duplicar ' + literal,
+    );
+  }
   if (file !== 'app/index.tsx') {
     assert.match(source, /SCREEN_TITLE_STYLE/, file + ' deve usar o título comum');
   }

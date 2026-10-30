@@ -21,6 +21,7 @@ export interface ConditionsRefreshOptions {
 /** Refresh enrichment sparingly; it must never run on the OBD polling cadence. */
 export const CURRENT_CONDITIONS_REFRESH_INTERVAL_MS = 15 * 60 * 1000;
 export const CURRENT_CONDITIONS_RETRY_COOLDOWN_MS = 60 * 1000;
+export const CURRENT_CONDITIONS_MAX_RETRY_COOLDOWN_MS = 15 * 60 * 1000;
 
 export function isConditionsNetworkAvailable(state: NetworkReachabilitySnapshot): boolean {
   // 4G/5G and Wi-Fi both work. A null reachability result means "not yet known",
@@ -65,6 +66,7 @@ export function startCurrentConditionsRefresh(
   let lastOnline: boolean | null = null;
   let lastAttemptAt = 0;
   let lastSuccessAt = 0;
+  let consecutiveFailures = 0;
 
   const refresh = async (
     providedState?: NetworkReachabilitySnapshot,
@@ -86,9 +88,15 @@ export function startCurrentConditionsRefresh(
 
     const currentTime = now();
     const reconnecting = wasOnline !== true;
+    const retryDelayMs = consecutiveFailures === 0
+      ? retryCooldownMs
+      : Math.min(
+        CURRENT_CONDITIONS_MAX_RETRY_COOLDOWN_MS,
+        retryCooldownMs * (2 ** Math.min(consecutiveFailures - 1, 4)),
+      );
     if (!force && !reconnecting) {
-      if (lastAttemptAt > 0 && currentTime - lastAttemptAt < retryCooldownMs) return;
-      if (lastSuccessAt > 0 && currentTime - lastSuccessAt < refreshIntervalMs) return;
+      if (lastAttemptAt > 0 && currentTime - lastAttemptAt < retryDelayMs) return;
+      if (consecutiveFailures === 0 && lastSuccessAt > 0 && currentTime - lastSuccessAt < refreshIntervalMs) return;
     }
 
     inFlight = true;
@@ -109,7 +117,12 @@ export function startCurrentConditionsRefresh(
     }
 
     if (disposed) return;
-    if (result.available) lastSuccessAt = now();
+    if (result.available) {
+      consecutiveFailures = 0;
+      lastSuccessAt = now();
+    } else {
+      consecutiveFailures = Math.min(consecutiveFailures + 1, 5);
+    }
     onUpdate(result);
   };
 

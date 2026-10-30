@@ -395,8 +395,9 @@ async function testProtocolRecoverySerializesWholeNegotiation() {
 async function testConfiguredBluetoothRetryLimit() {
   const managerPath = path.join(ROOT, 'src/obd/bluetoothManager.ts');
   const source = fs.readFileSync(managerPath, 'utf8');
-  assert.ok(source.includes('const effectiveMaxAttempts = config.maxConnectionAttempts > 0'), 'retry deve derivar do maxConnectionAttempts configurado');
+  assert.ok(source.includes('const effectiveMaxAttempts = resolveMaxConnectionAttempts(config.maxConnectionAttempts, MAX_BLUETOOTH_ATTEMPTS)'), 'retry deve respeitar configuração e limite padrão finito');
   assert.ok(source.includes('attempt <= effectiveMaxAttempts'), 'loop de retry deve respeitar o limite efetivo');
+  assert.ok(source.includes('shouldRetryElmSessionAttempt'), 'falha conclusiva da ECU não deve repetir toda a sequência no mesmo adaptador');
   assert.ok(!source.includes('const maxAttempts = config.maxConnectionAttempts'), 'não pode haver shadowing de maxAttempts');
   console.log('configured Bluetooth retry limit: OK');
 }
@@ -496,8 +497,8 @@ async function testEcuValidationGate() {
   assert.strictEqual(manager.isValidEcuProbe({ status: 'OK', response: 'NO DATA', command: '010C', elapsedMs: 10, attempt: 1 }), false);
   assert.strictEqual(manager.isValidEcuProbe({ status: 'TIMEOUT', response: '', command: '010C', elapsedMs: 1000, attempt: 1 }), false);
   assert.strictEqual(manager.isValidEcuProbe({ status: 'OK', response: '41 0B 25', command: '010C', elapsedMs: 10, attempt: 1 }), false);
-  assert.strictEqual(manager.MAX_BLUETOOTH_ATTEMPTS, 20);
-  assert.strictEqual(manager.BLUETOOTH_RETRY_INTERVAL_MS, 8000);
+  assert.strictEqual(manager.MAX_BLUETOOTH_ATTEMPTS, 3);
+  assert.strictEqual(manager.BLUETOOTH_RETRY_INTERVAL_MS, 1500);
 }
 
 async function testPidScanner() {
@@ -1307,11 +1308,12 @@ async function testPidAndLearningWriteSerialization() {
   assert.strictEqual(profile.learningStatus, 'COLD_START');
   const autoTripServiceSource = fs.readFileSync(path.join(ROOT, 'src', 'trip', 'autoTripService.ts'), 'utf8');
   const cockpitSource = fs.readFileSync(path.join(ROOT, 'app', 'index.tsx'), 'utf8');
-  assert.ok(cockpitSource.includes("item.pid === '0105'"), 'cockpit deve identificar temperatura do líquido pelo PID 0105');
+  assert.ok(cockpitSource.includes("pid: '0105'") && cockpitSource.includes('TEMPERATURA DO MOTOR'), 'quadrante de temperatura deve mapear o PID 0105');
   assert.ok(cockpitSource.includes("item.source !== 'REAL'"), 'cockpit não deve exibir temperatura simulada como dado real');
   assert.ok(cockpitSource.includes('ageMs >= 0 && ageMs <= 30_000'), 'cockpit deve descartar temperatura OBD futura ou obsoleta após 30 segundos');
-  assert.ok(cockpitSource.includes('LÍQUIDO DE ARREFECIMENTO'), 'página inicial deve apresentar métrica de temperatura do arrefecimento');
-  assert.ok(cockpitSource.includes("'TEMPERATURA ALTA'"), 'cockpit deve destacar temperatura alta sem esconder o valor numérico');
+  assert.ok(cockpitSource.includes('quadrantDefinitions') && cockpitSource.includes('TEMPERATURA DO MOTOR'), 'temperatura deve aparecer no quadrante principal, sem cartão duplicado');
+  const cockpitTelemetrySource = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'cockpitTelemetry.ts'), 'utf8');
+  assert.ok(cockpitTelemetrySource.includes("if (value >= 115) return 'danger'") && cockpitSource.includes('quadrantCardDanger'), 'temperatura alta deve ganhar destaque no quadrante sem esconder o valor numérico');
   assert.ok(autoTripServiceSource.includes('registerObdQuery(this.basePath, fuelLevelResult, \'REAL\')'), 'PID 012F automático deve alimentar o pipeline de persistência');
   assert.ok(autoTripServiceSource.includes('registerObdQuery(this.basePath, fuelResult, \'REAL\')'), 'PID 015E automático deve alimentar o pipeline de persistência');
   assert.ok(autoTripServiceSource.includes('registerObdQuery(this.basePath, speedResult, \'REAL\')'), 'PID 010D automático deve alimentar o pipeline de persistência');
@@ -1391,12 +1393,14 @@ function testPidResponseIsNotVehicleValidation() {
     'a cadência deve ser independente por PID');
 }
 
-function testStorageScreenDoesNotPromoteSeedOrInvalidFuel() {
+function testTripHistoryDoesNotPromoteSeedOrInvalidFuel() {
+  const tripScreen = fs.readFileSync(path.join(ROOT, 'app/viagens.tsx'), 'utf8');
   const storageScreen = fs.readFileSync(path.join(ROOT, 'app/armazenamento.tsx'), 'utf8');
-  assert.ok(storageScreen.includes("filter((cycle) => cycle.source === 'REAL_OBD')"), 'tela de histórico não deve apresentar viagens seed do Car Scanner como viagens do app');
-  assert.ok(storageScreen.includes("cycle.fuelDataValid !== false"), 'consumo precisa respeitar o indicador de confiabilidade');
-  assert.ok(storageScreen.includes("cycle.fuelUsedL >= 0.05"), 'consumo deve exigir volume de combustível válido');
-  assert.ok(storageScreen.includes("'Consumo: N/D'"), 'consumo inválido deve ser apresentado como N/D, nunca 0,00 km/L');
+  assert.ok(/filter\(cycle => cycle\.source === 'REAL_OBD'\)/.test(tripScreen), 'tela canônica de viagens não deve apresentar viagens seed do Car Scanner como trajetos reais');
+  assert.ok(tripScreen.includes('cycle.fuelDataValid !== false'), 'consumo precisa respeitar o indicador de confiabilidade');
+  assert.ok(tripScreen.includes('cycle.fuelUsedL >= 0.05'), 'consumo deve exigir volume de combustível válido');
+  assert.ok(tripScreen.includes("'CONSUMO N/D'"), 'consumo inválido deve ser apresentado como N/D, nunca 0,00 km/L');
+  assert.ok(!storageScreen.includes('VIAGENS SALVAS'), 'armazenamento não deve renderizar uma segunda lista de viagens');
 }
 
 
@@ -1463,7 +1467,7 @@ async function main() {
     ['PID + DNA serializados', testPidAndLearningWriteSerialization],
     ['contratos de aquisição e persistência', testAcquisitionPolicyConsistency],
     ['PID respondeu não significa sensor validado', testPidResponseIsNotVehicleValidation],
-    ['histórico sem seed e consumo N/D', testStorageScreenDoesNotPromoteSeedOrInvalidFuel],
+    ['histórico sem seed e consumo N/D', testTripHistoryDoesNotPromoteSeedOrInvalidFuel],
 
     ['autosave race', testAutosaveRace],
   ];

@@ -58,11 +58,13 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
   L.push('[LAST READINGS]');
   if (state.lastReadings.length) {
     for (const reading of state.lastReadings) {
-      const value =
-        reading.value === null || reading.value === undefined
+      const value = reading.pid === '0101' && reading.interpretation
+        ? 'STATUS OBD-II (bitmap interpretado)'
+        : reading.value === null || reading.value === undefined
           ? ND
           : `${reading.value} ${reading.unit}`;
       L.push(`${reading.pid} ${reading.name}: ${value} [${reading.status}] fonte=${reading.source} ${reading.timestamp}`);
+      if (reading.interpretation) L.push(`  Interpretacao: ${reading.interpretation}`);
     }
   } else {
     L.push(ND);
