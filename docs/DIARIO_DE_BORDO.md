@@ -287,6 +287,7 @@
 - **DB-194** · 2026-10-30 — Corrigir relógio do buffer 012F e limpar fallback quando ECU perde resposta.
 - **DB-195** · 2026-10-30 — Auditar arquitetura, contexto, agentes e módulos; alinhar escopo do veículo e fluxo APK.
 - **DB-196** · 2026-10-30 — Incluir MANUTENCAO no backup/export, implementar restauração verificada e deduplicar CI.
+- **DB-197** · 2026-10-30 — Configurar publicação automática do APK após CI verde e corrigir gate do índice.
 
 ---
 
