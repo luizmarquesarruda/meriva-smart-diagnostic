@@ -1,14 +1,14 @@
-## ESTADO VIGENTE — 2026-10-30 (correções GPS + acompanhamento CI)
+## ESTADO VIGENTE — 2026-10-30 (PR #96 integrada; correção de transporte em validação)
 
-> Frente única de trabalho: PR #96, branch `ui/cockpit-instant-consumption-20261027`. Este bloco é a referência operacional; snapshots abaixo são históricos.
+> Frente única de trabalho: correção crítica do transporte ELM327 na branch `fix/elm-buffered-prompt-20261030`. PR #96 já foi integrada; não é mais uma PR aberta.
 
 - Repositório: [luizmarquesarruda/meriva-smart-diagnostic](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
-- PR #96: [Evita DTC duplicado no cockpit e mostra pressão do coletor](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/96), aberta, fora de rascunho e sem merge. Base `main` observada nesta PR: `7eec3afecb3718020724baf053f8b6d2ca636fab`.
-- HEAD/CI: consultar a PR #96 para o SHA atual e o workflow correspondente. A execução no SHA `2441a48131517cf5dda600eb9ab2ec15c69ccfd4` falhou na asserção antiga de timeout; DB-181 atualiza o teste para o contrato novo. DB-178 a DB-181 precisam de validação integral no mesmo SHA final.
-- A falha histórica em `tests/orientationLayout.test.js:78` era uma asserção textual obsoleta, corrigida em DB-176. Não há confirmação de CI verde para as correções posteriores.
-- Após qualquer alteração, reconsultar o HEAD e a CI correspondentes. Só considerar a PR validada com `validate` e `android-build` verdes no mesmo SHA, diff reconciliado contra `main` e validação física separada.
-- A auditoria atual encontrou divergências de documentação e um débito relevante de modernização do SDK. Não houve upgrade de SDK nem remoção de dependências nativas nesta rodada: fazê-los antes de preservar um baseline físico poderia introduzir regressão no Bluetooth Classic.
-- Testes com Galaxy A06/Android 16/ELM327 real, confirmação de resposta `010C`, inspeção do APK instalado e validação GPS/autonomia continuam pendentes.
+- PR #96: [Evita DTC duplicado no cockpit e mostra pressão do coletor](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/96) foi mesclada em 2026-10-30; merge commit `0397cb8d716895200e2bc045beef27603f4a272d`.
+- A CI consultada no SHA `19636997c0a023f2e5ca70a09e8201dfe198f754` concluiu com sucesso. Esse resultado não substitui validação do novo SHA nem teste físico.
+- Correção em andamento: verificar o prompt `>` já recebido antes de fazer uma nova sonda nativa `isConnected()`; adicionar proteção anti-regressão e registrar a alteração neste diário.
+- Antes de considerar esta rodada validada, exigir `validate` e `android-build` verdes no mesmo SHA da nova PR, diff revisado e reconciliação com `main`.
+- Testes com Galaxy A06 / SM-A065M / Android 16, adaptador ELM327 real, resposta ECU válida a `010C`, inspeção do APK instalado e validação física de GPS/autonomia continuam pendentes.
+- Não foi implementada fila offline-first de envio de telemetria porque a auditoria do código não encontrou um caminho de upload de telemetria ou WebSocket que a justificasse; persistência e exportação locais existem. Não inventar endpoint ou contrato de nuvem sem requisito verificável.
 - DB-145 registra a regressão de leitura KWP e classificação de estado ECU/Bluetooth; DB-162/163/164/166 protegem o ciclo RFCOMM; DB-165 limita HTTP de clima; DB-167 expira fixes GPS antigos; DB-168 neutraliza fórmula no CSV; DB-169 torna o start GPS não bloqueante para o polling OBD e aplica cooldown de retry. DB-170 atualiza o gate para aceitar a proteção de timestamp por `state.lastTimestamp`. DB-171 serializa cancelamento da descoberta; DB-172 valida coeficientes/resultados de fórmula; DB-173 corrige documentação cloud; DB-174 centraliza os tokens de cor compartilhados nas telas. DB-175 limita as chamadas de localização opcionais e usa backoff exponencial para o enriquecimento online. DB-177 limita a própria operação nativa de desconexão e mantém o bloqueio RFCOMM se ela expirar; DB-178 bloqueia reconexão quando a sonda do socket fica indeterminada; DB-179 reutiliza a Promise nativa pendente para impedir desconexões concorrentes; DB-180 bloqueia novos comandos após timeout sem prompt para evitar que resposta atrasada seja atribuída ao PID seguinte. DB-182/183 corrigem regressões e cobertura do GPS (timestamp monotônico, ciclo background e movimento urbano); DB-184 mantém o índice do diário alinhado à sequência de IDs.
 - O cockpit deve continuar mostrando N/D até existir leitura OBD real, completa e recente; seed ou histórico não deve ser reapresentado como valor atual.
 - DB-146 restaura os quatro quadrantes de telemetria em simultâneo; os PIDs adicionais continuam acessíveis em páginas de quatro métricas. A ausência de ECU não remove a grade, apenas mantém os valores em N/D.
@@ -273,6 +273,7 @@
 - **DB-182** · 2026-10-30 — Corrigir fixture de timestamp GPS e mockar ciclo de vida nativo em segundo plano
 - **DB-183** · 2026-10-30 — Confirmar movimento urbano sem exigir 8 m em cada callback GPS
 - **DB-184** · 2026-10-30 — Sincronizar índice DB-NNN com as novas entradas de auditoria
+- **DB-185** · 2026-10-30 — Consumir prompt ELM já bufferizado antes de sondar o socket
 
 ---
 
@@ -4815,3 +4816,20 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 
 ### Validação
 - O próximo push deve disparar a CI para o HEAD atualizado. Ainda não há resultado de `validate` nem de `android-build` para esse novo SHA.
+
+
+## DB-185 · 2026-10-30 — Consumir prompt ELM já bufferizado antes de sondar o socket
+
+### Causa
+- `readUntilPrompt()` consultava `device.isConnected()` antes de procurar o delimitador `>` já recebido. Se a sonda nativa rejeitasse ou ficasse lenta, a resposta completa já presente no buffer não era consumida naquele ciclo e podia terminar em erro apesar de o framing estar disponível.
+
+### Correção
+- A leitura agora verifica e consome primeiro o prompt já bufferizado, incluindo a política existente de overflow e descarte de conteúdo após o primeiro prompt.
+- Só quando ainda não há prompt no buffer é feita a sonda nativa limitada pelo tempo restante; o limite global de leitura continua finito.
+- `tests/bluetoothLifecycle.test.js` protege a ordem para impedir regressão. O teste é um contrato de ordem do código, não uma simulação de hardware.
+
+### Validação e limites
+- A PR #96 já havia sido mesclada em `main` em 2026-10-30; esta correção segue em uma nova branch para revisão isolada, sem reescrever a PR integrada.
+- A CI do commit integrado `19636997c0a023f2e5ca70a09e8201dfe198f754` concluiu com sucesso antes desta correção; não é evidência de validação do novo código.
+- A nova PR precisa concluir `validate` e `android-build` no mesmo SHA. Não foi possível executar os comandos localmente através da integração GitHub.
+- Teste físico de RFCOMM, inicialização ELM e resposta real da ECU a `010C` no Galaxy A06 / Android 16 continua pendente.
