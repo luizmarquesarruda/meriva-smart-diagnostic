@@ -129,7 +129,7 @@ O ELM327 deve estar previamente pareado no Android. O aplicativo escolhe automat
 
 ## Build Android e distribuição
 
-O fluxo de build vigente usa Expo prebuild + Gradle na GitHub Actions e gera um APK standalone. EAS Build e atualização OTA não fazem parte do fluxo atual; não há publicação remota automática. Cada alteração de código exige gerar e instalar um novo APK. O artefato correto deve ser baixado da execução de CI correspondente ao SHA exato que será testado.
+O fluxo de build usa Expo prebuild + Gradle na GitHub Actions e gera um APK standalone. Após `validate` e `android-build` passarem em um push para `main`, a CI publica automaticamente uma GitHub Release com o APK. O link estável para a versão mais recente é [Baixar Meriva Smart APK](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/releases/latest/download/meriva-smart-diagnostic.apk). Builds de PR continuam como artefatos temporários da CI e não são publicados como versão estável. EAS Build e atualização OTA não fazem parte do fluxo atual. No Android, o download pode ser iniciado pelo link; a instalação/atualização exige confirmação do usuário.
 
 ```bash
 npm ci --no-audit --no-fund
