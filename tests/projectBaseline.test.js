@@ -173,6 +173,9 @@ assert.match(read('src/storage/quotaManager.ts'), /TAMANHO_DE_ARQUIVO_INDISPONIV
 assert.match(read('src/storage/backup.ts'), /MAX_BACKUPS_TO_KEEP\s*=\s*5/);
 assert.match(read('src/storage/backup.ts'), /manifest\.json/);
 assert.match(read('src/storage/backup.ts'), /'MANUTENCAO'/, 'backups must include maintenance and refueling records');
+assert.match(read('src/storage/backup.ts'), /export async function restoreBackup/);
+assert.match(read('src/storage/backup.ts'), /readVerifiedManifest/, 'restore must verify backup manifests and contents');
+assert.match(read('app/configuracoes.tsx'), /Confirmar|Restaurar backup\?/, 'restore must require an explicit destructive confirmation');
 assert.match(read('src/storage/quotaManager.ts'), /'MANUTENCAO'/, 'storage breakdown must account for maintenance data');
 assert.match(read('src/meriva/autosaveManager.ts'), /'MANUTENCAO'/, 'startup must provision the maintenance data directory');
 assert.match(read('src/database/maintenanceStorage.ts'), /MANUTENCAO\/registros\.json/);
