@@ -210,3 +210,35 @@ A política de confiança é coerente: REAL_OBD, SIMULACAO, CARSCANNER_BASELINE 
 A estrutura atual é coerente para um aplicativo Android OBD com foco operacional no Chevrolet Meriva, com bom isolamento do transporte, sessão serial, parser, dados reais, GPS e persistência local. O principal risco imediato não é uma ausência de camadas, mas a validação ainda incompleta do hardware real e do APK no SHA final.
 
 As correções da PR #98 não devem ser consideradas aceitas apenas porque `validate` passou. O build Android, o APK e o teste físico continuam gates independentes. As dívidas multi-veículo, SQLite e atualização de SDK devem ser tratadas como frentes planejadas e não misturadas à estabilização Bluetooth.
+
+
+## 9. Execução das prioridades — atualização 2026-10-30
+
+### P0 — Bluetooth e APK
+- Revisado o caminho RFCOMM/ELM já presente na PR: socket Classic com stream ASCII, prompt `>` consumido antes de sondar conexão nativa, timeout RX sem prompt invalidando o stream e trava compartilhada durante limpeza nativa.
+- Revisados o gate real 010C, seleção automática de candidatos pareados, tentativa de protocolos e serialização da sessão. Não foi feita alteração de protocolo sem evidência do adaptador real.
+- A CI é deduplicada por repositório/branch para push e pull_request, evitando builds paralelos do mesmo branch.
+- **Limite físico:** nenhum código pode verificar o rádio, adaptador, ECU ou APK instalado no Galaxy A06 neste ambiente. A homologação física continua pendente.
+
+### P1 — GPS e autonomia
+- Código existente do GPS foi cruzado com testes: timestamp crescente, precisão conhecida, janela de três segmentos/quatro posições, filtro de drift, watchdog de fix e separação entre velocidade OBD/GPS.
+- Autonomia foi cruzada com a política 012F/015E: leitura atual tem prioridade; fallback exige 10 leituras reais, expira em 60 s, usa relógio monotônico e é limpo na perda da resposta ECU/troca de sessão.
+- Não houve mudança das fórmulas de GPS/combustível sem dados medidos no veículo; validar distância em trajeto e autonomia com abastecimento real é obrigatório.
+
+### P1 — Persistência, backup e restauração
+- **Defeito encontrado e corrigido:** `MANUTENCAO/registros.json` ficava fora do backup, da quebra de uso de armazenamento e da exportação JSON. Agora `MANUTENCAO` é criado na inicialização, incluído no backup verificado, contabilizado na tela de armazenamento e exportado.
+- Implementada listagem de backups íntegros e restauração com validação do manifesto/tamanho por diretório, staging, cópia de segurança prévia e rollback dos diretórios afetados em falha.
+- Configurações solicita confirmação destrutiva, desconecta o OBD, encerra a viagem, descarrega o autosave e re-hidrata o estado em memória após a restauração.
+- Regressões adicionadas para MANUTENCAO em backup/quota e para restauração, cópia de segurança e rejeição de snapshot alterado.
+
+### P2 — Decisões concluídas
+- Escopo atual explicitado como Chevrolet Meriva; multi-veículo não será anunciado nem simulado até existir projeto completo de generalização.
+- Decidido manter JSON/TXT/CSV por ora; SQLite será reavaliado somente com métricas de volume, latência e consultas que justifiquem a migração.
+- Registrado plano de modernização do Expo/RN em separado, condicionado a baseline físico e atualização incremental SDK a SDK. Nenhum upgrade arriscado foi misturado à estabilização Bluetooth.
+
+**Registro de decisão:** `docs/DECISOES_ARQUITETURA_2026-10-30.md`.
+
+### Validação
+- Uma execução inicial reprovou somente na expectativa de tamanho da suíte de quota depois da inclusão correta de MANUTENCAO (1,6 MB em vez de 1,5 MB); a expectativa foi corrigida.
+- O SHA de código/documentação mais recente precisa concluir `validate` e `android-build` no mesmo HEAD. O build APK e a inspeção do artefato não serão presumidos antes dessa conclusão.
+- Teste físico Galaxy A06 / SM-A065M / Android 16 + ELM327/ECU, percurso GPS e autonomia seguem pendentes.
