@@ -176,6 +176,7 @@ assert.match(read('src/storage/backup.ts'), /'MANUTENCAO'/, 'backups must includ
 assert.match(read('src/storage/quotaManager.ts'), /'MANUTENCAO'/, 'storage breakdown must account for maintenance data');
 assert.match(read('src/meriva/autosaveManager.ts'), /'MANUTENCAO'/, 'startup must provision the maintenance data directory');
 assert.match(read('src/database/maintenanceStorage.ts'), /MANUTENCAO\/registros\.json/);
+assert.match(read('src/storage/exportDiagnostics.ts'), /readMaintenanceData/, 'diagnostic JSON export must carry manual maintenance/refueling records');
 assert.match(read('src/meriva/autosaveValidation.ts'), /validateDriveCycles/);
 assert.match(read('src/meriva/autosaveValidation.ts'), /validateDtcs/);
 assert.match(read('src/gps/gpsTracker.ts'), /c\.latitude < -90/);
