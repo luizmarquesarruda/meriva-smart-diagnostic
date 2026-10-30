@@ -77,10 +77,11 @@ export default function ConfiguracaoScreen() {
     setBusy(true);
     let tripServiceStopped = false;
     try {
-      // Stop the OBD/Trip owners before replacing files they may persist.
+      // Mark cleanup as required before awaiting either owner; a failing native
+      // close or trip finalization must still enter the recovery path below.
+      tripServiceStopped = true;
       await disconnectSharedObd();
       await autoTripService.stop();
-      tripServiceStopped = true;
       const stateSaved = await saveNow('critical');
       if (!stateSaved) throw new Error('AUTOSAVE ATUAL NÃO FOI CONFIRMADO; RESTAURAÇÃO CANCELADA PARA EVITAR PERDA DE DADOS.');
 
@@ -107,6 +108,7 @@ export default function ConfiguracaoScreen() {
       // the runtime even on failure so autosave never keeps a stale snapshot.
       if (tripServiceStopped) {
         try {
+          await autoTripService.stop();
           disposeAutoSave();
           await initAutoSave(storageBase);
           await autoTripService.start(storageBase);
