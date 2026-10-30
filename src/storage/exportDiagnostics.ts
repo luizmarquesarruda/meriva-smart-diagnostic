@@ -2,6 +2,7 @@ import * as FileSystem from 'expo-file-system';
 import { getAutoSaveState } from '../meriva/autosaveManager';
 import { readDtcs } from '../database/dtcManager';
 import { readDriveCycles } from './driveCycleStorage';
+import { readMaintenanceData } from '../database/maintenanceStorage';
 import { escapeCsvCell } from './csvEncoding';
 
 async function ensureExportDir(basePath: string): Promise<string> {
@@ -14,6 +15,7 @@ export async function exportDiagnosticsJson(basePath: string): Promise<string> {
   const state = getAutoSaveState();
   const dtcs = await readDtcs(basePath);
   const driveCycles = await readDriveCycles(basePath);
+  const maintenance = await readMaintenanceData(basePath);
   const dir = await ensureExportDir(basePath);
   const path = `${dir}/diagnostic_${Date.now()}.json`;
   await FileSystem.writeAsStringAsync(path, JSON.stringify({
@@ -23,6 +25,7 @@ export async function exportDiagnosticsJson(basePath: string): Promise<string> {
     lastReadings: state.lastReadings,
     dtcs,
     driveCycles,
+    maintenance,
     autonomy: state.autonomy,
     sourcePolicy: {
       realObd: 'REAL_OBD',
