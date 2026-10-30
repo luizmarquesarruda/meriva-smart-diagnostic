@@ -1,11 +1,13 @@
-## ESTADO VIGENTE — 2026-10-30 (PR #96 integrada; correção de transporte em validação)
+## ESTADO VIGENTE — 2026-10-30 (conectividade ELM327 + OTA segura em validação)
 
-> Frente única de trabalho: correção crítica do transporte ELM327 na branch `fix/elm-buffered-prompt-20261030`. PR #96 já foi integrada; não é mais uma PR aberta.
+> Frente única de trabalho: PR #98 / branch `fix/elm-buffered-prompt-20261030`, reunindo a correção de framing ELM327 e a configuração OTA reconciliada sobre o main atual.
 
 - Repositório: [luizmarquesarruda/meriva-smart-diagnostic](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
 - PR #96: [Evita DTC duplicado no cockpit e mostra pressão do coletor](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/96) foi mesclada em 2026-10-30; merge commit `0397cb8d716895200e2bc045beef27603f4a272d`.
 - A CI consultada no SHA `19636997c0a023f2e5ca70a09e8201dfe198f754` concluiu com sucesso. Esse resultado não substitui validação do novo SHA nem teste físico.
-- Correção em andamento: verificar o prompt `>` já recebido antes de fazer uma nova sonda nativa `isConnected()`; adicionar proteção anti-regressão e registrar a alteração neste diário.
+- Correção ELM: verificar primeiro o prompt `>` já recebido antes de sondar novamente `isConnected()`; a ordem está protegida em `tests/bluetoothLifecycle.test.js`.
+- OTA: a preparação da antiga PR #97 foi portada sobre o `main` atual. A PR antiga estava 177 commits atrás e tinha removido testes existentes do `npm test`; a versão reconciliada preserva todas as suítes e acrescenta `easUpdateConfig.test.js`.
+- A publicação OTA continua desabilitada por padrão: somente poderá executar após push em `main`, sucesso de `validate` e `android-build`, variável `EAS_UPDATE_ENABLED=true` e secret `EXPO_TOKEN`. Projeto/owner/canal EAS ainda exigem confirmação no painel/CLI Expo; não foi publicado update.
 - Antes de considerar esta rodada validada, exigir `validate` e `android-build` verdes no mesmo SHA da nova PR, diff revisado e reconciliação com `main`.
 - Testes com Galaxy A06 / SM-A065M / Android 16, adaptador ELM327 real, resposta ECU válida a `010C`, inspeção do APK instalado e validação física de GPS/autonomia continuam pendentes.
 - Não foi implementada fila offline-first de envio de telemetria porque a auditoria do código não encontrou um caminho de upload de telemetria ou WebSocket que a justificasse; persistência e exportação locais existem. Não inventar endpoint ou contrato de nuvem sem requisito verificável.
@@ -274,6 +276,7 @@
 - **DB-183** · 2026-10-30 — Confirmar movimento urbano sem exigir 8 m em cada callback GPS
 - **DB-184** · 2026-10-30 — Sincronizar índice DB-NNN com as novas entradas de auditoria
 - **DB-185** · 2026-10-30 — Consumir prompt ELM já bufferizado antes de sondar o socket
+- **DB-186** · 2026-10-30 — Reconciliar configuração OTA e preservar todas as suítes de teste
 
 ---
 
@@ -4833,3 +4836,21 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - A CI do commit integrado `19636997c0a023f2e5ca70a09e8201dfe198f754` concluiu com sucesso antes desta correção; não é evidência de validação do novo código.
 - A nova PR precisa concluir `validate` e `android-build` no mesmo SHA. Não foi possível executar os comandos localmente através da integração GitHub.
 - Teste físico de RFCOMM, inicialização ELM e resposta real da ECU a `010C` no Galaxy A06 / Android 16 continua pendente.
+
+
+## DB-186 · 2026-10-30 — Reconciliar configuração OTA e preservar todas as suítes de teste
+
+### Defeito encontrado na antiga PR #97
+- A branch OTA estava 177 commits atrás de `main`, com mergeabilidade negativa.
+- Seu `package.json` tinha removido da sequência `npm test` suítes existentes no `main`, incluindo `locationProviders.test.js`, `csvEncoding.test.js` e `sourceStatusLegend.test.js`. O gate `tests/projectBaseline.test.js` exige que todos os arquivos `tests/*.test.js` estejam ligados ao comando de testes; essa omissão faria a reconciliação falhar e permitiria perder cobertura.
+- O lockfile OTA foi gerado sobre uma árvore antiga e não deve substituir diretamente o lockfile mais recente.
+
+### Correção aplicada nesta branch
+- Portadas as configurações OTA de forma seletiva sobre o `main` integrado: `app.json`, `eas.json`, `expo-updates ~0.25.27`, dependências correspondentes do lockfile, job de publicação condicionado e documentação.
+- O script `npm test` atual foi preservado integralmente e somente ganhou `tests/easUpdateConfig.test.js`; todas as entradas novas do lockfile foram acrescentadas sem descartar as dependências atuais.
+- O gate de publicação permanece fechado por padrão e ignora commits que alterem configuração/dependências/código nativo. A primeira APK com o módulo `expo-updates` é obrigatória antes de qualquer OTA.
+
+### Validação e limites
+- O vínculo de owner, slug, project ID e canal remoto ainda não foi autenticado contra o serviço Expo nesta sessão. A variável `EAS_UPDATE_ENABLED` deve permanecer desativada até a verificação no painel/CLI e a instalação/teste da APK inicial.
+- A CI deve validar `npm ci`, Expo Doctor, gate, TypeScript, todas as suítes e build Android no SHA final desta PR.
+- Não houve publicação OTA e não houve teste em aparelho real nesta etapa.
