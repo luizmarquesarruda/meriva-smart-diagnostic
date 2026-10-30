@@ -15,7 +15,7 @@ const dashboard = fs.readFileSync(path.join(ROOT, 'app', 'index.tsx'), 'utf8');
 
 assert(transport.includes('onConnected?: () => void'));
 assert(transport.includes('onDisconnected?: (reason: string) => void'));
-assert.match(transport, /normalizeBluetoothAddress\\(eventAddress\\) !== normalizeBluetoothAddress\\(this\\.deviceAddress\\)/,
+assert.ok(transport.includes('normalizeBluetoothAddress(eventAddress) !== normalizeBluetoothAddress(this.deviceAddress)'),
   'eventos Android devem comparar o MAC normalizado, independentemente de caixa/separadores');
 assert(transport.includes('this.callbacks?.onConnected?.()'));
 assert(transport.includes("this.callbacks?.onDisconnected?.('BLUETOOTH DESCONECTADO')"));
