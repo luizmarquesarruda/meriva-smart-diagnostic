@@ -102,7 +102,7 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 - Manter as dez leituras válidas mais recentes da mesma sessão ECU. Com menos de 10/10, não existe fallback.
 - Leitura ao vivo com até 30 s prevalece; quando ficar desatualizada, a mediana do buffer pode sustentar estimativa temporária até 60 s após a última leitura válida. Depois disso, autonomia retorna N/D.
 - Rejeitar timestamp futuro, duplicado/regressivo e nível fora de 0–100. Resetar buffer ao iniciar/trocar/encerrar sessão ECU; não persistir amostras entre sessões.
-- A interface identifica o buffer explicitamente e não o apresenta como leitura atual do PID. ECU deve continuar conectada e o consumo médio deve ser positivo e confiável.
+- Calcular a média aritmética simples das dez porcentagens (não mediana); a interface identifica o buffer explicitamente e não o apresenta como leitura atual do PID. ECU deve continuar conectada e o consumo médio deve ser positivo e confiável.
 - Testes: tests/fuelLevelBuffer.test.js e tests/autonomyPresentation.test.js; validação física confirma resposta real 012F da ECU.
 
 ## PID-AI-01 — Proveniência, frescor e rastreabilidade do diagnóstico local
