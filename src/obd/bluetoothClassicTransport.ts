@@ -574,7 +574,7 @@ export class BluetoothClassicTransport implements ObdTransport {
     if (RNBluetoothClassic.onDeviceDisconnected) {
       this.disconnectSubscription = RNBluetoothClassic.onDeviceDisconnected((event) => {
         const eventAddress = event?.address ?? event?.device?.address;
-        if (eventAddress && eventAddress !== this.deviceAddress) return;
+        if (eventAddress && normalizeBluetoothAddress(eventAddress) !== normalizeBluetoothAddress(this.deviceAddress)) return;
         this.logDiagnostic('DEVICE_DISCONNECTED', eventAddress ?? {});
         this.markDisconnected();
       });

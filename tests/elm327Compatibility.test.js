@@ -4,7 +4,7 @@ const path = require('path');
 const Module = require('module');
 const ts = require('typescript');
 
-function loadTs(tsPath) {
+function loadTs(tsPath, overrides = {}) {
   const source = fs.readFileSync(tsPath, 'utf8');
   const output = ts.transpileModule(source, {
     compilerOptions: {
@@ -16,7 +16,13 @@ function loadTs(tsPath) {
   const mod = new Module(tsPath, null);
   mod.filename = tsPath;
   mod.paths = Module._nodeModulePaths(path.dirname(tsPath));
-  mod._compile(output, tsPath);
+  const originalLoad = Module._load;
+  Module._load = function(request, parent, isMain) {
+    if (parent && parent.filename === tsPath && Object.prototype.hasOwnProperty.call(overrides, request)) return overrides[request];
+    return originalLoad.apply(this, arguments);
+  };
+  try { mod._compile(output, tsPath); }
+  finally { Module._load = originalLoad; }
   return mod.exports;
 }
 
@@ -32,9 +38,8 @@ assert.equal(classify('BUS ERROR\r\n'), 'ERROR');
 assert.equal(classify('ELM327 v1.5\r\n>'), 'OK');
 assert.equal(classify(''), 'NO_RESPONSE');
 
-const { classifyElmError, mergeCompatibilityConfig, getRecoveryProtocolCommand, resolveMaxConnectionAttempts } = loadTs(
-  path.join(__dirname, '..', 'src', 'obd', 'elm327Compatibility.ts'),
-);
+const compatibility = loadTs(path.join(__dirname, '..', 'src', 'obd', 'elm327Compatibility.ts'));
+const { classifyElmError, mergeCompatibilityConfig, getRecoveryProtocolCommand, resolveMaxConnectionAttempts } = compatibility;
 assert.equal(classifyElmError('NO DATA'), 'NO_DATA');
 assert.equal(classifyElmError('BUFFER FULL'), 'BUFFER_FULL');
 assert.equal(classifyElmError('BUS ERROR'), 'BUS_ERROR');
@@ -65,3 +70,52 @@ const customTimeouts = mergeCompatibilityConfig({ optionalAtTimeoutMs: 1800, pro
 assert.equal(customTimeouts.optionalAtTimeoutMs, 1800);
 assert.equal(customTimeouts.protocolSelectionTimeoutMs, 9000);
 console.log('ELM327 compatibility regression tests: PASS');
+
+
+(async () => {
+  const parserStub = { parsePidResponse: () => ({ status: 'RESPONDEU', value: 800, unit: 'rpm' }) };
+  const { Elm327Session } = loadTs(
+    path.join(__dirname, '..', 'src', 'obd', 'elm327.ts'),
+    { './parser': parserStub, './elm327Compatibility': compatibility },
+  );
+  class FakeTransport {
+    failNextWrite = false;
+    timeoutNextRead = false;
+    async open() {}
+    async close() {}
+    async write() {
+      if (this.failNextWrite) {
+        this.failNextWrite = false;
+        throw new Error('NATIVE WRITE FAILURE');
+      }
+    }
+    async readUntilPrompt() {
+      if (this.timeoutNextRead) {
+        this.timeoutNextRead = false;
+        throw new Error('TIMEOUT: RESPOSTA ELM SEM PROMPT FINAL');
+      }
+      return 'OK';
+    }
+  }
+  const transport = new FakeTransport();
+  const session = new Elm327Session(transport, {
+    ...compatibility.DEFAULT_ELM327_COMPATIBILITY,
+    commandDelayMs: 0, adaptiveTiming: false, ioTimeoutMs: 1000,
+    optionalAtTimeoutMs: 1000, protocolSelectionTimeoutMs: 1000,
+  });
+  await session.initialize();
+  transport.failNextWrite = true;
+  const writeFailure = await session.executeCommand('010C');
+  assert.equal(writeFailure.status, 'ERROR');
+  let health = session.getHealthSnapshot();
+  assert.equal(health.timeouts, 0, 'falha de escrita não pode inflar timeout');
+  assert.equal(health.errors, 1, 'falha de escrita deve aumentar errors');
+  transport.timeoutNextRead = true;
+  const readTimeout = await session.executeCommand('010D');
+  assert.equal(readTimeout.status, 'TIMEOUT');
+  health = session.getHealthSnapshot();
+  assert.equal(health.timeouts, 1, 'somente timeout real incrementa timeouts');
+  assert.equal(health.errors, 1, 'timeout não duplica em errors');
+  await session.close();
+  console.log('ELM327 health counters: PASS');
+})().catch((error) => { console.error(error); process.exitCode = 1; });
