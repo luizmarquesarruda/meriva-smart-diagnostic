@@ -4775,3 +4775,26 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - Commit desta correção GPS: `408cb7a558c069afeb3de446c08207be1df5f019`.
 - A validação automatizada no novo HEAD precisa concluir `validate` e `android-build`. Nenhuma aprovação de CI é presumida neste registro.
 - Não houve teste físico de GPS nem conexão real Bluetooth/ELM327/ECU no Galaxy A06 / Android 16. Nenhum merge foi realizado.
+
+
+## DB-183 · 2026-10-30 — Confirmar movimento urbano sem exigir 8 m em cada callback GPS
+
+### Defeito confirmado
+- A lógica anterior exigia `MIN_MOVEMENT_DISTANCE_M = 8` em cada segmento de dois fixes. Com atualização configurada a cada 1 s e deslocamento de 10 km/h, o veículo percorre cerca de 2,8 m por segmento; nenhum segmento alcançava 8 m e o contador nunca chegava aos três segmentos necessários.
+- A branch histórica `fix/gps-movement-confirmation-20261027` continha uma correção direcionada para o problema, mas ela não estava presente no código da PR #96.
+
+### Correção portada
+- O limite mínimo por segmento passou a considerar o tempo decorrido e uma fração do limite de precisão; cada segmento ainda precisa indicar velocidade coerente e não pode exceder 250 m.
+- A confirmação exige três segmentos válidos consecutivos (quatro posições) e deslocamento líquido acumulado pelo menos igual ao limite de precisão entre o início e o fim da janela.
+- Segmento fora do limite, intervalo excessivo ou fix sem precisão aceitável reinicia a janela, impedindo acumular jitter em distância real.
+- A velocidade apresentada continua separando fonte OBD e GPS; a mudança não trata uma amostra GPS como resposta da ECU.
+
+### Regressões adicionadas
+- Cenário de 10 km/h com quatro posições separadas por 1 s e cerca de 2,8 m por segmento.
+- A suíte existente continua cobrindo zigue-zague parado, amostras sem precisão, timestamp inválido/regressivo, salto geográfico e expiração de fix.
+
+### Validação e limites
+- Implementação: `9b318122ce353279a0f2b3de6672c835772ef2dc`.
+- Teste de movimento urbano: `9213dc5d6fe9f164425d9c2e9c858b1d0403986d`.
+- A CI completa deve validar o HEAD final; testes automatizados não equivalem a percurso real.
+- Continua pendente ensaio físico no Galaxy A06 / SM-A065M / Android 16, comparando distância GPS com trajeto/odômetro conhecido, incluindo baixa velocidade e parada. Nenhuma validação física foi declarada e nenhum merge foi realizado.
