@@ -1,14 +1,14 @@
-## ESTADO VIGENTE — 2026-10-30 (corrigir Expo Doctor e fechar validação Bluetooth/OTA)
+## ESTADO VIGENTE — 2026-10-30 (priorizar APK instalável e conexão Bluetooth)
 
-> Frente única de trabalho: PR #98 / branch `fix/elm-buffered-prompt-20261030`, reunindo a correção de framing ELM327 e a configuração OTA reconciliada sobre o main atual.
+> Frente única de trabalho: PR #98 / branch `fix/elm-buffered-prompt-20261030`, priorizando a correção de framing ELM327 e a geração verificável de APK. Atualização OTA removida temporariamente.
 
 - Repositório: [luizmarquesarruda/meriva-smart-diagnostic](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
 - PR #96: [Evita DTC duplicado no cockpit e mostra pressão do coletor](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/96) foi mesclada em 2026-10-30; merge commit `0397cb8d716895200e2bc045beef27603f4a272d`.
 - A CI consultada no SHA `19636997c0a023f2e5ca70a09e8201dfe198f754` concluiu com sucesso. Esse resultado não substitui validação do novo SHA nem teste físico.
 - Correção ELM: verificar primeiro o prompt `>` já recebido antes de sondar novamente `isConnected()`; a ordem está protegida em `tests/bluetoothLifecycle.test.js`.
-- OTA: a preparação da antiga PR #97 foi portada sobre o `main` atual. A PR antiga estava 177 commits atrás e tinha removido testes existentes do `npm test`; a versão reconciliada preserva todas as suítes e acrescenta `easUpdateConfig.test.js`.
-- A primeira CI OTA identificou a versão incompatível de `expo-updates` (corrigida em DB-187). A validação do YAML também identificou dois comandos `run: echo` com `:` sem aspas, que impediam a criação dos jobs em eventos `push`; DB-188 registra a correção com blocos YAML. A publicação OTA continua opt-in.
-- Antes de considerar esta rodada validada, exigir `validate` e `android-build` verdes no mesmo SHA da nova PR, diff revisado e reconciliação com `main`.
+- A configuração de atualização OTA foi removida por decisão operacional: a publicação online exigia configurar a conta Expo, canal e credenciais, o que ainda não foi concluído. A distribuição nesta etapa será por APK gerado na CI; a remoção não altera a lógica de Bluetooth, GPS, autonomia nem a persistência local.
+- O workflow mantém validação, gate anti-regressão e compilação Android com upload do APK como artefato; não há mais job de publicação OTA.
+- Antes de considerar esta rodada validada, exigir `validate` e `android-build` verdes no mesmo SHA da PR, diff revisado e reconciliação com `main`.
 - Testes com Galaxy A06 / SM-A065M / Android 16, adaptador ELM327 real, resposta ECU válida a `010C`, inspeção do APK instalado e validação física de GPS/autonomia continuam pendentes.
 - Não foi implementada fila offline-first de envio de telemetria porque a auditoria do código não encontrou um caminho de upload de telemetria ou WebSocket que a justificasse; persistência e exportação locais existem. Não inventar endpoint ou contrato de nuvem sem requisito verificável.
 - DB-145 registra a regressão de leitura KWP e classificação de estado ECU/Bluetooth; DB-162/163/164/166 protegem o ciclo RFCOMM; DB-165 limita HTTP de clima; DB-167 expira fixes GPS antigos; DB-168 neutraliza fórmula no CSV; DB-169 torna o start GPS não bloqueante para o polling OBD e aplica cooldown de retry. DB-170 atualiza o gate para aceitar a proteção de timestamp por `state.lastTimestamp`. DB-171 serializa cancelamento da descoberta; DB-172 valida coeficientes/resultados de fórmula; DB-173 corrige documentação cloud; DB-174 centraliza os tokens de cor compartilhados nas telas. DB-175 limita as chamadas de localização opcionais e usa backoff exponencial para o enriquecimento online. DB-177 limita a própria operação nativa de desconexão e mantém o bloqueio RFCOMM se ela expirar; DB-178 bloqueia reconexão quando a sonda do socket fica indeterminada; DB-179 reutiliza a Promise nativa pendente para impedir desconexões concorrentes; DB-180 bloqueia novos comandos após timeout sem prompt para evitar que resposta atrasada seja atribuída ao PID seguinte. DB-182/183 corrigem regressões e cobertura do GPS (timestamp monotônico, ciclo background e movimento urbano); DB-184 mantém o índice do diário alinhado à sequência de IDs.
@@ -279,6 +279,7 @@
 - **DB-186** · 2026-10-30 — Reconciliar configuração OTA e preservar todas as suítes de teste
 - **DB-187** · 2026-10-30 — Alinhar expo-updates à versão exigida pelo Expo Doctor
 - **DB-188** · 2026-10-30 — Corrigir strings run do job OTA para YAML válido
+- **DB-189** · 2026-10-30 — Remover atualização OTA e simplificar a entrega por APK
 
 ---
 
@@ -4884,3 +4885,18 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 
 ### Validação
 - A CI deverá criar os jobs normalmente no novo commit. O job de validação ainda precisa comprovar Expo Doctor, baseline, TypeScript e testes; Android precisa concluir a montagem do APK no mesmo SHA.
+
+## DB-189 · 2026-10-30 — Remover atualização OTA e simplificar a entrega por APK
+
+### Decisão
+- A configuração de publicação OTA foi retirada temporariamente porque a configuração remota de owner/projeto/canal e credenciais não foi concluída e não é requisito para validar o aplicativo no aparelho.
+- A distribuição nesta fase será feita pelo APK standalone gerado e publicado como artefato da CI, sem publicação de código pelo EAS Update.
+
+### Alterações
+- Removidos expo-updates, as configurações updates/runtimeVersion, owner e project ID da configuração Expo, a referência ao canal nos perfis EAS, o job publish-ota, o teste exclusivo de OTA e a documentação específica de ativação.
+- Mantidos os jobs de validação, baseline anti-regressão, Expo Doctor, typecheck, testes existentes e build Android com upload do APK. O contrato de teste continua exigindo que todas as suítes presentes estejam ligadas ao npm test.
+- A mudança não declara conectividade Bluetooth validada: continua necessário instalar o APK e testar o adaptador ELM327 real, incluindo inicialização ELM e resposta válida da ECU a 010C no Galaxy A06 / Android 16.
+
+### Validação
+- A CI precisa executar novamente no novo SHA: npm ci, Expo Doctor, baseline, TypeScript, suíte completa e montagem do APK no mesmo commit.
+- Nenhuma atualização OTA foi publicada. Nenhum merge foi realizado por esta alteração.

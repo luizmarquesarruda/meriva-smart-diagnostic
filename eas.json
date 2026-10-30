@@ -4,14 +4,12 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
-      },
-      "channel": "production"
+      }
     },
     "production": {
       "android": {
         "buildType": "apk"
       },
-      "channel": "production",
       "distribution": "internal"
     }
   }
