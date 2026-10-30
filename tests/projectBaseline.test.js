@@ -37,6 +37,8 @@ const diagnosticsExporter = read('src/storage/exportDiagnostics.ts');
 // Gate itself must be a first-class CI step, not a note in the diary.
 assert.equal(packageJson.scripts['gate:baseline'], 'node tests/projectBaseline.test.js');
 assert.match(workflow, /name: Run anti-regression baseline gate[\s\S]*?run: npm run gate:baseline/);
+assert.match(workflow, /group: ci-\$\{\{ github\.workflow \}\}-\$\{\{ github\.event\.pull_request\.head\.repo\.full_name \|\| github\.repository \}\}-\$\{\{ github\.head_ref \|\| github\.ref_name \}\}/,
+  'push and pull_request for the same branch must share one CI concurrency group');
 assert.equal(packageJson.scripts.validate, 'npm run typecheck && npm test');
 
 // Regression-sensitive suites must remain connected to npm test.
@@ -170,6 +172,10 @@ assert.match(read('src/storage/quotaManager.ts'), /cleanupToTarget/);
 assert.match(read('src/storage/quotaManager.ts'), /TAMANHO_DE_ARQUIVO_INDISPONIVEL/);
 assert.match(read('src/storage/backup.ts'), /MAX_BACKUPS_TO_KEEP\s*=\s*5/);
 assert.match(read('src/storage/backup.ts'), /manifest\.json/);
+assert.match(read('src/storage/backup.ts'), /'MANUTENCAO'/, 'backups must include maintenance and refueling records');
+assert.match(read('src/storage/quotaManager.ts'), /'MANUTENCAO'/, 'storage breakdown must account for maintenance data');
+assert.match(read('src/meriva/autosaveManager.ts'), /'MANUTENCAO'/, 'startup must provision the maintenance data directory');
+assert.match(read('src/database/maintenanceStorage.ts'), /MANUTENCAO\/registros\.json/);
 assert.match(read('src/meriva/autosaveValidation.ts'), /validateDriveCycles/);
 assert.match(read('src/meriva/autosaveValidation.ts'), /validateDtcs/);
 assert.match(read('src/gps/gpsTracker.ts'), /c\.latitude < -90/);
