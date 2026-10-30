@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Smart OBD Diagnostic",
-    "slug": "smart-obd-diagnostic",
+    "slug": "meriva",
     "scheme": "smart-obd-diagnostic",
     "version": "1.0.1",
     "orientation": "default",
@@ -58,6 +58,23 @@
       "image": "./assets/splash.png",
       "backgroundColor": "#07111f",
       "resizeMode": "contain"
+    },
+    "owner": "luizarruda",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "enabled": true,
+      "url": "https://u.expo.dev/013db816-eec1-4406-8952-d6c0731cf461",
+      "checkAutomatically": "ON_LOAD",
+      "requestHeaders": {
+        "expo-channel-name": "production"
+      }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "013db816-eec1-4406-8952-d6c0731cf461"
+      }
     }
   }
 }
