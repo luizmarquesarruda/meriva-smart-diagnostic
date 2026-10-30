@@ -119,7 +119,7 @@ O módulo src/obd/fuelIdentification.ts é deliberadamente conservador. Ele sepa
 
 O aplicativo mantém CONFIG, BANCO, LEITURAS, APRENDIZADO, DTC, LOGS, VIAGENS e BACKUP.
 
-O autosave usa arquivo temporário, valida o conteúdo e mantém uma cópia anterior para recuperação.
+O autosave usa arquivo temporário, valida o conteúdo e mantém uma cópia anterior para recuperação. Backups manuais em Configurações incluem BANCO, APRENDIZADO, DTC, CONFIG, LEITURAS, LOGS, VIAGENS e MANUTENCAO. A lista de restauração exibe somente snapshots com manifesto/tamanhos íntegros; restaurar desconecta a ECU, cria antes uma cópia do estado atual e substitui somente os diretórios presentes no snapshot.
 
 ## Bluetooth
 
