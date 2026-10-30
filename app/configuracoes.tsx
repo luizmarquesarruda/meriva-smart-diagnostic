@@ -7,7 +7,7 @@ import * as FileSystem from 'expo-file-system';
 import { createBackup, listVerifiedBackups, restoreBackup, type StoredBackupInfo } from '../src/storage/backup';
 import { cleanupOldLogs, cleanupOldReadings } from '../src/storage/cleanup';
 import { VehicleProfile } from '../src/database/vehicleConfig';
-import { disposeAutoSave, getAutoSaveState, getAutoSaveStatus, initAutoSave } from '../src/meriva/autosaveManager';
+import { disposeAutoSave, getAutoSaveState, getAutoSaveStatus, initAutoSave, saveNow } from '../src/meriva/autosaveManager';
 import { autoTripService } from '../src/trip/autoTripService';
 import { disconnectSharedObd } from '../src/obd/sharedConnection';
 import { exportAutoSaveTxt, exportDailyObdHistoryTxt } from '../src/meriva/exportAutoSaveTxt';
@@ -77,6 +77,8 @@ export default function ConfiguracaoScreen() {
       await disconnectSharedObd();
       await autoTripService.stop();
       tripServiceStopped = true;
+      const stateSaved = await saveNow('critical');
+      if (!stateSaved) throw new Error('AUTOSAVE ATUAL NÃO FOI CONFIRMADO; RESTAURAÇÃO CANCELADA PARA EVITAR PERDA DE DADOS.');
 
       const restored = await restoreBackup(storageBase, backup.name);
       // Re-hydrate the in-memory autosave runtime from the restored CONFIG snapshot.
