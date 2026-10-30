@@ -5069,3 +5069,30 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - O SHA final após este registro deve concluir `validate` e `android-build` no mesmo workflow. A aprovação não é presumida.
 - Teste físico no Galaxy A06 / SM-A065M / Android 16 com ELM327 real, resposta ECU 010C, PIDs 012F/015E, percurso GPS, background e autonomia por abastecimento continuam pendentes.
 - PR #98 permanece aberta e não mesclada. CI verde não substitui ensaio no aparelho e no veículo.
+
+
+## DB-197 · 2026-10-30 — Publicação automática do APK estável
+
+### Objetivo
+- Eliminar a necessidade de localizar manualmente o artefato de cada execução de CI e oferecer um endereço estável para baixar a versão mais recente do Meriva Smart.
+
+### Implementação
+- O workflow .github/workflows/ci.yml ganhou o job publish-release, dependente de validate e android-build.
+- O job só executa em evento push para main; builds de pull request não são promovidos para distribuição estável.
+- O job baixa o APK produzido pela mesma execução, verifica que o arquivo existe e não está vazio e cria uma GitHub Release com tag exclusiva por execução/tentativa.
+- O APK é publicado com nome estável meriva-smart-diagnostic.apk, mantendo o endereço permanente:
+  https://github.com/luizmarquesarruda/meriva-smart-diagnostic/releases/latest/download/meriva-smart-diagnostic.apk.
+- A permissão contents: write foi limitada ao job de publicação; os demais jobs continuam com contents: read.
+- README atualizado com a regra de publicação, diferença entre artefatos de PR e releases estáveis e limitações da instalação Android.
+
+### Segurança e comportamento
+- Nenhuma versão é publicada se validação ou build Android falhar, pois o job depende dos dois jobs.
+- A release é gerada somente a partir de main; a PR #98 não publica versões estáveis enquanto não for integrada.
+- O download pode ser aberto pelo navegador Android. Instalar/atualizar o APK continua exigindo confirmação do usuário; não há instalação silenciosa nem atualização OTA.
+- Cada release preserva o SHA do commit nas notas e usa tag própria para rastreabilidade.
+
+### Validação pendente
+- A alteração precisa passar por nova CI no SHA resultante da PR.
+- Depois do merge, validar a primeira execução de push em main, confirmar a criação da Release, baixar o asset pelo endereço estável e instalar no Galaxy A06.
+- Não considerar o mecanismo validado apenas pela existência do YAML; a primeira publicação real é o teste de ponta a ponta.
+- PR #98 permanece sujeita às validações e ao teste físico Bluetooth/ELM327/ECU já registrados.
