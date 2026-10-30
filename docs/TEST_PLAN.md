@@ -178,3 +178,11 @@ O catálogo atual contém 34 PIDs, 20 fórmulas, 34 faixas e 30 avaliações de 
 - Buffer RX: exceder 16 KiB precisa gerar erro explícito, limitar diagnósticos a 256 caracteres e permitir receber um próximo quadro válido.
 - Buffer de descoberta: FIFO limitado, normalização, capacidade ajustável e isolamento por execução.
 - Aceitação física: comparar capturas RAW do ELM327/ECU para confirmar framing/checksum e precisão; testes sintéticos não substituem validação no veículo.
+
+
+## GPS-BG-02 — Lifecycle and timestamp recovery
+- A sample with a valid timestamp must be newer than the last accepted timestamp, including a sample whose coordinates were accepted but whose accuracy was unknown. Verify NaN, duplicate and regressive timestamps are rejected without changing sample count or distance.
+- After a regressive/invalid sample, recovery is permitted only with a strictly increasing timestamp.
+- The Expo Location test double must implement `hasStartedLocationUpdatesAsync`, `startLocationUpdatesAsync`, and `stopLocationUpdatesAsync`; do not let a caught TypeError stand in for a native lifecycle test.
+- Verify background task start, stop, and reuse when a native task is already active after JavaScript context recreation. Confirm no duplicate task registration and no retained watchdog timer after stop.
+- Physical validation remains required for Android foreground/background execution and permission transitions; mocked TaskManager/Location APIs are not a hardware or OS lifecycle test.
