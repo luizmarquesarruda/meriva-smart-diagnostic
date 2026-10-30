@@ -186,3 +186,10 @@ O catálogo atual contém 34 PIDs, 20 fórmulas, 34 faixas e 30 avaliações de 
 - The Expo Location test double must implement `hasStartedLocationUpdatesAsync`, `startLocationUpdatesAsync`, and `stopLocationUpdatesAsync`; do not let a caught TypeError stand in for a native lifecycle test.
 - Verify background task start, stop, and reuse when a native task is already active after JavaScript context recreation. Confirm no duplicate task registration and no retained watchdog timer after stop.
 - Physical validation remains required for Android foreground/background execution and permission transitions; mocked TaskManager/Location APIs are not a hardware or OS lifecycle test.
+
+
+## GPS-MOTION-04 — Movimento urbano em callbacks de 1 segundo
+- Com quatro posições GPS válidas a intervalos de 1 s, deslocamento aproximado de 2,8 m por segmento (10 km/h) e precisão de 5 m, confirmar movimento após três segmentos consecutivos sem exigir 8 m em cada segmento isolado.
+- Exigir deslocamento líquido do início ao fim da janela maior ou igual ao limite de precisão calculado; segmentos individuais acima de 250 m, velocidade incoerente, precisão inválida ou intervalo excessivo quebram a janela.
+- Confirmar que zigue-zague/jitter parado não aumenta a distância e que a distância só é adicionada após a confirmação da janela.
+- Ensaiar também no veículo, comparando com odômetro/percurso conhecido. O teste sintético não substitui validação de precisão GNSS no Android 16.
