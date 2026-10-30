@@ -98,7 +98,7 @@ jobs:
           APK="dist/app-release.apk"
           test -s "$APK"
           TAG="build-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"
-          gh release create "$TAG" "$APK#Meriva Smart APK" \
+          gh release create "$TAG" "$APK#meriva-smart-diagnostic.apk" \
             --repo "$GITHUB_REPOSITORY" \
             --title "Meriva Smart build ${GITHUB_RUN_NUMBER}" \
             --notes "APK standalone gerado pela CI após validate e android-build aprovados. Commit: ${GITHUB_SHA}." \
