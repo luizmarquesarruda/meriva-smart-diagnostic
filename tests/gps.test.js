@@ -192,6 +192,26 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
   assert.strictEqual(tracker.getState().running, false);
   unsubscribe();
 
+  // At 10 km/h, each 1 s segment is about 2.8 m. Three consecutive
+  // segments (four valid positions) must confirm urban movement without
+  // weakening the net-displacement gate against GPS drift.
+  const urbanTracker = new GpsTracker({
+    now: () => 150_000,
+    setIntervalFn: () => 43,
+    clearIntervalFn: (handle) => assert.strictEqual(handle, 43),
+  });
+  assert.strictEqual(await urbanTracker.start(), true);
+  urbanTracker.setVehicleSpeedHintKmh(10);
+  watcher({ coords: { latitude: 0, longitude: 0, speed: 10 / 3.6, accuracy: 5 }, timestamp: 40000 });
+  watcher({ coords: { latitude: 0, longitude: 0.000025, speed: 10 / 3.6, accuracy: 5 }, timestamp: 41000 });
+  watcher({ coords: { latitude: 0, longitude: 0.000050, speed: 10 / 3.6, accuracy: 5 }, timestamp: 42000 });
+  watcher({ coords: { latitude: 0, longitude: 0.000075, speed: 10 / 3.6, accuracy: 5 }, timestamp: 43000 });
+  assert.strictEqual(urbanTracker.getState().speedSource, 'OBD');
+  assert.strictEqual(urbanTracker.getState().currentSpeedKmh, 10);
+  assert.ok(urbanTracker.getState().distanceKm >= 0.008,
+    'three valid urban segments at 10 km/h must contribute confirmed distance');
+  await urbanTracker.stop();
+
   // A total loss of fresh GNSS fixes must expire stale GPS speed without erasing distance.
   // A fresh OBD speed remains independent and must be the actual value labelled OBD.
   let fakeNow = 100_000;
