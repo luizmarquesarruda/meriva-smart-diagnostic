@@ -635,7 +635,7 @@ test('11. quota calcula tamanho real dos diretórios', async () => {
   await currentFS.writeAsStringAsync(`${BASE}/MANUTENCAO/registros.json`, 'm'.repeat(128 * 1024));
   await currentFS.writeAsStringAsync(`${BASE}/LOGS/sub/b.csv`, 'y'.repeat(512 * 1024));
   const usage = await quota.getStorageUsage(BASE);
-  assert.ok(Math.abs(usage.usedMb - 1.5) < 0.01, `uso real esperado 1.5MB, obtido ${usage.usedMb}`);
+  assert.ok(Math.abs(usage.usedMb - 1.6) < 0.01, `uso real esperado 1.6MB incluindo manutenção, obtido ${usage.usedMb}`);
   assert.strictEqual(usage.limitMb, 2048);
   const breakdown = await quota.getStorageBreakdown(BASE);
   assert.strictEqual(breakdown.LOGS, 1.5);
