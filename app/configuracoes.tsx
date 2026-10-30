@@ -63,7 +63,11 @@ export default function ConfiguracaoScreen() {
   async function handleBackup() {
     if (!storageBase || busy) return;
     setBusy(true);
-    try { const info = await createBackup(storageBase); setStatus(`BACKUP CRIADO: ${info.timestamp}`); }
+    try {
+      const info = await createBackup(storageBase);
+      setBackupOptions(await listVerifiedBackups(storageBase));
+      setStatus(`BACKUP CRIADO: ${info.timestamp}`);
+    }
     catch { setStatus('FALHA NO BACKUP'); }
     finally { setBusy(false); setSaveStatus(getAutoSaveStatus()); }
   }
