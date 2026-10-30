@@ -15,9 +15,20 @@ mod.filename = sourcePath;
 mod.paths = Module._nodeModulePaths(path.dirname(sourcePath));
 mod._compile(output, sourcePath);
 
-const { FuelLevelBuffer, FUEL_LEVEL_BUFFER_CAPACITY, FUEL_LEVEL_BUFFER_MAX_AGE_MS } = mod.exports;
+const { FuelLevelBuffer, FUEL_LEVEL_BUFFER_CAPACITY, FUEL_LEVEL_BUFFER_MAX_AGE_MS, monotonicNowMs } = mod.exports;
 const buffer = new FuelLevelBuffer();
 const start = 1_000_000;
+
+const originalPerformance = Object.getOwnPropertyDescriptor(globalThis, 'performance');
+try {
+  Object.defineProperty(globalThis, 'performance', { configurable: true, value: { now: () => 1000 } });
+  assert.equal(monotonicNowMs(), 1000);
+  Object.defineProperty(globalThis, 'performance', { configurable: true, value: { now: () => 999 } });
+  assert.equal(monotonicNowMs(), 1000, 'relógio regressivo não pode retroceder a ordenação monotônica');
+} finally {
+  if (originalPerformance) Object.defineProperty(globalThis, 'performance', originalPerformance);
+  else delete globalThis.performance;
+}
 
 assert.equal(FUEL_LEVEL_BUFFER_CAPACITY, 10);
 assert.equal(FUEL_LEVEL_BUFFER_MAX_AGE_MS, 60_000);

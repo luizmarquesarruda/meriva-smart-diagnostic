@@ -284,6 +284,7 @@
 - **DB-191** · 2026-10-30 — Atualizar manual Android para o fluxo real de APK via Gradle CI
 - **DB-192** · 2026-10-30 — Remover pacotes transitivos órfãos remanescentes da configuração OTA
 - **DB-193** · 2026-10-30 — Auditoria modular: MAC normalizado, métricas ELM e buffer real 012F 10/10.
+- **DB-194** · 2026-10-30 — Corrigir relógio do buffer 012F e limpar fallback quando ECU perde resposta.
 
 ---
 
@@ -4981,3 +4982,27 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - A validação anterior estava verde no SHA `29a646d`; este lote exige novo gate, TypeScript, suíte completa e build Android.
 - Teste físico pendente: Galaxy A06 / SM-A065M / Android 16 com ELM327 real; confirmar RFCOMM, ATZ, protocolo, resposta ECU 41 0C e PID 012F. Bluetooth/ECU/autonomia física não são declarados validados.
 - Nenhum merge executado.
+
+
+## DB-194 · 2026-10-30 — Corrigir relógio do buffer 012F e limpar fallback quando ECU perde resposta
+
+### Achados confirmados na revisão pós-CI
+- O buffer 012F declarava timestamp monotônico, mas recebia Date.now(), que é relógio civil e pode ser ajustado pelo sistema. Isso podia reordenar amostras ou afetar a expiração.
+- Quando o socket Bluetooth permanecia ativo, mas a ECU deixava de responder, o serviço encerrava GPS/viagem e zerava o nível ao vivo, porém não limpava o buffer de dez amostras. Uma recuperação da ECU no mesmo socket poderia reutilizar estimativa anterior.
+- A leitura viva do PID 012F só atualizava o valor atual quando a inserção no buffer também era aceita. Os dois caminhos precisam ser independentes: uma leitura atual válida não pode ser descartada por duplicidade temporal apenas no buffer.
+
+### Correções aplicadas
+- Criado relógio monotônico de runtime baseado em performance.now(), com fallback protegido contra regressão; o buffer usa esse relógio para inserir, ordenar e expirar as amostras.
+- Separado timestamp civil de frescor da leitura atual (Date.now()) do timestamp monotônico interno do buffer.
+- A perda da resposta da ECU agora limpa o buffer, remove seus metadados de estado e zera a origem da autonomia antes de aguardar recuperação.
+- O PID 012F ao vivo atualiza o nível atual após validação da resposta real, independentemente do resultado de inserção da amostra no buffer.
+
+### Regressões adicionadas
+- Teste do relógio monotônico sob regressão simulada do relógio.
+- Testes de autonomia com relógio civil e relógio monotônico distintos.
+- Gate anti-regressão verifica o reset de buffer na transição ECU SEM RESPOSTA.
+- Requisito RG-52 documenta o contrato de separação entre leitura atual e buffer de fallback.
+
+### Validação
+- CI prévia verde no SHA f15d75916bd0222a163886e7825eaffea9d64771: validate e android-build passaram; APK standalone gerado. Esta entrada representa correções posteriores e exige nova CI no novo SHA.
+- Teste físico Galaxy A06 / Android 16 + ELM327 real permanece pendente; CI não valida rádio, ELM327 ou ECU físicos.

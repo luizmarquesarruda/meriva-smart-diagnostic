@@ -7,7 +7,7 @@ import { getAutoSaveState, updateAutoSaveState, initAutoSave } from '../meriva/a
 import { RealTripRecorder, getReliableTripConsumptionKml, shouldFinalizeStoppedTrip } from './tripRecorder';
 import { estimateRangeFromFuelLevel, fuelLevelPercentToLiters, isFuelReserve } from './fuelLevel';
 import { getCurrentAutonomyEstimate, isCurrentFuelLevelSample } from './autonomyPresentation';
-import { FuelLevelBuffer } from './fuelLevelBuffer';
+import { FuelLevelBuffer, monotonicNowMs } from './fuelLevelBuffer';
 import { getLivePidTrend, resetLiveTelemetry } from '../obd/liveTelemetry';
 import { estimateFuelRateLph, type FuelRateSource } from '../obd/fuelConsumption';
 import { startBackgroundMonitoring } from '../gps/backgroundMonitoring';
@@ -114,6 +114,7 @@ class AutoTripService {
       fuelLevelBufferPercent: bufferedFuel?.percent ?? null,
       fuelLevelBufferReadAtMs: bufferedFuel?.latestReadAtMs ?? null,
       fuelLevelBufferSampleCount: bufferedFuel?.sampleCount ?? 0,
+      bufferNowMs: monotonicNowMs(),
     });
     return {
       ...snapshot,
@@ -253,6 +254,8 @@ class AutoTripService {
       if (!getSharedObdStatus().ecuConnected) {
         // A ECU perdeu a resposta: encerrar a captura de localização e fechar a
         // viagem com a última evidência válida, sem acumular GPS offline.
+        // A sessão pode recuperar no mesmo socket, mas não herda amostras antigas.
+        this.fuelLevelBuffer.reset();
         await this.stopGpsForEcu();
         await this.finalizeRecorder();
         this.stoppedSinceMs = null;
@@ -263,6 +266,10 @@ class AutoTripService {
           fuelLevelReadAtMs: null,
           fuelRemainingL: null,
           fuelReserve: null,
+          fuelLevelBufferPercent: null,
+          fuelLevelBufferReadAtMs: null,
+          fuelLevelBufferSampleCount: 0,
+          autonomySource: null,
           estimatedRangeKm: 0,
           error: 'ADAPTADOR OK / ECU SEM RESPOSTA',
         });
@@ -364,10 +371,11 @@ class AutoTripService {
             fuelLevelResult.parsed.value <= 100
           ) {
             const readAtMs = Date.now();
-            if (this.fuelLevelBuffer.addSample(fuelLevelResult.parsed.value, readAtMs)) {
-              fuelLevelPercent = fuelLevelResult.parsed.value;
-              fuelLevelReadAtMs = readAtMs;
-            }
+            // A amostra ao vivo é válida independentemente da janela de fallback.
+            // Frescor da leitura é civil; ordem/expiração do buffer é monotônica.
+            fuelLevelPercent = fuelLevelResult.parsed.value;
+            fuelLevelReadAtMs = readAtMs;
+            this.fuelLevelBuffer.addSample(fuelLevelResult.parsed.value, monotonicNowMs());
           }
         } else {
           fuelLevelPercent = this.state.fuelLevelPercent;
@@ -560,6 +568,7 @@ class AutoTripService {
           fuelLevelBufferPercent: bufferedFuel?.percent ?? null,
           fuelLevelBufferReadAtMs: bufferedFuel?.latestReadAtMs ?? null,
           fuelLevelBufferSampleCount: bufferedFuel?.sampleCount ?? 0,
+          bufferNowMs: monotonicNowMs(),
         });
         this.setState({
           connected: true,

@@ -1,4 +1,5 @@
 import { estimateRangeFromFuelLevel } from './fuelLevel';
+import { monotonicNowMs } from './fuelLevelBuffer';
 
 export const FUEL_LEVEL_BUFFER_REQUIRED_SAMPLES = 10;
 export const FUEL_LEVEL_BUFFER_STALE_AFTER_MS = 60_000;
@@ -31,6 +32,7 @@ export interface CurrentAutonomyInput {
   fuelLevelBufferPercent?: number | null;
   fuelLevelBufferReadAtMs?: number | null;
   fuelLevelBufferSampleCount?: number;
+  bufferNowMs?: number;
   nowMs?: number;
 }
 
@@ -55,11 +57,13 @@ export function getCurrentAutonomyEstimate(input: CurrentAutonomyInput): Current
     const bufferedPercent = input.fuelLevelBufferPercent;
     const bufferedReadAtMs = input.fuelLevelBufferReadAtMs;
     const bufferedCount = input.fuelLevelBufferSampleCount ?? 0;
-    const ageMs = bufferedReadAtMs == null ? Number.POSITIVE_INFINITY : nowMs - bufferedReadAtMs;
+    const bufferNowMs = input.bufferNowMs ?? monotonicNowMs();
+    const ageMs = bufferedReadAtMs == null ? Number.POSITIVE_INFINITY : bufferNowMs - bufferedReadAtMs;
     if (
       bufferedPercent == null || !Number.isFinite(bufferedPercent) ||
       bufferedPercent < 0 || bufferedPercent > 100 ||
       bufferedReadAtMs == null || !Number.isFinite(bufferedReadAtMs) ||
+      !Number.isFinite(bufferNowMs) ||
       ageMs < 0 || ageMs > FUEL_LEVEL_BUFFER_STALE_AFTER_MS ||
       bufferedCount !== FUEL_LEVEL_BUFFER_REQUIRED_SAMPLES
     ) return null;

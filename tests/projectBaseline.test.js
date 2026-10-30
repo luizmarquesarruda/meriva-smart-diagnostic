@@ -286,6 +286,16 @@ assert.match(tripService, /fuelLevelReadAtMs/);
 assert.match(fuelLevelBuffer, /FUEL_LEVEL_BUFFER_CAPACITY = 10/);
 assert.match(tripService, /new FuelLevelBuffer\(\)/);
 assert.match(tripService, /fuelLevelBuffer\.addSample/);
+assert.match(fuelLevelBuffer, /performance\.now\(\)/, 'buffer deve usar relógio monotônico');
+assert.match(tripService, /this\.fuelLevelBuffer\.addSample\([^\n]*monotonicNowMs\(\)\)/,
+  'ordem do buffer não pode depender do relógio civil');
+const ecuNoResponseBlock = tripService.slice(
+  tripService.indexOf("if (!getSharedObdStatus().ecuConnected)"),
+  tripService.indexOf("if (this.pollingPauseCount > 0)")
+);
+assert.match(ecuNoResponseBlock, /this\.fuelLevelBuffer\.reset\(\)/,
+  'perda da resposta da ECU deve esvaziar o fallback da sessão anterior');
+assert.match(ecuNoResponseBlock, /fuelLevelBufferSampleCount: 0/);
 assert.match(read('src/trip/autonomyPresentation.ts'), /CURRENT_FUEL_LEVEL_STALE_AFTER_MS\s*=\s*30_000/);
 assert.match(home, /coolantUnavailable/);
 assert.ok(!tripService.includes('averageConsumptionKml * state.autonomy.tankCapacityL'),

@@ -1,3 +1,15 @@
+let lastMonotonicTimestampMs = 0;
+
+/** Monotonic runtime clock for volatile sample ordering and expiry. */
+export function monotonicNowMs(): number {
+  const candidate = typeof performance !== 'undefined' && typeof performance.now === 'function'
+    ? performance.now()
+    : Date.now();
+  if (!Number.isFinite(candidate)) return lastMonotonicTimestampMs;
+  lastMonotonicTimestampMs = Math.max(lastMonotonicTimestampMs, candidate);
+  return lastMonotonicTimestampMs;
+}
+
 export const FUEL_LEVEL_BUFFER_CAPACITY = 10;
 export const FUEL_LEVEL_BUFFER_MAX_AGE_MS = 60_000;
 export const FUEL_LEVEL_BUFFER_SAMPLE_RETENTION_MS = 120_000;
@@ -22,7 +34,7 @@ export class FuelLevelBuffer {
     });
   }
 
-  addSample(percent: number, timestampMs: number, nowMs = Date.now()): boolean {
+  addSample(percent: number, timestampMs: number, nowMs = monotonicNowMs()): boolean {
     if (
       !Number.isFinite(percent) || percent < 0 || percent > 100 ||
       !Number.isFinite(timestampMs) || timestampMs <= 0 ||
@@ -41,7 +53,7 @@ export class FuelLevelBuffer {
     return true;
   }
 
-  getEstimate(nowMs = Date.now()): FuelLevelBufferEstimate | null {
+  getEstimate(nowMs = monotonicNowMs()): FuelLevelBufferEstimate | null {
     if (!Number.isFinite(nowMs)) return null;
     this.prune(nowMs);
     if (this.samples.length !== FUEL_LEVEL_BUFFER_CAPACITY) return null;
@@ -58,7 +70,7 @@ export class FuelLevelBuffer {
     };
   }
 
-  getSampleCount(nowMs = Date.now()): number {
+  getSampleCount(nowMs = monotonicNowMs()): number {
     if (!Number.isFinite(nowMs)) return 0;
     this.prune(nowMs);
     return this.samples.length;
