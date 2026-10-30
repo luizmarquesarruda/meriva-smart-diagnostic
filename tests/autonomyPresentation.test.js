@@ -31,7 +31,11 @@ function loadTs(file, overrides = {}) {
 
 const root = path.resolve(__dirname, '..');
 const fuelLevel = loadTs(path.join(root, 'src/trip/fuelLevel.ts'));
-const presentation = loadTs(path.join(root, 'src/trip/autonomyPresentation.ts'), { './fuelLevel': fuelLevel });
+const fuelLevelBuffer = loadTs(path.join(root, 'src/trip/fuelLevelBuffer.ts'));
+const presentation = loadTs(path.join(root, 'src/trip/autonomyPresentation.ts'), {
+  './fuelLevel': fuelLevel,
+  './fuelLevelBuffer': fuelLevelBuffer,
+});
 const { getCurrentAutonomyRangeKm } = presentation;
 
 const valid = {
