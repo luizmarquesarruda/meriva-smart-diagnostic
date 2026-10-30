@@ -72,3 +72,35 @@ jobs:
           path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14
+
+  publish-release:
+    name: Publish latest Android APK
+    # Publish only from main, and only after validation + native APK build succeeded.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    needs: [validate, android-build]
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified APK artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: meriva-smart-diagnostic-standalone-apk
+          path: dist
+      - name: Publish GitHub Release and stable APK asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          APK="dist/app-release.apk"
+          test -s "$APK"
+          TAG="build-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"
+          gh release create "$TAG" "$APK#Meriva Smart APK" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Meriva Smart build ${GITHUB_RUN_NUMBER}" \
+            --notes "APK standalone gerado pela CI após validate e android-build aprovados. Commit: ${GITHUB_SHA}." \
+            --target "$GITHUB_SHA" \
+            --latest
