@@ -17,12 +17,24 @@ const output = ts.transpileModule(fs.readFileSync(sourcePath, 'utf8'), {
 }).outputText;
 
 let watcher = null;
+let backgroundUpdatesStarted = false;
+let backgroundStartCalls = 0;
+let backgroundStopCalls = 0;
 const fakeLocation = {
   Accuracy: { BestForNavigation: 6 },
   PermissionStatus: { GRANTED: 'granted' },
   hasServicesEnabledAsync: async () => true,
   getForegroundPermissionsAsync: async () => ({ status: 'granted' }),
   requestForegroundPermissionsAsync: async () => ({ status: 'granted' }),
+  hasStartedLocationUpdatesAsync: async () => backgroundUpdatesStarted,
+  startLocationUpdatesAsync: async () => {
+    backgroundStartCalls += 1;
+    backgroundUpdatesStarted = true;
+  },
+  stopLocationUpdatesAsync: async () => {
+    backgroundStopCalls += 1;
+    backgroundUpdatesStarted = false;
+  },
   watchPositionAsync: async (_options, callback) => {
     watcher = callback;
     return {
@@ -168,9 +180,11 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
     'amostra com timestamp anterior ao último fix válido deve ser descartada');
   assert.strictEqual(tracker.getState().distanceKm, distanceBeforeBadTimestamp,
     'timestamp atrasado não deve alterar distância');
-  watcher({ coords: { latitude: 0, longitude: 0.00175, speed: 0, accuracy: 5 }, timestamp: 30000 });
+  // 31.000 e 32.000 ms foram aceitos acima, mesmo sem precisão GPS.
+  // A recuperação precisa ser posterior ao último timestamp aceito, não só ao último fix preciso.
+  watcher({ coords: { latitude: 0, longitude: 0.00175, speed: 0, accuracy: 5 }, timestamp: 33000 });
   assert.strictEqual(tracker.getState().samples, samplesBeforeBadTimestamp + 1,
-    'a coleta deve se recuperar quando chega um timestamp válido crescente');
+    'a coleta deve se recuperar somente quando chega um timestamp maior que o último aceito');
   assert.strictEqual(tracker.getState().distanceKm, distanceBeforeBadTimestamp,
     'a amostra válida de recuperação não deve inventar deslocamento');
 
@@ -232,7 +246,48 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
 
   await staleTracker.stop();
   assert.strictEqual(clearedWatchdog, true, 'stop must remove the watchdog timer');
-  console.log('PASS GPS: automático, velocidade, distância, consumo e expiração de fix');
+
+  // Background location API is part of expo-location and must be represented
+  // by the test double; silently catching a missing mock method hides test defects.
+  let backgroundWatchdogCleared = false;
+  const backgroundTracker = new GpsTracker({
+    now: () => 200_000,
+    setIntervalFn: (handler) => {
+      watchdogHandler = handler;
+      return 77;
+    },
+    clearIntervalFn: (handle) => {
+      assert.strictEqual(handle, 77);
+      backgroundWatchdogCleared = true;
+    },
+  });
+  const startsBeforeBackground = backgroundStartCalls;
+  const stopsBeforeBackground = backgroundStopCalls;
+  assert.strictEqual(await backgroundTracker.startBackgroundLocation(), true);
+  assert.strictEqual(backgroundUpdatesStarted, true);
+  assert.strictEqual(backgroundStartCalls, startsBeforeBackground + 1,
+    'background GPS must call the native start API once');
+  await backgroundTracker.stop();
+  assert.strictEqual(backgroundUpdatesStarted, false);
+  assert.strictEqual(backgroundStopCalls, stopsBeforeBackground + 1,
+    'stop must call the native background stop API');
+  assert.strictEqual(backgroundWatchdogCleared, true);
+
+  // Recreating the JS tracker while the native task survives must not start a duplicate task.
+  backgroundUpdatesStarted = true;
+  const recoveredBackgroundTracker = new GpsTracker({
+    now: () => 300_000,
+    setIntervalFn: () => 88,
+    clearIntervalFn: () => {},
+  });
+  const startsBeforeRecovery = backgroundStartCalls;
+  assert.strictEqual(await recoveredBackgroundTracker.startBackgroundLocation(), true);
+  assert.strictEqual(backgroundStartCalls, startsBeforeRecovery,
+    'an already-running native task must be reused rather than registered twice');
+  await recoveredBackgroundTracker.stop();
+  assert.strictEqual(backgroundUpdatesStarted, false);
+
+  console.log('PASS GPS: automático, velocidade, distância, consumo, watchdog e background');
 })().catch((error) => {
   console.error(error);
   process.exitCode = 1;
