@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### GPS / background location
+- Corrigido o fixture de recuperação para respeitar o timestamp estritamente crescente após amostras com precisão desconhecida.
+- Expandido o mock de Expo Location e incluídos testes de start/stop/reuso da tarefa nativa de localização em segundo plano.
+
 ### Bluetooth Classic — limites de espera nativa
 - A verificação nativa `isConnected()` agora tem timeout finito em escrita e leitura; exceções/timeout não são ignorados e impedem TX quando o estado do socket é desconhecido.
 - O timeout de leitura limita a sonda nativa ao orçamento restante, e o fechamento do socket retorna após espera limitada sem liberar o bloqueio RFCOMM enquanto a limpeza nativa continua pendente.
