@@ -280,6 +280,7 @@
 - **DB-187** · 2026-10-30 — Alinhar expo-updates à versão exigida pelo Expo Doctor
 - **DB-188** · 2026-10-30 — Corrigir strings run do job OTA para YAML válido
 - **DB-189** · 2026-10-30 — Remover atualização OTA e simplificar a entrega por APK
+- **DB-190** · 2026-10-30 — Eliminar resíduos de build EAS e restaurar identidade Expo original
 
 ---
 
@@ -4900,3 +4901,21 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 ### Validação
 - A CI precisa executar novamente no novo SHA: npm ci, Expo Doctor, baseline, TypeScript, suíte completa e montagem do APK no mesmo commit.
 - Nenhuma atualização OTA foi publicada. Nenhum merge foi realizado por esta alteração.
+
+
+## DB-190 · 2026-10-30 — Eliminar resíduos de build EAS e restaurar identidade Expo original
+
+### Achados
+- Após a retirada da publicação OTA, permaneceram os scripts `build:apk` e `build:production` chamando `eas build`, apesar de a entrega oficial da CI usar `expo prebuild` + Gradle + upload de artefato. Esses comandos eram caminhos de build não utilizados e exigiam configuração remota EAS.
+- O arquivo `eas.json` ficou sem consumidor no fluxo de build da CI e nos scripts mantidos.
+- O `slug` do Expo havia sido alterado de `smart-obd-diagnostic` para `meriva` sem necessidade técnica para o APK Gradle, criando mudança de identidade do projeto sem benefício.
+
+### Correções
+- Removidos os scripts EAS sem consumidor de `package.json` e excluído `eas.json`.
+- Restaurado `expo.slug` para `smart-obd-diagnostic`, preservando o identificador original.
+- Mantidos os scripts locais `android`, `prebuild`, `doctor`, `validate` e o build de APK executado diretamente pelo workflow Gradle.
+- Nenhuma dependência Expo usada pelo aplicativo foi removida. Pacotes transitivos no lockfile não foram apagados por nome: só devem ser removidos se a árvore npm comprovar que ficaram sem dependentes.
+
+### Limites e validação
+- Reexecutar `npm ci`, Expo Doctor, baseline, TypeScript, todos os testes e build Android no mesmo SHA.
+- A busca de referências e a revisão de configuração foram feitas sobre a branch da PR; não equivale a auditoria dinâmica em aparelho físico.

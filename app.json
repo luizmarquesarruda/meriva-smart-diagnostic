@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Smart OBD Diagnostic",
-    "slug": "meriva",
+    "slug": "smart-obd-diagnostic",
     "scheme": "smart-obd-diagnostic",
     "version": "1.0.1",
     "orientation": "default",
