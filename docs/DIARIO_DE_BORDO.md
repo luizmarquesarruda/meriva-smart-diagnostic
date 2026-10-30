@@ -286,6 +286,7 @@
 - **DB-193** · 2026-10-30 — Auditoria modular: MAC normalizado, métricas ELM e buffer real 012F 10/10.
 - **DB-194** · 2026-10-30 — Corrigir relógio do buffer 012F e limpar fallback quando ECU perde resposta.
 - **DB-195** · 2026-10-30 — Auditar arquitetura, contexto, agentes e módulos; alinhar escopo do veículo e fluxo APK.
+- **DB-196** · 2026-10-30 — Incluir MANUTENCAO no backup/export, implementar restauração verificada e deduplicar CI.
 
 ---
 
@@ -5034,3 +5035,32 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - Percurso GPS real, comparação de distância, validação de autonomia por abastecimento e teste de background.
 - Definir futuramente se o produto será multi-veículo e medir o histórico antes de decidir migração seletiva para SQLite.
 - Nenhuma refatoração ampla de dependências foi iniciada; nenhuma conclusão de hardware foi inferida a partir da CI.
+
+
+## DB-196 · 2026-10-30 — Incluir MANUTENCAO no backup/export, implementar restauração verificada e deduplicar CI
+
+### Causa e riscos confirmados
+- `maintenanceStorage.ts` grava quilometragem, histórico de manutenção e abastecimentos em `MANUTENCAO/registros.json`, mas essa pasta não estava na lista de `createBackup`, não aparecia no detalhamento de quota e não entrava no JSON de diagnóstico exportado.
+- O aplicativo criava backups, mas não havia um fluxo geral de restauração dos snapshots locais pela tela de Configurações.
+- O workflow era acionado por push e pull_request com grupos de concorrência diferentes; as duas origens podiam iniciar CI/build APK concorrentes para o mesmo branch.
+- A inclusão de 128 KiB de dados de manutenção na fixture fez falhar uma expectativa antiga de quota (1,5 MB); o valor arredondado correto passou a 1,6 MB.
+
+### Correções aplicadas
+- A inicialização do autosave cria `MANUTENCAO`; backup, detalhamento de armazenamento e exportação JSON incluem os registros dessa pasta. A limpeza automática permanece limitada a LOGS/LEITURAS.
+- O backup valida manifesto, lista somente snapshots íntegros e restaura diretórios verificados com staging, safety backup prévio, checagem de tamanho após a cópia e rollback em falha. Diretórios ausentes em snapshots antigos são preservados.
+- Configurações exige confirmação destrutiva, desconecta a ECU, encerra o serviço de viagem, força o autosave atual, restaura os dados, re-hidrata o estado em memória e mantém a ECU desconectada.
+- `tests/regression.test.js` cobre backup de MANUTENCAO, restauração de histórico e abastecimentos, cópia de segurança do estado anterior e rejeição de snapshot adulterado. `tests/merivaAutosave.test.js` cobre criação e quota da pasta MANUTENCAO.
+- O teste de quota foi atualizado de 1,5 MB para 1,6 MB para refletir a nova pasta de dados.
+- Push e pull_request do mesmo repositório/branch compartilham o grupo de concorrência da CI, evitando build Android duplicado.
+- README, arquitetura, plano de testes, auditoria e decisões arquiteturais foram atualizados.
+
+### Decisões P2
+- Escopo atual explicitado como Chevrolet Meriva; não anunciar seleção multi-veículo que ainda não existe.
+- JSON/TXT/CSV foram mantidos; SQLite só será reavaliado com métricas de tamanho, latência, padrões de consulta e concorrência que justifiquem a migração.
+- Atualização Expo/React Native permanece separada da estabilização Bluetooth, condicionada a baseline físico e migração incremental SDK a SDK.
+
+### Validação e pendências
+- Uma execução de CI anterior passou Expo Doctor e o gate anti-regressão, mas falhou apenas na expectativa de quota acima descrita; essa expectativa foi corrigida.
+- O SHA final após este registro deve concluir `validate` e `android-build` no mesmo workflow. A aprovação não é presumida.
+- Teste físico no Galaxy A06 / SM-A065M / Android 16 com ELM327 real, resposta ECU 010C, PIDs 012F/015E, percurso GPS, background e autonomia por abastecimento continuam pendentes.
+- PR #98 permanece aberta e não mesclada. CI verde não substitui ensaio no aparelho e no veículo.
