@@ -2,7 +2,7 @@
 
 Repositório e linha de desenvolvimento: MERIVA SMART. O rótulo do aplicativo Expo permanece `Smart OBD Diagnostic`, genérico para permitir configurar diferentes veículos; o perfil Chevrolet Meriva é o foco de validação atual, não uma restrição do motor OBD.
 
-As especificações físicas e de manutenção do veículo são mantidas em `src/database/merivaManual.ts`, com referência ao Manual do Proprietário Chevrolet Meriva 2012.
+As especificações físicas e de manutenção do perfil operacional atual são mantidas em `src/database/merivaManual.ts`, com referência ao Manual do Proprietário Chevrolet Meriva 2012. A seleção e o gerenciamento de múltiplos veículos ainda não estão implementados; o fluxo atual normaliza o perfil para Meriva Maxx.
 
 Versão: 1.0.1 | Plataforma: Android | Transporte: Bluetooth Classic | ECU: OBD-II/ELM327
 
@@ -126,6 +126,21 @@ O autosave usa arquivo temporário, valida o conteúdo e mantém uma cópia ante
 Na abertura do aplicativo, o sistema verifica suporte, solicita permissões, verifica o estado do Bluetooth, solicita ativação quando necessário e repete a verificação ao retornar ao aplicativo.
 
 O ELM327 deve estar previamente pareado no Android. O aplicativo escolhe automaticamente os candidatos pareados: primeiro nomes compatíveis com ELM/OBD e depois outros dispositivos Classic, aceitando somente o candidato que passa pela inicialização do ELM e pelo teste real 010C. A conexão usa Bluetooth Classic/RFCOMM e preserva o prompt > para o parser do ELM. O estado do rádio é revalidado antes de cada socket; se estiver desligado ou não puder ser confirmado, o fallback e os retries são interrompidos com erro explícito, sem iniciar outra conexão concorrente. Reative o Bluetooth no Android e tente novamente pelo painel.
+
+## Build Android e distribuição
+
+O fluxo de build vigente usa Expo prebuild + Gradle na GitHub Actions e gera um APK standalone. EAS Build e atualização OTA não fazem parte do fluxo atual; não há publicação remota automática. Cada alteração de código exige gerar e instalar um novo APK. O artefato correto deve ser baixado da execução de CI correspondente ao SHA exato que será testado.
+
+```bash
+npm ci --no-audit --no-fund
+npm run doctor
+npm run gate:baseline
+npm run validate
+npx expo prebuild --clean --platform android --non-interactive
+cd android && ./gradlew :app:assembleRelease --no-daemon
+```
+
+O APK esperado é `android/app/build/outputs/apk/release/app-release.apk`. A CI deve concluir `validate` e `android-build` no mesmo SHA. APK compilado não substitui teste físico de Bluetooth/ELM327/ECU.
 
 ## Testes
 
