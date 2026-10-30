@@ -64,7 +64,6 @@ async function readVerifiedManifest(backupDir: string): Promise<BackupManifest> 
     !Number.isFinite(parsed.payloadSizeBytes) ||
     parsed.payloadSizeBytes < 0 ||
     !Array.isArray(parsed.directories) ||
-    parsed.directories.length === 0
   ) {
     throw new Error('BACKUP_MANIFEST_INVALID');
   }
