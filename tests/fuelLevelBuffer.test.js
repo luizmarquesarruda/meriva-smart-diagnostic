@@ -31,7 +31,7 @@ assert.deepEqual(buffer.getEstimate(start + 54_000), {
 });
 assert.equal(buffer.addSample(100, start + 60_000, start + 60_000), true);
 assert.equal(buffer.getSampleCount(start + 60_000), 10);
-assert.equal(buffer.getEstimate(start + 60_000).percent, 45.5);
+assert.equal(buffer.getEstimate(start + 60_000).percent, 54.5, 'a média usa as dez leituras mais recentes');
 assert.equal(buffer.addSample(101, start + 66_000, start + 66_000), false);
 assert.equal(buffer.addSample(-1, start + 66_000, start + 66_000), false);
 assert.equal(buffer.addSample(50, start + 66_000, start + 65_999), false, 'timestamp futuro rejeitado');

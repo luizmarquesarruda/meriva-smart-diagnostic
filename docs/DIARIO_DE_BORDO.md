@@ -4964,7 +4964,7 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 ### Defeitos confirmados e correções
 1. O callback Android de desconexão comparava MAC por igualdade textual. Variação de caixa/separadores podia impedir reconhecer a desconexão do próprio adaptador. A comparação agora normaliza os endereços; a suíte Bluetooth protege o contrato.
 2. O contador de timeouts ELM era incrementado para qualquer exceção capturada, inclusive falha de escrita nativa. Agora somente classificação TIMEOUT incrementa `timeouts`; classificação ERROR incrementa `errors`. Adicionado teste comportamental com transporte falso.
-3. A autonomia ficava indisponível após o frescor do PID 012F apesar de leituras reais recentes na sessão. Adicionado buffer volátil das dez amostras válidas mais recentes, com timestamp monotônico e mediana. Leitura ao vivo até 30 s tem prioridade; fallback expira 60 s após a última leitura. Buffer é apagado ao trocar/desconectar ECU, não é persistido e não aparece como leitura atual.
+3. A autonomia ficava indisponível após o frescor do PID 012F apesar de leituras reais recentes na sessão. Adicionado buffer volátil das dez amostras válidas mais recentes, com timestamp monotônico e média aritmética das dez leituras. Leitura ao vivo até 30 s tem prioridade; fallback expira 60 s após a última leitura. Buffer é apagado ao trocar/desconectar ECU, não é persistido e não aparece como leitura atual.
 
 ### Arquivos alterados
 - `src/obd/bluetoothClassicTransport.ts`, `src/obd/elm327.ts`

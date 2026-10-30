@@ -50,10 +50,9 @@ export class FuelLevelBuffer {
     const ageMs = nowMs - latest.timestampMs;
     if (ageMs < 0 || ageMs > FUEL_LEVEL_BUFFER_MAX_AGE_MS) return null;
 
-    const sorted = this.samples.map((sample) => sample.percent).sort((a, b) => a - b);
-    const middle = sorted.length / 2;
+    const average = this.samples.reduce((sum, sample) => sum + sample.percent, 0) / this.samples.length;
     return {
-      percent: Number(((sorted[middle - 1] + sorted[middle]) / 2).toFixed(2)),
+      percent: Number(average.toFixed(2)),
       latestReadAtMs: latest.timestampMs,
       sampleCount: this.samples.length,
     };
