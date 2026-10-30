@@ -21,9 +21,9 @@ assert.equal(app.updates.enabled, true);
 assert.equal(app.updates.checkAutomatically, 'ON_LOAD');
 assert.equal(app.updates.requestHeaders['expo-channel-name'], 'production');
 
-assert.equal(pkg.dependencies['expo-updates'], '~0.25.27');
-assert.equal(lock.packages[''].dependencies['expo-updates'], '~0.25.27');
-assert.equal(lock.packages['node_modules/expo-updates'].version, '0.25.27');
+assert.equal(pkg.dependencies['expo-updates'], '~0.25.28');
+assert.equal(lock.packages[''].dependencies['expo-updates'], '~0.25.28');
+assert.equal(lock.packages['node_modules/expo-updates'].version, '0.25.28');
 assert.equal(eas.build.preview.channel, 'production');
 assert.equal(eas.build.production.channel, 'production');
 assert.equal(eas.build.preview.distribution, 'internal');
