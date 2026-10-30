@@ -1197,10 +1197,18 @@ async function testBackupCompleteness() {
   await m.initAutoSave(BASE);
   const backup = loadTs(path.join(ROOT, 'src/storage/backup.ts'));
 
-  const expectedDirs = ['BANCO', 'APRENDIZADO', 'DTC', 'CONFIG', 'LEITURAS', 'LOGS', 'VIAGENS'];
+  const expectedDirs = ['BANCO', 'APRENDIZADO', 'DTC', 'CONFIG', 'LEITURAS', 'LOGS', 'VIAGENS', 'MANUTENCAO'];
   for (const dir of expectedDirs) {
     await fakeFS.writeAsStringAsync(`${BASE}/${dir}/arquivo.txt`, dir);
   }
+  const maintenanceData = {
+    currentOdometerKm: 123456,
+    severeUse: true,
+    records: { ENGINE_OIL: { lastServiceAt: '2026-10-01', lastServiceOdometerKm: 120000 } },
+    fuelings: [{ id: 'fuel-backup-test', occurredAt: '2026-10-20T12:00:00.000Z', odometerKm: 123000, liters: 40, totalCost: 220, type: 'GASOLINA' }],
+    updatedAt: '2026-10-30T12:00:00.000Z',
+  };
+  await fakeFS.writeAsStringAsync(`${BASE}/MANUTENCAO/registros.json`, JSON.stringify(maintenanceData));
 
   const info = await backup.createBackup(BASE);
   assert.deepStrictEqual(info.includes, expectedDirs);
@@ -1218,6 +1226,9 @@ async function testBackupCompleteness() {
       `backup deve conter ${dir}`,
     );
   }
+  const backedUpMaintenance = JSON.parse(files.get(`${backupRoot}/MANUTENCAO/registros.json`));
+  assert.deepStrictEqual(backedUpMaintenance, maintenanceData,
+    'backup deve preservar quilometragem, plano de manutenção e abastecimentos manuais');
 
   const historicalBackupRoot = `${BASE}/BACKUP`;
   for (let index = 0; index < 6; index += 1) {
