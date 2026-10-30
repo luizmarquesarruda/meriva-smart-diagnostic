@@ -281,6 +281,7 @@
 - **DB-188** · 2026-10-30 — Corrigir strings run do job OTA para YAML válido
 - **DB-189** · 2026-10-30 — Remover atualização OTA e simplificar a entrega por APK
 - **DB-190** · 2026-10-30 — Eliminar resíduos de build EAS e restaurar identidade Expo original
+- **DB-191** · 2026-10-30 — Atualizar manual Android para o fluxo real de APK via Gradle CI
 
 ---
 
@@ -4919,3 +4920,17 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 ### Limites e validação
 - Reexecutar `npm ci`, Expo Doctor, baseline, TypeScript, todos os testes e build Android no mesmo SHA.
 - A busca de referências e a revisão de configuração foram feitas sobre a branch da PR; não equivale a auditoria dinâmica em aparelho físico.
+
+
+## DB-191 · 2026-10-30 — Atualizar manual Android para o fluxo real de APK via Gradle CI
+
+### Achado
+- `BUILD_ANDROID.md` ainda instruía login no EAS, build por perfis preview/production e AAB de produção, apesar de `eas.json` e os scripts EAS terem sido removidos e a CI usar Gradle para produzir APK standalone.
+
+### Correção
+- Reescrito o manual para documentar o pipeline real, os comandos locais, a localização do APK e a expiração de 14 dias do artefato.
+- Explicitado que atualização de código exige novo APK e que CI verde não substitui teste físico Bluetooth/ECU.
+- Registrada a dívida de modernização Expo SDK 51 / React Native 0.74.5 sem misturar upgrade de SDK nesta limpeza.
+
+### Validação
+- Conferir manual, workflow e artefato da CI no mesmo SHA após o commit.

@@ -1,11 +1,18 @@
 # Build Android
 
-## Perfis
+## Fluxo oficial de APK
 
-- `preview`: gera APK instalável para testes no Android.
-- `production`: gera AAB para distribuição pela Google Play.
+O fluxo suportado nesta etapa não usa EAS Build nem atualização OTA. A CI gera um APK standalone a partir da configuração Expo e do projeto Android nativo:
 
-## Toolchain oficial do projeto
+1. instala dependências com `npm ci --no-audit --no-fund`;
+2. executa Expo Doctor, baseline anti-regressão, TypeScript e todas as suítes;
+3. gera o projeto Android com `npx expo prebuild --clean --platform android --non-interactive`;
+4. monta `android/app/build/outputs/apk/release/app-release.apk` com Gradle;
+5. publica o arquivo como artefato `meriva-smart-diagnostic-standalone-apk` por 14 dias.
+
+O download fica na seção **Artifacts** da execução da CI correspondente ao SHA desejado. Não use APK de execução anterior como se contivesse alterações ainda não compiladas.
+
+## Toolchain
 
 - Node.js: 20.x
 - Java/JDK: 17
@@ -18,56 +25,36 @@ Java 21 não é a referência deste projeto. O build CI usa Java 17. Em Termux/A
 ## Validação local
 
 ```bash
-npm install
+npm ci --no-audit --no-fund
 npm run doctor
-npm run typecheck
-npm test
+npm run gate:baseline
+npm run validate
 npx expo prebuild --clean --platform android --non-interactive
 ```
 
-Para testar o projeto nativo em um Android conectado:
+Para montar o APK localmente após o prebuild, com Android SDK e Java 17 configurados:
+
+```bash
+cd android
+./gradlew :app:assembleRelease --no-daemon
+```
+
+O APK esperado é `android/app/build/outputs/apk/release/app-release.apk`. O projeto Android é gerado pelo prebuild e não é versionado no Git.
+
+## Executar no aparelho
+
+Para desenvolvimento nativo com dispositivo Android conectado:
 
 ```bash
 npx expo run:android
 ```
 
-## APK pela EAS
+O app usa `react-native-bluetooth-classic`; Expo Go não substitui um build nativo Android para validar Bluetooth Classic.
 
-Depois de autenticar no Expo:
+## Estado e limites
 
-```bash
-npx eas-cli login
-npx eas-cli build --platform android --profile preview
-```
-
-O perfil `preview` está configurado com `android.buildType = apk`.
-
-O arquivo gerado pode ser instalado diretamente no Android. O EAS usa APK para instalação direta e AAB como formato padrão para distribuição em loja. 
-
-## Produção
-
-```bash
-npx eas-cli build --platform android --profile production
-```
-
-O perfil de produção gera AAB.
-
-## Observação sobre Android/Java
-
-O diretório `android/` é ignorado pelo Git e é recriado pelo prebuild. A configuração nativa usada pela CI é, portanto, derivada do `app.json`, das dependências e do Expo SDK. O workflow fixa Java 17 antes do prebuild e do Gradle.
-
-## Observação sobre Bluetooth
-
-Este aplicativo usa `react-native-bluetooth-classic`, portanto o teste deve ser feito em um build nativo Android. Expo Go não é suficiente para validar o transporte Bluetooth Classic.
-
-## Estado da auditoria
-
-- Expo SDK: 51
-- React Native: 0.74.5
-- Android package: `com.meriva.smartdiagnostic`
-- EAS: configurado
-- APK preview: configurado
-- AAB production: configurado
-- Assinatura: será administrada pelo EAS quando o primeiro build for executado
-
-Antes do primeiro build, execute `npm run doctor`. Se houver incompatibilidade de dependências, corrija-a antes de gerar o APK final.
+- Distribuição de teste: APK produzido pelo Gradle na CI.
+- EAS Build: não faz parte do fluxo atual e não deve ser usado como instrução operacional.
+- Atualização OTA: removida temporariamente; alterações de código exigem gerar e instalar um novo APK.
+- Validação física: instalar o APK no Android real e testar inicialização fria, permissões, conexão RFCOMM, inicialização ELM e resposta real da ECU. CI verde não comprova comunicação com hardware.
+- SDK 51 / React Native 0.74.5 permanecem dívida de modernização; não atualizar junto da limpeza de EAS sem plano incremental e baseline físico.
