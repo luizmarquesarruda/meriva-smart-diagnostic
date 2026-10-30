@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import Constants from 'expo-constants';
 import { Link } from 'expo-router';
-import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
-import { createBackup } from '../src/storage/backup';
+import { createBackup, listVerifiedBackups, restoreBackup, type StoredBackupInfo } from '../src/storage/backup';
 import { cleanupOldLogs, cleanupOldReadings } from '../src/storage/cleanup';
 import { VehicleProfile } from '../src/database/vehicleConfig';
-import { getAutoSaveState, getAutoSaveStatus, initAutoSave } from '../src/meriva/autosaveManager';
+import { disposeAutoSave, getAutoSaveState, getAutoSaveStatus, initAutoSave } from '../src/meriva/autosaveManager';
+import { autoTripService } from '../src/trip/autoTripService';
+import { disconnectSharedObd } from '../src/obd/sharedConnection';
 import { exportAutoSaveTxt, exportDailyObdHistoryTxt } from '../src/meriva/exportAutoSaveTxt';
 import { exportBluetoothDiagnosticTxt } from '../src/obd/exportBluetoothDiagnosticTxt';
 import { AppSettings, readAppSettings, writeAppSettings } from '../src/database/appSettings';
@@ -29,6 +31,7 @@ export default function ConfiguracaoScreen() {
   const [status, setStatus] = useState('INICIALIZANDO...');
   const [busy, setBusy] = useState(false);
   const [saveStatus, setSaveStatus] = useState<AutoSaveStatus>({ lastSavedAt: null, lastSaveReason: null, lastError: null, obdSessionActive: false });
+  const [backupOptions, setBackupOptions] = useState<StoredBackupInfo[]>([]);
   const appVersion = Constants.expoConfig?.version ?? '1.0.1';
 
   useEffect(() => {
@@ -38,6 +41,7 @@ export default function ConfiguracaoScreen() {
       setProfile(state.vehicle);
       setSettings(await readAppSettings(basePath));
       setSaveStatus(getAutoSaveStatus());
+      setBackupOptions(await listVerifiedBackups(basePath));
       setStatus('PRONTO');
       setStorageBase(basePath);
     }
@@ -62,6 +66,69 @@ export default function ConfiguracaoScreen() {
     try { const info = await createBackup(storageBase); setStatus(`BACKUP CRIADO: ${info.timestamp}`); }
     catch { setStatus('FALHA NO BACKUP'); }
     finally { setBusy(false); setSaveStatus(getAutoSaveStatus()); }
+  }
+
+  async function handleRestoreBackup(backup: StoredBackupInfo): Promise<void> {
+    if (!storageBase || busy) return;
+    setBusy(true);
+    let tripServiceStopped = false;
+    try {
+      // Stop the OBD/Trip owners before replacing files they may persist.
+      await disconnectSharedObd();
+      await autoTripService.stop();
+      tripServiceStopped = true;
+
+      const restored = await restoreBackup(storageBase, backup.name);
+      // Re-hydrate the in-memory autosave runtime from the restored CONFIG snapshot.
+      disposeAutoSave();
+      const state = await initAutoSave(storageBase);
+      setProfile(state.vehicle);
+      setSettings(await readAppSettings(storageBase));
+      await autoTripService.start(storageBase);
+      tripServiceStopped = false;
+
+      const backups = await listVerifiedBackups(storageBase);
+      setBackupOptions(backups);
+      setSaveStatus(getAutoSaveStatus());
+      setStatus(`RESTAURADO: ${backup.name} • CÓPIA DE SEGURANÇA: ${restored.safetyBackupName}`);
+      Alert.alert(
+        'Restauração concluída',
+        `Dados restaurados: ${restored.includes.join(', ')}. Uma cópia do estado anterior foi criada: ${restored.safetyBackupName}. A ECU permanece desconectada.`,
+      );
+    } catch (cause) {
+      const detail = cause instanceof Error ? cause.message : String(cause);
+      // restoreBackup rolls back affected directories if a copy fails. Re-open
+      // the runtime even on failure so autosave never keeps a stale snapshot.
+      if (tripServiceStopped) {
+        try {
+          disposeAutoSave();
+          await initAutoSave(storageBase);
+          await autoTripService.start(storageBase);
+          tripServiceStopped = false;
+        } catch (restartCause) {
+          console.warn('[backup] não foi possível reabrir o serviço após a falha de restauração:', restartCause);
+        }
+      }
+      setStatus('FALHA NA RESTAURAÇÃO: ' + detail);
+      Alert.alert('Falha na restauração', detail);
+    } finally {
+      if (tripServiceStopped && storageBase) {
+        try { await autoTripService.start(storageBase); } catch { /* preserve the restore result */ }
+      }
+      setBusy(false);
+      setSaveStatus(getAutoSaveStatus());
+    }
+  }
+
+  function confirmRestoreBackup(backup: StoredBackupInfo): void {
+    Alert.alert(
+      'Restaurar backup?',
+      `O conteúdo dos diretórios ${backup.includes.join(', ')} será substituído pela cópia de ${new Date(backup.createdAt).toLocaleString('pt-BR')}. Antes, o estado atual será salvo em um novo backup. O adaptador OBD será desconectado.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Restaurar', style: 'destructive', onPress: () => void handleRestoreBackup(backup) },
+      ],
+    );
   }
 
   async function handleCleanLogs() {
@@ -258,6 +325,22 @@ export default function ConfiguracaoScreen() {
       <TouchableOpacity style={styles.button} onPress={handleBackup} disabled={busy}>
         <Text style={styles.buttonText}>{busy ? 'AGUARDE...' : 'FAZER BACKUP'}</Text>
       </TouchableOpacity>
+      <Text style={styles.info}>BACKUPS ÍNTEGROS DISPONÍVEIS: {backupOptions.length}</Text>
+      {backupOptions.map((backup) => (
+        <TouchableOpacity
+          key={backup.name}
+          style={styles.button}
+          onPress={() => confirmRestoreBackup(backup)}
+          disabled={busy}
+          accessibilityRole="button"
+          accessibilityLabel={`Restaurar backup de ${new Date(backup.createdAt).toLocaleString('pt-BR')}`}
+        >
+          <Text style={styles.buttonText}>
+            {busy ? 'AGUARDE...' : `RESTAURAR ${new Date(backup.createdAt).toLocaleString('pt-BR')} • ${backup.includes.length} DIRETÓRIOS`}
+          </Text>
+        </TouchableOpacity>
+      ))}
+      {backupOptions.length === 0 ? <Text style={styles.info}>NENHUM BACKUP ÍNTEGRO DISPONÍVEL.</Text> : null}
       <TouchableOpacity style={styles.button} onPress={handleCleanLogs} disabled={busy}>
         <Text style={styles.buttonText}>{busy ? 'AGUARDE...' : 'LIMPAR LOGS ANTIGOS'}</Text>
       </TouchableOpacity>
