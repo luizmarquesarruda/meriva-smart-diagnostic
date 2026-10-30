@@ -5059,6 +5059,11 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - JSON/TXT/CSV foram mantidos; SQLite só será reavaliado com métricas de tamanho, latência, padrões de consulta e concorrência que justifiquem a migração.
 - Atualização Expo/React Native permanece separada da estabilização Bluetooth, condicionada a baseline físico e migração incremental SDK a SDK.
 
+### Recuperação do desvio de branch
+- A criação inicial do documento ADR foi executada sem o parâmetro de branch e adicionou somente `docs/DECISOES_ARQUITETURA_2026-10-30.md` a `main` no commit `709f93f20a8cd2e347fd1dde3c1dd8819663d543`.
+- A inclusão foi removida de `main` no commit `f4120541dd879231612e1622c872f98b261f092e`; o documento foi criado novamente, com branch explícita, em `fix/elm-buffered-prompt-20261030` no commit `763ca4d8f82398672d23c6826c3f989cfb7b6149`.
+- Verificação posterior confirmou que a branch `main` aponta para `f4120541dd879231612e1622c872f98b261f092e` e que o documento ADR está presente na branch da PR. Nenhum código funcional foi enviado a `main`.
+
 ### Validação e pendências
 - Uma execução de CI anterior passou Expo Doctor e o gate anti-regressão, mas falhou apenas na expectativa de quota acima descrita; essa expectativa foi corrigida.
 - O SHA final após este registro deve concluir `validate` e `android-build` no mesmo workflow. A aprovação não é presumida.
