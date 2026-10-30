@@ -176,6 +176,9 @@ assert.match(read('src/storage/backup.ts'), /'MANUTENCAO'/, 'backups must includ
 assert.match(read('src/storage/backup.ts'), /export async function restoreBackup/);
 assert.match(read('src/storage/backup.ts'), /readVerifiedManifest/, 'restore must verify backup manifests and contents');
 assert.match(read('app/configuracoes.tsx'), /Confirmar|Restaurar backup\?/, 'restore must require an explicit destructive confirmation');
+assert.match(read('app/configuracoes.tsx'), /await disconnectSharedObd\(\)/, 'restore must close the live ECU session first');
+assert.match(read('app/configuracoes.tsx'), /await saveNow\('critical'\)/, 'restore must flush the current autosave before replacing files');
+assert.match(read('app/configuracoes.tsx'), /disposeAutoSave\(\)[\s\S]*?initAutoSave\(storageBase\)/, 'restore must rehydrate the in-memory autosave from restored files');
 assert.match(read('src/storage/quotaManager.ts'), /'MANUTENCAO'/, 'storage breakdown must account for maintenance data');
 assert.match(read('src/meriva/autosaveManager.ts'), /'MANUTENCAO'/, 'startup must provision the maintenance data directory');
 assert.match(read('src/database/maintenanceStorage.ts'), /MANUTENCAO\/registros\.json/);
