@@ -7,7 +7,7 @@
 - A CI consultada no SHA `19636997c0a023f2e5ca70a09e8201dfe198f754` concluiu com sucesso. Esse resultado não substitui validação do novo SHA nem teste físico.
 - Correção ELM: verificar primeiro o prompt `>` já recebido antes de sondar novamente `isConnected()`; a ordem está protegida em `tests/bluetoothLifecycle.test.js`.
 - OTA: a preparação da antiga PR #97 foi portada sobre o `main` atual. A PR antiga estava 177 commits atrás e tinha removido testes existentes do `npm test`; a versão reconciliada preserva todas as suítes e acrescenta `easUpdateConfig.test.js`.
-- A primeira CI OTA falhou no Expo Doctor: SDK 51 exige `expo-updates ~0.25.28`, mas a primeira portabilidade usou `0.25.27`. DB-187 registra a correção no package e lockfile. A publicação OTA continua desabilitada por padrão até validar projeto/owner/canal e a primeira APK.
+- A primeira CI OTA identificou a versão incompatível de `expo-updates` (corrigida em DB-187). A validação do YAML também identificou dois comandos `run: echo` com `:` sem aspas, que impediam a criação dos jobs em eventos `push`; DB-188 registra a correção com blocos YAML. A publicação OTA continua opt-in.
 - Antes de considerar esta rodada validada, exigir `validate` e `android-build` verdes no mesmo SHA da nova PR, diff revisado e reconciliação com `main`.
 - Testes com Galaxy A06 / SM-A065M / Android 16, adaptador ELM327 real, resposta ECU válida a `010C`, inspeção do APK instalado e validação física de GPS/autonomia continuam pendentes.
 - Não foi implementada fila offline-first de envio de telemetria porque a auditoria do código não encontrou um caminho de upload de telemetria ou WebSocket que a justificasse; persistência e exportação locais existem. Não inventar endpoint ou contrato de nuvem sem requisito verificável.
@@ -278,6 +278,7 @@
 - **DB-185** · 2026-10-30 — Consumir prompt ELM já bufferizado antes de sondar o socket
 - **DB-186** · 2026-10-30 — Reconciliar configuração OTA e preservar todas as suítes de teste
 - **DB-187** · 2026-10-30 — Alinhar expo-updates à versão exigida pelo Expo Doctor
+- **DB-188** · 2026-10-30 — Corrigir strings run do job OTA para YAML válido
 
 ---
 
@@ -4870,3 +4871,16 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 ### Validação
 - A CI precisa repetir Expo Doctor, gate anti-regressão, typecheck, suíte completa e build Android sobre o SHA final.
 - A configuração do projeto EAS (owner, slug e project ID) ainda requer confirmação de acesso no serviço Expo. A publicação OTA permanece bloqueada pela variável de opt-in e não foi executada.
+
+
+## DB-188 · 2026-10-30 — Corrigir strings run do job OTA para YAML válido
+
+### Causa da falha
+- Os dois passos finais do job `publish-ota` usavam `run: echo "… mudança: …"` em escala simples YAML. O caractere `:` seguido de espaço dentro do escalar sem aspas tornava o workflow inválido. O GitHub Actions criava uma execução de evento `push` com conclusão failure, mas sem criar jobs.
+
+### Correção
+- Os comandos de explicação para mudança nativa e ausência de código do app foram convertidos para blocos `run: |`, preservando o texto exibido e a lógica de skip.
+- Não foram alteradas as condições de publicação, a exigência de `EXPO_TOKEN`, a dependência de `validate` + `android-build` nem o opt-in `EAS_UPDATE_ENABLED=true`.
+
+### Validação
+- A CI deverá criar os jobs normalmente no novo commit. O job de validação ainda precisa comprovar Expo Doctor, baseline, TypeScript e testes; Android precisa concluir a montagem do APK no mesmo SHA.
