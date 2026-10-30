@@ -283,6 +283,7 @@
 - **DB-190** · 2026-10-30 — Eliminar resíduos de build EAS e restaurar identidade Expo original
 - **DB-191** · 2026-10-30 — Atualizar manual Android para o fluxo real de APK via Gradle CI
 - **DB-192** · 2026-10-30 — Remover pacotes transitivos órfãos remanescentes da configuração OTA
+- **DB-193** · 2026-10-30 — Auditoria modular: MAC normalizado, métricas ELM e buffer real 012F 10/10.
 
 ---
 
@@ -4948,3 +4949,35 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 
 ### Validação
 - A CI deve comprovar `npm ci`, Expo Doctor, baseline, TypeScript, testes completos e APK no SHA final. Se o npm identificar inconsistência, reverter apenas esta poda e regenerar o lockfile pelo npm da toolchain oficial.
+
+
+## DB-193 · 2026-10-30 — Auditoria modular e correções de telemetria/autonomia
+
+### Escopo examinado
+- Telas/navegação: splash, cockpit, Bluetooth, conectividade, Dados, Viagens, Laboratório, Saúde, Armazenamento, Configurações e auxiliares.
+- OBD/Bluetooth: transporte RFCOMM, permissões/radio, fila ELM, inicialização, validação ECU por 010C, recuperação, bitmap e descoberta de PIDs.
+- GPS/rede/clima: coordenadas/timestamps, precisão, watchdog, execução em segundo plano, estado de rede e atualização opcional de clima.
+- Viagens/combustível: integração 015E, estimativas MAF/MAP, gravação de percurso, PID 012F, reserva e autonomia.
+- Persistência/armazenamento: autosave, histórico, CSV, DTC, aprendizado, exportação e quota. Caminhos protegidos foram mantidos sem reescrita especulativa.
+- Revisão estática modular direcionada por implementação, contratos e integrações; não equivale à leitura manual de cada linha dos 183 arquivos nem à execução integral no aparelho.
+
+### Defeitos confirmados e correções
+1. O callback Android de desconexão comparava MAC por igualdade textual. Variação de caixa/separadores podia impedir reconhecer a desconexão do próprio adaptador. A comparação agora normaliza os endereços; a suíte Bluetooth protege o contrato.
+2. O contador de timeouts ELM era incrementado para qualquer exceção capturada, inclusive falha de escrita nativa. Agora somente classificação TIMEOUT incrementa `timeouts`; classificação ERROR incrementa `errors`. Adicionado teste comportamental com transporte falso.
+3. A autonomia ficava indisponível após o frescor do PID 012F apesar de leituras reais recentes na sessão. Adicionado buffer volátil das dez amostras válidas mais recentes, com timestamp monotônico e mediana. Leitura ao vivo até 30 s tem prioridade; fallback expira 60 s após a última leitura. Buffer é apagado ao trocar/desconectar ECU, não é persistido e não aparece como leitura atual.
+
+### Arquivos alterados
+- `src/obd/bluetoothClassicTransport.ts`, `src/obd/elm327.ts`
+- `src/trip/fuelLevelBuffer.ts` (novo), `src/trip/autonomyPresentation.ts`, `src/trip/autoTripService.ts`
+- `app/index.tsx`, `app/dados.tsx`
+- `tests/bluetoothLifecycle.test.js`, `tests/elm327Compatibility.test.js`, `tests/autonomyPresentation.test.js`, `tests/fuelLevelBuffer.test.js` (novo), `tests/projectBaseline.test.js`, `package.json`
+- `docs/CONTRATO_ANTI_REGRESSAO.md`, `docs/TEST_PLAN.md`, `docs/DIARIO_DE_BORDO.md`
+
+### Módulos sem alteração
+- Parser, scanner DTC, descoberta de PIDs, recuperação de socket, integrador combustível, recorder de viagem, filtros GPS, enriquecimento de clima e persistência de histórico foram mantidos porque não foi confirmado defeito que justificasse alteração nesta rodada. Protocolos legados e formatos com consumidores foram preservados.
+- Dívida técnica mantida: Expo SDK 51, React Native 0.74.5, biblioteca Bluetooth Classic release candidate e APIs legadas expo-file-system. Modernizações exigem baseline e validação física separados.
+
+### Validação e pendências
+- A validação anterior estava verde no SHA `29a646d`; este lote exige novo gate, TypeScript, suíte completa e build Android.
+- Teste físico pendente: Galaxy A06 / SM-A065M / Android 16 com ELM327 real; confirmar RFCOMM, ATZ, protocolo, resposta ECU 41 0C e PID 012F. Bluetooth/ECU/autonomia física não são declarados validados.
+- Nenhum merge executado.

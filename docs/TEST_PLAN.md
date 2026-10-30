@@ -97,6 +97,14 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 - Antes desse limiar, usar apenas uma média histórica positiva válida; se não existir, apresentar N/D, nunca transformar amostra insuficiente em consumo alto.
 - CI automatizada não substitui teste físico com ELM327/ECU; validar no veículo a resposta real do PID 012F e a estabilidade da autonomia.
 
+## FUEL-BUFFER-01 — Buffer volátil de nível de combustível PID 012F
+- Coletar somente respostas reais do PID 012F com status RESPONDEU, unidade percent e valor finito entre 0 e 100; ignorar seed, simulação, histórico e falhas.
+- Manter as dez leituras válidas mais recentes da mesma sessão ECU. Com menos de 10/10, não existe fallback.
+- Leitura ao vivo com até 30 s prevalece; quando ficar desatualizada, a mediana do buffer pode sustentar estimativa temporária até 60 s após a última leitura válida. Depois disso, autonomia retorna N/D.
+- Rejeitar timestamp futuro, duplicado/regressivo e nível fora de 0–100. Resetar buffer ao iniciar/trocar/encerrar sessão ECU; não persistir amostras entre sessões.
+- A interface identifica o buffer explicitamente e não o apresenta como leitura atual do PID. ECU deve continuar conectada e o consumo médio deve ser positivo e confiável.
+- Testes: tests/fuelLevelBuffer.test.js e tests/autonomyPresentation.test.js; validação física confirma resposta real 012F da ECU.
+
 ## PID-AI-01 — Proveniência, frescor e rastreabilidade do diagnóstico local
 
 - Catalogar todas as entradas em `pids.json` e confirmar correspondência exata com `formulas.json` e `ranges.json`; nenhum PID duplicado, fórmula inexistente, unidade ausente ou payload divergente.

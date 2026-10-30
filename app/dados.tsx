@@ -98,6 +98,9 @@ export default function DadosScreen() {
             <Metric landscape={layout.landscape} label="CONSUMO" value={trip.consumptionKml != null && trip.consumptionKml > 0 ? trip.consumptionKml.toFixed(1) + ' km/L' : 'N/D'} />
             <Metric landscape={layout.landscape} label="AUTONOMIA" value={trip.estimatedRangeKm > 0 ? trip.estimatedRangeKm.toFixed(0) + ' km' : trip.fuelLevelPercent === 0 && trip.fuelLevelReadAtMs != null ? '0 km' : 'N/D'} />
           </View>
+          {trip.autonomySource === 'BUFFER_012F' ? (
+            <Text style={styles.chartHint}>ESTIMATIVA TEMPORÁRIA • MEDIANA DE {trip.fuelLevelBufferSampleCount}/10 LEITURAS REAIS DO PID 012F. O ÚLTIMO VALOR RECEBIDO ESTÁ TEMPORARIAMENTE DESATUALIZADO.</Text>
+          ) : null}
 
           <Text style={styles.section}>CONTEXTO OPERACIONAL</Text>
           <View style={styles.contextCard}>
