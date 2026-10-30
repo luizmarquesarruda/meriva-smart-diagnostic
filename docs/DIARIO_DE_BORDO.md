@@ -285,6 +285,7 @@
 - **DB-192** · 2026-10-30 — Remover pacotes transitivos órfãos remanescentes da configuração OTA
 - **DB-193** · 2026-10-30 — Auditoria modular: MAC normalizado, métricas ELM e buffer real 012F 10/10.
 - **DB-194** · 2026-10-30 — Corrigir relógio do buffer 012F e limpar fallback quando ECU perde resposta.
+- **DB-195** · 2026-10-30 — Auditar arquitetura, contexto, agentes e módulos; alinhar escopo do veículo e fluxo APK.
 
 ---
 
@@ -5006,3 +5007,30 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 ### Validação
 - CI prévia verde no SHA f15d75916bd0222a163886e7825eaffea9d64771: validate e android-build passaram; APK standalone gerado. Esta entrada representa correções posteriores e exige nova CI no novo SHA.
 - Teste físico Galaxy A06 / Android 16 + ELM327 real permanece pendente; CI não valida rádio, ELM327 ou ECU físicos.
+
+
+## DB-195 · 2026-10-30 — Auditar arquitetura, contexto, agentes e módulos
+
+### Escopo e evidência
+- Auditoria estática da árvore da branch `fix/elm-buffered-prompt-20261030`, PR #98, SHA examinado `1feb108867d085b5c2bfe5cb1bf9d2fe7532c4bd`.
+- Cruzados arquitetura, estado/contexto, serviços/orquestradores, telas, transporte ELM327, GPS, rede, autonomia, persistência, diagnóstico, permissões, catálogos, testes, documentação e CI.
+- Relatório completo: `docs/AUDITORIA_ARQUITETURA_CONTEXTO_AGENTES_2026-10-30.md`.
+
+### Achados
+- Arquitetura principal está separada por domínio; `sharedConnection` coordena a sessão e `Elm327Session` mantém comandos serializados.
+- Não existe agente LLM/IA generativa ou agente remoto no aplicativo. Descoberta PID, diagnóstico, aprendizado e testes de sensores são motores locais determinísticos.
+- Persistência é baseada em JSON/TXT/CSV; não foi encontrada implementação SQLite nem cliente/fila de telemetria em nuvem.
+- Identificada inconsistência entre promessa de app multi-veículo e implementação que normaliza perfil para Meriva Maxx e usa tanque/reserva fixos de 56 L/5 L. O README foi corrigido para não prometer seleção de veículos inexistente. Generalização exige alteração funcional e migração próprias.
+- Expo SDK 51, React Native 0.74.5, biblioteca Bluetooth RC e APIs FileSystem legadas permanecem dívida controlada; não atualizar durante a estabilização Bluetooth.
+- README alinhado ao fluxo atual de APK standalone por Expo prebuild + Gradle; EAS Build e OTA não fazem parte do fluxo atual.
+
+### Estado CI observado no SHA examinado
+- Run `41073088871`: `validate` passou; `android-build` estava em execução.
+- O resultado acima não valida os commits de documentação DB-195; a CI deve executar novamente no HEAD resultante.
+- O APK só pode ser aceito quando o artefato vier do mesmo SHA final e for instalado/testado.
+
+### Pendências
+- Teste físico Galaxy A06 / SM-A065M / Android 16 com ELM327 real: RFCOMM, ATZ, protocolo, resposta 010C → 41 0C, PID 012F e PID 015E.
+- Percurso GPS real, comparação de distância, validação de autonomia por abastecimento e teste de background.
+- Definir futuramente se o produto será multi-veículo e medir o histórico antes de decidir migração seletiva para SQLite.
+- Nenhuma refatoração ampla de dependências foi iniciada; nenhuma conclusão de hardware foi inferida a partir da CI.
