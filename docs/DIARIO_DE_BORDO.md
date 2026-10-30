@@ -1,4 +1,4 @@
-## ESTADO VIGENTE — 2026-10-30 (conectividade ELM327 + OTA segura em validação)
+## ESTADO VIGENTE — 2026-10-30 (corrigir Expo Doctor e fechar validação Bluetooth/OTA)
 
 > Frente única de trabalho: PR #98 / branch `fix/elm-buffered-prompt-20261030`, reunindo a correção de framing ELM327 e a configuração OTA reconciliada sobre o main atual.
 
@@ -7,7 +7,7 @@
 - A CI consultada no SHA `19636997c0a023f2e5ca70a09e8201dfe198f754` concluiu com sucesso. Esse resultado não substitui validação do novo SHA nem teste físico.
 - Correção ELM: verificar primeiro o prompt `>` já recebido antes de sondar novamente `isConnected()`; a ordem está protegida em `tests/bluetoothLifecycle.test.js`.
 - OTA: a preparação da antiga PR #97 foi portada sobre o `main` atual. A PR antiga estava 177 commits atrás e tinha removido testes existentes do `npm test`; a versão reconciliada preserva todas as suítes e acrescenta `easUpdateConfig.test.js`.
-- A publicação OTA continua desabilitada por padrão: somente poderá executar após push em `main`, sucesso de `validate` e `android-build`, variável `EAS_UPDATE_ENABLED=true` e secret `EXPO_TOKEN`. Projeto/owner/canal EAS ainda exigem confirmação no painel/CLI Expo; não foi publicado update.
+- A primeira CI OTA falhou no Expo Doctor: SDK 51 exige `expo-updates ~0.25.28`, mas a primeira portabilidade usou `0.25.27`. DB-187 registra a correção no package e lockfile. A publicação OTA continua desabilitada por padrão até validar projeto/owner/canal e a primeira APK.
 - Antes de considerar esta rodada validada, exigir `validate` e `android-build` verdes no mesmo SHA da nova PR, diff revisado e reconciliação com `main`.
 - Testes com Galaxy A06 / SM-A065M / Android 16, adaptador ELM327 real, resposta ECU válida a `010C`, inspeção do APK instalado e validação física de GPS/autonomia continuam pendentes.
 - Não foi implementada fila offline-first de envio de telemetria porque a auditoria do código não encontrou um caminho de upload de telemetria ou WebSocket que a justificasse; persistência e exportação locais existem. Não inventar endpoint ou contrato de nuvem sem requisito verificável.
@@ -277,6 +277,7 @@
 - **DB-184** · 2026-10-30 — Sincronizar índice DB-NNN com as novas entradas de auditoria
 - **DB-185** · 2026-10-30 — Consumir prompt ELM já bufferizado antes de sondar o socket
 - **DB-186** · 2026-10-30 — Reconciliar configuração OTA e preservar todas as suítes de teste
+- **DB-187** · 2026-10-30 — Alinhar expo-updates à versão exigida pelo Expo Doctor
 
 ---
 
@@ -4846,7 +4847,7 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - O lockfile OTA foi gerado sobre uma árvore antiga e não deve substituir diretamente o lockfile mais recente.
 
 ### Correção aplicada nesta branch
-- Portadas as configurações OTA de forma seletiva sobre o `main` integrado: `app.json`, `eas.json`, `expo-updates ~0.25.27`, dependências correspondentes do lockfile, job de publicação condicionado e documentação.
+- Portadas as configurações OTA de forma seletiva sobre o `main` integrado: `app.json`, `eas.json`, `expo-updates ~0.25.28`, dependências correspondentes do lockfile, job de publicação condicionado e documentação.
 - O script `npm test` atual foi preservado integralmente e somente ganhou `tests/easUpdateConfig.test.js`; todas as entradas novas do lockfile foram acrescentadas sem descartar as dependências atuais.
 - O gate de publicação permanece fechado por padrão e ignora commits que alterem configuração/dependências/código nativo. A primeira APK com o módulo `expo-updates` é obrigatória antes de qualquer OTA.
 
@@ -4854,3 +4855,18 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - O vínculo de owner, slug, project ID e canal remoto ainda não foi autenticado contra o serviço Expo nesta sessão. A variável `EAS_UPDATE_ENABLED` deve permanecer desativada até a verificação no painel/CLI e a instalação/teste da APK inicial.
 - A CI deve validar `npm ci`, Expo Doctor, gate, TypeScript, todas as suítes e build Android no SHA final desta PR.
 - Não houve publicação OTA e não houve teste em aparelho real nesta etapa.
+
+
+## DB-187 · 2026-10-30 — Alinhar expo-updates à versão exigida pelo Expo Doctor
+
+### Causa da falha CI
+- No SHA `b9af0f602814a774367851d0b8214d1dad546e2d`, `npm ci` passou, mas o Expo Doctor falhou com 16/17 checks: `expo-updates@0.25.27` estava abaixo da versão exigida pelo Expo SDK 51 (`~0.25.28`). O gate, TypeScript, testes e build Android foram corretamente bloqueados a partir dessa etapa.
+
+### Correção
+- Atualizada a dependência em `package.json` para `~0.25.28`.
+- Atualizado `package-lock.json` com a resolução e integridade oficiais do pacote 0.25.28; as dependências transitivas já presentes foram preservadas.
+- Atualizadas as asserções de versão em `tests/easUpdateConfig.test.js`.
+
+### Validação
+- A CI precisa repetir Expo Doctor, gate anti-regressão, typecheck, suíte completa e build Android sobre o SHA final.
+- A configuração do projeto EAS (owner, slug e project ID) ainda requer confirmação de acesso no serviço Expo. A publicação OTA permanece bloqueada pela variável de opt-in e não foi executada.
