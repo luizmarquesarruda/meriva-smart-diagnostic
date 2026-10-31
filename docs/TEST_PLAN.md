@@ -8,6 +8,15 @@ Este documento define os critérios de aceitação para mudanças no cockpit, na
 
 A branch mantém o fluxo OBD/ELM327 existente e inclui testes automatizados para navegação do cockpit, estado de conectividade, apresentação da autonomia, temperatura e DTC. O relatório de funcionalidades é uma proposta, não prova de que cada recurso está implementado. Antes de criar novos módulos, verificar a tela/serviço existente e ampliar o contrato atual.
 
+## SEC-CI-01 — Distribuição privada do APK
+
+- Em repositório público, push, pull request e workflow_dispatch podem validar/compilar, mas não enviam APK como artefato e não criam GitHub Release.
+- Em repositório privado, somente execução de `main` pode enviar APK e checksum SHA-256; retenção máxima de três dias.
+- Pull requests nunca recebem etapa de upload, mesmo quando o repositório é privado.
+- Confirmar `permissions: contents: read`, ausência de `contents: write` e ausência de job `publish-release`.
+- Confirmar que cada action externa usa SHA completo de commit e que os SHAs correspondem às releases oficiais selecionadas.
+- A configuração de visibilidade privada é requisito operacional separado; a CI não deve presumir que a branch de origem é privada.
+
 ## Casos de regressão obrigatórios
 
 | ID | Cenário | Resultado esperado | Evidência |

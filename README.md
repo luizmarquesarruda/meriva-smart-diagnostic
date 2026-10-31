@@ -127,6 +127,14 @@ Na abertura do aplicativo, o sistema verifica suporte, solicita permissões, ver
 
 O ELM327 deve estar previamente pareado no Android. O aplicativo escolhe automaticamente os candidatos pareados: primeiro nomes compatíveis com ELM/OBD e depois outros dispositivos Classic, aceitando somente o candidato que passa pela inicialização do ELM e pelo teste real 010C. A conexão usa Bluetooth Classic/RFCOMM e preserva o prompt > para o parser do ELM. O estado do rádio é revalidado antes de cada socket; se estiver desligado ou não puder ser confirmado, o fallback e os retries são interrompidos com erro explícito, sem iniciar outra conexão concorrente. Reative o Bluetooth no Android e tente novamente pelo painel.
 
+## Build Android e distribuição privada
+
+A GitHub Actions executa validação, Expo Doctor, gate anti-regressão e build Android standalone. O APK **não é publicado em GitHub Releases**. O artefato só é enviado quando o repositório está configurado como `Private` e a execução corresponde à branch `main`; builds de PR e builds enquanto o repositório estiver público não enviam APK. O artefato inclui `app-release.apk` e o checksum `app-release.apk.sha256`, com retenção de três dias.
+
+Para baixar uma versão, entre no GitHub com uma conta que tenha acesso de leitura ao repositório privado, abra **Actions → CI → execução da branch main → Artifacts** e confira o SHA-256 antes de instalar. A instalação/atualização no Android exige confirmação local.
+
+**Estado de configuração:** o repositório ainda aparece como público na verificação desta alteração. A condição de upload já bloqueia novos artefatos enquanto essa visibilidade não for alterada para `Private`; a visibilidade do repositório precisa ser ajustada pelo proprietário nas configurações do GitHub. O conteúdo do código continuará público até essa alteração.
+
 ## Testes
 
 ```bash

@@ -68,6 +68,10 @@ Este documento é o contrato de aceitação entre mudanças, testes, diário e C
 | RG-49 | O modo paisagem não pode obter encaixe à custa de tipografia quase ilegível: rótulos e dicas dos quadrantes usam ao menos 8 dp, a instrução e os rótulos auxiliares ao menos 7 dp, mantendo 2×2 e sem clipping. Testes protegem esses limites; inspeção em aparelho continua obrigatória. | tests/orientationLayout.test.js, app/index.tsx |
 | RG-50 | A geração de hipóteses/evidências locais é apresentada uma única vez na Central de Saúde; o Laboratório fornece consultas de PID, descoberta, varredura DTC e detalhes brutos e encaminha para a Central de Saúde para interpretar hipóteses. Não manter uma segunda instância da UI ou do cálculo de hipóteses no Laboratório. | tests/orientationLayout.test.js, tests/diagnosticEngine.test.js |
 
+## Segurança da CI e distribuição do APK
+
+A CI pode validar e compilar em branches e pull requests, mas não pode publicar APK em execução de PR ou em repositório público. O único upload permitido é um artefato de curta retenção na branch `main` quando a visibilidade atual do repositório é `private`. Não criar GitHub Releases automáticas, URLs públicas estáveis nem conceder `contents: write` ao workflow de build. O APK deve acompanhar checksum SHA-256; Actions externas devem ser fixadas em SHA completo de commit verificado. A política é protegida por `tests/projectBaseline.test.js`.
+
 ## Regras para uma alteração legítima
 
 - Não reduzir ou excluir um teste essencial só para deixar a CI verde.
