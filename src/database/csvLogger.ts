@@ -408,9 +408,6 @@ export async function flushCsvLogs(): Promise<void> {
   }
 }
 
-/** Compatibility path  if (pendingRows.size > 0) scheduleBatchFlush();
-}
-
 /** Compatibility path for non-live records, including finalized drive cycles. */
 export async function appendCsvRow(filePath: string, row: CsvRow): Promise<void> {
   await enqueueFileOperation(filePath, () => writeRowsUnsafe(filePath, [row]));
