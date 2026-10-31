@@ -7,7 +7,6 @@ import type { MerivaPersistedState } from './autosaveState';
  * eventos de início/fim sem substituir os eventos anteriores daquele dia.
  */
 export const DAILY_OBD_HISTORY_FILE = 'meriva_smart_daily_obd_history.txt';
-const MAX_DAYS = 365;
 const HEADER = [
   'MERIVA SMART DIAGNOSTIC',
   'HISTÓRICO TXT POR DIA — CADA DATA É UMA PÁGINA LÓGICA.',
@@ -127,7 +126,7 @@ async function appendDailyObdSessionEventUnsafe(
   pages.set(date, updatedEvents);
   const eventCount = (updatedEvents.match(/--- EVENTO: SESSION_(?:START|END|RECOVERED) \|/g) ?? []).length;
 
-  const sortedDates = Array.from(pages.keys()).sort().slice(-MAX_DAYS);
+  const sortedDates = Array.from(pages.keys()).sort();
   const output = [HEADER.trimEnd()];
   for (const day of sortedDates) {
     output.push('', `========== DIA: ${day} ==========`, pages.get(day) ?? '', `========== FIM DO DIA ==========`);

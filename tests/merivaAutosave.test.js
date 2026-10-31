@@ -902,6 +902,33 @@ test('15. diário de sessões preserva eventos concorrentes no mesmo arquivo', a
   assert.ok(saved.includes('2026-10-10T12:00:03.000Z'));
 });
 
+test('16. diário ECU preserva páginas anteriores a 365 dias', async () => {
+  resetFS();
+  const history = loadTs(path.join(ROOT, 'src/meriva/dailyObdHistory.ts'));
+  const stateModule = loadTs(path.join(ROOT, 'src/meriva/autosaveState.ts'));
+  const state = stateModule.createEmptyMerivaState();
+  const target = BASE + '/VIAGENS/meriva_smart_daily_obd_history.txt';
+  const oldPages = Array.from({ length: 366 }, (_, index) => {
+    const day = new Date(Date.UTC(2024, 0, 1 + index)).toISOString().slice(0, 10);
+    return [
+      `========== DIA: ${day} ==========`,
+      `REGISTRO ANTIGO: ${day}`,
+      '========== FIM DO DIA ==========',
+    ].join('\n');
+  });
+  files.set(target, `MERIVA SMART DIAGNOSTIC\n${oldPages.join('\n')}\n`);
+
+  await history.appendDailyObdSessionEvent(BASE, state, 'SESSION_START', '2025-01-01T12:00:00.000Z');
+
+  const saved = files.get(target);
+  assert.ok(saved.includes('========== DIA: 2024-01-01 =========='), 'a primeira data não pode expirar após 365 dias');
+  assert.ok(saved.includes('REGISTRO ANTIGO: 2024-01-01'), 'o conteúdo da página mais antiga deve ser preservado');
+  assert.ok(saved.includes('========== DIA: 2024-12-31 =========='), 'a última página antiga deve permanecer');
+  assert.ok(saved.includes('========== DIA: 2025-01-01 =========='), 'o novo evento deve ser acrescentado');
+  assert.strictEqual((saved.match(/^========== DIA: \d{4}-\d{2}-\d{2} ==========$/gm) || []).length, 367,
+    'todas as 366 páginas antigas e a nova página devem permanecer');
+});
+
 test('recuperação após encerramento abrupto limpa conexão fantasma e registra evento', async () => {
   const m = manager();
   m.disposeAutoSave();

@@ -1,13 +1,16 @@
-## ESTADO VIGENTE — 2026-10-31 (consolidação Bluetooth, autonomia e backup)
+## ESTADO VIGENTE — 2026-10-31 (relatórios e rastreabilidade)
 
-> Frente em consolidação: PR #98, reconciliada com a PR #101 já integrada. O workflow de segurança da main é preservado; publicação automática de Release não é aceita.
+> Frente em revisão: `fix/diagnostic-reports-main-20261031`. Base alinhada ao `main` atual após a integração do hardening Bluetooth, buffer 012F e backup verificado.
 
-- `main` de referência: `1443ace6ac3d35139d1177fd0601ada871826dc5`; PR #101 está integrada e separou permissões/ciclo GPS do OBD.
-- A PR #98 original foi baseada em uma linha anterior e continha um job `publish-release` com `contents: write`. Esse job NÃO será integrado. A regra da main permanece: nenhum APK público/Release automático; upload temporário permitido somente em main e repositório privado.
-- Os ajustes de buffer do PID 012F, recuperação do prompt ELM, contadores de saúde, backup/restauração e MANUTENCAO estão sendo reconciliados sobre a main atual.
-- PR #99 tem conflito de merge e sua alteração de navegação será reaplicada em uma frente separada após a consolidação.
-- PR #103 (relatórios) foi aberta sobre a main antiga desta consolidação; precisará ser reaplicada após a integração para evitar conflitos de exportação/documentação.
-- Não há validação física ainda no Galaxy A06 / SM-A065M / Android 16 com ELM327 real. O PID 010C e o PID 012F continuam pendentes de comprovação no veículo.
+- Base da frente: `e3383051be0561f31472c9ea96a728b76c302740`; as mudanças de relatório foram reaplicadas sem substituir a recuperação ELM327, o buffer real do PID 012F ou a rotina de backup/restauração.
+- PR #103 antiga foi aberta sobre a base anterior `1443ace6ac3d35139d1177fd0601ada871826dc5`; esta frente reaplica os mesmos objetivos sobre o `main` atualizado para evitar conflitos e colisão do identificador DB-187.
+- Relatório Bluetooth TXT schema 2 separa o erro mais recente da trilha do erro compartilhado, com evento, timestamp e origem.
+- Exportação técnica e compartilhável: a segunda mascara endereços MAC em cabeçalho e conteúdo RAW.
+- Diagnóstico JSON usa `MERIVA_DIAGNOSTIC_EXPORT` schema 1, inclui timestamp do snapshot, manutenção e política de proveniência.
+- O modelo físico Android só é registrado se vier de `Platform.constants.Model`; `Constants.deviceName` não é tratado como modelo.
+- Exigir baseline, typecheck, suíte completa e build Android no SHA final desta frente. A inspeção visual dos relatórios no Galaxy A06 / SM-A065M / Android 16 ainda é necessária.
+- A comprovação física de Bluetooth Classic, ELM327, PID 010C e PID 012F continua separada da CI.
+
 
 ---
 
@@ -272,6 +275,9 @@
 - **DB-185** — Bloquear publicação pública/automática do APK; upload privado somente na branch main, checksum SHA-256 e Actions fixadas em commit.
 - **DB-186** — Desacoplar permissões GPS do OBD e centralizar o ciclo de vida de localização no AutoTripService.
 - **DB-187** · 2026-10-31 — Reconciliar Bluetooth, buffer 012F, backup e segurança de integração.
+- **DB-188** · 2026-10-31 — Integridade, privacidade e metadados verificados nos relatórios.
+- **DB-189** · 2026-10-31 — Privacidade ampliada e snapshot do relatório Bluetooth
+- **DB-190** · 2026-10-31 — Preservação integral do histórico diário ECU
 
 ---
 
@@ -4877,3 +4883,49 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - Executar baseline, TypeScript, suíte completa e build Android no commit final da PR reconciliada.
 - Testar restauração real de backup e os dados de manutenção/abastecimento no aparelho.
 - Validar no veículo a resposta 010C e leitura real 012F. A CI não confirma comunicação física.
+
+
+## DB-188 · 2026-10-31 — Integridade, privacidade e metadados verificados nos relatórios
+
+### Problemas confirmados
+- O relatório Bluetooth podia exibir como erro principal um estado compartilhado mais antigo que a última falha da trilha.
+- Endereços MAC eram incluídos em logs e dispositivos pareados sem uma opção de exportação redigida.
+- O nome do dispositivo fornecido por Expo pode ser personalizado e não deve substituir o modelo físico Android.
+- O JSON não tinha schema próprio e horário do snapshot; não incluía toda a proveniência nem os registros de manutenção.
+- Leituras assíncronas de arquivos podiam prolongar a exportação enquanto o estado em memória mudava.
+
+### Correções reaplicadas sobre o main atualizado
+- Erro principal extraído do último evento concreto de falha, preservando evento, timestamp e origem; erro compartilhado permanece em campo separado.
+- Dois modos TXT: técnico completo e compartilhável com MACs mascarados também dentro da trilha RAW.
+- JSON `MERIVA_DIAGNOSTIC_EXPORT` schema 1 com versão, plataforma, app, timestamps, veículo, OBD, leituras, DTCs, viagens, autonomia, manutenção e política de proveniência.
+- Clone do estado em memória antes da leitura paralela de DTCs, viagens e manutenção.
+- Modelo físico obtido somente do campo de modelo do runtime Android; sem fallback por nome personalizado. Campo vazio/ausente resulta em `N/D` no TXT e omissão no JSON.
+- Testes cobrem falha mais recente, ausência de erro, MACs separados por dois formatos, contrato JSON e modelo Android ausente/vazio.
+
+### Validação necessária
+- Executar `gate:baseline`, `validate` e `android-build` no SHA final da PR.
+- Conferir ambos os modos no Galaxy A06 e verificar ausência de MAC no compartilhável.
+- Confirmar que o runtime Android do aparelho informa `SM-A065M`; a ausência do campo deve permanecer como dado ausente, sem inferência.
+- CI não comprova comunicação física com ELM327/ECU nem respostas reais aos PIDs 010C/012F.
+
+
+## DB-189 — 2026-10-31 — Privacidade ampliada e snapshot do relatório Bluetooth
+
+- Auditoria da PR #105 identificou que a exportação compartilhável ocultava MACs, mas ainda podia expor nomes de dispositivos, VIN e coordenadas GPS presentes em texto bruto.
+- A exportação compartilhável agora mascara nomes de dispositivos pareados/conectados, VIN rotulado e coordenadas GPS rotuladas, além de MACs. O modo técnico permanece integral para diagnóstico interno.
+- O relatório Bluetooth captura conexão, dispositivos pareados, trilha, erro e estado de telemetria antes da primeira leitura assíncrona; o TXT identifica o horário do snapshot.
+- Testes de regressão cobrem VIN, nome de dispositivo, latitude/longitude e MAC em conteúdo RAW.
+- A documentação distingue o snapshot em memória de dados persistidos em arquivos independentes, sem prometer atomicidade inexistente.
+- Validação automatizada deve ser conferida no SHA final após os commits desta entrada. Inspeção real dos arquivos no Galaxy A06 / SM-A065M / Android 16 continua pendente.
+- Limite conhecido: DTCs, leituras, horários e características do veículo continuam no relatório compartilhável por relevância diagnóstica e podem permitir correlação indireta; revisar antes de enviar.
+
+
+## DB-190 — 2026-10-31 — Preservação integral do histórico diário ECU
+
+- Auditoria confirmou que `src/meriva/dailyObdHistory.ts` limitava o diário às 365 datas mais recentes com `slice(-MAX_DAYS)`.
+- O limite temporal foi removido: a gravação preserva todas as páginas existentes e acrescenta a nova data sem descartar as mais antigas.
+- Teste de regressão cria 366 páginas antigas, acrescenta a data seguinte e verifica a preservação da primeira, da última e da nova página (367 no total).
+- A limpeza de LOGS/LEITURAS não altera o diário em VIAGENS. A documentação registra que o TXT cresce com o uso e que segmentação futura exige migração/recuperação testada.
+- Configurações agora explica a diferença entre relatório técnico e compartilhável e alerta que TXT de autosave, DTCs e dados do veículo exigem revisão antes de envio.
+- Nenhuma migração geral para SQLite foi feita; primeiro preservar os dados e medir o comportamento.
+- Validar gate:baseline, suíte completa e build Android no SHA final. Inspeção física dos relatórios no Galaxy A06 / SM-A065M / Android 16 continua pendente.

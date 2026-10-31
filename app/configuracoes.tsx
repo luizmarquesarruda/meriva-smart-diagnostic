@@ -199,12 +199,12 @@ export default function ConfiguracaoScreen() {
     finally { setBusy(false); setSaveStatus(getAutoSaveStatus()); }
   }
 
-  async function handleBluetoothReport() {
+  async function handleBluetoothReport(mode: 'TECHNICAL' | 'SHAREABLE') {
     if (busy) return;
     setBusy(true);
     try {
-      const result = await exportBluetoothDiagnosticTxt();
-      if (result.ok) setStatus(`RELATÓRIO BLUETOOTH EXPORTADO: ${result.fileName}`);
+      const result = await exportBluetoothDiagnosticTxt(mode);
+      if (result.ok) setStatus(`RELATÓRIO BLUETOOTH ${mode === 'TECHNICAL' ? 'TÉCNICO' : 'COMPARTILHÁVEL'} EXPORTADO: ${result.fileName}`);
       else if (result.reason === 'CANCELADO') setStatus('EXPORTAÇÃO CANCELADA');
       else setStatus(`FALHA NO RELATÓRIO BLUETOOTH: ${result.message ?? result.reason}`);
     } finally { setBusy(false); setSaveStatus(getAutoSaveStatus()); }
@@ -403,8 +403,12 @@ export default function ConfiguracaoScreen() {
       <TouchableOpacity style={styles.button} onPress={handleCleanLogs} disabled={busy}>
         <Text style={styles.buttonText}>{busy ? 'AGUARDE...' : 'LIMPAR LOGS ANTIGOS'}</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.button} onPress={handleBluetoothReport} disabled={busy}>
-        <Text style={styles.buttonText}>{busy ? 'AGUARDE...' : 'EXPORTAR RELATÓRIO BLUETOOTH (.TXT)'}</Text>
+      <Text style={styles.info}>PRIVACIDADE: o relatório técnico Bluetooth preserva a trilha e os endereços MAC; o TXT de salvamento pode conter VIN, nome do adaptador, DTCs e dados do veículo. O compartilhável mascara MACs, nomes conhecidos de dispositivos, VIN rotulado e coordenadas GPS rotuladas; ainda mantém leituras, DTCs e características do aparelho. Revise antes de enviar.</Text>
+      <TouchableOpacity style={styles.button} onPress={() => void handleBluetoothReport('TECHNICAL')} disabled={busy}>
+        <Text style={styles.buttonText}>{busy ? 'AGUARDE...' : 'EXPORTAR RELATÓRIO TÉCNICO BLUETOOTH (.TXT)'}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.button} onPress={() => void handleBluetoothReport('SHAREABLE')} disabled={busy}>
+        <Text style={styles.buttonText}>{busy ? 'AGUARDE...' : 'EXPORTAR RELATÓRIO COMPARTILHÁVEL (.TXT)'}</Text>
       </TouchableOpacity>
       <TouchableOpacity style={styles.button} onPress={handleDailyHistoryExport} disabled={busy}>
         <Text style={styles.buttonText}>{busy ? 'AGUARDE...' : 'EXPORTAR HISTÓRICO DIÁRIO ECU (.TXT)'}</Text>
