@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Constants from 'expo-constants';
 import { Link } from 'expo-router';
-import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
 import { createBackup } from '../src/storage/backup';
