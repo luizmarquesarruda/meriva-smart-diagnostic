@@ -55,6 +55,21 @@ assert(!shared.includes('BE:76:46:00:00:B4'));
 assert(!shared.includes('AA-BB-CC-DD-EE-FF'));
 assert.strictEqual((shared.match(/XX:XX:XX:XX:XX:XX/g) || []).length, 3,
   'shareable output must redact colon- and hyphen-separated MACs');
+const personalReport = [
+  'VIN: 1HGCM82633A004352',
+  'deviceName: Galaxy Duzentos',
+  'latitude: -23.501234',
+  'longitude: -47.452345',
+  'GPS: -23.501234, -47.452345',
+  'TRACE: 01:23:45:67:89:BA',
+].join('\\n');
+const safeReport = reportUtils.redactSensitiveReportData(personalReport, ['Galaxy Duzentos']);
+assert(!safeReport.includes('1HGCM82633A004352'), 'shareable report must redact labeled VIN values');
+assert(!safeReport.includes('Galaxy Duzentos'), 'shareable report must redact paired device names');
+assert(!safeReport.includes('-23.501234'), 'shareable report must redact labeled GPS coordinates');
+assert(!safeReport.includes('-47.452345'), 'shareable report must redact longitude and coordinate pairs');
+assert(!safeReport.includes('01:23:45:67:89:BA'), 'shareable report must redact MACs in raw traces');
+
 
 const document = exportContract.buildDiagnosticExportDocument({
   exportedAt: '2026-10-31T10:00:00.000Z',
