@@ -535,7 +535,7 @@ export class GpsTracker {
       derivedSpeedKmh != null &&
       derivedSpeedKmh >= MIN_MOVEMENT_SPEED_KMH &&
       derivedSpeedKmh <= MAX_SPEED_KMH &&
-      speedEvidenceIsConsistent &&
+      reportedSpeedConfirmsMovement(sample.speedKmh, vehicleSpeedHintKmh) &&
       this.movementEstablished;
     let speedKmh = movementConfirmed
       ? (vehicleSpeedHintKmh != null
