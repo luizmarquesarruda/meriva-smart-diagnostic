@@ -73,6 +73,9 @@ function snapshotFingerprint(state: MerivaPersistedState): string {
   // savedAt is metadata of the persistence operation, not application state.
   const payload = {
     ...state,
+    // Completed trips are stored canonically in VIAGENS/index.json; keeping a
+    // second copy here caused autosave size and TXT history to grow with every trip.
+    driveCycles: [],
     metadata: { ...state.metadata, savedAt: '' },
   };
   return JSON.stringify(payload);
@@ -140,7 +143,9 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
       savedAt,
       dataType: AUTOSAVE_DATA_TYPE,
       source: AUTOSAVE_SOURCE,
-      payload: runtime.state,
+      // Legacy autosaves may contain driveCycles; new snapshots do not duplicate
+      // the canonical history index. Runtime memory still exposes the loaded trips.
+      payload: { ...runtime.state, driveCycles: [] },
     };
     const content = JSON.stringify(envelope, null, 2);
     const base = runtime.basePath;
