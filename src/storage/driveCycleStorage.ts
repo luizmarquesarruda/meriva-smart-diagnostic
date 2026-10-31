@@ -222,7 +222,9 @@ async function readCyclesFromFile(filePath: string): Promise<DriveCycle[] | null
   try {
     const info = await FileSystem.getInfoAsync(filePath);
     if (!info.exists || info.isDirectory) return null;
-    const data = JSON.parse(await FileSystem.readAsStringAsync(filePath)) as { cycles?: unknown };
+    const data = JSON.parse(await FileSystem.readAsStringAsync(filePath)) as { cycles?: unknown; schemaVersion?: unknown };
+    if (data.schemaVersion !== undefined && (!Number.isInteger(data.schemaVersion) ||
+        (data.schemaVersion as number) < 1 || (data.schemaVersion as number) > CURRENT_HISTORY_SCHEMA_VERSION)) return null;
     if (!Array.isArray(data.cycles)) return null;
     const onlySeeds = data.cycles.every((cycle) =>
       typeof cycle === 'object' && cycle !== null &&
