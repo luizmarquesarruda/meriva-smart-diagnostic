@@ -18,7 +18,7 @@ const queuePolicyModule = new Module(queuePolicyPath, null);
 queuePolicyModule.filename = queuePolicyPath;
 queuePolicyModule.paths = Module._nodeModulePaths(path.dirname(queuePolicyPath));
 queuePolicyModule._compile(queuePolicyOutput, queuePolicyPath);
-const { getCsvQueueAction, MAX_PENDING_CSV_ROWS, HARD_MAX_PENDING_CSV_ROWS } = queuePolicyModule.exports;
+const { getCsvQueueAction, MAX_PENDING_CSV_ROWS, HARD_MAX_PENDING_CSV_ROWS, SPILL_CHUNK_ROWS } = queuePolicyModule.exports;
 const migrations = fs.readFileSync(path.join(root, 'src/storage/historyIndexMigrations.ts'), 'utf8');
 const tripStorage = fs.readFileSync(path.join(root, 'src/storage/driveCycleStorage.ts'), 'utf8');
 const migrationPath = path.join(root, 'src/storage/historyIndexMigrations.ts');
