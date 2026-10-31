@@ -4926,5 +4926,6 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - O limite temporal foi removido: a gravação preserva todas as páginas existentes e acrescenta a nova data sem descartar as mais antigas.
 - Teste de regressão cria 366 páginas antigas, acrescenta a data seguinte e verifica a preservação da primeira, da última e da nova página (367 no total).
 - A limpeza de LOGS/LEITURAS não altera o diário em VIAGENS. A documentação registra que o TXT cresce com o uso e que segmentação futura exige migração/recuperação testada.
+- Configurações agora explica a diferença entre relatório técnico e compartilhável e alerta que TXT de autosave, DTCs e dados do veículo exigem revisão antes de envio.
 - Nenhuma migração geral para SQLite foi feita; primeiro preservar os dados e medir o comportamento.
 - Validar gate:baseline, suíte completa e build Android no SHA final. Inspeção física dos relatórios no Galaxy A06 / SM-A065M / Android 16 continua pendente.
