@@ -1,16 +1,14 @@
-## ESTADO VIGENTE — 2026-10-31 (relatórios e rastreabilidade)
+## ESTADO VIGENTE — 2026-10-31 (relatórios, layout responsivo e estabilidade operacional)
 
-> Frente em revisão: `fix/diagnostic-reports-main-20261031`. Base alinhada ao `main` atual após a integração do hardening Bluetooth, buffer 012F e backup verificado.
+> PR #105 integrada em `main` no commit `b128b413427e612e621dc2ef2c82b6c2476ce659`, após `validate` e `android-build` verdes no HEAD `ff131e9b23ad745955dfe59904025a47cafabc98`. PR #104 está sendo reconciliada sobre essa nova base; a CI deverá ser repetida no SHA final.
 
-- Base da frente: `e3383051be0561f31472c9ea96a728b76c302740`; as mudanças de relatório foram reaplicadas sem substituir a recuperação ELM327, o buffer real do PID 012F ou a rotina de backup/restauração.
-- PR #103 antiga foi aberta sobre a base anterior `1443ace6ac3d35139d1177fd0601ada871826dc5`; esta frente reaplica os mesmos objetivos sobre o `main` atualizado para evitar conflitos e colisão do identificador DB-187.
-- Relatório Bluetooth TXT schema 2 separa o erro mais recente da trilha do erro compartilhado, com evento, timestamp e origem.
-- Exportação técnica e compartilhável: a segunda mascara endereços MAC em cabeçalho e conteúdo RAW.
-- Diagnóstico JSON usa `MERIVA_DIAGNOSTIC_EXPORT` schema 1, inclui timestamp do snapshot, manutenção e política de proveniência.
-- O modelo físico Android só é registrado se vier de `Platform.constants.Model`; `Constants.deviceName` não é tratado como modelo.
-- Exigir baseline, typecheck, suíte completa e build Android no SHA final desta frente. A inspeção visual dos relatórios no Galaxy A06 / SM-A065M / Android 16 ainda é necessária.
-- A comprovação física de Bluetooth Classic, ELM327, PID 010C e PID 012F continua separada da CI.
-
+- PR #98 está integrada: transporte Bluetooth Classic/ELM327 endurecido, buffer volátil com dez leituras reais do PID 012F, backup/restauração verificados e dados de manutenção incluídos no backup.
+- PR #101 está integrada: GPS permanece opcional, exige opt-in e tem ciclo de vida centralizado no `AutoTripService`, sem bloquear o início OBD.
+- PR #105 está integrada: relatórios Bluetooth técnico/compartilhável, proteção de identificadores, JSON `MERIVA_DIAGNOSTIC_EXPORT` schema 1, metadados físicos sem inferência e preservação integral do histórico diário ECU.
+- PR #104 consolida cockpit responsivo, cinco destinos independentes em retrato, navegação compacta em paisagem, cabeçalhos internos, retornos explícitos, áreas de toque e grades adaptáveis. Configurações mantém os switches GPS, backup/restauração e os dois modos de exportação Bluetooth.
+- A CI da PR #105 passou no SHA final informado acima. A PR #104 precisa passar novamente por `gate:baseline`, `validate` e `android-build` após a reconciliação dos arquivos compartilhados.
+- O repositório permanece público conforme a configuração operacional existente. A CI compila e verifica o APK, mas não cria Release pública nem publica APK automaticamente; não ampliar o escopo de distribuição.
+- Não declarar validação visual ou física no Galaxy A06 / SM-A065M / Android 16. Permanecem necessários screenshots em retrato/paisagem e teste real com ELM327/ECU, incluindo respostas 010C e 012F.
 
 ---
 
@@ -278,6 +276,7 @@
 - **DB-188** · 2026-10-31 — Integridade, privacidade e metadados verificados nos relatórios.
 - **DB-189** · 2026-10-31 — Privacidade ampliada e snapshot do relatório Bluetooth
 - **DB-190** · 2026-10-31 — Preservação integral do histórico diário ECU
+- **DB-191** · 2026-10-31 — Consolidar layout responsivo sem regredir GPS, autonomia e restauração de backups
 
 ---
 
@@ -4929,3 +4928,19 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - Configurações agora explica a diferença entre relatório técnico e compartilhável e alerta que TXT de autosave, DTCs e dados do veículo exigem revisão antes de envio.
 - Nenhuma migração geral para SQLite foi feita; primeiro preservar os dados e medir o comportamento.
 - Validar gate:baseline, suíte completa e build Android no SHA final. Inspeção física dos relatórios no Galaxy A06 / SM-A065M / Android 16 continua pendente.
+
+## DB-191 · 2026-10-31 — Consolidar layout responsivo sem regredir GPS, autonomia e restauração de backups
+
+### Alterações reconciliadas sobre a main atual
+- Cockpit: cinco abas inferiores com cartões independentes em retrato; a raia lateral e as dimensões da navegação em paisagem permanecem separadas e preservadas.
+- Ampliadas as áreas de toque das cinco abas e dos controles de paginação; a tipografia compacta do cockpit foi elevada nos rótulos e valores auxiliares para reduzir risco de ilegibilidade em paisagem.
+- Cabeçalhos nativos duplicados foram ocultados onde as telas já possuem cabeçalho interno; rotas receberam retornos explícitos para Cockpit ou Mais Recursos.
+- Viagens, Manutenção e Configurações utilizam os breakpoints/layouts compartilhados para reorganizar cartões em largura maior. Dados e telas secundárias usam títulos responsivos e controles com alvos mínimos de toque.
+- Configurações foi mesclada manualmente com a main: mantém os switches de GPS foreground/background com opt-in, os fluxos de permissão, os backups íntegros/restauração/safety backup e os relatórios existentes.
+- Cockpit e Dados foram reconciliados sobre o código novo de autonomia: origem BUFFER_012F, indicação visível de estimativa temporária e os dados de 10 amostras não foram removidos.
+- Testes estruturais de navegação e orientação foram atualizados; não houve alteração de Bluetooth, ELM327, PIDs, fórmulas, GPS tracking ou lógica de autonomia.
+
+### Validação e limites
+- Rodar gate de baseline, TypeScript, suíte completa e build Android no SHA final desta PR.
+- Fazer inspeção visual no Galaxy A06 SM-A065M em retrato, paisagem, fontes ampliadas e áreas de toque. Os testes estruturais não substituem screenshots/inspeção no aparelho.
+- Verificar também as telas Configurações/Backup e Dados com buffer 012F ativo para confirmar que a consolidação visual não oculta os novos controles/indicadores.

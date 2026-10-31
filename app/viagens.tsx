@@ -49,14 +49,14 @@ export default function ViagensScreen() {
   const selected = selectedId ? cycles.find(cycle => cycle.id === selectedId) ?? null : null;
 
   return <SafeAreaView style={s.container} edges={['top','bottom','left','right']}>
-    <ScrollView contentContainerStyle={[s.content,{paddingHorizontal:layout.horizontalPadding}]} showsVerticalScrollIndicator={false}>
+    <ScrollView contentContainerStyle={[s.content,{paddingHorizontal:layout.horizontalPadding,paddingVertical:layout.compact?12:16}]} showsVerticalScrollIndicator={false}>
       <View style={[s.frame,{maxWidth:layout.maxContentWidth}]}>
-        {selected ? <TripDetails cycle={selected} onBack={() => setSelectedId(null)} /> : <>
+        {selected ? <TripDetails cycle={selected} onBack={() => setSelectedId(null)} valueSize={layout.valueSize} /> : <>
           <Text style={s.eyebrow}>SMART OBD DIAGNOSTIC</Text>
-          <Text style={s.title}>RELATÓRIO DE VIAGENS</Text>
+          <Text style={[s.title,{fontSize:layout.titleSize}]}>RELATÓRIO DE VIAGENS</Text>
           <Text style={s.subtitle}>HISTÓRICO REAL • SESSÕES INDEPENDENTES • DADOS AUDITÁVEIS</Text>
           <SourceStatusLegend compact />
-          <View style={s.grid}>
+          <View style={[s.grid,{gap:layout.gap}]}>
             <Metric l="VIAGENS" v={String(visible.length)} />
             <Metric l="DISTÂNCIA TOTAL" v={mv(summary.totalDistanceKm,'km')} />
             <Metric l="CONSUMO MÉDIO" v={summary.avgConsumptionKml > 0 ? mv(summary.avgConsumptionKml,'km/L') : 'N/D'} />
@@ -64,13 +64,13 @@ export default function ViagensScreen() {
           <Text style={s.section}>PERÍODO</Text>
           <View style={s.filters}>
             {([{label:'TODAS',value:0},{label:'7 DIAS',value:7},{label:'30 DIAS',value:30}] as const).map(item =>
-              <TouchableOpacity key={item.value} onPress={() => setPeriodDays(item.value)} style={[s.filter,periodDays === item.value && s.filterActive]}>
+              <TouchableOpacity key={item.value} accessibilityRole="button" accessibilityState={{ selected: periodDays === item.value }} onPress={() => setPeriodDays(item.value)} style={[s.filter,periodDays === item.value && s.filterActive]}>
                 <Text style={[s.filterText,periodDays === item.value && s.filterTextActive]}>{item.label}</Text>
               </TouchableOpacity>
             )}
           </View>
           <Text style={s.section}>HISTÓRICO DE VIAGENS</Text>
-          {visible.length ? visible.map(cycle => <TouchableOpacity accessibilityRole="button" onPress={() => setSelectedId(cycle.id)} style={s.card} key={cycle.id}>
+          {visible.length ? <View style={[s.tripList,layout.landscape&&s.tripListLandscape,{gap:layout.gap}]}>{visible.map(cycle => <TouchableOpacity accessibilityRole="button" accessibilityHint="Abre os detalhes desta viagem" onPress={() => setSelectedId(cycle.id)} style={[s.card,{padding:layout.cardPadding},layout.landscape&&s.cardLandscape]} key={cycle.id}>
             <View style={s.cardHeader}>
               <AppIcon name="trips" size={20} color={COLORS.accent} />
               <View style={{flex:1}}>
@@ -90,7 +90,7 @@ export default function ViagensScreen() {
                 {cycle.fuelDataValid === false || cycle.fuelUsedL < 0.05 || cycle.avgFuelConsumptionKml <= 0 ? 'CONSUMO N/D' : mv(cycle.avgFuelConsumptionKml,'km/L')}
               </Text>
             </View>
-          </TouchableOpacity>) : <View style={s.empty}>
+          </TouchableOpacity>)}</View> : <View style={s.empty}>
             <Text style={s.emptyTitle}>Nenhuma viagem neste período</Text>
             <Text style={s.emptyText}>A lista contém apenas viagens registradas com fonte REAL_OBD. Dados importados ou simulados não são apresentados como trajetos da Meriva.</Text>
           </View>}
@@ -106,7 +106,7 @@ export default function ViagensScreen() {
   </SafeAreaView>;
 }
 
-function TripDetails({cycle,onBack}:{cycle:DriveCycle;onBack:()=>void}) {
+function TripDetails({cycle,onBack,valueSize}:{cycle:DriveCycle;onBack:()=>void;valueSize:number}) {
   const samples = cycle.telemetrySamples ?? [];
   const coolant = samples.filter(x => n(x.coolantTempC) != null).map(x => x.coolantTempC as number);
   const rpm = samples.filter(x => n(x.rpm) != null).map(x => x.rpm as number);
@@ -123,7 +123,7 @@ function TripDetails({cycle,onBack}:{cycle:DriveCycle;onBack:()=>void}) {
     <Text style={s.subtitle}>{dateLabel(cycle.startedAt)}</Text>
     <View style={s.hero}>
       <Text style={s.heroLabel}>DISTÂNCIA REGISTRADA</Text>
-      <Text style={s.heroValue}>{mv(n(cycle.distanceTotalKm),'km',2)}</Text>
+      <Text style={[s.heroValue,{fontSize:Math.min(valueSize-4,38)}]}>{mv(n(cycle.distanceTotalKm),'km',2)}</Text>
       <Text style={s.heroSub}>{dateLabel(cycle.startedAt)} → {dateLabel(cycle.finishedAt)}</Text>
     </View>
     <Text style={s.section}>RESUMO</Text>
@@ -168,13 +168,13 @@ function Detail({label,value}:{label:string;value:string}) { return <View style=
 const s=StyleSheet.create({
   container:{flex:1,backgroundColor:COLORS.screen},content:{flexGrow:1,width:'100%',paddingVertical:16,paddingBottom:34},frame:{width:'100%',alignSelf:'center'},
   eyebrow:{color:'#55d6be',fontSize:9,fontWeight:'900',letterSpacing:1.5,marginBottom:5},title: { ...SCREEN_TITLE_STYLE, marginBottom: 6 },subtitle:{color:'#91a9c9',fontSize:10,fontWeight:'700',marginTop:5,marginBottom:16,lineHeight:15},
-  grid:{flexDirection:'row',gap:9,marginBottom:9},metric:{flex:1,minWidth:0,backgroundColor:COLORS.surface,borderRadius:14,borderWidth:1,borderColor:'#233a56',padding:12},label:{color:'#8196b4',fontSize:8,fontWeight:'900',letterSpacing:0.5},metricValue:{color:COLORS.text,fontSize:15,fontWeight:'900',marginTop:6},
-  section:{color:'#55d6be',fontSize:10,fontWeight:'900',letterSpacing:1,marginTop:18,marginBottom:8},filters:{flexDirection:'row',gap:8,marginBottom:3},filter:{flex:1,padding:11,borderRadius:10,borderWidth:1,borderColor:'#29415f',backgroundColor:COLORS.surface,alignItems:'center'},filterActive:{backgroundColor:'#123a42',borderColor:'#55d6be'},filterText:{color:'#9fb3cd',fontSize:9,fontWeight:'900'},filterTextActive:{color:'#a8fff0'},
-  card:{backgroundColor:COLORS.surface,borderRadius:14,borderWidth:1,borderColor:'#233a56',padding:13,marginBottom:9},cardHeader:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginBottom:13},tripDate:{color:COLORS.text,fontSize:12,fontWeight:'900'},tripRange:{color:'#8196b4',fontSize:9,marginTop:4},chevron:{color:'#55d6be',fontSize:26,fontWeight:'300',marginLeft:10},
+  grid:{flexDirection:'row',gap:9,marginBottom:9},metric:{flex:1,minWidth:0,backgroundColor:COLORS.surface,borderRadius:14,borderWidth:1,borderColor:'#233a56',padding:12},label:{color:COLORS.textMuted,fontSize:9,fontWeight:'900',letterSpacing:0.3},metricValue:{color:COLORS.text,fontSize:15,fontWeight:'900',marginTop:6},
+  section:{color:'#55d6be',fontSize:10,fontWeight:'900',letterSpacing:1,marginTop:18,marginBottom:8},filters:{flexDirection:'row',gap:8,marginBottom:3},filter:{flex:1,minHeight:48,padding:11,borderRadius:10,borderWidth:1,borderColor:'#29415f',backgroundColor:COLORS.surface,alignItems:'center'},filterActive:{backgroundColor:'#123a42',borderColor:'#55d6be'},filterText:{color:'#9fb3cd',fontSize:9,fontWeight:'900'},filterTextActive:{color:'#a8fff0'},
+  tripList:{width:'100%'},tripListLandscape:{flexDirection:'row',flexWrap:'wrap',alignItems:'stretch'},card:{backgroundColor:COLORS.surface,borderRadius:14,borderWidth:1,borderColor:'#233a56',padding:13,marginBottom:9},cardLandscape:{width:'48%',minWidth:0},cardHeader:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginBottom:13},tripDate:{color:COLORS.text,fontSize:12,fontWeight:'900'},tripRange:{color:'#8196b4',fontSize:9,marginTop:4},chevron:{color:'#55d6be',fontSize:26,fontWeight:'300',marginLeft:10},
   stats:{flexDirection:'row',gap:8,marginBottom:10},stat:{flex:1,minWidth:0},statValue:{color:COLORS.text,fontSize:12,fontWeight:'900',marginTop:5},tripFooter:{borderTopWidth:1,borderTopColor:'#233a56',paddingTop:10,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8},tripFooterText:{color:'#9fb3cd',fontSize:9},consumption:{color:'#55d6be',fontSize:10,fontWeight:'900'},muted:{color:'#8196b4'},
   empty:{backgroundColor:COLORS.surface,borderRadius:14,padding:18,borderWidth:1,borderColor:'#233a56'},emptyTitle:{color:COLORS.text,fontSize:13,fontWeight:'900',marginBottom:7},emptyText:{color:'#9fb3cd',fontSize:10,lineHeight:16},
   note:{backgroundColor:'#0b252e',borderRadius:12,padding:13,marginTop:8,borderWidth:1,borderColor:'#1b5b61'},noteTitle:{color:'#7debd7',fontSize:9,fontWeight:'900',marginBottom:6},noteText:{color:'#bad8dd',fontSize:10,lineHeight:16},
-  primary:{backgroundColor:'#176e70',borderRadius:12,padding:15,alignItems:'center',marginTop:13},primaryText:{color:'#f0fdfa',fontSize:10,fontWeight:'900',textAlign:'center'},back:{padding:15,alignItems:'center'},backInline:{alignSelf:'flex-start',paddingVertical:10,marginBottom:8},backText:{color:'#8de8db',fontSize:10,fontWeight:'900'},
+  primary:{minHeight:48,backgroundColor:'#176e70',borderRadius:12,padding:15,alignItems:'center',justifyContent:'center',marginTop:13},primaryText:{color:'#f0fdfa',fontSize:10,fontWeight:'900',textAlign:'center'},back:{minHeight:48,padding:15,alignItems:'center',justifyContent:'center'},backInline:{alignSelf:'flex-start',minHeight:48,justifyContent:'center',paddingVertical:10,marginBottom:8},backText:{color:'#8de8db',fontSize:10,fontWeight:'900'},
   hero:{backgroundColor:'#10363c',borderColor:'#247b7d',borderWidth:1,borderRadius:16,padding:18,marginBottom:4},heroLabel:{color:'#8de8db',fontSize:9,fontWeight:'900',letterSpacing:1},heroValue:{color:'#f0fdfa',fontSize:30,fontWeight:'900',marginTop:6},heroSub:{color:'#b7d9d9',fontSize:9,marginTop:8,lineHeight:15},
   detail:{flexDirection:'row',justifyContent:'space-between',alignItems:'flex-start',gap:12,paddingVertical:8,borderBottomWidth:1,borderBottomColor:'#20334b'},detailLabel:{color:'#9fb3cd',fontSize:10,flex:1},detailValue:{color:COLORS.text,fontSize:10,fontWeight:'800',flex:1,textAlign:'right'},smallNote:{color:'#8196b4',fontSize:9,lineHeight:15,marginTop:10},
   chart:{height:92,flexDirection:'row',alignItems:'flex-end',gap:3,paddingTop:8,paddingBottom:3},chartColumn:{flex:1,height:82,justifyContent:'flex-end',alignItems:'center'},chartBar:{width:'75%',minHeight:5,backgroundColor:'#55d6be',borderRadius:3},

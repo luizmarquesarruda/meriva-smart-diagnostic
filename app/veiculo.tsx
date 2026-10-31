@@ -19,7 +19,7 @@ export default function VeiculoScreen() {
     return () => clearInterval(t);
   }, []);
   return <SafeAreaView style={styles.container} edges={["top","bottom","left","right"]}><ScrollView contentContainerStyle={[styles.content,{paddingHorizontal:layout.horizontalPadding}]} showsHorizontalScrollIndicator={false}><View style={[styles.screenFrame,{maxWidth:layout.maxContentWidth}]}>
-    <Text style={styles.title}>VEÍCULO</Text><Text style={styles.subtitle}>PERFIL DO MERIVA + ECU</Text>
+    <Text style={[styles.title,{fontSize:layout.titleSize-3}]}>VEÍCULO</Text><Text style={styles.subtitle}>PERFIL DO MERIVA + ECU</Text>
     <View style={[styles.vehicleColumns, layout.landscape && styles.vehicleColumnsLandscape]}>
       {profile ? <View style={[styles.hero, layout.landscape && styles.heroLandscape]}><Text style={styles.name}>{profile.vehicleName}</Text><Text style={styles.engine}>{profile.engine} • {profile.displacementCm3} cm³ • {profile.cylinders} cilindros</Text><Text style={styles.fuel}>{profile.fuel}</Text></View> : null}
       <View style={[styles.card, layout.landscape && styles.cardLandscape]}>
@@ -37,5 +37,5 @@ const styles = StyleSheet.create({
   container:{flex:1,backgroundColor:COLORS.screen},content:{flexGrow:1,width:'100%',paddingVertical:14,paddingBottom:30},screenFrame:{width:'100%',alignSelf:'center'},title: { ...SCREEN_TITLE_STYLE, marginBottom: 6 },subtitle:{color:COLORS.accent,fontSize:9,fontWeight:'900',marginTop:3,marginBottom:12},
   vehicleColumns:{width:'100%',gap:10},vehicleColumnsLandscape:{flexDirection:'row',alignItems:'flex-start'},hero:{backgroundColor:'#0f2035',borderRadius:16,borderWidth:1,borderColor:'#2d5278',padding:16,marginBottom:10},name:{color:COLORS.textStrong,fontSize:23,fontWeight:'900'},engine:{color:'#9fc5f7',fontSize:10,marginTop:5},fuel:{color:COLORS.textSubtle,fontSize:10,marginTop:3},
   heroLandscape:{flex:0.72,minWidth:0,marginBottom:0},cardLandscape:{flex:1,minWidth:0},card:{backgroundColor:COLORS.surface,borderRadius:14,borderWidth:1,borderColor:COLORS.border,padding:5},row:{padding:11,borderBottomWidth:1,borderBottomColor:'#1c3048'},label:{flex:1,minWidth:0,color:COLORS.textSubtle,fontSize:8,fontWeight:'900'},value:{color:'#dbeafe',fontSize:11,fontWeight:'800',marginTop:3,flexShrink:1,textAlign:'right'},
-  primary:{backgroundColor:COLORS.primary,borderRadius:11,padding:14,alignItems:'center',marginTop:10},actionContent:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5},primaryText:{color:COLORS.white,fontSize:10,fontWeight:'900'},back:{padding:14,alignItems:'center'},backText:{color:COLORS.accent,fontSize:10,fontWeight:'900'}
+  primary:{minHeight:48,backgroundColor:COLORS.primary,borderRadius:11,padding:14,alignItems:'center',justifyContent:'center',marginTop:10},actionContent:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5},primaryText:{color:COLORS.white,fontSize:10,fontWeight:'900'},back:{minHeight:48,padding:14,alignItems:'center',justifyContent:'center'},backText:{color:COLORS.accent,fontSize:10,fontWeight:'900'}
 });

@@ -36,7 +36,7 @@ export default function MaisScreen() {
     <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
       <ScrollView contentContainerStyle={[styles.content, { paddingHorizontal: layout.horizontalPadding }]} showsHorizontalScrollIndicator={false}>
         <View style={[styles.screenFrame, { maxWidth: layout.maxContentWidth }]}>
-          <Text style={styles.title}>MAIS RECURSOS</Text>
+          <Text style={[styles.title,{fontSize:layout.titleSize-3}]}>MAIS RECURSOS</Text>
           <Text style={styles.subtitle}>ATALHOS NATIVOS • DADOS LOCAIS • SEM LOGIN</Text>
           {groups.map((group) => (
             <View key={group.title} style={styles.group}>
