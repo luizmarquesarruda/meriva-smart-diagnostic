@@ -62,10 +62,10 @@ const personalReport = [
   'longitude: -47.452345',
   'GPS: -23.501234, -47.452345',
   'TRACE: 01:23:45:67:89:BA',
-].join('\\n');
-const safeReport = reportUtils.redactSensitiveReportData(personalReport, ['Galaxy Duzentos']);
+].join('\n');
+const safeReport = reportUtils.redactSensitiveReportData(personalReport, ['Phone Name XYZ']);
 assert(!safeReport.includes('1HGCM82633A004352'), 'shareable report must redact labeled VIN values');
-assert(!safeReport.includes('Galaxy Duzentos'), 'shareable report must redact paired device names');
+assert(!safeReport.includes('Phone Name XYZ'), 'shareable report must redact paired device names');
 assert(!safeReport.includes('-23.501234'), 'shareable report must redact labeled GPS coordinates');
 assert(!safeReport.includes('-47.452345'), 'shareable report must redact longitude and coordinate pairs');
 assert(!safeReport.includes('01:23:45:67:89:BA'), 'shareable report must redact MACs in raw traces');
