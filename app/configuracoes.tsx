@@ -113,13 +113,14 @@ export default function ConfiguracaoScreen() {
     <SafeAreaView style={{flex:1,backgroundColor:COLORS.screen}} edges={["top","bottom","left","right"]}>
     <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
       <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
-      <Text style={styles.title}>CONFIGURAÇÕES</Text>
+      <Text style={[styles.title,{fontSize:layout.titleSize-3}]}>CONFIGURAÇÕES</Text>
       <Text style={styles.status}>{status}</Text>
 
       {settings && (
         <>
-          <Text style={styles.section}>PREFERÊNCIAS BÁSICAS</Text>
-          <View style={styles.card}>
+          <View style={[styles.settingsGrid,layout.landscape&&styles.settingsGridLandscape,{gap:layout.gap}]}>
+          <Text style={[styles.section,styles.sectionFullWidth]}>PREFERÊNCIAS BÁSICAS</Text>
+          <View style={[styles.card,{padding:layout.cardPadding},layout.landscape&&styles.cardLandscape]}>
             <Text style={styles.label}>Combustível</Text>
             <View style={styles.row}>
               <TouchableOpacity style={[styles.choice, settings.fuelType === 'FLEX' && styles.choiceActive]} onPress={() => void updateSetting('fuelType', 'FLEX')}>
@@ -142,7 +143,7 @@ export default function ConfiguracaoScreen() {
             </Text>
           </View>
 
-          <View style={styles.card}>
+          <View style={[styles.card,{padding:layout.cardPadding},layout.landscape&&styles.cardLandscape]}>
             <Text style={styles.label}>Unidade de distância</Text>
             <View style={styles.row}>
               <TouchableOpacity style={[styles.choice, settings.distanceUnit === 'KM' && styles.choiceActive]} onPress={() => void updateSetting('distanceUnit', 'KM')}>
@@ -154,12 +155,12 @@ export default function ConfiguracaoScreen() {
             </View>
           </View>
 
-          <SettingSwitch label="Conectar ao ELM327 automaticamente" value={settings.autoConnectObd} onChange={(v) => void updateSetting('autoConnectObd', v)} />
-          <SettingSwitch label="Inicialização forçada do ELM (ATZ + ATE0)" value={settings.elmForceInitialization} onChange={(v) => void updateSetting('elmForceInitialization', v)} />
-          <SettingSwitch label="Alertas de diagnóstico" value={settings.diagnosticAlerts} onChange={(v) => void updateSetting('diagnosticAlerts', v)} />
+          <SettingSwitch label="Conectar ao ELM327 automaticamente" value={settings.autoConnectObd} onChange={(v) => void updateSetting('autoConnectObd', v)} landscapeCard={layout.landscape} />
+          <SettingSwitch label="Inicialização forçada do ELM (ATZ + ATE0)" value={settings.elmForceInitialization} onChange={(v) => void updateSetting('elmForceInitialization', v)} landscapeCard={layout.landscape} />
+          <SettingSwitch label="Alertas de diagnóstico" value={settings.diagnosticAlerts} onChange={(v) => void updateSetting('diagnosticAlerts', v)} landscapeCard={layout.landscape} />
 
-          <Text style={styles.section}>COMPATIBILIDADE ELM327</Text>
-          <View style={styles.card}>
+          <Text style={[styles.section,styles.sectionFullWidth]}>COMPATIBILIDADE ELM327</Text>
+          <View style={[styles.card,{padding:layout.cardPadding},layout.landscape&&styles.cardLandscape]}>
             <Text style={styles.label}>Tempo de espera de entrada/saída</Text>
             <View style={styles.row}>
               {[5000, 10000, 15000].map((value) => (
@@ -170,7 +171,7 @@ export default function ConfiguracaoScreen() {
             </View>
           </View>
 
-          <View style={styles.card}>
+          <View style={[styles.card,{padding:layout.cardPadding},layout.landscape&&styles.cardLandscape]}>
             <Text style={styles.label}>Tempo limite Bluetooth</Text>
             <View style={styles.row}>
               {[3000, 5000, 10000].map((value) => (
@@ -181,7 +182,7 @@ export default function ConfiguracaoScreen() {
             </View>
           </View>
 
-          <View style={styles.card}>
+          <View style={[styles.card,{padding:layout.cardPadding},layout.landscape&&styles.cardLandscape]}>
             <Text style={styles.label}>Atraso antes de enviar comando</Text>
             <View style={styles.row}>
               {[0, 20, 50].map((value) => (
@@ -192,7 +193,7 @@ export default function ConfiguracaoScreen() {
             </View>
           </View>
 
-          <View style={styles.card}>
+          <View style={[styles.card,{padding:layout.cardPadding},layout.landscape&&styles.cardLandscape]}>
             <Text style={styles.label}>Tentativas de conexão</Text>
             <View style={styles.row}>
               {[3, 10, 20].map((value) => (
@@ -204,7 +205,7 @@ export default function ConfiguracaoScreen() {
             <Text style={styles.note}>O limite é finito para evitar ciclos de conexão indefinidos. A opção 20 corresponde ao limite operacional padrão.</Text>
           </View>
 
-          <View style={styles.card}>
+          <View style={[styles.card,{padding:layout.cardPadding},layout.landscape&&styles.cardLandscape]}>
             <Text style={styles.label}>Adaptive Timing do ELM</Text>
             <SettingSwitch label="Ajustar timeout conforme a resposta" value={settings.elmAdaptiveTiming} onChange={(v) => void updateSetting('elmAdaptiveTiming', v)} />
             <View style={styles.row}>
@@ -217,7 +218,7 @@ export default function ConfiguracaoScreen() {
             <Text style={styles.note}>O app aumenta o tempo quando há timeout/erro e reduz gradualmente quando as respostas ficam rápidas.</Text>
           </View>
 
-          <View style={styles.card}>
+          <View style={[styles.card,{padding:layout.cardPadding},layout.landscape&&styles.cardLandscape]}>
             <Text style={styles.label}>NO DATA antes de recuperação</Text>
             <View style={styles.row}>
               {[3, 4, 6].map((value) => (
@@ -228,7 +229,7 @@ export default function ConfiguracaoScreen() {
             </View>
           </View>
 
-          <View style={styles.card}>
+          <View style={[styles.card,{padding:layout.cardPadding},layout.landscape&&styles.cardLandscape]}>
             <Text style={styles.label}>Resposta parcial</Text>
             <View style={styles.row}>
               <TouchableOpacity style={[styles.choice, settings.elmPartialResponseAction === 'RECONNECT_AND_INITIALIZE' && styles.choiceActive]} onPress={() => void updateSetting('elmPartialResponseAction', 'RECONNECT_AND_INITIALIZE')}>
@@ -243,8 +244,9 @@ export default function ConfiguracaoScreen() {
             </View>
           </View>
 
-          <Text style={styles.note}>Os parâmetros são inspirados no comportamento observado no Car Scanner e em implementações públicas de ELM327. Eles não garantem compatibilidade com todo clone.</Text>
-          <Text style={styles.note}>O GPS inicia automaticamente quando o aplicativo entra em uso. Essa função é controlada pelo sistema para manter a viagem automática.</Text>
+          <Text style={[styles.note,styles.noteFullWidth]}>Os parâmetros são inspirados no comportamento observado no Car Scanner e em implementações públicas de ELM327. Eles não garantem compatibilidade com todo clone.</Text>
+          <Text style={[styles.note,styles.noteFullWidth]}>O GPS inicia automaticamente quando o aplicativo entra em uso. Essa função é controlada pelo sistema para manter a viagem automática.</Text>
+          </View>
         </>
       )}
 
@@ -255,37 +257,40 @@ export default function ConfiguracaoScreen() {
       <Text style={styles.info}>ÚLTIMO SALVAMENTO: {formatTime(saveStatus.lastSavedAt)}</Text>
       {saveStatus.lastError ? <Text style={styles.error}>FALHA NO AUTOSAVE: {saveStatus.lastError}</Text> : null}
 
-      <TouchableOpacity style={styles.button} onPress={handleBackup} disabled={busy}>
+      <View style={[styles.actionsGrid,layout.landscape&&styles.actionsGridLandscape,{gap:layout.gap}]}>
+      <TouchableOpacity style={[styles.button,layout.landscape&&styles.buttonLandscape]} onPress={handleBackup} disabled={busy}>
         <Text style={styles.buttonText}>{busy ? 'AGUARDE...' : 'FAZER BACKUP'}</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.button} onPress={handleCleanLogs} disabled={busy}>
+      <TouchableOpacity style={[styles.button,layout.landscape&&styles.buttonLandscape]} onPress={handleCleanLogs} disabled={busy}>
         <Text style={styles.buttonText}>{busy ? 'AGUARDE...' : 'LIMPAR LOGS ANTIGOS'}</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.button} onPress={handleBluetoothReport} disabled={busy}>
+      <TouchableOpacity style={[styles.button,layout.landscape&&styles.buttonLandscape]} onPress={handleBluetoothReport} disabled={busy}>
         <Text style={styles.buttonText}>{busy ? 'AGUARDE...' : 'EXPORTAR RELATÓRIO BLUETOOTH (.TXT)'}</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.button} onPress={handleDailyHistoryExport} disabled={busy}>
+      <TouchableOpacity style={[styles.button,layout.landscape&&styles.buttonLandscape]} onPress={handleDailyHistoryExport} disabled={busy}>
         <Text style={styles.buttonText}>{busy ? 'AGUARDE...' : 'EXPORTAR HISTÓRICO DIÁRIO ECU (.TXT)'}</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.button} onPress={handleExport} disabled={busy}>
+      <TouchableOpacity style={[styles.button,layout.landscape&&styles.buttonLandscape]} onPress={handleExport} disabled={busy}>
         <Text style={styles.buttonText}>{busy ? 'AGUARDE...' : 'EXPORTAR SALVAMENTO (.TXT)'}</Text>
       </TouchableOpacity>
       {profile ? (
         <Link href="/veiculo" asChild>
-          <TouchableOpacity style={styles.button} accessibilityRole="button" accessibilityLabel="Abrir perfil do veículo">
+          <TouchableOpacity style={[styles.button,layout.landscape&&styles.buttonLandscape]} accessibilityRole="button" accessibilityLabel="Abrir perfil do veículo">
             <Text style={styles.buttonText}>VER PERFIL DO VEÍCULO</Text>
           </TouchableOpacity>
         </Link>
       ) : <Text style={styles.info}>Veículo: N/D</Text>}
+      </View>
+      <Link href="/mais" asChild><TouchableOpacity style={styles.backButton} accessibilityRole="button" accessibilityLabel="Voltar aos recursos"><Text style={styles.backButtonText}>VOLTAR AOS RECURSOS</Text></TouchableOpacity></Link>
       </View>
     </ScrollView>
     </SafeAreaView>
   );
 }
 
-function SettingSwitch({ label, value, onChange }: { label: string; value: boolean; onChange: (value: boolean) => void }) {
+function SettingSwitch({ label, value, onChange, landscapeCard = false }: { label: string; value: boolean; onChange: (value: boolean) => void; landscapeCard?: boolean }) {
   return (
-    <View style={styles.switchRow}>
+    <View style={[styles.switchRow,landscapeCard&&styles.switchRowLandscape]}>
       <Text style={styles.label}>{label}</Text>
       <Switch value={value} onValueChange={onChange} />
     </View>
@@ -295,18 +300,29 @@ function SettingSwitch({ label, value, onChange }: { label: string; value: boole
 const styles = StyleSheet.create({
   container: { flexGrow: 1, paddingVertical: 16, backgroundColor: COLORS.screen },
   title: { ...SCREEN_TITLE_STYLE, marginBottom: 6 },
-  section: { fontSize: 12, fontWeight: '900', color: COLORS.accent, letterSpacing: 0.8, marginTop: 16, marginBottom: 8 },
+  section: { width: '100%', fontSize: 12, fontWeight: '900', color: COLORS.accent, letterSpacing: 0.8, marginTop: 16, marginBottom: 8 },
+  sectionFullWidth: { width: '100%' },
+  settingsGrid: { width: '100%' },
+  settingsGridLandscape: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start' },
+  cardLandscape: { width: '48.5%', minWidth: 0 },
+  noteFullWidth: { width: '100%' },
+  actionsGrid: { width: '100%' },
+  actionsGridLandscape: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'stretch' },
+  buttonLandscape: { width: '48.5%', minHeight: 48, justifyContent: 'center' },
+  backButton: { minHeight: 48, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.border, borderRadius: 10, marginTop: 10, padding: 12 },
+  backButtonText: { color: COLORS.accent, fontWeight: '900', fontSize: 11 },
   status: { color: COLORS.primary, fontWeight: '700', marginBottom: 12 },
   card: { backgroundColor: COLORS.surfaceRaised, borderRadius: 8, padding: 11, marginBottom: 9, borderWidth: 1, borderColor: '#243652' },
   label: { flex: 1, color: COLORS.text, fontWeight: '600' },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
-  choice: { flexGrow: 1, flexBasis: 86, minWidth: 86, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, padding: 11, alignItems: 'center' },
+  choice: { flexGrow: 1, flexBasis: 86, minWidth: 86, minHeight: 48, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, padding: 11, alignItems: 'center', justifyContent: 'center' },
   choiceActive: { backgroundColor: '#172f52', borderColor: '#3b82f6' },
   choiceText: { color: COLORS.text, fontWeight: '700', flexShrink: 1, textAlign: 'center', lineHeight: 16 },
-  switchRow: { backgroundColor: COLORS.surfaceRaised, borderRadius: 8, padding: 11, marginBottom: 9, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#243652' },
+  switchRow: { minHeight: 48, backgroundColor: COLORS.surfaceRaised, borderRadius: 8, padding: 11, marginBottom: 9, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#243652' },
+  switchRowLandscape: { width: '48.5%', minWidth: 0 },
   info: { color: COLORS.text, marginBottom: 6, fontSize: 12 },
   note: { color: '#8da2bd', fontSize: 10, lineHeight: 15, marginTop: -2, marginBottom: 8 },
   error: { color: '#dc2626', fontWeight: '600', marginBottom: 12 },
-  button: { backgroundColor: COLORS.primary, borderRadius: 10, padding: 14, alignItems: 'center', marginBottom: 10, marginTop: 6 },
+  button: { minHeight: 48, backgroundColor: COLORS.primary, borderRadius: 10, padding: 14, alignItems: 'center', justifyContent: 'center', marginBottom: 10, marginTop: 6 },
   buttonText: { color: COLORS.white, fontWeight: '700' },
 });
