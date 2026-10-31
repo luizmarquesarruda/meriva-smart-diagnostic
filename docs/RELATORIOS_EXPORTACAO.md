@@ -35,6 +35,11 @@ Todo JSON exportado precisa incluir:
 
 O estado em memória é copiado antes das leituras assíncronas dos arquivos, para que alterações posteriores durante a exportação não mudem silenciosamente o snapshot inicial. O relatório Bluetooth captura conexão, dispositivos, trilha, erro e telemetria antes da primeira leitura assíncrona e informa o horário desse snapshot. Dados persistidos em arquivos independentes podem ter horários próprios; não devem ser apresentados como uma transação atômica se o armazenamento não oferecer essa garantia.
 
+
+## Histórico diário e retenção
+
+O histórico diário de sessões ECU não tem expiração automática por quantidade de dias. Todas as páginas existentes são preservadas quando um novo evento é acrescentado. A limpeza de LOGS e LEITURAS não remove o arquivo em VIAGENS. O TXT cresce com o uso; qualquer segmentação por período deve preservar a exportação consolidada e ser precedida por teste de migração/recuperação, não por descarte de páginas antigas.
+
 ## Privacidade e retenção
 
 O relatório técnico pode conter identificadores Bluetooth e dados do veículo; deve ser tratado como arquivo privado. A exportação compartilhável aplica anonimização aos identificadores diretos tratados pelo contrato (MAC, nomes conhecidos de dispositivos, VIN rotulado e coordenadas GPS rotuladas). DTCs, leituras, horários, fabricante/modelo Android e características do veículo permanecem porque são relevantes ao diagnóstico e ainda podem permitir correlação indireta. Revisar o conteúdo antes de enviar. TXT de autosave e JSON/CSV permanecem exportações técnicas; não compartilhar sem revisão, pois podem conter VIN, dados de viagem e identificadores do veículo.
