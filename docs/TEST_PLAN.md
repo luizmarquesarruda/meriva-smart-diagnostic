@@ -208,6 +208,9 @@ O catálogo atual contém 34 PIDs, 20 fórmulas, 34 faixas e 30 avaliações de 
 - Histórico de viagens: gravações concorrentes não perdem nenhuma viagem; substituir o índice somente após validar o temporário; se índice principal e backup forem inválidos, preservar o arquivo e falhar explicitamente.
 - Data do CSV de viagem: usar o calendário local da data de início da viagem, não a data UTC do momento de gravação.
 - CSV: manter ordenação de colunas existente; ao aparecer campo novo, migrar cabeçalho e linhas antigas sem deslocar valores. Fila pendente possui teto explícito e contador de linhas descartadas.
+- CSV de telemetria: confirmar rotação de segmentos em 512 KiB; após 10.000 linhas pendentes, verificar spool CSV durável, read-back e retry sem duplicar ou perder os lotes; simular indisponibilidade de escrita e acompanhar o contador explícito de descartes.
+- Histórico de viagens: repetir finalização com o mesmo ID não cria uma segunda linha no índice nem no CSV de resumo; inicialização deduplica IDs repetidos preservando a amostra mais completa; reconciliação importa uma vez registros legados do autosave para `VIAGENS/index.json`.
+- Autosave: novos snapshots não persistem `driveCycles`; payloads antigos com `driveCycles` e payloads novos sem esse campo continuam válidos. As telas recebem o histórico carregado do índice canônico.
 - Cota: quando ultrapassada, limpeza remove apenas arquivos descartáveis de LOGS/LEITURAS até a meta possível. Erro ao consultar tamanho deve ser propagado e nunca virar zero silencioso.
 - Backup: descarregar CSV antes de copiar, verificar tamanho copiado por diretório, validar manifesto, remover backup parcial em caso de erro e reter no máximo cinco backups verificados.
 - Autosave: schema, dataType, timestamp e subestruturas devem ser validados; testar v0 com migração cadastrada, schema futuro, payload parcial, valores NaN/Infinity e restauração de previous.json.
