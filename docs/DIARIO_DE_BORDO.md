@@ -1,3 +1,13 @@
+## DB-201 — 2026-10-31 — Privacidade ampliada e snapshot do relatório Bluetooth
+
+- Auditoria da PR #105 identificou que a exportação compartilhável ocultava MACs, mas ainda podia expor nomes de dispositivos, VIN e coordenadas GPS presentes em texto bruto.
+- A exportação compartilhável agora mascara nomes de dispositivos pareados/conectados, VIN rotulado e coordenadas GPS rotuladas, além de MACs. O modo técnico permanece integral para diagnóstico interno.
+- O relatório Bluetooth captura conexão, dispositivos pareados, trilha, erro e estado de telemetria antes da primeira leitura assíncrona; o TXT identifica o horário do snapshot.
+- Testes de regressão cobrem VIN, nome de dispositivo, latitude/longitude e MAC em conteúdo RAW.
+- A documentação distingue o snapshot em memória de dados persistidos em arquivos independentes, sem prometer atomicidade inexistente.
+- Validação automatizada deve ser conferida no SHA final após os commits desta entrada. Inspeção real dos arquivos no Galaxy A06 / SM-A065M / Android 16 continua pendente.
+- Limite conhecido: DTCs, leituras, horários e características do veículo continuam no relatório compartilhável por relevância diagnóstica e podem permitir correlação indireta; revisar antes de enviar.
+
 ## ESTADO VIGENTE — 2026-10-31 (relatórios e rastreabilidade)
 
 > Frente em revisão: `fix/diagnostic-reports-main-20261031`. Base alinhada ao `main` atual após a integração do hardening Bluetooth, buffer 012F e backup verificado.
@@ -276,6 +286,7 @@
 - **DB-186** — Desacoplar permissões GPS do OBD e centralizar o ciclo de vida de localização no AutoTripService.
 - **DB-187** · 2026-10-31 — Reconciliar Bluetooth, buffer 012F, backup e segurança de integração.
 - **DB-188** · 2026-10-31 — Integridade, privacidade e metadados verificados nos relatórios.
+- **DB-201** · 2026-10-31 — Privacidade ampliada e snapshot do relatório Bluetooth
 
 ---
 
