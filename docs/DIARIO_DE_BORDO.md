@@ -284,6 +284,7 @@
 - **DB-191** · 2026-10-31 — Consolidar layout responsivo sem regredir GPS, autonomia e restauração de backups
 - **DB-192** · 2026-10-31 — Integrar layout e relatórios, consolidar P0 e registrar validação dos SHAs finais
 - **DB-193** · 2026-10-31 — Velocidade derivada GPS e recuperação atômica do histórico ECU
+- **DB-194** · 2026-10-31 — Auditoria estática do layout no Galaxy A06 / Android 16
 ---
 
 Este arquivo é o registro operacional das correções, auditorias e decisões técnicas do projeto.
@@ -4982,4 +4983,14 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - Teste de percurso GPS no Galaxy A06 / SM-A065M / Android 16, comparação com odômetro e inspeção visual retrato/paisagem continuam pendentes.
 - Não foi migrado armazenamento para SQLite nem atualizados Expo SDK/RN/biblioteca Bluetooth; essas mudanças seguem separadas para não misturar riscos.
 - A CI, o APK e a revisão do diff devem ser registrados após validação no SHA final desta branch. Nenhum teste físico é inferido da CI.
+
+## DB-194 · 2026-10-31 — Auditoria estática do layout no Galaxy A06 / Android 16
+
+- Inspecionada a documentação pública Samsung do Galaxy A06/SM-A065M: tela PLS LCD de 6,7", 720 × 1600, Bluetooth 5.3 e rede móvel até 4G LTE; manual do usuário em português para Android 16 listado no suporte Samsung.
+- Comparado o código de main no SHA ba2ef4b72f43e65eb4254ae58fce0091df7a5dce: orientação livre, SafeAreaProvider/SafeAreaView, uso de useWindowDimensions, cockpit com navegação inferior em retrato e raia lateral em paisagem, tema escuro e telas secundárias com rolagem.
+- A base responsiva está coerente com as dimensões compactas; não foi encontrada evidência estática suficiente para justificar alteração de medidas. Não fazer ajuste visual por suposição sem screenshot do A06.
+- Riscos a validar: fontes pequenas no cockpit (8–10sp), cockpit sem ScrollView, largura real dos cinco alvos, recortes e barras do One UI, gestos versus três botões e zoom/fonte ampliados.
+- app.json não fixa targetSdkVersion/compileSdkVersion e a pasta android é gerada pelo prebuild. O target efetivo deve ser lido do APK final; a referência-base do Expo SDK 51/RN 0.74 não substitui a inspeção do manifesto do artefato. Edge-to-edge Android 15/16 depende do target efetivo.
+- Relatório detalhado: docs/AUDITORIA_LAYOUT_GALAXY_A06_ANDROID_16_2026-10-31.md.
+- Limite: auditoria estática de código/documentação. Nenhuma captura, instalação ou inspeção física do Galaxy A06 foi realizada nesta rodada. O teste visual no aparelho continua pendente.
 
