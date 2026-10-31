@@ -4966,3 +4966,20 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - Inspeção visual no Galaxy A06 / SM-A065M / Android 16, retrato/paisagem, áreas de toque e fontes ampliadas continua pendente.
 - Testar com adaptador ELM327 real: conexão RFCOMM, inicialização ELM, resposta 010C, leitura 012F e perda/recuperação da ECU.
 - Comparar autonomia com abastecimento/nível real e percurso com odômetro conhecido; não alterar fórmulas sem registrar a evidência.
+
+## DB-193 · 2026-10-31 — Velocidade derivada GPS e recuperação atômica do histórico ECU
+
+### Alterações desta rodada
+- GPS: quando 010D/OBD e a velocidade reportada pelo callback GPS estão ausentes, o rastreador pode derivar a velocidade somente após três segmentos consecutivos com coordenadas, precisão e timestamps válidos e deslocamento líquido confirmado.
+- GPS: velocidade reportada explicitamente incompatível continua impedindo a confirmação. Janelas sem velocidade independente que não atinjam o deslocamento líquido são descartadas para impedir acumulação de deriva.
+- Histórico ECU: gravação passa por arquivo temporário com leitura de retorno; o snapshot anterior é preservado antes da substituição do principal.
+- Histórico ECU: falha ao substituir o principal tenta restaurar e validar o snapshot anterior; arquivo principal ausente tenta recuperar o snapshot; arquivo existente ilegível não é convertido em histórico vazio.
+- Testes novos: posição-only, deriva, falha simulada de substituição, recuperação, gravações concorrentes e arquivo ilegível. O novo teste foi incluído em `npm test` e no gate de baseline.
+- Contratos RG-54/RG-55 e critérios GPS-DERIVED-SPEED-01/HISTORY-ATOMIC-01 adicionados.
+
+### Limites e próximas validações
+- Nenhum gate Bluetooth/ECU foi afrouxado. A conexão continua exigindo uma resposta 010C válida; a captura anterior de timeout permanece uma falha física a investigar com o ELM327 real.
+- Teste de percurso GPS no Galaxy A06 / SM-A065M / Android 16, comparação com odômetro e inspeção visual retrato/paisagem continuam pendentes.
+- Não foi migrado armazenamento para SQLite nem atualizados Expo SDK/RN/biblioteca Bluetooth; essas mudanças seguem separadas para não misturar riscos.
+- A CI, o APK e a revisão do diff devem ser registrados após validação no SHA final desta branch. Nenhum teste físico é inferido da CI.
+
