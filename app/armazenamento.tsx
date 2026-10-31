@@ -117,7 +117,7 @@ export default function ArmazenamentoScreen() {
         <Text style={styles.note}>Limite configurado: 2 GB. A limpeza remove somente dados antigos permitidos pelo sistema.</Text>
         <Text style={styles.note}>
           Fila CSV: {csvQueueStatus.pendingRows}/{csvQueueStatus.maxPendingRows} pendentes.
-          Registros preservados em spool: {csvQueueStatus.durablySpooledRows}.
+          Registros preservados em spool nesta execução: {csvQueueStatus.durablySpooledRows}.
           Registros descartados por saturação: {csvQueueStatus.droppedRows}.
         </Text>
       </View>
