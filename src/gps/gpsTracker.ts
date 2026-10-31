@@ -351,7 +351,8 @@ export class GpsTracker {
     }
   }
 
-  async start(): Promise<boolean> {
+  async start(options: { resetTrip?: boolean } = {}): Promise<boolean> {
+    const resetTrip = options.resetTrip !== false;
     const permitted = await this.requestPermission();
     if (!permitted) {
       await this.stop();
@@ -360,16 +361,16 @@ export class GpsTracker {
 
     if ((this.subscription || this.backgroundTaskRunning) && this.state.running) return true;
 
-    await this.stop({ resetTrip: true });
+    await this.stop({ resetTrip });
     this.state = {
       ...this.state,
       running: true,
       currentSpeedKmh: 0,
-      maxSpeedKmh: 0,
-      distanceKm: 0,
-      samples: 0,
-      lastTimestamp: null,
-      lastAccuracyM: null,
+      maxSpeedKmh: resetTrip ? 0 : this.state.maxSpeedKmh,
+      distanceKm: resetTrip ? 0 : this.state.distanceKm,
+      samples: resetTrip ? 0 : this.state.samples,
+      lastTimestamp: resetTrip ? null : this.state.lastTimestamp,
+      lastAccuracyM: resetTrip ? null : this.state.lastAccuracyM,
       error: null,
       signalQuality: 'SEM_FIX',
       speedSource: 'PARADO',

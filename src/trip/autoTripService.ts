@@ -73,6 +73,8 @@ class AutoTripService {
   private pollCycleNumber = 0;
   private stoppedSinceMs: number | null = null;
   private gpsStartedForEcu = false;
+  private backgroundGpsEnabled = false;
+  private gpsModeTransition: Promise<void> = Promise.resolve();
   private gpsStartPromise: Promise<void> | null = null;
   private gpsStartRetryAfterMs = 0;
   private lastEstimatedFuelRate: { rateLph: number; source: FuelRateSource; timestampMs: number } | null = null;
@@ -117,12 +119,20 @@ class AutoTripService {
     this.basePath = basePath;
     const settings = await readAppSettings(basePath);
     this.fuelType = settings.fuelType;
+    this.backgroundGpsEnabled = settings.backgroundGpsEnabled === true;
     this.unsubscribeAppSettings?.();
     this.unsubscribeAppSettings = subscribeAppSettings((nextSettings) => {
       if (nextSettings.fuelType !== this.fuelType) {
         this.fuelType = nextSettings.fuelType;
         this.lastFuelEthanolPercent = null;
         this.lastEstimatedFuelRate = null;
+      }
+      if (nextSettings.backgroundGpsEnabled !== this.backgroundGpsEnabled) {
+        this.backgroundGpsEnabled = nextSettings.backgroundGpsEnabled === true;
+        this.gpsModeTransition = this.gpsModeTransition
+          .catch(() => undefined)
+          .then(() => this.applyBackgroundGpsPreference(this.backgroundGpsEnabled))
+          .catch((cause) => console.warn('[trip] falha ao aplicar preferência de GPS em segundo plano:', cause));
       }
     });
     const persisted = await initAutoSave(basePath);
@@ -154,6 +164,7 @@ class AutoTripService {
     this.unsubscribeAppSettings?.();
     this.unsubscribeAppSettings = null;
     await this.transition;
+    await this.gpsModeTransition;
     await this.stopCurrentLoop();
     await this.stopGpsForEcu();
     this.lastEstimatedFuelRate = null;
@@ -589,6 +600,44 @@ class AutoTripService {
     });
   }
 
+  private async applyBackgroundGpsPreference(enabled: boolean): Promise<void> {
+    const generation = this.generation;
+    const sessionIsCurrent = () => this.running
+      && generation === this.generation
+      && getSharedObdStatus().ecuConnected;
+    if (!sessionIsCurrent()) return;
+
+    if (enabled) {
+      if (gpsTracker.isBackgroundLocationRunning()) return;
+      // Enabling the setting already obtained foreground and background consent
+      // in the Settings screen. This call only reads the granted state.
+      if (gpsTracker.getState().running) {
+        const started = await startBackgroundMonitoring();
+        if (!sessionIsCurrent()) {
+          if (started && gpsTracker.isBackgroundLocationRunning()) await gpsTracker.stop();
+          return;
+        }
+        this.gpsStartedForEcu = gpsTracker.getState().running || gpsTracker.isBackgroundLocationRunning();
+      } else {
+        this.gpsStartRetryAfterMs = 0;
+      }
+      return;
+    }
+
+    if (gpsTracker.isBackgroundLocationRunning()) {
+      await gpsTracker.stopBackgroundLocation();
+      if (!sessionIsCurrent()) return;
+      // Preserve accumulated distance/sample counters while changing to a
+      // foreground watcher; the new stream starts with a fresh motion window.
+      const started = await gpsTracker.start({ resetTrip: false });
+      if (!sessionIsCurrent()) {
+        if (gpsTracker.getState().running) await gpsTracker.stop();
+        return;
+      }
+      this.gpsStartedForEcu = started && gpsTracker.getState().running;
+    }
+  }
+
   private async startGpsForEcu(generation: number): Promise<void> {
     const generationIsCurrent = () => this.running
       && generation === this.generation
@@ -600,10 +649,12 @@ class AutoTripService {
     // start attempt in flight; if the ECU/trip generation ends while native
     // startup is pending, tear down any late-started location task.
     let backgroundStarted = false;
-    try {
-      backgroundStarted = await startBackgroundMonitoring();
-    } catch {
-      backgroundStarted = false;
+    if (this.backgroundGpsEnabled) {
+      try {
+        backgroundStarted = await startBackgroundMonitoring();
+      } catch {
+        backgroundStarted = false;
+      }
     }
 
     if (!backgroundStarted && generationIsCurrent()) {

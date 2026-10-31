@@ -72,6 +72,14 @@ Este documento é o contrato de aceitação entre mudanças, testes, diário e C
 
 A CI pode validar e compilar em branches e pull requests, mas não pode publicar APK em execução de PR ou em repositório público. O único upload permitido é um artefato de curta retenção na branch `main` quando a visibilidade atual do repositório é `private`. Não criar GitHub Releases automáticas, URLs públicas estáveis nem conceder `contents: write` ao workflow de build. O APK deve acompanhar checksum SHA-256; Actions externas devem ser fixadas em SHA completo de commit verificado. A política é protegida por `tests/projectBaseline.test.js`.
 
+## Permissões e ciclo de vida GPS
+
+- A inicialização pede apenas permissões necessárias ao Bluetooth/OBD; localização não pode bloquear conexão, polling ou diagnóstico.
+- A permissão de localização em primeiro plano só pode ser solicitada pelo fluxo de uso GPS/viagem, não como efeito colateral da inicialização do app.
+- A permissão em segundo plano exige opt-in explícito na tela Configurações; serviços de GPS só consultam a permissão existente e nunca exibem prompt durante polling OBD.
+- `autoTripService` é o único dono do ciclo de vida GPS/viagem. `sharedConnection` administra somente a sessão OBD; não pode iniciar/parar o rastreador.
+- Trocar de rastreamento em segundo plano para primeiro plano durante uma sessão não pode zerar distância ou contagem de amostras já acumuladas.
+
 ## Regras para uma alteração legítima
 
 - Não reduzir ou excluir um teste essencial só para deixar a CI verde.

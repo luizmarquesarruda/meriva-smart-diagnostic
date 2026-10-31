@@ -17,6 +17,15 @@ A branch mantém o fluxo OBD/ELM327 existente e inclui testes automatizados para
 - Confirmar que cada action externa usa SHA completo de commit e que os SHAs correspondem às releases oficiais selecionadas.
 - A configuração de visibilidade privada é requisito operacional separado; a CI não deve presumir que a branch de origem é privada.
 
+## PERM-GPS-01 — Permissões opcionais e propriedade única do GPS
+
+- Inicialização no Android 12+ solicita Bluetooth Connect/Scan sem solicitar localização.
+- OBD pode conectar, inicializar ELM327 e consultar a ECU mesmo quando localização está negada ou serviços de localização estão desligados.
+- A permissão de segundo plano só é solicitada após ação explícita no switch de Configurações; configuração ausente em arquivos antigos equivale a `false`.
+- O serviço de monitoramento só consulta permissão de segundo plano já concedida e nunca abre prompt durante polling OBD.
+- `sharedConnection` não inicia nem encerra GPS; `autoTripService` controla início, troca foreground/background e parada.
+- Desativar background durante sessão troca para watcher foreground sem zerar distância, máximo de velocidade ou contagem de amostras.
+
 ## Casos de regressão obrigatórios
 
 | ID | Cenário | Resultado esperado | Evidência |

@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { requestBackgroundLocationPermissionsOnly } from '../permissions/permissionManager';
+import { getBackgroundLocationPermissionOnly } from '../permissions/permissionManager';
 import { gpsTracker } from './gpsTracker';
 
 let starting: Promise<boolean> | null = null;
@@ -10,7 +10,7 @@ export async function startBackgroundMonitoring(): Promise<boolean> {
 
   starting = (async () => {
     try {
-      const permission = await requestBackgroundLocationPermissionsOnly();
+      const permission = await getBackgroundLocationPermissionOnly();
       if (permission !== 'GRANTED') {
         console.warn('[background] localização em segundo plano não autorizada:', permission);
         return false;

@@ -52,6 +52,16 @@ export async function requestBackgroundLocationPermissionsOnly(): Promise<Permis
   return permission.canAskAgain === false ? 'BLOCKED' : 'DENIED';
 }
 
+/** Read-only permission check. Background GPS must never prompt during OBD startup/polling. */
+export async function getBackgroundLocationPermissionOnly(): Promise<PermissionAudit['location']> {
+  if (Platform.OS !== 'android') return 'UNAVAILABLE';
+  if (Platform.Version < 29) return 'GRANTED';
+
+  const permission = await Location.getBackgroundPermissionsAsync();
+  if (permission.status === Location.PermissionStatus.GRANTED) return 'GRANTED';
+  return permission.canAskAgain === false ? 'BLOCKED' : 'DENIED';
+}
+
 export async function requestLocationPermissionsOnly(): Promise<PermissionAudit['location']> {
   if (Platform.OS !== 'android') return 'UNAVAILABLE';
 

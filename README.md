@@ -135,6 +135,10 @@ Para baixar uma versão, entre no GitHub com uma conta que tenha acesso de leitu
 
 **Estado de configuração:** o repositório ainda aparece como público na verificação desta alteração. A condição de upload já bloqueia novos artefatos enquanto essa visibilidade não for alterada para `Private`; a visibilidade do repositório precisa ser ajustada pelo proprietário nas configurações do GitHub. O conteúdo do código continuará público até essa alteração.
 
+## GPS e permissões
+
+A conexão OBD solicita apenas as permissões Bluetooth necessárias. A localização não é requisito de inicialização, conexão ou polling da ECU. O rastreamento GPS em primeiro plano é iniciado de forma não bloqueante após a validação da ECU; o acesso com a tela apagada é opcional, permanece desativado por padrão e só solicita permissão após ativação explícita em **Configurações**. `autoTripService` é o único proprietário do ciclo de vida GPS/viagens; `sharedConnection` permanece responsável pela sessão OBD.
+
 ## Testes
 
 ```bash
