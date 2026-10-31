@@ -7,30 +7,11 @@ import { readLearningProfile, type MerivaLearningProfile } from '../database/lea
 import { getAutoSaveState } from '../meriva/autosaveManager';
 import { normalizeDiagnosticSource, runLocalDiagnostic, type DiagnosticResult } from '../diagnostics/diagnosticEngine';
 import type { PidObservation } from '../types/sourceTypes';
+import { extractLastTraceFailure, redactBluetoothAddresses, resolveAndroidModel } from './diagnosticReportUtils';
 
 async function readCurrentLearningProfile(): Promise<MerivaLearningProfile | null> {
   const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
   return readLearningProfile(basePath);
-}
-
-function extractLastTraceError(trace: string): string | null {
-  const lines = trace.split('\n');
-  for (let index = lines.length - 1; index >= 0; index -= 1) {
-    const line = lines[index];
-    if (line.includes('BLUETOOTH_ATTEMPT_RESULT') && line.includes('"result":"FAILURE"')) {
-      const match = line.match(/"error":"((?:\\.|[^"\\])*)"/);
-      if (match?.[1]) {
-        try { return JSON.parse('"' + match[1] + '"'); } catch { return match[1]; }
-      }
-    }
-    if (line.includes('ELM_SESSION_FAILURE') || line.includes('CONNECT_FAILURE')) {
-      const match = line.match(/"error":"((?:\\.|[^"\\])*)"/);
-      if (match?.[1]) {
-        try { return JSON.parse('"' + match[1] + '"'); } catch { return match[1]; }
-      }
-    }
-  }
-  return null;
 }
 
 function diagnosticReportLines(result: DiagnosticResult): string[] {
@@ -112,23 +93,49 @@ export interface BluetoothReportResult {
   message?: string;
 }
 
-async function buildReport(): Promise<string> {
+export type BluetoothDiagnosticReportMode = 'TECHNICAL' | 'SHAREABLE';
+
+function platformConstant(name: string): string {
+  const constants = (Platform as unknown as { constants?: Record<string, unknown> }).constants;
+  const value = constants?.[name];
+  return typeof value === 'string' || typeof value === 'number' ? String(value) : 'N/D';
+}
+
+export async function buildBluetoothDiagnosticReport(
+  mode: BluetoothDiagnosticReportMode = 'TECHNICAL',
+): Promise<string> {
   const connection = getSharedObdConnection();
   const context = getSharedObdDiagnosticContext();
   const trace = connection?.getDiagnosticsText() || context.trace || getLastBluetoothDiagnosticText();
+  const traceFailure = extractLastTraceFailure(trace);
+  const sharedError = getSharedObdLastError();
   const learningProfile = await readCurrentLearningProfile();
   const localDiagnostic = buildLocalDiagnostic();
+  const manufacturer = platformConstant('Manufacturer');
+  const model = resolveAndroidModel(
+    (Platform as unknown as { constants?: Record<string, unknown> }).constants?.Model,
+  ) ?? 'N/D';
+  const androidRelease = platformConstant('Release');
   const lines = [
     'MERIVA SMART',
     'BLUETOOTH CLASSIC / ELM327 DIAGNOSTIC REPORT',
+    'REPORT SCHEMA: 2',
+    `EXPORT MODE: ${mode === 'TECHNICAL' ? 'TECHNICAL_FULL' : 'SHAREABLE_REDACTED'}`,
     '',
     `DATA: ${new Date().toISOString()}`,
     `APP VERSION: ${Constants.expoConfig?.version ?? 'N/D'}`,
-    `PLATFORM: ${Platform.OS} ${Platform.Version}`,
-    `DEVICE: ${Constants.deviceName ?? 'N/D'}`,
+    `PLATFORM: ${Platform.OS}`,
+    `DEVICE MANUFACTURER: ${manufacturer}`,
+    `DEVICE MODEL: ${model}`,
+    `ANDROID RELEASE: ${androidRelease}`,
+    `ANDROID API: ${Platform.OS === 'android' ? Platform.Version : 'N/D'}`,
     `ELM DEVICE: ${connection ? `${connection.device.name} | ${connection.device.address}` : 'NÃO CONECTADO'}`,
     `PROTOCOL: ${connection?.protocol ?? 'N/D'}`,
-    `LAST ERROR: ${getSharedObdLastError() ?? extractLastTraceError(trace) ?? 'NENHUM'}`,
+    `LAST ERROR: ${traceFailure?.error ?? sharedError ?? 'NENHUM'}`,
+    `LAST ERROR SOURCE: ${traceFailure ? 'RAW_BLUETOOTH_TRACE' : sharedError ? 'SHARED_CONNECTION_STATE' : 'NONE'}`,
+    `LAST ERROR EVENT: ${traceFailure?.event ?? 'N/D'}`,
+    `LAST ERROR AT: ${traceFailure?.timestamp ?? 'N/D'}`,
+    `SHARED CONNECTION ERROR: ${sharedError ?? 'NENHUM'}`,
     `PAIRED DEVICES: ${context.devices.length}`,
     ...context.devices.map((device, index) => `PAIRED ${index + 1}: ${device.name} | ${device.address}`),
     '',
@@ -141,22 +148,26 @@ async function buildReport(): Promise<string> {
     '',
     '--- FIM DO RELATÓRIO ---',
   ];
-  return lines.join('\n');
+  const report = lines.join('\n');
+  return mode === 'SHAREABLE' ? redactBluetoothAddresses(report) : report;
 }
 
-export async function exportBluetoothDiagnosticTxt(): Promise<BluetoothReportResult> {
+export async function exportBluetoothDiagnosticTxt(
+  mode: BluetoothDiagnosticReportMode = 'TECHNICAL',
+): Promise<BluetoothReportResult> {
   try {
     const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
     if (!permissions.granted) return { ok: false, reason: 'CANCELADO' };
 
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const fileName = `meriva_bluetooth_diagnostic_${stamp}.txt`;
+    const suffix = mode === 'TECHNICAL' ? 'technical' : 'shareable';
+    const fileName = `meriva_bluetooth_diagnostic_${suffix}_${stamp}.txt`;
     const uri = await FileSystem.StorageAccessFramework.createFileAsync(
       permissions.directoryUri,
       fileName,
       'text/plain',
     );
-    await FileSystem.writeAsStringAsync(uri, await buildReport(), {
+    await FileSystem.writeAsStringAsync(uri, await buildBluetoothDiagnosticReport(mode), {
       encoding: FileSystem.EncodingType.UTF8,
     });
     return { ok: true, fileName };
