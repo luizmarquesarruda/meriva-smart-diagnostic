@@ -54,6 +54,7 @@ assert.equal(packageJson.scripts.validate, 'npm run typecheck && npm test');
 // Regression-sensitive suites must remain connected to npm test.
 // Removing a test file from the script must fail this gate before merge.
 const requiredSuites = [
+  'dailyObdHistory.test.js',
   'pidParserIntegrity.test.js',
   'weatherRefresh.test.js',
   'bluetoothRadioRecovery.test.js',
