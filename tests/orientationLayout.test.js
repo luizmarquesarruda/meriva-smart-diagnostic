@@ -13,6 +13,10 @@ const healthScreen = fs.readFileSync('app/saude.tsx', 'utf8');
 const laboratoryScreen = fs.readFileSync('app/laboratorio.tsx', 'utf8');
 const storageScreen = fs.readFileSync('app/armazenamento.tsx', 'utf8');
 const tripScreen = fs.readFileSync('app/viagens.tsx', 'utf8');
+const maintenanceScreen = fs.readFileSync('app/manutencao.tsx', 'utf8');
+const settingsScreen = fs.readFileSync('app/configuracoes.tsx', 'utf8');
+const dataScreen = fs.readFileSync('app/dados.tsx', 'utf8');
+const bluetoothScreen = fs.readFileSync('app/bluetooth.tsx', 'utf8');
 const moreScreen = fs.readFileSync('app/mais.tsx', 'utf8');
 const configurationScreen = fs.readFileSync('app/configuracoes.tsx', 'utf8');
 const screenFiles = [
@@ -45,11 +49,11 @@ assert.match(index, /quadrantValueLandscape:\{fontSize:21,lineHeight:22/, 'valor
 assert.match(index, /quadrantHintLandscape:\{fontSize:8,lineHeight:9/, 'dicas devem manter tamanho legível em uma linha na paisagem');
 assert.match(index, /quadrantHeaderLandscape:\{marginBottom:4/, 'cabeçalho do carrossel deve diminuir em paisagem');
 assert.match(index, /quadrantValueRowLandscape:\{marginTop:2,gap:3/, 'respiro do valor deve ser reduzido em paisagem');
-assert.match(index, /quadrantInstructionLandscape:\{fontSize:7,lineHeight:9,letterSpacing:0,marginTop:3/, 'instrução do carrossel deve continuar legível em paisagem');
+assert.match(index, /quadrantInstructionLandscape:\{fontSize:8,lineHeight:10,letterSpacing:0,marginTop:3/, 'instrução do carrossel deve continuar legível em paisagem');
 assert.match(index, /cockpitMetricCompact:\{paddingVertical:3,paddingHorizontal:3/, 'consumo/autonomia/pressão devem continuar visíveis em cartões compactos');
-assert.match(index, /metricLabelCompact:\{fontSize:7,letterSpacing:0,lineHeight:9/, 'rótulos das métricas auxiliares não devem cair para tipografia quase ilegível');
+assert.match(index, /metricLabelCompact:\{fontSize:8,letterSpacing:0,lineHeight:10/, 'rótulos das métricas auxiliares não devem cair para tipografia quase ilegível');
 assert.match(index, /quadrantLabelLandscape:\{fontSize:8,lineHeight:9/, 'rótulos dos quadrantes mantêm tamanho legível em paisagem');
-assert.match(index, /metricValueCompact:\{fontSize:10,marginTop:1/, 'valores auxiliares devem caber sem gastar altura excessiva');
+assert.match(index, /metricValueCompact:\{fontSize:11,marginTop:1/, 'valores auxiliares devem caber sem gastar altura excessiva');
 
 assert.match(index, /layoutSpacerLandscape:\{flexGrow:0,minHeight:0,height:4/, 'espaçador não deve consumir a altura útil na paisagem');
 
@@ -134,5 +138,19 @@ for (const file of screenFiles) {
   assert.doesNotMatch(source, /SafeAreaView[^\n]*style=\{styles\.container\}\s*>/, file + ' deve declarar edges explicitamente quando usa o componente');
 }
 assert.match(midLayout, /export function useMidLayout\(\)/);
+assert.match(layout, /screenOptions=\{\{\s*headerShown: false/, 'as rotas usam cabeçalho interno único sem barra nativa duplicada');
+assert.match(laboratoryScreen, /VOLTAR AO COCKPIT/, 'Laboratório precisa oferecer retorno visível após ocultar cabeçalho nativo');
+assert.match(storageScreen, /VOLTAR AOS RECURSOS/, 'Armazenamento precisa oferecer retorno visível após ocultar cabeçalho nativo');
+assert.match(settingsScreen, /VOLTAR AOS RECURSOS/, 'Configurações precisa oferecer retorno visível após ocultar cabeçalho nativo');
+assert.match(tripScreen, /tripListLandscape:\s*\{flexDirection:'row',flexWrap:'wrap'/, 'histórico de viagens deve usar grade em paisagem');
+assert.match(maintenanceScreen, /taskGridLandscape:\s*\{flexDirection:'row',flexWrap:'wrap'/, 'tarefas de manutenção devem usar duas colunas em paisagem');
+assert.match(settingsScreen, /settingsGridLandscape:\s*\{flexDirection:'row',flexWrap:'wrap'/, 'configurações devem reorganizar cartões em paisagem');
+assert.match(tripScreen, /layout\.compact\?12:16/, 'Viagens deve consumir o breakpoint compacto');
+assert.match(maintenanceScreen, /layout\.compact \? 12 : 14/, 'Manutenção deve consumir o breakpoint compacto');
+assert.match(settingsScreen, /layout\.compact \? 12 : 16/, 'Configurações deve consumir o breakpoint compacto');
+assert.match(tripScreen, /Math\.min\(valueSize-4,38\)/, 'valor principal do relatório deve usar o tamanho responsivo central');
+for (const [name, source] of [['Manutenção', maintenanceScreen], ['Configurações', settingsScreen], ['Dados', dataScreen], ['Bluetooth', bluetoothScreen], ['Laboratório', laboratoryScreen]]) {
+  assert.match(source, /minHeight:\s*48/, name + ' deve preservar áreas mínimas de toque');
+}
 
 console.log('Rotação livre e proteção responsiva: OK');
