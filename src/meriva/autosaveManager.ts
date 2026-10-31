@@ -15,6 +15,7 @@ import { hydrateState, isValidEnvelope, validatePayload } from './autosaveValida
 import { migrateEnvelope } from './autosaveMigrations';
 import { appendAutoSaveHistory } from './autosaveHistoryTxt';
 import { appendDailyObdSessionEvent } from './dailyObdHistory';
+import { reconcileDriveCycleHistory } from '../storage/driveCycleStorage';
 
 const DEBOUNCE_MS = 1500;
 const CHECKPOINT_MS = 45000;
@@ -38,6 +39,7 @@ interface AutosaveRuntime {
   obdSessionActive: boolean;
   appStateSubscription: { remove: () => void } | null;
   lastReadingMutationAt: Map<string, number>;
+  driveCycleHistoryReconciled: boolean;
 }
 
 const runtime: AutosaveRuntime = {
@@ -57,6 +59,7 @@ const runtime: AutosaveRuntime = {
   obdSessionActive: false,
   appStateSubscription: null,
   lastReadingMutationAt: new Map(),
+  driveCycleHistoryReconciled: false,
 };
 
 function mainPath(basePath: string): string {
@@ -145,7 +148,12 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
       source: AUTOSAVE_SOURCE,
       // Legacy autosaves may contain driveCycles; new snapshots do not duplicate
       // the canonical history index. Runtime memory still exposes the loaded trips.
-      payload: { ...runtime.state, driveCycles: [] },
+      payload: {
+        ...runtime.state,
+        // Only omit legacy runtime trips after the canonical index has been
+        // reconciled and verified. If migration fails, keep the autosave copy.
+        driveCycles: runtime.driveCycleHistoryReconciled ? [] : runtime.state.driveCycles,
+      },
     };
     const content = JSON.stringify(envelope, null, 2);
     const base = runtime.basePath;
@@ -213,6 +221,19 @@ async function initAutoSaveUnsafe(basePath: string): Promise<MerivaPersistedStat
 
   const envelope = await loadLastValidEnvelope(basePath);
   runtime.state = envelope ? hydrateState(envelope.payload) : createEmptyMerivaState();
+
+  // Migrate legacy autosave trips before any interrupted-session recovery can
+  // save a new envelope without driveCycles. If the index/backup is damaged,
+  // retain the legacy autosave payload rather than clearing its only copy.
+  runtime.driveCycleHistoryReconciled = false;
+  try {
+    runtime.state.driveCycles = await reconcileDriveCycleHistory(basePath, runtime.state.driveCycles);
+    runtime.driveCycleHistoryReconciled = true;
+  } catch (cause) {
+    console.warn('[autosave] histórico de viagens não reconciliado; cópia legada será preservada:',
+      cause instanceof Error ? cause.message : cause);
+  }
+
   runtime.lastSavedAt = envelope?.savedAt ?? null;
   runtime.lastSaveReason = null;
   runtime.lastError = null;
@@ -484,4 +505,5 @@ export function disposeAutoSave(): void {
   runtime.lastError = null;
   runtime.lastSavedFingerprint = null;
   runtime.lastReadingMutationAt.clear();
+  runtime.driveCycleHistoryReconciled = false;
 }
