@@ -83,6 +83,7 @@ const requiredSuites = [
   'merivaAutosave.test.js',
   'onlineConditions.test.js',
   'autonomyPresentation.test.js',
+  'fuelLevelBuffer.test.js',
   'connectivity.test.js',
   'permissions.test.js',
   'screenTheme.test.js',
