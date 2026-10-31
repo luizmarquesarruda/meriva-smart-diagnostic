@@ -138,6 +138,7 @@ export default function ArmazenamentoScreen() {
           Registros preservados em spool nesta execução: {csvQueueStatus.durablySpooledRows}.
           Registros descartados por saturação: {csvQueueStatus.droppedRows}.
         </Text>
+        <Text style={styles.note}>Monitoramento da fila: pico {csvQueueStatus.peakObservedPendingRows} linhas; flushes {csvQueueStatus.totalFlushes}; última gravação {csvQueueStatus.lastFlushDurationMs} ms; máximo {csvQueueStatus.maxFlushDurationMs} ms; falhas {csvQueueStatus.flushFailures}.</Text>
       </View>
       <View style={[styles.historyCard, layout.landscape && styles.dataColumnCard]}>
         <Text style={styles.cardTitle}>RELATÓRIOS DE VIAGENS</Text>
