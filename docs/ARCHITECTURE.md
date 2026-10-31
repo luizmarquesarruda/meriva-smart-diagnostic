@@ -67,6 +67,8 @@ A recepção Bluetooth usa o listener de dados como fonte única. A `Elm327Sessi
 
 `src/database/` contém persistência, DTC, banco de PIDs, aprendizado e configuração do veículo.
 
+`src/database/maintenanceStorage.ts` mantém o plano de manutenção, quilometragem e abastecimentos manuais em `MANUTENCAO/registros.json`. Esses abastecimentos são registros administrativos e não alimentam telemetria OBD, consumo integrado ou autonomia.
+
 ### Meriva
 
 `src/meriva/` contém o estado persistido e o autosave.
@@ -75,7 +77,7 @@ A recepção Bluetooth usa o listener de dados como fonte única. A `Elm327Sessi
 
 ### Storage
 
-`src/storage/` controla quota, limpeza, backups e ciclos de condução.
+`src/storage/` controla quota, limpeza, backups verificados, restauração com cópia de segurança/rollback e ciclos de condução. Backups e quebra de armazenamento incluem `MANUTENCAO`; limpeza automática continua limitada a `LOGS` e `LEITURAS`.
 
 ### Tipos
 

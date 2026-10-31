@@ -237,6 +237,9 @@ export default function IndexScreen() {
     fuelLevelReadAtMs: tripState.fuelLevelReadAtMs,
     tripConsumptionKml: tripState.consumptionKml,
     averageConsumptionKml: tripState.averageConsumptionKml,
+    fuelLevelBufferPercent: tripState.fuelLevelBufferPercent,
+    fuelLevelBufferReadAtMs: tripState.fuelLevelBufferReadAtMs,
+    fuelLevelBufferSampleCount: tripState.fuelLevelBufferSampleCount,
   });
   const connectedSupportedPids = connectionStatus.ecuConnected
     ? getSharedObdConnection()?.supportedPids ?? []
@@ -461,7 +464,7 @@ export default function IndexScreen() {
             </Text>
             <View style={[styles.metricRow, layout.landscape && styles.metricRowLandscape]}>
               <CockpitMetric compact={layout.landscape} label={consumptionLabel} value={availableConsumptionKml != null ? availableConsumptionKml.toFixed(1) + ' km/L' : 'N/D'} />
-              <CockpitMetric compact={layout.landscape} label="AUTONOMIA ATUAL" value={currentAutonomyKm != null ? Math.round(currentAutonomyKm) + ' km' : 'N/D'} />
+              <CockpitMetric compact={layout.landscape} label={tripState.autonomySource === 'BUFFER_012F' ? 'AUTONOMIA • BUFFER' : 'AUTONOMIA ATUAL'} value={currentAutonomyKm != null ? Math.round(currentAutonomyKm) + ' km' : 'N/D'} />
               <CockpitMetric compact={layout.landscape} label="PRESSÃO DO COLETOR" value={manifoldPressureKpa != null ? manifoldPressureKpa.toFixed(0) + ' kPa' : 'N/D'} />
             </View>
           </View>

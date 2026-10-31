@@ -1197,10 +1197,18 @@ async function testBackupCompleteness() {
   await m.initAutoSave(BASE);
   const backup = loadTs(path.join(ROOT, 'src/storage/backup.ts'));
 
-  const expectedDirs = ['BANCO', 'APRENDIZADO', 'DTC', 'CONFIG', 'LEITURAS', 'LOGS', 'VIAGENS'];
+  const expectedDirs = ['BANCO', 'APRENDIZADO', 'DTC', 'CONFIG', 'LEITURAS', 'LOGS', 'VIAGENS', 'MANUTENCAO'];
   for (const dir of expectedDirs) {
     await fakeFS.writeAsStringAsync(`${BASE}/${dir}/arquivo.txt`, dir);
   }
+  const maintenanceData = {
+    currentOdometerKm: 123456,
+    severeUse: true,
+    records: { ENGINE_OIL: { lastServiceAt: '2026-10-01', lastServiceOdometerKm: 120000 } },
+    fuelings: [{ id: 'fuel-backup-test', occurredAt: '2026-10-20T12:00:00.000Z', odometerKm: 123000, liters: 40, totalCost: 220, type: 'GASOLINA' }],
+    updatedAt: '2026-10-30T12:00:00.000Z',
+  };
+  await fakeFS.writeAsStringAsync(`${BASE}/MANUTENCAO/registros.json`, JSON.stringify(maintenanceData));
 
   const info = await backup.createBackup(BASE);
   assert.deepStrictEqual(info.includes, expectedDirs);
@@ -1218,6 +1226,9 @@ async function testBackupCompleteness() {
       `backup deve conter ${dir}`,
     );
   }
+  const backedUpMaintenance = JSON.parse(files.get(`${backupRoot}/MANUTENCAO/registros.json`));
+  assert.deepStrictEqual(backedUpMaintenance, maintenanceData,
+    'backup deve preservar quilometragem, plano de manutenção e abastecimentos manuais');
 
   const historicalBackupRoot = `${BASE}/BACKUP`;
   for (let index = 0; index < 6; index += 1) {
@@ -1233,6 +1244,56 @@ async function testBackupCompleteness() {
     'retenção deve manter no máximo cinco backups após confirmar que o novo backup foi criado');
   assert.ok(retained.some((name) => name === `meriva_smart_${info.timestamp}`),
     'backup recém-validado deve ser mantido');
+  m.disposeAutoSave();
+}
+
+async function testBackupRestore() {
+  resetFS();
+  const m = loadTs(path.join(ROOT, 'src/meriva/autosaveManager.ts'));
+  m.disposeAutoSave();
+  await m.initAutoSave(BASE);
+  const backup = loadTs(path.join(ROOT, 'src/storage/backup.ts'));
+
+  const oldLog = 'telemetria-original';
+  const oldMaintenance = JSON.stringify({
+    currentOdometerKm: 123456,
+    severeUse: true,
+    records: { ENGINE_OIL: { lastServiceAt: '2026-10-01', lastServiceOdometerKm: 120000 } },
+    fuelings: [{ id: 'fuel-restore-test', occurredAt: '2026-10-20T12:00:00.000Z', odometerKm: 123000, liters: 40, totalCost: 220, type: 'GASOLINA' }],
+    updatedAt: '2026-10-30T12:00:00.000Z',
+  });
+  await fakeFS.writeAsStringAsync(`${BASE}/LOGS/obd.csv`, oldLog);
+  await fakeFS.writeAsStringAsync(`${BASE}/MANUTENCAO/registros.json`, oldMaintenance);
+
+  const created = await backup.createBackup(BASE);
+  const backupName = `meriva_smart_${created.timestamp}`;
+  const available = await backup.listVerifiedBackups(BASE);
+  assert.ok(available.some((item) => item.name === backupName),
+    'backup íntegro deve aparecer na lista de restauração');
+
+  await fakeFS.writeAsStringAsync(`${BASE}/LOGS/obd.csv`, 'newer-telemetry');
+  await fakeFS.writeAsStringAsync(`${BASE}/MANUTENCAO/registros.json`, '{"fuelings":[]}');
+  const restored = await backup.restoreBackup(BASE, backupName);
+
+  assert.strictEqual(files.get(`${BASE}/LOGS/obd.csv`), oldLog,
+    'restauração deve recuperar o arquivo do histórico');
+  assert.strictEqual(files.get(`${BASE}/MANUTENCAO/registros.json`), oldMaintenance,
+    'restauração deve recuperar manutenção e abastecimentos manuais');
+  assert.ok(restored.safetyBackupName.startsWith('meriva_smart_'),
+    'restauração deve criar uma cópia de segurança do estado anterior');
+  assert.strictEqual(
+    files.get(`${BASE}/BACKUP/${restored.safetyBackupName}/LOGS/obd.csv`),
+    'newer-telemetry',
+    'a cópia de segurança deve preservar os dados anteriores à restauração',
+  );
+
+  await fakeFS.writeAsStringAsync(`${BASE}/BACKUP/${backupName}/LOGS/obd.csv`, 'tampered');
+  const verifiedAfterTamper = await backup.listVerifiedBackups(BASE);
+  assert.ok(!verifiedAfterTamper.some((item) => item.name === backupName),
+    'backup alterado/corrompido deve deixar de ser oferecido para restauração');
+  await assert.rejects(() => backup.restoreBackup(BASE, backupName),
+    /BACKUP_DIRECTORY_SIZE_MISMATCH/,
+    'restauração deve rejeitar backup que não passa na verificação de integridade');
   m.disposeAutoSave();
 }
 
@@ -1463,6 +1524,7 @@ async function main() {
     ['resumo de velocidade real ponderado', testDriveCycleSummaryUsesWeightedRealSpeed],
     ['DTC persistência', testDtcStorage],
     ['backup completo', testBackupCompleteness],
+    ['restauração verificada de backup', testBackupRestore],
     ['CSV serializado', testCsvWriteSerialization],
     ['PID + DNA serializados', testPidAndLearningWriteSerialization],
     ['contratos de aquisição e persistência', testAcquisitionPolicyConsistency],

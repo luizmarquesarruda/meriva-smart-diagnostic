@@ -629,14 +629,17 @@ test('11. quota calcula tamanho real dos diretórios', async () => {
   m.disposeAutoSave();
   resetFS();
   await m.initAutoSave(BASE);
+  assert.ok(dirs.has(`${BASE}/MANUTENCAO`), 'initAutoSave deve provisionar o diretório de manutenção');
   const quota = loadTs(path.join(ROOT, 'src/storage/quotaManager.ts'));
   await currentFS.writeAsStringAsync(`${BASE}/LOGS/a.csv`, 'x'.repeat(1024 * 1024));
+  await currentFS.writeAsStringAsync(`${BASE}/MANUTENCAO/registros.json`, 'm'.repeat(128 * 1024));
   await currentFS.writeAsStringAsync(`${BASE}/LOGS/sub/b.csv`, 'y'.repeat(512 * 1024));
   const usage = await quota.getStorageUsage(BASE);
-  assert.ok(Math.abs(usage.usedMb - 1.5) < 0.01, `uso real esperado 1.5MB, obtido ${usage.usedMb}`);
+  assert.ok(Math.abs(usage.usedMb - 1.6) < 0.01, `uso real esperado 1.6MB incluindo manutenção, obtido ${usage.usedMb}`);
   assert.strictEqual(usage.limitMb, 2048);
   const breakdown = await quota.getStorageBreakdown(BASE);
   assert.strictEqual(breakdown.LOGS, 1.5);
+  assert.strictEqual(breakdown.MANUTENCAO, 0.1, 'a quota deve contabilizar registros de manutenção e abastecimento');
   m.disposeAutoSave();
 });
 

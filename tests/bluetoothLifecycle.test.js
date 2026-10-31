@@ -15,6 +15,8 @@ const dashboard = fs.readFileSync(path.join(ROOT, 'app', 'index.tsx'), 'utf8');
 
 assert(transport.includes('onConnected?: () => void'));
 assert(transport.includes('onDisconnected?: (reason: string) => void'));
+assert.ok(transport.includes('normalizeBluetoothAddress(eventAddress) !== normalizeBluetoothAddress(this.deviceAddress)'),
+  'eventos Android devem comparar o MAC normalizado, independentemente de caixa/separadores');
 assert(transport.includes('this.callbacks?.onConnected?.()'));
 assert(transport.includes("this.callbacks?.onDisconnected?.('BLUETOOTH DESCONECTADO')"));
 assert(manager.includes('callbacks?.onBluetoothConnected'));
@@ -97,6 +99,9 @@ assert(connectedProbe.includes('this.markDisconnected()'),
   'unknown runtime socket state must clear local state after the cleanup guard is installed');
 assert(transport.includes('await this.assertDeviceConnected(device, NATIVE_CONNECTION_CHECK_TIMEOUT_MS)'), 'write must not transmit while native state is unknown');
 assert(transport.includes('Math.min(NATIVE_CONNECTION_CHECK_TIMEOUT_MS, remainingMs)'), 'read must reserve only the remaining response timeout for native state checks');
+const promptRead = transport.slice(transport.indexOf('async readUntilPrompt'), transport.indexOf('private async safeDisconnect'));
+assert(promptRead.indexOf("const promptIndex = this.received.indexOf('>')") < promptRead.indexOf('await this.assertDeviceConnected('),
+  'a resposta ELM já delimitada no buffer deve ser consumida antes de consultar o estado nativo do socket');
 assert(transport.includes('private receiveDesynchronized = false'),
   'transport must remember when a response timed out before its framing prompt');
 assert.match(transport, /this\.receiveDesynchronized = true;[\s\S]*?READ_TIMEOUT/,
