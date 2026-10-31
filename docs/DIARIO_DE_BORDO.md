@@ -4909,15 +4909,6 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - CI não comprova comunicação física com ELM327/ECU nem respostas reais aos PIDs 010C/012F.
 
 
-## DB-190 — 2026-10-31 — Preservação integral do histórico diário ECU
-
-- Auditoria confirmou que `src/meriva/dailyObdHistory.ts` limitava o diário às 365 datas mais recentes com `slice(-MAX_DAYS)`.
-- O limite temporal foi removido: a gravação preserva todas as páginas existentes e acrescenta a nova data sem descartar as mais antigas.
-- Teste de regressão cria 366 páginas antigas, acrescenta a data seguinte e verifica a preservação da primeira, da última e da nova página (367 no total).
-- A limpeza de LOGS/LEITURAS não altera o diário em VIAGENS. A documentação registra que o TXT cresce com o uso e que segmentação futura exige migração/recuperação testada.
-- Nenhuma migração geral para SQLite foi feita; primeiro preservar os dados e medir o comportamento.
-- Validar gate:baseline, suíte completa e build Android no SHA final. Inspeção física dos relatórios no Galaxy A06 / SM-A065M / Android 16 continua pendente.
-
 ## DB-189 — 2026-10-31 — Privacidade ampliada e snapshot do relatório Bluetooth
 
 - Auditoria da PR #105 identificou que a exportação compartilhável ocultava MACs, mas ainda podia expor nomes de dispositivos, VIN e coordenadas GPS presentes em texto bruto.
@@ -4927,3 +4918,13 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - A documentação distingue o snapshot em memória de dados persistidos em arquivos independentes, sem prometer atomicidade inexistente.
 - Validação automatizada deve ser conferida no SHA final após os commits desta entrada. Inspeção real dos arquivos no Galaxy A06 / SM-A065M / Android 16 continua pendente.
 - Limite conhecido: DTCs, leituras, horários e características do veículo continuam no relatório compartilhável por relevância diagnóstica e podem permitir correlação indireta; revisar antes de enviar.
+
+
+## DB-190 — 2026-10-31 — Preservação integral do histórico diário ECU
+
+- Auditoria confirmou que `src/meriva/dailyObdHistory.ts` limitava o diário às 365 datas mais recentes com `slice(-MAX_DAYS)`.
+- O limite temporal foi removido: a gravação preserva todas as páginas existentes e acrescenta a nova data sem descartar as mais antigas.
+- Teste de regressão cria 366 páginas antigas, acrescenta a data seguinte e verifica a preservação da primeira, da última e da nova página (367 no total).
+- A limpeza de LOGS/LEITURAS não altera o diário em VIAGENS. A documentação registra que o TXT cresce com o uso e que segmentação futura exige migração/recuperação testada.
+- Nenhuma migração geral para SQLite foi feita; primeiro preservar os dados e medir o comportamento.
+- Validar gate:baseline, suíte completa e build Android no SHA final. Inspeção física dos relatórios no Galaxy A06 / SM-A065M / Android 16 continua pendente.
