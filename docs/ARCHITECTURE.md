@@ -116,3 +116,12 @@ A aplicação usa `@react-native-community/netinfo` para apresentar conectividad
 **Integração de telemetria em nuvem não está implementada nesta branch.** No inventário do repositório não existem `src/cloud/bubbleWorkflowContract.ts`, `src/cloud/bubbleWorkflowClient.ts` nem `docs/BUBBLE_WORKFLOW_PORT.md`, apesar de versões anteriores desta documentação os citarem. Não pressupor que login/sincronização Bubble, outbox ou fila persistente de uploads esteja disponível.
 
 Qualquer integração futura precisa definir endpoint/schema versionados, autenticação de usuário por credenciais de escopo mínimo, IDs de evento idempotentes, retenção/consentimento, timeout, política de retry com backoff, fila local durável e mecanismo de descarte/retentativa. A fonte operacional continua local; indisponibilidade de rede não pode parar Bluetooth/ELM327, GPS local, diagnóstico, cálculos ou autosave.
+
+
+## Relatórios e exportações
+
+`src/obd/exportBluetoothDiagnosticTxt.ts` gera relatórios TXT com correlação do último evento de falha, timestamp e origem do erro. A exportação técnica preserva a trilha completa; a exportação compartilhável mascara endereços MAC também dentro do texto RAW.
+
+`src/storage/diagnosticExportContract.ts` define o contrato JSON `MERIVA_DIAGNOSTIC_EXPORT` schema 1. O estado em memória é copiado no início da operação e DTCs, viagens e manutenção são lidos em paralelo. Cada exportação registra versão do app, API Android e metadados do fabricante/modelo quando fornecidos pelo sistema.
+
+Detalhes de campos, proveniência e privacidade ficam em `docs/RELATORIOS_EXPORTACAO.md`.
