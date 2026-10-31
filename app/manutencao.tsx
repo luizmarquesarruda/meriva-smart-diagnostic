@@ -79,7 +79,7 @@ export default function MaintenanceScreen() {
       setData(loaded);
       setDrafts(buildDrafts(loaded));
       setOdometerInput(loaded.currentOdometerKm == null ? '' : String(loaded.currentOdometerKm));
-      setStatus('REGISTROS LOCAIS PRONTOS');
+      setStatus(loaded.storageWarning ?? 'REGISTROS LOCAIS PRONTOS');
     }).catch(() => {
       if (!cancelled) setStatus('NÃO FOI POSSÍVEL LER OS REGISTROS');
     });
@@ -89,8 +89,8 @@ export default function MaintenanceScreen() {
   const tasks = useMemo(() => getMaintenanceTasks(Boolean(data?.severeUse)), [data?.severeUse]);
   const latestFueling = data?.fuelings[data.fuelings.length - 1] ?? null;
 
-  async function persist(next: MaintenanceData, message: string): Promise<void> {
-    if (busy) return;
+  async function persist(next: MaintenanceData, message: string): Promise<boolean> {
+    if (busy) return false;
     setBusy(true);
     try {
       await writeMaintenanceData(basePath, next);
@@ -98,9 +98,11 @@ export default function MaintenanceScreen() {
       setData(saved);
       setDrafts(buildDrafts(saved));
       setStatus(message);
+      return true;
     } catch {
       setStatus('FALHA AO SALVAR • DADOS NÃO CONFIRMADOS');
       Alert.alert('Falha no salvamento', 'O registro não foi confirmado. Tente novamente.');
+      return false;
     } finally {
       setBusy(false);
     }
@@ -185,13 +187,15 @@ export default function MaintenanceScreen() {
       totalCost,
       type: fuelType,
     };
-    await persist({
+    const saved = await persist({
       ...data,
       currentOdometerKm: odometer,
-      fuelings: [...data.fuelings, fueling].slice(-100),
+      fuelings: [...data.fuelings, fueling],
     }, 'ABASTECIMENTO SALVO');
-    setLitersInput('');
-    setCostInput('');
+    if (saved) {
+      setLitersInput('');
+      setCostInput('');
+    }
   }
 
   return (

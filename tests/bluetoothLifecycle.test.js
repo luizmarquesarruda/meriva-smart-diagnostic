@@ -52,6 +52,10 @@ assert(autosaveManager.includes('initializationPromise'), 'initAutoSave deve ser
 
 assert(shared.includes('startBluetoothMonitor'));
 assert(shared.includes('preferredAddress'));
+assert(shared.includes('runConnectionCandidates'), 'candidate discovery must use a generation-aware queue');
+assert(shared.includes('const pendingAttempt = connecting'), 'manual disconnect must retain and await the in-flight native connection cleanup');
+assert(shared.includes('if (connecting === attempt) connecting = null'), 'a completed old attempt must not clear a newer connection promise');
+assert(shared.includes('attemptGeneration !== connectionGeneration'), 'disconnect generation must invalidate a stale candidate before publishing it');
 assert(shared.includes('selectedAdapterAddress: connection.device.address.toUpperCase()'));
 assert(shared.includes('ecuValidatedAt: validatedAt'));
 // ECU validation must be attributed to a real OBD response, never a vehicle profile alone.

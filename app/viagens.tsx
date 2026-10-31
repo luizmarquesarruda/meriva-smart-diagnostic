@@ -32,11 +32,19 @@ export default function ViagensScreen() {
   const [cycles, setCycles] = useState<DriveCycle[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [periodDays, setPeriodDays] = useState<7 | 30 | 0>(0);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   useEffect(() => {
     let mounted = true;
     void readDriveCycles(BASE_PATH)
-      .then(items => { if (mounted) setCycles(items.filter(cycle => cycle.source === 'REAL_OBD')); })
-      .catch(() => { if (mounted) setCycles([]); });
+      .then(items => { if (mounted) { setCycles(items.filter(cycle => cycle.source === 'REAL_OBD')); setHistoryError(null); } })
+      .catch((cause) => {
+        if (!mounted) return;
+        setCycles([]);
+        const detail = cause instanceof Error ? cause.message : String(cause);
+        setHistoryError(detail.includes('HISTORY_SCHEMA_VERSION_NEWER_THAN_APP')
+          ? 'ESTE HISTÓRICO FOI CRIADO POR UMA VERSÃO MAIS NOVA DO APLICATIVO. O ARQUIVO ORIGINAL FOI PRESERVADO; ATUALIZE O APLICATIVO COMPATÍVEL ANTES DE CONTINUAR.'
+          : 'NÃO FOI POSSÍVEL VALIDAR O HISTÓRICO. O ARQUIVO ORIGINAL FOI PRESERVADO; NÃO HÁ DADOS CONFIRMADOS PARA EXIBIR.');
+      });
     return () => { mounted = false; };
   }, []);
 
@@ -70,7 +78,10 @@ export default function ViagensScreen() {
             )}
           </View>
           <Text style={s.section}>HISTÓRICO DE VIAGENS</Text>
-          {visible.length ? <View style={[s.tripList,layout.landscape&&s.tripListLandscape,{gap:layout.gap}]}>{visible.map(cycle => <TouchableOpacity accessibilityRole="button" accessibilityHint="Abre os detalhes desta viagem" onPress={() => setSelectedId(cycle.id)} style={[s.card,{padding:layout.cardPadding},layout.landscape&&s.cardLandscape]} key={cycle.id}>
+          {historyError ? <View style={s.empty}>
+            <Text style={s.emptyTitle}>HISTÓRICO NÃO DISPONÍVEL</Text>
+            <Text style={s.emptyText}>{historyError}</Text>
+          </View> : visible.length ? <View style={[s.tripList,layout.landscape&&s.tripListLandscape,{gap:layout.gap}]}>{visible.map(cycle => <TouchableOpacity accessibilityRole="button" accessibilityHint="Abre os detalhes desta viagem" onPress={() => setSelectedId(cycle.id)} style={[s.card,{padding:layout.cardPadding},layout.landscape&&s.cardLandscape]} key={cycle.id}>
             <View style={s.cardHeader}>
               <AppIcon name="trips" size={20} color={COLORS.accent} />
               <View style={{flex:1}}>

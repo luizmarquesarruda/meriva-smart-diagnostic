@@ -22,6 +22,7 @@ let foregroundPermissionRequests = 0;
 let backgroundUpdatesStarted = false;
 let backgroundStartCalls = 0;
 let backgroundStopCalls = 0;
+let backgroundStartShouldFail = false;
 const fakeLocation = {
   Accuracy: { BestForNavigation: 6 },
   PermissionStatus: { GRANTED: 'granted' },
@@ -35,6 +36,7 @@ const fakeLocation = {
   hasStartedLocationUpdatesAsync: async () => backgroundUpdatesStarted,
   startLocationUpdatesAsync: async () => {
     backgroundStartCalls += 1;
+    if (backgroundStartShouldFail) throw new Error('BACKGROUND START FAILED');
     backgroundUpdatesStarted = true;
   },
   stopLocationUpdatesAsync: async () => {
@@ -329,6 +331,18 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
 
   await staleTracker.stop();
   assert.strictEqual(clearedWatchdog, true, 'stop must remove the watchdog timer');
+
+  // A failed native background start must not remove an existing foreground watcher.
+  const failedTransitionTracker = new GpsTracker();
+  assert.strictEqual(await failedTransitionTracker.start(), true);
+  const originalForegroundWatcher = watcher;
+  backgroundStartShouldFail = true;
+  assert.strictEqual(await failedTransitionTracker.startBackgroundLocation(), false);
+  backgroundStartShouldFail = false;
+  assert.strictEqual(failedTransitionTracker.getState().running, true);
+  assert.strictEqual(watcher, originalForegroundWatcher,
+    'foreground watcher must remain active if Android background startup fails');
+  await failedTransitionTracker.stop();
 
   // Background location API is part of expo-location and must be represented
   // by the test double; silently catching a missing mock method hides test defects.

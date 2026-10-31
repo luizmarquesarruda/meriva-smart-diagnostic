@@ -1,4 +1,11 @@
-## ESTADO VIGENTE — 2026-10-31 (P1 persistência e integridade dos históricos)
+## ESTADO VIGENTE — 2026-10-31 (P0/P1 robustez de viagens, JSON, backup, Bluetooth e GPS)
+
+- DB-197 — Branch de integração: `fix/storage-and-history-integrity-20261031`, sobre o estado de `main` documentado em 31/10/2026. Escopo ampliado para preservar viagens pendentes, endurecer JSON local, coordenar snapshots, cancelar descoberta Bluetooth e manter GPS foreground em falha de background.
+- A finalização de uma viagem só libera o gravador após índice JSON, resumo CSV idempotente e checkpoint do autosave serem confirmados. Falha mantém a viagem pendente e bloqueia novas amostras para não misturar sessões.
+- Backup/restauração passam a pausar e drenar o ciclo OBD, confirmar autosave, descarregar aprendizado e CSV antes da cópia/substituição. Configurações, veículo, manutenção e aprendizado passam a usar gravação JSON temporária validada e cópia anterior; corrupção sem recuperação não é substituída por padrões.
+- Versões futuras dos históricos/configurações são tratadas como incompatíveis e preservadas; a tela Viagens informa a indisponibilidade em vez de exibir um histórico vazio. O índice sequencial deste diário é sincronizado com DB-195, DB-196 e DB-197.
+- Testes comportamentais foram adicionados para falha de persistência, recuperação JSON, retenção de abastecimentos, cancelamento de candidatos Bluetooth, transição GPS e consistência de backup. A segunda auditoria estática e a CI da cabeça final permanecem pendentes neste registro; nenhum resultado é presumido.
+- SQLite permanece adiado: a medição equivalente no Galaxy A06 ainda é necessária; nenhum histórico foi migrado.
 
 - DB-194 — Branch de trabalho: `fix/storage-and-history-integrity-20261031`, criada sobre o `main` observado em 31/10/2026. Escopo: rotação/spool de CSV, deduplicação e reconciliação do histórico de viagens, e remoção da cópia persistente de viagens no autosave.
 - O logger mantém o formato CSV e o FileSystem legacy do Expo SDK 51. Os arquivos diários usam partes de até 512 KiB; a primeira parte conserva o nome legado. Ao alcançar 10.000 linhas pendentes, chunks imutáveis são gravados e relidos para verificação. O limite duro em RAM é 20.000; qualquer descarte residual permanece contado e reportado.
@@ -296,6 +303,9 @@
 - **DB-192** · 2026-10-31 — Integrar layout e relatórios, consolidar P0 e registrar validação dos SHAs finais
 - **DB-193** · 2026-10-31 — Velocidade derivada GPS e recuperação atômica do histórico ECU
 - **DB-194** · 2026-10-31 — Auditoria estática do layout no Galaxy A06 / Android 16
+- **DB-195** · 2026-10-31 — Instrumentação de tamanho e latência do histórico no aparelho
+- **DB-196** · 2026-10-31 — Versionamento do índice de viagens e observabilidade dos buffers
+- **DB-197** · 2026-10-31 — Endurecer finalização de viagens, persistência JSON, backup, Bluetooth e GPS
 ---
 
 Este arquivo é o registro operacional das correções, auditorias e decisões técnicas do projeto.
@@ -5027,3 +5037,17 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - A tela Armazenamento agora exibe pico de fila, total de flushes, duração do último e do maior flush e falhas de flush, além dos contadores já existentes de spool e descarte.
 - A medição de JSON descrita em DB-195 continua aguardando execução no Galaxy A06. A comparação equivalente com SQLite não foi feita e nenhuma viagem foi migrada para SQLite.
 - O próximo gate é CI completa no SHA final; depois, executar o benchmark no aparelho e decidir a migração com base em tamanho, p95 de leitura/gravação e consultas reais. Preservar JSON e testar restauração antes de alterar a fonte de leitura.
+
+
+## DB-197 · 2026-10-31 — Endurecer finalização de viagens, persistência JSON, backup, Bluetooth e GPS
+
+- **Finalização de viagem:** o gravador permanece acessível enquanto o índice canônico, a linha CSV de resumo e o autosave não estiverem confirmados. A gravação do índice/CSV é repetível pelo ID estável; uma falha mantém o estado pendente e a próxima sessão não recebe amostras da viagem anterior.
+- **Ciclo OBD e backup:** o AutoTripService expõe uma barreira que interrompe novas consultas e aguarda o ciclo em andamento. Backup e restauração usam essa barreira, exigem checkpoint de autosave e descarregam fila de aprendizado/CSV antes de copiar ou substituir os diretórios.
+- **JSON local:** configurações, perfil do veículo, manutenção/abastecimentos e perfil de aprendizado usam arquivo temporário, read-back validado e cópia anterior validada. Arquivo corrompido sem cópia recuperável não é substituído por valores padrão. Arquivo de versão futura não pode ser sobrescrito por aplicativo antigo; o arquivo corrompido é preservado para inspeção.
+- **Manutenção:** o histórico de abastecimentos deixa de ser truncado silenciosamente aos 100 registros. A interface só limpa litros/valor depois da confirmação da gravação e informa quando houve recuperação da cópia anterior.
+- **Bluetooth:** a geração de conexão atravessa preparação, descoberta e toda a fila de candidatos. Desconexão manual cancela a fila, callbacks antigos não reabrem estados e a tentativa pendente termina sua limpeza antes de liberar uma nova conexão.
+- **GPS:** o watcher foreground não é removido antes da confirmação de início do serviço nativo em segundo plano. Falha restaura o estado anterior e mantém a coleta em primeiro plano.
+- **Histórico de viagens:** leitura, reconciliação e gravação bloqueiam downgrade de schema futuro. A tela de viagens exibe estado indisponível com orientação explícita, em vez de apresentar uma lista vazia.
+- **Regressões adicionadas:** falha ao persistir viagem não chama a liberação do gravador; JSON futuro não é substituído; manutenção preserva mais de 100 abastecimentos; Bluetooth não avança ao próximo candidato após cancelamento; GPS mantém watcher foreground se o serviço background falhar; backup exige barreira de snapshot.
+- **Validação:** as alterações e os testes foram preparados sem disparar CI. A segunda auditoria estática deve anteceder a execução da CI na cabeça final. Este registro não declara teste local, build Android ou ensaio físico concluído.
+- **SQLite:** permanece sem migração. A decisão continua condicionada à medição real de JSON e à comparação equivalente com SQLite no Galaxy A06, conforme DB-195.

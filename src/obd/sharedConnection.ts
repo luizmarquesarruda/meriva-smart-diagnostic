@@ -96,6 +96,29 @@ function setLifecycle(next: BluetoothLifecycleState): void {
   emit();
 }
 
+export async function runConnectionCandidates<TDevice, TResult>(
+  candidates: TDevice[],
+  isCurrent: () => boolean,
+  connect: (device: TDevice) => Promise<TResult>,
+): Promise<TResult> {
+  let lastError: unknown = null;
+  for (const device of candidates) {
+    if (!isCurrent()) throw new Error('CONEXÃO BLUETOOTH CANCELADA; PRÓXIMO ADAPTADOR NÃO SERÁ TESTADO.');
+    try {
+      const result = await connect(device);
+      if (!isCurrent()) throw new Error('CONEXÃO BLUETOOTH CANCELADA.');
+      return result;
+    } catch (cause) {
+      lastError = cause;
+      if (!isCurrent()) {
+        throw new Error('CONEXÃO BLUETOOTH CANCELADA; PRÓXIMO ADAPTADOR NÃO SERÁ TESTADO.');
+      }
+    }
+  }
+  if (!isCurrent()) throw new Error('CONEXÃO BLUETOOTH CANCELADA.');
+  throw lastError instanceof Error ? lastError : new Error('NENHUM ADAPTADOR PAREADO RESPONDEU.');
+}
+
 function setEcuResponseState(next: EcuResponseState, error?: string): void {
   ecuResponseState = next;
   if (error) lastEcuError = error;
@@ -393,24 +416,24 @@ export function subscribeSharedObdStatus(listener: (status: SharedObdStatus) => 
   return () => statusListeners.delete(listener);
 }
 
-async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm327CompatibilityConfig): Promise<SharedObdConnection> {
+async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm327CompatibilityConfig, attemptGeneration: number): Promise<SharedObdConnection> {
   setLifecycle('DEVICE_SELECTED');
   setLifecycle('BLUETOOTH_CONNECTING');
-  intentionalDisconnect = false;
+  const isCurrent = () => attemptGeneration === connectionGeneration && !intentionalDisconnect;
 
   try {
-      const attemptGeneration = connectionGeneration;
     let disconnectedDuringAttempt = false;
     const connection = await createRealElmSession(
       device,
       compatibility,
       getAutoSaveState().pidDiscovery,
       {
-        onBluetoothConnected: () => setLifecycle('BLUETOOTH_CONNECTED'),
-        onElmResponding: () => setLifecycle('ELM_RESPONDING'),
-        onElmInitialized: () => setLifecycle('ELM_INITIALIZED'),
-        onEcuResponding: () => setLifecycle('ECU_RESPONDING'),
+        onBluetoothConnected: () => { if (isCurrent()) setLifecycle('BLUETOOTH_CONNECTED'); },
+        onElmResponding: () => { if (isCurrent()) setLifecycle('ELM_RESPONDING'); },
+        onElmInitialized: () => { if (isCurrent()) setLifecycle('ELM_INITIALIZED'); },
+        onEcuResponding: () => { if (isCurrent()) setLifecycle('ECU_RESPONDING'); },
         onDisconnected: (reason) => {
+          if (!isCurrent()) return;
           disconnectedDuringAttempt = true;
           void handleUnexpectedDisconnect(reason);
         },
@@ -457,6 +480,11 @@ async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm3
       // Identificação é opcional e não invalida uma ECU já validada.
     }
 
+    if (!isCurrent() || disconnectedDuringAttempt) {
+      try { await connection.session.close(); } catch { /* sessão cancelada */ }
+      throw new Error('CONEXÃO BLUETOOTH CANCELADA ANTES DE PUBLICAR A SESSÃO.');
+    }
+
     active = {
       session: connection.session,
       device,
@@ -484,6 +512,11 @@ async function connectCandidate(device: BluetoothDeviceInfo, compatibility: Elm3
       // Falha de persistência não invalida uma conexão já validada pelo ELM/ECU.
       console.warn('[obd] falha ao persistir adaptador/ECU:', persistCause instanceof Error ? persistCause.message : persistCause);
     }
+    if (!isCurrent() || disconnectedDuringAttempt) {
+      if (active?.session === connection.session) active = null;
+      try { await connection.session.close(); } catch { /* sessão cancelada */ }
+      throw new Error('CONEXÃO BLUETOOTH CANCELADA DURANTE A PERSISTÊNCIA.');
+    }
     lastConnectionError = null;
     setLifecycle('READY');
     startBluetoothMonitor();
@@ -501,31 +534,38 @@ async function connectPreferredElmOnce(
   compatibility: Elm327CompatibilityConfig,
   preferredAddress: string | null,
   selectionMode: ConnectionSelectionMode = 'PREFERRED',
+  attemptGeneration: number,
 ): Promise<SharedObdConnection> {
+  const isCurrent = () => attemptGeneration === connectionGeneration && !intentionalDisconnect;
+  if (!isCurrent()) throw new Error('CONEXÃO BLUETOOTH CANCELADA.');
   clearBluetoothDiagnostic();
   lastDiscoveryDevices = [];
   await ensureBluetoothReady();
+  if (!isCurrent()) throw new Error('CONEXÃO BLUETOOTH CANCELADA DURANTE A PREPARAÇÃO.');
   setLifecycle('BLUETOOTH_ON');
 
   const devices = await discoverPairedDevices();
+  if (!isCurrent()) throw new Error('CONEXÃO BLUETOOTH CANCELADA DURANTE A DESCOBERTA.');
   lastDiscoveryDevices = devices;
   const candidates = buildCandidateList(devices, preferredAddress, selectionMode);
   if (selectionMode === 'EXPLICIT' && candidates.length === 0) {
     throw new Error('DISPOSITIVO BLUETOOTH SELECIONADO NÃO ESTÁ MAIS PAREADO.');
   }
 
-  let lastError: unknown = null;
-  for (const device of candidates) {
-    try {
-      return await connectCandidate(device, compatibility);
-    } catch (cause) {
-      lastError = cause;
-      setConnectionError(cause);
-    }
+  try {
+    return await runConnectionCandidates(candidates, isCurrent, async (device) => {
+      try {
+        return await connectCandidate(device, compatibility, attemptGeneration);
+      } catch (cause) {
+        if (isCurrent()) setConnectionError(cause);
+        throw cause;
+      }
+    });
+  } catch (cause) {
+    if (!isCurrent()) throw cause;
+    const detail = cause instanceof Error ? cause.message : String(cause);
+    throw new Error('ELM327 NÃO CONECTOU. DISPOSITIVOS TESTADOS: ' + candidates.length + '. ÚLTIMO ERRO: ' + detail);
   }
-
-  const detail = lastError instanceof Error ? lastError.message : String(lastError ?? 'NENHUM DISPOSITIVO PAREADO RESPONDEU');
-  throw new Error('ELM327 NÃO CONECTOU. DISPOSITIVOS TESTADOS: ' + candidates.length + '. ÚLTIMO ERRO: ' + detail);
 }
 
 export async function connectPreferredElm(
@@ -542,30 +582,33 @@ export async function connectPreferredElm(
   if (connecting) return connecting;
 
   const config = mergeCompatibilityConfig(compatibility ?? DEFAULT_ELM327_COMPATIBILITY);
-
-  connecting = (async () => {
-    // O fluxo usa a política limitada de bluetooth_config.json: três tentativas
-    // por candidato por padrão, com 1,5 s entre falhas transitórias. Após uma
-    // varredura completa sem resposta ECU válida ao 010C, avança ao próximo
-    // adaptador em vez de repetir a mesma varredura no mesmo dispositivo.
+  const attemptGeneration = connectionGeneration;
+  intentionalDisconnect = false;
+  const attempt = (async () => {
     try {
-      return await connectPreferredElmOnce(config, preferredAddress, selectionMode);
+      return await connectPreferredElmOnce(config, preferredAddress, selectionMode, attemptGeneration);
     } catch (cause) {
-      setConnectionError(cause);
-      const message = cause instanceof Error ? cause.message : String(cause);
-      if (/BLUETOOTH.*DESLIGADO|BLUETOOTH CONTINUA DESLIGADO|BLUETOOTH NÃO FOI ATIVADO/i.test(message)) {
-        setLifecycle('BLUETOOTH_OFF');
+      if (attemptGeneration === connectionGeneration && !intentionalDisconnect) {
+        setConnectionError(cause);
+        const message = cause instanceof Error ? cause.message : String(cause);
+        if (/BLUETOOTH.*DESLIGADO|BLUETOOTH CONTINUA DESLIGADO|BLUETOOTH NÃO FOI ATIVADO/i.test(message)) {
+          setLifecycle('BLUETOOTH_OFF');
+        } else {
+          setLifecycle('ERROR');
+        }
       } else {
-        setLifecycle('ERROR');
+        lifecycle = 'DISCONNECTED';
+        emit();
       }
       throw cause;
     }
   })();
+  connecting = attempt;
 
   try {
-    return await connecting;
+    return await attempt;
   } finally {
-    connecting = null;
+    if (connecting === attempt) connecting = null;
   }
 }
 
@@ -606,7 +649,7 @@ export async function setSharedObdConnection(connection: SharedObdConnection | n
 export async function disconnectSharedObd(): Promise<void> {
   intentionalDisconnect = true;
   connectionGeneration += 1;
-  connecting = null;
+  const pendingAttempt = connecting;
 
   if (monitorTimer) {
     clearInterval(monitorTimer);
@@ -625,6 +668,9 @@ export async function disconnectSharedObd(): Promise<void> {
   try {
     if (connection) await connection.session.close();
   } finally {
+    if (pendingAttempt) {
+      try { await pendingAttempt; } catch { /* tentativa cancelada e limpa antes de permitir outra */ }
+    }
     // AutoTripService receives the disconnected state and owns GPS teardown.
     try { await closeObdAutosaveSession(); } catch { /* continuar o flush dos logs */ }
     try { await flushCsvLogs(); } catch { /* fila retém o lote e agenda nova tentativa */ }

@@ -117,6 +117,7 @@ function isAccurate(sample: GpsSample): boolean {
 export class GpsTracker {
   private subscription: Location.LocationSubscription | null = null;
   private backgroundTaskRunning = false;
+  private backgroundTransitioning = false;
   private previous: GpsSample | null = null;
   private readonly listeners = new Set<GpsListener>();
   private consecutiveMovingSamples = 0;
@@ -229,14 +230,10 @@ export class GpsTracker {
   async startBackgroundLocation(options: { requestPermission?: boolean } = {}): Promise<boolean> {
     const permitted = await this.requestPermission({ prompt: options.requestPermission !== false });
     if (!permitted) return false;
-
     if (this.backgroundTaskRunning) return true;
 
-    // Ao assumir o Foreground Service, não manter o watcher de foreground em paralelo:
-    // isso duplicaria callbacks e poderia inflar samples/distância.
-    this.subscription?.remove();
-    this.subscription = null;
-
+    const previousState = { ...this.state };
+    this.backgroundTransitioning = true;
     if (!this.state.running) {
       this.state = {
         ...this.state,
@@ -275,6 +272,10 @@ export class GpsTracker {
           },
         });
       }
+
+      // Remove the foreground watcher only after Android confirms the native task.
+      this.subscription?.remove();
+      this.subscription = null;
       this.backgroundTaskRunning = true;
       this.state = { ...this.state, running: true, error: null };
       this.startStalenessWatchdog();
@@ -283,12 +284,13 @@ export class GpsTracker {
     } catch (cause) {
       this.backgroundTaskRunning = false;
       this.state = {
-        ...this.state,
-        running: false,
+        ...previousState,
         error: cause instanceof Error ? cause.message : 'NÃO FOI POSSÍVEL INICIAR O GPS EM SEGUNDO PLANO.',
       };
       this.emit();
       return false;
+    } finally {
+      this.backgroundTransitioning = false;
     }
   }
 
@@ -405,7 +407,9 @@ export class GpsTracker {
           distanceInterval: 1,
           mayShowUserSettingsDialog: true,
         },
-        (location) => this.handleLocation(location),
+        (location) => {
+          if (!this.backgroundTransitioning) this.handleLocation(location);
+        },
       );
       this.startStalenessWatchdog();
       return true;

@@ -23,6 +23,19 @@ function localDateKey(date: Date): string {
 function indexBackupPath(indexFile: string): string { return indexFile.replace(/\.json$/, '.previous.json'); }
 function indexTempPath(indexFile: string): string { return indexFile.replace(/\.json$/, '.tmp'); }
 
+async function hasFutureHistorySchema(indexFile: string): Promise<boolean> {
+  try {
+    const info = await FileSystem.getInfoAsync(indexFile);
+    if (!info.exists || info.isDirectory) return false;
+    const parsed = JSON.parse(await FileSystem.readAsStringAsync(indexFile)) as { schemaVersion?: unknown };
+    return typeof parsed.schemaVersion === 'number'
+      && Number.isInteger(parsed.schemaVersion)
+      && parsed.schemaVersion > CURRENT_HISTORY_SCHEMA_VERSION;
+  } catch {
+    return false;
+  }
+}
+
 function isDriveCycle(value: unknown): value is DriveCycle {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
   const cycle = value as Partial<DriveCycle>;
@@ -251,6 +264,9 @@ async function readCyclesFromFile(filePath: string): Promise<DriveCycle[] | null
 
 export async function readDriveCycles(basePath: string): Promise<DriveCycle[]> {
   const indexFile = `${basePath}/VIAGENS/index.json`;
+  if (await hasFutureHistorySchema(indexFile)) {
+    throw new Error('HISTORY_SCHEMA_VERSION_NEWER_THAN_APP; HISTORICO_PRESERVADO_SEM_DOWNGRADE.');
+  }
   const main = await readCyclesFromFile(indexFile);
   if (main) return deduplicateDriveCycles(main);
   return deduplicateDriveCycles((await readCyclesFromFile(indexBackupPath(indexFile))) ?? []);
@@ -264,8 +280,11 @@ export async function reconcileDriveCycleHistory(
   basePath: string,
   legacyCycles: DriveCycle[] = [],
 ): Promise<DriveCycle[]> {
-  await initializeDriveCycles(basePath);
   const indexFile = `${basePath}/VIAGENS/index.json`;
+  if (await hasFutureHistorySchema(indexFile)) {
+    throw new Error('HISTORY_SCHEMA_VERSION_NEWER_THAN_APP; RECONCILIACAO_BLOQUEADA.');
+  }
+  await initializeDriveCycles(basePath);
   return serializeIndexWrite(indexFile, async () => {
     let main = await readCyclesFromFile(indexFile);
     const previousFile = indexBackupPath(indexFile);
@@ -344,8 +363,11 @@ export async function addDriveCycle(basePath: string, cycle: DriveCycle): Promis
   const indexFile = `${viagensDir}/index.json`;
   return serializeIndexWrite(indexFile, async () => {
   await FileSystem.makeDirectoryAsync(viagensDir, { intermediates: true });
+  if (await hasFutureHistorySchema(indexFile)) {
+    throw new Error('HISTORY_SCHEMA_VERSION_NEWER_THAN_APP; GRAVACAO_DE_VIAGEM_BLOQUEADA.');
+  }
 
-  let data: { version: string; cycles: DriveCycle[]; totalCount: number; lastModified?: string } = {
+  let data: DriveCycleIndex = {
     version: '1.0',
     cycles: [],
     totalCount: 0,
@@ -357,24 +379,34 @@ export async function addDriveCycle(basePath: string, cycle: DriveCycle): Promis
     try {
       const parsed = JSON.parse(await FileSystem.readAsStringAsync(indexFile)) as {
         version?: string;
+        schemaVersion?: number;
         cycles?: unknown;
         totalCount?: number;
+        [key: string]: unknown;
       };
-      if (!Array.isArray(parsed.cycles)) throw new Error('INDEX_CYCLES_NOT_ARRAY');
-      const invalidNonSeeds = parsed.cycles.some((item) =>
+      if (typeof parsed.schemaVersion === 'number' && parsed.schemaVersion > CURRENT_HISTORY_SCHEMA_VERSION) {
+        throw new Error('HISTORY_SCHEMA_VERSION_NEWER_THAN_APP');
+      }
+      const migration = migrateHistoryIndexDocument(parsed);
+      const normalizedCycles = migration.document.cycles;
+      if (!Array.isArray(normalizedCycles)) throw new Error('INDEX_CYCLES_NOT_ARRAY');
+      const invalidNonSeeds = normalizedCycles.some((item) =>
         !(typeof item === 'object' && item !== null &&
           (item as { source?: unknown }).source === 'CARSCANNER_SEED') &&
         !isDriveCycle(item),
       );
       if (invalidNonSeeds) throw new Error('INDEX_HAS_INVALID_CYCLES');
-      const validCycles = cyclesFromUnknown(parsed.cycles).filter((item) => item.source !== 'CARSCANNER_SEED');
+      const validCycles = deduplicateDriveCycles(cyclesFromUnknown(normalizedCycles));
       data = {
-        version: typeof parsed.version === 'string' ? parsed.version : '1.0',
+        ...migration.document,
+        version: typeof migration.document.version === 'string' ? migration.document.version : '1.0',
+        schemaVersion: CURRENT_HISTORY_SCHEMA_VERSION,
         cycles: validCycles,
         totalCount: validCycles.length,
       };
       mainIsValid = true;
     } catch (mainError) {
+      if (mainError instanceof Error && mainError.message.includes('HISTORY_SCHEMA_VERSION_NEWER_THAN_APP')) throw mainError;
       const backupCycles = await readCyclesFromFile(indexBackupPath(indexFile));
       if (backupCycles === null) {
         throw new Error('HISTORICO_DE_VIAGENS_CORROMPIDO; ARQUIVO PRESERVADO PARA RECUPERACAO');

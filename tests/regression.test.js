@@ -45,6 +45,7 @@ let bluetoothMaxNativeConnections = 0;
 let bluetoothConnectDelayMs = 0;
 let bluetoothWriteNeverSettles = false;
 let bluetoothDisconnectFails = false;
+let backupPauseCalls = 0;
 
 function parentDir(p) {
   const i = p.lastIndexOf('/');
@@ -224,6 +225,9 @@ Module._load = function (request, parent, isMain) {
   if (request === 'expo-file-system') return fakeFS;
   if (request === 'react-native') return fakeRN;
   if (request === 'react-native-bluetooth-classic') return fakeBluetooth;
+  if (parent?.filename?.endsWith(path.join('src', 'storage', 'backup.ts')) && request === '../trip/autoTripService') {
+    return { autoTripService: { withPollingPaused: async (operation) => { backupPauseCalls += 1; return operation(); } } };
+  }
   if (request === 'expo-location') return { PermissionStatus: { GRANTED: 'granted' }, requestForegroundPermissionsAsync: async () => ({ status: 'granted' }), getBackgroundPermissionsAsync: async () => ({ status: 'granted' }), requestBackgroundPermissionsAsync: async () => ({ status: 'granted' }), hasStartedLocationUpdatesAsync: async () => false, startLocationUpdatesAsync: async () => {}, stopLocationUpdatesAsync: async () => {}, Accuracy: { BestForNavigation: 6 } };
   if (parent && parent.filename && (request.startsWith('./') || request.startsWith('../'))) {
     const resolved = path.resolve(path.dirname(parent.filename), request);
@@ -1118,6 +1122,17 @@ async function testDriveCycleValidation() {
 
   resetFS();
   await fakeFS.makeDirectoryAsync(BASE + '/VIAGENS', { intermediates: true });
+  const futureIndex = JSON.stringify({ schemaVersion: 99, version: '1.0', cycles: [cycle], totalCount: 1 });
+  files.set(indexFile, futureIndex);
+  await assert.rejects(
+    () => storage.addDriveCycle(BASE, { ...cycle, id: 'old-app-must-not-write' }),
+    /HISTORY_SCHEMA_VERSION_NEWER_THAN_APP/,
+    'older application must reject a future history schema before writing',
+  );
+  assert.strictEqual(files.get(indexFile), futureIndex, 'future history index must remain byte-for-byte unchanged');
+
+  resetFS();
+  await fakeFS.makeDirectoryAsync(BASE + '/VIAGENS', { intermediates: true });
   files.set(BASE + '/VIAGENS/index.previous.json', JSON.stringify({
     version: '1.0',
     cycles: [cycle],
@@ -1129,6 +1144,130 @@ async function testDriveCycleValidation() {
     ['test-1'],
     'startup initialization must recover a missing main index from its valid backup',
   );
+}
+
+
+async function testAtomicJsonPersistenceAndMaintenanceRetention() {
+  resetFS();
+  const atomic = loadTs(path.join(ROOT, 'src/storage/atomicJsonFile.ts'));
+  const validate = (value) => Boolean(value && typeof value === 'object'
+    && value.schemaVersion === 1 && typeof value.value === 'string');
+  const future = (value) => Boolean(value && typeof value === 'object'
+    && Number.isInteger(value.schemaVersion) && value.schemaVersion > 1);
+  const target = `${BASE}/CONFIG/atomic.json`;
+
+  await atomic.writeJsonAtomically(target, { schemaVersion: 1, value: 'first' }, validate, future);
+  await atomic.writeJsonAtomically(target, { schemaVersion: 1, value: 'second' }, validate, future);
+  assert.strictEqual(JSON.parse(files.get(target)).value, 'second');
+  assert.strictEqual(JSON.parse(files.get(target.replace(/\.json$/, '.previous.json'))).value, 'first');
+
+  const corrupt = '{corrupt-main';
+  files.set(target, corrupt);
+  const recovered = await atomic.readJsonWithRecovery(target, validate, future);
+  assert.strictEqual(recovered.value.value, 'first');
+  assert.strictEqual(recovered.recoveredFromPrevious, true);
+  assert.strictEqual(files.get(target), corrupt, 'read recovery must not rewrite a damaged main file');
+
+  await atomic.writeJsonAtomically(target, { schemaVersion: 1, value: 'third' }, validate, future);
+  assert.strictEqual(JSON.parse(files.get(target)).value, 'third');
+  assert.ok(Array.from(files.keys()).some((name) => name.startsWith(target + '.corrupt-')),
+    'writing after recovery must preserve the corrupt original for manual inspection');
+
+  const newer = JSON.stringify({ schemaVersion: 99, value: 'newer-app-data' });
+  files.set(target, newer);
+  await assert.rejects(() => atomic.readJsonWithRecovery(target, validate, future), /JSON_SCHEMA_VERSION_NEWER_THAN_APP/);
+  await assert.rejects(() => atomic.writeJsonAtomically(target, { schemaVersion: 1, value: 'old-app' }, validate, future),
+    /JSON_SCHEMA_VERSION_NEWER_THAN_APP/);
+  assert.strictEqual(files.get(target), newer, 'older app must not overwrite a future JSON schema');
+
+  resetFS();
+  const maintenance = loadTs(path.join(ROOT, 'src/database/maintenanceStorage.ts'));
+  const fuelings = Array.from({ length: 120 }, (_, index) => ({
+    id: 'fuel-' + index,
+    occurredAt: new Date(Date.UTC(2026, 0, 1) + index * 60_000).toISOString(),
+    odometerKm: 100_000 + index,
+    liters: 20 + (index % 10),
+    totalCost: 100,
+    type: 'GASOLINA',
+  }));
+  const data = {
+    currentOdometerKm: 100119,
+    severeUse: false,
+    records: {},
+    fuelings,
+    updatedAt: new Date().toISOString(),
+  };
+  await maintenance.writeMaintenanceData(BASE, data);
+  await maintenance.writeMaintenanceData(BASE, { ...data, currentOdometerKm: 100120 });
+  const maintenanceFile = `${BASE}/MANUTENCAO/registros.json`;
+  const corruptMaintenance = '{maintenance-corrupt';
+  files.set(maintenanceFile, corruptMaintenance);
+  const maintenanceRecovered = await maintenance.readMaintenanceData(BASE);
+  assert.strictEqual(maintenanceRecovered.fuelings.length, 120,
+    'all manual fuelings must survive recovery; no silent last-100 truncation');
+  assert.ok(maintenanceRecovered.storageWarning, 'maintenance recovery must be visible to the UI');
+  assert.strictEqual(files.get(maintenanceFile), corruptMaintenance,
+    'reading must preserve the damaged maintenance file for inspection');
+
+  resetFS();
+  files.set(maintenanceFile, corruptMaintenance);
+  await assert.rejects(() => maintenance.readMaintenanceData(BASE), /JSON_CORRUPTED_WITHOUT_VALID_PREVIOUS_COPY/);
+  assert.strictEqual(files.get(maintenanceFile), corruptMaintenance,
+    'corrupt maintenance data without backup must not be replaced by defaults');
+
+  resetFS();
+  const settings = loadTs(path.join(ROOT, 'src/database/appSettings.ts'));
+  const settingsPath = `${BASE}/CONFIG/app-settings.json`;
+  await fakeFS.makeDirectoryAsync(`${BASE}/CONFIG`, { intermediates: true });
+  files.set(settingsPath, '{settings-corrupt');
+  await assert.rejects(() => settings.readAppSettings(BASE), /JSON_CORRUPTED_WITHOUT_VALID_PREVIOUS_COPY/);
+  assert.strictEqual(files.get(settingsPath), '{settings-corrupt',
+    'settings read must not replace a corrupt file with defaults');
+  const futureSettings = JSON.stringify({ schemaVersion: 99, fuelType: 'FLEX' });
+  files.set(settingsPath, futureSettings);
+  await assert.rejects(() => settings.readAppSettings(BASE), /JSON_SCHEMA_VERSION_NEWER_THAN_APP/);
+  assert.strictEqual(files.get(settingsPath), futureSettings, 'older app must not reset a future settings file');
+}
+
+async function testBluetoothCandidateCancellationStopsQueue() {
+  const shared = loadTs(path.join(ROOT, 'src/obd/sharedConnection.ts'));
+  const attempted = [];
+  let current = true;
+  await assert.rejects(
+    () => shared.runConnectionCandidates(['first', 'second'], () => current, async (device) => {
+      attempted.push(device);
+      current = false;
+      throw new Error('native attempt cancelled');
+    }),
+    /CONEXÃO BLUETOOTH CANCELADA/,
+  );
+  assert.deepStrictEqual(attempted, ['first'],
+    'manual disconnect must stop candidate iteration before another adapter opens');
+}
+
+async function testTripRecorderRetainedUntilPersistence() {
+  const serviceSource = fs.readFileSync(path.join(ROOT, 'src/trip/autoTripService.ts'), 'utf8');
+  assert.ok(serviceSource.includes('persistTripBeforeRelease'), 'trip service must release only after the durable persistence helper completes');
+  assert.ok(serviceSource.includes('this.recorderFinalizationPending ? null : this.recorder'), 'a failed previous trip must not absorb telemetry from the next session');
+  assert.ok(serviceSource.includes('recorderFinalizationRetryAfterMs'), 'pending trip retries must be throttled without blocking OBD polling');
+  const tripFinalization = loadTs(path.join(ROOT, 'src/trip/tripFinalization.ts'));
+  let released = false;
+  await assert.rejects(() => tripFinalization.persistTripBeforeRelease(
+    { id: 'trip-1' },
+    async () => { throw new Error('INDEX WRITE FAILED'); },
+    () => { released = true; },
+  ), /INDEX WRITE FAILED/);
+  assert.strictEqual(released, false, 'failed persistence must keep the recorder owned');
+
+  let persisted = false;
+  const completed = await tripFinalization.persistTripBeforeRelease(
+    { id: 'trip-1' },
+    async () => { persisted = true; },
+    () => { released = true; },
+  );
+  assert.strictEqual(completed, true);
+  assert.strictEqual(persisted, true);
+  assert.strictEqual(released, true, 'recorder can be released only after persistence succeeds');
 }
 
 async function testDriveCycleSummaryUsesWeightedRealSpeed() {
@@ -1251,7 +1390,9 @@ async function testBackupCompleteness() {
   };
   await fakeFS.writeAsStringAsync(`${BASE}/MANUTENCAO/registros.json`, JSON.stringify(maintenanceData));
 
+  const pauseBeforeBackup = backupPauseCalls;
   const info = await backup.createBackup(BASE);
+  assert.ok(backupPauseCalls > pauseBeforeBackup, 'backup deve pausar polling e confirmar o autosave antes de copiar');
   assert.deepStrictEqual(info.includes, expectedDirs);
 
   const backupRoot = `${BASE}/BACKUP/meriva_smart_${info.timestamp}`;
@@ -1314,7 +1455,9 @@ async function testBackupRestore() {
 
   await fakeFS.writeAsStringAsync(`${BASE}/LOGS/obd.csv`, 'newer-telemetry');
   await fakeFS.writeAsStringAsync(`${BASE}/MANUTENCAO/registros.json`, '{"fuelings":[]}');
+  const pauseBeforeRestore = backupPauseCalls;
   const restored = await backup.restoreBackup(BASE, backupName);
+  assert.ok(backupPauseCalls > pauseBeforeRestore, 'restauração deve pausar os gravadores durante a substituição');
 
   assert.strictEqual(files.get(`${BASE}/LOGS/obd.csv`), oldLog,
     'restauração deve recuperar o arquivo do histórico');
@@ -1503,6 +1646,8 @@ function testTripHistoryDoesNotPromoteSeedOrInvalidFuel() {
   assert.ok(tripScreen.includes('cycle.fuelUsedL >= 0.05'), 'consumo deve exigir volume de combustível válido');
   assert.ok(tripScreen.includes("'CONSUMO N/D'"), 'consumo inválido deve ser apresentado como N/D, nunca 0,00 km/L');
   assert.ok(!storageScreen.includes('VIAGENS SALVAS'), 'armazenamento não deve renderizar uma segunda lista de viagens');
+  assert.ok(tripScreen.includes('HISTÓRICO NÃO DISPONÍVEL'), 'esquema mais novo/corrupção não deve ser exibido como histórico vazio');
+  assert.ok(tripScreen.includes('HISTORY_SCHEMA_VERSION_NEWER_THAN_APP'), 'tela deve orientar o usuário quando o histórico pertence a versão mais nova');
 }
 
 
@@ -1573,6 +1718,9 @@ async function main() {
     ['histórico sem seed e consumo N/D', testTripHistoryDoesNotPromoteSeedOrInvalidFuel],
 
     ['autosave race', testAutosaveRace],
+    ['atomic JSON and maintenance retention', testAtomicJsonPersistenceAndMaintenanceRetention],
+    ['Bluetooth candidate cancellation', testBluetoothCandidateCancellationStopsQueue],
+    ['trip recorder retained after persistence failure', testTripRecorderRetainedUntilPersistence],
   ];
 
   let failed = 0;
