@@ -1,6 +1,7 @@
 import * as FileSystem from 'expo-file-system';
 import { appendCsvRowIfMissing, CsvRow } from '../database/csvLogger';
 import { DriveCycle } from '../data/driveCycles';
+import { CURRENT_HISTORY_SCHEMA_VERSION, migrateHistoryIndexDocument } from './historyIndexMigrations';
 
 const indexWriteQueues = new Map<string, Promise<unknown>>();
 
@@ -108,7 +109,7 @@ type DriveCycleIndex = {
 
 async function persistIndexSnapshot(indexFile: string, data: DriveCycleIndex): Promise<void> {
   const tempFile = indexTempPath(indexFile);
-  await FileSystem.writeAsStringAsync(tempFile, JSON.stringify(data, null, 2), {
+  await FileSystem.writeAsStringAsync(tempFile, JSON.stringify({ ...data, schemaVersion: CURRENT_HISTORY_SCHEMA_VERSION }, null, 2), {
     encoding: FileSystem.EncodingType.UTF8,
   });
   try {
@@ -151,6 +152,7 @@ export async function initializeDriveCycles(basePath: string): Promise<void> {
             totalCount?: number;
             [key: string]: unknown;
           };
+          const migration = migrateHistoryIndexDocument(parsed);
           const originalCycles = Array.isArray(parsed.cycles) ? parsed.cycles : [];
           const invalidNonSeeds = originalCycles.some((cycle) =>
             !(typeof cycle === 'object' && cycle !== null &&
@@ -159,7 +161,7 @@ export async function initializeDriveCycles(basePath: string): Promise<void> {
           );
           if (invalidNonSeeds) throw new Error('INDEX_HAS_INVALID_CYCLES_DURING_MIGRATION');
           const cycles = deduplicateDriveCycles(cyclesFromUnknown(originalCycles));
-          const needsNormalization = originalCycles.some((cycle) =>
+          const needsNormalization = migration.migrated || originalCycles.some((cycle) =>
             typeof cycle === 'object' && cycle !== null &&
               (cycle as { source?: unknown }).source === 'CARSCANNER_SEED',
           ) || cycles.length !== originalCycles.length;
