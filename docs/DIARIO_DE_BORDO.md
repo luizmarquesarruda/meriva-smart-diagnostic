@@ -9,7 +9,7 @@
 - Após qualquer alteração, reconsultar o HEAD e a CI correspondentes. Só considerar a PR validada com `validate` e `android-build` verdes no mesmo SHA, diff reconciliado contra `main` e validação física separada.
 - A auditoria atual encontrou divergências de documentação e um débito relevante de modernização do SDK. Não houve upgrade de SDK nem remoção de dependências nativas nesta rodada: fazê-los antes de preservar um baseline físico poderia introduzir regressão no Bluetooth Classic.
 - Testes com Galaxy A06/Android 16/ELM327 real, confirmação de resposta `010C`, inspeção do APK instalado e validação GPS/autonomia continuam pendentes.
-- DB-145 registra a regressão de leitura KWP e classificação de estado ECU/Bluetooth; DB-162/163/164/166 protegem o ciclo RFCOMM; DB-165 limita HTTP de clima; DB-167 expira fixes GPS antigos; DB-168 neutraliza fórmula no CSV; DB-169 torna o start GPS não bloqueante para o polling OBD e aplica cooldown de retry. DB-170 atualiza o gate para aceitar a proteção de timestamp por `state.lastTimestamp`. DB-171 serializa cancelamento da descoberta; DB-172 valida coeficientes/resultados de fórmula; DB-173 corrige documentação cloud; DB-174 centraliza os tokens de cor compartilhados nas telas. DB-175 limita as chamadas de localização opcionais e usa backoff exponencial para o enriquecimento online. DB-177 limita a própria operação nativa de desconexão e mantém o bloqueio RFCOMM se ela expirar; DB-178 bloqueia reconexão quando a sonda do socket fica indeterminada; DB-179 reutiliza a Promise nativa pendente para impedir desconexões concorrentes; DB-180 bloqueia novos comandos após timeout sem prompt para evitar que resposta atrasada seja atribuída ao PID seguinte. DB-182/183 corrigem regressões e cobertura do GPS (timestamp monotônico, ciclo background e movimento urbano); DB-184 mantém o índice do diário alinhado à sequência de IDs.
+- DB-145 registra a regressão de leitura KWP e classificação de estado ECU/Bluetooth; DB-162/163/164/166 protegem o ciclo RFCOMM; DB-165 limita HTTP de clima; DB-167 expira fixes GPS antigos; DB-168 neutraliza fórmula no CSV; DB-169 torna o start GPS não bloqueante para o polling OBD e aplica cooldown de retry. DB-170 atualiza o gate para aceitar a proteção de timestamp por `state.lastTimestamp`. DB-171 serializa cancelamento da descoberta; DB-172 valida coeficientes/resultados de fórmula; DB-173 corrige documentação cloud; DB-174 centraliza os tokens de cor compartilhados nas telas. DB-175 limita as chamadas de localização opcionais e usa backoff exponencial para o enriquecimento online. DB-177 limita a própria operação nativa de desconexão e mantém o bloqueio RFCOMM se ela expirar; DB-178 bloqueia reconexão quando a sonda do socket fica indeterminada; DB-179 reutiliza a Promise nativa pendente para impedir desconexões concorrentes; DB-180 bloqueia novos comandos após timeout sem prompt para evitar que resposta atrasada seja atribuída ao PID seguinte. DB-182/183 corrigem regressões e cobertura do GPS (timestamp monotônico, ciclo background e movimento urbano); DB-184 mantém o índice do diário alinhado à sequência de IDs. DB-185 registra o refinamento visual da navegação do cockpit em retrato, preservando a composição em paisagem.
 - O cockpit deve continuar mostrando N/D até existir leitura OBD real, completa e recente; seed ou histórico não deve ser reapresentado como valor atual.
 - DB-146 restaura os quatro quadrantes de telemetria em simultâneo; os PIDs adicionais continuam acessíveis em páginas de quatro métricas. A ausência de ECU não remove a grade, apenas mantém os valores em N/D.
 - DB-147 fixa os quatro PIDs principais na primeira página e transforma os restantes PIDs suportados em carrossel completo, com setas anterior/próxima e avanço automático a cada 10 s. Anomalias adicionais são priorizadas sem deslocar os quadrantes principais.
@@ -4815,3 +4815,27 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 
 ### Validação
 - O próximo push deve disparar a CI para o HEAD atualizado. Ainda não há resultado de `validate` nem de `android-build` para esse novo SHA.
+
+
+## DB-185 · 2026-10-30 — Separar visualmente os botões inferiores do cockpit em retrato
+
+### Causa
+- Em retrato, as cinco rotas inferiores eram exibidas dentro de um único contêiner com fundo e borda compartilhados. Os itens não tinham superfície individual, o que reduzia a separação visual entre ações.
+- A navegação em paisagem já estava organizada como uma raia vertical compacta e foi considerada adequada; alterar suas dimensões ou distribuição criaria risco sem benefício comprovado.
+
+### Alterações
+- O contêiner de navegação em retrato passou a ser transparente e sem borda, com espaçamento uniforme entre as abas.
+- Cada uma das cinco abas recebeu fundo, borda e raio próprios, mantendo altura mínima de 60 dp.
+- A aba ativa recebeu borda de destaque, sem alterar destinos, ícones, rótulos ou propriedades de acessibilidade.
+- Os novos estilos são aplicados exclusivamente em retrato. As definições de largura, posicionamento, espaçamento e alvos da raia em paisagem foram preservadas.
+- O ajuste não altera a grade de indicadores, fórmulas, leituras OBD, conexão Bluetooth ou lógica de viagens.
+
+### Regressões adicionadas
+- Verificação das cinco abas com estilo individual em retrato.
+- Verificação do estado ativo e da seleção condicional do contêiner.
+- Asserções explícitas para garantir que os estilos da navegação em paisagem permaneçam idênticos.
+
+### Validação e limites
+- Alterações registradas na branch `fix/cockpit-portrait-navigation-20261030`.
+- A CI e o build Android precisam validar o HEAD final desta branch antes de qualquer merge.
+- A aparência precisa ser conferida no Galaxy A06 em retrato e paisagem; os testes estáticos não substituem a inspeção visual no aparelho.
