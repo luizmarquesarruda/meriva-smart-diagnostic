@@ -85,7 +85,7 @@ export default function DadosScreen() {
     <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
       <ScrollView contentContainerStyle={[styles.content, { paddingHorizontal: layout.horizontalPadding }]} showsHorizontalScrollIndicator={false}>
         <View style={[styles.screenFrame, { maxWidth: layout.maxContentWidth }]}>
-          <Header title="DADOS EM TEMPO REAL" subtitle="PIDs • TELEMETRIA • HISTÓRICO LOCAL" />
+          <Header title="DADOS EM TEMPO REAL" subtitle="PIDs • TELEMETRIA • HISTÓRICO LOCAL" titleSize={layout.titleSize} />
           <SourceStatusLegend />
           <View style={[styles.liveCard, ecuConnected ? styles.connectedCard : styles.disconnectedCard]}>
             <Text style={styles.liveTitle}>{ecuConnected ? '● ECU RESPONDENDO' : '○ ECU DESCONECTADA / SEM RESPOSTA'}</Text>
@@ -268,8 +268,8 @@ function formatClock(timestamp: string): string {
   return Number.isFinite(parsed) ? new Date(parsed).toLocaleTimeString() : 'N/D';
 }
 
-function Header({ title, subtitle }: { title: string; subtitle: string }) {
-  return <View style={styles.header}><Text style={styles.title}>{title}</Text><Text style={styles.subtitle}>{subtitle}</Text></View>;
+function Header({ title, subtitle, titleSize }: { title: string; subtitle: string; titleSize: number }) {
+  return <View style={styles.header}><Text style={[styles.title,{fontSize:titleSize-3}]}>{title}</Text><Text style={styles.subtitle}>{subtitle}</Text></View>;
 }
 
 function Metric({ label, value, landscape = false }: { label: string; value: string; landscape?: boolean }) {
