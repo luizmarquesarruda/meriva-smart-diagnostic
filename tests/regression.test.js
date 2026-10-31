@@ -964,7 +964,7 @@ async function testRawLogger() {
   const currentDay = logger.getObdLogLocalDateKey(new Date());
   const oversizedLegacyFile = `${BASE}/LOGS/obd_raw_${currentDay}.csv`;
   await fakeFS.makeDirectoryAsync(BASE + '/LOGS', { intermediates: true });
-  const legacyHeader = 'timestamp,tx,rx,pid,responseTimeMs,commandStatus,protocol,source\\n';
+  const legacyHeader = 'timestamp,tx,rx,pid,responseTimeMs,commandStatus,protocol,source\n';
   await fakeFS.writeAsStringAsync(oversizedLegacyFile, legacyHeader + 'x'.repeat(csvLogger.MAX_CSV_SEGMENT_BYTES));
   const originalLegacyContent = files.get(oversizedLegacyFile);
   await logger.logRawObdData(BASE, thirdQuery, '010C', 'REAL');
@@ -1022,7 +1022,7 @@ async function testDriveCycleValidation() {
   assert.strictEqual(read[0].id, 'test-1');
   const dailyTripCsv = `${BASE}/VIAGENS/viagens_2026-10-02.csv`;
   assert.ok(files.has(dailyTripCsv), 'resumo CSV da viagem deve ser criado');
-  assert.strictEqual(files.get(dailyTripCsv).trim().split('\\n').length, 2,
+  assert.strictEqual(files.get(dailyTripCsv).trim().split('\n').length, 2,
     'a linha CSV da viagem deve ser idempotente pelo ID, mesmo em retry');
 
   const indexFile = `${BASE}/VIAGENS/index.json`;
