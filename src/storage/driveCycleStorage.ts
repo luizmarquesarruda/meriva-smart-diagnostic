@@ -259,6 +259,7 @@ export async function reconcileDriveCycleHistory(
   return serializeIndexWrite(indexFile, async () => {
     let main = await readCyclesFromFile(indexFile);
     const previousFile = indexBackupPath(indexFile);
+    let indexChanged = false;
 
     if (main === null) {
       // Recover a damaged/missing main file only from a fully validated
@@ -274,6 +275,7 @@ export async function reconcileDriveCycleHistory(
         lastModified: new Date().toISOString(),
       });
       main = backup;
+      indexChanged = true;
     }
 
     const merged = mergeDriveCycleHistories(main, legacyCycles);
@@ -294,13 +296,14 @@ export async function reconcileDriveCycleHistory(
         totalCount: merged.length,
         lastModified: new Date().toISOString(),
       });
+      indexChanged = true;
     }
 
     // After reconciliation succeeds, advance the recovery copy to the exact
     // committed index. This ensures newly imported legacy trips survive a
     // later main-file corruption even when no new trip is recorded afterward.
     const backupTemp = indexTempPath(previousFile);
-    try {
+    if (indexChanged) try {
       await FileSystem.copyAsync({ from: indexFile, to: backupTemp });
       const backupCycles = await readCyclesFromFile(backupTemp);
       if (backupCycles === null || !sameDriveCycleHistory(backupCycles, merged)) {
