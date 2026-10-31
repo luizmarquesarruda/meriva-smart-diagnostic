@@ -15,7 +15,7 @@ export async function startBackgroundMonitoring(): Promise<boolean> {
         console.warn('[background] localização em segundo plano não autorizada:', permission);
         return false;
       }
-      return await gpsTracker.startBackgroundLocation();
+      return await gpsTracker.startBackgroundLocation({ requestPermission: false });
     } catch (cause) {
       console.warn(
         '[background] não foi possível iniciar monitoramento persistente:',
