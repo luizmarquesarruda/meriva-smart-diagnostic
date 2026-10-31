@@ -1,5 +1,6 @@
 import * as FileSystem from 'expo-file-system';
 import { AppState } from 'react-native';
+import { BATCH_FLUSH_ROW_LIMIT, HARD_MAX_PENDING_CSV_ROWS, MAX_PENDING_CSV_ROWS, SPILL_CHUNK_ROWS, getCsvQueueAction } from './csvQueuePolicy';
 
 export type CsvValue = string | number | boolean | null | undefined;
 
@@ -21,10 +22,6 @@ export interface CsvRow {
 const fileQueues = new Map<string, Promise<void>>();
 const pendingRows = new Map<string, CsvRow[]>();
 const BATCH_FLUSH_INTERVAL_MS = 1000;
-const BATCH_FLUSH_ROW_LIMIT = 8;
-const MAX_PENDING_CSV_ROWS = 10_000;
-const HARD_MAX_PENDING_CSV_ROWS = 20_000;
-const SPILL_CHUNK_ROWS = 128;
 export const MAX_CSV_SEGMENT_BYTES = 512 * 1024;
 let droppedPendingRows = 0;
 let durablySpooledRows = 0;
@@ -328,7 +325,7 @@ async function spillPendingCsvRows(): Promise<void> {
 
 export function queueCsvRow(filePath: string, row: CsvRow): void {
   const totalBefore = countPendingRows();
-  if (totalBefore >= HARD_MAX_PENDING_CSV_ROWS) {
+  if (getCsvQueueAction(totalBefore) === 'drop') {
     droppedPendingRows += 1;
     if (droppedPendingRows === 1 || droppedPendingRows % 100 === 0) {
       console.warn(`[csv] spool indisponível; fila atingiu ${HARD_MAX_PENDING_CSV_ROWS}; linhas descartadas: ${droppedPendingRows}`);
@@ -342,7 +339,7 @@ export function queueCsvRow(filePath: string, row: CsvRow): void {
   const totalPending = totalBefore + 1;
   peakObservedPendingRows = Math.max(peakObservedPendingRows, totalPending);
 
-  if (totalPending >= MAX_PENDING_CSV_ROWS) {
+  if (getCsvQueueAction(totalPending) === 'spill') {
     if (flushTimer) {
       clearTimeout(flushTimer);
       flushTimer = null;
@@ -354,7 +351,7 @@ export function queueCsvRow(filePath: string, row: CsvRow): void {
     return;
   }
 
-  if (totalPending >= BATCH_FLUSH_ROW_LIMIT) {
+  if (getCsvQueueAction(totalPending) === 'flush') {
     if (flushTimer) {
       clearTimeout(flushTimer);
       flushTimer = null;
