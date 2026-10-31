@@ -1,14 +1,16 @@
-## ESTADO VIGENTE — 2026-10-31 (permissões GPS desacopladas do OBD)
+## ESTADO VIGENTE — 2026-10-31 (auditoria de relatórios e reconciliação de PRs)
 
-> Frente dependente da PR #100: `fix/optional-gps-permissions-20261031`. A base inclui o endurecimento de artefatos privados, ainda sujeito ao build Android da PR #100.
+> Frente em andamento: `fix/diagnostic-report-integrity-20261031`. Nenhuma integração desta frente foi mesclada.
 
-- Repositório: [luizmarquesarruda/meriva-smart-diagnostic](https://github.com/luizmarquesarruda/meriva-smart-diagnostic). Visibilidade verificada como `public`; o workflow novo bloqueia upload de APK enquanto continuar público.
-- PR #100: segurança de CI, sem publicação automática, upload somente em `main` quando privado, checksum e retenção de três dias. Não mesclar até `validate` e `android-build` verdes no mesmo SHA.
-- Esta frente elimina pedidos de localização durante inicialização/polling OBD. GPS foreground e background começam desativados e exigem opt-in explícito; remove a inicialização duplicada em `sharedConnection` e mantém `autoTripService` como proprietário único.
-- O GPS foreground só é iniciado após a opção de distância/viagens ser ativada e autorizada. O modo com tela apagada exige opt-in adicional. Os serviços usam somente checagem de permissão sem prompt automático; trocas de modo preservam distância acumulada.
-- PR #98 e #99 permanecem sem merge; seus contratos e números DB-NNN precisam ser reconciliados sobre esta base antes de integração. Nenhum teste físico no Galaxy A06/Android 16/ELM327 é declarado por esta frente.
+- `main` está em `1443ace6ac3d35139d1177fd0601ada871826dc5`; PR #101 foi integrada por squash após `validate` e `android-build` verdes no SHA da PR `4d20e7955576ff840f87b13aa24cfdf7e27a8483`.
+- A CI pós-merge no SHA `1443ace6ac3d35139d1177fd0601ada871826dc5` estava em execução durante esta auditoria; consultar seu resultado antes de considerar a integração principal totalmente validada.
+- PRs #98 e #99 foram redirecionadas para `main`, mas o GitHub identificou conflito de merge (`mergeable_state=dirty`). Não mesclar essas branches no estado atual; reconciliar os diffs e seus registros DB-NNN.
+- A nova frente de relatórios implementa relatório Bluetooth com erro correlacionado à trilha, modelo/versão Android, exportação técnica e compartilhável com MAC redigido, e contrato JSON versionado com manutenção.
+- A branch de relatórios ainda precisa de CI completa no mesmo SHA e inspeção dos dois formatos no Galaxy A06 / SM-A065M / Android 16.
+- O teste físico com ELM327/ECU, conferência do PID 010C e leitura real do PID 012F continuam pendentes. CI não substitui homologação no veículo.
 
 ---
+
 
 ## ESTADO HISTÓRICO — 2026-10-25 (snapshot DB-130; superado em 2026-10-28)
 
@@ -269,6 +271,7 @@
 - **DB-184** · 2026-10-30 — Sincronizar índice DB-NNN com as novas entradas de auditoria
 - **DB-185** — Bloquear publicação pública/automática do APK; upload privado somente na branch main, checksum SHA-256 e Actions fixadas em commit.
 - **DB-186** — Desacoplar permissões GPS do OBD e centralizar o ciclo de vida de localização no AutoTripService.
+- **DB-187** · 2026-10-31 — Integridade, rastreabilidade e privacidade dos relatórios.
 
 ---
 
@@ -4854,7 +4857,7 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - Validar no Galaxy A06 que negar localização não impede Bluetooth/ELM/010C, que GPS foreground funciona após ECU validada e que background só solicita permissão após opt-in.
 
 
-## DB-1 · 2026-10-31 — Integridade, rastreabilidade e privacidade dos relatórios
+## DB-187 · 2026-10-31 — Integridade, rastreabilidade e privacidade dos relatórios
 
 ### Problemas confirmados
 - O relatório Bluetooth priorizava o texto de erro compartilhado sem registrar origem/evento/horário; isso podia divergir do último erro visível na trilha da tentativa.
