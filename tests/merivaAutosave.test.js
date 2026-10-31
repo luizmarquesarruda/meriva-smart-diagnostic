@@ -221,6 +221,44 @@ test('1. estado vazio -> salvar -> restaurar', async () => {
   assert.strictEqual(state.settings.teste, 42, 'estado deve ser restaurado');
 });
 
+test('1a. histórico de viagens fica apenas no índice canônico, sem duplicação no autosave', async () => {
+  const m = manager();
+  m.disposeAutoSave();
+  resetFS();
+  await m.initAutoSave(BASE);
+  const cycle = {
+    id: 'canonical-trip-1',
+    startedAt: '2026-10-30T10:00:00.000Z',
+    finishedAt: '2026-10-30T10:15:00.000Z',
+    distanceTotalKm: 8,
+    distanceIceKm: 8,
+    fuelUsedL: 0.8,
+    totalTimeHms: '00:15:00',
+    drivingTimeHms: '00:12:00',
+    standingTimeHms: '00:03:00',
+    avgDrivingSpeedKmh: 40,
+    avgFuelConsumptionKml: 10,
+    source: 'REAL_OBD',
+    importedAt: '2026-10-30T10:15:00.000Z',
+  };
+  m.updateAutoSaveState((state) => {
+    state.driveCycles = [cycle];
+    state.settings.autosaveHistoryTest = 'persisted';
+  });
+  assert.strictEqual(await m.saveNow('critical'), true);
+  const envelope = JSON.parse(files.get(CONFIG_DIR + '/autosave.json'));
+  assert.deepStrictEqual(envelope.payload.driveCycles, [],
+    'autosave novo não deve duplicar viagens já mantidas em VIAGENS/index.json');
+  assert.strictEqual(m.getAutoSaveState().driveCycles.length, 1,
+    'as viagens continuam disponíveis no estado em memória para as telas');
+  const validation = loadTs(path.join(ROOT, 'src/meriva/autosaveValidation.ts'));
+  assert.strictEqual(validation.validatePayload(envelope.payload), true);
+  const legacyPayload = { ...envelope.payload, driveCycles: [cycle] };
+  assert.strictEqual(validation.validatePayload(legacyPayload), true,
+    'autosaves antigos com driveCycles continuam válidos para migração');
+  m.disposeAutoSave();
+});
+
 test('1b. leituras rápidas atualizam memória sem regravar TXT a cada mudança; background salva o valor mais recente', async () => {
   const m = manager();
   m.disposeAutoSave();

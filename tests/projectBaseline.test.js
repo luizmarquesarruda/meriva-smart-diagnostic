@@ -81,6 +81,7 @@ const requiredSuites = [
   'tripRecorder.test.js',
   'autosaveTxtFormatter.test.js',
   'csvEncoding.test.js',
+  'historyBenchmark.test.js',
   'merivaAutosave.test.js',
   'onlineConditions.test.js',
   'autonomyPresentation.test.js',

@@ -65,19 +65,19 @@ A recepção Bluetooth usa o listener de dados como fonte única. A `Elm327Sessi
 
 ### Dados
 
-`src/database/` contém persistência, DTC, banco de PIDs, aprendizado e configuração do veículo.
+`src/database/` contém persistência em arquivos, DTC, banco de PIDs, aprendizado e configuração do veículo. A pasta não representa uma base SQLite.
 
 `src/database/maintenanceStorage.ts` mantém o plano de manutenção, quilometragem e abastecimentos manuais em `MANUTENCAO/registros.json`. Esses abastecimentos são registros administrativos e não alimentam telemetria OBD, consumo integrado ou autonomia.
 
 ### Meriva
 
-`src/meriva/` contém o estado persistido e o autosave.
+`src/meriva/` contém o estado em memória e o autosave. Viagens concluídas são mantidas no índice canônico `VIAGENS/index.json`; `driveCycles` permanece no estado em memória para as telas, mas não é duplicado nos novos snapshots JSON do autosave. A inicialização reconcilia uma única vez registros legados do autosave com o índice por ID estável.
 
 `src/database/merivaManual.ts` contém somente especificações confirmadas no Manual do Proprietário 2012. Elas servem para configurar o veículo e cálculos físicos, como a capacidade de 56 L do tanque. Não criam PIDs, não substituem a ECU e não confirmam protocolo.
 
 ### Storage
 
-`src/storage/` controla quota, limpeza, backups verificados, restauração com cópia de segurança/rollback e ciclos de condução. Backups e quebra de armazenamento incluem `MANUTENCAO`; limpeza automática continua limitada a `LOGS` e `LEITURAS`.
+`src/storage/` controla quota, limpeza, backups verificados, restauração com cópia de segurança/rollback e ciclos de condução. O índice de viagens deduplica por ID e escolhe o snapshot válido mais completo; a exportação CSV do resumo de viagem é idempotente por ID. Backups e quebra de armazenamento incluem `MANUTENCAO`; limpeza automática continua limitada a `LOGS` e `LEITURAS`.
 
 ### Tipos
 
@@ -99,6 +99,8 @@ O estado não deve ser resumido a "conectado". O diagnóstico precisa separar Bl
 
 O autosave escreve primeiro em arquivo temporário, valida o conteúdo e só então atualiza o arquivo principal. O arquivo anterior é mantido como recuperação.
 
+O autosave persiste configurações/estado operacional, não o histórico completo de viagens. Snapshots antigos com `driveCycles` continuam aceitos e são reconciliados com `VIAGENS/index.json` no carregamento. O índice de viagens é a fonte persistente única; relatórios e telas recebem o histórico do índice.
+
 ## Limite atual
 
 A aplicação exige build nativo Android por usar Bluetooth Classic. Expo Go não é suficiente para validar o transporte.
@@ -119,6 +121,10 @@ A aplicação usa `@react-native-community/netinfo` para apresentar conectividad
 
 Qualquer integração futura precisa definir endpoint/schema versionados, autenticação de usuário por credenciais de escopo mínimo, IDs de evento idempotentes, retenção/consentimento, timeout, política de retry com backoff, fila local durável e mecanismo de descarte/retentativa. A fonte operacional continua local; indisponibilidade de rede não pode parar Bluetooth/ELM327, GPS local, diagnóstico, cálculos ou autosave.
 
+
+## Logs CSV e retenção
+
+O logger mantém compatibilidade com `expo-file-system` legacy do SDK 51: o append não está disponível nessa superfície. Em vez de regravar um CSV diário sem limite, cada arquivo é dividido em partes de no máximo 512 KiB antes da rotação. Se a fila pendente atingir 10.000 linhas, ela é descarregada em chunks CSV imutáveis com verificação de leitura; o limite duro de RAM é 20.000 linhas e descartes restantes são contados/expostos. Os arquivos `.queue-*.csv` são dados preservados e entram no backup/limpeza normal de LOGS.
 
 ## Relatórios e exportações
 

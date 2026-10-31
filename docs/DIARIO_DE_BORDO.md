@@ -1,3 +1,14 @@
+## ESTADO VIGENTE — 2026-10-31 (P1 persistência e integridade dos históricos)
+
+- DB-194 — Branch de trabalho: `fix/storage-and-history-integrity-20261031`, criada sobre o `main` observado em 31/10/2026. Escopo: rotação/spool de CSV, deduplicação e reconciliação do histórico de viagens, e remoção da cópia persistente de viagens no autosave.
+- O logger mantém o formato CSV e o FileSystem legacy do Expo SDK 51. Os arquivos diários usam partes de até 512 KiB; a primeira parte conserva o nome legado. Ao alcançar 10.000 linhas pendentes, chunks imutáveis são gravados e relidos para verificação. O limite duro em RAM é 20.000; qualquer descarte residual permanece contado e reportado.
+- `VIAGENS/index.json` é agora a fonte persistente canônica de viagens. O índice é deduplicado pelo ID, preservando o registro validado com mais amostras de telemetria; gravações repetidas do mesmo ID não duplicam a linha CSV de resumo.
+- Na abertura, o app reconcilia uma única vez registros de viagem existentes em autosaves antigos com o índice canônico. Novos autosaves armazenam `driveCycles: []`; o objeto em memória continua recebendo o histórico do índice para as telas. O validador aceita payloads antigos com o campo e os novos sem ele.
+- SQLite permanece adiado: não adicionar dependência ou converter dados até medir a instalação real, definir baseline de desempenho e validar migração/backup/rollback. As alterações desta rodada reduzem o crescimento sem trocar o armazenamento nativo nem o schema de exportação.
+- Testes adicionados para rotação CSV, idempotência do resumo de viagem, deduplicação preservando telemetria e compatibilidade dos autosaves antigos. CI ainda deve ser executada no SHA final desta branch; nenhum resultado de CI/build ou ensaio físico é declarado neste registro.
+
+---
+
 ## ESTADO VIGENTE — 2026-10-31 (P0 relatórios, layout e estabilidade)
 
 > PR #105 integrada em `main` no commit `b128b413427e612e621dc2ef2c82b6c2476ce659`. PR #104 integrada em `main` no commit `4055a776a4e95e1ec775c6b0ae039da234a7c6c6`. Ambas passaram `validate` e `android-build` nos respectivos SHAs finais.
@@ -4994,3 +5005,25 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - Relatório detalhado: docs/AUDITORIA_LAYOUT_GALAXY_A06_ANDROID_16_2026-10-31.md.
 - Limite: auditoria estática de código/documentação. Nenhuma captura, instalação ou inspeção física do Galaxy A06 foi realizada nesta rodada. O teste visual no aparelho continua pendente.
 
+
+
+## DB-195 · 2026-10-31 — Instrumentação de tamanho e latência do histórico no aparelho
+
+- Adicionada medição executável em Armazenamento para coletar no dispositivo real o tamanho do índice JSON de viagens, bytes de CSV, viagens, IDs únicos e amostras embutidas nos registros de viagem.
+- A leitura/parse e a gravação temporária com read-back são medidas em sete rodadas; o relatório exibe mediana, p95 e mínimo. O arquivo principal e o backup do histórico são somente leitura durante o ensaio; gravações usam arquivo temporário exclusivo e removido ao final.
+- O ensaio falha se o índice estiver inválido, se o número de viagens mudar durante a coleta ou se o conteúdo escrito divergir do original. Não há migração ou limpeza automática.
+- A tela identifica plataforma e API Android, permitindo que a coleta seja feita no Galaxy A06 / SM-A065M / Android 16 após instalar o APK.
+- A comparação SQLite ainda não foi executada: o projeto não possui expo-sqlite instalado no lockfile e não há medição física disponível nesta sessão. Não foi inventado resultado nem iniciada migração de produção.
+- Os buffers existentes permanecem com watermark de 10.000 linhas, limite rígido de 20.000 e spool em blocos de 128; nenhuma capacidade foi aumentada.
+- Próxima etapa após a coleta no A06: executar JSON e SQLite com o mesmo snapshot congelado de viagens e amostras, comparar bytes e latências de leitura/gravação, e só então decidir migração seletiva. Preservar JSON e validar IDs, contagens, checksum e restauração antes de qualquer troca de fonte.
+- Limite desta rodada: a medição do JSON foi instrumentada, mas ainda não foi executada no aparelho; a CI não substitui o ensaio físico.
+
+
+## DB-196 · 2026-10-31 — Versionamento do índice de viagens e observabilidade dos buffers
+
+- O índice de viagens passa a declarar schemaVersion 2. Instalações legadas sem schemaVersion (schema 1) são migradas para v2 após cópia do JSON anterior e validação do backup; totalCount é recalculado a partir de cycles e campos adicionais são preservados.
+- O app rejeita schemaVersion futuro ou inválido sem regravar o arquivo. A escrita continua usando temporário, read-back e cópia anterior; o novo schemaVersion só é persistido no snapshot validado.
+- A política de fila CSV foi isolada em função pura e conectada ao logger. Teste de estresse simula 50.000 chegadas com spool disponível, verificando limites, descarte zero e acionamento do watermark; os limites operacionais permanecem 10.000 / 20.000 / 128.
+- A tela Armazenamento agora exibe pico de fila, total de flushes, duração do último e do maior flush e falhas de flush, além dos contadores já existentes de spool e descarte.
+- A medição de JSON descrita em DB-195 continua aguardando execução no Galaxy A06. A comparação equivalente com SQLite não foi feita e nenhuma viagem foi migrada para SQLite.
+- O próximo gate é CI completa no SHA final; depois, executar o benchmark no aparelho e decidir a migração com base em tamanho, p95 de leitura/gravação e consultas reais. Preservar JSON e testar restauração antes de alterar a fonte de leitura.

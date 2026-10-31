@@ -110,13 +110,15 @@ export function validatePayload(payload: MerivaPersistedState): boolean {
   if (!('vehicle' in payload) || !('obd' in payload) ||
       !Array.isArray(payload.lastReadings) ||
       !Array.isArray(payload.dtcs) ||
-      !Array.isArray(payload.driveCycles)) return false;
+      ('driveCycles' in payload && !Array.isArray(payload.driveCycles))) return false;
 
   if (payload.vehicle !== null && !isRecord(payload.vehicle)) return false;
   if (!isRecord(payload.obd)) return false;
   if ('connected' in payload.obd && typeof payload.obd.connected !== 'boolean') return false;
   if (!validateReadings(payload.lastReadings)) return false;
-  if (!validateDriveCycles(payload.driveCycles)) return false;
+  // driveCycles is optional for schema-1 compatibility: the canonical history
+  // now lives in VIAGENS/index.json and is hydrated separately at startup.
+  if ('driveCycles' in payload && !validateDriveCycles(payload.driveCycles)) return false;
   if (!validateDtcs(payload.dtcs)) return false;
 
   if ('learning' in payload && payload.learning !== null && !isRecord(payload.learning)) return false;
