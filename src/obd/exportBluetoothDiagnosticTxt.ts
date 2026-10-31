@@ -169,7 +169,12 @@ export async function buildBluetoothDiagnosticReport(
     '--- FIM DO RELATÓRIO ---',
   ];
   const report = lines.join('\n');
-  return mode === 'SHAREABLE' ? redactBluetoothAddresses(report) : report;
+  return mode === 'SHAREABLE'
+    ? redactSensitiveReportData(report, [
+        ...devicesSnapshot.map((device) => device.name),
+        ...(connectionSnapshot ? [connectionSnapshot.deviceName] : []),
+      ])
+    : report;
 }
 
 export async function exportBluetoothDiagnosticTxt(
