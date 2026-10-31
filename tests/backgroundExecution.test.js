@@ -73,6 +73,10 @@ assert(autoTrip.includes('this.gpsStartPromise'), 'GPS must use a single in-flig
 assert(autoTrip.includes('GPS_START_RETRY_COOLDOWN_MS'), 'failed GPS startup must be throttled instead of prompting every OBD cycle');
 assert(autoTrip.includes('if (!generationIsCurrent())'), 'late GPS startup must be cleaned after the trip/ECU generation ends');
 assert(autoTrip.includes('await this.stopGpsForEcu()'), 'serviço de viagem para GPS quando ECU perde resposta/desconecta');
+const applyConnectionStart = autoTrip.indexOf('private async applyConnection');
+const recorderFinalizeIndex = autoTrip.indexOf('await this.finalizeRecorder();', applyConnectionStart);
+const gpsResetIndex = autoTrip.indexOf('await gpsTracker.stop({ resetTrip: true });', applyConnectionStart);
+assert(recorderFinalizeIndex >= 0 && gpsResetIndex > recorderFinalizeIndex, 'finalizar viagem antes de zerar métricas GPS na troca/desconexão ECU');
 assert(autoTrip.includes("if (!getSharedObdStatus().ecuConnected)"), 'gravação deve exigir estado ECU conectado');
 
 console.log('background execution: Android FGS + TaskManager + lifecycle: OK');
