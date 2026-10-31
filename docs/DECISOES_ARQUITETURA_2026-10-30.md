@@ -54,3 +54,14 @@
 ## Critério de release
 
 Nenhuma dessas decisões substitui o gate P0: `validate` e `android-build` verdes no mesmo SHA, APK artefato associado ao SHA e teste físico separado no Galaxy A06 / SM-A065M / Android 16 com ELM327 e ECU reais.
+
+
+## ADR-006 — Integridade do histórico e rotação de logs — 2026-10-31
+
+**Decisão:** manter `VIAGENS/index.json` como fonte persistente única de viagens concluídas; manter as exportações CSV/TXT compatíveis. Os autosaves novos mantêm apenas o estado transitório e não gravam uma segunda cópia de `driveCycles`. No carregamento, os dados legados são reconciliados por ID e gravados no índice após backup validado. Duplicatas usam o snapshot válido com mais evidência de telemetria.
+
+**Decisão de logging:** manter a API legada do FileSystem no SDK 51, rotacionando CSVs diários em partes limitadas a 512 KiB. A fila de telemetria tem watermark de 10.000 linhas; ao alcançá-lo, persiste chunks CSV independentes e verifica a leitura. O limite duro de RAM é 20.000 linhas; a tela Armazenamento expõe linhas pendentes, linhas em spool e descartes residuais.
+
+**Motivo:** a API atualmente instalada não oferece append tipado. A rotação limita o custo de regravação por flush sem trocar a biblioteca nativa durante a homologação Bluetooth/GPS. O índice de viagens evita serializar amostras históricas grandes em cada autosave.
+
+**SQLite:** continua como opção seletiva futura para histórico/eventos, condicionada a medições no Galaxy A06 de crescimento, latência, concorrência e consultas. Não migrar sem cópia anterior, reconciliação por ID, teste de restauração e rollback.
