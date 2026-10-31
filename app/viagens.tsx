@@ -49,9 +49,9 @@ export default function ViagensScreen() {
   const selected = selectedId ? cycles.find(cycle => cycle.id === selectedId) ?? null : null;
 
   return <SafeAreaView style={s.container} edges={['top','bottom','left','right']}>
-    <ScrollView contentContainerStyle={[s.content,{paddingHorizontal:layout.horizontalPadding}]} showsVerticalScrollIndicator={false}>
+    <ScrollView contentContainerStyle={[s.content,{paddingHorizontal:layout.horizontalPadding,paddingVertical:layout.compact?12:16}]} showsVerticalScrollIndicator={false}>
       <View style={[s.frame,{maxWidth:layout.maxContentWidth}]}>
-        {selected ? <TripDetails cycle={selected} onBack={() => setSelectedId(null)} /> : <>
+        {selected ? <TripDetails cycle={selected} onBack={() => setSelectedId(null)} valueSize={layout.valueSize} /> : <>
           <Text style={s.eyebrow}>SMART OBD DIAGNOSTIC</Text>
           <Text style={[s.title,{fontSize:layout.titleSize}]}>RELATÓRIO DE VIAGENS</Text>
           <Text style={s.subtitle}>HISTÓRICO REAL • SESSÕES INDEPENDENTES • DADOS AUDITÁVEIS</Text>
@@ -106,7 +106,7 @@ export default function ViagensScreen() {
   </SafeAreaView>;
 }
 
-function TripDetails({cycle,onBack}:{cycle:DriveCycle;onBack:()=>void}) {
+function TripDetails({cycle,onBack,valueSize}:{cycle:DriveCycle;onBack:()=>void;valueSize:number}) {
   const samples = cycle.telemetrySamples ?? [];
   const coolant = samples.filter(x => n(x.coolantTempC) != null).map(x => x.coolantTempC as number);
   const rpm = samples.filter(x => n(x.rpm) != null).map(x => x.rpm as number);
@@ -123,7 +123,7 @@ function TripDetails({cycle,onBack}:{cycle:DriveCycle;onBack:()=>void}) {
     <Text style={s.subtitle}>{dateLabel(cycle.startedAt)}</Text>
     <View style={s.hero}>
       <Text style={s.heroLabel}>DISTÂNCIA REGISTRADA</Text>
-      <Text style={s.heroValue}>{mv(n(cycle.distanceTotalKm),'km',2)}</Text>
+      <Text style={[s.heroValue,{fontSize:Math.min(valueSize-4,38)}]}>{mv(n(cycle.distanceTotalKm),'km',2)}</Text>
       <Text style={s.heroSub}>{dateLabel(cycle.startedAt)} → {dateLabel(cycle.finishedAt)}</Text>
     </View>
     <Text style={s.section}>RESUMO</Text>
