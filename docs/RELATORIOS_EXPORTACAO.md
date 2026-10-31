@@ -15,7 +15,7 @@
 A tela Configurações oferece duas exportações distintas:
 
 - **Técnico completo:** preserva nomes, endereços MAC e trilha bruta para diagnóstico interno.
-- **Compartilhável:** substitui todos os endereços MAC por `XX:XX:XX:XX:XX:XX`, inclusive dentro da trilha bruta.
+- **Compartilhável:** substitui endereços MAC, nomes conhecidos de dispositivos pareados, VIN rotulado e coordenadas GPS rotuladas, inclusive dentro da trilha bruta. O nome do adaptador conectado vira uma descrição genérica.
 
 O cabeçalho deve identificar fabricante/modelo Android quando fornecidos pela plataforma, versão Android, API, versão do aplicativo e modo de exportação. O modelo físico vem exclusivamente de `Platform.constants.Model`; se ausente, o TXT informa `N/D` e o JSON omite o campo. Não usar `Constants.deviceName` nem outro nome personalizado como substituto do modelo.
 
@@ -33,10 +33,10 @@ Todo JSON exportado precisa incluir:
 - Estado do veículo, OBD, leituras, DTCs, viagens, autonomia e manutenção.
 - Política de proveniência que distingue `REAL_OBD`, `SIMULACAO`, `CARSCANNER_SEED`, `CARSCANNER_BASELINE` e `IMPORTADO`.
 
-O estado em memória é copiado antes das leituras assíncronas dos arquivos, para que alterações posteriores durante a exportação não mudem silenciosamente o snapshot inicial.
+O estado em memória é copiado antes das leituras assíncronas dos arquivos, para que alterações posteriores durante a exportação não mudem silenciosamente o snapshot inicial. O relatório Bluetooth captura conexão, dispositivos, trilha, erro e telemetria antes da primeira leitura assíncrona e informa o horário desse snapshot. Dados persistidos em arquivos independentes podem ter horários próprios; não devem ser apresentados como uma transação atômica se o armazenamento não oferecer essa garantia.
 
 ## Privacidade e retenção
 
-O relatório técnico pode conter identificadores Bluetooth e dados do veículo; deve ser tratado como arquivo privado. A exportação compartilhável reduz a exposição de endereços MAC, mas o conteúdo ainda pode revelar nomes dos dispositivos, DTCs, leituras, horários e características do veículo. Revisar o conteúdo antes de enviar.
+O relatório técnico pode conter identificadores Bluetooth e dados do veículo; deve ser tratado como arquivo privado. A exportação compartilhável aplica anonimização aos identificadores diretos tratados pelo contrato (MAC, nomes conhecidos de dispositivos, VIN rotulado e coordenadas GPS rotuladas). DTCs, leituras, horários, fabricante/modelo Android e características do veículo permanecem porque são relevantes ao diagnóstico e ainda podem permitir correlação indireta. Revisar o conteúdo antes de enviar. TXT de autosave e JSON/CSV permanecem exportações técnicas; não compartilhar sem revisão, pois podem conter VIN, dados de viagem e identificadores do veículo.
 
 O histórico interno permanece sob controle do aplicativo. A exportação não deve apagar nem alterar os dados de origem.
