@@ -1063,8 +1063,8 @@ async function testDriveCycleValidation() {
   files.set(indexFile, JSON.stringify({ cycles: 'corrompido' }));
   assert.deepStrictEqual(
     (await storage.readDriveCycles(BASE)).map((item) => item.id),
-    ['test-1'],
-    'índice corrompido deve recuperar a última cópia válida em vez de ocultar o histórico',
+    ['test-1', 'test-2'],
+    'índice corrompido deve recuperar a última cópia válida anterior à reconciliação, preservando todas as viagens conhecidas',
   );
 
   resetFS();
