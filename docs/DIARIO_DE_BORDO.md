@@ -1,15 +1,14 @@
-## ESTADO VIGENTE — 2026-10-31 (consolidação Bluetooth, autonomia e backup)
+## ESTADO VIGENTE — 2026-10-31 (Bluetooth, autonomia e consolidação responsiva)
 
-> Frente em consolidação: PR #98, reconciliada com a PR #101 já integrada. O workflow de segurança da main é preservado; publicação automática de Release não é aceita.
+> PR #98 integrada na `main` em `e3383051be0561f31472c9ea96a728b76c302740`. PR #104 está sendo reconciliada sobre essa base, preservando as alterações de P0 e os switches de GPS opcionais.
 
-- `main` de referência: `1443ace6ac3d35139d1177fd0601ada871826dc5`; PR #101 está integrada e separou permissões/ciclo GPS do OBD.
-- A PR #98 original foi baseada em uma linha anterior e continha um job `publish-release` com `contents: write`. Esse job NÃO será integrado. A regra da main permanece: nenhum APK público/Release automático; upload temporário permitido somente em main e repositório privado.
-- Os ajustes de buffer do PID 012F, recuperação do prompt ELM, contadores de saúde, backup/restauração e MANUTENCAO estão sendo reconciliados sobre a main atual.
-- PR #99 tem conflito de merge e sua alteração de navegação será reaplicada em uma frente separada após a consolidação.
-- PR #103 (relatórios) foi aberta sobre a main antiga desta consolidação; precisará ser reaplicada após a integração para evitar conflitos de exportação/documentação.
-- Não há validação física ainda no Galaxy A06 / SM-A065M / Android 16 com ELM327 real. O PID 010C e o PID 012F continuam pendentes de comprovação no veículo.
+- PR #101 foi integrada anteriormente: o GPS permanece independente do OBD, exige opt-in e tem o ciclo de vida centralizado no `AutoTripService`.
+- PR #98 agora está integrada: transporte ELM327 mais robusto, buffer volátil de dez leituras reais PID 012F, backup/restauração verificados e dados de manutenção no backup/exportação. `validate` e `android-build` passaram no SHA da PR antes do merge.
+- O fluxo Android permanece Expo prebuild + Gradle. A CI compila e verifica o APK, gera SHA-256, mas não publica APK nem GitHub Release enquanto o repositório estiver público. O upload continua restrito à `main` privada.
+- PR #104 está sendo reaplicada sobre a nova `main`: navegação independente em retrato, preservação do cockpit em paisagem, cabeçalhos e retornos internos, áreas de toque e grids responsivos. Configurações mantém os switches GPS e restauração de backup.
+- PR #103 (relatórios) ainda precisa ser reaplicada sobre a base atual, após concluir a PR #104, para evitar conflito em Configurações, exportação JSON e Diário de Bordo.
+- Não declarar teste físico no Galaxy A06 / SM-A065M / Android 16. Ainda precisamos validar visualmente retrato/paisagem, RFCOMM, inicialização ELM, resposta 010C e leitura real 012F com adaptador/ECU.
 
----
 
 
 ## ESTADO HISTÓRICO — 2026-10-25 (snapshot DB-130; superado em 2026-10-28)
@@ -272,6 +271,7 @@
 - **DB-185** — Bloquear publicação pública/automática do APK; upload privado somente na branch main, checksum SHA-256 e Actions fixadas em commit.
 - **DB-186** — Desacoplar permissões GPS do OBD e centralizar o ciclo de vida de localização no AutoTripService.
 - **DB-187** · 2026-10-31 — Reconciliar Bluetooth, buffer 012F, backup e segurança de integração.
+- **DB-188** · 2026-10-31 — Consolidar layout responsivo sem regredir GPS, autonomia e restauração de backups.
 
 ---
 
@@ -4877,3 +4877,20 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - Executar baseline, TypeScript, suíte completa e build Android no commit final da PR reconciliada.
 - Testar restauração real de backup e os dados de manutenção/abastecimento no aparelho.
 - Validar no veículo a resposta 010C e leitura real 012F. A CI não confirma comunicação física.
+
+
+## DB-188 · 2026-10-31 — Consolidar layout responsivo sem regredir GPS, autonomia e restauração de backups
+
+### Alterações reconciliadas sobre a main atual
+- Cockpit: cinco abas inferiores com cartões independentes em retrato; a raia lateral e as dimensões da navegação em paisagem permanecem separadas e preservadas.
+- Ampliadas as áreas de toque das cinco abas e dos controles de paginação; a tipografia compacta do cockpit foi elevada nos rótulos e valores auxiliares para reduzir risco de ilegibilidade em paisagem.
+- Cabeçalhos nativos duplicados foram ocultados onde as telas já possuem cabeçalho interno; rotas receberam retornos explícitos para Cockpit ou Mais Recursos.
+- Viagens, Manutenção e Configurações utilizam os breakpoints/layouts compartilhados para reorganizar cartões em largura maior. Dados e telas secundárias usam títulos responsivos e controles com alvos mínimos de toque.
+- Configurações foi mesclada manualmente com a main: mantém os switches de GPS foreground/background com opt-in, os fluxos de permissão, os backups íntegros/restauração/safety backup e os relatórios existentes.
+- Cockpit e Dados foram reconciliados sobre o código novo de autonomia: origem BUFFER_012F, indicação visível de estimativa temporária e os dados de 10 amostras não foram removidos.
+- Testes estruturais de navegação e orientação foram atualizados; não houve alteração de Bluetooth, ELM327, PIDs, fórmulas, GPS tracking ou lógica de autonomia.
+
+### Validação e limites
+- Rodar gate de baseline, TypeScript, suíte completa e build Android no SHA final desta PR.
+- Fazer inspeção visual no Galaxy A06 SM-A065M em retrato, paisagem, fontes ampliadas e áreas de toque. Os testes estruturais não substituem screenshots/inspeção no aparelho.
+- Verificar também as telas Configurações/Backup e Dados com buffer 012F ativo para confirmar que a consolidação visual não oculta os novos controles/indicadores.

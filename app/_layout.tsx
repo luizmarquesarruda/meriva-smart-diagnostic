@@ -116,6 +116,7 @@ export default function RootLayout() {
     <Stack
       initialRouteName="splash"
       screenOptions={{
+        headerShown: false,
         headerStyle: { backgroundColor: COLORS.screen },
         headerTintColor: COLORS.accent,
         headerTitleStyle: { fontWeight: '900' },
@@ -126,9 +127,9 @@ export default function RootLayout() {
       <Stack.Screen name="manutencao" options={{ headerShown: false }} />
       <Stack.Screen name="bluetooth" options={{ headerShown: false }} />
       <Stack.Screen name="conectividade" options={{ headerShown: false }} />
-      <Stack.Screen name="laboratorio" options={{ title: 'DIAGNÓSTICO OBD' }} />
-      <Stack.Screen name="armazenamento" options={{ title: 'HISTÓRICO E DADOS' }} />
-      <Stack.Screen name="configuracoes" options={{ title: 'CONFIGURAÇÕES' }} />
+      <Stack.Screen name="laboratorio" options={{ headerShown: false }} />
+      <Stack.Screen name="armazenamento" options={{ headerShown: false }} />
+      <Stack.Screen name="configuracoes" options={{ headerShown: false }} />
     </Stack>
     </SafeAreaProvider>
   );

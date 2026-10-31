@@ -98,7 +98,7 @@ export default function ArmazenamentoScreen() {
     <SafeAreaView style={{flex:1,backgroundColor:COLORS.screen}} edges={["top","bottom","left","right"]}>
     <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
       <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
-      <Text style={styles.title}>ARMAZENAMENTO E EXPORTAÇÃO</Text>
+      <Text style={[styles.title,{fontSize:layout.titleSize-3}]}>ARMAZENAMENTO E EXPORTAÇÃO</Text>
       <Text style={styles.subtitle}>Arquivos locais, fila de registros, espaço usado e exportações. Para ver trajetos, métricas e detalhes, abra Viagens.</Text>
       <SourceStatusLegend compact />
       <Text style={[styles.status, quota?.critical ? styles.critical : quota?.warning ? styles.warning : styles.ok]}>
@@ -145,6 +145,7 @@ export default function ArmazenamentoScreen() {
         <AppIcon name="warning" size={18} color={COLORS.white} />
         <Text style={styles.buttonText}>{busy ? 'LIMPANDO...' : 'LIMPAR DADOS ANTIGOS'}</Text>
       </TouchableOpacity>
+      <Link href="/mais" asChild><TouchableOpacity style={styles.backButton} accessibilityRole="button" accessibilityLabel="Voltar aos recursos"><Text style={styles.backButtonText}>VOLTAR AOS RECURSOS</Text></TouchableOpacity></Link>
       </View>
     </ScrollView>
     </SafeAreaView>
@@ -178,7 +179,9 @@ const styles = StyleSheet.create({
   label: { color: COLORS.text, fontWeight: '600' },
   value: { color: COLORS.primary, fontWeight: '700' },
   exportRow: { width: '100%', flexDirection: 'row', gap: 8, marginTop: 4 },
-  button: { flex: 1, backgroundColor: '#1557a6', borderRadius: 7, padding: 13, alignItems: 'center', marginTop: 4 },
+  button: { flex: 1, minHeight: 48, backgroundColor: '#1557a6', borderRadius: 7, padding: 13, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
   buttonWithIcon: { flexDirection: 'row', justifyContent: 'center', gap: 7 },
   buttonText: { color: COLORS.white, fontWeight: '700' },
+  backButton: { minHeight: 48, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.border, borderRadius: 10, padding: 12, marginTop: 10 },
+  backButtonText: { color: COLORS.accent, fontSize: 11, fontWeight: '900' },
 });

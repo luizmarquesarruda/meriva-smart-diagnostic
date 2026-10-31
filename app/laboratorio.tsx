@@ -481,9 +481,9 @@ export default function LaboratorioScreen() {
 
   return (
     <SafeAreaView style={{flex:1,backgroundColor:COLORS.screen}} edges={["top","bottom","left","right"]}>
-    <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
+    <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, paddingTop: layout.compact ? 12 : 16, alignItems: 'center' }]}>
       <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
-      <Text style={styles.title}>DIAGNÓSTICO OBD</Text>
+      <Text style={[styles.title,{fontSize:layout.titleSize-3}]}>DIAGNÓSTICO OBD</Text>
       <Text style={styles.status}>{status}</Text>
       <View style={styles.connectionSummary}>
         <View style={styles.connectionItem}><Text style={styles.connectionLabel}>ELM327</Text><Text style={styles.connectionValue}>{sessionRef.current ? 'CONECTADO' : 'AGUARDANDO'}</Text></View>
@@ -655,6 +655,7 @@ export default function LaboratorioScreen() {
       ) : null}
 
       {!!error && <Text style={styles.error}>{error}</Text>}
+      <Link href="/" asChild><TouchableOpacity style={styles.secondaryButton} accessibilityRole="button" accessibilityLabel="Voltar ao cockpit"><Text style={styles.secondaryButtonText}>VOLTAR AO COCKPIT</Text></TouchableOpacity></Link>
       </View>
     </ScrollView>
     </SafeAreaView>
@@ -674,14 +675,14 @@ const styles = StyleSheet.create({
   rowLandscape: { alignItems: 'stretch' },
   flexButton: { flex: 1 },
   commandCardLandscape: { maxWidth: 620 },
-  modeButton: { flex: 1, padding: 10, borderRadius: 7, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center' },
+  modeButton: { flex: 1, minHeight: 48, padding: 10, borderRadius: 7, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center' },
   modeText: { color: COLORS.text, fontWeight: '900', fontSize: 11 },
   active: { backgroundColor: '#152a45', borderColor: COLORS.primary },
   simActive: { backgroundColor: '#352b16', borderColor: COLORS.warning },
   commandCard: { backgroundColor: COLORS.surface, borderRadius: 8, padding: 11, marginBottom: 10, borderWidth: 1, borderColor: COLORS.border },
   commandTitle: { color: COLORS.text, fontSize: 12, fontWeight: '900', marginBottom: 7 },
-  button: { backgroundColor: '#1557a6', borderRadius: 7, padding: 13, alignItems: 'center', marginBottom: 9 },
-  secondaryButton: { backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1, borderRadius: 7, padding: 12, alignItems: 'center', marginBottom: 9 },
+  button: { minHeight: 48, backgroundColor: '#1557a6', borderRadius: 7, padding: 13, alignItems: 'center', marginBottom: 9 },
+  secondaryButton: { minHeight: 48, backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1, borderRadius: 7, padding: 12, justifyContent: 'center', alignItems: 'center', marginBottom: 9 },
   secondaryButtonText: { color: COLORS.text, fontWeight: '700' },
   disconnect: { backgroundColor: '#64748b' },
   disabledButton: { backgroundColor: '#26374b', borderWidth: 1, borderColor: COLORS.border, opacity: 0.72 },
@@ -690,7 +691,7 @@ const styles = StyleSheet.create({
   selected: { borderColor: COLORS.primary, borderWidth: 2 },
   deviceName: { fontWeight: '700', color: COLORS.text },
   warning: { color: COLORS.warning, marginBottom: 12 },
-  input: { backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 12, color: COLORS.text },
+  input: { minHeight: 48, backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 12, color: COLORS.text },
   dtcPanel: { backgroundColor: COLORS.surface, borderRadius: 10, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: COLORS.border },
   dtcTitle: { color: COLORS.accent, fontSize: 13, fontWeight: '900', marginBottom: 6 },
   dtcRow: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: COLORS.border, paddingVertical: 8 },
