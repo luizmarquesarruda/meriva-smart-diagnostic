@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Constants from 'expo-constants';
 import { Link } from 'expo-router';
-import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
 import { createBackup } from '../src/storage/backup';
@@ -11,6 +11,7 @@ import { getAutoSaveState, getAutoSaveStatus, initAutoSave } from '../src/meriva
 import { exportAutoSaveTxt, exportDailyObdHistoryTxt } from '../src/meriva/exportAutoSaveTxt';
 import { exportBluetoothDiagnosticTxt } from '../src/obd/exportBluetoothDiagnosticTxt';
 import { AppSettings, readAppSettings, writeAppSettings } from '../src/database/appSettings';
+import { requestBackgroundLocationPermissionsOnly, requestLocationPermissionsOnly } from '../src/permissions/permissionManager';
 import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
 import { getMidLayout } from '../src/ui/midLayout';
 import { COLORS, SCREEN_TITLE_STYLE } from '../src/ui/theme';
@@ -54,6 +55,54 @@ export default function ConfiguracaoScreen() {
     } catch {
       setStatus('FALHA AO SALVAR CONFIGURAÇÃO');
     }
+  }
+
+  async function updateGpsTrackingPreference(enabled: boolean) {
+    if (!storageBase || !settings) return;
+    if (!enabled) {
+      const next = { ...settings, gpsTrackingEnabled: false, backgroundGpsEnabled: false };
+      setSettings(next);
+      try {
+        await writeAppSettings(storageBase, next);
+        setStatus('GPS DESATIVADO • OBD PERMANECE ATIVO');
+      } catch {
+        setStatus('FALHA AO SALVAR PREFERÊNCIA GPS');
+      }
+      return;
+    }
+
+    const foreground = await requestLocationPermissionsOnly();
+    if (foreground !== 'GRANTED') {
+      Alert.alert('Localização não autorizada', 'O GPS para viagens exige permissão de localização em primeiro plano. O diagnóstico Bluetooth/OBD continua funcionando.');
+      return;
+    }
+    await updateSetting('gpsTrackingEnabled', true);
+  }
+
+  async function updateBackgroundGpsPreference(enabled: boolean) {
+    if (enabled && !settings?.gpsTrackingEnabled) {
+      Alert.alert('Ative o GPS primeiro', 'Ative antes a opção de usar GPS em viagens. O rastreamento em segundo plano é complementar e opcional.');
+      return;
+    }
+    if (!enabled) {
+      await updateSetting('backgroundGpsEnabled', false);
+      return;
+    }
+
+    const foreground = await requestLocationPermissionsOnly();
+    if (foreground !== 'GRANTED') {
+      Alert.alert('Localização não autorizada', 'O GPS em primeiro plano precisa ser autorizado antes de ativar o rastreamento com a tela apagada. O diagnóstico OBD continua funcionando.');
+      return;
+    }
+
+    const background = await requestBackgroundLocationPermissionsOnly();
+    if (background !== 'GRANTED') {
+      Alert.alert('GPS em segundo plano não autorizado', 'O rastreamento com a tela apagada não foi ativado. O GPS em primeiro plano e o diagnóstico OBD continuam independentes.');
+      return;
+    }
+
+    await updateSetting('backgroundGpsEnabled', true);
+    Alert.alert('Rastreamento em segundo plano ativado', 'A preferência será aplicada à sessão de viagem atual. O Android manterá a notificação persistente enquanto o GPS estiver ativo.');
   }
 
   async function handleBackup() {
@@ -154,7 +203,9 @@ export default function ConfiguracaoScreen() {
             </View>
           </View>
 
-          <SettingSwitch label="Conectar ao ELM327 automaticamente" value={settings.autoConnectObd} onChange={(v) => void updateSetting('autoConnectObd', v)} />
+          <SettingSwitch label="Usar GPS para distância e viagens" value={settings.gpsTrackingEnabled} onChange={(v) => void updateGpsTrackingPreference(v)} />
+          <SettingSwitch label="Rastrear GPS com a tela apagada" value={settings.backgroundGpsEnabled} onChange={(v) => void updateBackgroundGpsPreference(v)} />
+          <Text style={styles.note}>GPS é opcional e não interfere no Bluetooth/OBD. A permissão em primeiro plano só é solicitada ao ativar a primeira opção; segundo plano exige que ela já esteja ativa e uma segunda autorização. Desativar GPS encerra o rastreamento sem bloquear as leituras OBD.</Text>
           <SettingSwitch label="Inicialização forçada do ELM (ATZ + ATE0)" value={settings.elmForceInitialization} onChange={(v) => void updateSetting('elmForceInitialization', v)} />
           <SettingSwitch label="Alertas de diagnóstico" value={settings.diagnosticAlerts} onChange={(v) => void updateSetting('diagnosticAlerts', v)} />
 
@@ -244,7 +295,7 @@ export default function ConfiguracaoScreen() {
           </View>
 
           <Text style={styles.note}>Os parâmetros são inspirados no comportamento observado no Car Scanner e em implementações públicas de ELM327. Eles não garantem compatibilidade com todo clone.</Text>
-          <Text style={styles.note}>O GPS inicia automaticamente quando o aplicativo entra em uso. Essa função é controlada pelo sistema para manter a viagem automática.</Text>
+          <Text style={styles.note}>O GPS permanece desativado até você ativar seu uso para distância e viagens. A conexão e o diagnóstico OBD funcionam independentemente dessa preferência.</Text>
         </>
       )}
 

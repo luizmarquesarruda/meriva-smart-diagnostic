@@ -17,6 +17,8 @@ const output = ts.transpileModule(fs.readFileSync(sourcePath, 'utf8'), {
 }).outputText;
 
 let watcher = null;
+let foregroundPermissionStatus = 'granted';
+let foregroundPermissionRequests = 0;
 let backgroundUpdatesStarted = false;
 let backgroundStartCalls = 0;
 let backgroundStopCalls = 0;
@@ -24,8 +26,12 @@ const fakeLocation = {
   Accuracy: { BestForNavigation: 6 },
   PermissionStatus: { GRANTED: 'granted' },
   hasServicesEnabledAsync: async () => true,
-  getForegroundPermissionsAsync: async () => ({ status: 'granted' }),
-  requestForegroundPermissionsAsync: async () => ({ status: 'granted' }),
+  getForegroundPermissionsAsync: async () => ({ status: foregroundPermissionStatus }),
+  requestForegroundPermissionsAsync: async () => {
+    foregroundPermissionRequests += 1;
+    foregroundPermissionStatus = 'granted';
+    return { status: 'granted' };
+  },
   hasStartedLocationUpdatesAsync: async () => backgroundUpdatesStarted,
   startLocationUpdatesAsync: async () => {
     backgroundStartCalls += 1;
@@ -79,6 +85,15 @@ assert.strictEqual(calculateConsumptionKml(0, 8), null);
 assert.strictEqual(calculateConsumptionKml(100, 0), null);
 
 (async () => {
+  // Background OBD services must read permission state and never trigger a prompt.
+  foregroundPermissionStatus = 'denied';
+  const noPromptTracker = new GpsTracker();
+  const promptsBeforeReadOnlyStart = foregroundPermissionRequests;
+  assert.strictEqual(await noPromptTracker.start({ requestPermission: false }), false);
+  assert.strictEqual(foregroundPermissionRequests, promptsBeforeReadOnlyStart,
+    'a read-only GPS start must not request foreground location permission');
+  foregroundPermissionStatus = 'granted';
+
   const tracker = new GpsTracker();
   const receivedStates = [];
   const unsubscribe = tracker.subscribe((state) => receivedStates.push(state));
@@ -293,6 +308,26 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
     'stop must call the native background stop API');
   assert.strictEqual(backgroundWatchdogCleared, true);
 
+  // Switching background -> foreground must preserve the current trip aggregates.
+  const modeSwitchTracker = new GpsTracker({ now: () => 400_000 });
+  assert.strictEqual(await modeSwitchTracker.start(), true);
+  const modeSwitchWatcher = watcher;
+  modeSwitchWatcher({ coords: { latitude: 1, longitude: 1, speed: 10, accuracy: 5 }, timestamp: 1000 });
+  modeSwitchWatcher({ coords: { latitude: 1, longitude: 1.0001, speed: 10, accuracy: 5 }, timestamp: 2000 });
+  modeSwitchWatcher({ coords: { latitude: 1, longitude: 1.0002, speed: 10, accuracy: 5 }, timestamp: 3000 });
+  modeSwitchWatcher({ coords: { latitude: 1, longitude: 1.0003, speed: 10, accuracy: 5 }, timestamp: 4000 });
+  const beforeModeSwitch = modeSwitchTracker.getState();
+  assert.ok(beforeModeSwitch.distanceKm > 0);
+  assert.ok(beforeModeSwitch.samples > 0);
+  assert.ok(beforeModeSwitch.maxSpeedKmh > 0);
+  assert.strictEqual(await modeSwitchTracker.startBackgroundLocation(), true);
+  await modeSwitchTracker.stopBackgroundLocation();
+  assert.strictEqual(await modeSwitchTracker.start({ resetTrip: false }), true);
+  const afterModeSwitch = modeSwitchTracker.getState();
+  assert.strictEqual(afterModeSwitch.distanceKm, beforeModeSwitch.distanceKm, 'background/foreground transition must not reset trip distance');
+  assert.strictEqual(afterModeSwitch.samples, beforeModeSwitch.samples, 'background/foreground transition must not reset sample count');
+  assert.strictEqual(afterModeSwitch.maxSpeedKmh, beforeModeSwitch.maxSpeedKmh, 'background/foreground transition must not reset max speed');
+  await modeSwitchTracker.stop();
   // Recreating the JS tracker while the native task survives must not start a duplicate task.
   backgroundUpdatesStarted = true;
   const recoveredBackgroundTracker = new GpsTracker({

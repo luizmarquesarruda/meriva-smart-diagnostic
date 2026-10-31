@@ -6,6 +6,8 @@ export interface AppSettings {
   fuelType: FuelType;
   distanceUnit: DistanceUnit;
   autoConnectObd: boolean;
+  gpsTrackingEnabled: boolean;
+  backgroundGpsEnabled: boolean;
   diagnosticAlerts: boolean;
   selectedAdapterAddress: string | null;
   elmIoTimeoutMs: number;
@@ -41,6 +43,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   fuelType: 'FLEX',
   distanceUnit: 'KM',
   autoConnectObd: true,
+  gpsTrackingEnabled: false,
+  backgroundGpsEnabled: false,
   diagnosticAlerts: true,
   selectedAdapterAddress: null,
   elmIoTimeoutMs: 10_000,
@@ -81,6 +85,8 @@ export async function readAppSettings(basePath: string): Promise<AppSettings> {
       fuelType: parsed.fuelType === 'GASOLINA' ? 'GASOLINA' : parsed.fuelType === 'ETANOL' ? 'ETANOL' : 'FLEX',
       distanceUnit: parsed.distanceUnit === 'MI' ? 'MI' : 'KM',
       autoConnectObd: parsed.autoConnectObd !== false,
+      gpsTrackingEnabled: parsed.gpsTrackingEnabled === true,
+      backgroundGpsEnabled: parsed.backgroundGpsEnabled === true && parsed.gpsTrackingEnabled === true,
       diagnosticAlerts: parsed.diagnosticAlerts !== false,
       selectedAdapterAddress: typeof parsed.selectedAdapterAddress === 'string' && parsed.selectedAdapterAddress.trim()
         ? parsed.selectedAdapterAddress.trim().toUpperCase()

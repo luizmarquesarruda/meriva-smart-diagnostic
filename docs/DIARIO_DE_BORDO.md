@@ -1,14 +1,12 @@
-## ESTADO VIGENTE — 2026-10-31 (contenção de distribuição pública do APK)
+## ESTADO VIGENTE — 2026-10-31 (permissões GPS desacopladas do OBD)
 
-> Frente P0: PR de segurança `security/private-apk-artifact-20261031`, baseada no `main` observado em `f4120541dd879231612e1622c872f98b261f092e`.
+> Frente dependente da PR #100: `fix/optional-gps-permissions-20261031`. A base inclui o endurecimento de artefatos privados, ainda sujeito ao build Android da PR #100.
 
-- Repositório: [luizmarquesarruda/meriva-smart-diagnostic](https://github.com/luizmarquesarruda/meriva-smart-diagnostic). A consulta de configuração retornou `visibility: public`; a lista de GitHub Releases está vazia.
-- Risco confirmado em `main`: o workflow enviava APK como artefato em todos os eventos/builds, com retenção de 14 dias, em repositório público. A branch da PR #98 também contém job `publish-release` com permissão `contents: write`; esse job não existe no `main` observado, mas continua perigoso na branch.
-- Correção nesta frente: retirar publicação de Release, condicionar upload a `repository.visibility == private` e `refs/heads/main`, não enviar APK em PR ou enquanto público, limitar artefato a três dias, gerar checksum SHA-256, manter `contents: read` e fixar Actions em SHAs completos.
-- Limite operacional: a integração GitHub disponível nesta sessão não oferece alteração de visibilidade nem remoção de artefatos. O workflow bloqueia novos uploads públicos após a correção ser integrada, mas o código-fonte continua público até o proprietário alterar a visibilidade para `Private`; artefatos anteriores precisam ser revisados separadamente.
-- PR #98 permanece aberta com alterações Bluetooth/autonomia. Sua versão do workflow e a sequência DB-185 a DB-197 precisam ser reconciliadas após integrar esta correção de segurança; não mesclar uma branch que reintroduza o job de Release.
-- PR #99 permanece aberta. Seu DB-185 de navegação conflita com o DB-185 do trabalho Bluetooth na #98; a numeração deve ser refeita depois da consolidação, nunca resolvida apenas adicionando um item ao índice.
-- Toda validação deve ser consultada no SHA final da frente: `validate` e `android-build` verdes no mesmo commit. O ensaio físico do Galaxy A06/Android 16/ELM327/ECU continua separado e pendente.
+- Repositório: [luizmarquesarruda/meriva-smart-diagnostic](https://github.com/luizmarquesarruda/meriva-smart-diagnostic). Visibilidade verificada como `public`; o workflow novo bloqueia upload de APK enquanto continuar público.
+- PR #100: segurança de CI, sem publicação automática, upload somente em `main` quando privado, checksum e retenção de três dias. Não mesclar até `validate` e `android-build` verdes no mesmo SHA.
+- Esta frente elimina pedidos de localização durante inicialização/polling OBD. GPS foreground e background começam desativados e exigem opt-in explícito; remove a inicialização duplicada em `sharedConnection` e mantém `autoTripService` como proprietário único.
+- O GPS foreground só é iniciado após a opção de distância/viagens ser ativada e autorizada. O modo com tela apagada exige opt-in adicional. Os serviços usam somente checagem de permissão sem prompt automático; trocas de modo preservam distância acumulada.
+- PR #98 e #99 permanecem sem merge; seus contratos e números DB-NNN precisam ser reconciliados sobre esta base antes de integração. Nenhum teste físico no Galaxy A06/Android 16/ELM327 é declarado por esta frente.
 
 ---
 
@@ -270,6 +268,7 @@
 - **DB-183** · 2026-10-30 — Confirmar movimento urbano sem exigir 8 m em cada callback GPS
 - **DB-184** · 2026-10-30 — Sincronizar índice DB-NNN com as novas entradas de auditoria
 - **DB-185** — Bloquear publicação pública/automática do APK; upload privado somente na branch main, checksum SHA-256 e Actions fixadas em commit.
+- **DB-186** — Desacoplar permissões GPS do OBD e centralizar o ciclo de vida de localização no AutoTripService.
 
 ---
 
@@ -4831,3 +4830,25 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - O GitHub connector desta sessão não oferece operação para mudar visibilidade do repositório nem apagar artefatos já criados. O repositório continua público até ação do proprietário em Settings; esta PR impede novos uploads públicos apenas depois de integrada.
 - A validação automatizada e o build Android devem concluir no mesmo SHA desta branch. Nenhum resultado é presumido antes da CI.
 - Não houve teste físico, alteração do transporte Bluetooth, migração SQLite ou merge nesta correção.
+
+
+## DB-186 · 2026-10-31 — Exigir opt-in GPS e centralizar a propriedade do rastreador
+
+### Problemas confirmados
+- O `autoTripService` chamava `gpsTracker.start()` após ECU validada, e esse método ainda podia abrir prompt foreground mesmo com o layout já desacoplado.
+- `app/_layout.tsx` chamava `requestAllRequiredPermissions()` na inicialização e solicitava localização junto com Bluetooth, embora GPS seja opcional.
+- `sharedConnection.persistValidatedConnection()` iniciava o serviço GPS ao validar ECU, enquanto `autoTripService` também iniciava o GPS após receber a mesma conexão. Isso criava dois caminhos proprietários para um mesmo serviço nativo.
+- `startBackgroundMonitoring()` solicitava permissão de segundo plano por efeito colateral da conexão OBD.
+
+### Correções aplicadas nesta branch
+- Startup passa a solicitar apenas Bluetooth; a localização não participa do gate OBD.
+- GPS foreground e background passam a ter flags separadas, ambas desativadas por padrão; background exige foreground habilitado.
+- As preferências `gpsTrackingEnabled` (foreground) e `backgroundGpsEnabled` começam `false`, inclusive em configurações antigas sem esses campos.
+- A tela Configurações solicita primeiro localização foreground após opt-in de uso GPS; a autorização background só é solicitada após o segundo switch explícito.
+- `GpsTracker.start` e `startBackgroundLocation` aceitam modo read-only; `autoTripService` e o serviço background não abrem prompt. Permissão revogada desativa o GPS opcional sem bloquear OBD.
+- `sharedConnection` deixa de iniciar/parar GPS; `autoTripService` fica como único proprietário do ciclo de vida.
+- Desativar o modo em segundo plano troca para watcher foreground preservando distância, velocidade máxima e amostras da viagem.
+
+### Validação necessária
+- `npm run gate:baseline`, `npm run validate` e build Android na PR desta frente.
+- Validar no Galaxy A06 que negar localização não impede Bluetooth/ELM/010C, que GPS foreground funciona após ECU validada e que background só solicita permissão após opt-in.

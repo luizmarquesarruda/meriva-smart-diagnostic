@@ -212,8 +212,8 @@ export class GpsTracker {
     this.emit();
   }
 
-  async startBackgroundLocation(): Promise<boolean> {
-    const permitted = await this.requestPermission();
+  async startBackgroundLocation(options: { requestPermission?: boolean } = {}): Promise<boolean> {
+    const permitted = await this.requestPermission({ prompt: options.requestPermission !== false });
     if (!permitted) return false;
 
     if (this.backgroundTaskRunning) return true;
@@ -315,7 +315,7 @@ export class GpsTracker {
     for (const listener of this.listeners) listener(snapshot);
   }
 
-  async requestPermission(): Promise<boolean> {
+  async requestPermission(options: { prompt?: boolean } = {}): Promise<boolean> {
     try {
       if (!(await Location.hasServicesEnabledAsync())) {
         this.state = {
@@ -328,7 +328,7 @@ export class GpsTracker {
       }
 
       let permission = await Location.getForegroundPermissionsAsync();
-      if (permission.status !== Location.PermissionStatus.GRANTED) {
+      if (permission.status !== Location.PermissionStatus.GRANTED && options.prompt !== false) {
         permission = await Location.requestForegroundPermissionsAsync();
       }
 
@@ -351,8 +351,9 @@ export class GpsTracker {
     }
   }
 
-  async start(): Promise<boolean> {
-    const permitted = await this.requestPermission();
+  async start(options: { resetTrip?: boolean; requestPermission?: boolean } = {}): Promise<boolean> {
+    const resetTrip = options.resetTrip !== false;
+    const permitted = await this.requestPermission({ prompt: options.requestPermission !== false });
     if (!permitted) {
       await this.stop();
       return false;
@@ -360,16 +361,16 @@ export class GpsTracker {
 
     if ((this.subscription || this.backgroundTaskRunning) && this.state.running) return true;
 
-    await this.stop({ resetTrip: true });
+    await this.stop({ resetTrip });
     this.state = {
       ...this.state,
       running: true,
       currentSpeedKmh: 0,
-      maxSpeedKmh: 0,
-      distanceKm: 0,
-      samples: 0,
-      lastTimestamp: null,
-      lastAccuracyM: null,
+      maxSpeedKmh: resetTrip ? 0 : this.state.maxSpeedKmh,
+      distanceKm: resetTrip ? 0 : this.state.distanceKm,
+      samples: resetTrip ? 0 : this.state.samples,
+      lastTimestamp: resetTrip ? null : this.state.lastTimestamp,
+      lastAccuracyM: resetTrip ? null : this.state.lastAccuracyM,
       error: null,
       signalQuality: 'SEM_FIX',
       speedSource: 'PARADO',
