@@ -295,7 +295,7 @@ export default function ConfiguracaoScreen() {
           </View>
 
           <Text style={styles.note}>Os parâmetros são inspirados no comportamento observado no Car Scanner e em implementações públicas de ELM327. Eles não garantem compatibilidade com todo clone.</Text>
-          <Text style={styles.note}>O GPS inicia automaticamente quando o aplicativo entra em uso. Essa função é controlada pelo sistema para manter a viagem automática.</Text>
+          <Text style={styles.note}>O GPS permanece desativado até você ativar seu uso para distância e viagens. A conexão e o diagnóstico OBD funcionam independentemente dessa preferência.</Text>
         </>
       )}
 
