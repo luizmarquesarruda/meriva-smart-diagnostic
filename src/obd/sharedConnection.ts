@@ -336,7 +336,8 @@ async function persistValidatedConnection(
   });
 
   // GPS/viagem pertence ao AutoTripService; a conexão OBD apenas persiste a sessão.
-  return startObdAutosaveSession();
+  const sessionSaved = await startObdAutosaveSession();
+  return sessionSaved;
 }
 export type ConnectionSelectionMode = 'PREFERRED' | 'EXPLICIT';
 
