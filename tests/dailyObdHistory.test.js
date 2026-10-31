@@ -109,6 +109,7 @@ async function main() {
   );
   assert.equal(first.eventCount, 1);
   assert.ok(files.get(logPath).includes('SESSION_START | 2026-10-31T10:00:00.000Z'));
+  assert.equal(files.get(previousPath), files.get(logPath), 'backup snapshot must match the committed main history');
 
   const second = await appendDailyObdSessionEvent(
     basePath, makeState(), 'SESSION_END', '2026-10-31T11:00:00.000Z',
@@ -116,8 +117,8 @@ async function main() {
   assert.equal(second.eventCount, 2);
   assert.ok(files.get(logPath).includes('SESSION_START | 2026-10-31T10:00:00.000Z'));
   assert.ok(files.get(logPath).includes('SESSION_END | 2026-10-31T11:00:00.000Z'));
-  assert.equal(files.get(previousPath).includes('SESSION_START | 2026-10-31T10:00:00.000Z'), true,
-    'a verified previous snapshot must be kept before replacing the main history');
+  assert.equal(files.get(previousPath), files.get(logPath),
+    'after a successful append, the recovery snapshot must match the committed main history');
 
   // Two concurrent appends must serialize and retain both events.
   const concurrent = await Promise.all([
@@ -128,6 +129,7 @@ async function main() {
   let history = files.get(logPath);
   assert.ok(history.includes('SESSION_RECOVERED | 2026-10-31T12:00:00.000Z'));
   assert.ok(history.includes('SESSION_START | 2026-10-31T13:00:00.000Z'));
+  assert.equal(files.get(previousPath), history);
 
   // A failed replacement must restore the last verified snapshot.
   const beforeFailedWrite = history;
@@ -138,6 +140,8 @@ async function main() {
   );
   assert.equal(files.get(logPath), beforeFailedWrite,
     'failed replacement must restore the previous complete daily history');
+  assert.equal(files.get(previousPath), beforeFailedWrite,
+    'the restored main file and its recovery snapshot must agree after failure');
   assert.equal(files.get(logPath).includes('SESSION_END | 2026-10-31T14:00:00.000Z'), false);
   assert.equal(files.has(temporaryPath), false, 'failed temporary file must be cleaned up');
 
@@ -145,6 +149,8 @@ async function main() {
     basePath, makeState(), 'SESSION_END', '2026-10-31T15:00:00.000Z',
   );
   assert.equal(afterRecovery.eventCount, 5);
+  assert.equal(files.get(previousPath), files.get(logPath),
+    'the recovery snapshot must advance after the successful event');
 
   // If the main file is missing, recover the last verified previous snapshot
   // rather than silently creating a new empty history.
@@ -156,6 +162,8 @@ async function main() {
   history = files.get(logPath);
   assert.ok(history.includes('SESSION_START | 2026-10-31T10:00:00.000Z'));
   assert.ok(history.includes('SESSION_RECOVERED | 2026-10-31T16:00:00.000Z'));
+  assert.equal(files.get(previousPath), history,
+    'missing-main recovery must commit a refreshed recovery snapshot');
 
   // An unreadable existing main file is not an empty history and must not be overwritten.
   const preservedHistory = files.get(logPath);
