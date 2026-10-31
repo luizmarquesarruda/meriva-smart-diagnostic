@@ -7,7 +7,7 @@ import { readLearningProfile, type MerivaLearningProfile } from '../database/lea
 import { getAutoSaveState } from '../meriva/autosaveManager';
 import { normalizeDiagnosticSource, runLocalDiagnostic, type DiagnosticResult } from '../diagnostics/diagnosticEngine';
 import type { PidObservation } from '../types/sourceTypes';
-import { extractLastTraceFailure, redactBluetoothAddresses, resolveAndroidModel } from './diagnosticReportUtils';
+import { extractLastTraceFailure, redactSensitiveReportData, resolveAndroidModel } from './diagnosticReportUtils';
 
 async function readCurrentLearningProfile(): Promise<MerivaLearningProfile | null> {
   const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
@@ -42,8 +42,7 @@ function diagnosticReportLines(result: DiagnosticResult): string[] {
   return lines;
 }
 
-function buildLocalDiagnostic(): DiagnosticResult {
-  const state = getAutoSaveState();
+function buildLocalDiagnostic(state = getAutoSaveState()): DiagnosticResult {
   const observations: PidObservation[] = state.lastReadings.map((reading) => ({
     pid: reading.pid,
     name: reading.name,
@@ -104,13 +103,27 @@ function platformConstant(name: string): string {
 export async function buildBluetoothDiagnosticReport(
   mode: BluetoothDiagnosticReportMode = 'TECHNICAL',
 ): Promise<string> {
+  // Capture all synchronous sources before the first await. The report must not
+  // mix a new connection/error state with an older in-memory telemetry snapshot.
   const connection = getSharedObdConnection();
   const context = getSharedObdDiagnosticContext();
-  const trace = connection?.getDiagnosticsText() || context.trace || getLastBluetoothDiagnosticText();
+  const connectionSnapshot = connection ? {
+    deviceName: connection.device.name,
+    deviceAddress: connection.device.address,
+    protocol: connection.protocol,
+  } : null;
+  const devicesSnapshot = context.devices.map((device) => ({
+    name: device.name,
+    address: device.address,
+  }));
+  const trace = String(connection?.getDiagnosticsText() || context.trace || getLastBluetoothDiagnosticText());
   const traceFailure = extractLastTraceFailure(trace);
   const sharedError = getSharedObdLastError();
+  const stateSnapshotAt = new Date().toISOString();
+  const liveState = getAutoSaveState();
+  const stateSnapshot = JSON.parse(JSON.stringify(liveState)) as typeof liveState;
+  const localDiagnostic = buildLocalDiagnostic(stateSnapshot);
   const learningProfile = await readCurrentLearningProfile();
-  const localDiagnostic = buildLocalDiagnostic();
   const manufacturer = platformConstant('Manufacturer');
   const model = resolveAndroidModel(
     (Platform as unknown as { constants?: Record<string, unknown> }).constants?.Model,
@@ -123,21 +136,28 @@ export async function buildBluetoothDiagnosticReport(
     `EXPORT MODE: ${mode === 'TECHNICAL' ? 'TECHNICAL_FULL' : 'SHAREABLE_REDACTED'}`,
     '',
     `DATA: ${new Date().toISOString()}`,
+    `STATE SNAPSHOT AT: ${stateSnapshotAt}`,
     `APP VERSION: ${Constants.expoConfig?.version ?? 'N/D'}`,
     `PLATFORM: ${Platform.OS}`,
     `DEVICE MANUFACTURER: ${manufacturer}`,
     `DEVICE MODEL: ${model}`,
     `ANDROID RELEASE: ${androidRelease}`,
     `ANDROID API: ${Platform.OS === 'android' ? Platform.Version : 'N/D'}`,
-    `ELM DEVICE: ${connection ? `${connection.device.name} | ${connection.device.address}` : 'NÃO CONECTADO'}`,
-    `PROTOCOL: ${connection?.protocol ?? 'N/D'}`,
+    `ELM DEVICE: ${connectionSnapshot
+      ? mode === 'TECHNICAL'
+        ? `${connectionSnapshot.deviceName} | ${connectionSnapshot.deviceAddress}`
+        : 'ADAPTADOR BLUETOOTH'
+      : 'NÃO CONECTADO'}`,
+    `PROTOCOL: ${connectionSnapshot?.protocol ?? 'N/D'}`,
     `LAST ERROR: ${traceFailure?.error ?? sharedError ?? 'NENHUM'}`,
     `LAST ERROR SOURCE: ${traceFailure ? 'RAW_BLUETOOTH_TRACE' : sharedError ? 'SHARED_CONNECTION_STATE' : 'NONE'}`,
     `LAST ERROR EVENT: ${traceFailure?.event ?? 'N/D'}`,
     `LAST ERROR AT: ${traceFailure?.timestamp ?? 'N/D'}`,
     `SHARED CONNECTION ERROR: ${sharedError ?? 'NENHUM'}`,
-    `PAIRED DEVICES: ${context.devices.length}`,
-    ...context.devices.map((device, index) => `PAIRED ${index + 1}: ${device.name} | ${device.address}`),
+    `PAIRED DEVICES: ${devicesSnapshot.length}`,
+    ...devicesSnapshot.map((device, index) => mode === 'TECHNICAL'
+      ? `PAIRED ${index + 1}: ${device.name} | ${device.address}`
+      : `PAIRED ${index + 1}: DISPOSITIVO ${index + 1}`),
     '',
     ...learningReportLines(learningProfile),
     '',
