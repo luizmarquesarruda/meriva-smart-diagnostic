@@ -212,8 +212,8 @@ export class GpsTracker {
     this.emit();
   }
 
-  async startBackgroundLocation(): Promise<boolean> {
-    const permitted = await this.requestPermission();
+  async startBackgroundLocation(options: { requestPermission?: boolean } = {}): Promise<boolean> {
+    const permitted = await this.requestPermission({ prompt: options.requestPermission !== false });
     if (!permitted) return false;
 
     if (this.backgroundTaskRunning) return true;
@@ -315,7 +315,7 @@ export class GpsTracker {
     for (const listener of this.listeners) listener(snapshot);
   }
 
-  async requestPermission(): Promise<boolean> {
+  async requestPermission(options: { prompt?: boolean } = {}): Promise<boolean> {
     try {
       if (!(await Location.hasServicesEnabledAsync())) {
         this.state = {
@@ -328,7 +328,7 @@ export class GpsTracker {
       }
 
       let permission = await Location.getForegroundPermissionsAsync();
-      if (permission.status !== Location.PermissionStatus.GRANTED) {
+      if (permission.status !== Location.PermissionStatus.GRANTED && options.prompt !== false) {
         permission = await Location.requestForegroundPermissionsAsync();
       }
 
@@ -351,9 +351,9 @@ export class GpsTracker {
     }
   }
 
-  async start(options: { resetTrip?: boolean } = {}): Promise<boolean> {
+  async start(options: { resetTrip?: boolean; requestPermission?: boolean } = {}): Promise<boolean> {
     const resetTrip = options.resetTrip !== false;
-    const permitted = await this.requestPermission();
+    const permitted = await this.requestPermission({ prompt: options.requestPermission !== false });
     if (!permitted) {
       await this.stop();
       return false;
