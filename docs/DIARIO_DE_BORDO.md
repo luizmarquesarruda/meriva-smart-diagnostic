@@ -4,8 +4,8 @@
 
 - Repositório: [luizmarquesarruda/meriva-smart-diagnostic](https://github.com/luizmarquesarruda/meriva-smart-diagnostic). Visibilidade verificada como `public`; o workflow novo bloqueia upload de APK enquanto continuar público.
 - PR #100: segurança de CI, sem publicação automática, upload somente em `main` quando privado, checksum e retenção de três dias. Não mesclar até `validate` e `android-build` verdes no mesmo SHA.
-- Esta frente elimina pedido de localização durante a inicialização OBD, torna o rastreamento de segundo plano um opt-in explícito, remove a inicialização duplicada do GPS em `sharedConnection` e mantém `autoTripService` como proprietário único.
-- O GPS em primeiro plano continua independente e não bloqueia o polling OBD; o modo com tela apagada só é tentado quando autorizado pelo usuário nas Configurações. Trocas de modo preservam a distância acumulada.
+- Esta frente elimina pedidos de localização durante inicialização/polling OBD. GPS foreground e background começam desativados e exigem opt-in explícito; remove a inicialização duplicada em `sharedConnection` e mantém `autoTripService` como proprietário único.
+- O GPS foreground só é iniciado após a opção de distância/viagens ser ativada e autorizada. O modo com tela apagada exige opt-in adicional. Os serviços usam somente checagem de permissão sem prompt automático; trocas de modo preservam distância acumulada.
 - PR #98 e #99 permanecem sem merge; seus contratos e números DB-NNN precisam ser reconciliados sobre esta base antes de integração. Nenhum teste físico no Galaxy A06/Android 16/ELM327 é declarado por esta frente.
 
 ---
@@ -4832,18 +4832,20 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - Não houve teste físico, alteração do transporte Bluetooth, migração SQLite ou merge nesta correção.
 
 
-## DB-186 · 2026-10-31 — Desacoplar permissões GPS do OBD e centralizar a propriedade do rastreador
+## DB-186 · 2026-10-31 — Exigir opt-in GPS e centralizar a propriedade do rastreador
 
 ### Problemas confirmados
+- O `autoTripService` chamava `gpsTracker.start()` após ECU validada, e esse método ainda podia abrir prompt foreground mesmo com o layout já desacoplado.
 - `app/_layout.tsx` chamava `requestAllRequiredPermissions()` na inicialização e solicitava localização junto com Bluetooth, embora GPS seja opcional.
 - `sharedConnection.persistValidatedConnection()` iniciava o serviço GPS ao validar ECU, enquanto `autoTripService` também iniciava o GPS após receber a mesma conexão. Isso criava dois caminhos proprietários para um mesmo serviço nativo.
 - `startBackgroundMonitoring()` solicitava permissão de segundo plano por efeito colateral da conexão OBD.
 
 ### Correções aplicadas nesta branch
 - Startup passa a solicitar apenas Bluetooth; a localização não participa do gate OBD.
-- A preferência `backgroundGpsEnabled` é adicionada com padrão `false`, inclusive para configurações antigas sem esse campo.
-- A tela Configurações solicita primeiro localização em primeiro plano e depois segundo plano, somente após o usuário ativar o switch.
-- O serviço automático apenas lê a permissão em segundo plano já concedida; não mostra prompt dentro do ciclo de polling.
+- GPS foreground e background passam a ter flags separadas, ambas desativadas por padrão; background exige foreground habilitado.
+- As preferências `gpsTrackingEnabled` (foreground) e `backgroundGpsEnabled` começam `false`, inclusive em configurações antigas sem esses campos.
+- A tela Configurações solicita primeiro localização foreground após opt-in de uso GPS; a autorização background só é solicitada após o segundo switch explícito.
+- `GpsTracker.start` e `startBackgroundLocation` aceitam modo read-only; `autoTripService` e o serviço background não abrem prompt. Permissão revogada desativa o GPS opcional sem bloquear OBD.
 - `sharedConnection` deixa de iniciar/parar GPS; `autoTripService` fica como único proprietário do ciclo de vida.
 - Desativar o modo em segundo plano troca para watcher foreground preservando distância, velocidade máxima e amostras da viagem.
 
