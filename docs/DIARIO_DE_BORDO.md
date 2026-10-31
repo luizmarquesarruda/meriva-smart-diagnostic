@@ -277,6 +277,7 @@
 - **DB-187** · 2026-10-31 — Reconciliar Bluetooth, buffer 012F, backup e segurança de integração.
 - **DB-188** · 2026-10-31 — Integridade, privacidade e metadados verificados nos relatórios.
 - **DB-189** · 2026-10-31 — Privacidade ampliada e snapshot do relatório Bluetooth
+- **DB-190** · 2026-10-31 — Preservação integral do histórico diário ECU
 
 ---
 
@@ -4907,6 +4908,15 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - Confirmar que o runtime Android do aparelho informa `SM-A065M`; a ausência do campo deve permanecer como dado ausente, sem inferência.
 - CI não comprova comunicação física com ELM327/ECU nem respostas reais aos PIDs 010C/012F.
 
+
+## DB-190 — 2026-10-31 — Preservação integral do histórico diário ECU
+
+- Auditoria confirmou que `src/meriva/dailyObdHistory.ts` limitava o diário às 365 datas mais recentes com `slice(-MAX_DAYS)`.
+- O limite temporal foi removido: a gravação preserva todas as páginas existentes e acrescenta a nova data sem descartar as mais antigas.
+- Teste de regressão cria 366 páginas antigas, acrescenta a data seguinte e verifica a preservação da primeira, da última e da nova página (367 no total).
+- A limpeza de LOGS/LEITURAS não altera o diário em VIAGENS. A documentação registra que o TXT cresce com o uso e que segmentação futura exige migração/recuperação testada.
+- Nenhuma migração geral para SQLite foi feita; primeiro preservar os dados e medir o comportamento.
+- Validar gate:baseline, suíte completa e build Android no SHA final. Inspeção física dos relatórios no Galaxy A06 / SM-A065M / Android 16 continua pendente.
 
 ## DB-189 — 2026-10-31 — Privacidade ampliada e snapshot do relatório Bluetooth
 
