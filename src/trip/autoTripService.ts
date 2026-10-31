@@ -639,6 +639,9 @@ class AutoTripService {
       } else {
         this.gpsStartRetryAfterMs = 0;
         this.scheduleGpsStart(generation);
+        if (this.gpsStartPromise) {
+          try { await this.gpsStartPromise; } catch { /* optional GPS failure does not affect OBD */ }
+        }
       }
       return;
     }
@@ -658,12 +661,11 @@ class AutoTripService {
     }
 
     if (!gpsTracker.getState().running) {
-      const started = await gpsTracker.start({ resetTrip: false, requestPermission: false });
-      if (!sessionIsCurrent()) {
-        if (gpsTracker.getState().running) await gpsTracker.stop();
-        return;
+      this.gpsStartRetryAfterMs = 0;
+      this.scheduleGpsStart(generation);
+      if (this.gpsStartPromise) {
+        try { await this.gpsStartPromise; } catch { /* optional GPS failure does not affect OBD */ }
       }
-      this.gpsStartedForEcu = started && gpsTracker.getState().running;
     }
   }
 
