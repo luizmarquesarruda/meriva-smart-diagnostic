@@ -916,7 +916,7 @@ test('16. diário ECU preserva páginas anteriores a 365 dias', async () => {
       '========== FIM DO DIA ==========',
     ].join('\n');
   });
-  files.set(target, `MERIVA SMART DIAGNOSTIC\\n${oldPages.join('\n')}\\n`);
+  files.set(target, `MERIVA SMART DIAGNOSTIC\n${oldPages.join('\n')}\n`);
 
   await history.appendDailyObdSessionEvent(BASE, state, 'SESSION_START', '2025-01-01T12:00:00.000Z');
 
@@ -925,7 +925,7 @@ test('16. diário ECU preserva páginas anteriores a 365 dias', async () => {
   assert.ok(saved.includes('REGISTRO ANTIGO: 2024-01-01'), 'o conteúdo da página mais antiga deve ser preservado');
   assert.ok(saved.includes('========== DIA: 2024-12-31 =========='), 'a última página antiga deve permanecer');
   assert.ok(saved.includes('========== DIA: 2025-01-01 =========='), 'o novo evento deve ser acrescentado');
-  assert.strictEqual((saved.match(/^========== DIA: \d{4}-\\d{2}-\\d{2} ==========$/gm) || []).length, 367,
+  assert.strictEqual((saved.match(/^========== DIA: \d{4}-\d{2}-\d{2} ==========$/gm) || []).length, 367,
     'todas as 366 páginas antigas e a nova página devem permanecer');
 });
 
