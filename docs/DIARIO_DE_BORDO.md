@@ -1,3 +1,14 @@
+## ESTADO VIGENTE — 2026-10-31 (P1 persistência e integridade dos históricos)
+
+- DB-194 — Branch de trabalho: `fix/storage-and-history-integrity-20261031`, criada sobre o `main` observado em 31/10/2026. Escopo: rotação/spool de CSV, deduplicação e reconciliação do histórico de viagens, e remoção da cópia persistente de viagens no autosave.
+- O logger mantém o formato CSV e o FileSystem legacy do Expo SDK 51. Os arquivos diários usam partes de até 512 KiB; a primeira parte conserva o nome legado. Ao alcançar 10.000 linhas pendentes, chunks imutáveis são gravados e relidos para verificação. O limite duro em RAM é 20.000; qualquer descarte residual permanece contado e reportado.
+- `VIAGENS/index.json` é agora a fonte persistente canônica de viagens. O índice é deduplicado pelo ID, preservando o registro validado com mais amostras de telemetria; gravações repetidas do mesmo ID não duplicam a linha CSV de resumo.
+- Na abertura, o app reconcilia uma única vez registros de viagem existentes em autosaves antigos com o índice canônico. Novos autosaves armazenam `driveCycles: []`; o objeto em memória continua recebendo o histórico do índice para as telas. O validador aceita payloads antigos com o campo e os novos sem ele.
+- SQLite permanece adiado: não adicionar dependência ou converter dados até medir a instalação real, definir baseline de desempenho e validar migração/backup/rollback. As alterações desta rodada reduzem o crescimento sem trocar o armazenamento nativo nem o schema de exportação.
+- Testes adicionados para rotação CSV, idempotência do resumo de viagem, deduplicação preservando telemetria e compatibilidade dos autosaves antigos. CI ainda deve ser executada no SHA final desta branch; nenhum resultado de CI/build ou ensaio físico é declarado neste registro.
+
+---
+
 ## ESTADO VIGENTE — 2026-10-31 (P0 relatórios, layout e estabilidade)
 
 > PR #105 integrada em `main` no commit `b128b413427e612e621dc2ef2c82b6c2476ce659`. PR #104 integrada em `main` no commit `4055a776a4e95e1ec775c6b0ae039da234a7c6c6`. Ambas passaram `validate` e `android-build` nos respectivos SHAs finais.
