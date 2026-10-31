@@ -73,6 +73,7 @@ class AutoTripService {
   private pollCycleNumber = 0;
   private stoppedSinceMs: number | null = null;
   private gpsStartedForEcu = false;
+  private gpsTrackingEnabled = false;
   private backgroundGpsEnabled = false;
   private gpsModeTransition: Promise<void> = Promise.resolve();
   private gpsStartPromise: Promise<void> | null = null;
@@ -119,7 +120,8 @@ class AutoTripService {
     this.basePath = basePath;
     const settings = await readAppSettings(basePath);
     this.fuelType = settings.fuelType;
-    this.backgroundGpsEnabled = settings.backgroundGpsEnabled === true;
+    this.gpsTrackingEnabled = settings.gpsTrackingEnabled === true;
+    this.backgroundGpsEnabled = this.gpsTrackingEnabled && settings.backgroundGpsEnabled === true;
     this.unsubscribeAppSettings?.();
     this.unsubscribeAppSettings = subscribeAppSettings((nextSettings) => {
       if (nextSettings.fuelType !== this.fuelType) {
@@ -127,12 +129,20 @@ class AutoTripService {
         this.lastFuelEthanolPercent = null;
         this.lastEstimatedFuelRate = null;
       }
+      let gpsPreferenceChanged = false;
+      if (nextSettings.gpsTrackingEnabled !== this.gpsTrackingEnabled) {
+        this.gpsTrackingEnabled = nextSettings.gpsTrackingEnabled === true;
+        gpsPreferenceChanged = true;
+      }
       if (nextSettings.backgroundGpsEnabled !== this.backgroundGpsEnabled) {
-        this.backgroundGpsEnabled = nextSettings.backgroundGpsEnabled === true;
+        this.backgroundGpsEnabled = this.gpsTrackingEnabled && nextSettings.backgroundGpsEnabled === true;
+        gpsPreferenceChanged = true;
+      }
+      if (gpsPreferenceChanged) {
         this.gpsModeTransition = this.gpsModeTransition
           .catch(() => undefined)
-          .then(() => this.applyBackgroundGpsPreference(this.backgroundGpsEnabled))
-          .catch((cause) => console.warn('[trip] falha ao aplicar preferência de GPS em segundo plano:', cause));
+          .then(() => this.applyGpsPreferences())
+          .catch((cause) => console.warn('[trip] falha ao aplicar preferências de GPS:', cause));
       }
     });
     const persisted = await initAutoSave(basePath);
@@ -258,7 +268,7 @@ class AutoTripService {
         continue;
       }
 
-      if (!this.gpsStartedForEcu && !this.gpsStartPromise && Date.now() >= this.gpsStartRetryAfterMs) {
+      if (this.gpsTrackingEnabled && !this.gpsStartedForEcu && !this.gpsStartPromise && Date.now() >= this.gpsStartRetryAfterMs) {
         this.scheduleGpsStart(generation);
       }
 
@@ -600,26 +610,35 @@ class AutoTripService {
     });
   }
 
-  private async applyBackgroundGpsPreference(enabled: boolean): Promise<void> {
+  private async applyGpsPreferences(): Promise<void> {
+    if (this.gpsStartPromise) {
+      try { await this.gpsStartPromise; } catch { /* a failed optional GPS start must not block OBD */ }
+    }
     const generation = this.generation;
     const sessionIsCurrent = () => this.running
       && generation === this.generation
       && getSharedObdStatus().ecuConnected;
     if (!sessionIsCurrent()) return;
 
-    if (enabled) {
+    if (!this.gpsTrackingEnabled) {
+      await this.stopGpsForEcu();
+      return;
+    }
+
+    if (this.backgroundGpsEnabled) {
       if (gpsTracker.isBackgroundLocationRunning()) return;
-      // Enabling the setting already obtained foreground and background consent
-      // in the Settings screen. This call only reads the granted state.
       if (gpsTracker.getState().running) {
         const started = await startBackgroundMonitoring();
         if (!sessionIsCurrent()) {
           if (started && gpsTracker.isBackgroundLocationRunning()) await gpsTracker.stop();
           return;
         }
+        // If background permission was revoked, retain the already-running
+        // foreground watcher; optional background tracking must not stop GPS.
         this.gpsStartedForEcu = gpsTracker.getState().running || gpsTracker.isBackgroundLocationRunning();
       } else {
         this.gpsStartRetryAfterMs = 0;
+        this.scheduleGpsStart(generation);
       }
       return;
     }
@@ -629,7 +648,17 @@ class AutoTripService {
       if (!sessionIsCurrent()) return;
       // Preserve accumulated distance/sample counters while changing to a
       // foreground watcher; the new stream starts with a fresh motion window.
-      const started = await gpsTracker.start({ resetTrip: false });
+      const started = await gpsTracker.start({ resetTrip: false, requestPermission: false });
+      if (!sessionIsCurrent()) {
+        if (gpsTracker.getState().running) await gpsTracker.stop();
+        return;
+      }
+      this.gpsStartedForEcu = started && gpsTracker.getState().running;
+      return;
+    }
+
+    if (!gpsTracker.getState().running) {
+      const started = await gpsTracker.start({ resetTrip: false, requestPermission: false });
       if (!sessionIsCurrent()) {
         if (gpsTracker.getState().running) await gpsTracker.stop();
         return;
@@ -643,7 +672,7 @@ class AutoTripService {
       && generation === this.generation
       && getSharedObdStatus().ecuConnected;
 
-    if (!generationIsCurrent()) return;
+    if (!generationIsCurrent() || !this.gpsTrackingEnabled) return;
 
     // GPS acquisition must never gate the serial OBD polling loop. Keep one
     // start attempt in flight; if the ECU/trip generation ends while native
@@ -658,7 +687,7 @@ class AutoTripService {
     }
 
     if (!backgroundStarted && generationIsCurrent()) {
-      await gpsTracker.start();
+      await gpsTracker.start({ requestPermission: false });
     }
 
     if (!generationIsCurrent()) {
