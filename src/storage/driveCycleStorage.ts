@@ -282,6 +282,27 @@ export async function reconcileDriveCycleHistory(
         totalCount: merged.length,
         lastModified: new Date().toISOString(),
       });
+
+      // Reconciliation imports legacy trips into the canonical index. Advance
+      // the recovery snapshot only after the new main index has been committed
+      // and validated, so a later main-file failure cannot hide those imports.
+      const backupTemp = indexTempPath(previousFile);
+      try {
+        await FileSystem.copyAsync({ from: indexFile, to: backupTemp });
+        const backupCycles = await readCyclesFromFile(backupTemp);
+        if (backupCycles === null || !sameDriveCycleHistory(backupCycles, merged)) {
+          throw new Error('BACKUP_DA_RECONCILIACAO_NAO_VALIDADO');
+        }
+        await FileSystem.deleteAsync(previousFile, { idempotent: true });
+        await FileSystem.moveAsync({ from: backupTemp, to: previousFile });
+        const committedBackup = await readCyclesFromFile(previousFile);
+        if (committedBackup === null || !sameDriveCycleHistory(committedBackup, merged)) {
+          throw new Error('BACKUP_DA_RECONCILIACAO_NAO_CONFIRMADO');
+        }
+      } catch (cause) {
+        await FileSystem.deleteAsync(backupTemp, { idempotent: true }).catch(() => undefined);
+        console.warn('[trips] índice principal conciliado, mas o backup não foi avançado:', cause instanceof Error ? cause.message : cause);
+      }
     }
     return merged;
   });
