@@ -55,6 +55,8 @@ assert.match(tripStorage, /migrateHistoryIndexDocument\(parsed\)/);
 assert.match(tripStorage, /schemaVersion: CURRENT_HISTORY_SCHEMA_VERSION/);
 assert.match(tripStorage, /CURRENT_HISTORY_SCHEMA_VERSION/);
 assert.match(tripStorage, /schemaVersion as number/);
+assert.match(tripStorage, /verified\.totalCount !== data\.cycles\.length/);
+assert.match(source, /tripDirectoryBytes/);
 const legacyIndex = { version: '1.0', totalCount: 99, customMetadata: 'preserve', cycles: [{ id: 'trip-1', telemetrySamples: [{ timestamp: '2026-01-01T00:00:00.000Z' }] }] };
 const migrated = migrateHistoryIndexDocument(legacyIndex);
 assert.equal(migrated.migrated, true);
