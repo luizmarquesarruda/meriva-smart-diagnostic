@@ -137,7 +137,7 @@ Para baixar uma versão, entre no GitHub com uma conta que tenha acesso de leitu
 
 ## GPS e permissões
 
-A conexão OBD solicita apenas as permissões Bluetooth necessárias. A localização não é requisito de inicialização, conexão ou polling da ECU. O rastreamento GPS em primeiro plano é iniciado de forma não bloqueante após a validação da ECU; o acesso com a tela apagada é opcional, permanece desativado por padrão e só solicita permissão após ativação explícita em **Configurações**. `autoTripService` é o único proprietário do ciclo de vida GPS/viagens; `sharedConnection` permanece responsável pela sessão OBD.
+A conexão OBD solicita apenas as permissões Bluetooth necessárias. A localização não é requisito de inicialização, conexão ou polling da ECU. O uso do GPS para distância e viagens começa desativado e só é ativado após opt-in explícito em **Configurações**; o rastreamento com a tela apagada exige uma segunda autorização. Os serviços de OBD/viagem consultam somente permissões já concedidas e nunca abrem caixas de localização durante o polling. `autoTripService` é o único proprietário do ciclo de vida GPS/viagens; `sharedConnection` permanece responsável pela sessão OBD.
 
 ## Testes
 
