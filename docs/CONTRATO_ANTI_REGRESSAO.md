@@ -74,14 +74,6 @@ A CI pode validar e compilar em branches e pull requests, mas não pode publicar
 
 ## Permissões e ciclo de vida GPS
 
-- A inicialização pede apenas permissões necessárias ao Bluetooth/OBD; localização não pode bloquear conexão, polling ou diagnóstico.
-- A permissão de localização em primeiro plano só pode ser solicitada pelo fluxo de uso GPS/viagem, não como efeito colateral da inicialização do app.
-- A permissão em segundo plano exige opt-in explícito na tela Configurações; serviços de GPS só consultam a permissão existente e nunca exibem prompt durante polling OBD.
-- `autoTripService` é o único dono do ciclo de vida GPS/viagem. `sharedConnection` administra somente a sessão OBD; não pode iniciar/parar o rastreador.
-- Trocar de rastreamento em segundo plano para primeiro plano durante uma sessão não pode zerar distância ou contagem de amostras já acumuladas.
-
-## Permissões e ciclo de vida GPS
-
 - A inicialização pede somente permissões necessárias ao Bluetooth/OBD; localização não pode bloquear conexão, polling ou diagnóstico.
 - A permissão de localização em primeiro plano exige opt-in explícito na tela Configurações. A preferência ausente em configurações antigas equivale a desativado.
 - A permissão em segundo plano exige GPS foreground previamente ativado e um segundo opt-in explícito; serviços automáticos apenas consultam permissões existentes e nunca abrem prompts durante polling OBD.
