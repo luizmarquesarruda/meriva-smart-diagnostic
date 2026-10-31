@@ -6,7 +6,7 @@ export interface DiagnosticTraceFailure {
 
 function decodeJsonString(value: string): string {
   try {
-    return JSON.parse('" + value + "') as string;
+    return JSON.parse('"' + value + '"') as string;
   } catch {
     return value;
   }
