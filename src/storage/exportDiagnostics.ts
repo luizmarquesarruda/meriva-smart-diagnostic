@@ -1,8 +1,12 @@
 import * as FileSystem from 'expo-file-system';
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 import { getAutoSaveState } from '../meriva/autosaveManager';
 import { readDtcs } from '../database/dtcManager';
 import { readDriveCycles } from './driveCycleStorage';
 import { escapeCsvCell } from './csvEncoding';
+import { readMaintenanceData } from '../database/maintenanceStorage';
+import { buildDiagnosticExportDocument } from './diagnosticExportContract';
 
 async function ensureExportDir(basePath: string): Promise<string> {
   const dir = `${basePath}/BACKUP/EXPORTS`;
@@ -11,24 +15,45 @@ async function ensureExportDir(basePath: string): Promise<string> {
 }
 
 export async function exportDiagnosticsJson(basePath: string): Promise<string> {
-  const state = getAutoSaveState();
-  const dtcs = await readDtcs(basePath);
-  const driveCycles = await readDriveCycles(basePath);
-  const dir = await ensureExportDir(basePath);
-  const path = `${dir}/diagnostic_${Date.now()}.json`;
-  await FileSystem.writeAsStringAsync(path, JSON.stringify({
-    exportedAt: new Date().toISOString(),
+  const stateSnapshotAt = new Date().toISOString();
+  // Keep one immutable in-memory snapshot while asynchronous files are read.
+  const liveState = getAutoSaveState();
+  const state = JSON.parse(JSON.stringify(liveState)) as typeof liveState;
+  const [dtcs, driveCycles, maintenance] = await Promise.all([
+    readDtcs(basePath),
+    readDriveCycles(basePath),
+    readMaintenanceData(basePath),
+  ]);
+  const constants = (Platform as unknown as { constants?: Record<string, unknown> }).constants ?? {};
+  const getPlatformValue = (key: string): string | undefined => {
+    const value = constants[key];
+    return typeof value === 'string' || typeof value === 'number' ? String(value) : undefined;
+  };
+  const exportedAt = new Date().toISOString();
+  const document = buildDiagnosticExportDocument({
+    exportedAt,
+    stateSnapshotAt,
+    appVersion: Constants.expoConfig?.version ?? 'N/D',
+    platform: {
+      os: Platform.OS,
+      androidRelease: getPlatformValue('Release'),
+      apiLevel: Platform.OS === 'android' ? Platform.Version : undefined,
+      manufacturer: getPlatformValue('Manufacturer'),
+      model: getPlatformValue('Model') ?? Constants.deviceName ?? undefined,
+    },
     vehicle: state.vehicle,
     obd: state.obd,
     lastReadings: state.lastReadings,
     dtcs,
     driveCycles,
     autonomy: state.autonomy,
-    sourcePolicy: {
-      realObd: 'REAL_OBD',
-      importedReference: 'CARSCANNER_SEED',
-    },
-  }, null, 2), { encoding: FileSystem.EncodingType.UTF8 });
+    maintenance,
+  });
+  const dir = await ensureExportDir(basePath);
+  const path = `${dir}/diagnostic_${Date.now()}.json`;
+  await FileSystem.writeAsStringAsync(path, JSON.stringify(document, null, 2), {
+    encoding: FileSystem.EncodingType.UTF8,
+  });
   return path;
 }
 
