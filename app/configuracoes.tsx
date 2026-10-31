@@ -403,7 +403,7 @@ export default function ConfiguracaoScreen() {
       <TouchableOpacity style={styles.button} onPress={handleCleanLogs} disabled={busy}>
         <Text style={styles.buttonText}>{busy ? 'AGUARDE...' : 'LIMPAR LOGS ANTIGOS'}</Text>
       </TouchableOpacity>
-      <Text style={styles.info}>O relatório técnico preserva endereços MAC e trilha completa. O compartilhável oculta endereços MAC, inclusive dentro da trilha RAW.</Text>
+      <Text style={styles.info}>PRIVACIDADE: o relatório técnico Bluetooth preserva a trilha e os endereços MAC; o TXT de salvamento pode conter VIN, nome do adaptador, DTCs e dados do veículo. O compartilhável mascara MACs, nomes conhecidos de dispositivos, VIN rotulado e coordenadas GPS rotuladas; ainda mantém leituras, DTCs e características do aparelho. Revise antes de enviar.</Text>
       <TouchableOpacity style={styles.button} onPress={() => void handleBluetoothReport('TECHNICAL')} disabled={busy}>
         <Text style={styles.buttonText}>{busy ? 'AGUARDE...' : 'EXPORTAR RELATÓRIO TÉCNICO BLUETOOTH (.TXT)'}</Text>
       </TouchableOpacity>
