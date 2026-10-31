@@ -111,7 +111,7 @@ export default function ConfiguracaoScreen() {
 
   return (
     <SafeAreaView style={{flex:1,backgroundColor:COLORS.screen}} edges={["top","bottom","left","right"]}>
-    <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
+    <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, paddingVertical: layout.compact ? 12 : 16, alignItems: 'center' }]}>
       <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
       <Text style={[styles.title,{fontSize:layout.titleSize-3}]}>CONFIGURAÇÕES</Text>
       <Text style={styles.status}>{status}</Text>
