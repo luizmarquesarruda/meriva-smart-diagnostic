@@ -36,6 +36,17 @@ const diagnosticsExporter = read('src/storage/exportDiagnostics.ts');
 // Gate itself must be a first-class CI step, not a note in the diary.
 assert.equal(packageJson.scripts['gate:baseline'], 'node tests/projectBaseline.test.js');
 assert.match(workflow, /name: Run anti-regression baseline gate[\s\S]*?run: npm run gate:baseline/);
+// CI security: APKs are not published from public repositories or pull-request builds.
+assert.doesNotMatch(workflow, /^\s*publish-release\s*:/m, 'CI must never create public GitHub Releases automatically');
+assert.doesNotMatch(workflow, /^\s*contents:\s*write\s*$/m, 'the build workflow must not request write access to repository contents');
+assert.match(workflow, /github\.event\.repository\.visibility == 'private'/, 'APK artifact upload must require a private repository');
+assert.match(workflow, /github\.ref == 'refs\/heads\/main'/, 'APK artifact upload must be limited to main');
+assert.match(workflow, /retention-days:\s*3\b/, 'private APK artifacts must have short retention');
+assert.match(workflow, /sha256sum android\/app\/build\/outputs\/apk\/release\/app-release\.apk/, 'the APK must have a verifiable SHA-256 checksum');
+assert.match(workflow, /actions\/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1/);
+assert.match(workflow, /actions\/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1/);
+assert.match(workflow, /actions\/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad/);
+assert.match(workflow, /actions\/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9/);
 assert.equal(packageJson.scripts.validate, 'npm run typecheck && npm test');
 
 // Regression-sensitive suites must remain connected to npm test.

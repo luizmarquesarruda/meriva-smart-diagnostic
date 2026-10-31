@@ -1,19 +1,15 @@
-## ESTADO VIGENTE — 2026-10-30 (correções GPS + acompanhamento CI)
+## ESTADO VIGENTE — 2026-10-31 (contenção de distribuição pública do APK)
 
-> Frente única de trabalho: PR #96, branch `ui/cockpit-instant-consumption-20261027`. Este bloco é a referência operacional; snapshots abaixo são históricos.
+> Frente P0: PR de segurança `security/private-apk-artifact-20261031`, baseada no `main` observado em `f4120541dd879231612e1622c872f98b261f092e`.
 
-- Repositório: [luizmarquesarruda/meriva-smart-diagnostic](https://github.com/luizmarquesarruda/meriva-smart-diagnostic).
-- PR #96: [Evita DTC duplicado no cockpit e mostra pressão do coletor](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/pull/96), aberta, fora de rascunho e sem merge. Base `main` observada nesta PR: `7eec3afecb3718020724baf053f8b6d2ca636fab`.
-- HEAD/CI: consultar a PR #96 para o SHA atual e o workflow correspondente. A execução no SHA `2441a48131517cf5dda600eb9ab2ec15c69ccfd4` falhou na asserção antiga de timeout; DB-181 atualiza o teste para o contrato novo. DB-178 a DB-181 precisam de validação integral no mesmo SHA final.
-- A falha histórica em `tests/orientationLayout.test.js:78` era uma asserção textual obsoleta, corrigida em DB-176. Não há confirmação de CI verde para as correções posteriores.
-- Após qualquer alteração, reconsultar o HEAD e a CI correspondentes. Só considerar a PR validada com `validate` e `android-build` verdes no mesmo SHA, diff reconciliado contra `main` e validação física separada.
-- A auditoria atual encontrou divergências de documentação e um débito relevante de modernização do SDK. Não houve upgrade de SDK nem remoção de dependências nativas nesta rodada: fazê-los antes de preservar um baseline físico poderia introduzir regressão no Bluetooth Classic.
-- Testes com Galaxy A06/Android 16/ELM327 real, confirmação de resposta `010C`, inspeção do APK instalado e validação GPS/autonomia continuam pendentes.
-- DB-145 registra a regressão de leitura KWP e classificação de estado ECU/Bluetooth; DB-162/163/164/166 protegem o ciclo RFCOMM; DB-165 limita HTTP de clima; DB-167 expira fixes GPS antigos; DB-168 neutraliza fórmula no CSV; DB-169 torna o start GPS não bloqueante para o polling OBD e aplica cooldown de retry. DB-170 atualiza o gate para aceitar a proteção de timestamp por `state.lastTimestamp`. DB-171 serializa cancelamento da descoberta; DB-172 valida coeficientes/resultados de fórmula; DB-173 corrige documentação cloud; DB-174 centraliza os tokens de cor compartilhados nas telas. DB-175 limita as chamadas de localização opcionais e usa backoff exponencial para o enriquecimento online. DB-177 limita a própria operação nativa de desconexão e mantém o bloqueio RFCOMM se ela expirar; DB-178 bloqueia reconexão quando a sonda do socket fica indeterminada; DB-179 reutiliza a Promise nativa pendente para impedir desconexões concorrentes; DB-180 bloqueia novos comandos após timeout sem prompt para evitar que resposta atrasada seja atribuída ao PID seguinte. DB-182/183 corrigem regressões e cobertura do GPS (timestamp monotônico, ciclo background e movimento urbano); DB-184 mantém o índice do diário alinhado à sequência de IDs.
-- O cockpit deve continuar mostrando N/D até existir leitura OBD real, completa e recente; seed ou histórico não deve ser reapresentado como valor atual.
-- DB-146 restaura os quatro quadrantes de telemetria em simultâneo; os PIDs adicionais continuam acessíveis em páginas de quatro métricas. A ausência de ECU não remove a grade, apenas mantém os valores em N/D.
-- DB-147 fixa os quatro PIDs principais na primeira página e transforma os restantes PIDs suportados em carrossel completo, com setas anterior/próxima e avanço automático a cada 10 s. Anomalias adicionais são priorizadas sem deslocar os quadrantes principais.
-- DB-148 corrige a ocupação vertical em paisagem: cabeçalho/clima na mesma faixa, cockpit + sessão lado a lado, navegação lateral e métricas compactas. O teste físico deve confirmar clipping/overlap no Galaxy A06.
+- Repositório: [luizmarquesarruda/meriva-smart-diagnostic](https://github.com/luizmarquesarruda/meriva-smart-diagnostic). A consulta de configuração retornou `visibility: public`; a lista de GitHub Releases está vazia.
+- Risco confirmado em `main`: o workflow enviava APK como artefato em todos os eventos/builds, com retenção de 14 dias, em repositório público. A branch da PR #98 também contém job `publish-release` com permissão `contents: write`; esse job não existe no `main` observado, mas continua perigoso na branch.
+- Correção nesta frente: retirar publicação de Release, condicionar upload a `repository.visibility == private` e `refs/heads/main`, não enviar APK em PR ou enquanto público, limitar artefato a três dias, gerar checksum SHA-256, manter `contents: read` e fixar Actions em SHAs completos.
+- Limite operacional: a integração GitHub disponível nesta sessão não oferece alteração de visibilidade nem remoção de artefatos. O workflow bloqueia novos uploads públicos após a correção ser integrada, mas o código-fonte continua público até o proprietário alterar a visibilidade para `Private`; artefatos anteriores precisam ser revisados separadamente.
+- PR #98 permanece aberta com alterações Bluetooth/autonomia. Sua versão do workflow e a sequência DB-185 a DB-197 precisam ser reconciliadas após integrar esta correção de segurança; não mesclar uma branch que reintroduza o job de Release.
+- PR #99 permanece aberta. Seu DB-185 de navegação conflita com o DB-185 do trabalho Bluetooth na #98; a numeração deve ser refeita depois da consolidação, nunca resolvida apenas adicionando um item ao índice.
+- Toda validação deve ser consultada no SHA final da frente: `validate` e `android-build` verdes no mesmo commit. O ensaio físico do Galaxy A06/Android 16/ELM327/ECU continua separado e pendente.
+
 ---
 
 ## ESTADO HISTÓRICO — 2026-10-25 (snapshot DB-130; superado em 2026-10-28)
@@ -273,6 +269,7 @@
 - **DB-182** · 2026-10-30 — Corrigir fixture de timestamp GPS e mockar ciclo de vida nativo em segundo plano
 - **DB-183** · 2026-10-30 — Confirmar movimento urbano sem exigir 8 m em cada callback GPS
 - **DB-184** · 2026-10-30 — Sincronizar índice DB-NNN com as novas entradas de auditoria
+- **DB-185** — Bloquear publicação pública/automática do APK; upload privado somente na branch main, checksum SHA-256 e Actions fixadas em commit.
 
 ---
 
@@ -4815,3 +4812,22 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 
 ### Validação
 - O próximo push deve disparar a CI para o HEAD atualizado. Ainda não há resultado de `validate` nem de `android-build` para esse novo SHA.
+
+
+## DB-185 · 2026-10-31 — Bloquear publicação pública/automática do APK
+
+### Risco confirmado
+- O workflow de `main` enviava o APK como artefato em repositório público em todos os eventos, com retenção de 14 dias. A branch da PR #98 ainda continha `publish-release`, permissão `contents: write` e criação automática de GitHub Release em push para `main`.
+- O repositório foi confirmado como `public`; a API de Releases retornou lista vazia. Não foi encontrada Release pública ativa no momento da auditoria.
+
+### Correção aplicada nesta branch
+- Removido o job de publicação de GitHub Release e qualquer uso de `contents: write` no workflow de build.
+- O upload do APK agora exige, ao mesmo tempo, repositório `private` e referência `refs/heads/main`; builds de PR, outras branches e repositório público não enviam o APK.
+- O artefato passa a incluir checksum SHA-256 e tem retenção de três dias.
+- `actions/checkout`, `setup-node`, `setup-java` e `upload-artifact` foram fixadas nos SHAs completos das releases oficiais verificadas.
+- O baseline anti-regressão, contrato e plano de testes passam a proteger a política.
+
+### Limites e validação
+- O GitHub connector desta sessão não oferece operação para mudar visibilidade do repositório nem apagar artefatos já criados. O repositório continua público até ação do proprietário em Settings; esta PR impede novos uploads públicos apenas depois de integrada.
+- A validação automatizada e o build Android devem concluir no mesmo SHA desta branch. Nenhum resultado é presumido antes da CI.
+- Não houve teste físico, alteração do transporte Bluetooth, migração SQLite ou merge nesta correção.
