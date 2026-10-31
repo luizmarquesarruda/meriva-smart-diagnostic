@@ -273,6 +273,7 @@
 - **DB-182** · 2026-10-30 — Corrigir fixture de timestamp GPS e mockar ciclo de vida nativo em segundo plano
 - **DB-183** · 2026-10-30 — Confirmar movimento urbano sem exigir 8 m em cada callback GPS
 - **DB-184** · 2026-10-30 — Sincronizar índice DB-NNN com as novas entradas de auditoria
+- **DB-185** — Separar visualmente as cinco abas inferiores do cockpit em retrato, preservando o layout em paisagem.
 
 ---
 
