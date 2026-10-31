@@ -57,7 +57,7 @@ assert.strictEqual((shared.match(/XX:XX:XX:XX:XX:XX/g) || []).length, 3,
   'shareable output must redact colon- and hyphen-separated MACs');
 const personalReport = [
   'VIN: 1HGCM82633A004352',
-  'deviceName: Galaxy Duzentos',
+  'deviceName: Phone Name XYZ',
   'latitude: -23.501234',
   'longitude: -47.452345',
   'GPS: -23.501234, -47.452345',
