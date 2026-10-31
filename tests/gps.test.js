@@ -227,6 +227,54 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
     'three valid urban segments at 10 km/h must contribute confirmed distance');
   await urbanTracker.stop();
 
+  // With no GPS speed field and no supported OBD speed PID, the tracker may
+  // derive speed from four accurate positions when three consecutive segments
+  // independently confirm sufficient net displacement.
+  const derivedOnlyTracker = new GpsTracker({
+    now: () => 200_000,
+    setIntervalFn: () => 44,
+    clearIntervalFn: () => {},
+  });
+  assert.strictEqual(await derivedOnlyTracker.start(), true);
+  const derivedOnlyWatcher = watcher;
+  derivedOnlyWatcher({ coords: { latitude: 0, longitude: 0, speed: null, accuracy: 5 }, timestamp: 50000 });
+  derivedOnlyWatcher({ coords: { latitude: 0, longitude: 0.000025, speed: null, accuracy: 5 }, timestamp: 51000 });
+  derivedOnlyWatcher({ coords: { latitude: 0, longitude: 0.000050, speed: null, accuracy: 5 }, timestamp: 52000 });
+  derivedOnlyWatcher({ coords: { latitude: 0, longitude: 0.000075, speed: null, accuracy: 5 }, timestamp: 53000 });
+  assert.strictEqual(derivedOnlyTracker.getState().speedSource, 'GPS',
+    'position-derived speed must be labelled GPS when OBD/GPS speed fields are absent');
+  assert.ok(derivedOnlyTracker.getState().currentSpeedKmh >= 9.5
+    && derivedOnlyTracker.getState().currentSpeedKmh <= 10.5,
+  'three accurate segments must derive approximately 10 km/h');
+  assert.ok(derivedOnlyTracker.getState().distanceKm >= 0.008,
+    'validated position-derived movement must add the confirmed distance');
+  derivedOnlyWatcher({ coords: { latitude: 0, longitude: 0.000100, speed: null, accuracy: 5 }, timestamp: 54000 });
+  assert.ok(derivedOnlyTracker.getState().currentSpeedKmh >= 9.5,
+    'position-derived speed must remain stable after the first confirmed window');
+  derivedOnlyWatcher({ coords: { latitude: 0, longitude: 0.000125, speed: null, accuracy: 5 }, timestamp: 55000 });
+  assert.ok(derivedOnlyTracker.getState().currentSpeedKmh >= 9.5,
+    'continuous position-only movement must not reset speed after a single segment');
+  await derivedOnlyTracker.stop();
+
+  // A position-only drift must not accumulate over multiple failed windows.
+  const derivedDriftTracker = new GpsTracker({
+    now: () => 250_000,
+    setIntervalFn: () => 45,
+    clearIntervalFn: () => {},
+  });
+  assert.strictEqual(await derivedDriftTracker.start(), true);
+  const derivedDriftWatcher = watcher;
+  for (let index = 0; index < 7; index += 1) {
+    derivedDriftWatcher({
+      coords: { latitude: 0, longitude: index * 0.0000144, speed: null, accuracy: 5 },
+      timestamp: 60000 + index * 1000,
+    });
+  }
+  assert.strictEqual(derivedDriftTracker.getState().distanceKm, 0,
+    'sub-threshold position-only drift must be discarded instead of accumulating');
+  assert.strictEqual(derivedDriftTracker.getState().currentSpeedKmh, 0);
+  await derivedDriftTracker.stop();
+
   // A total loss of fresh GNSS fixes must expire stale GPS speed without erasing distance.
   // A fresh OBD speed remains independent and must be the actual value labelled OBD.
   let fakeNow = 100_000;

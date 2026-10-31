@@ -100,6 +100,157 @@ function splitPages(content: string): Map<string, string> {
   return pages;
 }
 
+function previousHistoryPath(path: string): string {
+  return `${path}.previous`;
+}
+
+function temporaryHistoryPath(path: string): string {
+  return `${path}.tmp`;
+}
+
+function temporaryPreviousHistoryPath(path: string): string {
+  return `${path}.previous.tmp`;
+}
+
+async function readHistorySnapshot(path: string): Promise<string | null> {
+  const info = await FileSystem.getInfoAsync(path);
+  if (!info.exists) return null;
+  if (info.isDirectory) throw new Error('SNAPSHOT_DO_HISTORICO_APONTA_PARA_DIRETORIO');
+  return FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 });
+}
+
+async function readPreviousHistorySnapshot(path: string): Promise<string | null> {
+  const previousPath = previousHistoryPath(path);
+  const previous = await readHistorySnapshot(previousPath);
+  if (previous != null) return previous;
+  return readHistorySnapshot(previousPath + '.fallback');
+}
+
+async function writePreviousHistorySnapshot(path: string, content: string): Promise<void> {
+  const previousPath = previousHistoryPath(path);
+  const temporaryPath = temporaryPreviousHistoryPath(path);
+  const fallbackPath = previousPath + '.fallback';
+  let fallbackReady = false;
+
+  try {
+    await writeAndVerifyHistoryFile(temporaryPath, content);
+    const previousInfo = await FileSystem.getInfoAsync(previousPath);
+    if (previousInfo.exists && previousInfo.isDirectory) {
+      throw new Error('BACKUP_DO_HISTORICO_APONTA_PARA_DIRETORIO');
+    }
+    const fallbackInfo = await FileSystem.getInfoAsync(fallbackPath);
+    if (fallbackInfo.exists && fallbackInfo.isDirectory) {
+      throw new Error('FALLBACK_DO_HISTORICO_APONTA_PARA_DIRETORIO');
+    }
+    if (fallbackInfo.exists) await FileSystem.deleteAsync(fallbackPath, { idempotent: true });
+    if (previousInfo.exists) {
+      await FileSystem.moveAsync({ from: previousPath, to: fallbackPath });
+      fallbackReady = true;
+    }
+
+    try {
+      await FileSystem.moveAsync({ from: temporaryPath, to: previousPath });
+      const verified = await readHistorySnapshot(previousPath);
+      if (verified !== content) throw new Error('NOVO_BACKUP_DO_HISTORICO_NAO_VALIDADO');
+      if (fallbackReady) {
+        await FileSystem.deleteAsync(fallbackPath, { idempotent: true });
+        fallbackReady = false;
+      }
+    } catch (cause) {
+      if (fallbackReady) {
+        const partialPrevious = await FileSystem.getInfoAsync(previousPath);
+        if (partialPrevious.exists) await FileSystem.deleteAsync(previousPath, { idempotent: true });
+        await FileSystem.moveAsync({ from: fallbackPath, to: previousPath });
+        const restored = await readHistorySnapshot(previousPath);
+        if (restored == null) throw new Error('FALLBACK_DO_HISTORICO_NAO_RESTAURADO');
+        fallbackReady = false;
+      }
+      throw cause;
+    }
+  } finally {
+    await FileSystem.deleteAsync(temporaryPath, { idempotent: true }).catch(() => undefined);
+  }
+}
+
+async function writeAndVerifyHistoryFile(path: string, content: string): Promise<void> {
+  await FileSystem.writeAsStringAsync(path, content, { encoding: FileSystem.EncodingType.UTF8 });
+  const verified = await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 });
+  if (verified !== content) throw new Error('VALIDACAO_DO_SNAPSHOT_TXT_FALHOU');
+}
+
+async function restorePreviousHistory(path: string, previousPath: string): Promise<void> {
+  const previous = await readHistorySnapshot(previousPath);
+  if (previous == null) throw new Error('SNAPSHOT_ANTERIOR_INDISPONIVEL_PARA_RECUPERACAO');
+  const currentInfo = await FileSystem.getInfoAsync(path);
+  if (currentInfo.exists) {
+    if (currentInfo.isDirectory) throw new Error('CAMINHO_PRINCIPAL_DO_HISTORICO_VIROU_DIRETORIO');
+    await FileSystem.deleteAsync(path, { idempotent: true });
+  }
+  await FileSystem.copyAsync({ from: previousPath, to: path });
+  const restored = await readHistorySnapshot(path);
+  if (restored !== previous) throw new Error('RESTAURACAO_DO_HISTORICO_NAO_VALIDADA');
+}
+
+/**
+ * Replace the daily history only after its new contents and previous snapshot
+ * have both been written and read back successfully. A failed main-file move
+ * restores the last verified snapshot instead of leaving a missing/partial file.
+ */
+async function persistHistorySnapshot(path: string, content: string, previousContent: string | null): Promise<void> {
+  const temporaryPath = temporaryHistoryPath(path);
+  const previousPath = previousHistoryPath(path);
+  const previousTemporaryPath = temporaryPreviousHistoryPath(path);
+  let previousReady = false;
+  let mainReplacementStarted = false;
+
+  try {
+    await writeAndVerifyHistoryFile(temporaryPath, content);
+
+    if (previousContent != null) {
+      await writePreviousHistorySnapshot(path, previousContent);
+      previousReady = true;
+    }
+
+    const currentMain = await FileSystem.getInfoAsync(path);
+    if (currentMain.exists && currentMain.isDirectory) {
+      throw new Error('CAMINHO_PRINCIPAL_DO_HISTORICO_VIROU_DIRETORIO');
+    }
+    if (currentMain.exists) {
+      mainReplacementStarted = true;
+      await FileSystem.deleteAsync(path, { idempotent: true });
+    }
+    mainReplacementStarted = true;
+    await FileSystem.moveAsync({ from: temporaryPath, to: path });
+
+    const verifiedMain = await readHistorySnapshot(path);
+    if (verifiedMain !== content) throw new Error('NOVO_HISTORICO_NAO_PASSOU_NA_VALIDACAO');
+
+    // Keep the recovery snapshot aligned with the newly committed main file.
+    // Failure to refresh this secondary copy must not report the already-saved
+    // event as failed, which could cause duplicate retries by the caller.
+    try {
+      await writePreviousHistorySnapshot(path, content);
+    } catch {
+      // The verified main history remains authoritative.
+    }
+  } catch (cause) {
+    let recoveryDetail = '';
+    if (mainReplacementStarted && previousReady) {
+      try {
+        await restorePreviousHistory(path, previousPath);
+      } catch (recoveryCause) {
+        recoveryDetail = '; FALHA_DE_RESTAURACAO: ' +
+          (recoveryCause instanceof Error ? recoveryCause.message : String(recoveryCause));
+      }
+    }
+    const message = cause instanceof Error ? cause.message : String(cause);
+    throw new Error('FALHA_AO_GRAVAR_HISTORICO_DIARIO: ' + message + recoveryDetail);
+  } finally {
+    await FileSystem.deleteAsync(temporaryPath, { idempotent: true }).catch(() => undefined);
+    await FileSystem.deleteAsync(previousTemporaryPath, { idempotent: true }).catch(() => undefined);
+  }
+}
+
 async function appendDailyObdSessionEventUnsafe(
   basePath: string,
   state: MerivaPersistedState,
@@ -109,15 +260,17 @@ async function appendDailyObdSessionEventUnsafe(
   const path = historyPath(basePath);
   const date = localDayKey(new Date(timestamp));
   await FileSystem.makeDirectoryAsync(`${basePath}/VIAGENS`, { intermediates: true });
-  let content = '';
-  const info = await FileSystem.getInfoAsync(path);
-  if (info.exists && info.isDirectory) {
-    throw new Error('O caminho do histórico diário aponta para um diretório; arquivo existente preservado.');
-  }
-  if (info.exists) {
-    // A failure to read an existing file is not equivalent to an empty history.
-    // Abort the append instead of overwriting unreadable data with a new file.
-    content = await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 });
+  const mainSnapshot = await readHistorySnapshot(path);
+  let content = mainSnapshot ?? '';
+  let previousContent: string | null = mainSnapshot;
+  if (mainSnapshot == null) {
+    // A missing main file may be the result of an interrupted replacement.
+    // Recover the previous verified snapshot instead of starting an empty log.
+    const recovered = await readPreviousHistorySnapshot(path);
+    if (recovered != null) {
+      content = recovered;
+      previousContent = recovered;
+    }
   }
 
   const pages = splitPages(content);
@@ -131,7 +284,7 @@ async function appendDailyObdSessionEventUnsafe(
   for (const day of sortedDates) {
     output.push('', `========== DIA: ${day} ==========`, pages.get(day) ?? '', `========== FIM DO DIA ==========`);
   }
-  await FileSystem.writeAsStringAsync(path, `${output.join('\n')}\n`, { encoding: FileSystem.EncodingType.UTF8 });
+  await persistHistorySnapshot(path, `${output.join('\n')}\n`, previousContent);
   return { date, eventCount };
 }
 
