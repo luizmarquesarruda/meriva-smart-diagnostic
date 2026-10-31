@@ -231,3 +231,21 @@ O catálogo atual contém 34 PIDs, 20 fórmulas, 34 faixas e 30 avaliações de 
 - Exigir deslocamento líquido do início ao fim da janela maior ou igual ao limite de precisão calculado; segmentos individuais acima de 250 m, velocidade incoerente, precisão inválida ou intervalo excessivo quebram a janela.
 - Confirmar que zigue-zague/jitter parado não aumenta a distância e que a distância só é adicionada após a confirmação da janela.
 - Ensaiar também no veículo, comparando com odômetro/percurso conhecido. O teste sintético não substitui validação de precisão GNSS no Android 16.
+
+## GPS-DERIVED-SPEED-01 — Velocidade derivada por posições GPS válidas
+
+- Quando OBD 010D e velocidade do callback GPS não estiverem disponíveis, quatro posições com precisão conhecida e timestamps estritamente crescentes podem confirmar três segmentos de movimento.
+- Derivar velocidade por distância geodésica/tempo e só confirmar movimento quando cada segmento estiver dentro dos limites e o deslocamento líquido da janela superar o limiar de precisão.
+- Velocidade explicitamente reportada abaixo de 5 km/h, acima do limite plausível ou não finita não pode ser ignorada para promover movimento.
+- Se uma janela de três segmentos não atingir o deslocamento líquido e não existir velocidade independente, descartar toda a janela; não acumular deriva em janelas consecutivas.
+- Testes automatizados: `tests/gps.test.js` cobre posição-only a 10 km/h, deriva abaixo do limiar, timestamps, precisão, retomada após perda de fix e continuidade foreground/background.
+- Aceitação física: no Galaxy A06 / Android 16, comparar velocidade e distância GPS com hodômetro/percurso conhecido em baixa velocidade, parada, retomada e céu parcialmente obstruído. Teste sintético não valida precisão GNSS real.
+
+## HISTORY-ATOMIC-01 — Persistência recuperável do histórico diário ECU
+
+- Serializar todas as operações read-modify-write para o mesmo arquivo.
+- Escrever o novo conteúdo num temporário, ler de volta e validar igualdade antes de substituir o histórico principal.
+- Antes da substituição, preservar o último snapshot íntegro num arquivo `.previous`; se a troca do principal falhar, restaurar e validar o snapshot anterior.
+- Se o principal estiver ausente, tentar recuperar o snapshot anterior antes de iniciar um histórico vazio. Se o principal existir mas estiver ilegível, abortar sem sobrescrevê-lo.
+- Testes automatizados: primeira gravação, múltiplos eventos, concorrência, falha simulada de move, restauração do snapshot e leitura de arquivo principal ilegível.
+
