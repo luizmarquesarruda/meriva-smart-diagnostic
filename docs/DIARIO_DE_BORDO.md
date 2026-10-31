@@ -1,12 +1,13 @@
-## ESTADO VIGENTE — 2026-10-31 (permissões GPS desacopladas do OBD)
+## ESTADO VIGENTE — 2026-10-31 (layout responsivo e permissões GPS desacopladas)
 
-> Frente dependente da PR #100: `fix/optional-gps-permissions-20261031`. A base inclui o endurecimento de artefatos privados, ainda sujeito ao build Android da PR #100.
+> PR #102 — `fix/layout-system-consolidation-20261031`, reconciliada com o `main` SHA `1443ace6ac3d35139d1177fd0601ada871826dc5` antes da validação final.
 
-- Repositório: [luizmarquesarruda/meriva-smart-diagnostic](https://github.com/luizmarquesarruda/meriva-smart-diagnostic). Visibilidade verificada como `public`; o workflow novo bloqueia upload de APK enquanto continuar público.
-- PR #100: segurança de CI, sem publicação automática, upload somente em `main` quando privado, checksum e retenção de três dias. Não mesclar até `validate` e `android-build` verdes no mesmo SHA.
-- Esta frente elimina pedidos de localização durante inicialização/polling OBD. GPS foreground e background começam desativados e exigem opt-in explícito; remove a inicialização duplicada em `sharedConnection` e mantém `autoTripService` como proprietário único.
-- O GPS foreground só é iniciado após a opção de distância/viagens ser ativada e autorizada. O modo com tela apagada exige opt-in adicional. Os serviços usam somente checagem de permissão sem prompt automático; trocas de modo preservam distância acumulada.
-- PR #98 e #99 permanecem sem merge; seus contratos e números DB-NNN precisam ser reconciliados sobre esta base antes de integração. Nenhum teste físico no Galaxy A06/Android 16/ELM327 é declarado por esta frente.
+- A base atual contém a separação entre permissões Bluetooth/OBD e GPS opcional. GPS foreground/background exigem opt-in explícito; `autoTripService` controla o ciclo de vida e o startup OBD não solicita localização.
+- A segurança de artefatos continua restrita: nenhum APK é publicado em PR nem enquanto o repositório estiver público; o upload só pode ocorrer em `main` privado, com checksum e retenção curta.
+- Esta PR consolida navegação independente das cinco abas em retrato, preserva a geometria de paisagem, padroniza cabeçalhos internos e retornos e aplica grids responsivos em Viagens, Manutenção e Configurações.
+- A tela Configurações foi reconciliada com os switches de GPS e permissões do `main`; os controles de layout foram portados sem remover preferências GPS nem reintroduzir prompts durante o startup OBD.
+- Não houve alteração de protocolo ELM327, PIDs, transporte Bluetooth, cálculo de autonomia ou fórmulas. Nenhum APK foi gerado ou distribuído nesta frente.
+- PR #102 ainda aguarda CI no SHA final. Não mesclar antes de `gate:baseline`, `validate` e `android-build` verdes no mesmo SHA e inspeção visual em dispositivo. Teste físico no Galaxy A06/SM-A065M/Android 16 continua pendente.
 
 ---
 
@@ -267,8 +268,22 @@
 - **DB-182** · 2026-10-30 — Corrigir fixture de timestamp GPS e mockar ciclo de vida nativo em segundo plano
 - **DB-183** · 2026-10-30 — Confirmar movimento urbano sem exigir 8 m em cada callback GPS
 - **DB-184** · 2026-10-30 — Sincronizar índice DB-NNN com as novas entradas de auditoria
-- **DB-185** — Bloquear publicação pública/automática do APK; upload privado somente na branch main, checksum SHA-256 e Actions fixadas em commit.
-- **DB-186** — Desacoplar permissões GPS do OBD e centralizar o ciclo de vida de localização no AutoTripService.
+- **DB-185** · 2026-10-30 — Consumir prompt ELM já bufferizado antes de sondar o socket
+- **DB-186** · 2026-10-30 — Reconciliar configuração OTA e preservar todas as suítes de teste
+- **DB-187** · 2026-10-30 — Alinhar expo-updates à versão exigida pelo Expo Doctor
+- **DB-188** · 2026-10-30 — Corrigir strings run do job OTA para YAML válido
+- **DB-189** · 2026-10-30 — Remover atualização OTA e simplificar a entrega por APK
+- **DB-190** · 2026-10-30 — Eliminar resíduos de build EAS e restaurar identidade Expo original
+- **DB-191** · 2026-10-30 — Atualizar manual Android para o fluxo real de APK via Gradle CI
+- **DB-192** · 2026-10-30 — Remover pacotes transitivos órfãos remanescentes da configuração OTA
+- **DB-193** · 2026-10-30 — Auditoria modular: MAC normalizado, métricas ELM e buffer real 012F 10/10.
+- **DB-194** · 2026-10-30 — Corrigir relógio do buffer 012F e limpar fallback quando ECU perde resposta.
+- **DB-195** · 2026-10-30 — Auditar arquitetura, contexto, agentes e módulos; alinhar escopo do veículo e fluxo APK.
+- **DB-196** · 2026-10-30 — Incluir MANUTENCAO no backup/export, implementar restauração verificada e deduplicar CI.
+- **DB-197** · 2026-10-30 — Configurar publicação automática do APK após CI verde e corrigir gate do índice.
+- **DB-198** — Bloquear publicação pública/automática do APK; upload privado somente na branch main, checksum SHA-256 e Actions fixadas em commit.
+- **DB-199** — Consolidar responsividade, cabeçalhos, áreas de toque, navegação individual em retrato e preservação de paisagem.
+- **DB-200** — Reconciliar layout responsivo com permissões GPS opcionais já integradas ao main.
 
 ---
 
@@ -4813,7 +4828,274 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - O próximo push deve disparar a CI para o HEAD atualizado. Ainda não há resultado de `validate` nem de `android-build` para esse novo SHA.
 
 
-## DB-185 · 2026-10-31 — Bloquear publicação pública/automática do APK
+> **Reconciliação de histórico de branches (2026-10-31):** as entradas DB-185 a DB-197 abaixo foram preservadas a partir da branch da PR #98, apenas para manter a sequência documental e o histórico das propostas. Elas não indicam que o conteúdo dessas alterações foi integrado a `main`. Em especial, DB-197 descreve uma proposta antiga de publicação automática de Releases; ela conflita com a contenção de artefatos públicos registrada em DB-198 e não deve ser tratada como política vigente nem integrada sem nova revisão de segurança.
+
+## DB-185 · 2026-10-30 — Consumir prompt ELM já bufferizado antes de sondar o socket
+
+### Causa
+- `readUntilPrompt()` consultava `device.isConnected()` antes de procurar o delimitador `>` já recebido. Se a sonda nativa rejeitasse ou ficasse lenta, a resposta completa já presente no buffer não era consumida naquele ciclo e podia terminar em erro apesar de o framing estar disponível.
+
+### Correção
+- A leitura agora verifica e consome primeiro o prompt já bufferizado, incluindo a política existente de overflow e descarte de conteúdo após o primeiro prompt.
+- Só quando ainda não há prompt no buffer é feita a sonda nativa limitada pelo tempo restante; o limite global de leitura continua finito.
+- `tests/bluetoothLifecycle.test.js` protege a ordem para impedir regressão. O teste é um contrato de ordem do código, não uma simulação de hardware.
+
+### Validação e limites
+- A PR #96 já havia sido mesclada em `main` em 2026-10-30; esta correção segue em uma nova branch para revisão isolada, sem reescrever a PR integrada.
+- A CI do commit integrado `19636997c0a023f2e5ca70a09e8201dfe198f754` concluiu com sucesso antes desta correção; não é evidência de validação do novo código.
+- A nova PR precisa concluir `validate` e `android-build` no mesmo SHA. Não foi possível executar os comandos localmente através da integração GitHub.
+- Teste físico de RFCOMM, inicialização ELM e resposta real da ECU a `010C` no Galaxy A06 / Android 16 continua pendente.
+
+
+## DB-186 · 2026-10-30 — Reconciliar configuração OTA e preservar todas as suítes de teste
+
+### Defeito encontrado na antiga PR #97
+- A branch OTA estava 177 commits atrás de `main`, com mergeabilidade negativa.
+- Seu `package.json` tinha removido da sequência `npm test` suítes existentes no `main`, incluindo `locationProviders.test.js`, `csvEncoding.test.js` e `sourceStatusLegend.test.js`. O gate `tests/projectBaseline.test.js` exige que todos os arquivos `tests/*.test.js` estejam ligados ao comando de testes; essa omissão faria a reconciliação falhar e permitiria perder cobertura.
+- O lockfile OTA foi gerado sobre uma árvore antiga e não deve substituir diretamente o lockfile mais recente.
+
+### Correção aplicada nesta branch
+- Portadas as configurações OTA de forma seletiva sobre o `main` integrado: `app.json`, `eas.json`, `expo-updates ~0.25.28`, dependências correspondentes do lockfile, job de publicação condicionado e documentação.
+- O script `npm test` atual foi preservado integralmente e somente ganhou `tests/easUpdateConfig.test.js`; todas as entradas novas do lockfile foram acrescentadas sem descartar as dependências atuais.
+- O gate de publicação permanece fechado por padrão e ignora commits que alterem configuração/dependências/código nativo. A primeira APK com o módulo `expo-updates` é obrigatória antes de qualquer OTA.
+
+### Validação e limites
+- O vínculo de owner, slug, project ID e canal remoto ainda não foi autenticado contra o serviço Expo nesta sessão. A variável `EAS_UPDATE_ENABLED` deve permanecer desativada até a verificação no painel/CLI e a instalação/teste da APK inicial.
+- A CI deve validar `npm ci`, Expo Doctor, gate, TypeScript, todas as suítes e build Android no SHA final desta PR.
+- Não houve publicação OTA e não houve teste em aparelho real nesta etapa.
+
+
+## DB-187 · 2026-10-30 — Alinhar expo-updates à versão exigida pelo Expo Doctor
+
+### Causa da falha CI
+- No SHA `b9af0f602814a774367851d0b8214d1dad546e2d`, `npm ci` passou, mas o Expo Doctor falhou com 16/17 checks: `expo-updates@0.25.27` estava abaixo da versão exigida pelo Expo SDK 51 (`~0.25.28`). O gate, TypeScript, testes e build Android foram corretamente bloqueados a partir dessa etapa.
+
+### Correção
+- Atualizada a dependência em `package.json` para `~0.25.28`.
+- Atualizado `package-lock.json` com a resolução e integridade oficiais do pacote 0.25.28; as dependências transitivas já presentes foram preservadas.
+- Atualizadas as asserções de versão em `tests/easUpdateConfig.test.js`.
+
+### Validação
+- A CI precisa repetir Expo Doctor, gate anti-regressão, typecheck, suíte completa e build Android sobre o SHA final.
+- A configuração do projeto EAS (owner, slug e project ID) ainda requer confirmação de acesso no serviço Expo. A publicação OTA permanece bloqueada pela variável de opt-in e não foi executada.
+
+
+## DB-188 · 2026-10-30 — Corrigir strings run do job OTA para YAML válido
+
+### Causa da falha
+- Os dois passos finais do job `publish-ota` usavam `run: echo "… mudança: …"` em escala simples YAML. O caractere `:` seguido de espaço dentro do escalar sem aspas tornava o workflow inválido. O GitHub Actions criava uma execução de evento `push` com conclusão failure, mas sem criar jobs.
+
+### Correção
+- Os comandos de explicação para mudança nativa e ausência de código do app foram convertidos para blocos `run: |`, preservando o texto exibido e a lógica de skip.
+- Não foram alteradas as condições de publicação, a exigência de `EXPO_TOKEN`, a dependência de `validate` + `android-build` nem o opt-in `EAS_UPDATE_ENABLED=true`.
+
+### Validação
+- A CI deverá criar os jobs normalmente no novo commit. O job de validação ainda precisa comprovar Expo Doctor, baseline, TypeScript e testes; Android precisa concluir a montagem do APK no mesmo SHA.
+
+## DB-189 · 2026-10-30 — Remover atualização OTA e simplificar a entrega por APK
+
+### Decisão
+- A configuração de publicação OTA foi retirada temporariamente porque a configuração remota de owner/projeto/canal e credenciais não foi concluída e não é requisito para validar o aplicativo no aparelho.
+- A distribuição nesta fase será feita pelo APK standalone gerado e publicado como artefato da CI, sem publicação de código pelo EAS Update.
+
+### Alterações
+- Removidos expo-updates, as configurações updates/runtimeVersion, owner e project ID da configuração Expo, a referência ao canal nos perfis EAS, o job publish-ota, o teste exclusivo de OTA e a documentação específica de ativação.
+- Mantidos os jobs de validação, baseline anti-regressão, Expo Doctor, typecheck, testes existentes e build Android com upload do APK. O contrato de teste continua exigindo que todas as suítes presentes estejam ligadas ao npm test.
+- A mudança não declara conectividade Bluetooth validada: continua necessário instalar o APK e testar o adaptador ELM327 real, incluindo inicialização ELM e resposta válida da ECU a 010C no Galaxy A06 / Android 16.
+
+### Validação
+- A CI precisa executar novamente no novo SHA: npm ci, Expo Doctor, baseline, TypeScript, suíte completa e montagem do APK no mesmo commit.
+- Nenhuma atualização OTA foi publicada. Nenhum merge foi realizado por esta alteração.
+
+
+## DB-190 · 2026-10-30 — Eliminar resíduos de build EAS e restaurar identidade Expo original
+
+### Achados
+- Após a retirada da publicação OTA, permaneceram os scripts `build:apk` e `build:production` chamando `eas build`, apesar de a entrega oficial da CI usar `expo prebuild` + Gradle + upload de artefato. Esses comandos eram caminhos de build não utilizados e exigiam configuração remota EAS.
+- O arquivo `eas.json` ficou sem consumidor no fluxo de build da CI e nos scripts mantidos.
+- O `slug` do Expo havia sido alterado de `smart-obd-diagnostic` para `meriva` sem necessidade técnica para o APK Gradle, criando mudança de identidade do projeto sem benefício.
+
+### Correções
+- Removidos os scripts EAS sem consumidor de `package.json` e excluído `eas.json`.
+- Restaurado `expo.slug` para `smart-obd-diagnostic`, preservando o identificador original.
+- Mantidos os scripts locais `android`, `prebuild`, `doctor`, `validate` e o build de APK executado diretamente pelo workflow Gradle.
+- Nenhuma dependência Expo usada pelo aplicativo foi removida. Pacotes transitivos no lockfile não foram apagados por nome: só devem ser removidos se a árvore npm comprovar que ficaram sem dependentes.
+
+### Limites e validação
+- Reexecutar `npm ci`, Expo Doctor, baseline, TypeScript, todos os testes e build Android no mesmo SHA.
+- A busca de referências e a revisão de configuração foram feitas sobre a branch da PR; não equivale a auditoria dinâmica em aparelho físico.
+
+
+## DB-191 · 2026-10-30 — Atualizar manual Android para o fluxo real de APK via Gradle CI
+
+### Achado
+- `BUILD_ANDROID.md` ainda instruía login no EAS, build por perfis preview/production e AAB de produção, apesar de `eas.json` e os scripts EAS terem sido removidos e a CI usar Gradle para produzir APK standalone.
+
+### Correção
+- Reescrito o manual para documentar o pipeline real, os comandos locais, a localização do APK e a expiração de 14 dias do artefato.
+- Explicitado que atualização de código exige novo APK e que CI verde não substitui teste físico Bluetooth/ECU.
+- Registrada a dívida de modernização Expo SDK 51 / React Native 0.74.5 sem misturar upgrade de SDK nesta limpeza.
+
+### Validação
+- Conferir manual, workflow e artefato da CI no mesmo SHA após o commit.
+
+
+## DB-192 · 2026-10-30 — Remover pacotes transitivos órfãos remanescentes da configuração OTA
+
+### Achado
+- A comparação do lockfile da branch com `main` encontrou quatro pacotes novos sem dependentes externos: `expo-eas-client`, `expo-manifests`, `expo-json-utils` e `expo-structured-headers`. A única referência interna era `expo-manifests -> expo-json-utils`; a cadeia inteira ficou órfã após remover `expo-updates` e o fluxo EAS.
+
+### Correção
+- Removidas somente as quatro entradas órfãs do lockfile. Pacotes Expo usados pelo prebuild, incluindo `@expo/fingerprint`, foram preservados.
+- Nenhuma dependência direta do aplicativo foi removida; `package.json` e dependências-raiz do lockfile permanecem alinhados.
+
+### Validação
+- A CI deve comprovar `npm ci`, Expo Doctor, baseline, TypeScript, testes completos e APK no SHA final. Se o npm identificar inconsistência, reverter apenas esta poda e regenerar o lockfile pelo npm da toolchain oficial.
+
+
+## DB-193 · 2026-10-30 — Auditoria modular e correções de telemetria/autonomia
+
+### Escopo examinado
+- Telas/navegação: splash, cockpit, Bluetooth, conectividade, Dados, Viagens, Laboratório, Saúde, Armazenamento, Configurações e auxiliares.
+- OBD/Bluetooth: transporte RFCOMM, permissões/radio, fila ELM, inicialização, validação ECU por 010C, recuperação, bitmap e descoberta de PIDs.
+- GPS/rede/clima: coordenadas/timestamps, precisão, watchdog, execução em segundo plano, estado de rede e atualização opcional de clima.
+- Viagens/combustível: integração 015E, estimativas MAF/MAP, gravação de percurso, PID 012F, reserva e autonomia.
+- Persistência/armazenamento: autosave, histórico, CSV, DTC, aprendizado, exportação e quota. Caminhos protegidos foram mantidos sem reescrita especulativa.
+- Revisão estática modular direcionada por implementação, contratos e integrações; não equivale à leitura manual de cada linha dos 183 arquivos nem à execução integral no aparelho.
+
+### Defeitos confirmados e correções
+1. O callback Android de desconexão comparava MAC por igualdade textual. Variação de caixa/separadores podia impedir reconhecer a desconexão do próprio adaptador. A comparação agora normaliza os endereços; a suíte Bluetooth protege o contrato.
+2. O contador de timeouts ELM era incrementado para qualquer exceção capturada, inclusive falha de escrita nativa. Agora somente classificação TIMEOUT incrementa `timeouts`; classificação ERROR incrementa `errors`. Adicionado teste comportamental com transporte falso.
+3. A autonomia ficava indisponível após o frescor do PID 012F apesar de leituras reais recentes na sessão. Adicionado buffer volátil das dez amostras válidas mais recentes, com timestamp monotônico e média aritmética das dez leituras. Leitura ao vivo até 30 s tem prioridade; fallback expira 60 s após a última leitura. Buffer é apagado ao trocar/desconectar ECU, não é persistido e não aparece como leitura atual.
+
+### Arquivos alterados
+- `src/obd/bluetoothClassicTransport.ts`, `src/obd/elm327.ts`
+- `src/trip/fuelLevelBuffer.ts` (novo), `src/trip/autonomyPresentation.ts`, `src/trip/autoTripService.ts`
+- `app/index.tsx`, `app/dados.tsx`
+- `tests/bluetoothLifecycle.test.js`, `tests/elm327Compatibility.test.js`, `tests/autonomyPresentation.test.js`, `tests/fuelLevelBuffer.test.js` (novo), `tests/projectBaseline.test.js`, `package.json`
+- `docs/CONTRATO_ANTI_REGRESSAO.md`, `docs/TEST_PLAN.md`, `docs/DIARIO_DE_BORDO.md`
+
+### Módulos sem alteração
+- Parser, scanner DTC, descoberta de PIDs, recuperação de socket, integrador combustível, recorder de viagem, filtros GPS, enriquecimento de clima e persistência de histórico foram mantidos porque não foi confirmado defeito que justificasse alteração nesta rodada. Protocolos legados e formatos com consumidores foram preservados.
+- Dívida técnica mantida: Expo SDK 51, React Native 0.74.5, biblioteca Bluetooth Classic release candidate e APIs legadas expo-file-system. Modernizações exigem baseline e validação física separados.
+
+### Validação e pendências
+- A validação anterior estava verde no SHA `29a646d`; este lote exige novo gate, TypeScript, suíte completa e build Android.
+- Teste físico pendente: Galaxy A06 / SM-A065M / Android 16 com ELM327 real; confirmar RFCOMM, ATZ, protocolo, resposta ECU 41 0C e PID 012F. Bluetooth/ECU/autonomia física não são declarados validados.
+- Nenhum merge executado.
+
+
+## DB-194 · 2026-10-30 — Corrigir relógio do buffer 012F e limpar fallback quando ECU perde resposta
+
+### Achados confirmados na revisão pós-CI
+- O buffer 012F declarava timestamp monotônico, mas recebia Date.now(), que é relógio civil e pode ser ajustado pelo sistema. Isso podia reordenar amostras ou afetar a expiração.
+- Quando o socket Bluetooth permanecia ativo, mas a ECU deixava de responder, o serviço encerrava GPS/viagem e zerava o nível ao vivo, porém não limpava o buffer de dez amostras. Uma recuperação da ECU no mesmo socket poderia reutilizar estimativa anterior.
+- A leitura viva do PID 012F só atualizava o valor atual quando a inserção no buffer também era aceita. Os dois caminhos precisam ser independentes: uma leitura atual válida não pode ser descartada por duplicidade temporal apenas no buffer.
+
+### Correções aplicadas
+- Criado relógio monotônico de runtime baseado em performance.now(), com fallback protegido contra regressão; o buffer usa esse relógio para inserir, ordenar e expirar as amostras.
+- Separado timestamp civil de frescor da leitura atual (Date.now()) do timestamp monotônico interno do buffer.
+- A perda da resposta da ECU agora limpa o buffer, remove seus metadados de estado e zera a origem da autonomia antes de aguardar recuperação.
+- O PID 012F ao vivo atualiza o nível atual após validação da resposta real, independentemente do resultado de inserção da amostra no buffer.
+
+### Regressões adicionadas
+- Teste do relógio monotônico sob regressão simulada do relógio.
+- Testes de autonomia com relógio civil e relógio monotônico distintos.
+- Gate anti-regressão verifica o reset de buffer na transição ECU SEM RESPOSTA.
+- Requisito RG-52 documenta o contrato de separação entre leitura atual e buffer de fallback.
+
+### Validação
+- CI prévia verde no SHA f15d75916bd0222a163886e7825eaffea9d64771: validate e android-build passaram; APK standalone gerado. Esta entrada representa correções posteriores e exige nova CI no novo SHA.
+- Teste físico Galaxy A06 / Android 16 + ELM327 real permanece pendente; CI não valida rádio, ELM327 ou ECU físicos.
+
+
+## DB-195 · 2026-10-30 — Auditar arquitetura, contexto, agentes e módulos
+
+### Escopo e evidência
+- Auditoria estática da árvore da branch `fix/elm-buffered-prompt-20261030`, PR #98, SHA examinado `1feb108867d085b5c2bfe5cb1bf9d2fe7532c4bd`.
+- Cruzados arquitetura, estado/contexto, serviços/orquestradores, telas, transporte ELM327, GPS, rede, autonomia, persistência, diagnóstico, permissões, catálogos, testes, documentação e CI.
+- Relatório completo: `docs/AUDITORIA_ARQUITETURA_CONTEXTO_AGENTES_2026-10-30.md`.
+
+### Achados
+- Arquitetura principal está separada por domínio; `sharedConnection` coordena a sessão e `Elm327Session` mantém comandos serializados.
+- Não existe agente LLM/IA generativa ou agente remoto no aplicativo. Descoberta PID, diagnóstico, aprendizado e testes de sensores são motores locais determinísticos.
+- Persistência é baseada em JSON/TXT/CSV; não foi encontrada implementação SQLite nem cliente/fila de telemetria em nuvem.
+- Identificada inconsistência entre promessa de app multi-veículo e implementação que normaliza perfil para Meriva Maxx e usa tanque/reserva fixos de 56 L/5 L. O README foi corrigido para não prometer seleção de veículos inexistente. Generalização exige alteração funcional e migração próprias.
+- Expo SDK 51, React Native 0.74.5, biblioteca Bluetooth RC e APIs FileSystem legadas permanecem dívida controlada; não atualizar durante a estabilização Bluetooth.
+- README alinhado ao fluxo atual de APK standalone por Expo prebuild + Gradle; EAS Build e OTA não fazem parte do fluxo atual.
+
+### Estado CI observado no SHA examinado
+- Run `41073088871`: `validate` passou; `android-build` estava em execução.
+- O resultado acima não valida os commits de documentação DB-195; a CI deve executar novamente no HEAD resultante.
+- O APK só pode ser aceito quando o artefato vier do mesmo SHA final e for instalado/testado.
+
+### Pendências
+- Teste físico Galaxy A06 / SM-A065M / Android 16 com ELM327 real: RFCOMM, ATZ, protocolo, resposta 010C → 41 0C, PID 012F e PID 015E.
+- Percurso GPS real, comparação de distância, validação de autonomia por abastecimento e teste de background.
+- Definir futuramente se o produto será multi-veículo e medir o histórico antes de decidir migração seletiva para SQLite.
+- Nenhuma refatoração ampla de dependências foi iniciada; nenhuma conclusão de hardware foi inferida a partir da CI.
+
+
+## DB-196 · 2026-10-30 — Incluir MANUTENCAO no backup/export, implementar restauração verificada e deduplicar CI
+
+### Causa e riscos confirmados
+- `maintenanceStorage.ts` grava quilometragem, histórico de manutenção e abastecimentos em `MANUTENCAO/registros.json`, mas essa pasta não estava na lista de `createBackup`, não aparecia no detalhamento de quota e não entrava no JSON de diagnóstico exportado.
+- O aplicativo criava backups, mas não havia um fluxo geral de restauração dos snapshots locais pela tela de Configurações.
+- O workflow era acionado por push e pull_request com grupos de concorrência diferentes; as duas origens podiam iniciar CI/build APK concorrentes para o mesmo branch.
+- A inclusão de 128 KiB de dados de manutenção na fixture fez falhar uma expectativa antiga de quota (1,5 MB); o valor arredondado correto passou a 1,6 MB.
+
+### Correções aplicadas
+- A inicialização do autosave cria `MANUTENCAO`; backup, detalhamento de armazenamento e exportação JSON incluem os registros dessa pasta. A limpeza automática permanece limitada a LOGS/LEITURAS.
+- O backup valida manifesto, lista somente snapshots íntegros e restaura diretórios verificados com staging, safety backup prévio, checagem de tamanho após a cópia e rollback em falha. Diretórios ausentes em snapshots antigos são preservados.
+- Configurações exige confirmação destrutiva, desconecta a ECU, encerra o serviço de viagem, força o autosave atual, restaura os dados, re-hidrata o estado em memória e mantém a ECU desconectada.
+- `tests/regression.test.js` cobre backup de MANUTENCAO, restauração de histórico e abastecimentos, cópia de segurança do estado anterior e rejeição de snapshot adulterado. `tests/merivaAutosave.test.js` cobre criação e quota da pasta MANUTENCAO.
+- O teste de quota foi atualizado de 1,5 MB para 1,6 MB para refletir a nova pasta de dados.
+- Push e pull_request do mesmo repositório/branch compartilham o grupo de concorrência da CI, evitando build Android duplicado.
+- README, arquitetura, plano de testes, auditoria e decisões arquiteturais foram atualizados.
+
+### Decisões P2
+- Escopo atual explicitado como Chevrolet Meriva; não anunciar seleção multi-veículo que ainda não existe.
+- JSON/TXT/CSV foram mantidos; SQLite só será reavaliado com métricas de tamanho, latência, padrões de consulta e concorrência que justifiquem a migração.
+- Atualização Expo/React Native permanece separada da estabilização Bluetooth, condicionada a baseline físico e migração incremental SDK a SDK.
+
+### Recuperação do desvio de branch
+- A criação inicial do documento ADR foi executada sem o parâmetro de branch e adicionou somente `docs/DECISOES_ARQUITETURA_2026-10-30.md` a `main` no commit `709f93f20a8cd2e347fd1dde3c1dd8819663d543`.
+- A inclusão foi removida de `main` no commit `f4120541dd879231612e1622c872f98b261f092e`; o documento foi criado novamente, com branch explícita, em `fix/elm-buffered-prompt-20261030` no commit `763ca4d8f82398672d23c6826c3f989cfb7b6149`.
+- Verificação posterior confirmou que a branch `main` aponta para `f4120541dd879231612e1622c872f98b261f092e` e que o documento ADR está presente na branch da PR. Nenhum código funcional foi enviado a `main`.
+
+### Validação e pendências
+- Uma execução de CI anterior passou Expo Doctor e o gate anti-regressão, mas falhou apenas na expectativa de quota acima descrita; essa expectativa foi corrigida.
+- O SHA final após este registro deve concluir `validate` e `android-build` no mesmo workflow. A aprovação não é presumida.
+- Teste físico no Galaxy A06 / SM-A065M / Android 16 com ELM327 real, resposta ECU 010C, PIDs 012F/015E, percurso GPS, background e autonomia por abastecimento continuam pendentes.
+- PR #98 permanece aberta e não mesclada. CI verde não substitui ensaio no aparelho e no veículo.
+
+
+## DB-197 · 2026-10-30 — Publicação automática do APK estável
+
+### Objetivo
+- Eliminar a necessidade de localizar manualmente o artefato de cada execução de CI e oferecer um endereço estável para baixar a versão mais recente do Meriva Smart.
+
+### Implementação
+- O workflow .github/workflows/ci.yml ganhou o job publish-release, dependente de validate e android-build.
+- O job só executa em evento push para main; builds de pull request não são promovidos para distribuição estável.
+- O job baixa o APK produzido pela mesma execução, verifica que o arquivo existe e não está vazio e cria uma GitHub Release com tag exclusiva por execução/tentativa.
+- O APK é publicado com nome estável meriva-smart-diagnostic.apk, mantendo o endereço permanente:
+  https://github.com/luizmarquesarruda/meriva-smart-diagnostic/releases/latest/download/meriva-smart-diagnostic.apk.
+- A permissão contents: write foi limitada ao job de publicação; os demais jobs continuam com contents: read.
+- README atualizado com a regra de publicação, diferença entre artefatos de PR e releases estáveis e limitações da instalação Android.
+
+### Segurança e comportamento
+- Nenhuma versão é publicada se validação ou build Android falhar, pois o job depende dos dois jobs.
+- A release é gerada somente a partir de main; a PR #98 não publica versões estáveis enquanto não for integrada.
+- O download pode ser aberto pelo navegador Android. Instalar/atualizar o APK continua exigindo confirmação do usuário; não há instalação silenciosa nem atualização OTA.
+- Cada release preserva o SHA do commit nas notas e usa tag própria para rastreabilidade.
+
+### Validação pendente
+- A alteração precisa passar por nova CI no SHA resultante da PR.
+- Depois do merge, validar a primeira execução de push em main, confirmar a criação da Release, baixar o asset pelo endereço estável e instalar no Galaxy A06.
+- Não considerar o mecanismo validado apenas pela existência do YAML; a primeira publicação real é o teste de ponta a ponta.
+- PR #98 permanece sujeita às validações e ao teste físico Bluetooth/ELM327/ECU já registrados.
+## DB-198 · 2026-10-31 — Bloquear publicação pública/automática do APK
 
 ### Risco confirmado
 - O workflow de `main` enviava o APK como artefato em repositório público em todos os eventos, com retenção de 14 dias. A branch da PR #98 ainda continha `publish-release`, permissão `contents: write` e criação automática de GitHub Release em push para `main`.
@@ -4831,24 +5113,50 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - A validação automatizada e o build Android devem concluir no mesmo SHA desta branch. Nenhum resultado é presumido antes da CI.
 - Não houve teste físico, alteração do transporte Bluetooth, migração SQLite ou merge nesta correção.
 
+## DB-199 · 2026-10-31 — Consolidar responsividade e consistência visual entre telas
 
-## DB-186 · 2026-10-31 — Exigir opt-in GPS e centralizar a propriedade do rastreador
+### Escopo e defeitos tratados
+- A PR #99 anterior tratava somente a navegação inferior do cockpit e estava divergente da base atual. Seu refinamento de cinco abas individuais foi incorporado e ampliado nesta frente; o layout em paisagem permaneceu com as mesmas dimensões, posição e distribuição.
+- O cockpit em retrato agora usa cinco cartões de navegação independentes, com destaque visual próprio para a aba ativa e rótulos maiores. As cinco abas ampliam a área de toque com `hitSlop`; a paginação dos quadrantes também amplia sua área de toque sem alterar o desenho dos botões.
+- O rodapé do cockpit passou a consumir `COLORS.textSubtle`; rótulos auxiliares compactos e instruções dos quadrantes receberam aumento moderado de tipografia. Nenhuma fórmula, PID, fonte de leitura ou rotina OBD foi alterada.
 
-### Problemas confirmados
-- O `autoTripService` chamava `gpsTracker.start()` após ECU validada, e esse método ainda podia abrir prompt foreground mesmo com o layout já desacoplado.
-- `app/_layout.tsx` chamava `requestAllRequiredPermissions()` na inicialização e solicitava localização junto com Bluetooth, embora GPS seja opcional.
-- `sharedConnection.persistValidatedConnection()` iniciava o serviço GPS ao validar ECU, enquanto `autoTripService` também iniciava o GPS após receber a mesma conexão. Isso criava dois caminhos proprietários para um mesmo serviço nativo.
-- `startBackgroundMonitoring()` solicitava permissão de segundo plano por efeito colateral da conexão OBD.
+### Padronização global e telas secundárias
+- O Stack passou a ocultar a barra nativa para evitar cabeçalhos duplicados. Laboratório, Armazenamento e Configurações receberam retorno explícito dentro do conteúdo; as demais telas já tinham navegação de retorno própria.
+- Viagens passou a reorganizar o histórico em grade de duas colunas em paisagem, usar `layout.gap`, `layout.cardPadding`, `layout.titleSize`, `layout.valueSize` e `layout.compact`, além de alvos de toque mínimos de 48 dp nos filtros, detalhes e ações.
+- Manutenção passou a reorganizar cartões de tarefas em duas colunas em paisagem, consumir parâmetros centrais de layout e ampliar os campos e ações para pelo menos 48 dp.
+- Configurações passou a organizar cartões e ações em duas colunas em paisagem, consumir espaçamentos/tamanhos do layout compartilhado, ampliar opções e switches para 48 dp e oferecer retorno explícito a Mais Recursos.
+- Laboratório, Dados, Bluetooth, Saúde, Aprendizado, Veículo, Mais e Testes de Sensores passaram a consumir o tamanho dinâmico de título; controles de ação e retorno relevantes foram padronizados para pelo menos 48 dp.
+- As telas Configurações e Viagens preservam o conteúdo em coluna no retrato. A reorganização em paisagem usa quebra de linha e largura mínima zero, sem alterar o conteúdo de domínio ou persistência.
 
-### Correções aplicadas nesta branch
-- Startup passa a solicitar apenas Bluetooth; a localização não participa do gate OBD.
-- GPS foreground e background passam a ter flags separadas, ambas desativadas por padrão; background exige foreground habilitado.
-- As preferências `gpsTrackingEnabled` (foreground) e `backgroundGpsEnabled` começam `false`, inclusive em configurações antigas sem esses campos.
-- A tela Configurações solicita primeiro localização foreground após opt-in de uso GPS; a autorização background só é solicitada após o segundo switch explícito.
-- `GpsTracker.start` e `startBackgroundLocation` aceitam modo read-only; `autoTripService` e o serviço background não abrem prompt. Permissão revogada desativa o GPS opcional sem bloquear OBD.
-- `sharedConnection` deixa de iniciar/parar GPS; `autoTripService` fica como único proprietário do ciclo de vida.
-- Desativar o modo em segundo plano troca para watcher foreground preservando distância, velocidade máxima e amostras da viagem.
+### Testes de regressão
+- `tests/cockpitNavigation.test.js` verifica os cinco cartões em retrato, estado ativo, hitSlop de navegação/paginação e o token de contraste do rodapé.
+- `tests/orientationLayout.test.js` verifica o cabeçalho único, caminhos explícitos de retorno, grids de Viagens/Manutenção/Configurações, consumo dos parâmetros compactos e áreas de toque mínimas.
+- Os testes são estáticos/estruturais. Eles não substituem screenshots, inspeção de recorte, teste de fonte ampliada ou uso real no Galaxy A06.
 
-### Validação necessária
-- `npm run gate:baseline`, `npm run validate` e build Android na PR desta frente.
-- Validar no Galaxy A06 que negar localização não impede Bluetooth/ELM/010C, que GPS foreground funciona após ECU validada e que background só solicita permissão após opt-in.
+### Arquivos modificados
+- `app/index.tsx`, `app/_layout.tsx`, `app/viagens.tsx`, `app/manutencao.tsx`, `app/configuracoes.tsx`, `app/laboratorio.tsx`, `app/armazenamento.tsx`, `app/dados.tsx`, `app/bluetooth.tsx`, `app/saude.tsx`, `app/aprendizado.tsx`, `app/veiculo.tsx`, `app/mais.tsx`, `app/testes-sensores.tsx`.
+- Testes atualizados: `tests/cockpitNavigation.test.js` e `tests/orientationLayout.test.js`.
+
+### Validação e limites
+- Branch de consolidação: `fix/layout-system-consolidation-20261031`, criada sobre `main` no SHA `d86f3589970cefc7f816f37b582bcf15d2744bbc`.
+- Alterações finais por arquivo nesta rodada: cockpit `2a81b3545822b028928d031558acab9c47f1e8e2`; viagens `c508454bac2200375404ca143486e65800051a48`; manutenção `bafab4d5cc36a70fe4f897a359549217b864ad0a`; configurações `476ce0daaabbb8a0f087736a4b7d96d310897356`; laboratório `0b983820c1502fea6428214cfcb2b33b73c0c253`; armazenamento `d25d7c099cbe11c77c323c2c23d2dd35d4d89b14`; Stack `4d03f4f01af796a4b228b5b6b143e3e0d70b9e93`; Dados `38b556cefe46f0d2f2ef6738ae6f996dc45110d1`; Bluetooth `e982be2a4407046cd33551a953f17c78bc8990c7`; Saúde `002b5dacb9964a0f6ed7d620f58a6afa5be82d3f`; Aprendizado `1c91319505c8f81829c01e684399a0e82415b7e7`; Veículo `66c0de8eb5266d3f54184baa51abad125bafc834`; Mais `f8f8e1349c965bac37b580753f9c01b81ce5f04b`; Testes de Sensores `adfe2e484fab1089d037778e2ce0d6b7ac7e886a`; regressões de orientação `41ae858a80392e1eb7dec88fe1b29686c95020c6`; regressões de navegação `ecf42243979967826416833e61e78e96e5547843`.
+- O Diário de Bordo mantém agora DB-001…DB-199 em sequência e o índice deve corresponder ao corpo. A CI ainda precisa validar o HEAD final desta branch.
+- Não houve captura visual nem teste físico no Galaxy A06/SM-A065M/Android 16 nesta sessão. A preservação da paisagem foi mantida no código, mas clipping, fonte ampliada e toque real precisam de inspeção no dispositivo.
+- Nenhum merge foi realizado; não declarar a CI aprovada até consultar `validate` e `android-build` no mesmo SHA final.
+
+## DB-200 · 2026-10-31 — Reconciliar layout responsivo com permissões GPS opcionais
+
+### Risco encontrado na integração
+- A `main` avançou um commit após a criação da branch de layout. Esse commit alterou `app/_layout.tsx`, `app/configuracoes.tsx`, o Diário de Bordo e os módulos/contratos de permissões GPS.
+- A versão inicial da PR #102 estava baseada no SHA anterior e, se mesclada sem reconciliação, poderia restaurar o prompt de localização no startup OBD e remover da tela Configurações os switches explícitos de GPS.
+
+### Reconciliação aplicada
+- Os módulos GPS, permissões, AutoTripService, sharedConnection, testes GPS/permissões e documentos do commit `1443ace6ac3d35139d1177fd0601ada871826dc5` foram copiados para a branch de layout, preservando o comportamento mais recente de `main`.
+- `app/_layout.tsx` agora mantém `requestBluetoothPermissionsOnly()` e `canStartObdStartup({ bluetooth })`, ao mesmo tempo em que oculta a barra nativa duplicada para as rotas com cabeçalho interno.
+- `app/configuracoes.tsx` parte da versão atual com opt-in GPS foreground/background; o grid em paisagem, espaçamento compacto, cartões, botões e retorno foram reaplicados sem remover os controles GPS.
+- A política de GPS permanece: localização opcional, prompts somente após ação explícita em Configurações, background com autorização separada e ciclo de vida único em `autoTripService`.
+
+### Validação pendente
+- Conferir que a PR compara apenas o delta de layout contra o `main` atual; executar `gate:baseline`, `validate` e `android-build` no mesmo SHA final.
+- Inspecionar Configurações e cockpit em retrato/paisagem e testar no Galaxy A06/Android 16. Não declarar a CI aprovada até haver runs concluídos no HEAD da PR.
+
