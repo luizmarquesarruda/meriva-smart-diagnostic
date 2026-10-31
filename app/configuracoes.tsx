@@ -57,7 +57,33 @@ export default function ConfiguracaoScreen() {
     }
   }
 
+  async function updateGpsTrackingPreference(enabled: boolean) {
+    if (!storageBase || !settings) return;
+    if (!enabled) {
+      const next = { ...settings, gpsTrackingEnabled: false, backgroundGpsEnabled: false };
+      setSettings(next);
+      try {
+        await writeAppSettings(storageBase, next);
+        setStatus('GPS DESATIVADO • OBD PERMANECE ATIVO');
+      } catch {
+        setStatus('FALHA AO SALVAR PREFERÊNCIA GPS');
+      }
+      return;
+    }
+
+    const foreground = await requestLocationPermissionsOnly();
+    if (foreground !== 'GRANTED') {
+      Alert.alert('Localização não autorizada', 'O GPS para viagens exige permissão de localização em primeiro plano. O diagnóstico Bluetooth/OBD continua funcionando.');
+      return;
+    }
+    await updateSetting('gpsTrackingEnabled', true);
+  }
+
   async function updateBackgroundGpsPreference(enabled: boolean) {
+    if (enabled && !settings?.gpsTrackingEnabled) {
+      Alert.alert('Ative o GPS primeiro', 'Ative antes a opção de usar GPS em viagens. O rastreamento em segundo plano é complementar e opcional.');
+      return;
+    }
     if (!enabled) {
       await updateSetting('backgroundGpsEnabled', false);
       return;
@@ -177,9 +203,9 @@ export default function ConfiguracaoScreen() {
             </View>
           </View>
 
-          <SettingSwitch label="Conectar ao ELM327 automaticamente" value={settings.autoConnectObd} onChange={(v) => void updateSetting('autoConnectObd', v)} />
+          <SettingSwitch label="Usar GPS para distância e viagens" value={settings.gpsTrackingEnabled} onChange={(v) => void updateGpsTrackingPreference(v)} />
           <SettingSwitch label="Rastrear GPS com a tela apagada" value={settings.backgroundGpsEnabled} onChange={(v) => void updateBackgroundGpsPreference(v)} />
-          <Text style={styles.note}>Opcional. A permissão de segundo plano só é solicitada após ativar esta opção. Desativar muda a sessão atual para GPS em primeiro plano sem zerar a distância acumulada. A conexão OBD não depende de localização.</Text>
+          <Text style={styles.note}>GPS é opcional e não interfere no Bluetooth/OBD. A permissão em primeiro plano só é solicitada ao ativar a primeira opção; segundo plano exige que ela já esteja ativa e uma segunda autorização. Desativar GPS encerra o rastreamento sem bloquear as leituras OBD.</Text>
           <SettingSwitch label="Inicialização forçada do ELM (ATZ + ATE0)" value={settings.elmForceInitialization} onChange={(v) => void updateSetting('elmForceInitialization', v)} />
           <SettingSwitch label="Alertas de diagnóstico" value={settings.diagnosticAlerts} onChange={(v) => void updateSetting('diagnosticAlerts', v)} />
 
