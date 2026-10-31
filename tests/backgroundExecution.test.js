@@ -58,6 +58,8 @@ assert(autoTrip.includes('startBackgroundMonitoring()'), 'AutoTripService é o �
 assert(autoTrip.includes('this.gpsTrackingEnabled'), 'GPS exige opt-in foreground explícito');
 assert(autoTrip.includes('this.backgroundGpsEnabled'), 'background GPS exige preferência explícita adicional');
 assert(autoTrip.includes('applyGpsPreferences'), 'alterar preferências deve aplicar a transição de GPS');
+assert(autoTrip.includes('this.scheduleGpsStart(generation)'), 'preferências e polling devem compartilhar o mesmo dono de inicialização GPS');
+assert(autoTrip.includes('await this.gpsStartPromise'), 'troca de preferência deve aguardar a inicialização GPS já serializada');
 assert(autoTrip.includes('gpsTracker.start({ requestPermission: false })'), 'serviço OBD/trips não deve abrir prompts de localização');
 assert(monitoring.includes('startBackgroundLocation({ requestPermission: false })'), 'serviço background não pode abrir prompts de localização');
 assert(autoTrip.includes('gpsTracker.start({ resetTrip: false })'), 'troca para foreground preserva distância acumulada');
