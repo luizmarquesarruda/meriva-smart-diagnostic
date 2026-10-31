@@ -432,9 +432,9 @@ export default function ConfiguracaoScreen() {
   );
 }
 
-function SettingSwitch({ label, value, onChange }: { label: string; value: boolean; onChange: (value: boolean) => void }) {
+function SettingSwitch({ label, value, onChange, landscapeCard = false }: { label: string; value: boolean; onChange: (value: boolean) => void; landscapeCard?: boolean }) {
   return (
-    <View style={styles.switchRow}>
+    <View style={[styles.switchRow,landscapeCard&&styles.switchRowLandscape]}>
       <Text style={styles.label}>{label}</Text>
       <Switch value={value} onValueChange={onChange} />
     </View>
