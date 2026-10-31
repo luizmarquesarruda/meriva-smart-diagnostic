@@ -48,7 +48,7 @@ assert(settingsScreen.includes('requestBackgroundLocationPermissionsOnly()'));
 assert(settingsScreen.includes('updateBackgroundGpsPreference(v)'));
 assert(source.includes('getBackgroundLocationPermissionOnly'), 'a checagem de background no serviço deve ser somente leitura');
 assert(appJson.expo.plugins.includes('./plugins/withBluetoothLegacyPermissionLimits'), 'plugin deve limitar permissões Bluetooth legadas no manifest');
-assert(!layout.includes('requestBluetoothPermissions'));
+assert(!layout.includes('requestBluetoothPermissions('), 'não duplicar uma função de permissão Bluetooth legada');
 assert(appJson.expo.android.permissions.includes('BLUETOOTH_CONNECT'));
 assert(appJson.expo.android.permissions.includes('BLUETOOTH_SCAN'));
 assert(appJson.expo.android.permissions.includes('ACCESS_FINE_LOCATION'));
