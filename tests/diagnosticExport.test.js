@@ -37,6 +37,13 @@ assert.deepStrictEqual(failure, {
 assert.strictEqual(reportUtils.extractLastTraceFailure('[2026-10-31T09:00:00.000Z] BLUETOOTH_READY_START'), null,
   'a trace without failure events must not invent an error');
 
+assert.strictEqual(reportUtils.resolveAndroidModel('SM-A065M'), 'SM-A065M',
+  'Android hardware model reported by the platform must be preserved');
+assert.strictEqual(reportUtils.resolveAndroidModel('  '), undefined,
+  'empty model metadata must be omitted instead of guessed');
+assert.strictEqual(reportUtils.resolveAndroidModel(undefined), undefined,
+  'missing hardware model metadata must remain unavailable');
+
 const sensitive = [
   'PAIRED: OBDII | 01:23:45:67:89:BA',
   'TRACE: {"address":"BE:76:46:00:00:B4"}',
@@ -72,4 +79,4 @@ assert.strictEqual(document.sourcePolicy.importedReference, 'CARSCANNER_SEED');
 assert.strictEqual(document.sourcePolicy.simulation, 'SIMULACAO');
 assert.ok(Object.prototype.hasOwnProperty.call(document, 'maintenance'));
 
-console.log('diagnosticExport.test.js: report trace, privacy and JSON contract OK');
+console.log('diagnosticExport.test.js: report trace, privacy, Android model and JSON contract OK');
