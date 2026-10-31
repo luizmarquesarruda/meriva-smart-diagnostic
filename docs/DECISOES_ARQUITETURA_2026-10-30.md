@@ -65,3 +65,12 @@ Nenhuma dessas decisões substitui o gate P0: `validate` e `android-build` verde
 **Motivo:** a API atualmente instalada não oferece append tipado. A rotação limita o custo de regravação por flush sem trocar a biblioteca nativa durante a homologação Bluetooth/GPS. O índice de viagens evita serializar amostras históricas grandes em cada autosave.
 
 **SQLite:** continua como opção seletiva futura para histórico/eventos, condicionada a medições no Galaxy A06 de crescimento, latência, concorrência e consultas. Não migrar sem cópia anterior, reconciliação por ID, teste de restauração e rollback.
+
+
+## ADR-007 — Versionamento e benchmark do histórico — 2026-10-31
+
+**Decisão:** o índice JSON de viagens usa `schemaVersion: 2`; índices legados sem versão explícita são tratados como schema 1 e atualizados somente após backup verificado. Schemas futuros/desconhecidos são somente leitura para a versão atual do app e nunca são regravados por downgrade.
+
+**Medição:** o benchmark no aparelho mede tamanho do índice, volume CSV, viagens/IDs/amostras, leitura+parse e gravação temporária+read-back. O benchmark não altera o histórico real. A comparação SQLite deve usar o mesmo snapshot congelado, a mesma carga de viagens/amostras e o mesmo aparelho.
+
+**Critério de migração:** não migrar viagens ou amostras para SQLite até haver resultado físico comparável no Galaxy A06. Se a evidência justificar, migrar primeiro viagens e amostras em transação, manter JSON como cópia imutável até conferir IDs/contagens/checksum e validar restauração. Configurações, buffers e exportações ficam fora do escopo.
