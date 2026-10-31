@@ -7,6 +7,7 @@ import { readDriveCycles } from './driveCycleStorage';
 import { escapeCsvCell } from './csvEncoding';
 import { readMaintenanceData } from '../database/maintenanceStorage';
 import { buildDiagnosticExportDocument } from './diagnosticExportContract';
+import { resolveAndroidModel } from '../obd/diagnosticReportUtils';
 
 async function ensureExportDir(basePath: string): Promise<string> {
   const dir = `${basePath}/BACKUP/EXPORTS`;
@@ -39,7 +40,7 @@ export async function exportDiagnosticsJson(basePath: string): Promise<string> {
       androidRelease: getPlatformValue('Release'),
       apiLevel: Platform.OS === 'android' ? Platform.Version : undefined,
       manufacturer: getPlatformValue('Manufacturer'),
-      model: getPlatformValue('Model') ?? Constants.deviceName ?? undefined,
+      model: resolveAndroidModel(constants.Model),
     },
     vehicle: state.vehicle,
     obd: state.obd,
