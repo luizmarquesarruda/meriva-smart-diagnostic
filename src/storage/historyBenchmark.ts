@@ -123,7 +123,7 @@ export async function measureHistoryStorage(
     uniqueTripIds,
     jsonBytes: typeof info.size === 'number' ? info.size : raw.length,
     csvBytes: csv.bytes,
-    historyFiles: tripFiles.files + csv.files,
+    historyFiles: tripFiles.files,
     readParseMs: summarize(readTimes),
     scratchWriteReadbackMs: summarize(writeReadbackTimes),
     integrity,
