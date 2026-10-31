@@ -624,7 +624,7 @@ export async function disconnectSharedObd(): Promise<void> {
   try {
     if (connection) await connection.session.close();
   } finally {
-    try { await stopBackgroundMonitoring(); } catch { /* continuar o fechamento da sessão */ }
+    // AutoTripService receives the disconnected state and owns GPS teardown.
     try { await closeObdAutosaveSession(); } catch { /* continuar o flush dos logs */ }
     try { await flushCsvLogs(); } catch { /* fila retém o lote e agenda nova tentativa */ }
     intentionalDisconnect = false;
