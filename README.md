@@ -2,7 +2,7 @@
 
 Repositório e linha de desenvolvimento: MERIVA SMART. O rótulo do aplicativo Expo permanece `Smart OBD Diagnostic`, genérico para permitir configurar diferentes veículos; o perfil Chevrolet Meriva é o foco de validação atual, não uma restrição do motor OBD.
 
-As especificações físicas e de manutenção do veículo são mantidas em `src/database/merivaManual.ts`, com referência ao Manual do Proprietário Chevrolet Meriva 2012.
+As especificações físicas e de manutenção do perfil operacional atual são mantidas em `src/database/merivaManual.ts`, com referência ao Manual do Proprietário Chevrolet Meriva 2012. A seleção e o gerenciamento de múltiplos veículos ainda não estão implementados; o fluxo atual normaliza o perfil para Meriva Maxx.
 
 Versão: 1.0.1 | Plataforma: Android | Transporte: Bluetooth Classic | ECU: OBD-II/ELM327
 
@@ -119,7 +119,7 @@ O módulo src/obd/fuelIdentification.ts é deliberadamente conservador. Ele sepa
 
 O aplicativo mantém CONFIG, BANCO, LEITURAS, APRENDIZADO, DTC, LOGS, VIAGENS e BACKUP.
 
-O autosave usa arquivo temporário, valida o conteúdo e mantém uma cópia anterior para recuperação.
+O autosave usa arquivo temporário, valida o conteúdo e mantém uma cópia anterior para recuperação. Backups manuais em Configurações incluem BANCO, APRENDIZADO, DTC, CONFIG, LEITURAS, LOGS, VIAGENS e MANUTENCAO. A lista de restauração exibe somente snapshots com manifesto/tamanhos íntegros; restaurar desconecta a ECU, cria antes uma cópia do estado atual e substitui somente os diretórios presentes no snapshot.
 
 ## Bluetooth
 
@@ -127,17 +127,20 @@ Na abertura do aplicativo, o sistema verifica suporte, solicita permissões, ver
 
 O ELM327 deve estar previamente pareado no Android. O aplicativo escolhe automaticamente os candidatos pareados: primeiro nomes compatíveis com ELM/OBD e depois outros dispositivos Classic, aceitando somente o candidato que passa pela inicialização do ELM e pelo teste real 010C. A conexão usa Bluetooth Classic/RFCOMM e preserva o prompt > para o parser do ELM. O estado do rádio é revalidado antes de cada socket; se estiver desligado ou não puder ser confirmado, o fallback e os retries são interrompidos com erro explícito, sem iniciar outra conexão concorrente. Reative o Bluetooth no Android e tente novamente pelo painel.
 
-## Build Android e distribuição privada
+## Build Android e distribuição
 
-A GitHub Actions executa validação, Expo Doctor, gate anti-regressão e build Android standalone. O APK **não é publicado em GitHub Releases**. O artefato só é enviado quando o repositório está configurado como `Private` e a execução corresponde à branch `main`; builds de PR e builds enquanto o repositório estiver público não enviam APK. O artefato inclui `app-release.apk` e o checksum `app-release.apk.sha256`, com retenção de três dias.
+O fluxo de build usa Expo prebuild + Gradle na GitHub Actions e gera um APK standalone. A CI só pode enviar o APK como artefato temporário quando o evento é um push para `main` e o repositório está configurado como privado; em repositórios públicos, branches de trabalho e pull requests, o upload é bloqueado. Não há GitHub Release pública automática nem link estável de download. O acesso ao APK exige consultar os artefatos da execução autorizada da CI. EAS Build e atualização OTA não fazem parte do fluxo atual. A instalação/atualização no Android exige confirmação do usuário.
 
-Para baixar uma versão, entre no GitHub com uma conta que tenha acesso de leitura ao repositório privado, abra **Actions → CI → execução da branch main → Artifacts** e confira o SHA-256 antes de instalar. A instalação/atualização no Android exige confirmação local.
+```bash
+npm ci --no-audit --no-fund
+npm run doctor
+npm run gate:baseline
+npm run validate
+npx expo prebuild --clean --platform android --non-interactive
+cd android && ./gradlew :app:assembleRelease --no-daemon
+```
 
-**Estado de configuração:** o repositório ainda aparece como público na verificação desta alteração. A condição de upload já bloqueia novos artefatos enquanto essa visibilidade não for alterada para `Private`; a visibilidade do repositório precisa ser ajustada pelo proprietário nas configurações do GitHub. O conteúdo do código continuará público até essa alteração.
-
-## GPS e permissões
-
-A conexão OBD solicita apenas as permissões Bluetooth necessárias. A localização não é requisito de inicialização, conexão ou polling da ECU. O uso do GPS para distância e viagens começa desativado e só é ativado após opt-in explícito em **Configurações**; o rastreamento com a tela apagada exige uma segunda autorização. Os serviços de OBD/viagem consultam somente permissões já concedidas e nunca abrem caixas de localização durante o polling. `autoTripService` é o único proprietário do ciclo de vida GPS/viagens; `sharedConnection` permanece responsável pela sessão OBD.
+O APK esperado é `android/app/build/outputs/apk/release/app-release.apk`. A CI deve concluir `validate` e `android-build` no mesmo SHA. APK compilado não substitui teste físico de Bluetooth/ELM327/ECU.
 
 ## Testes
 

@@ -388,18 +388,19 @@ export class Elm327Session {
       };
     } catch (cause) {
       this.commands += 1;
-      this.timeouts += 1;
       this.consecutiveFailures += 1;
-      this.lastErrorType = classifyElmError('', cause instanceof Error ? cause.message : '');
-      if (this.config.adaptiveTiming) {
-        this.adaptiveTimeoutMs = Math.min(this.config.adaptiveTimeoutMaxMs, this.adaptiveTimeoutMs + this.config.adaptiveTimeoutStepMs);
-      }
       const errorMessage = cause instanceof Error ? cause.message : 'ERRO DESCONHECIDO';
       const status: ElmCommandStatus = isPartialResponseError(errorMessage)
         ? 'TIMEOUT'
         : errorMessage.includes('TIMEOUT')
           ? 'TIMEOUT'
           : 'ERROR';
+      if (status === 'TIMEOUT') this.timeouts += 1;
+      else this.errors += 1;
+      this.lastErrorType = classifyElmError('', errorMessage);
+      if (this.config.adaptiveTiming) {
+        this.adaptiveTimeoutMs = Math.min(this.config.adaptiveTimeoutMaxMs, this.adaptiveTimeoutMs + this.config.adaptiveTimeoutStepMs);
+      }
 
       return {
         command,

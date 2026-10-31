@@ -87,7 +87,7 @@ async function ensureDir(path: string): Promise<void> {
 }
 
 export async function ensureStorageDirs(basePath: string): Promise<void> {
-  const dirs = ['CONFIG', 'BANCO', 'LEITURAS', 'APRENDIZADO', 'DTC', 'LOGS', 'VIAGENS', 'BACKUP'];
+  const dirs = ['CONFIG', 'BANCO', 'LEITURAS', 'APRENDIZADO', 'DTC', 'LOGS', 'VIAGENS', 'MANUTENCAO', 'BACKUP'];
   for (const dir of dirs) await ensureDir(`${basePath}/${dir}`);
 }
 

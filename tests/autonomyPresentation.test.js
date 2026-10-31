@@ -31,7 +31,11 @@ function loadTs(file, overrides = {}) {
 
 const root = path.resolve(__dirname, '..');
 const fuelLevel = loadTs(path.join(root, 'src/trip/fuelLevel.ts'));
-const presentation = loadTs(path.join(root, 'src/trip/autonomyPresentation.ts'), { './fuelLevel': fuelLevel });
+const fuelLevelBuffer = loadTs(path.join(root, 'src/trip/fuelLevelBuffer.ts'));
+const presentation = loadTs(path.join(root, 'src/trip/autonomyPresentation.ts'), {
+  './fuelLevel': fuelLevel,
+  './fuelLevelBuffer': fuelLevelBuffer,
+});
 const { getCurrentAutonomyRangeKm } = presentation;
 
 const valid = {
@@ -74,4 +78,25 @@ assert.strictEqual(getCurrentAutonomyRangeKm({ ...valid, fuelLevelReadAtMs: Numb
 assert.strictEqual(getCurrentAutonomyRangeKm({ ...valid, fuelLevelReadAtMs: 1_000_001 }), null,
   'timestamp futuro não pode ser tratado como leitura atual');
 
+assert.strictEqual(getCurrentAutonomyRangeKm({
+  ...valid, fuelLevelReadAtMs: 960_000, nowMs: 1_000_000,
+  fuelLevelBufferPercent: 40, fuelLevelBufferReadAtMs: 960_000, fuelLevelBufferSampleCount: 10, bufferNowMs: 1_000_000,
+}), 224, 'buffer 10/10 sustenta estimativa temporária entre 30 e 60 s');
+assert.strictEqual(getCurrentAutonomyRangeKm({
+  ...valid, fuelLevelReadAtMs: 960_000, nowMs: 1_000_000,
+  fuelLevelBufferPercent: 40, fuelLevelBufferReadAtMs: 960_000, fuelLevelBufferSampleCount: 9, bufferNowMs: 1_000_000,
+}), null, 'nove leituras não completam o buffer inicial obrigatório');
+assert.strictEqual(getCurrentAutonomyRangeKm({
+  ...valid, fuelLevelReadAtMs: 960_000, nowMs: 1_000_000,
+  fuelLevelBufferPercent: 40, fuelLevelBufferReadAtMs: 939_999, fuelLevelBufferSampleCount: 10, bufferNowMs: 1_000_000,
+}), null, 'buffer com mais de 60 s deve expirar');
+assert.strictEqual(getCurrentAutonomyRangeKm({
+  ...valid, fuelLevelReadAtMs: 1_000_000, nowMs: 1_000_000,
+  fuelLevelBufferPercent: 40, fuelLevelBufferReadAtMs: 1_000_000, fuelLevelBufferSampleCount: 10, bufferNowMs: 1_000_000,
+}), 280, 'leitura ao vivo tem prioridade sobre a mediana do buffer');
+assert.strictEqual(getCurrentAutonomyRangeKm({
+  ...valid, fuelLevelReadAtMs: 960_000, nowMs: 1_000_000,
+  fuelLevelBufferPercent: 40, fuelLevelBufferReadAtMs: 960_000,
+  fuelLevelBufferSampleCount: 10, bufferNowMs: 1_060_001,
+}), null, 'buffer expirado pelo relógio monotônico não pode sobreviver a uma hora civil diferente');
 console.log('autonomyPresentation.test.js: PASS');

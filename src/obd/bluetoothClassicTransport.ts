@@ -574,7 +574,7 @@ export class BluetoothClassicTransport implements ObdTransport {
     if (RNBluetoothClassic.onDeviceDisconnected) {
       this.disconnectSubscription = RNBluetoothClassic.onDeviceDisconnected((event) => {
         const eventAddress = event?.address ?? event?.device?.address;
-        if (eventAddress && eventAddress !== this.deviceAddress) return;
+        if (eventAddress && normalizeBluetoothAddress(eventAddress) !== normalizeBluetoothAddress(this.deviceAddress)) return;
         this.logDiagnostic('DEVICE_DISCONNECTED', eventAddress ?? {});
         this.markDisconnected();
       });
@@ -708,18 +708,6 @@ export class BluetoothClassicTransport implements ObdTransport {
     while (Date.now() - started < timeoutMs) {
       if (!this.connected || !this.device) throw new Error('BLUETOOTH DESCONECTADO');
 
-      if (Date.now() >= nextConnectionCheck && typeof device.isConnected === 'function') {
-        const remainingMs = timeoutMs - (Date.now() - started);
-        if (remainingMs <= 0) break;
-        // The state probe uses only the remaining read budget, so it cannot
-        // silently extend the caller's response timeout by waiting forever.
-        await this.assertDeviceConnected(
-          device,
-          Math.min(NATIVE_CONNECTION_CHECK_TIMEOUT_MS, remainingMs),
-        );
-        nextConnectionCheck = Date.now() + 250;
-      }
-
       const promptIndex = this.received.indexOf('>');
       if (promptIndex >= 0) {
         if (this.receiveOverflow) {
@@ -743,6 +731,18 @@ export class BluetoothClassicTransport implements ObdTransport {
           ...(stale ? { trailingDiscarded: stale } : {}),
         });
         return clean;
+      }
+
+      if (Date.now() >= nextConnectionCheck && typeof device.isConnected === 'function') {
+        const remainingMs = timeoutMs - (Date.now() - started);
+        if (remainingMs <= 0) break;
+        // The state probe uses only the remaining read budget, so it cannot
+        // silently extend the caller's response timeout by waiting forever.
+        await this.assertDeviceConnected(
+          device,
+          Math.min(NATIVE_CONNECTION_CHECK_TIMEOUT_MS, remainingMs),
+        );
+        nextConnectionCheck = Date.now() + 250;
       }
 
       await new Promise((resolve) => setTimeout(resolve, 25));

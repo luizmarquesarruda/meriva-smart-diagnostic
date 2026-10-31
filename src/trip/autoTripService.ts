@@ -6,7 +6,8 @@ import { forceSaveOnObdEvent, registerObdQuery } from '../meriva/autosaveIntegra
 import { getAutoSaveState, updateAutoSaveState, initAutoSave } from '../meriva/autosaveManager';
 import { RealTripRecorder, getReliableTripConsumptionKml, shouldFinalizeStoppedTrip } from './tripRecorder';
 import { estimateRangeFromFuelLevel, fuelLevelPercentToLiters, isFuelReserve } from './fuelLevel';
-import { getCurrentAutonomyRangeKm, isCurrentFuelLevelSample } from './autonomyPresentation';
+import { getCurrentAutonomyEstimate, isCurrentFuelLevelSample } from './autonomyPresentation';
+import { FuelLevelBuffer, monotonicNowMs } from './fuelLevelBuffer';
 import { getLivePidTrend, resetLiveTelemetry } from '../obd/liveTelemetry';
 import { estimateFuelRateLph, type FuelRateSource } from '../obd/fuelConsumption';
 import { startBackgroundMonitoring } from '../gps/backgroundMonitoring';
@@ -23,6 +24,10 @@ export interface AutoTripServiceState {
   fuelLevelReadAtMs: number | null;
   fuelRemainingL: number | null;
   fuelReserve: boolean | null;
+  fuelLevelBufferPercent: number | null;
+  fuelLevelBufferReadAtMs: number | null;
+  fuelLevelBufferSampleCount: number;
+  autonomySource: 'LIVE_012F' | 'BUFFER_012F' | null;
   distanceKm: number;
   fuelUsedL: number;
   consumptionKml: number | null;
@@ -49,6 +54,10 @@ const INITIAL_STATE: AutoTripServiceState = {
   fuelLevelReadAtMs: null,
   fuelRemainingL: null,
   fuelReserve: null,
+  fuelLevelBufferPercent: null,
+  fuelLevelBufferReadAtMs: null,
+  fuelLevelBufferSampleCount: 0,
+  autonomySource: null,
   distanceKm: 0,
   fuelUsedL: 0,
   consumptionKml: null,
@@ -81,6 +90,7 @@ class AutoTripService {
   private lastEstimatedFuelRate: { rateLph: number; source: FuelRateSource; timestampMs: number } | null = null;
   private fuelType: FuelType = 'FLEX';
   private lastFuelEthanolPercent: number | null = null;
+  private readonly fuelLevelBuffer = new FuelLevelBuffer();
   private unsubscribeAppSettings: (() => void) | null = null;
   private state: AutoTripServiceState = { ...INITIAL_STATE };
 
@@ -92,17 +102,34 @@ class AutoTripService {
 
   getState(): AutoTripServiceState {
     const snapshot = { ...this.state };
-    const currentFuelLevelIsValid = snapshot.connected
-      && getSharedObdStatus().ecuConnected
-      && isCurrentFuelLevelSample(snapshot.fuelLevelReadAtMs);
-    if (currentFuelLevelIsValid) return snapshot;
+    const ecuConnected = getSharedObdStatus().ecuConnected;
+    const currentFuelLevelIsValid = snapshot.connected && ecuConnected &&
+      snapshot.fuelLevelPercent != null && isCurrentFuelLevelSample(snapshot.fuelLevelReadAtMs);
+    const bufferedFuel = this.fuelLevelBuffer.getEstimate();
+    const autonomy = getCurrentAutonomyEstimate({
+      ecuConnected,
+      tripConnected: snapshot.connected,
+      fuelLevelSupported: snapshot.fuelLevelSupported,
+      fuelLevelPercent: snapshot.fuelLevelPercent,
+      fuelLevelReadAtMs: snapshot.fuelLevelReadAtMs,
+      tripConsumptionKml: snapshot.consumptionKml,
+      averageConsumptionKml: snapshot.averageConsumptionKml,
+      fuelLevelBufferPercent: bufferedFuel?.percent ?? null,
+      fuelLevelBufferReadAtMs: bufferedFuel?.latestReadAtMs ?? null,
+      fuelLevelBufferSampleCount: bufferedFuel?.sampleCount ?? 0,
+      bufferNowMs: monotonicNowMs(),
+    });
     return {
       ...snapshot,
-      fuelLevelPercent: null,
-      fuelLevelReadAtMs: null,
-      fuelRemainingL: null,
-      fuelReserve: null,
-      estimatedRangeKm: 0,
+      fuelLevelPercent: currentFuelLevelIsValid ? snapshot.fuelLevelPercent : null,
+      fuelLevelReadAtMs: currentFuelLevelIsValid ? snapshot.fuelLevelReadAtMs : null,
+      fuelRemainingL: currentFuelLevelIsValid ? snapshot.fuelRemainingL : null,
+      fuelReserve: currentFuelLevelIsValid ? snapshot.fuelReserve : null,
+      fuelLevelBufferPercent: bufferedFuel?.percent ?? null,
+      fuelLevelBufferReadAtMs: bufferedFuel?.latestReadAtMs ?? null,
+      fuelLevelBufferSampleCount: bufferedFuel?.sampleCount ?? 0,
+      estimatedRangeKm: autonomy?.rangeKm ?? 0,
+      autonomySource: autonomy?.source ?? null,
     };
   }
 
@@ -178,6 +205,7 @@ class AutoTripService {
     await this.stopCurrentLoop();
     await this.stopGpsForEcu();
     this.lastEstimatedFuelRate = null;
+    this.fuelLevelBuffer.reset();
     await this.finalizeRecorder();
     this.state = { ...INITIAL_STATE };
     this.emit();
@@ -199,6 +227,7 @@ class AutoTripService {
     this.pollCycleNumber = 0;
     this.lastEstimatedFuelRate = null;
     this.lastFuelEthanolPercent = null;
+    this.fuelLevelBuffer.reset();
 
     if (!connection || !this.running) {
       this.state = { ...INITIAL_STATE };
@@ -249,6 +278,8 @@ class AutoTripService {
       if (!getSharedObdStatus().ecuConnected) {
         // A ECU perdeu a resposta: encerrar a captura de localização e fechar a
         // viagem com a última evidência válida, sem acumular GPS offline.
+        // A sessão pode recuperar no mesmo socket, mas não herda amostras antigas.
+        this.fuelLevelBuffer.reset();
         await this.stopGpsForEcu();
         await this.finalizeRecorder();
         this.stoppedSinceMs = null;
@@ -259,6 +290,10 @@ class AutoTripService {
           fuelLevelReadAtMs: null,
           fuelRemainingL: null,
           fuelReserve: null,
+          fuelLevelBufferPercent: null,
+          fuelLevelBufferReadAtMs: null,
+          fuelLevelBufferSampleCount: 0,
+          autonomySource: null,
           estimatedRangeKm: 0,
           error: 'ADAPTADOR OK / ECU SEM RESPOSTA',
         });
@@ -359,8 +394,12 @@ class AutoTripService {
             fuelLevelResult.parsed.value >= 0 &&
             fuelLevelResult.parsed.value <= 100
           ) {
+            const readAtMs = Date.now();
+            // A amostra ao vivo é válida independentemente da janela de fallback.
+            // Frescor da leitura é civil; ordem/expiração do buffer é monotônica.
             fuelLevelPercent = fuelLevelResult.parsed.value;
-            fuelLevelReadAtMs = Date.now();
+            fuelLevelReadAtMs = readAtMs;
+            this.fuelLevelBuffer.addSample(fuelLevelResult.parsed.value, monotonicNowMs());
           }
         } else {
           fuelLevelPercent = this.state.fuelLevelPercent;
@@ -541,6 +580,20 @@ class AutoTripService {
             ? tripVehicleSpeedKmh / fuelRateForDisplayLph
             : null;
 
+        const bufferedFuel = this.fuelLevelBuffer.getEstimate();
+        const autonomy = getCurrentAutonomyEstimate({
+          ecuConnected: getSharedObdStatus().ecuConnected,
+          tripConnected: true,
+          fuelLevelSupported: this.state.fuelLevelSupported,
+          fuelLevelPercent,
+          fuelLevelReadAtMs,
+          tripConsumptionKml,
+          averageConsumptionKml: this.state.averageConsumptionKml,
+          fuelLevelBufferPercent: bufferedFuel?.percent ?? null,
+          fuelLevelBufferReadAtMs: bufferedFuel?.latestReadAtMs ?? null,
+          fuelLevelBufferSampleCount: bufferedFuel?.sampleCount ?? 0,
+          bufferNowMs: monotonicNowMs(),
+        });
         this.setState({
           connected: true,
           active: Boolean(recorder),
@@ -553,15 +606,11 @@ class AutoTripService {
           fuelLevelReadAtMs,
           fuelRemainingL: fuelLevelPercentToLiters(fuelLevelPercent),
           fuelReserve: isFuelReserve(fuelLevelPercent),
-          estimatedRangeKm: getCurrentAutonomyRangeKm({
-            ecuConnected: getSharedObdStatus().ecuConnected,
-            tripConnected: true,
-            fuelLevelSupported: this.state.fuelLevelSupported,
-            fuelLevelPercent,
-            fuelLevelReadAtMs,
-            tripConsumptionKml,
-            averageConsumptionKml: this.state.averageConsumptionKml,
-          }) ?? 0,
+          fuelLevelBufferPercent: bufferedFuel?.percent ?? null,
+          fuelLevelBufferReadAtMs: bufferedFuel?.latestReadAtMs ?? null,
+          fuelLevelBufferSampleCount: bufferedFuel?.sampleCount ?? 0,
+          estimatedRangeKm: autonomy?.rangeKm ?? 0,
+          autonomySource: autonomy?.source ?? null,
           error: rpm === 0 && obdSpeedKmh === 0 && fuelRateForDisplayLph == null
             ? 'MOTOR DESLIGADO? / ECU SEM TELEMETRIA VÁLIDA'
             : fuelRateForDisplaySource && fuelRateForDisplaySource !== 'MEASURED_015E'

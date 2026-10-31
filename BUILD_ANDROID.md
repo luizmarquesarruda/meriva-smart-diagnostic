@@ -1,32 +1,26 @@
 # Build Android
 
-## Fluxo oficial pela CI
+## Fluxo oficial de APK
 
-O workflow `.github/workflows/ci.yml` executa:
+O fluxo suportado nesta etapa não usa EAS Build nem atualização OTA. A CI gera um APK standalone a partir da configuração Expo e do projeto Android nativo:
 
-1. instalação reproduzível com `npm ci --no-audit --no-fund`;
-2. Expo Doctor, gate anti-regressão, TypeScript e suíte completa;
-3. `npx expo prebuild --clean --platform android --non-interactive`;
-4. build standalone com Gradle em Java 17;
-5. verificação do APK e geração de `app-release.apk.sha256`.
+1. instala dependências com `npm ci --no-audit --no-fund`;
+2. executa Expo Doctor, baseline anti-regressão, TypeScript e todas as suítes;
+3. gera o projeto Android com `npx expo prebuild --clean --platform android --non-interactive`;
+4. monta `android/app/build/outputs/apk/release/app-release.apk` com Gradle;
+5. só envia o artefato `meriva-smart-diagnostic-standalone-apk` quando o evento é push para `main` e o repositório está privado; a retenção é de três dias. Em repositório público, branch de trabalho ou pull request, o upload é bloqueado.
 
-## Política de distribuição
-
-- Não existe publicação automática de GitHub Release nem URL pública estável de APK.
-- O artefato é enviado somente quando `repository.visibility` é `private` e a referência é `refs/heads/main`.
-- Eventos `pull_request`, builds de outras branches e execuções enquanto o repositório for público compilam e validam, mas não enviam o APK como artefato.
-- O artefato contém o APK e seu checksum SHA-256 e expira após três dias.
-- O download exige autenticação e permissão de leitura no repositório privado.
-- O workflow usa `contents: read`; não recebe permissão `contents: write`.
-
-**Importante:** na data desta alteração, o GitHub ainda informa o repositório como público. A condição do workflow impede novos uploads de APK enquanto isso não for corrigido, mas não torna privado o código-fonte nem revoga artefatos antigos. O proprietário precisa mudar a visibilidade do repositório para `Private` nas configurações do GitHub e revisar artefatos já existentes.
+O artefato fica na seção **Artifacts** da execução autorizada da CI correspondente ao SHA desejado. Não há GitHub Release pública ou link estável. Não use APK de execução anterior como se contivesse alterações ainda não compiladas.
 
 ## Toolchain
 
 - Node.js: 20.x
 - Java/JDK: 17
-- Expo SDK: conforme `package.json` e `app.json` versionados
-- Android nativo: gerado pelo Expo prebuild; o diretório `android/` não é versionado.
+- Expo SDK: 51.0.39
+- React Native: 0.74.5
+- Android nativo: gerado pelo Expo prebuild
+
+Java 21 não é a referência deste projeto. O build CI usa Java 17. Em Termux/ARM, erros do Gradle envolvendo `SystemInfo` não devem ser corrigidos trocando aleatoriamente a versão do Gradle.
 
 ## Validação local
 
@@ -36,12 +30,20 @@ npm run doctor
 npm run gate:baseline
 npm run validate
 npx expo prebuild --clean --platform android --non-interactive
-cd android && ./gradlew :app:assembleRelease --no-daemon
 ```
 
-O APK esperado é `android/app/build/outputs/apk/release/app-release.apk`. O checksum pode ser criado/verificado com `sha256sum app-release.apk`.
+Para montar o APK localmente após o prebuild, com Android SDK e Java 17 configurados:
+
+```bash
+cd android
+./gradlew :app:assembleRelease --no-daemon
+```
+
+O APK esperado é `android/app/build/outputs/apk/release/app-release.apk`. O projeto Android é gerado pelo prebuild e não é versionado no Git.
 
 ## Executar no aparelho
+
+Para desenvolvimento nativo com dispositivo Android conectado:
 
 ```bash
 npx expo run:android
@@ -49,8 +51,10 @@ npx expo run:android
 
 O app usa `react-native-bluetooth-classic`; Expo Go não substitui um build nativo Android para validar Bluetooth Classic.
 
-## Limites de validação
+## Estado e limites
 
-CI verde comprova validação automatizada e compilação, não conexão física RFCOMM, inicialização ELM, resposta real `010C`, leitura `012F/015E`, GPS ou autonomia. Esses pontos exigem ensaio separado no Galaxy A06/Android 16 e no veículo.
-
-SDK 51 / React Native 0.74.5 permanecem dívida de modernização. Não combinar uma atualização de SDK com a estabilização Bluetooth sem migração incremental e baseline físico.
+- Distribuição de teste: APK produzido pelo Gradle na CI.
+- EAS Build: não faz parte do fluxo atual e não deve ser usado como instrução operacional.
+- Atualização OTA: removida temporariamente; alterações de código exigem gerar e instalar um novo APK.
+- Validação física: instalar o APK no Android real e testar inicialização fria, permissões, conexão RFCOMM, inicialização ELM e resposta real da ECU. CI verde não comprova comunicação com hardware.
+- SDK 51 / React Native 0.74.5 permanecem dívida de modernização; não atualizar junto da limpeza de EAS sem plano incremental e baseline físico.

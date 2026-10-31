@@ -36,6 +36,8 @@ const diagnosticsExporter = read('src/storage/exportDiagnostics.ts');
 // Gate itself must be a first-class CI step, not a note in the diary.
 assert.equal(packageJson.scripts['gate:baseline'], 'node tests/projectBaseline.test.js');
 assert.match(workflow, /name: Run anti-regression baseline gate[\s\S]*?run: npm run gate:baseline/);
+assert.match(workflow, /group: ci-\$\{\{ github\.workflow \}\}-\$\{\{ github\.event\.pull_request\.head\.repo\.full_name \|\| github\.repository \}\}-\$\{\{ github\.head_ref \|\| github\.ref_name \}\}/,
+  'push and pull_request for the same branch must share one CI concurrency group');
 // CI security: APKs are not published from public repositories or pull-request builds.
 assert.doesNotMatch(workflow, /^\s*publish-release\s*:/m, 'CI must never create public GitHub Releases automatically');
 assert.doesNotMatch(workflow, /^\s*contents:\s*write\s*$/m, 'the build workflow must not request write access to repository contents');

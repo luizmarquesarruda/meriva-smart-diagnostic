@@ -54,6 +54,9 @@ A branch mantém o fluxo OBD/ELM327 existente e inclui testes automatizados para
 | DTC-02 | Limpar DTC | Confirmar a ação destrutiva, informar sucesso/erro conforme resposta ECU | teste automatizado com transporte simulado e teste físico |
 | SPLASH-01 | Inicialização fria de APK nativo | Fundo e imagem de marca corretos; transição para o app sem tela vazia persistente | gate de baseline verifica plugin, caminho e assinatura PNG; inspeção visual em Android instalado continua obrigatória |
 | BUILD-01 | Commit final da PR | Gate, TypeScript, suíte e build Android concluídos com sucesso para o mesmo SHA | execução GitHub Actions do SHA exato |
+| BACKUP-01 | Criar backup com registros de manutenção/abastecimento | Manifesto inclui MANUTENCAO e os tamanhos dos diretórios conferem; armazenamento mostra o tamanho da pasta | `tests/regression.test.js`, `tests/merivaAutosave.test.js` |
+| BACKUP-02 | Restaurar snapshot íntegro com dados posteriores no aparelho | Desconectar OBD, salvar estado atual, criar safety backup, restaurar diretórios listados e re-hidratar autosave; rollback em falha de cópia | `tests/regression.test.js`, CI e teste Android |
+| BACKUP-03 | Snapshot alterado ou incompleto | Não oferecer backup inválido e rejeitar restauração com divergência de manifesto/tamanho | `tests/regression.test.js` |
 
 ## Critérios para recursos adicionais
 
@@ -123,6 +126,14 @@ Este plano não autoriza modo oficina avançado, sincronização em nuvem/perfis
 - A autonomia em tempo real só pode priorizar consumo da viagem quando houver distância ≥ 0,1 km, combustível integrado ≥ 0,05 L e pelo menos duas amostras válidas.
 - Antes desse limiar, usar apenas uma média histórica positiva válida; se não existir, apresentar N/D, nunca transformar amostra insuficiente em consumo alto.
 - CI automatizada não substitui teste físico com ELM327/ECU; validar no veículo a resposta real do PID 012F e a estabilidade da autonomia.
+
+## FUEL-BUFFER-01 — Buffer volátil de nível de combustível PID 012F
+- Coletar somente respostas reais do PID 012F com status RESPONDEU, unidade percent e valor finito entre 0 e 100; ignorar seed, simulação, histórico e falhas.
+- Manter as dez leituras válidas mais recentes da mesma sessão ECU. Com menos de 10/10, não existe fallback.
+- Leitura ao vivo com até 30 s prevalece; quando ficar desatualizada, a média aritmética do buffer pode sustentar estimativa temporária até 60 s após a última leitura válida. Depois disso, autonomia retorna N/D.
+- Rejeitar timestamp futuro, duplicado/regressivo e nível fora de 0–100. Resetar buffer ao iniciar/trocar/encerrar sessão ECU; não persistir amostras entre sessões.
+- Calcular a média aritmética simples das dez porcentagens (não mediana); a interface identifica o buffer explicitamente e não o apresenta como leitura atual do PID. ECU deve continuar conectada e o consumo médio deve ser positivo e confiável.
+- Testes: tests/fuelLevelBuffer.test.js e tests/autonomyPresentation.test.js; validação física confirma resposta real 012F da ECU.
 
 ## PID-AI-01 — Proveniência, frescor e rastreabilidade do diagnóstico local
 
