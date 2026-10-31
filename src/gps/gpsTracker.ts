@@ -495,6 +495,7 @@ export class GpsTracker {
             );
             this.pendingMovingDistanceKm = 0;
             this.pendingMovingStart = sample;
+            this.consecutiveMovingSamples = 0;
             this.movementEstablished = true;
           } else if (
             this.consecutiveMovingSamples >= MIN_MOVING_SAMPLES &&
