@@ -1,14 +1,19 @@
-## ESTADO VIGENTE — 2026-10-31 (relatórios, layout responsivo e estabilidade operacional)
+## ESTADO VIGENTE — 2026-10-31 (P0 relatórios, layout e estabilidade)
 
-> PR #105 integrada em `main` no commit `b128b413427e612e621dc2ef2c82b6c2476ce659`, após `validate` e `android-build` verdes no HEAD `ff131e9b23ad745955dfe59904025a47cafabc98`. PR #104 está sendo reconciliada sobre essa nova base; a CI deverá ser repetida no SHA final.
+> PR #105 integrada em `main` no commit `b128b413427e612e621dc2ef2c82b6c2476ce659`. PR #104 integrada em `main` no commit `4055a776a4e95e1ec775c6b0ae039da234a7c6c6`. Ambas passaram `validate` e `android-build` nos respectivos SHAs finais.
 
-- PR #98 está integrada: transporte Bluetooth Classic/ELM327 endurecido, buffer volátil com dez leituras reais do PID 012F, backup/restauração verificados e dados de manutenção incluídos no backup.
-- PR #101 está integrada: GPS permanece opcional, exige opt-in e tem ciclo de vida centralizado no `AutoTripService`, sem bloquear o início OBD.
-- PR #105 está integrada: relatórios Bluetooth técnico/compartilhável, proteção de identificadores, JSON `MERIVA_DIAGNOSTIC_EXPORT` schema 1, metadados físicos sem inferência e preservação integral do histórico diário ECU.
-- PR #104 consolida cockpit responsivo, cinco destinos independentes em retrato, navegação compacta em paisagem, cabeçalhos internos, retornos explícitos, áreas de toque e grades adaptáveis. Configurações mantém os switches GPS, backup/restauração e os dois modos de exportação Bluetooth.
-- A CI da PR #105 passou no SHA final informado acima. A PR #104 precisa passar novamente por `gate:baseline`, `validate` e `android-build` após a reconciliação dos arquivos compartilhados.
-- O repositório permanece público conforme a configuração operacional existente. A CI compila e verifica o APK, mas não cria Release pública nem publica APK automaticamente; não ampliar o escopo de distribuição.
-- Não declarar validação visual ou física no Galaxy A06 / SM-A065M / Android 16. Permanecem necessários screenshots em retrato/paisagem e teste real com ELM327/ECU, incluindo respostas 010C e 012F.
+- PR #98 permanece integrada: transporte Bluetooth Classic/ELM327 endurecido, buffer volátil com dez leituras reais do PID 012F, backup/restauração verificados e dados de manutenção no backup.
+- PR #101 permanece integrada: GPS opcional, opt-in explícito e ciclo de vida centralizado no `AutoTripService`, sem bloquear o início OBD.
+- PR #105 integrada: relatórios Bluetooth técnico/compartilhável, proteção de identificadores, JSON `MERIVA_DIAGNOSTIC_EXPORT` schema 1, metadados físicos sem inferência e preservação integral do histórico diário ECU.
+- PR #104 integrada: cockpit e telas responsivos, navegação em retrato/paisagem, áreas de toque ampliadas, cabeçalhos/retornos explícitos, Configurações reorganizada e botões separados para exportação Bluetooth técnica/compartilhável.
+- Validação PR #105: `validate` e `android-build` passaram no SHA `ff131e9b23ad745955dfe59904025a47cafabc98`.
+- Validação PR #104: `validate` e `android-build` passaram no SHA `2cdbda3807a50e68cd1fe24fe3ff207dc125dbfd`.
+- A CI também passou no push da `main` após a integração da PR #105, SHA `b128b413427e612e621dc2ef2c82b6c2476ce659`. O push de main após o merge da #104 está em execução e deve ser consultado no SHA final correspondente.
+- O repositório permanece público conforme a decisão operacional original. A CI compila/verifica APK, mas não cria Release pública nem publica APK automaticamente; não alterar visibilidade ou distribuição.
+- O índice e os títulos do Diário estavam alinhados até DB-191; esta atualização registra DB-192.
+- Não declarar inspeção visual ou teste físico no Galaxy A06 / SM-A065M / Android 16. Permanecem necessários screenshots em retrato/paisagem e teste ELM327/ECU real, incluindo respostas 010C/012F.
+- A próxima etapa operacional é instalar o APK produzido pela CI e executar inspeção visual e teste físico; registrar respostas RAW, protocolo, resposta ECU, leitura 012F e resultado do percurso/autonomia antes de alterar algoritmos GPS/combustível.
+
 
 ---
 
@@ -277,6 +282,7 @@
 - **DB-189** · 2026-10-31 — Privacidade ampliada e snapshot do relatório Bluetooth
 - **DB-190** · 2026-10-31 — Preservação integral do histórico diário ECU
 - **DB-191** · 2026-10-31 — Consolidar layout responsivo sem regredir GPS, autonomia e restauração de backups
+- **DB-192** · 2026-10-31 — Integrar layout e relatórios, consolidar P0 e registrar validação dos SHAs finais
 
 ---
 
@@ -4944,3 +4950,19 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - Rodar gate de baseline, TypeScript, suíte completa e build Android no SHA final desta PR.
 - Fazer inspeção visual no Galaxy A06 SM-A065M em retrato, paisagem, fontes ampliadas e áreas de toque. Os testes estruturais não substituem screenshots/inspeção no aparelho.
 - Verificar também as telas Configurações/Backup e Dados com buffer 012F ativo para confirmar que a consolidação visual não oculta os novos controles/indicadores.
+
+## DB-192 · 2026-10-31 — Integrar layout e relatórios, consolidar P0 e registrar validação dos SHAs finais
+
+### Alterações integradas
+- PR #105 — relatórios e exportações — integrada em `main` no commit `b128b413427e612e621dc2ef2c82b6c2476ce659`.
+- PR #104 — layout responsivo e navegação — integrada em `main` no commit `4055a776a4e95e1ec775c6b0ae039da234a7c6c6`.
+- Configurações preserva switches de GPS e backup/restauração, e oferece exportação Bluetooth técnica e compartilhável com aviso de privacidade.
+- Alterações de layout permanecem isoladas da lógica Bluetooth/ELM327, polling de PIDs, GPS tracking e cálculo de autonomia.
+- As duas PRs tiveram `validate` e `android-build` aprovados nos SHAs exatos listados nesta entrada.
+- Nenhuma PR permanece aberta após estas integrações; verificar o inventário novamente antes de iniciar outra frente.
+
+### Limites de validação e próxima ação
+- CI compila e verifica APK, mas não executa rádio Bluetooth, ECU, sensores ou GPS físico.
+- Inspeção visual no Galaxy A06 / SM-A065M / Android 16, retrato/paisagem, áreas de toque e fontes ampliadas continua pendente.
+- Testar com adaptador ELM327 real: conexão RFCOMM, inicialização ELM, resposta 010C, leitura 012F e perda/recuperação da ECU.
+- Comparar autonomia com abastecimento/nível real e percurso com odômetro conhecido; não alterar fórmulas sem registrar a evidência.
