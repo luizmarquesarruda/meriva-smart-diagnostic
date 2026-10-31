@@ -248,6 +248,12 @@ assert.strictEqual(calculateConsumptionKml(100, 0), null);
   'three accurate segments must derive approximately 10 km/h');
   assert.ok(derivedOnlyTracker.getState().distanceKm >= 0.008,
     'validated position-derived movement must add the confirmed distance');
+  derivedOnlyWatcher({ coords: { latitude: 0, longitude: 0.000100, speed: null, accuracy: 5 }, timestamp: 54000 });
+  assert.ok(derivedOnlyTracker.getState().currentSpeedKmh >= 9.5,
+    'position-derived speed must remain stable after the first confirmed window');
+  derivedOnlyWatcher({ coords: { latitude: 0, longitude: 0.000125, speed: null, accuracy: 5 }, timestamp: 55000 });
+  assert.ok(derivedOnlyTracker.getState().currentSpeedKmh >= 9.5,
+    'continuous position-only movement must not reset speed after a single segment');
   await derivedOnlyTracker.stop();
 
   // A position-only drift must not accumulate over multiple failed windows.
