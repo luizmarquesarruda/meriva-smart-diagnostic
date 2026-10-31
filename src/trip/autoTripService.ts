@@ -176,8 +176,8 @@ class AutoTripService {
   private async applyConnection(connection: SharedObdConnection | null): Promise<void> {
     const hadTrackingSession = Boolean(this.loopPromise || this.recorder || this.gpsStartedForEcu);
     await this.stopCurrentLoop();
-    // A conexão inicial pode já ter iniciado o GPS pelo serviço nativo em
-    // sharedConnection; não o desligar e ligar novamente sem necessidade.
+    // Keep an existing tracker alive only when this AutoTripService already
+    // owns the current trip generation; new ECU sessions start a fresh trip.
     if (!connection || hadTrackingSession) await this.stopGpsForEcu();
     await this.finalizeRecorder();
 
