@@ -1,14 +1,16 @@
-## ESTADO VIGENTE — 2026-10-31 (Bluetooth, autonomia e consolidação responsiva)
+## ESTADO VIGENTE — 2026-10-31 (relatórios, layout responsivo e estabilidade operacional)
 
-> PR #98 integrada na `main` em `e3383051be0561f31472c9ea96a728b76c302740`. PR #104 está sendo reconciliada sobre essa base, preservando as alterações de P0 e os switches de GPS opcionais.
+> PR #105 integrada em `main` no commit `b128b413427e612e621dc2ef2c82b6c2476ce659`, após `validate` e `android-build` verdes no HEAD `ff131e9b23ad745955dfe59904025a47cafabc98`. PR #104 está sendo reconciliada sobre essa nova base; a CI deverá ser repetida no SHA final.
 
-- PR #101 foi integrada anteriormente: o GPS permanece independente do OBD, exige opt-in e tem o ciclo de vida centralizado no `AutoTripService`.
-- PR #98 agora está integrada: transporte ELM327 mais robusto, buffer volátil de dez leituras reais PID 012F, backup/restauração verificados e dados de manutenção no backup/exportação. `validate` e `android-build` passaram no SHA da PR antes do merge.
-- O fluxo Android permanece Expo prebuild + Gradle. A CI compila e verifica o APK, gera SHA-256, mas não publica APK nem GitHub Release enquanto o repositório estiver público. O upload continua restrito à `main` privada.
-- PR #104 está sendo reaplicada sobre a nova `main`: navegação independente em retrato, preservação do cockpit em paisagem, cabeçalhos e retornos internos, áreas de toque e grids responsivos. Configurações mantém os switches GPS e restauração de backup.
-- PR #103 (relatórios) ainda precisa ser reaplicada sobre a base atual, após concluir a PR #104, para evitar conflito em Configurações, exportação JSON e Diário de Bordo.
-- Não declarar teste físico no Galaxy A06 / SM-A065M / Android 16. Ainda precisamos validar visualmente retrato/paisagem, RFCOMM, inicialização ELM, resposta 010C e leitura real 012F com adaptador/ECU.
+- PR #98 está integrada: transporte Bluetooth Classic/ELM327 endurecido, buffer volátil com dez leituras reais do PID 012F, backup/restauração verificados e dados de manutenção incluídos no backup.
+- PR #101 está integrada: GPS permanece opcional, exige opt-in e tem ciclo de vida centralizado no `AutoTripService`, sem bloquear o início OBD.
+- PR #105 está integrada: relatórios Bluetooth técnico/compartilhável, proteção de identificadores, JSON `MERIVA_DIAGNOSTIC_EXPORT` schema 1, metadados físicos sem inferência e preservação integral do histórico diário ECU.
+- PR #104 consolida cockpit responsivo, cinco destinos independentes em retrato, navegação compacta em paisagem, cabeçalhos internos, retornos explícitos, áreas de toque e grades adaptáveis. Configurações mantém os switches GPS, backup/restauração e os dois modos de exportação Bluetooth.
+- A CI da PR #105 passou no SHA final informado acima. A PR #104 precisa passar novamente por `gate:baseline`, `validate` e `android-build` após a reconciliação dos arquivos compartilhados.
+- O repositório permanece público conforme a configuração operacional existente. A CI compila e verifica o APK, mas não cria Release pública nem publica APK automaticamente; não ampliar o escopo de distribuição.
+- Não declarar validação visual ou física no Galaxy A06 / SM-A065M / Android 16. Permanecem necessários screenshots em retrato/paisagem e teste real com ELM327/ECU, incluindo respostas 010C e 012F.
 
+---
 
 
 ## ESTADO HISTÓRICO — 2026-10-25 (snapshot DB-130; superado em 2026-10-28)
@@ -271,7 +273,10 @@
 - **DB-185** — Bloquear publicação pública/automática do APK; upload privado somente na branch main, checksum SHA-256 e Actions fixadas em commit.
 - **DB-186** — Desacoplar permissões GPS do OBD e centralizar o ciclo de vida de localização no AutoTripService.
 - **DB-187** · 2026-10-31 — Reconciliar Bluetooth, buffer 012F, backup e segurança de integração.
-- **DB-188** · 2026-10-31 — Consolidar layout responsivo sem regredir GPS, autonomia e restauração de backups.
+- **DB-188** · 2026-10-31 — Integridade, privacidade e metadados verificados nos relatórios.
+- **DB-189** · 2026-10-31 — Privacidade ampliada e snapshot do relatório Bluetooth
+- **DB-190** · 2026-10-31 — Preservação integral do histórico diário ECU
+- **DB-191** · 2026-10-31 — Consolidar layout responsivo sem regredir GPS, autonomia e restauração de backups
 
 ---
 
@@ -4879,7 +4884,52 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - Validar no veículo a resposta 010C e leitura real 012F. A CI não confirma comunicação física.
 
 
-## DB-188 · 2026-10-31 — Consolidar layout responsivo sem regredir GPS, autonomia e restauração de backups
+## DB-188 · 2026-10-31 — Integridade, privacidade e metadados verificados nos relatórios
+
+### Problemas confirmados
+- O relatório Bluetooth podia exibir como erro principal um estado compartilhado mais antigo que a última falha da trilha.
+- Endereços MAC eram incluídos em logs e dispositivos pareados sem uma opção de exportação redigida.
+- O nome do dispositivo fornecido por Expo pode ser personalizado e não deve substituir o modelo físico Android.
+- O JSON não tinha schema próprio e horário do snapshot; não incluía toda a proveniência nem os registros de manutenção.
+- Leituras assíncronas de arquivos podiam prolongar a exportação enquanto o estado em memória mudava.
+
+### Correções reaplicadas sobre o main atualizado
+- Erro principal extraído do último evento concreto de falha, preservando evento, timestamp e origem; erro compartilhado permanece em campo separado.
+- Dois modos TXT: técnico completo e compartilhável com MACs mascarados também dentro da trilha RAW.
+- JSON `MERIVA_DIAGNOSTIC_EXPORT` schema 1 com versão, plataforma, app, timestamps, veículo, OBD, leituras, DTCs, viagens, autonomia, manutenção e política de proveniência.
+- Clone do estado em memória antes da leitura paralela de DTCs, viagens e manutenção.
+- Modelo físico obtido somente do campo de modelo do runtime Android; sem fallback por nome personalizado. Campo vazio/ausente resulta em `N/D` no TXT e omissão no JSON.
+- Testes cobrem falha mais recente, ausência de erro, MACs separados por dois formatos, contrato JSON e modelo Android ausente/vazio.
+
+### Validação necessária
+- Executar `gate:baseline`, `validate` e `android-build` no SHA final da PR.
+- Conferir ambos os modos no Galaxy A06 e verificar ausência de MAC no compartilhável.
+- Confirmar que o runtime Android do aparelho informa `SM-A065M`; a ausência do campo deve permanecer como dado ausente, sem inferência.
+- CI não comprova comunicação física com ELM327/ECU nem respostas reais aos PIDs 010C/012F.
+
+
+## DB-189 — 2026-10-31 — Privacidade ampliada e snapshot do relatório Bluetooth
+
+- Auditoria da PR #105 identificou que a exportação compartilhável ocultava MACs, mas ainda podia expor nomes de dispositivos, VIN e coordenadas GPS presentes em texto bruto.
+- A exportação compartilhável agora mascara nomes de dispositivos pareados/conectados, VIN rotulado e coordenadas GPS rotuladas, além de MACs. O modo técnico permanece integral para diagnóstico interno.
+- O relatório Bluetooth captura conexão, dispositivos pareados, trilha, erro e estado de telemetria antes da primeira leitura assíncrona; o TXT identifica o horário do snapshot.
+- Testes de regressão cobrem VIN, nome de dispositivo, latitude/longitude e MAC em conteúdo RAW.
+- A documentação distingue o snapshot em memória de dados persistidos em arquivos independentes, sem prometer atomicidade inexistente.
+- Validação automatizada deve ser conferida no SHA final após os commits desta entrada. Inspeção real dos arquivos no Galaxy A06 / SM-A065M / Android 16 continua pendente.
+- Limite conhecido: DTCs, leituras, horários e características do veículo continuam no relatório compartilhável por relevância diagnóstica e podem permitir correlação indireta; revisar antes de enviar.
+
+
+## DB-190 — 2026-10-31 — Preservação integral do histórico diário ECU
+
+- Auditoria confirmou que `src/meriva/dailyObdHistory.ts` limitava o diário às 365 datas mais recentes com `slice(-MAX_DAYS)`.
+- O limite temporal foi removido: a gravação preserva todas as páginas existentes e acrescenta a nova data sem descartar as mais antigas.
+- Teste de regressão cria 366 páginas antigas, acrescenta a data seguinte e verifica a preservação da primeira, da última e da nova página (367 no total).
+- A limpeza de LOGS/LEITURAS não altera o diário em VIAGENS. A documentação registra que o TXT cresce com o uso e que segmentação futura exige migração/recuperação testada.
+- Configurações agora explica a diferença entre relatório técnico e compartilhável e alerta que TXT de autosave, DTCs e dados do veículo exigem revisão antes de envio.
+- Nenhuma migração geral para SQLite foi feita; primeiro preservar os dados e medir o comportamento.
+- Validar gate:baseline, suíte completa e build Android no SHA final. Inspeção física dos relatórios no Galaxy A06 / SM-A065M / Android 16 continua pendente.
+
+## DB-191 · 2026-10-31 — Consolidar layout responsivo sem regredir GPS, autonomia e restauração de backups
 
 ### Alterações reconciliadas sobre a main atual
 - Cockpit: cinco abas inferiores com cartões independentes em retrato; a raia lateral e as dimensões da navegação em paisagem permanecem separadas e preservadas.
