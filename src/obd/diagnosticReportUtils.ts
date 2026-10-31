@@ -61,26 +61,26 @@ export function redactBluetoothAddresses(value: string): string {
 export function redactSensitiveReportData(value: string, deviceNames: readonly string[] = []): string {
   let redacted = redactBluetoothAddresses(value);
   redacted = redacted.replace(
-    /\\b(VIN\\s*[:=]\\s*)[A-HJ-NPR-Z0-9]{17}\\b/gi,
+    /\b(VIN\s*[:=]\s*)[A-HJ-NPR-Z0-9]{17}\b/gi,
     '$1[REDACTED]',
   );
   redacted = redacted.replace(
-    /(["']?(?:vin)["']?\\s*:\\s*["'])[A-HJ-NPR-Z0-9]{17}(["'])/gi,
+    /("?vin"?\s*:\s*")[A-HJ-NPR-Z0-9]{17}(")/gi,
     '$1[REDACTED]$2',
   );
   redacted = redacted.replace(
-    /(["']?(?:latitude|longitude|gpsLatitude|gpsLongitude|lat|lon|lng)["']?\\s*[:=]\\s*)-?\\d{1,3}(?:\\.\\d+)?/gi,
+    /("?((?:latitude|longitude|gpsLatitude|gpsLongitude|lat|lon|lng))"?\s*[:=]\s*)-?\d{1,3}(?:\.\d+)?/gi,
     '$1[REDACTED]',
   );
   redacted = redacted.replace(
-    /(["']?(?:gps|location|coordinates?)["']?\\s*[:=]\\s*)[-+]?\\d{1,3}\\.\\d+\\s*[,; ]\\s*[-+]?\\d{1,3}\\.\\d+/gi,
+    /("?(?:gps|location|coordinates?)"?\s*[:=]\s*)[-+]?\d{1,3}\.\d+\s*[,; ]\s*[-+]?\d{1,3}\.\d+/gi,
     '$1[REDACTED]',
   );
 
   const uniqueNames = [...new Set(deviceNames.map((name) => name.trim()).filter((name) => name.length >= 3))]
     .sort((left, right) => right.length - left.length);
   for (const name of uniqueNames) {
-    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const escaped = name.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
     redacted = redacted.replace(new RegExp(escaped, 'gi'), '[DEVICE]');
   }
   return redacted;
