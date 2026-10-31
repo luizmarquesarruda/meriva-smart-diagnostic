@@ -189,7 +189,10 @@ class AutoTripService {
     // Keep an existing tracker alive only when this AutoTripService already
     // owns the current trip generation; new ECU sessions start a fresh trip.
     if (!connection || hadTrackingSession) await this.stopGpsForEcu();
+    // Preserve the completed trip's GPS evidence through recorder finalization,
+    // then clear in-memory trip metrics before a new ECU session (or disconnect).
     await this.finalizeRecorder();
+    await gpsTracker.stop({ resetTrip: true });
 
     resetLiveTelemetry();
     this.telemetryCursor = 0;
