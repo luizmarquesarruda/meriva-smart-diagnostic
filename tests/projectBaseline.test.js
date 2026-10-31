@@ -183,8 +183,9 @@ assert.match(read('src/meriva/autosaveValidation.ts'), /validateDriveCycles/);
 assert.match(read('src/meriva/autosaveValidation.ts'), /validateDtcs/);
 assert.match(read('src/gps/gpsTracker.ts'), /c\.latitude < -90/);
 assert.match(read('src/obd/fuelConsumption.ts'), /temperatureK <= 0/);
-assert.match(read('app/_layout.tsx'), /canStartObdStartup\(audit\)/);
-assert.match(read('app/_layout.tsx'), /canUseGps\(audit\)/);
+assert.match(read('app/_layout.tsx'), /requestBluetoothPermissionsOnly\(\)/);
+assert.match(read('app/_layout.tsx'), /canStartObdStartup\(\{ bluetooth \}\)/);
+assert.doesNotMatch(read('app/_layout.tsx'), /requestAllRequiredPermissions|canUseGps\(/, 'optional location must not gate OBD startup');
 assert.ok(app.expo.plugins.includes('./plugins/withBluetoothLegacyPermissionLimits'));
 
 // The ELM protocol must serialize all commands through the shared session queue.

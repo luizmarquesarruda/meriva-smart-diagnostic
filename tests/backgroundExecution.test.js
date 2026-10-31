@@ -11,6 +11,7 @@ const layout = fs.readFileSync('app/_layout.tsx', 'utf8');
 const autoTrip = fs.readFileSync('src/trip/autoTripService.ts', 'utf8');
 const keepAwakePackage = require('../package.json').dependencies['expo-keep-awake'];
 const permissions = fs.readFileSync('src/permissions/permissionManager.ts', 'utf8');
+const settingsScreen = fs.readFileSync('app/configuracoes.tsx', 'utf8');
 const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
 
 assert.strictEqual(packageJson.dependencies['expo-task-manager'], '~11.8.2');
@@ -46,11 +47,18 @@ assert(!gps.includes('if (!this.backgroundTaskRunning) return;'), 'stop deve con
 assert(gps.includes('watchPositionAsync('));
 
 assert(permissions.includes('requestBackgroundLocationPermissionsOnly'));
+assert(permissions.includes('getBackgroundLocationPermissionOnly'));
 assert(permissions.includes('requestBackgroundPermissionsAsync'));
 assert(monitoring.includes('startBackgroundMonitoring'));
-assert(monitoring.includes('stopBackgroundMonitoring'));
-assert(shared.includes('startBackgroundMonitoring()'));
-assert(shared.includes('stopBackgroundMonitoring()'));
+assert(monitoring.includes('getBackgroundLocationPermissionOnly'));
+assert(!monitoring.includes('requestBackgroundLocationPermissionsOnly'), 'o serviço automático não pode pedir permissão de background');
+assert(!shared.includes('startBackgroundMonitoring'), 'sharedConnection não deve iniciar GPS');
+assert(!shared.includes('stopBackgroundMonitoring'), 'sharedConnection não deve administrar o ciclo de vida GPS');
+assert(autoTrip.includes('startBackgroundMonitoring()'), 'AutoTripService é o único dono do início GPS');
+assert(autoTrip.includes('this.backgroundGpsEnabled'), 'background GPS exige preferência explícita');
+assert(autoTrip.includes('applyBackgroundGpsPreference'), 'alterar opt-in deve aplicar a transição de GPS');
+assert(autoTrip.includes('gpsTracker.start({ resetTrip: false })'), 'troca para foreground preserva distância acumulada');
+assert(settingsScreen.includes('requestBackgroundLocationPermissionsOnly()'), 'a permissão de background só é solicitada na tela de configurações');
 assert(layout.includes("import '../src/gps/backgroundLocationTask';"));
 assert(!layout.includes('const startGps ='), 'layout não deve iniciar GPS independentemente da ECU');
 assert(!layout.includes('startGps(settings.diagnosticAlerts)'), 'startup não deve criar trilha GPS sem ECU');

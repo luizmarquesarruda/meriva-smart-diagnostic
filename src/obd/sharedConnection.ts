@@ -9,7 +9,6 @@ import RNBluetoothClassic from 'react-native-bluetooth-classic';
 import * as FileSystem from 'expo-file-system';
 import { flushCsvLogs } from '../database/csvLogger';
 import { readAppSettings, writeAppSettings } from '../database/appSettings';
-import { startBackgroundMonitoring, stopBackgroundMonitoring } from '../gps/backgroundMonitoring';
 import { readVehicleIdentity } from './vehicleIdentity';
 import { cleanupDisconnectedSession, runDisconnectPersistenceTasks, runWithTimeout, shouldRetryAfterDisconnectCleanup } from './connectionRecovery';
 
@@ -108,7 +107,6 @@ async function persistDisconnectedState(): Promise<void> {
   // Cada ação é tentada mesmo quando outra falha. A camada de recuperação
   // registra o erro agregado sem impedir o fechamento da sessão ELM327.
   await runDisconnectPersistenceTasks([
-    { label: 'parar monitoramento em segundo plano', run: async () => { await stopBackgroundMonitoring(); } },
     { label: 'fechar sessão de autosave', run: async () => { await closeObdAutosaveSession(); } },
     { label: 'descarregar logs CSV', run: async () => { await flushCsvLogs(); } },
   ]);
@@ -337,12 +335,8 @@ async function persistValidatedConnection(
     };
   });
 
-  const sessionSaved = await startObdAutosaveSession();
-  const backgroundStarted = await startBackgroundMonitoring();
-  if (!backgroundStarted) {
-    console.warn('[obd] ECU validada, mas o monitoramento em segundo plano não foi iniciado.');
-  }
-  return sessionSaved;
+  // GPS/viagem pertence ao AutoTripService; a conexão OBD apenas persiste a sessão.
+  return startObdAutosaveSession();
 }
 export type ConnectionSelectionMode = 'PREFERRED' | 'EXPLICIT';
 
