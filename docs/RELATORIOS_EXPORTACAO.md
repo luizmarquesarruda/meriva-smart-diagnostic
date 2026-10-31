@@ -17,7 +17,7 @@ A tela Configurações oferece duas exportações distintas:
 - **Técnico completo:** preserva nomes, endereços MAC e trilha bruta para diagnóstico interno.
 - **Compartilhável:** substitui todos os endereços MAC por `XX:XX:XX:XX:XX:XX`, inclusive dentro da trilha bruta.
 
-O cabeçalho deve identificar fabricante/modelo Android quando fornecidos pela plataforma, versão Android, API, versão do aplicativo e modo de exportação. Não usar o nome genérico do dispositivo como substituto silencioso do modelo físico.
+O cabeçalho deve identificar fabricante/modelo Android quando fornecidos pela plataforma, versão Android, API, versão do aplicativo e modo de exportação. O modelo físico vem exclusivamente de `Platform.constants.Model`; se ausente, o TXT informa `N/D` e o JSON omite o campo. Não usar `Constants.deviceName` nem outro nome personalizado como substituto do modelo.
 
 O campo de erro principal deve apontar para a falha mais recente identificada na trilha da tentativa, com evento e timestamp. O erro mantido pelo estado compartilhado deve aparecer separadamente como contexto, pois pode ter sido registrado por uma camada diferente.
 
