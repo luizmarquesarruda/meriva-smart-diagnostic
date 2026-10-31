@@ -1,13 +1,13 @@
-## ESTADO VIGENTE — 2026-10-31 (auditoria de relatórios e reconciliação de PRs)
+## ESTADO VIGENTE — 2026-10-31 (relatórios e validação Android)
 
-> Frente em andamento: `fix/diagnostic-report-integrity-20261031`. Nenhuma integração desta frente foi mesclada.
+> Frente em andamento: `fix/diagnostic-report-integrity-20261031`, PR #103. Nenhuma integração desta frente foi mesclada.
 
-- `main` está em `1443ace6ac3d35139d1177fd0601ada871826dc5`; PR #101 foi integrada por squash após `validate` e `android-build` verdes no SHA da PR `4d20e7955576ff840f87b13aa24cfdf7e27a8483`.
-- A CI pós-merge no SHA `1443ace6ac3d35139d1177fd0601ada871826dc5` estava em execução durante esta auditoria; consultar seu resultado antes de considerar a integração principal totalmente validada.
-- PRs #98 e #99 foram redirecionadas para `main`, mas o GitHub identificou conflito de merge (`mergeable_state=dirty`). Não mesclar essas branches no estado atual; reconciliar os diffs e seus registros DB-NNN.
-- A nova frente de relatórios implementa relatório Bluetooth com erro correlacionado à trilha, modelo/versão Android, exportação técnica e compartilhável com MAC redigido, e contrato JSON versionado com manutenção.
-- A branch de relatórios ainda precisa de CI completa no mesmo SHA e inspeção dos dois formatos no Galaxy A06 / SM-A065M / Android 16.
-- O teste físico com ELM327/ECU, conferência do PID 010C e leitura real do PID 012F continuam pendentes. CI não substitui homologação no veículo.
+- `main` permanece em `1443ace6ac3d35139d1177fd0601ada871826dc5`; confirmar atualização/reconciliação da base antes de qualquer merge.
+- A CI do SHA anterior da PR #103 (`f28f78d88306cfcb8e2df602c09fef2be4e9b71f`) passou em baseline, typecheck, suíte completa e build Android. As alterações subsequentes de DB-188 exigem CI no novo SHA.
+- PR #103 inclui relatório Bluetooth com correlação do erro à trilha, exportação técnica/compartilhável com MAC redigido e JSON versionado com manutenção/proveniência.
+- DB-188 corrige a identificação do modelo: somente o campo físico `Platform.constants.Model` é aceito; `Constants.deviceName` não é fallback, pois pode ser um nome personalizado.
+- A validação visual e os dois modos de exportação ainda precisam ser conferidos no Galaxy A06 / SM-A065M / Android 16.
+- Teste físico com ELM327/ECU, resposta válida ao PID 010C e leitura real do PID 012F permanecem pendentes. CI não substitui homologação no veículo.
 
 ---
 
@@ -272,6 +272,7 @@
 - **DB-185** — Bloquear publicação pública/automática do APK; upload privado somente na branch main, checksum SHA-256 e Actions fixadas em commit.
 - **DB-186** — Desacoplar permissões GPS do OBD e centralizar o ciclo de vida de localização no AutoTripService.
 - **DB-187** · 2026-10-31 — Integridade, rastreabilidade e privacidade dos relatórios.
+- **DB-188** · 2026-10-31 — Não confundir nome personalizado do aparelho com modelo físico Android.
 
 ---
 
@@ -4879,3 +4880,20 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - Executar baseline, typecheck, suíte completa e build Android no SHA final desta branch.
 - Confirmar os dois modos de exportação no Galaxy A06 e conferir que o relatório compartilhável não contém nenhum endereço MAC.
 - Comparar o último erro destacado com uma falha real RFCOMM/ELM/ECU no dispositivo. A validação sintética não substitui a conexão real.
+
+
+## DB-188 · 2026-10-31 — Identificação física conservadora do aparelho nos relatórios
+
+### Problema confirmado
+- TXT e JSON usavam `Constants.deviceName` como fallback para o modelo Android. Esse valor pode ser um nome escolhido pelo usuário e não comprova fabricante/modelo físico; a exportação poderia atribuir ao Galaxy A06 uma identificação imprecisa.
+
+### Correções aplicadas nesta branch
+- Criada a função pura `resolveAndroidModel`, que aceita somente texto não vazio fornecido pelo runtime Android.
+- Relatório Bluetooth usa `Platform.constants.Model`; quando ausente, informa `N/D`.
+- Diagnóstico JSON omite `platform.model` quando o Android não fornece o modelo físico, em vez de inferi-lo pelo nome do dispositivo.
+- Adicionados testes para modelo válido, campo vazio e campo ausente.
+- Mantida a compatibilidade do contrato JSON schema 1; nenhum campo foi renomeado ou removido quando o valor existe.
+
+### Validação necessária
+- Executar `gate:baseline`, `validate` e `android-build` no SHA final atualizado da PR #103.
+- Conferir em Android real que o relatório identifica `SM-A065M` quando o runtime fornece esse valor e não inventa um modelo quando o campo está ausente.
