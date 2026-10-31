@@ -196,7 +196,7 @@ export default function MaintenanceScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
-      <ScrollView contentContainerStyle={[styles.content, { paddingHorizontal: layout.horizontalPadding }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingHorizontal: layout.horizontalPadding, paddingVertical: layout.compact ? 12 : 14 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={[styles.frame, { maxWidth: layout.maxContentWidth }]}>
           <View style={styles.header}>
             <View style={styles.headerTop}>
