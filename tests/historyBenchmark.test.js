@@ -10,6 +10,15 @@ const root = path.resolve(__dirname, '..');
 const source = fs.readFileSync(path.join(root, 'src/storage/historyBenchmark.ts'), 'utf8');
 const screen = fs.readFileSync(path.join(root, 'app/armazenamento.tsx'), 'utf8');
 const logger = fs.readFileSync(path.join(root, 'src/database/csvLogger.ts'), 'utf8');
+const queuePolicyPath = path.join(root, 'src/database/csvQueuePolicy.ts');
+const queuePolicyOutput = ts.transpileModule(fs.readFileSync(queuePolicyPath, 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2019 },
+}).outputText;
+const queuePolicyModule = new Module(queuePolicyPath, null);
+queuePolicyModule.filename = queuePolicyPath;
+queuePolicyModule.paths = Module._nodeModulePaths(path.dirname(queuePolicyPath));
+queuePolicyModule._compile(queuePolicyOutput, queuePolicyPath);
+const { getCsvQueueAction, MAX_PENDING_CSV_ROWS, HARD_MAX_PENDING_CSV_ROWS } = queuePolicyModule.exports;
 const migrations = fs.readFileSync(path.join(root, 'src/storage/historyIndexMigrations.ts'), 'utf8');
 const tripStorage = fs.readFileSync(path.join(root, 'src/storage/driveCycleStorage.ts'), 'utf8');
 const migrationPath = path.join(root, 'src/storage/historyIndexMigrations.ts');
@@ -58,5 +67,21 @@ assert.throws(() => migrateHistoryIndexDocument({ schemaVersion: 3, cycles: [] }
 assert.match(logger, /peakObservedPendingRows/);
 assert.match(logger, /maxFlushDurationMs/);
 assert.match(logger, /flushFailures/);
+
+// Stress the policy with 50,000 arrivals while durable spool is available.
+let pending = 0;
+let spooled = 0;
+let dropped = 0;
+for (let index = 0; index < 50_000; index += 1) {
+  const action = getCsvQueueAction(pending);
+  if (action === 'drop') { dropped += 1; continue; }
+  pending += 1;
+  if (getCsvQueueAction(pending) === 'spill') { spooled += pending; pending = 0; }
+  assert.ok(pending <= HARD_MAX_PENDING_CSV_ROWS, 'pending queue exceeded hard cap');
+}
+assert.equal(spooled + pending + dropped, 50_000);
+assert.equal(dropped, 0, 'successful spool must avoid dropping stress-test rows');
+assert.ok(spooled > 0, 'stress run must exercise durable spool threshold');
+assert.equal(getCsvQueueAction(HARD_MAX_PENDING_CSV_ROWS), 'drop');
 
 console.log('historyBenchmark.test.js: OK');
