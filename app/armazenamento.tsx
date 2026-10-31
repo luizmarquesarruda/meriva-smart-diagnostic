@@ -28,7 +28,8 @@ export default function ArmazenamentoScreen() {
   const [usageBreakdown, setUsageBreakdown] = useState<Record<string, number>>({});
   const [csvQueueStatus, setCsvQueueStatus] = useState(getCsvQueueStatus());
   const [message, setMessage] = useState('');
-  const [busy, setBusy] = useState(false);\n  const [measurement, setMeasurement] = useState<HistoryStorageMeasurement | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [measurement, setMeasurement] = useState<HistoryStorageMeasurement | null>(null);
 
   async function refresh(path: string) {
     setCsvQueueStatus(getCsvQueueStatus());
@@ -57,7 +58,23 @@ export default function ArmazenamentoScreen() {
     void checkQuota();
   }, []);
 
-  async function handleBenchmark() {\n    if (!basePath || busy) return;\n    setBusy(true);\n    setMessage('MEDINDO HISTÓRICO NO DISPOSITIVO...');\n    try {\n      await flushCsvLogs();\n      const result = await measureHistoryStorage(basePath, Platform.OS, Platform.Version);\n      setMeasurement(result);\n      setMessage('MEDIÇÃO JSON CONCLUÍDA. NENHUM HISTÓRICO FOI ALTERADO.');\n    } catch (cause) {\n      setMessage('FALHA NA MEDIÇÃO: ' + (cause instanceof Error ? cause.message : String(cause)));\n    } finally {\n      setBusy(false);\n    }\n  }\n\n  async function handleClean() {
+  async function handleBenchmark() {
+    if (!basePath || busy) return;
+    setBusy(true);
+    setMessage('MEDINDO HISTÓRICO NO DISPOSITIVO...');
+    try {
+      await flushCsvLogs();
+      const result = await measureHistoryStorage(basePath, Platform.OS, Platform.Version);
+      setMeasurement(result);
+      setMessage('MEDIÇÃO JSON CONCLUÍDA. NENHUM HISTÓRICO FOI ALTERADO.');
+    } catch (cause) {
+      setMessage('FALHA NA MEDIÇÃO: ' + (cause instanceof Error ? cause.message : String(cause)));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleClean() {
     if (!basePath || busy) return;
     setBusy(true);
     setMessage('LIMPANDO...');
