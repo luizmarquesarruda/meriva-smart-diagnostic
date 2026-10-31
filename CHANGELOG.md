@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Histórico, autosave e logs CSV
+- `VIAGENS/index.json` passa a ser a única fonte persistente de viagens; inicialização deduplica por ID, preserva a viagem com telemetria mais completa e reconcilia registros de autosaves antigos.
+- Novos autosaves não duplicam o histórico completo de viagens; a memória de runtime continua hidratada para as telas e relatórios.
+- Resumos CSV de viagem são idempotentes por ID, evitando linhas repetidas quando o fechamento da viagem é repetido.
+- CSVs diários de telemetria giram em partes de 512 KiB; filas grandes são persistidas em chunks CSV verificados em vez de descartar imediatamente as amostras.
+- SQLite não foi introduzido nesta etapa: a decisão continua condicionada a medir no aparelho volume, latência, concorrência, consultas e restauração antes de migrar dados existentes.
+
 ### GPS / background location
 - Corrigido o fixture de recuperação para respeitar o timestamp estritamente crescente após amostras com precisão desconhecida.
 - Expandido o mock de Expo Location e incluídos testes de start/stop/reuso da tarefa nativa de localização em segundo plano.
