@@ -80,6 +80,14 @@ A CI pode validar e compilar em branches e pull requests, mas não pode publicar
 - `autoTripService` é o único dono do ciclo de vida GPS/viagem. `sharedConnection` administra somente a sessão OBD; não pode iniciar/parar o rastreador.
 - Trocar de rastreamento em segundo plano para primeiro plano durante uma sessão não pode zerar distância ou contagem de amostras já acumuladas.
 
+## Permissões e ciclo de vida GPS
+
+- A inicialização pede somente permissões necessárias ao Bluetooth/OBD; localização não pode bloquear conexão, polling ou diagnóstico.
+- A permissão de localização em primeiro plano exige opt-in explícito na tela Configurações. A preferência ausente em configurações antigas equivale a desativado.
+- A permissão em segundo plano exige GPS foreground previamente ativado e um segundo opt-in explícito; serviços automáticos apenas consultam permissões existentes e nunca abrem prompts durante polling OBD.
+- `autoTripService` é o único dono do ciclo de vida GPS/viagem. `sharedConnection` administra somente a sessão OBD; não pode iniciar/parar o rastreador.
+- Trocar de rastreamento em segundo plano para primeiro plano durante uma sessão não pode zerar distância ou contagem de amostras já acumuladas.
+
 ## Regras para uma alteração legítima
 
 - Não reduzir ou excluir um teste essencial só para deixar a CI verde.
