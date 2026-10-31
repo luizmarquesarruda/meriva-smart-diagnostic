@@ -142,9 +142,9 @@ assert.match(layout, /screenOptions=\{\{\s*headerShown: false/, 'as rotas usam c
 assert.match(laboratoryScreen, /VOLTAR AO COCKPIT/, 'Laboratório precisa oferecer retorno visível após ocultar cabeçalho nativo');
 assert.match(storageScreen, /VOLTAR AOS RECURSOS/, 'Armazenamento precisa oferecer retorno visível após ocultar cabeçalho nativo');
 assert.match(settingsScreen, /VOLTAR AOS RECURSOS/, 'Configurações precisa oferecer retorno visível após ocultar cabeçalho nativo');
-assert.match(tripScreen, /tripListLandscape:\\{flexDirection:'row',flexWrap:'wrap'/, 'histórico de viagens deve usar grade em paisagem');
-assert.match(maintenanceScreen, /taskGridLandscape:\\{flexDirection:'row',flexWrap:'wrap'/, 'tarefas de manutenção devem usar duas colunas em paisagem');
-assert.match(settingsScreen, /settingsGridLandscape:\\{flexDirection:'row',flexWrap:'wrap'/, 'configurações devem reorganizar cartões em paisagem');
+assert.match(tripScreen, /tripListLandscape:\s*\{flexDirection:'row',flexWrap:'wrap'/, 'histórico de viagens deve usar grade em paisagem');
+assert.match(maintenanceScreen, /taskGridLandscape:\s*\{flexDirection:'row',flexWrap:'wrap'/, 'tarefas de manutenção devem usar duas colunas em paisagem');
+assert.match(settingsScreen, /settingsGridLandscape:\s*\{flexDirection:'row',flexWrap:'wrap'/, 'configurações devem reorganizar cartões em paisagem');
 assert.match(tripScreen, /layout\.compact\?12:16/, 'Viagens deve consumir o breakpoint compacto');
 assert.match(maintenanceScreen, /layout\.compact \? 12 : 14/, 'Manutenção deve consumir o breakpoint compacto');
 assert.match(settingsScreen, /layout\.compact \? 12 : 16/, 'Configurações deve consumir o breakpoint compacto');
