@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'expo-router';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
 import { flushCsvLogs, getCsvQueueStatus } from '../src/database/csvLogger';
@@ -11,6 +11,7 @@ import { COLORS, SCREEN_TITLE_STYLE } from '../src/ui/theme';
 import { AppIcon } from '../src/ui/AppIcon';
 import { SourceStatusLegend } from '../src/ui/SourceStatusLegend';
 import { exportDiagnosticsJson, exportDriveCyclesCsv } from '../src/storage/exportDiagnostics';
+import { HistoryStorageMeasurement, measureHistoryStorage } from '../src/storage/historyBenchmark';
 
 const DEFAULT_QUOTA: StorageQuotaConfig = {
   limitMb: 2048,
@@ -27,7 +28,7 @@ export default function ArmazenamentoScreen() {
   const [usageBreakdown, setUsageBreakdown] = useState<Record<string, number>>({});
   const [csvQueueStatus, setCsvQueueStatus] = useState(getCsvQueueStatus());
   const [message, setMessage] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(false);\n  const [measurement, setMeasurement] = useState<HistoryStorageMeasurement | null>(null);
 
   async function refresh(path: string) {
     setCsvQueueStatus(getCsvQueueStatus());
@@ -56,7 +57,7 @@ export default function ArmazenamentoScreen() {
     void checkQuota();
   }, []);
 
-  async function handleClean() {
+  async function handleBenchmark() {\n    if (!basePath || busy) return;\n    setBusy(true);\n    setMessage('MEDINDO HISTÓRICO NO DISPOSITIVO...');\n    try {\n      await flushCsvLogs();\n      const result = await measureHistoryStorage(basePath, Platform.OS, Platform.Version);\n      setMeasurement(result);\n      setMessage('MEDIÇÃO JSON CONCLUÍDA. NENHUM HISTÓRICO FOI ALTERADO.');\n    } catch (cause) {\n      setMessage('FALHA NA MEDIÇÃO: ' + (cause instanceof Error ? cause.message : String(cause)));\n    } finally {\n      setBusy(false);\n    }\n  }\n\n  async function handleClean() {
     if (!basePath || busy) return;
     setBusy(true);
     setMessage('LIMPANDO...');
@@ -131,6 +132,24 @@ export default function ArmazenamentoScreen() {
           </TouchableOpacity>
         </Link>
       </View>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>MEDIÇÃO REAL DO HISTÓRICO</Text>
+        <Text style={styles.note}>Executa leitura, parse e gravação de teste no armazenamento deste aparelho. A gravação usa arquivo temporário e não modifica viagens existentes.</Text>
+        <TouchableOpacity style={[styles.button, styles.buttonWithIcon]} onPress={() => void handleBenchmark()} disabled={!basePath || busy}>
+          <AppIcon name="data" size={18} color={COLORS.white} />
+          <Text style={styles.buttonText}>{busy ? 'MEDINDO...' : 'MEDIR TAMANHO E LATÊNCIA JSON'}</Text>
+        </TouchableOpacity>
+        {measurement && <>
+          <View style={styles.row}><Text style={styles.label}>Viagens / IDs únicos</Text><Text style={styles.value}>{measurement.trips} / {measurement.uniqueTripIds}</Text></View>
+          <View style={styles.row}><Text style={styles.label}>Amostras nas viagens</Text><Text style={styles.value}>{measurement.telemetrySamples}</Text></View>
+          <View style={styles.row}><Text style={styles.label}>JSON / CSV</Text><Text style={styles.value}>{(measurement.jsonBytes / 1024).toFixed(1)} / {(measurement.csvBytes / 1024).toFixed(1)} KB</Text></View>
+          <View style={styles.row}><Text style={styles.label}>Leitura + parse (mediana / p95)</Text><Text style={styles.value}>{measurement.readParseMs.median} / {measurement.readParseMs.p95} ms</Text></View>
+          <View style={styles.row}><Text style={styles.label}>Gravação + read-back (mediana / p95)</Text><Text style={styles.value}>{measurement.scratchWriteReadbackMs.median} / {measurement.scratchWriteReadbackMs.p95} ms</Text></View>
+          <Text style={styles.note}>Android/API: {measurement.platform} / {measurement.androidApi}. Integridade: {measurement.integrity}. Medido em {new Date(measurement.measuredAt).toLocaleString()}.</Text>
+          <Text style={styles.note}>Esta etapa mede JSON. SQLite ainda precisa ser executado com a mesma carga antes de decidir qualquer migração.</Text>
+        </>}
       </View>
 
       <View style={styles.exportRow}>
