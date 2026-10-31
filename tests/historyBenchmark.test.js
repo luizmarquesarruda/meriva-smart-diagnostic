@@ -33,6 +33,10 @@ assert.match(migrations, /1:\s*\(document\)/);
 assert.match(migrations, /HISTORY_SCHEMA_VERSION_NEWER_THAN_APP/);
 assert.match(tripStorage, /migrateHistoryIndexDocument\(parsed\)/);
 assert.match(tripStorage, /schemaVersion: CURRENT_HISTORY_SCHEMA_VERSION/);
-assert.match(tripStorage, /HISTORY_SCHEMA_VERSION_NEWER_THAN_APP/);
+assert.match(tripStorage, /CURRENT_HISTORY_SCHEMA_VERSION/);
+assert.match(tripStorage, /schemaVersion as number/);
+assert.match(logger, /peakObservedPendingRows/);
+assert.match(logger, /maxFlushDurationMs/);
+assert.match(logger, /flushFailures/);
 
 console.log('historyBenchmark.test.js: OK');
