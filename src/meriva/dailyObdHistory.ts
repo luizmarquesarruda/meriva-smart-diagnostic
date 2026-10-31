@@ -119,6 +119,59 @@ async function readHistorySnapshot(path: string): Promise<string | null> {
   return FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 });
 }
 
+async function readPreviousHistorySnapshot(path: string): Promise<string | null> {
+  const previousPath = previousHistoryPath(path);
+  const previous = await readHistorySnapshot(previousPath);
+  if (previous != null) return previous;
+  return readHistorySnapshot(previousPath + '.fallback');
+}
+
+async function writePreviousHistorySnapshot(path: string, content: string): Promise<void> {
+  const previousPath = previousHistoryPath(path);
+  const temporaryPath = temporaryPreviousHistoryPath(path);
+  const fallbackPath = previousPath + '.fallback';
+  let fallbackReady = false;
+
+  try {
+    await writeAndVerifyHistoryFile(temporaryPath, content);
+    const previousInfo = await FileSystem.getInfoAsync(previousPath);
+    if (previousInfo.exists && previousInfo.isDirectory) {
+      throw new Error('BACKUP_DO_HISTORICO_APONTA_PARA_DIRETORIO');
+    }
+    const fallbackInfo = await FileSystem.getInfoAsync(fallbackPath);
+    if (fallbackInfo.exists && fallbackInfo.isDirectory) {
+      throw new Error('FALLBACK_DO_HISTORICO_APONTA_PARA_DIRETORIO');
+    }
+    if (fallbackInfo.exists) await FileSystem.deleteAsync(fallbackPath, { idempotent: true });
+    if (previousInfo.exists) {
+      await FileSystem.moveAsync({ from: previousPath, to: fallbackPath });
+      fallbackReady = true;
+    }
+
+    try {
+      await FileSystem.moveAsync({ from: temporaryPath, to: previousPath });
+      const verified = await readHistorySnapshot(previousPath);
+      if (verified !== content) throw new Error('NOVO_BACKUP_DO_HISTORICO_NAO_VALIDADO');
+      if (fallbackReady) {
+        await FileSystem.deleteAsync(fallbackPath, { idempotent: true });
+        fallbackReady = false;
+      }
+    } catch (cause) {
+      if (fallbackReady) {
+        const partialPrevious = await FileSystem.getInfoAsync(previousPath);
+        if (partialPrevious.exists) await FileSystem.deleteAsync(previousPath, { idempotent: true });
+        await FileSystem.moveAsync({ from: fallbackPath, to: previousPath });
+        const restored = await readHistorySnapshot(previousPath);
+        if (restored == null) throw new Error('FALLBACK_DO_HISTORICO_NAO_RESTAURADO');
+        fallbackReady = false;
+      }
+      throw cause;
+    }
+  } finally {
+    await FileSystem.deleteAsync(temporaryPath, { idempotent: true }).catch(() => undefined);
+  }
+}
+
 async function writeAndVerifyHistoryFile(path: string, content: string): Promise<void> {
   await FileSystem.writeAsStringAsync(path, content, { encoding: FileSystem.EncodingType.UTF8 });
   const verified = await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 });
@@ -181,6 +234,15 @@ async function persistHistorySnapshot(path: string, content: string, previousCon
 
     const verifiedMain = await readHistorySnapshot(path);
     if (verifiedMain !== content) throw new Error('NOVO_HISTORICO_NAO_PASSOU_NA_VALIDACAO');
+
+    // Keep the recovery snapshot aligned with the newly committed main file.
+    // Failure to refresh this secondary copy must not report the already-saved
+    // event as failed, which could cause duplicate retries by the caller.
+    try {
+      await writePreviousHistorySnapshot(path, content);
+    } catch {
+      // The verified main history remains authoritative.
+    }
   } catch (cause) {
     let recoveryDetail = '';
     if (mainReplacementStarted && previousReady) {
@@ -214,7 +276,7 @@ async function appendDailyObdSessionEventUnsafe(
   if (mainSnapshot == null) {
     // A missing main file may be the result of an interrupted replacement.
     // Recover the previous verified snapshot instead of starting an empty log.
-    const recovered = await readHistorySnapshot(previousHistoryPath(path));
+    const recovered = await readPreviousHistorySnapshot(path);
     if (recovered != null) {
       content = recovered;
       previousContent = recovered;
