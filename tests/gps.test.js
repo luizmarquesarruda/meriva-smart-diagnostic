@@ -17,6 +17,8 @@ const output = ts.transpileModule(fs.readFileSync(sourcePath, 'utf8'), {
 }).outputText;
 
 let watcher = null;
+let foregroundPermissionStatus = 'granted';
+let foregroundPermissionRequests = 0;
 let backgroundUpdatesStarted = false;
 let backgroundStartCalls = 0;
 let backgroundStopCalls = 0;
@@ -24,8 +26,12 @@ const fakeLocation = {
   Accuracy: { BestForNavigation: 6 },
   PermissionStatus: { GRANTED: 'granted' },
   hasServicesEnabledAsync: async () => true,
-  getForegroundPermissionsAsync: async () => ({ status: 'granted' }),
-  requestForegroundPermissionsAsync: async () => ({ status: 'granted' }),
+  getForegroundPermissionsAsync: async () => ({ status: foregroundPermissionStatus }),
+  requestForegroundPermissionsAsync: async () => {
+    foregroundPermissionRequests += 1;
+    foregroundPermissionStatus = 'granted';
+    return { status: 'granted' };
+  },
   hasStartedLocationUpdatesAsync: async () => backgroundUpdatesStarted,
   startLocationUpdatesAsync: async () => {
     backgroundStartCalls += 1;
@@ -79,6 +85,15 @@ assert.strictEqual(calculateConsumptionKml(0, 8), null);
 assert.strictEqual(calculateConsumptionKml(100, 0), null);
 
 (async () => {
+  // Background OBD services must read permission state and never trigger a prompt.
+  foregroundPermissionStatus = 'denied';
+  const noPromptTracker = new GpsTracker();
+  const promptsBeforeReadOnlyStart = foregroundPermissionRequests;
+  assert.strictEqual(await noPromptTracker.start({ requestPermission: false }), false);
+  assert.strictEqual(foregroundPermissionRequests, promptsBeforeReadOnlyStart,
+    'a read-only GPS start must not request foreground location permission');
+  foregroundPermissionStatus = 'granted';
+
   const tracker = new GpsTracker();
   const receivedStates = [];
   const unsubscribe = tracker.subscribe((state) => receivedStates.push(state));
