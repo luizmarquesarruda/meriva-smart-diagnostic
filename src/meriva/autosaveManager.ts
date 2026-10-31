@@ -40,6 +40,7 @@ interface AutosaveRuntime {
   appStateSubscription: { remove: () => void } | null;
   lastReadingMutationAt: Map<string, number>;
   driveCycleHistoryReconciled: boolean;
+  futureSchemaDetected: boolean;
 }
 
 const runtime: AutosaveRuntime = {
@@ -60,6 +61,7 @@ const runtime: AutosaveRuntime = {
   appStateSubscription: null,
   lastReadingMutationAt: new Map(),
   driveCycleHistoryReconciled: false,
+  futureSchemaDetected: false,
 };
 
 function mainPath(basePath: string): string {
@@ -97,19 +99,33 @@ export async function ensureStorageDirs(basePath: string): Promise<void> {
   for (const dir of dirs) await ensureDir(`${basePath}/${dir}`);
 }
 
-async function readEnvelope(path: string): Promise<AutoSaveEnvelope<MerivaPersistedState> | null> {
+type AutosaveEnvelopeFileStatus =
+  | { kind: 'MISSING' }
+  | { kind: 'INVALID' }
+  | { kind: 'FUTURE' }
+  | { kind: 'VALID'; envelope: AutoSaveEnvelope<MerivaPersistedState> };
+
+async function inspectEnvelopeFile(path: string): Promise<AutosaveEnvelopeFileStatus> {
   try {
     const info = await FileSystem.getInfoAsync(path);
-    if (!info.exists) return null;
+    if (!info.exists) return { kind: 'MISSING' };
+    if (info.isDirectory) return { kind: 'INVALID' };
     const content = await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 });
-    const parsed = JSON.parse(content);
-    if (!isValidEnvelope(parsed)) return null;
-    const migrated = migrateEnvelope<MerivaPersistedState>(parsed);
-    if (!migrated || !validatePayload(migrated.payload)) return null;
-    return migrated;
+    const parsed = JSON.parse(content) as { schemaVersion?: unknown };
+    if (typeof parsed.schemaVersion === 'number' && Number.isInteger(parsed.schemaVersion)
+        && parsed.schemaVersion > AUTOSAVE_SCHEMA_VERSION) return { kind: 'FUTURE' };
+    if (!isValidEnvelope(parsed)) return { kind: 'INVALID' };
+    const migrated = migrateEnvelope<MerivaPersistedState>(parsed as AutoSaveEnvelope<MerivaPersistedState>);
+    if (!migrated || !validatePayload(migrated.payload)) return { kind: 'INVALID' };
+    return { kind: 'VALID', envelope: migrated };
   } catch {
-    return null;
+    return { kind: 'INVALID' };
   }
+}
+
+async function readEnvelope(path: string): Promise<AutoSaveEnvelope<MerivaPersistedState> | null> {
+  const inspected = await inspectEnvelopeFile(path);
+  return inspected.kind === 'VALID' ? inspected.envelope : null;
 }
 
 async function loadLastValidEnvelope(
@@ -132,6 +148,12 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
     runtime.dirty = false;
     runtime.lastError = null;
     return true;
+  }
+
+  if (runtime.futureSchemaDetected) {
+    runtime.dirty = true;
+    runtime.lastError = 'AUTOSAVE_SCHEMA_VERSION_NEWER_THAN_APP; ARQUIVO ORIGINAL PRESERVADO E GRAVACAO BLOQUEADA.';
+    return false;
   }
 
   runtime.saving = true;
@@ -170,13 +192,33 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
       throw new Error('AUTOSAVE_VALIDACAO_FALHOU');
     }
 
-    const mainInfo = await FileSystem.getInfoAsync(mainPath(base));
-    if (mainInfo.exists) {
-      await FileSystem.copyAsync({ from: mainPath(base), to: previousPath(base) });
+    const mainStatus = await inspectEnvelopeFile(mainPath(base));
+    if (mainStatus.kind === 'FUTURE') {
+      runtime.futureSchemaDetected = true;
+      throw new Error('AUTOSAVE_SCHEMA_VERSION_NEWER_THAN_APP; ARQUIVO ORIGINAL PRESERVADO.');
     }
-
-    await FileSystem.copyAsync({ from: tmpPath(base), to: mainPath(base) });
-    await FileSystem.deleteAsync(tmpPath(base), { idempotent: true });
+    if (mainStatus.kind === 'VALID') {
+      const previousTemp = previousPath(base) + '.tmp';
+      await FileSystem.deleteAsync(previousTemp, { idempotent: true });
+      await FileSystem.copyAsync({ from: mainPath(base), to: previousTemp });
+      const verifiedPrevious = await inspectEnvelopeFile(previousTemp);
+      if (verifiedPrevious.kind !== 'VALID') throw new Error('AUTOSAVE_PREVIOUS_COPY_VALIDATION_FAILED; ARQUIVO PRINCIPAL NAO SUBSTITUIDO.');
+      await FileSystem.deleteAsync(previousPath(base), { idempotent: true });
+      await FileSystem.moveAsync({ from: previousTemp, to: previousPath(base) });
+    } else if (mainStatus.kind === 'INVALID') {
+      const previousStatus = await inspectEnvelopeFile(previousPath(base));
+      if (previousStatus.kind !== 'VALID') throw new Error('AUTOSAVE_CORROMPIDO_SEM_COPIA_ANTERIOR_VALIDA; ARQUIVO ORIGINAL PRESERVADO.');
+      await FileSystem.copyAsync({ from: mainPath(base), to: mainPath(base) + '.corrupt-' + Date.now() });
+    } else {
+      const previousInfo = await FileSystem.getInfoAsync(previousPath(base));
+      if (previousInfo.exists && (await inspectEnvelopeFile(previousPath(base))).kind !== 'VALID') {
+        throw new Error('AUTOSAVE_PREVIOUS_COPY_INVALID; ARQUIVO ORIGINAL PRESERVADO.');
+      }
+    }
+    await FileSystem.deleteAsync(mainPath(base), { idempotent: true });
+    await FileSystem.moveAsync({ from: tmpPath(base), to: mainPath(base) });
+    const committed = await inspectEnvelopeFile(mainPath(base));
+    if (committed.kind !== 'VALID') throw new Error('AUTOSAVE_COMMITTED_READBACK_FAILED; COPIA ANTERIOR PRESERVADA.');
 
     runtime.lastSavedAt = savedAt;
     runtime.lastSaveReason = reason;
@@ -197,6 +239,7 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
     saved = true;
     return true;
   } catch (cause) {
+    await FileSystem.deleteAsync(tmpPath(runtime.basePath), { idempotent: true }).catch(() => undefined);
     runtime.dirty = true;
     runtime.lastError = cause instanceof Error ? cause.message : 'ERRO DESCONHECIDO NO AUTOSAVE';
     console.warn('[autosave] falha ao salvar:', runtime.lastError);
@@ -218,6 +261,7 @@ async function initAutoSaveUnsafe(basePath: string): Promise<MerivaPersistedStat
 
   await ensureStorageDirs(basePath);
   runtime.basePath = basePath;
+  runtime.futureSchemaDetected = (await inspectEnvelopeFile(mainPath(basePath))).kind === 'FUTURE';
 
   const envelope = await loadLastValidEnvelope(basePath);
   runtime.state = envelope ? hydrateState(envelope.payload) : createEmptyMerivaState();
@@ -236,7 +280,9 @@ async function initAutoSaveUnsafe(basePath: string): Promise<MerivaPersistedStat
 
   runtime.lastSavedAt = envelope?.savedAt ?? null;
   runtime.lastSaveReason = null;
-  runtime.lastError = null;
+  runtime.lastError = runtime.futureSchemaDetected
+    ? 'AUTOSAVE_SCHEMA_VERSION_NEWER_THAN_APP; ULTIMA COPIA COMPATIVEL SOMENTE PARA LEITURA.'
+    : null;
   runtime.lastSavedFingerprint = envelope ? snapshotFingerprint(runtime.state) : null;
   runtime.dirty = false;
   runtime.mutationVersion = 0;

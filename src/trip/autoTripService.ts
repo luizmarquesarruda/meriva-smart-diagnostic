@@ -139,9 +139,11 @@ class AutoTripService {
   }
 
   async withPollingPaused<T>(operation: () => Promise<T>): Promise<T> {
+    const deadline = Date.now() + 15_000;
     this.pollingPauseCount += 1;
     try {
       while (this.pollingCycleInFlight) {
+        if (Date.now() >= deadline) throw new Error('OBD_POLLING_DID_NOT_DRAIN; SNAPSHOT_CANCELLED.');
         await new Promise((resolve) => setTimeout(resolve, 25));
       }
       return await operation();
@@ -180,7 +182,13 @@ class AutoTripService {
           .catch((cause) => console.warn('[trip] falha ao aplicar preferências de GPS:', cause));
       }
     });
-    const persisted = await initAutoSave(basePath);
+    let persisted = getAutoSaveState();
+    try {
+      persisted = await initAutoSave(basePath);
+    } catch (cause) {
+      console.warn('[trip] autosave indisponível; telemetria OBD continuará em memória:',
+        cause instanceof Error ? cause.message : String(cause));
+    }
     this.state = {
       ...this.state,
       averageConsumptionKml: persisted.autonomy.averageConsumptionKml > 0
@@ -214,13 +222,20 @@ class AutoTripService {
     await this.stopGpsForEcu();
     this.lastEstimatedFuelRate = null;
     this.fuelLevelBuffer.reset();
-    await this.finalizeRecorder();
-    this.state = { ...INITIAL_STATE };
+    try {
+      await this.finalizeRecorder();
+    } catch (cause) {
+      this.recorderFinalizationPending = Boolean(this.recorder);
+      this.recorderFinalizationError = 'VIAGEM PENDENTE DE GRAVACAO: '
+        + (cause instanceof Error ? cause.message : String(cause));
+    }
+    this.state = { ...INITIAL_STATE, error: this.recorderFinalizationError };
     this.emit();
   }
 
   private async applyConnection(connection: SharedObdConnection | null): Promise<void> {
-    const hadTrackingSession = Boolean(this.loopPromise || this.recorder || this.gpsStartedForEcu);
+    while (this.pollingPauseCount > 0) await new Promise((resolve) => setTimeout(resolve, 25));
+    const hadTrackingSession = Boolean(this.loopPromise || this.recorder || this.recorderFinalizationPending || this.gpsStartedForEcu);
     await this.stopCurrentLoop();
     // Keep an existing tracker alive only when this AutoTripService already
     // owns the current trip generation; new ECU sessions start a fresh trip.
@@ -244,7 +259,7 @@ class AutoTripService {
     this.fuelLevelBuffer.reset();
 
     if (!connection || !this.running) {
-      this.state = { ...INITIAL_STATE };
+      this.state = { ...INITIAL_STATE, error: this.recorderFinalizationError };
       this.emit();
       return;
     }
@@ -256,7 +271,13 @@ class AutoTripService {
     const generation = ++this.generation;
     this.gpsStartRetryAfterMs = 0;
 
-    const persistedAutonomy = (await initAutoSave(this.basePath)).autonomy;
+    let persistedAutonomy = getAutoSaveState().autonomy;
+    try {
+      persistedAutonomy = (await initAutoSave(this.basePath)).autonomy;
+    } catch (cause) {
+      console.warn('[trip] autosave indisponível ao iniciar sessão ECU; usando último estado em memória:',
+        cause instanceof Error ? cause.message : String(cause));
+    }
     this.state = {
       ...INITIAL_STATE,
       connected: true,
@@ -267,7 +288,7 @@ class AutoTripService {
       fuelLevelReadAtMs: null,
       fuelRemainingL: null,
       fuelReserve: null,
-      error: null,
+      error: this.recorderFinalizationError,
       averageConsumptionKml: persistedAutonomy.averageConsumptionKml > 0
         ? persistedAutonomy.averageConsumptionKml
         : 0,
@@ -315,7 +336,7 @@ class AutoTripService {
             fuelLevelBufferSampleCount: 0,
             autonomySource: null,
             estimatedRangeKm: 0,
-            error: 'ADAPTADOR OK / ECU SEM RESPOSTA',
+            error: this.recorderFinalizationError ?? 'ADAPTADOR OK / ECU SEM RESPOSTA',
           });
         } catch (cause) {
           this.recorderFinalizationPending = Boolean(this.recorder);
@@ -701,6 +722,7 @@ class AutoTripService {
   }
 
   private async applyGpsPreferences(): Promise<void> {
+    while (this.pollingPauseCount > 0) await new Promise((resolve) => setTimeout(resolve, 25));
     if (this.gpsStartPromise) {
       try { await this.gpsStartPromise; } catch { /* a failed optional GPS start must not block OBD */ }
     }

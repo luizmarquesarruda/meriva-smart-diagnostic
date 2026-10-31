@@ -26,6 +26,9 @@ export interface AppSettings {
 const SETTINGS_SCHEMA_VERSION = 1;
 const settingsListeners = new Set<(settings: AppSettings) => void>();
 let latestSettings: AppSettings | null = null;
+let settingsStorageWarning: string | null = null;
+
+export function getAppSettingsStorageWarning(): string | null { return settingsStorageWarning; }
 
 function publishSettings(settings: AppSettings): void {
   latestSettings = { ...settings };
@@ -139,20 +142,33 @@ async function settingsPath(basePath: string): Promise<string> {
 
 export async function readAppSettings(basePath: string): Promise<AppSettings> {
   const target = await settingsPath(basePath);
-  const result = await readJsonWithRecovery(target, isSettingsDocument, isFutureSettingsDocument);
-  if (!result.value) {
-    await writeAppSettings(basePath, DEFAULT_SETTINGS);
+  try {
+    const result = await readJsonWithRecovery(target, isSettingsDocument, isFutureSettingsDocument);
+    if (!result.value) {
+      await writeAppSettings(basePath, DEFAULT_SETTINGS);
+      settingsStorageWarning = null;
+      return DEFAULT_SETTINGS;
+    }
+    const normalized = normalizeSettings(result.value);
+    settingsStorageWarning = result.recoveredFromPrevious
+      ? 'CONFIGURAÇÕES RECUPERADAS DA CÓPIA ANTERIOR; O ARQUIVO PRINCIPAL FOI PRESERVADO.' : null;
+    publishSettings(normalized);
+    return normalized;
+  } catch (cause) {
+    settingsStorageWarning = cause instanceof Error
+      ? 'CONFIGURAÇÕES NÃO GRAVÁVEIS: ' + cause.message + '. PADRÕES USADOS SOMENTE EM MEMÓRIA; ARQUIVO ORIGINAL PRESERVADO.'
+      : 'CONFIGURAÇÕES NÃO GRAVÁVEIS; PADRÕES USADOS SOMENTE EM MEMÓRIA; ARQUIVO ORIGINAL PRESERVADO.';
+    console.warn('[settings] ', settingsStorageWarning);
+    publishSettings(DEFAULT_SETTINGS);
     return DEFAULT_SETTINGS;
   }
-  const settings = normalizeSettings(result.value);
-  publishSettings(settings);
-  return settings;
 }
 
 export async function writeAppSettings(basePath: string, settings: AppSettings): Promise<void> {
   const target = await settingsPath(basePath);
   const next = { ...settings, schemaVersion: SETTINGS_SCHEMA_VERSION };
   await writeJsonAtomically(target, next, isSettingsDocument, isFutureSettingsDocument);
+  settingsStorageWarning = null;
   publishSettings(settings);
 }
 

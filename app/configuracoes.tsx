@@ -12,7 +12,7 @@ import { exportAutoSaveTxt, exportDailyObdHistoryTxt } from '../src/meriva/expor
 import { exportBluetoothDiagnosticTxt } from '../src/obd/exportBluetoothDiagnosticTxt';
 import { autoTripService } from '../src/trip/autoTripService';
 import { disconnectSharedObd } from '../src/obd/sharedConnection';
-import { AppSettings, readAppSettings, writeAppSettings } from '../src/database/appSettings';
+import { AppSettings, getAppSettingsStorageWarning, readAppSettings, writeAppSettings } from '../src/database/appSettings';
 import { requestBackgroundLocationPermissionsOnly, requestLocationPermissionsOnly } from '../src/permissions/permissionManager';
 import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
 import { getMidLayout } from '../src/ui/midLayout';
@@ -42,6 +42,7 @@ export default function ConfiguracaoScreen() {
       setProfile(state.vehicle);
       setSettings(await readAppSettings(basePath));
       setSaveStatus(getAutoSaveStatus());
+      setStatus(getAppSettingsStorageWarning() ?? 'PRONTO');
       setBackupOptions(await listVerifiedBackups(basePath));
       setStatus('PRONTO');
       setStorageBase(basePath);
@@ -140,6 +141,7 @@ export default function ConfiguracaoScreen() {
       const state = await initAutoSave(storageBase);
       setProfile(state.vehicle);
       setSettings(await readAppSettings(storageBase));
+      setStatus(getAppSettingsStorageWarning() ?? 'CONFIGURAÇÕES RESTAURADAS');
       await autoTripService.start(storageBase);
       tripServiceStopped = false;
 
