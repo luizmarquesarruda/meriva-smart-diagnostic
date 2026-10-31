@@ -481,9 +481,9 @@ export default function LaboratorioScreen() {
 
   return (
     <SafeAreaView style={{flex:1,backgroundColor:COLORS.screen}} edges={["top","bottom","left","right"]}>
-    <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, alignItems: 'center' }]}>
+    <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: layout.horizontalPadding, paddingTop: layout.compact ? 12 : 16, alignItems: 'center' }]}>
       <View style={{ width: '100%', maxWidth: layout.maxContentWidth }}>
-      <Text style={styles.title}>DIAGNÓSTICO OBD</Text>
+      <Text style={[styles.title,{fontSize:layout.titleSize-3}]}>DIAGNÓSTICO OBD</Text>
       <Text style={styles.status}>{status}</Text>
       <View style={styles.connectionSummary}>
         <View style={styles.connectionItem}><Text style={styles.connectionLabel}>ELM327</Text><Text style={styles.connectionValue}>{sessionRef.current ? 'CONECTADO' : 'AGUARDANDO'}</Text></View>
