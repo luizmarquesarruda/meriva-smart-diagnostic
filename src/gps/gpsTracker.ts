@@ -52,6 +52,20 @@ function movementThresholdM(sample: GpsSample, previous: GpsSample): number {
   return Math.max(MIN_MOVEMENT_DISTANCE_M, reportedAccuracy * 1.5);
 }
 
+function reportedSpeedConfirmsMovement(
+  gpsSpeedKmh: number | null,
+  obdSpeedKmh: number | null,
+): boolean {
+  // OBD is preferred when available; otherwise a GPS-reported speed is used.
+  // When both are absent, allow only the independently validated three-segment
+  // GNSS displacement window to establish movement.
+  const reportedSpeed = obdSpeedKmh ?? gpsSpeedKmh;
+  if (reportedSpeed == null) return true;
+  return Number.isFinite(reportedSpeed)
+    && reportedSpeed >= MIN_MOVEMENT_SPEED_KMH
+    && reportedSpeed <= MAX_SPEED_KMH;
+}
+
 export function haversineDistanceKm(
   a: Pick<GpsSample, 'latitude' | 'longitude'>,
   b: Pick<GpsSample, 'latitude' | 'longitude'>,
@@ -455,17 +469,13 @@ export class GpsTracker {
           1,
           Math.min(confidenceDistanceM * 0.5, timeBasedMinimumM),
         );
-        const reportedSpeedConfirmsMovement = vehicleSpeedHintKmh != null
-          ? vehicleSpeedHintKmh >= MIN_MOVEMENT_SPEED_KMH
-          : sample.speedKmh != null &&
-            sample.speedKmh >= MIN_MOVEMENT_SPEED_KMH &&
-            sample.speedKmh <= MAX_SPEED_KMH;
+        const speedEvidenceIsConsistent = reportedSpeedConfirmsMovement(sample.speedKmh, vehicleSpeedHintKmh);
         const derivedMoving =
           segmentKm <= MAX_ACCEPTED_SEGMENT_KM &&
           segmentDistanceM >= minimumSegmentDistanceM &&
           derivedSpeedKmh >= MIN_MOVEMENT_SPEED_KMH &&
           derivedSpeedKmh <= MAX_SPEED_KMH &&
-          reportedSpeedConfirmsMovement;
+          speedEvidenceIsConsistent;
 
         if (derivedMoving) {
           if (this.consecutiveMovingSamples === 0) this.pendingMovingStart = this.previous;
@@ -486,6 +496,17 @@ export class GpsTracker {
             this.pendingMovingDistanceKm = 0;
             this.pendingMovingStart = sample;
             this.movementEstablished = true;
+          } else if (
+            this.consecutiveMovingSamples >= MIN_MOVING_SAMPLES &&
+            vehicleSpeedHintKmh == null &&
+            sample.speedKmh == null
+          ) {
+            // With no independent speed value, do not accumulate small GPS
+            // drifts across multiple windows until they look like a trip.
+            this.consecutiveMovingSamples = 0;
+            this.pendingMovingDistanceKm = 0;
+            this.pendingMovingStart = null;
+            this.movementEstablished = false;
           }
         } else {
           this.consecutiveMovingSamples = 0;
@@ -514,11 +535,7 @@ export class GpsTracker {
       derivedSpeedKmh != null &&
       derivedSpeedKmh >= MIN_MOVEMENT_SPEED_KMH &&
       derivedSpeedKmh <= MAX_SPEED_KMH &&
-      (vehicleSpeedHintKmh != null
-        ? vehicleSpeedHintKmh >= MIN_MOVEMENT_SPEED_KMH
-        : sample.speedKmh != null &&
-          sample.speedKmh >= MIN_MOVEMENT_SPEED_KMH &&
-          sample.speedKmh <= MAX_SPEED_KMH) &&
+      speedEvidenceIsConsistent &&
       this.movementEstablished;
     let speedKmh = movementConfirmed
       ? (vehicleSpeedHintKmh != null
