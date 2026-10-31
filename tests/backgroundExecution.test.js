@@ -62,7 +62,7 @@ assert(autoTrip.includes('this.scheduleGpsStart(generation)'), 'preferências e 
 assert(autoTrip.includes('await this.gpsStartPromise'), 'troca de preferência deve aguardar a inicialização GPS já serializada');
 assert(autoTrip.includes('gpsTracker.start({ requestPermission: false })'), 'serviço OBD/trips não deve abrir prompts de localização');
 assert(monitoring.includes('startBackgroundLocation({ requestPermission: false })'), 'serviço background não pode abrir prompts de localização');
-assert(autoTrip.includes('gpsTracker.start({ resetTrip: false })'), 'troca para foreground preserva distância acumulada');
+assert(autoTrip.includes('gpsTracker.start({ resetTrip: false, requestPermission: false })'), 'troca para foreground preserva distância sem abrir prompt');
 assert(settingsScreen.includes('requestBackgroundLocationPermissionsOnly()'), 'a permissão de background só é solicitada na tela de configurações');
 assert(layout.includes("import '../src/gps/backgroundLocationTask';"));
 assert(!layout.includes('const startGps ='), 'layout não deve iniciar GPS independentemente da ECU');
