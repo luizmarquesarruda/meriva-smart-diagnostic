@@ -208,9 +208,10 @@ async function appendDailyObdSessionEventUnsafe(
   const path = historyPath(basePath);
   const date = localDayKey(new Date(timestamp));
   await FileSystem.makeDirectoryAsync(`${basePath}/VIAGENS`, { intermediates: true });
-  let content = await readHistorySnapshot(path) ?? '';
-  let previousContent: string | null = content || null;
-  if (content === '') {
+  const mainSnapshot = await readHistorySnapshot(path);
+  let content = mainSnapshot ?? '';
+  let previousContent: string | null = mainSnapshot;
+  if (mainSnapshot == null) {
     // A missing main file may be the result of an interrupted replacement.
     // Recover the previous verified snapshot instead of starting an empty log.
     const recovered = await readHistorySnapshot(previousHistoryPath(path));
