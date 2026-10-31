@@ -257,15 +257,27 @@ export async function reconcileDriveCycleHistory(
   await initializeDriveCycles(basePath);
   const indexFile = `${basePath}/VIAGENS/index.json`;
   return serializeIndexWrite(indexFile, async () => {
-    const main = await readCyclesFromFile(indexFile);
+    let main = await readCyclesFromFile(indexFile);
+    const previousFile = indexBackupPath(indexFile);
+
     if (main === null) {
-      // A damaged main index is never silently overwritten. Return the last
-      // validated recovery copy and leave the bad source available for repair.
-      return deduplicateDriveCycles((await readCyclesFromFile(indexBackupPath(indexFile))) ?? []);
+      // Recover a damaged/missing main file only from a fully validated
+      // previous snapshot. Never replace the only copy with an empty index.
+      const backup = await readCyclesFromFile(previousFile);
+      if (backup === null) {
+        throw new Error('HISTORICO_DE_VIAGENS_CORROMPIDO_SEM_BACKUP_VALIDO; DADOS_LEGADOS_PRESERVADOS');
+      }
+      await persistIndexSnapshot(indexFile, {
+        version: '1.0',
+        cycles: backup,
+        totalCount: backup.length,
+        lastModified: new Date().toISOString(),
+      });
+      main = backup;
     }
+
     const merged = mergeDriveCycleHistories(main, legacyCycles);
     if (!sameDriveCycleHistory(main, merged)) {
-      const previousFile = indexBackupPath(indexFile);
       const mainInfo = await FileSystem.getInfoAsync(indexFile);
       if (mainInfo.exists) {
         await FileSystem.deleteAsync(previousFile, { idempotent: true });
@@ -282,28 +294,31 @@ export async function reconcileDriveCycleHistory(
         totalCount: merged.length,
         lastModified: new Date().toISOString(),
       });
-
-      // Reconciliation imports legacy trips into the canonical index. Advance
-      // the recovery snapshot only after the new main index has been committed
-      // and validated, so a later main-file failure cannot hide those imports.
-      const backupTemp = indexTempPath(previousFile);
-      try {
-        await FileSystem.copyAsync({ from: indexFile, to: backupTemp });
-        const backupCycles = await readCyclesFromFile(backupTemp);
-        if (backupCycles === null || !sameDriveCycleHistory(backupCycles, merged)) {
-          throw new Error('BACKUP_DA_RECONCILIACAO_NAO_VALIDADO');
-        }
-        await FileSystem.deleteAsync(previousFile, { idempotent: true });
-        await FileSystem.moveAsync({ from: backupTemp, to: previousFile });
-        const committedBackup = await readCyclesFromFile(previousFile);
-        if (committedBackup === null || !sameDriveCycleHistory(committedBackup, merged)) {
-          throw new Error('BACKUP_DA_RECONCILIACAO_NAO_CONFIRMADO');
-        }
-      } catch (cause) {
-        await FileSystem.deleteAsync(backupTemp, { idempotent: true }).catch(() => undefined);
-        console.warn('[trips] índice principal conciliado, mas o backup não foi avançado:', cause instanceof Error ? cause.message : cause);
-      }
     }
+
+    // After reconciliation succeeds, advance the recovery copy to the exact
+    // committed index. This ensures newly imported legacy trips survive a
+    // later main-file corruption even when no new trip is recorded afterward.
+    const backupTemp = indexTempPath(previousFile);
+    try {
+      await FileSystem.copyAsync({ from: indexFile, to: backupTemp });
+      const backupCycles = await readCyclesFromFile(backupTemp);
+      if (backupCycles === null || !sameDriveCycleHistory(backupCycles, merged)) {
+        throw new Error('BACKUP_DA_RECONCILIACAO_NAO_VALIDADO');
+      }
+      await FileSystem.deleteAsync(previousFile, { idempotent: true });
+      await FileSystem.moveAsync({ from: backupTemp, to: previousFile });
+      const committedBackup = await readCyclesFromFile(previousFile);
+      if (committedBackup === null || !sameDriveCycleHistory(committedBackup, merged)) {
+        throw new Error('BACKUP_DA_RECONCILIACAO_NAO_CONFIRMADO');
+      }
+    } catch (cause) {
+      await FileSystem.deleteAsync(backupTemp, { idempotent: true }).catch(() => undefined);
+      // The main index is already verified; keep the older recovery copy if
+      // updating its replacement failed and allow startup to proceed.
+      console.warn('[trips] índice principal conciliado, mas o backup não foi avançado:', cause instanceof Error ? cause.message : cause);
+    }
+
     return merged;
   });
 }
