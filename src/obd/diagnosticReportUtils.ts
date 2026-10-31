@@ -39,6 +39,16 @@ export function extractLastTraceFailure(trace: string): DiagnosticTraceFailure |
   return null;
 }
 
+/**
+ * Uses only the physical model reported by the Android runtime.
+ * A user-configurable device name is not a reliable hardware model.
+ */
+export function resolveAndroidModel(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const model = value.trim();
+  return model.length > 0 ? model : undefined;
+}
+
 /** Hides complete Bluetooth MAC addresses before a report is shared externally. */
 export function redactBluetoothAddresses(value: string): string {
   return value.replace(/\b(?:[A-F0-9]{2}[:-]){5}[A-F0-9]{2}\b/gi, 'XX:XX:XX:XX:XX:XX');
