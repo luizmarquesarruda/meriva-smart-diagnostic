@@ -8,6 +8,7 @@ export interface HistoryStorageMeasurement {
   telemetrySamples: number;
   uniqueTripIds: number;
   jsonBytes: number;
+  tripDirectoryBytes: number;
   csvBytes: number;
   historyFiles: number;
   readParseMs: { median: number; p95: number; min: number };
@@ -122,6 +123,7 @@ export async function measureHistoryStorage(
     telemetrySamples,
     uniqueTripIds,
     jsonBytes: typeof info.size === 'number' ? info.size : raw.length,
+    tripDirectoryBytes: tripFiles.bytes,
     csvBytes: csv.bytes,
     historyFiles: tripFiles.files,
     readParseMs: summarize(readTimes),
