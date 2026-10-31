@@ -1,14 +1,13 @@
-## ESTADO VIGENTE — 2026-10-31 (contenção de distribuição pública do APK)
+## ESTADO VIGENTE — 2026-10-31 (layout responsivo e permissões GPS desacopladas)
 
-> Frente P0: PR de segurança `security/private-apk-artifact-20261031`, baseada no `main` observado em `f4120541dd879231612e1622c872f98b261f092e`.
+> PR #102 — `fix/layout-system-consolidation-20261031`, reconciliada com o `main` SHA `1443ace6ac3d35139d1177fd0601ada871826dc5` antes da validação final.
 
-- Repositório: [luizmarquesarruda/meriva-smart-diagnostic](https://github.com/luizmarquesarruda/meriva-smart-diagnostic). A consulta de configuração retornou `visibility: public`; a lista de GitHub Releases está vazia.
-- Risco confirmado em `main`: o workflow enviava APK como artefato em todos os eventos/builds, com retenção de 14 dias, em repositório público. A branch da PR #98 também contém job `publish-release` com permissão `contents: write`; esse job não existe no `main` observado, mas continua perigoso na branch.
-- Correção nesta frente: retirar publicação de Release, condicionar upload a `repository.visibility == private` e `refs/heads/main`, não enviar APK em PR ou enquanto público, limitar artefato a três dias, gerar checksum SHA-256, manter `contents: read` e fixar Actions em SHAs completos.
-- Limite operacional: a integração GitHub disponível nesta sessão não oferece alteração de visibilidade nem remoção de artefatos. O workflow bloqueia novos uploads públicos após a correção ser integrada, mas o código-fonte continua público até o proprietário alterar a visibilidade para `Private`; artefatos anteriores precisam ser revisados separadamente.
-- PR #98 permanece aberta com alterações Bluetooth/autonomia. Sua versão do workflow e a sequência DB-185 a DB-197 precisam ser reconciliadas após integrar esta correção de segurança; não mesclar uma branch que reintroduza o job de Release.
-- PR #99 permanece aberta. Seu DB-185 de navegação conflita com o DB-185 do trabalho Bluetooth na #98; a numeração deve ser refeita depois da consolidação, nunca resolvida apenas adicionando um item ao índice.
-- Toda validação deve ser consultada no SHA final da frente: `validate` e `android-build` verdes no mesmo commit. O ensaio físico do Galaxy A06/Android 16/ELM327/ECU continua separado e pendente.
+- A base atual contém a separação entre permissões Bluetooth/OBD e GPS opcional. GPS foreground/background exigem opt-in explícito; `autoTripService` controla o ciclo de vida e o startup OBD não solicita localização.
+- A segurança de artefatos continua restrita: nenhum APK é publicado em PR nem enquanto o repositório estiver público; o upload só pode ocorrer em `main` privado, com checksum e retenção curta.
+- Esta PR consolida navegação independente das cinco abas em retrato, preserva a geometria de paisagem, padroniza cabeçalhos internos e retornos e aplica grids responsivos em Viagens, Manutenção e Configurações.
+- A tela Configurações foi reconciliada com os switches de GPS e permissões do `main`; os controles de layout foram portados sem remover preferências GPS nem reintroduzir prompts durante o startup OBD.
+- Não houve alteração de protocolo ELM327, PIDs, transporte Bluetooth, cálculo de autonomia ou fórmulas. Nenhum APK foi gerado ou distribuído nesta frente.
+- PR #102 ainda aguarda CI no SHA final. Não mesclar antes de `gate:baseline`, `validate` e `android-build` verdes no mesmo SHA e inspeção visual em dispositivo. Teste físico no Galaxy A06/SM-A065M/Android 16 continua pendente.
 
 ---
 
@@ -284,6 +283,7 @@
 - **DB-197** · 2026-10-30 — Configurar publicação automática do APK após CI verde e corrigir gate do índice.
 - **DB-198** — Bloquear publicação pública/automática do APK; upload privado somente na branch main, checksum SHA-256 e Actions fixadas em commit.
 - **DB-199** — Consolidar responsividade, cabeçalhos, áreas de toque, navegação individual em retrato e preservação de paisagem.
+- **DB-200** — Reconciliar layout responsivo com permissões GPS opcionais já integradas ao main.
 
 ---
 
@@ -5143,4 +5143,20 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - O Diário de Bordo mantém agora DB-001…DB-199 em sequência e o índice deve corresponder ao corpo. A CI ainda precisa validar o HEAD final desta branch.
 - Não houve captura visual nem teste físico no Galaxy A06/SM-A065M/Android 16 nesta sessão. A preservação da paisagem foi mantida no código, mas clipping, fonte ampliada e toque real precisam de inspeção no dispositivo.
 - Nenhum merge foi realizado; não declarar a CI aprovada até consultar `validate` e `android-build` no mesmo SHA final.
+
+## DB-200 · 2026-10-31 — Reconciliar layout responsivo com permissões GPS opcionais
+
+### Risco encontrado na integração
+- A `main` avançou um commit após a criação da branch de layout. Esse commit alterou `app/_layout.tsx`, `app/configuracoes.tsx`, o Diário de Bordo e os módulos/contratos de permissões GPS.
+- A versão inicial da PR #102 estava baseada no SHA anterior e, se mesclada sem reconciliação, poderia restaurar o prompt de localização no startup OBD e remover da tela Configurações os switches explícitos de GPS.
+
+### Reconciliação aplicada
+- Os módulos GPS, permissões, AutoTripService, sharedConnection, testes GPS/permissões e documentos do commit `1443ace6ac3d35139d1177fd0601ada871826dc5` foram copiados para a branch de layout, preservando o comportamento mais recente de `main`.
+- `app/_layout.tsx` agora mantém `requestBluetoothPermissionsOnly()` e `canStartObdStartup({ bluetooth })`, ao mesmo tempo em que oculta a barra nativa duplicada para as rotas com cabeçalho interno.
+- `app/configuracoes.tsx` parte da versão atual com opt-in GPS foreground/background; o grid em paisagem, espaçamento compacto, cartões, botões e retorno foram reaplicados sem remover os controles GPS.
+- A política de GPS permanece: localização opcional, prompts somente após ação explícita em Configurações, background com autorização separada e ciclo de vida único em `autoTripService`.
+
+### Validação pendente
+- Conferir que a PR compara apenas o delta de layout contra o `main` atual; executar `gate:baseline`, `validate` e `android-build` no mesmo SHA final.
+- Inspecionar Configurações e cockpit em retrato/paisagem e testar no Galaxy A06/Android 16. Não declarar a CI aprovada até haver runs concluídos no HEAD da PR.
 
