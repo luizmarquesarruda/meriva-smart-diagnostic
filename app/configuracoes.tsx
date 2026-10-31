@@ -11,6 +11,7 @@ import { getAutoSaveState, getAutoSaveStatus, initAutoSave } from '../src/meriva
 import { exportAutoSaveTxt, exportDailyObdHistoryTxt } from '../src/meriva/exportAutoSaveTxt';
 import { exportBluetoothDiagnosticTxt } from '../src/obd/exportBluetoothDiagnosticTxt';
 import { AppSettings, readAppSettings, writeAppSettings } from '../src/database/appSettings';
+import { requestBackgroundLocationPermissionsOnly, requestLocationPermissionsOnly } from '../src/permissions/permissionManager';
 import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
 import { getMidLayout } from '../src/ui/midLayout';
 import { COLORS, SCREEN_TITLE_STYLE } from '../src/ui/theme';
@@ -54,6 +55,28 @@ export default function ConfiguracaoScreen() {
     } catch {
       setStatus('FALHA AO SALVAR CONFIGURAÇÃO');
     }
+  }
+
+  async function updateBackgroundGpsPreference(enabled: boolean) {
+    if (!enabled) {
+      await updateSetting('backgroundGpsEnabled', false);
+      return;
+    }
+
+    const foreground = await requestLocationPermissionsOnly();
+    if (foreground !== 'GRANTED') {
+      Alert.alert('Localização não autorizada', 'O GPS em primeiro plano precisa ser autorizado antes de ativar o rastreamento com a tela apagada. O diagnóstico OBD continua funcionando.');
+      return;
+    }
+
+    const background = await requestBackgroundLocationPermissionsOnly();
+    if (background !== 'GRANTED') {
+      Alert.alert('GPS em segundo plano não autorizado', 'O rastreamento com a tela apagada não foi ativado. O GPS em primeiro plano e o diagnóstico OBD continuam independentes.');
+      return;
+    }
+
+    await updateSetting('backgroundGpsEnabled', true);
+    Alert.alert('Rastreamento em segundo plano ativado', 'A preferência será aplicada à sessão de viagem atual. O Android manterá a notificação persistente enquanto o GPS estiver ativo.');
   }
 
   async function handleBackup() {
@@ -155,6 +178,8 @@ export default function ConfiguracaoScreen() {
           </View>
 
           <SettingSwitch label="Conectar ao ELM327 automaticamente" value={settings.autoConnectObd} onChange={(v) => void updateSetting('autoConnectObd', v)} />
+          <SettingSwitch label="Rastrear GPS com a tela apagada" value={settings.backgroundGpsEnabled} onChange={(v) => void updateBackgroundGpsPreference(v)} />
+          <Text style={styles.note}>Opcional. A permissão de segundo plano só é solicitada após ativar esta opção. Desativar muda a sessão atual para GPS em primeiro plano sem zerar a distância acumulada. A conexão OBD não depende de localização.</Text>
           <SettingSwitch label="Inicialização forçada do ELM (ATZ + ATE0)" value={settings.elmForceInitialization} onChange={(v) => void updateSetting('elmForceInitialization', v)} />
           <SettingSwitch label="Alertas de diagnóstico" value={settings.diagnosticAlerts} onChange={(v) => void updateSetting('diagnosticAlerts', v)} />
 
