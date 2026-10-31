@@ -80,11 +80,9 @@ export function redactSensitiveReportData(value: string, deviceNames: readonly s
   const uniqueNames = [...new Set(deviceNames.map((name) => name.trim()).filter((name) => name.length >= 3))]
     .sort((left, right) => right.length - left.length);
   for (const name of uniqueNames) {
-    const escaped = name
-      .replace(/[.*+?^$()|[\]\\]/g, '\\const escaped = name.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');')
-      .replace(/\//g, '\\/')
-      .replace(/{/g, '\\{')
-      .replace(/}/g, '\\}');
+    const escaped = name.split('').map((character) =>
+      '\\^$.*+?()[]{}|/'.includes(character) ? '\\' + character : character,
+    ).join('');
     redacted = redacted.replace(new RegExp(escaped, 'gi'), '[DEVICE]');
   }
   return redacted;
