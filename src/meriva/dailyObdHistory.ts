@@ -207,17 +207,7 @@ async function persistHistorySnapshot(path: string, content: string, previousCon
     await writeAndVerifyHistoryFile(temporaryPath, content);
 
     if (previousContent != null) {
-      await writeAndVerifyHistoryFile(previousTemporaryPath, previousContent);
-      const existingPrevious = await FileSystem.getInfoAsync(previousPath);
-      if (existingPrevious.exists && existingPrevious.isDirectory) {
-        throw new Error('BACKUP_DO_HISTORICO_APONTA_PARA_DIRETORIO');
-      }
-      if (existingPrevious.exists) await FileSystem.deleteAsync(previousPath, { idempotent: true });
-      await FileSystem.moveAsync({ from: previousTemporaryPath, to: previousPath });
-      const verifiedPrevious = await readHistorySnapshot(previousPath);
-      if (verifiedPrevious !== previousContent) {
-        throw new Error('BACKUP_ANTERIOR_DO_HISTORICO_NAO_VALIDADO');
-      }
+      await writePreviousHistorySnapshot(path, previousContent);
       previousReady = true;
     }
 
