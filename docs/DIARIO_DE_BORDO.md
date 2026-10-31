@@ -4852,3 +4852,27 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 ### Validação necessária
 - `npm run gate:baseline`, `npm run validate` e build Android na PR desta frente.
 - Validar no Galaxy A06 que negar localização não impede Bluetooth/ELM/010C, que GPS foreground funciona após ECU validada e que background só solicita permissão após opt-in.
+
+
+## DB-1 · 2026-10-31 — Integridade, rastreabilidade e privacidade dos relatórios
+
+### Problemas confirmados
+- O relatório Bluetooth priorizava o texto de erro compartilhado sem registrar origem/evento/horário; isso podia divergir do último erro visível na trilha da tentativa.
+- A exportação Bluetooth incluía endereços MAC tanto no cabeçalho dos pareados quanto nos eventos RAW, sem uma opção de compartilhamento redigida.
+- O campo DEVICE era baseado em `Constants.deviceName`, que não garante o modelo físico do Android.
+- O JSON diagnóstico não possuía versão de schema própria, timestamp do snapshot ou metadados da plataforma e não incluía os registros de manutenção.
+- O estado em memória era mantido por referência enquanto leituras assíncronas de outros arquivos eram aguardadas.
+
+### Correções aplicadas nesta branch
+- Relatório Bluetooth schema 2: erro mais recente extraído da trilha com evento, timestamp e origem; erro compartilhado permanece exibido separadamente.
+- Metadados de fabricante, modelo, versão Android, API e versão do aplicativo são registrados quando a plataforma fornece os valores.
+- Configurações oferece exportação técnica completa e exportação compartilhável com endereços MAC mascarados inclusive na trilha RAW.
+- JSON passa a usar o contrato `MERIVA_DIAGNOSTIC_EXPORT` schema 1, com política explícita de proveniência, metadados do app/plataforma, timestamp de snapshot e manutenção.
+- O estado em memória é serializado em snapshot antes das leituras assíncronas de DTC, viagens e manutenção.
+- Novo teste cobre seleção do último erro, timestamp, mascaramento de MAC e contrato JSON; foi incluído na suíte padrão.
+- Documentação específica criada em `docs/RELATORIOS_EXPORTACAO.md`.
+
+### Validação necessária
+- Executar baseline, typecheck, suíte completa e build Android no SHA final desta branch.
+- Confirmar os dois modos de exportação no Galaxy A06 e conferir que o relatório compartilhável não contém nenhum endereço MAC.
+- Comparar o último erro destacado com uma falha real RFCOMM/ELM/ECU no dispositivo. A validação sintética não substitui a conexão real.
