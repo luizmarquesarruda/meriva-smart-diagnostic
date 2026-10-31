@@ -143,7 +143,7 @@ export default function BluetoothScreen() {
       <ScrollView contentContainerStyle={[styles.content,{paddingHorizontal:layout.horizontalPadding}]} showsHorizontalScrollIndicator={false}>
         <View style={[styles.screenFrame,{maxWidth:layout.maxContentWidth}]}>
         <View style={styles.header}>
-          <Text style={styles.title}>BLUETOOTH</Text>
+          <Text style={[styles.title,{fontSize:layout.titleSize-3}]}>BLUETOOTH</Text>
           <Text style={styles.subtitle}>ELM327 • BLUETOOTH CLASSIC</Text>
         </View>
 
@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
   detail: { color: '#cbd5e1', fontSize: 11, marginTop: 4 },
   warning: { color: COLORS.warning, fontSize: 10, fontWeight: '900', marginTop: 5 },
   section: { color: COLORS.accent, fontSize: 10, fontWeight: '900', letterSpacing: 1, marginTop: 7, marginBottom: 7 },
-  primary: { backgroundColor: COLORS.primary, borderRadius: 11, padding: 14, alignItems: 'center', marginBottom: 9 },
+  primary: { minHeight: 48, backgroundColor: COLORS.primary, borderRadius: 11, padding: 14, alignItems: 'center', justifyContent: 'center', marginBottom: 9 },
   primaryText: { color: COLORS.white, fontSize: 11, fontWeight: '900' },
   disabled: { opacity: 0.45 },
   device: { backgroundColor: COLORS.surfaceRaised, borderRadius: 11, borderWidth: 1, borderColor: '#243652', padding: 13, marginBottom: 8 },
@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
   address: { color: COLORS.textMuted, fontSize: 11, marginTop: 3 },
   deviceType: { color: COLORS.textSubtle, fontSize: 9, fontWeight: '800', marginTop: 4 },
   empty: { color: '#94a3b8', fontSize: 11, padding: 10, textAlign: 'center' },
-  secondary: { backgroundColor: '#1e293b', borderRadius: 11, padding: 13, alignItems: 'center', borderWidth: 1, borderColor: '#475569', marginBottom: 9 },
+  secondary: { minHeight: 48, backgroundColor: '#1e293b', borderRadius: 11, padding: 13, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#475569', marginBottom: 9 },
   secondaryText: { color: '#e2e8f0', fontWeight: '900', fontSize: 11 },
   error: { color: COLORS.danger, fontSize: 10, fontWeight: '800', marginVertical: 8 },
   ruleCard: { backgroundColor: COLORS.surfaceRaised, borderRadius: 12, borderWidth: 1, borderColor: '#243652', padding: 13, marginTop: 4 },
