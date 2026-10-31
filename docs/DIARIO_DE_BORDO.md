@@ -10,7 +10,7 @@
 - Validação PR #104: `validate` e `android-build` passaram no SHA `2cdbda3807a50e68cd1fe24fe3ff207dc125dbfd`.
 - A CI também passou no push da `main` após a integração da PR #105, SHA `b128b413427e612e621dc2ef2c82b6c2476ce659`. O push de main após o merge da #104 está em execução e deve ser consultado no SHA final correspondente.
 - O repositório permanece público conforme a decisão operacional original. A CI compila/verifica APK, mas não cria Release pública nem publica APK automaticamente; não alterar visibilidade ou distribuição.
-- O índice e os títulos do Diário estavam alinhados até DB-191; esta atualização registra DB-192.
+- O índice e os títulos do Diário estão alinhados até DB-193; esta atualização registra as correções de GPS por posição e a recuperação atômica do histórico.
 - Não declarar inspeção visual ou teste físico no Galaxy A06 / SM-A065M / Android 16. Permanecem necessários screenshots em retrato/paisagem e teste ELM327/ECU real, incluindo respostas 010C/012F.
 - A próxima etapa operacional é instalar o APK produzido pela CI e executar inspeção visual e teste físico; registrar respostas RAW, protocolo, resposta ECU, leitura 012F e resultado do percurso/autonomia antes de alterar algoritmos GPS/combustível.
 
@@ -283,7 +283,7 @@
 - **DB-190** · 2026-10-31 — Preservação integral do histórico diário ECU
 - **DB-191** · 2026-10-31 — Consolidar layout responsivo sem regredir GPS, autonomia e restauração de backups
 - **DB-192** · 2026-10-31 — Integrar layout e relatórios, consolidar P0 e registrar validação dos SHAs finais
-
+- **DB-193** · 2026-10-31 — Velocidade derivada GPS e recuperação atômica do histórico ECU
 ---
 
 Este arquivo é o registro operacional das correções, auditorias e decisões técnicas do projeto.
