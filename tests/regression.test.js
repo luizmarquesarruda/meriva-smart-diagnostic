@@ -957,6 +957,23 @@ async function testRawLogger() {
     'raw log must use the local calendar date');
   assert.ok(files.has(BASE + '/LOGS/obd_interpreted_2026-10-12.csv'),
     'interpreted log must use the same local date, not the UTC day');
+
+  // Existing legacy CSVs stay readable, but new writes move to a bounded part
+  // rather than re-reading/re-writing an ever-growing daily file.
+  resetFS();
+  const currentDay = logger.getObdLogLocalDateKey(new Date());
+  const oversizedLegacyFile = `${BASE}/LOGS/obd_raw_${currentDay}.csv`;
+  await fakeFS.makeDirectoryAsync(BASE + '/LOGS', { intermediates: true });
+  const legacyHeader = 'timestamp,tx,rx,pid,responseTimeMs,commandStatus,protocol,source\\n';
+  await fakeFS.writeAsStringAsync(oversizedLegacyFile, legacyHeader + 'x'.repeat(csvLogger.MAX_CSV_SEGMENT_BYTES));
+  const originalLegacyContent = files.get(oversizedLegacyFile);
+  await logger.logRawObdData(BASE, thirdQuery, '010C', 'REAL');
+  await csvLogger.flushCsvLogs();
+  const rotatedPath = `${BASE}/LOGS/obd_raw_${currentDay}.part-0002.csv`;
+  assert.ok(files.has(rotatedPath), 'CSV acima de 512 KiB deve girar para uma parte seguinte');
+  assert.ok(files.get(rotatedPath).includes('41 0C 20 00'), 'nova amostra deve entrar na parte ativa');
+  assert.strictEqual(files.get(oversizedLegacyFile), originalLegacyContent,
+    'a parte histórica fechada não deve ser regravada durante a rotação');
 }
 
 async function testVehicleProfile() {
@@ -999,9 +1016,14 @@ async function testDriveCycleValidation() {
   };
 
   await storage.addDriveCycle(BASE, cycle);
+  await storage.addDriveCycle(BASE, cycle);
   const read = await storage.readDriveCycles(BASE);
-  assert.strictEqual(read.length, 1);
+  assert.strictEqual(read.length, 1, 'repetir a finalização com o mesmo ID não pode duplicar a viagem');
   assert.strictEqual(read[0].id, 'test-1');
+  const dailyTripCsv = `${BASE}/VIAGENS/viagens_2026-10-02.csv`;
+  assert.ok(files.has(dailyTripCsv), 'resumo CSV da viagem deve ser criado');
+  assert.strictEqual(files.get(dailyTripCsv).trim().split('\\n').length, 2,
+    'a linha CSV da viagem deve ser idempotente pelo ID, mesmo em retry');
 
   const indexFile = `${BASE}/VIAGENS/index.json`;
   files.set(indexFile, JSON.stringify({
@@ -1009,15 +1031,34 @@ async function testDriveCycleValidation() {
     cycles: [
       { ...cycle, id: 'legacy-seed', source: 'CARSCANNER_SEED' },
       cycle,
+      { ...cycle, telemetrySamples: [
+        { timestamp: '2026-10-02T13:01:00.000Z', speedKmh: 30, rpm: 1500, coolantTempC: 80 },
+        { timestamp: '2026-10-02T13:01:10.000Z', speedKmh: 35, rpm: 1700, coolantTempC: 81 },
+      ], maxSpeedKmh: 35 },
     ],
-    totalCount: 2,
+    totalCount: 3,
   }));
   const filtered = await storage.readDriveCycles(BASE);
-  assert.deepStrictEqual(filtered.map((item) => item.id), ['test-1'], 'legacy seed trips must not appear in operational trip history');
+  assert.deepStrictEqual(filtered.map((item) => item.id), ['test-1'], 'legacy seed trips and repeated trip IDs must not duplicate the operational history');
+  await storage.initializeDriveCycles(BASE);
+  const normalized = JSON.parse(files.get(indexFile));
+  assert.strictEqual(normalized.cycles.length, 1, 'startup migration must physically deduplicate trip IDs');
+  assert.strictEqual(normalized.cycles[0].telemetrySamples.length, 2,
+    'deduplication must preserve the richer trip snapshot instead of discarding telemetry');
 
   await storage.addDriveCycle(BASE, { ...cycle, id: 'test-2' });
   const migratedIndex = JSON.parse(files.get(indexFile));
   assert.ok(migratedIndex.cycles.every((item) => item.source !== 'CARSCANNER_SEED'), 'adding a real trip must remove legacy seeds from active index');
+
+  const legacyAutosaveTrip = { ...cycle, id: 'legacy-autosave-only' };
+  const reconciled = await storage.reconcileDriveCycleHistory(BASE, [
+    legacyAutosaveTrip,
+    legacyAutosaveTrip,
+    cycle,
+  ]);
+  assert.deepStrictEqual(reconciled.map((item) => item.id).sort(),
+    ['legacy-autosave-only', 'test-1', 'test-2'],
+    'reconciliação deve importar viagens legadas uma única vez para o índice canônico');
 
   files.set(indexFile, JSON.stringify({ cycles: 'corrompido' }));
   assert.deepStrictEqual(
