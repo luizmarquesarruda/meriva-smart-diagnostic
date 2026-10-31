@@ -28,6 +28,11 @@ const SPILL_CHUNK_ROWS = 128;
 export const MAX_CSV_SEGMENT_BYTES = 512 * 1024;
 let droppedPendingRows = 0;
 let durablySpooledRows = 0;
+let peakObservedPendingRows = 0;
+let totalFlushes = 0;
+let lastFlushDurationMs = 0;
+let maxFlushDurationMs = 0;
+let flushFailures = 0;
 let spillSequence = 0;
 let spillPromise: Promise<void> | null = null;
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
@@ -96,12 +101,22 @@ export function getCsvQueueStatus(): {
   droppedRows: number;
   maxPendingRows: number;
   durablySpooledRows: number;
+  peakObservedPendingRows: number;
+  totalFlushes: number;
+  lastFlushDurationMs: number;
+  maxFlushDurationMs: number;
+  flushFailures: number;
 } {
   return {
     pendingRows: countPendingRows(),
     droppedRows: droppedPendingRows,
     maxPendingRows: MAX_PENDING_CSV_ROWS,
     durablySpooledRows,
+    peakObservedPendingRows,
+    totalFlushes,
+    lastFlushDurationMs,
+    maxFlushDurationMs,
+    flushFailures,
   };
 }
 
@@ -325,6 +340,7 @@ export function queueCsvRow(filePath: string, row: CsvRow): void {
   queue.push({ ...row });
   pendingRows.set(filePath, queue);
   const totalPending = totalBefore + 1;
+  peakObservedPendingRows = Math.max(peakObservedPendingRows, totalPending);
 
   if (totalPending >= MAX_PENDING_CSV_ROWS) {
     if (flushTimer) {
@@ -371,6 +387,8 @@ export async function flushCsvLogs(): Promise<void> {
 
   const batch = new Map(pendingRows);
   pendingRows.clear();
+  const flushStartedAt = Date.now();
+  totalFlushes += 1;
   flushPromise = (async () => {
     const entries = Array.from(batch.entries());
     for (let index = 0; index < entries.length; index += 1) {
@@ -392,11 +410,14 @@ export async function flushCsvLogs(): Promise<void> {
   try {
     await flushPromise;
   } catch (cause) {
+    flushFailures += 1;
     // Keep retrying after export/disconnect-triggered flushes too, not only
     // after the timer-driven flush path. Rows were restored to pendingRows.
     if (pendingRows.size > 0) scheduleBatchFlush();
     throw cause;
   } finally {
+    lastFlushDurationMs = Date.now() - flushStartedAt;
+    maxFlushDurationMs = Math.max(maxFlushDurationMs, lastFlushDurationMs);
     flushPromise = null;
   }
   if (countPendingRows() >= MAX_PENDING_CSV_ROWS) {
