@@ -5017,3 +5017,13 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - Os buffers existentes permanecem com watermark de 10.000 linhas, limite rígido de 20.000 e spool em blocos de 128; nenhuma capacidade foi aumentada.
 - Próxima etapa após a coleta no A06: executar JSON e SQLite com o mesmo snapshot congelado de viagens e amostras, comparar bytes e latências de leitura/gravação, e só então decidir migração seletiva. Preservar JSON e validar IDs, contagens, checksum e restauração antes de qualquer troca de fonte.
 - Limite desta rodada: a medição do JSON foi instrumentada, mas ainda não foi executada no aparelho; a CI não substitui o ensaio físico.
+
+
+## DB-196 · 2026-10-31 — Versionamento do índice de viagens e observabilidade dos buffers
+
+- O índice de viagens passa a declarar schemaVersion 2. Instalações legadas sem schemaVersion (schema 1) são migradas para v2 após cópia do JSON anterior e validação do backup; totalCount é recalculado a partir de cycles e campos adicionais são preservados.
+- O app rejeita schemaVersion futuro ou inválido sem regravar o arquivo. A escrita continua usando temporário, read-back e cópia anterior; o novo schemaVersion só é persistido no snapshot validado.
+- A política de fila CSV foi isolada em função pura e conectada ao logger. Teste de estresse simula 50.000 chegadas com spool disponível, verificando limites, descarte zero e acionamento do watermark; os limites operacionais permanecem 10.000 / 20.000 / 128.
+- A tela Armazenamento agora exibe pico de fila, total de flushes, duração do último e do maior flush e falhas de flush, além dos contadores já existentes de spool e descarte.
+- A medição de JSON descrita em DB-195 continua aguardando execução no Galaxy A06. A comparação equivalente com SQLite não foi feita e nenhuma viagem foi migrada para SQLite.
+- O próximo gate é CI completa no SHA final; depois, executar o benchmark no aparelho e decidir a migração com base em tamanho, p95 de leitura/gravação e consultas reais. Preservar JSON e testar restauração antes de alterar a fonte de leitura.
