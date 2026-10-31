@@ -9,7 +9,7 @@ import { AppIcon } from '../src/ui/AppIcon';
 import { NetworkStatusIndicator } from '../src/ui/NetworkStatusIndicator';
 import * as FileSystem from 'expo-file-system';
 import NetInfo from '@react-native-community/netinfo';
-import { readDriveCycles, initializeDriveCycles } from '../src/storage/driveCycleStorage';
+import { reconcileDriveCycleHistory, initializeDriveCycles } from '../src/storage/driveCycleStorage';
 import { getDriveCycleSummary, type DriveCycle } from '../src/data/driveCycles';
 import { getAutoSaveState, getAutoSaveStatus, initAutoSave, updateAutoSaveState } from '../src/meriva/autosaveManager';
 import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
@@ -109,14 +109,12 @@ export default function IndexScreen() {
       const learningProfile = await readLearningProfile(basePath);
       if (!learningProfile) await createLearningProfile(basePath, '2026-09-24T14:48:00.000Z');
       await initializeCarScannerSeed(basePath);
-      const storedCycles = await readDriveCycles(basePath);
-      const loaded = restored.driveCycles.length ? restored.driveCycles : storedCycles;
-
-      if (!restored.driveCycles.length && loaded.length) {
-        updateAutoSaveState((state) => {
-          state.driveCycles = loaded;
-        });
-      }
+      // Merge any legacy autosave-only trips into the dedicated index once,
+      // then always render from that single canonical source.
+      const loaded = await reconcileDriveCycleHistory(basePath, restored.driveCycles);
+      updateAutoSaveState((state) => {
+        state.driveCycles = loaded;
+      });
 
       setSettings(nextSettings);
       setCycles(loaded);
