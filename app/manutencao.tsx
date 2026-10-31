@@ -201,14 +201,14 @@ export default function MaintenanceScreen() {
           <View style={styles.header}>
             <View style={styles.headerTop}>
               <AppIcon name="vehicle" size={24} color={COLORS.accent} />
-              <Text style={styles.title}>MANUTENÇÃO E ABASTECIMENTO</Text>
+              <Text style={[styles.title,{fontSize:layout.titleSize-3}]}>MANUTENÇÃO E ABASTECIMENTO</Text>
             </View>
             <Text style={styles.subtitle}>LEMBRETES POR KM/DATA • REGISTROS LOCAIS</Text>
             <Text style={styles.disclaimer}>Prazos de referência do manual do Meriva 2012. Confirme o plano correto para o veículo e o uso reais.</Text>
             <Text style={styles.statusText}>{status}</Text>
           </View>
 
-          <View style={styles.card}>
+          <View style={[styles.card,{padding:layout.cardPadding}]}>
             <Text style={styles.sectionTitle}>QUILOMETRAGEM ATUAL</Text>
             <View style={styles.inlineInput}>
               <TextInput
@@ -242,13 +242,14 @@ export default function MaintenanceScreen() {
           </View>
 
           <Text style={styles.sectionHeading}>PLANO DE MANUTENÇÃO</Text>
+          <View style={[styles.taskGrid,layout.landscape&&styles.taskGridLandscape,{gap:layout.gap}]}>
           {tasks.map((task) => {
             const record = data?.records[task.id] ?? null;
             const evaluation = evaluateMaintenance(task, record, data?.currentOdometerKm ?? null);
             const draft = drafts[task.id];
             const due = evaluation.status === 'DUE';
             return (
-              <View key={task.id} style={styles.taskCard}>
+              <View key={task.id} style={[styles.taskCard,{padding:layout.cardPadding},layout.landscape&&styles.taskCardLandscape]}>
                 <View style={styles.taskHeader}>
                   <View style={styles.taskCopy}>
                     <Text style={styles.taskTitle}>{task.title}</Text>
@@ -299,9 +300,10 @@ export default function MaintenanceScreen() {
               </View>
             );
           })}
+          </View>
 
           <Text style={styles.sectionHeading}>ABASTECIMENTOS</Text>
-          <View style={styles.card}>
+          <View style={[styles.card,{padding:layout.cardPadding}]}>
             <Text style={styles.sectionTitle}>NOVO ABASTECIMENTO</Text>
             <View style={styles.buttonRow}>
               <TouchableOpacity style={[styles.fuelTypeButton, fuelType === 'GASOLINA' && styles.fuelTypeButtonActive]} onPress={() => setFuelType('GASOLINA')} accessibilityRole="button" accessibilityState={{ selected: fuelType === 'GASOLINA' }}>
@@ -361,18 +363,21 @@ const styles = StyleSheet.create({
   card: { backgroundColor: COLORS.surface, borderRadius: 14, borderWidth: 1, borderColor: COLORS.border, padding: 13, gap: 9 },
   sectionTitle: { color: COLORS.textStrong, fontSize: 13, fontWeight: '900' },
   inlineInput: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  input: { flex: 1, minWidth: 0, minHeight: 46, borderRadius: 10, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surfaceInset, color: COLORS.textStrong, paddingHorizontal: 11, paddingVertical: 8, fontSize: 13 },
-  primaryButton: { minHeight: 46, minWidth: 112, borderRadius: 10, paddingHorizontal: 13, paddingVertical: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.primary },
+  input: { flex: 1, minWidth: 0, minHeight: 48, borderRadius: 10, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surfaceInset, color: COLORS.textStrong, paddingHorizontal: 11, paddingVertical: 8, fontSize: 13 },
+  primaryButton: { minHeight: 48, minWidth: 112, borderRadius: 10, paddingHorizontal: 13, paddingVertical: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.primary },
   primaryButtonText: { color: COLORS.white, fontSize: 10, fontWeight: '900', letterSpacing: 0.4, textAlign: 'center' },
-  secondaryButton: { flex: 1, minHeight: 46, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surfaceInset, alignItems: 'center', justifyContent: 'center' },
+  secondaryButton: { flex: 1, minHeight: 48, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surfaceInset, alignItems: 'center', justifyContent: 'center' },
   secondaryButtonText: { color: COLORS.accent, fontSize: 10, fontWeight: '900', textAlign: 'center' },
   disabled: { opacity: 0.5 },
   subtle: { color: COLORS.textSubtle, fontSize: 10, lineHeight: 15 },
   severeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 2 },
   severeCopy: { flex: 1, minWidth: 0, gap: 3 },
-  fieldLabel: { color: COLORS.textMuted, fontSize: 9, fontWeight: '900' },
+  fieldLabel: { color: COLORS.textMuted, fontSize: 10, fontWeight: '900' },
   sectionHeading: { color: COLORS.accent, fontSize: 13, fontWeight: '900', letterSpacing: 0.9, marginTop: 7 },
+  taskGrid: { width: '100%' },
+  taskGridLandscape: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'stretch' },
   taskCard: { backgroundColor: COLORS.surfaceRaised, borderRadius: 14, borderWidth: 1, borderColor: COLORS.border, padding: 13, gap: 10 },
+  taskCardLandscape: { width: '48.5%', minWidth: 0 },
   taskHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   taskCopy: { flex: 1, minWidth: 0, gap: 4 },
   taskTitle: { color: COLORS.textStrong, fontSize: 13, fontWeight: '900' },
@@ -380,13 +385,13 @@ const styles = StyleSheet.create({
   statusDue: { backgroundColor: '#512334' },
   statusOk: { backgroundColor: '#133b32' },
   statusUnknown: { backgroundColor: '#25364a' },
-  statusPillText: { color: COLORS.textStrong, fontSize: 8, fontWeight: '900' },
+  statusPillText: { color: COLORS.textStrong, fontSize: 9, fontWeight: '900' },
   intervalRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 5 },
-  intervalText: { color: COLORS.textMuted, fontSize: 9, lineHeight: 14 },
+  intervalText: { color: COLORS.textMuted, fontSize: 10, lineHeight: 14 },
   formRow: { flexDirection: 'row', gap: 8 },
   formField: { flex: 1, minWidth: 0, gap: 5 },
   buttonRow: { flexDirection: 'row', alignItems: 'stretch', gap: 8 },
-  fuelTypeButton: { flex: 1, minHeight: 42, borderRadius: 10, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surfaceInset, alignItems: 'center', justifyContent: 'center' },
+  fuelTypeButton: { flex: 1, minHeight: 48, borderRadius: 10, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surfaceInset, alignItems: 'center', justifyContent: 'center' },
   fuelTypeButtonActive: { borderColor: COLORS.accent, backgroundColor: '#142b44' },
   fuelTypeText: { color: COLORS.textStrong, fontSize: 10, fontWeight: '900' },
   fullButton: { width: '100%' },
@@ -396,5 +401,5 @@ const styles = StyleSheet.create({
   empty: { padding: 17, alignItems: 'center', backgroundColor: COLORS.surface, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border },
   backButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', minHeight: 48, gap: 7, padding: 12 },
   backButtonText: { color: COLORS.accent, fontSize: 10, fontWeight: '900' },
-  footer: { color: COLORS.textSubtle, textAlign: 'center', fontSize: 8, fontWeight: '800', letterSpacing: 0.6, marginTop: 5 },
+  footer: { color: COLORS.textSubtle, textAlign: 'center', fontSize: 9, fontWeight: '800', letterSpacing: 0.6, marginTop: 5 },
 });
