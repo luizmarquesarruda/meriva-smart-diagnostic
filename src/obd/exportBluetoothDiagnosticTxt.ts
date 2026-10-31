@@ -7,7 +7,7 @@ import { readLearningProfile, type MerivaLearningProfile } from '../database/lea
 import { getAutoSaveState } from '../meriva/autosaveManager';
 import { normalizeDiagnosticSource, runLocalDiagnostic, type DiagnosticResult } from '../diagnostics/diagnosticEngine';
 import type { PidObservation } from '../types/sourceTypes';
-import { extractLastTraceFailure, redactBluetoothAddresses } from './diagnosticReportUtils';
+import { extractLastTraceFailure, redactBluetoothAddresses, resolveAndroidModel } from './diagnosticReportUtils';
 
 async function readCurrentLearningProfile(): Promise<MerivaLearningProfile | null> {
   const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
@@ -112,9 +112,9 @@ export async function buildBluetoothDiagnosticReport(
   const learningProfile = await readCurrentLearningProfile();
   const localDiagnostic = buildLocalDiagnostic();
   const manufacturer = platformConstant('Manufacturer');
-  const model = platformConstant('Model') !== 'N/D'
-    ? platformConstant('Model')
-    : Constants.deviceName ?? 'N/D';
+  const model = resolveAndroidModel(
+    (Platform as unknown as { constants?: Record<string, unknown> }).constants?.Model,
+  ) ?? 'N/D';
   const androidRelease = platformConstant('Release');
   const lines = [
     'MERIVA SMART',
