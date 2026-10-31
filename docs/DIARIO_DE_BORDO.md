@@ -5005,3 +5005,15 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - Relatório detalhado: docs/AUDITORIA_LAYOUT_GALAXY_A06_ANDROID_16_2026-10-31.md.
 - Limite: auditoria estática de código/documentação. Nenhuma captura, instalação ou inspeção física do Galaxy A06 foi realizada nesta rodada. O teste visual no aparelho continua pendente.
 
+
+
+## DB-195 · 2026-10-31 — Instrumentação de tamanho e latência do histórico no aparelho
+
+- Adicionada medição executável em Armazenamento para coletar no dispositivo real o tamanho do índice JSON de viagens, bytes de CSV, viagens, IDs únicos e amostras embutidas nos registros de viagem.
+- A leitura/parse e a gravação temporária com read-back são medidas em sete rodadas; o relatório exibe mediana, p95 e mínimo. O arquivo principal e o backup do histórico são somente leitura durante o ensaio; gravações usam arquivo temporário exclusivo e removido ao final.
+- O ensaio falha se o índice estiver inválido, se o número de viagens mudar durante a coleta ou se o conteúdo escrito divergir do original. Não há migração ou limpeza automática.
+- A tela identifica plataforma e API Android, permitindo que a coleta seja feita no Galaxy A06 / SM-A065M / Android 16 após instalar o APK.
+- A comparação SQLite ainda não foi executada: o projeto não possui expo-sqlite instalado no lockfile e não há medição física disponível nesta sessão. Não foi inventado resultado nem iniciada migração de produção.
+- Os buffers existentes permanecem com watermark de 10.000 linhas, limite rígido de 20.000 e spool em blocos de 128; nenhuma capacidade foi aumentada.
+- Próxima etapa após a coleta no A06: executar JSON e SQLite com o mesmo snapshot congelado de viagens e amostras, comparar bytes e latências de leitura/gravação, e só então decidir migração seletiva. Preservar JSON e validar IDs, contagens, checksum e restauração antes de qualquer troca de fonte.
+- Limite desta rodada: a medição do JSON foi instrumentada, mas ainda não foi executada no aparelho; a CI não substitui o ensaio físico.
