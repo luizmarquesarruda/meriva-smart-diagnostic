@@ -113,8 +113,14 @@ async function persistIndexSnapshot(indexFile: string, data: DriveCycleIndex): P
     encoding: FileSystem.EncodingType.UTF8,
   });
   try {
-    const verified = JSON.parse(await FileSystem.readAsStringAsync(tempFile)) as { cycles?: unknown };
+    const verified = JSON.parse(await FileSystem.readAsStringAsync(tempFile)) as {
+      cycles?: unknown;
+      schemaVersion?: unknown;
+      totalCount?: unknown;
+    };
     if (!Array.isArray(verified.cycles) || verified.cycles.length !== data.cycles.length ||
+        verified.totalCount !== data.cycles.length ||
+        verified.schemaVersion !== CURRENT_HISTORY_SCHEMA_VERSION ||
         !verified.cycles.every(isDriveCycle)) {
       throw new Error('VALIDACAO_DO_INDICE_TEMPORARIO_FALHOU');
     }
