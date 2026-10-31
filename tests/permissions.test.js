@@ -41,10 +41,13 @@ assert(!layout.includes('requestAllRequiredPermissions'), 'a inicialização do 
 assert(layout.includes('canStartObdStartup({ bluetooth })'), 'Bluetooth permanece necessário para conexão OBD real');
 assert(!layout.includes("throw new Error('PERMISSÃO DE GPS/LOCALIZAÇÃO NÃO CONCEDIDA.')"), 'GPS negado não pode bloquear diagnóstico OBD');
 assert(!layout.includes('canUseGps('), 'localização não participa do gate de inicialização OBD');
+assert(settingsSource.includes('gpsTrackingEnabled: false'), 'GPS foreground deve iniciar desativado até opt-in explícito');
+assert(settingsSource.includes('gpsTrackingEnabled: parsed.gpsTrackingEnabled === true'), 'configurações antigas não devem ativar GPS foreground silenciosamente');
 assert(settingsSource.includes('backgroundGpsEnabled: false'), 'rastreamento em segundo plano deve iniciar desativado até opt-in explícito');
-assert(settingsSource.includes('backgroundGpsEnabled: parsed.backgroundGpsEnabled === true'), 'configurações antigas não devem ativar background GPS silenciosamente');
+assert(settingsSource.includes('backgroundGpsEnabled: parsed.backgroundGpsEnabled === true && parsed.gpsTrackingEnabled === true'), 'background GPS exige consentimento foreground e background');
 assert(settingsScreen.includes('requestLocationPermissionsOnly()'));
 assert(settingsScreen.includes('requestBackgroundLocationPermissionsOnly()'));
+assert(settingsScreen.includes('updateGpsTrackingPreference(v)'));
 assert(settingsScreen.includes('updateBackgroundGpsPreference(v)'));
 assert(source.includes('getBackgroundLocationPermissionOnly'), 'a checagem de background no serviço deve ser somente leitura');
 assert(appJson.expo.plugins.includes('./plugins/withBluetoothLegacyPermissionLimits'), 'plugin deve limitar permissões Bluetooth legadas no manifest');
