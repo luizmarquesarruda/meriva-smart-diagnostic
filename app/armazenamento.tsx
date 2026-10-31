@@ -161,8 +161,8 @@ export default function ArmazenamentoScreen() {
         </TouchableOpacity>
         {measurement && <>
           <View style={styles.row}><Text style={styles.label}>Viagens / IDs únicos</Text><Text style={styles.value}>{measurement.trips} / {measurement.uniqueTripIds}</Text></View>
-          <View style={styles.row}><Text style={styles.label}>Amostras nas viagens</Text><Text style={styles.value}>{measurement.telemetrySamples}</Text></View>
-          <View style={styles.row}><Text style={styles.label}>JSON / CSV</Text><Text style={styles.value}>{(measurement.jsonBytes / 1024).toFixed(1)} / {(measurement.csvBytes / 1024).toFixed(1)} KB</Text></View>
+          <View style={styles.row}><Text style={styles.label}>Amostras embutidas nas viagens</Text><Text style={styles.value}>{measurement.telemetrySamples}</Text></View>
+          <View style={styles.row}><Text style={styles.label}>Índice JSON / pasta VIAGENS / CSV</Text><Text style={styles.value}>{(measurement.jsonBytes / 1024).toFixed(1)} / {(measurement.tripDirectoryBytes / 1024).toFixed(1)} / {(measurement.csvBytes / 1024).toFixed(1)} KB</Text></View>
           <View style={styles.row}><Text style={styles.label}>Leitura + parse (mediana / p95)</Text><Text style={styles.value}>{measurement.readParseMs.median} / {measurement.readParseMs.p95} ms</Text></View>
           <View style={styles.row}><Text style={styles.label}>Gravação + read-back (mediana / p95)</Text><Text style={styles.value}>{measurement.scratchWriteReadbackMs.median} / {measurement.scratchWriteReadbackMs.p95} ms</Text></View>
           <Text style={styles.note}>Android/API: {measurement.platform} / {measurement.androidApi}. Integridade: {measurement.integrity}. Medido em {new Date(measurement.measuredAt).toLocaleString()}.</Text>
