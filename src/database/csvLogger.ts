@@ -615,10 +615,9 @@ export async function appendCsvRowIfMissing(
   await enqueueFileOperation(filePath, async () => {
     const segments = await getCsvLogSegments(filePath);
     for (const segmentPath of segments) {
-      const segment = { path: segmentPath };
-      const info = await FileSystem.getInfoAsync(segment.path);
+      const info = await FileSystem.getInfoAsync(segmentPath);
       if (!info.exists || info.isDirectory) continue;
-      const content = await FileSystem.readAsStringAsync(segment.path, { encoding: FileSystem.EncodingType.UTF8 });
+      const content = await FileSystem.readAsStringAsync(segmentPath, { encoding: FileSystem.EncodingType.UTF8 });
       const records = parseCsvRecords(content);
       const headers = records[0] ?? [];
       const column = headers.indexOf(uniqueKey);
