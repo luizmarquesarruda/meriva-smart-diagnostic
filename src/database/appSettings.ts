@@ -132,6 +132,7 @@ export async function readAppSettings(basePath: string): Promise<AppSettings> {
       'critical',
       'CONFIG/app-settings.json',
     );
+    publishSettings(DEFAULT_SETTINGS);
     return DEFAULT_SETTINGS;
   }
 
