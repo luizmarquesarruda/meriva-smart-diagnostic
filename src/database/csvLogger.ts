@@ -1,5 +1,6 @@
 import * as FileSystem from 'expo-file-system';
 import { AppState } from 'react-native';
+import { clearStorageHealthIssue, recordStorageHealthIssue } from '../storage/storageHealth';
 
 export type CsvValue = string | number | boolean | null | undefined;
 
@@ -193,6 +194,7 @@ export function queueCsvRow(filePath: string, row: CsvRow): void {
   for (const rows of pendingRows.values()) totalPending += rows.length;
   if (totalPending >= MAX_PENDING_CSV_ROWS) {
     droppedPendingRows += 1;
+    recordStorageHealthIssue('CSV_ROWS_DROPPED', 'Linhas CSV descartadas', String(droppedPendingRows) + ' linha(s) descartada(s) por saturação da fila. Os registros já descartados não podem ser reconstruídos.', 'critical');
     if (droppedPendingRows === 1 || droppedPendingRows % 100 === 0) {
       console.warn(`[csv] fila limitada a ${MAX_PENDING_CSV_ROWS}; registros entrantes descartados: ${droppedPendingRows}`);
     }
@@ -256,6 +258,7 @@ export async function flushCsvLogs(): Promise<void> {
   try {
     await flushPromise;
   } catch (cause) {
+    recordStorageHealthIssue('CSV_FLUSH_FAILED', 'Falha ao gravar histórico CSV', cause instanceof Error ? cause.message : String(cause), 'critical');
     // Keep retrying after export/disconnect-triggered flushes too, not only
     // after the timer-driven flush path. Rows were restored to pendingRows.
     if (pendingRows.size > 0) scheduleBatchFlush();
@@ -263,6 +266,7 @@ export async function flushCsvLogs(): Promise<void> {
   } finally {
     flushPromise = null;
   }
+  clearStorageHealthIssue('CSV_FLUSH_FAILED');
   if (pendingRows.size > 0) scheduleBatchFlush();
 }
 
