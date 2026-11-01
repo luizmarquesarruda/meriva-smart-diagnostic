@@ -201,7 +201,7 @@ async function preserveVerifiedMainAsPrevious(
   }
 }
 
-async function persistIndexSnapshot(indexFile: string, data: Omit<DriveCycleIndex, 'schemaVersion'> & { schemaVersion?: number }): Promise<void> {
+async function persistIndexSnapshot(indexFile: string, data: DriveCycleIndex): Promise<void> {
   const main = await inspectIndexFile(indexFile);
   const previous = await inspectIndexFile(indexBackupPath(indexFile));
 
