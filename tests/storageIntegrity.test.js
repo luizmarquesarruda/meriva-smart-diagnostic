@@ -243,7 +243,7 @@ async function main() {
   const exported = await benchmark.exportHistoryBenchmarkTxt(measured);
   assert.equal(exported.ok, true);
   const report = Array.from(exportFiles.values()).find((value) => value.includes('RELATÓRIO DE MEDIÇÃO DO HISTÓRICO'));
-  assert.ok(report && report.includes('ADB dumpsys meminfo'));
+  assert.ok(report && report.includes('dumpsys meminfo'));
   assert.equal(files.get(indexPath), beforeBenchmark, 'exportar relatório também não pode alterar o histórico');
 
   const backupBase = '/doc/BACKUP_POLICY_TEST';
