@@ -20,6 +20,14 @@ assert.ok(transport.includes('normalizeBluetoothAddress(eventAddress) !== normal
 assert(transport.includes('this.callbacks?.onConnected?.()'));
 assert(transport.includes("this.callbacks?.onDisconnected?.('BLUETOOTH DESCONECTADO')"));
 assert(manager.includes('callbacks?.onBluetoothConnected'));
+assert(manager.includes("logBluetoothDiagnostic('ELM_PROTOCOL_FALLBACK_START'"), 'cada protocolo alternativo precisa ter início registrado');
+assert(manager.includes("logBluetoothDiagnostic('ELM_PROTOCOL_FALLBACK_SET_RESULT'"), 'a resposta ATSP de cada fallback precisa ser diagnosticada');
+assert(manager.includes("logBluetoothDiagnostic('ELM_PROTOCOL_FALLBACK_ECU_PROBE_RESULT'"), 'cada 010C após ATSP deve registrar status, RX, duração e validação');
+assert(manager.includes("logBluetoothDiagnostic('ELM_PROTOCOL_FALLBACK_SUMMARY'"), 'a tentativa completa de fallback precisa ter resumo estruturado');
+assert(manager.includes('initialEcuProbeValid'), 'o resumo deve distinguir a sonda inicial do resultado final do fallback');
+assert(manager.includes('atspElapsedMs: forcedProtocol.elapsedMs'), 'o trace deve preservar a duração real do ATSP');
+assert(manager.includes('ecuElapsedMs: ecuProbe.elapsedMs'), 'o trace deve preservar a duração real da sonda ECU');
+
 assert(manager.includes("import { runWithTimeout } from './connectionRecovery';"), 'Bluetooth readiness must use the bounded native-operation helper');
 assert.match(manager, /const status = await runWithTimeout\(\s*\(\) => requestBluetoothPermissionsOnly\(\)/, 'runtime permission request must have a finite wait');
 assert.match(manager, /const available = await runWithTimeout\(\s*\(\) => bluetoothClassic\.isBluetoothAvailable\(\)/, 'native Bluetooth availability must have a finite wait');
