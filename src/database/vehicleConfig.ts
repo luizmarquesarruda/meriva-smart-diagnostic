@@ -1,7 +1,7 @@
 import * as FileSystem from 'expo-file-system';
 import { MERIVA_MANUAL } from './merivaManual';
 import { readJsonWithRecovery, writeJsonAtomically } from '../storage/atomicJsonFile';
-import { recordStorageHealthIssue } from '../storage/storageHealth';
+import { getStorageHealthIssues, recordStorageHealthIssue } from '../storage/storageHealth';
 
 export interface VehicleProfile {
   vehicleName: string;
@@ -100,6 +100,13 @@ export async function ensureMerivaVehicleProfile(basePath: string): Promise<Vehi
   const now = new Date().toISOString();
 
   if (existing) {
+    // Em recuperação somente de leitura, não tente normalizar/gravar sobre o
+    // JSON principal corrompido. A cópia validada pode alimentar a sessão.
+    const readOnlyRecovery = getStorageHealthIssues().some((issue) =>
+      issue.id === 'JSON_RECOVERED:CONFIG/veiculo.json',
+    );
+    if (readOnlyRecovery) return existing;
+
     const normalized: VehicleProfile = {
       ...existing,
       vehicleName: 'Meriva Maxx',
@@ -140,6 +147,12 @@ export async function ensureMerivaVehicleProfile(basePath: string): Promise<Vehi
     protocolBaseline: 'ISO 14230-4 KWP FAST INIT / K-LINE (OBSERVADO)',
     ecuAddress: '0x11',
   };
+
+  const blockedVehicleIssue = getStorageHealthIssues().some((issue) =>
+    issue.id === 'JSON_CORRUPTED:CONFIG/veiculo.json' ||
+    issue.id === 'FUTURE_SCHEMA:CONFIG/veiculo.json',
+  );
+  if (blockedVehicleIssue) return profile; // perfil em memória; arquivo existente permanece intacto.
 
   await createVehicleProfile(basePath, profile);
   return profile;
