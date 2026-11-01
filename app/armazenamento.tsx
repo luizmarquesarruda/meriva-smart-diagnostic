@@ -157,8 +157,7 @@ export default function ArmazenamentoScreen() {
         </View>
         <Text style={styles.note}>Novos backups incluem configurações, banco, viagens, manutenção e aprendizado. CSVs brutos de LEITURAS e LOGS ficam fora dos novos backups; restaurações antigas continuam compatíveis e preservam diretórios ausentes no snapshot.</Text>
         <Text style={styles.note}>
-          Fila CSV: {csvQueueStatus.pendingRows}/{csvQueueStatus.maxPendingRows} pendentes.
-          Registros descartados por saturação: {csvQueueStatus.droppedRows}.
+          Fila CSV: {csvQueueStatus.pendingRows}/{csvQueueStatus.maxPendingRows} pendentes. Os avisos de descarte e falha ficam centralizados na Central de Saúde.
         </Text>
       </View>
       <View style={[styles.historyCard, layout.landscape && styles.dataColumnCard]}>
