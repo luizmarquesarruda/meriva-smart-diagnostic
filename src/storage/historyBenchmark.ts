@@ -1,6 +1,6 @@
 import * as FileSystem from 'expo-file-system';
 import { migrateHistoryIndexDocument } from './historyIndexMigrations';
-import { readDriveCycles } from './driveCycleStorage';
+import { isDriveCycle, readDriveCycles } from './driveCycleStorage';
 
 export interface HistoryStorageMeasurement {
   measuredAt: string;
@@ -118,11 +118,10 @@ export async function measureHistoryStorage(
   }
 
   const cycles = parsed.cycles as Array<{ id?: unknown; telemetrySamples?: unknown }>;
-  if (cycles.some((cycle) => !cycle || typeof cycle !== 'object' || Array.isArray(cycle)
-    || typeof cycle.id !== 'string' || !cycle.id.trim())) {
+  if (!cycles.every((cycle) => isDriveCycle(cycle))) {
     throw new Error('INDICE_DE_VIAGENS_CONTEM_VIAGEM_INVALIDA; MEDICAO_CANCELADA');
   }
-  const ids = cycles.map((cycle) => cycle.id as string);
+  const ids = cycles.map((cycle) => cycle.id);
   const uniqueTripIds = new Set(ids).size;
   const validatedCycles = await readDriveCycles(basePath);
   if (validatedCycles.length !== uniqueTripIds) {
