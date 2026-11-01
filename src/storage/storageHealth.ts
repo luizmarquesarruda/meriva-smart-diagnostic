@@ -19,7 +19,7 @@ export interface StorageHealthIssue {
   updatedAt: string;
 }
 
-const issues = new Map<StorageHealthCode, StorageHealthIssue>();
+const issues = new Map<string, StorageHealthIssue>();
 const listeners = new Set<() => void>();
 
 function emit(): void {
