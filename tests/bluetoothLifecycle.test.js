@@ -26,7 +26,7 @@ assert(manager.includes("logBluetoothDiagnostic('ELM_PROTOCOL_FALLBACK_ECU_PROBE
 assert(manager.includes("logBluetoothDiagnostic('ELM_PROTOCOL_FALLBACK_SUMMARY'"), 'a tentativa completa de fallback precisa ter resumo estruturado');
 assert(manager.includes('initialEcuProbeValid'), 'o resumo deve distinguir a sonda inicial do resultado final do fallback');
 assert(manager.includes('atspElapsedMs: forcedProtocol.elapsedMs'), 'o trace deve preservar a duração real do ATSP');
-assert(manager.includes('ecuElapsedMs: ecuProbe.elapsedMs'), 'o trace deve preservar a duração real da sonda ECU');
+assert(manager.includes('fallbackAttempt.ecuElapsedMs = ecuProbe.elapsedMs'), 'o trace deve preservar a duração real da sonda ECU');
 
 assert(manager.includes("import { runWithTimeout } from './connectionRecovery';"), 'Bluetooth readiness must use the bounded native-operation helper');
 assert.match(manager, /const status = await runWithTimeout\(\s*\(\) => requestBluetoothPermissionsOnly\(\)/, 'runtime permission request must have a finite wait');
