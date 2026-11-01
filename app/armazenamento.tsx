@@ -12,6 +12,7 @@ import { AppIcon } from '../src/ui/AppIcon';
 import { SourceStatusLegend } from '../src/ui/SourceStatusLegend';
 import { exportDiagnosticsJson, exportDriveCyclesCsv } from '../src/storage/exportDiagnostics';
 import { HistoryStorageMeasurement, measureHistoryStorage } from '../src/storage/historyBenchmark';
+import { autoTripService } from '../src/trip/autoTripService';
 
 const DEFAULT_QUOTA: StorageQuotaConfig = {
   limitMb: 2048,
@@ -64,7 +65,9 @@ export default function ArmazenamentoScreen() {
     setMessage('MEDINDO HISTÓRICO NO DISPOSITIVO...');
     try {
       await flushCsvLogs();
-      const result = await measureHistoryStorage(basePath, Platform.OS, Platform.Version);
+      const result = await autoTripService.withPollingPaused(() =>
+        measureHistoryStorage(basePath, Platform.OS, Platform.Version),
+      );
       setMeasurement(result);
       setMessage('MEDIÇÃO JSON CONCLUÍDA. NENHUM HISTÓRICO FOI ALTERADO.');
     } catch (cause) {
