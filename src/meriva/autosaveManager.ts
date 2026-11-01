@@ -15,6 +15,7 @@ import { hydrateState, isValidEnvelope, validatePayload } from './autosaveValida
 import { migrateEnvelope } from './autosaveMigrations';
 import { appendAutoSaveHistory } from './autosaveHistoryTxt';
 import { appendDailyObdSessionEvent } from './dailyObdHistory';
+import { clearStorageHealthIssue, recordStorageHealthIssue } from '../storage/storageHealth';
 
 const DEBOUNCE_MS = 1500;
 const CHECKPOINT_MS = 45000;
@@ -95,14 +96,64 @@ async function readEnvelope(path: string): Promise<AutoSaveEnvelope<MerivaPersis
   try {
     const info = await FileSystem.getInfoAsync(path);
     if (!info.exists) return null;
+    if (info.isDirectory) {
+      recordStorageHealthIssue('AUTOSAVE_FAILED', 'Autosave JSON inválido', 'O caminho do autosave aponta para um diretório; o arquivo não foi alterado.', 'critical');
+      return null;
+    }
     const content = await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 });
-    const parsed = JSON.parse(content);
-    if (!isValidEnvelope(parsed)) return null;
+    const parsed: unknown = JSON.parse(content);
+    if (typeof parsed === 'object' && parsed !== null &&
+        typeof (parsed as { schemaVersion?: unknown }).schemaVersion === 'number' &&
+        (parsed as { schemaVersion: number }).schemaVersion > AUTOSAVE_SCHEMA_VERSION) {
+      recordStorageHealthIssue('FUTURE_SCHEMA', 'Schema futuro do autosave', 'O arquivo ' + path.split('/').pop() + ' foi criado por uma versão mais nova. O conteúdo foi preservado.', 'critical');
+      return null;
+    }
+    if (!isValidEnvelope(parsed)) {
+      recordStorageHealthIssue('AUTOSAVE_FAILED', 'Autosave JSON corrompido', 'O arquivo ' + path.split('/').pop() + ' não passou pela validação do envelope. O original foi preservado.', 'critical');
+      return null;
+    }
     const migrated = migrateEnvelope<MerivaPersistedState>(parsed);
-    if (!migrated || !validatePayload(migrated.payload)) return null;
+    if (!migrated || !validatePayload(migrated.payload)) {
+      recordStorageHealthIssue('AUTOSAVE_FAILED', 'Autosave JSON inválido', 'A migração ou validação do conteúdo falhou. O original foi preservado.', 'critical');
+      return null;
+    }
     return migrated;
-  } catch {
+  } catch (cause) {
+    recordStorageHealthIssue('AUTOSAVE_FAILED', 'Falha ao ler autosave JSON', cause instanceof Error ? cause.message : 'Falha desconhecida de leitura. O arquivo original foi preservado.', 'critical');
     return null;
+  }
+}
+
+async function assertAutosaveFileReplaceable(path: string): Promise<void> {
+  const info = await FileSystem.getInfoAsync(path);
+  if (!info.exists) return;
+  if (info.isDirectory) throw new Error('AUTOSAVE_JSON_PATH_IS_DIRECTORY; ARQUIVO PRESERVADO.');
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(await FileSystem.readAsStringAsync(path, {
+      encoding: FileSystem.EncodingType.UTF8,
+    }));
+  } catch {
+    recordStorageHealthIssue('AUTOSAVE_FAILED', 'Autosave JSON corrompido', 'A gravação foi bloqueada porque o arquivo existente não é um JSON válido.', 'critical');
+    throw new Error('AUTOSAVE_JSON_CORRUPTED; ARQUIVO ORIGINAL PRESERVADO; GRAVACAO BLOQUEADA.');
+  }
+
+  if (typeof parsed === 'object' && parsed !== null &&
+      typeof (parsed as { schemaVersion?: unknown }).schemaVersion === 'number' &&
+      (parsed as { schemaVersion: number }).schemaVersion > AUTOSAVE_SCHEMA_VERSION) {
+    recordStorageHealthIssue('FUTURE_SCHEMA', 'Schema futuro do autosave', 'O arquivo existente pertence a uma versão mais nova. A gravação foi bloqueada.', 'critical');
+    throw new Error('AUTOSAVE_SCHEMA_VERSION_NEWER_THAN_APP; ARQUIVO PRESERVADO.');
+  }
+
+  if (!isValidEnvelope(parsed)) {
+    recordStorageHealthIssue('AUTOSAVE_FAILED', 'Autosave JSON inválido', 'O arquivo existente não passou pela validação. A gravação foi bloqueada.', 'critical');
+    throw new Error('AUTOSAVE_JSON_INVALID; ARQUIVO ORIGINAL PRESERVADO; GRAVACAO BLOQUEADA.');
+  }
+  const migrated = migrateEnvelope<MerivaPersistedState>(parsed);
+  if (!migrated || !validatePayload(migrated.payload)) {
+    recordStorageHealthIssue('AUTOSAVE_FAILED', 'Autosave JSON inválido', 'O conteúdo não passou pela migração/validação. A gravação foi bloqueada.', 'critical');
+    throw new Error('AUTOSAVE_JSON_INVALID; ARQUIVO ORIGINAL PRESERVADO; GRAVACAO BLOQUEADA.');
   }
 }
 
@@ -145,6 +196,11 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
     const content = JSON.stringify(envelope, null, 2);
     const base = runtime.basePath;
 
+    // Verificar as duas fontes existentes antes de escrever qualquer arquivo.
+    // JSON corrompido ou schema futuro nunca é substituído pelo autosave atual.
+    await assertAutosaveFileReplaceable(mainPath(base));
+    await assertAutosaveFileReplaceable(previousPath(base));
+
     await FileSystem.writeAsStringAsync(tmpPath(base), content, {
       encoding: FileSystem.EncodingType.UTF8,
     });
@@ -168,6 +224,8 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
     runtime.lastSavedAt = savedAt;
     runtime.lastSaveReason = reason;
     runtime.lastError = null;
+    clearStorageHealthIssue('AUTOSAVE_FAILED');
+    clearStorageHealthIssue('FUTURE_SCHEMA');
     runtime.lastSavedFingerprint = fingerprintBeforeSave;
 
     try {
@@ -178,7 +236,9 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
         reason,
       );
     } catch (historyCause) {
-      console.warn('[autosave] falha ao atualizar histórico TXT:', historyCause instanceof Error ? historyCause.message : historyCause);
+      const detail = historyCause instanceof Error ? historyCause.message : String(historyCause);
+      recordStorageHealthIssue('AUTOSAVE_TXT_FAILED', 'Falha no histórico TXT de autosave', detail, 'warning');
+      console.warn('[autosave] falha ao atualizar histórico TXT:', detail);
     }
     runtime.dirty = runtime.mutationVersion !== mutationVersionAtStart;
     saved = true;
@@ -186,6 +246,7 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
   } catch (cause) {
     runtime.dirty = true;
     runtime.lastError = cause instanceof Error ? cause.message : 'ERRO DESCONHECIDO NO AUTOSAVE';
+    recordStorageHealthIssue('AUTOSAVE_FAILED', 'Falha na gravação do autosave', runtime.lastError, 'critical');
     console.warn('[autosave] falha ao salvar:', runtime.lastError);
     return false;
   } finally {
@@ -394,7 +455,9 @@ async function appendDailySessionBoundary(event: 'SESSION_START' | 'SESSION_END'
     );
   } catch (cause) {
     // O histórico diário é complementar: falha no TXT não invalida o autosave JSON.
-    console.warn('[autosave] falha ao registrar fronteira da sessão ECU:', cause instanceof Error ? cause.message : cause);
+    const detail = cause instanceof Error ? cause.message : String(cause);
+    recordStorageHealthIssue('DAILY_TXT_FAILED', 'Falha no histórico TXT diário da ECU', detail, 'warning');
+    console.warn('[autosave] falha ao registrar fronteira da sessão ECU:', detail);
   }
 }
 
