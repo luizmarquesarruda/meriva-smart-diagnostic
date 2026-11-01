@@ -8,6 +8,7 @@ const ts = require('typescript');
 const sourcePath = path.resolve(__dirname, '../src/database/csvLogger.ts');
 const files = new Map();
 const directories = new Set(['/base', '/base/LOGS']);
+const unreadableDirectories = new Set();
 
 function info(filePath) {
   const isDirectory = directories.has(filePath);
@@ -29,6 +30,7 @@ const fakeFileSystem = {
     return info(filePath);
   },
   async readDirectoryAsync(directory) {
+    if (unreadableDirectories.has(directory)) throw new Error('DIRECTORY_READ_FAILED: ' + directory);
     if (!directories.has(directory)) throw new Error('DIRECTORY_NOT_FOUND: ' + directory);
     const prefix = directory.endsWith('/') ? directory : directory + '/';
     return Array.from(new Set([
