@@ -162,8 +162,12 @@ async function main() {
   // A normal append that would cross 512 KiB must rotate rather than enlarge the prior segment.
   const rotationPath = '/base/LOGS/obd_raw_2026-11-01_rotation.csv';
   const header = 'timestamp,eventId,pid\\n';
-  const largeValue = 'x'.repeat(restartedLogger.MAX_CSV_SEGMENT_BYTES - Buffer.byteLength(header, 'utf8') - 32);
-  const originalSegment = header + '2026-11-01T09:00:00.000Z,existing,' + largeValue + '\\n';
+  const existingPrefix = '2026-11-01T09:00:00.000Z,existing,';
+  const largeValue = 'x'.repeat(restartedLogger.MAX_CSV_SEGMENT_BYTES
+    - Buffer.byteLength(header, 'utf8')
+    - Buffer.byteLength(existingPrefix, 'utf8')
+    - 16);
+  const originalSegment = header + existingPrefix + largeValue + '\\n';
   files.set(rotationPath, originalSegment);
   await restartedLogger.appendCsvRowIfMissing(
     rotationPath,
