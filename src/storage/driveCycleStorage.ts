@@ -260,8 +260,14 @@ export async function initializeDriveCycles(basePath: string): Promise<void> {
       throw new Error('HISTORY_SCHEMA_VERSION_NEWER_THAN_APP; HISTÓRICO PRESERVADO.');
     }
     if (main.kind === 'CORRUPT') {
-      recordStorageHealthIssue('HISTORY_CORRUPTED', 'Histórico JSON corrompido', main.reason + ' O índice original foi preservado; nenhuma migração foi executada.', 'critical');
-      throw new Error('HISTORICO_DE_VIAGENS_CORROMPIDO; MIGRACAO BLOQUEADA; ARQUIVO PRESERVADO.');
+      recordStorageHealthIssue('HISTORY_CORRUPTED', 'Histórico JSON corrompido', main.reason + ' O índice original foi preservado; a leitura usará somente uma cópia anterior validada, se existir.', 'critical');
+      const recovery = await inspectIndexFile(indexBackupPath(indexFile));
+      if (recovery.kind === 'VALID') return; // leitura poderá usar a cópia, mas toda gravação permanece bloqueada.
+      if (recovery.kind === 'FUTURE') {
+        recordStorageHealthIssue('FUTURE_SCHEMA', 'Schema futuro na cópia anterior', 'A recuperação foi bloqueada para não ocultar dados de uma versão mais nova.', 'critical');
+        throw new Error('HISTORY_PREVIOUS_SCHEMA_VERSION_NEWER_THAN_APP; CÓPIA PRESERVADA.');
+      }
+      throw new Error('HISTORICO_DE_VIAGENS_CORROMPIDO_SEM_COPIA_VALIDADA; ARQUIVO PRESERVADO.');
     }
 
     if (main.kind === 'VALID') {
