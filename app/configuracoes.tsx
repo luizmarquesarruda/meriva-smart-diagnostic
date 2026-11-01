@@ -196,7 +196,8 @@ export default function ConfiguracaoScreen() {
     try {
       const logs = await cleanupOldLogs(storageBase);
       const readings = await cleanupOldReadings(storageBase);
-      setStatus(`REMOVIDOS: ${logs} LOGS, ${readings} LEITURAS`);
+      const failed = logs.failed + readings.failed;
+      setStatus(`REMOVIDOS: ${logs.removed} LOGS, ${readings.removed} LEITURAS • FALHAS: ${failed}`);
     } catch { setStatus('FALHA NA LIMPEZA'); }
     finally { setBusy(false); setSaveStatus(getAutoSaveStatus()); }
   }

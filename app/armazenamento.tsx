@@ -83,7 +83,8 @@ export default function ArmazenamentoScreen() {
       setCsvQueueStatus(getCsvQueueStatus());
       const logs = await cleanupOldLogs(basePath);
       const readings = await cleanupOldReadings(basePath);
-      setMessage(`REMOVIDOS: ${logs} LOGS, ${readings} LEITURAS`);
+      const failed = logs.failed + readings.failed;
+      setMessage(`REMOVIDOS: ${logs.removed} LOGS, ${readings.removed} LEITURAS • FALHAS: ${failed}`);
       await refresh(basePath);
     } catch {
       setMessage('FALHA NA LIMPEZA');
