@@ -140,12 +140,40 @@ export async function getCsvLogSegments(filePath: string): Promise<string[]> {
   if (!directoryInfo.exists) return [];
   if (!directoryInfo.isDirectory) throw new Error('CSV_SEGMENT_DIRECTORY_INVALID: ' + directory);
   const segments = await listCsvSegments(filePath, true);
-  const existing: string[] = [];
-  for (const segment of segments) {
-    const info = await FileSystem.getInfoAsync(segment.path);
-    if (info.exists && !info.isDirectory) existing.push(segment.path);
+  const { stem, extension } = splitCsvPath(filePath);
+  // Older app versions persisted overflow in .queue-* files. Keep those
+  // immutable files readable until the user exports/cleans them deliberately.
+  const names = await FileSystem.readDirectoryAsync(directory);
+  const legacyQueuePaths = names
+    .filter((name) => name.startsWith(stem + '.queue-') && name.endsWith(extension))
+    .map((name) => directory + '/' + name);
+  const candidates = [
+    ...segments.map((segment) => segment.path),
+    ...legacyQueuePaths,
+  ];
+  const existing: Array<{ path: string; modifiedAt: number | null; stableOrder: number }> = [];
+  for (let index = 0; index < candidates.length; index += 1) {
+    const segmentPath = candidates[index];
+    const info = await FileSystem.getInfoAsync(segmentPath);
+    if (!info.exists || info.isDirectory) continue;
+    const modifiedAt = typeof info.modificationTime === 'number'
+      && Number.isFinite(info.modificationTime) && info.modificationTime > 0
+        ? info.modificationTime
+        : null;
+    existing.push({ path: segmentPath, modifiedAt, stableOrder: index });
+    knownCsvPaths.add(segmentPath);
   }
-  return existing;
+  // Expo returns modificationTime in seconds on Android. Use it when available
+  // for legacy/new mixed histories, with deterministic discovery order as fallback.
+  existing.sort((left, right) => {
+    if (left.modifiedAt != null && right.modifiedAt != null && left.modifiedAt !== right.modifiedAt) {
+      return left.modifiedAt - right.modifiedAt;
+    }
+    if (left.modifiedAt != null && right.modifiedAt == null) return -1;
+    if (left.modifiedAt == null && right.modifiedAt != null) return 1;
+    return left.stableOrder - right.stableOrder;
+  });
+  return existing.map((segment) => segment.path);
 }
 
 function* pendingRowsMapValues(): IterableIterator<CsvRow[]> {
