@@ -246,7 +246,7 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
   } catch (cause) {
     runtime.dirty = true;
     runtime.lastError = cause instanceof Error ? cause.message : 'ERRO DESCONHECIDO NO AUTOSAVE';
-    recordStorageHealthIssue('AUTOSAVE_FAILED', 'Falha na gravação do autosave', runtime.lastError, 'critical', 'CONFIG/' + path.split('/').pop());
+    recordStorageHealthIssue('AUTOSAVE_FAILED', 'Falha na gravação do autosave', runtime.lastError, 'critical', 'CONFIG/autosave.json');
     console.warn('[autosave] falha ao salvar:', runtime.lastError);
     return false;
   } finally {
