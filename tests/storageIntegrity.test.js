@@ -11,6 +11,7 @@ const files = new Map();
 const directories = new Set(['/doc']);
 const csvRows = [];
 const exportFiles = new Map();
+let failMoveTarget = null;
 
 function ensureDirectory(directory) {
   const parts = directory.split('/').filter(Boolean);
@@ -98,6 +99,10 @@ const fakeFileSystem = {
     }
   },
   async moveAsync({ from, to }) {
+    if (failMoveTarget === to) {
+      failMoveTarget = null;
+      throw new Error('SIMULATED_MOVE_FAILURE: ' + to);
+    }
     if (!files.has(from)) throw new Error('MOVE_SOURCE_NOT_FOUND: ' + from);
     if (files.has(to)) throw new Error('MOVE_TARGET_EXISTS: ' + to);
     ensureDirectory(parentDirectory(to));
@@ -151,6 +156,7 @@ function loadTs(relativePath) {
   return loaded.exports;
 }
 
+const atomicJson = loadTs('src/storage/atomicJsonFile.ts');
 const migrations = loadTs('src/storage/historyIndexMigrations.ts');
 migrationExports = migrations;
 const health = loadTs('src/storage/storageHealth.ts');
@@ -195,6 +201,49 @@ async function main() {
     () => migrations.migrateHistoryIndexDocument({ schemaVersion: 99, cycles: [] }),
     /HISTORY_SCHEMA_VERSION_NEWER_THAN_APP/,
   );
+
+  const isJsonRecord = (value) => typeof value === 'object' && value !== null &&
+    !Array.isArray(value) && value.schemaVersion === 1 && typeof value.value === 'string';
+  const isFutureJson = (value) => typeof value === 'object' && value !== null &&
+    typeof value.schemaVersion === 'number' && value.schemaVersion > 1;
+
+  const corruptJsonPath = '/doc/atomic/corrupt.json';
+  ensureDirectory('/doc/atomic');
+  files.set(corruptJsonPath, '{JSON CORROMPIDO');
+  await assert.rejects(
+    () => atomicJson.writeJsonAtomically(corruptJsonPath, { schemaVersion: 1, value: 'novo' }, isJsonRecord, isFutureJson),
+    /JSON_CORRUPTED/,
+  );
+  assert.equal(files.get(corruptJsonPath), '{JSON CORROMPIDO');
+
+  const futureJsonPath = '/doc/atomic/future.json';
+  const futureJson = JSON.stringify({ schemaVersion: 2, value: 'versão futura' });
+  files.set(futureJsonPath, futureJson);
+  await assert.rejects(
+    () => atomicJson.writeJsonAtomically(futureJsonPath, { schemaVersion: 1, value: 'novo' }, isJsonRecord, isFutureJson),
+    /JSON_SCHEMA_VERSION_NEWER_THAN_APP/,
+  );
+  assert.equal(files.get(futureJsonPath), futureJson, 'schema futuro deve permanecer byte a byte intacto');
+
+  const validJsonPath = '/doc/atomic/valid.json';
+  const originalValid = { schemaVersion: 1, value: 'versão anterior' };
+  files.set(validJsonPath, JSON.stringify(originalValid));
+  files.set('/doc/atomic/valid.previous.json', JSON.stringify({ schemaVersion: 1, value: 'cópia anterior' }));
+  await atomicJson.writeJsonAtomically(validJsonPath, { schemaVersion: 1, value: 'versão nova' }, isJsonRecord, isFutureJson);
+  assert.equal(JSON.parse(files.get(validJsonPath)).value, 'versão nova');
+  assert.equal(JSON.parse(files.get('/doc/atomic/valid.previous.json')).value, 'versão anterior',
+    'a cópia anterior deve conter o último principal validado');
+
+  const rollbackJsonPath = '/doc/atomic/rollback.json';
+  const rollbackOriginal = { schemaVersion: 1, value: 'estado íntegro' };
+  files.set(rollbackJsonPath, JSON.stringify(rollbackOriginal));
+  failMoveTarget = rollbackJsonPath;
+  await assert.rejects(
+    () => atomicJson.writeJsonAtomically(rollbackJsonPath, { schemaVersion: 1, value: 'falha' }, isJsonRecord, isFutureJson),
+    /SIMULATED_MOVE_FAILURE/,
+  );
+  assert.deepEqual(JSON.parse(files.get(rollbackJsonPath)), rollbackOriginal,
+    'falha ao substituir deve restaurar a cópia anterior verificada');
 
   const base = '/doc/MERIVA_SMART';
   const tripsDirectory = base + '/VIAGENS';
@@ -252,7 +301,7 @@ async function main() {
     files.set(backupBase + '/' + directory + '/' + directory.toLowerCase() + (directory === 'BANCO' ? '.json' : '.csv'), 'conteúdo');
   }
   const createdBackup = await backup.createBackup(backupBase);
-  assert.ok(createdBackup.includes === undefined || !createdBackup.includes.includes('LEITURAS'));
+  assert.ok(!createdBackup.includes.includes('LEITURAS'));
   assert.ok(!createdBackup.includes.includes('LOGS'), 'novos backups não devem copiar CSVs brutos de LOGS');
   assert.ok(files.has(backupBase + '/LEITURAS/leituras.csv'), 'a política de backup não pode apagar a origem LEITURAS');
   assert.ok(files.has(backupBase + '/LOGS/logs.csv'), 'a política de backup não pode apagar a origem LOGS');
