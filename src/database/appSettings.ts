@@ -75,6 +75,8 @@ function isStoredAppSettings(value: unknown): value is StoredAppSettings {
   if (!knownFields.some((key) => Object.prototype.hasOwnProperty.call(value, key))) return false;
   if (value.fuelType !== undefined && !['FLEX', 'ETANOL', 'GASOLINA'].includes(String(value.fuelType))) return false;
   if (value.distanceUnit !== undefined && value.distanceUnit !== 'KM' && value.distanceUnit !== 'MI') return false;
+  if (value.elmPartialResponseAction !== undefined &&
+      !['RECONNECT_AND_INITIALIZE', 'RECONNECT', 'IGNORE'].includes(String(value.elmPartialResponseAction))) return false;
   for (const key of ['autoConnectObd', 'gpsTrackingEnabled', 'backgroundGpsEnabled', 'diagnosticAlerts',
     'elmForceInitialization', 'elmAdaptiveTiming']) {
     if (value[key] !== undefined && typeof value[key] !== 'boolean') return false;
