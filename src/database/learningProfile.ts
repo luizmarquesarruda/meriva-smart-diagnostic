@@ -1,4 +1,6 @@
 import * as FileSystem from 'expo-file-system';
+import { readJsonWithRecovery, writeJsonAtomically } from '../storage/atomicJsonFile';
+import { recordStorageHealthIssue } from '../storage/storageHealth';
 import type {
   ConfidenceLevel,
   SampleStatistics,
@@ -45,6 +47,42 @@ export interface MerivaLearningProfile {
 function profilePath(basePath: string): string {
   return `${basePath}/APRENDIZADO/dna_meriva.json`;
 }
+
+const LEARNING_PROFILE_SCHEMA_VERSION = 1;
+type StoredLearningProfile = MerivaLearningProfile & { schemaVersion?: number };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isLearningProfile(value: unknown): value is StoredLearningProfile {
+  if (!isRecord(value)) return false;
+  if (value.schemaVersion !== undefined &&
+      (!Number.isInteger(value.schemaVersion) || (value.schemaVersion as number) < 0)) return false;
+  if (typeof value.vehicleId !== 'string' ||
+      typeof value.profileCreated !== 'string' ||
+      typeof value.lastUpdated !== 'string' ||
+      typeof value.seedVersion !== 'string' ||
+      typeof value.seedImportDate !== 'string' ||
+      !['COLD_START', 'SEED_INITIALIZED', 'LEARNING_ACTIVE', 'CONFIDENT'].includes(String(value.learningStatus)) ||
+      !Array.isArray(value.contextualData) ||
+      !isRecord(value.overallStatistics) ||
+      !isRecord(value.globalSampleCounts) ||
+      !isRecord(value.confidenceThresholds) ||
+      !isRecord(value.dataContamination) ||
+      !['HYBRID', 'REAL_ONLY'].includes(String(value.source)) ||
+      typeof value.seedWeight !== 'number' || !Number.isFinite(value.seedWeight)) return false;
+  const counts = value.globalSampleCounts;
+  return typeof counts.seedSamples === 'number' && Number.isFinite(counts.seedSamples) &&
+    typeof counts.realSamples === 'number' && Number.isFinite(counts.realSamples) &&
+    typeof counts.totalSamples === 'number' && Number.isFinite(counts.totalSamples);
+}
+
+function hasFutureLearningProfileSchema(value: unknown): boolean {
+  return isRecord(value) && typeof value.schemaVersion === 'number'
+    && value.schemaVersion > LEARNING_PROFILE_SCHEMA_VERSION;
+}
+
 const MEDIAN_WINDOW_LIMIT = 101;
 
 function medianOf(values: number[]): number {
@@ -125,13 +163,28 @@ async function readLearningProfileUnsafe(
   basePath: string,
 ): Promise<MerivaLearningProfile | null> {
   const target = profilePath(basePath);
-  const info = await FileSystem.getInfoAsync(target);
-  if (!info.exists || info.isDirectory) return null;
-
   try {
-    const content = await FileSystem.readAsStringAsync(target);
-    return JSON.parse(content) as MerivaLearningProfile;
-  } catch {
+    const result = await readJsonWithRecovery(target, isLearningProfile, hasFutureLearningProfileSchema);
+    if (result.recoveredFromPrevious) {
+      recordStorageHealthIssue(
+        'JSON_RECOVERED',
+        'Perfil de aprendizado recuperado da cópia anterior',
+        'O arquivo principal está inválido. A cópia validada foi usada somente para leitura; gravações permanecem bloqueadas.',
+        'critical',
+        'APRENDIZADO/dna_meriva.json',
+      );
+    }
+    return result.value as MerivaLearningProfile | null;
+  } catch (cause) {
+    const detail = cause instanceof Error ? cause.message : String(cause);
+    const future = detail.includes('SCHEMA_VERSION_NEWER_THAN_APP');
+    recordStorageHealthIssue(
+      future ? 'FUTURE_SCHEMA' : 'JSON_CORRUPTED',
+      future ? 'Schema futuro do aprendizado local' : 'JSON do aprendizado local inválido',
+      detail + ' O arquivo original foi preservado.',
+      'critical',
+      'APRENDIZADO/dna_meriva.json',
+    );
     return null;
   }
 }
@@ -142,9 +195,12 @@ async function writeLearningProfileUnsafe(
 ): Promise<void> {
   const target = profilePath(basePath);
   await FileSystem.makeDirectoryAsync(`${basePath}/APRENDIZADO`, { intermediates: true });
-  await FileSystem.writeAsStringAsync(target, JSON.stringify(profile, null, 2), {
-    encoding: FileSystem.EncodingType.UTF8,
-  });
+  await writeJsonAtomically(
+    target,
+    { ...profile, schemaVersion: LEARNING_PROFILE_SCHEMA_VERSION },
+    isLearningProfile,
+    hasFutureLearningProfileSchema,
+  );
 }
 
 async function enqueueProfileTransaction<T>(
