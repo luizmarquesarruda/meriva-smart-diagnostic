@@ -335,6 +335,7 @@ export async function initializeDriveCycles(basePath: string): Promise<void> {
 
     await persistIndexSnapshot(indexFile, {
       version: '1.0',
+      schemaVersion: CURRENT_HISTORY_SCHEMA_VERSION,
       cycles: [],
       totalCount: 0,
       initializedAt: new Date().toISOString(),
