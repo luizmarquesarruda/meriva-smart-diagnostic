@@ -159,6 +159,30 @@ async function main() {
   assert.deepEqual(eventIds, ['event-1', 'event-2', 'event-3', 'event-4', 'event-5']);
   assert.equal(new Set(eventIds).size, eventIds.length, 'restart/append must not duplicate committed rows');
 
+  // A normal append that would cross 512 KiB must rotate rather than enlarge the prior segment.
+  const rotationPath = '/base/LOGS/obd_raw_2026-11-01_rotation.csv';
+  const header = 'timestamp,eventId,pid\\n';
+  const largeValue = 'x'.repeat(restartedLogger.MAX_CSV_SEGMENT_BYTES - Buffer.byteLength(header, 'utf8') - 32);
+  const originalSegment = header + '2026-11-01T09:00:00.000Z,existing,' + largeValue + '\\n';
+  files.set(rotationPath, originalSegment);
+  await restartedLogger.appendCsvRowIfMissing(
+    rotationPath,
+    { timestamp: '2026-11-01T10:00:00.006Z', eventId: 'after-limit', pid: '010C' },
+    'eventId',
+  );
+  const rotatedSegments = await restartedLogger.getCsvLogSegments(rotationPath);
+  assert.deepEqual(rotatedSegments, [
+    rotationPath,
+    '/base/LOGS/obd_raw_2026-11-01_rotation.part-0002.csv',
+  ], 'an append that exceeds the byte budget must create a new segment');
+  assert.equal(files.get(rotationPath), originalSegment,
+    'rotation must not rewrite or truncate the previously committed segment');
+  for (const segment of rotatedSegments) {
+    assert.ok(Buffer.byteLength(files.get(segment), 'utf8') <= restartedLogger.MAX_CSV_SEGMENT_BYTES,
+      'no committed segment may exceed the byte limit');
+  }
+  assert.ok(files.get(rotatedSegments[1]).includes('after-limit'));
+
   console.log('csvSpoolDurability.test.js: PASS');
 }
 
