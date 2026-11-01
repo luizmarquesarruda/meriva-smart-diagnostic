@@ -1,4 +1,6 @@
 import * as FileSystem from 'expo-file-system';
+import { migrateHistoryIndexDocument } from './historyIndexMigrations';
+import { readDriveCycles } from './driveCycleStorage';
 
 export interface HistoryStorageMeasurement {
   measuredAt: string;
@@ -36,19 +38,29 @@ async function measureDirectory(
   directory: string,
   predicate: (path: string) => boolean,
 ): Promise<{ bytes: number; files: number }> {
+  const directoryInfo = await FileSystem.getInfoAsync(directory);
+  if (!directoryInfo.exists || !directoryInfo.isDirectory) {
+    throw new Error('HISTORY_MEASUREMENT_DIRECTORY_UNAVAILABLE: ' + directory);
+  }
+
   let bytes = 0;
   let files = 0;
-  const names = await FileSystem.readDirectoryAsync(directory).catch(() => []);
+  // An unreadable directory must fail the measurement. Treating it as empty
+  // creates deceptively small storage totals and can corrupt a SQLite decision.
+  const names = await FileSystem.readDirectoryAsync(directory);
   for (const name of names) {
     const path = directory.replace(/\/$/, '') + '/' + name;
-    const info = await FileSystem.getInfoAsync(path, { size: true }).catch(() => null);
-    if (!info?.exists) continue;
+    const info = await FileSystem.getInfoAsync(path, { size: true });
+    if (!info.exists) throw new Error('HISTORY_MEASUREMENT_ENTRY_DISAPPEARED: ' + path);
     if (info.isDirectory) {
       const nested = await measureDirectory(path, predicate);
       bytes += nested.bytes;
       files += nested.files;
     } else if (predicate(path)) {
-      bytes += typeof info.size === 'number' ? info.size : 0;
+      if (typeof info.size !== 'number' || !Number.isFinite(info.size) || info.size < 0) {
+        throw new Error('HISTORY_MEASUREMENT_SIZE_UNAVAILABLE: ' + path);
+      }
+      bytes += info.size;
       files += 1;
     }
   }
@@ -71,27 +83,49 @@ export async function measureHistoryStorage(
   }
 
   const raw = await FileSystem.readAsStringAsync(indexPath);
-  const parsed = JSON.parse(raw) as { cycles?: unknown };
+  let parsed: { cycles?: unknown; schemaVersion?: unknown };
+  try {
+    parsed = JSON.parse(raw) as { cycles?: unknown; schemaVersion?: unknown };
+    const migration = migrateHistoryIndexDocument(parsed);
+    parsed = migration.document;
+  } catch (cause) {
+    throw new Error('INDICE_DE_VIAGENS_INVALIDO_OU_SCHEMA_NAO_SUPORTADO; MEDICAO_CANCELADA: '
+      + (cause instanceof Error ? cause.message : String(cause)));
+  }
   if (!Array.isArray(parsed.cycles)) {
     throw new Error('INDICE_DE_VIAGENS_INVALIDO; MEDICAO_CANCELADA');
   }
 
   const cycles = parsed.cycles as Array<{ id?: unknown; telemetrySamples?: unknown }>;
-  const ids = cycles.map((cycle) => cycle.id).filter((id): id is string => typeof id === 'string');
+  if (cycles.some((cycle) => !cycle || typeof cycle !== 'object' || Array.isArray(cycle)
+    || typeof cycle.id !== 'string' || !cycle.id.trim())) {
+    throw new Error('INDICE_DE_VIAGENS_CONTEM_VIAGEM_INVALIDA; MEDICAO_CANCELADA');
+  }
+  const ids = cycles.map((cycle) => cycle.id as string);
   const uniqueTripIds = new Set(ids).size;
+  const validatedCycles = await readDriveCycles(basePath);
+  if (validatedCycles.length !== uniqueTripIds) {
+    throw new Error('INDICE_E_LEITURA_VALIDADA_DIVERGEM; MEDICAO_CANCELADA');
+  }
   const telemetrySamples = cycles.reduce((total, cycle) =>
     total + (Array.isArray(cycle.telemetrySamples) ? cycle.telemetrySamples.length : 0), 0);
 
   const readTimes: number[] = [];
   const writeReadbackTimes: number[] = [];
-  const scratchPath = basePath.replace(/\/$/, '') + '/.history-benchmark-' + Date.now() + '.tmp';
+  let scratchSequence = 0;
+  let scratchPath = '';
+  do {
+    scratchSequence += 1;
+    scratchPath = basePath.replace(/\/$/, '') + '/.history-benchmark-' + Date.now() + '-' + scratchSequence + '.tmp';
+  } while ((await FileSystem.getInfoAsync(scratchPath)).exists);
   let integrity: 'OK' | 'FAILED' = 'OK';
   try {
     for (let index = 0; index < BENCHMARK_ROUNDS; index += 1) {
       const readStartedAt = Date.now();
       const current = await FileSystem.readAsStringAsync(indexPath);
       const currentParsed = JSON.parse(current) as { cycles?: unknown };
-      if (!Array.isArray(currentParsed.cycles) || currentParsed.cycles.length !== cycles.length) {
+      if (current !== raw || !Array.isArray(currentParsed.cycles)
+        || currentParsed.cycles.length !== cycles.length) {
         throw new Error('HISTORICO_MUDOU_DURANTE_MEDICAO');
       }
       readTimes.push(Date.now() - readStartedAt);
