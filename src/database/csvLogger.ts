@@ -133,6 +133,17 @@ export function getActiveCsvLogPaths(now = new Date()): string[] {
   return Array.from(paths);
 }
 
+/** Returns every committed part of a daily CSV log in chronological part order. */
+export async function getCsvLogSegments(filePath: string): Promise<string[]> {
+  const segments = await listCsvSegments(filePath);
+  const existing: string[] = [];
+  for (const segment of segments) {
+    const info = await FileSystem.getInfoAsync(segment.path);
+    if (info.exists && !info.isDirectory) existing.push(segment.path);
+  }
+  return existing;
+}
+
 function* pendingRowsMapValues(): IterableIterator<CsvRow[]> {
   yield* pendingRows.values();
 }
@@ -281,10 +292,181 @@ function scheduleBatchFlush(): void {
   }, BATCH_FLUSH_INTERVAL_MS);
 }
 
-function queuedCsvPath(filePath: string): string {
+function utf8ByteLength(value: string): number {
+  let bytes = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code <= 0x7f) bytes += 1;
+    else if (code <= 0x7ff) bytes += 2;
+    else if (code >= 0xd800 && code <= 0xdbff && index + 1 < value.length
+      && value.charCodeAt(index + 1) >= 0xdc00 && value.charCodeAt(index + 1) <= 0xdfff) {
+      bytes += 4;
+      index += 1;
+    } else bytes += 3;
+  }
+  return bytes;
+}
+
+interface CsvSpoolChunk {
+  rows: CsvRow[];
+  headers: string[];
+  content: string;
+}
+
+/** Keep each immutable overflow segment under the configured byte limit. */
+function buildCsvSpoolChunks(rows: CsvRow[]): CsvSpoolChunk[] {
+  if (rows.length === 0) return [];
+  const headers = Array.from(new Set(rows.flatMap((row) => Object.keys(row))));
+  const headerLine = `${headers.join(',')}\\n`;
+  const chunks: CsvSpoolChunk[] = [];
+  let chunkRows: CsvRow[] = [];
+  let content = headerLine;
+
+  for (const row of rows) {
+    const serialized = `${serializeRow(row, headers)}\\n`;
+    if (chunkRows.length > 0 && (
+      chunkRows.length >= SPILL_CHUNK_ROWS
+      || utf8ByteLength(content + serialized) > MAX_CSV_SEGMENT_BYTES
+    )) {
+      chunks.push({ rows: chunkRows, headers, content });
+      chunkRows = [];
+      content = headerLine;
+    }
+
+    if (utf8ByteLength(content + serialized) > MAX_CSV_SEGMENT_BYTES) {
+      throw new Error('CSV_QUEUE_ROW_EXCEEDS_SEGMENT_LIMIT');
+    }
+    chunkRows.push(row);
+    content += serialized;
+  }
+
+  if (chunkRows.length > 0) chunks.push({ rows: chunkRows, headers, content });
+  return chunks;
+}
+
+/**
+ * Commit one immutable CSV segment. The temporary file is read back and
+ * validated before the final .csv/.part-NNNN.csv name becomes visible.
+ */
+async function writeCsvSpoolSegmentUnsafe(
+  filePath: string,
+  chunk: CsvSpoolChunk,
+): Promise<void> {
   const { directory, stem, extension } = splitCsvPath(filePath);
+  await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
+
+  const existingSegments = await listCsvSegments(filePath);
+  let nextPart = 1;
+  for (const segment of existingSegments) {
+    const info = await FileSystem.getInfoAsync(segment.path, { size: true });
+    if (info.exists) nextPart = Math.max(nextPart, segment.part + 1);
+  }
+
+  let targetPath = nextPart === 1
+    ? filePath
+    : `${directory}/${stem}.part-${String(nextPart).padStart(4, '0')}${extension}`;
+  let targetInfo = await FileSystem.getInfoAsync(targetPath);
+  while (targetInfo.exists) {
+    nextPart += 1;
+    targetPath = `${directory}/${stem}.part-${String(nextPart).padStart(4, '0')}${extension}`;
+    targetInfo = await FileSystem.getInfoAsync(targetPath);
+  }
+
   spillSequence += 1;
-  return `${directory}/${stem}.queue-${Date.now()}-${String(spillSequence).padStart(6, '0')}${extension || '.csv'}`;
+  let temporaryPath = `${targetPath}.tmp-${Date.now()}-${String(spillSequence).padStart(6, '0')}`;
+  while ((await FileSystem.getInfoAsync(temporaryPath)).exists) {
+    spillSequence += 1;
+    temporaryPath = `${targetPath}.tmp-${Date.now()}-${String(spillSequence).padStart(6, '0')}`;
+  }
+
+  writingCsvPaths.add(targetPath);
+  try {
+    await FileSystem.writeAsStringAsync(temporaryPath, chunk.content, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
+    const persisted = await FileSystem.readAsStringAsync(temporaryPath, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
+    const records = parseCsvRecords(persisted);
+    const temporaryInfo = await FileSystem.getInfoAsync(temporaryPath, { size: true });
+    if (
+      persisted !== chunk.content
+      || records.length !== chunk.rows.length + 1
+      || records[0]?.join(',') !== chunk.headers.join(',')
+      || !temporaryInfo.exists
+      || utf8ByteLength(persisted) > MAX_CSV_SEGMENT_BYTES
+      || (typeof temporaryInfo.size === 'number' && temporaryInfo.size > MAX_CSV_SEGMENT_BYTES)
+    ) {
+      throw new Error('CSV_QUEUE_SPOOL_VALIDATION_FAILED: ' + temporaryPath);
+    }
+
+    await FileSystem.moveAsync({ from: temporaryPath, to: targetPath });
+    knownCsvPaths.add(filePath);
+    knownCsvPaths.add(targetPath);
+  } catch (cause) {
+    try { await FileSystem.deleteAsync(temporaryPath, { idempotent: true }); } catch { /* preserve original error */ }
+    throw cause;
+  } finally {
+    writingCsvPaths.delete(targetPath);
+  }
+}
+
+/**
+ * Persist immutable chunks as canonical daily CSV segments. These files are
+ * enumerated with the normal .part-NNNN.csv history after process restart.
+ */
+async function spillPendingCsvRows(): Promise<void> {
+  if (spillPromise) return spillPromise;
+  if (pendingRows.size === 0) return;
+
+  const batch = new Map(pendingRows);
+  pendingRows.clear();
+  const current = (async () => {
+    const entries = Array.from(batch.entries());
+    for (let entryIndex = 0; entryIndex < entries.length; entryIndex += 1) {
+      const [filePath, rows] = entries[entryIndex];
+      let offset = 0;
+      try {
+        const chunks = buildCsvSpoolChunks(rows);
+        for (const chunk of chunks) {
+          await enqueueFileOperation(filePath, () => writeCsvSpoolSegmentUnsafe(filePath, chunk));
+          offset += chunk.rows.length;
+          durablySpooledRows += chunk.rows.length;
+        }
+      } catch (cause) {
+        const restore = rows.slice(offset);
+        for (let pendingIndex = entryIndex + 1; pendingIndex < entries.length; pendingIndex += 1) {
+          const [restorePath, restoreRows] = entries[pendingIndex];
+          const newerRows = pendingRows.get(restorePath) ?? [];
+          pendingRows.set(restorePath, [...restoreRows, ...newerRows]);
+        }
+        if (restore.length) {
+          const newerRows = pendingRows.get(filePath) ?? [];
+          pendingRows.set(filePath, [...restore, ...newerRows]);
+        }
+        throw cause;
+      }
+    }
+  })();
+  spillPromise = current;
+  let succeeded = false;
+  try {
+    await current;
+    succeeded = true;
+  } finally {
+    if (spillPromise === current) spillPromise = null;
+  }
+
+  if (succeeded) {
+    const remainingRows = countPendingRows();
+    if (remainingRows >= MAX_PENDING_CSV_ROWS) {
+      await spillPendingCsvRows();
+    } else if (remainingRows >= BATCH_FLUSH_ROW_LIMIT) {
+      await flushCsvLogs();
+    } else if (remainingRows > 0) {
+      scheduleBatchFlush();
+    }
+  }
 }
 
 /**
