@@ -96,6 +96,8 @@ async function writeJsonAtomicallyUnsafe<T>(
 
   const temp = uniqueTemporaryPath(path, 'snapshot');
   const backupTemp = uniqueTemporaryPath(backup, 'snapshot');
+  const backupHold = uniqueTemporaryPath(backup, 'preserved');
+  let backupHeld = false;
   try {
     await FileSystem.writeAsStringAsync(temp, content, { encoding: FileSystem.EncodingType.UTF8 });
     const staged = await readCandidate(temp, validate, isFutureVersion);
@@ -106,10 +108,27 @@ async function writeJsonAtomicallyUnsafe<T>(
       const verifiedBackup = await readCandidate(backupTemp, validate, isFutureVersion);
       if (verifiedBackup.kind !== 'VALID') throw new Error('JSON_PREVIOUS_COPY_VALIDATION_FAILED: ' + path);
 
-      if (backupBefore.kind === 'VALID') await FileSystem.deleteAsync(backup, { idempotent: true });
-      await FileSystem.moveAsync({ from: backupTemp, to: backup });
-      const committedBackup = await readCandidate(backup, validate, isFutureVersion);
-      if (committedBackup.kind !== 'VALID') throw new Error('JSON_PREVIOUS_COPY_COMMIT_FAILED: ' + path);
+      if (backupBefore.kind === 'VALID') {
+        await FileSystem.moveAsync({ from: backup, to: backupHold });
+        backupHeld = true;
+      }
+      try {
+        await FileSystem.moveAsync({ from: backupTemp, to: backup });
+        const committedBackup = await readCandidate(backup, validate, isFutureVersion);
+        if (committedBackup.kind !== 'VALID') throw new Error('JSON_PREVIOUS_COPY_COMMIT_FAILED: ' + path);
+      } catch (cause) {
+        if (backupHeld) {
+          const partial = await FileSystem.getInfoAsync(backup);
+          if (partial.exists) await FileSystem.deleteAsync(backup, { idempotent: true });
+          await FileSystem.moveAsync({ from: backupHold, to: backup });
+          backupHeld = false;
+        }
+        throw cause;
+      }
+      if (backupHeld) {
+        await FileSystem.deleteAsync(backupHold, { idempotent: true });
+        backupHeld = false;
+      }
     }
 
     if (mainBefore.kind === 'VALID') await FileSystem.deleteAsync(path, { idempotent: true });
@@ -134,6 +153,8 @@ async function writeJsonAtomicallyUnsafe<T>(
   } finally {
     await FileSystem.deleteAsync(temp, { idempotent: true }).catch(() => undefined);
     await FileSystem.deleteAsync(backupTemp, { idempotent: true }).catch(() => undefined);
+    // Se a restauração da cópia anterior falhar, manter o arquivo de retenção
+    // no disco para inspeção/recuperação manual, sem apagá-lo no finally.
   }
 }
 
