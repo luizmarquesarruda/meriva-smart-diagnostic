@@ -28,7 +28,7 @@ async function cleanupDirectory(basePath: string, directory: 'LOGS' | 'LEITURAS'
     try {
       if (protectedPaths.has(filePath)) continue;
       const fileInfo = await FileSystem.getInfoAsync(filePath);
-      if (typeof fileInfo.modificationTime === 'number'
+      if (fileInfo.exists && typeof fileInfo.modificationTime === 'number'
           && isExpiredCleanupFile(directory, fileInfo.modificationTime * 1000, now)) {
         await FileSystem.deleteAsync(filePath, { idempotent: true });
         result.removed += 1;
