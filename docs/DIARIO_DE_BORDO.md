@@ -1,5 +1,6 @@
 ## ESTADO VIGENTE — 2026-10-31 (P0/P1 robustez de viagens, JSON, backup, Bluetooth e GPS)
 
+- DB-201 — Testes JSON alinhados ao contrato: erros explícitos na leitura direta de corrupção, defaults somente em memória nas telas e bloqueio de escrita sobre schema futuro.
 - DB-200 — Teste Bluetooth atualizado para verificar retries limitados no `bluetoothManager` e uma única descoberta de pareados por varredura; não foi alterada a lógica de conexão.
 - DB-199 — Gate de baseline alinhado à política de APK público: exige upload somente na `main`, não exige visibilidade privada e confere retenção de 14 dias.
 - A execução de PR continua validando TypeScript, testes e build Android sem publicar o APK; nenhum Release automático ou permissão de escrita foi adicionado.
@@ -314,6 +315,7 @@
 - **DB-198** · 2026-10-31 — Preservar artefato APK público somente na main
 - **DB-199** · 2026-10-31 — Alinhar gate de CI à política do APK público
 - **DB-200** · 2026-10-31 — Sincronizar teste de retry Bluetooth com o ponto real de implementação
+- **DB-201** · 2026-10-31 — Cobrir fallback não destrutivo e proteção de schema futuro nos testes JSON
 ---
 
 Este arquivo é o registro operacional das correções, auditorias e decisões técnicas do projeto.
@@ -5093,3 +5095,12 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - Também confirma que `sharedConnection.ts` descobre os dispositivos pareados uma vez, constrói a lista de candidatos com esse snapshot e executa a fila sem repetir a descoberta.
 - Nenhum comportamento de conexão ou limite de retry foi alterado; somente as expectativas desatualizadas do teste foram alinhadas ao código existente.
 - A CI deve repetir gate:baseline, TypeScript, suíte completa e build Android no novo SHA. Não mesclar antes da validação completa.
+
+## DB-201 · 2026-10-31 — Cobrir fallback não destrutivo e proteção de schema futuro nos testes JSON
+
+- O teste direto de perfil do veículo agora espera erro quando o JSON está corrompido e não existe cópia anterior válida; confirma que o arquivo original permanece intacto.
+- O fluxo `ensureMerivaVehicleProfile` é testado separadamente: pode fornecer o perfil Meriva padrão em memória, mas deve emitir aviso e não regravar o arquivo danificado.
+- Configurações seguem a política da interface: em caso de arquivo corrompido ou schema futuro, retornam padrões somente em memória e expõem aviso de armazenamento; a leitura não grava o arquivo.
+- Acrescentada verificação de que uma gravação explícita por uma versão antiga é rejeitada quando o arquivo contém schema futuro, preservando o conteúdo byte a byte.
+- As correções ajustam expectativas de teste ao contrato implementado; não alteram produção nem enfraquecem a proteção contra perda de dados.
+- Repetir CI completa no SHA desta atualização; não mesclar antes de `validate` e `android-build` verdes.

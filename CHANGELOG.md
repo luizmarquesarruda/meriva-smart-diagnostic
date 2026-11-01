@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Persistência JSON: atualiza regressões para exigir erro explícito em leitura direta de perfil corrompido e fallback de interface somente em memória, sem sobrescrever arquivos corrompidos ou schemas futuros.
 - Bluetooth: atualiza o teste de retry para validar a implementação limitada em `bluetoothManager.ts` e a reutilização da lista de pareados durante a varredura.
 - CI: alinha o gate de baseline à política de APK público somente na `main`, sem exigir repositório privado, e valida a retenção de 14 dias.
 

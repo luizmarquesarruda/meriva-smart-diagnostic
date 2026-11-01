@@ -996,8 +996,23 @@ async function testVehicleProfile() {
 
   await vehicle.createVehicleProfile(BASE, profile);
   assert.strictEqual((await vehicle.readVehicleProfile(BASE)).vehicleName, 'Meriva Maxx');
-  files.set(`${BASE}/CONFIG/veiculo.json`, '{invalido');
-  assert.strictEqual(await vehicle.readVehicleProfile(BASE), null);
+  const vehiclePath = `${BASE}/CONFIG/veiculo.json`;
+  const corruptVehicle = '{invalido';
+  files.set(vehiclePath, corruptVehicle);
+  await assert.rejects(
+    () => vehicle.readVehicleProfile(BASE),
+    /JSON_CORRUPTED_WITHOUT_VALID_PREVIOUS_COPY/,
+    'direct profile reads must surface unrecoverable corruption instead of pretending that no profile exists',
+  );
+  assert.strictEqual(files.get(vehiclePath), corruptVehicle,
+    'direct profile reads must preserve the damaged vehicle file for inspection');
+  const inMemoryFallback = await vehicle.ensureMerivaVehicleProfile(BASE);
+  assert.strictEqual(inMemoryFallback.vehicleName, 'Meriva Maxx',
+    'the app may use the documented default vehicle profile in memory');
+  assert.match(vehicle.getVehicleProfileStorageWarning(), /PERFIL DO VEÍCULO NÃO GRAVÁVEL/,
+    'the in-memory fallback must expose a storage warning');
+  assert.strictEqual(files.get(vehiclePath), corruptVehicle,
+    'the in-memory vehicle fallback must never overwrite the corrupt source file');
 }
 
 async function testDriveCycleValidation() {
@@ -1219,14 +1234,32 @@ async function testAtomicJsonPersistenceAndMaintenanceRetention() {
   const settings = loadTs(path.join(ROOT, 'src/database/appSettings.ts'));
   const settingsPath = `${BASE}/CONFIG/app-settings.json`;
   await fakeFS.makeDirectoryAsync(`${BASE}/CONFIG`, { intermediates: true });
-  files.set(settingsPath, '{settings-corrupt');
-  await assert.rejects(() => settings.readAppSettings(BASE), /JSON_CORRUPTED_WITHOUT_VALID_PREVIOUS_COPY/);
-  assert.strictEqual(files.get(settingsPath), '{settings-corrupt',
-    'settings read must not replace a corrupt file with defaults');
+  const corruptSettings = '{settings-corrupt';
+  files.set(settingsPath, corruptSettings);
+  const memorySettingsFallback = await settings.readAppSettings(BASE);
+  assert.strictEqual(memorySettingsFallback.fuelType, 'FLEX',
+    'the settings screen may continue with documented defaults in memory when persistence is unavailable');
+  assert.match(settings.getAppSettingsStorageWarning(), /JSON_CORRUPTED_WITHOUT_VALID_PREVIOUS_COPY/,
+    'settings corruption without a valid backup must produce a visible storage warning');
+  assert.strictEqual(files.get(settingsPath), corruptSettings,
+    'in-memory settings fallback must not replace the damaged file');
+
   const futureSettings = JSON.stringify({ schemaVersion: 99, fuelType: 'FLEX' });
   files.set(settingsPath, futureSettings);
-  await assert.rejects(() => settings.readAppSettings(BASE), /JSON_SCHEMA_VERSION_NEWER_THAN_APP/);
-  assert.strictEqual(files.get(settingsPath), futureSettings, 'older app must not reset a future settings file');
+  const futureSettingsFallback = await settings.readAppSettings(BASE);
+  assert.strictEqual(futureSettingsFallback.fuelType, 'FLEX',
+    'a future schema may use defaults in memory while remaining read-only to this app version');
+  assert.match(settings.getAppSettingsStorageWarning(), /JSON_SCHEMA_VERSION_NEWER_THAN_APP/,
+    'future settings schema must be surfaced as a storage warning');
+  assert.strictEqual(files.get(settingsPath), futureSettings,
+    'older app must not rewrite a future settings file during read');
+  await assert.rejects(
+    () => settings.writeAppSettings(BASE, futureSettingsFallback),
+    /JSON_SCHEMA_VERSION_NEWER_THAN_APP/,
+    'older app must reject explicit writes over a future settings schema',
+  );
+  assert.strictEqual(files.get(settingsPath), futureSettings,
+    'rejected writes must leave the future settings file byte-for-byte unchanged');
 }
 
 async function testBluetoothCandidateCancellationStopsQueue() {
