@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'expo-router';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
 import { flushCsvLogs, getCsvQueueStatus } from '../src/database/csvLogger';
@@ -67,7 +67,6 @@ export default function ArmazenamentoScreen() {
       await flushCsvLogs();
       const result = await measureHistoryStorage(basePath, Platform.OS, Platform.Version);
       setBenchmark(result);
-      clearStorageHealthIssue('CLEANUP_FAILED');
       setMessage('MEDIÇÃO CONCLUÍDA. O ÍNDICE REAL E A CÓPIA ANTERIOR NÃO FORAM ALTERADOS.');
     } catch (cause) {
       setMessage('FALHA NA MEDIÇÃO: ' + (cause instanceof Error ? cause.message : String(cause)));
