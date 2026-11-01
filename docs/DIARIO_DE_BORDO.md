@@ -286,6 +286,7 @@
 - **DB-193** · 2026-10-31 — Velocidade derivada GPS e recuperação atômica do histórico ECU
 - **DB-194** · 2026-10-31 — Auditoria estática do layout no Galaxy A06 / Android 16
 - **DB-195** · 2026-11-01 — Integridade JSON, backup seletivo e benchmark local do histórico
+- **DB-196** · 2026-11-01 — Ajustar regressões dos contratos de armazenamento e publicar APK de PR
 ---
 
 Este arquivo é o registro operacional das correções, auditorias e decisões técnicas do projeto.
