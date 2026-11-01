@@ -97,7 +97,7 @@ async function readEnvelope(path: string): Promise<AutoSaveEnvelope<MerivaPersis
     const info = await FileSystem.getInfoAsync(path);
     if (!info.exists) return null;
     if (info.isDirectory) {
-      recordStorageHealthIssue('AUTOSAVE_FAILED', 'Autosave JSON inválido', 'O caminho do autosave aponta para um diretório; o arquivo não foi alterado.', 'critical', 'CONFIG/autosave.json');
+      recordStorageHealthIssue('AUTOSAVE_FAILED', 'Autosave JSON inválido', 'O caminho do autosave aponta para um diretório; o arquivo não foi alterado.', 'critical', 'CONFIG/' + path.split('/').pop());
       return null;
     }
     const content = await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 });
@@ -114,12 +114,12 @@ async function readEnvelope(path: string): Promise<AutoSaveEnvelope<MerivaPersis
     }
     const migrated = migrateEnvelope<MerivaPersistedState>(parsed);
     if (!migrated || !validatePayload(migrated.payload)) {
-      recordStorageHealthIssue('AUTOSAVE_FAILED', 'Autosave JSON inválido', 'A migração ou validação do conteúdo falhou. O original foi preservado.', 'critical', 'CONFIG/autosave.json');
+      recordStorageHealthIssue('AUTOSAVE_FAILED', 'Autosave JSON inválido', 'A migração ou validação do conteúdo falhou. O original foi preservado.', 'critical', 'CONFIG/' + path.split('/').pop());
       return null;
     }
     return migrated;
   } catch (cause) {
-    recordStorageHealthIssue('AUTOSAVE_FAILED', 'Falha ao ler autosave JSON', cause instanceof Error ? cause.message : 'Falha desconhecida de leitura. O arquivo original foi preservado.', 'critical', 'CONFIG/autosave.json');
+    recordStorageHealthIssue('AUTOSAVE_FAILED', 'Falha ao ler autosave JSON', cause instanceof Error ? cause.message : 'Falha desconhecida de leitura. O arquivo original foi preservado.', 'critical', 'CONFIG/' + path.split('/').pop());
     return null;
   }
 }
@@ -135,24 +135,24 @@ async function assertAutosaveFileReplaceable(path: string): Promise<void> {
       encoding: FileSystem.EncodingType.UTF8,
     }));
   } catch {
-    recordStorageHealthIssue('AUTOSAVE_FAILED', 'Autosave JSON corrompido', 'A gravação foi bloqueada porque o arquivo existente não é um JSON válido.', 'critical', 'CONFIG/autosave.json');
+    recordStorageHealthIssue('AUTOSAVE_FAILED', 'Autosave JSON corrompido', 'A gravação foi bloqueada porque o arquivo existente não é um JSON válido.', 'critical', 'CONFIG/' + path.split('/').pop());
     throw new Error('AUTOSAVE_JSON_CORRUPTED; ARQUIVO ORIGINAL PRESERVADO; GRAVACAO BLOQUEADA.');
   }
 
   if (typeof parsed === 'object' && parsed !== null &&
       typeof (parsed as { schemaVersion?: unknown }).schemaVersion === 'number' &&
       (parsed as { schemaVersion: number }).schemaVersion > AUTOSAVE_SCHEMA_VERSION) {
-    recordStorageHealthIssue('FUTURE_SCHEMA', 'Schema futuro do autosave', 'O arquivo existente pertence a uma versão mais nova. A gravação foi bloqueada.', 'critical', 'CONFIG/autosave.json');
+    recordStorageHealthIssue('FUTURE_SCHEMA', 'Schema futuro do autosave', 'O arquivo existente pertence a uma versão mais nova. A gravação foi bloqueada.', 'critical', 'CONFIG/' + path.split('/').pop());
     throw new Error('AUTOSAVE_SCHEMA_VERSION_NEWER_THAN_APP; ARQUIVO PRESERVADO.');
   }
 
   if (!isValidEnvelope(parsed)) {
-    recordStorageHealthIssue('AUTOSAVE_FAILED', 'Autosave JSON inválido', 'O arquivo existente não passou pela validação. A gravação foi bloqueada.', 'critical', 'CONFIG/autosave.json');
+    recordStorageHealthIssue('AUTOSAVE_FAILED', 'Autosave JSON inválido', 'O arquivo existente não passou pela validação. A gravação foi bloqueada.', 'critical', 'CONFIG/' + path.split('/').pop());
     throw new Error('AUTOSAVE_JSON_INVALID; ARQUIVO ORIGINAL PRESERVADO; GRAVACAO BLOQUEADA.');
   }
   const migrated = migrateEnvelope<MerivaPersistedState>(parsed);
   if (!migrated || !validatePayload(migrated.payload)) {
-    recordStorageHealthIssue('AUTOSAVE_FAILED', 'Autosave JSON inválido', 'O conteúdo não passou pela migração/validação. A gravação foi bloqueada.', 'critical', 'CONFIG/autosave.json');
+    recordStorageHealthIssue('AUTOSAVE_FAILED', 'Autosave JSON inválido', 'O conteúdo não passou pela migração/validação. A gravação foi bloqueada.', 'critical', 'CONFIG/' + path.split('/').pop());
     throw new Error('AUTOSAVE_JSON_INVALID; ARQUIVO ORIGINAL PRESERVADO; GRAVACAO BLOQUEADA.');
   }
 }
@@ -246,7 +246,7 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
   } catch (cause) {
     runtime.dirty = true;
     runtime.lastError = cause instanceof Error ? cause.message : 'ERRO DESCONHECIDO NO AUTOSAVE';
-    recordStorageHealthIssue('AUTOSAVE_FAILED', 'Falha na gravação do autosave', runtime.lastError, 'critical', 'CONFIG/autosave.json');
+    recordStorageHealthIssue('AUTOSAVE_FAILED', 'Falha na gravação do autosave', runtime.lastError, 'critical', 'CONFIG/' + path.split('/').pop());
     console.warn('[autosave] falha ao salvar:', runtime.lastError);
     return false;
   } finally {
