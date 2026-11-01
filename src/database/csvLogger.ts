@@ -227,13 +227,13 @@ async function writeRowsUnsafe(filePath: string, rows: CsvRow[]): Promise<void> 
       position: 0,
       length: 8192,
     });
-    const firstNewline = headerPreview.indexOf('\\n');
+    const firstNewline = headerPreview.indexOf('\n');
     if (firstNewline < 0 && (info.size ?? 0) > headerPreview.length) {
       throw new Error('CSV_HEADER_EXCEEDS_READ_WINDOW: ' + targetPath);
     }
     const headerLine = (firstNewline >= 0
       ? headerPreview.slice(0, firstNewline)
-      : headerPreview).replace(/\\r$/, '');
+      : headerPreview).replace(/\r$/, '');
     if (!headerLine.trim()) {
       if (info.size !== 0) throw new Error('CSV_HEADER_INVALIDO: ' + targetPath);
       const chunks = buildCsvSpoolChunks(rows);
@@ -260,7 +260,7 @@ async function writeRowsUnsafe(filePath: string, rows: CsvRow[]): Promise<void> 
         headers.map((_, index) => formatCsvValue(oldRow[index] ?? '')).join(','),
       );
       const newLines = rows.map((row) => serializeRow(row, headers));
-      const updatedContent = `${headers.join(',')}\\n${[...existingLines, ...newLines].join('\\n')}\\n`;
+      const updatedContent = `${headers.join(',')}\n${[...existingLines, ...newLines].join('\n')}\n`;
       if (utf8ByteLength(updatedContent) > MAX_CSV_SEGMENT_BYTES) {
         const chunks = buildCsvSpoolChunks(rows, headers);
         for (const chunk of chunks) await writeCsvSpoolSegmentUnsafe(filePath, chunk);
@@ -276,8 +276,8 @@ async function writeRowsUnsafe(filePath: string, rows: CsvRow[]): Promise<void> 
     const current = await FileSystem.readAsStringAsync(targetPath, {
       encoding: FileSystem.EncodingType.UTF8,
     });
-    const separator = current.length > 0 && !current.endsWith('\\n') ? '\\n' : '';
-    const updatedContent = `${current}${separator}${lines.join('\\n')}\\n`;
+    const separator = current.length > 0 && !current.endsWith('\n') ? '\n' : '';
+    const updatedContent = `${current}${separator}${lines.join('\n')}\n`;
     if (utf8ByteLength(updatedContent) > MAX_CSV_SEGMENT_BYTES) {
       const chunks = buildCsvSpoolChunks(rows, oldHeaders);
       for (const chunk of chunks) await writeCsvSpoolSegmentUnsafe(filePath, chunk);
