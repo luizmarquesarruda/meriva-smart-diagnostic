@@ -11,6 +11,8 @@ import { COLORS, SCREEN_TITLE_STYLE } from '../src/ui/theme';
 import { AppIcon } from '../src/ui/AppIcon';
 import { SourceStatusLegend } from '../src/ui/SourceStatusLegend';
 import { exportDiagnosticsJson, exportDriveCyclesCsv } from '../src/storage/exportDiagnostics';
+import { exportHistoryBenchmarkTxt, measureHistoryStorage, type HistoryStorageMeasurement } from '../src/storage/historyBenchmark';
+import { recordStorageHealthIssue, clearStorageHealthIssue } from '../src/storage/storageHealth';
 
 const DEFAULT_QUOTA: StorageQuotaConfig = {
   limitMb: 2048,
@@ -28,6 +30,7 @@ export default function ArmazenamentoScreen() {
   const [csvQueueStatus, setCsvQueueStatus] = useState(getCsvQueueStatus());
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const [benchmark, setBenchmark] = useState<HistoryStorageMeasurement | null>(null);
 
   async function refresh(path: string) {
     setCsvQueueStatus(getCsvQueueStatus());
@@ -56,6 +59,37 @@ export default function ArmazenamentoScreen() {
     void checkQuota();
   }, []);
 
+  async function handleBenchmark() {
+    if (!basePath || busy) return;
+    setBusy(true);
+    setMessage('MEDINDO HISTÓRICO NO DISPOSITIVO...');
+    try {
+      await flushCsvLogs();
+      const result = await measureHistoryStorage(basePath, Platform.OS, Platform.Version);
+      setBenchmark(result);
+      clearStorageHealthIssue('CLEANUP_FAILED');
+      setMessage('MEDIÇÃO CONCLUÍDA. O ÍNDICE REAL E A CÓPIA ANTERIOR NÃO FORAM ALTERADOS.');
+    } catch (cause) {
+      setMessage('FALHA NA MEDIÇÃO: ' + (cause instanceof Error ? cause.message : String(cause)));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleExportBenchmark() {
+    if (!benchmark || busy) return;
+    setBusy(true);
+    try {
+      const result = await exportHistoryBenchmarkTxt(benchmark);
+      setMessage(result.ok
+        ? 'RELATÓRIO TXT EXPORTADO: ' + result.fileName
+        : result.reason === 'CANCELADO' ? 'EXPORTAÇÃO CANCELADA.'
+          : 'FALHA AO EXPORTAR RELATÓRIO: ' + (result.message ?? result.reason ?? 'ERRO'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleClean() {
     if (!basePath || busy) return;
     setBusy(true);
@@ -66,9 +100,12 @@ export default function ArmazenamentoScreen() {
       const logs = await cleanupOldLogs(basePath);
       const readings = await cleanupOldReadings(basePath);
       setMessage(`REMOVIDOS: ${logs} LOGS, ${readings} LEITURAS`);
+      clearStorageHealthIssue('CLEANUP_FAILED');
       await refresh(basePath);
-    } catch {
-      setMessage('FALHA NA LIMPEZA');
+    } catch (cause) {
+      const detail = cause instanceof Error ? cause.message : String(cause);
+      recordStorageHealthIssue('CLEANUP_FAILED', 'Falha na limpeza do armazenamento', detail, 'warning');
+      setMessage('FALHA NA LIMPEZA: ' + detail);
     } finally {
       setBusy(false);
     }
@@ -108,13 +145,18 @@ export default function ArmazenamentoScreen() {
       <View style={[styles.dataColumns, layout.landscape && styles.dataColumnsLandscape]}>
       <View style={[styles.card, layout.landscape && styles.dataColumnCard]}>
         <Text style={styles.cardTitle}>ESPAÇO UTILIZADO</Text>
-        {Object.entries(usageBreakdown).map(([dir, sizesMb]) => (
+        {Object.entries(usageBreakdown).filter(([dir]) => dir !== 'BACKUP').map(([dir, sizesMb]) => (
           <View key={dir} style={styles.row}>
             <Text style={styles.label}>{dir}</Text>
             <Text style={styles.value}>{sizesMb} MB</Text>
           </View>
         ))}
         <Text style={styles.note}>Limite configurado: 2 GB. A limpeza remove somente dados antigos permitidos pelo sistema.</Text>
+        <View style={styles.row}>
+          <Text style={styles.label}>BACKUP (uso separado)</Text>
+          <Text style={styles.value}>{usageBreakdown.BACKUP ?? 0} MB</Text>
+        </View>
+        <Text style={styles.note}>Novos backups incluem configurações, banco, viagens, manutenção e aprendizado. CSVs brutos de LEITURAS e LOGS ficam fora dos novos backups; restaurações antigas continuam compatíveis e preservam diretórios ausentes no snapshot.</Text>
         <Text style={styles.note}>
           Fila CSV: {csvQueueStatus.pendingRows}/{csvQueueStatus.maxPendingRows} pendentes.
           Registros descartados por saturação: {csvQueueStatus.droppedRows}.
@@ -130,6 +172,28 @@ export default function ArmazenamentoScreen() {
           </TouchableOpacity>
         </Link>
       </View>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>MEDIÇÃO DO HISTÓRICO NO APARELHO</Text>
+        <Text style={styles.note}>Mede volume, leitura, gravação temporária e cópia de restauração em teste. O índice principal e sua cópia anterior não são modificados. A medição não compara SQLite.</Text>
+        <TouchableOpacity style={[styles.button, styles.buttonWithIcon]} onPress={() => void handleBenchmark()} disabled={!basePath || busy}>
+          <AppIcon name="data" size={18} color={COLORS.white} />
+          <Text style={styles.buttonText}>{busy ? 'MEDINDO...' : 'MEDIR HISTÓRICO JSON'}</Text>
+        </TouchableOpacity>
+        {benchmark && <>
+          <View style={styles.row}><Text style={styles.label}>Viagens / IDs únicos</Text><Text style={styles.value}>{benchmark.trips} / {benchmark.uniqueTripIds}</Text></View>
+          <View style={styles.row}><Text style={styles.label}>Amostras / IDs duplicados</Text><Text style={styles.value}>{benchmark.telemetrySamples} / {benchmark.duplicateTripIds}</Text></View>
+          <View style={styles.row}><Text style={styles.label}>Índice JSON / pasta VIAGENS / CSV</Text><Text style={styles.value}>{(benchmark.jsonBytes / 1024).toFixed(1)} / {(benchmark.tripDirectoryBytes / 1024).toFixed(1)} / {(benchmark.csvBytes / 1024).toFixed(1)} KB</Text></View>
+          <View style={styles.row}><Text style={styles.label}>Leitura + parse P95</Text><Text style={styles.value}>{benchmark.readParseMs.p95} ms (limiar {benchmark.thresholds.historyReadParseP95Ms} ms)</Text></View>
+          <View style={styles.row}><Text style={styles.label}>Escrita + read-back P95</Text><Text style={styles.value}>{benchmark.scratchWriteReadbackMs.p95} ms (limiar {benchmark.thresholds.scratchWriteReadbackP95Ms} ms)</Text></View>
+          <View style={styles.row}><Text style={styles.label}>Restauração em teste P95</Text><Text style={styles.value}>{benchmark.restoreDryRunMs.p95} ms</Text></View>
+          <Text style={styles.note}>Memória do processo: N/D pela API Expo. Integridade: {benchmark.integrity}. Abertura de tela e memória exigem medição externa no Galaxy A06.</Text>
+          <TouchableOpacity style={[styles.button, styles.buttonWithIcon]} onPress={() => void handleExportBenchmark()} disabled={busy}>
+            <AppIcon name="history" size={18} color={COLORS.white} />
+            <Text style={styles.buttonText}>EXPORTAR RELATÓRIO TXT</Text>
+          </TouchableOpacity>
+        </>}
       </View>
 
       <View style={styles.exportRow}>
