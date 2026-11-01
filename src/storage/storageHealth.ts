@@ -1,6 +1,7 @@
 export type StorageHealthCode =
   | 'AUTOSAVE_FAILED'
   | 'HISTORY_CORRUPTED'
+  | 'JSON_CORRUPTED'
   | 'JSON_RECOVERED'
   | 'FUTURE_SCHEMA'
   | 'AUTOSAVE_TXT_FAILED'
