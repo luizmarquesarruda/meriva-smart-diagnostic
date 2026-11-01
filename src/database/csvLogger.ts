@@ -135,7 +135,11 @@ export function getActiveCsvLogPaths(now = new Date()): string[] {
 
 /** Returns every committed part of a daily CSV log in chronological part order. */
 export async function getCsvLogSegments(filePath: string): Promise<string[]> {
-  const segments = await listCsvSegments(filePath);
+  const { directory } = splitCsvPath(filePath);
+  const directoryInfo = await FileSystem.getInfoAsync(directory);
+  if (!directoryInfo.exists) return [];
+  if (!directoryInfo.isDirectory) throw new Error('CSV_SEGMENT_DIRECTORY_INVALID: ' + directory);
+  const segments = await listCsvSegments(filePath, true);
   const existing: string[] = [];
   for (const segment of segments) {
     const info = await FileSystem.getInfoAsync(segment.path);
@@ -191,7 +195,7 @@ async function listCsvSegments(filePath: string, requireDirectory = false): Prom
  * filename as part 1 and rotate later writes into bounded segments.
  */
 async function resolveWritableSegment(filePath: string): Promise<string> {
-  const segments = await listCsvSegments(filePath);
+  const segments = await listCsvSegments(filePath, true);
   const latest = segments[segments.length - 1];
   if (!latest) return filePath;
   const info = await FileSystem.getInfoAsync(latest.path, { size: true });
@@ -609,8 +613,9 @@ export async function appendCsvRowIfMissing(
     throw new Error('CSV_UNIQUE_KEY_MISSING: ' + uniqueKey);
   }
   await enqueueFileOperation(filePath, async () => {
-    const segments = await listCsvSegments(filePath);
-    for (const segment of segments) {
+    const segments = await getCsvLogSegments(filePath);
+    for (const segmentPath of segments) {
+      const segment = { path: segmentPath };
       const info = await FileSystem.getInfoAsync(segment.path);
       if (!info.exists || info.isDirectory) continue;
       const content = await FileSystem.readAsStringAsync(segment.path, { encoding: FileSystem.EncodingType.UTF8 });
