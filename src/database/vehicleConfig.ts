@@ -1,5 +1,7 @@
 import * as FileSystem from 'expo-file-system';
 import { MERIVA_MANUAL } from './merivaManual';
+import { readJsonWithRecovery, writeJsonAtomically } from '../storage/atomicJsonFile';
+import { recordStorageHealthIssue } from '../storage/storageHealth';
 
 export interface VehicleProfile {
   vehicleName: string;
@@ -21,38 +23,78 @@ export interface VehicleProfile {
   ecuAddress?: string;
 }
 
+
+const VEHICLE_PROFILE_SCHEMA_VERSION = 1;
+type StoredVehicleProfile = VehicleProfile & { schemaVersion?: number };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isVehicleProfile(value: unknown): value is StoredVehicleProfile {
+  if (!isRecord(value)) return false;
+  if (value.schemaVersion !== undefined &&
+      (!Number.isInteger(value.schemaVersion) || (value.schemaVersion as number) < 0)) return false;
+  return typeof value.vehicleName === 'string' &&
+    typeof value.year === 'number' && Number.isFinite(value.year) &&
+    typeof value.make === 'string' &&
+    typeof value.model === 'string' &&
+    typeof value.engine === 'string' &&
+    typeof value.displacementCm3 === 'number' && Number.isFinite(value.displacementCm3) &&
+    typeof value.cylinders === 'number' && Number.isFinite(value.cylinders) &&
+    typeof value.fuel === 'string' &&
+    typeof value.modelYearReference === 'string' &&
+    typeof value.tankCapacityL === 'number' && Number.isFinite(value.tankCapacityL) &&
+    typeof value.reserveCapacityL === 'number' && Number.isFinite(value.reserveCapacityL) &&
+    typeof value.manualSource === 'string' &&
+    typeof value.createdAt === 'string' &&
+    typeof value.lastModified === 'string' &&
+    typeof value.protocolBaseline === 'string';
+}
+
+function hasFutureVehicleProfileSchema(value: unknown): boolean {
+  return isRecord(value) && typeof value.schemaVersion === 'number'
+    && value.schemaVersion > VEHICLE_PROFILE_SCHEMA_VERSION;
+}
+
 export async function createVehicleProfile(basePath: string, profile: VehicleProfile): Promise<void> {
   await FileSystem.makeDirectoryAsync(`${basePath}/CONFIG`, { intermediates: true });
   const target = `${basePath}/CONFIG/veiculo.json`;
-  await FileSystem.writeAsStringAsync(target, JSON.stringify(profile, null, 2), { encoding: FileSystem.EncodingType.UTF8 });
+  await writeJsonAtomically(
+    target,
+    { ...profile, schemaVersion: VEHICLE_PROFILE_SCHEMA_VERSION },
+    isVehicleProfile,
+    hasFutureVehicleProfileSchema,
+  );
 }
 
 export async function readVehicleProfile(basePath: string): Promise<VehicleProfile | null> {
   const target = `${basePath}/CONFIG/veiculo.json`;
-  const info = await FileSystem.getInfoAsync(target);
-  if (!info.exists || info.isDirectory) return null;
-
   try {
-    const content = await FileSystem.readAsStringAsync(target);
-    const parsed = JSON.parse(content) as Partial<VehicleProfile>;
-    if (
-      typeof parsed.vehicleName !== 'string' ||
-      typeof parsed.year !== 'number' ||
-      typeof parsed.make !== 'string' ||
-      typeof parsed.model !== 'string' ||
-      typeof parsed.engine !== 'string' ||
-      typeof parsed.createdAt !== 'string' ||
-      typeof parsed.lastModified !== 'string' ||
-      typeof parsed.protocolBaseline !== 'string'
-    ) {
-      return null;
+    const result = await readJsonWithRecovery(target, isVehicleProfile, hasFutureVehicleProfileSchema);
+    if (result.recoveredFromPrevious) {
+      recordStorageHealthIssue(
+        'JSON_RECOVERED',
+        'Perfil do veículo recuperado da cópia anterior',
+        'O arquivo principal está inválido. A cópia validada foi usada somente para leitura; a gravação permanece bloqueada.',
+        'critical',
+        'CONFIG/veiculo.json',
+      );
     }
-    return parsed as VehicleProfile;
-  } catch {
+    return result.value as VehicleProfile | null;
+  } catch (cause) {
+    const detail = cause instanceof Error ? cause.message : String(cause);
+    const future = detail.includes('SCHEMA_VERSION_NEWER_THAN_APP');
+    recordStorageHealthIssue(
+      future ? 'FUTURE_SCHEMA' : 'JSON_CORRUPTED',
+      future ? 'Schema futuro do perfil do veículo' : 'Perfil do veículo JSON inválido',
+      detail + ' O arquivo original foi preservado; nenhum perfil padrão será gravado sobre ele.',
+      'critical',
+      'CONFIG/veiculo.json',
+    );
     return null;
   }
 }
-
 export async function ensureMerivaVehicleProfile(basePath: string): Promise<VehicleProfile> {
   const existing = await readVehicleProfile(basePath);
   const now = new Date().toISOString();
