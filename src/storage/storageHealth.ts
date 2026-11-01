@@ -11,6 +11,7 @@ export type StorageHealthCode =
   | 'CLEANUP_FAILED';
 
 export interface StorageHealthIssue {
+  id: string;
   code: StorageHealthCode;
   title: string;
   message: string;
@@ -30,13 +31,22 @@ export function recordStorageHealthIssue(
   title: string,
   message: string,
   severity: 'warning' | 'critical' = 'warning',
+  resource?: string,
 ): void {
-  issues.set(code, { code, title, message, severity, updatedAt: new Date().toISOString() });
+  const id = code + ':' + (resource ?? code);
+  issues.set(id, { id, code, title, message, severity, updatedAt: new Date().toISOString() });
   emit();
 }
 
-export function clearStorageHealthIssue(code: StorageHealthCode): void {
-  if (issues.delete(code)) emit();
+export function clearStorageHealthIssue(code: StorageHealthCode, resource?: string): void {
+  let changed = false;
+  if (resource !== undefined) changed = issues.delete(code + ':' + resource);
+  else {
+    for (const [id, issue] of issues) {
+      if (issue.code === code) changed = issues.delete(id) || changed;
+    }
+  }
+  if (changed) emit();
 }
 
 export function getStorageHealthIssues(): StorageHealthIssue[] {
