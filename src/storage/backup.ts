@@ -26,8 +26,12 @@ interface BackupManifest {
 }
 
 const BACKUP_DATA_DIRS = [
-  'BANCO', 'APRENDIZADO', 'DTC', 'CONFIG', 'LEITURAS', 'LOGS', 'VIAGENS', 'MANUTENCAO',
+  'BANCO', 'APRENDIZADO', 'DTC', 'CONFIG', 'VIAGENS', 'MANUTENCAO',
 ] as const;
+// Formato aceito apenas para restaurar snapshots antigos. Novos backups não
+// incluem LEITURAS/LOGS para evitar duplicar CSVs brutos e consumir toda a quota.
+const LEGACY_BACKUP_DATA_DIRS = ['LEITURAS', 'LOGS'] as const;
+const RESTORABLE_BACKUP_DATA_DIRS = [...BACKUP_DATA_DIRS, ...LEGACY_BACKUP_DATA_DIRS];
 const MAX_BACKUPS_TO_KEEP = 5;
 
 async function getDirectorySize(path: string): Promise<number> {
@@ -74,7 +78,7 @@ async function readVerifiedManifest(backupDir: string): Promise<BackupManifest> 
     if (
       !entry ||
       typeof entry.directory !== 'string' ||
-      !(BACKUP_DATA_DIRS as readonly string[]).includes(entry.directory) ||
+      !(RESTORABLE_BACKUP_DATA_DIRS as readonly string[]).includes(entry.directory) ||
       seen.has(entry.directory) ||
       typeof entry.sizeBytes !== 'number' ||
       !Number.isFinite(entry.sizeBytes) ||
@@ -279,7 +283,7 @@ export async function restoreBackup(basePath: string, backupName: string): Promi
       timestamp: manifest.createdAt,
       sizeBytes: manifest.payloadSizeBytes,
       includes: restored,
-      preservedDirectories: BACKUP_DATA_DIRS.filter((dir) =>
+      preservedDirectories: RESTORABLE_BACKUP_DATA_DIRS.filter((dir) =>
         !manifest.directories.some((entry) => entry.directory === dir),
       ),
     };
