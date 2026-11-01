@@ -1,6 +1,7 @@
 ## ESTADO VIGENTE — 2026-10-31 (P0/P1 robustez de viagens, JSON, backup, Bluetooth e GPS)
 
 - DB-202 — Publicação do APK também em PRs do próprio repositório; forks continuam sem upload. A execução de PR #109 anterior compilou e verificou o APK, mas não publicou artefato porque a condição estava limitada à `main`.
+- DB-204 — Overflow CSV passa a usar segmentos CSV canônicos verificados e enumeráveis após reinício; o antigo `.queue-*` sem consumidor deixa de ser gerado. O teste de reinício integra `npm test` e o gate anti-regressão.
 - DB-201 — Testes JSON alinhados ao contrato: erros explícitos na leitura direta de corrupção, defaults somente em memória nas telas e bloqueio de escrita sobre schema futuro.
 - DB-200 — Teste Bluetooth atualizado para verificar retries limitados no `bluetoothManager` e uma única descoberta de pareados por varredura; não foi alterada a lógica de conexão.
 - DB-199 — Gate de baseline alinhado à política de APK público: não exige visibilidade privada, bloqueia Releases automáticas e confere retenção de 14 dias.
@@ -319,6 +320,7 @@
 - **DB-201** · 2026-10-31 — Cobrir fallback não destrutivo e proteção de schema futuro nos testes JSON
 - **DB-202** · 2026-10-31 — Publicar artefato APK nas PRs do próprio repositório
 - **DB-203** · 2026-11-01 — Corrigir compilação do logger CSV e isolamento dos testes de limpeza
+- **DB-204** · 2026-11-01 — Tornar o overflow CSV recuperável como segmentos canônicos após reinício
 ---
 
 Este arquivo é o registro operacional das correções, auditorias e decisões técnicas do projeto.
@@ -5122,3 +5124,14 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - O teste de robustez da limpeza agora isola as dependências do logger CSV e da política de retenção; a política real continua coberta por sua suíte própria.
 - A execução CI do SHA `f05e03009ee4c66bf03f58c1dbcc56e18955fa09` passou por `expo-doctor` e `gate:baseline`; `npm run validate` ainda está em execução.
 - Nenhum merge foi realizado. A compilação e o ensaio físico no Galaxy A06/ELM327 permanecem pendentes.
+
+## DB-204 · 2026-11-01 — Tornar o overflow CSV recuperável como segmentos canônicos após reinício
+
+- A auditoria da PR #109 identificou que `spillPendingCsvRows` gravava arquivos `.queue-*`, mas o leitor/enumeração de segmentos e a deduplicação do histórico não os consumiam. Isso deixava linhas persistidas fisicamente sem integração ao fluxo normal após reinício; não foi classificado como perda física comprovada.
+- O overflow agora grava segmentos CSV canônicos: o primeiro usa o nome diário legado e os seguintes seguem `.part-NNNN.csv`. A gravação ocorre em arquivo temporário, com leitura de retorno, validação de cabeçalho/quantidade e limite de bytes antes de mover o arquivo ao nome final.
+- Os chunks usam a união das colunas do lote e respeitam simultaneamente o limite de linhas e o limite de 512 KiB. A fila de novas amostras continua serializada por caminho, e o restante pendente é descarregado após a conclusão do spill.
+- `getCsvLogSegments` enumera as partes persistidas após reinício; `appendCsvRowIfMissing` continua verificando todas as partes antes de inserir resumos idempotentes. O contador `durablySpooledRows` é explicitamente uma métrica em memória por execução, não um contador persistente.
+- Adicionado `tests/csvSpoolDurability.test.js`, cobrindo segmentos canônicos, colunas variáveis, limite por bytes, enumeração após novo carregamento do módulo e ausência de duplicação. O teste foi incluído em `npm test` e no gate `projectBaseline`.
+- Alinhado o nome do artefato APK com a PR #110 (`meriva-smart-diagnostic-standalone-apk-*`) e removida do changelog a afirmação obsoleta de que PRs do próprio repositório não publicam artefatos.
+- Commits de implementação e cobertura: `b734c197fa74ee241ab0f49cb3e31e34eb466054`, `0550e48a305d9e939874e91692e5b2b80f7591ca`; integração do teste/gate/changelog/workflow em `02e5122aa7f0e090de8ad9a800c8fc690f33615b`, `baec05b6be0a385964b276021243dfbb668fd424`, `db403bde77981ab40c3b12006f2f1793f988b83f` e `49796b2e0c6d7d586bb209e4e7a20bcdb3b0cc42`.
+- A CI completa deve ser repetida no novo HEAD; nenhum resultado é presumido nesta entrada. Nenhum merge ou teste físico no Galaxy A06/ELM327 foi realizado.
