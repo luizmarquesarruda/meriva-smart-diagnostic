@@ -5020,4 +5020,10 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 ### Próximos passos
 - Revisar o diff final da PR, executar CI no SHA exato e corrigir qualquer falha sem enfraquecer o baseline.
 - Executar o benchmark TXT no Galaxy A06 e guardar o resultado antes de decidir qualquer migração SQLite.
+## DB-196 · 2026-11-01 — Ajustar regressões dos contratos de armazenamento e publicar APK de PR
 
+- Os testes de perfil do veículo e aprendizado agora fornecem fixtures compatíveis com os campos obrigatórios e datas válidas dos schemas versionados; a validação de produção permanece estrita.
+- Os testes de backup foram alinhados à política: novos snapshots não copiam CSVs brutos de LEITURAS/LOGS, preservam as origens e validam o snapshot de segurança pelos diretórios efetivamente restaurados.
+- O workflow publica APK standalone e SHA-256 em `main` e em PRs do próprio repositório; PRs de forks não publicam artefatos. Retenção de 14 dias, sem Release automática e sem `contents: write`.
+- CI no SHA `6ee40b33ee79b998779eede88c5fd65c2ce064fb`: `expo-doctor`, `gate:baseline`, TypeScript e suíte completa passaram. A montagem do APK Android permanece em execução; artefato ainda não confirmado.
+- Benchmark no Galaxy A06 e ensaio físico com ELM327/ECU continuam não validados.
