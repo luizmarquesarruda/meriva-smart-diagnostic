@@ -125,7 +125,7 @@ export function getActiveCsvLogPaths(now = new Date()): string[] {
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const day = String(now.getDate()).padStart(2, '0');
   const date = `${year}-${month}-${day}`;
-  const currentDayPattern = new RegExp(\`obd_(?:raw|interpreted)_\${date}(?:\\.part-\\d{4})?\\.csv\`);
+  const currentDayPattern = new RegExp(`obd_(?:raw|interpreted)_${date}(?:\\.part-\\d{4})?\\.csv`);
 );
   const paths = new Set<string>(writingCsvPaths);
   for (const filePath of knownCsvPaths) {
