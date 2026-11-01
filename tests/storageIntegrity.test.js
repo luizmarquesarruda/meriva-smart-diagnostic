@@ -206,6 +206,8 @@ async function main() {
   files.set(previousPath, JSON.stringify({ ...legacy, schemaVersion: 1 }));
   const readRecovered = await history.readDriveCycles(base);
   assert.equal(readRecovered.length, 1, 'a leitura pode usar a cópia anterior validada sem escrever no índice principal');
+  await history.initializeDriveCycles(base);
+  assert.equal(files.get(indexPath), '{JSON CORROMPIDO', 'nem a inicialização pode substituir o JSON corrompido');
   assert.equal(files.get(indexPath), '{JSON CORROMPIDO', 'a leitura não pode substituir o JSON corrompido');
   assert.ok(health.getStorageHealthIssues().some((issue) => issue.code === 'HISTORY_CORRUPTED'));
 
