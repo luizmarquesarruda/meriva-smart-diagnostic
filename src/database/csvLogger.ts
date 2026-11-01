@@ -171,11 +171,13 @@ function splitCsvPath(filePath: string): { directory: string; stem: string; exte
   };
 }
 
-async function listCsvSegments(filePath: string): Promise<Array<{ part: number; path: string }>> {
+async function listCsvSegments(filePath: string, requireDirectory = false): Promise<Array<{ part: number; path: string }>> {
   const { directory, stem, extension } = splitCsvPath(filePath);
   const output: Array<{ part: number; path: string }> = [{ part: 1, path: filePath }];
   const marker = `${stem}.part-`;
-  const names = await FileSystem.readDirectoryAsync(directory).catch(() => []);
+  const names = requireDirectory
+    ? await FileSystem.readDirectoryAsync(directory)
+    : await FileSystem.readDirectoryAsync(directory).catch(() => []);
   for (const name of names) {
     if (!name.startsWith(marker) || !name.endsWith(extension)) continue;
     const part = Number(name.slice(marker.length, name.length - extension.length));
@@ -213,74 +215,82 @@ async function writeRowsUnsafe(filePath: string, rows: CsvRow[]): Promise<void> 
   writingCsvPaths.add(targetPath);
 
   try {
-  const info = await FileSystem.getInfoAsync(targetPath, { size: true });
-  if (!info.exists) {
-    const headers = Object.keys(rows[0]);
-    const lines = rows.map((row) => serializeRow(row, headers));
-    await FileSystem.writeAsStringAsync(targetPath, `${headers.join(',')}\n${lines.join('\n')}\n`, {
-      encoding: FileSystem.EncodingType.UTF8,
-    });
-    return;
-  }
-
-  const headerPreview = await FileSystem.readAsStringAsync(targetPath, {
-    encoding: FileSystem.EncodingType.UTF8,
-    position: 0,
-    length: 8192,
-  });
-  const firstNewline = headerPreview.indexOf('\n');
-  if (firstNewline < 0 && (info.size ?? 0) > headerPreview.length) {
-    throw new Error('CSV_HEADER_EXCEEDS_READ_WINDOW: ' + targetPath);
-  }
-  const headerLine = (firstNewline >= 0
-    ? headerPreview.slice(0, firstNewline)
-    : headerPreview).replace(/\r$/, '');
-  if (!headerLine.trim()) {
-    const headers = Object.keys(rows[0]);
-    const lines = rows.map((row) => serializeRow(row, headers));
-    await FileSystem.writeAsStringAsync(targetPath, `${headers.join(',')}\n${lines.join('\n')}\n`, {
-      encoding: FileSystem.EncodingType.UTF8,
-    });
-    return;
-  }
-  const oldHeaders = headerLine.split(',');
-  if (!oldHeaders.length || oldHeaders.some((header) => !header)) {
-    throw new Error('CSV_HEADER_INVALIDO: ' + targetPath);
-  }
-
-  const addedHeaders = Array.from(new Set(rows.flatMap((row) =>
-    Object.keys(row).filter((key) => !oldHeaders.includes(key)),
-  )));
-  if (addedHeaders.length > 0) {
-    const current = await FileSystem.readAsStringAsync(targetPath);
-    const records = parseCsvRecords(current);
-    if (!records.length || records[0].join(',') !== oldHeaders.join(',')) {
-      throw new Error('CSV_HEADER_CHANGED_DURING_SCHEMA_MIGRATION: ' + targetPath);
+    const info = await FileSystem.getInfoAsync(targetPath, { size: true });
+    if (!info.exists) {
+      const chunks = buildCsvSpoolChunks(rows);
+      for (const chunk of chunks) await writeCsvSpoolSegmentUnsafe(filePath, chunk);
+      return;
     }
-    const headers = [...oldHeaders, ...addedHeaders];
-    const existingLines = records.slice(1).map((oldRow) =>
-      headers.map((_, index) => formatCsvValue(oldRow[index] ?? '')).join(','),
-    );
-    const newLines = rows.map((row) => serializeRow(row, headers));
-    await FileSystem.writeAsStringAsync(targetPath, `${headers.join(',')}\n${[...existingLines, ...newLines].join('\n')}\n`, {
+
+    const headerPreview = await FileSystem.readAsStringAsync(targetPath, {
+      encoding: FileSystem.EncodingType.UTF8,
+      position: 0,
+      length: 8192,
+    });
+    const firstNewline = headerPreview.indexOf('\\n');
+    if (firstNewline < 0 && (info.size ?? 0) > headerPreview.length) {
+      throw new Error('CSV_HEADER_EXCEEDS_READ_WINDOW: ' + targetPath);
+    }
+    const headerLine = (firstNewline >= 0
+      ? headerPreview.slice(0, firstNewline)
+      : headerPreview).replace(/\\r$/, '');
+    if (!headerLine.trim()) {
+      if (info.size !== 0) throw new Error('CSV_HEADER_INVALIDO: ' + targetPath);
+      const chunks = buildCsvSpoolChunks(rows);
+      for (const chunk of chunks) await writeCsvSpoolSegmentUnsafe(filePath, chunk);
+      return;
+    }
+
+    const oldHeaders = headerLine.split(',');
+    if (!oldHeaders.length || oldHeaders.some((header) => !header)) {
+      throw new Error('CSV_HEADER_INVALIDO: ' + targetPath);
+    }
+
+    const addedHeaders = Array.from(new Set(rows.flatMap((row) =>
+      Object.keys(row).filter((key) => !oldHeaders.includes(key)),
+    )));
+    if (addedHeaders.length > 0) {
+      const current = await FileSystem.readAsStringAsync(targetPath);
+      const records = parseCsvRecords(current);
+      if (!records.length || records[0].join(',') !== oldHeaders.join(',')) {
+        throw new Error('CSV_HEADER_CHANGED_DURING_SCHEMA_MIGRATION: ' + targetPath);
+      }
+      const headers = [...oldHeaders, ...addedHeaders];
+      const existingLines = records.slice(1).map((oldRow) =>
+        headers.map((_, index) => formatCsvValue(oldRow[index] ?? '')).join(','),
+      );
+      const newLines = rows.map((row) => serializeRow(row, headers));
+      const updatedContent = `${headers.join(',')}\\n${[...existingLines, ...newLines].join('\\n')}\\n`;
+      if (utf8ByteLength(updatedContent) > MAX_CSV_SEGMENT_BYTES) {
+        const chunks = buildCsvSpoolChunks(rows, headers);
+        for (const chunk of chunks) await writeCsvSpoolSegmentUnsafe(filePath, chunk);
+        return;
+      }
+      await FileSystem.writeAsStringAsync(targetPath, updatedContent, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+      return;
+    }
+
+    const lines = rows.map((row) => serializeRow(row, oldHeaders));
+    const current = await FileSystem.readAsStringAsync(targetPath, {
       encoding: FileSystem.EncodingType.UTF8,
     });
-    return;
-  }
-
-  const lines = rows.map((row) => serializeRow(row, oldHeaders));
-  // The compatibility rewrite is now bounded by MAX_CSV_SEGMENT_BYTES.
-  const current = await FileSystem.readAsStringAsync(targetPath, {
-    encoding: FileSystem.EncodingType.UTF8,
-  });
-  const separator = current.length > 0 && !current.endsWith('\n') ? '\n' : '';
-  await FileSystem.writeAsStringAsync(targetPath, `${current}${separator}${lines.join('\n')}\n`, {
-    encoding: FileSystem.EncodingType.UTF8,
-  });
+    const separator = current.length > 0 && !current.endsWith('\\n') ? '\\n' : '';
+    const updatedContent = `${current}${separator}${lines.join('\\n')}\\n`;
+    if (utf8ByteLength(updatedContent) > MAX_CSV_SEGMENT_BYTES) {
+      const chunks = buildCsvSpoolChunks(rows, oldHeaders);
+      for (const chunk of chunks) await writeCsvSpoolSegmentUnsafe(filePath, chunk);
+      return;
+    }
+    await FileSystem.writeAsStringAsync(targetPath, updatedContent, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
   } finally {
     writingCsvPaths.delete(targetPath);
   }
 }
+
 function scheduleBatchFlush(): void {
   if (flushTimer) return;
   flushTimer = setTimeout(() => {
@@ -314,9 +324,9 @@ interface CsvSpoolChunk {
 }
 
 /** Keep each immutable overflow segment under the configured byte limit. */
-function buildCsvSpoolChunks(rows: CsvRow[]): CsvSpoolChunk[] {
+function buildCsvSpoolChunks(rows: CsvRow[], headersOverride?: string[]): CsvSpoolChunk[] {
   if (rows.length === 0) return [];
-  const headers = Array.from(new Set(rows.flatMap((row) => Object.keys(row))));
+  const headers = headersOverride ? [...headersOverride] : Array.from(new Set(rows.flatMap((row) => Object.keys(row))));
   const headerLine = `${headers.join(',')}\n`;
   const chunks: CsvSpoolChunk[] = [];
   let chunkRows: CsvRow[] = [];
@@ -355,7 +365,7 @@ async function writeCsvSpoolSegmentUnsafe(
   const { directory, stem, extension } = splitCsvPath(filePath);
   await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
 
-  const existingSegments = await listCsvSegments(filePath);
+  const existingSegments = await listCsvSegments(filePath, true);
   let nextPart = 1;
   for (const segment of existingSegments) {
     const info = await FileSystem.getInfoAsync(segment.path, { size: true });
