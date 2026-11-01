@@ -1,4 +1,5 @@
 import * as FileSystem from 'expo-file-system';
+import { isExpiredCleanupFile } from './cleanupPolicy';
 
 export async function cleanupOldLogs(basePath: string, retentionDays = 7): Promise<number> {
   const logsDir = `${basePath}/LOGS`;
@@ -7,13 +8,12 @@ export async function cleanupOldLogs(basePath: string, retentionDays = 7): Promi
 
   const files = await FileSystem.readDirectoryAsync(logsDir);
   const now = Date.now();
-  const cutoff = now - retentionDays * 24 * 60 * 60 * 1000;
   let removed = 0;
 
   for (const file of files) {
     const filePath = `${logsDir}/${file}`;
     const fileInfo = await FileSystem.getInfoAsync(filePath);
-    if ('modificationTime' in fileInfo && fileInfo.modificationTime && fileInfo.modificationTime * 1000 < cutoff) {
+    if ('modificationTime' in fileInfo && fileInfo.modificationTime && isExpiredCleanupFile('LOGS', fileInfo.modificationTime * 1000, now)) {
       await FileSystem.deleteAsync(filePath);
       removed++;
     }
@@ -29,13 +29,12 @@ export async function cleanupOldReadings(basePath: string, retentionDays = 30): 
 
   const files = await FileSystem.readDirectoryAsync(readingsDir);
   const now = Date.now();
-  const cutoff = now - retentionDays * 24 * 60 * 60 * 1000;
   let removed = 0;
 
   for (const file of files) {
     const filePath = `${readingsDir}/${file}`;
     const fileInfo = await FileSystem.getInfoAsync(filePath);
-    if ('modificationTime' in fileInfo && fileInfo.modificationTime && fileInfo.modificationTime * 1000 < cutoff) {
+    if ('modificationTime' in fileInfo && fileInfo.modificationTime && isExpiredCleanupFile('LEITURAS', fileInfo.modificationTime * 1000, now)) {
       await FileSystem.deleteAsync(filePath);
       removed++;
     }

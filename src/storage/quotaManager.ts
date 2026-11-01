@@ -1,5 +1,6 @@
 import * as FileSystem from 'expo-file-system';
 import { flushCsvLogs } from '../database/csvLogger';
+import { CLEANUP_DIRECTORIES, sortCleanupCandidates } from './cleanupPolicy';
 
 export interface StorageQuotaConfig {
   limitMb: number;
@@ -58,12 +59,12 @@ async function cleanupToTarget(basePath: string, targetBytes: number): Promise<{
   if (usedBytes <= targetBytes) return { removed: 0, usedBytes };
 
   const candidates: DeletableStorageFile[] = [];
-  for (const directory of ['LOGS', 'LEITURAS']) {
+  for (const directory of CLEANUP_DIRECTORIES) {
     await collectDeletableFiles(`${basePath}/${directory}`, candidates);
   }
-  candidates.sort((a, b) => a.modifiedAt - b.modifiedAt);
+  const orderedCandidates = sortCleanupCandidates(candidates);
   let removed = 0;
-  for (const item of candidates) {
+  for (const item of orderedCandidates) {
     if (usedBytes <= targetBytes) break;
     await FileSystem.deleteAsync(item.path, { idempotent: true });
     usedBytes = Math.max(0, usedBytes - item.size);
