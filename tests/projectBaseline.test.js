@@ -92,6 +92,7 @@ const requiredSuites = [
   'permissions.test.js',
   'screenTheme.test.js',
   'maintenanceRules.test.js',
+  'csvSpoolDurability.test.js',
 ];
 const scriptedTests = new Set(testCommand.map((command) => {
   const match = command.match(/^node tests\/([A-Za-z0-9._-]+)$/);
@@ -179,6 +180,11 @@ assert.match(read('src/obd/dtcParser.ts'), /validAdditiveChecksum/);
 assert.match(read('src/storage/driveCycleStorage.ts'), /HISTORICO_DE_VIAGENS_CORROMPIDO/);
 assert.match(read('src/storage/driveCycleStorage.ts'), /indexWriteQueues/);
 assert.match(read('src/database/csvLogger.ts'), /MAX_PENDING_CSV_ROWS/);
+assert.match(read('src/database/csvLogger.ts'), /writeCsvSpoolSegmentUnsafe/);
+assert.match(read('src/database/csvLogger.ts'), /getCsvLogSegments/);
+assert.match(read('src/database/csvLogger.ts'), /buildCsvSpoolChunks/);
+assert.doesNotMatch(read('src/database/csvLogger.ts'), /\\.queue-/,
+  'durable overflow must use canonical CSV segments rather than orphan queue files');
 assert.match(read('app/armazenamento.tsx'), /csvQueueStatus\.droppedRows/);
 assert.match(read('app/armazenamento.tsx'), /csvQueueStatus\.pendingRows/);
 assert.match(read('src/database/csvLogger.ts'), /parseCsvRecords/);
