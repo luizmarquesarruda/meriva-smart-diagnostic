@@ -119,6 +119,17 @@ Resposta conhecida de referência: 41 0C 1A F8.
 RPM = ((0x1A * 256) + 0xF8) / 4 = 1726 rpm.
 Uma conexão Bluetooth sem 410C não deve ser chamada de ECU OK.
 
+## Observabilidade do fallback de protocolo
+
+Quando a primeira consulta `010C` não validar a ECU, cada protocolo alternativo precisa ser rastreável sem alterar a negociação:
+
+- `ELM_PROTOCOL_FALLBACK_START` identifica o protocolo tentado e a resposta ECU imediatamente anterior.
+- `ELM_PROTOCOL_FALLBACK_SET_RESULT` registra o resultado real de `ATSPx`, duração e RX. Se o comando falhar, a tentativa termina sem sondar a ECU naquele protocolo.
+- `ELM_PROTOCOL_FALLBACK_ECU_PROBE_RESULT` registra status, duração, RX, resultado do parser e se a resposta satisfaz o gate `41 0C`.
+- `ELM_PROTOCOL_FALLBACK_SUMMARY` agrega as tentativas e o protocolo aceito, separando a primeira sonda de `010C` do resultado final.
+
+Esses eventos são evidência diagnóstica do software, não prova de que um protocolo é suportado pela ECU física. A aceitação continua exigindo payload real e válido de `010C`. Não se deve inferir sucesso por `ATSPx = OK`, resposta `ATDP`, nome do adaptador ou Bluetooth conectado. A instrumentação não altera ordem de fallback, limites de retry ou timeout.
+
 ## Timing
 O ELM327 possui seu próprio temporizador de resposta. ATST usa unidades de aproximadamente 4 ms. O ELM também possui adaptive timing.
 
