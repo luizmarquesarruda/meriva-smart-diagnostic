@@ -129,7 +129,7 @@ Module._load = function(request) {
   if (request === './historyIndexMigrations') return migrationExports;
   if (request === './storageHealth') return healthExports;
   if (request === '../database/csvLogger') {
-    return { appendCsvRow: async (filePath, row) => csvRows.push({ filePath, row }) };
+    return { appendCsvRow: async (filePath, row) => csvRows.push({ filePath, row }), flushCsvLogs: async () => undefined };
   }
   return originalLoad.apply(this, arguments);
 };
@@ -157,6 +157,7 @@ const health = loadTs('src/storage/storageHealth.ts');
 healthExports = health;
 const history = loadTs('src/storage/driveCycleStorage.ts');
 const benchmark = loadTs('src/storage/historyBenchmark.ts');
+const backup = loadTs('src/storage/backup.ts');
 
 function makeTrip(id) {
   return {
@@ -242,6 +243,40 @@ async function main() {
   const report = Array.from(exportFiles.values()).find((value) => value.includes('RELATÓRIO DE MEDIÇÃO DO HISTÓRICO'));
   assert.ok(report && report.includes('ADB dumpsys meminfo'));
   assert.equal(files.get(indexPath), beforeBenchmark, 'exportar relatório também não pode alterar o histórico');
+
+  const backupBase = '/doc/BACKUP_POLICY_TEST';
+  for (const directory of ['BANCO', 'LEITURAS', 'LOGS', 'VIAGENS']) {
+    ensureDirectory(backupBase + '/' + directory);
+    files.set(backupBase + '/' + directory + '/' + directory.toLowerCase() + (directory === 'BANCO' ? '.json' : '.csv'), 'conteúdo');
+  }
+  const createdBackup = await backup.createBackup(backupBase);
+  assert.ok(createdBackup.includes === undefined || !createdBackup.includes.includes('LEITURAS'));
+  assert.ok(!createdBackup.includes.includes('LOGS'), 'novos backups não devem copiar CSVs brutos de LOGS');
+  assert.ok(files.has(backupBase + '/LEITURAS/leituras.csv'), 'a política de backup não pode apagar a origem LEITURAS');
+  assert.ok(files.has(backupBase + '/LOGS/logs.csv'), 'a política de backup não pode apagar a origem LOGS');
+
+  const backupRoot = backupBase + '/BACKUP';
+  const legacyName = 'meriva_smart_2026-10-30T00-00-00-000Z';
+  const legacyRoot = backupRoot + '/' + legacyName;
+  const legacyDirectories = [];
+  let legacySize = 0;
+  for (const directory of ['LEITURAS', 'LOGS']) {
+    ensureDirectory(legacyRoot + '/' + directory);
+    const content = 'CSV legado preservado';
+    files.set(legacyRoot + '/' + directory + '/historico.csv', content);
+    const sizeBytes = Buffer.byteLength(content, 'utf8');
+    legacySize += sizeBytes;
+    legacyDirectories.push({ directory, sizeBytes });
+  }
+  files.set(legacyRoot + '/manifest.json', JSON.stringify({
+    schemaVersion: 1,
+    createdAt: '2026-10-30T00:00:00.000Z',
+    payloadSizeBytes: legacySize,
+    directories: legacyDirectories,
+  }));
+  const listedBackups = await backup.listVerifiedBackups(backupBase);
+  assert.ok(listedBackups.some((item) => item.name === legacyName),
+    'backups antigos com LEITURAS/LOGS devem continuar válidos para restauração');
 
   Module._load = originalLoad;
   console.log('storageIntegrity.test.js: PASS');
