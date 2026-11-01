@@ -120,10 +120,14 @@ const fakeFileSystem = {
 };
 
 const platform = { Platform: { OS: 'android', Version: 36 } };
+let migrationExports = null;
+let healthExports = null;
 const originalLoad = Module._load;
 Module._load = function(request) {
   if (request === 'expo-file-system') return fakeFileSystem;
   if (request === 'react-native') return platform;
+  if (request === './historyIndexMigrations') return migrationExports;
+  if (request === './storageHealth') return healthExports;
   if (request === '../database/csvLogger') {
     return { appendCsvRow: async (filePath, row) => csvRows.push({ filePath, row }) };
   }
@@ -148,7 +152,9 @@ function loadTs(relativePath) {
 }
 
 const migrations = loadTs('src/storage/historyIndexMigrations.ts');
+migrationExports = migrations;
 const health = loadTs('src/storage/storageHealth.ts');
+healthExports = health;
 const history = loadTs('src/storage/driveCycleStorage.ts');
 const benchmark = loadTs('src/storage/historyBenchmark.ts');
 
