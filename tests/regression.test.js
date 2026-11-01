@@ -1296,8 +1296,8 @@ async function testBackupRestore() {
   assert.ok(restored.safetyBackupName.startsWith('meriva_smart_'),
     'restauração deve criar uma cópia de segurança do estado anterior');
   const safetyManifest = JSON.parse(files.get(`${BASE}/BACKUP/${restored.safetyBackupName}/manifest.json`));
-  assert.deepStrictEqual(safetyManifest.directories.map((entry) => entry.directory), ['MANUTENCAO'],
-    'a cópia de segurança deve cobrir exatamente os diretórios substituídos pela restauração');
+  assert.deepStrictEqual(safetyManifest.directories.map((entry) => entry.directory), created.includes,
+    'a cópia de segurança deve cobrir exatamente os diretórios presentes no snapshot restaurado');
 
   await fakeFS.writeAsStringAsync(`${BASE}/BACKUP/${backupName}/MANUTENCAO/registros.json`, 'tampered');
   const verifiedAfterTamper = await backup.listVerifiedBackups(BASE);
@@ -1370,7 +1370,7 @@ async function testPidAndLearningWriteSerialization() {
   assert.strictEqual(discovered.find((item) => item.pid === '010C').status, 'CONFIRMADO');
 
   const learning = loadTs(path.join(ROOT, 'src/database/learningProfile.ts'));
-  await learning.createLearningProfile(BASE, '');  
+  await learning.createLearningProfile(BASE, '2026-09-24T14:48:00.000Z');  
   await Promise.all([
     learning.updateLearningProfileRealSample(BASE, 'RPM', 1000, 'IDLE_WARM'),
     learning.updateLearningProfileRealSample(BASE, 'RPM', 1100, 'IDLE_WARM'),
