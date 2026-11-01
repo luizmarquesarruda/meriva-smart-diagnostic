@@ -120,9 +120,28 @@ export async function measureHistoryStorage(
   const cycles = migrated.document.cycles;
   if (!Array.isArray(cycles)) throw new Error('INDICE_DE_VIAGENS_INVALIDO; MEDICAO_CANCELADA');
 
-  const ids = cycles
-    .map((cycle) => typeof cycle === 'object' && cycle !== null ? (cycle as { id?: unknown }).id : null)
-    .filter((id): id is string => typeof id === 'string');
+  const validTrip = (cycle: unknown): cycle is { id: string; telemetrySamples?: unknown } => {
+    if (typeof cycle !== 'object' || cycle === null || Array.isArray(cycle)) return false;
+    const item = cycle as Record<string, unknown>;
+    const validDate = (value: unknown): boolean =>
+      typeof value === 'string' && Number.isFinite(Date.parse(value));
+    const finiteNonNegative = (value: unknown): boolean =>
+      typeof value === 'number' && Number.isFinite(value) && value >= 0;
+    return typeof item.id === 'string' && item.id.length > 0 &&
+      validDate(item.startedAt) && validDate(item.finishedAt) &&
+      finiteNonNegative(item.distanceTotalKm) &&
+      finiteNonNegative(item.distanceIceKm) &&
+      finiteNonNegative(item.fuelUsedL) &&
+      finiteNonNegative(item.avgDrivingSpeedKmh) &&
+      finiteNonNegative(item.avgFuelConsumptionKml) &&
+      ['REAL_OBD', 'SIMULACAO', 'CARSCANNER_SEED'].includes(String(item.source)) &&
+      (item.telemetrySamples === undefined || Array.isArray(item.telemetrySamples));
+  };
+  if (!cycles.every(validTrip)) {
+    throw new Error('HISTORICO_CONTEM_VIAGEM_INVALIDA; MEDICAO_CANCELADA');
+  }
+
+  const ids = cycles.map((cycle) => cycle.id);
   const uniqueTripIds = new Set(ids).size;
   const telemetrySamples = cycles.reduce((total, cycle) => {
     const samples = typeof cycle === 'object' && cycle !== null
@@ -136,7 +155,7 @@ export async function measureHistoryStorage(
   const restoreTimes: number[] = [];
   const stamp = Date.now() + '-' + Math.random().toString(16).slice(2);
   const writeScratch = root + '/.history-benchmark-write-' + stamp + '.tmp';
-  const restoreScratch = root + '/.history-benchmark-restore-' + stamp + '.tmp';
+  const restoreScratchPaths: string[] = [];
   let integrity: 'OK' | 'FAILED' = 'OK';
 
   try {
@@ -160,6 +179,8 @@ export async function measureHistoryStorage(
       writeReadbackTimes.push(Date.now() - writeStarted);
 
       const restoreStarted = Date.now();
+      const restoreScratch = root + '/.history-benchmark-restore-' + stamp + '-' + index + '.tmp';
+      restoreScratchPaths.push(restoreScratch);
       await FileSystem.copyAsync({ from: writeScratch, to: restoreScratch });
       const restored = await FileSystem.readAsStringAsync(restoreScratch, { encoding: FileSystem.EncodingType.UTF8 });
       if (restored !== raw) {
@@ -170,7 +191,9 @@ export async function measureHistoryStorage(
     }
   } finally {
     await FileSystem.deleteAsync(writeScratch, { idempotent: true }).catch(() => undefined);
-    await FileSystem.deleteAsync(restoreScratch, { idempotent: true }).catch(() => undefined);
+    await Promise.all(restoreScratchPaths.map((path) =>
+      FileSystem.deleteAsync(path, { idempotent: true }).catch(() => undefined),
+    ));
   }
 
   const csv = await measureDirectory(root, (path) => path.toLowerCase().endsWith('.csv'));
