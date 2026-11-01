@@ -38,13 +38,14 @@ assert.equal(packageJson.scripts['gate:baseline'], 'node tests/projectBaseline.t
 assert.match(workflow, /name: Run anti-regression baseline gate[\s\S]*?run: npm run gate:baseline/);
 assert.match(workflow, /group: ci-\$\{\{ github\.workflow \}\}-\$\{\{ github\.event\.pull_request\.head\.repo\.full_name \|\| github\.repository \}\}-\$\{\{ github\.head_ref \|\| github\.ref_name \}\}/,
   'push and pull_request for the same branch must share one CI concurrency group');
-// CI security: APK artifacts are uploaded only from main; pull requests and non-main refs never publish them.
+// CI security: publish APK artifacts from main and same-repository PRs only; never from fork PRs.
 assert.doesNotMatch(workflow, /^\s*publish-release\s*:/m, 'CI must never create public GitHub Releases automatically');
 assert.doesNotMatch(workflow, /^\s*contents:\s*write\s*$/m, 'the build workflow must not request write access to repository contents');
-assert.match(workflow, /- name: Upload Android APK artifact \(public main only\)\n\s+if: \$\{\{ github\.ref == 'refs\/heads\/main' \}\}\n\s+uses: actions\/upload-artifact@/, 'APK artifact upload must be explicitly restricted to main');
+assert.match(workflow, /- name: Upload Android APK artifact \(main or same-repository PR\)\n\s+if: \$\{\{ github\.ref == 'refs\/heads\/main' \|\| \(github\.event_name == 'pull_request' && github\.event\.pull_request\.head\.repo\.full_name == github\.repository\) \}\}\n\s+uses: actions\/upload-artifact@/, 'APK upload must be limited to main and pull requests originating in this repository');
+assert.match(workflow, /github\.event\.pull_request\.head\.repo\.full_name == github\.repository/, 'fork pull requests must not publish APK artifacts');
 assert.doesNotMatch(workflow, /github\.event\.repository\.visibility/, 'APK artifact upload must not depend on repository visibility');
-assert.match(workflow, /github\.ref == 'refs\/heads\/main'/, 'APK artifact upload must be limited to main');
-assert.match(workflow, /retention-days:\s*14\b/, 'public main APK artifacts must be retained for 14 days');
+assert.match(workflow, /github\.ref == 'refs\/heads\/main'/, 'main must continue to publish the APK artifact');
+assert.match(workflow, /retention-days:\s*14\b/, 'APK artifacts must be retained for 14 days');
 assert.match(workflow, /sha256sum android\/app\/build\/outputs\/apk\/release\/app-release\.apk/, 'the APK must have a verifiable SHA-256 checksum');
 assert.match(workflow, /actions\/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1/);
 assert.match(workflow, /actions\/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1/);

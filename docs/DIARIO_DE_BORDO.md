@@ -1,9 +1,10 @@
 ## ESTADO VIGENTE — 2026-10-31 (P0/P1 robustez de viagens, JSON, backup, Bluetooth e GPS)
 
+- DB-202 — Publicação do APK também em PRs do próprio repositório; forks continuam sem upload. A execução de PR #109 anterior compilou e verificou o APK, mas não publicou artefato porque a condição estava limitada à `main`.
 - DB-201 — Testes JSON alinhados ao contrato: erros explícitos na leitura direta de corrupção, defaults somente em memória nas telas e bloqueio de escrita sobre schema futuro.
 - DB-200 — Teste Bluetooth atualizado para verificar retries limitados no `bluetoothManager` e uma única descoberta de pareados por varredura; não foi alterada a lógica de conexão.
-- DB-199 — Gate de baseline alinhado à política de APK público: exige upload somente na `main`, não exige visibilidade privada e confere retenção de 14 dias.
-- A execução de PR continua validando TypeScript, testes e build Android sem publicar o APK; nenhum Release automático ou permissão de escrita foi adicionado.
+- DB-199 — Gate de baseline alinhado à política de APK público: não exige visibilidade privada, bloqueia Releases automáticas e confere retenção de 14 dias.
+- DB-202 amplia o upload de APK: `main` e PRs originadas neste repositório publicam artefatos; PRs de forks apenas compilam e validam, sem upload.
 - DB-198 — Política de artefato CI: compilar e verificar APK em PRs, mas publicar o APK e SHA-256 somente em execuções da branch `main`, com retenção de 14 dias.
 - A alteração reconcilia a regra de upload com a decisão de manter o artefato público sem criar Releases automáticas nem publicar APKs de branches de trabalho.
 - DB-197 — Branch de integração: `fix/storage-and-history-integrity-20261031`, sobre o estado de `main` documentado em 31/10/2026. Escopo ampliado para preservar viagens pendentes, endurecer JSON local, coordenar snapshots, cancelar descoberta Bluetooth e manter GPS foreground em falha de background.
@@ -316,6 +317,7 @@
 - **DB-199** · 2026-10-31 — Alinhar gate de CI à política do APK público
 - **DB-200** · 2026-10-31 — Sincronizar teste de retry Bluetooth com o ponto real de implementação
 - **DB-201** · 2026-10-31 — Cobrir fallback não destrutivo e proteção de schema futuro nos testes JSON
+- **DB-202** · 2026-10-31 — Publicar artefato APK nas PRs do próprio repositório
 ---
 
 Este arquivo é o registro operacional das correções, auditorias e decisões técnicas do projeto.
@@ -5104,3 +5106,11 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - Acrescentada verificação de que uma gravação explícita por uma versão antiga é rejeitada quando o arquivo contém schema futuro, preservando o conteúdo byte a byte.
 - As correções ajustam expectativas de teste ao contrato implementado; não alteram produção nem enfraquecem a proteção contra perda de dados.
 - Repetir CI completa no SHA desta atualização; não mesclar antes de `validate` e `android-build` verdes.
+
+## DB-202 · 2026-10-31 — Publicar artefato APK nas PRs do próprio repositório
+
+- A execução anterior da PR #109 concluiu `validate` e `android-build`, inclusive a verificação do APK e do SHA-256, mas a etapa de upload foi ignorada pela condição exclusiva de `main`; por isso nenhum artefato ficou disponível para download.
+- O workflow agora publica o APK standalone e seu checksum em execuções de `main` e em PRs cuja branch de origem pertença ao próprio repositório.
+- PRs originadas em forks continuam sem upload de artefato; o build e a validação permanecem executados normalmente.
+- Retenção de 14 dias; sem GitHub Release automática e sem permissão `contents: write`.
+- A CI precisa executar novamente no novo SHA e confirmar o artefato na lista da execução. O APK anterior não foi guardado como artefato e não pode ser recuperado dessa execução.

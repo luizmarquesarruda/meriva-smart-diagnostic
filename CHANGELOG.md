@@ -2,9 +2,10 @@
 
 ## Unreleased
 
+- CI/Android: publica o APK standalone e SHA-256 em `main` e em PRs originadas no próprio repositório; PRs de forks não publicam artefatos. Retenção de 14 dias, sem Release automática.
 - Persistência JSON: atualiza regressões para exigir erro explícito em leitura direta de perfil corrompido e fallback de interface somente em memória, sem sobrescrever arquivos corrompidos ou schemas futuros.
 - Bluetooth: atualiza o teste de retry para validar a implementação limitada em `bluetoothManager.ts` e a reutilização da lista de pareados durante a varredura.
-- CI: alinha o gate de baseline à política de APK público somente na `main`, sem exigir repositório privado, e valida a retenção de 14 dias.
+- CI: o gate de baseline valida a publicação de APK na `main` e em PRs do mesmo repositório, sem exigir visibilidade privada nem permitir upload de forks.
 
 - CI: mantém a publicação do APK standalone e do SHA-256 como artefato somente na branch main, inclusive no repositório público, com retenção de 14 dias; PRs continuam compilando e verificando sem publicar artefatos.
 
