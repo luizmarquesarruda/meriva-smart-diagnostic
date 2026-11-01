@@ -177,7 +177,14 @@ assert.match(read('src/obd/dtcParser.ts'), /validAdditiveChecksum/);
 assert.match(read('src/storage/driveCycleStorage.ts'), /HISTORICO_DE_VIAGENS_CORROMPIDO/);
 assert.match(read('src/storage/driveCycleStorage.ts'), /indexWriteQueues/);
 assert.match(read('src/database/csvLogger.ts'), /MAX_PENDING_CSV_ROWS/);
-assert.match(read('app/armazenamento.tsx'), /csvQueueStatus\.droppedRows/);
+assert.match(read('src/database/csvLogger.ts'), /recordStorageHealthIssue\('CSV_ROWS_DROPPED'/,
+  'descarte de linhas CSV deve gerar aviso de integridade');
+assert.match(healthScreen, /getStorageHealthIssues/,
+  'Central de Saúde deve ser a fonte canônica de avisos de armazenamento');
+assert.match(healthScreen, /storageIssues\.map/,
+  'Central de Saúde deve listar avisos de armazenamento sem duplicá-los em outras telas');
+assert.doesNotMatch(read('app/armazenamento.tsx'), /csvQueueStatus\.droppedRows/,
+  'Armazenamento não deve duplicar o aviso de descarte apresentado na Central de Saúde');
 assert.match(read('app/armazenamento.tsx'), /csvQueueStatus\.pendingRows/);
 assert.match(read('src/database/csvLogger.ts'), /parseCsvRecords/);
 assert.match(read('src/storage/quotaManager.ts'), /cleanupToTarget/);
