@@ -1,6 +1,6 @@
 import * as FileSystem from 'expo-file-system';
 import { readJsonWithRecovery, writeJsonAtomically } from '../storage/atomicJsonFile';
-import { recordStorageHealthIssue } from '../storage/storageHealth';
+import { getStorageHealthIssues, recordStorageHealthIssue } from '../storage/storageHealth';
 import type {
   ConfidenceLevel,
   SampleStatistics,
@@ -305,7 +305,13 @@ export async function createLearningProfile(
     },
   };
 
-  await saveLearningProfile(basePath, profile);
+  const blockedByFileIntegrity = getStorageHealthIssues().some((issue) =>
+    issue.id === 'JSON_CORRUPTED:APRENDIZADO/dna_meriva.json' ||
+    issue.id === 'FUTURE_SCHEMA:APRENDIZADO/dna_meriva.json',
+  );
+  if (!blockedByFileIntegrity) await saveLearningProfile(basePath, profile);
+  // Sem confiança para gravar, devolve apenas um perfil em memória e mantém
+  // o arquivo existente intacto; a ausência de persistência não bloqueia o OBD.
   return profile;
 }
 
