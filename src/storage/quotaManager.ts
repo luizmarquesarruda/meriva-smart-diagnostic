@@ -1,5 +1,6 @@
 import * as FileSystem from 'expo-file-system';
 import { flushCsvLogs } from '../database/csvLogger';
+import { clearStorageHealthIssue, recordStorageHealthIssue } from './storageHealth';
 
 export interface StorageQuotaConfig {
   limitMb: number;
@@ -108,6 +109,7 @@ export async function checkStorageQuota(
   if (percentUsed >= 1 && config.autoCleanupEnabled && targetMb != null && targetMb < limitMb) {
     try {
       const result = await cleanupToTarget(basePath, targetMb * MB);
+      clearStorageHealthIssue('CLEANUP_FAILED');
       ({ usedMb, limitMb } = await getStorageUsage(basePath, config.limitMb));
       percentUsed = usedMb / limitMb;
       cleanupNote = result.removed > 0
@@ -117,8 +119,9 @@ export async function checkStorageQuota(
         cleanupNote += ` Meta de ${targetMb} MB não atingida sem remover dados não descartáveis.`;
       }
     } catch (cause) {
-      cleanupNote = ' FALHA NA LIMPEZA/VERIFICAÇÃO: ' +
-        (cause instanceof Error ? cause.message : String(cause));
+      const detail = cause instanceof Error ? cause.message : String(cause);
+      recordStorageHealthIssue('CLEANUP_FAILED', 'Falha na limpeza automática', detail, 'warning');
+      cleanupNote = ' FALHA NA LIMPEZA/VERIFICAÇÃO: ' + detail;
     }
   }
 
