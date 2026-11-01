@@ -53,7 +53,7 @@ export default function SaudeScreen() {
       <Text style={styles.section}>INTEGRIDADE DO ARMAZENAMENTO</Text>
       <View style={styles.storageHealthPanel}>
         {storageIssues.map((issue)=>(
-          <View key={issue.code} style={styles.storageHealthItem}>
+          <View key={issue.id} style={styles.storageHealthItem}>
             <Text style={issue.severity==='critical'?styles.storageHealthCritical:styles.storageHealthWarning}>{issue.title}</Text>
             <Text style={styles.storageHealthMessage}>{issue.message}</Text>
           </View>
