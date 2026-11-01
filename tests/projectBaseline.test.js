@@ -183,8 +183,10 @@ assert.match(read('src/database/csvLogger.ts'), /MAX_PENDING_CSV_ROWS/);
 assert.match(read('src/database/csvLogger.ts'), /writeCsvSpoolSegmentUnsafe/);
 assert.match(read('src/database/csvLogger.ts'), /getCsvLogSegments/);
 assert.match(read('src/database/csvLogger.ts'), /buildCsvSpoolChunks/);
-assert.doesNotMatch(read('src/database/csvLogger.ts'), /\\.queue-/,
-  'durable overflow must use canonical CSV segments rather than orphan queue files');
+assert.match(read('src/database/csvLogger.ts'), /name\\.startsWith\\(stem \\+ '\\.queue-'\\)/,
+  'pre-upgrade CSV queue files must remain readable for recovery');
+assert.doesNotMatch(read('src/database/csvLogger.ts'), /queuedCsvPath|\\.queue-\\$\\{/,
+  'new durable overflow writes must use canonical CSV segments, not legacy queue files');
 assert.match(read('app/armazenamento.tsx'), /csvQueueStatus\.droppedRows/);
 assert.match(read('app/armazenamento.tsx'), /csvQueueStatus\.pendingRows/);
 assert.match(read('src/database/csvLogger.ts'), /parseCsvRecords/);
